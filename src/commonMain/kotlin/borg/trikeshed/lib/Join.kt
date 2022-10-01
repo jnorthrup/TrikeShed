@@ -13,10 +13,15 @@ interface Join<A, B> {
         get() = Pair(a, b)
 
     companion object {
-        operator fun <A, B> invoke(a: A, b: B) = object : Join<A, B> {
-            override val a: A = a
-            override val b: B = b
-        } as Join<A, B>
+        operator fun <A, B> invoke(a1: A, b1: B) = object : Join<A, B> {
+            override val a get() = a1
+            override val b get() = b1
+        }
     }
 }
-operator fun <A, B> A.plus(other: B): Join<A, B> = Join(this, other)
+
+/**
+ * exactly like "to" for "Join" but with a different (and shorter!) name
+ */
+infix fun <A, B> A.j(b: B): Join<A, B> = Join(this, b)
+

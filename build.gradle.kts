@@ -10,6 +10,11 @@ repositories {
 }
 
 kotlin {
+
+
+
+
+
     val hostOs = System.getProperty("os.name")
     val isMingwX64 = hostOs.startsWith("Windows")
     val nativeTarget = when {
@@ -18,6 +23,7 @@ kotlin {
         isMingwX64 -> mingwX64("native")
         else -> throw GradleException("Host OS is not supported in Kotlin/Native.")
     }
+
 
     nativeTarget.apply {
         binaries {
@@ -29,5 +35,11 @@ kotlin {
     sourceSets {
         val nativeMain by getting
         val nativeTest by getting
+        //add dep for  kotlinx.datetime.*
+        val commonMain by getting {
+            dependencies {
+                implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.4.0")
+            }
+        }
     }
 }

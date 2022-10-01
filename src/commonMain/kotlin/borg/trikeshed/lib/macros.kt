@@ -2,7 +2,7 @@ package borg.trikeshed.lib
 
 
 object s_  {
-      operator fun <  T> get(vararg t: T): Series<T> = t.size + t::get
+      operator fun <  T> get(vararg t: T): Series<T> = t.size j t::get
 }
 
 
@@ -24,7 +24,7 @@ object _a {
     inline operator fun get(vararg t: ULong): ULongArray = t
     inline operator fun get(vararg t: Float): FloatArray = t
     inline operator fun get(vararg t: Double): DoubleArray = t
-    inline operator fun <T> get(vararg t: T): Array<T> = t as Array<T>
+    inline operator fun <T> get(vararg t: T): Array<out T> =t
 }
 //
 ///**
