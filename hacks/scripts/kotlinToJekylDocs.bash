@@ -203,6 +203,8 @@ else
     exit 1
 fi
 
+exit 1
+
 # pushd to /tmp and git clone the project to tmp folder and checkout the gh-pages branch
 
 pushd /tmp
