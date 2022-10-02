@@ -17,10 +17,6 @@ fi
 # store the new CWD in GRADLEPROJROOT  var for later when we git clone the gh-pages branch in tmp
 export GRADLEPROJROOT=$(pwd)
 
-
-
-done
-
 # check if the gradle project is kotlin or groovy dialect
 
 if [[ -f build.gradle.kts ]]; then
