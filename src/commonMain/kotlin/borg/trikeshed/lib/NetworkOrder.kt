@@ -46,92 +46,72 @@ fun ByteArray.networkOrderSetLongAt(i: Int, value: Long) {
     this[i + 7] = value.toByte()
 }
 
-fun ByteArray.networkOrderGetShortAt(i: Int): Short {
-    return (this[i].toInt() shl 8 or (this[i + 1].toInt() and 0xff)).toShort()
-}
+fun ByteArray.networkOrderGetShortAt(i: Int): Short =
+    (this[i].toInt() shl 8 or (this[i + 1].toInt() and 0xff)).toShort()
 
 fun ByteArray.networkOrderSetShortAt(i: Int, value: Short) {
     this[i] = (value.toInt() shr 8).toByte()
     this[i + 1] = value.toByte()
 }
 
-fun ByteArray.networkOrderGetFloatAt(i: Int): Float {
-    return Float.fromBits(this.networkOrderGetIntAt(i))
-}
+fun ByteArray.networkOrderGetFloatAt(i: Int): Float = Float.fromBits(this.networkOrderGetIntAt(i))
 
 
 fun ByteArray.networkOrderSetFloatAt(i: Int, value: Float) {
     this.networkOrderSetIntAt(i, value.toBits())
 }
 
-fun ByteArray.networkOrderGetDoubleAt(i: Int): Double {
-    return Double.fromBits(this.networkOrderGetLongAt(i))
-}
+fun ByteArray.networkOrderGetDoubleAt(i: Int): Double = Double.fromBits(this.networkOrderGetLongAt(i))
 
 
 fun ByteArray.networkOrderSetDoubleAt(i: Int, value: Double) {
     this.networkOrderSetLongAt(i, value.toBits())
 }
 
-fun ByteArray.networkOrderGetCharAt(i: Int): Char {
-    return this.networkOrderGetShortAt(i).toChar()
-}
+fun ByteArray.networkOrderGetCharAt(i: Int): Char = this.networkOrderGetShortAt(i).toChar()
 
 fun ByteArray.networkOrderSetCharAt(i: Int, value: Char) {
     this.networkOrderSetShortAt(i, value.toShort())
 }
 
-fun ByteArray.networkOrderGetBooleanAt(i: Int): Boolean {
-    return this[i] != 0.toByte()
-}
+fun ByteArray.networkOrderGetBooleanAt(i: Int): Boolean = this[i] != 0.toByte()
 
 fun ByteArray.networkOrderSetBooleanAt(i: Int, value: Boolean) {
     this[i] = if (value) 1.toByte() else 0.toByte()
 }
 
-fun ByteArray.networkOrderGetByteAt(i: Int): Byte {
-    return this[i]
-}
+fun ByteArray.networkOrderGetByteAt(i: Int): Byte = this[i]
 
 fun ByteArray.networkOrderSetByteAt(i: Int, value: Byte) {
     this[i] = value
 }
 
-fun ByteArray.networkOrderGetUByteAt(i: Int): UByte {
-    return this[i].toUByte()
-}
+fun ByteArray.networkOrderGetUByteAt(i: Int): UByte = this[i].toUByte()
 
 fun ByteArray.networkOrderSetUByteAt(i: Int, value: UByte) {
     this[i] = value.toByte()
 }
 
-fun ByteArray.networkOrderGetUShortAt(i: Int): UShort {
-    return this.networkOrderGetShortAt(i).toUShort()
-}
+fun ByteArray.networkOrderGetUShortAt(i: Int): UShort = this.networkOrderGetShortAt(i).toUShort()
 
 fun ByteArray.networkOrderSetUShortAt(i: Int, value: UShort) {
     this.networkOrderSetShortAt(i, value.toShort())
 }
 
-fun ByteArray.networkOrderGetUIntAt(i: Int): UInt {
-    return this.networkOrderGetIntAt(i).toUInt()
-}
+fun ByteArray.networkOrderGetUIntAt(i: Int): UInt = this.networkOrderGetIntAt(i).toUInt()
 
 fun ByteArray.networkOrderSetUIntAt(i: Int, value: UInt) {
     this.networkOrderSetIntAt(i, value.toInt())
 }
 
-fun ByteArray.networkOrderGetULongAt(i: Int): ULong {
-    return this.networkOrderGetLongAt(i).toULong()
-}
+fun ByteArray.networkOrderGetULongAt(i: Int): ULong = this.networkOrderGetLongAt(i).toULong()
 
 fun ByteArray.networkOrderSetULongAt(i: Int, value: ULong) {
     this.networkOrderSetLongAt(i, value.toLong())
 }
 
-fun ByteArray.networkOrderGetUByteArrayAt(i: Int, length: Int): UByteArray {
-    return UByteArray(length) { this.networkOrderGetUByteAt(i + it) }
-}
+fun ByteArray.networkOrderGetUByteArrayAt(i: Int, length: Int): UByteArray =
+    UByteArray(length) { this.networkOrderGetUByteAt(i + it) }
 
 fun ByteArray.networkOrderSetUByteArrayAt(i: Int, value: UByteArray) {
     for (j in value.indices) {
@@ -139,9 +119,8 @@ fun ByteArray.networkOrderSetUByteArrayAt(i: Int, value: UByteArray) {
     }
 }
 
-fun ByteArray.networkOrderGetUShortArrayAt(i: Int, length: Int): UShortArray {
-    return UShortArray(length) { this.networkOrderGetUShortAt(i + it * 2) }
-}
+fun ByteArray.networkOrderGetUShortArrayAt(i: Int, length: Int): UShortArray =
+    UShortArray(length) { this.networkOrderGetUShortAt(i + it * 2) }
 
 fun ByteArray.networkOrderSetUShortArrayAt(i: Int, value: UShortArray) {
     for (j in value.indices) {
@@ -149,9 +128,8 @@ fun ByteArray.networkOrderSetUShortArrayAt(i: Int, value: UShortArray) {
     }
 }
 
-fun ByteArray.networkOrderGetUIntArrayAt(i: Int, length: Int): UIntArray {
-    return UIntArray(length) { this.networkOrderGetUIntAt(i + it * 4) }
-}
+fun ByteArray.networkOrderGetUIntArrayAt(i: Int, length: Int): UIntArray =
+    UIntArray(length) { this.networkOrderGetUIntAt(i + it * 4) }
 
 fun ByteArray.networkOrderSetUIntArrayAt(i: Int, value: UIntArray) {
     for (j in value.indices) {
@@ -159,9 +137,8 @@ fun ByteArray.networkOrderSetUIntArrayAt(i: Int, value: UIntArray) {
     }
 }
 
-fun ByteArray.networkOrderGetULongArrayAt(i: Int, length: Int): ULongArray {
-    return ULongArray(length) { this.networkOrderGetULongAt(i + it * 8) }
-}
+fun ByteArray.networkOrderGetULongArrayAt(i: Int, length: Int): ULongArray =
+    ULongArray(length) { this.networkOrderGetULongAt(i + it * 8) }
 
 fun ByteArray.networkOrderSetULongArrayAt(i: Int, value: ULongArray) {
     for (j in value.indices) {
@@ -169,9 +146,8 @@ fun ByteArray.networkOrderSetULongArrayAt(i: Int, value: ULongArray) {
     }
 }
 
-fun ByteArray.networkOrderGetByteArrayAt(i: Int, length: Int): ByteArray {
-    return ByteArray(length) { this.networkOrderGetByteAt(i + it) }
-}
+fun ByteArray.networkOrderGetByteArrayAt(i: Int, length: Int): ByteArray =
+    ByteArray(length) { this.networkOrderGetByteAt(i + it) }
 
 fun ByteArray.networkOrderSetByteArrayAt(i: Int, value: ByteArray) {
     for (j in value.indices) {
@@ -179,9 +155,8 @@ fun ByteArray.networkOrderSetByteArrayAt(i: Int, value: ByteArray) {
     }
 }
 
-fun ByteArray.networkOrderGetShortArrayAt(i: Int, length: Int): ShortArray {
-    return ShortArray(length) { this.networkOrderGetShortAt(i + it * 2) }
-}
+fun ByteArray.networkOrderGetShortArrayAt(i: Int, length: Int): ShortArray =
+    ShortArray(length) { this.networkOrderGetShortAt(i + it * 2) }
 
 fun ByteArray.networkOrderSetShortArrayAt(i: Int, value: ShortArray) {
     for (j in value.indices) {
@@ -189,9 +164,8 @@ fun ByteArray.networkOrderSetShortArrayAt(i: Int, value: ShortArray) {
     }
 }
 
-fun ByteArray.networkOrderGetIntArrayAt(i: Int, length: Int): IntArray {
-    return IntArray(length) { this.networkOrderGetIntAt(i + it * 4) }
-}
+fun ByteArray.networkOrderGetIntArrayAt(i: Int, length: Int): IntArray =
+    IntArray(length) { this.networkOrderGetIntAt(i + it * 4) }
 
 fun ByteArray.networkOrderSetIntArrayAt(i: Int, value: IntArray) {
     for (j in value.indices) {
@@ -199,9 +173,8 @@ fun ByteArray.networkOrderSetIntArrayAt(i: Int, value: IntArray) {
     }
 }
 
-fun ByteArray.networkOrderGetLongArrayAt(i: Int, length: Int): LongArray {
-    return LongArray(length) { this.networkOrderGetLongAt(i + it * 8) }
-}
+fun ByteArray.networkOrderGetLongArrayAt(i: Int, length: Int): LongArray =
+    LongArray(length) { this.networkOrderGetLongAt(i + it * 8) }
 
 fun ByteArray.networkOrderSetLongArrayAt(i: Int, value: LongArray) {
     for (j in value.indices) {
@@ -209,9 +182,8 @@ fun ByteArray.networkOrderSetLongArrayAt(i: Int, value: LongArray) {
     }
 }
 
-fun ByteArray.networkOrderGetFloatArrayAt(i: Int, length: Int): FloatArray {
-    return FloatArray(length) { this.networkOrderGetFloatAt(i + it * 4) }
-}
+fun ByteArray.networkOrderGetFloatArrayAt(i: Int, length: Int): FloatArray =
+    FloatArray(length) { this.networkOrderGetFloatAt(i + it * 4) }
 
 fun ByteArray.networkOrderSetFloatArrayAt(i: Int, value: FloatArray) {
     for (j in value.indices) {
@@ -219,9 +191,8 @@ fun ByteArray.networkOrderSetFloatArrayAt(i: Int, value: FloatArray) {
     }
 }
 
-fun ByteArray.networkOrderGetDoubleArrayAt(i: Int, length: Int): DoubleArray {
-    return DoubleArray(length) { this.networkOrderGetDoubleAt(i + it * 8) }
-}
+fun ByteArray.networkOrderGetDoubleArrayAt(i: Int, length: Int): DoubleArray =
+    DoubleArray(length) { this.networkOrderGetDoubleAt(i + it * 8) }
 
 fun ByteArray.networkOrderSetDoubleArrayAt(i: Int, value: DoubleArray) {
     for (j in value.indices) {
@@ -229,9 +200,8 @@ fun ByteArray.networkOrderSetDoubleArrayAt(i: Int, value: DoubleArray) {
     }
 }
 
-fun ByteArray.networkOrderGetBooleanArrayAt(i: Int, length: Int): BooleanArray {
-    return BooleanArray(length) { this.networkOrderGetBooleanAt(i + it) }
-}
+fun ByteArray.networkOrderGetBooleanArrayAt(i: Int, length: Int): BooleanArray =
+    BooleanArray(length) { this.networkOrderGetBooleanAt(i + it) }
 
 fun ByteArray.networkOrderSetBooleanArrayAt(i: Int, value: BooleanArray) {
     for (j in value.indices) {

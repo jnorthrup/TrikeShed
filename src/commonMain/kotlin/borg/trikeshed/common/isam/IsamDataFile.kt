@@ -68,7 +68,6 @@ class IsamDataFile(
         }
     }
 
-    override fun toString(): String {
-        return "IsamDataFile(metafile=$metafile, recordlen=$recordlen, constraints=$constraints, datafileFilename='$datafileFilename', fileSize=$fileSize)"
-    }
+    override fun toString(): String =
+        "IsamDataFile(metafile=$metafile, recordlen=$recordlen, constraints=$constraints, datafileFilename='$datafileFilename', fileSize=$fileSize)"
 }
