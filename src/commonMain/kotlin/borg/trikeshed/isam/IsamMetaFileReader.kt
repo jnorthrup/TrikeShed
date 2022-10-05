@@ -1,5 +1,13 @@
 package borg.trikeshed.isam
 
+import borg.trikeshed.common.isam.meta.IOMemento.*
+import borg.trikeshed.common.isam.meta.IOMemento
+import borg.trikeshed.lib.*
+import borg.trikeshed.isam.*
+import kotlinx.datetime.Instant
+import kotlinx.datetime.LocalDate
+
+
 /**
  * 1. create a class that can read the metadata file and create a collection of record constraints
  *
@@ -25,6 +33,6 @@ expect class IsamMetaFileReader {
     1. log (DEBUG) some dimension features and statistics about the record layouts
     1.  return the collection of record constraints
      */
-    fun open()
+      fun open():Unit
 
 }

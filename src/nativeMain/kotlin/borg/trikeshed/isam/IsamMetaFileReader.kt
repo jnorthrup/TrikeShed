@@ -2,10 +2,9 @@ package borg.trikeshed.isam
 
 import borg.trikeshed.common.isam.RecordMeta
 import borg.trikeshed.common.isam.meta.IOMemento
-import borg.trikeshed.lib.*
+import borg.trikeshed.common.isam.meta.IOMemento.Companion.createDecoder
+import borg.trikeshed.common.isam.meta.IOMemento.Companion.createEncoder
 import kotlinx.cinterop.*
-import kotlinx.datetime.Instant
-import kotlinx.datetime.LocalDate
 import platform.posix.*
 
 /**
@@ -22,91 +21,7 @@ IoInstant IoInstant IoDouble IoDouble IoDouble IoDouble IoDouble IoDouble IoInt 
 ```
  */
 actual class IsamMetaFileReader(val metafileFilename: String) {
-    companion object {
-        private val readBool = { value: ByteArray -> value[0] == 1.toByte() }
-        private val readByte = { value: ByteArray -> value[0] }
-        private val readInt = { value: ByteArray -> value.networkOrderGetIntAt(0) }
-        private val readLong = { value: ByteArray -> value.networkOrderGetLongAt(0) }
-        private val readFloat = { value: ByteArray -> value.networkOrderGetFloatAt(0) }
-        private val readDouble = { value: ByteArray -> value.networkOrderGetDoubleAt(0) }
-        private val readInstant = { value: ByteArray ->
-            Instant.fromEpochSeconds(
-                value.networkOrderGetLongAt(0),
-                value.networkOrderGetIntAt(0)
-            )
-        }
-        private val readLocalDate = { value: ByteArray ->
-            LocalDate.fromEpochDays(
-                value.networkOrderGetLongAt(0).toLong().toInt()
-            )
-        }
-        private val readString = { value: ByteArray -> value.decodeToString() }
-        private val readNothing = { _: ByteArray -> null }
-        private val writeBool = { value: Any? -> byteArrayOf(if (value as Boolean) 1 else 0) }
-        private val writeByte = { value: Any? -> byteArrayOf(value as Byte) }
-        private val writeInt = { value: Any? -> ByteArray(4).apply { networkOrderSetIntAt(0, value as Int) } }
-        private val writeLong = { value: Any? -> ByteArray(8).apply { networkOrderSetLongAt(0, value as Long) } }
-        private val writeFloat = { value: Any? -> ByteArray(4).apply { networkOrderSetFloatAt(0, value as Float) } }
-        private val writeDouble = { value: Any? -> ByteArray(8).apply { networkOrderSetDoubleAt(0, value as Double) } }
-        private val writeInstant = { value: Any? ->
-            ByteArray(12).apply {
-                networkOrderSetLongAt(
-                    0,
-                    (value as Instant).epochSeconds
-                ); networkOrderSetIntAt(0, value.nanosecondsOfSecond)
-            }
-        }
 
-        private
-        val writeLocalDate = { value: Any? ->
-            ByteArray(8).apply<ByteArray> {
-                ->
-                networkOrderSetLongAt(
-                    0,
-                    (value as LocalDate).toEpochDays().toLong()
-                )
-            }
-        }
-        private val writeString = { value: Any? -> (value as String).encodeToByteArray() }
-        private val writeNothing = { _: Any? -> ByteArray(0) }
-        fun createEncoder(type: IOMemento, size: Int): (Any?) -> ByteArray {
-            // must use corresponding  networkOrderSetXXX functions to set the bytes in the ByteArray
-            return when (type) {
-                IOMemento.IoBoolean -> writeBool
-                IOMemento.IoByte -> writeByte
-
-                IOMemento.IoInt -> writeInt
-                IOMemento.IoLong -> writeLong
-                IOMemento.IoFloat -> writeFloat
-                IOMemento.IoDouble -> writeDouble
-                IOMemento.IoString -> writeString
-                IOMemento.IoInstant -> writeInstant
-                IOMemento.IoLocalDate -> writeLocalDate
-                IOMemento.IoNothing -> writeNothing
-            }
-        }
-    }
-
-     fun createDecoder(
-        type: IOMemento,
-        size: Int
-    ): (ByteArray) -> Any? {
-        return when (type) {
-            // all values must be read and written in network endian order
-            // we must call the marshalling functions inside the NetworkOrder ByteArray extension functions to ensure this
-
-            IOMemento.IoBoolean -> readBool
-            IOMemento.IoByte -> readByte
-            IOMemento.IoInt -> readInt
-            IOMemento.IoLong -> readLong
-            IOMemento.IoFloat -> readFloat
-            IOMemento.IoDouble -> readDouble
-            IOMemento.IoInstant -> readInstant
-            IOMemento.IoLocalDate -> readLocalDate
-            IOMemento.IoString -> readString
-            IOMemento.IoNothing -> readNothing
-        }
-    }
 
     var recordlen: Int = -1
     lateinit var constraints: List<RecordMeta>
@@ -123,7 +38,7 @@ actual class IsamMetaFileReader(val metafileFilename: String) {
      1.  return the collection of record constraints
      */
  actual
-    fun open: Unit {
+    fun open()  {
         memScoped {
             val fd = open(metafileFilename, O_RDONLY)
             val stat = alloc<stat>()
@@ -145,8 +60,8 @@ actual class IsamMetaFileReader(val metafileFilename: String) {
                 val name = names[i]
                 val type = IOMemento.valueOf(types[i])
                 val size = end - begin
-                val decoder = createDecoder(type, size)
-                val encoder = createEncoder(type, size)
+                val decoder: (ByteArray) -> Any? =  createDecoder(type, size)
+                val encoder: (Any?) -> ByteArray = createEncoder(type, size)
 
                 RecordMeta(name, type, begin, end, decoder, encoder)
             }

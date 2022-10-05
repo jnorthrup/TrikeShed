@@ -1,7 +1,14 @@
 package borg.trikeshed.isam
 
+import borg.trikeshed.common.isam.RecordMeta
+import borg.trikeshed.common.isam.meta.IOMemento
+import borg.trikeshed.common.isam.meta.IOMemento.Companion.createDecoder
+import borg.trikeshed.common.isam.meta.IOMemento.Companion.createEncoder
+import java.io.File
+import java.nio.file.Files
+
 /**
- * 1. create a class that can read the metadata file and create a collection of record constraints
+ * A class that can read the metadata file and create a collection of record constraints
  *
  * the isam metafile format follows this sample
  *
@@ -13,19 +20,29 @@ Open_time Close_time Open High Low Close Volume Quote_asset_volume Number_of_tra
 IoInstant IoInstant IoDouble IoDouble IoDouble IoDouble IoDouble IoDouble IoInt IoDouble IoDouble
 ```
  */
-actual class IsamMetaFileReader {
-    /**
-     * 1. open the metafile descriptor for reading
-    1.  mmap the file into memory
-    1. close the file descriptor
-    1.  parse the file into a collection of record constraints
-    1. update recordlen
-    1. track meta isam field constraints:  name, type, begin, end , decoder, encoder
-    1. sanity check begin and end against defined IOMemento networkSizes
-    1. log (DEBUG) some dimension features and statistics about the record layouts
-    1.  return the collection of record constraints
-     */
-    actual fun open() {
-    }
+actual class IsamMetaFileReader(val metafileFilename: String) {
 
+
+    var recordlen: Int = -1
+    lateinit var constraints: List<RecordMeta>
+
+    actual fun open() {
+        val lines = Files.readAllLines(File(metafileFilename).toPath()).filterNot { it.trim().startsWith("#") }
+        val coords = lines[2].split("\\s+".toRegex())
+        val names = lines[3].split("\\s+".toRegex())
+        val types = lines[4].split("\\s+".toRegex())
+        recordlen = coords.last().toInt()
+
+        //avoid using zip to construct the constraints because the zip will stop at the shortest list
+        constraints = (0 until types.size - 1).map { i ->
+            val begin = coords[i * 2].toInt()
+            val end = coords[i * 2 + 1].toInt()
+            val name = names[i]
+            val type = IOMemento.valueOf(types[i])
+            val size = end - begin
+            val decoder: (ByteArray) -> Any? = createDecoder(type, size)
+            val encoder: (Any?) -> ByteArray = createEncoder(type, size)
+            RecordMeta(name, type, begin, end, decoder, encoder)
+        }
+    }
 }
