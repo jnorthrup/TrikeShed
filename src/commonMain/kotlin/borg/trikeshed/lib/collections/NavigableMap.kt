@@ -1,6 +1,6 @@
 package borg.trikeshed.lib.collections
 
-interface   NavigableMap<T, U> : SortedMap<T, U> {
+interface NavigableMap<T, U> : SortedMap<T, U> {
     fun lowerEntry(key: T): Map.Entry<T, U>?
     fun floorEntry(key: T): Map.Entry<T, U>?
     fun ceilingEntry(key: T): Map.Entry<T, U>?

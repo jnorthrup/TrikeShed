@@ -13,5 +13,5 @@ object _a {
     inline operator fun get(vararg t: ULong): ULongArray = t
     inline operator fun get(vararg t: Float): FloatArray = t
     inline operator fun get(vararg t: Double): DoubleArray = t
-    inline operator fun <T> get(vararg t: T): Array<out T> =t
+    inline operator fun <T> get(vararg t: T): Array<out T> = t
 }

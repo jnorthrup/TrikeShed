@@ -1,20 +1,10 @@
 package borg.trikeshed.lib
 
-
-//import the IoMemento enum
+// import the IoMemento enum
 import borg.trikeshed.common.isam.RecordMeta
 import borg.trikeshed.common.isam.meta.IOMemento.*
-import borg.trikeshed.lib.collections._l
-import kotlinx.datetime.Instant
-import kotlinx.datetime.LocalDate
+import kotlin.jvm.JvmInline
 import kotlin.reflect.KClass
-import kotlin.test.AfterClass
-import kotlin.test.BeforeClass
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.time.Duration.Companion.minutes
-import kotlin.time.ExperimentalTime
-
 
 /**
  * Cursors are a columnar abstraction composed of Series of Joined value+meta pairs (RecordMeta)
@@ -35,7 +25,7 @@ operator fun Cursor.unaryMinus(): Series<Series<*>> = this α { it α Join<*, ()
  * it "as?" A
  */
 inline operator fun <reified A : Any> Cursor.div(c: KClass<out A>): Series<Series<A?>> = (-this).let { s ->
-    return s α { intFunction1Join    -> intFunction1Join α {  it as? A } }
+    return s α { intFunction1Join -> intFunction1Join α { it as? A } }
 }
 
 /**
@@ -63,7 +53,7 @@ operator fun Cursor.get(i: IntRange): Cursor {
     require(i.first >= 0) { "index ${i.first} out of bounds for cursor of size $size" }
     require(i.last < size) { "index ${i.last} out of bounds for cursor of size $size" }
     return size j { y ->
-        //get the size of range
+        // get the size of range
         val rangeSize = i.last - i.first + 1
         rangeSize j { x ->
             row(y)[i.first + x]
@@ -83,7 +73,7 @@ create an Intarray of cursor meta by Strings of column names
 fun Cursor.meta(vararg s: String): Series<Int> {
     val meta = meta
     return s.size j { i ->
-        meta.`⮞`.indexOfFirst { it: RecordMeta -> it.name == s[i] }
+        meta.iterable.indexOfFirst { it: RecordMeta -> it.name == s[i] }
     }
 }
 
@@ -100,6 +90,7 @@ fun Cursor.get(vararg s: String): Cursor = this[meta(*s)]
  * @param s the name of the column to exclude
  *
  */
+@JvmInline
 value class ColumnExclusion(public val name: String) {
     override fun toString(): String = "ColumnExclusion($name)"
 }
@@ -124,11 +115,9 @@ operator fun Cursor.minus(killbag: Series<Int>) {
 fun Cursor.get(s: Series<ColumnExclusion>): Cursor {
 
     val exclusionBag = mutableSetOf<Int>()
-    s.`⮞`.forEachIndexed { i: Int, it: ColumnExclusion ->
-        exclusionBag.add(meta.`⮞`.indexOfFirst { it.name == it.name })
+    s.iterable.forEachIndexed { i: Int, it: ColumnExclusion ->
+        exclusionBag.add(meta.iterable.indexOfFirst { it.name == it.name })
     }
     val retained = ((0 until meta.size).toSet() - exclusionBag).toIntArray()
     return this[retained]
 }
-
-

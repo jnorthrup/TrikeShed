@@ -3,10 +3,7 @@ package borg.trikeshed.lib.collections
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
-
 class PriorityQueueTest {
-
-
 
     @Test
     fun remove() {
@@ -30,7 +27,6 @@ class PriorityQueueTest {
         assertEquals(1, h.poll())
         assertEquals(2, h.poll())
         assertEquals(3, h.poll())
-
     }
 
     @Test
@@ -43,8 +39,6 @@ class PriorityQueueTest {
         assertEquals(1, h.element())
         assertEquals(1, h.element())
         assertEquals(1, h.element())
-
-
     }
 
     @Test
@@ -57,8 +51,6 @@ class PriorityQueueTest {
         assertEquals(1, h.peek())
         assertEquals(1, h.peek())
         assertEquals(1, h.peek())
-
-
     }
 
     @Test
@@ -71,7 +63,5 @@ class PriorityQueueTest {
         assertEquals(1, h.remove())
         assertEquals(2, h.remove())
         assertEquals(3, h.remove())
-
-
     }
 }

@@ -1,5 +1,6 @@
-package borg.trikeshed.common.isam
+package borg.trikeshed.isam
 
+import borg.trikeshed.common.isam.RecordMeta
 import borg.trikeshed.common.isam.meta.IOMemento
 import borg.trikeshed.lib.*
 import kotlinx.cinterop.*
@@ -19,26 +20,8 @@ import platform.posix.*
 Open_time Close_time Open High Low Close Volume Quote_asset_volume Number_of_trades Taker_buy_base_asset_volume Taker_buy_quote_asset_volume
 IoInstant IoInstant IoDouble IoDouble IoDouble IoDouble IoDouble IoDouble IoInt IoDouble IoDouble
 ```
- *
- * the first two lines are comments written in english which hint at the metadata file text tokenization of the following 3 lines
- * the third line is the sequence of begin+end offsets of the fields. the offsets are 1-based.  the offsets are separated by WS tokens.
- * the last token on the third line is the number of bytes in the record coincident with the end of the last field
- * the 4th line is the sequence of field names separated by WS tokens
- * the 5th line is the encoder types corresponding to the above sequences of fields separated by WS tokens
- *
- * the class will read the metadata file and create a collection of record constraints
- *
- * the class will also create a collection of field names and a collection of field types
- *
- * the class will also create a collection of field decoders
- *
- * the class will also create a collection of field encoders
- *
- * the class will also create a collection of field offsets
- *
- * the class will also create a collection of field sizes
  */
-class IsamMetaFileReader(val metafileFilename: String) {
+actual class IsamMetaFileReader(val metafileFilename: String) {
     companion object {
         private val readBool = { value: ByteArray -> value[0] == 1.toByte() }
         private val readByte = { value: ByteArray -> value[0] }
@@ -87,7 +70,7 @@ class IsamMetaFileReader(val metafileFilename: String) {
         private val writeString = { value: Any? -> (value as String).encodeToByteArray() }
         private val writeNothing = { _: Any? -> ByteArray(0) }
         fun createEncoder(type: IOMemento, size: Int): (Any?) -> ByteArray {
-            //must use corresponding  networkOrderSetXXX functions to set the bytes in the ByteArray
+            // must use corresponding  networkOrderSetXXX functions to set the bytes in the ByteArray
             return when (type) {
                 IOMemento.IoBoolean -> writeBool
                 IOMemento.IoByte -> writeByte
@@ -100,14 +83,13 @@ class IsamMetaFileReader(val metafileFilename: String) {
                 IOMemento.IoInstant -> writeInstant
                 IOMemento.IoLocalDate -> writeLocalDate
                 IOMemento.IoNothing -> writeNothing
-
             }
         }
     }
 
-
-    fun createDecoder(
-        type: IOMemento, size: Int
+     fun createDecoder(
+        type: IOMemento,
+        size: Int
     ): (ByteArray) -> Any? {
         return when (type) {
             // all values must be read and written in network endian order
@@ -126,23 +108,22 @@ class IsamMetaFileReader(val metafileFilename: String) {
         }
     }
 
-
     var recordlen: Int = -1
     lateinit var constraints: List<RecordMeta>
 
-
     /**
      * 1. open the metafile descriptor for reading
-    1.  mmap the file into memory
-    1. close the file descriptor
-    1.  parse the file into a collection of record constraints
-    1. update recordlen
-    1. track meta isam field constraints:  name, type, begin, end , decoder, encoder
-    1. sanity check begin and end against defined IOMemento networkSizes
-    1. log (DEBUG) some dimension features and statistics about the record layouts
-    1.  return the collection of record constraints
+     1.  mmap the file into memory
+     1. close the file descriptor
+     1.  parse the file into a collection of record constraints
+     1. update recordlen
+     1. track meta isam field constraints:  name, type, begin, end , decoder, encoder
+     1. sanity check begin and end against defined IOMemento networkSizes
+     1. log (DEBUG) some dimension features and statistics about the record layouts
+     1.  return the collection of record constraints
      */
-    init {
+ actual
+    fun open: Unit {
         memScoped {
             val fd = open(metafileFilename, O_RDONLY)
             val stat = alloc<stat>()

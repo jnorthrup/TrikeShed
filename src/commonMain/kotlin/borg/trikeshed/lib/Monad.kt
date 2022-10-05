@@ -1,6 +1,5 @@
 package borg.trikeshed.lib
 
-
 /**
  * a Monad is a container that can be:
  *  - converted to a list
@@ -33,4 +32,3 @@ val <A> Monad<A>.sequence get() = sequence<A> { for (i in 0 until size) yield(se
 val <A> Monad<A>.iterator get() = list.iterator()
 val <A> Monad<A>.asSequence get() = sequence.iterator()
 val <A> Monad<A>.asIterable get() = list
-

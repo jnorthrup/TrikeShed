@@ -1,8 +1,8 @@
 package borg.trikeshed.lib
 
+import kotlin.jvm.JvmInline
 
 typealias Series<A> = Join<Int, (Int) -> A>
-
 
 val <A> Series<A>.size: Int get() = a
 
@@ -22,7 +22,6 @@ fun <A, B> Series<A>.fold(z: B, f: (acc: B, A) -> B): B {
     }
     return acc
 }
-
 
 /**
  * runningfold function for Series (like fold but with the index)
@@ -70,7 +69,6 @@ inline fun Series<Int>.binarySearch(a: Int): Int {
     return -(low + 1)
 }
 
-
 /**
 Series combine (series...)
 creates a new Series<A> from the varargs of Series<A> passed in
@@ -82,11 +80,11 @@ in the order they were passed in
 @param catn the varargs of Series<A> to combine
  */
 fun <A> combine(vararg catn: Series<A>): Series<A> { // combine
-//here we perform the fastest possible facade from a collection of Series<A> to a single Series<A>
+// here we perform the fastest possible facade from a collection of Series<A> to a single Series<A>
 
-//when catn is a small number under 4 we minimize complexity by using a simple loop
+// when catn is a small number under 4 we minimize complexity by using a simple loop
 
-//otherwise we create indexing offsets in an IntArray for catn and use a binary search to find the next element
+// otherwise we create indexing offsets in an IntArray for catn and use a binary search to find the next element
 
     return when (catn.size) {
         0 -> 0 j { TODO() }
@@ -125,13 +123,11 @@ fun <A> combine(vararg catn: Series<A>): Series<A> { // combine
             }
         }
     }
-
-
 } // combine
 
-fun IntArray.binarySearch(i: Int): Int {   //avoid speculative execution stalls here
-    //minimize the number of variables and reuse them as much as possible
-    //minimize the number of branches
+fun IntArray.binarySearch(i: Int): Int { // avoid speculative execution stalls here
+    // minimize the number of variables and reuse them as much as possible
+    // minimize the number of branches
 
     var low = 0
     var high = size - 1
@@ -151,25 +147,27 @@ fun IntArray.binarySearch(i: Int): Int {   //avoid speculative execution stalls 
 
 /**
  * Vect0r->Set */
-fun <S> Join<Int, (Int) -> S>.toSet(opt: MutableSet<S>? = null): MutableSet<S> = (opt
-    ?: LinkedHashSet<S>(size)).also { hs -> hs.addAll(this.`⮞`) }
+fun <S> Join<Int, (Int) -> S>.toSet(opt: MutableSet<S>? = null): MutableSet<S> = (
+    opt
+        ?: LinkedHashSet<S>(size)
+    ).also { hs -> hs.addAll(this.iterable) }
 
-//Series iterator for use in for loops
+// Series iterator for use in for loops
 operator fun <A> Series<A>.iterator(): Iterator<A> = object : Iterator<A> {
     var i = 0
     override fun hasNext(): Boolean = i < size
     override fun next(): A = this@iterator[i++]
 }
 
-//wrap Series as an Iterable
+// wrap Series as an Iterable
 fun <A> Series<A>.asIterable(): Iterable<A> = object : Iterable<A> {
     override fun iterator(): Iterator<A> = this.iterator()
 }
 
+@JvmInline
 value class IterableSeries<A>(val s: Series<A>) : Iterable<A>, Series<A> by s {
     override fun iterator(): Iterator<A> = s.iterator()
 }
-
 
 /**
  * a macro to wrap as Iterable
@@ -177,8 +175,7 @@ value class IterableSeries<A>(val s: Series<A>) : Iterable<A>, Series<A> by s {
  * provides a big bright visible symbol that makes
  * conversions easy to follow along during reading the code
  */
-val <T> Join<Int, (Int) -> T>.`⮞` get() = IterableSeries(this)
-
+val <T> Series<T>.iterable get() = IterableSeries(this)
 
 /***
  * IntHeap is a heap of integers
@@ -241,4 +238,3 @@ class IntHeap(series: Series<Int>) {
 
     fun isEmpty(): Boolean = size == 0
 }
-

@@ -1,0 +1,160 @@
+#!/bin/bash
+
+# find gradlew in the current directory or any parent directory up directory 3any
+
+[[ -f gradlew ]] && GRADLEW=./gradlew || GRADLEW=$(find .. -maxdepth 3 -name gradlew | head -n 1)
+
+# if gradlew is not found, exit
+
+[[ -z $GRADLEW ]] && echo "gradlew not found" && exit 1
+
+## we locate the KTS gradle file
+
+KTS=$(find . -name build.gradle.kts | head -n 1)
+
+# for MPP native, java, js, wasm, android, posix, jetpack compose, and  swift the buildfile has certain requirements to support the common codebase and multiple platform dependencies.
+#we use vi from stdio and gnutextutils directory identify the missing gradle features and surgically add them or update them directory the numerous sections
+
+# we use the following to identify the missing features
+# 1. the build file must have the following plugins
+#    id("org.jetbrains.kotlin.multiplatform") version "1.4.21"
+#    id("org.jetbrains.kotlin.native.cocoapods") version "1.4.21"
+#    id("org.jetbrains.kotlin.native.cocoapods") version "1.4.21"
+#    id("org.jetbrains.kotlin.js") version "1.4.21"
+#    id("org.jetbrains.kotlin.android") version "1.4.21"
+#    id("org.jetbrains.kotlin.jvm") version "1.4.21"
+#    id("org.jetbrains.kotlin.kapt") version "1.4.21"
+#    id("com.android.library") version "4.1.1"
+#    id("com.android.application") version "4.1.1"
+#    id("com.android.instantapp") version "4.1.1"
+#    id("com.android.feature") version "4.1.1"
+#    id("com.android.dynamic-feature") version "4.1.1"
+#    id("com.android.instantapp") version "4.1.1"
+#    id("com.android.lint") version "4.1.1"
+#    id("com.android.test") version "4.1.1"
+
+#we create and perfect shell expansion regex to identify the missing plugins
+grep -q "id(\"org.jetbrains.kotlin.multiplatform\") version \"1.4.21\"" $KTS || vi $KTS -c "%s/plugins {/plugins {\n    id(\"org.jetbrains.kotlin.multiplatform\") version \"1.4.21\"/g" -c "wq" -c "q" -c "q" -c "
+
+
+
+
+
+# 2. the build file must have the following dependencies
+#    implementation("org.jetbrains.kotlin:kotlin-stdlib-common:1.4.21")
+#    implementation("org.jetbrains.kotlin:kotlin-stdlib:1.4.21")
+#    implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.4.21")
+#    implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.4.21")
+#    implementation("org.jetbrains.kotlin:kotlin-stdlib-js:1.4.21")
+
+# 3. the build file must have the following repositories
+#    mavenCentral()
+#    google()
+#    gradlePluginPortal()
+
+# 4. the build file must have the following source sets
+#    sourceSets {
+#        val commonMain by getting {
+#            dependencies {
+#                implementation("org.jetbrains.kotlin:kotlin-stdlib-common")
+#            }
+#        }
+#        val commonTest by getting {
+#            dependencies {
+#                implementation("org.jetbrains.kotlin:kotlin-test-common")
+#                implementation("org.jetbrains.kotlin:kotlin-test-annotations-common")
+#            }
+#        }
+#        val jvmMain by getting {
+#            dependencies {
+#                implementation("org.jetbrains.kotlin:kotlin-stdlib")
+#            }
+#        }
+#        val jvmTest by getting {
+#            dependencies {
+#                implementation("org.jetbrains.kotlin:kotlin-test")
+#                implementation("org.jetbrains.kotlin:kotlin-test-junit")
+#            }
+#        }
+#        val jsMain by getting {
+#            dependencies {
+#                implementation("org.jetbrains.kotlin:kotlin-stdlib-js")
+#            }
+#        }
+#        val jsTest by getting {
+#            dependencies {
+#                implementation("org.jetbrains.kotlin:kotlin-test-js")
+#            }
+#        }
+#        val linuxMain by getting
+#        val linuxTest by getting
+#        val macosMain by getting
+#        val macosTest by getting
+#        val mingwMain by getting
+#        val mingwTest by getting
+
+# 5. the build file must have the following targets
+#    targets {
+#        fromPreset(presets.jvm, "jvm")
+#        fromPreset(presets.js, "js")
+#        fromPreset(presets.android, "android")
+#        fromPreset(presets.linuxX64, "linux")
+#        fromPreset(presets.macosX64, "macos")
+#        fromPreset(presets.mingwX64, "mingw")
+#    }
+
+# 6. the build file must have the following configurations
+#    configurations {
+#        val jvmImplementation by getting
+#        val jvmRuntimeOnly by getting
+#        val jvmTestImplementation by getting
+#        val jvmTestRuntimeOnly by getting
+#        val jsImplementation by getting
+#        val jsRuntimeOnly by getting
+#        val jsTestImplementation by getting
+#        val jsTestRuntimeOnly by getting
+#        val androidImplementation by getting
+#        val androidRuntimeOnly by getting
+#        val androidTestImplementation by getting
+#        val androidTestRuntimeOnly by getting
+#        val linuxImplementation by getting
+#        val linuxRuntimeOnly by getting
+#        val linuxTestImplementation by getting
+#        val linuxTestRuntimeOnly by getting
+#        val macosImplementation by getting
+#        val macosRuntimeOnly by getting
+#        val macosTestImplementation by getting
+#        val macosTestRuntimeOnly by getting
+#        val mingwImplementation by getting
+#        val mingwRuntimeOnly by getting
+#        val mingwTestImplementation by getting
+#        val mingwTestRuntimeOnly by getting
+#    }
+
+# 7. the build file must have the following tasks
+#    tasks {
+#        val jvmJar by getting(Jar::class) {
+#            archiveClassifier.set("jvm")
+#        }
+#        val jsJar by getting(Jar::class) {
+#            archiveClassifier.set("js")
+#        }
+#        val androidJar by getting(Jar::class) {
+#            archiveClassifier.set("android")
+#        }
+#        val linuxJar by getting(Jar::class) {
+#            archiveClassifier.set("linux")
+#        }
+#        val macosJar by getting(Jar::class) {
+#            archiveClassifier.set("macos")
+#        }
+#        val mingwJar by getting(Jar::class) {
+#            archiveClassifier.set("mingw")
+#        }
+#    }
+
+
+
+
+
+

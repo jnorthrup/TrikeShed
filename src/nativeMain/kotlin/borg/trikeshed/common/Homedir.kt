@@ -1,12 +1,11 @@
-package borg.trikeshed
+package borg.trikeshed.common
 
 import kotlinx.cinterop.toKString
 import platform.posix.getenv
 
 /**
  * get homedir
- */
-val homedir: String by lazy {
+ */ actual val homedir: String by lazy {
     val home = getenv("HOME")
     if (home != null) {
         return@lazy home.toKString()

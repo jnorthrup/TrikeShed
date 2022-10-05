@@ -23,7 +23,6 @@ class Heap<T> {
         }
     }
 
-
     fun remove(): T {
         val e = list[0]
         val last = list.removeAt(list.size - 1)

@@ -17,7 +17,7 @@ class PriorityQueue<T>(
     private val shrinkFactor: Double = 0.5,
     private val shrinkThreshold: Double = 0.25
 ) {
-     var  ary: ArrayList<T> =ArrayList(initialCapacity)
+    var ary: ArrayList<T> = ArrayList(initialCapacity)
     private var size = 0
 
     constructor(initialCapacity: Int = 16, growFactor: Double = 1.5, shrinkFactor: Double = 0.5, shrinkThreshold: Double = 0.25) : this(

@@ -1,6 +1,5 @@
 package borg.trikeshed.lib
 
-
 /**
  * this is a set of helper extension functions to produce network-endian versions of getIntAt, setIntAt, getLongAt, setLongAt, etc. for ByteArray
  *
@@ -11,9 +10,9 @@ package borg.trikeshed.lib
  */
 fun ByteArray.networkOrderGetIntAt(i: Int): Int {
     return this[i].toInt() shl 24 or
-            (this[i + 1].toInt() and 0xff shl 16) or
-            (this[i + 2].toInt() and 0xff shl 8) or
-            (this[i + 3].toInt() and 0xff)
+        (this[i + 1].toInt() and 0xff shl 16) or
+        (this[i + 2].toInt() and 0xff shl 8) or
+        (this[i + 3].toInt() and 0xff)
 }
 
 fun ByteArray.networkOrderSetIntAt(i: Int, value: Int) {
@@ -23,16 +22,15 @@ fun ByteArray.networkOrderSetIntAt(i: Int, value: Int) {
     this[i + 3] = value.toByte()
 }
 
-
 fun ByteArray.networkOrderGetLongAt(i: Int): Long {
     return this[i].toLong() shl 56 or
-            (this[i + 1].toLong() and 0xff shl 48) or
-            (this[i + 2].toLong() and 0xff shl 40) or
-            (this[i + 3].toLong() and 0xff shl 32) or
-            (this[i + 4].toLong() and 0xff shl 24) or
-            (this[i + 5].toLong() and 0xff shl 16) or
-            (this[i + 6].toLong() and 0xff shl 8) or
-            (this[i + 7].toLong() and 0xff)
+        (this[i + 1].toLong() and 0xff shl 48) or
+        (this[i + 2].toLong() and 0xff shl 40) or
+        (this[i + 3].toLong() and 0xff shl 32) or
+        (this[i + 4].toLong() and 0xff shl 24) or
+        (this[i + 5].toLong() and 0xff shl 16) or
+        (this[i + 6].toLong() and 0xff shl 8) or
+        (this[i + 7].toLong() and 0xff)
 }
 
 fun ByteArray.networkOrderSetLongAt(i: Int, value: Long) {
@@ -56,13 +54,11 @@ fun ByteArray.networkOrderSetShortAt(i: Int, value: Short) {
 
 fun ByteArray.networkOrderGetFloatAt(i: Int): Float = Float.fromBits(this.networkOrderGetIntAt(i))
 
-
 fun ByteArray.networkOrderSetFloatAt(i: Int, value: Float) {
     this.networkOrderSetIntAt(i, value.toBits())
 }
 
 fun ByteArray.networkOrderGetDoubleAt(i: Int): Double = Double.fromBits(this.networkOrderGetLongAt(i))
-
 
 fun ByteArray.networkOrderSetDoubleAt(i: Int, value: Double) {
     this.networkOrderSetLongAt(i, value.toBits())
@@ -208,4 +204,3 @@ fun ByteArray.networkOrderSetBooleanArrayAt(i: Int, value: BooleanArray) {
         this.networkOrderSetBooleanAt(i + j, value[j])
     }
 }
-

@@ -96,7 +96,6 @@ frequency : #"([0]?\.[0-9]+|1\.[0]*|1|0)"           (* 0 <= x <= 1 *)
 confidence : #"[0]?\.[0]*[1-9]{1}[0-9]*"             (* 0 <  x <  1 *)
 ```
 
-
  ### Example Usage
 Tim is alive.
 
@@ -124,4 +123,3 @@ Tom eats chocolate.
 <chocolate --> (/,eat,{Tom},_)>.
  ```
 */
-

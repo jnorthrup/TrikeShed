@@ -1,5 +1,7 @@
 package borg.trikeshed.lib
 
+import kotlin.js.JsName
+
 /**
  * Joins two things.  same as Pair but with a different name.
  */
@@ -31,10 +33,8 @@ infix fun <A, B> A.j(b: B): Join<A, B> = Join(this, b)
  * */
 infix fun <A, C, B : (A) -> C, V : Series<A>> V.α(m: B): Join<Int, (Int) -> C> = map(m)
 
-
 fun <T, R, V : Join<Int, (Int) -> T>> V.map(fn: (T) -> R): Join<Int, (Int) -> R> =
     Series(this.size) { it: Int -> fn(b(it)) }
-
 
 /**
  * provides unbounded access to first and last rows beyond the existing bounds of 0 until size
@@ -66,7 +66,6 @@ fun <A> Series<A>.toList(): AbstractList<A> = object : AbstractList<A>() {
     override fun get(index: Int): A = b(index)
 }
 
-
 fun <T : Byte> Join<Int, (Int) -> T>.toByteArray(): ByteArray =
     ByteArray(size) { i -> get(i) }
 
@@ -94,19 +93,15 @@ fun <T : Short> Join<Int, (Int) -> T>.toShortArray(): ShortArray =
 inline fun <reified T> Join<Int, (Int) -> T>.toArray(): Array<T> =
     Array<T>(size) { i -> get(i) }
 
-
 fun <T> Array<T>.toSeries(): Join<Int, (Int) -> T> =
     (size j ::get) as Join<Int, (Int) -> T>
 
 val <T> T.rightIdentity: () -> T get() = { this }
 
-/**right identity*/
-val <T> T.`⟲`: () -> T get() = rightIdentity
-
 
 infix fun <C, B : (Long) -> C> LongArray.α(m: B): Join<Int, (Int) -> C> = this.size j { i: Int -> m(this[i]) }
 
-//do all the other primitive arrays
+// do all the other primitive arrays
 
 infix fun <C, B : (Int) -> C> IntArray.α(m: B): Join<Int, (Int) -> C> = this.size j { i: Int -> m(this[i]) }
 
@@ -124,7 +119,6 @@ infix fun <C, B : (Any) -> C> Array<Any>.α(m: B): Join<Int, (Int) -> C> = this.
 
 infix fun <C, B : (Boolean) -> C> BooleanArray.α(m: B): Join<Int, (Int) -> C> = this.size j { i: Int -> m(this[i]) }
 
-
 /**
  * series get by iterable
  */
@@ -140,11 +134,9 @@ operator fun <T> Series<T>.get(index: Iterable<Int>): Series<T> {
 operator fun <T> Series<T>.get(index: Series<Int>): Series<T> {
 
     val array = IntArray(index.size) { i -> index[i] }; return this[array]
-
 }
 
 /**
  * series get by array
  */
 operator fun <T> Series<T>.get(index: IntArray): Series<T> = Series(index.size) { i -> this[index[i]] }
-

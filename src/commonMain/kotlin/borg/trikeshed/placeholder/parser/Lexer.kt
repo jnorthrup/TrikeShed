@@ -8,6 +8,4 @@ package borg.trikeshed.placeholder.parser
  *
  */
 
-class Lexer {
-
-}
+class Lexer

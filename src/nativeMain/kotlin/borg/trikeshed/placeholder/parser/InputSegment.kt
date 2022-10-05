@@ -9,5 +9,5 @@ import kotlinx.cinterop.COpaquePointer
 data class InputSegment(
     val buffer: COpaquePointer,
     val length: Int,
-    val state: LexerState)
-
+    val state: LexerState
+)

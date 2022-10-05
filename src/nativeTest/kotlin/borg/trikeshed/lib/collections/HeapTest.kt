@@ -14,7 +14,6 @@ class HeapTest {
         assertEquals(1, h.remove())
         assertEquals(2, h.remove())
         assertEquals(3, h.remove())
-
     }
 
     @Test
@@ -39,7 +38,6 @@ class HeapTest {
         assertEquals(1, h.poll())
         assertEquals(2, h.poll())
         assertEquals(3, h.poll())
-
     }
 
     @Test
@@ -52,7 +50,6 @@ class HeapTest {
         assertEquals(1, h.element())
         assertEquals(1, h.element())
         assertEquals(1, h.element())
-
     }
 
     @Test
@@ -65,8 +62,6 @@ class HeapTest {
         assertEquals(1, h.peek())
         assertEquals(1, h.peek())
         assertEquals(1, h.peek())
-
-
     }
 
     @Test
@@ -83,8 +78,6 @@ class HeapTest {
         assertEquals(1, h.size())
         h.remove()
         assertEquals(0, h.size())
-
-
     }
 
     @Test
@@ -101,7 +94,6 @@ class HeapTest {
         assertEquals(false, h.isEmpty())
         h.remove()
         assertEquals(true, h.isEmpty())
-
     }
 
     @Test
@@ -114,6 +106,5 @@ class HeapTest {
         assertEquals(false, h.isEmpty())
         h.clear()
         assertEquals(true, h.isEmpty())
-
     }
 }

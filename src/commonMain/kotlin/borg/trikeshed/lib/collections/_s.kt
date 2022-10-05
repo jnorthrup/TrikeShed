@@ -1,7 +1,7 @@
 package borg.trikeshed.lib.collections
 
 //
-///**
+// /**
 // * missing stdlib set operator https://github.com/Kotlin/KEEP/pull/112
 // */
 object _s {

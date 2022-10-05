@@ -1,5 +1,3 @@
 package borg.trikeshed.placeholder.parser
 
-class   FSM {
-
-}
+class FSM

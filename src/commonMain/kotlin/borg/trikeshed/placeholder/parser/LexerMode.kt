@@ -29,6 +29,5 @@ enum class LexerMode {
     /** noescape
      * this mode will not enter escape for any reason
      */
-    NOESCAPE ,
+    NOESCAPE,
 }
-
