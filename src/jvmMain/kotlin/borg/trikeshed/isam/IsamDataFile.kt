@@ -1,7 +1,6 @@
 package borg.trikeshed.isam
 
-import borg.trikeshed.common.isam.RecordMeta
-import borg.trikeshed.common.isam.meta.IOMemento
+import borg.trikeshed.isam.meta.IOMemento
 import borg.trikeshed.lib.Join
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.j
@@ -56,19 +55,20 @@ actual class IsamDataFile(
         data.close()
     }
 
-    override val b: (Int) -> Join<Int, (Int) -> Join<*, () -> RecordMeta>> = { row ->
-        constraints.size j { col ->
+    private val lock = java.util.concurrent.locks.ReentrantLock()
 
-            //seek to the beginning of the field
-            val recordMeta = constraints[col]
-            val offset = row * recordlen + recordMeta.begin
-            data.position(offset.toLong())
-            val buffer = ByteBuffer.allocate(recordMeta.end - recordMeta.begin)
-            data.read(buffer)
-            buffer.flip()
-            val bytes = buffer.array()
-            val thing = recordMeta.decoder(bytes)
-            thing j { recordMeta }
+    override val b: (Int) -> Join<Int, (Int) -> Join<*, () -> RecordMeta>> = { row ->
+        lock.lock()
+        val buffer = ByteBuffer.allocate(recordlen)
+        data.position(row * recordlen.toLong())
+        data.read(buffer)
+        lock.unlock()
+        val array =     buffer.position(0).array()
+
+        constraints.size j { col ->
+            val constraint = constraints[col]
+            val s = array.sliceArray(constraint.begin until constraint.end)
+            constraint.decoder(s) j { constraint }
         }
     }
 }

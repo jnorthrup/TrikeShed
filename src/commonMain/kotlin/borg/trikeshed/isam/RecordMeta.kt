@@ -1,6 +1,6 @@
-package borg.trikeshed.common.isam
+package borg.trikeshed.isam
 
-import borg.trikeshed.common.isam.meta.IOMemento
+import borg.trikeshed.isam.meta.IOMemento
 
 data class RecordMeta(
     val name: String,

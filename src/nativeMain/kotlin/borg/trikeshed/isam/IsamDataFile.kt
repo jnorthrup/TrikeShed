@@ -1,7 +1,6 @@
 package borg.trikeshed.isam
 
-import borg.trikeshed.common.isam.RecordMeta
-import borg.trikeshed.common.isam.meta.IOMemento
+import borg.trikeshed.isam.meta.IOMemento
 import borg.trikeshed.lib.Join
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.j
@@ -71,4 +70,10 @@ actual class IsamDataFile(
 
     override fun toString(): String =
         "IsamDataFile(metafile=$metafile, recordlen=$recordlen, constraints=$constraints, datafileFilename='$datafileFilename', fileSize=$fileSize)"
+
+    actual fun close() {
+        memScoped {
+            munmap(data, fileSize.toULong())
+        }
+    }
 }

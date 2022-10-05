@@ -19,10 +19,17 @@ class Launcher {
      */
 
     fun main(args: Array<String>) {
-        val metafile = homedir+"mpdata/import/klines/1m/BNB/USDT/final-BNB-USDT-1m.isam.meta"
-        val datafile = homedir+"mpdata/import/klines/1m/BNB/USDT/final-BNB-USDT-1m.isam"
+        //print DEBUG using homedir
+        println("DEBUG homedir = $homedir")
+        val metafile = homedir+"/mpdata/import/klines/1m/BNB/USDT/final-BNB-USDT-1m.isam.meta"
+        val datafile = homedir+"/mpdata/import/klines/1m/BNB/USDT/final-BNB-USDT-1m.isam"
 
-        val meta = IsamMetaFileReader(metafile)
+        //show filenames
+        println("DEBUG metafile = $metafile")
+        println("DEBUG datafile = $datafile")
+
+
+        val meta = IsamMetaFileReader(metafile).also { it.open() }
         println("open, read isam volume  $datafile with meta found in  $metafile")
 
         println("print some sample records")
@@ -62,3 +69,4 @@ class Launcher {
         }
     }
 }
+

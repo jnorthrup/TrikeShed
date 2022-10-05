@@ -1,10 +1,9 @@
 package borg.trikeshed.isam
 
-import borg.trikeshed.common.isam.RecordMeta
-import borg.trikeshed.common.isam.meta.IOMemento
-import borg.trikeshed.common.isam.meta.IOMemento.Companion.createDecoder
-import borg.trikeshed.common.isam.meta.IOMemento.Companion.createEncoder
+import borg.trikeshed.isam.meta.IOMemento
+import borg.trikeshed.isam.meta.PlatformCodec
 import kotlinx.cinterop.*
+import platform.linux.malloc_trim
 import platform.posix.*
 
 /**
@@ -26,47 +25,50 @@ actual class IsamMetaFileReader(val metafileFilename: String) {
     var recordlen: Int = -1
     lateinit var constraints: List<RecordMeta>
 
-    /**
-     * 1. open the metafile descriptor for reading
-     1.  mmap the file into memory
-     1. close the file descriptor
-     1.  parse the file into a collection of record constraints
-     1. update recordlen
-     1. track meta isam field constraints:  name, type, begin, end , decoder, encoder
-     1. sanity check begin and end against defined IOMemento networkSizes
-     1. log (DEBUG) some dimension features and statistics about the record layouts
-     1.  return the collection of record constraints
-     */
- actual
-    fun open()  {
+    actual fun open() {
+        //open
+        val fd = open(metafileFilename, O_RDONLY)
         memScoped {
-            val fd = open(metafileFilename, O_RDONLY)
+            //read the entire file into
             val stat = alloc<stat>()
             fstat(fd, stat.ptr)
             val size = stat.st_size.convert<Int>()
-            val data: COpaquePointer = mmap(null, size.toULong(), PROT_READ, MAP_PRIVATE, fd, 0)!!
+            val buf = allocArray<ByteVar>(size)
+            read(fd, buf, size.convert<size_t>())
+            //close
             close(fd)
+            //use readBytes and decodeString to read the lines into
+            val lines = buf.readBytes(size).decodeToString().lines().filterNot { it.trim().startsWith("#") }.map(String::trim)
+            //split on \s+
+            val coords = lines[0].split("\\s+".toRegex())
+            val names = lines[1].split("\\s+".toRegex())
+            val types = lines[2].split("\\s+".toRegex())
+            //update recordlen
+            this@IsamMetaFileReader.recordlen = coords.last().toInt()
+            //do not use zip --
+            //          track meta isam field constraints:  name, type, begin, end , decoder, encoder
 
-            val lines = data.readBytes(size).decodeToString().split("[\r\n]+".toRegex())
-            val coords = lines[2].split("\\s+".toRegex())
-            val names = lines[3].split("\\s+".toRegex())
-            val types = lines[4].split("\\s+".toRegex())
-            recordlen = coords.last().toInt()
-
-            //avoid using zip to construct the constraints because the zip will stop at the shortest list
-            constraints = (0 until types.size - 1).map { i ->
-                val begin = coords[i * 2].toInt()
-                val end = coords[i * 2 + 1].toInt()
-                val name = names[i]
-                val type = IOMemento.valueOf(types[i])
-                val size = end - begin
-                val decoder: (ByteArray) -> Any? =  createDecoder(type, size)
-                val encoder: (Any?) -> ByteArray = createEncoder(type, size)
-
-                RecordMeta(name, type, begin, end, decoder, encoder)
+            this@IsamMetaFileReader.constraints = names.zip(types).mapIndexed { index, (name, type) ->
+                val begin = coords[2*index].toInt()
+                val end = coords[2*index + 1].toInt()
+                val ioMemento = IOMemento.valueOf(type)
+                //use PlatformCodec to get the decoder and encoder
+                val decoder = PlatformCodec.createDecoder(ioMemento, end-begin)
+                val encoder = PlatformCodec.createEncoder(ioMemento, end-begin)
+                RecordMeta(name, ioMemento, begin, end, decoder, encoder)
+            }
+            //sanity check begin and end against defined IOMemento networkSizes
+            constraints.forEach { constraint ->
+                require(constraint.end - constraint.begin == constraint.type.networkSize?:0) {
+                    "constraint.end - constraint.begin == constraint.type.networkSize"
+                }
             }
         }
     }
+    //toString
+    actual override fun toString(): String {
+        return "IsamMetaFileReader(metafileFilename='$metafileFilename', recordlen=$recordlen, constraints=$constraints)"
+    }
+
+
 }
-
-

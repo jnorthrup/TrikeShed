@@ -1,8 +1,8 @@
 package borg.trikeshed.lib
 
 // import the IoMemento enum
-import borg.trikeshed.common.isam.RecordMeta
-import borg.trikeshed.common.isam.meta.IOMemento.*
+import borg.trikeshed.isam.RecordMeta
+import borg.trikeshed.isam.meta.IOMemento.*
 import kotlin.jvm.JvmInline
 import kotlin.reflect.KClass
 

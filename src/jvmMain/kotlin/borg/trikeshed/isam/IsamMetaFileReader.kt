@@ -1,9 +1,8 @@
 package borg.trikeshed.isam
 
-import borg.trikeshed.common.isam.RecordMeta
-import borg.trikeshed.common.isam.meta.IOMemento
-import borg.trikeshed.common.isam.meta.IOMemento.Companion.createDecoder
-import borg.trikeshed.common.isam.meta.IOMemento.Companion.createEncoder
+import borg.trikeshed.isam.meta.IOMemento
+import borg.trikeshed.isam.meta.PlatformCodec.createDecoder
+import borg.trikeshed.isam.meta.PlatformCodec.createEncoder
 import java.io.File
 import java.nio.file.Files
 
