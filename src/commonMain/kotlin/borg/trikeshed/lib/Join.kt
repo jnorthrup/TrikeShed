@@ -95,7 +95,7 @@ inline fun <reified T> Join<Int, (Int) -> T>.toArray(): Array<T> =
     Array<T>(size) { i -> get(i) }
 
 
-fun <T> Array<T>.toVect0r(): Join<Int, (Int) -> T> =
+fun <T> Array<T>.toSeries(): Join<Int, (Int) -> T> =
     (size j ::get) as Join<Int, (Int) -> T>
 
 val <T> T.rightIdentity: () -> T get() = { this }

@@ -1,4 +1,4 @@
-package borg.trikeshed.lib
+package borg.trikeshed.lib.collections
 
 object _a {
     inline operator fun get(vararg t: Boolean): BooleanArray = t

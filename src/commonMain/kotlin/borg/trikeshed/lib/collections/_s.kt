@@ -1,4 +1,4 @@
-package borg.trikeshed.lib
+package borg.trikeshed.lib.collections
 
 //
 ///**
