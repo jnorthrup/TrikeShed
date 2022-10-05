@@ -1,7 +1,19 @@
 package borg.trikeshed.lib
 
+
+//import the IoMemento enum
 import borg.trikeshed.common.isam.RecordMeta
+import borg.trikeshed.common.isam.meta.IOMemento.*
+import borg.trikeshed.lib.collections._l
+import kotlinx.datetime.Instant
+import kotlinx.datetime.LocalDate
 import kotlin.reflect.KClass
+import kotlin.test.AfterClass
+import kotlin.test.BeforeClass
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.ExperimentalTime
 
 
 /**
@@ -13,7 +25,7 @@ typealias Cursor = Series<Series<Join<*, () -> RecordMeta>>>
 /**
  * overload unary minus operator for Cursor to strip out the meta and return a series of values-only
  */
-operator fun Cursor.unaryMinus(): Series<Series<*>> = this α  { it α Join<*, () -> RecordMeta>::a }
+operator fun Cursor.unaryMinus(): Series<Series<*>> = this α { it α Join<*, () -> RecordMeta>::a }
 
 /**
  * Operator Cursor '/' Class<A>
@@ -22,8 +34,8 @@ operator fun Cursor.unaryMinus(): Series<Series<*>> = this α  { it α Join<*, (
  *
  * it "as?" A
  */
-operator fun <A : Any> Cursor.div(c: KClass<out A>): Series<Series<A?>> = (-this).let { s ->
-    return s α { it α { it as? A } }
+inline operator fun <reified A : Any> Cursor.div(c: KClass<out A>): Series<Series<A?>> = (-this).let { s ->
+    return s α { intFunction1Join    -> intFunction1Join α {  it as? A } }
 }
 
 /**
@@ -100,7 +112,7 @@ operator fun String.unaryMinus(): ColumnExclusion = ColumnExclusion(this)
 /**
  * Return cursor with columns excluded by indexes
  */
-operator fun Cursor.minus (killbag:Series<Int>) {
+operator fun Cursor.minus(killbag: Series<Int>) {
     val toSet = (0 until meta.size).toSet()
     val ints = (toSet - killbag.toSet()).toIntArray()
     this[ints]
@@ -109,12 +121,14 @@ operator fun Cursor.minus (killbag:Series<Int>) {
 /**
  * cursor get by ColumnExclusion vararg -- return a Cursor with the columns excluded by the vararg
  */
-fun Cursor.get( s: Series<ColumnExclusion>): Cursor {
+fun Cursor.get(s: Series<ColumnExclusion>): Cursor {
 
     val exclusionBag = mutableSetOf<Int>()
     s.`⮞`.forEachIndexed { i: Int, it: ColumnExclusion ->
         exclusionBag.add(meta.`⮞`.indexOfFirst { it.name == it.name })
     }
-        val retained = ((0 until meta.size).toSet() - exclusionBag).toIntArray()
+    val retained = ((0 until meta.size).toSet() - exclusionBag).toIntArray()
     return this[retained]
 }
+
+

@@ -40,66 +40,92 @@ IoInstant IoInstant IoDouble IoDouble IoDouble IoDouble IoDouble IoDouble IoInt 
  */
 class IsamMetaFileReader(val metafileFilename: String) {
     companion object {
+        private val readBool = { value: ByteArray -> value[0] == 1.toByte() }
+        private val readByte = { value: ByteArray -> value[0] }
+        private val readInt = { value: ByteArray -> value.networkOrderGetIntAt(0) }
+        private val readLong = { value: ByteArray -> value.networkOrderGetLongAt(0) }
+        private val readFloat = { value: ByteArray -> value.networkOrderGetFloatAt(0) }
+        private val readDouble = { value: ByteArray -> value.networkOrderGetDoubleAt(0) }
+        private val readInstant = { value: ByteArray ->
+            Instant.fromEpochSeconds(
+                value.networkOrderGetLongAt(0),
+                value.networkOrderGetIntAt(0)
+            )
+        }
+        private val readLocalDate = { value: ByteArray ->
+            LocalDate.fromEpochDays(
+                value.networkOrderGetLongAt(0).toLong().toInt()
+            )
+        }
+        private val readString = { value: ByteArray -> value.decodeToString() }
+        private val readNothing = { _: ByteArray -> null }
+        private val writeBool = { value: Any? -> byteArrayOf(if (value as Boolean) 1 else 0) }
+        private val writeByte = { value: Any? -> byteArrayOf(value as Byte) }
+        private val writeInt = { value: Any? -> ByteArray(4).apply { networkOrderSetIntAt(0, value as Int) } }
+        private val writeLong = { value: Any? -> ByteArray(8).apply { networkOrderSetLongAt(0, value as Long) } }
+        private val writeFloat = { value: Any? -> ByteArray(4).apply { networkOrderSetFloatAt(0, value as Float) } }
+        private val writeDouble = { value: Any? -> ByteArray(8).apply { networkOrderSetDoubleAt(0, value as Double) } }
+        private val writeInstant = { value: Any? ->
+            ByteArray(12).apply {
+                networkOrderSetLongAt(
+                    0,
+                    (value as Instant).epochSeconds
+                ); networkOrderSetIntAt(0, value.nanosecondsOfSecond)
+            }
+        }
+
+        private
+        val writeLocalDate = { value: Any? ->
+            ByteArray(8).apply<ByteArray> {
+                ->
+                networkOrderSetLongAt(
+                    0,
+                    (value as LocalDate).toEpochDays().toLong()
+                )
+            }
+        }
+        private val writeString = { value: Any? -> (value as String).encodeToByteArray() }
+        private val writeNothing = { _: Any? -> ByteArray(0) }
         fun createEncoder(type: IOMemento, size: Int): (Any?) -> ByteArray {
             //must use corresponding  networkOrderSetXXX functions to set the bytes in the ByteArray
             return when (type) {
-                IOMemento.IoBoolean -> { value -> byteArrayOf(if (value as Boolean) 1 else 0) }
-                IOMemento.IoByte -> { value -> byteArrayOf(value as Byte) }
-                IOMemento.IoInt -> { value -> ByteArray(size).apply { networkOrderSetIntAt(0, value as Int) } }
-                IOMemento.IoLong -> { value -> ByteArray(size).apply { networkOrderSetLongAt(0, value as Long) } }
-                IOMemento.IoFloat -> { value -> ByteArray(size).apply { networkOrderSetFloatAt(0, value as Float) } }
-                IOMemento.IoDouble -> { value -> ByteArray(size).apply { networkOrderSetDoubleAt(0, value as Double) } }
-                IOMemento.IoInstant -> { value ->
-                    ByteArray(size).apply {
-                        networkOrderSetLongAt(0, (value as Instant).epochSeconds)
-                        networkOrderSetIntAt(0, value.nanosecondsOfSecond)
-                    }
-                }
-                IOMemento.IoLocalDate -> { value ->
-                    ByteArray(size).apply {
-                        networkOrderSetLongAt(
-                            0,
-                            (value as LocalDate).toEpochDays().toLong()
-                        )
-                    }
-                }
+                IOMemento.IoBoolean -> writeBool
+                IOMemento.IoByte -> writeByte
 
-                IOMemento.IoString -> { value -> (value as String).encodeToByteArray() }
-                IOMemento.IoNothing -> { _ -> ByteArray(0) }
-
+                IOMemento.IoInt -> writeInt
+                IOMemento.IoLong -> writeLong
+                IOMemento.IoFloat -> writeFloat
+                IOMemento.IoDouble -> writeDouble
+                IOMemento.IoString -> writeString
+                IOMemento.IoInstant -> writeInstant
+                IOMemento.IoLocalDate -> writeLocalDate
+                IOMemento.IoNothing -> writeNothing
 
             }
         }
-
-        fun createDecoder(
-            type: IOMemento, size: Int
-        ): (ByteArray) -> Any? {
-            return when (type) {
-                // all values must be read and written in network endian order
-                // we must call the marshalling functions inside the NetworkOrder ByteArray extension functions to ensure this
-
-                IOMemento.IoBoolean -> { value -> value[0] == 1.toByte() }
-                IOMemento.IoByte -> { value -> value[0] }
-                IOMemento.IoInt -> { value -> value.networkOrderGetIntAt(0) }
-                IOMemento.IoLong -> { value -> value.networkOrderGetLongAt(0) }
-                IOMemento.IoFloat -> { value -> value.networkOrderGetFloatAt(0) }
-                IOMemento.IoDouble -> { value -> value.networkOrderGetDoubleAt(0) }
-                IOMemento.IoString -> { value -> value.decodeToString() }
-                IOMemento.IoLocalDate -> { value -> LocalDate.fromEpochDays(value.networkOrderGetLongAt(0).toInt()) }
-                IOMemento.IoInstant -> { value ->
-                    Instant.fromEpochSeconds(
-                        value.networkOrderGetLongAt(0),
-                        value.networkOrderGetIntAt(8)
-                    )
-                }
-
-                IOMemento.IoNothing -> { _ -> null }
-
-
-            }
-        }
-
     }
+
+
+    fun createDecoder(
+        type: IOMemento, size: Int
+    ): (ByteArray) -> Any? {
+        return when (type) {
+            // all values must be read and written in network endian order
+            // we must call the marshalling functions inside the NetworkOrder ByteArray extension functions to ensure this
+
+            IOMemento.IoBoolean -> readBool
+            IOMemento.IoByte -> readByte
+            IOMemento.IoInt -> readInt
+            IOMemento.IoLong -> readLong
+            IOMemento.IoFloat -> readFloat
+            IOMemento.IoDouble -> readDouble
+            IOMemento.IoInstant -> readInstant
+            IOMemento.IoLocalDate -> readLocalDate
+            IOMemento.IoString -> readString
+            IOMemento.IoNothing -> readNothing
+        }
+    }
+
 
     var recordlen: Int = -1
     lateinit var constraints: List<RecordMeta>
