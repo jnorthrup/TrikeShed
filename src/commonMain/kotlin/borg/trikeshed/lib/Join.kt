@@ -145,3 +145,8 @@ operator fun <T> Series<T>.get(index: Series<Int>): Series<T> {
  * series get by array
  */
 operator fun <T> Series<T>.get(index: IntArray): Series<T> = Series(index.size) { i -> this[index[i]] }
+
+/**
+ * series get by intRange
+ */
+operator fun <T> Series<T>.get(index: IntRange): Series<T> = Series(index.count()) { i -> this[index.first + i] }
