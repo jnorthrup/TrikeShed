@@ -21,9 +21,8 @@ IoInstant IoInstant IoDouble IoDouble IoDouble IoDouble IoDouble IoDouble IoInt 
  */
 actual class IsamMetaFileReader(val metafileFilename: String) {
 
-
     var recordlen: Int = -1
-    lateinit var constraints: List<RecordMeta>
+    var constraints: List<RecordMeta> = emptyList()
 
     actual fun open() {
         //open
@@ -56,12 +55,6 @@ actual class IsamMetaFileReader(val metafileFilename: String) {
                 val decoder = PlatformCodec.createDecoder(ioMemento, end-begin)
                 val encoder = PlatformCodec.createEncoder(ioMemento, end-begin)
                 RecordMeta(name, ioMemento, begin, end, decoder, encoder)
-            }
-            //sanity check begin and end against defined IOMemento networkSizes
-            constraints.forEach { constraint ->
-                require(constraint.end - constraint.begin == constraint.type.networkSize?:0) {
-                    "constraint.end - constraint.begin == constraint.type.networkSize"
-                }
             }
         }
     }

@@ -1,4 +1,4 @@
-package borg.trikeshed.placeholder.parser
+package borg.trikeshed.placeholder.nars.parser
 
 /**
  * hierarchical Lexer: a bifurcating lexer graph model for parsing InputSegments.

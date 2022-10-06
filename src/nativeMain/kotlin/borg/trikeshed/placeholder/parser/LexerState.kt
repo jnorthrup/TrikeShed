@@ -1,5 +1,6 @@
 package borg.trikeshed.placeholder.parser
 
+import borg.trikeshed.placeholder.nars.parser.*
 import kotlinx.cinterop.ByteVar
 import kotlinx.cinterop.CPointer
 

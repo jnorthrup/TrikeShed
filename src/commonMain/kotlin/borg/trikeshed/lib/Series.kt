@@ -1,5 +1,8 @@
 package borg.trikeshed.lib
 
+import borg.trikeshed.isam.meta.IOMemento.*
+import kotlin.js.JsExport
+import kotlin.js.JsName
 import kotlin.jvm.JvmInline
 
 typealias Series<A> = Join<Int, (Int) -> A>
@@ -148,9 +151,9 @@ fun IntArray.binarySearch(i: Int): Int { // avoid speculative execution stalls h
 /**
  * Vect0r->Set */
 fun <S> Join<Int, (Int) -> S>.toSet(opt: MutableSet<S>? = null): MutableSet<S> = (
-    opt
-        ?: LinkedHashSet<S>(size)
-    ).also { hs -> hs.addAll(this.iterable) }
+        opt
+            ?: LinkedHashSet<S>(size)
+        ).also { hs -> hs.addAll(this.`▶`) }
 
 // Series iterator for use in for loops
 operator fun <A> Series<A>.iterator(): Iterator<A> = object : Iterator<A> {
@@ -159,10 +162,6 @@ operator fun <A> Series<A>.iterator(): Iterator<A> = object : Iterator<A> {
     override fun next(): A = this@iterator[i++]
 }
 
-// wrap Series as an Iterable
-fun <A> Series<A>.asIterable(): Iterable<A> = object : Iterable<A> {
-    override fun iterator(): Iterator<A> = this.iterator()
-}
 
 @JvmInline
 value class IterableSeries<A>(val s: Series<A>) : Iterable<A>, Series<A> by s {
@@ -175,7 +174,9 @@ value class IterableSeries<A>(val s: Series<A>) : Iterable<A>, Series<A> by s {
  * provides a big bright visible symbol that makes
  * conversions easy to follow along during reading the code
  */
-val <T> Series<T>.iterable get() = IterableSeries(this)
+@property:JsExport
+@JsName("iterable")
+val <T> Series<T>.`▶`: IterableSeries<T> get() = IterableSeries(this)
 
 /***
  * IntHeap is a heap of integers
@@ -238,3 +239,44 @@ class IntHeap(series: Series<Int>) {
 
     fun isEmpty(): Boolean = size == 0
 }
+
+///**
+// * overload unary minus operator for [Series<J2>]  and return the left side of the join
+// */
+//inline operator fun <A, B, J : Join<A, B>, S : Series<J>, R : Series<A>> S.unaryMinus() = this.let { it ->
+//    val (a, b) = it
+//    it α { (a, b) ->
+//        a
+//    }
+//}
+
+/** clashes  with  above
+ * overload unary minus operator for [Cursor] or similar 2d Series and return the left side of the innermost join
+ */
+inline operator fun <reified A> Series<Series<Join<A, *>>>.unaryMinus(): Series<Series<A>> =
+    this.let { it: Series<Series<Join<A, *>>> ->
+        it α { it: Series<Join<A, *>> ->
+            it α { it: Join<A, *> ->
+                it.a
+            }
+        }
+    }
+
+/** IsNumerical
+ * iterate the meta enum types and check if all are numerical
+ *
+ * IoByte,,IoShort,IoInt,IoDouble,IoLong   qualify as numerical
+ *
+ * kotlin enumset is not available in JS
+ *
+ */
+val Cursor.isNumerical: Boolean
+    get() = meta.`▶`.all {
+        when (it.type) {
+            IoByte, IoShort, IoInt, IoFloat, IoDouble, IoLong -> true
+            else -> false
+        }
+    }
+
+val Cursor.isHomoMorphic: Boolean // all columns are of the same type
+    get() = meta.`▶`.all { it.type == meta[0].type }

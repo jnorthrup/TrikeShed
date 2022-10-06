@@ -1,4 +1,4 @@
-package borg.trikeshed.placeholder.parser
+package borg.trikeshed.placeholder.nars.parser
 
 /**
  * this defines the lexer mode, which is a state machine that defines the next lexer mode and the next lexer mode's behavior

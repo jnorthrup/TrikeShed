@@ -4,10 +4,7 @@ import borg.trikeshed.common.homedir
 import borg.trikeshed.isam.IsamMetaFileReader
 import borg.trikeshed.humanReadableByteCountSI
 import borg.trikeshed.isam.IsamDataFile
-import borg.trikeshed.lib.Cursor
-import borg.trikeshed.lib.get
-import borg.trikeshed.lib.row
-import borg.trikeshed.lib.size
+import borg.trikeshed.lib.*
 import kotlin.random.Random
 
 class Launcher {
@@ -50,15 +47,16 @@ class Launcher {
         val x: Cursor = isam
         // print some random records
         for (i in 1..10) {
-            val r = Random.nextInt(0, x.size)
-            // print the record index
-            print("record $r: ")
+            val r  = (0 until x.size).random()
+            println("DEBUG: row $r = ${x[r]}")
+
+
             // get the cursor row
-            val row = x row r
+            val row = (x row r) .toList()
 
             // print some random fields from the row
             for (j in 1..10) {
-                val f = Random.nextInt(0, row.size)
+                val f = (0 until row.size).random()
                 // print colname/type and value
                 row[f].let { (value, b) ->
                     val (name, type,) = b()

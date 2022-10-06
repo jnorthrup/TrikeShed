@@ -1,6 +1,7 @@
 package borg.trikeshed.lib
 
 // import the IoMemento enum
+import borg.trikeshed.isam.ColMeta
 import borg.trikeshed.isam.RecordMeta
 import borg.trikeshed.isam.meta.IOMemento.*
 import kotlin.jvm.JvmInline
@@ -12,21 +13,21 @@ import kotlin.reflect.KClass
  */
 typealias Cursor = Series<Series<Join<*, () -> RecordMeta>>>
 
-/**
- * overload unary minus operator for Cursor to strip out the meta and return a series of values-only
- */
-operator fun Cursor.unaryMinus(): Series<Series<*>> = this α { it α Join<*, () -> RecordMeta>::a }
+///**
+// * overload unary minus operator for Cursor to strip out the meta and return a series of values-only
+// *
+// * apparently this duplicates the unaryMinus() function above it, but it's not clear how to get the compiler to use that one
+// */
+//operator fun Cursor.unaryMinus(): Series<Series<*>> = this α { it α Join<*, () -> RecordMeta>::a }
 
 /**
  * Operator Cursor '/' Class<A>
  *
  * returns Series<Series<A?>>> where the meta is stripped out and the values are cast using
  *
- * it "as?" A
+ * it "as?" A return only A values and null for non-A values
  */
-inline operator fun <reified A : Any> Cursor.div(c: KClass<out A>): Series<Series<A?>> = (-this).let { s ->
-    return s α { intFunction1Join -> intFunction1Join α { it as? A } }
-}
+  inline operator fun <  A:Any,IR:Any?,SrInnr:Series<Join<  A,*>>,SrOutr:Series< SrInnr >,RC:KClass<A?>> SrOutr.div(c: KClass<out A>): Series<Series<A?>> =         this α { it α Join<A, *>::a } α { it α { it as? A } } α { it α { it as? A } }
 
 /**
  *
@@ -62,7 +63,7 @@ operator fun Cursor.get(i: IntRange): Cursor {
 }
 
 /** get meta for a cursor from row 0 */
-val Cursor.meta: Series<RecordMeta>
+val Cursor.meta: Series<out ColMeta>
     get() = row(0) α {
         it.b()
     }
@@ -73,7 +74,7 @@ create an Intarray of cursor meta by Strings of column names
 fun Cursor.meta(vararg s: String): Series<Int> {
     val meta = meta
     return s.size j { i ->
-        meta.iterable.indexOfFirst { it: RecordMeta -> it.name == s[i] }
+        meta.`▶`.indexOfFirst { it -> it.name == s[i] }
     }
 }
 
@@ -115,9 +116,11 @@ operator fun Cursor.minus(killbag: Series<Int>) {
 fun Cursor.get(s: Series<ColumnExclusion>): Cursor {
 
     val exclusionBag = mutableSetOf<Int>()
-    s.iterable.forEachIndexed { i: Int, it: ColumnExclusion ->
-        exclusionBag.add(meta.iterable.indexOfFirst { it.name == it.name })
+    s.`▶`.forEachIndexed { i: Int, it: ColumnExclusion ->
+        exclusionBag.add(meta.`▶`.indexOfFirst { it.name == it.name })
     }
     val retained = ((0 until meta.size).toSet() - exclusionBag).toIntArray()
     return this[retained]
 }
+
+

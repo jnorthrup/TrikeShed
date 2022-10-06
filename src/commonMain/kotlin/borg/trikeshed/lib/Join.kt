@@ -1,9 +1,9 @@
 package borg.trikeshed.lib
 
-import kotlin.js.JsName
+
 
 /**
- * Joins two things.  same as Pair but with a different name.
+ * Joins two things.  Pair semantics but distinct in the symbol naming
  */
 interface Join<A, B> {
     val a: A
@@ -19,8 +19,13 @@ interface Join<A, B> {
             override val a get() = a1
             override val b get() = b1
         }
-    }
-}
+
+        inline   fun < reified B> empty():Series<B> = Join(0,   {  throw Exception("empty series") })
+
+}}
+
+inline val <reified A> Join<A, *>.first : A get() = this.a as A
+inline val < reified B> Join<*, B>.second : B get() = this.b as B
 
 /**
  * exactly like "to" for "Join" but with a different (and shorter!) name

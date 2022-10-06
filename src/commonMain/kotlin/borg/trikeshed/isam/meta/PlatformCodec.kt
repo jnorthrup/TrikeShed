@@ -29,5 +29,8 @@ expect object PlatformCodec {
         size: Int
     ): (ByteArray) -> Any?
 
+    val readShort: (ByteArray) -> Short
+    val writeShort: (Any?) -> ByteArray
+
 
 }

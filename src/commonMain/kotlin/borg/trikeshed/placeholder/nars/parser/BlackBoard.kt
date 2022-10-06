@@ -1,3 +1,3 @@
-package borg.trikeshed.placeholder.parser
+package borg.trikeshed.placeholder.nars.parser
 
 typealias BlackBoard = MutableMap<String, Any>

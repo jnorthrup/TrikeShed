@@ -33,7 +33,7 @@ interface Join2<A1, A2,> {
 fun <A1, A2,> Join2<A1, A2, >.toString(): String = "($a1, $a2, )"
 
 // Tuple2 Series using s_
-val <A1, A2,> Join2<A1, A2, >.iterable get() = s_[a1, a2, ].iterable
+val <A1, A2,> Join2<A1, A2, >.iterable get() = s_[a1, a2, ].`▶`
 
 /**
  * Joins 3 things - a Triple tuple
@@ -66,7 +66,7 @@ interface Join3<A1, A2, A3,> {
 fun <A1, A2, A3,> Join3<A1, A2, A3, >.toString(): String = "($a1, $a2, $a3, )"
 
 // Tuple3 Series using s_
-val <A1, A2, A3,> Join3<A1, A2, A3, >.iterable get() = s_[a1, a2, a3, ].iterable
+val <A1, A2, A3,> Join3<A1, A2, A3, >.iterable get() = s_[a1, a2, a3, ].`▶`
 
 /**
  * Joins 4 things - a Quad tuple
@@ -103,7 +103,7 @@ interface Join4<A1, A2, A3, A4,> {
 fun <A1, A2, A3, A4,> Join4<A1, A2, A3, A4, >.toString(): String = "($a1, $a2, $a3, $a4, )"
 
 // Tuple4 Series using s_
-val <A1, A2, A3, A4,> Join4<A1, A2, A3, A4, >.iterable get() = s_[a1, a2, a3, a4, ].iterable
+val <A1, A2, A3, A4,> Join4<A1, A2, A3, A4, >.iterable get() = s_[a1, a2, a3, a4, ].`▶`
 
 /**
  * Joins 5 things - a Quint tuple
@@ -144,7 +144,7 @@ interface Join5<A1, A2, A3, A4, A5,> {
 fun <A1, A2, A3, A4, A5,> Join5<A1, A2, A3, A4, A5, >.toString(): String = "($a1, $a2, $a3, $a4, $a5, )"
 
 // Tuple5 Series using s_
-val <A1, A2, A3, A4, A5,> Join5<A1, A2, A3, A4, A5, >.iterable get() = s_[a1, a2, a3, a4, a5, ].iterable
+val <A1, A2, A3, A4, A5,> Join5<A1, A2, A3, A4, A5, >.iterable get() = s_[a1, a2, a3, a4, a5, ].`▶`
 
 /**
  * Joins 6 things - a Set tuple
@@ -189,7 +189,7 @@ interface Join6<A1, A2, A3, A4, A5, A6,> {
 fun <A1, A2, A3, A4, A5, A6,> Join6<A1, A2, A3, A4, A5, A6, >.toString(): String = "($a1, $a2, $a3, $a4, $a5, $a6, )"
 
 // Tuple6 Series using s_
-val <A1, A2, A3, A4, A5, A6,> Join6<A1, A2, A3, A4, A5, A6, >.iterable get() = s_[a1, a2, a3, a4, a5, a6, ].iterable
+val <A1, A2, A3, A4, A5, A6,> Join6<A1, A2, A3, A4, A5, A6, >.iterable get() = s_[a1, a2, a3, a4, a5, a6, ].`▶`
 
 /**
  * Joins 7 things - a Sept tuple
@@ -238,7 +238,7 @@ interface Join7<A1, A2, A3, A4, A5, A6, A7,> {
 fun <A1, A2, A3, A4, A5, A6, A7,> Join7<A1, A2, A3, A4, A5, A6, A7, >.toString(): String = "($a1, $a2, $a3, $a4, $a5, $a6, $a7, )"
 
 // Tuple7 Series using s_
-val <A1, A2, A3, A4, A5, A6, A7,> Join7<A1, A2, A3, A4, A5, A6, A7, >.iterable get() = s_[a1, a2, a3, a4, a5, a6, a7, ].iterable
+val <A1, A2, A3, A4, A5, A6, A7,> Join7<A1, A2, A3, A4, A5, A6, A7, >.iterable get() = s_[a1, a2, a3, a4, a5, a6, a7, ].`▶`
 
 /**
  * Joins 8 things - a Oct tuple
@@ -291,7 +291,7 @@ interface Join8<A1, A2, A3, A4, A5, A6, A7, A8,> {
 fun <A1, A2, A3, A4, A5, A6, A7, A8,> Join8<A1, A2, A3, A4, A5, A6, A7, A8, >.toString(): String = "($a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, )"
 
 // Tuple8 Series using s_
-val <A1, A2, A3, A4, A5, A6, A7, A8,> Join8<A1, A2, A3, A4, A5, A6, A7, A8, >.iterable get() = s_[a1, a2, a3, a4, a5, a6, a7, a8, ].iterable
+val <A1, A2, A3, A4, A5, A6, A7, A8,> Join8<A1, A2, A3, A4, A5, A6, A7, A8, >.iterable get() = s_[a1, a2, a3, a4, a5, a6, a7, a8, ].`▶`
 
 /**
  * Joins 9 things - a Non tuple
@@ -348,7 +348,7 @@ interface Join9<A1, A2, A3, A4, A5, A6, A7, A8, A9,> {
 fun <A1, A2, A3, A4, A5, A6, A7, A8, A9,> Join9<A1, A2, A3, A4, A5, A6, A7, A8, A9, >.toString(): String = "($a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, )"
 
 // Tuple9 Series using s_
-val <A1, A2, A3, A4, A5, A6, A7, A8, A9,> Join9<A1, A2, A3, A4, A5, A6, A7, A8, A9, >.iterable get() = s_[a1, a2, a3, a4, a5, a6, a7, a8, a9, ].iterable
+val <A1, A2, A3, A4, A5, A6, A7, A8, A9,> Join9<A1, A2, A3, A4, A5, A6, A7, A8, A9, >.iterable get() = s_[a1, a2, a3, a4, a5, a6, a7, a8, a9, ].`▶`
 
 /**
  * Joins 10 things - a Dec tuple
@@ -409,7 +409,7 @@ interface Join10<A1, A2, A3, A4, A5, A6, A7, A8, A9, A10,> {
 fun <A1, A2, A3, A4, A5, A6, A7, A8, A9, A10,> Join10<A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, >.toString(): String = "($a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10, )"
 
 // Tuple10 Series using s_
-val <A1, A2, A3, A4, A5, A6, A7, A8, A9, A10,> Join10<A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, >.iterable get() = s_[a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, ].iterable
+val <A1, A2, A3, A4, A5, A6, A7, A8, A9, A10,> Join10<A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, >.iterable get() = s_[a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, ].`▶`
 
 /**
  * Joins 11 things - a Undec tuple
@@ -474,7 +474,7 @@ interface Join11<A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11,> {
 fun <A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11,> Join11<A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, >.toString(): String = "($a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10, $a11, )"
 
 // Tuple11 Series using s_
-val <A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11,> Join11<A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, >.iterable get() = s_[a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, ].iterable
+val <A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11,> Join11<A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, >.iterable get() = s_[a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, ].`▶`
 
 /**
  * Joins 12 things - a Duodec tuple
@@ -543,7 +543,7 @@ interface Join12<A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12,> {
 fun <A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12,> Join12<A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, >.toString(): String = "($a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10, $a11, $a12, )"
 
 // Tuple12 Series using s_
-val <A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12,> Join12<A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, >.iterable get() = s_[a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, ].iterable
+val <A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12,> Join12<A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, >.iterable get() = s_[a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, ].`▶`
 
 /**
  * Joins 13 things - a Tredec tuple
@@ -616,7 +616,7 @@ interface Join13<A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, A13,> {
 fun <A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, A13,> Join13<A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, A13, >.toString(): String = "($a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10, $a11, $a12, $a13, )"
 
 // Tuple13 Series using s_
-val <A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, A13,> Join13<A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, A13, >.iterable get() = s_[a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, ].iterable
+val <A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, A13,> Join13<A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, A13, >.iterable get() = s_[a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, ].`▶`
 
 /**
  * Joins 14 things - a Quattuordec tuple
@@ -693,7 +693,7 @@ interface Join14<A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, A13, A14,> {
 fun <A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, A13, A14,> Join14<A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, A13, A14, >.toString(): String = "($a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10, $a11, $a12, $a13, $a14, )"
 
 // Tuple14 Series using s_
-val <A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, A13, A14,> Join14<A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, A13, A14, >.iterable get() = s_[a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14, ].iterable
+val <A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, A13, A14,> Join14<A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, A13, A14, >.iterable get() = s_[a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14, ].`▶`
 
 /**
  * Joins 15 things - a Quindec tuple
@@ -774,7 +774,7 @@ interface Join15<A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, A13, A14, A1
 fun <A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, A13, A14, A15,> Join15<A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, A13, A14, A15, >.toString(): String = "($a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10, $a11, $a12, $a13, $a14, $a15, )"
 
 // Tuple15 Series using s_
-val <A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, A13, A14, A15,> Join15<A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, A13, A14, A15, >.iterable get() = s_[a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14, a15, ].iterable
+val <A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, A13, A14, A15,> Join15<A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, A13, A14, A15, >.iterable get() = s_[a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14, a15, ].`▶`
 
 /**
  * Joins 16 things - a Sexdec tuple
@@ -859,7 +859,7 @@ interface Join16<A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, A13, A14, A1
 fun <A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, A13, A14, A15, A16,> Join16<A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, A13, A14, A15, A16, >.toString(): String = "($a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10, $a11, $a12, $a13, $a14, $a15, $a16, )"
 
 // Tuple16 Series using s_
-val <A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, A13, A14, A15, A16,> Join16<A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, A13, A14, A15, A16, >.iterable get() = s_[a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14, a15, a16, ].iterable
+val <A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, A13, A14, A15, A16,> Join16<A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, A13, A14, A15, A16, >.iterable get() = s_[a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14, a15, a16, ].`▶`
 
 /**
  * Joins 17 things - a Septendec tuple
@@ -948,7 +948,7 @@ interface Join17<A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, A13, A14, A1
 fun <A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, A13, A14, A15, A16, A17,> Join17<A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, A13, A14, A15, A16, A17, >.toString(): String = "($a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10, $a11, $a12, $a13, $a14, $a15, $a16, $a17, )"
 
 // Tuple17 Series using s_
-val <A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, A13, A14, A15, A16, A17,> Join17<A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, A13, A14, A15, A16, A17, >.iterable get() = s_[a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14, a15, a16, a17, ].iterable
+val <A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, A13, A14, A15, A16, A17,> Join17<A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, A13, A14, A15, A16, A17, >.iterable get() = s_[a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14, a15, a16, a17, ].`▶`
 
 /**
  * Joins 18 things - a Octodec tuple
@@ -1041,7 +1041,7 @@ interface Join18<A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, A13, A14, A1
 fun <A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, A13, A14, A15, A16, A17, A18,> Join18<A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, A13, A14, A15, A16, A17, A18, >.toString(): String = "($a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10, $a11, $a12, $a13, $a14, $a15, $a16, $a17, $a18, )"
 
 // Tuple18 Series using s_
-val <A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, A13, A14, A15, A16, A17, A18,> Join18<A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, A13, A14, A15, A16, A17, A18, >.iterable get() = s_[a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14, a15, a16, a17, a18, ].iterable
+val <A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, A13, A14, A15, A16, A17, A18,> Join18<A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, A13, A14, A15, A16, A17, A18, >.iterable get() = s_[a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14, a15, a16, a17, a18, ].`▶`
 
 /**
  * Joins 19 things - a Novemdec tuple
@@ -1138,7 +1138,7 @@ interface Join19<A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, A13, A14, A1
 fun <A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, A13, A14, A15, A16, A17, A18, A19,> Join19<A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, A13, A14, A15, A16, A17, A18, A19, >.toString(): String = "($a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10, $a11, $a12, $a13, $a14, $a15, $a16, $a17, $a18, $a19, )"
 
 // Tuple19 Series using s_
-val <A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, A13, A14, A15, A16, A17, A18, A19,> Join19<A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, A13, A14, A15, A16, A17, A18, A19, >.iterable get() = s_[a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14, a15, a16, a17, a18, a19, ].iterable
+val <A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, A13, A14, A15, A16, A17, A18, A19,> Join19<A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, A13, A14, A15, A16, A17, A18, A19, >.iterable get() = s_[a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14, a15, a16, a17, a18, a19, ].`▶`
 
 /**
  * Joins 20 things - a Vigint tuple
@@ -1239,7 +1239,7 @@ interface Join20<A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, A13, A14, A1
 fun <A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, A13, A14, A15, A16, A17, A18, A19, A20,> Join20<A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, A13, A14, A15, A16, A17, A18, A19, A20, >.toString(): String = "($a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10, $a11, $a12, $a13, $a14, $a15, $a16, $a17, $a18, $a19, $a20, )"
 
 // Tuple20 Series using s_
-val <A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, A13, A14, A15, A16, A17, A18, A19, A20,> Join20<A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, A13, A14, A15, A16, A17, A18, A19, A20, >.iterable get() = s_[a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14, a15, a16, a17, a18, a19, a20, ].iterable
+val <A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, A13, A14, A15, A16, A17, A18, A19, A20,> Join20<A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, A13, A14, A15, A16, A17, A18, A19, A20, >.iterable get() = s_[a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14, a15, a16, a17, a18, a19, a20, ].`▶`
 
 /**
  * Joins 21 things - a Unvigint tuple
@@ -1344,7 +1344,7 @@ interface Join21<A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, A13, A14, A1
 fun <A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, A13, A14, A15, A16, A17, A18, A19, A20, A21,> Join21<A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, A13, A14, A15, A16, A17, A18, A19, A20, A21, >.toString(): String = "($a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10, $a11, $a12, $a13, $a14, $a15, $a16, $a17, $a18, $a19, $a20, $a21, )"
 
 // Tuple21 Series using s_
-val <A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, A13, A14, A15, A16, A17, A18, A19, A20, A21,> Join21<A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, A13, A14, A15, A16, A17, A18, A19, A20, A21, >.iterable get() = s_[a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14, a15, a16, a17, a18, a19, a20, a21, ].iterable
+val <A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, A13, A14, A15, A16, A17, A18, A19, A20, A21,> Join21<A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, A13, A14, A15, A16, A17, A18, A19, A20, A21, >.iterable get() = s_[a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14, a15, a16, a17, a18, a19, a20, a21, ].`▶`
 
 /**
  * Joins 22 things - a Duovigint tuple
@@ -1453,7 +1453,7 @@ interface Join22<A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, A13, A14, A1
 fun <A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, A13, A14, A15, A16, A17, A18, A19, A20, A21, A22,> Join22<A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, A13, A14, A15, A16, A17, A18, A19, A20, A21, A22, >.toString(): String = "($a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10, $a11, $a12, $a13, $a14, $a15, $a16, $a17, $a18, $a19, $a20, $a21, $a22, )"
 
 // Tuple22 Series using s_
-val <A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, A13, A14, A15, A16, A17, A18, A19, A20, A21, A22,> Join22<A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, A13, A14, A15, A16, A17, A18, A19, A20, A21, A22, >.iterable get() = s_[a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14, a15, a16, a17, a18, a19, a20, a21, a22, ].iterable
+val <A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, A13, A14, A15, A16, A17, A18, A19, A20, A21, A22,> Join22<A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, A13, A14, A15, A16, A17, A18, A19, A20, A21, A22, >.iterable get() = s_[a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14, a15, a16, a17, a18, a19, a20, a21, a22, ].`▶`
 
 /**
  * Joins 23 things - a  tuple
@@ -1566,4 +1566,4 @@ interface Join23<A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, A13, A14, A1
 fun <A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, A13, A14, A15, A16, A17, A18, A19, A20, A21, A22, A23,> Join23<A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, A13, A14, A15, A16, A17, A18, A19, A20, A21, A22, A23, >.toString(): String = "($a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $a10, $a11, $a12, $a13, $a14, $a15, $a16, $a17, $a18, $a19, $a20, $a21, $a22, $a23, )"
 
 // Tuple23 Series using s_
-val <A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, A13, A14, A15, A16, A17, A18, A19, A20, A21, A22, A23,> Join23<A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, A13, A14, A15, A16, A17, A18, A19, A20, A21, A22, A23, >.iterable get() = s_[a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14, a15, a16, a17, a18, a19, a20, a21, a22, a23, ].iterable
+val <A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, A13, A14, A15, A16, A17, A18, A19, A20, A21, A22, A23,> Join23<A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, A13, A14, A15, A16, A17, A18, A19, A20, A21, A22, A23, >.iterable get() = s_[a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14, a15, a16, a17, a18, a19, a20, a21, a22, a23, ].`▶`

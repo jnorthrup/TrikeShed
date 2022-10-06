@@ -1,10 +1,11 @@
 package borg.trikeshed.isam.meta
 
+import borg.trikeshed.isam.meta.IOMemento.*
 import borg.trikeshed.lib.*
 import kotlinx.datetime.Instant
 import kotlinx.datetime.LocalDate
 
-actual object PlatformCodec{
+actual object PlatformCodec {
 
 
     actual val readBool = { value: ByteArray -> value[0] == 1.toByte() }
@@ -16,12 +17,12 @@ actual object PlatformCodec{
     actual val readInstant = { value: ByteArray ->
         Instant.fromEpochSeconds(
             value.networkOrderGetLongAt(0),
-            value.networkOrderGetIntAt(0)
+            value.networkOrderGetIntAt(8)
         )
     }
     private val readLocalDate = { value: ByteArray ->
         LocalDate.fromEpochDays(
-            value.networkOrderGetLongAt(0).toLong().toInt()
+            value.networkOrderGetLongAt(0).toInt()
         )
     }
     actual val readString = { value: ByteArray -> value.decodeToString() }
@@ -30,6 +31,7 @@ actual object PlatformCodec{
     actual val writeBool = { value: Any? -> byteArrayOf(if (value as Boolean) 1 else 0) }
     actual val writeByte = { value: Any? -> byteArrayOf(value as Byte) }
     actual val writeInt = { value: Any? -> ByteArray(4).apply { networkOrderSetIntAt(0, value as Int) } }
+    actual val writeShort = { value: Any? -> ByteArray(2).apply { networkOrderSetShortAt(0, value as Short) } }
     actual val writeLong = { value: Any? -> ByteArray(8).apply { networkOrderSetLongAt(0, value as Long) } }
     actual val writeFloat = { value: Any? -> ByteArray(4).apply { networkOrderSetFloatAt(0, value as Float) } }
     actual val writeDouble = { value: Any? -> ByteArray(8).apply { networkOrderSetDoubleAt(0, value as Double) } }
@@ -38,7 +40,7 @@ actual object PlatformCodec{
             networkOrderSetLongAt(
                 0,
                 (value as Instant).epochSeconds
-            ); networkOrderSetIntAt(0, value.nanosecondsOfSecond)
+            ); networkOrderSetIntAt(8, value.nanosecondsOfSecond)
         }
     }
 
@@ -56,17 +58,18 @@ actual object PlatformCodec{
     actual fun createEncoder(type: IOMemento, size: Int): (Any?) -> ByteArray {
         // must use corresponding  networkOrderSetXXX functions to set the bytes in the ByteArray
         return when (type) {
-            IOMemento.IoBoolean -> writeBool
-            IOMemento.IoByte -> writeByte
+            IoBoolean -> writeBool
+            IoByte -> writeByte
 
-            IOMemento.IoInt -> writeInt
-            IOMemento.IoLong -> writeLong
-            IOMemento.IoFloat -> writeFloat
-            IOMemento.IoDouble -> writeDouble
-            IOMemento.IoString -> writeString
-            IOMemento.IoInstant -> writeInstant
-            IOMemento.IoLocalDate -> writeLocalDate
-            IOMemento.IoNothing -> writeNothing
+            IoInt -> writeInt
+            IoLong -> writeLong
+            IoFloat -> writeFloat
+            IoDouble -> writeDouble
+            IoString -> writeString
+            IoInstant -> writeInstant
+            IoLocalDate -> writeLocalDate
+            IoNothing -> writeNothing
+            IoShort -> writeShort
         }
     }
 
@@ -78,16 +81,20 @@ actual object PlatformCodec{
             // all values must be read and written in network endian order
             // we must call the marshalling functions inside the NetworkOrder ByteArray extension functions to ensure this
 
-            IOMemento.IoBoolean -> readBool
-            IOMemento.IoByte -> readByte
-            IOMemento.IoInt -> readInt
-            IOMemento.IoLong -> readLong
-            IOMemento.IoFloat -> readFloat
-            IOMemento.IoDouble -> readDouble
-            IOMemento.IoInstant -> readInstant
-            IOMemento.IoLocalDate -> readLocalDate
-            IOMemento.IoString -> readString
-            IOMemento.IoNothing -> readNothing
+            IoBoolean -> readBool
+            IoByte -> readByte
+            IoShort -> readShort
+            IoInt -> readInt
+            IoLong -> readLong
+            IoFloat -> readFloat
+            IoDouble -> readDouble
+            IoInstant -> readInstant
+            IoLocalDate -> readLocalDate
+            IoString -> readString
+            IoNothing -> readNothing
         }
     }
+
+    actual val readShort: (ByteArray) -> Short
+        get() = TODO("Not yet implemented")
 }
