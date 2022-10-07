@@ -1,5 +1,8 @@
 package borg.trikeshed.lib
 
+import kotlin.js.JsExport
+import kotlin.js.JsName
+
 
 /**
  * Joins two things.  Pair semantics but distinct in the symbol naming
@@ -61,14 +64,182 @@ inline val <reified B> Join<*, B>.second: B get() = this.b as B
  */
 infix fun <A, B> A.j(b: B): Join<A, B> = Join(this, b)
 
-/**
+/** α
  * (λx.M[x]) → (λy.M[y])	α-conversion
  * https://en.wikipedia.org/wiki/Lambda_calculus
- * */
-infix fun <A, C, B : (A) -> C, V : Series<A>> V.α(m: B): Join<Int, (Int) -> C> = map(m)
+ *
+ * in kotlin terms, λ above is a lambda expression and M is a function and the '.' is the body of the lambda
+ * therefore the function M is the receiver of the extension function and the lambda expression is the argument
+ *
+ *  the simplest possible kotlin example of λx.M[x] is
+ *  ` { x -> M(x) } ` making the delta symbol into lambda braces and the x into a parameter and the M(x) into the body
+ *
+ *  to understand `(λx.M[x]) → (λy.M[y])` we need to understand the difference between the two lambdas
+ *  the first lambda is a function that takes a parameter x and returns the result of calling M with x
+ *  the second lambda is a function that takes a parameter y and returns the result of calling M with y
+ *  the difference is that the first lambda is a function of x and the second lambda is a function of y
+ *
+ *  is M generally assumed to be a function placeholder when reading wikipedia or should we assume that we need to understand what M functoin is outputting?
+ *  λ above is a lambda expression and M is a function and the '.' is the body of the lambda
+ *
+ *
+ *  alpha-conversion in lambda calculus is the process of changing the name of a bound variable in a lambda expression.
+ *
+ *  this function does not merely change the name of a variable but also changes function return type.
+ *
+ *  the definition of conversion applies in lambda calculus but not in kotlin.  why is that?
+ *  because in kotlin, the lambda expression is not a function but a function type.  the function type is the return type
+ *
+ *  the function type is the return type of the lambda expression.  the lambda expression is the body of the function
+ *
+ *  does lambda calculus have function types?  yes, it does.  it is called a lambda abstraction and it is written as
+ *  λx.M where x is the parameter and M is the body of the lambda abstraction
+ *
+ *  does lambda calculus have function calls?  yes, it does.  it is written as M[x] where M is the function and x is the argument
+ *  in kotlin M[x] is written as M(x) and in lambda calculus M[x] is written as M x
+ *
+ *  in lambda calculus, the lambda abstraction is the function type and the lambda expression is the body of the function
+ *
+ *  does lambda calculus have a programming language?  yes, it does.  it is called untyped lambda calculus.
+ *  the conversion from untyped lambda calculus to typed lambda calculus is called type inference
+ *
+ *  which type of lambda calculus is the text `(λx.M[x]) → (λy.M[y])` showing?  it is showing untyped lambda calculus
+ *
+ *  how do we convert untyped lambda calculus to typed lambda calculus?  we need to add type annotations to the lambda abstractions
+ *  the type annotation for the first lambda abstraction is (x:A) -> B where A is the type of the parameter and B is the return type
+ *  the type annotation for the second lambda abstraction is (y:C) -> D where C is the type of the parameter and D is the return type
+ *
+ *      (λx.M[x]) → (λy.M[y]) (untype lambda calculus)
+ *      (x:A) -> B → (y:C) -> D (typed lambda calculus)
+ *      (kotlin)  (A) -> B → (C) -> D
+ *
+ *      in kotlin implementation this is the code:
+ *      `fun <A, B, C, D> ((A) -> B).alpha(f: (C) -> D): (C) -> D = f`
+ *
+ *      the type of the receiver is (A) -> B
+ *      the type of the argument is (C) -> D
+ *      the type of the return value is (C) -> D
+ *
+ *      the receiver is the first lambda abstraction
+ *      the argument is the second lambda abstraction
+ *      the return value is the second lambda abstraction
+ *
+ *      the receiver is the function type of the first lambda abstraction
+ *      the argument is the function type of the second lambda abstraction
+ *      the return value is the function type of the second lambda abstraction
+  *     the operators of untyped lambda, typed lambda, and kotlin are shown in the markdown table below
+ *
+ *     the kotlin definition `infix fun <X, C, Y : (X) -> C, V : Series<X>> V.α(xform: Y): Join<Int, (Int) -> C> =  size j { i -> xform(this[i]) }`
+ *     is the same as the untyped lambda calculus definition `(λx.M[x]) → (λy.M[y])` except that the parameter names are different
+ *     the parameter names are different because the parameter names are not part of the type signature
+ *     the parameter names are part of the function body
+ *     the parameter names are part of the function body because the function body is a lambda expression
+ *     the implication of → is that the function body is a lambda expression
+ *     the meaning  of → is described in wikipedia as "the function type constructor"
+ *     the meaning of α is described in wikipedia as "alpha-conversion" which is the process of changing the name of a bound variable in a lambda expression
+ *
+ *      *     the difference between changing a name in untyped calculus and changing a name in kotlin is that in untyped
+ *     calculus the name is part of the type signature whereas in kotlin the name is part of the function body which
+ *     is a lambda expression.
+ *     in typed lambda calculus the type signature is the function type and the function body is the lambda expression.
+ *
+ *   shown below in markdown table form are the concepts of lambda calculus, typed lambda calculus, and kotlin
+ *
+ *  |concept name | untyped lambda calculus | typed lambda calculus | kotlin |
+ *  |-------------|-------------------------|-----------------------|--------|
+ *  |lambda abstraction| λx.M | (x:A) -> B | (A) -> B |
+ *  |lambda expression| M[x] | M(x) | M(x) |
+ *  |function type| (x:A) -> B | (x:A) -> B | (A) -> B |
+ *  |function body| M | M(x) | { x -> M(x) } |
+ *  |function call| M x | M(x) | M(x) |
+ *  |function placeholder| M | M | M |
+ *  |function parameter| x | x | x |
+ *  |function return type| B | B | B |
+ *  |function type constructor| → | → | → |
+ *  |function type annotation| (x:A) -> B | (x:A) -> B | (A) -> B |
+ *  |function type signature| (x:A) -> B | (x:A) -> B | (A) -> B |
+ *
+ *
+ *
+ *
+ *  in kotlin type signatures exist but they are not part of the function type
+ *  in lambda calculus type signatures are part of the function type and used for type inference
+ *  the definition of a lambda abstraction is a function type and the definition of a lambda expression is a function body
+ *
+ *  kotlin function types are not the same as lambda calculus function types because kotlin function types do not have type signatures
+ *  kotlin function types are the same as lambda calculus function types because kotlin function types have a function type constructor
+ *
+ *  in kotlin function type declaration the difference between (A)->B and (a:A)->B specific to kotlin is that the
+ *  parameter name is part of the function type declaration, and is a legal identifier in kotlin, whereas the parameter
+ *  name is not part of the function type declaration in lambda calculus.
+ *
+ *  classes in kotlin are not the same as lambda calculus function types because classes in kotlin have a class type constructor and
+ *  lambda calculus function types have a function type constructor
+ *
+ *   for clarification the meaning of `->` and `→` are shown below in markdown table form
+ *
+ *   | concept name | untyped lambda calculus | typed lambda calculus | kotlin |
+ *   |--------------|-------------------------|-----------------------|--------|
+ *   |function type constructor| → | → | -> |
+ *
+ *   does this mean that they describe the same thing in two different lexicons ? yes, they do
+ *
+ *   common lambda calculus concepts are shown below in markdown table form
+ *
+ *   | concept name | untyped lambda calculus | typed lambda calculus | kotlin |
+ *   |--------------|-------------------------|-----------------------|--------|
+ *   |lambda abstraction| λx.M | (x:A) -> B | (A) -> B |
+ *   |lambda expression| M[x] | M(x) | M(x) |
+ *   |function type| (x:A) -> B | (x:A) -> B | (A) -> B |
+ *   |function body| M | M(x) | { x -> M(x) } |
+ *   |function call| M x | M(x) | M(x) |
+ *   |function placeholder| M | M | M |
+ *
+ *   common category theory concepts are shown below in markdown table form
+ *
+ *   | concept name | untyped lambda calculus | typed lambda calculus | kotlin |
+ *   |--------------|-------------------------|-----------------------|--------|
+ *   |function parameter| x | x | x |
+ *   |function return type| B | B | B |
+ *   |function type constructor| → | → | -> |
+ *   |function type annotation| (x:A) -> B | (x:A) -> B | (A) -> B |
+ *   |function type signature| (x:A) -> B | (x:A) -> B | (A) -> B |
+ *
+ *   common set thoery notations are shown below in markdown table form
+ *
+ *   | concept name | untyped lambda calculus | typed lambda calculus | kotlin |
+ *   |--------------|-------------------------|-----------------------|--------|
+ *   |function type constructor| → | → | -> |
+ *
+ *
+ */
 
-fun <T, R, V : Join<Int, (Int) -> T>> V.map(fn: (T) -> R): Join<Int, (Int) -> R> =
-    Series(this.size) { it: Int -> fn(b(it)) }
+@JsName("alpha") @JsExport
+infix fun <X, C, Y : (X) -> C, V : Series<X>> V.α(xform: Y): Join<Int, (Int) -> C> =  size j { i -> xform(this[i]) }
+
+
+
+
+
+
+fun <A, B, C, D> ((A) -> B).alpha(f: (C) -> D): (C) -> D = f
+//simple example
+//fun main() {
+//    val f = { x: Int -> x + 1 }
+//    val g = { y: Int -> y * 2 }
+//    val h = f.alpha(g)
+//    println(h(1))
+//    //result is 4
+//
+//    //for Series type
+//    val s = Series(1, 2, 3)
+//    val t = { x: Int -> x + 1 }
+//    val u = { y: Int -> y * 2 }
+//    val v = s.α(t)
+//    println(v)
+//    //result is [2, 4, 6]
+//}
+
 
 /**
  * provides unbounded access to first and last rows beyond the existing bounds of 0 until size

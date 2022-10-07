@@ -15,7 +15,8 @@ val L1CacheSizeInInts: Long by lazy {
 
     // how many ints fit l1 cache ?
 
-    val l1CacheSize = fgets?.toKString()?.readAsIfHuman() ?: 64
+    val l1CacheSize = fgets?.toKString()?.readableUnitsToNumber() ?: 64
 
-    return@lazy l1CacheSize / 4
+    return@lazy     l1CacheSize.toLong() / 4
+
 }

@@ -2,8 +2,8 @@ package borg.trikeshed.isam
 
 import borg.trikeshed.isam.meta.IOMemento
 import borg.trikeshed.isam.meta.PlatformCodec
+import borg.trikeshed.lib.*
 import kotlinx.cinterop.*
-import platform.linux.malloc_trim
 import platform.posix.*
 
 /**
@@ -21,10 +21,18 @@ IoInstant IoInstant IoDouble IoDouble IoDouble IoDouble IoDouble IoDouble IoInt 
  */
 actual class IsamMetaFileReader(val metafileFilename: String) {
 
-    var recordlen: Int = -1
-    var constraints: List<RecordMeta> = emptyList()
+    val recordlen: Int by lazy {
+        constraints.last().end
+    }
+    val constraints: Series<RecordMeta> by lazy {
+        open()
+        constraints1.toSeries()
+    }
+    var opened = true
 
+    private lateinit var constraints1: List<RecordMeta>
     actual fun open() {
+        if (!opened) return
         //open
         val fd = open(metafileFilename, O_RDONLY)
         memScoped {
@@ -37,27 +45,26 @@ actual class IsamMetaFileReader(val metafileFilename: String) {
             //close
             close(fd)
             //use readBytes and decodeString to read the lines into
-            val lines = buf.readBytes(size).decodeToString().lines().filterNot { it.trim().startsWith("#") }.map(String::trim)
+            val lines =
+                buf.readBytes(size).decodeToString().lines().filterNot { it.trim().startsWith("#") }.map(String::trim)
             //split on \s+
             val coords = lines[0].split("\\s+".toRegex())
             val names = lines[1].split("\\s+".toRegex())
             val types = lines[2].split("\\s+".toRegex())
-            //update recordlen
-            this@IsamMetaFileReader.recordlen = coords.last().toInt()
-            //do not use zip --
-            //          track meta isam field constraints:  name, type, begin, end , decoder, encoder
 
-            this@IsamMetaFileReader.constraints = names.zip(types).mapIndexed { index, (name, type) ->
-                val begin = coords[2*index].toInt()
-                val end = coords[2*index + 1].toInt()
+
+            this@IsamMetaFileReader.constraints1 = names.zip(types).mapIndexed { index, (name, type) ->
+                val begin = coords[2 * index].toInt()
+                val end = coords[2 * index + 1].toInt()
                 val ioMemento = IOMemento.valueOf(type)
                 //use PlatformCodec to get the decoder and encoder
-                val decoder = PlatformCodec.createDecoder(ioMemento, end-begin)
-                val encoder = PlatformCodec.createEncoder(ioMemento, end-begin)
+                val decoder = PlatformCodec.createDecoder(ioMemento, end - begin)
+                val encoder = PlatformCodec.createEncoder(ioMemento, end - begin)
                 RecordMeta(name, ioMemento, begin, end, decoder, encoder)
             }
         }
     }
+
     //toString
     actual override fun toString(): String {
         return "IsamMetaFileReader(metafileFilename='$metafileFilename', recordlen=$recordlen, constraints=$constraints)"

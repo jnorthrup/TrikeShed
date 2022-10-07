@@ -11,7 +11,7 @@ interface AppendableSeries<T> : Series<T> {
 //series val appendable
 inline val <reified T> Series<T>.appendable: AppendableSeries<T>
 
-    get() = this.let { dad ->
+    get() = this.let {
         if (this is AppendableSeries<*>) this as AppendableSeries<T>
         else run {
             val backing: MutableList<T> = ArrayList(size)
@@ -25,11 +25,11 @@ inline val <reified T> Series<T>.appendable: AppendableSeries<T>
                 override val b: (Int) -> T = backing::get
             }
         }
-    } as AppendableSeries<T>
+    }
 
 operator fun <T> AppendableSeries<T>.plusAssign(item: T) = append(item)
 val  Series<Char>.appendable: AppendableSeries<Char>
-    get() = this.let { dad ->
+    get() = this.let { origin ->
         if (this is AppendableSeries<Char>) this
         else run {
             //offload this to StringBuilder
@@ -38,7 +38,7 @@ val  Series<Char>.appendable: AppendableSeries<Char>
                     override val length by ::size
                     override fun get(index: Int): Char = this[index]
                     override fun subSequence(startIndex: Int, endIndex: Int): CharSequence =
-                        StringBuilder().apply { for (i in startIndex until endIndex) append(dad[i]) }.toString()
+                        StringBuilder().apply { for (i in startIndex until endIndex) append(origin[i]) }.toString()
                 })
                 operator fun get(index: Int): Char = backing[index]
                 override fun append(item: Char) {

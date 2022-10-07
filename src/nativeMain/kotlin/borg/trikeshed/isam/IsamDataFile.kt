@@ -1,9 +1,7 @@
 package borg.trikeshed.isam
 
 import borg.trikeshed.isam.meta.IOMemento
-import borg.trikeshed.lib.Join
-import borg.trikeshed.lib.Series
-import borg.trikeshed.lib.j
+import borg.trikeshed.lib.*
 import kotlinx.cinterop.*
 import platform.posix.*
 
@@ -11,18 +9,32 @@ actual class IsamDataFile(
     val datafileFilename: String,
     metafileFilename: String = "$datafileFilename.meta",
     val metafile: IsamMetaFileReader = IsamMetaFileReader(metafileFilename)
-) : Series<Series<Join<*, () -> RecordMeta>>> {
-    val recordlen = metafile.recordlen
-    val constraints = metafile.constraints
+) : Cursor {
+
+
+
+
+    val recordlen: Int by lazy {
+        metafile.recordlen.also {
+            require(it > 0) { "recordlen must be > 0" }
+        }
+
+    } // unfortunately due to seperatoin of ctor and open, this is not immutable
+    val constraints: Series<RecordMeta> by lazy { metafile.constraints }
     private lateinit var data: COpaquePointer
     var fileSize: Long = -1
 
-    actual fun open () {
+    private var first = true
+    actual fun open() {
+        if(!first)return
         memScoped {
             val fd = open(datafileFilename, O_RDONLY)
             val stat = alloc<stat>()
             fstat(fd, stat.ptr)
             fileSize = stat.st_size
+
+            require(fileSize % recordlen == 0L) { "fileSize must be a multiple of recordlen" }
+
 
             data = mmap(null, fileSize.toULong(), PROT_READ, MAP_PRIVATE, fd, 0)!!
             close(fd)
@@ -34,7 +46,10 @@ actual class IsamDataFile(
             } else
                 println("DEBUG: file $datafileFilename is aligned to recordlen $recordlen")
 
-            // mention record counts and percentages of each field type by record byte occupancy
+
+            println("DEBUG: each record is ${recordlen.toLong().humanReadableByteCountIEC} bytes long")
+
+            // mention record counts and percentages of each field type by record byte occupancy and by file byte occupancy, and percentage of file
             val fieldCounts = mutableMapOf<IOMemento, Int>()
             val fieldOccupancy = mutableMapOf<IOMemento, Int>()
             constraints.forEach { constraint ->
@@ -43,15 +58,21 @@ actual class IsamDataFile(
                 val occupancy = fieldOccupancy.getOrPut(constraint.type) { 0 }
                 fieldOccupancy[constraint.type] = occupancy + constraint.end - constraint.begin
             }
-            println("DEBUG: file $datafileFilename has ${fileSize / recordlen} records")
+            val recordCount = fileSize / recordlen
+            println("DEBUG: file  $datafileFilename has $recordCount records in ${fileSize.humanReadableByteCountIEC}")
             fieldCounts.forEach { (type, count) ->
                 val occupancy = fieldOccupancy[type]!!
-                println("DEBUG: file $datafileFilename has $count fields of type $type occupying $occupancy bytes")
+                println("DEBUG: file $datafileFilename has $count fields of type $type occupying $occupancy bytes (${occupancy * 100 / recordlen}%) of each record (${(occupancy * recordCount).humanReadableByteCountSI} in the file)")
             }
         }
     }
 
-    override val a: Int = fileSize.toInt() / recordlen
+    override val a: Int get()  {
+            open ().let {
+            return (fileSize  / recordlen).toInt()
+        }
+    }
+
     override val b: (Int) -> Join<Int, (Int) -> Join<*, () -> RecordMeta>> = { row ->
         memScoped {
 

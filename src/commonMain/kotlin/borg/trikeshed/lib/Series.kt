@@ -254,10 +254,10 @@ class IntHeap(series: Series<Int>) {
  * overload unary minus operator for [Cursor] or similar 2d Series and return the left side of the innermost join
  */
 inline operator fun <reified A> Series<Series<Join<A, *>>>.unaryMinus(): Series<Series<A>> =
-    this.let { it: Series<Series<Join<A, *>>> ->
-        it α { it: Series<Join<A, *>> ->
-            it α { it: Join<A, *> ->
-                it.a
+    this.let { intFunction1Join: Series<Series<Join<A, *>>> ->
+        intFunction1Join α { intFunction1Join1: Series<Join<A, *>> ->
+            intFunction1Join1 α { aAnyJoin: Join<A, *> ->
+                aAnyJoin.a
             }
         }
     }
@@ -278,5 +278,21 @@ val Cursor.isNumerical: Boolean
         }
     }
 
-val Cursor.isHomoMorphic: Boolean // all columns are of the same type
-    get() = meta.`▶`.all { it.type == meta[0].type }
+val Cursor.isHeteroMorphic: Boolean
+    get() = meta.`▶`.any { it.type != meta[0].type }
+
+val Cursor.isHomoMorphic: Boolean get() = !isHeteroMorphic
+
+fun<T> List<T>.toSeries():Series<T> = size j ::get // Series<T>
+
+//series foreachIndexed
+fun <T> Series<T>.forEachIndexed(action: (index: Int, T) -> Unit) :Unit=this.`▶`.forEachIndexed(action)
+
+//series foreach
+fun <T> Series<T>.forEach(action: (T) -> Unit) :Unit=this.`▶`.forEach(action)
+
+//series map
+fun <T, R> Series<T>.map(transform: (T) -> R): Series<R> = this.`▶`.map(transform)
+
+//last
+fun <T> Series<T>.last(): T = this[size - 1]
