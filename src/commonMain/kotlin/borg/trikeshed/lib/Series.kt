@@ -1,6 +1,7 @@
 package borg.trikeshed.lib
 
 import borg.trikeshed.isam.meta.IOMemento.*
+import borg.trikeshed.lib.collections._a
 import kotlin.js.JsExport
 import kotlin.js.JsName
 import kotlin.jvm.JvmInline
@@ -262,6 +263,49 @@ inline operator fun <reified A> Series<Series<Join<A, *>>>.unaryMinus(): Series<
         }
     }
 
+
+
+fun<T> List<T>.toSeries():Series<T> = size j ::get
+
+fun BooleanArray.toSeries():Series<Boolean> = size j ::get
+//byteArray
+fun ByteArray.toSeries():Series<Byte> = size j ::get
+fun ShortArray.toSeries():Series<Short> = size j ::get
+fun IntArray.toSeries():Series<Int> = size j ::get
+fun LongArray.toSeries():Series<Long> = size j ::get
+fun FloatArray.toSeries():Series<Float> = size j ::get
+fun DoubleArray.toSeries():Series<Double> = size j ::get
+fun CharArray.toSeries():Series<Char> = size j ::get
+fun UByteArray.toSeries() = size j ::get
+fun UShortArray.toSeries() = size j ::get
+fun UIntArray.toSeries() = size j ::get
+fun ULongArray.toSeries() = size j ::get
+fun String.toSeries() = length j ::get
+fun CharSequence.toSeries() = length j ::get
+
+
+
+
+
+
+
+//UByteArray
+fun <T> Series<T>.last(): T = this[size - 1]
+fun <B> Series<B>.isNotEmpty() = size < 0
+fun <B> Series<B>.first() = this.get(0) //naming is _a little bit_ confusing with the pair overloads so it stays a function
+fun <B> Series<B>.drop(front: Int) = get(front until size)
+fun <B> Series<B>.take(front: Int) = get(0 until front)
+
+//series foreachIndexed
+fun <T> Series<T>.forEachIndexed(action: (index: Int, T) -> Unit) :Unit=this.`▶`.forEachIndexed(action)
+
+//series foreach
+fun <T> Series<T>.forEach(action: (T) -> Unit) :Unit=this.`▶`.forEach(action)
+
+//series map
+fun <T, R> Series<T>.map(transform: (T) -> R): Series<R> = this.`▶`.map(transform)
+
+
 /** IsNumerical
  * iterate the meta enum types and check if all are numerical
  *
@@ -278,21 +322,4 @@ val Cursor.isNumerical: Boolean
         }
     }
 
-val Cursor.isHeteroMorphic: Boolean
-    get() = meta.`▶`.any { it.type != meta[0].type }
-
-val Cursor.isHomoMorphic: Boolean get() = !isHeteroMorphic
-
-fun<T> List<T>.toSeries():Series<T> = size j ::get // Series<T>
-
-//series foreachIndexed
-fun <T> Series<T>.forEachIndexed(action: (index: Int, T) -> Unit) :Unit=this.`▶`.forEachIndexed(action)
-
-//series foreach
-fun <T> Series<T>.forEach(action: (T) -> Unit) :Unit=this.`▶`.forEach(action)
-
-//series map
-fun <T, R> Series<T>.map(transform: (T) -> R): Series<R> = this.`▶`.map(transform)
-
-//last
-fun <T> Series<T>.last(): T = this[size - 1]
+val Cursor.isHomoMorphic: Boolean get() = !meta.`▶`.any { it.type != meta[0].type }

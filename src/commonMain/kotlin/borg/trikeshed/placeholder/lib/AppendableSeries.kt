@@ -27,6 +27,7 @@ inline val <reified T> Series<T>.appendable: AppendableSeries<T>
         }
     }
 
+
 operator fun <T> AppendableSeries<T>.plusAssign(item: T) = append(item)
 val  Series<Char>.appendable: AppendableSeries<Char>
     get() = this.let { origin ->
