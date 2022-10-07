@@ -1,7 +1,6 @@
 package borg.trikeshed.lib
 
 
-
 /**
  * Joins two things.  Pair semantics but distinct in the symbol naming
  */
@@ -15,17 +14,47 @@ interface Join<A, B> {
         get() = Pair(a, b)
 
     companion object {
+        //the Join factory method
         operator fun <A, B> invoke(a1: A, b1: B) = object : Join<A, B> {
             override val a get() = a1
             override val b get() = b1
         }
 
-        inline   fun < reified B> empty():Series<B> = Join(0,   {  throw Exception("empty series") })
+        //the Series factory method
+        operator fun <T> invoke(vararg items: T) = object : Series<T> {
+            override val a: Int get() = items.size
+            override val b: (Int) -> T get() = items::get
+        }
 
-}}
+        //the Pair factory method
+        operator fun <A, B> invoke(pair: Pair<A, B>) = object : Join<A, B> {
+            override val a get() = pair.first
+            override val b get() = pair.second
+        }
 
-inline val <reified A> Join<A, *>.first : A get() = this.a as A
-inline val < reified B> Join<*, B>.second : B get() = this.b as B
+        //Twin factory method
+        fun <T>Twin(a:T,b:T):Twin<T> = object : Twin<T> {
+            override val a get() = a
+            override val b get() = b
+        }
+
+        //the Map factory method
+        operator fun <A, B> invoke(map: Map<A, B>) = object : Series<Join<A, B>> {
+            override val a: Int get() = map.size
+            override val b: (Int) -> Join<A, B> get() = { map.entries.elementAt(it).let { Join(it.key, it.value) } }
+        }
+
+
+
+        inline fun <reified B> empty(): Series<B> = Join(0, { throw Exception("empty series") })
+
+    }
+}
+
+typealias Twin<T> = Join<T, T>
+
+inline val <reified A> Join<A, *>.first: A get() = this.a as A
+inline val <reified B> Join<*, B>.second: B get() = this.b as B
 
 /**
  * exactly like "to" for "Join" but with a different (and shorter!) name
