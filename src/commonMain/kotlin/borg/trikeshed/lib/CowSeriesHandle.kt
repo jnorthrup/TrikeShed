@@ -4,7 +4,7 @@ import kotlin.properties.Delegates
 
 
 //factory method for CopyOnWriteSeries
-inline val <reified T> Series<T>.cow: CopyOnWriteSeriesEnvelope<T> get() = CopyOnWriteSeriesEnvelope(CopyOnWriteLetterSeries(this.toArray()))
+inline val <reified T> Series<T>.cow: CowSeriesHandle<T> get() = CowSeriesHandle(COWSeriesBody(this.toArray()))
 
 /**
  * CopyOnWriteSeries which creates a new copy of the backing Series on all mutation methods.
@@ -14,12 +14,12 @@ inline val <reified T> Series<T>.cow: CopyOnWriteSeriesEnvelope<T> get() = CopyO
  * this contains a Long? immutable version attribute which is incremented during cloning, or stays null
  *
  */
-class CopyOnWriteSeriesEnvelope<T>(
-    letter1: CopyOnWriteLetterSeries<T>,
+class CowSeriesHandle<T>(
+    letter1: COWSeriesBody<T>,
     var observer: ((Twin<Series<T>>) -> Unit)? = null,
     var versionObserver: ((Twin<Long?>) -> Unit)? = null,
 
-) : MutableSeries<T> {
+    ) : MutableSeries<T> {
 
     var letter by Delegates.observable(letter1) { _, old, new ->
         observer?.invoke( old j new )

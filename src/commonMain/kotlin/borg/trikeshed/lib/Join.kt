@@ -217,11 +217,6 @@ infix fun <A, B> A.j(b: B): Join<A, B> = Join(this, b)
 @JsName("alpha") @JsExport
 infix fun <X, C, Y : (X) -> C, V : Series<X>> V.α(xform: Y): Join<Int, (Int) -> C> =  size j { i -> xform(this[i]) }
 
-
-
-
-
-
 fun <A, B, C, D> ((A) -> B).alpha(f: (C) -> D): (C) -> D = f
 //simple example
 //fun main() {
@@ -350,3 +345,4 @@ operator fun <T> Series<T>.get(index: IntArray): Series<T> = Series(index.size) 
  * series get by intRange
  */
 operator fun <T> Series<T>.get(index: IntRange): Series<T> = Series(index.count()) { i -> this[index.first + i] }
+

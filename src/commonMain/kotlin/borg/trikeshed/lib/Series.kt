@@ -1,7 +1,10 @@
+@file:Suppress("UNCHECKED_CAST", "ObjectPropertyName")
+@file:OptIn(ExperimentalUnsignedTypes::class)
+
 package borg.trikeshed.lib
 
 import borg.trikeshed.isam.meta.IOMemento.*
-import borg.trikeshed.lib.collections._a
+import borg.trikeshed.lib.collections.s_
 import kotlin.js.JsExport
 import kotlin.js.JsName
 import kotlin.jvm.JvmInline
@@ -86,31 +89,94 @@ in the order they were passed in
 fun <A> combine(vararg catn: Series<A>): Series<A> { // combine
 // here we perform the fastest possible facade from a collection of Series<A> to a single Series<A>
 
-// when catn is a small number under 4 we minimize complexity by using a simple loop
+// when catn is a small number under 10 we minimize complexity by using a simple loop
 
 // otherwise we create indexing offsets in an IntArray for catn and use a binary search to find the next element
-
+    require(catn.isNotEmpty()) { "combine requires at least one Series<A>" }
+    val frst = catn[0]
+    val sz0 = frst.size
     return when (catn.size) {
         0 -> 0 j { TODO() }
-        1 -> catn[0]
-        2 -> catn[0].size + catn[1].size j { i ->
-            if (i < catn[0].size) catn[0][i] else catn[1][i - catn[0].size]
+        1 -> frst
+        2 -> sz0 + catn[1].size j { i ->
+            if (i < sz0) frst[i] else catn[1][i - sz0]
         }
 
-        3 -> catn[0].size + catn[1].size + catn[2].size j { i ->
+        3 -> sz0 + catn[1].size + catn[2].size j { i ->
             when {
-                i < catn[0].size -> catn[0][i]
-                i < catn[0].size + catn[1].size -> catn[1][i - catn[0].size]
-                else -> catn[2][i - catn[0].size - catn[1].size]
+                i < sz0 -> frst[i]
+                i < sz0 + catn[1].size -> catn[1][i - sz0]
+                else -> catn[2][i - sz0 - catn[1].size]
             }
         }
 
-        4 -> catn[0].size + catn[1].size + catn[2].size + catn[3].size j { i ->
+        4 -> sz0 + catn[1].size + catn[2].size + catn[3].size j { i ->
             when {
-                i < catn[0].size -> catn[0][i]
-                i < catn[0].size + catn[1].size -> catn[1][i - catn[0].size]
-                i < catn[0].size + catn[1].size + catn[2].size -> catn[2][i - catn[0].size - catn[1].size]
-                else -> catn[3][i - catn[0].size - catn[1].size - catn[2].size]
+                i < sz0 -> frst[i]
+                i < sz0 + catn[1].size -> catn[1][i - sz0]
+                i < sz0 + catn[1].size + catn[2].size -> catn[2][i - sz0 - catn[1].size]
+                else -> catn[3][i - sz0 - catn[1].size - catn[2].size]
+            }
+
+        }
+
+        5 -> sz0 + catn[1].size + catn[2].size + catn[3].size + catn[4].size j { i ->
+            when {
+                i < sz0 -> frst[i]
+                i < sz0 + catn[1].size -> catn[1][i - sz0]
+                i < sz0 + catn[1].size + catn[2].size -> catn[2][i - sz0 - catn[1].size]
+                i < sz0 + catn[1].size + catn[2].size + catn[3].size -> catn[3][i - sz0 - catn[1].size - catn[2].size]
+                else -> catn[4][i - sz0 - catn[1].size - catn[2].size - catn[3].size]
+            }
+        }
+
+        6 -> sz0 + catn[1].size + catn[2].size + catn[3].size + catn[4].size + catn[5].size j { i ->
+            when {
+                i < sz0 -> frst[i]
+                i < sz0 + catn[1].size -> catn[1][i - sz0]
+                i < sz0 + catn[1].size + catn[2].size -> catn[2][i - sz0 - catn[1].size]
+                i < sz0 + catn[1].size + catn[2].size + catn[3].size -> catn[3][i - sz0 - catn[1].size - catn[2].size]
+                i < sz0 + catn[1].size + catn[2].size + catn[3].size + catn[4].size -> catn[4][i - sz0 - catn[1].size - catn[2].size - catn[3].size]
+                else -> catn[5][i - sz0 - catn[1].size - catn[2].size - catn[3].size - catn[4].size]
+            }
+        }
+
+        7 -> sz0 + catn[1].size + catn[2].size + catn[3].size + catn[4].size + catn[5].size + catn[6].size j { i ->
+            when {
+                i < sz0 -> frst[i]
+                i < sz0 + catn[1].size -> catn[1][i - sz0]
+                i < sz0 + catn[1].size + catn[2].size -> catn[2][i - sz0 - catn[1].size]
+                i < sz0 + catn[1].size + catn[2].size + catn[3].size -> catn[3][i - sz0 - catn[1].size - catn[2].size]
+                i < sz0 + catn[1].size + catn[2].size + catn[3].size + catn[4].size -> catn[4][i - sz0 - catn[1].size - catn[2].size - catn[3].size]
+                i < sz0 + catn[1].size + catn[2].size + catn[3].size + catn[4].size + catn[5].size -> catn[5][i - sz0 - catn[1].size - catn[2].size - catn[3].size - catn[4].size]
+                else -> catn[6][i - sz0 - catn[1].size - catn[2].size - catn[3].size - catn[4].size - catn[5].size]
+            }
+        }
+
+        8 -> sz0 + catn[1].size + catn[2].size + catn[3].size + catn[4].size + catn[5].size + catn[6].size + catn[7].size j { i ->
+            when {
+                i < sz0 -> frst[i]
+                i < sz0 + catn[1].size -> catn[1][i - sz0]
+                i < sz0 + catn[1].size + catn[2].size -> catn[2][i - sz0 - catn[1].size]
+                i < sz0 + catn[1].size + catn[2].size + catn[3].size -> catn[3][i - sz0 - catn[1].size - catn[2].size]
+                i < sz0 + catn[1].size + catn[2].size + catn[3].size + catn[4].size -> catn[4][i - sz0 - catn[1].size - catn[2].size - catn[3].size]
+                i < sz0 + catn[1].size + catn[2].size + catn[3].size + catn[4].size + catn[5].size -> catn[5][i - sz0 - catn[1].size - catn[2].size - catn[3].size - catn[4].size]
+                i < sz0 + catn[1].size + catn[2].size + catn[3].size + catn[4].size + catn[5].size + catn[6].size -> catn[6][i - sz0 - catn[1].size - catn[2].size - catn[3].size - catn[4].size - catn[5].size]
+                else -> catn[7][i - sz0 - catn[1].size - catn[2].size - catn[3].size - catn[4].size - catn[5].size - catn[6].size]
+            }
+        }
+
+        9 -> sz0 + catn[1].size + catn[2].size + catn[3].size + catn[4].size + catn[5].size + catn[6].size + catn[7].size + catn[8].size j { i ->
+            when {
+                i < sz0 -> frst[i]
+                i < sz0 + catn[1].size -> catn[1][i - sz0]
+                i < sz0 + catn[1].size + catn[2].size -> catn[2][i - sz0 - catn[1].size]
+                i < sz0 + catn[1].size + catn[2].size + catn[3].size -> catn[3][i - sz0 - catn[1].size - catn[2].size]
+                i < sz0 + catn[1].size + catn[2].size + catn[3].size + catn[4].size -> catn[4][i - sz0 - catn[1].size - catn[2].size - catn[3].size]
+                i < sz0 + catn[1].size + catn[2].size + catn[3].size + catn[4].size + catn[5].size -> catn[5][i - sz0 - catn[1].size - catn[2].size - catn[3].size - catn[4].size]
+                i < sz0 + catn[1].size + catn[2].size + catn[3].size + catn[4].size + catn[5].size + catn[6].size -> catn[6][i - sz0 - catn[1].size - catn[2].size - catn[3].size - catn[4].size - catn[5].size]
+                i < sz0 + catn[1].size + catn[2].size + catn[3].size + catn[4].size + catn[5].size + catn[6].size + catn[7].size -> catn[7][i - sz0 - catn[1].size - catn[2].size - catn[3].size - catn[4].size - catn[5].size - catn[6].size]
+                else -> catn[8][i - sz0 - catn[1].size - catn[2].size - catn[3].size - catn[4].size - catn[5].size - catn[6].size - catn[7].size]
             }
         }
 
@@ -264,43 +330,40 @@ inline operator fun <reified A> Series<Series<Join<A, *>>>.unaryMinus(): Series<
     }
 
 
+fun <T> List<T>.toSeries(): Series<T> = size j ::get
 
-fun<T> List<T>.toSeries():Series<T> = size j ::get
+fun BooleanArray.toSeries(): Series<Boolean> = size j ::get
 
-fun BooleanArray.toSeries():Series<Boolean> = size j ::get
 //byteArray
-fun ByteArray.toSeries():Series<Byte> = size j ::get
-fun ShortArray.toSeries():Series<Short> = size j ::get
-fun IntArray.toSeries():Series<Int> = size j ::get
-fun LongArray.toSeries():Series<Long> = size j ::get
-fun FloatArray.toSeries():Series<Float> = size j ::get
-fun DoubleArray.toSeries():Series<Double> = size j ::get
-fun CharArray.toSeries():Series<Char> = size j ::get
-fun UByteArray.toSeries() = size j ::get
-fun UShortArray.toSeries() = size j ::get
-fun UIntArray.toSeries() = size j ::get
-fun ULongArray.toSeries() = size j ::get
-fun String.toSeries() = length j ::get
+fun ByteArray.toSeries(): Series<Byte> = size j ::get
+fun ShortArray.toSeries(): Series<Short> = size j ::get
+fun IntArray.toSeries(): Series<Int> = size j ::get
+fun LongArray.toSeries(): Series<Long> = size j ::get
+fun FloatArray.toSeries(): Series<Float> = size j ::get
+fun DoubleArray.toSeries(): Series<Double> = size j ::get
+fun CharArray.toSeries(): Series<Char> = size j ::get
+fun UByteArray.toSeries(): Series<UByte> = size j ::get
+fun UShortArray.toSeries(): Series<UShort> = size j ::get
+fun UIntArray.toSeries(): Series<UInt> = size j ::get
+fun ULongArray.toSeries(): Series<ULong> = size j ::get
+fun String.toSeries(): Series<Char> = length j ::get
 fun CharSequence.toSeries() = length j ::get
-
-
-
-
-
 
 
 //UByteArray
 fun <T> Series<T>.last(): T = this[size - 1]
 fun <B> Series<B>.isNotEmpty() = size < 0
-fun <B> Series<B>.first() = this.get(0) //naming is _a little bit_ confusing with the pair overloads so it stays a function
+fun <B> Series<B>.first() =
+    this.get(0) //naming is _a little bit_ confusing with the pair overloads so it stays a function
+
 fun <B> Series<B>.drop(front: Int) = get(front until size)
 fun <B> Series<B>.take(front: Int) = get(0 until front)
 
 //series foreachIndexed
-fun <T> Series<T>.forEachIndexed(action: (index: Int, T) -> Unit) :Unit=this.`▶`.forEachIndexed(action)
+fun <T> Series<T>.forEachIndexed(action: (index: Int, T) -> Unit): Unit = this.`▶`.forEachIndexed(action)
 
 //series foreach
-fun <T> Series<T>.forEach(action: (T) -> Unit) :Unit=this.`▶`.forEach(action)
+fun <T> Series<T>.forEach(action: (T) -> Unit): Unit = this.`▶`.forEach(action)
 
 //series map
 fun <T, R> Series<T>.map(transform: (T) -> R): Series<R> = this.`▶`.map(transform)
@@ -323,3 +386,8 @@ val Cursor.isNumerical: Boolean
     }
 
 val Cursor.isHomoMorphic: Boolean get() = !meta.`▶`.any { it.type != meta[0].type }
+
+
+operator fun <A> Series<A>.plus(c: Series<A>) = combine(s_[this] as Series<A>, c)
+
+

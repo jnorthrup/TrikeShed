@@ -9,7 +9,7 @@ package borg.trikeshed.lib
  * this contains a Long? immutable version attribute which is incremented during cloning, or stays null if the
  * object-identity is good enough for unordered version discriminator
  */
-class CopyOnWriteLetterSeries<T> (
+class COWSeriesBody<T> (
     val backing: Array<T>,
     override val version: Long? = null,
 
@@ -20,10 +20,10 @@ class CopyOnWriteLetterSeries<T> (
     /**
      * create a new copy of this, with the given item inserted at the given index
      */
-    fun set(index: Int, item: T): CopyOnWriteLetterSeries<T> {
+    fun set(index: Int, item: T): COWSeriesBody<T> {
         val newBacking = backing.copyOf()
         newBacking[index] = item
-        return CopyOnWriteLetterSeries(newBacking, version?.inc())
+        return COWSeriesBody(newBacking, version?.inc())
     }
 
     /**
@@ -34,13 +34,13 @@ class CopyOnWriteLetterSeries<T> (
     /**
      * create a new copy of this, with the given item removed
      */
-    fun remove(item: T): CopyOnWriteLetterSeries<T> {
+    fun remove(item: T): COWSeriesBody<T> {
         val i = backing.indexOf(item)
         if (i != -1) return copy(backing = backing.copyOf().apply { removeAt(i) })
         return this
     }
 
-    fun insert(index: Int, item: T): CopyOnWriteLetterSeries<T> {
+    fun insert(index: Int, item: T): COWSeriesBody<T> {
         val t = backing.sliceArray(0 until 1)
         t[0] = item
         //slice to index
@@ -52,7 +52,7 @@ class CopyOnWriteLetterSeries<T> (
     /**
      * create a new copy of this, with the given item removed at the given index
      */
-    fun removeAt(index: Int): CopyOnWriteLetterSeries<T> {
+    fun removeAt(index: Int): COWSeriesBody<T> {
         //make 2 slices of the array, then join them
         val a = backing.sliceArray(0 until index)
         val b = backing.sliceArray(index + 1 until backing.size)
@@ -63,7 +63,7 @@ class CopyOnWriteLetterSeries<T> (
     /**
      * create a new copy of this, with all items removed
      */
-    fun clear(): CopyOnWriteLetterSeries<T> {
+    fun clear(): COWSeriesBody<T> {
         //create a new slice of 0
         return copy(backing = backing.copyOfRange(0, 0))
 
@@ -73,5 +73,5 @@ class CopyOnWriteLetterSeries<T> (
      * create a new copy of this, with the given item inserted at the given index
      */
     fun copy(backing: Array<T> = this.backing, version: Long? = this.version?.inc()) =
-        CopyOnWriteLetterSeries(backing, version)
+        COWSeriesBody(backing, version)
 }
