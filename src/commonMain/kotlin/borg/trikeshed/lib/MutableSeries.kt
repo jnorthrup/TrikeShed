@@ -1,6 +1,5 @@
 package borg.trikeshed.lib
 
-import borg.trikeshed.placeholder.lib.AppendableSeries
 
 /**
  * Mutable Series with operators

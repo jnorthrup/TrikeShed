@@ -36,7 +36,7 @@ interface Join<A, B> {
         }
 
         //Twin factory method
-        fun <T>Twin(a:T,b:T):Twin<T> = object : Twin<T> {
+        fun <T> Twin(a: T, b: T): Twin<T> = object : Twin<T> {
             override val a get() = a
             override val b get() = b
         }
@@ -47,17 +47,14 @@ interface Join<A, B> {
             override val b: (Int) -> Join<A, B> get() = { map.entries.elementAt(it).let { Join(it.key, it.value) } }
         }
 
-
-
-        inline fun <reified B> empty(): Series<B> = Join(0, { throw Exception("empty series") })
-
+        inline fun <reified B> emptySeriesOf(): Series<B> = 0 j { TODO("Empty list is incomplete") }
     }
 }
 
 typealias Twin<T> = Join<T, T>
 
-inline val <reified A> Join<A, *>.first: A get() = this.a as A
-inline val <reified B> Join<*, B>.second: B get() = this.b as B
+inline val <reified A> Join<A, *>.first: A get() = this.a
+inline val <reified B> Join<*, B>.second: B get() = this.b
 
 /**
  * exactly like "to" for "Join" but with a different (and shorter!) name
@@ -127,7 +124,7 @@ infix fun <A, B> A.j(b: B): Join<A, B> = Join(this, b)
  *      the receiver is the function type of the first lambda abstraction
  *      the argument is the function type of the second lambda abstraction
  *      the return value is the function type of the second lambda abstraction
-  *     the operators of untyped lambda, typed lambda, and kotlin are shown in the markdown table below
+ *     the operators of untyped lambda, typed lambda, and kotlin are shown in the markdown table below
  *
  *     the kotlin definition `infix fun <X, C, Y : (X) -> C, V : Series<X>> V.α(xform: Y): Join<Int, (Int) -> C> =  size j { i -> xform(this[i]) }`
  *     is the same as the untyped lambda calculus definition `(λx.M[x]) → (λy.M[y])` except that the parameter names are different
@@ -214,8 +211,9 @@ infix fun <A, B> A.j(b: B): Join<A, B> = Join(this, b)
  *
  */
 
-@JsName("alpha") @JsExport
-infix fun <X, C, Y : (X) -> C, V : Series<X>> V.α(xform: Y): Join<Int, (Int) -> C> =  size j { i -> xform(this[i]) }
+@JsName("alpha")
+@JsExport
+infix fun <X, C, Y : (X) -> C, V : Series<X>> V.α(xform: Y): Join<Int, (Int) -> C> = size j { i -> xform(this[i]) }
 
 fun <A, B, C, D> ((A) -> B).alpha(f: (C) -> D): (C) -> D = f
 //simple example

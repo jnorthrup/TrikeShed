@@ -14,6 +14,7 @@ plugins {
 
     // gradle versions update plugin
     id("com.github.ben-manes.versions") version "0.42.0"
+
 }
 
 group = "org.bereft"
@@ -28,14 +29,41 @@ repositories {
 }
 
 kotlin {
-    jvm()
-//    js      {
+    linuxX64 { // Replace with a target you need.
+        compilations.getByName("main") {
+            val myInterop by cinterops.creating {
+//                // Def-file describing the native API.
+//                // The default path is src/nativeInterop/cinterop/<interop-name>.def
+//                defFile(project.file("def-file.def"))
+//
+//                // Package to place the Kotlin API generated.
+//                packageName("org.sample")
+//
+//                // Options to be passed to compiler by cinterop tool.
+//                compilerOpts("-Ipath/to/headers")
+//
+//                // Directories for header search (an analogue of the -I<path> compiler option).
+//                includeDirs.allHeaders("path1", "path2")
+//
+//                // A shortcut for includeDirs.allHeaders.
+//                includeDirs("include/directory", "another/directory")
+            }
+
+            val anotherInterop by cinterops.creating { /* ... */ }
+        }
+    }
+    jvm {
+        withJava()
+
+
+    }
+    wasm32()
+//    js { we use func interfaces
 //        // To build distributions for and run tests on browser or Node.js use one or both of:
-//        browser()
+////        browser()
 //        nodejs()
 //    }
 //    ios()
-
     val hostOs = System.getProperty("os.name")
     val isMingwX64 = hostOs.startsWith("Windows")
     val nativeTarget = when {
@@ -60,6 +88,8 @@ kotlin {
                 implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.4.0")
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.2")
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.3.0")
+                //atomicfu
+                implementation("org.jetbrains.kotlinx:atomicfu:0.17.4")
             }
         }
 
@@ -100,19 +130,5 @@ kotlin {
 
         val jvmTest by getting
 
-//        val jsMain by getting {
-//            dependencies {  implementation(npm("@js-joda/timezone", "2.3.0"))
-//            }
-//        }
-//
-//        val jsTest by getting {
-//            dependencies {
-//                implementation(kotlin("test-js"))
-//            }
-//        }
-//
-//
-//        val iosMain by getting
-//        val iosTest by getting
     }
 }

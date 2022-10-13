@@ -196,4 +196,15 @@ data class Either<Left, Right>(val left: Left? = null, val right: Right? = null)
         else -> this as Either<Left, T>
 
     }
+    companion object{
+        /**
+         * Creates a [Left] containing the given [value].
+         */
+        fun <L, R> left(value: L): Either<L, R> = Either(value, null)
+
+        /**
+         * Creates a [Right] containing the given [value].
+         */
+        fun <L, R> right(value: R): Either<L, R> = Either(null, value)
+    }
 }

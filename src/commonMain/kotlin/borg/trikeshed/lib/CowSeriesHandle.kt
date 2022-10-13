@@ -1,10 +1,13 @@
 package borg.trikeshed.lib
 
 import kotlin.properties.Delegates
+import kotlin.reflect.KClass
 
 
-//factory method for CopyOnWriteSeries
+// inline factory value for CopyOnWriteSeries
 inline val <reified T> Series<T>.cow: CowSeriesHandle<T> get() = CowSeriesHandle(COWSeriesBody(this.toArray()))
+
+
 
 /**
  * CopyOnWriteSeries which creates a new copy of the backing Series on all mutation methods.
@@ -77,6 +80,7 @@ class CowSeriesHandle<T>(
     override fun minusAssign(item: T) {
         letter = letter.remove(item)
     }
+      operator fun get(range:IntRange)   =  letter.get(range)
 
     //version from backing
     val version: Any get() = letter.version ?: letter.toString()

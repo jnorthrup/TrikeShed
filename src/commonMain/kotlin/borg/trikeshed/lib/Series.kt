@@ -30,6 +30,7 @@ fun <A, B> Series<A>.fold(z: B, f: (acc: B, A) -> B): B {
     return acc
 }
 
+
 /**
  * runningfold function for Series (like fold but with the index)
  *
@@ -390,4 +391,23 @@ val Cursor.isHomoMorphic: Boolean get() = !meta.`▶`.any { it.type != meta[0].t
 
 operator fun <A> Series<A>.plus(c: Series<A>) = combine(s_[this] as Series<A>, c)
 
+fun <T> Series<T>.isEmpty(): Boolean {return a==0 }
 
+
+fun <T> Series<T>.binarysearch(element: T, c: Comparator<T>): Int{
+    var low = 0
+    var high = size - 1
+    while (low <= high) {
+        val mid = (low + high).ushr(1)
+        val midVal = get(mid)
+        val cmp = c.compare(midVal, element)
+        when {
+            cmp < 0 -> low = mid + 1
+            cmp > 0 -> high = mid - 1
+            else -> return mid // key found
+        }
+    }
+    return -(low + 1)  // key not found.
+}
+
+fun <T> Series<T>.reversed(): Series<T> = size j {it: Int ->this.b(size - it - 1)}
