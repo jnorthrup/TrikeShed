@@ -358,7 +358,7 @@ fun <B> Series<B>.first() =
     this.get(0) //naming is _a little bit_ confusing with the pair overloads so it stays a function
 
 fun <B> Series<B>.drop(front: Int) = get(front until size)
-fun <B> Series<B>.take(front: Int) = get(0 until front)
+fun <B> Series<B>.take(exclusiveEnd: Int) = get(0 until exclusiveEnd)
 
 //series foreachIndexed
 fun <T> Series<T>.forEachIndexed(action: (index: Int, T) -> Unit): Unit = this.`▶`.forEachIndexed(action)

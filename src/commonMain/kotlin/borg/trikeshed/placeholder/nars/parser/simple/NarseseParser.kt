@@ -23,33 +23,34 @@ class CharSeries(buf: Series<Char>) : Series<Char> by buf {
     var limit = size
     var mark = -1
     val slice get() = CharSeries(drop(position)) //not hashed, ever
-    fun get(): Char {
-        require(position < limit); return b(position++)
-    }
+    val get: Char
+        get() {
+            require(position < limit); return b(position++)
+        }
 
     val hasNext get() = position < limit
 
-    fun mk() = apply {
+    val mk = apply {
         mark = position
     }
 
     //reset
-    fun res() = apply {
+    val res = apply {
         position = mark
     }
 
     //flip
-    fun fl() = apply {
+    val fl = apply {
         limit = position; position = 0
     }
 
     //rewind
-    fun rew() = apply {
+    val rew = apply {
         position = 0
     }
 
     //clear
-    fun cl() = apply {
+    val clr = apply {
         position = 0; limit = size;mark = -1
     }
 
@@ -58,10 +59,10 @@ class CharSeries(buf: Series<Char>) : Series<Char> by buf {
         position = p
     }
 
-    val clone get() = CharSeries(take(size))
+    fun clone() = CharSeries(take(size))
 
 
-    //a hash of the chars between position and limit
+    /** a hash of contents only. not position, limit, mark */
     val cacheCode: Int
         get() {
             var h = 1
@@ -72,18 +73,23 @@ class CharSeries(buf: Series<Char>) : Series<Char> by buf {
         }
 
     override fun equals(other: Any?): Boolean {
-        if (this === other) return true
-        if (other !is CharSeries) return false
-        if (position != other.position) return false
-        if (limit != other.limit) return false
-        if (mark != other.mark) return false
-        if (size != other.size) return false
-        for (i in 0 until size) {
-            if (b(i) != other.b(i)) return false
+        when {
+            this === other -> return true
+            other !is CharSeries -> return false
+            position != other.position -> return false
+            limit != other.limit -> return false
+            mark != other.mark -> return false
+            size != other.size -> return false
+            else -> {
+                for (i in 0 until size) {
+                    if (b(i) != other.b(i)) return false
+                }
+                return true
+            }
         }
-        return true
     }
 
+    /** idempotent, a cache can contain this hash and safely deduce the result from previous inserts */
     override fun hashCode(): Int {
         var result = position
         result = 31 * result + limit
@@ -108,30 +114,32 @@ typealias CharParser = ConditionalUnary<CharSeries>
 // just read it from the coroutineContext? yes, that would work
 
 interface IAnyOf {
-     val ops: Array<out CharParser>
-}interface IAllOf {
-     val ops: Array<out  CharParser>
+    val ops: Array<out CharParser>
 }
 
-open class anyOf(override vararg val ops: CharParser) :   CharParser by { s -> ops.firstNotNullOfOrNull { it(s) } },
+interface IAllOf {
+    val ops: Array<out CharParser>
+}
+
+open class anyOf(override vararg val ops: CharParser) : CharParser by { s -> ops.firstNotNullOfOrNull { it(s) } },
     IAnyOf
 
-class allOf(override vararg val ops: CharParser) :IAllOf, CharParser by { s ->
+class allOf(override vararg val ops: CharParser) : IAllOf, CharParser by { s ->
     ops.reduce { acc, conditionalUnary -> { s -> acc(s)?.let { conditionalUnary(it) } } }(s)
 }
 
 
-class concAnyOf(override vararg var ops: CharParser) : IAnyOf,CharParser by { series ->
+class concAnyOf(override vararg var ops: CharParser) : IAnyOf, CharParser by { series ->
     runBlocking {
         val channel = Channel<Pair<CoroutineScope, CharSeries>>()
-        supervisorScope { //we use this and 2 joins, instead of flow with concurrent merge. cancellation is less clear with flow
+        supervisorScope { //we use this and 2 launches, instead of flow with concurrent merge. cancellation is less clear with flow
             launch {
                 for ((index, op) in ops.withIndex()) {
                     //some ops are enums, take thier name, else use AnyOf$index
                     val name = (op as? Enum<*>)?.name ?: op::class.simpleName ?: "AnyOf$index"
                     val storedOp = store_(op, name)
                     launch {
-                        val result = storedOp(series.clone)
+                        val result = storedOp(series.clone())
                         if (result != null) {
                             val element = this to result
                             channel.send(element)
@@ -147,17 +155,17 @@ class concAnyOf(override vararg var ops: CharParser) : IAnyOf,CharParser by { se
     }
 }
 
-class concAllOf(override vararg var ops: CharParser) :IAllOf, CharParser by { series ->
+class concAllOf(override vararg var ops: CharParser) : IAllOf, CharParser by { series ->
     runBlocking {
         val channel = Channel<Pair<CoroutineScope, CharSeries>>()
         supervisorScope { //we use this and 2 joins, instead of flow with concurrent merge. cancellation is less clear with flow
             launch {
-                val series=series.clone
+                val series = series.clone()
                 for ((index, op) in ops.withIndex()) {
                     //some ops are enums, take thier name, else use AnyOf$index
                     val name = (op as? Enum<*>)?.name ?: op::class.simpleName ?: "AnyOf$index"
                     val storedOp = store_(op, name)
-                    runBlocking {
+                    supervisorScope {
                         val result = storedOp(series)
                         if (result != null) {
                             val element = this to result
@@ -176,11 +184,11 @@ class concAllOf(override vararg var ops: CharParser) :IAllOf, CharParser by { se
 
 
 class backtrack_(val op: CharParser) : CharParser by {
-    it.mk().let { op(it) }?.let { it.res(); it } ?: it
+    it.mk.let { op(it) }?.let { it.res; it } ?: it
 }
 
 class char_(val c: Char) : CharParser by {
-    if (it.hasNext && (it.get() == c)) it else null
+    if (it.hasNext && (it.get == c)) it else null
 }
 
 
@@ -219,8 +227,6 @@ class string_(val s: String) : CharParser {
     }
 
     override fun invoke(p1: CharSeries): CharSeries? {
-
-
         val slice = p1.slice
         if (slice.size < s.length) return null
         //compare in order of searchOrder
@@ -252,7 +258,7 @@ class infix_(val op: CharParser, val infix: CharParser) :
 /** limit the buffer size. */
 class lim(val op: CharParser, val n: Int) : CharParser by {
 
-    val b = it.clone
+    val b = it.clone()
     op(b)?.let { if (b.position <= n) it else null }
 }
 
@@ -305,35 +311,13 @@ class repeat_(val op: CharParser, val n: Int = -1) : CharParser by {
 
 /** mk_ marks the current position in the input stream. */
 class mk_ : CharParser by {
-    it.mk()
+    it.mk
     it
 }
 
-/** res_ resets the input stream to the last marked position. */
-class res_ : CharParser by {
-    it.res()
-    it
-}
-
-/** fl_ flips the input stream. */
-class fl_ : CharParser by {
-    it.fl()
-    it
-}
-
-/** rew_ rewinds the input stream. */
-class rew_ : CharParser by {
-    it.rew()
-    it
-}
-
-
-class value_(val op: CharParser, val v: TypeMemento) : CharParser by {
-    TODO()
-}
 
 class chrange_(val start: Char, val end: Char) : CharParser by {
-    if (it.hasNext && (it.get() in start..end)) it else null
+    if (it.hasNext && (it.get in start..end)) it else null
 }
 
 class chgroup_(val s: String) : CharParser {
@@ -342,12 +326,12 @@ class chgroup_(val s: String) : CharParser {
     override fun invoke(p1: CharSeries): CharSeries? = runBlocking {
         //if more than 32 use binary search
         if (chars.size > 32) {
-            if (p1.hasNext && (chars.binarySearch(p1.get()) >= 0)) p1 else null
+            if (p1.hasNext && (chars.binarySearch(p1.get) >= 0)) p1 else null
         } else {
             //if less than 32 use Int as bitset
             var bs = 0
             chars.forEach { bs = bs or (1 shl (it - 'a')) }
-            if (p1.hasNext && ((bs and (1 shl (p1.get() - 'a'))) != 0)) p1 else null
+            if (p1.hasNext && ((bs and (1 shl (p1.get - 'a'))) != 0)) p1 else null
         }
     }
 
