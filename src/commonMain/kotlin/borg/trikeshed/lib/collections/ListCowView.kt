@@ -5,11 +5,11 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
 /** a mutable listView of a List which performs a copy to MutableList on first mutation.  not threadsafe or concurrent. */
-class ListCowView<T>(var list: List<T>) : List<T>, AbstractMutableList<T>() {
+class ListCowView<T>(private var list: List<T> = emptyList()) : List<T>, AbstractMutableList<T>() {
     //keep our inital list until a mutable operation, then replace with .toMutableList
-    var once: Mutex? = Mutex()
+   private var once: Mutex? = Mutex()
 
-    var guardFunction:(()->Unit)? = {
+  private  var guardFunction:(()->Unit)? = {
         runBlocking {
             once?.withLock { //thundering herds may all arrive here at once, but only one will get to copy the list
                 if (list !is MutableList<T>) {

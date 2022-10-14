@@ -1,3 +1,5 @@
+@file:Suppress("UNCHECKED_CAST")
+
 package borg.trikeshed.lib.collections
 
 import kotlinx.coroutines.runBlocking
@@ -5,15 +7,15 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
 //and for Map:
-class MapCowView<K,V>(var list: Map<K,V>) : Map<K,V>, AbstractMutableMap<K,V>() {
+class MapCowView<K, V>(private var kvMap: Map<K, V> = emptyMap()) : Map<K, V>, AbstractMutableMap<K, V>() {
     //keep our inital list until a mutable operation, then replace with .toMutableMap
-    var once: Mutex? = Mutex()
+    private var once: Mutex? = Mutex()
 
-    var guardFunction:(()->Unit)? = {
+    private var guardFunction: (() -> Unit)? = {
         runBlocking {
             once?.withLock { //thundering herds may all arrive here at once, but only one will get to copy the list
-                if (list !is MutableMap<K, V>) {
-                    list = list.toMutableMap()
+                if (kvMap !is MutableMap<K, V>) {
+                    kvMap = kvMap.toMutableMap()
                 }
                 once = null
                 guardFunction = null
@@ -23,24 +25,28 @@ class MapCowView<K,V>(var list: Map<K,V>) : Map<K,V>, AbstractMutableMap<K,V>() 
 
     override fun put(key: K, value: V): V? {
         guardFunction?.invoke()
-        return (list as MutableMap<K,V>).put(key, value)
+        return (kvMap as MutableMap<K, V>).put(key, value)
     }
 
     override val size: Int
-        get() = list.size
+        get() = kvMap.size
 
     override fun containsKey(key: K): Boolean {
-        return list.containsKey(key)
+        return kvMap.containsKey(key)
     }
 
     override fun containsValue(value: V): Boolean {
-        return list.containsValue(value)
+        return kvMap.containsValue(value)
     }
 
     override fun get(key: K): V? {
-        return list.get(key)
+        return kvMap.get(key)
     }
 
     override fun isEmpty(): Boolean {
-        return list.isEmpty()
+        return kvMap.isEmpty()
     }
+
+    @Deprecated("undefined behavior")
+    override val entries: MutableSet<MutableMap.MutableEntry<K, V>> get() = kvMap.entries as MutableSet<MutableMap.MutableEntry<K, V>>
+}

@@ -6,13 +6,14 @@ import borg.trikeshed.isam.meta.IOMemento
 import borg.trikeshed.isam.meta.TypeMemento
 import borg.trikeshed.lib.*
 import borg.trikeshed.lib.collections.Stack
+import borg.trikeshed.placeholder.nars.parser.simple.chgroup_.Companion.digit
+import borg.trikeshed.placeholder.nars.parser.simple.chgroup_.Companion.letter
+import borg.trikeshed.placeholder.nars.parser.simple.chgroup_.Companion.whitespace
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.*
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.CoroutineContext.Key
-import kotlin.properties.ReadWriteProperty
-import kotlin.reflect.KProperty
 
 
 /**
@@ -106,24 +107,30 @@ class CharSeries(buf: Series<Char>) : Series<Char> by buf {
 //the token parser which is a finite state machine which parses the input stream into tokens, but also
 //creates a list of token indexes for fast random access
 
-typealias ConditionalUnary<T> = (T) -> T?
-typealias CharParser = ConditionalUnary<CharSeries>
+typealias ConditionalUnary<T> = ((T) -> T?)
+typealias   CharParser = ConditionalUnary<CharSeries>
+
+infix fun CharParser.invoke(other: CharParser): CharParser = this + other
 
 // can the FSM stuff the current coroutineContext with a CoroutineContext.Element that captures the current
 // state and the next state and the input and the current token? and then the vetoable can
 // just read it from the coroutineContext? yes, that would work
 
+/** marker interface */
 interface IAnyOf {
     val ops: Array<out CharParser>
 }
 
+/** marker interface */
 interface IAllOf {
     val ops: Array<out CharParser>
 }
 
+@Deprecated("this is just a placeholder for collapsing a run of IAnyOf", replaceWith = ReplaceWith("concAnyOf"))
 open class anyOf(override vararg val ops: CharParser) : CharParser by { s -> ops.firstNotNullOfOrNull { it(s) } },
     IAnyOf
 
+@Deprecated("this is just a placeholder for collapsing a run of IAllOf", replaceWith = ReplaceWith("concAllOf"))
 class allOf(override vararg val ops: CharParser) : IAllOf, CharParser by { s ->
     ops.reduce { acc, conditionalUnary -> { s -> acc(s)?.let { conditionalUnary(it) } } }(s)
 }
@@ -281,11 +288,7 @@ class dbg_(val op: CharParser) : CharParser by {
  *
  *
  */
-class opt_(val op: CharParser) : CharParser by { s ->
-    op(s)?.let { s } ?: s
-
-
-}
+class opt_(val op: CharParser) : CharParser by { s: CharSeries -> op(s)?.let { s } ?: s }
 
 class pos(val op: CharParser, val p: Int) : CharParser by {
     it.pos(p).let { op(it) }?.let { it.pos(p); it }
@@ -395,22 +398,29 @@ class track_(val op: CharParser, val observer: (CharSeries?) -> Unit) :
         }
     }
 
-infix fun IAnyOf.or(b: anyOf): IAnyOf =
+infix fun IAnyOf.or(b: concAnyOf): IAnyOf =
     concAnyOf(*ops as Array<(CharSeries) -> CharSeries?> + b.ops as Array<(CharSeries) -> CharSeries?>)
 
-infix fun IAllOf.and(b: allOf): IAllOf =
+infix fun IAllOf.and(b: concAllOf): IAllOf =
     concAllOf(*ops as Array<(CharSeries) -> CharSeries?> + b.ops as Array<(CharSeries) -> CharSeries?>)
 
-infix fun CharParser.or(b: CharParser) = anyOf(this, b)
-infix fun CharParser.and(b: CharParser) = allOf(this, b)
+infix fun CharParser.or(b: CharParser) = concAnyOf(this, b)
+infix fun CharParser.and(b: CharParser) = concAllOf(this, b)
+
+
+/** not_ */
 operator fun CharParser.not() = not_(this)
-operator fun CharParser.get(n: Int) = repeat_(this, n)
 
 /**repeat minimum/max */
 operator fun CharParser.get(n: IntRange) =
     repeat_(this, n.last) and opt_(this)[n.first - n.last]
 
-/** optional*/
+/**
+ * repeat, -1 means repeat until failure
+ */
+operator fun CharParser.get(n: Int) = repeat_(this, n)
+
+/** optional  -- synonyms: a[b] , a*b  */
 operator fun CharParser.get(op: CharParser) = this and opt_(op)
 
 /** stores state with name */
@@ -419,55 +429,36 @@ operator fun CharParser.get(name: String) = store_(this, name)
 /** stores state with name and type parser*/
 operator fun CharParser.get(meta: Join<String, TypeMemento>) = store_(this, meta.a, meta.b)
 
-/** alt optional */
+/** optional, anyOf */
 operator fun CharParser.div(op: CharParser) = this or op
-operator fun CharParser.plus(op: CharParser) = this and op
+operator fun CharParser.div(c: Char): CharParser = this / char_(c)
+operator fun CharParser.div(s: String): CharParser = this / string_(s)
 
-/** this and opt_ op*/
-operator fun CharParser.times(op: CharParser) = this and opt_(op)
-operator fun CharParser.minus(op: CharParser) = this and not_(op) //
+/**and, allOf*/
+operator fun CharParser.plus(op: CharParser) = this and op
+operator fun CharParser.plus(c: Char): CharParser = this + char_(c)
+operator fun CharParser.plus(s: String): CharParser = this + string_(s)
+
+
+/** zero or more this */
+operator fun CharParser.times(op: CharParser) = this[-1] + (op)
+operator fun CharParser.times(c: Char): CharParser = this * char_(c)
+operator fun CharParser.times(s: String): CharParser = this * string_(s)
 
 /** one but not both */
-operator fun CharParser.rem(op: CharParser) =
-    this and not_(op) or op and not_(this)
+operator fun CharParser.rem(op: CharParser) = this and not_(op) or op and not_(this)
+operator fun CharParser.rem(c: Char): CharParser = this % char_(c)
+operator fun CharParser.rem(s: String): CharParser = this % string_(s)
 
+/**this and not*/
+operator fun CharParser.minus(op: CharParser) = this and not_(op) //
+operator fun CharParser.dec() = opt_(this)
+ fun String.dec() = opt_(  + this)
+ fun Char.dec() = opt_(  + this)
+operator fun CharParser.minus(c: Char): CharParser = this - c
+operator fun CharParser.minus(s: String): CharParser = this - s
 
-//parser operator overloading  legend:
-//   |operator | meaning | example |
-//   |---------|---------|---------|
-//   |   +     | and     | a + b   |
-//   |   -     | not     | a - b   |
-//   |   *     | and opt | a * b   |
-//   |   /     | or      | a / b   |
-//   |   %     | xor     | a % b   |
-//   |   []    | repeat  | a[3]    |
-//   |   []    | repeat  | a[3..5] |
-//   |   []    | opt     | a[b]    |
-//   |   []    | store   | a["name"]|
-//   |   []    | store   | a["name":type]|
-//   |   ()    | passthru| a(b)    |
-//   |   ()    | passthru| a(b,c)  |
-//   |   ()    | passthru| a(b,c,d)|
-
-
-//wraps a ConditionalUnary ".invoke" operator with a "by Delegates.vetoable" property that can be vetoed by a vetoable function
-open class VetoableUnaryConditional<T>(
-    /**can be changed as needed*/
-    private val f: ConditionalUnary<T>,
-    /**can be changed as needed*/
-    var vetoable: ReadWriteProperty<Any?, ConditionalUnary<T>>,
-    /** intended to label a single FSM state */
-    val statename: String
-) : ConditionalUnary<T> by f {
-    override fun invoke(p1: T): T? {
-
-        val v: (T) -> T? = vetoable.getValue(this, object : KProperty<T?> {
-            override val name: String
-                get() = statename
-        })
-        return v(p1)
-    }
-}
+object `^` : CharParser by { it -> skipws_({ s -> s })(it) }
 
 data class FSMState(
     val name: String,
@@ -584,6 +575,14 @@ class peek_(
     }
 }
 
+/** backtrack quietly on fail as success */
+class bof_(val op: CharParser) : CharParser {
+    override fun invoke(p1: CharSeries): CharSeries = runBlocking {
+        val clone = p1.clone()
+        op(p1) ?: clone
+    }
+}
+
 
 // the nars reasoner logic:
 // 1.  parse the input into a task
@@ -623,7 +622,7 @@ class peek_(
 //               task ::= [budget] sentence                       (* task to be processed *)
 //
 //         sentence ::= statement"." [tense] [truth]            (* judgement to be absorbed into beliefs *)
-//                    / statement"?" [tense] [truth]            (* question on thuth-value to be answered *)
+//                    / statement"?" [tense] [truth]            (* question on truth-value to be answered *)
 //                    / statement"!" [desire]                   (* goal to be realized by operations *)
 //                    / statement"@" [desire]                   (* question on desire-value to be answered *)
 //
@@ -696,156 +695,171 @@ class peek_(
 //            quality : #"([0]?\.[0-9]+|1\.[0]*|1|0)"           (* 0 <= x <= 1 *)
 //          frequency : #"([0]?\.[0-9]+|1\.[0]*|1|0)"           (* 0 <= x <= 1 *)
 //         confidence : #"[0]?\.[0]*[1-9]{1}[0-9]*"             (* 0 <  x <  1 *)
-sealed interface NarsParserFSM : CharParser {
-    val name: String
-    val metaType: TypeMemento
+
+
+typealias `-_` = CharParser
+
+infix operator fun Char.get(s: CharParser): CharParser = (+this)[s]
+infix operator fun Char.invoke(s: Char): CharParser = (+this) + s
+infix operator fun Char.invoke(s: CharParser): CharParser = (+this) + s
+infix operator fun Char.invoke(s: String): CharParser = (+this) + s
+infix operator fun Char.minus(s: CharParser): CharParser = (+this) - s
+infix operator fun Char.plus(s: CharParser): CharParser = (+this) + s
+infix operator fun Char.plus(s: String): CharParser = (+this) + s
+infix operator fun Char.times(s: CharParser): CharParser = (+this) * s
+infix operator fun String.div(s: CharParser): CharParser = (+this) / s
+infix operator fun String.get(s: CharParser): CharParser = (+this)[s]
+infix operator fun String.invoke(s: Char): CharParser = (+this) + s
+infix operator fun String.invoke(s: CharParser): CharParser = (+this) + s
+infix operator fun String.invoke(s: String): CharParser = (+this) + s
+infix operator fun String.minus(s: CharParser): CharParser = (+this) - s
+infix operator fun String.plus(s: CharParser): CharParser = (+this) + s
+infix operator fun String.times(s: CharParser): CharParser = (+this) * s
+operator fun Char.unaryPlus(): CharParser = `^` + this
+operator fun String.unaryPlus(): CharParser = `^` + this
+
+typealias `-^` = NarseseParser
+
+//when the parser precedence exceeds the kotlin operator precedence we need to insert parens to make it work
+sealed interface NarseseParser : CharParser {
+    class `^^`(var op: CharParser) : NarseseParser {
+        override fun invoke(p1: CharSeries): CharSeries? = op(p1)
+        override fun toString(): String = "^^($op)"
+
+        companion object {
+            infix operator fun invoke(op: CharParser): `-^` = `^^`(op)
+        }
+    }
+
+
+    //priority here is to express the cheapest kolmogorov complexity of the kotlin code needed to express the parser
+    // single char strings should be Char not String
+    // opening Char and String should use  +x operator
+    // a[b] is preferable to a(--b) however --b is necessary for opening parser in a parse expression
+    // a b is preferable to a and b , also preferable to a + b
+    //kotlin operator precedence is not the same as parser precedence, so we need to use parens to make it work
+
+
+    //               task ::= [budget] sentence                       (* task to be processed *)
+    object task : `-^` by `^^`(opt_(budget) + sentence)
+
+    //            sentence ::= statement [tense]      /               (* declarative sentence *)
+//                         question [tense]  [truth]     /               (* question sentence *)
+//                         goal [tense]           /               (* goal sentence *)
+//                         quest [tense]          /               (* quest sentence *)
+//                         judgement [tense] [truth ]     /               (* judgement sentence *)
+//                         command [tense]                        (* command sentence *)
+    object sentence : `-^` by `^^`(
+        statement[tense] /
+                question[tense][truth] /
+                goal[tense] /
+                quest[tense] /
+                judgement[tense][truth] /
+                command[tense]
+    )
+
+    //            question ::= "?" term                                (* question *)
+    object question : `-^` by `^^`(+"?" + term)
+
+    //               goal ::= "!" term                                 (* goal *)
+    object goal : `-^` by `^^`(+"!" + term)
+
+    //              quest ::= "?" "!" term                             (* quest *)
+    object quest : `-^` by `^^`(+"?" + "!" + term)
+
+    //          judgement ::= term copula term                        (* judgement *)
+    object judgement : `-^` by `^^`(term + copula + term)
+
+    //            command ::= term                                    (* command *)
+    object command : `-^` by `^^`(term)
+
+    //            statement ::= "(" statement ")"                      (* statement in parentheses *)
+    //                        / compound                               (* compound statement *)
+    //                        / operation                              (* operation *)
+    //                        / variable                               (* variable *)
+    object statement : `-^` by `^^`(
+        +"(" + statement + ")" /
+                compound /
+                operation /
+                variable
+    )
+
+    //            compound ::= term conjunction term                   (* compound statement *)
+    object compound : `-^` by `^^`(term + conjunction + term)
+
+    //            operation ::= term operator term                     (* operation *)
+    object operation : `-^` by `^^`(term + operator + term)
+
+    //            variable ::= "$" word                                (* variable *)
+    object variable : `-^` by `^^`(+"$" + word)
+
+    //            term ::= word                                        (* word *)
+//                   / image                                       (* image *)
+//                   / set                                         (* set *)
+//                   / statement                                   (* statement *)
+//                   / variable                                    (* variable *)
+//                   / compound                                    (* compound term *)
+//                   / operation                                   (* operation *)
+//                   / question                                    (* question *)
+//                   / goal                                        (* goal *)
+//                   / quest                                       (* quest *)
+//                   / judgement                                   (* judgement *)
+//                   / command                                     (* command *)
+    object term : `-^` by `^^`(
+        word /
+                image /
+                set /
+                statement /
+                variable /
+                compound /
+                operation /
+                question /
+                goal /
+                quest /
+                judgement /
+                command
+    )
+
+    //            word ::= !(whitespace*)            (* word *)
+    object word : `-^` by `^^`(!whitespace[-1])
+
+    //            image ::= "image:" word                             (* image *)
+    object image : `-^` by `^^`(+"image:" + word)
+
+    //              set ::= "{" term {"," term} "}"                   (* set *)
+    object set : `-^` by `^^`(+"{" + term * (+"," + term) + "}")
+
+    //            copula ::= ":"                                      (* copula *)
+    object copula : `-^` by `^^`(+":")
+
+    //            conjunction ::= "&"                                 (* conjunction *)
+    object conjunction : `-^` by `^^`(+"&")
+
+    //            operator ::= "+"                                   (* operator *)
+    object operator : `-^` by `^^`(+"+")
+
+    //            tense ::= ":" word                                  (* tense *)
+    object tense : `-^` by `^^`(+":" + word)
+
+    //            truth ::= "(" truth_value ")"                       (* truth value *)
+    object truth : `-^` by `^^`(+"(" + truth_value + ")")
+
+    //            truth_value ::= float ":" float ":" float           (* frequency, confidence, expectation *)
+    object truth_value : `-^` by `^^`(float + ":" + float + ":" + float)
+
+    //            budget ::= "(" budget_value ")"                     (* budget value *)
+    object budget : `-^` by `^^`(+"(" + budget_value + ")")
+
+    //            budget_value ::= float ":" float ":" float ":" float (* priority, durability, quality, frequency *)
+    object budget_value : `-^` by `^^`(float + ":" + float + ":" + float + ":" + float)
+
+    //            float ::= digit {digit} "." {digit}                 (* decimal number *)
+    object float : `-^` by `^^`(digit * digit + "." + digit[-1])
 
 }
 
 
-object term : CharParser by skipws_(
-    word or  //an atomic constant term
-            variable or  //an atomic variable term
-            compound_term or  //a term with internal structure
-            statement
-)  //a statement can serve as a term
 
 
-object compound_term : CharParser by skipws_(
-    allOf(char_('('), term, copula, term, char_(')')) or  //two terms related to each other
-            term or  //a term can name a statement
-            allOf(
-                char_('('),
-                char_('^'),
-                word,
-                repeat_(allOf(char_(','), term)),
-                char_(')')
-            ) or  //an operation to be executed
-            allOf(word, char_('('), term, repeat_(allOf(char_(','), term)), char_(')'))
-)  //an operation to be executed
 
-
-object statement : CharParser by skipws_(
-    concAllOf(
-        char_('('),
-        statement,
-        copula,
-        statement,
-        char_(')')
-    ) or  //two statements related to each other
-            term or  //a term can name a statement
-            concAllOf(
-                char_('('),
-                char_('^'),
-                word,
-                repeat_(allOf(char_(','), term)),
-                char_(')')
-            ) or  //an operation to be executed
-            concAllOf(word, char_('('), term, repeat_(allOf(char_(','), term)), char_(')'))
-)  //an operation to be executed
-
-
-object variable : CharParser by skipws_(
-    (char_('$') + word) /  //independent variable
-            (char_('#') + word) /  //dependent variable
-            (char_('?') + word)
-)  //query variable in question
-
-
-object budget : CharParser by skipws_(char_('%') and number)  //a budget value
-
-object word :
-    CharParser by skipws_((!whitespace)[-1])  //word is a sequence of non-whitespace characters
-
-
-object copula : CharParser by skipws_(
-    string_("-->") /  //inheritance
-            string_("--]") /  //property
-            string_("<->") /  //similarity
-            string_("</>") /  //predictive equivalence
-            string_("<=>") /  //equivalence
-            string_("<|>") /  //concurrent equivalence
-            string_("=/>") /  //predictive implication
-            string_("==>") /  //implication
-            string_("=\\>") /  //=\> retrospective implication
-            string_("=|>") /  //concurrent implication
-            string_("{--") /  //instance
-            string_("{-]")
-)  //instance-property
-
-object tense : CharParser by skipws_(
-    string_(":/:") /  //future event
-            string_(":|:") /  //present event
-            string_(":\\:")
-)  //\: past event
-
-object desire : CharParser by skipws_(truth)  //same format, different interpretations
-
-object truth : CharParser by skipws_(char_('%') and number)  //a truth value
-
-object priority : CharParser by skipws_(number)  //a priority value
-
-object durability : CharParser by skipws_(number)  //a durability value
-
-object quality : CharParser by skipws_(number)  //a quality value
-
-object frequency : CharParser by skipws_(number)  //a frequency value
-
-object confidence : CharParser by skipws_(number)  //a confidence value
-
-object number : CharParser by skipws_(chgroup_.digit[-1])  //a number is a sequence of digits
-
-//        op-ext-set::= "{"                                     (* extensional set *)
-//        op-int-set::= "["                                     (* intensional set *)
-//       op-negation::= "--"                                    (* negation *)
-//      op-int-image::= "\\"                                    (* \ intensional image *)
-//      op-ext-image::= "/"                                     (* extensional image *)
-//         op-multi ::= "&&"                                    (* conjunction *)
-//                    / "*"                                     (* product *)
-//                    / "||"                                    (* disjunction *)
-//                    / "&|"                                    (* parallel events *)
-//                    / "&/"                                    (* sequential events *)
-//                    / "|"                                     (* intensional intersection *)
-//                    / "&"                                     (* extensional intersection *)
-//        op-single ::= "-"                                     (* extensional difference *)
-//                    / "~"                                     (* intensional difference *)
-//    compound-term ::= op-ext-set term {"," term} "}"          (* extensional set *)
-//                    / op-int-set term {"," term} "]"          (* intensional set *)
-//                    / "("op-multi"," term {"," term} ")"      (* with prefix operator *)
-//                    / "("op-single"," term "," term ")"       (* with prefix operator *)
-//                    / "(" term {op-multi term} ")"            (* with infix operator *)
-//                    / "(" term op-single term ")"             (* with infix operator *)
-//                    / "(" term {","term} ")"                  (* product, new notation *)
-//                    / "(" op-ext-image "," term {"," term} ")"(* special case, extensional image *)
-//                    / "(" op-int-image "," term {"," term} ")"(* special case, \ intensional image *)
-//                    / "(" op-negation "," term ")"            (* negation *)
-//                    / op-negation term                        (* negation, new notation *)
-
-object op_ext_set : CharParser by skipws_(char_('{'))  //extensional set
-
-object op_int_set : CharParser by skipws_(char_('['))  //intensional set
-
-object op_multi : CharParser by skipws_(
-    string_("&&") /  //conjunction
-            string_("*") /  //product
-            string_("||") /  //disjunction
-            string_("&|") /   //parallel events
-            string_("&/") /  //sequential events
-            string_("|") /  //intensional intersection
-            string_("&")
-)  //extensional intersection
-
-object op_single : CharParser by skipws_(
-    char_('-') or  //extensional difference
-            char_('~')
-)  //intensional difference
-
-object op_ext_image : CharParser by skipws_(char_('/'))  //extensional image
-
-object op_int_image : CharParser by skipws_(char_('\\'))  //\ intensional image
-
-object op_negation : CharParser by skipws_(string_("--"))  //negation
-
-object whitespace :
-    CharParser by skipws_(char_(' ') or char_('\t') or char_('\r') or char_('\n'))  //whitespace
 

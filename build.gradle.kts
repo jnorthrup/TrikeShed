@@ -22,6 +22,7 @@ version = "1.0"
 
 repositories {
     maven("https://oss.sonatype.org/content/repositories/snapshots/")
+    maven("https://mvnrepository.com/artifact/org.jetbrains.kotlinx/")
     mavenCentral()
     mavenLocal()
     gradlePluginPortal()
@@ -31,7 +32,7 @@ repositories {
 kotlin {
     linuxX64 { // Replace with a target you need.
         compilations.getByName("main") {
-            val myInterop by cinterops.creating {
+//            val myInterop by cinterops.creating {
 //                // Def-file describing the native API.
 //                // The default path is src/nativeInterop/cinterop/<interop-name>.def
 //                defFile(project.file("def-file.def"))
@@ -47,17 +48,15 @@ kotlin {
 //
 //                // A shortcut for includeDirs.allHeaders.
 //                includeDirs("include/directory", "another/directory")
-            }
+//            }
 
-            val anotherInterop by cinterops.creating { /* ... */ }
+//            val anotherInterop by cinterops.creating { /* ... */ }
         }
     }
     jvm {
         withJava()
-
-
     }
-    wasm32()
+//    wasm32()
 //    js { we use func interfaces
 //        // To build distributions for and run tests on browser or Node.js use one or both of:
 ////        browser()
@@ -88,8 +87,6 @@ kotlin {
                 implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.4.0")
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.2")
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.3.0")
-                //atomicfu
-                implementation("org.jetbrains.kotlinx:atomicfu:0.17.4")
             }
         }
 
@@ -129,6 +126,5 @@ kotlin {
         }
 
         val jvmTest by getting
-
     }
 }
