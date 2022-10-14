@@ -453,8 +453,8 @@ operator fun CharParser.rem(s: String): CharParser = this % string_(s)
 /**this and not*/
 operator fun CharParser.minus(op: CharParser) = this and not_(op) //
 operator fun CharParser.dec() = opt_(this)
- fun String.dec() = opt_(  + this)
- fun Char.dec() = opt_(  + this)
+fun String.dec() = opt_(+this)
+fun Char.dec() = opt_(+this)
 operator fun CharParser.minus(c: Char): CharParser = this - c
 operator fun CharParser.minus(s: String): CharParser = this - s
 
@@ -601,102 +601,6 @@ class bof_(val op: CharParser) : CharParser {
 // 5.  repeat 1-4 until no new tasks are derived
 
 
-// the parser needs cold, lazy kotlin Sequence or TrikeShed Series to work with the forward and backward token
-// definition and to avoid stack overflow
-
-//the nars grammars, with annotations and meta data, are defined in the following data classes
-
-
-//the Narsese BNF grammar:
-
-//next we define the same grammar while removing the left recursion and left factoring
-//the grammar is now LL(1) and can be parsed with a simple recursive descent parser
-
-// <symbol> is a nonterminal (variable) and the __expression__ consists of one or more sequences of either terminal or nonterminal symbols;
-// ::= means that the symbol on the left must be replaced with the expression on the right.
-//  more sequences [of symbols] are separated by the vertical bar "|", indicating a choice, the whole being a possible substitution for the symbol on the left.
-// '#' as a token prefix indicates regex pattern
-// { } around a construction indicates a repeating group
-//--------------------------------------------------------------------------------------------------------
-//
-//               task ::= [budget] sentence                       (* task to be processed *)
-//
-//         sentence ::= statement"." [tense] [truth]            (* judgement to be absorbed into beliefs *)
-//                    / statement"?" [tense] [truth]            (* question on truth-value to be answered *)
-//                    / statement"!" [desire]                   (* goal to be realized by operations *)
-//                    / statement"@" [desire]                   (* question on desire-value to be answered *)
-//
-//
-//           copula ::= "-->"                                   (* inheritance *)
-//                    / "--]"                                   (* property *)
-//                    / "<->"                                   (* similarity *)
-//                    / "</>"                                   (* predictive equivalence *)
-//                    / "<=>"                                   (* equivalence *)
-//                    / "<|>"                                   (* concurrent equivalence *)
-//                    / "=/>"                                   (* predictive implication *)
-//                    / "==>"                                   (* implication *)
-//                    / "=\\>"                                  (* =\> retrospective implication *)
-//                    / "=|>"                                   (* concurrent implication *)
-//                    / "{--"                                   (* instance *)
-//                    / "{-]"                                   (* instance-property *)
-//
-//             term ::= word                                    (* an atomic constant term *)
-//                    / variable                                (* an atomic variable term *)
-//                    / compound-term                           (* a term with internal structure *)
-//                    / statement                               (* a statement can serve as a term *)
-//
-//        op-ext-set::= "{"                                     (* extensional set *)
-//        op-int-set::= "["                                     (* intensional set *)
-//       op-negation::= "--"                                    (* negation *)
-//      op-int-image::= "\\"                                    (* \ intensional image *)
-//      op-ext-image::= "/"                                     (* extensional image *)
-//         op-multi ::= "&&"                                    (* conjunction *)
-//                    / "*"                                     (* product *)
-//                    / "||"                                    (* disjunction *)
-//                    / "&|"                                    (* parallel events *)
-//                    / "&/"                                    (* sequential events *)
-//                    / "|"                                     (* intensional intersection *)
-//                    / "&"                                     (* extensional intersection *)
-//        op-single ::= "-"                                     (* extensional difference *)
-//                    / "~"                                     (* intensional difference *)
-//    compound-term ::= op-ext-set term {"," term} "}"          (* extensional set *)
-//                    / op-int-set term {"," term} "]"          (* intensional set *)
-//                    / "("op-multi"," term {"," term} ")"      (* with prefix operator *)
-//                    / "("op-single"," term "," term ")"       (* with prefix operator *)
-//                    / "(" term {op-multi term} ")"            (* with infix operator *)
-//                    / "(" term op-single term ")"             (* with infix operator *)
-//                    / "(" term {","term} ")"                  (* product, new notation *)
-//                    / "(" op-ext-image "," term {"," term} ")"(* special case, extensional image *)
-//                    / "(" op-int-image "," term {"," term} ")"(* special case, \ intensional image *)
-//                    / "(" op-negation "," term ")"            (* negation *)
-//                    / op-negation term                        (* negation, new notation *)
-//
-//        statement ::= <"<">term copula term<">">              (* two terms related to each other *)
-//                    / <"(">term copula term<")">              (* two terms related to each other, new notation *)
-//                    / term                                    (* a term can name a statement *)
-//                    / "(^"word {","term} ")"                  (* an operation to be executed *)
-//                    / word"("term {","term} ")"               (* an operation to be executed, new notation *)
-//
-//         variable ::= "$"word                                 (* independent variable *)
-//                    / "#"word                                 (* dependent variable *)
-//                    / "?"word                                 (* query variable in question *)
-//
-//            tense ::= ":/:"                                   (* future event *)
-//                    / ":|:"                                   (* present event *)
-//                    / ":\\:"                                  (* :\: past event *)
-//
-//           desire ::= truth                                   (* same format, different interpretations *)
-//            truth ::= <"%">frequency[<";">confidence]<"%">    (* two numbers in [0,1]x(0,1) *)
-//           budget ::= <"$">priority[<";">durability][<";">quality]<"$"> (* three numbers in [0,1]x(0,1)x[0,1] *)
-//
-//               word : #"[^\ ]+"                               (* unicode string *)
-//           priority : #"([0]?\.[0-9]+|1\.[0]*|1|0)"           (* 0 <= x <= 1 *)
-//         durability : #"[0]?\.[0]*[1-9]{1}[0-9]*"             (* 0 <  x <  1 *)
-//            quality : #"([0]?\.[0-9]+|1\.[0]*|1|0)"           (* 0 <= x <= 1 *)
-//          frequency : #"([0]?\.[0-9]+|1\.[0]*|1|0)"           (* 0 <= x <= 1 *)
-//         confidence : #"[0]?\.[0]*[1-9]{1}[0-9]*"             (* 0 <  x <  1 *)
-
-
 typealias `-_` = CharParser
 
 infix operator fun Char.get(s: CharParser): CharParser = (+this)[s]
@@ -732,134 +636,178 @@ sealed interface NarseseParser : CharParser {
     }
 
 
-    //priority here is to express the cheapest kolmogorov complexity of the kotlin code needed to express the parser
     // single char strings should be Char not String
     // opening Char and String should use  +x operator
     // a[b] is preferable to a(--b) however --b is necessary for opening parser in a parse expression
     // a b is preferable to a and b , also preferable to a + b
     //kotlin operator precedence is not the same as parser precedence, so we need to use parens to make it work
 
+//narsese (oPennars) grammar
+// <symbol> is a nonterminal (variable) and the __expression__ consists of one or more sequences of either terminal or nonterminal symbols;
+// ::= means that the symbol on the left must be replaced with the expression on the right.
+//  more sequences [of symbols] are separated by the vertical bar "|", indicating a choice, the whole being a possible substitution for the symbol on the left.
+// '#' as a token prefix indicates regex pattern
+// { } around a construction indicates a repeating group
+//--------------------------------------------------------------------------------------------------------
+//
+//               task ::= [budget] sentence                       (* task to be processed *)
+//
+//         sentence ::= statement"." [tense] [truth]            (* judgement to be absorbed into beliefs *)
+//                    / statement"?" [tense] [truth]            (* question on truth-value to be answered *)
+//                    / statement"!" [desire]                   (* goal to be realized by operations *)
+//                    / statement"@" [desire]                   (* question on desire-value to be answered *)
+//
+//
+//           copula ::= "-->"                                   (* inheritance *)
+//                    / "--]"                                   (* property *)
+//                    / "<->"                                   (* similarity *)
+//                    / "</>"                                   (* predictive equivalence *)
+//                    / "<=>"                                   (* equivalence *)
+//                    / "<|>"                                   (* concurrent equivalence *)
+//                    / "=/>"                                   (* predictive implication *)
+//                    / "==>"                                   (* implication *)
+//                    / "=\\>"                                  (* =\> retrospective implication *)
+//                    / "=|>"                                   (* concurrent implication *)
+//                    / "{--"                                   (* instance *)
+//                    / "{-]"                                   (* instance-property *)
+//
+//             term ::= word                                    (* an atomic constant term *)
+//                    / variable                                (* an atomic variable term *)
+//                    / compound-term                           (* a term with internal structure *)
+//                    / statement                               (* a statement can serve as a term *)
+//
+
 
     //               task ::= [budget] sentence                       (* task to be processed *)
     object task : `-^` by `^^`(opt_(budget) + sentence)
 
-    //            sentence ::= statement [tense]      /               (* declarative sentence *)
-//                         question [tense]  [truth]     /               (* question sentence *)
-//                         goal [tense]           /               (* goal sentence *)
-//                         quest [tense]          /               (* quest sentence *)
-//                         judgement [tense] [truth ]     /               (* judgement sentence *)
-//                         command [tense]                        (* command sentence *)
+    //         sentence ::= statement"." [tense] [truth]            (* judgement to be absorbed into beliefs *)
+    //                    / statement"?" [tense] [truth]            (* question on truth-value to be answered *)
+    //                    / statement"!" [desire]                   (* goal to be realized by operations *)
+    //                    / statement"@" [desire]                   (* question on desire-value to be answered *)
     object sentence : `-^` by `^^`(
-        statement[tense] /
-                question[tense][truth] /
-                goal[tense] /
-                quest[tense] /
-                judgement[tense][truth] /
-                command[tense]
+        statement + "." + opt_(tense) + opt_(truth) / statement + "?" + opt_(tense) + opt_(truth) / statement + "!" + opt_(
+            desire
+        ) / statement + "@" + opt_(desire)
     )
 
-    //            question ::= "?" term                                (* question *)
-    object question : `-^` by `^^`(+"?" + term)
+    //           copula ::= "-->"                                   (* inheritance *)
+    //                    / "--]"                                   (* property *)
+    //                    / "<->"                                   (* similarity *)
+    //                    / "</>"                                   (* predictive equivalence *)
+    //                    / "<=>"                                   (* equivalence *)
+    //                    / "<|>"                                   (* concurrent equivalence *)
+    //                    / "=/>"                                   (* predictive implication *)
+    //                    / "==>"                                   (* implication *)
+    //                    / "=\\>"                                  (* =\> retrospective implication *)
+    //                    / "=|>"                                   (* concurrent implication *)
+    //                    / "{--"                                   (* instance *)
+    //                    / "{-]"                                   (* instance-property *)
+    object copula :
+        `-^` by `^^`(+"-->" / "--]" / "<->" / "</>" / "<=>" / "<|>" / "=/>" / "==>" / "=\\>" / "=|>" / "{--" / "{-]")
 
-    //               goal ::= "!" term                                 (* goal *)
-    object goal : `-^` by `^^`(+"!" + term)
+    //             term ::= word                                    (* an atomic constant term *)
+    //                    / variable                                (* an atomic variable term *)
+    //                    / compound-term                           (* a term with internal structure *)
+    //                    / statement                               (* a statement can serve as a term *)
+    object term : `-^` by `^^`(word / variable / compound_term / statement)
 
-    //              quest ::= "?" "!" term                             (* quest *)
-    object quest : `-^` by `^^`(+"?" + "!" + term)
+    //             word ::= #"[^ ]+"                                (* a sequence of non-space characters *)
+    object word : `-^` by `^^`(!whitespace*!whitespace)
 
-    //          judgement ::= term copula term                        (* judgement *)
-    object judgement : `-^` by `^^`(term + copula + term)
 
-    //            command ::= term                                    (* command *)
-    object command : `-^` by `^^`(term)
+    //        op-ext-set::= "{"                                     (* extensional set *)
+//        op-int-set::= "["                                     (* intensional set *)
+//       op-negation::= "--"                                    (* negation *)
+//      op-int-image::= "\\"                                    (* \ intensional image *)
+//      op-ext-image::= "/"                                     (* extensional image *)
+//         op-multi ::= "&&"                                    (* conjunction *)
+//                    / "*"                                     (* product *)
+//                    / "||"                                    (* disjunction *)
+//                    / "&|"                                    (* parallel events *)
+//                    / "&/"                                    (* sequential events *)
+//                    / "|"                                     (* intensional intersection *)
+//                    / "&"                                     (* extensional intersection *)
+//        op-single ::= "-"                                     (* extensional difference *)
+//                    / "~"                                     (* intensional difference *)
+    object op_ext_set : `-^` by `^^`(+"{")
+    object op_int_set : `-^` by `^^`(+'[')
+    object op_negation : `-^` by `^^`(+"--")
+    object op_int_image : `-^` by `^^`(+"\\")
+    object op_ext_image : `-^` by `^^`(+"/")
+    object op_multi : `-^` by `^^`(+"&&" / "*" / "||" / "&|" / "&/" / "|" / "&")
+    object op_single : `-^` by `^^`(+"-" / "~")
 
-    //            statement ::= "(" statement ")"                      (* statement in parentheses *)
-    //                        / compound                               (* compound statement *)
-    //                        / operation                              (* operation *)
-    //                        / variable                               (* variable *)
-    object statement : `-^` by `^^`(
-        +"(" + statement + ")" /
-                compound /
-                operation /
-                variable
-    )
 
-    //            compound ::= term conjunction term                   (* compound statement *)
-    object compound : `-^` by `^^`(term + conjunction + term)
+//    compound-term ::= op-ext-set term {"," term} "}"          (* extensional set *)
+//                    / op-int-set term {"," term} "]"          (* intensional set *)
+//                    / "("op-multi"," term {"," term} ")"      (* with prefix operator *)
+//                    / "("op-single"," term "," term ")"       (* with prefix operator *)
+//                    / "(" term {op-multi term} ")"            (* with infix operator *)
+//                    / "(" term op-single term ")"             (* with infix operator *)
+//                    / "(" term {","term} ")"                  (* product, new notation *)
+//                    / "(" op-ext-image "," term {"," term} ")"(* special case, extensional image *)
+//                    / "(" op-int-image "," term {"," term} ")"(* special case, \ intensional image *)
+//                    / "(" op-negation "," term ")"            (* negation *)
+//                    / op-negation term                        (* negation, new notation *)
 
-    //            operation ::= term operator term                     (* operation *)
-    object operation : `-^` by `^^`(term + operator + term)
+    object compound_term :
+        `-^` by `^^`(
+            op_ext_set + term + (+',' + term) * '}' /
+                    op_int_set + term + (+"," + term) * "]" /
+                    (+'(' + op_multi + "," + term + (+"," + term) * ")" )/
+                    (+'(' + op_single + "," + term + "," + term + ")" )/
+                    (+'(' + term + (op_multi + term) * ")" )/
+                    (+'(' + term + op_single + term + ")" )/
+                    (+'(' + term + (+"," + term) * ")" )/
+                    (+'(' + op_ext_image + "," + term + (+"," + term) * ")" )/
+                    (+'(' + op_int_image + "," + term + (+"," + term) * ")" )/
+                    (+'(' + op_negation + "," + term + ")" )/
+                    op_negation + term
+        )
 
-    //            variable ::= "$" word                                (* variable *)
-    object variable : `-^` by `^^`(+"$" + word)
 
-    //            term ::= word                                        (* word *)
-//                   / image                                       (* image *)
-//                   / set                                         (* set *)
-//                   / statement                                   (* statement *)
-//                   / variable                                    (* variable *)
-//                   / compound                                    (* compound term *)
-//                   / operation                                   (* operation *)
-//                   / question                                    (* question *)
-//                   / goal                                        (* goal *)
-//                   / quest                                       (* quest *)
-//                   / judgement                                   (* judgement *)
-//                   / command                                     (* command *)
-    object term : `-^` by `^^`(
-        word /
-                image /
-                set /
-                statement /
-                variable /
-                compound /
-                operation /
-                question /
-                goal /
-                quest /
-                judgement /
-                command
-    )
+    //        statement ::= <"<">term copula term<">">              (* two terms related to each other *)
+//                    / <"(">term copula term<")">              (* two terms related to each other, new notation *)
+//                    / term                                    (* a term can name a statement *)
+//                    / "(^"word {","term} ")"                  (* an operation to be executed *)
+//                    / word"("term {","term} ")"               (* an operation to be executed, new notation *)
+    object statement :
+        `-^` by `^^`(
+            (+'<' + term + copula + term + '>') /
+                    (+'(' + term + copula + term + ')') /
+                    term /
+                    (+'(' + '^' + word + (+',' + term) * ')') /
+                    (word + '(' + term + (+',' + term) * ')')
+        )
 
-    //            word ::= !(whitespace*)            (* word *)
-    object word : `-^` by `^^`(!whitespace[-1])
 
-    //            image ::= "image:" word                             (* image *)
-    object image : `-^` by `^^`(+"image:" + word)
+    //         variable ::= "$"word                                 (* independent variable *)
+//                    / "#"word                                 (* dependent variable *)
+//                    / "?"word                                 (* query variable in question *)
+    object variable :
+        `-^` by `^^`((+"$" + word) / (+"#" + word) / (+"?" + word))
 
-    //              set ::= "{" term {"," term} "}"                   (* set *)
-    object set : `-^` by `^^`(+"{" + term * (+"," + term) + "}")
+    //            tense ::= ":/:"                                   (* future event *)
+//                    / ":|:"                                   (* present event *)
+//                    / ":\\:"                                  (* :\: past event *)
+    object tense : `-^` by `^^`(+":/:" / ":|:" / ":\\:")
 
-    //            copula ::= ":"                                      (* copula *)
-    object copula : `-^` by `^^`(+":")
+    //           desire ::= truth                                   (* same format, different interpretations *)
+//            truth ::= <"%">frequency[<";">confidence]<"%">    (* two numbers in [0,1]x(0,1) *)
+//           budget ::= <"$">priority[<";">durability][<";">quality]<"$"> (* three numbers in [0,1]x(0,1)x[0,1] *)
+    object desire : `-^` by `^^`(truth)
+    object truth : `-^` by `^^`(+'%' + frequency + (+';' + confidence) * '%')
+    object budget : `-^` by `^^`(+'$' + priority + (+';' + durability) * (+';' + quality) * '$')
 
-    //            conjunction ::= "&"                                 (* conjunction *)
-    object conjunction : `-^` by `^^`(+"&")
 
-    //            operator ::= "+"                                   (* operator *)
-    object operator : `-^` by `^^`(+"+")
+    object priority : `-^` by `^^`(float)
+    object durability : `-^` by `^^`(float)
+    object quality : `-^` by `^^`(float)
+    object frequency : `-^` by `^^`(float)
+    object confidence : `-^` by `^^`(float)
 
-    //            tense ::= ":" word                                  (* tense *)
-    object tense : `-^` by `^^`(+":" + word)
-
-    //            truth ::= "(" truth_value ")"                       (* truth value *)
-    object truth : `-^` by `^^`(+"(" + truth_value + ")")
-
-    //            truth_value ::= float ":" float ":" float           (* frequency, confidence, expectation *)
-    object truth_value : `-^` by `^^`(float + ":" + float + ":" + float)
-
-    //            budget ::= "(" budget_value ")"                     (* budget value *)
-    object budget : `-^` by `^^`(+"(" + budget_value + ")")
-
-    //            budget_value ::= float ":" float ":" float ":" float (* priority, durability, quality, frequency *)
-    object budget_value : `-^` by `^^`(float + ":" + float + ":" + float + ":" + float)
-
-    //            float ::= digit {digit} "." {digit}                 (* decimal number *)
-    object float : `-^` by `^^`(digit * digit + "." + digit[-1])
+    object float : `-^` by `^^`(+'0' * '.' + '0' * digit * digit / +'0' * digit * digit + '.' + '0' * digit * digit)
 
 }
-
-
-
-
-
 
