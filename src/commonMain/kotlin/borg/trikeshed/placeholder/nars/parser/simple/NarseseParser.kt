@@ -7,7 +7,6 @@ import borg.trikeshed.isam.meta.TypeMemento
 import borg.trikeshed.lib.*
 import borg.trikeshed.lib.collections.Stack
 import borg.trikeshed.placeholder.nars.parser.simple.chgroup_.Companion.digit
-import borg.trikeshed.placeholder.nars.parser.simple.chgroup_.Companion.letter
 import borg.trikeshed.placeholder.nars.parser.simple.chgroup_.Companion.whitespace
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
