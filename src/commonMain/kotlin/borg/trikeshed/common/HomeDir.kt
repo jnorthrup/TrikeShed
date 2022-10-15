@@ -1,4 +1,4 @@
 package borg.trikeshed.common
 
 
-expect val homedir: String
+ val homedir: String by lazy { homedirGet  }

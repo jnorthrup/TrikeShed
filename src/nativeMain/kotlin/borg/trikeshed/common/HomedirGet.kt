@@ -5,7 +5,7 @@ import platform.posix.getenv
 
 /**
  * get homedir
- */ actual val homedir: String by lazy {
+ */ actual val homedirGet: String by lazy {
     val home = getenv("HOME")
     if (home != null) {
         return@lazy home.toKString()
