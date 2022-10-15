@@ -1,9 +1,6 @@
 package borg.trikeshed.lib.parser.simple
 
-import borg.trikeshed.lib.Series
-import borg.trikeshed.lib.drop
-import borg.trikeshed.lib.size
-import borg.trikeshed.lib.take
+import borg.trikeshed.lib.*
 
 /**
  * char based spiritual successor to ByteBuffer for parsing
@@ -17,6 +14,10 @@ class CharSeries(buf: Series<Char>) : Series<Char> by buf {
         get() {
             require(position < limit); return b(position++)
         }
+
+    //string ctor
+    constructor(s: String) : this(s.toSeries())
+
 
     val hasNext get() = position < limit
 
@@ -88,6 +89,16 @@ class CharSeries(buf: Series<Char>) : Series<Char> by buf {
         //include cachecode
         result = 31 * result + cacheCode
         return result
+    }
+
+
+    fun asString(): String {
+        val charArray = CharArray(limit - position, b)
+        return charArray.concatToString()
+    }
+    override fun toString(): String {
+        val take = take(4).toArray().toCharArray().concatToString()
+        return "CharSeries(position=$position, limit=$limit, mark=$mark, cacheCode=$cacheCode,take-4=${take})"
     }
 
 }

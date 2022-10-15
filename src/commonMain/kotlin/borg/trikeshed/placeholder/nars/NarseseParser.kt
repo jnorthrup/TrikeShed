@@ -31,7 +31,7 @@ sealed interface NarseseParser : CharParser {
 //narsese (oPennars) grammar
 // <symbol> is a nonterminal (variable) and the __expression__ consists of one or more sequences of either terminal or nonterminal symbols;
 // ::= means that the symbol on the left must be replaced with the expression on the right.
-//  more sequences [of symbols] are separated by the vertical bar "|", indicating a choice, the whole being a possible substitution for the symbol on the left.
+//  more sequences [of symbols] are separated by the vertical bar '|', indicating a choice, the whole being a possible substitution for the symbol on the left.
 // '#' as a token prefix indicates regex pattern
 // { } around a construction indicates a repeating group
 //--------------------------------------------------------------------------------------------------------
@@ -40,14 +40,14 @@ sealed interface NarseseParser : CharParser {
     //               task ::= [budget] sentence                       (* task to be processed *)
     object task : `-^` by `^^`(opt_(budget) + sentence)
 
-    //         sentence ::= statement"." [tense] [truth]            (* judgement to be absorbed into beliefs *)
-    //                    / statement"?" [tense] [truth]            (* question on truth-value to be answered *)
-    //                    / statement"!" [desire]                   (* goal to be realized by operations *)
-    //                    / statement"@" [desire]                   (* question on desire-value to be answered *)
+    //         sentence ::= statement'.' [tense] [truth]            (* judgement to be absorbed into beliefs *)
+    //                    / statement'?' [tense] [truth]            (* question on truth-value to be answered *)
+    //                    / statement'!' [desire]                   (* goal to be realized by operations *)
+    //                    / statement'@' [desire]                   (* question on desire-value to be answered *)
     object sentence : `-^` by `^^`(
-        statement + "." + opt_(tense) + opt_(truth) / statement + "?" + opt_(tense) + opt_(truth) / statement + "!" + opt_(
+        statement + '.' + opt_(tense) + opt_(truth) / statement + '?' + opt_(tense) + opt_(truth) / statement + '!' + opt_(
             desire
-        ) / statement + "@" + opt_(desire)
+        ) / statement + '@' + opt_(desire)
     ) 
 
     //           copula ::= "-->"                                   (* inheritance *)
@@ -74,62 +74,62 @@ sealed interface NarseseParser : CharParser {
     object word : `-^` by `^^`(!chgroup_.whitespace *!chgroup_.whitespace)
 
 
-    //        op-ext-set::= "{"                                     (* extensional set *)
-//        op-int-set::= "["                                     (* intensional set *)
+    //        op-ext-set::= '{'                                     (* extensional set *)
+//        op-int-set::= '['                                     (* intensional set *)
 //       op-negation::= "--"                                    (* negation *)
 //      op-int-image::= "\\"                                    (* \ intensional image *)
-//      op-ext-image::= "/"                                     (* extensional image *)
+//      op-ext-image::= '/'                                     (* extensional image *)
 //         op-multi ::= "&&"                                    (* conjunction *)
-//                    / "*"                                     (* product *)
+//                    / '*'                                     (* product *)
 //                    / "||"                                    (* disjunction *)
 //                    / "&|"                                    (* parallel events *)
 //                    / "&/"                                    (* sequential events *)
-//                    / "|"                                     (* intensional intersection *)
-//                    / "&"                                     (* extensional intersection *)
-//        op-single ::= "-"                                     (* extensional difference *)
-//                    / "~"                                     (* intensional difference *)
-    object op_ext_set : `-^` by `^^`(+"{")
+//                    / '|'                                     (* intensional intersection *)
+//                    / '&'                                     (* extensional intersection *)
+//        op-single ::= '-'                                     (* extensional difference *)
+//                    / '~'                                     (* intensional difference *)
+    object op_ext_set : `-^` by `^^`(+'{')
     object op_int_set : `-^` by `^^`(+'[')
     object op_negation : `-^` by `^^`(+"--")
     object op_int_image : `-^` by `^^`(+"\\")
-    object op_ext_image : `-^` by `^^`(+"/")
-    object op_multi : `-^` by `^^`(+"&&" / "*" / "||" / "&|" / "&/" / "|" / "&")
-    object op_single : `-^` by `^^`(+"-" / "~")
+    object op_ext_image : `-^` by `^^`(+'/')
+    object op_multi : `-^` by `^^`(+"&&" / '*' / "||" / "&|" / "&/" / '|' / '&')
+    object op_single : `-^` by `^^`(+'-' / '~')
 
 
-//    compound-term ::= op-ext-set term {"," term} "}"          (* extensional set *)
-//                    / op-int-set term {"," term} "]"          (* intensional set *)
-//                    / "("op-multi"," term {"," term} ")"      (* with prefix operator *)
-//                    / "("op-single"," term "," term ")"       (* with prefix operator *)
-//                    / "(" term {op-multi term} ")"            (* with infix operator *)
-//                    / "(" term op-single term ")"             (* with infix operator *)
-//                    / "(" term {","term} ")"                  (* product, new notation *)
-//                    / "(" op-ext-image "," term {"," term} ")"(* special case, extensional image *)
-//                    / "(" op-int-image "," term {"," term} ")"(* special case, \ intensional image *)
-//                    / "(" op-negation "," term ")"            (* negation *)
+//    compound-term ::= op-ext-set term {',' term} '}'          (* extensional set *)
+//                    / op-int-set term {',' term} ']'          (* intensional set *)
+//                    / '('op-multi',' term {',' term} ')'      (* with prefix operator *)
+//                    / '('op-single',' term ',' term ')'       (* with prefix operator *)
+//                    / '(' term {op-multi term} ')'            (* with infix operator *)
+//                    / '(' term op-single term ')'             (* with infix operator *)
+//                    / '(' term {','term} ')'                  (* product, new notation *)
+//                    / '(' op-ext-image ',' term {',' term} ')'(* special case, extensional image *)
+//                    / '(' op-int-image ',' term {',' term} ')'(* special case, \ intensional image *)
+//                    / '(' op-negation ',' term ')'            (* negation *)
 //                    / op-negation term                        (* negation, new notation *)
 
     object compound_term :
         `-^` by `^^`(
-            op_ext_set + term + (+',' + term) * '}' /
-                    op_int_set + term + (+"," + term) * "]" /
-                    (+'(' + op_multi + "," + term + (+"," + term) * ")" )/
-                    (+'(' + op_single + "," + term + "," + term + ")" )/
-                    (+'(' + term + (op_multi + term) * ")" )/
-                    (+'(' + term + op_single + term + ")" )/
-                    (+'(' + term + (+"," + term) * ")" )/
-                    (+'(' + op_ext_image + "," + term + (+"," + term) * ")" )/
-                    (+'(' + op_int_image + "," + term + (+"," + term) * ")" )/
-                    (+'(' + op_negation + "," + term + ")" )/
+            op_ext_set + term + (+',' + term)* '}' /
+                    op_int_set + term + (+',' + term) * ']' /
+                    (+'(' + op_multi + ',' + term + (+',' + term) * ')' )/
+                    (+'(' + op_single + ',' + term + ',' + term + ')' )/
+                    (+'(' + term + (op_multi + term) * ')' )/
+                    (+'(' + term + op_single + term + ')' )/
+                    (+'(' + term + (+',' + term) * ')' )/
+                    (+'(' + op_ext_image + ',' + term + (+',' + term) * ')' )/
+                    (+'(' + op_int_image + ',' + term + (+',' + term) * ')' )/
+                    (+'(' + op_negation + ',' + term + ')' )/
                     op_negation + term
         )
 
 
-    //        statement ::= <"<">term copula term<">">              (* two terms related to each other *)
-//                    / <"(">term copula term<")">              (* two terms related to each other, new notation *)
+    //        statement ::= <'<'>term copula term<'>'>              (* two terms related to each other *)
+//                    / <'('>term copula term<')'>              (* two terms related to each other, new notation *)
 //                    / term                                    (* a term can name a statement *)
-//                    / "(^"word {","term} ")"                  (* an operation to be executed *)
-//                    / word"("term {","term} ")"               (* an operation to be executed, new notation *)
+//                    / "(^"word {','term} ')'                  (* an operation to be executed *)
+//                    / word'('term {','term} ')'               (* an operation to be executed, new notation *)
     object statement :
         `-^` by `^^`(
             (+'<' + term + copula + term + '>') /
@@ -140,11 +140,11 @@ sealed interface NarseseParser : CharParser {
         )
 
 
-//         variable ::= "$"word                                 (* independent variable *)
-//                    / "#"word                                 (* dependent variable *)
-//                    / "?"word                                 (* query variable in question *)
+//         variable ::= '$'word                                 (* independent variable *)
+//                    / '#'word                                 (* dependent variable *)
+//                    / '?'word                                 (* query variable in question *)
     object variable :
-        `-^` by `^^`((+"$" + word) / (+"#" + word) / (+"?" + word))
+        `-^` by `^^`((+'$' + word) / (+'#' + word) / (+'?' + word))
 
 //            tense ::= ":/:"                                   (* future event *)
 //                    / ":|:"                                   (* present event *)
@@ -152,12 +152,11 @@ sealed interface NarseseParser : CharParser {
     object tense : `-^` by `^^`(+":/:" / ":|:" / ":\\:")
 
 //           desire ::= truth                                   (* same format, different interpretations *)
-//            truth ::= <"%">frequency[<";">confidence]<"%">    (* two numbers in [0,1]x(0,1) *)
-//           budget ::= <"$">priority[<";">durability][<";">quality]<"$"> (* three numbers in [0,1]x(0,1)x[0,1] *)
+//            truth ::= <'%'>frequency[<';'>confidence]<'%'>    (* two numbers in [0,1]x(0,1) *)
+//           budget ::= <'$'>priority[<';'>durability][<';'>quality]<'$'> (* three numbers in [0,1]x(0,1)x[0,1] *)
     object desire : `-^` by `^^`(truth)
     object truth : `-^` by `^^`(+'%' + frequency + (+';' + confidence) * '%')
     object budget : `-^` by `^^`(+'$' + priority + (+';' + durability) * (+';' + quality) * '$')
-
 
     object priority : `-^` by `^^`(float)
     object durability : `-^` by `^^`(float)
@@ -165,6 +164,6 @@ sealed interface NarseseParser : CharParser {
     object frequency : `-^` by `^^`(float)
     object confidence : `-^` by `^^`(float)
 
-    object float : `-^` by `^^`(+'0' * '.' + '0' * chgroup_.digit * chgroup_.digit / +'0' * chgroup_.digit * chgroup_.digit + '.' + '0' * chgroup_.digit * chgroup_.digit)
+    object float : `-^` by `^^`(+'0' * '.' + '0' * chgroup_.digit * chgroup_.digit / +'0' * chgroup_.digit * chgroup_.digit + '.' * (+'0') * chgroup_.digit * chgroup_.digit)
 
 }

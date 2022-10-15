@@ -29,7 +29,7 @@ interface IAnyOf {
 
 /** marker interface */
 interface IAllOf {
-    val ops: Array<out CharParser>
+    val ops: Array<out  CharParser>
 }
 
 @Deprecated("this is just a placeholder for collapsing a run of IAnyOf", replaceWith = ReplaceWith("concAnyOf"))
@@ -40,6 +40,10 @@ open class anyOf(override vararg val ops: CharParser) : CharParser by { s -> ops
 class allOf(override vararg val ops: CharParser) : IAllOf, CharParser by { s ->
     ops.reduce { acc, conditionalUnary -> { s -> acc(s)?.let { conditionalUnary(it) } } }(s)
 }
+
+
+
+
 
 
 class concAnyOf(override vararg var ops: CharParser) : IAnyOf, CharParser by { series ->
@@ -300,10 +304,10 @@ class track_(val op: CharParser, val observer: (CharSeries?) -> Unit) :
         }
     }
 
-infix fun IAnyOf.or(b: concAnyOf): IAnyOf =
+infix fun IAnyOf.or(b: IAnyOf): IAnyOf =
     concAnyOf(*ops as Array<(CharSeries) -> CharSeries?> + b.ops as Array<(CharSeries) -> CharSeries?>)
 
-infix fun IAllOf.and(b: concAllOf): IAllOf =
+infix fun IAllOf.and(b: IAllOf): IAllOf =
     concAllOf(*ops as Array<(CharSeries) -> CharSeries?> + b.ops as Array<(CharSeries) -> CharSeries?>)
 
 infix fun CharParser.or(b: CharParser) = concAnyOf(this, b)
@@ -523,4 +527,3 @@ infix operator fun String.plus(s: CharParser): CharParser = (+this) + s
 infix operator fun String.times(s: CharParser): CharParser = (+this) * s
 operator fun Char.unaryPlus(): CharParser = `^` + this
 operator fun String.unaryPlus(): CharParser = `^` + this
-
