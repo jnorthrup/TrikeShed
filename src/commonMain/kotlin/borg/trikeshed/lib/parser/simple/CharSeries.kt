@@ -42,8 +42,7 @@ class CharSeries(buf: Series<Char>) : Series<Char> by buf {
         }
 
     //flip
-    val fl
-        get() = apply {
+    val fl get() = apply {
             limit = pos
             pos = 0
             mark = -1
@@ -58,7 +57,9 @@ class CharSeries(buf: Series<Char>) : Series<Char> by buf {
     //clear
     val clr
         get() = apply {
-            pos = 0; limit = size;mark = -1
+            pos = 0
+            limit = size
+            mark = -1
         }
 
     //position
@@ -88,9 +89,7 @@ class CharSeries(buf: Series<Char>) : Series<Char> by buf {
             mark != other.mark -> return false
             size != other.size -> return false
             else -> {
-                for (i in 0 until size) {
-                    if (b(i) != other.b(i)) return false
-                }
+                for (i in 0 until size) if (b(i) != other.b(i)) return false
                 return true
             }
         }
