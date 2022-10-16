@@ -71,7 +71,7 @@ sealed interface NarseseParser : CharParser {
     object term : `-^` by `^^`(word / variable / compound_term / statement)
 
     //             word ::= #"[^ ]+"                                (* a sequence of non-space characters *)
-    object word : `-^` by `^^`(!chgroup_.whitespace *!chgroup_.whitespace)
+    object word : `-^` by `^^`(!chgroup_.whitespace*!chgroup_.whitespace)
 
 
     //        op-ext-set::= '{'                                     (* extensional set *)
@@ -111,7 +111,7 @@ sealed interface NarseseParser : CharParser {
 
     object compound_term :
         `-^` by `^^`(
-            op_ext_set + term + (+',' + term)* '}' /
+            op_ext_set + term + ((+',' )+ term)* '}' /
                     op_int_set + term + (+',' + term) * ']' /
                     (+'(' + op_multi + ',' + term + (+',' + term) * ')' )/
                     (+'(' + op_single + ',' + term + ',' + term + ')' )/

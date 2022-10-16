@@ -5,8 +5,6 @@ package borg.trikeshed.lib
 
 import borg.trikeshed.isam.meta.IOMemento.*
 import borg.trikeshed.lib.collections.s_
-import kotlin.js.JsExport
-import kotlin.js.JsName
 import kotlin.jvm.JvmInline
 
 typealias Series<A> = Join<Int, (Int) -> A>
@@ -242,9 +240,11 @@ value class IterableSeries<A>(val s: Series<A>) : Iterable<A>, Series<A> by s {
  * provides a big bright visible symbol that makes
  * conversions easy to follow along during reading the code
  */
-@property:JsExport
-@JsName("iterable")
-val <T> Series<T>.`▶`: IterableSeries<T> get() = IterableSeries(this)
+val <T> Series<T>.`▶`: IterableSeries<T> get() = this as?  IterableSeries?: IterableSeries(this)
+
+operator fun <T>Series<T>.contains(it: Char): Boolean =it in this.`▶`
+operator fun <T>IterableSeries<T>.contains(x: Char): Boolean =this.any { x == it }
+
 
 /***
  * IntHeap is a heap of integers
@@ -385,29 +385,10 @@ val Cursor.isNumerical: Boolean
             else -> false
         }
     }
-
 val Cursor.isHomoMorphic: Boolean get() = !meta.`▶`.any { it.type != meta[0].type }
-
 
 operator fun <A> Series<A>.plus(c: Series<A>) = combine(s_[this] as Series<A>, c)
 
 fun <T> Series<T>.isEmpty(): Boolean {return a==0 }
-
-
-fun <T> Series<T>.binarysearch(element: T, c: Comparator<T>): Int{
-    var low = 0
-    var high = size - 1
-    while (low <= high) {
-        val mid = (low + high).ushr(1)
-        val midVal = get(mid)
-        val cmp = c.compare(midVal, element)
-        when {
-            cmp < 0 -> low = mid + 1
-            cmp > 0 -> high = mid - 1
-            else -> return mid // key found
-        }
-    }
-    return -(low + 1)  // key not found.
-}
 
 fun <T> Series<T>.reversed(): Series<T> = size j {it: Int ->this.b(size - it - 1)}

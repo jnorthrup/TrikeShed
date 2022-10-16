@@ -1,6 +1,7 @@
 package borg.trikeshed.lib.parser.simple
 
 import borg.trikeshed.lib.*
+import kotlin.math.min
 
 /**
  * char based spiritual successor to ByteBuffer for parsing
@@ -18,9 +19,14 @@ class CharSeries(buf: Series<Char>) : Series<Char> by buf {
     //string ctor
     constructor(s: String) : this(s.toSeries())
 
-
+    /**remaining chars*/
+    val rem: Int get() = limit - position
+    /**max capacity of this buffer*/
+    val cap: Int get() = size
+    /**remaining chars as a string*/
     val hasNext get() = position < limit
 
+    /** mark the current position */
     val mk = apply {
         mark = position
     }
@@ -90,15 +96,12 @@ class CharSeries(buf: Series<Char>) : Series<Char> by buf {
         result = 31 * result + cacheCode
         return result
     }
-
-
-    fun asString(): String {
-        val charArray = CharArray(limit - position, b)
+    fun asString(upto:Int = Int.MAX_VALUE): String {
+        val charArray = drop(position).take(min(rem,upto)).toCharArray()
         return charArray.concatToString()
     }
     override fun toString(): String {
-        val take = take(4).toArray().toCharArray().concatToString()
+        val take = asString().take(4)
         return "CharSeries(position=$position, limit=$limit, mark=$mark, cacheCode=$cacheCode,take-4=${take})"
     }
-
 }

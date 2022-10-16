@@ -23,7 +23,7 @@ class SortedSetImpl<T : Any>(val c: Comparator<T>, val cowSeriesHandle: CowSerie
     }
 
     override fun add(element: T): Boolean {
-        val binarysearch = cowSeriesHandle.binarysearch(element, c)
+        val binarysearch = cowSeriesHandle.binarySearch(element, c)
         if (binarysearch >= 0) return false
         cowSeriesHandle.add(-binarysearch - 1, element)
         return true
@@ -46,7 +46,7 @@ class SortedSetImpl<T : Any>(val c: Comparator<T>, val cowSeriesHandle: CowSerie
     }
 
     override fun remove(element: T): Boolean {
-        val binarysearch = cowSeriesHandle.binarysearch(element, c)
+        val binarysearch = cowSeriesHandle.binarySearch(element, c)
         if (binarysearch < 0) return false
         cowSeriesHandle.removeAt(binarysearch)
         return true
@@ -74,7 +74,7 @@ class SortedSetImpl<T : Any>(val c: Comparator<T>, val cowSeriesHandle: CowSerie
     override val size: Int get() = cowSeriesHandle.size
 
     override fun contains(element: T): Boolean {
-        return cowSeriesHandle.binarysearch(element, c) >= 0
+        return cowSeriesHandle.binarySearch(element, c) >= 0
     }
 
     override fun containsAll(elements: Collection<T>): Boolean {
