@@ -108,48 +108,13 @@ class char_(val c: Char) : CharParser by {
 
 /**compiles a skip-search compare function*/
 @SkipWs
-class string_(val s: String) : CharParser {
-    companion object {
-        val leastFrequentCharIndex by lazy {
-            val mostFreq = "ETAOINSHRDLU"
-            val chars =
-                "ABCDEFGHIJKLMNOPQRSTUVWXYZ".toSet() - mostFreq.toSet() //returns "BCFGJKMPQVWXYZ"
-            val chars1 =
-                mostFreq.toCharArray() + chars.toCharArray() //returns "ETAOINSHRDLUBCFGJKMPQVWXYZ"
-            val s = chars1.reversedArray() //returns  "ZYXWVQPJKMGCFLDRSHNIOTSAOIE"
-            s//returns
-        }
-    }
-
-    val searchOrder = s.let { s ->
-        //create a search order from leastFrequentCharIndex + (s.uppercase() -leastFrequentCharIndex )
-        val SU = s.uppercase()
-
-        val v1 = leastFrequentCharIndex.toTypedArray().toCharArray().toSet() + SU.toCharArray()
-            .toSet()
-
-        val union = v1.distinct()
-
-        val prs = SU.mapIndexed { x, c ->
-            union.indexOf(c)
-            x to c
-        }
-        prs.sortedBy { it.second }.map { it.first }
-    }
-
-    override fun invoke(p1: CharSeries): CharSeries? {
-        val slice = p1.slice
-        if (slice.size < s.length) return null
-        //compare in order of searchOrder
-        for (i in searchOrder) {
-            if (slice.b(i) != s[i]) return null
-        }
-        //if we get here, we have a match
-        p1.pos(p1.position + s.length)
-        return p1
-    }
+class string_(val match: String) : CharParser by { cs: CharSeries ->
+    val slice = cs.slice
+    slice.limit= match.length
+    var c=0
+    while(slice.hasNext && slice.get == match[c++]);
+    if(cs.hasNext)null else cs
 }
-//    test first, last, mid chars
 
 class confix_(
     val prefix: CharParser,
@@ -168,7 +133,7 @@ class infix_(val op: CharParser, val infix: CharParser) :
 class lim(val op: CharParser, val n: Int) : CharParser by {
 
     val b = it.clone()
-    op(b)?.let { if (b.position <= n) it else null }
+    op(b)?.let { if (b.pos <= n) it else null }
 }
 
 class log_(val op: CharParser, val msg: String) : CharParser by {
@@ -228,11 +193,10 @@ class chrange_(val start: Char, val end: Char) : CharParser by {
 class chgroup_(
     s: String,//sort and distinct the chars first to make the search faster,
     val chars: Series<Char> = s.toCharArray().distinct().sorted().toSeries()
-
-
 ) : CharParser {
-
     override fun invoke(p1: CharSeries): CharSeries? {
+        // see https://pvk.ca/Blog/2012/07/03/binary-search-star-eliminates-star-branch-mispredictions/
+
         if (p1.hasNext) {
             val c = p1.get
             val i = chars.binarySearch(c)
@@ -241,251 +205,250 @@ class chgroup_(
         return null
     }
 
-        //cache these for fast lookup
-        companion object {
-            //factory method for idempotent chgroup ops
-            val cache = mutableMapOf<String, chgroup_>()
-            fun of(s: String) = cache.getOrPut(s) { chgroup_(s) }
-            val digit = of("0123456789")
-            val hexdigit = of("0123456789abcdefABCDEF")
-            val letter = of("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
-            val lower = of("abcdefghijklmnopqrstuvwxyz")
-            val upper = of("ABCDEFGHIJKLMNOPQRSTUVWXYZ")
-            val whitespace = of(" \t\n\r")
-            val symbol = of("!@#\$%^&*()_+-=[]{}|;':\",./<>?")
+     companion object {
+        //factory method for idempotent chgroup ops
+        val cache = mutableMapOf<String, chgroup_>()
+        fun of(s: String) = cache.getOrPut(s) { chgroup_(s) }
+        val digit = of("0123456789")
+        val hexdigit = of("0123456789abcdefABCDEF")
+        val letter = of("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
+        val lower = of("abcdefghijklmnopqrstuvwxyz")
+        val upper = of("ABCDEFGHIJKLMNOPQRSTUVWXYZ")
+        val whitespace = of(" \t\n\r")
+        val symbol = of("!@#\$%^&*()_+-=[]{}|;':\",./<>?")
+    }
+}
+
+
+@Target(AnnotationTarget.CLASS)
+/** this means that the parser does not need to be saved in the FSM. */
+annotation class NoSave
+
+
+/**fsm does trim the input tokens of this parser scope. */
+@Target(AnnotationTarget.CLASS)
+annotation class SkipWs
+
+
+/**fsm does not trim the input tokens of this parser scope. */
+@Target(AnnotationTarget.CLASS)
+annotation class NoSkipWs // fsm does not trim the input of this parser
+
+//nosave passthru parser
+@NoSave
+class nosave_(val op: CharParser) : CharParser by op
+
+//skipws passthru parser
+@SkipWs
+class skipws_(val op: CharParser) : CharParser by op
+
+//noskipws passthru parser
+@NoSkipWs
+class noskipws_(val op: CharParser) : CharParser by op
+
+/** passthru emits a warn on null  */
+class null_warn : CharParser by {
+    it.let { it }
+}
+
+/** passthru throws on null  */
+class null_throw(val throws: Throwable = TODO("because reasons")) : CharParser by {
+    it.let { it }
+}
+
+/** passthru fires an Delegates.observer on invoke results */
+class track_(val op: CharParser, val observer: (CharSeries?) -> Unit) :
+    CharParser by {
+        it.let { op(it).also { observer(it) } } ?: run {
+            observer(null)
+            null
         }
     }
 
+infix fun IAnyOf.or(b: IAnyOf): IAnyOf =
+    concAnyOf(*ops as Array<(CharSeries) -> CharSeries?> + b.ops as Array<(CharSeries) -> CharSeries?>)
 
-    @Target(AnnotationTarget.CLASS)
-    /** this means that the parser does not need to be saved in the FSM. */
-    annotation class NoSave
+infix fun IAllOf.and(b: IAllOf): IAllOf =
+    concAllOf(*ops as Array<(CharSeries) -> CharSeries?> + b.ops as Array<(CharSeries) -> CharSeries?>)
 
-
-    /**fsm does trim the input tokens of this parser scope. */
-    @Target(AnnotationTarget.CLASS)
-    annotation class SkipWs
-
-
-    /**fsm does not trim the input tokens of this parser scope. */
-    @Target(AnnotationTarget.CLASS)
-    annotation class NoSkipWs // fsm does not trim the input of this parser
-
-    //nosave passthru parser
-    @NoSave
-    class nosave_(val op: CharParser) : CharParser by op
-
-    //skipws passthru parser
-    @SkipWs
-    class skipws_(val op: CharParser) : CharParser by op
-
-    //noskipws passthru parser
-    @NoSkipWs
-    class noskipws_(val op: CharParser) : CharParser by op
-
-    /** passthru emits a warn on null  */
-    class null_warn : CharParser by {
-        it.let { it }
-    }
-
-    /** passthru throws on null  */
-    class null_throw(val throws: Throwable = TODO("because reasons")) : CharParser by {
-        it.let { it }
-    }
-
-    /** passthru fires an Delegates.observer on invoke results */
-    class track_(val op: CharParser, val observer: (CharSeries?) -> Unit) :
-        CharParser by {
-            it.let { op(it).also { observer(it) } } ?: run {
-                observer(null)
-                null
-            }
-        }
-
-    infix fun IAnyOf.or(b: IAnyOf): IAnyOf =
-        concAnyOf(*ops as Array<(CharSeries) -> CharSeries?> + b.ops as Array<(CharSeries) -> CharSeries?>)
-
-    infix fun IAllOf.and(b: IAllOf): IAllOf =
-        concAllOf(*ops as Array<(CharSeries) -> CharSeries?> + b.ops as Array<(CharSeries) -> CharSeries?>)
-
-    infix fun CharParser.or(b: CharParser) = concAnyOf(this, b)
-    infix fun CharParser.and(b: CharParser) = concAllOf(this, b)
+infix fun CharParser.or(b: CharParser) = concAnyOf(this, b)
+infix fun CharParser.and(b: CharParser) = concAllOf(this, b)
 
 
-    /** not_ */
-    operator fun CharParser.not() = not_(this)
+/** not_ */
+operator fun CharParser.not() = not_(this)
 
-    /**repeat minimum/max */
-    operator fun CharParser.get(n: IntRange) =
-        repeat_(this, n.last) and opt_(this)[n.first - n.last]
+/**repeat minimum/max */
+operator fun CharParser.get(n: IntRange) =
+    repeat_(this, n.last) and opt_(this)[n.first - n.last]
 
-    /**
-     * repeat, -1 means repeat until failure
-     */
-    operator fun CharParser.get(n: Int) = repeat_(this, n)
+/**
+ * repeat, -1 means repeat until failure
+ */
+operator fun CharParser.get(n: Int) = repeat_(this, n)
 
-    /** optional  -- synonyms: a[b] , a*b  */
-    operator fun CharParser.get(op: CharParser) = this and opt_(op)
+/** optional  -- synonyms: a[b] , a*b  */
+operator fun CharParser.get(op: CharParser) = this and opt_(op)
 
-    /** stores state with name */
-    operator fun CharParser.get(name: String) = store_(this, name)
+/** stores state with name */
+operator fun CharParser.get(name: String) = store_(this, name)
 
-    /** stores state with name and type parser*/
-    operator fun CharParser.get(meta: Join<String, TypeMemento>) = store_(this, meta.a, meta.b)
+/** stores state with name and type parser*/
+operator fun CharParser.get(meta: Join<String, TypeMemento>) = store_(this, meta.a, meta.b)
 
-    /** optional, anyOf */
-    operator fun CharParser.div(op: CharParser) = this or op
-    operator fun CharParser.div(c: Char): CharParser = this / char_(c)
-    operator fun CharParser.div(s: String): CharParser = this / string_(s)
+/** optional, anyOf */
+operator fun CharParser.div(op: CharParser) = this or op
+operator fun CharParser.div(c: Char): CharParser = this / char_(c)
+operator fun CharParser.div(s: String): CharParser = this / string_(s)
 
-    /**and, allOf*/
-    operator fun CharParser.plus(op: CharParser) = this and op
-    operator fun CharParser.plus(c: Char): CharParser = this + char_(c)
-    operator fun CharParser.plus(s: String): CharParser = this + string_(s)
+/**and, allOf*/
+operator fun CharParser.plus(op: CharParser) = this and op
+operator fun CharParser.plus(c: Char): CharParser = this + char_(c)
+operator fun CharParser.plus(s: String): CharParser = this + string_(s)
 
 
-    /** zero or more this */
-    operator fun CharParser.times(op: CharParser) = this[-1] + (op)
-    operator fun CharParser.times(c: Char): CharParser = this * char_(c)
-    operator fun CharParser.times(s: String): CharParser = this * string_(s)
+/** zero or more this */
+operator fun CharParser.times(op: CharParser) = this[-1] + (op)
+operator fun CharParser.times(c: Char): CharParser = this * char_(c)
+operator fun CharParser.times(s: String): CharParser = this * string_(s)
 
-    /** one but not both */
-    operator fun CharParser.rem(op: CharParser) = this and not_(op) or op and not_(this)
-    operator fun CharParser.rem(c: Char): CharParser = this % char_(c)
-    operator fun CharParser.rem(s: String): CharParser = this % string_(s)
+/** one but not both */
+operator fun CharParser.rem(op: CharParser) = this and not_(op) or op and not_(this)
+operator fun CharParser.rem(c: Char): CharParser = this % char_(c)
+operator fun CharParser.rem(s: String): CharParser = this % string_(s)
 
-    /**this and not*/
-    operator fun CharParser.minus(op: CharParser) = this and not_(op) //
-    operator fun CharParser.dec() = opt_(this)
-    fun String.dec() = opt_(+this)
-    fun Char.dec() = opt_(+this)
-    operator fun CharParser.minus(c: Char): CharParser = this - c
-    operator fun CharParser.minus(s: String): CharParser = this - s
+/**this and not*/
+operator fun CharParser.minus(op: CharParser) = this and not_(op) //
+operator fun CharParser.dec() = opt_(this)
+fun String.dec() = opt_(+this)
+fun Char.dec() = opt_(+this)
+operator fun CharParser.minus(c: Char): CharParser = this - c
+operator fun CharParser.minus(s: String): CharParser = this - s
 
-    object `^` : CharParser by { it -> skipws_({ s -> s })(it) }
+object `^` : CharParser by { it -> skipws_({ s -> s })(it) }
 
-    data class FSMState(
-        val name: String,
-        val parser: CharParser,
-        val typ: TypeMemento = IOMemento.IoString,
-    )
+data class FSMState(
+    val name: String,
+    val parser: CharParser,
+    val typ: TypeMemento = IOMemento.IoString,
+)
 
-    /**this is the FSM State referenced in op push.  This is created in a parser's runBlocking or children coroutine context, obviously.  read up on CoroutineContext.Element */
-    data class ParseEnv(
+/**this is the FSM State referenced in op push.  This is created in a parser's runBlocking or children coroutine context, obviously.  read up on CoroutineContext.Element */
+data class ParseEnv(
+    /** intended to label a single FSM state */
+    var statename: String = "start",
+
+    /** a stack of FSM states */
+    val opstack: Stack<FSMState> = Stack()
+) : CoroutineContext.Element {
+
+
+    companion object { //static
         /** intended to label a single FSM state */
-        var statename: String = "start",
+        var statename: String = "start"
 
-        /** a stack of FSM states */
-        val opstack: Stack<FSMState> = Stack()
-    ) : CoroutineContext.Element {
+        //system-wide map of  TypeMemento to (String)->Any?
+        val conversions = HashMap<TypeMemento, (String) -> Any?>()
 
+        //coroutineElement key
+        val key: Key<ParseEnv> = object : Key<ParseEnv> {}
 
-        companion object { //static
-            /** intended to label a single FSM state */
-            var statename: String = "start"
-
-            //system-wide map of  TypeMemento to (String)->Any?
-            val conversions = HashMap<TypeMemento, (String) -> Any?>()
-
-            //coroutineElement key
-            val key: Key<ParseEnv> = object : Key<ParseEnv> {}
-
-
-        }
-
-        override val key: Key<*>
-            get() = Companion.key
-
-        fun clone(): CoroutineContext.Element { //clone
-            return ParseEnv(statename, opstack.clone())
-        }
 
     }
 
+    override val key: Key<*>
+        get() = Companion.key
 
-    /** store_ stores the result of the op in the fsm */
-    class store_(
-        val op: CharParser,
-        val name: String,
-        val metaType: TypeMemento = IOMemento.IoString
-    ) : CharParser {
-        override fun invoke(p1: CharSeries): CharSeries? = runBlocking {
-            val ret = op(p1)
-            if (ret != null) {
-                val env = currentCoroutineContext()[ParseEnv.key]
-                if (env != null) {
-                    env.statename = name
-                    env.opstack.push(FSMState(name, op, metaType))
-                }
+    fun clone(): CoroutineContext.Element { //clone
+        return ParseEnv(statename, opstack.clone())
+    }
+
+}
+
+
+/** store_ stores the result of the op in the fsm */
+class store_(
+    val op: CharParser,
+    val name: String,
+    val metaType: TypeMemento = IOMemento.IoString
+) : CharParser {
+    override fun invoke(p1: CharSeries): CharSeries? = runBlocking {
+        val ret = op(p1)
+        if (ret != null) {
+            val env = currentCoroutineContext()[ParseEnv.key]
+            if (env != null) {
+                env.statename = name
+                env.opstack.push(FSMState(name, op, metaType))
             }
-            ret
         }
+        ret
     }
+}
 
-    /** push_ pushes the op onto the fsm */
-    class push_(
-        val op: CharParser,
-        val name: String,
-        val metaType: TypeMemento = IOMemento.IoString
-    ) : CharParser {
-        override fun invoke(p1: CharSeries): CharSeries? = runBlocking {
-            val ret = op(p1)
-            if (ret != null) {
-                val env = currentCoroutineContext()[ParseEnv.key]
-                if (env != null) {
-                    env.statename = name
-                    env.opstack.push(FSMState(name, op, metaType))
-                }
+/** push_ pushes the op onto the fsm */
+class push_(
+    val op: CharParser,
+    val name: String,
+    val metaType: TypeMemento = IOMemento.IoString
+) : CharParser {
+    override fun invoke(p1: CharSeries): CharSeries? = runBlocking {
+        val ret = op(p1)
+        if (ret != null) {
+            val env = currentCoroutineContext()[ParseEnv.key]
+            if (env != null) {
+                env.statename = name
+                env.opstack.push(FSMState(name, op, metaType))
             }
-            ret
         }
+        ret
     }
+}
 
-    /** pop_ pops the op from the fsm */
-    class pop_(
-        val op: CharParser,
-        val name: String,
-        val metaType: TypeMemento = IOMemento.IoString
-    ) : CharParser {
-        override fun invoke(p1: CharSeries): CharSeries? = runBlocking {
-            val ret = op(p1)
-            if (ret != null) {
-                val env = currentCoroutineContext()[ParseEnv.key]
-                if (env != null) {
-                    env.statename = name
-                    env.opstack.pop()
-                }
+/** pop_ pops the op from the fsm */
+class pop_(
+    val op: CharParser,
+    val name: String,
+    val metaType: TypeMemento = IOMemento.IoString
+) : CharParser {
+    override fun invoke(p1: CharSeries): CharSeries? = runBlocking {
+        val ret = op(p1)
+        if (ret != null) {
+            val env = currentCoroutineContext()[ParseEnv.key]
+            if (env != null) {
+                env.statename = name
+                env.opstack.pop()
             }
-            ret
         }
+        ret
     }
+}
 
-    /** peek_ peeks the op from the fsm */
-    class peek_(
-        val op: CharParser,
-        val name: String,
-        val metaType: TypeMemento = IOMemento.IoString
-    ) : CharParser {
-        override fun invoke(p1: CharSeries): CharSeries? = runBlocking {
-            val ret = op(p1)
-            if (ret != null) {
-                val env = currentCoroutineContext()[ParseEnv.key]
-                if (env != null) {
-                    env.statename = name
-                    env.opstack.peek()
-                }
+/** peek_ peeks the op from the fsm */
+class peek_(
+    val op: CharParser,
+    val name: String,
+    val metaType: TypeMemento = IOMemento.IoString
+) : CharParser {
+    override fun invoke(p1: CharSeries): CharSeries? = runBlocking {
+        val ret = op(p1)
+        if (ret != null) {
+            val env = currentCoroutineContext()[ParseEnv.key]
+            if (env != null) {
+                env.statename = name
+                env.opstack.peek()
             }
-            ret
         }
+        ret
     }
+}
 
-    /** backtrack quietly on fail as success */
-    class bof_(val op: CharParser) : CharParser {
-        override fun invoke(p1: CharSeries): CharSeries = runBlocking {
-            val clone = p1.clone()
-            op(p1) ?: clone
-        }
+/** backtrack quietly on fail as success */
+class bof_(val op: CharParser) : CharParser {
+    override fun invoke(p1: CharSeries): CharSeries = runBlocking {
+        val clone = p1.clone()
+        op(p1) ?: clone
     }
+}
 
 
 // the nars reasoner logic:
@@ -505,23 +468,23 @@ class chgroup_(
 // 5.  repeat 1-4 until no new tasks are derived
 
 
-    typealias `-_` = CharParser
+typealias `-_` = CharParser
 
-    infix operator fun Char.get(s: CharParser): CharParser = (+this)[s]
-    infix operator fun Char.invoke(s: Char): CharParser = (+this) + s
-    infix operator fun Char.invoke(s: CharParser): CharParser = (+this) + s
-    infix operator fun Char.invoke(s: String): CharParser = (+this) + s
-    infix operator fun Char.minus(s: CharParser): CharParser = (+this) - s
-    infix operator fun Char.plus(s: CharParser): CharParser = (+this) + s
-    infix operator fun Char.plus(s: String): CharParser = (+this) + s
-    infix operator fun Char.times(s: CharParser): CharParser = (+this) * s
-    infix operator fun String.div(s: CharParser): CharParser = (+this) / s
-    infix operator fun String.get(s: CharParser): CharParser = (+this)[s]
-    infix operator fun String.invoke(s: Char): CharParser = (+this) + s
-    infix operator fun String.invoke(s: CharParser): CharParser = (+this) + s
-    infix operator fun String.invoke(s: String): CharParser = (+this) + s
-    infix operator fun String.minus(s: CharParser): CharParser = (+this) - s
-    infix operator fun String.plus(s: CharParser): CharParser = (+this) + s
-    infix operator fun String.times(s: CharParser): CharParser = (+this) * s
-    operator fun Char.unaryPlus(): CharParser = `^` + this
-    operator fun String.unaryPlus(): CharParser = `^` + this
+infix operator fun Char.get(s: CharParser): CharParser = (+this)[s]
+infix operator fun Char.invoke(s: Char): CharParser = (+this) + s
+infix operator fun Char.invoke(s: CharParser): CharParser = (+this) + s
+infix operator fun Char.invoke(s: String): CharParser = (+this) + s
+infix operator fun Char.minus(s: CharParser): CharParser = (+this) - s
+infix operator fun Char.plus(s: CharParser): CharParser = (+this) + s
+infix operator fun Char.plus(s: String): CharParser = (+this) + s
+infix operator fun Char.times(s: CharParser): CharParser = (+this) * s
+infix operator fun String.div(s: CharParser): CharParser = (+this) / s
+infix operator fun String.get(s: CharParser): CharParser = (+this)[s]
+infix operator fun String.invoke(s: Char): CharParser = (+this) + s
+infix operator fun String.invoke(s: CharParser): CharParser = (+this) + s
+infix operator fun String.invoke(s: String): CharParser = (+this) + s
+infix operator fun String.minus(s: CharParser): CharParser = (+this) - s
+infix operator fun String.plus(s: CharParser): CharParser = (+this) + s
+infix operator fun String.times(s: CharParser): CharParser = (+this) * s
+operator fun Char.unaryPlus(): CharParser = `^` + this
+operator fun String.unaryPlus(): CharParser = `^` + this

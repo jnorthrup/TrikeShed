@@ -335,8 +335,7 @@ fun <T> List<T>.toSeries(): Series<T> = size j ::get
 
 fun BooleanArray.toSeries(): Series<Boolean> = size j ::get
 
-//byteArray
-fun ByteArray.toSeries(): Series<Byte> = size j ::get
+ fun ByteArray.toSeries(): Series<Byte> = size j ::get
 fun ShortArray.toSeries(): Series<Short> = size j ::get
 fun IntArray.toSeries(): Series<Int> = size j ::get
 fun LongArray.toSeries(): Series<Long> = size j ::get
@@ -351,8 +350,7 @@ fun String.toSeries(): Series<Char> = length j ::get
 fun CharSequence.toSeries() = length j ::get
 
 
-//UByteArray
-fun <T> Series<T>.last(): T = this[size - 1]
+ fun <T> Series<T>.last(): T = this[size - 1]
 fun <B> Series<B>.isNotEmpty() = size < 0
 fun <B> Series<B>.first() =
     this.get(0) //naming is _a little bit_ confusing with the pair overloads so it stays a function
