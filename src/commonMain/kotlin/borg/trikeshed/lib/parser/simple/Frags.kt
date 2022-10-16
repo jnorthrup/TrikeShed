@@ -106,14 +106,15 @@ class char_(val c: Char) : CharParser by {
 }
 
 
-/**compiles a skip-search compare function*/
 @SkipWs
 class string_(val match: String) : CharParser by { cs: CharSeries ->
-    val slice = cs.slice
-    slice.limit= match.length
-    var c=0
-    while(slice.hasNext && slice.get == match[c++]);
-    if(cs.hasNext)null else cs
+    var r: CharSeries? = null
+    val length = match.length
+    if (cs.rem >= length) cs.slice.lim(length).let {
+        while (it.hasNext && match[it.pos] == it.get);
+        if (!it.hasNext) r = it
+    }
+    r
 }
 
 class confix_(
@@ -205,7 +206,7 @@ class chgroup_(
         return null
     }
 
-     companion object {
+    companion object {
         //factory method for idempotent chgroup ops
         val cache = mutableMapOf<String, chgroup_>()
         fun of(s: String) = cache.getOrPut(s) { chgroup_(s) }

@@ -5,10 +5,14 @@ import borg.trikeshed.lib.*
 /**
  * char based spiritual successor to ByteBuffer for parsing
  */
-class CharSeries(buf: Series<Char>) : Series<Char> by buf {
+class CharSeries(buf: Series<Char>) : Series<Char> {
+    override val a: Int =buf.a
+    override val b: (Int) -> Char =buf.b
+
     var pos = 0
     var limit = size
     var mark = -1
+
 
 
     val get: Char
@@ -107,10 +111,8 @@ class CharSeries(buf: Series<Char>) : Series<Char> by buf {
     }
 
     //Java ByteBuffer style slice
-    val slice: CharSeries
-        get() :CharSeries {
-            return CharSeries((limit - pos) j { x -> this[x + pos] })
-        }
+    val slice: CharSeries get()=        CharSeries(this[pos until limit])
+
 
     fun asString(upto: Int = Int.MAX_VALUE): String =
         ((limit - pos) j { x: Int -> this[x + pos] }).toCharArray().concatToString()
@@ -120,5 +122,5 @@ class CharSeries(buf: Series<Char>) : Series<Char> by buf {
         return "CharSeries(position=$pos, limit=$limit, mark=$mark, cacheCode=$cacheCode,take-4=${take})"
     }
 
-    fun lim(i: Int) = apply { limit = i }
+    fun lim(i: Int)  = apply { limit = i }
 }

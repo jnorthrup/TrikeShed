@@ -348,7 +348,7 @@ fun UIntArray.toSeries(): Series<UInt> = size j ::get
 fun ULongArray.toSeries(): Series<ULong> = size j ::get
 fun String.toSeries(): Series<Char> = length j ::get
 fun CharSequence.toSeries() = length j ::get
-
+fun IntProgression.toSeries() =this.toList().toSeries()
 
  fun <T> Series<T>.last(): T = this[size - 1]
 fun <B> Series<B>.isNotEmpty() = size < 0
@@ -356,6 +356,8 @@ fun <B> Series<B>.first() =
     this.get(0) //naming is _a little bit_ confusing with the pair overloads so it stays a function
 
 fun <B> Series<B>.drop(front: Int) = get(front until size)
+
+
 fun <B> Series<B>.take(exclusiveEnd: Int) = get(0 until exclusiveEnd)
 
 //series foreachIndexed

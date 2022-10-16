@@ -1,7 +1,7 @@
 
 package borg.trikeshed.lib.parser.simple
 
-import borg.trikeshed.lib.size
+import borg.trikeshed.lib.*
 import kotlin.test.*
 
 
@@ -28,14 +28,17 @@ class CharSeriesTest {
         assertEquals("The quick ", csl.asString())
     }
 
+    @Test
+    fun drop() {
 
-
-
-
-
-
-
-
+        val s = CharSeries((0..9).toSeries() α { it: Int ->it.digitToChar() })
+      val s1= CharSeries(s.drop(5))
+        assertEquals(5, s1.size)
+        assertEquals('5', s1[0] )
+        assertEquals('9', s1[4] )
+val s2=s1.clr
+        assertEquals(5, s2.size)
+    }
 
 
 }
