@@ -347,8 +347,9 @@ fun UShortArray.toSeries(): Series<UShort> = size j ::get
 fun UIntArray.toSeries(): Series<UInt> = size j ::get
 fun ULongArray.toSeries(): Series<ULong> = size j ::get
 fun String.toSeries(): Series<Char> = length j ::get
-fun CharSequence.toSeries() = length j ::get
-fun IntProgression.toSeries() =this.toList().toSeries()
+fun CharSequence.toSeries(): Series<Char> = length j ::get
+fun ClosedRange<Int>.toSeries(): Series<Int> = (endInclusive - start + 1) j { i:Int -> i + start }
+fun <T> Sequence<T>.toSeries()=toList().toSeries()
 
  fun <T> Series<T>.last(): T = this[size - 1]
 fun <B> Series<B>.isNotEmpty() = size < 0
