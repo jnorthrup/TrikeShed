@@ -381,7 +381,7 @@ class FSM(var root: Series<`^^`>, var parseNode: ParseNode) : CoroutineContext.E
                     //if rule is neither, run the root in the current context
                     when (rule) {
                         is IOneOf -> {
-                            val success = channelFlow<FSM> {
+                            channelFlow<FSM> {
                                 launch {
                                     for (r in rule.rules) {
                                         launch {
@@ -434,6 +434,24 @@ class FSM(var root: Series<`^^`>, var parseNode: ParseNode) : CoroutineContext.E
             }
         }
         return parseNode.value as CharSeries
+
+        //what is returned ?  the parseNode.value as CharSeries
+        //what is the parseNode.value ?  the remaining CharSeries after parsing
+        //what is the parseNode.name ?  the name of the rule that was parsed
+        //what is the parseNode.children ?  the children of the rule that was parsed
+
+        // what is the FSM state? the parseNode and the FSM booleans for skipWs, backTrack, named, name
+        // what is the FSM context? the CoroutineContext that contains the FSM state
+        // what is the FSM root? the root rule that was parsed (the first rule in the series)
+
+        // Adaptive resonance theory (ART) is a computational theory of mind that describes how the brain learns to recognize patterns in its environment.
+        // The theory is based on the idea that the brain is a network of interconnected nodes, each of which represents a pattern.
+        // what is the meaning of "resonance" part of ART? the ability to recognize patterns in the environment.
+        // by what does an implementation of ART recognize patterns? by the ability to parse a series of rules
+
+
+
+
     }
 }
 
