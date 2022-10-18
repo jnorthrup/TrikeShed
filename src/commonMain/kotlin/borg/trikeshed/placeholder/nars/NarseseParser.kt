@@ -1,18 +1,20 @@
 package borg.trikeshed.placeholder.nars
 
-import borg.trikeshed.lib.Join
-import borg.trikeshed.lib.Series
+import borg.trikeshed.lib.*
 import borg.trikeshed.lib.collections._l
 import borg.trikeshed.lib.collections.s_
 import borg.trikeshed.lib.parser.simple.CharSeries
-import borg.trikeshed.lib.toSeries
-import borg.trikeshed.lib.`▶`
+import borg.trikeshed.placeholder.nars.chgroup_.Companion.digit
+import borg.trikeshed.placeholder.nars.chgroup_.Companion.whitespace
 import kotlinx.coroutines.*
-import kotlinx.coroutines.NonCancellable.join
 import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.firstOrNull
 import kotlin.coroutines.CoroutineContext
 import kotlin.reflect.*
+
+typealias ConditionalUnary<T> = (T) -> T?
+typealias ParseFunction = ConditionalUnary<CharSeries>
+typealias `^^` = ParseFunction
 
 // single char strings should be Char not String
 // opening Char and String should use  +x operator
@@ -30,17 +32,17 @@ import kotlin.reflect.*
 //
 
 //               task ::= [budget] sentence                       (* task to be processed *)
-object task : `-^` by `^^`(opt_(budget) + sentence)
+object task : `^^` by (opt_(budget) + sentence)
 
 //         sentence ::= statement'.' [tense] [truth]            (* judgement to be absorbed into beliefs *)
 //                    / statement'?' [tense] [truth]            (* question on truth-value to be answered *)
 //                    / statement'!' [desire]                   (* goal to be realized by operations *)
 //                    / statement'@' [desire]                   (* question on desire-value to be answered *)
-object sentence : `-^` by `^^`(
-    statement + '.' + opt_(tense) + opt_(truth) / statement + '?' + opt_(tense) + opt_(truth) / statement + '!' + opt_(
-        desire
-    ) / statement + '@' + opt_(desire)
-)
+object sentence : `^^` by (
+        statement + '.' + opt_(tense) + opt_(truth) / statement + '?' + opt_(tense) + opt_(truth) / statement + '!' + opt_(
+            desire
+        ) / statement + '@' + opt_(desire)
+        )
 
 //           copula ::= "-->"                                   (* inheritance *)
 //                    / "--]"                                   (* property *)
@@ -55,16 +57,16 @@ object sentence : `-^` by `^^`(
 //                    / "{--"                                   (* instance *)
 //                    / "{-]"                                   (* instance-property *)
 object copula :
-    `-^` by `^^`((+"-->") / "--]" / "<->" / "</>" / "<=>" / "<|>" / "=/>" / "==>" / "=\\>" / "=|>" / "{--" / "{-]")
+    `^^` by ((+"-->") / "--]" / "<->" / "</>" / "<=>" / "<|>" / "=/>" / "==>" / "=\\>" / "=|>" / "{--" / "{-]")
 
 //             term ::= word                                    (* an atomic constant term *)
 //                    / variable                                (* an atomic variable term *)
 //                    / compound-term                           (* a term with internal structure *)
 //                    / statement                               (* a statement can serve as a term *)
-object term : `-^` by `^^`(word / variable / compound_term / statement)
+object term : `^^` by (word / variable / compound_term / statement)
 
 //             word ::= #"[^ ]+"                                (* a sequence of non-space characters *)
-object word : `-^` by `^^`(!whitespace * !whitespace)
+object word : `^^` by (!whitespace * !whitespace)
 
 
 //        op-ext-set::= '{'                                     (* extensional set *)
@@ -81,13 +83,13 @@ object word : `-^` by `^^`(!whitespace * !whitespace)
 //                    / '&'                                     (* extensional intersection *)
 //        op-single ::= '-'                                     (* extensional difference *)
 //                    / '~'                                     (* intensional difference *)
-object op_ext_set : `-^` by `^^`(+'{')
-object op_int_set : `-^` by `^^`(+'[')
-object op_negation : `-^` by `^^`(+"--")
-object op_int_image : `-^` by `^^`(+"\\")
-object op_ext_image : `-^` by `^^`(+'/')
-object op_multi : `-^` by `^^`(+"&&" / '*' / "||" / "&|" / "&/" / '|' / '&')
-object op_single : `-^` by `^^`(+'-' / '~')
+object op_ext_set : `^^` by (+'{')
+object op_int_set : `^^` by (+'[')
+object op_negation : `^^` by (+"--")
+object op_int_image : `^^` by (+"\\")
+object op_ext_image : `^^` by (+'/')
+object op_multi : `^^` by (+"&&" / '*' / "||" / "&|" / "&/" / '|' / '&')
+object op_single : `^^` by (+'-' / '~')
 
 
 //    compound-term ::= op-ext-set term {',' term} '}'          (* extensional set *)
@@ -103,19 +105,19 @@ object op_single : `-^` by `^^`(+'-' / '~')
 //                    / op-negation term                        (* negation, new notation *)
 
 object compound_term :
-    `-^` by `^^`(
-        op_ext_set + term + ((+',') + term) * '}' /
-                op_int_set + term + (+',' + term) * ']' /
-                (+'(' + op_multi + ',' + term + (+',' + term) * ')') /
-                (+'(' + op_single + ',' + term + ',' + term + ')') /
-                (+'(' + term + (op_multi + term) * ')') /
-                (+'(' + term + op_single + term + ')') /
-                (+'(' + term + (+',' + term) * ')') /
-                (+'(' + op_ext_image + ',' + term + (+',' + term) * ')') /
-                (+'(' + op_int_image + ',' + term + (+',' + term) * ')') /
-                (+'(' + op_negation + ',' + term + ')') /
-                op_negation + term
-    )
+    `^^` by (
+            op_ext_set + term + ((+',') + term) * '}' /
+                    op_int_set + term + (+',' + term) * ']' /
+                    (+'(' + op_multi + ',' + term + (+',' + term) * ')') /
+                    (+'(' + op_single + ',' + term + ',' + term + ')') /
+                    (+'(' + term + (op_multi + term) * ')') /
+                    (+'(' + term + op_single + term + ')') /
+                    (+'(' + term + (+',' + term) * ')') /
+                    (+'(' + op_ext_image + ',' + term + (+',' + term) * ')') /
+                    (+'(' + op_int_image + ',' + term + (+',' + term) * ')') /
+                    (+'(' + op_negation + ',' + term + ')') /
+                    op_negation + term
+            )
 
 
 //        statement ::= <'<'>term copula term<'>'>              (* two terms related to each other *)
@@ -124,46 +126,40 @@ object compound_term :
 //                    / "(^"word {','term} ')'                  (* an operation to be executed *)
 //                    / word'('term {','term} ')'               (* an operation to be executed, new notation *)
 object statement :
-    `-^` by `^^`(
-        (+'<' + term + copula + term + '>') /
-                (+'(' + term + copula + term + ')') /
-                term /
-                (+'(' + '^' + word + (+',' + term) * ')') /
-                (word + '(' + term + (+',' + term) * ')')
-    )
+    `^^` by (
+            (+'<' + term + copula + term + '>') /
+                    (+'(' + term + copula + term + ')') /
+                    term /
+                    (+'(' + '^' + word + (+',' + term) * ')') /
+                    (word + '(' + term + (+',' + term) * ')')
+            )
 
 
 //         variable ::= '$'word                                 (* independent variable *)
 //                    / '#'word                                 (* dependent variable *)
 //                    / '?'word                                 (* query variable in question *)
 object variable :
-    `-^` by `^^`((+'$' + word) / (+'#' + word) / (+'?' + word))
+    `^^` by ((+'$' + word) / (+'#' + word) / (+'?' + word))
 
 //            tense ::= ":/:"                                   (* future event *)
 //                    / ":|:"                                   (* present event *)
 //                    / ":\\:"                                  (* :\: past event *)
-object tense : `-^` by `^^`(+":/:" / ":|:" / ":\\:")
+object tense : `^^` by (+":/:" / ":|:" / ":\\:")
 
 //           desire ::= truth                                   (* same format, different interpretations *)
 //            truth ::= <'%'>frequency[<';'>confidence]<'%'>    (* two numbers in [0,1]x(0,1) *)
 //           budget ::= <'$'>priority[<';'>durability][<';'>quality]<'$'> (* three numbers in [0,1]x(0,1)x[0,1] *)
-object desire : `-^` by `^^`(truth)
-object truth : `-^` by `^^`(+'%' + frequency + (+';' + confidence) * '%')
-object budget : `-^` by `^^`(+'$' + priority + (+';' + durability) * (+';' + quality) * '$')
+object desire : `^^` by (truth)
+object truth : `^^` by (+'%' + frequency + (+';' + confidence) * '%')
+object budget : `^^` by (+'$' + priority + (+';' + durability) * (+';' + quality) * '$')
 
-object priority : `-^` by `^^`(float)
-object durability : `-^` by `^^`(float)
-object quality : `-^` by `^^`(float)
-object frequency : `-^` by `^^`(float)
-object confidence : `-^` by `^^`(float)
+object priority : `^^` by (float)
+object durability : `^^` by (float)
+object quality : `^^` by (float)
+object frequency : `^^` by (float)
+object confidence : `^^` by (float)
 
-object float : `-^` by `^^`(+'0' * '.' + '0' * digit * digit / +'0' * digit * digit + '.' * (+'0') * digit * digit)
-}
-
-typealias ConditionalUnary<T> = (T) -> T?
-typealias ConditionalBinary<T> = (T, T) -> T?
-typealias ParseFunction = ConditionalUnary<CharSeries>
-typealias `^^` = ParseFunction
+object float : `^^` by ((+_l['+', '-'] * digit * '.' * digit * (digit + +_l['E', 'e'] + +_l['+', '-'] * digit)))
 
 
 //1. unaryPlus (promotion to parse rule) from Char, String, /*Regex,*/ Iterable<Char>,
@@ -174,27 +170,28 @@ operator fun String.unaryPlus(): `^^` = string_(this)
 operator fun Iterable<Char>.unaryPlus(): `^^` = group_(this)
 
 //1. a `+` b (and)
-operator fun `^^`.plus(b: `^^`): `^^` = seqAllOf_(this, b)
-operator fun `^^`.plus(b: Char): `^^` = seqAllOf_(this, +b)
-operator fun `^^`.plus(b: String): `^^` = seqAllOf_(this, +b)
+operator fun `^^`.plus(b: `^^`): `^^` = allOf_(this, b)
+
+operator fun `^^`.plus(b: Char): `^^` = oneOf_(this, +b)
+operator fun `^^`.plus(b: String): `^^` = allOf_(this, +b)
 
 //1. a `/` b (a or b)
-operator fun `^^`.div(b: `^^`): `^^` = seqOneOf_(this, b)
+operator fun `^^`.div(b: `^^`): `^^` = oneOf_(this, b)
 
 
-operator fun `^^`.div(b: Char): `^^` = seqOneOf_(this, +b)
-operator fun `^^`.div(b: String): `^^` = seqOneOf_(this, +b)
+operator fun `^^`.div(b: Char): `^^` = oneOf_(this, +b)
+operator fun `^^`.div(b: String): `^^` = oneOf_(this, +b)
 
 //1. a[-1] repeat until counter ==specified value (-n is infinite)
 operator fun `^^`.get(n: Int): `^^` = repeat_(this, n)
 
 //1. a[2..5] repeat at least 2, up to 5
-operator fun `^^`.get(range: IntRange): `^^` = this[range.first] + optional_(this)[range.last - range.first]
+operator fun `^^`.get(range: IntRange): `^^` = this[range.first] + opt_(this)[range.last - range.first]
 
 //1. a `*` b (zero or more a, one b)
 operator fun `^^`.times(b: `^^`): `^^` = this[-1] + b
-operator fun `^^`.times(b: Char): `^^` = (+this)[-1] + +b
-operator fun `^^`.times(b: String): `^^` = (+this)[-1] + +b
+operator fun `^^`.times(b: Char): `^^` = (this)[-1] + +b
+operator fun `^^`.times(b: String): `^^` = (this)[-1] + +b
 
 //1. a[b] (one a ,optional b)
 operator fun `^^`.get(b: `^^`): `^^` = (this) + b[0..1]
@@ -203,11 +200,13 @@ operator fun `^^`.get(b: Char): `^^` = (this) + (+b)[0..1]
 //1. `!` (not)
 operator fun `^^`.not(): `^^` = not_(this)
 
+
 //1. a["named"] (named value)
 operator fun `^^`.get(name: String): `^^` = named_(this, name)
 
 //1. 'a'..'z' (range of characters)
 operator fun Char.rangeTo(b: Char): `^^` = range_(this, b)
+class range_(val a: Char, val b: Char) : `^^` by { cs -> cs.takeIf { it.get in a..b } }
 
 //1. a 'b' (character) a+ (+b)
 infix operator fun `^^`.invoke(a: Char): `^^` = this + (+a)
@@ -215,16 +214,39 @@ infix operator fun `^^`.invoke(a: Char): `^^` = this + (+a)
 //1. a "abc" (string)
 infix operator fun `^^`.invoke(a: String): `^^` = this + (+a)
 
-interface IAllOf : `^^` {
+interface IAllOf {
     val rules: Sequence<`^^`>
 }
 
-interface IOneOf : `^^` {
+class allOf_(override val rules: Sequence<`^^`>) : IAllOf, IBackTrack, `^^` {
+    constructor(vararg rulesIn: `^^`) : this(rulesIn.asSequence())
+
+    override fun invoke(p1: CharSeries): CharSeries? {
+        var cs: CharSeries = p1
+        for (rule in rules) {
+            cs = rule(cs) ?: return null
+        }
+        return cs
+    }
+}
+
+interface IOneOf {
     val rules: Sequence<`^^`>
 }
 
-operator fun `IAllOf`.plus(b: IAllOf): `^^` = seqAllOf_(this.rules + b.rules)
-operator fun `IOneOf`.div(b: IOneOf): `^^` = seqOneOf_(this.rules + b.rules)
+class oneOf_(
+    override val rules: Sequence<`^^`>
+) : IOneOf, `^^` {
+    constructor(vararg rulesIn: `^^`) : this(rulesIn.asSequence())
+
+    override fun invoke(p1: CharSeries): CharSeries? {
+        return rules.map { it(p1) }.firstOrNull { it != null }
+    }
+}
+
+operator fun `IAllOf`.plus(b: IAllOf): `^^` = allOf_(this.rules + (b.rules))
+
+operator fun `IOneOf`.div(b: IOneOf): `^^` = oneOf_(this.rules + b.rules)
 
 
 fun char_(c: Char): `^^` = { cs: CharSeries ->
@@ -240,10 +262,7 @@ interface INamed {
     val name: String
 }
 
-
-class group_(grp: Iterable<Char>) : `^^` by { cs ->
-    cs.takeIf { cs.get in grp }
-}
+class named_(val rule: `^^`, override val name: String) : INamed, `^^` by rule
 
 
 object skipWs_ : IBackTrack, `^^` by +_l[' ', '\r', '\n', '\t']
@@ -255,6 +274,7 @@ class backtrack_(r: `^^`) : IBackTrack, `^^` by { cs: CharSeries ->
 
 }
 
+class not_(r: `^^`) : IBackTrack, `^^` by { cs: CharSeries -> cs.clone().takeIf { r(cs) == null } }
 
 open class ParseNode(
     override var name: String,
@@ -346,7 +366,7 @@ class FSM(var root: Series<`^^`>, var parseNode: ParseNode) : CoroutineContext.E
     }
 
 
-    override operator fun invoke(cs: CharSeries): CharSeries? {
+    override operator fun invoke(cs: CharSeries): CharSeries {
         val theFsm = this
         runBlocking(this) {
             supervisorScope {
@@ -364,7 +384,6 @@ class FSM(var root: Series<`^^`>, var parseNode: ParseNode) : CoroutineContext.E
                             val success = channelFlow<FSM> {
                                 launch {
                                     for (r in rule.rules) {
-
                                         launch {
                                             val fsm = theFsm.clone()
                                             fsm.root = s_[r]
@@ -416,12 +435,62 @@ class FSM(var root: Series<`^^`>, var parseNode: ParseNode) : CoroutineContext.E
         }
         return parseNode.value as CharSeries
     }
+}
 
-    //review the above method here:
-    // what can be done more efficiently while keeping concurrent search with IOneOf is:
-    // 1.  run the IOneOf in a supervisorScope
-    //
-    // for efficiency's sake we can change this to populate parseNode.children with the results of the IOneOf.  why?
-    // 1.  we can then use the parseNode.children to determine which rule was matched
+class opt_(rule: `^^`) : IBackTrack, `^^` by { cs: CharSeries -> rule(cs) }
+class keepWs_(rule: `^^`) : IKeepWS, `^^` by { cs: CharSeries -> rule(cs) }
+class forwardOnly_(rule: `^^`) : IForwardOnly, `^^` by { cs: CharSeries -> rule(cs) }
+class repeat_(rule: `^^`, count: Int = -1) : `^^` by { cs: CharSeries ->
+    var c = 0
+    var result: CharSeries? = cs
+    var pos = cs.pos
+    do {
+        result = rule(result!!.also { pos = it.pos })
+
+    } while (result != null && (c++ != count))
+    if (result == null) cs.pos(pos)
+    else result
+}  //this functor wants as post-flip
+
+
+class string_(val str: String) : IBackTrack, `^^` by { cs: CharSeries ->
+    var c = 0
+    @Suppress("ControlFlowWithEmptyBody")
+    while (cs.hasNext && cs.get == str[c++]);
+    cs.takeIf { c == str.length }
 
 }
+
+class chgroup_(
+    s: String,//sort and distinct the chars first to make the search faster,
+    val chars: Series<Char> = s.toCharArray().distinct().sorted().toSeries()
+) : `^^` {
+    override fun invoke(p1: CharSeries): CharSeries? {
+        // see https://pvk.ca/Blog/2012/07/03/binary-search-star-eliminates-star-branch-mispredictions/
+
+        if (p1.hasNext) {
+            val c = p1.get
+            val i = chars.binarySearch(c)
+            if (i >= 0) return p1
+        }
+        return null
+    }
+
+    companion object {
+        //factory method for idempotent chgroup ops
+        val cache = mutableMapOf<String, chgroup_>()
+        fun of(s: String) = cache.getOrPut(s) { chgroup_(s) }
+        val digit = of("0123456789")
+        val hexdigit = of("0123456789abcdefABCDEF")
+        val letter = of("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
+        val lower = of("abcdefghijklmnopqrstuvwxyz")
+        val upper = of("ABCDEFGHIJKLMNOPQRSTUVWXYZ")
+        val whitespace = of(" \t\n\r")
+        val symbol = of("!@#\$%^&*()_+-=[]{}|;':\",./<>?")
+    }
+}
+
+inline fun group_(grp: Iterable<Char>): `^^` = chgroup_(grp.joinToString(""))
+
+
+

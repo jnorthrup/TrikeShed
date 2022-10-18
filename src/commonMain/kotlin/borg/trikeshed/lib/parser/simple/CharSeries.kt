@@ -71,7 +71,7 @@ class CharSeries(buf: Series<Char>) : Series<Char> {
         pos = p
     }
 
-    fun clone() = CharSeries(take(size))
+    fun clone() = CharSeries(a j b ).also { it.pos = pos; it.limit = limit; it.mark = mark }
 
 
     /** a hash of contents only. not position, limit, mark */
