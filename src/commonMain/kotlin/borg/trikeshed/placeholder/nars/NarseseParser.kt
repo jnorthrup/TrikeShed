@@ -277,17 +277,23 @@ class backtrack_(r: `^^`) : IBackTrack, `^^` by { cs: CharSeries ->
 class not_(r: `^^`) : IBackTrack, `^^` by { cs: CharSeries -> cs.clone().takeIf { r(cs) == null } }
 
 open class ParseNode(
-    override var name: String,
-    val value: Any,
+    override var name: String="node-${counter++}",
+    var value: CharSeries?=null,
     var children: MutableList<ParseNode>,
 ) : INamed {
 
     constructor(other: ParseNode) : this(other.name, other.value, other.children.map { ParseNode(it) }.toMutableList())
 
     fun clone() = ParseNode(this)
-
+companion object {
+    var counter = 0
+}
 }
 
+
+val `^^`.name
+    get() =     /*check for INamed,  Enum, and KClass names first*/ (this as? INamed)?.name ?: (this as? Enum<*>)?.name
+    ?: this::class.simpleName ?: toString()
 
 /**
 a single recursive FSM tree builder for all rules using runBlocking to open a new CoroutineContext and installing
@@ -300,7 +306,7 @@ otherwise it will fill the local stack with the current ParseNode and its childr
  */
 
 
-class FSM(var root: Series<`^^`>, var parseNode: ParseNode) : CoroutineContext.Element, `^^` {
+class FSM(var root: Series<`^^`>, var parseNode: ParseNode = ParseNode()) : CoroutineContext.Element, `^^` {
     companion object {
 
         val key: CoroutineContext.Key<*> = object : CoroutineContext.Key<CoroutineContext.Element> {}
@@ -450,8 +456,6 @@ class FSM(var root: Series<`^^`>, var parseNode: ParseNode) : CoroutineContext.E
         // by what does an implementation of ART recognize patterns? by the ability to parse a series of rules
 
 
-
-
     }
 }
 
@@ -481,7 +485,7 @@ class string_(val str: String) : IBackTrack, `^^` by { cs: CharSeries ->
 
 class chgroup_(
     s: String,//sort and distinct the chars first to make the search faster,
-    val chars: Series<Char> = s.toCharArray().distinct().sorted().toSeries()
+    private val chars: Series<Char> = s.toCharArray().distinct().sorted().toSeries()
 ) : `^^` {
     override fun invoke(p1: CharSeries): CharSeries? {
         // see https://pvk.ca/Blog/2012/07/03/binary-search-star-eliminates-star-branch-mispredictions/
@@ -508,7 +512,7 @@ class chgroup_(
     }
 }
 
-inline fun group_(grp: Iterable<Char>): `^^` = chgroup_(grp.joinToString(""))
+inline fun group_(grp: Iterable<Char>): `^^` = chgroup_.of(grp.joinToString(""))
 
 
 
