@@ -46,7 +46,7 @@ object sentence : `^^` by (
 //                    / "=/>"                                   (* predictive implication *)
 //                    / "==>"                                   (* implication *)
 //                    / "=\\>"                                  (* =\> retrospective implication *)
-//                    / "=|>"                                   (* concurrent implication *)
+//                    / "=|s>"                                   (* concurrent implication *)
 //                    / "{--"                                   (* instance *)
 //                    / "{-]"                                   (* instance-property *)
 object copula :

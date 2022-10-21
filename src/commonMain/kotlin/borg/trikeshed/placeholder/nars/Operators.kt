@@ -219,12 +219,17 @@ class FSM(var root: Series<`^^`>, var parseNode: ParseNode = ParseNode()) : Coro
         it.backTrack = backTrack
         it.named = named
         it.name = name
-
-
     }
 
+    override fun toString(): String {
+        val take = root.take(5)
+        val join = take α ::getName
+        val toList = join.toList()
+        return "FSM(root=$toList, parseNode=$parseNode)"
+    }
 
     override operator fun invoke(cs: CharSeries): CharSeries {
+         logDebug { "${this} parsing: $cs" }
         val theFsm = this
         runBlocking(this)  {
             for ((ix, rule) in root.`▶`.withIndex()) supervisorScope{
