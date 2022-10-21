@@ -264,28 +264,28 @@ fun <A> Series<A>.toList(): AbstractList<A> = object : AbstractList<A>() {
     override fun get(index: Int): A = b(index)
 }
 
-fun <T : Byte> Join<Int, (Int) -> T>.toByteArray(): ByteArray =
+fun Series<Byte>.toArray(): ByteArray =
     ByteArray(size) { i -> get(i) }
 
-fun <T : Char> Join<Int, (Int) -> T>.toCharArray(): CharArray =
+fun Series<Char>.toArray(): CharArray =
     CharArray(size) { i -> get(i) }
 
-fun <T : Int> Join<Int, (Int) -> T>.toIntArray(): IntArray =
+fun Series<Int>.toArray(): IntArray =
     IntArray(size) { i -> get(i) }
 
-fun <T : Boolean> Join<Int, (Int) -> T>.toBooleanArray(): BooleanArray =
+fun Series<Boolean>.toArray(): BooleanArray =
     BooleanArray(size) { i -> get(i) }
 
-fun <T : Long> Join<Int, (Int) -> T>.toLongArray(): LongArray =
+fun Series<Long>.toArray(): LongArray =
     LongArray(size) { i -> get(i) }
 
-fun <T : Float> Join<Int, (Int) -> T>.toFloatArray(): FloatArray =
+fun Series<Float>.toArray(): FloatArray =
     FloatArray(size) { i -> get(i) }
 
-fun <T : Double> Join<Int, (Int) -> T>.toDoubleArray(): DoubleArray =
+fun Series<Double>.toArray(): DoubleArray =
     DoubleArray(size) { i -> get(i) }
 
-fun <T : Short> Join<Int, (Int) -> T>.toShortArray(): ShortArray =
+fun Series<Short>.toArray(): ShortArray =
     ShortArray(size) { i -> get(i) }
 
 inline fun <reified T> Join<Int, (Int) -> T>.toArray(): Array<T> =

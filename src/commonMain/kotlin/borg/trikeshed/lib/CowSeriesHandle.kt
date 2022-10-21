@@ -1,11 +1,10 @@
 package borg.trikeshed.lib
 
 import kotlin.properties.Delegates
-import kotlin.reflect.KClass
 
 
 // inline factory value for CopyOnWriteSeries
-inline val <reified T> Series<T>.cow: CowSeriesHandle<T> get() = CowSeriesHandle(COWSeriesBody(this.toArray()))
+inline val <reified T> Series<T>.cow: CowSeriesHandle<T> get() = CowSeriesHandle(COWSeriesBody(this.toList()))
 
 
 

@@ -1,5 +1,5 @@
 @file:Suppress("UNCHECKED_CAST", "ObjectPropertyName")
-@file:OptIn(ExperimentalUnsignedTypes::class)
+@file:OptIn(kotlin.experimental.ExperimentalTypeInference::class,ExperimentalUnsignedTypes::class)
 
 package borg.trikeshed.lib
 
@@ -393,3 +393,6 @@ operator fun <A> Series<A>.plus(c: Series<A>) = combine(s_[this] as Series<A>, c
 fun <T> Series<T>.isEmpty(): Boolean {return a==0 }
 
 fun <T> Series<T>.reversed(): Series<T> = size j {it: Int ->this.b(size - it - 1)}
+
+open class EmptySeries:Series<Nothing> by 0 j { x:Int->TODO("undefined")}
+fun <T> emptySeries():Series<T> = EmptySeries() as Series<T>

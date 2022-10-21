@@ -111,11 +111,11 @@ class CharSeries(buf: Series<Char>) : Series<Char> {
     }
 
     //Java ByteBuffer style slice
-    val slice: CharSeries get()=        CharSeries(this[pos until limit])
+    val slice: CharSeries get()= CharSeries(this[pos until limit])
 
 
     fun asString(upto: Int = Int.MAX_VALUE): String =
-        ((limit - pos) j { x: Int -> this[x + pos] }).toCharArray().concatToString()
+        ((limit - pos) j { x: Int -> this[x + pos] }).toArray().concatToString()
 
     override fun toString(): String {
         val take = asString().take(4)
