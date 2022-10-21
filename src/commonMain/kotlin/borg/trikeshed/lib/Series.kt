@@ -6,15 +6,16 @@ package borg.trikeshed.lib
 import borg.trikeshed.isam.meta.IOMemento.*
 import borg.trikeshed.lib.collections.s_
 import kotlin.jvm.JvmInline
+import kotlin.math.min
 
-typealias Series<A> = Join<Int, (Int) -> A>
+typealias Series<T> = Join<Int, (Int) -> T>
 
-val <A> Series<A>.size: Int get() = a
+val <T> Series<T>.size: Int get() = a
 
 /**
  * index operator for Series
  */
-operator fun <A> Series<A>.get(i: Int): A = b(i)
+operator fun <T> Series<T>.get(i: Int): T = b(i)
 
 /**
  * fold for Series
@@ -356,10 +357,10 @@ fun <B> Series<B>.isNotEmpty() = size < 0
 fun <B> Series<B>.first() =
     this.get(0) //naming is _a little bit_ confusing with the pair overloads so it stays a function
 
-fun <B> Series<B>.drop(front: Int) = get(front until size)
+fun <B> Series<B>.drop(front: Int) = get(min(front,size) until size)
 
 
-fun <B> Series<B>.take(exclusiveEnd: Int) = get(0 until exclusiveEnd)
+fun <B> Series<B>.take(exclusiveEnd: Int) = get(0 until min(exclusiveEnd,size))
 
 //series foreachIndexed
 fun <T> Series<T>.forEachIndexed(action: (index: Int, T) -> Unit): Unit = this.`▶`.forEachIndexed(action)

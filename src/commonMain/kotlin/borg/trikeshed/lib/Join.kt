@@ -211,9 +211,7 @@ infix fun <A, B> A.j(b: B): Join<A, B> = Join(this, b)
  *
  */
 
-@JsName("alpha")
-@JsExport
-infix fun <X, C, Y : (X) -> C, V : Series<X>> V.α(xform: Y): Join<Int, (Int) -> C> = size j { i -> xform(this[i]) }
+infix fun <X, C, V : Series<X> > V.α(xform: (X)->C): Join<Int, (Int) -> C> = size j { i -> xform(this[i]) }
 
 fun <A, B, C, D> ((A) -> B).alpha(f: (C) -> D): (C) -> D = f
 //simple example
@@ -254,14 +252,11 @@ val <T> Join<Int, (Int) -> T>.infinite: Join<Int, (Int) -> T>
 operator fun <S, E : Enum<E>> Join<Int, (Int) -> S>.get(e: E): S = get(e.ordinal)
 
 /** Series toList
- * @return an AbstractList<A> of the Series<A>
+ * @return an AbstractList<T> of the Series<T>
  */
-fun <A> Series<A>.toList(): AbstractList<A> = object : AbstractList<A>() {
-    /** kotlin delegation of 'a' to 'size' */
-    override val size: Int by ::a
-
-    /** kotlin delegation of 'b' to 'get' */
-    override fun get(index: Int): A = b(index)
+fun <T> Series<T>.toList(): AbstractList<T> = object : AbstractList<T>() {
+    override val size: Int =a
+    override fun get(index: Int): T = b(index)
 }
 
 fun Series<Byte>.toArray(): ByteArray =
