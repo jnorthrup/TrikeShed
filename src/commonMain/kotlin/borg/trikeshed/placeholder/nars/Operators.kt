@@ -1,12 +1,9 @@
 package borg.trikeshed.placeholder.nars
 
-import borg.trikeshed.lib.Series
-import borg.trikeshed.lib.binarySearch
+import borg.trikeshed.lib.*
 import borg.trikeshed.lib.collections._l
 import borg.trikeshed.lib.collections.s_
 import borg.trikeshed.lib.parser.simple.CharSeries
-import borg.trikeshed.lib.toSeries
-import borg.trikeshed.lib.`▶`
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.firstOrNull
@@ -229,7 +226,7 @@ class FSM(var root: Series<`^^`>, var parseNode: ParseNode = ParseNode()) : Coro
 
     override operator fun invoke(cs: CharSeries): CharSeries {
         val theFsm = this
-        runBlocking(this) {
+        runBlocking(this)  {
             for ((ix, rule) in root.`▶`.withIndex()) supervisorScope{
                 //update name with +"$ix"
                 name += ":$ix"
@@ -261,7 +258,9 @@ class FSM(var root: Series<`^^`>, var parseNode: ParseNode = ParseNode()) : Coro
                             named = it.named
                             name = it.name
                             parseNode = it.parseNode
+                            println( "oneOf: $name = parseNode = $parseNode")
                         } ?: cancel()
+
 
                     }
 
@@ -276,11 +275,15 @@ class FSM(var root: Series<`^^`>, var parseNode: ParseNode = ParseNode()) : Coro
                             named = fsm.named
                             name = fsm.name
                             parseNode = fsm.parseNode
+                            println( "allOf: $name = parseNode = $parseNode")
                         } ?: cancel()
                     }
 
                     else -> {
-                        val result = (decorate(rule)(cs))?.let {
+                        val d = decorate(rule)
+                        val d1 = d(cs)
+
+                        val result = d1?.let {
                             //copy the fsm details into this fsm
                             skipWs = theFsm.skipWs
                             backTrack = theFsm.backTrack
@@ -339,7 +342,7 @@ class chgroup_(
     companion object {
         //factory method for idempotent chgroup ops
         val cache = mutableMapOf<String, chgroup_>()
-        fun of(s: String) = cache.getOrPut(s) { chgroup_(s) }
+        fun of(s: String) = cache.getOrPut(s) { chgroup_(s.debug {s-> logDebug { "chgrp: ($s) "} }) }
         val digit = of("0123456789")
         val hexdigit = of("0123456789abcdefABCDEF")
         val letter = of("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
