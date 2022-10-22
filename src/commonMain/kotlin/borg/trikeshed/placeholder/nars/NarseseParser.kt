@@ -5,9 +5,6 @@ import borg.trikeshed.lib.parser.simple.CharSeries
 import borg.trikeshed.placeholder.nars.chgroup_.Companion.digit
 import borg.trikeshed.placeholder.nars.chgroup_.Companion.whitespace
 
-typealias ConditionalUnary<T> = (T) -> T?
-typealias ParseFunction = ConditionalUnary<CharSeries>
-typealias `^^` = ParseFunction
 
 // single char strings should be Char not String
 // opening Char and String should use  +x operator
@@ -25,7 +22,7 @@ typealias `^^` = ParseFunction
 //
 
 //               task ::= [budget] sentence                       (* task to be processed *)
-object task : `^^` by ( budget`¿` (digit) + sentence)
+object task : `^^` by (budget `¿` sentence)
 
 //         sentence ::= statement'.' [tense] [truth]            (* judgement to be absorbed into beliefs *)
 //                    / statement'?' [tense] [truth]            (* question on truth-value to be answered *)
@@ -50,14 +47,14 @@ object sentence : `^^` by (
 //                    / "{--"                                   (* instance *)
 //                    / "{-]"                                   (* instance-property *)
 object copula :
-    `^^` by ((+"-->") / "--]" / "<->" / "</>" / "<=>" / "<|>" / "=/>" / "==>" / "=\\>" / "=|>" / "{--" / "{-]")
+    `^-` by ((+"-->") / "--]" / "<->" / "</>" / "<=>" / "<|>" / "=/>" / "==>" / "=\\>" / "=|>" / "{--" / "{-]")
 
 //             term ::= word                                    (* an atomic constant term *)
 //                    / variable                                (* an atomic variable term *)
 //                    / compound-term                           (* a term with internal structure *)
 //                    / statement                               (* a statement can serve as a term *)
-object term : IOneOf, ISkipWS, `^^` {
-    override val rules: Sequence<`^^`>
+object term : `^^`, IOneOf, ISkipWS {
+    override val rules: Sequence<`^`>
         get() = sequence {
             yield(word)
             yield(variable)
@@ -72,7 +69,7 @@ object term : IOneOf, ISkipWS, `^^` {
 
 
 //             word ::= #"[^ ]+"                                (* a sequence of non-space characters *)
-object word : `^^` by (!whitespace * !whitespace)
+object word : `^` by (!whitespace * !whitespace)
 
 
 //        op-ext-set::= '{'                                     (* extensional set *)
@@ -89,13 +86,13 @@ object word : `^^` by (!whitespace * !whitespace)
 //                    / '&'                                     (* extensional intersection *)
 //        op-single ::= '-'                                     (* extensional difference *)
 //                    / '~'                                     (* intensional difference *)
-object op_ext_set : `^^` by (+'{')
-object op_int_set : `^^` by (+'[')
-object op_negation : `^^` by (+"--")
-object op_int_image : `^^` by (+"\\")
-object op_ext_image : `^^` by (+'/')
-object op_multi : `^^` by (+"&&" / '*' / "||" / "&|" / "&/" / '|' / '&')
-object op_single : `^^` by (+'-' / '~')
+object op_ext_set : `^` by (+'{')
+object op_int_set : `^` by (+'[')
+object op_negation : `^` by (+"--")
+object op_int_image : `^` by (+"\\")
+object op_ext_image : `^` by (+'/')
+object op_multi : `^` by (+"&&" / '*' / "||" / "&|" / "&/" / '|' / '&')
+object op_single : `^` by (+'-' / '~')
 
 
 //    compound-term ::= op-ext-set term {',' term} '}'          (* extensional set *)
@@ -112,16 +109,16 @@ object op_single : `^^` by (+'-' / '~')
 
 
 object compound_term : IOneOf, `^^` {
-    override val rules: Sequence<`^^`> = sequence {
-        yield((op_ext_set + term + ((+',') + term) * '}'))
+    override val rules: Sequence<`^`> = sequence {
+        yield(op_ext_set + term + ((+',') + term) * '}')
         yield(op_int_set + term + (+',' + term) * ']')
-        yield((+'(' + op_multi + ',' + term + (+',' + term) * ')'))
-        yield((+'(' + op_single + ',' + term + ',' + term + ')'))
-        yield((+'(' + term + (op_multi + term) * ')'))
-        yield((+'(' + term + op_single + term + ')'))
-        yield((+'(' + term + (+',' + term) * ')'))
-        yield((+'(' + op_ext_image + ',' + term + (+',' + term) * ')'))
-        yield((+'(' + op_int_image + ',' + term + (+',' + term) * ')'))
+        yield(+'(' + op_multi + ',' + term + (+',' + term) * ')')
+        yield(+'(' + op_single + ',' + term + ',' + term + ')')
+        yield(+'(' + term + (op_multi + term) * ')')
+        yield(+'(' + term + op_single + term + ')')
+        yield(+'(' + term + (+',' + term) * ')')
+        yield(+'(' + op_ext_image + ',' + term + (+',' + term) * ')')
+        yield(+'(' + op_int_image + ',' + term + (+',' + term) * ')')
         yield((+'(' + op_negation + ',' + term + ')') / (op_negation + term))
     }
 
@@ -137,36 +134,31 @@ object compound_term : IOneOf, `^^` {
 //                    / "(^"word {','term} ')'                  (* an operation to be executed *)
 //                    / word'('term {','term} ')'               (* an operation to be executed, new notation *)
 object statement :
-    `^^` by (
-            (+'<' + term + copula + term + '>') /
-                    (+'(' + term + copula + term + ')') /
-                    term /
-                    (+'(' + '^' + word + (+',' + term) * ')') /
-                    (word + '(' + term + (+',' + term) * ')')
+    `^-` by ((+'<' + term + copula + term + '>') / (+'(' + term + copula + term + ')') / term / (+'(' + '^' + word + (+',' + term) * ')') / (word + '(' + term + (+',' + term) * ')')
             )
 
 
 //         variable ::= '$'word                                 (* independent variable *)
 //                    / '#'word                                 (* dependent variable *)
 //                    / '?'word                                 (* query variable in question *)
-object variable : `^^` by ((+'$' + word) / (+'#' + word) / (+'?' + word))
+object variable : `^-` by ((+'$' + word) / (+'#' + word) / (+'?' + word))
 
 //            tense ::= ":/:"                                   (* future event *)
 //                    / ":|:"                                   (* present event *)
 //                    / ":\\:"                                  (* :\: past event *)
-object tense : `^^` by (+":/:" / ":|:" / ":\\:")
+object tense : `^-` by ((+":/:") / ":|:" / ":\\:")
 
 //           desire ::= truth                                   (* same format, different interpretations *)
 //            truth ::= <'%'>frequency[<';'>confidence]<'%'>    (* two numbers in [0,1]x(0,1) *)
 //           budget ::= <'$'>priority[<';'>durability][<';'>quality]<'$'> (* three numbers in [0,1]x(0,1)x[0,1] *)
-object desire : `^^` by (truth)
-object truth : `^^` by (+'%' + frequency + (+';' + confidence) * '%')
-object budget : `^^` by (+'$' + priority + (+';' + durability) * (+';' + quality) * '$')
-
+object desire : `^^` by truth
 object priority : `^^` by (float)
 object durability : `^^` by (float)
+
 object quality : `^^` by (float)
 object frequency : `^^` by (float)
 object confidence : `^^` by (float)
 object float : `^^` by ((+_l['+', '-'] * digit * '.' * digit * (digit + +_l['E', 'e'] + +_l['+', '-'] * digit)))
+object truth : `^^` by (  (+'%') + frequency + (+';' + confidence) * '%')
+object budget : `^^` by ( (+'$') + priority  + (+';' + durability) * (+';' + quality) * '$')
 
