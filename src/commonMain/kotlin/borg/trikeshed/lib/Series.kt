@@ -6,6 +6,7 @@ package borg.trikeshed.lib
 import borg.trikeshed.isam.meta.IOMemento.*
 import borg.trikeshed.lib.collections.s_
 import kotlin.jvm.JvmInline
+import kotlin.math.max
 import kotlin.math.min
 
 typealias Series<T> = Join<Int, (Int) -> T>
@@ -358,8 +359,7 @@ fun <B> Series<B>.first() =
     this.get(0) //naming is _a little bit_ confusing with the pair overloads so it stays a function
 
 fun <B> Series<B>.drop(front: Int) = get(min(front,size) until size)
-
-
+fun <B> Series<B>.dropLast(back: Int) = get(0 until max(0,size - back))
 fun <B> Series<B>.take(exclusiveEnd: Int) = get(0 until min(exclusiveEnd,size))
 
 //series foreachIndexed

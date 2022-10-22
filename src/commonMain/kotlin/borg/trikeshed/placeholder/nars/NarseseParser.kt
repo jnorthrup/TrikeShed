@@ -25,7 +25,7 @@ typealias `^^` = ParseFunction
 //
 
 //               task ::= [budget] sentence                       (* task to be processed *)
-object task : `^^` by (opt_(budget) + sentence)
+object task : `^^` by ( budget`¿` (digit) + sentence)
 
 //         sentence ::= statement'.' [tense] [truth]            (* judgement to be absorbed into beliefs *)
 //                    / statement'?' [tense] [truth]            (* question on truth-value to be answered *)
@@ -127,7 +127,7 @@ object compound_term : IOneOf, `^^` {
 
 
     override fun invoke(p1: CharSeries): CharSeries? {
-        TODO( "this is intercepted in FSM" )
+        TODO("this is intercepted in FSM")
     }
 }
 

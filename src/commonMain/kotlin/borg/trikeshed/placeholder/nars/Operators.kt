@@ -65,6 +65,11 @@ infix operator fun `^^`.invoke(a: Char): `^^` = this + (+a)
 //1. a "abc" (string)
 infix operator fun `^^`.invoke(a: String): `^^` = this + (+a)
 
+//unicode upside down question mark: \u00BF (¿)
+infix fun `^^`.`¿`(a: `^^`): `^^` = opt_(this) + (a)
+infix fun `^^`.`¿`(a: Char): `^^` = opt_(this) + (+a)
+infix fun `^^`.`¿`(a: String): `^^` = opt_(this) + (+a)
+
 interface IAllOf {
     val rules: Sequence<`^^`>
 }
@@ -97,7 +102,7 @@ class oneOf_(
 
 operator fun `IAllOf`.plus(b: IAllOf): `^^` = allOf_(this.rules + (b.rules))
 
-operator fun `IOneOf`.div(b: IOneOf): `^^` = oneOf_(this.rules + b.rules )
+operator fun `IOneOf`.div(b: IOneOf): `^^` = oneOf_(this.rules + b.rules)
 
 
 fun char_(c: Char): `^^` = { cs: CharSeries ->
@@ -129,14 +134,15 @@ class not_(r: `^^`) : IBackTrack, `^^` by { cs: CharSeries -> cs.clone().takeIf 
 
 
 open class ParseNode(
-    var name: String="node-${counter++}",
-    var value: CharSeries?=null,
+    var name: String = "node-${counter++}",
+    var value: CharSeries? = null,
     var children: MutableList<ParseNode> = ArrayList()
-)   {
+) {
 
     constructor(other: ParseNode) : this(other.name, other.value, other.children.map { ParseNode(it) }.toMutableList())
 
     fun clone() = ParseNode(this)
+
     companion object {
         var counter = 0
     }
@@ -190,11 +196,12 @@ class FSM(var root: Series<`^^`>, var parseNode: ParseNode = ParseNode()) : Coro
     // * when rule is ISkipWS, the skipWs boolean is set to true
     // * when rule is IBackTrack, the backTrack boolean is set to true
     // * when rule is IForwardOnly, the backTrack boolean is set to false
-    // * when rule is INamed, the named boolean is set to true and the name is set to the name of the rule
     fun decorate(rule: `^^`): `^^` {
+        logDebug { "decorate before: $rule" }
         var r: `^^` = rule
         if (skipWs) r = skipWs_ * r
         if (backTrack) r = backtrack_(r)
+        logDebug { "decorate after: $r" }
         return r
     }
 
@@ -208,7 +215,6 @@ class FSM(var root: Series<`^^`>, var parseNode: ParseNode = ParseNode()) : Coro
                 named = true
                 name = getName(rule)
             }
-
             else -> {}
         }
 
@@ -229,14 +235,13 @@ class FSM(var root: Series<`^^`>, var parseNode: ParseNode = ParseNode()) : Coro
     }
 
     override operator fun invoke(cs: CharSeries): CharSeries {
-         logDebug { "${this} parsing: $cs" }
+        logDebug { "${this} parsing: $cs" }
         val theFsm = this
-        runBlocking(this)  {
-            for ((ix, rule) in root.`▶`.withIndex()) supervisorScope{
+        runBlocking(this) {
+            for ((ix, rule) in root.`▶`.withIndex()) supervisorScope {
                 //update name with +"$ix"
                 name += ":$ix"
                 prepareFor(rule)
-
 
                 //if rule is IAllOf, run the sequence in a supervisor FSM job that is a clone of this FSM
                 //if rule is IOneOf, run each element in a clone of the current FSM and the first to complete wins
@@ -245,12 +250,14 @@ class FSM(var root: Series<`^^`>, var parseNode: ParseNode = ParseNode()) : Coro
                     is IOneOf -> {
                         channelFlow<FSM> {
                             launch {
-                                for (r in rule.rules) supervisorScope{
+                                for (r in rule.rules) supervisorScope {
                                     launch {
                                         val fsm = theFsm.clone()
                                         fsm.root = s_[r]
                                         fsm.parseNode.name = name
-                                        val result = (decorate(fsm)(cs))?.let {
+                                        val decorated = decorate(fsm)
+                                        val executed = decorated(cs)
+                                        val result = executed?.let {
                                             send(fsm)
                                         } ?: cancel()
                                     }
@@ -263,32 +270,32 @@ class FSM(var root: Series<`^^`>, var parseNode: ParseNode = ParseNode()) : Coro
                             named = it.named
                             name = it.name
                             parseNode = it.parseNode
-                            println( "oneOf: $name = parseNode = $parseNode")
+                            println("oneOf: $name = parseNode = $parseNode")
                         } ?: cancel()
-
-
                     }
 
                     is IAllOf -> {
                         val fsm = theFsm.clone()
                         fsm.root = rule.rules.toSeries()
                         fsm.parseNode.name = name
-                        (decorate(fsm)(cs))?.let {
+                        val decorated = decorate(fsm)
+                        val executed = decorated(cs)
+                        executed?.let {
                             //copy the fsm details into this fsm
                             skipWs = fsm.skipWs
                             backTrack = fsm.backTrack
                             named = fsm.named
                             name = fsm.name
                             parseNode = fsm.parseNode
-                            println( "allOf: $name = parseNode = $parseNode")
+                            println("allOf: $name = parseNode = $parseNode")
                         } ?: cancel()
                     }
 
                     else -> {
-                        val d = decorate(rule)
-                        val d1 = d(cs)
+                        val decorated = decorate(rule)
+                        val executed = decorated(cs)
 
-                        val result = d1?.let {
+                        val result = executed?.let {
                             //copy the fsm details into this fsm
                             skipWs = theFsm.skipWs
                             backTrack = theFsm.backTrack
@@ -305,6 +312,7 @@ class FSM(var root: Series<`^^`>, var parseNode: ParseNode = ParseNode()) : Coro
     }
 }
 
+/** see also `¿` */
 class opt_(rule: `^^`) : IBackTrack, `^^` by { cs: CharSeries -> rule(cs) }
 class keepWs_(rule: `^^`) : IKeepWS, `^^` by { cs: CharSeries -> rule(cs) }
 class forwardOnly_(rule: `^^`) : IForwardOnly, `^^` by { cs: CharSeries -> rule(cs) }
@@ -347,7 +355,7 @@ class chgroup_(
     companion object {
         //factory method for idempotent chgroup ops
         val cache = mutableMapOf<String, chgroup_>()
-        fun of(s: String) = cache.getOrPut(s) { chgroup_(s.debug {s-> logDebug { "chgrp: ($s) "} }) }
+        fun of(s: String) = cache.getOrPut(s) { chgroup_(s.debug { s -> logDebug { "chgrp: ($s) " } }) }
         val digit = of("0123456789")
         val hexdigit = of("0123456789abcdefABCDEF")
         val letter = of("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
@@ -359,6 +367,4 @@ class chgroup_(
 }
 
 inline fun group_(grp: Iterable<Char>): `^^` = chgroup_.of(grp.joinToString(""))
-
-
 
