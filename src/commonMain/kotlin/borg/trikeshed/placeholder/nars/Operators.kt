@@ -103,16 +103,15 @@ fun char_(c: Char): `^` = { cs: CharSeries ->
     cs.takeIf {cs.hasRemaining&& cs.get == c }
 }
 
-
-interface IKeepWS
+interface  IWrapRule{val rule: `^`}
+interface IKeepWS:IWrapRule
 interface ISkipWS
 interface IBackTrack
-interface IForwardOnly
-interface INamed {
-    val name: String
-}
+interface IForwardOnly:IWrapRule
+interface INamed:IWrapRule { val name: String }
+interface IRepeat :IWrapRule{ val count:Int }
 
-class named_(val rule: `^`, override val name: String) : INamed, `^` by rule
+class named_(override val rule: `^`, override val name: String) : INamed, `^` by rule
 
 //object skipWs_ : IBackTrack, `^^` by +_l[' ', '\r', '\n', '\t']
 
@@ -126,10 +125,10 @@ class not_(r: `^`) : IBackTrack, `^` by { cs: CharSeries -> cs.clone().takeIf { 
 
 
 /** see also `¿` */
-class opt_(rule: `^`) : IBackTrack, `^` by { cs: CharSeries -> rule(cs) }
-class keepWs_(rule: `^`) : IKeepWS, `^` by { cs: CharSeries -> rule(cs) }
-class forwardOnly_(rule: `^`) : IForwardOnly, `^` by { cs: CharSeries -> rule(cs) }
-class repeat_(rule: `^`, count: Int = -1) : `^` by { cs: CharSeries ->
+class opt_( val rule: `^`) : IBackTrack, `^` by { cs: CharSeries -> rule(cs) }
+class keepWs_(override val rule: `^`) : IKeepWS, `^` by { cs: CharSeries -> rule(cs) }
+class forwardOnly_(override val rule: `^`) : IForwardOnly, `^` by { cs: CharSeries -> rule(cs) }
+class repeat_(override val rule: `^`, override val count: Int = -1) :IRepeat, `^` by { cs: CharSeries ->
     var c = 0
     var result: CharSeries? = cs
     var pos = cs.pos
@@ -142,7 +141,7 @@ class repeat_(rule: `^`, count: Int = -1) : `^` by { cs: CharSeries ->
 }  //this functor wants as post-flip
 
 
-class string_(val str: String) : IBackTrack, `^` by { cs: CharSeries ->
+class string_(val str: String) : IBackTrack , `^` by { cs: CharSeries ->
     var c = 0
     @Suppress("ControlFlowWithEmptyBody")
     while (cs.hasRemaining && cs.get == str[c++]);
@@ -181,7 +180,7 @@ class chgroup_(
 
 inline fun group_(grp: Iterable<Char>): `^` = chgroup_.of(grp.joinToString(""))
 
-open class ParseNode(
+ data class ParseNode(
     var name: String = "node-${counter++}",
     var value: CharSeries? = null,
     var children: MutableList<ParseNode> = ArrayList()

@@ -26,7 +26,7 @@ class NarseseParserTest {
         println()
     }
 
-    val abc= (+'a' + (+_l['a', 'b', 'c'])[1..2])
+    val abc= (+'a' + (+_l['a', 'b', 'c'])[1..2])["abc"]
     val abclp= (abc["first"] + ((+',')["comma"] + abc["trailling"])[0..Integer.MAX_VALUE])
 
     @Test
@@ -39,6 +39,18 @@ class NarseseParserTest {
 
         val fsm = RecursiveContextParserImpl( ) // create a FSM for the task parser
         val result = fsm(abclp,CharSeries(line1Expected)) // parse the line
-        println()
+        println(result.toString())
+    }
+    @Test
+    fun testSpaceParser2() {
+
+        //TEST LINE 1
+        val line1 = lines[0]
+        val line1Expected = "ab,ac,abc,aaa,zba".trim()
+
+
+        val fsm = RecursiveContextParserImpl( ) // create a FSM for the task parser
+        val result = fsm(abclp,CharSeries(line1Expected)) // parse the line
+        println(result.toString())
     }
 }
