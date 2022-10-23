@@ -26,8 +26,8 @@ class NarseseParserTest {
         println()
     }
 
-    val abc=  (+'a' + (+_l['a', 'b', 'c'])[1..2])["abc"]
-    val abclp= (abc["first"] + (((+',')["comma"] + abc["trailling"])[0..Integer.MAX_VALUE]))["outer"]
+    val abc= (+'a' + (+_l['a', 'b', 'c'])[1..2])
+    val abclp= (abc["first"] + ((+',')["comma"] + abc["trailling"])[0..Integer.MAX_VALUE])
 
     @Test
     fun testSpaceParser() {

@@ -67,10 +67,8 @@ object term : `^^`, IOneOf, ISkipWS {
     }
 }
 
-
 //             word ::= #"[^ ]+"                                (* a sequence of non-space characters *)
 object word : `^` by (!whitespace * !whitespace)
-
 
 //        op-ext-set::= '{'                                     (* extensional set *)
 //        op-int-set::= '['                                     (* intensional set *)
@@ -133,8 +131,7 @@ object compound_term : IOneOf, `^^` {
 //                    / term                                    (* a term can name a statement *)
 //                    / "(^"word {','term} ')'                  (* an operation to be executed *)
 //                    / word'('term {','term} ')'               (* an operation to be executed, new notation *)
-object statement :
-    `^-` by ((+'<' + term + copula + term + '>') / (+'(' + term + copula + term + ')') / term / (+'(' + '^' + word + (+',' + term) * ')') / (word + '(' + term + (+',' + term) * ')')
+object statement :`^-` by ((+'<' + term + copula + term + '>') / (+'(' + term + copula + term + ')') / term / (+'(' + '^' + word + (+',' + term) * ')') / (word + '(' + term + (+',' + term) * ')')
             )
 
 
@@ -158,7 +155,7 @@ object durability : `^^` by (float)
 object quality : `^^` by (float)
 object frequency : `^^` by (float)
 object confidence : `^^` by (float)
-object float : `^^` by ((+_l['+', '-'] * digit * '.' * digit * (digit + +_l['E', 'e'] + +_l['+', '-'] * digit)))
-object truth : `^^` by (  (+'%') + frequency + (+';' + confidence) * '%')
-object budget : `^^` by ( (+'$') + priority  + (+';' + durability) * (+';' + quality) * '$')
+object float : `^^` by ( +_l['+', '-'] * digit * '.' * digit * (digit + +_l['E', 'e'] + +_l['+', '-'] * digit))
+object truth : `^^` by (+'%' + frequency + (+';' + confidence) * '%')
+object budget : `^^` by (+'$' + priority + (+';' + durability) * (+';' + quality) * '$')
 

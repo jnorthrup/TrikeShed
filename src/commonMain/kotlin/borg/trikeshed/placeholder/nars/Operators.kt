@@ -5,6 +5,8 @@ package borg.trikeshed.placeholder.nars
 import borg.trikeshed.lib.*
 import borg.trikeshed.lib.parser.simple.CharSeries
 import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.channelFlow
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlin.coroutines.CoroutineContext
@@ -35,9 +37,9 @@ operator fun String.unaryPlus(): `^` = string_(this)
 operator fun Iterable<Char>.unaryPlus(): `^` = group_(this)
 
 //1. a `+` b (and)
-operator fun `^`.plus(b: `^`)  = allOf_(this, b)
+operator fun `^`.plus(b: `^`) = allOf_(this, b)
 operator fun `^`.plus(b: Char) = oneOf_(this, +b)
-operator fun `^`.plus(b: String)  = allOf_(this, +b)
+operator fun `^`.plus(b: String) = allOf_(this, +b)
 
 //1. a `/` b (a or b)
 operator fun `^`.div(b: `^`): `^-` = oneOf_(this, b)
@@ -87,7 +89,7 @@ interface IAllOf : `^` {
     val rules: Sequence<`^`>
 }
 
-interface IOneOf  : `^`{
+interface IOneOf : `^` {
     val rules: Sequence<`^`>
 }
 
@@ -98,7 +100,7 @@ operator fun `IOneOf`.div(b: IOneOf): `^-` = oneOf_(this.rules + b.rules)
 
 
 fun char_(c: Char): `^` = { cs: CharSeries ->
-    cs.takeIf { cs.get == c }
+    cs.takeIf {cs.hasRemaining&& cs.get == c }
 }
 
 
@@ -143,7 +145,7 @@ class repeat_(rule: `^`, count: Int = -1) : `^` by { cs: CharSeries ->
 class string_(val str: String) : IBackTrack, `^` by { cs: CharSeries ->
     var c = 0
     @Suppress("ControlFlowWithEmptyBody")
-    while (cs.hasNext && cs.get == str[c++]);
+    while (cs.hasRemaining && cs.get == str[c++]);
     cs.takeIf { c == str.length }
 
 }
@@ -155,7 +157,7 @@ class chgroup_(
     override fun invoke(p1: CharSeries): CharSeries? {
         // see https://pvk.ca/Blog/2012/07/03/binary-search-star-eliminates-star-branch-mispredictions/
 
-        if (p1.hasNext) {
+        if (p1.hasRemaining) {
             val c = p1.get
             val i = chars.binarySearch(c)
             if (i >= 0) return p1
@@ -198,7 +200,9 @@ open class ParseNode(
 class allOf_(override val rules: Sequence<`^`>) : IAllOf, IBackTrack, `^` {
     constructor(vararg rulesIn: `^`) : this(rulesIn.asSequence())
 
-    override fun invoke(p1: CharSeries): CharSeries = TODO()
+    override fun invoke(p1: CharSeries): CharSeries = rules.fold(p1) { cs, rule ->
+        rule(cs) ?: return cs
+    }
 }
 
 class oneOf_(
@@ -206,14 +210,28 @@ class oneOf_(
 ) : IOneOf, `^` {
     constructor(vararg rulesIn: `^`) : this(rulesIn.asSequence())
 
-    override fun invoke(p1: CharSeries): CharSeries = TODO()
+    override fun invoke(p1: CharSeries)= runBlocking {
+        var r: CharSeries? = null
+
+        supervisorScope {
+            channelFlow<CharSeries> {
+                rules.forEach { rule ->
+                    launch {
+                        val result = rule(p1.clone())
+                        if (result != null) send(result)
+                    }
+                }
+            }.firstOrNull().also { r = it }
+            this@supervisorScope.coroutineContext.cancelChildren()
+        }
+        r
+    }
 }
 
 abstract class RecursiveContextParser : CoroutineContext.Element, Parser {
     companion object {
         val key: CoroutineContext.Key<*> = object : CoroutineContext.Key<CoroutineContext.Element> {}
     }
-
 
     override val key: CoroutineContext.Key<*> = RecursiveContextParser.key
 
@@ -269,21 +287,20 @@ the processing of IAllOf will create a RecursiveContextParser for each rule in t
 sequence so that the flags are set correctly for each rule.  the last rule will be the one that is returned to the
 parent context.  the parent context will then be returned to the parent context, and so on.
  */
-class RecursiveContextParserImpl(override val parent: RecursiveContextParser? = null) : RecursiveContextParser() { //, CoroutineScope
+class RecursiveContextParserImpl(override val parent: RecursiveContextParser? = null) :
+    RecursiveContextParser() { //, CoroutineScope
 
     override fun invoke(rule: ParseFunction, cs: CharSeries): ParseNode = runBlocking {
         lateinit var result: ParseNode
         prepareFor(rule)
         val csClone = if (backTrack) cs.clone() else cs
 
-        if (skipWs) while (csClone.hasNext && csClone.get.isWhitespace()); //skip whitespace
+        if (skipWs) while (csClone.hasRemaining && csClone.get.isWhitespace()); //skip whitespace
 
         when (rule) {
-            /*
-                        the processing of IOneOf will create a RecursiveContextParser for each rule in the sequence
-                        inside supervisorContext, and run them in parallel
-                        with a mutex lock on the current publisherLock for first completion.
-                */
+            /*  the processing of IOneOf will create a RecursiveContextParser for each rule in the sequence inside
+                supervisorContext, and run them in parallel with a mutex lock on the current publisherLock for
+                first completion. */
             is IOneOf -> runBlocking {
                 supervisorScope { //run in parallel
                     rule.rules.forEach { r ->
@@ -309,14 +326,10 @@ class RecursiveContextParserImpl(override val parent: RecursiveContextParser? = 
                     parent context.  the parent context will then be returned to the parent context, and so on.
             */
             is IAllOf -> runBlocking {
-                rule.rules.forEach { r ->
+                for (r in rule.rules) {
                     val childParser = RecursiveContextParserImpl(this@RecursiveContextParserImpl)
                     val childResult = childParser(r, csClone)
-                    if (childResult != null) {
-                        result = childResult
-                    } else {
-                        cancel()
-                    }
+                    if (childResult != null) result = childResult else cancel()
                 }
             }
 

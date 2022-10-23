@@ -1,6 +1,8 @@
 package borg.trikeshed.lib.parser.simple
 
 import borg.trikeshed.lib.*
+import borg.trikeshed.lib.CZero.nz
+import borg.trikeshed.lib.CZero.z
 
 /**
  * char based spiritual successor to ByteBuffer for parsing
@@ -31,7 +33,7 @@ class CharSeries(buf: Series<Char>) : Series<Char> {
     val cap: Int get() = size
 
     /**remaining chars as a string*/
-    val hasNext get() = pos < limit
+    val hasRemaining get() = rem.nz
 
     /** mark the current position */
     val mk
