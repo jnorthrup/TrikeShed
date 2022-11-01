@@ -1,11 +1,8 @@
 @file:Suppress("ControlFlowWithEmptyBody", "UNCHECKED_CAST")
 
 package borg.trikeshed.placeholder.nars
-
-
 import borg.trikeshed.lib.Join
 import borg.trikeshed.lib.Twin
-import borg.trikeshed.lib.collections.Stack
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.parser.simple.CharSeries
 import borg.trikeshed.lib.plus
@@ -117,14 +114,24 @@ typealias ParseResult = Join<
         Rule,
         /** first is next as a slice, second is flipped buffer value/success*/
         Twin<CharSeries>>
+//what changes to ParseResult above are required to enable left recursion and avoid stack and heap overflows ?
+
+
+
 
 typealias ParseFunctor = (CharSeries) -> ParseResult?
+
 
 /** the rule produces the ParseResult of the rule, or null if the rule fails */
 interface Rule : ParseFunctor {
     val asm: Twin<Rule?>? get() = null
     val trim: Boolean get() = true
     val backtrack: Boolean get() = true
+
+
+    val Rule.name : String get(){
+        return Rule.nameOf(this)
+    }
 
     override operator fun invoke(cs: CharSeries): ParseResult? {
         require(asm != null) { "default Rule implemenation with null asm" }
@@ -162,6 +169,9 @@ interface Rule : ParseFunctor {
         return let as ParseResult?
     }
 
+    operator fun dec(): Rule = this * noop
+
+
     companion object {
         fun `^`(block: ConditionalUnaryCharOp): Rule = object : Rule {
             override fun invoke(p1: CharSeries): ParseResult? {
@@ -169,6 +179,8 @@ interface Rule : ParseFunctor {
                 val result = block(clone)
                 return if (result != null) Join(this, Twin(result.slice, result.fl)) else null
             }
+
+            override fun toString() = "Rule: "+name
         }
 
         val nameRegistry = mutableMapOf<Rule, String>()
@@ -191,9 +203,13 @@ operator fun Rule.div(other: Rule): Rule {
         override val trim: Boolean = true
         override val backtrack: Boolean = true
 
+        override fun toString(): String {
+            return "OR: ${asm.pair.first} / ${asm.pair.second}"
 
-         override operator fun invoke(cs: CharSeries): ParseResult? {
-             require(asm != null) { "A OR B  Rule implemenation with null asm" }
+        }
+
+        override operator fun invoke(cs: CharSeries): ParseResult? {
+            require(asm != null) { "A OR B  Rule implemenation with null asm" }
             //default behavior proceed for a, then b if not null and a succeeds and b succeeds
             val (a, b) = asm
 
@@ -215,8 +231,6 @@ operator fun Rule.div(other: Rule): Rule {
 
             return doRule(a!!, cs.clone()) ?: doRule(b!!, cs.clone())
         }
-
-
     }
 }
 
@@ -238,15 +252,14 @@ operator fun Char.unaryPlus(): ConditionalUnaryCharOp =
 //kotlin/java unquoted legal currency symbols are: $¢£¤¥₠₡₢₣₤₥₦₧₨₩₪₫€₭₮₯₰₱₲₳₴₵₶₷₸₹₺₻₼₽₾₿
 //legal unquoted greek symbols in kotlin are: αβγδεζηθικλμνξοπρστυφχψω
 
-val String.λ :Rule get() = +(+this)
-val Char.λ :Rule get() = +(+this)
+val String.λ: Rule get() = (+(+this))["lit $this"]
+val Char.λ: Rule get() = (+(+this))["lit '$this'"]
 
 operator fun String.unaryPlus(): ConditionalUnaryCharOp = { cs ->
     var c = 0
     while (c < this.length && cs.hasRemaining && cs.mk.get == this[c]) c++
     cs.res.takeIf { c == this.length }
 }
-
 
 
 //combine two rules into a single rule with a + b  or to continue to replace b with a new rule a,b, recurse
@@ -334,18 +347,18 @@ object confidence : Rule by ((+chgroup_("10")))[1..1] + (+digit)[1..9] `¿` +(+(
 //| "</>"                                   (* predictive equivalence *)
 //| "<|>"                                   (* concurrent equivalence *)
 
-object copula : Rule by (+(+"-->"))["inheritance"] /
-        (+(+"<->"))["similarity"] /
-        (+(+"{--"))["instance"] /
-        (+(+"--]"))["property"] /
-        (+(+"{-]"))["instance-property"] /
-        (+(+"==>"))["implication"] /
-        (+(+"=/>"))["predictive implication"] /
-        (+(+"=|>"))["concurrent implication"] /
-        (+(+"=\\>"))["retrospective implication"] /
-        (+(+"<=>"))["equivalence"] /
-        (+(+"</>"))["predictive equivalence"] /
-        (+(+"<|>"))["concurrent equivalence"]
+object copula : Rule by "-->".λ["inheritance"] /
+        "<->".λ["similarity"] /
+        "{--".λ["instance"] /
+        "--]".λ["property"] /
+        "{-]".λ["instance-property"] /
+        "==>".λ["implication"] /
+        "=/>".λ["predictive implication"] /
+        "=|>".λ["concurrent implication"] /
+        "=\\>".λ["retrospective implication"] /
+        "<=>".λ["equivalence"] /
+        "</>".λ["predictive equivalence"] /
+        "<|>".λ["concurrent equivalence"]
 
 
 operator fun Rule.get(name: String): Rule = object : INamed, Rule {
@@ -390,23 +403,45 @@ object term : Rule by word["atomicconstant"] /
 //op-single ::= '-'                                     (* extensional difference *)
 //| '~'                                     (* intensional difference *)
 
-object compound_term : Rule by '['.λ["intensional set"] + term + (','.λ + term) * ']'.λ /
-        '{'.λ["extensional set"] + term + (','.λ + term) *  '}'.λ /
-        '('.λ + "&&".λ["conjunction"] + term + (','.λ + term) * ')'.λ /
-        '('.λ + '*'.λ["product"] + term + (','.λ + term) *  ')'.λ /
-        '('.λ + "||".λ["disjunction"] + term + (','.λ + term) * ')'.λ /
-        '('.λ + "&|".λ["parallel events"] + term + (','.λ + term) * ')'.λ /
-        '('.λ + "&/".λ["sequential events"] + term + (','.λ + term) * ')'.λ /
-        '('.λ + '|'.λ["intensional intersection"] + term + (','.λ + term) * ')'.λ /
-        '('.λ + '&'.λ["extensional intersection"] + term + (','.λ + term) * ')'.λ /
-        '('.λ + '-'.λ["extensional difference"] + term + (','.λ + term) * ')'.λ /
-        '('.λ + '~'.λ["intensional difference"] + term + (','.λ + term) * ')'.λ /
-        '('.λ + term + (','.λ + term) * ')'.λ /
-        '('.λ + '/'.λ["special case, extensional image"] + term + (','.λ + term) * ')'.λ /
-        '('.λ + "\\".λ["special case, intensional image"] + term + (','.λ + term) * ')'.λ /
-        '('.λ + "--".λ["negation"] + term + (','.λ + term) * ')'.λ /
-         "--".λ["negation"] + term
+object termSet : Rule by (','.λ + term)[-1]
 
+
+object compound_term : Rule by '['.λ["intensional set"] + term + termSet * ']'.λ /
+        '{'.λ["extensional set"] + term + termSet +'}'.λ /
+        '('.λ(//confix opening
+            ("&&".λ["conjunction"]  ) /
+                    ('*'.λ["product"]  ) /
+                    ("||".λ["disjunction"]  ) /
+                    ("&|".λ["parallel events"]  ) /
+                    ("&/".λ["sequential events"]  ) /
+                    ('|'.λ["intensional intersection"]  ) /
+                    ('&'.λ["extensional intersection"]  ) /
+                    ('-'.λ["extensional difference"]  ) /
+                    ('~'.λ["intensional difference"]  ) /
+                    ('/'.λ["special case, extensional image"]  ) /
+                    ("\\".λ["special case, intensional image"] ) /
+                    ("--".λ["negation"]) /
+                    (noop["product alt"]+term + termSet)
+        )(term + termSet + ')'.λ) /
+        "--".λ["negation"] + term
+
+
+infix operator fun Rule.times(noop: noop) = opt_(this)[-1]
+
+
+infix operator fun Rule.invoke(rule: Rule): InfixRule = InfixRule(this, rule)
+
+infix operator fun InfixRule.invoke(rule: Rule): ConfixRule = ConfixRule(this, rule)
+
+/**
+ * a Rule override which uses a j b to override asm
+ */
+class InfixRule(a: Rule, b: Rule, override val asm: Twin<Rule?>? = Twin(a, b)) : Rule
+
+/**
+ * a Rule override which uses a j b to override asm
+ */
+class ConfixRule(a: Rule, b: Rule, override val asm: Twin<Rule?>? = Twin(a, b)) : Rule
 
 //sentence ::= statement'.' [tense] [truth]            (* judgement to be absorbed into beliefs *)
 //| statement'?' [tense]                    (* question on truth-value to be answered *)
@@ -418,7 +453,6 @@ object sentence : Rule by statement + '.'.λ["judgement to be absorbed into beli
         statement + '?'.λ["question on truth-value to be answered"] + (tense `¿` noop) /
         statement + '!'.λ["goal to be realized by operations"] + (desire `¿` noop) /
         statement + '@'.λ["question on desire-value to be answered"]
-
 
 
 //statement ::= <'<'>term copula term<'>'>              (* two terms related to each other *)
@@ -445,7 +479,7 @@ object variable : Rule by '$'.λ + word["independent variable"] /
 //tense ::= ":/:"                                   (* future event *)
 //| ":|:"                                   (* present event *)
 //| ":\:"                                   (* past event *)
-object tense : Rule by ":/:".λ ["future event"] /
+object tense : Rule by ":/:".λ["future event"] /
         ":|:".λ["present event"] /
         ":\\:".λ["past event"]
 
@@ -459,4 +493,5 @@ object truth : Rule by ('%'.λ) + frequency + (+(+(';')) + confidence) * '%'.λ
 object budget : Rule by '$'.λ + priority + (';'.λ + durability) * ((';'.λ + quality) * '$'.λ)
 
 // task ::= [budget] sentence                       (* task to be processed *)
-object task : Rule by (budget`¿` sentence )
+object task : Rule by (budget `¿` sentence)
+

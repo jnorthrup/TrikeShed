@@ -21,15 +21,15 @@ class NarseseParserTest {
 //        }
 //    }
 
+    object abc: Rule by "abc".λ
+
     @kotlin.test.Test
     fun testParse() {
         val right = "abcabcabc"
         val sright = "abc abc abc"
         val wrong = "abcabcab"
-        val oparser: Rule = +(+"abc")
-        val rparser = oparser[3]
 
-        oparser(CharSeries(sright))?.let { res: ParseResult ->
+        abc(CharSeries(right))?.let { res: ParseResult ->
             println( res).debug {
                 "oparser: $it" }
              }
