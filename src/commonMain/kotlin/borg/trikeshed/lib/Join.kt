@@ -1,14 +1,9 @@
 package borg.trikeshed.lib
 
-import borg.trikeshed.lib.parser.simple.CharSeries
-import kotlin.js.JsExport
-import kotlin.js.JsName
-
-
 /**
  * Joins two things.  Pair semantics but distinct in the symbol naming
  */
-interface Join<A, B> : Twin<CharSeries> {
+interface Join<A, B>{
     val a: A
     val b: B
     operator fun component1(): A = a

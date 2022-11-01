@@ -2,7 +2,6 @@ package borg.trikeshed.placeholder.nars
 
 import borg.trikeshed.lib.collections._a
 import borg.trikeshed.lib.parser.simple.CharSeries
-import borg.trikeshed.placeholder.nars.symbolConfix.Companion.of
 import kotlinx.coroutines.flow.Flow
 
 
@@ -134,66 +133,8 @@ then run backward pass to build a parse AST of the task(s).
 
 /** iff an element of narsese has deterministic constants (7 or less options combined)  for begin and end we can use this to find them*/
 data class symbolConfix(val begin:  Char , val end:  Char ){init{ require(' ' !in _a[ begin , end ])};companion object { fun of(begin: Char, end: Char) = symbolConfix(begin, end) } }
-/** a master enum of named elements to use as symbols following*/
 
-enum class Element(val parent: Element? = null,val cf:symbolConfix?=null) {
-    //the possible opening characters of task are:
-//    task, desire, word,
-        task,desire , word ,
-
-    //copulas
-    copula, inheritance(copula, of('-','>') ), similarity(copula, of('<','>') ), instance(copula, of('{','-') ),
-    property(copula, of('-',']') ), instance_property(copula, of('{','-' ) ), implication(copula, of('=','>') ),
-    predictive_implication(copula, of('=','/') ), concurrent_implication(copula, of('=','|') ),
-    retrospective_implication(copula, of('=','\\') ), equivalence(copula, of('<','>') ),
-    predictive_equivalence(copula, of('<','/') ), concurrent_equivalence(copula, of('<','|') ),
-
-    //terms
-    term, atomic_term(term), compound_term(term), statement(term),
-
-    //compound terms
-    op_ext_set(compound_term, of('{','}') ), op_int_set(compound_term, of('[',']') ), op_negation(compound_term ),
-    op_int_image(compound_term ), op_ext_image(compound_term ), op_multi(compound_term), op_single(compound_term),
-
-    //variables
-    variable, independent_variable(variable  ), dependent_variable(variable ),
-    query_variable(variable  ),
-
-    //tense
-    tense, future_tense(tense, of(':','/') ), present_tense(tense, of(':','|') ), past_tense(tense, of(':','\\') ),
-
-    //desire
-    truth(desire),
-    budget,
-
-    //priority
-    priority(budget ), durability(budget  ), quality(budget ),
-
-    //frequency
-    frequency(truth ), confidence(truth ),
-;
-    //create  maps of all elements by begin, end if avaiilable
-    companion object {
-        val beginnings = Element.values().filter { it.cf != null }.associateBy { it.cf!!.begin }
-        val _endings = Element.values().filter { it.cf != null }.associateBy { it.cf!!.end }
-        // create  a mapping of child relations for each element to its parent
-        val parentMap = Element.values().associateBy { it }.mapValues { it.value.parent }.filterValues { it != null }.mapValues { it.value!! }
-        //create a mapping of each pa=rent to its children
-        val childMap = parentMap.values.toSet().associateWith { parent -> Element.values().filter { it.parent == parent } }
-        //create a hierarchical rank mapping for each element by ascent count for each node in the parent Map
-        val rankMap = Element.values().associateWith {
-            var c = 0;
-            var p = it.parent
-            while (p != null) {
-                c++
-                p = p.parent
-            }
-            c
-        }
-    }
-}
-
-/** charseries and java CharBuffer are used to represent the input stream of characters, the calls are:
+/** charseriescalls are:
  * - get to get the next character
  * - get(n) get at position n
  * - pos to get the current position
@@ -203,15 +144,6 @@ enum class Element(val parent: Element? = null,val cf:symbolConfix?=null) {
  * - rem to get the number of remaining characters
  * - fl to flip the buffer, which sets the limit to the current position and the position to 0
  * - slice to get a new CharBuffer with the same content starting at pos until limit
- * - clone()
- * */
+ * - clone() */
 typealias CharBuffer = CharSeries
 
-/**
- * we utilize Element.companion  beginnings _endings parentMap childMap rankMap to idetify the outter most matched
- * concrete scopes of the input stream.
- * */
-
-class NarsScanner (var input:Flow<String> ) {
-
-}

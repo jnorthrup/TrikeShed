@@ -8,9 +8,9 @@ import kotlinx.coroutines.*
 
 class chgroup_(
     s: String,//sort and distinct the chars first to make the search faster,
-    private val chars: Series<Char> = s.toCharArray().distinct().sorted().toSeries()
-)   {
-      fun invoke(p1: CharSeries): CharSeries? {
+    val chars: Series<Char> = s.toCharArray().distinct().sorted().toSeries()
+) :ConditionalUnaryCharOp  {
+      override fun invoke(p1: CharSeries): CharSeries? {
         // see https://pvk.ca/Blog/2012/07/03/binary-search-star-eliminates-star-branch-mispredictions/
 
         if (p1.hasRemaining) {
@@ -20,7 +20,6 @@ class chgroup_(
         }
         return null
     }
-
     companion object {
         //factory method for idempotent chgroup ops
         private val cache = mutableMapOf<String, chgroup_>()
