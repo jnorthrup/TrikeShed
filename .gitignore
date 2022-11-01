@@ -1,6 +1,6 @@
 gradle
 .idea
-gradle
+.gradle
 build
 docs/
 tmp/
