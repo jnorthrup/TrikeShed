@@ -9,8 +9,8 @@ import kotlin.math.max
  * char based spiritual successor to ByteBuffer for parsing
  */
 class CharSeries(buf: Series<Char>) : Series<Char> {
-    override val a: Int =buf.a
-    override val b: (Int) -> Char =buf.b
+    override val a: Int = buf.a
+    override val b: (Int) -> Char = buf.b
 
     var pos = 0
     var limit = size
@@ -18,7 +18,7 @@ class CharSeries(buf: Series<Char>) : Series<Char> {
 
     val get: Char
         get() {
-            require(pos < limit);
+            require(pos < limit)
             return b(pos++)
         }
 
@@ -43,11 +43,12 @@ class CharSeries(buf: Series<Char>) : Series<Char> {
     //reset
     val res
         get() = apply {
-            pos = max(mark,pos)
+            pos = max(mark, pos)
         }
 
     //flip
-    val fl get() = apply {
+    val fl
+        get() = apply {
             limit = pos
             pos = 0
             mark = -1
@@ -72,7 +73,7 @@ class CharSeries(buf: Series<Char>) : Series<Char> {
         pos = p
     }
 
-    fun clone() = CharSeries(a j b ).also { it.pos = pos; it.limit = limit; it.mark = mark }
+    fun clone() = CharSeries(a j b).also { it.pos = pos; it.limit = limit; it.mark = mark }
 
 
     /** a hash of contents only. not position, limit, mark */
@@ -112,7 +113,7 @@ class CharSeries(buf: Series<Char>) : Series<Char> {
     }
 
     //Java ByteBuffer style slice
-    val slice: CharSeries get()= CharSeries(this[pos until limit])
+    val slice: CharSeries get() = CharSeries(this[pos until limit])
 
     fun asString(upto: Int = Int.MAX_VALUE): String =
         ((limit - pos) j { x: Int -> this[x + pos] }).toArray().concatToString()
@@ -122,5 +123,8 @@ class CharSeries(buf: Series<Char>) : Series<Char> {
         return "CharSeries(position=$pos, limit=$limit, mark=$mark, cacheCode=$cacheCode,take-4=${take})"
     }
 
-    fun lim(i: Int)  = apply { limit = i }
+    fun lim(i: Int) = apply { limit = i }
+
+    //isEmpty override
+    val isEmpty: Boolean get() = pos == limit
 }

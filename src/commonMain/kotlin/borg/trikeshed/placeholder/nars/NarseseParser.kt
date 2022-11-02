@@ -1,13 +1,17 @@
 @file:Suppress("ControlFlowWithEmptyBody", "UNCHECKED_CAST")
 
 package borg.trikeshed.placeholder.nars
-import borg.trikeshed.lib.Join
-import borg.trikeshed.lib.Twin
-import borg.trikeshed.lib.j
+
+import borg.trikeshed.lib.*
+import borg.trikeshed.lib.collections.Stack
 import borg.trikeshed.lib.parser.simple.CharSeries
-import borg.trikeshed.lib.plus
+import borg.trikeshed.placeholder.nars.ParseContext.Key
 import borg.trikeshed.placeholder.nars.Rule.Companion.`^`
 import borg.trikeshed.placeholder.nars.chgroup_.Companion.digit
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.runBlocking
+import kotlin.coroutines.CoroutineContext
 
 val selfDoc = """ 
     
@@ -109,17 +113,18 @@ interface INamed {
 
 typealias ConditionalUnaryCharOp = (CharSeries) -> CharSeries?
 
+
 typealias ParseResult = Join<
         /** the firing rule*/
         Rule,
         /** first is next as a slice, second is flipped buffer value/success*/
         Twin<CharSeries>>
-//what changes to ParseResult above are required to enable left recursion and avoid stack and heap overflows ?
 
+val ParseResult.next get() = b.b.a
+val ParseResult.rule get() = b.a
+val ParseResult.value get() = b.b.a
 
-
-
-typealias ParseFunctor = (CharSeries) -> ParseResult?
+typealias ParseFunctor = (suspend (CharSeries) -> ParseResult?)
 
 
 /** the rule produces the ParseResult of the rule, or null if the rule fails */
@@ -129,11 +134,12 @@ interface Rule : ParseFunctor {
     val backtrack: Boolean get() = true
 
 
-    val Rule.name : String get(){
-        return Rule.nameOf(this)
-    }
+    val Rule.name: String
+        get() {
+            return nameOf(this)
+        }
 
-    override operator fun invoke(cs: CharSeries): ParseResult? {
+    override suspend operator fun invoke(cs: CharSeries): ParseResult? {
         require(asm != null) { "default Rule implemenation with null asm" }
         //default behavior proceed for a, then b if not null and a succeeds and b succeeds
         val (a, b) = asm!!
@@ -146,7 +152,7 @@ interface Rule : ParseFunctor {
             cs.res
         }
 
-        fun doRule(r: Rule, cs: CharSeries): ParseResult? {
+        suspend fun doRule(r: Rule, cs: CharSeries): ParseResult? {
             if (trim) trim(cs)
 
             val cs0 = if (backtrack) cs.clone() else cs
@@ -155,7 +161,7 @@ interface Rule : ParseFunctor {
 
         val aResult = doRule(a!!, cs)
 
-        val let = aResult?.let { (_: Rule, i: Twin<CharSeries>): ParseResult ->
+        val res = aResult?.let { (_: Rule, i: Twin<CharSeries>): ParseResult ->
             val (next, value) = i
             when (b) {
                 null -> i
@@ -165,8 +171,7 @@ interface Rule : ParseFunctor {
                 }
             }
         }
-
-        return let as ParseResult?
+        return (res as? ParseResult)?.snitch()
     }
 
     operator fun dec(): Rule = this * noop
@@ -174,13 +179,21 @@ interface Rule : ParseFunctor {
 
     companion object {
         fun `^`(block: ConditionalUnaryCharOp): Rule = object : Rule {
-            override fun invoke(p1: CharSeries): ParseResult? {
+            override suspend fun invoke(p1: CharSeries): ParseResult? {
                 val clone = p1.clone()
                 val result = block(clone)
-                return if (result != null) Join(this, Twin(result.slice, result.fl)) else null
+
+                return result?.let { result ->
+                    val a1 = result.slice
+                    val b1 = result.fl
+                    (ParseResult(
+                        this,
+                        Twin(a1, b1)
+                    ) as? ParseResult)?.snitch()
+                }
             }
 
-            override fun toString() = "Rule: "+name
+            override fun toString() = "Rule: " + name
         }
 
         val nameRegistry = mutableMapOf<Rule, String>()
@@ -195,6 +208,19 @@ interface Rule : ParseFunctor {
     }
 }
 
+suspend fun ParseResult.snitch() = apply {
+    lateinit var parseContext: ParseContext
+    lateinit var currentCoroutineContext: CoroutineContext
+
+    currentCoroutineContext = currentCoroutineContext()
+    parseContext = currentCoroutineContext[Key] ?: ParseContext().apply {
+        currentCoroutineContext + this
+    }
+
+
+    parseContext.stack.push(this@apply)
+
+}
 
 //perform a OR b on the input CharSeries and return the result of the first rule that succeeds
 operator fun Rule.div(other: Rule): Rule {
@@ -208,7 +234,8 @@ operator fun Rule.div(other: Rule): Rule {
 
         }
 
-        override operator fun invoke(cs: CharSeries): ParseResult? {
+        override suspend operator fun invoke(cs: CharSeries): ParseResult? {
+
             require(asm != null) { "A OR B  Rule implemenation with null asm" }
             //default behavior proceed for a, then b if not null and a succeeds and b succeeds
             val (a, b) = asm
@@ -221,18 +248,26 @@ operator fun Rule.div(other: Rule): Rule {
                 cs.res
             }
 
-            fun doRule(r: Rule, cs: CharSeries): ParseResult? {
+            suspend fun doRule(r: Rule, cs: CharSeries): ParseResult? {
                 if (trim) trim(cs)
 
                 val cs0 = if (backtrack) cs.clone() else cs
                 return r(cs0)
             }
             //clone cs, then perform a, and if not a perform b on new clone
-
-            return doRule(a!!, cs.clone()) ?: doRule(b!!, cs.clone())
+            return (doRule(a!!, cs.clone()) ?: doRule(b!!, cs.clone()))?.snitch()
         }
     }
 }
+
+//there is a Stack in the coroutine context that can be used to store state between calls to the parse coroutine
+class ParseContext : CoroutineContext.Element {
+    companion object Key : CoroutineContext.Key<ParseContext>
+
+    override val key: CoroutineContext.Key<*> get() = Key
+    val stack = Stack<ParseResult>()
+}
+
 
 object word : Rule by `^`({ cs: CharSeries ->
     val p = cs.pos
@@ -261,11 +296,10 @@ operator fun String.unaryPlus(): ConditionalUnaryCharOp = { cs ->
     cs.res.takeIf { c == this.length }
 }
 
-
 //combine two rules into a single rule with a + b  or to continue to replace b with a new rule a,b, recurse
 operator fun Rule.plus(b: Rule): Rule = asm?.let { twin ->
     val (a, c) = twin
-    c?.let { c1 -> a!! + (c1 + b) } ?: a!! + b
+    c?.let { c1 -> a!! + (c1 + b) } ?: (a!! + b)
 } ?: object : Rule {
     override val asm: Twin<Rule?> = Twin(this@plus, b)
 }
@@ -273,10 +307,12 @@ operator fun Rule.plus(b: Rule): Rule = asm?.let { twin ->
 infix fun Rule.`¿`(r: Rule): Rule = opt_(this) + r
 
 fun opt_(r: Rule): Rule = `^` { cs ->
-    val clone = cs.clone()
-    val result = r(clone)
-    if (result != null) cs.res
-    else noop(cs) as CharSeries
+    runBlocking {
+        val clone = cs.clone()
+        val result = r(clone)
+        if (result != null) cs.res
+        else noop(cs) as CharSeries
+    }
 }
 
 infix fun ConditionalUnaryCharOp.`¿`(r: ConditionalUnaryCharOp): Rule = `^` { cs ->
@@ -294,17 +330,18 @@ operator fun Rule.times(always: Rule): Rule = opt_(this)[-1] + always
 
 //operator get = repeat n  times, -1 = infinite until fail then backtrack
 operator fun Rule.get(n: Int): Rule = object : Rule {
-    override fun invoke(cs: CharSeries): ParseResult? {
+    override suspend fun invoke(cs: CharSeries): ParseResult? {
         var i = 0
         var result: ParseResult? = null
         var clone = cs.clone()
         while (i != n) {
-            result = this@get(clone)
+            val rule = this@get
+            result = rule.invoke(clone)
             if (result == null) break
             clone = clone.clone()
             i++
         }
-        return result.takeIf { i == n || n == -1 }
+        return result?.takeIf { i == n || n == -1 }?.snitch()
     }
 }
 
@@ -363,7 +400,7 @@ object copula : Rule by "-->".λ["inheritance"] /
 
 operator fun Rule.get(name: String): Rule = object : INamed, Rule {
     override val name: String = name
-    override fun invoke(cs: CharSeries): ParseResult? = this@get(cs)
+    override suspend fun invoke(cs: CharSeries): ParseResult? = this@get(cs)
 
 }
 
@@ -407,27 +444,24 @@ object termSet : Rule by (','.λ + term)[-1]
 
 
 object compound_term : Rule by '['.λ["intensional set"] + term + termSet * ']'.λ /
-        '{'.λ["extensional set"] + term + termSet +'}'.λ /
-        '('.λ(//confix opening
-            ("&&".λ["conjunction"]  ) /
-                    ('*'.λ["product"]  ) /
-                    ("||".λ["disjunction"]  ) /
-                    ("&|".λ["parallel events"]  ) /
-                    ("&/".λ["sequential events"]  ) /
-                    ('|'.λ["intensional intersection"]  ) /
-                    ('&'.λ["extensional intersection"]  ) /
-                    ('-'.λ["extensional difference"]  ) /
-                    ('~'.λ["intensional difference"]  ) /
-                    ('/'.λ["special case, extensional image"]  ) /
-                    ("\\".λ["special case, intensional image"] ) /
-                    ("--".λ["negation"]) /
-                    (noop["product alt"]+term + termSet)
-        )(term + termSet + ')'.λ) /
+        '{'.λ["extensional set"] + term + termSet + '}'.λ /
+        ('(' λ "&&".λ["conjunction"] /
+                '*'.λ["product"] /
+                "||".λ["disjunction"] /
+                "&|".λ["parallel events"] /
+                "&/".λ["sequential events"] /
+                '|'.λ["intensional intersection"] /
+                '&'.λ["extensional intersection"] /
+                '-'.λ["extensional difference"] /
+                '~'.λ["intensional difference"] /
+                '/'.λ["special case, extensional image"] /
+                "\\".λ["special case, intensional image"] /
+                "--".λ["negation"] /
+                (noop["product alt"] + term + termSet))(term + termSet + ')'.λ) /
         "--".λ["negation"] + term
 
 
 infix operator fun Rule.times(noop: noop) = opt_(this)[-1]
-
 
 infix operator fun Rule.invoke(rule: Rule): InfixRule = InfixRule(this, rule)
 
@@ -494,4 +528,7 @@ object budget : Rule by '$'.λ + priority + (';'.λ + durability) * ((';'.λ + q
 
 // task ::= [budget] sentence                       (* task to be processed *)
 object task : Rule by (budget `¿` sentence)
+
+
+
 

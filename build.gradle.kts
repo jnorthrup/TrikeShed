@@ -122,19 +122,16 @@ kotlin {
     }
 
     sourceSets {
-
         val commonMain by getting {
             dependencies {
-                implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.4.0")
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.2")
-
-
-                 implementation("org.jetbrains.kotlin:kotlin-reflect:1.7.20")
+                implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.4.0")
+                implementation("org.jetbrains.kotlin:kotlin-reflect:1.7.20")
             }
         }
 
         val commonTest by getting {
-            //bring in the dependencies from commonMain
+//            dependsOn(commonMain)
             dependencies {
                 implementation(kotlin("test-common"))
                 implementation(kotlin("test-annotations-common"))
@@ -142,10 +139,9 @@ kotlin {
         }
 
         val nativeMain by getting {
+//            dependsOn(commonMain)
 
-            dependencies {
-                //native coroutines
-            }
+
         }
 
         val nativeTest by getting {
@@ -158,13 +154,12 @@ kotlin {
 
 
         val jvmMain by getting {
+//            dependsOn(commonMain)
             dependencies {
                 //datetime
                 implementation("org.jetbrains.kotlinx:kotlinx-datetime-jvm:0.4.0")
-
                 //coroutines
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:1.6.2")
-
                 //serialization
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-json-jvm:1.3.0")
 
