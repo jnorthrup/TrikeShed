@@ -120,9 +120,9 @@ typealias ParseResult = Join<
         /** first is next as a slice, second is flipped buffer value/success*/
         Twin<CharSeries>>
 
-val ParseResult.next get() = b.b.a
-val ParseResult.rule get() = b.a
-val ParseResult.value get() = b.b.a
+val ParseResult.next get() =  b.a
+val ParseResult.rule get() =  a
+val ParseResult.value get() = b.b
 
 typealias ParseFunctor = (suspend (CharSeries) -> ParseResult?)
 
@@ -328,7 +328,7 @@ object float_ :
 //0 or more Rule*Rule  operator = opt_(this) +other
 operator fun Rule.times(always: Rule): Rule = opt_(this)[-1] + always
 
-//operator get = repeat n  times, -1 = infinite until fail then backtrack
+//operator get = repeat_ n  times, -1 = infinite until fail then backtrack
 operator fun Rule.get(n: Int): Rule = object : Rule {
     override suspend fun invoke(cs: CharSeries): ParseResult? {
         var i = 0
@@ -338,7 +338,8 @@ operator fun Rule.get(n: Int): Rule = object : Rule {
             val rule = this@get
             result = rule.invoke(clone)
             if (result == null) break
-            clone = clone.clone()
+            clone = result.next
+
             i++
         }
         return result?.takeIf { i == n || n == -1 }?.snitch()
