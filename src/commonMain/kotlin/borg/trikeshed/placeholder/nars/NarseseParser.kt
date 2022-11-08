@@ -120,8 +120,8 @@ typealias ParseResult = Join<
         /** first is next as a slice, second is flipped buffer value/success*/
         Twin<CharSeries>>
 
-val ParseResult.next get() =  b.a
-val ParseResult.rule get() =  a
+val ParseResult.next get() = b.a
+val ParseResult.rule get() = a
 val ParseResult.value get() = b.b
 
 typealias ParseFunctor = (suspend (CharSeries) -> ParseResult?)
@@ -202,6 +202,7 @@ interface Rule : ParseFunctor {
             return when (val r = rule) {
                 is INamed -> r.name
                 is Enum<*> -> r.name
+                is CoroutineContext.Element -> "${r.key}"
                 else -> nameRegistry[rule] ?: rule::class.simpleName ?: "unknown"
             }
         }
@@ -216,10 +217,14 @@ suspend fun ParseResult.snitch() = apply {
     parseContext = currentCoroutineContext[Key] ?: ParseContext().apply {
         currentCoroutineContext + this
     }
-
-
     parseContext.stack.push(this@apply)
+}
 
+fun skipWs(r: Rule): Rule = object : Rule {
+    override suspend fun invoke(p1: CharSeries): ParseResult? {
+        while (p1.hasRemaining && p1.mk.get.isWhitespace());
+        return if (p1.hasRemaining) r(p1.res) else r(p1)
+    }
 }
 
 //perform a OR b on the input CharSeries and return the result of the first rule that succeeds
@@ -236,7 +241,7 @@ operator fun Rule.div(other: Rule): Rule {
 
         override suspend operator fun invoke(cs: CharSeries): ParseResult? {
 
-            require(asm != null) { "A OR B  Rule implemenation with null asm" }
+            require(asm != null) { "A OR B Rule implemenation with null asm" }
             //default behavior proceed for a, then b if not null and a succeeds and b succeeds
             val (a, b) = asm
 
