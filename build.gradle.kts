@@ -85,9 +85,9 @@ kotlin {
     sourceSets {
         val commonMain by getting {
             dependencies {
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.2")
-                implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.4.0")
-                implementation("org.jetbrains.kotlin:kotlin-reflect:1.7.20")
+                api("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.2")
+                api("org.jetbrains.kotlinx:kotlinx-datetime:0.4.0")
+                api("org.jetbrains.kotlin:kotlin-reflect:1.7.20")
             }
         }
 

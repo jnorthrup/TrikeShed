@@ -2,9 +2,11 @@
 
 package borg.trikeshed.placeholder.nars
 
+import borg.trikeshed.common.collections.Stack
+import borg.trikeshed.common.parser.simple.CharSeries
 import borg.trikeshed.lib.*
-import borg.trikeshed.lib.collections.Stack
-import borg.trikeshed.lib.parser.simple.CharSeries
+
+
 import borg.trikeshed.placeholder.nars.ParseContext.Key
 import borg.trikeshed.placeholder.nars.Rule.Companion.`^`
 import borg.trikeshed.placeholder.nars.chgroup_.Companion.digit

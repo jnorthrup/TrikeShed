@@ -3,8 +3,8 @@
 
 package borg.trikeshed.lib
 
+import borg.trikeshed.common.collections.s_
 import borg.trikeshed.isam.meta.IOMemento.*
-import borg.trikeshed.lib.collections.s_
 import kotlin.jvm.JvmInline
 import kotlin.math.max
 import kotlin.math.min

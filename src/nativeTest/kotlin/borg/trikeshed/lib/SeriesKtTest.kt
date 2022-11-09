@@ -1,6 +1,6 @@
 package borg.trikeshed.lib
 
-import borg.trikeshed.lib.collections.s_
+import borg.trikeshed.common.collections.s_
 import kotlin.test.Test
 import kotlin.test.assertEquals
 

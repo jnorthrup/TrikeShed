@@ -1,7 +1,7 @@
 package borg.trikeshed.placeholder.nars
 
-import borg.trikeshed.lib.collections._a
-import borg.trikeshed.lib.parser.simple.CharSeries
+import borg.trikeshed.common.collections._a
+import borg.trikeshed.common.parser.simple.CharSeries
 
 
 /**

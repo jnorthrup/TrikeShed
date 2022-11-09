@@ -1,6 +1,7 @@
 package borg.trikeshed.lib
 
-import borg.trikeshed.lib.collections.s_
+import borg.trikeshed.common.collections.s_
+
 
 /**
  * boilerplate tuples as _INTERFACES_ not classes, for Kotlin Common created by tuplegen script

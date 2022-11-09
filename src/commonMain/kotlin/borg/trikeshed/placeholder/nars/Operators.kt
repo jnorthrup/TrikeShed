@@ -3,7 +3,7 @@
 package borg.trikeshed.placeholder.nars
 
 import borg.trikeshed.lib.*
-import borg.trikeshed.lib.parser.simple.CharSeries
+import borg.trikeshed.common.parser.simple.CharSeries
 import kotlinx.coroutines.*
 
 class chgroup_(
