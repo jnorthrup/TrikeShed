@@ -1,4 +1,4 @@
-package borg.trikeshed.lib.collections
+package borg.trikeshed.common.collections
 
 /**
  * heap based pq with comparator

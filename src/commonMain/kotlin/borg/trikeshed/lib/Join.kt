@@ -15,8 +15,8 @@ interface Join<A, B>{
     companion object {
         //the Join factory method
         operator fun <A, B> invoke(a1: A, b1: B) = object : Join<A, B> {
-            override val a get() = a1
-            override val b get() = b1
+            override val a:A get() = a1
+            override val b:B get() = b1
         }
 
         //the Series factory method
@@ -27,14 +27,14 @@ interface Join<A, B>{
 
         //the Pair factory method
         operator fun <A, B> invoke(pair: Pair<A, B>) = object : Join<A, B> {
-            override val a get() = pair.first
-            override val b get() = pair.second
+            override val a:A get() = pair.first
+            override val b:B get() = pair.second
         }
 
         //Twin factory method
         fun <T> Twin(a: T, b: T): Twin<T> = object : Twin<T> {
-            override val a get() = a
-            override val b get() = b
+            override val a:T get() = a
+            override val b:T get() = b
         }
 
         //the Map factory method

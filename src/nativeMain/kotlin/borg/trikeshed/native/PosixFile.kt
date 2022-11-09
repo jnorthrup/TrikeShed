@@ -9,7 +9,7 @@ import kotlinx.cinterop.*
 import platform.posix.*
 
 /**
-opens file for syncronous read/write
+opens file for syncronous read  /write
  */
 class PosixFile(
     val path: String?,

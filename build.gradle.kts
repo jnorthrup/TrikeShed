@@ -34,7 +34,13 @@ repositories {
 
 kotlin {
     jvm {
+        compilations.all {
+            kotlinOptions.jvmTarget = "18" //floating point math changes here
+        }
         withJava()
+        testRuns["test"].executionTask.configure {
+            useJUnitPlatform()
+        }
     }
 
     val hostOs = System.getProperty("os.name")
@@ -46,35 +52,35 @@ kotlin {
         else -> throw GradleException("Host OS is not supported in Kotlin/Native.")
     }
 
-    nativeTarget.apply {
-        binaries {
-            executable {
-                entryPoint = "main"
-            }
-        }
-    }
-    linuxX64 { // Replace with a target you need.
-        compilations.getByName("main") {
-//            val myInterop by cinterops.creating {
-//                // Def-file describing the native API.
-//                // The default path is src/nativeInterop/cinterop/<interop-name>.def
-//                defFile(project.file("def-file.def"))
-//
-//                // Package to place the Kotlin API generated.
-//                packageName("org.sample")
-//
-//                // Options to be passed to compiler by cinterop tool.
-//                compilerOpts("-Ipath/to/headers")
-//
-//                // Directories for header search (an analogue of the -I<path> compiler option).
-//                includeDirs.allHeaders("path1", "path2")
-//
-//                // A shortcut for includeDirs.allHeaders.
-//                includeDirs("include/directory", "another/directory")
+//    nativeTarget.apply {
+//        binaries {
+//            executable {
+//                entryPoint = "main"
 //            }
-//            val anotherInterop by cinterops.creating { /* ... */ }
-        }
-    }
+//        }
+//    }
+//    linuxX64 { // Replace with a target you need.
+//        compilations.getByName("main") {
+////            val myInterop by cinterops.creating {
+////                // Def-file describing the native API.
+////                // The default path is src/nativeInterop/cinterop/<interop-name>.def
+////                defFile(project.file("def-file.def"))
+////
+////                // Package to place the Kotlin API generated.
+////                packageName("org.sample")
+////
+////                // Options to be passed to compiler by cinterop tool.
+////                compilerOpts("-Ipath/to/headers")
+////
+////                // Directories for header search (an analogue of the -I<path> compiler option).
+////                includeDirs.allHeaders("path1", "path2")
+////
+////                // A shortcut for includeDirs.allHeaders.
+////                includeDirs("include/directory", "another/directory")
+////            }
+////            val anotherInterop by cinterops.creating { /* ... */ }
+//        }
+//    }
 
     sourceSets {
         val commonMain by getting {
@@ -86,7 +92,6 @@ kotlin {
         }
 
         val commonTest by getting {
-//            dependsOn(commonMain)
             dependencies {
                 implementation(kotlin("test-common"))
                 implementation(kotlin("test-annotations-common"))
@@ -94,7 +99,6 @@ kotlin {
         }
 
         val nativeMain by getting {
-//            dependsOn(commonMain)
 
 
         }
@@ -104,8 +108,6 @@ kotlin {
             dependencies {
             }
         }
-        val linuxX64Main  by getting { dependsOn(nativeMain) }
-        val linuxX64Test  by getting { dependsOn(nativeTest) }
 
 
         val jvmMain by getting {
@@ -131,8 +133,3 @@ kotlin {
     }
 
 }
-/**
- * export a pom file for the project
- *
- * requires: id("maven-publish")
- */

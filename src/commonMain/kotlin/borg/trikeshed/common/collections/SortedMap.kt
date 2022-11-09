@@ -1,4 +1,4 @@
-package borg.trikeshed.lib.collections
+package borg.trikeshed.common.collections
 
 interface SortedMap<T, U> : Map<T, U> {
     fun firstKey(): T

@@ -1,4 +1,4 @@
-package borg.trikeshed.lib.collections
+package borg.trikeshed.common.collections
 
 
 class Stack<T>(src: List<T> = listOf(), private val list: MutableList<T> = ListCowView(src)) {

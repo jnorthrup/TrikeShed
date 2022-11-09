@@ -1,4 +1,4 @@
-package borg.trikeshed.lib.collections
+package borg.trikeshed.common.collections
 
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex

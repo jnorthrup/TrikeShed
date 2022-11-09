@@ -1,4 +1,4 @@
-package borg.trikeshed.lib.collections
+package borg.trikeshed.common.collections
 
 interface NavigableMap<T, U> : SortedMap<T, U> {
     fun lowerEntry(key: T): Map.Entry<T, U>?

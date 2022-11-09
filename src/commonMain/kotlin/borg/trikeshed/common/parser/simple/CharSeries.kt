@@ -1,4 +1,4 @@
-package borg.trikeshed.lib.parser.simple
+package borg.trikeshed.common.parser.simple
 
 import borg.trikeshed.lib.*
 import borg.trikeshed.lib.CZero.nz
