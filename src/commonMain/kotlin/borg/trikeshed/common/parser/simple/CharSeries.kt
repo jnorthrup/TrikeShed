@@ -127,4 +127,34 @@ class CharSeries(buf: Series<Char>) : Series<Char> {
 
     //isEmpty override
     val isEmpty: Boolean get() = pos == limit
+
+}
+
+
+//lazy split
+operator fun CharSeries.div(delim: Char): Series<CharSeries> {
+    //fold -- forward scan to record a list of commas from hdr.get
+    val intList = mutableListOf<Int>()
+    while (this.hasRemaining) {
+        val c = get
+        if (c == delim) {
+            intList.add(pos)
+        }
+    }
+
+    /**
+     * iarr is an index of delimitted endings of the CharSeries.
+     */
+    val iarr = intList.toIntArray()
+
+    return iarr α { x ->
+        /**handle first and last index) if (x == 0) 0 else iarr[x.dec()].inc()*/
+        val p = if (x == 0) 0 else iarr[x.dec()].inc() //start of next
+        val l = //is x last index?
+            if (x == iarr.lastIndex)
+                this.limit
+            else
+                iarr[x].dec()
+        clone().slice.pos(p).lim(l)
+    }
 }

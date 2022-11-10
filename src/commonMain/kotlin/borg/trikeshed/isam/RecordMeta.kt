@@ -1,7 +1,6 @@
 package borg.trikeshed.isam
 
 import borg.trikeshed.isam.meta.IOMemento
-import borg.trikeshed.isam.meta.PlatformCodec
 import borg.trikeshed.isam.meta.PlatformCodec.createDecoder
 import borg.trikeshed.isam.meta.PlatformCodec.createEncoder
 

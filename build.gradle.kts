@@ -16,7 +16,7 @@ plugins {
 
     // gradle versions update plugin
     id("com.github.ben-manes.versions") version "0.42.0"
-
+//    id("atomicfu-gradle-plugin") version "0.18.5"
     `maven-publish`
 }
 
@@ -34,13 +34,8 @@ repositories {
 
 kotlin {
     jvm {
-        compilations.all {
-            kotlinOptions.jvmTarget = "18" //floating point math changes here
-        }
+
         withJava()
-        testRuns["test"].executionTask.configure {
-            useJUnitPlatform()
-        }
     }
 
     val hostOs = System.getProperty("os.name")
@@ -104,9 +99,7 @@ kotlin {
         }
 
         val nativeTest by getting {
-            //bring in the dependencies from nativeMain
-            dependencies {
-            }
+
         }
 
 
@@ -114,11 +107,11 @@ kotlin {
 //            dependsOn(commonMain)
             dependencies {
                 //datetime
-                implementation("org.jetbrains.kotlinx:kotlinx-datetime-jvm:0.4.0")
+                api("org.jetbrains.kotlinx:kotlinx-datetime-jvm:0.4.0")
                 //coroutines
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:1.6.2")
+                api("org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:1.6.2")
                 //serialization
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json-jvm:1.3.0")
+                api("org.jetbrains.kotlinx:kotlinx-serialization-json-jvm:1.3.0")
 
             }
         }

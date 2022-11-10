@@ -1,5 +1,6 @@
 package borg.trikeshed.lib.collections
 
+import borg.trikeshed.common.collections.PriorityQueue
 import kotlin.test.Test
 import kotlin.test.assertEquals
 

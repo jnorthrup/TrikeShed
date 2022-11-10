@@ -1,6 +1,7 @@
 package borg.trikeshed.isam
 
 import borg.trikeshed.isam.meta.IOMemento
+import borg.trikeshed.lib.Cursor
 import borg.trikeshed.lib.Join
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.j
@@ -11,8 +12,8 @@ import java.nio.file.Files
 actual class IsamDataFile(
     val datafileFilename: String,
     metafileFilename: String = "$datafileFilename.meta",
-    val metafile: IsamMetaFileReader = IsamMetaFileReader(metafileFilename)
-) : Series<Series<Join<*, () -> RecordMeta>>> {
+    val metafile: IsamMetaFileReader = IsamMetaFileReader(metafileFilename),
+) : Cursor {
     val recordlen = metafile.recordlen
     val constraints = metafile.constraints
 
@@ -20,7 +21,8 @@ actual class IsamDataFile(
 
     var fileSize: Long = -1
     override fun toString(): String =
-        "IsamDataFile(metafile=$metafile, recordlen=$recordlen, constraints=$constraints, datafileFilename='$datafileFilename', fileSize=$fileSize)"
+        "IsamDataFile(metafile=$metafile, recordlen=$recordlen, constraints=$constraints," +
+                " datafileFilename='$datafileFilename', fileSize=$fileSize)"
 
 
     actual fun open() {
@@ -63,7 +65,7 @@ actual class IsamDataFile(
         data.position(row * recordlen.toLong())
         data.read(buffer)
         lock.unlock()
-        val array =     buffer.position(0).array()
+        val array = buffer.position(0).array()
 
         constraints.size j { col ->
             val constraint = constraints[col]

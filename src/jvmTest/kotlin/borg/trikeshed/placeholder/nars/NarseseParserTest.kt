@@ -1,11 +1,9 @@
 package borg.trikeshed.placeholder.nars
 
+import borg.trikeshed.common.parser.simple.CharSeries
 import borg.trikeshed.lib.debug
 import borg.trikeshed.lib.first
 import borg.trikeshed.lib.logDebug
-import borg.trikeshed.lib.parser.simple.CharSeries
-import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import java.nio.file.Paths
