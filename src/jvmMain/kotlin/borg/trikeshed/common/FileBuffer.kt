@@ -4,29 +4,30 @@ import java.nio.channels.FileChannel
 
 /**
  * an openable and closeable mmap file.
+ *
+ * get has no side effects but put has  undefined effects on size and sync
  */
-actual class   FileBuffer actual constructor(filename: String, initialOffset: Long, blkSize: Long, readOnly: Boolean) : Join<Long, (Long) -> Byte> {
+actual class FileBuffer actual constructor(filename: String, initialOffset: Long, blkSize: Long, readOnly: Boolean) :
+    Join<Long, (Long) -> Byte> {
 
- actual  val filename: String
- actual  val initialOffset: Long
- actual  val blkSize: Long
- actual  val readOnly: Boolean
-   init {
-    this.filename = filename
-    this.initialOffset = initialOffset
-    this.blkSize = blkSize
-    this.readOnly = readOnly
-}
+    actual val filename: String
+    actual val initialOffset: Long
+    actual val blkSize: Long
+    actual val readOnly: Boolean
 
+    init {
+        this.filename = filename
+        this.initialOffset = initialOffset
+        this.blkSize = blkSize
+        this.readOnly = readOnly
+    }
 
     var jvmFile: java.io.RandomAccessFile? = null
-    var jvmChannel: java.nio.channels.FileChannel? = null
+    var jvmChannel: FileChannel? = null
     var jvmMappedByteBuffer: java.nio.MappedByteBuffer? = null
 
-    override val a: Long
-        get() = jvmMappedByteBuffer!!.capacity().toLong()
-    override val b: (Long) -> Byte
-        get() = { index -> jvmMappedByteBuffer!!.get(index.toInt()) }
+    override val a: Long get() = jvmMappedByteBuffer!!.capacity().toLong()
+    override val b: (Long) -> Byte get() = { index -> jvmMappedByteBuffer!!.get(index.toInt()) }
 
     actual fun close() {
         logDebug { "closing $filename" }
@@ -47,28 +48,19 @@ actual class   FileBuffer actual constructor(filename: String, initialOffset: Lo
         jvmMappedByteBuffer = jvmChannel!!.map(
             if (readOnly) FileChannel.MapMode.READ_ONLY else
                 FileChannel.MapMode.READ_WRITE,
-            initialOffset, if(blkSize ==-1L) jvmChannel!!.size()- /*initial offset*/ initialOffset else blkSize
+            initialOffset, if (blkSize == -1L) jvmChannel!!.size() - /*initial offset*/ initialOffset else blkSize
         )
     }
 
-    actual fun isOpen(): Boolean {
-        return jvmMappedByteBuffer != null
-    }
-
-    actual fun size(): Long {
-        return jvmMappedByteBuffer!!.capacity().toLong()
-    }
-
-    actual fun get(index: Long): Byte {
-        return jvmMappedByteBuffer!!.get(index.toInt())
-    }
-
+    actual fun isOpen(): Boolean = jvmMappedByteBuffer != null
+    actual fun size(): Long = jvmMappedByteBuffer!!.capacity().toLong()
+    actual fun get(index: Long): Byte = jvmMappedByteBuffer!!.get(index.toInt())
     actual fun put(index: Long, value: Byte) {
         jvmMappedByteBuffer!!.put(index.toInt(), value)
     }
 
-      companion object {
-          fun open(filename: String, initialOffset: Long=0, blkSize: Long=-1, readOnly: Boolean=true): FileBuffer {
+    companion object {
+        fun open(filename: String, initialOffset: Long = 0, blkSize: Long = -1, readOnly: Boolean = true): FileBuffer {
             return FileBuffer(filename, initialOffset, blkSize, readOnly)
         }
     }
