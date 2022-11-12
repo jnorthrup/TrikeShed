@@ -1,9 +1,10 @@
 package borg.trikeshed.lib
 
+
 /**
  * Joins two things.  Pair semantics but distinct in the symbol naming
  */
-interface Join<A, B>{
+interface Join<A, B> {
     val a: A
     val b: B
     operator fun component1(): A = a
@@ -15,8 +16,8 @@ interface Join<A, B>{
     companion object {
         //the Join factory method
         operator fun <A, B> invoke(a1: A, b1: B) = object : Join<A, B> {
-            override val a:A get() = a1
-            override val b:B get() = b1
+            override val a: A get() = a1
+            override val b: B get() = b1
         }
 
         //the Series factory method
@@ -27,14 +28,14 @@ interface Join<A, B>{
 
         //the Pair factory method
         operator fun <A, B> invoke(pair: Pair<A, B>) = object : Join<A, B> {
-            override val a:A get() = pair.first
-            override val b:B get() = pair.second
+            override val a: A get() = pair.first
+            override val b: B get() = pair.second
         }
 
         //Twin factory method
         fun <T> Twin(a: T, b: T): Twin<T> = object : Twin<T> {
-            override val a:T get() = a
-            override val b:T get() = b
+            override val a: T get() = a
+            override val b: T get() = b
         }
 
         //the Map factory method
@@ -66,12 +67,11 @@ infix fun <A, B> A.j(b: B): Join<A, B> = Join(this, b)
  *
  *  the simplest possible kotlin example of λx.M[x] is
  *  ` { x -> M(x) } ` making the delta symbol into lambda braces and the x into a parameter and the M(x) into the body
- *
- *
  */
 
-infix fun <X, C, V : Series<X> > V.α(xform: (X)->C): Join<Int, (Int) -> C> = size j { i -> xform(this[i]) }
-infix fun <X, C, V : List<X> > V.α(xform: (X)->C): Join<Int, (Int) -> C> = size j   { i -> xform(this[i]) }
+infix fun <X, C, V : Series<X>> V.α(xform: (X) -> C): Series<C> = size j { i -> xform(this[i]) }
+infix fun <X, C, V : Iterable<X>> V.α(xform: (X) -> C): Series<C> = this.toList().toSeries() α xform
+inline infix fun <X, C> Array<X>.α(crossinline xform: (X) -> C): Series<C> = size j { i -> xform(this[i]) }
 
 
 fun <A, B, C, D> ((A) -> B).alpha(f: (C) -> D): (C) -> D = f
@@ -116,7 +116,7 @@ operator fun <S, E : Enum<E>> Join<Int, (Int) -> S>.get(e: E): S = get(e.ordinal
  * @return an AbstractList<T> of the Series<T>
  */
 fun <T> Series<T>.toList(): AbstractList<T> = object : AbstractList<T>() {
-    override val size: Int =a
+    override val size: Int = a
     override fun get(index: Int): T = b(index)
 }
 
