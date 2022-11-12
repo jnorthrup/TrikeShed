@@ -1,7 +1,6 @@
 package borg.trikeshed.isam.meta
 
 import borg.trikeshed.isam.meta.IOMemento.*
-import borg.trikeshed.lib.α
 import borg.trikeshed.placeholder.nars.CharBuffer
 import kotlinx.datetime.Instant
 import kotlinx.datetime.LocalDate
@@ -80,9 +79,9 @@ actual object PlatformCodec {
             IoString -> writeString
             IoInstant -> writeInstant
             IoLocalDate -> writeLocalDate
+            IoCharBuffer -> writeCharBuffer
+            IoByteArray -> writeByteArray
             IoNothing -> writeNothing
-            IoCharBuf -> writeCharBuffer
-            IoByteBuf -> writeByteArray
         }
     }
 
@@ -96,8 +95,6 @@ actual object PlatformCodec {
             // all values must be read and written in network endian order
             // we must call the marshalling functions inside the NetworkOrder ByteArray extension functions to ensure this
 
-            //reorder by ordinal here
-
             IoBoolean -> readBool
             IoByte -> readByte
             IoShort -> readShort
@@ -108,10 +105,9 @@ actual object PlatformCodec {
             IoString -> readString
             IoLocalDate -> readLocalDate
             IoInstant -> readInstant
+            IoCharBuffer -> readCharBuffer
+            IoByteArray -> readByteArray
             IoNothing -> readNothing
-            IoCharBuf -> readCharBuffer
-            IoByteBuf -> readByteArray
-
         }
     }
 }

@@ -166,7 +166,7 @@ object CSVUtil {
                     lazy { lazyLine.value[range.asIntRange]/*intrange downconverts the LongSeries to Series */ }
                 val recordMeta: () -> RecordMeta = {
                     range = DelimitRange(segments[x])
-                    RecordMeta(headerNames[x], IOMemento.IoCharBuf, decoder = {
+                    RecordMeta(headerNames[x], IOMemento.IoCharBuffer, decoder = {
                         it α { byte: Byte -> byte.toInt().toChar() }
                     })
                 }
