@@ -1,5 +1,5 @@
 @file:Suppress("UNCHECKED_CAST", "ObjectPropertyName")
-@file:OptIn(kotlin.experimental.ExperimentalTypeInference::class,ExperimentalUnsignedTypes::class)
+@file:OptIn(kotlin.experimental.ExperimentalTypeInference::class, ExperimentalUnsignedTypes::class)
 
 package borg.trikeshed.lib
 
@@ -10,6 +10,7 @@ import kotlin.math.max
 import kotlin.math.min
 
 typealias Series<T> = Join<Int, (Int) -> T>
+
 val <T> Series<T>.size: Int get() = a
 
 /**
@@ -242,10 +243,10 @@ value class IterableSeries<A>(val s: Series<A>) : Iterable<A>, Series<A> by s {
  * provides a big bright visible symbol that makes
  * conversions easy to follow along during reading the code
  */
-val <T> Series<T>.`▶`: IterableSeries<T> get() = this as?  IterableSeries?: IterableSeries(this)
+val <T> Series<T>.`▶`: IterableSeries<T> get() = this as? IterableSeries ?: IterableSeries(this)
 
-operator fun <T>Series<T>.contains(it: Char): Boolean =it in this.`▶`
-operator fun <T>IterableSeries<T>.contains(x: Char): Boolean =this.any { x == it }
+operator fun <T> Series<T>.contains(it: Char): Boolean = it in this.`▶`
+operator fun <T> IterableSeries<T>.contains(x: Char): Boolean = this.any { x == it }
 
 
 /***
@@ -337,7 +338,7 @@ fun <T> List<T>.toSeries(): Series<T> = size j ::get
 
 fun BooleanArray.toSeries(): Series<Boolean> = size j ::get
 
- fun ByteArray.toSeries(): Series<Byte> = size j ::get
+fun ByteArray.toSeries(): Series<Byte> = size j ::get
 fun ShortArray.toSeries(): Series<Short> = size j ::get
 fun IntArray.toSeries(): Series<Int> = size j ::get
 fun LongArray.toSeries(): Series<Long> = size j ::get
@@ -350,17 +351,20 @@ fun UIntArray.toSeries(): Series<UInt> = size j ::get
 fun ULongArray.toSeries(): Series<ULong> = size j ::get
 fun String.toSeries(): Series<Char> = length j ::get
 fun CharSequence.toSeries(): Series<Char> = length j ::get
-fun ClosedRange<Int>.toSeries(): Series<Int> = (endInclusive - start + 1) j { i:Int -> i + start }
-fun <T> Sequence<T>.toSeries()=toList().toSeries()
+fun ClosedRange<Int>.toSeries(): Series<Int> = (endInclusive - start + 1) j { i: Int -> i + start }
+fun <T> Sequence<T>.toSeries() = toList().toSeries()
 
- fun <T> Series<T>.last(): T = this[size - 1]
+fun <T> Series<T>.last(): T {
+    require(size > 0) { "last() on empty Series" }
+    return this[size .dec()]
+}
 fun <B> Series<B>.isNotEmpty() = size < 0
 fun <B> Series<B>.first() =
     this.get(0) //naming is _a little bit_ confusing with the pair overloads so it stays a function
 
-fun <B> Series<B>.drop(front: Int) = get(min(front,size) until size)
-fun <B> Series<B>.dropLast(back: Int) = get(0 until max(0,size - back))
-fun <B> Series<B>.take(exclusiveEnd: Int) = get(0 until min(exclusiveEnd,size))
+fun <B> Series<B>.drop(front: Int) = get(min(front, size) until size)
+fun <B> Series<B>.dropLast(back: Int) = get(0 until max(0, size - back))
+fun <B> Series<B>.take(exclusiveEnd: Int) = get(0 until min(exclusiveEnd, size))
 
 //series foreachIndexed
 fun <T> Series<T>.forEachIndexed(action: (index: Int, T) -> Unit): Unit = this.`▶`.forEachIndexed(action)
@@ -391,9 +395,12 @@ val Cursor.isHomoMorphic: Boolean get() = !meta.`▶`.any { it.type != meta[0].t
 
 operator fun <A> Series<A>.plus(c: Series<A>) = combine(s_[this] as Series<A>, c)
 
-fun <T> Series<T>.isEmpty(): Boolean {return a==0 }
+fun <T> Series<T>.isEmpty(): Boolean {
+    return a == 0
+}
 
-fun <T> Series<T>.reversed(): Series<T> = size j {it: Int ->this.b(size - it - 1)}
+fun <T> Series<T>.reversed(): Series<T> = size j { it: Int -> this.b(size - it - 1) }
 
-open class EmptySeries:Series<Nothing> by 0 j { x:Int->TODO("undefined")}
-fun <T> emptySeries():Series<T> = EmptySeries() as Series<T>
+open class EmptySeries : Series<Nothing> by 0 j { x: Int -> TODO("undefined") }
+
+fun <T> emptySeries(): Series<T> = EmptySeries() as Series<T>

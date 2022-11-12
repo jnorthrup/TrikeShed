@@ -1,6 +1,6 @@
 package borg.trikeshed.common
 
-import borg.trikeshed.common.collections._a
+import borg.trikeshed.common.TypeDeduction.Companion.update
 import borg.trikeshed.isam.RecordMeta
 import borg.trikeshed.isam.meta.IOMemento
 import borg.trikeshed.lib.*
@@ -8,24 +8,54 @@ import borg.trikeshed.parse.DelimitRange
 import borg.trikeshed.placeholder.nars.CharBuffer
 import kotlin.jvm.JvmOverloads
 import kotlin.jvm.JvmStatic
+import kotlin.math.max
 
 
-data class /** This is a dragnet for a given line to record the coutners of character classes */ TypeDeduction (
+data class
+/** This is a dragnet for a given line to record the coutners of character classes */
+TypeDeduction(//todo convert to enum
 
-    var digits:UShort=0U,
-    var periods:UShort=0U,
-    var exponent:UShort=0U,
-    var signs:UShort=0U,
-    var special:UShort=0U,
-    var alpha:UShort=0U,
-    /** the letters in true and false */var truefalse:UShort=0U,
-    var empty:UShort=0U,
-    var quotes:UShort=0U,
-    var dquotes:UShort=0U,
-    var whitespaces:UShort=0U,
-    var backslashes:UShort=0U,
-    var linefeed:UShort=0U,
-)
+    var digits: UShort = 0U,
+    var periods: UShort = 0U,
+    var exponent: UShort = 0U,
+    var signs: UShort = 0U,
+    var special: UShort = 0U,
+    var alpha: UShort = 0U,
+    /** the letters in true and false */
+    var truefalse: UShort = 0U,
+    var empty: UShort = 0U,
+    var quotes: UShort = 0U,
+    var dquotes: UShort = 0U,
+    var whitespaces: UShort = 0U,
+    var backslashes: UShort = 0U,
+    var linefeed: UShort = 0U,
+){companion object{  fun update(
+    fileDeduce: MutableList<TypeDeduction>?,
+    lineDeduce: MutableList<TypeDeduction>?,
+) {
+    fileDeduce?.apply {
+        //update the fileDeduce with the max of the lineDeduce
+        lineDeduce?.forEachIndexed { index, typeDeduction ->
+            while (index >= this.size) this.add(TypeDeduction())
+            this[index].apply {
+                if (digits < typeDeduction.digits) digits = typeDeduction.digits
+                if (periods < typeDeduction.periods) periods = typeDeduction.periods
+                if (exponent < typeDeduction.exponent) exponent = typeDeduction.exponent
+                if (signs < typeDeduction.signs) signs = typeDeduction.signs
+                if (special < typeDeduction.special) special = typeDeduction.special
+                if (alpha < typeDeduction.alpha) alpha = typeDeduction.alpha
+                if (truefalse < typeDeduction.truefalse) truefalse = typeDeduction.truefalse
+                if (empty < typeDeduction.empty) empty = typeDeduction.empty
+                if (quotes < typeDeduction.quotes) quotes = typeDeduction.quotes
+                if (dquotes < typeDeduction.dquotes) dquotes = typeDeduction.dquotes
+                if (whitespaces < typeDeduction.whitespaces) whitespaces = typeDeduction.whitespaces
+                if (backslashes < typeDeduction.backslashes) backslashes = typeDeduction.backslashes
+                if (linefeed < typeDeduction.linefeed) linefeed = typeDeduction.linefeed
+            }
+        }
+    }
+}
+}}
 
 
 /**
@@ -36,7 +66,9 @@ object CSVUtil {
 
     /**
      * read a csv file into a series of segments
-     */@JvmStatic @JvmOverloads
+     */
+    @JvmStatic
+    @JvmOverloads
     fun parseLine(
         /**the source media*/
         file: LongSeries<Byte>,
@@ -45,21 +77,23 @@ object CSVUtil {
         /**the last offset exclusive.  -1 has an undefined end. */
         end: Long = -1L,
         //this is 1 TypeDeduction per column, for one line. elsewhere, there should be a TypeDeduction holding maximum findings per file/column.
-        deduce:List<TypeDeduction> ?=null
+        deduce: MutableList<TypeDeduction>? = null
     ): Series<DelimitRange> {
         var quote = false
         var doubleQuote = false
         var escape = false
-
         var ordinal = 0
         var x = start
         var since = x
+
         val rlist = mutableListOf<Int>()
         val size = file.size
-        while (x != end  && x < size) {
+        while (x != end && x < size) {
             val c = file.get(x)
             val char = c.toInt().toChar()
             deduce?.apply {
+                //test deduce length and add if needed
+                while (ordinal >= deduce.size) deduce.add(TypeDeduction())
                 deduce[ordinal].apply {
                     when (char) {
                         in '0'..'9' -> digits++
@@ -72,7 +106,7 @@ object CSVUtil {
                         '\'' -> quotes++
                         '\\' -> backslashes++
                         ' ', '\t' -> whitespaces++
-                        '\r',-> linefeed++
+                        '\r', -> linefeed++
                         else -> special++
                     }
                 }
@@ -85,24 +119,21 @@ object CSVUtil {
                 char == '\\' -> escape = !escape
                 char == ',' -> if (!quote || !doubleQuote) {
                     deduce?.apply {
-                        if(x ==start) this[ordinal].empty++ }
+                        if (x == start) this[ordinal].empty++
+                    }
                     rlist.add(DelimitRange.of(since.toUShort(), x.toUShort()).value)
                     since = x.inc()
                     ordinal++
                 }
 
-                char in _a['\r', '\n'] -> if (!quote || !doubleQuote) {
-                    break
-                }
+                char == '\r' || char == '\n' -> if (!quote || !doubleQuote) break
             }
             x++
         }
         if (since != x) // add the last one
             rlist.add(DelimitRange.of(since.toUShort(), x.toUShort()).value)
         val toArray = (rlist α { DelimitRange(it).value }).toArray()
-
         return toArray α { DelimitRange(it) } //the b element of the last delim range is the end of the line
-
     }
 
     /**
@@ -116,10 +147,10 @@ object CSVUtil {
         /**
          * if list is passed in here it will be the per-file deduce containing the max of a given column classes found in the file
          */
-        deduce :List<TypeDeduction>?=null
+        fileDeduce: MutableList<TypeDeduction>? = null
     ): Cursor {
         val size = file.size
-        val headerLine: Join<Int, (Int) -> DelimitRange> = parseLine(file, 0, deduce = deduce)
+        val headerLine: Join<Int, (Int) -> DelimitRange> = parseLine(file, 0)
 
         //for headers we want to extract Strings from the delimitted reanges.
         val headerNames: Series<String> =
@@ -132,9 +163,13 @@ object CSVUtil {
         val lines: MutableList<IntArray> = mutableListOf()
         try {
             do {
-                val line: Series<DelimitRange> = parseLine(file, lineStart)
+                val lineDeduce = fileDeduce?.let { mutableListOf<TypeDeduction>() }
+                val line = parseLine(file, lineStart.inc(), deduce = lineDeduce)
+
+                fileDeduce?.apply{ update(this, lineDeduce) }
+
                 lineStart += line.last().b.toLong()
-                lines += ((line α { it.value }).toArray())
+                lines += (line α { it.value }).toArray()
             } while (lineStart < size)
         } catch (e: Exception) {
             //logDebug some state details here
@@ -180,6 +215,7 @@ object CSVUtil {
             }
         }.toSeries()
     }
+
 
     /**
      * this will do a best-attempt at using the parseSegments output to marshal the types of newMeta passed in.
