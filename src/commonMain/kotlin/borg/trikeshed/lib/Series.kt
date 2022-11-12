@@ -10,13 +10,13 @@ import kotlin.math.max
 import kotlin.math.min
 
 typealias Series<T> = Join<Int, (Int) -> T>
-
 val <T> Series<T>.size: Int get() = a
 
 /**
  * index operator for Series
  */
 operator fun <T> Series<T>.get(i: Int): T = b(i)
+
 
 /**
  * fold for Series
@@ -369,7 +369,7 @@ fun <T> Series<T>.forEachIndexed(action: (index: Int, T) -> Unit): Unit = this.`
 fun <T> Series<T>.forEach(action: (T) -> Unit): Unit = this.`▶`.forEach(action)
 
 //series map
-fun <T, R> Series<T>.map(transform: (T) -> R): Series<R> = this.`▶`.map(transform)
+fun <T, R> Series<T>.map(transform: (T) -> R): List<R> = this.toList().map(transform)
 
 
 /** IsNumerical

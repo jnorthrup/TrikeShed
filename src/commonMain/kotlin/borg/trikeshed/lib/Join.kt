@@ -71,7 +71,7 @@ infix fun <A, B> A.j(b: B): Join<A, B> = Join(this, b)
 
 infix fun <X, C, V : Series<X>> V.α(xform: (X) -> C): Series<C> = size j { i -> xform(this[i]) }
 infix fun <X, C, V : Iterable<X>> V.α(xform: (X) -> C): Series<C> = this.toList().toSeries() α xform
-inline infix fun <X, C> Array<X>.α(crossinline xform: (X) -> C): Series<C> = size j { i -> xform(this[i]) }
+inline infix fun <X, C> Array<X>.α(crossinline xform: (X) -> C): Series<C> = size j { i: Int -> xform(this[i]) }
 
 
 fun <A, B, C, D> ((A) -> B).alpha(f: (C) -> D): (C) -> D = f
@@ -150,28 +150,33 @@ inline fun <reified T> Join<Int, (Int) -> T>.toArray(): Array<T> =
 fun <T> Array<T>.toSeries(): Join<Int, (Int) -> T> =
     (size j ::get) as Join<Int, (Int) -> T>
 
+
 val <T> T.rightIdentity: () -> T get() = { this }
+val <T> T.`↺`: () -> T get() = rightIdentity
 
 
-infix fun <C, B : (Long) -> C> LongArray.α(m: B): Join<Int, (Int) -> C> = this.size j { i: Int -> m(this[i]) }
+//unicode symbol of a counterclockwise arrow: ↺
+
+
+infix fun <C, B : (Long) -> C> LongArray.α(m: B):Series<C> = this.size j { i: Int -> m(this[i]) }
 
 // do all the other primitive arrays
 
-infix fun <C, B : (Int) -> C> IntArray.α(m: B): Join<Int, (Int) -> C> = this.size j { i: Int -> m(this[i]) }
+infix fun <C, B : (Int) -> C> IntArray.α(m: B):Series<C> = this.size j { i: Int -> m(this[i]) }
 
-infix fun <C, B : (Float) -> C> FloatArray.α(m: B): Join<Int, (Int) -> C> = this.size j { i: Int -> m(this[i]) }
+infix fun <C, B : (Float) -> C> FloatArray.α(m: B):Series<C> = this.size j { i: Int -> m(this[i]) }
 
-infix fun <C, B : (Double) -> C> DoubleArray.α(m: B): Join<Int, (Int) -> C> = this.size j { i: Int -> m(this[i]) }
+infix fun <C, B : (Double) -> C> DoubleArray.α(m: B):Series<C> = this.size j { i: Int -> m(this[i]) }
 
-infix fun <C, B : (Short) -> C> ShortArray.α(m: B): Join<Int, (Int) -> C> = this.size j { i: Int -> m(this[i]) }
+infix fun <C, B : (Short) -> C> ShortArray.α(m: B):Series<C> = this.size j { i: Int -> m(this[i]) }
 
-infix fun <C, B : (Byte) -> C> ByteArray.α(m: B): Join<Int, (Int) -> C> = this.size j { i: Int -> m(this[i]) }
+infix fun <C, B : (Byte) -> C> ByteArray.α(m: B):Series<C> = this.size j { i: Int -> m(this[i]) }
 
-infix fun <C, B : (Char) -> C> CharArray.α(m: B): Join<Int, (Int) -> C> = this.size j { i: Int -> m(this[i]) }
+infix fun <C, B : (Char) -> C> CharArray.α(m: B):Series<C> = this.size j { i: Int -> m(this[i]) }
 
-infix fun <C, B : (Any) -> C> Array<Any>.α(m: B): Join<Int, (Int) -> C> = this.size j { i: Int -> m(this[i]) }
+infix fun <C, B : (Any) -> C> Array<Any>.α(m: B):Series<C> = this.size j { i: Int -> m(this[i]) }
 
-infix fun <C, B : (Boolean) -> C> BooleanArray.α(m: B): Join<Int, (Int) -> C> = this.size j { i: Int -> m(this[i]) }
+infix fun <C, B : (Boolean) -> C> BooleanArray.α(m: B):Series<C> = this.size j { i: Int -> m(this[i]) }
 
 /**
  * series get by iterable

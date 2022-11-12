@@ -1,14 +1,17 @@
-import borg.trikeshed.lib.Join
+import borg.trikeshed.common.LongSeries
 import borg.trikeshed.lib.logDebug
 import java.nio.channels.FileChannel
+
 
 /**
  * an openable and closeable mmap file.
  *
  * get has no side effects but put has  undefined effects on size and sync
  */
-actual class FileBuffer actual constructor(filename: String, initialOffset: Long, blkSize: Long, readOnly: Boolean) :
-    Join<Long, (Long) -> Byte> {
+actual class FileBuffer actual constructor(
+    filename: String, initialOffset: Long,
+    blkSize: Long, readOnly: Boolean
+) : LongSeries<Byte> {
 
     actual val filename: String
     actual val initialOffset: Long
@@ -38,7 +41,6 @@ actual class FileBuffer actual constructor(filename: String, initialOffset: Long
         jvmChannel = null
         jvmFile?.close()
         jvmFile = null
-
     }
 
     actual fun open() {

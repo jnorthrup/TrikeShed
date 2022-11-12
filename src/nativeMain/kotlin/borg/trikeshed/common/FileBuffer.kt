@@ -10,7 +10,7 @@ import platform.posix.munmap
  * an openable and closeable mmap file.
  */
 actual class FileBuffer actual constructor(filename: String, initialOffset: Long, blkSize: Long, readOnly: Boolean) :
-    Join<Long, (Long) -> Byte> {
+    borg.trikeshed.common.LongSeries<Byte>{
 
     actual val filename: String
     actual val initialOffset: Long

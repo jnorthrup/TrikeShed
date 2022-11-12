@@ -14,5 +14,7 @@ enum class IOMemento(override val networkSize: Int? = null) : TypeMemento {
      */
     IoInstant(12),
     IoString,
+    IoCharBuf,
+    IoByteBuf,
     IoNothing;}
 

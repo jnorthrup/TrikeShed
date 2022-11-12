@@ -1,4 +1,6 @@
+import borg.trikeshed.common.LongSeries
 import borg.trikeshed.lib.Join
+import borg.trikeshed.lib.j
 
 
 /**
@@ -11,7 +13,7 @@ expect class FileBuffer(
     /** blocksize or file-size if -1*/
     blkSize: Long,
     readOnly: Boolean,
-) : Join<Long, (Long) -> Byte> {
+): LongSeries<Byte > {
     val filename: String
     val initialOffset: Long
     val blkSize: Long
@@ -22,4 +24,4 @@ expect class FileBuffer(
     fun size(): Long
     fun get(index: Long): Byte
     fun put(index: Long, value: Byte)
-}
+    }
