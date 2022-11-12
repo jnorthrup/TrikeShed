@@ -17,7 +17,7 @@ class CSVUtilTest {
         val systemResource = ClassLoader.getSystemResource("hi.csv")
         val filename = systemResource.file.trim()
         val fileBuf = FileBuffer.open(filename)
-        val deduce = mutableListOf<TypeDeduction>()
+        val deduce = mutableListOf<TypeEvidence>()
         val csv = CSVUtil.parseLine(fileBuf, 0, deduce = deduce)
         val lp = (csv α { it.pair }).toList()
         println(lp)
@@ -32,9 +32,9 @@ class CSVUtilTest {
         val systemResource = ClassLoader.getSystemResource("hi.csv")
         val filename = systemResource.file.trim()
         val fileBuf = FileBuffer.open(filename)
-        val fileDeduce = mutableListOf<TypeDeduction>()
+        val fileDeduce = mutableListOf<TypeEvidence>()
 
-        CSVUtil.parseSegments(fileBuf,  fileDeduce = fileDeduce)
+        val parseSegments = CSVUtil.parseSegments(fileBuf, fileDeduce = fileDeduce)
 
         debug { logDebug { "${Random.nextInt()}" } }
 

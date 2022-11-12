@@ -1,6 +1,6 @@
 package borg.trikeshed.common
 
-import borg.trikeshed.common.TypeDeduction.Companion.update
+import borg.trikeshed.common.TypeEvidence.Companion.update
 import borg.trikeshed.isam.RecordMeta
 import borg.trikeshed.isam.meta.IOMemento
 import borg.trikeshed.lib.*
@@ -8,12 +8,12 @@ import borg.trikeshed.parse.DelimitRange
 import borg.trikeshed.placeholder.nars.CharBuffer
 import kotlin.jvm.JvmOverloads
 import kotlin.jvm.JvmStatic
-import kotlin.math.max
 
 
 data class
 /** This is a dragnet for a given line to record the coutners of character classes */
-TypeDeduction(//todo convert to enum
+TypeEvidence(
+//todo convert to enum
 
     var digits: UShort = 0U,
     var periods: UShort = 0U,
@@ -29,33 +29,36 @@ TypeDeduction(//todo convert to enum
     var whitespaces: UShort = 0U,
     var backslashes: UShort = 0U,
     var linefeed: UShort = 0U,
-){companion object{  fun update(
-    fileDeduce: MutableList<TypeDeduction>?,
-    lineDeduce: MutableList<TypeDeduction>?,
 ) {
-    fileDeduce?.apply {
-        //update the fileDeduce with the max of the lineDeduce
-        lineDeduce?.forEachIndexed { index, typeDeduction ->
-            while (index >= this.size) this.add(TypeDeduction())
-            this[index].apply {
-                if (digits < typeDeduction.digits) digits = typeDeduction.digits
-                if (periods < typeDeduction.periods) periods = typeDeduction.periods
-                if (exponent < typeDeduction.exponent) exponent = typeDeduction.exponent
-                if (signs < typeDeduction.signs) signs = typeDeduction.signs
-                if (special < typeDeduction.special) special = typeDeduction.special
-                if (alpha < typeDeduction.alpha) alpha = typeDeduction.alpha
-                if (truefalse < typeDeduction.truefalse) truefalse = typeDeduction.truefalse
-                if (empty < typeDeduction.empty) empty = typeDeduction.empty
-                if (quotes < typeDeduction.quotes) quotes = typeDeduction.quotes
-                if (dquotes < typeDeduction.dquotes) dquotes = typeDeduction.dquotes
-                if (whitespaces < typeDeduction.whitespaces) whitespaces = typeDeduction.whitespaces
-                if (backslashes < typeDeduction.backslashes) backslashes = typeDeduction.backslashes
-                if (linefeed < typeDeduction.linefeed) linefeed = typeDeduction.linefeed
+    companion object {
+        fun update(
+            fileEvidence: MutableList<TypeEvidence>,
+            lineEvidence: MutableList<TypeEvidence>,
+        ) {
+            fileEvidence.apply {
+                //update the fileDeduce with the max of the lineDeduce
+                lineEvidence.forEachIndexed { index, typeDeduction ->
+                    while (index >= this.size) this.add(TypeEvidence())
+                    this[index].apply {
+                        if (digits < typeDeduction.digits) digits = typeDeduction.digits
+                        if (periods < typeDeduction.periods) periods = typeDeduction.periods
+                        if (exponent < typeDeduction.exponent) exponent = typeDeduction.exponent
+                        if (signs < typeDeduction.signs) signs = typeDeduction.signs
+                        if (special < typeDeduction.special) special = typeDeduction.special
+                        if (alpha < typeDeduction.alpha) alpha = typeDeduction.alpha
+                        if (truefalse < typeDeduction.truefalse) truefalse = typeDeduction.truefalse
+                        if (empty < typeDeduction.empty) empty = typeDeduction.empty
+                        if (quotes < typeDeduction.quotes) quotes = typeDeduction.quotes
+                        if (dquotes < typeDeduction.dquotes) dquotes = typeDeduction.dquotes
+                        if (whitespaces < typeDeduction.whitespaces) whitespaces = typeDeduction.whitespaces
+                        if (backslashes < typeDeduction.backslashes) backslashes = typeDeduction.backslashes
+                        if (linefeed < typeDeduction.linefeed) linefeed = typeDeduction.linefeed
+                    }
+                }
             }
         }
     }
 }
-}}
 
 
 /**
@@ -77,7 +80,7 @@ object CSVUtil {
         /**the last offset exclusive.  -1 has an undefined end. */
         end: Long = -1L,
         //this is 1 TypeDeduction per column, for one line. elsewhere, there should be a TypeDeduction holding maximum findings per file/column.
-        deduce: MutableList<TypeDeduction>? = null
+        deduce: MutableList<TypeEvidence>? = null,
     ): Series<DelimitRange> {
         var quote = false
         var doubleQuote = false
@@ -93,7 +96,7 @@ object CSVUtil {
             val char = c.toInt().toChar()
             deduce?.apply {
                 //test deduce length and add if needed
-                while (ordinal >= deduce.size) deduce.add(TypeDeduction())
+                while (ordinal >= deduce.size) deduce.add(TypeEvidence())
                 deduce[ordinal].apply {
                     when (char) {
                         in '0'..'9' -> digits++
@@ -106,7 +109,7 @@ object CSVUtil {
                         '\'' -> quotes++
                         '\\' -> backslashes++
                         ' ', '\t' -> whitespaces++
-                        '\r', -> linefeed++
+                        '\r' -> linefeed++
                         else -> special++
                     }
                 }
@@ -147,7 +150,7 @@ object CSVUtil {
         /**
          * if list is passed in here it will be the per-file deduce containing the max of a given column classes found in the file
          */
-        fileDeduce: MutableList<TypeDeduction>? = null
+        fileDeduce: MutableList<TypeEvidence>? = null,
     ): Cursor {
         val size = file.size
         val headerLine: Join<Int, (Int) -> DelimitRange> = parseLine(file, 0)
@@ -163,10 +166,10 @@ object CSVUtil {
         val lines: MutableList<IntArray> = mutableListOf()
         try {
             do {
-                val lineDeduce = fileDeduce?.let { mutableListOf<TypeDeduction>() }
-                val line = parseLine(file, lineStart.inc(), deduce = lineDeduce)
+                val lineEvidence = fileDeduce?.let { mutableListOf<TypeEvidence>() }
+                val line = parseLine(file, lineStart.inc(), deduce = lineEvidence)
 
-                fileDeduce?.apply{ update(this, lineDeduce) }
+                fileDeduce?.apply { update(this,  lineEvidence!!) }
 
                 lineStart += line.last().b.toLong()
                 lines += (line α { it.value }).toArray()
