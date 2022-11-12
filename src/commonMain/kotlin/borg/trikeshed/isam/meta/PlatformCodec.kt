@@ -19,6 +19,9 @@ expect object PlatformCodec {
     val writeFloat: (Any?) -> ByteArray
     val writeDouble: (Any?) -> ByteArray
     val writeInstant: (Any?) -> ByteArray
+
+    val readShort: (ByteArray) -> Short
+    val writeShort: (Any?) -> ByteArray
     fun createEncoder(
         type: IOMemento,
         size: Int
@@ -29,8 +32,6 @@ expect object PlatformCodec {
         size: Int
     ): (ByteArray) -> Any?
 
-    val readShort: (ByteArray) -> Short
-    val writeShort: (Any?) -> ByteArray
 
 
 }

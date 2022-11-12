@@ -1,7 +1,10 @@
 package borg.trikeshed.isam.meta
 
 import borg.trikeshed.isam.meta.IOMemento.*
-import borg.trikeshed.placeholder.nars.CharBuffer
+import borg.trikeshed.isam.meta.IOMemento.Companion.readByteArray
+import borg.trikeshed.isam.meta.IOMemento.Companion.readCharbuffer
+import borg.trikeshed.isam.meta.IOMemento.Companion.writeByteArray
+import borg.trikeshed.isam.meta.IOMemento.Companion.writeCharbuffer
 import kotlinx.datetime.Instant
 import kotlinx.datetime.LocalDate
 import sun.misc.Unsafe
@@ -9,15 +12,11 @@ import sun.misc.Unsafe
 actual object PlatformCodec {
     val unsafe = Unsafe::class.java.getDeclaredField("theUnsafe").apply { isAccessible = true }.get(null) as Unsafe
     actual val readBool = { value: ByteArray -> unsafe.getByte(value, 0) == 1.toByte() }
-
     actual val readByte = { value: ByteArray -> unsafe.getByte(value, 0) }
 
     //readShort
     actual val readShort = { value: ByteArray -> unsafe.getShort(value, 0) }
-
     actual val readInt = { value: ByteArray -> unsafe.getInt(value, 0) }
-
-
     actual val readLong = { value: ByteArray -> unsafe.getLong(value, 0) }
     actual val readFloat = { value: ByteArray -> unsafe.getFloat(value, 0) }
     actual val readDouble = { value: ByteArray -> unsafe.getDouble(value, 0) }
@@ -61,10 +60,6 @@ actual object PlatformCodec {
 
     val writeString = { value: Any? -> (value as String).encodeToByteArray() }
     val writeNothing = { _: Any? -> ByteArray(0) }
-    val writeCharBuffer = { value: Any? ->(value as CharBuffer).asString().encodeToByteArray() }
-    val readCharBuffer = { value: ByteArray -> CharBuffer(value.decodeToString()) }
-    val writeByteArray = { value: Any? -> value as ByteArray }
-    val readByteArray = { value: ByteArray -> value }
 
     actual fun createEncoder(type: IOMemento, size: Int): (Any?) -> ByteArray {
         // must use corresponding  networkOrderSetXXX functions to set the bytes in the ByteArray
@@ -79,13 +74,11 @@ actual object PlatformCodec {
             IoString -> writeString
             IoInstant -> writeInstant
             IoLocalDate -> writeLocalDate
-            IoCharBuffer -> writeCharBuffer
+            IoCharBuffer -> writeCharbuffer
             IoByteArray -> writeByteArray
             IoNothing -> writeNothing
         }
     }
-
-
 
     actual fun createDecoder(
         type: IOMemento,
@@ -105,7 +98,7 @@ actual object PlatformCodec {
             IoString -> readString
             IoLocalDate -> readLocalDate
             IoInstant -> readInstant
-            IoCharBuffer -> readCharBuffer
+            IoCharBuffer -> readCharbuffer
             IoByteArray -> readByteArray
             IoNothing -> readNothing
         }

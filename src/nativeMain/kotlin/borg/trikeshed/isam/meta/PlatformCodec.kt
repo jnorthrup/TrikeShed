@@ -1,6 +1,10 @@
 package borg.trikeshed.isam.meta
 
 import borg.trikeshed.isam.meta.IOMemento.*
+import borg.trikeshed.isam.meta.IOMemento.Companion.readByteArray
+import borg.trikeshed.isam.meta.IOMemento.Companion.readCharbuffer
+import borg.trikeshed.isam.meta.IOMemento.Companion.writeByteArray
+import borg.trikeshed.isam.meta.IOMemento.Companion.writeCharbuffer
 import borg.trikeshed.lib.*
 import kotlinx.datetime.Instant
 import kotlinx.datetime.LocalDate
@@ -68,8 +72,10 @@ actual object PlatformCodec {
             IoString -> writeString
             IoInstant -> writeInstant
             IoLocalDate -> writeLocalDate
-            IoNothing -> writeNothing
             IoShort -> writeShort
+            IoCharBuffer -> writeCharbuffer
+            IoByteArray -> writeByteArray
+            IoNothing -> writeNothing
         }
     }
 
@@ -91,10 +97,15 @@ actual object PlatformCodec {
             IoInstant -> readInstant
             IoLocalDate -> readLocalDate
             IoString -> readString
+            IoCharBuffer -> readCharbuffer
+            IoByteArray -> readByteArray
             IoNothing -> readNothing
         }
     }
 
-    actual val readShort: (ByteArray) -> Short
-        get() = TODO("Not yet implemented")
+    actual val readShort: (ByteArray) -> Short = { value: ByteArray -> value.networkOrderGetShortAt(0) }
+
+
+
+
 }

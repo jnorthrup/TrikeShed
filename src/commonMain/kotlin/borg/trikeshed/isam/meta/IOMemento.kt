@@ -1,5 +1,8 @@
 package borg.trikeshed.isam.meta
 
+import borg.trikeshed.lib.α
+import borg.trikeshed.placeholder.nars.CharBuffer
+
 enum class IOMemento(override val networkSize: Int? = null) : TypeMemento {
     IoBoolean(1),
     IoByte(1),
@@ -16,5 +19,13 @@ enum class IOMemento(override val networkSize: Int? = null) : TypeMemento {
     IoString,
     IoCharBuffer,
     IoByteArray,
-    IoNothing;}
+    IoNothing;
+    companion object {
+        val readCharbuffer: (ByteArray) -> CharBuffer = { value: ByteArray -> CharBuffer(value α { it.toChar() }) }
+        val writeCharbuffer: (Any?) -> ByteArray =
+            { value: Any? -> (value as CharBuffer).asString().encodeToByteArray() }
+        val readByteArray: (ByteArray) -> ByteArray = { value: ByteArray -> value }
+        val writeByteArray: (Any?) -> ByteArray = { value: Any? -> value as ByteArray }
+    }
 
+}
