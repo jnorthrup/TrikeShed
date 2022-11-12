@@ -1,6 +1,8 @@
 package borg.trikeshed.isam.meta
 
 import borg.trikeshed.isam.meta.IOMemento.*
+import borg.trikeshed.lib.α
+import borg.trikeshed.placeholder.nars.CharBuffer
 import kotlinx.datetime.Instant
 import kotlinx.datetime.LocalDate
 import sun.misc.Unsafe
@@ -54,13 +56,16 @@ actual object PlatformCodec {
 
     val writeLocalDate = { value: Any? ->
         ByteArray(8).apply<ByteArray> {
-            ->
             unsafe.putLong(this, 0, (value as LocalDate).toEpochDays().toLong())
         }
     }
 
     val writeString = { value: Any? -> (value as String).encodeToByteArray() }
     val writeNothing = { _: Any? -> ByteArray(0) }
+    val writeCharBuffer = { value: Any? ->(value as CharBuffer).asString().encodeToByteArray() }
+    val readCharBuffer = { value: ByteArray -> CharBuffer(value.decodeToString()) }
+    val writeByteArray = { value: Any? -> value as ByteArray }
+    val readByteArray = { value: ByteArray -> value }
 
     actual fun createEncoder(type: IOMemento, size: Int): (Any?) -> ByteArray {
         // must use corresponding  networkOrderSetXXX functions to set the bytes in the ByteArray
@@ -76,8 +81,12 @@ actual object PlatformCodec {
             IoInstant -> writeInstant
             IoLocalDate -> writeLocalDate
             IoNothing -> writeNothing
+            IoCharBuf -> writeCharBuffer
+            IoByteBuf -> writeByteArray
         }
     }
+
+
 
     actual fun createDecoder(
         type: IOMemento,
@@ -100,6 +109,9 @@ actual object PlatformCodec {
             IoLocalDate -> readLocalDate
             IoInstant -> readInstant
             IoNothing -> readNothing
+            IoCharBuf -> readCharBuffer
+            IoByteBuf -> readByteArray
+
         }
     }
 }

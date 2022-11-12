@@ -174,8 +174,6 @@ infix fun <C, B : (Byte) -> C> ByteArray.α(m: B):Series<C> = this.size j { i: I
 
 infix fun <C, B : (Char) -> C> CharArray.α(m: B):Series<C> = this.size j { i: Int -> m(this[i]) }
 
-infix fun <C, B : (Any) -> C> Array<Any>.α(m: B):Series<C> = this.size j { i: Int -> m(this[i]) }
-
 infix fun <C, B : (Boolean) -> C> BooleanArray.α(m: B):Series<C> = this.size j { i: Int -> m(this[i]) }
 
 /**
