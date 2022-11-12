@@ -11,7 +11,8 @@ class CSVUtilTest {
     fun testParseLineAndDeduce() {
         //use classpath to find the file using the src/test/resources hi.csv in the root package of the classloadr
         val systemResource = ClassLoader.getSystemResource("hi.csv")
-        val fileBuf = FileBuffer.open(systemResource.file)
+        val filename = systemResource.file.trim()
+        val fileBuf = FileBuffer.open(filename)
         val deduce = emptyList<TypeDeduction>()
         val csv = CSVUtil.parseLine(fileBuf, 0, deduce = deduce)
         logDebug { "csv: $csv" }

@@ -1,4 +1,5 @@
 import borg.trikeshed.common.LongSeries
+import borg.trikeshed.lib.debug
 import borg.trikeshed.lib.logDebug
 import java.nio.channels.FileChannel
 
@@ -10,7 +11,7 @@ import java.nio.channels.FileChannel
  */
 actual class FileBuffer actual constructor(
     filename: String, initialOffset: Long,
-    blkSize: Long, readOnly: Boolean
+    blkSize: Long, readOnly: Boolean,
 ) : LongSeries<Byte> {
 
     actual val filename: String
@@ -45,17 +46,17 @@ actual class FileBuffer actual constructor(
 
     actual fun open() {
         logDebug { "opening $filename" }
-        jvmFile = java.io.RandomAccessFile(filename, if (!readOnly) "rw" else "r")
-        jvmChannel = jvmFile!!.channel
+        jvmFile = java.io.RandomAccessFile(filename, if (!readOnly) "rw" else "r").debug {raf-> logDebug { "randomAccesFile: $raf" } }
+        jvmChannel = jvmFile!!.channel.debug {thing-> logDebug { "fileChannel: $thing" } }
         jvmMappedByteBuffer = jvmChannel!!.map(
-            if (readOnly) FileChannel.MapMode.READ_ONLY else
-                FileChannel.MapMode.READ_WRITE,
-            initialOffset, if (blkSize == -1L) jvmChannel!!.size() - /*initial offset*/ initialOffset else blkSize
-        )
+            (if (readOnly) FileChannel.MapMode.READ_ONLY else        FileChannel.MapMode.READ_WRITE).debug {thing-> logDebug { "mapMode: $thing" } },
+            initialOffset.debug {thing-> logDebug { "initialOffset: $thing" } },
+            (if (blkSize == -1L) jvmChannel!!.size() - /*initial offset*/ initialOffset else blkSize).debug {thing-> logDebug { "blkSize: $thing" } }
+        ).debug {thing-> logDebug { "blkSize: $thing" } }
     }
 
     actual fun isOpen(): Boolean = jvmMappedByteBuffer != null
-    actual fun size(): Long = jvmMappedByteBuffer!!.capacity().toLong()
+    actual fun size(): Long = jvmMappedByteBuffer!!.capacity().toLong().debug {thing-> logDebug { "size: $thing" } }
     actual fun get(index: Long): Byte = jvmMappedByteBuffer!!.get(index.toInt())
     actual fun put(index: Long, value: Byte) {
         jvmMappedByteBuffer!!.put(index.toInt(), value)
@@ -63,7 +64,12 @@ actual class FileBuffer actual constructor(
 
     companion object {
         fun open(filename: String, initialOffset: Long = 0, blkSize: Long = -1, readOnly: Boolean = true): FileBuffer {
-            return FileBuffer(filename, initialOffset, blkSize, readOnly)
+            logDebug { "opening $filename" }
+            return FileBuffer(filename, initialOffset, blkSize, readOnly).apply {
+                logDebug { "this isOpen()=${isOpen()}" }
+                open().debug { logDebug { "call(ed) open()" } }
+                logDebug { "this isOpen()=${isOpen()}" }
+            }
         }
     }
 }

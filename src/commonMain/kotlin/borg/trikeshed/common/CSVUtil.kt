@@ -6,7 +6,8 @@ import borg.trikeshed.isam.meta.IOMemento
 import borg.trikeshed.lib.*
 import borg.trikeshed.parse.DelimitRange
 import borg.trikeshed.placeholder.nars.CharBuffer
-
+import kotlin.jvm.JvmOverloads
+import kotlin.jvm.JvmStatic
 
 
 data class /** This is a dragnet for a given line to record the coutners of character classes */ TypeDeduction (
@@ -35,7 +36,7 @@ object CSVUtil {
 
     /**
      * read a csv file into a series of segments
-     */
+     */@JvmStatic @JvmOverloads
     fun parseLine(
         /**the source media*/
         file: LongSeries<Byte>,

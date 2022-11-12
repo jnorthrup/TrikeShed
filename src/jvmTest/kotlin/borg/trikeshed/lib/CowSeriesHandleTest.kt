@@ -2,8 +2,6 @@ package borg.trikeshed.lib
 
 import kotlin.test.*
 
-import org.junit.Assert.*
-
 class CowSeriesHandleTest {
 
     @Test
@@ -42,6 +40,4 @@ class CowSeriesHandleTest {
         assertEquals(4, series[2])
 
     }
-
-
 }
