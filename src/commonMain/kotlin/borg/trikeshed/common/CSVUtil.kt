@@ -1,11 +1,12 @@
 package borg.trikeshed.common
 
 import borg.trikeshed.common.TypeEvidence.Companion.update
+import borg.trikeshed.common.parser.simple.CharSeries
 import borg.trikeshed.isam.RecordMeta
 import borg.trikeshed.isam.meta.IOMemento
+import borg.trikeshed.isam.meta.PlatformCodec
 import borg.trikeshed.lib.*
 import borg.trikeshed.parse.DelimitRange
-import borg.trikeshed.placeholder.nars.CharBuffer
 import kotlin.jvm.JvmOverloads
 import kotlin.jvm.JvmStatic
 
@@ -29,6 +30,8 @@ TypeEvidence(
     var whitespaces: UShort = 0U,
     var backslashes: UShort = 0U,
     var linefeed: UShort = 0U,
+    /**the length of the column */
+    var columnLength: UShort = 0U,
 ) {
     companion object {
         fun update(
@@ -53,6 +56,7 @@ TypeEvidence(
                         if (whitespaces < typeDeduction.whitespaces) whitespaces = typeDeduction.whitespaces
                         if (backslashes < typeDeduction.backslashes) backslashes = typeDeduction.backslashes
                         if (linefeed < typeDeduction.linefeed) linefeed = typeDeduction.linefeed
+                        if (columnLength < typeDeduction.columnLength) columnLength = typeDeduction.columnLength
                     }
                 }
             }
@@ -80,7 +84,7 @@ object CSVUtil {
         /**the last offset exclusive.  -1 has an undefined end. */
         end: Long = -1L,
         //this is 1 TypeDeduction per column, for one line. elsewhere, there should be a TypeDeduction holding maximum findings per file/column.
-        deduce: MutableList<TypeEvidence>? = null,
+        lineEvidence: MutableList<TypeEvidence>? = null,
     ): Series<DelimitRange> {
         var quote = false
         var doubleQuote = false
@@ -94,10 +98,10 @@ object CSVUtil {
         while (x != end && x < size) {
             val c = file.get(x)
             val char = c.toInt().toChar()
-            deduce?.apply {
+            lineEvidence?.apply {
                 //test deduce length and add if needed
-                while (ordinal >= deduce.size) deduce.add(TypeEvidence())
-                deduce[ordinal].apply {
+                while (ordinal >= lineEvidence.size) lineEvidence.add(TypeEvidence())
+                lineEvidence[ordinal].apply {
                     when (char) {
                         in '0'..'9' -> digits++
                         '.' -> periods++
@@ -121,22 +125,26 @@ object CSVUtil {
                 char == '\'' -> quote = !quote
                 char == '\\' -> escape = !escape
                 char == ',' -> if (!quote || !doubleQuote) {
-                    deduce?.apply {
-                        if (x == start) this[ordinal].empty++
+                    lineEvidence?.apply {
+                        if (x == since) this[ordinal].empty++
                     }
-                    rlist.add(DelimitRange.of(since.toUShort(), x.toUShort()).value)
+                    rlist.add(DelimitRange.of(since.toUShort(), x.toUShort().inc()).value)
                     since = x.inc()
                     ordinal++
                 }
 
-                char == '\r' || char == '\n' -> if (!quote || !doubleQuote) break
+                char == '\n' -> if (!quote || !doubleQuote) break
             }
             x++
         }
+        lineEvidence?.apply {
+            this[ordinal].columnLength = (since - x).toUShort().also { if (0U.toUShort() == it) this[ordinal].empty++ }
+
+        }
         if (since != x) // add the last one
-            rlist.add(DelimitRange.of(since.toUShort(), x.toUShort()).value)
-        val toArray = (rlist α { DelimitRange(it).value }).toArray()
-        return toArray α { DelimitRange(it) } //the b element of the last delim range is the end of the line
+            rlist.add(DelimitRange.of(since.toUShort(), x.toUShort().inc()).value)
+        val compactArr = (rlist α { DelimitRange(it).value }).toArray()
+        return compactArr α { DelimitRange(it) } //the b element of the last delim range is the end of the line
     }
 
     /**
@@ -144,80 +152,89 @@ object CSVUtil {
      */
     fun parseSegments(
         file: LongSeries<Byte>,
-        /**
-         * when not null the longest ranges are recorded inthis list */
-        columnMaxLengths: MutableList<Int>? = null,
+
         /**
          * if list is passed in here it will be the per-file deduce containing the max of a given column classes found in the file
          */
-        fileDeduce: MutableList<TypeEvidence>? = null,
+        fileEvidence: MutableList<TypeEvidence>? = null,
     ): Cursor {
         val size = file.size
         val headerLine: Join<Int, (Int) -> DelimitRange> = parseLine(file, 0)
 
+        debug {
+            var c = 0
+            for (delimitRange in headerLine) {
+                logDebug {
+                    "col ${c.also { c++ }} " + file[delimitRange.start.toInt()..delimitRange.endInclusive.toInt()].toArray()
+                        .decodeToString()
+                }
+            }
+        }
+
+
         //for headers we want to extract Strings from the delimitted reanges.
-        val headerNames: Series<String> =
-            headerLine α { file.get(it.asIntRange) } α { CharBuffer(it α { it.toInt().toChar() }).asString() }
+        val headerNames =
+            headerLine α { delim: DelimitRange -> file.get(delim.asIntRange) } α { buf: Series<Byte> ->
+                lazy{
+                    CharSeries(buf α { theByte: Byte ->
+                        theByte.toInt().toChar()
+                    }).asString()
+                }
+            }
 
         //for untyped CSV data we want to produce a lambda to create RecordMeta of the correct ordinal and IoCharBuf type with the specific bounds
+        var relativeLast = headerLine.last().b
 
+        relativeLast.toLong().let { lineStart1 ->
+            var lineStart = lineStart1
+            val lines: MutableList<IntArray> = mutableListOf() //the list of lines
+            return try {
 
-        var lineStart = headerLine.last().b.toLong()
-        val lines: MutableList<IntArray> = mutableListOf()
-        try {
-            do {
-                val lineEvidence = fileDeduce?.let { mutableListOf<TypeEvidence>() }
-                val line = parseLine(file, lineStart.inc(), deduce = lineEvidence)
+                //first pass is to obtain segments for each line into a list
+                //Bandwidth.java would also insert processing inline by some arcanery but we'll just settle for a forward pass and an extremely lazy reification step
 
-                fileDeduce?.apply { update(this,  lineEvidence!!) }
+                do {
+                    val lineEvidence = fileEvidence?.let { mutableListOf<TypeEvidence>() } //the evidence for this line
+                    val line = parseLine(file, lineStart.inc(), lineEvidence = lineEvidence) //the line
+                    relativeLast = line.last().b
+                    fileEvidence?.apply { update(this, lineEvidence!!) } // update the fileDeduce with the line evidence
+                    lineStart += relativeLast.toLong()
+                    lines += (line α { it.value }).toArray() //add the line to the list of lines as an array of ints
+                } while (lineStart < size) //while there are more lines
 
-                lineStart += line.last().b.toLong()
-                lines += (line α { it.value }).toArray()
-            } while (lineStart < size)
-        } catch (e: Exception) {
-            //logDebug some state details here
-            logDebug { "lineStart: $lineStart" }
-            logDebug { "size: $size" }
-            logDebug { "headerLine: $headerLine" }
-            logDebug { "headerNames: $headerNames" }
-            logDebug { "linesCount: $lines.size" }
-            throw e
-        }
-        columnMaxLengths?.also {
-            repeat(headerNames.size) { it ->
-                columnMaxLengths[it] = 0
-            }
-        }
-        lineStart = headerLine.last().b.toLong()
-        val hdrCount = headerNames.size
-        /* we cannot use alpha (lazy)conversion of the indices here because we need to use the lineStart variable which is not a parameter of the lambda */
+                lineStart = lineStart1
+                lines.withIndex() α { (y: Int, ints: IntArray): IndexedValue<IntArray> ->
+                    val lazyLine: Lazy<LongSeries<Byte>> = lazy { file.drop(lineStart) }
+                    (ints.toList() α ::DelimitRange).`▶`.withIndex().toList() α { (x: Int, seg: DelimitRange): IndexedValue<DelimitRange> ->
+                        val dec: (ByteArray) -> Any? =PlatformCodec.createDecoder(IOMemento.IoCharBuffer, (seg.b - seg.a).toInt())
+                        val value: LongSeries<Byte> = lazyLine.value
+                        val bArr = (value [ seg.asIntRange ] ).toArray()
+                        dec(bArr)!! j {
+                            RecordMeta(
+                                headerNames[x].value ?: "col$x",
+                                IOMemento.IoCharBuffer,
+                                seg.a.toInt(),
+                                seg.b.toInt(),
+                            )
+                        }
 
-        return lines.mapIndexed { y, segments ->
-            require(segments.size == hdrCount) { "line $y has ${segments.size} segments but $hdrCount headers" }
-            var range: DelimitRange = DelimitRange.of(0.toUShort(), 0.toUShort())
-            val lazyLine: Lazy<LongSeries<Byte>> = lazy { file.drop(lineStart) }//row level lazy byteSeries
-            val parsed = segments.indices.toList() α { x ->
-                range = DelimitRange(segments[x])
-                columnMaxLengths?.also { cmax ->
-                    if ((range.b - range.a).toInt() > cmax[x]) cmax[x] = (range.b - range.a).toInt()
+                    }.also {
+                        lineStart += relativeLast.toLong()
+                    }
                 }
-                val subFile =
-                    lazy { lazyLine.value[range.asIntRange]/*intrange downconverts the LongSeries to Series */ }
-                val recordMeta: () -> RecordMeta = {
-                    range = DelimitRange(segments[x])
-                    RecordMeta(headerNames[x], IOMemento.IoCharBuffer, decoder = {
-                        it α { byte: Byte -> byte.toInt().toChar() }
-                    })
-                }
-                subFile j recordMeta
+            } catch (e: Exception) {
+                //logDebug some state details here
+                logDebug { "lineStart: $lineStart" }
+                logDebug { "size: $size" }
+                logDebug { "headerLine: $headerLine" }
+                logDebug { "headerNames: $headerNames" }
+                logDebug { "linesCount: $lines.size" }
+                throw e
             }
-            lineStart += range.b.toLong().inc()
-            parsed α { (lazyArray: Lazy<Series<Byte>>, metaFunctor: () -> RecordMeta): Join<Lazy<Series<Byte>>, () -> RecordMeta> ->
-                @Suppress("USELESS_CAST")
-                (lazyArray.value.toArray() j metaFunctor) as Join<*, () -> RecordMeta>
-            }
-        }.toSeries()
+        }
+
     }
+
 
 
     /**
@@ -228,40 +245,48 @@ object CSVUtil {
     @OptIn(ExperimentalStdlibApi::class)
     fun parseConformant(
         file: LongSeries<Byte>,
-        newMeta: List<RecordMeta>? = null,
-        maxColSizes: Boolean = false,
+        newMeta: MutableList<RecordMeta>? = null,
+        fileEvidence: MutableList<TypeEvidence>? = null,
     ): Cursor {
-        val columnMaxLengths: MutableList<Int>? = if (maxColSizes) mutableListOf() else null
-        val parseSegments = parseSegments(file, columnMaxLengths)
+
+        val parseSegments = parseSegments(file, fileEvidence)
 
         //if columnMaxLengths is not null,
         // we need to layout all the newMeta fields, and for the variable length IoMementos of IoString, and IoCharBuffer we need to set the max size; these will be the child meta of the newMeta
-        newMeta?.also {
-            columnMaxLengths?.also { cmaxLens ->
+
+        newMeta?.also { newRecordMeta: MutableList<RecordMeta> ->
+            fileEvidence?.map { evidence ->
+                evidence.columnLength
+            }?.also { cmaxLens: List<UShort> ->
                 //create an array of networksizes for each column
                 val networkSizes = newMeta.mapIndexed { index: Int, recordMeta: RecordMeta ->
-                    recordMeta.child?.type?.networkSize ?: recordMeta.type.networkSize ?: cmaxLens[index]
+                    (recordMeta.child?.type?.networkSize?.toUShort() ?: recordMeta.type.networkSize?.toUShort()
+                    ?: cmaxLens[index])
                 }
 
                 //accumulate networksizes to create begin,endExclusive  ranges for each column
                 val ranges: MutableList<IntRange> =
-                    networkSizes.foldIndexed(mutableListOf()) { index: Int, acc: MutableList<IntRange>, i: Int ->
-                        acc += if (index == 0) 0 until i
-                        else {
-                            val newStart = acc.last().endExclusive
-                            newStart until newStart + i
+                    networkSizes.foldIndexed(mutableListOf()) { index, acc: MutableList<IntRange>, i: UShort ->
+                        acc += when {
+                            0 != index -> {
+                                val newStart = acc.last().endExclusive
+                                newStart until newStart + i.toInt()
+                            }
+
+                            else -> 0 until i.toInt()
                         }
                         acc
                     }
 
                 //install or update the child meta of the newMeta with the new ranges
                 newMeta.forEachIndexed { index, recordMeta ->
-                    val range = ranges[index]
+                    val range: IntRange = ranges[index]
                     recordMeta.child = recordMeta.child?.copy(begin = range.first, end = range.endExclusive)
                         ?: recordMeta.copy(begin = range.first, end = range.endExclusive)
                 }
             }
         }
+
         return parseSegments.`▶`.withIndex() α { (lineNo, segments): IndexedValue<Join<Int, (Int) -> Join<*, () -> RecordMeta>>> ->
             segments.`▶`.withIndex() α { (x: Int, segment: Join<*, () -> RecordMeta>): IndexedValue<Join<*, () -> RecordMeta>> ->
                 //newMeta presides over the output of this regment
@@ -272,8 +297,8 @@ object CSVUtil {
                     val bArr = segment.a as ByteArray
 
                     @Suppress("UNCHECKED_CAST")
-                    val bArrDecoder = oldMetaRecord.decoder as (ByteArray) -> CharBuffer
-                    val cbufEncoder = newMetaRecord.encoder as (CharBuffer) -> ByteArray
+                    val bArrDecoder = oldMetaRecord.decoder
+                    val cbufEncoder = newMetaRecord.encoder
                     val xlated = cbufEncoder(bArrDecoder(bArr))
                     xlated j (newMetaRecord.child ?: newMetaRecord).`↺`
                 } catch (e: Exception) {

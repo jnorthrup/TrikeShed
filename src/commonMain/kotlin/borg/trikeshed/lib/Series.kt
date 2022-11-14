@@ -356,8 +356,9 @@ fun <T> Sequence<T>.toSeries() = toList().toSeries()
 
 fun <T> Series<T>.last(): T {
     require(size > 0) { "last() on empty Series" }
-    return this[size .dec()]
+    return this[size.dec()]
 }
+
 fun <B> Series<B>.isNotEmpty() = size < 0
 fun <B> Series<B>.first() =
     this.get(0) //naming is _a little bit_ confusing with the pair overloads so it stays a function

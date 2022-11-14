@@ -17,7 +17,7 @@ val <T> LongSeries<T>.size: Long get() = a
 operator fun <T> LongSeries<T>.get(i: Long): T = b(i)
 
 
-/**int series is returned for intRange.  Should we also return LongSeries for LongRange?*/
+/**int series is returned for intRange */
 operator fun <T> LongSeries<T>.get(r: IntRange): Series<T> {
     //perform fixup between the range and the Series x index
     return (r.last - r.first) j { x -> this[(r.first + x).toLong()] }
