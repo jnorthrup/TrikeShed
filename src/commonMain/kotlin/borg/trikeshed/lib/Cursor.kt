@@ -5,13 +5,17 @@ import borg.trikeshed.isam.ColMeta
 import borg.trikeshed.isam.RecordMeta
 import borg.trikeshed.isam.meta.IOMemento.*
 import kotlin.jvm.JvmInline
+import kotlin.jvm.JvmOverloads
+import kotlin.math.max
+import kotlin.math.min
+import kotlin.random.Random
 import kotlin.reflect.KClass
 
-/**
- * Cursors are a columnar abstraction composed of Series of Joined value+meta pairs (RecordMeta)
- *
- */
-typealias Cursor = Series<Series<Join<*, () -> RecordMeta>>>
+typealias RowVec = Series2<*, () -> RecordMeta >
+val RowVec.left: Series<*> get() = this α Join<*, *>::a
+
+/** Cursors are a columnar abstraction composed of Series of Joined value+meta pairs (RecordMeta) */
+typealias Cursor = Series<RowVec>
 
 ///**
 // * overload unary minus operator for Cursor to strip out the meta and return a series of values-only
@@ -20,36 +24,29 @@ typealias Cursor = Series<Series<Join<*, () -> RecordMeta>>>
 // */
 //operator fun Cursor.unaryMinus(): Series<Series<*>> = this α { it α Join<*, () -> RecordMeta>::a }
 
-/**
- * Operator Cursor '/' Class<A>
+/** Operator Cursor '/' Class<A>
  *
  * returns Series<Series<A?>>> where the meta is stripped out and the values are cast using
  *
- * it "as?" A return only A values and null for non-A values
- */
-  inline operator fun <  A:Any,IR:Any?,SrInnr:Series<Join<  A,*>>,SrOutr:Series< SrInnr >,RC:KClass<A?>> SrOutr.div(c: KClass<out A>): Series<Series<A?>> =         this α { it α Join<A, *>::a } α { it α { it as? A } } α { it α { it as? A } }
+ * it "as?" A return only A values and null for non-A values */
+inline operator fun <A : Any, IR : Any?, SrInnr : Series<Join<A, *>>, SrOutr : Series<SrInnr>, RC : KClass<A?>> SrOutr.div(
+    c: KClass<out A>,
+): Series<Series<A?>> = this α { it α Join<A, *>::a } α { it α { it } } α { it α { it } }
 
-/**
- *
- */
+/** get a row, which is not the same as get[x] which creates a new Cursor with only column x */
 infix fun Cursor.row(y: Int): Series<Join<*, () -> RecordMeta>> {
     require(y < size) { "index $y out of bounds for cursor of size $size" }
     return b(y)
 }
 
-/**
- * Cursor get by Int vararg -- return a Cursor with the columns specified by the vararg
- */
-operator fun Cursor.get(vararg i: Int): Cursor =
-    size j { y ->
-        i.size j { x ->
-            row(y)[i[x]]
-        }
+/** Cursor get by Int vararg -- return a Cursor with the columns specified by the vararg */
+operator fun Cursor.get(vararg i: Int): Cursor = size j { y: Int ->
+    i.size j { x: Int ->
+        row(y)[i[x]]
     }
+}
 
-/**
- * cursor get by IntRange -- return a Cursor with the columns specified by the IntRange
- */
+/** cursor get by IntRange -- return a Cursor with the columns specified by the IntRange */
 operator fun Cursor.get(i: IntRange): Cursor {
     require(i.first >= 0) { "index ${i.first} out of bounds for cursor of size $size" }
     require(i.last < size) { "index ${i.last} out of bounds for cursor of size $size" }
@@ -63,56 +60,43 @@ operator fun Cursor.get(i: IntRange): Cursor {
 }
 
 /** get meta for a cursor from row 0 */
-val Cursor.meta: Series<out ColMeta>
-    get() = row(0) α {
+val Cursor.meta: Series<ColMeta>
+    get() = row(0) α { it: Join<*, () -> RecordMeta> ->
         it.b()
     }
 
-/**
-create an Intarray of cursor meta by Strings of column names
- */
+/** create an Intarray of cursor meta by Strings of column names */
 fun Cursor.meta(vararg s: String): Series<Int> {
-    val meta = meta
+    val meta:Series<ColMeta> = meta
     return s.size j { i ->
-        meta.`▶`.indexOfFirst { it -> it.name == s[i] }
+        meta.`▶`.indexOfFirst { colMeta: ColMeta -> colMeta.name == s[i] }
     }
 }
 
-/**
- * cursor get by String vararg -- return a Cursor with the columns specified by the vararg
- */
+/** cursor get by String vararg -- return a Cursor with the columns specified by the vararg */
 fun Cursor.get(vararg s: String): Cursor = this[meta(*s)]
 
-/**
- * ColumnExclusion value class
+/** ColumnExclusion value class
  *
  * used to exclude columns from a cursor by name
  *
- * @param s the name of the column to exclude
- *
- */
+ * @param name the name of the column to exclude */
 @JvmInline
-value class ColumnExclusion(public val name: String) {
+value class ColumnExclusion(val name: String) {
     override fun toString(): String = "ColumnExclusion($name)"
 }
 
-/**
- * create operator unary minus for ColumnExclusion on string
- */
+/** create operator unary minus for ColumnExclusion on string */
 operator fun String.unaryMinus(): ColumnExclusion = ColumnExclusion(this)
 
-/**
- * Return cursor with columns excluded by indexes
- */
+/** Return cursor with columns excluded by indexes */
 operator fun Cursor.minus(killbag: Series<Int>) {
     val toSet = (0 until meta.size).toSet()
     val ints = (toSet - killbag.toSet()).toIntArray()
     this[ints]
 }
 
-/**
- * cursor get by ColumnExclusion vararg -- return a Cursor with the columns excluded by the vararg
- */
+/** cursor get by ColumnExclusion vararg -- return a Cursor with the columns excluded by the vararg */
 fun Cursor.get(s: Series<ColumnExclusion>): Cursor {
 
     val exclusionBag = mutableSetOf<Int>()
@@ -124,3 +108,41 @@ fun Cursor.get(s: Series<ColumnExclusion>): Cursor {
 }
 
 
+/** gets the RowVec at y or if y is negative then -y from last */
+infix fun Cursor.at(y: Int):RowVec = b(if (y < 0) size - y else y)
+
+
+
+/** simple printout macro*/
+fun Cursor.show(range: IntProgression = 0 until size) {
+    val meta = meta
+    println("rows:$size" to meta.names.toList())
+    showValues(range)
+}
+
+//in columnar project this is meta.right
+val Series<out ColMeta>.names: Series<String> get() = this α ColMeta::name
+
+fun Cursor.showValues(range: IntProgression) {
+    try {
+        (range).forEach {
+            val catn: Series<*> = ((this at it) as RowVec).left
+            val combine = combine(catn)
+            println(combine.toList())
+        }
+    } catch (e: NoSuchElementException) {
+        println("cannot fully access range $range")
+    }
+}
+
+/** head default 5 rows
+ * just like unix head - print default 5 lines from cursor contents to stdout */
+@JvmOverloads
+fun Cursor.head(last: Int = 5): Unit = show(0 until (max(0, min(last, size))))
+
+/** run head starting at random index */
+fun Cursor.showRandom(n: Int = 5) {
+    head(0);repeat(n) {
+        if (size > 0) showValues(Random.nextInt(0, size).let { it..it })
+    }
+}

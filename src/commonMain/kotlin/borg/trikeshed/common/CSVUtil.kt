@@ -191,8 +191,6 @@ object CSVUtil {
             return try {
 
                 //first pass is to obtain segments for each line into a list
-                //Bandwidth.java would also insert processing inline by some arcanery but we'll just settle for a forward pass and an extremely lazy reification step
-
                 do {
                     val lineEvidence = fileEvidence?.let { mutableListOf<TypeEvidence>() } //the evidence for this line
                     val line = parseLine(file, lineStart.inc(), lineEvidence = lineEvidence) //the line
@@ -215,6 +213,7 @@ object CSVUtil {
                                 IOMemento.IoCharBuffer,
                                 seg.a.toInt(),
                                 seg.b.toInt(),
+                                decoder = dec
                             )
                         }
 

@@ -13,6 +13,7 @@ typealias Series<T> = Join<Int, (Int) -> T>
 
 val <T> Series<T>.size: Int get() = a
 
+
 /**
  * index operator for Series
  */
@@ -405,3 +406,4 @@ fun <T> Series<T>.reversed(): Series<T> = size j { it: Int -> this.b(size - it -
 open class EmptySeries : Series<Nothing> by 0 j { x: Int -> TODO("undefined") }
 
 fun <T> emptySeries(): Series<T> = EmptySeries() as Series<T>
+
