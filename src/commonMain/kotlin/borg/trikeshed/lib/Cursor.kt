@@ -5,13 +5,18 @@ import borg.trikeshed.isam.ColMeta
 import borg.trikeshed.isam.RecordMeta
 import borg.trikeshed.isam.meta.IOMemento.*
 import kotlin.jvm.JvmInline
+import kotlin.jvm.JvmOverloads
+import kotlin.math.max
+import kotlin.math.min
+import kotlin.random.Random
 import kotlin.reflect.KClass
 
-/**
- * Cursors are a columnar abstraction composed of Series of Joined value+meta pairs (RecordMeta)
- *
+typealias RowVec = Series2<*, () -> RecordMeta >
+val RowVec.left: Series<*> get() = this α Join<*, *>::a
+
+/** Cursors are a columnar abstraction composed of Series of Joined value+meta pairs (RecordMeta)
  */
-typealias Cursor = Series<Series<Join<*, () -> RecordMeta>>>
+typealias Cursor = Series<RowVec>
 
 ///**
 // * overload unary minus operator for Cursor to strip out the meta and return a series of values-only
@@ -27,7 +32,9 @@ typealias Cursor = Series<Series<Join<*, () -> RecordMeta>>>
  *
  * it "as?" A return only A values and null for non-A values
  */
-  inline operator fun <  A:Any,IR:Any?,SrInnr:Series<Join<  A,*>>,SrOutr:Series< SrInnr >,RC:KClass<A?>> SrOutr.div(c: KClass<out A>): Series<Series<A?>> =         this α { it α Join<A, *>::a } α { it α { it as? A } } α { it α { it as? A } }
+inline operator fun <A : Any, IR : Any?, SrInnr : Series<Join<A, *>>, SrOutr : Series<SrInnr>, RC : KClass<A?>> SrOutr.div(
+    c: KClass<out A>,
+): Series<Series<A?>> = this α { it α Join<A, *>::a } α { it α { it } } α { it α { it } }
 
 /**
  *
@@ -40,12 +47,11 @@ infix fun Cursor.row(y: Int): Series<Join<*, () -> RecordMeta>> {
 /**
  * Cursor get by Int vararg -- return a Cursor with the columns specified by the vararg
  */
-operator fun Cursor.get(vararg i: Int): Cursor =
-    size j { y ->
-        i.size j { x ->
-            row(y)[i[x]]
-        }
+operator fun Cursor.get(vararg i: Int): Cursor = size j { y: Int ->
+    i.size j { x: Int ->
+        row(y)[i[x]]
     }
+}
 
 /**
  * cursor get by IntRange -- return a Cursor with the columns specified by the IntRange
@@ -88,11 +94,11 @@ fun Cursor.get(vararg s: String): Cursor = this[meta(*s)]
  *
  * used to exclude columns from a cursor by name
  *
- * @param s the name of the column to exclude
+ * @param name the name of the column to exclude
  *
  */
 @JvmInline
-value class ColumnExclusion(public val name: String) {
+value class ColumnExclusion(val name: String) {
     override fun toString(): String = "ColumnExclusion($name)"
 }
 
@@ -124,3 +130,45 @@ fun Cursor.get(s: Series<ColumnExclusion>): Cursor {
 }
 
 
+/** gets the RowVec at y or if y is negative then -y from last */
+infix fun Cursor.at(y: Int) = b(if (y < 0) size - y else y)
+
+
+
+/*simple printout macro*/
+fun Cursor.show(range: IntProgression = 0 until size) {
+    val meta = meta
+    println("rows:$size" to meta.names.toList())
+    showValues(range)
+}
+
+//in columnar project this is meta.right
+val Series<out ColMeta>.names: Series<String> get() = this α ColMeta::name
+
+fun Cursor.showValues(range: IntProgression) {
+    try {
+        (range).forEach {
+            val catn: Series<*> = ((this at it) as RowVec).left
+            val combine = combine(catn)
+            println(combine.toList())
+        }
+    } catch (e: NoSuchElementException) {
+        println("cannot fully access range $range")
+    }
+}
+
+/**
+ * head default 5 rows
+ * just like unix head - print default 5 lines from cursor contents to stdout
+ */
+@JvmOverloads
+fun Cursor.head(last: Int = 5): Unit = show(0 until (max(0, min(last, size))))
+
+/**
+ * run head starting at random index
+ */
+fun Cursor.showRandom(n: Int = 5) {
+    head(0);repeat(n) {
+        if (size > 0) showValues(Random.nextInt(0, size).let { it..it })
+    }
+}
