@@ -11,62 +11,7 @@ import kotlin.jvm.JvmOverloads
 import kotlin.jvm.JvmStatic
 
 
-data class
-/** This is a dragnet for a given line to record the coutners of character classes */
-TypeEvidence(
-//todo convert to enum
-
-    var digits: UShort = 0U,
-    var periods: UShort = 0U,
-    var exponent: UShort = 0U,
-    var signs: UShort = 0U,
-    var special: UShort = 0U,
-    var alpha: UShort = 0U,
-    /** the letters in true and false */
-    var truefalse: UShort = 0U,
-    var empty: UShort = 0U,
-    var quotes: UShort = 0U,
-    var dquotes: UShort = 0U,
-    var whitespaces: UShort = 0U,
-    var backslashes: UShort = 0U,
-    var linefeed: UShort = 0U,
-    /**the length of the column */
-    var columnLength: UShort = 0U,
-) {
-    companion object {
-        fun update(
-            fileEvidence: MutableList<TypeEvidence>,
-            lineEvidence: MutableList<TypeEvidence>,
-        ) {
-            fileEvidence.apply {
-                //update the fileDeduce with the max of the lineDeduce
-                lineEvidence.forEachIndexed { index, typeDeduction ->
-                    while (index >= this.size) this.add(TypeEvidence())
-                    this[index].apply {
-                        if (digits < typeDeduction.digits) digits = typeDeduction.digits
-                        if (periods < typeDeduction.periods) periods = typeDeduction.periods
-                        if (exponent < typeDeduction.exponent) exponent = typeDeduction.exponent
-                        if (signs < typeDeduction.signs) signs = typeDeduction.signs
-                        if (special < typeDeduction.special) special = typeDeduction.special
-                        if (alpha < typeDeduction.alpha) alpha = typeDeduction.alpha
-                        if (truefalse < typeDeduction.truefalse) truefalse = typeDeduction.truefalse
-                        if (empty < typeDeduction.empty) empty = typeDeduction.empty
-                        if (quotes < typeDeduction.quotes) quotes = typeDeduction.quotes
-                        if (dquotes < typeDeduction.dquotes) dquotes = typeDeduction.dquotes
-                        if (whitespaces < typeDeduction.whitespaces) whitespaces = typeDeduction.whitespaces
-                        if (backslashes < typeDeduction.backslashes) backslashes = typeDeduction.backslashes
-                        if (linefeed < typeDeduction.linefeed) linefeed = typeDeduction.linefeed
-                        if (columnLength < typeDeduction.columnLength) columnLength = typeDeduction.columnLength
-                    }
-                }
-            }
-        }
-    }
-}
-
-
-/**
- * forward scanner of commas, quotes, and newlines
+/** forward scanner of commas, quotes, and newlines
  */
 object CSVUtil {
 
@@ -91,16 +36,17 @@ object CSVUtil {
         var escape = false
         var ordinal = 0
         var x = start
+        while (x != end && file[x].toInt().toChar().isWhitespace()) x++ //trim
         var since = x
 
         val rlist = mutableListOf<Int>()
         val size = file.size
         while (x != end && x < size) {
-            val c = file.get(x)
+            val c = file[x]
             val char = c.toInt().toChar()
             lineEvidence?.apply {
                 //test deduce length and add if needed
-                while (ordinal >= lineEvidence.size) lineEvidence.add(TypeEvidence())
+                if (ordinal >= lineEvidence.size) lineEvidence.add(TypeEvidence())
                 lineEvidence[ordinal].apply {
                     when (char) {
                         in '0'..'9' -> digits++
@@ -118,33 +64,34 @@ object CSVUtil {
                     }
                 }
             }
-
             when {
                 escape -> escape = false
                 char == '"' -> doubleQuote = !doubleQuote
                 char == '\'' -> quote = !quote
                 char == '\\' -> escape = !escape
-                char == ',' -> if (!quote || !doubleQuote) {
+                char == ',' -> if (!quote && !doubleQuote) {
                     lineEvidence?.apply {
                         if (x == since) this[ordinal].empty++
                     }
-                    rlist.add(DelimitRange.of(since.toUShort(), x.toUShort().inc()).value)
-                    since = x.inc()
-                    ordinal++
+                    rlist.add(DelimitRange.of(since.toUShort(), (++x).toUShort()).value)
+                    since = x
+                    ++ordinal
                 }
 
-                char == '\n' -> if (!quote || !doubleQuote) break
+                char == '\r' || char == '\n' -> if (!quote && !doubleQuote) break
             }
             x++
         }
         lineEvidence?.apply {
-            this[ordinal].columnLength = (since - x).toUShort().also { if (0U.toUShort() == it) this[ordinal].empty++ }
-
+            this[ordinal].columnLength =
+                (since - x).toUShort().also { if (0U.toUShort() == it) this[ordinal].empty++ }
+            if (since != x) // add the last one
+                rlist.add(DelimitRange.of(since.toUShort(), x.toUShort().inc()).value)
         }
-        if (since != x) // add the last one
-            rlist.add(DelimitRange.of(since.toUShort(), x.toUShort().inc()).value)
+
         val compactArr = (rlist α { DelimitRange(it).value }).toArray()
-        return compactArr α { DelimitRange(it) } //the b element of the last delim range is the end of the line
+        return compactArr α
+                { DelimitRange(it) } //the b element of the last delim range is the end of the line
     }
 
     /**
@@ -175,7 +122,7 @@ object CSVUtil {
         //for headers we want to extract Strings from the delimitted reanges.
         val headerNames =
             headerLine α { delim: DelimitRange -> file.get(delim.asIntRange) } α { buf: Series<Byte> ->
-                lazy{
+                lazy {
                     CharSeries(buf α { theByte: Byte ->
                         theByte.toInt().toChar()
                     }).asString()
@@ -185,31 +132,40 @@ object CSVUtil {
         //for untyped CSV data we want to produce a lambda to create RecordMeta of the correct ordinal and IoCharBuf type with the specific bounds
         var relativeLast = headerLine.last().b
 
-        relativeLast.toLong().let { lineStart1 ->
-            var lineStart = lineStart1
+        relativeLast.toLong().let { lineStart1: Long ->
+            var lineStart: Long = lineStart1
             val lines: MutableList<IntArray> = mutableListOf() //the list of lines
             return try {
 
                 //first pass is to obtain segments for each line into a list
                 do {
-                    val lineEvidence = fileEvidence?.let { mutableListOf<TypeEvidence>() } //the evidence for this line
+                    val lineEvidence =
+                        fileEvidence?.let { mutableListOf<TypeEvidence>() } //the evidence for this line
                     val line = parseLine(file, lineStart.inc(), lineEvidence = lineEvidence) //the line
                     relativeLast = line.last().b
-                    fileEvidence?.apply { update(this, lineEvidence!!) } // update the fileDeduce with the line evidence
+                    fileEvidence?.apply {
+                        update(
+                            this,
+                            lineEvidence!!
+                        )
+                    } // update the fileDeduce with the line evidence
                     lineStart += relativeLast.toLong()
                     lines += (line α { it.value }).toArray() //add the line to the list of lines as an array of ints
                 } while (lineStart < size) //while there are more lines
 
                 lineStart = lineStart1
-                lines.withIndex() α { (y: Int, ints: IntArray): IndexedValue<IntArray> ->
-                    val lazyLine: Lazy<LongSeries<Byte>> = lazy { file.drop(lineStart) }
-                    (ints.toList() α ::DelimitRange).`▶`.withIndex().toList() α { (x: Int, seg: DelimitRange): IndexedValue<DelimitRange> ->
-                        val dec: (ByteArray) -> Any? =PlatformCodec.createDecoder(IOMemento.IoCharBuffer, (seg.b - seg.a).toInt())
+                lines α { ints: IntArray ->
+                    val lazyLine: Lazy<LongSeries<Byte>> =
+                        lineStart.let { beginning -> lazy { file.drop(beginning) } }
+                    (ints.toList() α ::DelimitRange).`▶`.withIndex()
+                        .toList() α { (x: Int, seg: DelimitRange): IndexedValue<DelimitRange> ->
+                        val dec: (ByteArray) -> Any? =
+                            PlatformCodec.createDecoder(IOMemento.IoCharBuffer, (seg.b - seg.a).toInt())
                         val value: LongSeries<Byte> = lazyLine.value
-                        val bArr = (value [ seg.asIntRange ] ).toArray()
+                        val bArr: ByteArray = (value[seg.asIntRange]).toArray()
                         dec(bArr)!! j {
                             RecordMeta(
-                                headerNames[x].value ?: "col$x",
+                                headerNames[x].value,
                                 IOMemento.IoCharBuffer,
                                 seg.a.toInt(),
                                 seg.b.toInt(),
@@ -233,7 +189,6 @@ object CSVUtil {
         }
 
     }
-
 
 
     /**
@@ -311,3 +266,4 @@ object CSVUtil {
         }
     }
 }
+

@@ -31,8 +31,13 @@ actual class FileBuffer actual constructor(
     var jvmChannel: FileChannel? = null
     var jvmMappedByteBuffer: MappedByteBuffer? = null
 
-    override val a: Long get() = jvmMappedByteBuffer!!.capacity().toLong()
-    override val b: (Long) -> Byte get() = { index -> jvmMappedByteBuffer!!.get(index.toInt()) }
+    override val a: Long get() = jvmMappedByteBuffer!!.limit().toLong()
+    override val b: (Long) -> Byte
+        get() = { index: Long ->
+            //show size and position of the buffer
+//            logDebug { "longSeries get( ${index}) /  ${jvmMappedByteBuffer!!.limit()}" }
+            jvmMappedByteBuffer!!.get(index.toInt())
+        }
 
     actual fun close() {
         logDebug { "closing $filename" }

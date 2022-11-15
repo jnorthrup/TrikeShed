@@ -15,16 +15,16 @@ interface Join<A, B> {
 
     companion object {
         //the Join factory method
-        operator fun <A, B> invoke(a1: A, b1: B) = object : Join<A, B> {
-            override val a: A get() = a1
-            override val b: B get() = b1
+        operator fun <A, B> invoke(a: A, b: B) = object : Join<A, B> {
+            override val a: A get() = a
+            override val b: B get() = b
         }
 
-        //the Series factory method
-        operator fun <T> invoke(vararg items: T) = object : Series<T> {
-            override val a: Int get() = items.size
-            override val b: (Int) -> T get() = items::get
-        }
+//        //the Series factory method
+//        operator fun <T> invoke(vararg items: T) = object : Series<T> {
+//            override val a: Int get() = items.size
+//            override val b: (Int) -> T get() = items::get
+//        }
 
         //the Pair factory method
         operator fun <A, B> invoke(pair: Pair<A, B>) = object : Join<A, B> {
@@ -151,30 +151,43 @@ fun <T> Array<T>.toSeries(): Join<Int, (Int) -> T> =
     (size j ::get) as Join<Int, (Int) -> T>
 
 
-val <T> T.rightIdentity: () -> T get() = { this }
-val <T> T.`↺`: () -> T get() = rightIdentity
+
+//clockwise circle arrow unicode character is ↻ (U+21BB)
+//counterclockwise circle arrow  unicode character is  ↺ (U+21BA)
+
+//which one above denotes right identity function?  the clockwise one, so the right identity function is the clockwise circle arrow
+//which one above denotes left identity function?  the counterclockwise one, so the left identity function is the counterclockwise circle arrow
+
+//left identity function is the counterclockwise circle arrow
+
+//according to openai Codex:
+// in kotlin, val a: ()->B  wraps a B.  in lambda calculus which is left identity ?  in kotlin, a: ()->B  is right identity.  left identity is: val a: ()->B = { b }  right identity is:  val a: ()->B = b
+
+val <T> T.leftIdentity: () -> T get() = { this }
+/**Left Identity Function */
+val <T> T.`↺` get() = leftIdentity
 
 
-//unicode symbol of a counterclockwise arrow: ↺
+fun <T> `↻`(t: T): T = t
+infix fun <T> T.rightIdentity(t: T): T = `↻`(t)
 
-
-infix fun <C, B : (Long) -> C> LongArray.α(m: B):Series<C> = this.size j { i: Int -> m(this[i]) }
+infix fun <C, B : (Long) -> C> LongArray.α(m: B): Series<C> = this.size j { i: Int -> m(this[i]) }
 
 // do all the other primitive arrays
 
-infix fun <C, B : (Int) -> C> IntArray.α(m: B):Series<C> = this.size j { i: Int -> m(this[i]) }
+infix fun <C, B : (Int) -> C> IntArray.α(m: B): Series<C> = this.size j { i: Int -> m(this[i]) }
 
-infix fun <C, B : (Float) -> C> FloatArray.α(m: B):Series<C> = this.size j { i: Int -> m(this[i]) }
+infix fun <C, B : (Float) -> C> FloatArray.α(m: B): Series<C> = this.size j { i: Int -> m(this[i]) }
 
-infix fun <C, B : (Double) -> C> DoubleArray.α(m: B):Series<C> = this.size j { i: Int -> m(this[i]) }
+infix fun <C, B : (Double) -> C> DoubleArray.α(m: B): Series<C> = this.size j { i: Int -> m(this[i]) }
 
-infix fun <C, B : (Short) -> C> ShortArray.α(m: B):Series<C> = this.size j { i: Int -> m(this[i]) }
+infix fun <C, B : (Short) -> C> ShortArray.α(m: B): Series<C> = this.size j { i: Int -> m(this[i]) }
 
-infix fun <C, B : (Byte) -> C> ByteArray.α(m: B):Series<C> = this.size j { i: Int -> m(this[i]) }
+infix fun <C, B : (Byte) -> C> ByteArray.α(m: B): Series<C> = this.size j { i: Int -> m(this[i]) }
 
-infix fun <C, B : (Char) -> C> CharArray.α(m: B):Series<C> = this.size j { i: Int -> m(this[i]) }
+infix fun <C, B : (Char) -> C> CharArray.α(m: B): Series<C> = this.size j { i: Int -> m(this[i]) }
 
-infix fun <C, B : (Boolean) -> C> BooleanArray.α(m: B):Series<C> = this.size j { i: Int -> m(this[i]) }
+infix fun <C, B : (Boolean) -> C> BooleanArray.α(m: B): Series<C> = this.size j { i: Int -> m(this[i]) }
 
 /**
  * series get by iterable

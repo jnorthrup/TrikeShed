@@ -35,7 +35,7 @@ class CSVUtilTest {
 
         val parseSegments:  Cursor = CSVUtil.parseSegments(fileBuf, fileEvidence = fileDeduce)
 
-//        parseSegments.head
+        parseSegments.head()
         debug { logDebug { "${Random.nextInt()}" } }
     }
 

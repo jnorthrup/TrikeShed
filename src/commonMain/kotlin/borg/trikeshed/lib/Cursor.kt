@@ -1,6 +1,7 @@
 package borg.trikeshed.lib
 
 // import the IoMemento enum
+import borg.trikeshed.common.parser.simple.CharSeries
 import borg.trikeshed.isam.ColMeta
 import borg.trikeshed.isam.RecordMeta
 import borg.trikeshed.isam.meta.IOMemento.*
@@ -11,7 +12,8 @@ import kotlin.math.min
 import kotlin.random.Random
 import kotlin.reflect.KClass
 
-typealias RowVec = Series2<*, () -> RecordMeta >
+typealias RowVec = Series2<*, () -> RecordMeta>
+
 val RowVec.left: Series<*> get() = this α Join<*, *>::a
 
 /** Cursors are a columnar abstraction composed of Series of Joined value+meta pairs (RecordMeta) */
@@ -33,11 +35,10 @@ inline operator fun <A : Any, IR : Any?, SrInnr : Series<Join<A, *>>, SrOutr : S
     c: KClass<out A>,
 ): Series<Series<A?>> = this α { it α Join<A, *>::a } α { it α { it } } α { it α { it } }
 
-/** get a row, which is not the same as get[x] which creates a new Cursor with only column x */
-infix fun Cursor.row(y: Int): Series<Join<*, () -> RecordMeta>> {
-    require(y < size) { "index $y out of bounds for cursor of size $size" }
-    return b(y)
-}
+/** gets the RowVec at y or if y is negative then -y from last */
+infix fun Cursor.at(y: Int): RowVec = b(if (y < 0) size - y else y)
+infix fun Cursor.row(y: Int): RowVec = at(y)
+
 
 /** Cursor get by Int vararg -- return a Cursor with the columns specified by the vararg */
 operator fun Cursor.get(vararg i: Int): Cursor = size j { y: Int ->
@@ -67,7 +68,7 @@ val Cursor.meta: Series<ColMeta>
 
 /** create an Intarray of cursor meta by Strings of column names */
 fun Cursor.meta(vararg s: String): Series<Int> {
-    val meta:Series<ColMeta> = meta
+    val meta: Series<ColMeta> = meta
     return s.size j { i ->
         meta.`▶`.indexOfFirst { colMeta: ColMeta -> colMeta.name == s[i] }
     }
@@ -107,15 +108,9 @@ fun Cursor.get(s: Series<ColumnExclusion>): Cursor {
     return this[retained]
 }
 
-
-/** gets the RowVec at y or if y is negative then -y from last */
-infix fun Cursor.at(y: Int):RowVec = b(if (y < 0) size - y else y)
-
-
-
 /** simple printout macro*/
-fun Cursor.show(range: IntProgression = 0 until size) {
-    val meta = meta
+fun Cursor.show(range: IntRange = 0 until size) {
+    val meta: Series<ColMeta> = meta
     println("rows:$size" to meta.names.toList())
     showValues(range)
 }
@@ -123,11 +118,12 @@ fun Cursor.show(range: IntProgression = 0 until size) {
 //in columnar project this is meta.right
 val Series<out ColMeta>.names: Series<String> get() = this α ColMeta::name
 
-fun Cursor.showValues(range: IntProgression) {
+fun Cursor.showValues(range: IntRange) {
     try {
-        (range).forEach {
-            val catn: Series<*> = ((this at it) as RowVec).left
-            val combine = combine(catn)
+        range.forEach { x: Int ->
+            val row = row(x)
+            val catn: Series<*> = row.left
+            val combine = combine(catn) α { if(it is CharSeries ) it.asString() else "$it"  }
             println(combine.toList())
         }
     } catch (e: NoSuchElementException) {
