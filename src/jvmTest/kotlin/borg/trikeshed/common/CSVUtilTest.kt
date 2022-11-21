@@ -17,7 +17,7 @@ class CSVUtilTest {
         val filename = systemResource.file.trim()
         val fileBuf = FileBuffer.open(filename)
         val deduce = mutableListOf<TypeEvidence>()
-        val csv = CSVUtil.parseLine(fileBuf, 0, lineEvidence = deduce)
+        val csv = CSVUtil.parseLine(fileBuf, 0, lineEvidence = deduce) α ::DelimitRange
         val lp=(csv α {delimR :DelimitRange->String( fileBuf.get(delimR.asIntRange).toArray()) } ).`▶`.withIndex().toList()
         println(lp)
 
@@ -37,6 +37,4 @@ class CSVUtilTest {
         parseSegments.head()
         debug { logDebug { "${Random.nextInt()}" } }
     }
-
-
 }

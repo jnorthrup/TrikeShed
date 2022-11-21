@@ -62,8 +62,8 @@ operator fun Cursor.get(i: IntRange): Cursor {
 
 /** get meta for a cursor from row 0 */
 val Cursor.meta: Series<ColMeta>
-    get() = row(0) α { it: Join<*, () -> RecordMeta> ->
-        it.b()
+    get() = row(0) α {( a , b)->
+        b()
     }
 
 /** create an Intarray of cursor meta by Strings of column names */
@@ -108,28 +108,10 @@ fun Cursor.get(s: Series<ColumnExclusion>): Cursor {
     return this[retained]
 }
 
-/** simple printout macro*/
-fun Cursor.show(range: IntRange = 0 until size) {
-    val meta: Series<ColMeta> = meta
-    println("rows:$size" to meta.names.toList())
-    showValues(range)
-}
 
 //in columnar project this is meta.right
 val Series<out ColMeta>.names: Series<String> get() = this α ColMeta::name
 
-fun Cursor.showValues(range: IntRange) {
-    try {
-        range.forEach { x: Int ->
-            val row = row(x)
-            val catn: Series<*> = row.left
-            val combine = combine(catn) α { if(it is CharSeries ) it.asString() else "$it"  }
-            println(combine.toList())
-        }
-    } catch (e: NoSuchElementException) {
-        println("cannot fully access range $range")
-    }
-}
 
 /** head default 5 rows
  * just like unix head - print default 5 lines from cursor contents to stdout */
@@ -140,5 +122,24 @@ fun Cursor.head(last: Int = 5): Unit = show(0 until (max(0, min(last, size))))
 fun Cursor.showRandom(n: Int = 5) {
     head(0);repeat(n) {
         if (size > 0) showValues(Random.nextInt(0, size).let { it..it })
+    }
+}
+/** simple printout macro*/
+fun Cursor.show(range: IntRange = 0 until size) {
+    val meta: Series<ColMeta> = meta
+    println("rows:$size" to meta.names.toList())
+    showValues(range)
+}
+
+fun Cursor.showValues(range: IntRange) {
+    try {
+        range.forEach { x: Int ->
+            val row = row(x)
+            val catn: Series<*> = row.left.debug { logDebug { "showval coords ${it.toList() .map {(it as? CharSeries)?.asString()?:""} }" } }
+            val combine = combine(catn) α { if(it is CharSeries ) it.asString() else "$it"  }
+            println(combine.toList())
+        }
+    } catch (e: NoSuchElementException) {
+        println("cannot fully access range $range")
     }
 }

@@ -3,7 +3,6 @@
 package borg.trikeshed.common
 
 import borg.trikeshed.common.TypeEvidence.Companion.deduce
-import borg.trikeshed.common.collections.s_
 import borg.trikeshed.common.parser.simple.CharSeries
 import borg.trikeshed.isam.RecordMeta
 import borg.trikeshed.isam.meta.IOMemento
@@ -12,8 +11,6 @@ import borg.trikeshed.lib.*
 import borg.trikeshed.parse.DelimitRange
 import kotlin.jvm.JvmOverloads
 import kotlin.jvm.JvmStatic
-
-//legal java symol name identifier characters are: 0-9, a-z, A-Z, $, _, and unicode characters in the general category "Letter" or "Number"
 
 
 /** forward scanner of commas, quotes, and newlines
@@ -33,7 +30,9 @@ object CSVUtil {
         end: Long = -1L,
         //this is 1 TypeDeduction per column, for one line. elsewhere, there should be a TypeDeduction holding maximum findings per file/column.
         lineEvidence: MutableList<TypeEvidence>? = null,
-    ): Series<DelimitRange> {
+    ):
+            /** compressed DelimitRange array as IntArr*/
+            IntArray {
         var quote = false
         var doubleQuote = false
         var escape = false
@@ -42,30 +41,16 @@ object CSVUtil {
         while (x != end && file[x].toInt().toChar().isWhitespace()) x++ //trim
         var since = x
 
-        val rlist = mutableListOf<Int>()
+        val rlist = mutableListOf<DelimitRange>()
         val size = file.size
         while (x != end && x < size) {
             val c = file[x]
             val char = c.toInt().toChar()
             lineEvidence?.apply {
                 //test deduce length and add if needed
-                if (ordinal >= lineEvidence.size) lineEvidence.add(TypeEvidence())
-                lineEvidence[ordinal].apply {
-                    when (char) {
-                        in '0'..'9' -> digits++
-                        '.' -> periods++
-                        'e', 'E' -> exponent++
-                        '+', '-' -> signs++
-                        't', 'r', 'u', 'f', 'a', 'l', 's', 'T', 'R', 'U', 'F', 'A', 'L', 'S' -> truefalse++
-                        in 'a'..'z', in 'A'..'Z' -> alpha++
-                        '"' -> dquotes++
-                        '\'' -> quotes++
-                        '\\' -> backslashes++
-                        ' ', '\t' -> whitespaces++
-                        '\r' -> linefeed++
-                        else -> special++
-                    }
-                }
+                if (ordinal >= lineEvidence.size)
+                    lineEvidence.add(TypeEvidence())
+                lineEvidence[ordinal] + char
             }
             when {
                 escape -> escape = false
@@ -73,52 +58,35 @@ object CSVUtil {
                 char == '\'' -> quote = !quote
                 char == '\\' -> escape = !escape
                 char == ',' -> if (!quote && !doubleQuote) {
+                    val element = DelimitRange.of(since.toUShort(), x.toUShort())
+                    rlist.add(element)
+// these check out                    logDebug { "val${element.pair}: "+ CharSeries(file[ element.asIntRange ].decodeUtf8()).asString() }
                     lineEvidence?.apply {
-                        //test capacity first
-                        if (ordinal >= lineEvidence.size)
-                            lineEvidence.add(TypeEvidence())
-                        if (x == since)
-                            this[ordinal].empty++
+                        if (since == x)
+                            lineEvidence[ordinal].empty++
                     }
-                    rlist.add(DelimitRange.of(since.toUShort(), (++x).toUShort()).value)
-                    since = x
-                    lineEvidence?.apply {
-                        this[ordinal].columnLength = (since - x).toUShort().also {
-                            if (0U.toUShort() == it) {
-                                //test capacity first
-                                if (ordinal >= lineEvidence.size)
-                                    lineEvidence.add(TypeEvidence())
-                                this[ordinal].empty++
-                            }
-                        }
-                        ordinal++
-                    }
-                    if (since != x) // add the last one
-                        rlist.add(DelimitRange.of(since.toUShort(), x.toUShort().inc()).value)
+                    ordinal++
+                    since = x + 1
                 }
 
-                char == '\r' || char == '\n' ->
-                    if (!quote && !doubleQuote)
-                        break
+                char == '\r' || char == '\n' || end == x.inc() -> {
+                    val element = DelimitRange.of(since.toUShort(), x.toUShort())
+                    rlist.add(element)
+                    lineEvidence?.apply {
+                             logDebug { "bookend val${element.pair}: "+ CharSeries(file[ element.asIntRange ].decodeUtf8()).asString() }
+
+                        if (since == x)
+                            lineEvidence[ordinal].empty++
+                    }
+                    break
+                }
             }
             x++
         }
-        lineEvidence?.apply {
-            //test capacity first
-            if (ordinal >= lineEvidence.size)
-                lineEvidence.add(TypeEvidence())
-            this[ordinal].columnLength =
-                (since - x).toUShort().also {
-                    if (0U.toUShort() == it) this[ordinal].empty++
-                }
-            ordinal++
-        }
-        if (since != x) // add the last one
-            rlist.add(DelimitRange.of(since.toUShort(), x.toUShort().inc()).value)
-
-        val compactArr = (rlist α { DelimitRange(it).value }).toArray()
-        return compactArr α { DelimitRange(it) } //the b element of the last delim range is the end of the line
+        assert(rlist.size > 0)
+        return IntArray(rlist.size) { rlist[it].value }
     }
+
 
     /**
      * this will do a best-attempt at using the parseSegments output to marshal the types of newMeta passed in.
@@ -197,7 +165,10 @@ object CSVUtil {
 
     /**
      * read a csv file into a series of segments and return the series of segments as
-     * a series of byte arrays with Meta pointing to CharBuffer of the line
+     * a series of byte arrays with Meta pointing to CharBuffer of the line.
+     *
+     * this trades 64 bit indexes for seek
+     *
      */
     fun parseSegments(
         file: LongSeries<Byte>,
@@ -207,16 +178,23 @@ object CSVUtil {
         fileEvidence: MutableList<TypeEvidence>? = null,
     ): Cursor = file.size.let { upperBound ->
         //parse in the headers
-        val header: Series<DelimitRange> = parseLine(file, 0, upperBound)
-        val headerNames: Series<String> = header α { delimR: DelimitRange -> file[delimR.asIntRange].asString() }
-        val lines = mutableListOf<Join<Long, IntArray>>()
+        val hdrParsRes = parseLine(file, 0, upperBound)
+        val header = hdrParsRes α ::DelimitRange
+        val headerNames =
+            header α { delimR: DelimitRange ->
+                CharSeries(file.get(delimR.a.toInt() until delimR.b.inc().toInt() ).decodeUtf8()).asString()
+            }
+        logDebug { "headerNames: ${headerNames.toList()}" }
+        val lines: MutableList<Join<Long, IntArray>> = mutableListOf()
 
         header.last().b.toLong().let { datazero2 ->
             var datazero1 = datazero2
 
             do {
-                val line: Series<DelimitRange> =
-                    parseLine(file.drop(datazero1), 0, file.drop(datazero1).size, fileEvidence)
+                val file1 = file.drop(datazero1)
+                if (file1.size < headerNames.size) break  // we can parse n commas as n+1 default fields but no less
+                val parsRes = parseLine(file1, 0, file1.size, fileEvidence)
+                val line = parsRes α ::DelimitRange
                 val dstart: Long = datazero1
                 datazero1 += line.last().b.toLong()
                 if (line.size != header.size) {
@@ -235,15 +213,15 @@ object CSVUtil {
                 val deduce: IOMemento = deduce(evidence)
                 deduce j (deduce.networkSize ?: evidence.columnLength.toInt())
             }
-            val convertedSegmentLengths =conversionSegments?.right?.toArray()
+            val convertedSegmentLengths = conversionSegments?.right?.toArray()
 
             val successorMeta: List<RecordMeta>? = convertedSegmentLengths?.let {
                 it.indices.map { x ->
-                    RecordMeta (
+                    RecordMeta(
                         name = headerNames[x],
                         type = conversionSegments.left[x],
-                        begin=if(x==0) 0 else it[x-1],
-                        end=it[x]
+                        begin = if (x == 0) 0 else it[x - 1],
+                        end = it[x]
                     )
                 }
             }
@@ -252,17 +230,19 @@ object CSVUtil {
             lines α { line ->
                 //y axis here
 
-                val lserr: Series<Byte> = file.drop(line.a  )[0 until line.b.size]
+                val lserr: Series<Byte> = file.drop(line.a)[0 until line.b.size]
                 line.b.withIndex() α { (x, b) ->
                     //x axis here
 
                     val delimitRange = DelimitRange(b)
-                    CharSeries(lserr[delimitRange.asIntRange].decodeUtf8()) j {
+                    CharSeries(lserr[delimitRange.first.toInt() until delimitRange.endInclusive.inc().toInt()].decodeUtf8()) j {
+                         val air = delimitRange.asIntRange
+
                         RecordMeta(
                             headerNames[x],
                             IoCharBuffer,
-                            delimitRange.a.toInt(),
-                            delimitRange.b.toInt(),
+                            air.first,
+                            air.endInclusive.inc()  ,
                             child = successorMeta?.get(x)//this is an ISAM schema
                         )
                     }

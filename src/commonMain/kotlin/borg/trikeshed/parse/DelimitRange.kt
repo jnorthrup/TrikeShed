@@ -20,7 +20,11 @@ value class DelimitRange(val value: Int) : Twin<UShort>,ClosedRange<UShort> {
     override val endInclusive: UShort
         get() = b.dec()
 
-    val asIntRange: IntRange get()= (a.toInt() until b.toInt())
+     /**this range is end-exclusive, he UShort range end is inclusive. */
+    val asIntRange: IntRange get() {
+        val endExclusive = b.toInt().inc()
+        return (a.toInt() until b.inc().toInt())
+    }
 }
 
 

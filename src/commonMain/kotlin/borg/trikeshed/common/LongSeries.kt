@@ -12,10 +12,10 @@ val <T> LongSeries<T>.size: Long get() = a
  */
 operator fun <T> LongSeries<T>.get(i: Long): T = b(i)
 
-/**int series is returned for intRange */
-operator fun <T> LongSeries<T>.get(r: IntRange): Series<T> {
+/**int-based series is returned for intRange */
+operator fun <T> LongSeries<T>.get(exclusiveRange: IntRange): Series<T> {
     //perform fixup between the range and the Series x index
-    return (r.last - r.first) j { x -> this[(r.first + x).toLong()] }
+    return (exclusiveRange.last - exclusiveRange.first) j { x -> this[(exclusiveRange.first + x).toLong()] }
 }
 
 operator fun <T> LongSeries<T>.get(r: LongRange): LongSeries<T> {
@@ -55,8 +55,7 @@ fun Series<Byte>.decodeUtf8(r1:CharArray?=null): Series<Char> {
             }
         }
     }
-    return /*if*/ /*(w == r.size) */ w j r::get
-    /*else w j (r.copyOf(w))::get*/
+    return w j r::get
 }
 
 fun Series<Byte>.asString(): String = decodeUtf8().toArray().concatToString()

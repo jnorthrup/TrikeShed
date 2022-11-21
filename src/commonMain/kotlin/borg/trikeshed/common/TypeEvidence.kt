@@ -22,7 +22,25 @@ TypeEvidence(
     /**the length of the column */
     var columnLength: UShort = 0U,
 ) {
+    operator fun plus(char: Char): TypeEvidence = apply {
+    when    (char) {
+            in '0'..'9' -> digits++
+            '.' -> periods++
+            'e', 'E' -> exponent++
+            '+', '-' -> signs++
+            't', 'r', 'u', 'f', 'a', 'l', 's', 'T', 'R', 'U', 'F', 'A', 'L', 'S' -> truefalse++
+            in 'a'..'z', in 'A'..'Z' -> alpha++
+            '"' -> dquotes++
+            '\'' -> quotes++
+            '\\' -> backslashes++
+            ' ', '\t' -> whitespaces++
+            '\r' -> linefeed++
+            else -> special++
+        }
+    }
+
     companion object {
+
         /**
          * based on the process of eliminating illegal and oversized coutners we deduce the most specific numerical primitives specializations of IoMemento jvm-primitives
          *
@@ -109,5 +127,7 @@ TypeEvidence(
                 }
             }
         }
+
     }
+
 }
