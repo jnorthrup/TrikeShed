@@ -5,8 +5,6 @@ import borg.trikeshed.isam.meta.IOMemento
 data class
 /** This is a dragnet for a given line to record the coutners of character classes */
 TypeEvidence(
-//todo convert to enum
-
     var digits: UShort = 0U,
     var periods: UShort = 0U,
     var exponent: UShort = 0U,

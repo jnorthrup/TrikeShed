@@ -1,21 +1,24 @@
+@file:Suppress("DEPRECATION")
+
 package borg.trikeshed.common
 
-import borg.trikeshed.common.TypeEvidence.Companion.update
+import borg.trikeshed.common.TypeEvidence.Companion.deduce
+import borg.trikeshed.common.collections.s_
 import borg.trikeshed.common.parser.simple.CharSeries
 import borg.trikeshed.isam.RecordMeta
 import borg.trikeshed.isam.meta.IOMemento
-import borg.trikeshed.isam.meta.PlatformCodec
+import borg.trikeshed.isam.meta.IOMemento.IoCharBuffer
 import borg.trikeshed.lib.*
 import borg.trikeshed.parse.DelimitRange
 import kotlin.jvm.JvmOverloads
 import kotlin.jvm.JvmStatic
 
+//legal java symol name identifier characters are: 0-9, a-z, A-Z, $, _, and unicode characters in the general category "Letter" or "Number"
+
 
 /** forward scanner of commas, quotes, and newlines
  */
 object CSVUtil {
-
-
     /**
      * read a csv file into a series of segments
      */
@@ -71,125 +74,51 @@ object CSVUtil {
                 char == '\\' -> escape = !escape
                 char == ',' -> if (!quote && !doubleQuote) {
                     lineEvidence?.apply {
-                        if (x == since) this[ordinal].empty++
+                        //test capacity first
+                        if (ordinal >= lineEvidence.size)
+                            lineEvidence.add(TypeEvidence())
+                        if (x == since)
+                            this[ordinal].empty++
                     }
                     rlist.add(DelimitRange.of(since.toUShort(), (++x).toUShort()).value)
                     since = x
-                    ++ordinal
+                    lineEvidence?.apply {
+                        this[ordinal].columnLength = (since - x).toUShort().also {
+                            if (0U.toUShort() == it) {
+                                //test capacity first
+                                if (ordinal >= lineEvidence.size)
+                                    lineEvidence.add(TypeEvidence())
+                                this[ordinal].empty++
+                            }
+                        }
+                        ordinal++
+                    }
+                    if (since != x) // add the last one
+                        rlist.add(DelimitRange.of(since.toUShort(), x.toUShort().inc()).value)
                 }
 
-                char == '\r' || char == '\n' -> if (!quote && !doubleQuote) break
+                char == '\r' || char == '\n' ->
+                    if (!quote && !doubleQuote)
+                        break
             }
             x++
         }
         lineEvidence?.apply {
+            //test capacity first
+            if (ordinal >= lineEvidence.size)
+                lineEvidence.add(TypeEvidence())
             this[ordinal].columnLength =
-                (since - x).toUShort().also { if (0U.toUShort() == it) this[ordinal].empty++ }
-            if (since != x) // add the last one
-                rlist.add(DelimitRange.of(since.toUShort(), x.toUShort().inc()).value)
+                (since - x).toUShort().also {
+                    if (0U.toUShort() == it) this[ordinal].empty++
+                }
+            ordinal++
         }
+        if (since != x) // add the last one
+            rlist.add(DelimitRange.of(since.toUShort(), x.toUShort().inc()).value)
 
         val compactArr = (rlist α { DelimitRange(it).value }).toArray()
-        return compactArr α
-                { DelimitRange(it) } //the b element of the last delim range is the end of the line
+        return compactArr α { DelimitRange(it) } //the b element of the last delim range is the end of the line
     }
-
-    /**
-     * read a csv file into a series of segments and return the series of segments as a series of byte arrays with Meta pointing to CharBuffer of the line
-     */
-    fun parseSegments(
-        file: LongSeries<Byte>,
-
-        /**
-         * if list is passed in here it will be the per-file deduce containing the max of a given column classes found in the file
-         */
-        fileEvidence: MutableList<TypeEvidence>? = null,
-    ): Cursor {
-        val size = file.size
-        val headerLine: Join<Int, (Int) -> DelimitRange> = parseLine(file, 0)
-
-        debug {
-            var c = 0
-            for (delimitRange in headerLine) {
-                logDebug {
-                    "col ${c.also { c++ }} " + file[delimitRange.start.toInt()..delimitRange.endInclusive.toInt()].toArray()
-                        .decodeToString()
-                }
-            }
-        }
-
-
-        //for headers we want to extract Strings from the delimitted reanges.
-        val headerNames =
-            headerLine α { delim: DelimitRange -> file.get(delim.asIntRange) } α { buf: Series<Byte> ->
-                lazy {
-                    CharSeries(buf α { theByte: Byte ->
-                        theByte.toInt().toChar()
-                    }).asString()
-                }
-            }
-
-        //for untyped CSV data we want to produce a lambda to create RecordMeta of the correct ordinal and IoCharBuf type with the specific bounds
-        var relativeLast = headerLine.last().b
-
-        relativeLast.toLong().let { lineStart1: Long ->
-            var lineStart: Long = lineStart1
-            val lines: MutableList<IntArray> = mutableListOf() //the list of lines
-            return try {
-
-                //first pass is to obtain segments for each line into a list
-                do {
-                    val lineEvidence =
-                        fileEvidence?.let { mutableListOf<TypeEvidence>() } //the evidence for this line
-                    val line = parseLine(file, lineStart.inc(), lineEvidence = lineEvidence) //the line
-                    relativeLast = line.last().b
-                    fileEvidence?.apply {
-                        update(
-                            this,
-                            lineEvidence!!
-                        )
-                    } // update the fileDeduce with the line evidence
-                    lineStart += relativeLast.toLong()
-                    lines += (line α { it.value }).toArray() //add the line to the list of lines as an array of ints
-                } while (lineStart < size) //while there are more lines
-
-                lineStart = lineStart1
-                lines α { ints: IntArray ->
-                    val lazyLine: Lazy<LongSeries<Byte>> =
-                        lineStart.let { beginning -> lazy { file.drop(beginning) } }
-                    (ints.toList() α ::DelimitRange).`▶`.withIndex()
-                        .toList() α { (x: Int, seg: DelimitRange): IndexedValue<DelimitRange> ->
-                        val dec: (ByteArray) -> Any? =
-                            PlatformCodec.createDecoder(IOMemento.IoCharBuffer, (seg.b - seg.a).toInt())
-                        val value: LongSeries<Byte> = lazyLine.value
-                        val bArr: ByteArray = (value[seg.asIntRange]).toArray()
-                        dec(bArr)!! j {
-                            RecordMeta(
-                                headerNames[x].value,
-                                IOMemento.IoCharBuffer,
-                                seg.a.toInt(),
-                                seg.b.toInt(),
-                                decoder = dec
-                            )
-                        }
-
-                    }.also {
-                        lineStart += relativeLast.toLong()
-                    }
-                }
-            } catch (e: Exception) {
-                //logDebug some state details here
-                logDebug { "lineStart: $lineStart" }
-                logDebug { "size: $size" }
-                logDebug { "headerLine: $headerLine" }
-                logDebug { "headerNames: $headerNames" }
-                logDebug { "linesCount: $lines.size" }
-                throw e
-            }
-        }
-
-    }
-
 
     /**
      * this will do a best-attempt at using the parseSegments output to marshal the types of newMeta passed in.
@@ -261,6 +190,82 @@ object CSVUtil {
                     logDebug { "newMetaRecord: $newMetaRecord" }
                     logDebug { "oldMetaRecord: $oldMetaRecord" }
                     throw e
+                }
+            }
+        }
+    }
+
+    /**
+     * read a csv file into a series of segments and return the series of segments as
+     * a series of byte arrays with Meta pointing to CharBuffer of the line
+     */
+    fun parseSegments(
+        file: LongSeries<Byte>,
+        /** if list is passed in here it will be the per-file deduce containing the max of a
+         * given column classes found in the file
+         */
+        fileEvidence: MutableList<TypeEvidence>? = null,
+    ): Cursor = file.size.let { upperBound ->
+        //parse in the headers
+        val header: Series<DelimitRange> = parseLine(file, 0, upperBound)
+        val headerNames: Series<String> = header α { delimR: DelimitRange -> file[delimR.asIntRange].asString() }
+        val lines = mutableListOf<Join<Long, IntArray>>()
+
+        header.last().b.toLong().let { datazero2 ->
+            var datazero1 = datazero2
+
+            do {
+                val line: Series<DelimitRange> =
+                    parseLine(file.drop(datazero1), 0, file.drop(datazero1).size, fileEvidence)
+                val dstart: Long = datazero1
+                datazero1 += line.last().b.toLong()
+                if (line.size != header.size) {
+                    logDebug { "line.size: ${line.size}" }
+                    logDebug { "header.size: ${header.size}" }
+                    logDebug { "headerNames: ${headerNames.toList()}" }
+                    logDebug { "line: ${line α DelimitRange::pair}" }
+                    logDebug { "fileStart/End: $datazero1/${file.size}" }
+                    throw Exception("line segments does not match header count")
+                }
+                val toArray = (line α { it.value }).toArray()
+                lines.add(dstart j toArray)
+            } while (datazero1 < file.size)
+
+            val conversionSegments = fileEvidence?.α { evidence ->
+                val deduce: IOMemento = deduce(evidence)
+                deduce j (deduce.networkSize ?: evidence.columnLength.toInt())
+            }
+            val convertedSegmentLengths =conversionSegments?.right?.toArray()
+
+            val successorMeta: List<RecordMeta>? = convertedSegmentLengths?.let {
+                it.indices.map { x ->
+                    RecordMeta (
+                        name = headerNames[x],
+                        type = conversionSegments.left[x],
+                        begin=if(x==0) 0 else it[x-1],
+                        end=it[x]
+                    )
+                }
+            }
+
+
+            lines α { line ->
+                //y axis here
+
+                val lserr: Series<Byte> = file.drop(line.a  )[0 until line.b.size]
+                line.b.withIndex() α { (x, b) ->
+                    //x axis here
+
+                    val delimitRange = DelimitRange(b)
+                    CharSeries(lserr[delimitRange.asIntRange].decodeUtf8()) j {
+                        RecordMeta(
+                            headerNames[x],
+                            IoCharBuffer,
+                            delimitRange.a.toInt(),
+                            delimitRange.b.toInt(),
+                            child = successorMeta?.get(x)//this is an ISAM schema
+                        )
+                    }
                 }
             }
         }
