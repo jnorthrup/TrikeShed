@@ -23,7 +23,7 @@ TypeEvidence(
     var columnLength: UShort = 0U,
 ) {
     operator fun plus(char: Char): TypeEvidence = apply {
-    when    (char) {
+        when (char) {
             in '0'..'9' -> digits++
             '.' -> periods++
             'e', 'E' -> exponent++
@@ -34,7 +34,7 @@ TypeEvidence(
             '\'' -> quotes++
             '\\' -> backslashes++
             ' ', '\t' -> whitespaces++
-            '\r' -> linefeed++
+            '\r', ',', '\n' -> {}
             else -> special++
         }
     }
@@ -64,50 +64,49 @@ TypeEvidence(
                         && typeEvidence.exponent.toUInt() == 0U
                         && typeEvidence.signs.toUInt() <= 1U
                         && typeEvidence.special.toUInt() == 0U
-                        && typeEvidence.columnLength <= 3U -> IOMemento.IoByte
+                        && typeEvidence.columnLength <= 3U +typeEvidence.signs-> IOMemento.IoByte
 
                 typeEvidence.periods.toUInt() == 0U
                         && typeEvidence.exponent.toUInt() == 0U
                         && typeEvidence.signs.toUInt() <= 1U
                         && typeEvidence.special.toUInt() == 0U
-                        && typeEvidence.columnLength <= 5U -> IOMemento.IoShort
+                        && typeEvidence.columnLength <= 5U +typeEvidence.signs-> IOMemento.IoShort
 
                 typeEvidence.periods.toUInt() == 0U
                         && typeEvidence.exponent.toUInt() == 0U
                         && typeEvidence.signs.toUInt() <= 1U
                         && typeEvidence.special.toUInt() == 0U
-                        && typeEvidence.columnLength <= 10U -> IOMemento.IoInt
+                        && typeEvidence.columnLength <= 10U +typeEvidence.signs-> IOMemento.IoInt
 
                 typeEvidence.periods.toUInt() == 0U
                         && typeEvidence.exponent.toUInt() == 0U
                         && typeEvidence.signs.toUInt() <= 1U
                         && typeEvidence.special.toUInt() == 0U
-                        && typeEvidence.columnLength <= 19U -> IOMemento.IoLong
+                        && typeEvidence.columnLength <= 19U +typeEvidence.signs-> IOMemento.IoLong
 
                 typeEvidence.periods.toUInt() == 1U
                         && typeEvidence.exponent.toUInt() == 0U
                         && typeEvidence.signs <= 1U
                         && typeEvidence.special.toUInt() == 0U
-                        && typeEvidence.columnLength <= 34U -> IOMemento.IoFloat
+                        && typeEvidence.columnLength <= 34U +typeEvidence.signs+ typeEvidence.exponent.toUInt() -> IOMemento.IoFloat
 
                 typeEvidence.periods.toUInt() == 1U
                         && typeEvidence.exponent <= 1U
                         && typeEvidence.signs <= 1U
                         && typeEvidence.special.toUInt() == 0U
-                        && typeEvidence.columnLength <= 66U -> IOMemento.IoDouble
+                        && typeEvidence.columnLength <= 66U +typeEvidence.signs+ typeEvidence.exponent.toUInt() -> IOMemento.IoDouble
 
                 else -> IOMemento.IoString
             }
         }
 
-        fun update(
-            fileEvidence: MutableList<TypeEvidence>,
+        fun MutableList<TypeEvidence>.update(
             lineEvidence: MutableList<TypeEvidence>,
         ) {
-            fileEvidence.apply {
+            apply {
                 //update the fileDeduce with the max of the lineDeduce
                 lineEvidence.forEachIndexed { index, typeDeduction ->
-                    while (index >= this.size) this.add(TypeEvidence())
+                    while (index >= size) add(TypeEvidence())
                     this[index].apply {
                         if (digits < typeDeduction.digits) digits = typeDeduction.digits
                         if (periods < typeDeduction.periods) periods = typeDeduction.periods

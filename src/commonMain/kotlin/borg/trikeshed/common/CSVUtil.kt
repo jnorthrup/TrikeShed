@@ -2,7 +2,9 @@
 
 package borg.trikeshed.common
 
+import FileBuffer
 import borg.trikeshed.common.TypeEvidence.Companion.deduce
+import borg.trikeshed.common.TypeEvidence.Companion.update
 import borg.trikeshed.common.parser.simple.CharSeries
 import borg.trikeshed.isam.RecordMeta
 import borg.trikeshed.isam.meta.IOMemento
@@ -64,6 +66,7 @@ object CSVUtil {
                     lineEvidence?.apply {
                         if (since == x)
                             lineEvidence[ordinal].empty++
+                        else lineEvidence[ordinal].columnLength=(x-since).toUShort()
                     }
                     ordinal++
                     since = x + 1
@@ -77,6 +80,7 @@ object CSVUtil {
 
                         if (since == x)
                             lineEvidence[ordinal].empty++
+                        else lineEvidence[ordinal].columnLength=(x-since).toUShort()
                     }
                     break
                 }
@@ -146,7 +150,9 @@ object CSVUtil {
             do {
                 val file1 = file.drop(datazero1)
                 if (file1.size < headerNames.size) break  // we can parse n commas as n+1 default fields but no less
-                val parsRes = parseLine(file1, 0, file1.size, fileEvidence)
+                val lineEvidence = fileEvidence?.let<MutableList<TypeEvidence>, MutableList<TypeEvidence>> { mutableListOf() }
+                val parsRes = parseLine(file1, 0, file1.size, lineEvidence)
+                lineEvidence?.apply { fileEvidence.update(lineEvidence) }
                 val line = parsRes α ::DelimitRange
                 val dstart: Long = datazero1
                 datazero1 += line.last().b.toLong()
@@ -207,3 +213,9 @@ object CSVUtil {
     }
 }
 
+fun main(args: Array<String>) {
+    //test parseConformant from src/jvmTest/resources/hi.csv
+    val file = FileBuffer("src/jvmTest/resources/hi.csv",0,-1,true)
+    val cursor = CSVUtil.parseConformant(file)
+    cursor.head()
+}

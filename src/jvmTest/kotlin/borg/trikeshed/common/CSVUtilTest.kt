@@ -60,5 +60,25 @@ class CSVUtilTest {
         //test row 17 against the contents
 
     }
+    @Test
+    fun testConformant() {
+        val systemResource: URL = ClassLoader.getSystemResource("hi.csv")
+        val filename: String = systemResource.file.trim()
+        val fileBuf: FileBuffer = FileBuffer.open(filename)
+        val cursor=CSVUtil.parseConformant(fileBuf )
+        cursor.meta.forEach { println(it) }
+        //RecordMeta(name=Open_time, type=IoLong, begin=-1, end=-1, decoder=(kotlin.ByteArray) -> kotlin.Long, encoder=(kotlin.Any?) -> kotlin.ByteArray, child=null)
+//RecordMeta(name=Open, type=IoFloat, begin=-1, end=-1, decoder=(kotlin.ByteArray) -> kotlin.Float, encoder=(kotlin.Any?) -> kotlin.ByteArray, child=null)
+//RecordMeta(name=High, type=IoFloat, begin=-1, end=-1, decoder=(kotlin.ByteArray) -> kotlin.Float, encoder=(kotlin.Any?) -> kotlin.ByteArray, child=null)
+//RecordMeta(name=Low, type=IoFloat, begin=-1, end=-1, decoder=(kotlin.ByteArray) -> kotlin.Float, encoder=(kotlin.Any?) -> kotlin.ByteArray, child=null)
+//RecordMeta(name=Close, type=IoFloat, begin=-1, end=-1, decoder=(kotlin.ByteArray) -> kotlin.Float, encoder=(kotlin.Any?) -> kotlin.ByteArray, child=null)
+//RecordMeta(name=Volume, type=IoFloat, begin=-1, end=-1, decoder=(kotlin.ByteArray) -> kotlin.Float, encoder=(kotlin.Any?) -> kotlin.ByteArray, child=null)
+//RecordMeta(name=Close_time, type=IoLong, begin=-1, end=-1, decoder=(kotlin.ByteArray) -> kotlin.Long, encoder=(kotlin.Any?) -> kotlin.ByteArray, child=null)
+//RecordMeta(name=Quote_asset_volume, type=IoFloat, begin=-1, end=-1, decoder=(kotlin.ByteArray) -> kotlin.Float, encoder=(kotlin.Any?) -> kotlin.ByteArray, child=null)
+//RecordMeta(name=Number_of_trades, type=IoByte, begin=-1, end=-1, decoder=(kotlin.ByteArray) -> kotlin.Byte, encoder=(kotlin.Any?) -> kotlin.ByteArray, child=null)
+//RecordMeta(name=Taker_buy_base_asset_volume, type=IoFloat, begin=-1, end=-1, decoder=(kotlin.ByteArray) -> kotlin.Float, encoder=(kotlin.Any?) -> kotlin.ByteArray, child=null)
+//RecordMeta(name=Taker_buy_quote_asset_volume, type=IoFloat, begin=-1, end=-1, decoder=(kotlin.ByteArray) -> kotlin.Float, encoder=(kotlin.Any?) -> kotlin.ByteArray, child=null)
+//RecordMeta(name=Ignore, type=IoFloat, begin=-1, end=-1, decoder=(kotlin.ByteArray) -> kotlin.Float, encoder=(kotlin.Any?) -> kotlin.ByteArray, child=null)
 
+    }
 }
