@@ -6,7 +6,7 @@ import borg.trikeshed.common.TypeEvidence.Companion.deduce
 import borg.trikeshed.common.parser.simple.CharSeries
 import borg.trikeshed.isam.RecordMeta
 import borg.trikeshed.isam.meta.IOMemento
-import borg.trikeshed.isam.meta.IOMemento.IoCharBuffer
+import borg.trikeshed.isam.meta.IOMemento.IoCharSeries
 import borg.trikeshed.lib.*
 import borg.trikeshed.parse.DelimitRange
 import kotlin.jvm.JvmOverloads
@@ -73,7 +73,7 @@ object CSVUtil {
                     val element = DelimitRange.of(since.toUShort(), x.toUShort())
                     rlist.add(element)
                     lineEvidence?.apply {
-                             logDebug { "bookend val${element.pair}: "+ CharSeries(file[ element.asIntRange ].decodeUtf8()).asString() }
+                        logDebug { "bookend val${element.pair}: " + CharSeries(file[element.asIntRange].decodeUtf8()).asString() }
 
                         if (since == x)
                             lineEvidence[ordinal].empty++
@@ -96,71 +96,25 @@ object CSVUtil {
     @OptIn(ExperimentalStdlibApi::class)
     fun parseConformant(
         file: LongSeries<Byte>,
-        newMeta: MutableList<RecordMeta>? = null,
-        fileEvidence: MutableList<TypeEvidence>? = null,
+        newMeta: Series<RecordMeta>? = null,
+        fileEvidence: MutableList<TypeEvidence>? = mutableListOf(),
     ): Cursor {
-        val parseSegments = parseSegments(file, fileEvidence)
-
-        //if columnMaxLengths is not null,
-        // we need to layout all the newMeta fields, and for the variable length IoMementos of IoString, and IoCharBuffer we need to set the max size; these will be the child meta of the newMeta
-
-        newMeta?.also { newRecordMeta: MutableList<RecordMeta> ->
-            fileEvidence?.map { evidence ->
-                evidence.columnLength
-            }?.also { cmaxLens: List<UShort> ->
-                //create an array of networksizes for each column
-                val networkSizes = newMeta.mapIndexed { index: Int, recordMeta: RecordMeta ->
-                    (recordMeta.child?.type?.networkSize?.toUShort() ?: recordMeta.type.networkSize?.toUShort()
-                    ?: cmaxLens[index])
-                }
-
-                //accumulate networksizes to create begin,endExclusive  ranges for each column
-                val ranges: MutableList<IntRange> =
-                    networkSizes.foldIndexed(mutableListOf()) { index, acc: MutableList<IntRange>, i: UShort ->
-                        acc += when {
-                            0 != index -> {
-                                val newStart = acc.last().endExclusive
-                                newStart until newStart + i.toInt()
-                            }
-
-                            else -> 0 until i.toInt()
-                        }
-                        acc
-                    }
-
-                //install or update the child meta of the newMeta with the new ranges
-                newMeta.forEachIndexed { index, recordMeta ->
-                    val range: IntRange = ranges[index]
-                    recordMeta.child = recordMeta.child?.copy(begin = range.first, end = range.endExclusive)
-                        ?: recordMeta.copy(begin = range.first, end = range.endExclusive)
-                }
-            }
-        }
-
-        return parseSegments.`▶`.withIndex() α { (lineNo, segments): IndexedValue<Join<Int, (Int) -> Join<*, () -> RecordMeta>>> ->
-            segments.`▶`.withIndex() α { (x: Int, segment: Join<*, () -> RecordMeta>): IndexedValue<Join<*, () -> RecordMeta>> ->
-                //newMeta presides over the output of this regment
-                val oldMetaRecord: RecordMeta = segment.b()
-                val newMetaRecord: RecordMeta = newMeta?.get(x) ?: oldMetaRecord
-                try {
-                    /*this is an assertion inline with the type system*/
-                    val bArr = segment.a as ByteArray
-
-                    @Suppress("UNCHECKED_CAST")
-                    val bArrDecoder = oldMetaRecord.decoder
-                    val cbufEncoder = newMetaRecord.encoder
-                    val xlated = cbufEncoder(bArrDecoder(bArr))
-                    xlated j (newMetaRecord.child ?: newMetaRecord).`↺`
-                } catch (e: Exception) {
-                    logDebug { "lineNo: $lineNo" }
-                    logDebug { "x: $x" }
-                    logDebug { "newMetaRecord: $newMetaRecord" }
-                    logDebug { "oldMetaRecord: $oldMetaRecord" }
-                    throw e
+        //first we call parseSegments with our fileEvidence then we trap the RecordMeta child types as a separate meta,
+        // then we use the CharSeries cursor features to create a String marshaller per column
+        val segments = parseSegments(file, fileEvidence)
+        val meta = (newMeta ?: (segments.meta α { (it as RecordMeta).child!! }))
+        return segments.size j { y: Int ->
+            segments.row(y).let {
+                it.size j { x: Int ->
+                    val recordMeta = meta[x]
+                    val type = recordMeta.type
+                    val any = it.left[x] as CharSeries
+                    type.fromString(any.asString()) j { RecordMeta(recordMeta.name, recordMeta.type) }
                 }
             }
         }
     }
+
 
     /**
      * read a csv file into a series of segments and return the series of segments as
@@ -181,7 +135,7 @@ object CSVUtil {
         val header = hdrParsRes α ::DelimitRange
         val headerNames =
             header α { delimR: DelimitRange ->
-                CharSeries(file.get(delimR.a.toInt() until delimR.b.inc().toInt() ).decodeUtf8()).asString()
+                CharSeries(file.get(delimR.a.toInt() until delimR.b.inc().toInt()).decodeUtf8()).asString()
             }
         logDebug { "headerNames: ${headerNames.toList()}" }
         val lines: MutableList<Join<Long, IntArray>> = mutableListOf()
@@ -234,14 +188,16 @@ object CSVUtil {
                     //x axis here
 
                     val delimitRange = DelimitRange(b)
-                    CharSeries(lserr[delimitRange.first.toInt() until delimitRange.endInclusive.inc().toInt()].decodeUtf8()) j {
-                         val air = delimitRange.asIntRange
+                    CharSeries(
+                        lserr[delimitRange.first.toInt() until delimitRange.endInclusive.inc().toInt()].decodeUtf8()
+                    ) j {
+                        val air = delimitRange.asIntRange
 
                         RecordMeta(
                             headerNames[x],
-                            IoCharBuffer,
+                            IoCharSeries,
                             air.first,
-                            air.endInclusive.inc()  ,
+                            air.endInclusive.inc(),
                             child = successorMeta?.get(x)//this is an ISAM schema
                         )
                     }

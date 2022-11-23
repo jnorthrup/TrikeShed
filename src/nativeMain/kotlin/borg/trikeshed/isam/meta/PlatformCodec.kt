@@ -73,7 +73,7 @@ actual object PlatformCodec {
             IoInstant -> writeInstant
             IoLocalDate -> writeLocalDate
             IoShort -> writeShort
-            IoCharBuffer -> writeCharbuffer
+            IoCharSeries -> writeCharbuffer
             IoByteArray -> writeByteArray
             IoNothing -> writeNothing
         }
@@ -97,7 +97,7 @@ actual object PlatformCodec {
             IoInstant -> readInstant
             IoLocalDate -> readLocalDate
             IoString -> readString
-            IoCharBuffer -> readCharbuffer
+            IoCharSeries -> readCharbuffer
             IoByteArray -> readByteArray
             IoNothing -> readNothing
         }
