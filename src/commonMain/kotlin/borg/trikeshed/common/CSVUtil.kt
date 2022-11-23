@@ -99,7 +99,6 @@ object CSVUtil {
         newMeta: MutableList<RecordMeta>? = null,
         fileEvidence: MutableList<TypeEvidence>? = null,
     ): Cursor {
-
         val parseSegments = parseSegments(file, fileEvidence)
 
         //if columnMaxLengths is not null,
