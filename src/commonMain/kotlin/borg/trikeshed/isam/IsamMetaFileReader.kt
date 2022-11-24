@@ -29,5 +29,13 @@ expect class IsamMetaFileReader {
     fun open()
     override fun toString(): String
 
-
+    companion object {
+        /** metafile writer function
+         * 1. open the metafile descriptor for writing
+         * 1. write the file from a collection of record constraints
+         * 1. close the file descriptor
+         */
+        fun write(metafilename: String, recordMetas: List<RecordMeta>)
+    }
 }
+ 

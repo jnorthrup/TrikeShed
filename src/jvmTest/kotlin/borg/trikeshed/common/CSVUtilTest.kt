@@ -2,6 +2,7 @@ package borg.trikeshed.common
 
 import FileBuffer
 import borg.trikeshed.common.parser.simple.CharSeries
+import borg.trikeshed.isam.IsamDataFile
 import borg.trikeshed.isam.meta.IOMemento
 import borg.trikeshed.isam.meta.IOMemento.*
 import borg.trikeshed.lib.*
@@ -81,9 +82,15 @@ class CSVUtilTest {
         assertEquals(IoFloat,meta[9].type)
         assertEquals(IoFloat,meta[10].type)
         assertEquals(IoFloat,meta[11].type)
-
-
     }
 
+  @Test
+    fun testConformant2Isam() {
+        val systemResource: URL = ClassLoader.getSystemResource("hi.csv")
+        val filename: String = systemResource.file.trim()
+        val fileBuf: FileBuffer = FileBuffer.open(filename)
+        val cursor=CSVUtil.parseConformant(fileBuf )
+        cursor.meta.forEach { println(it) }
 
+        val isam=IsamDataFile("/tmp/hi.isam",)
 }

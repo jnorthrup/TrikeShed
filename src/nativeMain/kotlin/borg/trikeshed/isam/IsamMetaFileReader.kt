@@ -87,8 +87,24 @@ actual class IsamMetaFileReader(val metafileFilename: String) {
     actual override fun toString(): String {
         return "IsamMetaFileReader(metafileFilename='$metafileFilename', recordlen=$recordlen, constraints=$constraints)"
     }
-}
-
-
-
-// Language: kotlin
+    /** metafile writer function
+     * 1. open the metafile descriptor for writing
+     * 1. write the file from a collection of record constraints
+     * 1. close the file descriptor
+     */
+    actual companion object {
+        actual fun write(metafilename: String, recordMetas: List<RecordMeta>) {
+            val lines = mutableListOf<String>()
+            lines.add("# format:  coords WS .. EOL names WS .. EOL TypeMememento WS ..")
+            lines.add("# last coord is the recordlen")
+            lines.add(recordMetas.joinToString(" ") { it.begin.toString() + " " + it.end })
+            lines.add(recordMetas.joinToString(" ") { it.name })
+            lines.add(recordMetas.joinToString(" ") { it.type.name })
+            lines.add("# recordlen: ${recordMetas.last().end}")
+//            File(metafilename).writeText(lines.joinToString("\n"))
+            val fd = open(metafilename, O_WRONLY)
+            write(fd, lines.joinToString("\n").cstr, lines.joinToString("\n").length.convert<size_t>())
+            close(fd)
+        }
+    }
+}  

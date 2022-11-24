@@ -20,8 +20,7 @@ actual object PlatformCodec {
     actual val readLong = { value: ByteArray -> unsafe.getLong(value, 0) }
     actual val readFloat = { value: ByteArray -> unsafe.getFloat(value, 0) }
     actual val readDouble = { value: ByteArray -> unsafe.getDouble(value, 0) }
-    actual val readInstant = { value: ByteArray ->
-        Instant.fromEpochSeconds(
+    actual val readInstant = { value: ByteArray -> Instant.fromEpochSeconds(
             unsafe.getLong(value, 0),
             unsafe.getInt(value, 8)
         )

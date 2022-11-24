@@ -24,7 +24,6 @@ actual class IsamDataFile(
         "IsamDataFile(metafile=$metafile, recordlen=$recordlen, constraints=$constraints," +
                 " datafileFilename='$datafileFilename', fileSize=$fileSize)"
 
-
     actual fun open() {
         data = Files.newByteChannel(java.nio.file.Paths.get(datafileFilename))
         fileSize = data.size()
