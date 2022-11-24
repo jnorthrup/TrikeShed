@@ -1,8 +1,7 @@
-@file:Suppress("DEPRECATION")
+@file:Suppress("DEPRECATION", "UNCHECKED_CAST")
 
 package borg.trikeshed.common
 
-import FileBuffer
 import borg.trikeshed.common.TypeEvidence.Companion.deduce
 import borg.trikeshed.common.TypeEvidence.Companion.update
 import borg.trikeshed.common.parser.simple.CharSeries
@@ -112,8 +111,8 @@ object CSVUtil {
                 it.size j { x: Int ->
                     val recordMeta = meta[x]
                     val type = recordMeta.type
-                    val any = it.left[x] as CharSeries
-                    type.fromString(any.asString()) j { RecordMeta(recordMeta.name, recordMeta.type) }
+                    val any = it.left[x] as Series<Char>
+                    type.fromChars(any as CharSeries) j { RecordMeta(recordMeta.name, recordMeta.type) }
                 }
             }
         }
@@ -211,11 +210,4 @@ object CSVUtil {
             }
         }
     }
-}
-
-fun main(args: Array<String>) {
-    //test parseConformant from src/jvmTest/resources/hi.csv
-    val file = FileBuffer("src/jvmTest/resources/hi.csv",0,-1,true)
-    val cursor = CSVUtil.parseConformant(file)
-    cursor.head()
 }

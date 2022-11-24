@@ -8,6 +8,7 @@ import borg.trikeshed.isam.meta.IOMemento.*
 import kotlin.jvm.JvmInline
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.pow
 
 typealias Series<T> = Join<Int, (Int) -> T>
 
@@ -406,4 +407,100 @@ fun <T> Series<T>.reversed(): Series<T> = size j { it: Int -> this.b(size - it -
 open class EmptySeries : Series<Nothing> by 0 j { x: Int -> TODO("undefined") }
 
 fun <T> emptySeries(): Series<T> = EmptySeries() as Series<T>
+
+fun Series<Char>.parseLong(): Long {
+    //handles +-
+    var sign = 1L
+    var x = 0
+    if (this[0] == '-') {
+        sign = -1L
+        x++
+    } else if (this[0] == '+') {
+        x++
+    }
+    var r = 0L
+    while (x < size) {
+        r = r * 10 + (this[x] - '0')
+        x++
+    }
+    return r * sign
+}
+
+
+fun Series<Char>.parseDouble(): Double {
+    var sign = 1.0
+    var x = 0
+    if (this[0] == '-') {
+        sign = -1.0
+        x++
+    } else if (this[0] == '+') {
+        x++
+    }
+    var r = 0.0
+    while (x < size) {
+        if (this[x] == 'E' || this[x] == 'e') {
+            x++
+            var exp = 0.0
+            if (this[x] == '-') {
+                exp = -1.0
+                x++
+            } else if (this[x] == '+') {
+                x++
+            }
+            while (x < size) {
+                exp = exp * 10 + (this[x] - '0')
+                x++
+            }
+            return r * sign * 10.0.pow(exp)
+        }
+        r = r * 10 + (this[x] - '0')
+        x++
+    }
+    return r * sign
+}
+
+fun Series<Char>.parseIsoDateTime(): kotlinx.datetime.LocalDateTime {
+    val year = this[0..3].parseLong().toInt()
+    val month = this[5..6].parseLong().toInt()
+    val day = this[8..9].parseLong().toInt()
+    val hour = this[11..12].parseLong().toInt()
+    val minute = this[14..15].parseLong().toInt()
+    val second = this[17..18].parseLong().toInt()
+    val nanosecond = this[20..26].parseLong().toInt()
+    return kotlinx.datetime.LocalDateTime(year, month, day, hour, minute, second, nanosecond)
+}
+
+fun Series<Char>.encodeToByteArray(): ByteArray {
+    //encode unicode chars to bytes using UTF-8
+    var x = 0
+    val r = ByteArray(size*3) //trim after
+    var spill= 0 //spill cost of unicode encodings
+    while (x < size) {
+        val c = this[x].toInt()
+        if (c < 0x80) {
+            r[x+spill] = c.toByte()
+        } else if (c < 0x800) {
+            r[x+spill] = (0xC0 or (c shr 6)).toByte()
+            r[x+spill+1] = (0x80 or (c and 0x3F)).toByte()
+            spill++
+        } else {
+            r[x+spill] = (0xE0 or (c shr 12)).toByte()
+            r[x+spill+1] = (0x80 or ((c shr 6) and 0x3F)).toByte()
+            r[x+spill+2] = (0x80 or (c and 0x3F)).toByte()
+            spill += 2
+        }
+        x++
+    }
+    return r.sliceArray(0..(x+spill-1))
+}
+
+fun Series<Char>.parseIsoDate(): kotlinx.datetime.LocalDate {
+    val year = this[0..3].parseLong().toInt()
+    val month = this[5..6].parseLong().toInt()
+    val day = this[8..9].parseLong().toInt()
+    return kotlinx.datetime.LocalDate(year, month, day)
+}
+
+fun Series<Char>.asString(upto: Int = Int.MAX_VALUE): String =this.take(upto).encodeToByteArray().decodeToString()
+
 

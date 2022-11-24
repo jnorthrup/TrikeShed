@@ -2,7 +2,6 @@ package borg.trikeshed.common.parser.simple
 
 import borg.trikeshed.lib.*
 import borg.trikeshed.lib.CZero.nz
-import borg.trikeshed.lib.CZero.z
 import kotlin.math.max
 
 /**

@@ -2,9 +2,9 @@ package borg.trikeshed.isam.meta
 
 import borg.trikeshed.isam.meta.IOMemento.*
 import borg.trikeshed.isam.meta.IOMemento.Companion.readByteArray
-import borg.trikeshed.isam.meta.IOMemento.Companion.readCharbuffer
+import borg.trikeshed.isam.meta.IOMemento.Companion.readCharSeries
 import borg.trikeshed.isam.meta.IOMemento.Companion.writeByteArray
-import borg.trikeshed.isam.meta.IOMemento.Companion.writeCharbuffer
+import borg.trikeshed.isam.meta.IOMemento.Companion.writeCharSeries
 import kotlinx.datetime.Instant
 import kotlinx.datetime.LocalDate
 import sun.misc.Unsafe
@@ -74,7 +74,7 @@ actual object PlatformCodec {
             IoString -> writeString
             IoInstant -> writeInstant
             IoLocalDate -> writeLocalDate
-            IoCharSeries -> writeCharbuffer
+            IoCharSeries -> writeCharSeries
             IoByteArray -> writeByteArray
             IoNothing -> writeNothing
         }
@@ -98,7 +98,7 @@ actual object PlatformCodec {
             IoString -> readString
             IoLocalDate -> readLocalDate
             IoInstant -> readInstant
-            IoCharSeries -> readCharbuffer
+            IoCharSeries -> readCharSeries
             IoByteArray -> readByteArray
             IoNothing -> readNothing
         }

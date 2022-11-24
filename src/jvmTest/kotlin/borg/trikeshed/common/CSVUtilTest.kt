@@ -40,7 +40,6 @@ class CSVUtilTest {
         parseSegments.head()
         debug { logDebug { "${Random.nextInt()}" } }
 
-
         //test row 16 against the contents
     // 1502943360000,4261.48000000,4261.48000000,4261.48000000,4261.48000000,0.00000000,1502943419999,0.00000000,0,0.00000000,0.00000000,7958.34896534
         val row16 = parseSegments.row(16)
@@ -58,10 +57,9 @@ class CSVUtilTest {
         assertEquals("0.00000000", row16List[9])
         assertEquals("0.00000000", row16List[10])
         assertEquals("7958.34896534", row16List[11])
-
         //test row 17 against the contents
-
     }
+
     @Test
     fun testConformant() {
         val systemResource: URL = ClassLoader.getSystemResource("hi.csv")
@@ -69,19 +67,6 @@ class CSVUtilTest {
         val fileBuf: FileBuffer = FileBuffer.open(filename)
         val cursor=CSVUtil.parseConformant(fileBuf )
         cursor.meta.forEach { println(it) }
-        //RecordMeta(name=Open_time, type=IoLong, begin=-1, end=-1, decoder=(kotlin.ByteArray) -> kotlin.Long, encoder=(kotlin.Any?) -> kotlin.ByteArray, child=null)
-        //RecordMeta(name=Open, type=IoFloat, begin=-1, end=-1, decoder=(kotlin.ByteArray) -> kotlin.Float, encoder=(kotlin.Any?) -> kotlin.ByteArray, child=null)
-        //RecordMeta(name=High, type=IoFloat, begin=-1, end=-1, decoder=(kotlin.ByteArray) -> kotlin.Float, encoder=(kotlin.Any?) -> kotlin.ByteArray, child=null)
-        //RecordMeta(name=Low, type=IoFloat, begin=-1, end=-1, decoder=(kotlin.ByteArray) -> kotlin.Float, encoder=(kotlin.Any?) -> kotlin.ByteArray, child=null)
-        //RecordMeta(name=Close, type=IoFloat, begin=-1, end=-1, decoder=(kotlin.ByteArray) -> kotlin.Float, encoder=(kotlin.Any?) -> kotlin.ByteArray, child=null)
-        //RecordMeta(name=Volume, type=IoFloat, begin=-1, end=-1, decoder=(kotlin.ByteArray) -> kotlin.Float, encoder=(kotlin.Any?) -> kotlin.ByteArray, child=null)
-        //RecordMeta(name=Close_time, type=IoLong, begin=-1, end=-1, decoder=(kotlin.ByteArray) -> kotlin.Long, encoder=(kotlin.Any?) -> kotlin.ByteArray, child=null)
-        //RecordMeta(name=Quote_asset_volume, type=IoFloat, begin=-1, end=-1, decoder=(kotlin.ByteArray) -> kotlin.Float, encoder=(kotlin.Any?) -> kotlin.ByteArray, child=null)
-        //RecordMeta(name=Number_of_trades, type=IoByte, begin=-1, end=-1, decoder=(kotlin.ByteArray) -> kotlin.Byte, encoder=(kotlin.Any?) -> kotlin.ByteArray, child=null)
-        //RecordMeta(name=Taker_buy_base_asset_volume, type=IoFloat, begin=-1, end=-1, decoder=(kotlin.ByteArray) -> kotlin.Float, encoder=(kotlin.Any?) -> kotlin.ByteArray, child=null)
-        //RecordMeta(name=Taker_buy_quote_asset_volume, type=IoFloat, begin=-1, end=-1, decoder=(kotlin.ByteArray) -> kotlin.Float, encoder=(kotlin.Any?) -> kotlin.ByteArray, child=null)
-        //RecordMeta(name=Ignore, type=IoFloat, begin=-1, end=-1, decoder=(kotlin.ByteArray) -> kotlin.Float, encoder=(kotlin.Any?) -> kotlin.ByteArray, child=null)
-        //test the IoMetaTypes of the above meta
 
         val meta=cursor.meta
         assertEquals(IoLong,meta[0].type)
@@ -98,8 +83,7 @@ class CSVUtilTest {
         assertEquals(IoFloat,meta[11].type)
 
 
-
-
-
     }
+
+
 }
