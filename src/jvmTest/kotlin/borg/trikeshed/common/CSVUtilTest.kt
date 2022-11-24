@@ -2,6 +2,8 @@ package borg.trikeshed.common
 
 import FileBuffer
 import borg.trikeshed.common.parser.simple.CharSeries
+import borg.trikeshed.isam.meta.IOMemento
+import borg.trikeshed.isam.meta.IOMemento.*
 import borg.trikeshed.lib.*
 import borg.trikeshed.parse.DelimitRange
 import java.net.URL
@@ -68,17 +70,36 @@ class CSVUtilTest {
         val cursor=CSVUtil.parseConformant(fileBuf )
         cursor.meta.forEach { println(it) }
         //RecordMeta(name=Open_time, type=IoLong, begin=-1, end=-1, decoder=(kotlin.ByteArray) -> kotlin.Long, encoder=(kotlin.Any?) -> kotlin.ByteArray, child=null)
-//RecordMeta(name=Open, type=IoFloat, begin=-1, end=-1, decoder=(kotlin.ByteArray) -> kotlin.Float, encoder=(kotlin.Any?) -> kotlin.ByteArray, child=null)
-//RecordMeta(name=High, type=IoFloat, begin=-1, end=-1, decoder=(kotlin.ByteArray) -> kotlin.Float, encoder=(kotlin.Any?) -> kotlin.ByteArray, child=null)
-//RecordMeta(name=Low, type=IoFloat, begin=-1, end=-1, decoder=(kotlin.ByteArray) -> kotlin.Float, encoder=(kotlin.Any?) -> kotlin.ByteArray, child=null)
-//RecordMeta(name=Close, type=IoFloat, begin=-1, end=-1, decoder=(kotlin.ByteArray) -> kotlin.Float, encoder=(kotlin.Any?) -> kotlin.ByteArray, child=null)
-//RecordMeta(name=Volume, type=IoFloat, begin=-1, end=-1, decoder=(kotlin.ByteArray) -> kotlin.Float, encoder=(kotlin.Any?) -> kotlin.ByteArray, child=null)
-//RecordMeta(name=Close_time, type=IoLong, begin=-1, end=-1, decoder=(kotlin.ByteArray) -> kotlin.Long, encoder=(kotlin.Any?) -> kotlin.ByteArray, child=null)
-//RecordMeta(name=Quote_asset_volume, type=IoFloat, begin=-1, end=-1, decoder=(kotlin.ByteArray) -> kotlin.Float, encoder=(kotlin.Any?) -> kotlin.ByteArray, child=null)
-//RecordMeta(name=Number_of_trades, type=IoByte, begin=-1, end=-1, decoder=(kotlin.ByteArray) -> kotlin.Byte, encoder=(kotlin.Any?) -> kotlin.ByteArray, child=null)
-//RecordMeta(name=Taker_buy_base_asset_volume, type=IoFloat, begin=-1, end=-1, decoder=(kotlin.ByteArray) -> kotlin.Float, encoder=(kotlin.Any?) -> kotlin.ByteArray, child=null)
-//RecordMeta(name=Taker_buy_quote_asset_volume, type=IoFloat, begin=-1, end=-1, decoder=(kotlin.ByteArray) -> kotlin.Float, encoder=(kotlin.Any?) -> kotlin.ByteArray, child=null)
-//RecordMeta(name=Ignore, type=IoFloat, begin=-1, end=-1, decoder=(kotlin.ByteArray) -> kotlin.Float, encoder=(kotlin.Any?) -> kotlin.ByteArray, child=null)
+        //RecordMeta(name=Open, type=IoFloat, begin=-1, end=-1, decoder=(kotlin.ByteArray) -> kotlin.Float, encoder=(kotlin.Any?) -> kotlin.ByteArray, child=null)
+        //RecordMeta(name=High, type=IoFloat, begin=-1, end=-1, decoder=(kotlin.ByteArray) -> kotlin.Float, encoder=(kotlin.Any?) -> kotlin.ByteArray, child=null)
+        //RecordMeta(name=Low, type=IoFloat, begin=-1, end=-1, decoder=(kotlin.ByteArray) -> kotlin.Float, encoder=(kotlin.Any?) -> kotlin.ByteArray, child=null)
+        //RecordMeta(name=Close, type=IoFloat, begin=-1, end=-1, decoder=(kotlin.ByteArray) -> kotlin.Float, encoder=(kotlin.Any?) -> kotlin.ByteArray, child=null)
+        //RecordMeta(name=Volume, type=IoFloat, begin=-1, end=-1, decoder=(kotlin.ByteArray) -> kotlin.Float, encoder=(kotlin.Any?) -> kotlin.ByteArray, child=null)
+        //RecordMeta(name=Close_time, type=IoLong, begin=-1, end=-1, decoder=(kotlin.ByteArray) -> kotlin.Long, encoder=(kotlin.Any?) -> kotlin.ByteArray, child=null)
+        //RecordMeta(name=Quote_asset_volume, type=IoFloat, begin=-1, end=-1, decoder=(kotlin.ByteArray) -> kotlin.Float, encoder=(kotlin.Any?) -> kotlin.ByteArray, child=null)
+        //RecordMeta(name=Number_of_trades, type=IoByte, begin=-1, end=-1, decoder=(kotlin.ByteArray) -> kotlin.Byte, encoder=(kotlin.Any?) -> kotlin.ByteArray, child=null)
+        //RecordMeta(name=Taker_buy_base_asset_volume, type=IoFloat, begin=-1, end=-1, decoder=(kotlin.ByteArray) -> kotlin.Float, encoder=(kotlin.Any?) -> kotlin.ByteArray, child=null)
+        //RecordMeta(name=Taker_buy_quote_asset_volume, type=IoFloat, begin=-1, end=-1, decoder=(kotlin.ByteArray) -> kotlin.Float, encoder=(kotlin.Any?) -> kotlin.ByteArray, child=null)
+        //RecordMeta(name=Ignore, type=IoFloat, begin=-1, end=-1, decoder=(kotlin.ByteArray) -> kotlin.Float, encoder=(kotlin.Any?) -> kotlin.ByteArray, child=null)
+        //test the IoMetaTypes of the above meta
+
+        val meta=cursor.meta
+        assertEquals(IoLong,meta[0].type)
+        assertEquals(IoFloat,meta[1].type)
+        assertEquals(IoFloat,meta[2].type)
+        assertEquals(IoFloat,meta[3].type)
+        assertEquals(IoFloat,meta[4].type)
+        assertEquals(IoFloat,meta[5].type)
+        assertEquals(IoLong,meta[6].type)
+        assertEquals(IoFloat,meta[7].type)
+        assertEquals(IoByte,meta[8].type)
+        assertEquals(IoFloat,meta[9].type)
+        assertEquals(IoFloat,meta[10].type)
+        assertEquals(IoFloat,meta[11].type)
+
+
+
+
 
     }
 }
