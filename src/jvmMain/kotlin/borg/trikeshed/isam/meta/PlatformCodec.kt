@@ -20,13 +20,14 @@ actual object PlatformCodec {
     actual val readLong = { value: ByteArray -> unsafe.getLong(value, 0) }
     actual val readFloat = { value: ByteArray -> unsafe.getFloat(value, 0) }
     actual val readDouble = { value: ByteArray -> unsafe.getDouble(value, 0) }
-    actual val readInstant = { value: ByteArray -> Instant.fromEpochSeconds(
+    actual val readInstant = { value: ByteArray ->
+        Instant.fromEpochSeconds(
             unsafe.getLong(value, 0),
             unsafe.getInt(value, 8)
         )
     }
 
-    val readLocalDate = { value: ByteArray ->
+    actual val readLocalDate = { value: ByteArray ->
         LocalDate.fromEpochDays(
             unsafe.getLong(value, 0).toLong().toInt()
         )
@@ -51,14 +52,14 @@ actual object PlatformCodec {
         }
     }
 
-    val writeLocalDate = { value: Any? ->
+    actual val writeLocalDate = { value: Any? ->
         ByteArray(8).apply<ByteArray> {
             unsafe.putLong(this, 0, (value as LocalDate).toEpochDays().toLong())
         }
     }
 
-    val writeString = { value: Any? -> (value as String).encodeToByteArray() }
-    val writeNothing = { _: Any? -> ByteArray(0) }
+    actual val writeString = { value: Any? -> (value as String).encodeToByteArray() }
+    actual val writeNothing = { _: Any? -> ByteArray(0) }
 
     actual fun createEncoder(type: IOMemento, size: Int): (Any?) -> ByteArray {
         // must use corresponding  networkOrderSetXXX functions to set the bytes in the ByteArray
@@ -81,7 +82,7 @@ actual object PlatformCodec {
 
     actual fun createDecoder(
         type: IOMemento,
-        size: Int
+        size: Int,
     ): (ByteArray) -> Any? {
         return when (type) {
             // all values must be read and written in network endian order

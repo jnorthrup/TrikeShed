@@ -2,9 +2,9 @@ package borg.trikeshed.isam.meta
 
 import borg.trikeshed.isam.meta.IOMemento.*
 import borg.trikeshed.isam.meta.IOMemento.Companion.readByteArray
-import borg.trikeshed.isam.meta.IOMemento.Companion.readCharbuffer
+import borg.trikeshed.isam.meta.IOMemento.Companion.readCharSeries
 import borg.trikeshed.isam.meta.IOMemento.Companion.writeByteArray
-import borg.trikeshed.isam.meta.IOMemento.Companion.writeCharbuffer
+import borg.trikeshed.isam.meta.IOMemento.Companion.writeCharSeries
 import borg.trikeshed.lib.*
 import kotlinx.datetime.Instant
 import kotlinx.datetime.LocalDate
@@ -24,7 +24,7 @@ actual object PlatformCodec {
             value.networkOrderGetIntAt(8)
         )
     }
-    private val readLocalDate = { value: ByteArray ->
+    actual  val readLocalDate = { value: ByteArray ->
         LocalDate.fromEpochDays(
             value.networkOrderGetLongAt(0).toInt()
         )
@@ -73,7 +73,7 @@ actual object PlatformCodec {
             IoInstant -> writeInstant
             IoLocalDate -> writeLocalDate
             IoShort -> writeShort
-            IoCharSeries -> writeCharbuffer
+            IoCharSeries -> writeCharSeries
             IoByteArray -> writeByteArray
             IoNothing -> writeNothing
         }
@@ -81,7 +81,7 @@ actual object PlatformCodec {
 
     actual fun createDecoder(
         type: IOMemento,
-        size: Int
+        size: Int,
     ): (ByteArray) -> Any? {
         return when (type) {
             // all values must be read and written in network endian order
@@ -97,15 +97,13 @@ actual object PlatformCodec {
             IoInstant -> readInstant
             IoLocalDate -> readLocalDate
             IoString -> readString
-            IoCharSeries -> readCharbuffer
+            IoCharSeries -> readCharSeries
             IoByteArray -> readByteArray
             IoNothing -> readNothing
         }
     }
 
     actual val readShort: (ByteArray) -> Short = { value: ByteArray -> value.networkOrderGetShortAt(0) }
-
-
 
 
 }

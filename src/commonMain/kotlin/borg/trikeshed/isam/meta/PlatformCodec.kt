@@ -1,6 +1,7 @@
 package borg.trikeshed.isam.meta
 
 import kotlinx.datetime.Instant
+import kotlinx.datetime.LocalDate
 
 expect object PlatformCodec {
     val readBool: (ByteArray) -> Boolean
@@ -32,6 +33,10 @@ expect object PlatformCodec {
         size: Int
     ): (ByteArray) -> Any?
 
+    val readLocalDate: (ByteArray) -> LocalDate
+    val writeLocalDate: (Any?) -> ByteArray
+    val writeString: (Any?) -> ByteArray
+    val writeNothing: (Any?) -> ByteArray
 
 
 }
