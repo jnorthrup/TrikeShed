@@ -22,7 +22,8 @@ class CSVUtilTest {
         val fileBuf = FileBuffer.open(filename)
         val deduce = mutableListOf<TypeEvidence>()
         val csv = CSVUtil.parseLine(fileBuf, 0, lineEvidence = deduce) α ::DelimitRange
-        val lp=(csv α {delimR :DelimitRange->String( fileBuf.get(delimR.asIntRange).toArray()) } ).`▶`.withIndex().toList()
+        val lp = (csv α { delimR: DelimitRange -> String(fileBuf.get(delimR.asIntRange).toArray()) }).`▶`.withIndex()
+            .toList()
         println(lp)
 
         fileBuf.close()
@@ -36,15 +37,15 @@ class CSVUtilTest {
         val filename: String = systemResource.file.trim()
         val fileBuf: FileBuffer = FileBuffer.open(filename)
         val fileDeduce: MutableList<TypeEvidence> = mutableListOf()
-        val parseSegments:  Cursor = CSVUtil.parseSegments(fileBuf, fileEvidence = fileDeduce)
+        val parseSegments: Cursor = CSVUtil.parseSegments(fileBuf, fileEvidence = fileDeduce)
 
         parseSegments.head()
         debug { logDebug { "${Random.nextInt()}" } }
 
         //test row 16 against the contents
-    // 1502943360000,4261.48000000,4261.48000000,4261.48000000,4261.48000000,0.00000000,1502943419999,0.00000000,0,0.00000000,0.00000000,7958.34896534
+        // 1502943360000,4261.48000000,4261.48000000,4261.48000000,4261.48000000,0.00000000,1502943419999,0.00000000,0,0.00000000,0.00000000,7958.34896534
         val row16 = parseSegments.row(16)
-        val row16List = row16.left  α {it as CharSeries} α CharSeries::asString
+        val row16List = row16.left α { it as CharSeries } α CharSeries::asString
         assertEquals(12, row16List.size)
         assertEquals("1502943360000", row16List[0])
         assertEquals("4261.48000000", row16List[1])
@@ -66,31 +67,32 @@ class CSVUtilTest {
         val systemResource: URL = ClassLoader.getSystemResource("hi.csv")
         val filename: String = systemResource.file.trim()
         val fileBuf: FileBuffer = FileBuffer.open(filename)
-        val cursor=CSVUtil.parseConformant(fileBuf )
+        val cursor = CSVUtil.parseConformant(fileBuf)
         cursor.meta.forEach { println(it) }
 
-        val meta=cursor.meta
-        assertEquals(IoLong,meta[0].type)
-        assertEquals(IoFloat,meta[1].type)
-        assertEquals(IoFloat,meta[2].type)
-        assertEquals(IoFloat,meta[3].type)
-        assertEquals(IoFloat,meta[4].type)
-        assertEquals(IoFloat,meta[5].type)
-        assertEquals(IoLong,meta[6].type)
-        assertEquals(IoFloat,meta[7].type)
-        assertEquals(IoByte,meta[8].type)
-        assertEquals(IoFloat,meta[9].type)
-        assertEquals(IoFloat,meta[10].type)
-        assertEquals(IoFloat,meta[11].type)
+        val meta = cursor.meta
+        assertEquals(IoLong, meta[0].type)
+        assertEquals(IoFloat, meta[1].type)
+        assertEquals(IoFloat, meta[2].type)
+        assertEquals(IoFloat, meta[3].type)
+        assertEquals(IoFloat, meta[4].type)
+        assertEquals(IoFloat, meta[5].type)
+        assertEquals(IoLong, meta[6].type)
+        assertEquals(IoFloat, meta[7].type)
+        assertEquals(IoByte, meta[8].type)
+        assertEquals(IoFloat, meta[9].type)
+        assertEquals(IoFloat, meta[10].type)
+        assertEquals(IoFloat, meta[11].type)
     }
 
-  @Test
+    @Test
     fun testConformant2Isam() {
         val systemResource: URL = ClassLoader.getSystemResource("hi.csv")
         val filename: String = systemResource.file.trim()
         val fileBuf: FileBuffer = FileBuffer.open(filename)
-        val cursor=CSVUtil.parseConformant(fileBuf )
+        val cursor = CSVUtil.parseConformant(fileBuf)
         cursor.meta.forEach { println(it) }
 
-        val isam=IsamDataFile("/tmp/hi.isam",)
+        IsamDataFile.write(cursor, "/tmp/hi.isam")
+    }
 }

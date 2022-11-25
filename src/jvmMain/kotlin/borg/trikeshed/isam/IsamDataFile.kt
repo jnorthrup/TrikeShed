@@ -1,10 +1,8 @@
 package borg.trikeshed.isam
 
 import borg.trikeshed.isam.meta.IOMemento
-import borg.trikeshed.lib.Cursor
-import borg.trikeshed.lib.Join
-import borg.trikeshed.lib.Series
-import borg.trikeshed.lib.j
+import borg.trikeshed.lib.*
+import java.io.RandomAccessFile
 import java.nio.ByteBuffer
 import java.nio.channels.SeekableByteChannel
 import java.nio.file.Files
@@ -70,6 +68,46 @@ actual class IsamDataFile(
             val constraint = constraints[col]
             val s = array.sliceArray(constraint.begin until constraint.end)
             constraint.decoder(s) j { constraint }
+        }
+    }
+
+    actual companion object {
+        actual fun write(cursor: Cursor, datafilename: String) {
+            val metafilename = "$datafilename.meta"
+
+            IsamMetaFileReader.write(metafilename, cursor.meta.map { colMeta: ColMeta -> colMeta as RecordMeta })
+
+            //open RandomAccessDataFile
+
+            val randomAccessFile = RandomAccessFile(datafilename, "rw")
+            val data = randomAccessFile.channel
+
+            //create row buffer
+            val meta = cursor.meta α { it as RecordMeta }
+            val rowLen = meta.last().end
+
+            val rowBuffer = ByteBuffer.allocateDirect(rowLen)
+
+            val clears = meta.`▶`.withIndex().filter { it.value.type.networkSize == null }.map { it.index }.toSet()
+
+            //write rows
+            for (y in 0 until cursor.a) {
+                rowBuffer.position(0)
+                val rowData = cursor.row(y).left
+
+                for (x in 0 until cursor.meta.size) {
+                    val colMeta = meta[x]
+                    val colData = rowData[x]
+                    val colBytes = colMeta.encoder(colData)
+                    rowBuffer.position(colMeta.begin)
+                    rowBuffer.put(colBytes)
+                    //write a trailling null byte on varchar
+                    if (x in clears&&colBytes.size<colMeta.end-colMeta.begin) rowBuffer.put(0)
+                }
+                rowBuffer.position(0)
+                data.write(rowBuffer)
+            }
+            data.close()
         }
     }
 }

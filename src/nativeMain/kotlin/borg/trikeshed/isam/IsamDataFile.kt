@@ -8,10 +8,8 @@ import platform.posix.*
 actual class IsamDataFile(
     val datafileFilename: String,
     metafileFilename: String = "$datafileFilename.meta",
-    val metafile: IsamMetaFileReader = IsamMetaFileReader(metafileFilename)
+    val metafile: IsamMetaFileReader = IsamMetaFileReader(metafileFilename),
 ) : Cursor {
-
-
 
 
     val recordlen: Int by lazy {
@@ -26,7 +24,7 @@ actual class IsamDataFile(
 
     private var first = true
     actual fun open() {
-        if(!first)return
+        if (!first) return
         memScoped {
             val fd = open(datafileFilename, O_RDONLY)
             val stat = alloc<stat>()
@@ -67,11 +65,12 @@ actual class IsamDataFile(
         }
     }
 
-    override val a: Int get()  {
-            open ().let {
-            return (fileSize  / recordlen).toInt()
+    override val a: Int
+        get() {
+            open().let {
+                return (fileSize / recordlen).toInt()
+            }
         }
-    }
 
     override val b: (Int) -> Join<Int, (Int) -> Join<*, () -> RecordMeta>> = { row ->
         memScoped {
@@ -97,4 +96,43 @@ actual class IsamDataFile(
             munmap(data, fileSize.toULong())
         }
     }
+
+
+    actual companion object {
+        actual fun write(cursor: Cursor, datafilename: String): Unit = memScoped {
+            val metafilename = "$datafilename.meta"
+
+            IsamMetaFileReader.write(metafilename, cursor.meta.map { colMeta: ColMeta -> colMeta as RecordMeta })
+
+            //open RandomAccessDataFile
+
+            val data = fopen(datafilename, "w")
+
+            //create row buffer
+            val meta = cursor.meta α { it as RecordMeta }
+            val rowLen = meta.last().end
+            val rowBuffer = ByteArray(rowLen)
+            val clears = meta.`▶`.withIndex().filter { it.value.type.networkSize == null }.map { it.index }.toSet()
+
+            //write rows
+            for (y in 0 until cursor.a) {
+                val rowData = cursor.row(y).left
+
+                for (x in 0 until cursor.meta.size) {
+                    val colMeta = meta[x]
+                    val colData = rowData[x]
+                    val colBytes = colMeta.encoder(colData)
+                    colBytes.copyInto(rowBuffer, colMeta.begin, 0, colBytes.size)
+                    if (x in clears && colBytes.size < colMeta.end - colMeta.begin)   //write 1 zero
+                        rowBuffer[colMeta.begin + colBytes.size] = 0
+                }
+
+                fwrite(rowBuffer.refTo(0), 1, rowLen.toULong(), data)
+            }
+
+            fclose(data)
+        }.let {}
+    }
 }
+
+

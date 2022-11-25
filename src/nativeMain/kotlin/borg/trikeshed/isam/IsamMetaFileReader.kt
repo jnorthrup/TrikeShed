@@ -60,15 +60,17 @@ actual class IsamMetaFileReader(val metafileFilename: String) {
             val size = stat.st_size.convert<Int>()
             val buf = allocArray<ByteVar>(size)
             read(fd, buf, size.convert<size_t>())
+
             //close
             close(fd)
+
             //use readBytes and decodeString to read the lines into
             val lines =
                 buf.readBytes(size).decodeToString().lines().filterNot { it.trim().startsWith("#") }.map(String::trim)
             //split on \s+
             val coords = lines[0].split("\\s+".toRegex())
-            val names = lines[1].split("\\s+".toRegex())
-            val types = lines[2].split("\\s+".toRegex())
+            val names  = lines[1].split("\\s+".toRegex())
+            val types  = lines[2].split("\\s+".toRegex())
 
 
             this@IsamMetaFileReader.constraints1 = names.zip(types).mapIndexed { index, (name, type) ->
@@ -107,4 +109,4 @@ actual class IsamMetaFileReader(val metafileFilename: String) {
             close(fd)
         }
     }
-}  
+}
