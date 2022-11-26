@@ -13,7 +13,9 @@ package borg.trikeshed.isam
 Open_time Close_time Open High Low Close Volume Quote_asset_volume Number_of_trades Taker_buy_base_asset_volume Taker_buy_quote_asset_volume
 IoInstant IoInstant IoDouble IoDouble IoDouble IoDouble IoDouble IoDouble IoInt IoDouble IoDouble
 ```
- */
+
+ TODO: the name "Reader" was initial quick and dirty reader testing.  this classname and the metafile format
+ should be renamed to something more appropriate*/
 expect class IsamMetaFileReader {
     /**
      * 1. open the metafile descriptor for reading

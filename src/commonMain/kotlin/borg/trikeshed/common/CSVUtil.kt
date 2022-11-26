@@ -65,7 +65,7 @@ object CSVUtil {
                     lineEvidence?.apply {
                         if (since == x)
                             lineEvidence[ordinal].empty++
-                        else lineEvidence[ordinal].columnLength=(x-since).toUShort()
+                        else lineEvidence[ordinal].columnLength = (x - since).toUShort()
                     }
                     ordinal++
                     since = x + 1
@@ -79,7 +79,7 @@ object CSVUtil {
 
                         if (since == x)
                             lineEvidence[ordinal].empty++
-                        else lineEvidence[ordinal].columnLength=(x-since).toUShort()
+                        else lineEvidence[ordinal].columnLength = (x - since).toUShort()
                     }
                     break
                 }
@@ -105,14 +105,17 @@ object CSVUtil {
         //first we call parseSegments with our fileEvidence then we trap the RecordMeta child types as a separate meta,
         // then we use the CharSeries cursor features to create a String marshaller per column
         val segments = parseSegments(file, fileEvidence)
-        val meta = (newMeta ?: (segments.meta α { (it as RecordMeta).child!! }))
+        val meta = (newMeta ?: (segments.meta α { (it as RecordMeta).child!! })).debug {
+            val l = it.toList()
+            logDebug { "parseConformantmeta: $l" }
+        }
         return segments.size j { y: Int ->
             segments.row(y).let {
                 it.size j { x: Int ->
                     val recordMeta = meta[x]
                     val type = recordMeta.type
                     val any = it.left[x] as Series<Char>
-                    type.fromChars(any as CharSeries) j { RecordMeta(recordMeta.name, recordMeta.type) }
+                    type.fromChars(any as CharSeries) j recordMeta.`↺`
                 }
             }
         }
@@ -149,7 +152,8 @@ object CSVUtil {
             do {
                 val file1 = file.drop(datazero1)
                 if (file1.size < headerNames.size) break  // we can parse n commas as n+1 default fields but no less
-                val lineEvidence = fileEvidence?.let<MutableList<TypeEvidence>, MutableList<TypeEvidence>> { mutableListOf() }
+                val lineEvidence =
+                    fileEvidence?.let<MutableList<TypeEvidence>, MutableList<TypeEvidence>> { mutableListOf() }
                 val parsRes = parseLine(file1, 0, file1.size, lineEvidence)
                 lineEvidence?.apply { fileEvidence.update(lineEvidence) }
                 val line = parsRes α ::DelimitRange
@@ -173,13 +177,22 @@ object CSVUtil {
             }
             val convertedSegmentLengths = conversionSegments?.right?.toArray()
 
+            //perform the length additions of the segment lengths to arrive at DelimitRanges
+            val convertedSegments = convertedSegmentLengths?.fold(mutableListOf<DelimitRange>()) { acc, length ->
+                val last = acc.lastOrNull()?.b ?: 0.toUShort()
+                acc.add(DelimitRange.of(last, (last + length.toUInt()).toUShort()))
+                acc
+            }
+
+            /**this meta will be the child layout for an ISAM promotion of the Cursor*/
             val successorMeta: List<RecordMeta>? = convertedSegmentLengths?.let {
                 it.indices.map { x ->
                     RecordMeta(
                         name = headerNames[x],
                         type = conversionSegments.left[x],
-                        begin = if (x == 0) 0 else it[x - 1],
-                        end = it[x]
+                        //begin,end from convertedSegments
+                        begin = convertedSegments?.get(x)?.a?.toInt() ?: -1,
+                        end = convertedSegments?.get(x)?.b?.toInt() ?: -1,
                     )
                 }
             }

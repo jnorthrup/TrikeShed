@@ -1,6 +1,9 @@
+@file:Suppress("UNCHECKED_CAST")
+
 package borg.trikeshed.isam
 
 import borg.trikeshed.isam.meta.IOMemento
+import borg.trikeshed.isam.meta.PlatformCodec
 import borg.trikeshed.lib.*
 import java.io.RandomAccessFile
 import java.nio.ByteBuffer
@@ -50,9 +53,7 @@ actual class IsamDataFile(
     }
 
     override val a: Int = fileSize.toInt() / recordlen
-    actual fun close() {
-        data.close()
-    }
+    actual fun close() = data.close()
 
     private val lock = java.util.concurrent.locks.ReentrantLock()
 
@@ -83,12 +84,22 @@ actual class IsamDataFile(
             val data = randomAccessFile.channel
 
             //create row buffer
-            val meta = cursor.meta α { it as RecordMeta }
-            val rowLen = meta.last().end
+            val meta0 = cursor.meta α { it as RecordMeta }
+            meta0.debug {
+                logDebug { "toIsam: "+it.toList() }
+            }
+
+            val last = meta0.last()
+            val meta=(meta0 α {
+                val encoder = PlatformCodec.createEncoder(it.type, it.end - it.begin)
+                RecordMeta(it.name, it.type, it.begin, it.end, encoder = encoder)
+            }).toArray()
+            val rowLen = last.end
+
+            val clears = meta.withIndex().filter {
+                it.value.type.networkSize == null }.map { it.index }.toIntArray()
 
             val rowBuffer = ByteBuffer.allocateDirect(rowLen)
-
-            val clears = meta.`▶`.withIndex().filter { it.value.type.networkSize == null }.map { it.index }.toSet()
 
             //write rows
             for (y in 0 until cursor.a) {
@@ -98,15 +109,18 @@ actual class IsamDataFile(
                 for (x in 0 until cursor.meta.size) {
                     val colMeta = meta[x]
                     val colData = rowData[x]
-                    val colBytes = colMeta.encoder(colData)
+
                     rowBuffer.position(colMeta.begin)
-                    rowBuffer.put(colBytes)
+//                    val debugMe = colMeta::encoder
+                    val colBytes = colMeta.encoder(colData)
+                    rowBuffer.put(colMeta.begin,colBytes)
                     //write a trailling null byte on varchar
-                    if (x in clears&&colBytes.size<colMeta.end-colMeta.begin) rowBuffer.put(0)
+                    if (x in clears && colBytes.size < (colMeta.end - colMeta.begin)) rowBuffer.put(colMeta.begin+colBytes.size,0)
                 }
                 rowBuffer.position(0)
                 data.write(rowBuffer)
             }
+            randomAccessFile.close()
             data.close()
         }
     }

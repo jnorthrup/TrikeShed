@@ -112,7 +112,8 @@ actual class IsamDataFile(
             val meta = cursor.meta α { it as RecordMeta }
             val rowLen = meta.last().end
             val rowBuffer = ByteArray(rowLen)
-            val clears = meta.`▶`.withIndex().filter { it.value.type.networkSize == null }.map { it.index }.toSet()
+
+            val clears = meta.`▶`.withIndex().filter { it.value.type.networkSize == null }.map { it.index }.toIntArray()
 
             //write rows
             for (y in 0 until cursor.a) {
@@ -126,11 +127,9 @@ actual class IsamDataFile(
                     if (x in clears && colBytes.size < colMeta.end - colMeta.begin)   //write 1 zero
                         rowBuffer[colMeta.begin + colBytes.size] = 0
                 }
-
-                fwrite(rowBuffer.refTo(0), 1, rowLen.toULong(), data)
+                val fwrite = fwrite(rowBuffer.refTo(0), 1, rowLen.toULong(), data)
             }
-
-            fclose(data)
+            val fclose = fclose(data)
         }.let {}
     }
 }

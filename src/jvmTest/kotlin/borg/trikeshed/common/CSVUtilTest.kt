@@ -91,7 +91,10 @@ class CSVUtilTest {
         val filename: String = systemResource.file.trim()
         val fileBuf: FileBuffer = FileBuffer.open(filename)
         val cursor = CSVUtil.parseConformant(fileBuf)
-        cursor.meta.forEach { println(it) }
+        val meta = cursor.meta.debug {
+            logDebug { "meta: ${it.toList()}" }
+        }
+        meta.forEach { println(it) }
 
         IsamDataFile.write(cursor, "/tmp/hi.isam")
     }

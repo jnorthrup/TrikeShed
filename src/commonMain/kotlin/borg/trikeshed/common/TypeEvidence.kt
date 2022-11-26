@@ -42,7 +42,7 @@ TypeEvidence(
     companion object {
 
         /**
-         * based on the process of eliminating illegal and oversized coutners we deduce the most specific numerical primitives specializations of IoMemento jvm-primitives
+         * based on the process of eliminating illegal and oversized counters we deduce the most specific numerical primitives specializations of IoMemento jvm-primitives
          *
          * maximum chars in a boolean range would be: 5 and limitted to true or false
          * presence of alpha would eliminate many types

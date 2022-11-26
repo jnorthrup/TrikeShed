@@ -1,10 +1,12 @@
+@file:Suppress("UNCHECKED_CAST")
+
 package borg.trikeshed.isam.meta
 
 import borg.trikeshed.common.parser.simple.CharSeries
 import borg.trikeshed.lib.*
 import kotlinx.datetime.Instant
 
-enum class IOMemento(override val networkSize: Int? = null, val fromChars: (CharSeries) -> Any) : TypeMemento {
+enum class IOMemento(override val networkSize: Int? = null, val fromChars: (Series<Char>) -> Any) : TypeMemento {
     IoBoolean(1, {
         when (it[0]) {
             't' -> true
@@ -19,7 +21,7 @@ enum class IOMemento(override val networkSize: Int? = null, val fromChars: (Char
         it.parseLong().toShort()
     }),
     IoInt(4, { it.parseLong().toInt() }),
-    IoLong(8, CharSeries::parseLong),
+    IoLong(8, Series<Char>::parseLong),
     IoFloat(4, { it.parseDouble().toFloat() }),
     IoDouble(8, { it.parseDouble() }),
     IoLocalDate(8, { it.parseIsoDateTime() }),
@@ -35,10 +37,10 @@ enum class IOMemento(override val networkSize: Int? = null, val fromChars: (Char
     ;
 
     companion object {
-        val readCharSeries: (ByteArray) -> CharSeries =
-            { value: ByteArray -> CharSeries(value α { it.toInt().toChar() }) }
+        val readCharSeries: (ByteArray) -> Series<Char> =
+            { value: ByteArray -> (value α { it.toInt().toChar() }) }
         val writeCharSeries: (Any?) -> ByteArray =
-            { value: Any? -> (value as CharSeries).asString().encodeToByteArray() }
+            { value: Any? -> (value as Series<Char>).asString().encodeToByteArray() }
         val readByteArray: (ByteArray) -> ByteArray = { value: ByteArray -> value }
         val writeByteArray: (Any?) -> ByteArray = { value: Any? -> value as ByteArray }
     }
