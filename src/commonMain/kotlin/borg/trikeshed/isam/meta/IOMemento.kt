@@ -5,6 +5,7 @@ package borg.trikeshed.isam.meta
 import borg.trikeshed.common.parser.simple.CharSeries
 import borg.trikeshed.lib.*
 import kotlinx.datetime.Instant
+import kotlinx.datetime.LocalDate
 
 enum class IOMemento(override val networkSize: Int? = null, val fromChars: (Series<Char>) -> Any) : TypeMemento {
     IoBoolean(1, {
@@ -43,5 +44,53 @@ enum class IOMemento(override val networkSize: Int? = null, val fromChars: (Seri
             { value: Any? -> (value as Series<Char>).asString().encodeToByteArray() }
         val readByteArray: (ByteArray) -> ByteArray = { value: ByteArray -> value }
         val writeByteArray: (Any?) -> ByteArray = { value: Any? -> value as ByteArray }
+
+        //        val readLocalDate: (ByteArray) -> LocalDate
+//        val writeLocalDate: (Any?) -> ByteArray           
+//        val writeString: (Any?) -> ByteArray 
+//        val writeNothing: (Any?) -> ByteArray 
+//        val readBool: (ByteArray) -> Boolean       
+//        val readByte: (ByteArray) -> Byte         
+//        val readInstant: (ByteArray) -> Instant             
+//        val readString: (ByteArray) -> String
+//        val readNothing: (ByteArray) -> Nothing?
+//        val writeInstant: (Any?) -> ByteArray        
+        val readInstant = { value: ByteArray ->
+            Instant.fromEpochSeconds(
+                value.networkOrderGetLongAt(0),
+                value.networkOrderGetIntAt(8)
+            )
+        }
+        val readLocalDate = { value: ByteArray ->
+            LocalDate.fromEpochDays(
+                value.networkOrderGetLongAt(0).toInt()
+            )
+        }
+        val readString = { value: ByteArray -> value.decodeToString() }
+        val readNothing = { _: ByteArray -> null }
+        val writeLocalDate = { value: Any? ->
+            ByteArray(8).apply<ByteArray> {
+                ->
+                networkOrderSetLongAt(
+                    0,
+                    (value as LocalDate).toEpochDays().toLong()
+                )
+            }
+        }
+        val writeString = { value: Any? -> (value as String).encodeToByteArray() }
+        val writeNothing = { _: Any? -> ByteArray(0) }
+
+
+        val writeInstant = { value: Any? ->
+            ByteArray(12).apply {
+                networkOrderSetLongAt(
+                    0,
+                    (value as Instant).epochSeconds
+                ); networkOrderSetIntAt(8, value.nanosecondsOfSecond)
+            }
+        }
+        val readBool = { value: ByteArray -> value[0] == 1.toByte() }
+        val readByte = { value: ByteArray -> value[0] }
     }
+
 }

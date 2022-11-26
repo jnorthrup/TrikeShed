@@ -9,6 +9,7 @@ import java.io.RandomAccessFile
 import java.nio.ByteBuffer
 import java.nio.channels.SeekableByteChannel
 import java.nio.file.Files
+import java.nio.file.StandardOpenOption
 
 actual class IsamDataFile(
     val datafileFilename: String,
@@ -16,7 +17,7 @@ actual class IsamDataFile(
     val metafile: IsamMetaFileReader = IsamMetaFileReader(metafileFilename),
 ) : Cursor {
     val recordlen = metafile.recordlen
-    val constraints = metafile.constraints
+    val constraints get() = metafile.constraints
 
     private lateinit var data: SeekableByteChannel
 
@@ -26,7 +27,8 @@ actual class IsamDataFile(
                 " datafileFilename='$datafileFilename', fileSize=$fileSize)"
 
     actual fun open() {
-        data = Files.newByteChannel(java.nio.file.Paths.get(datafileFilename))
+        metafile.open()
+        data = Files.newByteChannel(java.nio.file.Paths.get(datafileFilename ) , StandardOpenOption.READ, StandardOpenOption.SPARSE)
         fileSize = data.size()
 
         // report on record alignment of the file

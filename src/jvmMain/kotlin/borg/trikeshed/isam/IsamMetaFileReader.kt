@@ -4,7 +4,11 @@ import borg.trikeshed.isam.meta.IOMemento
 import borg.trikeshed.isam.meta.PlatformCodec.createDecoder
 import borg.trikeshed.isam.meta.PlatformCodec.createEncoder
 import java.io.File
+import java.nio.charset.StandardCharsets.UTF_8
 import java.nio.file.Files
+import java.nio.file.OpenOption
+import java.nio.file.Paths
+import java.nio.file.StandardOpenOption
 
 /**
  * A class that can read the metadata file and create a collection of record constraints
@@ -19,9 +23,9 @@ Open_time Close_time Open High Low Close Volume Quote_asset_volume Number_of_tra
 IoInstant IoInstant IoDouble IoDouble IoDouble IoDouble IoDouble IoDouble IoInt IoDouble IoDouble
 ```
  */
-actual class IsamMetaFileReader(val metafileFilename: String) { 
+actual class IsamMetaFileReader(val metafileFilename: String) {
     var recordlen: Int = -1
-    lateinit var constraints: List<RecordMeta>
+      var constraints: List<RecordMeta> = mutableListOf()
 
     /** reader function for the metadata file
      * 1. open the metafile descriptor for reading
@@ -33,8 +37,8 @@ actual class IsamMetaFileReader(val metafileFilename: String) {
     actual fun open() {
         val lines = Files.readAllLines(File(metafileFilename).toPath()).filterNot { it.trim().startsWith("#") }
         val coords = lines[0].split("\\s+".toRegex())
-        val names =  lines[1].split("\\s+".toRegex())
-        val types =  lines[2].split("\\s+".toRegex())
+        val names = lines[1].split("\\s+".toRegex())
+        val types = lines[2].split("\\s+".toRegex())
         recordlen = coords.last().toInt()
 
         //avoid using zip to construct the constraints because the zip will stop at the shortest list
@@ -49,21 +53,23 @@ actual class IsamMetaFileReader(val metafileFilename: String) {
             RecordMeta(name, type, begin, end, decoder, encoder)
         }
     }
- actual companion object {
-     /** metafile writer function
-      * 1. open the metafile descriptor for writing
-      * 1. write the file from a collection of record constraints
-      * 1. close the file descriptor
-      */
-     actual fun write(metafilename:String,recordMetas: List<RecordMeta>) {
-         val lines = mutableListOf<String>()
-         lines.add("# format:  coords WS .. EOL names WS .. EOL TypeMememento WS ..")
-         lines.add("# last coord is the recordlen")
-         lines.add(recordMetas.joinToString(" ") { it.begin.toString() + " " + it.end })
-         lines.add(recordMetas.joinToString(" ") { it.name })
-         lines.add(recordMetas.joinToString(" ") { it.type.name })
-         lines.add("# recordlen: ${recordMetas.last().end}")
-         File(metafilename).writeText(lines.joinToString("\n"))
-     }
- }
+
+    actual companion object {
+        /** metafile writer function
+         * 1. open the metafile descriptor for writing
+         * 1. write the file from a collection of record constraints
+         * 1. close the file descriptor
+         */
+        actual fun write(metafilename: String, recordMetas: List<RecordMeta>) {
+            val lines = mutableListOf<String>()
+            lines.add("# format:  coords WS .. EOL names WS .. EOL TypeMememento WS .. [EOL]")
+            lines.add("# last coord is the recordlen")
+            lines.add(recordMetas.joinToString(" ") { it.begin.toString() + " " + it.end })
+            lines.add(recordMetas.joinToString(" ") { it.name })
+            lines.add(recordMetas.joinToString(" ") { it.type.name })
+            val path = Paths.get(metafilename)
+            Files.write(path, lines, UTF_8, StandardOpenOption.TRUNCATE_EXISTING)
+
+        }
+    }
 }

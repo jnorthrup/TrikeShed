@@ -23,9 +23,9 @@ plugins {
 group= "org.bereft"
 version = "1.0"
 
+/*    maven("https://mvnrepository.com/artifact/org.jetbrains.kotlinx/") */
 repositories {
     maven("https://oss.sonatype.org/content/repositories/snapshots/")
-    maven("https://mvnrepository.com/artifact/org.jetbrains.kotlinx/")
     mavenCentral()
     mavenLocal()
     gradlePluginPortal()
