@@ -3,6 +3,7 @@
 package borg.trikeshed.isam.meta
 
 import borg.trikeshed.common.parser.simple.CharSeries
+import borg.trikeshed.isam.meta.PlatformCodec.Companion.currentPlatformCodec
 import borg.trikeshed.lib.*
 import kotlinx.datetime.Instant
 import kotlinx.datetime.LocalDate
@@ -14,28 +15,74 @@ enum class IOMemento(override val networkSize: Int? = null, val fromChars: (Seri
             'f' -> false
             else -> throw IllegalArgumentException("invalid boolean: $it")
         }
-    }),
+    }) {
+        override fun createEncoder(i: Int): (Any?) -> ByteArray = writeBool
+        override fun createDecoder(size: Int): (ByteArray) -> Any? = readBool
+    },
     IoByte(1, {
         it.parseLong().toByte()
-    }),
-    IoShort(2, {
-        it.parseLong().toShort()
-    }),
-    IoInt(4, { it.parseLong().toInt() }),
-    IoLong(8, Series<Char>::parseLong),
-    IoFloat(4, { it.parseDouble().toFloat() }),
-    IoDouble(8, { it.parseDouble() }),
-    IoLocalDate(8, { it.parseIsoDateTime() }),
+    }) {
+        override fun createEncoder(i: Int): (Any?) -> ByteArray = writeByte
+        override fun createDecoder(size: Int): (ByteArray) -> Any? = readByte
+    },
+    IoShort(2, { it.parseLong().toShort() }) {
+        override fun createEncoder(i: Int): (Any?) -> ByteArray = currentPlatformCodec.writeShort as (Any?) -> ByteArray
+        override fun createDecoder(size: Int): (ByteArray) -> Any? = currentPlatformCodec.readShort
+    },
+
+    IoInt(4, { it.parseLong().toInt() }) {
+        override fun createEncoder(i: Int): (Any?) -> ByteArray = currentPlatformCodec.writeInt as (Any?) -> ByteArray
+        override fun createDecoder(size: Int): (ByteArray) -> Any? = currentPlatformCodec.readInt
+    },
+    IoLong(8, Series<Char>::parseLong) {
+        override fun createEncoder(i: Int): (Any?) -> ByteArray = currentPlatformCodec.writeLong as (Any?) -> ByteArray
+        override fun createDecoder(size: Int): (ByteArray) -> Any? = currentPlatformCodec.readLong
+    },
+    IoFloat(4, { it.parseDouble().toFloat() }) {
+        override fun createEncoder(i: Int): (Any?) -> ByteArray = currentPlatformCodec.writeFloat as (Any?) -> ByteArray
+        override fun createDecoder(size: Int): (ByteArray) -> Any? = currentPlatformCodec.readFloat
+    },
+    IoDouble(8, { it.parseDouble() }) {
+        override fun createEncoder(i: Int): (Any?) -> ByteArray =
+            currentPlatformCodec.writeDouble as (Any?) -> ByteArray
+
+        override fun createDecoder(size: Int): (ByteArray) -> Any? = currentPlatformCodec.readDouble
+    },
+    IoLocalDate(8, { it.parseIsoDateTime() }) {
+        override fun createEncoder(i: Int): (Any?) -> ByteArray = writeLocalDate as (Any?) -> ByteArray
+        override fun createDecoder(size: Int): (ByteArray) -> Any? = readLocalDate
+    },
 
     /**
      * 12 bytes of storage, first epoch seconds Long , then nanos Int
      */
-    IoInstant(12, { Instant.parse(it.toString()) }),
-    IoString(null, { it.asString() }),
-    IoCharSeries(null, ::CharSeries),
-    IoByteArray(null, { it.encodeToByteArray() }),
-    IoNothing(null, { "" }),
+    IoInstant(12,
+        { Instant.parse(it.toString()) }) {
+        override fun createEncoder(i: Int): (Any?) -> ByteArray = writeInstant
+
+        override fun createDecoder(size: Int): (ByteArray) -> Any? = readInstant
+    },
+    IoString(null, { it.asString() }) {
+        override fun createEncoder(i: Int): (Any?) -> ByteArray = writeString
+
+        override fun createDecoder(size: Int): (ByteArray) -> Any? = readString
+    },
+    IoCharSeries(null, ::CharSeries) {
+        override fun createEncoder(i: Int): (Any?) -> ByteArray = writeCharSeries
+        override fun createDecoder(size: Int): (ByteArray) -> Any? = readCharSeries
+    },
+    IoByteArray(null, { it.encodeToByteArray() }) {
+        override fun createEncoder(i: Int): (Any?) -> ByteArray = writeByteArray
+        override fun createDecoder(size: Int): (ByteArray) -> Any? = readByteArray
+    },
+    IoNothing(null, { "" }) {
+        override fun createEncoder(i: Int): (Any?) -> ByteArray = { ByteArray(0) }
+        override fun createDecoder(size: Int): (ByteArray) -> Any? = { ByteArray(0) }
+    }
     ;
+
+    abstract fun createEncoder(i: Int): (Any?) -> ByteArray
+    abstract fun createDecoder(size: Int): (ByteArray) -> Any?
 
     companion object {
         val readCharSeries: (ByteArray) -> Series<Char> =
@@ -46,51 +93,41 @@ enum class IOMemento(override val networkSize: Int? = null, val fromChars: (Seri
         val writeByteArray: (Any?) -> ByteArray = { value: Any? -> value as ByteArray }
 
         //        val readLocalDate: (ByteArray) -> LocalDate
-//        val writeLocalDate: (Any?) -> ByteArray           
-//        val writeString: (Any?) -> ByteArray 
-//        val writeNothing: (Any?) -> ByteArray 
-//        val readBool: (ByteArray) -> Boolean       
-//        val readByte: (ByteArray) -> Byte         
-//        val readInstant: (ByteArray) -> Instant             
-//        val readString: (ByteArray) -> String
-//        val readNothing: (ByteArray) -> Nothing?
-//        val writeInstant: (Any?) -> ByteArray        
+        //        val writeLocalDate: (Any?) -> ByteArray
+        //        val writeString: (Any?) -> ByteArray
+        //        val writeNothing: (Any?) -> ByteArray
+        //        val readBool: (ByteArray) -> Boolean
+        //        val readByte: (ByteArray) -> Byte
+        //        val readInstant: (ByteArray) -> Instant
+        //        val readString: (ByteArray) -> String
+        //        val readNothing: (ByteArray) -> Nothing?
+        //        val writeInstant: (Any?) -> ByteArray
+
         val readInstant = { value: ByteArray ->
-            Instant.fromEpochSeconds(
-                value.networkOrderGetLongAt(0),
-                value.networkOrderGetIntAt(8)
-            )
+            val seconds = currentPlatformCodec.readLong(value.sliceArray(0..7))
+            val nanos =PlatformCodec.currentPlatformCodec.readInt(value.sliceArray(8..11))
+            Instant.fromEpochSeconds(seconds, nanos)
+
         }
-        val readLocalDate = { value: ByteArray ->
-            LocalDate.fromEpochDays(
-                value.networkOrderGetLongAt(0).toInt()
-            )
+        val writeInstant = { value: Any? ->
+            val instant = value as Instant
+            val seconds = instant.epochSeconds
+            val nanos = instant.nanosecondsOfSecond
+            currentPlatformCodec.writeLong( seconds)+ currentPlatformCodec.writeInt( nanos)
+        }
+        val readLocalDate = { value: ByteArray -> LocalDate.fromEpochDays(value.networkOrderGetLongAt(0).toInt()) }
+        val writeLocalDate = { value: LocalDate ->
+            val l1 = value.toEpochDays().toLong()
+            currentPlatformCodec.writeLong(l1)
         }
         val readString = { value: ByteArray -> value.decodeToString() }
-        val readNothing = { _: ByteArray -> null }
-        val writeLocalDate = { value: Any? ->
-            ByteArray(8).apply<ByteArray> {
-                ->
-                networkOrderSetLongAt(
-                    0,
-                    (value as LocalDate).toEpochDays().toLong()
-                )
-            }
-        }
         val writeString = { value: Any? -> (value as String).encodeToByteArray() }
+        val readNothing = { _: ByteArray -> null }
         val writeNothing = { _: Any? -> ByteArray(0) }
-
-
-        val writeInstant = { value: Any? ->
-            ByteArray(12).apply {
-                networkOrderSetLongAt(
-                    0,
-                    (value as Instant).epochSeconds
-                ); networkOrderSetIntAt(8, value.nanosecondsOfSecond)
-            }
-        }
-        val readBool = { value: ByteArray -> value[0] == 1.toByte() }
-        val readByte = { value: ByteArray -> value[0] }
     }
-
 }
+
+val readBool = { value: ByteArray -> value[0] == 1.toByte() }
+val readByte = { value: ByteArray -> value[0] }
+val writeBool = { value: Any? -> ByteArray(1).apply { this[0] = if (value as Boolean) 1 else 0 } }
+val writeByte = { value: Any? -> ByteArray(1).apply { this[0] = value as Byte } }

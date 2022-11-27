@@ -494,7 +494,7 @@ class PosixFile(
                 while (true) {
                     read = getline(line.ptr, len.ptr, fp)
                     if (read == -1L) break
-                    yield(/*CharSeries*/(line.value!!.toKString().trim()))
+                    yield(/*CharSeries*/line.value!!.toKString().trim())
                 }
                 free(line.value)
                 if (ferror(fp) != 0) {
@@ -537,7 +537,6 @@ class PosixFile(
             file.close()
             ByteArray(len) { buf[it] }
         }
-
         fun readString(filename: String): String = readAllBytes(filename).decodeToString()
         fun writeBytes(filename: String, bytes: ByteArray) = memScoped {
             val file = PosixFile(filename)
@@ -548,8 +547,6 @@ class PosixFile(
             HasPosixErr.posixRequires(written.toLong() == len.toLong()) { "writeAllBytes $filename" }
             file.close()
         }
-
-
         /**
          * writes \n terminated lines to a file
          */

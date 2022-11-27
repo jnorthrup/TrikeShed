@@ -93,7 +93,7 @@ actual class IsamDataFile(
 
             val last = meta0.last()
             val meta=(meta0 α {
-                val encoder = PlatformCodec.createEncoder(it.type, it.end - it.begin)
+                val encoder = it.type.createEncoder( it.end - it.begin)
                 RecordMeta(it.name, it.type, it.begin, it.end, encoder = encoder)
             }).toArray()
             val rowLen = last.end

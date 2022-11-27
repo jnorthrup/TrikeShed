@@ -1,8 +1,6 @@
 package borg.trikeshed.isam
 
 import borg.trikeshed.isam.meta.IOMemento
-import borg.trikeshed.isam.meta.PlatformCodec.createDecoder
-import borg.trikeshed.isam.meta.PlatformCodec.createEncoder
 
 data class RecordMeta(
     /** column name*/
@@ -14,9 +12,9 @@ data class RecordMeta(
     /** context-specific byte offset ending*/
     val end: Int = -1,
     /** a lambda that converts a byte[]  to downstream, often but not necessarily the IoMemento utility */
-    val decoder: (ByteArray) -> Any? = createDecoder(type, end - begin),
+    val decoder: (ByteArray) -> Any? = type.createDecoder(end - begin),
     /** a lambda that produces a byte[] for marshalling to disk or elsewhere */
-    val encoder: (Any?) -> ByteArray = createEncoder(type, end - begin),
+    val encoder: (Any?) -> ByteArray = type.createEncoder(end - begin),
     /** open to interpretation, for instance, CSV conversion to ISAM might define two RecordMetas for two steps*/
     var child: RecordMeta? = null,
 ) : ColMeta

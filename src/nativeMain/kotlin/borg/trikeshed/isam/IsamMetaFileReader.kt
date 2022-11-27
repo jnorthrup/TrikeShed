@@ -78,8 +78,8 @@ actual class IsamMetaFileReader(val metafileFilename: String) {
                 val end = coords[2 * index + 1].toInt()
                 val ioMemento = IOMemento.valueOf(type)
                 //use PlatformCodec to get the decoder and encoder
-                val decoder = PlatformCodec.createDecoder(ioMemento, end - begin)
-                val encoder = PlatformCodec.createEncoder(ioMemento, end - begin)
+                val decoder =  ioMemento.createDecoder( end - begin)
+                val encoder =ioMemento.createEncoder(end - begin)
                 RecordMeta(name, ioMemento, begin, end, decoder, encoder)
             }
         }

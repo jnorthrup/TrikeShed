@@ -1,12 +1,9 @@
 package borg.trikeshed.isam
 
 import borg.trikeshed.isam.meta.IOMemento
-import borg.trikeshed.isam.meta.PlatformCodec.createDecoder
-import borg.trikeshed.isam.meta.PlatformCodec.createEncoder
 import java.io.File
 import java.nio.charset.StandardCharsets.UTF_8
 import java.nio.file.Files
-import java.nio.file.OpenOption
 import java.nio.file.Paths
 import java.nio.file.StandardOpenOption
 
@@ -48,8 +45,8 @@ actual class IsamMetaFileReader(val metafileFilename: String) {
             val name = names[i]
             val type = IOMemento.valueOf(types[i])
             val size = end - begin
-            val decoder: (ByteArray) -> Any? = createDecoder(type, size)
-            val encoder: (Any?) -> ByteArray = createEncoder(type, size)
+            val decoder  = type.createDecoder( size) as (ByteArray) -> Any?
+            val encoder: (Any?) -> ByteArray = type.createEncoder( size)
             RecordMeta(name, type, begin, end, decoder, encoder)
         }
     }
