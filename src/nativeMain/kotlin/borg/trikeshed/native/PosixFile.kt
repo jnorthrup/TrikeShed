@@ -380,7 +380,7 @@ class PosixFile(
 
         /** offset must be a multiple
         of the page size as returned by sysconf(_SC_PAGE_SIZE).*/
-        offset: off_t = 0L
+        offset: off_t = 0L,
     ): CPointer<CArrayPointerVar<ByteVar>> {
 
         require(offset % sysconf(_SC_PAGE_SIZE).toLong() == 0L) { "offset must be a multiple of the page size as returned by sysconf(_SC_PAGE_SIZE)." }
@@ -476,6 +476,7 @@ class PosixFile(
                 file_path.substring(tail.inc())
             )
         }
+
         fun exists(fname: String) = access(fname, F_OK).z
 
         //todo: better FILE* handling
@@ -484,14 +485,14 @@ class PosixFile(
         fun readLinesSeq(path: String): Sequence<String> = memScoped {
 
             val file = PosixFile(path)
-            val fp   = fdopen(file.fd, "r")
-            val line: CPointerVarOf<CPointer<ByteVarOf<Byte>>> = alloc<CPointerVar<ByteVar>>()
-            val len: ULongVarOf<size_t> = alloc<size_tVar>()
+            val fp = fdopen(file.fd, "r")
+            val line: CPointerVarOf<CPointer<ByteVarOf<Byte>>> = alloc()
+            val len: ULongVarOf<size_t> = alloc()
             len.value = 0u
             var read: ssize_t = 0L
-            return sequence {
+            return sequence<String> {
                 while (true) {
-                    read =  getline(line.ptr, len.ptr, fp )
+                    read = getline(line.ptr, len.ptr, fp)
                     if (read == -1L) break
                     yield(/*CharSeries*/(line.value!!.toKString().trim()))
                 }
@@ -500,23 +501,21 @@ class PosixFile(
                     perror("ferror")
                     exit(1)
                 }
-            }
+            }.also { file.close().also { fclose(fp) } }
 
         }
 
-
-        /** lean on getline to read a file into a List of CharSeries */
-        fun readLines(path: String): List<String> = memScoped{
+        fun readLines(path: String): List<String> = memScoped {
             val file = PosixFile(path)
-            val fp   = fdopen(file.fd, "r")
-            val line: CPointerVarOf<CPointer<ByteVarOf<Byte>>> = alloc<CPointerVar<ByteVar>>()
-            val len: ULongVarOf<size_t> = alloc<size_tVar>()
+            val fp = fdopen(file.fd, "r")
+            val line: CPointerVarOf<CPointer<ByteVarOf<Byte>>> = alloc()
+            val len: ULongVarOf<size_t> = alloc()
             len.value = 0u
             var read: ssize_t = 0L
             val list: MutableList<String> = mutableListOf<String>()
 
             while (true) {
-                read =  getline(line.ptr, len.ptr, fp )
+                read = getline(line.ptr, len.ptr, fp)
                 if (read == -1L) break
                 list.add((line.value!!.toKString().trim()))
             }
@@ -525,43 +524,47 @@ class PosixFile(
                 perror("ferror")
                 exit(1)
             }
-            return list
+            return list.also { file.close().also { fclose(fp) } }
         }
-         fun readAllBytes(filename: String): ByteArray = memScoped {
+
+        fun readAllBytes(filename: String): ByteArray = memScoped {
             val file = PosixFile(filename)
             val stat = statk(filename)
             val len = stat.st_size.convert<Int>()
             val buf = allocArray<ByteVar>(len)
             val read = read(file.fd, buf, len.convert())
             HasPosixErr.posixRequires(read.toLong() == len.toLong()) { "readAllBytes $filename" }
+            file.close()
             ByteArray(len) { buf[it] }
         }
 
-         fun readString(filename: String): String = readAllBytes(filename).decodeToString()
-         fun writeAllBytes(filename: String, bytes: ByteArray) = memScoped {
+        fun readString(filename: String): String = readAllBytes(filename).decodeToString()
+        fun writeBytes(filename: String, bytes: ByteArray) = memScoped {
             val file = PosixFile(filename)
             val len = bytes.size
             val buf = allocArray<ByteVar>(len)
             bytes.forEachIndexed { index, byte -> buf[index] = byte }
             val written = write(file.fd, buf, len.convert())
             HasPosixErr.posixRequires(written.toLong() == len.toLong()) { "writeAllBytes $filename" }
-         }
+            file.close()
+        }
 
 
         /**
          * writes \n terminated lines to a file
          */
-        fun writeAllLines(filename: String, lines: List<String>) = memScoped {
+        fun writeLines(filename: String, lines: List<String>) = memScoped {
             val file = PosixFile(filename)
             lines.forEach { line ->
                 val len = line.length
                 val buf = line.plus('\n').cstr.getPointer(this)
                 val written = write(file.fd, buf, len.inc().convert())
                 HasPosixErr.posixRequires(written.toLong() == len.inc().toLong()) { "writeAllLines $filename" }
+            }.also {
+                file.close()
             }
-
-         }
-         fun writeString(filename: String, string: String) = writeAllBytes(filename, string.encodeToByteArray())
+        }
+        fun writeString(filename: String, string: String) = writeBytes(filename, string.encodeToByteArray())
 
     }
 }
