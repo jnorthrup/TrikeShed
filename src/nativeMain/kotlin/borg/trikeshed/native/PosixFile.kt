@@ -478,68 +478,90 @@ class PosixFile(
         }
         fun exists(fname: String) = access(fname, F_OK).z
 
+        //todo: better FILE* handling
+
         /** lean on getline to read a file into a sequence of CharSeries */
         fun readLinesSeq(path: String): Sequence<String> = memScoped {
+
+            val file = PosixFile(path)
+            val fp   = fdopen(file.fd, "r")
+            val line: CPointerVarOf<CPointer<ByteVarOf<Byte>>> = alloc<CPointerVar<ByteVar>>()
+            val len: ULongVarOf<size_t> = alloc<size_tVar>()
+            len.value = 0u
+            var read: ssize_t = 0L
             return sequence {
-                val fp = fopen(path, "r")
-                if (fp == null) {
-                    perror("fopen")
-                    exit(1)
-                }
-
-                val line: CPointerVarOf<CPointer<ByteVarOf<Byte>>> = alloc<CPointerVar<ByteVar>>()
-                val len: ULongVarOf<size_t> = alloc<size_tVar>()
-                len.value = 0u
-                var read: ssize_t = 0L
-
                 while (true) {
-                    read = getline(line.ptr, len.ptr, fp)
+                    read =  getline(line.ptr, len.ptr, fp )
                     if (read == -1L) break
                     yield(/*CharSeries*/(line.value!!.toKString().trim()))
                 }
                 free(line.value)
-                fclose(fp)
                 if (ferror(fp) != 0) {
                     perror("ferror")
                     exit(1)
                 }
             }
+
         }
 
 
         /** lean on getline to read a file into a List of CharSeries */
         fun readLines(path: String): List<String> = memScoped{
-//cinterop as above
-
-            val list = mutableListOf<String>()
-            val fp = fopen(path, "r")
-            if (fp == null) {
-                perror("fopen")
-                exit(1)
-            }
-
+            val file = PosixFile(path)
+            val fp   = fdopen(file.fd, "r")
             val line: CPointerVarOf<CPointer<ByteVarOf<Byte>>> = alloc<CPointerVar<ByteVar>>()
             val len: ULongVarOf<size_t> = alloc<size_tVar>()
             len.value = 0u
             var read: ssize_t = 0L
+            val list: MutableList<String> = mutableListOf<String>()
 
             while (true) {
-                read = getline(line.ptr, len.ptr, fp)
+                read =  getline(line.ptr, len.ptr, fp )
                 if (read == -1L) break
-                list.add(/*CharSeries*/(line.value!!.toKString().trim()))
+                list.add((line.value!!.toKString().trim()))
             }
             free(line.value)
-            fclose(fp)
             if (ferror(fp) != 0) {
                 perror("ferror")
                 exit(1)
             }
             return list
         }
+         fun readAllBytes(filename: String): ByteArray = memScoped {
+            val file = PosixFile(filename)
+            val stat = statk(filename)
+            val len = stat.st_size.convert<Int>()
+            val buf = allocArray<ByteVar>(len)
+            val read = read(file.fd, buf, len.convert())
+            HasPosixErr.posixRequires(read.toLong() == len.toLong()) { "readAllBytes $filename" }
+            ByteArray(len) { buf[it] }
+        }
+
+         fun readString(filename: String): String = readAllBytes(filename).decodeToString()
+         fun writeAllBytes(filename: String, bytes: ByteArray) = memScoped {
+            val file = PosixFile(filename)
+            val len = bytes.size
+            val buf = allocArray<ByteVar>(len)
+            bytes.forEachIndexed { index, byte -> buf[index] = byte }
+            val written = write(file.fd, buf, len.convert())
+            HasPosixErr.posixRequires(written.toLong() == len.toLong()) { "writeAllBytes $filename" }
+         }
 
 
+        /**
+         * writes \n terminated lines to a file
+         */
+        fun writeAllLines(filename: String, lines: List<String>) = memScoped {
+            val file = PosixFile(filename)
+            lines.forEach { line ->
+                val len = line.length
+                val buf = line.plus('\n').cstr.getPointer(this)
+                val written = write(file.fd, buf, len.inc().convert())
+                HasPosixErr.posixRequires(written.toLong() == len.inc().toLong()) { "writeAllLines $filename" }
+            }
 
+         }
+         fun writeString(filename: String, string: String) = writeAllBytes(filename, string.encodeToByteArray())
 
     }
-
 }

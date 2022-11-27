@@ -1,8 +1,5 @@
 package borg.trikeshed.common
 
-import borg.trikeshed.common.parser.simple.CharSeries
-import kotlinx.cinterop.*
-import platform.posix.*
 import simple.PosixFile
 
 /** lean on getline to read a file into a sequence of CharSeries */
