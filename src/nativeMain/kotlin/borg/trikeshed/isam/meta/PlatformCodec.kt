@@ -9,6 +9,8 @@ import borg.trikeshed.isam.meta.IOMemento.Companion.readInstant
 import borg.trikeshed.isam.meta.IOMemento.Companion.readLocalDate
 import borg.trikeshed.isam.meta.IOMemento.Companion.readNothing
 import borg.trikeshed.isam.meta.IOMemento.Companion.readString
+import borg.trikeshed.isam.meta.IOMemento.Companion.writeBoolean
+import borg.trikeshed.isam.meta.IOMemento.Companion.writeByte
 import borg.trikeshed.isam.meta.IOMemento.Companion.writeByteArray
 import borg.trikeshed.isam.meta.IOMemento.Companion.writeCharSeries
 import borg.trikeshed.isam.meta.IOMemento.Companion.writeInstant
@@ -18,26 +20,22 @@ import borg.trikeshed.isam.meta.IOMemento.Companion.writeString
 import borg.trikeshed.lib.*
 
 actual object PlatformCodec {
-
-
     actual val readInt = { value: ByteArray -> value.networkOrderGetIntAt(0) }
     actual val readLong = { value: ByteArray -> value.networkOrderGetLongAt(0) }
     actual val readFloat = { value: ByteArray -> value.networkOrderGetFloatAt(0) }
     actual val readDouble = { value: ByteArray -> value.networkOrderGetDoubleAt(0) }
+    actual val readShort = { value: ByteArray -> value.networkOrderGetShortAt(0) }
 
-    actual val writeBool = { value: Any? -> byteArrayOf(if (value as Boolean) 1 else 0) }
-    actual val writeByte = { value: Any? -> byteArrayOf(value as Byte) }
     actual val writeInt = { value: Any? -> ByteArray(4).apply { networkOrderSetIntAt(0, value as Int) } }
     actual val writeShort = { value: Any? -> ByteArray(2).apply { networkOrderSetShortAt(0, value as Short) } }
     actual val writeLong = { value: Any? -> ByteArray(8).apply { networkOrderSetLongAt(0, value as Long) } }
     actual val writeFloat = { value: Any? -> ByteArray(4).apply { networkOrderSetFloatAt(0, value as Float) } }
     actual val writeDouble = { value: Any? -> ByteArray(8).apply { networkOrderSetDoubleAt(0, value as Double) } }
 
-
     actual fun createEncoder(type: IOMemento, size: Int): (Any?) -> ByteArray {
         // must use corresponding  networkOrderSetXXX functions to set the bytes in the ByteArray
         return when (type) {
-            IoBoolean -> writeBool
+            IoBoolean -> writeBoolean
             IoByte -> writeByte
 
             IoInt -> writeInt
@@ -78,5 +76,4 @@ actual object PlatformCodec {
         }
     }
 
-    actual val readShort: (ByteArray) -> Short = { value: ByteArray -> value.networkOrderGetShortAt(0) }
 }

@@ -1,10 +1,10 @@
 package borg.trikeshed.lib
 
-/**
- * this is a set of helper extension functions to produce network-endian versions of getIntAt, setIntAt, getLongAt, setLongAt, etc. for ByteArray
+/** this is a set of helper extension functions to produce network-endian versions of getIntAt, setIntAt, getLongAt,
+ *  setLongAt, etc. for ByteArray
  *
- * the kotlin native package marshalling is treated as if it was in Least-Significant-Byte first (little-endian) byte order.
- * we have to conform to what java ByteBuffer reads/writes in network order (big-endian)
+ * the kotlin native package marshalling is treated as if it was in Least-Significant-Byte first (little-endian) byte
+ * order.  we have to conform to what java ByteBuffer reads/writes in network order (big-endian)
  *
  * the functions in this file use the symbol prefix "networkOrder" to indicate that they are in network order
  */
