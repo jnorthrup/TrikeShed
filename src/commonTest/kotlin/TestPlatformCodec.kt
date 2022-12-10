@@ -7,7 +7,7 @@ import kotlin.test.Test
 class TestPlatformCodec {
     @Test
     fun testPlatformCodec() {
-        val r=PlatformCodec.currentPlatformCodec
+        val r=PlatformCodec. Companion.currentPlatformCodec
         println(r)
     }
 }

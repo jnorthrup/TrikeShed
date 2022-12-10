@@ -4,8 +4,12 @@ package borg.trikeshed.isam.meta
 
 import borg.trikeshed.common.parser.simple.CharSeries
 import borg.trikeshed.isam.meta.PlatformCodec.Companion.currentPlatformCodec
+import borg.trikeshed.isam.meta.PlatformCodec.Companion.currentPlatformCodec.readInt
+import borg.trikeshed.isam.meta.PlatformCodec.Companion.currentPlatformCodec.readLong
+import borg.trikeshed.isam.meta.PlatformCodec.Companion.currentPlatformCodec.writeInt
+import borg.trikeshed.isam.meta.PlatformCodec.Companion.currentPlatformCodec.writeLong
 import borg.trikeshed.lib.*
-import kotlinx.datetime.Instant
+import kotlinx.datetime.*
 import kotlinx.datetime.LocalDate
 
 enum class IOMemento(override val networkSize: Int? = null, val fromChars: (Series<Char>) -> Any) : TypeMemento {
@@ -31,12 +35,12 @@ enum class IOMemento(override val networkSize: Int? = null, val fromChars: (Seri
     },
 
     IoInt(4, { it.parseLong().toInt() }) {
-        override fun createEncoder(i: Int): (Any?) -> ByteArray = currentPlatformCodec.writeInt as (Any?) -> ByteArray
-        override fun createDecoder(size: Int): (ByteArray) -> Any? = currentPlatformCodec.readInt
+        override fun createEncoder(i: Int): (Any?) -> ByteArray =currentPlatformCodec. writeInt as (Any?) -> ByteArray
+        override fun createDecoder(size: Int): (ByteArray) -> Any? =currentPlatformCodec. readInt
     },
     IoLong(8, Series<Char>::parseLong) {
-        override fun createEncoder(i: Int): (Any?) -> ByteArray = currentPlatformCodec.writeLong as (Any?) -> ByteArray
-        override fun createDecoder(size: Int): (ByteArray) -> Any? = currentPlatformCodec.readLong
+        override fun createEncoder(i: Int): (Any?) -> ByteArray =currentPlatformCodec. writeLong as (Any?) -> ByteArray
+        override fun createDecoder(size: Int): (ByteArray) -> Any? =currentPlatformCodec. readLong
     },
     IoFloat(4, { it.parseDouble().toFloat() }) {
         override fun createEncoder(i: Int): (Any?) -> ByteArray = currentPlatformCodec.writeFloat as (Any?) -> ByteArray
@@ -49,8 +53,20 @@ enum class IOMemento(override val networkSize: Int? = null, val fromChars: (Seri
         override fun createDecoder(size: Int): (ByteArray) -> Any? = currentPlatformCodec.readDouble
     },
     IoLocalDate(8, { it.parseIsoDateTime() }) {
-        override fun createEncoder(i: Int): (Any?) -> ByteArray = writeLocalDate as (Any?) -> ByteArray
-        override fun createDecoder(size: Int): (ByteArray) -> Any? = readLocalDate
+        override fun createEncoder(i: Int): (Any?) -> ByteArray = {
+            //try a cast elvis first with Instant then with LocalDate
+            val date = (it as? Instant)?.toLocalDateTime(TimeZone.UTC)?.date ?: it as LocalDate
+//
+//            val toEpochDays = (it as LocalDate).toEpochDays()
+//            writeLong (toEpochDays.toLong())
+            writeLong(date.toEpochDays().toLong())
+
+
+        }
+        override fun createDecoder(size: Int): (ByteArray) -> Any? = {
+            val fromEpochDays = LocalDate.fromEpochDays(readLong(it).toInt())
+            fromEpochDays
+        }
     },
 
     /**
@@ -58,9 +74,17 @@ enum class IOMemento(override val networkSize: Int? = null, val fromChars: (Seri
      */
     IoInstant(12,
         { Instant.parse(it.toString()) }) {
-        override fun createEncoder(i: Int): (Any?) -> ByteArray = writeInstant
-
-        override fun createDecoder(size: Int): (ByteArray) -> Any? = readInstant
+        override fun createEncoder(i: Int): (Any?) -> ByteArray = { inst: Any? ->
+            val instant = inst as Instant
+            val epochSeconds = instant.epochSeconds
+            val nanoAdjustment = instant.nanosecondsOfSecond
+            writeLong(epochSeconds)+writeInt(nanoAdjustment)
+        }
+        override fun createDecoder(size: Int): (ByteArray) -> Any? = { bytes: ByteArray ->
+            val epochSeconds = readLong(bytes)
+            val nanoAdjustment = readInt(bytes.sliceArray(8..11))
+            Instant.fromEpochSeconds(epochSeconds, nanoAdjustment)
+        }
     },
     IoString(null, { it.asString() }) {
         override fun createEncoder(i: Int): (Any?) -> ByteArray = writeString
@@ -103,31 +127,30 @@ enum class IOMemento(override val networkSize: Int? = null, val fromChars: (Seri
         //        val readNothing: (ByteArray) -> Nothing?
         //        val writeInstant: (Any?) -> ByteArray
 
-        val readInstant = { value: ByteArray ->
-            val seconds = currentPlatformCodec.readLong(value.sliceArray(0..7))
-            val nanos =PlatformCodec.currentPlatformCodec.readInt(value.sliceArray(8..11))
-            Instant.fromEpochSeconds(seconds, nanos)
-
-        }
-        val writeInstant = { value: Any? ->
-            val instant = value as Instant
-            val seconds = instant.epochSeconds
-            val nanos = instant.nanosecondsOfSecond
-            currentPlatformCodec.writeLong( seconds)+ currentPlatformCodec.writeInt( nanos)
-        }
-        val readLocalDate = { value: ByteArray -> LocalDate.fromEpochDays(value.networkOrderGetLongAt(0).toInt()) }
-        val writeLocalDate = { value: LocalDate ->
-            val l1 = value.toEpochDays().toLong()
-            currentPlatformCodec.writeLong(l1)
-        }
+//        val readInstant = { value: ByteArray ->
+//            val seconds = currentPlatformCodec.readLong(value.sliceArray(0..7))
+//            val nanos = currentPlatformCodec.readInt(value.sliceArray(8..11))
+//            Instant.fromEpochSeconds(seconds, nanos)
+//
+//        }
+//        val writeInstant = { value: Any? ->
+//            val instant = value as Instant
+//            val seconds = instant.epochSeconds
+//            val nanos = instant.nanosecondsOfSecond
+//            currentPlatformCodec.writeLong( seconds)+ currentPlatformCodec.writeInt( nanos)
+//        }
+//        val readLocalDate = { value: ByteArray -> LocalDate.fromEpochDays(value.networkOrderGetLongAt(0).toInt()) }
+//        val writeLocalDate = { value: LocalDate ->
+//            val l1 = value.toEpochDays().toLong()
+//            currentPlatformCodec.writeLong(l1)
+//        }
         val readString = { value: ByteArray -> value.decodeToString() }
         val writeString = { value: Any? -> (value as String).encodeToByteArray() }
-        val readNothing = { _: ByteArray -> null }
-        val writeNothing = { _: Any? -> ByteArray(0) }
+
+
+        val readBool = { value: ByteArray -> value[0] == 1.toByte() }
+        val readByte = { value: ByteArray -> value[0] }
+        val writeBool = { value: Any? -> ByteArray(1).apply { this[0] = if (value as Boolean) 1 else 0 } }
+        val writeByte = { value: Any? -> ByteArray(1).apply { this[0] = value as Byte } }
     }
 }
-
-val readBool = { value: ByteArray -> value[0] == 1.toByte() }
-val readByte = { value: ByteArray -> value[0] }
-val writeBool = { value: Any? -> ByteArray(1).apply { this[0] = if (value as Boolean) 1 else 0 } }
-val writeByte = { value: Any? -> ByteArray(1).apply { this[0] = value as Byte } }

@@ -1,18 +1,17 @@
 package borg.trikeshed.placeholder.nars
 
 import borg.trikeshed.common.parser.simple.CharSeries
+import borg.trikeshed.common.readLines
 import borg.trikeshed.lib.debug
 import borg.trikeshed.lib.first
 import borg.trikeshed.lib.logDebug
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
-import java.nio.file.Paths
-import kotlin.io.path.readLines
 
 
 class NarseseParserTest {
     // read src/jvmTest/resources/sample.nars into lines
-    private val lines: List<String> = Paths.get("src/jvmTest/resources/sample.nars").readLines()
+    private val lines: List<String> = readLines("src/jvmTest/resources/sample.nars")
 
     object abc : Rule by "abc".λ
 
@@ -55,7 +54,7 @@ class NarseseParserTest {
                 }
             }
         }
-        parseContext1= ParseContext()
+        parseContext1 = ParseContext()
         runBlocking {
             launch(parseContext1) {
                 val res = abc(CharSeries("abcabcabc"))
