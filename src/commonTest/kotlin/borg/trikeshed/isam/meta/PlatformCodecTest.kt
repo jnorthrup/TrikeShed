@@ -3,6 +3,10 @@ package testingstuff.borg.trikeshed.isam.meta
 import borg.trikeshed.isam.meta.IOMemento.*
 import kotlinx.datetime.Clock
 import borg.trikeshed.isam.meta.PlatformCodec.Companion.currentPlatformCodec
+import borg.trikeshed.lib.Series
+import borg.trikeshed.lib.asString
+import borg.trikeshed.lib.size
+import borg.trikeshed.lib.toSeries
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import kotlin.test.Test
@@ -68,18 +72,18 @@ class PlatformCodecTest {
                 }
 
                 IoCharSeries -> {
-                    val v = "Hello World"
+                    val v = "Hello World".toSeries()
                     val dec =
                         IoCharSeries.createDecoder(
-                            IoCharSeries.networkSize ?: v.length
+                            IoCharSeries.networkSize ?: v.size
                         )
                     val enc =
                         IoCharSeries.createEncoder(
-                            IoCharSeries.networkSize ?: v.length
+                            IoCharSeries.networkSize ?: v.size
                         )
                     val bytes = enc(v)
-                    val v2 = dec(bytes)
-                    assertEquals(v, v2)
+                    @Suppress("UNCHECKED_CAST") val v2 = dec(bytes) as Series<Char>
+                    assertEquals(v.asString(), v2.asString())
                 }
 
                 IoByteArray -> {
@@ -89,8 +93,8 @@ class PlatformCodecTest {
                     val enc =
                         IoByteArray.createEncoder(IoByteArray.networkSize ?: v.size)
                     val bytes = enc(v)
-                    val v2 = dec(bytes)
-                    assertEquals(v, v2)
+                    val v2 = dec(bytes) as ByteArray
+                    assertEquals( v.toList() , v2.toList())
                 }
 
                 IoShort -> {

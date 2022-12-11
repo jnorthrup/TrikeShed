@@ -109,41 +109,11 @@ enum class IOMemento(override val networkSize: Int? = null, val fromChars: (Seri
     abstract fun createDecoder(size: Int): (ByteArray) -> Any?
 
     companion object {
-        val readCharSeries: (ByteArray) -> Series<Char> =
-            { value: ByteArray -> (value α { it.toInt().toChar() }) }
-        val writeCharSeries: (Any?) -> ByteArray =
-            { value: Any? -> (value as Series<Char>).asString().encodeToByteArray() }
+        val readCharSeries: (ByteArray) -> Series<Char> = { value: ByteArray -> value.decodeToCharSeries() }
+        val writeCharSeries: (Any?) -> ByteArray = { value: Any? -> (value as Series<Char>).encodeToByteArray() }
         val readByteArray: (ByteArray) -> ByteArray = { value: ByteArray -> value }
         val writeByteArray: (Any?) -> ByteArray = { value: Any? -> value as ByteArray }
 
-        //        val readLocalDate: (ByteArray) -> LocalDate
-        //        val writeLocalDate: (Any?) -> ByteArray
-        //        val writeString: (Any?) -> ByteArray
-        //        val writeNothing: (Any?) -> ByteArray
-        //        val readBool: (ByteArray) -> Boolean
-        //        val readByte: (ByteArray) -> Byte
-        //        val readInstant: (ByteArray) -> Instant
-        //        val readString: (ByteArray) -> String
-        //        val readNothing: (ByteArray) -> Nothing?
-        //        val writeInstant: (Any?) -> ByteArray
-
-//        val readInstant = { value: ByteArray ->
-//            val seconds = currentPlatformCodec.readLong(value.sliceArray(0..7))
-//            val nanos = currentPlatformCodec.readInt(value.sliceArray(8..11))
-//            Instant.fromEpochSeconds(seconds, nanos)
-//
-//        }
-//        val writeInstant = { value: Any? ->
-//            val instant = value as Instant
-//            val seconds = instant.epochSeconds
-//            val nanos = instant.nanosecondsOfSecond
-//            currentPlatformCodec.writeLong( seconds)+ currentPlatformCodec.writeInt( nanos)
-//        }
-//        val readLocalDate = { value: ByteArray -> LocalDate.fromEpochDays(value.networkOrderGetLongAt(0).toInt()) }
-//        val writeLocalDate = { value: LocalDate ->
-//            val l1 = value.toEpochDays().toLong()
-//            currentPlatformCodec.writeLong(l1)
-//        }
         val readString = { value: ByteArray -> value.decodeToString() }
         val writeString = { value: Any? -> (value as String).encodeToByteArray() }
 

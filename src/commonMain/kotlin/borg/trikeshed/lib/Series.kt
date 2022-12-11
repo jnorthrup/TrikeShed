@@ -5,6 +5,7 @@ package borg.trikeshed.lib
 
 import borg.trikeshed.common.collections.s_
 import borg.trikeshed.isam.meta.IOMemento.*
+import kotlin.experimental.and
 import kotlin.jvm.JvmInline
 import kotlin.math.max
 import kotlin.math.min
@@ -493,6 +494,26 @@ fun Series<Char>.encodeToByteArray(): ByteArray {
     }
     return r.sliceArray(0..(x+spill-1))
 }
+//opposite method to build a charSeries from byte[]
+fun ByteArray.decodeToCharSeries(): Series<Char> {
+    var x = 0
+    val r = CharArray(size) //trim after
+    while (x < size) {
+        val c = this[x].toInt()
+        if (c < 0x80) {
+            r[x] = c.toChar()
+        } else if (c < 0xE0) {
+            r[x] = ((((c and 0x1F) shl 6) or (((this[x+1] and 0x3F).toInt()))).toChar())
+            x++
+        } else {
+            r[x] = (((c and 0x0F) shl 12) or ((this[x+1] and 0x3F).toInt().shl(6)) or ((this[x+2] and 0x3F).toInt())).toChar()
+            x += 2
+        }
+        x++
+    }
+    return r.sliceArray(0..(x-1)).toSeries()
+}
+
 
 fun Series<Char>.parseIsoDate(): kotlinx.datetime.LocalDate {
     val year = this[0..3].parseLong().toInt()
