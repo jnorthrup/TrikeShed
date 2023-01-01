@@ -7,7 +7,7 @@ import borg.trikeshed.common.TypeEvidence.Companion.update
 import borg.trikeshed.common.parser.simple.CharSeries
 import borg.trikeshed.isam.RecordMeta
 import borg.trikeshed.isam.meta.IOMemento
-import borg.trikeshed.isam.meta.IOMemento.IoCharSeries
+import borg.trikeshed.isam.meta.IOMemento.*
 import borg.trikeshed.lib.*
 import borg.trikeshed.parse.DelimitRange
 import kotlin.jvm.JvmOverloads
@@ -88,6 +88,8 @@ object CSVUtil {
         }
         assert(rlist.size > 0)
         return IntArray(rlist.size) { rlist[it].value }
+        // what happens specifically in the above code when we pass in a line with no cr/lf in the above code:
+
     }
 
 
@@ -220,6 +222,37 @@ object CSVUtil {
                         )
                     }
                 }
+            }
+        }
+    }
+
+
+    /** list<String>  -> CSV Cursor of strings
+     * */
+    @OptIn(ExperimentalUnsignedTypes::class)
+    fun simpelCsvCursor(lineList: List<String>): Cursor {
+        //take line11 as headers.  the split by ','
+        val headerNames = lineList[0].split(",").map { it.trim() }
+        val hdrMeta = headerNames.map { RecordMeta(it, IoString) }
+        //count of fields
+        val fieldCount = headerNames.size
+        val lines = lineList.drop(1)
+        val lineSegments = arrayOfNulls<UShortArray>(lines.size)
+
+        return lines.size j { y ->
+            val line = lines[y]
+            //lazily create linesegs
+            val lineSegs = lineSegments[y] ?: UShortArray(headerNames.size).also { proto ->
+                lineSegments[y] = proto
+                var f = 0
+                for ((x, c) in line.withIndex()) if (c == ',')
+                    proto[f++] = x.toUShort()
+            }
+
+            fieldCount j { x: Int ->
+                val start = if (x == 0) 0 else lineSegs[x - 1].toInt() + 1
+                val end = if (x == fieldCount - 1) line.length else lineSegs[x].toInt()
+                line.substring(start, end) j hdrMeta[x].`↺`
             }
         }
     }
