@@ -76,7 +76,15 @@ actual class FileBuffer actual constructor(filename: String, initialOffset: Long
             initialOffset: Long = 0L,
             blkSize: Long = -1L,
             readOnly: Boolean = true,
-        ): FileBuffer =
-            FileBuffer(filename, initialOffset, blkSize, readOnly)
+        ): FileBuffer = FileBuffer(filename, initialOffset, blkSize, readOnly)
     }
+}
+
+actual fun openFileBuffer(
+    filename: String,
+    initialOffset: Long,
+    blkSize: Long,
+    readOnly: Boolean,
+): FileBuffer {
+    return FileBuffer.open(filename, initialOffset, blkSize, readOnly)
 }

@@ -21,5 +21,7 @@ expect class FileBuffer(
     fun isOpen(): Boolean
     fun size(): Long
     fun get(index: Long): Byte
-    fun put(index: Long, value: Byte)
-    }
+    fun put(index: Long, value: Byte) //undefined effects on size and sync
+}
+
+expect fun openFileBuffer(filename: String, initialOffset: Long = 0, blkSize: Long = -1, readOnly: Boolean = true): FileBuffer

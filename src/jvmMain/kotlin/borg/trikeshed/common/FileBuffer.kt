@@ -9,6 +9,8 @@ import java.nio.channels.FileChannel
  * an openable and closeable mmap file.
  *
  * get has no side effects but put has  undefined effects on size and sync
+ *
+ * see FileBuffer.open
  */
 actual class FileBuffer actual constructor(
     filename: String, initialOffset: Long,
@@ -79,4 +81,9 @@ actual class FileBuffer actual constructor(
             }
         }
     }
+}
+
+actual fun openFileBuffer(
+    filename: String, initialOffset: Long, blkSize: Long, readOnly: Boolean): FileBuffer {
+    return FileBuffer.open(filename, initialOffset, blkSize, readOnly)
 }
