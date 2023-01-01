@@ -1,4 +1,4 @@
-package borg.trikeshed.lib.collections
+package testingstuff.borg.trikeshed.lib.collections
 
 import borg.trikeshed.common.collections.PriorityQueue
 import kotlin.test.Test

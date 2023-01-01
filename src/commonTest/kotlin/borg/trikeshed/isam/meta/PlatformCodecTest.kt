@@ -18,7 +18,6 @@ class PlatformCodecTest {
     @Test
     fun testCurrentCodec() {
         borg.trikeshed.isam.meta.IOMemento.values().forEach {
-
             val current = currentPlatformCodec
 
             when (it) {
@@ -145,5 +144,6 @@ class PlatformCodecTest {
                 IoNothing -> {}
             }
         }
+        println("testCurrentCodec: OK")
     }
 }

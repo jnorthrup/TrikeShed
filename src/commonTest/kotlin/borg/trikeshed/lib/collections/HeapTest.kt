@@ -1,12 +1,13 @@
-package borg.trikeshed.lib.collections
+package testingstuff.borg.trikeshed.lib.collections
 
+import borg.trikeshed.common.collections.Heap
 import kotlin.test.*
 
 class HeapTest {
 
     @Test
     fun add() {
-        val h = borg.trikeshed.common.collections.Heap<Int>()
+        val h = Heap<Int>()
         h.add(1)
         h.add(2)
         h.add(3)
@@ -18,7 +19,7 @@ class HeapTest {
 
     @Test
     fun remove() {
-        val h = borg.trikeshed.common.collections.Heap<Int>()
+        val h = Heap<Int>()
         h.add(1)
         h.add(2)
         h.add(3)
@@ -30,7 +31,7 @@ class HeapTest {
 
     @Test
     fun poll() {
-        val h = borg.trikeshed.common.collections.Heap<Int>()
+        val h = Heap<Int>()
         h.add(1)
         h.add(2)
         h.add(3)
@@ -42,7 +43,7 @@ class HeapTest {
 
     @Test
     fun element() {
-        val h = borg.trikeshed.common.collections.Heap<Int>()
+        val h = Heap<Int>()
         h.add(1)
         h.add(2)
         h.add(3)
@@ -54,7 +55,7 @@ class HeapTest {
 
     @Test
     fun peek() {
-        val h = borg.trikeshed.common.collections.Heap<Int>()
+        val h = Heap<Int>()
         h.add(1)
         h.add(2)
         h.add(3)
@@ -66,7 +67,7 @@ class HeapTest {
 
     @Test
     fun size() {
-        val h = borg.trikeshed.common.collections.Heap<Int>()
+        val h = Heap<Int>()
         h.add(1)
         h.add(2)
         h.add(3)
@@ -82,7 +83,7 @@ class HeapTest {
 
     @Test
     fun isEmpty() {
-        val h = borg.trikeshed.common.collections.Heap<Int>()
+        val h = Heap<Int>()
         h.add(1)
         h.add(2)
         h.add(3)
@@ -98,7 +99,7 @@ class HeapTest {
 
     @Test
     fun clear() {
-        val h = borg.trikeshed.common.collections.Heap<Int>()
+        val h = Heap<Int>()
         h.add(1)
         h.add(2)
         h.add(3)

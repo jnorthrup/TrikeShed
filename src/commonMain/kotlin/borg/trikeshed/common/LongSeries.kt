@@ -2,8 +2,7 @@ package borg.trikeshed.common
 
 import borg.trikeshed.lib.*
 
-/** Series with long Indexes for large files
- */
+/** Series with long Indexes for large files */
 typealias LongSeries<T> = Join<Long, (Long) -> T>
 
 val <T> LongSeries<T>.size: Long get() = a
