@@ -75,8 +75,7 @@ object CSVUtil {
                     val element = DelimitRange.of(since.toUShort(), x.toUShort())
                     rlist.add(element)
                     lineEvidence?.apply {
-                        logDebug { "bookend val${element.pair}: " + CharSeries(file[element.asIntRange].decodeUtf8()).asString() }
-
+//                        logDebug { "bookend val${element.pair}: " + CharSeries(file[element.asIntRange].decodeUtf8()).asString() }
                         if (since == x)
                             lineEvidence[ordinal].empty++
                         else lineEvidence[ordinal].columnLength = (x - since).toUShort()
@@ -98,7 +97,6 @@ object CSVUtil {
      *  the meta encode functions of the newMeta must be aligned with CharBuf input of the parseSegments output to
      *  utilize String-ish conversions implied by CSV data
      */
-    @OptIn(ExperimentalStdlibApi::class)
     fun parseConformant(
         file: LongSeries<Byte>,
         newMeta: Series<RecordMeta>? = null,
@@ -143,7 +141,7 @@ object CSVUtil {
         val header = hdrParsRes α ::DelimitRange
         val headerNames =
             header α { delimR: DelimitRange ->
-                CharSeries(file.get(delimR.a.toInt() until delimR.b.inc().toInt()).decodeUtf8()).asString()
+                CharSeries(file[delimR.a.toInt() until delimR.b.inc().toInt()].decodeUtf8()).asString()
             }
         logDebug { "headerNames: ${headerNames.toList()}" }
         val lines: MutableList<Join<Long, IntArray>> = mutableListOf()
@@ -199,12 +197,15 @@ object CSVUtil {
                 }
             }
 
+            var reporter: FibonacciReporter? = null
+            debug { reporter = FibonacciReporter(lines.size) }
+
 
             lines α { line ->
                 //y axis here
 
                 val lserr: Series<Byte> = file.drop(line.a)[0 until line.b.size]
-                line.b.withIndex() α { (x, b) ->
+                line.b.withIndex() α { (x, b): IndexedValue<Int> ->
                     //x axis here
 
                     val delimitRange = DelimitRange(b)
@@ -217,43 +218,44 @@ object CSVUtil {
                             headerNames[x],
                             IoCharSeries,
                             air.first,
-                            air.endInclusive.inc(),
+                            air.last.inc(),
                             child = successorMeta?.get(x)//this is an ISAM schema
                         )
                     }
-                }
+                }.debug { reporter?.report()?.let { rep -> logDebug { rep } } }
             }
+
         }
     }
+}
 
 
-    /** list<String>  -> CSV Cursor of strings
-     * */
-    @OptIn(ExperimentalUnsignedTypes::class)
-    fun simpelCsvCursor(lineList: List<String>): Cursor {
-        //take line11 as headers.  the split by ','
-        val headerNames = lineList[0].split(",").map { it.trim() }
-        val hdrMeta = headerNames.map { RecordMeta(it, IoString) }
-        //count of fields
-        val fieldCount = headerNames.size
-        val lines = lineList.drop(1)
-        val lineSegments = arrayOfNulls<UShortArray>(lines.size)
+/** list<String>  -> CSV Cursor of strings
+ * */
+@OptIn(ExperimentalUnsignedTypes::class)
+fun simpelCsvCursor(lineList: List<String>): Cursor {
+    //take line11 as headers.  the split by ','
+    val headerNames = lineList[0].split(",").map { it.trim() }
+    val hdrMeta = headerNames.map { RecordMeta(it, IoString) }
+    //count of fields
+    val fieldCount = headerNames.size
+    val lines = lineList.drop(1)
+    val lineSegments = arrayOfNulls<UShortArray>(lines.size)
 
-        return lines.size j { y ->
-            val line = lines[y]
-            //lazily create linesegs
-            val lineSegs = lineSegments[y] ?: UShortArray(headerNames.size).also { proto ->
-                lineSegments[y] = proto
-                var f = 0
-                for ((x, c) in line.withIndex()) if (c == ',')
-                    proto[f++] = x.toUShort()
-            }
+    return lines.size j { y ->
+        val line = lines[y]
+        //lazily create linesegs
+        val lineSegs = lineSegments[y] ?: UShortArray(headerNames.size).also { proto ->
+            lineSegments[y] = proto
+            var f = 0
+            for ((x, c) in line.withIndex()) if (c == ',')
+                proto[f++] = x.toUShort()
+        }
 
-            fieldCount j { x: Int ->
-                val start = if (x == 0) 0 else lineSegs[x - 1].toInt() + 1
-                val end = if (x == fieldCount - 1) line.length else lineSegs[x].toInt()
-                line.substring(start, end) j hdrMeta[x].`↺`
-            }
+        fieldCount j { x: Int ->
+            val start = if (x == 0) 0 else lineSegs[x - 1].toInt() + 1
+            val end = if (x == fieldCount - 1) line.length else lineSegs[x].toInt()
+            line.substring(start, end) j hdrMeta[x].`↺`
         }
     }
 }

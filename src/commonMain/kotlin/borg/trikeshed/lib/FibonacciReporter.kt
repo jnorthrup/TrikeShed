@@ -23,8 +23,8 @@ class FibonacciReporter(/** if we know the size beforehand we provide estimation
     var trigger: Int = 0
     var countdown: Int = 1
     val begin: TimeSource.Monotonic.ValueTimeMark = TimeSource.Monotonic.markNow()
-
-    fun report(iy: Int): String? =
+    var iy = 0
+    fun report(): String? =(iy++).run {
         if (--countdown == 0) {
             //without -ea this benchmark only costs a unused variable decrement.
             countdown = fib(++trigger)
@@ -35,7 +35,10 @@ class FibonacciReporter(/** if we know the size beforehand we provide estimation
             "logged $iy $noun in $l ${(iy.toDouble() / (secondsSinceBegin.toDouble())).toFloat()}/s " + (size?.let {
                 val ticksLeft = size - iy
                 val remaining: Duration = slice * ticksLeft
-                "remaining: $remaining est ${Clock.System.now().plus(remaining).toLocalDateTime(TimeZone.currentSystemDefault())}"
+                "remaining: $remaining est ${
+                    Clock.System.now().plus(remaining).toLocalDateTime(TimeZone.currentSystemDefault())
+                }"
             } ?: "")
         } else null
+    }
 }

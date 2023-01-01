@@ -25,7 +25,7 @@ operator fun <T> LongSeries<T>.get(r: LongRange): LongSeries<T> {
 fun <T> LongSeries<T>.slice(start: Long, end: Long = size): LongSeries<T> =
     (end - start) j { x -> this[start + x] }
 
-fun <T> LongSeries<T>.drop(removeInitial: Long) = slice(removeInitial)
+fun <T> LongSeries<T>.drop(removeInitial: Long): LongSeries<T> = slice(removeInitial)
 
 fun Series<Byte>.decodeUtf8(r1:CharArray?=null): Series<Char> {
     //does not use StringBuilder, but is faster than String(bytes, Charsets.UTF_8)
@@ -58,5 +58,3 @@ fun Series<Byte>.decodeUtf8(r1:CharArray?=null): Series<Char> {
 }
 
 fun Series<Byte>.asString(): String = decodeUtf8().toArray().concatToString()
-
-

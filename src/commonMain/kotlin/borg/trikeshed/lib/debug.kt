@@ -40,6 +40,7 @@ infix fun <T> T.d(other: T): T {
     return this
 }
 
+/** iff debugging is enabled, print the result of the block */
 inline fun logDebug(block: () -> String) {
     if (debugging) println("debug: " + block())
 }
