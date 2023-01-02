@@ -135,7 +135,7 @@ fun Cursor.showValues(range: IntRange) {
     try {
         range.forEach { x: Int ->
             val row = row(x)
-            val catn: Series<*> = row.left.debug { logDebug { "showval coords ${it.toList() .map {(it as? CharSeries)?.asString()?:""} }" } }
+            val catn: Series<*> = row.left//.debug { logDebug { "showval coords ${it.toList() .map {(it as? CharSeries)?.asString()?:""} }" } }
             val combine = combine(catn) α { if(it is CharSeries ) it.asString() else "$it"  }
             println(combine.toList())
         }

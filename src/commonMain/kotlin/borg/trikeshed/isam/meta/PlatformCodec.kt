@@ -34,19 +34,18 @@ interface PlatformCodec {
             override val readInt: (ByteArray) -> Int by lazy {
                 if (isLittleEndian) {
                     {
-                        ((((it[3].toInt() and 0xFF) shl 24) or
-                                ((it[2].toShort() and 0xFF).toInt() shl 16) or
-                                ((it[1].toShort() and 0xFF).toInt() shl 8) or
-                                (it[0].toShort() and 0xFF).toInt()).toULong() and 0xFFFFFFFFUL).toInt()
+                        (((it[3].toUByte()).toUInt() shl 24) or
+                                ((it[2].toUByte()).toUInt() shl 16) or
+                                ((it[1].toUByte()).toUInt() shl 8) or
+                                (it[0].toUByte()).toUInt()).toInt()
 
                     }
                 } else {
                     {
-                        ((((it[0].toInt() and 0xFF) shl 24) or
-                                ((it[1].toShort() and 0xFF).toInt() shl 16) or
-                                ((it[2].toShort() and 0xFF).toInt() shl 8) or
-                                (it[3].toShort() and 0xFF).toInt()
-                                ).toULong() and 0xFFFFFFFFUL).toInt()
+                        (((it[0].toUByte()).toUInt() shl 24) or
+                                ((it[1].toUByte()).toUInt() shl 16) or
+                                ((it[2].toUByte()).toUInt() shl 8) or
+                                (it[3].toUByte()).toUInt()).toInt()
                     }
                 }
 
@@ -56,63 +55,63 @@ interface PlatformCodec {
 
                 if (isLittleEndian) {
                     {
-                        (((it[7].toInt() and 0xFF).toLong() shl 56) or
-                                ((it[6].toInt() and 0xFF).toLong() shl 48) or
-                                ((it[5].toInt() and 0xFF).toLong() shl 40) or
-                                ((it[4].toInt() and 0xFF).toLong() shl 32) or
-                                ((it[3].toInt() and 0xFF).toLong() shl 24) or
-                                ((it[2].toInt() and 0xFF).toLong() shl 16) or
-                                ((it[1].toInt() and 0xFF).toLong() shl 8) or
-                                (it[0].toInt() and 0xFF).toLong())
+                        (((it[7].toUByte()).toULong() shl 56) or
+                                ((it[6].toUByte()).toULong() shl 48) or
+                                ((it[5].toUByte()).toULong() shl 40) or
+                                ((it[4].toUByte()).toULong() shl 32) or
+                                ((((it[3].toUByte()).toUInt() shl 24) or
+                                        ((it[2].toUByte()).toUInt() shl 16) or
+                                        ((it[1].toUByte()).toUInt() shl 8) or
+                                        (it[0].toUByte()).toUInt()).toULong())).toLong()
                     }
                 } else {
                     {
-                        ((it[0].toInt() and 0xFF).toLong() shl 56) or
-                                ((it[1].toInt() and 0xFF).toLong() shl 48) or
-                                ((it[2].toInt() and 0xFF).toLong() shl 40) or
-                                ((it[3].toInt() and 0xFF).toLong() shl 32) or
-                                ((it[4].toInt() and 0xFF).toLong() shl 24) or
-                                ((it[5].toInt() and 0xFF).toLong() shl 16) or
-                                ((it[6].toInt() and 0xFF).toLong() shl 8) or
-                                (it[7].toInt() and 0xFF).toLong()
+                        (((it[0].toUByte()).toULong() shl 56) or
+                                ((it[1].toUByte()).toULong() shl 48) or
+                                ((it[2].toUByte()).toULong() shl 40) or
+                                ((it[3].toUByte()).toULong() shl 32) or
+                                ((((it[4].toUByte()).toUInt() shl 24) or
+                                        ((it[5].toUByte()).toUInt() shl 16) or
+                                        ((it[6].toUByte()).toUInt() shl 8) or
+                                        (it[7].toUByte()).toUInt()).toULong())).toLong()
 
                     }
                 }
             }
 
             override val readShort: (ByteArray) -> Short by lazy {
-                    if (isLittleEndian) {
-                        { ((it[1].toInt() and 0xFF) shl 8).toShort() or (it[0].toInt() and 0xFF).toShort() }
-                    } else {
-                        { (it[0].toInt() and 0xFF shl 8 or (it[1].toInt() and 0xFF)).toShort() }
-                    }
+                if (isLittleEndian) {
+                    { ((it[1].toInt() and 0xFF) shl 8).toShort() or (it[0].toInt() and 0xFF).toShort() }
+                } else {
+                    { (it[0].toInt() and 0xFF shl 8 or (it[1].toInt() and 0xFF)).toShort() }
+                }
             }
 
             override val writeLong: (Long) -> ByteArray by lazy {
                 if (isLittleEndian) {
                     {
                         byteArrayOf(
-                            (it and 0xFF).toByte(),
-                            ((it shr 8) and 0xFF).toByte(),
-                            ((it shr 16) and 0xFF).toByte(),
-                            ((it shr 24) and 0xFF).toByte(),
-                            ((it shr 32) and 0xFF).toByte(),
-                            ((it shr 40) and 0xFF).toByte(),
-                            ((it shr 48) and 0xFF).toByte(),
-                            ((it shr 56) and 0xFF).toByte()
+                            (it.toUByte()).toByte(),
+                            ((it shr 8).toUByte()).toByte(),
+                            ((it shr 16).toUByte()).toByte(),
+                            ((it shr 24).toUByte()).toByte(),
+                            ((it shr 32).toUByte()).toByte(),
+                            ((it shr 40).toUByte()).toByte(),
+                            ((it shr 48).toUByte()).toByte(),
+                            ((it shr 56).toUByte()).toByte()
                         )
                     }
                 } else {
                     {
                         byteArrayOf(
-                            ((it shr 56) and 0xFF).toByte(),
-                            ((it shr 48) and 0xFF).toByte(),
-                            ((it shr 40) and 0xFF).toByte(),
-                            ((it shr 32) and 0xFF).toByte(),
-                            ((it shr 24) and 0xFF).toByte(),
-                            ((it shr 16) and 0xFF).toByte(),
-                            ((it shr 8) and 0xFF).toByte(),
-                            (it and 0xFF).toByte()
+                            ((it shr 56).toUByte()).toByte(),
+                            ((it shr 48).toUByte()).toByte(),
+                            ((it shr 40).toUByte()).toByte(),
+                            ((it shr 32).toUByte()).toByte(),
+                            ((it shr 24).toUByte()).toByte(),
+                            ((it shr 16).toUByte()).toByte(),
+                            ((it shr 8).toUByte()).toByte(),
+                            (it.toUByte()).toByte()
                         )
                     }
                 }
@@ -122,19 +121,19 @@ interface PlatformCodec {
                 if (isLittleEndian) {
                     {
                         byteArrayOf(
-                            (it and 0xFF).toByte(),
-                            ((it shr 8) and 0xFF).toByte(),
-                            ((it shr 16) and 0xFF).toByte(),
-                            ((it shr 24) and 0xFF).toByte()
+                            (it.toUByte()).toByte(),
+                            ((it shr 8).toUByte()).toByte(),
+                            ((it shr 16).toUByte()).toByte(),
+                            ((it shr 24).toUByte()).toByte()
                         )
                     }
                 } else {
                     {
                         byteArrayOf(
-                            ((it shr 24) and 0xFF).toByte(),
-                            ((it shr 16) and 0xFF).toByte(),
-                            ((it shr 8) and 0xFF).toByte(),
-                            (it and 0xFF).toByte()
+                            ((it shr 24).toUByte()).toByte(),
+                            ((it shr 16).toUByte()).toByte(),
+                            ((it shr 8).toUByte()).toByte(),
+                            (it.toUByte()).toByte()
                         )
                     }
                 }
@@ -144,15 +143,15 @@ interface PlatformCodec {
                 if (isLittleEndian) {
                     {
                         byteArrayOf(
-                            (it and 0xFF).toByte(),
-                            ((it.toInt() shr 8) and 0xFF).toByte()
+                            (it.toUByte()).toByte(),
+                            ((it.toUInt() shr 8).toUByte()).toByte()
                         )
                     }
                 } else {
                     {
                         byteArrayOf(
-                            ((it.toInt() shr 8) and 0xFF).toByte(),
-                            (it and 0xFF).toByte()
+                            ((it.toUInt() shr 8).toUByte()).toByte(),
+                            (it.toUByte()).toByte()
                         )
                     }
                 }
