@@ -1,21 +1,21 @@
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
-    kotlin("multiplatform") version "1.7.20"
+    kotlin("multiplatform") version "1.8.0"
     id("org.jetbrains.intellij") version "1.9.+" apply false
-    id("org.jetbrains.dokka") version "1.7.0"
-    id("org.jlleitschuh.gradle.ktlint") version "11.0.0"
+    id("org.jetbrains.dokka") version "1.7.0" apply false
+    id("org.jlleitschuh.gradle.ktlint") version "11.0.0" apply false
 
     // support kotlinx-datetime
-    id("org.jetbrains.kotlin.plugin.serialization") version "1.7.20" apply false
+    id("org.jetbrains.kotlin.plugin.serialization") version "1.8.0" apply false
 
     // support for k2 compiler plugin
-    id("org.jetbrains.kotlin.kapt") version "1.7.20" apply false
-    id("org.jetbrains.kotlin.plugin.allopen") version "1.7.20"
-    id("org.jetbrains.kotlin.plugin.noarg") version "1.7.20"
+    id("org.jetbrains.kotlin.kapt") version "1.8.0" apply false
+    id("org.jetbrains.kotlin.plugin.allopen") version "1.8.0" apply false
+    id("org.jetbrains.kotlin.plugin.noarg") version "1.8.0" apply false
 
     // gradle versions update plugin
-    id("com.github.ben-manes.versions") version "0.42.0"
+    id("com.github.ben-manes.versions") version "0.42.0" apply false
 //    id("atomicfu-gradle-plugin") version "0.18.5"
     `maven-publish`
 }
@@ -82,7 +82,7 @@ kotlin {
             dependencies {
                 api("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.2")
                 api("org.jetbrains.kotlinx:kotlinx-datetime:0.4.0")
-                api("org.jetbrains.kotlin:kotlin-reflect:1.7.20")
+                api("org.jetbrains.kotlin:kotlin-reflect:1.8.0")
             }
         }
 
