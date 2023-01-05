@@ -60,7 +60,7 @@ enum class PosixOpenOpts(val posixConst: Int) {
     modes: O_RDONLY, O_WRONLY, or O_RDWR.  These request opening the
     file read-only, write-only, or read/write, respectively.
      */
-    O_Wronly(O_WRONLY),
+    O_WrOnly(O_WRONLY),
 
     /**
     The argument flags must include one of the following access

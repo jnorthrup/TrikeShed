@@ -544,19 +544,20 @@ class PosixFile(
             val buf = allocArray<ByteVar>(len)
             bytes.forEachIndexed { index, byte -> buf[index] = byte }
             val written = write(file.fd, buf, len.convert())
-            HasPosixErr.posixRequires(written.toLong() == len.toLong()) { "writeAllBytes $filename" }
+            HasPosixErr.posixRequires(written.toLong() == len.toLong()) { "writeBytes $filename" }
             file.close()
         }
         /**
          * writes \n terminated lines to a file
          */
         fun writeLines(filename: String, lines: List<String>) = memScoped {
-            val file = PosixFile(filename)
+            val O_FLAGS = PosixOpenOpts.withFlags(PosixOpenOpts.O_Creat, PosixOpenOpts.O_Trunc, PosixOpenOpts.O_WrOnly)
+            val file = PosixFile(filename, O_FLAGS)
             lines.forEach { line ->
                 val len = line.length
                 val buf = line.plus('\n').cstr.getPointer(this)
                 val written = write(file.fd, buf, len.inc().convert())
-                HasPosixErr.posixRequires(written.toLong() == len.inc().toLong()) { "writeAllLines $filename" }
+                HasPosixErr.posixRequires(written == len.inc().toLong()) { "writeLines $filename" }
             }.also {
                 file.close()
             }

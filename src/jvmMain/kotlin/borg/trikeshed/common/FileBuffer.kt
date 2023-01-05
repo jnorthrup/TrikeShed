@@ -13,21 +13,25 @@ import java.nio.channels.FileChannel
  * see FileBuffer.open
  */
 actual class FileBuffer actual constructor(
-    filename: String, initialOffset: Long,
-    blkSize: Long, readOnly: Boolean,
+     actual val filename: String,
+    actual val initialOffset: Long,
+    actual val blkSize: Long,
+    actual val readOnly: Boolean
+//   filename: String, initialOffset: Long,
+//    blkSize: Long, readOnly: Boolean,
 ) : LongSeries<Byte> {
 
-    actual val filename: String
-    actual val initialOffset: Long
-    actual val blkSize: Long
-    actual val readOnly: Boolean
+//    actual val filename: String
+//    actual val initialOffset: Long
+//    actual val blkSize: Long
+//    actual val readOnly: Boolean
 
-    init {
-        this.filename = filename
-        this.initialOffset = initialOffset
-        this.blkSize = blkSize
-        this.readOnly = readOnly
-    }
+//    init {
+//        this.filename = filename
+//        this.initialOffset = initialOffset
+//        this.blkSize = blkSize
+//        this.readOnly = readOnly
+//    }
 
     var jvmFile: java.io.RandomAccessFile? = null
     var jvmChannel: FileChannel? = null

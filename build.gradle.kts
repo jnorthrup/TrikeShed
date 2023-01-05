@@ -1,6 +1,3 @@
-import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
-import org.jetbrains.kotlin.gradle.tasks.KotlinTest
-
 plugins {
     kotlin("multiplatform") version "1.8.0"
 //    id("org.jetbrains.intellij") version "3.1" apply true
@@ -22,7 +19,7 @@ plugins {
     `maven-publish`
 }
 
-group= "org.bereft"
+group = "org.bereft"
 version = "1.0"
 
 repositories {
@@ -35,12 +32,13 @@ repositories {
 
 
 kotlin {
-   jvmToolchain(18)
+    jvmToolchain(18)
 
     jvm {
 
         withJava()
     }
+
 
 //    val hostOs = System.getProperty("os.name")
 //    val isMingwX64 = hostOs.startsWith("Windows")
@@ -51,17 +49,15 @@ kotlin {
 //        else -> throw GradleException("Host OS is not supported in Kotlin/Native.")
 //    }
 //we want to develop a linuxX64 target separately from generic native
-val linuxX64Target = linuxX64("linuxX64")
-//val linuxX64TargetTest = linuxX64("linuxX64Test")
-//val linuxX64TargetMain = linuxX64("linuxX64Main")
 
-
-
+    val nativeTarget = macosX64 ("native")
+    val linuxX64Target = linuxX64("linuxX64")
 
     sourceSets {
         val commonMain by getting {
             dependencies {
-                api("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.2")
+                             api("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.4")
+
                 api("org.jetbrains.kotlinx:kotlinx-datetime:0.4.0")
                 api("org.jetbrains.kotlin:kotlin-reflect:1.8.0")
             }
@@ -74,22 +70,20 @@ val linuxX64Target = linuxX64("linuxX64")
             }
         }
 
-//        val nativeMain by getting {
-//
-//
-//        }
-//
-//        val nativeTest by getting {
-//
-//        }
-
-        val linuxX64Main by getting {
-
+        val nativeMain by getting {
 
         }
 
-        val linuxX64Test by getting {
+        val nativeTest by getting {
 
+        }
+
+        val linuxX64Main by getting {
+            dependsOn(nativeMain)
+        }
+
+        val linuxX64Test by getting {
+            dependsOn(nativeTest)
         }
 
 
@@ -99,14 +93,14 @@ val linuxX64Target = linuxX64("linuxX64")
                 //datetime
                 api("org.jetbrains.kotlinx:kotlinx-datetime-jvm:0.4.0")
                 //coroutines
-                api("org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:1.6.2")
+                api("org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:1.6.4")
                 //serialization
                 api("org.jetbrains.kotlinx:kotlinx-serialization-json-jvm:1.3.0")
 
             }
         }
 
-        val jvmTest by getting{
+        val jvmTest by getting {
             //bring in the dependencies from jvmMain
             dependencies {
                 implementation(kotlin("test"))

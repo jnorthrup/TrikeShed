@@ -1,7 +1,9 @@
 package borg.trikeshed.common
 
 
+import borg.trikeshed.lib.debug
 import borg.trikeshed.lib.logDebug
+import borg.trikeshed.lib.`↺`
 
 import simple.PosixFile
 import simple.PosixOpenOpts
@@ -11,25 +13,30 @@ import platform.posix.munmap
 /**
  * an openable and closeable mmap file.
  */
-actual class FileBuffer actual constructor(filename: String, initialOffset: Long, blkSize: Long, readOnly: Boolean) :
-    LongSeries<Byte> {
+actual class FileBuffer actual constructor(//filename: String, initialOffset: Long, blkSize: Long, readOnly: Boolean)
+    actual val filename: String,
+    actual val initialOffset: Long,
+    actual val blkSize: Long,
+    actual val readOnly: Boolean,
 
-    actual val filename: String
-    actual val initialOffset: Long
-    actual val blkSize: Long
-    actual val readOnly: Boolean
+//    init {
+//        this.filename = filename.debug { logDebug { "filename: $it" } }
+//        this.initialOffset = initialOffset.debug {  logDebug("initialOffset: $it".`↺`) }
+//        this.blkSize = blkSize .debug { logDebug("blkSize: $it".`↺`) }
+//        this.readOnly = readOnly .debug { logDebug("readOnly: $it".`↺`) }
+//    }
+): LongSeries<Byte> {
 
-    init {
-        this.filename = filename
-        this.initialOffset = initialOffset
-        this.blkSize = blkSize
-        this.readOnly = readOnly
+    init{
+        logDebug { "native FileBuffer: $filename, $initialOffset, $blkSize, $readOnly" }
     }
-
     var buffer: COpaquePointer? = null
     var file: PosixFile? = null
 
-    override val a: Long   = if (blkSize == (-1L)) file!!.size else blkSize
+    override val a: Long by lazy {
+        open()
+        if (blkSize == (-1L)) file!!.size else blkSize
+    }
 
     override val b: (Long) -> Byte
         get() = { index: Long ->
@@ -53,6 +60,7 @@ actual class FileBuffer actual constructor(filename: String, initialOffset: Long
             else PosixOpenOpts.withFlags(PosixOpenOpts.O_Rdwr),
         )
         val len: ULong = if (blkSize == (-1L)) file!!.size.toULong() else blkSize.toULong()
+        logDebug { "len: $len" }
         buffer = file!!.mmap(len, offset = initialOffset)
     }
 

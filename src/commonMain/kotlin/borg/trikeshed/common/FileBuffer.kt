@@ -16,7 +16,7 @@ fun <T> FileBuffer.use(block: (FileBuffer) -> T) {
     }
 }
 fun open(filename: String, initialOffset: Long = 0, blkSize: Long = -1, readOnly: Boolean = true): FileBuffer {
-    logDebug { "opening $filename" }
+    logDebug { "pre-opening $filename" }
     return FileBuffer(filename, initialOffset, blkSize, readOnly).apply {
         logDebug { "this isOpen()=${isOpen()}" }
         open().debug { logDebug { "call(ed) open()" } }
@@ -29,10 +29,11 @@ fun open(filename: String, initialOffset: Long = 0, blkSize: Long = -1, readOnly
  *  get has no side effects but put has undefined effects on size and sync
  */
 expect class FileBuffer(
-    filename: String, initialOffset: Long,
+    filename: String,
+    initialOffset: Long=0,
     /** blocksize or file-size if -1*/
-    blkSize: Long,
-    readOnly: Boolean,
+    blkSize: Long=-1,
+    readOnly: Boolean=true,
 ): LongSeries<Byte> {
     val filename: String
     val initialOffset: Long

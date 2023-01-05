@@ -29,7 +29,7 @@ actual class IsamDataFile actual constructor(
             val fd = open(datafileFilename, O_RDONLY)
             val stat = alloc<stat>()
             fstat(fd, stat.ptr)
-            fileSize = stat.st_size
+            fileSize = stat.st_size.toLong()
 
             require(fileSize % recordlen == 0L) { "fileSize must be a multiple of recordlen" }
 
