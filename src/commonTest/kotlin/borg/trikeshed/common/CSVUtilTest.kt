@@ -11,11 +11,11 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 
 class CSVUtilTest {
+    val target = "src/commonTest/resources/hi.csv"
 
     /** read in hi.csv and verify the contents */
     @Test
     fun testParseLineAndDeduce() {
-        val target = "src/test/resources/hi.csv"
         val fileBuf = fileBuffer(target)
 
         fileBuf.use {
@@ -42,7 +42,6 @@ class CSVUtilTest {
 
 
         //use classpath to find the file using the src/test/resources hi.csv in the root package of the classloader
-        val target = "src/test/resources/hi.csv"
         fileBuffer(target).use { fileBuf ->
             val fileDeduce: MutableList<TypeEvidence> = mutableListOf()
             val parseSegments: Cursor = CSVUtil.parseSegments(fileBuf, fileEvidence = fileDeduce)
@@ -73,9 +72,8 @@ class CSVUtilTest {
 
     @Test
     fun testConformant() {
-        val target = "src/test/resources/hi.csv"
         val fileBuf = fileBuffer(target)
-        fileBuf.use{
+        fileBuf.use {
             val cursor = CSVUtil.parseConformant(fileBuf)
             cursor.meta.forEach { println(it) }
 
@@ -94,48 +92,48 @@ class CSVUtilTest {
             assertEquals(IOMemento.IoFloat, meta[11].type)
         }
     }
+
     @Test
     fun testConformant2Isam() {
-        val target = "src/test/resources/hi.csv"
         val fileBuf = fileBuffer(target)
-fileBuf.use {
-    val cursor = CSVUtil.parseConformant(fileBuf)
-    val meta = cursor.meta.debug {
-        logDebug { "meta: ${it.toList()}" }
-    }
-    meta.forEach { println(it) }
-
-    IsamDataFile.write(cursor, "/tmp/hi.isam")
-
-    val isam =  IsamDataFile("/tmp/hi.isam")
-    isam.open()
-    isam.head()
-    logDebug {
-        "meta: ${
-            isam.meta.map { isam ->
-                isam.name to isam.type
+        fileBuf.use {
+            val cursor = CSVUtil.parseConformant(fileBuf)
+            val meta = cursor.meta.debug {
+                logDebug { "meta: ${it.toList()}" }
             }
-        }"
-    }
-    //test row 16 against the contents
-    // 1502943360000,4261.48000000,4261.48000000,4261.48000000,4261.48000000,0.00000000,1502943419999,0.00000000,0,0.00000000,0.00000000,7958.34896534
-    val row16 = isam.row(16)
-    val row16List = row16.left
-    assertEquals(12, row16List.size)
-    assertEquals(1502943360000, row16List[0])
+            meta.forEach { println(it) }
 
-    assertEquals(1502943419999, row16List[6])
-    assertEquals(0.toByte(), row16List[8])//this test arrives at a Byte duck type, and needs a cast or fails.
-    assertEquals(4261.48000000, row16List[1])
-    assertEquals(4261.48000000, row16List[2])
-    assertEquals(4261.48000000, row16List[3])
-    assertEquals(4261.48000000, row16List[4])
-    assertEquals(7958.34896534, row16List[11])
-    assertEquals(0.00000000, row16List[5])
-    assertEquals(0.00000000, row16List[7])
-    assertEquals(0.00000000, row16List[9])
-    assertEquals(0.00000000, row16List[10])
-    isam.close()
-}
+            IsamDataFile.write(cursor, "/tmp/hi.isam")
+
+            val isam = IsamDataFile("/tmp/hi.isam")
+            isam.open()
+            isam.head()
+            logDebug {
+                "meta: ${
+                    isam.meta.map { isam ->
+                        isam.name to isam.type
+                    }
+                }"
+            }
+            //test row 16 against the contents
+            // 1502943360000,4261.48000000,4261.48000000,4261.48000000,4261.48000000,0.00000000,1502943419999,0.00000000,0,0.00000000,0.00000000,7958.34896534
+            val row16 = isam.row(16)
+            val row16List = row16.left
+            assertEquals(12, row16List.size)
+            assertEquals(1502943360000, row16List[0])
+
+            assertEquals(1502943419999, row16List[6])
+            assertEquals(0.toByte(), row16List[8])//this test arrives at a Byte duck type, and needs a cast or fails.
+            assertEquals(4261.48f, row16List[1])
+            assertEquals(4261.48f, row16List[2])
+            assertEquals(4261.48f, row16List[3])
+            assertEquals(4261.48f, row16List[4])
+            assertEquals(7958.34896534f, row16List[11])
+            assertEquals(0f, row16List[5])
+            assertEquals(0f, row16List[7])
+            assertEquals(0f, row16List[9])
+            assertEquals(0f, row16List[10])
+            isam.close()
+        }
     }
 }

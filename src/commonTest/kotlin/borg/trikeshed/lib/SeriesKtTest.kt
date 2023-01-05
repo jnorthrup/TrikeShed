@@ -61,6 +61,7 @@ class SeriesKtTest {
     }
 
 
+    @OptIn(ExperimentalUnsignedTypes::class)
     @Test
     fun testParseDouble() {
         val s = "1.234E-5".toSeries()
