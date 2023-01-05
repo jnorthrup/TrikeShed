@@ -39,8 +39,6 @@ class CSVUtilTest {
     /** read in hi.csv and verify the contents */
     @Test
     fun testParseMutlipleLines() {
-
-
         //use classpath to find the file using the src/test/resources hi.csv in the root package of the classloader
         fileBuffer(target).use { fileBuf ->
             val fileDeduce: MutableList<TypeEvidence> = mutableListOf()
@@ -102,9 +100,7 @@ class CSVUtilTest {
                 logDebug { "meta: ${it.toList()}" }
             }
             meta.forEach { println(it) }
-
             IsamDataFile.write(cursor, "/tmp/hi.isam")
-
             val isam = IsamDataFile("/tmp/hi.isam")
             isam.open()
             isam.head()
