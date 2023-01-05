@@ -1,5 +1,6 @@
 package borg.trikeshed.isam
 
+import borg.trikeshed.common.Files
 import borg.trikeshed.isam.meta.IOMemento
 import borg.trikeshed.isam.meta.PlatformCodec
 import borg.trikeshed.lib.*
@@ -46,7 +47,7 @@ IoType :=  IoInstant | IoDouble | IoString | IoInt
      fun open(){
         //use readBytes and decodeString to read the lines into
 //        val lines = buf.readBytes(size).decodeToString().lines().filterNot { it.trim().startsWith("#") }.map(String::trim)
-        val lines=Files.readAllLines(metafileFilename ).filterNot {it.trim().startsWith('#')  }
+        val lines= Files.readAllLines(metafileFilename ).filterNot {it.trim().startsWith('#')  }
         //split on \s+
         val coords = lines[0].split("\\s+".toRegex())
         val names = lines[1].split("\\s+".toRegex())

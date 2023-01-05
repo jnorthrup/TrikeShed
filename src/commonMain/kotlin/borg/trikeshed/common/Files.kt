@@ -1,4 +1,4 @@
-package borg.trikeshed.isam
+package borg.trikeshed.common
 
 expect object Files{
     fun readAllLines(filename: String): List<String>

@@ -1,13 +1,11 @@
 package borg.trikeshed.common
 
 import borg.trikeshed.common.parser.simple.CharSeries
-import borg.trikeshed.isam.Files
+import borg.trikeshed.common.Files
 import borg.trikeshed.isam.IsamDataFile
 import borg.trikeshed.isam.meta.IOMemento
 import borg.trikeshed.lib.*
 import borg.trikeshed.parse.DelimitRange
-import openFileBuffer
-import use
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -109,7 +107,7 @@ fileBuf.use {
 
     IsamDataFile.write(cursor, "/tmp/hi.isam")
 
-    val isam = borg.trikeshed.isam.IsamDataFile("/tmp/hi.isam")
+    val isam =  IsamDataFile("/tmp/hi.isam")
     isam.open()
     isam.head()
     logDebug {

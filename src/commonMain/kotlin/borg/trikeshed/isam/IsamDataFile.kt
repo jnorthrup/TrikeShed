@@ -2,7 +2,15 @@ package borg.trikeshed.isam
 
 import borg.trikeshed.lib.Cursor
 
-expect class IsamDataFile {
+expect class IsamDataFile(
+    datafileFilename: String,
+    metafileFilename: String = "$datafileFilename.meta",
+    metafile: IsamMetaFileReader = IsamMetaFileReader(metafileFilename)
+) :Cursor{
+    val datafileFilename: String
+    val metafile: IsamMetaFileReader
+
+
     fun open()
     fun close()
     companion object {

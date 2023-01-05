@@ -19,8 +19,6 @@ class PlatformCodecTest {
     @Test
     fun testCurrentCodec() {
         borg.trikeshed.isam.meta.IOMemento.values().forEach {
-            val current = currentPlatformCodec
-
             when (it) {
                 IoBoolean -> {
                     val v = true
@@ -162,9 +160,7 @@ class PlatformCodecTest {
                         val v2 = dec(bytes)
                         assertEquals(v, v2)
                     }
-
                 }
-
                 IoNothing -> {}
             }
         }

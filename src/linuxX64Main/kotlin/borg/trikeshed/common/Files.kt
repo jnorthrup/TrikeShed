@@ -1,8 +1,9 @@
-package borg.trikeshed.isam
+package borg.trikeshed.common
 
-import borg.trikeshed.common.readLines
 import kotlinx.cinterop.*
+import platform.posix._PC_PATH_MAX
 import platform.posix.getcwd
+import platform.posix.pathconf
 import simple.PosixFile
 
 actual object Files {
@@ -16,7 +17,7 @@ actual object Files {
     /**cinterop to get cwd from posix */
     actual fun cwd(): String = memScoped {
         // cinterop pathmax to get the max path length
-        val pathmax = platform.posix.pathconf(".", platform.posix._PC_PATH_MAX)
+        val pathmax = pathconf(".", _PC_PATH_MAX)
         // allocate a buffer of that size
         val buf: CPointer<ByteVarOf<Byte>> = allocArray(pathmax.toInt())
         // get the cwd into the buffer

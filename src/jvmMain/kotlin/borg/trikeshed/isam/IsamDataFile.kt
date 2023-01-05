@@ -10,13 +10,15 @@ import java.nio.ByteBuffer
 import java.nio.channels.SeekableByteChannel
 import java.nio.file.Files
 import java.nio.file.StandardOpenOption
+import java.util.concurrent.locks.ReentrantLock
 
-actual class IsamDataFile(
-    val datafileFilename: String,
-    metafileFilename: String = "$datafileFilename.meta",
-    val metafile: IsamMetaFileReader = IsamMetaFileReader(metafileFilename),
+actual class IsamDataFile actual constructor(
+    actual val datafileFilename: String,
+    metafileFilename: String,
+    actual val metafile: IsamMetaFileReader
 ) : Cursor {
-    val recordlen = metafile.recordlen
+
+    val recordlen: Int
     val constraints get() = metafile.constraints
 
     private lateinit var data: SeekableByteChannel
@@ -54,25 +56,12 @@ actual class IsamDataFile(
         }
     }
 
-    override val a: Int = fileSize.toInt() / recordlen
+    override val a: Int
+    override val b: (Int) -> Join<Int, (Int) -> Join<*, () -> RecordMeta>>
+
     actual fun close() = data.close()
 
-    private val lock = java.util.concurrent.locks.ReentrantLock()
-
-    override val b: (Int) -> Join<Int, (Int) -> Join<*, () -> RecordMeta>> = { row ->
-        lock.lock()
-        val buffer = ByteBuffer.allocate(recordlen)
-        data.position(row * recordlen.toLong())
-        data.read(buffer)
-        lock.unlock()
-        val array = buffer.position(0).array()
-
-        constraints.size j { col ->
-            val constraint = constraints[col]
-            val s = array.sliceArray(constraint.begin until constraint.end)
-            constraint.decoder(s) j { constraint }
-        }
-    }
+    private val lock: ReentrantLock
 
     actual companion object {
         actual fun write(cursor: Cursor, datafilename: String) {
@@ -124,6 +113,26 @@ actual class IsamDataFile(
             }
             randomAccessFile.close()
             data.close()
+        }
+    }
+
+    init {
+        this.recordlen = metafile.recordlen
+        this.a = fileSize.toInt() / recordlen
+        this.lock = java.util.concurrent.locks.ReentrantLock()
+        this.b = { row ->
+            lock.lock()
+            val buffer = ByteBuffer.allocate(recordlen)
+            data.position(row * recordlen.toLong())
+            data.read(buffer)
+            lock.unlock()
+            val array = buffer.position(0).array()
+
+            constraints.size j { col ->
+                val constraint = constraints[col]
+                val s = array.sliceArray(constraint.begin until constraint.end)
+                constraint.decoder(s) j { constraint }
+            }
         }
     }
 }

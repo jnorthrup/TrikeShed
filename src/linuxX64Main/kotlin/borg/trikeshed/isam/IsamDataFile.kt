@@ -5,15 +5,15 @@ import borg.trikeshed.lib.*
 import kotlinx.cinterop.*
 import platform.posix.*
 
-actual class IsamDataFile(
-    val datafileFilename: String,
-    metafileFilename: String = "$datafileFilename.meta",
-    val metafile: IsamMetaFileReader = IsamMetaFileReader(metafileFilename),
+actual class IsamDataFile actual constructor(
+    actual val datafileFilename: String,
+    metafileFilename: String,
+    actual val metafile: IsamMetaFileReader
 ) : Cursor {
 
 
     val recordlen: Int by lazy {
-        metafile.recordlen.also {
+        this.metafile.recordlen.also {
             require(it > 0) { "recordlen must be > 0" }
         }
 
@@ -72,21 +72,7 @@ actual class IsamDataFile(
             }
         }
 
-    override val b: (Int) -> Join<Int, (Int) -> Join<*, () -> RecordMeta>> = { row ->
-        memScoped {
-
-            val d2 = data.toLong() + (row * recordlen)
-
-            constraints.size j { col ->
-                constraints[col].let { recordMeta ->
-                    val d4 = d2 + recordMeta.begin
-                    val d5: COpaquePointer = d4.toCPointer()!!
-                    val d6: ByteArray = d5.readBytes(recordMeta.end - recordMeta.begin)
-                    recordMeta.decoder(d6)!! j { recordMeta }
-                }
-            }
-        }
-    }
+    override val b: (Int) -> Join<Int, (Int) -> Join<*, () -> RecordMeta>>
 
     override fun toString(): String =
         "IsamDataFile(metafile=$metafile, recordlen=$recordlen, constraints=$constraints, datafileFilename='$datafileFilename', fileSize=$fileSize)"
@@ -131,6 +117,24 @@ actual class IsamDataFile(
             }
             val fclose = fclose(data)
         }.let {}
+    }
+
+    init {
+        this.b = { row ->
+            memScoped {
+
+                val d2 = data.toLong() + (row * recordlen)
+
+                constraints.size j { col ->
+                    constraints[col].let { recordMeta ->
+                        val d4 = d2 + recordMeta.begin
+                        val d5: COpaquePointer = d4.toCPointer()!!
+                        val d6: ByteArray = d5.readBytes(recordMeta.end - recordMeta.begin)
+                        recordMeta.decoder(d6)!! j { recordMeta }
+                    }
+                }
+            }
+        }
     }
 }
 
