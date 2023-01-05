@@ -1,8 +1,10 @@
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
+import org.jetbrains.kotlin.gradle.tasks.KotlinTest
 
 plugins {
     kotlin("multiplatform") version "1.8.0"
-    id("org.jetbrains.intellij") version "1.9.+" apply false
+//    id("org.jetbrains.intellij") version "3.1" apply true
+
     id("org.jetbrains.dokka") version "1.7.0" apply false
     id("org.jlleitschuh.gradle.ktlint") version "11.0.0" apply false
 
@@ -23,7 +25,6 @@ plugins {
 group= "org.bereft"
 version = "1.0"
 
-/*    maven("https://mvnrepository.com/artifact/org.jetbrains.kotlinx/") */
 repositories {
     maven("https://oss.sonatype.org/content/repositories/snapshots/")
     mavenCentral()
@@ -32,50 +33,30 @@ repositories {
     google()
 }
 
+
 kotlin {
+   jvmToolchain(18)
+
     jvm {
 
         withJava()
     }
 
-    val hostOs = System.getProperty("os.name")
-    val isMingwX64 = hostOs.startsWith("Windows")
-    val nativeTarget = when {
-        hostOs == "Mac OS X" -> macosX64("native")
-        hostOs == "Linux" -> linuxX64("native")
-        isMingwX64 -> mingwX64("native")
-        else -> throw GradleException("Host OS is not supported in Kotlin/Native.")
-    }
+//    val hostOs = System.getProperty("os.name")
+//    val isMingwX64 = hostOs.startsWith("Windows")
+//    val nativeTarget = when {
+//        hostOs == "Mac OS X" -> macosX64("native")
+//        hostOs == "Linux" -> linuxX64("native")
+//        isMingwX64 -> mingwX64("native")
+//        else -> throw GradleException("Host OS is not supported in Kotlin/Native.")
+//    }
+//we want to develop a linuxX64 target separately from generic native
+val linuxX64Target = linuxX64("linuxX64")
+//val linuxX64TargetTest = linuxX64("linuxX64Test")
+//val linuxX64TargetMain = linuxX64("linuxX64Main")
 
-//    nativeTarget.apply {
-//        binaries {
-//            executable {
-//                entryPoint = "main"
-//            }
-//        }
-//    }
-//    linuxX64 { // Replace with a target you need.
-//        compilations.getByName("main") {
-////            val myInterop by cinterops.creating {
-////                // Def-file describing the native API.
-////                // The default path is src/nativeInterop/cinterop/<interop-name>.def
-////                defFile(project.file("def-file.def"))
-////
-////                // Package to place the Kotlin API generated.
-////                packageName("org.sample")
-////
-////                // Options to be passed to compiler by cinterop tool.
-////                compilerOpts("-Ipath/to/headers")
-////
-////                // Directories for header search (an analogue of the -I<path> compiler option).
-////                includeDirs.allHeaders("path1", "path2")
-////
-////                // A shortcut for includeDirs.allHeaders.
-////                includeDirs("include/directory", "another/directory")
-////            }
-////            val anotherInterop by cinterops.creating { /* ... */ }
-//        }
-//    }
+
+
 
     sourceSets {
         val commonMain by getting {
@@ -93,12 +74,21 @@ kotlin {
             }
         }
 
-        val nativeMain by getting {
+//        val nativeMain by getting {
+//
+//
+//        }
+//
+//        val nativeTest by getting {
+//
+//        }
+
+        val linuxX64Main by getting {
 
 
         }
 
-        val nativeTest by getting {
+        val linuxX64Test by getting {
 
         }
 
@@ -124,5 +114,12 @@ kotlin {
             }
         }
     }
-
 }
+
+//tasks.withType<KotlinTest> {
+//    useKotlinTestRunner()
+//    testLogging {
+//        events("passed", "skipped", "failed")
+//        exceptionFormat = "full"
+//    }
+//}

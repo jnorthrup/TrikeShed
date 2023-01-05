@@ -1,9 +1,9 @@
-import borg.trikeshed.common.LongSeries
+package borg.trikeshed.common
+
 import borg.trikeshed.lib.debug
 import borg.trikeshed.lib.logDebug
 import java.nio.MappedByteBuffer
 import java.nio.channels.FileChannel
-
 
 /**
  * an openable and closeable mmap file.
@@ -31,6 +31,7 @@ actual class FileBuffer actual constructor(
 
     var jvmFile: java.io.RandomAccessFile? = null
     var jvmChannel: FileChannel? = null
+
     var jvmMappedByteBuffer: MappedByteBuffer? = null
 
     override val a: Long get() = jvmMappedByteBuffer!!.limit().toLong()
@@ -42,6 +43,7 @@ actual class FileBuffer actual constructor(
         }
 
     actual fun close() {
+        if (!isOpen()) return
         logDebug { "closing $filename" }
         jvmMappedByteBuffer?.force()
         jvmMappedByteBuffer?.clear()
@@ -52,7 +54,9 @@ actual class FileBuffer actual constructor(
         jvmFile = null
     }
 
+
     actual fun open() {
+        if (isOpen()) return
         logDebug { "opening $filename" }
         jvmFile = java.io.RandomAccessFile(filename, if (!readOnly) "rw" else "r")
             .debug { raf -> logDebug { "randomAccesFile: $raf" } }
@@ -70,20 +74,5 @@ actual class FileBuffer actual constructor(
     actual fun put(index: Long, value: Byte) {
         jvmMappedByteBuffer!!.put(index.toInt(), value)
     }
-
-    companion object {
-        fun open(filename: String, initialOffset: Long = 0, blkSize: Long = -1, readOnly: Boolean = true): FileBuffer {
-            logDebug { "opening $filename" }
-            return FileBuffer(filename, initialOffset, blkSize, readOnly).apply {
-                logDebug { "this isOpen()=${isOpen()}" }
-                open().debug { logDebug { "call(ed) open()" } }
-                logDebug { "this isOpen()=${isOpen()}" }
-            }
-        }
-    }
 }
 
-actual fun openFileBuffer(
-    filename: String, initialOffset: Long, blkSize: Long, readOnly: Boolean): FileBuffer {
-    return FileBuffer.open(filename, initialOffset, blkSize, readOnly)
-}

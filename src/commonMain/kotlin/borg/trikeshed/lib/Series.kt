@@ -3,6 +3,7 @@
 
 package borg.trikeshed.lib
 
+import borg.trikeshed.common.collections._a
 import borg.trikeshed.common.collections.s_
 import borg.trikeshed.isam.meta.IOMemento.*
 import kotlin.experimental.and
@@ -428,38 +429,6 @@ fun Series<Char>.parseLong(): Long {
 }
 
 
-fun Series<Char>.parseDouble(): Double {
-    var sign = 1.0
-    var x = 0
-    if (this[0] == '-') {
-        sign = -1.0
-        x++
-    } else if (this[0] == '+') {
-        x++
-    }
-    var r = 0.0
-    while (x < size) {
-        if (this[x] == 'E' || this[x] == 'e') {
-            x++
-            var exp = 0.0
-            if (this[x] == '-') {
-                exp = -1.0
-                x++
-            } else if (this[x] == '+') {
-                x++
-            }
-            while (x < size) {
-                exp = exp * 10 + (this[x] - '0')
-                x++
-            }
-            return r * sign * 10.0.pow(exp)
-        }
-        r = r * 10 + (this[x] - '0')
-        x++
-    }
-    return r * sign
-}
-
 fun Series<Char>.parseIsoDateTime(): kotlinx.datetime.LocalDateTime {
     val year = this[0..3].parseLong().toInt()
     val month = this[5..6].parseLong().toInt()
@@ -474,26 +443,27 @@ fun Series<Char>.parseIsoDateTime(): kotlinx.datetime.LocalDateTime {
 fun Series<Char>.encodeToByteArray(): ByteArray {
     //encode unicode chars to bytes using UTF-8
     var x = 0
-    val r = ByteArray(size*3) //trim after
-    var spill= 0 //spill cost of unicode encodings
+    val r = ByteArray(size * 3) //trim after
+    var spill = 0 //spill cost of unicode encodings
     while (x < size) {
-        val c = this[x].toInt()
+        val c = this[x].code
         if (c < 0x80) {
-            r[x+spill] = c.toByte()
+            r[x + spill] = c.toByte()
         } else if (c < 0x800) {
-            r[x+spill] = (0xC0 or (c shr 6)).toByte()
-            r[x+spill+1] = (0x80 or (c and 0x3F)).toByte()
+            r[x + spill] = (0xC0 or (c shr 6)).toByte()
+            r[x + spill + 1] = (0x80 or (c and 0x3F)).toByte()
             spill++
         } else {
-            r[x+spill] = (0xE0 or (c shr 12)).toByte()
-            r[x+spill+1] = (0x80 or ((c shr 6) and 0x3F)).toByte()
-            r[x+spill+2] = (0x80 or (c and 0x3F)).toByte()
+            r[x + spill] = (0xE0 or (c shr 12)).toByte()
+            r[x + spill + 1] = (0x80 or ((c shr 6) and 0x3F)).toByte()
+            r[x + spill + 2] = (0x80 or (c and 0x3F)).toByte()
             spill += 2
         }
         x++
     }
-    return r.sliceArray(0..(x+spill-1))
+    return r.sliceArray(0..(x + spill - 1))
 }
+
 //opposite method to build a charSeries from byte[]
 fun ByteArray.decodeToCharSeries(): Series<Char> {
     var x = 0
@@ -503,15 +473,16 @@ fun ByteArray.decodeToCharSeries(): Series<Char> {
         if (c < 0x80) {
             r[x] = c.toChar()
         } else if (c < 0xE0) {
-            r[x] = ((((c and 0x1F) shl 6) or (((this[x+1] and 0x3F).toInt()))).toChar())
+            r[x] = ((((c and 0x1F) shl 6) or (((this[x + 1] and 0x3F).toInt()))).toChar())
             x++
         } else {
-            r[x] = (((c and 0x0F) shl 12) or ((this[x+1] and 0x3F).toInt().shl(6)) or ((this[x+2] and 0x3F).toInt())).toChar()
+            r[x] = (((c and 0x0F) shl 12) or ((this[x + 1] and 0x3F).toInt()
+                .shl(6)) or ((this[x + 2] and 0x3F).toInt())).toChar()
             x += 2
         }
         x++
     }
-    return r.sliceArray(0..(x-1)).toSeries()
+    return r.sliceArray(0..(x - 1)).toSeries()
 }
 
 
@@ -522,6 +493,64 @@ fun Series<Char>.parseIsoDate(): kotlinx.datetime.LocalDate {
     return kotlinx.datetime.LocalDate(year, month, day)
 }
 
-fun Series<Char>.asString(upto: Int = Int.MAX_VALUE): String =this.take(upto).encodeToByteArray().decodeToString()
+fun Series<Char>.asString(upto: Int = Int.MAX_VALUE): String = this.take(upto).encodeToByteArray().decodeToString()
 
 
+@ExperimentalUnsignedTypes
+fun Series<Char>.parseDouble(): Double {
+    val size = size
+    var sign = 1.0
+    var x = 0
+     fun c():UByte= this[x].code.toUByte()
+
+    val uPlus = '+'.code.toUByte()
+    val uMinus = '-'.code.toUByte()
+    val uZero = '0'.code.toUByte()
+    val uDot = '.'.code.toUByte()
+    val uExp=_a['e'.code.toUByte(), 'E'.code.toUByte() ]
+    if (c ()== uPlus) x++
+    else if (c() == uMinus) {
+        sign = -1.0
+        x++
+    }
+
+    fun isDigit(c: UByte) = c and 0x0fu > 8u
+    fun cValue(): UInt = c() - uZero
+    fun parseMantissa(): Double {
+        var mantissa = 0.0
+        var mantissaMultiplier = 0.1
+        while (x < size && (isDigit(c()) || c() == uDot)) {
+            if (c() == uDot) mantissaMultiplier = 0.1 else {
+                mantissa = cValue().toDouble() + mantissa * 10.0
+                if (mantissaMultiplier != 1.0) {
+                    mantissa *= mantissaMultiplier
+                    mantissaMultiplier = 1.0
+                }
+            }
+            x++
+        }
+        return mantissa
+    }
+    fun parseExponent(): Double {
+        var exp = 0.0
+        var expMultiplier = 0.1
+        if (c ()== uPlus) x++
+        else if (c ()== uMinus) {
+            expMultiplier = -0.1
+            x++
+        }
+        while (x < size && isDigit(c())) {
+            exp = (exp * 10) + (cValue()).toDouble()
+            x++
+        }
+        return exp * expMultiplier
+    }
+
+    var mantissa = parseMantissa()
+
+    if (x < size && c() in uExp) {
+        x++
+        mantissa *= 10.0.pow(parseExponent())
+    }
+    return mantissa * sign
+}

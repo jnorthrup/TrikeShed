@@ -14,11 +14,13 @@ expect fun assert(value: Boolean)
 @Throws(AssertionError::class)
 expect inline fun assert(value: Boolean, lazyMessage: () -> Any)
 
+//var forceDebug = env// stopgap measure until i figure out how to do native -ea
 
 val debugging by lazy {
     try {
         assert(false) { "debugging" }
-        false
+//        forceDebug
+    false
     } catch (e: AssertionError) {
         true
     }
@@ -43,4 +45,8 @@ infix fun <T> T.d(other: T): T {
 /** iff debugging is enabled, print the result of the block */
 inline fun logDebug(block: () -> String) {
     if (debugging) println("debug: " + block())
+}
+
+inline fun logAlways (block: () -> String) {//import as logDebug
+  println("debug: " + block())
 }

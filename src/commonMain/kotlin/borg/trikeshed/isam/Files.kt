@@ -7,4 +7,6 @@ expect object Files{
     fun write(filename: String, bytes: ByteArray)
     fun write(filename: String, lines: List<String>)
     fun write(filename: String, string: String)
+    fun cwd(): String
+    fun exists(filename: String): Boolean
 }

@@ -1,4 +1,6 @@
-import borg.trikeshed.lib.Join
+package borg.trikeshed.common
+
+
 import borg.trikeshed.lib.logDebug
 
 import simple.PosixFile
@@ -10,7 +12,7 @@ import platform.posix.munmap
  * an openable and closeable mmap file.
  */
 actual class FileBuffer actual constructor(filename: String, initialOffset: Long, blkSize: Long, readOnly: Boolean) :
-    borg.trikeshed.common.LongSeries<Byte>{
+    LongSeries<Byte> {
 
     actual val filename: String
     actual val initialOffset: Long
@@ -69,22 +71,4 @@ actual class FileBuffer actual constructor(filename: String, initialOffset: Long
     actual fun put(index: Long, value: Byte) {
         (buffer!!.toLong() + index).toCPointer<ByteVar>()!!.pointed.value = value
     }
-
-    companion object {
-        fun open(
-            filename: String,
-            initialOffset: Long = 0L,
-            blkSize: Long = -1L,
-            readOnly: Boolean = true,
-        ): FileBuffer = FileBuffer(filename, initialOffset, blkSize, readOnly)
-    }
-}
-
-actual fun openFileBuffer(
-    filename: String,
-    initialOffset: Long,
-    blkSize: Long,
-    readOnly: Boolean,
-): FileBuffer {
-    return FileBuffer.open(filename, initialOffset, blkSize, readOnly)
 }

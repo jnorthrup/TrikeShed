@@ -9,6 +9,7 @@ import borg.trikeshed.lib.size
 import borg.trikeshed.lib.toSeries
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
+import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
@@ -124,21 +125,44 @@ class PlatformCodecTest {
                 }
 
                 IoFloat -> {
-                    val v = 0x7fffffff.toFloat()
-                    val dec = IoFloat.createDecoder(IoFloat.networkSize!!  /*?:v.size */)
-                    val enc = IoFloat.createEncoder(IoFloat.networkSize!!  /*?:v.size */)
-                    val bytes = enc(v)
-                    val v2 = dec(bytes)
-                    assertEquals(v, v2)
+                    also {
+                        val v = 0x7fffffff.toFloat()
+                        val dec = IoFloat.createDecoder(IoFloat.networkSize!!  /*?:v.size */)
+                        val enc = IoFloat.createEncoder(IoFloat.networkSize!!  /*?:v.size */)
+                        val bytes = enc(v)
+                        val v2 = dec(bytes)
+                        assertEquals(v, v2)
+                    }
+                    //test 10 more random values
+                    repeat(10) {
+                        val v = Random.nextFloat()
+                        val dec = IoFloat.createDecoder(IoFloat.networkSize!!  /*?:v.size */)
+                        val enc = IoFloat.createEncoder(IoFloat.networkSize!!  /*?:v.size */)
+                        val bytes = enc(v)
+                        val v2 = dec(bytes)
+                        assertEquals(v, v2)
+                    }
                 }
 
                 IoDouble -> {
-                    val v = 0x7fffffffffffffff.toDouble()
-                    val dec = IoDouble.createDecoder(IoDouble.networkSize!!  /*?:v.size */)
-                    val enc = IoDouble.createEncoder(IoDouble.networkSize!!  /*?:v.size */)
-                    val bytes = enc(v)
-                    val v2 = dec(bytes)
-                    assertEquals(v, v2)
+                    also {
+                        val v = 0x7fffffffffffffff.toDouble()
+                        val dec = IoDouble.createDecoder(IoDouble.networkSize!!  /*?:v.size */)
+                        val enc = IoDouble.createEncoder(IoDouble.networkSize!!  /*?:v.size */)
+                        val bytes = enc(v)
+                        val v2 = dec(bytes)
+                        assertEquals(v, v2)
+                    }
+                    //test 10 more random values
+                    repeat(10) {
+                        val v = Random.nextDouble()
+                        val dec = IoDouble.createDecoder(IoDouble.networkSize!!  /*?:v.size */)
+                        val enc = IoDouble.createEncoder(IoDouble.networkSize!!  /*?:v.size */)
+                        val bytes = enc(v)
+                        val v2 = dec(bytes)
+                        assertEquals(v, v2)
+                    }
+
                 }
 
                 IoNothing -> {}
