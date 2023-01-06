@@ -31,9 +31,8 @@ typealias Cursor = Series<RowVec>
  * returns Series<Series<A?>>> where the meta is stripped out and the values are cast using
  *
  * it "as?" A return only A values and null for non-A values */
-inline operator fun <A : Any, IR : Any?, SrInnr : Series<Join<A, *>>, SrOutr : Series<SrInnr>, RC : KClass<A?>> SrOutr.div(
-    c: KClass<out A>,
-): Series<Series<A?>> = this α { it α Join<A, *>::a } α { it α { it } } α { it α { it } }
+operator fun <A : Any, SrInnr : Series<Join<A, *>>, SrOutr : Series<SrInnr>> SrOutr.div(c: KClass<out A>): Series<Series<A?>> =
+    this α { it α Join<A, *>::a } α { it α { it } } α { it α { it } }
 
 /** gets the RowVec at y or if y is negative then -y from last */
 infix fun Cursor.at(y: Int): RowVec = b(if (y < 0) size - y else y)
@@ -62,7 +61,7 @@ operator fun Cursor.get(i: IntRange): Cursor {
 
 /** get meta for a cursor from row 0 */
 val Cursor.meta: Series<ColMeta>
-    get() = row(0) α {(_, b)->
+    get() = row(0) α { (_, b) ->
         b()
     }
 
@@ -99,19 +98,16 @@ operator fun Cursor.minus(killbag: Series<Int>) {
 
 /** cursor get by ColumnExclusion vararg -- return a Cursor with the columns excluded by the vararg */
 fun Cursor.get(s: Series<ColumnExclusion>): Cursor {
-
     val exclusionBag = mutableSetOf<Int>()
-    s.`▶`.forEachIndexed { i: Int, it: ColumnExclusion ->
-        exclusionBag.add(meta.`▶`.indexOfFirst { it.name == it.name })
+    s.`▶`.forEach {  cn: ColumnExclusion ->
+        exclusionBag.add(meta.`▶`.indexOfFirst { it.name == cn.name })
     }
     val retained = ((0 until meta.size).toSet() - exclusionBag).toIntArray()
     return this[retained]
 }
 
-
 //in columnar project this is meta.right
 val Series<out ColMeta>.names: Series<String> get() = this α ColMeta::name
-
 
 /** head default 5 rows
  * just like unix head - print default 5 lines from cursor contents to stdout */
@@ -124,6 +120,7 @@ fun Cursor.showRandom(n: Int = 5) {
         if (size > 0) showValues(Random.nextInt(0, size).let { it..it })
     }
 }
+
 /** simple printout macro*/
 fun Cursor.show(range: IntRange = 0 until size) {
     val meta: Series<ColMeta> = meta
@@ -135,8 +132,9 @@ fun Cursor.showValues(range: IntRange) {
     try {
         range.forEach { x: Int ->
             val row = row(x)
-            val catn: Series<*> = row.left//.debug { logDebug { "showval coords ${it.toList() .map {(it as? CharSeries)?.asString()?:""} }" } }
-            val combine = combine(catn) α { if(it is CharSeries ) it.asString() else "$it"  }
+            val catn: Series<*> =
+                row.left//.debug { logDebug { "showval coords ${it.toList() .map {(it as? CharSeries)?.asString()?:""} }" } }
+            val combine = combine(catn) α { it: Any? -> if (it is CharSeries) it.asString() else "$it" }
             println(combine.toList())
         }
     } catch (e: NoSuchElementException) {

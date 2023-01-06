@@ -3,6 +3,7 @@ package borg.trikeshed.common.parser.simple
 import borg.trikeshed.lib.*
 import borg.trikeshed.lib.CZero.nz
 import kotlin.math.max
+import kotlin.math.min
 
 /**
  * char based spiritual successor to ByteBuffer for parsing
@@ -114,15 +115,18 @@ class CharSeries(buf: Series<Char>) : Series<Char> {
     //Java ByteBuffer style slice
     val slice: CharSeries get() = CharSeries(this[pos until limit])
 
-    fun asString(upto: Int = Int.MAX_VALUE): String =
-        ((limit - pos) j { x: Int -> this[x + pos] }).toArray().concatToString()
+    fun asString(upto: Int = Int.MAX_VALUE): String {
+        val limit1 = min(upto, limit);
+        val toArray: CharArray = ((limit1 - pos) j { x: Int -> this[x + pos] }).toArray()
+        return toArray.concatToString()
+    }
 
     override fun toString(): String {
         val take = asString().take(4)
         return "CharSeries(position=$pos, limit=$limit, mark=$mark, cacheCode=$cacheCode,take-4=${take})"
     }
 
-    fun lim(i: Int) = apply { limit = i }
+    fun lim(i: Int): CharSeries = apply { limit = i }
 
     //isEmpty override
     val isEmpty: Boolean get() = pos == limit

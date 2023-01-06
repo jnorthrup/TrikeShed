@@ -17,3 +17,11 @@ expect class IsamDataFile(
         fun write(cursor: Cursor, datafilename: String)
     }
 }
+fun<T> IsamDataFile.use (block: (IsamDataFile) -> T): T {
+    try {
+        open()
+        return block(this)
+    } finally {
+        close()
+    }
+}

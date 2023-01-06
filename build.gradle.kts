@@ -1,3 +1,6 @@
+import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTargetWithHostTests
+import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
+
 plugins {
     kotlin("multiplatform") version "1.8.0"
 //    id("org.jetbrains.intellij") version "3.1" apply true
@@ -39,25 +42,12 @@ kotlin {
         withJava()
     }
 
-
-//    val hostOs = System.getProperty("os.name")
-//    val isMingwX64 = hostOs.startsWith("Windows")
-//    val nativeTarget = when {
-//        hostOs == "Mac OS X" -> macosX64("native")
-//        hostOs == "Linux" -> linuxX64("native")
-//        isMingwX64 -> mingwX64("native")
-//        else -> throw GradleException("Host OS is not supported in Kotlin/Native.")
-//    }
-//we want to develop a linuxX64 target separately from generic native
-
-    val nativeTarget = macosX64 ("native")
-    val linuxX64Target = linuxX64("linuxX64")
+    val nativeTarget: KotlinNativeTargetWithHostTests = linuxX64("native")
 
     sourceSets {
         val commonMain by getting {
             dependencies {
-                             api("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.4")
-
+                api("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.4")
                 api("org.jetbrains.kotlinx:kotlinx-datetime:0.4.0")
                 api("org.jetbrains.kotlin:kotlin-reflect:1.8.0")
             }
@@ -70,33 +60,15 @@ kotlin {
             }
         }
 
-        val nativeMain by getting {
+        val nativeMain by getting
 
-        }
-
-        val nativeTest by getting {
-
-        }
-
-        val linuxX64Main by getting {
-            dependsOn(nativeMain)
-        }
-
-        val linuxX64Test by getting {
-            dependsOn(nativeTest)
-        }
-
+        val nativeTest by getting
 
         val jvmMain by getting {
-//            dependsOn(commonMain)
             dependencies {
-                //datetime
                 api("org.jetbrains.kotlinx:kotlinx-datetime-jvm:0.4.0")
-                //coroutines
                 api("org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:1.6.4")
-                //serialization
                 api("org.jetbrains.kotlinx:kotlinx-serialization-json-jvm:1.3.0")
-
             }
         }
 
@@ -106,6 +78,15 @@ kotlin {
                 implementation(kotlin("test"))
                 implementation(kotlin("test-junit"))
             }
+        }
+    }
+    tasks.withType<KotlinCompile> {
+        kotlinOptions.freeCompilerArgs += "-Xuse-experimental=kotlin.Experimental"
+    }
+    tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinTest> {
+        testLogging {
+            events("passed", "skipped", "failed")
+            exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
         }
     }
 }
