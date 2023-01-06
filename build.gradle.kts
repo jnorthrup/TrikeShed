@@ -112,10 +112,10 @@ kotlin {
             }
         }
     }
-    tasks.withType<KotlinCompile> {
-        kotlinOptions.freeCompilerArgs += "-opt-in"
-
-    }
+//    tasks.withType<KotlinCompile> {
+//        kotlinOptions.freeCompilerArgs += "-opt-in"
+//
+//    }
     tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinTest> {
         testLogging {
             events("passed", "skipped", "failed")
@@ -123,11 +123,3 @@ kotlin {
         }
     }
 }
-
-//tasks.withType<KotlinTest> {
-//    useKotlinTestRunner()
-//    testLogging {
-//        events("passed", "skipped", "failed")
-//        exceptionFormat = "full"
-//    }
-//}
