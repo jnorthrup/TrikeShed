@@ -2,6 +2,8 @@ import org.jetbrains.kotlin.gradle.plugin.extraProperties
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTargetWithHostTests
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
+//which stanza do we add a linux64 cinteropdef for liburing below? (the linux64 stanza is the only one that has a cinterop block)
+
 plugins {
     kotlin("multiplatform") version "1.8.0"
 //    id("org.jetbrains.intellij") version "3.1" apply true
@@ -44,8 +46,8 @@ kotlin {
     }
 
 
-//    val hostOs = System.getProperty("os.name")
-//    val isMingwX64 = hostOs.startsWith("Windows")
+    val hostOs = System.getProperty("os.name")
+    val isMingwX64 = hostOs.startsWith("Windows")
 //    val nativeTarget = when {
 //        hostOs == "Mac OS X" -> macosX64("native")
 //        hostOs == "Linux" -> linuxX64("native")
@@ -53,15 +55,13 @@ kotlin {
 //        else -> throw GradleException("Host OS is not supported in Kotlin/Native.")
 //    }
 //we want to develop a linuxX64 target separately from generic native
-
-    val nativeTarget = macosX64 ("native")
+    val nativeTarget = mingwX64("native")
     val linuxX64Target = linuxX64("linuxX64")
 
     sourceSets {
         val commonMain by getting {
             dependencies {
-                             api("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.4")
-
+                api("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.4")
                 api("org.jetbrains.kotlinx:kotlinx-datetime:0.4.0")
                 api("org.jetbrains.kotlin:kotlin-reflect:1.8.0")
             }
@@ -92,7 +92,6 @@ kotlin {
 
 
         val jvmMain by getting {
-//            dependsOn(commonMain)
             dependencies {
                 //datetime
                 api("org.jetbrains.kotlinx:kotlinx-datetime-jvm:0.4.0")
@@ -112,10 +111,10 @@ kotlin {
             }
         }
     }
-//    tasks.withType<KotlinCompile> {
-//        kotlinOptions.freeCompilerArgs += "-opt-in"
-//
-//    }
+    //    tasks.withType<KotlinCompile> {
+    //        kotlinOptions.freeCompilerArgs += "-opt-in"
+    //
+    //    }
     tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinTest> {
         testLogging {
             events("passed", "skipped", "failed")
