@@ -1,3 +1,6 @@
 [submodule "liburing"]
 	path = liburing
 	url = https://github.com/axboe/liburing.git
+[submodule "kotlin_uring"]
+	path = kotlin_uring
+	url = git@github.com:jnorthrup/kotlin_uring.git

@@ -56,8 +56,16 @@ kotlin {
 //    }
 //we want to develop a linuxX64 target separately from generic native
     val nativeTarget = macosX64("native")
-    val linuxX64Target = linuxX64("linuxX64")
+    val linuxX64Target = linuxX64("linuxX64"){
+         compilations.first().cinterops {
+            println("compilation: $this")
+            create(name) {
+                defFile = project.file("io_uring_interop/linux_uring.def")
+            }
+        }
 
+
+    }
     sourceSets {
         val commonMain by getting {
             dependencies {
