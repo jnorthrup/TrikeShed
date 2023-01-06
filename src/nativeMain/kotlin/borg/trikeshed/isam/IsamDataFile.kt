@@ -6,10 +6,12 @@ import kotlinx.cinterop.*
 import platform.posix.*
 
 actual class IsamDataFile actual constructor(
-    actual val datafileFilename: String,
+    datafileFilename: String,
     metafileFilename: String,
-    actual val metafile: IsamMetaFileReader
+    metafile: IsamMetaFileReader,
 ) : Cursor {
+    actual val datafileFilename: String = datafileFilename
+    actual val metafile: IsamMetaFileReader = metafile
 
 
     val recordlen: Int by lazy {
@@ -122,7 +124,6 @@ actual class IsamDataFile actual constructor(
     init {
         this.b = { row ->
             memScoped {
-
                 val d2 = data.toLong() + (row * recordlen)
 
                 constraints.size j { col ->
