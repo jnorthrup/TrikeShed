@@ -1,3 +1,4 @@
+import org.jetbrains.kotlin.gradle.plugin.extraProperties
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTargetWithHostTests
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
@@ -81,7 +82,8 @@ kotlin {
         }
     }
     tasks.withType<KotlinCompile> {
-        kotlinOptions.freeCompilerArgs += "-Xuse-experimental=kotlin.Experimental"
+        kotlinOptions.freeCompilerArgs += "-opt-in"
+
     }
     tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinTest> {
         testLogging {
