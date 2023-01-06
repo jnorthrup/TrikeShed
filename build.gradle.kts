@@ -1,3 +1,7 @@
+import org.jetbrains.kotlin.gradle.plugin.extraProperties
+import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTargetWithHostTests
+import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
+
 plugins {
     kotlin("multiplatform") version "1.8.0"
 //    id("org.jetbrains.intellij") version "3.1" apply true
@@ -106,6 +110,16 @@ kotlin {
                 implementation(kotlin("test"))
                 implementation(kotlin("test-junit"))
             }
+        }
+    }
+    tasks.withType<KotlinCompile> {
+        kotlinOptions.freeCompilerArgs += "-opt-in"
+
+    }
+    tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinTest> {
+        testLogging {
+            events("passed", "skipped", "failed")
+            exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
         }
     }
 }
