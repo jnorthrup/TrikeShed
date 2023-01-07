@@ -60,7 +60,7 @@ kotlin {
          compilations.first().cinterops {
             println("compilation: $this")
             create(name) {
-                defFile = project.file("io_uring_interop/linux_uring.def")
+                defFile = project.file("io_uring_interop/zlinux_uring.def")
             }
         }
 
