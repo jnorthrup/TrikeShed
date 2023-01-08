@@ -1,8 +1,9 @@
 @file:Suppress("EnumEntryName")
 package linux_uring.include
 
-import linux_uring.*
-import simple.CZero.nz
+import borg.trikeshed.lib.CZero.nz
+import zlinux_uring.*
+
 
 /**
  * The io_uring_setup() system call sets up a submission queue (SQ) and completion queue (CQ) with at least entries

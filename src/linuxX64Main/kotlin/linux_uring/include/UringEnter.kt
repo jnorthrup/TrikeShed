@@ -1,8 +1,9 @@
 package linux_uring.include
 
-import linux_uring.IORING_ENTER_GETEVENTS
-import linux_uring.IORING_ENTER_SQ_WAIT
-import linux_uring.IORING_ENTER_SQ_WAKEUP
+import zlinux_uring.IORING_ENTER_GETEVENTS
+import zlinux_uring.IORING_ENTER_SQ_WAIT
+import zlinux_uring.IORING_ENTER_SQ_WAKEUP
+
 
 /**
  * If the io_uring instance was configured for polling, by specifying IORING_SETUP_IOPOLL in the call to io_uring_setup(2),

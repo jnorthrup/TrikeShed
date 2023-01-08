@@ -86,41 +86,6 @@ actual class IsamDataFile actual constructor(
     }
 
 
-    actual companion object {
-        actual fun write(cursor: Cursor, datafilename: String): Unit = memScoped {
-            val metafilename = "$datafilename.meta"
-
-            IsamMetaFileReader.write(metafilename, cursor.meta.map { colMeta: ColMeta -> colMeta as RecordMeta })
-
-            //open RandomAccessDataFile
-
-            val data = fopen(datafilename, "w")
-
-            //create row buffer
-            val meta = cursor.meta α { it as RecordMeta }
-            val rowLen = meta.last().end
-            val rowBuffer = ByteArray(rowLen)
-
-            val clears = meta.`▶`.withIndex().filter { it.value.type.networkSize == null }.map { it.index }.toIntArray()
-
-            //write rows
-            for (y in 0 until cursor.a) {
-                val rowData = cursor.row(y).left
-
-                for (x in 0 until cursor.meta.size) {
-                    val colMeta = meta[x]
-                    val colData = rowData[x]
-                    val colBytes = colMeta.encoder(colData)
-                    colBytes.copyInto(rowBuffer, colMeta.begin, 0, colBytes.size)
-                    if (x in clears && colBytes.size < colMeta.end - colMeta.begin)   //write 1 zero
-                        rowBuffer[colMeta.begin + colBytes.size] = 0
-                }
-                val fwrite = fwrite(rowBuffer.refTo(0), 1, rowLen.toULong(), data)
-            }
-            val fclose = fclose(data)
-        }.let {}
-    }
-
     init {
         this.b = { row ->
             memScoped {
@@ -137,6 +102,43 @@ actual class IsamDataFile actual constructor(
             }
         }
     }
+
+    actual companion object {
+        actual fun write(cursor: Cursor, datafilename: String): Unit = memScoped {
+            val metafilename = "$datafilename.meta"
+
+            IsamMetaFileReader.write(metafilename, cursor.meta.map { colMeta: ColMeta -> colMeta as RecordMeta })
+
+            //open RandomAccessDataFile
+
+            val data = fopen(datafilename, "w")
+
+            //create row buffer
+            val meta = cursor.meta α { it as RecordMeta }
+            val rowLen = meta.last().end
+            val rowBuffer = ByteArray(rowLen)
+            val clears = meta.`▶`.withIndex().filter { it.value.type.networkSize == null }.map { it.index }.toIntArray()
+
+            //write rows
+            for (y in 0 until cursor.a) {
+                val rowData = cursor.row(y).left
+
+                for (x in 0 until cursor.meta.size) {
+                    val colMeta = meta[x]
+                    val colData = rowData[x]
+                    val colBytes = colMeta.encoder(colData)
+                    colBytes.copyInto(rowBuffer, colMeta.begin, 0, colBytes.size)
+                    if (x in clears && colBytes.size < colMeta.end - colMeta.begin)
+                        rowBuffer[colMeta.begin + colBytes.size] = 0
+                }
+                val fwrite = fwrite(rowBuffer.refTo(0), 1, rowLen.toULong(), data)
+            }
+            val fclose = fclose(data)
+        }.let {}
+
+    }
+
+
 }
 
 

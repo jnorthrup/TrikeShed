@@ -2,8 +2,8 @@
 
 package linux_uring.include
 
-import linux_uring.*
-import simple.CZero.nz
+import borg.trikeshed.lib.CZero.nz
+import zlinux_uring.*
 
 /**
 The flagsfield is a bit mask. The supported flags are:

@@ -7,11 +7,20 @@ import kotlinx.cinterop.*
 
 //import linux_uring.fstatat
 import platform.posix.*
+import zlinux_uring.AT_FDCWD
 
 /**
 opens file for syncronous read  /write
+
+ NOTE: This is a clone of PosixFile, should be reconciled later with hierarchical kotlin native posix root, or not.
+
+ the project is not intended to be run on anything except linux, however there's too many good reasons to keep the door
+ open to general native targets.
+
+ in the case of getDirFd and getFd, linux fcntl.h is platform specific and is only used in inbound uring samples.
  */
-class PosixFile(
+
+class LinuxPosixFile(
     val path: String?,
     O_FLAGS: __u32 = PosixOpenOpts.withFlags(PosixOpenOpts.OpenReadOnly, PosixOpenOpts.OpenSync),
     override val fd: Int = run {
@@ -461,7 +470,13 @@ class PosixFile(
         }
 
 
-
+        fun getDirFd(namedDirAndFile: List<String>): Int = if (namedDirAndFile.first().isEmpty()) {
+            AT_FDCWD
+        } else {
+            platform.posix.open(namedDirAndFile.first(), O_DIRECTORY).also {
+                HasPosixErr.posixRequires(it > 0) { "opendir ${namedDirAndFile.first()}" }
+            }
+        }
 
         fun namedDirAndFile(file_path: String) = file_path.lastIndexOf('/').let { tail ->
             if (tail == -1) listOf("", file_path) else listOf(
@@ -477,7 +492,7 @@ class PosixFile(
         /** lean on getline to read a file into a sequence of CharSeries */
         fun readLinesSeq(path: String): Sequence<String> = memScoped {
 
-            val file = PosixFile(path)
+            val file = LinuxPosixFile(path)
             val fp = fdopen(file.fd, "r")
             val line: CPointerVarOf<CPointer<ByteVarOf<Byte>>> = alloc()
             val len: ULongVarOf<size_t> = alloc()
@@ -499,7 +514,7 @@ class PosixFile(
         }
 
         fun readLines(path: String): List<String> = memScoped {
-            val file = PosixFile(path)
+            val file = LinuxPosixFile(path)
             val fp = fdopen(file.fd, "r")
             val line: CPointerVarOf<CPointer<ByteVarOf<Byte>>> = alloc()
             val len: ULongVarOf<size_t> = alloc()
@@ -521,7 +536,7 @@ class PosixFile(
         }
 
         fun readAllBytes(filename: String): ByteArray = memScoped {
-            val file = PosixFile(filename)
+            val file = LinuxPosixFile(filename)
             val stat = statk(filename)
             val len = stat.st_size.convert<Int>()
             val buf = allocArray<ByteVar>(len)
@@ -532,7 +547,7 @@ class PosixFile(
         }
         fun readString(filename: String): String = readAllBytes(filename).decodeToString()
         fun writeBytes(filename: String, bytes: ByteArray) = memScoped {
-            val file = PosixFile(filename)
+            val file = LinuxPosixFile(filename)
             val len = bytes.size
             val buf = allocArray<ByteVar>(len)
             bytes.forEachIndexed { index, byte -> buf[index] = byte }
@@ -545,7 +560,7 @@ class PosixFile(
          */
         fun writeLines(filename: String, lines: List<String>) = memScoped {
             val O_FLAGS = PosixOpenOpts.withFlags(PosixOpenOpts.O_Creat, PosixOpenOpts.O_Trunc, PosixOpenOpts.O_WrOnly)
-            val file = PosixFile(filename, O_FLAGS)
+            val file = LinuxPosixFile(filename, O_FLAGS)
             lines.forEach { line ->
                 val len = line.length
                 val buf = line.plus('\n').cstr.getPointer(this)

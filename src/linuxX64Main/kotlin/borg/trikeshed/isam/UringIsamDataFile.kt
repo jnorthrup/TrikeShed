@@ -2,11 +2,27 @@ package borg.trikeshed.isam
 
 import borg.trikeshed.isam.meta.IOMemento
 import borg.trikeshed.lib.*
+import borg.trikeshed.lib.CZero.nz
 import borg.trikeshed.native.HasPosixErr
 import kotlinx.cinterop.*
 import platform.posix.*
+import platform.posix.FILE
+import platform.posix.MAP_PRIVATE
+import platform.posix.O_RDONLY
+import platform.posix.PROT_READ
+import platform.posix.close
+import platform.posix.fclose
+import platform.posix.fileno
+import platform.posix.fopen
+import platform.posix.fstat
+import platform.posix.fwrite
+import platform.posix.malloc
+import platform.posix.mmap
+import platform.posix.munmap
+import platform.posix.open
+import platform.posix.stat
 import simple.PosixOpenOpts
-import zlinux_uring.io_uring
+import zlinux_uring.*
 
 
 class UringIsamDataFile constructor(
@@ -141,27 +157,24 @@ class UringIsamDataFile constructor(
             val meta: Series<RecordMeta> = cursor.meta α { it as RecordMeta }
             val rowLen: Int = meta.last().end
             val rowBuffer = ByteArray(rowLen)
-            val clears: IntArray =
+            val clears: IntArray =// if the ioMemento is null, then it is a variable length field, and we end as null
                 meta.`▶`.withIndex().filter { it.value.type.networkSize == null }.map { it.index }.toIntArray()
 
-            //open RandomAccessDataFile
-//            val data: CPointer<FILE>? = fopen(datafilename, "w")
-
             //set up liburing
-            val ring: io_uring = alloc()
-            var ret = HasPosixErr.posixRequires(io_uring_queue_init(8, ring.ptr, 0) != 0) { "io_uring_queue_init" }
+            val ring = malloc(io_uring.size.convert())!!.reinterpret<io_uring>()
+            val ringParams = malloc(io_uring_params.size.convert())!!.reinterpret<io_uring_params>()
+            ringParams.pointed.sq_entries = 1024.toUInt()
+            ringParams.pointed.cq_entries = 1024.toUInt()
+            ringParams.pointed.flags = IORING_SETUP_IOPOLL.toUInt()
 
-            //open file data
-            val ownerPerms = 644.fromOctal()
+            val ret: Int = io_uring_queue_init(32, ring, 0)  //initialize the ring
+            HasPosixErr.posixRequires(ret.nz) { "io_uring_queue_init" }
 
+            //open RandomAccessDataFile
+            val data: CPointer<FILE>? = fopen(datafilename, "w")
+            val fd: Int = fileno(data)
 
-            val data = open(
-                datafilename,
-                PosixOpenOpts.withFlags(PosixOpenOpts.O_Trunc, PosixOpenOpts.O_WrOnly, PosixOpenOpts.O_Creat).toInt(),
-                ownerPerms.reinterpret() as mode_t
-            )
-
-            //write rows using liburing and io_uring_prep_write
+            //write rows
             for (y in 0 until cursor.a) {
                 val rowData: Series<*> = cursor.row(y).left
 
@@ -173,9 +186,14 @@ class UringIsamDataFile constructor(
                     if (x in clears && colBytes.size < colMeta.end - colMeta.begin)   //write 1 zero
                         rowBuffer[colMeta.begin + colBytes.size] = 0
                 }
-                val fwrite: ULong = fwrite(rowBuffer.refTo(0), 1, rowLen.toULong(), data)
-
+//                    val fwrite: ULong = fwrite(rowBuffer.refTo(0), 1, rowLen.toULong(), data)
+                //use io_uring instead
+                val sqe: CPointer<io_uring_sqe>? = io_uring_get_sqe(ring)  //get a submission queue entry
+                io_uring_prep_write(sqe, fd, rowBuffer.refTo(0), rowLen.toUInt(), 0)  //prepare the submission queue entry
+                io_uring_submit(ring)  //submit the submission queue entry
+                io_uring_wait_cqe(ring, null)  //wait for the completion queue entry
             }
             val fclose: Int = fclose(data)
         }
-
+    }
+}

@@ -2,10 +2,11 @@
 
 package linux_uring.include
 
+import borg.trikeshed.lib.CZero.nz
 import kotlinx.cinterop.get
 import kotlinx.cinterop.memScoped
 import linux_uring.*
-import simple.CZero.nz
+import zlinux_uring.*
 
 /**
 If no flags are specified, the io_uring instance is setup for interrupt driven I/O. I/O may be submitted using
