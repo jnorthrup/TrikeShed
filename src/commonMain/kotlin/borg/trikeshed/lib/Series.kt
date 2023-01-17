@@ -3,7 +3,6 @@
 
 package borg.trikeshed.lib
 
-import borg.trikeshed.common.collections._a
 import borg.trikeshed.common.collections.s_
 import borg.trikeshed.isam.meta.IOMemento.*
 import kotlin.experimental.and
@@ -473,7 +472,7 @@ fun ByteArray.decodeToCharSeries(): Series<Char> {
         if (c < 0x80) {
             r[x] = c.toChar()
         } else if (c < 0xE0) {
-            r[x] = ((((c and 0x1F) shl 6) or (((this[x + 1] and 0x3F).toInt()))).toChar())
+            r[x] = (((c and 0x1F) shl 6) or (((this[x + 1] and 0x3F).toInt()))).toChar()
             x++
         } else {
             r[x] = (((c and 0x0F) shl 12) or ((this[x + 1] and 0x3F).toInt()
@@ -495,43 +494,58 @@ fun Series<Char>.parseIsoDate(): kotlinx.datetime.LocalDate {
 
 fun Series<Char>.asString(upto: Int = Int.MAX_VALUE): String = this.take(upto).encodeToByteArray().decodeToString()
 fun Series<Char>.parseDouble(): Double {
-    var x = 0
-    var sign = 1.0
-    var r = 0.0
-    var decimal = 0
-    var exponent = 0
-    var exponentSign = 1
-    var exponentValue = 0
-    var digitsAfterDecimal = 0
-
-    if (this[0] == '+') x++
-    else if (this[0] == '-') {
-        sign = -1.0
-        x++
+    var x:  Int = 0
+    var isNegativeValue:Boolean=false
+    var r: Double = 0.0
+    var decimal: Boolean = false
+    var exponent: UInt = 0u
+    var exponentSign: Byte = 1
+    var exponentValue: UShort = 0u
+    var digitsAfterDecimal: UByte = 0u
+    var c: Char
+    fun initSign() {
+        if (this[x] == '-') {
+            isNegativeValue = true
+            x++
+        } else if (this[x] == '+') {
+            isNegativeValue = false
+            x++
+        } else {
+            isNegativeValue = false
+        }
     }
-    while (x < size) {
-        if (this[x] == 'E' || this[x] == 'e') {
-            exponent = 1
+    fun isDigit(c: Char): Boolean = c in '0'..'9'
+
+    fun parseExponent() {
+        if (this[x] == '-') {
+            exponentSign = -1
             x++
-            if (this[x] == '-') {
-                exponentSign = -1
-                x++
-            } else if (this[x] == '+') x++
-            while (x < size) {
-                if (this[x] !in '0'..'9') throw NumberFormatException("Invalid exponent value")
-                exponentValue = exponentValue * 10 + (this[x] - '0')
-                x++
-            }
-        } else if (this[x] == '.') {
-            decimal = 1
-            x++
-        } else if (this[x] !in '0'..'9') throw NumberFormatException("Invalid digit")
-        else {
-            r = r * 10 + (this[x] - '0')
-            if (decimal == 1) digitsAfterDecimal++
+        } else if (this[x] == '+') x++
+        while (x < size ) {
+            val c = this[x]
+            if (!isDigit(c)) throw NumberFormatException("Invalid exponent value")
+            exponentValue = (exponentValue * 10u + (c - '0').toUShort()).toUShort()
             x++
         }
     }
-    if (exponent == 0) return sign * r * 10.0.pow(exponentSign * exponentValue - digitsAfterDecimal)
-    return sign * r * 10.0.pow(exponentSign * exponentValue - digitsAfterDecimal)
+
+    initSign()
+    while (x < size ) {
+        c = this[x]
+        if (c == 'E' || c == 'e') {
+            exponent = 1u
+            x++
+            parseExponent()
+        } else if (c == '.') {
+            decimal = true
+            x++
+        } else if (!isDigit(c)) throw NumberFormatException("Invalid digit")
+        else {
+            r = r * 10 + (c - '0').toDouble()
+            if (decimal) digitsAfterDecimal++
+            x++
+        }
+    }
+    val dneg:Double=if(isNegativeValue && (r != 0.0)) -1.0 else 1.0
+    return dneg * r * 10.0.pow((exponentSign * exponentValue.toInt() - digitsAfterDecimal.toInt()).toDouble())
 }
