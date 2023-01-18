@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalUnsignedTypes::class)
+
 package borg.trikeshed.lib
 
 /** this is a set of helper extension functions to produce network-endian versions of getIntAt, setIntAt, getLongAt,

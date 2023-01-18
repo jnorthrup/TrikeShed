@@ -1,3 +1,5 @@
+@file:Suppress("EXTENSION_SHADOWED_BY_MEMBER")
+
 package borg.trikeshed.lib
 
 import borg.trikeshed.common.collections.s_

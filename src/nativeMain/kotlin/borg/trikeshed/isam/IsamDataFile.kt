@@ -1,5 +1,6 @@
 package borg.trikeshed.isam
 
+import borg.trikeshed.common.Usable
 import borg.trikeshed.isam.meta.IOMemento
 import borg.trikeshed.lib.*
 import kotlinx.cinterop.*
@@ -9,7 +10,7 @@ actual class IsamDataFile actual constructor(
     datafileFilename: String,
     metafileFilename: String,
     metafile: IsamMetaFileReader,
-) : Cursor {
+) : Usable,Cursor {
     actual val datafileFilename: String = datafileFilename
     actual val metafile: IsamMetaFileReader = metafile
 
@@ -25,13 +26,13 @@ actual class IsamDataFile actual constructor(
     var fileSize: Long = -1
 
     private var first = true
-    actual fun open() {
+    actual override fun open() {
         if (!first) return
         memScoped {
             val fd = open(datafileFilename, O_RDONLY)
             val stat = alloc<stat>()
             fstat(fd, stat.ptr)
-            fileSize = stat.st_size.toLong()
+            fileSize = stat.st_size
 
             require(fileSize % recordlen == 0L) { "fileSize must be a multiple of recordlen" }
 
@@ -79,12 +80,11 @@ actual class IsamDataFile actual constructor(
     override fun toString(): String =
         "IsamDataFile(metafile=$metafile, recordlen=$recordlen, constraints=$constraints, datafileFilename='$datafileFilename', fileSize=$fileSize)"
 
-    actual fun close() {
+    actual override fun close() {
         memScoped {
             munmap(data, fileSize.toULong())
         }
     }
-
 
     init {
         this.b = { row ->
@@ -135,10 +135,13 @@ actual class IsamDataFile actual constructor(
             }
             val fclose = fclose(data)
         }.let {}
-
     }
-
-
 }
 
-
+//fun IsamDataFile.use(block: (IsamDataFile) -> Unit) {
+//    try {
+//        block(this)
+//    } finally {
+//        close()
+//    }
+//}

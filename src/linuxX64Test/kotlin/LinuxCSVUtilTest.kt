@@ -100,35 +100,38 @@ class LinuxCSVUtilTest {
             }
             meta.forEach { println(it) }
             UringIsamDataFile.write(cursor, "/tmp/hi.isam")
-            val isam = IsamDataFile("/tmp/hi.isam")
-            isam.open()
-            isam.head()
-            logDebug {
-                "meta: ${
-                    isam.meta.map { isam ->
-                        isam.name to isam.type
-                    }
-                }"
-            }
-            //test row 16 against the contents
-            // 1502943360000,4261.48000000,4261.48000000,4261.48000000,4261.48000000,0.00000000,1502943419999,0.00000000,0,0.00000000,0.00000000,7958.34896534
-            val row16 = isam.row(16)
-            val row16List = row16.left
-            assertEquals(12, row16List.size)
-            assertEquals(1502943360000, row16List[0])
+            IsamDataFile("/tmp/hi.isam").use { isam:Cursor ->
 
-            assertEquals(1502943419999, row16List[6])
-            assertEquals(0.toByte(), row16List[8])//this test arrives at a Byte duck type, and needs a cast or fails.
-            assertEquals(4261.48f, row16List[1])
-            assertEquals(4261.48f, row16List[2])
-            assertEquals(4261.48f, row16List[3])
-            assertEquals(4261.48f, row16List[4])
-            assertEquals(7958.34896534f, row16List[11])
-            assertEquals(0f, row16List[5])
-            assertEquals(0f, row16List[7])
-            assertEquals(0f, row16List[9])
-            assertEquals(0f, row16List[10])
-            isam.close()
+                isam.head()
+                logDebug {
+                    "meta: ${
+                        isam.meta.map { isam ->
+                            isam.name to isam.type
+                        }
+                    }"
+                }
+                //test row 16 against the contents
+                // 1502943360000,4261.48000000,4261.48000000,4261.48000000,4261.48000000,0.00000000,1502943419999,0.00000000,0,0.00000000,0.00000000,7958.34896534
+                val row16 = isam.row(16)
+                val row16List = row16.left
+                assertEquals(12, row16List.size)
+                assertEquals(1502943360000, row16List[0])
+
+                assertEquals(1502943419999, row16List[6])
+                assertEquals(
+                    0.toByte(),
+                    row16List[8]
+                )//this test arrives at a Byte duck type, and needs a cast or fails.
+                assertEquals(4261.48f, row16List[1])
+                assertEquals(4261.48f, row16List[2])
+                assertEquals(4261.48f, row16List[3])
+                assertEquals(4261.48f, row16List[4])
+                assertEquals(7958.34896534f, row16List[11])
+                assertEquals(0f, row16List[5])
+                assertEquals(0f, row16List[7])
+                assertEquals(0f, row16List[9])
+                assertEquals(0f, row16List[10])
+            }
         }
     }
 }
