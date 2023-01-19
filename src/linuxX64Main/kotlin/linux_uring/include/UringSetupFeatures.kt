@@ -120,18 +120,3 @@ enum class UringSetupFeatures(val src: UInt) {
         }
     }
 }
-
-fun io_uring.asString(): String = memScoped {
-    val ss = sequence {
-        val kh = sq.sqe_head
-        while (kh != sq.sqe_tail) this.yield(kh to sq.sqes?.get(kh.toInt()))
-    }.mapNotNull { (kh, sqe) ->
-        sqe?.let {
-            val sqe_index = kh
-            val sqe_opcode = UringOpcode.fromInt(sqe.opcode.toUInt())
-            val sqe_flag = UringSqeFlags.fromInt(sqe.flags.toUInt())
-            "sqe{ix: $sqe_index opcode: $sqe_opcode flag: $sqe_flag}"
-        }
-    }.toList()
-    return "ring{ cq: $cq features: ${UringSetupFeatures.fromInt(features)} flags: ${UringSetupFlags.fromInt(flags)} pad: $pad ring_fd: $ring_fd sq: ${ss}}"
-}

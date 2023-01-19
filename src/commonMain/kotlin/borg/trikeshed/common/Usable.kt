@@ -14,7 +14,6 @@ interface Usable {
     fun close()
 }
 
-
 /** this is not present in stdlib for kotlin mpp, we extend the functionality to return a value as needed.*/
 fun <T : Usable, R> T.use(block: (T) -> R): R {
     open()

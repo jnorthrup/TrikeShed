@@ -111,14 +111,3 @@ enum class UringSetupFlags(val src: UInt) {
         }
     }
 }
-
-fun io_uring_params.asString(): String =
-    "$cq_entries cq_off: $cq_off features: ${UringSetupFeatures.fromInt(features)} flags: ${
-        UringSetupFlags.fromInt(flags)
-    } resv: $resv sq_entries: $sq_entries sq_off: $sq_off sq_thread_cpu: $sq_thread_cpu sq_thread_idle: $sq_thread_idle wq_fd: $wq_fd"
-
-
-fun io_uring_cqe.asString(): String {
-    return "cqe:{ flags: $flags res: $res user_data: $user_data }"
-}
-

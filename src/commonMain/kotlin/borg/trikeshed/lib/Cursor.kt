@@ -142,3 +142,12 @@ fun Cursor.showValues(range: IntRange) {
         println("cannot fully access range $range")
     }
 }
+
+/** how should we encode multiple Binary Cursor ISAM data into a single parquet file?
+ * 1. each cursor is a row group
+ * 2. each cursor is a column group
+ * 3. each cursor is a page
+ * 4. each cursor is a page group
+ * 5. each cursor is a page group group
+ *
+ */

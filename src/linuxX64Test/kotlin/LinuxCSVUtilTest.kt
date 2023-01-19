@@ -99,7 +99,7 @@ class LinuxCSVUtilTest {
                 logDebug { "meta: ${it.toList()}" }
             }
             meta.forEach { println(it) }
-            UringIsamDataFile.write(cursor, "/tmp/hi.isam")
+            UringIsamDataFile.write  (cursor, "/tmp/hi.isam")
             IsamDataFile("/tmp/hi.isam").use { isam:Cursor ->
 
                 isam.head()

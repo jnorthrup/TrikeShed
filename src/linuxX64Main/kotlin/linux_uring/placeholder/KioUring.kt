@@ -8,6 +8,7 @@ import borg.trikeshed.native.mallocWithFlex
 import kotlinx.cinterop.*
 import linux_uring.include.UringOpcode
 import linux_uring.include.UringSetupFeatures
+import linux_uring.include.UringSetupFlags
 import linux_uring.include.UringSqeFlags
 import platform.linux.memalign
 import platform.posix.*
@@ -327,6 +328,32 @@ fun createSubmission(file_path: String, s: KioUring): Int {
     }
 
     return 0
+}
+
+fun io_uring_params.asString(): String =
+    "$cq_entries cq_off: $cq_off features: ${UringSetupFeatures.fromInt(features)} flags: ${
+        UringSetupFlags.fromInt(flags)
+    } resv: $resv sq_entries: $sq_entries sq_off: $sq_off sq_thread_cpu: $sq_thread_cpu sq_thread_idle: $sq_thread_idle wq_fd: $wq_fd"
+
+
+fun io_uring_cqe.asString(): String {
+    return "cqe:{ flags: $flags res: $res user_data: $user_data }"
+}
+
+
+fun io_uring.asString(): String = memScoped {
+    val ss = sequence {
+        val kh = sq.sqe_head
+        while (kh != sq.sqe_tail) this.yield(kh to sq.sqes?.get(kh.toInt()))
+    }.mapNotNull { (kh, sqe) ->
+        sqe?.let {
+            val sqe_index = kh
+            val sqe_opcode = UringOpcode.fromInt(sqe.opcode.toUInt())
+            val sqe_flag = UringSqeFlags.fromInt(sqe.flags.toUInt())
+            "sqe{ix: $sqe_index opcode: $sqe_opcode flag: $sqe_flag}"
+        }
+    }.toList()
+    return "ring{ cq: $cq features: ${UringSetupFeatures.fromInt(features)} flags: ${UringSetupFlags.fromInt(flags)} pad: $pad ring_fd: $ring_fd sq: ${ss}}"
 }
 
 fun main(argv1: Array<String>): Unit = memScoped {
