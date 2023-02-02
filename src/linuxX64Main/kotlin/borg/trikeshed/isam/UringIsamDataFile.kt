@@ -1,7 +1,10 @@
 package borg.trikeshed.isam
 
 import borg.trikeshed.common.Usable
-import borg.trikeshed.cursor.*
+import borg.trikeshed.cursor.ColMeta
+import borg.trikeshed.cursor.Cursor
+import borg.trikeshed.cursor.meta
+import borg.trikeshed.cursor.row
 import borg.trikeshed.isam.meta.IOMemento
 import borg.trikeshed.lib.*
 import borg.trikeshed.native.HasPosixErr
@@ -90,7 +93,7 @@ class UringIsamDataFile constructor(
     }
 
     override val a: Int get() = open().let { return (fileSize / recordlen).toInt() }
-    override val b: (Int) -> Join<Int, (Int) -> Join<*, () -> RecordMeta>> = { row ->
+    override val b: (Int) -> Join<Int, (Int) -> Join<Any, () -> RecordMeta>> = { row ->
         memScoped {
             val d2 = data.toLong() + (row * recordlen)
 
@@ -133,7 +136,7 @@ class UringIsamDataFile constructor(
 
             //write rows
             for (y in 0 until cursor.a) {
-                val rowData: Series<*> = cursor.row(y).left
+                val rowData: Series<Any> = cursor.row(y).left
 
                 for (x in 0 until cursor.meta.size) {
                     val colMeta: RecordMeta = meta[x]
@@ -182,7 +185,7 @@ class UringIsamDataFile constructor(
 
                 //write rows
                 for (y in 0 until cursor.a) {
-                    val rowData: Series<*> = cursor.row(y).left
+                    val rowData: Series<Any> = cursor.row(y).left
 
                     for (x in 0 until cursor.meta.size) {
                         val colMeta: RecordMeta = meta[x]

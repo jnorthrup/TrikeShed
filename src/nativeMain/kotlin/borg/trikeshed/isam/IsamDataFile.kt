@@ -76,7 +76,7 @@ actual class IsamDataFile actual constructor(
             }
         }
 
-    override val b: (Int) -> Join<Int, (Int) -> Join<*, () -> RecordMeta>>
+    override val b: (Int) -> Join<Int, (Int) -> Join<Any, () -> RecordMeta>>
 
     override fun toString(): String =
         "IsamDataFile(metafile=$metafile, recordlen=$recordlen, constraints=$constraints, datafileFilename='$datafileFilename', fileSize=$fileSize)"

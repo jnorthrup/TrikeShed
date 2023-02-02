@@ -13,8 +13,8 @@ import kotlin.math.min
 import kotlin.random.Random
 import kotlin.reflect.KClass
 
-typealias RowVec = Series2<*, () -> RecordMeta>
-val RowVec.left get() =  this α Join<*, () -> RecordMeta>::a
+typealias RowVec = Series2<Any, () -> RecordMeta>
+//val RowVec.left get() =  this α Join<*, () -> RecordMeta>::a
 
 
 /** Cursors are a columnar abstraction composed of Series of Joined value+meta pairs (RecordMeta) */
@@ -125,8 +125,8 @@ fun Cursor.show(range: IntRange = 0 until size) {
 fun Cursor.showValues(range: IntRange) {
     try {
         range.forEach { x: Int ->
-            val row:RowVec = row(x)
-            val catn : Series<*> = row. left //.debug { logDebug { "showval coords ${it.toList() .map {(it as? CharSeries)?.asString()?:""} }" } }
+            val row: RowVec = row(x)
+            val catn : Series<Any> =( row as Series2<Any,Any>). left //.debug { logDebug { "showval coords ${it.toList() .map {(it as? CharSeries)?.asString()?:""} }" } }
             val combine = combine(catn) α { if(it is CharSeries) it.asString() else "$it"  }
             println(combine.toList())
         }

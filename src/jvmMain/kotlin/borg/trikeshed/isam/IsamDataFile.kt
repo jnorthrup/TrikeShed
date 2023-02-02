@@ -65,7 +65,7 @@ actual class IsamDataFile actual constructor(
     }
 
     override val a: Int
-    override val b: (Int) -> Join<Int, (Int) -> Join<*, () -> RecordMeta>>
+    override val b: (Int) -> Join<Int, (Int) -> Join<Any, () -> RecordMeta>>
 
     actual override fun close() = data.close()
 
@@ -89,7 +89,7 @@ actual class IsamDataFile actual constructor(
             constraints.size j { col ->
                 val constraint = constraints[col]
                 val s = array.sliceArray(constraint.begin until constraint.end)
-                constraint.decoder(s) j { constraint }
+                constraint.decoder(s)!! j { constraint }
             }
         }
     }
@@ -126,7 +126,7 @@ actual class IsamDataFile actual constructor(
             //write rows
             for (y in 0 until cursor.a) {
                 rowBuffer.position(0)
-                val rowData = cursor.row(y).left
+                val rowData = (cursor.row(y) as RowVec).left
 
                 for (x in 0 until cursor.meta.size) {
                     val colMeta: RecordMeta = meta[x]

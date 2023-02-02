@@ -115,8 +115,15 @@ object CSVUtil {
                 rv.size j { x: Int ->
                     val recordMeta = meta[x]
                     val type = recordMeta.type
-                    val any = rv.left
-                    type.fromChars(any as CharSeries) j recordMeta.`↺`
+                    val any = rv[x].a
+                    try{
+                        val fromChars = type.fromChars(any as CharSeries)
+                        val function = recordMeta.`↺`
+                        fromChars j function
+                    }catch (e:Exception){
+                        log  { "parseConformant: $e col $x row $y " }
+                        throw e
+                    }
                 }
             }
         }
@@ -226,7 +233,7 @@ object CSVUtil {
                 }.debug { reporter?.report()?.let { rep -> logDebug { rep } } }
             }
 
-        }
+        } as Cursor
     }
 }
 
