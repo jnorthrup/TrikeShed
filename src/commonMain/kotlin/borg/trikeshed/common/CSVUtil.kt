@@ -5,11 +5,12 @@ package borg.trikeshed.common
 import borg.trikeshed.common.TypeEvidence.Companion.deduce
 import borg.trikeshed.common.TypeEvidence.Companion.update
 import borg.trikeshed.common.parser.simple.CharSeries
+import borg.trikeshed.cursor.*
 import borg.trikeshed.isam.RecordMeta
 import borg.trikeshed.isam.meta.IOMemento
 import borg.trikeshed.isam.meta.IOMemento.*
 import borg.trikeshed.lib.*
-import borg.trikeshed.parse.DelimitRange
+import borg.trikeshed.parse.*
 import kotlin.jvm.JvmOverloads
 import kotlin.jvm.JvmStatic
 
@@ -110,11 +111,11 @@ object CSVUtil {
             logDebug { "parseConformantmeta: $l" }
         }
         return segments.size j { y: Int ->
-            segments.row(y).let {
-                it.size j { x: Int ->
+            segments.row(y).let { rv: RowVec ->
+                rv.size j { x: Int ->
                     val recordMeta = meta[x]
                     val type = recordMeta.type
-                    val any = it.left[x] as Series<Char>
+                    val any = rv.left
                     type.fromChars(any as CharSeries) j recordMeta.`↺`
                 }
             }
@@ -150,7 +151,7 @@ object CSVUtil {
             var datazero1 = datazero2
 
             do {
-                val file1 = file.drop(datazero1)
+                val file1:LongSeries<Byte> = file.drop(datazero1)
                 if (file1.size < headerNames.size) break  // we can parse n commas as n+1 default fields but no less
                 val lineEvidence =
                     fileEvidence?.let<MutableList<TypeEvidence>, MutableList<TypeEvidence>> { mutableListOf() }
@@ -171,7 +172,7 @@ object CSVUtil {
                 lines.add(dstart j toArray)
             } while (datazero1 < file.size)
 
-            val conversionSegments = fileEvidence?.α { evidence ->
+            val conversionSegments: Series2<IOMemento, Int>? = fileEvidence?.α { evidence ->
                 val deduce: IOMemento = deduce(evidence)
                 deduce j (deduce.networkSize ?: evidence.columnLength.toInt())
             }

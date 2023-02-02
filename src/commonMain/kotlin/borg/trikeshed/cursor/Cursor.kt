@@ -1,10 +1,11 @@
-package borg.trikeshed.lib
+package borg.trikeshed.cursor
 
 // import the IoMemento enum
 import borg.trikeshed.common.parser.simple.CharSeries
-import borg.trikeshed.isam.ColMeta
 import borg.trikeshed.isam.RecordMeta
 import borg.trikeshed.isam.meta.IOMemento.*
+import borg.trikeshed.lib.*
+import kotlinx.coroutines.flow.combine
 import kotlin.jvm.JvmInline
 import kotlin.jvm.JvmOverloads
 import kotlin.math.max
@@ -13,8 +14,8 @@ import kotlin.random.Random
 import kotlin.reflect.KClass
 
 typealias RowVec = Series2<*, () -> RecordMeta>
+val RowVec.left get() =  this α Join<*, () -> RecordMeta>::a
 
-val RowVec.left: Series<*> get() = this α Join<*, *>::a
 
 /** Cursors are a columnar abstraction composed of Series of Joined value+meta pairs (RecordMeta) */
 typealias Cursor = Series<RowVec>
@@ -35,17 +36,6 @@ inline operator fun <A : Any, IR : Any?, SrInnr : Series<Join<A, *>>, SrOutr : S
     c: KClass<out A>,
 ): Series<Series<A?>> = this α { it α Join<A, *>::a } α { it α { it } } α { it α { it } }
 
-/** gets the RowVec at y or if y is negative then -y from last */
-infix fun Cursor.at(y: Int): RowVec = b(if (y < 0) size - y else y)
-infix fun Cursor.row(y: Int): RowVec = at(y)
-
-
-/** Cursor get by Int vararg -- return a Cursor with the columns specified by the vararg */
-operator fun Cursor.get(vararg i: Int): Cursor = size j { y: Int ->
-    i.size j { x: Int ->
-        row(y)[i[x]]
-    }
-}
 
 /** cursor get by IntRange -- return a Cursor with the columns specified by the IntRange */
 operator fun Cursor.get(i: IntRange): Cursor {
@@ -60,8 +50,11 @@ operator fun Cursor.get(i: IntRange): Cursor {
     }
 }
 
+
+
 /** get meta for a cursor from row 0 */
-val Cursor.meta: Series<ColMeta> get() = row(0) α { (_, b): Join<*, () -> RecordMeta> ->
+val Cursor.meta: Series<ColMeta>
+    get() = row(0) α { (_, b): Join<*, () -> RecordMeta> ->
         b()
     }
 
@@ -107,10 +100,8 @@ fun Cursor.get(s: Series<ColumnExclusion>): Cursor {
     return this[retained]
 }
 
-
 //in columnar project this is meta.right
 val Series<out ColMeta>.names: Series<String> get() = this α ColMeta::name
-
 
 /** head default 5 rows
  * just like unix head - print default 5 lines from cursor contents to stdout */
@@ -123,6 +114,7 @@ fun Cursor.showRandom(n: Int = 5) {
         if (size > 0) showValues(Random.nextInt(0, size).let { it..it })
     }
 }
+
 /** simple printout macro*/
 fun Cursor.show(range: IntRange = 0 until size) {
     val meta: Series<ColMeta> = meta
@@ -133,9 +125,9 @@ fun Cursor.show(range: IntRange = 0 until size) {
 fun Cursor.showValues(range: IntRange) {
     try {
         range.forEach { x: Int ->
-            val row = row(x)
-            val catn: Series<*> = row.left//.debug { logDebug { "showval coords ${it.toList() .map {(it as? CharSeries)?.asString()?:""} }" } }
-            val combine = combine(catn) α { if(it is CharSeries ) it.asString() else "$it"  }
+            val row:RowVec = row(x)
+            val catn : Series<*> = row. left //.debug { logDebug { "showval coords ${it.toList() .map {(it as? CharSeries)?.asString()?:""} }" } }
+            val combine = combine(catn) α { if(it is CharSeries) it.asString() else "$it"  }
             println(combine.toList())
         }
     } catch (e: NoSuchElementException) {
@@ -143,11 +135,14 @@ fun Cursor.showValues(range: IntRange) {
     }
 }
 
-/** how should we encode multiple Binary Cursor ISAM data into a single parquet file?
- * 1. each cursor is a row group
- * 2. each cursor is a column group
- * 3. each cursor is a page
- * 4. each cursor is a page group
- * 5. each cursor is a page group group
- *
- */
+
+/** gets the RowVec at y or if y is negative then -y from last */
+infix fun Cursor.at(y: Int): RowVec = b(if (y < 0) size - y else y)
+infix fun Cursor.row(y: Int): RowVec = at(y)
+
+/** Cursor get by Int vararg -- return a Cursor with the columns specified by the vararg */
+operator fun Cursor.get(vararg i: Int): Cursor = size j { y: Int ->
+    i.size j { x: Int ->
+        row(y)[i[x]]
+    }
+}

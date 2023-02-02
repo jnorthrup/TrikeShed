@@ -5,12 +5,9 @@ import borg.trikeshed.common.CSVUtil
 import borg.trikeshed.common.FileBuffer
 import borg.trikeshed.common.homedir
 import borg.trikeshed.common.use
-import borg.trikeshed.isam.ColMeta
+import borg.trikeshed.cursor.*
 import borg.trikeshed.isam.meta.IOMemento
-import borg.trikeshed.lib.Cursor
-import borg.trikeshed.lib.head
 import borg.trikeshed.lib.map
-import borg.trikeshed.lib.meta
 import kotlin.test.Test
 import borg.trikeshed.common.open as FileBuffer_open
 

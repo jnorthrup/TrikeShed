@@ -2,8 +2,11 @@
 
 package borg.trikeshed.isam
 
+import borg.trikeshed.common.Usable
+import borg.trikeshed.cursor.*
 import borg.trikeshed.isam.meta.IOMemento
 import borg.trikeshed.lib.*
+
 import java.io.RandomAccessFile
 import java.nio.ByteBuffer
 import java.nio.channels.SeekableByteChannel
@@ -15,7 +18,7 @@ actual class IsamDataFile actual constructor(
     datafileFilename: String,
     metafileFilename: String,
     metafile: IsamMetaFileReader,
-) : Cursor {
+) : Usable,Cursor {
     actual val datafileFilename: String
     actual val metafile: IsamMetaFileReader
 
@@ -29,7 +32,7 @@ actual class IsamDataFile actual constructor(
         "IsamDataFile(metafile=$metafile, recordlen=$recordlen, constraints=$constraints," +
                 " datafileFilename='$datafileFilename', fileSize=$fileSize)"
 
-    actual fun open() {
+    actual override fun open() {
         metafile.open()
         data = Files.newByteChannel(
             java.nio.file.Paths.get(datafileFilename),
@@ -64,7 +67,7 @@ actual class IsamDataFile actual constructor(
     override val a: Int
     override val b: (Int) -> Join<Int, (Int) -> Join<*, () -> RecordMeta>>
 
-    actual fun close() = data.close()
+    actual override fun close() = data.close()
 
     private val lock: ReentrantLock
 

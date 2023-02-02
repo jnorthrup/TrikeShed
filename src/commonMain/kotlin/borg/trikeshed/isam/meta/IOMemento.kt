@@ -3,6 +3,7 @@
 package borg.trikeshed.isam.meta
 
 import borg.trikeshed.common.parser.simple.CharSeries
+import borg.trikeshed.cursor.TypeMemento
 import borg.trikeshed.isam.meta.PlatformCodec.Companion.currentPlatformCodec
 import borg.trikeshed.isam.meta.PlatformCodec.Companion.currentPlatformCodec.readInt
 import borg.trikeshed.isam.meta.PlatformCodec.Companion.currentPlatformCodec.readLong

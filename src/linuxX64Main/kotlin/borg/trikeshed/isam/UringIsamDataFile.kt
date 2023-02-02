@@ -1,5 +1,7 @@
 package borg.trikeshed.isam
 
+import borg.trikeshed.common.Usable
+import borg.trikeshed.cursor.*
 import borg.trikeshed.isam.meta.IOMemento
 import borg.trikeshed.lib.*
 import borg.trikeshed.native.HasPosixErr
@@ -29,7 +31,7 @@ class UringIsamDataFile constructor(
     datafileFilename: String,
     metafileFilename: String,
     metafile: IsamMetaFileReader,
-) : Cursor {
+) : Usable,Cursor {
     val datafileFilename: String = datafileFilename
     val metafile: IsamMetaFileReader = metafile
 
@@ -45,7 +47,7 @@ class UringIsamDataFile constructor(
     var fileSize: Long = -1
 
     private var first = true
-    fun open() {
+    override fun open() {
         if (!first) return
         memScoped {
             val fd = open(datafileFilename, O_RDONLY)
@@ -106,7 +108,7 @@ class UringIsamDataFile constructor(
     override fun toString(): String =
         "IsamDataFile(metafile=$metafile, recordlen=$recordlen, constraints=$constraints, datafileFilename='$datafileFilename', fileSize=$fileSize)"
 
-    fun close() {
+    override fun close() {
         memScoped {
             munmap(data, fileSize.toULong())
         }

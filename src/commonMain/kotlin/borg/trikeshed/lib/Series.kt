@@ -4,6 +4,9 @@
 package borg.trikeshed.lib
 
 import borg.trikeshed.common.collections.s_
+import borg.trikeshed.cursor.Cursor
+import borg.trikeshed.cursor.meta
+import borg.trikeshed.cursor.type
 import borg.trikeshed.isam.meta.IOMemento.*
 import kotlin.experimental.and
 import kotlin.jvm.JvmInline

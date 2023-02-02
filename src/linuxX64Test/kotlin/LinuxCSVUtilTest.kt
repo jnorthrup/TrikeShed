@@ -2,6 +2,7 @@ package borg.trikeshed.isam
 
 import borg.trikeshed.common.*
 import borg.trikeshed.common.parser.simple.CharSeries
+import borg.trikeshed.cursor.*
 import borg.trikeshed.isam.meta.IOMemento
 import borg.trikeshed.lib.*
 import borg.trikeshed.parse.DelimitRange

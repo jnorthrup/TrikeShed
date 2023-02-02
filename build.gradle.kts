@@ -35,7 +35,13 @@ repositories {
     gradlePluginPortal()
     google()
 }
-
+publishing {
+    repositories {
+        maven {
+            url = uri("file://${System.getProperty("user.home")}/.m2/repository")
+        }
+    }
+}
 
 kotlin {
     jvmToolchain(18)

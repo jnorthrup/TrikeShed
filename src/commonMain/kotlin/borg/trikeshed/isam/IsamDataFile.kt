@@ -1,7 +1,7 @@
 package borg.trikeshed.isam
 
 import borg.trikeshed.common.Usable
-import borg.trikeshed.lib.Cursor
+import borg.trikeshed.cursor.Cursor
 
 expect class IsamDataFile(
     datafileFilename: String,

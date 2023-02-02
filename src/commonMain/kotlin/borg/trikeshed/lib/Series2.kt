@@ -2,5 +2,5 @@ package borg.trikeshed.lib
 
 typealias Series2<A, B> = Series<Join<A, B>>
 
-val <A,B> Series2<A,B>.left:Series<A> get() = this α Join<A, B>::a
-val <A,B> Series2<A,B>.right:Series<B> get() = this α Join<A, B>::b
+val <T,I> Series2<T, I>.left: Series<T> get() = this α Join<T, I>::a
+val <T,I> Series2<I, T>.right: Series<T> get() = this α Join<I, T>::b

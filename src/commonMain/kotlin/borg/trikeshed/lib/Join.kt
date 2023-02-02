@@ -171,11 +171,9 @@ val <T> T.`↺` get() = leftIdentity
 fun <T> `↻`(t: T): T = t
 infix fun <T> T.rightIdentity(t: T): T = `↻`(t)
 
-infix fun <C, B : (Long) -> C> LongArray.α(m: B): Series<C> = this.size j { i: Int -> m(this[i]) }
-
-// do all the other primitive arrays
-
 infix fun <C, B : (Int) -> C> IntArray.α(m: B): Series<C> = this.size j { i: Int -> m(this[i]) }
+
+infix fun <C, B : (Long) -> C> LongArray.α(m: B): Series<C> = this.size j { i: Int -> m(this[i]) }
 
 infix fun <C, B : (Float) -> C> FloatArray.α(m: B): Series<C> = this.size j { i: Int -> m(this[i]) }
 
