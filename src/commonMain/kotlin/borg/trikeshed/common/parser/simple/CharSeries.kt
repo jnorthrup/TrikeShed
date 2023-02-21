@@ -7,7 +7,7 @@ import kotlin.math.max
 /**
  * char based spiritual successor to ByteBuffer for parsing
  */
-class CharSeries(buf: Series<Char>) : Series<Char> {
+class CharSeries(buf: Series<Char>) : Series<Char>  {
     override val a: Int = buf.a
     override val b: (Int) -> Char = buf.b
 
