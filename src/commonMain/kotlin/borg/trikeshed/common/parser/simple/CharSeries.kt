@@ -11,10 +11,14 @@ class CharSeries(buf: Series<Char>) : Series<Char>  {
     override val a: Int = buf.a
     override val b: (Int) -> Char = buf.b
 
+    /** the mutable position accessor */
     var pos = 0
+    /** the limit accessor */
     var limit = size
+    /** the mark accessor */
     var mark = -1
 
+    /** get, the verb - the char at the current position and increment position */
     val get: Char
         get() {
             if (!hasRemaining) throw IndexOutOfBoundsException("pos: $pos, limit: $limit")
@@ -30,25 +34,25 @@ class CharSeries(buf: Series<Char>) : Series<Char>  {
     /**remaining chars*/
     val rem: Int get() = limit - pos
 
-    /**max capacity of this buffer*/
-    val cap: Int get() = size
+    /** immutable max capacity of this buffer, alias for size*/
+    val cap: Int  by ::size
 
-    /**remaining chars as a string*/
+    /** boolean indicating if there are remaining chars */
     val hasRemaining get() = rem.nz
 
-    /** mark the current position */
+    /** mark, the verb - marks the current position */
     val mk
         get() = apply {
             mark = pos
         }
 
-    //reset
+    /** reset pos to mark */
     val res
         get() = apply {
             pos = if(mark<0)pos else mark
         }
 
-    //flip
+    /** flip the buffer, limit becomes pos, pos becomes 0 */
     val fl
         get() = apply {
             limit = pos
@@ -56,13 +60,13 @@ class CharSeries(buf: Series<Char>) : Series<Char>  {
             mark = -1
         }
 
-    //rewind
+    /**rewind to 0*/
     val rew
         get() = apply {
             pos = 0
         }
 
-    //clear
+    /** clears the mark,pos, and sets limit to size */
     val clr
         get() = apply {
             pos = 0
@@ -70,10 +74,17 @@ class CharSeries(buf: Series<Char>) : Series<Char>  {
             mark = -1
         }
 
-    //position
+    /** position, the verb - holds the position that will be returned by the next get */
     fun pos(p: Int) = apply {
         pos = p
     }
+
+    /** slice creates/returns a subrange CharSeries from pos until limit */
+    val slice: CharSeries get() = CharSeries(this[pos until limit])
+
+    /** limit, the verb - redefines the last position accessable by get and redefines remaining accordingly*/
+    fun lim(i: Int) = apply { limit = i }
+
 
     fun clone() = CharSeries(a j b).also { it.pos = pos; it.limit = limit; it.mark = mark }
 
@@ -114,8 +125,6 @@ class CharSeries(buf: Series<Char>) : Series<Char>  {
         return result
     }
 
-    //Java ByteBuffer style slice
-    val slice: CharSeries get() = CharSeries(this[pos until limit])
 
     fun asString(upto: Int = Int.MAX_VALUE): String =
         ((limit - pos) j { x: Int -> this[x + pos] }).toArray().concatToString()
@@ -125,7 +134,6 @@ class CharSeries(buf: Series<Char>) : Series<Char>  {
         return "CharSeries(position=$pos, limit=$limit, mark=$mark, cacheCode=$cacheCode,take-4=${take})"
     }
 
-    fun lim(i: Int) = apply { limit = i }
 
     //isEmpty override
     val isEmpty: Boolean get() = pos == limit

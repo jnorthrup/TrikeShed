@@ -1,11 +1,10 @@
 package borg.trikeshed.lib
 
 import borg.trikeshed.common.collections.s_
-import kotlin.test.*
+import kotlin.test.Test
+import kotlin.test.assertEquals
 
-
-
-class SeriesKtTest {
+class SeriesKtTest0 {
     @Test
     fun combine() {
         // create several randomly ordered Series<String> with non-uniform values and combine them
