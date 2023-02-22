@@ -17,8 +17,11 @@ class CharSeries(buf: Series<Char>) : Series<Char>  {
 
     val get: Char
         get() {
-            require(pos < limit)
-            return b(pos++)
+            if (!hasRemaining) throw IndexOutOfBoundsException("pos: $pos, limit: $limit")
+
+            val c = b(pos)
+            pos++
+            return c
         }
 
     //string ctor
@@ -42,7 +45,7 @@ class CharSeries(buf: Series<Char>) : Series<Char>  {
     //reset
     val res
         get() = apply {
-            pos = max(mark, pos)
+            pos = if(mark<0)pos else mark
         }
 
     //flip
