@@ -1,51 +1,66 @@
 package borg.trikeshed.parse
 
-import borg.trikeshed.common.parser.simple.CharSeries
+import borg.trikeshed.common.parser.simple.*
 import borg.trikeshed.lib.*
-import borg.trikeshed.parse.JsonParser.SplittableObject
-import kotlinx.coroutines.handleCoroutineException
-import kotlin.test.Test
+import borg.trikeshed.common.collections.s_
+import kotlin.test.*
 
-//unit tests
-class TestJson {
-    @Test
-    fun test() {
-        val json = """
+class JsonParserTest {
+
+        val jsonString = """
             {
-                "name": "John Doe",
-                "age": 43,
-                "phones": [
-                    "+44 1234567",
-                    "+44 2345678"
-                ],
-                "address": {
-                    "street": "Downing Street",
-                    "city": "London"
-                }
+              "string": "Hello, world!",
+              "number": 42.0,
+              "bool": true,
+              "null": null,
+              "array": [1, 2, 3],
+              "object": {"key": "value"}
             }
         """.trimIndent()
-        val src = CharSeries(json)
-        //test that lengths are the same between source handleCoroutineException() series limit
-        assert(src.size == json.length)
-        assert(src.limit== json.length )
 
-        val rawIndex: JsonParser.SplittableScope<*> = JsonParser.open(src)
+        val expectedJsonElement:JsElement =    Twin(0, jsonString.length - 1) j s_ [29, 47, 63, 79, 101]
 
-        val index: SplittableObject? = rawIndex as? SplittableObject
-        val entries: Series<Int>? = index?.entries
 
-        val pair = index!![0]
-        val key = pair.a
-        val value = pair.b
 
-        val keyString = key.asString()
-        val valueString: JsonParser.IndexString? = value as? JsonParser.IndexString
-        val reify1 = valueString?.reify
 
-        val reify = rawIndex.reify as? Map<String, Any?>
+    @Test
+    fun `test scanJson`() {
+        val json = CharSeries(jsonString)
+        val (a1,b1) = expectedJsonElement
+        val index = JsonParser.index(json)
+        val (a2,b2) = index
+        assertEquals(a1.pair.toString(),a2.pair.toString())
+        val expected = b1.toList().toString()
+        val actual = b2.toList().toString()
+        assertEquals(expected, actual)
+    }
 
-        debug {
-            debug { }
-        }
+    val expectedParsedJson =linkedMapOf(
+        "string" to "Hello, world!",
+        "number" to 42.0,
+        "bool" to true,
+        "null" to null,
+        "array" to listOf(1, 2, 3),
+        "object" to mapOf("key" to "value")
+    )
+
+    /** tests each of the above members */
+  @Test
+    fun reifyTest() {
+
+ 
+        val reifiedObj = JsonParser.reify(jsonString.toSeries())as  Map<String,Any?>
+
+        reifiedObj["string"]?.let { assertEquals("Hello, world!", it) }?:TODO("finish Test")
+        reifiedObj["number"]?.let { assertEquals(42.0, it) }?:TODO("finish Test")
+        reifiedObj["bool"]?.let { assertEquals(true, it) }?:TODO("finish Test")
+        reifiedObj["null"]?.let { fail() }
+        reifiedObj["array"]?.let { assertEquals(listOf(1, 2, 3).toString(), it.toString()) }?:TODO("finish Test")
+        reifiedObj["object"]?.let { assertEquals(mapOf("key" to "value"), it) }?:TODO("finish Test")
     }
 }
+
+
+
+
+

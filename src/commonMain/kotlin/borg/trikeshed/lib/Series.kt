@@ -19,11 +19,9 @@ typealias Series<T> = Join<Int, (Int) -> T>
 val <T> Series<T>.size: Int get() = a
 
 
-/**
- * index operator for Series
+/** index operator for Series
  */
 operator fun <T> Series<T>.get(i: Int): T = b(i)
-
 
 /**
  * fold for Series
@@ -496,12 +494,16 @@ fun Series<Char>.parseIsoDate(): kotlinx.datetime.LocalDate {
 }
 
 fun Series<Char>.asString(upto: Int = Int.MAX_VALUE): String = this.take(upto).encodeToByteArray().decodeToString()
+
+/** parse a double or throw an exception
+ *
+ * @return Double
+ */
 fun Series<Char>.parseDouble(): Double {
     var x:  Int = 0
     var isNegativeValue:Boolean=false
     var r: Double = 0.0
     var decimal: Boolean = false
-    var exponent: UInt = 0u
     var exponentSign: Byte = 1
     var exponentValue: UShort = 0u
     var digitsAfterDecimal: UByte = 0u
@@ -536,7 +538,6 @@ fun Series<Char>.parseDouble(): Double {
     while (x < size ) {
         c = this[x]
         if (c == 'E' || c == 'e') {
-            exponent = 1u
             x++
             parseExponent()
         } else if (c == '.') {
@@ -552,3 +553,9 @@ fun Series<Char>.parseDouble(): Double {
     val dneg:Double=if(isNegativeValue && (r != 0.0)) -1.0 else 1.0
     return dneg * r * 10.0.pow((exponentSign * exponentValue.toInt() - digitsAfterDecimal.toInt()).toDouble())
 }
+
+/** parse a double or return null if not a valid double
+ *
+ * @return Double?
+ */
+fun Series<Char>.parseDoubleOrNull(): Double? = try { parseDouble() } catch (e: Throwable) { null }

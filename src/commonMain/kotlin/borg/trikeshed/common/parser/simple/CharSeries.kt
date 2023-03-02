@@ -2,7 +2,6 @@ package borg.trikeshed.common.parser.simple
 
 import borg.trikeshed.lib.*
 import borg.trikeshed.lib.CZero.nz
-import kotlin.math.max
 
 /**
  * char based spiritual successor to ByteBuffer for parsing
@@ -22,9 +21,11 @@ class CharSeries(buf: Series<Char>) : Series<Char> {
     var mark = -1
 
     /** get, the verb - the char at the current position and increment position */
-    val get: Char get() {
+    val get: Char
+        get() {
             if (!hasRemaining) throw IndexOutOfBoundsException("pos: $pos, limit: $limit")
-            val c = b(pos); pos++; return c }
+            val c = b(pos); pos++; return c
+        }
 
     //string ctor
     constructor(s: String) : this(s.toSeries())
@@ -86,8 +87,7 @@ class CharSeries(buf: Series<Char>) : Series<Char> {
     /** skip whitespace */
     val skipWs get() = apply { while (hasRemaining && mk.get.isWhitespace()); res }
 
-    val rtrim get() = apply { while(rem>0 && b(limit-1).isWhitespace()) limit-- }
-
+    val rtrim get() = apply { while (rem > 0 && b(limit - 1).isWhitespace()) limit-- }
 
 
     fun clone() = CharSeries(a j b).also { it.pos = pos; it.limit = limit; it.mark = mark }
@@ -138,21 +138,58 @@ class CharSeries(buf: Series<Char>) : Series<Char> {
         return "CharSeries(position=$pos, limit=$limit, mark=$mark, cacheCode=$cacheCode,take-4=${take})"
     }
 
-    fun trim(): CharSeries {
-        var p = pos
-        var l = limit
-        while (p < l && get(p).isWhitespace()) p++
-        while (l > p && get(l.dec()).isWhitespace()) l--
-        return clone().pos(p).lim(l)
-    }
+    /** skipws and rtrim */
+    val trim
+        get() = apply {
+            var p = pos
+            var l = limit
+            while (p < l && get(p).isWhitespace()) p++
+            while (l > p && get(l.dec()).isWhitespace()) l--
+            lim(l)
+            pos(p)
+        }
 
 
     //isEmpty override
     val isEmpty: Boolean get() = pos == limit
 
+    /** success move position to the char after found and returns true.  fail returns false and leaves position unchanged */
+    fun seekTo(
+        /**target*/
+        target: Char,
+    ): Boolean {
+        val anchor=pos
+        var escaped=false
+        while(hasRemaining){
+            val c=get
+            if (c == target) return true
+        }
+        pos=anchor
+        return false
+    }
+
+    /** success move position to the char after found and returns true.  fail returns false and leaves position unchanged */
+    fun seekTo(
+        /**target*/
+        target: Char,
+        /**if present this escapes one char*/
+        escape: Char
+    ): Boolean {
+        val anchor=pos
+        var escaped=false
+        while(hasRemaining){
+            val c=get
+            if (!escaped) {
+                when (c) {
+                    target -> return true
+                    escape -> escaped=true
+                }
+            } else escaped=false
+        }
+        pos=anchor
+        return false
+    }
 }
-
-
 //lazy split
 operator fun CharSeries.div(delim: Char): Series<CharSeries> {
 //fold -- forward scan to record a list of commas from hdr.get
