@@ -554,7 +554,7 @@ fun Series<Char>.parseDouble(): Double {
     return dneg * r * 10.0.pow((exponentSign * exponentValue.toInt() - digitsAfterDecimal.toInt()).toDouble())
 }
 
-/** parse a double or return null if not a valid double
+/** parse a double or return null if not a valid double.
  *
  * @return Double?
  */

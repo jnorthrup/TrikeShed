@@ -55,7 +55,9 @@ class JsonParserTest {
         reifiedObj["number"]?.let { assertEquals(42.0, it) }?:TODO("finish Test")
         reifiedObj["bool"]?.let { assertEquals(true, it) }?:TODO("finish Test")
         reifiedObj["null"]?.let { fail() }
-        reifiedObj["array"]?.let { assertEquals(listOf(1, 2, 3).toString(), it.toString()) }?:TODO("finish Test")
+        reifiedObj["array"]?.let {
+            val anies = it as Array<Any?>
+            assertEquals(listOf(1.0, 2.0, 3.0).toString(), anies.toList().toString()) }?:TODO("finish Test")
         reifiedObj["object"]?.let { assertEquals(mapOf("key" to "value"), it) }?:TODO("finish Test")
     }
 }

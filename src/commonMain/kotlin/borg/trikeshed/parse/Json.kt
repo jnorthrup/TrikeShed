@@ -2,6 +2,7 @@
 
 package borg.trikeshed.parse
 
+import borg.trikeshed.common.collections._l
 import borg.trikeshed.common.collections.s_
 import borg.trikeshed.common.parser.simple.CharSeries
 import borg.trikeshed.lib.*
@@ -72,7 +73,8 @@ object JsonParser {
                 //if obj we create k-v pairs otherwise we create values
 
                 //iterate  segments exclusive of src first and last and commas in the middle
-                (s_[openIdx] + commaIdxs + s_[closeIdx]).`▶`.zipWithNext().map { (before, after) ->
+                val join = _l[openIdx] + commaIdxs.toList() + _l[closeIdx]
+                join./*`▶`.*/zipWithNext().map { (before, after) ->
                     if (isObj) {
                         val tmp = CharSeries(src[before.inc() until after]).trim
                         val quoted = tmp.seekTo('"')
@@ -89,7 +91,7 @@ object JsonParser {
                         //set limit to create a slice that excludes the quotes
                         tmp.lim(keyLast).pos(openQuote).asString() to value
                     } else {
-                        reify(src[before.inc() until after])
+                        reify(CharSeries(src[before.inc() until after]).trim)
                     }
                 }.let { res ->
                     if (isObj) {
@@ -111,7 +113,7 @@ object JsonParser {
             't', 'f' -> 't' == c
             'n' -> null
             else -> {
-                src.parseDoubleOrNull()
+                src.res.slice.parseDoubleOrNull()
             }
         }
     }
