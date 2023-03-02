@@ -7,26 +7,24 @@ import kotlin.math.max
 /**
  * char based spiritual successor to ByteBuffer for parsing
  */
-class CharSeries(buf: Series<Char>) : Series<Char>  {
+class CharSeries(buf: Series<Char>) : Series<Char> {
+
     override val a: Int = buf.a
     override val b: (Int) -> Char = buf.b
 
     /** the mutable position accessor */
     var pos = 0
+
     /** the limit accessor */
-    var limit = size
+    var limit = size //initialized to size
+
     /** the mark accessor */
     var mark = -1
 
     /** get, the verb - the char at the current position and increment position */
-    val get: Char
-        get() {
+    val get: Char get() {
             if (!hasRemaining) throw IndexOutOfBoundsException("pos: $pos, limit: $limit")
-
-            val c = b(pos)
-            pos++
-            return c
-        }
+            val c = b(pos); pos++; return c }
 
     //string ctor
     constructor(s: String) : this(s.toSeries())
@@ -35,7 +33,7 @@ class CharSeries(buf: Series<Char>) : Series<Char>  {
     val rem: Int get() = limit - pos
 
     /** immutable max capacity of this buffer, alias for size*/
-    val cap: Int  by ::size
+    val cap: Int by ::size
 
     /** boolean indicating if there are remaining chars */
     val hasRemaining get() = rem.nz
@@ -49,7 +47,7 @@ class CharSeries(buf: Series<Char>) : Series<Char>  {
     /** reset pos to mark */
     val res
         get() = apply {
-            pos = if(mark<0)pos else mark
+            pos = if (mark < 0) pos else mark
         }
 
     /** flip the buffer, limit becomes pos, pos becomes 0 */
@@ -84,6 +82,12 @@ class CharSeries(buf: Series<Char>) : Series<Char>  {
 
     /** limit, the verb - redefines the last position accessable by get and redefines remaining accordingly*/
     fun lim(i: Int) = apply { limit = i }
+
+    /** skip whitespace */
+    val skipWs get() = apply { while (hasRemaining && mk.get.isWhitespace()); res }
+
+    val rtrim get() = apply { while(rem>0 && b(limit-1).isWhitespace()) limit-- }
+
 
 
     fun clone() = CharSeries(a j b).also { it.pos = pos; it.limit = limit; it.mark = mark }
@@ -120,7 +124,7 @@ class CharSeries(buf: Series<Char>) : Series<Char>  {
         result = 31 * result + limit
         result = 31 * result + mark
         result = 31 * result + size
-        //include cachecode
+//include cachecode
         result = 31 * result + cacheCode
         return result
     }
@@ -134,6 +138,14 @@ class CharSeries(buf: Series<Char>) : Series<Char>  {
         return "CharSeries(position=$pos, limit=$limit, mark=$mark, cacheCode=$cacheCode,take-4=${take})"
     }
 
+    fun trim(): CharSeries {
+        var p = pos
+        var l = limit
+        while (p < l && get(p).isWhitespace()) p++
+        while (l > p && get(l.dec()).isWhitespace()) l--
+        return clone().pos(p).lim(l)
+    }
+
 
     //isEmpty override
     val isEmpty: Boolean get() = pos == limit
@@ -143,7 +155,7 @@ class CharSeries(buf: Series<Char>) : Series<Char>  {
 
 //lazy split
 operator fun CharSeries.div(delim: Char): Series<CharSeries> {
-    //fold -- forward scan to record a list of commas from hdr.get
+//fold -- forward scan to record a list of commas from hdr.get
     val intList = mutableListOf<Int>()
     while (this.hasRemaining) {
         val c = get
@@ -168,3 +180,4 @@ operator fun CharSeries.div(delim: Char): Series<CharSeries> {
         clone().slice.pos(p).lim(l)
     }
 }
+
