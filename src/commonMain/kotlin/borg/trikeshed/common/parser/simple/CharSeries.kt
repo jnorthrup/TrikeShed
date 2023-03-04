@@ -159,13 +159,13 @@ class CharSeries(buf: Series<Char>) : Series<Char> {
         /**target*/
         target: Char,
     ): Boolean {
-        val anchor=pos
-        var escaped=false
-        while(hasRemaining){
-            val c=get
+        val anchor = pos
+        var escaped = false
+        while (hasRemaining) {
+            val c = get
             if (c == target) return true
         }
-        pos=anchor
+        pos = anchor
         return false
     }
 
@@ -175,26 +175,25 @@ class CharSeries(buf: Series<Char>) : Series<Char> {
         /**target*/
         target: Char,
         /**if present this escapes one char*/
-        escape: Char
+        escape: Char,
     ): Boolean {
-        val anchor=pos
-        var escaped=false
-        while(hasRemaining) get.let { c->
+        val anchor = pos
+        var escaped = false
+        while (hasRemaining) get.let { c ->
             if (escaped) escaped = false
             else when (c) {
                 target -> return true
                 escape -> escaped = true
             }
         }
-        pos=anchor
+        pos = anchor
         return false
     }
 }
-//lazy split
-operator fun CharSeries.div(delim: Char): Series<CharSeries> {
-//fold -- forward scan to record a list of commas from hdr.get
+
+operator fun CharSeries.div(delim: Char): Series<CharSeries> { //lazy split
     val intList = mutableListOf<Int>()
-    while (this.hasRemaining) get.let{c-> if (c == delim) intList.add(pos) }
+    while (this.hasRemaining) get.let { c -> if (c == delim) intList.add(pos) }
 
     /**
      * iarr is an index of delimitted endings of the CharSeries.
@@ -202,13 +201,99 @@ operator fun CharSeries.div(delim: Char): Series<CharSeries> {
     val iarr = intList.toIntArray()
 
     return iarr α { x ->
-        /**handle first and last index) if (x == 0) 0 else iarr[x.dec()].inc()*/
         val p = if (x == 0) 0 else iarr[x.dec()].inc() //start of next
         val l = //is x last index?
             if (x == iarr.lastIndex)
                 this.limit
             else
                 iarr[x].dec()
-        clone().slice.pos(p).lim(l)
+        slice.pos(p).lim(l)
     }
 }
+
+private operator fun CharSeries.div(s: String): Join<Int, (Int) -> CharSeries> {
+    val res = mutableListOf<Twin<Int>>()
+    var open = pos
+    var close = limit
+    fresh@ do {
+        var c = 0
+        hunt@ do {
+            if (seekTo(s[c])) {
+                close = pos //optimistic guess that we have a match
+                c++ //progress
+                //compare `get` until c is s.length; if c is s.length then we have a match
+                while (hasRemaining && c < s.length && get == s[c]) c++ //progress
+                //evaluate success
+                if (c == s.length) {
+                    res.add(Twin(open, close))
+                    open = pos
+                    continue@fresh
+                } else {
+                    pos = close //reset
+                    continue@hunt
+                }
+            } else {
+                pos = close //reset
+                continue@hunt
+
+            }
+        } while (hasRemaining)
+        break@fresh
+    } while (hasRemaining)
+    return res α { x -> slice.pos(x.a).lim(x.b) }
+
+
+}
+
+/***** Key and Index expressions:
+ * create a parser for expressions such as `2,3-4,>5,<9`
+ *
+ * operators are:
+ *   * inclusive ranges such as   `1..3`
+ *   * exclusive ranges such as >1 and `1 until 9` and `1 < 9`
+ *   * negation such as `!1` and `not 1`
+ *   * commas such as `1,12,4..5` and `1,2,3`
+ *
+ *   * the expression is a series of groups separated by commas
+ *   * a group is a subexpression containing at least a constant and zero or one operators
+ *   * a constant is an unsigned Int
+ *   * an operator is one of the following:
+ *      '..' inclusive range
+ *      '=>' inclusive range
+ *      '<=' inclusive range , also unary
+ *      '>' exclusive range , also unary
+ *      '<' exclusive range , also unary
+ *       '!'/'not' negation, unary
+ *      ',' terminus
+ *
+ *   @return The range's indices that match the expression
+ */
+operator fun IntRange.get(expr: String): Series<Int> {
+    val cs = CharSeries(expr).trim
+
+    val groups = (cs / ',') α CharSeries::trim
+    val ranges = groups α { g ->
+        val r = g / ".."
+        when (r.size) {
+            0 -> {
+                val c = g.asString().toInt()
+                c..c
+            }
+
+            1 -> {
+                val c = r[0].asString().toInt()
+                c..c
+            }
+
+            2 -> {
+                val c1 = r[0].asString().toInt()
+                val c2 = r[1].asString().toInt()
+                c1..c2
+            }
+
+            else -> throw Exception("too many .. in range expression")
+        }
+    }
+
+
+

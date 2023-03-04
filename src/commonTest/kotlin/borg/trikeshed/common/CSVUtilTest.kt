@@ -1,12 +1,11 @@
 package borg.trikeshed.common
 
 import borg.trikeshed.common.parser.simple.CharSeries
-import borg.trikeshed.common.Files
 import borg.trikeshed.cursor.*
 import borg.trikeshed.isam.IsamDataFile
 import borg.trikeshed.isam.meta.IOMemento
 import borg.trikeshed.lib.*
-import borg.trikeshed.parse.DelimitRange
+import borg.trikeshed.lib.DelimitRange
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
