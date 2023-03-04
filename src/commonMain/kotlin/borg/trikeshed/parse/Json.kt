@@ -13,7 +13,6 @@ typealias JsElement = Join<Twin<Int>, Series<Int>> //(openIdx j closeIdx) j comm
 object JsonParser {
 
     /** includes open and close braces and provides a list of comma indexes*/
-
     fun index(src: Series<Char>): JsElement {
         var depth = 0
         var openIdx = -1
@@ -30,9 +29,7 @@ object JsonParser {
                         c == '\\' -> escapeNextChar = true
                         c == '"' -> insideQuote = false
                     }
-                }
-
-                else -> when (c) {
+                }else -> when (c) {
 
                     '{', '[' -> {
                         depth++
