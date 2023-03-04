@@ -56,7 +56,7 @@ class JsonParserTest {
         reifiedObj["bool"]?.let { assertEquals(true, it) }?:TODO("finish Test")
         reifiedObj["null"]?.let { fail() }
         reifiedObj["array"]?.let {
-            val anies = it as Array<Any?>
+            val anies = it as Series<Any?>
             assertEquals(listOf(1.0, 2.0, 3.0).toString(), anies.toList().toString()) }?:TODO("finish Test")
         reifiedObj["object"]?.let { assertEquals(mapOf("key" to "value"), it) }?:TODO("finish Test")
     }

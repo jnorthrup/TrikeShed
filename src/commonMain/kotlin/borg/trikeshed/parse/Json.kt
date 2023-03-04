@@ -2,7 +2,6 @@
 
 package borg.trikeshed.parse
 
-import borg.trikeshed.common.collections._l
 import borg.trikeshed.common.collections.s_
 import borg.trikeshed.common.parser.simple.CharSeries
 import borg.trikeshed.lib.*
@@ -29,7 +28,9 @@ object JsonParser {
                         c == '\\' -> escapeNextChar = true
                         c == '"' -> insideQuote = false
                     }
-                }else -> when (c) {
+                }
+
+                else -> when (c) {
 
                     '{', '[' -> {
                         depth++
@@ -55,7 +56,7 @@ object JsonParser {
 
     fun reify(
         /** includes open and close braces, or both quotes, or the raw type*/
-        src1: Series<Char>
+        src1: Series<Char>,
     ): Any? {
         val src: CharSeries = CharSeries(src1).trim
 
@@ -64,39 +65,39 @@ object JsonParser {
             '{', '[' -> {
                 val index = index(src)
                 val (openIdx, closeIdx) = index.first
-                val commaIdxs = index.second
+                val commaIdxs: Series<Int> = index.second
 
                 val isObj = '{' == c
                 //if obj we create k-v pairs otherwise we create values
 
                 //iterate  segments exclusive of src first and last and commas in the middle
-                val join = _l[openIdx] + commaIdxs.toList() + _l[closeIdx]
-                join./*`▶`.*/zipWithNext().map { (before, after) ->
+                combine(s_[openIdx], commaIdxs, s_[closeIdx]).`▶`.zipWithNext().α { (before, after) ->
                     if (isObj) {
                         val tmp = CharSeries(src[before.inc() until after]).trim
-                        val quoted = tmp.seekTo('"')
-                        if (!quoted) throw Exception("expected quoted key")
-                        val openQuote = tmp.pos
-                        val keyBegin = tmp.seekTo('"', '\\')
-                        if (!keyBegin) throw Exception("expected end of quoted key")
-                        val keyLast = tmp.pos - 1
-                        val colonBegin = tmp.seekTo(':')
-                        if (!colonBegin) throw Exception("expected colon")
-                        val valueContext = tmp.slice
-                        val value = reify(valueContext)
+                        require(tmp.seekTo('"')) {
+                            "malformed open quote in ${tmp.take(40).asString()}"
+                        }
+                        tmp.pos.let { openQuote ->
+                            require(tmp.seekTo('"', '\\')) {
+                                "malformed close-quote in ${tmp.take(40).asString()}"
+                            }
+                            (tmp.pos - 1).let { closeQuote ->
+                                require(tmp.seekTo(':')) {
+                                    "expected colon in ${tmp.take(40).asString()}"
+                                }
+                                tmp.slice.let { valueContext ->
+                                    tmp.lim(closeQuote).pos(openQuote).asString() j reify(valueContext)
+                                }
+                            }
+                        }
+                    } else reify(CharSeries(src[before.inc() until after]).trim)
+                }.let {
+                    if(isObj ) it.`▶`.map {(it as Join<*,*>).pair }.toMap()
 
-                        //set limit to create a slice that excludes the quotes
-                        tmp.lim(keyLast).pos(openQuote).asString() to value
-                    } else {
-                        reify(CharSeries(src[before.inc() until after]).trim)
+
+                        else  it
+
                     }
-                }.let { res ->
-                    if (isObj) {
-                        (res as List<Pair<String, Any?>>).toMap()
-                    } else {
-                        res.toTypedArray()
-                    }
-                }
             }
 
             '"' -> {

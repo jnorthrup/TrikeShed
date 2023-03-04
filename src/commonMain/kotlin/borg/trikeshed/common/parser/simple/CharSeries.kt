@@ -153,7 +153,8 @@ class CharSeries(buf: Series<Char>) : Series<Char> {
     //isEmpty override
     val isEmpty: Boolean get() = pos == limit
 
-    /** success move position to the char after found and returns true.  fail returns false and leaves position unchanged */
+    /** success move position to the char after found and returns true.
+     *  fail returns false and leaves position unchanged */
     fun seekTo(
         /**target*/
         target: Char,
@@ -168,7 +169,8 @@ class CharSeries(buf: Series<Char>) : Series<Char> {
         return false
     }
 
-    /** success move position to the char after found and returns true.  fail returns false and leaves position unchanged */
+    /** success move position to the char after found and returns true.
+     *  fail returns false and leaves position unchanged */
     fun seekTo(
         /**target*/
         target: Char,
@@ -177,14 +179,12 @@ class CharSeries(buf: Series<Char>) : Series<Char> {
     ): Boolean {
         val anchor=pos
         var escaped=false
-        while(hasRemaining){
-            val c=get
-            if (!escaped) {
-                when (c) {
-                    target -> return true
-                    escape -> escaped=true
-                }
-            } else escaped=false
+        while(hasRemaining) get.let { c->
+            if (escaped) escaped = false
+            else when (c) {
+                target -> return true
+                escape -> escaped = true
+            }
         }
         pos=anchor
         return false
@@ -194,12 +194,7 @@ class CharSeries(buf: Series<Char>) : Series<Char> {
 operator fun CharSeries.div(delim: Char): Series<CharSeries> {
 //fold -- forward scan to record a list of commas from hdr.get
     val intList = mutableListOf<Int>()
-    while (this.hasRemaining) {
-        val c = get
-        if (c == delim) {
-            intList.add(pos)
-        }
-    }
+    while (this.hasRemaining) get.let{c-> if (c == delim) intList.add(pos) }
 
     /**
      * iarr is an index of delimitted endings of the CharSeries.
@@ -217,4 +212,3 @@ operator fun CharSeries.div(delim: Char): Series<CharSeries> {
         clone().slice.pos(p).lim(l)
     }
 }
-
