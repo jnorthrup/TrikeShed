@@ -1,5 +1,8 @@
+@file:Suppress("SpellCheckingInspection")
+
 package borg.trikeshed.common.parser.simple
 
+import borg.trikeshed.common.collections.s_
 import borg.trikeshed.lib.*
 import borg.trikeshed.lib.CZero.nz
 
@@ -189,6 +192,21 @@ class CharSeries(buf: Series<Char>) : Series<Char> {
         pos = anchor
         return false
     }
+
+    fun seekTo(lit: Series<Char>): Boolean {
+        val anchor = pos
+        var i = 0
+        while (hasRemaining) {
+            if (get == lit[i]) {
+                i++
+                if (i == lit.size) return true
+            } else {
+                i = 0
+            }
+        }
+        pos = anchor
+        return false
+    }
 }
 
 operator fun CharSeries.div(delim: Char): Series<CharSeries> { //lazy split
@@ -198,7 +216,7 @@ operator fun CharSeries.div(delim: Char): Series<CharSeries> { //lazy split
     /**
      * iarr is an index of delimitted endings of the CharSeries.
      */
-    val iarr = intList.toIntArray()
+    val iarr: IntArray = intList.toIntArray()
 
     return iarr α { x ->
         val p = if (x == 0) 0 else iarr[x.dec()].inc() //start of next
@@ -211,7 +229,12 @@ operator fun CharSeries.div(delim: Char): Series<CharSeries> { //lazy split
     }
 }
 
-private operator fun CharSeries.div(s: String): Join<Int, (Int) -> CharSeries> {
+/**
+ * split on a string
+ * @param s the string to split on
+ * @return a series of CharSeries; in the case where the token does not exist the result is empty
+ */
+operator fun CharSeries.div(s: String): Join<Int, (Int) -> CharSeries> {
     val res = mutableListOf<Twin<Int>>()
     var open = pos
     var close = limit
@@ -240,60 +263,9 @@ private operator fun CharSeries.div(s: String): Join<Int, (Int) -> CharSeries> {
         } while (hasRemaining)
         break@fresh
     } while (hasRemaining)
+
+    // if we have a match then we have a result
     return res α { x -> slice.pos(x.a).lim(x.b) }
 
 
 }
-
-/***** Key and Index expressions:
- * create a parser for expressions such as `2,3-4,>5,<9`
- *
- * operators are:
- *   * inclusive ranges such as   `1..3`
- *   * exclusive ranges such as >1 and `1 until 9` and `1 < 9`
- *   * negation such as `!1` and `not 1`
- *   * commas such as `1,12,4..5` and `1,2,3`
- *
- *   * the expression is a series of groups separated by commas
- *   * a group is a subexpression containing at least a constant and zero or one operators
- *   * a constant is an unsigned Int
- *   * an operator is one of the following:
- *      '..' inclusive range
- *      '=>' inclusive range
- *      '<=' inclusive range , also unary
- *      '>' exclusive range , also unary
- *      '<' exclusive range , also unary
- *       '!'/'not' negation, unary
- *      ',' terminus
- *
- *   @return The range's indices that match the expression
- */
-operator fun IntRange.get(expr: String): Series<Int> {
-    val cs = CharSeries(expr).trim
-
-    val groups = (cs / ',') α CharSeries::trim
-    val ranges = groups α { g ->
-        val r = g / ".."
-        when (r.size) {
-            0 -> {
-                val c = g.asString().toInt()
-                c..c
-            }
-
-            1 -> {
-                val c = r[0].asString().toInt()
-                c..c
-            }
-
-            2 -> {
-                val c1 = r[0].asString().toInt()
-                val c2 = r[1].asString().toInt()
-                c1..c2
-            }
-
-            else -> throw Exception("too many .. in range expression")
-        }
-    }
-
-
-

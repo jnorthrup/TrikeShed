@@ -1,3 +1,5 @@
+@file:Suppress("NonAsciiCharacters", "FunctionName", "ObjectPropertyName")
+
 package borg.trikeshed.lib
 
 
@@ -70,33 +72,20 @@ infix fun <A, B> A.j(b: B): Join<A, B> = Join(this, b)
  */
 
 infix fun <X, C, V : Series<X>> V.α(xform: (X) -> C): Series<C> = size j { i -> xform(this[i]) }
-infix fun <X, C, V : Iterable<X>> V.α(xform: (X) -> C): Series<C> = this.toList().toSeries() α xform
+
+/** an iterable is converted by full reification to List then lazy transform. */
+infix fun <X, C, V : Iterable<X>> V.α(xform: (X) -> C): Series<C> =
+    ((this as? List<X>) ?: this.toList()).toSeries() α xform
+
+/** this is an alpha conversion however the type erasure forces inlining here for Arrays as a holdover from java
+ *  acquiesence */
 inline infix fun <X, C> Array<X>.α(crossinline xform: (X) -> C): Series<C> = size j { i: Int -> xform(this[i]) }
-
-
-fun <A, B, C, D> ((A) -> B).alpha(f: (C) -> D): (C) -> D = f
-//simple example
-//fun main() {
-//    val f = { x: Int -> x + 1 }
-//    val g = { y: Int -> y * 2 }
-//    val h = f.alpha(g)
-//    println(h(1))
-//    //result is 4
-//
-//    //for Series type
-//    val s = Series(1, 2, 3)
-//    val t = { x: Int -> x + 1 }
-//    val u = { y: Int -> y * 2 }
-//    val v = s.α(t)
-//    println(v)
-//    //result is [2, 4, 6]
-//}
 
 
 /**
  * provides unbounded access to first and last rows beyond the existing bounds of 0 until size
  */
-val <T> Join<Int, (Int) -> T>.infinite: Join<Int, (Int) -> T>
+val <T> Series<T>.infinite: Series<T>
     get() = Int.MAX_VALUE j { x: Int ->
         this.b(
             when {
@@ -151,7 +140,6 @@ fun <T> Array<T>.toSeries(): Join<Int, (Int) -> T> =
     (size j ::get) as Join<Int, (Int) -> T>
 
 
-
 //clockwise circle arrow unicode character is ↻ (U+21BB)
 //counterclockwise circle arrow  unicode character is  ↺ (U+21BA)
 
@@ -164,6 +152,7 @@ fun <T> Array<T>.toSeries(): Join<Int, (Int) -> T> =
 // in kotlin, val a: ()->B  wraps a B.  in lambda calculus which is left identity ?  in kotlin, a: ()->B  is right identity.  left identity is: val a: ()->B = { b }  right identity is:  val a: ()->B = b
 
 val <T> T.leftIdentity: () -> T get() = { this }
+
 /**Left Identity Function */
 val <T> T.`↺` get() = leftIdentity
 

@@ -10,7 +10,6 @@ typealias JsElement = Join<Twin<Int>, Series<Int>> //(openIdx j closeIdx) j comm
 
 
 object JsonParser {
-
     /** includes open and close braces and provides a list of comma indexes*/
     fun index(src: Series<Char>): JsElement {
         var depth = 0
@@ -56,12 +55,10 @@ object JsonParser {
 
     fun reify(
         /** includes open and close braces, or both quotes, or the raw type*/
-        src1: Series<Char>,
-    ): Any? {
+        src1: Series<Char> ): Any? {
         val src: CharSeries = CharSeries(src1).trim
 
-        val c: Char = src.mk.get
-        return when (c) {
+        return when (val c: Char = src.mk.get) {
             '{', '[' -> {
                 val index = index(src)
                 val (openIdx, closeIdx) = index.first
@@ -91,13 +88,7 @@ object JsonParser {
                             }
                         }
                     } else reify(CharSeries(src[before.inc() until after]).trim)
-                }.let {
-                    if(isObj ) it.`▶`.map {(it as Join<*,*>).pair }.toMap()
-
-
-                        else  it
-
-                    }
+                }.let { if (isObj) it.`▶`.map { (it as Join<*, *>).pair }.toMap() else it }
             }
 
             '"' -> {
@@ -109,10 +100,8 @@ object JsonParser {
             }
 
             't', 'f' -> 't' == c
-            'n' -> null
-            else -> {
-                src.res.slice.parseDoubleOrNull()
-            }
+//            'n' -> null
+            else -> src.res.slice.parseDoubleOrNull()
         }
     }
 }
