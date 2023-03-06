@@ -19,6 +19,8 @@ typealias Series<T> = Join<Int, (Int) -> T>
 val <T> Series<T>.size: Int get() = a
 
 
+
+
 /** index operator for Series
  */
 operator fun <T> Series<T>.get(i: Int): T = b(i)

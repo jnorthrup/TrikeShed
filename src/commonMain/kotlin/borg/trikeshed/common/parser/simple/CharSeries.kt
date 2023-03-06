@@ -258,7 +258,6 @@ operator fun CharSeries.div(s: String): Join<Int, (Int) -> CharSeries> {
             } else {
                 pos = close //reset
                 continue@hunt
-
             }
         } while (hasRemaining)
         break@fresh
@@ -266,6 +265,4 @@ operator fun CharSeries.div(s: String): Join<Int, (Int) -> CharSeries> {
 
     // if we have a match then we have a result
     return res α { x -> slice.pos(x.a).lim(x.b) }
-
-
 }

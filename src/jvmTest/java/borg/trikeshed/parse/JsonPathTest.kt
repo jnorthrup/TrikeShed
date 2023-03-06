@@ -1,0 +1,65 @@
+package borg.trikeshed.parse
+
+import borg.trikeshed.common.collections._l
+import borg.trikeshed.lib.d
+import borg.trikeshed.lib.j
+import borg.trikeshed.lib.toSeries
+import borg.trikeshed.parse.JsonParser.index
+import borg.trikeshed.parse.JsonParser.jsPath
+import kotlin.test.*
+
+class JsonPathTest {
+    @Test
+    fun `test depth correctness and robustness with empty arrays`() {
+        var json = "[0,[],[1],[[[ ]]]]"
+        var d = mutableListOf<Int>()
+        var elem = index(json.toSeries(), d)
+        assertEquals(0, d[0])
+        assertEquals(1, d[1])
+        assertEquals(1, d[2])
+        assertEquals(3, d[3])
+
+
+        json = """[0, {}, [1], {"1": {"2": {"3": {"4": 1}}}}]"""
+        d = mutableListOf<Int>()
+        elem = index(json.toSeries(), d)
+        assertEquals(0, d[0])
+        assertEquals(1, d[1])
+        assertEquals(1, d[2])
+        assertEquals(4, d[3])
+    }
+
+    @Test
+    fun `test the simplest path and some misc whitespace`() {
+        val src = (""" [0 , 1,2 , 3 ] """).toSeries()
+        val depths = mutableListOf<Int>()
+        val element = index(src, depths)
+        val path: JsPath = _l[0].toJsPath
+        val result = jsPath(element j src, path, true, depths)
+        val expected = 0.0
+        assertEquals(expected, result)
+
+    }
+
+    @Test
+    fun test1() {
+        val src = ("""{"a":{"b":[1,2,3,4,5],"c":"hi","d":true},"e":false}""").toSeries()
+        val element = index(src)
+        val path: JsPath = _l[("a"), ("b"), (2)].toJsPath
+        val result = jsPath(element j src, path, true, mutableListOf())
+        val expected = 3.0
+        assertEquals(expected, result)
+
+    }
+
+    //tests the use of index on jsObj
+    @Test
+    fun test2() {
+        val src = ("""{"a":{"b":[1,2,3,4,{"meh":[4,3,2,1]}],"c":"hi","d":true},"e":false}""").toSeries()
+        val element = index(src)
+        val path: JsPath = _l[("a"), ("b"), (4), 0, (1)].toJsPath
+        val result = jsPath(element j src, path, true, mutableListOf())
+        val expected = 3.0
+        assertEquals(expected, result)
+    }
+}

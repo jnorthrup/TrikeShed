@@ -50,8 +50,6 @@ operator fun Cursor.get(i: IntRange): Cursor {
     }
 }
 
-
-
 /** get meta for a cursor from row 0 */
 val Cursor.meta: Series<ColMeta>
     get() = row(0) α { (_, b): Join<*, () -> RecordMeta> ->

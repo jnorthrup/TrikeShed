@@ -14,6 +14,8 @@ interface Join<A, B> {
 
     val pair: Pair<A, B>
         get() = Pair(a, b)
+    /** debugger hack only, violates all common sense */
+    val list get() = (this as? Series<out Any?>)?.toList() ?: emptyList<Any?>()
 
     companion object {
         //the Join factory method

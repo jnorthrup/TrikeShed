@@ -5,9 +5,9 @@ import borg.trikeshed.lib.*
 import borg.trikeshed.common.collections.s_
 import kotlin.test.*
 
-class JsonParserTest {
+class JsonParserTest2 {
 
-        val jsonString = """
+    val jsonString = """
             {
               "string": "Hello, world!",
               "number": 42.0,
@@ -18,24 +18,21 @@ class JsonParserTest {
             }
         """.trimIndent()
 
-        val expectedJsonElement:JsElement =    Twin(0, jsonString.length - 1) j s_ [29, 47, 63, 79, 101]
-
-
-
+    val expectedJsonElement: JsElement = Twin(0, jsonString.length - 1) j s_[29, 47, 63, 79, 101]
 
     @Test
     fun `test scanJson`() {
         val json = CharSeries(jsonString)
-        val (a1,b1) = expectedJsonElement
+        val (a1, b1) = expectedJsonElement
         val index = JsonParser.index(json)
-        val (a2,b2) = index
-        assertEquals(a1.pair.toString(),a2.pair.toString())
+        val (a2, b2) = index
+        assertEquals(a1.pair.toString(), a2.pair.toString())
         val expected = b1.toList().toString()
         val actual = b2.toList().toString()
         assertEquals(expected, actual)
     }
 
-    val expectedParsedJson =linkedMapOf(
+    val expectedParsedJson = linkedMapOf(
         "string" to "Hello, world!",
         "number" to 42.0,
         "bool" to true,
@@ -45,24 +42,18 @@ class JsonParserTest {
     )
 
     /** tests each of the above members */
-  @Test
+    @Test
     fun reifyTest() {
+        val reifiedObj = JsonParser.reify(jsonString.toSeries()) as Map<String, Any?>
 
- 
-        val reifiedObj = JsonParser.reify(jsonString.toSeries())as  Map<String,Any?>
-
-        reifiedObj["string"]?.let { assertEquals("Hello, world!", it) }?:TODO("finish Test")
-        reifiedObj["number"]?.let { assertEquals(42.0, it) }?:TODO("finish Test")
-        reifiedObj["bool"]?.let { assertEquals(true, it) }?:TODO("finish Test")
+        reifiedObj["string"]?.let { assertEquals("Hello, world!", it) } ?: TODO("finish Test")
+        reifiedObj["number"]?.let { assertEquals(42.0, it) } ?: TODO("finish Test")
+        reifiedObj["bool"]?.let { assertEquals(true, it) } ?: TODO("finish Test")
         reifiedObj["null"]?.let { fail() }
         reifiedObj["array"]?.let {
             val anies = it as Series<Any?>
-            assertEquals(listOf(1.0, 2.0, 3.0).toString(), anies.toList().toString()) }?:TODO("finish Test")
-        reifiedObj["object"]?.let { assertEquals(mapOf("key" to "value"), it) }?:TODO("finish Test")
+            assertEquals(listOf(1.0, 2.0, 3.0).toString(), anies.toList().toString())
+        } ?: TODO("finish Test")
+        reifiedObj["object"]?.let { assertEquals(mapOf("key" to "value"), it) } ?: TODO("finish Test")
     }
 }
-
-
-
-
-
