@@ -122,7 +122,15 @@ object JsonParser {
                 //if obj we create k-v pairs otherwise we create values
 
                 //iterate  segments exclusive of src first and last and commas in the middle
-                combine(s_[openIdx], commaIdxs, s_[closeIdx]).`▶`.zipWithNext().α { (before, after) ->
+                val combine = combine(s_[openIdx], commaIdxs, s_[closeIdx])
+                if(commaIdxs.isEmpty()){
+                    val (before,after)= combine.toArray()
+                    val possiblyEmpty = src.clone().lim(after).pos(before + 1).trim
+                    if(!possiblyEmpty.hasRemaining) return if(isObj)
+                        emptyMap<String,Any?>() else 0 j {x:Int-> TODO() }
+                }
+
+                combine.`▶`.zipWithNext().α { (before, after) ->
                     if (isObj) {
                         val tmp = CharSeries(src[before.inc() until after]).trim
                         require(tmp.seekTo('"')) {

@@ -1,8 +1,7 @@
 package borg.trikeshed.parse
 
 import borg.trikeshed.common.collections._l
-import borg.trikeshed.lib.j
-import borg.trikeshed.lib.toSeries
+import borg.trikeshed.lib.*
 import borg.trikeshed.parse.JsonParser.index
 import borg.trikeshed.parse.JsonParser.jsPath
 import kotlin.test.*
@@ -83,7 +82,7 @@ class JsonPathTest {
     fun test1() {
         val src = ("""{"a":{"b":[1,2,3,4,5],"c":"hi","d":true},"e":false}""").toSeries()
         val element = index(src)
-        val path: JsPath = _l[("a"), ("b"), (2)].toJsPath
+        val path: JsPath = _l["a", "b", 2].toJsPath
         val result = jsPath(element j src, path, true, mutableListOf())
         val expected = 3.0
         assertEquals(expected, result)
@@ -100,4 +99,28 @@ class JsonPathTest {
         val expected = 3.0
         assertEquals(expected, result)
     }
+    @Test
+    fun `handle empty jsarray`() {
+        val src = ("""[0,[],[1],[[[ ]]]] """).toSeries()
+        val element = index(src)
+        val path: JsPath = _l[3,0,0].toJsPath
+        val result = jsPath(element j src, path, true, mutableListOf())
+        if (result is Join<*,*>) {
+            val r = result as Join<*,*>
+            if(r.a!=0) fail("result.a is not an empty Series")
+        }
+    }
+
+    @Test
+    fun `handle empty jsObject`() {
+        val src = ("""[0,[],[1],[[{ }]]] """).toSeries()
+        val element = index(src)
+        val path: JsPath = _l[3,0,0].toJsPath
+        val result = jsPath(element j src, path, true, mutableListOf())
+        if (result is Map<*,*>) {
+            val r = result as Map<*,*>
+            if(r.isNotEmpty()) fail("result is not an empty Map")
+        }
+    }
+
 }
