@@ -211,10 +211,10 @@ class CharSeries(buf: Series<Char>) : Series<Char> by buf { //delegate to the un
     }
 
     /**backtrack 1*/
-    operator fun dec() = apply { require(pos > 0) { "Underflow" }; pos-- }
+    operator fun dec(): CharSeries = apply { require(pos > 0) { "Underflow" }; pos-- }
 
     /** advance 1*/
-    operator fun inc() = apply { require(hasRemaining) { "Overflow" };pos++ }
+    operator fun inc(): CharSeries = apply { require(hasRemaining) { "Overflow" };pos++ }
 
 }
 

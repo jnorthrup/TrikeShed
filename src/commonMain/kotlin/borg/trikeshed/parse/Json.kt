@@ -123,11 +123,11 @@ object JsonParser {
 
                 //iterate  segments exclusive of src first and last and commas in the middle
                 val combine = combine(s_[openIdx], commaIdxs, s_[closeIdx])
-                if(commaIdxs.isEmpty()){
-                    val (before,after)= combine.toArray()
+                if (commaIdxs.isEmpty()) {
+                    val (before, after) = combine.toArray()
                     val possiblyEmpty = src.clone().lim(after).pos(before + 1).trim
-                    if(!possiblyEmpty.hasRemaining) return if(isObj)
-                        emptyMap<String,Any?>() else 0 j {x:Int-> TODO() }
+                    if (!possiblyEmpty.hasRemaining) return if (isObj)
+                        emptyMap<String, Any?>() else 0 j { x: Int -> TODO() }
                 }
 
                 combine.`▶`.zipWithNext().α { (before, after) ->
@@ -199,7 +199,7 @@ object JsonParser {
                 var r: Any? = Unit  //this is the payload
                 val segments: Series<JsIndex> = context.segments
                 var idx = 0
-                if (!('{' == src[element.first.first])) do {
+                if (('{' == src[element.first.first])) do {
                     val segment: JsIndex = segments[idx]
                     val (segOpenIdx, segCloseIdx) = segment.first
                     val (x, _) = segment
@@ -209,11 +209,21 @@ object JsonParser {
                     require(tmp.get == '"') {
                         "malformed open quote in ${tmp.take(40).asString()}"
                     }
-                    require(tmp.seekTo('"', '\\')) {
+                    require(tmp.mk.seekTo('"', '\\')) {
                         "malformed close-quote in ${tmp.take(40).asString()}"
                     }
-                    val key1 =
-                        tmp.clone().apply { pos-- }.flip().asString()//if obj we create k-v pairs otherwise we create values
+//                    var clone = tmp.clone()
+//                    clone--
+//                    var flip = clone.flip()
+//                    flip++
+                    var buf = tmp.clone()
+                    buf--
+                    buf.flip()
+                    buf++
+
+
+                    val key1 = buf.asString()
+                    //if obj we create k-v pairs otherwise we create values
                     //iterate  segments exclusive of src first and last and commas in the middle
 
                     /** this will check for enough segments to select the desired element, and
