@@ -21,12 +21,24 @@ val List<*>.toJsPath: JsPath
         }
     }
 
+/** delimiter-exclusive segments in a splittable json element.
+ *  e.g. ",1," in "[0,1,2,3]" would be "1"
+ *
+ *  "[ 0 , " in "[0,1,2,3]" would be "0"
+ *
+ *  " 3 ]" in "[0,1,2,3]" would be "3"
+ *
+ *
+ *
+ *
+ *
+ */
 val JsContext.segments: Series<JsIndex>
     get() {
         val (element, src) = this
         val (openIdx, closeIdx) = element.first
         val commaIdxs: Series<Int> = combine(s_[openIdx], element.second, s_[closeIdx])
-        return commaIdxs.`▶`.zipWithNext().map { (a: Int, b: Int) -> ((a j b)) }.toList() α { it j src }
+        return commaIdxs.`▶`.zipWithNext().map { (a: Int, b: Int) -> a.inc() j b }.toList() α { it j src }
     }
 
 object JsonParser {
@@ -44,8 +56,7 @@ object JsonParser {
         val commaIdxs: MutableList<Int> = mutableListOf()
         var insideQuote = false
         var escapeNextChar = false
-        var maxDepth = -1
-
+        var maxDepth = 0
         for (i in 0 until src.size) {
             val c: Char = src[i]
             when {
@@ -80,7 +91,7 @@ object JsonParser {
 
                         //record and reset maxDepth
                         depths?.add(maxDepth)
-                        maxDepth = -1
+                        maxDepth = 0
 
 
                     }
@@ -90,7 +101,6 @@ object JsonParser {
             }
         }
         return (openIdx j closeIdx) j commaIdxs.toIntArray().toSeries()
-
 
 
     }
@@ -157,10 +167,6 @@ object JsonParser {
      *  @param reifyResult whether to reify the payload or return the JsIndex
      *  @param payload a mutable array that is used to pass the payload back up the stack
      *  @return on success the payload, on any other outcome Unit is returned
-     *
-     *
-     *
-     *
      */
     fun jsPath(
         /**contains the indexes and the src chars */
@@ -174,75 +180,96 @@ object JsonParser {
         depths: MutableList<Int>? = null,
 //        payload: Array<Any?> = arrayOf(Unit),
     ): Any? {
-        val (element, src) = context
+        val (element: JsElement, src) = context
         val (pathHead: JsPathElement, pathTail: JsPath) = path.first() j path.drop(1)
 
-        return pathHead.fold(
+        return pathHead.fold<Any?>(
+            /** this, String branch, performs the search of a key by descending into each segment, and looking for a
+             * key that matches, and then will recurse into that, or return the desired form
+             */
             { key ->
-                val (openIdx, closeIdx) = element.first
-                var r: Any? = Unit
-                if ('{' == src[openIdx]) {
-                    val segments = context.segments
-                    var segIdx = 0
-                    do {//while segments
+                var r: Any? = Unit  //this is the payload
+                val segments: Series<JsIndex> = context.segments
+                var idx = 0
+                if (!('{' == src[element.first.first])) do {
+                    val segment: JsIndex = segments[idx]
+                    val (segOpenIdx, segCloseIdx) = segment.first
+                    val (x, _) = segment
+                    val (segOpen, segClose) = x
+                    var tmp = CharSeries(src[segOpen until segClose]).trim
+                    if (!tmp.hasRemaining) continue//empty obj
+                    require(tmp.get == '"') {
+                        "malformed open quote in ${tmp.take(40).asString()}"
+                    }
+                    require(tmp.seekTo('"', '\\')) {
+                        "malformed close-quote in ${tmp.take(40).asString()}"
+                    }
+                    val key1 =
+                        tmp.clone().apply { pos-- }.flip().asString()//if obj we create k-v pairs otherwise we create values
+                    //iterate  segments exclusive of src first and last and commas in the middle
 
-                        val segment = segments[segIdx]
-                        if (depths?.size == segments.size && depths[segIdx] < path.size) continue
-
-                        val (segOpenIdx, segCloseIdx) = segment.first
-                        val tmp = CharSeries(src).lim(segCloseIdx).pos(segOpenIdx).trim
-                        if (tmp.get != '"') continue
-                        val q0 = tmp.pos
-                        if (!tmp.seekTo('"', '\\')) continue
-                        val q1 = tmp.pos
-                        if (tmp[q0 until q1].asString() != key) continue
-                        if (tmp.skipWs.get != ':') continue
-                        if (pathTail.isEmpty()) {
-                            r = if (reifyResult) reify(tmp.trim) else tmp.trim
-                            break
-                        }
-                        //index pos .. lim
-                        val depths1: MutableList<Int> = mutableListOf()
-                        val src1 = tmp.slice
-                        val context1 = index(src1, depths1)
-
-                        r = jsPath(context1 j tmp.slice, pathTail, reifyResult, depths1)
-                        if (r != Unit) break
-                    } while (++segIdx < segments.size)
-                }
-                return@fold r
+                    /** this will check for enough segments to select the desired element, and
+                     *  then will recurse into that or return the desired form, discarding the
+                     *  segment key as necessary.  This works on both obj and array */
+                    //if pathtail is not empty, we need to index and recurse
+                    if (key1 != key) continue
+                    if (pathTail.isEmpty()) {
+                        if (reifyResult) {
+                            val valueContext = CharSeries(src).lim(segCloseIdx).pos(segOpenIdx).slice.trim
+                            r = reify(valueContext)
+                        } else r = tmp.pos j tmp.limit j tmp
+                        break
+                    }
+                    //recurse
+                    val valueContext = CharSeries(src).lim(segCloseIdx).pos(segOpenIdx).slice.trim
+                    val depths2 = mutableListOf<Int>()
+                    val index = index(valueContext, depths2)
+                    r = jsPath(JsContext(index, valueContext), pathTail, reifyResult, depths2)
+                } while (++idx < segments.size)
+                r
             },
+            /** this will check for enough segments to select the desired element, and
+             *  then will recurse into that or return the desired form, discarding the
+             *  segment key as necessary.  This works on both obj and array */
             { idx ->
                 var r: Any? = Unit
-                do {
-                    val (openIdx, closeIdx) = element.first
-                    val isObj = '{' == src[openIdx]
+                val segments: Series<JsIndex> = context.segments
 
-                    val segments = context.segments
-                    if (segments.size <= idx) break
-                    val segment = segments[idx]
-                    if (depths?.size == segments.size && depths[idx] < path.size) break
-                    if (pathTail.isEmpty()) {//this is the sought element
-                        // if obj skip the key and colon
-                        val (segOpenIdx, segCloseIdx) = segment.first
-                        val tmp = CharSeries(src).lim(segCloseIdx).pos(segOpenIdx).trim
-                        if (isObj) {
-                            if (tmp.get != '"') break
-                            if (!tmp.seekTo('"', '\\')) break
-                            if (tmp.skipWs.get != ':') break
+                if (idx < segments.size) do {
+
+                    val segment: JsIndex = segments[idx]
+                    val (segOpenIdx, segCloseIdx) = segment.first
+                    val src0 = CharSeries(src).lim(segCloseIdx).pos(segOpenIdx)
+                    val src01 = src0.slice
+                    var src1 = src01.trim
+                    val inObj = '{' == src[element.first.first]
+                    if (inObj) {
+
+                        logDebug { "obj segment ${src1.asString()}" }
+                        val tmp = CharSeries(src1).trim
+                        require(tmp.get == '"') {
+                            "malformed open quote in ${tmp.take(40).asString()}"
                         }
-                        val trim = tmp.trim
-                        r = if (reifyResult) reify(trim) else trim
-
-                    } else {
-                        val depths1: MutableList<Int> = mutableListOf()
-                        val ctx: JsContext = index(src, depths1) j src
-                        r = jsPath(ctx, pathTail, reifyResult, depths1)
+                        require(tmp.seekTo('"', '\\')) {
+                            "malformed close-quote in ${tmp.take(40).asString()}"
+                        }
+                        require(tmp.skipWs.get == ':') {
+                            "expected colon in ${tmp.take(40).asString()}"
+                        }
+                        src1 = tmp.slice.trim
                     }
+                    if (pathTail.isEmpty()) {
+                        logDebug { "[] pathTail is empty" }
+                        r = if (reifyResult) reify(src1) else src1
+                        logDebug { "success, returning $r" }
+                        break
+                    }
+                    logDebug { "[] pathTail is ${pathTail.size}" }
+                    val depths1: MutableList<Int> = mutableListOf()
+                    val context1: JsElement = index(src1, depths1)
+                    r = jsPath(context1 j src1, pathTail, reifyResult, depths1)
                 } while (false)
-                return@fold r
-            }
-        )
+                r
+            })
     }
-
 }

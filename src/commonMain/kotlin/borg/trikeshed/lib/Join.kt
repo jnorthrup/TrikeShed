@@ -203,5 +203,8 @@ operator fun <T> Series<T>.get(index: IntArray): Series<T> = Series(index.size) 
 /**
  * series get by intRange
  */
-operator fun <T> Series<T>.get(index: IntRange): Series<T> = Series(index.count()) { i -> this[index.first + i] }
+operator fun <T> Series<T>.get(index: IntRange): Series<T> = Series((index.last+1)-index.first  ) { i ->
+    require(index.step == 1)
+    this[index.first + i]
+}
 

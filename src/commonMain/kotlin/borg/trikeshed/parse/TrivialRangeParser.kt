@@ -21,39 +21,41 @@ import borg.trikeshed.lib.*
  *
  */
 operator fun Series<Int>.get(expr: Series<Char>): Series<Int> {
-    val tmp = CharSeries(expr)
+
     // outer scope is ','
-    val groups: Series<CharSeries> = (tmp / ',' α { x -> x.trim }).takeIf { it.isNotEmpty() } ?: s_[tmp.trim]
+    val groups: Series<CharSeries> =
+        ((expr / ',') α { x:Series<Char> -> CharSeries(x).trim }).takeIf { it.isNotEmpty() } ?: s_[CharSeries(expr).trim]
     val negated = mutableSetOf<Int>()
 
     val bag = mutableListOf<Int>()
     (groups α { it.trim }).`▶`.forEach { y: CharSeries ->
 
-        val tmp: CharSeries = y
+        val tmp1: CharSeries = y
         when {
             y[0] == ('!') ->
                 negated += y.pos(1).slice.trim.parseLong().toInt()
 
             y.seekTo("..".toSeries()) ->
-                ((if (tmp[0] == '.') this.first
+                ((if (tmp1[0] == '.') this.first
                 else
-                    tmp.slice.trim.parseLong().toInt()
+                    tmp1.slice.trim.parseLong().toInt()
                         )..(//is the second part empty?
-                        if (tmp[tmp.limit - 1] == '.') this.last()
-                        else tmp.pos(tmp.limit - 1).slice.trim.parseLong().toInt()
+                        if (tmp1[tmp1.limit - 1] == '.') this.last()
+                        else tmp1.pos(tmp1.limit - 1).slice.trim.parseLong().toInt()
                         )).forEach { bag += it }
 
             y.seekTo("until".toSeries()) ->
-                ((if (tmp[0] == 'u') this.first
+                ((if (tmp1[0] == 'u') this.first
                 else
-                    tmp.slice.trim.parseLong().toInt()
-                        ) until tmp.pos(tmp.limit - 1).slice.trim.parseLong().toInt()).forEach { bag += it }
+                    tmp1.slice.trim.parseLong().toInt()
+                        ) until tmp1.pos(tmp1.limit - 1).slice.trim.parseLong().toInt()).forEach { bag += it }
+
             else -> bag += y.slice.trim.parseLong().toInt()
         }
     }
-    bag.toMutableSet() .removeAll(negated)
+    bag.toMutableSet().removeAll(negated)
     val toSet = this.toSet()
-    return( bag.filter{ it in toSet }).toSeries()
+    return (bag.filter { it in toSet }).toSeries()
 }
 
 

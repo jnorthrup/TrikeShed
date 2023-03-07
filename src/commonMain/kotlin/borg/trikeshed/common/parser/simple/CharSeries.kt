@@ -2,17 +2,13 @@
 
 package borg.trikeshed.common.parser.simple
 
-import borg.trikeshed.common.collections.s_
 import borg.trikeshed.lib.*
 import borg.trikeshed.lib.CZero.nz
 
 /**
  * char based spiritual successor to ByteBuffer for parsing
  */
-class CharSeries(buf: Series<Char>) : Series<Char> {
-
-    override val a: Int = buf.a
-    override val b: (Int) -> Char = buf.b
+class CharSeries(buf: Series<Char>) : Series<Char> by buf { //delegate to the underlying series
 
     /** the mutable position accessor */
     var pos = 0
@@ -54,13 +50,12 @@ class CharSeries(buf: Series<Char>) : Series<Char> {
             pos = if (mark < 0) pos else mark
         }
 
-    /** flip the buffer, limit becomes pos, pos becomes 0 */
-    val fl
-        get() = apply {
-            limit = pos
-            pos = 0
-            mark = -1
-        }
+    /** flip the buffer, limit becomes pos, pos becomes 0 -- made into a function for possible side effects in debugger */
+    fun flip(): CharSeries = apply {
+        limit = pos
+        pos = 0
+        mark = -1
+    }
 
     /**rewind to 0*/
     val rew
@@ -82,7 +77,14 @@ class CharSeries(buf: Series<Char>) : Series<Char> {
     }
 
     /** slice creates/returns a subrange CharSeries from pos until limit */
-    val slice: CharSeries get() = CharSeries(this[pos until limit])
+    val slice: CharSeries get() {
+        val pos1 = this.pos
+        val limit1 = this.limit
+        val    intRange = pos1 until limit1
+        val buf = (this)[intRange]
+        val charSeries = CharSeries(buf)
+        return charSeries
+    }
 
     /** limit, the verb - redefines the last position accessable by get and redefines remaining accordingly*/
     fun lim(i: Int) = apply { limit = i }
@@ -207,11 +209,18 @@ class CharSeries(buf: Series<Char>) : Series<Char> {
         pos = anchor
         return false
     }
+
+    /**backtrack 1*/
+    operator fun dec() = apply { require(pos > 0) { "Underflow" }; pos-- }
+
+    /** advance 1*/
+    operator fun inc() = apply { require(hasRemaining) { "Overflow" };pos++ }
+
 }
 
-operator fun CharSeries.div(delim: Char): Series<CharSeries> { //lazy split
+operator fun Series<Char>.div(delim: Char): Series<Series<Char>> { //lazy split
     val intList = mutableListOf<Int>()
-    while (this.hasRemaining) get.let { c -> if (c == delim) intList.add(pos) }
+    for (x in 0 until size) if (this[x] == delim) intList.add(x)
 
     /**
      * iarr is an index of delimitted endings of the CharSeries.
@@ -222,47 +231,9 @@ operator fun CharSeries.div(delim: Char): Series<CharSeries> { //lazy split
         val p = if (x == 0) 0 else iarr[x.dec()].inc() //start of next
         val l = //is x last index?
             if (x == iarr.lastIndex)
-                this.limit
+                this.size
             else
                 iarr[x].dec()
-        slice.pos(p).lim(l)
+        this[p until l]
     }
-}
-
-/**
- * split on a string
- * @param s the string to split on
- * @return a series of CharSeries; in the case where the token does not exist the result is empty
- */
-operator fun CharSeries.div(s: String): Join<Int, (Int) -> CharSeries> {
-    val res = mutableListOf<Twin<Int>>()
-    var open = pos
-    var close = limit
-    fresh@ do {
-        var c = 0
-        hunt@ do {
-            if (seekTo(s[c])) {
-                close = pos //optimistic guess that we have a match
-                c++ //progress
-                //compare `get` until c is s.length; if c is s.length then we have a match
-                while (hasRemaining && c < s.length && get == s[c]) c++ //progress
-                //evaluate success
-                if (c == s.length) {
-                    res.add(Twin(open, close))
-                    open = pos
-                    continue@fresh
-                } else {
-                    pos = close //reset
-                    continue@hunt
-                }
-            } else {
-                pos = close //reset
-                continue@hunt
-            }
-        } while (hasRemaining)
-        break@fresh
-    } while (hasRemaining)
-
-    // if we have a match then we have a result
-    return res α { x -> slice.pos(x.a).lim(x.b) }
 }
