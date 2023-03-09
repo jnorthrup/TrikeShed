@@ -3,7 +3,7 @@
 package borg.trikeshed.parse
 
 import borg.trikeshed.common.collections.s_
-import borg.trikeshed.common.parser.simple.CharSeries
+import borg.trikeshed.lib.CharSeries
 import borg.trikeshed.lib.*
 
 typealias JsElement = Join<Twin<Int>, Series<Int>> //(openIdx j closeIdx) j commaIdxs

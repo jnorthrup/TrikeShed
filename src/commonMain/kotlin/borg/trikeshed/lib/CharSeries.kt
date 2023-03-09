@@ -1,6 +1,6 @@
 @file:Suppress("SpellCheckingInspection")
 
-package borg.trikeshed.common.parser.simple
+package borg.trikeshed.lib
 
 import borg.trikeshed.lib.*
 import borg.trikeshed.lib.CZero.nz
@@ -77,7 +77,8 @@ class CharSeries(buf: Series<Char>) : Series<Char> by buf { //delegate to the un
     }
 
     /** slice creates/returns a subrange CharSeries from pos until limit */
-    val slice: CharSeries get() {
+    val slice: CharSeries
+        get() {
         val pos1 = this.pos
         val limit1 = this.limit
         val    intRange = pos1 until limit1

@@ -4,7 +4,7 @@ package borg.trikeshed.common
 
 import borg.trikeshed.common.TypeEvidence.Companion.deduce
 import borg.trikeshed.common.TypeEvidence.Companion.update
-import borg.trikeshed.common.parser.simple.CharSeries
+import borg.trikeshed.lib.CharSeries
 import borg.trikeshed.cursor.*
 import borg.trikeshed.isam.RecordMeta
 import borg.trikeshed.isam.meta.IOMemento

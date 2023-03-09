@@ -158,7 +158,6 @@ val <T> T.leftIdentity: () -> T get() = { this }
 /**Left Identity Function */
 val <T> T.`↺` get() = leftIdentity
 
-
 fun <T> `↻`(t: T): T = t
 infix fun <T> T.rightIdentity(t: T): T = `↻`(t)
 

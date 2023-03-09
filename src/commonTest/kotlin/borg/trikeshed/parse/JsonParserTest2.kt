@@ -1,6 +1,5 @@
 package borg.trikeshed.parse
 
-import borg.trikeshed.common.parser.simple.*
 import borg.trikeshed.lib.*
 import borg.trikeshed.common.collections.s_
 import kotlin.test.*
