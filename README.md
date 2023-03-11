@@ -37,7 +37,7 @@ typealias Cursor = Series<RowVec>
     - `myseries[4,3,2,1]` will provide a mapped Series in any order specified, even dupes. similar range indexes are
       available for other types
     - `myseries<T>[(T)->Boolean]` is a shorthand filter expression
-    - "banana".toSeries() / 'n' would split series into s_['ba','a','a']
+    - "banana".toSeries() / 'n' would split series into `s_['ba','a','a']`
     - combine(Series...), and join(Cursor...) will concatenate and widen respectively with underlying binary-search
       index remapping on y,x axis respectively where Cursors are concerned.
     - a handful of nonstandard symbols are used to hint the code for a quick read
