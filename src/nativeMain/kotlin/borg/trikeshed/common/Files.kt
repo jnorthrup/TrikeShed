@@ -1,5 +1,7 @@
 package borg.trikeshed.common
 
+import borg.trikeshed.lib.CharSeries
+import borg.trikeshed.lib.Join
 import kotlinx.cinterop.*
 import platform.posix._PC_PATH_MAX
 import platform.posix.getcwd
@@ -27,5 +29,7 @@ actual object Files {
     }
 
     actual fun exists(filename: String): Boolean = PosixFile.exists(filename)
-
+    actual fun streamLines(fileName: String): Sequence<Join<Long, ByteArray>> {
+        TODO()
+    }
 }

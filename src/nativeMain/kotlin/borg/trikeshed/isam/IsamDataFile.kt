@@ -121,8 +121,8 @@ actual class IsamDataFile actual constructor(
             val clears = meta.`▶`.withIndex().filter { it.value.type.networkSize == null }.map { it.index }.toIntArray()
 
             //write rows
-            for (y in 0 until cursor.a) {
-                val rowData = cursor.row(y).left
+            cursor.iterator().forEach { rowVec->
+                val rowData = rowVec.left
 
                 for (x in 0 until cursor.meta.size) {
                     val colMeta = meta[x]

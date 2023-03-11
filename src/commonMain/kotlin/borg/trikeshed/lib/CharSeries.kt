@@ -8,16 +8,17 @@ import borg.trikeshed.lib.CZero.nz
 /**
  * char based spiritual successor to ByteBuffer for parsing
  */
-class CharSeries(buf: Series<Char>) : Series<Char> by buf { //delegate to the underlying series
+class CharSeries(buf: Series<Char>,
 
-    /** the mutable position accessor */
-    var pos = 0
+                 /** the mutable position accessor */
+    var pos: Int = 0,
 
-    /** the limit accessor */
-    var limit = size //initialized to size
+                 /** the limit accessor */
+    var limit: Int = buf.size, //initialized to size
 
-    /** the mark accessor */
-    var mark = -1
+                 /** the mark accessor */
+    var mark: Int = -1,
+    ) : Series<Char> by buf { //delegate to the underlying series
 
     /** get, the verb - the char at the current position and increment position */
     val get: Char

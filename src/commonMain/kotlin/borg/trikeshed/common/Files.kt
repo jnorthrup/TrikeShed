@@ -1,6 +1,9 @@
 package borg.trikeshed.common
 
-expect object Files{
+import borg.trikeshed.lib.*
+
+/** not unlike nio.Files */
+expect object Files {
     fun readAllLines(filename: String): List<String>
     fun readAllBytes(filename: String): ByteArray
     fun readString(filename: String): String
@@ -9,4 +12,6 @@ expect object Files{
     fun write(filename: String, string: String)
     fun cwd(): String
     fun exists(filename: String): Boolean
+    /** read offsets and lines accompanying*/
+    fun streamLines(/**non-seekable RO file, as in a fifo  */ fileName: String): Sequence<Join<Long, ByteArray>>
 }

@@ -18,7 +18,7 @@ actual class IsamDataFile actual constructor(
     datafileFilename: String,
     metafileFilename: String,
     metafile: IsamMetaFileReader,
-) : Usable,Cursor {
+) : Usable, Cursor {
     actual val datafileFilename: String
     actual val metafile: IsamMetaFileReader
 
@@ -93,6 +93,7 @@ actual class IsamDataFile actual constructor(
             }
         }
     }
+
     actual companion object {
         actual fun write(cursor: Cursor, datafilename: String) {
             val metafilename = "$datafilename.meta"
@@ -124,13 +125,13 @@ actual class IsamDataFile actual constructor(
             val rowBuffer = ByteBuffer.allocateDirect(rowLen)
 
             //write rows
-            for (y in 0 until cursor.a) {
+            cursor.iterator().forEach { rowVec ->
+                val rowData = rowVec.left
                 rowBuffer.position(0)
-                val rowData = (cursor.row(y) as RowVec).left
 
                 for (x in 0 until cursor.meta.size) {
                     val colMeta: RecordMeta = meta[x]
-                    val colData: Any? = rowData[x]
+                    val colData: Any = rowData[x]
 
                     rowBuffer.position(colMeta.begin)
 

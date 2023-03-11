@@ -10,6 +10,7 @@ import borg.trikeshed.cursor.type
 import borg.trikeshed.isam.meta.IOMemento.*
 import kotlin.experimental.and
 import kotlin.jvm.JvmInline
+import kotlin.jvm.JvmName
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.pow
@@ -17,8 +18,6 @@ import kotlin.math.pow
 typealias Series<T> = Join<Int, (Int) -> T>
 
 val <T> Series<T>.size: Int get() = a
-
-
 
 
 /** index operator for Series
@@ -31,9 +30,8 @@ operator fun <T> Series<T>.get(i: Int): T = b(i)
  */
 fun <A, B> Series<A>.fold(z: B, f: (acc: B, A) -> B): B {
     var acc = z
-    for (i in 0 until size) {
+    for (i in 0 until size)
         acc = f(acc, this[i])
-    }
     return acc
 }
 
@@ -91,15 +89,10 @@ which is a view of the underlying data, not a copy
 
 the resulting Series<A> is ordered and contains all the elements of catn
 in the order they were passed in
-
+@see https://en.algorithmica.org/hpc/data-structures/s-tree/#b-tree-layout-1
 @param catn the varargs of Series<A> to combine
  */
 fun <A> combine(vararg catn: Series<A>): Series<A> { // combine
-// here we perform the fastest possible facade from a collection of Series<A> to a single Series<A>
-
-// when catn is a small number under 10 we minimize complexity by using a simple loop
-
-// otherwise we create indexing offsets in an IntArray for catn and use a binary search to find the next element
     require(catn.isNotEmpty()) { "combine requires at least one Series<A>" }
     val frst = catn[0]
     val sz0 = frst.size
@@ -203,10 +196,7 @@ fun <A> combine(vararg catn: Series<A>): Series<A> { // combine
     }
 } // combine
 
-fun IntArray.binarySearch(i: Int): Int { // avoid speculative execution stalls here
-    // minimize the number of variables and reuse them as much as possible
-    // minimize the number of branches
-
+fun IntArray.binarySearch(i: Int): Int {
     var low = 0
     var high = size - 1
 
@@ -262,18 +252,13 @@ class IntHeap(series: Series<Int>) {
     private var heap: IntArray = IntArray(series.size)
     private var size = 0
 
-    init {
-        for (i in series) {
-            add(i)
-        }
-    }
+    init { for (i in series) add(i) }
 
     fun add(i: Int) {
         if (size == heap.size) {
             val newHeap = IntArray(heap.size * 2)
-            for (j in heap.indices) {
+            for (j in heap.indices)
                 newHeap[j] = heap[j]
-            }
             heap = newHeap
         }
         heap[size] = i
@@ -416,11 +401,12 @@ fun Series<Char>.parseLong(): Long {
     //handles +-
     var sign = 1L
     var x = 0
-    if (this[0] == '-') {
-        sign = -1L
-        x++
-    } else if (this[0] == '+') {
-        x++
+    when (this[0]) {
+        '-' -> {
+            sign = -1L; x++
+        }
+
+        '+' -> x++
     }
     var r = 0L
     while (x < size) {
@@ -449,17 +435,20 @@ fun Series<Char>.encodeToByteArray(): ByteArray {
     var spill = 0 //spill cost of unicode encodings
     while (x < size) {
         val c = this[x].code
-        if (c < 0x80) {
-            r[x + spill] = c.toByte()
-        } else if (c < 0x800) {
-            r[x + spill] = (0xC0 or (c shr 6)).toByte()
-            r[x + spill + 1] = (0x80 or (c and 0x3F)).toByte()
-            spill++
-        } else {
-            r[x + spill] = (0xE0 or (c shr 12)).toByte()
-            r[x + spill + 1] = (0x80 or ((c shr 6) and 0x3F)).toByte()
-            r[x + spill + 2] = (0x80 or (c and 0x3F)).toByte()
-            spill += 2
+        when {
+            c < 0x80 -> r[x + spill] = c.toByte()
+            c < 0x800 -> {
+                r[x + spill] = (0xC0 or (c shr 6)).toByte()
+                r[x + spill + 1] = (0x80 or (c and 0x3F)).toByte()
+                spill++
+            }
+
+            else -> {
+                r[x + spill] = (0xE0 or (c shr 12)).toByte()
+                r[x + spill + 1] = (0x80 or ((c shr 6) and 0x3F)).toByte()
+                r[x + spill + 2] = (0x80 or (c and 0x3F)).toByte()
+                spill += 2
+            }
         }
         x++
     }
@@ -471,16 +460,19 @@ fun ByteArray.decodeToCharSeries(): Series<Char> {
     var x = 0
     val r = CharArray(size) //trim after
     while (x < size) {
-        val c = this[x].toInt()
-        if (c < 0x80) {
-            r[x] = c.toChar()
-        } else if (c < 0xE0) {
-            r[x] = (((c and 0x1F) shl 6) or (((this[x + 1] and 0x3F).toInt()))).toChar()
-            x++
-        } else {
-            r[x] = (((c and 0x0F) shl 12) or ((this[x + 1] and 0x3F).toInt()
-                .shl(6)) or ((this[x + 2] and 0x3F).toInt())).toChar()
-            x += 2
+        val c: Int = this[x].toInt()
+        when {
+            c < 0x80 -> r[x] = c.toChar()
+            c < 0xE0 -> {
+                r[x] = (((c and 0x1F) shl 6) or (((this[x + 1] and 0x3F).toInt()))).toChar()
+                x++
+            }
+
+            else -> {
+                r[x] = (((c and 0x0F) shl 12) or ((this[x + 1] and 0x3F).toInt()
+                    .shl(6)) or ((this[x + 2] and 0x3F).toInt())).toChar()
+                x += 2
+            }
         }
         x++
     }
@@ -502,8 +494,8 @@ fun Series<Char>.asString(upto: Int = Int.MAX_VALUE): String = this.take(upto).e
  * @return Double
  */
 fun Series<Char>.parseDouble(): Double {
-    var x:  Int = 0
-    var isNegativeValue:Boolean=false
+    var x: Int = 0
+    var isNegativeValue: Boolean = false
     var r: Double = 0.0
     var decimal: Boolean = false
     var exponentSign: Byte = 1
@@ -521,6 +513,7 @@ fun Series<Char>.parseDouble(): Double {
             isNegativeValue = false
         }
     }
+
     fun isDigit(c: Char): Boolean = c in '0'..'9'
 
     fun parseExponent() {
@@ -528,7 +521,7 @@ fun Series<Char>.parseDouble(): Double {
             exponentSign = -1
             x++
         } else if (this[x] == '+') x++
-        while (x < size ) {
+        while (x < size) {
             val c = this[x]
             if (!isDigit(c)) throw NumberFormatException("Invalid exponent value")
             exponentValue = (exponentValue * 10u + (c - '0').toUShort()).toUShort()
@@ -537,7 +530,7 @@ fun Series<Char>.parseDouble(): Double {
     }
 
     initSign()
-    while (x < size ) {
+    while (x < size) {
         c = this[x]
         if (c == 'E' || c == 'e') {
             x++
@@ -552,7 +545,7 @@ fun Series<Char>.parseDouble(): Double {
             x++
         }
     }
-    val dneg:Double=if(isNegativeValue && (r != 0.0)) -1.0 else 1.0
+    val dneg: Double = if (isNegativeValue && (r != 0.0)) -1.0 else 1.0
     return dneg * r * 10.0.pow((exponentSign * exponentValue.toInt() - digitsAfterDecimal.toInt()).toDouble())
 }
 
@@ -560,4 +553,28 @@ fun Series<Char>.parseDouble(): Double {
  *
  * @return Double?
  */
-fun Series<Char>.parseDoubleOrNull(): Double? = try { parseDouble() } catch (e: Throwable) { null }
+fun Series<Char>.parseDoubleOrNull(): Double? = try {
+    parseDouble()
+} catch (e: Throwable) {
+    null
+}
+
+
+//  --- ported from Columnar ---
+/**
+ * Returns a list of pairs built from the elements of `this` array and the [other] array with the same index.
+ * The returned list has length of the shortest collection.
+ *
+ * @sample samples.collections.Iterables.Operations.zipIterable
+ */
+infix fun <T, R> List<T>.zip(other: Series<R>): List<Join<T, R>> =
+    zip(other.`▶`) { a: T, b: R -> a j b }
+
+@JvmName("vvzip2f")
+fun <T, O, R> Series<T>.zip(o: Series<O>, f: (T, O) -> R) = size j { x: Int -> f(this[x], o[x]) }
+
+@JvmName("vvzip2")
+@Suppress("UNCHECKED_CAST")
+infix fun <T, O, R : Series2<T, O>> Series<T>.zip(o: Series<O>): R =
+    (min(size, o.size) j { x: Int -> (this[x] j o[x]) }) as R
+

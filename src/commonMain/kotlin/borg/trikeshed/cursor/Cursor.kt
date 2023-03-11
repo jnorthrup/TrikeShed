@@ -3,8 +3,10 @@ package borg.trikeshed.cursor
 // import the IoMemento enum
 import borg.trikeshed.lib.CharSeries
 import borg.trikeshed.isam.RecordMeta
+import borg.trikeshed.isam.meta.IOMemento
 import borg.trikeshed.isam.meta.IOMemento.*
 import borg.trikeshed.lib.*
+import kotlin.coroutines.CoroutineContext
 import kotlin.jvm.JvmInline
 import kotlin.jvm.JvmOverloads
 import kotlin.math.max

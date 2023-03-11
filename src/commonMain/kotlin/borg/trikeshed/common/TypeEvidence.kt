@@ -3,7 +3,7 @@ package borg.trikeshed.common
 import borg.trikeshed.isam.meta.IOMemento
 
 data class
-/** This is a dragnet for a given line to record the coutners of character classes */
+/** This is a dragnet for a given line to record the counters of character classes */
 TypeEvidence(
     var digits: UShort = 0U,
     var periods: UShort = 0U,
@@ -44,7 +44,7 @@ TypeEvidence(
         /**
          * based on the process of eliminating illegal and oversized counters we deduce the most specific numerical primitives specializations of IoMemento jvm-primitives
          *
-         * maximum chars in a boolean range would be: 5 and limitted to true or false
+         * maximum chars in a boolean range would be: 5 and limited to true or false
          * presence of alpha would eliminate many types
          * maximum digits in a binary range would be: 1 (0 or 1)
          * maximum digits in a float range would be: 1+1+8+1+23 = 34

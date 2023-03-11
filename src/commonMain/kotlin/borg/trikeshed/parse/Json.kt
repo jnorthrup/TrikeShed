@@ -5,6 +5,7 @@ package borg.trikeshed.parse
 import borg.trikeshed.common.collections.s_
 import borg.trikeshed.lib.CharSeries
 import borg.trikeshed.lib.*
+import borg.trikeshed.parse.JsonParser
 
 typealias JsElement = Join<Twin<Int>, Series<Int>> //(openIdx j closeIdx) j commaIdxs
 typealias JsIndex = Join<Twin<Int>, Series<Char>> //(twin j src)
@@ -27,11 +28,6 @@ val List<*>.toJsPath: JsPath
  *  "[ 0 , " in "[0,1,2,3]" would be "0"
  *
  *  " 3 ]" in "[0,1,2,3]" would be "3"
- *
- *
- *
- *
- *
  */
 val JsContext.segments: Series<JsIndex>
     get() {
@@ -40,6 +36,9 @@ val JsContext.segments: Series<JsIndex>
         val commaIdxs: Series<Int> = combine(s_[openIdx], element.second, s_[closeIdx])
         return commaIdxs.`▶`.zipWithNext().map { (a: Int, b: Int) -> a.inc() j b }.toList() α { it j src }
     }
+
+/** reifiying query */
+operator fun JsContext.get(path: JsPath): Any? = JsonParser.jsPath(this, path,reifyResult = true)
 
 object JsonParser {
     /** includes open and close braces and provides a list of comma indexes*/
@@ -168,7 +167,7 @@ object JsonParser {
     }
 
     /** a recursive depth-first search of the json tree, the path is a series of strings and ints,
-     *  the ints are indexes into arrays, the strings are keys into objects
+     *  the ints are indexes into elements, the strings are keys into objects exclusively
      *  @param context the current context, the element and the src
      *  @param path the path to the desired node
      *  @param depths the depths of the nodes, this is used to skip nodes that are too shallow

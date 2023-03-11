@@ -31,7 +31,7 @@ typealias Cursor = Series<RowVec>
 ## if you are still reading... I've also written ideas that describe (some) goals and ideals of the library:  
 
 * [x] strongly immmutable Join aka Pair,Twin,Series aka Array,Series2, Cursors, are all typealiases of Join
-    * extending the language through index and other operators happens as a sideeffect of testing new expression
+    * extending the language through index and other operators happens as a side-effect of testing new expression
       economies.
 
     - `myseries[4,3,2,1]` will provide a mapped Series in any order specified, even dupes. similar range indexes are
