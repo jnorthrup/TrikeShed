@@ -2,11 +2,8 @@ package borg.trikeshed.cursor
 
 // import the IoMemento enum
 import borg.trikeshed.lib.CharSeries
-import borg.trikeshed.isam.RecordMeta
-import borg.trikeshed.isam.meta.IOMemento
 import borg.trikeshed.isam.meta.IOMemento.*
 import borg.trikeshed.lib.*
-import kotlin.coroutines.CoroutineContext
 import kotlin.jvm.JvmInline
 import kotlin.jvm.JvmOverloads
 import kotlin.math.max
@@ -14,7 +11,7 @@ import kotlin.math.min
 import kotlin.random.Random
 import kotlin.reflect.KClass
 
-typealias RowVec = Series2<Any, () -> RecordMeta>
+typealias RowVec = Series2<Any, () -> ColumnMeta>
 //val RowVec.left get() =  this α Join<*, () -> RecordMeta>::a
 
 
@@ -52,16 +49,16 @@ operator fun Cursor.get(i: IntRange): Cursor {
 }
 
 /** get meta for a cursor from row 0 */
-val Cursor.meta: Series<ColMeta>
-    get() = row(0) α { (_, b): Join<*, () -> RecordMeta> ->
+val Cursor.meta: Series<ColumnMeta>
+    get() = row(0) α { (_, b): Join<*, () -> ColumnMeta> ->
         b()
     }
 
 /** create an Intarray of cursor meta by Strings of column names */
 fun Cursor.meta(vararg s: String): Series<Int> {
-    val meta: Series<ColMeta> = meta
+    val meta: Series<ColumnMeta> = meta
     return s.size j { i ->
-        meta.`▶`.indexOfFirst { colMeta: ColMeta -> colMeta.name == s[i] }
+        meta.`▶`.indexOfFirst { columnMeta: ColumnMeta -> columnMeta.name == s[i] }
     }
 }
 
@@ -100,7 +97,7 @@ fun Cursor.get(s: Series<ColumnExclusion>): Cursor {
 }
 
 //in columnar project this is meta.right
-val Series<out ColMeta>.names: Series<String> get() = this α ColMeta::name
+val Series<out ColumnMeta>.names: Series<String> get() = this α ColumnMeta::name
 
 /** head default 5 rows
  * just like unix head - print default 5 lines from cursor contents to stdout */
@@ -116,7 +113,7 @@ fun Cursor.showRandom(n: Int = 5) {
 
 /** simple printout macro*/
 fun Cursor.show(range: IntRange = 0 until size) {
-    val meta: Series<ColMeta> = meta
+    val meta: Series<ColumnMeta> = meta
     println("rows:$size" to meta.names.toList())
     showValues(range)
 }

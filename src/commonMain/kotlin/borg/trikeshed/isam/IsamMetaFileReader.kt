@@ -1,11 +1,14 @@
 package borg.trikeshed.isam
 
 import borg.trikeshed.common.Files
-import borg.trikeshed.cursor.ColMeta
+import borg.trikeshed.cursor.ColumnMeta
+import borg.trikeshed.cursor.TypeMemento
 import borg.trikeshed.cursor.name
 import borg.trikeshed.cursor.type
 import borg.trikeshed.isam.meta.IOMemento
 import borg.trikeshed.lib.*
+import kotlin.math.min
+
 /**
  * 1. create a class that can read the metadata file and create a collection of record constraints
  *
@@ -35,7 +38,7 @@ IoType :=  IoInstant | IoDouble | IoString | IoInt
  * the binary file format follows this sample
  *
  */
- class IsamMetaFileReader(val metafileFilename: String) {
+class IsamMetaFileReader(val metafileFilename: String) {
 
     val recordlen: Int by lazy {
         constraints.last().end
@@ -78,33 +81,40 @@ IoType :=  IoInstant | IoDouble | IoString | IoInt
      * 1. close the file descriptor
      */
     companion object {
-     fun write(metafilename: String, recordMetas: List<RecordMeta>) {
+        fun write(metafilename: String, recordMetas: Series<ColumnMeta>,varchars:Map<String,Int>): Series<RecordMeta> {
             val lines = mutableListOf<String>()
+
+            val result = sanitize(recordMetas,varchars)
             lines.add("# format:  coords WS .. EOL names WS .. EOL TypeMememento WS .. [EOL]")
             lines.add("# last coord is the recordlen")
-            lines.add(recordMetas.joinToString(" ") { it.begin.toString() + " " + it.end })
-            lines.add(recordMetas.joinToString(" ") { it.name })
-            lines.add(recordMetas.joinToString(" ") { it.type.name })
+            lines.add(result.`▶`.joinToString(" ") { it.begin.toString() + " " + it.end })
+            lines.add(result.`▶`.joinToString(" ") { it.name })
+            lines.add(result.`▶`.joinToString(" ") { it.type.name })
             Files.write(metafilename, lines)
+            return result
         }
 
-        fun arrange(recordMetas: Series<RecordMeta>, varLengths: Map<String, Int>? = null): Series<RecordMeta> {
-            var offset = 0
-            return recordMetas α { colMeta: ColMeta ->
-                val type = colMeta.type
-                val len = varLengths?.get(colMeta.name) ?: type.networkSize ?: varLengths?.get(colMeta.name)
-                ?: throw Exception("no network size for ${colMeta.name}")
-                val recordMeta = RecordMeta(
-                    colMeta.name,
-                    type as IOMemento,
-                    offset,
-                    offset + len,
-                    type.createDecoder(len),
-                    type.createEncoder(len)
-                )
-                offset += len
-                recordMeta
-            }
+        fun sanitize(recordMetas: Series<ColumnMeta>, varchars: Map<String, Int>): Series<RecordMeta> {
+            val result = (if (recordMetas.`▶`.any { !(it is RecordMeta) || (min(it.begin, it.end) < 0&&null==it.child) }) {
+                var offset = 0
+                recordMetas α { columnMeta: ColumnMeta ->
+                    val type: TypeMemento = columnMeta.type
+                    val len =  type.networkSize?: varchars[columnMeta.name]?: throw Exception("no network size for ${columnMeta.name}")
+                    val recordMeta = RecordMeta(
+                        columnMeta.name,
+                        type as IOMemento,
+                        offset,
+                        offset + len,
+                        type.createDecoder(len),
+                        type.createEncoder(len)
+                    )
+                    offset += len
+                    recordMeta
+                }
+            } else recordMetas as Series<RecordMeta>
+                    )
+            return result
         }
+
     }
 }

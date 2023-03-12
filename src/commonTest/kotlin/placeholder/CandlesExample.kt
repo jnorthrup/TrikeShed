@@ -2,7 +2,6 @@ package placeholder
 
 
 import borg.trikeshed.common.CSVUtil
-import borg.trikeshed.common.FileBuffer
 import borg.trikeshed.common.homedir
 import borg.trikeshed.common.use
 import borg.trikeshed.cursor.*
@@ -25,7 +24,7 @@ class CandlesExample {
             val csv: Cursor = CSVUtil.parseConformant(fileBuffer)
 
             //show the IoMemento for the first row
-            csv.meta.map { it: ColMeta -> it.name to it.type as IOMemento }.forEach { (name: String, type: IOMemento) ->
+            csv.meta.map { it: ColumnMeta -> it.name to it.type as IOMemento }.forEach { (name: String, type: IOMemento) ->
                 println("$name: $type")
             }
 

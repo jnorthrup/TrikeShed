@@ -6,7 +6,7 @@ import borg.trikeshed.lib.*
 import kotlin.jvm.JvmOverloads
 
 class SimpleCursor @JvmOverloads constructor(
-    val scalars: Series<ColMeta>,
+    val scalars: Series<ColumnMeta>,
     val data: Series<Series<Any>>,
     val o: Series<RecordMeta> = scalars α {
         (it as? RecordMeta) ?: RecordMeta(it.name, it.first as? IOMemento ?: IOMemento.IoString)

@@ -75,8 +75,20 @@ actual class IsamDataFile actual constructor(
                 return (fileSize / recordlen).toInt()
             }
         }
+    override val b: (Int) -> Join<Int, (Int) -> Join<Any, () -> ColumnMeta>> = { row ->
+        memScoped {
+            val d2 = data.toLong() + (row * recordlen)
 
-    override val b: (Int) -> Join<Int, (Int) -> Join<Any, () -> RecordMeta>>
+            constraints.size j { col ->
+                constraints[col].let { recordMeta ->
+                    val d4 = d2 + recordMeta.begin
+                    val d5: COpaquePointer = d4.toCPointer()!!
+                    val d6: ByteArray = d5.readBytes(recordMeta.end - recordMeta.begin)
+                    recordMeta.decoder(d6)!! j { recordMeta }
+                }
+            }
+        }
+    }
 
     override fun toString(): String =
         "IsamDataFile(metafile=$metafile, recordlen=$recordlen, constraints=$constraints, datafileFilename='$datafileFilename', fileSize=$fileSize)"
@@ -87,62 +99,43 @@ actual class IsamDataFile actual constructor(
         }
     }
 
-    init {
-        this.b = { row ->
-            memScoped {
-                val d2 = data.toLong() + (row * recordlen)
-
-                constraints.size j { col ->
-                    constraints[col].let { recordMeta ->
-                        val d4 = d2 + recordMeta.begin
-                        val d5: COpaquePointer = d4.toCPointer()!!
-                        val d6: ByteArray = d5.readBytes(recordMeta.end - recordMeta.begin)
-                        recordMeta.decoder(d6)!! j { recordMeta }
-                    }
-                }
-            }
-        }
-    }
-
     actual companion object {
-        actual fun write(cursor: Cursor, datafilename: String): Unit = memScoped {
+
+        actual fun write(cursor: Cursor, datafilename: String, varChars: Map<String, Int>) {
             val metafilename = "$datafilename.meta"
 
-            IsamMetaFileReader.write(metafilename, cursor.meta.map { colMeta: ColMeta -> colMeta as RecordMeta })
+            val meta0 = IsamMetaFileReader.write(metafilename, cursor.meta, varChars)
 
             //open RandomAccessDataFile
 
             val data = fopen(datafilename, "w")
 
             //create row buffer
-            val meta = cursor.meta α { it as RecordMeta }
-            val rowLen = meta.last().end
-            val rowBuffer = ByteArray(rowLen)
-            val clears = meta.`▶`.withIndex().filter { it.value.type.networkSize == null }.map { it.index }.toIntArray()
+            meta0.debug {
+                logDebug { "toIsam: " + it.toList() }
+            }
+
+            val last = meta0.last()
+            val meta = (meta0 α {
+                val encoder = it.type.createEncoder(it.end - it.begin)
+                RecordMeta(it.name, it.type, it.begin, it.end, encoder = encoder)
+            }).toArray()
+            val rowLen = last.end
+
+            val clears = meta.withIndex().filter {
+                it.value.type.networkSize == null
+            }.map { it.index }.toIntArray()
+
+            val rowBuffer1  = ByteArray(rowLen)
+            val rowBuffer = rowBuffer1
 
             //write rows
-            cursor.iterator().forEach { rowVec->
-                val rowData = rowVec.left
+            cursor.iterator().forEach { rowVec ->
+                WireProto.writeToWire(rowVec, rowBuffer, meta )
 
-                for (x in 0 until cursor.meta.size) {
-                    val colMeta = meta[x]
-                    val colData = rowData[x]
-                    val colBytes = colMeta.encoder(colData)
-                    colBytes.copyInto(rowBuffer, colMeta.begin, 0, colBytes.size)
-                    if (x in clears && colBytes.size < colMeta.end - colMeta.begin)
-                        rowBuffer[colMeta.begin + colBytes.size] = 0
-                }
-                val fwrite = fwrite(rowBuffer.refTo(0), 1, rowLen.toULong(), data)
-            }
-            val fclose = fclose(data)
-        }.let {}
+                   val fwrite = fwrite(rowBuffer.refTo(0), 1, rowLen.toULong(), data)
+         }
+            fclose(data)
+        }
     }
 }
-
-//fun IsamDataFile.use(block: (IsamDataFile) -> Unit) {
-//    try {
-//        block(this)
-//    } finally {
-//        close()
-//    }
-//}

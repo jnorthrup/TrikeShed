@@ -14,6 +14,6 @@ expect class IsamDataFile(
     override fun open()
     override fun close()
     companion object {
-        fun write(cursor: Cursor, datafilename: String)
+        fun write(cursor: Cursor, datafilename: String,varChars:Map<String,Int> = emptyMap())
     }
 }

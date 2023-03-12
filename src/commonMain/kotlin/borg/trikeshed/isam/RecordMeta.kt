@@ -1,6 +1,6 @@
 package borg.trikeshed.isam
 
-import borg.trikeshed.cursor.ColMeta
+import borg.trikeshed.cursor.ColumnMeta
 import borg.trikeshed.cursor.TypeMemento
 import borg.trikeshed.isam.meta.IOMemento
 import borg.trikeshed.lib.j
@@ -33,4 +33,4 @@ class RecordMeta(
     val encoder: (Any?) -> ByteArray = type.createEncoder(end - begin),
     /** open to interpretation, for instance, CSV conversion to ISAM might define two RecordMetas for two steps*/
     var child: RecordMeta? = null,
-    ) : ColMeta by (name j (type as TypeMemento))
+    ) : ColumnMeta by (name j (type as TypeMemento))

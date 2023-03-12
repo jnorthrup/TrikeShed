@@ -65,7 +65,8 @@ actual class IsamDataFile actual constructor(
     }
 
     override val a: Int
-    override val b: (Int) -> Join<Int, (Int) -> Join<Any, () -> RecordMeta>>
+    override val b: (Int) -> RowVec
+
 
     actual override fun close() = data.close()
 
@@ -95,10 +96,10 @@ actual class IsamDataFile actual constructor(
     }
 
     actual companion object {
-        actual fun write(cursor: Cursor, datafilename: String) {
+        actual fun write(cursor: Cursor, datafilename: String, varChars: Map<String, Int>) {
             val metafilename = "$datafilename.meta"
 
-            IsamMetaFileReader.write(metafilename, cursor.meta.map { colMeta: ColMeta -> colMeta as RecordMeta })
+            IsamMetaFileReader.write(metafilename, cursor.meta, varChars)
 
             //open RandomAccessDataFile
 
@@ -122,31 +123,14 @@ actual class IsamDataFile actual constructor(
                 it.value.type.networkSize == null
             }.map { it.index }.toIntArray()
 
-            val rowBuffer = ByteBuffer.allocateDirect(rowLen)
+            val rowBuffer1 = ByteBuffer.allocate(rowLen)
+            val rowBuffer = rowBuffer1.array()
 
             //write rows
             cursor.iterator().forEach { rowVec ->
-                val rowData = rowVec.left
-                rowBuffer.position(0)
-
-                for (x in 0 until cursor.meta.size) {
-                    val colMeta: RecordMeta = meta[x]
-                    val colData: Any = rowData[x]
-
-                    rowBuffer.position(colMeta.begin)
-
-                    // val debugMe = colMeta::encoder
-                    val colBytes = colMeta.encoder(colData)
-                    rowBuffer.put(colMeta.begin, colBytes)
-
-                    // write a trailing null byte on varchar
-                    if (x in clears && colBytes.size < (colMeta.end - colMeta.begin)) rowBuffer.put(
-                        colMeta.begin + colBytes.size,
-                        0
-                    )
-                }
-                rowBuffer.position(0)
-                data.write(rowBuffer)
+                WireProto.writeToWire(rowVec, rowBuffer, meta)
+                rowBuffer1.position(0)
+                data.write(rowBuffer1)
             }
             randomAccessFile.close()
             data.close()
