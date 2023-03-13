@@ -11,9 +11,8 @@ import kotlin.math.min
 import kotlin.random.Random
 import kotlin.reflect.KClass
 
-typealias RowVec = Series2<Any, () -> ColumnMeta>
+typealias RowVec = Series2<Any?, () -> ColumnMeta>
 //val RowVec.left get() =  this α Join<*, () -> RecordMeta>::a
-
 
 /** Cursors are a columnar abstraction composed of Series of Joined value+meta pairs (RecordMeta) */
 typealias Cursor = Series<RowVec>

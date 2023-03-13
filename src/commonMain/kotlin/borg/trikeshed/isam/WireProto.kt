@@ -16,7 +16,7 @@ object WireProto{
 
         for (x in 0 until  meta.size) {
             val colMeta: RecordMeta = meta[x]
-            val colData: Any = rowData[x]
+            val colData  = rowData[x]
 
             val pos=(colMeta.begin)
 
