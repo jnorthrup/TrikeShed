@@ -4,11 +4,11 @@
 package borg.trikeshed.lib
 
 import borg.trikeshed.common.collections.s_
+import borg.trikeshed.common.decodeUtf8
 import borg.trikeshed.cursor.Cursor
 import borg.trikeshed.cursor.meta
 import borg.trikeshed.cursor.type
 import borg.trikeshed.isam.meta.IOMemento.*
-import kotlin.experimental.and
 import kotlin.jvm.JvmInline
 import kotlin.jvm.JvmName
 import kotlin.math.max
@@ -456,28 +456,7 @@ fun Series<Char>.encodeToByteArray(): ByteArray {
 }
 
 //opposite method to build a charSeries from byte[]
-fun ByteArray.decodeToCharSeries(): Series<Char> {
-    var x = 0
-    val r = CharArray(size) //trim after
-    while (x < size) {
-        val c: Int = this[x].toInt()
-        when {
-            c < 0x80 -> r[x] = c.toChar()
-            c < 0xE0 -> {
-                r[x] = (((c and 0x1F) shl 6) or (((this[x + 1] and 0x3F).toInt()))).toChar()
-                x++
-            }
-
-            else -> {
-                r[x] = (((c and 0x0F) shl 12) or ((this[x + 1] and 0x3F).toInt()
-                    .shl(6)) or ((this[x + 2] and 0x3F).toInt())).toChar()
-                x += 2
-            }
-        }
-        x++
-    }
-    return r.sliceArray(0..(x - 1)).toSeries()
-}
+fun ByteArray.decodeToChars(): Series<Char> = toSeries().decodeUtf8(CharArray(size))
 
 
 fun Series<Char>.parseIsoDate(): kotlinx.datetime.LocalDate {

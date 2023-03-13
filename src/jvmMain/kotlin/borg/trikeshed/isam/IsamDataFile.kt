@@ -11,7 +11,8 @@ import java.io.RandomAccessFile
 import java.nio.ByteBuffer
 import java.nio.channels.SeekableByteChannel
 import java.nio.file.Files
-import java.nio.file.StandardOpenOption
+import java.nio.file.Paths
+import java.nio.file.StandardOpenOption.*
 import java.util.concurrent.locks.ReentrantLock
 
 actual class IsamDataFile actual constructor(
@@ -36,8 +37,8 @@ actual class IsamDataFile actual constructor(
         metafile.open()
         data = Files.newByteChannel(
             java.nio.file.Paths.get(datafileFilename),
-            StandardOpenOption.READ,
-            StandardOpenOption.SPARSE
+            READ,
+            SPARSE
         )
         fileSize = data.size()
 
@@ -99,7 +100,7 @@ actual class IsamDataFile actual constructor(
         actual fun write(cursor: Cursor, datafilename: String, varChars: Map<String, Int>) {
             val metafilename = "$datafilename.meta"
 
-            IsamMetaFileReader.write(metafilename, cursor.meta, varChars)
+           val meta0 = IsamMetaFileReader.write(metafilename, cursor.meta, varChars)
 
             //open RandomAccessDataFile
 
@@ -107,32 +108,57 @@ actual class IsamDataFile actual constructor(
             val data = randomAccessFile.channel
 
             //create row buffer
-            val meta0 = cursor.meta α { it as RecordMeta }
-            meta0.debug {
+             meta0.debug {
                 logDebug { "toIsam: " + it.toList() }
             }
 
             val last = meta0.last()
-            val meta = (meta0 α {
-                val encoder = it.type.createEncoder(it.end - it.begin)
-                RecordMeta(it.name, it.type, it.begin, it.end, encoder = encoder)
-            }).toArray()
+
             val rowLen = last.end
-
-            val clears = meta.withIndex().filter {
-                it.value.type.networkSize == null
-            }.map { it.index }.toIntArray()
-
             val rowBuffer1 = ByteBuffer.allocate(rowLen)
             val rowBuffer = rowBuffer1.array()
 
             //write rows
             cursor.iterator().forEach { rowVec ->
-                WireProto.writeToWire(rowVec, rowBuffer, meta)
+                WireProto.writeToBuffer(rowVec, rowBuffer, meta0)
                 rowBuffer1.position(0)
                 data.write(rowBuffer1)
             }
             randomAccessFile.close()
+            data.close()
+        }
+
+        actual fun append(
+            cseq: Iterator<RowVec>,
+            meta: Series<ColumnMeta>,
+            datafilename: String,
+            varChars: Map<String, Int>
+        ) {
+            val metafilename = "$datafilename.meta"
+
+            //            TODO("not assume we have to write this file for this call.  if it exists, verify it and use it")
+            val meta0= IsamMetaFileReader.write(metafilename, meta, varChars)
+
+            //open RandomAccessDataFile
+            val data = Files.newOutputStream(Paths.get(datafilename),APPEND, WRITE,CREATE)
+
+            meta0.debug {
+                logDebug { "toIsam: " + it.toList() }
+            }
+
+            val last = meta0.last()
+
+            val rowLen = last.end
+
+
+            val rowBuffer = ByteArray(rowLen){0}
+
+
+            //write rows
+            cseq .forEach { rowVec ->
+                WireProto.writeToBuffer(rowVec, rowBuffer, meta0)
+                data.write (rowBuffer)
+            }
             data.close()
         }
     }

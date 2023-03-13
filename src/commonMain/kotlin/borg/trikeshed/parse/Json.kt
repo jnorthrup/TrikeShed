@@ -40,11 +40,17 @@ val JsContext.segments: Series<JsIndex>
 /** reifiying query */
 operator fun JsContext.get(path: JsPath): Any? = JsonParser.jsPath(this, path,reifyResult = true)
 
+
+/** a json scanner that indexes and optionally reifies the json chars
+ * and provides a way to query it.
+ */
 object JsonParser {
     /** includes open and close braces and provides a list of comma indexes*/
     fun index(
         src: Series<Char>,
-        /** depths is passed in for the purpose of queries being able to skip a slot if it is too shallow */
+        /** depths is passed in for the purpose of queries being able to skip a slot if it is too shallow;
+         * format is _a[1,1,2,] where any valid segment is at least 1.
+         * */
         depths: MutableList<Int>? = mutableListOf(),
         /*  * an optional int that gives you n commas max, presuming undefined null bias in the last comma */
         takeFirst: Int? = null,
@@ -59,13 +65,11 @@ object JsonParser {
         for (i in 0 until src.size) {
             val c: Char = src[i]
             when {
-                takeFirst?.takeIf { commaIdxs.size >= it } != null -> break
-                insideQuote -> {
-                    when {
-                        escapeNextChar -> escapeNextChar = false
-                        c == '\\' -> escapeNextChar = true
-                        c == '"' -> insideQuote = false
-                    }
+
+                insideQuote -> when {
+                    escapeNextChar -> escapeNextChar = false
+                    c == '\\' -> escapeNextChar = true
+                    c == '"' -> insideQuote = false
                 }
 
                 else -> when (c) {
@@ -91,8 +95,7 @@ object JsonParser {
                         //record and reset maxDepth
                         depths?.add(maxDepth)
                         maxDepth = 0
-
-
+                        if(takeFirst!=null&& commaIdxs.size >= takeFirst ) break
                     }
 
                     '"' -> insideQuote = true
@@ -184,7 +187,7 @@ object JsonParser {
         reifyResult: Boolean = true,
         /**path and depth have a relationship, path needs depth to succeed, so this can aid in skipping shallow
         nodes */
-        depths: MutableList<Int>? = null,
+        depths: List<Int>? = null,
 //        payload: Array<Any?> = arrayOf(Unit),
     ): Any? {
         val (element: JsElement, src) = context

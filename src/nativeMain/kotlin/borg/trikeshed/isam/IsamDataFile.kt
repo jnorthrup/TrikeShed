@@ -6,12 +6,14 @@ import borg.trikeshed.isam.meta.IOMemento
 import borg.trikeshed.lib.*
 import kotlinx.cinterop.*
 import platform.posix.*
+import simple.PosixFile
+import simple.PosixOpenOpts
 
 actual class IsamDataFile actual constructor(
     datafileFilename: String,
     metafileFilename: String,
     metafile: IsamMetaFileReader,
-) : Usable,Cursor {
+) : Usable, Cursor {
     actual val datafileFilename: String = datafileFilename
     actual val metafile: IsamMetaFileReader = metafile
 
@@ -108,7 +110,10 @@ actual class IsamDataFile actual constructor(
 
             //open RandomAccessDataFile
 
-            val data = fopen(datafilename, "w")
+            val data = PosixFile(
+                datafilename,
+                PosixOpenOpts.withFlags(PosixOpenOpts.O_Creat, PosixOpenOpts.O_Trunc, PosixOpenOpts.O_Rdwr)
+            )
 
             //create row buffer
             meta0.debug {
@@ -126,16 +131,53 @@ actual class IsamDataFile actual constructor(
                 it.value.type.networkSize == null
             }.map { it.index }.toIntArray()
 
-            val rowBuffer1  = ByteArray(rowLen)
+            val rowBuffer1 = ByteArray(rowLen)
             val rowBuffer = rowBuffer1
 
             //write rows
             cursor.iterator().forEach { rowVec ->
-                WireProto.writeToWire(rowVec, rowBuffer, meta )
+                WireProto.writeToBuffer(rowVec, rowBuffer, meta0)
 
-                   val fwrite = fwrite(rowBuffer.refTo(0), 1, rowLen.toULong(), data)
-         }
-            fclose(data)
+                data.write(rowBuffer)
+            }
+            data.close()
+        }
+
+        actual fun append(
+            cseq: Iterator<RowVec>,
+            meta: Series<ColumnMeta>,
+            datafilename: String,
+            varChars: Map<String, Int>,
+        ) {
+            val metafilename = "$datafilename.meta"
+
+            //            TODO("not assume we have to write this file for this call.  if it exists, verify it and use it")
+            val meta0 = IsamMetaFileReader.write(metafilename, meta, varChars)
+
+            //open RandomAccessDataFile
+            val data = PosixFile(
+                datafilename,
+                PosixOpenOpts.withFlags(PosixOpenOpts.O_Creat, PosixOpenOpts.O_Append, PosixOpenOpts.O_WrOnly)
+            )
+
+            meta0.debug {
+                logDebug { "toIsam: " + it.toList() }
+            }
+
+            val last = meta0.last()
+
+            val rowLen = last.end
+
+
+            val rowBuffer = ByteArray(rowLen) { 0 }
+
+
+            //write rows
+            cseq .forEach { rowVec ->
+                WireProto.writeToBuffer(rowVec, rowBuffer, meta0)
+                data.write(rowBuffer)
+            }
+            data.close()
         }
     }
 }

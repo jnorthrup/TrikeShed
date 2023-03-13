@@ -110,7 +110,7 @@ enum class IOMemento(override val networkSize: Int? = null, val fromChars: (Seri
     abstract fun createDecoder(size: Int): (ByteArray) -> Any?
 
     companion object {
-        val readCharSeries: (ByteArray) -> Series<Char> = { value: ByteArray -> value.decodeToCharSeries() }
+        val readCharSeries: (ByteArray) -> Series<Char> = { value: ByteArray -> value.decodeToChars() }
         val writeCharSeries: (Any?) -> ByteArray = { value: Any? -> (value as Series<Char>).encodeToByteArray() }
         val readByteArray: (ByteArray) -> ByteArray = { value: ByteArray -> value }
         val writeByteArray: (Any?) -> ByteArray = { value: Any? -> value as ByteArray }

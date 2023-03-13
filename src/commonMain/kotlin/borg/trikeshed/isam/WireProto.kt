@@ -1,15 +1,16 @@
 package borg.trikeshed.isam
 
 import borg.trikeshed.cursor.RowVec
-import borg.trikeshed.lib.Join
+import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.left
+import borg.trikeshed.lib.size
 
 object WireProto{
-    fun writeToWire(
+    fun writeToBuffer(
         rowVec:RowVec,
         rowBuf: ByteArray,
-        meta: Array<RecordMeta>,
+        meta: Series<RecordMeta>,
     ): ByteArray {
         val rowData = rowVec.left
 
