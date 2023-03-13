@@ -129,7 +129,7 @@ actual class IsamDataFile actual constructor(
         }
 
         actual fun append(
-            cseq: Iterator<RowVec>,
+            cseq: Iterable<RowVec>,
             meta: Series<ColumnMeta>,
             datafilename: String,
             varChars: Map<String, Int>
@@ -152,12 +152,14 @@ actual class IsamDataFile actual constructor(
 
 
             val rowBuffer = ByteArray(rowLen){0}
-
+            var fibLog: FibonacciReporter?=null
+            debug { fibLog = FibonacciReporter(size = null, noun = "appends") }
 
             //write rows
             cseq .forEach { rowVec ->
                 WireProto.writeToBuffer(rowVec, rowBuffer, meta0)
                 data.write (rowBuffer)
+                debug { fibLog?.report() ?.let { println(it) } }
             }
             data.close()
         }

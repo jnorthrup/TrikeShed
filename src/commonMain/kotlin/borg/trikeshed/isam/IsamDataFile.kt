@@ -18,6 +18,6 @@ expect class IsamDataFile(
     override fun close()
     companion object {
         fun write(cursor: Cursor, datafilename: String,varChars:Map<String,Int> = emptyMap())
-        fun append(cseq: Iterator<RowVec>, meta:Series<ColumnMeta>, datafilename: String, varChars:Map<String,Int> = emptyMap())
+        fun append(cseq: Iterable<RowVec>, meta:Series<ColumnMeta>, datafilename: String, varChars:Map<String,Int> = emptyMap())
     }
 }

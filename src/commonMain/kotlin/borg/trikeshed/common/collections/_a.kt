@@ -1,3 +1,5 @@
+@file:Suppress("OPT_IN_USAGE", "UNCHECKED_CAST")
+
 package borg.trikeshed.common.collections
 
 object _a {

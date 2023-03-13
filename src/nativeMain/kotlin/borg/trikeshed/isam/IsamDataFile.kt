@@ -144,7 +144,7 @@ actual class IsamDataFile actual constructor(
         }
 
         actual fun append(
-            cseq: Iterator<RowVec>,
+            cseq: Iterable<RowVec>,
             meta: Series<ColumnMeta>,
             datafilename: String,
             varChars: Map<String, Int>,
