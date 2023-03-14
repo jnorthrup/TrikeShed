@@ -13,5 +13,5 @@ expect object Files {
     fun cwd(): String
     fun exists(filename: String): Boolean
     /** read offsets and lines accompanying*/
-    fun streamLines(/**non-seekable RO file, as in a fifo  */ fileName: String): Sequence<Join<Long, ByteArray>>
+    fun streamLines(/**non-seekable RO file, as in a fifo  */ fileName: String,bufsize:Int=64): Sequence<Join<Long, ByteArray>>
 }

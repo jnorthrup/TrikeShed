@@ -4,7 +4,6 @@
 package borg.trikeshed.lib
 
 import borg.trikeshed.common.collections.s_
-import borg.trikeshed.common.decodeUtf8
 import borg.trikeshed.cursor.Cursor
 import borg.trikeshed.cursor.meta
 import borg.trikeshed.cursor.type

@@ -27,12 +27,12 @@ actual object Files {
     actual fun cwd(): String = JavaNioFilePaths.get("").toAbsolutePath().toString()
 
     actual fun exists(filename: String): Boolean = JavaNioFileFiles.exists(JavaNioFilePaths.get(filename))
-    actual fun streamLines(fileName: String): Sequence<Join<Long, ByteArray>> {
+    actual fun streamLines(fileName: String, bufsize:Int): Sequence<Join<Long, ByteArray>> {
         var outerPos = 0L
         var curLineStart = 0L
         val carry = mutableListOf<ByteArray>()
         val recycler=ArrayDeque<ByteArray>()
-        val buf = ByteArray(64)
+        val buf = ByteArray(bufsize)
         return sequence {
             FileInputStream(fileName).use { channel ->
 
@@ -43,10 +43,10 @@ actual object Files {
                     for (i in 0 until read) {
                         if (buf[i] == '\n'.code.toByte()) {
                             //if len==64 then use buf from recycler
-                            if (i - lineStart == 63) {
+                            if (i - lineStart == bufsize .dec()) {
                                 if (recycler.isNotEmpty()) {
                                     val recycled = recycler.removeFirst()
-                                    System.arraycopy(buf, lineStart, recycled, 0, 64)
+                                    System.arraycopy(buf, lineStart, recycled, 0, bufsize)
                                     carry.add(recycled)
                                 } else {
                                     carry.add(buf.copyOfRange(lineStart, i + 1))
@@ -61,7 +61,7 @@ actual object Files {
                             if (carry.sumOf { it.size } > 0)
                                 yield((curLineStart j carry.reduce { acc, bytes -> acc + bytes }))
                             //reclaim 64 byte buffers from carry into recycler
-                            carry.forEach({ if (it.size == 64) recycler.addLast(it) })
+                            carry.forEach({ if (it.size == bufsize) recycler.addLast(it) })
                             carry.clear()
                             lineStart = i + 1
                             curLineStart = outerPos + lineStart

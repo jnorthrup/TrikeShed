@@ -161,7 +161,11 @@ class PlatformCodecTest {
                         assertEquals(v, v2)
                     }
                 }
-                IoNothing -> {}
+                else -> {}
+//                IoUByte -> TODO()
+//                IoUShort -> TODO()
+//                IoUInt -> TODO()
+//                IoULong -> TODO()
             }
         }
         println("testCurrentCodec: OK")

@@ -29,7 +29,14 @@ actual object Files {
     }
 
     actual fun exists(filename: String): Boolean = PosixFile.exists(filename)
-    actual fun streamLines(fileName: String): Sequence<Join<Long, ByteArray>> {
-        TODO()
+
+    /** read offsets and lines accompanying*/
+    actual fun streamLines(
+        fileName: String,
+        bufsize: Int,
+    ): Sequence<Join<Long, ByteArray>> {
+        TODO("Not yet implemented")
     }
+
+
 }
