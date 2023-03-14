@@ -54,6 +54,11 @@ enum class IOMemento(override val networkSize: Int? = null, val fromChars: (Seri
         override fun createEncoder(i: Int): (Any?) -> ByteArray = writeLong as (Any?) -> ByteArray
         override fun createDecoder(size: Int): (ByteArray) -> Any? = readLong
     },
+    IoUShort(2, { it.parseLong().toUShort() }) {
+        override fun createEncoder(i: Int): (Any?) -> ByteArray = currentPlatformCodec.writeUShort as (Any?) -> ByteArray
+        override fun createDecoder(size: Int): (ByteArray) -> Any? = currentPlatformCodec.readUShort
+    },
+
     IoUInt(4, { it.parseLong().toUInt() }) {
         override fun createEncoder(i: Int): (Any?) -> ByteArray =writeUInt as (Any?) -> ByteArray
         override fun createDecoder(size: Int): (ByteArray) -> Any? =readUInt
