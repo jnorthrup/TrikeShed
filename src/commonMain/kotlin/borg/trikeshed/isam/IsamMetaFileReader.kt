@@ -97,7 +97,7 @@ class IsamMetaFileReader(val metafileFilename: String) {
         fun sanitize(recordMetas: Series<ColumnMeta>, varchars: Map<String, Int>): Series<RecordMeta> {
             val result = (if (recordMetas.`▶`.any { !(it is RecordMeta) || (min(it.begin, it.end) < 0&&null==it.child) }) {
                 var offset = 0
-                recordMetas α { columnMeta: ColumnMeta ->
+                recordMetas .map { columnMeta: ColumnMeta ->
                     val type: TypeMemento = columnMeta.type
                     val len =  type.networkSize?: varchars[columnMeta.name]?: throw Exception("no network size for ${columnMeta.name}")
                     val recordMeta = RecordMeta(
@@ -110,7 +110,7 @@ class IsamMetaFileReader(val metafileFilename: String) {
                     )
                     offset += len
                     recordMeta
-                }
+                }.toSeries()
             } else recordMetas as Series<RecordMeta>
                     )
             return result

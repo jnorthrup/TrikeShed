@@ -34,26 +34,29 @@ actual object Files {
         val buf = ByteArray(64)
         return sequence {
             FileInputStream(fileName).use { channel ->
+
                 while (true) {
                     val read = channel.read(buf)
                     if (read == -1) break
                     var lineStart = 0
                     for (i in 0 until read) {
                         if (buf[i] == '\n'.code.toByte()) {
-                            carry.add(buf.sliceArray(lineStart..i))
-                          if(carry.sumOf { it.size } > 0 )  yield((curLineStart j carry.reduce { acc, bytes -> acc + bytes }))
+                            carry.add(buf.copyOfRange(lineStart, i+1))
+                            if (carry.sumOf { it.size } > 0)
+                                yield((curLineStart j carry.reduce { acc, bytes -> acc + bytes }))
                             carry.clear()
                             lineStart = i + 1
                             curLineStart = outerPos + lineStart
                         }
                     }
                     if (lineStart < read)
-                        carry.add(buf.sliceArray(lineStart until read))
+                        carry.add(buf.copyOfRange(lineStart, read))
                     outerPos += read
+
                 }
                 if (carry.isNotEmpty()) {
-                    if(carry.sumOf { it.size } > 0 )
-                    yield(curLineStart j carry.reduce { acc, bytes -> acc + bytes })
+                    if (carry.sumOf { it.size } > 0)
+                        yield(curLineStart j carry.reduce { acc, bytes -> acc + bytes })
                 }
             }
         }

@@ -17,6 +17,12 @@ interface PlatformCodec {
     val writeFloat: (Float) -> ByteArray get() = { writeInt(it.toBits()) }
     val readDouble: (ByteArray) -> Double get() = { Double.fromBits(readLong(it)) }
     val readFloat: (ByteArray) -> Float get() = { Float.fromBits(readInt(it)) }
+    val readUShort: (ByteArray) -> UShort
+    val readUInt: (ByteArray) -> UInt
+    val readULong: (ByteArray) -> ULong
+    val writeUShort: (UShort) -> ByteArray
+    val writeUInt: (UInt) -> ByteArray
+    val writeULong: (ULong) -> ByteArray
 
     companion object {
         @JvmStatic
@@ -31,6 +37,13 @@ interface PlatformCodec {
         val isLittleEndian get() = !isNetworkEndian
 
         object currentPlatformCodec : PlatformCodec {
+            override val readShort: (ByteArray) -> Short by lazy {
+                if (isLittleEndian) {
+                    { ((it[1].toInt() and 0xFF) shl 8).toShort() or (it[0].toInt() and 0xFF).toShort() }
+                } else {
+                    { (it[0].toInt() and 0xFF shl 8 or (it[1].toInt() and 0xFF)).toShort() }
+                }
+            }
             override val readInt: (ByteArray) -> Int by lazy {
                 if (isLittleEndian) {
                     {
@@ -50,7 +63,6 @@ interface PlatformCodec {
                 }
 
             }
-
             override val readLong: (ByteArray) -> Long by lazy {
 
                 if (isLittleEndian) {
@@ -78,15 +90,45 @@ interface PlatformCodec {
                     }
                 }
             }
+            override val writeShort: (Short) -> ByteArray by lazy {
 
-            override val readShort: (ByteArray) -> Short by lazy {
                 if (isLittleEndian) {
-                    { ((it[1].toInt() and 0xFF) shl 8).toShort() or (it[0].toInt() and 0xFF).toShort() }
+                    {
+                        byteArrayOf(
+                            (it.toUByte()).toByte(),
+                            ((it.toUInt() shr 8).toUByte()).toByte()
+                        )
+                    }
                 } else {
-                    { (it[0].toInt() and 0xFF shl 8 or (it[1].toInt() and 0xFF)).toShort() }
+                    {
+                        byteArrayOf(
+                            ((it.toUInt() shr 8).toUByte()).toByte(),
+                            (it.toUByte()).toByte()
+                        )
+                    }
                 }
             }
-
+            override val writeInt: (Int) -> ByteArray by lazy {
+                if (isLittleEndian) {
+                    {
+                        byteArrayOf(
+                            (it.toUByte()).toByte(),
+                            ((it shr 8).toUByte()).toByte(),
+                            ((it shr 16).toUByte()).toByte(),
+                            ((it shr 24).toUByte()).toByte()
+                        )
+                    }
+                } else {
+                    {
+                        byteArrayOf(
+                            ((it shr 24).toUByte()).toByte(),
+                            ((it shr 16).toUByte()).toByte(),
+                            ((it shr 8).toUByte()).toByte(),
+                            (it.toUByte()).toByte()
+                        )
+                    }
+                }
+            }
             override val writeLong: (Long) -> ByteArray by lazy {
                 if (isLittleEndian) {
                     {
@@ -116,46 +158,15 @@ interface PlatformCodec {
                     }
                 }
             }
+            //6 kotlin unsigned adapters below for the above 6
+            override val readUShort: (ByteArray) -> UShort ={it->readShort(it).toUShort()}
+            override val readUInt: (ByteArray) -> UInt ={it->readInt(it).toUInt()}
+            override val readULong: (ByteArray) -> ULong ={it->readLong(it).toULong()}
+            override val writeUShort: (UShort) -> ByteArray ={it->writeShort(it.toShort())}
+            override val writeUInt: (UInt) -> ByteArray ={it->writeInt(it.toInt())}
+            override val writeULong: (ULong) -> ByteArray ={it->writeLong(it.toLong())}
 
-            override val writeInt: (Int) -> ByteArray by lazy {
-                if (isLittleEndian) {
-                    {
-                        byteArrayOf(
-                            (it.toUByte()).toByte(),
-                            ((it shr 8).toUByte()).toByte(),
-                            ((it shr 16).toUByte()).toByte(),
-                            ((it shr 24).toUByte()).toByte()
-                        )
-                    }
-                } else {
-                    {
-                        byteArrayOf(
-                            ((it shr 24).toUByte()).toByte(),
-                            ((it shr 16).toUByte()).toByte(),
-                            ((it shr 8).toUByte()).toByte(),
-                            (it.toUByte()).toByte()
-                        )
-                    }
-                }
-            }
-            override val writeShort: (Short) -> ByteArray by lazy {
-
-                if (isLittleEndian) {
-                    {
-                        byteArrayOf(
-                            (it.toUByte()).toByte(),
-                            ((it.toUInt() shr 8).toUByte()).toByte()
-                        )
-                    }
-                } else {
-                    {
-                        byteArrayOf(
-                            ((it.toUInt() shr 8).toUByte()).toByte(),
-                            (it.toUByte()).toByte()
-                        )
-                    }
-                }
-            }
         }
     }
+
 }

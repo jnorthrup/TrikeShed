@@ -18,7 +18,7 @@ import borg.trikeshed.lib.j
  * @param child a child RecordMeta for a child record, for instance, CSV conversion to ISAM might define two RecordMetas for two steps
  */
 
-class RecordMeta(
+   class RecordMeta(
 //    /** column name*/
     val name: String,
     /** enum-resident Type describing byte marshalling strategies - a specialization of TypeMemento */
@@ -33,4 +33,6 @@ class RecordMeta(
     val encoder: (Any?) -> ByteArray = type.createEncoder(end - begin),
     /** open to interpretation, for instance, CSV conversion to ISAM might define two RecordMetas for two steps*/
     var child: RecordMeta? = null,
-    ) : ColumnMeta by (name j (type as TypeMemento))
+    ) : ColumnMeta by (name j (type as TypeMemento)){
+       override fun toString(): String = "RecordMeta(name='$name', type=$type, begin=$begin, end=$end, decoder=$decoder, encoder=$encoder, child=$child)"
+    }

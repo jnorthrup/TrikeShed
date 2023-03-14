@@ -51,7 +51,7 @@ object JsonParser {
         /** depths is passed in for the purpose of queries being able to skip a slot if it is too shallow;
          * format is _a[1,1,2,] where any valid segment is at least 1.
          * */
-        depths: MutableList<Int>? = mutableListOf(),
+        depths: MutableList<Int>?  = null,
         /*  * an optional int that gives you n commas max, presuming undefined null bias in the last comma */
         takeFirst: Int? = null,
     ): JsElement {

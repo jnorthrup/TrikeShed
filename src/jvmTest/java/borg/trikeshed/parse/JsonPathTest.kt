@@ -25,6 +25,16 @@ class JsonPathTest {
         assertEquals(1, d[1])
         assertEquals(1, d[2])
         assertEquals(4, d[3])
+        json = """[0, { } , [ 1
+            |], {"1"
+            |: {"2": { "3 ": { "4" : 1} }} } ] 
+            |""".trimMargin()
+        d = mutableListOf<Int>()
+        elem = index(json.toSeries(), d)
+        assertEquals(0, d[0])
+        assertEquals(1, d[1])
+        assertEquals(1, d[2])
+        assertEquals(4, d[3])
 
         json = """ [ 0,1 , 2 ,   3]"""
         d = mutableListOf<Int>()

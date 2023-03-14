@@ -7,8 +7,12 @@ import borg.trikeshed.cursor.TypeMemento
 import borg.trikeshed.isam.meta.PlatformCodec.Companion.currentPlatformCodec
 import borg.trikeshed.isam.meta.PlatformCodec.Companion.currentPlatformCodec.readInt
 import borg.trikeshed.isam.meta.PlatformCodec.Companion.currentPlatformCodec.readLong
+import borg.trikeshed.isam.meta.PlatformCodec.Companion.currentPlatformCodec.readUInt
+import borg.trikeshed.isam.meta.PlatformCodec.Companion.currentPlatformCodec.readULong
 import borg.trikeshed.isam.meta.PlatformCodec.Companion.currentPlatformCodec.writeInt
 import borg.trikeshed.isam.meta.PlatformCodec.Companion.currentPlatformCodec.writeLong
+import borg.trikeshed.isam.meta.PlatformCodec.Companion.currentPlatformCodec.writeUInt
+import borg.trikeshed.isam.meta.PlatformCodec.Companion.currentPlatformCodec.writeULong
 import borg.trikeshed.lib.*
 import kotlinx.datetime.*
 import kotlinx.datetime.LocalDate
@@ -30,18 +34,33 @@ enum class IOMemento(override val networkSize: Int? = null, val fromChars: (Seri
         override fun createEncoder(i: Int): (Any?) -> ByteArray = writeByte
         override fun createDecoder(size: Int): (ByteArray) -> Any? = readByte
     },
+    IoUByte(1, {
+        it.parseLong().toUByte()
+    }) {
+        override fun createEncoder(i: Int): (Any?) -> ByteArray = writeUByte
+        override fun createDecoder(size: Int): (ByteArray) -> Any? = readUByte
+    },
+
     IoShort(2, { it.parseLong().toShort() }) {
         override fun createEncoder(i: Int): (Any?) -> ByteArray = currentPlatformCodec.writeShort as (Any?) -> ByteArray
         override fun createDecoder(size: Int): (ByteArray) -> Any? = currentPlatformCodec.readShort
     },
 
     IoInt(4, { it.parseLong().toInt() }) {
-        override fun createEncoder(i: Int): (Any?) -> ByteArray =currentPlatformCodec. writeInt as (Any?) -> ByteArray
-        override fun createDecoder(size: Int): (ByteArray) -> Any? =currentPlatformCodec. readInt
+        override fun createEncoder(i: Int): (Any?) -> ByteArray = writeInt as (Any?) -> ByteArray
+        override fun createDecoder(size: Int): (ByteArray) -> Any? = readInt
     },
     IoLong(8, Series<Char>::parseLong) {
-        override fun createEncoder(i: Int): (Any?) -> ByteArray =currentPlatformCodec. writeLong as (Any?) -> ByteArray
-        override fun createDecoder(size: Int): (ByteArray) -> Any? =currentPlatformCodec. readLong
+        override fun createEncoder(i: Int): (Any?) -> ByteArray = writeLong as (Any?) -> ByteArray
+        override fun createDecoder(size: Int): (ByteArray) -> Any? = readLong
+    },
+    IoUInt(4, { it.parseLong().toUInt() }) {
+        override fun createEncoder(i: Int): (Any?) -> ByteArray =writeUInt as (Any?) -> ByteArray
+        override fun createDecoder(size: Int): (ByteArray) -> Any? =readUInt
+    },
+    IoULong(8, { it.parseLong().toULong() }) {
+        override fun createEncoder(i: Int): (Any?) -> ByteArray =writeULong as (Any?) -> ByteArray
+        override fun createDecoder(size: Int): (ByteArray) -> Any? =readULong
     },
     IoFloat(4, { it.parseDouble().toFloat() }) {
         override fun createEncoder(i: Int): (Any?) -> ByteArray = currentPlatformCodec.writeFloat as (Any?) -> ByteArray
@@ -118,10 +137,11 @@ enum class IOMemento(override val networkSize: Int? = null, val fromChars: (Seri
         val readString = { value: ByteArray -> value.decodeToString() }
         val writeString = { value: Any? -> (value as String).encodeToByteArray() }
 
-
         val readBool = { value: ByteArray -> value[0] == 1.toByte() }
-        val readByte = { value: ByteArray -> value[0] }
         val writeBool = { value: Any? -> ByteArray(1).apply { this[0] = if (value as Boolean) 1 else 0 } }
+        val readByte = { value: ByteArray -> value[0] }
         val writeByte = { value: Any? -> ByteArray(1).apply { this[0] = value as Byte } }
+        val readUByte = { value: ByteArray -> value[0].toUByte() }
+        val writeUByte = { value: Any? -> ByteArray(1).apply { this[0] = (value as Byte) } }//take it on faith here
     }
 }

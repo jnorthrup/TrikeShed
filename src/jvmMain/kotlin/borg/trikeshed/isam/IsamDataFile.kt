@@ -109,7 +109,7 @@ actual class IsamDataFile actual constructor(
 
             //create row buffer
              meta0.debug {
-                logDebug { "toIsam: " + it.toList() }
+                logDebug { "toIsam: " + it.map { it.toString() } }
             }
 
             val last = meta0.last()
