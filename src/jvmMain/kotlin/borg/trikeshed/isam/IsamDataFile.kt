@@ -6,6 +6,9 @@ import borg.trikeshed.common.Usable
 import borg.trikeshed.cursor.*
 import borg.trikeshed.isam.meta.IOMemento
 import borg.trikeshed.lib.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.withContext
 
 import java.io.RandomAccessFile
 import java.nio.ByteBuffer
@@ -36,7 +39,7 @@ actual class IsamDataFile actual constructor(
     actual override fun open() {
         metafile.open()
         data = Files.newByteChannel(
-            java.nio.file.Paths.get(datafileFilename),
+            Paths.get(datafileFilename),
             READ,
             SPARSE
         )
@@ -100,7 +103,7 @@ actual class IsamDataFile actual constructor(
         actual fun write(cursor: Cursor, datafilename: String, varChars: Map<String, Int>) {
             val metafilename = "$datafilename.meta"
 
-           val meta0 = IsamMetaFileReader.write(metafilename, cursor.meta, varChars)
+            val meta0 = IsamMetaFileReader.write(metafilename, cursor.meta, varChars)
 
             //open RandomAccessDataFile
 
@@ -108,7 +111,7 @@ actual class IsamDataFile actual constructor(
             val data = randomAccessFile.channel
 
             //create row buffer
-             meta0.debug {
+            meta0.debug {
                 logDebug { "toIsam: " + it.map { it.toString() } }
             }
 
@@ -128,40 +131,49 @@ actual class IsamDataFile actual constructor(
             data.close()
         }
 
-        actual fun append(
-            cseq: Iterable<RowVec>,
-            meta: Series<ColumnMeta>,
+        actual suspend fun append(
+            msf: MutableSharedFlow<RowVec>,
             datafilename: String,
-            varChars: Map<String, Int>
+            varChars: Map<String, Int>,
+            transform: ((RowVec) -> RowVec)?
         ) {
             val metafilename = "$datafilename.meta"
 
-            //            TODO("not assume we have to write this file for this call.  if it exists, verify it and use it")
-            val meta0= IsamMetaFileReader.write(metafilename, meta, varChars)
+            // TODO("not assume we have to write this file for this call.  if it exists, verify it and use it")
+           lateinit  var meta0: Series<RecordMeta>
 
-            //open RandomAccessDataFile
-            val data = Files.newOutputStream(Paths.get(datafilename),APPEND, WRITE,CREATE)
-
-            meta0.debug {
-                logDebug { "toIsam: " + it.toList() }
+            // open RandomAccessDataFile
+            val data = withContext(Dispatchers.IO) {
+                Files.newOutputStream(Paths.get(datafilename), APPEND, WRITE, CREATE)
             }
 
-            val last = meta0.last()
+            var last: RecordMeta
 
-            val rowLen = last.end
+            var rowLen: Int = 0
 
-
-            val rowBuffer = ByteArray(rowLen){0}
-            var fibLog: FibonacciReporter?=null
+            lateinit var rowBuffer: ByteArray
+            var fibLog: FibonacciReporter? = null
             debug { fibLog = FibonacciReporter(size = null, noun = "appends") }
+            var first = true
+            // write rows
+            msf.collect { rowVec1: RowVec ->
+                val rowVec = transform?.let { it(rowVec1) } ?: rowVec1
+                if (first) {
+                    meta0 = IsamMetaFileReader.write(metafilename, rowVec.right.α { it() }, varChars)
+                    last = meta0.last()
+                    rowLen = last.end
+                    rowBuffer = ByteArray(rowLen) { 0 }
+                    debug { logDebug { "toIsam: " + meta0.toList() } }
+                    first = false
+                }
 
-            //write rows
-            cseq .forEach { rowVec ->
                 WireProto.writeToBuffer(rowVec, rowBuffer, meta0)
-                data.write (rowBuffer)
-                debug { fibLog?.report() ?.let { println(it) } }
+                withContext(Dispatchers.IO) { data.write(rowBuffer) }
+                debug { fibLog?.report()?.let { println(it) } }
             }
-            data.close()
+            withContext(Dispatchers.IO) {
+                data.close()
+            }
         }
     }
 }
