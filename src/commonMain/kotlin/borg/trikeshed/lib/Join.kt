@@ -14,6 +14,7 @@ interface Join<A, B> {
 
     val pair: Pair<A, B>
         get() = Pair(a, b)
+
     /** debugger hack only, violates all common sense */
     val list get() = (this as? Series<out Any?>)?.toList() ?: emptyList<Any?>()
 
@@ -202,7 +203,7 @@ operator fun <T> Series<T>.get(index: IntArray): Series<T> = Series(index.size) 
 /**
  * series get by intRange
  */
-operator fun <T> Series<T>.get(index: IntRange): Series<T> = Series((index.last+1)-index.first  ) { i ->
+operator fun <T> Series<T>.get(index: IntRange): Series<T> = Series((index.last + 1) - index.first) { i ->
     require(index.step == 1)
     this[index.first + i]
 }

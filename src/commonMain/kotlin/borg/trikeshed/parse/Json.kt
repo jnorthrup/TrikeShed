@@ -206,7 +206,7 @@ object JsonParser {
                     val (segOpenIdx, segCloseIdx) = segment.first
                     val (x, _) = segment
                     val (segOpen, segClose) = x
-                    var tmp = CharSeries(src[segOpen until segClose]).trim
+                    val tmp = CharSeries(src[segOpen until segClose]).trim
                     if (!tmp.hasRemaining) continue//empty obj
                     require(tmp.get == '"') {
                         "malformed open quote in ${tmp.take(40).asString()}"
@@ -214,10 +214,7 @@ object JsonParser {
                     require(tmp.mk.seekTo('"', '\\')) {
                         "malformed close-quote in ${tmp.take(40).asString()}"
                     }
-//                    var clone = tmp.clone()
-//                    clone--
-//                    var flip = clone.flip()
-//                    flip++
+
                     var buf = tmp.clone()
                     buf--
                     buf.flip()

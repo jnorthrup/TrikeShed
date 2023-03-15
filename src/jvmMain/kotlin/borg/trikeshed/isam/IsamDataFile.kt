@@ -136,16 +136,16 @@ actual class IsamDataFile actual constructor(
             datafilename: String,
             varChars: Map<String, Int>,
             transform: ((RowVec) -> RowVec)?
-        ) {
+        ):Unit=  withContext(Dispatchers.IO) {
             val metafilename = "$datafilename.meta"
 
             // TODO("not assume we have to write this file for this call.  if it exists, verify it and use it")
            lateinit  var meta0: Series<RecordMeta>
 
             // open RandomAccessDataFile
-            val data = withContext(Dispatchers.IO) {
+            val data =
                 Files.newOutputStream(Paths.get(datafilename), APPEND, WRITE, CREATE)
-            }
+
 
             var last: RecordMeta
 
@@ -171,9 +171,9 @@ actual class IsamDataFile actual constructor(
                 withContext(Dispatchers.IO) { data.write(rowBuffer) }
                 debug { fibLog?.report()?.let { println(it) } }
             }
-            withContext(Dispatchers.IO) {
-                data.close()
-            }
+//            withContext(Dispatchers.IO) {
+//                data.close()
+//            }
         }
     }
 }
