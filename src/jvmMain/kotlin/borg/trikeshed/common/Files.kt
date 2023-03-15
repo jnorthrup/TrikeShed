@@ -36,7 +36,7 @@ actual object Files {
         var lineStartOffset: Long = 0
         val lineBuffer = mutableListOf<ByteArray>()
 
-        file.inputStream() .use { input ->
+        file.inputStream().use { input ->
             while (true) {
                 val bytesRead = input.read(buffer)
                 if (bytesRead == -1) break
@@ -45,7 +45,7 @@ actual object Files {
                     val byte = buffer[i]
                     when (byte) {
                         '\n'.code.toByte() -> {
-                            lineBuffer.add(buffer.copyOfRange(mark, i))
+                            lineBuffer.add(buffer.sliceArray(mark..i))
                             mark = i
 
                             // Sum the sizes of the ByteArrays in lineBuffer and create a new ByteArray of that size
@@ -65,7 +65,7 @@ actual object Files {
                         }
                     }
                 }
-                lineBuffer.add(buffer.copyOfRange(mark, bytesRead))
+                lineBuffer.add(buffer.sliceArray(mark until bytesRead))
 
                 offset += bytesRead
             }
@@ -86,8 +86,7 @@ actual object Files {
                     yield((lineStartOffset j tharr))
             }
         }
-    }
-}
+    }}
 
 /** unit test for fun streamLines*/
 fun main() {
