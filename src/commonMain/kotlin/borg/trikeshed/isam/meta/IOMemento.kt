@@ -139,14 +139,14 @@ enum class IOMemento(override val networkSize: Int? = null, val fromChars: (Seri
         val readByteArray: (ByteArray) -> ByteArray = { value: ByteArray -> value }
         val writeByteArray: (Any?) -> ByteArray = { value: Any? -> value as ByteArray }
 
-        val readString = { value: ByteArray -> value.decodeToString() }
-        val writeString = { value: Any? -> (value as String).encodeToByteArray() }
+        val readString: (ByteArray) -> String = { value: ByteArray -> value.decodeToString() }
+        val writeString: (Any?) -> ByteArray = { value: Any? -> (value as String).encodeToByteArray() }
 
-        val readBool = { value: ByteArray -> value[0] == 1.toByte() }
-        val writeBool = { value: Any? -> ByteArray(1).apply { this[0] = if (value as Boolean) 1 else 0 } }
-        val readByte = { value: ByteArray -> value[0] }
-        val writeByte = { value: Any? -> ByteArray(1).apply { this[0] = value as Byte } }
-        val readUByte = { value: ByteArray -> value[0].toUByte() }
-        val writeUByte = { value: Any? -> ByteArray(1).apply { this[0] = (value as Byte) } }//take it on faith here
+        val readBool: (ByteArray) -> Boolean = { value: ByteArray -> value[0] == 1.toByte() }
+        val writeBool: (Any?) -> ByteArray = { value: Any? -> ByteArray(1).apply { this[0] = if (value as Boolean) 1 else 0 } }
+        val readByte: (ByteArray) -> Byte = { value: ByteArray -> value[0] }
+        val writeByte: (Any?) -> ByteArray = { value: Any? -> ByteArray(1).apply { this[0] = value as Byte } }
+        val readUByte: (ByteArray) -> UByte = { value: ByteArray -> value[0].toUByte() }
+        val writeUByte: (Any?) -> ByteArray = { value: Any? -> ByteArray(1).apply { this[0] = (value as Byte) } }//take it on faith here
     }
 }

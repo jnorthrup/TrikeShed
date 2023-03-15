@@ -110,12 +110,12 @@ enum class UringSetupFeatures(val src: UInt) {
     featRsrc_tags(IORING_FEAT_RSRC_TAGS),
     ;
 
-    val i get() = src.toInt()
-    val l get() = src.toLong()
-    val ul get() = src.toULong()
+    val i: Int get() = src.toInt()
+    val l: Long get() = src.toLong()
+    val ul: ULong get() = src.toULong()
 
     companion object {
-        fun fromInt(features: __u32) = values().mapNotNull {
+        fun fromInt(features: __u32): List<Pair<UringSetupFeatures, UInt>> = values().mapNotNull {
             it.takeIf { features.and(it.src).nz }?.to(it.src)
         }
     }

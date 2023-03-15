@@ -514,13 +514,13 @@ enum class PosixOpenOpts(val posixConst: Int) {
     O_Trunc(O_TRUNC),
     ;
 
-    val i get() = posixConst.toInt()
-    val ui get() = posixConst.toUInt()
-    val l get() = posixConst.toLong()
-    val ul get() = posixConst.toULong()
+    val i: Int get() = posixConst.toInt()
+    val ui: UInt get() = posixConst.toUInt()
+    val l: Long get() = posixConst.toLong()
+    val ul: ULong get() = posixConst.toULong()
 
     companion object {
-        fun fromInt(features: __u32) = values().mapNotNull {
+        fun fromInt(features: __u32): List<Pair<PosixOpenOpts, UInt>> = values().mapNotNull {
             it.takeIf { (features and it.ui).nz }?.to(it.ui)
         }
 

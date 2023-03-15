@@ -22,7 +22,7 @@ inline fun <reified A : CStructVar, reified B : CVariable> mallocWithFlex(
         .also { HasPosixErr.posixRequires(it.toLong() > 0L) { "malloc $size_t_" } }
 }
 
-val NativePlacement.m get() = this
+val NativePlacement.m: NativePlacement get() = this
 
 /** shortest possible debug printer */
 infix fun NativePlacement.d(a: Any?) {

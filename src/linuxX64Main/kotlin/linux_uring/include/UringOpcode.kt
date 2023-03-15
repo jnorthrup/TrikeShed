@@ -579,12 +579,12 @@ enum class UringOpcode {
         this.opConstant = opConstant.value.toUInt()
     }
 
-    val i get() = opConstant.toInt()
-    val l get() = opConstant.toLong()
-    val ul get() = opConstant.toULong()
+    val i: Int get() = opConstant.toInt()
+    val l: Long get() = opConstant.toLong()
+    val ul: ULong get() = opConstant.toULong()
 
     companion object {
-        fun fromInt(features: __u32) = values().firstNotNullOf {
+        fun fromInt(features: __u32): Pair<UringOpcode, UInt> = values().firstNotNullOf {
             it.takeIf { features.and(it.opConstant).nz }?.to(it.opConstant)
         }
     }

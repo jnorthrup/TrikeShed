@@ -22,7 +22,7 @@ class COWSeriesBody<T>(
     }
 
     /** create a new copy of this, with the given item appended */
-    fun append(item: T) = copy(backing = backing + item)
+    fun append(item: T): COWSeriesBody<T> = copy(backing = backing + item)
 
     /** create a new copy of this, with the given item removed */
     fun remove(item: T): COWSeriesBody<T> {

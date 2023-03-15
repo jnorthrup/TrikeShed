@@ -3,7 +3,7 @@ package borg.trikeshed.lib
 //a boilerplate file for the kotlin compiler to generate the kotlin trikeshed commons lib
 
 //binary search
-fun <T:Comparable<T>> Series<T>.binarySearch(element: T, low :Int= 0, high :Int= size - 1) =binarySearch(element, naturalOrder(),low,high)
+fun <T:Comparable<T>> Series<T>.binarySearch(element: T, low :Int= 0, high :Int= size - 1): Int =binarySearch(element, naturalOrder(),low,high)
 
 fun <T> Series<T>.binarySearch(element: T, c: Comparator<T>, low_ :Int= 0,  high_:Int = size - 1): Int{
     var low = low_

@@ -205,13 +205,13 @@ object JsonParser {
         )
     }
 
-    private fun selectByIndex(
+      fun selectByIndex(
         context: JsContext,
         src: Series<Char>,
         element: JsElement,
         pathTail: Series<Either<String, Int>>,
         reifyResult: Boolean,
-    ) = { idx:Int ->
+    ): (Int) -> Any? = { idx:Int ->
         var r: Any? = Unit
         val segments: Series<JsIndex> = context.segments
 
@@ -251,13 +251,13 @@ object JsonParser {
         r
     }
 
-    private fun selectByKey(
+      fun selectByKey(
         context: JsContext,
         src: Series<Char>,
         element: JsElement,
         pathTail: Series<Either<String, Int>>,
         reifyResult: Boolean,
-    ) = { key:String ->
+    ): (String) -> Any? = { key:String ->
         var r: Any? = Unit  //this is the payload
         val segments: Series<JsIndex> = context.segments
         var idx = 0

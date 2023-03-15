@@ -101,12 +101,12 @@ enum class UringSetupFlags(val src: UInt) {
     uringSetupR_disabled(IORING_SETUP_R_DISABLED),
     ;
 
-    val i get() = src.toInt()
-    val l get() = src.toLong()
-    val ul get() = src.toULong()
+    val i: Int get() = src.toInt()
+    val l: Long get() = src.toLong()
+    val ul: ULong get() = src.toULong()
 
     companion object {
-        fun fromInt(flags: __u32) = values().mapNotNull {
+        fun fromInt(flags: __u32): List<Pair<UringSetupFlags, UInt>> = values().mapNotNull {
             it.takeIf { flags.and(it.src).nz }?.to(it.src)
         }
     }

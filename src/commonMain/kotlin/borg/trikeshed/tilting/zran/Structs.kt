@@ -22,14 +22,14 @@ import borg.trikeshed.tilting.zran.VERBOSITY_LEVEL.VERBOSITY_NORMAL
 //#define CHUNKS_TO_LOOK_BACKWARDS 3
 
 //convert the above to kotlin constants
-const val SPAN = 10485760L      /* desired distance between access points */
-const val WINSIZE = 32768U      /* sliding window size */
-const val CHUNK = 16384         /* file input buffer size */
-const val UNCOMPRESSED_WINDOW = UInt.MAX_VALUE // window is an uncompressed WINSIZE size window
-const val GZIP_INDEX_IDENTIFIER_STRING = "gzipindx"  // default index version (v0)
-const val GZIP_INDEX_IDENTIFIER_STRING_V1 = "gzipindX"  // index version with line number info
-const val GZIP_INDEX_HEADER_SIZE = 16  // header size in bytes of gztool's .gzi files
-const val GZIP_HEADER_SIZE_BY_ZLIB = 10  // header size in bytes of gzip files created by zlib:
+const val SPAN: Long = 10485760L      /* desired distance between access points */
+const val WINSIZE: UInt = 32768U      /* sliding window size */
+const val CHUNK: Int = 16384         /* file input buffer size */
+const val UNCOMPRESSED_WINDOW: UInt = UInt.MAX_VALUE // window is an uncompressed WINSIZE size window
+const val GZIP_INDEX_IDENTIFIER_STRING: String = "gzipindx"  // default index version (v0)
+const val GZIP_INDEX_IDENTIFIER_STRING_V1: String = "gzipindX"  // index version with line number info
+const val GZIP_INDEX_HEADER_SIZE: Int = 16  // header size in bytes of gztool's .gzi files
+const val GZIP_HEADER_SIZE_BY_ZLIB: Int = 10  // header size in bytes of gzip files created by zlib:
 //github.com/madler/zlib/blob/master/zlib.h
 
 
@@ -171,7 +171,7 @@ enum class ACTION{ ACT_NOT_SET, ACT_EXTRACT_FROM_BYTE, ACT_COMPRESS_CHUNK, ACT_D
 //enum VERBOSITY_LEVEL verbosity_level = VERBOSITY_NORMAL;
 
 //convert the above to kotlin
-var verbosity_level = VERBOSITY_NORMAL
+var verbosity_level: VERBOSITY_LEVEL = VERBOSITY_NORMAL
 
 
 // values returned by decompress_in_advance() in ret.error value:

@@ -16,7 +16,7 @@ expect inline fun assert(value: Boolean, lazyMessage: () -> Any)
 
 //var forceDebug = env// stopgap measure until i figure out how to do native -ea
 
-val debugging by lazy {
+val debugging: Boolean by lazy {
     try {
         assert(false) { "debugging" }
 //        forceDebug

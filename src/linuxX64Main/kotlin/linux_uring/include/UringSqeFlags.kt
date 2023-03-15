@@ -57,12 +57,12 @@ enum class UringSqeFlags(val src: UInt) {
     sqeBuffer_select(IOSQE_BUFFER_SELECT),
     ;
 
-    val ub get() = src.toUByte()
-    val l get() = src.toLong()
-    val ul get() = src.toULong()
+    val ub: UByte get() = src.toUByte()
+    val l: Long get() = src.toLong()
+    val ul: ULong get() = src.toULong()
 
     companion object {
-        fun fromInt(sqeFlags: __u32) = UringSetupFeatures.values().mapNotNull {
+        fun fromInt(sqeFlags: __u32): List<Pair<UringSetupFeatures, UInt>> = UringSetupFeatures.values().mapNotNull {
             it.takeIf { sqeFlags.and(it.src).nz }?.to(it.src)
         }
     }

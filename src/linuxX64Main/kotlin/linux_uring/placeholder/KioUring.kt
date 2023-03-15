@@ -42,7 +42,7 @@ import zlinux_uring.*
  */
 class KioUring {
     val p: io_uring_params = nativeHeap.alloc()
-    val ring_fd =
+    val ring_fd: Int =
         io_uring_setup(CATQUEUE_DEPTH.toUInt(), p.ptr).also { ring_fd -> posixRequires(ring_fd >= 0, { ring_fd }) }
     val featuresInUse: Set<UringSetupFeatures> by lazy {
         (
@@ -58,11 +58,11 @@ class KioUring {
             }
     }
 
-    val singleMmap get() = UringSetupFeatures.featSingle_mmap in featuresInUse
+    val singleMmap: Boolean get() = UringSetupFeatures.featSingle_mmap in featuresInUse
 
-    val sring_sz = (p.sq_off.array + p.sq_entries * UInt.SIZE_BYTES.toUInt())
-    val cring_sz = (p.cq_off.cqes + p.cq_entries * sizeOf<io_uring_cqe>().toUInt())
-    val sqes = run {
+    val sring_sz: UInt = (p.sq_off.array + p.sq_entries * UInt.SIZE_BYTES.toUInt())
+    val cring_sz: UInt = (p.cq_off.cqes + p.cq_entries * sizeOf<io_uring_cqe>().toUInt())
+    val sqes: CPointer<io_uring_sqe> = run {
         read_barrier()
         posix_mmap(
             NULL,
@@ -75,15 +75,15 @@ class KioUring {
             posixRequires(it != MAP_FAILED) { "mmap" }
         }
     }
-    val sqPtr = run {
+    val sqPtr: CPointer<ByteVar> = run {
         val __len = sring_sz.toULong()
         val __prot = PROT_READ or PROT_WRITE
         val __flags = MAP_SHARED or MAP_POPULATE
         val __offset = IORING_OFF_SQ_RING.toLong()
         mapIORingQueue(__len, __prot, __flags, __offset)
     }
-    val sqRing = appIOSqRing(sqPtr)
-    val cqPtr = if (singleMmap) sqPtr
+    val sqRing: appIOSqRing = appIOSqRing(sqPtr)
+    val cqPtr: CPointer<ByteVar> = if (singleMmap) sqPtr
     else {
         val __len = cring_sz.toULong()
         val __prot = PROT_READ or PROT_WRITE
@@ -92,31 +92,31 @@ class KioUring {
         mapIORingQueue(__len, __prot, __flags, __offset)
     }
 
-    val cqRing = appIOCqRing(cqPtr)
+    val cqRing: appIOCqRing = appIOCqRing(cqPtr)
 
     inner class appIOSqRing(sqptr1: CPointer<ByteVar>, val sqptr: Long = sqptr1.toLong()) {
 
-        val array get() = (sqptr + p.sq_off.array.toLong()).toCPointer<__u32Var>()!!
-        val dropped get() = (sqptr + p.sq_off.dropped.toLong()).toCPointer<__u32Var>()!!
-        val flags get() = (sqptr + p.sq_off.flags.toLong()).toCPointer<__u32Var>()!!
-        val head get() = (sqptr + p.sq_off.head.toLong()).toCPointer<__u32Var>()!!
-        val resv1 get() = (sqptr + p.sq_off.resv1.toLong()).toCPointer<__u32Var>()!!
-        val resv2 get() = (sqptr + p.sq_off.resv2.toLong()).toCPointer<__u64Var>()!!
-        val ring_entries get() = (sqptr + p.sq_off.ring_entries.toLong()).toCPointer<__u32Var>()!!
-        val ring_mask get() = (sqptr + p.sq_off.ring_mask.toLong()).toCPointer<__u32Var>()!!
-        val tail get() = (sqptr + p.sq_off.tail.toLong()).toCPointer<__u32Var>()!!
+        val array: CPointer<__u32Var> get() = (sqptr + p.sq_off.array.toLong()).toCPointer<__u32Var>()!!
+        val dropped: CPointer<__u32Var> get() = (sqptr + p.sq_off.dropped.toLong()).toCPointer<__u32Var>()!!
+        val flags: CPointer<__u32Var> get() = (sqptr + p.sq_off.flags.toLong()).toCPointer<__u32Var>()!!
+        val head: CPointer<__u32Var> get() = (sqptr + p.sq_off.head.toLong()).toCPointer<__u32Var>()!!
+        val resv1: CPointer<__u32Var> get() = (sqptr + p.sq_off.resv1.toLong()).toCPointer<__u32Var>()!!
+        val resv2: CPointer<__u64Var> get() = (sqptr + p.sq_off.resv2.toLong()).toCPointer<__u64Var>()!!
+        val ring_entries: CPointer<__u32Var> get() = (sqptr + p.sq_off.ring_entries.toLong()).toCPointer<__u32Var>()!!
+        val ring_mask: CPointer<__u32Var> get() = (sqptr + p.sq_off.ring_mask.toLong()).toCPointer<__u32Var>()!!
+        val tail: CPointer<__u32Var> get() = (sqptr + p.sq_off.tail.toLong()).toCPointer<__u32Var>()!!
     }
 
     inner class appIOCqRing(cqptr1: CPointer<ByteVar>, val cqptr: Long = cqptr1.toLong()) {
-        val cqes get() = (cqptr + p.cq_off.cqes.toLong()).toCPointer<io_uring_cqe>()!!
-        val flags get() = (cqptr + p.cq_off.flags.toLong()).toCPointer<__u32Var>()!!
-        val head get() = (cqptr + p.cq_off.head.toLong()).toCPointer<__u32Var>()!!
-        val overflow get() = (cqptr + p.cq_off.overflow.toLong()).toCPointer<__u32Var>()!!
-        val resv1 get() = (cqptr + p.cq_off.resv1.toLong()).toCPointer<__u32Var>()!!
-        val resv2 get() = (cqptr + p.cq_off.resv2.toLong()).toCPointer<__u64Var>()!!
-        val ring_entries get() = (cqptr + p.cq_off.ring_entries.toLong()).toCPointer<__u32Var>()!!
-        val ring_mask get() = (cqptr + p.cq_off.ring_mask.toLong()).toCPointer<__u32Var>()!!
-        val tail get() = (cqptr + p.cq_off.tail.toLong()).toCPointer<__u32Var>()!!
+        val cqes: CPointer<io_uring_cqe> get() = (cqptr + p.cq_off.cqes.toLong()).toCPointer<io_uring_cqe>()!!
+        val flags: CPointer<__u32Var> get() = (cqptr + p.cq_off.flags.toLong()).toCPointer<__u32Var>()!!
+        val head: CPointer<__u32Var> get() = (cqptr + p.cq_off.head.toLong()).toCPointer<__u32Var>()!!
+        val overflow: CPointer<__u32Var> get() = (cqptr + p.cq_off.overflow.toLong()).toCPointer<__u32Var>()!!
+        val resv1: CPointer<__u32Var> get() = (cqptr + p.cq_off.resv1.toLong()).toCPointer<__u32Var>()!!
+        val resv2: CPointer<__u64Var> get() = (cqptr + p.cq_off.resv2.toLong()).toCPointer<__u64Var>()!!
+        val ring_entries: CPointer<__u32Var> get() = (cqptr + p.cq_off.ring_entries.toLong()).toCPointer<__u32Var>()!!
+        val ring_mask: CPointer<__u32Var> get() = (cqptr + p.cq_off.ring_mask.toLong()).toCPointer<__u32Var>()!!
+        val tail: CPointer<__u32Var> get() = (cqptr + p.cq_off.tail.toLong()).toCPointer<__u32Var>()!!
     }
 
     fun mapIORingQueue(__len: ULong, __prot: Int, __flags: Int, __offset: Long): CPointer<ByteVar> {
@@ -126,7 +126,7 @@ class KioUring {
         return qringPtr
     }
 
-    fun opReadWholeFile(file_fd: Int) = memScoped {
+    fun opReadWholeFile(file_fd: Int): Unit = memScoped {
         val triple = sqePreamble()
         val sqe: CPointer<io_uring_sqe> = sqes[triple.third.toInt()].ptr
         // ---opcode
@@ -144,7 +144,7 @@ class KioUring {
         sqeSubmit(triple)
     }
 
-    fun MemScope.sqePreamble() = run {
+    fun MemScope.sqePreamble(): Triple<UIntVar, UInt, UInt> = run {
         val tail  = alloc <UIntVar>{ sqRing.tail.pointed.value }
         var next_tail = tail.value
         next_tail++
@@ -167,7 +167,7 @@ class KioUring {
     fun createfileInfoReaderSqe(
         file_fd: Int,
         sqe: CPointer<io_uring_sqe>,
-    ) = run {
+    ): Unit = run {
         val file_sz: posix_off_t = get_file_size(file_fd)
         var blocks: Int = (file_sz / BLOCK_SZ).toInt()
         val fi_ptr = mallocWithFlex(file_info::iovecs, blocks)
@@ -222,10 +222,10 @@ class KioUring {
  *  part of standard C libraries. So, we roll our own system call wrapper
  *  functions.
  */
-fun io_uring_setup(entries: UInt, p: CPointer<io_uring_params>) =
+fun io_uring_setup(entries: UInt, p: CPointer<io_uring_params>): Int =
     posix_syscall(__NR_io_uring_setup.toLong(), entries, p).toInt()
 
-fun io_uring_enter(ring_fd: Int, to_submit: UInt, min_complete: UInt, flags: UInt, sig: CPointer<sigset_t>? = null) =
+fun io_uring_enter(ring_fd: Int, to_submit: UInt, min_complete: UInt, flags: UInt, sig: CPointer<sigset_t>? = null): Int =
     posix_syscall(__NR_io_uring_enter.toLong(), ring_fd, to_submit, min_complete, flags, 0L, sig).toInt()
 
 /** Returns the size of the file whose open file descriptor is passed in.
@@ -299,7 +299,7 @@ fun completionQueues(s: KioUring) {
 }
 
 const val tehBlockSize: Long = BLOCK_SZ.toLong()
-const val pvtHandleSpec = 2113U
+const val pvtHandleSpec: UInt = 2113U
 val pvtHandle: UInt = pvtHandleSpec.dec()
 
 /*

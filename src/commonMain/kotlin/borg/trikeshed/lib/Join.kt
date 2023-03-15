@@ -16,17 +16,17 @@ interface Join<A, B> {
         get() = Pair(a, b)
 
     /** debugger hack only, violates all common sense */
-    val list get() = (this as? Series<out Any?>)?.toList() ?: emptyList<Any?>()
+    val list: List<Any?> get() = (this as? Series<out Any?>)?.toList() ?: emptyList<Any?>()
 
     companion object {
         //the Join factory method
-        operator fun <A, B> invoke(a: A, b: B) = object : Join<A, B> {
+        operator fun <A, B> invoke(a: A, b: B): Join<A, B> = object : Join<A, B> {
             override val a: A get() = a
             override val b: B get() = b
         }
 
         //the Pair factory method
-        operator fun <A, B> invoke(pair: Pair<A, B>) = object : Join<A, B> {
+        operator fun <A, B> invoke(pair: Pair<A, B>): Join<A, B> = object : Join<A, B> {
             override val a: A get() = pair.first
             override val b: B get() = pair.second
         }
@@ -38,7 +38,7 @@ interface Join<A, B> {
         }
 
         //the Map factory method
-        operator fun <A, B> invoke(map: Map<A, B>) = object : Series<Join<A, B>> {
+        operator fun <A, B> invoke(map: Map<A, B>): Series<Join<A, B>> = object : Series<Join<A, B>> {
             override val a: Int get() = map.size
             override val b: (Int) -> Join<A, B> get() = { map.entries.elementAt(it).let { Join(it.key, it.value) } }
         }
@@ -151,7 +151,7 @@ fun <T> Array<T>.toSeries(): Join<Int, (Int) -> T> =
 val <T> T.leftIdentity: () -> T get() = { this }
 
 /**Left Identity Function */
-val <T> T.`↺` get() = leftIdentity
+val <T> T.`↺`: () -> T get() = leftIdentity
 
 fun <T> `↻`(t: T): T = t
 infix fun <T> T.rightIdentity(t: T): T = `↻`(t)

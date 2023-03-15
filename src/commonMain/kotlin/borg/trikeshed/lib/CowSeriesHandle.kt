@@ -23,7 +23,7 @@ class CowSeriesHandle<T>(
 
     ) : MutableSeries<T> {
 
-    var letter by Delegates.observable(letter1) { _, old, new ->
+    var letter: COWSeriesBody<T> by Delegates.observable(letter1) { _, old, new ->
         observer?.invoke( old j new )
     }
 
@@ -79,7 +79,7 @@ class CowSeriesHandle<T>(
     override fun minusAssign(item: T) {
         letter = letter.remove(item)
     }
-      operator fun get(range:IntRange)   =  letter.get(range)
+      operator fun get(range:IntRange): COWSeriesBody<T> =  letter.get(range)
 
     //version from backing
     val version: Any get() = letter.version ?: letter.toString()

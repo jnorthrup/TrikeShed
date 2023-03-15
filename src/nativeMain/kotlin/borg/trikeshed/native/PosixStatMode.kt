@@ -65,10 +65,10 @@ enum class PosixStatMode(state_: Int, val state: UInt = state_.convert()) {
     S_ISSOCK(__S_IFSOCK)
     ;
 
-    operator fun invoke(mode: __mode_t) = __S_ISTYPE((mode), this.state.convert())
+    operator fun invoke(mode: __mode_t): Boolean = __S_ISTYPE((mode), this.state.convert())
 
     companion object {
-        fun __S_ISTYPE(mode: __mode_t, mask: __mode_t) = mode and __S_IFMT.convert() == mask
+        fun __S_ISTYPE(mode: __mode_t, mask: __mode_t): Boolean = mode and __S_IFMT.convert() == mask
     }
 
 }

@@ -27,7 +27,7 @@ actual class IsamDataFile actual constructor(
     actual val metafile: IsamMetaFileReader
 
     val recordlen: Int
-    val constraints get() = metafile.constraints
+    val constraints: Series<RecordMeta> get() = metafile.constraints
 
     private lateinit var data: SeekableByteChannel
 
@@ -72,7 +72,7 @@ actual class IsamDataFile actual constructor(
     override val b: (Int) -> RowVec
 
 
-    actual override fun close() = data.close()
+    actual override fun close(): Unit = data.close()
 
     private val lock: ReentrantLock
 

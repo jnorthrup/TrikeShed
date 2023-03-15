@@ -37,16 +37,16 @@ class CharSeries(buf: Series<Char>,
     val cap: Int by ::size
 
     /** boolean indicating if there are remaining chars */
-    val hasRemaining get() = rem.nz
+    val hasRemaining: Boolean get() = rem.nz
 
     /** mark, the verb - marks the current position */
-    val mk
+    val mk: CharSeries
         get() = apply {
             mark = pos
         }
 
     /** reset pos to mark */
-    val res
+    val res: CharSeries
         get() = apply {
             pos = if (mark < 0) pos else mark
         }
@@ -59,13 +59,13 @@ class CharSeries(buf: Series<Char>,
     }
 
     /**rewind to 0*/
-    val rew
+    val rew: CharSeries
         get() = apply {
             pos = 0
         }
 
     /** clears the mark,pos, and sets limit to size */
-    val clr
+    val clr: CharSeries
         get() = apply {
             pos = 0
             limit = size
@@ -73,7 +73,7 @@ class CharSeries(buf: Series<Char>,
         }
 
     /** position, the verb - holds the position that will be returned by the next get */
-    fun pos(p: Int) = apply {
+    fun pos(p: Int): CharSeries = apply {
         pos = p
     }
 
@@ -89,15 +89,15 @@ class CharSeries(buf: Series<Char>,
     }
 
     /** limit, the verb - redefines the last position accessable by get and redefines remaining accordingly*/
-    fun lim(i: Int) = apply { limit = i }
+    fun lim(i: Int): CharSeries = apply { limit = i }
 
     /** skip whitespace */
-    val skipWs get() = apply { while (hasRemaining && mk.get.isWhitespace()); res }
+    val skipWs: CharSeries get() = apply { while (hasRemaining && mk.get.isWhitespace()); res }
 
-    val rtrim get() = apply { while (rem > 0 && b(limit - 1).isWhitespace()) limit-- }
+    val rtrim: CharSeries get() = apply { while (rem > 0 && b(limit - 1).isWhitespace()) limit-- }
 
 
-    fun clone() = CharSeries(a j b).also { it.pos = pos; it.limit = limit; it.mark = mark }
+    fun clone(): CharSeries = CharSeries(a j b).also { it.pos = pos; it.limit = limit; it.mark = mark }
 
 
     /** a hash of contents only. not position, limit, mark */
@@ -146,7 +146,7 @@ class CharSeries(buf: Series<Char>,
     }
 
     /** skipws and rtrim */
-    val trim
+    val trim: CharSeries
         get() = apply {
             var p = pos
             var l = limit

@@ -25,6 +25,6 @@ inline val <reified T> Series<T>.appendable: AppendableSeries<T>
     }
 
 
-operator fun AppendableSeries<Char>.plusAssign(item: Char) = append(item)
-operator fun AppendableSeries<Char>.plusAssign(item: String) = item.forEach { append(it) }
+operator fun AppendableSeries<Char>.plusAssign(item: Char): Unit = append(item)
+operator fun AppendableSeries<Char>.plusAssign(item: String): Unit = item.forEach { append(it) }
 

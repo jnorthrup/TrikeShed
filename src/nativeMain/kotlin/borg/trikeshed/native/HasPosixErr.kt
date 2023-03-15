@@ -19,9 +19,9 @@ interface HasPosixErr {
         /**
          * more terse when errno
          */
-        fun posixFailOn(mustNotBe: Boolean, res: () -> Any?) = posixRequires(!mustNotBe, res)
+        fun posixFailOn(mustNotBe: Boolean, res: () -> Any?): Unit = posixRequires(!mustNotBe, res)
 
         /**a non-throwing require*/
-        fun warning(cond: Boolean, lazyz: () -> Any?) = Unit.also { if (!cond) println("**warning: ${lazyz()}") }
+        fun warning(cond: Boolean, lazyz: () -> Any?): Unit = Unit.also { if (!cond) println("**warning: ${lazyz()}") }
     }
 }

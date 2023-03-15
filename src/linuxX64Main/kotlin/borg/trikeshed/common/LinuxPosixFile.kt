@@ -424,7 +424,7 @@ class LinuxPosixFile(
             }
         }
 
-        val page_size by lazy { sysconf(_SC_PAGE_SIZE) }
+        val page_size: Long by lazy { sysconf(_SC_PAGE_SIZE) }
 
         /** [manpage](https://www.man7.org/linux/man-pages/man2/mmap.2.html) */
         fun mmap_base(
@@ -478,14 +478,14 @@ class LinuxPosixFile(
             }
         }
 
-        fun namedDirAndFile(file_path: String) = file_path.lastIndexOf('/').let { tail ->
+        fun namedDirAndFile(file_path: String): List<String> = file_path.lastIndexOf('/').let { tail ->
             if (tail == -1) listOf("", file_path) else listOf(
                 file_path.substring(0, tail),
                 file_path.substring(tail.inc())
             )
         }
 
-        fun exists(fname: String) = access(fname, F_OK).z
+        fun exists(fname: String): Boolean = access(fname, F_OK).z
 
         //todo: better FILE* handling
 
@@ -546,7 +546,7 @@ class LinuxPosixFile(
             ByteArray(len) { buf[it] }
         }
         fun readString(filename: String): String = readAllBytes(filename).decodeToString()
-        fun writeBytes(filename: String, bytes: ByteArray) = memScoped {
+        fun writeBytes(filename: String, bytes: ByteArray): Int = memScoped {
             val file = LinuxPosixFile(filename)
             val len = bytes.size
             val buf = allocArray<ByteVar>(len)
@@ -558,7 +558,7 @@ class LinuxPosixFile(
         /**
          * writes \n terminated lines to a file
          */
-        fun writeLines(filename: String, lines: List<String>) = memScoped {
+        fun writeLines(filename: String, lines: List<String>): Unit = memScoped {
             val O_FLAGS = PosixOpenOpts.withFlags(PosixOpenOpts.O_Creat, PosixOpenOpts.O_Trunc, PosixOpenOpts.O_WrOnly)
             val file = LinuxPosixFile(filename, O_FLAGS)
             lines.forEach { line ->
@@ -570,7 +570,7 @@ class LinuxPosixFile(
                 file.close()
             }
         }
-        fun writeString(filename: String, string: String) = writeBytes(filename, string.encodeToByteArray())
+        fun writeString(filename: String, string: String): Int = writeBytes(filename, string.encodeToByteArray())
 
     }
 }

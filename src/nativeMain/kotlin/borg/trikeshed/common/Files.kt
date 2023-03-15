@@ -12,9 +12,9 @@ actual object Files {
     actual fun readAllLines(filename: String): List<String> = readLines(filename)
     actual fun readAllBytes(filename: String): ByteArray = PosixFile.readAllBytes(filename)
     actual fun readString(filename: String): String = PosixFile.readString(filename)
-    actual fun write(filename: String, bytes: ByteArray) = PosixFile.writeBytes(filename, bytes).let { }
-    actual fun write(filename: String, lines: List<String>) = PosixFile.writeLines(filename, lines)
-    actual fun write(filename: String, string: String) = PosixFile.writeString(filename, string).let { }
+    actual fun write(filename: String, bytes: ByteArray): Unit = PosixFile.writeBytes(filename, bytes).let { }
+    actual fun write(filename: String, lines: List<String>): Unit = PosixFile.writeLines(filename, lines)
+    actual fun write(filename: String, string: String): Unit = PosixFile.writeString(filename, string).let { }
 
     /**cinterop to get cwd from posix */
     actual fun cwd(): String = memScoped {

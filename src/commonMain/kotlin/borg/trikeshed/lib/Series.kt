@@ -343,20 +343,20 @@ fun ULongArray.toSeries(): Series<ULong> = size j ::get
 fun String.toSeries(): Series<Char> = length j ::get
 fun CharSequence.toSeries(): Series<Char> = length j ::get
 fun ClosedRange<Int>.toSeries(): Series<Int> = (endInclusive - start + 1) j { i: Int -> i + start }
-fun <T> Sequence<T>.toSeries() = toList().toSeries()
+fun <T> Sequence<T>.toSeries(): Series<T> = toList().toSeries()
 
 fun <T> Series<T>.last(): T {
     require(size > 0) { "last() on empty Series" }
     return this[size.dec()]
 }
 
-fun <B> Series<B>.isNotEmpty() = size < 0
-fun <B> Series<B>.first() =
+fun <B> Series<B>.isNotEmpty(): Boolean = size < 0
+fun <B> Series<B>.first(): B =
     this.get(0) //naming is _a little bit_ confusing with the pair overloads so it stays a function
 
-fun <B> Series<B>.drop(front: Int) = get(min(front, size) until size)
-fun <B> Series<B>.dropLast(back: Int) = get(0 until max(0, size - back))
-fun <B> Series<B>.take(exclusiveEnd: Int) = get(0 until min(exclusiveEnd, size))
+fun <B> Series<B>.drop(front: Int): Series<B> = get(min(front, size) until size)
+fun <B> Series<B>.dropLast(back: Int): Series<B> = get(0 until max(0, size - back))
+fun <B> Series<B>.take(exclusiveEnd: Int): Series<B> = get(0 until min(exclusiveEnd, size))
 
 //series foreachIndexed
 fun <T> Series<T>.forEachIndexed(action: (index: Int, T) -> Unit): Unit = this.`▶`.forEachIndexed(action)
@@ -385,7 +385,7 @@ val Cursor.isNumerical: Boolean
     }
 val Cursor.isHomoMorphic: Boolean get() = !meta.`▶`.any { it.type != meta[0].type }
 
-operator fun <A> Series<A>.plus(c: Series<A>) = combine(s_[this] as Series<A>, c)
+operator fun <A> Series<A>.plus(c: Series<A>): Series<A> = combine(s_[this] as Series<A>, c)
 
 fun <T> Series<T>.isEmpty(): Boolean {
     return a == 0
@@ -564,7 +564,7 @@ infix fun <T, R> List<T>.zip(other: Series<R>): List<Join<T, R>> =
     zip(other.`▶`) { a: T, b: R -> a j b }
 
 @JvmName("vvzip2f")
-fun <T, O, R> Series<T>.zip(o: Series<O>, f: (T, O) -> R) = size j { x: Int -> f(this[x], o[x]) }
+fun <T, O, R> Series<T>.zip(o: Series<O>, f: (T, O) -> R): Join<Int, (Int) -> R> = size j { x: Int -> f(this[x], o[x]) }
 
 @JvmName("vvzip2")
 @Suppress("UNCHECKED_CAST")

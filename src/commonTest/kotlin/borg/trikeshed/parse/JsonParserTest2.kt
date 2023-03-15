@@ -6,7 +6,7 @@ import kotlin.test.*
 
 class JsonParserTest2 {
 
-    val jsonString = """
+    val jsonString: String = """
             {
               "string": "Hello, world!",
               "number": 42.0,
@@ -31,7 +31,7 @@ class JsonParserTest2 {
         assertEquals(expected, actual)
     }
 
-    val expectedParsedJson = linkedMapOf(
+    val expectedParsedJson: LinkedHashMap<String, Any?> = linkedMapOf(
         "string" to "Hello, world!",
         "number" to 42.0,
         "bool" to true,

@@ -52,7 +52,7 @@ actual class FileBuffer actual constructor(//filename: String, initialOffset: Lo
         buffer = null
     }
 
-    actual fun open() = memScoped {
+    actual fun open(): Unit = memScoped {
         logDebug { "opening $filename" }
         file = PosixFile(
             filename,

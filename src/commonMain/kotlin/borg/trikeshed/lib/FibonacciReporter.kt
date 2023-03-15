@@ -23,7 +23,7 @@ class FibonacciReporter(/** if we know the size beforehand we provide estimation
     var trigger: Int = 0
     var countdown: Int = 1
     val begin: TimeSource.Monotonic.ValueTimeMark = TimeSource.Monotonic.markNow()
-    var count = 0
+    var count: Int = 0
     fun report(): String? =(count++).run {
         if (--countdown == 0) {
             //without -ea this benchmark only costs a unused variable decrement.

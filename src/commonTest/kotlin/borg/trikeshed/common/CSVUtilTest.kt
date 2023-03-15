@@ -11,7 +11,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 
 class CSVUtilTest {
-    val target = "src/commonTest/resources/hi.csv"
+    val target: String = "src/commonTest/resources/hi.csv"
 
     /** read in hi.csv and verify the contents */
     @Test

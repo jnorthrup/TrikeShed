@@ -28,45 +28,45 @@ private fun <E> Set<E>.cartesianProduct(other: Set<E>) = this.flatMap { a -> oth
 
 //        ∈
 //        Denotes set membership, and is read "in" or "belongs to". That is, {\displaystyle x\in S}x\in S means that x is an element of the set S.
-infix fun <A> A.`∈`(set:Set<A>) = set.contains(this)
+infix fun <A> A.`∈`(set:Set<A>): Boolean = set.contains(this)
 
 //        ∉
 //        Means "not in". That is, {\displaystyle x\notin S}{\displaystyle x\notin S} means {\displaystyle \neg (x\in S)}{\displaystyle \neg (x\in S)}.
-infix fun <A> A.`∉`(set:Set<A>) = !set.contains(this)
+infix fun <A> A.`∉`(set:Set<A>): Boolean = !set.contains(this)
 
 //        ⊂
 //        Denotes set inclusion. However two slightly different definitions are common.
 
-infix fun <A> Set<A>.`⊂`(other:Set<A>) = this.containsAll(other) && this.size < other.size
+infix fun <A> Set<A>.`⊂`(other:Set<A>): Boolean = this.containsAll(other) && this.size < other.size
 
 
 //        ⊆
 //        {\displaystyle A\subseteq B}A\subseteq B means that A is a subset of B. Used for emphasizing that equality is possible, or when the second definition of {\displaystyle A\subset B}A\subset B is used.
-infix fun <A> Set<A>.`⊆`(other:Set<A>) = this.containsAll(other)
+infix fun <A> Set<A>.`⊆`(other:Set<A>): Boolean = this.containsAll(other)
 
 
 //        ⊊
 //        {\displaystyle A\subsetneq B}{\displaystyle A\subsetneq B} means that A is a proper subset of B. Used for emphasizing that {\displaystyle A\neq B}A\neq B, or when the first definition of {\displaystyle A\subset B}A\subset B is used.
-infix fun <A> Set<A>.`⊊`(other:Set<A>) = this.containsAll(other) && this.size < other.size
+infix fun <A> Set<A>.`⊊`(other:Set<A>): Boolean = this.containsAll(other) && this.size < other.size
 //        ⊃, ⊇, ⊋
 //        Denote the converse relation of {\displaystyle \subset }\subset , {\displaystyle \subseteq }\subseteq , and {\displaystyle \subsetneq }\subsetneq  respectively. For example, {\displaystyle B\supset A}B\supset A is equivalent to {\displaystyle A\subset B}A\subset B.
-infix fun <A> Set<A>.`⊃`(other:Set<A>) = other.containsAll(this) && other.size < this.size
-infix fun <A> Set<A>.`⊇`(other:Set<A>) = other.containsAll(this)
-infix fun <A> Set<A>.`⊋`(other:Set<A>) = other.containsAll(this) && other.size < this.size
+infix fun <A> Set<A>.`⊃`(other:Set<A>): Boolean = other.containsAll(this) && other.size < this.size
+infix fun <A> Set<A>.`⊇`(other:Set<A>): Boolean = other.containsAll(this)
+infix fun <A> Set<A>.`⊋`(other:Set<A>): Boolean = other.containsAll(this) && other.size < this.size
 
 
 //        ∪
 //        Denotes set-theoretic union, that is, {\displaystyle A\cup B}A\cup B is the set formed by the elements of A and B together. That is, {\displaystyle A\cup B=\{x\mid (x\in A)\lor (x\in B)\}}{\displaystyle A\cup B=\{x\mid (x\in A)\lor (x\in B)\}}.
-infix fun <A> Set<A>.`∪`(other:Set<A>) = this.union(other)
+infix fun <A> Set<A>.`∪`(other:Set<A>): Set<A> = this.union(other)
 //        ∩
 //        Denotes set-theoretic intersection, that is, {\displaystyle A\cap B}A\cap B is the set formed by the elements of both A and B. That is, {\displaystyle A\cap B=\{x\mid (x\in A)\land (x\in B)\}}{\displaystyle A\cap B=\{x\mid (x\in A)\land (x\in B)\}}.
 
-infix fun <A> Set<A>.`∩`(other:Set<A>) = this.intersect(other)
+infix fun <A> Set<A>.`∩`(other:Set<A>): Set<A> = this.intersect(other)
 
 //        ∖
 //        Set difference; that is, {\displaystyle A\setminus B}{\displaystyle A\setminus B} is the set formed by the elements of A that are not in B. Sometimes, {\displaystyle A-B}A-B is used instead; see – in § Arithmetic operators.
 
-infix fun <A> Set<A>.`∖`(other:Set<A>) = this.subtract(other)
+infix fun <A> Set<A>.`∖`(other:Set<A>): Set<A> = this.subtract(other)
 
 
 private fun <E> Set<E>.symmetricDifference(other: Set<E>): Set<E> {
@@ -84,14 +84,14 @@ private fun <E> Set<E>.symmetricDifference(other: Set<E>): Set<E> {
 Symmetric difference: that is, {\displaystyle A\ominus B}A\ominus B or {\displaystyle A\operatorname {\triangle } B}{\displaystyle A\operatorname {\triangle } B} is the set formed by the elements that belong to exactly one of the two sets A and B.
 */
 
-infix fun <A> Set<A>.`⊖`(other:Set<A>) = this.symmetricDifference(other)
+infix fun <A> Set<A>.`⊖`(other:Set<A>): Set<A> = this.symmetricDifference(other)
 
 
 //        ∁
 //        1.  With a subscript, denotes a set complement: that is, if {\displaystyle B\subseteq A}B\subseteq A, then {\displaystyle \complement _{A}B=A\setminus B}{\displaystyle \complement _{A}B=A\setminus B}.
 //        2.  Without a subscript, denotes the absolute complement; that is, {\displaystyle \complement A=\complement _{U}A}{\displaystyle \complement A=\complement _{U}A}, where U is a set implicitly defined by the context, which contains all sets under consideration. This set U is sometimes called the universe of discourse.
 
-infix fun <A> Set<A>.`∁`(other:Set<A>) = this.subtract(other)
+infix fun <A> Set<A>.`∁`(other:Set<A>): Set<A> = this.subtract(other)
 
 
 //        ×
@@ -101,17 +101,17 @@ infix fun <A> Set<A>.`∁`(other:Set<A>) = this.subtract(other)
 //        3.  In category theory, denotes the direct product (often called simply product) of two objects, which is a generalization of the preceding concepts of product.
 
 
-infix fun <A> Set<A>.`×`(other:Set<A>) = this.cartesianProduct(other)
+infix fun <A> Set<A>.`×`(other:Set<A>): Set<Pair<A, A>> = this.cartesianProduct(other)
 
 //        ⊔
 //        Denotes the disjoint union. That is, if A and B are sets then {\displaystyle A\sqcup B=\left(A\times \{i_{A}\}\right)\cup \left(B\times \{i_{B}\}\right)}{\displaystyle A\sqcup B=\left(A\times \{i_{A}\}\right)\cup \left(B\times \{i_{B}\}\right)} is a set of pairs where iA and iB are distinct indices discriminating the members of A and B in {\displaystyle A\sqcup B}{\displaystyle A\sqcup B}.
 
-infix fun <A> Set<A>.`⊔`(other:Set<A>) = this.disjointUnion(other)
+infix fun <A> Set<A>.`⊔`(other:Set<A>): Set<A> = this.disjointUnion(other)
 
 
 //        ∐
 //        1.  An alternative to {\displaystyle \sqcup }\sqcup .
 //        2.  Denotes the coproduct of mathematical structures or of objects in a category.
 
-infix fun <A> Set<A>.`∐`(other:Set<A>) = this.disjointUnion(other)
+infix fun <A> Set<A>.`∐`(other:Set<A>): Set<A> = this.disjointUnion(other)
 

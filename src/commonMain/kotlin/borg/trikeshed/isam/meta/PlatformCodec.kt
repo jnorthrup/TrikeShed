@@ -26,7 +26,7 @@ interface PlatformCodec {
 
     companion object {
         @JvmStatic
-        val isNetworkEndian by lazy {
+        val isNetworkEndian: Boolean by lazy {
             val i = 0x01020304
             val b = i.toByte()
             b == 0x01.toByte()
@@ -34,7 +34,7 @@ interface PlatformCodec {
         }
 
         @JvmStatic
-        val isLittleEndian get() = !isNetworkEndian
+        val isLittleEndian: Boolean get() = !isNetworkEndian
 
         object currentPlatformCodec : PlatformCodec {
             override val readShort: (ByteArray) -> Short by lazy {
