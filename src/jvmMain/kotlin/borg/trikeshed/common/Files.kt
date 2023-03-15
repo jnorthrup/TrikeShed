@@ -2,6 +2,7 @@ package borg.trikeshed.common
 
 import borg.trikeshed.lib.Join
 import borg.trikeshed.lib.j
+import borg.trikeshed.lib.second
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.nio.file.Files as JavaNioFileFiles
@@ -29,6 +30,7 @@ actual object Files {
 
     actual fun exists(filename: String): Boolean = JavaNioFileFiles.exists(JavaNioFilePaths.get(filename))
 
+    /** read a file line by line, returning a sequence of Join<Long, ByteArray> where the first element is the offset of the line in the file, and the second element is the line as a ByteArray*/
     actual fun streamLines(fileName: String, bufsize: Int): Sequence<Join<Long, ByteArray>> = sequence {
         val file = File(fileName)
         val buffer = ByteArray(bufsize)
@@ -40,26 +42,49 @@ actual object Files {
             while (true) {
                 val bytesRead = input.read(buffer)
                 if (bytesRead == -1) break
-
+                var mark = 0
                 for (i in 0 until bytesRead) {
                     val byte = buffer[i]
                     when (byte) {
                         '\n'.code.toByte() -> {
-                            lineBuffer.write(byte.toInt())
-                            yield( (lineStartOffset j lineBuffer.toByteArray()))
+                            lineBuffer.write(buffer, mark, i - mark)
+                            mark = i
+                            yield(lineStartOffset j lineBuffer.toByteArray())
                             lineBuffer.reset()
                             lineStartOffset = offset + i + 1
                         }
-                        else -> lineBuffer.write(byte.toInt())
+
+//                        else -> lineBuffer.write(byte.toInt())
                     }
                 }
+                lineBuffer.write(buffer, mark, bytesRead - mark)
 
                 offset += bytesRead
             }
 
             if (lineBuffer.size() > 0) {
-                yield( (lineStartOffset j lineBuffer.toByteArray()))
+                val tharr = lineBuffer.toByteArray()
+                if (!tharr.decodeToString().trim().isEmpty())
+                    yield((lineStartOffset j tharr))
             }
         }
     }
 }
+
+/** unit test for fun streamLines*/
+fun main() {
+//write several lines in a  tmpfile
+    val tmpfile = File.createTempFile("test", ".txt")
+
+    val lines = listOf("line1", "line2", "line3")
+
+    JavaNioFileFiles.write(tmpfile.toPath(), lines)
+    tmpfile.deleteOnExit()
+
+    //read the lines back in a sequence
+    val seq = Files.streamLines(tmpfile.absolutePath, 1)
+    seq.forEach { println(it.second.decodeToString()) }
+    println("lines should be 3 - lines are ${seq.count()}")
+    assert(seq.map { it.second.toString(Charsets.UTF_8) }.toList() == lines) { "lines differ" }
+}
+
