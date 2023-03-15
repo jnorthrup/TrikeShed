@@ -36,7 +36,7 @@ actual object Files {
         var lineStartOffset: Long = 0
         val lineBuffer = mutableListOf<ByteArray>()
 
-        file.inputStream().buffered(bufsize).use { input ->
+        file.inputStream() .use { input ->
             while (true) {
                 val bytesRead = input.read(buffer)
                 if (bytesRead == -1) break
