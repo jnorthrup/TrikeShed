@@ -7,6 +7,4 @@ import borg.trikeshed.lib.toSeries
 import  kotlin.test.*
 
 
-class CharSeriesKtTest {
-
-}
+class CharSeriesKtTest

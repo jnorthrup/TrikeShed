@@ -116,7 +116,7 @@ class JsonPathTest {
         val path: JsPath = _l[3,0,0].toJsPath
         val result = jsPath(element j src, path, true, mutableListOf())
         if (result is Join<*,*>) {
-            val r = result as Join<*,*>
+            val r = result
             if(r.a!=0) fail("result.a is not an empty Series")
         }
     }
@@ -128,7 +128,7 @@ class JsonPathTest {
         val path: JsPath = _l[3,0,0].toJsPath
         val result = jsPath(element j src, path, true, mutableListOf())
         if (result is Map<*,*>) {
-            val r = result as Map<*,*>
+            val r = result
             if(r.isNotEmpty()) fail("result is not an empty Map")
         }
     }

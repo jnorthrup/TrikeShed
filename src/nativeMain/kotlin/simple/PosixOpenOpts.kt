@@ -514,7 +514,7 @@ enum class PosixOpenOpts(val posixConst: Int) {
     O_Trunc(O_TRUNC),
     ;
 
-    val i: Int get() = posixConst.toInt()
+    val i: Int get() = posixConst
     val ui: UInt get() = posixConst.toUInt()
     val l: Long get() = posixConst.toLong()
     val ul: ULong get() = posixConst.toULong()

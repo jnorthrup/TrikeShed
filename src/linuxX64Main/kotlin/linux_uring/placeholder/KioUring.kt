@@ -195,7 +195,7 @@ class KioUring {
     ) {
         sqe.pointed.run {
             fd = file_fd
-            flags = (UringSqeFlags.sqeIo_link.ub or UringSqeFlags.sqeIo_hardlink.ub).toUByte()
+            flags = (UringSqeFlags.sqeIo_link.ub or UringSqeFlags.sqeIo_hardlink.ub)
             opcode = UringOpcode.Op_Readv.opConstant.toUByte()
             addr = fi.iovecs.toLong().toULong()
             len = blocks.toUInt()
@@ -211,7 +211,7 @@ class KioUring {
         val triple = sqePreamble()
         sqe.pointed.run {
             fd = file_fd
-            flags = UringSqeFlags.sqeIo_link.ub.toUByte()
+            flags = UringSqeFlags.sqeIo_link.ub
             opcode = UringOpcode.Op_Close.opConstant.toUByte()
         }
         sqeSubmit(triple)

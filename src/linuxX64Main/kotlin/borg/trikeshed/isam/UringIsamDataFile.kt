@@ -1,4 +1,4 @@
-//package borg.trikeshed.isam
+package borg.trikeshed.isam//package borg.trikeshed.isam
 //
 //import borg.trikeshed.common.Usable
 //import borg.trikeshed.cursor.*

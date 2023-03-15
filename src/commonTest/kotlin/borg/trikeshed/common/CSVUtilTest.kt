@@ -124,7 +124,7 @@ class CSVUtilTest {
             assertEquals(4261.48f, row16List[2])
             assertEquals(4261.48f, row16List[3])
             assertEquals(4261.48f, row16List[4])
-            assertEquals(7958.34896534f, row16List[11])
+            assertEquals(7958.349f, row16List[11])
             assertEquals(0f, row16List[5])
             assertEquals(0f, row16List[7])
             assertEquals(0f, row16List[9])

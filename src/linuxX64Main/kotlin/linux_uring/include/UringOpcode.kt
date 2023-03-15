@@ -576,7 +576,7 @@ enum class UringOpcode {
         this.opConstant = opConstant
     }
     constructor(opConstant: io_uring_op) {
-        this.opConstant = opConstant.value.toUInt()
+        this.opConstant = opConstant.value
     }
 
     val i: Int get() = opConstant.toInt()

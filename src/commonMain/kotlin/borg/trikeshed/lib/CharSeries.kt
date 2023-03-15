@@ -1,4 +1,4 @@
-@file:Suppress("SpellCheckingInspection")
+@file:Suppress("SpellCheckingInspection", "ControlFlowWithEmptyBody")
 
 package borg.trikeshed.lib
 
