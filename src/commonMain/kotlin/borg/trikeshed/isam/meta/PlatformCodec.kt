@@ -1,6 +1,5 @@
 package borg.trikeshed.isam.meta
 
-import kotlin.experimental.and
 import kotlin.experimental.or
 import kotlin.jvm.JvmStatic
 

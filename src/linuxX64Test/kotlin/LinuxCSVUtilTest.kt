@@ -32,8 +32,7 @@ class LinuxCSVUtilTest {
     fun fileBuffer(target: String): FileBuffer {
         logDebug { "Cwd:" + Files.cwd() }
         val fname = Files.cwd() + '/' + target
-        val fileBuf = openFileBuffer(fname)
-        return fileBuf
+        return openFileBuffer(fname)
     }
 
     /** read in hi.csv and verify the contents */

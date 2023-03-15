@@ -149,7 +149,7 @@ actual class IsamDataFile actual constructor(
 
             var last: RecordMeta
 
-            var rowLen: Int = 0
+            var rowLen = 0
 
             lateinit var rowBuffer: ByteArray
             var fibLog: FibonacciReporter? = null

@@ -3,9 +3,7 @@
 package borg.trikeshed.parse
 
 import borg.trikeshed.common.collections.s_
-import borg.trikeshed.lib.CharSeries
 import borg.trikeshed.lib.*
-import borg.trikeshed.parse.JsonParser
 
 typealias JsElement = Join<Twin<Int>, Series<Int>> //(openIdx j closeIdx) j commaIdxs
 typealias JsIndex = Join<Twin<Int>, Series<Char>> //(twin j src)
@@ -129,7 +127,7 @@ object JsonParser {
                     val (before, after) = combine.toArray()
                     val possiblyEmpty = src.clone().lim(after).pos(before + 1).trim
                     if (!possiblyEmpty.hasRemaining) return if (isObj)
-                        emptyMap<String, Any?>() else 0 j { x: Int -> TODO() }
+                        emptyMap<String, Any?>() else 0 j { _: Int -> TODO() }
                 }
 
                 combine.`▶`.zipWithNext().α { (before, after) ->
@@ -193,7 +191,7 @@ object JsonParser {
         val (element: JsElement, src) = context
         val (pathHead: JsPathElement, pathTail: JsPath) = path.first() j path.drop(1)
 
-        return pathHead.fold<Any?>(
+        return pathHead.fold(
             /** this, String branch, performs the search of a key by descending into each segment, and looking for a
              * key that matches, and then will recurse into that, or return the desired form
              */

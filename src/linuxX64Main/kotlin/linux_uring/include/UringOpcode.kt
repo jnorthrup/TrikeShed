@@ -1,10 +1,9 @@
 @file:Suppress("EnumEntryName")
 
 package linux_uring.include
-import borg.trikeshed.lib.CZero.nz
-import borg.trikeshed.lib.Either
-import cnames.structs.statx
 
+import borg.trikeshed.lib.CZero.nz
+import cnames.structs.statx
 import zlinux_uring.*
 import zlinux_uring.io_uring_op.*
 

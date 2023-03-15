@@ -1,6 +1,5 @@
 package borg.trikeshed.common
 
-import borg.trikeshed.lib.CharSeries
 import borg.trikeshed.lib.Join
 import kotlinx.cinterop.*
 import platform.posix._PC_PATH_MAX

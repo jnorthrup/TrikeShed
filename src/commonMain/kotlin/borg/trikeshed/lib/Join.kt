@@ -16,13 +16,13 @@ interface Join<A, B> {
         get() = Pair(a, b)
 
     /** debugger hack only, violates all common sense */
-    val list: List<Any?> get() = (this as? Series<out Any?>)?.toList() ?: emptyList<Any?>()
+    val list: List<Any?> get() = (this as? Series<out Any?>)?.toList() ?: emptyList()
 
     companion object {
         //the Join factory method
         operator fun <A, B> invoke(a: A, b: B): Join<A, B> = object : Join<A, B> {
-            override val a: A get() = a
-            override val b: B get() = b
+            override inline val a: A get() = a
+            override inline val b: B get() = b
         }
 
         //the Pair factory method
@@ -32,10 +32,7 @@ interface Join<A, B> {
         }
 
         //Twin factory method
-        fun <T> Twin(a: T, b: T): Twin<T> = object : Twin<T> {
-            override val a: T get() = a
-            override val b: T get() = b
-        }
+        inline fun <T> Twin(a: T, b: T): Twin<T> = a j b
 
         //the Map factory method
         operator fun <A, B> invoke(map: Map<A, B>): Series<Join<A, B>> = object : Series<Join<A, B>> {
@@ -49,13 +46,13 @@ interface Join<A, B> {
 
 typealias Twin<T> = Join<T, T>
 
-val <A> Join<A, *>.first: A get() = this.a
-val <B> Join<*, B>.second: B get() = this.b
+inline val <A> Join<A, *>.first: A get() = this.a
+inline val <B> Join<*, B>.second: B get() = this.b
 
 /**
  * exactly like "to" for "Join" but with a different (and shorter!) name
  */
-infix fun <A, B> A.j(b: B): Join<A, B> = Join(this, b)
+inline infix fun <A, B> A.j(b: B): Join<A, B> = Join(this, b)
 
 /** α
  * (λx.M[x]) → (λy.M[y])	α-conversion
@@ -68,7 +65,7 @@ infix fun <A, B> A.j(b: B): Join<A, B> = Join(this, b)
  *  ` { x -> M(x) } ` making the delta symbol into lambda braces and the x into a parameter and the M(x) into the body
  */
 
-infix fun <X, C, V : Series<X>> V.α(xform: (X) -> C): Series<C> = size j { i -> xform(this[i]) }
+inline infix fun <X, C, V : Series<X>> V.α(crossinline xform: (X) -> C): Series<C> = size j { i -> xform(this[i]) }
 
 /** an iterable is converted by full reification to List then lazy transform. */
 infix fun <X, C, V : Iterable<X>> V.α(xform: (X) -> C): Series<C> =
@@ -131,10 +128,9 @@ fun Series<Short>.toArray(): ShortArray =
     ShortArray(size) { i -> get(i) }
 
 inline fun <reified T> Join<Int, (Int) -> T>.toArray(): Array<T> =
-    Array<T>(size) { i -> get(i) }
+    Array(size) { i -> get(i) }
 
-fun <T> Array<T>.toSeries(): Join<Int, (Int) -> T> =
-    (size j ::get) as Join<Int, (Int) -> T>
+fun <T> Array<T>.toSeries(): Join<Int, (Int) -> T> = size j ::get
 
 
 //clockwise circle arrow unicode character is ↻ (U+21BB)
@@ -148,10 +144,10 @@ fun <T> Array<T>.toSeries(): Join<Int, (Int) -> T> =
 //according to openai Codex:
 // in kotlin, val a: ()->B  wraps a B.  in lambda calculus which is left identity ?  in kotlin, a: ()->B  is right identity.  left identity is: val a: ()->B = { b }  right identity is:  val a: ()->B = b
 
-val <T> T.leftIdentity: () -> T get() = { this }
+inline val <T> T.leftIdentity: () -> T get() = { this }
 
 /**Left Identity Function */
-val <T> T.`↺`: () -> T get() = leftIdentity
+inline val <T> T.`↺`: () -> T get() = leftIdentity
 
 fun <T> `↻`(t: T): T = t
 infix fun <T> T.rightIdentity(t: T): T = `↻`(t)

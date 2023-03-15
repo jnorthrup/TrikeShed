@@ -1,10 +1,14 @@
 package borg.trikeshed.parse
 
 import borg.trikeshed.common.collections._l
-import borg.trikeshed.lib.*
+import borg.trikeshed.lib.Join
+import borg.trikeshed.lib.j
+import borg.trikeshed.lib.toSeries
 import borg.trikeshed.parse.JsonParser.index
 import borg.trikeshed.parse.JsonParser.jsPath
-import kotlin.test.*
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.fail
 
 class JsonPathTest {
     @Test
@@ -19,7 +23,7 @@ class JsonPathTest {
 
 
         json = """[0, {}, [1], {"1": {"2": {"3": {"4": 1}}}}]"""
-        d = mutableListOf<Int>()
+        d = mutableListOf()
         elem = index(json.toSeries(), d)
         assertEquals(0, d[0])
         assertEquals(1, d[1])
@@ -29,7 +33,7 @@ class JsonPathTest {
             |], {"1"
             |: {"2": { "3 ": { "4" : 1} }} } ] 
             |""".trimMargin()
-        d = mutableListOf<Int>()
+        d = mutableListOf()
         elem = index(json.toSeries(), d)
         assertEquals(0, d[0])
         assertEquals(1, d[1])
@@ -37,14 +41,14 @@ class JsonPathTest {
         assertEquals(4, d[3])
 
         json = """ [ 0,1 , 2 ,   3]"""
-        d = mutableListOf<Int>()
+        d = mutableListOf()
         elem = index(json.toSeries(), d)
         assertEquals(0, d[0])
         assertEquals(0, d[1])
         assertEquals(0, d[2])
         assertEquals(0, d[3])
         json = """ [ 0,1 , 2 ,   [ [[ [3]] ]] ] """
-        d = mutableListOf<Int>()
+        d = mutableListOf()
         elem = index(json.toSeries(), d)
         assertEquals(0, d[0])
         assertEquals(0, d[1])

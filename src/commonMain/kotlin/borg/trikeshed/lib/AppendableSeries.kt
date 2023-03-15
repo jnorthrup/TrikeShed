@@ -1,9 +1,5 @@
 package borg.trikeshed.lib
 
-import borg.trikeshed.lib.Series
-import borg.trikeshed.lib.get
-import borg.trikeshed.lib.size
-
 interface AppendableSeries<T> : Series<T> { fun append(item: T) }
 
 //series val appendable

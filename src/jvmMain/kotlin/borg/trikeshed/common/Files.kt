@@ -27,11 +27,13 @@ actual object Files {
     actual fun cwd(): String = JavaNioFilePaths.get("").toAbsolutePath().toString()
 
     actual fun exists(filename: String): Boolean = JavaNioFileFiles.exists(JavaNioFilePaths.get(filename))
-    actual fun streamLines(fileName: String, bufsize:Int): Sequence<Join<Long, ByteArray>> {
+
+    actual
+    fun streamLines(fileName: String, bufsize: Int): Sequence<Join<Long, ByteArray>> {
         var outerPos = 0L
         var curLineStart = 0L
         val carry = mutableListOf<ByteArray>()
-        val recycler=ArrayDeque<ByteArray>()
+        val recycler = ArrayDeque<ByteArray>()
         val buf = ByteArray(bufsize)
         return sequence {
             FileInputStream(fileName).use { channel ->
@@ -40,42 +42,32 @@ actual object Files {
                     val read = channel.read(buf)
                     if (read == -1) break
                     var lineStart = 0
-                    for (i in 0 until read) {
-                        if (buf[i] == '\n'.code.toByte()) {
-                            //if len==64 then use buf from recycler
-                            if (i - lineStart == bufsize .dec()) {
-                                if (recycler.isNotEmpty()) {
-                                    val recycled = recycler.removeFirst()
-                                    System.arraycopy(buf, lineStart, recycled, 0, bufsize)
-                                    carry.add(recycled)
-                                } else {
-                                    carry.add(buf.copyOfRange(lineStart, i + 1))
-                                }
-                            } else {
-                                carry.add(buf.copyOfRange(lineStart, i + 1))
-                            }
+                    for (i in 0 until read) if (buf[i] == '\n'.code.toByte()) {
+                        var docopy = false
+                        if (i - lineStart == bufsize.dec()) {
+                            if (recycler.isNotEmpty()) {
+                                val recycled = recycler.removeFirst()
+                                System.arraycopy(buf, lineStart, recycled, 0, bufsize)
+                                carry.add(recycled)
+                            } else docopy = true
+                        } else docopy = true
+                        if (docopy) carry.add(buf.copyOfRange(lineStart, i + 1))
 
+                        if (carry.sumOf { it.size } > 0)
+                            yield((curLineStart j carry.reduce { acc, bytes -> acc + bytes }))
 
-
-
-                            if (carry.sumOf { it.size } > 0)
-                                yield((curLineStart j carry.reduce { acc, bytes -> acc + bytes }))
-                            //reclaim 64 byte buffers from carry into recycler
-                            carry.forEach({ if (it.size == bufsize) recycler.addLast(it) })
-                            carry.clear()
-                            lineStart = i + 1
-                            curLineStart = outerPos + lineStart
-                        }
+                        carry.forEach { if (it.size == bufsize) recycler.addLast(it) }
+                        carry.clear()
+                        lineStart = i + 1
+                        curLineStart = outerPos + lineStart
                     }
                     if (lineStart < read)
                         carry.add(buf.copyOfRange(lineStart, read))
                     outerPos += read
 
                 }
-                if (carry.isNotEmpty()) {
-                    if (carry.sumOf { it.size } > 0)
-                        yield(curLineStart j carry.reduce { acc, bytes -> acc + bytes })
-                }
+                if (carry.isNotEmpty()) if (carry.sumOf { it.size } > 0)
+                    yield(curLineStart j carry.reduce { acc, bytes -> acc + bytes })
             }
         }
     }

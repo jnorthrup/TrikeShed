@@ -1,10 +1,8 @@
 package borg.trikeshed.isam
 
 import borg.trikeshed.common.Usable
-import borg.trikeshed.cursor.ColumnMeta
 import borg.trikeshed.cursor.Cursor
 import borg.trikeshed.cursor.RowVec
-import borg.trikeshed.lib.Series
 import kotlinx.coroutines.flow.MutableSharedFlow
 
 expect class IsamDataFile(

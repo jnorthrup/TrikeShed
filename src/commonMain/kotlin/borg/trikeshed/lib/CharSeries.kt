@@ -2,7 +2,6 @@
 
 package borg.trikeshed.lib
 
-import borg.trikeshed.lib.*
 import borg.trikeshed.lib.CZero.nz
 
 /**
@@ -21,10 +20,10 @@ class CharSeries(buf: Series<Char>,
     ) : Series<Char> by buf { //delegate to the underlying series
 
     /** get, the verb - the char at the current position and increment position */
-    val get: Char
+    inline val get: Char
         get() {
             if (!hasRemaining) throw IndexOutOfBoundsException("pos: $pos, limit: $limit")
-            val c = b(pos); pos++; return c
+            val c = get(pos); pos++; return c
         }
 
     //string ctor
@@ -80,13 +79,12 @@ class CharSeries(buf: Series<Char>,
     /** slice creates/returns a subrange CharSeries from pos until limit */
     val slice: CharSeries
         get() {
-        val pos1 = this.pos
-        val limit1 = this.limit
-        val    intRange = pos1 until limit1
-        val buf = (this)[intRange]
-        val charSeries = CharSeries(buf)
-        return charSeries
-    }
+            val pos1 = this.pos
+            val limit1 = this.limit
+            val intRange = pos1 until limit1
+            val buf = (this)[intRange]
+            return CharSeries(buf)
+        }
 
     /** limit, the verb - redefines the last position accessable by get and redefines remaining accordingly*/
     fun lim(i: Int): CharSeries = apply { limit = i }

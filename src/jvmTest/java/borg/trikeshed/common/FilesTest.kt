@@ -1,8 +1,6 @@
 package borg.trikeshed.common
 
-import borg.trikeshed.lib.first
 import borg.trikeshed.lib.second
-import kotlin.io.path.absolutePathString
 import kotlin.io.path.createTempDirectory
 import kotlin.test.Test
 import kotlin.test.assertContentEquals

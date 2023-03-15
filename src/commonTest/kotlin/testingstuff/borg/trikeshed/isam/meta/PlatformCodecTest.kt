@@ -1,18 +1,16 @@
 package testingstuff.borg.trikeshed.isam.meta
 
 import borg.trikeshed.isam.meta.IOMemento.*
-import kotlinx.datetime.Clock
-import borg.trikeshed.isam.meta.PlatformCodec.Companion.currentPlatformCodec
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.asString
 import borg.trikeshed.lib.size
 import borg.trikeshed.lib.toSeries
+import kotlinx.datetime.Clock
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertNotEquals
 
 
 class PlatformCodecTest {

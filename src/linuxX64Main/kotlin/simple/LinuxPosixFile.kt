@@ -29,7 +29,7 @@ class LinuxPosixFile(
 ) : HasDescriptor, HasSize {
     override fun read64(buf: ByteArray): ULong {
         val addressOf = buf.pin().addressOf(0)
-        val b: CArrayPointer<ByteVar> = addressOf.reinterpret<ByteVar>()
+        val b: CArrayPointer<ByteVar> = addressOf.reinterpret()
         val read = read(fd, b, buf.size.toULong())
         HasPosixErr.posixRequires(read >= 0) { "read failed with result ${HasPosixErr.reportErr(read.toInt())}" }
         return read.toULong()
@@ -400,7 +400,7 @@ class LinuxPosixFile(
             __prot = prot,
             __flags = flags,
             __offset = offset
-        ).reinterpret<CArrayPointerVar<ByteVar>>()
+        ).reinterpret()
     }
 
     /** * lseek [manpage](https://www.man7.org/linux/man-pages/man2/leek.2.html) */
@@ -417,7 +417,7 @@ class LinuxPosixFile(
             return fd
         }
 
-        fun statk(path: String?, stat1: stat = nativeHeap.alloc<stat>()): stat {
+        fun statk(path: String?, stat1: stat = nativeHeap.alloc()): stat {
             stat(path, stat1.ptr).also {
                 HasPosixErr.posixRequires(it.z) { "statx $path" }
                 return stat1
@@ -520,7 +520,7 @@ class LinuxPosixFile(
             val len: ULongVarOf<size_t> = alloc()
             len.value = 0u
             var read: ssize_t = 0L
-            val list: MutableList<String> = mutableListOf<String>()
+            val list: MutableList<String> = mutableListOf()
 
             while (true) {
                 read = getline(line.ptr, len.ptr, fp)

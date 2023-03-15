@@ -3,8 +3,6 @@
 package linux_uring.include
 
 import borg.trikeshed.lib.CZero.nz
-import kotlinx.cinterop.get
-import kotlinx.cinterop.memScoped
 import linux_uring.*
 import zlinux_uring.*
 

@@ -1,16 +1,19 @@
 package borg.trikeshed.isam
 
 import borg.trikeshed.common.Usable
-import borg.trikeshed.cursor.*
+import borg.trikeshed.cursor.Cursor
+import borg.trikeshed.cursor.RowVec
+import borg.trikeshed.cursor.meta
 import borg.trikeshed.isam.meta.IOMemento
 import borg.trikeshed.lib.*
 import kotlinx.cinterop.*
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.withContext
 import platform.posix.*
 import simple.PosixFile
 import simple.PosixOpenOpts
+import kotlin.collections.component1
+import kotlin.collections.component2
+import kotlin.collections.set
 
 actual class IsamDataFile actual constructor(
     datafileFilename: String,
@@ -130,18 +133,17 @@ actual class IsamDataFile actual constructor(
             }).toArray()
             val rowLen = last.end
 
-            val clears = meta.withIndex().filter {
+            meta.withIndex().filter {
                 it.value.type.networkSize == null
             }.map { it.index }.toIntArray()
 
             val rowBuffer1 = ByteArray(rowLen)
-            val rowBuffer = rowBuffer1
 
             //write rows
             cursor.iterator().forEach { rowVec ->
-                WireProto.writeToBuffer(rowVec, rowBuffer, meta0)
+                WireProto.writeToBuffer(rowVec, rowBuffer1, meta0)
 
-                data.write(rowBuffer)
+                data.write(rowBuffer1)
             }
             data.close()
         }

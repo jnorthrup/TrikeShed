@@ -215,7 +215,7 @@ fun IntArray.binarySearch(i: Int): Int {
  * Vect0r->Set */
 fun <S> Join<Int, (Int) -> S>.toSet(opt: MutableSet<S>? = null): MutableSet<S> = (
         opt
-            ?: LinkedHashSet<S>(size)
+            ?: LinkedHashSet(size)
         ).also { hs -> hs.addAll(this.`▶`) }
 
 // Series iterator for use in for loops
@@ -328,7 +328,6 @@ inline operator fun <reified A> Series<Series<Join<A, *>>>.unaryMinus(): Series<
 fun <T> List<T>.toSeries(): Series<T> = size j ::get
 
 fun BooleanArray.toSeries(): Series<Boolean> = size j ::get
-
 fun ByteArray.toSeries(): Series<Byte> = size j ::get
 fun ShortArray.toSeries(): Series<Short> = size j ::get
 fun IntArray.toSeries(): Series<Int> = size j ::get
@@ -473,46 +472,29 @@ fun Series<Char>.asString(upto: Int = Int.MAX_VALUE): String = this.take(upto).e
  * @return Double
  */
 fun Series<Char>.parseDouble(): Double {
-    var x: Int = 0
-    var isNegativeValue: Boolean = false
-    var r: Double = 0.0
-    var decimal: Boolean = false
+    var x = 0
+    var isNegativeValue = false
+    var r = 0.0
+    var decimal = false
     var exponentSign: Byte = 1
     var exponentValue: UShort = 0u
     var digitsAfterDecimal: UByte = 0u
-    fun initSign() {
-        when (this[x]) {
-            '-' -> {
-                isNegativeValue = true
-                x++
-            }
 
-            '+' -> {
-                isNegativeValue = false
-                x++
-            }
 
-            else -> isNegativeValue = false
-        }
-    }
-
-    fun isDigit(c: Char): Boolean = c in '0'..'9'
-
-    fun parseExponent() {
-        if (this[x] == '-') {
-            exponentSign = -1
-            x++
-        } else if (this[x] == '+') x++
-        while (x < size) {
-            val c = this[x]
-            if (!isDigit(c)) throw NumberFormatException("Invalid exponent value")
-            exponentValue = (exponentValue * 10u + (c - '0').toUShort()).toUShort()
+    when (this[x]) {
+        '-' -> {
+            isNegativeValue = true
             x++
         }
+
+        '+' -> {
+            isNegativeValue = false
+            x++
+        }
+        else -> isNegativeValue = false
     }
 
-    initSign()
-    var afterE=false
+    var afterE = false
     while (x < size) {
         val c: Char = this[x]
         when (c) {
@@ -520,8 +502,21 @@ fun Series<Char>.parseDouble(): Double {
                 require(!afterE) { "Invalid second exponent" }
                 afterE = true
                 x++
-                parseExponent()
+                when {
+                    this[x] == '-' -> {
+                        exponentSign = -1
+                        x++
+                    }
+                    this[x] == '+' -> x++
+                }
+                while (x < size) {
+                    val c1 = this[x]
+                    if (c1 !in '0'..'9') throw NumberFormatException("Invalid exponent value")
+                    exponentValue = (exponentValue * 10u + (c1 - '0').toUShort()).toUShort()
+                    x++
+                }
             }
+
             '.' -> {
                 require(!decimal) { "Invalid second decimal point" }
                 require(!afterE) { "Invalid decimal point behind exponent" }
@@ -538,7 +533,7 @@ fun Series<Char>.parseDouble(): Double {
             else -> throw NumberFormatException("Invalid character at '${c}' ")
         }
     }
-    val dneg: Double = if (isNegativeValue && (r != 0.0)) -1.0 else 1.0
+    val dneg: Double = if (isNegativeValue && r != 0.0) -1.0 else 1.0
     return dneg * r * 10.0.pow((exponentSign * exponentValue.toInt() - digitsAfterDecimal.toInt()).toDouble())
 }
 

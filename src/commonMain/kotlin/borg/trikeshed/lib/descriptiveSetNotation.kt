@@ -70,7 +70,7 @@ infix fun <A> Set<A>.`∖`(other:Set<A>): Set<A> = this.subtract(other)
 
 
 private fun <E> Set<E>.symmetricDifference(other: Set<E>): Set<E> {
-    val result = HashSet<E>(this)
+    val result = HashSet(this)
     for (element in other) {
         if (!result.remove(element)) {
             result.add(element)

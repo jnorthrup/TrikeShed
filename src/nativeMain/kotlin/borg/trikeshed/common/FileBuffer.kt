@@ -1,14 +1,11 @@
 package borg.trikeshed.common
 
 
-import borg.trikeshed.lib.debug
 import borg.trikeshed.lib.logDebug
-import borg.trikeshed.lib.`↺`
-
-import simple.PosixFile
-import simple.PosixOpenOpts
 import kotlinx.cinterop.*
 import platform.posix.munmap
+import simple.PosixFile
+import simple.PosixOpenOpts
 
 /**
  * an openable and closeable mmap file.
