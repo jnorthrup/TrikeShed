@@ -25,12 +25,6 @@ interface Join<A, B> {
             override val b: B get() = b
         }
 
-//        //the Series factory method
-//        operator fun <T> invoke(vararg items: T) = object : Series<T> {
-//            override val a: Int get() = items.size
-//            override val b: (Int) -> T get() = items::get
-//        }
-
         //the Pair factory method
         operator fun <A, B> invoke(pair: Pair<A, B>) = object : Join<A, B> {
             override val a: A get() = pair.first
@@ -49,14 +43,14 @@ interface Join<A, B> {
             override val b: (Int) -> Join<A, B> get() = { map.entries.elementAt(it).let { Join(it.key, it.value) } }
         }
 
-        inline fun <reified B> emptySeriesOf(): Series<B> = 0 j { TODO("Empty list is incomplete") }
+        fun <B> emptySeriesOf(): Series<B> = 0 j { TODO("Empty list is incomplete") }
     }
 }
 
 typealias Twin<T> = Join<T, T>
 
-inline val <reified A> Join<A, *>.first: A get() = this.a
-inline val <reified B> Join<*, B>.second: B get() = this.b
+val <A> Join<A, *>.first: A get() = this.a
+val <B> Join<*, B>.second: B get() = this.b
 
 /**
  * exactly like "to" for "Join" but with a different (and shorter!) name
