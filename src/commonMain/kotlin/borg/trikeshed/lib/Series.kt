@@ -21,7 +21,7 @@ val <T> Series<T>.size: Int get() = a
 
 /** index operator for Series
  */
-operator fun <T> Series<T>.get(i: Int): T = b(i)
+inline operator fun <T> Series<T>.get(i: Int): T = b(i)
 
 /**
  * fold for Series
@@ -96,7 +96,6 @@ fun <A> combine(vararg catn: Series<A>): Series<A> { // combine
     val frst = catn[0]
     val sz0 = frst.size
     return when (catn.size) {
-        0 -> 0 j { TODO() }
         1 -> frst
         2 -> sz0 + catn[1].size j { i ->
             if (i < sz0) frst[i] else catn[1][i - sz0]
@@ -251,7 +250,9 @@ class IntHeap(series: Series<Int>) {
     private var heap: IntArray = IntArray(series.size)
     private var size = 0
 
-    init { for (i in series) add(i) }
+    init {
+        for (i in series) add(i)
+    }
 
     fun add(i: Int) {
         if (size == heap.size) {
@@ -479,16 +480,19 @@ fun Series<Char>.parseDouble(): Double {
     var exponentSign: Byte = 1
     var exponentValue: UShort = 0u
     var digitsAfterDecimal: UByte = 0u
-    var c: Char
     fun initSign() {
-        if (this[x] == '-') {
-            isNegativeValue = true
-            x++
-        } else if (this[x] == '+') {
-            isNegativeValue = false
-            x++
-        } else {
-            isNegativeValue = false
+        when (this[x]) {
+            '-' -> {
+                isNegativeValue = true
+                x++
+            }
+
+            '+' -> {
+                isNegativeValue = false
+                x++
+            }
+
+            else -> isNegativeValue = false
         }
     }
 
@@ -508,19 +512,30 @@ fun Series<Char>.parseDouble(): Double {
     }
 
     initSign()
+    var afterE=false
     while (x < size) {
-        c = this[x]
-        if (c == 'E' || c == 'e') {
-            x++
-            parseExponent()
-        } else if (c == '.') {
-            decimal = true
-            x++
-        } else if (!isDigit(c)) throw NumberFormatException("Invalid digit")
-        else {
-            r = r * 10 + (c - '0').toDouble()
-            if (decimal) digitsAfterDecimal++
-            x++
+        val c: Char = this[x]
+        when (c) {
+            'E', 'e' -> {
+                require(!afterE) { "Invalid second exponent" }
+                afterE = true
+                x++
+                parseExponent()
+            }
+            '.' -> {
+                require(!decimal) { "Invalid second decimal point" }
+                require(!afterE) { "Invalid decimal point behind exponent" }
+                decimal = true
+                x++
+            }
+
+            in '0'..'9' -> {
+                r = r * 10 + (c - '0').toDouble()
+                if (decimal) digitsAfterDecimal++
+                x++
+            }
+
+            else -> throw NumberFormatException("Invalid character at '${c}' ")
         }
     }
     val dneg: Double = if (isNegativeValue && (r != 0.0)) -1.0 else 1.0
