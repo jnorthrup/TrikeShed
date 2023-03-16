@@ -2,20 +2,27 @@
 
 many things
 
-## tldr 
+## tldr
+
 this is the backbone of the json scanner and the fast-enough single-threaded database within trappings.
+
 ```kotlin 
-interface Join<A, B> {    val a: A;   val b: B;
+interface Join<A, B> {
+    val a: A
+    val b: B
     operator fun component1(): A = a//destructuring 1&2
     operator fun component2(): B = b
-    val pair: Pair<A, B> get() = Pair(a, b); ...}
+    val pair: Pair<A, B> get() = Pair(a, b); ...
+}
 
 typealias Twin<T> = Join<T, T>
 typealias Series<T> = Join<Int, (Int) -> T>
+
 val <T> Series<T>.size: Int get() = a
+
 /** index operator for Series*/
 operator fun <T> Series<T>.get(i: Int): T = b(i)
-[...] dozens of mix-ins and specializations
+[...] dozens of mix - ins and specializations
 
 typealias JsElement = Join<Twin<Int>, Series<Int>> //(openIdx j closeIdx) j commaIdxs
 typealias JsIndex = Join<Twin<Int>, Series<Char>> //(element j src)
@@ -28,7 +35,7 @@ typealias RowVec = Series2<Any, () -> RecordMeta>
 typealias Cursor = Series<RowVec>
  ```
 
-## if you are still reading... I've also written ideas that describe (some) goals and ideals of the library:  
+## if you are still reading... I've also written ideas that describe (some) goals and ideals of the library:
 
 * [x] strongly immmutable Join aka Pair,Twin,Series aka Array,Series2, Cursors, are all typealiases of Join
     * extending the language through index and other operators happens as a side-effect of testing new expression
@@ -58,11 +65,11 @@ typealias Cursor = Series<RowVec>
 * [x] Cursor lazy and memory-resident Dataframes lending strongly typed columns, with names, splittability,
   combinability, transforms,
 
-* [x] ISAM Columnar Dataframes Storage @see http://github.com/jnorthrup/columnar
+* [x] ~~ISAM~~ FlatFile Columnar Dataframes Storage @see http://github.com/jnorthrup/columnar
     - now with a native port. the jvm rewrite of columnar is also a full rewrite, streamlined and simplified.
-    - the kotlin-native isam is linux-posix-64bit specific mmap code.
+    - the kotlin-native ~~isam~~ FlatFile is linux-posix-64bit specific mmap code.
     - the columnar project has a lot more bells and whistles and is battle hardened
-    - the default construction of an ISAM volume are tested to be correct in a single threaded environment
+    - the default construction of an ~~ISAM~~ FlatFile volume are tested to be correct in a single threaded environment
         - [x] the jvm version employs a lock-seek-reed-unlock strategy
         - [x] the native version uses [linux] `mmap` with readonly memory.
             - [x] in practice this is copmatible with macos posix until you look into liburing integration, so the uring
@@ -73,7 +80,7 @@ typealias Cursor = Series<RowVec>
 
 * [x] Duck-typing CSV-Cursor which includes varchar
   width sizing and narrowing numerical of types and float/integer detection on imported columns. supports
-  explicit ISAM transcription on initial scan. heap stores only index to first records for CSV cursors.
+  explicit ~~ISAM~~ FlatFile transcription on initial scan. heap stores only index to first records for CSV cursors.
 
 
 * [x] JSON indexer/reifier/path-selector written for simplicity and speed. This is not a serdes library.
@@ -101,5 +108,4 @@ typealias Cursor = Series<RowVec>
 
 
 * [ ]  a handful of missing kotlin-common collections are scattered about, these would be about as warrantable as the
-  unit
-  tests you might find for them.
+  unit tests you might find for them.

@@ -24,7 +24,7 @@ class CowSeriesHandle<T>(
     ) : MutableSeries<T> {
 
     var letter: COWSeriesBody<T> by Delegates.observable(letter1) { _, old, new ->
-        observer?.invoke( old j new )
+        observer?.invoke( old  j new )
     }
 
     override val a: Int get() = letter.a

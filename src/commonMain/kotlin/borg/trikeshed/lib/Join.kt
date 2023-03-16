@@ -45,6 +45,7 @@ interface Join<A, B> {
 }
 
 typealias Twin<T> = Join<T, T>
+typealias Triplet<T> = Join3<T, T, T>
 
 inline val <A> Join<A, *>.first: A get() = this.a
 inline val <B> Join<*, B>.second: B get() = this.b

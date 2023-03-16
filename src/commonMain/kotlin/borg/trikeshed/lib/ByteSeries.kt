@@ -7,16 +7,16 @@ fun Series<Byte>.decodeUtf8(charArray:CharArray= CharArray(size)): Series<Char> 
     while (y < this.size && w < charArray.size) {
         val c = this[y++].toInt()
         /* 0xxxxxxx */
-        when (c shr 4) {
+        when (c shr 4 ) {
             in 0..7 -> charArray[w++] = c.toChar() // 0xxxxxxx
 
-            12, 13 -> {
+            /*12, 13*/ 0x0C, 0x0D -> {
                 // 110x xxxx   10xx xxxx
                 val c2 = this[y++].toInt()
                 charArray[w++] = ((c and 0x1F) shl 6 or (c2 and 0x3F)).toChar()
             }
 
-            14 -> {
+            /*14*/ 0x0E -> {
                 // 1110 xxxx  10xx xxxx  10xx xxxx
                 val c2 = this[y++].toInt()
                 val c3 = this[y++].toInt()
