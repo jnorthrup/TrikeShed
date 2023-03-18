@@ -237,3 +237,23 @@ operator fun Series<Char>.div(delim: Char): Series<Series<Char>> { //lazy split
         this[p until l]
     }
 }
+
+operator fun Series<Byte>.div(delim: Byte): Series<Series<Byte>> { //lazy split
+    val intList = mutableListOf<Int>()
+    for (x in 0 until size) if (this[x] == delim) intList.add(x)
+
+    /**
+     * iarr is an index of delimitted endings of the ByteSeries.
+     */
+    val iarr: IntArray = intList.toIntArray()
+
+    return iarr α { x ->
+        val p = if (x == 0) 0 else iarr[x.dec()].inc() //start of next
+        val l = //is x last index?
+            if (x == iarr.lastIndex)
+                this.size
+            else
+                iarr[x].dec()
+        this[p until l]
+    }
+}
