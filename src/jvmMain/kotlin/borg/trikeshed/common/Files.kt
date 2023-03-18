@@ -3,6 +3,7 @@ package borg.trikeshed.common
 import borg.trikeshed.lib.Join
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.second
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.nio.file.Files as JavaNioFileFiles
 import java.nio.file.Paths as JavaNioFilePaths
@@ -34,7 +35,7 @@ actual object Files {
         val buffer = ByteArray(bufsize)
         var offset: Long = 0
         var lineStartOffset: Long = 0
-        val lineBuffer = mutableListOf<ByteArray>()
+        val lineBuffer = ByteArrayOutputStream()
 
         file.inputStream().use { input ->
             while (true) {
@@ -45,43 +46,24 @@ actual object Files {
                     val byte = buffer[i]
                     when (byte) {
                         '\n'.code.toByte() -> {
-                            lineBuffer.add(buffer.sliceArray(mark..i))
-                            mark = i
+                            lineBuffer.write(buffer, mark, i - mark + 1)
+                            mark = i + 1
 
-                            // Sum the sizes of the ByteArrays in lineBuffer and create a new ByteArray of that size
-                            val totalSize = lineBuffer.sumOf { it.size }
-                            val tharr = ByteArray(totalSize)
-
-                            // Copy the elements from each ByteArray in lineBuffer into tharr
-                            var index = 0
-                            for (ba in lineBuffer) {
-                                ba.copyInto(tharr, index)
-                                index += ba.size
-                            }
-
-                            yield(lineStartOffset j tharr)
-                            lineBuffer.clear()
+                            yield(lineStartOffset j lineBuffer.toByteArray())
+                            lineBuffer.reset()
                             lineStartOffset = offset + i + 1
                         }
                     }
                 }
-                lineBuffer.add(buffer.sliceArray(mark until bytesRead))
+                if (mark < bytesRead) {
+                    lineBuffer.write(buffer, mark, bytesRead - mark)
+                }
 
                 offset += bytesRead
             }
 
-            if (lineBuffer.isNotEmpty()) {
-                // Sum the sizes of the ByteArrays in lineBuffer and create a new ByteArray of that size
-                val totalSize = lineBuffer.sumOf { it.size }
-                val tharr = ByteArray(totalSize)
-
-                // Copy the elements from each ByteArray in lineBuffer into tharr
-                var index = 0
-                for (ba in lineBuffer) {
-                    ba.copyInto(tharr, index)
-                    index += ba.size
-                }
-
+            if (lineBuffer.size() > 0) {
+                val tharr = lineBuffer.toByteArray()
                 if (!tharr.decodeToString().trim().isEmpty())
                     yield((lineStartOffset j tharr))
             }
