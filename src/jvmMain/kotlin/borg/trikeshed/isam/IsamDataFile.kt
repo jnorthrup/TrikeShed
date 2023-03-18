@@ -23,27 +23,78 @@ actual class IsamDataFile actual constructor(
     metafileFilename: String,
     metafile: IsamMetaFileReader,
 ) : Usable, Cursor {
-    actual val datafileFilename: String
-    actual val metafile: IsamMetaFileReader
+//    actual val datafileFilename: String
+//    actual val metafile: IsamMetaFileReader
+actual val datafileFilename  = datafileFilename
+    actual val metafile by lazy { metafile.open();
+    metafile
+    }
+     val data: SeekableByteChannel by lazy {
+         Files.newByteChannel(
+             Paths.get(datafileFilename),
+             READ
+         )
+     }
 
-    val recordlen: Int
+    val recordlen :Int by lazy {  metafile.recordlen}
+    val fileSize: Long get() =data.size()
+    override val a: Int  by lazy { fileSize.toInt() / recordlen }
+
     val constraints: Series<RecordMeta> get() = metafile.constraints
-
-    private lateinit var data: SeekableByteChannel
-
-    var fileSize: Long = -1
     override fun toString(): String =
         "IsamDataFile(metafile=$metafile, recordlen=$recordlen, constraints=$constraints," +
                 " datafileFilename='$datafileFilename', fileSize=$fileSize)"
 
+
+    override val b: (Int) -> RowVec  = { row ->
+        lock.lock()
+        val buffer = ByteBuffer.allocate(recordlen)
+        data.position(row * recordlen.toLong())
+        data.read(buffer)
+        lock.unlock()
+        val array = buffer.position(0).array()
+
+        constraints.size j { col ->
+            val constraint = constraints[col]
+            val s = array.sliceArray(constraint.begin until constraint.end)
+            constraint.decoder(s)!! j { constraint }
+        }
+    }
+    private val lock: ReentrantLock =ReentrantLock()
+//        fileSize = data.size()
+
+    //    actual override fun open() {
+//        metafile.open()
+//        data = Files.newByteChannel(
+//            Paths.get(datafileFilename),
+//            READ,
+//            SPARSE
+//        )
+//        fileSize = data.size()
+//
+//        // report on record alignment of the file
+//        val alignment = fileSize % recordlen
+//        if (alignment != 0L) {
+//            println("WARN: file $datafileFilename is not aligned to recordlen $recordlen")
+//        } else
+//            println("DEBUG: file $datafileFilename is aligned to recordlen $recordlen")
+//
+//        // mention record counts and percentages of each field type by record byte occupancy
+//        val fieldCounts = mutableMapOf<IOMemento, Int>()
+//        val fieldOccupancy = mutableMapOf<IOMemento, Int>()
+//        constraints.forEach { constraint ->
+//            val count = fieldCounts.getOrPut(constraint.type) { 0 }
+//            fieldCounts[constraint.type] = count + 1
+//            val occupancy = fieldOccupancy.getOrPut(constraint.type) { 0 }
+//            fieldOccupancy[constraint.type] = occupancy + constraint.end - constraint.begin
+//        }
+//        println("DEBUG: file $datafileFilename has ${fileSize / recordlen} records")
+//        fieldCounts.forEach { (type, count) ->
+//            val occupancy = fieldOccupancy[type]!!
+//            println("DEBUG: file $datafileFilename has $count fields of type $type occupying $occupancy bytes")
+//        }
+//    }
     actual override fun open() {
-        metafile.open()
-        data = Files.newByteChannel(
-            Paths.get(datafileFilename),
-            READ,
-            SPARSE
-        )
-        fileSize = data.size()
 
         // report on record alignment of the file
         val alignment = fileSize % recordlen
@@ -53,51 +104,31 @@ actual class IsamDataFile actual constructor(
             println("DEBUG: file $datafileFilename is aligned to recordlen $recordlen")
 
         // mention record counts and percentages of each field type by record byte occupancy
-        val fieldCounts = mutableMapOf<IOMemento, Int>()
-        val fieldOccupancy = mutableMapOf<IOMemento, Int>()
-        constraints.forEach { constraint ->
-            val count = fieldCounts.getOrPut(constraint.type) { 0 }
-            fieldCounts[constraint.type] = count + 1
-            val occupancy = fieldOccupancy.getOrPut(constraint.type) { 0 }
-            fieldOccupancy[constraint.type] = occupancy + constraint.end - constraint.begin
-        }
-        println("DEBUG: file $datafileFilename has ${fileSize / recordlen} records")
-        fieldCounts.forEach { (type, count) ->
-            val occupancy = fieldOccupancy[type]!!
-            println("DEBUG: file $datafileFilename has $count fields of type $type occupying $occupancy bytes")
+
+//        val fieldCounts = mutableMapOf<IOMemento, Pair<Int, Int>>()
+//        constraints.forEach { constraint ->
+//            val (count, occupancy) = fieldCounts.getOrPut(constraint.type) { 0 to 0 }
+//            fieldCounts[constraint.type] = count + 1 to occupancy + constraint.end - constraint.begin
+//        }
+        //attempt as groupBy expression above
+
+        val fieldCounts: Map<IOMemento, Pair<Int, Int>> = constraints.`▶`.groupBy { it.type }
+            .mapValues { (_, v) -> v.size to v.sumOf { it.end - it.begin } }
+
+        val ySize = fileSize / recordlen
+        println("DEBUG: file $datafileFilename has $ySize records")
+        fieldCounts.forEach { (type, pair) ->
+            val (count, occupancy) = pair
+            val ocu2 = occupancy.toLong()
+            val unitSize = ocu2.humanReadableByteCountIEC
+            val collectiveSize = (ySize.toLong() * ocu2).humanReadableByteCountIEC
+            println("DEBUG: file $datafileFilename has $count fields of type $type occupying $unitSize or total of $collectiveSize   (${occupancy * 100 / recordlen}%)")
         }
     }
-
-    override val a: Int
-    override val b: (Int) -> RowVec
-
 
     actual override fun close(): Unit = data.close()
 
-    private val lock: ReentrantLock
 
-
-    init {
-        this.datafileFilename = datafileFilename
-        this.metafile = metafile
-        this.recordlen = metafile.recordlen
-        this.a = fileSize.toInt() / recordlen
-        this.lock = ReentrantLock()
-        this.b = { row ->
-            lock.lock()
-            val buffer = ByteBuffer.allocate(recordlen)
-            data.position(row * recordlen.toLong())
-            data.read(buffer)
-            lock.unlock()
-            val array = buffer.position(0).array()
-
-            constraints.size j { col ->
-                val constraint = constraints[col]
-                val s = array.sliceArray(constraint.begin until constraint.end)
-                constraint.decoder(s)!! j { constraint }
-            }
-        }
-    }
 
     actual companion object {
         actual fun write(cursor: Cursor, datafilename: String, varChars: Map<String, Int>) {

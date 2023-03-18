@@ -2,9 +2,10 @@
 
 many things
 
-## tldr
+## tldr --
 
-this is the backbone of the json scanner and the fast-enough single-threaded database within trappings.
+this is the backbone of the json scanner and the fast-enough single-threaded Flat/ISAM <sup>[1]</sup>  database within
+trappings.
 
 ```kotlin 
 interface Join<A, B> {
@@ -44,7 +45,7 @@ typealias Cursor = Series<RowVec>
     - `myseries[4,3,2,1]` will provide a mapped Series in any order specified, even dupes. similar range indexes are
       available for other types
     - `myseries<T>[(T)->Boolean]` is a shorthand filter expression
-    - "banana".toSeries() / 'n' would split series into `s_['ba','a','a']`
+    - `"banana".toSeries() / 'n'` would split series into `s_['ba','a','a']`
     - combine(Series...), and join(Cursor...) will concatenate and widen respectively with underlying binary-search
       index remapping on y,x axis respectively where Cursors are concerned.
     - a handful of nonstandard symbols are used to hint the code for a quick read
@@ -57,16 +58,29 @@ typealias Cursor = Series<RowVec>
                 - `(myseries as Series<T>).`\`▶\` visually noticable forward-iterator accessor denoting kotlin stdlib
                   collections/functional facade for a given purpose, typically filters, maps, or folds
                 - left identity anchors, respectively __\`↺\`__ e.g. "columnname".\`↺\` to functionalize a constant or
-                  other
-                  value in situations where sometimes a lambda might be generative but constant can be distinctly picked
-                  out
-                  from in the code
+                  other value in situations where sometimes a lambda might be generative but constant can be distinctly
+                  picked out from in the code
 
 * [x] Cursor lazy and memory-resident Dataframes lending strongly typed columns, with names, splittability,
-  combinability, transforms,
+  combinability, transforms.
+    - cursor meta is provided per row per cell by a lambda. often this is by e.g. `RecordMeta("name",IoString,0,64).\`
+      ↺\``
+    - similar to `Series[1,3,2]` and `Series2[1,3,2]`,` Cursor[1,3,2]` will return a new cursor with the columns in the
+      order
+      specified. `cursor[1,1,1]` likewise will project a cursor of column 1 in 3 columns at columns 0,1,2
+    - `cursor ["name","name"]` will provide a cursor from the first such named column, column "name" twice as shown.
+    - `cursor[-"age",-"debug"]` will provide a new cursor with column exclusions from the existing columns
+    - indexes on indexes:   `cursor["name","age"]["age","name"]` will swap the columns;
+        - `cursor["name","age"][-"age"]` will remove the age column
+        - `cursor["name"][0][-"name"]` would effectively return a cursor with rows but no columns
+    - `combine(cursor1,cursor2)` will combine the rows in order, with the caution aboutmixing row meta, it can be done
+      per row and cell but if all rows have isomorphic meta then row 0 meta the first time is good enough
+    - `join(cursor1,cursor2)` will combine the columns with presumably bad results for differing row lengths- though
+      myShortCursor.infinite can be used here
 
 * [x] ~~ISAM~~ FlatFile Columnar Dataframes Storage @see http://github.com/jnorthrup/columnar
-    - now with a native port. the jvm rewrite of columnar is also a full rewrite, streamlined and simplified.
+    - now with a native port. the jvm rewrite of columnar is also a full rewrite, streamlined and simplified lacking
+      NIO specialization.
     - the kotlin-native ~~isam~~ FlatFile is linux-posix-64bit specific mmap code.
     - the columnar project has a lot more bells and whistles and is battle hardened
     - the default construction of an ~~ISAM~~ FlatFile volume are tested to be correct in a single threaded environment
@@ -81,23 +95,24 @@ typealias Cursor = Series<RowVec>
 * [x] Duck-typing CSV-Cursor which includes varchar
   width sizing and narrowing numerical of types and float/integer detection on imported columns. supports
   explicit ~~ISAM~~ FlatFile transcription on initial scan. heap stores only index to first records for CSV cursors.
+    - exmaples tbd
 
 
 * [x] JSON indexer/reifier/path-selector written for simplicity and speed. This is not a serdes library.
     * ~300 lines at time of writing this. no external deps. no reflection.
-    * JsonParser.index(Series<Char>) will return a JsElement with CharSeries segments of the top level element.  
+    * `JsonParser.index(Series<Char>)` will return a `JsElement` with CharSeries `segments` of the top level element.  
       each segment is the complete json object, array, or value including the open/close brackets to recreate
       the json and act as discriminators for the type of the segment.
         * optional depth list param will record how deep each segment is during the single-level scan of the input
         * optional field cutoff param will parse only the first n fields of the top level element. A very specific
           tabular use case drives this and the unparsed elements all come back in one abandoned segment with undefined
           behavior
-    * JsonParser.reify(Series<Char>) parse and return the expression as nested maps and arrays and values
+    * `JsonParser.reify(Series<Char>)` parse and return the expression as nested maps and arrays and values
         * Js Arrays return as Series<Any?>, Js Objects return as Map<String,Any?> ; all Js Values return as Any?
         * for better or worse, non-string ParseDoubleOrNull not only does a cheap withotu string allocation costs but is
           also the source of parsed nulls when the Double parser falls through.
-    * JsonParser.jsPath(Series<Char>,JsPath) ~~ghetto jq~~ will traverse the index to the depth of the path provided.
-        * JsPathElement is an Either<String,Int> created by List<*>::toJsPath() extension function
+    * `JsonParser.jsPath(Series<Char>,JsPath)` ~~ghetto jq~~ will traverse the index to the depth of the path provided.
+        * `JsPathElement` is an `Either<String,Int>` created by `List<*>::toJsPath()` extension function
         * optional reified param will return the value at the path reified as a kotlin type else just a segment JsIndex
         * String keys will abort on Arrays but Int keys will fetch the nth index from either a json object or Array
 
@@ -106,6 +121,21 @@ typealias Cursor = Series<RowVec>
     * [ ] IO-Uring has been brought in and many tests ported, but not applied knowledgably as yet nor updated to keep
       current with liburing.
 
-
 * [ ]  a handful of missing kotlin-common collections are scattered about, these would be about as warrantable as the
   unit tests you might find for them.
+
+---- 
+
+<sup>[#1]</sup>:   ISAM
+
+- according to wikipedia, ISAM is not only a flat table file format but also a key-value index and a btree-ish
+  or b+treeish layout for the vaguely flat description of data volumes.
+- Columnar and TrikeShed have used ISAM to mean Indexed(as in array) Sequential Access Method, whereas perhaps   
+  Array Indexed (as in array index) Random Access Flat Binary Storage or "AIRAFBS" would be the better acronym.
+- Cursors, the "AIRAFBS" facade, are typealias from Series2->Series->Join with mixins matching the generic types at
+  compile time. The combine function creates a top list of blocks (an Array or vararg of Series) and a sequential index
+  of the lengths to redirect a lookup into. the Joined columns or combined Series being immutable, the lookups can
+  behave like B+Tree but the block size makes no attempt at uniformity or balancing nodes. A chunked list iterator could
+  approximate the layout of a B+Tree cheaply. 
+    
+

@@ -27,22 +27,24 @@ fun String.readableUnitsToNumber(decimal: Boolean = false): Number {
 /**
  * human readable bytecounts using 1.xx format
  */
-val Long.humanReadableByteCountIEC: String get() {
-    val seriesConstant = 1024
-    val seriesDoubleConstant = seriesConstant.toDouble()
+val Long.humanReadableByteCountIEC: String
+    get() {
+        val seriesConstant = 1024
+        val seriesDoubleConstant = seriesConstant.toDouble()
         return unitizer(seriesConstant, seriesDoubleConstant)
 
-}
+    }
 
 /**
  * human readable bytecounts using 1.xx format
  */
-val Long.humanReadableByteCountSI: String get() {
+val Long.humanReadableByteCountSI: String
+    get() {
 
-    val seriesConstant = 1000
-    val seriesDoubleConstant = seriesConstant.toDouble()
-    return unitizer(seriesConstant, seriesDoubleConstant)
-}
+        val seriesConstant = 1000
+        val seriesDoubleConstant = seriesConstant.toDouble()
+        return unitizer(seriesConstant, seriesDoubleConstant)
+    }
 
 private fun Long.unitizer(seriesConstant: Int, seriesDoubleConstant: Double): String {
     if (this == Long.MIN_VALUE) return (Long.MIN_VALUE + 1).humanReadableByteCountIEC
@@ -51,9 +53,6 @@ private fun Long.unitizer(seriesConstant: Int, seriesDoubleConstant: Double): St
     val exp = (ln(this.toDouble()) / ln(seriesDoubleConstant)).toInt()
     val pre = "KMGTPE"[exp - 1] + "i"
     //cannot use string formmatting in kotlin native/common/js
-
-    //round  to x.xx
-
-    val rounded = (this / seriesDoubleConstant.pow(exp.toDouble())).toString().substringBefore(".") + "." + (this / seriesDoubleConstant.pow(exp.toDouble())).toString().substringAfter(".").substring(0, 2)
+    val rounded = (this / seriesDoubleConstant.pow(exp.toDouble())).toString().take(4)
     return rounded + " " + pre + "B"
 }

@@ -16,7 +16,7 @@ import kotlin.math.pow
 
 typealias Series<T> = Join<Int, (Int) -> T>
 
-val <T> Series<T>.size: Int get() = a
+val <T> Series<T>.size: Int get() =a
 
 
 /** index operator for Series
@@ -237,10 +237,10 @@ value class IterableSeries<A>(val s: Series<A>) : Iterable<A>, Series<A> by s {
  * provides a big bright visible symbol that makes
  * conversions easy to follow along during reading the code
  */
-val <T> Series<T>.`▶`: IterableSeries<T> get() = this as? IterableSeries ?: IterableSeries(this)
+  val <T> Series<T>.`▶`: IterableSeries<T> get() = this as? IterableSeries ?: IterableSeries(this)
 
-operator fun <T> Series<T>.contains(it: Char): Boolean = it in this.`▶`
-operator fun <T> IterableSeries<T>.contains(x: Char): Boolean = this.any { x == it }
+infix operator fun <T> IterableSeries<T>.contains(x: Char): Boolean = this.any { x == it }
+infix operator fun <T> Series<T>.contains(it: Char): Boolean =  this.`▶` contains it
 
 
 /***

@@ -1,6 +1,7 @@
 package borg.trikeshed.isam
 
 import borg.trikeshed.common.Files
+import borg.trikeshed.common.Usable
 import borg.trikeshed.cursor.ColumnMeta
 import borg.trikeshed.cursor.TypeMemento
 import borg.trikeshed.cursor.name
@@ -38,7 +39,7 @@ IoType :=  IoInstant | IoDouble | IoString | IoInt
  * the binary file format follows this sample
  *
  */
-class IsamMetaFileReader(val metafileFilename: String) {
+class IsamMetaFileReader(val metafileFilename: String) :Usable{
 
     val recordlen: Int by lazy {
         constraints.last().end
@@ -49,7 +50,7 @@ class IsamMetaFileReader(val metafileFilename: String) {
     }
 
     private lateinit var constraints1: List<RecordMeta>
-    fun open() {
+    override fun open() {
         //use readBytes and decodeString to read the lines into
 //        val lines = buf.readBytes(size).decodeToString().lines().filterNot { it.trim().startsWith("#") }.map(String::trim)
         val lines = Files.readAllLines(metafileFilename).filterNot { it.trim().startsWith('#') }
@@ -68,6 +69,10 @@ class IsamMetaFileReader(val metafileFilename: String) {
             val encoder = ioMemento.createEncoder(end - begin)
             RecordMeta(name, ioMemento, begin, end, decoder, encoder)
         }
+    }
+
+    override fun close() {
+         logDebug { "noOp:closing metafile ${this.metafileFilename}" }
     }
 
     //toString

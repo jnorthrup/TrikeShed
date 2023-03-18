@@ -10,6 +10,7 @@ typealias JsIndex = Join<Twin<Int>, Series<Char>> //(twin j src)
 typealias JsContext = Join<JsElement, Series<Char>> //(element j src)
 typealias JsPathElement = Either<String, Int>
 typealias JsPath = Series<JsPathElement>
+private fun logDebug(t:()->String)  {  } //logging turned off for now
 
 val List<*>.toJsPath: JsPath
     get() = this.α {
@@ -104,7 +105,6 @@ object JsonParser {
 
 
     }
-
 
     fun reify(
         /** includes open and close braces, or both quotes, or the raw type*/

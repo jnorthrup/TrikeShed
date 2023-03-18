@@ -519,7 +519,7 @@ class LinuxPosixFile(
             val line: CPointerVarOf<CPointer<ByteVarOf<Byte>>> = alloc()
             val len: ULongVarOf<size_t> = alloc()
             len.value = 0u
-            var read: ssize_t = 0L
+            var read: ssize_t
             val list: MutableList<String> = mutableListOf()
 
             while (true) {
