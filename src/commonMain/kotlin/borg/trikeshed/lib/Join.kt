@@ -104,32 +104,24 @@ fun <T> Series<T>.toList(): AbstractList<T> = object : AbstractList<T>() {
     override fun get(index: Int): T = b(index)
 }
 
-fun Series<Byte>.toArray(): ByteArray =
-    ByteArray(size) { i -> get(i) }
+fun Series<Byte>.toArray(): ByteArray = ByteArray(size, ::get)
 
-fun Series<Char>.toArray(): CharArray =
-    CharArray(size) { i -> get(i) }
+fun Series<Char>.toArray(): CharArray = CharArray(size, ::get)
 
-fun Series<Int>.toArray(): IntArray =
-    IntArray(size) { i -> get(i) }
+fun Series<Int>.toArray(): IntArray = IntArray(size, ::get)
 
-fun Series<Boolean>.toArray(): BooleanArray =
-    BooleanArray(size) { i -> get(i) }
+fun Series<Boolean>.toArray(): BooleanArray = BooleanArray(size, ::get)
 
-fun Series<Long>.toArray(): LongArray =
-    LongArray(size) { i -> get(i) }
+fun Series<Long>.toArray(): LongArray = LongArray(size, ::get)
 
-fun Series<Float>.toArray(): FloatArray =
-    FloatArray(size) { i -> get(i) }
+fun Series<Float>.toArray(): FloatArray = FloatArray(size, ::get)
 
-fun Series<Double>.toArray(): DoubleArray =
-    DoubleArray(size) { i -> get(i) }
+fun Series<Double>.toArray(): DoubleArray = DoubleArray(size, ::get)
 
-fun Series<Short>.toArray(): ShortArray =
-    ShortArray(size) { i -> get(i) }
+fun Series<Short>.toArray(): ShortArray = ShortArray(size, ::get)
 
 inline fun <reified T> Join<Int, (Int) -> T>.toArray(): Array<T> =
-    Array(size) { i -> get(i) }
+    Array(size, ::get)
 
 fun <T> Array<T>.toSeries(): Join<Int, (Int) -> T> = size j ::get
 
@@ -153,43 +145,36 @@ inline val <T> T.`↺`: () -> T get() = leftIdentity
 fun <T> `↻`(t: T): T = t
 infix fun <T> T.rightIdentity(t: T): T = `↻`(t)
 
-infix fun <C, B : (Int) -> C> IntArray.α(m: B): Series<C> = this.size j { i: Int -> m(this[i]) }
+infix fun <C, B : (Int) -> C> IntArray.α(m: B): Series<C> = this.size j { m(this[it]) }
 
-infix fun <C, B : (Long) -> C> LongArray.α(m: B): Series<C> = this.size j { i: Int -> m(this[i]) }
+infix fun <C, B : (Long) -> C> LongArray.α(m: B): Series<C> = this.size j { m(this[it]) }
 
-infix fun <C, B : (Float) -> C> FloatArray.α(m: B): Series<C> = this.size j { i: Int -> m(this[i]) }
+infix fun <C, B : (Float) -> C> FloatArray.α(m: B): Series<C> = this.size j { m(this[it]) }
 
-infix fun <C, B : (Double) -> C> DoubleArray.α(m: B): Series<C> = this.size j { i: Int -> m(this[i]) }
+infix fun <C, B : (Double) -> C> DoubleArray.α(m: B): Series<C> = this.size j { m(this[it]) }
 
-infix fun <C, B : (Short) -> C> ShortArray.α(m: B): Series<C> = this.size j { i: Int -> m(this[i]) }
+infix fun <C, B : (Short) -> C> ShortArray.α(m: B): Series<C> = this.size j { m(this[it]) }
 
-infix fun <C, B : (Byte) -> C> ByteArray.α(m: B): Series<C> = this.size j { i: Int -> m(this[i]) }
+infix fun <C, B : (Byte) -> C> ByteArray.α(m: B): Series<C> = this.size j { m(this[it]) }
 
-infix fun <C, B : (Char) -> C> CharArray.α(m: B): Series<C> = this.size j { i: Int -> m(this[i]) }
+infix fun <C, B : (Char) -> C> CharArray.α(m: B): Series<C> = this.size j { m(this[it]) }
 
-infix fun <C, B : (Boolean) -> C> BooleanArray.α(m: B): Series<C> = this.size j { i: Int -> m(this[i]) }
+infix fun <C, B : (Boolean) -> C> BooleanArray.α(m: B): Series<C> = this.size j { m(this[it]) }
 
 /**
  * series get by iterable
  */
-operator fun <T> Series<T>.get(index: Iterable<Int>): Series<T> {
-
-    val array = IntArray(index.count()) { i -> index.elementAt(i) }
-    return this[array]
-}
+operator fun <T> Series<T>.get(index: Iterable<Int>): Series<T> = this[IntArray(index.count(), index::elementAt)]
 
 /**
  * series get by Series<Int>
  */
-operator fun <T> Series<T>.get(index: Series<Int>): Series<T> {
-
-    val array = IntArray(index.size) { i -> index[i] }; return this[array]
-}
+operator fun <T> Series<T>.get(index: Series<Int>): Series<T> = this[IntArray(index.size) { index[it] }]
 
 /**
  * series get by array
  */
-operator fun <T> Series<T>.get(index: IntArray): Series<T> = Series(index.size) { i -> this[index[i]] }
+operator fun <T> Series<T>.get(index: IntArray): Series<T> = Series(index.size) { this[index[it]] }
 
 /**
  * series get by intRange
@@ -198,4 +183,3 @@ operator fun <T> Series<T>.get(index: IntRange): Series<T> = Series((index.last 
     require(index.step == 1)
     this[index.first + i]
 }
-
