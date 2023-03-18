@@ -1,6 +1,6 @@
 package borg.trikeshed.common
 
-import borg.trikeshed.lib.*
+import borg.trikeshed.lib.Join
 
 /** not unlike nio.Files */
 expect object Files {
@@ -12,6 +12,17 @@ expect object Files {
     fun write(filename: String, string: String)
     fun cwd(): String
     fun exists(filename: String): Boolean
+
     /** read offsets and lines accompanying*/
-    fun streamLines(/**non-seekable RO file, as in a fifo  */ fileName: String,bufsize:Int=64): Sequence<Join<Long, ByteArray>>
+    fun streamLines(
+        /**non-seekable RO file, as in a fifo  */
+        fileName: String,
+        bufsize: Int = 64,
+    ): Sequence<Join<Long, ByteArray>>
+
+    fun iterateLines(
+        fileName: String,
+        bufsize: Int,
+    ): Iterable<Join<Long, ByteArray>>
 }
+

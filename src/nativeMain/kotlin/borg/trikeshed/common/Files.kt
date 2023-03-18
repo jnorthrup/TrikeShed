@@ -37,5 +37,12 @@ actual object Files {
         TODO("Not yet implemented")
     }
 
+    actual fun iterateLines(
+        fileName: String,
+        bufsize: Int,
+    ): Iterable<Join<Long, ByteArray>> {
+        TODO("Not yet implemented")
+    }
+
 
 }

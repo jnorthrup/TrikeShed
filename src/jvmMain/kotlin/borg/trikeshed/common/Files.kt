@@ -68,7 +68,75 @@ actual object Files {
                     yield((lineStartOffset j tharr))
             }
         }
-    }}
+    }
+
+    actual fun iterateLines(fileName: String, bufsize: Int): Iterable<Join<Long, ByteArray>> {
+        val file = File(fileName)
+        val buffer = ByteArray(bufsize)
+        var offset: Long = 0
+        var lineStartOffset: Long = 0
+        val lineBuffer = ByteArrayOutputStream()
+
+        return object : Iterable<Join<Long, ByteArray>> {
+            override fun iterator(): Iterator<Join<Long, ByteArray>> {
+                val input = file.inputStream()
+                var nextValue: Join<Long, ByteArray>? = null
+
+                fun readNext(): Join<Long, ByteArray>? {
+                    while (true) {
+                        val bytesRead = input.read(buffer)
+                        if (bytesRead == -1) break
+                        var mark = 0
+                        for (i in 0 until bytesRead) {
+                            val byte = buffer[i]
+                            when (byte) {
+                                '\n'.code.toByte() -> {
+                                    lineBuffer.write(buffer, mark, i - mark + 1)
+                                    mark = i + 1
+
+                                    val result = lineStartOffset j lineBuffer.toByteArray()
+                                    lineBuffer.reset()
+                                    lineStartOffset = offset + i + 1
+                                    offset += bytesRead
+                                    return result
+                                }
+                            }
+                        }
+                        if (mark < bytesRead) {
+                            lineBuffer.write(buffer, mark, bytesRead - mark)
+                        }
+
+                        offset += bytesRead
+                    }
+
+                    if (lineBuffer.size() > 0) {
+                        val tharr = lineBuffer.toByteArray()
+                        if (!tharr.decodeToString().trim().isEmpty()) {
+                            return lineStartOffset j tharr
+                        }
+                    }
+
+                    input.close()
+                    return null
+                }
+
+                return object : Iterator<Join<Long, ByteArray>> {
+                    override fun hasNext(): Boolean {
+                        if (nextValue == null) nextValue = readNext()
+                        return nextValue != null
+                    }
+
+                    override fun next(): Join<Long, ByteArray> {
+                        if (!hasNext()) throw NoSuchElementException()
+                        val result = nextValue!!
+                        nextValue = null
+                        return result
+                    }
+                }
+            }
+        }
+    }
+}
 
 /** unit test for fun streamLines*/
 fun main() {
