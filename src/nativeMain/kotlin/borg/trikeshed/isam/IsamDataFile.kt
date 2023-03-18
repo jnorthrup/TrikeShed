@@ -7,7 +7,6 @@ import borg.trikeshed.cursor.meta
 import borg.trikeshed.isam.meta.IOMemento
 import borg.trikeshed.lib.*
 import kotlinx.cinterop.*
-import kotlinx.coroutines.flow.MutableSharedFlow
 import platform.posix.*
 import simple.PosixFile
 import simple.PosixOpenOpts
@@ -148,14 +147,13 @@ actual class IsamDataFile actual constructor(
             data.close()
         }
         actual suspend  fun append(
-            msf: MutableSharedFlow<RowVec>,
+            msf: Sequence<RowVec>,
             datafilename: String,
             varChars: Map<String, Int>,
             transform: ((RowVec) -> RowVec)?
-        ) {
-             TODO()
+        ):Unit {
+            TODO()
         }
-
     }
 }
 

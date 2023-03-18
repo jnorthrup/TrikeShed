@@ -1,7 +1,6 @@
 package borg.trikeshed.cursor
 
 // import the IoMemento enum
-import borg.trikeshed.lib.CharSeries
 import borg.trikeshed.isam.meta.IOMemento.*
 import borg.trikeshed.lib.*
 import kotlin.jvm.JvmInline
@@ -121,9 +120,19 @@ fun Cursor.showValues(range: IntRange) {
     try {
         range.forEach { x: Int ->
             val row: RowVec = row(x)
-            val catn : Series<Any> =( row as Series2<Any,Any>). left //.debug { logDebug { "showval coords ${it.toList() .map {(it as? CharSeries)?.asString()?:""} }" } }
-            val combine = combine(catn) α { if(it is CharSeries) it.asString() else "$it"  }
-            println(combine.toList())
+
+            val show=row α {(c,d)->
+                val meta=d()
+                meta.name to c
+                when(meta.type){
+                    IoCharSeries->meta.name to (c as Series<Char> ).asString()
+                    else-> c
+                }
+
+
+            }
+
+            println(show.toList())
         }
     } catch (e: NoSuchElementException) {
         println("cannot fully access range $range")

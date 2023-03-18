@@ -3,7 +3,6 @@ package borg.trikeshed.isam
 import borg.trikeshed.common.Usable
 import borg.trikeshed.cursor.Cursor
 import borg.trikeshed.cursor.RowVec
-import kotlinx.coroutines.flow.MutableSharedFlow
 
 expect class IsamDataFile(
     datafileFilename: String,
@@ -20,7 +19,7 @@ expect class IsamDataFile(
         fun write(cursor: Cursor, datafilename: String, varChars: Map<String, Int> = emptyMap())
 
         suspend  fun append(
-            msf: MutableSharedFlow<RowVec>,
+            msf: Sequence<RowVec>,
             datafilename: String,
             varChars: Map<String, Int> = emptyMap(),            transform: ((RowVec) -> RowVec)?
         )

@@ -7,9 +7,7 @@ import borg.trikeshed.cursor.*
 import borg.trikeshed.isam.meta.IOMemento
 import borg.trikeshed.lib.*
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.withContext
-
 import java.io.RandomAccessFile
 import java.nio.ByteBuffer
 import java.nio.channels.SeekableByteChannel
@@ -163,7 +161,7 @@ actual val datafileFilename  = datafileFilename
         }
 
         actual suspend fun append(
-            msf: MutableSharedFlow<RowVec>,
+            msf: Sequence<RowVec>,
             datafilename: String,
             varChars: Map<String, Int>,
             transform: ((RowVec) -> RowVec)?
@@ -187,7 +185,7 @@ actual val datafileFilename  = datafileFilename
             debug { fibLog = FibonacciReporter(size = null, noun = "appends") }
             var first = true
             // write rows
-            msf.collect { rowVec1: RowVec ->
+            msf.forEach { rowVec1: RowVec ->
                 val rowVec = transform?.let { it(rowVec1) } ?: rowVec1
                 if (first) {
                     meta0 = IsamMetaFileReader.write(metafilename, rowVec.right.α { it() }, varChars)
@@ -202,9 +200,6 @@ actual val datafileFilename  = datafileFilename
                 withContext(Dispatchers.IO) { data.write(rowBuffer) }
                 debug { fibLog?.report()?.let { println(it) } }
             }
-//            withContext(Dispatchers.IO) {
-//                data.close()
-//            }
         }
     }
 }

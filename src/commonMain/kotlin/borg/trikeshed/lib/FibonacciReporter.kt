@@ -27,7 +27,7 @@ class FibonacciReporter(
     val size: Int? = null,
     /** what do we report? */
     val noun: String = "rows",
-) :    Usable {
+) : Usable {
 
     var trigger: Int = 0
     var countdown: Int = 1
@@ -37,7 +37,9 @@ class FibonacciReporter(
         "FibonacciReporter(size=$size, noun='$noun', trigger=$trigger, countdown=$countdown, begin=$begin, count=$count)"
 
     override fun open() = logDebug { "debug: $noun FibonacciReporter opened @$begin" }
-    override fun close() = logDebug { count--;countdown = 1; "debug:FibonacciReporter closed ${report()} @ ${TimeSource.Monotonic.markNow()} " }
+    override fun close() = logDebug {
+        count--;countdown = 1; "debug:FibonacciReporter closed ${report()} @ ${TimeSource.Monotonic.markNow()} "
+    }
 
     fun report(): String? = (count++).run {
         if (--countdown == 0) {
