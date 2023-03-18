@@ -1,5 +1,6 @@
 package borg.trikeshed.common
 
+import borg.trikeshed.lib.ByteSeries
 import borg.trikeshed.lib.Join
 import kotlinx.cinterop.*
 import platform.posix._PC_PATH_MAX
@@ -40,7 +41,7 @@ actual object Files {
     actual fun iterateLines(
         fileName: String,
         bufsize: Int,
-    ): Iterable<Join<Long, ByteArray>> {
+    ): Iterable<Join<Long, ByteSeries>> {
         TODO("Not yet implemented")
     }
 

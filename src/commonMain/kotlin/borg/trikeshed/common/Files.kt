@@ -1,5 +1,6 @@
 package borg.trikeshed.common
 
+import borg.trikeshed.lib.ByteSeries
 import borg.trikeshed.lib.Join
 
 /** not unlike nio.Files */
@@ -23,6 +24,6 @@ expect object Files {
     fun iterateLines(
         fileName: String,
         bufsize: Int,
-    ): Iterable<Join<Long, ByteArray>>
+    ): Iterable<Join<Long, ByteSeries>>
 }
 

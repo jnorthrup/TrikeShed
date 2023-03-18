@@ -1,10 +1,9 @@
 package borg.trikeshed.common
 
-import borg.trikeshed.lib.Join
-import borg.trikeshed.lib.j
-import borg.trikeshed.lib.second
+import borg.trikeshed.lib.*
 import java.io.ByteArrayOutputStream
 import java.io.File
+import kotlin.assert
 import java.nio.file.Files as JavaNioFileFiles
 import java.nio.file.Paths as JavaNioFilePaths
 
@@ -70,19 +69,19 @@ actual object Files {
         }
     }
 
-    actual fun iterateLines(fileName: String, bufsize: Int): Iterable<Join<Long, ByteArray>> {
+    actual fun iterateLines(fileName: String, bufsize: Int): Iterable<Join<Long, ByteSeries>> {
         val file = File(fileName)
         val buffer = ByteArray(bufsize)
         var offset: Long = 0
         var lineStartOffset: Long = 0
         val lineBuffer = ByteArrayOutputStream()
 
-        return object : Iterable<Join<Long, ByteArray>> {
-            override fun iterator(): Iterator<Join<Long, ByteArray>> {
+        return object : Iterable<Join<Long, ByteSeries>> {
+            override fun iterator(): Iterator<Join<Long, ByteSeries>> {
                 val input = file.inputStream()
-                var nextValue: Join<Long, ByteArray>? = null
+                var nextValue: Join<Long, ByteSeries>? = null
 
-                fun readNext(): Join<Long, ByteArray>? {
+                fun readNext(): Join<Long, ByteSeries>? {
                     while (true) {
                         val bytesRead = input.read(buffer)
                         if (bytesRead == -1) break
@@ -94,7 +93,7 @@ actual object Files {
                                     lineBuffer.write(buffer, mark, i - mark + 1)
                                     mark = i + 1
 
-                                    val result = lineStartOffset j lineBuffer.toByteArray()
+                                    val result = lineStartOffset j ByteSeries( lineBuffer.toByteArray())
                                     lineBuffer.reset()
                                     lineStartOffset = offset + i + 1
                                     offset += bytesRead
@@ -110,20 +109,21 @@ actual object Files {
                     }
 
                     if (lineBuffer.size() > 0) {
-                        val tharr = lineBuffer.toByteArray()
-                        if (!tharr.decodeToString().trim().isEmpty()) return lineStartOffset j tharr
+                        val tmp:ByteSeries = ByteSeries(lineBuffer.toByteArray().toSeries())
+
+                        if (!tmp.trim.isEmpty()) return lineStartOffset j tmp
                     }
 
                     input.close()
                     return null
                 }
 
-                return object : Iterator<Join<Long, ByteArray>> {
+                return object : Iterator<Join<Long, ByteSeries>> {
                     override fun hasNext(): Boolean = nextValue ?: readNext().also { nextValue = it } != null
 
-                    override fun next(): Join<Long, ByteArray> = when {
+                    override fun next(): Join<Long, ByteSeries> = when {
                         hasNext() -> {
-                            val result: Join<Long, ByteArray> = nextValue!!
+                            val result: Join<Long, ByteSeries> = nextValue!!
                             nextValue = null
                             result
                         }

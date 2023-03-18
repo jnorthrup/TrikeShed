@@ -55,6 +55,7 @@ class ByteSeries(buf: Series<Byte>,
 
     //string ctor
     constructor(s: String) : this(s.toSeries().encodeToByteArray().toSeries())
+    constructor(s: ByteArray) : this(s.toSeries())
 
     /**remaining chars*/
     val rem: Int get() = limit - pos
