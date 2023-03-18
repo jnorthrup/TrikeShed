@@ -111,9 +111,7 @@ actual object Files {
 
                     if (lineBuffer.size() > 0) {
                         val tharr = lineBuffer.toByteArray()
-                        if (!tharr.decodeToString().trim().isEmpty()) {
-                            return lineStartOffset j tharr
-                        }
+                        if (!tharr.decodeToString().trim().isEmpty()) return lineStartOffset j tharr
                     }
 
                     input.close()
@@ -121,16 +119,15 @@ actual object Files {
                 }
 
                 return object : Iterator<Join<Long, ByteArray>> {
-                    override fun hasNext(): Boolean {
-                        if (nextValue == null) nextValue = readNext()
-                        return nextValue != null
-                    }
+                    override fun hasNext(): Boolean = nextValue ?: readNext().also { nextValue = it } != null
 
-                    override fun next(): Join<Long, ByteArray> {
-                        if (!hasNext()) throw NoSuchElementException()
-                        val result = nextValue!!
-                        nextValue = null
-                        return result
+                    override fun next(): Join<Long, ByteArray> = when {
+                        hasNext() -> {
+                            val result: Join<Long, ByteArray> = nextValue!!
+                            nextValue = null
+                            result
+                        }
+                        else -> throw NoSuchElementException()
                     }
                 }
             }

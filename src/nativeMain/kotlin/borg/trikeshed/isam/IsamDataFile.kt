@@ -147,7 +147,7 @@ actual class IsamDataFile actual constructor(
             data.close()
         }
         actual suspend  fun append(
-            msf: Sequence<RowVec>,
+            msf: Iterable<RowVec>,
             datafilename: String,
             varChars: Map<String, Int>,
             transform: ((RowVec) -> RowVec)?

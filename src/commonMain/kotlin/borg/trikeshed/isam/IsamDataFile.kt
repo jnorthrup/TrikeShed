@@ -19,9 +19,9 @@ expect class IsamDataFile(
         fun write(cursor: Cursor, datafilename: String, varChars: Map<String, Int> = emptyMap())
 
         suspend  fun append(
-            msf: Sequence<RowVec>,
+            msf: Iterable<RowVec>,
             datafilename: String,
-            varChars: Map<String, Int> = emptyMap(),            transform: ((RowVec) -> RowVec)?
+            varChars: Map<String, Int> = emptyMap(), transform: ((RowVec) -> RowVec)?
         )
 
     }
