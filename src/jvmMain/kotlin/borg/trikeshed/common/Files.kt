@@ -69,19 +69,20 @@ actual object Files {
         }
     }
 
-    actual fun iterateLines(fileName: String, bufsize: Int): Iterable<Join<Long, ByteSeries>> {
+    actual fun iterateLines(fileName: String, bufsize: Int): Iterable<Join3<Long, ByteSeries, Boolean>> {
         val file = File(fileName)
         val buffer = ByteArray(bufsize)
         var offset: Long = 0
         var lineStartOffset: Long = 0
         val lineBuffer = ByteArrayOutputStream()
 
-        return object : Iterable<Join<Long, ByteSeries>> {
-            override fun iterator(): Iterator<Join<Long, ByteSeries>> {
+        return object : Iterable<Join3<Long, ByteSeries, Boolean>> {
+            override fun iterator(): Iterator<Join3<Long, ByteSeries, Boolean>> {
                 val input = file.inputStream()
-                var nextValue: Join<Long, ByteSeries>? = null
+                var nextValue: Join3<Long, ByteSeries, Boolean>? = null
 
-                fun readNext(): Join<Long, ByteSeries>? {
+
+                fun readNext(): Join3<Long, ByteSeries, Boolean>? {
                     while (true) {
                         val bytesRead = input.read(buffer)
                         if (bytesRead == -1) break
@@ -93,8 +94,10 @@ actual object Files {
                                     lineBuffer.write(buffer, mark, i - mark + 1)
                                     mark = i + 1
 
-                                    val result = lineStartOffset j ByteSeries( lineBuffer.toByteArray())
-                                    lineBuffer.reset()
+                                    val s = lineBuffer.toByteArray()
+                                    val byteSeries = ByteSeries(s)
+                                    val result: Join3<Long, ByteSeries, Boolean> =
+                                        lineStartOffset j byteSeries x dirtyUtf8Bytes(byteSeries)
                                     lineStartOffset = offset + i + 1
                                     offset += bytesRead
                                     return result
@@ -109,24 +112,26 @@ actual object Files {
                     }
 
                     if (lineBuffer.size() > 0) {
-                        val tmp:ByteSeries = ByteSeries(lineBuffer.toByteArray().toSeries())
-
-                        if (!tmp.trim.isEmpty()) return lineStartOffset j tmp
+                        val barray = lineBuffer.toByteArray()
+                        val tmp: ByteSeries = ByteSeries(barray.toSeries())
+                        val dirty = dirtyUtf8Bytes(tmp)
+                        if (!tmp.trim.isEmpty()) return lineStartOffset j tmp x dirty
                     }
 
                     input.close()
                     return null
                 }
 
-                return object : Iterator<Join<Long, ByteSeries>> {
+                return object : Iterator<Join3<Long, ByteSeries, Boolean>> {
                     override fun hasNext(): Boolean = nextValue ?: readNext().also { nextValue = it } != null
 
-                    override fun next(): Join<Long, ByteSeries> = when {
+                    override fun next(): Join3<Long, ByteSeries, Boolean> = when {
                         hasNext() -> {
-                            val result: Join<Long, ByteSeries> = nextValue!!
+                            val result: Join3<Long, ByteSeries, Boolean> = nextValue!!
                             nextValue = null
                             result
                         }
+
                         else -> throw NoSuchElementException()
                     }
                 }

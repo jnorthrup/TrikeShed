@@ -4,7 +4,6 @@ package borg.trikeshed.common
 
 import borg.trikeshed.common.TypeEvidence.Companion.deduce
 import borg.trikeshed.common.TypeEvidence.Companion.update
-import borg.trikeshed.lib.CharSeries
 import borg.trikeshed.cursor.*
 import borg.trikeshed.isam.RecordMeta
 import borg.trikeshed.isam.meta.IOMemento
@@ -148,7 +147,8 @@ object CSVUtil {
         val header = hdrParsRes α ::DelimitRange
         val headerNames =
             header α { delimR: DelimitRange ->
-                CharSeries(file[delimR.a.toInt() until delimR.b.inc().toInt()].decodeUtf8()).asString()
+                val join: Series<Byte> = file[delimR.a.toInt() until delimR.b.inc().toInt()]
+                CharSeries(join.decodeUtf8()).asString()
             }
         logDebug { "headerNames: ${headerNames.toList()}" }
         val lines: MutableList<Join<Long, IntArray>> = mutableListOf()

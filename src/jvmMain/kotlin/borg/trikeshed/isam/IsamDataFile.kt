@@ -89,6 +89,9 @@ actual class IsamDataFile actual constructor(
         actual fun write(cursor: Cursor, datafilename: String, varChars: Map<String, Int>) {
             val metafilename = "$datafilename.meta"
 
+            //turn off debug logging in here
+            fun logDebug(f: (String) -> Unit): Unit = Unit
+
             val meta0 = IsamMetaFileReader.write(metafilename, cursor.meta, varChars)
 
             //open RandomAccessDataFile
@@ -97,9 +100,8 @@ actual class IsamDataFile actual constructor(
             val data = randomAccessFile.channel
 
             //create row buffer
-            meta0.debug {
-                logDebug { "toIsam: " + it.map { it.toString() } }
-            }
+            meta0.debug { logDebug { "toIsam: " + it.map { it.toString() } } }
+
 
             val last = meta0.last()
 

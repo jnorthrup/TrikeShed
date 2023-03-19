@@ -2,28 +2,33 @@ package borg.trikeshed.lib
 
 import borg.trikeshed.lib.CZero.nz
 
-fun Series<Byte>.decodeUtf8(charArray:CharArray= CharArray(size)): Series<Char> {
+inline fun Series<Byte>.decodeUtf8(charArray: CharArray? = null): Series<Char> =
+    charArray?.let { decodeDirtyUtf8(it) } ?: if (dirtyUtf8Bytes(this)) decodeDirtyUtf8() else (this α {
+        it.toInt().toChar()
+    })
+
+fun Series<Byte>.decodeDirtyUtf8(charArray: CharArray = CharArray(size)): Series<Char> {
     //does not use StringBuilder, but is faster than String(bytes, Charsets.UTF_8)
     var y = 0
     var w = 0
     while (y < this.size && w < charArray.size) {
         val c = this[y++].toInt()
         /* 0xxxxxxx */
-        when (c shr 4 ) {
+        when (c shr 4) {
             in 0..7 -> charArray[w++] = c.toChar() // 0xxxxxxx
 
             /*12, 13*/ 0x0C, 0x0D -> {
-                // 110x xxxx   10xx xxxx
-                val c2 = this[y++].toInt()
-                charArray[w++] = ((c and 0x1F) shl 6 or (c2 and 0x3F)).toChar()
-            }
+            // 110x xxxx   10xx xxxx
+            val c2 = this[y++].toInt()
+            charArray[w++] = ((c and 0x1F) shl 6 or (c2 and 0x3F)).toChar()
+        }
 
             /*14*/ 0x0E -> {
-                // 1110 xxxx  10xx xxxx  10xx xxxx
-                val c2 = this[y++].toInt()
-                val c3 = this[y++].toInt()
-                charArray[w++] = ((c and 0x0F) shl 12 or (c2 and 0x3F) shl 6 or (c3 and 0x3F)).toChar()
-            }
+            // 1110 xxxx  10xx xxxx  10xx xxxx
+            val c2 = this[y++].toInt()
+            val c3 = this[y++].toInt()
+            charArray[w++] = ((c and 0x0F) shl 12 or (c2 and 0x3F) shl 6 or (c3 and 0x3F)).toChar()
+        }
         }
     }
     return w j charArray::get
@@ -34,17 +39,18 @@ fun Series<Byte>.asString(): String = toArray().decodeToString()
 /**
  * byte based spiritual successor to ByteBuffer for parsing
  */
-class ByteSeries(buf: Series<Byte>,
+class ByteSeries(
+    buf: Series<Byte>,
 
-                 /** the mutable position accessor */
+    /** the mutable position accessor */
     var pos: Int = 0,
 
-                 /** the limit accessor */
+    /** the limit accessor */
     var limit: Int = buf.size, //initialized to size
 
-                 /** the mark accessor */
+    /** the mark accessor */
     var mark: Int = -1,
-    ) : Series<Byte> by buf { //delegate to the underlying series
+) : Series<Byte> by buf { //delegate to the underlying series
 
     /** get, the verb - the char at the current position and increment position */
     inline val get: Byte
@@ -118,9 +124,9 @@ class ByteSeries(buf: Series<Byte>,
     fun lim(i: Int): ByteSeries = apply { limit = i }
 
     /** skip whitespace */
-        val skipWs: ByteSeries get() = apply { while (hasRemaining && mk.get.toChar().isWhitespace()); res }
+    val skipWs: ByteSeries get() = apply { while (hasRemaining && mk.get.toInt().toChar().isWhitespace()); res }
 
-    val rtrim: ByteSeries get() = apply { while (rem > 0 && b(limit - 1).toChar().isWhitespace()) limit-- }
+    val rtrim: ByteSeries get() = apply { while (rem > 0 && b(limit - 1).toInt().toChar().isWhitespace()) limit-- }
 
 
     fun clone(): ByteSeries = ByteSeries(a j b).also { it.pos = pos; it.limit = limit; it.mark = mark }
@@ -175,8 +181,8 @@ class ByteSeries(buf: Series<Byte>,
         get() = apply {
             var p = pos
             var l = limit
-            while (p < l && get(p).toChar().isWhitespace()) p++
-            while (l > p && get(l.dec()).toChar().isWhitespace()) l--
+            while (p < l && get(p).toInt().toChar().isWhitespace()) p++
+            while (l > p && get(l.dec()).toInt().toChar().isWhitespace()) l--
             lim(l)
             pos(p)
         }
@@ -242,5 +248,23 @@ class ByteSeries(buf: Series<Byte>,
 
     /** advance 1*/
     operator fun inc(): ByteSeries = apply { require(hasRemaining) { "Overflow" };pos++ }
+}
 
+
+fun dirtyUtf8Bytes(barray: Series<Byte>): Boolean {
+    var dirty = false
+    val bsz = barray.size
+    //if thereis one more byte to test and the first byte is in the range of 110x xxxx
+    //what shr 4 proves: 110x xxxx
+    val barLen = bsz.dec()
+    for (b in 0 until barLen)
+        if ((barray[b].toInt() shr 4) in 0x0C..0x0E) {
+            val byte = barray[b.inc()]
+            if ((byte.toInt() shr 6) == 0x02) {
+                dirty = true
+                break
+                //what shr 6 proves: 10xx xxxx
+            }
+        }
+    return dirty
 }

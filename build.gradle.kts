@@ -1,7 +1,3 @@
-import org.jetbrains.kotlin.gradle.plugin.extraProperties
-import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTargetWithHostTests
-import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
-
 //which stanza do we add a linux64 cinteropdef for liburing below? (the linux64 stanza is the only one that has a cinterop block)
 
 plugins {
@@ -54,24 +50,24 @@ kotlin {
 
     val hostOs = System.getProperty("os.name")
     val isMingwX64 = hostOs.startsWith("Windows")
-//    val nativeTarget = when {
-//        hostOs == "Mac OS X" -> macosX64("native")
-//        hostOs == "Linux" -> linuxX64("native")
-//        isMingwX64 -> mingwX64("native")
-//        else -> throw GradleException("Host OS is not supported in Kotlin/Native.")
-//    }
-//we want to develop a linuxX64 target separately from generic native
-    val nativeTarget = macosX64("native")
-    val linuxX64Target = linuxX64("linuxX64"){
-         compilations.first().cinterops {
-            println("compilation: $this")
-            create(name) {
-                defFile = project.file("io_uring_interop/zlinux_uring.def")
-            }
-        }
-
-
+    val nativeTarget = when {
+        hostOs == "Mac OS X" -> macosX64("native")
+        hostOs == "Linux" -> linuxX64("native")
+        isMingwX64 -> mingwX64("native")
+        else -> throw GradleException("Host OS is not supported in Kotlin/Native.")
     }
+//we want to develop a linuxX64 target separately from generic native
+//    val nativeTarget = macosX64("native")
+//    val linuxX64Target = linuxX64("linuxX64"){
+//         compilations.first().cinterops {
+//            println("compilation: $this")
+//            create(name) {
+//                defFile = project.file("io_uring_interop/zlinux_uring.def")
+//            }
+//        }
+//
+//
+//    }
     sourceSets {
         val commonMain by getting {
             dependencies {
@@ -96,13 +92,12 @@ kotlin {
 
         }
 
-        val linuxX64Main by getting {
-            dependsOn(nativeMain)
-        }
-
-        val linuxX64Test by getting {
-            dependsOn(nativeTest)
-        }
+//        val linuxX64Main by getting {
+//            dependsOn(nativeMain)
+//        }
+//        val linuxX64Test by getting {
+//            dependsOn(nativeTest)
+//        }
 
 
         val jvmMain by getting {

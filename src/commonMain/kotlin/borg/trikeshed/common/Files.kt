@@ -2,6 +2,7 @@ package borg.trikeshed.common
 
 import borg.trikeshed.lib.ByteSeries
 import borg.trikeshed.lib.Join
+import borg.trikeshed.lib.Join3
 
 /** not unlike nio.Files */
 expect object Files {
@@ -21,9 +22,12 @@ expect object Files {
         bufsize: Int = 64,
     ): Sequence<Join<Long, ByteArray>>
 
+    /** read offsets and lines
+     * checks if the bytes can be facade as chars or if utf8 conversion is needed (dirty)
+     * @return triple ( len, bytes, dirty   )*/
     fun iterateLines(
         fileName: String,
         bufsize: Int,
-    ): Iterable<Join<Long, ByteSeries>>
+    ): Iterable<Join3<Long, ByteSeries, Boolean>>
 }
 

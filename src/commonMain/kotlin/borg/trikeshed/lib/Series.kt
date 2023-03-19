@@ -455,7 +455,7 @@ fun Series<Char>.encodeToByteArray(): ByteArray {
 }
 
 //opposite method to build a charSeries from byte[]
-fun ByteArray.decodeToChars(): Series<Char> = toSeries().decodeUtf8(CharArray(size))
+fun ByteArray.decodeToChars(): Series<Char> = toSeries().decodeUtf8(/*CharArray(size)*/)
 
 
 fun Series<Char>.parseIsoDate(): kotlinx.datetime.LocalDate {
