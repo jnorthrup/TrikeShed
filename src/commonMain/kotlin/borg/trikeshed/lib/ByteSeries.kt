@@ -195,7 +195,7 @@ class ByteSeries(
     //isEmpty override
     val isEmpty: Boolean get() = pos == limit
 
-    /** success move position to the char after found and returns true.
+    /** success move position to the char after found (exclusive) and returns true.
      *  fail returns false and leaves position unchanged */
     fun seekTo(
         /**target*/
@@ -253,6 +253,11 @@ class ByteSeries(
 
     /** advance 1*/
     operator fun inc(): ByteSeries = apply { require(hasRemaining) { "Overflow" };pos++ }
+
+    /**
+     * this rewrites the Series default toArray() to use the position and limit
+     */
+    fun toArray(): ByteArray = ByteArray(rem, ::get)
 }
 
 
@@ -273,3 +278,4 @@ fun Series<Byte>.isDirtyUTF8(): Boolean {
         }
     return dirty
 }
+

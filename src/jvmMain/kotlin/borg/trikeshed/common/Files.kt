@@ -3,7 +3,6 @@ package borg.trikeshed.common
 import borg.trikeshed.lib.*
 import java.io.ByteArrayOutputStream
 import java.io.File
-import java.io.FileInputStream
 import java.nio.file.Files as JavaNioFileFiles
 import java.nio.file.Paths as JavaNioFilePaths
 
@@ -72,95 +71,94 @@ actual object Files {
     }
 
     actual fun iterateLines(fileName: String, bufsize: Int): Iterable<Join<Long, Series<Byte>>> {
-        val input = FileInputStream(fileName)
 
-        /** a fragment in accum is a buffer which ends before EOL. */
-        val accum: MutableList<BFrag> = mutableListOf()
+        val file = File(fileName)
 
-        /** we only create bufSize arrays, and recycle them.*/
-        val recycle: MutableList<ByteArray> = mutableListOf()
-        var currentLineStart = 0L
+        file.inputStream().use { input ->
+            val theIterable = object : Iterable<Join<Long, Series<Byte>>> {
+                override fun iterator(): Iterator<Join<Long, Series<Byte>>> {
+                    var fileClosed = false
+                    var accum: MutableList<ByteArray> = mutableListOf()
+                    var curBuf: ByteArray? = null
+                    var curlinepos = 0L
+                    fun drainAccum(): ByteArray {
 
-        /** when EOL occurs in the buffer we have to remember the start of the next line. */
-        var curBuff: ByteArray? = null
-        var fClosed = false
-        var pending: BFrag? = null
-        fun fragMerge(): Join<Long, Series<Byte>> {
-            val lineLen = accum.sumOf { (bound, b) ->
-                val (f, l) = bound
-                l - f
-            }
-            //if linelen is at least 2/3 of the buffer size, we can use the recycle list.
-            val buf =
-                if (bufsize > lineLen && (bufsize - lineLen) < bufsize / 3 && recycle.isNotEmpty()) recycle.removeLast()
-                else ByteArray(lineLen)
-            var pos = 0
-            for ((bound, b) in accum) {
-                val (f, l) = bound
-                b.copyInto(buf, pos, f, l)
-                pos += l - f
-                if (b !== curBuff) recycle.add(b)
-            }
-            accum.clear()
-            //if pending twin is not empty, we have to add it to the accum list.
-            if (pending != null) {
-                val (bound: Twin<Int>) = pending!!
-                val (f, l) = bound
-                if (f < l) accum.add(pending!!)
-                pending = null
-            }
-
-            val retval: Join<Long, Series<Byte>> = currentLineStart j (lineLen j buf::get)
-            currentLineStart += lineLen
-            return retval
-        }
-
-        fun readNextLine(): Join<Long, Series<Byte>>? {
-            if (fClosed) return null
-            curBuff = curBuff ?: recycle.lastOrNull() ?: ByteArray(bufsize)
-            val read = input.read(curBuff!!)
-            if (read == -1) {
-                fClosed = true
-                if (accum.isNotEmpty()) return fragMerge() else
-                    return null
-            }
-            val byteSeries: ByteSeries = ByteSeries(read j curBuff!!::get)
-            if (byteSeries.seekTo('\n'.code.toByte())) {
-                //create 2 BFrag objects, one for the line, one for the remainder.
-                val join = 0 j byteSeries.pos
-                val complete: BFrag = join j curBuff!!
-                pending = (byteSeries.pos.inc() j read) j curBuff!!
-                accum.add(complete)
-                return fragMerge()
-            } else {
-                //if we are here, we have not found EOL in the buffer.
-                accum.add(0 j read j curBuff!!) //add the whole buffer to the accum list.
-                return null
-            }
-        }
-        return object : Iterable<Join<Long, Series<Byte>>> {
-            override fun iterator(): Iterator<Join<Long, Series<Byte>>> {
-                return object : Iterator<Join<Long, Series<Byte>>> {
-                    var nextLine: Join<Long, Series<Byte>>? = null
-                    override fun hasNext(): Boolean {
-                        if (nextLine == null) nextLine = readNextLine()
-                        return nextLine != null
+                        val ret = ByteArray(accum.sumOf { it.size })
+                        var offset = 0
+                        for (a in accum) {
+                            a.copyInto(ret, offset)
+                            offset += a.size
+                        }
+                        accum.clear()
+                        return ret
                     }
 
-                    override fun next(): Join<Long, Series<Byte>> {
-                        if (nextLine == null) nextLine = readNextLine()
-                        val retval = nextLine!!
-                        nextLine = null
-                        return retval
+                    fun newLine(): Join<Long, Series<Byte>>? {
+                        do {
+                            if (fileClosed) return null
+                            if (curBuf == null) {
+                                curBuf = ByteArray(bufsize)
+                                val read = input.read(curBuf)
+                                if (read == -1) {
+                                    fileClosed = true
+                                    curBuf = null
+                                }
+                            }
+                            if (curBuf == null) {
+                                val drainAccum = drainAccum()
+                                if (drainAccum.isEmpty()) return null
+                                return curlinepos j drainAccum.toSeries()
+                            }
+
+                            //right here we should be at the split  point of the line. we either drain the accum and keep a curBuff
+                            //or accumulate the whole remaining buffer and null out curBuf and loop back until newline or eof
+                            var mark = 0
+                            ByteSeries(curBuf!!).let { bs ->
+                                if (bs.seekTo('\n'.code.toByte())) {
+                                    val carry = bs.slice
+                                    val terminus = bs.flip()
+
+                                    accum += terminus.run { ByteArray(rem, ::get) }
+                                    curBuf = carry.run { ByteArray(rem, ::get) }
+                                    val drainAccum = drainAccum()
+                                    val r = curlinepos j drainAccum.toSeries()
+                                    curlinepos += drainAccum.size
+                                    return r
+                                } else {
+                                    accum += curBuf!!
+                                    curBuf = null
+
+
+                                }
+                            }
+
+                        } while (true)
+
+
+                    }
+                    return object : Iterator<Join<Long, Series<Byte>>> {
+                        var nextLine: Join<Long, Series<Byte>>? = null
+                        override fun hasNext(): Boolean {
+                            if (nextLine == null) nextLine = newLine()
+                            return nextLine != null
+                        }
+
+                        override fun next(): Join<Long, Series<Byte>> {
+                            if (nextLine == null) nextLine = newLine()
+                            val retval = nextLine!!
+                            nextLine = null
+                            return retval
+                        }
                     }
                 }
             }
+            return theIterable
         }
     }
 }
 
 fun main() {
-    val lines = Files.iterateLines("/etc/default/grub", 1024)
+    val lines = Files.iterateLines("/etc/default/grub", 25)
     for (line in lines) {
         val (offset, lineBytes) = line
         val lineStr = lineBytes.asString()
