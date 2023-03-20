@@ -77,7 +77,7 @@ actual object Files {
         val input = file.inputStream()
         val theIterable = object : Iterable<Join<Long, Series<Byte>>> {
             var fileClosed = false
-            val accum: MutableList<ByteArray> = mutableListOf()
+            var accum: MutableList<ByteArray> = mutableListOf()
             var curBuf: ByteArray? = null
             var curlinepos = 0L
             fun drainAccum(): ByteArray {
@@ -104,7 +104,8 @@ actual object Files {
                         }
                     }
                     if (curBuf == null) {
-                        while (accum.last().first() == 0.toByte()) accum.removeLast()
+                        accum = accum.filterNot { it.isEmpty() }.toMutableList()
+
                         val drainAccum = drainAccum()
                         if (drainAccum.isEmpty()) return null
                         return curlinepos j drainAccum.toSeries()
@@ -118,15 +119,23 @@ actual object Files {
                             val carry = bs.slice
                             val terminus = bs.flip()
 
-                            accum += terminus.run { ByteArray(rem, ::get) }
-                            curBuf = carry.run { ByteArray(rem, ::get) }
+                            if (terminus.hasRemaining) accum += terminus.run { ByteArray(rem, ::get) }
+                            if (carry.hasRemaining) curBuf = carry.run { ByteArray(rem, ::get) } else curBuf = null
                             val drainAccum = drainAccum()
                             val r = curlinepos j drainAccum.toSeries()
                             curlinepos += drainAccum.size
                             return r
                         } else {
-                            accum += curBuf!!
-                            curBuf = null
+                            if (curBuf?.isEmpty() == true) return null
+                            val byteSeries = ByteSeries(curBuf!!)
+                            if (byteSeries.seekTo(0.toByte()))
+                                byteSeries.flip()
+                            if (byteSeries.hasRemaining) {
+                                curBuf = byteSeries.toArray()
+                                if (curBuf!!.isEmpty() || curBuf!![0] == 0.toByte()) return null
+                                accum += curBuf!!
+                                curBuf = null
+                            }
                         }
                     }
 
@@ -156,7 +165,7 @@ actual object Files {
 }
 
 fun main() {
-    val lines = Files.iterateLines("/etc/default/grub", 25)
+    val lines = Files.iterateLines("/etc/default/grub", 128 * 1024)
     for (line in lines) {
         val (offset, lineBytes) = line
         val lineStr = lineBytes.asString()
