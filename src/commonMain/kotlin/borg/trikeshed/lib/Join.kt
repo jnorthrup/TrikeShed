@@ -32,7 +32,6 @@ interface Join<A, B> {
         }
 
 
-
         //the Map factory method
         operator fun <A, B> invoke(map: Map<A, B>): Series<Join<A, B>> = object : Series<Join<A, B>> {
             override val a: Int get() = map.size
@@ -58,12 +57,13 @@ inline val <B> Join<*, B>.second: B get() = this.b
  * exactly like "to" for "Join" but with a different (and shorter!) name
  */
 inline infix fun <A, B> A.j(b: B): Join<A, B> = Join(this, b)
-inline infix fun Int.j(b: Int): Twin<Int> = (this.toLong() shl 32 and (0xFFFFFFFFL and b.toLong())).let { theLong ->
+inline infix fun Int.j(b: Int): Twin<Int> = ((this.toLong() shl 32) or (b.toLong())).let { capture ->
     object : Twin<Int> {
-        override val a: Int get() = (theLong shr 32).toInt()
-        override val b: Int get() = (theLong and 0xFFFFFFFFL).toInt()
+        override val a: Int get() = (capture shr 32).toInt()
+        override val b: Int get() = (capture and 0xFFFFFFFF).toInt()
     }
 }
+
 
 inline infix fun Short.j(b: Short): Twin<Short> = (this.toInt() shl 16 and (0xFFFF and b.toInt())).let { theInt ->
     object : Twin<Short> {

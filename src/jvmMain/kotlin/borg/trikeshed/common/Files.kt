@@ -127,8 +127,9 @@ actual object Files {
             val byteSeries: ByteSeries = ByteSeries(read j curBuff!!::get)
             if (byteSeries.seekTo('\n'.code.toByte())) {
                 //create 2 BFrag objects, one for the line, one for the remainder.
-                val complete: BFrag = 0 j byteSeries.pos j curBuff!!
-                pending = (byteSeries.pos + 1 j read) j curBuff!!
+                val join = 0 j byteSeries.pos
+                val complete: BFrag = join j curBuff!!
+                pending = (byteSeries.pos.inc() j read) j curBuff!!
                 accum.add(complete)
                 return fragMerge()
             } else {
@@ -158,3 +159,11 @@ actual object Files {
     }
 }
 
+fun main() {
+    val lines = Files.iterateLines("/etc/default/grub", 1024)
+    for (line in lines) {
+        val (offset, lineBytes) = line
+        val lineStr = lineBytes.asString()
+        println("$offset: $lineStr")
+    }
+}
