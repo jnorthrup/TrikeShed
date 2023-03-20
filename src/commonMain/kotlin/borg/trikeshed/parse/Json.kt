@@ -10,10 +10,11 @@ typealias JsIndex = Join<Twin<Int>, Series<Char>> //(twin j src)
 typealias JsContext = Join<JsElement, Series<Char>> //(element j src)
 typealias JsPathElement = Either<String, Int>
 typealias JsPath = Series<JsPathElement>
-private fun logDebug(t:()->String)  {  } //logging turned off for now
+
+private fun logDebug(t: () -> String) {} //logging turned off for now
 
 val List<*>.toJsPath: JsPath
-    get() = this.α {
+    get() = this.toSeries() α {
         when (it) {
             is String -> JsPathElement.left(it)
             is Int -> JsPathElement.right(it)
@@ -28,7 +29,7 @@ val List<*>.toJsPath: JsPath
  *
  *  " 3 ]" in "[0,1,2,3]" would be "3"
  */
-val JsContext.segments: Series<JsIndex>
+val JsContext.segments: Iterable<JsIndex>
     get() {
         val (element, src) = this
         val (openIdx, closeIdx) = element.first
@@ -150,7 +151,7 @@ object JsonParser {
                             }
                         }
                     } else reify(CharSeries(src[before.inc() until after]).trim)
-                }.let { if (isObj) it.`▶`.map { (it as Join<*, *>).pair }.toMap() else it }
+                }.let { if (isObj) it/*.`▶`*/.map { (it as Join<*, *>).pair }.toMap() else it }
             }
 
             '"' -> {
@@ -203,24 +204,26 @@ object JsonParser {
         )
     }
 
-      fun selectByIndex(
+    fun selectByIndex(
         context: JsContext,
         src: Series<Char>,
         element: JsElement,
         pathTail: Series<Either<String, Int>>,
         reifyResult: Boolean,
-    ): (Int) -> Any? = { idx:Int ->
+    ): (Int) -> Any? = { idx: Int ->
         var r: Any? = Unit
-        val segments: Series<JsIndex> = context.segments
+        val segments = context.segments.toList()
 
         if (idx < segments.size) do {
-
             val segment: JsIndex = segments[idx]
             val (segOpenIdx, segCloseIdx) = segment.first
             val src0 = CharSeries(src).lim(segCloseIdx).pos(segOpenIdx)
             val src01 = src0.slice
             var src1 = src01.trim
-            val inObj = '{' == src[element.first.first]
+            val inObj = element.run {
+                val (a, _) = first
+                a in 0 until src.size && '{' == src[a]
+            }
             if (inObj) {
                 logDebug { "obj segment ${src1.asString()}" }
                 val tmp = CharSeries(src1).trim
@@ -249,15 +252,15 @@ object JsonParser {
         r
     }
 
-      fun selectByKey(
+    fun selectByKey(
         context: JsContext,
         src: Series<Char>,
         element: JsElement,
         pathTail: Series<Either<String, Int>>,
         reifyResult: Boolean,
-    ): (String) -> Any? = { key:String ->
+    ): (String) -> Any? = { key: String ->
         var r: Any? = Unit  //this is the payload
-        val segments: Series<JsIndex> = context.segments
+        val segments = context.segments.toList()
         var idx = 0
         if (('{' == src[element.first.first])) do {
             val segment: JsIndex = segments[idx]

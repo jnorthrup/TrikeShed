@@ -97,13 +97,14 @@ actual object Files {
                     if (fileClosed) return null
                     if (curBuf == null) {
                         curBuf = ByteArray(bufsize)
-                        val read = input.read(curBuf)
+                        val read = input.read(curBuf!!)
                         if (read == -1) {
                             fileClosed = true
                             curBuf = null
                         }
                     }
                     if (curBuf == null) {
+                        while (accum.last().first() == 0.toByte()) accum.removeLast()
                         val drainAccum = drainAccum()
                         if (drainAccum.isEmpty()) return null
                         return curlinepos j drainAccum.toSeries()
@@ -130,8 +131,6 @@ actual object Files {
                     }
 
                 } while (true)
-
-
             }
 
             override fun iterator(): Iterator<Join<Long, Series<Byte>>> {
