@@ -18,11 +18,12 @@ expect class IsamDataFile(
     companion object {
         fun write(cursor: Cursor, datafilename: String, varChars: Map<String, Int> = emptyMap())
 
-        suspend  fun append(
-            msf: Iterable<RowVec>,
-            datafilename: String,
-            varChars: Map<String, Int> = emptyMap(), transform: ((RowVec) -> RowVec)?
-        )
+           fun append(
+               msf: Iterable<RowVec>,
+               datafilename: String,
+               varChars: Map<String, Int> = emptyMap(),
+               transform: ((RowVec) -> RowVec)? = null,
+           )
 
     }
 }

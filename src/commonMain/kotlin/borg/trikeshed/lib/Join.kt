@@ -31,8 +31,7 @@ interface Join<A, B> {
             override val b: B get() = pair.second
         }
 
-        //Twin factory method
-        inline fun <T> Twin(a: T, b: T): Twin<T> = a j b
+
 
         //the Map factory method
         operator fun <A, B> invoke(map: Map<A, B>): Series<Join<A, B>> = object : Series<Join<A, B>> {
@@ -45,6 +44,11 @@ interface Join<A, B> {
 }
 
 typealias Twin<T> = Join<T, T>
+
+//Twin factory method
+inline fun <T> Twin(a: T, b: T): Twin<T> = a j b
+
+
 typealias Triplet<T> = Join3<T, T, T>
 
 inline val <A> Join<A, *>.first: A get() = this.a
@@ -54,6 +58,27 @@ inline val <B> Join<*, B>.second: B get() = this.b
  * exactly like "to" for "Join" but with a different (and shorter!) name
  */
 inline infix fun <A, B> A.j(b: B): Join<A, B> = Join(this, b)
+inline infix fun Int.j(b: Int): Twin<Int> = (this.toLong() shl 32 and (0xFFFFFFFFL and b.toLong())).let { theLong ->
+    object : Twin<Int> {
+        override val a: Int get() = (theLong shr 32).toInt()
+        override val b: Int get() = (theLong and 0xFFFFFFFFL).toInt()
+    }
+}
+
+inline infix fun Short.j(b: Short): Twin<Short> = (this.toInt() shl 16 and (0xFFFF and b.toInt())).let { theInt ->
+    object : Twin<Short> {
+        override val a: Short get() = (theInt shr 16).toShort()
+        override val b: Short get() = (theInt and 0xFFFF).toShort()
+    }
+}
+
+inline infix fun Byte.j(b: Byte): Twin<Byte> = (this.toInt() shl 8 and (0xFF and b.toInt())).let { theInt ->
+    object : Twin<Byte> {
+        override val a: Byte get() = (theInt shr 8).toByte()
+        override val b: Byte get() = (theInt and 0xFF).toByte()
+    }
+}
+
 
 /** α
  * (λx.M[x]) → (λy.M[y])	α-conversion

@@ -3,7 +3,7 @@ package borg.trikeshed.lib
 import borg.trikeshed.lib.CZero.nz
 
 inline fun Series<Byte>.decodeUtf8(charArray: CharArray? = null): Series<Char> =
-    charArray?.let { decodeDirtyUtf8(it) } ?: if (dirtyUtf8Bytes(this)) decodeDirtyUtf8() else (this α {
+    charArray?.let { decodeDirtyUtf8(it) } ?: if (isDirtyUTF8()) decodeDirtyUtf8() else (this α {
         it.toInt().toChar()
     })
 
@@ -61,7 +61,11 @@ class ByteSeries(
 
     //string ctor
     constructor(s: String) : this(s.toSeries().encodeToByteArray().toSeries())
-    constructor(s: ByteArray) : this(s.toSeries())
+
+    constructor(buf: ByteArray, pos: Int = 0, limit: Int = buf.size) : this(
+        limit j buf::get,
+        pos
+    )
 
     /**remaining chars*/
     val rem: Int get() = limit - pos
@@ -181,8 +185,8 @@ class ByteSeries(
         get() = apply {
             var p = pos
             var l = limit
-            while (p < l && get(p).toInt().toChar().isWhitespace()) p++
-            while (l > p && get(l.dec()).toInt().toChar().isWhitespace()) l--
+            while (p < l && (0xff and get(p).toInt()).toChar().isWhitespace()) p++
+            while (l > p && (0xff and get(l.dec()).toInt()).toChar().isWhitespace()) l--
             lim(l)
             pos(p)
         }
@@ -201,7 +205,8 @@ class ByteSeries(
         var escaped = false
         while (hasRemaining) {
             val c = get
-            if (c == target) return true
+            if (c == target)
+                return true
         }
         pos = anchor
         return false
@@ -251,15 +256,15 @@ class ByteSeries(
 }
 
 
-fun dirtyUtf8Bytes(barray: Series<Byte>): Boolean {
+fun Series<Byte>.isDirtyUTF8(): Boolean {
     var dirty = false
-    val bsz = barray.size
+    val bsz = this.size
     //if thereis one more byte to test and the first byte is in the range of 110x xxxx
     //what shr 4 proves: 110x xxxx
     val barLen = bsz.dec()
     for (b in 0 until barLen)
-        if ((barray[b].toInt() shr 4) in 0x0C..0x0E) {
-            val byte = barray[b.inc()]
+        if ((this[b].toInt() shr 4) in 0x0C..0x0E) {
+            val byte = this[b.inc()]
             if ((byte.toInt() shr 6) == 0x02) {
                 dirty = true
                 break

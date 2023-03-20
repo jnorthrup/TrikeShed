@@ -49,8 +49,11 @@ class CircularQueue<T>(capacity: Int, val onEvict: ((T) -> Unit)? = null) {
         A factory method that creates a circular queue with a given capacity and initial elements
         e.g. CircularQueue.create(3, 1, 2, 3) { println("Evicted $it") }
          */
-        fun <T> create(capacity: Int, vararg elements: T, onEvict: (T) -> Unit?): CircularQueue<T> {
-            val queue = CircularQueue<T>(capacity)// Createa new instance of CircularQueue<T> withthe given capacity
+        fun <T> create(capacity: Int, vararg elements: T, onEvict1: ((T) -> Unit)? = null): CircularQueue<T> {
+            val queue = CircularQueue<T>(
+                capacity,
+                onEvict = onEvict1
+            )// Createa new instance of CircularQueue<T> withthe given capacity
             for (element in elements) {// Loop throughthe given elements
                 queue.enqueue(element)// Add each element tothe queue using enqueue() method
             }

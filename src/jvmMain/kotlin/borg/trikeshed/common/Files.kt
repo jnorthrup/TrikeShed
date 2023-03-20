@@ -3,9 +3,11 @@ package borg.trikeshed.common
 import borg.trikeshed.lib.*
 import java.io.ByteArrayOutputStream
 import java.io.File
-import kotlin.assert
+import java.io.FileInputStream
 import java.nio.file.Files as JavaNioFileFiles
 import java.nio.file.Paths as JavaNioFilePaths
+
+typealias BFrag = Join<Twin<Int>, ByteArray>
 
 actual object Files {
     actual fun readAllLines(filename: String): List<String> =
@@ -69,91 +71,90 @@ actual object Files {
         }
     }
 
-    actual fun iterateLines(fileName: String, bufsize: Int): Iterable<Join3<Long, ByteSeries, Boolean>> {
-        val file = File(fileName)
-        val buffer = ByteArray(bufsize)
-        var offset: Long = 0
-        var lineStartOffset: Long = 0
-        val lineBuffer = ByteArrayOutputStream()
+    actual fun iterateLines(fileName: String, bufsize: Int): Iterable<Join<Long, Series<Byte>>> {
+        val input = FileInputStream(fileName)
 
-        return object : Iterable<Join3<Long, ByteSeries, Boolean>> {
-            override fun iterator(): Iterator<Join3<Long, ByteSeries, Boolean>> {
-                val input = file.inputStream()
-                var nextValue: Join3<Long, ByteSeries, Boolean>? = null
+        /** a fragment in accum is a buffer which ends before EOL. */
+        val accum: MutableList<BFrag> = mutableListOf()
 
+        /** we only create bufSize arrays, and recycle them.*/
+        val recycle: MutableList<ByteArray> = mutableListOf()
+        var currentLineStart = 0L
 
-                fun readNext(): Join3<Long, ByteSeries, Boolean>? {
-                    while (true) {
-                        val bytesRead = input.read(buffer)
-                        if (bytesRead == -1) break
-                        var mark = 0
-                        for (i in 0 until bytesRead) {
-                            val byte = buffer[i]
-                            when (byte) {
-                                '\n'.code.toByte() -> {
-                                    lineBuffer.write(buffer, mark, i - mark + 1)
-                                    mark = i + 1
+        /** when EOL occurs in the buffer we have to remember the start of the next line. */
+        var curBuff: ByteArray? = null
+        var fClosed = false
+        var pending: BFrag? = null
+        fun fragMerge(): Join<Long, Series<Byte>> {
+            val lineLen = accum.sumOf { (bound, b) ->
+                val (f, l) = bound
+                l - f
+            }
+            //if linelen is at least 2/3 of the buffer size, we can use the recycle list.
+            val buf =
+                if (bufsize > lineLen && (bufsize - lineLen) < bufsize / 3 && recycle.isNotEmpty()) recycle.removeLast()
+                else ByteArray(lineLen)
+            var pos = 0
+            for ((bound, b) in accum) {
+                val (f, l) = bound
+                b.copyInto(buf, pos, f, l)
+                pos += l - f
+                if (b !== curBuff) recycle.add(b)
+            }
+            accum.clear()
+            //if pending twin is not empty, we have to add it to the accum list.
+            if (pending != null) {
+                val (bound: Twin<Int>) = pending!!
+                val (f, l) = bound
+                if (f < l) accum.add(pending!!)
+                pending = null
+            }
 
-                                    val s = lineBuffer.toByteArray()
-                                    val byteSeries = ByteSeries(s)
-                                    val result: Join3<Long, ByteSeries, Boolean> =
-                                        lineStartOffset j byteSeries x dirtyUtf8Bytes(byteSeries)
-                                    lineStartOffset = offset + i + 1
-                                    offset += bytesRead
-                                    return result
-                                }
-                            }
-                        }
-                        if (mark < bytesRead) {
-                            lineBuffer.write(buffer, mark, bytesRead - mark)
-                        }
+            val retval: Join<Long, Series<Byte>> = currentLineStart j (lineLen j buf::get)
+            currentLineStart += lineLen
+            return retval
+        }
 
-                        offset += bytesRead
-                    }
-
-                    if (lineBuffer.size() > 0) {
-                        val barray = lineBuffer.toByteArray()
-                        val tmp: ByteSeries = ByteSeries(barray.toSeries())
-                        val dirty = dirtyUtf8Bytes(tmp)
-                        if (!tmp.trim.isEmpty()) return lineStartOffset j tmp x dirty
-                    }
-
-                    input.close()
+        fun readNextLine(): Join<Long, Series<Byte>>? {
+            if (fClosed) return null
+            curBuff = curBuff ?: recycle.lastOrNull() ?: ByteArray(bufsize)
+            val read = input.read(curBuff!!)
+            if (read == -1) {
+                fClosed = true
+                if (accum.isNotEmpty()) return fragMerge() else
                     return null
-                }
+            }
+            val byteSeries: ByteSeries = ByteSeries(read j curBuff!!::get)
+            if (byteSeries.seekTo('\n'.code.toByte())) {
+                //create 2 BFrag objects, one for the line, one for the remainder.
+                val complete: BFrag = 0 j byteSeries.pos j curBuff!!
+                pending = (byteSeries.pos + 1 j read) j curBuff!!
+                accum.add(complete)
+                return fragMerge()
+            } else {
+                //if we are here, we have not found EOL in the buffer.
+                accum.add(0 j read j curBuff!!) //add the whole buffer to the accum list.
+                return null
+            }
+        }
+        return object : Iterable<Join<Long, Series<Byte>>> {
+            override fun iterator(): Iterator<Join<Long, Series<Byte>>> {
+                return object : Iterator<Join<Long, Series<Byte>>> {
+                    var nextLine: Join<Long, Series<Byte>>? = null
+                    override fun hasNext(): Boolean {
+                        if (nextLine == null) nextLine = readNextLine()
+                        return nextLine != null
+                    }
 
-                return object : Iterator<Join3<Long, ByteSeries, Boolean>> {
-                    override fun hasNext(): Boolean = nextValue ?: readNext().also { nextValue = it } != null
-
-                    override fun next(): Join3<Long, ByteSeries, Boolean> = when {
-                        hasNext() -> {
-                            val result: Join3<Long, ByteSeries, Boolean> = nextValue!!
-                            nextValue = null
-                            result
-                        }
-
-                        else -> throw NoSuchElementException()
+                    override fun next(): Join<Long, Series<Byte>> {
+                        if (nextLine == null) nextLine = readNextLine()
+                        val retval = nextLine!!
+                        nextLine = null
+                        return retval
                     }
                 }
             }
         }
     }
-}
-
-/** unit test for fun streamLines*/
-fun main() {
-//write several lines in a  tmpfile
-    val tmpfile = File.createTempFile("test", ".txt")
-
-    val lines = listOf("line1", "line2", "line3")
-
-    JavaNioFileFiles.write(tmpfile.toPath(), lines)
-    tmpfile.deleteOnExit()
-
-    //read the lines back in a sequence
-    val seq = Files.streamLines(tmpfile.absolutePath, 1)
-    seq.forEach { println(it.second.decodeToString()) }
-    println("lines should be 3 - lines are ${seq.count()}")
-    assert(seq.map { it.second.toString(Charsets.UTF_8) }.toList() == lines) { "lines differ" }
 }
 

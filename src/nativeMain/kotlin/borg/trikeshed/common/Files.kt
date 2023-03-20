@@ -1,8 +1,7 @@
 package borg.trikeshed.common
 
-import borg.trikeshed.lib.ByteSeries
 import borg.trikeshed.lib.Join
-import borg.trikeshed.lib.Join3
+import borg.trikeshed.lib.Series
 import kotlinx.cinterop.*
 import platform.posix._PC_PATH_MAX
 import platform.posix.getcwd
@@ -42,7 +41,7 @@ actual object Files {
     actual fun iterateLines(
         fileName: String,
         bufsize: Int,
-    ): Iterable<Join3<Long, ByteSeries, Boolean>> {
+    ): Iterable<Join<Long, Series<Byte>>> {
         TODO("Not yet implemented")
     }
 

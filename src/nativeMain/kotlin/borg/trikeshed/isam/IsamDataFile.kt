@@ -146,12 +146,13 @@ actual class IsamDataFile actual constructor(
             }
             data.close()
         }
-        actual suspend  fun append(
+
+        actual fun append(
             msf: Iterable<RowVec>,
             datafilename: String,
             varChars: Map<String, Int>,
-            transform: ((RowVec) -> RowVec)?
-        ):Unit {
+            transform: ((RowVec) -> RowVec)?,
+        ): Unit {
             TODO()
         }
     }

@@ -6,8 +6,6 @@ import borg.trikeshed.common.Usable
 import borg.trikeshed.cursor.*
 import borg.trikeshed.isam.meta.IOMemento
 import borg.trikeshed.lib.*
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import java.io.RandomAccessFile
 import java.nio.ByteBuffer
 import java.nio.channels.SeekableByteChannel
@@ -119,12 +117,12 @@ actual class IsamDataFile actual constructor(
             data.close()
         }
 
-        actual suspend fun append(
+        actual fun append(
             msf: Iterable<RowVec>,
             datafilename: String,
             varChars: Map<String, Int>,
             transform: ((RowVec) -> RowVec)?,
-        ): Unit = withContext(Dispatchers.IO) {
+        ): Unit {
             val metafilename = "$datafilename.meta"
 
             // TODO("not assume we have to write this file for this call.  if it exists, verify it and use it")
@@ -156,7 +154,7 @@ actual class IsamDataFile actual constructor(
                 }
 
                 WireProto.writeToBuffer(rowVec, rowBuffer, meta0)
-                withContext(Dispatchers.IO) { data.write(rowBuffer) }
+                data.write(rowBuffer)
                 debug { fibLog?.report()?.let { println(it) } }
             }
         }

@@ -3,7 +3,6 @@
 
 package borg.trikeshed.lib
 
-import borg.trikeshed.common.collections.s_
 import borg.trikeshed.cursor.Cursor
 import borg.trikeshed.cursor.meta
 import borg.trikeshed.cursor.type
@@ -81,118 +80,28 @@ inline fun Series<Int>.binarySearch(a: Int): Int {
     return -(low + 1)
 }
 
-/**
-Series combine (series...)
-creates a new Series<A> from the varargs of Series<A> passed in
-which is a view of the underlying data, not a copy
-
-the resulting Series<A> is ordered and contains all the elements of catn
-in the order they were passed in
-@see https://en.algorithmica.org/hpc/data-structures/s-tree/#b-tree-layout-1
-@param catn the varargs of Series<A> to combine
+/**splits a range into multiple parts for upstream reindexing utility
+ * 0..11 / 3 produces [0..3, 4..7, 8..11].toSeries()
+ *
+ * in order to dereference these vectors, invert the applied order
+ *  val r=(0 until 743 * 347 * 437) / 437 / 347 / 743
+ *
+ *  the order to access these is the r[..743][..347][..437]
  */
-fun <A> combine(vararg catn: Series<A>): Series<A> { // combine
-    require(catn.isNotEmpty()) { "combine requires at least one Series<A>" }
-    val frst = catn[0]
-    val sz0 = frst.size
-    return when (catn.size) {
-        1 -> frst
-        2 -> sz0 + catn[1].size j { i ->
-            if (i < sz0) frst[i] else catn[1][i - sz0]
-        }
-
-        3 -> sz0 + catn[1].size + catn[2].size j { i ->
-            when {
-                i < sz0 -> frst[i]
-                i < sz0 + catn[1].size -> catn[1][i - sz0]
-                else -> catn[2][i - sz0 - catn[1].size]
-            }
-        }
-
-        4 -> sz0 + catn[1].size + catn[2].size + catn[3].size j { i ->
-            when {
-                i < sz0 -> frst[i]
-                i < sz0 + catn[1].size -> catn[1][i - sz0]
-                i < sz0 + catn[1].size + catn[2].size -> catn[2][i - sz0 - catn[1].size]
-                else -> catn[3][i - sz0 - catn[1].size - catn[2].size]
-            }
-
-        }
-
-        5 -> sz0 + catn[1].size + catn[2].size + catn[3].size + catn[4].size j { i ->
-            when {
-                i < sz0 -> frst[i]
-                i < sz0 + catn[1].size -> catn[1][i - sz0]
-                i < sz0 + catn[1].size + catn[2].size -> catn[2][i - sz0 - catn[1].size]
-                i < sz0 + catn[1].size + catn[2].size + catn[3].size -> catn[3][i - sz0 - catn[1].size - catn[2].size]
-                else -> catn[4][i - sz0 - catn[1].size - catn[2].size - catn[3].size]
-            }
-        }
-
-        6 -> sz0 + catn[1].size + catn[2].size + catn[3].size + catn[4].size + catn[5].size j { i ->
-            when {
-                i < sz0 -> frst[i]
-                i < sz0 + catn[1].size -> catn[1][i - sz0]
-                i < sz0 + catn[1].size + catn[2].size -> catn[2][i - sz0 - catn[1].size]
-                i < sz0 + catn[1].size + catn[2].size + catn[3].size -> catn[3][i - sz0 - catn[1].size - catn[2].size]
-                i < sz0 + catn[1].size + catn[2].size + catn[3].size + catn[4].size -> catn[4][i - sz0 - catn[1].size - catn[2].size - catn[3].size]
-                else -> catn[5][i - sz0 - catn[1].size - catn[2].size - catn[3].size - catn[4].size]
-            }
-        }
-
-        7 -> sz0 + catn[1].size + catn[2].size + catn[3].size + catn[4].size + catn[5].size + catn[6].size j { i ->
-            when {
-                i < sz0 -> frst[i]
-                i < sz0 + catn[1].size -> catn[1][i - sz0]
-                i < sz0 + catn[1].size + catn[2].size -> catn[2][i - sz0 - catn[1].size]
-                i < sz0 + catn[1].size + catn[2].size + catn[3].size -> catn[3][i - sz0 - catn[1].size - catn[2].size]
-                i < sz0 + catn[1].size + catn[2].size + catn[3].size + catn[4].size -> catn[4][i - sz0 - catn[1].size - catn[2].size - catn[3].size]
-                i < sz0 + catn[1].size + catn[2].size + catn[3].size + catn[4].size + catn[5].size -> catn[5][i - sz0 - catn[1].size - catn[2].size - catn[3].size - catn[4].size]
-                else -> catn[6][i - sz0 - catn[1].size - catn[2].size - catn[3].size - catn[4].size - catn[5].size]
-            }
-        }
-
-        8 -> sz0 + catn[1].size + catn[2].size + catn[3].size + catn[4].size + catn[5].size + catn[6].size + catn[7].size j { i ->
-            when {
-                i < sz0 -> frst[i]
-                i < sz0 + catn[1].size -> catn[1][i - sz0]
-                i < sz0 + catn[1].size + catn[2].size -> catn[2][i - sz0 - catn[1].size]
-                i < sz0 + catn[1].size + catn[2].size + catn[3].size -> catn[3][i - sz0 - catn[1].size - catn[2].size]
-                i < sz0 + catn[1].size + catn[2].size + catn[3].size + catn[4].size -> catn[4][i - sz0 - catn[1].size - catn[2].size - catn[3].size]
-                i < sz0 + catn[1].size + catn[2].size + catn[3].size + catn[4].size + catn[5].size -> catn[5][i - sz0 - catn[1].size - catn[2].size - catn[3].size - catn[4].size]
-                i < sz0 + catn[1].size + catn[2].size + catn[3].size + catn[4].size + catn[5].size + catn[6].size -> catn[6][i - sz0 - catn[1].size - catn[2].size - catn[3].size - catn[4].size - catn[5].size]
-                else -> catn[7][i - sz0 - catn[1].size - catn[2].size - catn[3].size - catn[4].size - catn[5].size - catn[6].size]
-            }
-        }
-
-        9 -> sz0 + catn[1].size + catn[2].size + catn[3].size + catn[4].size + catn[5].size + catn[6].size + catn[7].size + catn[8].size j { i ->
-            when {
-                i < sz0 -> frst[i]
-                i < sz0 + catn[1].size -> catn[1][i - sz0]
-                i < sz0 + catn[1].size + catn[2].size -> catn[2][i - sz0 - catn[1].size]
-                i < sz0 + catn[1].size + catn[2].size + catn[3].size -> catn[3][i - sz0 - catn[1].size - catn[2].size]
-                i < sz0 + catn[1].size + catn[2].size + catn[3].size + catn[4].size -> catn[4][i - sz0 - catn[1].size - catn[2].size - catn[3].size]
-                i < sz0 + catn[1].size + catn[2].size + catn[3].size + catn[4].size + catn[5].size -> catn[5][i - sz0 - catn[1].size - catn[2].size - catn[3].size - catn[4].size]
-                i < sz0 + catn[1].size + catn[2].size + catn[3].size + catn[4].size + catn[5].size + catn[6].size -> catn[6][i - sz0 - catn[1].size - catn[2].size - catn[3].size - catn[4].size - catn[5].size]
-                i < sz0 + catn[1].size + catn[2].size + catn[3].size + catn[4].size + catn[5].size + catn[6].size + catn[7].size -> catn[7][i - sz0 - catn[1].size - catn[2].size - catn[3].size - catn[4].size - catn[5].size - catn[6].size]
-                else -> catn[8][i - sz0 - catn[1].size - catn[2].size - catn[3].size - catn[4].size - catn[5].size - catn[6].size - catn[7].size]
-            }
-        }
-
-        else -> {
-            val offsets = IntArray(catn.size)
-            var offset = 0
-            for (i in catn.indices) {
-                offsets[i] = offset
-                offset += catn[i].size
-            }
-            offset j { i ->
-                val j = offsets.binarySearch(i)
-                if (j >= 0) catn[j][i - offsets[j]] else catn[-j - 2][i - offsets[-j - 2]]
+infix operator fun IntRange.div(denominator: Int): Series<IntRange> =
+    (this j (last - first + (1 - first)) / denominator).let { (_: IntRange, subSize: Int): Join<IntRange, Int> ->
+        Series(denominator) { x: Int ->
+            (subSize * x).let { lower ->
+                lower..last.coerceAtMost(lower + subSize - 1)
             }
         }
     }
-} // combine
+
+operator fun <T> Series<T>.div(d: Int): Series<Series<T>> = (0 until size) / d α {
+    this[it]
+}
+
+
 
 fun IntArray.binarySearch(i: Int): Int {
     var low = 0
@@ -212,7 +121,7 @@ fun IntArray.binarySearch(i: Int): Int {
 }
 
 /**
- * Vect0r->Set */
+ * Series->Set */
 fun <S> Join<Int, (Int) -> S>.toSet(opt: MutableSet<S>? = null): MutableSet<S> = (
         opt
             ?: LinkedHashSet(size)
@@ -384,7 +293,6 @@ val Cursor.isNumerical: Boolean
     }
 val Cursor.isHomoMorphic: Boolean get() = !meta.`▶`.any { it.type != meta[0].type }
 
-operator fun <A> Series<A>.plus(c: Series<A>): Series<A> = combine(s_[this] as Series<A>, c)
 
 fun <T> Series<T>.isEmpty(): Boolean {
     return a == 0
