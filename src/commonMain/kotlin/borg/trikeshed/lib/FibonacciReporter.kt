@@ -38,7 +38,7 @@ class FibonacciReporter(
 
     override fun open() = logDebug { "debug: $noun FibonacciReporter opened @$begin" }
     override fun close() = logDebug {
-        count--;countdown = 1; "debug:FibonacciReporter closed ${report()} @ ${TimeSource.Monotonic.markNow()} "
+        count--;countdown = 1; "debug:FibonacciReporter closed ${report()} @ ${TimeSource.Monotonic.markNow()-begin} "
     }
 
     fun report(): String? = (count++).run {

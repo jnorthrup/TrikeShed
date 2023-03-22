@@ -1,8 +1,11 @@
+@file:OptIn(ExperimentalTime::class)
+
 package borg.trikeshed.common
 
 import borg.trikeshed.lib.*
 import java.io.ByteArrayOutputStream
 import java.io.File
+import kotlin.time.ExperimentalTime
 import java.nio.file.Files as JavaNioFileFiles
 import java.nio.file.Paths as JavaNioFilePaths
 
@@ -104,7 +107,7 @@ actual object Files {
 
 
     actual fun iterateLines(fileName: String, bufsize: Int): Iterable<Join<Long, Series<Byte>>> {
-        val rowLogger = FibonacciReporter(noun = "writes"/*, verb = "read"*/)
+        val rowLogger = FibonacciReporter(noun = "lines"/*, verb = "read"*/)
         val file = File(fileName)
         val input = file.inputStream()
         var counter = 0
@@ -112,6 +115,8 @@ actual object Files {
             var fileClosed = false
             var accum: MutableList<BFrag> = mutableListOf()
             var recycler: LinkedHashSet<ByteArray> = linkedSetOf()
+            var recycleHit=0
+            var recycleMiss=0
             var curBuf: BFrag? = null
             var curlinepos = 0L
             fun drainAccum(tail: BFrag? = null): ByteArray {
@@ -157,7 +162,32 @@ actual object Files {
                             val drainAccum = drainAccum()/* our state:  accum: empty, curBuf: null, EOF: yes */
                             if (drainAccum.isEmpty()) return null
                             return curlinepos j drainAccum.toSeries()
-                                .also { rowLogger.report() }/* our state:  accum: empty, curBuf: null, EOF: yes */
+                                .debug {
+
+                                    curlinepos+=it.size
+
+
+                                    rowLogger.close()
+                                    //print the total bytes(curlinepos), average bytes per line,avg lines/sec, avg bytes/s,  recycler hit/miss ratio and total calls, unrecycled buffers and bufsize*unrecycled, all using Long.humanReadableIEC
+                                    //also print the total time taken to read the file
+                                    val elapsedNow = rowLogger.begin.elapsedNow()
+                                    val totalSeconds = elapsedNow.inWholeSeconds.toLong()
+                                    println("total bytes read: ${curlinepos.humanReadableByteCountIEC}" +
+                                            "\n average bytes per line: ${(curlinepos/counter).humanReadableByteCountIEC}" +
+                                            "\n average lines per second: ${((counter/ totalSeconds)).humanReadableByteCountIEC.replace("iB", "L")}" +
+                                            "\n average bytes per second: ${((curlinepos/ totalSeconds)).humanReadableByteCountIEC}" +
+                                            "\n recycler miss ratio: ${ recycleMiss.toFloat()/recycleHit.toFloat()  }" +
+                                            "\n total calls to recycler: ${recycleHit+recycleMiss}" +
+                                            "\n unrecycled buffers: ${recycler.size}" +
+                                            "\n unrecycled space in buffers: ${(recycler.size*bufsize).toLong().humanReadableByteCountSI}" +
+                                            "\n total time taken to read the file: ${elapsedNow} seconds")
+
+
+
+
+
+
+                                }/* our state:  accum: empty, curBuf: null, EOF: yes */
                         }
                     }
 
@@ -172,7 +202,7 @@ actual object Files {
 
                             curlinepos += result.size
                             return curlinepos j result.toSeries()
-                                .also { rowLogger.report() }
+                                .debug { rowLogger?.report()?.also { println(it) } }
                         } else {
                             /* our state: accum: ?, curBuf: non-null, EOF: no */
                             accum.add(theBuff)
@@ -188,6 +218,8 @@ actual object Files {
                 val iterator = recycler.takeUnless { it.isEmpty() }?.iterator()
                 val attempt = iterator?.next()
                 val byteArray = attempt?.also { iterator.remove() } ?: ByteArray(bufsize)
+                //update hit and miss counters
+                if (attempt != null) recycleHit++ else recycleMiss++
                 return byteArray
             }
 
