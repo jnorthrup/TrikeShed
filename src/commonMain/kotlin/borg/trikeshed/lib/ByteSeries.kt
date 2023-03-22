@@ -2,7 +2,7 @@ package borg.trikeshed.lib
 
 import borg.trikeshed.lib.CZero.nz
 
-inline fun Series<Byte>.decodeUtf8(charArray: CharArray? = null): Series<Char> =
+fun Series<Byte>.decodeUtf8(charArray: CharArray? = null): Series<Char> =
     charArray?.let { decodeDirtyUtf8(it) } ?: if (isDirtyUTF8()) decodeDirtyUtf8() else (this α {
         it.toInt().toChar()
     })

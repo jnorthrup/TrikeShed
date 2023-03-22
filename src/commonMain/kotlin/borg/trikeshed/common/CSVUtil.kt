@@ -178,10 +178,10 @@ object CSVUtil {
                 lines.add(dstart j toArray)
             } while (datazero1 < file.size)
 
-            val conversionSegments: Series2<IOMemento, Int>? = fileEvidence?.α { evidence ->
+            val conversionSegments = (fileEvidence?.α { evidence ->
                 val deduce: IOMemento = deduce(evidence)
                 deduce j (deduce.networkSize ?: evidence.columnLength.toInt())
-            }
+            })?.toList()?.toSeries()
             val convertedSegmentLengths = conversionSegments?.right?.toArray()
 
             //perform the length additions of the segment lengths to arrive at DelimitRanges

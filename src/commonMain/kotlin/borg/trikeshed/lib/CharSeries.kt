@@ -216,6 +216,11 @@ class CharSeries(buf: Series<Char>,
     /** advance 1*/
     operator fun inc(): CharSeries = apply { require(hasRemaining) { "Overflow" };pos++ }
 
+    //toArray override
+    fun toArray(): CharArray {
+        require(rem > 0) { "heads up: using an empty stateful CharSeries toArray()" }
+        return CharArray(rem, ::get)
+    }
 }
 
 operator fun Series<Char>.div(delim: Char): Series<Series<Char>> { //lazy split

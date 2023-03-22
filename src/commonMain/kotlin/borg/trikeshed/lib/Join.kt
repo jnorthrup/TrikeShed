@@ -93,9 +93,15 @@ inline infix fun Byte.j(b: Byte): Twin<Byte> = (this.toInt() shl 8 and (0xFF and
 
 inline infix fun <X, C, V : Series<X>> V.α(crossinline xform: (X) -> C): Series<C> = size j { i -> xform(this[i]) }
 
-/** an iterable is converted by full reification to List then lazy transform. */
-infix fun <X, C, V : Iterable<X>> V.α(xform: (X) -> C): Series<C> =
-    ((this as? List<X>) ?: this.toList()).toSeries() α xform
+/*iterable conversion*/
+infix fun <X, C, Subject : Iterable<X>> Subject.α(xform: (X) -> C) = object : Iterable<C> {
+    override fun iterator(): Iterator<C> = object : Iterator<C> {
+        val iter: Iterator<X> = this@α.iterator()
+        override fun hasNext(): Boolean = iter.hasNext()
+        override fun next(): C = xform(iter.next())
+    }
+}
+
 
 /** this is an alpha conversion however the type erasure forces inlining here for Arrays as a holdover from java
  *  acquiesence */

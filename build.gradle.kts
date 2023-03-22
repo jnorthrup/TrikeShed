@@ -1,19 +1,19 @@
 //which stanza do we add a linux64 cinteropdef for liburing below? (the linux64 stanza is the only one that has a cinterop block)
 
 plugins {
-    kotlin("multiplatform") version "1.8.0"
+    kotlin("multiplatform") version "1.8.10"
 //    id("org.jetbrains.intellij") version "3.1" apply true
 
     id("org.jetbrains.dokka") version "1.7.0" apply false
     id("org.jlleitschuh.gradle.ktlint") version "11.0.0" apply false
 
     // support kotlinx-datetime
-    id("org.jetbrains.kotlin.plugin.serialization") version "1.8.0" apply false
+    id("org.jetbrains.kotlin.plugin.serialization") version "1.8.10" apply false
 
     // support for k2 compiler plugin
-    id("org.jetbrains.kotlin.kapt") version "1.8.0" apply false
-    id("org.jetbrains.kotlin.plugin.allopen") version "1.8.0" apply false
-    id("org.jetbrains.kotlin.plugin.noarg") version "1.8.0" apply false
+    id("org.jetbrains.kotlin.kapt") version "1.8.10" apply false
+    id("org.jetbrains.kotlin.plugin.allopen") version "1.8.10" apply false
+    id("org.jetbrains.kotlin.plugin.noarg") version "1.8.10" apply false
 
     // gradle versions update plugin
     id("com.github.ben-manes.versions") version "0.42.0" apply false

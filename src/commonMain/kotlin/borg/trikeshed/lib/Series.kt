@@ -20,7 +20,7 @@ val <T> Series<T>.size: Int get() =a
 
 /** index operator for Series
  */
-inline operator fun <T> Series<T>.get(i: Int): T = b(i)
+operator fun <T> Series<T>.get(i: Int): T = b(i)
 
 /**
  * fold for Series
@@ -232,12 +232,16 @@ inline operator fun <reified A> Series<Series<Join<A, *>>>.unaryMinus(): Series<
             }
         }
     }
-
-
 fun <T> List<T>.toSeries(): Series<T> = size j ::get
 
 fun BooleanArray.toSeries(): Series<Boolean> = size j ::get
-fun ByteArray.toSeries(): Series<Byte> = size j ::get
+fun ByteArray.toSeries(): Series<Byte> = size j { index: Int ->
+    if (index < 0) {
+        val stall = 1
+    }
+    get(index)
+}
+
 fun ShortArray.toSeries(): Series<Short> = size j ::get
 fun IntArray.toSeries(): Series<Int> = size j ::get
 fun LongArray.toSeries(): Series<Long> = size j ::get
