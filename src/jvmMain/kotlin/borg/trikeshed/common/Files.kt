@@ -111,9 +111,9 @@ actual object Files {
         val theIterable = object : Iterable<Join<Long, Series<Byte>>> {
             var fileClosed = false
             var accum: MutableList<BFrag> = mutableListOf()
+            var recycler: LinkedHashSet<ByteArray> = linkedSetOf()
             var curBuf: BFrag? = null
             var curlinepos = 0L
-            var curFrag: BFrag? = null
             fun drainAccum(tail: BFrag? = null): ByteArray {
                 val appendum = tail?.run { a.b - a.a } ?: 0
                 val ret = ByteArray(appendum + accum.sumOf { (a: Twin<Int>, _) -> val (c, d) = a; d - c })
@@ -122,7 +122,9 @@ actual object Files {
                     val (beg, end) = frag.a
                     frag.b.copyInto(ret, offset, beg, end)
                     offset += end - beg
+                    if (tail?.b !== frag.b && curBuf?.b !== frag.b) recycler.add(frag.b)
                 }
+
                 accum.clear()
                 if (tail != null) {
                     val (beg, end) = tail.a
@@ -139,7 +141,8 @@ actual object Files {
                     /* our state: accum: ?, curBuf: ?, EOF: no */
                     if (curBuf == null) {
                         /* our state:  accum: ?, curBuf: null, EOF: no */
-                        val byteArray = ByteArray(bufsize)
+                        val byteArray = unrecycle()
+
                         val read = input.read(byteArray)
                         if (read != -1)
                             curBuf = ((0 j read) j byteArray) // same as flip
@@ -179,6 +182,13 @@ actual object Files {
 
 
                 } while (true)
+            }
+
+            private fun unrecycle(): ByteArray {
+                val iterator = recycler.takeUnless { it.isEmpty() }?.iterator()
+                val attempt = iterator?.next()
+                val byteArray = attempt?.also { iterator.remove() } ?: ByteArray(bufsize)
+                return byteArray
             }
 
 
