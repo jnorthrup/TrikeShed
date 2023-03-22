@@ -53,7 +53,6 @@ fun <A> combine(catn: Series<Series<A>>): Series<A> { // combine
                 i < sz0 + catn[1].size + catn[2].size -> catn[2][i - sz0 - catn[1].size]
                 else -> catn[3][i - sz0 - catn[1].size - catn[2].size]
             }
-
         }
 
         5 -> sz0 + catn[1].size + catn[2].size + catn[3].size + catn[4].size j { i ->

@@ -141,21 +141,31 @@ actual class IsamDataFile actual constructor(
             var fibLog: FibonacciReporter? = null
             debug { fibLog = FibonacciReporter(size = null, noun = "appends") }
             var first = true
+            var counter = 0
             // write rows
             msf.forEach { rowVec1: RowVec ->
-                val rowVec = transform?.let { it(rowVec1) } ?: rowVec1
-                if (first) {
-                    meta0 = IsamMetaFileReader.write(metafilename, rowVec.right.α { it() }, varChars)
-                    last = meta0.last()
-                    rowLen = last.end
-                    rowBuffer = ByteArray(rowLen) { 0 }
-                    debug { logDebug { "toIsam: " + meta0.toList() } }
-                    first = false
-                }
+                try {
+                    val rowVec = transform?.let { it(rowVec1) } ?: rowVec1
+                    if (first) {
+                        meta0 = IsamMetaFileReader.write(metafilename, rowVec.right.α { it() }, varChars)
+                        last = meta0.last()
+                        rowLen = last.end
+                        rowBuffer = ByteArray(rowLen) { 0 }
+                        debug { logDebug { "toIsam: " + meta0.toList() } }
+                        first = false
+                    }
 
-                WireProto.writeToBuffer(rowVec, rowBuffer, meta0)
-                data.write(rowBuffer)
-                debug { fibLog?.report()?.let { println(it) } }
+                    WireProto.writeToBuffer(rowVec, rowBuffer, meta0)
+                    data.write(rowBuffer)
+                    debug { fibLog?.report()?.let { println(it) } }
+                } catch (e: Exception) {
+                    val s = rowVec1.left.map {
+                        (it as? Series<Char>)?.asString() ?: (it as? Series<Byte>)?.asString() ?: "$it"
+                    }
+                    //print the rowvec that failed and show the exception that caused it
+                    println("ERROR: failed to append rowVec: $s --  $e line ${fibLog?.count}")
+                }
+                counter++
             }
         }
     }

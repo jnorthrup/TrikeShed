@@ -6,7 +6,16 @@ import java.io.File
 import java.nio.file.Files as JavaNioFileFiles
 import java.nio.file.Paths as JavaNioFilePaths
 
-typealias BFrag = Join<Twin<Int>, ByteArray>
+typealias BFrag = Join<
+        /**endexclusive range*/
+        Twin<Int>, ByteArray>
+
+fun BFrag.isEmpty() = a.run { a == b }
+fun BFrag.slice(atInclusive: Int, untilExclusive: Int = a.b) = a.run { a + atInclusive j untilExclusive } j b
+
+//as in ByteBuffer.flip after a read
+fun BFrag.flip(bytesRead: Int) = a.run { a j a + bytesRead } j b
+fun ByteSeries(BFragment: BFrag) = ByteSeries(BFragment.b, BFragment.a.a, BFragment.a.b)
 
 actual object Files {
     actual fun readAllLines(filename: String): List<String> =
@@ -70,11 +79,14 @@ actual object Files {
         }
     }
 
+    const val debugForNulls = true
+
     /**probably leaks a file handle here*/
-    actual fun iterateLines(fileName: String, bufsize: Int): Iterable<Join<Long, Series<Byte>>> {
+    fun iterateLines2(fileName: String, bufsize: Int): Iterable<Join<Long, Series<Byte>>> {
 
         val file = File(fileName)
         val input = file.inputStream()
+        var counter = 0
         val theIterable = object : Iterable<Join<Long, Series<Byte>>> {
             var fileClosed = false
             var accum: MutableList<ByteArray> = mutableListOf()
@@ -84,59 +96,80 @@ actual object Files {
 
                 val ret = ByteArray(accum.sumOf { it.size })
                 var offset = 0
-                for (a in accum) {
+                var errData: String? = null
+                for ((ix, a) in accum.withIndex()) {
                     a.copyInto(ret, offset)
+                    if (debugForNulls && a.contains(0.toByte())) {
+                        errData = "${errData ?: ""}\n:null(s) offset: $curlinepos lineNo:$counter in accum[$ix] at ${
+                            a.indexOf(0.toByte())
+                        } of ${a.size} in ${a.decodeToString()}"
+                    }
                     offset += a.size
                 }
                 accum.clear()
+                if (errData != null) throw Exception(
+                    "for string \"${
+                        ret.decodeToString().take(40)
+                    }\" \n\n*** nulls in data ${errData} \n\n*** curbuf: ${curBuf?.decodeToString()}"
+                )
                 return ret
             }
 
             fun newLine(): Join<Long, Series<Byte>>? {
                 do {
+                    /* our state: accum: ?, curBuf: ?, EOF: ? */
+
                     if (fileClosed) return null
+                    /* our state: accum: ?, curBuf: ?, EOF: no */
                     if (curBuf == null) {
+                        /* our state:  accum: ?, curBuf: null, EOF: no */
                         curBuf = ByteArray(bufsize)
                         val read = input.read(curBuf!!)
                         if (read == -1) {
                             fileClosed = true
                             curBuf = null
+
+                            /* our state: accum: ?, curBuf: null, EOF: yes */
+                            accum = accum.filterNot { it.isEmpty() }
+                                .toMutableList()/* our state: accum: ?, curBuf: null, EOF: yes */
+
+                            val drainAccum = drainAccum()/* our state:  accum: empty, curBuf: null, EOF: yes */
+                            if (drainAccum.isEmpty()) return null
+                            return curlinepos j drainAccum.toSeries()/* our state:  accum: empty, curBuf: null, EOF: yes */
                         }
                     }
-                    if (curBuf == null) {
-                        accum = accum.filterNot { it.isEmpty() }.toMutableList()
 
-                        val drainAccum = drainAccum()
-                        if (drainAccum.isEmpty()) return null
-                        return curlinepos j drainAccum.toSeries()
-                    }
 
                     //right here we should be at the split  point of the line. we either drain the accum and keep a curBuff
                     //or accumulate the whole remaining buffer and null out curBuf and loop back until newline or eof
-                    var mark = 0
-                    ByteSeries(curBuf!!).let { bs ->
+                    ByteSeries(curBuf!!).let { bs ->/* our state: accum: ?, curBuf: y, EOF: ? */
                         if (bs.seekTo('\n'.code.toByte())) {
                             val carry = bs.slice
                             val terminus = bs.flip()
 
-                            if (terminus.hasRemaining) accum += terminus.run { ByteArray(rem, ::get) }
+                            if (terminus.hasRemaining) accum += terminus.run {
+                                ByteArray(
+                                    rem,
+                                    ::get
+                                )
+                            }/* our state: accum: +, curBuf: y, EOF: ? */
                             if (carry.hasRemaining) curBuf = carry.run { ByteArray(rem, ::get) } else curBuf = null
                             val drainAccum = drainAccum()
                             val r = curlinepos j drainAccum.toSeries()
                             curlinepos += drainAccum.size
-                            return r
-                        } else {
-                            if (curBuf?.isEmpty() == true) return null
+                            return r/* our state: accum: empty, curBuf: y, EOF: ? */
+                        } else {/* our state: accum: ?, curBuf: y, EOF: ? */
+                            if (curBuf!!.isEmpty()) return null/* our state: accum: ?, curBuf: y, EOF: ? */
                             val byteSeries = ByteSeries(curBuf!!)
                             if (byteSeries.seekTo(0.toByte()))
                                 byteSeries.flip()
-                            if (byteSeries.hasRemaining) {
+                            if (byteSeries.hasRemaining) {/* our state: accum: ?, curBuf: y, EOF: ? */
                                 curBuf = byteSeries.toArray()
                                 if (curBuf!!.isEmpty() || curBuf!![0] == 0.toByte()) return null
                                 accum += curBuf!!
                                 curBuf = null
                             }
-                        }
+                        }/* our state: accum: ?, curBuf: y, EOF: ? */
                     }
 
                 } while (true)
@@ -153,7 +186,111 @@ actual object Files {
 
                     override fun next(): Join<Long, Series<Byte>> {
                         if (nextLine == null) nextLine = newLine()
-                        val retval = nextLine!!
+                        val retval = nextLine!!.also { counter++ }
+                        nextLine = null
+                        return retval
+                    }
+                }
+            }
+        }
+        return theIterable
+    }
+
+    actual fun iterateLines(fileName: String, bufsize: Int): Iterable<Join<Long, Series<Byte>>> {
+
+        val file = File(fileName)
+        val input = file.inputStream()
+        var counter = 0
+        val theIterable = object : Iterable<Join<Long, Series<Byte>>> {
+            var fileClosed = false
+            var accum: MutableList<BFrag> = mutableListOf()
+            var curBuf: BFrag? = null
+            var curlinepos = 0L
+            var curFrag: BFrag? = null
+            fun drainAccum(): ByteArray {
+
+                val ret = ByteArray(accum.sumOf { (a: Twin<Int>, _) -> val (c, d) = a; d - c })
+
+
+                var offset = 0
+                for (frag in accum) {
+                    val (beg, end) = frag.a
+                    frag.b.copyInto(ret, offset, beg, end)
+                    offset += end - beg
+
+                }
+                accum.clear()
+                return ret
+            }
+
+            fun newLine(): Join<Long, Series<Byte>>? {
+                do {
+                    /* our state: accum: ?, curBuf: ?, EOF: ? */
+
+                    if (fileClosed) return null
+                    /* our state: accum: ?, curBuf: ?, EOF: no */
+                    if (curBuf == null) {
+                        /* our state:  accum: ?, curBuf: null, EOF: no */
+                        val byteArray = ByteArray(bufsize)
+                        val read = input.read(byteArray)
+                        if (read != -1)
+                            curBuf = (0 j read j byteArray)
+                        else {
+                            fileClosed = true
+                            curBuf = null
+
+                            /* our state: accum: ?, curBuf: null, EOF: yes */
+                            accum = accum.filterNot { it.a.run { a == b } }
+                                .toMutableList()/* our state: accum: ?, curBuf: null, EOF: yes */
+
+                            val drainAccum = drainAccum()/* our state:  accum: empty, curBuf: null, EOF: yes */
+                            if (drainAccum.isEmpty()) return null
+                            return curlinepos j drainAccum.toSeries()/* our state:  accum: empty, curBuf: null, EOF: yes */
+                        }
+                    }
+
+                    //right here we should be at the split  point of the line. we either drain the accum and keep a curBuff
+                    //or accumulate the whole remaining buffer and null out curBuf and loop back until newline or eof
+                    ByteSeries(curBuf!!).let { bs ->/* our state: accum: ?, curBuf: y, EOF: ? */
+                        if (bs.seekTo('\n'.code.toByte())) {
+                            val carry = curBuf!!.slice(bs.pos)
+                            val terminus = curBuf!!.a.run { a j bs.pos + a } j curBuf!!.b
+
+                            if (terminus.a.run { a < b }) accum += terminus /* our state: accum: +, curBuf: y, EOF: ? */
+                            if (carry.a.run { a < b }) curBuf = carry else curBuf = null
+                            val drainAccum = drainAccum()
+                            val r = curlinepos j drainAccum.toSeries()
+                            curlinepos += drainAccum.size
+                            return r/* our state: accum: empty, curBuf: y, EOF: ? */
+                        } else {/* our state: accum: ?, curBuf: y, EOF: ? */
+                            if (curBuf!!.isEmpty()) return null/* our state: accum: ?, curBuf: y, EOF: ? */
+                            val bs1: ByteSeries = ByteSeries(curBuf!!)
+                            if (bs1.seekTo(0.toByte()))
+                                bs1.flip()
+                            if (bs1.hasRemaining) {/* our state: accum: ?, curBuf: y, EOF: ? */
+                                curBuf = curBuf!!.a.run { a j bs1.pos + a } j curBuf!!.b
+                                if (curBuf!!.isEmpty() || curBuf!!.run { b[a.a + 0] == 0.toByte() }) return null
+                                accum += curBuf!!
+                                curBuf = null
+                            }
+                        }/* our state: accum: ?, curBuf: y, EOF: ? */
+                    }
+                } while (true)
+            }
+
+
+            override fun iterator(): Iterator<Join<Long, Series<Byte>>> {
+
+                return object : Iterator<Join<Long, Series<Byte>>> {
+                    var nextLine: Join<Long, Series<Byte>>? = null
+                    override fun hasNext(): Boolean {
+                        if (nextLine == null) nextLine = newLine()
+                        return nextLine != null
+                    }
+
+                    override fun next(): Join<Long, Series<Byte>> {
+                        if (nextLine == null) nextLine = newLine()
+                        val retval = nextLine!!.also { counter++ }
                         nextLine = null
                         return retval
                     }

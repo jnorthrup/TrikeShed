@@ -221,6 +221,7 @@ class CharSeries(buf: Series<Char>,
         require(rem > 0) { "heads up: using an empty stateful CharSeries toArray()" }
         return CharArray(rem, ::get)
     }
+    val nullTerm = rew.seekTo(0.toChar()).let { if (it) flip() else this }
 }
 
 operator fun Series<Char>.div(delim: Char): Series<Series<Char>> { //lazy split

@@ -289,10 +289,6 @@ object JsonParser {
             /** this will check for enough segments to select the desired element, and
              *  then will recurse into that or return the desired form, discarding the
              *  segment key as necessary.  This works on both obj and array */
-
-            /** this will check for enough segments to select the desired element, and
-             *  then will recurse into that or return the desired form, discarding the
-             *  segment key as necessary.  This works on both obj and array */
             //if pathtail is not empty, we need to index and recurse
             if (key1 != key) continue
             if (pathTail.isEmpty()) {

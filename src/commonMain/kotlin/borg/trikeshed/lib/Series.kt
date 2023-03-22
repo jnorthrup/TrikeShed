@@ -15,7 +15,7 @@ import kotlin.math.pow
 
 typealias Series<T> = Join<Int, (Int) -> T>
 
-val <T> Series<T>.size: Int get() =a
+val <T> Series<T>.size: Int get() = a
 
 
 /** index operator for Series
@@ -102,7 +102,6 @@ operator fun <T> Series<T>.div(d: Int): Series<Series<T>> = (0 until size) / d �
 }
 
 
-
 fun IntArray.binarySearch(i: Int): Int {
     var low = 0
     var high = size - 1
@@ -146,10 +145,10 @@ value class IterableSeries<A>(val s: Series<A>) : Iterable<A>, Series<A> by s {
  * provides a big bright visible symbol that makes
  * conversions easy to follow along during reading the code
  */
-  val <T> Series<T>.`▶`: IterableSeries<T> get() = this as? IterableSeries ?: IterableSeries(this)
+val <T> Series<T>.`▶`: IterableSeries<T> get() = this as? IterableSeries ?: IterableSeries(this)
 
 infix operator fun <T> IterableSeries<T>.contains(x: Char): Boolean = this.any { x == it }
-infix operator fun <T> Series<T>.contains(it: Char): Boolean =  this.`▶` contains it
+infix operator fun <T> Series<T>.contains(it: Char): Boolean = this.`▶` contains it
 
 
 /***
@@ -232,6 +231,7 @@ inline operator fun <reified A> Series<Series<Join<A, *>>>.unaryMinus(): Series<
             }
         }
     }
+
 fun <T> List<T>.toSeries(): Series<T> = size j ::get
 
 fun BooleanArray.toSeries(): Series<Boolean> = size j ::get
@@ -309,61 +309,95 @@ open class EmptySeries : Series<Nothing> by 0 j { x: Int -> TODO("undefined") }
 fun <T> emptySeries(): Series<T> = EmptySeries() as Series<T>
 
 fun Series<Char>.parseLong(): Long {
-    //handles +-
-    var sign = 1L
-    var x = 0
-    when (this[0]) {
-        '-' -> {
-            sign = -1L; x++
-        }
 
-        '+' -> x++
+    var sign = false
+    var x = 0
+    if (this[0] == '-') {
+        sign = true; x++
     }
     var r = 0L
     while (x < size) {
         r = r * 10 + (this[x] - '0')
         x++
     }
-    return r * sign
+
+    return if (sign) -r else r
 }
 
 
 fun Series<Char>.parseIsoDateTime(): kotlinx.datetime.LocalDateTime {
+    //example
+    //2021-01-01T00:00:00.0000000
+    //verify T
+
+    if (this[10] != 'T') throw Exception("invalid date format for ${this.asString()}")
+
     val year = this[0..3].parseLong().toInt()
     val month = this[5..6].parseLong().toInt()
     val day = this[8..9].parseLong().toInt()
     val hour = this[11..12].parseLong().toInt()
     val minute = this[14..15].parseLong().toInt()
     val second = this[17..18].parseLong().toInt()
-    val nanosecond = this[20..26].parseLong().toInt()
+    val nanosecond: Int = /*check length*/ when {
+        this.size > 19 && this[19] == '.' -> this[20 until size].parseLong().toInt()
+        else -> 0
+    }
     return kotlinx.datetime.LocalDateTime(year, month, day, hour, minute, second, nanosecond)
+
+
 }
 
 fun Series<Char>.encodeToByteArray(): ByteArray {
     //encode unicode chars to bytes using UTF-8
-    var x = 0
-    val r = ByteArray(size * 3) //trim after
-    var spill = 0 //spill cost of unicode encodings
-    while (x < size) {
+//    //dirty with 3 bytes?
+//    val dirty3 = this.`▶`.any { it.code > 0x7FF }
+//    //dirty with 2 bytes?
+//    val dirty2 = dirty3 || this.`▶`.any { it.code > 0x7F }
+    //replace with forward scan recording max until 0x7ff or higher is reached
+    var dirty3 = false
+    var dirty2 = false
+    for (x: Int in 0 until size) {
         val c = this[x].code
         when {
-            c < 0x80 -> r[x + spill] = c.toByte()
-            c < 0x800 -> {
-                r[x + spill] = (0xC0 or (c shr 6)).toByte()
-                r[x + spill + 1] = (0x80 or (c and 0x3F)).toByte()
-                spill++
+            c > 0x7FF -> {
+                dirty3 = true
+                dirty2 = true
+                break
             }
 
-            else -> {
-                r[x + spill] = (0xE0 or (c shr 12)).toByte()
-                r[x + spill + 1] = (0x80 or ((c shr 6) and 0x3F)).toByte()
-                r[x + spill + 2] = (0x80 or (c and 0x3F)).toByte()
-                spill += 2
+            c > 0x7F -> dirty2 = true
+        }
+    }
+
+    return if (!(dirty3 || dirty2)) ByteArray(size) { i -> (0xff and this[i].code).toByte() }
+    else {
+        val r = ByteArray(
+            size * when {
+                dirty3 -> 3
+                else -> 2
+            }
+        ) //trim after
+        var spill = 0 //spill cost of unicode encodings
+        var curOffset = 0
+        for (x: Int in 0 until size) {
+            val c = this[x].code
+            curOffset = x + spill
+            when {
+                c < 0x80 -> r[curOffset] = c.toByte()
+                c < 0x800 -> {
+                    r[curOffset] = (0xC0 or (c shr 6)).toByte()
+                    r[x + ++spill] = (0x80 or (c and 0x3F)).toByte()  // 0x3F = 0011111 0x80 = 10000000
+                }
+
+                else -> {
+                    r[curOffset] = (0xE0 or (c shr 12)).toByte() //0xE0 = 11100000
+                    r[x + ++spill] = (0x80 or ((c shr 6) and 0x3F)).toByte() //0x3F = 00111111
+                    r[x + ++spill] = (0x80 or (c and 0x3F)).toByte() //0x3F = 00111111
+                } //0x3F = 00111111
             }
         }
-        x++
+        if (curOffset != r.size) r.copyOf(curOffset) else r
     }
-    return r.sliceArray(0..(x + spill - 1))
 }
 
 //opposite method to build a charSeries from byte[]
@@ -403,6 +437,7 @@ fun Series<Char>.parseDouble(): Double {
             isNegativeValue = false
             x++
         }
+
         else -> isNegativeValue = false
     }
 
@@ -419,6 +454,7 @@ fun Series<Char>.parseDouble(): Double {
                         exponentSign = -1
                         x++
                     }
+
                     this[x] == '+' -> x++
                 }
                 while (x < size) {
@@ -471,7 +507,8 @@ infix fun <T, R> List<T>.zip(other: Series<R>): List<Join<T, R>> =
     zip(other.`▶`) { a: T, b: R -> a j b }
 
 @JvmName("vvzip2f")
-fun <T, O, R> Series<T>.zip(o: Series<O>, f: (T, O) -> R): Join<Int, (Int) -> R> = size j { x: Int -> f(this[x], o[x]) }
+fun <T, O, R> Series<T>.zip(o: Series<O>, f: (T, O) -> R): Join<Int, (Int) -> R> =
+    size j { x: Int -> f(this[x], o[x]) }
 
 @JvmName("vvzip2")
 @Suppress("UNCHECKED_CAST")

@@ -202,12 +202,7 @@ class ByteSeries(
         target: Byte,
     ): Boolean {
         val anchor = pos
-        var escaped = false
-        while (hasRemaining) {
-            val c = get
-            if (c == target)
-                return true
-        }
+        while (hasRemaining) if (get == target) return true
         pos = anchor
         return false
     }
@@ -258,6 +253,8 @@ class ByteSeries(
      * this rewrites the Series default toArray() to use the position and limit
      */
     fun toArray(): ByteArray = ByteArray(rem, ::get)
+
+    val nullTerm = rew.seekTo(0.toByte()).let { if (it) flip() else this }
 }
 
 
@@ -268,9 +265,8 @@ fun Series<Byte>.isDirtyUTF8(): Boolean {
     //what shr 4 proves: 110x xxxx
     val barLen = bsz.dec()
     for (b in 0 until barLen)
-        if ((this[b].toInt() shr 4) in 0x0C..0x0E) {
-            val byte = this[b.inc()]
-            if ((byte.toInt() shr 6) == 0x02) {
+        if ((1 * this[b] shr 4) in 0x0C..0x0E) {
+            if ((1 * this[b.inc()] shr 6) == 0x02) {
                 dirty = true
                 break
                 //what shr 6 proves: 10xx xxxx
