@@ -122,7 +122,7 @@ actual class IsamDataFile actual constructor(
             datafilename: String,
             varChars: Map<String, Int>,
             transform: ((RowVec) -> RowVec)?,
-        ): Unit {
+        ) {
             val metafilename = "$datafilename.meta"
 
             // TODO("not assume we have to write this file for this call.  if it exists, verify it and use it")
@@ -132,14 +132,13 @@ actual class IsamDataFile actual constructor(
             val data =
                 Files.newOutputStream(Paths.get(datafilename), APPEND, WRITE, CREATE)
 
-
             var last: RecordMeta
 
             var rowLen = 0
 
             lateinit var rowBuffer: ByteArray
             var fibLog: FibonacciReporter? = null
-            debug { fibLog = FibonacciReporter(size = null, noun = "appends") }
+            run { fibLog = FibonacciReporter(size = null, noun = "appends") }
             var first = true
             var counter = 0
             // write rows
@@ -157,7 +156,7 @@ actual class IsamDataFile actual constructor(
 
                     WireProto.writeToBuffer(rowVec, rowBuffer, meta0)
                     data.write(rowBuffer)
-                    debug { fibLog?.report()?.let { println(it) } }
+                    run { fibLog?.report()?.let { println(it) } }
                 } catch (e: Exception) {
                     val s = rowVec1.left.map {
                         (it as? Series<Char>)?.asString() ?: (it as? Series<Byte>)?.asString() ?: "$it"

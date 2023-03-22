@@ -81,123 +81,9 @@ actual object Files {
 
     const val debugForNulls = true
 
-    /**probably leaks a file handle here*/
-    fun iterateLines2(fileName: String, bufsize: Int): Iterable<Join<Long, Series<Byte>>> {
-
-        val file = File(fileName)
-        val input = file.inputStream()
-        var counter = 0
-        val theIterable = object : Iterable<Join<Long, Series<Byte>>> {
-            var fileClosed = false
-            var accum: MutableList<ByteArray> = mutableListOf()
-            var curBuf: ByteArray? = null
-            var curlinepos = 0L
-            fun drainAccum(): ByteArray {
-
-                val ret = ByteArray(accum.sumOf { it.size })
-                var offset = 0
-                var errData: String? = null
-                for ((ix, a) in accum.withIndex()) {
-                    a.copyInto(ret, offset)
-                    if (debugForNulls && a.contains(0.toByte())) {
-                        errData = "${errData ?: ""}\n:null(s) offset: $curlinepos lineNo:$counter in accum[$ix] at ${
-                            a.indexOf(0.toByte())
-                        } of ${a.size} in ${a.decodeToString()}"
-                    }
-                    offset += a.size
-                }
-                accum.clear()
-                if (errData != null) throw Exception(
-                    "for string \"${
-                        ret.decodeToString().take(40)
-                    }\" \n\n*** nulls in data ${errData} \n\n*** curbuf: ${curBuf?.decodeToString()}"
-                )
-                return ret
-            }
-
-            fun newLine(): Join<Long, Series<Byte>>? {
-                do {
-                    /* our state: accum: ?, curBuf: ?, EOF: ? */
-
-                    if (fileClosed) return null
-                    /* our state: accum: ?, curBuf: ?, EOF: no */
-                    if (curBuf == null) {
-                        /* our state:  accum: ?, curBuf: null, EOF: no */
-                        curBuf = ByteArray(bufsize)
-                        val read = input.read(curBuf!!)
-                        if (read == -1) {
-                            fileClosed = true
-                            curBuf = null
-
-                            /* our state: accum: ?, curBuf: null, EOF: yes */
-                            accum = accum.filterNot { it.isEmpty() }
-                                .toMutableList()/* our state: accum: ?, curBuf: null, EOF: yes */
-
-                            val drainAccum = drainAccum()/* our state:  accum: empty, curBuf: null, EOF: yes */
-                            if (drainAccum.isEmpty()) return null
-                            return curlinepos j drainAccum.toSeries()/* our state:  accum: empty, curBuf: null, EOF: yes */
-                        }
-                    }
-
-
-                    //right here we should be at the split  point of the line. we either drain the accum and keep a curBuff
-                    //or accumulate the whole remaining buffer and null out curBuf and loop back until newline or eof
-                    ByteSeries(curBuf!!).let { bs ->/* our state: accum: ?, curBuf: y, EOF: ? */
-                        if (bs.seekTo('\n'.code.toByte())) {
-                            val carry = bs.slice
-                            val terminus = bs.flip()
-
-                            if (terminus.hasRemaining) accum += terminus.run {
-                                ByteArray(
-                                    rem,
-                                    ::get
-                                )
-                            }/* our state: accum: +, curBuf: y, EOF: ? */
-                            if (carry.hasRemaining) curBuf = carry.run { ByteArray(rem, ::get) } else curBuf = null
-                            val drainAccum = drainAccum()
-                            val r = curlinepos j drainAccum.toSeries()
-                            curlinepos += drainAccum.size
-                            return r/* our state: accum: empty, curBuf: y, EOF: ? */
-                        } else {/* our state: accum: ?, curBuf: y, EOF: ? */
-                            if (curBuf!!.isEmpty()) return null/* our state: accum: ?, curBuf: y, EOF: ? */
-                            val byteSeries = ByteSeries(curBuf!!)
-                            if (byteSeries.seekTo(0.toByte()))
-                                byteSeries.flip()
-                            if (byteSeries.hasRemaining) {/* our state: accum: ?, curBuf: y, EOF: ? */
-                                curBuf = byteSeries.toArray()
-                                if (curBuf!!.isEmpty() || curBuf!![0] == 0.toByte()) return null
-                                accum += curBuf!!
-                                curBuf = null
-                            }
-                        }/* our state: accum: ?, curBuf: y, EOF: ? */
-                    }
-
-                } while (true)
-            }
-
-            override fun iterator(): Iterator<Join<Long, Series<Byte>>> {
-
-                return object : Iterator<Join<Long, Series<Byte>>> {
-                    var nextLine: Join<Long, Series<Byte>>? = null
-                    override fun hasNext(): Boolean {
-                        if (nextLine == null) nextLine = newLine()
-                        return nextLine != null
-                    }
-
-                    override fun next(): Join<Long, Series<Byte>> {
-                        if (nextLine == null) nextLine = newLine()
-                        val retval = nextLine!!.also { counter++ }
-                        nextLine = null
-                        return retval
-                    }
-                }
-            }
-        }
-        return theIterable
-    }
 
     actual fun iterateLines(fileName: String, bufsize: Int): Iterable<Join<Long, Series<Byte>>> {
-
+        val rowLogger = FibonacciReporter(noun = "writes"/*, verb = "read"*/)
         val file = File(fileName)
         val input = file.inputStream()
         var counter = 0
@@ -234,7 +120,7 @@ actual object Files {
                         val byteArray = ByteArray(bufsize)
                         val read = input.read(byteArray)
                         if (read != -1)
-                            curBuf = (0 j read j byteArray)
+                            curBuf = ((0 j read) j byteArray)
                         else {
                             fileClosed = true
                             curBuf = null
@@ -245,7 +131,8 @@ actual object Files {
 
                             val drainAccum = drainAccum()/* our state:  accum: empty, curBuf: null, EOF: yes */
                             if (drainAccum.isEmpty()) return null
-                            return curlinepos j drainAccum.toSeries()/* our state:  accum: empty, curBuf: null, EOF: yes */
+                            return curlinepos j drainAccum.toSeries()
+                                .also { rowLogger.report() }/* our state:  accum: empty, curBuf: null, EOF: yes */
                         }
                     }
 
@@ -261,7 +148,7 @@ actual object Files {
                             val drainAccum = drainAccum()
                             val r = curlinepos j drainAccum.toSeries()
                             curlinepos += drainAccum.size
-                            return r/* our state: accum: empty, curBuf: y, EOF: ? */
+                            return r/* our state: accum: empty, curBuf: y, EOF: ? */.also { rowLogger.report() }
                         } else {/* our state: accum: ?, curBuf: y, EOF: ? */
                             if (curBuf!!.isEmpty()) return null/* our state: accum: ?, curBuf: y, EOF: ? */
                             val bs1: ByteSeries = ByteSeries(curBuf!!)
