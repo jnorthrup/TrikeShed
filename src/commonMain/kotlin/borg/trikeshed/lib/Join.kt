@@ -57,27 +57,6 @@ inline val <B> Join<*, B>.second: B get() = this.b
  * exactly like "to" for "Join" but with a different (and shorter!) name
  */
 inline infix fun <A, B> A.j(b: B): Join<A, B> = Join(this, b)
-inline infix fun Int.j(b: Int): Twin<Int> = ((this.toLong() shl 32) or (b.toLong())).let { capture ->
-    object : Twin<Int> {
-        override val a: Int get() = (capture shr 32).toInt()
-        override val b: Int get() = (capture and 0xFFFFFFFF).toInt()
-    }
-}
-
-
-inline infix fun Short.j(b: Short): Twin<Short> = (this.toInt() shl 16 and (0xFFFF and b.toInt())).let { theInt ->
-    object : Twin<Short> {
-        override val a: Short get() = (theInt shr 16).toShort()
-        override val b: Short get() = (theInt and 0xFFFF).toShort()
-    }
-}
-
-inline infix fun Byte.j(b: Byte): Twin<Byte> = (this.toInt() shl 8 and (0xFF and b.toInt())).let { theInt ->
-    object : Twin<Byte> {
-        override val a: Byte get() = (theInt shr 8).toByte()
-        override val b: Byte get() = (theInt and 0xFF).toByte()
-    }
-}
 
 
 /** α

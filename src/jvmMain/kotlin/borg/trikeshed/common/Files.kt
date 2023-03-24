@@ -5,40 +5,10 @@ package borg.trikeshed.common
 import borg.trikeshed.lib.*
 import java.io.ByteArrayOutputStream
 import java.io.File
+import java.io.InputStream
 import kotlin.time.ExperimentalTime
 import java.nio.file.Files as JavaNioFileFiles
 import java.nio.file.Paths as JavaNioFilePaths
-
-typealias BFrag = Join<
-        /**endexclusive range*/
-        Twin<Int>, ByteArray>
-
-val BFrag.size get() = a.run { b - a }
-fun BFrag.isEmpty() = size == 0
-fun BFrag.slice(atInclusive: Int, untilExclusive: Int = a.b): BFrag = a.run { a + atInclusive j untilExclusive } j b
-
-//as in ByteBuffer.flip after a read
-fun BFrag.flip(bytesRead: Int): BFrag = a.run { a j bytesRead + a } j b //a.b = bytesRead+a
-
-/**
-split1 returns 1 or 2 BFrags.
-if the lit is not found, first is null, second is original
-if the lit is found, first is up to and including lit.
-if remaining bytes is zero, null, else second is the rest
- */
-fun BFrag.split1(lit: Byte): Twin<BFrag?> {
-    val (beg, end, buf) = a + b
-    var x = beg
-    while (x < end && buf[x++] != lit);
-    return if (x == end) null j this
-    else {
-        val slice = this.slice(x)
-        ((beg j x) j buf) j if (slice.run { a.a == a.b }) null else slice
-    }
-}
-
-
-fun ByteSeries(BFragment: BFrag) = ByteSeries(BFragment.b, BFragment.a.a, BFragment.a.b)
 
 
 actual object Files {
@@ -103,20 +73,23 @@ actual object Files {
         }
     }
 
-    const val debugForNulls = true
-
-
     actual fun iterateLines(fileName: String, bufsize: Int): Iterable<Join<Long, Series<Byte>>> {
-        val rowLogger = FibonacciReporter(noun = "lines"/*, verb = "read"*/)
         val file = File(fileName)
         val input = file.inputStream()
+        return iterateLines(input, bufsize)
+    }
+
+    @OptIn(ExperimentalTime::class)
+    fun iterateLines(input: InputStream, bufsize: Int): Iterable<Join<Long, Series<Byte>>> {
+        val rowLogger = FibonacciReporter(noun = "lines"/*, verb = "read"*/)
+
         var counter = 0
         val theIterable = object : Iterable<Join<Long, Series<Byte>>> {
             var fileClosed = false
             var accum: MutableList<BFrag> = mutableListOf()
             var recycler: LinkedHashSet<ByteArray> = linkedSetOf()
-            var recycleHit=0
-            var recycleMiss=0
+            var recycleHit = 0
+            var recycleMiss = 0
             var curBuf: BFrag? = null
             var curlinepos = 0L
             fun drainAccum(tail: BFrag? = null): ByteArray {
@@ -130,12 +103,14 @@ actual object Files {
                     if (tail?.b !== frag.b && curBuf?.b !== frag.b) recycler.add(frag.b)
                 }
 
-                accum.clear()
                 if (tail != null) {
                     val (beg, end) = tail.a
                     tail.b.copyInto(ret, offset, beg, end)
                 }
+                accum.clear()
                 return ret
+
+
             }
 
             fun newLine(): Join<Long, Series<Byte>>? {
@@ -161,33 +136,32 @@ actual object Files {
                             if (accum.isEmpty()) return null
                             val drainAccum = drainAccum()/* our state:  accum: empty, curBuf: null, EOF: yes */
                             if (drainAccum.isEmpty()) return null
-                            return curlinepos j drainAccum.toSeries()
-                                .debug {
-
-                                    curlinepos+=it.size
-
-
-                                    rowLogger.close()
-                                    //print the total bytes(curlinepos), average bytes per line,avg lines/sec, avg bytes/s,  recycler hit/miss ratio and total calls, unrecycled buffers and bufsize*unrecycled, all using Long.humanReadableIEC
-                                    //also print the total time taken to read the file
-                                    val elapsedNow = rowLogger.begin.elapsedNow()
-                                    val totalSeconds = elapsedNow.inWholeSeconds.toLong()
-                                    println("total bytes read: ${curlinepos.humanReadableByteCountIEC}" +
-                                            "\n average bytes per line: ${(curlinepos/counter).humanReadableByteCountIEC}" +
-                                            "\n average lines per second: ${((counter/ totalSeconds)).humanReadableByteCountIEC.replace("iB", "L")}" +
-                                            "\n average bytes per second: ${((curlinepos/ totalSeconds)).humanReadableByteCountIEC}" +
-                                            "\n recycler miss ratio: ${ recycleMiss.toFloat()/recycleHit.toFloat()  }" +
-                                            "\n total calls to recycler: ${recycleHit+recycleMiss}" +
+                            return curlinepos j drainAccum.toSeries().debug {
+                                curlinepos += it.size
+                                rowLogger.close()
+                                //print the total bytes(curlinepos), average bytes per line,avg lines/sec, avg bytes/s,  recycler hit/miss ratio and total calls, unrecycled buffers and bufsize*unrecycled, all using Long.humanReadableIEC
+                                //also print the total time taken to read the file
+                                val elapsedNow = rowLogger.begin.elapsedNow()
+                                val totalSeconds = elapsedNow.inWholeSeconds.toLong()
+                                println(
+                                    "total bytes read: ${curlinepos.humanReadableByteCountIEC}" +
+                                            "\n average bytes per line: ${(curlinepos / counter).humanReadableByteCountIEC}" +
+                                            "\n average lines per second: ${
+                                                ((counter / totalSeconds)).humanReadableByteCountIEC.replace(
+                                                    "iB",
+                                                    "L"
+                                                )
+                                            }" +
+                                            "\n average bytes per second: ${((curlinepos / totalSeconds)).humanReadableByteCountIEC}" +
+                                            "\n recycler miss ratio: ${recycleMiss.toFloat() / recycleHit.toFloat()}" +
+                                            "\n total calls to recycler: ${recycleHit + recycleMiss}" +
                                             "\n unrecycled buffers: ${recycler.size}" +
-                                            "\n unrecycled space in buffers: ${(recycler.size*bufsize).toLong().humanReadableByteCountSI}" +
-                                            "\n total time taken to read the file: ${elapsedNow} seconds")
+                                            "\n unrecycled space in buffers: ${(recycler.size * bufsize).toLong().humanReadableByteCountSI}" +
+                                            "\n total time taken to read the file: ${elapsedNow} seconds"
+                                )
 
 
-
-
-
-
-                                }/* our state:  accum: empty, curBuf: null, EOF: yes */
+                            }/* our state:  accum: empty, curBuf: null, EOF: yes */
                         }
                     }
 
@@ -202,7 +176,7 @@ actual object Files {
 
                             curlinepos += result.size
                             return curlinepos j result.toSeries()
-                                .debug { rowLogger?.report()?.also { println(it) } }
+                                .debug { rowLogger.report()?.also { println(it) } }
                         } else {
                             /* our state: accum: ?, curBuf: non-null, EOF: no */
                             accum.add(theBuff)
