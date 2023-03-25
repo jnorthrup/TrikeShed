@@ -2,6 +2,7 @@ package borg.trikeshed.lib
 
 import kotlin.jvm.JvmInline
 
+
 inline infix fun Int.j(b: Int): Twin<Int> = TwInt(((this.toLong() shl 32) or (b.toLong())))
 inline infix fun Short.j(b: Short): Twin<Short> = Twhort(((this.toInt() shl 16) or (b.toInt())))
 inline infix fun Byte.j(b: Byte): Twin<Byte> = Twyte(((this.toInt() shl 8) or (b.toInt())).toShort())
@@ -32,3 +33,4 @@ value class Twyte(private val capture: Short) : Twin<Byte> {
     override val a: Byte get() = (1 * capture shr (8)).toByte()
     override val b: Byte get() = (1 * capture and 0xFF).toByte()
 }
+

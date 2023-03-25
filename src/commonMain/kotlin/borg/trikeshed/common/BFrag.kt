@@ -65,7 +65,5 @@ fun BFrag.copyInto(ret: ByteArray, offset: Int) {
     buf.copyInto(ret, offset, beg, end)
 }
 
-fun ByteSeries(frag: BFrag): ByteSeries = frag.let { (bounds: Twin<Int>, buf: ByteArray) ->
-    val (beg: Int, end: Int) = bounds
-    ByteSeries(buf, beg, end)
-}
+val BFrag.byteSeries: ByteSeries
+    get() = ByteSeries(b, a.a, a.b)
