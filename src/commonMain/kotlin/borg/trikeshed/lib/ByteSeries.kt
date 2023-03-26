@@ -269,6 +269,7 @@ fun Series<Byte>.isDirtyUTF8(): Boolean {
     val barLen = bsz.dec()
     for (b in 0 until barLen)
         if ((this[b].toInt() shr 4) in 0x0C..0x0E) {
+            // what shr 4 proves: 1110 xxxx
             val byte = this[b.inc()]
             if ((byte.toInt() shr 6) == 0x02) {
                 dirty = true
@@ -279,3 +280,4 @@ fun Series<Byte>.isDirtyUTF8(): Boolean {
     return dirty
 }
 
+fun ByteSeries.decodeToString() = decodeUtf8().asString()

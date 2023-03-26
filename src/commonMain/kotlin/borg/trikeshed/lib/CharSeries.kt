@@ -7,17 +7,18 @@ import borg.trikeshed.lib.CZero.nz
 /**
  * char based spiritual successor to ByteBuffer for parsing
  */
-class CharSeries(buf: Series<Char>,
+class CharSeries(
+    buf: Series<Char>,
 
-                 /** the mutable position accessor */
+    /** the mutable position accessor */
     var pos: Int = 0,
 
-                 /** the limit accessor */
+    /** the limit accessor */
     var limit: Int = buf.size, //initialized to size
 
-                 /** the mark accessor */
+    /** the mark accessor */
     var mark: Int = -1,
-    ) : Series<Char> by buf { //delegate to the underlying series
+) : Series<Char> by buf { //delegate to the underlying series
 
     /** get, the verb - the char at the current position and increment position */
     inline val get: Char
@@ -145,14 +146,28 @@ class CharSeries(buf: Series<Char>,
 
     /** skipws and rtrim */
     val trim: CharSeries
-        get() = apply {
-            var p = pos
-            var l = limit
-            while (p < l && get(p).isWhitespace()) p++
-            while (l > p && get(l.dec()).isWhitespace()) l--
-            lim(l)
-            pos(p)
+        get() = apply { confixScope(Char::isWhitespace) }
+
+    /**     trims and mutates the string to remove front and back quotes  1-deep without escape checking*/
+    val unquote: CharSeries
+        get() = trim.apply {
+            //hackish
+            var first = true
+            confixScope { (it == '"').also { first = !it } }
+            first = true
+            confixScope { (it == '"').also { first = !it } }
         }
+
+
+    /** mutating operation to shrink the buffer  */
+    fun confixScope(pred: (Char) -> Boolean) {
+        var p = pos
+        var l = limit
+        while (p < l && pred(get(p))) p++
+        while (l > p && pred(get(l.dec()))) l--
+        lim(l)
+        pos(p)
+    }
 
 
     //isEmpty override
@@ -221,6 +236,8 @@ class CharSeries(buf: Series<Char>,
         require(rem > 0) { "heads up: using an empty stateful CharSeries toArray()" }
         return CharArray(rem, ::get)
     }
+
+
 }
 
 operator fun Series<Char>.div(delim: Char): Series<Series<Char>> { //lazy split
@@ -261,4 +278,6 @@ operator fun Series<Byte>.div(delim: Byte): Series<Series<Byte>> { //lazy split
                 iarr[x].dec()
         this[p until l]
     }
+
+
 }

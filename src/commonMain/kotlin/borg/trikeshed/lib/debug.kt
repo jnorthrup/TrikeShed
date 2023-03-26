@@ -15,16 +15,14 @@ expect fun assert(value: Boolean)
 expect inline fun assert(value: Boolean, lazyMessage: () -> Any)
 
 //var forceDebug = env// stopgap measure until i figure out how to do native -ea
-
-val debugging: Boolean by lazy {
+val debugging: Boolean =
     try {
         assert(false) { "debugging" }
 //        forceDebug
-    false
+        false
     } catch (e: AssertionError) {
         true
     }
-}
 
 //exactly like .also
 inline fun <T> T.debug(block: (T) -> Unit): T {

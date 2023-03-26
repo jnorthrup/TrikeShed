@@ -1,9 +1,6 @@
 package borg.trikeshed.common
 
-import borg.trikeshed.lib.ByteSeries
-import borg.trikeshed.lib.Join
-import borg.trikeshed.lib.Twin
-import borg.trikeshed.lib.j
+import borg.trikeshed.lib.*
 
 typealias BFrag = Join<
         /**endexclusive range*/
@@ -56,6 +53,7 @@ fun BFrag.split1(lit: Byte): Twin<BFrag?> {
             line j tail
         }
     }
+    assert(ret.a != null || ret.b != null)
     return ret
 }
 

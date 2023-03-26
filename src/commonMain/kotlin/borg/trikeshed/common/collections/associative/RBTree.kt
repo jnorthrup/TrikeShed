@@ -10,11 +10,8 @@ import kotlin.math.max
 class RBTree<Key : Comparable<Key>, Value>(vararg pairs: Join<Key, Value>) {
 
     private val RED = true
-
     private val BLACK = false
-
     private var root: Node<Key, Value>? = null
-
     init {
         pairs.forEach { (first, second) -> put(first, second) }
     }

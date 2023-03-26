@@ -129,12 +129,29 @@ class JsonPathTest {
     fun `handle empty jsObject`() {
         val src = ("""[0,[],[1],[[{ }]]] """).toSeries()
         val element = index(src)
-        val path: JsPath = _l[3,0,0].toJsPath
+        val path: JsPath = _l[3, 0, 0].toJsPath
         val result = jsPath(element j src, path, true, mutableListOf())
-        if (result is Map<*,*>) {
+        if (result is Map<*, *>) {
             val r = result
-            if(r.isNotEmpty()) fail("result is not an empty Map")
+            if (r.isNotEmpty()) fail("result is not an empty Map")
         }
     }
+
+    val systemJson =
+        """       {"id64":2064711,"name":"Ooscs Chreou AA-A h0","coords":{"x":-10149.875,"y":830.28125,"z":27589.65625},"allegiance":null,"government":"None","primaryEconomy":"None","secondaryEconomy":"None","security":"Anarchy","population":0,"bodyCount":1,"date":"2023-01-31 01:21:12+00","bodies":[{"id64":2064711,"bodyId":0,"name":"Ooscs Chreou AA-A h0","type":"Star","subType":"Black Hole","distanceToArrival":0.0,"mainStar":true,"age":2,"spectralClass":null,"luminosity":"VII","absoluteMagnitude":20.0,"solarMasses":13.6875,"solarRadius":0.0000580558894234364,"surfaceTemperature":0.0,"rotationalPeriod":0.00000144196759259259,"axialTilt":0.0,"stations":[],"updateTime":"2023-01-31 01:21:02+00"}],"stations":[]} """
+
+    @Test
+    fun `test body 0 name`() {
+
+        val src = systemJson.toSeries()
+        val element = index(src)
+        val path: JsPath = _l["bodies", 0, "name"].toJsPath
+        val result = jsPath(element j src, path, true, mutableListOf())
+        val expected = "Ooscs Chreou AA-A h0"
+        assertEquals(expected, result)
+//        expected:<[Ooscs Chreou AA-A h0]> but was:<[name]>
+//what's the bug?
+    }
+
 
 }
