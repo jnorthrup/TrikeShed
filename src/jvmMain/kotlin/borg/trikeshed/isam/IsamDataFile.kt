@@ -88,7 +88,7 @@ actual class IsamDataFile actual constructor(
             val metafilename = "$datafilename.meta"
 
             //turn off debug logging in here
-            fun logDebug(f: (String) -> Unit): Unit = Unit
+//            fun logDebug(f: (String) -> Unit): Unit = Unit
 
             val meta0 = IsamMetaFileReader.write(metafilename, cursor.meta, varChars)
 

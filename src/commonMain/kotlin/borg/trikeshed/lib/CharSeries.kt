@@ -148,17 +148,6 @@ class CharSeries(
     val trim: CharSeries
         get() = apply { confixScope(Char::isWhitespace) }
 
-    /**     trims and mutates the string to remove front and back quotes  1-deep without escape checking*/
-    val unquote: CharSeries
-        get() = trim.apply {
-            //hackish
-            var first = true
-            confixScope { (it == '"').also { first = !it } }
-            first = true
-            confixScope { (it == '"').also { first = !it } }
-        }
-
-
     /** mutating operation to shrink the buffer  */
     fun confixScope(pred: (Char) -> Boolean) {
         var p = pos
@@ -237,7 +226,40 @@ class CharSeries(
         return CharArray(rem, ::get)
     }
 
+    companion object {
 
+        /**returns true and advances the position if the confix is {}*/
+        fun unbrace(it: CharSeries): Boolean {
+            val chlit = "{} "
+            return confixFeature(it, chlit)
+        }
+
+        /**returns true and advances the position if the confix is []*/
+        fun unbracket(it: CharSeries): Boolean {
+            val chlit = "[] "
+            return confixFeature(it, chlit)
+
+        }
+
+        /**returns true and advances the position if the series is quoted */
+        fun unquote(it: CharSeries): Boolean {
+            val chlit = "\"\" "
+            return confixFeature(it, chlit)
+
+        }
+
+        private fun confixFeature(client: CharSeries, chlit: String): Boolean {
+            logDebug { "confix $chlit before: ${client.asString()}" }
+            var x = 0
+            client.confixScope { test: Char ->
+                val target = chlit[x]
+                (target == test && x < 2).apply { if (this) x++ }
+            }
+            return x == 2.debug {
+                logDebug { "confix $chlit  after: ${client.asString()}" }
+            }
+        }
+    }
 }
 
 operator fun Series<Char>.div(delim: Char): Series<Series<Char>> { //lazy split
