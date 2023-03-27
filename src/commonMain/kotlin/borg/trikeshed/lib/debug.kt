@@ -12,7 +12,7 @@ Throws an AssertionError if the value is false and runtime assertions have been 
 expect fun assert(value: Boolean)
 
 @Throws(AssertionError::class)
-expect inline fun assert(value: Boolean, lazyMessage: () -> Any)
+expect fun assert(value: Boolean, lazyMessage: () -> Any)
 
 //var forceDebug = env// stopgap measure until i figure out how to do native -ea
 val debugging: Boolean =
@@ -25,12 +25,12 @@ val debugging: Boolean =
     }
 
 //exactly like .also
-inline fun <T> T.debug(block: (T) -> Unit): T {
+fun <T> T.debug(block: (T) -> Unit): T {
     if (debugging) block(this)
     return this
 }
 
-inline fun <T> T.log(block: (T) -> String): T {
+fun <T> T.log(block: (T) -> String): T {
     println(block(this))
     return this
 }
@@ -41,10 +41,12 @@ infix fun <T> T.d(other: T): T {
 }
 
 /** iff debugging is enabled, print the result of the block */
-inline fun logDebug(block: () -> String) {
+fun logDebug(block: () -> String) {
     if (debugging) println("debug: " + block())
 }
 
-inline fun logAlways (block: () -> String) {//import as logDebug
-  println("debug: " + block())
+fun logNone(block: () -> String) {}
+
+fun logAlways(block: () -> String) {//import as logDebug
+    println("info: " + block())
 }

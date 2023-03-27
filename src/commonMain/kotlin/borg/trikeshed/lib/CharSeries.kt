@@ -3,8 +3,7 @@
 package borg.trikeshed.lib
 
 import borg.trikeshed.lib.CZero.nz
-
-/**
+ /**
  * char based spiritual successor to ByteBuffer for parsing
  */
 class CharSeries(
@@ -249,14 +248,14 @@ class CharSeries(
         }
 
         private fun confixFeature(client: CharSeries, chlit: String): Boolean {
-            logDebug { "confix $chlit before: ${client.asString()}" }
+            logNone { "confix $chlit before: ${client.asString()}" }
             var x = 0
             client.confixScope { test: Char ->
                 val target = chlit[x]
                 (target == test && x < 2).apply { if (this) x++ }
             }
             return x == 2.debug {
-                logDebug { "confix $chlit  after: ${client.asString()}" }
+                logNone { "confix $chlit  after: ${client.asString()}" }
             }
         }
     }
