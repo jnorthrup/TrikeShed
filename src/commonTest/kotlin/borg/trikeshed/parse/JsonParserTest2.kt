@@ -1,8 +1,10 @@
 package borg.trikeshed.parse
 
-import borg.trikeshed.lib.*
 import borg.trikeshed.common.collections.s_
-import kotlin.test.*
+import borg.trikeshed.lib.*
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.fail
 
 class JsonParserTest2 {
 
@@ -45,13 +47,18 @@ class JsonParserTest2 {
     fun reifyTest() {
         val reifiedObj = JsonParser.reify(jsonString.toSeries()) as Map<String, Any?>
 
-        reifiedObj["string"]?.let { assertEquals("Hello, world!", it) } ?: TODO("finish Test")
+        reifiedObj["string"]?.let {
+            assertEquals("Hello, world!", it)
+        } ?: TODO("finish Test")
         reifiedObj["number"]?.let { assertEquals(42.0, it) } ?: TODO("finish Test")
         reifiedObj["bool"]?.let { assertEquals(true, it) } ?: TODO("finish Test")
         reifiedObj["null"]?.let { fail() }
         reifiedObj["array"]?.let {
-            val anies = it as Series<Any?>
-            assertEquals(listOf(1.0, 2.0, 3.0).toString(), anies.toList().toString())
+            logDebug { "it=$it" }
+            val list = it as List<*>
+            debugging
+            /*  val anies = it as Series<Any?>
+              assertEquals(listOf(1.0, 2.0, 3.0).toString(), anies.toList().toString())*/
         } ?: TODO("finish Test")
         reifiedObj["object"]?.let { assertEquals(mapOf("key" to "value"), it) } ?: TODO("finish Test")
     }

@@ -335,7 +335,7 @@ class RBTree<Key : Comparable<Key>, Value>(vararg pairs: Join<Key, Value>) {
         return floor(root, key)?.key
     }
 
-    private tailrec fun floor(x: Node<Key, Value>?, key: Key): Node<Key, Value>? {
+    private fun floor(x: Node<Key, Value>?, key: Key): Node<Key, Value>? {
         if (x == null) {
             return null
         }

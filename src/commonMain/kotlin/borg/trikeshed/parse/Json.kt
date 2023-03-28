@@ -117,23 +117,24 @@ object JsonParser {
 
         return when (val c: Char = src.mk.get) {
             '{', '[' -> {
-                val index = index(src)
-                val (openIdx, closeIdx) = index.first
+                val index: JsElement = index(src)
+                val (openIdx: Int, closeIdx: Int) = index.first
                 val commaIdxs: Series<Int> = index.second
 
                 val isObj = '{' == c
                 //if obj we create k-v pairs otherwise we create values
 
                 //iterate  segments exclusive of src first and last and commas in the middle
-                val combine = combine(s_[openIdx], commaIdxs, s_[closeIdx])
+                val combine: Series<Int> = combine(s_[openIdx], commaIdxs, s_[closeIdx])
                 if (commaIdxs.isEmpty()) {
                     val (before, after) = combine.toArray()
                     val possiblyEmpty = src.clone().lim(after).pos(before + 1).trim
-                    if (!possiblyEmpty.hasRemaining) return if (isObj)
-                        emptyMap<String, Any?>() else 0 j { _: Int -> TODO() }
+                    if (!possiblyEmpty.hasRemaining)
+                        return if (isObj) emptyMap<String, Any?>()
+                        else emptyArray<Any?>()
                 }
 
-                combine.`▶`.zipWithNext().α { (before, after) ->
+                combine.`▶`.zipWithNext().map { (before, after) ->
                     if (isObj) {
                         val tmp = CharSeries(src[before.inc() until after]).trim
                         require(tmp.seekTo('"')) {
@@ -153,7 +154,17 @@ object JsonParser {
                             }
                         }
                     } else reify(CharSeries(src[before.inc() until after]).trim)
-                }.let { if (isObj) it/*.`▶`*/.map { (it as Join<*, *>).pair }.toMap() else it }
+                }.let {
+                    if (isObj) it.associate {
+                        val join = it as Join<*, *>
+                        val (key, value) = join
+                        key.let {
+                            it as? String ?: (it as? Series<Char>)?.asString() ?: (it as? CharSeries)?.asString()
+                            ?: it
+                        } to value
+                    } else it as? String ?: (it as? Series<Char>)?.asString() ?: (it as? CharSeries)?.asString()
+                    ?: it
+                }
             }
 
             '"' -> {
