@@ -9,6 +9,7 @@ import kotlin.test.fail
 class JsonParserTest2 {
 
     val jsonString: String = """
+            
             {
               "string": "Hello, world!",
               "number": 42.0,
@@ -57,9 +58,10 @@ class JsonParserTest2 {
             logDebug { "it=$it" }
             val list = it as List<*>
             debugging
-            /*  val anies = it as Series<Any?>
-              assertEquals(listOf(1.0, 2.0, 3.0).toString(), anies.toList().toString())*/
+            val anies = it as Series<Any?>
+            assertEquals(listOf(1.0, 2.0, 3.0).toString(), anies.toList().toString())
         } ?: TODO("finish Test")
         reifiedObj["object"]?.let { assertEquals(mapOf("key" to "value"), it) } ?: TODO("finish Test")
     }
 }
+

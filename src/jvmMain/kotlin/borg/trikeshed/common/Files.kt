@@ -5,7 +5,6 @@ package borg.trikeshed.common
 import borg.trikeshed.lib.*
 import java.io.ByteArrayOutputStream
 import java.io.File
-import java.io.InputStream
 import kotlin.time.ExperimentalTime
 import java.nio.file.Files as JavaNioFileFiles
 import java.nio.file.Paths as JavaNioFilePaths
@@ -76,13 +75,7 @@ actual object Files {
     actual fun iterateLines(fileName: String, bufsize: Int): Iterable<Join<Long, Series<Byte>>> {
         val file = File(fileName)
         val input = file.inputStream()
-        return iterateLines(input, bufsize)
-    }
-
-    @OptIn(ExperimentalTime::class)
-    fun iterateLines(input: InputStream, bufsize: Int): Iterable<Join<Long, Series<Byte>>> {
         val rowLogger = FibonacciReporter(noun = "lines"/*, verb = "read"*/)
-
         var counter = 0
         val theIterable = object : Iterable<Join<Long, Series<Byte>>> {
             var fileClosed = false
@@ -218,6 +211,7 @@ actual object Files {
         }
         return theIterable
     }
+
 }
 
 fun main() {

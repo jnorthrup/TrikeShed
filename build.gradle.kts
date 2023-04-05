@@ -56,18 +56,8 @@ kotlin {
         isMingwX64 -> mingwX64("native")
         else -> throw GradleException("Host OS is not supported in Kotlin/Native.")
     }
-//we want to develop a linuxX64 target separately from generic native
-//    val nativeTarget = macosX64("native")
-//    val linuxX64Target = linuxX64("linuxX64"){
-//         compilations.first().cinterops {
-//            println("compilation: $this")
-//            create(name) {
-//                defFile = project.file("io_uring_interop/zlinux_uring.def")
-//            }
-//        }
-//
-//
-//    }
+
+
     sourceSets {
         val commonMain by getting {
             dependencies {
@@ -120,10 +110,6 @@ kotlin {
             }
         }
     }
-    //    tasks.withType<KotlinCompile> {
-    //        kotlinOptions.freeCompilerArgs += "-opt-in"
-    //
-    //    }
     tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinTest> {
         testLogging {
             events("passed", "skipped", "failed")

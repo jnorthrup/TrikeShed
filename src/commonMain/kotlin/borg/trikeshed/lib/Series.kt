@@ -19,7 +19,7 @@ val <T> Series<T>.size: Int get() =a
 
 
 /** index operator for Series
- */
+*/
 operator fun <T> Series<T>.get(i: Int): T = b(i)
 
 /**
@@ -146,7 +146,7 @@ value class IterableSeries<A>(val s: Series<A>) : Iterable<A>, Series<A> by s {
  * provides a big bright visible symbol that makes
  * conversions easy to follow along during reading the code
  */
-  val <T> Series<T>.`▶`: IterableSeries<T> get() = this as? IterableSeries ?: IterableSeries(this)
+val <T> Series<T>.`▶`: IterableSeries<T> get() = this as? IterableSeries ?: IterableSeries(this)
 
 infix operator fun <T> IterableSeries<T>.contains(x: Char): Boolean = this.any { x == it }
 infix operator fun <T> Series<T>.contains(it: Char): Boolean =  this.`▶` contains it
@@ -309,7 +309,7 @@ open class EmptySeries : Series<Nothing> by 0 j { x: Int -> TODO("undefined") }
 fun <T> emptySeries(): Series<T> = EmptySeries() as Series<T>
 
 fun Series<Char>.parseLong(): Long {
-    //handles +-
+//handles +-
     var sign = 1L
     var x = 0
     when (this[0]) {
@@ -340,7 +340,7 @@ fun Series<Char>.parseIsoDateTime(): kotlinx.datetime.LocalDateTime {
 }
 
 fun Series<Char>.encodeToByteArray(): ByteArray {
-    //encode unicode chars to bytes using UTF-8
+//encode unicode chars to bytes using UTF-8
     var x = 0
     val r = ByteArray(size * 3) //trim after
     var spill = 0 //spill cost of unicode encodings
@@ -403,6 +403,7 @@ fun Series<Char>.parseDouble(): Double {
             isNegativeValue = false
             x++
         }
+
         else -> isNegativeValue = false
     }
 
@@ -419,6 +420,7 @@ fun Series<Char>.parseDouble(): Double {
                         exponentSign = -1
                         x++
                     }
+
                     this[x] == '+' -> x++
                 }
                 while (x < size) {
