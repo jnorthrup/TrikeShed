@@ -258,6 +258,7 @@ class ByteSeries(
      * this rewrites the Series default toArray() to use the position and limit
      */
     fun toArray(): ByteArray = ByteArray(rem, ::get)
+
 }
 
 
@@ -280,4 +281,15 @@ fun Series<Byte>.isDirtyUTF8(): Boolean {
     return dirty
 }
 
+
 fun ByteSeries.decodeToString() = decodeUtf8().asString()
+
+fun Series<Byte>.startsWith(s: String): Boolean {
+    val join = s.encodeToByteArray() α { it }
+    return join.size <= size && join.zip(this).`▶`.all { it.first == it.second }
+}
+
+fun Series<Byte>.endsWith(s: String): Boolean {
+    val join = s.encodeToByteArray() α { it }
+    return join.size <= size && join.zip(this.reversed()).`▶`.all { it.first == it.second }
+}
