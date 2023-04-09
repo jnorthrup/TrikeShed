@@ -7,12 +7,13 @@ package gk.kademlia.include
 
 import borg.trikeshed.lib.Join
 import gk.kademlia.id.NUID
-import java.net.URI
+//import java.net.URI
 
 /**
  * kicking the can down the road here
  */
-typealias Address = URI
+//typealias Address = URI
+typealias Address = String
 /** routes */
 typealias Route<TNum> = Join<NUID<TNum>, Address>
 

@@ -1,12 +1,17 @@
 package gk.kademlia.id
 
+import borg.trikeshed.lib.assert
+import borg.trikeshed.num.BigInt
 import gk.kademlia.bitops.BitOps
 import gk.kademlia.bitops.BitOps.Companion.minOps
 import gk.kademlia.id.impl.*
 import gk.kademlia.net.NetMask
-import java.math.BigInteger
-import java.util.concurrent.ThreadLocalRandom
-import kotlin.random.asKotlinRandom
+import kotlin.random.Random
+
+//import java.math.BigInteger
+//import java.math.BigInteger
+//import java.util.concurrent.ThreadLocalRandom
+//import kotlin.random as KotlinRandom
 
 /**
  * Network Unique ID
@@ -21,7 +26,8 @@ interface NUID<Primitive : Comparable<Primitive>> {
     val ops: BitOps<Primitive>
 
     fun random(distance: Int? = null, centroid: Primitive = id!!) = ops.run {
-        ThreadLocalRandom.current().asKotlinRandom().run {
+        Random/*
+        ThreadLocalRandom.current().asKotlinRandom()*/.run {
             var accum = centroid
             val uBits = netmask.bits
             (distance?.takeIf { it <= uBits } ?: nextInt(uBits)).let { distance ->
@@ -47,8 +53,6 @@ interface NUID<Primitive : Comparable<Primitive>> {
      *
      * from _a[3,4,5]
      * to   1<<3+1<<4+1<<5
-     *
-     *
      */
     fun fromBitClock(vararg clock: Int): Primitive = ops.run {
         clock.fold(xor(one, one)) { acc, i ->
@@ -127,9 +131,9 @@ interface NUID<Primitive : Comparable<Primitive>> {
                         }
                 }
 
-                else -> object : BigIntegerNUID(minOps(size).one as BigInteger) {
-                    override val netmask: NetMask<BigInteger>
-                        get() = object : NetMask<BigInteger> {
+                else -> object : BigIntegerNUID(minOps(size).one as BigInt) {
+                    override val netmask: NetMask<BigInt>
+                        get() = object : NetMask<BigInt> {
                             override val bits: Int
                                 get() = size.toInt()
                         }

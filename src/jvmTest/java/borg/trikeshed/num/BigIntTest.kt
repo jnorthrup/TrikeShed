@@ -1,73 +1,10 @@
 package borg.trikeshed.num
 
-import borg.trikeshed.lib.toList
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 class BigIntTest {
-
-    @Test
-    fun testConstructorInt() {
-        val zero = BigInt(0)
-        assertEquals(null, zero.sign)
-        assertEquals(listOf(), zero.magnitude.toList())
-
-        val positive = BigInt(42)
-        assertEquals(true, positive.sign)
-        assertEquals(listOf(42u), positive.magnitude.toList())
-
-        val negative = BigInt(-42)
-        assertEquals(false, negative.sign)
-        assertEquals(listOf(42u), negative.magnitude.toList())
-    }
-
-    @Test
-    fun testConstructorLong() {
-        val zero = BigInt(0L)
-        assertEquals(null, zero.sign)
-        assertEquals(listOf(), zero.magnitude.toList())
-
-        val positive = BigInt(42L)
-        assertEquals(true, positive.sign)
-        assertEquals(listOf(42u), positive.magnitude.toList())
-
-        val negative = BigInt(-42L)
-        assertEquals(false, negative.sign)
-        assertEquals(listOf(42u), negative.magnitude.toList())
-    }
-
-    @Test
-    fun testConstructorString() {
-        val zero = BigInt("0")
-        assertEquals(null, zero.sign)
-        assertEquals(listOf(), zero.magnitude.toList())
-
-        val positive = BigInt("42")
-        assertEquals(true, positive.sign)
-        assertEquals(listOf(42u), positive.magnitude.toList())
-
-        val negative = BigInt("-42")
-        assertEquals(false, negative.sign)
-        assertEquals(listOf(42u), negative.magnitude.toList())
-
-        assertFailsWith<NumberFormatException> {
-            BigInt("invalid")
-        }
-    }
-
-    @Test
-    fun testConstructorULong() {
-        val zero = BigInt(0UL)
-        assertEquals(null, zero.sign)
-        assertEquals(listOf(), zero.magnitude.toList())
-
-        val positive = BigInt(42UL)
-        assertEquals(true, positive.sign)
-        assertEquals(listOf(42u), positive.magnitude.toList())
-    }
-
     @Test
     fun testCompareTo() {
         val a = BigInt(42)

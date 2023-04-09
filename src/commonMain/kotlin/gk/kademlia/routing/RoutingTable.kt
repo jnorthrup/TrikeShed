@@ -6,8 +6,8 @@ import gk.kademlia.id.NUID
 import gk.kademlia.include.Address
 import gk.kademlia.include.Route
 import gk.kademlia.net.NetMask
-import java.lang.Integer.min
-
+//import java.lang.Integer.min
+import kotlin.math.min
 
 /**
  * once an agent knows its network id it can create a routeTable, the agent will also be

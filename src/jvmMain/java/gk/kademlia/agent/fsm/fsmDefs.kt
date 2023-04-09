@@ -2,24 +2,27 @@
 
 package gk.kademlia.agent.fsm
 
+import borg.trikeshed.lib.*
 import gk.kademlia.codec.SmCodec
-import vec.macros.*
 import java.nio.ByteBuffer
 import java.nio.channels.ByteChannel
 import java.nio.channels.SelectionKey
+import borg.trikeshed.lib.Join3 as Tripl3
+import borg.trikeshed.lib.Twin as Tw1n
+import borg.trikeshed.lib.j as t2
 
 typealias KeyAction = (SelectionKey) -> FsmNode?
 
 /**like RFC822 smtp message*/
-typealias SimpleMessage = Join<Vect0r<Join<String, String>>, String>
+typealias SimpleMessage = Join<Iterable<Tw1n<String>>, String>
 typealias ReifiedMessage = Pair<List<Pair<String, String>>, String>
 
 val SimpleMessage.reify: ReifiedMessage get() = first.toList().map { it.pair } to second
-val ReifiedMessage.virtualize: SimpleMessage get() = first α { Tw1n(it) } t2 second
+val ReifiedMessage.virtualize: SimpleMessage get() = first α { (a, b) -> Tw1n(a, b) } t2 second
 
-val SimpleMessage.toChunk: Tripl3<String, Int, ByteBuffer>
+val SimpleMessage.toChunk: Chunk
     get() = SmCodec.send(this).run { Tripl3("BYTE", limit(), this) }
-val ByteBuffer.fromChunk: Join<Join<Int, (Int) -> Join<String, String>>, String>
+val ByteBuffer.fromChunk: SimpleMessage?
     get() = SmCodec.recv(also { long }.slice())
 
 
@@ -80,7 +83,7 @@ fun ReadChunk(yeild: ((Chunk) -> Unit)?, next: FsmNode = Terminal()): ReadNode =
                     chan.read(buf)
                     if (buf.hasRemaining()) null
                     else {
-                        yeild?.invoke(typ t2 ckSize t3 buf.flip())
+                        yeild?.invoke(typ t2 ckSize plus buf.flip())
                         next
                     }
                 }

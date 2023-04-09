@@ -8,7 +8,8 @@ import kotlin.math.max
 
 
 /** made immutable by series. */
-class BigInt(private val sign: Boolean?, private val magnitude: Series<UInt>) : Number(), Comparable<BigInt> {
+class BigInt private constructor(private val sign: Boolean?, private val magnitude: Series<UInt>) : Number(),
+    Comparable<BigInt> {
 
 
     // Constructor from Long
@@ -23,7 +24,7 @@ class BigInt(private val sign: Boolean?, private val magnitude: Series<UInt>) : 
         }
     )
 
-    private constructor(value: ULong) : this(
+    private constructor(value: ULong, javaCannotCompileULongAndLongMethodsThatConflict: String = "") : this(
         sign = if (value.z) null else true,
         magnitude = if (value.z) emptySeries() else value.let { absValue ->
             val low = (absValue and 0xFFFF_FFFFUL).toUInt()
@@ -109,7 +110,7 @@ class BigInt(private val sign: Boolean?, private val magnitude: Series<UInt>) : 
     }
 
     /** inverts the bits (but not xor?).  Assumes that the sign of the result should be opposite of the current instance's sign */
-    fun not(): BigInt = BigInt(sign?.let(Boolean::not), magnitude α UInt::inv)
+    operator fun not(): BigInt = BigInt(sign?.let(Boolean::not), magnitude α UInt::inv)
 
     fun or(bigInt: BigInt): BigInt = BigInt(
         sign, max(magnitude.size, bigInt.magnitude.size) j {
@@ -197,16 +198,16 @@ class BigInt(private val sign: Boolean?, private val magnitude: Series<UInt>) : 
         return BigInt(sign, result.reversed().toUIntArray().toSeries())
     }
 
-    fun add(addend: BigInt) = when {
+    operator fun plus(addend: BigInt): BigInt = when {
         sign == null -> addend
         addend.sign == null -> this
         sign == addend.sign -> BigInt(sign, processMagnitudes(addend, true))
         else -> BigInt(sign, processMagnitudes(addend, false))
     }
 
-    fun subtract(subtrahend: BigInt): BigInt {
+    operator fun minus(subtrahend: BigInt): BigInt {
         val negatedSubtrahend = BigInt(subtrahend.sign?.not(), subtrahend.magnitude)
-        return add(negatedSubtrahend)
+        return plus(negatedSubtrahend)
     }
 
     private fun processMagnitudes(addend: BigInt, addition: Boolean): Series<UInt> {
@@ -279,9 +280,9 @@ class BigInt(private val sign: Boolean?, private val magnitude: Series<UInt>) : 
         }
 
         operator fun <Primitive : Comparable<Primitive>> invoke(primitive: Primitive): BigInt = when (primitive) {
-            is Byte -> invoke(primitive.toULong())
-            is Short -> invoke(primitive.toULong())
-            is Int -> BigInt(primitive)
+            is Byte -> invoke(primitive.toLong())
+            is Short -> invoke(primitive.toLong())
+            is Int -> BigInt(primitive.toLong())
             is UByte -> invoke(primitive.toULong())
             is UShort -> invoke(primitive.toULong())
             is UInt -> invoke(primitive.toULong())
