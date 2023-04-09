@@ -2,22 +2,22 @@
 
 plugins {
     kotlin("multiplatform") version "1.8.10"
-//    id("org.jetbrains.intellij") version "3.1" apply true
-
-    id("org.jetbrains.dokka") version "1.7.0" apply false
-    id("org.jlleitschuh.gradle.ktlint") version "11.0.0" apply false
-
-    // support kotlinx-datetime
-    id("org.jetbrains.kotlin.plugin.serialization") version "1.8.10" apply false
-
-    // support for k2 compiler plugin
-    id("org.jetbrains.kotlin.kapt") version "1.8.10" apply false
-    id("org.jetbrains.kotlin.plugin.allopen") version "1.8.10" apply false
-    id("org.jetbrains.kotlin.plugin.noarg") version "1.8.10" apply false
-
-    // gradle versions update plugin
-    id("com.github.ben-manes.versions") version "0.42.0" apply false
-//    id("atomicfu-gradle-plugin") version "0.18.5"
+////    id("org.jetbrains.intellij") version "3.1" apply true
+//
+//    id("org.jetbrains.dokka") version "1.7.0" apply false
+//    id("org.jlleitschuh.gradle.ktlint") version "11.0.0" apply false
+//
+//    // support kotlinx-datetime
+//    id("org.jetbrains.kotlin.plugin.serialization") version "1.8.10" apply false
+//
+//    // support for k2 compiler plugin
+//    id("org.jetbrains.kotlin.kapt") version "1.8.10" apply false
+//    id("org.jetbrains.kotlin.plugin.allopen") version "1.8.10" apply false
+//    id("org.jetbrains.kotlin.plugin.noarg") version "1.8.10" apply false
+//
+//    // gradle versions update plugin
+//    id("com.github.ben-manes.versions") version "0.42.0" apply false
+////    id("atomicfu-gradle-plugin") version "0.18.5"
     `maven-publish`
 }
 
@@ -30,6 +30,7 @@ repositories {
     mavenLocal()
     gradlePluginPortal()
     google()
+    maven("https://www.jitpack.io")
 }
 publishing {
     repositories {
@@ -61,7 +62,8 @@ kotlin {
     sourceSets {
         val commonMain by getting {
             dependencies {
-                api("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.4")
+
+            api("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.4")
                 api("org.jetbrains.kotlinx:kotlinx-datetime:0.4.0")
                 api("org.jetbrains.kotlin:kotlin-reflect:1.8.0")
             }
@@ -81,14 +83,6 @@ kotlin {
         val nativeTest by getting {
 
         }
-
-//        val linuxX64Main by getting {
-//            dependsOn(nativeMain)
-//        }
-//        val linuxX64Test by getting {
-//            dependsOn(nativeTest)
-//        }
-
 
         val jvmMain by getting {
             dependencies {
