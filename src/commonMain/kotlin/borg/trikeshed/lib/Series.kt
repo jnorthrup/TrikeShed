@@ -15,7 +15,7 @@ import kotlin.math.pow
 
 typealias Series<T> = Join<Int, (Int) -> T>
 
-val <T> Series<T>.size: Int get() =a
+val <T> Series<T>.size: Int get() = a
 
 
 /** index operator for Series
@@ -90,7 +90,7 @@ inline fun Series<Int>.binarySearch(a: Int): Int {
  */
 infix operator fun IntRange.div(denominator: Int): Series<IntRange> =
     (this j (last - first + (1 - first)) / denominator).let { (_: IntRange, subSize: Int): Join<IntRange, Int> ->
-        Series(denominator) { x: Int ->
+        denominator j { x: Int ->
             (subSize * x).let { lower ->
                 lower..last.coerceAtMost(lower + subSize - 1)
             }
@@ -100,7 +100,6 @@ infix operator fun IntRange.div(denominator: Int): Series<IntRange> =
 operator fun <T> Series<T>.div(d: Int): Series<Series<T>> = (0 until size) / d α {
     this[it]
 }
-
 
 
 fun IntArray.binarySearch(i: Int): Int {
@@ -149,7 +148,7 @@ value class IterableSeries<A>(val s: Series<A>) : Iterable<A>, Series<A> by s {
 val <T> Series<T>.`▶`: IterableSeries<T> get() = this as? IterableSeries ?: IterableSeries(this)
 
 infix operator fun <T> IterableSeries<T>.contains(x: Char): Boolean = this.any { x == it }
-infix operator fun <T> Series<T>.contains(it: Char): Boolean =  this.`▶` contains it
+infix operator fun <T> Series<T>.contains(it: Char): Boolean = this.`▶` contains it
 
 
 /***
@@ -232,6 +231,7 @@ inline operator fun <reified A> Series<Series<Join<A, *>>>.unaryMinus(): Series<
             }
         }
     }
+
 fun <T> List<T>.toSeries(): Series<T> = size j ::get
 
 fun BooleanArray.toSeries(): Series<Boolean> = size j ::get
@@ -302,7 +302,10 @@ fun <T> Series<T>.isEmpty(): Boolean {
     return a == 0
 }
 
-fun <T> Series<T>.reversed(): Series<T> = size j { it: Int -> this.b(size - it - 1) }
+fun <T> Series<T>.reversed(): Series<T> {
+    val szCapture = size.dec()
+    return size j { it: Int -> this.b((szCapture - it)) }
+}
 
 open class EmptySeries : Series<Nothing> by 0 j { x: Int -> TODO("undefined") }
 

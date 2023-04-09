@@ -193,3 +193,10 @@ operator fun <T> Series<T>.get(index: IntRange): Series<T> = Series((index.last 
     require(index.step == 1)
     this[index.first + i]
 }
+
+/** series get by int
+ *
+ * @param index the index to test and get
+ * @return the element at the index or null if the index is out of bounds
+ */
+fun <T> Series<T>.getOrNull(i: Int): T? = if (i < size) this[i] else null
