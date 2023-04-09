@@ -1,6 +1,7 @@
 package gk.kademlia.bitops
 
 import gk.kademlia.bitops.impl.*
+import borg.trikeshed.num.BigInt.Companion as BigInteger
 
 interface BitOps<Primitive : Comparable<Primitive>> {
     val one: Primitive
@@ -16,7 +17,7 @@ interface BitOps<Primitive : Comparable<Primitive>> {
             is UByte -> (it as UByte).toInt()
             is UShort -> (it as UShort).toInt()
             is UInt -> (it as UInt).toLong()
-            else -> (it).toString().toBigInteger()
+            else -> BigInteger((it).toString())//megamorphic call
         }
     }
 

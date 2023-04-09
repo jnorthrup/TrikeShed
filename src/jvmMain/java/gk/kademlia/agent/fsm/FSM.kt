@@ -1,15 +1,11 @@
 package gk.kademlia.agent.fsm
 
-import vec.macros.Tripl3
-import vec.macros.t2
-import java.net.InetSocketAddress
-import java.nio.channels.*
-import java.util.concurrent.ConcurrentLinkedQueue
-import java.util.concurrent.ExecutorService
-import java.util.concurrent.Executors
+import kotlinx.coroutines.Runnable
 import kotlin.math.min
+import borg.trikeshed.lib.Join3 as Tripl3
 
 open class FSM(var topLevel: FsmNode? = null) : Runnable, AutoCloseable {
+
     private val q = ConcurrentLinkedQueue<Tripl3<SelectableChannel, Int, FsmNode>>()
     var selectorThread: Thread = Thread.currentThread()
     var selector: Selector = Selector.open()
@@ -28,7 +24,7 @@ open class FSM(var topLevel: FsmNode? = null) : Runnable, AutoCloseable {
                     val att = s.third
                     try {
                         x.configureBlocking(false)
-                        x.register(selector, op, att)!!
+                        x.register(selector, op, att) ?: return@synchronized
                     } catch (e: Throwable) {
                         e.printStackTrace()
                     }

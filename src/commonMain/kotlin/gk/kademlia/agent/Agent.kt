@@ -4,7 +4,7 @@ package gk.kademlia.agent
 import gk.kademlia.id.NUID
 import gk.kademlia.net.NetMask
 import gk.kademlia.routing.RoutingTable
-import java.math.BigInteger
+import borg.trikeshed.num.BigInt as BigInteger
 
 interface Agent<TNum : Comparable<TNum>, Sz : NetMask<TNum>> {
     /**
@@ -27,7 +27,3 @@ object WorldNetwork : NetMask<BigInteger> {
     override val bits: Int
         get() = 128
 }
-
-/**
- *
- */
