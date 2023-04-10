@@ -1,63 +1,81 @@
 package borg.trikeshed.common.collections
 
-class CircularQueue<T>(capacity: Int, val onEvict: ((T) -> Unit)? = null) {
+import borg.trikeshed.lib.Join
+import borg.trikeshed.lib.j
+import borg.trikeshed.lib.size
+import kotlinx.coroutines.InternalCoroutinesApi
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
+//package vec
 
-    // Modify the dequeue method to call the eviction delegate's onEvict method
-    fun dequeue(): T {
-        if (isEmpty()) throw NoSuchElementException("Queue is empty")
-        val element = array[head] as T // Get the element at the head index
-        array[head] = null // Clear the slot
-        head = (head + 1) % array.size // Increment and wrap around if needed
-        size--// Decreasethe size by one
-        onEvict?.invoke(element) // Call
-        return element// Returnthe removed element
-    } // The array that stores the elements
+@InternalCoroutinesApi
+typealias CircularQueue<T> = CirQlar<T>
 
-    private val array = arrayOfNulls<Any?>(capacity)
+/**
 
-    // The index of the first element
-    private var head = 0
+stripped down  circular  queue
 
-    // The index of the next available slot
-    private var tail = 0
+only mutability is offer(T)
 
-    // The number of elements in the queue
-    private var size = 0
+has cheap direct toVect0r with live properties
+has more expensive toList/iterator by copy/concat
+ */
+@InternalCoroutinesApi
+open class CirQlar<T>(
+    val maxSize: Int,
+    val al: Array<Any?> = arrayOfNulls<Any?>(maxSize),
+    val lock: Mutex = Mutex(),
+    val evict: ((T) -> Unit)? = null,
+) /*: AbstractQueue<T>()*/ {
 
-    // Check if the queue is empty
-    fun isEmpty(): Boolean {
-        return size == 0
+    var tail: Int = 0
+    /*override*/ val size: Int get() = kotlin.math.min(tail, maxSize)
+
+    val full: Boolean get() = tail >= maxSize
+
+    /*override */  fun offer(e: T): Boolean = runBlocking {
+        val tmp: Any?
+        lock.withLock {
+            val i = tail % maxSize
+            tmp = evict?.run { al.takeIf { it.size < i }?.get(i) }
+            al[i] = e
+
+            if (++tail == 2 * maxSize) tail = maxSize
+        }
+        tmp?.let { t -> evict?.invoke(t as T) }
+        true
     }
 
-    // Check if the queue is full
-    fun isFull(): Boolean {
-        return size == array.size
-    }
-
-    // Add an element to the tail of the queue
-    fun enqueue(element: T) {
-        if (isFull()) throw IllegalStateException("Queue is full")
-        array[tail] = element // Store the element at the tail index
-        tail = (tail + 1) % array.size // Increment and wrap around if needed
-        size++ // Increase the size by one
-    }
-
-
-    companion object {
-        /**
-        A factory method that creates a circular queue with a given capacity and initial elements
-        e.g. CircularQueue.create(3, 1, 2, 3) { println("Evicted $it") }
-         */
-        fun <T> create(capacity: Int, vararg elements: T, onEvict1: ((T) -> Unit)? = null): CircularQueue<T> {
-            val queue = CircularQueue<T>(
-                capacity,
-                onEvict = onEvict1
-            )// Createa new instance of CircularQueue<T> withthe given capacity
-            for (element in elements) {// Loop throughthe given elements
-                queue.enqueue(element)// Add each element tothe queue using enqueue() method
-            }
-            return queue// Returnthe createdqueue instance
+    fun toList(): List<T> {
+        val iterator = iterator()
+        return List(size) {
+            val next = iterator.next()
+            next
         }
     }
+
+    /*override*/ fun poll(): T = TODO("Not yet implemented")
+    /*override*/ fun peek(): T = TODO("Not yet implemented")
+    /*override*/ fun add(k: T): Boolean = offer(k)
+    operator fun CirQlar<T>.plus(k: T): Boolean = offer(k)
+    operator fun CirQlar<T>.plusAssign(k: T) {
+        offer(k)
+    }
+
+    fun toVect0r(): Join<Int, (Int) -> T> = (size j { x: Int ->
+        al[if (tail >= maxSize) {
+            (tail + x) % maxSize
+        } else x] as T
+    })
+
+    /*override*/ fun iterator(): MutableIterator<T> = object : MutableIterator<T> {
+        val v = toVect0r()
+        var i = 0
+        override fun hasNext(): Boolean = i < v.size
+        override fun next(): T = v.b(i++)
+        override fun remove(): Unit = TODO("Not yet implemented")
+    }
 }
+

@@ -17,8 +17,8 @@ class BigInt private constructor(private val sign: Boolean?, private val magnitu
         sign = if (value.z) null else value > 0,
         magnitude = if (value.z) emptySeries() else {
             value.absoluteValue.let { absValue ->
-                val low = (absValue and 0xFFFF_FFFF).toUInt() // Lower 32 bits
-                val high = ((absValue ushr 32) and 0xFFFF_FFFF).toUInt() // Upper 32 bits
+                val low = (absValue and 0xFFFF_FFFFL).toUInt() // Lower 32 bits
+                val high = ((absValue ushr 32) and 0xFFFF_FFFFL).toUInt() // Upper 32 bits
                 if (high.nz) arrayOf(high, low) else arrayOf(low)
             }.toSeries()
         }
@@ -41,7 +41,7 @@ class BigInt private constructor(private val sign: Boolean?, private val magnitu
         },
         magnitude = value.trimStart('+', '-').trimStart('0').let { cleanedValue ->
             if (cleanedValue.isEmpty()) {
-                arrayOf<UInt>().toSeries()
+                emptySeries()
             } else {
                 val chunkSize =
                     9 // Using 9 digits per chunk to ensure UInt compatibility (max UInt value is 4,294,967,295)
