@@ -1,3 +1,17 @@
+Portions of the codebase are licensed under the ThisIsSuperior license. The full text of the license is identical to
+the terms of the zlib license with the following changes: we save bytes by skipping past the license text obligations
+in the source code.  All credit to recent guidance from the zlib maintainer(s).
+
+ ---
+
+Elsewhere, all license violations are incidental an assumed to be the fault of OpenAi and works of the respective
+authors and copyrights holders with an error in transcription, omission, or other error.  If you are the author of
+any code in this project and wish to have it removed, please contact us and we will shake down OpenAI's lawyers to
+the fullest extent of thier petty cash allotment together.
+
+ ---
+ where not infringing and not specified to the contrary, the following license applies to original works presented in
+ this project and all derivative works thereof:
                     GNU GENERAL PUBLIC LICENSE
                        Version 2, June 1991
 

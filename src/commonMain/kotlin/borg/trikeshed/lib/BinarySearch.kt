@@ -2,9 +2,10 @@ package borg.trikeshed.lib
 
 
 //binary search
-fun <T:Comparable<T>> Series<T>.binarySearch(element: T, low :Int= 0, high :Int= size - 1): Int =binarySearch(element, naturalOrder(),low,high)
+fun <T : Comparable<T>> Series<T>.binarySearch(element: T, low: Int = 0, high: Int = size - 1): Int =
+    binarySearch(element, naturalOrder(), low, high)
 
-fun <T> Series<T>.binarySearch(element: T, c: Comparator<T>, low_ :Int= 0,  high_:Int = size - 1): Int{
+fun <T> Series<T>.binarySearch(element: T, c: Comparator<T>, low_: Int = 0, high_: Int = size - 1): Int {
     var low = low_
     var high = high_
 
@@ -23,7 +24,7 @@ fun <T> Series<T>.binarySearch(element: T, c: Comparator<T>, low_ :Int= 0,  high
 
 
 //signed, unsigned primitives all need boilerplate here
-fun Series<Byte>.binarySearch(element: Byte, low_ :Int= 0, high_:Int = size - 1): Int{
+fun Series<Byte>.binarySearch(element: Byte, low_: Int = 0, high_: Int = size - 1): Int {
     var low = low_
     var high = high_
 
@@ -41,7 +42,7 @@ fun Series<Byte>.binarySearch(element: Byte, low_ :Int= 0, high_:Int = size - 1)
     return -(low + 1)  // key not found.
 }
 
-fun Series<Short>.binarySearch(element: Short, low_ :Int= 0, high_:Int = size - 1): Int{
+fun Series<Short>.binarySearch(element: Short, low_: Int = 0, high_: Int = size - 1): Int {
     var low = low_
     var high = high_
 
@@ -58,25 +59,7 @@ fun Series<Short>.binarySearch(element: Short, low_ :Int= 0, high_:Int = size - 
     return -(low + 1)  // key not found.
 }
 
-fun Series<Int>.binarySearch(element: Int, low_ :Int= 0, high_:Int = size - 1): Int{
-    var low = low_
-    var high = high_
-
-    while (low <= high) {
-        val mid = (low + high).ushr(1)
-        val midVal = get(mid)
-        /** test for equality, then compare */
-        when {
-            midVal < element -> low = mid + 1
-            midVal > element -> high = mid - 1
-            else -> return mid // key found
-        }
-
-    }
-    return -(low + 1)  // key not found.
-}
-
-fun Series<Long>.binarySearch(element: Long, low_ :Int= 0, high_:Int = size - 1): Int{
+fun Series<Int>.binarySearch(element: Int, low_: Int = 0, high_: Int = size - 1): Int {
     var low = low_
     var high = high_
 
@@ -94,7 +77,7 @@ fun Series<Long>.binarySearch(element: Long, low_ :Int= 0, high_:Int = size - 1)
     return -(low + 1)  // key not found.
 }
 
-fun Series<Float>.binarySearch(element: Float, low_ :Int= 0, high_:Int = size - 1): Int{
+fun Series<Long>.binarySearch(element: Long, low_: Int = 0, high_: Int = size - 1): Int {
     var low = low_
     var high = high_
 
@@ -112,7 +95,7 @@ fun Series<Float>.binarySearch(element: Float, low_ :Int= 0, high_:Int = size - 
     return -(low + 1)  // key not found.
 }
 
-fun Series<Double>.binarySearch(element: Double, low_ :Int= 0, high_:Int = size - 1): Int{
+fun Series<Float>.binarySearch(element: Float, low_: Int = 0, high_: Int = size - 1): Int {
     var low = low_
     var high = high_
 
@@ -130,7 +113,25 @@ fun Series<Double>.binarySearch(element: Double, low_ :Int= 0, high_:Int = size 
     return -(low + 1)  // key not found.
 }
 
-fun Series<Char>.binarySearch(element: Char, low_ :Int= 0, high_:Int = size - 1): Int{
+fun Series<Double>.binarySearch(element: Double, low_: Int = 0, high_: Int = size - 1): Int {
+    var low = low_
+    var high = high_
+
+    while (low <= high) {
+        val mid = (low + high).ushr(1)
+        val midVal = get(mid)
+        /** test for equality, then compare */
+        when {
+            midVal < element -> low = mid + 1
+            midVal > element -> high = mid - 1
+            else -> return mid // key found
+        }
+
+    }
+    return -(low + 1)  // key not found.
+}
+
+fun Series<Char>.binarySearch(element: Char, low_: Int = 0, high_: Int = size - 1): Int {
     var low = low_
     var high = high_
 
@@ -149,7 +150,7 @@ fun Series<Char>.binarySearch(element: Char, low_ :Int= 0, high_:Int = size - 1)
 }
 
 //ubyte, then ...
-fun Series<UByte>.binarySearch(element: UByte, low_ :Int= 0, high_:Int = size - 1): Int{
+fun Series<UByte>.binarySearch(element: UByte, low_: Int = 0, high_: Int = size - 1): Int {
     var low = low_
     var high = high_
 
@@ -167,7 +168,7 @@ fun Series<UByte>.binarySearch(element: UByte, low_ :Int= 0, high_:Int = size - 
     return -(low + 1)  // key not found.
 }
 
-fun Series<UShort>.binarySearch(element: UShort, low_ :Int= 0, high_:Int = size - 1): Int{
+fun Series<UShort>.binarySearch(element: UShort, low_: Int = 0, high_: Int = size - 1): Int {
     var low = low_
     var high = high_
 
@@ -185,7 +186,7 @@ fun Series<UShort>.binarySearch(element: UShort, low_ :Int= 0, high_:Int = size 
     return -(low + 1)  // key not found.
 }
 
-fun Series<UInt>.binarySearch(element: UInt, low_ :Int= 0, high_:Int = size - 1): Int{
+fun Series<UInt>.binarySearch(element: UInt, low_: Int = 0, high_: Int = size - 1): Int {
     var low = low_
     var high = high_
 
@@ -201,7 +202,11 @@ fun Series<UInt>.binarySearch(element: UInt, low_ :Int= 0, high_:Int = size - 1)
     return -(low + 1)  // key not found.
 }
 
-fun Series<ULong>.binarySearch(element: ULong, low_ :Int= 0, high_:Int = size - 1): Int{
+/**
+when the index is exact match, return the index
+when the index is not exact match, return the negative value of the index of the next element
+ */
+fun Series<ULong>.binarySearch(element: ULong, low_: Int = 0, high_: Int = size - 1): Int {
     var low = low_
     var high = high_
 
@@ -214,8 +219,6 @@ fun Series<ULong>.binarySearch(element: ULong, low_ :Int= 0, high_:Int = size - 
             midVal > element -> high = mid - 1
             else -> return mid // key found
         }
-
     }
-
     return -(low + 1)  // key not found.
 }
