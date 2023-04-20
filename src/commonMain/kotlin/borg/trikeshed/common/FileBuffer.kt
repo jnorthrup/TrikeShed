@@ -5,7 +5,6 @@ import borg.trikeshed.lib.debug
 import borg.trikeshed.lib.logDebug
 
 
-fun openFileBuffer(filename: String, initialOffset: Long = 0, blkSize: Long = -1, readOnly: Boolean = true): FileBuffer=open(filename, initialOffset, blkSize, readOnly)
 
 fun <T> FileBuffer.use(block: (FileBuffer) -> T) {
     open()
@@ -46,3 +45,10 @@ expect class FileBuffer(
     fun get(index: Long): Byte
     fun put(index: Long, value: Byte)
 }
+
+fun openFileBuffer(
+    filename: String,
+    initialOffset: Long = 0,
+    blkSize: Long = -1,
+    readOnly: Boolean = true,
+): FileBuffer = open(filename, initialOffset, blkSize, readOnly)

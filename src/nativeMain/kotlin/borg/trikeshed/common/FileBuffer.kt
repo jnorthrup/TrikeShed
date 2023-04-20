@@ -15,13 +15,6 @@ actual class FileBuffer actual constructor(//filename: String, initialOffset: Lo
     actual val initialOffset: Long,
     actual val blkSize: Long,
     actual val readOnly: Boolean,
-
-//    init {
-//        this.filename = filename.debug { logDebug { "filename: $it" } }
-//        this.initialOffset = initialOffset.debug {  logDebug("initialOffset: $it".`↺`) }
-//        this.blkSize = blkSize .debug { logDebug("blkSize: $it".`↺`) }
-//        this.readOnly = readOnly .debug { logDebug("readOnly: $it".`↺`) }
-//    }
 ): LongSeries<Byte> {
 
     init{

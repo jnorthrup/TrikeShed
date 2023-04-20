@@ -25,17 +25,6 @@ const val CHUNK = 16384
 val __usSz = UShort.SIZE_BYTES.toULong()
 val __ulSz = ULong.SIZE_BYTES.toULong()
 
-
-class Point(
-    var output: ULong,
-    var input: ULong,
-    win: UByteArray,
-    val winsize: UShort = win.size.toUShort(),
-    windowSupplier: () -> UByteArray = win.`↺`,
-) {
-    val window: UByteArray by lazy(windowSupplier)
-}
-
 @ExperimentalUnsignedTypes
 class GzIndex {
     val have: Int get() = list.size
@@ -49,6 +38,7 @@ class GzIndex {
     /** The 1-shot index file pointer, or stdin if fpName is null */
     val indexFp: CPointer<FILE> by lazy {
         val name = fpName ?: "-"
+
         val fp = fpName?.let { fopen(name, "rb") } ?: stdin
         posixRequires(fp != null) { "Error: could not open index file $name" }
         fp!!
@@ -64,7 +54,8 @@ class GzIndex {
 
     @OptIn(ExperimentalUnsignedTypes::class)
     fun build(gzFile: CPointer<FILE>, span: ULong): Int {
-        val strm = z_stream_s(NativePtr.NULL)
+        val strm = nativeHeap.alloc<z_stream>()
+        val strmp: z_streamp = strm.ptr
         val buf = UByteArray(CHUNK)
         val win = UByteArray(WINSIZE.toInt())
         var totin = 0
@@ -115,11 +106,9 @@ class GzIndex {
                     stride = 1
                     continue
                 }
-
-
-                val deflater = z_stream_s(NativePtr.NULL)
+                val deflater = nativeHeap.alloc<z_stream>()
                 var ret1 = deflateInit(deflater.ptr, Z_BEST_COMPRESSION)
-                var compressedData = UByteArray(32 * 1024)
+                var compressedData = UByteArray(32 shl 10 /* 32K */)
                 val compressedDataBuffer = compressedData.pin()
                 deflater.next_in = win.pin().addressOf(0)
                 deflater.avail_in = WINSIZE
@@ -153,7 +142,6 @@ class GzIndex {
 
     fun writeIndex(indexFname: String): Int {
         return withIndexFile(indexFname, "wb") { indexFp ->
-
             "kzra".encodeToByteArray()
                 .usePinned { fwrite(it.addressOf(0), 1, "kzra".encodeToByteArray().size.toULong(), indexFp) }
             list.forEach { writeULong(it.output).usePinned { fwrite(it.addressOf(0), 1, __ulSz, indexFp) } }
@@ -256,7 +244,7 @@ class GzIndex {
      * @return the z_stream that is primed with 32k of data
      */
     fun prepareIndexEntry(index: Int): z_stream {
-        val strm = z_stream(nativeNullPtr)
+        val strm = nativeHeap.alloc<z_stream>()
         val windowSize = list[index].winsize
         val orign_window = list[index].window
         logDebug {

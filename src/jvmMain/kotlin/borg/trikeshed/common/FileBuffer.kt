@@ -21,17 +21,6 @@ actual class FileBuffer actual constructor(
 //    blkSize: Long, readOnly: Boolean,
 ) : LongSeries<Byte> {
 
-//    actual val filename: String
-//    actual val initialOffset: Long
-//    actual val blkSize: Long
-//    actual val readOnly: Boolean
-
-//    init {
-//        this.filename = filename
-//        this.initialOffset = initialOffset
-//        this.blkSize = blkSize
-//        this.readOnly = readOnly
-//    }
 
     var jvmFile: java.io.RandomAccessFile? = null
     var jvmChannel: FileChannel? = null
