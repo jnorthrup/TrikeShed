@@ -3,7 +3,8 @@
 package borg.trikeshed.lib
 
 import borg.trikeshed.lib.CZero.nz
- /**
+
+/**
  * char based spiritual successor to ByteBuffer for parsing
  */
 class CharSeries(
@@ -18,6 +19,7 @@ class CharSeries(
     /** the mark accessor */
     var mark: Int = -1,
 ) : Series<Char> by buf { //delegate to the underlying series
+
 
     /** get, the verb - the char at the current position and increment position */
     inline val get: Char
@@ -302,3 +304,11 @@ operator fun Series<Byte>.div(delim: Byte): Series<Series<Byte>> { //lazy split
 
 
 }
+
+val Series<Char>.cs: CharSequence
+    get() = object : CharSequence {
+        override val length: Int by ::a
+        override fun get(index: Int) = b(index)
+        override fun toString(): String = asString()
+        override fun subSequence(startIndex: Int, endIndex: Int): CharSequence = this@cs[startIndex until endIndex].cs
+    }

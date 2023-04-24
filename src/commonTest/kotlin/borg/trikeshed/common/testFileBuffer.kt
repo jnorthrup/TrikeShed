@@ -44,7 +44,7 @@ class TestFileBuffer {
 
         val fileBuffer = openFileBuffer(refFile).use { fbuf ->
             //treat the LongSeries like mmap buffer, and verify all the bytes are the same
-            for (fileByte in 0 until fileBytes.size) assertEquals(fileBytes[fileByte], fbuf[fileByte.toLong()])
+            for (fileByte in fileBytes.indices) assertEquals(fileBytes[fileByte], fbuf[fileByte.toLong()])
         }
     }
 }

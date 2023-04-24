@@ -483,3 +483,16 @@ fun <T, O, R> Series<T>.zip(o: Series<O>, f: (T, O) -> R): Join<Int, (Int) -> R>
 infix fun <T, O, R : Series2<T, O>> Series<T>.zip(o: Series<O>): R =
     (min(size, o.size) j { x: Int -> (this[x] j o[x]) }) as R
 
+fun <T> Series<T>.commonPrefixWith(other: Series<T>): Series<T> {
+    val shortestLength = min(this.size, other.size)
+    var i = 0
+    while (i < shortestLength && this[i]!!.equals(other[i])) {
+        i++
+    }
+    return this[0..i]
+
+}
+
+fun <T> Series<T>.zipWithNext(): Series<Twin<T>> = size.dec() j { x: Int -> this[x] j this[x + 1] }
+
+

@@ -28,16 +28,16 @@ class BigIntTest {
 
         val positive = BigInt(42)
         val positiveBytes = positive.toUByteArray()
-        assertEquals(3, positiveBytes.size)
+        assertEquals(5, positiveBytes.size)
         assertEquals(1u, positiveBytes[0])
         assertEquals(0u, positiveBytes[1])
-        assertEquals(42u, positiveBytes[2])
+        assertEquals(42u, positiveBytes[4])
 
         val negative = BigInt(-42)
         val negativeBytes = negative.toUByteArray()
-        assertEquals(3, negativeBytes.size)
+        assertEquals(5, negativeBytes.size)
         assertEquals(255u, negativeBytes[0])
         assertEquals(0u, negativeBytes[1])
-        assertEquals(42u, negativeBytes[2])
+        assertEquals(42u, negativeBytes[4])
     }
 }

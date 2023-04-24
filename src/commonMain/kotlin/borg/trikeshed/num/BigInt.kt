@@ -1,5 +1,6 @@
 package borg.trikeshed.num
 
+import borg.trikeshed.isam.meta.PlatformCodec.Companion.currentPlatformCodec.readUInt
 import borg.trikeshed.lib.*
 import borg.trikeshed.lib.CZero.nz
 import borg.trikeshed.lib.CZero.z
@@ -13,7 +14,7 @@ class BigInt private constructor(private val sign: Boolean?, private val magnitu
 
 
     // Constructor from Long
-    private constructor(value: Long) : this(
+    constructor(value: Long) : this(
         sign = if (value.z) null else value > 0,
         magnitude = if (value.z) emptySeries() else {
             value.absoluteValue.let { absValue ->
@@ -33,66 +34,74 @@ class BigInt private constructor(private val sign: Boolean?, private val magnitu
         }.toSeries()
     )
 
-    private constructor(value: String) : this(
-        sign = when {
-            value.startsWith("-") -> false
-            value.startsWith("+") || value.isEmpty() || value.first().isDigit() -> true
-            else -> throw NumberFormatException("Invalid BigInt string: $value")
-        },
-        magnitude = value.trimStart('+', '-').trimStart('0').let { cleanedValue ->
-            if (cleanedValue.isEmpty()) {
-                emptySeries()
-            } else {
-                val chunkSize =
-                    9 // Using 9 digits per chunk to ensure UInt compatibility (max UInt value is 4,294,967,295)
-                val chunks = cleanedValue.chunked(chunkSize).reversed()
-                val base = 1_000_000_000.toUInt() // 10^9, matching the chunkSize
-
-                chunks.fold(mutableListOf<UInt>()) { acc, chunk ->
-                    val chunkValue = chunk.toUInt()
-                    if (chunkValue.nz) {
-                        val sizeDiff = chunks.size - 1 - acc.size
-                        for (i in 0 until sizeDiff) {
-                            var carry = chunkValue
-                            for (j in acc.indices) {
-                                carry = multiplyAdd(acc, acc[j], base, carry, j)
-                            }
-                            if (carry.nz) {
-                                acc.add(carry)
-                            }
-                        }
+    constructor(value: String) : this(
+        sign = if (value.isEmpty()) null else value[0] != '-',
+        magnitude = if (value.isEmpty()) emptySeries() else {
+            val magnitude = mutableListOf<UInt>()
+            var i = if (value[0] == '-') 1 else 0
+            while (i < value.length) {
+                var chunk = 0u
+                for (j in 0..8) {
+                    if (i < value.length) {
+                        chunk = chunk * 10u + (value[i] - '0').toUInt()
+                        i++
                     }
-                    acc
-                }.toSeries()
+                }
+                magnitude.add(chunk)
             }
+            magnitude.toSeries()
         }
     )
 
+
     fun toUByteArray(): UByteArray {
+
+//        0b000001 as network endian byte[] looks like: [0, 0, 0, 1]
+//        0b000001 as little endian byte[] looks like: [1, 0, 0, 0]
+//        0b000001 as big endian byte[] looks like: [0, 0, 0, 1]
+
+
         if (sign == null || magnitude.isEmpty()) {
             return ubyteArrayOf(0u)
         }
 
         val result = mutableListOf<UByte>()
         result.add(if (sign) 1u else 255u) // Add the unsigned byte for the sign
+        //write the int's in network endian order (big endian) (most significant byte first)
 
-        for (x in magnitude.size - 1 downTo 0) {
-            val value = magnitude[x]
-            var nonZeroByteFound = false
-            for (shift in 0..24 step 8) {
-                val byteValue = ((value shr shift) and 0xFFu).toUByte()
-                if (nonZeroByteFound || byteValue.toUInt().nz || x == magnitude.size - 1) {
-                    nonZeroByteFound = true
-                    result.add(byteValue)
-                }
-            }
+        magnitude.forEach {
+            result.add((it shr 24).toUByte())
+            result.add((it shr 16).toUByte())
+            result.add((it shr 8).toUByte())
+            result.add(it.toUByte())
         }
-
         return result.toUByteArray()
     }
 
+    /**
+    from network-endian Ubyte[]
+    the length must be a multiple of 4+1 except for 0
+    the first byte is the sign
+    the rest are the magnitude in network-endian order (big endian) (most significant byte first)
 
-    //comparator
+    when the length is not a (multiple of 4)+1, treat the missing bytes as leading zeros in the first magnitude chunk
+     */
+    @OptIn(ExperimentalUnsignedTypes::class)
+    constructor(value: UByteArray) : this(
+        sign = value.takeUnless { it.isEmpty() }?.let { it[0].dec().z },
+        magnitude = value.takeUnless(UByteArray::isEmpty)?.let { v1 ->
+            var uByteArray = v1.drop(1).toUByteArray()
+            if (uByteArray.size % 4 != 0) uByteArray =
+                UByteArray(uByteArray.size + (4 - uByteArray.size % 4)) + uByteArray
+            val res1 = UIntArray(uByteArray.size / 4)
+            for (i in uByteArray.indices step 4)
+                readUInt(
+                    uByteArray.sliceArray(i until i + 4).asByteArray()
+                ).let { res1[i / 4] = it }
+            res1.toSeries()
+        } ?: emptySeries()
+    )
+
     override fun compareTo(other: BigInt): Int {
         sign?.let {
             other.sign?.let { if (sign != other.sign) return if (sign) 1 else -1 } ?: return if (sign) 1 else -1
@@ -138,9 +147,7 @@ class BigInt private constructor(private val sign: Boolean?, private val magnitu
     }
 
     override fun toByte(): Byte = toInt().toByte()
-
-    override fun toChar(): Char = toLong().toInt().toChar()
-
+    override fun toChar(): Char = toInt().toChar()
     override fun toDouble(): Double = toLong().toDouble()
     override fun toFloat(): Float = toLong().toFloat()
     override fun toInt(): Int = toLong().toInt()
@@ -283,9 +290,11 @@ class BigInt private constructor(private val sign: Boolean?, private val magnitu
             is Byte -> invoke(primitive.toLong())
             is Short -> invoke(primitive.toLong())
             is Int -> BigInt(primitive.toLong())
+//            is Long -> BigInt(primitive)
             is UByte -> invoke(primitive.toULong())
             is UShort -> invoke(primitive.toULong())
             is UInt -> invoke(primitive.toULong())
+//            is String -> invoke(primitive.toLong())
             else -> throw IllegalArgumentException("Unsupported type ${primitive::class}")
         }
     }

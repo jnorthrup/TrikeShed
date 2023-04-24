@@ -1,6 +1,8 @@
 package borg.trikeshed.parse
 
+import borg.trikeshed.common.collections._l
 import borg.trikeshed.common.collections.s_
+
 import borg.trikeshed.lib.*
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -8,9 +10,7 @@ import kotlin.test.fail
 
 class JsonParserTest2 {
 
-    val jsonString: String = """
-            
-            {
+    val jsonString: String = """{
               "string": "Hello, world!",
               "number": 42.0,
               "bool": true,
@@ -22,17 +22,6 @@ class JsonParserTest2 {
 
     val expectedJsonElement: JsElement = Twin(0, jsonString.length - 1) j s_[29, 47, 63, 79, 101]
 
-    @Test
-    fun `test scanJson`() {
-        val json = CharSeries(jsonString)
-        val (a1, b1) = expectedJsonElement
-        val index = JsonParser.index(json)
-        val (a2, b2) = index
-        assertEquals(a1.pair.toString(), a2.pair.toString())
-        val expected = b1.toList().toString()
-        val actual = b2.toList().toString()
-        assertEquals(expected, actual)
-    }
 
     val expectedParsedJson: LinkedHashMap<String, Any?> = linkedMapOf(
         "string" to "Hello, world!",
@@ -58,10 +47,36 @@ class JsonParserTest2 {
             logDebug { "it=$it" }
             val list = it as List<*>
             debugging
-            val anies = it as Series<Any?>
+            val anies = it
             assertEquals(listOf(1.0, 2.0, 3.0).toString(), anies.toList().toString())
         } ?: TODO("finish Test")
         reifiedObj["object"]?.let { assertEquals(mapOf("key" to "value"), it) } ?: TODO("finish Test")
+    }
+
+
+    @Test
+    fun `test path get slot by index`() {
+        val path: JsPath = _l[5, 0].toJsPath
+        //"object": {"key": "value"}
+        val src = CharSeries(jsonString)
+        val jsElement = JsonParser.index(src)
+        val e: JsContext = jsElement j src
+        val jsPath = JsonParser.jsPath(e, path)
+        println("reified: $jsPath")
+        assertEquals("key", jsPath)
+    }
+
+    @Test
+    fun `test path get slot by key`() {
+        val path: JsPath = _l[5, "key"].toJsPath
+        //"object": {"key": "value"}
+        val src = CharSeries(jsonString)
+        val jsElement = JsonParser.index(src)
+        val e: JsContext = jsElement j src
+        val jsPath = JsonParser.jsPath(e, path)
+
+        println("reified: $jsPath")
+        assertEquals("value", jsPath)
     }
 }
 
