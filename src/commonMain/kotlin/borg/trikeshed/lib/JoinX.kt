@@ -1647,71 +1647,71 @@ val <A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, A13, A14, A15, A16, A17,
 
 /**extension syntax for JoinX to Join(X+1) like a j b */
 
-infix operator fun <A, B, C> Join<A, B>.plus(extends: C) = Join3(a, b, extends)
-infix operator fun <A, B, C, D> Join3<A, B, C>.plus(extends: D) = Join4(a1, a2, a3, extends)
-infix operator fun <A, B, C, D, E> Join4<A, B, C, D>.plus(extends: E) = Join5(a1, a2, a3, a4, extends)
-infix operator fun <A, B, C, D, E, F> Join5<A, B, C, D, E>.plus(extends: F) = Join6(a1, a2, a3, a4, a5, extends)
-infix operator fun <A, B, C, D, E, F, G> Join6<A, B, C, D, E, F>.plus(extends: G) =
+infix operator fun <A, B, C> Join<A, B>.times(extends: C) = Join3(a, b, extends)
+infix operator fun <A, B, C, D> Join3<A, B, C>.times(extends: D) = Join4(a1, a2, a3, extends)
+infix operator fun <A, B, C, D, E> Join4<A, B, C, D>.times(extends: E) = Join5(a1, a2, a3, a4, extends)
+infix operator fun <A, B, C, D, E, F> Join5<A, B, C, D, E>.times(extends: F) = Join6(a1, a2, a3, a4, a5, extends)
+infix operator fun <A, B, C, D, E, F, G> Join6<A, B, C, D, E, F>.times(extends: G) =
     Join7(a1, a2, a3, a4, a5, a6, extends)
 
-infix operator fun <A, B, C, D, E, F, G, H> Join7<A, B, C, D, E, F, G>.plus(extends: H) =
+infix operator fun <A, B, C, D, E, F, G, H> Join7<A, B, C, D, E, F, G>.times(extends: H) =
     Join8(a1, a2, a3, a4, a5, a6, a7, extends)
 
-infix operator fun <A, B, C, D, E, F, G, H, I> Join8<A, B, C, D, E, F, G, H>.plus(extends: I) =
+infix operator fun <A, B, C, D, E, F, G, H, I> Join8<A, B, C, D, E, F, G, H>.times(extends: I) =
     Join9(a1, a2, a3, a4, a5, a6, a7, a8, extends)
 
-infix operator fun <A, B, C, D, E, F, G, H, I, J> Join9<A, B, C, D, E, F, G, H, I>.plus(extends: J) =
+infix operator fun <A, B, C, D, E, F, G, H, I, J> Join9<A, B, C, D, E, F, G, H, I>.times(extends: J) =
     Join10(a1, a2, a3, a4, a5, a6, a7, a8, a9, extends)
 
-infix operator fun <A, B, C, D, E, F, G, H, I, J, K> Join10<A, B, C, D, E, F, G, H, I, J>.plus(extends: K) =
+infix operator fun <A, B, C, D, E, F, G, H, I, J, K> Join10<A, B, C, D, E, F, G, H, I, J>.times(extends: K) =
     Join11(a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, extends)
 
-infix operator fun <A, B, C, D, E, F, G, H, I, J, K, L> Join11<A, B, C, D, E, F, G, H, I, J, K>.plus(extends: L) =
+infix operator fun <A, B, C, D, E, F, G, H, I, J, K, L> Join11<A, B, C, D, E, F, G, H, I, J, K>.times(extends: L) =
     Join12(a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, extends)
 
-infix operator fun <A, B, C, D, E, F, G, H, I, J, K, L, M> Join12<A, B, C, D, E, F, G, H, I, J, K, L>.plus(
+infix operator fun <A, B, C, D, E, F, G, H, I, J, K, L, M> Join12<A, B, C, D, E, F, G, H, I, J, K, L>.times(
     extends: M,
 ) =
     Join13(a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, extends)
 
-infix operator fun <A, B, C, D, E, F, G, H, I, J, K, L, M, N> Join13<A, B, C, D, E, F, G, H, I, J, K, L, M>.plus(
+infix operator fun <A, B, C, D, E, F, G, H, I, J, K, L, M, N> Join13<A, B, C, D, E, F, G, H, I, J, K, L, M>.times(
     extends: N,
 ) =
     Join14(a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, extends)
 
-infix operator fun <A, B, C, D, E, F, G, H, I, J, K, L, M, N, O> Join14<A, B, C, D, E, F, G, H, I, J, K, L, M, N>.plus(
+infix operator fun <A, B, C, D, E, F, G, H, I, J, K, L, M, N, O> Join14<A, B, C, D, E, F, G, H, I, J, K, L, M, N>.times(
     extends: O,
 ) = Join15(a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14, extends)
 
-infix operator fun <A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P> Join15<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O>.plus(
+infix operator fun <A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P> Join15<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O>.times(
     extends: P,
 ) = Join16(a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14, a15, extends)
 
-infix operator fun <A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q> Join16<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P>.plus(
+infix operator fun <A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q> Join16<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P>.times(
     extends: Q,
 ) = Join17(a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14, a15, a16, extends)
 
-infix operator fun <A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R> Join17<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q>.plus(
+infix operator fun <A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R> Join17<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q>.times(
     extends: R,
 ) = Join18(a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14, a15, a16, a17, extends)
 
-infix operator fun <A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S> Join18<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R>.plus(
+infix operator fun <A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S> Join18<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R>.times(
     extends: S,
 ) = Join19(a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14, a15, a16, a17, a18, extends)
 
-infix operator fun <A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T> Join19<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S>.plus(
+infix operator fun <A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T> Join19<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S>.times(
     extends: T,
 ) = Join20(a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14, a15, a16, a17, a18, a19, extends)
 
-infix operator fun <A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U> Join20<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T>.plus(
+infix operator fun <A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U> Join20<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T>.times(
     extends: U,
 ) = Join21(a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14, a15, a16, a17, a18, a19, a20, extends)
 
-infix operator fun <A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V> Join21<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U>.plus(
+infix operator fun <A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V> Join21<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U>.times(
     extends: V,
 ) = Join22(a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14, a15, a16, a17, a18, a19, a20, a21, extends)
 
-infix operator fun <A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W> Join22<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V>.plus(
+infix operator fun <A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W> Join22<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V>.times(
     extends: W,
 ) = Join23(a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14, a15, a16, a17, a18, a19, a20, a21, a22, extends)
 //23 is enough for now
