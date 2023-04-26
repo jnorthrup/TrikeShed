@@ -4,8 +4,6 @@
 package borg.trikeshed.lib
 
 import borg.trikeshed.cursor.Cursor
-import borg.trikeshed.cursor.meta
-import borg.trikeshed.cursor.type
 import borg.trikeshed.isam.meta.IOMemento.*
 import kotlin.jvm.JvmInline
 import kotlin.jvm.JvmName
@@ -15,11 +13,170 @@ import kotlin.math.pow
 
 typealias Series<T> = Join<Int, (Int) -> T>
 
+//comparable series
+interface CSeries<T : Comparable<T>> : Series<T>, Comparable<Series<T>> {
+    override fun compareTo(other: Series<T>): Int {
+        val size = min(size, other.size)
+        for (i in 0 until size) {
+            val cmp = this[i].compareTo(other[i])
+            if (cmp != 0) return cmp
+        }
+        return size.compareTo(other.size)
+    }
+}
+
+/** Comparable Series */
+val <T : Comparable<T>> Series<T>.cpb: CSeries<T>
+    get() = object : CSeries<T>, Series<T> by this {}
+
+
 val <T> Series<T>.size: Int get() = a
 
 
+/** α
+ * (λx.M[x]) → (λy.M[y])	α-conversion
+ * https://en.wikipedia.org/wiki/Lambda_calculus
+ *
+ * in kotlin terms, λ above is a lambda expression and M is a function and the '.' is the body of the lambda
+ * therefore the function M is the receiver of the extension function and the lambda expression is the argument
+ *
+ *  the simplest possible kotlin example of λx.M[x] is
+ *  ` { x -> M(x) } ` making the delta symbol into lambda braces and the x into a parameter and the M(x) into the body
+ */
+
+inline infix fun <X, C, V : Series<X>> V.α(crossinline xform: (X) -> C): Series<C> = size j { i -> xform(this[i]) }
+
+/*iterable conversion*/
+infix fun <X, C, Subject : Iterable<X>> Subject.α(xform: (X) -> C) = object : Iterable<C> {
+    override fun iterator(): Iterator<C> = object : Iterator<C> {
+        val iter: Iterator<X> = this@α.iterator()
+        override fun hasNext(): Boolean = iter.hasNext()
+        override fun next(): C = xform(iter.next())
+    }
+}
+
+
+/** this is an alpha conversion however the type erasure forces inlining here for Arrays as a holdover from java
+ *  acquiesence */
+inline infix fun <X, C> Array<X>.α(crossinline xform: (X) -> C): Series<C> = size j { i: Int -> xform(this[i]) }
+
+
+/**
+ * provides unbounded access to first and last rows beyond the existing bounds of 0 until size
+ */
+val <T> Series<T>.infinite: Series<T>
+    get() = Int.MAX_VALUE j { x: Int ->
+        this.b(
+            when {
+                x < 0 -> 0
+                size <= x -> size.dec()
+                else -> x
+            }
+        )
+    }
+
+/**
+ * index by enum
+ */
+operator fun <S, E : Enum<E>> Join<Int, (Int) -> S>.get(e: E): S = get(e.ordinal)
+
+/** Series toList
+ * @return an AbstractList<T> of the Series<T>
+ */
+fun <T> Series<T>.toList(): AbstractList<T> = object : AbstractList<T>() {
+    override val size: Int = a
+    override fun get(index: Int): T = b(index)
+}
+
+fun Series<Byte>.toArray(): ByteArray = ByteArray(size, ::get)
+
+fun Series<Char>.toArray(): CharArray = CharArray(size, ::get)
+
+fun Series<Int>.toArray(): IntArray = IntArray(size, ::get)
+
+fun Series<Boolean>.toArray(): BooleanArray = BooleanArray(size, ::get)
+
+fun Series<Long>.toArray(): LongArray = LongArray(size, ::get)
+
+fun Series<Float>.toArray(): FloatArray = FloatArray(size, ::get)
+
+fun Series<Double>.toArray(): DoubleArray = DoubleArray(size, ::get)
+
+fun Series<Short>.toArray(): ShortArray = ShortArray(size, ::get)
+
+inline fun <reified T> Series<T>.toArray(): Array<T> = Array(size, ::get)
+
+fun <T> Array<T>.toSeries(): Join<Int, (Int) -> T> = size j ::get
+
+
+//clockwise circle arrow unicode character is ↻ (U+21BB)
+//counterclockwise circle arrow  unicode character is  ↺ (U+21BA)
+
+//which one above denotes right identity function?  the clockwise one, so the right identity function is the clockwise circle arrow
+//which one above denotes left identity function?  the counterclockwise one, so the left identity function is the counterclockwise circle arrow
+
+//left identity function is the counterclockwise circle arrow
+
+//according to openai Codex:
+// in kotlin, val a: ()->B  wraps a B.  in lambda calculus which is left identity ?  in kotlin, a: ()->B  is right identity.  left identity is: val a: ()->B = { b }  right identity is:  val a: ()->B = b
+
+inline val <T> T.leftIdentity: () -> T get() = { this }
+
+/**Left Identity Function */
+inline val <T> T.`↺`: () -> T get() = leftIdentity
+
+fun <T> `↻`(t: T): T = t
+infix fun <T> T.rightIdentity(t: T): T = `↻`(t)
+
+infix fun <C, B : (Int) -> C> IntArray.α(m: B): Series<C> = this.size j { m(this[it]) }
+
+infix fun <C, B : (Long) -> C> LongArray.α(m: B): Series<C> = this.size j { m(this[it]) }
+
+infix fun <C, B : (Float) -> C> FloatArray.α(m: B): Series<C> = this.size j { m(this[it]) }
+
+infix fun <C, B : (Double) -> C> DoubleArray.α(m: B): Series<C> = this.size j { m(this[it]) }
+
+infix fun <C, B : (Short) -> C> ShortArray.α(m: B): Series<C> = this.size j { m(this[it]) }
+
+infix fun <C, B : (Byte) -> C> ByteArray.α(m: B): Series<C> = this.size j { m(this[it]) }
+
+infix fun <C, B : (Char) -> C> CharArray.α(m: B): Series<C> = this.size j { m(this[it]) }
+
+infix fun <C, B : (Boolean) -> C> BooleanArray.α(m: B): Series<C> = this.size j { m(this[it]) }
+
+/**
+ * series get by iterable
+ */
+operator fun <T> Series<T>.get(index: Iterable<Int>): Series<T> = this[IntArray(index.count(), index::elementAt)]
+
+/**
+ * series get by Series<Int>
+ */
+operator fun <T> Series<T>.get(index: Series<Int>): Series<T> = this[IntArray(index.size) { index[it] }]
+
+/**
+ * series get by array
+ */
+operator fun <T> Series<T>.get(index: IntArray): Series<T> = Series(index.size) { this[index[it]] }
+
+/**
+ * series get by intRange
+ */
+operator fun <T> Series<T>.get(index: IntRange): Series<T> = Series((index.last + 1) - index.first) { i ->
+    require(index.step == 1)
+    this[index.first + i]
+}
+
+/** series get by int
+ *
+ * @param index the index to test and get
+ * @return the element at the index or null if the index is out of bounds
+ */
+fun <T> Series<T>.getOrNull(i: Int): T? = if (i < size) this[i] else null
+
+
 /** index operator for Series
-*/
+ */
 operator fun <T> Series<T>.get(i: Int): T = b(i)
 
 /**
@@ -69,13 +226,7 @@ inline fun Series<Int>.binarySearch(a: Int): Int {
             cmp > 0 -> high = mid - 1
             else -> return mid // key found
         }
-        if (cmp < 0) {
-            low = mid + 1
-        } else if (cmp > 0) {
-            high = mid - 1
-        } else {
-            return mid
-        }
+        if (cmp < 0) low = mid + 1 else if (cmp > 0) high = mid - 1 else return mid
     }
     return -(low + 1)
 }
@@ -210,16 +361,6 @@ class IntHeap(series: Series<Int>) {
     fun isEmpty(): Boolean = size == 0
 }
 
-///**
-// * overload unary minus operator for [Series<J2>]  and return the left side of the join
-// */
-//inline operator fun <A, B, J : Join<A, B>, S : Series<J>, R : Series<A>> S.unaryMinus() = this.let { it ->
-//    val (a, b) = it
-//    it α { (a, b) ->
-//        a
-//    }
-//}
-
 /** clashes  with  above
  * overload unary minus operator for [Cursor] or similar 2d Series and return the left side of the innermost join
  */
@@ -235,13 +376,7 @@ inline operator fun <reified A> Series<Series<Join<A, *>>>.unaryMinus(): Series<
 fun <T> List<T>.toSeries(): Series<T> = size j ::get
 
 fun BooleanArray.toSeries(): Series<Boolean> = size j ::get
-fun ByteArray.toSeries(): Series<Byte> = size j { index: Int ->
-    if (index < 0) {
-        val stall = 1
-    }
-    get(index)
-}
-
+fun ByteArray.toSeries(): Series<Byte> = size j ::get
 fun ShortArray.toSeries(): Series<Short> = size j ::get
 fun IntArray.toSeries(): Series<Int> = size j ::get
 fun LongArray.toSeries(): Series<Long> = size j ::get
@@ -252,7 +387,7 @@ fun UByteArray.toSeries(): Series<UByte> = size j ::get
 fun UShortArray.toSeries(): Series<UShort> = size j ::get
 fun UIntArray.toSeries(): Series<UInt> = size j ::get
 fun ULongArray.toSeries(): Series<ULong> = size j ::get
-fun String.toSeries(): Series<Char> = this.length j this::get
+
 fun CharSequence.toSeries(): Series<Char> = length j ::get
 fun ClosedRange<Int>.toSeries(): Series<Int> = (endInclusive - start + 1) j { i: Int -> i + start }
 fun <T> Sequence<T>.toSeries(): Series<T> = toList().toSeries()
@@ -264,7 +399,7 @@ fun <T> Series<T>.last(): T {
 
 fun <B> Series<B>.isNotEmpty(): Boolean = size < 0
 fun <B> Series<B>.first(): B =
-    this.get(0) //naming is _a little bit_ confusing with the pair overloads so it stays a function
+    this[0] //naming is _a little bit_ confusing with the pair overloads so it stays a function
 
 fun <B> Series<B>.drop(front: Int): Series<B> = get(min(front, size) until size)
 fun <B> Series<B>.dropLast(back: Int): Series<B> = get(0 until max(0, size - back))
@@ -280,24 +415,6 @@ fun <T> Series<T>.forEach(action: (T) -> Unit): Unit = this.`▶`.forEach(action
 fun <T, R> Series<T>.map(transform: (T) -> R): List<R> = this.toList().map(transform)
 
 
-/** IsNumerical
- * iterate the meta enum types and check if all are numerical
- *
- * IoByte,,IoShort,IoInt,IoDouble,IoLong   qualify as numerical
- *
- * kotlin enumset is not available in JS
- *
- */
-val Cursor.isNumerical: Boolean
-    get() = meta.`▶`.all {
-        when (it.type) {
-            IoByte, IoShort, IoInt, IoFloat, IoDouble, IoLong -> true
-            else -> false
-        }
-    }
-val Cursor.isHomoMorphic: Boolean get() = !meta.`▶`.any { it.type != meta[0].type }
-
-
 fun <T> Series<T>.isEmpty(): Boolean {
     return a == 0
 }
@@ -307,9 +424,9 @@ fun <T> Series<T>.reversed(): Series<T> {
     return size j { it: Int -> this.b((szCapture - it)) }
 }
 
-open class EmptySeries : Series<Nothing> by 0 j { x: Int -> TODO("undefined") }
+object EmptySeries : Series<Nothing> by 0 j { x: Int -> TODO("undefined") }
 
-fun <T> emptySeries(): Series<T> = EmptySeries() as Series<T>
+fun <T> emptySeries(): Series<T> = EmptySeries as Series<T>
 
 fun Series<Char>.parseLong(): Long {
 //handles +-
@@ -483,16 +600,38 @@ fun <T, O, R> Series<T>.zip(o: Series<O>, f: (T, O) -> R): Join<Int, (Int) -> R>
 infix fun <T, O, R : Series2<T, O>> Series<T>.zip(o: Series<O>): R =
     (min(size, o.size) j { x: Int -> (this[x] j o[x]) }) as R
 
-fun <T> Series<T>.commonPrefixWith(other: Series<T>): Series<T> {
+private fun <T : Comparable<T>> Series<T>.shortestLength(other: Series<T>): Int {
     val shortestLength = min(this.size, other.size)
     var i = 0
-    while (i < shortestLength && this[i]!!.equals(other[i])) {
-        i++
-    }
-    return this[0..i]
-
+    while (i < shortestLength && this[i] == other[i]) i++
+    return i
 }
+
+fun <T : Comparable<T>> Series<T>.commonPrefixWith(other: Series<T>): Series<T> = this[0..shortestLength(other)]
+fun <T : Comparable<T>> Series<T>.startsWith(other: Series<T>): Boolean = shortestLength(other) == other.size
 
 fun <T> Series<T>.zipWithNext(): Series<Twin<T>> = size.dec() j { x: Int -> this[x] j this[x + 1] }
 
+
+fun <T : Comparable<T>> Series<T>.compareTo(other: Series<T>): Int {
+    val shortestLength = min(this.size, other.size)
+    var i = 0
+    while (i < shortestLength) {
+        val c = this[i].compareTo(other[i])
+        if (c != 0) return c
+        i++
+    }
+    return this.size.compareTo(other.size)
+}
+
+fun <T> Series<T>.compareTo(other: Series<T>, comparator: Comparator<T>): Int {
+    val shortestLength = min(this.size, other.size)
+    var i = 0
+    while (i < shortestLength) {
+        val c = comparator.compare(this[i]!!, other[i]!!)
+        if (c != 0) return c
+        i++
+    }
+    return this.size.compareTo(other.size)
+}
 

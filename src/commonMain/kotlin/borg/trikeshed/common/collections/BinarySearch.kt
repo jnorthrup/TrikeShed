@@ -1,4 +1,8 @@
-package borg.trikeshed.lib
+package borg.trikeshed.common.collections
+
+import borg.trikeshed.lib.Series
+import borg.trikeshed.lib.get
+import borg.trikeshed.lib.size
 
 
 //binary search
@@ -217,6 +221,51 @@ fun Series<ULong>.binarySearch(element: ULong, low_: Int = 0, high_: Int = size 
         when {
             midVal < element -> low = mid + 1
             midVal > element -> high = mid - 1
+            else -> return mid // key found
+        }
+    }
+    return -(low + 1)  // key not found.
+}
+
+fun <T> Array<out T>.binarySearch(
+    element: T,
+    comparator: Comparator<in T>,
+    fromIndex: Int = 0,
+    toIndex: Int = size
+): Int {
+    var low = fromIndex
+    var high = toIndex - 1
+
+    while (low <= high) {
+        val mid = (low + high).ushr(1)
+        val midVal = get(mid)
+        val cmp = comparator.compare(midVal, element)
+        /** test for equality, then compare */
+        when {
+            cmp < 0 -> low = mid + 1
+            cmp > 0 -> high = mid - 1
+            else -> return mid // key found
+        }
+    }
+    return -(low + 1)  // key not found.
+}
+
+fun <T : Comparable<T>> Array<out T>.binarySearch(
+    element: T,
+    fromIndex: Int = 0,
+    toIndex: Int = size
+): Int {
+    var low = fromIndex
+    var high = toIndex - 1
+
+    while (low <= high) {
+        val mid = (low + high).ushr(1)
+        val midVal = get(mid)
+        val cmp = midVal.compareTo(element)
+        /** test for equality, then compare */
+        when {
+            cmp < 0 -> low = mid + 1
+            cmp > 0 -> high = mid - 1
             else -> return mid // key found
         }
     }

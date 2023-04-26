@@ -24,6 +24,14 @@ inline val <T> T.`↺`: () -> T get() = leftIdentity
 /*lazy series conversion */ inline infix fun <X, C, V : Series<X>> V.α(crossinline xform: (X) -> C): Series<C> =
     size j { i -> xform(this[i]) }
 /*iterable conversion*/ infix fun <X, C, Subject : Iterable<X>> Subject.α[...]
+interface CSeries<T : Comparable<T>> : Series<T>, Comparable<Series<T>>
+val <T : Comparable<T>> Series<T>.cpb : CSeries<T>
+//some collections macros:
+object _l { operator fun <T> get(vararg t: T): List<T> = listOf(*t) }
+ _l[...] //lists
+ _a[...]// arrays as above +primitives  
+ _s[...] //sets 
+ s_[...] //Series<T>
 
 [...] dozens of monadic and fp mix -ins and specializations
 ```

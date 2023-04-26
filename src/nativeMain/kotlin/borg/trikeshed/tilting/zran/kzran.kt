@@ -2,6 +2,7 @@
 
 package borg.trikeshed.tilting.zran
 
+import borg.trikeshed.common.collections.binarySearch
 import borg.trikeshed.isam.meta.PlatformCodec.Companion.currentPlatformCodec.readULong
 import borg.trikeshed.isam.meta.PlatformCodec.Companion.currentPlatformCodec.readUShort
 import borg.trikeshed.isam.meta.PlatformCodec.Companion.currentPlatformCodec.writeULong

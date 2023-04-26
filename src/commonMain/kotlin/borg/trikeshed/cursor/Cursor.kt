@@ -152,4 +152,20 @@ operator fun Cursor.get(vararg i: Int): Cursor = size j { y: Int ->
 }
 
 
+/** IsNumerical
+ * iterate the meta enum types and check if all are numerical
+ *
+ * IoByte,IoShort,IoInt,IoDouble,IoLong   qualify as numerical
+ *
+ * kotlin enumset is not available in JS
+ *
+ */
+val Cursor.isNumerical: Boolean
+    get() = meta.`▶`.all {
+        when (it.type) {
+            IoByte, IoShort, IoInt, IoFloat, IoDouble, IoLong -> true
+            else -> false
+        }
+    }
 
+val Cursor.isHomoMorphic: Boolean get() = !meta.`▶`.any { it.type != meta[0].type }
