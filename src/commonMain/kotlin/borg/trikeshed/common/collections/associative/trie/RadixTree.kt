@@ -1,5 +1,6 @@
 package borg.trikeshed.common.collections.associative.trie
 
+import borg.trikeshed.common.collections.binarySearch
 import borg.trikeshed.lib.*
 
 /**
@@ -10,7 +11,6 @@ class RadixTree<C : Comparable<C>>(var root: RadixTreeNode<C>? = null) {
         root = root?.plus(key) ?: RadixTreeNode(key, true)
         return root!!
     }
-
     fun keys() = root?.keys() ?: emptyList()
 
 }
@@ -21,7 +21,7 @@ class RadixTree<C : Comparable<C>>(var root: RadixTreeNode<C>? = null) {
 class RadixTreeNode<C : Comparable<C>>(
     var key: Series<C> = emptySeries(),
     var term: Boolean = false,
-    var children: MutableList<RadixTreeNode<C>>? = null
+    var children: Array<RadixTreeNode<C>>? = null
 ) {
     operator fun plus(other: Series<C>): RadixTreeNode<C> {
         // Find the common prefix length between the current node's key and the other key
@@ -42,20 +42,21 @@ class RadixTreeNode<C : Comparable<C>>(
             // If the current node has children, we try to find a child with a matching prefix for the remaining key
             //using binarysearch to retain sorted order
             children?.let { children ->
-                var index = children.binarySearchBy(remainingKey.take(1).cpb) { it.key.take(1).cpb }
+                var index = (children.toSeries() α { it.key.cpb }).binarySearch(remainingKey.take(1).cpb)
                 when {
                     index >= 0 -> return children[index] + remainingKey
                     else -> {
                         index = -index - 1
-                        val newNode = RadixTreeNode(remainingKey, true)
-                        children.add(index, newNode)
+                        val newNode: RadixTreeNode<C> = RadixTreeNode(remainingKey, true)
+                        children.toMutableList().apply { add(index, newNode) }
+                            .also { this.children = it.toTypedArray() }
                         return this
                     }
                 }
             } ?: run {
                 // If the current node has no children, we just create a new child node for the remaining key
                 val newNode = RadixTreeNode(remainingKey, true)
-                children = mutableListOf(newNode)
+                children = arrayOf(newNode)
                 return this
             }
         }
@@ -78,10 +79,10 @@ class RadixTreeNode<C : Comparable<C>>(
 
             // Set the new internal node's children
             newInternalNode.children =
-                (if (remainingCurrentKey.cpb < remainingOtherKey.cpb) mutableListOf(
+                if (remainingCurrentKey.cpb < remainingOtherKey.cpb) arrayOf(
                     newChildNode,
                     newOtherNode
-                ) else mutableListOf(newOtherNode, newChildNode))
+                ) else arrayOf(newOtherNode, newChildNode)
             return newInternalNode
         }
 
@@ -101,5 +102,4 @@ class RadixTreeNode<C : Comparable<C>>(
         }
         return ret
     }
-
 }
