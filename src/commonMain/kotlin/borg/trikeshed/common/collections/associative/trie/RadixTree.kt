@@ -1,5 +1,6 @@
 package borg.trikeshed.common.collections.associative.trie
 
+import borg.trikeshed.common.collections._l
 import borg.trikeshed.lib.*
 
 
@@ -38,15 +39,35 @@ class RadixTreeNode<C : Comparable<C>>(
             }
 
             // If the current node has children, we try to find a child with a matching prefix for the remaining key
-            if (children != null) for (child in children!!)
-                if (child.key.first() == remainingKey.first())
-                    return child + remainingKey
-                else children = mutableListOf()
-
-            // If there is no matching child, we create a new child node with the remaining key and add it to the children
-            val newNode = RadixTreeNode(remainingKey, true)
-            children!!.add(newNode)
-            return this
+            //using binarysearch to retain sorted order
+//            if (children != null)// for (child in children!!)
+//                if (child.key.first() == remainingKey.first())
+//                    return child + remainingKey
+//                else children = mutableListOf()
+//
+//            // If there is no matching child, we create a new child node with the remaining key and add it to the children
+//            val newNode = RadixTreeNode(remainingKey, true)
+//            children!!.add(newNode)
+//            return this
+            children?.let { children ->
+                var index = children.binarySearch { it.key.first().compareTo(remainingKey.first()) }
+                //get the two nieghbors of the insertion point
+                index = if (index < 0) -index - 1 else index
+                _l[children.getOrNull(index - 1),
+                    children.getOrNull(index)
+                ].filterNotNull().maxByOrNull {//by length of common key prefix
+                    it.key.commonPrefixWith(remainingKey).size
+                }?.let { bestMatch ->
+                    val cps = bestMatch.key.commonPrefixWith(remainingKey).size
+                    if (cps > 0) {
+                        return bestMatch + remainingKey
+                    } else {
+                        val newNode = RadixTreeNode(remainingKey, true)
+                        children.add(index, newNode)
+                        return this
+                    }
+                }
+            }
         }
 
         // If the common prefix length is less than the current node's key length,
