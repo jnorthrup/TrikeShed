@@ -83,7 +83,7 @@ fun ReadChunk(yeild: ((Chunk) -> Unit)?, next: FsmNode = Terminal()): ReadNode =
                     chan.read(buf)
                     if (buf.hasRemaining()) null
                     else {
-                        yeild?.invoke(typ t2 ckSize plus buf.flip())
+                        yeild?.invoke((typ t2 ckSize) * buf.flip())
                         next
                     }
                 }

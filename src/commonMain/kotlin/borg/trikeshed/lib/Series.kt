@@ -13,22 +13,6 @@ import kotlin.math.pow
 
 typealias Series<T> = Join<Int, (Int) -> T>
 
-//comparable series
-interface CSeries<T : Comparable<T>> : Series<T>, Comparable<Series<T>> {
-    override fun compareTo(other: Series<T>): Int {
-        val size = min(size, other.size)
-        for (i in 0 until size) {
-            val cmp = this[i].compareTo(other[i])
-            if (cmp != 0) return cmp
-        }
-        return size.compareTo(other.size)
-    }
-}
-
-/** Comparable Series */
-val <T : Comparable<T>> Series<T>.cpb: CSeries<T>
-    get() = object : CSeries<T>, Series<T> by this {}
-
 
 val <T> Series<T>.size: Int get() = a
 
@@ -424,7 +408,7 @@ fun <T> Series<T>.reversed(): Series<T> {
     return size j { it: Int -> this.b((szCapture - it)) }
 }
 
-object EmptySeries : Series<Nothing> by 0 j { x: Int -> TODO("undefined") }
+object EmptySeries : Series<Nothing> by 0 j { x: Int -> TODO("empty Series Access Violation") }
 
 fun <T> emptySeries(): Series<T> = EmptySeries as Series<T>
 
@@ -600,29 +584,11 @@ fun <T, O, R> Series<T>.zip(o: Series<O>, f: (T, O) -> R): Join<Int, (Int) -> R>
 infix fun <T, O, R : Series2<T, O>> Series<T>.zip(o: Series<O>): R =
     (min(size, o.size) j { x: Int -> (this[x] j o[x]) }) as R
 
-private fun <T : Comparable<T>> Series<T>.shortestLength(other: Series<T>): Int {
-    val shortestLength = min(this.size, other.size)
-    var i = 0
-    while (i < shortestLength && this[i] == other[i]) i++
-    return i
-}
 
-fun <T : Comparable<T>> Series<T>.commonPrefixWith(other: Series<T>): Series<T> = this[0..shortestLength(other)]
 fun <T : Comparable<T>> Series<T>.startsWith(other: Series<T>): Boolean = shortestLength(other) == other.size
 
 fun <T> Series<T>.zipWithNext(): Series<Twin<T>> = size.dec() j { x: Int -> this[x] j this[x + 1] }
 
-
-fun <T : Comparable<T>> Series<T>.compareTo(other: Series<T>): Int {
-    val shortestLength = min(this.size, other.size)
-    var i = 0
-    while (i < shortestLength) {
-        val c = this[i].compareTo(other[i])
-        if (c != 0) return c
-        i++
-    }
-    return this.size.compareTo(other.size)
-}
 
 fun <T> Series<T>.compareTo(other: Series<T>, comparator: Comparator<T>): Int {
     val shortestLength = min(this.size, other.size)
@@ -635,3 +601,32 @@ fun <T> Series<T>.compareTo(other: Series<T>, comparator: Comparator<T>): Int {
     return this.size.compareTo(other.size)
 }
 
+fun <T : Comparable<T>> Series<T>.compareTo(other: Series<T>): Int {
+    val shortestLength = min(this.size, other.size)
+    var i = shortestLength(other)
+    while (i < shortestLength) {
+        val c = this[i].compareTo(other[i])
+        if (c != 0) return c
+        i++
+    }
+    return this.size.compareTo(other.size)
+}
+
+private fun <T : Comparable<T>> Series<T>.shortestLength(other: Series<T>): Int {
+    val shortestLength = min(this.size, other.size)
+    var i = 0
+    while (i < shortestLength && this[i] == other[i]) i++
+    return i
+}
+
+//comparable series
+interface CSeries<T : Comparable<T>> : Series<T>, Comparable<Series<T>>
+
+/** Comparable Series */
+val <T : Comparable<T>> Series<T>.cpb: CSeries<T>
+    get() = object : CSeries<T>, Series<T> by this, Comparable<Series<T>> {
+        override fun compareTo(other: Series<T>): Int = compareTo(other, naturalOrder())
+    }
+
+fun <T : Comparable<T>> Series<T>.commonPrefixWith(other: Series<T>): Series<T> =
+    if (size == 0) this else this[0 until shortestLength(other)]

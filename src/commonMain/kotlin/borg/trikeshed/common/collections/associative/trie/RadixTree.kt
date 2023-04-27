@@ -1,81 +1,83 @@
 package borg.trikeshed.common.collections.associative.trie
 
-import borg.trikeshed.common.collections._a
-import borg.trikeshed.common.collections.binarySearch
 import borg.trikeshed.lib.*
-import kotlin.jvm.JvmInline
+
+
+/**
+ * a prefix tree (trie) implementation
+ */
+class RadixTree<C : Comparable<C>>(var root: RadixTreeNode<C>? = null) {
+    operator fun plus(key: Series<C>): RadixTreeNode<C> {
+        root = root?.plus(key) ?: RadixTreeNode(key, true)
+        return root!!
+    }
+}
 
 /**
  * a node in a prefix tree (trie)
  */
-sealed interface RadixTreeNode<C : Comparable<C>, K : Series<C>> {
-    val key: Series<C>
-    operator fun plus(key: Series<C>): RadixTreeNode<C, K>
-}
+class RadixTreeNode<C : Comparable<C>>(
+    var key: Series<C> = emptySeries(),
+    var term: Boolean = false,
+    var children: MutableList<RadixTreeNode<C>>? = null
+) {
+    operator fun plus(other: Series<C>): RadixTreeNode<C> {
+        // Find the common prefix length between the current node's key and the other key
+        val commonPrefixLength = key.commonPrefixWith(other).size
 
-/**
- * implement a prefix tree (trie) for a series of values of type T (which must be comparable)
- */
-@Suppress("UNCHECKED_CAST")
-class RadixTree<T : Comparable<T>, K : Series<T>>(
-    private var root: RadixTreeNode<T, K> = RadixTreeBranch(emptySeries<T>(), mutableListOf())
-) : RadixTreeNode<T, K> {
-    override fun plus(key: Series<T>): RadixTreeNode<T, K> = run { root.plus(key) }.also { root = it }
-    override val key: K get() = root.key as K
-}
+        // If the common prefix length is equal to the current node's key length,
+        // it means that we need to insert the remaining part of the other key into the children of the current node
+        if (commonPrefixLength == key.size) {
+            val remainingKey = other.drop(commonPrefixLength)
 
-class RadixTreeBranch<C : Comparable<C>, K : Series<C>>(
-    override val key: Series<C>,
-    private var children: MutableList<RadixTreeNode<C, K>>
-) : RadixTreeNode<C, K> {
-    override fun plus(key1: Series<C>): RadixTreeNode<C, K> {
-        if (this.key.compareTo(key1) == 0) return this.apply {
-            if (!children.first().key.isEmpty()) children.add(0, RadixTreeLeaf(emptySeries<C>() as K))
-        }
-
-        val cp = key.commonPrefixWith(key1)
-        val newBranchKey: Series<C> = (this.key.take(cp.size).takeUnless { it.isEmpty() } ?: emptySeries())
-        val oldKey: Series<C> = (this.key.drop(cp.size).takeUnless { it.isEmpty() } ?: emptySeries())
-        val newKey: Series<C> = (key1.drop(cp.size).takeUnless { it.isEmpty() } ?: emptySeries())
-
-        (children.toSeries() α { it.key.cpb }).binarySearch(newKey.cpb).let { index ->
-            if (index >= 0) {
-                val radixTreeNode: RadixTreeNode<C, K> = children[index]
-                if (radixTreeNode is RadixTreeBranch<C, K>) {
-                    // Recursively add the key to the child branch
-                    children[index] = radixTreeNode.plus(newKey as K)
-                } else {
-                    // Create a new branch with the leaf and the new key
-                    val join = radixTreeNode.plus(newKey)
-                    children[index] = join
-                }
+            // If there is no remaining part, it means that the other key is equal to the current node's key,
+            // so we just need to mark the current node as a terminal node
+            if (remainingKey.isEmpty()) {
+                term = true
                 return this
             }
+
+            // If the current node has children, we try to find a child with a matching prefix for the remaining key
+            if (children != null) {
+                for (child in children!!) {
+                    if (child.key.first() == remainingKey.first()) {
+                        return child + remainingKey
+                    }
+                }
+            } else {
+                children = mutableListOf()
+            }
+
+            // If there is no matching child, we create a new child node with the remaining key and add it to the children
+            val newNode = RadixTreeNode(remainingKey, true)
+            children!!.add(newNode)
+            return newNode
         }
 
-        val newLeaf = RadixTreeLeaf(newKey)
-        val oldBranch = RadixTreeBranch(oldKey, this.children)
-        return RadixTreeBranch(
-            newBranchKey,
-            mutableListOf(newLeaf, oldBranch).apply { sortBy { it.key.cpb } }
-                .toMutableList() as MutableList<RadixTreeNode<C, K>>
-        )
+        // If the common prefix length is less than the current node's key length,
+        // it means that we need to split the current node into a new internal node and two child nodes
+        if (commonPrefixLength < key.size) {
+            val commonPrefix = key.take(commonPrefixLength)
+            val remainingCurrentKey = key.drop(commonPrefixLength)
+            val remainingOtherKey = other.drop(commonPrefixLength)
+
+            // Create the new internal node with the common prefix
+            val newInternalNode = RadixTreeNode(commonPrefix)
+
+            // Create a new child node for the remaining part of the current node's key
+            val newChildNode = RadixTreeNode(remainingCurrentKey, term, children)
+
+            // Create a new child node for the remaining part of the other key
+            val newOtherNode = RadixTreeNode(remainingOtherKey, true)
+
+            // Set the new internal node's children
+            newInternalNode.children = mutableListOf(newChildNode, newOtherNode)
+
+            return newInternalNode
+        }
+
+        // If the common prefix length is 0, it means that there is no common prefix, so we cannot insert the other key
+        throw IllegalArgumentException("Cannot insert a key with no common prefix.")
     }
+
 }
-
-
-@JvmInline
-value class RadixTreeLeaf<C : Comparable<C>, K : Series<C>>(override val key: K) : RadixTreeNode<C, K> {
-    override operator fun plus(key: Series<C>): RadixTreeNode<C, K> {
-        val kcpb: CSeries<C> = key.cpb
-        val other: CSeries<C> = key.cpb
-        if (0 == kcpb.compareTo(other)) return this
-        val commonPrefix = key.commonPrefixWith(key)
-        val commonPrefixLength = commonPrefix.size
-        val s1 = (_a[key.drop(commonPrefixLength).cpb, key.drop(commonPrefixLength).cpb].apply { sort() } α {
-            RadixTreeLeaf(it)
-        }).toList().toMutableList()
-        return RadixTreeBranch(commonPrefix, s1 as MutableList<RadixTreeNode<C, K>>)
-    }
-}
-
