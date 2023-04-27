@@ -4,14 +4,34 @@ import borg.trikeshed.lib.*
 import kotlin.test.Test
 
 class RadixTreeTest {
+    val banana = "banana".toSeries()
+    val banner = "banner".toSeries()
+    val ban = "ban".toSeries()
+    val banshee = "banshee".toSeries()
+
+    @Test
+    fun testKeys() {
+        val tree = RadixTree<Char>()
+        tree + banshee
+        tree + ban
+        tree + banana
+        tree + banner
+        tree + "b1bomber".toSeries()
+        debug { }
+        val keys = tree.keys()
+        assert(keys.size == 5)
+        debug {
+            for (key in keys) {
+                println(key.asString())
+            }
+
+        }
+    }
 
     @Test
     fun insertAndVerifyNodes() {
         // Insert the values "banana", "banner", "ban", "banshee" into the PrefixTree
-        val banana = "banana".toSeries()
-        val banner = "banner".toSeries()
-        val ban = "ban".toSeries()
-        val banshee = "banshee".toSeries()
+
         val tree = RadixTree<Char>()
         tree + banana
         tree + banner
@@ -35,7 +55,6 @@ class RadixTreeTest {
                 assert(children[2].children == null)
             }
         }
-
-        println(tree.keys())
     }
+
 }

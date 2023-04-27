@@ -11,9 +11,8 @@ class RadixTree<C : Comparable<C>>(var root: RadixTreeNode<C>? = null) {
         return root!!
     }
 
-    // Inside the RadixTree class
-    fun keys(lowerBound: Series<C>? = null, upperBound: Series<C>? = null): List<Series<C>> =
-        root?.allKeysFromNode(emptySeries(), lowerBound, upperBound) ?: emptyList()
+    fun keys() = root?.keys() ?: emptyList()
+
 }
 
 /**
@@ -90,21 +89,17 @@ class RadixTreeNode<C : Comparable<C>>(
         throw IllegalArgumentException("Cannot insert a key with no common prefix.")
     }
 
-    fun allKeysFromNode(prefix: Series<C>, lowerBound: Series<C>?, upperBound: Series<C>?): List<Series<C>> {
-        val currentPrefix = prefix + key
-        val keys = mutableListOf<Series<C>>()
+    fun keys(prefix: Series<C>? = null): List<Series<C>> {
+        val ret = mutableListOf<Series<C>>()
+        val newPrefix = prefix?.takeUnless { it.isEmpty() }?.plus(this.key) ?: this.key
 
-        if (term && (lowerBound == null || currentPrefix.cpb >= lowerBound.cpb) && (upperBound == null ||
-                    currentPrefix.cpb <= upperBound.cpb)
-        ) keys.add(currentPrefix)
-
-        children?.forEach { child ->
-            if ((lowerBound == null || child.key.cpb >= lowerBound.drop(prefix.size).cpb) &&
-                (upperBound == null || child.key.cpb <= upperBound.drop(prefix.size).cpb)
-            ) keys.addAll(child.allKeysFromNode(currentPrefix, lowerBound, upperBound))
+        if (term) {
+            ret.add(newPrefix)
         }
-
-        return keys
+        children?.let { children ->
+            for (child in children) ret.addAll(child.keys(newPrefix))
+        }
+        return ret
     }
 
 }
