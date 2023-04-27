@@ -38,20 +38,15 @@ class RadixTreeNode<C : Comparable<C>>(
             }
 
             // If the current node has children, we try to find a child with a matching prefix for the remaining key
-            if (children != null) {
-                for (child in children!!) {
-                    if (child.key.first() == remainingKey.first()) {
-                        return child + remainingKey
-                    }
-                }
-            } else {
-                children = mutableListOf()
-            }
+            if (children != null) for (child in children!!)
+                if (child.key.first() == remainingKey.first())
+                    return child + remainingKey
+                else children = mutableListOf()
 
             // If there is no matching child, we create a new child node with the remaining key and add it to the children
             val newNode = RadixTreeNode(remainingKey, true)
             children!!.add(newNode)
-            return newNode
+            return this
         }
 
         // If the common prefix length is less than the current node's key length,
