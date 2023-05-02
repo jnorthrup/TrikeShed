@@ -11,45 +11,35 @@ class AdaptiveArithmeticCodec {
     private fun cumulativeFrequency(state: Int): UInt =
         stateFrequencies.take(state).sumOf { it.toUInt() }
 
-    private fun stateForCumulativeFrequency(cumulativeFrequency: UInt): Int? {
-        for (i in stateFrequencies.indices) {
-            if (cumulativeFrequency < cumulativeFrequency(i + 1)) {
-                return i
-            }
-        }
-        return null
-    }
-
     fun encode(input: Iterable<UByte>): Sequence<ULong> = sequence {
-        var rangeStart: ULong = 0uL
-        var rangeSize: ULong = ULong.MAX_VALUE
+        var lower: ULong = 0uL
+        var upper: ULong = ULong.MAX_VALUE - 1uL
+
         for (state in input) {
-            val stateCumulative: UInt = cumulativeFrequency(state.toInt())
-            val rangeDelta: ULong = rangeSize / totalFrequency.toULong()
-            rangeStart += stateCumulative.toULong() * rangeDelta
-            rangeSize = stateFrequencies[state.toInt()].toULong() * rangeDelta
+            val rangeSize: ULong = (upper - lower + 1uL) / totalFrequency.toULong()
+            upper = lower + rangeSize * cumulativeFrequency(state.toInt() + 1) - 1uL
+            lower += rangeSize * cumulativeFrequency(state.toInt())
             updateFrequencies(state.toInt())
+            yield(lower)
         }
-        yield(rangeStart)
     }
 
     fun decode(input: Iterable<ULong>): Sequence<UByte> = sequence {
+        var lower: ULong = 0uL
+        var upper: ULong = ULong.MAX_VALUE - 1uL
+
         for (encodedValue in input) {
-            var rangeStart: ULong = 0uL
-            var rangeSize: ULong = ULong.MAX_VALUE
-            var state = 0
-            while (state < stateFrequencies.size) {
-                val stateCumulative: UInt = cumulativeFrequency(state)
-                val rangeDelta: ULong = rangeSize / totalFrequency.toULong()
-                val nextStateStart = rangeStart + stateCumulative.toULong() * rangeDelta
+            val rangeSize: ULong = (upper - lower + 1uL) / totalFrequency.toULong()
+
+            for (state in stateFrequencies.indices) {
+                val nextStateStart: ULong = lower + rangeSize * cumulativeFrequency(state + 1)
                 if (encodedValue < nextStateStart) {
                     yield(state.toUByte())
+                    upper = nextStateStart - 1uL
+                    lower = lower + rangeSize * cumulativeFrequency(state)
                     updateFrequencies(state)
                     break
                 }
-                rangeStart = nextStateStart
-                rangeSize = stateFrequencies[state].toULong() * rangeDelta
-                state++
             }
         }
     }
