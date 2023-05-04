@@ -1,58 +1,66 @@
 package borg.trikeshed.parse.json
+class ArithmeticCodec(val nStates: Int, private var frequencies: UIntArray = UIntArray(nStates) { 1u }) {
 
-class AdaptiveArithmeticCodec {
-    private val stateFrequencies: UIntArray = UIntArray(4) { 1u }
-    private val totalFrequency: UInt get() = stateFrequencies.sum()
+    fun updateFrequencies(state: Int) = frequencies[state]++
 
-    private fun updateFrequencies(state: Int) {
-        stateFrequencies[state]++
-    }
-
-    private fun cumulativeFrequency(state: Int): UInt =
-        stateFrequencies.take(state).sumOf { it.toUInt() }
-
-    fun encode(input: Iterable<UByte>): Sequence<ULong> = sequence {
-        var lower: ULong = 0uL
-        var upper: ULong = ULong.MAX_VALUE - 1uL
+    fun encode(input: Iterable<UInt>): Sequence<Double> = sequence {
+        var lower = 0.0
+        var upper = 1.0
 
         for (state in input) {
-            val rangeSize: ULong = (upper - lower + 1uL) / totalFrequency.toULong()
-            upper = lower + rangeSize * cumulativeFrequency(state.toInt() + 1) - 1uL
-            lower += rangeSize * cumulativeFrequency(state.toInt())
+            val totalFreq = frequencies.sum()
+            val cumulativeFreq = frequencies.sliceArray(0 until state.toInt()).sum()
+            val freq = frequencies[state.toInt()]
+
+            val range = upper - lower
+            upper = lower + range * (cumulativeFreq + freq).toDouble() / totalFreq.toDouble()
+            lower = lower + range * cumulativeFreq.toDouble() / totalFreq.toDouble()
+
             updateFrequencies(state.toInt())
         }
         yield(lower)
     }
 
-    fun decode(input: Iterable<ULong>, length: Int): Sequence<UByte> = sequence {
-        val encodedValue = input.first()
-        var lower: ULong = 0uL
-        var upper: ULong = ULong.MAX_VALUE - 1uL
+    fun decode(encoded: Double, length: Int): Sequence<UInt> = sequence {
+        var value = encoded
 
-        for (i in 0 until length) {
-            val rangeSize: ULong = (upper - lower + 1uL) / totalFrequency.toULong()
+        repeat(length) {
+            val state = findState(value)
+            yield(state)
+            updateFrequencies(state.toInt())
 
-            for (state in stateFrequencies.indices) {
-                val nextStateStart: ULong = lower + rangeSize * cumulativeFrequency(state + 1)
-                if (encodedValue < nextStateStart) {
-                    yield(state.toUByte())
-                    upper = nextStateStart - 1uL
-                    lower = lower + rangeSize * cumulativeFrequency(state)
-                    updateFrequencies(state)
-                    break
-                }
+            val totalFreq = frequencies.sum()
+            val cumulativeFreq = frequencies.sliceArray(0 until state.toInt()).sum()
+            val freq = frequencies[state.toInt()]
+
+            value = (value - cumulativeFreq.toDouble() / totalFreq.toDouble()) * totalFreq.toDouble() / freq.toDouble()
+        }
+    }
+
+    private fun findState(targetProb: Double): UInt {
+        var accum = 0.0
+        val totalFreq = frequencies.sum()
+        for ((i, freq) in frequencies.withIndex()) {
+            val prob = freq.toDouble() / totalFreq.toDouble()
+            accum += prob
+            if (accum > targetProb) {
+                return i.toUInt()
             }
         }
+        throw IllegalStateException("should never get here")
     }
 }
 
 fun main() {
-    val codec = AdaptiveArithmeticCodec()
-    val input: List<UByte> = listOf<UByte>(0u, 1u, 2u, 3u, 0u, 1u, 2u, 3u, 0u, 1u, 2u, 3u)
-    val encoded: List<ULong> = codec.encode(input).toList()
-    val decoded: List<UByte> = codec.decode(encoded, input.size).toList()
-    println("Input: $input")
-    println("Encoded: $encoded")
-    println("Decoded: $decoded")
-    println("Are input and decoded equal? ${input == decoded}")
+    val codec = ArithmeticCodec(4)
+    val input = listOf(0u, 1u, 2u, 3u, 0u, 1u, 2u, 3u, 0u, 1u, 2u, 3u, 0u, 1u, 2u, 3u)
+    val encoded = codec.encode(input).first()
+    val decoded = codec.decode(encoded, input.size)
+
+    println(input)
+    println(encoded)
+    println(decoded.toList())
+
+    //compare both
+    println("matching? ${input.toList() == decoded.toList()} ")
 }
