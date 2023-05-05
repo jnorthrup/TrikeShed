@@ -1,4 +1,4 @@
-copilot healper to get on the page quickly
+below is the project's kernel fp concepts we use in our kotlin-common projects.
 
 ```kotlin 
 interface Join<A, B> {
@@ -35,3 +35,5 @@ object _l { operator fun <T> get(vararg t: T): List<T> = listOf(*t) }
 
 [...] dozens of monadic and fp mix -ins and specializations
 ```
+
+---

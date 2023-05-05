@@ -23,21 +23,22 @@ class ArithmeticCodec(val nStates: Int, private var frequencies: UIntArray = UIn
 
     fun decode(encoded: Double, length: Int): Sequence<UInt> = sequence {
         var value = encoded
+        val decodeFrequencies = frequencies.copyOf()
 
         repeat(length) {
-            val state = findState(value)
+            val state = findState(value, decodeFrequencies)
             yield(state)
-            updateFrequencies(state.toInt())
+            updateFrequencies(state.toInt(), decodeFrequencies)
 
-            val totalFreq = frequencies.sum()
-            val cumulativeFreq = frequencies.sliceArray(0 until state.toInt()).sum()
-            val freq = frequencies[state.toInt()]
+            val totalFreq = decodeFrequencies.sum()
+            val cumulativeFreq = decodeFrequencies.sliceArray(0 until state.toInt()).sum()
+            val freq = decodeFrequencies[state.toInt()]
 
             value = (value - cumulativeFreq.toDouble() / totalFreq.toDouble()) * totalFreq.toDouble() / freq.toDouble()
         }
     }
 
-    private fun findState(targetProb: Double): UInt {
+    private fun findState(targetProb: Double, frequencies: UIntArray): UInt {
         var accum = 0.0
         val totalFreq = frequencies.sum()
         for ((i, freq) in frequencies.withIndex()) {
@@ -49,11 +50,52 @@ class ArithmeticCodec(val nStates: Int, private var frequencies: UIntArray = UIn
         }
         throw IllegalStateException("should never get here")
     }
+
+    private fun updateFrequencies(state: Int, frequencies: UIntArray) = frequencies[state]++
 }
 
 fun main() {
     val codec = ArithmeticCodec(4)
-    val input = listOf(0u, 1u, 2u, 3u, 0u, 1u, 2u, 3u, 0u, 1u, 2u, 3u, 0u, 1u, 2u, 3u)
+    val input = listOf(
+        0u,
+        1u,
+        2u,
+        3u,
+        0u,
+        1u,
+        2u,
+        3u,
+        0u,
+        2u,
+        3u,
+        0u,
+        1u,
+        2u,
+        3u,
+        0u,
+        1u,
+        2u,
+        3u,
+        0u,
+        2u,
+        3u,
+        0u,
+        1u,
+        2u,
+        3u,
+        0u,
+        1u,
+        2u,
+        3u,
+        0u,
+        1u,
+        2u,
+        3u,
+        0u,
+        1u,
+        2u,
+        3u
+    )
     val encoded = codec.encode(input).first()
     val decoded = codec.decode(encoded, input.size)
 
@@ -64,3 +106,5 @@ fun main() {
     //compare both
     println("matching? ${input.toList() == decoded.toList()} ")
 }
+
+
