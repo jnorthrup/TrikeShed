@@ -42,7 +42,7 @@ class RadixTreeNode<C : Comparable<C>>(
             // If the current node has children, we try to find a child with a matching prefix for the remaining key
             //using binarysearch to retain sorted order
             children?.let { children ->
-                var index = (children.toSeries() α { it.key.cpb }).binarySearch(remainingKey.take(1).cpb)
+                var index = (children.toSeries() α { it.key.first() }).binarySearch(remainingKey.first())
                 when {
                     index >= 0 -> return children[index] + remainingKey
                     else -> {
