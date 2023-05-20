@@ -3,4 +3,6 @@ gradle
 .gradle
 build
 docs/
-tmp/liburing/
+tmp/
+.vscode/
+
