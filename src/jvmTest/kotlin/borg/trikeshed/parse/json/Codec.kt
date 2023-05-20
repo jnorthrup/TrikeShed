@@ -48,15 +48,24 @@ class CounterCodec : Codec<Char, Int>() {
 
     override fun encode(input: Iterable<Char>): Sequence<Int> = sequence {
         for (c in input) {
+            val cumulativeFrequency = frequencyModel.getCumulativeFrequency(c)
+            val range = IntRange(
+                (cumulativeFrequency * 0xFFFF).toInt(),
+                (cumulativeFrequency * 0xFFFF).toInt() + frequencyModel.getFrequency(c)
+            )
             frequencyModel.updateFrequency(c)
-            yield(c.code)
+            yield(range.first)
         }
         yield(flushSymbol.code)
     }
 
     override fun decode(output: Iterable<Int>): Sequence<Char> = sequence {
         for (c in output) {
-            val char = c.toChar()
+            val char = frequencyModel.frequencyTable.entries.firstOrNull {
+                val lowerBound = (frequencyModel.getCumulativeFrequency(it.key) * 0xFFFF).toInt()
+                val upperBound = lowerBound + it.value
+                c in lowerBound until upperBound
+            }?.key ?: flushSymbol
             if (char == flushSymbol) {
                 continue
             }
@@ -69,7 +78,6 @@ class CounterCodec : Codec<Char, Int>() {
         return frequencyModel.getFrequency(c)
     }
 }
-
 
 fun main() {
     val iCodec = CounterCodec()
