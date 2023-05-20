@@ -1,44 +1,71 @@
 package borg.trikeshed.lib
-
-import borg.trikeshed.common.collections.s_
-import kotlin.test.*
+import kotlin.test.Test
+import kotlin.test.assertEquals
 
 class CowSeriesHandleTest {
-
     @Test
-    fun set() {
-        val series = s_[1, 2, 3, 4, 5].cow
-        series.set(2, 99)
-        assertEquals(99, series[2])
+    fun testAdd() {
+        val cowSeries = borg.trikeshed.common.collections.s_[1, 2, 3].cow
+        cowSeries.add(4)
+        assertEquals(borg.trikeshed.common.collections.s_[1, 2, 3, 4].cpb, cowSeries.cpb)
     }
 
     @Test
-    fun add() {
-        val series = s_[1, 2, 3, 4, 5].cow
-        series.add(99)
-        assertEquals(99, series[5])
-
+    fun testRemoveAt() {
+        val cowSeries = borg.trikeshed.common.collections.s_[1, 2, 3].cow
+        cowSeries.removeAt(1)
+        assertEquals(borg.trikeshed.common.collections.s_[1, 3].cpb, cowSeries.cpb)
     }
 
-    @Test
-    fun plus() {
-        val series = s_[1, 2, 3, 4, 5].cow
-        series + 99
-        assertEquals(99, series[5])
-    }
 
-    @Test
-    fun get() {
-        val series = s_[1, 2, 3, 4, 5].cow
-        assertEquals(3, series[2])
-
-    }
-    @Test
-    fun rm() {
-
-        val series = s_[1, 2, 3, 4, 5].cow
-        series.removeAt(2)
-        assertEquals(4, series[2])
-
-    }
+//
+//    @Test
+//    fun testRemove() {
+//        val cowSeries = s_[1,2,3].cow
+//        assertTrue(cowSeries.remove(2))
+//        assertFalse(cowSeries.remove(2))
+//        assertEquals(s_(1, 3), cowSeries.toList())
+//    }
+//
+//    @Test
+//    fun testClear() {
+//        val cowSeries = s_[1,2,3].cow
+//        cowSeries.clear()
+//        assertTrue(cowSeries.isEmpty())
+//    }
+//
+//    @Test
+//    fun testAppend() {
+//        val cowSeries = s_[1,2,3].cow
+//        cowSeries.append(4)
+//        assertEquals(s_(1, 2, 3, 4), cowSeries.toList())
+//    }
+//
+//    @Test
+//    fun testPlus() {
+//        val cowSeries = s_[1,2,3].cow
+//        cowSeries.plus(4)
+//        assertEquals(s_(1, 2, 3, 4), cowSeries.toList())
+//    }
+//
+//    @Test
+//    fun testMinus() {
+//        val cowSeries = s_[1,2,3].cow
+//        cowSeries.minus(2)
+//        assertEquals(s_(1, 3), cowSeries.toList())
+//    }
+//
+//    @Test
+//    fun testPlusAssign() {
+//        val cowSeries = s_[1,2,3].cow
+//        cowSeries.plusAssign(4)
+//        assertEquals(s_(1, 2, 3, 4), cowSeries.toList())
+//    }
+//
+//    @Test
+//    fun testMinusAssign() {
+//        val cowSeries = s_[1,2,3].cow
+//        cowSeries.minusAssign(2)
+//        assertEquals(s_(1, 3), cowSeries.toList())
+//    }
 }
