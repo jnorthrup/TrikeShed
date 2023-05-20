@@ -85,18 +85,14 @@ class RadixTreeNode<C : Comparable<C>>(
                 ) else arrayOf(newOtherNode, newChildNode)
             return newInternalNode
         }
-
-        // If the common prefix length is 0, it means that there is no common prefix, so we cannot insert the other key
-        throw IllegalArgumentException("Cannot insert a key with no common prefix.")
+        TODO("commonPrefixLength > key.size")
     }
 
     fun keys(prefix: Series<C>? = null): List<Series<C>> {
         val ret = mutableListOf<Series<C>>()
         val newPrefix = prefix?.takeUnless { it.isEmpty() }?.plus(this.key) ?: this.key
 
-        if (term) {
-            ret.add(newPrefix)
-        }
+        if (term) ret.add(newPrefix)
         children?.let { children ->
             for (child in children) ret.addAll(child.keys(newPrefix))
         }
