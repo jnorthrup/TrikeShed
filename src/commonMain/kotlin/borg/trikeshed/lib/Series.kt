@@ -630,3 +630,5 @@ val <T : Comparable<T>> Series<T>.cpb: CSeries<T>
 
 fun <T : Comparable<T>> Series<T>.commonPrefixWith(other: Series<T>): Series<T> =
     if (size == 0) this else this[0 until shortestLength(other)]
+
+fun <T> Series<T>.firstOrNull(): T? = takeUnless { it.isEmpty() }?.first()
