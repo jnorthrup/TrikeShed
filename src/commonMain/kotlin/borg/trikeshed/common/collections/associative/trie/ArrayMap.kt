@@ -14,7 +14,7 @@ class ArrayMap<K : Comparable<K>, V>(
                 o2
             )
         }.then { e1, e2 ->
-            ("${e1.key.toString()}".compareTo("${e2.key.toString()}"))
+            ("${e1.key}".compareTo("${e2.key}"))
         }
 ) : Map<K, V> {
     override val entries: Set<Map_Entry<K, V>>
@@ -32,9 +32,9 @@ class ArrayMap<K : Comparable<K>, V>(
     override fun containsValue(value: V): Boolean = entre.any { (_, v) -> (v?.equals(value) ?: false) }
     private fun binIndexOf(key1: K) = entre.binarySearch(comparatorKeyShim(key1), valComparator)
 
-    override fun get(key1: K): V? = binIndexOf(key1).takeIf { it >= 0 }?.let { ix -> entre[ix].value }
+    override fun get(key: K): V? = binIndexOf(key).takeIf { it >= 0 }?.let { ix -> entre[ix].value }
 
-    fun comparatorKeyShim(key1: K): Map_Entry<K, V> = ShimEntry(key1)
+    fun comparatorKeyShim(key: K): Map_Entry<K, V> = ShimEntry(key)
 
     override fun isEmpty(): Boolean = run(entre::isEmpty)
 
@@ -48,14 +48,7 @@ class ArrayMap<K : Comparable<K>, V>(
             map: Map<K, V>,
             cmp: Comparator<K> = naturalOrder(),
             valComparator: Comparator<Map_Entry<K, V>> =
-                Comparator<Map_Entry<K, V>> { (o1: K), (o2: K) ->
-                    cmp.compare(
-                        o1,
-                        o2
-                    )
-                }.then { e1, e2 ->
-                    ("${e1.key.toString()}".compareTo("${e2.key.toString()}"))
-                }
+                compareBy { it.key },
         ): ArrayMap<K, V> {
             val entre = map.entries.toTypedArray()
             entre.sortWith(valComparator)
