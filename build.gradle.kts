@@ -1,111 +1,51 @@
-//which stanza do we add a linux64 cinteropdef for liburing below? (the linux64 stanza is the only one that has a cinterop block)
-
 plugins {
-    kotlin("multiplatform") version "2.0.20"
-////    id("org.jetbrains.intellij") version "3.1" apply true
-//
-//    id("org.jetbrains.dokka") version "1.7.0" apply false
-//    id("org.jlleitschuh.gradle.ktlint") version "11.0.0" apply false
-//
-//    // support kotlinx-datetime
-//    id("org.jetbrains.kotlin.plugin.serialization") version "1.8.10" apply false
-//
-//    // support for k2 compiler plugin
-//    id("org.jetbrains.kotlin.kapt") version "1.8.10" apply false
-//    id("org.jetbrains.kotlin.plugin.allopen") version "1.8.10" apply false
-//    id("org.jetbrains.kotlin.plugin.noarg") version "1.8.10" apply false
-//
-//    // gradle versions update plugin
-//    id("com.github.ben-manes.versions") version "0.42.0" apply false
-////    id("atomicfu-gradle-plugin") version "0.18.5"
-    `maven-publish`
-}
-
-group = "org.bereft"
-version = "1.0"
-
-repositories {
-    maven("https://oss.sonatype.org/content/repositories/snapshots/")
-    mavenCentral()
-    mavenLocal()
-    gradlePluginPortal()
-    google()
-    maven("https://www.jitpack.io")
-}
-publishing {
-    repositories {
-        maven {
-            url = uri("file://${System.getProperty("user.home")}/.m2/repository")
-        }
-    }
+    kotlin("multiplatform") version "1.9.0"
 }
 
 kotlin {
-    jvmToolchain(24)
-    jvm { withJava() }
-
-
-    val hostOs = System.getProperty("os.name")
-    val isMingwX64 = hostOs.startsWith("Windows")
-    val nativeTarget = when {
-        hostOs == "Mac OS X" ->
-            if (System.getProperty("os.arch") == "aarch64") macosArm64("native")
-            else macosX64("native")
-        hostOs == "Linux" -> linuxX64("native")
-        isMingwX64 -> mingwX64("native")
-        else -> throw GradleException("Host OS is not supported in Kotlin/Native.")
+    // JVM target
+    jvm(  ) {
+        withJava()
     }
 
+    // JS target for WebAssembly/JavaScript
+    js(IR) {
+        browser()
+        nodejs()
+    }
+
+    // Native POSIX targets
+    macosX64("macos")
+    linuxX64("linux")
 
     sourceSets {
-        val commonMain by getting {
-            dependencies {
+        // Common code for all platforms (shared logic)
+        val commonMain by getting
+        val commonTest by getting
 
-            api("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.4")
-                api("org.jetbrains.kotlinx:kotlinx-datetime:0.4.0")
-                api("org.jetbrains.kotlin:kotlin-reflect:1.8.0")
-            }
+        // POSIX-compliant code (shared between macOS and Linux)
+        val posixMain by creating {
+            dependsOn(commonMain)
         }
 
-        val commonTest by getting {
-            dependencies {
-                implementation(kotlin("test-common"))
-                implementation(kotlin("test-annotations-common"))
-            }
+        // macOS-specific code
+        val macosMain by getting {
+            dependsOn(posixMain)
         }
 
-        val nativeMain by getting {
-
+        // Linux-specific code (liburing, etc.)
+        val linuxMain by getting {
+            dependsOn(posixMain)
         }
 
-        val nativeTest by getting {
-
-        }
-
+        // JVM-specific code
         val jvmMain by getting {
-            dependencies {
-                //datetime
-                api("org.jetbrains.kotlinx:kotlinx-datetime-jvm:0.4.0")
-                //coroutines
-                api("org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:1.6.4")
-                //serialization
-                api("org.jetbrains.kotlinx:kotlinx-serialization-json-jvm:1.3.0")
-
-            }
+            dependsOn(commonMain)
         }
 
-        val jvmTest by getting {
-            //bring in the dependencies from jvmMain
-            dependencies {
-                implementation(kotlin("test"))
-                implementation(kotlin("test-junit"))
-            }
-        }
-    }
-    tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinTest> {
-        testLogging {
-            events("passed", "skipped", "failed")
-            exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
+        // JS-specific code
+        val jsMain by getting {
+            dependsOn(commonMain)
         }
     }
 }
