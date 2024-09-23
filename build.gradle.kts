@@ -1,7 +1,7 @@
 //which stanza do we add a linux64 cinteropdef for liburing below? (the linux64 stanza is the only one that has a cinterop block)
 
 plugins {
-    kotlin("multiplatform") version "1.8.10"
+    kotlin("multiplatform") version "2.0.20"
 ////    id("org.jetbrains.intellij") version "3.1" apply true
 //
 //    id("org.jetbrains.dokka") version "1.7.0" apply false
@@ -41,18 +41,16 @@ publishing {
 }
 
 kotlin {
-    jvmToolchain(18)
-
-    jvm {
-
-        withJava()
-    }
+    jvmToolchain(24)
+    jvm { withJava() }
 
 
     val hostOs = System.getProperty("os.name")
     val isMingwX64 = hostOs.startsWith("Windows")
     val nativeTarget = when {
-        hostOs == "Mac OS X" -> macosX64("native")
+        hostOs == "Mac OS X" ->
+            if (System.getProperty("os.arch") == "aarch64") macosArm64("native")
+            else macosX64("native")
         hostOs == "Linux" -> linuxX64("native")
         isMingwX64 -> mingwX64("native")
         else -> throw GradleException("Host OS is not supported in Kotlin/Native.")
