@@ -33,11 +33,8 @@ kotlin {
         languageVersion.set(org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_0)
          freeCompilerArgs = listOf(
                     "-opt-in=kotlin.RequiresOptIn", // Add more opt-in annotations as needed
-//                    "-Xjsr305=strict", // Strict null-safety interop with Java code
                     "-Xsuppress-version-warnings", // Suppress version warnings
-//                    "-Xuse-ir", // Enable the Kotlin IR backend
                     "-Xexpect-actual-classes", // Enable expect/actual classes
-//                    "-Xenable-jvm-annotations", // Enable JVM annotations
                 )
     }
 
@@ -51,14 +48,19 @@ kotlin {
 
     val hostOs = System.getProperty("os.name")
     val isMingwX64 = hostOs.startsWith("Windows")
-    val nativeTarget by lazy {
+    val nativeTarget=
         when {
-            hostOs == "Mac OS X" -> macosX64("native")
-            hostOs == "Linux" -> linuxX64("native")
+            hostOs == "Mac OS X" -> if ( //aarch
+                System.getProperty("os.arch") == "aarch64"
+            ) {
+                macosX64("native")
+            } else {
+                macosArm64("native")
+            }
+            hostOs == "Linux" -> linuxX64("native") // io_uring lives in linux sourceset only
             isMingwX64 -> mingwX64("native")
             else -> throw GradleException("Host OS is not supported in Kotlin/Native.")
         }
-    }
 
     sourceSets {
         val commonMain by getting {
