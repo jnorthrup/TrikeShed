@@ -4,7 +4,7 @@ import borg.trikeshed.isam.meta.PlatformCodec.Companion.currentPlatformCodec.rea
 import borg.trikeshed.lib.CZero.nz
 import borg.trikeshed.lib.CZero.z
 import borg.trikeshed.lib.Series
-import borg.trikeshed.lib.emptySerie
+import borg.trikeshed.lib.emptySeries
 import borg.trikeshed.lib.forEach
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.getOrNull
