@@ -6,3 +6,7 @@ docs/
 tmp/
 .vscode/
 
+.kotlin
+.idea
+.gradle
+gradle

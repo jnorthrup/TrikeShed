@@ -1,23 +1,10 @@
+import org.gradle.kotlin.dsl.support.kotlinCompilerOptions
+import org.jetbrains.kotlin.ir.backend.js.compileIr
+
 //which stanza do we add a linux64 cinteropdef for liburing below? (the linux64 stanza is the only one that has a cinterop block)
 
 plugins {
-    kotlin("multiplatform") version "1.8.10"
-////    id("org.jetbrains.intellij") version "3.1" apply true
-//
-//    id("org.jetbrains.dokka") version "1.7.0" apply false
-//    id("org.jlleitschuh.gradle.ktlint") version "11.0.0" apply false
-//
-//    // support kotlinx-datetime
-//    id("org.jetbrains.kotlin.plugin.serialization") version "1.8.10" apply false
-//
-//    // support for k2 compiler plugin
-//    id("org.jetbrains.kotlin.kapt") version "1.8.10" apply false
-//    id("org.jetbrains.kotlin.plugin.allopen") version "1.8.10" apply false
-//    id("org.jetbrains.kotlin.plugin.noarg") version "1.8.10" apply false
-//
-//    // gradle versions update plugin
-//    id("com.github.ben-manes.versions") version "0.42.0" apply false
-////    id("atomicfu-gradle-plugin") version "0.18.5"
+    kotlin("multiplatform") version "2.0.20" // Latest version of Kotlin Multiplatform as of now
     `maven-publish`
 }
 
@@ -41,7 +28,20 @@ publishing {
 }
 
 kotlin {
-    jvmToolchain(18)
+    compilerOptions {
+        apiVersion.set(org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_0)
+        languageVersion.set(org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_0)
+         freeCompilerArgs = listOf(
+                    "-opt-in=kotlin.RequiresOptIn", // Add more opt-in annotations as needed
+//                    "-Xjsr305=strict", // Strict null-safety interop with Java code
+                    "-Xsuppress-version-warnings", // Suppress version warnings
+//                    "-Xuse-ir", // Enable the Kotlin IR backend
+                    "-Xexpect-actual-classes", // Enable expect/actual classes
+//                    "-Xenable-jvm-annotations", // Enable JVM annotations
+                )
+    }
+
+    jvmToolchain(11)
 
     jvm {
 
@@ -51,19 +51,20 @@ kotlin {
 
     val hostOs = System.getProperty("os.name")
     val isMingwX64 = hostOs.startsWith("Windows")
-    val nativeTarget = when {
-        hostOs == "Mac OS X" -> macosX64("native")
-        hostOs == "Linux" -> linuxX64("native")
-        isMingwX64 -> mingwX64("native")
-        else -> throw GradleException("Host OS is not supported in Kotlin/Native.")
+    val nativeTarget by lazy {
+        when {
+            hostOs == "Mac OS X" -> macosX64("native")
+            hostOs == "Linux" -> linuxX64("native")
+            isMingwX64 -> mingwX64("native")
+            else -> throw GradleException("Host OS is not supported in Kotlin/Native.")
+        }
     }
-
 
     sourceSets {
         val commonMain by getting {
             dependencies {
 
-            api("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.4")
+                api("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.4")
                 api("org.jetbrains.kotlinx:kotlinx-datetime:0.4.0")
                 api("org.jetbrains.kotlin:kotlin-reflect:1.8.0")
             }
@@ -77,11 +78,11 @@ kotlin {
         }
 
         val nativeMain by getting {
-
+            dependsOn(commonMain)
         }
 
         val nativeTest by getting {
-
+            dependsOn(commonTest)
         }
 
         val jvmMain by getting {

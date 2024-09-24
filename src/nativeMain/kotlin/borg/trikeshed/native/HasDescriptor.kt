@@ -1,7 +1,7 @@
 package borg.trikeshed.native
 
 import platform.posix.SEEK_SET
-import platform.posix.__off_t
+import platform.posix. off_t as __off_t
 import platform.posix.stat
 import simple.PosixStatMode.*
 

@@ -22,7 +22,7 @@ actual fun rm(path: String): Boolean {
 
 actual fun  mkdir(path: String): Boolean {
     //kotlin native posix make directory hierarchy
-    val res = platform.posix.mkdir(path, 777.fromOctal().toUInt())
+    val res = platform.posix.mkdir(path, 777.fromOctal().toUShort())
     return res == 0
 }
 

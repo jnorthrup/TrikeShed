@@ -4,9 +4,17 @@ import borg.trikeshed.lib.CZero.z
 import borg.trikeshed.native.HasDescriptor
 import borg.trikeshed.native.HasPosixErr
 import kotlinx.cinterop.*
+import platform.posix.MAP_SHARED
+import platform.posix.PROT_READ
+import platform.posix.PROT_WRITE
+import platform.posix._SC_PAGE_SIZE
+import platform.posix.sysconf
+import platform.posix.uint32_t as __u32
 
 //import linux_uring.fstatat
+import platform.posix.off_t as __off_t
 import platform.posix.*
+
 
 /**
 opens file for syncronous read  /write
@@ -133,7 +141,7 @@ class PosixFile(
         len: ULong,
         prot: Int = PROT_READ or PROT_WRITE,
         flags: Int = MAP_SHARED or MAP_ANONYMOUS,
-        offset: off_t = 0L,
+        offset: __off_t = 0L,
     ): COpaquePointer = mmap_base(fd = -1, __len = len, __prot = prot, __flags = flags, __offset = offset)
 
     /** * mmap [manpage](https://www.man7.org/linux/man-pages/man2/mmap.2.html) */
@@ -392,7 +400,7 @@ class PosixFile(
 
         /** offset must be a multiple
         of the page size as returned by sysconf(_SC_PAGE_SIZE).*/
-        offset: off_t = 0L,
+        offset: __off_t = 0L,
     ): CPointer<CArrayPointerVar<ByteVar>> {
 
         require(offset % sysconf(_SC_PAGE_SIZE) == 0L) { "offset must be a multiple of the page size as returned by sysconf(_SC_PAGE_SIZE)." }
@@ -408,7 +416,7 @@ class PosixFile(
 
     /** * lseek [manpage](https://www.man7.org/linux/man-pages/man2/leek.2.html) */
     fun at(offset: __off_t, whence: Int) {
-        lseek(fd, offset /* = kotlin.Long */, __whence = whence)
+        lseek(fd, offset /* = kotlin.Long */,   whence)
     }
 
     companion object {
