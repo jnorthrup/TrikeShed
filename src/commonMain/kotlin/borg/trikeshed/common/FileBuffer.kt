@@ -44,6 +44,7 @@ expect class FileBuffer(
     fun size(): Long
     fun get(index: Long): Byte
     fun put(index: Long, value: Byte)
+
 }
 
 fun openFileBuffer(

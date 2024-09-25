@@ -1,4 +1,11 @@
+@file:Suppress("UNCHECKED_CAST")
+
 package borg.trikeshed.common.collections.associative
+
+import borg.trikeshed.common.collections._l
+import borg.trikeshed.common.collections.binarySearch
+import borg.trikeshed.common.collections.s_
+import borg.trikeshed.lib.*
 
 /**
  * A [Set] that further provides a *total ordering* on its elements.

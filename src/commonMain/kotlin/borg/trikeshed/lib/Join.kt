@@ -1,4 +1,4 @@
-@file:Suppress("NonAsciiCharacters", "FunctionName", "ObjectPropertyName")
+@file:Suppress("NonAsciiCharacters", "FunctionName", "ObjectPropertyName", "OVERRIDE_BY_INLINE", "UNCHECKED_CAST")
 
 package borg.trikeshed.lib
 

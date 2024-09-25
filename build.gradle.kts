@@ -31,8 +31,8 @@ publishing {
 kotlin {
     @OptIn(ExperimentalKotlinGradlePluginApi::class)
     compilerOptions {
-        apiVersion.set(org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_0)
-        languageVersion.set(org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_0)
+        apiVersion.set(org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_1)
+        languageVersion.set(org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_1)
          freeCompilerArgs = listOf(
                     "-opt-in=kotlin.RequiresOptIn", // Add more opt-in annotations as needed
                     "-Xsuppress-version-warnings", // Suppress version warnings
