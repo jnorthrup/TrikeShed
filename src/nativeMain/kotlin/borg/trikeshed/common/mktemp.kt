@@ -1,6 +1,9 @@
+@file:OptIn(ExperimentalForeignApi::class)
+
 package borg.trikeshed.common
 
 import borg.trikeshed.lib.fromOctal
+import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.cstr
 import kotlinx.cinterop.toKStringFromUtf8
 import platform.posix.mkdtemp

@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalForeignApi::class)
+
 package simple
 
 import borg.trikeshed.lib.CZero.z

@@ -2,7 +2,49 @@
 
 package borg.trikeshed.lib
 
-/** this is a set of helper extension functions to produce network-endian versions of getIntAt, setIntAt, getLongAt,
+import kotlin.math.abs
+
+object Float32ToInt32Converter {
+    fun convertFloat32ToInt32(f: Float): Int {
+        if (f == 0f) return 0
+        if (f.isNaN()) return 0
+        if (f.isInfinite()) return if (f > 0) Int.MAX_VALUE else Int.MIN_VALUE
+
+        val bits = f.toRawBits()
+        val sign = bits ushr 31
+        val exponent = (bits ushr 23) and 0xFF
+        val mantissa = bits and 0x7FFFFF
+
+        val adjustedExponent = exponent - 127
+        var result = 0x800000 or mantissa
+
+        when {
+            adjustedExponent > 7 -> return if (sign == 0) Int.MAX_VALUE else Int.MIN_VALUE
+            adjustedExponent >= -23 -> {
+                if (adjustedExponent >= 0) {
+                    result = result shl adjustedExponent
+                } else {
+                    result = result ushr -adjustedExponent
+                }
+            }
+            else -> return if (sign == 0) 0 else -1
+        }
+
+        return if (sign == 1) -result else result
+    }
+}
+
+fun main() {
+    val testValues = listOf(0f, -0f, 1f, -1f, 1.5f, -1.5f,
+        Float.MAX_VALUE, Float.MIN_VALUE,
+        Float.POSITIVE_INFINITY, Float.NEGATIVE_INFINITY,
+        Float.NaN)
+
+    for (value in testValues) {
+        val result = Float32ToInt32Converter.convertFloat32ToInt32(value)
+        println("Float: $value, Int: $result")
+    }
+}/** this is a set of helper extension functions to produce network-endian versions of getIntAt, setIntAt, getLongAt,
  *  setLongAt, etc. for ByteArray
  *
  * the kotlin native package marshalling is treated as if it was in Least-Significant-Byte first (little-endian) byte

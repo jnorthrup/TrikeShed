@@ -1,5 +1,8 @@
+@file:OptIn(ExperimentalForeignApi::class)
+
 package simple
 
+import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.convert
 import platform.posix.*
 import platform.posix.mode_t as __mode_t
@@ -66,6 +69,7 @@ enum class PosixStatMode(state_: Int, val state: UInt = state_.convert()) {
     S_ISSOCK(S_IFSOCK)
     ;
 
+    @OptIn(ExperimentalForeignApi::class)
     operator fun invoke(mode:
                         __mode_t ): Boolean = __S_ISTYPE((mode), this.state.convert())
 

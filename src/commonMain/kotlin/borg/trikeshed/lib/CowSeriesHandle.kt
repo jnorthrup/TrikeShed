@@ -1,10 +1,11 @@
 package borg.trikeshed.lib
 
+import borg.trikeshed.common.collections.s_
 import kotlin.properties.Delegates
 
 
 // inline factory value for CopyOnWriteSeries
-inline val <reified T> Series<T>.cow: CowSeriesHandle<T> get() = CowSeriesHandle(COWSeriesBody(this.toList()))
+inline val <reified T> Series<T>.cow: CowSeriesHandle<T> get() = CowSeriesHandle(COWSeriesBody(this))
 
 
 /**
@@ -47,7 +48,7 @@ class CowSeriesHandle<T>(
     }
 
     override fun remove(item: T): Boolean {
-        val i = letter.backing.indexOf(item)
+        val i = letter.backing.`▶`.indexOf(item)
         if (i != -1) {
             letter = letter.removeAt(i)
             return true
@@ -57,10 +58,6 @@ class CowSeriesHandle<T>(
 
     override fun clear() {
         letter = letter.clear()
-    }
-
-    override fun append(item: T) {
-        letter = letter.append(item)
     }
 
     override fun plus(item: T): MutableSeries<T> {
@@ -95,29 +92,28 @@ class CowSeriesHandle<T>(
  * object-identity is good enough for unordered version discriminator
  */
 class COWSeriesBody<T>(
-    val backing: List<T> = emptyList(),
+    val backing: Series<T> = EmptySeries as Series<T>,
     override val version: Long? = null,
-) : Series<T>, VersionedSeries {
-    override val a: Int by backing::size
-    override val b: (Int) -> T = backing::get
+) : Series<T> by backing, VersionedSeries<T> {
 
     /** create a new copy of this, with the given item inserted at the given index */
     fun set(index: Int, item: T): COWSeriesBody<T> {
         //use List(size){x} ctor here to avoid copying the backing list
-        return copy(List(a) { i -> if (i == index) item else backing[i] }, version?.inc())
+        return copy((a) j { i: Int -> if (i == index) item else backing[i] }, version?.inc())
     }
 
     /** create a new copy of this, with the given item appended */
-    fun append(item: T): COWSeriesBody<T> = copy(backing = backing + item)
+    fun append(item: T): COWSeriesBody<T> = copy(backing + s_[item])
 
     /** create a new copy of this, with the given item removed */
     fun remove(item: T): COWSeriesBody<T> {
 
-        return copy(backing.filterNot { item == it })
+        val i = backing.`▶`.indexOf(item)
+        return if (i != -1) removeAt(i) else this
 
     }
 
-    fun insert(index: Int, item: T): COWSeriesBody<T> = copy(backing = List(backing.size.inc()) {
+    fun insert(index: Int, item: T): COWSeriesBody<T> = copy(backing = (backing.size.inc()) j {
         when {
             it < index -> backing[it]
             it > index -> backing[it.dec()]
@@ -127,7 +123,7 @@ class COWSeriesBody<T>(
 
 
     /** create a new copy of this, with the given item removed at the given index */
-    fun removeAt(index: Int): COWSeriesBody<T> = copy(backing = List(backing.size.dec()) {
+    fun removeAt(index: Int): COWSeriesBody<T> = copy(backing = (backing.size.dec()) j {
         when {
             it < index -> backing[it]
             else -> backing[it.inc()]
@@ -135,11 +131,12 @@ class COWSeriesBody<T>(
     })
 
 
-    fun clear(): COWSeriesBody<T> = /*create a new slice of 0*/ copy(backing = backing.subList(0, 0))
-    operator fun get(range: IntRange): COWSeriesBody<T> = copy(backing = backing.slice(range))
+    fun clear(): COWSeriesBody<T> = /*create a new slice of 0*/ copy( EmptySeries as Series<T>)
+
+    operator fun get(range: IntRange): COWSeriesBody<T> = copy(backing = backing[range])
 
     /** create a new copy of this, with the given item inserted at the given index */
-    private fun copy(backing: List<T> = this.backing, version: Long? = this.version?.inc()) =
+    private fun copy(backing: Join<Int, (Int) -> T> = this.backing, version: Long? = this.version?.inc()): COWSeriesBody<T> =
         COWSeriesBody(backing, version)
 }
 
