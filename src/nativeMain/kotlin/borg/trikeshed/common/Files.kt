@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalForeignApi::class)
+
 package borg.trikeshed.common
 
 import borg.trikeshed.lib.Join

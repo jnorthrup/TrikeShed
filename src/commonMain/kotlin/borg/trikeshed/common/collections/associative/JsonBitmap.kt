@@ -1,9 +1,13 @@
-package borg.trikeshed.parse.json
+@file:OptIn(ExperimentalUnsignedTypes::class)
+
+package borg.trikeshed.common.collections.associative
 
 import borg.trikeshed.common.Files
+import borg.trikeshed.common.collections.associative.JsonBitmap.LexerEvents.EscapeIncrement
+import borg.trikeshed.common.collections.associative.JsonBitmap.LexerEvents.QuoteIncrement
+import borg.trikeshed.common.collections.associative.JsonBitmap.LexerEvents.UtfInitiatorOrContinuation
 import borg.trikeshed.lib.CZero.nz
 import borg.trikeshed.lib.CZero.z
-import kotlin.test.Test
 
 object JsonBitmap {
 
@@ -15,7 +19,7 @@ object JsonBitmap {
         ;
 
         companion object {
-            val cache: Array<JsStateEvent> = values().drop(1).toTypedArray().reversedArray()
+            val cache: Array<JsStateEvent> = entries.drop(1).toTypedArray().reversedArray()
 
             fun test(byte: UByte): Int {
                 return cache.firstOrNull { it.predicate(byte) }?.ordinal ?: Unchanged.ordinal
@@ -31,7 +35,7 @@ object JsonBitmap {
         ;
 
         companion object {
-            val cache: Array<LexerEvents> = values().drop(1).toTypedArray()
+            val cache: Array<LexerEvents> = entries.drop(1).toTypedArray()
             fun test(byte: UByte): Int {
                 return cache.firstOrNull { it.predicate(byte) }?.ordinal ?: Unchanged.ordinal
             }
@@ -105,12 +109,12 @@ object JsonBitmap {
                     if ((quoteCounter % 2).nz) {
                         when {
                             (escapeCounter % 2).nz -> escapeCounter = 0
-                            (maskBits and LexerEvents.EscapeIncrement.ordinal.toUInt()).nz -> escapeCounter = 1
-                            (maskBits and LexerEvents.UtfInitiatorOrContinuation.ordinal.toUInt()).nz -> {}//matters in super rare caase of initiator on top of quotes not yet impl
-                            (maskBits and LexerEvents.QuoteIncrement.ordinal.toUInt()).nz -> quoteCounter++
+                            (maskBits and EscapeIncrement.ordinal.toUInt()).nz -> escapeCounter = 1
+                            (maskBits and UtfInitiatorOrContinuation.ordinal.toUInt()).nz -> {}//matters in super rare caase of initiator on top of quotes not yet impl
+                            (maskBits and QuoteIncrement.ordinal.toUInt()).nz -> quoteCounter++
                         }
                     } else
-                        if ((maskBits and LexerEvents.QuoteIncrement.ordinal.toUInt()).nz) quoteCounter++
+                        if ((maskBits and QuoteIncrement.ordinal.toUInt()).nz) quoteCounter++
 
                     val jsStateBits = if ((quoteCounter % 2).nz) 0u else b.toUInt() and 0x3u
 //write the jsStateBits 2 bit result right-to-left in the input bits so we can reuse the input array
@@ -133,15 +137,3 @@ object JsonBitmap {
     }
 }
 
-
-class TestJsonBitmap {
-    @Test
-    fun testAbitOfEverythingJson() {
-        val lines =
-            Files.readAllLines("src/commonTest/resources/big.json").map { it.encodeToByteArray().toUByteArray() }
-
-        for (line in lines) {
-            val encode = JsonBitmap.encode(line)
-        }
-    }
-}

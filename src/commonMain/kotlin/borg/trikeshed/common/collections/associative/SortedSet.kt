@@ -2,11 +2,6 @@
 
 package borg.trikeshed.common.collections.associative
 
-import borg.trikeshed.common.collections._l
-import borg.trikeshed.common.collections.binarySearch
-import borg.trikeshed.common.collections.s_
-import borg.trikeshed.lib.*
-
 /**
  * A [Set] that further provides a *total ordering* on its elements.
  * The elements are ordered using their [natural][Comparable], or by a [Comparator] typically provided at sorted
@@ -97,7 +92,7 @@ import borg.trikeshed.lib.*
  *
  * @since 1.2
 </E> */
-interface SortedSet<E> : MutableSet<E> {
+interface SortedSet<E : Comparable<E>> : MutableSet<E> {
     /**
      * Returns the comparator used to order the elements in this set,
      * or `null` if this set uses the [ natural ordering][Comparable] of its elements.
@@ -106,7 +101,7 @@ interface SortedSet<E> : MutableSet<E> {
      * or `null` if this set uses the natural ordering
      * of its elements
      */
-    fun comparator(): Comparator<in E>?
+    fun comparator(): Comparator<E>
 
     /**
      * Returns a view of the portion of this set whose elements range
@@ -140,7 +135,7 @@ interface SortedSet<E> : MutableSet<E> {
      * has a restricted range, and `fromElement` or
      * `toElement` lies outside the bounds of the range
      */
-    fun subSet(fromElement: E, toElement: E): SortedSet<E>?
+    fun subSet(fromElement: E, toElement: E): SortedSet<E>
 
     /**
      * Returns a view of the portion of this set whose elements are
@@ -168,7 +163,7 @@ interface SortedSet<E> : MutableSet<E> {
      * restricted range, and `toElement` lies outside the
      * bounds of the range
      */
-    fun headSet(toElement: E): SortedSet<E>?
+    fun headSet(toElement: E): SortedSet<E>
 
     /**
      * Returns a view of the portion of this set whose elements are
@@ -196,7 +191,7 @@ interface SortedSet<E> : MutableSet<E> {
      * restricted range, and `fromElement` lies outside the
      * bounds of the range
      */
-    fun tailSet(fromElement: E): SortedSet<E>?
+    fun tailSet(fromElement: E): SortedSet<E>
 
     /**
      * Returns the first (lowest) element currently in this set.

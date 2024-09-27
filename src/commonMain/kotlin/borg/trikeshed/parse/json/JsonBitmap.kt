@@ -1,12 +1,9 @@
 package borg.trikeshed.parse.json
 
-import borg.trikeshed.common.Files
 import borg.trikeshed.lib.CZero.nz
 import borg.trikeshed.lib.CZero.z
-import kotlin.test.Test
 
 object JsonBitmap {
-
     enum class JsStateEvent(val predicate: (UByte) -> Boolean) {
         Unchanged({ false }),
         ScopeOpen({ it.toUInt() == 0x7bU || it.toUInt() == 0x5bU }),
@@ -15,11 +12,10 @@ object JsonBitmap {
         ;
 
         companion object {
-            val cache: Array<JsStateEvent> = values().drop(1).toTypedArray().reversedArray()
+            val cache: Array<JsStateEvent> = entries.drop(1).toTypedArray().reversedArray()
 
-            fun test(byte: UByte): Int {
-                return cache.firstOrNull { it.predicate(byte) }?.ordinal ?: Unchanged.ordinal
-            }
+            fun test(byte: UByte): Int =
+                cache.firstOrNull { it.predicate(byte) }?.ordinal ?: Unchanged.ordinal
         }
     }
 
@@ -31,7 +27,7 @@ object JsonBitmap {
         ;
 
         companion object {
-            val cache: Array<LexerEvents> = values().drop(1).toTypedArray()
+            val cache: Array<LexerEvents> = entries.drop(1).toTypedArray()
             fun test(byte: UByte): Int {
                 return cache.firstOrNull { it.predicate(byte) }?.ordinal ?: Unchanged.ordinal
             }
@@ -134,14 +130,3 @@ object JsonBitmap {
 }
 
 
-class TestJsonBitmap {
-    @Test
-    fun testAbitOfEverythingJson() {
-        val lines =
-            Files.readAllLines("src/commonTest/resources/big.json").map { it.encodeToByteArray().toUByteArray() }
-
-        for (line in lines) {
-            val encode = JsonBitmap.encode(line)
-        }
-    }
-}

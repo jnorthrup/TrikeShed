@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalForeignApi::class)
+
 package borg.trikeshed.isam
 
 import borg.trikeshed.common.Usable
@@ -19,6 +21,7 @@ actual class IsamDataFile actual constructor(
     metafileFilename: String,
     metafile: IsamMetaFileReader,
 ) : Usable, Cursor {
+
     actual val datafileFilename: String = datafileFilename
     actual val metafile: IsamMetaFileReader = metafile
 
@@ -76,13 +79,13 @@ actual class IsamDataFile actual constructor(
         }
     }
 
-    override val a: Int
+    actual override val a: Int
         get() {
             open().let {
                 return (fileSize / recordlen).toInt()
             }
         }
-    override val b:(Int)-> RowVec /*(Int) -> Join<Int, (Int) -> Join<Any?, () -> ColumnMeta>>*/ = { row ->
+    actual override val b:(Int)-> RowVec /*(Int) -> Join<Int, (Int) -> Join<Any?, () -> ColumnMeta>>*/ = { row ->
         memScoped {
             val d2 = data.toLong() + (row * recordlen)
 

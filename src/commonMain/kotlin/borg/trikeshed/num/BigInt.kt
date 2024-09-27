@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalUnsignedTypes::class)
+
 package borg.trikeshed.num
 
 import borg.trikeshed.isam.meta.PlatformCodec.Companion.currentPlatformCodec.readUInt

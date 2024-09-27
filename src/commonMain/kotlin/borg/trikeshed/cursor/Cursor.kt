@@ -95,7 +95,7 @@ fun Cursor.get(s: Series<ColumnExclusion>): Cursor {
 }
 
 //in columnar project this is meta.right
-val Series<out ColumnMeta>.names: Series<String> get() = this α ColumnMeta::name
+val Series< ColumnMeta>.names get() = this α ColumnMeta::name
 
 /** head default 5 rows
  * just like unix head - print default 5 lines from cursor contents to stdout */

@@ -25,12 +25,12 @@ actual class FileBuffer actual constructor(//filename: String, initialOffset: Lo
     var buffer: COpaquePointer? = null
     var file: PosixFile? = null
 
-    override val a: Long by lazy {
+    actual override val a: Long by lazy {
         open()
         if (blkSize == (-1L)) file!!.size else blkSize
     }
 
-    override val b: (Long) -> Byte
+    actual override val b: (Long) -> Byte
         get() = { index: Long ->
             (buffer!!.toLong() + index).toCPointer<ByteVar>()!!.pointed.value
         }

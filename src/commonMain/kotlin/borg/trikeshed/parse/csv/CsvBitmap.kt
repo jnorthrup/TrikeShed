@@ -5,7 +5,7 @@ import borg.trikeshed.lib.CZero.nz
 import borg.trikeshed.lib.CZero.z
 import borg.trikeshed.parse.json.JsonBitmap.LexerEvents.*
 import borg.trikeshed.parse.json.JsonBitmap.LexerEvents.Companion.test
-import kotlin.test.Test
+
 
 object CsvBitmap {
 
@@ -121,16 +121,16 @@ object CsvBitmap {
     }
 }
 
-
-class TestCsvBitmap {
-    @OptIn(ExperimentalUnsignedTypes::class)
-    @Test
-    fun testAbitOfEverythingCsv() {
-        val lines =
-            Files.readAllLines("src/commonTest/resources/hi.csv").map { it.encodeToByteArray().toUByteArray() }
-
-        for (line in lines) {
-            val encode = CsvBitmap.encode(line)
-        }
-    }
-}
+//
+//class TestCsvBitmap {
+//    @OptIn(ExperimentalUnsignedTypes::class)
+//    @Test
+//    fun testAbitOfEverythingCsv() {
+//        val lines =
+//            Files.readAllLines("src/commonTest/resources/hi.csv").map { it.encodeToByteArray().toUByteArray() }
+//
+//        for (line in lines) {
+//            val encode = CsvBitmap.encode(line)
+//        }
+//    }
+//}

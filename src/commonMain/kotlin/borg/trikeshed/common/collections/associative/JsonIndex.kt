@@ -1,4 +1,4 @@
-package borg.trikeshed.parse.json
+package borg.trikeshed.common.collections.associative
 
 class JsonIndex {
 

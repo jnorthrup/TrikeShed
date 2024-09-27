@@ -1,4 +1,6 @@
-@file:OptIn(ExperimentalUnsignedTypes::class, ExperimentalForeignApi::class, ExperimentalForeignApi::class)
+@file:OptIn(ExperimentalUnsignedTypes::class, ExperimentalForeignApi::class, ExperimentalForeignApi::class,
+    ExperimentalForeignApi::class, ExperimentalForeignApi::class
+)
 
 package borg.trikeshed.tilting.zran
 
@@ -336,7 +338,7 @@ fun decode(args: Array<String>) {
         return start j end
     }
 
-    val (start, end) = expr?.let { parseRangeExpression(expr) } ?: 0UL j ULong.MAX_VALUE
+    val (start, end) = expr?.let { parseRangeExpression(expr) } ?: (0UL j ULong.MAX_VALUE)
 
 
     if (gzFileName == null && indexFileName == null) throw IllegalStateException("stdin used twice")
@@ -353,7 +355,7 @@ fun decode(args: Array<String>) {
 
     for (i in start until end) {
         val window = gzIndex.getWindow(i.toInt())
-        window.usePinned { fwrite(it.addressOf(0), 1, window.size.toULong(), stdout) }
+        window.usePinned { fwrite(it.addressOf(0), 1u, window.size.toULong(), stdout) }
     }
 
     val list = gzIndex.list
@@ -370,7 +372,7 @@ fun decode(args: Array<String>) {
             val buf = UByteArray(32 shl 10)
             while (!fail) {
                 buf.usePinned { tbuf ->
-                    val bytesRead = fread(tbuf.addressOf(0), 1, buf.size.toULong(), gzFile)
+                    val bytesRead = fread(tbuf.addressOf(0), 1u, buf.size.toULong(), gzFile)
                     if (bytesRead == 0UL) fail = true else {
                         strm.avail_in = bytesRead.toUInt()
                         strm.next_in = tbuf.addressOf(0)
@@ -395,7 +397,7 @@ fun decode(args: Array<String>) {
         val buf = UByteArray(1)
         for (uByte in ofsrc) {
             buf[0] = uByte
-            fwrite(buf.refTo(0), 1, 1UL, outputStream).also {
+            fwrite(buf.refTo(0), 1u, 1UL, outputStream).also {
                 posixRequires(it == 1UL) { "Error: could not write to $outfile" }
             }
         }

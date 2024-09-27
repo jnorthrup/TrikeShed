@@ -8,7 +8,6 @@ Throws an AssertionError if the value is false and runtime assertions have been 
 For Native
 Throws an AssertionError if the value is false and runtime assertions have been enabled during compilation.*/
 
-@Throws(AssertionError::class)
 expect fun assert(value: Boolean)
 
 @Throws(AssertionError::class)

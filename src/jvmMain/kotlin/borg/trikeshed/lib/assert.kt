@@ -7,5 +7,7 @@ Throws an AssertionError if the value is false and runtime assertions have been 
 
 For Native
 Throws an AssertionError if the value is false and runtime assertions have been enabled during compilation.*/
+@Throws(AssertionError::class)
 actual fun  assert(value: Boolean): Unit =kotlin.assert(value)
+@Throws(AssertionError::class)
 actual inline fun assert(value: Boolean, lazyMessage: () -> Any) { kotlin.assert(value, lazyMessage) }
