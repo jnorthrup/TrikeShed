@@ -25,5 +25,7 @@ fun <T> LongSeries<T>.slice(start: Long, end: Long = size): LongSeries<T> =
     (end - start) j { x -> this[start + x] }
 
 fun <T> LongSeries<T>.drop(removeInitial: Long): LongSeries<T> = slice(removeInitial)
+fun <A> Series<A>.toLongSeries():LongSeries<A>  =  a.toLong() j {it:Long -> b(it.toInt())}
+
 
 

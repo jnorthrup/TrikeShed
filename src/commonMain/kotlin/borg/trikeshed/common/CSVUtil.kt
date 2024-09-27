@@ -10,8 +10,6 @@ import borg.trikeshed.isam.meta.IOMemento
 import borg.trikeshed.isam.meta.IOMemento.*
 import borg.trikeshed.lib.*
 import kotlin.jvm.JvmOverloads
-import kotlin.jvm.JvmStatic
-
 import kotlin.jvm.JvmInline
 
 /**
