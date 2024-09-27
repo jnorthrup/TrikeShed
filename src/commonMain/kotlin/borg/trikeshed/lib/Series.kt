@@ -147,7 +147,7 @@ operator fun <T> Series<T>.get(index: IntArray): Series<T> = Series(index.size) 
 /**
  * series get by intRange
  */
-operator fun <T> Series<T>.get(index: IntRange): Series<T> =  ((index.last + 1) - index.first) j { i ->
+operator fun <T> Series<T>.get(index: IntRange): Series<T> = ((index.last + 1) - index.first) j { i ->
     require(index.step == 1)
     this[index.first + i]
 }
@@ -319,18 +319,6 @@ class IntHeap(series: Series<Int>) {
 
     fun isEmpty(): Boolean = size == 0
 }
-
-/** clashes  with  above
- * overload unary minus operator for [Cursor] or similar 2d Series and return the left side of the innermost join
- */
-inline operator fun <reified A> Series<Series<Join<A, *>>>.unaryMinus(): Series<Series<A>> =
-    this.let { intFunction1Join: Series<Series<Join<A, *>>> ->
-        intFunction1Join α { intFunction1Join1: Series<Join<A, *>> ->
-            intFunction1Join1 α { aAnyJoin: Join<A, *> ->
-                aAnyJoin.a
-            }
-        }
-    }
 
 fun <T> List<T>.toSeries(): Series<T> = size j ::get
 

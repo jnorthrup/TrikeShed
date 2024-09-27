@@ -7,7 +7,7 @@ class CowSeriesHandleTest {
     fun testAdd() {
         val cowSeries = borg.trikeshed.common.collections.s_[1, 2, 3].cow
         cowSeries.add(4)
-        assertEquals(borg.trikeshed.common.collections.s_[1, 2, 3, 4].cpb, cowSeries.cpb)
+        assertEquals(borg.trikeshed.common.collections.s_[1, 2, 3, 4].cpb.toList(), cowSeries.cpb.toList())
     }
 
     @Test
