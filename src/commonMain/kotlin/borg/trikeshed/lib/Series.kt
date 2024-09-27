@@ -3,6 +3,7 @@
 
 package borg.trikeshed.lib
 
+import borg.trikeshed.common.collections.binarySearch
 import borg.trikeshed.cursor.Cursor
 import borg.trikeshed.isam.meta.IOMemento.*
 import kotlin.jvm.JvmInline
@@ -146,7 +147,7 @@ operator fun <T> Series<T>.get(index: IntArray): Series<T> = Series(index.size) 
 /**
  * series get by intRange
  */
-operator fun <T> Series<T>.get(index: IntRange): Series<T> = Series((index.last + 1) - index.first) { i ->
+operator fun <T> Series<T>.get(index: IntRange): Series<T> = ((index.last + 1) - index.first) j { i ->
     require(index.step == 1)
     this[index.first + i]
 }
@@ -167,12 +168,7 @@ operator fun <T> Series<T>.get(i: Int): T = b(i)
  * fold for Series
  *
  */
-fun <A, B> Series<A>.fold(z: B, f: (acc: B, A) -> B): B {
-    var acc = z
-    for (i in 0 until size)
-        acc = f(acc, this[i])
-    return acc
-}
+fun <A, B> Series<A>.fold(z: B, f: (acc: B, A) -> B): B = this.`▶`.fold(z, f)
 
 
 /**
@@ -180,13 +176,7 @@ fun <A, B> Series<A>.fold(z: B, f: (acc: B, A) -> B): B {
  *
  * because the Series is lazy this is a bit more complicated than it would be for a list
  */
-fun <A, B> Series<A>.runningfold(initial: B, f: (acc: B, A, Int) -> B): Series<B> {
-    var acc = initial
-    return size j { i ->
-        acc = f(acc, this[i], i)
-        acc
-    }
-}
+fun <A, B> Series<A>.runningfold(initial: B, f: (acc: B, A, Int) -> B): Series<B> = this.`▶`.runningfold(initial, f)
 
 /**
  * Binary Search for Series<Comparable>
@@ -198,22 +188,7 @@ fun <A, B> Series<A>.runningfold(initial: B, f: (acc: B, A, Int) -> B): Series<B
  *          if the Series is null then 0 is returned
  *          if the value is null then 0 is returned
  */
-inline fun Series<Int>.binarySearch(a: Int): Int {
-    var low = 0
-    var high = size - 1
-    while (low <= high) {
-        val mid = (low + high) ushr 1
-        val midVal = this[mid]
-        val cmp = midVal.compareTo(a)
-        when {
-            cmp < 0 -> low = mid + 1
-            cmp > 0 -> high = mid - 1
-            else -> return mid // key found
-        }
-        if (cmp < 0) low = mid + 1 else if (cmp > 0) high = mid - 1 else return mid
-    }
-    return -(low + 1)
-}
+inline fun Series<Int>.binarySearch(t: Int): Int = this.`▶`.binarySearch(t)
 
 /**splits a range into multiple parts for upstream reindexing utility
  * 0..11 / 3 produces [0..3, 4..7, 8..11].toSeries()
@@ -345,18 +320,6 @@ class IntHeap(series: Series<Int>) {
     fun isEmpty(): Boolean = size == 0
 }
 
-/** clashes  with  above
- * overload unary minus operator for [Cursor] or similar 2d Series and return the left side of the innermost join
- */
-inline operator fun <reified A> Series<Series<Join<A, *>>>.unaryMinus(): Series<Series<A>> =
-    this.let { intFunction1Join: Series<Series<Join<A, *>>> ->
-        intFunction1Join α { intFunction1Join1: Series<Join<A, *>> ->
-            intFunction1Join1 α { aAnyJoin: Join<A, *> ->
-                aAnyJoin.a
-            }
-        }
-    }
-
 fun <T> List<T>.toSeries(): Series<T> = size j ::get
 
 fun BooleanArray.toSeries(): Series<Boolean> = size j ::get
@@ -399,9 +362,7 @@ fun <T> Series<T>.forEach(action: (T) -> Unit): Unit = this.`▶`.forEach(action
 fun <T, R> Series<T>.map(transform: (T) -> R): List<R> = this.toList().map(transform)
 
 
-fun <T> Series<T>.isEmpty(): Boolean {
-    return a == 0
-}
+fun <T> Series<T>.isEmpty(): Boolean = a == 0
 
 fun <T> Series<T>.reversed(): Series<T> {
     val szCapture = size.dec()
@@ -489,70 +450,59 @@ fun Series<Char>.asString(upto: Int = Int.MAX_VALUE): String = this.take(upto).e
  */
 fun Series<Char>.parseDouble(): Double {
     var x = 0
-    var isNegativeValue = false
-    var r = 0.0
-    var decimal = false
-    var exponentSign: Byte = 1
-    var exponentValue: UShort = 0u
-    var digitsAfterDecimal: UByte = 0u
-
+    var isNegative = false
+    var result = 0.0
+    var hasDecimal = false
+    var exponentSign = 1
+    var exponentValue = 0
+    var digitsAfterDecimal = 0
 
     when (this[x]) {
         '-' -> {
-            isNegativeValue = true
-            x++
+            isNegative = true; x++
         }
 
-        '+' -> {
-            isNegativeValue = false
-            x++
-        }
-
-        else -> isNegativeValue = false
+        '+' -> x++
     }
 
     var afterE = false
     while (x < size) {
-        val c: Char = this[x]
-        when (c) {
+        when (val c = this[x]) {
             'E', 'e' -> {
                 require(!afterE) { "Invalid second exponent" }
                 afterE = true
                 x++
-                when {
-                    this[x] == '-' -> {
-                        exponentSign = -1
-                        x++
+                when (this[x]) {
+                    '-' -> {
+                        exponentSign = -1; x++
                     }
 
-                    this[x] == '+' -> x++
+                    '+' -> x++
                 }
-                while (x < size) {
-                    val c1 = this[x]
-                    if (c1 !in '0'..'9') throw NumberFormatException("Invalid exponent value")
-                    exponentValue = (exponentValue * 10u + (c1 - '0').toUShort()).toUShort()
+                while (x < size && this[x] in '0'..'9') {
+                    exponentValue = exponentValue * 10 + (this[x] - '0')
                     x++
                 }
             }
 
             '.' -> {
-                require(!decimal) { "Invalid second decimal point" }
+                require(!hasDecimal) { "Invalid second decimal point" }
                 require(!afterE) { "Invalid decimal point behind exponent" }
-                decimal = true
+                hasDecimal = true
                 x++
             }
 
             in '0'..'9' -> {
-                r = r * 10 + (c - '0').toDouble()
-                if (decimal) digitsAfterDecimal++
+                result = result * 10 + (c - '0')
+                if (hasDecimal) digitsAfterDecimal++
                 x++
             }
 
-            else -> throw NumberFormatException("Invalid character at '${c}' ")
+            else -> throw NumberFormatException("Invalid character at '$c'")
         }
     }
-    val dneg: Double = if (isNegativeValue && r != 0.0) -1.0 else 1.0
-    return dneg * r * 10.0.pow((exponentSign * exponentValue.toInt() - digitsAfterDecimal.toInt()).toDouble())
+    val signMultiplier = if (isNegative && result != 0.0) -1.0 else 1.0
+    return signMultiplier * result * 10.0.pow((exponentSign * exponentValue - digitsAfterDecimal).toDouble())
 }
 
 /** parse a double or return null if not a valid double.

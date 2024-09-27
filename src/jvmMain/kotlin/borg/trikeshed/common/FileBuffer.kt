@@ -22,13 +22,13 @@ actual class FileBuffer actual constructor(
 ) : LongSeries<Byte> {
 
 
-    var jvmFile: java.io.RandomAccessFile? = null
-    var jvmChannel: FileChannel? = null
+    private var jvmFile: java.io.RandomAccessFile? = null
+    private var jvmChannel: FileChannel? = null
 
-    var jvmMappedByteBuffer: MappedByteBuffer? = null
+    private var jvmMappedByteBuffer: MappedByteBuffer? = null
 
-    override val a: Long get() = jvmMappedByteBuffer!!.limit().toLong()
-    override val b: (Long) -> Byte
+    actual override val a: Long get() = jvmMappedByteBuffer!!.limit().toLong()
+    actual override val b: (Long) -> Byte
         get() = { index: Long ->
             //show size and position of the buffer
 //            logDebug { "longSeries get( ${index}) /  ${jvmMappedByteBuffer!!.limit()}" }

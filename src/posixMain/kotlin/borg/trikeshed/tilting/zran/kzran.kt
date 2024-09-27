@@ -1,4 +1,6 @@
-@file:OptIn(ExperimentalUnsignedTypes::class)
+@file:OptIn(ExperimentalUnsignedTypes::class, ExperimentalForeignApi::class, ExperimentalForeignApi::class,
+    ExperimentalForeignApi::class, ExperimentalForeignApi::class
+)
 
 package borg.trikeshed.tilting.zran
 
@@ -144,12 +146,12 @@ class GzIndex {
     fun writeIndex(indexFname: String): Int {
         return withIndexFile(indexFname, "wb") { indexFp ->
             "kzra".encodeToByteArray()
-                .usePinned { fwrite(it.addressOf(0), 1, "kzra".encodeToByteArray().size.toULong(), indexFp) }
-            list.forEach { writeULong(it.output).usePinned { fwrite(it.addressOf(0), 1, __ulSz, indexFp) } }
-            writeULong(ULong.MAX_VALUE).usePinned { fwrite(it.addressOf(0), 1, __ulSz, indexFp) }
-            list.forEach { writeULong(it.input).usePinned { fwrite(it.addressOf(0), 1, __ulSz, indexFp) } }
-            list.forEach { writeUShort(it.winsize).usePinned { fwrite(it.addressOf(0), 1, __usSz, indexFp) } }
-            list.forEach { it.window.apply { usePinned { fwrite(it.addressOf(0), 1, size.toULong(), indexFp) } } }
+                .usePinned { fwrite(it.addressOf(0), 1u, "kzra".encodeToByteArray().size.toULong(), indexFp) }
+            list.forEach { writeULong(it.output).usePinned { fwrite(it.addressOf(0), 1u, __ulSz, indexFp) } }
+            writeULong(ULong.MAX_VALUE).usePinned { fwrite(it.addressOf(0), 1u, __ulSz, indexFp) }
+            list.forEach { writeULong(it.input).usePinned { fwrite(it.addressOf(0), 1u, __ulSz, indexFp) } }
+            list.forEach { writeUShort(it.winsize).usePinned { fwrite(it.addressOf(0), 1u, __usSz, indexFp) } }
+            list.forEach { it.window.apply { usePinned { fwrite(it.addressOf(0), 1u, size.toULong(), indexFp) } } }
             0
         }
     }
@@ -162,7 +164,7 @@ class GzIndex {
     @OptIn(ExperimentalUnsignedTypes::class)
     fun readIndex(indexFname: String?): Int = withIndexFile(indexFname, "rb") { indexFp ->
         val magic = UByteArray(4)
-        magic.usePinned { fread(it.addressOf(0), 1, 4u, indexFp) }
+        magic.usePinned { fread(it.addressOf(0), 1u, 4u, indexFp) }
         val magicStr = magic.toByteArray().decodeToString()
         posixFailOn(magicStr != "kzra") { ("Error: invalid index file format: '$magicStr' is not 'kzra'") }
         val pointOutput = mutableListOf<ULong>()
@@ -205,14 +207,14 @@ class GzIndex {
             list += Point(pointOutput[i], pointInput[i], UByteArray(0),
                 windowSupplier = if (isStdin) {
                     val window = UByteArray(windowSizes[i].toInt())
-                    window.usePinned { fread(it.addressOf(0), 1, windowSizes[i].toULong(), stdin) }
+                    window.usePinned { fread(it.addressOf(0), 1u, windowSizes[i].toULong(), stdin) }
                     window.`↺`
                 } else fun(): UByteArray {
                     return withIndexFile(indexFname) { indexFp ->
                         fseek(indexFp, windowOffsets[i].toLong(), SEEK_SET)
                         val window = UByteArray(windowSizes[i].toInt())
                         window.usePinned {
-                            fread(it.addressOf(0), 1, windowSizes[i].toULong(), indexFp)
+                            fread(it.addressOf(0), 1u, windowSizes[i].toULong(), indexFp)
                         }
                         window
                     }
@@ -336,7 +338,7 @@ fun decode(args: Array<String>) {
         return start j end
     }
 
-    val (start, end) = expr?.let { parseRangeExpression(expr) } ?: 0UL j ULong.MAX_VALUE
+    val (start, end) = expr?.let { parseRangeExpression(expr) } ?: (0UL j ULong.MAX_VALUE)
 
 
     if (gzFileName == null && indexFileName == null) throw IllegalStateException("stdin used twice")
@@ -353,7 +355,7 @@ fun decode(args: Array<String>) {
 
     for (i in start until end) {
         val window = gzIndex.getWindow(i.toInt())
-        window.usePinned { fwrite(it.addressOf(0), 1, window.size.toULong(), stdout) }
+        window.usePinned { fwrite(it.addressOf(0), 1u, window.size.toULong(), stdout) }
     }
 
     val list = gzIndex.list
@@ -370,7 +372,7 @@ fun decode(args: Array<String>) {
             val buf = UByteArray(32 shl 10)
             while (!fail) {
                 buf.usePinned { tbuf ->
-                    val bytesRead = fread(tbuf.addressOf(0), 1, buf.size.toULong(), gzFile)
+                    val bytesRead = fread(tbuf.addressOf(0), 1u, buf.size.toULong(), gzFile)
                     if (bytesRead == 0UL) fail = true else {
                         strm.avail_in = bytesRead.toUInt()
                         strm.next_in = tbuf.addressOf(0)
@@ -395,7 +397,7 @@ fun decode(args: Array<String>) {
         val buf = UByteArray(1)
         for (uByte in ofsrc) {
             buf[0] = uByte
-            fwrite(buf.refTo(0), 1, 1UL, outputStream).also {
+            fwrite(buf.refTo(0), 1u, 1UL, outputStream).also {
                 posixRequires(it == 1UL) { "Error: could not write to $outfile" }
             }
         }

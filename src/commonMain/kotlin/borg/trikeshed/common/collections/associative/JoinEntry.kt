@@ -1,4 +1,7 @@
+@file:Suppress("UNCHECKED_CAST")
+
 package borg.trikeshed.common.collections.associative
+
 
 import borg.trikeshed.lib.Join
 import kotlin.jvm.JvmInline
@@ -12,3 +15,4 @@ value class JoinEntry<A, B>(val join: Join<A, B>) : Map.Entry<A, B> {
 
 
 inline val <A, B> Join<A, B>.entry: JoinEntry<A, B> get() = JoinEntry(this)
+

@@ -1,6 +1,9 @@
+@file:OptIn(ExperimentalForeignApi::class)
+
 package borg.trikeshed.common
 
 import borg.trikeshed.lib.fromOctal
+import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.cstr
 import kotlinx.cinterop.toKStringFromUtf8
 import platform.posix.mkdtemp
@@ -22,7 +25,7 @@ actual fun rm(path: String): Boolean {
 
 actual fun  mkdir(path: String): Boolean {
     //kotlin native posix make directory hierarchy
-    val res = platform.posix.mkdir(path, 777.fromOctal().toUInt())
+    val res = platform.posix.mkdir(path, 777.fromOctal().toUShort())
     return res == 0
 }
 

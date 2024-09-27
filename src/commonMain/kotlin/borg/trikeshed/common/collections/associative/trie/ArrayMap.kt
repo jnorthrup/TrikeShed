@@ -27,7 +27,7 @@ class ArrayMap<K : Comparable<K>, V>(
     override val size: Int get() = entre.size
     override val keys: Set<K> get() = entre.map(Map_Entry<K, *>::key).toSet()
     override val values: List<V> get() = entre.map(Map_Entry<K, V>::value)
-    override fun containsKey(key1: K): Boolean = 0 <= binIndexOf(key1)
+    override fun containsKey(key: K): Boolean = 0 <= binIndexOf(key)
 
     override fun containsValue(value: V): Boolean = entre.any { (_, v) -> (v?.equals(value) ?: false) }
     private fun binIndexOf(key1: K) = entre.binarySearch(comparatorKeyShim(key1), valComparator)

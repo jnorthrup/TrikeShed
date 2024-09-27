@@ -1,4 +1,8 @@
+@file:OptIn(ExperimentalNativeApi::class, ExperimentalNativeApi::class)
+
 package borg.trikeshed.lib
+
+import kotlin.experimental.ExperimentalNativeApi
 
 /**fun assert(value: Boolean)
 (JVM source) (Native source)
@@ -7,5 +11,6 @@ Throws an AssertionError if the value is false and runtime assertions have been 
 
 For Native
 Throws an AssertionError if the value is false and runtime assertions have been enabled during compilation.*/
+@OptIn(ExperimentalNativeApi::class)
 actual fun assert(value: Boolean): Unit =kotlin.assert(value)
 actual inline fun   assert(value: Boolean, lazyMessage: () -> Any) { kotlin.assert(value, lazyMessage) }

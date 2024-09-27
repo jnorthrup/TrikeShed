@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalForeignApi::class, ExperimentalForeignApi::class)
+
 package borg.trikeshed.common
 
 
@@ -20,15 +22,17 @@ actual class FileBuffer actual constructor(//filename: String, initialOffset: Lo
     init{
         logDebug { "native FileBuffer: $filename, $initialOffset, $blkSize, $readOnly" }
     }
+    @OptIn(ExperimentalForeignApi::class)
     var buffer: COpaquePointer? = null
     var file: PosixFile? = null
 
-    override val a: Long by lazy {
+    actual override val a: Long by lazy {
         open()
         if (blkSize == (-1L)) file!!.size else blkSize
     }
 
-    override val b: (Long) -> Byte
+    @OptIn(ExperimentalForeignApi::class)
+    actual override val b: (Long) -> Byte
         get() = { index: Long ->
             (buffer!!.toLong() + index).toCPointer<ByteVar>()!!.pointed.value
         }
@@ -54,13 +58,9 @@ actual class FileBuffer actual constructor(//filename: String, initialOffset: Lo
         buffer = file!!.mmap(len, offset = initialOffset)
     }
 
-    actual fun isOpen(): Boolean {
-        return buffer != null
-    }
+    actual fun isOpen(): Boolean = buffer != null
 
-    actual fun size(): Long {
-        return file!!.size
-    }
+    actual fun size(): Long = file!!.size
 
     actual fun get(index: Long): Byte {
         return (buffer!!.toLong() + index).toCPointer<ByteVar>()!!.pointed.value

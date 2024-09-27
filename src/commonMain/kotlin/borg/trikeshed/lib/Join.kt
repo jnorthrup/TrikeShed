@@ -1,4 +1,4 @@
-@file:Suppress("NonAsciiCharacters", "FunctionName", "ObjectPropertyName")
+@file:Suppress("NonAsciiCharacters", "FunctionName", "ObjectPropertyName", "OVERRIDE_BY_INLINE", "UNCHECKED_CAST")
 
 package borg.trikeshed.lib
 
@@ -37,7 +37,7 @@ interface Join<A, B> {
             override val b: (Int) -> Join<A, B> get() = { map.entries.elementAt(it).let { Join(it.key, it.value) } }
         }
 
-        fun <B> emptySeriesOf(): Series<B> = 0 j { TODO("Empty list is incomplete") }
+        fun <B> emptySeriesOf(): Series<B> = EmptySeries as Series<B>
     }
 }
 

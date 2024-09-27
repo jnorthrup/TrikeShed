@@ -1,7 +1,11 @@
+@file:OptIn(ExperimentalForeignApi::class)
+
 package simple
 
+import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.convert
 import platform.posix.*
+import platform.posix.mode_t as __mode_t
 
 /**
  * All of these system calls return a stat structure, which contains the following fields:
@@ -44,31 +48,33 @@ The following POSIX macros are defined to check the file type using the st_mode 
 enum class PosixStatMode(state_: Int, val state: UInt = state_.convert()) {
 
     /** is it a regular file?*/
-    S_ISREG(__S_IFREG),
+    S_ISREG(S_IFREG),
 
     /**directory?*/
-    S_ISDIR(__S_IFDIR),
+    S_ISDIR(S_IFDIR),
 
     /**character device?*/
-    S_ISCHR(__S_IFCHR),
+    S_ISCHR(S_IFCHR),
 
     /**block device?*/
-    S_ISBLK(__S_IFBLK),
+    S_ISBLK(S_IFBLK),
 
     /**FIFO (named pipe)?*/
-    S_ISFIFO(__S_IFIFO),
+    S_ISFIFO(S_IFIFO),
 
     /**symbolic link? *//*Not in POSIX.1-1996.*//*)*/
-    S_ISLNK(__S_IFLNK),
+    S_ISLNK(S_IFLNK),
 
     /**socket? *//*Not in POSIX.1-1996.*//*)*/
-    S_ISSOCK(__S_IFSOCK)
+    S_ISSOCK(S_IFSOCK)
     ;
 
-    operator fun invoke(mode: __mode_t): Boolean = __S_ISTYPE((mode), this.state.convert())
+    @OptIn(ExperimentalForeignApi::class)
+    operator fun invoke(mode:
+                        __mode_t ): Boolean = __S_ISTYPE((mode), this.state.convert())
 
     companion object {
-        fun __S_ISTYPE(mode: __mode_t, mask: __mode_t): Boolean = mode and __S_IFMT.convert() == mask
+        fun __S_ISTYPE(mode: __mode_t, mask: __mode_t): Boolean = mode and S_IFMT.convert() == mask
     }
 
 }

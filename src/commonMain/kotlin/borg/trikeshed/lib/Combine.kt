@@ -28,11 +28,12 @@ in the order they were passed in
  */
 fun <A> combine(catn: Series<Series<A>>): Series<A> { // combine
 
-    val frst = catn[0]
+    val frst:Series<A>  = catn[0]
     val sz0 = frst.size
     val captureSize = catn.size
+    @Suppress("UNCHECKED_CAST")
     return when (captureSize) {
-        0 -> 0 j { x: Int -> TODO() }
+        0 ->EmptySeries as Series<A> // empty
         1 -> frst
         2 -> sz0 + catn[1].size j { i ->
             if (i < sz0) frst[i] else catn[1][i - sz0]

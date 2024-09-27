@@ -2,9 +2,7 @@ package borg.trikeshed.common
 
 import borg.trikeshed.lib.*
 
-typealias BFrag = Join<
-        /**endexclusive range*/
-        Twin<Int>, ByteArray>
+typealias BFrag = Join< /**endexclusive range*/ Twin<Int>, ByteArray>
 
 val BFrag.size: Int
     get() {

@@ -6,4 +6,14 @@ docs/
 tmp/
 .vscode/
 
+<<<<<<< HEAD
 .kotlin/
+=======
+.kotlin
+.idea
+.gradle
+gradle
+gradlew
+gradlew.bat
+
+>>>>>>> posixish

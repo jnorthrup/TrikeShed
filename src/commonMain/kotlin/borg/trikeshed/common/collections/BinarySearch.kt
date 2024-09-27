@@ -9,23 +9,19 @@ import borg.trikeshed.lib.size
 fun <T : Comparable<T>> Series<T>.binarySearch(element: T, low: Int = 0, high: Int = size - 1): Int =
     binarySearch(element, naturalOrder(), low, high)
 
-fun <T> Series<T>.binarySearch(element: T, c: Comparator<T>, low_: Int = 0, high_: Int = size - 1): Int {
-    var low = low_
-    var high = high_
 
-    while (low <= high) {
-        val mid = (low + high).ushr(1)
-        val midVal = get(mid)
-        val cmp = c.compare(midVal, element)
-        when {
-            cmp < 0 -> low = mid + 1
-            cmp > 0 -> high = mid - 1
-            else -> return mid // key found
-        }
+// Tail-recursive binary search
+tailrec fun <T: Comparable<T>> Series<T>.binarySearch(element: T, c: Comparator<T>, low: Int = 0, high: Int = size - 1): Int {
+    if (low > high) return -(low + 1)  // key not found
+
+    val mid = (low + high) ushr 1
+    val cmp = c.compare(get(mid), element)
+    return when {
+        cmp < 0 -> binarySearch(element, c, mid.inc(), high)
+        cmp > 0 -> binarySearch(element, c, low, mid.dec())
+        else -> mid  // key found
     }
-    return -(low + 1)  // key not found.
 }
-
 
 //signed, unsigned primitives all need boilerplate here
 fun Series<Byte>.binarySearch(element: Byte, low_: Int = 0, high_: Int = size - 1): Int {

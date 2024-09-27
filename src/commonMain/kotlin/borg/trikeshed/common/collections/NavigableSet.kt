@@ -1,4 +1,4 @@
-package borg.trikeshed.common.collections.associative
+package borg.trikeshed.common.collections
 
 /**
  * A [SortedSet] extended with navigation methods reporting
@@ -54,7 +54,7 @@ package borg.trikeshed.common.collections.associative
  * @param <E> the type of elements maintained by this set
  * @since 1.6
 </E> */
-interface NavigableSet<E> : SortedSet<E?> {
+interface NavigableSet<E:Comparable<E>> : SortedSet<E> {
     /**
      * Returns the greatest element in this set strictly less than the
      * given element, or `null` if there is no such element.
@@ -67,7 +67,7 @@ interface NavigableSet<E> : SortedSet<E?> {
      * @throws NullPointerException if the specified element is null
      * and this set does not permit null elements
      */
-    fun lower(e: E): E
+    fun lower(e: E): E?
 
     /**
      * Returns the greatest element in this set less than or equal to
@@ -81,7 +81,7 @@ interface NavigableSet<E> : SortedSet<E?> {
      * @throws NullPointerException if the specified element is null
      * and this set does not permit null elements
      */
-    fun floor(e: E): E
+    fun floor(e: E): E?
 
     /**
      * Returns the least element in this set greater than or equal to
@@ -95,7 +95,7 @@ interface NavigableSet<E> : SortedSet<E?> {
      * @throws NullPointerException if the specified element is null
      * and this set does not permit null elements
      */
-    fun ceiling(e: E): E
+    fun ceiling(e: E): E?
 
     /**
      * Returns the least element in this set strictly greater than the
@@ -109,7 +109,7 @@ interface NavigableSet<E> : SortedSet<E?> {
      * @throws NullPointerException if the specified element is null
      * and this set does not permit null elements
      */
-    fun higher(e: E): E
+    fun higher(e: E): E?
 
     /**
      * Retrieves and removes the first (lowest) element,
@@ -117,7 +117,7 @@ interface NavigableSet<E> : SortedSet<E?> {
      *
      * @return the first element, or `null` if this set is empty
      */
-    fun pollFirst(): E
+    fun pollFirst(): E?
 
     /**
      * Retrieves and removes the last (highest) element,
@@ -125,7 +125,7 @@ interface NavigableSet<E> : SortedSet<E?> {
      *
      * @return the last element, or `null` if this set is empty
      */
-    fun pollLast(): E
+    fun pollLast(): E?
 
 
     /**
@@ -144,7 +144,7 @@ interface NavigableSet<E> : SortedSet<E?> {
      *
      * @return a reverse order view of this set
      */
-    fun descendingSet(): NavigableSet<E>?
+    fun descendingSet(): NavigableSet<E>
 
     /**
      * Returns an iterator over the elements in this set, in descending order.
@@ -152,7 +152,7 @@ interface NavigableSet<E> : SortedSet<E?> {
      *
      * @return an iterator over the elements in this set, in descending order
      */
-    fun descendingIterator(): Iterator<E>?
+    fun descendingIterator(): Iterator<E>
 
     /**
      * Returns a view of the portion of this set whose elements range from
@@ -192,7 +192,7 @@ interface NavigableSet<E> : SortedSet<E?> {
     fun subSet(
         fromElement: E, fromInclusive: Boolean,
         toElement: E, toInclusive: Boolean,
-    ): NavigableSet<E>?
+    ): NavigableSet<E>
 
     /**
      * Returns a view of the portion of this set whose elements are less than
@@ -222,7 +222,7 @@ interface NavigableSet<E> : SortedSet<E?> {
      * restricted range, and `toElement` lies outside the
      * bounds of the range
      */
-    fun headSet(toElement: E, inclusive: Boolean): NavigableSet<E>?
+    fun headSet(toElement: E, inclusive: Boolean): NavigableSet<E>
 
     /**
      * Returns a view of the portion of this set whose elements are greater
@@ -252,7 +252,7 @@ interface NavigableSet<E> : SortedSet<E?> {
      * restricted range, and `fromElement` lies outside the
      * bounds of the range
      */
-    fun tailSet(fromElement: E, inclusive: Boolean): NavigableSet<E>?
+    fun tailSet(fromElement: E, inclusive: Boolean): NavigableSet<E>
 
 
 }/*

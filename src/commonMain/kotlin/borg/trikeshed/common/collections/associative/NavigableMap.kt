@@ -1,5 +1,7 @@
 package borg.trikeshed.common.collections.associative
 
+import borg.trikeshed.common.collections.NavigableSet
+
 /**
  * A [SortedMap] extended with navigation methods returning the
  * closest matches for given search targets. Methods
@@ -64,7 +66,7 @@ package borg.trikeshed.common.collections.associative
  * @param <V> the type of mapped values
  * @since 1.6
 </V></K> */
-interface NavigableMap<K, V> : SortedMap<K, V> {
+interface NavigableMap<K : Comparable<K>, V> : SortedMap<K, V> {
     /**
      * Returns a key-value mapping associated with the greatest key
      * strictly less than the given key, or `null` if there is

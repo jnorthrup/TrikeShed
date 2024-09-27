@@ -1,4 +1,5 @@
 @file:Suppress("UNUSED_PARAMETER")
+@file:OptIn(ExperimentalForeignApi::class)
 
 package borg.trikeshed.native
 
@@ -8,11 +9,13 @@ import platform.posix.malloc
 import platform.posix.stderr
 import kotlin.reflect.KProperty1
 
+@OptIn(ExperimentalForeignApi::class)
 inline fun <reified A : CStructVar, reified B : CVariable> NativePlacement.allocWithFlex(
     bProperty: KProperty1<A, CPointer<B>>,
     count: Int,
 ): A = alloc(sizeOf<A>() + sizeOf<B>() * count, alignOf<A>()).reinterpret()
 
+@ExperimentalForeignApi
 inline fun <reified A : CStructVar, reified B : CVariable> mallocWithFlex(
     bProperty: KProperty1<A, CPointer<B>>,
     count: Int,

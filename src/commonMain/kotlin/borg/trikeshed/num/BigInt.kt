@@ -1,9 +1,23 @@
+@file:OptIn(ExperimentalUnsignedTypes::class)
+
 package borg.trikeshed.num
 
 import borg.trikeshed.isam.meta.PlatformCodec.Companion.currentPlatformCodec.readUInt
-import borg.trikeshed.lib.*
 import borg.trikeshed.lib.CZero.nz
 import borg.trikeshed.lib.CZero.z
+import borg.trikeshed.lib.Series
+import borg.trikeshed.lib.emptySeries
+import borg.trikeshed.lib.forEach
+import borg.trikeshed.lib.get
+import borg.trikeshed.lib.getOrNull
+import borg.trikeshed.lib.isEmpty
+import borg.trikeshed.lib.iterator
+import borg.trikeshed.lib.j
+import borg.trikeshed.lib.reversed
+import borg.trikeshed.lib.size
+import borg.trikeshed.lib.toSeries
+import borg.trikeshed.lib.α
+import borg.trikeshed.lib.`▶`
 import kotlin.math.absoluteValue
 import kotlin.math.max
 
@@ -25,7 +39,13 @@ class BigInt private constructor(private val sign: Boolean?, private val magnitu
         }
     )
 
-    private constructor(value: ULong, javaCannotCompileULongAndLongMethodsThatConflict: String = "") : this(
+    private constructor(
+        value: ULong,
+        /**This parameter is not used within the constructor but
+         *  ensures that the method signatures for ULong and Long
+         *  constructors do not clash when compiled in Java.*/
+        javaCannotCompileULongAndLongMethodsThatConflict: String = ""
+    ) : this(
         sign = if (value.z) null else true,
         magnitude = if (value.z) emptySeries() else value.let { absValue ->
             val low = (absValue and 0xFFFF_FFFFUL).toUInt()
@@ -147,6 +167,11 @@ class BigInt private constructor(private val sign: Boolean?, private val magnitu
     }
 
     override fun toByte(): Byte = toInt().toByte()
+
+    @Deprecated(
+        "Direct conversion to Char is deprecated. Use toInt().toChar() or Char constructor instead.\nIf you override toChar() function in your Number inheritor, it's recommended to gradually deprecate the overriding function and then remove it.\nSee https://youtrack.jetbrains.com/issue/KT-46465 for details about the migration",
+        replaceWith = ReplaceWith("this.toInt().toChar()")
+    )
     override fun toChar(): Char = toInt().toChar()
     override fun toDouble(): Double = toLong().toDouble()
     override fun toFloat(): Float = toLong().toFloat()

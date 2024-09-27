@@ -5,6 +5,7 @@ package simple
 
 import borg.trikeshed.lib.CZero.nz
 import platform.posix.*
+import platform.posix.uint32_t as __u32
 
 /**
 The open() system call opens the file specified by pathname.  If
@@ -193,7 +194,7 @@ enum class PosixOpenOpts(val posixConst: Int) {
     A semantically similar (but deprecated) interface for
     block devices is described in raw(8).
      */
-    O_Direct(__O_DIRECT),
+//    O_Direct(__O_DIRECT),
 
     /**
     If pathname is not a directory, cause the open to fail.
@@ -269,7 +270,7 @@ enum class PosixOpenOpts(val posixConst: Int) {
 
 
      */
-    O_Largefile(__O_LARGEFILE),
+//    O_Largefile(__O_LARGEFILE),
 
     /**
     This flag is intended for use by indexing or backup
@@ -278,7 +279,7 @@ enum class PosixOpenOpts(val posixConst: Int) {
     on all filesystems.  One example is NFS, where the server
     maintains the access time.
      */
-    O_Noatime(__O_NOATIME),
+//    O_Noatime(__O_NOATIME),
 
     /**
     If pathname refers to a terminal device—see tty(4)—it will
@@ -423,7 +424,8 @@ enum class PosixOpenOpts(val posixConst: Int) {
     An O_PATH file descriptor can also be passed as the
     argument of fexecve(3).
      */
-    PathSpecific(__O_PATH),
+//    PathSpecific(__O_PATH),
+
 
     /**
     Write operations on the file will complete according to
@@ -502,7 +504,7 @@ enum class PosixOpenOpts(val posixConst: Int) {
     as follows: XFS (Linux 3.15); Btrfs (Linux 3.16); F2FS
     (Linux 3.16); and ubifs (Linux 4.9)
      */
-    O_Tmpfile(__O_TMPFILE),
+//    O_Tmpfile(__O_TMPFILE),
 
     /**
     If the file already exists and is a regular file and the

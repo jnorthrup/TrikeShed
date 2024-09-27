@@ -4,8 +4,10 @@ import borg.trikeshed.common.collections._l
 import borg.trikeshed.lib.Join
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.toSeries
-import borg.trikeshed.parse.JsonParser.index
-import borg.trikeshed.parse.JsonParser.jsPath
+import borg.trikeshed.parse.json.JsPath
+import borg.trikeshed.parse.json.JsonParser.index
+import borg.trikeshed.parse.json.JsonParser.jsPath
+import borg.trikeshed.parse.json.toJsPath
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.fail
