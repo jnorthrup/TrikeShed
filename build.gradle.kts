@@ -67,29 +67,9 @@ kotlin {
         isMingwX64 -> mingwX64("posix")
         else -> throw GradleException("Host OS is not supported in Kotlin/Native.")
 
-
     }
 
     sourceSets {
-        val jvmMain by getting {
-            dependencies {
-                //datetime
-                api("org.jetbrains.kotlinx:kotlinx-datetime-jvm:0.4.0")
-                //coroutines
-                api("org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:1.6.4")
-                //serialization
-                api("org.jetbrains.kotlinx:kotlinx-serialization-json-jvm:1.3.0")
-
-            }
-        }
-
-        val jvmTest by getting {
-            //bring in the dependencies from jvmMain
-            dependencies {
-                implementation(kotlin("test"))
-                implementation(kotlin("test-junit"))
-            }
-        }
 
         val commonMain by getting {
             dependencies {
@@ -104,6 +84,24 @@ kotlin {
             dependencies {
                 implementation(kotlin("test-common"))
                 implementation(kotlin("test-annotations-common"))
+            }
+        }
+        val jvmMain by getting {
+            dependencies {
+                //datetime
+                api("org.jetbrains.kotlinx:kotlinx-datetime-jvm:0.4.0")
+                //coroutines
+                api("org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:1.6.4")
+                //serialization
+                api("org.jetbrains.kotlinx:kotlinx-serialization-json-jvm:1.3.0")
+            }
+        }
+
+        val jvmTest by getting {
+            //bring in the dependencies from jvmMain
+            dependencies {
+                implementation(kotlin("test"))
+                implementation(kotlin("test-junit"))
             }
         }
 
@@ -131,26 +129,23 @@ kotlin {
                 "Linux" -> {
                     //io_uring
                     val linuxMain by getting {
-                        dependsOn(nativeMain)
+                        dependsOn(posixMain)
                         dependencies {
                             implementation("org.bereft:io_uring:1.0")
                         }
                     }
                     val linuxTest by getting {
-                        dependsOn(nativeTest)
+                        dependsOn(posixTest)
                     }
                 }
 
                 "Mac OS X" -> {
                     //libdispatch
                     val macosMain by getting {
-                        dependsOn(nativeMain)
-                        dependencies {
-
-                        }
+                        dependsOn(posixMain)
                     }
                     val macosTest by getting {
-                        dependsOn(nativeTest)
+                        dependsOn(posixTest)
                     }
                 }
 
