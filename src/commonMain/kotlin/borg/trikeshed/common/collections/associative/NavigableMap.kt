@@ -1,5 +1,7 @@
 package borg.trikeshed.common.collections.associative
 
+import borg.trikeshed.common.collections.NavigableSet
+
 /**
  * A [SortedMap] extended with navigation methods returning the
  * closest matches for given search targets. Methods

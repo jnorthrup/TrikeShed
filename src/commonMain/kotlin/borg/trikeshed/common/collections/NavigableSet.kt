@@ -1,4 +1,4 @@
-package borg.trikeshed.common.collections.associative
+package borg.trikeshed.common.collections
 
 /**
  * A [SortedSet] extended with navigation methods reporting

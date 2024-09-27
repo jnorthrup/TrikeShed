@@ -1,4 +1,4 @@
-package borg.trikeshed.common.collections.associative
+package borg.trikeshed.common.collections
 
 class HashSet<T> : Set<T> {
     private var buckets: Array<Any?> = arrayOfNulls(16)

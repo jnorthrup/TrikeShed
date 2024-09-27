@@ -1,8 +1,8 @@
 @file:Suppress("UNCHECKED_CAST")
 
-package borg.trikeshed.common.collections.associative
+package borg.trikeshed.common.collections
 
-import borg.trikeshed.common.collections.associative.HashSeriesSet.Companion.MutableHashSeriesSet
+import borg.trikeshed.common.collections.HashSeriesSet.Companion.MutableHashSeriesSet
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.iterator

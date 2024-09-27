@@ -1,5 +1,7 @@
 package borg.trikeshed.common.collections.associative
 
+import borg.trikeshed.common.collections.ArraySet
+import borg.trikeshed.common.collections.HashSet
 import kotlin.test.Test
 
 class TestAssrtaySet{

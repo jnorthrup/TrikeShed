@@ -1,7 +1,6 @@
 package borg.trikeshed.parse.json
 
 import borg.trikeshed.common.Files
-import borg.trikeshed.common.collections.associative.JsonBitmap
 import kotlin.test.Test
 
 class TestJsonBitmap1 {

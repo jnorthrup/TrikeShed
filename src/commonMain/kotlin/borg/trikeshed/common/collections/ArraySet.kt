@@ -1,4 +1,4 @@
-package borg.trikeshed.common.collections.associative
+package borg.trikeshed.common.collections
 
 class ArraySet<T> : Set<T> {
     private var elements: Array<Any?> = arrayOfNulls(10)

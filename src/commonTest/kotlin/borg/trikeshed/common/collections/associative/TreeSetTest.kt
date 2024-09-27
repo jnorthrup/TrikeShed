@@ -1,5 +1,6 @@
 package borg.trikeshed.common.collections.associative
 
+import borg.trikeshed.common.collections.TreeSet
 import kotlin.test.Test
 import kotlin.test.assertTrue
 class TreeSetTest {

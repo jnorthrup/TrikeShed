@@ -1,11 +1,23 @@
 @file:Suppress("ControlFlowWithEmptyBody")
 
-package borg.trikeshed.parse
+package borg.trikeshed.parse.json
 
 import borg.trikeshed.common.collections.s_
-import borg.trikeshed.lib.*
+
 import borg.trikeshed.lib.CharSeries.Companion.unbrace
 import borg.trikeshed.lib.CharSeries.Companion.unquote
+import borg.trikeshed.lib.Either
+import borg.trikeshed.lib.Join
+import borg.trikeshed.lib.Series
+import borg.trikeshed.lib.Twin
+import borg.trikeshed.lib.combine
+import borg.trikeshed.lib.first
+import borg.trikeshed.lib.get
+import borg.trikeshed.lib.second
+import borg.trikeshed.lib.toSeries
+import borg.trikeshed.lib.`▶`
+import borg.trikeshed.lib.α
+import borg.trikeshed.lib.*
 
 typealias JsElement = Join<Twin<Int>, Series<Int>> //(openIdx j closeIdx) j commaIdxs
 typealias JsIndex = Join<Twin<Int>, Series<Char>> //(twin j src)
@@ -17,10 +29,10 @@ typealias JsPath = Series<JsPathElement>
 
 //private fun logDebug(t: () -> String) {} //logging turned off for now
 
-fun JsIndex.toSeries(): Series<Char> = this.second[a.a until a.b]
+fun JsIndex.toSeries(): Series<Char> = this.second [ a.a until a.b]
 
 val List<*>.toJsPath: JsPath
-    get() = this.toSeries() α {
+    get() = this.toSeries() α  {
         when (it) {
             is String -> JsPathElement.left(it)
             is Int -> JsPathElement.right(it)
@@ -40,7 +52,7 @@ val JsContext.segments: Iterable<JsIndex>
         val (element, src) = this
         val (openIdx, closeIdx) = element.first
         val commaIdxs: Series<Int> = combine(s_[openIdx], element.second, s_[closeIdx])
-        return commaIdxs.`▶`.zipWithNext().map { (a: Int, b: Int) -> a.inc() j b }.toList() α { it j src }
+        return commaIdxs. `▶` .zipWithNext().map { (a: Int, b: Int) -> a.inc() j b }.toList() α { it j src }
     }
 
 /** a json scanner that indexes and optionally reifies the json chars

@@ -1,6 +1,6 @@
 @file:Suppress("UNCHECKED_CAST")
 
-package borg.trikeshed.common.collections.associative
+package borg.trikeshed.common.collections
 
 /**
  * A [Set] that further provides a *total ordering* on its elements.

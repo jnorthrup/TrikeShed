@@ -1,4 +1,4 @@
-package borg.trikeshed.common.collections.associative
+package borg.trikeshed.common.collections
 
 import kotlin.math.max
 

@@ -3,8 +3,8 @@ package borg.trikeshed.parse.csv
 import borg.trikeshed.common.Files
 import borg.trikeshed.lib.CZero.nz
 import borg.trikeshed.lib.CZero.z
-import borg.trikeshed.common.collections.associative.JsonBitmap.LexerEvents.*
-import borg.trikeshed.common.collections.associative.JsonBitmap.LexerEvents.Companion.test
+import borg.trikeshed.parse.json.JsonBitmap.LexerEvents.*
+import borg.trikeshed.parse.json.JsonBitmap.LexerEvents.Companion.test
 import kotlin.test.Test
 
 object CsvBitmap {
