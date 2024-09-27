@@ -1,4 +1,4 @@
-@file:OptIn(ExperimentalForeignApi::class)
+@file:OptIn(ExperimentalForeignApi::class, ExperimentalForeignApi::class)
 
 package borg.trikeshed.common
 
@@ -58,13 +58,9 @@ actual class FileBuffer actual constructor(//filename: String, initialOffset: Lo
         buffer = file!!.mmap(len, offset = initialOffset)
     }
 
-    actual fun isOpen(): Boolean {
-        return buffer != null
-    }
+    actual fun isOpen(): Boolean = buffer != null
 
-    actual fun size(): Long {
-        return file!!.size
-    }
+    actual fun size(): Long = file!!.size
 
     actual fun get(index: Long): Byte {
         return (buffer!!.toLong() + index).toCPointer<ByteVar>()!!.pointed.value
