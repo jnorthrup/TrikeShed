@@ -1,3 +1,33 @@
+<<<<<<< HEAD
+plugins {
+    kotlin("multiplatform") version "1.9.0"
+}
+
+kotlin {
+    // JVM target
+    jvm(  ) {
+        withJava()
+    }
+
+    // JS target for WebAssembly/JavaScript
+    js(IR) {
+        browser()
+        nodejs()
+    }
+
+    // Native POSIX targets
+    macosX64("macos")
+    linuxX64("linux")
+
+    sourceSets {
+        // Common code for all platforms (shared logic)
+        val commonMain by getting
+        val commonTest by getting
+
+        // POSIX-compliant code (shared between macOS and Linux)
+        val posixMain by creating {
+            dependsOn(commonMain)
+=======
 
 
 import org.jetbrains.kotlin.gradle.DeprecatedTargetPresetApi
@@ -78,14 +108,24 @@ kotlin {
                 api("org.jetbrains.kotlinx:kotlinx-datetime:0.4.0")
                 api("org.jetbrains.kotlin:kotlin-reflect:1.8.0")
             }
+>>>>>>> posixish
         }
 
-        val commonTest by getting {
-            dependencies {
-                implementation(kotlin("test-common"))
-                implementation(kotlin("test-annotations-common"))
-            }
+        // macOS-specific code
+        val macosMain by getting {
+            dependsOn(posixMain)
         }
+<<<<<<< HEAD
+
+        // Linux-specific code (liburing, etc.)
+        val linuxMain by getting {
+            dependsOn(posixMain)
+        }
+
+        // JVM-specific code
+        val jvmMain by getting {
+            dependsOn(commonMain)
+=======
         val jvmMain by getting {
             dependencies {
                 //datetime
@@ -95,15 +135,17 @@ kotlin {
                 //serialization
                 api("org.jetbrains.kotlinx:kotlinx-serialization-json-jvm:1.3.0")
             }
+>>>>>>> posixish
         }
 
-        val jvmTest by getting {
-            //bring in the dependencies from jvmMain
-            dependencies {
-                implementation(kotlin("test"))
-                implementation(kotlin("test-junit"))
-            }
+        // JS-specific code
+        val jsMain by getting {
+            dependsOn(commonMain)
         }
+<<<<<<< HEAD
+    }
+}
+=======
 
 
         if (hostOs in listOf("Linux", "Mac OS X")) {
@@ -165,3 +207,4 @@ tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinTest> {
     }
 }
 
+>>>>>>> posixish
