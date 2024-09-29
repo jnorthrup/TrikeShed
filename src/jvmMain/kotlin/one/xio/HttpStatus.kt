@@ -23,7 +23,7 @@ package one.xio
  * 5xx - Server Error
  * <br></br>Response status codes beginning with the digit"5" indicate cases in which the server is aware that it has erred or is incapable of performing the request. Except when responding to a HEAD request, the server SHOULD include an entity containing an explanation of the error situation, and whether it is a temporary or permanent condition. User agents SHOULD display any included entity to the user. These response codes are applicable to any request method.
  */
-enum class HttpStatus(caption: String) {
+enum class HttpStatus(val caption: String) {
     `$100`("Continue"),  //
     `$101`("Switching Protocols"),  //
 
@@ -93,11 +93,5 @@ enum class HttpStatus(caption: String) {
     `$503`("Service Unavailable"),  //
     `$504`("Gateway Timeout"),  //
     `$505`("HTTP Version Not Supported"),  //
-    `$507`("Insufficient Storage"); //
-
-    val caption: String?
-
-    init {
-        this.caption = caption
-    }
+    `$507`("Insufficient Storage") //
 }

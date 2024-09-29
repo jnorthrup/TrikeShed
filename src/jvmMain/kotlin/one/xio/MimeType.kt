@@ -11,7 +11,7 @@ package one.xio
  * Date: May 21, 2009
  * Time: 2:42:05 AM
  */
-enum class MimeType(contentType: String) {
+enum class MimeType(var contentType: String) {
     `$323`("text/h323"),  //
     `$3gp`("video/3gpp"),  //
     `$7z`("application/x-7z-compressed"),  //
@@ -165,8 +165,8 @@ enum class MimeType(contentType: String) {
     ics("text/calendar"),  //
     icz("text/calendar"),  //
     ief("image/ief"),  //
-    iges("depModel/iges"),  //
-    igs("depModel/iges"),  //
+    iges("model/iges"),  //
+    igs("model/iges"),  //
     iii("application/x-iphone"),  //
     inp("chemical/x-gamess-input"),  //
     ins("application/x-internet-signup"),  //
@@ -218,7 +218,7 @@ enum class MimeType(contentType: String) {
     mcm("chemical/x-macmolecule"),  //
     mdb("application/msaccess"),  //
     me("application/x-troff-me"),  //
-    mesh("depModel/mesh"),  //
+    mesh("model/mesh"),  //
     mid("audio/midi"),  //
     midi("audio/midi"),  //
     mif("application/x-mif"),  //
@@ -246,7 +246,7 @@ enum class MimeType(contentType: String) {
     mpga("audio/mpeg"),  //
     mpg("video/mpeg"),  //
     ms("application/x-troff-ms"),  //
-    msh("depModel/mesh"),  //
+    msh("model/mesh"),  //
     msi("application/x-msi"),  //
     mvb("chemical/x-mopac-vib"),  //
     mxu("video/vnd.mpegurl"),  //
@@ -356,7 +356,7 @@ enum class MimeType(contentType: String) {
     shtml("text/html"),  //
     sid("audio/prs.sid"),  //
     sik("application/x-trash"),  //
-    silo("depModel/mesh"),  //
+    silo("model/mesh"),  //
     sis("application/vnd.symbian.install"),  //
     sisx("x-epoc/x-sisx-app"),  //
     sit("application/x-stuffit"),  //
@@ -422,7 +422,7 @@ enum class MimeType(contentType: String) {
     vcs("text/x-vcalendar"),  //
     vmd("chemical/x-vmd"),  //
     vms("chemical/x-vamas-iso14976"),  //
-    `$vrml`("depModel/vrml"),  //
+    `$vrml`("model/vrml"),  //
     vrml("x-world/x-vrml"),  //
     vrm("x-world/x-vrml"),  //
     vsd("application/vnd.visio"),  //
@@ -444,7 +444,7 @@ enum class MimeType(contentType: String) {
     wmz("application/x-ms-wmz"),  //
     wp5("application/wordperfect5.1"),  //
     wpd("application/wordperfect"),  //
-    `$wrl`("depModel/vrml"),  //
+    `$wrl`("model/vrml"),  //
     wrl("x-world/x-vrml"),  //
     wsc("text/scriptlet"),  //
     wvx("video/x-ms-wvx"),  //
@@ -466,11 +466,5 @@ enum class MimeType(contentType: String) {
     xyz("chemical/x-xyz"),  //
     zip("application/zip"),  //
     zmt("chemical/x-mopac-input"),
-    ; //
-
-    val contentType: String?
-
-    init {
-        this.contentType = contentType
-    }
+    //
 }

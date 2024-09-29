@@ -1,11 +1,14 @@
 package borg.trikeshed.common
-import borg.trikeshed.common.CSVUtil.parseSegments
+import borg.trikeshed.parse.csv.CSVUtil.parseSegments
 import borg.trikeshed.cursor.Cursor
 import borg.trikeshed.cursor.row
 import borg.trikeshed.isam.RecordMeta
 import borg.trikeshed.isam.meta.IOMemento
 import borg.trikeshed.isam.meta.IOMemento.IoString
 import borg.trikeshed.lib.*
+import borg.trikeshed.parse.csv.CSVUtil
+import borg.trikeshed.parse.csv.DelimitRange
+import borg.trikeshed.parse.csv.simpelCsvCursor
 import org.junit.Assert
 import org.junit.Assert.assertThrows
 import kotlin.test.*
@@ -80,7 +83,7 @@ class CSVUtilTest {
         """.trimIndent()
 
         val file = csvData.encodeToByteArray().toSeries().toLongSeries()
-        val result :Cursor= borg.trikeshed.common.CSVUtil.parseSegments(file)
+        val result :Cursor= CSVUtil.parseSegments(file)
 
         assertEquals(3, result.size, "Incorrect number of rows")
         assertEquals(3, result.row(0).size, "Incorrect number of columns")

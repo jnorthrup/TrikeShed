@@ -1,9 +1,14 @@
 @file:Suppress("DEPRECATION", "UNCHECKED_CAST")
 
-package borg.trikeshed.common
+package borg.trikeshed.parse.csv
 
+import borg.trikeshed.common.LongSeries
+import borg.trikeshed.common.TypeEvidence
 import borg.trikeshed.common.TypeEvidence.Companion.deduce
 import borg.trikeshed.common.TypeEvidence.Companion.update
+import borg.trikeshed.common.drop
+import borg.trikeshed.common.get
+import borg.trikeshed.common.size
 import borg.trikeshed.cursor.Cursor
 import borg.trikeshed.cursor.RowVec
 import borg.trikeshed.cursor.meta
@@ -89,13 +94,14 @@ object CSVUtil {
         var escape = false
         var ordinal = 0
         var x = start
-        while (x != end && file[x].toInt().toChar().isWhitespace()) x++ //trim
+        val input = file[x]
+        while (x != end && input.toInt().toChar().isWhitespace()) x++ //trim
         var since = x
 
         val rlist = mutableListOf<DelimitRange>()
         val size = file.size
         while (x != end && x < size) {
-            val c = file[x]
+            val c = input
             val char = c.toInt().toChar()
             lineEvidence?.apply {
                 //test deduce length and add if needed
@@ -205,7 +211,7 @@ object CSVUtil {
 
         val last1: DelimitRange = header.last()
         val (a, b) = last1
-        b.toLong().j{ datazero2:Long ->
+        b.toLong().j { datazero2: Long ->
             var datazero1 = datazero2
 
             do {
@@ -263,7 +269,7 @@ object CSVUtil {
             lines α { line ->
                 //y axis here
 
-                val lserr: Series<Byte> = file.drop(line.a)[0 until line.b.size]
+                val lserr: Series<Byte> = file.drop(line.a)[0 until line.b.size] as Series<Byte>
                 line.b.withIndex() α { (x, b): IndexedValue<Int> ->
                     //x axis here
 
