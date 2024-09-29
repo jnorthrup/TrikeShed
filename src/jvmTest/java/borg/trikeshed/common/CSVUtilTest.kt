@@ -1,9 +1,12 @@
 package borg.trikeshed.common
+import borg.trikeshed.common.CSVUtil.parseSegments
+import borg.trikeshed.cursor.Cursor
 import borg.trikeshed.cursor.row
 import borg.trikeshed.isam.RecordMeta
 import borg.trikeshed.isam.meta.IOMemento
 import borg.trikeshed.isam.meta.IOMemento.IoString
 import borg.trikeshed.lib.*
+import org.junit.Assert
 import org.junit.Assert.assertThrows
 import kotlin.test.*
 
@@ -15,7 +18,7 @@ class CSVUtilTest {
             "a,b,c" to listOf(0..0, 2..2, 4..4),
             "\"a,b\",c,d" to listOf(1..3, 6..6, 8..8),
             "a,'b,c',d" to listOf(0..0, 3..5, 8..8),
-            "a,,c" to listOf(0..0, 2..1, 3..3),
+            "a,,c" to listOf(0..0, 2 downTo 1, 3..3),
             "a,\"b\"\"\",c" to listOf(0..0, 3..5, 8..8)
         )
 
@@ -42,7 +45,7 @@ class CSVUtilTest {
         """.trimIndent()
 
         val file = csvData.encodeToByteArray().toSeries().toLongSeries()
-        val meta = Series(3) { index ->
+        val meta =  (3) j { index:Int ->
             when (index) {
                 0 -> RecordMeta("Name", IoString)
                 1 -> RecordMeta("Age", IOMemento.IoInt)
@@ -51,7 +54,7 @@ class CSVUtilTest {
             }
         }
 
-        val result = CSVUtil.parseConformant(file, meta)
+        val result:Cursor = CSVUtil.parseConformant(file, meta) as Cursor
 
         assertEquals(3, result.size, "Incorrect number of rows")
         assertEquals(3, result.row(0).size, "Incorrect number of columns")
@@ -76,8 +79,8 @@ class CSVUtilTest {
             "Smith, Bob",40,Paris
         """.trimIndent()
 
-        val file = csvData.encodeToByteArray().toSeries().toMutableLongSeries()
-        val result = CSVUtil.parseSegments(file)
+        val file = csvData.encodeToByteArray().toSeries().toLongSeries()
+        val result :Cursor= borg.trikeshed.common.CSVUtil.parseSegments(file)
 
         assertEquals(3, result.size, "Incorrect number of rows")
         assertEquals(3, result.row(0).size, "Incorrect number of columns")
@@ -130,30 +133,30 @@ class CSVUtilTest {
     @Test
     fun testEdgeCases() {
         // Empty file
-        val emptyFile = "".encodeToByteArray().toSeries().toMutableLongSeries()
-        assertThrows(Exception::class.java) { CSVUtil.parseSegments(emptyFile) }
+        val emptyFile = "".encodeToByteArray().toSeries().toLongSeries()
+        Assert.assertThrows(Exception::class.java) { parseSegments(emptyFile) }
 
         // File with only headers
-        val headersOnly = "A,B,C".encodeToByteArray().toSeries().toMutableLongSeries()
-        val headersResult = CSVUtil.parseSegments(headersOnly)
+        val headersOnly = "A,B,C".encodeToByteArray().toSeries().toLongSeries()
+        val headersResult = parseSegments(headersOnly)
         assertEquals(0, headersResult.size, "Should have no data rows")
 
         // Mismatched columns
         val mismatchedColumns = """
-            A,B,C
-            1,2,3
-            4,5
-            6,7,8,9
-        """.trimIndent().encodeToByteArray().toSeries().toMutableLongSeries()
-        assertThrows(Exception::class.java) { CSVUtil.parseSegments(mismatchedColumns) }
+                A,B,C
+                1,2,3
+                4,5
+                6,7,8,9
+            """.trimIndent().encodeToByteArray().toSeries().toLongSeries()
+        assertThrows(Exception::class.java) { parseSegments(mismatchedColumns) }
 
         // Escaped quotes and commas
         val escapedData = """
-            "A","B","C"
-            "1,1","2""2","3"
-            "4","5,5","6"
-        """.trimIndent().encodeToByteArray().toSeries().toMutableLongSeries()
-        val escapedResult = CSVUtil.parseSegments(escapedData)
+                "A","B","C"
+                "1,1","2""2","3"
+                "4","5,5","6"
+            """.trimIndent().encodeToByteArray().toSeries().toLongSeries()
+        val escapedResult = parseSegments(escapedData)
         assertEquals(2, escapedResult.size, "Incorrect number of rows")
         assertEquals("1,1", (escapedResult.row(0)[0].a as CharSeries).asString())
         assertEquals("2\"2", (escapedResult.row(0)[1].a as CharSeries).asString())
@@ -163,4 +166,3 @@ class CSVUtilTest {
 
 
 
- }

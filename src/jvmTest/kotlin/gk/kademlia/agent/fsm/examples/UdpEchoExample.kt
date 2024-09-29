@@ -1,5 +1,8 @@
 package gk.kademlia.agent.fsm.examples
 
+import gk.kademlia.agent.fsm.FSM
+import gk.kademlia.agent.fsm.ReadNode
+import gk.kademlia.agent.fsm.WriteNode
 import java.nio.ByteBuffer
 import java.nio.channels.DatagramChannel
 
@@ -17,15 +20,15 @@ class UdpEchoExample {
         fun main(vararg args: String) {
 
             val buf: ByteBuffer = ByteBuffer.allocate(20)
-            lateinit var top: gk.kademlia.agent.fsm.ReadNode
-            top = gk.kademlia.agent.fsm.ReadNode {
+            lateinit var top: ReadNode
+            top = ReadNode {
                 val datagramChannel = it.channel() as DatagramChannel
                 val sa = datagramChannel.receive(buf)
                 if (buf.hasRemaining()) {
                     buf.clear()
                     top
                 } else {
-                    gk.kademlia.agent.fsm.WriteNode {
+                    WriteNode {
                         datagramChannel.send(buf.flip(), sa)
                         if (!buf.hasRemaining()) {
                             buf.clear()
@@ -34,7 +37,7 @@ class UdpEchoExample {
                     }
                 }
             }
-            gk.kademlia.agent.fsm.FSM.Companion.launch(top, channel = DatagramChannel.open())
+            FSM.Companion.launch(top, channel = DatagramChannel.open())
         }
 
     }

@@ -29,3 +29,4 @@ fun <A> Series<A>.toLongSeries():LongSeries<A>  =  a.toLong() j {it:Long -> b(it
 
 
 
+

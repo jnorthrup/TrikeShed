@@ -4,22 +4,48 @@ package borg.trikeshed.common
 
 import borg.trikeshed.common.TypeEvidence.Companion.deduce
 import borg.trikeshed.common.TypeEvidence.Companion.update
-import borg.trikeshed.cursor.*
+import borg.trikeshed.cursor.Cursor
+import borg.trikeshed.cursor.RowVec
+import borg.trikeshed.cursor.meta
+import borg.trikeshed.cursor.row
 import borg.trikeshed.isam.RecordMeta
 import borg.trikeshed.isam.meta.IOMemento
-import borg.trikeshed.isam.meta.IOMemento.*
-import borg.trikeshed.lib.*
-import kotlin.jvm.JvmOverloads
+import borg.trikeshed.isam.meta.IOMemento.IoCharSeries
+import borg.trikeshed.isam.meta.IOMemento.IoString
+import borg.trikeshed.lib.CharSeries
+import borg.trikeshed.lib.FibonacciReporter
+import borg.trikeshed.lib.Join
+import borg.trikeshed.lib.Series
+import borg.trikeshed.lib.Twin
+import borg.trikeshed.lib.assert
+import borg.trikeshed.lib.debug
+import borg.trikeshed.lib.decodeUtf8
+import borg.trikeshed.lib.first
+import borg.trikeshed.lib.get
+import borg.trikeshed.lib.j
+import borg.trikeshed.lib.last
+import borg.trikeshed.lib.left
+import borg.trikeshed.lib.log
+import borg.trikeshed.lib.logDebug
+import borg.trikeshed.lib.right
+import borg.trikeshed.lib.size
+import borg.trikeshed.lib.toArray
+import borg.trikeshed.lib.toList
+import borg.trikeshed.lib.toSeries
+import borg.trikeshed.lib.α
+import borg.trikeshed.lib.`↺`
 import kotlin.jvm.JvmInline
+import kotlin.jvm.JvmOverloads
 
 /**
  * a versatile range of two unsigned shorts stored as a 32 bit Int value as Inline class
  */
 @JvmInline
-value class DelimitRange(val value: Int) : Twin<UShort>,ClosedRange<UShort> {
+value class DelimitRange(val value: Int) : Twin<UShort>, ClosedRange<UShort> {
     //emulates a pair of UShorts using 16 bits for two UShorts
     override val a: UShort get() = (value ushr 16).toUShort()
     override val b: UShort get() = (value and 0xFFFF).toUShort()
+
     companion object {
         fun of(a: UShort, b: UShort): DelimitRange = DelimitRange((a.toInt() shl 16) or b.toInt())
     }
@@ -30,10 +56,11 @@ value class DelimitRange(val value: Int) : Twin<UShort>,ClosedRange<UShort> {
         get() = b.dec()
 
     /**this range is end-exclusive, he UShort range end is inclusive. */
-    val asIntRange: IntRange get() {
-        val endExclusive = b.toInt().inc()
-        return (a.toInt() until b.inc().toInt())
-    }
+    val asIntRange: IntRange
+        get() {
+            val endExclusive = b.toInt().inc()
+            return (a.toInt() until b.inc().toInt())
+        }
 }
 
 
@@ -127,10 +154,9 @@ object CSVUtil {
     ): Cursor {
         //first we call parseSegments with our fileEvidence then we trap the RecordMeta child types as a separate meta,
         // then we use the CharSeries cursor features to create a String marshaller per column
-        val segments = parseSegments(file, fileEvidence)
+        val segments: Cursor = parseSegments(file, fileEvidence)
         val meta = (newMeta ?: (segments.meta α { (it as RecordMeta).child!! })).debug {
-            val l = it.toList()
-            logDebug { "parseConformantmeta: $l" }
+            logDebug { "parseConformantmeta: ${it.toList()}" }
         }
         return segments.size j { y: Int ->
             segments.row(y).let { rv: RowVec ->
@@ -138,12 +164,12 @@ object CSVUtil {
                     val recordMeta = meta[x]
                     val type = recordMeta.type
                     val any = rv[x].a
-                    try{
+                    try {
                         val fromChars = type.fromChars(any as CharSeries)
                         val function = recordMeta.`↺`
                         fromChars j function
-                    }catch (e:Exception){
-                        log  { "parseConformant: $e col $x row $y " }
+                    } catch (e: Exception) {
+                        log { "parseConformant: $e col $x row $y " }
                         throw e
                     }
                 }
@@ -178,12 +204,12 @@ object CSVUtil {
         val lines: MutableList<Join<Long, IntArray>> = mutableListOf()
 
         val last1: DelimitRange = header.last()
-        val (a,b) = last1
-        b .toLong().let { datazero2 ->
+        val (a, b) = last1
+        b.toLong().j{ datazero2:Long ->
             var datazero1 = datazero2
 
             do {
-                val file1:LongSeries<Byte> = file.drop(datazero1)
+                val file1: LongSeries<Byte> = file.drop(datazero1)
                 if (file1.size < headerNames.size) break  // we can parse n commas as n+1 default fields but no less
                 val lineEvidence =
                     fileEvidence?.let<MutableList<TypeEvidence>, MutableList<TypeEvidence>> { mutableListOf() }
