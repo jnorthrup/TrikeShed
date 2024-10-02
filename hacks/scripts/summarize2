@@ -48,7 +48,7 @@ cache_file() {
     if [ ! -s "$INPUT_FILE" ]; then
         echo "Error: Input file is empty or does not exist." >&2
         return 1
-    }
+    fi
     
     local MD5=$(get_md5 "$INPUT_FILE")
     local CACHE_SUBDIR="$CACHE_DIR/${MD5:0:2}/${MD5:2:2}"
