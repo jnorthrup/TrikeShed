@@ -143,19 +143,11 @@ process_job_queue() {
     local JOB_COUNT=${#JOB_QUEUE[@]}
     echo "Processing job queue ($JOB_COUNT jobs)..."
     for (( i=0; i<JOB_COUNT; i++ )); do
-        # Example job execution with progress updates
         echo "Processing job $((i+1))/$JOB_COUNT: ${JOB_QUEUE[$i]}"
         update_job_progress "$i" 10 1 "Starting job..."
         update_job_progress "$i" 10 5 "Processing..."
+        eval "${JOB_QUEUE[$i]}"
         update_job_progress "$i" 10 10 "Finishing job..."
-        
-        # Temporarily comment out the actual job execution
-        # eval "${JOB_QUEUE[$i]}"
-        
-        # Instead, test the summarize_segment function with a short test string
-        echo "Testing summarize_segment function..."
-        local TEST_TEXT="This is a test transcript. 00:00:05 The first key point is mentioned. 00:00:15 Another important point is discussed."
-        summarize_segment "$TEST_TEXT" "$MIDDLE_PROMPT"
     done
 }
 
@@ -174,6 +166,8 @@ process_vtt() {
     TILE_DURATION_SECONDS=720.0 # 12 minutes
     OVERLAP_DURATION_SECONDS=120.0 # 2 minutes
 
+    echo "Processing VTT file: $VTT_FILE"
+
     # Copy the VTT file to the temporary directory
     if ! cp "$VTT_FILE" "${BASE_NAME}.vtt"; then
         echo "Error: Failed to copy VTT file to temporary directory." >&2
@@ -187,7 +181,7 @@ process_vtt() {
     fi
 
     # Clean the VTT transcript
-    if ! python3 vttclean.py "$CACHED_VTT" > "$CLEANED_TRANSCRIPT" 2>"${CLEANED_TRANSCRIPT}.error"; then
+    if ! python3 "$(dirname "$0")/vttclean.py" "$CACHED_VTT" > "$CLEANED_TRANSCRIPT" 2>"${CLEANED_TRANSCRIPT}.error"; then
         echo "Error: Failed to clean the VTT file. Error log:" >&2
         cat "${CLEANED_TRANSCRIPT}.error" >&2
         exit 1
