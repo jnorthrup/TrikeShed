@@ -1,6 +1,10 @@
 package borg.trikeshed.common
 
-import borg.trikeshed.lib.*
+import borg.trikeshed.lib.ByteSeries
+import borg.trikeshed.lib.Join
+import borg.trikeshed.lib.Twin
+import borg.trikeshed.lib.assert
+import borg.trikeshed.lib.j
 
 typealias BFrag = Join< /**endexclusive range*/ Twin<Int>, ByteArray>
 
@@ -27,34 +31,25 @@ fun BFrag.flip(endExclusive: Int): BFrag {
     val buf = b
     return beg j newEnd j buf
 }
-
-/**
-split1 returns 1 or 2 BFrags.
-if the lit is not found, first is null, second is original
-if the lit is found, first is up to and including lit.
-if remaining bytes is zero, null, else second is the rest
- */
 fun BFrag.split1(lit: Byte): Twin<BFrag?> {
-    val (bounds, buf) = this
-    val (beg, end) = bounds
+    val (beg, end) = a
     var x = beg
-    while (x < end && buf[x] != lit) x++ //if token is found x is inclusive
+    while (x < end && b[x] != lit) x++
 
     val ret: Twin<BFrag?> = when (x) {
         end -> null j this
-        end.dec() -> this j null
+        end - 1 -> this j null
         else -> {
-            ++x     //x is now exclusive of token
-            x -= beg//the bug that held me captive for 2 days
-            val line = flip(x)// flip is 0-based as if beg was 0;
-            val tail = slice(x)//slice is 0-based as if beg was 0
+            x++
+            x -= beg
+            val line = flip(x)
+            val tail = slice(x)
             line j tail
         }
     }
     assert(ret.a != null || ret.b != null)
     return ret
 }
-
 fun BFrag.copyInto(ret: ByteArray, offset: Int) {
     val (bounds, buf) = this
     val (beg, end) = bounds

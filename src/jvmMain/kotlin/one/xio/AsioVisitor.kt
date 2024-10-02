@@ -27,7 +27,7 @@ interface AsioVisitor {
     class Impl : AsioVisitor {
         init {
             if (`$DBG`) `$origins`!![this] =
-                HttpMethod.wheresWaldo(4)
+                HttpMethod.Companion.wheresWaldo(4)
         }
 
         fun preRead(vararg env: Any?): Impl {
@@ -43,8 +43,9 @@ interface AsioVisitor {
             System.err.println("fail: $key")
             val channel = key.channel() as SocketChannel
             val receiveBufferSize = channel.socket().receiveBufferSize
-            val trim =
-                HttpMethod.UTF8.decode(ByteBuffer.allocateDirect(receiveBufferSize)).toString().trim { it <= ' ' }
+            val trim: String =
+                HttpMethod.Companion.UTF8.decode(ByteBuffer.allocateDirect(receiveBufferSize)).toString()
+                    .trim { it <= ' ' }
 
             throw UnsupportedOperationException("found " + trim + " in " + javaClass.name)
         }
@@ -72,14 +73,12 @@ interface AsioVisitor {
             val c = key.channel() as ServerSocketChannel
             val accept = c.accept()
             accept.configureBlocking(false)
-            HttpMethod.enqueue(accept, SelectionKey.OP_READ or SelectionKey.OP_WRITE, key.attachment())
+            HttpMethod.Companion.enqueue(accept, SelectionKey.OP_READ or SelectionKey.OP_WRITE, key.attachment())
         }
     }
 
     companion object {
-        @JvmField
         val `$DBG`: Boolean = null != System.getenv("DEBUG_VISITOR_ORIGINS")
-        @JvmField
         val `$origins`: WeakHashMap<Impl, String>? = if (`$DBG`) WeakHashMap() else null
     }
 }

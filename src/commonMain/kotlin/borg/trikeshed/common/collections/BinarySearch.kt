@@ -59,24 +59,17 @@ fun Series<Short>.binarySearch(element: Short, low_: Int = 0, high_: Int = size 
     return -(low + 1)  // key not found.
 }
 
-fun Series<Int>.binarySearch(element: Int, low_: Int = 0, high_: Int = size - 1): Int {
-    var low = low_
-    var high = high_
+tailrec fun Series<Int>.binarySearch(element: Int, low: Int = 0, high: Int = size - 1): Int {
+    if (low > high) return -(low + 1)
 
-    while (low <= high) {
-        val mid = (low + high).ushr(1)
-        val midVal = get(mid)
-        /** test for equality, then compare */
-        when {
-            midVal < element -> low = mid + 1
-            midVal > element -> high = mid - 1
-            else -> return mid // key found
-        }
-
+    val mid = (low + high) ushr 1
+    val midVal = get(mid)
+    return when {
+        midVal < element -> binarySearch(element, mid + 1, high)
+        midVal > element -> binarySearch(element, low, mid - 1)
+        else -> mid
     }
-    return -(low + 1)  // key not found.
 }
-
 fun Series<Long>.binarySearch(element: Long, low_: Int = 0, high_: Int = size - 1): Int {
     var low = low_
     var high = high_

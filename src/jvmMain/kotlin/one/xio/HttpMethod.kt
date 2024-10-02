@@ -1,5 +1,16 @@
 package one.xio
 
+import one.xio.AsioVisitor.Impl
+import java.io.IOException
+import java.nio.channels.ClosedChannelException
+import java.nio.channels.SelectableChannel
+import java.nio.channels.SelectionKey
+import java.nio.channels.Selector
+import java.nio.channels.SocketChannel
+import java.nio.charset.Charset
+import java.util.*
+import java.util.concurrent.ConcurrentLinkedQueue
+
 /**
  * See  http://www.w3.org/Protocols/rfc2616/rfc2616-sec9.html
  * User: jim
@@ -10,7 +21,7 @@ enum class HttpMethod {
     GET, POST, PUT, HEAD, DELETE, TRACE, CONNECT, OPTIONS, HELP, VERSION;
 
     companion object {
-        private val q: Queue<Array<Any>?> = ConcurrentLinkedQueue<Any?>()
+        private val q: Queue<Array<Any>?> = ConcurrentLinkedQueue()
         var UTF8: Charset = Charset.forName("UTF8")
         var selectorThread: Thread? = null
         var killswitch: Boolean = false
@@ -81,7 +92,8 @@ enum class HttpMethod {
                             e.printStackTrace()
                         }
                     }
-                    val select = selector.select(timeout)
+                    val select = //selector.select(timeout)
+                        selector!!.select(timeout)
 
                     timeout = if (0 == select) StrictMath.min(timeout shl 1, timeoutMax) else 1
                     if (0 != select) innerloop(protocoldecoder)
@@ -133,9 +145,8 @@ enum class HttpMethod {
                         if (AsioVisitor.`$DBG`) {
                             val asioVisitor = inferAsioVisitor(protocoldecoder, key)
                             if (asioVisitor is Impl) {
-                                val visitor = asioVisitor
-                                if (AsioVisitor.`$origins`!!.containsKey(visitor)) {
-                                    val s = AsioVisitor.`$origins`[visitor]
+                                val visitor: Impl = asioVisitor as one.xio.AsioVisitor.Impl                                if (AsioVisitor.`$origins`!!.containsKey(visitor)) {
+                                    val s: String = one.xio.AsioVisitor.`$origins`.get(visitor)
                                     System.err.println("origin$s")
                                 }
                             }

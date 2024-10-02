@@ -1,5 +1,6 @@
 package one.xio
 
+import one.xio.HttpMethod.Companion.UTF8
 import java.net.URLDecoder
 import java.nio.ByteBuffer
 
@@ -1651,7 +1652,7 @@ enum class HttpHeaders {
     ;
 
     private val header: String = URLDecoder.decode(name.replace('$', '%'))
-    val token: ByteBuffer = HttpMethod.Companion.UTF8.encode(header)
+    val token: ByteBuffer = UTF8.encode(header)
     var tokenLen: Int = token.limit()
 
     fun getHeader(): String {
@@ -1701,8 +1702,7 @@ enum class HttpHeaders {
                 val p3 = headers.position()
 
                 val key: String =
-                    HttpMethod.Companion.UTF8.decode(headers.position(p1).limit(p2 - 1) as ByteBuffer).toString()
-                        .trim { it <= ' ' }
+                    UTF8.decode(headers.position(p1).limit(p2 - 1) as ByteBuffer).toString().trim()
                 if (key.length > 0) {
                     linkedHashMap[key] = intArrayOf(p2, p3)
                 }

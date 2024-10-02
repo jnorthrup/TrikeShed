@@ -1,13 +1,17 @@
 package rxf.server
 
-import one.xio.HttpMethod
+import borg.trikeshed.lib.ByteSeries
+import borg.trikeshed.common.BFrag as ByteBuffer
+
 import java.io.Serializable
 import java.net.URLDecoder
 import java.nio.Buffer
-import java.nio.ByteBuffer
-import java.util.*
 
-//typealias Pair<A,B> = Join<A,B>
+import java.util.*
+import borg.trikeshed.lib.Join as Pair
+
+
+
 /**
  * This enum defines the HTTP Cookie and Set-Cookie header fields.
  * Using the Set-Cookie header field, an HTTP server can pass name/value
@@ -87,8 +91,8 @@ enum class CookieRfc6265Util {
             token = null
         }
 
-        override fun value(input: ByteBuffer): Serializable {
-            var input = input
+        override fun value(token: ByteBuffer): Serializable {
+            var input = token
             input = input.duplicate().rewind() as ByteBuffer
             do {
                 while (input.hasRemaining() && Character.isWhitespace((input.mark() as ByteBuffer).get().toInt()));
@@ -210,7 +214,7 @@ enum class CookieRfc6265Util {
      * name of Max-Age and an attribute-value of expiry-time.
      */
     `Max$2dAge` {
-        override fun value(input: ByteBuffer): Serializable? {
+        override fun value(input: ByteSeries): Serializable? {
             var input = input
             input = input.slice()
             while (input.hasRemaining() && Character.isWhitespace((input.mark() as ByteBuffer).get().toInt()));
