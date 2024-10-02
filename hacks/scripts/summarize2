@@ -231,6 +231,7 @@ process_vtt() {
     current_time=0
     segment_text=""
     segment_count=0
+    last_sentence="" # Store the last sentence of the previous segment
     > "$SUMMARY_FILE"  # Clear the summary file
 
     while IFS= read -r line || [ -n "$line" ]; do
@@ -263,9 +264,17 @@ process_vtt() {
                 echo "$summary" >> "$SUMMARY_FILE"
 
                 # Reset for the next segment
+                last_sentence=$(echo "$segment_text" | tail -n 1) # Store the last sentence
                 segment_text=""
                 current_time=$(echo "$seconds - $OVERLAP_DURATION_SECONDS" | bc -l)
             fi
+        fi
+
+        # Check for duplicate sentence at the beginning of the segment
+        first_sentence=$(echo "$line" | awk -F' ' '{print $NF}')
+        if [[ "$segment_text" == "" && "$first_sentence" == "$last_sentence" ]]; then
+            # Remove duplicate sentence, append the rest to the previous segment
+            line=$(echo "$line" | sed 's/^[^ ]* //')
         fi
         segment_text="${segment_text}${line}\n"
     done < "$CLEANED_TRANSCRIPT"
