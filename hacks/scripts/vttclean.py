@@ -87,7 +87,8 @@ def process_vtt(content, cache):
                     else:
                         _, prev_text = buffer[-1].split(' ', 1)
                         if is_prefix(prev_text, clean_caption):
-                            buffer.append(current_line)
+                            # Keep the first timestamp, use the longer text
+                            buffer[-1] = current_line 
                         else:
                             flush_buffer()
                             buffer.append(current_line)
