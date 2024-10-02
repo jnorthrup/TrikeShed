@@ -1,8 +1,6 @@
-#!/usr/bin/python3
- 
+#!/usr/bin/env python3
+
 import re
-import datetime
-import glob
 import sys
 
 def clean_text(text):
@@ -25,22 +23,24 @@ def process_vtt(content):
 
     processed_captions = []
     buffer = []
-    
+
     def flush_buffer():
         if buffer:
             processed_captions.append(buffer[-1])  # Keep the last (most complete) line
             buffer.clear()
-         lines = caption.split('\n')1
+
+    for caption in captions:
+        lines = caption.split('\n')
         if len(lines) >= 2:
             # Extract only the start time and remove milliseconds
-            timestamp_match = re.match(r'(\d{2}:\d{2}:\d{2})\.(\d{3})', lines[0])
+            timestamp_match = re.match(r'(\d{2}:\d{2}:\d{2})', lines[0])
             if timestamp_match:
-                                                       timestamp = f"{timestamp_match.group(1)}.{timestamp_match.group(2)}"
+                timestamp = timestamp_match.group(1)
                 text = ' '.join(lines[1:])
                 clean_caption = clean_text(text)
                 if clean_caption:
                     current_line = f"{timestamp} {clean_caption}"
-                    
+
                     if not buffer:
                         buffer.append(current_line)
                     else:
@@ -57,14 +57,13 @@ def process_vtt(content):
 
 if __name__ == "__main__":
     try:
-        if len(sys.argv) < 2:
-            print("Usage: python vttclean.py <file_pattern>", file=sys.stderr)
-            sys.exit(1)
-
-        file_pattern = sys.argv[1]
-        for filename in glob.glob(file_pattern):
-            with open(filename, 'r', encoding='utf-8') as file:
+        if len(sys.argv) > 1:
+            # File input
+            with open(sys.argv[1], 'r', encoding='utf-8') as file:
                 content = file.read()
+        else:
+            # Stdin input
+            content = sys.stdin.read()
 
         result = process_vtt(content)
         print(result)
