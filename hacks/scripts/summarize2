@@ -43,13 +43,31 @@ get_md5() {
 cache_file() {
     local INPUT_FILE="$1"
     local EXTENSION="$2"
+    
+    # Check if the input file exists and is not empty
+    if [ ! -s "$INPUT_FILE" ]; then
+        echo "Error: Input file is empty or does not exist." >&2
+        return 1
+    }
+    
     local MD5=$(get_md5 "$INPUT_FILE")
     local CACHE_SUBDIR="$CACHE_DIR/${MD5:0:2}/${MD5:2:2}"
     local CACHE_FILE="$CACHE_SUBDIR/$MD5$EXTENSION"
 
-    mkdir -p "$CACHE_SUBDIR"
-    ln -f "$INPUT_FILE" "$CACHE_FILE"
-    echo "$CACHE_FILE"
+    # Create cache subdirectory if it doesn't exist
+    if ! mkdir -p "$CACHE_SUBDIR"; then
+        echo "Error: Failed to create cache subdirectory." >&2
+        return 1
+    fi
+
+    # Attempt to create the hardlink
+    if ln -f "$INPUT_FILE" "$CACHE_FILE"; then
+        echo "$CACHE_FILE"
+        return 0
+    else
+        echo "Error: Failed to create cache file." >&2
+        return 1
+    fi
 }
 
 # Function to sanitize a string for use as a filename
@@ -152,14 +170,27 @@ process_vtt() {
     OVERLAP_DURATION_SECONDS=120.0 # 2 minutes
 
     # Copy the VTT file to the temporary directory
-    cp "$VTT_FILE" "${BASE_NAME}.vtt"
+    if ! cp "$VTT_FILE" "${BASE_NAME}.vtt"; then
+        echo "Error: Failed to copy VTT file to temporary directory." >&2
+        exit 1
+    fi
+
     local CACHED_VTT=$(cache_file "${BASE_NAME}.vtt" ".vtt")
+    if [ $? -ne 0 ]; then
+        echo "Error: Failed to cache VTT file." >&2
+        exit 1
+    fi
 
     # Clean the VTT transcript
-    python3 vttclean.py "$CACHED_VTT" > "$CLEANED_TRANSCRIPT" 2>"${CLEANED_TRANSCRIPT}.error"
-    if [ $? -ne 0 ]; then
+    if ! python3 vttclean.py "$CACHED_VTT" > "$CLEANED_TRANSCRIPT" 2>"${CLEANED_TRANSCRIPT}.error"; then
         echo "Error: Failed to clean the VTT file. Error log:" >&2
         cat "${CLEANED_TRANSCRIPT}.error" >&2
+        exit 1
+    fi
+
+    # Check if the cleaned transcript is empty
+    if [ ! -s "$CLEANED_TRANSCRIPT" ]; then
+        echo "Error: Cleaned transcript is empty." >&2
         exit 1
     fi
 
