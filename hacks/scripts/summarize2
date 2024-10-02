@@ -324,6 +324,31 @@ process_vtt() {
     rm -rf "$TEMP_DIR"
 }
 
+# Function to calculate the time difference between two timestamps in HH:MM:SS format
+time_difference() {
+  local TIME1="$1"  # Format: HH:MM:SS
+  local TIME2="$2"  # Format: HH:MM:SS
+
+  # Extract hours, minutes, and seconds from timestamps
+  local TIME1_HOUR=$(echo "$TIME1" | cut -d: -f1)
+  local TIME1_MINUTE=$(echo "$TIME1" | cut -d: -f2)
+  local TIME1_SECOND=$(echo "$TIME1" | cut -d: -f3)
+
+  local TIME2_HOUR=$(echo "$TIME2" | cut -d: -f1)
+  local TIME2_MINUTE=$(echo "$TIME2" | cut -d: -f2)
+  local TIME2_SECOND=$(echo "$TIME2" | cut -d: -f3)
+
+  # Calculate total seconds for each timestamp
+  local TIME1_TOTAL_SECONDS=$((TIME1_HOUR * 3600 + TIME1_MINUTE * 60 + TIME1_SECOND))
+  local TIME2_TOTAL_SECONDS=$((TIME2_HOUR * 3600 + TIME2_MINUTE * 60 + TIME2_SECOND))
+
+  # Calculate the difference in seconds
+  local DIFF_SECONDS=$((TIME1_TOTAL_SECONDS - TIME2_TOTAL_SECONDS))
+
+  # Return the difference (could be negative if TIME2 is later than TIME1)
+  echo "$DIFF_SECONDS"
+}
+
 # Main script logic
 if [ $# -eq 0 ]; then
     echo "Error: No input provided. Please provide a valid URL, VTT file, or a local audio file."
