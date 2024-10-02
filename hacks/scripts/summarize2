@@ -173,12 +173,10 @@ update_job_progress() {
 process_job_queue() {
     local JOB_COUNT=${#JOB_QUEUE[@]}
     echo "Processing job queue ($JOB_COUNT jobs)..."
-    # Use tqdm to show progress bar
-    for (( i=0; i<JOB_COUNT; i++ )); do
+     for (( i=0; i<JOB_COUNT; i++ )); do
         # Remove update_job_progress calls
         eval "${JOB_QUEUE[$i]}"
-    done | tqdm --total="$JOB_COUNT" --format="Processing jobs: {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}{postfix}]"
-}
+    done  }
 
 # Function to process a single segment
 process_segment() {
