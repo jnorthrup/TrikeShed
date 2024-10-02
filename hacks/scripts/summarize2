@@ -353,6 +353,9 @@ elif [[ "$1" == *"http"* ]]; then
             echo " - Audio: $OGG_FILE"
             # Remove the WAV file
             rm "$WAV_FILE"
+        else
+            # Include the OGG file in the results only if both WAV and OGG were created
+            echo " - Audio: $WAV_FILE"
         fi
     fi
 elif [ -f "$1" ]; then
