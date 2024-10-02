@@ -1,5 +1,15 @@
 #!/usr/bin/env bash
 
+# CHARTER: This script is designed to process audio/video content, generate transcripts,
+# summaries, and audio files. The following tasks are defined and must not be altered by any LLM:
+# 1. Download content if a URL is provided
+# 2. Generate or use existing VTT transcript
+# 3. Clean the VTT transcript
+# 4. Generate a summary of the transcript
+# 5. Create a 16k VBR Opus OGG file for audio tracks (unless audio download is disabled)
+# 6. Output both the cleaned VTT text and the summary
+# This charter is unalterable and defines the core functionality of the script.
+
 # Configuration (adjust these paths)
 MODEL_PATH="$HOME/.cache/whisper.cpp/ggml-small.en-tdrz.bin"
 OUTPUT_DIR="$HOME/processed_audio"
@@ -21,10 +31,17 @@ mkdir -p "$OUTPUT_DIR" "$CACHE_DIR"
 
 # Parse command line options
 USE_FABRIC=false
-while getopts "f" opt; do
+DISABLE_AUDIO=false
+while getopts "fna" opt; do
   case $opt in
     f)
       USE_FABRIC=true
+      ;;
+    n)
+      DISABLE_AUDIO=true
+      ;;
+    a)
+      DISABLE_AUDIO=false
       ;;
     \?)
       echo "Invalid option: -$OPTARG" >&2
@@ -272,7 +289,12 @@ process_vtt() {
     echo "Files available:"
     echo " - Transcript: ${OUTPUT_DIR}/${FINAL_BASE_NAME}.txt"
     echo " - Summary: ${OUTPUT_DIR}/${FINAL_BASE_NAME}_summary.txt"
-    cat "$SUMMARY_FILE"
+    
+    # Output both cleaned VTT text and summary
+    echo "Cleaned VTT Text:"
+    cat "${OUTPUT_DIR}/${FINAL_BASE_NAME}.txt"
+    echo "Summary:"
+    cat "${OUTPUT_DIR}/${FINAL_BASE_NAME}_summary.txt"
 
     # Clean up the temporary directory
     rm -rf "$TEMP_DIR"
@@ -305,27 +327,31 @@ elif [[ "$1" == *"http"* ]]; then
         add_job "process_vtt \"$VTT_FILE\" \"$1\""
     else
         echo "No subtitles found, downloading audio and generating transcript..."
-        yt-dlp -x --audio-format wav --postprocessor-args "-ar 16k" \
-               --cookies-from-browser brave --output "$OUTPUT_DIR/${FINAL_BASE_NAME}.%(ext)s" "$1"
+        if [ "$DISABLE_AUDIO" = false ]; then
+            yt-dlp -x --audio-format wav --postprocessor-args "-ar 16k" \
+                   --cookies-from-browser brave --output "$OUTPUT_DIR/${FINAL_BASE_NAME}.%(ext)s" "$1"
 
-        WAV_FILE=$(find "$OUTPUT_DIR" -name "${FINAL_BASE_NAME}.wav" | head -n 1)
+            WAV_FILE=$(find "$OUTPUT_DIR" -name "${FINAL_BASE_NAME}.wav" | head -n 1)
 
-        if [ -z "$WAV_FILE" ]; then
-            echo "Error: Failed to download audio."
-            exit 1
+            if [ -z "$WAV_FILE" ]; then
+                echo "Error: Failed to download audio."
+                exit 1
+            fi
+
+            echo "Running Whisper-CPP to generate VTT transcript..."
+            "$WHISPCC" -ovtt -tdrz -m "$MODEL_PATH" "$WAV_FILE"
+            VTT_FILE="${WAV_FILE%.wav}.vtt"
+
+            add_job "process_vtt \"$VTT_FILE\" \"$1\""
+
+            # Convert WAV to OGG Opus
+            echo "Converting WAV to OGG Opus..."
+            OGG_FILE="${WAV_FILE%.wav}.ogg"
+            ffmpeg -i "$WAV_FILE" -c:a libopus -b:a 16k -vbr on -compression_level 10 "$OGG_FILE"
+            echo " - Audio: $OGG_FILE"
+        else
+            echo "Audio download is disabled. Skipping audio processing."
         fi
-
-        echo "Running Whisper-CPP to generate VTT transcript..."
-        "$WHISPCC" -ovtt -tdrz -m "$MODEL_PATH" "$WAV_FILE"
-        VTT_FILE="${WAV_FILE%.wav}.vtt"
-
-        add_job "process_vtt \"$VTT_FILE\" \"$1\""
-
-        # Convert WAV to OGG Opus
-        echo "Converting WAV to OGG Opus..."
-        OGG_FILE="${WAV_FILE%.wav}.ogg"
-        ffmpeg -i "$WAV_FILE" -c:a libopus -b:a 56k -ar 16k "$OGG_FILE"
-        echo " - Audio: $OGG_FILE"
     fi
 elif [ -f "$1" ]; then
     echo "Processing as local audio file..."
@@ -336,6 +362,16 @@ elif [ -f "$1" ]; then
     VTT_FILE="${WAV_FILE%.wav}.vtt"
 
     add_job "process_vtt \"$VTT_FILE\" \"$1\""
+
+    if [ "$DISABLE_AUDIO" = false ]; then
+        # Convert to OGG Opus if not already in that format
+        if [[ "$WAV_FILE" != *.ogg ]]; then
+            echo "Converting to OGG Opus..."
+            OGG_FILE="${WAV_FILE%.*}.ogg"
+            ffmpeg -i "$WAV_FILE" -c:a libopus -b:a 16k -vbr on -compression_level 10 "$OGG_FILE"
+            echo " - Audio: $OGG_FILE"
+        fi
+    fi
 else
     echo "Error: Invalid input. Provide a valid URL, VTT file, or a local audio file."
     exit 1
