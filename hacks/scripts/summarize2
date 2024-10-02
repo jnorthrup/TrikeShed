@@ -318,16 +318,16 @@ process_vtt() {
     cp "${BASE_NAME}_cleaned.txt" "${OUTPUT_DIR}/${FINAL_BASE_NAME}.txt"
     cp "${BASE_NAME}_summary_v${VERSION}.txt" "${OUTPUT_DIR}/${FINAL_BASE_NAME}_summary.txt"
 
-    echo "Files available:"
-    echo " - Transcript: ${OUTPUT_DIR}/${FINAL_BASE_NAME}.txt"
-    echo " - Summary: ${OUTPUT_DIR}/${FINAL_BASE_NAME}_summary.txt"
-    
     # Output both cleaned VTT text and summary
     echo "Cleaned VTT Text (last 50 lines):"
     tail -n 50 "${OUTPUT_DIR}/${FINAL_BASE_NAME}.txt"
     echo "Summary:"
     cat "${OUTPUT_DIR}/${FINAL_BASE_NAME}_summary.txt"
 
+    echo "Files available:"
+    echo " - Transcript: ${OUTPUT_DIR}/${FINAL_BASE_NAME}.txt"
+    echo " - Summary: ${OUTPUT_DIR}/${FINAL_BASE_NAME}_summary.txt"
+    
     # Clean up the temporary directory
     rm -rf "$TEMP_DIR"
 }
