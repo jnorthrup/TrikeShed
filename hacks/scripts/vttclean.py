@@ -2,6 +2,12 @@
 
 import re
 import sys
+import os
+import json
+from datetime import datetime, timedelta
+
+CACHE_FILE = os.path.expanduser("~/.vttclean_cache.json")
+CACHE_EXPIRY = timedelta(hours=1)
 
 def clean_text(text):
     # Remove HTML tags
@@ -14,7 +20,30 @@ def clean_text(text):
 def is_prefix(a, b):
     return b.startswith(a)
 
-def process_vtt(content):
+def load_cache():
+    if os.path.exists(CACHE_FILE):
+        try:
+            with open(CACHE_FILE, 'r') as f:
+                cache = json.load(f)
+            if datetime.fromisoformat(cache['timestamp']) + CACHE_EXPIRY > datetime.now():
+                return cache['data']
+        except (json.JSONDecodeError, KeyError, ValueError):
+            pass
+    return {}
+
+def save_cache(data):
+    cache = {
+        'timestamp': datetime.now().isoformat(),
+        'data': data
+    }
+    with open(CACHE_FILE, 'w') as f:
+        json.dump(cache, f)
+
+def invalidate_cache():
+    if os.path.exists(CACHE_FILE):
+        os.remove(CACHE_FILE)
+
+def process_vtt(content, cache):
     # Remove WEBVTT header and metadata
     content = re.sub(r'^WEBVTT\n.*?\n\n', '', content, flags=re.DOTALL)
 
@@ -37,7 +66,15 @@ def process_vtt(content):
             if timestamp_match:
                 timestamp = timestamp_match.group(1)
                 text = ' '.join(lines[1:])
-                clean_caption = clean_text(text)
+                
+                # Use cached clean caption if available
+                cache_key = f"{timestamp}_{text}"
+                if cache_key in cache:
+                    clean_caption = cache[cache_key]
+                else:
+                    clean_caption = clean_text(text)
+                    cache[cache_key] = clean_caption
+
                 if clean_caption:
                     current_line = f"{timestamp} {clean_caption}"
 
@@ -57,6 +94,8 @@ def process_vtt(content):
 
 if __name__ == "__main__":
     try:
+        cache = load_cache()
+
         if len(sys.argv) > 1:
             # File input
             with open(sys.argv[1], 'r', encoding='utf-8') as file:
@@ -65,8 +104,13 @@ if __name__ == "__main__":
             # Stdin input
             content = sys.stdin.read()
 
-        result = process_vtt(content)
+        result = process_vtt(content, cache)
         print(result)
+
+        # Save the updated cache
+        save_cache(cache)
+
     except Exception as e:
         print(f"Error processing input: {e}", file=sys.stderr)
+        invalidate_cache()  # Invalidate cache on error
         sys.exit(1)
