@@ -410,9 +410,26 @@ elif [ -f "$1" ]; then
     echo "Processing as local audio file..." 
     WAV_FILE="$1"
 
+    # Convert to the specified output audio format if needed
+    if [ "$OUTPUT_AUDIO_FORMAT" == "ogg" ]; then
+        echo "Converting to OGG Opus..."
+        OGG_FILE="${WAV_FILE%.*}.ogg"
+        ffmpeg -i "$WAV_FILE" -c:a libopus -b:a 16k -vbr on -compression_level 10 "$OGG_FILE"
+        echo " - Audio: $OGG_FILE"
+
+        # Remove the WAV file if OGG conversion is successful
+        if [ -f "$OGG_FILE" ]; then
+            rm "$WAV_FILE"
+        else
+            echo "Error: Failed to convert to OGG Opus. Keeping WAV file." >&2
+        fi
+    else
+        echo " - Audio: $WAV_FILE"
+    fi
+
     echo "Running Whisper-CPP to generate VTT transcript..."
     "$WHISPCC" -ovtt -tdrz -m "$MODEL_PATH" "$WAV_FILE"
-    VTT_FILE="${WAV_FILE%.wav}.vtt"
+    VTT_FILE="${WAV_FILE%.*}.vtt"
 
     add_job "process_vtt \"$VTT_FILE\" \"$1\""
 
