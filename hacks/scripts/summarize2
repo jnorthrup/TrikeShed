@@ -72,9 +72,12 @@ summarize_segment() {
     # Count the number of lines in the input
     local LINE_COUNT=$(echo "$SEGMENT_TEXT" | wc -l)
 
-    # If the input has less than 12 lines, return a simple response
+    # If the input has less than 12 lines, remove cache and return a simple response
     if [ "$LINE_COUNT" -lt 12 ]; then
-        echo "The input is too short for meaningful summarization. Here's the original text:"
+        local MD5=$(echo "$SEGMENT_TEXT" | md5sum | cut -d' ' -f1)
+        local CACHE_SUBDIR="$CACHE_DIR/${MD5:0:2}/${MD5:2:2}"
+        rm -f "$CACHE_SUBDIR/$MD5"*
+        echo "The input is too short for meaningful summarization. Cache entry removed. Here's the original text:"
         echo "$SEGMENT_TEXT"
         return 0
     fi
