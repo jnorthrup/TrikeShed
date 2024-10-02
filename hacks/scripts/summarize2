@@ -351,18 +351,24 @@ elif [[ "$1" == *"http"* ]]; then
     else
         echo "No subtitles found, downloading audio and generating transcript..."
         if [ "$DISABLE_AUDIO" = false ]; then
-            yt-dlp -x --audio-format wav --postprocessor-args "-ar 16k" \
-                   --cookies-from-browser brave --output "$OUTPUT_DIR/${FINAL_BASE_NAME}.%(ext)s" "$1"
+            if ! yt-dlp -x --audio-format wav --postprocessor-args "-ar 16k" \
+                   --cookies-from-browser brave --output "$OUTPUT_DIR/${FINAL_BASE_NAME}.%(ext)s" "$1"; then
+                echo "Error: Failed to download audio using yt-dlp. Check the URL and your internet connection." >&2
+                exit 1
+            fi
 
             WAV_FILE=$(find "$OUTPUT_DIR" -name "${FINAL_BASE_NAME}.wav" | head -n 1)
 
             if [ -z "$WAV_FILE" ]; then
-                echo "Error: Failed to download audio."
+                echo "Error: WAV file not found after download. Check yt-dlp output." >&2
                 exit 1
             fi
 
             echo "Running Whisper-CPP to generate VTT transcript..."
-            "$WHISPCC" -ovtt -tdrz -m "$MODEL_PATH" "$WAV_FILE"
+            if ! "$WHISPCC" -ovtt -tdrz -m "$MODEL_PATH" "$WAV_FILE"; then
+                echo "Error: Whisper-CPP transcription failed. Check the model path and audio file." >&2
+                exit 1
+            fi
             VTT_FILE="${WAV_FILE%.wav}.vtt"
 
             add_job "process_vtt \"$VTT_FILE\" \"$1\""
@@ -380,7 +386,7 @@ elif [[ "$1" == *"http"* ]]; then
         fi
     fi
 elif [ -f "$1" ]; then
-    echo "Processing as local audio file..."
+    echo "Processing as local audio file..." 
     WAV_FILE="$1"
 
     echo "Running Whisper-CPP to generate VTT transcript..."
