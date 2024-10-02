@@ -47,6 +47,10 @@ def process_vtt(content, cache):
     # Remove WEBVTT header and metadata
     content = re.sub(r'^WEBVTT\n.*?\n\n', '', content, flags=re.DOTALL)
 
+    for line in content.splitlines():
+        if re.match(r'^\d\d:\d\d:\d\d.\d\d\d --> \d\d:\d\d:\d\d.\d\d\d$', line):
+            continue
+
     # Split into captions
     captions = re.split(r'\n\n+', content)
 
