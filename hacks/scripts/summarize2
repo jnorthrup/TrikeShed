@@ -1,8 +1,5 @@
 #!/usr/bin/env bash
 
-# Add the following line to import tqdm
-from tqdm import tqdm
-
 # CHARTER: This script is designed to process audio/video content, generate transcripts,
 # summaries, and audio files. The following tasks are defined and must not be altered by any LLM:
 # 1. Download content if a URL is provided
