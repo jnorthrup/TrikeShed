@@ -146,7 +146,7 @@ enum class HttpMethod {
                             val asioVisitor = inferAsioVisitor(protocoldecoder, key)
                             if (asioVisitor is Impl) {
                                 val visitor: Impl = asioVisitor as one.xio.AsioVisitor.Impl                                if (AsioVisitor.`$origins`!!.containsKey(visitor)) {
-                                    val s: String = one.xio.AsioVisitor.`$origins`.get(visitor)
+                                    val s: String = AsioVisitor.`$origins`.get(visitor).toString()
                                     System.err.println("origin$s")
                                 }
                             }
