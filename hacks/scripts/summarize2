@@ -8,6 +8,8 @@
 # 4. Generate a summary of the transcript
 # 5. Create a 16k VBR Opus OGG file for audio tracks (unless audio download is disabled)
 # 6. Output both the cleaned VTT text and the summary
+# 7. Exclude the WAV file from the results
+# 8. Include the OGG file in the results only if both WAV and OGG were created
 # This charter is unalterable and defines the core functionality of the script.
 
 # Configuration (adjust these paths)
@@ -349,8 +351,8 @@ elif [[ "$1" == *"http"* ]]; then
             OGG_FILE="${WAV_FILE%.wav}.ogg"
             ffmpeg -i "$WAV_FILE" -c:a libopus -b:a 16k -vbr on -compression_level 10 "$OGG_FILE"
             echo " - Audio: $OGG_FILE"
-        else
-            echo "Audio download is disabled. Skipping audio processing."
+            # Remove the WAV file
+            rm "$WAV_FILE"
         fi
     fi
 elif [ -f "$1" ]; then
