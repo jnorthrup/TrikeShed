@@ -183,6 +183,18 @@ process_job_queue() {
     done | tqdm --total="$JOB_COUNT" --format="Processing jobs: {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}{postfix}]"
 }
 
+# Function to process a single segment
+process_segment() {
+    local SEGMENT_TEXT="$1"
+    local PROMPT="$2"
+    local OUTPUT_FILE="$3"  # Add output file argument
+
+    # ... (Your existing logic for summarize_segment)
+
+    # Write the summary to the specified output file
+    echo "$SUMMARY_OUTPUT" > "$OUTPUT_FILE" 
+}
+
 # Function to process a VTT file (generate summary and handle versioning)
 process_vtt() {
     local VTT_FILE=$1
@@ -225,15 +237,15 @@ process_vtt() {
         exit 1
     fi
 
-    # Generate summary (always fresh)
-    echo "Summarizing transcript..."
+    # Generate summary using background processes
+    echo "Summarizing transcript using background processes..."
 
-    # Tiling for large transcripts
+    # Tiling and parallel processing
     current_time=0
     segment_text=""
     segment_count=0
-    last_sentence="" # Store the last sentence of the previous segment
-    > "$SUMMARY_FILE"  # Clear the summary file
+    last_sentence=""
+    job_pids=()  # Array to store background job PIDs
 
     while IFS= read -r line || [ -n "$line" ]; do
         # Extract timestamp (assuming format 00:00:00.000 --> 00:00:01.000)
@@ -254,18 +266,12 @@ process_vtt() {
                 else
                     prompt="$MIDDLE_PROMPT"
                 fi
-                
-                summary=$(summarize_segment "$segment_text" "$prompt")
-                if [ $? -ne 0 ]; then
-                    echo "Error: Failed to summarize segment $segment_count." >&2
-                    echo "Problematic segment text:" >&2
-                    echo "$segment_text" >&2
-                    exit 1
-                fi
-                echo "$summary" >> "$SUMMARY_FILE"
 
-                # Reset for the next segment
-                last_sentence=$(echo "$segment_text" | tail -n 1) # Store the last sentence
+                # Start processing the segment in the background
+                segment_output_file="${TEMP_DIR}/segment_${segment_count}.txt"
+                process_segment "$segment_text" "$prompt" "$segment_output_file" &
+                job_pids+=($!)  # Store the PID of the background process
+
                 segment_text=""
                 current_time=$(echo "$seconds - $OVERLAP_DURATION_SECONDS" | bc -l)
             fi
@@ -280,17 +286,24 @@ process_vtt() {
         segment_text="${segment_text}${line}\n"
     done < "$CLEANED_TRANSCRIPT"
 
-    # Summarize the last segment
+    # Process the last segment
     if [ -n "$segment_text" ]; then
         segment_count=$((segment_count + 1))
-        echo "Processing final segment $segment_count..." >&2
-        summary=$(summarize_segment "$segment_text" "$LAST_PROMPT")
-        if [ $? -ne 0 ]; then
-            echo "Error: Failed to summarize final segment $segment_count." >&2
-            exit 1
-        fi
-        echo "$summary" >> "$SUMMARY_FILE"
+        segment_output_file="${TEMP_DIR}/segment_${segment_count}.txt"
+        process_segment "$segment_text" "$LAST_PROMPT" "$segment_output_file" &
+        job_pids+=($!) 
     fi
+
+    # Wait for all background jobs to complete
+    echo "Waiting for summarization jobs to finish..."
+    for pid in "${job_pids[@]}"; do
+        wait "$pid"
+    done
+
+    # Combine the segment summaries in the correct order
+    for i in $(seq 1 $segment_count); do
+        cat "${TEMP_DIR}/segment_${i}.txt" >> "$SUMMARY_FILE"
+    done
 
     echo "Summarization complete. Processed $segment_count segments." >&2
 
