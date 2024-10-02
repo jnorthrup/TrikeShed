@@ -69,6 +69,16 @@ summarize_segment() {
     local PROMPT="$2"
     local SUMMARY_OUTPUT=""
 
+    # Count the number of lines in the input
+    local LINE_COUNT=$(echo "$SEGMENT_TEXT" | wc -l)
+
+    # If the input has less than 12 lines, return a simple response
+    if [ "$LINE_COUNT" -lt 12 ]; then
+        echo "The input is too short for meaningful summarization. Here's the original text:"
+        echo "$SEGMENT_TEXT"
+        return 0
+    fi
+
     if $USE_FABRIC; then
         SUMMARY_OUTPUT=$(fabric -p summarize <<< "$SEGMENT_TEXT" 2>&1)
     else
