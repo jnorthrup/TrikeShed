@@ -8,7 +8,7 @@ import kotlinx.coroutines.*
 import borg.trikeshed.lib.RecursiveMutableSeries
 
 
-
+typealias ByteBuffer = ByteSeries
 
 
 expect interface NetworkChannel {
@@ -25,7 +25,7 @@ enum class HttpMethod {
 
     companion object {
         private val q = RecursiveMutableSeries<Array<Any?>>() // Use RecursiveMutableSeries
-        var UTF8 = Charsets.UTF_8 // Use Kotlin's Charsets
+        var UTF8 =  UTF_8
         private var selectorJob: Job? = null // Use a coroutine Job
         var killswitch = false
 
