@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 
+# Add the following line to import tqdm
+from tqdm import tqdm
+
 # CHARTER: This script is designed to process audio/video content, generate transcripts,
 # summaries, and audio files. The following tasks are defined and must not be altered by any LLM:
 # 1. Download content if a URL is provided
@@ -173,13 +176,11 @@ update_job_progress() {
 process_job_queue() {
     local JOB_COUNT=${#JOB_QUEUE[@]}
     echo "Processing job queue ($JOB_COUNT jobs)..."
+    # Use tqdm to show progress bar
     for (( i=0; i<JOB_COUNT; i++ )); do
-        echo "Processing job $((i+1))/$JOB_COUNT: ${JOB_QUEUE[$i]}"
-        update_job_progress "$i" 10 1 "Starting job..."
-        update_job_progress "$i" 10 5 "Processing..."
+        # Remove update_job_progress calls
         eval "${JOB_QUEUE[$i]}"
-        update_job_progress "$i" 10 10 "Finishing job..."
-    done
+    done | tqdm --total="$JOB_COUNT" --format="Processing jobs: {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}{postfix}]"
 }
 
 # Function to process a VTT file (generate summary and handle versioning)
