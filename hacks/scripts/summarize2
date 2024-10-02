@@ -52,9 +52,11 @@ cache_file() {
     
     local MD5=$(get_md5 "$INPUT_FILE")
     local CACHE_SUBDIR="$CACHE_DIR/${MD5:0:2}/${MD5:2:2}"
-    local CACHE_FILE="$CACHE_SUBDIR/$MD5$EXTENSION"
+    local SAFE_FILENAME=$(echo "$INPUT_FILE" | sed 's/[^a-zA-Z0-9._-]/_/g')
+    local CACHE_FILE="$CACHE_SUBDIR/${MD5}_${SAFE_FILENAME}${EXTENSION}"
 
     echo "Cache operation: MD5 sum = $MD5" >&2
+    echo "Cache file: $CACHE_FILE" >&2
 
     # Create cache subdirectory if it doesn't exist
     if ! mkdir -p "$CACHE_SUBDIR"; then
