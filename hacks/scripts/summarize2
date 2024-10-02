@@ -54,6 +54,8 @@ cache_file() {
     local CACHE_SUBDIR="$CACHE_DIR/${MD5:0:2}/${MD5:2:2}"
     local CACHE_FILE="$CACHE_SUBDIR/$MD5$EXTENSION"
 
+    echo "Cache operation: MD5 sum = $MD5" >&2
+
     # Create cache subdirectory if it doesn't exist
     if ! mkdir -p "$CACHE_SUBDIR"; then
         echo "Error: Failed to create cache subdirectory." >&2
@@ -62,6 +64,7 @@ cache_file() {
 
     # Attempt to create the hardlink
     if ln -f "$INPUT_FILE" "$CACHE_FILE"; then
+        echo "Cache file created: $CACHE_FILE" >&2
         echo "$CACHE_FILE"
         return 0
     else
