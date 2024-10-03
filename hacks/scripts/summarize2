@@ -73,6 +73,39 @@ set -euo pipefail
 # Function definitions
 $(declare -f log get_md5 cache_file sanitize_filename clean_text get_total_duration summarize_text process_vtt process_youtube_url download_and_process_audio process_local_audio)
 
+# Function to get MD5 sum of URL
+get_url_md5() {
+    echo -n "$1" | md5sum | awk '{print $1}'
+}
+
+# Modified cache_file function to use URL MD5
+cache_file() {
+    local url="$1"
+    local output="$2"
+    local md5=$(get_url_md5 "$url")
+    local cache_path="$CACHE_DIR/$md5"
+
+    if [[ -f "$cache_path" ]]; then
+        log "DEBUG" "Cache hit for $url"
+        cp "$cache_path" "$output"
+        return 0
+    else
+        log "DEBUG" "Cache miss for $url"
+        return 1
+    fi
+}
+
+# Modified function to save to cache using URL MD5
+save_to_cache() {
+    local url="$1"
+    local file="$2"
+    local md5=$(get_url_md5 "$url")
+    local cache_path="$CACHE_DIR/$md5"
+
+    cp "$file" "$cache_path"
+    log "DEBUG" "Saved to cache: $url"
+}
+
 # Logging function
 log() {
     local level="\$1"
