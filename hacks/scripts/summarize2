@@ -18,6 +18,7 @@ MODEL_PATH="$WHISPCC/models/ggml-small.en-tdrz.bin"
 OUTPUT_DIR="$HOME/processed_audio"
 CACHE_DIR="/tmp/summarize_cache"
 OLLAMA_MODEL="llama3.1:latest"
+OLLAMA_MODEL="deepseek-coder-v2:16b"
 
 # Prompts for different segments
 FIRST_PROMPT="Summarize this beginning part of a transcript in one sentence, then provide bullet points with timestamps (00:00:00 sentence)."
@@ -181,33 +182,15 @@ process_segment() {
 process_vtt() {
     local VTT_FILE=$1
     local URL=$2 
-    local URL_HASH=$(echo "$URL" | md5sum | cut -d' ' -f1)
     local TEMP_DIR=$(mktemp -d)
     local BASE_NAME="${TEMP_DIR}/temp" # Temporary base name
     local CLEANED_TRANSCRIPT="${BASE_NAME}_cleaned.txt"
-    local FINAL_BASE_NAME="" # Final base name for output files
-    local SUMMARY_FILE="${BASE_NAME}_summary.txt"
+    local SUMMARY_FILE="${OUTPUT_DIR}/$(basename "$VTT_FILE" .vtt)_summary.txt"
     
-    # Tiling for large transcripts
-    TILE_DURATION_SECONDS=720.0 # 12 minutes
-    OVERLAP_DURATION_SECONDS=120.0 # 2 minutes
-
     echo "Processing VTT file: $VTT_FILE"
 
-    # Copy the VTT file to the temporary directory
-    if ! cp "$VTT_FILE" "${BASE_NAME}.vtt"; then
-        echo "Error: Failed to copy VTT file to temporary directory." >&2
-        exit 1
-    fi
-
-    local CACHED_VTT=$(cache_file "${BASE_NAME}.vtt" ".vtt")
-    if [ $? -ne 0 ]; then
-        echo "Error: Failed to cache VTT file." >&2
-        exit 1
-    fi
-
     # Clean the VTT transcript
-    if ! python3 "$(dirname "$0")/vttclean.py" "$CACHED_VTT" > "$CLEANED_TRANSCRIPT" 2>"${CLEANED_TRANSCRIPT}.error"; then
+    if ! python3 "$(dirname "$0")/vttclean.py" "$VTT_FILE" > "$CLEANED_TRANSCRIPT" 2>"${CLEANED_TRANSCRIPT}.error"; then
         echo "Error: Failed to clean the VTT file. Error log:" >&2
         cat "${CLEANED_TRANSCRIPT}.error" >&2
         exit 1
@@ -219,113 +202,27 @@ process_vtt() {
         exit 1
     fi
 
-    # Generate summary using background processes
-    echo "Summarizing transcript using background processes..."
-
-    # Tiling and parallel processing
-    current_time=0
-    segment_text=""
-    segment_count=0
-    last_sentence=""
-    job_pids=()  # Array to store background job PIDs
-
-    while IFS= read -r line || [ -n "$line" ]; do
-        # Extract timestamp (assuming format 00:00:00.000 --> 00:00:01.000)
-        timestamp=$(echo "$line" | grep -oE '[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{3}' | head -n 1)
-        if [ -n "$timestamp" ]; then
-            # Convert timestamp to seconds (including milliseconds)
-            seconds=$(echo "$timestamp" | awk -F: '{ print ($1 * 3600) + ($2 * 60) + $3 }')
-
-            # Check if we need to start a new segment
-            if (( $(echo "$seconds >= $current_time + $TILE_DURATION_SECONDS" | bc -l) )); then
-                # Process the current segment
-                segment_count=$((segment_count + 1))
-                echo "Processing segment $segment_count (${current_time} - ${seconds})..." >&2
-                
-                # Choose the appropriate prompt
-                if [ $segment_count -eq 1 ]; then
-                    prompt="$FIRST_PROMPT"
-                else
-                    prompt="$MIDDLE_PROMPT"
-                fi
-
-                # Start processing the segment in the background
-                segment_output_file="${TEMP_DIR}/segment_${segment_count}.txt"
-                process_segment "$segment_text" "$prompt" "$segment_output_file" &
-                job_pids+=($!)  # Store the PID of the background process
-
-                segment_text=""
-                current_time=$(echo "$seconds - $OVERLAP_DURATION_SECONDS" | bc -l)
-            fi
-        fi
-
-        # Check for duplicate sentence at the beginning of the segment
-        first_sentence=$(echo "$line" | awk -F' ' '{print $NF}')
-        if [[ "$segment_text" == "" && "$first_sentence" == "$last_sentence" ]]; then
-            # Remove duplicate sentence, append the rest to the previous segment
-            line=$(echo "$line" | sed 's/^[^ ]* //')
-        fi
-        segment_text="${segment_text}${line}\n"
-    done < "$CLEANED_TRANSCRIPT"
-
-    # Process the last segment
-    if [ -n "$segment_text" ]; then
-        segment_count=$((segment_count + 1))
-        segment_output_file="${TEMP_DIR}/segment_${segment_count}.txt"
-        process_segment "$segment_text" "$LAST_PROMPT" "$segment_output_file" &
-        job_pids+=($!) 
-    fi
-
-    # Wait for all background jobs to complete
-    echo "Waiting for summarization jobs to finish..."
-    for pid in "${job_pids[@]}"; do
-        wait "$pid"
-    done
-
-    # Combine the segment summaries in the correct order
-    SUMMARY_FILE="${TEMP_DIR}/combined_summary.txt"
-    > "$SUMMARY_FILE"  # Clear or create the file
-    for i in $(seq 1 $segment_count); do
-        cat "${TEMP_DIR}/segment_${i}.txt" >> "$SUMMARY_FILE"
-    done
-
-    echo "Summarization complete. Processed $segment_count segments." >&2
-
-    # Determine the final base name for output files
-    FINAL_BASE_NAME=$(basename "$VTT_FILE" .vtt)
-    FINAL_BASE_NAME=$(sanitize_filename "$FINAL_BASE_NAME")
-
-    # Move files to the final destination with the sanitized name
-    cp "${BASE_NAME}_cleaned.txt" "${OUTPUT_DIR}/${FINAL_BASE_NAME}.txt"
-    cp "$SUMMARY_FILE" "${OUTPUT_DIR}/${FINAL_BASE_NAME}_summary.txt"
-
-    echo "Processing complete!"
-
-    # Output both cleaned VTT text and summary
-    echo "Cleaned VTT Text (last 50 lines):"
-    tail -n 50 "${OUTPUT_DIR}/${FINAL_BASE_NAME}.txt"
-    echo "Summary:"
-    SUMMARY_FILE="${OUTPUT_DIR}/${FINAL_BASE_NAME}_summary.txt"
-    if [ -f "$SUMMARY_FILE" ]; then
-        cat "$SUMMARY_FILE"
+    # Generate summary
+    echo "Summarizing transcript..."
+    if $USE_FABRIC; then
+        fabric -p summarize "$CLEANED_TRANSCRIPT" > "$SUMMARY_FILE"
     else
-        echo "Error: Summary file not found."
+        ollama run "$OLLAMA_MODEL" "$MIDDLE_PROMPT" $CLEANED_TRANSCRIPT > "$SUMMARY_FILE"
     fi
 
-    echo "Files available:"
-    echo " - Transcript: ${OUTPUT_DIR}/${FINAL_BASE_NAME}.txt"
-    echo " - Summary: $SUMMARY_FILE"
-    
-    # Clean up the temporary directory
-    rm -rf "$TEMP_DIR"
+    if [ ! -s "$SUMMARY_FILE" ]; then
+        echo "Error: Summary generation failed." >&2
+        exit 1
+    fi
+
+    echo "Summarization complete."
 
     # Display the content of the summary file
     echo "Summary content:"
-    if [ -f "$SUMMARY_FILE" ]; then
-        cat "$SUMMARY_FILE"
-    else
-        echo "Error: Summary file not found."
-    fi
+    cat "$SUMMARY_FILE"
+
+    # Clean up
+    rm -rf "$TEMP_DIR"
 }
 
 # Function to calculate the time difference between two timestamps in HH:MM:SS format
