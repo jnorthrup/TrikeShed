@@ -58,8 +58,10 @@ shift $((OPTIND-1))
 # Main processing function
 main_process() {
     local INPUT="$1"
+    local PROJECT_NAME=$(sanitize_filename "$(basename "$INPUT")")
+    local MAKEFILE="$OUTPUT_DIR/${PROJECT_NAME}_Makefile"
     
-    # Here-doc for the main processing logic
+    # Here-doc for the main processing logic and Makefile generation
     bash << EOF
 set -euo pipefail
 
@@ -73,6 +75,29 @@ log() {
     if [[ $VERBOSE == true ]] || [[ \$level != "DEBUG" ]]; then
         echo "[\$(date +'%Y-%m-%d %H:%M:%S')] [\$level] \$*" >&2
     fi
+}
+
+# Function to generate Makefile content
+generate_makefile() {
+    local input="\$1"
+    local output_dir="\$2"
+    local disable_audio="\$3"
+
+    cat << MAKEFILE
+.PHONY: all clean
+
+INPUT := \${input}
+OUTPUT_DIR := \${output_dir}
+DISABLE_AUDIO := \${disable_audio}
+
+all: \$(OUTPUT_DIR)/summary.txt \$(OUTPUT_DIR)/cleaned_transcript.txt
+
+\$(OUTPUT_DIR)/summary.txt \$(OUTPUT_DIR)/cleaned_transcript.txt: \$(INPUT)
+	./summarize2 \$(if \$(DISABLE_AUDIO),-n) "\$(INPUT)"
+
+clean:
+	rm -f \$(OUTPUT_DIR)/summary.txt \$(OUTPUT_DIR)/cleaned_transcript.txt
+MAKEFILE
 }
 
 # Main logic
@@ -89,6 +114,10 @@ else
     log "ERROR" "Invalid input. Provide a valid URL, VTT file, or a local audio file."
     exit 1
 fi
+
+# Generate Makefile
+generate_makefile "$INPUT" "$OUTPUT_DIR" "$DISABLE_AUDIO" > "$MAKEFILE"
+log "INFO" "Generated Makefile: $MAKEFILE"
 EOF
 }
 
