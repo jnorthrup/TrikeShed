@@ -117,8 +117,18 @@ summarize_text() {
         local OVERLAP_DURATION=60   # 10% of 10 minutes
         local TOTAL_LINES=$(wc -l < "$CLEANED_TRANSCRIPT")
         local TOTAL_DURATION=$(get_total_duration "$INPUT_FILE")
+    
+        # Ensure TOTAL_DURATION is not zero
+        if [ -z "$TOTAL_DURATION" ] || [ "$TOTAL_DURATION" = "0" ]; then
+            TOTAL_DURATION=1
+        fi
+    
         local LINES_PER_SEGMENT=$((SEGMENT_DURATION * TOTAL_LINES / TOTAL_DURATION))
         local OVERLAP_LINES=$((OVERLAP_DURATION * TOTAL_LINES / TOTAL_DURATION))
+    
+        # Ensure LINES_PER_SEGMENT is at least 1
+        [ "$LINES_PER_SEGMENT" -lt 1 ] && LINES_PER_SEGMENT=1
+    
         local START_LINE=1
         local END_LINE=$LINES_PER_SEGMENT
         local SEGMENT_COUNT=0
@@ -126,7 +136,10 @@ summarize_text() {
         while [ $START_LINE -le $TOTAL_LINES ]; do
             local SEGMENT=$(sed -n "${START_LINE},${END_LINE}p" "$CLEANED_TRANSCRIPT")
             SEGMENT_COUNT=$((SEGMENT_COUNT + 1))
-    
+
+            # Truncate SEGMENT if it's too long
+            SEGMENT="${SEGMENT:0:3000}"
+
             if [ $SEGMENT_COUNT -eq 1 ]; then
                 SUMMARY_OUTPUT+=$(ollama run "$OLLAMA_MODEL" "$FIRST_PROMPT" "$SEGMENT")
             elif [ $END_LINE -ge $TOTAL_LINES ]; then
@@ -142,8 +155,8 @@ summarize_text() {
 
         # Ensure there's at least a first and last segment if the transcript is very short
         if [ $SEGMENT_COUNT -eq 1 ]; then
-            SUMMARY_OUTPUT=$(ollama run "$OLLAMA_MODEL" "$FIRST_PROMPT" "$CLEANED_TRANSCRIPT")
-            SUMMARY_OUTPUT+=$(ollama run "$OLLAMA_MODEL" "$LAST_PROMPT" "$CLEANED_TRANSCRIPT")
+            SUMMARY_OUTPUT=$(ollama run "$OLLAMA_MODEL" "$FIRST_PROMPT" "${CLEANED_TRANSCRIPT:0:3000}")
+            SUMMARY_OUTPUT+=$(ollama run "$OLLAMA_MODEL" "$LAST_PROMPT" "${CLEANED_TRANSCRIPT:0:3000}")
         fi
     fi
 
