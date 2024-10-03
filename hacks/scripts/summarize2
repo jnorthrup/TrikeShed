@@ -10,6 +10,11 @@
 # 6. Output both the cleaned VTT text and the summary
 # 7. Exclude the WAV file from the results
 # 8. Include the OGG file in the results only if both WAV and OGG were created
+# 9. Implement a tiling methodology for efficient transcript processing:
+#    a. Divide the transcript into overlapping segments (tiles) of fixed duration
+#    b. Process each tile independently for summarization
+#    c. Ensure coherence between tiles by including context from adjacent tiles
+#    d. Merge tile summaries into a cohesive final summary
 # This charter is unalterable and defines the core functionality of the script.
 
 # Configuration (adjust these paths)
