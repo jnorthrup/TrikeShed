@@ -22,8 +22,8 @@ OLLAMA_MODEL="deepseek-coder-v2:16b"
 
 # Prompts for different segments
 FIRST_PROMPT="Summarize this beginning part of a transcript in one sentence, then provide bullet points with timestamps (00:00:00 sentence)."
-MIDDLE_PROMPT="Summarize the key points of this part of the transcript in bullet points with timestamps (00:00:00 sentence)."
-LAST_PROMPT="Summarize the main takeaways of this final part of the transcript in bullet points with timestamps (00:00:00 sentence)."
+MIDDLE_PROMPT="Continue summarizing the key points of this part of the transcript in bullet points with timestamps (00:00:00 sentence), maintaining coherence with the previous segments."
+LAST_PROMPT="Summarize the main takeaways of this final part of the transcript in bullet points with timestamps (00:00:00 sentence), and provide a brief overall conclusion."
 
 # Global variable to track job queue
 JOB_QUEUE=()
@@ -115,15 +115,17 @@ summarize_text() {
     else
         # Use ollama for summarization with segmentation
         local TOTAL_LINES=$(echo "$TEXT" | wc -l)
-        local SEGMENT_SIZE=$((TOTAL_LINES / 3))
+        local SEGMENT_SIZE=$((TOTAL_LINES / 4))
         local FIRST_SEGMENT=$(echo "$TEXT" | head -n $SEGMENT_SIZE)
-        local MIDDLE_SEGMENT=$(echo "$TEXT" | sed -n "$((SEGMENT_SIZE + 1)),$((2 * SEGMENT_SIZE))p")
+        local MIDDLE_SEGMENT1=$(echo "$TEXT" | sed -n "$((SEGMENT_SIZE + 1)),$((2 * SEGMENT_SIZE))p")
+        local MIDDLE_SEGMENT2=$(echo "$TEXT" | sed -n "$((2 * SEGMENT_SIZE + 1)),$((3 * SEGMENT_SIZE))p")
         local LAST_SEGMENT=$(echo "$TEXT" | tail -n $SEGMENT_SIZE)
 
         SUMMARY_OUTPUT=$(
             {
                 ollama run "$OLLAMA_MODEL" "$FIRST_PROMPT" "$FIRST_SEGMENT"
-                ollama run "$OLLAMA_MODEL" "$MIDDLE_PROMPT" "$MIDDLE_SEGMENT"
+                ollama run "$OLLAMA_MODEL" "$MIDDLE_PROMPT" "$MIDDLE_SEGMENT1"
+                ollama run "$OLLAMA_MODEL" "$MIDDLE_PROMPT" "$MIDDLE_SEGMENT2"
                 ollama run "$OLLAMA_MODEL" "$LAST_PROMPT" "$LAST_SEGMENT"
             } 2>&1
         )
