@@ -116,8 +116,9 @@ summarize_text() {
         local SEGMENT_DURATION=600  # 10 minutes in seconds
         local OVERLAP_DURATION=60   # 10% of 10 minutes
         local TOTAL_LINES=$(wc -l < "$CLEANED_TRANSCRIPT")
-        local LINES_PER_SEGMENT=$((SEGMENT_DURATION * TOTAL_LINES / $(get_total_duration "$INPUT_FILE")))
-        local OVERLAP_LINES=$((OVERLAP_DURATION * TOTAL_LINES / $(get_total_duration "$INPUT_FILE")))
+        local TOTAL_DURATION=$(get_total_duration "$INPUT_FILE")
+        local LINES_PER_SEGMENT=$((SEGMENT_DURATION * TOTAL_LINES / TOTAL_DURATION))
+        local OVERLAP_LINES=$((OVERLAP_DURATION * TOTAL_LINES / TOTAL_DURATION))
         local START_LINE=1
         local END_LINE=$LINES_PER_SEGMENT
         local SEGMENT_COUNT=0
@@ -125,7 +126,7 @@ summarize_text() {
         while [ $START_LINE -le $TOTAL_LINES ]; do
             local SEGMENT=$(sed -n "${START_LINE},${END_LINE}p" "$CLEANED_TRANSCRIPT")
             SEGMENT_COUNT=$((SEGMENT_COUNT + 1))
-            
+    
             if [ $SEGMENT_COUNT -eq 1 ]; then
                 SUMMARY_OUTPUT+=$(ollama run "$OLLAMA_MODEL" "$FIRST_PROMPT" "$SEGMENT")
             elif [ $END_LINE -ge $TOTAL_LINES ]; then
