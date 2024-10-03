@@ -211,13 +211,24 @@ process_vtt() {
     local LAST_SEGMENT=$(tail -n $SEGMENT_SIZE "$CLEANED_TRANSCRIPT")
 
     {
+        echo "Generating summary for first segment..."
         if $USE_FABRIC; then
             fabric -p summarize "$FIRST_SEGMENT"
-            fabric -p summarize "$MIDDLE_SEGMENT"
-            fabric -p summarize "$LAST_SEGMENT"
         else
             ollama run "$OLLAMA_MODEL" "$FIRST_PROMPT" "$FIRST_SEGMENT"
+        fi
+        
+        echo "Generating summary for middle segment..."
+        if $USE_FABRIC; then
+            fabric -p summarize "$MIDDLE_SEGMENT"
+        else
             ollama run "$OLLAMA_MODEL" "$MIDDLE_PROMPT" "$MIDDLE_SEGMENT"
+        fi
+        
+        echo "Generating summary for last segment..."
+        if $USE_FABRIC; then
+            fabric -p summarize "$LAST_SEGMENT"
+        else
             ollama run "$OLLAMA_MODEL" "$LAST_PROMPT" "$LAST_SEGMENT"
         fi
     } > "$SUMMARY_FILE"
@@ -231,7 +242,9 @@ process_vtt() {
 
     # Display the content of the summary file
     echo "Summary content:"
+    echo "----------------------------------------"
     cat "$SUMMARY_FILE"
+    echo "----------------------------------------"
 
     # Clean up
     rm -rf "$TEMP_DIR"
