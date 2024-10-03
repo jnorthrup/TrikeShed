@@ -105,30 +105,16 @@ clean_text() {
     sed 's/<[^>]*>//g' | tr -s ' ' | sed 's/^[ \t]*//;s/[ \t]*$//'
 }
 
-# Function to summarize a segment of text
-summarize_segment() {
-    local SEGMENT_TEXT="$1"
-    local PROMPT="$2"
+# Function to summarize text
+summarize_text() {
+    local TEXT="$1"
     local SUMMARY_OUTPUT=""
 
-    # Count the number of lines in the input
-    local LINE_COUNT=$(echo "$SEGMENT_TEXT" | wc -l)
-
-    # If the input has less than 12 lines, remove cache and return a simple response
-    if [ "$LINE_COUNT" -lt 12 ]; then
-        local MD5=$(echo "$SEGMENT_TEXT" | md5sum | cut -d' ' -f1)
-        local CACHE_SUBDIR="$CACHE_DIR/${MD5:0:2}/${MD5:2:2}"
-        rm -f "$CACHE_SUBDIR/$MD5"*
-        echo "The input is too short for meaningful summarization. Cache entry removed. Here's the original text:"
-        echo "$SEGMENT_TEXT"
-        return 0
-    fi
-
     if $USE_FABRIC; then
-        SUMMARY_OUTPUT=$(fabric -p summarize "$SEGMENT_TEXT" 2>&1)
+        SUMMARY_OUTPUT=$(fabric -p summarize "$TEXT" 2>&1)
     else
         # Use ollama for summarization
-        SUMMARY_OUTPUT=$(ollama run "$OLLAMA_MODEL" "$PROMPT" "$SEGMENT_TEXT" 2>&1)
+        SUMMARY_OUTPUT=$(ollama run "$OLLAMA_MODEL" "Summarize this transcript in bullet points with timestamps (00:00:00 sentence)." "$TEXT" 2>&1)
     fi
 
     if [ $? -ne 0 ]; then
@@ -204,34 +190,7 @@ process_vtt() {
 
     # Generate summary
     echo "Summarizing transcript..."
-    local TOTAL_LINES=$(wc -l < "$CLEANED_TRANSCRIPT")
-    local SEGMENT_SIZE=$((TOTAL_LINES / 3))
-    local FIRST_SEGMENT=$(head -n $SEGMENT_SIZE "$CLEANED_TRANSCRIPT")
-    local MIDDLE_SEGMENT=$(sed -n "$((SEGMENT_SIZE + 1)),$((2 * SEGMENT_SIZE))p" "$CLEANED_TRANSCRIPT")
-    local LAST_SEGMENT=$(tail -n $SEGMENT_SIZE "$CLEANED_TRANSCRIPT")
-
-    {
-        echo "Generating summary for first segment..."
-        if $USE_FABRIC; then
-            fabric -p summarize "$FIRST_SEGMENT"
-        else
-            ollama run "$OLLAMA_MODEL" "$FIRST_PROMPT" "$FIRST_SEGMENT"
-        fi
-        
-        echo "Generating summary for middle segment..."
-        if $USE_FABRIC; then
-            fabric -p summarize "$MIDDLE_SEGMENT"
-        else
-            ollama run "$OLLAMA_MODEL" "$MIDDLE_PROMPT" "$MIDDLE_SEGMENT"
-        fi
-        
-        echo "Generating summary for last segment..."
-        if $USE_FABRIC; then
-            fabric -p summarize "$LAST_SEGMENT"
-        else
-            ollama run "$OLLAMA_MODEL" "$LAST_PROMPT" "$LAST_SEGMENT"
-        fi
-    } > "$SUMMARY_FILE"
+    summarize_text "$(cat "$CLEANED_TRANSCRIPT")" > "$SUMMARY_FILE"
 
     if [ ! -s "$SUMMARY_FILE" ]; then
         echo "Error: Summary generation failed." >&2
