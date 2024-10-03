@@ -204,11 +204,23 @@ process_vtt() {
 
     # Generate summary
     echo "Summarizing transcript..."
-    if $USE_FABRIC; then
-        fabric -p summarize "$CLEANED_TRANSCRIPT" > "$SUMMARY_FILE"
-    else
-        ollama run "$OLLAMA_MODEL" "$MIDDLE_PROMPT" $CLEANED_TRANSCRIPT > "$SUMMARY_FILE"
-    fi
+    local TOTAL_LINES=$(wc -l < "$CLEANED_TRANSCRIPT")
+    local SEGMENT_SIZE=$((TOTAL_LINES / 3))
+    local FIRST_SEGMENT=$(head -n $SEGMENT_SIZE "$CLEANED_TRANSCRIPT")
+    local MIDDLE_SEGMENT=$(sed -n "$((SEGMENT_SIZE + 1)),$((2 * SEGMENT_SIZE))p" "$CLEANED_TRANSCRIPT")
+    local LAST_SEGMENT=$(tail -n $SEGMENT_SIZE "$CLEANED_TRANSCRIPT")
+
+    {
+        if $USE_FABRIC; then
+            fabric -p summarize "$FIRST_SEGMENT"
+            fabric -p summarize "$MIDDLE_SEGMENT"
+            fabric -p summarize "$LAST_SEGMENT"
+        else
+            ollama run "$OLLAMA_MODEL" "$FIRST_PROMPT" "$FIRST_SEGMENT"
+            ollama run "$OLLAMA_MODEL" "$MIDDLE_PROMPT" "$MIDDLE_SEGMENT"
+            ollama run "$OLLAMA_MODEL" "$LAST_PROMPT" "$LAST_SEGMENT"
+        fi
+    } > "$SUMMARY_FILE"
 
     if [ ! -s "$SUMMARY_FILE" ]; then
         echo "Error: Summary generation failed." >&2
