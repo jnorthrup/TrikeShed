@@ -107,32 +107,34 @@ clean_text() {
 
 # Function to summarize text
 summarize_text() {
-    local TEXT="$1"
+    local CLEANED_TRANSCRIPT="$1"
     local SUMMARY_OUTPUT=""
 
     if $USE_FABRIC; then
-        SUMMARY_OUTPUT=$(fabric -p summarize "$TEXT" 2>&1)
+        SUMMARY_OUTPUT=$(fabric -p summarize "$CLEANED_TRANSCRIPT" 2>&1)
     else
-        # Use ollama for summarization with 10-minute segments and 10% overlap
-        local TOTAL_DURATION=$(ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "$INPUT_FILE")
         local SEGMENT_DURATION=600  # 10 minutes in seconds
         local OVERLAP_DURATION=60   # 10% of 10 minutes
-        local SEGMENT_START=0
-        local SEGMENT_END=$SEGMENT_DURATION
+        local TOTAL_LINES=$(wc -l < "$CLEANED_TRANSCRIPT")
+        local LINES_PER_SEGMENT=$((SEGMENT_DURATION * TOTAL_LINES / $(get_total_duration "$INPUT_FILE")))
+        local OVERLAP_LINES=$((OVERLAP_DURATION * TOTAL_LINES / $(get_total_duration "$INPUT_FILE")))
+        local START_LINE=1
+        local END_LINE=$LINES_PER_SEGMENT
 
-        while [ $(echo "$SEGMENT_START < $TOTAL_DURATION" | bc -l) -eq 1 ]; do
-            local SEGMENT=$(ffmpeg -i "$INPUT_FILE" -ss $SEGMENT_START -to $SEGMENT_END -f vtt - 2>/dev/null | sed 's/<[^>]*>//g' | tr -s ' ' | sed 's/^[ \t]*//;s/[ \t]*$//')
+        while [ $START_LINE -le $TOTAL_LINES ]; do
+            local SEGMENT=$(sed -n "${START_LINE},${END_LINE}p" "$CLEANED_TRANSCRIPT")
             
-            if [ $SEGMENT_START -eq 0 ]; then
+            if [ $START_LINE -eq 1 ]; then
                 SUMMARY_OUTPUT+=$(ollama run "$OLLAMA_MODEL" "$FIRST_PROMPT" "$SEGMENT")
-            elif [ $(echo "$SEGMENT_END >= $TOTAL_DURATION" | bc -l) -eq 1 ]; then
+            elif [ $END_LINE -ge $TOTAL_LINES ]; then
                 SUMMARY_OUTPUT+=$(ollama run "$OLLAMA_MODEL" "$LAST_PROMPT" "$SEGMENT")
             else
                 SUMMARY_OUTPUT+=$(ollama run "$OLLAMA_MODEL" "$MIDDLE_PROMPT" "$SEGMENT")
             fi
 
-            SEGMENT_START=$(echo "$SEGMENT_END - $OVERLAP_DURATION" | bc -l)
-            SEGMENT_END=$(echo "$SEGMENT_START + $SEGMENT_DURATION" | bc -l)
+            START_LINE=$((END_LINE - OVERLAP_LINES))
+            END_LINE=$((START_LINE + LINES_PER_SEGMENT))
+            [ $END_LINE -gt $TOTAL_LINES ] && END_LINE=$TOTAL_LINES
         done
     fi
 
@@ -142,6 +144,11 @@ summarize_text() {
     fi
 
     echo "$SUMMARY_OUTPUT"
+}
+
+# Function to get total duration of the input file
+get_total_duration() {
+    ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "$1"
 }
 
 # Function to add a job to the queue
