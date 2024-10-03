@@ -17,6 +17,11 @@ set -euo pipefail
 #    b. Process each tile independently for summarization
 #    c. Ensure coherence between tiles by including context from adjacent tiles
 #    d. Merge tile summaries into a cohesive final summary
+# 10. Implement MD5 sum caching for idempotent processing:
+#    a. Calculate MD5 sum of input files or content
+#    b. Use a temporary cache directory to store processed results
+#    c. Check cache for existing results before processing
+#    d. Ensure idempotent behavior by reusing cached results when available
 # This charter is unalterable and defines the core functionality of the script.
 
 # Configuration
