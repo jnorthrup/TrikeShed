@@ -13,10 +13,10 @@
 # This charter is unalterable and defines the core functionality of the script.
 
 # Configuration (adjust these paths)
-MODEL_PATH="$HOME/.cache/whisper.cpp/ggml-small.en-tdrz.bin"
+WHISPCC="$HOME/work/whisper.cpp" # ./main to run ; ./models for models
+MODEL_PATH="$WHISPCC/models/ggml-small.en-tdrz.bin"
 OUTPUT_DIR="$HOME/processed_audio"
 CACHE_DIR="/tmp/summarize_cache"
-WHISPCC="$HOME/work/whisper.cpp" # ./main to run ; ./models for models  
 OLLAMA_MODEL="llama3.1:latest"
 
 # Prompts for different segments
@@ -386,7 +386,7 @@ elif [[ "$1" == *"http"* ]]; then
             fi
 
             echo "Running Whisper-CPP to generate VTT transcript..."
-            if ! "$WHISPCC" -ovtt -tdrz -m "$MODEL_PATH" "$WAV_FILE"; then
+            if ! "$WHISPCC"/main -ovtt -tdrz -m "$MODEL_PATH" "$WAV_FILE"; then
                 echo "Error: Whisper-CPP transcription failed. Check the model path and audio file." >&2
                 exit 1
             fi
@@ -428,7 +428,7 @@ elif [ -f "$1" ]; then
     fi
 
     echo "Running Whisper-CPP to generate VTT transcript..."
-    "$WHISPCC" -ovtt -tdrz -m "$MODEL_PATH" "$WAV_FILE"
+    "$WHISPCC"/main -ovtt -tdrz -m "$MODEL_PATH" "$WAV_FILE"  //duplicate code violating DRY?  TODO
     VTT_FILE="${WAV_FILE%.*}.vtt"
 
     add_job "process_vtt \"$VTT_FILE\" \"$1\""
