@@ -106,6 +106,42 @@ save_to_cache() {
     log "DEBUG" "Saved to cache: $url"
 }
 
+# Modified process_youtube_url function to use caching
+process_youtube_url() {
+    local url="$1"
+    local output_dir="$OUTPUT_DIR/$(sanitize_filename "$(basename "$url")")"
+    mkdir -p "$output_dir"
+
+    # Check cache for existing results
+    if cache_file "$url" "$output_dir/summary.txt" && cache_file "$url" "$output_dir/cleaned_transcript.txt"; then
+        log "INFO" "Using cached results for $url"
+        return
+    fi
+
+    # Download audio
+    if [ "$DISABLE_AUDIO" = false ]; then
+        yt-dlp -x --audio-format wav -o "$output_dir/audio.%(ext)s" "$url"
+        ffmpeg -i "$output_dir/audio.wav" -c:a libopus -b:a 16k "$output_dir/audio.ogg"
+        rm "$output_dir/audio.wav"
+    fi
+
+    # Generate transcript
+    yt-dlp --skip-download --write-auto-sub -o "$output_dir/subtitles.%(ext)s" "$url"
+    mv "$output_dir/subtitles.en.vtt" "$output_dir/transcript.vtt"
+
+    # Clean transcript
+    python3 "$HOME/hacks/scripts/vttclean.py" "$output_dir/transcript.vtt" > "$output_dir/cleaned_transcript.txt"
+
+    # Generate summary
+    summarize_text "$output_dir/cleaned_transcript.txt" > "$output_dir/summary.txt"
+
+    # Save results to cache
+    save_to_cache "$url" "$output_dir/summary.txt"
+    save_to_cache "$url" "$output_dir/cleaned_transcript.txt"
+
+    log "INFO" "Processed files are in $output_dir"
+}
+
 # Logging function
 log() {
     local level="\$1"
