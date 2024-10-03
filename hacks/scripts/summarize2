@@ -113,8 +113,20 @@ summarize_text() {
     if $USE_FABRIC; then
         SUMMARY_OUTPUT=$(fabric -p summarize "$TEXT" 2>&1)
     else
-        # Use ollama for summarization
-        SUMMARY_OUTPUT=$(ollama run "$OLLAMA_MODEL" "Summarize this transcript in bullet points with timestamps (00:00:00 sentence)." "$TEXT" 2>&1)
+        # Use ollama for summarization with segmentation
+        local TOTAL_LINES=$(echo "$TEXT" | wc -l)
+        local SEGMENT_SIZE=$((TOTAL_LINES / 3))
+        local FIRST_SEGMENT=$(echo "$TEXT" | head -n $SEGMENT_SIZE)
+        local MIDDLE_SEGMENT=$(echo "$TEXT" | sed -n "$((SEGMENT_SIZE + 1)),$((2 * SEGMENT_SIZE))p")
+        local LAST_SEGMENT=$(echo "$TEXT" | tail -n $SEGMENT_SIZE)
+
+        SUMMARY_OUTPUT=$(
+            {
+                ollama run "$OLLAMA_MODEL" "$FIRST_PROMPT" "$FIRST_SEGMENT"
+                ollama run "$OLLAMA_MODEL" "$MIDDLE_PROMPT" "$MIDDLE_SEGMENT"
+                ollama run "$OLLAMA_MODEL" "$LAST_PROMPT" "$LAST_SEGMENT"
+            } 2>&1
+        )
     fi
 
     if [ $? -ne 0 ]; then
@@ -198,6 +210,12 @@ process_vtt() {
     fi
 
     echo "Summarization complete."
+
+    # Post-process the summary to ensure consistent formatting
+    if ! $USE_FABRIC; then
+        sed -i 's/^/- /' "$SUMMARY_FILE"  # Add bullet points if not present
+        sed -i 's/^- - /- /' "$SUMMARY_FILE"  # Remove double bullet points
+    fi
 
     # Display the content of the summary file
     echo "Summary content:"
