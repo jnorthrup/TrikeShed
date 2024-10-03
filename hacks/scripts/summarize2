@@ -283,48 +283,49 @@ process_vtt() {
     done
 
     # Combine the segment summaries in the correct order
+    SUMMARY_FILE="${TEMP_DIR}/combined_summary.txt"
+    > "$SUMMARY_FILE"  # Clear or create the file
     for i in $(seq 1 $segment_count); do
         cat "${TEMP_DIR}/segment_${i}.txt" >> "$SUMMARY_FILE"
     done
 
     echo "Summarization complete. Processed $segment_count segments." >&2
 
-    # Versioned summary output
-    local VERSION=1
-    while [ -f "${BASE_NAME}_summary_v${VERSION}.txt" ]; do
-        VERSION=$((VERSION+1))
-    done
-    cp "$SUMMARY_FILE" "${BASE_NAME}_summary_v${VERSION}.txt"
-
-    echo "Processing complete!"
-
     # Determine the final base name for output files
     FINAL_BASE_NAME=$(basename "$VTT_FILE" .vtt)
     FINAL_BASE_NAME=$(sanitize_filename "$FINAL_BASE_NAME")
+
     # Move files to the final destination with the sanitized name
     cp "${BASE_NAME}_cleaned.txt" "${OUTPUT_DIR}/${FINAL_BASE_NAME}.txt"
-    cp "${BASE_NAME}_summary_v${VERSION}.txt" "${OUTPUT_DIR}/${FINAL_BASE_NAME}_summary.txt"
+    cp "$SUMMARY_FILE" "${OUTPUT_DIR}/${FINAL_BASE_NAME}_summary.txt"
+
+    echo "Processing complete!"
 
     # Output both cleaned VTT text and summary
     echo "Cleaned VTT Text (last 50 lines):"
     tail -n 50 "${OUTPUT_DIR}/${FINAL_BASE_NAME}.txt"
     echo "Summary:"
-    if [ -f "${OUTPUT_DIR}/${FINAL_BASE_NAME}_summary.txt" ]; then
-        cat "${OUTPUT_DIR}/${FINAL_BASE_NAME}_summary.txt"
+    SUMMARY_FILE="${OUTPUT_DIR}/${FINAL_BASE_NAME}_summary.txt"
+    if [ -f "$SUMMARY_FILE" ]; then
+        cat "$SUMMARY_FILE"
     else
         echo "Error: Summary file not found."
     fi
 
     echo "Files available:"
     echo " - Transcript: ${OUTPUT_DIR}/${FINAL_BASE_NAME}.txt"
-    echo " - Summary: ${OUTPUT_DIR}/${FINAL_BASE_NAME}_summary.txt"
+    echo " - Summary: $SUMMARY_FILE"
     
     # Clean up the temporary directory
     rm -rf "$TEMP_DIR"
 
     # Display the content of the summary file
     echo "Summary content:"
-    cat "${OUTPUT_DIR}/${FINAL_BASE_NAME}_summary.txt"
+    if [ -f "$SUMMARY_FILE" ]; then
+        cat "$SUMMARY_FILE"
+    else
+        echo "Error: Summary file not found."
+    fi
 }
 
 # Function to calculate the time difference between two timestamps in HH:MM:SS format
