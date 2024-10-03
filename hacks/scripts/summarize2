@@ -309,7 +309,11 @@ process_vtt() {
     echo "Cleaned VTT Text (last 50 lines):"
     tail -n 50 "${OUTPUT_DIR}/${FINAL_BASE_NAME}.txt"
     echo "Summary:"
-    cat "${OUTPUT_DIR}/${FINAL_BASE_NAME}_summary.txt"
+    if [ -f "${OUTPUT_DIR}/${FINAL_BASE_NAME}_summary.txt" ]; then
+        cat "${OUTPUT_DIR}/${FINAL_BASE_NAME}_summary.txt"
+    else
+        echo "Error: Summary file not found."
+    fi
 
     echo "Files available:"
     echo " - Transcript: ${OUTPUT_DIR}/${FINAL_BASE_NAME}.txt"
@@ -317,6 +321,10 @@ process_vtt() {
     
     # Clean up the temporary directory
     rm -rf "$TEMP_DIR"
+
+    # Display the content of the summary file
+    echo "Summary content:"
+    cat "${OUTPUT_DIR}/${FINAL_BASE_NAME}_summary.txt"
 }
 
 # Function to calculate the time difference between two timestamps in HH:MM:SS format
