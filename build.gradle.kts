@@ -6,7 +6,7 @@ import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 //which stanza do we add a linux64 cinteropdef for liburing below? (the linux64 stanza is the only one that has a cinterop block)
 
 plugins {
-    kotlin("multiplatform") version "2.0.20" // Latest version of Kotlin Multiplatform as of now
+    kotlin("multiplatform") version "2.1.0-Beta1" // Latest version of Kotlin Multiplatform as of now
     `maven-publish`
 }
 
