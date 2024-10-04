@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Feature Comparison Spiderweb Chart</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f0f0f0;
+        }
+        .chart-container {
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="chart-container">
+        <h1>Feature Comparison</h1>
+        <div id="chart"></div>
+    </div>
+
+    <script>
+        const data = [
+            { product: "Hazelcast", features: [8, 9, 9, 7, 8, 8, 8, 7, 8] },
+            { product: "Infinispan", features: [8, 8, 8, 8, 7, 9, 9, 8, 9] },
+            { product: "Ehcache", features: [6, 5, 10, 4, 3, 6, 7, 6, 8] },
+            { product: "Apache Ignite", features: [9, 10, 7, 9, 9, 9, 8, 6, 7] },
+            { product: "Redis", features: [7, 4, 8, 6, 7, 5, 7, 7, 10] },
+            { product: "Memcached", features: [1, 1, 10, 1, 1, 1, 4, 5, 9] }
+        ];
+
+        const features = [
+            "Data Structures", "Distributed Computing", "Caching Capabilities", 
+            "Querying", "Streaming", "Transactions", "Security", 
+            "Kotlin Integration", "Community & Support"
+        ];
+
+        const width = 800;
+        const height = 600;
+        const margin = 50;
+        const radius = Math.min(width, height) / 2 - margin;
+
+        const svg = d3.select("#chart")
+            .append("svg")
+            .attr("width", width)
+            .attr("height", height)
+            .append("g")
+            .attr("transform", `translate(${width/2},${height/2})`);
+
+        const angleSlice = Math.PI * 2 / features.length;
+
+        const rScale = d3.scaleLinear()
+            .range([0, radius])
+            .domain([0, 10]);
+
+        const axisGrid = svg.append("g").attr("class", "axisWrapper");
+
+        axisGrid.selectAll(".levels")
+            .data(d3.range(1, 6).reverse())
+            .enter()
+            .append("circle")
+            .attr("r", d => radius / 5 * d)
+            .style("fill", "#CDCDCD")
+            .style("stroke", "#CDCDCD")
+            .style("fill-opacity", 0.1);
+
+        const axis = axisGrid.selectAll(".axis")
+            .data(features)
+            .enter()
+            .append("g")
+            .attr("class", "axis");
+
+        axis.append("line")
+            .attr("x1", 0)
+            .attr("y1", 0)
+            .attr("x2", (d, i) => rScale(10) * Math.cos(angleSlice * i - Math.PI / 2))
+            .attr("y2", (d, i) => rScale(10) * Math.sin(angleSlice * i - Math.PI / 2))
+            .attr("class", "line")
+            .style("stroke", "white")
+            .style("stroke-width", "2px");
+
+        axis.append("text")
+            .attr("class", "legend")
+            .style("font-size", "11px")
+            .attr("text-anchor", "middle")
+            .attr("dy", "0.35em")
+            .attr("x", (d, i) => rScale(10.5) * Math.cos(angleSlice * i - Math.PI / 2))
+            .attr("y", (d, i) => rScale(10.5) * Math.sin(angleSlice * i - Math.PI / 2))
+            .text(d => d);
+
+        const radarLine = d3.lineRadial()
+            .radius(d => rScale(d))
+            .angle((d, i) => i * angleSlice);
+
+        const color = d3.scaleOrdinal(d3.schemeCategory10);
+
+        data.forEach((d, i) => {
+            const dataValues = features.map((f, j) => ({
+                angle: j * angleSlice,
+                value: d.features[j]
+            }));
+
+            svg.selectAll(`.radarArea${i}`)
+                .data([dataValues])
+                .enter()
+                .append("path")
+                .attr("class", `radarArea${i}`)
+                .attr("d", d => radarLine(d.map(p => p.value)))
+                .style("fill", color(i))
+                .style("fill-opacity", 0.1)
+                .style("stroke", color(i))
+                .style("stroke-width", "2px");
+        });
+
+        const legend = svg.append("g")
+            .attr("class", "legend")
+            .attr("transform", `translate(${radius + 20},-${radius})`);
+
+        data.forEach((d, i) => {
+            legend.append("rect")
+                .attr("x", 0)
+                .attr("y", i * 20)
+                .attr("width", 10)
+                .attr("height", 10)
+                .style("fill", color(i));
+
+            legend.append("text")
+                .attr("x", 20)
+                .attr("y", i * 20 + 9)
+                .text(d.product)
+                .style("font-size", "11px")
+                .attr("alignment-baseline", "middle");
+        });
+    </script>
+</body>
+</html>

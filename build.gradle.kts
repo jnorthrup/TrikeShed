@@ -57,7 +57,6 @@ kotlin {
             System.getProperty("os.arch") == "aarch64") {
             listOf(
                 macosX64("macos"),
-
                 ).first()
         } else {
             macosArm64("macos")

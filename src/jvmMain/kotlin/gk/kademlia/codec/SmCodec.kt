@@ -1,6 +1,6 @@
 package gk.kademlia.codec
 
-//import com.ensarsarajcic.kotlinx.serialization.msgpack.MsgPack
+
 import borg.trikeshed.lib.j
 import gk.kademlia.agent.fsm.ReifiedMessage
 import gk.kademlia.agent.fsm.SimpleMessage

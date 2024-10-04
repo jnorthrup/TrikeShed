@@ -42,7 +42,7 @@ infix fun <X, C, Subject : Iterable<X>> Subject.α(xform: (X) -> C) = object : I
 
 
 /** this is an alpha conversion however the type erasure forces inlining here for Arrays as a holdover from java
- *  acquiesence */
+ *   */
 inline infix fun <X, C> Array<X>.α(crossinline xform: (X) -> C): Series<C> = size j { i: Int -> xform(this[i]) }
 
 
