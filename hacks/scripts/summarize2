@@ -27,11 +27,12 @@ set -euo pipefail
 # This charter is unalterable and defines the core functionality of the script.
 
 # Configuration
-WHISPCC="$HOME/work/whisper.cpp"
-MODEL_PATH="$WHISPCC/models/ggml-small.en-tdrz.bin"
-OUTPUT_DIR="$HOME/processed_audio"
-CACHE_DIR="/tmp/summarize_cache"
-OLLAMA_MODEL="deepseek-coder-v2:16b"
+: Configs:
+: WHISPCC ${WHISPCC:="$HOME/work/whisper.cpp"}
+: MODEL_PATH ${MODEL_PATH:="$WHISPCC/models/ggml-small.en-tdrz.bin"}
+: OUTPUT_DIR ${OUTPUT_DIR:="$HOME/processed_audio"}
+: CACHE_DIR ${CACHE_DIR:="/tmp/summarize_cache"}
+: OLLAMA_MODEL ${OLLAMA_MODEL:="deepseek-coder-v2:16b"}
 
 # Ensure output and cache directories exist
 mkdir -p "$OUTPUT_DIR" "$CACHE_DIR"
@@ -169,10 +170,10 @@ DISABLE_AUDIO := \${disable_audio}
 all: \$(OUTPUT_DIR)/summary.txt \$(OUTPUT_DIR)/cleaned_transcript.txt
 
 \$(OUTPUT_DIR)/summary.txt \$(OUTPUT_DIR)/cleaned_transcript.txt: \$(INPUT)
-	./summarize2 \$(if \$(DISABLE_AUDIO),-n) "\$(INPUT)"
+    ./summarize2 \$(if \$(DISABLE_AUDIO),-n) "\$(INPUT)"
 
 clean:
-	rm -f \$(OUTPUT_DIR)/summary.txt \$(OUTPUT_DIR)/cleaned_transcript.txt
+    rm -f \$(OUTPUT_DIR)/summary.txt \$(OUTPUT_DIR)/cleaned_transcript.txt
 MAKEFILE
 }
 
