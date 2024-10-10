@@ -8,7 +8,7 @@ set -euo pipefail
 # 2. Generate or use existing VTT transcript
 # 3. Clean the VTT transcript
 # 4. Generate a summary of the transcript
-# 5. Create a 16k VBR Opus OGG file for audio tracks (unless audio download is disabled)
+# 5. Create a 16k sampled VBR Opus OGG file for audio tracks (unless audio download is disabled)
 # 6. Output both the cleaned VTT text and the summary
 # 7. Exclude the WAV file from the results
 # 8. Include the OGG file in the results only if both WAV and OGG were created
@@ -17,22 +17,13 @@ set -euo pipefail
 #    b. Process each tile independently for summarization
 #    c. Ensure coherence between tiles by including context from adjacent tiles
 #    d. Merge tile summaries into a cohesive final summary
-# 10. Implement MD5 sum caching for idempotent processing:
-#    a. Calculate MD5 sum of input URLs or content
-#    b. Use a temporary cache directory to store processed results
-#    c. Check cache for existing results before processing
-#    d. Ensure idempotent behavior by reusing cached results when available
-#    e. Use URL-based MD5 sums for caching YouTube and other web content
-#    f. Implement separate functions for caching and retrieving based on URL MD5
-# This charter is unalterable and defines the core functionality of the script.
 
 # Configuration
-: Configs:
-: WHISPCC ${WHISPCC:="$HOME/work/whisper.cpp"}
-: MODEL_PATH ${MODEL_PATH:="$WHISPCC/models/ggml-small.en-tdrz.bin"}
-: OUTPUT_DIR ${OUTPUT_DIR:="$HOME/processed_audio"}
-: CACHE_DIR ${CACHE_DIR:="/tmp/summarize_cache"}
-: OLLAMA_MODEL ${OLLAMA_MODEL:="deepseek-coder-v2:16b"}
+WHISPCC="$HOME/work/whisper.cpp"
+MODEL_PATH="$WHISPCC/models/ggml-small.en-tdrz.bin"
+OUTPUT_DIR="$HOME/processed_audio"
+CACHE_DIR="/tmp/summarize_cache"
+OLLAMA_MODEL="deepseek-coder-v2:16b"
 
 # Ensure output and cache directories exist
 mkdir -p "$OUTPUT_DIR" "$CACHE_DIR"
@@ -63,68 +54,57 @@ while getopts "fnav" opt; do
 done
 shift $((OPTIND-1))
 
-# Main processing function
-main_process() {
-    local INPUT="$1"
-    local PROJECT_NAME=$(sanitize_filename "$(basename "$INPUT")")
-    local MAKEFILE="$OUTPUT_DIR/${PROJECT_NAME}_Makefile"
-    
-    # Here-doc for the main processing logic and Makefile generation
-    bash << EOF
-set -euo pipefail
-
-# Function definitions
-$(declare -f log get_md5 cache_file sanitize_filename clean_text get_total_duration summarize_text process_vtt process_youtube_url download_and_process_audio process_local_audio)
-
-# Function to get MD5 sum of URL
-get_url_md5() {
-    echo -n "$1" | md5sum | awk '{print $1}'
-}
-
-# Modified cache_file function to use URL MD5
-cache_file() {
-    local url="$1"
-    local output="$2"
-    local md5=$(get_url_md5 "$url")
-    local cache_path="$CACHE_DIR/$md5"
-
-    if [[ -f "$cache_path" ]]; then
-        log "DEBUG" "Cache hit for $url"
-        cp "$cache_path" "$output"
-        return 0
-    else
-        log "DEBUG" "Cache miss for $url"
-        return 1
+# Logging function
+log() {
+    local level="$1"
+    shift
+    if [[ $VERBOSE == true ]] || [[ $level != "DEBUG" ]]; then
+        echo "[${BASH_SOURCE[0]}] [$level] $*" >&2
     fi
 }
 
-# Modified function to save to cache using URL MD5
-save_to_cache() {
-    local url="$1"
-    local file="$2"
-    local md5=$(get_url_md5 "$url")
-    local cache_path="$CACHE_DIR/$md5"
-
-    cp "$file" "$cache_path"
-    log "DEBUG" "Saved to cache: $url"
+# Function to sanitize filenames
+sanitize_filename() {
+    local filename="$1"
+    echo "${filename//[^a-zA-Z0-9_-]/_}"
 }
 
-# Modified process_youtube_url function to use caching
+# Function to clean VTT transcript
+clean_text() {
+    local text="$1"
+    echo "$text" | sed 's/<[^>]*>//g' | sed 's/[[:space:]]\+/ /g'
+}
+
+# Function to get total duration of audio file
+get_total_duration() {
+    local file="$1"
+    ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "$file"
+}
+
+# Function to summarize text
+summarize_text() {
+    local text="$1"
+    echo "$text" | your_summarization_tool_here
+}
+
+# Function to process VTT files
+process_vtt() {
+    local file="$1"
+    local cleaned=$(clean_text "$(cat "$file")")
+    echo "$cleaned" > "${file%.vtt}_cleaned.txt"
+    summarize_text "$cleaned" > "${file%.vtt}_summary.txt"
+}
+
+# Function to process YouTube URLs
 process_youtube_url() {
     local url="$1"
     local output_dir="$OUTPUT_DIR/$(sanitize_filename "$(basename "$url")")"
     mkdir -p "$output_dir"
 
-    # Check cache for existing results
-    if cache_file "$url" "$output_dir/summary.txt" && cache_file "$url" "$output_dir/cleaned_transcript.txt"; then
-        log "INFO" "Using cached results for $url"
-        return
-    fi
-
     # Download audio
     if [ "$DISABLE_AUDIO" = false ]; then
         yt-dlp -x --audio-format wav -o "$output_dir/audio.%(ext)s" "$url"
-        ffmpeg -i "$output_dir/audio.wav" -c:a libopus -b:a 16k "$output_dir/audio.ogg"
+        ffmpeg -y -i "$output_dir/audio.wav" -c:a libopus -vbr -ar 16k "$output_dir/audio.ogg"
         rm "$output_dir/audio.wav"
     fi
 
@@ -138,34 +118,44 @@ process_youtube_url() {
     # Generate summary
     summarize_text "$output_dir/cleaned_transcript.txt" > "$output_dir/summary.txt"
 
-    # Save results to cache
-    save_to_cache "$url" "$output_dir/summary.txt"
-    save_to_cache "$url" "$output_dir/cleaned_transcript.txt"
+    log "INFO" "Processed files are in $output_dir"
+}
+
+# Function to process local audio files
+process_local_audio() {
+    local file="$1"
+    local output_dir="$OUTPUT_DIR/$(sanitize_filename "$(basename "$file")")"
+    mkdir -p "$output_dir"
+
+    # Convert to OGG
+    if [ "$DISABLE_AUDIO" = false ]; then
+        ffmpeg -y -i "$file" -c:a libopus -b:a 16k "$output_dir/audio.ogg"
+    fi
+
+    # Generate transcript (insert your transcription method here)
+    transcription_tool "$file" > "$output_dir/transcript.vtt"
+
+    # Clean transcript
+    python3 "$HOME/hacks/scripts/vttclean.py" "$output_dir/transcript.vtt" > "$output_dir/cleaned_transcript.txt"
+
+    # Generate summary
+    summarize_text "$output_dir/cleaned_transcript.txt" > "$output_dir/summary.txt"
 
     log "INFO" "Processed files are in $output_dir"
 }
 
-# Logging function
-log() {
-    local level="\$1"
-    shift
-    if [[ $VERBOSE == true ]] || [[ \$level != "DEBUG" ]]; then
-        echo "[\$(date +'%Y-%m-%d %H:%M:%S')] [\$level] \$*" >&2
-    fi
-}
-
 # Function to generate Makefile content
 generate_makefile() {
-    local input="\$1"
-    local output_dir="\$2"
-    local disable_audio="\$3"
+    local input="$1"
+    local output_dir="$2"
+    local disable_audio="$3"
 
     cat << MAKEFILE
 .PHONY: all clean
 
-INPUT := \${input}
-OUTPUT_DIR := \${output_dir}
-DISABLE_AUDIO := \${disable_audio}
+INPUT := ${input}
+OUTPUT_DIR := ${output_dir}
+DISABLE_AUDIO := ${disable_audio}
 
 all: \$(OUTPUT_DIR)/summary.txt \$(OUTPUT_DIR)/cleaned_transcript.txt
 
@@ -177,25 +167,29 @@ clean:
 MAKEFILE
 }
 
-# Main logic
-if [[ "$INPUT" == *.vtt ]]; then
-    log "INFO" "Processing as VTT file..."
-    process_vtt "$INPUT"
-elif [[ "$INPUT" == *"http"* ]]; then
-    log "INFO" "Processing as YouTube URL..."
-    process_youtube_url "$INPUT"
-elif [ -f "$INPUT" ]; then
-    log "INFO" "Processing as local audio file..."
-    process_local_audio "$INPUT"
-else
-    log "ERROR" "Invalid input. Provide a valid URL, VTT file, or a local audio file."
-    exit 1
-fi
+# Main processing function
+main_process() {
+    local INPUT="$1"
+    local PROJECT_NAME=$(sanitize_filename "$(basename "$INPUT")")
+    local MAKEFILE="$OUTPUT_DIR/${PROJECT_NAME}_Makefile"
+    
+    if [[ "$INPUT" == *.vtt ]]; then
+        log "INFO" "Processing as VTT file..."
+        process_vtt "$INPUT"
+    elif [[ "$INPUT" == *"http"* ]]; then
+        log "INFO" "Processing as YouTube URL..."
+        process_youtube_url "$INPUT"
+    elif [ -f "$INPUT" ]; then
+        log "INFO" "Processing as local audio file..."
+        process_local_audio "$INPUT"
+    else
+        log "ERROR" "Invalid input. Provide a valid URL, VTT file, or a local audio file."
+        exit 1
+    fi
 
-# Generate Makefile
-generate_makefile "$INPUT" "$OUTPUT_DIR" "$DISABLE_AUDIO" > "$MAKEFILE"
-log "INFO" "Generated Makefile: $MAKEFILE"
-EOF
+    # Generate Makefile
+    generate_makefile "$INPUT" "$OUTPUT_DIR" "$DISABLE_AUDIO" > "$MAKEFILE"
+    log "INFO" "Generated Makefile: $MAKEFILE"
 }
 
 # Run the main process
