@@ -76,8 +76,8 @@ class CSVUtilTest {
             "Smith, Bob",40,Paris
         """.trimIndent()
 
-        val file = csvData.encodeToByteArray().toSeries().toMutableLongSeries()
-        val result = CSVUtil.parseSegments(file)
+        val file = csvData.encodeToByteArray().toSeries()
+        val result = CSVUtil.parseSegments(file as MutableLongSeries)
 
         assertEquals(3, result.size, "Incorrect number of rows")
         assertEquals(3, result.row(0).size, "Incorrect number of columns")
