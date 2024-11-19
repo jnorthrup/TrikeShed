@@ -38,7 +38,7 @@
     The required enum for this encoding scheme will be as follows:
 </p>
 <pre>
-enum class JsStateEvent(val predicate: (UByte) -> Boolean) {
+enum class JsStateEvent(val predicate: (UByte) -> Boolean) {inh: [ a, b ]
 Unchanged({ false }),
 ScopeOpen({ it.toUInt() == 0x7bU || it.toUInt() == 0x5bU }),
 ScopeClose({ it.toUInt() == 0x7dU || it.toUInt() == 0x5dU }),

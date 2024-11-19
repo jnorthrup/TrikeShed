@@ -4,7 +4,6 @@
 package borg.trikeshed.lib
 
 import borg.trikeshed.common.collections.binarySearch
-import borg.trikeshed.cursor.Cursor
 import borg.trikeshed.isam.meta.IOMemento.*
 import kotlin.jvm.JvmInline
 import kotlin.jvm.JvmName
@@ -207,8 +206,13 @@ infix operator fun IntRange.div(denominator: Int): Series<IntRange> =
         }
     }
 
-operator fun <T> Series<T>.div(d: Int): Series<Series<T>> = (0 until size) / d α {
-    this[it]
+operator fun <T> Series<T>.div(d: Int): Series<Series<T>> { //split into d parts
+    val subSize = size / d
+    return d j { x: Int ->
+        subSize j { i: Int ->
+            this[i + x * subSize]
+        }
+    }
 }
 
 
@@ -359,8 +363,7 @@ fun <T> Series<T>.forEachIndexed(action: (index: Int, T) -> Unit): Unit = this.`
 fun <T> Series<T>.forEach(action: (T) -> Unit): Unit = this.`▶`.forEach(action)
 
 //series map
-fun <T, R> Series<T>.map(transform: (T) -> R): List<R> = this.toList().map(transform)
-
+fun <T, R> Series<T>.map(transform: (T) -> R): List<R> = this.`▶`.map(transform)
 
 fun <T> Series<T>.isEmpty(): Boolean = a == 0
 
@@ -525,9 +528,6 @@ fun Series<Char>.parseDoubleOrNull(): Double? = try {
  */
 infix fun <T, R> List<T>.zip(other: Series<R>): List<Join<T, R>> =
     zip(other.`▶`) { a: T, b: R -> a j b }
-
-@JvmName("vvzip2f")
-fun <T, O, R> Series<T>.zip(o: Series<O>, f: (T, O) -> R): Join<Int, (Int) -> R> = size j { x: Int -> f(this[x], o[x]) }
 
 @JvmName("vvzip2")
 @Suppress("UNCHECKED_CAST")
