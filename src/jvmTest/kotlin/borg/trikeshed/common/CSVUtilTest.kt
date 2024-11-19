@@ -201,6 +201,77 @@ class CSVUtilTest {
     }
 
     @Test
+    fun `test invalid quotes`() {
+        val input = """1,"hello"world",2""".encodeToByteArray().toSeries()
+        assertThrows(IllegalStateException::class.java) {
+            val deduce = mutableListOf<TypeEvidence>()
+            CSVUtil.parseLine(input, 0, lineEvidence = deduce)
+        }
+    }
+
+    @Test
+    fun `test escaped quotes`() {
+        val input = """1,"hello""world",2""".encodeToByteArray().toSeries()
+        val deduce = mutableListOf<TypeEvidence>()
+        val csv = CSVUtil.parseLine(input, 0, lineEvidence = deduce) α ::DelimitRange
+        val fields = csv α { delimR: DelimitRange ->
+            val chars = input.get(delimR.asIntRange) α { it.toUByte().toInt().toChar() }
+            chars.asString()
+        }
+        assertEquals(3, fields.size)
+        assertEquals("1", fields[0])
+        assertEquals("hello\"world", fields[1])
+        assertEquals("2", fields[2])
+    }
+
+    @Test
+    fun `test mixed quotes`() {
+        val input = """1,'hello,world',"quoted",2""".encodeToByteArray().toSeries()
+        val deduce = mutableListOf<TypeEvidence>()
+        val csv = CSVUtil.parseLine(input, 0, lineEvidence = deduce) α ::DelimitRange
+        val fields = csv α { delimR: DelimitRange ->
+            val chars = input.get(delimR.asIntRange) α { it.toUByte().toInt().toChar() }
+            chars.asString()
+        }
+        assertEquals(4, fields.size)
+        assertEquals("1", fields[0])
+        assertEquals("hello,world", fields[1])
+        assertEquals("quoted", fields[2])
+        assertEquals("2", fields[3])
+    }
+
+    @Test
+    fun `test numeric type inference edge cases`() {
+        val input = """123,-456,+789,1.23e4,.456""".encodeToByteArray().toSeries()
+        val deduce = mutableListOf<TypeEvidence>()
+        CSVUtil.parseLine(input, 0, lineEvidence = deduce)
+        assertEquals(5, deduce.size)
+        assertEquals(TypeEvidence.INTEGER, deduce[0])
+        assertEquals(TypeEvidence.INTEGER, deduce[1])
+        assertEquals(TypeEvidence.INTEGER, deduce[2])
+        assertEquals(TypeEvidence.FLOAT, deduce[3])
+        assertEquals(TypeEvidence.FLOAT, deduce[4])
+    }
+
+    @Test
+    fun `test empty middle fields`() {
+        val input = "a,,b,,,c".encodeToByteArray().toSeries()
+        val deduce = mutableListOf<TypeEvidence>()
+        val csv = CSVUtil.parseLine(input, 0, lineEvidence = deduce) α ::DelimitRange
+        val fields = csv α { delimR: DelimitRange ->
+            val chars = input.get(delimR.asIntRange) α { it.toUByte().toInt().toChar() }
+            chars.asString()
+        }
+        assertEquals(6, fields.size)
+        assertEquals("a", fields[0])
+        assertEquals("", fields[1])
+        assertEquals("b", fields[2])
+        assertEquals("", fields[3])
+        assertEquals("", fields[4])
+        assertEquals("c", fields[5])
+    }
+
+    @Test 
     fun testEdgeCases() {
         // Empty file
         val emptyFile = "".encodeToByteArray().toSeries().toMutableLongSeries()
