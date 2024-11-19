@@ -1,14 +1,83 @@
-//package borg.trikeshed.common
-//
-//import borg.trikeshed.cursor.*
-//import borg.trikeshed.isam.IsamDataFile
-//import borg.trikeshed.isam.meta.IOMemento
-//import borg.trikeshed.lib.*
-//import kotlin.random.Random
-//import kotlin.test.Test
-//import kotlin.test.assertEquals
-//
-//class CSVUtilTest {
+package borg.trikeshed.common
+
+import borg.trikeshed.cursor.*
+import borg.trikeshed.isam.IsamDataFile
+import borg.trikeshed.isam.meta.IOMemento
+import borg.trikeshed.lib.*
+import kotlin.random.Random
+import kotlin.test.Test
+import kotlin.test.assertEquals
+
+class CSVUtilTest {
+    @Test
+    fun `test empty csv`() {
+        val emptyBuffer = "".encodeToByteArray().toSeries()
+        val deduce = mutableListOf<TypeEvidence>()
+        val csv = CSVUtil.parseLine(emptyBuffer, 0, lineEvidence = deduce)
+        assertEquals(0, csv.size)
+    }
+
+    @Test 
+    fun `test quoted fields`() {
+        val input = """1,"hello,world",2""".encodeToByteArray().toSeries()
+        val deduce = mutableListOf<TypeEvidence>()
+        val csv = CSVUtil.parseLine(input, 0, lineEvidence = deduce) α ::DelimitRange
+        val fields = csv α { delimR: DelimitRange ->
+            val chars = input.get(delimR.asIntRange) α { it.toUByte().toInt().toChar() }
+            chars.asString()
+        }
+        assertEquals(3, fields.size)
+        assertEquals("1", fields[0]) 
+        assertEquals("hello,world", fields[1])
+        assertEquals("2", fields[2])
+    }
+
+    @Test
+    fun `test malformed csv`() {
+        val input = "1,2,".encodeToByteArray().toSeries() 
+        val deduce = mutableListOf<TypeEvidence>()
+        val csv = CSVUtil.parseLine(input, 0, lineEvidence = deduce) α ::DelimitRange
+        val fields = csv α { delimR: DelimitRange ->
+            val chars = input.get(delimR.asIntRange) α { it.toUByte().toInt().toChar() }
+            chars.asString()
+        }
+        assertEquals(3, fields.size)
+        assertEquals("1", fields[0])
+        assertEquals("2", fields[1]) 
+        assertEquals("", fields[2])
+    }
+
+    @Test
+    fun `test type deduction`() {
+        val input = "123,12.34,true,hello".encodeToByteArray().toSeries()
+        val deduce = mutableListOf<TypeEvidence>()
+        CSVUtil.parseLine(input, 0, lineEvidence = deduce)
+        assertEquals(4, deduce.size)
+        assertEquals(TypeEvidence.INTEGER, deduce[0])
+        assertEquals(TypeEvidence.FLOAT, deduce[1]) 
+        assertEquals(TypeEvidence.BOOLEAN, deduce[2])
+        assertEquals(TypeEvidence.STRING, deduce[3])
+    }
+
+    @Test
+    fun `test parse with headers`() {
+        val input = """
+            name,age,active
+            bob,32,true
+            alice,28,false
+        """.trimIndent().encodeToByteArray().toSeries()
+        
+        val cursor = CSVUtil.parseConformant(input)
+        assertEquals(3, cursor.meta.size)
+        assertEquals("name", cursor.meta[0].name)
+        assertEquals("age", cursor.meta[1].name) 
+        assertEquals("active", cursor.meta[2].name)
+        
+        val row1 = cursor.row(0)
+        assertEquals("bob", row1[0])
+        assertEquals(32, row1[1]) 
+        assertEquals(true, row1[2])
+    }
 //    val target: String = "src/commonTest/resources/hi.csv"
 //
 //    /** read in hi.csv and verify the contents */
