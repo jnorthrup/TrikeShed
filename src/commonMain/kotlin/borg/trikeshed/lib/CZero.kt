@@ -1,3 +1,5 @@
+@file:Suppress("unused")
+
 package borg.trikeshed.lib
 
 object CZero {

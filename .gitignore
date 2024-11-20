@@ -17,3 +17,5 @@ gradlew
 gradlew.bat
 
 >>>>>>> posixish
+.aider*
+.env
