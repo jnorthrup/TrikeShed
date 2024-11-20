@@ -35,7 +35,7 @@ class RadixTree<C : Comparable<C>>(var root: RadixTreeNode<C>? = null) {
 class RadixTreeNode<C : Comparable<C>>(
     var key: Series<C> = emptySeries(),
     var term: Boolean = false,
-    var children: Array<RadixTreeNode<C>>? = null
+    var children: MutableList<RadixTreeNode<C>>? = null
 ) {
     operator fun plus(other: Series<C>): RadixTreeNode<C> {
         // Find common prefix length
@@ -44,7 +44,7 @@ class RadixTreeNode<C : Comparable<C>>(
         if (commonLength == 0) {
             // No common prefix, create new root with both nodes as children
             return RadixTreeNode(emptySeries(), false, 
-                arrayOf(this, RadixTreeNode(other, true)))
+                mutableListOf(this, RadixTreeNode(other, true)))
         }
         
         if (commonLength == key.size && commonLength == other.size) {
@@ -57,7 +57,7 @@ class RadixTreeNode<C : Comparable<C>>(
             // This node's key is a prefix of the new key
             val remainder = other.drop(commonLength)
             if (children == null) {
-                children = emptyArray()
+                children = mutableListOf()
             }
             
             // Try to add to existing child
@@ -65,17 +65,11 @@ class RadixTreeNode<C : Comparable<C>>(
             if (existingChild != null) {
                 val newChild = existingChild + remainder
                 // Replace the existing child with the new one
-                val newChildren = Array(children!!.size) { i ->
-                    val child = children!![i]
-                    if (child === existingChild) newChild else child
-                }
-                children = newChildren
+                val index = children!!.indexOf(existingChild)
+                children!![index] = newChild
             } else {
                 // Add new child
-                children = Array(children!!.size + 1) { i ->
-                    if (i < children!!.size) children!![i]
-                    else RadixTreeNode(remainder, true)
-                }
+                children!!.add(RadixTreeNode(remainder, true))
             }
             return this
         }
@@ -88,7 +82,7 @@ class RadixTreeNode<C : Comparable<C>>(
         return RadixTreeNode(
             commonPrefix,
             false,
-            arrayOf(
+            mutableListOf(
                 RadixTreeNode(thisRemainder, term, children),
                 RadixTreeNode(otherRemainder, true)
             )
