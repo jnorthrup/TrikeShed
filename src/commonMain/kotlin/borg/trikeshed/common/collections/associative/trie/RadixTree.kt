@@ -3,32 +3,32 @@ package borg.trikeshed.common.collections.associative.trie
 import borg.trikeshed.lib.*
 
 class RadixTree<C : Comparable<C>> {
-    private var root: Node<C>? = null
+    internal var root: Node<C>? = null
 
-    private class Node<C : Comparable<C>>(
-        var prefix: Series<C>,
-        var isTerminal: Boolean = false,
-        val children: MutableList<Node<C>> = mutableListOf()
+    internal class Node<C : Comparable<C>>(
+        var key: Series<C>,
+        var term: Boolean = false,
+        var children: MutableList<Node<C>> = mutableListOf()
     ) {
         fun insert(s: Series<C>) {
             var commonLength = 0
             val minLength = minOf(prefix.size, s.size)
             
-            while (commonLength < minLength && prefix[commonLength] == s[commonLength]) {
+            while (commonLength < minLength && key[commonLength] == s[commonLength]) {
                 commonLength++
             }
 
             when {
                 // Complete match with existing node
-                commonLength == prefix.size && commonLength == s.size -> {
-                    isTerminal = true
+                commonLength == key.size && commonLength == s.size -> {
+                    term = true
                 }
                 
                 // This node's prefix is a prefix of the new string
-                commonLength == prefix.size -> {
+                commonLength == key.size -> {
                     val remaining = s.drop(commonLength) as Series<C>
                     val matchingChild = children.firstOrNull { 
-                        it.prefix.isNotEmpty() && it.prefix[0] == remaining[0] 
+                        it.key.isNotEmpty() && it.key[0] == remaining[0] 
                     }
                     
                     if (matchingChild != null) {
@@ -41,15 +41,15 @@ class RadixTree<C : Comparable<C>> {
                 
                 // Need to split this node
                 else -> {
-                    val commonPrefix = prefix.take(commonLength) as Series<C>
-                    val oldSuffix = prefix.drop(commonLength) as Series<C>
+                    val commonPrefix = key.take(commonLength) as Series<C>
+                    val oldSuffix = key.drop(commonLength) as Series<C>
                     val newSuffix = s.drop(commonLength) as Series<C>
                     
-                    val oldNode = Node(oldSuffix, isTerminal, children)
+                    val oldNode = Node(oldSuffix, term, children)
                     val newNode = Node(newSuffix, true)
                     
-                    prefix = commonPrefix
-                    isTerminal = false
+                    key = commonPrefix
+                    term = false
                     children.clear()
                     children.add(oldNode)
                     children.add(newNode)
@@ -59,8 +59,8 @@ class RadixTree<C : Comparable<C>> {
         }
 
         fun collectKeys(prefix: Series<C>, result: MutableList<Series<C>>) {
-            val currentKey = prefix + this.prefix
-            if (isTerminal) {
+            val currentKey = prefix + this.key
+            if (term) {
                 result.add(currentKey)
             }
             for (child in children) {
