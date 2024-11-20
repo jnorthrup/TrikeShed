@@ -66,7 +66,7 @@ class RadixTreeNode<C : Comparable<C>>(
         
         if (commonLength == key.size) {
             // This node's key is a prefix of the new key
-            val remainder = other.drop(commonLength)
+            val remainder = other.drop(commonLength) as Series<C>
             if (children == null) {
                 children = mutableListOf(RadixTreeNode(remainder, true))
                 return this
@@ -87,9 +87,9 @@ class RadixTreeNode<C : Comparable<C>>(
         }
         
         // Split this node
-        val commonPrefix = key.take(commonLength)
-        val thisRemainder = key.drop(commonLength)
-        val otherRemainder = other.drop(commonLength)
+        val commonPrefix = key.take(commonLength) as Series<C>
+        val thisRemainder = key.drop(commonLength) as Series<C>
+        val otherRemainder = other.drop(commonLength) as Series<C>
         
         return RadixTreeNode(
             commonPrefix,
