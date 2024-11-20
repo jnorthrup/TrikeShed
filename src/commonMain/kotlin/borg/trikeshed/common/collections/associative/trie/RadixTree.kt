@@ -56,15 +56,19 @@ class RadixTreeNode<C : Comparable<C>>(
         if (commonLength == key.size) {
             // This node's key is a prefix of the new key
             val remainder = other.drop(commonLength)
-            children = children ?: emptyArray()
+            if (children == null) {
+                children = emptyArray()
+            }
             
             // Try to add to existing child
             val existingChild = children!!.find { it.key[0] == remainder[0] }
             if (existingChild != null) {
-                existingChild + remainder
+                val newChild = existingChild + remainder
+                // Replace the existing child with the new one
+                children = children!!.map { if (it === existingChild) newChild else it }.toTypedArray()
             } else {
                 // Add new child
-                children = children!! + RadixTreeNode(remainder, true)
+                children = (children!! + RadixTreeNode(remainder, true)).toTypedArray()
             }
             return this
         }
