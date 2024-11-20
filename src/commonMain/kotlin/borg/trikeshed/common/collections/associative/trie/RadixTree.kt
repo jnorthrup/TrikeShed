@@ -42,24 +42,24 @@ class RadixTreeNode<C : Comparable<C>>(
                     return this
                 }
                 
-                children?.let { children ->
-                    val index = (children.toSeries() α { it.key.first() })
-                        .binarySearch(remainingKey.first())
-                    return when {
-                        index >= 0 -> children[index] + remainingKey
-                        else -> {
-                            val insertIndex = -index - 1
-                            val newNode = RadixTreeNode(remainingKey, true)
-                            children.toMutableList().apply {
-                                add(insertIndex, newNode)
-                            }.toTypedArray().also { this.children = it }
-                            this
-                        }
-                    }
-                } ?: run {
+                if (children == null) {
                     children = arrayOf(RadixTreeNode(remainingKey, true))
                     return this
                 }
+                
+                val index = (children!!.toSeries() α { it.key.first() })
+                    .binarySearch(remainingKey.first())
+                
+                if (index >= 0) {
+                    children!![index] = children!![index] + remainingKey
+                } else {
+                    val insertIndex = -index - 1
+                    val newNode = RadixTreeNode(remainingKey, true)
+                    children = children!!.toMutableList().apply {
+                        add(insertIndex, newNode)
+                    }.toTypedArray()
+                }
+                return this
             }
             
             // Case 2: Split current node

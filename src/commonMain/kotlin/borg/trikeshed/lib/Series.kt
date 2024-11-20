@@ -238,9 +238,12 @@ fun <S> Join<Int, (Int) -> S>.toSet(opt: MutableSet<S>? = null): MutableSet<S> =
 
 // Series iterator for use in for loops
 operator fun <A> Series<A>.iterator(): Iterator<A> = object : Iterator<A> {
-    var i = 0
-    override fun hasNext(): Boolean = i < size
-    override fun next(): A = this@iterator[i++]
+    private var current = 0
+    override fun hasNext(): Boolean = current < size
+    override fun next(): A {
+        if (!hasNext()) throw NoSuchElementException()
+        return this@iterator[current++]
+    }
 }
 
 
