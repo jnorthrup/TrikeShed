@@ -24,6 +24,12 @@ class RadixTreeNode<C : Comparable<C>>(
     var children: Array<RadixTreeNode<C>>? = null
 ) {
     operator fun plus(other: Series<C>): RadixTreeNode<C> {
+        // Handle empty key case
+        if (other.isEmpty()) {
+            term = true
+            return this
+        }
+        
         // Find the common prefix length between the current node's key and the other key
         val commonPrefixLength = key.commonPrefixWith(other).size
 
@@ -85,7 +91,25 @@ class RadixTreeNode<C : Comparable<C>>(
                 ) else arrayOf(newOtherNode, newChildNode)
             return newInternalNode
         }
-        TODO("commonPrefixLength > key.size")
+        // The other key contains our key as a prefix
+        val remainingKey = other.drop(commonPrefixLength)
+        children?.let { children ->
+            var index = (children.toSeries() α { it.key.first() }).binarySearch(remainingKey.first())
+            when {
+                index >= 0 -> return children[index] + remainingKey
+                else -> {
+                    index = -index - 1
+                    val newNode = RadixTreeNode(remainingKey, true)
+                    children.toMutableList().apply { add(index, newNode) }
+                        .also { this.children = it.toTypedArray() }
+                    return this
+                }
+            }
+        } ?: run {
+            val newNode = RadixTreeNode(remainingKey, true)
+            children = arrayOf(newNode)
+            return this
+        }
     }
 
     fun keys(prefix: Series<C>? = null): List<Series<C>> {
