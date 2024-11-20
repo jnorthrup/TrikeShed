@@ -14,9 +14,8 @@ class RadixTree<C : Comparable<C>> {
             var commonLength = 0
             val minLength = minOf(key.size, s.size)
 
-            while (commonLength < minLength && key[commonLength] == s[commonLength]) {
-                commonLength++
-            }
+            val commonPrefix = key.commonPrefixWith(s)
+            commonLength = commonPrefix.size
 
             when {
                 // Complete match with existing node
@@ -41,18 +40,15 @@ class RadixTree<C : Comparable<C>> {
 
                 // Need to split this node
                 else -> {
-                    val commonPrefix = key.take(commonLength) as Series<C>
-                    val oldSuffix = key.drop(commonLength) as Series<C>
-                    val newSuffix = s.drop(commonLength) as Series<C>
-
+                    val oldSuffix = key.drop(commonLength)
+                    val newSuffix = s.drop(commonLength)
+                    
                     val oldNode = Node(oldSuffix, term, children)
                     val newNode = Node(newSuffix, true)
-
-                    key = commonPrefix
+                    
+                    key = key.take(commonLength)
                     term = false
-                    children.clear()
-                    children.add(oldNode)
-                    children.add(newNode)
+                    children = mutableListOf(oldNode, newNode)
                     children.sortBy { it.key[0] }
                 }
             }

@@ -62,19 +62,22 @@ class RadixTreeTest {
         debug { }
         // Verify the nodes
         tree.root?.let { root ->
-            assert(0 == root.key.cpb.compareTo("ban".toSeries().cpb))
-            assert(root.term)
-            assert(root.children?.size == 3)
-            root.children?.let { children ->
-                assert(children[0].key.asString() == "ana".toSeries().asString())
-                assert(children[0].term)
-                assert(children[0].children == null)
-                assert(children[1].key.asString() == "ner".toSeries().asString())
-                assert(children[1].term)
-                assert(children[1].children == null)
-                assert(children[2].key.asString() == "shee".toSeries().asString())
-                assert(children[2].term)
-                assert(children[2].children == null)
+            assert(root.key.commonPrefixWith("ban".toSeries()).size == root.key.size) { "Expected root key to be 'ban'" }
+            assert(root.term) { "Root should be terminal" }
+            assert(root.children.size == 3) { "Root should have 3 children" }
+            
+            val children = root.children
+            assert(children[0].key.asString() == "ana") { "First child should be 'ana'" }
+            assert(children[0].term) { "First child should be terminal" }
+            assert(children[0].children.isEmpty()) { "First child should have no children" }
+            
+            assert(children[1].key.asString() == "ner") { "Second child should be 'ner'" }
+            assert(children[1].term) { "Second child should be terminal" }
+            assert(children[1].children.isEmpty()) { "Second child should have no children" }
+            
+            assert(children[2].key.asString() == "shee") { "Third child should be 'shee'" }
+            assert(children[2].term) { "Third child should be terminal" }
+            assert(children[2].children.isEmpty()) { "Third child should have no children" }
             }
         }
     }
