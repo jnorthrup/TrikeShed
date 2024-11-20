@@ -12,8 +12,8 @@ class RadixTree<C : Comparable<C>> {
     ) {
         fun insert(s: Series<C>) {
             var commonLength = 0
-            val minLength = minOf(prefix.size, s.size)
-            
+            val minLength = minOf(key.size, s.size)
+
             while (commonLength < minLength && key[commonLength] == s[commonLength]) {
                 commonLength++
             }
@@ -23,37 +23,37 @@ class RadixTree<C : Comparable<C>> {
                 commonLength == key.size && commonLength == s.size -> {
                     term = true
                 }
-                
-                // This node's prefix is a prefix of the new string
+
+                // This node's key is a prefix of the new string
                 commonLength == key.size -> {
                     val remaining = s.drop(commonLength) as Series<C>
-                    val matchingChild = children.firstOrNull { 
-                        it.key.isNotEmpty() && it.key[0] == remaining[0] 
+                    val matchingChild = children.firstOrNull {
+                        it.key.isNotEmpty() && it.key[0] == remaining[0]
                     }
-                    
+
                     if (matchingChild != null) {
                         matchingChild.insert(remaining)
                     } else {
                         children.add(Node(remaining, true))
-                        children.sortBy { it.prefix[0] }
+                        children.sortBy { it.key[0] }
                     }
                 }
-                
+
                 // Need to split this node
                 else -> {
                     val commonPrefix = key.take(commonLength) as Series<C>
                     val oldSuffix = key.drop(commonLength) as Series<C>
                     val newSuffix = s.drop(commonLength) as Series<C>
-                    
+
                     val oldNode = Node(oldSuffix, term, children)
                     val newNode = Node(newSuffix, true)
-                    
+
                     key = commonPrefix
                     term = false
                     children.clear()
                     children.add(oldNode)
                     children.add(newNode)
-                    children.sortBy { it.prefix[0] }
+                    children.sortBy { it.key[0] }
                 }
             }
         }
@@ -71,7 +71,7 @@ class RadixTree<C : Comparable<C>> {
 
     operator fun plus(s: Series<C>): RadixTree<C> {
         if (s.isEmpty()) return this
-        
+
         if (root == null) {
             root = Node(s, true)
         } else {
