@@ -37,6 +37,9 @@ class RadixTreeNode<C : Comparable<C>>(
     var term: Boolean = false,
     var children: MutableList<RadixTreeNode<C>>? = null
 ) {
+    private fun sortChildren() {
+        children?.sortBy { it.key[0] }
+    }
     operator fun plus(other: Series<C>): RadixTreeNode<C> {
         // Handle empty input
         if (other.isEmpty()) return this
@@ -69,16 +72,16 @@ class RadixTreeNode<C : Comparable<C>>(
             
             // Try to add to existing child
             val firstChar = remainder[0]
-            val existingChildIndex = children!!.binarySearch { 
-                it.key[0].compareTo(firstChar) 
-            }
+            val existingChild = children!!.find { it.key[0] == firstChar }
             
-            if (existingChildIndex >= 0) {
-                val newChild = children!![existingChildIndex] + remainder
-                children!![existingChildIndex] = newChild
+            if (existingChild != null) {
+                val newChild = existingChild + remainder
+                children!!.remove(existingChild)
+                children!!.add(newChild)
+                sortChildren()
             } else {
-                val insertIndex = -(existingChildIndex + 1)
-                children!!.add(insertIndex, RadixTreeNode(remainder, true))
+                children!!.add(RadixTreeNode(remainder, true))
+                sortChildren()
             }
             return this
         }
@@ -88,20 +91,26 @@ class RadixTreeNode<C : Comparable<C>>(
         val thisRemainder = key.drop(commonLength)
         val otherRemainder = other.drop(commonLength)
         
-        return RadixTreeNode(
+        val newNode = RadixTreeNode(
             commonPrefix,
             false,
             mutableListOf(
                 RadixTreeNode(thisRemainder, term, children),
                 RadixTreeNode(otherRemainder, true)
-            ).sortedBy { it.key[0] }.toMutableList()
+            )
         )
+        newNode.sortChildren()
+        return newNode
     }
 
     fun keys(prefix: Series<C>? = null): List<Series<C>> {
-        val currentPrefix = prefix?.plus(key) ?: key
-        val result = mutableListOf<Series<C>>()
+        val currentPrefix = if (prefix != null && prefix.size > 0) {
+            prefix.plus(key)
+        } else {
+            key
+        }
         
+        val result = mutableListOf<Series<C>>()
         if (term) {
             result.add(currentPrefix)
         }
