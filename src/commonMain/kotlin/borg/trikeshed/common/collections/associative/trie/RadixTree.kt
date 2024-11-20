@@ -3,6 +3,14 @@ package borg.trikeshed.common.collections.associative.trie
 import borg.trikeshed.common.collections.binarySearch
 import borg.trikeshed.lib.*
 
+private fun <C : Comparable<C>> Series<C>.commonPrefixLength(other: Series<C>): Int {
+    val minLength = minOf(this.size, other.size)
+    for (i in 0 until minLength) {
+        if (this[i] != other[i]) return i
+    }
+    return minLength
+}
+
 /**
  * a prefix tree (trie) implementation
  */
