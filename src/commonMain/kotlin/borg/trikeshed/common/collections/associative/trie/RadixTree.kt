@@ -6,7 +6,8 @@ import borg.trikeshed.lib.*
 /**
  * a prefix tree (trie) implementation
  */
-class RadixTree<C : Comparable<C>>(var root: RadixTreeNode<C>? = null) {TODO    ()}
+class RadixTree<C : Comparable<C>>(var root: RadixTreeNode<C>? = null) {
+    // TODO: Implement RadixTree methods
 }
 
 /**
@@ -17,7 +18,13 @@ class RadixTreeNode<C : Comparable<C>>(
     var term: Boolean = false,
     var children: Array<RadixTreeNode<C>>? = null
 ) {
-    operator fun plus(other: Series<C>): RadixTreeNode<C> TODO()
+    operator fun plus(other: Series<C>): RadixTreeNode<C> {
+        // TODO: Implement plus operation
+        throw NotImplementedError()
+    }
 
-    fun keys(prefix: Series<C>? = null): List<Series<C>> TODO   ()
+    fun keys(prefix: Series<C>? = null): List<Series<C>> {
+        // TODO: Implement keys method
+        throw NotImplementedError()
+    }
 }
