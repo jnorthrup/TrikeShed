@@ -65,10 +65,17 @@ class RadixTreeNode<C : Comparable<C>>(
             if (existingChild != null) {
                 val newChild = existingChild + remainder
                 // Replace the existing child with the new one
-                children = children!!.map { if (it === existingChild) newChild else it }.toTypedArray()
+                val newChildren = Array(children!!.size) { i ->
+                    val child = children!![i]
+                    if (child === existingChild) newChild else child
+                }
+                children = newChildren
             } else {
                 // Add new child
-                children = (children!! + RadixTreeNode(remainder, true)).toTypedArray()
+                children = Array(children!!.size + 1) { i ->
+                    if (i < children!!.size) children!![i]
+                    else RadixTreeNode(remainder, true)
+                }
             }
             return this
         }
