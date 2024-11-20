@@ -38,6 +38,12 @@ class RadixTreeNode<C : Comparable<C>>(
     var children: MutableList<RadixTreeNode<C>>? = null
 ) {
     operator fun plus(other: Series<C>): RadixTreeNode<C> {
+        // Handle empty input
+        if (other.isEmpty()) return this
+        if (key.isEmpty() && children == null) {
+            return RadixTreeNode(other, true)
+        }
+        
         // Find common prefix length
         val commonLength = key.commonPrefixLength(other)
         
@@ -57,19 +63,22 @@ class RadixTreeNode<C : Comparable<C>>(
             // This node's key is a prefix of the new key
             val remainder = other.drop(commonLength)
             if (children == null) {
-                children = mutableListOf()
+                children = mutableListOf(RadixTreeNode(remainder, true))
+                return this
             }
             
             // Try to add to existing child
-            val existingChild = children!!.find { it.key[0] == remainder[0] }
-            if (existingChild != null) {
-                val newChild = existingChild + remainder
-                // Replace the existing child with the new one
-                val index = children!!.indexOf(existingChild)
-                children!![index] = newChild
+            val firstChar = remainder[0]
+            val existingChildIndex = children!!.binarySearch { 
+                it.key[0].compareTo(firstChar) 
+            }
+            
+            if (existingChildIndex >= 0) {
+                val newChild = children!![existingChildIndex] + remainder
+                children!![existingChildIndex] = newChild
             } else {
-                // Add new child
-                children!!.add(RadixTreeNode(remainder, true))
+                val insertIndex = -(existingChildIndex + 1)
+                children!!.add(insertIndex, RadixTreeNode(remainder, true))
             }
             return this
         }
@@ -85,7 +94,7 @@ class RadixTreeNode<C : Comparable<C>>(
             mutableListOf(
                 RadixTreeNode(thisRemainder, term, children),
                 RadixTreeNode(otherRemainder, true)
-            )
+            ).sortedBy { it.key[0] }.toMutableList()
         )
     }
 
