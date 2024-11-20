@@ -12,15 +12,19 @@ class RadixTreeTest {
     @Test
     fun testKeys() {
         val tree = RadixTree<Char>()
-        tree + banshee
-        tree + ban
-        tree + banana
-        tree + banner
-        tree + "b1bomber".toSeries()
+        
+        // Add items safely
+        listOf(banshee, ban, banana, banner, "b1bomber".toSeries()).forEach { 
+            tree + it
+        }
+        
         val keys = tree.keys()
-        assert(keys.size == 5)
+        assertEquals(5, keys.size, "Should have 5 keys")
+        
         val keyStrings = keys.map { it.asString() }.toSet()
-        assert(keyStrings.containsAll(setOf("banshee", "ban", "banana", "banner", "b1bomber")))
+        val expectedKeys = setOf("banshee", "ban", "banana", "banner", "b1bomber")
+        assertTrue(keyStrings.containsAll(expectedKeys), 
+            "Missing keys. Expected: $expectedKeys, Got: $keyStrings")
     }
 
     @Test

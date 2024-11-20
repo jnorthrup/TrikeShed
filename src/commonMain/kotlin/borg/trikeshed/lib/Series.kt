@@ -48,13 +48,11 @@ inline infix fun <X, C> Array<X>.α(crossinline xform: (X) -> C): Series<C> = si
  */
 val <T> Series<T>.infinite: Series<T>
     get() = Int.MAX_VALUE j { x: Int ->
-        this.b(
-            when {
-                x < 0 -> 0
-                size <= x -> size.dec()
-                else -> x
-            }
-        )
+        when {
+            x < 0 -> this[0]
+            x >= size -> this[size - 1]
+            else -> this[x]
+        }
     }
 
 /**
