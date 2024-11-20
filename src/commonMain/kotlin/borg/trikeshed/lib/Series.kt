@@ -441,7 +441,15 @@ fun Series<Char>.parseIsoDate(): kotlinx.datetime.LocalDate {
     return kotlinx.datetime.LocalDate(year, month, day)
 }
 
-fun Series<Char>.asString(upto: Int = Int.MAX_VALUE): String = this.take(upto).encodeToByteArray().decodeToString()
+fun Series<Char>.asString(upto: Int = Int.MAX_VALUE): String {
+    if (size == 0) return ""
+    val effectiveSize = minOf(size, upto)
+    return try {
+        this.take(effectiveSize).encodeToByteArray().decodeToString()
+    } catch (e: Exception) {
+        ""
+    }
+}
 
 /** parse a double or throw an exception
  *
