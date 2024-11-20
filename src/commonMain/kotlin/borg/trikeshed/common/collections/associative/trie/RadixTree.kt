@@ -16,10 +16,13 @@ private fun <C : Comparable<C>> Series<C>.commonPrefixLength(other: Series<C>): 
  */
 class RadixTree<C : Comparable<C>>(var root: RadixTreeNode<C>? = null) {
     operator fun plus(series: Series<C>): RadixTree<C> {
+        if (series.isEmpty()) return this
+        
         if (root == null) {
             root = RadixTreeNode(series, true)
         } else {
-            root = root!! + series
+            val newRoot = root!! + series
+            root = newRoot
         }
         return this
     }
@@ -43,17 +46,16 @@ class RadixTreeNode<C : Comparable<C>>(
     operator fun plus(other: Series<C>): RadixTreeNode<C> {
         // Handle empty input
         if (other.isEmpty()) return this
-        if (key.isEmpty() && children == null) {
-            return RadixTreeNode(other, true)
-        }
         
         // Find common prefix length
         val commonLength = key.commonPrefixLength(other)
         
         if (commonLength == 0) {
             // No common prefix, create new root with both nodes as children
-            return RadixTreeNode(emptySeries(), false, 
-                mutableListOf(this, RadixTreeNode(other, true)))
+            val newNode = RadixTreeNode(emptySeries(), false)
+            newNode.children = mutableListOf(this, RadixTreeNode(other, true))
+            newNode.sortChildren()
+            return newNode
         }
         
         if (commonLength == key.size && commonLength == other.size) {
@@ -72,16 +74,14 @@ class RadixTreeNode<C : Comparable<C>>(
             
             // Try to add to existing child
             val firstChar = remainder[0]
-            val existingChild = children!!.find { it.key[0] == firstChar }
+            val childIndex = children!!.binarySearch { it.key[0].compareTo(firstChar) }
             
-            if (existingChild != null) {
+            if (childIndex >= 0) {
+                val existingChild = children!![childIndex]
                 val newChild = existingChild + remainder
-                children!!.remove(existingChild)
-                children!!.add(newChild)
-                sortChildren()
+                children!![childIndex] = newChild
             } else {
-                children!!.add(RadixTreeNode(remainder, true))
-                sortChildren()
+                children!!.add(-childIndex - 1, RadixTreeNode(remainder, true))
             }
             return this
         }
@@ -91,16 +91,14 @@ class RadixTreeNode<C : Comparable<C>>(
         val thisRemainder = key.drop(commonLength)
         val otherRemainder = other.drop(commonLength)
         
-        val newNode = RadixTreeNode(
+        return RadixTreeNode(
             commonPrefix,
             false,
             mutableListOf(
                 RadixTreeNode(thisRemainder, term, children),
                 RadixTreeNode(otherRemainder, true)
             )
-        )
-        newNode.sortChildren()
-        return newNode
+        ).apply { sortChildren() }
     }
 
     fun keys(prefix: Series<C>? = null): List<Series<C>> {
