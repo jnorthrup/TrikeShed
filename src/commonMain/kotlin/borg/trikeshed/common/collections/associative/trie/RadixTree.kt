@@ -24,49 +24,41 @@ class RadixTreeNode<C : Comparable<C>>(
     var children: Array<RadixTreeNode<C>>? = null
 ) {
     operator fun plus(other: Series<C>): RadixTreeNode<C> {
-        // Handle empty key case
         if (other.isEmpty()) {
             term = true
             return this
         }
         
-        // Find common prefix length
         val commonPrefixLength = key.commonPrefixWith(other).size
         
-        when {
-            // Case 1: Current node's key is a prefix of the other key
+        return when {
             commonPrefixLength == key.size -> {
                 val remainingKey = other.drop(commonPrefixLength)
                 if (remainingKey.isEmpty()) {
                     term = true
-                    return this
-                }
-                
-                if (children == null) {
-                    children = arrayOf(RadixTreeNode(remainingKey, true))
-                    return this
-                }
-                
-                val firstChar = remainingKey.first()
-                val searchNode = RadixTreeNode(Series(1) { firstChar }, true)
-                val index = children!!.binarySearch(
-                    searchNode,
-                    compareBy { node -> node.key.first() }
-                )
-                
-                if (index >= 0) {
-                    children!![index] = children!![index] + remainingKey
+                    this
                 } else {
-                    val insertIndex = -index - 1
-                    val newNode = RadixTreeNode(remainingKey, true)
-                    children = children!!.toMutableList().apply {
-                        add(insertIndex, newNode)
-                    }.toTypedArray()
+                    if (children == null) {
+                        children = arrayOf(RadixTreeNode(remainingKey, true))
+                    } else {
+                        val firstChar = remainingKey.first()
+                        val index = children!!.binarySearch { 
+                            it.key.first().compareTo(firstChar) 
+                        }
+                        
+                        if (index >= 0) {
+                            children!![index] = children!![index] + remainingKey
+                        } else {
+                            val insertIndex = -index - 1
+                            children = children!!.toMutableList().apply {
+                                add(insertIndex, RadixTreeNode(remainingKey, true))
+                            }.toTypedArray()
+                        }
+                    }
+                    this
                 }
-                return this
             }
             
-            // Case 2: Split current node
             commonPrefixLength < key.size -> {
                 val commonPrefix = key.take(commonPrefixLength)
                 val remainingCurrentKey = key.drop(commonPrefixLength)
@@ -76,35 +68,34 @@ class RadixTreeNode<C : Comparable<C>>(
                 val currentNode = RadixTreeNode(remainingCurrentKey, term, children)
                 val newNode = RadixTreeNode(remainingOtherKey, true)
                 
-                newInternalNode.children = if (remainingCurrentKey.first() < remainingOtherKey.first())
-                    arrayOf(currentNode, newNode)
-                else 
-                    arrayOf(newNode, currentNode)
-                    
-                return newInternalNode
+                newInternalNode.children = arrayOf(
+                    if (remainingCurrentKey.first() <= remainingOtherKey.first()) 
+                        currentNode else newNode,
+                    if (remainingCurrentKey.first() <= remainingOtherKey.first()) 
+                        newNode else currentNode
+                )
+                
+                newInternalNode
             }
             
-            // Case 3: Other key is a prefix of current node's key
             else -> {
                 val newRoot = RadixTreeNode(other, true)
-                newRoot.children = arrayOf(RadixTreeNode(key.drop(commonPrefixLength), term, children))
-                return newRoot
+                newRoot.children = arrayOf(
+                    RadixTreeNode(key.drop(commonPrefixLength), term, children)
+                )
+                newRoot
             }
         }
     }
 
     fun keys(prefix: Series<C>? = null): List<Series<C>> {
-        val currentPrefix = prefix?.takeUnless { it.isEmpty() }?.plus(key) ?: key
-        val result = mutableListOf<Series<C>>()
-        
-        if (term) {
-            result.add(currentPrefix)
+        val currentPrefix = if (prefix == null || prefix.isEmpty()) key 
+                           else prefix.plus(key)
+        return buildList {
+            if (term) add(currentPrefix)
+            children?.forEach { child ->
+                addAll(child.keys(currentPrefix))
+            }
         }
-        
-        children?.forEach { child ->
-            result.addAll(child.keys(currentPrefix))
-        }
-        
-        return result
     }
 }
