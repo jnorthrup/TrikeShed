@@ -47,8 +47,8 @@ class RadixTreeNode<C : Comparable<C>>(
                     return this
                 }
                 
-                val index = (children!!.toSeries() α { it.key.first() })
-                    .binarySearch(remainingKey.first())
+                val firstChar = remainingKey.first()
+                val index = children!!.binarySearch { it.key.first().compareTo(firstChar) }
                 
                 if (index >= 0) {
                     children!![index] = children!![index] + remainingKey

@@ -242,7 +242,9 @@ operator fun <A> Series<A>.iterator(): Iterator<A> = object : Iterator<A> {
     override fun hasNext(): Boolean = current < size
     override fun next(): A {
         if (!hasNext()) throw NoSuchElementException()
-        return this@iterator[current++]
+        val result = this@iterator[current]
+        current++
+        return result
     }
 }
 
