@@ -2,6 +2,8 @@ package borg.trikeshed.common.collections.associative.trie
 
 import borg.trikeshed.lib.*
 import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 class RadixTreeTest {
     val banana = "banana".toSeries()
