@@ -30,85 +30,62 @@ class RadixTreeNode<C : Comparable<C>>(
             return this
         }
         
-        // Find the common prefix length between the current node's key and the other key
+        // Find common prefix length
         val commonPrefixLength = key.commonPrefixWith(other).size
-
-        // If the common prefix length is equal to the current node's key length,
-        // it means that we need to insert the remaining part of the other key into the children of the current node
-        if (commonPrefixLength == key.size) {
-            val remainingKey = other.drop(commonPrefixLength)
-
-            // If there is no remaining part, it means that the other key is equal to the current node's key,
-            // so we just need to mark the current node as a terminal node
-            if (remainingKey.isEmpty()) {
-                term = true
-                return this
-            }
-
-            // If the current node has children, we try to find a child with a matching prefix for the remaining key
-            //using binarysearch to retain sorted order
-            children?.let { children ->
-                var index = (children.toSeries() α { it.key.first() }).binarySearch(remainingKey.first())
-                when {
-                    index >= 0 -> return children[index] + remainingKey
-                    else -> {
-                        index = -index - 1
-                        val newNode: RadixTreeNode<C> = RadixTreeNode(remainingKey, true)
-                        children.toMutableList().apply { add(index, newNode) }
-                            .also { this.children = it.toTypedArray() }
-                        return this
-                    }
+        
+        when {
+            // Case 1: Current node's key is a prefix of the other key
+            commonPrefixLength == key.size -> {
+                val remainingKey = other.drop(commonPrefixLength)
+                if (remainingKey.isEmpty()) {
+                    term = true
+                    return this
                 }
-            } ?: run {
-                // If the current node has no children, we just create a new child node for the remaining key
-                val newNode = RadixTreeNode(remainingKey, true)
-                children = arrayOf(newNode)
-                return this
-            }
-        }
-
-        // If the common prefix length is less than the current node's key length,
-        // it means that we need to split the current node into a new internal node and two child nodes
-        if (commonPrefixLength < key.size) {
-            val commonPrefix = key.take(commonPrefixLength)
-            val remainingCurrentKey = key.drop(commonPrefixLength)
-            val remainingOtherKey = other.drop(commonPrefixLength)
-
-            // Create the new internal node with the common prefix
-            val newInternalNode = RadixTreeNode(commonPrefix)
-
-            // Create a new child node for the remaining part of the current node's key
-            val newChildNode = RadixTreeNode(remainingCurrentKey, term, children)
-
-            // Create a new child node for the remaining part of the other key
-            val newOtherNode = RadixTreeNode(remainingOtherKey, true)
-
-            // Set the new internal node's children
-            newInternalNode.children =
-                if (remainingCurrentKey.cpb < remainingOtherKey.cpb) arrayOf(
-                    newChildNode,
-                    newOtherNode
-                ) else arrayOf(newOtherNode, newChildNode)
-            return newInternalNode
-        }
-        // The other key contains our key as a prefix
-        val remainingKey = other.drop(commonPrefixLength)
-        children?.let { children ->
-            var index = (children.toSeries() α { it.key.first() }).binarySearch(remainingKey.first())
-            when {
-                index >= 0 -> return children[index] + remainingKey
-                else -> {
-                    index = -index - 1
-                    val newNode = RadixTreeNode(remainingKey, true)
-                    children.toMutableList().apply { add(index, newNode) }
-                        .also { this.children = it.toTypedArray() }
+                
+                children?.let { children ->
+                    val index = (children.toSeries() α { it.key.first() })
+                        .binarySearch(remainingKey.first())
+                    return when {
+                        index >= 0 -> children[index] + remainingKey
+                        else -> {
+                            val insertIndex = -index - 1
+                            val newNode = RadixTreeNode(remainingKey, true)
+                            children.toMutableList().apply {
+                                add(insertIndex, newNode)
+                            }.toTypedArray().also { this.children = it }
+                            this
+                        }
+                    }
+                } ?: run {
+                    children = arrayOf(RadixTreeNode(remainingKey, true))
                     return this
                 }
             }
-        } ?: run {
-            val newNode = RadixTreeNode(remainingKey, true)
-            children = arrayOf(newNode)
-            return this
+            
+            // Case 2: Split current node
+            commonPrefixLength < key.size -> {
+                val commonPrefix = key.take(commonPrefixLength)
+                val remainingCurrentKey = key.drop(commonPrefixLength)
+                val remainingOtherKey = other.drop(commonPrefixLength)
+                
+                val newInternalNode = RadixTreeNode(commonPrefix)
+                val currentNode = RadixTreeNode(remainingCurrentKey, term, children)
+                val newNode = RadixTreeNode(remainingOtherKey, true)
+                
+                newInternalNode.children = if (remainingCurrentKey.first() < remainingOtherKey.first())
+                    arrayOf(currentNode, newNode)
+                else 
+                    arrayOf(newNode, currentNode)
+                    
+                return newInternalNode
+            }
+            
+            // Case 3: Other key is a prefix of current node's key
+            else -> {
+                val newRoot = RadixTreeNode(other, true)
+                newRoot.children = arrayOf(RadixTreeNode(key.drop(commonPrefixLength), term, children))
+                return newRoot
+            }
         }
     }
 
