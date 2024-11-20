@@ -90,7 +90,7 @@ class JsonParserTest {
 
 
     fun readBigJson(): String {
-        val lines = readLines("src/main/resources/big.json")
+        val lines = readLines("src/commonTest/resources/big.json")
         return lines.joinToString("\n")
     }
 }

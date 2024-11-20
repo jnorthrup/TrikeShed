@@ -17,15 +17,10 @@ class RadixTreeTest {
         tree + banana
         tree + banner
         tree + "b1bomber".toSeries()
-        debug { }
         val keys = tree.keys()
         assert(keys.size == 5)
-        debug {
-            for (key in keys) {
-                println(key.asString())
-            }
-
-        }
+        val keyStrings = keys.map { it.asString() }.toSet()
+        assert(keyStrings.containsAll(setOf("banshee", "ban", "banana", "banner", "b1bomber")))
     }
 
     @Test

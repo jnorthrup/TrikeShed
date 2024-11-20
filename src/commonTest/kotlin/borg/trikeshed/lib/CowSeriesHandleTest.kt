@@ -14,6 +14,6 @@ class CowSeriesHandleTest {
     fun testRemoveAt() {
         val cowSeries = borg.trikeshed.common.collections.s_[1, 2, 3].cow
         cowSeries.removeAt(1)
-        assertEquals(borg.trikeshed.common.collections.s_[1, 3].cpb, cowSeries.cpb)
+        assertEquals(borg.trikeshed.common.collections.s_[1, 3].toList(), cowSeries.cpb.toList())
     }
 }
