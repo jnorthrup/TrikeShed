@@ -48,9 +48,10 @@ class RadixTreeNode<C : Comparable<C>>(
                 }
                 
                 val firstChar = remainingKey.first()
+                val searchNode = RadixTreeNode(Series(1) { firstChar }, true)
                 val index = children!!.binarySearch(
-                    element = RadixTreeNode(Series(1) { firstChar }, true),
-                    comparator = Comparator { a, b -> a.key.first().compareTo(b.key.first()) }
+                    searchNode,
+                    compareBy { node -> node.key.first() }
                 )
                 
                 if (index >= 0) {
@@ -93,13 +94,17 @@ class RadixTreeNode<C : Comparable<C>>(
     }
 
     fun keys(prefix: Series<C>? = null): List<Series<C>> {
-        val ret = mutableListOf<Series<C>>()
-        val newPrefix = prefix?.takeUnless { it.isEmpty() }?.plus(this.key) ?: this.key
-
-        if (term) ret.add(newPrefix)
-        children?.let { children ->
-            for (child in children) ret.addAll(child.keys(newPrefix))
+        val currentPrefix = prefix?.takeUnless { it.isEmpty() }?.plus(key) ?: key
+        val result = mutableListOf<Series<C>>()
+        
+        if (term) {
+            result.add(currentPrefix)
         }
-        return ret
+        
+        children?.forEach { child ->
+            result.addAll(child.keys(currentPrefix))
+        }
+        
+        return result
     }
 }
