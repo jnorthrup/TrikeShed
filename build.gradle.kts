@@ -63,7 +63,10 @@ kotlin {
             macosArm64("macos")
         }
 
-        hostOs == "Linux" -> linuxX64("linux") // io_uring lives in linux sourceset only
+        hostOs == "Linux" -> {
+            linuxX64("linux") // io_uring lives in linux sourceset only
+            linuxX64("posix")
+        }
         isMingwX64 -> mingwX64("posix")
         else -> throw GradleException("Host OS is not supported in Kotlin/Native.")
 
