@@ -7,7 +7,18 @@ import borg.trikeshed.lib.*
  * a prefix tree (trie) implementation
  */
 class RadixTree<C : Comparable<C>>(var root: RadixTreeNode<C>? = null) {
-    // TODO: Implement RadixTree methods
+    operator fun plus(series: Series<C>): RadixTree<C> {
+        if (root == null) {
+            root = RadixTreeNode(series, true)
+        } else {
+            root = root!! + series
+        }
+        return this
+    }
+
+    fun keys(): List<Series<C>> {
+        return root?.keys() ?: emptyList()
+    }
 }
 
 /**
@@ -19,12 +30,64 @@ class RadixTreeNode<C : Comparable<C>>(
     var children: Array<RadixTreeNode<C>>? = null
 ) {
     operator fun plus(other: Series<C>): RadixTreeNode<C> {
-        // TODO: Implement plus operation
-        throw NotImplementedError()
+        // Find common prefix length
+        val commonLength = key.commonPrefixLength(other)
+        
+        if (commonLength == 0) {
+            // No common prefix, create new root with both nodes as children
+            return RadixTreeNode(emptySeries(), false, 
+                arrayOf(this, RadixTreeNode(other, true)))
+        }
+        
+        if (commonLength == key.size && commonLength == other.size) {
+            // Exact match - mark as terminal
+            term = true
+            return this
+        }
+        
+        if (commonLength == key.size) {
+            // This node's key is a prefix of the new key
+            val remainder = other.drop(commonLength)
+            children = children ?: emptyArray()
+            
+            // Try to add to existing child
+            val existingChild = children!!.find { it.key[0] == remainder[0] }
+            if (existingChild != null) {
+                existingChild + remainder
+            } else {
+                // Add new child
+                children = children!! + RadixTreeNode(remainder, true)
+            }
+            return this
+        }
+        
+        // Split this node
+        val commonPrefix = key.take(commonLength)
+        val thisRemainder = key.drop(commonLength)
+        val otherRemainder = other.drop(commonLength)
+        
+        return RadixTreeNode(
+            commonPrefix,
+            false,
+            arrayOf(
+                RadixTreeNode(thisRemainder, term, children),
+                RadixTreeNode(otherRemainder, true)
+            )
+        )
     }
 
     fun keys(prefix: Series<C>? = null): List<Series<C>> {
-        // TODO: Implement keys method
-        throw NotImplementedError()
+        val currentPrefix = prefix?.plus(key) ?: key
+        val result = mutableListOf<Series<C>>()
+        
+        if (term) {
+            result.add(currentPrefix)
+        }
+        
+        children?.forEach { child ->
+            result.addAll(child.keys(currentPrefix))
+        }
+        
+        return result
     }
 }
