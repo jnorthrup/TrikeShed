@@ -15,15 +15,31 @@ class RadixTreeTest {
     fun testKeys() {
         val tree = RadixTree<Char>()
         
-        // Add items safely
-        listOf(banshee, ban, banana, banner, "b1bomber".toSeries()).forEach { 
-            tree + it
+        // Add items one at a time with validation
+        val items = listOf(banshee, ban, banana, banner, "b1bomber".toSeries())
+        items.forEach { item -> 
+            require(item.size > 0) { "Empty series not allowed" }
+            println("Adding item of size ${item.size}: ${item.asString()}")
+            tree + item
         }
         
         val keys = tree.keys()
+        println("Got ${keys.size} keys")
         assertEquals(5, keys.size, "Should have 5 keys")
         
-        val keyStrings = keys.map { it.asString() }.toSet()
+        // Convert to strings safely with debug info
+        val keyStrings = keys.mapNotNull { key -> 
+            try {
+                require(key.size > 0) { "Empty key found" }
+                val str = key.asString()
+                println("Successfully converted key to string: $str")
+                str
+            } catch (e: Exception) {
+                println("Failed to convert key: $e")
+                null
+            }
+        }.toSet()
+        
         val expectedKeys = setOf("banshee", "ban", "banana", "banner", "b1bomber")
         assertTrue(keyStrings.containsAll(expectedKeys), 
             "Missing keys. Expected: $expectedKeys, Got: $keyStrings")
