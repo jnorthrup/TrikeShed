@@ -1,122 +1,88 @@
 package borg.trikeshed.common.collections.associative.trie
 
-import borg.trikeshed.common.collections.binarySearch
 import borg.trikeshed.lib.*
 
-private fun <C : Comparable<C>> Series<C>.commonPrefixLength(other: Series<C>): Int {
-    val minLength = minOf(this.size, other.size)
-    for (i in 0 until minLength) {
-        if (this[i] != other[i]) return i
-    }
-    return minLength
-}
+class RadixTree<C : Comparable<C>> {
+    private var root: Node<C>? = null
 
-/**
- * a prefix tree (trie) implementation
- */
-class RadixTree<C : Comparable<C>>(var root: RadixTreeNode<C>? = null) {
-    operator fun plus(series: Series<C>): RadixTree<C> {
-        if (series.isEmpty()) return this
+    private class Node<C : Comparable<C>>(
+        var prefix: Series<C>,
+        var isTerminal: Boolean = false,
+        val children: MutableList<Node<C>> = mutableListOf()
+    ) {
+        fun insert(s: Series<C>) {
+            var commonLength = 0
+            val minLength = minOf(prefix.size, s.size)
+            
+            while (commonLength < minLength && prefix[commonLength] == s[commonLength]) {
+                commonLength++
+            }
+
+            when {
+                // Complete match with existing node
+                commonLength == prefix.size && commonLength == s.size -> {
+                    isTerminal = true
+                }
+                
+                // This node's prefix is a prefix of the new string
+                commonLength == prefix.size -> {
+                    val remaining = s.drop(commonLength) as Series<C>
+                    val matchingChild = children.firstOrNull { 
+                        it.prefix.isNotEmpty() && it.prefix[0] == remaining[0] 
+                    }
+                    
+                    if (matchingChild != null) {
+                        matchingChild.insert(remaining)
+                    } else {
+                        children.add(Node(remaining, true))
+                        children.sortBy { it.prefix[0] }
+                    }
+                }
+                
+                // Need to split this node
+                else -> {
+                    val commonPrefix = prefix.take(commonLength) as Series<C>
+                    val oldSuffix = prefix.drop(commonLength) as Series<C>
+                    val newSuffix = s.drop(commonLength) as Series<C>
+                    
+                    val oldNode = Node(oldSuffix, isTerminal, children)
+                    val newNode = Node(newSuffix, true)
+                    
+                    prefix = commonPrefix
+                    isTerminal = false
+                    children.clear()
+                    children.add(oldNode)
+                    children.add(newNode)
+                    children.sortBy { it.prefix[0] }
+                }
+            }
+        }
+
+        fun collectKeys(prefix: Series<C>, result: MutableList<Series<C>>) {
+            val currentKey = prefix + this.prefix
+            if (isTerminal) {
+                result.add(currentKey)
+            }
+            for (child in children) {
+                child.collectKeys(currentKey, result)
+            }
+        }
+    }
+
+    operator fun plus(s: Series<C>): RadixTree<C> {
+        if (s.isEmpty()) return this
         
         if (root == null) {
-            root = RadixTreeNode(series, true)
+            root = Node(s, true)
         } else {
-            val newRoot = root!! + series
-            root = newRoot
+            root!!.insert(s)
         }
         return this
     }
 
     fun keys(): List<Series<C>> {
-        return root?.keys() ?: emptyList()
-    }
-}
-
-/**
- * a node in a prefix tree (trie)
- */
-class RadixTreeNode<C : Comparable<C>>(
-    var key: Series<C> = emptySeries(),
-    var term: Boolean = false,
-    var children: MutableList<RadixTreeNode<C>>? = null
-) {
-    private fun sortChildren() {
-        children?.sortBy { it.key[0] }
-    }
-    operator fun plus(other: Series<C>): RadixTreeNode<C> {
-        // Handle empty input
-        if (other.isEmpty()) return this
-        
-        // Find common prefix length
-        val commonLength = key.commonPrefixLength(other)
-        
-        if (commonLength == 0) {
-            // No common prefix, create new root with both nodes as children
-            val newNode = RadixTreeNode(emptySeries(), false)
-            newNode.children = mutableListOf(this, RadixTreeNode(other, true))
-            newNode.sortChildren()
-            return newNode
-        }
-        
-        if (commonLength == key.size && commonLength == other.size) {
-            // Exact match - mark as terminal
-            term = true
-            return this
-        }
-        
-        if (commonLength == key.size) {
-            // This node's key is a prefix of the new key
-            val remainder = other.drop(commonLength) as Series<C>
-            if (children == null) {
-                children = mutableListOf(RadixTreeNode(remainder, true))
-                return this
-            }
-            
-            // Try to add to existing child
-            val firstChar = remainder[0]
-            val childIndex = children!!.binarySearch { it.key[0].compareTo(firstChar) }
-            
-            if (childIndex >= 0) {
-                val existingChild = children!![childIndex]
-                val newChild = existingChild + remainder
-                children!![childIndex] = newChild
-            } else {
-                children!!.add(-childIndex - 1, RadixTreeNode(remainder, true))
-            }
-            return this
-        }
-        
-        // Split this node
-        val commonPrefix = key.take(commonLength) as Series<C>
-        val thisRemainder = key.drop(commonLength) as Series<C>
-        val otherRemainder = other.drop(commonLength) as Series<C>
-        
-        return RadixTreeNode(
-            commonPrefix,
-            false,
-            mutableListOf(
-                RadixTreeNode(thisRemainder, term, children),
-                RadixTreeNode(otherRemainder, true)
-            )
-        ).apply { sortChildren() }
-    }
-
-    fun keys(prefix: Series<C>? = null): List<Series<C>> {
-        val currentPrefix = if (prefix != null && prefix.size > 0) {
-            prefix.plus(key)
-        } else {
-            key
-        }
-        
         val result = mutableListOf<Series<C>>()
-        if (term) {
-            result.add(currentPrefix)
-        }
-        
-        children?.forEach { child ->
-            result.addAll(child.keys(currentPrefix))
-        }
-        
+        root?.collectKeys(emptySeries(), result)
         return result
     }
 }
