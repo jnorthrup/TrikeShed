@@ -1,5 +1,4 @@
 @file:Suppress("UNCHECKED_CAST", "ObjectPropertyName")
-@file:OptIn(kotlin.experimental.ExperimentalTypeInference::class, ExperimentalUnsignedTypes::class)
 
 package borg.trikeshed.lib
 
@@ -11,9 +10,8 @@ import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.pow
 
-typealias Series<T> = Join<Int, (Int) -> T>
-
-
+typealias MetaSeries<I,T> =Join<I,(I)->T>
+typealias Series<T> = MetaSeries<Int,T>
 val <T> Series<T>.size: Int get() = a
 
 
