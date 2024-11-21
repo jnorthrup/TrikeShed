@@ -61,5 +61,8 @@ fun BFrag.copyInto(ret: ByteArray, offset: Int) {
     buf.copyInto(ret, offset, beg, end)
 }
 
+fun DelimitRange.toBFrag(bytes: ByteArray): BFrag =
+    (this.a.toInt() j this.b.toInt()) j bytes
+
 val BFrag.byteSeries: ByteSeries
     get() = ByteSeries(b, a.a, a.b)
