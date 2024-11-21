@@ -2,8 +2,7 @@ package borg.trikeshed.common
 
 import borg.trikeshed.lib.*
 
-typealias Twint = Twin<Int>
-typealias BFrag = Join<Twint, ByteArray>
+typealias BFrag = Join<DelimitRange, ByteArray>
 
 val BFrag.size: Int
     get() {
@@ -15,7 +14,9 @@ val BFrag.size: Int
 fun BFrag.isEmpty(): Boolean = size == 0
 
 /**slice is 0-based as if beg was 0;*/
-fun BFrag.slice(atInclusive: Int, untilExclusive: Int = a.b): BFrag = a.run { a + atInclusive j untilExclusive } j b
+fun BFrag.slice(
+    atInclusive: Int,
+    untilExclusive: Int = a.b ): BFrag =  (atInclusive j untilExclusive) j b
 
 /*
 as in ByteBuffer.flip after a read
@@ -26,7 +27,7 @@ fun BFrag.flip(endExclusive: Int): BFrag {
     val (beg) = a
     val newEnd = beg + endExclusive
     val buf = b
-    return beg j newEnd j buf
+    return (((beg j newEnd) as DelimitRange) j (buf as ByteArray)) as BFrag //as ByteArray is a hack to appease the compiler
 }
 
 /**

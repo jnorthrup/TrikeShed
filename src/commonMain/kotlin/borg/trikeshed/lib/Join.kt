@@ -2,6 +2,8 @@
 
 package borg.trikeshed.lib
 
+import borg.trikeshed.common.DelimitRange
+
 
 /**
  * Joins two things.  Pair semantics but distinct in the symbol naming
@@ -14,6 +16,7 @@ interface Join<A, B> {
 
     val pair: Pair<A, B>
         get() = Pair(a, b)
+
     /** debugger hack only, violates all common sense */
     val list: List<Any?> get() = (this as? Series<out Any?>)?.toList() ?: emptyList()
 
@@ -47,13 +50,11 @@ typealias Twin<T> = Join<T, T>
 inline fun <T> Twin(a: T, b: T): Twin<T> = a j b
 
 
-
-
 inline val <A> Join<A, *>.first: A get() = this.a
 inline val <B> Join<*, B>.second: B get() = this.b
 
 /**
  * exactly like "to" for "Join" but with a different (and shorter!) name
  */
-inline infix fun <A, B> A.j(b: B): Join<A, B> = Join(this, b)
+inline infix fun <A, B> A.j(b: B) = Join.invoke(this, b)
 

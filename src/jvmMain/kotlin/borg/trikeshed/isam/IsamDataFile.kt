@@ -143,7 +143,7 @@ actual class IsamDataFile actual constructor(
             var first = true
             // write rows
             msf.forEach { rowVec1: RowVec ->
-                val rowVec = transform?.let { it(rowVec1) } ?: rowVec1
+                val rowVec = transform?.let { transform -> transform(rowVec1) } ?: rowVec1
                 if (first) {
                     meta0 = IsamMetaFileReader.write(metafilename, rowVec.right.α { it() }, varChars)
                     last = meta0.last()
@@ -155,7 +155,11 @@ actual class IsamDataFile actual constructor(
 
                 WireProto.writeToBuffer(rowVec, rowBuffer, meta0)
                 data.write(rowBuffer)
-                debug { fibLog?.report()?.let { println(it) } }
+                debug {
+                    fibLog?.report()?.let { report ->
+                        println(report)
+                    }
+                }
             }
         }
     }

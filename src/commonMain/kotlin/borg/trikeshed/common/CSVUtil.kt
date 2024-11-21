@@ -9,12 +9,13 @@ import borg.trikeshed.isam.RecordMeta
 import borg.trikeshed.isam.meta.IOMemento
 import borg.trikeshed.isam.meta.IOMemento.*
 import borg.trikeshed.lib.*
-import kotlin.jvm.JvmOverloads
+import borg.trikeshed.lib.EmptySeries.b
+
 
 /**
  * a versatile range of two unsigned shorts, now using Twint for consistency
  */
-typealias DelimitRange = Twin<Int>
+typealias DelimitRange = Twin<Int> //beginInclusive, endInclusive
 
 
 /** forward scanner of commas, quotes, and newlines
@@ -27,32 +28,26 @@ object CSVUtil {
         val inDoubleQuote: Boolean = false,
         val isEscaped: Boolean = false,
         val evidence: MutableList<TypeEvidence>? = null,
-        val currentOrdinal: Int = 0
+        val currentOrdinal: Int = 0,
     )
+
     fun parseLine(
         file: LongSeries<Byte>,
         start: Long,
         end: Long = -1L,
-        lineEvidence: MutableList<TypeEvidence>? = null
+        lineEvidence: MutableList<TypeEvidence>? = null,
     ): List<DelimitRange> {
         val effectiveEnd = if (end == -1L) file.size else end
-        val initialStart = file.drop(start)
-            .takeWhile { it.toInt().toChar().isWhitespace() }
-            .count()
-            .let { start + it }
-            .toInt()
+        val initialStart = file.drop(start)./*toSeries().*/`▶`.takeWhile { it.toInt().toChar().isWhitespace() }.count()
+            .let { start + it }.toInt()
 
-        return file.asSequence()
-            .drop(start.toInt())
-            .take((effectiveEnd - start).toInt())
-            .foldIndexed(
+        return file.drop(start).`▶`.take((effectiveEnd - start).toInt()).`▶`.foldIndexed(
                 ParseState(
-                    currentStart = initialStart,
-                    evidence = lineEvidence
+                    currentStart = initialStart, evidence = lineEvidence
                 )
             ) { index, state, byte ->
                 val char = byte.toInt().toChar()
-                
+
                 // Update evidence if needed
                 state.evidence?.let { evidence ->
                     if (state.currentOrdinal >= evidence.size) {
@@ -68,13 +63,13 @@ object CSVUtil {
                     char == '\\' -> state.copy(isEscaped = true)
                     char == ',' && !state.inQuote && !state.inDoubleQuote -> {
                         val currentIndex = (start + index).toInt()
-                        val newSegment = Twint(state.currentStart, currentIndex)
-                        
+                        val newSegment = Twin(state.currentStart, currentIndex)
+
                         state.evidence?.let { evidence ->
                             if (state.currentStart == currentIndex) {
                                 evidence[state.currentOrdinal].empty++
                             } else {
-                                evidence[state.currentOrdinal].columnLength = 
+                                evidence[state.currentOrdinal].columnLength =
                                     (currentIndex - state.currentStart).toUShort()
                             }
                         }
@@ -85,21 +80,23 @@ object CSVUtil {
                             currentOrdinal = state.currentOrdinal + 1
                         )
                     }
+
                     char == '\r' || char == '\n' || index == (effectiveEnd - start - 1).toInt() -> {
                         val currentIndex = (start + index).toInt()
-                        val newSegment = Twint(state.currentStart, currentIndex)
-                        
+                        val newSegment = state.currentStart j currentIndex
+
                         state.evidence?.let { evidence ->
                             if (state.currentStart == currentIndex) {
                                 evidence[state.currentOrdinal].empty++
                             } else {
-                                evidence[state.currentOrdinal].columnLength = 
+                                evidence[state.currentOrdinal].columnLength =
                                     (currentIndex - state.currentStart).toUShort()
                             }
                         }
 
                         state.copy(segments = state.segments + newSegment)
                     }
+
                     else -> state
                 }
             }.segments
@@ -157,16 +154,17 @@ object CSVUtil {
          */
         fileEvidence: MutableList<TypeEvidence>? = null,
     ): Cursor {
-        return file.size.let { upperBound: Long ->
+        return file.let { ls: LongSeries<Byte> ->
+            val a1 = ls.size
+
             //parse in the headers
-            val hdrParsRes: Series<Join<UShort, UShort>> = parseLine(file, 0, upperBound).toSeries()
-            val headerNames =
-                hdrParsRes α { delimR: DelimitRange ->
-                    val a1 = delimR.a.toLong()
-                    val inc = delimR.b.inc().toLong()
-                    val join: LongSeries<Byte> = file[a1 until inc]
-                    CharSeries(join.toSeries().decodeUtf8()).asString()
-                }
+            val hdrParsRes = parseLine(file, 0, a1)
+            val headerNames = hdrParsRes.map { delimR: DelimitRange ->
+                val a1 = delimR.a.toLong()
+                val inc = delimR.b.inc().toLong()
+                val join: LongSeries<Byte> = file[a1 until inc]
+                CharSeries(join.toSeries().decodeUtf8()).asString()
+            }
             logDebug { "headerNames: ${headerNames.toList()}" }
             val lines: MutableList<Join<Long, Series<DelimitRange>>> = mutableListOf()
             val last1: DelimitRange = hdrParsRes.last();
@@ -189,7 +187,9 @@ object CSVUtil {
                     throw Exception("line segments does not match header count")
                 }
                 val joinMutableList = parsRes
-                lines.add(/*dstart j joinMutableList.toSeries()*/ (dstart j parsRes.toSeries()) as Join<Long, Series<DelimitRange>>)
+
+
+                lines += dstart j parsRes.toSeries()
 
 
             } while (datazero1 < file.size)
@@ -201,11 +201,12 @@ object CSVUtil {
             val convertedSegmentLengths = conversionSegments?.right?.toArray()
 
             //perform the length additions of the segment lengths to arrive at DelimitRanges
-val convertedSegments = convertedSegmentLengths?.fold(mutableListOf()) { acc: MutableList<DelimitRange>, length  ->
-    val last = acc.lastOrNull()?.b ?: 0.toUShort()
-    acc.add(DelimitRange(last, (last + length ).toUShort() ))
-    acc
-}
+            val convertedSegments =
+                convertedSegmentLengths?.fold(mutableListOf()) { acc: MutableList<DelimitRange>, length ->
+                    val last: UShort = (acc.lastOrNull()?.b ?: 0.toUShort()) as UShort
+                    acc.add((last j (length + last.toInt()).toUShort()) as DelimitRange)       //this is the fold
+                    acc
+                }
 
             /**this meta will be the child layout for an ISAM promotion of the Cursor*/
             val successorMeta: List<RecordMeta>? = convertedSegmentLengths?.let {
@@ -227,24 +228,25 @@ val convertedSegments = convertedSegmentLengths?.fold(mutableListOf()) { acc: Mu
             lines α { line ->
                 //y axis here
 
-                val lserr: Series<Byte> = file.drop(line.a)[0 until line.b.size]
+                val drop: Join<Long, (Long) -> Byte> = file.drop(line.a)
+                val lserr = drop[0 until line.b.size]
 
                 (0L until line.a) α { x: Long ->
                     //x axis here
 
 
-                    val delimitRange = b
+                    val delimitRange:DelimitRange = line.b[x.toInt()]
                     CharSeries(
-                        lserr[delimitRange.first.toInt() until delimitRange.endInclusive.inc().toInt()].decodeUtf8()
+                        lserr[delimitRange.a until delimitRange.b.inc() ].decodeUtf8()
                     ) j {
-                        val air = delimitRange.asIntRange
+                        val air = delimitRange
 
                         RecordMeta(
-                            headerNames[x],
+                            headerNames[x.toInt()],
                             IoCharSeries,
-                            air.first,
-                            air.last.inc(),
-                            child = successorMeta?.get(x)//this is an ISAM schema
+                            air.a.toInt(),
+                            air.b.inc().toInt(),
+                            child = successorMeta?.get(x.toInt())//this is an ISAM schema
                         )
                     }
                 }.debug { reporter?.report()?.let { rep -> logDebug { rep } } }
@@ -253,8 +255,6 @@ val convertedSegments = convertedSegmentLengths?.fold(mutableListOf()) { acc: Mu
         } as Cursor
     }
 }
-}
-
 
 /** list<String>  -> CSV Cursor of strings
  * */
@@ -274,8 +274,7 @@ fun simpelCsvCursor(lineList: List<String>): Cursor {
         val lineSegs = lineSegments[y] ?: UShortArray(headerNames.size).also { proto ->
             lineSegments[y] = proto
             var f = 0
-            for ((x, c) in line.withIndex()) if (c == ',')
-                proto[f++] = x.toUShort()
+            for ((x, c) in line.withIndex()) if (c == ',') proto[f++] = x.toUShort()
         }
 
         fieldCount j { x: Int ->

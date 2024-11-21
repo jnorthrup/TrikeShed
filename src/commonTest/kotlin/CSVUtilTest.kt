@@ -1,16 +1,14 @@
 package borg.trikeshed.isam
 
 import borg.trikeshed.common.*
-import borg.trikeshed.lib.CharSeries
 import borg.trikeshed.cursor.*
 import borg.trikeshed.isam.meta.IOMemento
 import borg.trikeshed.lib.*
-import borg.trikeshed.lib.DelimitRange
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
-class LinuxCSVUtilTest {
+class CSVUtilTest {
     val target: String = "src/commonTest/resources/hi.csv"
 
     /** read in hi.csv and verify the contents */
@@ -20,11 +18,12 @@ class LinuxCSVUtilTest {
 
         fileBuf.use {
             val deduce = mutableListOf<TypeEvidence>()
-            val csv = CSVUtil.parseLine(fileBuf, 0, lineEvidence = deduce) α ::DelimitRange
-            val lp = (csv α { delimR: DelimitRange ->
-                val chars = fileBuf.get(delimR.asIntRange) α { it.toUByte().toInt().toChar() }
+            val csv  = CSVUtil.parseLine(fileBuf, 0, lineEvidence = deduce).toSeries()
+            val withIndex = (csv α { delimR ->
+                val chars = fileBuf[delimR.run { a..b }] α { it: Byte -> it.toUByte().toInt().toChar() }
                 (chars).asString()
-            }).`▶`.withIndex().toList()
+            }).`▶`.withIndex()
+            val lp = withIndex.toList()
             println(lp)
         }
     }
