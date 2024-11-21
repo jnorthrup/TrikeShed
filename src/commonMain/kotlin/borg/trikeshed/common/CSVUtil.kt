@@ -10,31 +10,11 @@ import borg.trikeshed.isam.meta.IOMemento
 import borg.trikeshed.isam.meta.IOMemento.*
 import borg.trikeshed.lib.*
 import kotlin.jvm.JvmOverloads
-import kotlin.jvm.JvmInline
 
 /**
- * a versatile range of two unsigned shorts stored as a 32 bit Int value as Inline class
+ * a versatile range of two unsigned shorts
  */
-@JvmInline
-value class DelimitRange(val value: Int) : Twin<UShort>,ClosedRange<UShort> {
-    //emulates a pair of UShorts using 16 bits for two UShorts
-    override val a: UShort get() = (value ushr 16).toUShort()
-    override val b: UShort get() = (value and 0xFFFF).toUShort()
-    companion object {
-        fun of(a: UShort, b: UShort): DelimitRange = DelimitRange((a.toInt() shl 16) or b.toInt())
-    }
-
-    override val start: UShort
-        get() = a
-    override val endInclusive: UShort
-        get() = b.dec()
-
-    /**this range is end-exclusive, he UShort range end is inclusive. */
-    val asIntRange: IntRange get() {
-        val endExclusive = b.toInt().inc()
-        return (a.toInt() until b.inc().toInt())
-    }
-}
+typealias DelimitRange = Twin<UShort>
 
 
 /** forward scanner of commas, quotes, and newlines
@@ -56,7 +36,7 @@ object CSVUtil {
         lineEvidence: MutableList<TypeEvidence>? = null,
     ):
             /** compressed DelimitRange array as IntArr*/
-            IntArray {
+            MutableList<DelimitRange> {
         var quote = false
         var doubleQuote = false
         var escape = false
@@ -82,7 +62,7 @@ object CSVUtil {
                 char == '\'' -> quote = !quote
                 char == '\\' -> escape = !escape
                 char == ',' -> if (!quote && !doubleQuote) {
-                    val element = DelimitRange.of(since.toUShort(), x.toUShort())
+                    val element = DelimitRange(since.toUShort(), x.toUShort())
                     rlist.add(element)
 // these check out                    logDebug { "val${element.pair}: "+ CharSeries(file[ element.asIntRange ].decodeUtf8()).asString() }
                     lineEvidence?.apply {
@@ -95,7 +75,7 @@ object CSVUtil {
                 }
 
                 char == '\r' || char == '\n' || end == x.inc() -> {
-                    val element = DelimitRange.of(since.toUShort(), x.toUShort())
+                    val element = DelimitRange(since.toUShort(), x.toUShort())
                     rlist.add(element)
                     lineEvidence?.apply {
 //                        logDebug { "bookend val${element.pair}: " + CharSeries(file[element.asIntRange].decodeUtf8()).asString() }
@@ -109,7 +89,7 @@ object CSVUtil {
             x++
         }
         assert(rlist.size > 0)
-        return IntArray(rlist.size) { rlist[it].value }
+        return rlist
         // what happens specifically in the above code when we pass in a line with no cr/lf in the above code:
 
     }
@@ -138,12 +118,12 @@ object CSVUtil {
                     val recordMeta = meta[x]
                     val type = recordMeta.type
                     val any = rv[x].a
-                    try{
+                    try {
                         val fromChars = type.fromChars(any as CharSeries)
                         val function = recordMeta.`↺`
                         fromChars j function
-                    }catch (e:Exception){
-                        log  { "parseConformant: $e col $x row $y " }
+                    } catch (e: Exception) {
+                        log { "parseConformant: $e col $x row $y " }
                         throw e
                     }
                 }
@@ -165,43 +145,42 @@ object CSVUtil {
          * given column classes found in the file
          */
         fileEvidence: MutableList<TypeEvidence>? = null,
-    ): Cursor = file.size.let { upperBound ->
-        //parse in the headers
-        val hdrParsRes = parseLine(file, 0, upperBound)
-        val header = hdrParsRes α ::DelimitRange
-        val headerNames =
-            header α { delimR: DelimitRange ->
-                val join: Series<Byte> = file[delimR.a.toInt() until delimR.b.inc().toInt()]
-                CharSeries(join.decodeUtf8()).asString()
-            }
-        logDebug { "headerNames: ${headerNames.toList()}" }
-        val lines: MutableList<Join<Long, IntArray>> = mutableListOf()
-
-        val last1: DelimitRange = header.last()
-        val (a,b) = last1
-        b .toLong().let { datazero2 ->
-            var datazero1 = datazero2
+    ): Cursor {
+        return file.size.let { upperBound: Long ->
+            //parse in the headers
+            val hdrParsRes: Series<Join<UShort, UShort>> = parseLine(file, 0, upperBound).toSeries()
+            val headerNames =
+                hdrParsRes α { delimR: DelimitRange ->
+                    val a1 = delimR.a.toLong()
+                    val inc = delimR.b.inc().toLong()
+                    val join: LongSeries<Byte> = file[a1 until inc]
+                    CharSeries(join.toSeries().decodeUtf8()).asString()
+                }
+            logDebug { "headerNames: ${headerNames.toList()}" }
+            val lines: MutableList<Join<Long, Series<DelimitRange>>> = mutableListOf()
+            val last1: DelimitRange = hdrParsRes.last();
+            var datazero1: Long = last1.b.toUInt().toLong();
 
             do {
-                val file1:LongSeries<Byte> = file.drop(datazero1)
+                val file1: LongSeries<Byte> = file.drop(datazero1)
                 if (file1.size < headerNames.size) break  // we can parse n commas as n+1 default fields but no less
-                val lineEvidence =
-                    fileEvidence?.let<MutableList<TypeEvidence>, MutableList<TypeEvidence>> { mutableListOf() }
+                val lineEvidence: MutableList<TypeEvidence>? = fileEvidence?.let { mutableListOf() }
                 val parsRes = parseLine(file1, 0, file1.size, lineEvidence)
                 lineEvidence?.apply { fileEvidence.update(lineEvidence) }
-                val line = parsRes α ::DelimitRange
                 val dstart: Long = datazero1
-                datazero1 += line.last().b.toLong()
-                if (line.size != header.size) {
-                    logDebug { "line.size: ${line.size}" }
-                    logDebug { "header.size: ${header.size}" }
+                datazero1 += parsRes.last().b.toLong()
+                if (parsRes.size != hdrParsRes.size) {
+                    logDebug { "line.size: ${parsRes.size}" }
+                    logDebug { "header.size: ${hdrParsRes.size}" }
                     logDebug { "headerNames: ${headerNames.toList()}" }
-                    logDebug { "line: ${line α DelimitRange::pair}" }
+                    logDebug { "line: ${parsRes α DelimitRange::pair}" }
                     logDebug { "fileStart/End: $datazero1/${file.size}" }
                     throw Exception("line segments does not match header count")
                 }
-                val toArray = (line α { it.value }).toArray()
-                lines.add(dstart j toArray)
+                val joinMutableList = parsRes
+                lines.add(/*dstart j joinMutableList.toSeries()*/ (dstart j parsRes.toSeries()) as Join<Long, Series<DelimitRange>>)
+
+
             } while (datazero1 < file.size)
 
             val conversionSegments = (fileEvidence?.α { evidence ->
@@ -211,11 +190,11 @@ object CSVUtil {
             val convertedSegmentLengths = conversionSegments?.right?.toArray()
 
             //perform the length additions of the segment lengths to arrive at DelimitRanges
-            val convertedSegments = convertedSegmentLengths?.fold(mutableListOf<DelimitRange>()) { acc, length ->
-                val last = acc.lastOrNull()?.b ?: 0.toUShort()
-                acc.add(DelimitRange.of(last, (last + length.toUInt()).toUShort()))
-                acc
-            }
+val convertedSegments = convertedSegmentLengths?.fold(mutableListOf()) { acc: MutableList<DelimitRange>, length  ->
+    val last = acc.lastOrNull()?.b ?: 0.toUShort()
+    acc.add(DelimitRange(last, (last + length ).toUShort() ))
+    acc
+}
 
             /**this meta will be the child layout for an ISAM promotion of the Cursor*/
             val successorMeta: List<RecordMeta>? = convertedSegmentLengths?.let {
@@ -238,10 +217,12 @@ object CSVUtil {
                 //y axis here
 
                 val lserr: Series<Byte> = file.drop(line.a)[0 until line.b.size]
-                line.b.withIndex() α { (x, b): IndexedValue<Int> ->
+
+                (0L until line.a) α { x: Long ->
                     //x axis here
 
-                    val delimitRange = DelimitRange(b)
+
+                    val delimitRange = b
                     CharSeries(
                         lserr[delimitRange.first.toInt() until delimitRange.endInclusive.inc().toInt()].decodeUtf8()
                     ) j {
@@ -260,6 +241,7 @@ object CSVUtil {
 
         } as Cursor
     }
+}
 }
 
 
