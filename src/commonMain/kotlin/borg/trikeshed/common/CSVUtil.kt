@@ -12,9 +12,9 @@ import borg.trikeshed.lib.*
 import kotlin.jvm.JvmOverloads
 
 /**
- * a versatile range of two unsigned shorts
+ * a versatile range of two unsigned shorts, now using Twint for consistency
  */
-typealias DelimitRange = Twin<UShort>
+typealias DelimitRange = Twint
 
 
 /** forward scanner of commas, quotes, and newlines
@@ -22,7 +22,7 @@ typealias DelimitRange = Twin<UShort>
 object CSVUtil {
     data class ParseState(
         val segments: List<DelimitRange> = emptyList(),
-        val currentStart: UShort = 0u,
+        val currentStart: Int = 0,
         val inQuote: Boolean = false,
         val inDoubleQuote: Boolean = false,
         val isEscaped: Boolean = false,
@@ -40,7 +40,7 @@ object CSVUtil {
             .takeWhile { it.toInt().toChar().isWhitespace() }
             .count()
             .let { start + it }
-            .toUShort()
+            .toInt()
 
         return file.asSequence()
             .drop(start.toInt())
@@ -67,7 +67,7 @@ object CSVUtil {
                     char == '\'' -> state.copy(inQuote = !state.inQuote)
                     char == '\\' -> state.copy(isEscaped = true)
                     char == ',' && !state.inQuote && !state.inDoubleQuote -> {
-                        val currentIndex = (start + index).toUShort()
+                        val currentIndex = (start + index).toInt()
                         val newSegment = DelimitRange(state.currentStart, currentIndex)
                         
                         state.evidence?.let { evidence ->
@@ -81,7 +81,7 @@ object CSVUtil {
 
                         state.copy(
                             segments = state.segments + newSegment,
-                            currentStart = (currentIndex + 1u).toUShort(),
+                            currentStart = currentIndex + 1,
                             currentOrdinal = state.currentOrdinal + 1
                         )
                     }
