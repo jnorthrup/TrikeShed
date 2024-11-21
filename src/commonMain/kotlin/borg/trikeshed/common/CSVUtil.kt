@@ -14,7 +14,7 @@ import kotlin.jvm.JvmOverloads
 /**
  * a versatile range of two unsigned shorts, now using Twint for consistency
  */
-typealias DelimitRange = Twint
+typealias DelimitRange = Twin<Int>
 
 
 /** forward scanner of commas, quotes, and newlines
@@ -68,14 +68,14 @@ object CSVUtil {
                     char == '\\' -> state.copy(isEscaped = true)
                     char == ',' && !state.inQuote && !state.inDoubleQuote -> {
                         val currentIndex = (start + index).toInt()
-                        val newSegment = DelimitRange(state.currentStart, currentIndex)
+                        val newSegment = Twint(state.currentStart, currentIndex)
                         
                         state.evidence?.let { evidence ->
-                            if (state.currentStart.toInt() == currentIndex.toInt()) {
+                            if (state.currentStart == currentIndex) {
                                 evidence[state.currentOrdinal].empty++
                             } else {
                                 evidence[state.currentOrdinal].columnLength = 
-                                    (currentIndex.toInt() - state.currentStart.toInt()).toUShort()
+                                    (currentIndex - state.currentStart).toUShort()
                             }
                         }
 
@@ -86,15 +86,15 @@ object CSVUtil {
                         )
                     }
                     char == '\r' || char == '\n' || index == (effectiveEnd - start - 1).toInt() -> {
-                        val currentIndex = (start + index).toUShort()
-                        val newSegment = DelimitRange(state.currentStart, currentIndex)
+                        val currentIndex = (start + index).toInt()
+                        val newSegment = Twint(state.currentStart, currentIndex)
                         
                         state.evidence?.let { evidence ->
-                            if (state.currentStart.toInt() == currentIndex.toInt()) {
+                            if (state.currentStart == currentIndex) {
                                 evidence[state.currentOrdinal].empty++
                             } else {
                                 evidence[state.currentOrdinal].columnLength = 
-                                    (currentIndex.toInt() - state.currentStart.toInt()).toUShort()
+                                    (currentIndex - state.currentStart).toUShort()
                             }
                         }
 
