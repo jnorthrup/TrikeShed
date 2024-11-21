@@ -20,6 +20,15 @@ typealias DelimitRange = Twin<UShort>
 /** forward scanner of commas, quotes, and newlines
  */
 object CSVUtil {
+    data class ParseState(
+        val segments: List<DelimitRange> = emptyList(),
+        val currentStart: UShort = 0u,
+        val inQuote: Boolean = false,
+        val inDoubleQuote: Boolean = false,
+        val isEscaped: Boolean = false,
+        val evidence: MutableList<TypeEvidence>? = null,
+        val currentOrdinal: Int = 0
+    )
     fun parseLine(
         file: LongSeries<Byte>,
         start: Long,
