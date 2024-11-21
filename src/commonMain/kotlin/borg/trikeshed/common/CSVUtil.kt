@@ -20,78 +20,80 @@ typealias DelimitRange = Twin<UShort>
 /** forward scanner of commas, quotes, and newlines
  */
 object CSVUtil {
-    /**
-     * read a csv file into a series of segments
-     */
-//    @JvmStatic
-    @JvmOverloads
     fun parseLine(
-        /**the source media*/
         file: LongSeries<Byte>,
-        /**the first byte offset inclusive*/
         start: Long,
-        /**the last offset exclusive.  -1 has an undefined end. */
         end: Long = -1L,
-        //this is 1 TypeDeduction per column, for one line. elsewhere, there should be a TypeDeduction holding maximum findings per file/column.
-        lineEvidence: MutableList<TypeEvidence>? = null,
-    ):
-            /** compressed DelimitRange array as IntArr*/
-            MutableList<DelimitRange> {
-        var quote = false
-        var doubleQuote = false
-        var escape = false
-        var ordinal = 0
-        var x = start
-        while (x != end && file[x].toInt().toChar().isWhitespace()) x++ //trim
-        var since = x
+        lineEvidence: MutableList<TypeEvidence>? = null
+    ): List<DelimitRange> {
+        val effectiveEnd = if (end == -1L) file.size else end
+        val initialStart = file.drop(start)
+            .takeWhile { it.toInt().toChar().isWhitespace() }
+            .count()
+            .let { start + it }
+            .toUShort()
 
-        val rlist = mutableListOf<DelimitRange>()
-        val size = file.size
-        while (x != end && x < size) {
-            val c = file[x]
-            val char = c.toInt().toChar()
-            lineEvidence?.apply {
-                //test deduce length and add if needed
-                if (ordinal >= lineEvidence.size)
-                    lineEvidence.add(TypeEvidence())
-                lineEvidence[ordinal] + char
-            }
-            when {
-                escape -> escape = false
-                char == '"' -> doubleQuote = !doubleQuote
-                char == '\'' -> quote = !quote
-                char == '\\' -> escape = !escape
-                char == ',' -> if (!quote && !doubleQuote) {
-                    val element = DelimitRange(since.toUShort(), x.toUShort())
-                    rlist.add(element)
-// these check out                    logDebug { "val${element.pair}: "+ CharSeries(file[ element.asIntRange ].decodeUtf8()).asString() }
-                    lineEvidence?.apply {
-                        if (since == x)
-                            lineEvidence[ordinal].empty++
-                        else lineEvidence[ordinal].columnLength = (x - since).toUShort()
+        return file.asSequence()
+            .drop(start.toInt())
+            .take((effectiveEnd - start).toInt())
+            .foldIndexed(
+                ParseState(
+                    currentStart = initialStart,
+                    evidence = lineEvidence
+                )
+            ) { index, state, byte ->
+                val char = byte.toInt().toChar()
+                
+                // Update evidence if needed
+                state.evidence?.let { evidence ->
+                    if (state.currentOrdinal >= evidence.size) {
+                        evidence.add(TypeEvidence())
                     }
-                    ordinal++
-                    since = x + 1
+                    evidence[state.currentOrdinal] + char
                 }
 
-                char == '\r' || char == '\n' || end == x.inc() -> {
-                    val element = DelimitRange(since.toUShort(), x.toUShort())
-                    rlist.add(element)
-                    lineEvidence?.apply {
-//                        logDebug { "bookend val${element.pair}: " + CharSeries(file[element.asIntRange].decodeUtf8()).asString() }
-                        if (since == x)
-                            lineEvidence[ordinal].empty++
-                        else lineEvidence[ordinal].columnLength = (x - since).toUShort()
-                    }
-                    break
-                }
-            }
-            x++
-        }
-        assert(rlist.size > 0)
-        return rlist
-        // what happens specifically in the above code when we pass in a line with no cr/lf in the above code:
+                when {
+                    state.isEscaped -> state.copy(isEscaped = false)
+                    char == '"' -> state.copy(inDoubleQuote = !state.inDoubleQuote)
+                    char == '\'' -> state.copy(inQuote = !state.inQuote)
+                    char == '\\' -> state.copy(isEscaped = true)
+                    char == ',' && !state.inQuote && !state.inDoubleQuote -> {
+                        val currentIndex = (start + index).toUShort()
+                        val newSegment = DelimitRange(state.currentStart, currentIndex)
+                        
+                        state.evidence?.let { evidence ->
+                            if (state.currentStart.toInt() == currentIndex.toInt()) {
+                                evidence[state.currentOrdinal].empty++
+                            } else {
+                                evidence[state.currentOrdinal].columnLength = 
+                                    (currentIndex.toInt() - state.currentStart.toInt()).toUShort()
+                            }
+                        }
 
+                        state.copy(
+                            segments = state.segments + newSegment,
+                            currentStart = (currentIndex + 1u).toUShort(),
+                            currentOrdinal = state.currentOrdinal + 1
+                        )
+                    }
+                    char == '\r' || char == '\n' || index == (effectiveEnd - start - 1).toInt() -> {
+                        val currentIndex = (start + index).toUShort()
+                        val newSegment = DelimitRange(state.currentStart, currentIndex)
+                        
+                        state.evidence?.let { evidence ->
+                            if (state.currentStart.toInt() == currentIndex.toInt()) {
+                                evidence[state.currentOrdinal].empty++
+                            } else {
+                                evidence[state.currentOrdinal].columnLength = 
+                                    (currentIndex.toInt() - state.currentStart.toInt()).toUShort()
+                            }
+                        }
+
+                        state.copy(segments = state.segments + newSegment)
+                    }
+                    else -> state
+                }
+            }.segments
     }
 
 
