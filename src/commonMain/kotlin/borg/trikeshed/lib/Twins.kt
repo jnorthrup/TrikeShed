@@ -3,12 +3,12 @@ package borg.trikeshed.lib
 import kotlin.jvm.JvmInline
 
 
-inline infix fun Int.j(b: Int): Twin<Int> = TwInt(((this.toLong() shl 32) or (b.toLong())))
-inline infix fun Short.j(b: Short): Twin<Short> = Twhort(((this.toInt() shl 16) or (b.toInt())))
-inline infix fun Byte.j(b: Byte): Twin<Byte> = Twyte(((this.toInt() shl 8) or (b.toInt())).toShort())
-inline infix fun Char.j(b: Char): Twin<Char> = Twhar(((this.code shl 16) or (b.code)))
+inline infix fun Int.j(b: Int): Twin<Int> = TwInt(this.toLong() shl 32 or b.toLong())
+inline infix fun Short.j(b: Short): Twin<Short> = Twhort(this.toInt() shl 16 or b.toInt())
+inline infix fun UShort.j(b: UShort): UTwort = UTwort(this.toUInt() shl 16 or b.toUInt())
 
-
+inline infix fun Byte.j(b: Byte): Twin<Byte> = Twyte((this.toInt() shl 8 or b.toInt()).toShort())
+inline infix fun Char.j(b: Char): Twin<Char> = Twhar((this.code shl 16) or (b.code))
 
 @JvmInline
 value class TwInt(private val capture: Long) : Twin<Int> {
@@ -20,6 +20,12 @@ value class TwInt(private val capture: Long) : Twin<Int> {
 value class Twhort(private val capture: Int) : Twin<Short> {
     override val a: Short get() = (capture shr 16).toShort()
     override val b: Short get() = (capture and 0xFFFF).toShort()
+}
+
+@JvmInline
+value class UTwort(private val capture: UInt) : Twin<UShort> {
+    override val a: UShort get() = (capture shr 16).toUShort()
+    override val b: UShort get() = (capture and 0xFFFFU).toUShort()
 }
 
 @JvmInline

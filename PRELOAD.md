@@ -55,7 +55,6 @@ typealias HashBody<T> = Join<Version, Series<Bucket<T>>>
 
 1. Look for opportunities to replace standard library collections with Series
 2. Convert complex generic types to typealiases for improved readability
-3. Refactor mutable structures to immutable ones with versioning (like HashBody)
 4. Use extension functions on typealiases to add functionality without modifying core structures
 
  
