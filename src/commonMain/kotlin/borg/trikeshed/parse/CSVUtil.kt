@@ -11,13 +11,68 @@ import kotlin.collections.take
 /** forward scanner of commas, quotes, and newlines
  */
 object CSVUtil {
-    
+
     /**
      * Parses a CSV string into fields
      * @param text The CSV text to parse
      * @param collectEvidence Whether to collect type evidence for columns
      * @return List of DelimitRange representing the parsed fields
      */
+    fun parseLongSeries(series: Series<Long>, collectEvidence: Boolean = true): Cursor {
+        val lines = mutableListOf<List<DelimitRange>>()
+        val evidence = if (collectEvidence) mutableListOf<TypeEvidence>() else null
+        
+        var currentLine = mutableListOf<DelimitRange>()
+        var state = ParseState(evidence = evidence)
+        
+        series.forEach { value ->
+            val c = value.toInt().toChar()
+            state = when {
+                state.isEscaped -> handleEscaped(state, state.currentStart)
+                c == '\\' -> state.copy(isEscaped = true)
+                c == '"' -> handleDoubleQuote(state, state.currentStart) 
+                c == '\'' -> handleSingleQuote(state, state.currentStart)
+                c == ',' && !state.inQuote && !state.inDoubleQuote -> {
+                    val range = DelimitRange(state.currentStart, state.currentStart)
+                    collectEvidence(state, value.toString(), range)
+                    state.copy(
+                        currentStart = state.currentStart + 1,
+                        currentOrdinal = state.currentOrdinal + 1
+                    )
+                }
+                c == '\n' && !state.inQuote && !state.inDoubleQuote -> {
+                    if (state.currentStart < series.size) {
+                        val range = DelimitRange(state.currentStart, state.currentStart)
+                        collectEvidence(state, value.toString(), range)
+                    }
+                    lines.add(currentLine.toList())
+                    currentLine = mutableListOf()
+                    ParseState(currentStart = state.currentStart + 1, evidence = evidence)
+                }
+                else -> {
+                    // Add character evidence
+                    evidence?.let { ev ->
+                        while (ev.size <= state.currentOrdinal) ev.add(TypeEvidence())
+                        ev[state.currentOrdinal] += c
+                    }
+                    state
+                }
+            }
+        }
+
+        // Convert collected evidence into column metadata
+        val columnMetas = evidence?.map { ev ->
+            val type = TypeEvidence.deduce(ev)
+            Join("Column${ev.hashCode()}", type.`↺`) 
+        } ?: emptyList()
+
+        // Create cursor from lines and metadata
+        return size j { y ->
+            columnMetas.size j { x ->
+                lines[y][x] j columnMetas[x]
+            }
+        }
+    }
     fun parse(text: String, collectEvidence: Boolean = false): List<DelimitRange> {
         var state = ParseState(evidence = if (collectEvidence) mutableListOf() else null)
         
@@ -69,13 +124,17 @@ object CSVUtil {
 
     private fun collectEvidence(state: ParseState, text: String, range: DelimitRange) {
         state.evidence?.let { evidence ->
-            val field = text.substring(range.start, range.end).trim()
-            if (evidence.size <= state.currentOrdinal) {
+            while (evidence.size <= state.currentOrdinal) {
                 evidence.add(TypeEvidence())
             }
-            evidence[state.currentOrdinal].addEvidence(field)
+            text.substring(range.start, range.end).forEach { c ->
+                evidence[state.currentOrdinal] += c
+            }
         }
     }
+
+    fun Series<Long>.toCursor(collectEvidence: Boolean = true): Cursor =
+        parseLongSeries(this, collectEvidence)
 
     /**
      * Represents the state of parsing a CSV line.
