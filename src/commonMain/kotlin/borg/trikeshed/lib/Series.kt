@@ -339,10 +339,7 @@ fun CharSequence.toSeries(): Series<Char> = length j ::get
 fun ClosedRange<Int>.toSeries(): Series<Int> = (endInclusive - start + 1) j { i: Int -> i + start }
 fun <T> Sequence<T>.toSeries(): Series<T> = toList().toSeries()
 
-fun <T> Series<T>.last(): T {
-    require(size > 0) { "last() on empty Series" }
-    return this[size.dec()]
-}
+fun <T> Series<T>.last(): T = require(size > 0) { "last() on empty Series" }.let { return this[size.dec()] }
 
 fun <B> Series<B>.isNotEmpty(): Boolean = size < 0
 fun <B> Series<B>.first(): B =

@@ -145,28 +145,47 @@ class CharSeries(
         return "CharSeries(position=$pos, limit=$limit, mark=$mark, cacheCode=$cacheCode,take-4=${take})"
     }
 
-    /** skipws and rtrim */
+    /**
+     * Extension property to trim whitespace from both ends of a `CharSeries`.
+     *
+     * @receiver The `CharSeries` to be trimmed.
+     * @return The `CharSeries` with leading and trailing whitespace removed.
+     */
     val trim: CharSeries
         get() = apply { confixScope(Char::isWhitespace) }
 
-    /** mutating operation to shrink the buffer  */
+    /**
+     * Mutating operation to shrink the buffer.
+     *
+     * @param pred A predicate function that takes a `Char` and returns a `Boolean`.
+     *             The buffer will be shrunk by removing characters from the start and end
+     *             that satisfy this predicate.
+     */
     fun confixScope(pred: (Char) -> Boolean) {
         var p = pos
         var l = limit
+        // Increment the start position while the predicate is true
         while (p < l && pred(get(p))) p++
+        // Decrement the end position while the predicate is true
         while (l > p && pred(get(l.dec()))) l--
+        // Set the new limit
         lim(l)
+        // Set the new position
         pos(p)
     }
-
 
     //isEmpty override
     val isEmpty: Boolean get() = pos == limit
 
-    /** success move position to the char after found and returns true.
-     *  fail returns false and leaves position unchanged */
+    /**
+     * Moves the position to the character after the target character if found.
+     *
+     * @param target The character to seek.
+     * @return `true` if the target character is found and the position is moved to the character after it,
+     *         `false` if the target character is not found and the position remains unchanged.
+     */
     fun seekTo(
-        /**target*/
+        /** The target character to seek. */
         target: Char,
     ): Boolean {
         val anchor = pos
@@ -179,12 +198,18 @@ class CharSeries(
         return false
     }
 
-    /** success move position to the char after found and returns true.
-     *  fail returns false and leaves position unchanged */
+    /**
+     * Moves the position to the character after the target character if found.
+     *
+     * @param target The character to seek.
+     * @param escape If present, this character escapes one character.
+     * @return `true` if the target character is found and the position is moved to the character after it,
+     *         `false` if the target character is not found and the position remains unchanged.
+     */
     fun seekTo(
-        /**target*/
+        /** The target character to seek. */
         target: Char,
-        /**if present this escapes one char*/
+        /** If present, this character escapes one character. */
         escape: Char,
     ): Boolean {
         val anchor = pos
@@ -200,6 +225,13 @@ class CharSeries(
         return false
     }
 
+    /**
+     * Moves the position to the end of the given literal if found.
+     *
+     * @param lit The series of characters to seek.
+     * @return `true` if the literal is found and the position is moved to the end of it,
+     *         `false` if the literal is not found and the position remains unchanged.
+     */
     fun seekTo(lit: Series<Char>): Boolean {
         val anchor = pos
         var i = 0
@@ -215,13 +247,28 @@ class CharSeries(
         return false
     }
 
-    /**backtrack 1*/
+    /**
+     * Moves the position back by one character.
+     *
+     * @return The `CharSeries` with the position moved back by one character.
+     * @throws IllegalArgumentException if the position is already at the start.
+     */
     operator fun dec(): CharSeries = apply { require(pos > 0) { "Underflow" }; pos-- }
 
-    /** advance 1*/
-    operator fun inc(): CharSeries = apply { require(hasRemaining) { "Overflow" };pos++ }
+    /**
+     * Moves the position forward by one character.
+     *
+     * @return The `CharSeries` with the position moved forward by one character.
+     * @throws IllegalArgumentException if there are no remaining characters.
+     */
+    operator fun inc(): CharSeries = apply { require(hasRemaining) { "Overflow" }; pos++ }
 
-    //toArray override
+    /**
+     * Converts the remaining characters in the `CharSeries` to a `CharArray`.
+     *
+     * @return A `CharArray` containing the remaining characters.
+     * @throws IllegalStateException if the `CharSeries` is empty.
+     */
     fun toArray(): CharArray {
         require(rem > 0) { "heads up: using an empty stateful CharSeries toArray()" }
         return CharArray(rem, ::get)
@@ -249,60 +296,96 @@ class CharSeries(
 
         }
 
+        /**
+         * Applies a confix feature to the given CharSeries.
+         *
+         * @param client The CharSeries to apply the confix feature to.
+         * @param chlit A string representing the confix characters.
+         * @return True if the confix feature was successfully applied, false otherwise.
+         */
         private fun confixFeature(client: CharSeries, chlit: String): Boolean {
+            // Log the initial state of the CharSeries
             logNone { "confix $chlit before: ${client.asString()}" }
             var x = 0
+            // Apply the confix scope to the CharSeries
             client.confixScope { test: Char ->
                 val target = chlit[x]
+                // Check if the current character matches the target character
                 (target == test && x < 2).apply { if (this) x++ }
             }
+            // Return true if the confix feature was successfully applied, false otherwise
             return x == 2.debug {
+                // Log the final state of the CharSeries
                 logNone { "confix $chlit  after: ${client.asString()}" }
             }
         }
     }
 }
 
-operator fun Series<Char>.div(delim: Char): Series<Series<Char>> { //lazy split
+/**
+ * Extension function to split a `Series<Char>` by a given delimiter.
+ *
+ * @receiver The `Series<Char>` to be split.
+ * @param delim The character delimiter to split the series by.
+ * @return A `Series<Series<Char>>` where each sub-series is a segment of the original series split by the delimiter.
+ */
+operator fun Series<Char>.div(delim: Char): Series<Series<Char>> { // lazy split
+    // List to hold the indices of delimiter positions
     val intList = mutableListOf<Int>()
+    // Iterate over the series and add the index of each delimiter to the list
     for (x in 0 until size) if (this[x] == delim) intList.add(x)
 
     /**
-     * iarr is an index of delimitted endings of the CharSeries.
+     * iarr is an index of delimited endings of the CharSeries.
      */
     val iarr: IntArray = intList.toIntArray()
 
+    // Create and return a series of sub-series split by the delimiter
     return iarr α { x ->
-        val p = if (x == 0) 0 else iarr[x.dec()].inc() //start of next
-        val l = //is x last index?
+        // Determine the start position of the next segment
+        val p = if (x == 0) 0 else iarr[x.dec()].inc() // start of next
+        // Determine the end position of the current segment
+        val l = // is x last index?
             if (x == iarr.lastIndex)
                 this.size
             else
                 iarr[x].dec()
+        // Return the sub-series from start to end position
         this[p until l]
     }
 }
 
+/**
+ * Extension function to split a `Series<Byte>` by a given delimiter.
+ *
+ * @receiver The `Series<Byte>` to be split.
+ * @param delim The byte delimiter to split the series by.
+ * @return A `Series<Series<Byte>>` where each sub-series is a segment of the original series split by the delimiter.
+ */
 operator fun Series<Byte>.div(delim: Byte): Series<Series<Byte>> { //lazy split
+    // List to hold the indices of delimiter positions
     val intList = mutableListOf<Int>()
+    // Iterate over the series and add the index of each delimiter to the list
     for (x in 0 until size) if (this[x] == delim) intList.add(x)
 
     /**
-     * iarr is an index of delimitted endings of the ByteSeries.
+     * iarr is an index of delimited endings of the ByteSeries.
      */
     val iarr: IntArray = intList.toIntArray()
 
+    // Create and return a series of sub-series split by the delimiter
     return iarr α { x ->
+        // Determine the start position of the next segment
         val p = if (x == 0) 0 else iarr[x.dec()].inc() //start of next
+        // Determine the end position of the current segment
         val l = //is x last index?
             if (x == iarr.lastIndex)
                 this.size
             else
                 iarr[x].dec()
+        // Return the sub-series from start to end position
         this[p until l]
     }
-
-
 }
 
 val Series<Char>.cs: CharSequence
