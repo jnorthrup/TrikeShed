@@ -4,6 +4,8 @@ import borg.trikeshed.common.*
 import borg.trikeshed.cursor.*
 import borg.trikeshed.isam.meta.IOMemento
 import borg.trikeshed.lib.*
+import borg.trikeshed.parse.CSVUtil
+import borg.trikeshed.parse.TypeEvidence
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals

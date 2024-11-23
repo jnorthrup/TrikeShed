@@ -1,26 +1,28 @@
-package borg.trikeshed.common
+package borg.trikeshed.cursor
 
-import borg.trikeshed.cursor.Cursor
 import borg.trikeshed.isam.RecordMeta
 import borg.trikeshed.isam.meta.IOMemento
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.`↺`
-
-/** list<String>  -> CSV Cursor of strings
- * */
+/**
+ * Converts a list of CSV strings into a `Cursor` of strings.
+ *
+ * @param lineList The list of CSV strings, where the first line contains the headers.
+ * @return A `Cursor` representing the parsed CSV data.
+ */
 @OptIn(ExperimentalUnsignedTypes::class)
-fun simpelCsvCursor(lineList: List<String>): Cursor {
-    //take line11 as headers.  the split by ','
+fun simpleCsvCursor(lineList: List<String>): Cursor {
+    // Take the first line as headers and split by ','
     val headerNames = lineList[0].split(",").map { it.trim() }
     val hdrMeta = headerNames.map { RecordMeta(it, IOMemento.IoString) }
-    //count of fields
+    // Count of fields
     val fieldCount = headerNames.size
     val lines = lineList.drop(1)
     val lineSegments = arrayOfNulls<UShortArray>(lines.size)
 
     return lines.size j { y ->
         val line = lines[y]
-        //lazily create linesegs
+        // Lazily create line segments
         val lineSegs = lineSegments[y] ?: UShortArray(headerNames.size).also { proto ->
             lineSegments[y] = proto
             var f = 0

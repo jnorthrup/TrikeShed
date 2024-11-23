@@ -1,6 +1,7 @@
-package borg.trikeshed.common
+package borg.trikeshed.io
 
 import borg.trikeshed.lib.*
+import borg.trikeshed.parse.DelimitRange
 
 typealias BFrag = Join<DelimitRange, ByteArray>
 

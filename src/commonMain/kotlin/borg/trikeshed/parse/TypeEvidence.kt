@@ -1,4 +1,4 @@
-package borg.trikeshed.common
+package borg.trikeshed.parse
 
 import borg.trikeshed.isam.meta.IOMemento
 

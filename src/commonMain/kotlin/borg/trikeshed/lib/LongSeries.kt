@@ -1,13 +1,13 @@
-package borg.trikeshed.common
+package borg.trikeshed.lib
 
-import borg.trikeshed.lib.*
+import borg.trikeshed.io.size
 
 /** Series with long Indexes for large files */
 typealias LongSeries<T> = Join<Long, (Long) -> T>
 
-val <V>LongSeries<V>.`▶` get() = require(this.size < Int.MAX_VALUE).run { toSeries().`▶` }
 
 operator fun <T> LongSeries<T>.get(i: Long): T = b(i)
+val <V>LongSeries<V>.`▶` get() = require(this.size < Int.MAX_VALUE).run { toSeries().`▶` }
 
 operator fun <T> LongSeries<T>.get(exclusiveRange: IntRange): Series<T> {
     //perform fixup between the range and the Series x index

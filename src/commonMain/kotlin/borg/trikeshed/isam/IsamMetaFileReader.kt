@@ -1,7 +1,6 @@
 package borg.trikeshed.isam
 
-import borg.trikeshed.common.Files
-import borg.trikeshed.common.Usable
+import borg.trikeshed.io.*
 import borg.trikeshed.cursor.ColumnMeta
 import borg.trikeshed.cursor.TypeMemento
 import borg.trikeshed.cursor.name
