@@ -13,20 +13,83 @@ import kotlin.test.assertEquals
 class CSVUtilTest {
     val target: String = "src/commonTest/resources/hi.csv"
 
-    /** read in hi.csv and verify the contents */
     @Test
-    fun testParseLineAndDeduce() {
-        val fileBuf = fileBuffer(target)
+    fun testTwinEvidence() {
+        fileBuffer(target).use { fileBuf ->
+            val evidence = mutableListOf<Twin<TypeEvidence>>()
+            val cursor = CSVUtil.parseSegments(fileBuf, fileEvidence = evidence)
 
-        fileBuf.use {
-            val deduce = mutableListOf<TypeEvidence>()
-            val csv  = CSVUtil.parseLine(fileBuf, 0, lineEvidence = deduce).toSeries()
-            val withIndex = (csv α { delimR ->
-                val chars = fileBuf[delimR.run { a..b }] α { it: Byte -> it.toUByte().toInt().toChar() }
-                (chars).asString()
-            }).`▶`.withIndex()
-            val lp = withIndex.toList()
-            println(lp)
+            // Verify evidence collection
+            assertEquals(12, evidence.size) // 12 columns from hi.csv
+            
+            // Test timestamp column evidence (first column)
+            evidence[0].let { twin ->
+                assertEquals("1502942400000", twin.a.value) // Min value
+                assertEquals("1502943480000", twin.b.value) // Max value
+                assertTrue(twin.a.isNumeric && twin.b.isNumeric)
+                assertEquals(IOMemento.IoLong, cursor.meta[0].type)
+            }
+
+            // Test price column evidence (second column) 
+            evidence[1].let { twin ->
+                assertEquals("4261.48000000", twin.a.value) // Min value
+                assertEquals("4280.56000000", twin.b.value) // Max value
+                assertTrue(twin.a.hasDecimal && twin.b.hasDecimal)
+                assertEquals(IOMemento.IoDouble, cursor.meta[1].type)
+            }
+
+            // Test volume column evidence
+            evidence[5].let { twin ->
+                assertEquals("0.00000000", twin.a.value)
+                assertEquals("1.77518300", twin.b.value)
+                assertTrue(twin.a.hasDecimal && twin.b.hasDecimal)
+                assertEquals(IOMemento.IoDouble, cursor.meta[5].type)
+            }
+
+            // Test trades column evidence
+            evidence[8].let { twin ->
+                assertEquals("0", twin.a.value)
+                assertEquals("3", twin.b.value)
+                assertTrue(twin.a.isNumeric && twin.b.isNumeric)
+                assertEquals(IOMemento.IoInt, cursor.meta[8].type)
+            }
+        }
+    }
+
+    @Test 
+    fun testCursorAccess() {
+        fileBuffer(target).use { fileBuf ->
+            val cursor = CSVUtil.parseSegments(fileBuf)
+            
+            // Test accessing specific values
+            cursor.row(16).let { row ->
+                assertEquals(1502943360000L, row[0].a) // Open_time
+                assertEquals(4261.48, row[1].a as Double, 0.001) // Open
+                assertEquals(0.0, row[5].a as Double, 0.001) // Volume
+                assertEquals(0, row[8].a) // Number_of_trades
+            }
+        }
+    }
+
+    @Test
+    fun testColumnMetadata() {
+        fileBuffer(target).use { fileBuf ->
+            val cursor = CSVUtil.parseSegments(fileBuf)
+            val meta = cursor.meta
+
+            // Verify column types
+            assertEquals(IOMemento.IoLong, meta[0].type) // Open_time
+            assertEquals(IOMemento.IoDouble, meta[1].type) // Open
+            assertEquals(IOMemento.IoDouble, meta[2].type) // High
+            assertEquals(IOMemento.IoDouble, meta[3].type) // Low
+            assertEquals(IOMemento.IoDouble, meta[4].type) // Close
+            assertEquals(IOMemento.IoDouble, meta[5].type) // Volume
+            assertEquals(IOMemento.IoLong, meta[6].type) // Close_time
+            assertEquals(IOMemento.IoDouble, meta[7].type) // Quote_asset_volume
+            assertEquals(IOMemento.IoInt, meta[8].type) // Number_of_trades
+            assertEquals(IOMemento.IoDouble, meta[9].type) // Taker_buy_base_asset_volume
+            assertEquals(IOMemento.IoDouble, meta[10].type) // Taker_buy_quote_asset_volume
+            assertEquals(IOMemento.IoDouble, meta[11].type) // Ignore
         }
     }
 
