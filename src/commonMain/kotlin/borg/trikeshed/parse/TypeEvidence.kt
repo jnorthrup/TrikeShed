@@ -22,7 +22,7 @@ TypeEvidence(
     /**the length of the column */
     var columnLength: UShort = 0U,
 ) {
-    operator fun plus(char: Char): TypeEvidence = apply {
+  infix   operator fun plus  (char: Char): TypeEvidence = apply {
         when (char) {
             in '0'..'9' -> digits++
             '.' -> periods++

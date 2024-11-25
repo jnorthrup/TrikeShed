@@ -1,6 +1,7 @@
 package borg.trikeshed.lib
 
 import borg.trikeshed.io.size
+import kotlin.math.min
 
 /** Series with long Indexes for large files */
 typealias LongSeries<T> = Join<Long, (Long) -> T>
@@ -25,8 +26,8 @@ fun <T> LongSeries<T>.slice(start: Long, end: Long = size): LongSeries<T> =
 fun <T> LongSeries<T>.drop(removeInitial: Long): LongSeries<T> = slice(removeInitial)
 fun <A> Series<A>.toLongSeries(): LongSeries<A> = a.toLong() j { it: Long -> b(it.toInt()) }
 
-//LongSeries.toSeries
-fun <A> LongSeries<A>.toSeries(start: Long = 0L, len: Int = a.toInt().also { require(a < Int.MAX_VALUE) }): Series<A> =
+//LongSeries.toSeries convert long file to e.g. a line up to Int.MAX_VALUE in length
+fun <A> LongSeries<A>.toSeries(start: Long = 0L, len: Int = (min((a-start).toLong(),Int.MAX_VALUE.toLong()) ).toInt()): Series<A> =
     len j { it: Int -> b(start + it) }
 
 

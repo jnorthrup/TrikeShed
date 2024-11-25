@@ -4,15 +4,12 @@
 package borg.trikeshed.lib
 
 import borg.trikeshed.common.collections.binarySearch
-import borg.trikeshed.cursor.Cursor
 import borg.trikeshed.isam.meta.IOMemento.*
 import kotlin.jvm.JvmInline
 import kotlin.jvm.JvmName
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.pow
-
-typealias Series<T> = Join<Int, (Int) -> T>
 
 
 val <T> Series<T>.size: Int get() = a

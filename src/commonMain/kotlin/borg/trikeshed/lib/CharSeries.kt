@@ -355,39 +355,6 @@ operator fun Series<Char>.div(delim: Char): Series<Series<Char>> { // lazy split
     }
 }
 
-/**
- * Extension function to split a `Series<Byte>` by a given delimiter.
- *
- * @receiver The `Series<Byte>` to be split.
- * @param delim The byte delimiter to split the series by.
- * @return A `Series<Series<Byte>>` where each sub-series is a segment of the original series split by the delimiter.
- */
-operator fun Series<Byte>.div(delim: Byte): Series<Series<Byte>> { //lazy split
-    // List to hold the indices of delimiter positions
-    val intList = mutableListOf<Int>()
-    // Iterate over the series and add the index of each delimiter to the list
-    for (x in 0 until size) if (this[x] == delim) intList.add(x)
-
-    /**
-     * iarr is an index of delimited endings of the ByteSeries.
-     */
-    val iarr: IntArray = intList.toIntArray()
-
-    // Create and return a series of sub-series split by the delimiter
-    return iarr α { x ->
-        // Determine the start position of the next segment
-        val p = if (x == 0) 0 else iarr[x.dec()].inc() //start of next
-        // Determine the end position of the current segment
-        val l = //is x last index?
-            if (x == iarr.lastIndex)
-                this.size
-            else
-                iarr[x].dec()
-        // Return the sub-series from start to end position
-        this[p until l]
-    }
-}
-
 val Series<Char>.cs: CharSequence
     get() = object : CharSequence {
         override val length: Int by ::a

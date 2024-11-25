@@ -260,27 +260,30 @@ class ByteSeries(
     fun toArray(): ByteArray = ByteArray(rem, ::get)
 
 }
-
-
+/**
+ * Checks if the `Series<Byte>` contains dirty UTF-8 encoding.
+ * Dirty UTF-8 encoding is identified by the presence of certain byte patterns.
+ *
+ * @return `true` if the `Series<Byte>` contains dirty UTF-8 encoding, `false` otherwise.
+ */
 fun Series<Byte>.isDirtyUTF8(): Boolean {
     var dirty = false
     val bsz = this.size
-    //if thereis one more byte to test and the first byte is in the range of 110x xxxx
-    //what shr 4 proves: 110x xxxx
+    // If there is one more byte to test and the first byte is in the range of 110x xxxx
+    // What `shr 4` proves: 110x xxxx
     val barLen = bsz.dec()
     for (b in 0 until barLen)
         if ((this[b].toInt() shr 4) in 0x0C..0x0E) {
-            // what shr 4 proves: 1110 xxxx
+            // What `shr 4` proves: 1110 xxxx
             val byte = this[b.inc()]
             if ((byte.toInt() shr 6) == 0x02) {
                 dirty = true
                 break
-                //what shr 6 proves: 10xx xxxx
+                // What `shr 6` proves: 10xx xxxx
             }
         }
     return dirty
 }
-
 
 fun ByteSeries.decodeToString() = decodeUtf8().asString()
 
@@ -292,4 +295,38 @@ fun Series<Byte>.startsWith(s: String): Boolean {
 fun Series<Byte>.endsWith(s: String): Boolean {
     val join = s.encodeToByteArray() α { it }
     return join.size <= size && join.zip(this.reversed()).`▶`.all { it.first == it.second }
+}
+typealias Series<T> = Join<Int, (Int) -> T>
+
+/**
+ * Extension function to split a `Series<Byte>` by a given delimiter.
+ *
+ * @receiver The `Series<Byte>` to be split.
+ * @param delim The byte delimiter to split the series by.
+ * @return A `Series<Series<Byte>>` where each sub-series is a segment of the original series split by the delimiter.
+ */
+operator fun Series<Byte>.div(delim: Byte): Series<Series<Byte>> { //lazy split
+    // List to hold the indices of delimiter positions
+    val intList = mutableListOf<Int>()
+    // Iterate over the series and add the index of each delimiter to the list
+    for (x in 0 until size) if (this[x] == delim) intList.add(x)
+
+    /**
+     * iarr is an index of delimited endings of the ByteSeries.
+     */
+    val iarr: IntArray = intList.toIntArray()
+
+    // Create and return a series of sub-series split by the delimiter
+    return iarr α { x ->
+        // Determine the start position of the next segment
+        val p = if (x == 0) 0 else iarr[x.dec()].inc() //start of next
+        // Determine the end position of the current segment
+        val l = //is x last index?
+            if (x == iarr.lastIndex)
+                this.size
+            else
+                iarr[x].dec()
+        // Return the sub-series from start to end position
+        this[p until l]
+    }
 }

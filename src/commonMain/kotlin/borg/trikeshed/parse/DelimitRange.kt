@@ -8,6 +8,6 @@ import borg.trikeshed.lib.*
 /**
  * a versatile range of two unsigned shorts, now using Twint for consistency
  */
-typealias DelimitRange = Twin<Int> //beginInclusive, endInclusive
+typealias DelimitRange = Twin<UShort> //beginInclusive, endInclusive
 
 
