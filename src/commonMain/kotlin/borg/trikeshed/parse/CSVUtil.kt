@@ -53,7 +53,8 @@ object CSVUtil {
                     // Add character evidence
                     evidence?.let { ev ->
                         while (ev.size <= state.currentOrdinal) ev.add(TypeEvidence())
-                        ev[state.currentOrdinal] += c
+                        val typeEvidence = ev[state.currentOrdinal] + c
+                        typeEvidence
                     }
                     state
                 }
