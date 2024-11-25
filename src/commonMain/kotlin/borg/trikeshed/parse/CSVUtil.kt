@@ -17,11 +17,17 @@ object CSVUtil {
      * @return List of DelimitRange representing the parsed fields
      */
     fun parseLongSeries(csvFile: LongSeries<Byte>, collectEvidence: Boolean = true): Cursor {
+        val bytes = csvFile.toUByteArray()
+        val bitmap = CsvBitmap.encode(bytes)
+        val states = CsvBitmap.decode(arrayOf(bitmap))
+        
+        return createCursor(csvFile, states[0], collectEvidence)
+    }
 
-
+    private fun createCursor(data: LongSeries<Byte>, states: UByteArray, collectEvidence: Boolean): Cursor {
         val lines: CowSeriesHandle<Join<Long, Join<Int, (Int) -> Join<UShort, UShort>>>> =
             emptySeriesOf<Join<Long, Series<DelimitRange>>>().cow
 
-        val evidence:Twin<TypeEvidence> =TypeEvidence() j TypeEvidence()
+        val evidence: Twin<TypeEvidence> = TypeEvidence() j TypeEvidence()
         var c = 0L
-        while (csvFile.a > c) {
+        while (data.a > c) {

@@ -2,13 +2,12 @@
 
 package borg.trikeshed.parse.json
 
-import borg.trikeshed.parse.json.JsonBitmap.LexerEvents.EscapeIncrement
-import borg.trikeshed.parse.json.JsonBitmap.LexerEvents.QuoteIncrement
-import borg.trikeshed.parse.json.JsonBitmap.LexerEvents.UtfInitiatorOrContinuation
 import borg.trikeshed.lib.CZero.nz
 import borg.trikeshed.lib.CZero.z
+import borg.trikeshed.parse.DocumentBitmap
+import borg.trikeshed.parse.DocumentBitmap.LexerEvents.*
 
-object JsonBitmap {
+object JsonBitmap : DocumentBitmap {
 
     enum class JsStateEvent(val predicate: (UByte) -> Boolean) {
         Unchanged({ false }),
