@@ -62,9 +62,35 @@ object CSVUtil {
         }
 
         // Convert collected evidence into column metadata
-        val columnMetas = evidence?.map { ev ->
-            val type = TypeEvidence.deduce(ev)
-            Join("Column${ev.hashCode()}", type.`↺`) 
+        val columnMetas = evidence?.map { twin ->
+            val (min, max) = twin
+            val networkSize = when {
+                min.isNumeric && max.isNumeric -> {
+                    val maxLen = maxOf(min.value.length, max.value.length)
+                    when {
+                        min.hasDecimal || max.hasDecimal -> 8 // Double
+                        maxLen > 9 -> 8  // Long
+                        else -> 4 // Int
+                    }
+                }
+                else -> maxOf(min.value.length, max.value.length)
+            }
+
+            val type = when {
+                min.isNumeric && max.isNumeric -> when {
+                    min.hasDecimal || max.hasDecimal -> IOMemento.IoDouble
+                    networkSize > 4 -> IOMemento.IoLong
+                    else -> IOMemento.IoInt  
+                }
+                else -> IOMemento.IoString
+            }
+
+            RecordMeta(
+                name = "Col${twin.hashCode()}", 
+                type = type,
+                begin = -1,
+                end = -1
+            )
         } ?: emptyList()
 
         // Create cursor from lines and metadata
@@ -126,10 +152,19 @@ object CSVUtil {
     private fun collectEvidence(state: ParseState, text: String, range: DelimitRange) {
         state.evidence?.let { evidence ->
             while (evidence.size <= state.currentOrdinal) {
-                evidence.add(TypeEvidence())
+                evidence.add(TypeEvidence() j TypeEvidence()) // Create Twin of empty evidence
             }
-            text.substring(range.start, range.end).forEach { c ->
-                evidence[state.currentOrdinal] += c
+            val fieldText = text.substring(range.start, range.end).trim()
+            val twin = evidence[state.currentOrdinal]
+            
+            // Update min evidence
+            if (fieldText < twin.a.value) {
+                fieldText.forEach { c -> twin.a += c }
+            }
+            
+            // Update max evidence  
+            if (fieldText > twin.b.value) {
+                fieldText.forEach { c -> twin.b += c }
             }
         }
     }
@@ -154,7 +189,7 @@ object CSVUtil {
         val inQuote: Boolean = false,
         val inDoubleQuote: Boolean = false,
         val isEscaped: Boolean = false,
-        val evidence: MutableList<TypeEvidence>? = null,
+        val evidence: MutableList<Twin<TypeEvidence>>? = null,
         val currentOrdinal: Int = 0,
     )
 
