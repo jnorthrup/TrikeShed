@@ -1,6 +1,5 @@
 package borg.trikeshed.lib
 
-import borg.trikeshed.io.FileBuffer.Companion.size
 import kotlin.math.min
 
 /** Series with long Indexes for large files */

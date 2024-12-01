@@ -75,8 +75,8 @@ object JsonBitmap : DocumentBitmap {
     override fun decode(
         /** array of 4-bit bitmaps*/
         input: Array<UByteArray>,
-        /** the known size of input bytes, or an estimate by default*/
-        inputSize: UInt = input.sumOf { it.size.toUInt() * 2U },
+        /** the known size of input bytes*/
+        inputSize: UInt,
     ):
             /** 2 bits out*/
             Array<UByteArray> {
