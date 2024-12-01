@@ -100,7 +100,7 @@ object JsonBitmap : DocumentBitmap {
                     val b: UByte = if ((maskedSoFar % 2).z)
                         (input[inputY][inputX / 2].toUInt() shr 4).toUByte()
                     else
-                        input[inputY][inputX / 2] and 0b0000_1111U
+                        (input[inputY][inputX / 2] and 0b0000_1111U).toUByte()
 
                     val maskBits = b.toUInt() shr 2 and 0x3u
 
