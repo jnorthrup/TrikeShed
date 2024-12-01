@@ -1,6 +1,6 @@
 package borg.trikeshed.lib
 
-import borg.trikeshed.common.Usable
+import borg.trikeshed.io.Usable
 import kotlinx.datetime.Clock
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime

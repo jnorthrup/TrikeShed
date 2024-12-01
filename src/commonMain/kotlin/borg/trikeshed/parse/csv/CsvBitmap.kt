@@ -4,6 +4,7 @@ import borg.trikeshed.lib.CZero.nz
 import borg.trikeshed.lib.CZero.z
 import borg.trikeshed.parse.DocumentBitmap
 import borg.trikeshed.parse.DocumentBitmap.LexerEvents.*
+import borg.trikeshed.parse.DocumentBitmap.LexerEvents.Companion.test
 
 object CsvBitmap : DocumentBitmap {
 
@@ -26,7 +27,7 @@ object CsvBitmap : DocumentBitmap {
 
     /** we code a 2+2 bit pixel per input byte which marks the state of the lexer and the js state machine*/
     @OptIn(ExperimentalUnsignedTypes::class)
-    fun encode(input: UByteArray): UByteArray {
+    override fun encode(input: UByteArray): UByteArray {
         val output = UByteArray(input.size)
         for (i in input.indices) {
             val csvStateEvent = CsvStateEvent.test(input[i])
@@ -56,7 +57,7 @@ object CsvBitmap : DocumentBitmap {
      *
      */
     @OptIn(ExperimentalUnsignedTypes::class)
-    fun decode(
+    override fun decode(
         /** array of 4-bit bitmaps*/
         input: Array<UByteArray>,
         /** the known size of input bytes, or an estimate by default*/

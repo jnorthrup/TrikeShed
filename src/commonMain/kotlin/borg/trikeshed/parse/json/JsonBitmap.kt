@@ -42,7 +42,7 @@ object JsonBitmap : DocumentBitmap {
 
     /** we code a 2+2 bit pixel per input byte which marks the state of the lexer and the js state machine*/
     @OptIn(ExperimentalUnsignedTypes::class)
-    fun encode(input: UByteArray): UByteArray {
+    override fun encode(input: UByteArray): UByteArray {
         val output = UByteArray(input.size)
         for (i in input.indices) {
             val jsStateEvent = JsStateEvent.test(input[i])
@@ -72,7 +72,7 @@ object JsonBitmap : DocumentBitmap {
      *
      */
     @OptIn(ExperimentalUnsignedTypes::class)
-    fun decode(
+    override fun decode(
         /** array of 4-bit bitmaps*/
         input: Array<UByteArray>,
         /** the known size of input bytes, or an estimate by default*/
