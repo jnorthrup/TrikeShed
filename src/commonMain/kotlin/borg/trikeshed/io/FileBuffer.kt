@@ -3,9 +3,10 @@ package borg.trikeshed.io
 import borg.trikeshed.lib.LongSeries
 import borg.trikeshed.lib.debug
 import borg.trikeshed.lib.logDebug
+import borg.trikeshed.io.Usable
 
 
-fun <T> FileBuffer.use(block: (FileBuffer) -> T) {
+fun <T> FileBuffer.use(block: (FileBuffer) -> T): T {
     open()
     try {
         block(this)
@@ -18,16 +19,14 @@ fun open(filename: String, initialOffset: Long = 0, blkSize: Long = -1, readOnly
     logDebug { "pre-opening $filename" }
     return FileBuffer(filename, initialOffset, blkSize, readOnly).apply {
         logDebug { "this isOpen()=${isOpen()}" }
-        open().debug { logDebug { "call(ed) open()" } }
+        open()
+        debug { logDebug { "call(ed) open()" } }
         logDebug { "this isOpen()=${isOpen()}" }
     }
 }
 
-import borg.trikeshed.lib.LongSeries
-import borg.trikeshed.io.Usable
-
 /**
- * an openable and closeable mmap file.
+ * An openable and closeable mmap file.
  *
  *  get has no side effects but put has undefined effects on size and sync
  */
@@ -37,7 +36,7 @@ expect class FileBuffer(
     /** blocksize or file-size if -1*/
     blkSize: Long = -1,
     readOnly: Boolean = true,
-) : LongSeries<Byte> {
+) : LongSeries<Byte>, Usable {
     override val a: Long
     override val b: (Long) -> Byte
     val filename: String
