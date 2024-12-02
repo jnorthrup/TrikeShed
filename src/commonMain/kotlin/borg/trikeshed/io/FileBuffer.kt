@@ -6,12 +6,11 @@ import borg.trikeshed.io.Usable
 
 
 fun <T> FileBuffer.use(block: (FileBuffer) -> T): T {
-    val wasOpen = isOpen()
-    if (!wasOpen) open()
     try {
+        if (!isOpen()) open()
         return block(this)
     } finally {
-        if (!wasOpen) close()
+        if (isOpen()) close()
     }
 }
 
