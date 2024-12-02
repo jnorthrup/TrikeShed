@@ -9,7 +9,7 @@ import borg.trikeshed.io.Usable
 fun <T> FileBuffer.use(block: (FileBuffer) -> T): T {
     open()
     try {
-        block(this)
+        return block(this)
     } finally {
         close()
     }
@@ -17,12 +17,12 @@ fun <T> FileBuffer.use(block: (FileBuffer) -> T): T {
 
 fun open(filename: String, initialOffset: Long = 0, blkSize: Long = -1, readOnly: Boolean = true): FileBuffer {
     logDebug { "pre-opening $filename" }
-    return FileBuffer(filename, initialOffset, blkSize, readOnly).apply {
-        logDebug { "this isOpen()=${isOpen()}" }
-        open()
-        debug { logDebug { "call(ed) open()" } }
-        logDebug { "this isOpen()=${isOpen()}" }
-    }
+    val buffer = FileBuffer(filename, initialOffset, blkSize, readOnly)
+    logDebug { "this isOpen()=${buffer.isOpen()}" }
+    buffer.open()
+    debug { logDebug { "call(ed) open()" } }
+    logDebug { "this isOpen()=${buffer.isOpen()}" }
+    return buffer
 }
 
 /**
