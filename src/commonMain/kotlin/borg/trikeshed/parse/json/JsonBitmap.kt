@@ -75,8 +75,8 @@ object JsonBitmap : DocumentBitmap {
     override fun decode(
         /** array of 4-bit bitmaps*/
         input: Array<UByteArray>,
-        /** the known size of input bytes*/
-        inputSize: UInt,
+        /** the known size of input bytes, or an estimate by default*/
+        inputSize: UInt// = input.sumOf { it.size.toUInt() * 2U },
     ):
             /** 2 bits out*/
             Array<UByteArray> {
@@ -100,7 +100,7 @@ object JsonBitmap : DocumentBitmap {
                     val b: UByte = if ((maskedSoFar % 2).z)
                         (input[inputY][inputX / 2].toUInt() shr 4).toUByte()
                     else
-                        (input[inputY][inputX / 2].toUInt() and 0b0000_1111u).toUByte()
+                        input[inputY][inputX / 2] and 0b0000_1111U
 
                     val maskBits = b.toUInt() shr 2 and 0x3u
 

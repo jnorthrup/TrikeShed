@@ -1,5 +1,6 @@
 package borg.trikeshed.lib
 
+
 import kotlin.math.min
 
 /** Series with long Indexes for large files */
@@ -30,7 +31,7 @@ fun <A> LongSeries<A>.toSeries(start: Long = 0L, len: Int = (min((a-start).toLon
     len j { it: Int -> b(start + it) }
 
 
-val <T>LongSeries<T>.size: Long get() = a
+val <T>LongSeries<T>.size get() = a
 val <T> LongSeries<T>.isEmpty get() = size == 0L
 val <T> LongSeries<T>.isNotEmpty get() = size != 0L
 

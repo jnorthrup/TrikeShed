@@ -4,13 +4,14 @@ import borg.trikeshed.lib.CZero.nz
 import borg.trikeshed.lib.CZero.z
 import borg.trikeshed.parse.DocumentBitmap
 import borg.trikeshed.parse.DocumentBitmap.LexerEvents.*
-import borg.trikeshed.parse.DocumentBitmap.LexerEvents.Companion.test
+import borg.trikeshed.parse.csv.CsvBitmap.CsvStateEvent.Companion.test
+import kotlin.jvm.JvmStatic
 
 object CsvBitmap : DocumentBitmap {
 
     enum class CsvStateEvent(val predicate: (UByte) -> Boolean) {
         Unchanged({ false }),
-        reserved({false}),
+        reserved({ false }),
         ScopeClose({ it.toUInt() == '\n'.code.toUInt() }),
         ValueDelim({ it.toUInt() == 0x2cU }),
         ;
@@ -53,15 +54,14 @@ object CsvBitmap : DocumentBitmap {
      * escapes outside of the odd quotes are ignored.  utf bytes outside of the odd quotes are ignored.
      *
      * any non-0 masking bit forced the jsStateEvent to be Unchanged(0)
-     *
-     *
      */
+
     @OptIn(ExperimentalUnsignedTypes::class)
     override fun decode(
         /** array of 4-bit bitmaps*/
         input: Array<UByteArray>,
-        /** the known size of input bytes*/
-        inputSize: UInt,
+        /** the known size of input bytes, or an estimate by default*/
+        inputSize: UInt, ///= input.sumOf { it.size.toUInt() * 2U },
     ):
             /** 2 bits out*/
             Array<UByteArray> {
@@ -85,7 +85,7 @@ object CsvBitmap : DocumentBitmap {
                     val b: UByte = if ((maskedSoFar % 2).z)
                         (input[inputY][inputX / 2].toUInt() shr 4).toUByte()
                     else
-                        (input[inputY][inputX / 2].toUInt() and 0b0000_1111u).toUByte()
+                        input[inputY][inputX / 2] and 0b0000_1111U
 
                     val maskBits = b.toUInt() shr 2 and 0x3u
 

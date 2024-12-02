@@ -1,4 +1,4 @@
-package borg.trikeshed.common
+package borg.trikeshed.io
 
 import simple.PosixFile
 

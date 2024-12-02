@@ -1,8 +1,9 @@
 @file:OptIn(ExperimentalForeignApi::class, ExperimentalForeignApi::class)
 
-package borg.trikeshed.common
+package borg.trikeshed.io
 
 
+import borg.trikeshed.lib.LongSeries
 import borg.trikeshed.lib.logDebug
 import kotlinx.cinterop.*
 import platform.posix.munmap
@@ -37,6 +38,7 @@ actual class FileBuffer actual constructor(//filename: String, initialOffset: Lo
             (buffer!!.toLong() + index).toCPointer<ByteVar>()!!.pointed.value
         }
 
+    @OptIn(ExperimentalForeignApi::class)
     actual fun close() {
         logDebug { "closing $filename" }
         munmap(buffer, blkSize.toULong())
