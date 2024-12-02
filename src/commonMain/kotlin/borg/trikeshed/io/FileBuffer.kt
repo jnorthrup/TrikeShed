@@ -1,7 +1,6 @@
 package borg.trikeshed.io
 
 import borg.trikeshed.lib.LongSeries
-import borg.trikeshed.lib.debug
 import borg.trikeshed.lib.logDebug
 import borg.trikeshed.io.Usable
 
@@ -20,7 +19,7 @@ fun open(filename: String, initialOffset: Long = 0, blkSize: Long = -1, readOnly
     val buffer = FileBuffer(filename, initialOffset, blkSize, readOnly)
     logDebug { "this isOpen()=${buffer.isOpen()}" }
     buffer.open()
-    debug { logDebug { "call(ed) open()" } }
+    logDebug { "call(ed) open()" }
     logDebug { "this isOpen()=${buffer.isOpen()}" }
     return buffer
 }
@@ -43,8 +42,8 @@ expect class FileBuffer(
     val initialOffset: Long
     val blkSize: Long
     val readOnly: Boolean
-    fun close()
-    fun open() //post-init open
+    override fun close()
+    override fun open() //post-init open
     fun isOpen(): Boolean
     fun size(): Long
     fun get(index: Long): Byte
