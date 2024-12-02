@@ -7,7 +7,7 @@ import borg.trikeshed.io.Usable
 
 
 fun <T> FileBuffer.use(block: (FileBuffer) -> T): T {
-    open()
+    if (!isOpen()) open()
     try {
         return block(this)
     } finally {
