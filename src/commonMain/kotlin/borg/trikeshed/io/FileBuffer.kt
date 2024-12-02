@@ -24,7 +24,7 @@ fun open(filename: String, initialOffset: Long = 0, blkSize: Long = -1, readOnly
 }
 
 import borg.trikeshed.lib.LongSeries
-import borg.trikeshed.lib.Usable
+import borg.trikeshed.io.Usable
 
 /**
  * an openable and closeable mmap file.
