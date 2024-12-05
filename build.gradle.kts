@@ -23,6 +23,17 @@ repositories {
     maven("https://www.jitpack.io")
 }
 publishing {
+    publications {
+        // Create a publication for each target
+        kotlin.targets.withType<org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget>().forEach { target ->
+            create<MavenPublication>("${target.name}Publication") {
+                from(components["kotlin"])
+                groupId = project.group.toString()
+                artifactId = "${project.name}-${target.name}"
+                version = project.version.toString()
+            }
+        }
+    }
     repositories {
         maven {
             url = uri("file://${System.getProperty("user.home")}/.m2/repository")
