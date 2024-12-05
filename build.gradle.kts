@@ -12,7 +12,7 @@ plugins {
 }
 
 group = "com.vsiwest"
-version = "1.0"
+version = "1.0.0"
 
 repositories {
     maven("https://oss.sonatype.org/content/repositories/snapshots/")
