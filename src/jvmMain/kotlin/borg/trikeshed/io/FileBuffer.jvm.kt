@@ -3,7 +3,7 @@ package borg.trikeshed.io
 import borg.trikeshed.lib.LongSeries
 import java.io.RandomAccessFile
 import java.nio.MappedByteBuffer
-import java.nio.file.Files
+import java.nio.file.*
 import java.util.concurrent.atomic.AtomicLong
 
 /**
@@ -25,8 +25,8 @@ actual class FileBuffer actual constructor(
     actual override val a: Long = blkSize
 
     private var fileSize: Long = if (blkSize < 0) java.io.File(filename).length() else blkSize
-        if (readOnly) java.nio.channels.FileChannel.MapMode.READ_ONLY else
-            java.nio.channels.FileChannel.MapMode.READ_WRITE,
+    private var buffer: MappedByteBuffer = RandomAccessFile(filename, if (readOnly) "r" else "rw").channel.map(
+        if (readOnly) java.nio.channels.FileChannel.MapMode.READ_ONLY else java.nio.channels.FileChannel.MapMode.READ_WRITE,
         initialOffset,
         fileSize
     )
@@ -35,10 +35,7 @@ actual class FileBuffer actual constructor(
         open = false
     }
 
-    private var buffer: MappedByteBuffer = RandomAccessFile(filename, if (readOnly) "r" else "rw").channel.map(
-
-    val   epoch = AtomicLong(initialOffset)
-
+    val epoch = AtomicLong(initialOffset)
 
     actual override fun open() {
         val file = java.io.File(filename)
@@ -52,10 +49,14 @@ actual class FileBuffer actual constructor(
         open = true
         fileSize = buffer.capacity().toLong()
     }
+
     actual override val b: (Long) -> Byte = { index ->
-
-
+        if (index < 0 || index >= fileSize) {
+            throw IndexOutOfBoundsException("Index $index out of bounds for file size $fileSize")
+        }
+        buffer.get(index.toInt())
     }
+
     actual fun isOpen(): Boolean = open
 
     actual fun size(): Long = fileSize

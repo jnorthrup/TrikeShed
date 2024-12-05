@@ -11,7 +11,7 @@ plugins {
     `maven-publish`
 }
 
-group = "org.bereft"
+group = "com.vsiwest"
 version = "1.0"
 
 repositories {
