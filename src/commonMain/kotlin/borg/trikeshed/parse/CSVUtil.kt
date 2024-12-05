@@ -24,7 +24,7 @@ object CSVUtil {
     /** Index CSV data into DelimitRanges with escape handling */
     fun indexCsv(file: LongSeries<Byte>): Cursor {
 
-        data = ByteSeries(file.toSeries(data.pos.toLong()))
+        data = ByteSeries(file.toSeries(0, file.size.toInt()))
 
         val ranges: CowSeriesHandle<Join<Long, Series<DelimitRange>>> =
             emptySeriesOf<Join<Long, Series<DelimitRange>>>().cow

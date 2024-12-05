@@ -4,22 +4,16 @@ import borg.trikeshed.lib.LongSeries
 import borg.trikeshed.lib.logDebug
 import borg.trikeshed.io.Usable
 
-
-fun <T> FileBuffer.use(block: (FileBuffer) -> T): T {
-    val needsOpen = !isOpen()
-    if (needsOpen) open()
-    return try {
-        block(this)
-    } finally {
-        if (needsOpen && isOpen()) close()
-    }
-}
-
+/**
+ * open a filebuffer
+ */
 fun open(filename: String, initialOffset: Long = 0, blkSize: Long = -1, readOnly: Boolean = true): FileBuffer {
     logDebug { "pre-opening $filename" }
     val buffer = FileBuffer(filename, initialOffset, blkSize, readOnly)
     logDebug { "this isOpen()=${buffer.isOpen()}" }
     buffer.open()
+    if(!buffer.isOpen())throw  IllegalStateException("FileBuffer not open")
+
     logDebug { "call(ed) open()" }
     logDebug { "this isOpen()=${buffer.isOpen()}" }
     return buffer
@@ -44,6 +38,10 @@ expect class FileBuffer(
     val blkSize: Long
     val readOnly: Boolean
     override fun close()
+    /**
+     * open the filebuffer
+     * throws IllegalStateException if open "fails?"
+     */
     override fun open() //post-init open
     fun isOpen(): Boolean
     fun size(): Long

@@ -1,9 +1,13 @@
 package borg.trikeshed.io
 
 import borg.trikeshed.lib.LongSeries
+import java.io.RandomAccessFile
+import java.nio.MappedByteBuffer
+import java.nio.file.Files
+import java.util.concurrent.atomic.AtomicLong
 
 /**
- * an openable and closeable mmap file.
+ * An openable and closeable mmap file.
  *
  *  get has no side effects but put has undefined effects on size and sync
  */
@@ -12,38 +16,67 @@ actual class FileBuffer actual constructor(
     initialOffset: Long,
     blkSize: Long,
     readOnly: Boolean,
-) : LongSeries<Byte> {
-    actual override val a: Long
-        get() = TODO("Not yet implemented")
-    actual override val b: (Long) -> Byte
-        get() = TODO("Not yet implemented")
-    actual val filename: String
-        get() = TODO("Not yet implemented")
-    actual val initialOffset: Long
-        get() = TODO("Not yet implemented")
-    actual val blkSize: Long
-        get() = TODO("Not yet implemented")
-    actual val readOnly: Boolean
-        get() = TODO("Not yet implemented")
+) : LongSeries<Byte>, Usable {
+    actual val filename: String = filename
+    actual val initialOffset: Long = initialOffset
+    actual val blkSize: Long = blkSize
+    actual val readOnly: Boolean = readOnly
+    private var open: Boolean = false
+    actual override val a: Long = blkSize
 
-    actual fun close() {
+    private var fileSize: Long = if (blkSize < 0) java.io.File(filename).length() else blkSize
+        if (readOnly) java.nio.channels.FileChannel.MapMode.READ_ONLY else
+            java.nio.channels.FileChannel.MapMode.READ_WRITE,
+        initialOffset,
+        fileSize
+    )
+
+    actual override fun close() {
+        open = false
     }
 
-    actual fun open() {
-    }
+    private var buffer: MappedByteBuffer = RandomAccessFile(filename, if (readOnly) "r" else "rw").channel.map(
 
-    actual fun isOpen(): Boolean {
-        TODO("Not yet implemented")
-    }
+    val   epoch = AtomicLong(initialOffset)
 
-    actual fun size(): Long {
-        TODO("Not yet implemented")
+
+    actual override fun open() {
+        val file = java.io.File(filename)
+        val randomAccessFile = RandomAccessFile(file, if (readOnly) "r" else "rw")
+        val channel = randomAccessFile.channel
+        buffer = channel.map(
+            if (readOnly) java.nio.channels.FileChannel.MapMode.READ_ONLY else java.nio.channels.FileChannel.MapMode.READ_WRITE,
+            initialOffset,
+            Math.min(file.length() - initialOffset, Integer.MAX_VALUE.toLong())
+        )
+        open = true
+        fileSize = buffer.capacity().toLong()
     }
+    actual override val b: (Long) -> Byte = { index ->
+
+
+    }
+    actual fun isOpen(): Boolean = open
+
+    actual fun size(): Long = fileSize
 
     actual fun get(index: Long): Byte {
-        TODO("Not yet implemented")
+        if (!open) {
+            throw IllegalStateException("File is not open")
+        }
+        if (index < 0 || index >= fileSize) {
+            throw IndexOutOfBoundsException("Index $index out of bounds for file size $fileSize")
+        }
+        return buffer.get(index.toInt())
     }
 
     actual fun put(index: Long, value: Byte) {
+        if (!open) {
+            throw IllegalStateException("File is not open")
+        }
+        if (index < 0 || index >= fileSize) {
+            throw IndexOutOfBoundsException("Index $index out of bounds for file size $fileSize")
+        }
+        buffer.put(index.toInt(), value)
     }
 }

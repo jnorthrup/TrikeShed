@@ -36,7 +36,7 @@ val List<*>.toJsPath: JsPath
         when (it) {
             is String -> JsPathElement.left(it)
             is Int -> JsPathElement.right(it)
-            else -> throw IllegalArgumentException("expected String or Int, got $it")
+            else -> throw IllegalArgumentException("expected String or Int, got ${it}")
         }
     }
 
@@ -240,7 +240,7 @@ object JsonParser {
         logDebug { "select By Key $key from ${cs.asString()}" }
         if (unbrace(cs)) {
 
-            for (segment in (context.segments α { t ->
+            for (segment in (context.segments α { t  ->
                 val (bounds: Twin<Int>, src: Series<Char>) = t
                 val (pos, lim) = bounds
                 CharSeries(src, pos, lim).trim

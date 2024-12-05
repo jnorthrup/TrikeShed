@@ -347,13 +347,13 @@ fun <B> Series<B>.dropLast(back: Int): Series<B> = get(0 until max(0, size - bac
 fun <B> Series<B>.take(exclusiveEnd: Int): Series<B> = get(0 until min(exclusiveEnd, size))
 
 //series foreachIndexed
-fun <T> Series<T>.forEachIndexed(action: (index: Int, T) -> Unit): Unit = this.`▶`.forEachIndexed(action)
+fun <T> Series<T>.forEachIndexed(action: (index: Int, T) -> Unit): Unit = (0 until a) .forEach { it: Int -> action(it, b(it)) }
 
 //series foreach
-fun <T> Series<T>.forEach(action: (T) -> Unit): Unit = this.`▶`.forEach(action)
+fun <T> Series<T>.forEach(action: (T) -> Unit): Unit =( 0 until a ) .forEach { action(b(it)) }
 
 //series map
-fun <T, R> Series<T>.map(transform: (T) -> R): List<R> = this.toList().map(transform)
+fun <T, R> Series<T>.map(transform: (T) -> R) =List(a) { transform(b(it)) }
 
 
 fun <T> Series<T>.isEmpty(): Boolean = a == 0

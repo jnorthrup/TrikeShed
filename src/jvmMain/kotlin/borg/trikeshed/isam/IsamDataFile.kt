@@ -2,15 +2,15 @@
 
 package borg.trikeshed.isam
 
-import borg.trikeshed.common.Usable
 import borg.trikeshed.cursor.*
+import borg.trikeshed.io.*
 import borg.trikeshed.isam.meta.IOMemento
 import borg.trikeshed.lib.*
 import java.io.RandomAccessFile
 import java.nio.ByteBuffer
 import java.nio.channels.SeekableByteChannel
 import java.nio.file.Files
-import java.nio.file.Paths
+import java.nio.file.*
 import java.nio.file.StandardOpenOption.*
 import java.util.concurrent.locks.ReentrantLock
 
@@ -18,7 +18,7 @@ actual class IsamDataFile actual constructor(
     datafileFilename: String,
     metafileFilename: String,
     metafile: IsamMetaFileReader,
-) : Usable, Cursor {
+) : Usable , Cursor {
     actual val datafileFilename = datafileFilename
     actual val metafile by lazy {
         metafile.open()
