@@ -1,5 +1,8 @@
 package borg.trikeshed.lib
 
+import borg.trikeshed.io.homedir
+import kotlinx.datetime.Clock.System
+
 /**fun assert(value: Boolean)
 (JVM source) (Native source)
 For JVM
@@ -13,9 +16,14 @@ expect fun assert(value: Boolean)
 @Throws(AssertionError::class)
 expect fun assert(value: Boolean, lazyMessage: () -> Any)
 
+//val env = homedir.homedir
 //var forceDebug = env// stopgap measure until i figure out how to do native -ea
 val debugging: Boolean =
     try {
+
+
+
+
         assert(false) { "debugging" }
 //        forceDebug
         false
