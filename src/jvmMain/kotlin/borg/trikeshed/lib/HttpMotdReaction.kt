@@ -1,19 +1,20 @@
 package borg.trikeshed.lib
 
+import borg.trikeshed.lib.UnaryAsyncReaction.Companion.OP_READ
+import borg.trikeshed.lib.UnaryAsyncReaction.Companion.OP_WRITE
 import java.nio.ByteBuffer
 import java.nio.channels.SelectionKey
 import java.nio.channels.SocketChannel
-import java.time.LocalDateTime
-import java.time.format.DateTimeFormatter
+import borg.trikeshed.lib.datetime.getCurrentDateTime
+import borg.trikeshed.lib.datetime.formatRfc1123
 
 class HttpMotdReaction(
     private val reactor: Reactor,
     private val keepAlive: Boolean = true
 ) : UnaryAsyncReaction {
     private val motd = "Welcome to Trikeshed Server - ${LocalDateTime.now()}"
-    private val httpDateFormatter = DateTimeFormatter.RFC_1123_DATE_TIME
-    
-    override fun invoke(key: SelectionKey): Pair<Int, UnaryAsyncReaction>? {
+
+    override fun invoke(key: SelectionKey): Join<Int, UnaryAsyncReaction>? {
         val channel = key.channel() as SocketChannel
         
         return when (key.readyOps()) {
@@ -76,10 +77,10 @@ class HttpMotdReaction(
     }
 
     private fun buildHttpResponse(): ByteBuffer {
-        val now = LocalDateTime.now()
+        val now = getCurrentDateTime()
         val response = buildString {
             append("HTTP/1.1 200 OK\r\n")
-            append("Date: ${httpDateFormatter.format(now)}\r\n")
+            append("Date: ${formatRfc1123(now)}\r\n")
             append("Server: Trikeshed/1.0\r\n")
             append("Content-Type: text/plain\r\n")
             append("Content-Length: ${motd.length}\r\n")
