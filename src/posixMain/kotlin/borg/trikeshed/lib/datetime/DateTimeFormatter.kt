@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalForeignApi::class)
+
 package borg.trikeshed.lib.datetime
 
 import kotlinx.cinterop.*

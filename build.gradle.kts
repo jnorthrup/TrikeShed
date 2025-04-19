@@ -1,13 +1,8 @@
-
-
 import org.jetbrains.kotlin.gradle.DeprecatedTargetPresetApi
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 
-//which stanza do we add a linux64 cinteropdef for liburing below? (the linux64 stanza is the only one that has a cinterop block)
-
 plugins {
-    kotlin("multiplatform") version "2.1.0-RC2"   // Latest version of Kotlin Multiplatform as of now
-
+    kotlin("multiplatform") version "2.1.20"   // Latest version of Kotlin Multiplatform as of now
     `maven-publish`
 }
 
@@ -52,45 +47,28 @@ kotlin {
         )
     }
 
-    jvmToolchain(11)
+    jvmToolchain(21)
 
-    jvm {
-
-        withJava()
-    }
-
+    jvm {}
 
     val hostOs = System.getProperty("os.name")
-    val isMingwX64 = hostOs.startsWith("Windows")
 
     when {
-        hostOs == "Windows" -> mingwX64("windows")
-        hostOs == "Mac OS X" -> if ( //aarch
-            System.getProperty("os.arch") == "aarch64") {
-            listOf(
-                macosX64("macos"),
-                ).first()
+        hostOs == "Mac OS X" -> if (System.getProperty("os.arch") == "aarch64") {
+            macosArm64("posix")
         } else {
-            macosArm64("macos")
+            macosX64("posix")
         }
-
-        hostOs == "Linux" -> {
-            linuxX64("linux") // io_uring lives in linux sourceset only
-            linuxX64("posix")
-        }
-        isMingwX64 -> mingwX64("posix")
+        hostOs == "Linux" -> linuxX64("posix")
+        hostOs == "Windows" -> mingwX64("posix")
         else -> throw GradleException("Host OS is not supported in Kotlin/Native.")
-
     }
 
     sourceSets {
-
         val commonMain by getting {
             dependencies {
-
                 api("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.4")
                 api("org.jetbrains.kotlinx:kotlinx-datetime:0.4.0")
-                api("org.jetbrains.kotlin:kotlin-reflect:1.8.0")
             }
         }
 
@@ -107,75 +85,23 @@ kotlin {
                 //coroutines
                 api("org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:1.6.4")
                 //serialization
-                api("org.jetbrains.kotlinx:kotlinx-serialization-json-jvm:1.3.0")
-            }
+             }
         }
 
         val jvmTest by getting {
-            //bring in the dependencies from jvmMain
             dependencies {
                 implementation(kotlin("test"))
                 implementation(kotlin("test-junit"))
-            }
-        }
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.6.4")
 
-
-        if (hostOs in listOf("Linux", "Mac OS X")) {
-
-            //posix targets
-            val nativeMain by creating {
-                dependsOn(commonMain)
-            }
-
-            val nativeTest by creating {
-                dependsOn(commonTest)
-            }
-            //posix targets
-            val posixMain by creating {
-                dependsOn(nativeMain)
-            }
-
-            val posixTest by creating {
-                dependsOn(nativeTest)
-            }
-
-            when (hostOs) {
-                "Linux" -> {
-                    //io_uring
-                    val linuxMain by getting {
-                        dependsOn(posixMain)
-                        dependencies {
-                            implementation("org.bereft:io_uring:1.0")
-                        }
-                    }
-                    val linuxTest by getting {
-                        dependsOn(posixTest)
-                    }
-                }
-
-                "Mac OS X" -> {
-                    //libdispatch
-                    val macosMain by getting {
-                        dependsOn(posixMain)
-                    }
-                    val macosTest by getting {
-                        dependsOn(posixTest)
-                    }
-                }
-
-                else -> {
-                    TODO("OS wtf!!")
-                }
             }
         }
     }
-
-
 }
+
 tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinTest> {
     testLogging {
         events("passed", "skipped", "failed")
         exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
     }
 }
-

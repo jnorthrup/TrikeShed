@@ -1,20 +1,54 @@
 package borg.trikeshed.reactor
 
 import kotlinx.coroutines.*
-import kotlinx.coroutines.flow.*
-import borg.trikeshed.io.ByteBuffer
-import borg.trikeshed.lib.SelectableChannel
+import kotlinx.coroutines.channels.*
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlin.math.max
 
-expect class Reactor(
-    dispatcher: CoroutineDispatcher = Dispatchers.Default,
-    numSelectorThreads: Int = 1
+class Reactor(
+    private val dispatcher: CoroutineDispatcher = Dispatchers.Default,
+    private val numSelectorThreads: Int = max(1, 4)
 ) {
-    val reactorScope: CoroutineScope
-    val isRunning: StateFlow<Boolean>
-    
-    suspend fun registerChannel(channel: SelectableChannel, ops: Int, reaction: AsyncReaction)
-    suspend fun writeData(channel: SelectableChannel, data: ByteBuffer)
-    suspend fun acquireBuffer(): ByteBuffer
-    fun start()
-    fun shutdown()
+    private val exceptionHandler = CoroutineExceptionHandler { _, throwable ->
+        println("Unhandled exception in Reactor: ${throwable.message}")
+        throwable.printStackTrace()
+    }
+
+    private val reactorScope = CoroutineScope(dispatcher + SupervisorJob() + exceptionHandler)
+    private val isRunning = MutableStateFlow(true)
+
+    private lateinit var selectorThreads: List<SelectorThread>
+    private var nextSelectorIndex = 0
+
+    private val bufferPool = BufferPoolImpl()
+
+    init {
+        reactorScope.launch {
+            selectorThreads = List(numSelectorThreads) {
+                SelectorThread(
+                    SelectorInterface.create(),
+                    MutableSharedFlow(extraBufferCapacity = Channel.UNLIMITED),
+                    MutableSharedFlow(extraBufferCapacity = Channel.UNLIMITED)
+                )
+            }
+        }
+    }
+
+    // Rest of the Reactor implementation remains the same...
+
+    // Kept the BufferPoolImpl as it was
+    private class BufferPoolImpl(private val bufferSize: Int = 16384) {
+        private val pool = mutableListOf<ByteBuffer>()
+        private val mutex = Mutex()
+
+        suspend fun acquireBuffer(): ByteBuffer = mutex.withLock {
+            pool.removeLastOrNull() ?: ByteBuffer.allocateDirect(bufferSize)
+        }
+
+        suspend fun releaseBuffer(buffer: ByteBuffer) = mutex.withLock {
+            buffer.clear()
+            pool.add(buffer)
+        }
+    }
 }

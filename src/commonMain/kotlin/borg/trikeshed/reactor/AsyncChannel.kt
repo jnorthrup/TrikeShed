@@ -1,4 +1,4 @@
-package borg.trikeshed.lib
+package borg.trikeshed.reactor
 
 interface AsyncChannel {
     suspend fun close()

@@ -13,7 +13,21 @@ data class DateTimeComponents(
     val timeZone: String   // Time zone, e.g., GMT
 )
 
+//fun formatRfc1123(dateTime: DateTimeComponents): String {
+//    return "${dateTime.dayOfWeek}, ${"%02d".format(dateTime.day)} ${dateTime.month} ${dateTime.year} " +
+//           "${"%02d".format(dateTime.hour)}:${"%02d".format(dateTime.minute)}:${"%02d".format(dateTime.second)} ${dateTime.timeZone}"
+//}
 fun formatRfc1123(dateTime: DateTimeComponents): String {
-    return "${dateTime.dayOfWeek}, ${"%02d".format(dateTime.day)} ${dateTime.month} ${dateTime.year} " +
-           "${"%02d".format(dateTime.hour)}:${"%02d".format(dateTime.minute)}:${"%02d".format(dateTime.second)} ${dateTime.timeZone}"
+    val day = dateTime.day.toString().padStart(2, '0')
+    val hour = dateTime.hour.toString().padStart(2, '0')
+    val minute = dateTime.minute.toString().padStart(2, '0')
+    val second = dateTime.second.toString().padStart(2, '0')
+
+    return "${dateTime.dayOfWeek}, $day ${dateTime.month} ${dateTime.year} " +
+            "$hour:$minute:$second ${dateTime.timeZone}"
+}
+
+fun main() {
+    val dateTime = getCurrentDateTime()
+    println(formatRfc1123(dateTime))
 }
