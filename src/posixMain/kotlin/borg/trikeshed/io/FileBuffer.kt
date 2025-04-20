@@ -30,7 +30,7 @@ actual class FileBuffer actual constructor(
 
     actual override val a: Long by lazy {
         open()
-        if (blkSize == (-1L)) file!!.size else blkSize
+        if (blkSize == (-1L)) file?.size ?: throw IllegalStateException("File not initialized") else blkSize
     }
 
     @OptIn(ExperimentalForeignApi::class)
@@ -62,7 +62,7 @@ actual class FileBuffer actual constructor(
 
     actual fun isOpen(): Boolean = buffer != null
 
-    actual fun size(): Long = file!!.size
+    actual fun size(): Long = file?.size ?: throw IllegalStateException("File not initialized")
 
     actual fun get(index: Long): Byte {
         return (buffer!!.toLong() + index).toCPointer<ByteVar>()!!.pointed.value
