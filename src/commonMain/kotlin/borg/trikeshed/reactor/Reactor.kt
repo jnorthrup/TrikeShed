@@ -80,28 +80,69 @@ private class SelectorThread(
     private val reactions: MutableSharedFlow<Pair<SelectionKey, AsyncReaction>>
 ) {
     private val keyReactions = mutableMapOf<SelectionKey, () -> AsyncReaction?>()
+    private val selectorEvents = Channel<Set<SelectionKey>>(capacity = Channel.UNLIMITED)
 
     suspend fun registerChannel(channel: SelectableChannel, interest: Int, reaction: () -> AsyncReaction?) {
         channelRegistrations.emit(Triple(channel, interest, reaction))
     }
 
-    suspend fun runEventLoop(isRunning: MutableStateFlow<Boolean>) {
-        while (isRunning.value) {
-            // Handle new channel registrations
-            channelRegistrations.tryReceive().getOrNull()?.let { (channel, interest, reaction) ->
-                val key = selector.register(channel, interest, null)
-                keyReactions[key] = reaction
+    suspend fun runEventLoop(isRunning: MutableStateFlow<Boolean>) = coroutineScope {
+        // Launch a separate coroutine to handle blocking selector.select() on IO dispatcher
+        launch(Dispatchers.IO) {
+            while (isRunning.value && isActive) {
+                try {
+                    if (selector.select() > 0) {
+                        val readyKeys = selector.selectedKeys()
+                        selectorEvents.send(readyKeys)
+                    }
+                } catch (e: Exception) {
+                    println("Error in selector loop: ${e.message}")
+                    isRunning.value = false // Stop the loop on error
+                }
             }
+        }
 
-            // Select and process ready keys
-            if (selector.select() > 0) {
-                val readyKeys = selector.selectedKeys()
-                for (key in readyKeys) {
-                    if (key.isValid) {
-                        keyReactions[key]?.let { reaction ->
-                            reaction()?.let { asyncReaction ->
-                                reactions.emit(key to asyncReaction)
+        // Main event loop using select for non-blocking processing
+        while (isRunning.value && isActive) {
+            kotlinx.coroutines.selects.select<Unit> {
+                // Handle channel registrations
+                channelRegistrations.onReceiveCatching { result ->
+                    result.getOrNull()?.let { (channel, interest, reaction) ->
+                        try {
+                            val key = selector.register(channel, interest, null)
+                            keyReactions[key] = reaction
+                        } catch (e: Exception) {
+                            println("Error registering channel: ${e.message}")
+                            try { channel.close() } catch (_: Exception) {}
+                        }
+                    }
+                }
+
+                // Handle selector events
+                selectorEvents.onReceive { readyKeys ->
+                    val iterator = readyKeys.iterator()
+                    while (iterator.hasNext()) {
+                        val key = iterator.next()
+                        iterator.remove() // Remove from selected set
+
+                        if (key.isValid) {
+                            keyReactions[key]?.let { reaction ->
+                                try {
+                                    reaction()?.let { asyncReaction ->
+                                        reactions.emit(key to asyncReaction)
+                                    } ?: run {
+                                        keyReactions.remove(key)
+                                        key.cancel()
+                                    }
+                                } catch (e: Exception) {
+                                    println("Error during reaction for key $key: ${e.message}")
+                                    keyReactions.remove(key)
+                                    key.cancel()
+                                    try { key.channel().close() } catch (_: Exception) {}
+                                }
                             }
+                        } else {
+                            keyReactions.remove(key)
                         }
                     }
                 }
