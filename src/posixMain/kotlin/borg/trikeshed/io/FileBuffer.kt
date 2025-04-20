@@ -13,16 +13,17 @@ import simple.PosixOpenOpts
 /**
  * an openable and closeable mmap file.
  */
-actual class   FileBuffer  actual constructor(//filename: String, initialOffset: Long, blkSize: Long, readOnly: Boolean)
+actual class FileBuffer actual constructor(
     actual val filename: String,
     actual val initialOffset: Long,
     actual val blkSize: Long,
     actual val readOnly: Boolean,
-): LongSeries<Byte> ,Usable{
+): LongSeries<Byte>, Usable {
 
-    init{
+    init {
         logDebug { "native FileBuffer: $filename, $initialOffset, $blkSize, $readOnly" }
     }
+    
     @OptIn(ExperimentalForeignApi::class)
     var buffer: COpaquePointer? = null
     var file: PosixFile? = null
@@ -41,9 +42,8 @@ actual class   FileBuffer  actual constructor(//filename: String, initialOffset:
     @OptIn(ExperimentalForeignApi::class)
     actual override fun close() {
         logDebug { "closing $filename" }
-        munmap(buffer, blkSize.toULong())
+        buffer?.let { munmap(it, blkSize.toULong()) }
         file?.close()
-
         file = null
         buffer = null
     }
