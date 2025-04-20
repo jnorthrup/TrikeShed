@@ -32,12 +32,8 @@ interface ReadableChannel {
     suspend fun read(buffer: ByteBuffer): Int
 }
 
-interface SelectableChannel {
-    suspend fun configureBlocking(block: Boolean): SelectableChannel
-    suspend fun register(selector: SelectorInterface, ops: Int, attachment: Any?): SelectionKey
-    suspend fun close()
-}
-
+// Removed duplicate SelectableChannel interface definition here.
+// The expect interface is defined in SelectableChannel.kt
 expect class Selector {
     fun select(): Int
     fun selectedKeys(): MutableSet<SelectionKey>
@@ -45,7 +41,11 @@ expect class Selector {
 }
 
 typealias Interest = Int
-const val OP_READ: Interest = 1 shl 0
-const val OP_WRITE: Interest = 1 shl 2
-const val OP_CONNECT: Interest = 1 shl 3
-const val OP_ACCEPT: Interest = 1 shl 4
+
+class Operation(val interest: Interest, val action: () -> AsyncReaction?)
+
+
+fun OP_READ(action: () -> AsyncReaction?): Operation = Operation(1 shl 0, action)
+fun OP_WRITE(action: () -> AsyncReaction?): Operation = Operation(1 shl 2, action)
+fun OP_CONNECT(action: () -> AsyncReaction?): Operation = Operation(1 shl 3, action)
+fun OP_ACCEPT(action: () -> AsyncReaction?): Operation = Operation(1 shl 4, action)

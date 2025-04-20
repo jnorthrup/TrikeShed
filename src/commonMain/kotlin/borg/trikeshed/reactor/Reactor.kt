@@ -2,6 +2,8 @@ package borg.trikeshed.reactor
 
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.*
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlin.math.max
@@ -27,7 +29,7 @@ class Reactor(
         reactorScope.launch {
             selectorThreads = List(numSelectorThreads) {
                 SelectorThread(
-                    SelectorInterface.create(),
+                    createSelectorInterface(),
                     MutableSharedFlow(extraBufferCapacity = Channel.UNLIMITED),
                     MutableSharedFlow(extraBufferCapacity = Channel.UNLIMITED)
                 )
@@ -43,7 +45,7 @@ class Reactor(
         private val mutex = Mutex()
 
         suspend fun acquireBuffer(): ByteBuffer = mutex.withLock {
-            pool.removeLastOrNull() ?: ByteBuffer.allocateDirect(bufferSize)
+            pool.removeLastOrNull() ?: ByteBufferFactory.allocateDirect(bufferSize)  // Use the refactored ByteBufferFactory
         }
 
         suspend fun releaseBuffer(buffer: ByteBuffer) = mutex.withLock {
