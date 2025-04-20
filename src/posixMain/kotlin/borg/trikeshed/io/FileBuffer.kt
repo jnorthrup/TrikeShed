@@ -31,7 +31,7 @@ actual class FileBuffer actual constructor(
     actual override val a: Long by lazy {
         open()
         if (blkSize == (-1L)) {
-            file?.let { it.size } ?: throw IllegalStateException("File not initialized after open")
+            file!!.size
         } else {
             blkSize
         }
