@@ -37,20 +37,75 @@ class Reactor(
         }
     }
 
-    // Rest of the Reactor implementation remains the same...
-
-    // Kept the BufferPoolImpl as it was
-    private class BufferPoolImpl(private val bufferSize: Int = 16384) {
-        private val pool = mutableListOf<ByteBuffer>()
-        private val mutex = Mutex()
-
-        suspend fun acquireBuffer(): ByteBuffer = mutex.withLock {
-            pool.removeLastOrNull() ?: ByteBufferFactory.allocateDirect(bufferSize)  // Use the refactored ByteBufferFactory
+    // Register a channel with a specific operation (interest and reaction)
+    fun registerChannel(channel: SelectableChannel, operation: Operation) {
+        val selectorThread = selectorThreads[nextSelectorIndex]
+        nextSelectorIndex = (nextSelectorIndex + 1) % numSelectorThreads
+        reactorScope.launch {
+            selectorThread.registerChannel(channel, operation.interest, operation.action)
         }
+    }
 
-        suspend fun releaseBuffer(buffer: ByteBuffer) = mutex.withLock {
-            buffer.clear()
-            pool.add(buffer)
+    // Start the reactor, launching event loops for each selector thread
+    fun start() {
+        selectorThreads.forEach { thread ->
+            reactorScope.launch {
+                thread.runEventLoop(isRunning)
+            }
+        }
+    }
+
+    // Shutdown the reactor, stopping all selector threads and cleaning up resources
+    fun shutdown() {
+        isRunning.value = false
+        reactorScope.cancel()
+        reactorScope.launch {
+            selectorThreads.forEach { thread ->
+                thread.selector.close()
+            }
+        }
+    }
+
+    // Check if the reactor is active
+    val isActive: Boolean get() = isRunning.value
+    
+    // Property to hold the server channel if needed
+    var serverChannel: ServerChannel? = null
+}
+
+// SelectorThread class for handling selector operations
+private class SelectorThread(
+    val selector: SelectorInterface,
+    private val channelRegistrations: MutableSharedFlow<Triple<SelectableChannel, Int, () -> AsyncReaction?>>,
+    private val reactions: MutableSharedFlow<Pair<SelectionKey, AsyncReaction>>
+) {
+    private val keyReactions = mutableMapOf<SelectionKey, () -> AsyncReaction?>()
+
+    suspend fun registerChannel(channel: SelectableChannel, interest: Int, reaction: () -> AsyncReaction?) {
+        channelRegistrations.emit(Triple(channel, interest, reaction))
+    }
+
+    suspend fun runEventLoop(isRunning: MutableStateFlow<Boolean>) {
+        while (isRunning.value) {
+            // Handle new channel registrations
+            channelRegistrations.tryReceive().getOrNull()?.let { (channel, interest, reaction) ->
+                val key = selector.register(channel, interest, null)
+                keyReactions[key] = reaction
+            }
+
+            // Select and process ready keys
+            if (selector.select() > 0) {
+                val readyKeys = selector.selectedKeys()
+                for (key in readyKeys) {
+                    if (key.isValid) {
+                        keyReactions[key]?.let { reaction ->
+                            reaction()?.let { asyncReaction ->
+                                reactions.emit(key to asyncReaction)
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 }

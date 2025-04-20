@@ -49,3 +49,23 @@ fun OP_READ(action: () -> AsyncReaction?): Operation = Operation(1 shl 0, action
 fun OP_WRITE(action: () -> AsyncReaction?): Operation = Operation(1 shl 2, action)
 fun OP_CONNECT(action: () -> AsyncReaction?): Operation = Operation(1 shl 3, action)
 fun OP_ACCEPT(action: () -> AsyncReaction?): Operation = Operation(1 shl 4, action)
+
+interface AsyncReaction
+
+interface UnaryAsyncReaction {
+    suspend operator fun invoke(key: SelectionKey): AsyncReaction?
+}
+
+interface BufferPool {
+    suspend fun acquire(): ByteBuffer
+    suspend fun release(buffer: ByteBuffer)
+}
+
+interface ServerChannel : SelectableChannel {
+    suspend fun bind(port: Int)
+    suspend fun accept(): ClientChannel?
+}
+
+interface ClientChannel : SelectableChannel, ReadableChannel, WritableChannel {
+    suspend fun connect(host: String, port: Int)
+}
