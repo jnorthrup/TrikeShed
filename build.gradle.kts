@@ -94,6 +94,8 @@ kotlin {
                 api("org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:1.6.4")
                 //serialization
                 api("org.jetbrains.kotlinx:kotlinx-serialization-json-jvm:1.3.0")
+                //DuckDB JDBC driver with Arrow support
+                api("org.duckdb:duckdb_jdbc:1.1.0")
             }
         }
 
