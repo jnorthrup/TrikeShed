@@ -41,7 +41,7 @@ kotlin {
         )
     }
 
-    jvmToolchain(11)
+    jvmToolchain(21)
 
     jvm {
 
@@ -54,13 +54,10 @@ kotlin {
 
     when {
         hostOs == "Windows" -> mingwX64("windows")
-        hostOs == "Mac OS X" -> if ( //aarch
-            System.getProperty("os.arch") == "aarch64") {
-            listOf(
-                macosX64("macos"),
-                ).first()
-        } else {
+        hostOs == "Mac OS X" -> if (System.getProperty("os.arch") == "aarch64") {
             macosArm64("macos")
+        } else {
+            macosX64("macos")
         }
 
         hostOs == "Linux" -> {
