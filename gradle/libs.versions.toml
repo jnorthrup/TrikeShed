@@ -1,0 +1,60 @@
+[versions]
+# Kotlin & Coroutines
+kotlin = "2.0.20"
+kotlinx-coroutines = "1.6.4"
+kotlinx-datetime = "0.4.0"
+kotlinx-serialization = "1.3.0"
+kotlin-reflect = "1.8.0"
+
+# Kotlin Testing
+kotlin-test-common = "2.0.20"
+kotlin-test-annotations-common = "2.0.20"
+kotlin-test-junit = "2.0.20"
+
+# DuckDB
+duckdb-jdbc = "1.1.0"
+
+# IO Uring (Linux only)
+io-uring = "1.0"
+
+[libraries]
+# Kotlin stdlib & reflection
+kotlin-stdlib = { module = "org.jetbrains.kotlin:kotlin-stdlib", version.ref = "kotlin" }
+kotlin-reflect = { module = "org.jetbrains.kotlin:kotlin-reflect", version.ref = "kotlin-reflect" }
+
+# Kotlin Coroutines
+kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinx-coroutines" }
+kotlinx-coroutines-core-jvm = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm", version.ref = "kotlinx-coroutines" }
+
+# Kotlin DateTime
+kotlinx-datetime = { module = "org.jetbrains.kotlinx:kotlinx-datetime", version.ref = "kotlinx-datetime" }
+kotlinx-datetime-jvm = { module = "org.jetbrains.kotlinx:kotlinx-datetime-jvm", version.ref = "kotlinx-datetime" }
+
+# Kotlin Serialization
+kotlinx-serialization-json-jvm = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json-jvm", version.ref = "kotlinx-serialization" }
+
+# DuckDB JDBC
+duckdb-jdbc = { module = "org.duckdb:duckdb_jdbc", version.ref = "duckdb-jdbc" }
+
+# IO Uring (Linux)
+io-uring = { module = "org.bereft:io_uring", version.ref = "io-uring" }
+
+# Kotlin Test (common)
+kotlin-test-common = { module = "org.jetbrains.kotlin:kotlin-test-common", version.ref = "kotlin-test-common" }
+kotlin-test-annotations-common = { module = "org.jetbrains.kotlin:kotlin-test-annotations-common", version.ref = "kotlin-test-annotations-common" }
+kotlin-test-junit = { module = "org.jetbrains.kotlin:kotlin-test-junit", version.ref = "kotlin-test-junit" }
+
+# Kotlin Test (JVM specific)
+kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
+kotlin-test-junit = { module = "org.jetbrains.kotlin:kotlin-test-junit", version.ref = "kotlin-test-junit" }
+
+[plugins]
+# Kotlin Multiplatform
+kotlin-multiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
+
+# Maven Publishing
+maven-publish = { id = "maven-publish" }
+
+[metadata]
+# Version catalog metadata
+catalog-format-version = "1.1"

@@ -4,14 +4,16 @@ package borg.trikeshed.isam.meta
 
 import borg.trikeshed.cursor.TypeMemento
 import borg.trikeshed.isam.meta.PlatformCodec.Companion.currentPlatformCodec
-import borg.trikeshed.isam.meta.PlatformCodec.Companion.currentPlatformCodec.readInt
-import borg.trikeshed.isam.meta.PlatformCodec.Companion.currentPlatformCodec.readLong
-import borg.trikeshed.isam.meta.PlatformCodec.Companion.currentPlatformCodec.readUInt
-import borg.trikeshed.isam.meta.PlatformCodec.Companion.currentPlatformCodec.readULong
-import borg.trikeshed.isam.meta.PlatformCodec.Companion.currentPlatformCodec.writeInt
-import borg.trikeshed.isam.meta.PlatformCodec.Companion.currentPlatformCodec.writeLong
-import borg.trikeshed.isam.meta.PlatformCodec.Companion.currentPlatformCodec.writeUInt
-import borg.trikeshed.isam.meta.PlatformCodec.Companion.currentPlatformCodec.writeULong
+import borg.trikeshed.isam.meta.PlatformCodec.Companion.readInt
+import borg.trikeshed.isam.meta.PlatformCodec.Companion.readLong
+import borg.trikeshed.isam.meta.PlatformCodec.Companion.readShort
+import borg.trikeshed.isam.meta.PlatformCodec.Companion.readUInt
+import borg.trikeshed.isam.meta.PlatformCodec.Companion.readULong
+import borg.trikeshed.isam.meta.PlatformCodec.Companion.writeInt
+import borg.trikeshed.isam.meta.PlatformCodec.Companion.writeLong
+import borg.trikeshed.isam.meta.PlatformCodec.Companion.writeShort
+import borg.trikeshed.isam.meta.PlatformCodec.Companion.writeUInt
+import borg.trikeshed.isam.meta.PlatformCodec.Companion.writeULong
 import borg.trikeshed.lib.*
 import borg.trikeshed.lib.CharSeries
 import kotlinx.datetime.*

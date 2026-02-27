@@ -1,29 +1,24 @@
 /**
  * DuckSeries — SQL queries returning trikeshed Series.
  *
- * JVM-only implementation using duckdb-jdbc.
- * Native support via C API is future work.
+ * JVM implementation using duckdb-jdbc.
  */
 package borg.trikeshed.duck
 
 import borg.trikeshed.lib.*
 import java.sql.*
 
-/**
- * Execute SQL queries against DuckDB, return trikeshed Series.
- *
- * Usage:
- * ```kotlin
- * val db = DuckSeries.open("candles.duckdb")
- * val close = db.query<Double>("SELECT close FROM candles WHERE pair=? ORDER BY ts", "BTC/USD")
- * val indicators = FeatureExtractor.compute(close, high, low, volume)
- * db.close()
- * ```
- */
-class DuckSeries private constructor(private val conn: Connection) {
+actual class DuckSeries(private val conn: Connection) {
 
-    /** Execute SQL, return first column as Series */
-    fun query(sql: String, vararg args: Any?): Series<Any?> {
+    actual constructor(path: String?) : this(
+        if (path != null && path.isNotEmpty()) {
+            DriverManager.getConnection("jdbc:duckdb:$path")
+        } else {
+            DriverManager.getConnection("jdbc:duckdb:")
+        }
+    )
+
+    actual fun query(sql: String, vararg args: Any?): Series<Any?> {
         val prepared = conn.prepareStatement(sql)
         args.forEachIndexed { i, arg -> prepared.setObject(i + 1, arg) }
         val rs = prepared.executeQuery()
@@ -36,8 +31,7 @@ class DuckSeries private constructor(private val conn: Connection) {
         return values.size j { values[it] }
     }
 
-    /** Execute SQL, return all columns as Map<name, Series> */
-    fun columns(sql: String, vararg args: Any?): Map<String, Series<Any?>> {
+    actual fun columns(sql: String, vararg args: Any?): Map<String, Series<Any?>> {
         val prepared = conn.prepareStatement(sql)
         args.forEachIndexed { i, arg -> prepared.setObject(i + 1, arg) }
         val rs = prepared.executeQuery()
@@ -60,8 +54,7 @@ class DuckSeries private constructor(private val conn: Connection) {
         return result
     }
 
-    /** Execute SQL (INSERT, UPDATE, CREATE), return affected rows */
-    fun execute(sql: String, vararg args: Any?): Long {
+    actual fun execute(sql: String, vararg args: Any?): Long {
         val prepared = conn.prepareStatement(sql)
         args.forEachIndexed { i, arg -> prepared.setObject(i + 1, arg) }
         val n = prepared.executeUpdate().toLong()
@@ -69,22 +62,13 @@ class DuckSeries private constructor(private val conn: Connection) {
         return n
     }
 
-    /** Close connection */
-    fun close() { conn.close() }
+    actual fun close() { conn.close() }
+}
 
-    companion object {
-        /** Open DuckDB file */
-        @JvmStatic
-        fun open(path: String): DuckSeries {
-            val conn = DriverManager.getConnection("jdbc:duckdb:$path")
-            return DuckSeries(conn)
-        }
+actual fun duckOpen(path: String): DuckSeries {
+    return DuckSeries(path)
+}
 
-        /** Open in-memory DuckDB */
-        @JvmStatic
-        fun memory(): DuckSeries {
-            val conn = DriverManager.getConnection("jdbc:duckdb:")
-            return DuckSeries(conn)
-        }
-    }
+actual fun duckMemory(): DuckSeries {
+    return DuckSeries(null)
 }

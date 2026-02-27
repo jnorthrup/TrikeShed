@@ -11,14 +11,14 @@ import kotlin.math.*
 
 // ── element-wise arithmetic ────────────────────────────────────────────
 
-@JvmName("dplus") infix fun Series<Double>.add(o: Series<Double>): Series<Double> = size j { i: Int -> this[i] + o[i] }
-@JvmName("dminus") infix fun Series<Double>.sub(o: Series<Double>): Series<Double> = size j { i: Int -> this[i] - o[i] }
-@JvmName("dmul") infix fun Series<Double>.mul(o: Series<Double>): Series<Double> = size j { i: Int -> this[i] * o[i] }
-@JvmName("ddiv") infix fun Series<Double>.dvd(o: Series<Double>): Series<Double> = size j { i: Int -> this[i] / o[i] }
+infix fun Series<Double>.add(o: Series<Double>): Series<Double> = size j { i: Int -> this[i] + o[i] }
+infix fun Series<Double>.sub(o: Series<Double>): Series<Double> = size j { i: Int -> this[i] - o[i] }
+infix fun Series<Double>.mul(o: Series<Double>): Series<Double> = size j { i: Int -> this[i] * o[i] }
+infix fun Series<Double>.dvd(o: Series<Double>): Series<Double> = size j { i: Int -> this[i] / o[i] }
 
-@JvmName("dscaleup") infix fun Series<Double>.mul(s: Double): Series<Double> = size j { i: Int -> this[i] * s }
-@JvmName("dscaledn") infix fun Series<Double>.dvd(s: Double): Series<Double> = size j { i: Int -> this[i] / s }
-@JvmName("doffset") infix fun Series<Double>.add(s: Double): Series<Double> = size j { i: Int -> this[i] + s }
+infix fun Series<Double>.mul(s: Double): Series<Double> = size j { i: Int -> this[i] * s }
+infix fun Series<Double>.dvd(s: Double): Series<Double> = size j { i: Int -> this[i] / s }
+infix fun Series<Double>.add(s: Double): Series<Double> = size j { i: Int -> this[i] + s }
 
 fun Series<Double>.negate(): Series<Double> = size j { i: Int -> -this[i] }
 fun Series<Double>.dabs(): Series<Double> = size j { i: Int -> abs(this[i]) }

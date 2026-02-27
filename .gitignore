@@ -1,21 +1,29 @@
-gradle
-.idea
-.gradle
-build
-docs/
-tmp/
+# Build outputs
+build/
+.gradle/
+
+# IDE files
+.idea/
 .vscode/
 
-<<<<<<< HEAD
+# Kotlin cache
 .kotlin/
-=======
-.kotlin
-.idea
-.gradle
-gradle
-gradlew
-gradlew.bat
 
->>>>>>> posixish
-.aider*
+# Project-specific
+docs/
+tmp/
+
+# Environment files
 .env
+.aider*
+.aider.chat.history.md
+.aider.input.history
+
+# Gradle wrapper (optional - but gradle directory itself should be tracked for version catalogs)
+# Note: gradle wrapper is typically not tracked in some setups
+# gradlew
+# gradlew.bat
+# gradle/wrapper/
+
+# The gradle/ directory should contain version catalogs (libs.versions.toml)
+# which SHOULD be tracked by git

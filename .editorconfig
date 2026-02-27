@@ -1,0 +1,60 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+# Kotlin/Kotlin Multiplatform files
+[*.{kt,kts}]
+ij_kotlin_allow_trailing_comma = true
+ij_kotlin_allow_trailing_comma_on_call_site = true
+max_line_length = 120
+ij_kotlin_code_style_defaults = KOTLIN_OFFICIAL
+
+# Critical gotcha: Force explicit lambda parameter types to prevent inference failures
+ij_kotlin_lambda_return_arrow = true
+ij_kotlin_parameter_list_wrapping = false
+
+# Import ordering
+ij_kotlin_imports_layout = *, javax.**, kotlin.**, *
+
+# Indentation
+indent_style = space
+indent_size = 4
+
+# Kotlin scripts
+[*.kts]
+indent_style = space
+indent_size = 4
+
+# Gradle/Kotlin DSL
+[*.gradle.kts]
+indent_style = space
+indent_size = 4
+
+# Shell scripts
+[*.{sh,bash}]
+indent_style = space
+indent_size = 4
+
+# JSON
+[*.json]
+indent_style = space
+indent_size = 2
+
+# YAML
+[*.{yml,yaml}]
+indent_style = space
+indent_size = 2
+
+# Markdown
+[*.md]
+trim_trailing_whitespace = false
+
+# Python (for freqtrade integration)
+[*.py]
+indent_style = space
+indent_size = 4
+max_line_length = 100

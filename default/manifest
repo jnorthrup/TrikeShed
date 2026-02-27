@@ -1,0 +1,25 @@
+abi_version=1.8.0
+builtins_platform=NATIVE
+compilerOpts.linux=-I/opt/homebrew/Cellar/duckdb/1.4.4/include
+compilerOpts.macos=-I/opt/homebrew/Cellar/duckdb/1.4.4/include
+compilerOpts.macos_arm64=-I/opt/homebrew/Cellar/duckdb/1.4.4/include
+compilerOpts.macosx64=-I/opt/homebrew/Cellar/duckdb/1.4.4/include
+compiler_version=2.0.20
+depends=stdlib org.jetbrains.kotlin.native.platform.posix
+exportForwardDeclarations=* cnames.structs.ArrowArray cnames.structs.ArrowSchema
+headers=duckdb.h
+idx_t=ULong
+includedForwardDeclarations=* cnames.structs.ArrowArray cnames.structs.ArrowSchema
+includedHeaders=cbe6a827284375c5a646b8f27dbd3a00808ce8738b5bbb49c190cb1e08540281 0625b5a674ee90820b3a8d7b4a969724a8d2e35fcc277d8deac22748f683257e cf01d64b7016c40328b6dc864958e06eccc5da4d9b98e5440f46aa6bbf895452
+interop=true
+ir_provider=kotlin.native.cinterop
+ir_signature_versions=1,2
+linkerOpts.linux=-L/opt/homebrew/lib -lduckdb
+linkerOpts.macos=-L/opt/homebrew/lib -lduckdb
+linkerOpts.macos_arm64=-L/opt/homebrew/lib -lduckdb
+linkerOpts.macosx64=-L/opt/homebrew/lib -lduckdb
+metadata_version=1.4.1
+native_targets=macos_arm64
+package=duckdb
+type=aliases \=
+unique_name=duckdb

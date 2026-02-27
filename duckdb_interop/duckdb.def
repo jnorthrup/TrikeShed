@@ -1,0 +1,101 @@
+/* DuckDB C API cinterop definition for Kotlin/Native
+ * Matching actual duckdb.h signatures
+ */
+
+headers = /opt/homebrew/include/duckdb.h
+headerFilter = /opt/homebrew/include/duckdb.h
+
+compilerOpts.macos = -I/opt/homebrew/include
+linkerOpts.macos = -L/opt/homebrew/lib -lduckdb
+
+// === Core Resource Types ===
+type alias duckdb_database = COpaquePointer
+type alias duckdb_connection = COpaquePointer
+type alias duckdb_prepared_statement = COpaquePointer
+type alias duckdb_result = COpaquePointer
+
+// === Result Type ===
+type alias duckdb_state = Int
+
+// === Type Enum ===
+type alias duckdb_type = Int
+
+// === Database Lifecycle ===
+fun duckdb_open(path: CPointer<charVar>?, out_database: CPointer<duckdb_database>?): duckdb_state
+fun duckdb_close(database: CPointer<duckdb_database>?)
+
+// === Connection Lifecycle ===
+fun duckdb_connect(database: CPointer<duckdb_database>?, out_connection: CPointer<duckdb_connection>?): duckdb_state
+fun duckdb_disconnect(connection: CPointer<duckdb_connection>?)
+
+// === Query Execution ===
+fun duckdb_prepare(connection: CPointer<duckdb_connection>?, query: CPointer<charVar>?, out_prepared: CPointer<duckdb_prepared_statement>?): duckdb_state
+fun duckdb_execute_prepared(prepared: CPointer<duckdb_prepared_statement>?, out_result: CPointer<duckdb_result>?): duckdb_state
+
+// === Resource Cleanup ===
+fun duckdb_destroy_prepare(prepared: CPointer<duckdb_prepared_statement>?)
+fun duckdb_destroy_result(result: CPointer<duckdb_result>?)
+
+// === Result Inspection ===
+fun duckdb_column_name(result: CPointer<duckdb_result>?, col: uint64_t): CPointer<charVar>?
+fun duckdb_column_type(result: CPointer<duckdb_result>?, col: uint64_t): duckdb_type
+fun duckdb_column_count(result: CPointer<duckdb_result>?): uint64_t
+fun duckdb_row_count(result: CPointer<duckdb_result>?): uint64_t
+fun duckdb_rows_changed(result: CPointer<duckdb_result>?): uint64_t
+fun duckdb_result_error(result: CPointer<duckdb_result>?): CPointer<charVar>?
+
+// === Scalar Value Access ===
+fun duckdb_value_varchar(result: CPointer<duckdb_result>?, col: uint64_t, row: uint64_t): CPointer<charVar>?
+fun duckdb_value_int32(result: CPointer<duckdb_result>?, col: uint64_t, row: uint64_t): int32_t
+fun duckdb_value_int64(result: CPointer<duckdb_result>?, col: uint64_t, row: uint64_t): int64_t
+fun duckdb_value_double(result: CPointer<duckdb_result>?, col: uint64_t, row: uint64_t): double
+fun duckdb_value_int8(result: CPointer<duckdb_result>?, col: uint64_t, row: uint64_t): int8_t
+
+// === Null Mask and Column Data (for zero-copy) ===
+fun duckdb_nullmask_data(result: CPointer<duckdb_result>?, col: uint64_t): CPointer<BooleanVar>?
+fun duckdb_column_data(result: CPointer<duckdb_result>?, col: uint64_t): CPointer<ByteVar>?
+
+// === Parameter Binding ===
+fun duckdb_bind_null(prepared: CPointer<duckdb_prepared_statement>?, param_idx: uint64_t): duckdb_state
+fun duckdb_bind_boolean(prepared: CPointer<duckdb_prepared_statement>?, param_idx: uint64_t, val: bool): duckdb_state
+fun duckdb_bind_int8(prepared: CPointer<duckdb_prepared_statement>?, param_idx: uint64_t, val: int8_t): duckdb_state
+fun duckdb_bind_int16(prepared: CPointer<duckdb_prepared_statement>?, param_idx: uint64_t, val: int16_t): duckdb_state
+fun duckdb_bind_int32(prepared: CPointer<duckdb_prepared_statement>?, param_idx: uint64_t, val: int32_t): duckdb_state
+fun duckdb_bind_int64(prepared: CPointer<duckdb_prepared_statement>?, param_idx: uint64_t, val: int64_t): duckdb_state
+fun duckdb_bind_float(prepared: CPointer<duckdb_prepared_statement>?, param_idx: uint64_t, val: float): duckdb_state
+fun duckdb_bind_double(prepared: CPointer<duckdb_prepared_statement>?, param_idx: uint64_t, val: double): duckdb_state
+fun duckdb_bind_varchar(prepared: CPointer<duckdb_prepared_statement>?, param_idx: uint64_t, val: CPointer<charVar>?): duckdb_state
+
+// === Type Constants (DuckDBType enum values) ===
+const val DUCKDB_TYPE_INVALID = 0
+const val DUCKDB_TYPE_BOOLEAN = 1
+const val DUCKDB_TYPE_TINYINT = 2
+const val DUCKDB_TYPE_SMALLINT = 3
+const val DUCKDB_TYPE_INTEGER = 4
+const val DUCKDB_TYPE_BIGINT = 5
+const val DUCKDB_TYPE_UTINYINT = 6
+const val DUCKDB_TYPE_USMALLINT = 7
+const val DUCKDB_TYPE_UINTEGER = 8
+const val DUCKDB_TYPE_UBIGINT = 9
+const val DUCKDB_TYPE_FLOAT = 10
+const val DUCKDB_TYPE_DOUBLE = 11
+const val DUCKDB_TYPE_TIMESTAMP = 12
+const val DUCKDB_TYPE_DATE = 13
+const val DUCKDB_TYPE_TIME = 14
+const val DUCKDB_TYPE_INTERVAL = 15
+const val DUCKDB_TYPE_HUGEINT = 16
+const val DUCKDB_TYPE_VARCHAR = 17
+const val DUCKDB_TYPE_BLOB = 18
+const val DUCKDB_TYPE_DECIMAL = 19
+const val DUCKDB_TYPE_TIMESTAMP_MS = 20
+const val DUCKDB_TYPE_TIMESTAMP_NS = 21
+const val DUCKDB_TYPE_ENUM = 22
+const val DUCKDB_TYPE_LIST = 23
+const val DUCKDB_TYPE_STRUCT = 24
+const val DUCKDB_TYPE_MAP = 25
+const val DUCKDB_TYPE_UUID = 26
+const val DUCKDB_TYPE_JSON = 27
+
+// === Result Codes ===
+const val DUCKDB_SUCCESS = 1
+const val DUCKDB_ERROR = 0
