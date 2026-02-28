@@ -1,46 +1,24 @@
-/*
- * TrikeShed DuckDB Cursor - The Natural Wrapper
- */
-
 @file:OptIn(kotlinx.cinterop.ExperimentalForeignApi::class)
 package borg.trikeshed.duck
 
 import borg.trikeshed.lib.Series
-import borg.trikeshed.lib.j
-import kotlin.native.concurrent.freeze
 import kotlinx.cinterop.*
-
-// Generated cinterop imports
 import duckdb.*
 
-fun Any.toStatusInt(): Int = when (this) {
-    is UInt -> this.toInt()
-    is Int -> this
-    is Enum<*> -> (this as Enum<*>).ordinal
-    else -> 0
-}
-
-fun Any.toTypeInt(): Int = when (this) {
-    is UInt -> this.toInt()
-    is Int -> this
-    is Enum<*> -> (this as Enum<*>).ordinal
-    else -> 0
-}
-
 data class DuckCursor(
-    private val resultStruct: duckdb_result,
+    private val result: CPointer<duckdb_result>,
     private val connection: duckdb_connection
 ) : AutoCloseable, Iterable<DuckCursor> {
 
-    val rowCount: Int by lazy { duckdb_row_count(resultStruct.ptr).toInt() }
-    val columnCount: Int by lazy { duckdb_column_count(resultStruct.ptr).toInt() }
+    val rowCount: Int by lazy { duckdb_row_count(result).toInt() }
+    val columnCount: Int by lazy { duckdb_column_count(result).toInt() }
 
     fun getColumnName(index: Int): String =
-        duckdb_column_name(resultStruct.ptr, index.toULong())?.toKString() ?: "col$index"
+        duckdb_column_name(result, index.toULong())?.toKString() ?: "col$index"
 
     fun getColumnType(index: Int): DuckDBType {
-        val typeVal: Any = duckdb_column_type(resultStruct.ptr, index.toULong())
-        return DuckDBType.fromValue(typeVal.toTypeInt())
+        val typeVal = duckdb_column_type(result, index.toULong())
+        return DuckDBType.fromValue(typeVal.toInt())
     }
 
     fun getSeries(index: Int): Series<Any?> = materializeColumn(index)
@@ -57,7 +35,8 @@ data class DuckCursor(
         if (rowCount > 0) DuckCursorIterator(this) else emptyList<DuckCursor>().iterator()
 
     override fun close() {
-        duckdb_destroy_result(resultStruct.ptr)
+        duckdb_destroy_result(result)
+        nativeHeap.free(result)
     }
 
     private fun materializeColumn(colIdx: Int): Series<Any?> {
@@ -66,40 +45,38 @@ data class DuckCursor(
 
         return when (type) {
             DuckDBType.DOUBLE -> {
-                val data = Array(rowCount) { idx ->
-                    duckdb_value_double(resultStruct.ptr, colIdx.toULong(), idx.toULong())
+                val data = DoubleArray(rowCount) { idx ->
+                    duckdb_value_double(result, colIdx.toULong(), idx.toULong())
                 }
                 Series(rowCount) { data[it] }
             }
             DuckDBType.INTEGER -> {
-                val data = Array(rowCount) { idx ->
-                    duckdb_value_int32(resultStruct.ptr, colIdx.toULong(), idx.toULong())
+                val data = IntArray(rowCount) { idx ->
+                    duckdb_value_int32(result, colIdx.toULong(), idx.toULong())
                 }
                 Series(rowCount) { data[it] }
             }
             DuckDBType.BIGINT -> {
-                val data = Array(rowCount) { idx ->
-                    duckdb_value_int64(resultStruct.ptr, colIdx.toULong(), idx.toULong())
+                val data = LongArray(rowCount) { idx ->
+                    duckdb_value_int64(result, colIdx.toULong(), idx.toULong())
                 }
                 Series(rowCount) { data[it] }
             }
             DuckDBType.VARCHAR -> {
                 val data = Array(rowCount) { idx ->
-                    val strPtr = duckdb_value_varchar(resultStruct.ptr, colIdx.toULong(), idx.toULong())
-                    strPtr?.toKString()
+                    duckdb_value_varchar(result, colIdx.toULong(), idx.toULong())?.toKString()
                 }
                 Series(rowCount) { data[it] }
             }
             DuckDBType.BOOLEAN -> {
-                val data = Array(rowCount) { idx ->
-                    duckdb_value_boolean(resultStruct.ptr, colIdx.toULong(), idx.toULong())
+                val data = BooleanArray(rowCount) { idx ->
+                    duckdb_value_boolean(result, colIdx.toULong(), idx.toULong())
                 }
                 Series(rowCount) { data[it] }
             }
             else -> {
                 val data = Array(rowCount) { idx ->
-                    val strPtr = duckdb_value_varchar(resultStruct.ptr, colIdx.toULong(), idx.toULong())
-                    strPtr?.toKString()
+                    duckdb_value_varchar(result, colIdx.toULong(), idx.toULong())?.toKString()
                 }
                 Series(rowCount) { data[it] }
             }
@@ -108,31 +85,28 @@ data class DuckCursor(
 
     companion object {
         fun fromSQL(conn: duckdb_connection, sql: String): DuckCursor {
-            val resultStruct = nativeHeap.alloc<duckdb_result>()
+            val result = nativeHeap.alloc<duckdb_result>()
             
             memScoped {
-                val preparedVar = allocPointerTo<_duckdb_prepared_statement>()
-                if (duckdb_prepare(conn, sql, preparedVar.ptr).toStatusInt() != 0) {
+                val prepared = alloc<duckdb_prepared_statementVar>()
+                if (duckdb_prepare(conn, sql, prepared.ptr) != DuckDBSuccess) {
+                    nativeHeap.free(result)
                     throw DuckDBException("Failed to prepare: $sql")
                 }
                 
-                val prepared = preparedVar.value!!
-                if (duckdb_execute_prepared(prepared, resultStruct.ptr).toStatusInt() != 0) {
-                    val error = duckdb_result_error(resultStruct.ptr)
+                if (duckdb_execute_prepared(prepared.value, result.ptr) != DuckDBSuccess) {
+                    val error = duckdb_result_error(result.ptr)
                     val errorMsg = error?.toKString() ?: "Unknown error"
-                    val prepDestroyVar = allocPointerTo<_duckdb_prepared_statement>()
-                    prepDestroyVar.value = prepared
-                    duckdb_destroy_prepare(prepDestroyVar.ptr)
-                    nativeHeap.free(resultStruct)
+                    duckdb_destroy_result(result.ptr)
+                    duckdb_destroy_prepare(prepared.ptr)
+                    nativeHeap.free(result)
                     throw DuckDBException("Query failed: $errorMsg")
                 }
                 
-                val prepDestroyVar = allocPointerTo<_duckdb_prepared_statement>()
-                prepDestroyVar.value = prepared
-                duckdb_destroy_prepare(prepDestroyVar.ptr)
+                duckdb_destroy_prepare(prepared.ptr)
             }
             
-            return DuckCursor(resultStruct, conn)
+            return DuckCursor(result.ptr, conn)
         }
     }
 }
@@ -163,11 +137,11 @@ data class DuckConnection(
 
     override fun close() {
         memScoped {
-            val connVar = allocPointerTo<_duckdb_connection>()
+            val connVar = alloc<duckdb_connectionVar>()
             connVar.value = connection
             duckdb_disconnect(connVar.ptr)
             
-            val dbVar = allocPointerTo<_duckdb_database>()
+            val dbVar = alloc<duckdb_databaseVar>()
             dbVar.value = database
             duckdb_close(dbVar.ptr)
         }
@@ -178,28 +152,21 @@ data class DuckConnection(
         fun memory(): DuckConnection = createConnection(null)
 
         private fun createConnection(path: String?): DuckConnection {
-            var db: duckdb_database? = null
-            var conn: duckdb_connection? = null
-            
             memScoped {
-                val dbVar = allocPointerTo<_duckdb_database>()
-                val connVar = allocPointerTo<_duckdb_connection>()
+                val dbVar = alloc<duckdb_databaseVar>()
+                val connVar = alloc<duckdb_connectionVar>()
                 
-                if (duckdb_open(path, dbVar.ptr).toStatusInt() != 0) {
+                if (duckdb_open(path, dbVar.ptr) != DuckDBSuccess) {
                     throw DuckDBException("Failed to open database")
                 }
-                db = dbVar.value!!
+                val db = dbVar.value!!
                 
-                if (duckdb_connect(db, connVar.ptr).toStatusInt() != 0) {
-                    val dbCloseVar = allocPointerTo<_duckdb_database>()
-                    dbCloseVar.value = db
-                    duckdb_close(dbCloseVar.ptr)
+                if (duckdb_connect(db, connVar.ptr) != DuckDBSuccess) {
+                    duckdb_close(dbVar.ptr)
                     throw DuckDBException("Failed to connect")
                 }
-                conn = connVar.value!!
+                return DuckConnection(db, connVar.value!!)
             }
-            
-            return DuckConnection(db!!, conn!!)
         }
     }
 }
@@ -246,21 +213,6 @@ enum class DuckDBType {
 }
 
 class DuckDBException(message: String) : Exception(message)
-
-private fun CPointer<ByteVar>?.toKString(): String? =
-    this?.readBytes()?.decodeToString()?.takeIf { it.isNotEmpty() }
-
-private fun CPointer<ByteVar>.readBytes(): ByteArray {
-    var length = 0
-    while (this[length].toInt() != 0) {
-        length++
-    }
-    val bytes = ByteArray(length)
-    for (i in 0 until length) {
-        bytes[i] = this[i]
-    }
-    return bytes
-}
 
 fun DuckConnection.queryOHLCV(symbol: String): Map<String, Series<Any?>> {
     val sql = """
