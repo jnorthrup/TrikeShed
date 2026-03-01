@@ -1,0 +1,1 @@
+- Compare DuckDB native integration
