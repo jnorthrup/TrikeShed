@@ -1,0 +1,6 @@
+Hot;99.9
+Cold;-99.9
+Hot;0.0
+Cold;0.0
+Zero;0.0
+Zero;0.0

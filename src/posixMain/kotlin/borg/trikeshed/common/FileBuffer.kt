@@ -12,11 +12,12 @@ import simple.PosixOpenOpts
 /**
  * an openable and closeable mmap file.
  */
-actual class FileBuffer actual constructor(//filename: String, initialOffset: Long, blkSize: Long, readOnly: Boolean)
+actual class FileBuffer actual constructor(
     actual val filename: String,
     actual val initialOffset: Long,
     actual val blkSize: Long,
     actual val readOnly: Boolean,
+    actual val closeChannelOnMap: Boolean
 ): LongSeries<Byte> {
 
     init{

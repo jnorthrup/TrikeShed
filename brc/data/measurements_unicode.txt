@@ -1,0 +1,6 @@
+São Paulo;25.3
+Zürich;8.1
+München;-3.4
+São Paulo;22.7
+Zürich;-1.4
+München;12.6

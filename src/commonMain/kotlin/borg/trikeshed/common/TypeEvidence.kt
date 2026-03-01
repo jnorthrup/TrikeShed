@@ -19,8 +19,10 @@ TypeEvidence(
     var whitespaces: UShort = 0U,
     var backslashes: UShort = 0U,
     var linefeed: UShort = 0U,
-    /**the length of the column */
-    var columnLength: UShort = 0U,
+    /**maximum length of the column observed across the file */
+    var maxColumnLength: UShort = 0U,
+    /**minimum length of the column observed across the file */
+    var minColumnLength: UShort = UShort.MAX_VALUE,
 ) {
     operator fun plus(char: Char): TypeEvidence = apply {
         when (char) {
@@ -37,6 +39,15 @@ TypeEvidence(
             '\r', ',', '\n' -> {}
             else -> special++
         }
+    }
+
+    /**
+     * Update the column length tracking. Call this when a column value is fully parsed.
+     */
+    fun recordColumnLength(length: Int) {
+        val len = length.toUShort()
+        if (len > maxColumnLength) maxColumnLength = len
+        if (len < minColumnLength) minColumnLength = len
     }
 
     companion object {
@@ -64,37 +75,37 @@ TypeEvidence(
                         && typeEvidence.exponent.toUInt() == 0U
                         && typeEvidence.signs.toUInt() <= 1U
                         && typeEvidence.special.toUInt() == 0U
-                        && typeEvidence.columnLength <= 3U +typeEvidence.signs-> IOMemento.IoByte
+                        && typeEvidence.maxColumnLength <= 3U +typeEvidence.signs-> IOMemento.IoByte
 
                 typeEvidence.periods.toUInt() == 0U
                         && typeEvidence.exponent.toUInt() == 0U
                         && typeEvidence.signs.toUInt() <= 1U
                         && typeEvidence.special.toUInt() == 0U
-                        && typeEvidence.columnLength <= 5U +typeEvidence.signs-> IOMemento.IoShort
+                        && typeEvidence.maxColumnLength <= 5U +typeEvidence.signs-> IOMemento.IoShort
 
                 typeEvidence.periods.toUInt() == 0U
                         && typeEvidence.exponent.toUInt() == 0U
                         && typeEvidence.signs.toUInt() <= 1U
                         && typeEvidence.special.toUInt() == 0U
-                        && typeEvidence.columnLength <= 10U +typeEvidence.signs-> IOMemento.IoInt
+                        && typeEvidence.maxColumnLength <= 10U +typeEvidence.signs-> IOMemento.IoInt
 
                 typeEvidence.periods.toUInt() == 0U
                         && typeEvidence.exponent.toUInt() == 0U
                         && typeEvidence.signs.toUInt() <= 1U
                         && typeEvidence.special.toUInt() == 0U
-                        && typeEvidence.columnLength <= 19U +typeEvidence.signs-> IOMemento.IoLong
+                        && typeEvidence.maxColumnLength <= 19U +typeEvidence.signs-> IOMemento.IoLong
 
                 typeEvidence.periods.toUInt() == 1U
                         && typeEvidence.exponent.toUInt() == 0U
                         && typeEvidence.signs <= 1U
                         && typeEvidence.special.toUInt() == 0U
-                        && typeEvidence.columnLength <= 34U +typeEvidence.signs+ typeEvidence.exponent.toUInt() -> IOMemento.IoFloat
+                        && typeEvidence.maxColumnLength <= 34U +typeEvidence.signs+ typeEvidence.exponent.toUInt() -> IOMemento.IoFloat
 
                 typeEvidence.periods.toUInt() == 1U
                         && typeEvidence.exponent <= 1U
                         && typeEvidence.signs <= 1U
                         && typeEvidence.special.toUInt() == 0U
-                        && typeEvidence.columnLength <= 66U +typeEvidence.signs+ typeEvidence.exponent.toUInt() -> IOMemento.IoDouble
+                        && typeEvidence.maxColumnLength <= 66U +typeEvidence.signs+ typeEvidence.exponent.toUInt() -> IOMemento.IoDouble
 
                 else -> IOMemento.IoString
             }
@@ -121,7 +132,9 @@ TypeEvidence(
                         if (whitespaces < typeDeduction.whitespaces) whitespaces = typeDeduction.whitespaces
                         if (backslashes < typeDeduction.backslashes) backslashes = typeDeduction.backslashes
                         if (linefeed < typeDeduction.linefeed) linefeed = typeDeduction.linefeed
-                        if (columnLength < typeDeduction.columnLength) columnLength = typeDeduction.columnLength
+                        if (maxColumnLength < typeDeduction.maxColumnLength) maxColumnLength = typeDeduction.maxColumnLength
+            if (maxColumnLength < typeDeduction.maxColumnLength) maxColumnLength = typeDeduction.maxColumnLength
+            if (minColumnLength > typeDeduction.minColumnLength) minColumnLength = typeDeduction.minColumnLength
                     }
                 }
             }

@@ -1,0 +1,20 @@
+Hamburg;12.0
+Bulawayo;8.9
+Palembang;38.8
+St. John's;15.2
+Cracow;12.6
+Bridgetown;26.9
+Istanbul;6.2
+Roseau;34.4
+Conakry;31.2
+Istanbul;23.0
+Hamburg;-7.3
+Bulawayo;22.1
+Palembang;35.6
+St. John's;-2.1
+Cracow;-5.4
+Bridgetown;28.3
+Istanbul;18.7
+Roseau;30.1
+Conakry;29.8
+Istanbul;15.4

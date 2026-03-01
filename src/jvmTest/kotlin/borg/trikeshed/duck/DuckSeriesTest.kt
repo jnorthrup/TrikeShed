@@ -35,15 +35,15 @@ class DuckSeriesTest {
 
         // Query single column
         val close = db.query("SELECT close FROM candles WHERE pair=? ORDER BY ts", "BTC/USD")
-        assertEquals(2, close.size)
-        assertTrue(close[0] != null)
-        assertTrue(close[1] != null)
+        assertEquals(2, close.a)
+        assertTrue(close.b(0) != null)
+        assertTrue(close.b(1) != null)
 
         // Query multiple columns - just verify columns exist
         val cols = db.columns("SELECT open, high, low, close FROM candles WHERE pair=? ORDER BY ts", "BTC/USD")
         assertTrue(cols.containsKey("open"))
         assertTrue(cols.containsKey("high"))
-        assertEquals(2, cols["open"]!!.size)
+        assertEquals(2, cols["open"]!!.a)
 
         // Query all BTC
         val btc = db.columns("SELECT * FROM candles WHERE pair='BTC/USD' ORDER BY ts")
@@ -59,13 +59,13 @@ class DuckSeriesTest {
         db.execute("INSERT INTO test_types VALUES (3.14, 42, 'hello', true)")
 
         val d = db.query("SELECT d FROM test_types")
-        assertEquals(3.14, d[0])
+        assertEquals(3.14, d.b(0))
 
         val i = db.query("SELECT i FROM test_types")
-        assertEquals(42, i[0])
+        assertEquals(42, i.b(0))
 
         val s = db.query("SELECT s FROM test_types")
-        assertEquals("hello", s[0])
+        assertEquals("hello", s.b(0))
 
         db.close()
     }

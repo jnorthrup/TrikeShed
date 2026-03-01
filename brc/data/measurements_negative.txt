@@ -1,0 +1,7 @@
+Arctic;-99.9
+Antarctic;-50.0
+Arctic;-0.1
+Antarctic;-75.3
+Arctic;-42.7
+Siberia;-33.3
+Siberia;-88.8

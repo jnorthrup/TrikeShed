@@ -1,71 +1,69 @@
 package borg.trikeshed.common
 
-import borg.trikeshed.lib.debug
-import borg.trikeshed.lib.logDebug
-import java.nio.MappedByteBuffer
+import java.lang.foreign.Arena
+import java.lang.foreign.MemorySegment
+import java.lang.foreign.ValueLayout
 import java.nio.channels.FileChannel
+import java.nio.file.Paths
+import java.nio.file.StandardOpenOption
 
 /**
- * an openable and closeable mmap file.
+ * an openable and closeable file buffer using MemorySegment (Java 22+).
  *
- * get has no side effects but put has  undefined effects on size and sync
+ * Maps the file into a single MemorySegment via Arena — no 2GB limit,
+ * deterministic cleanup, and the OS handles paging.
  *
  * see FileBuffer.open
  */
 actual class FileBuffer actual constructor(
-     actual val filename: String,
+    actual val filename: String,
     actual val initialOffset: Long,
     actual val blkSize: Long,
-    actual val readOnly: Boolean
-//   filename: String, initialOffset: Long,
-//    blkSize: Long, readOnly: Boolean,
+    actual val readOnly: Boolean,
+    actual val closeChannelOnMap: Boolean
 ) : LongSeries<Byte> {
 
+    private var arena: Arena? = null
+    private var segment: MemorySegment? = null
+    private var fileSize: Long = 0
 
-    private var jvmFile: java.io.RandomAccessFile? = null
-    private var jvmChannel: FileChannel? = null
+    actual override val a: Long get() = if (blkSize == -1L) fileSize - initialOffset else blkSize
 
-    private var jvmMappedByteBuffer: MappedByteBuffer? = null
-
-    actual override val a: Long get() = jvmMappedByteBuffer!!.limit().toLong()
     actual override val b: (Long) -> Byte
         get() = { index: Long ->
-            //show size and position of the buffer
-//            logDebug { "longSeries get( ${index}) /  ${jvmMappedByteBuffer!!.limit()}" }
-            jvmMappedByteBuffer!!.get(index.toInt())
+            segment!!.get(ValueLayout.JAVA_BYTE, initialOffset + index)
         }
-
-    actual fun close() {
-        if (!isOpen()) return
-        logDebug { "closing $filename" }
-        jvmMappedByteBuffer?.force()
-        jvmMappedByteBuffer?.clear()
-        jvmMappedByteBuffer = null
-        jvmChannel?.close()
-        jvmChannel = null
-        jvmFile?.close().debug { logDebug { "closed $filename" } }
-        jvmFile = null
-    }
-
 
     actual fun open() {
         if (isOpen()) return
-        logDebug { "opening $filename" }
-        jvmFile = java.io.RandomAccessFile(filename, if (!readOnly) "rw" else "r")
-            .debug { raf -> logDebug { "randomAccesFile: $raf" } }
-        jvmChannel = jvmFile!!.channel.debug { thing -> logDebug { "fileChannel: $thing" } }
-        jvmMappedByteBuffer = jvmChannel!!.map(
-            (if (readOnly) FileChannel.MapMode.READ_ONLY else FileChannel.MapMode.READ_WRITE).debug { thing -> logDebug { "mapMode: $thing" } },
-            initialOffset.debug { thing -> logDebug { "initialOffset: $thing" } },
-            (if (blkSize == -1L) jvmChannel!!.size() - /*initial offset*/ initialOffset else blkSize).debug { thing -> logDebug { "blkSize: $thing" } }
-        ).debug { thing: MappedByteBuffer -> logDebug { "blkSize: $thing" } }
+        val path = Paths.get(filename)
+        val channel = if (readOnly) {
+            FileChannel.open(path, StandardOpenOption.READ)
+        } else {
+            FileChannel.open(path, StandardOpenOption.READ, StandardOpenOption.WRITE)
+        }
+        channel.use { ch ->
+            fileSize = ch.size()
+            val mapMode = if (readOnly) FileChannel.MapMode.READ_ONLY else FileChannel.MapMode.READ_WRITE
+            arena = Arena.ofShared()
+            segment = ch.map(mapMode, 0, fileSize, arena!!)
+        }
     }
 
-    actual fun isOpen(): Boolean = jvmMappedByteBuffer != null
-    actual fun size(): Long = jvmMappedByteBuffer!!.capacity().toLong().debug { thing -> logDebug { "size: $thing" } }
-    actual fun get(index: Long): Byte = jvmMappedByteBuffer!!.get(index.toInt())
+    actual fun close() {
+        if (!isOpen()) return
+        segment = null
+        arena?.close()
+        arena = null
+    }
+
+    actual fun isOpen(): Boolean = segment != null
+
+    actual fun size(): Long = a
+
+    actual fun get(index: Long): Byte = b(index)
+
     actual fun put(index: Long, value: Byte) {
-        jvmMappedByteBuffer!!.put(index.toInt(), value)
+        segment!!.set(ValueLayout.JAVA_BYTE, initialOffset + index, value)
     }
 }
-

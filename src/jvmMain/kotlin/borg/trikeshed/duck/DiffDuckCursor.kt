@@ -17,13 +17,8 @@ import borg.trikeshed.lib.*
  *
  * Acapulco lineage:
  *   ITradePairEventMuxer  ->  Flow<Join<Cursor, Int>>
- *   decorateView          ->  join(wallet, contextInfo, bookCursor, candles)
+ *   decorateView          ->  join(wallet, bookCursor, candles)
  *   pancake               ->  flatten rows x cols into 1-D feature vector
- *
- * Here:
- *   DiffDuckCursor        ->  Series<Double> columns joined with SVar params
- *   diffFold              ->  Series<Double> x params -> SFun<DReal> (scalar)
- *   CursorBridge          ->  adapter: Series<Double> <-> Series<SFun<DReal>>
  */
 class DiffDuckCursor private constructor(
     private val cols: Map<String, Series<Double>>
@@ -75,13 +70,10 @@ class DiffDuckCursor private constructor(
     // -- Differentiable folds (Series<Double> x SVar -> SFun<DReal>) --
 
     /**
-     * EMA fold — cached by (col, param key).
+     * EMA fold — cached by (col, span.name).
      *
      *   ema[0] = wrap(close[0])
      *   ema[i] = alpha * close[i] + (1-alpha) * ema[i-1]
-     *
-     * The entire recursion stays in the SFun expression graph so that
-     * d(ema[N])/d(span) works without manual chain-rule bookkeeping.
      */
     fun emaFold(col: String, span: SFun<DReal>): Series<SFun<DReal>> {
         val key = "ema:$col:${span.exprKey}"
@@ -101,7 +93,7 @@ class DiffDuckCursor private constructor(
     }
 
     /**
-     * MACD fold — cached by (col, fast key, slow key).
+     * MACD fold — cached by (col, fast, slow).
      * Reuses two emaFold entries if already cached.
      */
     fun macdFold(
@@ -136,9 +128,6 @@ class DiffDuckCursor private constructor(
      *
      * position[i] = buySig[i] - sellSig[i]  in (-1, 1)
      * return[i]   = (close[i+1] - close[i]) / close[i]
-     *
-     * Produces one SFun<DReal> scalar over the entire window.
-     * d(pnl)/d(any SVar) is a single .d(param) call.
      */
     fun softPnlFold(
         closeCol: String,
@@ -213,7 +202,7 @@ val SFun<DReal>.exprKey: String
 
 // -- Evaluate SFun<DReal> with a Map of bindings, return Double --
 
-fun SFun<DReal>.evalDouble(bindings: Map<SVar<DReal>, Number>): Double {
+fun SFun<DReal>.evalDouble(bindings: Map<SVar<DReal>, Double>): Double {
     val pairs = bindings.entries.map { (k, v) -> k to v as Any }.toTypedArray()
     return invoke(*pairs).toDouble()
 }

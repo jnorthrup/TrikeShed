@@ -63,12 +63,11 @@ actual class DuckSeries(private val conn: Connection) {
     }
 
     actual fun close() { conn.close() }
+
+    companion object {
+        fun memory(): DuckSeries = DuckSeries(null)
+    }
 }
 
-actual fun duckOpen(path: String): DuckSeries {
-    return DuckSeries(path)
-}
-
-actual fun duckMemory(): DuckSeries {
-    return DuckSeries(null)
-}
+actual fun duckOpen(path: String): DuckSeries = DuckSeries(path)
+actual fun duckMemory(): DuckSeries = DuckSeries.memory()

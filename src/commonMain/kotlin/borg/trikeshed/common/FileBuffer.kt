@@ -13,9 +13,9 @@ fun <T> FileBuffer.use(block: (FileBuffer) -> T) {
     }
 }
 
-fun open(filename: String, initialOffset: Long = 0, blkSize: Long = -1, readOnly: Boolean = true): FileBuffer {
+fun open(filename: String, initialOffset: Long = 0, blkSize: Long = -1, readOnly: Boolean = true, closeChannelOnMap: Boolean = true): FileBuffer {
     logDebug { "pre-opening $filename" }
-    return FileBuffer(filename, initialOffset, blkSize, readOnly).apply {
+    return FileBuffer(filename, initialOffset, blkSize, readOnly, closeChannelOnMap).apply {
         logDebug { "this isOpen()=${isOpen()}" }
         open().debug { logDebug { "call(ed) open()" } }
         logDebug { "this isOpen()=${isOpen()}" }
@@ -33,6 +33,7 @@ expect class FileBuffer(
     /** blocksize or file-size if -1*/
     blkSize: Long = -1,
     readOnly: Boolean = true,
+    closeChannelOnMap: Boolean = true,
 ) : LongSeries<Byte> {
     override val a: Long
     override val b: (Long) -> Byte
@@ -40,6 +41,7 @@ expect class FileBuffer(
     val initialOffset: Long
     val blkSize: Long
     val readOnly: Boolean
+    val closeChannelOnMap: Boolean
     fun close()
     fun open() //post-init open
     fun isOpen(): Boolean
@@ -53,4 +55,5 @@ fun openFileBuffer(
     initialOffset: Long = 0,
     blkSize: Long = -1,
     readOnly: Boolean = true,
-): FileBuffer = open(filename, initialOffset, blkSize, readOnly)
+    closeChannelOnMap: Boolean = true,
+): FileBuffer = open(filename, initialOffset, blkSize, readOnly, closeChannelOnMap)

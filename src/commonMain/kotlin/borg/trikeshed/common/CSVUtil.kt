@@ -88,7 +88,7 @@ object CSVUtil {
                     lineEvidence?.apply {
                         if (since == x)
                             lineEvidence[ordinal].empty++
-                        else lineEvidence[ordinal].columnLength = (x - since).toUShort()
+                        else lineEvidence[ordinal].maxColumnLength = (x - since).toUShort()
                     }
                     ordinal++
                     since = x + 1
@@ -101,7 +101,7 @@ object CSVUtil {
 //                        logDebug { "bookend val${element.pair}: " + CharSeries(file[element.asIntRange].decodeUtf8()).asString() }
                         if (since == x)
                             lineEvidence[ordinal].empty++
-                        else lineEvidence[ordinal].columnLength = (x - since).toUShort()
+                        else lineEvidence[ordinal].maxColumnLength = (x - since).toUShort()
                     }
                     break
                 }
@@ -206,7 +206,7 @@ object CSVUtil {
 
             val conversionSegments = (fileEvidence?.α { evidence ->
                 val deduce: IOMemento = deduce(evidence)
-                deduce j (deduce.networkSize ?: evidence.columnLength.toInt())
+                deduce j (deduce.networkSize ?: evidence.maxColumnLength.toInt())
             })?.toList()?.toSeries()
             val convertedSegmentLengths = conversionSegments?.right?.toArray()
 

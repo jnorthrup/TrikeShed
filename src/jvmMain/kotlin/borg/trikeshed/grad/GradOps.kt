@@ -3,7 +3,7 @@
 /**
  * GradOps.kt — kotlingrad extensions to the TrikeShed algebraic shorthand.
  *
- * Design principles (inheriting from borg.trikeshed.lib):
+ * Design principles:
  *   - Single Unicode character where mathematical precedent exists
  *   - Infix for binary, extension property for unary
  *   - Composes with existing j, α, ▶, ↺

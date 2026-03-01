@@ -48,7 +48,7 @@ class DuckValidationTest {
         val closeSeries = toDoubleSeries(cols["close"]!!)
         val volumeSeries = toDoubleSeries(cols["volume"]!!)
 
-        assertEquals(1000, closeSeries.size)
+        assertEquals(1000, closeSeries.a)
 
         // Compute indicators
         val startInd = System.nanoTime()
@@ -78,10 +78,10 @@ class DuckValidationTest {
         }
 
         val s = db.query("SELECT x FROM test")
-        assertEquals(100, s.size) // Size materialized
+        assertEquals(100, s.a) // Size materialized
 
         val t0 = System.nanoTime()
-        val v = s[50]
+        val v = s.b(50)
         val t1 = System.nanoTime()
 
         println("Lazy access (1 element): ${(t1 - t0) / 1_000.0} µs")
@@ -91,7 +91,7 @@ class DuckValidationTest {
     }
 
     private fun toDoubleSeries(s: Series<Any?>): Series<Double> {
-        val arr = DoubleArray(s.size) { s[it] as Double }
+        val arr = DoubleArray(s.a) { i: Int -> s.b(i) as Double }
         return arr.toSeries()
     }
 }
