@@ -11,7 +11,7 @@
  *  - Rounding semantics (IEEE 754 roundTowardPositive)
  *  - 10K unique station names
  */
-package borg.trikeshed.brc
+package borg.trikeshed.lib.brc
 
 import java.io.ByteArrayOutputStream
 import java.io.PrintStream

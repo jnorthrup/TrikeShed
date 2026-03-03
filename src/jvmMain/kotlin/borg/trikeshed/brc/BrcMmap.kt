@@ -9,7 +9,7 @@
  *  - Direct byte scanning without String creation
  *  - HashMap accumulation on raw byte keys (station name bytes)
  */
-package borg.trikeshed.brc
+package borg.trikeshed.lib.brc
 
 import borg.trikeshed.common.FileBuffer
 import kotlin.math.floor

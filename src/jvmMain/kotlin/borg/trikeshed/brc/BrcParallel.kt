@@ -10,7 +10,7 @@
  *  - Series `j` operator for building chunk descriptors
  *  - Merge-reduce pattern across chunk results
  */
-package borg.trikeshed.brc
+package borg.trikeshed.lib.brc
 
 import borg.trikeshed.common.FileBuffer
 import kotlinx.coroutines.*

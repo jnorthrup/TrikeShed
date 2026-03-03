@@ -18,6 +18,8 @@ import kotlin.system.measureNanoTime
  *   - init{} loads real data from DuckDB
  *   - measureNanoTimeStr for timing
  *   - keyboard aliases shown alongside glyphs
+ *
+ * NOTE: TradePairIoMux integration tests moved to freqtrade/src/kotlin-engine.
  */
 class KotlingradThinSliceTest {
 
@@ -65,14 +67,68 @@ class KotlingradThinSliceTest {
     }
 
     @Test fun `emaFold produces symbolic series`() {
-        val ema = cursor.emaFold("close", spanVar)
+        val ema = cursor.emaFold(
+            col = "close",
+            span = spanVar,
+            seedMode = DiffDuckCursor.EmaSeedMode.FIRST_OBSERVED,
+            infiniteIndexAdapter = false,
+        )
         assertEquals(candleLimit, ema.a)
         val v0 = ema[0].evalDouble(bindings)
         System.err.println("emaFold: ema[0]=$v0")
     }
 
+    @Test fun `emaFold supports infinite index adapter mode`() {
+        val emaInfinite = cursor.emaFold(
+            col = "close",
+            span = spanVar,
+            seedMode = DiffDuckCursor.EmaSeedMode.FIRST_OBSERVED,
+            infiniteIndexAdapter = true,
+        )
+        val emaFinite = cursor.emaFold(
+            col = "close",
+            span = spanVar,
+            seedMode = DiffDuckCursor.EmaSeedMode.FIRST_OBSERVED,
+            infiniteIndexAdapter = false,
+        )
+        val firstInfinite = emaInfinite[0].evalDouble(bindings)
+        val finiteFirst = emaFinite[0].evalDouble(bindings)
+        val finiteLast = emaFinite[candleLimit - 1].evalDouble(bindings)
+        val deepNegative = emaInfinite[-1_000_000].evalDouble(bindings)
+        val deepPositive = emaInfinite[1_000_000].evalDouble(bindings)
+        assertTrue(firstInfinite.isFinite())
+        assertEquals(Int.MAX_VALUE, emaInfinite.a)
+        assertEquals(candleLimit, emaFinite.a)
+        assertEquals(finiteFirst, deepNegative, 1e-10)
+        assertEquals(finiteLast, deepPositive, 1e-10)
+    }
+
+    @Test fun `emaFold supports explicit zero seed math`() {
+        val emaZeroSeed = cursor.emaFold(
+            col = "close",
+            span = spanVar,
+            seedMode = DiffDuckCursor.EmaSeedMode.ZERO,
+            infiniteIndexAdapter = false,
+        )
+        val v0 = emaZeroSeed[0].evalDouble(bindings)
+        assertEquals(0.0, v0, 1e-12)
+    }
+
+    @Test fun `pancake integrates as kotlingrad series`() {
+        val pancake = cursor.pancakeKotlingrad("open", "close")
+        assertEquals(candleLimit * 2, pancake.a)
+        val p0 = pancake[0].evalDouble(emptyMap())
+        assertTrue(p0.isFinite())
+        System.err.println("pancakeKotlingrad: p0=$p0 size=${pancake.a}")
+    }
+
     @Test fun `ema diff eval produces gradient of ema wrt span`() {
-        val ema = cursor.emaFold("close", spanVar)
+        val ema = cursor.emaFold(
+            col = "close",
+            span = spanVar,
+            seedMode = DiffDuckCursor.EmaSeedMode.FIRST_OBSERVED,
+            infiniteIndexAdapter = false,
+        )
         val dEma: Series<SFun<DReal>> = ema `∂` spanVar
         val dEmaVal: Series<Double> = dEma `≈` bindings
         assertEquals(0.0, dEmaVal[0], 1e-10)
@@ -90,12 +146,5 @@ class KotlingradThinSliceTest {
         val gradVals = gradVec `≈` bindings
         assertEquals(4, gradVals.a)
         System.err.println("softPnl: value=$pnlVal, grads=${gradVals[0]}, ${gradVals[1]}, ${gradVals[2]}, ${gradVals[3]}")
-    }
-
-    @Test fun `windup and step pipeline`() {
-        val mux = TradePairIoMux.windup(dbPath.toString(), pair, initialCandles = 50, numAgents = 6)
-        val results = kotlinx.coroutines.runBlocking { mux.step() }
-        assertEquals(6, results.a)
-        System.err.println("windup: 6 agents stepped")
     }
 }

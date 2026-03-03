@@ -1,4 +1,4 @@
-package borg.trikeshed.brc
+package borg.trikeshed.lib.brc
 
 import borg.trikeshed.common.FileBuffer
 import borg.trikeshed.lib.*
