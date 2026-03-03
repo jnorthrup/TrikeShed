@@ -27,3 +27,6 @@ tmp/
 
 # The gradle/ directory should contain version catalogs (libs.versions.toml)
 # which SHOULD be tracked by git
+
+measurements.txt
+logs/
