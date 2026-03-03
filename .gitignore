@@ -29,4 +29,15 @@ tmp/
 # which SHOULD be tracked by git
 
 measurements.txt
+measurements_*.txt
 logs/
+
+# Native build outputs
+*.kexe
+*.kexe.dSYM/
+*.dSYM/
+default/
+
+# Tool/AI working dirs
+.git.bfg-report/
+.qwen/
