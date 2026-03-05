@@ -294,3 +294,202 @@ object Hurst {
         return buf.toSeries()
     }
 }
+
+// ── 16. Sharpe & Sortino ───────────────────────────────────────────────
+
+object RiskAdjusted {
+    data class Result(val sharpe: Series<Double>, val sortino: Series<Double>)
+
+    /** Rolling Sharpe and Sortino ratios — the institutional quant's scoreboard.
+     *  Annualized assuming 252 trading days. */
+    fun compute(close: Series<Double>, period: Int = 20, riskFreeDaily: Double = 0.0): Result {
+        val n = close.size
+        val ret = DoubleArray(n)
+        for (i in 1 until n) ret[i] = (close[i] - close[i - 1]) / close[i - 1]
+        val sharpeBuf = DoubleArray(n)
+        val sortinoBuf = DoubleArray(n)
+        for (i in 0 until n) {
+            if (i < period) { sharpeBuf[i] = 0.0; sortinoBuf[i] = 0.0; continue }
+            var sum = 0.0; var sum2 = 0.0; var downSum2 = 0.0
+            for (k in (i - period + 1)..i) {
+                val excess = ret[k] - riskFreeDaily
+                sum += excess; sum2 += excess * excess
+                if (excess < 0.0) downSum2 += excess * excess
+            }
+            val mean = sum / period
+            val std = sqrt(maxOf(0.0, sum2 / period - mean * mean))
+            val downStd = sqrt(downSum2 / period)
+            val annFactor = sqrt(252.0)
+            sharpeBuf[i] = if (std == 0.0) 0.0 else mean / std * annFactor
+            sortinoBuf[i] = if (downStd == 0.0) 0.0 else mean / downStd * annFactor
+        }
+        return Result(sharpeBuf.toSeries(), sortinoBuf.toSeries())
+    }
+}
+
+// ── 17. Drawdown ───────────────────────────────────────────────────────
+
+object Drawdown {
+    data class Result(val drawdown: Series<Double>, val maxDrawdown: Series<Double>)
+
+    /** Rolling drawdown from peak and running max-drawdown.
+     *  Values are negative fractions (e.g. -0.10 = 10% drawdown). */
+    fun compute(close: Series<Double>): Result {
+        val n = close.size
+        val dd = DoubleArray(n)
+        val maxDd = DoubleArray(n)
+        var peak = close[0]; var worstDd = 0.0
+        for (i in 0 until n) {
+            if (close[i] > peak) peak = close[i]
+            dd[i] = (close[i] - peak) / peak
+            worstDd = minOf(worstDd, dd[i])
+            maxDd[i] = worstDd
+        }
+        return Result(dd.toSeries(), maxDd.toSeries())
+    }
+}
+
+// ── 18. Autocorrelation ────────────────────────────────────────────────
+
+object Autocorrelation {
+    /** Rolling autocorrelation of returns at given lag.
+     *  Positive = momentum, negative = mean-reversion. */
+    fun compute(close: Series<Double>, period: Int = 20, lag: Int = 1): Series<Double> {
+        val n = close.size
+        val ret = DoubleArray(n)
+        for (i in 1 until n) ret[i] = ln(close[i] / close[i - 1])
+        val buf = DoubleArray(n)
+        for (i in 0 until n) {
+            if (i < period + lag) { buf[i] = 0.0; continue }
+            var sumX = 0.0; var sumY = 0.0
+            for (k in (i - period + 1)..i) { sumX += ret[k - lag]; sumY += ret[k] }
+            val meanX = sumX / period; val meanY = sumY / period
+            var cov = 0.0; var varX = 0.0; var varY = 0.0
+            for (k in (i - period + 1)..i) {
+                val dx = ret[k - lag] - meanX; val dy = ret[k] - meanY
+                cov += dx * dy; varX += dx * dx; varY += dy * dy
+            }
+            val denom = sqrt(varX * varY)
+            buf[i] = if (denom == 0.0) 0.0 else cov / denom
+        }
+        return buf.toSeries()
+    }
+}
+
+// ── 19. KAMA (Kaufman Adaptive Moving Average) ─────────────────────────
+
+object KAMA {
+    /** Adapts smoothing speed to market noise — fast in trends, slow in chop.
+     *  The edge that separates quant filters from fixed-period retail MAs. */
+    fun compute(close: Series<Double>, erPeriod: Int = 10, fastSc: Int = 2, slowSc: Int = 30): Series<Double> {
+        val n = close.size
+        val fast = 2.0 / (fastSc + 1)
+        val slow = 2.0 / (slowSc + 1)
+        val buf = DoubleArray(n)
+        buf[0] = close[0]
+        for (i in 1 until n) {
+            if (i < erPeriod) { buf[i] = close[i]; continue }
+            val direction = abs(close[i] - close[i - erPeriod])
+            var volatility = 0.0
+            for (k in (i - erPeriod + 1)..i) volatility += abs(close[k] - close[k - 1])
+            val er = if (volatility == 0.0) 0.0 else direction / volatility
+            val sc = (er * (fast - slow) + slow).let { it * it }
+            buf[i] = buf[i - 1] + sc * (close[i] - buf[i - 1])
+        }
+        return buf.toSeries()
+    }
+}
+
+// ── 20. Shannon Entropy ────────────────────────────────────────────────
+
+object Entropy {
+    /** Rolling Shannon entropy of discretized returns.
+     *  Low entropy = predictable regime, high entropy = random walk.
+     *  Quants use this for regime detection and strategy rotation. */
+    fun compute(close: Series<Double>, period: Int = 20, bins: Int = 10): Series<Double> {
+        val n = close.size
+        val ret = DoubleArray(n)
+        for (i in 1 until n) ret[i] = ln(close[i] / close[i - 1])
+        val buf = DoubleArray(n)
+        val counts = IntArray(bins)
+        for (i in 0 until n) {
+            if (i < period) { buf[i] = 0.0; continue }
+            // Find min/max returns in window for adaptive binning
+            var lo = Double.MAX_VALUE; var hi = -Double.MAX_VALUE
+            for (k in (i - period + 1)..i) { lo = minOf(lo, ret[k]); hi = maxOf(hi, ret[k]) }
+            val range = hi - lo
+            if (range == 0.0) { buf[i] = 0.0; continue }
+            counts.fill(0)
+            for (k in (i - period + 1)..i) {
+                val bin = minOf(((ret[k] - lo) / range * bins).toInt(), bins - 1)
+                counts[bin]++
+            }
+            var h = 0.0
+            for (c in counts) {
+                if (c == 0) continue
+                val p = c.toDouble() / period
+                h -= p * ln(p)
+            }
+            buf[i] = h / ln(bins.toDouble()) // Normalize to [0, 1]
+        }
+        return buf.toSeries()
+    }
+}
+
+// ── 21. Parkinson Volatility ───────────────────────────────────────────
+
+object ParkinsonVol {
+    /** High-low range volatility estimator — 5x more efficient than close-close.
+     *  The quant's preferred vol measure when you have OHLC data. */
+    fun compute(high: Series<Double>, low: Series<Double>, period: Int = 20): Series<Double> {
+        val n = high.size
+        val hl2 = DoubleArray(n)
+        val factor = 1.0 / (4.0 * ln(2.0))
+        for (i in 0 until n) {
+            val ratio = if (low[i] == 0.0) 1.0 else high[i] / low[i]
+            hl2[i] = ln(ratio).let { it * it }
+        }
+        val rolling = hl2.toSeries().rollingMean(period)
+        return n j { i: Int -> sqrt(factor * rolling[i]) * sqrt(252.0) } // Annualized
+    }
+}
+
+// ── 22. Market Microstructure (Amihud Illiquidity, Kyle's Lambda) ──────
+
+object Microstructure {
+    data class Result(val amihud: Series<Double>, val kyleLambda: Series<Double>)
+
+    /** Amihud illiquidity: |return| / dollar volume — higher = less liquid.
+     *  Kyle's Lambda: price impact per unit of signed volume flow.
+     *  These are the metrics that separate market-making desks from chart readers. */
+    fun compute(close: Series<Double>, volume: Series<Double>, period: Int = 20): Result {
+        val n = close.size
+        val ret = DoubleArray(n)
+        for (i in 1 until n) ret[i] = abs((close[i] - close[i - 1]) / close[i - 1])
+        // Amihud: rolling mean of |r| / (price * volume)
+        val amihudRaw = DoubleArray(n)
+        for (i in 0 until n) {
+            val dv = close[i] * volume[i]
+            amihudRaw[i] = if (dv == 0.0) 0.0 else ret[i] / dv
+        }
+        val amihud = amihudRaw.toSeries().rollingMean(period)
+        // Kyle's Lambda: regression slope of delta-price on signed volume
+        val kyleBuf = DoubleArray(n)
+        for (i in 0 until n) {
+            if (i < period) { kyleBuf[i] = 0.0; continue }
+            var sumXY = 0.0; var sumX2 = 0.0; var sumX = 0.0; var sumY = 0.0
+            for (k in (i - period + 1)..i) {
+                val signedVol = if (k == 0) 0.0 else {
+                    val dir = if (close[k] >= close[k - 1]) 1.0 else -1.0
+                    dir * volume[k]
+                }
+                val dp = if (k == 0) 0.0 else close[k] - close[k - 1]
+                sumX += signedVol; sumY += dp
+                sumXY += signedVol * dp; sumX2 += signedVol * signedVol
+            }
+            val denom = period * sumX2 - sumX * sumX
+            kyleBuf[i] = if (denom == 0.0) 0.0 else (period * sumXY - sumX * sumY) / denom
+        }
+        return Result(amihud, kyleBuf.toSeries())
+    }
+}

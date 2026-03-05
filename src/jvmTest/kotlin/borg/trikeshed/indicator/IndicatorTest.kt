@@ -182,6 +182,82 @@ class IndicatorTest {
         assertTrue(hurst[50] > 0.5 || hurst[50] == 0.5)
     }
 
+    @Test fun testRiskAdjusted() {
+        val close = uptrend(50)
+        val result = RiskAdjusted.compute(close)
+        // Sharpe should be positive in a steady uptrend
+        assertTrue(result.sharpe[40] > 0.0, "Sharpe should be positive in uptrend")
+        // In a pure uptrend with no downside returns, Sortino is 0 (no downside variance)
+        // or very high — either way it should be non-negative
+        assertTrue(result.sortino[40] >= 0.0, "Sortino should be non-negative in uptrend")
+    }
+
+    @Test fun testDrawdown() {
+        // Create a series that rises then falls
+        val close = 50 j { i: Int -> if (i < 25) 100.0 + i else 125.0 - (i - 25) * 2.0 }
+        val result = Drawdown.compute(close)
+        // No drawdown in the rising part
+        assertEquals(0.0, result.drawdown[20], 0.0)
+        // Drawdown should be negative in the falling part
+        assertTrue(result.drawdown[40] < 0.0, "Should have drawdown after peak")
+        // Max drawdown should be monotonically non-increasing
+        assertTrue(result.maxDrawdown[49] <= result.maxDrawdown[30])
+    }
+
+    @Test fun testAutocorrelation() {
+        // Trending series should show positive autocorrelation
+        val close = uptrend(100)
+        val ac = Autocorrelation.compute(close, 20, 1)
+        // After warmup, should be in [-1, 1]
+        for (i in 25 until 100) {
+            assertTrue(ac[i] in -1.0..1.0, "Autocorr[$i] = ${ac[i]} out of range")
+        }
+    }
+
+    @Test fun testKama() {
+        val close = uptrend(50)
+        val kama = KAMA.compute(close)
+        // KAMA should follow the trend
+        assertTrue(kama[49] > kama[10], "KAMA should follow uptrend")
+        // KAMA should be smoother than raw close
+        val rawDiff = (10 until 49).sumOf { kotlin.math.abs(close[it + 1] - close[it]) }
+        val kamaDiff = (10 until 49).sumOf { kotlin.math.abs(kama[it + 1] - kama[it]) }
+        assertTrue(kamaDiff <= rawDiff, "KAMA should be smoother than raw")
+    }
+
+    @Test fun testEntropy() {
+        val close = volatile(50)
+        val ent = Entropy.compute(close, 20)
+        // Entropy should be in [0, 1] (normalized)
+        for (i in 25 until 50) {
+            assertTrue(ent[i] in 0.0..1.0, "Entropy[$i] = ${ent[i]} out of range")
+        }
+    }
+
+    @Test fun testParkinsonVol() {
+        val high = 50 j { i: Int -> 110.0 + i * 0.5 }
+        val low = 50 j { i: Int -> 90.0 + i * 0.5 }
+        val pv = ParkinsonVol.compute(high, low, 20)
+        // Should be positive
+        for (i in 25 until 50) {
+            assertTrue(pv[i] > 0.0, "ParkinsonVol[$i] = ${pv[i]} not positive")
+        }
+    }
+
+    @Test fun testMicrostructure() {
+        val close = volatile(50)
+        val volume: Series<Double> = 50 j { 1000.0 }
+        val result = Microstructure.compute(close, volume, 20)
+        // Amihud should be non-negative
+        for (i in 25 until 50) {
+            assertTrue(result.amihud[i] >= 0.0, "Amihud[$i] negative")
+        }
+        // Kyle's Lambda should be finite
+        for (i in 25 until 50) {
+            assertTrue(result.kyleLambda[i].isFinite(), "Kyle[$i] not finite")
+        }
+    }
+
     @Test fun testFeatureExtractor() {
         val n = 50
         val close = uptrend(n)
@@ -191,7 +267,7 @@ class IndicatorTest {
 
         val indicators = FeatureExtractor.compute(close, high, low, volume)
 
-        // Should have all expected keys
+        // Should have all expected keys — families 1-15
         assertTrue(indicators.containsKey("log_return"))
         assertTrue(indicators.containsKey("rsi_14"))
         assertTrue(indicators.containsKey("bb_upper"))
@@ -206,6 +282,19 @@ class IndicatorTest {
         assertTrue(indicators.containsKey("spread"))
         assertTrue(indicators.containsKey("kalman_filter"))
         assertTrue(indicators.containsKey("hurst_exponent"))
+
+        // Institutional quant layer — families 16-22
+        assertTrue(indicators.containsKey("sharpe_20"))
+        assertTrue(indicators.containsKey("sortino_20"))
+        assertTrue(indicators.containsKey("drawdown"))
+        assertTrue(indicators.containsKey("max_drawdown"))
+        assertTrue(indicators.containsKey("autocorr_1"))
+        assertTrue(indicators.containsKey("autocorr_5"))
+        assertTrue(indicators.containsKey("kama"))
+        assertTrue(indicators.containsKey("entropy"))
+        assertTrue(indicators.containsKey("parkinson_vol"))
+        assertTrue(indicators.containsKey("amihud_illiquidity"))
+        assertTrue(indicators.containsKey("kyle_lambda"))
 
         // All series should have correct size
         for ((key, series) in indicators) {

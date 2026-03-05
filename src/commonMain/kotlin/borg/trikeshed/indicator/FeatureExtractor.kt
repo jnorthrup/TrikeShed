@@ -17,6 +17,16 @@ object FeatureExtractor {
      *
      * @return Map of indicator name to Series<Double>
      */
+    /**
+     * Compute all 22 indicator families from OHLCV data.
+     *
+     * Families 1-15: Technical analysis foundation.
+     * Families 16-22: Institutional quant layer — risk-adjusted returns,
+     * drawdown, autocorrelation, adaptive filtering, entropy,
+     * efficient volatility, and market microstructure.
+     *
+     * @return Map of indicator name to Series<Double>
+     */
     fun compute(
         close: Series<Double>,
         high: Series<Double>,
@@ -81,5 +91,35 @@ object FeatureExtractor {
 
         // 15. Hurst Exponent
         put("hurst_exponent", Hurst.compute(close))
+
+        // ── Institutional Quant Layer ──────────────────────────────────
+
+        // 16. Sharpe & Sortino
+        RiskAdjusted.compute(close).let { (sharpe, sortino) ->
+            put("sharpe_20", sharpe); put("sortino_20", sortino)
+        }
+
+        // 17. Drawdown
+        Drawdown.compute(close).let { (dd, maxDd) ->
+            put("drawdown", dd); put("max_drawdown", maxDd)
+        }
+
+        // 18. Autocorrelation
+        put("autocorr_1", Autocorrelation.compute(close, 20, 1))
+        put("autocorr_5", Autocorrelation.compute(close, 20, 5))
+
+        // 19. KAMA
+        put("kama", KAMA.compute(close))
+
+        // 20. Entropy
+        put("entropy", Entropy.compute(close))
+
+        // 21. Parkinson Volatility
+        put("parkinson_vol", ParkinsonVol.compute(high, low))
+
+        // 22. Market Microstructure
+        Microstructure.compute(close, volume).let { (amihud, kyle) ->
+            put("amihud_illiquidity", amihud); put("kyle_lambda", kyle)
+        }
     }
 }
