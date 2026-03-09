@@ -3,10 +3,53 @@ package borg.trikeshed.grad
 import ai.hypergraph.kotlingrad.api.*
 import borg.trikeshed.duck.evalDouble
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlin.system.measureTimeMillis
 
 class DselBenchmarkTest {
+    @Test
+    fun `drawdown contract computes deterministic fraction from peak`() {
+        val close = SVar(DReal, "close")
+        val peak = SVar(DReal, "peak")
+        val drawdownExpr = ((close - peak) / peak).compile()
+
+        val drawdown = drawdownExpr.evalDouble(
+            mapOf(
+                close to 90.0,
+                peak to 120.0
+            )
+        )
+
+        assertEquals(-0.25, drawdown, 1e-9)
+    }
+
+    @Test
+    fun `max drawdown contract keeps worst observed drawdown`() {
+        val prevWorst = SVar(DReal, "prevWorst")
+        val close = SVar(DReal, "close")
+        val peak = SVar(DReal, "peak")
+        val currentDrawdown = (close - peak) / peak
+        val maxDrawdownExpr = (prevWorst `minOf` currentDrawdown).compile()
+
+        val newWorse = maxDrawdownExpr.evalDouble(
+            mapOf(
+                prevWorst to -0.10,
+                close to 90.0,
+                peak to 120.0
+            )
+        )
+        val noNewWorse = maxDrawdownExpr.evalDouble(
+            mapOf(
+                prevWorst to -0.10,
+                close to 118.0,
+                peak to 120.0
+            )
+        )
+
+        assertEquals(-0.25, newWorse, 1e-9)
+        assertEquals(-0.10, noNewWorse, 1e-9)
+    }
 
     @Test
     fun `benchmark standard evaluate throughput`() {

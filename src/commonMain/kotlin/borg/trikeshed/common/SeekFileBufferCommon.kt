@@ -1,5 +1,8 @@
 package borg.trikeshed.common
 
+import borg.trikeshed.lib.ByteSeries
+import borg.trikeshed.lib.Series2
+
 /**
  * Common seek-based file buffer with windowed reads.
  *
@@ -82,21 +85,20 @@ class SeekFileBufferCommon(
         windowPosition = 0
     }
 
-    /** Batch read scattered offsets — elevator sorted. */
-    fun readv(requests: List<Pair<Long, ByteArray>>): IntArray {
-        val results = IntArray(requests.size)
-        if (requests.isEmpty()) return results
+    /** Batch read scattered offsets in request order. */
+    fun readv(requests: Series2<Long, ByteSeries>): IntArray {
+        val results = IntArray(requests.a)
+        if (requests.a == 0) return results
 
-        // Elevator: sort by offset to minimize seeks
-        val sorted = requests.withIndex().sortedBy { it.value.first }
-
-        var totalRead = 0
-        for ((idx, pair) in sorted) {
-            val (offset, buf) = pair
+        for (idx in 0 until requests.a) {
+            val request = requests.b(idx)
+            val offset = request.a
+            val dst = request.b
             val absolutePos = initialOffset + offset
-            val bytes = handle.pread(fd, buf, 0, buf.size, absolutePos)
+            // ByteSeries is read-focused; use remaining as requested read length.
+            val tmp = ByteArray(dst.rem)
+            val bytes = handle.pread(fd, tmp, 0, tmp.size, absolutePos)
             results[idx] = if (bytes < 0) 0 else bytes
-            totalRead += results[idx]
         }
         return results
     }

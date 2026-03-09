@@ -1,5 +1,7 @@
 package borg.trikeshed.common
 
+import borg.trikeshed.lib.ByteSeries
+import borg.trikeshed.lib.Series2
 import borg.trikeshed.lib.debug
 import borg.trikeshed.lib.logDebug
 import java.nio.ByteBuffer
@@ -64,31 +66,17 @@ actual class SeekFileBuffer actual constructor(
      * @param requests list of (absolute offset, destination buffer) pairs.
      *                 Modifies buffers in place, returns bytes read per request.
      */
-    actual fun readv(requests: List<Pair<Long, ByteBuffer>>): IntArray {
-        val results = IntArray(requests.size) { 0 }
-        if (requests.isEmpty()) return results
+    actual fun readv(requests: Series2<Long, ByteSeries>): IntArray {
+        val results = IntArray(requests.a) { 0 }
+        if (requests.a == 0) return results
 
-        // Elevator sort: process in file order to minimize seeks
-        val sorted = requests.withIndex().sortedBy { it.value.first }
-
-        // Process in batches of READV_BATCH
-        var i = 0
-        while (i < sorted.size) {
-            val batch = sorted.subList(i, minOf(i + READV_BATCH, sorted.size))
-            val offsets = LongArray(batch.size) { batch[it].value.first }
-            val buffers = Array(batch.size) { batch[it].value.second }
-            val indices = IntArray(batch.size) { batch[it].index }
-
-            // Read at each offset individually (FileChannel doesn't support true scatter from different offsets)
-            // Future: could use io_uring on Linux for true async batch I/O
-            for (j in batch.indices) {
-                val pos = offsets[j]
-                val buf = buffers[j]
-                buf.clear()
-                val bytesRead = channel!!.read(buf, pos)
-                results[indices[j]] = if (bytesRead < 0) 0 else bytesRead
-            }
-            i += READV_BATCH
+        for (i in 0 until requests.a) {
+            val request = requests.b(i)
+            val pos = request.a
+            val dst = request.b
+            val buf = ByteBuffer.allocateDirect(dst.rem)
+            val bytesRead = channel!!.read(buf, pos)
+            results[i] = if (bytesRead < 0) 0 else bytesRead
         }
         return results
     }

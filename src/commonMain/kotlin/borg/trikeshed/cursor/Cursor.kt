@@ -16,6 +16,18 @@ typealias RowVec = Series2<Any?, () -> ColumnMeta>
 /** Cursors are a columnar abstraction composed of Series of Joined value+meta pairs (RecordMeta) */
 typealias Cursor = Series<RowVec>
 
+/** Series joins: combine row values with column metadata providers into a RowVec. */
+infix fun Series<Any?>.joins(meta: Series<() -> ColumnMeta>): RowVec = this.zip(meta)
+
+/** Cursors combine: combine a series of RowVec into a Cursor. */
+val Series<RowVec>.cursor: Cursor get() = this
+
+/** Explicit helper to combine two cursors (row concatenation). */
+fun combine(a: Cursor, b: Cursor): Cursor = borg.trikeshed.lib.combine(a, b)
+
+/** Mutable wrapper for combined cursors; no performance guarantees. */
+fun combineMutable(a: Cursor, b: Cursor): MutableSeries<RowVec> = combine(a, b).cow
+
 ///**
 // * overload unary minus operator for Cursor to strip out the meta and return a series of values-only
 // *

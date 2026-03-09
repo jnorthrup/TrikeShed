@@ -1,5 +1,10 @@
 package borg.trikeshed.common
 
+import borg.trikeshed.lib.Series2
+import borg.trikeshed.lib.ByteSeries
+import borg.trikeshed.lib.Join
+import borg.trikeshed.lib.j
+
 /** An openable file buffer with seek semantics */
 expect class SeekFileBuffer(
     filename: String,
@@ -26,7 +31,7 @@ expect class SeekFileBuffer(
      * Each read goes into its corresponding buffer, advancing position.
      * Returns bytes read for each request (may be short on EOF).
      */
-    fun readv(requests: List<Pair<Long, java.nio.ByteBuffer>>): IntArray
+    fun readv(requests: Series2<Long, ByteSeries>): IntArray
 }
 
 /** Open and use a SeekFileBuffer */
@@ -38,3 +43,7 @@ fun <T> SeekFileBuffer.use(block: (SeekFileBuffer) -> T): T {
         close()
     }
 }
+
+/** Convenience overload: `readv(0L j bs0, 4096L j bs1, ...)` */
+fun SeekFileBuffer.readv(vararg requests: Join<Long, ByteSeries>): IntArray =
+    readv(requests.size j requests::get)

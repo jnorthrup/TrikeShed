@@ -2,6 +2,12 @@ package borg.trikeshed.lib
 
 typealias Series2<A, B> = Series<Join<A, B>>
 
+/** Explicit helper for pairwise series join. */
+fun <A, B> join(a: Series<A>, b: Series<B>): Series2<A, B> = a.zip(b)
+
+/** Mutable wrapper for pairwise join; no performance guarantees. */
+fun <A, B> joinMutable(a: Series<A>, b: Series<B>): MutableSeries<Join<A, B>> = join(a, b).cow
+
 val <T, I> Series2<T, I>.left: Series<T> get() = this.α(Join<T, I>::a)
 val <T, I> Series2<I, T>.right: Series<T> get() = this.α(Join<I, T>::b)
 

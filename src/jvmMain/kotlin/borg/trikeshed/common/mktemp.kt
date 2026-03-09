@@ -5,7 +5,7 @@ import java.io.File
 /** emulates shell command*/
 actual fun  mktemp(): String {
     //java mktemp
-    val createTempFile = File.createTempFile("tmp", ".tmp", System.getProperty("java.io.tmpdir")?.let { File(it) })
+    val createTempFile = File.createTempFile("tmp", ".tmp", java.lang.System.getProperty("java.io.tmpdir")?.let { File(it) })
     return createTempFile.absolutePath
 
 

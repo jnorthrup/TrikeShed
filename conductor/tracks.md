@@ -20,6 +20,22 @@ Active development tracks for TrikeShed.
 
 ---
 
+## [ ] Track: CCEK Keyed Services Infrastructure
+
+**Track ID:** `ccek-keyed-services_20260309`
+
+**Branch:** `feat/ccek-keyed-services` (git worktree at `../TrikeShed-ccek`)
+
+**Purpose:** Add minimal CCEK keyed service infrastructure to TrikeShed `commonMain`. Refactor 3 existing services + add 2 coexisting transport designs (ngSCTP + channelized QUIC, no AI/ML).
+
+**Status:** 🆕 Open
+
+**Slices:** `ccek-01` worktree+base · `ccek-02` transport designs · `ccek-03` HomeDirService · `ccek-04` SeekHandleService · `ccek-05` IndicatorContextService · `ccek-06` tests
+
+**Plan:** `conductor/tracks/ccek-keyed-services_20260309/plan.md`
+
+---
+
 ## [~] Track: Unified Kotlingrad DSEL for Pretesting + Paper Testing Drawdown
 
 **Track ID:** `kotlingrad-unified-dsel-pretest-paper-dd_20260302`
@@ -33,3 +49,6 @@ Active development tracks for TrikeShed.
 - Cleared duplicated library code from sibling repos
 - Documented Gradle consumption logic
 - Synchronized boundaries in product/tech-stack docs
+- Added deterministic drawdown/max-drawdown DSEL contract tests in `DselBenchmarkTest`
+- Focused JVM verification currently blocked by Gradle wrapper distribution download under network-restricted runtime
+- Next slice: `kg-dd-test-contract-02` (execute focused JVM test once local Gradle distribution is available and capture evidence)

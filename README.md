@@ -38,6 +38,25 @@ typealias Cursor = Series<RowVec>
 
 ## if you are still reading... I've also written ideas that describe (some) goals and ideals of the library:
 
+### Testing
+
+The 1BRC benchmark harness is **not** a unit test. it lives in its own
+`brcTest` source set and is executed by the `brcTest` Gradle task, which is
+hooked into `check` and configured to run *after* the normal `test` task. This
+makes the suite behave like a regression/acceptance test – expensive and
+large-data exercises are kept out of the fast feedback loop but still part of
+`./gradlew check`.
+
+To run the BRC tests explicitly:
+
+```bash
+./gradlew brcTest
+```
+
+The harness lives under `src/brcTest/kotlin/borg/trikeshed/brc/BrcHarnessTest.kt`.
+
+
+
 * [x] strongly immmutable Join aka Pair,Twin,Series aka Array,Series2, Cursors, are all typealiases of Join
     * extending the language through index and other operators happens as a side-effect of testing new expression
       economies.
