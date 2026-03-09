@@ -1,5 +1,6 @@
 package borg.trikeshed.context
 
+import kotlinx.coroutines.currentCoroutineContext
 import kotlin.coroutines.CoroutineContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.withContext
@@ -16,12 +17,17 @@ class HandlerRegistry<K, V : Function<*>>(
     private val handlers: Map<K, V>
 ) : CoroutineContext.Element {
 
-    override val key: CoroutineContext.Key<*> = Key
+    override val key: CoroutineContext.Key<*> get() = Key
 
     /**
      * Retrieves a handler for the given key.
      */
     fun get(key: K): V? = handlers[key]
+
+    /**
+     * Returns the registered keys in overlay order.
+     */
+    fun keys(): Set<K> = handlers.keys
 
     /**
      * Composition operator. When adding a new registry to a context,
@@ -37,20 +43,28 @@ class HandlerRegistry<K, V : Function<*>>(
 /**
  * A DSL helper to add or update handlers in a coroutine's context.
  */
-suspend fun <K, V : Function<*>> withHandlers(
+suspend fun <K, V : Function<*>, R> withHandlers(
     vararg newHandlers: Pair<K, V>,
-    block: suspend CoroutineScope.() -> Unit
-) {
-    val existingRegistry = coroutineContext[HandlerRegistry.Key] as? HandlerRegistry<K, V>
+    block: suspend CoroutineScope.() -> R
+): R {
+    val existingRegistry = currentHandlerRegistry<K, V>()
     val newRegistry = HandlerRegistry(newHandlers.toMap())
 
     val finalRegistry = existingRegistry?.plus(newRegistry) ?: newRegistry
 
-    withContext(finalRegistry, block)
+    return withContext(finalRegistry, block)
 }
 
 /**
- * Extension to easily access the handler registry from any coroutine context.
+ * Access the handler registry from any coroutine context without relying on
+ * illegal generic extension properties.
  */
-inline val <K, V : Function<*>> CoroutineContext.handlerRegistry: HandlerRegistry<K, V>?
-    get() = this[HandlerRegistry.Key] as? HandlerRegistry<K, V>
+@Suppress("UNCHECKED_CAST")
+fun <K, V : Function<*>> CoroutineContext.handlerRegistryOrNull(): HandlerRegistry<K, V>? =
+    this[HandlerRegistry.Key] as? HandlerRegistry<K, V>
+
+/**
+ * Suspend helper for the current coroutine context.
+ */
+suspend fun <K, V : Function<*>> currentHandlerRegistry(): HandlerRegistry<K, V>? =
+    currentCoroutineContext().handlerRegistryOrNull()

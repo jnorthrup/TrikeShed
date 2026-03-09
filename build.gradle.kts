@@ -11,6 +11,7 @@ group = "org.bereft"
 version = "1.0"
 val enableNativeSharedLib = providers.gradleProperty("native.sharedLib").orNull == "true"
 val enableBrcTests = providers.gradleProperty("enableBrcTests").orNull == "true"
+val focusedTransportSlice = providers.gradleProperty("focusedTransportSlice").orNull == "true"
 
 repositories {
     maven("https://oss.sonatype.org/content/repositories/snapshots/")
@@ -142,6 +143,11 @@ kotlin {
                 api("org.jetbrains.kotlinx:kotlinx-datetime:0.4.0")
                 api("org.jetbrains.kotlin:kotlin-reflect:1.8.0")
             }
+            // The old pseudo-common xio surface is retired in favor of JVM/NIO transport boundaries.
+            kotlin.exclude("one/xio/NetworkChannel.kt")
+            if (focusedTransportSlice) {
+                kotlin.exclude("borg/trikeshed/grad/**")
+            }
         }
         val commonTest by getting {
             dependencies {
@@ -170,16 +176,27 @@ kotlin {
             kotlin.exclude("borg/trikeshed/brc/BrcPure.kt")
             kotlin.exclude("borg/trikeshed/brc/fused/**")
             kotlin.exclude("borg/trikeshed/grad/**")
+            if (focusedTransportSlice) {
+                kotlin.exclude("one/xio/AsioVisitor.kt")
+                kotlin.exclude("borg/trikeshed/brc/BrcDuckDbJvm.kt")
+                kotlin.exclude("one/xio/HttpHeaders.kt")
+                kotlin.exclude("one/xio/HttpMethod.kt")
+                kotlin.exclude("rxf/server/CookieRfc6265Util.kt")
+            }
         }
         val jvmTest by getting {
             dependencies {
                 implementation(kotlin("test-junit"))
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.6.4")
             }
             // WIP/experimental tests excluded from default build.
             kotlin.exclude("borg/trikeshed/duck/KotlingradThinSliceTest.kt")
             kotlin.exclude("borg/trikeshed/grad/**")
             kotlin.exclude("borg/trikeshed/signal/**")
             kotlin.exclude("borg/trikeshed/strategy/**")
+            if (focusedTransportSlice) {
+                kotlin.exclude("gk/kademlia/codec/SmMsgPackTest.kt")
+            }
         }
 
         val macosMain by getting { dependsOn(posixMain) }
@@ -237,5 +254,18 @@ afterEvaluate {
         tasks.named("check") {
             dependsOn("brcTest")
         }
+    }
+
+    tasks.register<Test>("focusedTransportTest") {
+        description = "Runs the focused JVM transport/routing slice."
+        group = "verification"
+        val jvmTestTask = tasks.named<Test>("jvmTest").get()
+        testClassesDirs = jvmTestTask.testClassesDirs
+        classpath = jvmTestTask.classpath
+        include("**/ProtocolRouterTest.class")
+        include("**/SelectorTransportBackendTest.class")
+        include("**/LinuxNativeTransportBackendTest.class")
+        include("**/CcekTransportCapabilityTest.class")
+        shouldRunAfter(jvmTestTask)
     }
 }
