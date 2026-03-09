@@ -1,10 +1,8 @@
 @file:Suppress("UNCHECKED_CAST", "ObjectPropertyName")
-@file:OptIn(kotlin.experimental.ExperimentalTypeInference::class, ExperimentalUnsignedTypes::class)
 
 package borg.trikeshed.lib
 
 import borg.trikeshed.common.collections.binarySearch
-import borg.trikeshed.cursor.Cursor
 import borg.trikeshed.isam.meta.IOMemento.*
 import kotlin.jvm.JvmInline
 import kotlin.jvm.JvmName
@@ -12,9 +10,8 @@ import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.pow
 
-typealias Series<T> = Join<Int, (Int) -> T>
-
-
+typealias MetaSeries<I,T> =Join<I,(I)->T>
+typealias Series<T> = MetaSeries<Int,T>
 val <T> Series<T>.size: Int get() = a
 
 
@@ -51,13 +48,11 @@ inline infix fun <X, C> Array<X>.α(crossinline xform: (X) -> C): Series<C> = si
  */
 val <T> Series<T>.infinite: Series<T>
     get() = Int.MAX_VALUE j { x: Int ->
-        this.b(
-            when {
-                x < 0 -> 0
-                size <= x -> size.dec()
-                else -> x
-            }
-        )
+        when {
+            x < 0 -> this[0]
+            x >= size -> this[size - 1]
+            else -> this[x]
+        }
     }
 
 /**
@@ -207,8 +202,13 @@ infix operator fun IntRange.div(denominator: Int): Series<IntRange> =
         }
     }
 
-operator fun <T> Series<T>.div(d: Int): Series<Series<T>> = (0 until size) / d α {
-    this[it]
+operator fun <T> Series<T>.div(d: Int): Series<Series<T>> { //split into d parts
+    val subSize = size / d
+    return d j { x: Int ->
+        subSize j { i: Int ->
+            this[i + x * subSize]
+        }
+    }
 }
 
 
@@ -238,9 +238,14 @@ fun <S> Join<Int, (Int) -> S>.toSet(opt: MutableSet<S>? = null): MutableSet<S> =
 
 // Series iterator for use in for loops
 operator fun <A> Series<A>.iterator(): Iterator<A> = object : Iterator<A> {
-    var i = 0
-    override fun hasNext(): Boolean = i < size
-    override fun next(): A = this@iterator[i++]
+    private var current = 0
+    override fun hasNext(): Boolean = current < size
+    override fun next(): A {
+        if (!hasNext()) throw NoSuchElementException()
+        val result = this@iterator[current]
+        current++
+        return result
+    }
 }
 
 
@@ -359,8 +364,7 @@ fun <T> Series<T>.forEachIndexed(action: (index: Int, T) -> Unit): Unit = this.`
 fun <T> Series<T>.forEach(action: (T) -> Unit): Unit = this.`▶`.forEach(action)
 
 //series map
-fun <T, R> Series<T>.map(transform: (T) -> R): List<R> = this.toList().map(transform)
-
+fun <T, R> Series<T>.map(transform: (T) -> R): List<R> = this.`▶`.map(transform)
 
 fun <T> Series<T>.isEmpty(): Boolean = a == 0
 
@@ -442,7 +446,15 @@ fun Series<Char>.parseIsoDate(): kotlinx.datetime.LocalDate {
     return kotlinx.datetime.LocalDate(year, month, day)
 }
 
-fun Series<Char>.asString(upto: Int = Int.MAX_VALUE): String = this.take(upto).encodeToByteArray().decodeToString()
+fun Series<Char>.asString(upto: Int = Int.MAX_VALUE): String {
+    if (size == 0) return ""
+    val effectiveSize = minOf(size, upto)
+    return try {
+        this.take(effectiveSize).encodeToByteArray().decodeToString()
+    } catch (e: Exception) {
+        ""
+    }
+}
 
 /** parse a double or throw an exception
  *
@@ -525,9 +537,6 @@ fun Series<Char>.parseDoubleOrNull(): Double? = try {
  */
 infix fun <T, R> List<T>.zip(other: Series<R>): List<Join<T, R>> =
     zip(other.`▶`) { a: T, b: R -> a j b }
-
-@JvmName("vvzip2f")
-fun <T, O, R> Series<T>.zip(o: Series<O>, f: (T, O) -> R): Join<Int, (Int) -> R> = size j { x: Int -> f(this[x], o[x]) }
 
 @JvmName("vvzip2")
 @Suppress("UNCHECKED_CAST")
