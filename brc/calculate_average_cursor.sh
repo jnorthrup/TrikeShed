@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 #
-# 1BRC Variant: Cursor Composition (Series j/α operators)
+# 1BRC Variant: Cursor (JVM)
+#
+# Uses TrikeShed's Cursor and Series operators (j, α) to parse
+# and aggregate the measurements file.
 #
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

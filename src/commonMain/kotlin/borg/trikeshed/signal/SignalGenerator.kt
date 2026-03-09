@@ -6,8 +6,10 @@
  */
 package borg.trikeshed.signal
 
+import borg.trikeshed.ccek.KeyedService
 import borg.trikeshed.indicator.*
 import borg.trikeshed.lib.*
+import kotlin.coroutines.CoroutineContext
 
 /**
  * Trade signal enumeration.
@@ -271,4 +273,16 @@ data class ConfigurableStrategy(
 
         return SignalResult(SignalType.HOLD)
     }
+}
+
+/**
+ * CCEK keyed service wrapping precomputed SampleStrategy indicators.
+ * Install via withContext(IndicatorContextService(indicators)) so all coroutines
+ * in the scope share one indicator computation instead of recomputing per-candle.
+ */
+data class IndicatorContextService(
+    val indicators: SampleStrategySignals.Indicators
+) : KeyedService {
+    companion object Key : CoroutineContext.Key<IndicatorContextService>
+    override val key: CoroutineContext.Key<*> get() = Key
 }

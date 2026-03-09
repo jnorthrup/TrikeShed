@@ -6,6 +6,7 @@ Build a stable, testable Kotlingrad DSEL layer for drawdown-related pretesting a
 ## Bounded Corpus
 - `src/jvmMain/kotlin/borg/trikeshed/grad/`
 - `src/commonMain/kotlin/borg/trikeshed/grad/`
+- `src/jvmTest/kotlin/borg/trikeshed/grad/`
 - `conductor/tracks/kotlingrad-unified-dsel-pretest-paper-dd_20260302/`
 
 ## Tasks
@@ -24,7 +25,7 @@ includeBuild("../TrikeShed")
 Then declare dependency in `build.gradle.kts`:
 ```kotlin
 dependencies {
-    implementation("borg.trikeshed:trikeshed-core")
+    implementation(project(":"))
 }
 ```
 

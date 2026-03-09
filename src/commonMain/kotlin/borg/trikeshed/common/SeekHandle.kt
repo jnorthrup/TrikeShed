@@ -1,5 +1,8 @@
 package borg.trikeshed.common
 
+import borg.trikeshed.ccek.KeyedService
+import kotlin.coroutines.CoroutineContext
+
 /**
  * Platform-specific I/O primitive for seek-based reading.
  * Each platform provides an actual implementation wrapping
@@ -53,3 +56,9 @@ expect fun platformSeekHandle(): SeekHandle
  * Optional: Get io_uring handle if available, else fallback.
  */
 expect fun ioUringHandle(): SeekHandle?
+
+/** CCEK keyed service exposing an open SeekHandle to the coroutine context. */
+data class SeekHandleService(val handle: SeekHandle) : KeyedService {
+    companion object Key : CoroutineContext.Key<SeekHandleService>
+    override val key: CoroutineContext.Key<*> get() = Key
+}

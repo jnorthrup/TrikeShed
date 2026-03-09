@@ -44,11 +44,11 @@ fun Series<SFun<DReal>>.sum(): SFun<DReal> =
 fun Series<SFun<DReal>>.mean(): SFun<DReal> =
     sum() / size.`↑`
 
-inline fun Series<SFun<DReal>>.min(): SFun<DReal> =
-    fold(first()) { a, b -> a `minOf` b }
+inline fun Series<SFun<DReal>>.minOf(): SFun<DReal> =
+    fold(first()) { a, b -> a.min(b) }
 
-inline fun Series<SFun<DReal>>.max(): SFun<DReal> =
-    fold(first()) { a, b -> a `maxOf` b }
+inline fun Series<SFun<DReal>>.maxOf(): SFun<DReal> =
+    fold(first()) { a, b -> a.max(b) }
 
 // Variance, stddev as Grad expressions
 fun Series<SFun<DReal>>.variance(): SFun<DReal> {

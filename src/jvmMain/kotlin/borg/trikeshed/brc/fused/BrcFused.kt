@@ -23,8 +23,8 @@ object BrcFused {
     ) {
         // Merge two aggregates (monoid combine)
         infix fun ⊕(other: StationAgg): StationAgg = StationAgg(
-            min = min `minOf` other.min,
-            max = max `maxOf` other.max,
+            min = min.min(other.min),
+            max = max.max(other.max),
             sum = sum + other.sum,
             count = count + other.count
         )
