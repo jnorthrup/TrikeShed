@@ -47,6 +47,9 @@ kotlin {
                 binaries.executable("brcCsvNative") {
                     entryPoint = "borg.trikeshed.brc.brcCsvNativeMain"
                 }
+                binaries.executable("brcCursorNative") {
+                    entryPoint = "borg.trikeshed.brc.brcCursorNativeMain"
+                }
                 binaries.executable("brcDuckDbNative") {
                     entryPoint = "borg.trikeshed.brc.brcDuckDbNativeMain"
                 }
@@ -78,6 +81,9 @@ kotlin {
                 binaries.executable("brcCsvNative") {
                     entryPoint = "borg.trikeshed.brc.brcCsvNativeMain"
                 }
+                binaries.executable("brcCursorNative") {
+                    entryPoint = "borg.trikeshed.brc.brcCursorNativeMain"
+                }
                 binaries.executable("brcDuckDbNative") {
                     entryPoint = "borg.trikeshed.brc.brcDuckDbNativeMain"
                 }
@@ -101,6 +107,9 @@ kotlin {
             }
             binaries.executable("brcCsvNative") {
                 entryPoint = "borg.trikeshed.brc.brcCsvNativeMain"
+            }
+            binaries.executable("brcCursorNative") {
+                entryPoint = "borg.trikeshed.brc.brcCursorNativeMain"
             }
             binaries.executable("brcDuckDbNative") {
                 entryPoint = "borg.trikeshed.brc.brcDuckDbNativeMain"

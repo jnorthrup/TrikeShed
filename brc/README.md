@@ -2,17 +2,22 @@
 
 Benchmark harness for the [One Billion Row Challenge](https://github.com/gunnarmorling/1brc),
 implemented as multiple TrikeShed variants showcasing different compositions of
-Series, Cursor, FileBuffer, and coroutine patterns.
+Series, Cursor, FileBuffer, DuckDB, and coroutine patterns.
 
 ## Variants
 
-| Script | Class | Strategy |
-|---|---|---|
-| `calculate_average_baseline.sh` | `BrcBaseline` | Naive `BufferedReader` + `HashMap` (Java-style baseline) |
-| `calculate_average_cursor.sh` | `BrcCursor` | Cursor-composition via `j`/`α` operators, ISAM roundtrip |
-| `calculate_average_mmap.sh` | `BrcMmap` | `FileBuffer` mmap + direct byte scanning, no allocation |
-| `calculate_average_parallel.sh` | `BrcParallel` | Chunked mmap + coroutine fan-out, merge reduce |
-| `calculate_average_fixedpoint.sh` | `BrcFixedPoint` | Integer-only fixed-point (×10), custom open-addressing hashmap |
+| Script | Class | Strategy | Platform |
+|---|---|---|---|
+| `calculate_average_baseline.sh` | `BrcBaseline` | Naive `BufferedReader` + `HashMap` (Java-style baseline) | JVM |
+| `calculate_average_cursor.sh` | `BrcCursor` | Cursor/Series composition via `j`/`α` operators | JVM |
+| `calculate_average_cursor_native.sh` | `brcCursorNativeMain` | Series j operator lazy construction | Native |
+| `calculate_average_mmap.sh` | `BrcMmap` | `FileBuffer` mmap + direct byte scanning | JVM |
+| `calculate_average_parallel.sh` | `BrcParallel` | Chunked mmap + coroutine fan-out, merge reduce | JVM |
+| `calculate_average_fixedpoint.sh` | `BrcFixedPoint` | Integer-only fixed-point (×10), custom hashmap | JVM |
+| `calculate_average_duckdb_jvm.sh` | `BrcDuckDbJvm` | DuckDB JDBC + SQL aggregation | JVM |
+| `calculate_average_duckdb_native.sh` | `brcDuckDbNativeMain` | DuckDB C-interop + SQL aggregation | Native |
+| `calculate_average_isam_native.sh` | `brcIsamNativeMain` | ISAM-style fixed-offset parsing | Native |
+| `calculate_average_csv_native.sh` | `brcCsvNativeMain` | FileBuffer mmap CSV parsing | Native |
 
 ## Quick Start
 
