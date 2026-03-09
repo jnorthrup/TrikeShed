@@ -1,3 +1,5 @@
+@file:Suppress("UNCHECKED_CAST")
+
 package borg.trikeshed.lib
 
 import borg.trikeshed.common.collections.s_

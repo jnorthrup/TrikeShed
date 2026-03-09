@@ -26,108 +26,36 @@ in the order they were passed in
 @see https://en.algorithmica.org/hpc/data-structures/s-tree/#b-tree-layout-1
 @param catn the Series of Series<A> to combine
  */
-fun <A> combine(catn: Series<Series<A>>): Series<A> { // combine
-
-    val frst:Series<A>  = catn[0]
-    val sz0 = frst.size
-    val captureSize = catn.size
-    @Suppress("UNCHECKED_CAST")
-    return when (captureSize) {
-        0 ->EmptySeries as Series<A> // empty
-        1 -> frst
-        2 -> sz0 + catn[1].size j { i ->
-            if (i < sz0) frst[i] else catn[1][i - sz0]
-        }
-
-        3 -> sz0 + catn[1].size + catn[2].size j { i ->
-            when {
-                i < sz0 -> frst[i]
-                i < sz0 + catn[1].size -> catn[1][i - sz0]
-                else -> catn[2][i - sz0 - catn[1].size]
-            }
-        }
-
-        4 -> sz0 + catn[1].size + catn[2].size + catn[3].size j { i ->
-            when {
-                i < sz0 -> frst[i]
-                i < sz0 + catn[1].size -> catn[1][i - sz0]
-                i < sz0 + catn[1].size + catn[2].size -> catn[2][i - sz0 - catn[1].size]
-                else -> catn[3][i - sz0 - catn[1].size - catn[2].size]
-            }
-
-        }
-
-        5 -> sz0 + catn[1].size + catn[2].size + catn[3].size + catn[4].size j { i ->
-            when {
-                i < sz0 -> frst[i]
-                i < sz0 + catn[1].size -> catn[1][i - sz0]
-                i < sz0 + catn[1].size + catn[2].size -> catn[2][i - sz0 - catn[1].size]
-                i < sz0 + catn[1].size + catn[2].size + catn[3].size -> catn[3][i - sz0 - catn[1].size - catn[2].size]
-                else -> catn[4][i - sz0 - catn[1].size - catn[2].size - catn[3].size]
-            }
-        }
-
-        6 -> sz0 + catn[1].size + catn[2].size + catn[3].size + catn[4].size + catn[5].size j { i ->
-            when {
-                i < sz0 -> frst[i]
-                i < sz0 + catn[1].size -> catn[1][i - sz0]
-                i < sz0 + catn[1].size + catn[2].size -> catn[2][i - sz0 - catn[1].size]
-                i < sz0 + catn[1].size + catn[2].size + catn[3].size -> catn[3][i - sz0 - catn[1].size - catn[2].size]
-                i < sz0 + catn[1].size + catn[2].size + catn[3].size + catn[4].size -> catn[4][i - sz0 - catn[1].size - catn[2].size - catn[3].size]
-                else -> catn[5][i - sz0 - catn[1].size - catn[2].size - catn[3].size - catn[4].size]
-            }
-        }
-
-        7 -> sz0 + catn[1].size + catn[2].size + catn[3].size + catn[4].size + catn[5].size + catn[6].size j { i ->
-            when {
-                i < sz0 -> frst[i]
-                i < sz0 + catn[1].size -> catn[1][i - sz0]
-                i < sz0 + catn[1].size + catn[2].size -> catn[2][i - sz0 - catn[1].size]
-                i < sz0 + catn[1].size + catn[2].size + catn[3].size -> catn[3][i - sz0 - catn[1].size - catn[2].size]
-                i < sz0 + catn[1].size + catn[2].size + catn[3].size + catn[4].size -> catn[4][i - sz0 - catn[1].size - catn[2].size - catn[3].size]
-                i < sz0 + catn[1].size + catn[2].size + catn[3].size + catn[4].size + catn[5].size -> catn[5][i - sz0 - catn[1].size - catn[2].size - catn[3].size - catn[4].size]
-                else -> catn[6][i - sz0 - catn[1].size - catn[2].size - catn[3].size - catn[4].size - catn[5].size]
-            }
-        }
-
-        8 -> sz0 + catn[1].size + catn[2].size + catn[3].size + catn[4].size + catn[5].size + catn[6].size + catn[7].size j { i ->
-            when {
-                i < sz0 -> frst[i]
-                i < sz0 + catn[1].size -> catn[1][i - sz0]
-                i < sz0 + catn[1].size + catn[2].size -> catn[2][i - sz0 - catn[1].size]
-                i < sz0 + catn[1].size + catn[2].size + catn[3].size -> catn[3][i - sz0 - catn[1].size - catn[2].size]
-                i < sz0 + catn[1].size + catn[2].size + catn[3].size + catn[4].size -> catn[4][i - sz0 - catn[1].size - catn[2].size - catn[3].size]
-                i < sz0 + catn[1].size + catn[2].size + catn[3].size + catn[4].size + catn[5].size -> catn[5][i - sz0 - catn[1].size - catn[2].size - catn[3].size - catn[4].size]
-                i < sz0 + catn[1].size + catn[2].size + catn[3].size + catn[4].size + catn[5].size + catn[6].size -> catn[6][i - sz0 - catn[1].size - catn[2].size - catn[3].size - catn[4].size - catn[5].size]
-                else -> catn[7][i - sz0 - catn[1].size - catn[2].size - catn[3].size - catn[4].size - catn[5].size - catn[6].size]
-            }
-        }
-
-        9 -> sz0 + catn[1].size + catn[2].size + catn[3].size + catn[4].size + catn[5].size + catn[6].size + catn[7].size + catn[8].size j { i ->
-            when {
-                i < sz0 -> frst[i]
-                i < sz0 + catn[1].size -> catn[1][i - sz0]
-                i < sz0 + catn[1].size + catn[2].size -> catn[2][i - sz0 - catn[1].size]
-                i < sz0 + catn[1].size + catn[2].size + catn[3].size -> catn[3][i - sz0 - catn[1].size - catn[2].size]
-                i < sz0 + catn[1].size + catn[2].size + catn[3].size + catn[4].size -> catn[4][i - sz0 - catn[1].size - catn[2].size - catn[3].size]
-                i < sz0 + catn[1].size + catn[2].size + catn[3].size + catn[4].size + catn[5].size -> catn[5][i - sz0 - catn[1].size - catn[2].size - catn[3].size - catn[4].size]
-                i < sz0 + catn[1].size + catn[2].size + catn[3].size + catn[4].size + catn[5].size + catn[6].size -> catn[6][i - sz0 - catn[1].size - catn[2].size - catn[3].size - catn[4].size - catn[5].size]
-                i < sz0 + catn[1].size + catn[2].size + catn[3].size + catn[4].size + catn[5].size + catn[6].size + catn[7].size -> catn[7][i - sz0 - catn[1].size - catn[2].size - catn[3].size - catn[4].size - catn[5].size - catn[6].size]
-                else -> catn[8][i - sz0 - catn[1].size - catn[2].size - catn[3].size - catn[4].size - catn[5].size - catn[6].size - catn[7].size]
-            }
-        }
+fun <A> combine(catn: Series<Series<A>>): Series<A> {
+    return when (val szN = catn.size) {
+        0 -> EmptySeries as Series<A>
+        1 -> catn[0]
 
         else -> {
-            val offsets = IntArray(captureSize)
-            var offset = 0
-            for (i in 0 until captureSize) {
-                offsets[i] = offset
-                offset += catn[i].size
+            val stairs by lazy {
+                val coords: Series<Int> = catn α Join<Int, (Int) -> A>::a
+                var acc = 0
+                IntArray(szN) { acc += it; acc }
             }
-            offset j { i ->
-                val j = offsets.binarySearch(i)
-                if (j >= 0) catn[j][i - offsets[j]] else catn[-j - 2][i - offsets[-j - 2]]
+            val sumSize = stairs[szN - 1]
+
+
+            sumSize j { i: Int ->
+
+              val idx=  when (szN) {
+
+                    in 2..4 -> stairs.indexOfFirst { it > i }
+                    else -> stairs.binarySearch(i)
+                }
+                val series = catn[idx]
+                val offset = if (idx == 0) i else i - stairs[idx - 1]
+                series[offset]
             }
         }
     }
-} // combine
+}
+
+
+
+
+
