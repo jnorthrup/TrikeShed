@@ -30,7 +30,7 @@ kotlin {
         )
     }
 
-    jvmToolchain(22)
+    jvmToolchain(21)
 
     jvm {
         withJava()
@@ -149,8 +149,8 @@ kotlin {
             }
         }
 
-        val macosMain by getting { dependsOn(posixMain) }
-        val macosTest by getting { dependsOn(posixTest) }
+        val macosMain by creating { dependsOn(posixMain) }
+        val macosTest by creating { dependsOn(posixTest) }
     }
 }
 
