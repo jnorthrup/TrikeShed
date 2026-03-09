@@ -69,6 +69,29 @@ Active development tracks for TrikeShed.
 
 ---
 
+## [ ] Track: Channelized Blackboard Platform
+
+**Track ID:** `channelized-blackboard-platform_20260309`
+
+**Branch:** `master`
+
+**Purpose:** Build the smallest viable channelized assembly/graph/job/block platform around Cursor/RowVec and CCEK without letting future model passes skip ahead into generic DI/reactor/socket abstractions.
+
+**Status:** 🔄 Open
+
+**Summary:**
+- Treat `Cursor` as dataframe substrate and `RowVec` as row/x-projection.
+- Keep CCEK assemblies as keyed attraction points, not library end-state.
+- Keep NIO as a backend projection/shim, not public architecture.
+- Add explicit phase gates so future LLM passes cannot jump to a fake end-state.
+- Preserve a separate blackboard overlay track from `TypeMemento`/`IOMemento`.
+
+**Slices:** `phase-00` vocabulary freeze · `phase-01` minimal channelization planner · `phase-02a` session identity · `phase-02b` block exchange · `phase-02c` planner projection · `phase-02d` HTTP-like proof · `phase-03` blackboard overlay core · `phase-04` graph/job surface · `phase-05` first protocol slice · `phase-06` backend tightening
+
+**Plan:** `conductor/tracks/channelized-blackboard-platform_20260309/plan.md`
+
+---
+
 ## [~] Track: Unified Kotlingrad DSEL for Pretesting + Paper Testing Drawdown
 
 **Track ID:** `kotlingrad-unified-dsel-pretest-paper-dd_20260302`
