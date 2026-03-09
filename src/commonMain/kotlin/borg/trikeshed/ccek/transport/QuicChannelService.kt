@@ -7,7 +7,7 @@ import kotlin.coroutines.CoroutineContext
  *
  * Key invariants (pure protocol engineering, no AI/ML):
  * - Each QUIC stream maps to a Kotlin Channel<ByteArray> under structured concurrency
- * - io_uring ring fd for zero-copy async I/O (liburing JNI, already in TrikeShed submodule)
+ * - io_uring ring fd for zero-copy async I/O (system liburing / JNI binding)
  * - XDP/eBPF for deterministic packet → per-core io_uring ring steering (hash-based, not ML)
  * - Cancellation is free: parent scope death cleans all stream channels automatically
  * - ioUringFd = -1 means epoll fallback mode

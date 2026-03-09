@@ -127,7 +127,7 @@ import kotlin.coroutines.CoroutineContext
 /**
  * Channelized QUIC transport CCEK service (Design 4).
  * - Each QUIC stream → Kotlin Channel<ByteArray> under structured concurrency
- * - io_uring ring fd for zero-copy async I/O (liburing JNI submodule)
+ * - io_uring ring fd for zero-copy async I/O (system liburing / JNI binding)
  * - XDP/eBPF for deterministic packet → per-core io_uring ring steering (hash-based)
  * - Cancellation free via structured concurrency scope
  * - ioUringFd = -1 → epoll fallback

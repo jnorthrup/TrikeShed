@@ -1,21 +1,14 @@
-~/bin/bash
-set -x
+#!/usr/bin/env bash
+set -euo pipefail
 
-#git refresh all submodules
-git submodule foreach git pull origin master
+if ! command -v pkg-config >/dev/null 2>&1; then
+    echo "pkg-config is required to locate system liburing" >&2
+    exit 1
+fi
 
-#git submodule refresh liburing
-cd liburing
-git submodule update --init
+if ! pkg-config --exists liburing; then
+    echo "system liburing not found; install the liburing development package first" >&2
+    exit 1
+fi
 
-cd $(dirname $0)/../../
-pushd #gradle top dir
-
-#locate ../../liburing from $0 dirname
-LIBURING_DIR=$(dirname $0)/../../liburing
-
-cd $LIBURING_DIR
-
-sh configure --prefix=test/output/liburing
-make -jl 8
-make install
+pkg-config --cflags --libs liburing
