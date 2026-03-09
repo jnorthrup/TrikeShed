@@ -1,24 +1,33 @@
 # Track: CCEK Keyed Services Infrastructure
 
 **Track ID:** `ccek-keyed-services_20260309`
-**Branch:** `feat/ccek-keyed-services`
-**Worktree:** `../TrikeShed-ccek` ✅ (already created)
-**Status:** 🆕 Open
+**Branch:** `master` (merged from former `feat/ccek-keyed-services`)
+**Worktree:** `../TrikeShed-ccek` detached at merged commit
+**Status:** 🔄 Course-correcting
 
 ---
 
 ## Purpose
 
 Add minimal CCEK (Coroutine Context Element Key) infrastructure to TrikeShed `commonMain`.
-Refactor 3 existing services. Add 2 coexisting transport designs (ngSCTP + channelized QUIC).
-No AI/ML features — pure oldschool protocol engineering + Kotlin structured concurrency.
+Keep only typed coroutine-key service plumbing as accepted scope.
+Transport architecture ownership is now being reassigned via `relaxfactory-literbike-arrangement_20260309`.
 
 ## Invariants
 
 - CCEK = `CoroutineContext.Element` + companion `CoroutineContext.Key`. No forced fields.
 - Kotlin native type-safe keys — no string dispatch.
+- Reject the string-keyed `ContextElement` / `EmptyContext` map pattern seen in `../literbike/src/concurrency/ccek.rs` and `../literbike/src/reactor/context.rs`.
 - Do NOT port: `CcekContext` 4-field structure, `CCEKEngine`, `TransformationPipeline`, ML hooks.
 - Flat package layout — `ccek` goes under existing `commonMain`, no new subproject.
+- `ccek/transport/*` is not the canonical owner of universal-listener or QUIC runtime architecture.
+
+## Course Correction
+
+- `ccek-01`, `ccek-03`, `ccek-04`, and `ccek-05` were materially merged.
+- The original `ccek-02` transport-design framing overstated CCEK as the transport architecture owner.
+- Bike-line CCEK experiments are useful as cautionary examples, but not as the target architecture for TrikeShed.
+- Follow-on transport arrangement now lives in `conductor/tracks/relaxfactory-literbike-arrangement_20260309/`.
 
 ---
 

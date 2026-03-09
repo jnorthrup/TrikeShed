@@ -20,19 +20,51 @@ Active development tracks for TrikeShed.
 
 ---
 
-## [ ] Track: CCEK Keyed Services Infrastructure
+## [~] Track: CCEK Keyed Services Infrastructure
 
 **Track ID:** `ccek-keyed-services_20260309`
 
-**Branch:** `feat/ccek-keyed-services` (git worktree at `../TrikeShed-ccek`)
+**Branch:** `master` (source branch merged; detached worktree remains at `../TrikeShed-ccek`)
 
-**Purpose:** Add minimal CCEK keyed service infrastructure to TrikeShed `commonMain`. Refactor 3 existing services + add 2 coexisting transport designs (ngSCTP + channelized QUIC, no AI/ML).
+**Purpose:** Keep only the minimal typed coroutine-key service substrate in TrikeShed `commonMain`. Transport architecture ownership is being moved out to a separate arrangement track.
 
-**Status:** 🆕 Open
+**Status:** 🔄 Course-correcting after merge
+
+**Summary:**
+- Base `KeyedService`/`coroutineService` and minimal service wrappers were merged.
+- The original track overstated CCEK as a transport architecture owner.
+- `ccek/transport/*` now remains only as capability-carrier scaffolding until the transport arrangement track lands.
 
 **Slices:** `ccek-01` worktree+base · `ccek-02` transport designs · `ccek-03` HomeDirService · `ccek-04` SeekHandleService · `ccek-05` IndicatorContextService · `ccek-06` tests
 
 **Plan:** `conductor/tracks/ccek-keyed-services_20260309/plan.md`
+
+---
+
+## [ ] Track: RelaxFactory/Literbike Transport Arrangement & Red-TDD Preservation
+
+**Track ID:** `relaxfactory-literbike-arrangement_20260309`
+
+**Branch:** `master`
+
+**Purpose:** Course-correct TrikeShed transport architecture using the real lineage from `../RelaxFactory`, `../litebike`, `../literbike`, and `../2litebike`. Preserve red tests/code as evidence; do not greenwash by deletion.
+
+**Status:** 🆕 Open
+
+**Summary:**
+- `RelaxFactory` contributes the reactor/no-container-cost dispatch lineage.
+- `literbike` contributes the universal listener shape, prefixed-stream preservation, QUIC/reactor split, and practical transport salvage.
+- `litebike` contributes the edge-vs-heavy-runtime arrangement and zero-cost abstraction emphasis.
+- `QuadShed` contributes parser lineage; `TrikeShedBridge` contributes service-adapter lineage.
+- Archived `old/v2superbikeshed/*` modules extend the parser/service corpus and preserve earlier transport/context splits.
+- String-keyed CCEK experiments in the bike line are recorded as negative evidence, not canonical direction.
+- CCEK is demoted to minimal typed service injection, not the protocol architecture center.
+
+**Slices:** `arrange-01` lineage truth materialization · `arrange-02` red-ledger capture · `arrange-03` universal-listener failing contracts · `arrange-04` handler/router reconciliation · `arrange-05` parser/service salvage triage
+
+**Plan:** `conductor/tracks/relaxfactory-literbike-arrangement_20260309/plan.md`
+
+**Arrangement:** `conductor/tracks/relaxfactory-literbike-arrangement_20260309/arrangement.md`
 
 ---
 
