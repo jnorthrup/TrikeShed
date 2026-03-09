@@ -70,6 +70,38 @@ Import the useful transport lineage without repeating the architectural overreac
 - Do **not** "fix" the repo by deleting failing tests or broken compile surfaces.
 - Do **not** collapse edge/runtime arrangement from `litebike` into a single undifferentiated transport blob inside TrikeShed.
 
+## CCEK Coverage Hooks Worth Keeping
+
+- `src/commonMain/kotlin/borg/trikeshed/ccek/KeyedService.kt` and `src/commonMain/kotlin/borg/trikeshed/ccek/CcekScope.kt`
+  - keep as the typed, coroutine-scoped capability lookup seam for protocol tests and bounded runtime features
+- `src/commonMain/kotlin/borg/trikeshed/ccek/transport/StreamTransport.kt`
+  - keep as the cross-transport contract for parity coverage across QUIC-like and SCTP-like stream behaviors
+- `src/commonMain/kotlin/borg/trikeshed/ccek/transport/QuicChannelService.kt` and `src/commonMain/kotlin/borg/trikeshed/ccek/transport/NgSctpService.kt`
+  - keep as invariants carriers and transport capability fixtures; do not promote them to full protocol owners
+- `src/commonMain/kotlin/borg/trikeshed/common/SeekHandle.kt`
+  - keep as the file/replay seam for parser corpora, packet captures, and cross-platform I/O coverage
+- `src/commonMain/kotlin/borg/trikeshed/context/Elements.kt`
+  - keep `IoPreference` and `IoCapability` as hints for coverage matrices across uring/epoll/kqueue/posix routes
+- `src/commonMain/kotlin/borg/trikeshed/context/HandlerRegistry.kt` and `src/commonMain/kotlin/borg/trikeshed/net/ProtocolRouter.kt`
+  - keep only the seam concept: detection -> handler lookup -> execution; the current implementations still require contract-driven repair
+
+## CCEK Composition Grammar Worth Keeping
+
+- `/Users/jim/work/old/v2superbikeshed/trikeshed-ccek/src/commonMain/kotlin/borg/trikeshed/ccek/ContextCompositionBehavior.kt`
+  - preserve as scenario language for service composition, replacement, and validation tests
+- `/Users/jim/work/old/v2superbikeshed/trikeshed-ccek/src/commonMain/kotlin/borg/trikeshed/ccek/MetaCompositionPatterns.kt`
+  - preserve as block-composition vocabulary for staged coverage plans and bounded orchestration specs
+- compositional blocks and `+`-style context assembly are useful inputs to an LLM when generating coverage, fixtures, and failing contracts
+- that scripting value stops at the boundary of executable proof; it does not make the surrounding architecture claims true
+- historical training bias matters here: the models of that era often could not implement or even reliably follow these compositions, so the grammar must be re-grounded through present code and tests
+
+## CCEK Coverage Hooks To De-Emphasize
+
+- `src/commonMain/kotlin/borg/trikeshed/common/HomeDir.kt`
+  - `HomeDirService` is support plumbing, not network/protocol architecture
+- `src/commonMain/kotlin/borg/trikeshed/signal/SignalGenerator.kt`
+  - `IndicatorContextService` is legitimate CCEK but unrelated to transport or protocol coverage
+
 ## Negative Evidence
 
 - `../literbike/src/concurrency/ccek.rs` implements CCEK as a string-keyed runtime map. That is useful only as a record of overreach and test scaffolding pressure.
@@ -78,6 +110,7 @@ Import the useful transport lineage without repeating the architectural overreac
 - `/Users/jim/work/old/v2superbikeshed/trikeshed-ccek/src/commonMain/kotlin/borg/trikeshed/ccek/CCEK.kt` expands CCEK into a four-field-plus meta-context with rules, constraints, validators, and transport adjuncts. That is exactly the scope creep this arrangement rejects.
 - `/Users/jim/work/old/v2superbikeshed/trikeshed-quic/src/commonMain/kotlin/borg/trikeshed/net/quic/QuicCCEK.kt` pushes full QUIC control/context/environment/knowledge orchestration into CCEK-named structures. Preserve it as history, not target architecture.
 - A repeated historical failure mode is model/training bias toward conventional frameworks. When the lineage says reactor, universal listener, context deck, or parser combinator, do not silently rewrite it into servlet, handler registry, DI container, or direct socket folklore.
+- A second failure mode is markdown theater that mirrors the request convincingly. Preserve only the compositional grammar and scenario shapes when they help coverage; reject unproven architecture claims.
 
 ## TDD Stance
 

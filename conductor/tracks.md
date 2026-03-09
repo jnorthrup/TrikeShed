@@ -33,9 +33,10 @@ Active development tracks for TrikeShed.
 **Summary:**
 - Base `KeyedService`/`coroutineService` and minimal service wrappers were merged.
 - The original track overstated CCEK as a transport architecture owner.
+- The retained CCEK value for network/protocol work is coverage-oriented: typed capability lookup, transport contract seams, and fixture/runtime hint injection.
 - `ccek/transport/*` now remains only as capability-carrier scaffolding until the transport arrangement track lands.
 
-**Slices:** `ccek-01` worktree+base · `ccek-02` transport designs · `ccek-03` HomeDirService · `ccek-04` SeekHandleService · `ccek-05` IndicatorContextService · `ccek-06` tests
+**Slices:** `ccek-01` worktree+base · `ccek-02` transport designs · `ccek-03` HomeDirService · `ccek-04` SeekHandleService · `ccek-05` IndicatorContextService · `ccek-06` tests · `ccek-07` coverage inventory
 
 **Plan:** `conductor/tracks/ccek-keyed-services_20260309/plan.md`
 

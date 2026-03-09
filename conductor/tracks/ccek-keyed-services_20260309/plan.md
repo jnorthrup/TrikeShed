@@ -29,6 +29,69 @@ Transport architecture ownership is now being reassigned via `relaxfactory-liter
 - Bike-line CCEK experiments are useful as cautionary examples, but not as the target architecture for TrikeShed.
 - Follow-on transport arrangement now lives in `conductor/tracks/relaxfactory-literbike-arrangement_20260309/`.
 
+## Coverage Value Retained
+
+The useful future for CCEK in network/protocol work is **coverage support**, not transport ownership.
+
+### High-value keepers
+
+- `src/commonMain/kotlin/borg/trikeshed/ccek/KeyedService.kt`
+  - typed capability keys with no string dispatch; this is the clean seam for protocol fixture injection
+- `src/commonMain/kotlin/borg/trikeshed/ccek/CcekScope.kt`
+  - direct coroutine-scoped lookup; this keeps protocol tests and runtime probes free of globals
+- `src/commonMain/kotlin/borg/trikeshed/ccek/transport/StreamTransport.kt`
+  - one cross-transport contract for stream opening and active-stream accounting; ideal for future QUIC/SCTP parity tests
+- `src/commonMain/kotlin/borg/trikeshed/common/SeekHandle.kt`
+  - `SeekHandleService` is the useful file-backed fixture seam for packet captures, replay corpora, and parser regression coverage
+
+### Medium-value keepers
+
+- `src/commonMain/kotlin/borg/trikeshed/ccek/transport/QuicChannelService.kt`
+  - keep as a capability carrier and invariants holder for QUIC coverage, not as the QUIC runtime owner
+- `src/commonMain/kotlin/borg/trikeshed/ccek/transport/NgSctpService.kt`
+  - keep as a contrasting capability carrier for message-oriented / multihoming semantics and contract coverage
+- `src/commonMain/kotlin/borg/trikeshed/context/Elements.kt`
+  - `IoPreference` and `IoCapability` are useful runtime hints for coverage matrices across uring/epoll/kqueue/posix paths
+- `src/commonMain/kotlin/borg/trikeshed/context/HandlerRegistry.kt`
+  - the overlay idea is useful for handler-lookup coverage, though the current single-key generic element needs reconciliation before it can be trusted
+- `src/commonMain/kotlin/borg/trikeshed/net/ProtocolRouter.kt`
+  - the detector-to-registry seam is useful, but the current string matching is only a toy placeholder and must not be treated as final routing logic
+
+### Low-value or non-network
+
+- `src/commonMain/kotlin/borg/trikeshed/common/HomeDir.kt`
+  - `HomeDirService` is incidental support for fixture paths and temp materialization, not a network/protocol core seam
+- `src/commonMain/kotlin/borg/trikeshed/signal/SignalGenerator.kt`
+  - `IndicatorContextService` is valid CCEK but irrelevant to network/protocol coverage and should not drive transport design
+
+### Future coverage bias
+
+- Prefer CCEK for capability injection into tests and bounded runtime seams.
+- Do not use CCEK to absorb protocol parsing, QUIC handshake state, reactor ownership, or universal-listener control flow.
+
+## LLM / Spec Scripting Value
+
+Some of the older CCEK corpus remains useful as a **compositional scripting grammar** even where its markdown was theatrical or over-claimed.
+The historical limit is that models from that period often could not actually implement the design or faithfully follow the markdown compositions; they could echo the shape without delivering the runtime.
+
+- `/Users/jim/work/old/v2superbikeshed/trikeshed-ccek/src/commonMain/kotlin/borg/trikeshed/ccek/ContextCompositionBehavior.kt`
+  - useful for expressing service composition, replacement, and validation scenarios in a way an LLM can turn into concrete coverage cases
+- `/Users/jim/work/old/v2superbikeshed/trikeshed-ccek/src/commonMain/kotlin/borg/trikeshed/ccek/MetaCompositionPatterns.kt`
+  - useful as a block-composition vocabulary for staged protocol/runtime scenarios
+- `/Users/jim/work/old/v2superbikeshed/trikeshed-ccek/META_COMPOSITION_ARCHITECTURE.md`
+  - useful only as request-shape vocabulary and scenario language, not as authoritative runtime design
+
+Use that material to generate:
+- failing tests for capability presence/replacement
+- coverage matrices for transport capability combinations
+- fixture orchestration language for parser/replay paths
+
+Do not use that material to justify:
+- kernel/database endgame claims
+- transport ownership by CCEK
+- architecture acceptance without code or failing tests
+- confidence that an LLM can execute the composition just because it can restate it fluently
+
 ---
 
 ## Slice Schema
@@ -258,6 +321,20 @@ data class IndicatorContextService(
 Test cases (use `runTest` from `kotlinx-coroutines-test`):
 
 1. **base composition** — `HomeDirService("~") + QuicChannelService()` context: retrieve both services, assert non-null
+
+---
+
+### ccek-07 — Network/Protocol Coverage Hooks Inventory
+**Status:** [x] closed
+**Owner:** master
+**Corpus:** `conductor/tracks/ccek-keyed-services_20260309/plan.md`, `src/commonMain/kotlin/borg/trikeshed/ccek/`, `src/commonMain/kotlin/borg/trikeshed/common/SeekHandle.kt`, `src/commonMain/kotlin/borg/trikeshed/context/`, `src/commonMain/kotlin/borg/trikeshed/net/`
+
+**Deliverables:**
+- identify which merged CCEK surfaces actually improve future network/protocol coverage
+- classify retained CCEK code as high-value, medium-value, or incidental for that coverage
+- explicitly demote non-network CCEK wrappers from transport importance
+
+**Verification:** inspect this inventory against the referenced in-repo source files
 2. **absent service** — empty context: `coroutineContext[HomeDirService.Key]` returns null without throwing
 3. **withContext round-trip** — `withContext(HomeDirService("/tmp")) { coroutineContext[HomeDirService.Key]!!.path }` == `"/tmp"`
 4. **transport coexistence** — `NgSctpService() + QuicChannelService()` context: both keys resolve; SCTP-first fallback pattern works

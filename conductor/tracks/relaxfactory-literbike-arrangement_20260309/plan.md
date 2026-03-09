@@ -70,6 +70,30 @@ It uses both the active sibling repos and the archival `superbikeshed` module fa
   - overgrown four-field-plus meta-orchestration CCEK; negative evidence
 - `/Users/jim/work/old/v2superbikeshed/trikeshed-quic/src/commonMain/kotlin/borg/trikeshed/net/quic/QuicCCEK.kt`
   - QUIC-specific CCEK orchestration layer; negative evidence for transport ownership inside CCEK
+- `/Users/jim/work/old/v2superbikeshed/trikeshed-ccek/src/commonMain/kotlin/borg/trikeshed/ccek/ContextCompositionBehavior.kt`
+  - useful as composition-scenario grammar for tests and coverage, not runtime truth
+- `/Users/jim/work/old/v2superbikeshed/trikeshed-ccek/src/commonMain/kotlin/borg/trikeshed/ccek/MetaCompositionPatterns.kt`
+  - useful as staged block-composition vocabulary, though its endgame claims are not architecture evidence
+- `/Users/jim/work/old/v2superbikeshed/trikeshed-ccek/META_COMPOSITION_ARCHITECTURE.md`
+  - mostly request-shaped markdown theater, but still useful for recovering composition nouns and scenario patterns
+- `src/commonMain/kotlin/borg/trikeshed/ccek/KeyedService.kt`
+  - current in-repo typed service seam worth keeping
+- `src/commonMain/kotlin/borg/trikeshed/ccek/CcekScope.kt`
+  - current coroutine-scoped capability lookup seam
+- `src/commonMain/kotlin/borg/trikeshed/ccek/transport/StreamTransport.kt`
+  - current cross-transport coverage contract
+- `src/commonMain/kotlin/borg/trikeshed/ccek/transport/QuicChannelService.kt`
+  - current QUIC capability carrier and invariants holder, not runtime owner
+- `src/commonMain/kotlin/borg/trikeshed/ccek/transport/NgSctpService.kt`
+  - current SCTP-semantics capability carrier for parity coverage
+- `src/commonMain/kotlin/borg/trikeshed/common/SeekHandle.kt`
+  - current file-backed fixture/replay seam for protocol coverage
+- `src/commonMain/kotlin/borg/trikeshed/context/Elements.kt`
+  - current runtime hint elements for I/O capability coverage
+- `src/commonMain/kotlin/borg/trikeshed/context/HandlerRegistry.kt`
+  - current handler-overlay seam that needs reconciliation
+- `src/commonMain/kotlin/borg/trikeshed/net/ProtocolRouter.kt`
+  - current detector-to-handler seam that needs real contracts
 
 ---
 
@@ -84,6 +108,8 @@ It uses both the active sibling repos and the archival `superbikeshed` module fa
 - Wishful or placeholder modules in sibling repos are evidence to triage through tests first, not code to anoint as architecture.
 - Archived `superbikeshed` modules are reference corpus only; import bounded behaviors, not entire module theories.
 - Conventional training bias toward servlet/handler/DI/socket patterns is treated as a distortion source; preserve repo-specific concepts instead of normalizing them away.
+- Request-shaped markdown that merely satisfies the ask is not sufficient evidence; only code, failing tests, or bounded scenario grammar get preserved.
+- Historical model limitations are part of the evidence: older LLMs often reproduced the composition prose without being able to code it or even follow the composition steps reliably.
 
 ---
 
@@ -190,3 +216,6 @@ These failures remain in place as tracked debt. This track must not "solve" them
 - 2026-03-09: Recorded `literbike` string-keyed CCEK/context wiring as negative evidence rather than target design.
 - 2026-03-09: Recorded `QuadShed` parser lineage and `TrikeShedBridge` adapter lineage as follow-on salvage candidates.
 - 2026-03-09: Recorded archival `old/v2superbikeshed/*` module families as parser/service/context reference corpus, with `trikeshed-ccek` and `trikeshed-quic` preserved mainly as anti-pattern evidence.
+- 2026-03-09: Identified the in-repo CCEK code that helps future network/protocol coverage: typed capability lookup, stream-transport contract seams, fixture I/O seams, and I/O capability hints.
+- 2026-03-09: Distinguished useful CCEK composition grammar from theatrical markdown; preserve the former as test/spec scripting material only.
+- 2026-03-09: Recorded that historical model bias also limited execution fidelity; composition markdown from that era cannot be treated as proof that the design was implementable by the assisting model.
