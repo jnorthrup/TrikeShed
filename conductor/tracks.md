@@ -20,7 +20,7 @@ Active development tracks for TrikeShed.
 
 ---
 
-## [~] Track: CCEK Keyed Services Infrastructure
+## [x] Track: CCEK Keyed Services Infrastructure
 
 **Track ID:** `ccek-keyed-services_20260309`
 
@@ -28,7 +28,7 @@ Active development tracks for TrikeShed.
 
 **Purpose:** Keep only the minimal typed coroutine-key service substrate in TrikeShed `commonMain`. Transport architecture ownership is being moved out to a separate arrangement track.
 
-**Status:** 🔄 Course-correcting after merge
+**Status:** ✅ Completed
 
 **Summary:**
 - Base `KeyedService`/`coroutineService` and minimal service wrappers were merged.

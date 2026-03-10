@@ -3,7 +3,7 @@
 **Track ID:** `ccek-keyed-services_20260309`
 **Branch:** `master` (merged from former `feat/ccek-keyed-services`)
 **Worktree:** `../TrikeShed-ccek` detached at merged commit
-**Status:** 🔄 Course-correcting
+**Status:** ✅ Completed
 
 ---
 
@@ -97,7 +97,7 @@ Do not use that material to justify:
 ## Slice Schema
 
 ### ccek-01 — Base Interface
-**Status:** [ ] open
+**Status:** [x] closed
 **Owner:** slave
 **Corpus:** new files under `src/commonMain/kotlin/borg/trikeshed/ccek/`
 
@@ -131,7 +131,7 @@ suspend fun <T : KeyedService> coroutineService(key: CoroutineContext.Key<T>): T
 ---
 
 ### ccek-02 — Transport Coexistence Designs
-**Status:** [ ] open
+**Status:** [x] closed
 **Owner:** slave
 **Corpus:** new files under `src/commonMain/kotlin/borg/trikeshed/ccek/transport/`
 **Depends on:** ccek-01 (KeyedService must exist)
@@ -232,7 +232,7 @@ withContext(ctx) {
 ---
 
 ### ccek-03 — HomeDirService
-**Status:** [ ] open
+**Status:** [x] closed
 **Owner:** slave
 **Corpus:** `src/commonMain/kotlin/borg/trikeshed/common/HomeDir.kt` (modify only — append, do not restructure)
 **Depends on:** ccek-01
@@ -257,7 +257,7 @@ data class HomeDirService(val path: String) : KeyedService {
 ---
 
 ### ccek-04 — SeekHandleService
-**Status:** [ ] open
+**Status:** [x] closed
 **Owner:** slave
 **Corpus:** `src/commonMain/kotlin/borg/trikeshed/common/SeekHandle.kt` (modify only — append)
 **Depends on:** ccek-01
@@ -282,7 +282,7 @@ data class SeekHandleService(val handle: SeekHandle) : KeyedService {
 ---
 
 ### ccek-05 — IndicatorContextService
-**Status:** [ ] open
+**Status:** [x] closed
 **Owner:** slave
 **Corpus:** `src/commonMain/kotlin/borg/trikeshed/signal/SignalGenerator.kt` (modify only — append)
 **Depends on:** ccek-01
@@ -313,7 +313,7 @@ data class IndicatorContextService(
 ---
 
 ### ccek-06 — Tests
-**Status:** [ ] open
+**Status:** [x] closed
 **Owner:** slave
 **Corpus:** `src/jvmTest/kotlin/borg/trikeshed/ccek/KeyedServiceTest.kt` (create new)
 **Depends on:** ccek-01 through ccek-05
