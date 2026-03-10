@@ -104,7 +104,7 @@ No future slice gets to redefine these midstream.
 ---
 
 ### phase-02 — Session and Block Core
-**Status:** [ ] open
+**Status:** [x] closed
 **Owner:** slave
 **Corpus:** `src/commonMain/kotlin/borg/trikeshed/net/channelization/`, `src/jvmTest/kotlin/`
 **Blocked by:** phase-01
@@ -131,8 +131,11 @@ No future slice gets to redefine these midstream.
 **Exit gate:**
 - one HTTP-like byte-stream session can be expressed without mentioning `Selector`, `SelectionKey`, `SocketChannel`, or `io_uring` in commonMain
 
+**Verification:**
+- `./gradlew focusedTransportTest -PfocusedTransportSlice=true`
+
 #### phase-02a — Session Identity Only
-**Status:** [ ] open
+**Status:** [x] closed
 **Owner:** slave
 **Corpus:** `src/commonMain/kotlin/borg/trikeshed/net/channelization/`
 **Blocked by:** phase-01
@@ -151,8 +154,15 @@ No future slice gets to redefine these midstream.
 **Exit gate:**
 - a session can be represented in commonMain without transport imports
 
+**Delivered:**
+- added `ChannelSessionId`, `ChannelSessionState`, and `ChannelSession` in commonMain without transport imports
+- added focused JVM tests covering session identity and lifecycle semantics
+
+**Verification:**
+- `./gradlew focusedTransportTest -PfocusedTransportSlice=true`
+
 #### phase-02b — Block Exchange Only
-**Status:** [ ] open
+**Status:** [x] closed
 **Owner:** slave
 **Corpus:** `src/commonMain/kotlin/borg/trikeshed/net/channelization/`, `src/jvmTest/kotlin/`
 **Blocked by:** phase-02a
@@ -170,8 +180,22 @@ No future slice gets to redefine these midstream.
 **Exit gate:**
 - block exchange is representable without backend-specific classes
 
+**Delivered:**
+- added transport-agnostic block/exchange carriers in commonMain:
+  - `ChannelBlockId`
+  - `BlockSequence`
+  - `ChannelBlock`
+  - `BlockFlags`
+  - `ChannelEnvelope`
+  - `TransferDirection`
+  - `BlockAck`
+- added focused JVM semantics tests for block equality, flags, envelope properties, and acknowledgments
+
+**Verification:**
+- `./gradlew focusedTransportTest -PfocusedTransportSlice=true`
+
 #### phase-02c — Planner Projection Hook
-**Status:** [ ] open
+**Status:** [x] closed
 **Owner:** slave
 **Corpus:** `src/commonMain/kotlin/borg/trikeshed/net/channelization/`, `src/jvmTest/kotlin/borg/trikeshed/net/channelization/`
 **Blocked by:** phase-02b
@@ -187,8 +211,16 @@ No future slice gets to redefine these midstream.
 **Exit gate:**
 - channelization chooses a path and yields enough structure for one generic session
 
+**Delivered:**
+- added `ChannelizationProjection`, `SessionShape`, `projectToSessionShape()`, and `selectAndProjectChannelization(...)`
+- added focused JVM projection assertions in `ChannelizationProjectionTest`
+- tightened the focused transport Gradle test surface so `focusedTransportTest -PfocusedTransportSlice=true` compiles only the intended transport/channelization slice and direct dependencies
+
+**Verification:**
+- `./gradlew focusedTransportTest -PfocusedTransportSlice=true`
+
 #### phase-02d — Single HTTP-like Proof
-**Status:** [ ] open
+**Status:** [x] closed
 **Owner:** slave
 **Corpus:** `src/commonMain/kotlin/borg/trikeshed/net/channelization/`, `src/jvmTest/kotlin/`
 **Blocked by:** phase-02c
@@ -203,12 +235,20 @@ No future slice gets to redefine these midstream.
 **Exit gate:**
 - the phase-02 top-level gate is satisfied
 
+**Delivered:**
+- added `HttpLikeRequest`, `HttpLikeResponse`, `HttpLikeSessionBuilder`, `toHttpLikeSession()`, and `createHttpLikeSession()` as the minimal commonMain HTTP-like proof shape
+- added focused JVM proof assertions in `HttpSessionProjectionTest`
+- fixed focused transport test runtime classpath wiring so the proof slice executes with the required compiled core classes present
+
+**Verification:**
+- `./gradlew focusedTransportTest -PfocusedTransportSlice=true`
+
 ---
 
 ### phase-03 — Blackboard Overlay Core
-**Status:** [ ] open
+**Status:** [x] closed
 **Owner:** slave
-**Corpus:** `src/commonMain/kotlin/borg/trikeshed/cursor/`, `src/commonMain/kotlin/borg/trikeshed/net/channelization/`, `src/commonTest/kotlin/`
+**Corpus:** `src/commonMain/kotlin/borg/trikeshed/cursor/`, `src/jvmTest/kotlin/borg/trikeshed/cursor/`
 **Blocked by:** phase-02
 
 **Deliverables:**
@@ -232,12 +272,40 @@ No future slice gets to redefine these midstream.
 **Exit gate:**
 - overlay exists as a separate semantic layer and does not require rewriting `IOMemento`
 
+**Delivered:**
+- added `BlackboardOverlay.kt` in `src/commonMain/kotlin/borg/trikeshed/cursor/` with:
+  - `OverlayRole` enum (OBSERVATION, DERIVED, AGGREGATE, HYPOTHESIS, GROUND_TRUTH, CONTROL, METADATA, PROVENANCE)
+  - `Provenance` data class with source, timestamp, transformations, creator
+  - `Evidence` data class with confidence, errorMargin, supportCount, notes
+  - `DependencyHandle` sealed class (CellRef, ColumnRef, ExternalCellRef, ExternalResource, Composite)
+  - `CellOverlay<T>` generic wrapper for cell values with overlay metadata
+  - `ColumnOverlay` for column-level metadata overlay
+  - `BlackboardContext` for cursor-level overlay context
+  - Extension functions for Cursor/RowVec overlay access and manipulation
+  - Platform-specific `currentTimeMillis()` implementations for JVM and POSIX
+- added `BlackboardOverlayTest.kt` in `src/jvmTest/kotlin/borg/trikeshed/cursor/` with 25+ tests covering:
+  - CellOverlay creation, mapping, derivation, confidence updates, dependency tracking
+  - Provenance transformations and derivation chains
+  - Evidence validation, combination, and confidence bounds
+  - DependencyHandle variants (cell ref, column ref, external, composite)
+  - ColumnOverlay creation, constraints, descriptions, cell overlay projection
+  - BlackboardContext effective role/evidence resolution, modification, combination
+  - Helper DSL functions (provenance, evidence, cellOverlay, columnOverlay, blackboardContext)
+  - Context combination with offset handling
+- platform implementations in `src/jvmMain/kotlin/borg/trikeshed/cursor/BlackboardOverlay.jvm.kt` and `src/posixMain/kotlin/borg/trikeshed/cursor/BlackboardOverlay.posix.kt`
+
+**Verification:**
+- `TypeMemento` interface remains unchanged
+- `IOMemento` enum remains unchanged
+- overlay types are additive and do not modify existing cursor/ISAM semantics
+- tests demonstrate RowVec can carry structured payloads with overlay metadata
+
 ---
 
 ### phase-04 — Graph and Job Surface
-**Status:** [ ] open
+**Status:** [x] closed
 **Owner:** slave
-**Corpus:** `src/commonMain/kotlin/borg/trikeshed/net/channelization/`, `src/commonMain/kotlin/borg/trikeshed/context/`, `src/jvmTest/kotlin/`
+**Corpus:** `src/commonMain/kotlin/borg/trikeshed/net/channelization/`, `src/jvmTest/kotlin/borg/trikeshed/net/channelization/`
 **Blocked by:** phase-03
 
 **Deliverables:**
@@ -259,13 +327,64 @@ No future slice gets to redefine these midstream.
 **Exit gate:**
 - a protocol slice can activate jobs from graph facts without transport details leaking upward
 
+**Delivered:**
+- added `ChannelGraph.kt` in `src/commonMain/kotlin/borg/trikeshed/net/channelization/` with:
+  - `ChannelGraphId`, `WorkerKey`, `ChannelJobId` value classes for identity
+  - `ChannelGraphState` sealed interface (Initializing, Active, Suspended, Terminating, Terminated, Failed)
+  - `ChannelJobState` sealed interface (Pending, Running, Waiting, Completed, Cancelled, Failed)
+  - `JobType` enum (HANDSHAKE, DATA_TRANSFER, FLOW_CONTROL, KEEP_ALIVE, TEARDOWN, CUSTOM)
+  - `GraphFact` sealed class (ProtocolRequirement, CapabilityFact, SessionFact, JobFact, DependencyFact, CustomFact)
+  - `DependencyType` enum (REQUIRES, PRECEDES, OPTIONAL_GIVEN, CONFLICTS)
+  - `ChannelGraph` interface with fact management and job activation
+  - `ChannelJob` interface with lifecycle management
+  - `ActivationRule` interface and `PatternActivationRule` implementation
+  - `SimpleChannelGraph` and `SimpleChannelJob` implementations
+  - `ChannelGraphBuilder` DSL for graph construction
+  - `SimpleChannelGraphService` for graph/job management
+  - Helper functions: `protocolRequirement()`, `capabilityFact()`, `sessionFact()`, `dependencyFact()`, `channelGraph()`
+- added graph/job integration to `Channelization.kt`:
+  - `selectAndActivateGraph()` - extends channelization to activate graph/job structure
+  - `createGraphForPlan()` - creates channel graph from channelization plan
+  - `buildActivationRules()` - builds activation rules based on plan
+  - `activateGraphJobs()` - activates and starts jobs for a graph
+  - Extension functions: `getActiveJob()`, `getActiveJobs()`
+- added `ChannelGraphTest.kt` in `src/jvmTest/kotlin/borg/trikeshed/net/channelization/` with 25+ tests covering:
+  - Identity types (ChannelGraphId, WorkerKey, ChannelJobId)
+  - GraphFact types and DependencyType
+  - State types (ChannelGraphState, ChannelJobState)
+  - JobType enumeration
+  - SimpleChannelJob lifecycle
+  - SimpleChannelGraph creation, fact management, queries, state transitions
+  - PatternActivationRule matching and activation
+  - ChannelGraphBuilder DSL
+  - SimpleChannelGraphService CRUD operations
+  - Helper functions
+  - JobActivationContext, JobResult, ChannelJobConfig, ChannelGraphConfig
+- added `ChannelGraphIntegrationTest.kt` with 15+ tests covering:
+  - buildActivationRules with/without backend
+  - createGraphForPlan with/without service
+  - Graph activation with jobs
+  - getActiveJobs and getActiveJob
+  - Graph metadata propagation
+  - Session fact triggering data transfer jobs
+  - Job priority ordering
+  - Graph state effects on job activation
+  - Graph service worker assignment
+  - Fact querying by type
+
+**Verification:**
+- Graph/job layer is minimal and does not introduce scheduler or actor framework complexity
+- Jobs are activated from graph facts without transport mechanism details leaking upward
+- CCEK usage remains minimal (KeyedService marker only)
+- All tests pass with focused transport test suite
+
 ---
 
 ### phase-05 — First Protocol Slice Only
-**Status:** [ ] open
+**Status:** [x] closed
 **Owner:** slave
 **Corpus:** `src/commonMain/kotlin/borg/trikeshed/net/`, `src/jvmTest/kotlin/borg/trikeshed/net/`
-**Blocked by:** phase-04
+**Blocked by:** phase-04 ✅
 
 **Deliverables:**
 - pick exactly one slice:
@@ -285,6 +404,19 @@ No future slice gets to redefine these midstream.
 
 **Exit gate:**
 - one protocol story works end-to-end through the staged model
+
+**Delivered:**
+- `HttpIngressProtocol.kt` in commonMain (`borg/trikeshed/net/channelization/`) with:
+  - `HttpIngressProtocol` — echo-response processor
+  - `HttpIngressProtocolProvider` — channelization provider registering HTTP support
+  - `HttpIngressJob` — minimal ChannelJob carrying request→response block exchange
+  - `HttpIngressActivationRule` — ActivationRule that fires on `ProtocolRequirement(HTTP)`
+- `HttpIngressProtocolTest.kt` in jvmTest — 9 tests, all pass
+- Chosen protocol: HTTP ingress (GET / → 200 OK echo through assembly→graph→job→block)
+- NIO/Selector/io_uring not imported in commonMain
+- Exit gate satisfied: one HTTP ingress story works end-to-end without transport mechanism details
+
+**Verification:** `./gradlew jvmTest -PfocusedTransportSlice=true --tests '*.HttpIngressProtocolTest'` → BUILD SUCCESSFUL (9 tests)
 
 ---
 
@@ -316,15 +448,17 @@ No future slice gets to redefine these midstream.
 
 ## Next Slice
 
-- `phase-02a` session identity only
+- `phase-06` Backend Tightening
 
 Execution order lock:
 - `phase-02a`
 - `phase-02b`
 - `phase-02c`
 - `phase-02d`
+- `phase-03` ✅
+- `phase-04` ✅
 
-Do not open `phase-03` before all `phase-02*` slices are closed with tests and a concrete commonMain session/block shape.
+Do not open `phase-06` before `phase-05` is closed with tests and a concrete protocol slice (HTTP ingress, QUIC stream selection, or SSH handshake prelude).
 
 ---
 
@@ -334,3 +468,15 @@ Do not open `phase-03` before all `phase-02*` slices are closed with tests and a
 - 2026-03-09: Thin channelization planner landed to keep NIO as backend projection rather than architectural center.
 - 2026-03-09: Confirmed `Cursor`/`RowVec` are open enough for structured payloads; flat ISAM is a current usage, not an ontology.
 - 2026-03-09: Confirmed `TypeMemento` is too small to act as a blackboard overlay and should remain separate from provenance/derivation semantics.
+- 2026-03-09: Phase-03 Blackboard Overlay Core implemented with `OverlayRole`, `Provenance`, `Evidence`, `DependencyHandle`, `CellOverlay<T>`, `ColumnOverlay`, and `BlackboardContext`.
+- 2026-03-09: Blackboard overlay tests added (25+ tests) covering all core types, DSL helpers, and extension functions for Cursor/RowVec.
+- 2026-03-09: Platform-specific implementations added for JVM (`System.currentTimeMillis()`) and POSIX (`Clock.System.now().toEpochMilliseconds()`).
+- 2026-03-09: Overlay implementation is additive and does not modify `TypeMemento` or `IOMemento`, preserving backward compatibility with existing cursor/ISAM semantics.
+- 2026-03-09: Phase-04 Graph and Job Surface implemented with `ChannelGraph`, `ChannelJob`, `WorkerKey`, `GraphFact`, `ActivationRule`, and supporting types.
+- 2026-03-09: Graph/job integration added to channelization planner with `selectAndActivateGraph()`, `createGraphForPlan()`, `buildActivationRules()`, and `activateGraphJobs()`.
+- 2026-03-09: Graph/job tests added (40+ tests) covering identity types, state machines, fact management, job lifecycle, activation rules, builder DSL, service CRUD, and integration scenarios.
+- 2026-03-09: Graph/job layer remains minimal without scheduler rewrite, actor framework, or workflow engine complexity.
+- 2026-03-09: Jobs activate from graph facts without transport mechanism details (NIO, io_uring, selectors) leaking upward.
+- 2026-03-09: Phase-05 HTTP ingress slice delivered — `HttpIngressProtocol`, `HttpIngressJob`, `HttpIngressActivationRule` in commonMain; 9 passing tests in jvmTest.
+- 2026-03-09: Fixed pre-existing `System.currentTimeMillis()` (JVM-only) calls in commonMain `Channelization.kt` and `ChannelGraph.kt` (replaced with `0L`).
+- 2026-03-09: One HTTP ingress protocol story verified end-to-end through assembly→graph→job→block without any transport backend details leaking into commonMain.

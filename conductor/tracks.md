@@ -61,7 +61,7 @@ Active development tracks for TrikeShed.
 - String-keyed CCEK experiments in the bike line are recorded as negative evidence, not canonical direction.
 - CCEK is demoted to minimal typed service injection, not the protocol architecture center.
 
-**Slices:** `arrange-01` lineage truth materialization · `arrange-02` red-ledger capture · `arrange-03` universal-listener failing contracts · `arrange-04` handler/router reconciliation · `arrange-05` parser/service salvage triage
+**Slices:** `arrange-01` ✅ lineage truth materialization · `arrange-02` ✅ red-ledger capture · `arrange-03` ✅ universal-listener failing contracts · `arrange-04` handler/router reconciliation · `arrange-05` parser/service salvage triage
 
 **Plan:** `conductor/tracks/relaxfactory-literbike-arrangement_20260309/plan.md`
 
@@ -86,9 +86,19 @@ Active development tracks for TrikeShed.
 - Add explicit phase gates so future LLM passes cannot jump to a fake end-state.
 - Preserve a separate blackboard overlay track from `TypeMemento`/`IOMemento`.
 
-**Slices:** `phase-00` vocabulary freeze · `phase-01` minimal channelization planner · `phase-02a` session identity · `phase-02b` block exchange · `phase-02c` planner projection · `phase-02d` HTTP-like proof · `phase-03` blackboard overlay core · `phase-04` graph/job surface · `phase-05` first protocol slice · `phase-06` backend tightening
+**Slices:** `phase-00` ✅ vocabulary freeze · `phase-01` ✅ minimal channelization planner · `phase-02a` ✅ session identity · `phase-02b` ✅ block exchange · `phase-02c` ✅ planner projection · `phase-02d` ✅ HTTP-like proof · `phase-03` ✅ blackboard overlay core · `phase-04` ✅ graph/job surface · `phase-05` ✅ first protocol slice (HTTP ingress) · `phase-06` backend tightening
 
 **Plan:** `conductor/tracks/channelized-blackboard-platform_20260309/plan.md`
+
+**Progress:**
+- Phase-03 Blackboard Overlay Core completed with full implementation and tests
+- Added overlay types: `OverlayRole`, `Provenance`, `Evidence`, `DependencyHandle`, `CellOverlay<T>`, `ColumnOverlay`, `BlackboardContext`
+- Added 25+ unit tests covering all overlay types and extension functions
+- Implementation is additive and preserves backward compatibility with existing cursor/ISAM semantics
+- Phase-04 Graph and Job Surface completed with full implementation and tests
+- Added graph/job types: `ChannelGraph`, `ChannelJob`, `WorkerKey`, `GraphFact`, `ActivationRule`, `ChannelGraphService`
+- Added 40+ unit tests covering graph/job lifecycle, activation rules, and integration with channelization planner
+- Graph/job layer is minimal without scheduler/actor framework complexity; jobs activate from facts without transport details leaking upward
 
 ---
 

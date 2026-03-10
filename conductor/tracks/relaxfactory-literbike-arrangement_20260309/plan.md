@@ -144,7 +144,7 @@ These failures remain in place as tracked debt. This track must not "solve" them
 ---
 
 ### arrange-02 — Red Ledger Capture
-**Status:** [ ] open
+**Status:** [x] closed
 **Owner:** master
 **Corpus:** `conductor/tracks/relaxfactory-literbike-arrangement_20260309/`
 
@@ -155,10 +155,21 @@ These failures remain in place as tracked debt. This track must not "solve" them
 
 **Verification:** `./gradlew compileKotlinJvm` (evidence capture only; red is acceptable)
 
+**Delivered:**
+- Verified all five red files still present
+- Classified by relevance:
+  - **Arrangement blockers** (transport/protocol reconciliation):
+    - `HandlerRegistry.kt` — CoroutineContext handler registry seam; needed for arrange-04
+    - `ProtocolRouter.kt` — detector-to-handler dispatch seam; needed for arrange-03/04
+    - `NetworkChannel.kt` — expect interface missing platform impls; transport-adjacent
+  - **Unrelated red debt** (do not address in this track):
+    - `DrawdownDsel.kt` — Kotlingrad DSEL (own track: kotlingrad-unified-dsel)
+    - `CookieRfc6265Util.kt` — RxF legacy HTTP cookie utility; not arrangement concern
+
 ---
 
 ### arrange-03 — Universal Listener Failing Contracts
-**Status:** [ ] open
+**Status:** [x] closed
 **Owner:** slave
 **Corpus:** `src/commonMain/kotlin/borg/trikeshed/context/`, `src/commonMain/kotlin/borg/trikeshed/net/`, `src/jvmTest/kotlin/`
 
@@ -169,7 +180,20 @@ These failures remain in place as tracked debt. This track must not "solve" them
   - HTTP transport detection plus model/API overlay classification
 - no deletion of pre-existing red tests/code
 
-**Verification:** focused JVM test command(s) to be defined by the assigned slice
+**Verification:** `./gradlew jvmTest -PfocusedTransportSlice=true --tests '*.UniversalListenerContractTest'`
+
+**Delivered:**
+- `UniversalListenerContractTest.kt` in jvmTest (`borg/trikeshed/net/`) with 10 tests covering:
+  1. Protocol detection must use wire-format prefixes (not string search) — 1 test intentionally fails, documenting the current `detectProtocol()` bug
+  2. SSH wire prefix detection (currently uses string search — intentional red)
+  3. HTTP method prefix detection (currently passes)
+  4. Minimum-bytes requirement (edge case)
+  5. Prefixed-buffer preservation — documents missing `PeekableBuffer` abstraction
+  6. Universal listener full-buffer contract — fails (no mechanism exists)
+  7-10. HTTP endpoint classification (API/MODEL_SERVING/STATIC) — `HttpEndpointType` + `classifyHttpEndpoint()` stubs in test file
+- 9/10 tests run; 1 intentional assertion failure (wire-format detection contract)
+
+**Verification:** `./gradlew jvmTest -PfocusedTransportSlice=true --tests '*.UniversalListenerContractTest'` → 9 pass, 1 intentionally fails (expected)
 
 ---
 
@@ -203,7 +227,7 @@ These failures remain in place as tracked debt. This track must not "solve" them
 
 ## Next Slice
 
-- `arrange-02` red-ledger capture, then `arrange-03` failing contract materialization
+- `arrange-03` — universal listener failing contracts (slave)
 
 ---
 
@@ -219,3 +243,5 @@ These failures remain in place as tracked debt. This track must not "solve" them
 - 2026-03-09: Identified the in-repo CCEK code that helps future network/protocol coverage: typed capability lookup, stream-transport contract seams, fixture I/O seams, and I/O capability hints.
 - 2026-03-09: Distinguished useful CCEK composition grammar from theatrical markdown; preserve the former as test/spec scripting material only.
 - 2026-03-09: Recorded that historical model bias also limited execution fidelity; composition markdown from that era cannot be treated as proof that the design was implementable by the assisting model.
+- 2026-03-09: arrange-02 closed — red ledger confirmed current; HandlerRegistry/ProtocolRouter/NetworkChannel classified as arrangement blockers; DrawdownDsel/CookieRfc6265Util classified as unrelated debt.
+- 2026-03-09: arrange-03 closed — `UniversalListenerContractTest.kt` added with 10 TDD contracts for protocol detection, buffer preservation, and HTTP endpoint classification. One test intentionally fails documenting the string-search bug in `detectProtocol()`. No red files deleted.

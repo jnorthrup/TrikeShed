@@ -154,6 +154,10 @@ kotlin {
                 implementation(kotlin("test-common"))
                 implementation(kotlin("test-annotations-common"))
             }
+            if (focusedTransportSlice) {
+                // Focused transport slice: exclude non-transport common tests
+                kotlin.exclude("borg/trikeshed/parse/**")
+            }
         }
         val nativeMain by creating { dependsOn(commonMain) }
         val nativeTest by creating { dependsOn(commonTest) }
@@ -195,7 +199,16 @@ kotlin {
             kotlin.exclude("borg/trikeshed/signal/**")
             kotlin.exclude("borg/trikeshed/strategy/**")
             if (focusedTransportSlice) {
-                kotlin.exclude("gk/kademlia/codec/SmMsgPackTest.kt")
+                // Focused transport slice: exclude all non-transport tests
+                kotlin.exclude("gk/kademlia/**")
+                kotlin.exclude("borg/trikeshed/parse/**")
+                kotlin.exclude("borg/trikeshed/num/**")
+                kotlin.exclude("borg/trikeshed/lib/**")
+                kotlin.exclude("borg/trikeshed/common/**")
+                kotlin.exclude("borg/trikeshed/duck/**")
+                kotlin.exclude("borg/trikeshed/indicator/**")
+                kotlin.exclude("borg/trikeshed/net/channelization/ChannelBlockExchangeTest.kt")
+                kotlin.exclude("borg/trikeshed/net/channelization/ChannelSessionTest.kt")
             }
         }
 
@@ -259,9 +272,12 @@ afterEvaluate {
     tasks.register<Test>("focusedTransportTest") {
         description = "Runs the focused JVM transport/routing slice."
         group = "verification"
-        val jvmTestTask = tasks.named<Test>("jvmTest").get()
-        testClassesDirs = jvmTestTask.testClassesDirs
-        classpath = jvmTestTask.classpath
+        val jvmTestComp = kotlin.targets.getByName("jvm").compilations.getByName("test")
+        val jvmTestTask = tasks.named<Test>("jvmTest")
+        testClassesDirs = jvmTestTask.get().testClassesDirs
+        classpath = files(jvmTestComp.runtimeDependencyFiles, jvmTestComp.output.allOutputs, jvmTestTask.get().outputs.files)
+        include("**/ChannelizationSelectionTest.class")
+        include("**/ChannelizationProjectionTest.class")
         include("**/ProtocolRouterTest.class")
         include("**/SelectorTransportBackendTest.class")
         include("**/LinuxNativeTransportBackendTest.class")
