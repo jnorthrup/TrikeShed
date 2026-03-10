@@ -61,7 +61,7 @@ Active development tracks for TrikeShed.
 - String-keyed CCEK experiments in the bike line are recorded as negative evidence, not canonical direction.
 - CCEK is demoted to minimal typed service injection, not the protocol architecture center.
 
-**Slices:** `arrange-01` ✅ lineage truth materialization · `arrange-02` ✅ red-ledger capture · `arrange-03` ✅ universal-listener failing contracts · `arrange-04` handler/router reconciliation · `arrange-05` parser/service salvage triage
+**Slices:** `arrange-01` ✅ · `arrange-02` ✅ · `arrange-03` ✅ universal-listener contracts · `arrange-04` ✅ handler/router reconciliation · `arrange-05` parser/service salvage triage
 
 **Plan:** `conductor/tracks/relaxfactory-literbike-arrangement_20260309/plan.md`
 
@@ -69,7 +69,7 @@ Active development tracks for TrikeShed.
 
 ---
 
-## [ ] Track: Channelized Blackboard Platform
+## [x] Track: Channelized Blackboard Platform
 
 **Track ID:** `channelized-blackboard-platform_20260309`
 
@@ -86,7 +86,7 @@ Active development tracks for TrikeShed.
 - Add explicit phase gates so future LLM passes cannot jump to a fake end-state.
 - Preserve a separate blackboard overlay track from `TypeMemento`/`IOMemento`.
 
-**Slices:** `phase-00` ✅ vocabulary freeze · `phase-01` ✅ minimal channelization planner · `phase-02a` ✅ session identity · `phase-02b` ✅ block exchange · `phase-02c` ✅ planner projection · `phase-02d` ✅ HTTP-like proof · `phase-03` ✅ blackboard overlay core · `phase-04` ✅ graph/job surface · `phase-05` ✅ first protocol slice (HTTP ingress) · `phase-06` backend tightening
+**Slices:** `phase-00` ✅ · `phase-01` ✅ · `phase-02a` ✅ · `phase-02b` ✅ · `phase-02c` ✅ · `phase-02d` ✅ · `phase-03` ✅ blackboard overlay core · `phase-04` ✅ graph/job surface · `phase-05` ✅ HTTP ingress slice · `phase-06` ✅ backend tightening
 
 **Plan:** `conductor/tracks/channelized-blackboard-platform_20260309/plan.md`
 

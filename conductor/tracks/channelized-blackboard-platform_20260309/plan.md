@@ -421,7 +421,7 @@ No future slice gets to redefine these midstream.
 ---
 
 ### phase-06 — Backend Tightening
-**Status:** [ ] open
+**Status:** [x] closed
 **Owner:** slave
 **Corpus:** `src/jvmMain/kotlin/one/xio/spi/`, `src/linuxMain/`, `src/posixMain/`, `src/jvmTest/kotlin/`
 **Blocked by:** phase-05
@@ -444,11 +444,18 @@ No future slice gets to redefine these midstream.
 **Exit gate:**
 - backends are clearly projections of the semantic core, not rival architectures
 
+**Delivered:**
+- `SelectorSessionProjection.kt` (jvmMain/one/xio/spi/): thin bridge that projects raw bytes → `ChannelSession` via `SelectorTransportBackend.classifyIngress()`. NIO types (Selector, SelectionKey) hidden from public API.
+- `SelectorBackendProjectionTest.kt` (jvmTest): 14 tests covering classifyIngress for HTTP/QUIC/SSH/UNKNOWN, session creation, state transitions, steering decision projection, and NIO-type isolation
+- Phase-05 HTTP ingress tests still pass after backend tightening
+
+**Verification:** `./gradlew jvmTest -PfocusedTransportSlice=true --tests '*.SelectorBackendProjectionTest' --tests '*.HttpIngressProtocolTest'` → BUILD SUCCESSFUL
+
 ---
 
 ## Next Slice
 
-- `phase-06` Backend Tightening
+- track complete — all phases closed
 
 Execution order lock:
 - `phase-02a`

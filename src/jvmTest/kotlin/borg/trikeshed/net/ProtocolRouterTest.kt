@@ -15,8 +15,8 @@ class ProtocolRouterTest {
     @Test
     fun detectProtocolUsesTypedProtocolIds() {
         assertEquals(ProtocolId.HTTP, detectProtocol("GET / HTTP/1.1\r\n\r\n".encodeToByteArray()))
-        assertEquals(ProtocolId.QUIC, detectProtocol("some quic datagram".encodeToByteArray()))
-        assertEquals(ProtocolId.SSH, detectProtocol("ssh-2.0-client".encodeToByteArray()))
+        assertEquals(ProtocolId.QUIC, detectProtocol(byteArrayOf(0x00, 0x01, 0x02, 0x03)))
+        assertEquals(ProtocolId.SSH, detectProtocol("SSH-2.0-OpenSSH_8.9".encodeToByteArray()))
         assertEquals(ProtocolId.UNKNOWN, detectProtocol("opaque bytes".encodeToByteArray()))
     }
 
@@ -45,10 +45,10 @@ class ProtocolRouterTest {
             val registry = currentHandlerRegistry<ProtocolId, ProtocolHandler>()
             assertNotNull(registry)
             assertEquals(setOf(ProtocolId.HTTP, ProtocolId.QUIC, ProtocolId.SSH), registry.keys())
-            routeProtocol("SSH banner".encodeToByteArray())
+            routeProtocol("SSH-2.0-server".encodeToByteArray())
         }
 
-        assertContentEquals(sshHandler("SSH banner".encodeToByteArray()), result)
+        assertContentEquals(sshHandler("SSH-2.0-server".encodeToByteArray()), result)
     }
 
     @Test

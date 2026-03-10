@@ -198,7 +198,7 @@ These failures remain in place as tracked debt. This track must not "solve" them
 ---
 
 ### arrange-04 — Handler/Router Reconciliation
-**Status:** [ ] open
+**Status:** [x] closed
 **Owner:** slave
 **Corpus:** `src/commonMain/kotlin/borg/trikeshed/context/HandlerRegistry.kt`, `src/commonMain/kotlin/borg/trikeshed/net/ProtocolRouter.kt`
 
@@ -208,6 +208,20 @@ These failures remain in place as tracked debt. This track must not "solve" them
 - do not claim full compile green if unrelated red debt remains
 
 **Verification:** focused compile/tests around `context` + `net`
+
+**Delivered:**
+- `detectProtocol()` rewritten to use wire-format prefix detection (no more string search):
+  - HTTP: checks exact method bytes at byte 0 (GET, POST, PUT, DELETE, HEAD, OPTIONS, PATCH)
+  - SSH: checks for 'SSH-' prefix at byte 0
+  - QUIC: checks for 0x00 first byte (QUIC long header)
+  - UNKNOWN: empty/short payloads or unrecognized prefixes
+- Dead code (`str`/`upper` string variables) removed from `detectProtocol()`
+- `HandlerRegistry.kt` preserved as-is — already correct coroutine-context seam
+- `routeProtocol()` preserved as the detection→handler-lookup→execution pipeline
+- `ProtocolRouterTest.kt` updated to match wire-format semantics (QUIC via 0x00 byte, SSH via "SSH-2.0-..." prefix)
+- Removed shadow `private typealias ProtocolHandler` from `UniversalListenerContractTest.kt`
+
+**Verification:** `./gradlew jvmTest -PfocusedTransportSlice=true --tests '*.UniversalListenerContractTest' --tests '*.ProtocolRouterTest'` → BUILD SUCCESSFUL (all pass)
 
 ---
 
@@ -245,3 +259,4 @@ These failures remain in place as tracked debt. This track must not "solve" them
 - 2026-03-09: Recorded that historical model bias also limited execution fidelity; composition markdown from that era cannot be treated as proof that the design was implementable by the assisting model.
 - 2026-03-09: arrange-02 closed — red ledger confirmed current; HandlerRegistry/ProtocolRouter/NetworkChannel classified as arrangement blockers; DrawdownDsel/CookieRfc6265Util classified as unrelated debt.
 - 2026-03-09: arrange-03 closed — `UniversalListenerContractTest.kt` added with 10 TDD contracts for protocol detection, buffer preservation, and HTTP endpoint classification. One test intentionally fails documenting the string-search bug in `detectProtocol()`. No red files deleted.
+- 2026-03-09: arrange-04 closed — `detectProtocol()` rewritten to wire-format prefix detection; dead string-search variables removed; `ProtocolRouterTest` updated to wire-format semantics; shadow `ProtocolHandler` typealias removed from test file. All ProtocolRouterTest + UniversalListenerContractTest pass.

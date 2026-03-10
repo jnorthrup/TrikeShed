@@ -361,8 +361,3 @@ fun classifyHttpEndpoint(request: ByteArray): HttpEndpointType {
     }
 }
 
-/**
- * Type alias for protocol handler function.
- * Kept in sync with ProtocolRouter.kt
- */
-private typealias ProtocolHandler = suspend (ByteArray) -> ByteArray
