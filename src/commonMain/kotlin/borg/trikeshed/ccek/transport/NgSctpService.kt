@@ -1,5 +1,6 @@
 package borg.trikeshed.ccek.transport
 
+import kotlinx.coroutines.channels.Channel
 import kotlin.coroutines.CoroutineContext
 
 /**
@@ -13,12 +14,36 @@ import kotlin.coroutines.CoroutineContext
  * - Congestion control: deterministic only (cubic / hstcp / rack)
  */
 data class NgSctpService(
-    val streams: Map<Int, StreamHandle> = emptyMap(),
+    val streams: MutableMap<Int, StreamHandle> = mutableMapOf(),
     val paths: List<String> = emptyList(),          // multi-homing: active path addresses
     val congestionControl: String = "cubic"          // cubic | hstcp | rack — deterministic only
 ) : StreamTransport {
     companion object Key : CoroutineContext.Key<NgSctpService>
+
+    // Public handle as non-negative Long (stream ID)
+    var handle: Long = 0
+        private set
+
+    // Backing map for stream handles
+    private val _streams: MutableMap<Int, StreamHandle> = streams
+
     override val key: CoroutineContext.Key<*> get() = Key
-    override suspend fun openStream(): StreamHandle = TODO("SCTP stream factory")
-    override val activeStreams: Int get() = streams.size
+
+    override suspend fun openStream(): StreamHandle {
+        val id = _streams.keys.maxOfOrNull { it }?.let { it + 1 } ?: 0
+        require(id >= 0) { "Stream ID must be non-negative" }
+
+        val send = Channel<ByteArray>(Channel.BUFFERED)
+        val recv = Channel<ByteArray>(Channel.BUFFERED)
+
+        val streamHandle = StreamHandle(id, send, recv)
+        _streams[id] = streamHandle
+
+        // Update handle to non-negative next id
+        handle = id.toLong() + 1
+
+        return streamHandle
+    }
+
+    override val activeStreams: Int get() = _streams.size
 }
