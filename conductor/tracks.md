@@ -103,6 +103,22 @@ Active development tracks for TrikeShed.
 
 ---
 
+## [ ] Track: Stream Transport Implementation
+
+**Track ID:** `stream-transport-contracts_20260310`
+
+**Branch:** `master`
+
+**Purpose:** Implement `openStream()` in `QuicChannelService` and `NgSctpService` to green 6 failing `StreamTransportContractTest` contract tests.
+
+**Status:** 🔄 Open — stream-01 contracts written (6 red tests); implementation pending
+
+**Slices:** `stream-01` ✅ failing contracts · `stream-02` QUIC stream factory · `stream-03` SCTP stream factory
+
+**Plan:** `conductor/tracks/stream-transport-contracts_20260310/plan.md`
+
+---
+
 ## [x] Track: HTTP Parser Implementation
 
 **Track ID:** `http-parser-implementation_20260310`
