@@ -226,7 +226,7 @@ These failures remain in place as tracked debt. This track must not "solve" them
 ---
 
 ### arrange-05 — Parser/Service Salvage Triage
-**Status:** [ ] open
+**Status:** [x] closed
 **Owner:** slave
 **Corpus:** `conductor/tracks/relaxfactory-literbike-arrangement_20260309/`, `src/commonMain/kotlin/borg/trikeshed/net/`, `src/jvmTest/kotlin/`
 
@@ -235,13 +235,39 @@ These failures remain in place as tracked debt. This track must not "solve" them
 - preserve wishful or placeholder sources as evidence without importing them wholesale
 - materialize new TrikeShed failing tests/specs for any selected parser/service salvage before implementation
 
-**Verification:** inspect conductor truth plus focused failing test additions
+**Verification:** `./gradlew jvmTest -PfocusedTransportSlice=true --tests '*.HttpParserContractTest' 2>&1 | tail -20`
+
+**Triage Catalog:**
+
+| Source | Package | Behavior | Verdict | Owner boundary |
+|---|---|---|---|---|
+| `v2superbikeshed/trikeshed-http/.../HttpParser.kt` | `borg.trikeshed.net.http` | `parseRequestLine(String)` → method/target/version | **salvage** — bounded pure string behavior, no platform deps | `borg.trikeshed.net.http` in commonMain |
+| `v2superbikeshed/trikeshed-http/.../HttpParser.kt` | `borg.trikeshed.net.http` | `parseHeaders(List<String>)` → name/value pairs | **salvage** — bounded pure string behavior | `borg.trikeshed.net.http` in commonMain |
+| `v2superbikeshed/trikeshed-http/.../HttpParser.kt` | `borg.trikeshed.net.http` | `parse(PlatformByteBuffer)` | **do not import** — JVM-only `PlatformByteBuffer` dep; only the pure string surface is worth salvaging | negative evidence |
+| `v2superbikeshed/trikeshed-json/.../SimpleJsonScanner.kt` | `borg.trikeshed.core` | `scan()` / `query(path)` | **evidence only** — depends on `JsonProperty` typealias not yet in TrikeShed; defer until JSON track exists | no import |
+| `v2superbikeshed/trikeshed-json/.../FastJsonScanner.kt` | `borg.trikeshed.core` | bitmap-based fast JSON scan | **evidence only** — overgrown surface; not a TDD candidate yet | no import |
+
+**Delivered:**
+- `HttpParserContractTest.kt` in jvmTest (`borg/trikeshed/net/`) with 9 failing contract tests covering:
+  1. `parseGETRequestLine` — method=GET, target, version extraction
+  2. `parsePOSTRequestLine` — POST variant
+  3. `parseHEADRequestLine` — HEAD variant + HTTP/1.0
+  4. `emptyLineReturnsNull` — guard contract
+  5. `malformedLineReturnsNull` — guard contract
+  6. `parseContentTypeHeader` — single header name/value pair
+  7. `parseMultipleHeaders` — 3-header batch
+  8. `headerValueWhitespaceIsTrimmed` — RFC 7230 trim contract
+  9. `headerLinesWithoutColonAreSkipped` — malformed line skip
+- Stubs `parseHttpRequestLine()` and `parseHttpHeaders()` defined in test file with `TODO()` — compile green, runtime red
+- Implementation target: `src/commonMain/kotlin/borg/trikeshed/net/http/HttpRequestLine.kt`
+
+**Verification:** `./gradlew jvmTest -PfocusedTransportSlice=true --tests '*.HttpParserContractTest'` → 9 compiled, 9 fail with `kotlin.NotImplementedError` (expected — red TDD state)
 
 ---
 
 ## Next Slice
 
-- `arrange-03` — universal listener failing contracts (slave)
+- track complete — all slices closed; next work is implement the parser under `src/commonMain/kotlin/borg/trikeshed/net/http/`
 
 ---
 
@@ -260,3 +286,4 @@ These failures remain in place as tracked debt. This track must not "solve" them
 - 2026-03-09: arrange-02 closed — red ledger confirmed current; HandlerRegistry/ProtocolRouter/NetworkChannel classified as arrangement blockers; DrawdownDsel/CookieRfc6265Util classified as unrelated debt.
 - 2026-03-09: arrange-03 closed — `UniversalListenerContractTest.kt` added with 10 TDD contracts for protocol detection, buffer preservation, and HTTP endpoint classification. One test intentionally fails documenting the string-search bug in `detectProtocol()`. No red files deleted.
 - 2026-03-09: arrange-04 closed — `detectProtocol()` rewritten to wire-format prefix detection; dead string-search variables removed; `ProtocolRouterTest` updated to wire-format semantics; shadow `ProtocolHandler` typealias removed from test file. All ProtocolRouterTest + UniversalListenerContractTest pass.
+- 2026-03-09: arrange-05 closed — triage catalog written; `HttpParserContractTest.kt` added with 9 failing contracts for RFC 7230 request-line and header parsing salvaged from v2superbikeshed lineage. SimpleJsonScanner and platform-dep HttpParser.parse() preserved as evidence only. 9 tests compile green, 9 fail at runtime (expected red TDD state).

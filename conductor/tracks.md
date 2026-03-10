@@ -42,7 +42,7 @@ Active development tracks for TrikeShed.
 
 ---
 
-## [ ] Track: RelaxFactory/Literbike Transport Arrangement & Red-TDD Preservation
+## [x] Track: RelaxFactory/Literbike Transport Arrangement & Red-TDD Preservation
 
 **Track ID:** `relaxfactory-literbike-arrangement_20260309`
 
@@ -50,7 +50,7 @@ Active development tracks for TrikeShed.
 
 **Purpose:** Course-correct TrikeShed transport architecture using the real lineage from `../RelaxFactory`, `../litebike`, `../literbike`, and `../2litebike`. Preserve red tests/code as evidence; do not greenwash by deletion.
 
-**Status:** 🆕 Open
+**Status:** ✅ Completed
 
 **Summary:**
 - `RelaxFactory` contributes the reactor/no-container-cost dispatch lineage.
@@ -60,8 +60,9 @@ Active development tracks for TrikeShed.
 - Archived `old/v2superbikeshed/*` modules extend the parser/service corpus and preserve earlier transport/context splits.
 - String-keyed CCEK experiments in the bike line are recorded as negative evidence, not canonical direction.
 - CCEK is demoted to minimal typed service injection, not the protocol architecture center.
+- RFC 7230 request-line and header parsing salvaged from archival lineage as failing TDD contracts; implementation deferred to next track.
 
-**Slices:** `arrange-01` ✅ · `arrange-02` ✅ · `arrange-03` ✅ universal-listener contracts · `arrange-04` ✅ handler/router reconciliation · `arrange-05` parser/service salvage triage
+**Slices:** `arrange-01` ✅ · `arrange-02` ✅ · `arrange-03` ✅ universal-listener contracts · `arrange-04` ✅ handler/router reconciliation · `arrange-05` ✅ parser/service salvage triage
 
 **Plan:** `conductor/tracks/relaxfactory-literbike-arrangement_20260309/plan.md`
 
