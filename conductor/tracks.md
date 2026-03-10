@@ -103,6 +103,22 @@ Active development tracks for TrikeShed.
 
 ---
 
+## [x] Track: HTTP Parser Implementation
+
+**Track ID:** `http-parser-implementation_20260310`
+
+**Branch:** `master`
+
+**Purpose:** Implement RFC 7230 HTTP request-line and header parsing contracts in `commonMain` to green the 9 failing `HttpParserContractTest` tests established in arrange-05.
+
+**Status:** ✅ Completed
+
+**Slices:** `http-01` ✅ request-line + header implementation
+
+**Plan:** `conductor/tracks/http-parser-implementation_20260310/plan.md`
+
+---
+
 ## [x] Track: Unified Kotlingrad DSEL for Pretesting + Paper Testing Drawdown
 
 **Track ID:** `kotlingrad-unified-dsel-pretest-paper-dd_20260302`

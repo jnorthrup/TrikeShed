@@ -1,47 +1,12 @@
 package borg.trikeshed.net
 
+import borg.trikeshed.net.http.HttpRequestLineSpec
+import borg.trikeshed.net.http.parseHttpHeaders
+import borg.trikeshed.net.http.parseHttpRequestLine
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
-
-// ── Salvage contract stubs ────────────────────────────────────────────────────
-// These stubs document the expected API surface from archival HttpParser.kt
-// (v2superbikeshed lineage). They live here until a commonMain implementation
-// is written under borg.trikeshed.net.http.
-
-/** RFC 7230 request-line: METHOD SP request-target SP HTTP-version */
-interface HttpRequestLineSpec {
-    val method: String
-    val requestTarget: String
-    val httpVersion: String
-}
-
-/**
- * Salvage contract: parse an RFC 7230 request line.
- * Returns null when the line is malformed (fewer than 3 space-delimited parts).
- *
- * CONTRACT (intentionally unimplemented — this stub always fails):
- * - "GET /path HTTP/1.1"   → method=GET, target=/path, version=HTTP/1.1
- * - "POST /api HTTP/1.1"   → method=POST, target=/api, version=HTTP/1.1
- * - "HEAD / HTTP/1.0"      → method=HEAD, target=/, version=HTTP/1.0
- * - ""                     → null
- * - "BADLINE"              → null
- */
-fun parseHttpRequestLine(line: String): HttpRequestLineSpec? = TODO("not implemented — add src/commonMain/kotlin/borg/trikeshed/net/http/HttpRequestLine.kt")
-
-// ── Header salvage contract stub ──────────────────────────────────────────────
-
-/**
- * Parse header lines (name: value) into a list of pairs.
- * Stops at blank line or end of list.
- *
- * CONTRACT (intentionally unimplemented):
- * - listOf("Content-Type: text/html", "Content-Length: 42") → [("Content-Type","text/html"), ("Content-Length","42")]
- * - Leading/trailing whitespace on value is trimmed.
- * - Lines without ':' are skipped.
- */
-fun parseHttpHeaders(lines: List<String>): List<Pair<String, String>> = TODO("not implemented — add header parsing to src/commonMain/kotlin/borg/trikeshed/net/http/")
 
 // ── Contract tests ────────────────────────────────────────────────────────────
 
