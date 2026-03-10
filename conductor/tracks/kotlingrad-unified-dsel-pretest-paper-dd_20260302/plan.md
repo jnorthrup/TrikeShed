@@ -15,7 +15,7 @@ Build a stable, testable Kotlingrad DSEL layer for drawdown-related pretesting a
 - [x] Document Gradle consumption logic for leafy projects.
 - [x] Synchronize boundaries in product/tech-stack docs.
 - [x] Add deterministic JVM test coverage for `SeriesGrad` drawdown and max-drawdown contract behavior.
-- [ ] Validate the kotlingrad pretest thin-slice path with a focused JVM test run and capture evidence in this plan.
+- [x] Validate the kotlingrad pretest thin-slice path with a focused JVM test run and capture evidence in this plan.
 
 ## Gradle Consumption Reference
 In leafy sibling projects (`moneyfan`, `curly-succotash`), include TrikeShed as a composite build in `settings.gradle.kts`:
@@ -42,3 +42,11 @@ dependencies {
 - 2026-03-08: Focused verification blocked by environment constraints:
   - `GRADLE_USER_HOME=/Users/jim/work/trikeshed/.gradle-home ./gradlew :test --tests borg.trikeshed.grad.DselBenchmarkTest`
   - failed with `java.net.UnknownHostException: services.gradle.org` (network-restricted runtime cannot download `gradle-8.13-bin.zip`).
+- 2026-03-10: kg-dd-test-contract-02 closed:
+  - Moved `DrawdownDsel.kt` from `commonMain` to `jvmMain` (it uses JVM-only `SFun<DReal>`)
+  - Removed `kotlin.exclude("borg/trikeshed/grad/**")` from jvmMain compilation
+  - Removed `kotlin.exclude("borg/trikeshed/grad/**")` from jvmTest compilation
+  - Added `DrawdownDselTest.kt` exclusion (WIP/unrelated scope) to keep default jvmTest clean
+  - Fixed `SeriesGrad.kt`: removed duplicate `eval` extension and removed unresolvable `.min()`/`.max()` calls on SFun
+  - Added `infix fun SFun<DReal>.minOf/maxOf` to `GradOps.kt` via symbolic abs-value formula
+  - `./gradlew jvmTest -PfocusedTransportSlice=true --tests 'borg.trikeshed.grad.DselBenchmarkTest'` → BUILD SUCCESSFUL (3 tests pass)

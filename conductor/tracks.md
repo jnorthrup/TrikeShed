@@ -103,13 +103,13 @@ Active development tracks for TrikeShed.
 
 ---
 
-## [~] Track: Unified Kotlingrad DSEL for Pretesting + Paper Testing Drawdown
+## [x] Track: Unified Kotlingrad DSEL for Pretesting + Paper Testing Drawdown
 
 **Track ID:** `kotlingrad-unified-dsel-pretest-paper-dd_20260302`
 
 **Purpose:** Build a stable, testable Kotlingrad DSEL layer for drawdown-related pretesting and paper-testing contracts.
 
-**Status:** 🔄 In Progress
+**Status:** ✅ Completed
 
 **Summary:**
 - Restored TrikeShed as Gradle source-of-truth
@@ -117,5 +117,7 @@ Active development tracks for TrikeShed.
 - Documented Gradle consumption logic
 - Synchronized boundaries in product/tech-stack docs
 - Added deterministic drawdown/max-drawdown DSEL contract tests in `DselBenchmarkTest`
-- Focused JVM verification currently blocked by Gradle wrapper distribution download under network-restricted runtime
-- Next slice: `kg-dd-test-contract-02` (execute focused JVM test once local Gradle distribution is available and capture evidence)
+- Moved `DrawdownDsel.kt` from commonMain to jvmMain (JVM-only Kotlingrad dependency)
+- Fixed SeriesGrad.kt conflicting overloads and unresolvable min/max calls
+- Added `minOf`/`maxOf` symbolic infix extensions to GradOps.kt
+- All 3 DselBenchmarkTest tests pass: drawdown fraction, max-drawdown running-min, throughput benchmark

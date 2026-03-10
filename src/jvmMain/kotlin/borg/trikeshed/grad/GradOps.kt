@@ -84,6 +84,24 @@ infix fun SFun<DReal>.eval(bindings: Map<SVar<DReal>, Double>): Double = `≈`(b
 infix fun Series<SFun<DReal>>.eval(bindings: Map<SVar<DReal>, Double>): Series<Double> = `≈`(bindings)
 
 
+// -- minOf / maxOf  Symbolic min/max --
+//
+//   a `minOf` b     returns the lesser of two SFun expressions: (a + b - |a - b|) / 2
+//   a `maxOf` b     returns the greater of two SFun expressions: (a + b + |a - b|) / 2
+
+infix fun SFun<DReal>.`minOf`(other: SFun<DReal>): SFun<DReal> {
+    val diff = this - other
+    val absVal = (diff * diff).pow(DReal.wrap(0.5))
+    return (this + other - absVal) / DReal.wrap(2.0)
+}
+
+infix fun SFun<DReal>.`maxOf`(other: SFun<DReal>): SFun<DReal> {
+    val diff = this - other
+    val absVal = (diff * diff).pow(DReal.wrap(0.5))
+    return (this + other + absVal) / DReal.wrap(2.0)
+}
+
+
 // -- ↑  Lift Constant to Expression Space / lift --
 //
 //   3.14.↑                 wrap(3.14) : SFun<DReal>

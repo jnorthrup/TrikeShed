@@ -179,7 +179,6 @@ kotlin {
             kotlin.exclude("borg/trikeshed/brc/BrcHeapBisect.kt")
             kotlin.exclude("borg/trikeshed/brc/BrcPure.kt")
             kotlin.exclude("borg/trikeshed/brc/fused/**")
-            kotlin.exclude("borg/trikeshed/grad/**")
             if (focusedTransportSlice) {
                 kotlin.exclude("one/xio/AsioVisitor.kt")
                 kotlin.exclude("borg/trikeshed/brc/BrcDuckDbJvm.kt")
@@ -195,7 +194,7 @@ kotlin {
             }
             // WIP/experimental tests excluded from default build.
             kotlin.exclude("borg/trikeshed/duck/KotlingradThinSliceTest.kt")
-            kotlin.exclude("borg/trikeshed/grad/**")
+            kotlin.exclude("borg/trikeshed/grad/DrawdownDselTest.kt")
             kotlin.exclude("borg/trikeshed/signal/**")
             kotlin.exclude("borg/trikeshed/strategy/**")
             if (focusedTransportSlice) {

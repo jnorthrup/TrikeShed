@@ -44,12 +44,6 @@ fun Series<SFun<DReal>>.sum(): SFun<DReal> =
 fun Series<SFun<DReal>>.mean(): SFun<DReal> =
     sum() / size.`↑`
 
-inline fun Series<SFun<DReal>>.minOf(): SFun<DReal> =
-    fold(first()) { a, b -> a.min(b) }
-
-inline fun Series<SFun<DReal>>.maxOf(): SFun<DReal> =
-    fold(first()) { a, b -> a.max(b) }
-
 // Variance, stddev as Grad expressions
 fun Series<SFun<DReal>>.variance(): SFun<DReal> {
     val μ = mean()
@@ -86,6 +80,4 @@ fun variable(name: String): SVar<DReal> = SVar(DReal, name)
 fun bind(series: Series<Double>, v: SVar<DReal>): Series<SFun<DReal>> =
     series.`↑` α { it * v } // creates expression graph
 
-// Evaluate entire Series<SFun> at binding point
-fun Series<SFun<DReal>>.eval(bindings: Map<SVar<DReal>, Double>): Series<Double> =
-    size j { i: Int -> (this[i] `≈` bindings).toDouble() }
+// Evaluate entire Series<SFun> at binding point — see GradOps.kt for infix eval alias
