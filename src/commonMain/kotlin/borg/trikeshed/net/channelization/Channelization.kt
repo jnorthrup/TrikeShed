@@ -194,6 +194,7 @@ fun createGraphForPlan(
         add(GraphFact.CustomFact("path", plan.path.name))
         add(GraphFact.CustomFact("provider", plan.provider))
         plan.backendKind?.let { add(GraphFact.CustomFact("backend", it.name)) }
+        add(GraphFact.SessionFact(ChannelSessionId("session-${plan.protocol.name}"), plan.protocol, active = true))
     }
 
     val rules = buildActivationRules(plan)

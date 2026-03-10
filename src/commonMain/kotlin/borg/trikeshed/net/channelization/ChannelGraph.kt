@@ -148,7 +148,7 @@ interface ChannelGraph {
     fun transitionTo(newState: ChannelGraphState)
 
     /** Check if graph can accept new jobs. */
-    fun canAcceptJobs(): Boolean = state == ChannelGraphState.Active
+    fun canAcceptJobs(): Boolean = state == ChannelGraphState.Initializing || state == ChannelGraphState.Active
 }
 
 /**

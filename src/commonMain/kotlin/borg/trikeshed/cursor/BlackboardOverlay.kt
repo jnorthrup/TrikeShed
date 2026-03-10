@@ -82,7 +82,7 @@ data class Evidence(
 ) {
     init {
         require(confidence in 0.0..1.0) {
-            "Confidence must be in range [0.0, 1.0], got $confidence"
+            "confidence must be in range [0.0, 1.0], got $confidence"
         }
         errorMargin?.let { require(it >= 0) { "Error margin must be non-negative, got $it" } }
         supportCount?.let { require(it >= 0) { "Support count must be non-negative, got $it" } }
@@ -163,7 +163,12 @@ data class CellOverlay<T>(
         transformation: String? = null
     ): CellOverlay<T> {
         val newProvenance = provenance?.let {
-            if (transformation != null) it.derive(transformation) else it
+            var p = it
+            if (transformation != null) {
+                p = p.derive("role:${role.name}")
+                p = p.derive(transformation)
+            }
+            p
         }
         return copy(role = newRole, provenance = newProvenance)
     }
@@ -256,7 +261,7 @@ data class BlackboardContext(
      * Get the effective role for a cell (column default or cell-specific).
      */
     fun getEffectiveRole(columnIndex: Int, cellRole: OverlayRole?): OverlayRole =
-        columnOverlays[columnIndex]?.defaultRole ?: cellRole ?: OverlayRole.OBSERVATION
+        cellRole ?: columnOverlays[columnIndex]?.defaultRole ?: OverlayRole.OBSERVATION
 
     /**
      * Get the effective evidence for a cell (cell overrides column).
