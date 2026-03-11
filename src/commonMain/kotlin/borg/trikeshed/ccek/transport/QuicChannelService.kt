@@ -1,5 +1,6 @@
 package borg.trikeshed.ccek.transport
 
+import kotlinx.coroutines.channels.Channel
 import kotlin.coroutines.CoroutineContext
 
 /**
@@ -13,12 +14,21 @@ import kotlin.coroutines.CoroutineContext
  * - ioUringFd = -1 means epoll fallback mode
  */
 data class QuicChannelService(
-    val streams: Map<Int, StreamHandle> = emptyMap(),
+    val streams: Map<Int, StreamHandle> = mutableMapOf(),
     val ioUringFd: Int = -1,          // -1 = epoll fallback
     val xdpProg: String? = null       // XDP prog name for hardware packet steering, null = software only
 ) : StreamTransport {
     companion object Key : CoroutineContext.Key<QuicChannelService>
     override val key: CoroutineContext.Key<*> get() = Key
-    override suspend fun openStream(): StreamHandle = TODO("QUIC stream factory")
+    override suspend fun openStream(): StreamHandle {
+        val streamId = (streams.keys.maxOrNull() ?: -1) + 1
+        val streamHandle = StreamHandle(
+            id = streamId,
+            send = Channel(Channel.BUFFERED),
+            recv = Channel(Channel.BUFFERED),
+        )
+        (streams as? MutableMap<Int, StreamHandle>)?.put(streamId, streamHandle)
+        return streamHandle
+    }
     override val activeStreams: Int get() = streams.size
 }

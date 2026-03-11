@@ -1692,7 +1692,7 @@ enum class HttpHeaders {
         fun getHeaders(headers: ByteBuffer): Map<String?, IntArray?> {
             headers.rewind()
             val l = headers.limit()
-            val linkedHashMap: MutableMap<String?, IntArray?> = LinkedHashMap<Any?, Any?>()
+            val linkedHashMap: MutableMap<String?, IntArray?> = LinkedHashMap<String?, IntArray?>()
             while (headers.hasRemaining() && '\n'.code.toByte() != headers.get());
             while (headers.hasRemaining()) {
                 val p1 = headers.position()

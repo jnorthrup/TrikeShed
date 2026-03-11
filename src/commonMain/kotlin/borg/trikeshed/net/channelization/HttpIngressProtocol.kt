@@ -29,7 +29,7 @@ class HttpIngressProtocol {
                 request.headers.forEach { (name, value) -> appendLine("  $name: $value") }
                 if (request.body.isNotEmpty()) {
                     appendLine("\nBody:")
-                    appendLine(String(request.body))
+                    appendLine(request.body.decodeToString())
                 }
             }.encodeToByteArray()
 

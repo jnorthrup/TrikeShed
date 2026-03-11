@@ -52,7 +52,7 @@ val JsContext.segments: Iterable<JsIndex>
         val (element, src) = this
         val (openIdx, closeIdx) = element.first
         val commaIdxs: Series<Int> = combine(s_[openIdx], element.second, s_[closeIdx])
-        return commaIdxs. `▶` .zipWithNext().map { (a: Int, b: Int) -> a.inc() j b }.toList() α { it j src }
+        return ((commaIdxs.`▶` as Iterable<Int>).zipWithNext().map { (a: Int, b: Int) -> a.inc() j b }) α { it j src }
     }
 
 /** a json scanner that indexes and optionally reifies the json chars
@@ -146,7 +146,7 @@ object JsonParser {
                         else emptyArray<Any?>()
                 }
 
-                combine.`▶`.zipWithNext().map { (before, after) ->
+                (combine.`▶` as Iterable<Int>).zipWithNext().map { (before, after) ->
                     if (isObj) {
                         val tmp = CharSeries(src[before.inc() until after]).trim
                         require(tmp.seekTo('"')) {
@@ -324,4 +324,3 @@ object JsonParser {
         r
     }
 }
-

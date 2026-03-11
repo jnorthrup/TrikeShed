@@ -554,7 +554,12 @@ class PosixFile(
         }
         fun readString(filename: String): String = readAllBytes(filename).decodeToString()
         fun writeBytes(filename: String, bytes: ByteArray): Int = memScoped {
-            val file = PosixFile(filename)
+            val flags = PosixOpenOpts.withFlags(
+                PosixOpenOpts.O_Creat,
+                PosixOpenOpts.O_Trunc,
+                PosixOpenOpts.O_WrOnly,
+            )
+            val file = PosixFile(filename, flags)
             val len = bytes.size
             val buf = allocArray<ByteVar>(len)
             bytes.forEachIndexed { index, byte -> buf[index] = byte }

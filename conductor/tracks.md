@@ -13,6 +13,7 @@ Active development tracks for TrikeShed.
 **Status:** ✅ Completed
 
 **Summary:**
+
 - Implemented Williams%R indicator (Stochastic & ADX already existed)
 - Extracted ROI/Stoploss rules into StrategyRules.kt DSEL contracts
 - Ported SampleStrategy signal logic into SignalGenerator.kt
@@ -31,6 +32,7 @@ Active development tracks for TrikeShed.
 **Status:** ✅ Completed
 
 **Summary:**
+
 - Base `KeyedService`/`coroutineService` and minimal service wrappers were merged.
 - The original track overstated CCEK as a transport architecture owner.
 - The retained CCEK value for network/protocol work is coverage-oriented: typed capability lookup, transport contract seams, and fixture/runtime hint injection.
@@ -53,6 +55,7 @@ Active development tracks for TrikeShed.
 **Status:** ✅ Completed
 
 **Summary:**
+
 - `RelaxFactory` contributes the reactor/no-container-cost dispatch lineage.
 - `literbike` contributes the universal listener shape, prefixed-stream preservation, QUIC/reactor split, and practical transport salvage.
 - `litebike` contributes the edge-vs-heavy-runtime arrangement and zero-cost abstraction emphasis.
@@ -78,9 +81,10 @@ Active development tracks for TrikeShed.
 
 **Purpose:** Build the smallest viable channelized assembly/graph/job/block platform around Cursor/RowVec and CCEK without letting future model passes skip ahead into generic DI/reactor/socket abstractions.
 
-**Status:** 🔄 Open
+**Status:** ✅ Completed
 
 **Summary:**
+
 - Treat `Cursor` as dataframe substrate and `RowVec` as row/x-projection.
 - Keep CCEK assemblies as keyed attraction points, not library end-state.
 - Keep NIO as a backend projection/shim, not public architecture.
@@ -92,6 +96,7 @@ Active development tracks for TrikeShed.
 **Plan:** `conductor/tracks/channelized-blackboard-platform_20260309/plan.md`
 
 **Progress:**
+
 - Phase-03 Blackboard Overlay Core completed with full implementation and tests
 - Added overlay types: `OverlayRole`, `Provenance`, `Evidence`, `DependencyHandle`, `CellOverlay<T>`, `ColumnOverlay`, `BlackboardContext`
 - Added 25+ unit tests covering all overlay types and extension functions
@@ -103,7 +108,117 @@ Active development tracks for TrikeShed.
 
 ---
 
-## [ ] Track: Stream Transport Implementation
+## [x] Track: JVM Compile Repair
+
+**Track ID:** `jvm-compile-repair_20260310`
+
+**Branch:** `master`
+
+**Purpose:** Restore default JVM compilation in bounded slices by repairing one compile blocker at a time.
+
+**Status:** ✅ Completed
+
+**Slices:** `jvmfix-01` ✅ `HttpMethod.kt` syntax repair · `jvmfix-02` ✅ `BrcDuckDbJvm.kt` Series access repair · `jvmfix-03` ✅ `HttpHeaders.kt` typed map initializer repair · `jvmfix-04a` ✅ `CookieRfc6265Util.kt` JVM ByteBuffer realignment · `jvmfix-05` ✅ `HttpMethod.kt` killswitch JVM signature clash
+
+**Plan:** `conductor/tracks/jvm-compile-repair_20260310/plan.md`
+
+---
+
+## [x] Track: JVM Test Compile Repair
+
+**Track ID:** `jvm-test-compile-repair_20260310`
+
+**Branch:** `master`
+
+**Purpose:** Restore JVM test compilation in bounded slices after default JVM compilation is green.
+
+**Status:** ✅ Completed
+
+**Slices:** `jvmtest-01` ✅ `SmMsgPackTest.kt` MsgPack dependency repair
+
+**Plan:** `conductor/tracks/jvm-test-compile-repair_20260310/plan.md`
+
+---
+
+## [ ] Track: JSON Runtime Stack Overflow Repair
+
+**Track ID:** `json-runtime-stack-overflow-repair_20260310`
+
+**Branch:** `master`
+
+**Purpose:** Restore JVM JSON-path/parser runtime behavior by repairing the `Series` recursion causing `StackOverflowError` in JSON tests.
+
+**Status:** 🔄 Open
+
+**Slices:** `jsonso-01` ✅ `Series.kt` iterable-map recursion repair · `jsonso-02` `Json.kt` segment boundary pair repair
+
+**Plan:** `conductor/tracks/json-runtime-stack-overflow-repair_20260310/plan.md`
+
+---
+
+## [ ] Track: JSON Scan Autovec Shaping
+
+**Track ID:** `json-scan-autovec-shaping_20260311`
+
+**Branch:** `master`
+
+**Purpose:** Reshape TrikeShed's JSON structural scan so the hot loop is embarrassingly vectorizable: contiguous indexed access, explicit `Int` induction, no iterator/polymorphic traversal overhead, and a clean split between scan and reify.
+
+**Status:** 🔄 Open
+
+**Slices:** `autovec-00` ✅ truth + gate capture · `autovec-01` JSON scan/reify red contracts · `autovec-02` `JsonBitmap.kt` induction-shape repair · `autovec-03` `Json.kt` scan extraction · `autovec-04` `Json.kt` reify consumption tightening · `autovec-05` `CsvBitmap.kt` parity follow-on
+
+**Plan:** `conductor/tracks/json-scan-autovec-shaping_20260311/plan.md`
+
+---
+
+## [ ] Track: Manifold Semantic Layer
+
+**Track ID:** `manifold-semantic-layer_20260311`
+
+**Branch:** `master`
+
+**Purpose:** Add the minimum working manifold surface to TrikeShed itself in pure Kotlin/commonMain with semantic coordinates first and dense lowered views second.
+
+**Status:** 🔄 Open
+
+**Summary:**
+
+- TrikeShed needs the manifold locally, not as cppfort narration.
+- The first slice is pure Kotlin and independent of Kotlingrad.
+- The semantic-vs-dense split is explicit so the same type does not pretend to be both.
+- `Manifold.kt` and `ManifoldTest.kt` are complete and verified (4 passing tests).
+
+**Slices:** `manifold-01` ✅ semantic coordinates + dense separation · `manifold-02` ✅ chart + atlas lookup · `manifold-03` ✅ transition/reprojection contracts · `manifold-04` tangent/jacobian follow-on
+
+**Plan:** `conductor/tracks/manifold-semantic-layer_20260311/plan.md`
+
+---
+
+## [ ] Track: Cpp2 Surface Transition
+
+**Track ID:** `cpp2-surface-transition_20260311`
+
+**Branch:** `master`
+
+**Purpose:** Port Kotlin text into an expanded cpp2 spec locally, using TrikeShed as the reference surface while refusing unverified sibling-repo completion claims.
+
+**Status:** 🔄 Open
+
+**Summary:**
+
+- Imported Grok material captured useful architecture signal but also speculative generated code and unverified sibling-repo claims.
+- User direction is now explicit: Kotlin is the ideal surface and cpp2 needs to be brought up to it.
+- This track is local spec work first, not sibling-repo implementation theater.
+- The current slice is the manifold/coordinates/atlas text port in [expanded_cpp2_spec.md](/Users/jim/work/TrikeShed/conductor/tracks/cpp2-surface-transition_20260311/expanded_cpp2_spec.md).
+
+**Slices:** `cpp2surf-01` ✅ transcript intake + course correction · `cpp2surf-02` ✅ Kotlin-first posture capture · `cpp2surf-03` ✅ expanded cpp2 manifold spec + dogfood · `cpp2surf-04` broader Kotlin text port · `cpp2surf-05` external dogfood verification only after a real slice
+
+**Plan:** `conductor/tracks/cpp2-surface-transition_20260311/plan.md`
+
+---
+
+## [x] Track: Stream Transport Implementation
 
 **Track ID:** `stream-transport-contracts_20260310`
 
@@ -111,9 +226,16 @@ Active development tracks for TrikeShed.
 
 **Purpose:** Implement `openStream()` in `QuicChannelService` and `NgSctpService` to green 6 failing `StreamTransportContractTest` contract tests.
 
-**Status:** 🔄 Open — stream-01 contracts written (6 red tests); implementation pending
+**Status:** ✅ Completed
 
-**Slices:** `stream-01` ✅ failing contracts · `stream-02` QUIC stream factory · `stream-03` SCTP stream factory
+**Slices:** `stream-01` ✅ failing contracts · `stream-02` ✅ QUIC stream factory · `stream-03` ✅ SCTP stream factory
+
+**Summary:**
+
+- Implemented `openStream()` in `QuicChannelService` and `NgSctpService`
+- Both services now allocate non-negative stream ids and open buffered send/recv channels
+- Default service instances record opened streams so `activeStreams` increments as contracted
+- `StreamTransportContractTest` is fully green under the focused transport slice
 
 **Plan:** `conductor/tracks/stream-transport-contracts_20260310/plan.md`
 
@@ -144,6 +266,7 @@ Active development tracks for TrikeShed.
 **Status:** ✅ Completed
 
 **Summary:**
+
 - Restored TrikeShed as Gradle source-of-truth
 - Cleared duplicated library code from sibling repos
 - Documented Gradle consumption logic

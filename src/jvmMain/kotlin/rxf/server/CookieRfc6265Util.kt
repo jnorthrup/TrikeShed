@@ -1,16 +1,15 @@
 package rxf.server
 
-import borg.trikeshed.lib.ByteSeries
-import borg.trikeshed.common.BFrag as ByteBuffer
-
+import borg.trikeshed.lib.Join as Pair
 import java.io.Serializable
 import java.net.URLDecoder
-import java.nio.Buffer
-
-import java.util.*
-import borg.trikeshed.lib.Join as Pair
-
-
+import java.nio.ByteBuffer
+import java.nio.charset.StandardCharsets
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.EnumMap
+import java.util.Locale
+import java.util.TimeZone
 
 /**
  * This enum defines the HTTP Cookie and Set-Cookie header fields.
@@ -83,438 +82,238 @@ import borg.trikeshed.lib.Join as Pair
  * fields.
  */
 enum class CookieRfc6265Util {
-    /**
-     * returns an array of bytes
-     */
     Name {
         init {
             token = null
         }
 
-        override fun value(token: ByteBuffer): Serializable {
-            var input = token
-            input = input.duplicate().rewind() as ByteBuffer
-            do {
-                while (input.hasRemaining() && Character.isWhitespace((input.mark() as ByteBuffer).get().toInt()));
-                val begin = input.reset().position()
-                while (input.hasRemaining() && '='.code.toByte() != (input.mark() as ByteBuffer).get());
-
-                return ByteBuffer.allocate(
-                    (input.reset().flip().position(begin) as ByteBuffer).slice().limit()
-                ).put(input).array()
-            } while (input.hasRemaining())
-        }
+        override fun value(token: ByteBuffer): Serializable? =
+            splitNameValue(token)?.a?.let(::byteBufferToArray)
     },
+
     Value {
         init {
             token = null
         }
 
-        override fun value(input: ByteBuffer): Serializable {
-            var input = input
-            input = input.duplicate().rewind() as ByteBuffer
-            do {
-                while (input.hasRemaining() && '='.code.toByte() != input.get());
-                while (input.hasRemaining() && Character.isWhitespace((input.mark() as ByteBuffer).get().toInt()));
-                val begin = input.reset().position()
-                while (input.hasRemaining() && ';'.code.toByte() != (input.mark() as ByteBuffer).get());
-
-                return ByteBuffer.allocate(
-                    (input.reset().flip().position(begin) as ByteBuffer).slice().limit()
-                ).put(input).array()
-            } while (input.hasRemaining())
-        }
+        override fun value(token: ByteBuffer): Serializable? =
+            splitNameValue(token)?.b?.let(::byteBufferToArray)
     },
 
-    /**
-     * 5.2.1.  The Expires Attribute
-     *
-     *
-     * If the attribute-name case-insensitively matches the string
-     * "Expires", the user agent MUST process the cookie-av as follows.
-     *
-     *
-     * Let the expiry-time be the result of parsing the attribute-value as
-     * cookie-date (see Section 5.1.1).
-     *
-     *
-     * If the attribute-value failed to parse as a cookie date, ignore the
-     * cookie-av.
-     *
-     *
-     * If the expiry-time is later than the last date the user agent can
-     * represent, the user agent MAY replace the expiry-time with the last
-     * representable date.
-     *
-     *
-     * If the expiry-time is earlier than the earliest date the user agent
-     * can represent, the user agent MAY replace the expiry-time with the
-     * earliest representable date.
-     *
-     *
-     * Append an attribute to the cookie-attribute-list with an attribute-
-     * name of Expires and an attribute-value of expiry-time.
-     */
     Expires {
-        override fun value(input: ByteBuffer): Serializable? {
-            var input = input
-            input = input.slice()
-            while (input.hasRemaining() && Character.isWhitespace((input.mark() as ByteBuffer).get().toInt()));
-            input = (input.reset() as ByteBuffer).slice()
-            var b: Byte
-            while (input.hasRemaining() && !Character.isWhitespace((input.mark() as ByteBuffer).get().also { b = it }
-                    .toInt())
-                && '='.code.toByte() != b
-            );
-
-            val position = input.reset().position()
-            val limit = token!!.limit()
-
-            if (position == limit) {
-                while (input.hasRemaining() && '='.code.toByte() != input.get());
-
-                val parseme = HttpMethod.UTF8.decode(input.slice())
-                var date: Date? = null
-                try {
-                    date = DateHeaderParser.parseDate(parseme.toString().trim { it <= ' ' })
-                } catch (e: Exception) {
-                }
-                return date
-            }
-
-            return null
-        }
+        override fun value(input: ByteBuffer): Serializable? =
+            attributeValueString(input, key)?.let(::parseCookieDate)
     },
 
-    /**
-     * 5.2.2.  The Max-Age Attribute
-     *
-     *
-     * If the attribute-name case-insensitively matches the string "Max-
-     * Age", the user agent MUST process the cookie-av as follows.
-     *
-     *
-     * If the first character of the attribute-value is not a DIGIT or a "-"
-     * character, ignore the cookie-av.
-     *
-     *
-     * If the remainder of attribute-value contains a non-DIGIT character,
-     * ignore the cookie-av.
-     *
-     *
-     * Let delta-seconds be the attribute-value converted to an integer.
-     *
-     *
-     * If delta-seconds is less than or equal to zero (0), let expiry-time
-     * be the earliest representable date and time.  Otherwise, let the
-     * expiry-time be the current date and time plus delta-seconds seconds.
-     *
-     *
-     * Append an attribute to the cookie-attribute-list with an attribute-
-     * name of Max-Age and an attribute-value of expiry-time.
-     */
     `Max$2dAge` {
-        override fun value(input: ByteSeries): Serializable? {
-            var input = input
-            input = input.slice()
-            while (input.hasRemaining() && Character.isWhitespace((input.mark() as ByteBuffer).get().toInt()));
-            input = (input.reset() as ByteBuffer).slice()
-            var b: Byte
-            while (input.hasRemaining() && !Character.isWhitespace((input.mark() as ByteBuffer).get().also { b = it }
-                    .toInt())
-                && '='.code.toByte() != b
-            );
-
-            val position = input.reset().position()
-            val limit = token!!.limit()
-
-            if (position == limit) {
-                while (input.hasRemaining() && '='.code.toByte() != input.get());
-
-                val parseme = HttpMethod.UTF8.decode(input.slice())
-                var l: Long? = null
-                try {
-                    l = parseme.toString().trim { it <= ' ' }.toLong()
-                } catch (e: NumberFormatException) {
-                }
-                return l
-            }
-
-            return null
-        }
+        override fun value(input: ByteBuffer): Serializable? =
+            attributeValueString(input, key)?.trim()?.toLongOrNull()
     },
 
-    /**
-     * 5.2.3.  The Domain Attribute
-     *
-     *
-     * If the attribute-name case-insensitively matches the string "Domain",
-     * the user agent MUST process the cookie-av as follows.
-     *
-     *
-     * If the attribute-value is empty, the behavior is undefined.  However,
-     * the user agent SHOULD ignore the cookie-av entirely.
-     *
-     *
-     * If the first character of the attribute-value string is %x2E ("."):
-     *
-     *
-     * Let cookie-domain be the attribute-value without the leading %x2E
-     * (".") character.
-     *
-     *
-     * Otherwise:
-     *
-     *
-     * Let cookie-domain be the entire attribute-value.
-     *
-     *
-     * Convert the cookie-domain to lower case.
-     *
-     *
-     * Append an attribute to the cookie-attribute-list with an attribute-
-     * name of Domain and an attribute-value of cookie-domain.
-     */
     Domain {
-        override fun value(input: ByteBuffer): Serializable? {
-            var input = input
-            input = input.slice()
-            while (input.hasRemaining() && Character.isWhitespace((input.mark() as ByteBuffer).get().toInt()));
-            input = (input.reset() as ByteBuffer).slice()
-            var b: Byte
-            while (input.hasRemaining() && !Character.isWhitespace((input.mark() as ByteBuffer).get().also { b = it }
-                    .toInt())
-                && '='.code.toByte() != b
-            );
-
-            val position = input.reset().position()
-            val limit = token!!.limit()
-
-            if (position == limit) {
-                while (input.hasRemaining() && '='.code.toByte() != input.get());
-
-                return ByteBuffer.allocate((input.slice().also { input = it }).limit()).put(input).array()
-            }
-
-            return null
-        }
+        override fun value(input: ByteBuffer): Serializable? =
+            attributeValueBuffer(input, key)?.let(::byteBufferToArray)
     },
 
-    /**
-     * 5.2.4.  The Path Attribute
-     *
-     *
-     * If the attribute-name case-insensitively matches the string "Path",
-     * the user agent MUST process the cookie-av as follows.
-     *
-     *
-     * If the attribute-value is empty or if the first character of the
-     * attribute-value is not %x2F ("/"):
-     *
-     *
-     * Let cookie-path be the default-path.
-     *
-     *
-     * Otherwise:
-     *
-     *
-     * Let cookie-path be the attribute-value.
-     *
-     *
-     * Append an attribute to the cookie-attribute-list with an attribute-
-     * name of Path and an attribute-value of cookie-path.
-     */
     Path {
-        override fun value(input: ByteBuffer): Serializable? {
-            var input = input
-            input = input.slice()
-            while (input.hasRemaining() && Character.isWhitespace((input.mark() as ByteBuffer).get().toInt()));
-            input = (input.reset() as ByteBuffer).slice()
-            var b: Byte
-            while (input.hasRemaining() && !Character.isWhitespace((input.mark() as ByteBuffer).get().also { b = it }
-                    .toInt())
-                && '='.code.toByte() != b
-            );
-
-            val position = input.reset().position()
-            val limit = token!!.limit()
-
-            if (position == limit) {
-                while (input.hasRemaining() && '='.code.toByte() != input.get());
-
-                return ByteBuffer.allocate((input.slice().also { input = it }).limit()).put(input).array()
-            }
-
-            return null
-        }
+        override fun value(input: ByteBuffer): Serializable? =
+            attributeValueBuffer(input, key)?.let(::byteBufferToArray)
     },
 
-    /**
-     * 5.2.5.  The Secure Attribute
-     *
-     *
-     * If the attribute-name case-insensitively matches the string "Secure",
-     * the user agent MUST append an attribute to the cookie-attribute-list
-     * with an attribute-name of Secure and an empty attribute-value.
-     */
     Secure {
-        override fun value(input: ByteBuffer): Serializable? {
-            input.rewind()
-            val tok = token!!.duplicate()
-            var b: Byte
-            do {
-                while (input.hasRemaining() && Character.isWhitespace((input.mark() as ByteBuffer).get().toInt()));
-                tok.rewind()
-                while (tok.hasRemaining() && input.hasRemaining()
-                    && tok.get() == input.get().lowercaseChar()
-                );
-                if (!tok.hasRemaining()) {
-                    var keep = false
-                    while (input.hasRemaining() && ';'.code.toByte() != ((input.mark() as ByteBuffer).get()
-                            .also { b = it }) && (Character.isWhitespace(b.toInt()).also { keep = it })
-                    );
-                    if (keep) return java.lang.Boolean.TRUE
-                }
-            } while (input.hasRemaining())
-
-            return null
-        }
+        override fun value(input: ByteBuffer): Serializable? =
+            if (matchesFlagAttribute(input, key)) java.lang.Boolean.TRUE else null
     },
 
-    /**
-     * 5.2.6.  The HttpOnly Attribute
-     *
-     *
-     * If the attribute-name case-insensitively matches the string
-     * "HttpOnly", the user agent MUST append an attribute to the cookie-
-     * attribute-list with an attribute-name of HttpOnly and an empty
-     * attribute-value.
-     */
     HttpOnly {
-        override fun value(input: ByteBuffer): Serializable? {
-            input.rewind()
-            val tok = token!!.duplicate()
-            var b: Byte
-            do {
-                while (input.hasRemaining() && Character.isWhitespace((input.mark() as ByteBuffer).get().toInt()));
-                tok.rewind()
-                while (tok.hasRemaining() && input.hasRemaining()
-                    && tok.get() == input.get().lowercaseChar()
-                );
-                if (!tok.hasRemaining()) {
-                    var keep = false
-                    while (input.hasRemaining() && ';'.code.toByte() != ((input.mark() as ByteBuffer).get()
-                            .also { b = it }) && (Character.isWhitespace(b.toInt()).also { keep = it })
-                    );
-                    if (keep) {
-                        return java.lang.Boolean.TRUE
-                    }
-                }
-            } while (input.hasRemaining())
-
-            return null
-        }
+        override fun value(input: ByteBuffer): Serializable? =
+            if (matchesFlagAttribute(input, key)) java.lang.Boolean.TRUE else null
     };
 
-    val key: String = URLDecoder.decode(name.replace('$', '%')).lowercase(Locale.getDefault())
-    var token: ByteBuffer? = HttpMethod.UTF8.encode(key)
+    val key: String =
+        URLDecoder.decode(name.replace('$', '%'), StandardCharsets.UTF_8.name()).lowercase(Locale.ROOT)
+
+    var token: ByteBuffer? = ByteBuffer.wrap(key.toByteArray(StandardCharsets.UTF_8)).asReadOnlyBuffer()
 
     abstract fun value(token: ByteBuffer): Serializable?
 
     companion object {
         fun parseSetCookie(input: ByteBuffer): EnumMap<CookieRfc6265Util, Serializable> {
-            val a = ArrayList<ByteBuffer>()
-            while (input.hasRemaining()) {
-                val begin = input.position()
-                var b: Byte = 0
-                while (input.hasRemaining() && ';'.code.toByte() != ((input.mark() as ByteBuffer).get()
-                        .also { b = it })
-                );
-                a.add(
-                    ((if (b == ';'.code.toByte()) input.duplicate().reset() else input.duplicate()).flip()
-                        .position(begin) as ByteBuffer).slice()
-                )
+            val result = EnumMap<CookieRfc6265Util, Serializable>(CookieRfc6265Util::class.java)
+            val segments = splitSegments(input)
+            if (segments.isEmpty()) {
+                return result
             }
-            val res =
-                EnumMap<CookieRfc6265Util, Serializable>(CookieRfc6265Util::class.java)
-            val iterator: Iterator<ByteBuffer> = a.iterator()
-            val next = iterator.next()
-            val n = Name.value(next)!!
-            res[Name] = n
-            val v = Value.value(next)!!
-            res[Value] = v
 
-            while (iterator.hasNext()) {
-                val byteBuffer = iterator.next()
-                val values = entries.toTypedArray()
-                for (i in 2 until values.size) {
-                    val cookieRfc6265Util = values[i]
-                    if (!res.containsKey(cookieRfc6265Util)) {
-                        val value = cookieRfc6265Util.value(byteBuffer.rewind() as ByteBuffer)
-                        if (null != value) {
-                            res[cookieRfc6265Util] = value
-                        }
+            Name.value(segments.first())?.let { result[Name] = it }
+            Value.value(segments.first())?.let { result[Value] = it }
+
+            for (segment in segments.drop(1)) {
+                for (attribute in entries) {
+                    if (attribute == Name || attribute == Value || result.containsKey(attribute)) {
+                        continue
                     }
+
+                    attribute.value(segment)?.let { result[attribute] = it }
                 }
             }
-            return res
+
+            return result
         }
 
-        /**
-         * @param filter ByteBuffers as keys for cookies
-         * @param input  unescaped bytes split by ';'
-         * @return slist of cookies
-         */
         fun parseCookie(
             input: ByteBuffer,
             vararg filter: ByteBuffer
-        ): Pair<Pair<ByteBuffer, ByteBuffer>, Pair?>? {
-            var ret: Pair<*, *>? = null
-            val buf = input.duplicate().slice()
+        ): Pair<Pair<ByteBuffer, ByteBuffer>, Pair<*, *>?>? {
+            var result: Pair<Pair<ByteBuffer, ByteBuffer>, Pair<*, *>?>? = null
 
-            while (buf.hasRemaining()) {
-                while (buf.hasRemaining() && Character.isWhitespace((buf.mark() as ByteBuffer).get().toInt()));
-                val keyBegin = buf.reset().position()
+            for (segment in splitSegments(input)) {
+                val cookie = splitNameValue(segment) ?: continue
+                val cookieName = cookie.a
+                val cookieValue = cookie.b
 
-                while (buf.hasRemaining() && '='.code.toByte() != (buf.mark() as ByteBuffer).get());
-                val ckey = (buf.duplicate().reset().flip().position(keyBegin) as ByteBuffer).slice()
-                while (buf.hasRemaining() && Character.isWhitespace((buf.mark() as ByteBuffer).get().toInt()));
-                val vBegin = buf.reset().position()
-
-                while (buf.hasRemaining()) {
-                    when ((buf.mark() as ByteBuffer).get()) {
-                        ';', '\r', '\n' -> {}
-                        else -> continue
-                    }
-                    break
+                if (filter.isNotEmpty() && filter.none { byteBufferEquals(it, cookieName) }) {
+                    continue
                 }
-                if (filter.size > 0) {
-                    for (filt in filter) {
-                        if (ckey.limit() == filt.limit()) {
-                            ckey.mark()
-                            filt.rewind()
-                            while (filt.hasRemaining() && ckey.hasRemaining() && filt.get() == ckey.get());
-                            if (!filt.hasRemaining() && !ckey.hasRemaining()) {
-                                ret =
-                                    Pair<Pair<Buffer, ByteBuffer>, Pair<*, *>?>(
-                                        Pair(
-                                            ckey.reset(), (buf.duplicate().reset().flip()
-                                                .position(vBegin) as ByteBuffer).slice()
-                                        ), ret
-                                    )
-                                break
-                            }
-                        }
-                    }
-                } else ret =
-                    Pair(
-                        Pair(
-                            ckey, (buf.duplicate().reset().flip().position(vBegin) as ByteBuffer)
-                                .slice()
-                        ), ret
-                    )
+
+                result = Pair(Pair(cookieName, cookieValue), result)
             }
-            return ret as Pair<Pair<ByteBuffer, ByteBuffer>, Pair?>?
+
+            return result
         }
     }
+}
+
+private val emptyByteBuffer: ByteBuffer = ByteBuffer.wrap(ByteArray(0)).asReadOnlyBuffer()
+
+private val cookieDateFormats = arrayOf(
+    "EEE, dd MMM yyyy HH:mm:ss zzz",
+    "EEE, dd-MMM-yyyy HH:mm:ss zzz",
+    "EEE, dd MMM yy HH:mm:ss zzz",
+)
+
+private fun splitSegments(input: ByteBuffer): List<ByteBuffer> {
+    val source = input.asReadOnlyBuffer()
+    val segments = ArrayList<ByteBuffer>()
+    var start = source.position()
+
+    for (index in start until source.limit()) {
+        if (source.get(index) == ';'.code.toByte()) {
+            trimSlice(source, start, index)?.let(segments::add)
+            start = index + 1
+        }
+    }
+
+    trimSlice(source, start, source.limit())?.let(segments::add)
+    return segments
+}
+
+private fun splitNameValue(segment: ByteBuffer): Pair<ByteBuffer, ByteBuffer>? {
+    val separator = indexOf(segment, '='.code.toByte())
+    if (separator < 0) {
+        return null
+    }
+
+    val name = trimSlice(segment, segment.position(), separator) ?: return null
+    val value = trimSlice(segment, separator + 1, segment.limit()) ?: emptyByteBuffer.duplicate()
+    return Pair(name, value)
+}
+
+private fun attributeValueBuffer(segment: ByteBuffer, expectedName: String): ByteBuffer? {
+    val separator = indexOf(segment, '='.code.toByte())
+    if (separator < 0) {
+        return null
+    }
+
+    val attributeName = trimSlice(segment, segment.position(), separator)?.let(::byteBufferToString) ?: return null
+    if (!attributeName.equals(expectedName, ignoreCase = true)) {
+        return null
+    }
+
+    return trimSlice(segment, separator + 1, segment.limit()) ?: emptyByteBuffer.duplicate()
+}
+
+private fun attributeValueString(segment: ByteBuffer, expectedName: String): String? =
+    attributeValueBuffer(segment, expectedName)?.let(::byteBufferToString)
+
+private fun matchesFlagAttribute(segment: ByteBuffer, expectedName: String): Boolean {
+    val separator = indexOf(segment, '='.code.toByte())
+    if (separator >= 0) {
+        val attributeName = trimSlice(segment, segment.position(), separator)?.let(::byteBufferToString) ?: return false
+        val attributeValue = trimSlice(segment, separator + 1, segment.limit())
+        return attributeName.equals(expectedName, ignoreCase = true) && attributeValue == null
+    }
+
+    val attributeName = trimSlice(segment, segment.position(), segment.limit())?.let(::byteBufferToString) ?: return false
+    return attributeName.equals(expectedName, ignoreCase = true)
+}
+
+private fun trimSlice(source: ByteBuffer, rawStart: Int, rawEnd: Int): ByteBuffer? {
+    var start = rawStart
+    var end = rawEnd
+
+    while (start < end && source.get(start).toInt().toChar().isWhitespace()) {
+        start++
+    }
+    while (end > start && source.get(end - 1).toInt().toChar().isWhitespace()) {
+        end--
+    }
+
+    if (start >= end) {
+        return null
+    }
+
+    val slice = source.asReadOnlyBuffer()
+    slice.position(start)
+    slice.limit(end)
+    return slice.slice().asReadOnlyBuffer()
+}
+
+private fun indexOf(source: ByteBuffer, target: Byte): Int {
+    for (index in source.position() until source.limit()) {
+        if (source.get(index) == target) {
+            return index
+        }
+    }
+    return -1
+}
+
+private fun byteBufferEquals(left: ByteBuffer, right: ByteBuffer): Boolean {
+    val leftCopy = left.asReadOnlyBuffer()
+    val rightCopy = right.asReadOnlyBuffer()
+    if (leftCopy.remaining() != rightCopy.remaining()) {
+        return false
+    }
+
+    while (leftCopy.hasRemaining()) {
+        if (leftCopy.get() != rightCopy.get()) {
+            return false
+        }
+    }
+
+    return true
+}
+
+private fun byteBufferToArray(buffer: ByteBuffer): ByteArray {
+    val copy = buffer.asReadOnlyBuffer()
+    val bytes = ByteArray(copy.remaining())
+    copy.get(bytes)
+    return bytes
+}
+
+private fun byteBufferToString(buffer: ByteBuffer): String =
+    String(byteBufferToArray(buffer), StandardCharsets.UTF_8)
+
+private fun parseCookieDate(value: String): Date? {
+    val candidate = value.trim()
+    for (pattern in cookieDateFormats) {
+        val format = SimpleDateFormat(pattern, Locale.US)
+        format.isLenient = true
+        format.timeZone = TimeZone.getTimeZone("GMT")
+        try {
+            return format.parse(candidate)
+        } catch (_: Exception) {
+        }
+    }
+    return null
 }

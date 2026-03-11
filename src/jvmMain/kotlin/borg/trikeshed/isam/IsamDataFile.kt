@@ -98,7 +98,7 @@ actual class IsamDataFile actual constructor(
             val data = randomAccessFile.channel
 
             //create row buffer
-            meta0.debug { logDebug { "toIsam: " + it.map { it.toString() } } }
+            meta0.debug { logDebug { "toIsam: " + it.`▶`.map { it.toString() } } }
 
 
             val last = meta0.last()

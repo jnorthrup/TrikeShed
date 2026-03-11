@@ -52,6 +52,9 @@ kotlin {
                 binaries.executable("brcCsvNative") {
                     entryPoint = "borg.trikeshed.brc.brcCsvNativeMain"
                 }
+                binaries.executable("autoresearchNative") {
+                    entryPoint = "borg.trikeshed.autoresearch.autoresearchNativeMain"
+                }
                 binaries.executable("brcCursorNative") {
                     entryPoint = "borg.trikeshed.brc.brcCursorNativeMain"
                 }
@@ -88,6 +91,9 @@ kotlin {
                 binaries.executable("brcCsvNative") {
                     entryPoint = "borg.trikeshed.brc.brcCsvNativeMain"
                 }
+                binaries.executable("autoresearchNative") {
+                    entryPoint = "borg.trikeshed.autoresearch.autoresearchNativeMain"
+                }
                 binaries.executable("brcCursorNative") {
                     entryPoint = "borg.trikeshed.brc.brcCursorNativeMain"
                 }
@@ -116,6 +122,9 @@ kotlin {
             }
             binaries.executable("brcCsvNative") {
                 entryPoint = "borg.trikeshed.brc.brcCsvNativeMain"
+            }
+            binaries.executable("autoresearchNative") {
+                entryPoint = "borg.trikeshed.autoresearch.autoresearchNativeMain"
             }
             binaries.executable("brcCursorNative") {
                 entryPoint = "borg.trikeshed.brc.brcCursorNativeMain"

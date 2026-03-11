@@ -363,9 +363,6 @@ fun <T> Series<T>.forEachIndexed(action: (index: Int, T) -> Unit): Unit = this.`
 //series foreach
 fun <T> Series<T>.forEach(action: (T) -> Unit): Unit = this.`▶`.forEach(action)
 
-//series map
-fun <T, R> Series<T>.map(transform: (T) -> R): List<R> = this.`▶`.map(transform)
-
 fun <T> Series<T>.isEmpty(): Boolean = a == 0
 
 fun <T> Series<T>.reversed(): Series<T> {

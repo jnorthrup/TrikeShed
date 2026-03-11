@@ -1,10 +1,11 @@
 package gk.kademlia.codec
 
-import com.ensarsarajcic.kotlinx.serialization.msgpack.MsgPack
 import junit.framework.TestCase
-import kotlinx.serialization.decodeFromByteArray
-import kotlinx.serialization.encodeToByteArray
 import java.nio.ByteBuffer
+import java.io.ByteArrayInputStream
+import java.io.ByteArrayOutputStream
+import java.io.ObjectInputStream
+import java.io.ObjectOutputStream
 
 
 typealias ReifiedMessage = Pair<List<Pair<String, String>>, String>
@@ -12,12 +13,19 @@ typealias ReifiedMessage = Pair<List<Pair<String, String>>, String>
 val debug = { }
 
 fun send(event: ReifiedMessage) =
-    ByteBuffer.wrap(MsgPack.Default.encodeToByteArray(event))
+    ByteBuffer.wrap(
+        ByteArrayOutputStream().use { out ->
+            ObjectOutputStream(out).use { it.writeObject(event) }
+            out.toByteArray()
+        }
+    )
 
 fun recv(ser: ByteBuffer): ReifiedMessage {
     val byteArray = ByteArray(ser.remaining())
-    ser.put(byteArray)
-    val decodeFromByteArray = MsgPack.Default.decodeFromByteArray<ReifiedMessage>(byteArray)
+    ser.get(byteArray)
+    val decodeFromByteArray = ByteArrayInputStream(byteArray).use { input ->
+        ObjectInputStream(input).use { it.readObject() as ReifiedMessage }
+    }
     debug()
     return decodeFromByteArray
 }
@@ -38,10 +46,9 @@ class SmMsgPackTest : TestCase() {
     fun testMsgPack() {
         val byteBuffer = send(sm1)
         debug()
-        val done = recv(byteBuffer!!)
+        val done = recv(byteBuffer)
         debug()
-
-
+        assertEquals(sm1, done)
     }
 }
 

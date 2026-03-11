@@ -10,6 +10,7 @@ import java.nio.channels.SocketChannel
 import java.nio.charset.Charset
 import java.util.*
 import java.util.concurrent.ConcurrentLinkedQueue
+import kotlin.jvm.JvmName
 
 /**
  * See  http://www.w3.org/Protocols/rfc2616/rfc2616-sec9.html
@@ -24,6 +25,7 @@ enum class HttpMethod {
         private val q: Queue<Array<Any>?> = ConcurrentLinkedQueue()
         var UTF8: Charset = Charset.forName("UTF8")
         var selectorThread: Thread? = null
+        @set:JvmName("setKillswitchValue")
         var killswitch: Boolean = false
         var selector: Selector? = null
 
@@ -145,7 +147,8 @@ enum class HttpMethod {
                         if (AsioVisitor.`$DBG`) {
                             val asioVisitor = inferAsioVisitor(protocoldecoder, key)
                             if (asioVisitor is Impl) {
-                                val visitor: Impl = asioVisitor as one.xio.AsioVisitor.Impl                                if (AsioVisitor.`$origins`!!.containsKey(visitor)) {
+                                val visitor: Impl = asioVisitor as one.xio.AsioVisitor.Impl
+                                if (AsioVisitor.`$origins`!!.containsKey(visitor)) {
                                     val s: String = AsioVisitor.`$origins`.get(visitor).toString()
                                     System.err.println("origin$s")
                                 }

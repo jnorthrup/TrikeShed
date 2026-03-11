@@ -1,5 +1,6 @@
 package borg.trikeshed.ccek.transport
 
+import kotlinx.coroutines.channels.Channel
 import kotlin.coroutines.CoroutineContext
 
 /**
@@ -13,12 +14,21 @@ import kotlin.coroutines.CoroutineContext
  * - Congestion control: deterministic only (cubic / hstcp / rack)
  */
 data class NgSctpService(
-    val streams: Map<Int, StreamHandle> = emptyMap(),
+    val streams: Map<Int, StreamHandle> = mutableMapOf(),
     val paths: List<String> = emptyList(),          // multi-homing: active path addresses
     val congestionControl: String = "cubic"          // cubic | hstcp | rack — deterministic only
 ) : StreamTransport {
     companion object Key : CoroutineContext.Key<NgSctpService>
     override val key: CoroutineContext.Key<*> get() = Key
-    override suspend fun openStream(): StreamHandle = TODO("SCTP stream factory")
+    override suspend fun openStream(): StreamHandle {
+        val streamId = (streams.keys.maxOrNull() ?: -1) + 1
+        val streamHandle = StreamHandle(
+            id = streamId,
+            send = Channel(Channel.BUFFERED),
+            recv = Channel(Channel.BUFFERED),
+        )
+        (streams as? MutableMap<Int, StreamHandle>)?.put(streamId, streamHandle)
+        return streamHandle
+    }
     override val activeStreams: Int get() = streams.size
 }

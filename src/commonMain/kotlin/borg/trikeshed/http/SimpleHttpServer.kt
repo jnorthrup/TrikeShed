@@ -53,7 +53,7 @@ class SimpleHttpServer(private val port: Int) : Server {
         // Handle request (not used in this example)
         // Send response
         val response = "HTTP/1.1 200 OK\nContent-Type: text/plain\nContent-Length: 13\n\nHello, World!"
-        write(socket, response.toByteArray())
+        write(socket, response.encodeToByteArray())
         closeSocket(socket)
     }
 
