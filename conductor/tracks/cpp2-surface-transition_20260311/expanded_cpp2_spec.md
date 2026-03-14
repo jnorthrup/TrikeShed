@@ -82,7 +82,7 @@ Beyond manifold/chart, the transcript proposes these **language-level additions*
 join            ::= expr 'j' expr
 indexed         ::= domain 'j' accessor
 series          ::= indexed<int>
-alpha           ::= series 'α' transform
+alpha           ::= expression 'α' transform
 fold            ::= series '.fold(' init ',' accumulator ')'
 slice           ::= series '[' from '..' to ']'
 cursor          ::= series<series>

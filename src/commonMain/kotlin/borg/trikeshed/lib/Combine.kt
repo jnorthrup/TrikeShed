@@ -33,9 +33,8 @@ fun <A> combine(catn: Series<Series<A>>): Series<A> {
 
         else -> {
             val stairs by lazy {
-                val coords: Series<Int> = catn α Join<Int, (Int) -> A>::a
                 var acc = 0
-                IntArray(szN) { acc += it; acc }
+                IntArray(szN) { acc += catn[it].size; acc }
             }
             val sumSize = stairs[szN - 1]
 

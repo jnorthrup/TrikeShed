@@ -51,8 +51,13 @@ val JsContext.segments: Iterable<JsIndex>
     get() {
         val (element, src) = this
         val (openIdx, closeIdx) = element.first
-        val commaIdxs: Series<Int> = combine(s_[openIdx], element.second, s_[closeIdx])
-        return ((commaIdxs.`▶` as Iterable<Int>).zipWithNext().map { (a: Int, b: Int) -> a.inc() j b }) α { it j src }
+        val commaIdxs: Series<Int> = element.second
+        // boundaries: [openIdx, ...commaIdxs..., closeIdx]
+        val boundaries: List<Int> = listOf(openIdx) + commaIdxs.toList() + listOf(closeIdx)
+        // generate segments: for each pair (b1, b2), the content is from b1+1 to b2 (exclusive)
+        return boundaries.zipWithNext().map { (prev, curr) ->
+            (prev + 1) j curr
+        } α { it j src }
     }
 
 /** a json scanner that indexes and optionally reifies the json chars
@@ -137,16 +142,16 @@ object JsonParser {
                 //if obj we create k-v pairs otherwise we create values
 
                 //iterate  segments exclusive of src first and last and commas in the middle
-                val combine: Series<Int> = combine(s_[openIdx], commaIdxs, s_[closeIdx])
+                val boundaries: List<Int> = listOf(openIdx) + commaIdxs.toList() + listOf(closeIdx)
                 if (commaIdxs.isEmpty()) {
-                    val (before, after) = combine.toArray()
+                    val (before, after) = boundaries
                     val possiblyEmpty = src.clone().lim(after).pos(before + 1).trim
                     if (!possiblyEmpty.hasRemaining)
                         return if (isObj) emptyMap<String, Any?>()
                         else emptyArray<Any?>()
                 }
 
-                (combine.`▶` as Iterable<Int>).zipWithNext().map { (before, after) ->
+                boundaries.zipWithNext().map { (before, after) ->
                     if (isObj) {
                         val tmp = CharSeries(src[before.inc() until after]).trim
                         require(tmp.seekTo('"')) {
