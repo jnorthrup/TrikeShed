@@ -9,6 +9,7 @@ import borg.trikeshed.common.TypeEvidence.Companion.update
 import borg.trikeshed.common.drop
 import borg.trikeshed.common.get
 import borg.trikeshed.common.size
+import borg.trikeshed.cursor.ColumnMeta
 import borg.trikeshed.cursor.Cursor
 import borg.trikeshed.cursor.RowVec
 import borg.trikeshed.cursor.meta
@@ -291,6 +292,167 @@ object CSVUtil {
             }
 
         } as Cursor
+    }
+
+    /**
+     * Schema + lazy row stream for a delimited byte file.
+     *
+     * Produced by [streamSpec]; callers use [rows] to iterate and [varChars] to
+     * supply column widths for variable-length types (IoString) when writing to ISAM.
+     */
+    data class StreamSpec(
+        val rows: Sequence<RowVec>,
+        val colNames: List<String>,
+        val colTypes: List<IOMemento>,
+        /** column name → max observed field length (only for IoString columns) */
+        val varChars: Map<String, Int>,
+    )
+
+    /**
+     * Sample [file] for TypeEvidence, deduce column types, then return a [StreamSpec]
+     * whose [StreamSpec.rows] streams typed [RowVec]s lazily without materialising.
+     *
+     * Suitable for 1BRC-scale files (832M rows). Uses direct byte access on [LongSeries].
+     */
+    fun streamSpec(
+        file: LongSeries<Byte>,
+        delim: Char = ',',
+        header: Boolean = true,
+        sampleSize: Int = 1000,
+    ): StreamSpec {
+        val spec = buildStreamSpec(file, delim, header, sampleSize)
+        return spec
+    }
+
+    /** Convenience wrapper — returns only the row [Sequence]. */
+    fun streamRows(
+        file: LongSeries<Byte>,
+        delim: Char = ',',
+        header: Boolean = true,
+        sampleSize: Int = 1000,
+    ): Sequence<RowVec> = streamSpec(file, delim, header, sampleSize).rows
+
+    private fun buildStreamSpec(
+        file: LongSeries<Byte>,
+        delim: Char,
+        header: Boolean,
+        sampleSize: Int,
+    ): StreamSpec {
+        val fileSize = file.a
+
+        // ── Phase 1: column names + data-start position ──────────────────────
+        val colNames = mutableListOf<String>()
+        var dataStart = 0L
+        val hdrBuf = ByteArray(1024)
+        var hdrLen = 0
+
+        if (header) {
+            while (dataStart < fileSize) {
+                val b = file[dataStart]
+                val c = b.toInt().toChar()
+                when {
+                    c == delim -> { colNames.add(hdrBuf.decodeToString(0, hdrLen)); hdrLen = 0 }
+                    c == '\r' || c == '\n' -> {
+                        colNames.add(hdrBuf.decodeToString(0, hdrLen))
+                        if (c == '\r' && dataStart + 1 < fileSize && file[dataStart + 1].toInt().toChar() == '\n')
+                            dataStart++
+                        dataStart++; break
+                    }
+                    else -> { hdrBuf[hdrLen++] = b }
+                }
+                dataStart++
+            }
+        } else {
+            var p = 0L; var count = 1
+            while (p < fileSize) {
+                val c = file[p++].toInt().toChar()
+                if (c == delim) count++ else if (c == '\r' || c == '\n') break
+            }
+            repeat(count) { i -> colNames.add("col$i") }
+        }
+        val colCount = colNames.size
+
+        // ── Phase 2: sample rows for TypeEvidence ────────────────────────────
+        val fileEvidence = mutableListOf<TypeEvidence>()
+        var samplePos = dataStart
+        repeat(sampleSize) {
+            if (samplePos >= fileSize) return@repeat
+            val rowEvidence = mutableListOf<TypeEvidence>()
+            var col = 0; var fLen = 0; var done = false
+            while (samplePos < fileSize && !done) {
+                val b = file[samplePos]
+                val c = b.toInt().toChar()
+                when {
+                    c == delim || c == '\r' || c == '\n' -> {
+                        while (col >= rowEvidence.size) rowEvidence.add(TypeEvidence())
+                        rowEvidence[col].recordColumnLength(fLen); fLen = 0
+                        if (c == delim) { col++; samplePos++ }
+                        else {
+                            if (c == '\r' && samplePos + 1 < fileSize &&
+                                file[samplePos + 1].toInt().toChar() == '\n') samplePos++
+                            samplePos++; done = true
+                        }
+                    }
+                    else -> {
+                        while (col >= rowEvidence.size) rowEvidence.add(TypeEvidence())
+                        rowEvidence[col] + c; fLen++; samplePos++
+                    }
+                }
+            }
+            fileEvidence.update(rowEvidence)
+        }
+
+        val colTypesList = List(colCount) { i ->
+            if (i < fileEvidence.size) deduce(fileEvidence[i]) else IoString
+        }
+        val metaArr = Array(colCount) { i -> RecordMeta(colNames[i], colTypesList[i]) }
+
+        // varChars: max observed length for each IoString column
+        val varChars: Map<String, Int> = buildMap {
+            colNames.forEachIndexed { i, name ->
+                if (colTypesList[i] == IoString && i < fileEvidence.size)
+                    put(name, fileEvidence[i].maxColumnLength.toInt().coerceAtLeast(1))
+            }
+        }
+
+        // ── Phase 3: lazy row stream from dataStart ───────────────────────────
+        val rows: Sequence<RowVec> = sequence {
+            var pos = dataStart
+            val fb = ByteArray(1024)
+            while (pos < fileSize) {
+                val cells = arrayOfNulls<Any?>(colCount)
+                var col = 0; var fLen = 0; var rowDone = false
+                while (pos < fileSize && !rowDone) {
+                    val b = file[pos]
+                    val c = b.toInt().toChar()
+                    when {
+                        c == delim || c == '\r' || c == '\n' -> {
+                            if (col < colCount) {
+                                val s = fb.decodeToString(0, fLen)
+                                cells[col] = colTypesList[col].fromChars(CharSeries(s.length j { s[it] }))
+                            }
+                            fLen = 0
+                            if (c == delim) { col++; pos++ }
+                            else {
+                                if (c == '\r' && pos + 1 < fileSize &&
+                                    file[pos + 1].toInt().toChar() == '\n') pos++
+                                pos++; rowDone = true
+                            }
+                        }
+                        else -> { if (fLen < fb.size) fb[fLen++] = b; pos++ }
+                    }
+                }
+                // handle EOF without trailing newline
+                if (!rowDone && fLen > 0 && col < colCount) {
+                    val s = fb.decodeToString(0, fLen)
+                    cells[col] = colTypesList[col].fromChars(CharSeries(s.length j { s[it] }))
+                }
+                if (cells[0] != null)
+                    yield(colCount j { x: Int -> cells[x] j { metaArr[x] as ColumnMeta } })
+            }
+        }
+
+        return StreamSpec(rows, colNames, colTypesList, varChars)
     }
 }
 

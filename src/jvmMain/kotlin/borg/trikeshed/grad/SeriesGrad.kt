@@ -1,83 +1,45 @@
 package borg.trikeshed.grad
 
-import ai.hypergraph.kotlingrad.api.*
-import borg.trikeshed.lib.*
+import borg.trikeshed.lib.Series
+import borg.trikeshed.lib.get
+import borg.trikeshed.lib.j
+import borg.trikeshed.lib.size
 
 /**
- * Series-Grad Bridge: Lift Series dimensions into expression space
+ * Wraps a Series<Double> as a Series<Dual>.
  *
- * Scaffolds Cursor dimensions (station, temp, etc.) as SFun variables
- * for AD optimization across the entire aggregation graph.
+ * @param varIdx  the index that should be treated as the independent variable (dv = 1.0).
+ *                All other elements are wrapped as constants (dv = 0.0).
+ *                Pass -1 (default) to make every element a constant.
  */
-
-// Lift a Series<T> into Series<SFun<DReal>> for element-wise operations
-inline val <T : Number> Series<T>.`↑`: Series<SFun<DReal>>
-    get() = size j { i: Int ->
-        when (val v = this[i]) {
-            is Int -> v.toDouble().`↑`
-            is Long -> v.toDouble().`↑`
-            is Float -> v.toDouble().`↑`
-            is Double -> v.`↑`
-            else -> (v.toString().toDoubleOrNull() ?: 0.0).`↑`
-        }
+fun Series<Double>.asDual(varIdx: Int = -1): Series<Dual> =
+    size j { i: Int ->
+        if (i == varIdx) Dual.variable(this[i]) else Dual.const(this[i])
     }
 
-// Element-wise Grad operations on Series<SFun>
-operator fun Series<SFun<DReal>>.plus(other: Series<SFun<DReal>>): Series<SFun<DReal>> =
-    (size j other.size).let { (n, _) ->
-        n j { i: Int -> this[i] + other[i] }
-    }
+/**
+ * Extracts the primal (.v) from each Dual in the series.
+ */
+fun Series<Dual>.values(): Series<Double> = size j { i: Int -> this[i].v }
 
-operator fun Series<SFun<DReal>>.minus(other: Series<SFun<DReal>>): Series<SFun<DReal>> =
-    size j { i: Int -> this[i] - other[i] }
+/**
+ * Extracts the tangent (.dv) from each Dual in the series.
+ */
+fun Series<Dual>.grads(): Series<Double> = size j { i: Int -> this[i].dv }
 
-operator fun Series<SFun<DReal>>.times(other: Series<SFun<DReal>>): Series<SFun<DReal>> =
-    size j { i: Int -> this[i] * other[i] }
-
-operator fun Series<SFun<DReal>>.div(other: Series<SFun<DReal>>): Series<SFun<DReal>> =
-    size j { i: Int -> this[i] / other[i] }
-
-// Aggregate SFun Series
-fun Series<SFun<DReal>>.sum(): SFun<DReal> =
-    fold(first()) { a, b -> a + b }
-
-fun Series<SFun<DReal>>.mean(): SFun<DReal> =
-    sum() / size.`↑`
-
-// Variance, stddev as Grad expressions
-fun Series<SFun<DReal>>.variance(): SFun<DReal> {
-    val μ = mean()
-    return map { (it - μ) * (it - μ) }.sum() / size.`↑`
-}
-
-fun Series<SFun<DReal>>.stddev(): SFun<DReal> =
-    variance().pow(0.5.`↑`)
-
-// Helper: map over Series<SFun>
-inline fun Series<SFun<DReal>>.map(
-    crossinline f: (SFun<DReal>) -> SFun<DReal>
-): Series<SFun<DReal>> = size j { i: Int -> f(this[i]) }
-
-// Helper: fold over Series<SFun>
-inline fun Series<SFun<DReal>>.fold(
-    initial: SFun<DReal>,
-    crossinline op: (SFun<DReal>, SFun<DReal>) -> SFun<DReal>
-): SFun<DReal> {
-    if (size == 0) return initial
-    var acc = initial
+/**
+ * Folds the Series<Double> using dual arithmetic.
+ *
+ * Each element is wrapped as a constant Dual before being passed to [f].
+ *
+ * @param init  the initial accumulator value
+ * @param f     a binary function expressed in Dual arithmetic
+ * @return      the final accumulated Dual (both primal and tangent)
+ */
+fun Series<Double>.gradFold(init: Dual, f: (Dual, Dual) -> Dual): Dual {
+    var acc = init
     for (i in 0 until size) {
-        acc = op(acc, this[i])
+        acc = f(acc, Dual.const(this[i]))
     }
     return acc
 }
-
-// Create SFun variables for AD optimization
-// e.g., val x = variable("temp")
-fun variable(name: String): SVar<DReal> = SVar(DReal, name)
-
-// Bind Series to variables for expression graph
-// e.g., val expr = bind(stationTemps, variable("t"))
-fun bind(series: Series<Double>, v: SVar<DReal>): Series<SFun<DReal>> =
-    series.`↑` α { it * v } // creates expression graph
-
-// Evaluate entire Series<SFun> at binding point — see GradOps.kt for infix eval alias

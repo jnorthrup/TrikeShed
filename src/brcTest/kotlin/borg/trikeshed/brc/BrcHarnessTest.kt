@@ -10,6 +10,8 @@
  *  - Output format compliance (sorted, {Station=min/mean/max, ...})
  *  - Rounding semantics (IEEE 754 roundTowardPositive)
  *  - 10K unique station names
+ *
+ * Large dataset convention: see BrcCache.PATH = "/tmp/measurements.txt" in BrcBillionRowCacheTest.kt
  */
 package borg.trikeshed.lib.brc
 
@@ -37,14 +39,11 @@ class BrcHarnessTest {
 
     private val variants = listOf(
         Variant("baseline") { args -> BrcBaseline.main(args) },
-        Variant("cursor") { args -> BrcCursor.main(args) },
+        Variant("csv_jvm") { args -> borg.trikeshed.brc.BrcCsvJvm.main(args) },
         Variant("mmap") { args -> BrcMmap.main(args) },
-        // BrcParallel and BrcFixedPoint use runBlocking — test separately
     )
 
     private val allVariants = variants + listOf(
-        Variant("parallel")   { args -> BrcParallel.main(args) },
-        Variant("fixedpoint") { args -> BrcFixedPoint.main(args) },
         Variant("duckdb_jvm") { args -> BrcDuckDbJvm.main(args) },
         Variant("isam_jvm")   { args -> BrcIsamJvm.main(args) },
     )

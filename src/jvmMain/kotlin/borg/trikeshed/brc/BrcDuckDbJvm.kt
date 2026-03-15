@@ -42,12 +42,13 @@ object BrcDuckDbJvm {
             // Load CSV directly using DuckDB's CSV reader
             // DuckDB auto-detects delimiter and column types
             db.execute("""
-                CREATE TABLE measurements AS 
-                SELECT * FROM read_csv_auto(
+                CREATE TABLE measurements AS
+                SELECT * FROM read_csv(
                     '$file',
                     header=false,
                     columns={'station': 'VARCHAR', 'temperature': 'DOUBLE'},
-                    delimiter=';'
+                    delim=';',
+                    ignore_errors=true
                 )
             """)
 

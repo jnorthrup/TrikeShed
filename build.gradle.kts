@@ -23,14 +23,16 @@ repositories {
 }
 
 kotlin {
-    @OptIn(ExperimentalKotlinGradlePluginApi::class) compilerOptions {
+    @OptIn(ExperimentalKotlinGradlePluginApi::class)
+    compilerOptions {
         apiVersion.set(org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_0)
         languageVersion.set(org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_0)
-        freeCompilerArgs = listOf(
-            "-opt-in=kotlin.RequiresOptIn",
-            "-Xsuppress-version-warnings",
-            "-Xexpect-actual-classes",
-        )
+        freeCompilerArgs =
+            listOf(
+                "-opt-in=kotlin.RequiresOptIn",
+                "-Xsuppress-version-warnings",
+                "-Xexpect-actual-classes",
+            )
     }
 
     jvmToolchain(21)
@@ -40,7 +42,7 @@ kotlin {
     }
 
     val hostOs = System.getProperty("os.name")
-    
+
     if (hostOs == "Mac OS X") {
         if (System.getProperty("os.arch") == "aarch64") {
             macosArm64("macos") {
@@ -176,21 +178,31 @@ kotlin {
             // Current native duck test references unavailable symbols.
             kotlin.exclude("borg/trikeshed/duck/DuckFFITest.kt")
         }
-        
+
         val jvmMain by getting {
             dependencies {
+                // DuckDB JDBC - used for BRC benchmarks and DuckSeries tests
+                // Arrangement note: DuckDB integration is intended for test/benchmark use only
                 implementation("org.duckdb:duckdb_jdbc:1.1.0")
-                implementation("ai.hypergraph:kotlingrad:0.4.7")
+
+                // JMH dependencies for benchmarking
+                implementation("org.openjdk.jmh:jmh-core:1.23")
+                implementation("org.openjdk.jmh:jmh-generator-annprocess:1.23")
             }
+
+            // Include JMH benchmark sources in jvmMain for compilation
+            kotlin.srcDir("src/jmhMain/kotlin")
+            resources.srcDir("src/jmhMain/resources")
+
             // WIP experimental implementations; excluded from default build.
             kotlin.exclude("borg/trikeshed/brc/BrcDiscoveryOrder.kt")
             kotlin.exclude("borg/trikeshed/brc/BrcHashArray.kt")
             kotlin.exclude("borg/trikeshed/brc/BrcHeapBisect.kt")
             kotlin.exclude("borg/trikeshed/brc/BrcPure.kt")
-            kotlin.exclude("borg/trikeshed/brc/fused/**")
             if (focusedTransportSlice) {
                 kotlin.exclude("one/xio/AsioVisitor.kt")
                 kotlin.exclude("borg/trikeshed/brc/BrcDuckDbJvm.kt")
+                kotlin.exclude("borg/trikeshed/brc/BrcBenchmark.kt")
                 kotlin.exclude("one/xio/HttpHeaders.kt")
                 kotlin.exclude("one/xio/HttpMethod.kt")
                 kotlin.exclude("rxf/server/CookieRfc6265Util.kt")
@@ -199,11 +211,10 @@ kotlin {
         val jvmTest by getting {
             dependencies {
                 implementation(kotlin("test-junit"))
+                implementation("org.junit.jupiter:junit-jupiter:5.9.0")
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.6.4")
             }
             // WIP/experimental tests excluded from default build.
-            kotlin.exclude("borg/trikeshed/duck/KotlingradThinSliceTest.kt")
-            kotlin.exclude("borg/trikeshed/grad/DrawdownDselTest.kt")
             kotlin.exclude("borg/trikeshed/signal/**")
             kotlin.exclude("borg/trikeshed/strategy/**")
             if (focusedTransportSlice) {
@@ -247,9 +258,16 @@ afterEvaluate {
     tasks.register("printJvmClasspath") {
         dependsOn("jvmJar")
         doLast {
-            val jvmMain = kotlin.targets.getByName("jvm").compilations.getByName("main")
+            val jvmMain =
+                kotlin.targets
+                    .getByName("jvm")
+                    .compilations
+                    .getByName("main")
             val cp = jvmMain.runtimeDependencyFiles!!.files.joinToString(":") { it.absolutePath }
-            val jar = tasks.getByName("jvmJar").outputs.files.singleFile.absolutePath
+            val jar =
+                tasks
+                    .getByName("jvmJar")
+                    .outputs.files.singleFile.absolutePath
             println("$jar:$cp")
         }
     }
@@ -280,10 +298,15 @@ afterEvaluate {
     tasks.register<Test>("focusedTransportTest") {
         description = "Runs the focused JVM transport/routing slice."
         group = "verification"
-        val jvmTestComp = kotlin.targets.getByName("jvm").compilations.getByName("test")
+        val jvmTestComp =
+            kotlin.targets
+                .getByName("jvm")
+                .compilations
+                .getByName("test")
         val jvmTestTask = tasks.named<Test>("jvmTest")
         testClassesDirs = jvmTestTask.get().testClassesDirs
-        classpath = files(jvmTestComp.runtimeDependencyFiles, jvmTestComp.output.allOutputs, jvmTestTask.get().outputs.files)
+        classpath =
+            files(jvmTestComp.runtimeDependencyFiles, jvmTestComp.output.allOutputs, jvmTestTask.get().outputs.files)
         include("**/ChannelizationSelectionTest.class")
         include("**/ChannelizationProjectionTest.class")
         include("**/ProtocolRouterTest.class")
@@ -291,5 +314,36 @@ afterEvaluate {
         include("**/LinuxNativeTransportBackendTest.class")
         include("**/CcekTransportCapabilityTest.class")
         shouldRunAfter(jvmTestTask)
+    }
+
+    // JMH task configuration
+    val jmhTask =
+        tasks.register<JavaExec>("jmh") {
+            description = "Runs JMH benchmarks"
+            group = "benchmark"
+
+            // Depend on compilation
+            dependsOn("compileKotlinJvm")
+            dependsOn("jvmJar")
+
+            // Setup classpath with JMH dependencies and compiled classes
+            val jvmComp =
+                kotlin.targets
+                    .getByName("jvm")
+                    .compilations
+                    .getByName("main")
+            classpath = jvmComp.runtimeDependencyFiles
+            classpath += files(jvmComp.output.classesDirs)
+            classpath += files(tasks.getByName("jvmJar").outputs.files)
+
+            mainClass.set("borg.trikeshed.brc.BrcBenchmarkKt")
+        }
+
+    // Combined benchmark task
+    tasks.register("benchmark") {
+        description = "Runs all benchmarks (tests + JMH)"
+        group = "verification"
+        dependsOn("test")
+        dependsOn(jmhTask)
     }
 }

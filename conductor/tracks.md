@@ -4,6 +4,22 @@ Active development tracks for TrikeShed.
 
 ---
 
+## [x] Track: Native Grad Analytics
+
+**Track ID:** `native-grad-analytics_20260314`
+
+**Branch:** `master`
+
+**Purpose:** Reimplement the deleted kotlingrad layer in plain Kotlin `Double` forward-mode autodiff — `Dual` number type, `GradOps`, `SeriesGrad`, `DrawdownDsel`, and `DiffDuckCursor` (emaFold/macdFold/softPnlFold) — with no external autodiff dependency.
+
+**Status:** ✅ Completed — 4 tests green
+
+**Slices:** `grad-01` ✅ Dual + GradOps · `grad-02` ✅ SeriesGrad · `grad-03` ✅ DrawdownDsel · `grad-04` ✅ DiffDuckCursor · `grad-05` ✅ contract tests
+
+**Plan:** `conductor/tracks/native-grad-analytics_20260314/plan.md`
+
+---
+
 ## [x] Track: Freqtrade Retirement and Feature Extraction
 
 **Track ID:** `freqtrade-retirement-and-extraction_20260303`
@@ -276,3 +292,85 @@ Active development tracks for TrikeShed.
 - Fixed SeriesGrad.kt conflicting overloads and unresolvable min/max calls
 - Added `minOf`/`maxOf` symbolic infix extensions to GradOps.kt
 - All 3 DselBenchmarkTest tests pass: drawdown fraction, max-drawdown running-min, throughput benchmark
+
+---
+
+## [ ] Track: Userspace Kernel Emulation Port
+
+**Track ID:** `userspace-port_20260314`
+
+**Branch:** `master`
+
+**Purpose:** Import architectural patterns from `../userspace` Rust library for Kotlin structured concurrency, kernel bypass (io_uring), eBPF JIT, and transport primitives while adapting to Kotlin's coroutine infrastructure.
+
+**Status:** 🔄 Open
+
+**Summary:**
+
+- userspace provides Rust structured concurrency patterns (Job/Scope/Dispatcher/Deferred/Cancel) applicable to Kotlin coroutines
+- io_uring kernel bypass requires Kotlin/Native Linux target
+- Network adapter patterns (HTTP/QUIC/SSH) align with TrikeShed protocol routing
+- All ports must follow TDD: failing Kotlin tests before implementation
+- Kotlin/Native target infrastructure needs setup before kernel bypass features
+
+**Slices:** `userspace-01` [x] architectural survey · `userspace-02` [SKIP] · `userspace-03` [ ] Kotlin/Native setup · `userspace-04` [ ] syscall interface design · `userspace-05` [ ] io_uring bindings prototype
+
+**Plan:** `conductor/tracks/userspace-port_20260314/plan.md`
+
+**Arrangement:** `conductor/tracks/userspace-port_20260314/arrangement.md`
+
+---
+
+## [ ] Track: 1BRC Benchmark & DuckDB Test Integration
+
+**Track ID:** `brc-benchmark-duckdb-test_20260314`
+
+**Branch:** `master`
+
+**Purpose:** Ensure One Billion Row Challenge (1BRC) benchmarks run correctly and DuckDB dependencies are confined to test scope only. Fix BRC test configuration issues and verify all variants compile and execute.
+
+**Status:** 🔄 Open
+
+**Summary:**
+
+- DuckDB JDBC dependency in jvmMain (production) scope violates test-only requirement
+- BrcHarnessTest references missing variants (BrcFixedPoint, BrcIsamJvm) and has package mismatch
+- DuckDB integration code exists in jvmMain and posixMain source sets
+- enableBrcTests Gradle property correctly gates heavy BRC tests
+- Test resources (measurements_test.txt, expected_output.txt) are in place
+
+**Slices:** `brc-01` ✅ DuckDB scope audit · `brc-02` [ ] test import fix · `brc-03` [ ] missing variants · `brc-04` [ ] test execution · `brc-05` [ ] native execution
+
+**Plan:** `conductor/tracks/brc-benchmark-duckdb-test_20260314/plan.md`
+
+**Arrangement:** `conductor/tracks/brc-benchmark-duckdb-test_20260314/arrangement.md`
+
+---
+
+## [x] Track: 1BRC CommonTest IO Matrix
+
+**Track ID:** `brc-commontest-io-matrix_20260314`
+
+**Branch:** `master`
+
+**Purpose:** `commonTest` contract suite for the full IO access matrix using 1BRC as forcing function.
+
+**Status:** ✅ Completed — 51 tests across 6 slices, all green
+
+**Plan:** `conductor/tracks/brc-commontest-io-matrix_20260314/plan.md`
+
+---
+
+## [ ] Track: BRC Slab Gateway Sort
+
+**Track ID:** `brc-slab-gateway-sort_20260314`
+
+**Branch:** `master`
+
+**Purpose:** Test all existing BRC Cursor IO varieties (BrcCursor, BrcPure, BrcDiscoveryOrder, BrcHashArray, BrcHeapBisect, BrcMmap, BrcParallel, BrcDuckDbJvm) in sequence — Cursor variants first — verifying each produces identical output against a `/tmp` fixture. Nothing written to repo.
+
+**Status:** 🔄 Open
+
+**Slices:** `gatewayseq-01` [ ] Cursor IO varieties (Cursor/Pure/DiscoveryOrder) · `gatewayseq-02` [ ] remaining JVM (HashArray/HeapBisect/Mmap/Parallel) · `gatewayseq-03` [ ] DuckDB gateway · `gatewayseq-04` [ ] full sequence all-match
+
+**Plan:** `conductor/tracks/brc-slab-gateway-sort_20260314/plan.md`

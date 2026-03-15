@@ -5,6 +5,7 @@
 - TrikeShed Kotlin text is the reference surface.
 - cpp2 needs to expand until it can honestly carry this shape.
 - The port starts as local spec text, not as a claim that `../cppfort` already implements it.
+- The repo-owned human-readable grammar reference now lives in `docs/cpp2/golden_surface_grammar.md`.
 
 ## Design Axioms
 
