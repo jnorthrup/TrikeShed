@@ -1,9 +1,8 @@
-import org.jetbrains.kotlin.gradle.DeprecatedTargetPresetApi
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
 
 plugins {
-    kotlin("multiplatform") version "2.0.20"
+    kotlin("multiplatform") version "2.3.20"
     `maven-publish`
 }
 
@@ -25,8 +24,8 @@ repositories {
 kotlin {
     @OptIn(ExperimentalKotlinGradlePluginApi::class)
     compilerOptions {
-        apiVersion.set(org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_0)
-        languageVersion.set(org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_0)
+        apiVersion.set(org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_3)
+        languageVersion.set(org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_3)
         freeCompilerArgs =
             listOf(
                 "-opt-in=kotlin.RequiresOptIn",
@@ -38,7 +37,6 @@ kotlin {
     jvmToolchain(21)
 
     jvm {
-        withJava()
     }
 
     js(IR) {
@@ -81,40 +79,6 @@ kotlin {
                         }
                     }
                     compilations.getByName("test") {
-                        cinterops {
-                            create("duckdb") {
-                                defFile(file("duckdb_interop/duckdb.def"))
-                                compilerOpts("-I/opt/homebrew/include")
-                            }
-                        }
-                    }
-                }
-            }
-        } else {
-            macosX64("macos") {
-                if (enableNativeSharedLib) {
-                    binaries.sharedLib {
-                        baseName = "trikeshed"
-                    }
-                }
-                binaries.executable("brcCsvNative") {
-                    entryPoint = "borg.trikeshed.brc.brcCsvNativeMain"
-                }
-                binaries.executable("autoresearchNative") {
-                    entryPoint = "borg.trikeshed.autoresearch.autoresearchNativeMain"
-                }
-                binaries.executable("brcCursorNative") {
-                    entryPoint = "borg.trikeshed.brc.brcCursorNativeMain"
-                }
-                binaries.executable("brcDuckDbNative") {
-                    entryPoint = "borg.trikeshed.brc.brcDuckDbNativeMain"
-                }
-                binaries.executable("brcIsamNative") {
-                    entryPoint = "borg.trikeshed.brc.brcIsamNativeMain"
-                }
-                val duckdbHeader = file("/opt/homebrew/Cellar/duckdb/1.4.4/include/duckdb.h")
-                if (duckdbHeader.exists()) {
-                    compilations.getByName("main") {
                         cinterops {
                             create("duckdb") {
                                 defFile(file("duckdb_interop/duckdb.def"))
@@ -350,7 +314,7 @@ afterEvaluate {
                     .getByName("jvm")
                     .compilations
                     .getByName("main")
-            classpath = jvmComp.runtimeDependencyFiles
+            classpath = jvmComp.runtimeDependencyFiles ?: files()
             classpath += files(jvmComp.output.classesDirs)
             classpath += files(tasks.getByName("jvmJar").outputs.files)
 
