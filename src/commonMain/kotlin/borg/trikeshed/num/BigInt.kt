@@ -17,7 +17,7 @@ import borg.trikeshed.lib.reversed
 import borg.trikeshed.lib.size
 import borg.trikeshed.lib.toSeries
 import borg.trikeshed.lib.α
-import borg.trikeshed.lib.`▶`
+import borg.trikeshed.lib.view
 import kotlin.math.absoluteValue
 import kotlin.math.max
 
@@ -163,7 +163,7 @@ class BigInt private constructor(private val sign: Boolean?, private val magnitu
 
     override fun toString(): String {
         val signString = if (sign == null) "" else if (sign) "+" else "-"
-        return signString + magnitude.reversed().`▶`.joinToString("") { it.toString().padStart(9, '0') }
+        return signString + magnitude.reversed().view.joinToString("") { it.toString().padStart(9, '0') }
     }
 
     override fun toByte(): Byte = toInt().toByte()

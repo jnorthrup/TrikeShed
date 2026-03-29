@@ -1,7 +1,7 @@
 package gk.kademlia.routing
 
 import borg.trikeshed.lib.Join
-import borg.trikeshed.lib.`↺`
+import borg.trikeshed.lib.leftIdentity
 import gk.kademlia.id.NUID
 import gk.kademlia.include.Address
 import gk.kademlia.include.Route
@@ -26,7 +26,7 @@ open class RoutingTable<TNum : Comparable<TNum>, Sz : NetMask<TNum>>(
     fun addRoute(other: Route<TNum>): Join<NUID<TNum>, Address>? = other.let { (g: NUID<TNum>) ->
         min(agentNUID.netmask.distance(agentNUID.id!!, g.id!!), bucketCount).let {
             if (it > 0)
-                buckets[it.dec()].getOrPut(g.id!!, other.`↺`)
+                buckets[it.dec()].getOrPut(g.id!!, other.leftIdentity)
             else null
         }
     }

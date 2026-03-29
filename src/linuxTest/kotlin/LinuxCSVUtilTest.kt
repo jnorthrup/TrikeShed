@@ -26,7 +26,7 @@ class LinuxCSVUtilTest {
             val lp = (csv α { delimR: DelimitRange ->
                 val chars = fileBuf.get(delimR.asIntRange) α { it.toUByte().toInt().toChar() }
                 (chars).asString()
-            }).`▶`.withIndex().toList()
+            }).view.withIndex().toList()
             println(lp)
         }
     }

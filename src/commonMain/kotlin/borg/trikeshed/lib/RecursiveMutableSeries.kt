@@ -34,7 +34,7 @@ class RecursiveMutableSeries<T> private constructor(private var data: Series<T>)
         }}
     }
 
-    override fun remove(item: T) =  this.`▶` .withIndex().firstOrNull { it.value == item }?.index?.let { removeAt(it) } != null
+    override fun remove(item: T) =  this.view .withIndex().firstOrNull { it.value == item }?.index?.let { removeAt(it) } != null
 
     override fun clear() {
         data = EmptySeries as Series<T>

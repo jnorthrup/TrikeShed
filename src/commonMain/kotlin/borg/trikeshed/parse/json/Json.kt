@@ -15,7 +15,7 @@ import borg.trikeshed.lib.first
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.second
 import borg.trikeshed.lib.toSeries
-import borg.trikeshed.lib.`▶`
+import borg.trikeshed.lib.view
 import borg.trikeshed.lib.α
 import borg.trikeshed.lib.*
 

@@ -1,7 +1,6 @@
 package borg.trikeshed.http
 
 
-import kotlinx.coroutines.runBlocking
 
 typealias Socket = Int
 typealias Address = String
@@ -39,14 +38,14 @@ class SimpleHttpServer(private val port: Int) : Server {
         // Implementation of socket listening
     }
 
-    private fun acceptConnections(socket: Socket) = runBlocking {
+    private fun acceptConnections(socket: Socket) {
         while (true) {
             val clientSocket = accept(socket)
             handleRequest(clientSocket)
         }
     }
 
-    private suspend fun handleRequest(socket: Socket) {
+    private fun handleRequest(socket: Socket) {
         val buffer = ByteArray(1024)
         // Read request from the socket
         val request = read(socket, buffer)

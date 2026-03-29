@@ -9,7 +9,7 @@ import borg.trikeshed.lib.iterator
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.plus
 import borg.trikeshed.lib.size
-import borg.trikeshed.lib.`▶`
+import borg.trikeshed.lib.view
 
 typealias Bucket<T> = Series<T>
 
@@ -33,7 +33,7 @@ open class HashSeriesSet<T : Any>  : SeriesSet<T> {
 
     override fun contains(element: T): Boolean {
         val bucketIndex = getBucketIndex(element)
-        return buckets[bucketIndex].`▶`.any { it == element }
+        return buckets[bucketIndex].view.any { it == element }
     }
 
     override fun iterator(): Iterator<T> = object : Iterator<T> {
@@ -99,7 +99,7 @@ open class HashSeriesSet<T : Any>  : SeriesSet<T> {
             override fun remove(element: T): Boolean {
                 val bucketIndex = theSet.getBucketIndex(element)
                 val bucket = buckets[bucketIndex]
-                val index = bucket.`▶`.indexOf(element)
+                val index = bucket.view.indexOf(element)
                 if (index != -1) {
                     buckets += buckets.size j { i ->
                         if (i == bucketIndex) {
@@ -167,6 +167,6 @@ fun main1() {
 
     println("Bucket contents:")
     for (bucket in testSet.buckets) {
-        println(bucket.`▶`.toList())
+        println(bucket.view.toList())
     }
 }

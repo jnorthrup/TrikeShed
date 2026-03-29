@@ -7,7 +7,7 @@ import kotlin.test.*
 class JsonParserTest {
 
     @Test
-    fun `test parse big json`() {
+    fun testParseBigJson() {
         // Read the big.json file content
         val jsonContent = readBigJson()
 

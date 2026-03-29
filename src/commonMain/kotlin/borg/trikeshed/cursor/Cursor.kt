@@ -68,7 +68,7 @@ val Cursor.meta: Series<ColumnMeta>
 fun Cursor.meta(vararg s: String): Series<Int> {
     val meta: Series<ColumnMeta> = meta
     return s.size j { i ->
-        meta.`▶`.indexOfFirst { columnMeta: ColumnMeta -> columnMeta.name == s[i] }
+        meta.view.indexOfFirst { columnMeta: ColumnMeta -> columnMeta.name == s[i] }
     }
 }
 
@@ -99,8 +99,8 @@ operator fun Cursor.minus(killbag: Series<Int>) {
 fun Cursor.get(s: Series<ColumnExclusion>): Cursor {
 
     val exclusionBag = mutableSetOf<Int>()
-    s.`▶`.forEachIndexed { i: Int, it: ColumnExclusion ->
-        exclusionBag.add(meta.`▶`.indexOfFirst { it.name == it.name })
+    s.view.forEachIndexed { i: Int, it: ColumnExclusion ->
+        exclusionBag.add(meta.view.indexOfFirst { it.name == it.name })
     }
     val retained = ((0 until meta.size).toSet() - exclusionBag).toIntArray()
     return this[retained]
@@ -173,11 +173,11 @@ operator fun Cursor.get(vararg i: Int): Cursor = size j { y: Int ->
  *
  */
 val Cursor.isNumerical: Boolean
-    get() = meta.`▶`.all {
+    get() = meta.view.all {
         when (it.type) {
             IoByte, IoShort, IoInt, IoFloat, IoDouble, IoLong -> true
             else -> false
         }
     }
 
-val Cursor.isHomoMorphic: Boolean get() = !meta.`▶`.any { it.type != meta[0].type }
+val Cursor.isHomoMorphic: Boolean get() = !meta.view.any { it.type != meta[0].type }

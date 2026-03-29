@@ -66,7 +66,7 @@ actual class IsamDataFile actual constructor(
         } else
             println("DEBUG: file $datafileFilename is aligned to recordlen $recordlen")
 
-        val fieldCounts: Map<IOMemento, Pair<Int, Int>> = constraints.`▶`.groupBy { it.type }
+        val fieldCounts: Map<IOMemento, Pair<Int, Int>> = constraints.view.groupBy { it.type }
             .mapValues { (_, v) -> v.size to v.sumOf { it.end - it.begin } }
 
         val ySize = fileSize / recordlen
@@ -98,7 +98,7 @@ actual class IsamDataFile actual constructor(
             val data = randomAccessFile.channel
 
             //create row buffer
-            meta0.debug { logDebug { "toIsam: " + it.`▶`.map { it.toString() } } }
+            meta0.debug { logDebug { "toIsam: " + it.view.map { it.toString() } } }
 
 
             val last = meta0.last()

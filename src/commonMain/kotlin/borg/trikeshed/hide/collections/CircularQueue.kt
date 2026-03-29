@@ -6,9 +6,7 @@ import borg.trikeshed.lib.Join
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.size
 import kotlinx.coroutines.InternalCoroutinesApi
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 
 //package vec
 
@@ -37,17 +35,14 @@ open class CirQlar<T>(
 
     val full: Boolean get() = tail >= maxSize
 
-    /*override */  fun offer(e: T): Boolean = runBlocking {
-        val tmp: Any?
-        lock.withLock {
-            val i = tail % maxSize
-            tmp = evict?.run { al.takeIf { it.size < i }?.get(i) }
-            al[i] = e
+    /*override */  fun offer(e: T): Boolean {
+        val i = tail % maxSize
+        val tmp = evict?.run { al.takeIf { it.size < i }?.get(i) }
+        al[i] = e
 
-            if (++tail == 2 * maxSize) tail = maxSize
-        }
+        if (++tail == 2 * maxSize) tail = maxSize
         tmp?.let { t -> evict?.invoke(t as T) }
-        true
+        return true
     }
 
     fun toList(): List<T> {

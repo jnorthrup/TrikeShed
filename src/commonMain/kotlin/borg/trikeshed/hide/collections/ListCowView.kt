@@ -1,8 +1,6 @@
 package borg.trikeshed.common.collections
 
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 
 /** a mutable listView of a List which performs a copy to MutableList on first mutation.  not threadsafe or concurrent. */
 class ListCowView<T>(private var list: List<T> = emptyList()) : List<T>, AbstractMutableList<T>() {
@@ -10,15 +8,11 @@ class ListCowView<T>(private var list: List<T> = emptyList()) : List<T>, Abstrac
    private var once: Mutex? = Mutex()
 
   private  var guardFunction:(()->Unit)? = {
-        runBlocking {
-            once?.withLock { //thundering herds may all arrive here at once, but only one will get to copy the list
-                if (list !is MutableList<T>) {
-                    list = list.toMutableList()
-                }
-                once = null
-                guardFunction = null
-            }
+        if (list !is MutableList<T>) {
+            list = list.toMutableList()
         }
+        once = null
+        guardFunction = null
     }
 
     override fun add(index: Int, element: T) {

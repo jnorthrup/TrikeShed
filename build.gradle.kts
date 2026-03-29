@@ -41,6 +41,10 @@ kotlin {
         withJava()
     }
 
+    js(IR) {
+        nodejs()
+    }
+
     val hostOs = System.getProperty("os.name")
 
     if (hostOs == "Mac OS X") {
@@ -66,19 +70,22 @@ kotlin {
                 binaries.executable("brcIsamNative") {
                     entryPoint = "borg.trikeshed.brc.brcIsamNativeMain"
                 }
-                compilations.getByName("main") {
-                    cinterops {
-                        create("duckdb") {
-                            defFile(file("duckdb_interop/duckdb.def"))
-                            compilerOpts("-I/opt/homebrew/include")
+                val duckdbHeader = file("/opt/homebrew/Cellar/duckdb/1.4.4/include/duckdb.h")
+                if (duckdbHeader.exists()) {
+                    compilations.getByName("main") {
+                        cinterops {
+                            create("duckdb") {
+                                defFile(file("duckdb_interop/duckdb.def"))
+                                compilerOpts("-I/opt/homebrew/include")
+                            }
                         }
                     }
-                }
-                compilations.getByName("test") {
-                    cinterops {
-                        create("duckdb") {
-                            defFile(file("duckdb_interop/duckdb.def"))
-                            compilerOpts("-I/opt/homebrew/include")
+                    compilations.getByName("test") {
+                        cinterops {
+                            create("duckdb") {
+                                defFile(file("duckdb_interop/duckdb.def"))
+                                compilerOpts("-I/opt/homebrew/include")
+                            }
                         }
                     }
                 }
@@ -105,11 +112,14 @@ kotlin {
                 binaries.executable("brcIsamNative") {
                     entryPoint = "borg.trikeshed.brc.brcIsamNativeMain"
                 }
-                compilations.getByName("main") {
-                    cinterops {
-                        create("duckdb") {
-                            defFile(file("duckdb_interop/duckdb.def"))
-                            compilerOpts("-I/opt/homebrew/include")
+                val duckdbHeader = file("/opt/homebrew/Cellar/duckdb/1.4.4/include/duckdb.h")
+                if (duckdbHeader.exists()) {
+                    compilations.getByName("main") {
+                        cinterops {
+                            create("duckdb") {
+                                defFile(file("duckdb_interop/duckdb.def"))
+                                compilerOpts("-I/opt/homebrew/include")
+                            }
                         }
                     }
                 }
@@ -152,7 +162,6 @@ kotlin {
             dependencies {
                 api("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.4")
                 api("org.jetbrains.kotlinx:kotlinx-datetime:0.4.0")
-                api("org.jetbrains.kotlin:kotlin-reflect:1.8.0")
             }
             // The old pseudo-common xio surface is retired in favor of JVM/NIO transport boundaries.
             kotlin.exclude("one/xio/NetworkChannel.kt")
@@ -162,8 +171,7 @@ kotlin {
         }
         val commonTest by getting {
             dependencies {
-                implementation(kotlin("test-common"))
-                implementation(kotlin("test-annotations-common"))
+                implementation(kotlin("test"))
             }
             if (focusedTransportSlice) {
                 // Focused transport slice: exclude non-transport common tests
@@ -235,6 +243,16 @@ kotlin {
         val macosTest by getting {
             dependsOn(posixTest)
         }
+
+        val jsMain by getting {
+            dependsOn(commonMain)
+            kotlin.exclude("borg/trikeshed/common/collections/**")
+            kotlin.exclude("borg/trikeshed/hide/collections/**")
+            kotlin.exclude("borg/trikeshed/http/SimpleHttpServer.kt")
+            kotlin.exclude("borg/trikeshed/lib/descriptiveSetNotation.kt")
+            kotlin.exclude("borg/trikeshed/lib/octals.kt")
+        }
+        val jsTest by getting { dependsOn(commonTest) }
 
         // Keep heavy 1BRC regression tests opt-in for local benchmarking.
         if (enableBrcTests) {

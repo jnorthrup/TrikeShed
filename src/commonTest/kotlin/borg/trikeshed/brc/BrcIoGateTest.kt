@@ -3,6 +3,7 @@ package borg.trikeshed.brc
 import borg.trikeshed.lib.CharSeries
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 /**
  * IO Surface Audit gate test for BRC processing.
@@ -19,7 +20,7 @@ class BrcIoGateTest {
 
         // Seek to ';' — advances pos to the char after ';'
         val found = cs.seekTo(';')
-        assert(found) { "Expected ';' delimiter in line" }
+        assertTrue(found, "Expected ';' delimiter in line")
 
         // Station is everything before ';': positions 0 until (pos-1)
         val stationEnd = cs.pos - 1

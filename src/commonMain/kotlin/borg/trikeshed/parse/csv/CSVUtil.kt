@@ -39,7 +39,7 @@ import borg.trikeshed.lib.toArray
 import borg.trikeshed.lib.toList
 import borg.trikeshed.lib.toSeries
 import borg.trikeshed.lib.α
-import borg.trikeshed.lib.`↺`
+import borg.trikeshed.lib.leftIdentity
 import kotlin.jvm.JvmInline
 import kotlin.jvm.JvmOverloads
 
@@ -173,7 +173,7 @@ object CSVUtil {
                     val any = rv[x].a
                     try {
                         val fromChars = type.fromChars(any as CharSeries)
-                        val function = recordMeta.`↺`
+                        val function = recordMeta.leftIdentity
                         fromChars j function
                     } catch (e: Exception) {
                         log { "parseConformant: $e col $x row $y " }
@@ -482,7 +482,7 @@ fun simpelCsvCursor(lineList: List<String>): Cursor {
         fieldCount j { x: Int ->
             val start = if (x == 0) 0 else lineSegs[x - 1].toInt() + 1
             val end = if (x == fieldCount - 1) line.length else lineSegs[x].toInt()
-            line.substring(start, end) j hdrMeta[x].`↺`
+            line.substring(start, end) j hdrMeta[x].leftIdentity
         }
     }
 }

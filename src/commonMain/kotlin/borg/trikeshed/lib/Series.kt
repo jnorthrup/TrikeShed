@@ -102,11 +102,7 @@ fun <T> Array<T>.toSeries(): Join<Int, (Int) -> T> = size j ::get
 
 inline val <T> T.leftIdentity: () -> T get() = { this }
 
-/**Left Identity Function */
-inline val <T> T.`↺`: () -> T get() = leftIdentity
-
-fun <T> `↻`(t: T): T = t
-infix fun <T> T.rightIdentity(t: T): T = `↻`(t)
+fun <T> T.rightIdentity(t: T): T = t
 
 infix fun <C, B : (Int) -> C> IntArray.α(m: B): Series<C> = this.size j { m(this[it]) }
 
@@ -163,7 +159,7 @@ operator fun <T> Series<T>.get(i: Int): T = b(i)
  * fold for Series
  *
  */
-fun <A, B> Series<A>.fold(z: B, f: (acc: B, A) -> B): B = this.`▶`.fold(z, f)
+fun <A, B> Series<A>.fold(z: B, f: (acc: B, A) -> B): B = this.view.fold(z, f)
 
 
 /**
@@ -171,7 +167,7 @@ fun <A, B> Series<A>.fold(z: B, f: (acc: B, A) -> B): B = this.`▶`.fold(z, f)
  *
  * because the Series is lazy this is a bit more complicated than it would be for a list
  */
-fun <A, B> Series<A>.runningfold(initial: B, f: (acc: B, A, Int) -> B): Series<B> = this.`▶`.runningfold(initial, f)
+fun <A, B> Series<A>.runningfold(initial: B, f: (acc: B, A, Int) -> B): Series<B> = this.view.runningfold(initial, f)
 
 /**
  * Binary Search for Series<Comparable>
@@ -183,7 +179,7 @@ fun <A, B> Series<A>.runningfold(initial: B, f: (acc: B, A, Int) -> B): Series<B
  *          if the Series is null then 0 is returned
  *          if the value is null then 0 is returned
  */
-inline fun Series<Int>.binarySearch(t: Int): Int = this.`▶`.binarySearch(t)
+inline fun Series<Int>.binarySearch(t: Int): Int = this.view.binarySearch(t)
 
 /**splits a range into multiple parts for upstream reindexing utility
  * 0..11 / 3 produces [0..3, 4..7, 8..11].toSeries()
@@ -234,7 +230,7 @@ fun IntArray.binarySearch(i: Int): Int {
 fun <S> Join<Int, (Int) -> S>.toSet(opt: MutableSet<S>? = null): MutableSet<S> = (
         opt
             ?: LinkedHashSet(size)
-        ).also { hs -> hs.addAll(this.`▶`) }
+        ).also { hs -> hs.addAll(this.view) }
 
 // Series iterator for use in for loops
 operator fun <A> Series<A>.iterator(): Iterator<A> = object : Iterator<A> {
@@ -260,10 +256,10 @@ value class IterableSeries<A>(val s: Series<A>) : Iterable<A>, Series<A> by s {
  * provides a big bright visible symbol that makes
  * conversions easy to follow along during reading the code
  */
-val <T> Series<T>.`▶`: IterableSeries<T> get() = this as? IterableSeries ?: IterableSeries(this)
+val <T> Series<T>.view: IterableSeries<T> get() = this as? IterableSeries ?: IterableSeries(this)
 
 infix operator fun <T> IterableSeries<T>.contains(x: Char): Boolean = this.any { x == it }
-infix operator fun <T> Series<T>.contains(it: Char): Boolean = this.`▶` contains it
+infix operator fun <T> Series<T>.contains(it: Char): Boolean = this.view contains it
 
 
 /***
@@ -358,10 +354,10 @@ fun <B> Series<B>.dropLast(back: Int): Series<B> = get(0 until max(0, size - bac
 fun <B> Series<B>.take(exclusiveEnd: Int): Series<B> = get(0 until min(exclusiveEnd, size))
 
 //series foreachIndexed
-fun <T> Series<T>.forEachIndexed(action: (index: Int, T) -> Unit): Unit = this.`▶`.forEachIndexed(action)
+fun <T> Series<T>.forEachIndexed(action: (index: Int, T) -> Unit): Unit = this.view.forEachIndexed(action)
 
 //series foreach
-fun <T> Series<T>.forEach(action: (T) -> Unit): Unit = this.`▶`.forEach(action)
+fun <T> Series<T>.forEach(action: (T) -> Unit): Unit = this.view.forEach(action)
 
 fun <T> Series<T>.isEmpty(): Boolean = a == 0
 
@@ -533,7 +529,7 @@ fun Series<Char>.parseDoubleOrNull(): Double? = try {
  * @sample samples.collections.Iterables.Operations.zipIterable
  */
 infix fun <T, R> List<T>.zip(other: Series<R>): List<Join<T, R>> =
-    zip(other.`▶`) { a: T, b: R -> a j b }
+    zip(other.view) { a: T, b: R -> a j b }
 
 @JvmName("vvzip2")
 @Suppress("UNCHECKED_CAST")

@@ -208,7 +208,7 @@ class GzIndex {
                 windowSupplier = if (isStdin) {
                     val window = UByteArray(windowSizes[i].toInt())
                     window.usePinned { fread(it.addressOf(0), 1u, windowSizes[i].toULong(), stdin) }
-                    window.`↺`
+                    window.leftIdentity
                 } else fun(): UByteArray {
                     return withIndexFile(indexFname) { indexFp ->
                         fseek(indexFp, windowOffsets[i].toLong(), SEEK_SET)

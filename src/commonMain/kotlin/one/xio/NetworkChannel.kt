@@ -8,16 +8,13 @@ import kotlinx.coroutines.*
 import borg.trikeshed.lib.RecursiveMutableSeries
 
 
-typealias ByteBuffer = ByteSeries
-
-
-expect interface NetworkChannel {
+interface NetworkChannel {
     fun register(selector: Any, op: Int, attachment: Any?)
     fun close()
     fun isOpen(): Boolean
     // Add methods for reading and writing data
-    suspend fun read(buffer: ByteBuffer): Int
-    suspend fun write(buffer: ByteBuffer): Int
+    suspend fun read(buffer: ByteSeries): Int
+    suspend fun write(buffer: ByteSeries): Int
 }
 
 enum class HttpMethod {

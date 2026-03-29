@@ -92,17 +92,17 @@ class IsamMetaFileReader(val metafileFilename: String) :Usable{
             val result = sanitize(recordMetas,varchars)
             lines.add("# format:  coords WS .. EOL names WS .. EOL TypeMememento WS .. [EOL]")
             lines.add("# last coord is the recordlen")
-            lines.add(result.`▶`.joinToString(" ") { it.begin.toString() + " " + it.end })
-            lines.add(result.`▶`.joinToString(" ") { it.name })
-            lines.add(result.`▶`.joinToString(" ") { it.type.name })
+            lines.add(result.view.joinToString(" ") { it.begin.toString() + " " + it.end })
+            lines.add(result.view.joinToString(" ") { it.name })
+            lines.add(result.view.joinToString(" ") { it.type.name })
             Files.write(metafilename, lines)
             return result
         }
 
         fun sanitize(recordMetas: Series<ColumnMeta>, varchars: Map<String, Int>): Series<RecordMeta> {
-            val result = (if (recordMetas.`▶`.any { !(it is RecordMeta) || (min(it.begin, it.end) < 0&&null==it.child) }) {
+            val result = (if (recordMetas.view.any { !(it is RecordMeta) || (min(it.begin, it.end) < 0&&null==it.child) }) {
                 var offset = 0
-                recordMetas.`▶`.map { columnMeta: ColumnMeta ->
+                recordMetas.view.map { columnMeta: ColumnMeta ->
                     val type: TypeMemento = columnMeta.type
                     val len =  type.networkSize?: varchars[columnMeta.name]?: throw Exception("no network size for ${columnMeta.name}")
                     val recordMeta = RecordMeta(
