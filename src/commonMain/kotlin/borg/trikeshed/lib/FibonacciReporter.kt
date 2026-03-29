@@ -1,9 +1,7 @@
 package borg.trikeshed.lib
 
 import borg.trikeshed.common.Usable
-import kotlinx.datetime.Clock
-import kotlinx.datetime.TimeZone
-import kotlinx.datetime.toLocalDateTime
+import kotlin.time.Clock
 import kotlin.jvm.JvmOverloads
 import kotlin.math.max
 import kotlin.time.Duration
@@ -48,13 +46,10 @@ class FibonacciReporter(
             val l = begin.elapsedNow()
             val slice = l / max(1, count)
             val secondsSinceBegin = l.inWholeSeconds
-
-            "logged $count $noun in $l ${(count.toDouble() / (secondsSinceBegin.toDouble())).toFloat()}/s " + (size?.let {
+            "logged $count $noun in $l ${(count.toDouble() / max(1.0, secondsSinceBegin.toDouble())).toFloat()}/s " + (size?.let {
                 val ticksLeft = size - count
                 val remaining: Duration = slice * ticksLeft
-                "remaining: $remaining est ${
-                    Clock.System.now().plus(remaining).toLocalDateTime(TimeZone.currentSystemDefault())
-                }"
+                "remaining: $remaining est ${Clock.System.now().plus(remaining)}"
             } ?: "")
         } else null
     }

@@ -16,7 +16,9 @@ import borg.trikeshed.isam.meta.PlatformCodec.Companion.writeUInt
 import borg.trikeshed.isam.meta.PlatformCodec.Companion.writeULong
 import borg.trikeshed.lib.*
 import borg.trikeshed.lib.CharSeries
-import kotlinx.datetime.*
+import kotlin.time.Instant
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.LocalDateTime
 
 enum class IOMemento(override val networkSize: Int? = null, val fromChars: (Series<Char>) -> Any) : TypeMemento {
     IoBoolean(1, {
@@ -82,19 +84,16 @@ enum class IOMemento(override val networkSize: Int? = null, val fromChars: (Seri
     },
     IoLocalDate(8, { it.parseIsoDateTime() }) {
         override fun createEncoder(i: Int): (Any?) -> ByteArray = {
-            //try a cast elvis first with Instant then with LocalDate
-            val date = (it as? Instant)?.toLocalDateTime(TimeZone.UTC)?.date ?: it as LocalDate
-//
-//            val toEpochDays = (it as LocalDate).toEpochDays()
-//            writeLong (toEpochDays.toLong())
+            val date = when (val value = it) {
+                is Instant -> LocalDate.parse(value.toString().substringBefore('T'))
+                is LocalDate -> value
+                else -> value as LocalDate
+            }
             writeLong(date.toEpochDays().toLong())
-
-
         }
 
         override fun createDecoder(size: Int): (ByteArray) -> Any? = {
-            val fromEpochDays = LocalDate.fromEpochDays(readLong(it).toInt())
-            fromEpochDays
+            LocalDate.fromEpochDays(readLong(it).toInt())
         }
     },
 

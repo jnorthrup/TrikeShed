@@ -1,4 +1,5 @@
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
+import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
 
 plugins {
@@ -41,6 +42,11 @@ kotlin {
 
     js(IR) {
         nodejs()
+    }
+
+    @OptIn(ExperimentalWasmDsl::class)
+    wasmJs {
+        browser()
     }
 
     val hostOs = System.getProperty("os.name")
@@ -124,8 +130,8 @@ kotlin {
     sourceSets {
         val commonMain by getting {
             dependencies {
-                api("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.4")
-                api("org.jetbrains.kotlinx:kotlinx-datetime:0.4.0")
+                api("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
+                api("org.jetbrains.kotlinx:kotlinx-datetime:0.7.0")
             }
             // The old pseudo-common xio surface is retired in favor of JVM/NIO transport boundaries.
             kotlin.exclude("one/xio/NetworkChannel.kt")
@@ -184,7 +190,7 @@ kotlin {
             dependencies {
                 implementation(kotlin("test-junit"))
                 implementation("org.junit.jupiter:junit-jupiter:5.9.0")
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.6.4")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
             }
             // WIP/experimental tests excluded from default build.
             kotlin.exclude("borg/trikeshed/signal/**")
@@ -217,6 +223,8 @@ kotlin {
             kotlin.exclude("borg/trikeshed/lib/octals.kt")
         }
         val jsTest by getting { dependsOn(commonTest) }
+        val wasmJsMain by getting { dependsOn(commonMain) }
+        val wasmJsTest by getting { dependsOn(commonTest) }
 
         // Keep heavy 1BRC regression tests opt-in for local benchmarking.
         if (enableBrcTests) {

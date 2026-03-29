@@ -2,7 +2,7 @@ package borg.trikeshed.autoresearch
 
 import borg.trikeshed.common.Files
 import borg.trikeshed.common.mkdir
-import kotlinx.datetime.Clock
+import kotlin.time.Clock
 import kotlin.math.abs
 
 object AutoresearchHarness {
