@@ -40,7 +40,7 @@ class RecursiveMutableSeries<T> private constructor(private var data: Series<T>)
         data = EmptySeries as Series<T>
     }
 
-    override fun plus(item: T): MutableSeries<T> = RecursiveMutableSeries(data + s_[item])
+    override fun plus(item: T): MutableSeries<T> = RecursiveMutableSeries(data + _root_ide_package_.borg.trikeshed.common.collections.s_[item])
 
     override fun minus(item: T): MutableSeries<T> = RecursiveMutableSeries(size j { i ->
         data[i].takeUnless { it == item } ?: data[i + 1]

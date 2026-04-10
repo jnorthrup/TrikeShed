@@ -3,7 +3,8 @@ import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
 
 plugins {
-    kotlin("multiplatform") version "2.3.20"
+    kotlin("multiplatform") version "2.4.0-Beta1"
+    id("com.github.ben-manes.versions") version "0.53.0"
     `maven-publish`
 }
 
@@ -25,8 +26,8 @@ repositories {
 kotlin {
     @OptIn(ExperimentalKotlinGradlePluginApi::class)
     compilerOptions {
-        apiVersion.set(org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_3)
-        languageVersion.set(org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_3)
+        apiVersion.set(org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_4)
+        languageVersion.set(org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_4)
         freeCompilerArgs =
             listOf(
                 "-opt-in=kotlin.RequiresOptIn",
@@ -131,7 +132,7 @@ kotlin {
         val commonMain by getting {
             dependencies {
                 api("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
-                api("org.jetbrains.kotlinx:kotlinx-datetime:0.7.0")
+                api("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1-0.6.x-compat")
             }
             // The old pseudo-common xio surface is retired in favor of JVM/NIO transport boundaries.
             kotlin.exclude("one/xio/NetworkChannel.kt")
@@ -161,11 +162,11 @@ kotlin {
             dependencies {
                 // DuckDB JDBC - used for BRC benchmarks and DuckSeries tests
                 // Arrangement note: DuckDB integration is intended for test/benchmark use only
-                implementation("org.duckdb:duckdb_jdbc:1.1.0")
+                implementation("org.duckdb:duckdb_jdbc:1.5.1.0")
 
                 // JMH dependencies for benchmarking
-                implementation("org.openjdk.jmh:jmh-core:1.23")
-                implementation("org.openjdk.jmh:jmh-generator-annprocess:1.23")
+                implementation("org.openjdk.jmh:jmh-core:1.37")
+                implementation("org.openjdk.jmh:jmh-generator-annprocess:1.37")
             }
 
             // Include JMH benchmark sources in jvmMain for compilation

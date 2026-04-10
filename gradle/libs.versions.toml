@@ -1,21 +1,24 @@
 [versions]
 # Kotlin & Coroutines
-kotlin = "2.3.20"
+kotlin = "2.4.0-Beta1"
 kotlinx-coroutines = "1.10.2"
-kotlinx-datetime = "0.7.0"
+kotlinx-datetime = "0.7.1-0.6.x-compat"
 kotlinx-serialization = "1.3.0"
 kotlin-reflect = "1.8.0"
 
 # Kotlin Testing
-kotlin-test-common = "2.3.20"
-kotlin-test-annotations-common = "2.3.20"
-kotlin-test-junit = "2.3.20"
+kotlin-test-common = "2.4.0-Beta1"
+kotlin-test-annotations-common = "2.4.0-Beta1"
+kotlin-test-junit = "2.4.0-Beta1"
 
 # DuckDB
-duckdb-jdbc = "1.1.0"
+duckdb-jdbc = "1.5.1.0"
 
 # IO Uring (Linux only)
 io-uring = "1.0"
+
+# JMH
+jmh = "1.37"
 
 [libraries]
 # Kotlin stdlib & reflection
