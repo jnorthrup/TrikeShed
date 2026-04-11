@@ -10,6 +10,20 @@ import kotlin.experimental.and
  */
 
 /**
+ * HTTP methods detected by byte-sniff
+ */
+enum class HttpMethod {
+    Get,
+    Post,
+    Put,
+    Delete,
+    Head,
+    Options,
+    Connect,
+    Patch
+}
+
+/**
  * Protocol detection result
  */
 enum class Protocol {

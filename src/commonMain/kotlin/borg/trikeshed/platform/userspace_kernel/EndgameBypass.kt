@@ -1,5 +1,6 @@
 package borg.literbike.userspace_kernel
 
+import borg.trikeshed.lib.j
 import kotlin.concurrent.Volatile
 
 /**
@@ -59,6 +60,6 @@ object EndgameBypassModule {
             }
         }
 
-        fun metrics(): Pair<Long, Long> = syscallCount to bypassCount
+        fun metrics() = syscallCount j  bypassCount
     }
 }

@@ -145,9 +145,8 @@ object CcekProtocolRegistryKey : Key<CcekProtocolRegistryElement> {
     override fun factory(): CcekProtocolRegistryElement = CcekProtocolRegistryElement()
 }
 
-// Re-export HTTP types from http_htx module
-typealias HttpMethod = borg.literbike.http_htx.HttpMethod
-typealias HttpStatus = borg.literbike.http_htx.HttpStatus
+// Re-export HTTP types from local module
+typealias HttpMethod = borg.literbike.ccek.agent8888.HttpMethod
 
 // Protocol element stubs
 class HtxElement : Element {

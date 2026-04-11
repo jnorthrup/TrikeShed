@@ -2,6 +2,8 @@
 
 package borg.literbike.userspace_network
 
+import kotlin.jvm.JvmName
+
 /**
  * Network abstractions and protocol adapters
  *
