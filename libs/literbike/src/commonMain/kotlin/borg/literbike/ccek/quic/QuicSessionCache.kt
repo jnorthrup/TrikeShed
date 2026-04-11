@@ -13,11 +13,11 @@ data class SessionEntry(
     val sessionTicket: List<UByte>,
     val alpn: List<UByte>? = null,
     val zeroRttParams: List<UByte>? = null,
-    val insertedAt: Long = System.currentTimeMillis(),
+    val insertedAt: Long = Clocks.System.now(),
     val ttl: Duration = 3600.seconds
 ) {
     val isExpired: Boolean
-        get() = (System.currentTimeMillis() - insertedAt) > ttl.inWholeMilliseconds
+        get() = (Clocks.System.now() - insertedAt) > ttl.inWholeMilliseconds
 }
 
 /** QUIC session cache trait */

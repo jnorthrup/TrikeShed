@@ -178,7 +178,7 @@ class TensorVM(backend: MemoryBackend) {
         val align = dtype.sizeBytes
         val alloc = (byteLen + align - 1) / align * align
 
-        val offset = nextOffset.addAndGet(alloc)
+        val offset = nextOffset.addAndFetch(alloc)
 
         if (offset + byteLen > backend.len()) {
             return Result.failure(IllegalStateException("out of memory"))

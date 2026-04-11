@@ -1,11 +1,10 @@
 package borg.literbike.request_factory
 
-import kotlinx.atomicfu.AtomicLong
-import kotlinx.atomicfu.AtomicRef
-import kotlinx.atomicfu.atomic
-import kotlinx.datetime.Clock
-import kotlinx.datetime.Instant
 import kotlinx.serialization.Serializable
+import java.time.Clock
+import java.time.Instant
+import java.time.temporal.ChronoUnit
+import java.util.concurrent.atomic.AtomicLong
 
 /**
  * Operations tracking metrics for RequestFactory batch operations.
@@ -16,37 +15,37 @@ class OperationsTracker(
     /**
      * Total number of operations processed
      */
-    private val totalOperations: AtomicLong = atomic(0L)
+    private val totalOperations = AtomicLong(0L)
 
     /**
      * Number of successful operations
      */
-    private val successCount: AtomicLong = atomic(0L)
+    private val successCount = AtomicLong(0L)
 
     /**
      * Number of failed operations
      */
-    private val errorCount: AtomicLong = atomic(0L)
+    private val errorCount = AtomicLong(0L)
 
     /**
      * Number of find operations
      */
-    private val findCount: AtomicLong = atomic(0L)
+    private val findCount = AtomicLong(0L)
 
     /**
      * Number of persist operations
      */
-    private val persistCount: AtomicLong = atomic(0L)
+    private val persistCount = AtomicLong(0L)
 
     /**
      * Number of delete operations
      */
-    private val deleteCount: AtomicLong = atomic(0L)
+    private val deleteCount = AtomicLong(0L)
 
     /**
      * Total processing time in microseconds
      */
-    private val totalProcessingTimeUs: AtomicLong = atomic(0L)
+    private val totalProcessingTimeUs = AtomicLong(0L)
 
     /**
      * Recent errors (capped for memory safety)
@@ -63,45 +62,45 @@ class OperationsTracker(
      * Record the start of an operation batch
      */
     fun recordBatchStart(count: Int): BatchTimer {
-        return BatchTimer(this, count, Clock.System.now())
+        return BatchTimer(this, count, Clock.systemUTC().instant())
     }
 
     /**
      * Record a successful find operation
      */
     fun recordFindSuccess() {
-        findCount.incrementAndGet()
-        successCount.incrementAndGet()
-        totalOperations.incrementAndGet()
+        findCount.incrementAndFetch()
+        successCount.incrementAndFetch()
+        totalOperations.incrementAndFetch()
     }
 
     /**
      * Record a successful persist operation
      */
     fun recordPersistSuccess() {
-        persistCount.incrementAndGet()
-        successCount.incrementAndGet()
-        totalOperations.incrementAndGet()
+        persistCount.incrementAndFetch()
+        successCount.incrementAndFetch()
+        totalOperations.incrementAndFetch()
     }
 
     /**
      * Record a successful delete operation
      */
     fun recordDeleteSuccess() {
-        deleteCount.incrementAndGet()
-        successCount.incrementAndGet()
-        totalOperations.incrementAndGet()
+        deleteCount.incrementAndFetch()
+        successCount.incrementAndFetch()
+        totalOperations.incrementAndFetch()
     }
 
     /**
      * Record a failed operation
      */
     fun recordError(operationType: String, entityType: String, error: String) {
-        errorCount.incrementAndGet()
-        totalOperations.incrementAndGet()
+        errorCount.incrementAndFetch()
+        totalOperations.incrementAndFetch()
 
         val trackedError = TrackedError(
-            timestamp = Clock.System.now(),
+            timestamp = Clock.systemUTC().instant(),
             operationType = operationType,
             entityType = entityType,
             error = error
@@ -119,17 +118,17 @@ class OperationsTracker(
      * Record processing time for a batch
      */
     fun recordProcessingTime(microseconds: Long) {
-        totalProcessingTimeUs.addAndGet(microseconds)
+        totalProcessingTimeUs.addAndFetch(microseconds)
     }
 
     /**
      * Get current metrics snapshot
      */
     fun getMetrics(): OperationsMetrics {
-        val total = totalOperations.value
-        val success = successCount.value
-        val errors = errorCount.value
-        val processingTime = totalProcessingTimeUs.value
+        val total = totalOperations.get()
+        val success = successCount.get()
+        val errors = errorCount.get()
+        val processingTime = totalProcessingTimeUs.get()
 
         val errorsCopy = synchronized(recentErrors) { recentErrors.toList() }
 
@@ -137,9 +136,9 @@ class OperationsTracker(
             totalOperations = total,
             successCount = success,
             errorCount = errors,
-            findCount = findCount.value,
-            persistCount = persistCount.value,
-            deleteCount = deleteCount.value,
+            findCount = findCount.get(),
+            persistCount = persistCount.get(),
+            deleteCount = deleteCount.get(),
             totalProcessingTimeUs = processingTime,
             avgProcessingTimeUs = if (total > 0) processingTime.toDouble() / total.toDouble() else 0.0,
             successRate = if (total > 0) success.toDouble() / total.toDouble() else 1.0,
@@ -151,13 +150,13 @@ class OperationsTracker(
      * Reset all metrics
      */
     fun reset() {
-        totalOperations.value = 0L
-        successCount.value = 0L
-        errorCount.value = 0L
-        findCount.value = 0L
-        persistCount.value = 0L
-        deleteCount.value = 0L
-        totalProcessingTimeUs.value = 0L
+        totalOperations.set(0L)
+        successCount.set(0L)
+        errorCount.set(0L)
+        findCount.set(0L)
+        persistCount.set(0L)
+        deleteCount.set(0L)
+        totalProcessingTimeUs.set(0L)
         synchronized(recentErrors) { recentErrors.clear() }
     }
 }
@@ -199,9 +198,8 @@ class BatchTimer(
     private val start: Instant
 ) {
     fun finish(): Long {
-        val elapsed = Clock.System.now() - start
-        val micros = elapsed.toLong(kotlinx.datetime.DateTimeUnit.MICROSECOND)
-        tracker.recordProcessingTime(micros)
-        return micros
+        val elapsed = ChronoUnit.MICROS.between(start, Clock.systemUTC().instant())
+        tracker.recordProcessingTime(elapsed)
+        return elapsed
     }
 }

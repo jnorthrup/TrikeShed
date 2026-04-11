@@ -3,6 +3,7 @@ package com.seaofnodes.simple.ccek
 import borg.literbike.ccek.core.Context
 import borg.literbike.ccek.core.Element
 import borg.literbike.ccek.core.Key
+import kotlin.reflect.KClass
 
 /**
  * SeaOfNodes CCEK Integration — Compiler phase state injection.
@@ -53,6 +54,12 @@ data class DagNode(
     val controls: List<Int>, // node ids of control predecessors
     val typeName: String = "?"
 ) {
+    val inputSeries:  lib.Series<Int>
+        get() = inputs.size j { i -> inputs[i] }
+
+    val controlSeries:  Series<Int>
+        get() = controls.size j { i -> controls[i] }
+
     override fun toString() = "$label#${nid}(${inputs.joinToString(",")})"
 }
 

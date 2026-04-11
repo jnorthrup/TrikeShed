@@ -48,7 +48,7 @@ class SpeculativeMatcher(
         parsers: List<(ByteArray) -> MatchResult>,
         input: ByteArray
     ): MatchResult? {
-        val startTime = System.currentTimeMillis()
+        val startTime = Clocks.System.now()
         val results = mutableListOf<MatchResult>()
 
         for (parser in parsers) {
@@ -59,7 +59,7 @@ class SpeculativeMatcher(
                 return result
             }
 
-            if (System.currentTimeMillis() - startTime > timeoutMs) {
+            if (Clocks.System.now() - startTime > timeoutMs) {
                 break
             }
         }
@@ -74,7 +74,7 @@ class SpeculativeMatcher(
  * HTTP/1 parser for speculative matching
  */
 fun http1Parser(input: ByteArray): MatchResult {
-    val startTime = System.currentTimeMillis()
+    val startTime = Clocks.System.now()
     val text = input.decodeToString()
 
     // Check for HTTP/ response
@@ -86,7 +86,7 @@ fun http1Parser(input: ByteArray): MatchResult {
             complete = complete,
             protocol = "HTTP/1.x",
             version = 1u to 1u,
-            elapsedMs = System.currentTimeMillis() - startTime
+            elapsedMs = Clocks.System.now() - startTime
         )
     }
 
@@ -101,14 +101,14 @@ fun http1Parser(input: ByteArray): MatchResult {
                 complete = complete,
                 protocol = "HTTP/1.x",
                 version = 1u to 1u,
-                elapsedMs = System.currentTimeMillis() - startTime
+                elapsedMs = Clocks.System.now() - startTime
             )
         }
     }
 
     return MatchResult(
         bytesMatched = 0, confidence = 0u, complete = false,
-        protocol = "HTTP/1.x", elapsedMs = System.currentTimeMillis() - startTime
+        protocol = "HTTP/1.x", elapsedMs = Clocks.System.now() - startTime
     )
 }
 
@@ -116,7 +116,7 @@ fun http1Parser(input: ByteArray): MatchResult {
  * HTTP/2 parser for speculative matching
  */
 fun http2Parser(input: ByteArray): MatchResult {
-    val startTime = System.currentTimeMillis()
+    val startTime = Clocks.System.now()
 
     // HTTP/2 connection preface
     val preface = "PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n".toByteArray()
@@ -124,7 +124,7 @@ fun http2Parser(input: ByteArray): MatchResult {
         return MatchResult(
             bytesMatched = 24, confidence = 100u, complete = true,
             protocol = "HTTP/2", version = 2u to 0u,
-            elapsedMs = System.currentTimeMillis() - startTime
+            elapsedMs = Clocks.System.now() - startTime
         )
     }
 
@@ -135,14 +135,14 @@ fun http2Parser(input: ByteArray): MatchResult {
             return MatchResult(
                 bytesMatched = 9, confidence = 90u, complete = false,
                 protocol = "HTTP/2", version = 2u to 0u,
-                elapsedMs = System.currentTimeMillis() - startTime
+                elapsedMs = Clocks.System.now() - startTime
             )
         }
     }
 
     return MatchResult(
         bytesMatched = 0, confidence = 0u, complete = false,
-        protocol = "HTTP/2", elapsedMs = System.currentTimeMillis() - startTime
+        protocol = "HTTP/2", elapsedMs = Clocks.System.now() - startTime
     )
 }
 
@@ -150,20 +150,20 @@ fun http2Parser(input: ByteArray): MatchResult {
  * HTTP/3 parser for speculative matching
  */
 fun http3Parser(input: ByteArray): MatchResult {
-    val startTime = System.currentTimeMillis()
+    val startTime = Clocks.System.now()
 
     if (input.size >= 3) {
         if (input[0] == 0x00.toByte() || input[0] == 0x01.toByte()) {
             return MatchResult(
                 bytesMatched = 3, confidence = 50u, complete = false,
                 protocol = "HTTP/3", version = 3u to 0u,
-                elapsedMs = System.currentTimeMillis() - startTime
+                elapsedMs = Clocks.System.now() - startTime
             )
         }
     }
 
     return MatchResult(
         bytesMatched = 0, confidence = 0u, complete = false,
-        protocol = "HTTP/3", elapsedMs = System.currentTimeMillis() - startTime
+        protocol = "HTTP/3", elapsedMs = Clocks.System.now() - startTime
     )
 }

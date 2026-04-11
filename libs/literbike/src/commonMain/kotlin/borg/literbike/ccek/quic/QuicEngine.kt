@@ -54,7 +54,7 @@ class QuicEngine(
     private val initialCryptoSendOffset = 0uL
     private val handshakeCryptoSendOffset = 0uL
     private var handshakeDoneSent = false
-    private var lastActivity = System.currentTimeMillis()
+    private var lastActivity = Clocks.System.now()
 
     companion object {
         /**
@@ -258,7 +258,7 @@ class QuicEngine(
         synchronized(streamStates) {
             streamStates[streamId]?.let { s ->
                 s.bytesSent += data.size.toULong()
-                s.lastActivity = System.currentTimeMillis()
+                s.lastActivity = Clocks.System.now()
             }
         }
 
@@ -362,11 +362,11 @@ class QuicEngine(
     // ---- Private helpers ----
 
     private fun markActivity() {
-        lastActivity = System.currentTimeMillis()
+        lastActivity = Clocks.System.now()
     }
 
     private fun isIdleTimedOut(): Boolean {
-        return System.currentTimeMillis() - lastActivity > idleTimeoutMs
+        return Clocks.System.now() - lastActivity > idleTimeoutMs
     }
 
     private fun processStreamFrame(frame: StreamFrame, reconstructedPacketNumber: ULong) {
@@ -381,7 +381,7 @@ class QuicEngine(
         stream.receiveBuffer.addAll(frame.data)
         stream.receiveOffset = frame.offset + frame.data.size.toULong()
         stream.bytesReceived += frame.data.size.toULong()
-        stream.lastActivity = System.currentTimeMillis()
+        stream.lastActivity = Clocks.System.now()
 
         // Mark packet for ACK
         synchronized(ackPending) {

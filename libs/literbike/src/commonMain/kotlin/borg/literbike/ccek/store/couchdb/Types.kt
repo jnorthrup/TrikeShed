@@ -241,7 +241,7 @@ data class Cursor(
 ) {
     companion object {
         fun new(key: String, docId: String? = null, skip: UInt = 0u): Cursor =
-            Cursor(key, docId, skip, Instant.fromEpochMilliseconds(System.currentTimeMillis()))
+            Cursor(key, docId, skip, Instant.fromEpochMilliseconds(Clocks.System.now()))
     }
 
     fun encode(): String {

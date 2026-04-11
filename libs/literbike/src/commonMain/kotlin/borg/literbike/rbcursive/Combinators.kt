@@ -46,11 +46,7 @@ sealed class ParseResult<out T> {
     }
 
     /** Map the error type */
-    fun <E : Any> mapErr(f: (ParseError) -> E): ParseResult<T> = when (this) {
-        is Complete -> this
-        is Incomplete -> this
-        is Error -> Error(f(error), consumed)
-    }
+    fun mapErr(): ParseResult<T> = this
 
     /** Collapse to a coarse signal for parser outcomes */
     fun signal(): Signal = when (this) {
@@ -142,11 +138,11 @@ class TakeWhileParser(
 /**
  * Tag parser - match exact byte sequence.
  */
-class TagParser(private val tag: ByteArray) : Parser<ByteArray> {
+class TagParser(private val targetTag: ByteArray) : Parser<ByteArray> {
     override fun parse(input: ByteArray): ParseResult<ByteArray> {
-        if (input.size < tag.size) return ParseResult.Incomplete(input.size)
-        return if (input.startsWith(tag)) {
-            ParseResult.Complete(input.copyOf(tag.size), tag.size)
+        if (input.size < targetTag.size) return ParseResult.Incomplete(input.size)
+        return if (input.startsWith(targetTag)) {
+            ParseResult.Complete(input.copyOf(targetTag.size), targetTag.size)
         } else {
             ParseResult.Error(ParseError.InvalidInput, 0)
         }

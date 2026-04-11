@@ -24,10 +24,10 @@ class HandlerElement {
     private val http3Count = AtomicLong(0)
     private val unknownCount = AtomicLong(0)
 
-    fun handleHttp1() { httpCount.incrementAndGet() }
-    fun handleHttp2() { http2Count.incrementAndGet() }
-    fun handleHttp3() { http3Count.incrementAndGet() }
-    fun handleUnknown() { unknownCount.incrementAndGet() }
+    fun handleHttp1() { httpCount.incrementAndFetch() }
+    fun handleHttp2() { http2Count.incrementAndFetch() }
+    fun handleHttp3() { http3Count.incrementAndFetch() }
+    fun handleUnknown() { unknownCount.incrementAndFetch() }
 
     fun stats(): HandlerStats = HandlerStats(
         http1 = httpCount.get().toULong(),

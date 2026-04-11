@@ -323,6 +323,6 @@ private fun generateRevision(currentRev: String): String {
         val parts = currentRev.split("-")
         if (parts.size >= 2) parts[0].toUIntOrNull()?.plus(1u) ?: 1u else 1u
     }
-    val hash = System.currentTimeMillis().toString(16).take(16)
+    val hash = Clocks.System.now().toString(16).take(16)
     return "$revNum-$hash"
 }

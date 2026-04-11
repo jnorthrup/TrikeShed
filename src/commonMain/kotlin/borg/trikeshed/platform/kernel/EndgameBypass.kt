@@ -75,7 +75,7 @@ class DensifiedKernel private constructor(
      * Direct kernel send with zero userspace overhead (Linux-specific)
      */
     fun densifiedSend(fd: RawFd, msg: ByteArray, flags: Int): Long {
-        bypassCount.incrementAndGet()
+        bypassCount.incrementAndFetch()
         // Platform-specific syscall
         return -1L
     }
@@ -84,7 +84,7 @@ class DensifiedKernel private constructor(
      * Direct kernel recv with zero userspace overhead (Linux-specific)
      */
     fun densifiedRecv(fd: RawFd, msg: ByteArray, flags: Int): Long {
-        bypassCount.incrementAndGet()
+        bypassCount.incrementAndFetch()
         // Platform-specific syscall
         return -1L
     }

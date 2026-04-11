@@ -10,6 +10,5 @@
  */
 package borg.literbike.request_factory
 
-// Re-export
-public typealias EntityId<T> = EntityId<T>
-public typealias Revision = Revision
+// Types defined in Types.kt: EntityId, Revision, Operation, RequestContext
+// Tracker defined in Tracker.kt: OperationsTracker, OperationsMetrics

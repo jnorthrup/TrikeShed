@@ -127,14 +127,14 @@ class AsyncBackgroundExecutor(
 
     /** Execute individual task with resource management */
     private suspend fun executeTask(task: AsyncTask<Unit>, workerId: Int) {
-        val startTime = System.currentTimeMillis()
+        val startTime = Clocks.System.now()
         val taskId = taskIdCounter
 
         val estimate = task.resourceEstimate()
 
         // Acquire resources based on estimate
         if (estimate.mmapRegions > 0) {
-            mmapSemaphore.acquire(estimate.mmapRegions)
+            repeat(estimate.mmapRegions) { mmapSemaphore.acquire() }
         }
         if (estimate.simdIntensity > 0.5f) {
             simdSemaphore.acquire()
@@ -154,17 +154,17 @@ class AsyncBackgroundExecutor(
 
         task.execute(ctx).fold(
             onSuccess = {
-                val duration = System.currentTimeMillis() - startTime
+                val duration = Clocks.System.now() - startTime
                 updateMetrics(duration, true)
             },
             onFailure = {
-                val duration = System.currentTimeMillis() - startTime
+                val duration = Clocks.System.now() - startTime
                 updateMetrics(duration, false)
             }
         )
 
         if (estimate.simdIntensity > 0.5f) simdSemaphore.release()
-        if (estimate.mmapRegions > 0) mmapSemaphore.release(estimate.mmapRegions)
+        if (estimate.mmapRegions > 0) repeat(estimate.mmapRegions) { mmapSemaphore.release() }
     }
 
     /** Update performance metrics */

@@ -314,30 +314,30 @@ class HtxElement {
     private val activeRequests = kotlin.native.concurrent.AtomicInt(0)
 
     fun recordHttp1(bytes: ULong) {
-        http1Count.incrementAndGet()
-        bytesParsed.addAndGet(bytes.toLong())
+        http1Count.incrementAndFetch()
+        bytesParsed.addAndFetch(bytes.toLong())
     }
 
     fun recordHttp2(bytes: ULong) {
-        http2Count.incrementAndGet()
-        bytesParsed.addAndGet(bytes.toLong())
+        http2Count.incrementAndFetch()
+        bytesParsed.addAndFetch(bytes.toLong())
     }
 
     fun recordHttp3(bytes: ULong) {
-        http3Count.incrementAndGet()
-        bytesParsed.addAndGet(bytes.toLong())
+        http3Count.incrementAndFetch()
+        bytesParsed.addAndFetch(bytes.toLong())
     }
 
     fun recordError() {
-        errorsCount.incrementAndGet()
+        errorsCount.incrementAndFetch()
     }
 
     fun requestStart() {
-        activeRequests.incrementAndGet()
+        activeRequests.incrementAndFetch()
     }
 
     fun requestEnd() {
-        activeRequests.decrementAndGet()
+        activeRequests.decrementAndFetch()
     }
 
     fun http1Count(): ULong = http1Count.get().toULong()

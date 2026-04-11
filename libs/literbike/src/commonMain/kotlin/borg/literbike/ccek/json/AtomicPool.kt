@@ -81,14 +81,14 @@ class AtomicPool<T : Any> private constructor(
         val obj = queue.poll()
         if (obj != null) {
             // Use atomic decrement to synchronize with put()
-            currentSize.decrementAndGet()
+            currentSize.decrementAndFetch()
             return obj
         }
 
         // Pool empty, create new object
         val newObj = factory()
         // Use relaxed for totalCreated since it's just statistics
-        totalCreated.incrementAndGet()
+        totalCreated.incrementAndFetch()
         return newObj
     }
 
@@ -118,7 +118,7 @@ class AtomicPool<T : Any> private constructor(
             if (current < maxSize) {
                 // Still under capacity, try again
                 queue.offer(obj)
-                currentSize.incrementAndGet()
+                currentSize.incrementAndFetch()
             }
             // Otherwise, drop the object
         }
@@ -142,7 +142,7 @@ class AtomicPool<T : Any> private constructor(
     fun clear() {
         while (queue.poll() != null) {
             // Atomic decrement to synchronize with any pending operations
-            currentSize.decrementAndGet()
+            currentSize.decrementAndFetch()
         }
     }
 }

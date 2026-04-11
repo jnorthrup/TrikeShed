@@ -167,7 +167,7 @@ class HttpIngressProtocolTest {
                 graphId = graph.id,
                 sessionId = ChannelSessionId("test-session"),
                 triggeringFact = GraphFact.ProtocolRequirement(ProtocolId.HTTP, ChannelSemantics.BYTE_STREAM, true),
-                timestamp = System.currentTimeMillis(),
+                timestamp = Clocks.System.now(),
             )
 
         val job = rule.activate(graph, context)

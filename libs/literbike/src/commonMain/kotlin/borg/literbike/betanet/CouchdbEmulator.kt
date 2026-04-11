@@ -31,7 +31,7 @@ data class Document(
 }
 
 class CouchDbEmulator {
-    private data class DocEntry(
+    internal data class DocEntry(
         var doc: Document,
     )
 
@@ -43,6 +43,7 @@ class CouchDbEmulator {
 
     companion object {
         fun new(): CouchDbEmulator = CouchDbEmulator()
+        const val SWAGGER_JSON: String = """{"info":{"title":"CouchDB Emulator","version":"1.7.2-emulated"},"paths":{"/db/{doc}":{"put":{},"get":{}},"/db/{doc}/attachments/{name}":{"put":{},"get":{}},"/ipfs/add":{"post":{}},"/ipfs/get":{"get":{}}}}"""
     }
 
     fun putDoc(id: String, content: ByteArray) {
@@ -97,10 +98,5 @@ class CouchDbEmulator {
 
     fun ipfsGet(key: String): ByteArray? = ipfsLock.withLock {
         ipfs[key]?.copyOf()
-    }
-
-    /** Minimal swagger stub describing the basic endpoints */
-    companion object {
-        const val SWAGGER_JSON: String = """{"info":{"title":"CouchDB Emulator","version":"1.7.2-emulated"},"paths":{"/db/{doc}":{"put":{},"get":{}},"/db/{doc}/attachments/{name}":{"put":{},"get":{}},"/ipfs/add":{"post":{}},"/ipfs/get":{"get":{}}}}"""
     }
 }

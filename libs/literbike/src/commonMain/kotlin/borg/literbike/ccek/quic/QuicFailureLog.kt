@@ -21,7 +21,7 @@ data class FailureEvent(
     val context: JsonObject
 )
 
-private fun nowMs(): Long = System.currentTimeMillis()
+private fun nowMs(): Long = Clocks.System.now()
 
 /**
  * QUIC failure log -- records structured failure events.

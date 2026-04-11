@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalAtomicApi::class)
+
 package borg.literbike.ccek.quic
 
 // ============================================================================
@@ -5,11 +7,14 @@ package borg.literbike.ccek.quic
 // Core foundation types and utilities for the QUIC stack
 // ============================================================================
 
-import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.atomic.AtomicBoolean
-import java.util.concurrent.atomic.AtomicLong
+import kotlin.concurrent.atomics.AtomicBoolean
+import kotlin.concurrent.atomics.AtomicLong
+import kotlin.concurrent.atomics.ExperimentalAtomicApi
+import kotlin.concurrent.atomics.incrementAndFetch
+import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Instant
 
 /**
  * Bedrock connection state tracker.
@@ -26,24 +31,24 @@ class QuicBedrockConnection(
     val bytesReceived = AtomicLong(0L)
     val isActive = AtomicBoolean(true)
 
-    val createdAt: Long = System.currentTimeMillis()
-    var lastActivity: Long = System.currentTimeMillis()
+    val createdAt  =  Clock.System.now()
+    var lastActivity  = Clock.System.now()
 
     fun markSent(bytes: Int) {
-        packetsSent.incrementAndGet()
-        bytesSent.addAndGet(bytes.toLong())
-        lastActivity = System.currentTimeMillis()
+        packetsSent.incrementAndFetch()
+        bytesSent.addAndFetch(bytes.toLong())
+        lastActivity = Clock.System.now()
     }
 
     fun markReceived(bytes: Int) {
-        packetsReceived.incrementAndGet()
-        bytesReceived.addAndGet(bytes.toLong())
-        lastActivity = System.currentTimeMillis()
+        packetsReceived.incrementAndFetch()
+        bytesReceived.addAndFetch(bytes.toLong())
+        lastActivity = Clock.System.now()
     }
 
     fun isActive(timeout: Duration = 30_000.milliseconds): Boolean {
         if (!isActive.get()) return false
-        return System.currentTimeMillis() - lastActivity < timeout.inWholeMilliseconds
+        return Clocks.System.now() - lastActivity < timeout.inWholeMilliseconds
     }
 
     fun close() {
@@ -96,11 +101,11 @@ class QuicBedrockPacketTracker(
     private val ackedPackets = mutableSetOf<ULong>()
 
     fun recordSent(packetNumber: ULong) {
-        sentPackets[packetNumber] = System.currentTimeMillis()
+        sentPackets[packetNumber] = Clocks.System.now()
     }
 
     fun recordReceived(packetNumber: ULong) {
-        receivedPackets[packetNumber] = System.currentTimeMillis()
+        receivedPackets[packetNumber] = Clocks.System.now()
     }
 
     fun recordAcked(packetNumber: ULong) {
@@ -110,7 +115,7 @@ class QuicBedrockPacketTracker(
 
     /** Get unacked sent packets (potential losses) */
     fun getUnackedPackets(timeout: Duration = 200.milliseconds): List<ULong> {
-        val now = System.currentTimeMillis()
+        val now = Clocks.System.now()
         return sentPackets.filter { (_, ts) -> now - ts > timeout.inWholeMilliseconds }.keys.toList()
     }
 

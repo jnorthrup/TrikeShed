@@ -52,27 +52,27 @@ class OperationsTracker(
      * Record a successful find operation
      */
     fun recordFindSuccess() {
-        findCount.incrementAndGet()
-        successCount.incrementAndGet()
-        totalOperations.incrementAndGet()
+        findCount.incrementAndFetch()
+        successCount.incrementAndFetch()
+        totalOperations.incrementAndFetch()
     }
 
     /**
      * Record a successful persist operation
      */
     fun recordPersistSuccess() {
-        persistCount.incrementAndGet()
-        successCount.incrementAndGet()
-        totalOperations.incrementAndGet()
+        persistCount.incrementAndFetch()
+        successCount.incrementAndFetch()
+        totalOperations.incrementAndFetch()
     }
 
     /**
      * Record a successful delete operation
      */
     fun recordDeleteSuccess() {
-        deleteCount.incrementAndGet()
-        successCount.incrementAndGet()
-        totalOperations.incrementAndGet()
+        deleteCount.incrementAndFetch()
+        successCount.incrementAndFetch()
+        totalOperations.incrementAndFetch()
     }
 
     /**
@@ -80,8 +80,8 @@ class OperationsTracker(
      */
     @Synchronized
     fun recordError(operationType: String, entityType: String, error: String) {
-        errorCount.incrementAndGet()
-        totalOperations.incrementAndGet()
+        errorCount.incrementAndFetch()
+        totalOperations.incrementAndFetch()
 
         val trackedError = TrackedError(
             timestamp = Instant.now(),
@@ -100,7 +100,7 @@ class OperationsTracker(
      * Record processing time for a batch
      */
     fun recordProcessingTime(microseconds: Long) {
-        totalProcessingTimeUs.addAndGet(microseconds)
+        totalProcessingTimeUs.addAndFetch(microseconds)
     }
 
     /**

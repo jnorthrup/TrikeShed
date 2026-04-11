@@ -77,7 +77,7 @@ class SctpSocket(
          * Generate a random verification tag
          */
         private fun generateTag(): UInt {
-            val nonce = System.currentTimeMillis()
+            val nonce = Clocks.System.now()
             // Simple hash-based tag generation
             val hashed = (nonce * 0x5DEECE66DL + 0xBL) and 0xFFFFFFFFL
             return hashed.toUInt()

@@ -108,7 +108,7 @@ class SimdPatternMatcher {
                 if (regexCache.size >= maxCacheSize) regexCache.clear()
                 Pattern.compile(pattern)
             }
-        }.recoverCatching { PatternError.InvalidRegex(it.message ?: "Unknown") }
+        }
     }
 
     /** Get or compile glob pattern with caching */
@@ -118,7 +118,7 @@ class SimdPatternMatcher {
                 if (globCache.size >= maxCacheSize) globCache.clear()
                 globToRegex(pattern).toRegex()
             }
-        }.recoverCatching { PatternError.InvalidGlob(it.message ?: "Unknown") }
+        }
     }
 
     /** Convert glob pattern to regex */
@@ -208,10 +208,10 @@ class SimdPatternMatcher {
                             Result.success(PatternMatchResult(false))
                         }
                     },
-                    onFailure = { Result.failure(it as PatternError) }
+                    onFailure = { Result.failure<PatternMatchResult>(it) }
                 )
             },
-            onFailure = { Result.failure(PatternError.EncodingError) }
+            onFailure = { Result.failure<PatternMatchResult>(PatternError.EncodingError) }
         )
     }
 
@@ -255,10 +255,10 @@ class SimdPatternMatcher {
 
                         Result.success(matches)
                     },
-                    onFailure = { Result.failure(it as PatternError) }
+                    onFailure = { Result.failure<List<PatternMatch>>(it) }
                 )
             },
-            onFailure = { Result.failure(PatternError.EncodingError) }
+            onFailure = { Result.failure<List<PatternMatch>>(PatternError.EncodingError) }
         )
     }
 

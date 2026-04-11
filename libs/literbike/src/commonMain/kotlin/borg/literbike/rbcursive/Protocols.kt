@@ -207,7 +207,7 @@ fun fastAnchorHint(data: ByteArray): ProtocolHint {
     for ((name, anchors) in PROTOCOL_ANCHORS) {
         for (a in anchors) {
             when (evalAnchor(a, data)) {
-                is Signal.Accept -> {
+                Signal.Accept -> {
                     return when (name) {
                         "http" -> ProtocolHint.Http
                         "socks5" -> ProtocolHint.Socks5
@@ -260,11 +260,10 @@ val PROTOCOL_SPECS: List<ProtocolSpec> = listOf(
         ),
         classify = { data ->
             val parser = HttpParser()
-            when (parser.parseRequest(data).getOrNull()?.method?.signal()) {
-                Signal.Accept -> Classify.Protocol(ProtocolType.Http)
-                Signal.NeedMore -> Classify.NeedMore
-                Signal.Reject -> Classify.Unknown
-                null -> Classify.Unknown
+            if (parser.parseRequest(data).getOrNull()?.method != null) {
+                Classify.Protocol(ProtocolType.Http)
+            } else {
+                Classify.NeedMore
             }
         }
     ),
@@ -344,7 +343,7 @@ class Listener(private val specs: List<ProtocolSpec>) {
         for (spec in specs) {
             for (a in spec.anchors) {
                 when (evalAnchor(a, data)) {
-                    is Signal.Accept -> return spec.classify(data)
+                    Signal.Accept -> return spec.classify(data)
                     Signal.NeedMore -> needMore = true
                     Signal.Reject -> {}
                 }

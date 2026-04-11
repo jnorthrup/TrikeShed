@@ -1,5 +1,7 @@
 package borg.trikeshed.platform.ccek.core
 
+import kotlin.reflect.KClass
+
 /**
  * CCEK Core — Context-Chain Element Key
  *

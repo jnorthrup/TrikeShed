@@ -33,7 +33,7 @@ class ListenerElement(
     constructor(bindAddr: String) : this(bindAddr, -1, 128u)
 
     fun incrementAccepted() {
-        acceptedConnections.incrementAndGet()
+        acceptedConnections.incrementAndFetch()
     }
 
     fun accepted(): Int = acceptedConnections.get()

@@ -69,7 +69,17 @@ class RfHandler(
         val metrics = rfTracker.getMetrics()
         sideEffects.add(buildJsonObject {
             put("type", JsonPrimitive("metrics"))
-            put("data", Json.encodeToJsonElement(OperationsMetrics.serializer(), metrics))
+            put("data", buildJsonObject {
+                put("totalOperations", JsonPrimitive(metrics.totalOperations))
+                put("successCount", JsonPrimitive(metrics.successCount))
+                put("errorCount", JsonPrimitive(metrics.errorCount))
+                put("findCount", JsonPrimitive(metrics.findCount))
+                put("persistCount", JsonPrimitive(metrics.persistCount))
+                put("deleteCount", JsonPrimitive(metrics.deleteCount))
+                put("totalProcessingTimeUs", JsonPrimitive(metrics.totalProcessingTimeUs))
+                put("avgProcessingTimeUs", JsonPrimitive(metrics.avgProcessingTimeUs))
+                put("successRate", JsonPrimitive(metrics.successRate))
+            })
         })
 
         return RfResponse(results = results, sideEffects = sideEffects)

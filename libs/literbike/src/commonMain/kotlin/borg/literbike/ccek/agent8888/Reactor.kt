@@ -40,11 +40,11 @@ class ReactorElement(
     fun isRunning(): Boolean = running.get()
 
     fun tick() {
-        selectCalls.incrementAndGet()
+        selectCalls.incrementAndFetch()
     }
 
     fun dispatch() {
-        eventsDispatched.incrementAndGet()
+        eventsDispatched.incrementAndFetch()
     }
 
     fun selectCalls(): Long = selectCalls.get()

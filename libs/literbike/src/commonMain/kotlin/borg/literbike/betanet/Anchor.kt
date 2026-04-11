@@ -21,14 +21,14 @@ data class Anchor(
         val pat = pattern and maskU64
 
         for (i in 0 until data.size - 7) {
-            val word = ((data[i].toLong() and 0xFF) shl 56) or
-                    ((data[i + 1].toLong() and 0xFF) shl 48) or
-                    ((data[i + 2].toLong() and 0xFF) shl 40) or
-                    ((data[i + 3].toLong() and 0xFF) shl 32) or
-                    ((data[i + 4].toLong() and 0xFF) shl 24) or
-                    ((data[i + 5].toLong() and 0xFF) shl 16) or
-                    ((data[i + 6].toLong() and 0xFF) shl 8) or
-                    (data[i + 7].toLong() and 0xFF)
+            val word = ((data[i].toLong() and 0xFFL) shl 56) or
+                    ((data[i + 1].toLong() and 0xFFL) shl 48) or
+                    ((data[i + 2].toLong() and 0xFFL) shl 40) or
+                    ((data[i + 3].toLong() and 0xFFL) shl 32) or
+                    ((data[i + 4].toLong() and 0xFFL) shl 24) or
+                    ((data[i + 5].toLong() and 0xFFL) shl 16) or
+                    ((data[i + 6].toLong() and 0xFFL) shl 8) or
+                    (data[i + 7].toLong() and 0xFFL)
             if ((word and maskU64) == pat) {
                 return i
             }

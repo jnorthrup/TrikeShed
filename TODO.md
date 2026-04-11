@@ -46,19 +46,7 @@
 | **TOTAL PORTED** | **264+153** | **~57K** | **417 Kotlin files across trikeshed + literbike** |
 
 ### REMAINING ⬜
-
-| Module | Files | Lines | Notes |
-|--------|-------|-------|-------|
-| betanet (remaining) | ~27 | ~8K | Larger files not yet ported |
-| rbcursive | 18 | ~6K | Text editor components |
-| bin | 9 | ~2K | CLI entry points |
-| gates | 12 | ~2K | Feature gates |
-| simd | 3 | ~1K | SIMD optimizations |
-| quic (src/) | ~26 | ~11K | Main quic module (not ccek/quic) |
-| modelmux (remaining) | ~2 | ~1K | Remaining files |
-| **TOTAL REMAINING** | **~97** | **~31K** | |
-
----
+ 
 
 ## Architecture
 
@@ -77,7 +65,7 @@
 
 ## Next Steps
 
-1. **Port remaining ~97 Rust files** (betanet, rbcursive, bin, gates, simd, quic)
+
 2. **Gradle build fix** — package declarations, imports, expect/actual resolution
 3. **Normalize into parent lib** — composite builds, dependency resolution
 4. **TDD remediation** — all tests green

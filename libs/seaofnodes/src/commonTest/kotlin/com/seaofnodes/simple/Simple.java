@@ -269,12 +269,12 @@ Options:
 
         if (do_eval) {
             // TODO: Support for evaluation of functions with different argument numbers and types
-            long t = System.currentTimeMillis();
+            long t = Clocks.System.now();
             long arg = (i+1 < args.length) ? Integer.parseInt(args[i+1]) : 0;
             System.out.println(Eval2.eval(code, arg, 100000));
             if (do_print_time) {
                 System.out.printf( "EXECUTION TIME:             %.3f sec%n",
-                    (System.currentTimeMillis() - t) / 1e3);
+                    (Clocks.System.now() - t) / 1e3);
             }
         }
         if (do_run) {

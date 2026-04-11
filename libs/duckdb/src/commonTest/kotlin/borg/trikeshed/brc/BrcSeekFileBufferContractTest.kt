@@ -50,7 +50,7 @@ class BrcSeekFileBufferContractTest {
     }
 
     @Test
-    fun seekFileBufferSeekAndGetIsIdempotent() {
+    fun seekFileBufferSeekAndFetchIsIdempotent() {
         val path = "/tmp/brc_test_seek.bin"
         try {
             SeekFileBuffer(path).use { buf ->
@@ -61,7 +61,7 @@ class BrcSeekFileBufferContractTest {
                 assertTrue(a == b, "Repeated seek(0) + get(0) must yield same byte")
             }
         } catch (e: Exception) {
-            println("SKIP seekFileBufferSeekAndGetIsIdempotent: $e")
+            println("SKIP seekFileBufferSeekAndFetchIsIdempotent: $e")
         }
     }
 }

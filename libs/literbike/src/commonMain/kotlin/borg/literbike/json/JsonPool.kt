@@ -26,11 +26,11 @@ class AtomicPool<T : Any>(maxSize: Int = 1000) {
     fun getOrCreate(factory: () -> T): T {
         val obj = queue.pollFirst()
         if (obj != null) {
-            currentSize.decrementAndGet()
+            currentSize.decrementAndFetch()
             return obj
         }
 
-        totalCreated.incrementAndGet()
+        totalCreated.incrementAndFetch()
         return factory()
     }
 
@@ -52,7 +52,7 @@ class AtomicPool<T : Any>(maxSize: Int = 1000) {
             val newCurrent = currentSize.get()
             if (newCurrent < maxSize) {
                 queue.addLast(obj)
-                currentSize.incrementAndGet()
+                currentSize.incrementAndFetch()
             }
             // Otherwise, drop the object
         }
@@ -70,7 +70,7 @@ class AtomicPool<T : Any>(maxSize: Int = 1000) {
     /** Clear all objects from the pool. Useful for cleanup or memory reclamation. */
     fun clear() {
         while (queue.pollFirst() != null) {
-            currentSize.decrementAndGet()
+            currentSize.decrementAndFetch()
         }
     }
 }

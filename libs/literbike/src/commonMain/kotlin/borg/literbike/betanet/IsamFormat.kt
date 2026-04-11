@@ -14,7 +14,7 @@ import java.nio.ByteOrder
  * IOMemento - runtime type representation with precise network sizes.
  */
 enum class IOMemento(
-    val ordinal: Int,
+    val ioOrdinal: Int,
     private val networkSize: Int?
 ) {
     IoBoolean(0, 1),
@@ -183,7 +183,7 @@ sealed class CellValue {
 
     companion object {
         fun nowInstant(): Instant {
-            val now = System.currentTimeMillis()
+            val now = Clocks.System.now()
             return Instant(now / 1000, (now % 1000 * 1_000_000).toInt())
         }
     }

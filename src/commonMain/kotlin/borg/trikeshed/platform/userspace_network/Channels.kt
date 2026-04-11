@@ -34,11 +34,11 @@ object ChannelsModule {
         fun bytesWritten(): Long = bytesWrittenVal.get()
 
         fun addBytesRead(n: Int) {
-            bytesReadVal.addAndGet(n.toLong())
+            bytesReadVal.addAndFetch(n.toLong())
         }
 
         fun addBytesWritten(n: Int) {
-            bytesWrittenVal.addAndGet(n.toLong())
+            bytesWrittenVal.addAndFetch(n.toLong())
         }
     }
 

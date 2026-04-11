@@ -264,7 +264,7 @@ class ChannelGraphTest {
             graphId = graph.id,
             sessionId = ChannelSessionId("session-1"),
             triggeringFact = graph.facts[0],
-            timestamp = System.currentTimeMillis()
+            timestamp = Clocks.System.now()
         )
 
         val job = rule.activate(graph, context)

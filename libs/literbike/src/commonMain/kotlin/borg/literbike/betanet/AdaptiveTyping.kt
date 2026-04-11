@@ -116,7 +116,7 @@ class Evidence(
     }
 
     private fun updateCurrentType() {
-        if (totalObservations == 0) {
+        if (totalObservations == 0L) {
             currentType = null
             return
         }

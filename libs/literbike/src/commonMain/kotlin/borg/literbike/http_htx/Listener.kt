@@ -29,7 +29,7 @@ class ListenerElement(
         fun new(bindAddr: String): ListenerElement = ListenerElement(bindAddr)
     }
 
-    fun incrementAccepted() { acceptedConnections.incrementAndGet() }
+    fun incrementAccepted() { acceptedConnections.incrementAndFetch() }
 
     fun accepted(): Int = acceptedConnections.get()
 }

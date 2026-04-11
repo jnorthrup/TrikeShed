@@ -48,7 +48,7 @@ data class WamQuicPacket(
     val header: WamQuicHeader,
     val payload: List<UByte>,
     val packetNumber: ULong,
-    val timestamp: Long = System.currentTimeMillis()
+    val timestamp: Long = Clocks.System.now()
 )
 
 /**
@@ -159,7 +159,7 @@ data class WamStreamCons(
 data class WamTimeoutEvent(
     val connectionId: ULong,
     val timeoutMs: Long,
-    val timestamp: Long = System.currentTimeMillis()
+    val timestamp: Long = Clocks.System.now()
 )
 
 /**
@@ -178,7 +178,7 @@ data class WamStateChange(
     val connectionId: ULong,
     val fromState: WamQuicConnectionState,
     val toState: WamQuicConnectionState,
-    val timestamp: Long = System.currentTimeMillis()
+    val timestamp: Long = Clocks.System.now()
 )
 
 /**
@@ -188,7 +188,7 @@ data class WamIoOperation(
     val connectionId: ULong,
     val operation: String,
     val bytes: Int,
-    val timestamp: Long = System.currentTimeMillis()
+    val timestamp: Long = Clocks.System.now()
 )
 
 /**
@@ -198,7 +198,7 @@ data class WamTimerOperation(
     val connectionId: ULong,
     val operation: String,
     val timeoutMs: Long,
-    val timestamp: Long = System.currentTimeMillis()
+    val timestamp: Long = Clocks.System.now()
 )
 
 /**
@@ -346,7 +346,7 @@ class WamQuicConnection(
 
     fun capturePacket(packet: WamQuicPacket) {
         captures.receivedPackets.add(packet)
-        atomicState.bytesReceived.addAndGet(packet.payload.size.toLong())
+        atomicState.bytesReceived.addAndFetch(packet.payload.size.toLong())
     }
 }
 

@@ -1,7 +1,6 @@
 package borg.literbike.simd
 
-import kotlin.concurrent.AtomicLong
-import kotlin.concurrent.AtomicInt
+import java.util.concurrent.atomic.AtomicLong
 
 /**
  * Densified constant-time SIMD cryptographic operations
@@ -46,7 +45,7 @@ class SimdChaCha20Poly1305(
         val tag = poly1305MacSimd(ciphertext, 0, plaintext.size, aad, polyKey)
         tag.copyInto(ciphertext, plaintext.size)
 
-        bytesEncrypted.addAndGet(plaintext.size.toLong())
+        bytesEncrypted.addAndFetch(plaintext.size.toLong())
         return ciphertext
     }
 
@@ -73,7 +72,7 @@ class SimdChaCha20Poly1305(
         val plaintext = ByteArray(encryptedSize)
         xorBlocksSimd(plaintext, 0, encrypted, keystream, encryptedSize)
 
-        bytesDecrypted.addAndGet(encryptedSize.toLong())
+        bytesDecrypted.addAndFetch(encryptedSize.toLong())
         return Result.success(plaintext)
     }
 

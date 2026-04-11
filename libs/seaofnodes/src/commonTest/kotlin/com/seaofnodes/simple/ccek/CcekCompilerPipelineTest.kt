@@ -1,6 +1,7 @@
 package com.seaofnodes.simple.ccek
 
 import borg.literbike.ccek.core.Context
+import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull

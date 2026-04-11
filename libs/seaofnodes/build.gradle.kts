@@ -42,8 +42,8 @@ kotlin {
         val commonMain by getting {
             dependencies {
                 api("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
-                // CCEK core from literbike
-                api(project(":")) // will be replaced by literbike dependency when composite is set up
+                // CCEK core from literbike composite build
+                api("org.bereft:literbike")
             }
         }
         val commonTest by getting {

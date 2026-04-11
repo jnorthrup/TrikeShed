@@ -477,7 +477,7 @@ Do not open `phase-06` before `phase-05` is closed with tests and a concrete pro
 - 2026-03-09: Confirmed `TypeMemento` is too small to act as a blackboard overlay and should remain separate from provenance/derivation semantics.
 - 2026-03-09: Phase-03 Blackboard Overlay Core implemented with `OverlayRole`, `Provenance`, `Evidence`, `DependencyHandle`, `CellOverlay<T>`, `ColumnOverlay`, and `BlackboardContext`.
 - 2026-03-09: Blackboard overlay tests added (25+ tests) covering all core types, DSL helpers, and extension functions for Cursor/RowVec.
-- 2026-03-09: Platform-specific implementations added for JVM (`System.currentTimeMillis()`) and POSIX (`Clock.System.now().toEpochMilliseconds()`).
+- 2026-03-09: Platform-specific implementations added for JVM (`Clocks.System.now()`) and POSIX (`Clock.System.now().toEpochMilliseconds()`).
 - 2026-03-09: Overlay implementation is additive and does not modify `TypeMemento` or `IOMemento`, preserving backward compatibility with existing cursor/ISAM semantics.
 - 2026-03-09: Phase-04 Graph and Job Surface implemented with `ChannelGraph`, `ChannelJob`, `WorkerKey`, `GraphFact`, `ActivationRule`, and supporting types.
 - 2026-03-09: Graph/job integration added to channelization planner with `selectAndActivateGraph()`, `createGraphForPlan()`, `buildActivationRules()`, and `activateGraphJobs()`.
@@ -485,5 +485,5 @@ Do not open `phase-06` before `phase-05` is closed with tests and a concrete pro
 - 2026-03-09: Graph/job layer remains minimal without scheduler rewrite, actor framework, or workflow engine complexity.
 - 2026-03-09: Jobs activate from graph facts without transport mechanism details (NIO, io_uring, selectors) leaking upward.
 - 2026-03-09: Phase-05 HTTP ingress slice delivered — `HttpIngressProtocol`, `HttpIngressJob`, `HttpIngressActivationRule` in commonMain; 9 passing tests in jvmTest.
-- 2026-03-09: Fixed pre-existing `System.currentTimeMillis()` (JVM-only) calls in commonMain `Channelization.kt` and `ChannelGraph.kt` (replaced with `0L`).
+- 2026-03-09: Fixed pre-existing `Clocks.System.now()` (JVM-only) calls in commonMain `Channelization.kt` and `ChannelGraph.kt` (replaced with `0L`).
 - 2026-03-09: One HTTP ingress protocol story verified end-to-end through assembly→graph→job→block without any transport backend details leaking into commonMain.

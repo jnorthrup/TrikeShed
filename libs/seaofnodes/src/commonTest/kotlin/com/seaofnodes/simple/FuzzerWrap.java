@@ -25,7 +25,7 @@ public class FuzzerWrap {
 
     @Test
     public void fuzzPeepsSmall() {
-        Random R = new Random(System.currentTimeMillis());
+        Random R = new Random(Clocks.System.now());
         var fuzzer = new Fuzzer();
         for (int i=0; i<100; i++)
             fuzzer.fuzzPeeps( R.nextLong());

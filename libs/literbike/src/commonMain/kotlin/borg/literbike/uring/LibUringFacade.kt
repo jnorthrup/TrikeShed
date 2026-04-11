@@ -1,9 +1,7 @@
 package borg.literbike.uring
 
-import kotlin.concurrent.thread
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.AtomicLong
-import kotlin.coroutines.*
 import kotlinx.coroutines.*
 
 /**
@@ -25,13 +23,16 @@ class LibUringFacade(
     init {
         backend = createBackend(entries)
         when (backend) {
-            is UringBackend.LibUring -> {
+            is UringBackend.Kernel -> {
                 println("LibUring facade initialized with kernel io_uring backend")
                 println("   Using real liburing C FFI for maximum performance")
             }
             is UringBackend.Userspace -> {
                 println("LibUring facade initialized with userspace backend")
                 println("   WASM-compatible fallback using coroutine runtime")
+            }
+            is UringBackend.EbpfAccelerated -> {
+                println("LibUring facade initialized with eBPF accelerated backend")
             }
         }
     }
@@ -50,7 +51,7 @@ class LibUringFacade(
                     true // Assume available if file doesn't exist
                 }
                 if (available) {
-                    return UringBackend.LibUring(LibUringBackend(entries))
+                    return UringBackend.Kernel
                 }
             } catch (e: Exception) {
                 println("Failed to create kernel io_uring: ${e.message}")
@@ -58,15 +59,16 @@ class LibUringFacade(
             }
         }
 
-        return UringBackend.Userspace(UserspaceBackend())
+        return UringBackend.Userspace
     }
 
     /** Submit read operation */
     fun prepRead(fd: Int, buf: ByteArray, offset: Long): LibUringOp {
         val userData = nextUserData()
         return when (backend) {
-            is UringBackend.LibUring -> submitLibUringRead(backend, fd, buf, offset, userData)
-            is UringBackend.Userspace -> submitUserspaceRead(backend, fd, buf.size, offset, userData)
+            is UringBackend.Kernel -> submitKernelRead(fd, buf, offset, userData)
+            is UringBackend.Userspace -> submitUserspaceRead(fd, buf.size, offset, userData)
+            is UringBackend.EbpfAccelerated -> submitUserspaceRead(fd, buf.size, offset, userData)
         }
     }
 
@@ -74,8 +76,9 @@ class LibUringFacade(
     fun prepWrite(fd: Int, buf: ByteArray, offset: Long): LibUringOp {
         val userData = nextUserData()
         return when (backend) {
-            is UringBackend.LibUring -> submitLibUringWrite(backend, fd, buf, offset, userData)
-            is UringBackend.Userspace -> submitUserspaceWrite(backend, fd, buf, offset, userData)
+            is UringBackend.Kernel -> submitKernelWrite(fd, buf, offset, userData)
+            is UringBackend.Userspace -> submitUserspaceWrite(fd, buf, offset, userData)
+            is UringBackend.EbpfAccelerated -> submitUserspaceWrite(fd, buf, offset, userData)
         }
     }
 
@@ -83,8 +86,9 @@ class LibUringFacade(
     fun prepAccept(fd: Int): LibUringOp {
         val userData = nextUserData()
         return when (backend) {
-            is UringBackend.LibUring -> submitLibUringAccept(backend, fd, userData)
-            is UringBackend.Userspace -> submitUserspaceAccept(backend, fd, userData)
+            is UringBackend.Kernel -> submitKernelAccept(fd, userData)
+            is UringBackend.Userspace -> submitUserspaceAccept(fd, userData)
+            is UringBackend.EbpfAccelerated -> submitUserspaceAccept(fd, userData)
         }
     }
 
@@ -92,8 +96,9 @@ class LibUringFacade(
     fun prepRbCursiveMatch(data: ByteArray): LibUringOp {
         val userData = nextUserData()
         return when (backend) {
-            is UringBackend.LibUring -> submitLibUringCustom(backend, OpCode.RbCursiveMatch, data, userData)
-            is UringBackend.Userspace -> submitUserspaceRbCursive(backend, data, userData)
+            is UringBackend.Kernel -> submitKernelCustom(OpCode.RbCursiveMatch, data, userData)
+            is UringBackend.Userspace -> submitUserspaceRbCursive(data, userData)
+            is UringBackend.EbpfAccelerated -> submitUserspaceRbCursive(data, userData)
         }
     }
 
@@ -101,16 +106,16 @@ class LibUringFacade(
     fun prepNoiseHandshake(handshakeData: ByteArray): LibUringOp {
         val userData = nextUserData()
         return when (backend) {
-            is UringBackend.LibUring -> submitLibUringCustom(backend, OpCode.NoiseHandshake, handshakeData, userData)
-            is UringBackend.Userspace -> submitUserspaceNoise(backend, handshakeData, userData)
+            is UringBackend.Kernel -> submitKernelCustom(OpCode.NoiseHandshake, handshakeData, userData)
+            is UringBackend.Userspace -> submitUserspaceNoise(handshakeData, userData)
+            is UringBackend.EbpfAccelerated -> submitUserspaceNoise(handshakeData, userData)
         }
     }
 
-    private fun nextUserData(): Long = opCounter.incrementAndGet()
+    private fun nextUserData(): Long = opCounter.incrementAndFetch()
 
-    /** Real liburing kernel operations (simulated on JVM) */
-    private fun submitLibUringRead(
-        backend: LibUringBackend,
+    /** Kernel operations */
+    private fun submitKernelRead(
         fd: Int,
         buf: ByteArray,
         offset: Long,
@@ -127,8 +132,7 @@ class LibUringFacade(
         }
     }
 
-    private fun submitLibUringWrite(
-        backend: LibUringBackend,
+    private fun submitKernelWrite(
         fd: Int,
         buf: ByteArray,
         offset: Long,
@@ -145,8 +149,7 @@ class LibUringFacade(
         }
     }
 
-    private fun submitLibUringAccept(
-        backend: LibUringBackend,
+    private fun submitKernelAccept(
         fd: Int,
         userData: Long
     ): LibUringOp {
@@ -161,8 +164,7 @@ class LibUringFacade(
         }
     }
 
-    private fun submitLibUringCustom(
-        backend: LibUringBackend,
+    private fun submitKernelCustom(
         opcode: OpCode,
         data: ByteArray,
         userData: Long
@@ -199,7 +201,6 @@ class LibUringFacade(
 
     /** Userspace fallback operations (WASM-compatible) */
     private fun submitUserspaceRead(
-        backend: UserspaceBackend,
         fd: Int,
         len: Int,
         offset: Long,
@@ -217,7 +218,6 @@ class LibUringFacade(
     }
 
     private fun submitUserspaceWrite(
-        backend: UserspaceBackend,
         fd: Int,
         buf: ByteArray,
         offset: Long,
@@ -235,7 +235,6 @@ class LibUringFacade(
     }
 
     private fun submitUserspaceAccept(
-        backend: UserspaceBackend,
         fd: Int,
         userData: Long
     ): LibUringOp {
@@ -251,7 +250,6 @@ class LibUringFacade(
     }
 
     private fun submitUserspaceRbCursive(
-        backend: UserspaceBackend,
         data: ByteArray,
         userData: Long
     ): LibUringOp {
@@ -271,7 +269,6 @@ class LibUringFacade(
     }
 
     private fun submitUserspaceNoise(
-        backend: UserspaceBackend,
         data: ByteArray,
         userData: Long
     ): LibUringOp {
@@ -286,18 +283,6 @@ class LibUringFacade(
         }
     }
 }
-
-/** Backend selection - real liburing vs userspace fallback */
-sealed class UringBackend {
-    data class LibUring(val backend: LibUringBackend) : UringBackend()
-    data class Userspace(val backend: UserspaceBackend) : UringBackend()
-}
-
-class LibUringBackend(entries: Int) {
-    val entries: Int = entries
-}
-
-class UserspaceBackend
 
 data class PendingOp(
     val userData: Long,

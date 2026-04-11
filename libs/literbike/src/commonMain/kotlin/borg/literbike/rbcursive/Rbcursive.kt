@@ -59,15 +59,6 @@ enum class Protocol {
 }
 
 /**
- * Recognition signal for protocol classification.
- */
-sealed class Signal {
-    data class Accept(val protocol: Protocol) : Signal()
-    object NeedMore : Signal()
-    object Reject : Signal()
-}
-
-/**
  * Protocol detection result.
  */
 sealed class ProtocolDetection {
@@ -143,16 +134,16 @@ class RBCursive(
 
         val detection = detectProtocol(data)
         return when (detection) {
-            is ProtocolDetection.Http -> Signal.Accept(Protocol.Http)
-            ProtocolDetection.Socks5 -> Signal.Accept(Protocol.Socks5)
-            ProtocolDetection.Tls -> Signal.Accept(Protocol.Tls)
-            ProtocolDetection.WebSocket -> Signal.Accept(Protocol.WebSocket)
-            ProtocolDetection.Dns -> Signal.Accept(Protocol.Dns)
-            ProtocolDetection.Json -> Signal.Accept(Protocol.Http)
+            is ProtocolDetection.Http -> Signal.Accept
+            ProtocolDetection.Socks5 -> Signal.Accept
+            ProtocolDetection.Tls -> Signal.Accept
+            ProtocolDetection.WebSocket -> Signal.Accept
+            ProtocolDetection.Dns -> Signal.Accept
+            ProtocolDetection.Json -> Signal.Accept
             ProtocolDetection.Unknown -> {
                 // Check for QUIC - QUIC v1 packets carry the fixed bit (0x40)
                 if (data[0].toInt() and 0x40 != 0) {
-                    Signal.Accept(Protocol.Quic)
+                    Signal.Accept
                 } else {
                     Signal.Reject
                 }

@@ -17,8 +17,8 @@ class ChannelMetadata(
     fun bytesRead(): Long = _bytesRead.get()
     fun bytesWritten(): Long = _bytesWritten.get()
 
-    internal fun addBytesRead(n: Int) { _bytesRead.addAndGet(n.toLong()) }
-    internal fun addBytesWritten(n: Int) { _bytesWritten.addAndGet(n.toLong()) }
+    internal fun addBytesRead(n: Int) { _bytesRead.addAndFetch(n.toLong()) }
+    internal fun addBytesWritten(n: Int) { _bytesWritten.addAndFetch(n.toLong()) }
 }
 
 /**

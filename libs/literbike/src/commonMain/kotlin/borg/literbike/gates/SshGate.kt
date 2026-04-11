@@ -16,8 +16,8 @@ data class SshSession(
     val username: String,
     val pubkeyFingerprint: String,
     val unlockedKeys: MutableMap<String, String> = mutableMapOf(),
-    val createdAt: Long = System.currentTimeMillis(),
-    var lastActivity: Long = System.currentTimeMillis(),
+    val createdAt: Long = Clocks.System.now(),
+    var lastActivity: Long = Clocks.System.now(),
 )
 
 /** SSH Gate configuration */
@@ -94,7 +94,7 @@ class SshGate(
 
     /** Clean up expired sessions */
     fun cleanupExpiredSessions() {
-        val now = System.currentTimeMillis()
+        val now = Clocks.System.now()
         val timeoutMs = config.sessionTimeoutSecs * 1000
         val expired = sessions.filterValues { (now - it.lastActivity) > timeoutMs }.keys.toList()
         for (id in expired) {

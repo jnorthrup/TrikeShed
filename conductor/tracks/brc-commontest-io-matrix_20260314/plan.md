@@ -30,7 +30,7 @@ Build a `commonTest` contract suite that exercises the full matrix of IO access 
 
 - All test files must be in `src/commonTest/kotlin/borg/trikeshed/`
 - No `java.*`, `java.nio.*`, NIO, Selector, or JVM-only imports anywhere in commonTest
-- No `System.currentTimeMillis()` — omit or use a stub
+- No `Clocks.System.now()` — omit or use a stub
 - Inline test data only (no filesystem fixture reads in commonTest — use in-memory byte arrays)
 - Tests are red TDD contracts first; implementations may be stubs or expect/actual expansions
 - BRC aggregation oracle is pure Kotlin arithmetic, no JVM math imports

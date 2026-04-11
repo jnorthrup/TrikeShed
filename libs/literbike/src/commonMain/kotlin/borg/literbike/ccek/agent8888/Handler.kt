@@ -39,23 +39,23 @@ class HandlerElement : Element {
     ): HandlerResult {
         return when (protocol.protocol) {
             Protocol.Http -> {
-                httpCount.incrementAndGet()
+                httpCount.incrementAndFetch()
                 handleHttp(clientSocket, buffer)
             }
             Protocol.Socks5 -> {
-                socks5Count.incrementAndGet()
+                socks5Count.incrementAndFetch()
                 handleSocks5(clientSocket, buffer)
             }
             Protocol.WebSocket -> {
-                websocketCount.incrementAndGet()
+                websocketCount.incrementAndFetch()
                 handleWebSocket(clientSocket, buffer)
             }
             Protocol.Upnp -> {
-                upnpCount.incrementAndGet()
+                upnpCount.incrementAndFetch()
                 handleUpnp(clientSocket, buffer)
             }
             else -> {
-                unknownCount.incrementAndGet()
+                unknownCount.incrementAndFetch()
                 HandlerResult.Unsupported
             }
         }
@@ -354,7 +354,7 @@ private fun handleUpnp(socket: Socket, buffer: ByteArray): HandlerResult {
         SERVER: CCEK/1.0 UPnP/1.0
         ST: upnp:rootdevice
         USN: uuid:ccek-001::upnp:rootdevice
-        
+
     """.trimIndent().replace("\n", "\r\n")
 
     return try {

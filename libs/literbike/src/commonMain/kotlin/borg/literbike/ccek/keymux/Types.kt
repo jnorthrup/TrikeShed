@@ -16,7 +16,7 @@ package borg.literbike.ccek.keymux
 data class ModelInfo(
     val id: String,
     val object: String = "model",
-    val created: Long = System.currentTimeMillis() / 1000,
+    val created: Long = Clocks.System.now() / 1000,
     val ownedBy: String,
     val metadata: WebModelCard? = null
 )

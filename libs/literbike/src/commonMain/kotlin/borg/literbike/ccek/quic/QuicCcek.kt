@@ -29,7 +29,7 @@ data class ProtocolTransition(
 /** CCEK reactor context with key graph navigation */
 data class CcekContext(
     var currentState: ULong,
-    var lastTransition: Long = System.currentTimeMillis(),
+    var lastTransition: Long = Clocks.System.now(),
     val continuationStack: MutableList<ULong> = mutableListOf(),
     val protocolMetadata: MutableMap<String, List<UByte>> = mutableMapOf()
 )
@@ -78,7 +78,7 @@ class QuicCcek(
                 keyGraph = keyGraph,
                 context = CcekContext(
                     currentState = initialState,
-                    lastTransition = System.currentTimeMillis(),
+                    lastTransition = Clocks.System.now(),
                     continuationStack = mutableListOf(initialState),
                     protocolMetadata = mutableMapOf()
                 )
@@ -106,7 +106,7 @@ class QuicCcek(
             ))
         }
 
-        ctx.lastTransition = System.currentTimeMillis()
+        ctx.lastTransition = Clocks.System.now()
         return Result.success(Unit)
     }
 

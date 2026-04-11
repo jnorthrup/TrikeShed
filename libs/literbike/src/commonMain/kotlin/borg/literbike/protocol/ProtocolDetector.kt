@@ -1,6 +1,6 @@
 package borg.literbike.protocol
 
-import kotlin.io.IOException
+import java.io.IOException
 
 /**
  * Result type for protocol handler operations.

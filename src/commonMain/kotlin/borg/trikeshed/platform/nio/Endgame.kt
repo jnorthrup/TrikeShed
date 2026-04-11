@@ -150,7 +150,7 @@ class UringFacade private constructor(
     fun path(): ProcessingPath = path
 
     inline fun submit(setup: (SqEntry) -> Unit): Long {
-        val tail = sqTail.incrementAndGet() - 1
+        val tail = sqTail.incrementAndFetch() - 1
         val index = tail and (SQ_RING_SIZE - 1).toLong()
 
         val sqe = SqEntry()

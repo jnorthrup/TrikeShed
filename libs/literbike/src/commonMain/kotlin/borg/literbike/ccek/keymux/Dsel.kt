@@ -612,7 +612,7 @@ class RuleEngine {
     val metrics: DSELMetrics = DSELMetrics()
 
     companion object {
-        private fun currentTimestamp(): Long = System.currentTimeMillis() / 1000
+        private fun currentTimestamp(): Long = Clocks.System.now() / 1000
 
         private fun initialQuotaForProvider(provider: String): ULong {
             return when (provider) {
@@ -895,7 +895,7 @@ class DSELBuilder {
                 providerName = name,
                 estimatedRemainingQuota = provider.availableTokens.toULong(),
                 quotaConfidence = 0.9,
-                lastQuotaUpdate = System.currentTimeMillis() / 1000
+                lastQuotaUpdate = Clocks.System.now() / 1000
             )
             ruleEngine.quotaTracking[name] = tracking
         }

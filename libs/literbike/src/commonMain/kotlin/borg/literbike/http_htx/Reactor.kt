@@ -29,8 +29,8 @@ class ReactorElement {
     fun start() { running.value = true }
     fun stop() { running.value = false }
     fun isRunning(): Boolean = running.value
-    fun tick() { selectCalls.incrementAndGet() }
-    fun dispatch() { eventsDispatched.incrementAndGet() }
+    fun tick() { selectCalls.incrementAndFetch() }
+    fun dispatch() { eventsDispatched.incrementAndFetch() }
     fun selectCalls(): ULong = selectCalls.get().toULong()
     fun eventsDispatched(): ULong = eventsDispatched.get().toULong()
 }

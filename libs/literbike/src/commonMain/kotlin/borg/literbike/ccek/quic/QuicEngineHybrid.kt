@@ -35,26 +35,26 @@ class QuicHotState {
     val streamCounter = AtomicLong(0L)
 
     /** HOT PATH: next packet number (atomic fetchAdd) */
-    fun nextPacketNumber(): ULong = packetSequence.incrementAndGet().toULong()
+    fun nextPacketNumber(): ULong = packetSequence.incrementAndFetch().toULong()
 
     /** HOT PATH: update ACK bitmap (atomic OR) */
     fun updateAck(pktNum: ULong) {
         val bit = 1uL shl (pktNum % 64uL)
         if (pktNum < 64uL) {
-            ackBitmapLow.updateAndGet { it or bit.toLong() }
+            ackBitmapLow.updateAndFetch { it or bit.toLong() }
         } else {
-            ackBitmapHigh.updateAndGet { it or bit.toLong() }
+            ackBitmapHigh.updateAndFetch { it or bit.toLong() }
         }
     }
 
     /** HOT PATH: add bytes in flight */
     fun addBytesInFlight(bytes: Int) {
-        bytesInFlight.addAndGet(bytes)
+        bytesInFlight.addAndFetch(bytes)
     }
 
     /** HOT PATH: remove bytes in flight */
     fun removeBytesInFlight(bytes: Int) {
-        bytesInFlight.addAndGet(-bytes)
+        bytesInFlight.addAndFetch(-bytes)
     }
 
     /** Get current state */
@@ -115,7 +115,7 @@ class QuicContentLogger(
         val hash = sha256Hash(data)
         return QuicLogEntry(
             packetNumber = pktNum,
-            timestamp = System.currentTimeMillis(),
+            timestamp = Clocks.System.now(),
             entryType = entryType,
             contentHash = hash,
             data = data
@@ -174,7 +174,7 @@ class QuicEngineHybrid(
         hotState.addBytesInFlight(data.size)
 
         // HOT PATH: Update bytes sent
-        hotState.bytesSent.addAndGet(data.size.toLong())
+        hotState.bytesSent.addAndFetch(data.size.toLong())
 
         // Build packet
         val packet = QuicPacketHybrid(

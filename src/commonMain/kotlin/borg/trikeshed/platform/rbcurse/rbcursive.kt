@@ -386,7 +386,7 @@ class RbCursor {
         return (now - cached.timestamp) < 1000 && cached.confidence > 0.5f
     }
 
-    private fun currentTimestamp(): Long = System.currentTimeMillis()
+    private fun currentTimestamp(): Long = Clocks.System.now()
 
     private fun determineProtocolFromData(data: ByteArray): Protocol {
         return when {

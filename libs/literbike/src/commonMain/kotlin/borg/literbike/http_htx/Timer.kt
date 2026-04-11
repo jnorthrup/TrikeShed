@@ -30,8 +30,8 @@ class TimerElement {
     private val scheduledTimers = mutableMapOf<TimerId, TimerEntry>()
 
     fun schedule(delayMs: Long, callback: () -> Unit): TimerId {
-        val id = nextId.incrementAndGet().toULong()
-        val deadline = System.currentTimeMillis() + delayMs
+        val id = nextId.incrementAndFetch().toULong()
+        val deadline = Clocks.System.now() + delayMs
         scheduledTimers[id] = TimerEntry(id, deadline, callback)
         return id
     }
@@ -44,7 +44,7 @@ class TimerElement {
      * Check and fire any expired timers
      */
     fun tick() {
-        val now = System.currentTimeMillis()
+        val now = Clocks.System.now()
         val expired = scheduledTimers.filter { it.value.deadline <= now }
         for ((id, entry) in expired) {
             scheduledTimers.remove(id)

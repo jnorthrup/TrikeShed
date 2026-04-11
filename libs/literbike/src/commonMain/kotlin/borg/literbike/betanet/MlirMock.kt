@@ -43,8 +43,8 @@ fun compileMlir(src: String): Result<CompiledMatcher> {
             defaultPattern
         }
 
-        val matcher: (ByteArray) -> Boolean = { data ->
-            if (data.size < 8) return@matcher false
+        val matcher: (ByteArray) -> Boolean = label@{ data ->
+            if (data.size < 8) return@label false
             val w = ((data[0].toLong() and 0xFF) shl 56) or
                     ((data[1].toLong() and 0xFF) shl 48) or
                     ((data[2].toLong() and 0xFF) shl 40) or

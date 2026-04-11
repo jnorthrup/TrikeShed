@@ -126,18 +126,18 @@ data class StreamingMetrics(
     var bytesStreamed: Long = 0,
     var framesParsed: Long = 0,
     var tokensTracked: Long = 0,
-    val startTime: Long = System.currentTimeMillis(),
-    var lastActivity: Long = System.currentTimeMillis(),
+    val startTime: Long = Clocks.System.now(),
+    var lastActivity: Long = Clocks.System.now(),
     var errorCount: Long = 0
 ) {
     fun recordBytes(bytes: Long) {
         bytesStreamed += bytes
-        lastActivity = System.currentTimeMillis()
+        lastActivity = Clocks.System.now()
     }
 
     fun recordFrame() {
         framesParsed++
-        lastActivity = System.currentTimeMillis()
+        lastActivity = Clocks.System.now()
     }
 
     fun recordTokens(tokens: Long) {
@@ -148,14 +148,14 @@ data class StreamingMetrics(
         errorCount++
     }
 
-    fun durationMs(): Long = System.currentTimeMillis() - startTime
+    fun durationMs(): Long = Clocks.System.now() - startTime
 
     fun tokensPerSecond(): Double {
         val secs = durationMs() / 1000.0
         return if (secs > 0) tokensTracked.toDouble() / secs else 0.0
     }
 
-    fun idleTimeMs(): Long = System.currentTimeMillis() - lastActivity
+    fun idleTimeMs(): Long = Clocks.System.now() - lastActivity
 }
 
 /**
@@ -167,7 +167,7 @@ data class StreamingConnection(
     val createdAt: Long,
     var lastUsed: Long
 ) {
-    fun isStale(): Boolean = (System.currentTimeMillis() - lastUsed) > 300_000 // 5 minutes
+    fun isStale(): Boolean = (Clocks.System.now() - lastUsed) > 300_000 // 5 minutes
 }
 
 /**
@@ -181,7 +181,7 @@ class StreamingConnectionPool(private val maxConnectionsPerProvider: Int = 10) {
         pool.removeAll { it.isStale() }
         return if (pool.isNotEmpty()) {
             val conn = pool.removeAt(pool.lastIndex)
-            conn.lastUsed = System.currentTimeMillis()
+            conn.lastUsed = Clocks.System.now()
             conn
         } else null
     }
@@ -195,7 +195,7 @@ class StreamingConnectionPool(private val maxConnectionsPerProvider: Int = 10) {
 
     companion object {
         fun createConnection(provider: String, baseUrl: String): StreamingConnection {
-            val now = System.currentTimeMillis()
+            val now = Clocks.System.now()
             return StreamingConnection(provider, baseUrl, now, now)
         }
     }

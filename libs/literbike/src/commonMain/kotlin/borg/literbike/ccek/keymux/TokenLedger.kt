@@ -24,7 +24,7 @@ class TokenLedgerManager {
     )
 
     companion object {
-        private fun currentTimestamp(): Long = System.currentTimeMillis() / 1000
+        private fun currentTimestamp(): Long = Clocks.System.now() / 1000
     }
 
     /**

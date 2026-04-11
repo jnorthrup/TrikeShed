@@ -122,7 +122,7 @@ class StreamParser<T>(
 /**
  * Multi-parser stream handler for protocol detection.
  */
-class MultiStreamParser(
+class MultiStreamParser<T>(
     private val maxBufferSize: Int = 1024,
     private val maxAttempts: Int = 10
 ) {
