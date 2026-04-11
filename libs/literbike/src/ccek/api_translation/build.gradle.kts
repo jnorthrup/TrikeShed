@@ -60,14 +60,18 @@ kotlin {
                 api("io.ktor:ktor-client-js:3.1.2")
             }
         }
-        val macosMain by getting {
-            dependencies {
-                api("io.ktor:ktor-client-darwin:3.1.2")
+        val hostOs = System.getProperty("os.name")
+        if (hostOs == "Mac OS X") {
+            val macosMain by getting {
+                dependencies {
+                    api("io.ktor:ktor-client-darwin:3.1.2")
+                }
             }
-        }
-        val linuxMain by getting {
-            dependencies {
-                api("io.ktor:ktor-client-curl:3.1.2")
+        } else if (hostOs == "Linux") {
+            val linuxMain by getting {
+                dependencies {
+                    api("io.ktor:ktor-client-curl:3.1.2")
+                }
             }
         }
         val commonTest by getting {

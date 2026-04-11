@@ -42,6 +42,25 @@ kotlin {
         val commonMain by getting {
             dependencies {
                 api("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
+                api("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
+            }
+        }
+        val jvmMain by getting {
+            dependencies {}
+        }
+        val jsMain by getting {
+            dependencies {}
+        }
+        afterEvaluate {
+            val hostOs = System.getProperty("os.name")
+            if (hostOs == "Mac OS X") {
+                try {
+                    val macosMain by getting { dependencies {} }
+                } catch (_: UnknownDomainObjectException) { /* already exists */ }
+            } else if (hostOs == "Linux") {
+                try {
+                    val linuxMain by getting { dependencies {} }
+                } catch (_: UnknownDomainObjectException) { /* already exists */ }
             }
         }
         val commonTest by getting {

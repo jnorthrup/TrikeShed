@@ -1,19 +1,34 @@
 package borg.literbike.ccek.keymux
 
 /**
- * Model Facade - Universal interface for AI model providers
+ * Universal Model Facade implementation
+ * Ported from facade.rs
  */
 
 /**
  * Model facade - unified interface across providers
+ * Aggregates models from all providers, checks quotas via DSEL, and enriches with metadata
  */
 class ModelFacade(
-    private val cardStore: ModelCardStore = ModelCardStore(),
-    private val ruleEngine: RuleEngine = RuleEngine(),
-    private val tokenLedger: TokenLedger = TokenLedger()
+    private val modelCards: ModelCardStore = ModelCardStore(),
+    ruleEngine: RuleEngine = RuleEngine()
 ) {
+    private val ruleEngine: RuleEngine
     private val providers = mutableMapOf<String, ProviderDef>()
-    private val quotas = mutableMapOf<String, QuotaContainer>()
+
+    init {
+        // Initialize DSEL engine with default quotas for active providers
+        val initialEngine = DSELBuilder()
+            .withQuota("global_pool", 10_000_000)
+            .withProvider("openai", 2_000_000, 1u, 10.0, false)
+            .withProvider("anthropic", 2_000_000, 1u, 15.0, false)
+            .withProvider("google", 5_000_000, 2u, 5.0, false)
+            .withFreeProvider("kilo_code", 1_000_000, 3u, 100_000, 3_000_000, 0u)
+            .buildWithRuleEngine()
+            .getOrNull()
+
+        this.ruleEngine = initialEngine ?: RuleEngine()
+    }
 
     companion object {
         fun new(): ModelFacade = ModelFacade()
@@ -37,191 +52,99 @@ class ModelFacade(
     fun allProviders(): List<ProviderDef> = providers.values.toList()
 
     /**
-     * Set quota for a provider
+     * Aggregate models from all providers, check quotas via DSEL, and enrich with metadata.
+     * Ported from handle_models() in facade.rs.
      */
-    fun setQuota(provider: String, total: Double, used: Double, resetAt: Long = 0L) {
-        quotas[provider] = QuotaContainer(
-            provider = provider,
-            total = total,
-            used = used,
-            remaining = total - used,
-            resetAt = resetAt
-        )
-    }
+    fun handleModels(activeProviders: List<String>): List<ModelInfo> {
+        val models = mutableListOf<ModelInfo>()
+        val allKnownModels = modelCards.getAllModels()
 
-    /**
-     * Get quota for a provider
-     */
-    fun getQuota(provider: String): QuotaContainer? = quotas[provider]
+        // If tags should be ignored, return every cached model without prefix filtering
+        val ignoreTags = Platform.getenv("MODELMUX_IGNORE_TAGS")
+            ?.let { it.lowercase() in listOf("1", "true", "yes", "on") }
+            ?: false
 
-    /**
-     * Get all provider quotas
-     */
-    fun allProviderQuotas(): Map<String, QuotaContainer> = quotas.toMap()
-
-    /**
-     * Get provider potential candidates
-     */
-    fun discoverProviders(): List<ProviderPotential> {
-        return providers.map { (_, p) ->
-            ProviderPotential(
-                provider = p.name,
-                score = if (p.isApiKeyValid) 1.0 else 0.0,
-                available = p.isApiKeyValid,
-                latencyMs = 0L
-            )
+        // 1. Quota-Aware Selection & Priority Routing
+        // Filter out providers that are out of quota
+        val eligibleProviders = activeProviders.filter { provider ->
+            ruleEngine.hasSufficientQuota(provider, 100uL)
         }
-    }
 
-    /**
-     * Route request to best provider
-     */
-    fun routeRequest(modelId: String): String? {
-        val candidates = discoverProviders()
-        val parsedModel = ModelId.parse(modelId)
+        // If we have no eligible providers or tags are ignored, include all models
+        if (eligibleProviders.isEmpty() || ignoreTags) {
+            for (mId in allKnownModels) {
+                val provider = mId.split('/').firstOrNull() ?: "unknown"
+                val metadata = modelCards.getCard(mId)
+                models.add(ModelInfo(
+                    id = mId,
+                    ownedBy = provider,
+                    metadata = metadata
+                ))
+            }
+            return models
+        }
 
-        if (parsedModel != null) {
-            val provider = providers[parsedModel.provider]
-            if (provider != null && provider.isApiKeyValid) {
-                return parsedModel.provider
+        // 2. DSEL-Driven Discovery
+        // Dynamically discover models that start with the provider prefix from ModelCardStore
+        for (provider in eligibleProviders) {
+            val prefix = "$provider/"
+            val providerModels = allKnownModels.filter { it.startsWith(prefix) }
+
+            for (mId in providerModels) {
+                val metadata = modelCards.getCard(mId)
+                models.add(ModelInfo(
+                    id = mId,
+                    ownedBy = provider,
+                    metadata = metadata
+                ))
             }
         }
 
-        return ruleEngine.selectProvider(candidates)
+        return models
     }
-
-    /**
-     * Track token usage
-     */
-    fun trackTokens(provider: String, model: String, tokens: ULong) {
-        tokenLedger.record(provider, model, tokens)
-    }
-
-    /**
-     * Check if API key looks valid (not obviously fake)
-     */
-    fun isRealKeyPub(key: String): Boolean {
-        // Basic validation - real keys are typically long enough
-        return key.length >= 20 && !key.startsWith("sk-test-") && !key.contains("example")
-    }
-
-    /**
-     * Add a model to a provider's store
-     */
-    fun addModel(provider: String, model: ModelInfo) {
-        cardStore.addModel(provider, model)
-    }
-
-    /**
-     * Get models for a provider
-     */
-    fun getModels(provider: String): List<ModelInfo> = cardStore.getModels(provider)
-
-    /**
-     * Get all models across providers
-     */
-    fun getAllModels(): List<ModelInfo> = cardStore.getAllModels()
 }
 
 /**
  * Provider menu with quota information
+ * Ported from menu.rs
  */
 data class MuxMenu(
-    val providers: List<ProviderQuota> = emptyList()
+    val activeProviders: List<ProviderDef> = emptyList(),
+    val selectedProvider: String? = null,
+    val quotas: Map<String, ProviderQuotaInfo> = emptyMap(),
+    val lastError: String? = null
 ) {
+    fun providerNames(): List<String> = activeProviders.map { it.name }
+
+    fun selectProvider(name: String): Boolean {
+        if (activeProviders.any { it.name == name }) {
+            return true
+        }
+        return false
+    }
+
+    fun routeModel(modelRef: String): Triple<String, String, String>? {
+        if ('/' in modelRef) {
+            return route(modelRef)
+        }
+        val provider = selectedProvider ?: activeProviders.firstOrNull()?.name ?: return null
+        return route("$provider/$modelRef")
+    }
+
     companion object {
-        fun fromFacade(facade: ModelFacade): MuxMenu {
-            return MuxMenu(
-                providers = facade.allProviders().map { p ->
-                    ProviderQuota(
-                        name = p.name,
-                        baseUrl = p.baseUrl,
-                        quota = facade.getQuota(p.name),
-                        available = p.isApiKeyValid
-                    )
-                }
-            )
+        fun new(): MuxMenu {
+            val activeProviders = discoverProviders()
+            return MuxMenu(activeProviders = activeProviders)
         }
     }
 }
 
 /**
- * Provider quota summary
+ * Quota information for a provider
  */
-data class ProviderQuota(
-    val name: String,
-    val baseUrl: String,
-    val quota: QuotaContainer? = null,
-    val available: Boolean = false
+data class ProviderQuotaInfo(
+    val provider: String,
+    val usedTokens: ULong,
+    val remainingTokens: ULong,
+    val confidence: Double
 )
-
-/**
- * DSEL builder for configuring provider routing
- */
-class DSELBuilder {
-    private val rules = mutableListOf<ProviderSelectionRule>()
-
-    fun route(rule: ProviderSelectionRule): DSELBuilder {
-        rules.add(rule)
-        return this
-    }
-
-    fun fallback(vararg providers: String): DSELBuilder {
-        rules.add(ProviderSelectionRule.Fallback(providers.toList()))
-        return this
-    }
-
-    fun roundRobin(vararg providers: String): DSELBuilder {
-        rules.add(ProviderSelectionRule.RoundRobin(providers.toList()))
-        return this
-    }
-
-    fun costOptimized(vararg providers: String): DSELBuilder {
-        rules.add(ProviderSelectionRule.CostOptimized(providers.toList()))
-        return this
-    }
-
-    fun qualityFirst(vararg providers: String): DSELBuilder {
-        rules.add(ProviderSelectionRule.QualityFirst(providers.toList()))
-        return this
-    }
-
-    fun fixed(provider: String): DSELBuilder {
-        rules.add(ProviderSelectionRule.Fixed(provider))
-        return this
-    }
-
-    fun build(): List<ProviderSelectionRule> = rules.toList()
-}
-
-/**
- * Model mapping between protocol types
- */
-object ModelMapping {
-    /**
-     * Map a model name from one provider format to another
-     */
-    fun mapModelName(model: String, sourceProvider: String, targetProvider: String): String {
-        // Basic mapping - in reality this would have provider-specific mappings
-        return when {
-            sourceProvider == "anthropic" && targetProvider == "openai" -> {
-                // Anthropic models to OpenAI equivalent
-                when {
-                    model.startsWith("claude-3-opus") -> "gpt-4-turbo"
-                    model.startsWith("claude-3-sonnet") -> "gpt-4"
-                    model.startsWith("claude-3-haiku") -> "gpt-3.5-turbo"
-                    else -> "gpt-3.5-turbo"
-                }
-            }
-            sourceProvider == "openai" && targetProvider == "anthropic" -> {
-                when {
-                    model.startsWith("gpt-4-turbo") -> "claude-3-opus-20240229"
-                    model.startsWith("gpt-4") -> "claude-3-sonnet-20240229"
-                    model.startsWith("gpt-3.5") -> "claude-3-haiku-20240307"
-                    else -> "claude-3-haiku-20240307"
-                }
-            }
-            else -> model
-        }
-    }
-}
