@@ -131,7 +131,7 @@ class HashSet<T> : Set<T> {
 }
 
 fun main() {
-    val arraySet = _root_ide_package_.borg.trikeshed.common.collections.ArraySet<Int>()
+    val arraySet = borg.trikeshed.common.collections.ArraySet<Int>()
     arraySet.add(10)
     arraySet.add(20)
     arraySet.add(30)
@@ -139,7 +139,7 @@ fun main() {
     arraySet.remove(20)
     println("ArraySet contains 20 after removal: ${arraySet.contains(20)}") // Output: false
 
-    val hashSet = _root_ide_package_.borg.trikeshed.common.collections.HashSet<String>()
+    val hashSet = borg.trikeshed.common.collections.HashSet<String>()
     hashSet.add("apple")
     hashSet.add("banana")
     hashSet.add("cherry")

@@ -11,13 +11,13 @@ import borg.trikeshed.lib.plus
 import borg.trikeshed.lib.size
 import borg.trikeshed.lib.view
 
-typealias Bucket<T> = borg.trikeshed.lib.Series<T>
+typealias Bucket<T> = Series<T>
 
-open class HashSeriesSet<T : Any>  : borg.trikeshed.common.collections.SeriesSet<T> {
-     open var buckets: borg.trikeshed.lib.Series<borg.trikeshed.common.collections.Bucket<T>> = createBuckets(16)
+open class HashSeriesSet<T : Any>  : SeriesSet<T> {
+     open var buckets: Series<Bucket<T>> = createBuckets(16)
     private var _size: Int = 0
 
-    private fun createBuckets(size: Int): borg.trikeshed.lib.Series<borg.trikeshed.lib.Series<T>> =
+    private fun createBuckets(size: Int): Series<Series<T>> =
         size j { 0 j { throw IndexOutOfBoundsException() } }
 
     override val a: Int
@@ -63,22 +63,22 @@ open class HashSeriesSet<T : Any>  : borg.trikeshed.common.collections.SeriesSet
 
     companion object {
         class MutableHashSeriesSet<T : Any>(
-            private val theSet: borg.trikeshed.common.collections.HashSeriesSet<T> = _root_ide_package_.borg.trikeshed.common.collections.HashSeriesSet<T>(),
+            private val theSet: HashSeriesSet<T> = HashSeriesSet<T>(),
 
-            ) : borg.trikeshed.common.collections.MutableSeriesSet<T>, borg.trikeshed.common.collections.SeriesSet<T> by theSet {
+            ) : MutableSeriesSet<T>, SeriesSet<T> by theSet {
 
             override val size: Int get() = theSet._size
-            var buckets: borg.trikeshed.lib.Series<borg.trikeshed.common.collections.Bucket<T>>
+            var buckets: Series<Bucket<T>>
                 get() = theSet.buckets;
                 set(value) {
                     theSet.buckets = value
                 }
 
             override fun add(element: T): Boolean {
-                if (_root_ide_package_.kotlin.collections.Set.contains(element)) return false
+                if (  contains(element)) return false
 
                 val bucketIndex = theSet.getBucketIndex(element)
-                theSet.buckets + buckets.size j { i ->
+                theSet.buckets +( buckets.size j { i ->
                     if (i == bucketIndex) {
                         buckets[i].size.inc() j { j ->
                             if (j == buckets[i].size) element else buckets[i][j]
@@ -86,7 +86,7 @@ open class HashSeriesSet<T : Any>  : borg.trikeshed.common.collections.SeriesSet
                     } else {
                         buckets[i]
                     }
-                }
+                })
                 theSet._size++
 
                 if (theSet._size > buckets.size * 0.75) {
@@ -101,9 +101,9 @@ open class HashSeriesSet<T : Any>  : borg.trikeshed.common.collections.SeriesSet
                 val bucket = buckets[bucketIndex]
                 val index = bucket.view.indexOf(element)
                 if (index != -1) {
-                    buckets + buckets.size j { i ->
+                    buckets + (buckets.size   j { i :Int->
                         if (i == bucketIndex) {
-                            bucket.size.dec() j { j ->
+                            bucket.size.dec() j { j:Int ->
                                 when {
                                     j < index -> bucket[j]
                                     j >= index -> bucket[j + 1]
@@ -113,7 +113,7 @@ open class HashSeriesSet<T : Any>  : borg.trikeshed.common.collections.SeriesSet
                         } else {
                             buckets[i]
                         }
-                    }
+                    })
                     theSet._size--
                     return true
                 }
@@ -126,7 +126,7 @@ open class HashSeriesSet<T : Any>  : borg.trikeshed.common.collections.SeriesSet
             }
 
             private fun resize() {
-                val oldSeries = buckets as borg.trikeshed.lib.Series<borg.trikeshed.lib.Series<T>>
+                val oldSeries = buckets as Series<Series<T>>
                 buckets = theSet.createBuckets(buckets.size * 2)
                 theSet._size = 0
 
@@ -139,9 +139,9 @@ open class HashSeriesSet<T : Any>  : borg.trikeshed.common.collections.SeriesSet
     }
 }
 
-interface SeriesSet<T>: borg.trikeshed.lib.Series<T>,Set<T>
+interface SeriesSet<T>: Series<T>,Set<T>
 
-interface MutableSeriesSet<T> : borg.trikeshed.common.collections.SeriesSet<T> {
+interface MutableSeriesSet<T> : SeriesSet<T> {
     fun add(element: T): Boolean
     fun remove(element: T): Boolean
     fun clear()
@@ -151,7 +151,7 @@ interface MutableSeriesSet<T> : borg.trikeshed.common.collections.SeriesSet<T> {
 // Example usage
 fun main1() {
     val testSet =
-        _root_ide_package_.borg.trikeshed.common.collections.HashSeriesSet.Companion.MutableHashSeriesSet<Int>()
+        MutableHashSeriesSet<Int>()
     testSet.add(10)
     testSet.add(20)
     testSet.add(30)

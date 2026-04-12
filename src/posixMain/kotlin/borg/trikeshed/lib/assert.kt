@@ -13,4 +13,4 @@ For Native
 Throws an AssertionError if the value is false and runtime assertions have been enabled during compilation.*/
 @OptIn(ExperimentalNativeApi::class)
 actual fun assert(value: Boolean): Unit =kotlin.assert(value)
-actual inline fun   assert(value: Boolean, lazyMessage: () -> Any) { kotlin.assert(value, lazyMessage) }
+internal actual inline fun   assert(value: Boolean, lazyMessage: () -> Any) { kotlin.assert(value, lazyMessage) }

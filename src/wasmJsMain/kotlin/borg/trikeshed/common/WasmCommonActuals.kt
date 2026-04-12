@@ -22,7 +22,7 @@ private object WasmNoopSeekHandle : SeekHandle {
 }
 
 actual object System {
-    actual fun getenv(name: String): String? = null
+    actual fun getenv(name: String, string: String): String? = null
 
     actual val homedir: String
         get() = "/"

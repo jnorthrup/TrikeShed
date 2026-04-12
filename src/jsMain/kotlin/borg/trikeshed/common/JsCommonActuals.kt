@@ -7,7 +7,7 @@ import borg.trikeshed.lib.Series2
 import borg.trikeshed.lib.toSeries
 
 actual object System {
-    actual fun getenv(name: String): String? = (js("process").env[name] as? String)
+    actual fun getenv(name: String, string: String): String? = (js("process").env[name] as? String)
 
     actual val homedir: String
         get() = jsHomeDir()

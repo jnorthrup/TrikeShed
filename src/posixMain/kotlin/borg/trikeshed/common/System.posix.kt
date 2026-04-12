@@ -6,14 +6,14 @@ import platform.posix.getenv as posix_getenv
 
 @OptIn(ExperimentalForeignApi::class)
 actual object System {
-    actual fun getenv(name: String): String? = posix_getenv(name)?.toKString()
+    actual fun getenv(name: String, string: String): String? = posix_getenv(name)?.toKString()
 
     actual val homedir: String by lazy {
-        getenv("HOME")
-            ?: getenv("USERPROFILE")
+        getenv("HOME", "false")
+            ?: getenv("USERPROFILE", "false")
             ?: run {
-                val homedrive = getenv("HOMEDRIVE")
-                val homepath = getenv("HOMEPATH")
+                val homedrive = getenv("HOMEDRIVE", "false")
+                val homepath = getenv("HOMEPATH", "false")
                 if (homedrive != null && homepath != null) "$homedrive$homepath" else null
             }
             ?: error("Failed to determine home directory")

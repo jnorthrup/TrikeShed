@@ -11,7 +11,7 @@ Throws an AssertionError if the value is false and runtime assertions have been 
 expect fun assert(value: Boolean)
 
 @Throws(AssertionError::class)
-expect fun assert(value: Boolean, lazyMessage: () -> Any)
+internal expect fun assert(value: Boolean, lazyMessage: () -> Any)
 
 //var forceDebug = env// stopgap measure until i figure out how to do native -ea
 val debugging: Boolean =

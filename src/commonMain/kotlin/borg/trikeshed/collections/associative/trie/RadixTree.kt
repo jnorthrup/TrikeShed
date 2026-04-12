@@ -86,7 +86,7 @@ class RadixTree<C : Comparable<C>> {
 
     fun keys(): List<borg.trikeshed.lib.Series<C>> {
         val result = mutableListOf<borg.trikeshed.lib.Series<C>>()
-        root?.collectKeys(_root_ide_package_.borg.trikeshed.lib.emptySeries(), result)
+        root?.collectKeys(borg.trikeshed.lib.emptySeries(), result)
         return result
     }
 }

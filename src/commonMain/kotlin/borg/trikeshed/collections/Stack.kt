@@ -10,7 +10,7 @@ class Stack<T>(src: List<T> = listOf()) {
     fun size(): Int = list.size
     fun isEmpty(): Boolean = list.isEmpty()
     fun clone(): borg.trikeshed.common.collections.Stack<T> =
-        _root_ide_package_.borg.trikeshed.common.collections.Stack(list)
+        borg.trikeshed.common.collections.Stack(list)
 
     override fun toString(): String = "Stack(list=$list)"
 }

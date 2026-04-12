@@ -1,21 +1,15 @@
 package one.xio.spi
 
+import borg.trikeshed.common.System
 import borg.trikeshed.net.ProtocolId
 import borg.trikeshed.net.detectProtocol
 import borg.trikeshed.net.spi.IngressSteeringDecision
-import borg.trikeshed.net.spi.ReadinessInterest
 import borg.trikeshed.net.spi.SteeringSource
 import borg.trikeshed.net.spi.TransportCapabilities
 import borg.trikeshed.net.spi.TransportEvent
 import borg.trikeshed.net.spi.TransportRegistration
 import borg.trikeshed.net.spi.TransportBackendKind
-import java.nio.ByteBuffer
-import java.nio.channels.ReadableByteChannel
-import java.nio.channels.SelectionKey
-import java.nio.channels.SelectableChannel
-import java.nio.channels.Selector
-import java.nio.channels.WritableByteChannel
-
+3
 data class LinuxNativeBackendConfig(
     val enableIoUring: Boolean = true,
     val enableXdpSteering: Boolean = true,
@@ -36,11 +30,11 @@ class LinuxNativeTransportBackend(
     override val kind: TransportBackendKind = TransportBackendKind.LINUX_NATIVE
 
     override fun capabilities(): TransportCapabilities {
-        val nativeLinux = System.getProperty("os.name").equals("Linux", ignoreCase = true)
+        val nativeLinux = System.getenv("os.name", "false").equals("Linux", ignoreCase = true)
         val ioUringAvailable = nativeLinux && config.enableIoUring &&
-            System.getProperty("trikeshed.transport.linux.native", "false").toBoolean()
+            System.getenv("trikeshed.transport.linux.native", "false").toBoolean()
         val xdpAvailable = nativeLinux && config.enableXdpSteering &&
-            System.getProperty("trikeshed.transport.linux.xdp", "false").toBoolean()
+            System.getenv("trikeshed.transport.linux.xdp", "false").toBoolean()
         return TransportCapabilities(
             backendKind = kind,
             nativeLinux = nativeLinux,

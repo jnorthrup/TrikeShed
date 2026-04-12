@@ -1,6 +1,6 @@
 package borg.trikeshed.platform.nio
 
-import java.io.IOException
+
 import kotlin.coroutines.*
 import kotlinx.coroutines.*
 
@@ -39,10 +39,10 @@ class Reactor private constructor(
     private val state: ReactorState,
 ) {
     companion object {
-        @Throws(IOException::class)
+        
         fun create(): Reactor = withConfig(BackendConfig())
 
-        @Throws(IOException::class)
+        
         fun withConfig(config: BackendConfig): Reactor {
             val backend = detectBackend(config)
             val state = ReactorState(
@@ -53,7 +53,7 @@ class Reactor private constructor(
     }
 
     /** Register a file descriptor for monitoring */
-    @Throws(IOException::class)
+    
     fun register(fd: Int, interest: Interest): RegistrationHandle {
         val token = allocateToken()
         state.backend.register(fd, token, interest)
@@ -63,7 +63,7 @@ class Reactor private constructor(
 
     /** Allocate a unique user_data token */
     @Synchronized
-    private fun allocateToken(): Long {
+    internal fun allocateToken(): Long {
         val token = state.nextUserData
         state.nextUserData = state.nextUserData + 1L
         if (state.nextUserData == 0L) {
@@ -73,7 +73,7 @@ class Reactor private constructor(
     }
 
     /** Submit a read operation — returns suspend function */
-    @Throws(IOException::class)
+    
     fun read(fd: Int, buf: ByteArray): ReadFuture {
         val userData = allocateToken()
         state.backend.submitRead(fd, buf, userData)
@@ -82,7 +82,7 @@ class Reactor private constructor(
     }
 
     /** Submit a write operation — returns suspend function */
-    @Throws(IOException::class)
+    
     fun write(fd: Int, buf: ByteArray): WriteFuture {
         val userData = allocateToken()
         state.backend.submitWrite(fd, buf, userData)
@@ -91,15 +91,15 @@ class Reactor private constructor(
     }
 
     /** Submit all pending operations */
-    @Throws(IOException::class)
+    
     fun submit(): Long = state.backend.submit()
 
     /** Wait for completions */
-    @Throws(IOException::class)
+    
     fun wait(min: Int): Long = state.backend.wait(min)
 
     /** Process completions */
-    @Throws(IOException::class)
+    
     fun processCompletions(completions: Array<Completion?>): Int {
         val count = state.backend.pollCompletions(completions)
 
@@ -113,7 +113,7 @@ class Reactor private constructor(
     }
 
     /** Run the reactor loop once */
-    @Throws(IOException::class)
+    
     fun runOnce(): Int {
         val completions = arrayOfNulls<Completion>(64)
         return processCompletions(completions)
@@ -172,7 +172,7 @@ class ReadableFuture(
     private val state: ReactorState,
 ) {
     companion object {
-        @Throws(IOException::class)
+        
         fun create(fd: Int, reactor: Reactor): ReadableFuture =
             ReadableFuture(fd, reactor.state)
     }
@@ -181,7 +181,7 @@ class ReadableFuture(
         val userData = state.allocateToken()
         runCatching {
             state.backend.submitPoll(fd, Interest.READABLE, userData)
-            state.wakers[userData] = cont as CancellableContinuation<Result<Int>>
+            state.wakers[userData] = cont
         }.onFailure {
             cont.resume(Result.failure(it))
         }
@@ -197,7 +197,7 @@ class WritableFuture(
     private val state: ReactorState,
 ) {
     companion object {
-        @Throws(IOException::class)
+        
         fun create(fd: Int, reactor: Reactor): WritableFuture =
             WritableFuture(fd, reactor.state)
     }
@@ -206,7 +206,7 @@ class WritableFuture(
         val userData = state.allocateToken()
         runCatching {
             state.backend.submitPoll(fd, Interest.WRITABLE, userData)
-            state.wakers[userData] = cont as CancellableContinuation<Result<Int>>
+            state.wakers[userData] = cont
         }.onFailure {
             cont.resume(Result.failure(it))
         }

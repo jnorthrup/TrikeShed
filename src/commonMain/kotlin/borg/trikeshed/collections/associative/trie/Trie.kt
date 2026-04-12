@@ -34,7 +34,7 @@ class Trie(var root: Map<String, Node> = linkedMapOf()) {
     fun frez(n: Node) {
 //        if (n.leaf) return
         (n.children.entries).let { cnodes ->
-            n.children = _root_ide_package_.borg.trikeshed.common.collections.associative.trie.ArrayMap.Companion.sorting(n.children)
+            n.children = borg.trikeshed.common.collections.associative.trie.ArrayMap.Companion.sorting(n.children)
             for ((_, v) in cnodes) frez(v)
         }
     }
@@ -43,7 +43,7 @@ class Trie(var root: Map<String, Node> = linkedMapOf()) {
         if (!freeze) {
             freeze = true
             root.values.forEach { frez(it) }
-            root = _root_ide_package_.borg.trikeshed.common.collections.associative.trie.ArrayMap.Companion.sorting(root)
+            root = borg.trikeshed.common.collections.associative.trie.ArrayMap.Companion.sorting(root)
         }
     }
 
