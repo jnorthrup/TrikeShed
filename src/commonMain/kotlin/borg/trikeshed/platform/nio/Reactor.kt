@@ -145,90 +145,49 @@ class ReadFuture(
     private val buf: ByteArray,
 ) {
     suspend fun await(): Result<Int> = suspendCancellableCoroutine { cont ->
-        val w: CancellableContinuation<Int> = object : CancellableContinuation<Int> by cont {
-            override fun resume(value: Int, onCancellation: (Throwable) -> Unit) {}
-            override fun resume(value: Int) {}
-        }
-        state.wakers[userData] = w
-        cont.invokeOnCancellation {
-            state.wakers.remove(userData)
-        }
+        state.wakers[userData] = cont
+        cont.invokeOnCancellation { state.wakers.remove(userData) }
     }
 }
 
-/** Suspend function for write operations */
 class WriteFuture(
     internal val state: ReactorState,
     private val userData: Long,
     private val buf: ByteArray,
 ) {
     suspend fun await(): Result<Int> = suspendCancellableCoroutine { cont ->
-        val w: CancellableContinuation<Int> = object : CancellableContinuation<Int> by cont {
-            override fun resume(value: Int, onCancellation: (Throwable) -> Unit) {}
-            override fun resume(value: Int) {}
-        }
-        state.wakers[userData] = w
-        cont.invokeOnCancellation {
-            state.wakers.remove(userData)
-        }
+        state.wakers[userData] = cont
+        cont.invokeOnCancellation { state.wakers.remove(userData) }
     }
 }
 
-/** Suspend function that waits for a file descriptor to become readable */
 class ReadableFuture(
     private val fd: Int,
     internal val state: ReactorState,
 ) {
     companion object {
-        
-        fun create(fd: Int, reactor: Reactor): ReadableFuture =
-            ReadableFuture(fd, reactor.state)
+        fun create(fd: Int, reactor: Reactor): ReadableFuture = ReadableFuture(fd, reactor.state)
     }
-
     suspend fun await(): Result<Unit> = suspendCancellableCoroutine { cont ->
         val userData = state.nextUserData++
-        runCatching {
-            state.backend.submitPoll(fd, Interest.READABLE, userData)
-            val w: CancellableContinuation<Int> = object : CancellableContinuation<Int> by cont {
-            override fun resume(value: Int, onCancellation: (Throwable) -> Unit) {}
-            override fun resume(value: Int) {}
-        }
-        state.wakers[userData] = w
-        }.onFailure {
-            cont.resume(Result.failure(it))
-        }
-        cont.invokeOnCancellation {
-            state.wakers.remove(userData)
-        }
+        state.backend.submitPoll(fd, Interest.READABLE, userData)
+        state.wakers[userData] = cont
+        cont.invokeOnCancellation { state.wakers.remove(userData) }
     }
 }
 
-/** Suspend function that waits for a file descriptor to become writable */
 class WritableFuture(
     private val fd: Int,
     internal val state: ReactorState,
 ) {
     companion object {
-        
-        fun create(fd: Int, reactor: Reactor): WritableFuture =
-            WritableFuture(fd, reactor.state)
+        fun create(fd: Int, reactor: Reactor): WritableFuture = WritableFuture(fd, reactor.state)
     }
-
     suspend fun await(): Result<Unit> = suspendCancellableCoroutine { cont ->
         val userData = state.nextUserData++
-        runCatching {
-            state.backend.submitPoll(fd, Interest.WRITABLE, userData)
-            val w: CancellableContinuation<Int> = object : CancellableContinuation<Int> by cont {
-            override fun resume(value: Int, onCancellation: (Throwable) -> Unit) {}
-            override fun resume(value: Int) {}
-        }
-        state.wakers[userData] = w
-        }.onFailure {
-            cont.resume(Result.failure(it))
-        }
-        cont.invokeOnCancellation {
-            state.wakers.remove(userData)
-        }
+        state.backend.submitPoll(fd, Interest.WRITABLE, userData)
+        state.wakers[userData] = cont
+        cont.invokeOnCancellation { state.wakers.remove(userData) }
     }
 }
 
