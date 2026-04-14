@@ -67,18 +67,15 @@ The harness lives under `src/brcTest/kotlin/borg/trikeshed/brc/BrcHarnessTest.kt
     - `"banana".toSeries() / 'n'` would split series into `s_['ba','a','a']`
     - combine(Series...), and join(Cursor...) will concatenate and widen respectively with underlying binary-search
       index remapping on y,x axis respectively where Cursors are concerned.
-    - a handful of nonstandard symbols are used to hint the code for a quick read
-        * _l,_a,_s,_m util objects provide e.g. `_l[1,2,3]` for a kotlin List; s_[] is a Series
+    - a handful of helper literals and operators are used to keep the code readable at a glance
+        * `_l`, `_a`, `_s`, `_m` provide list, array, set, and map literals; `s_[]` builds a Series
             * CharSeries is a Series<Char> with ByteBuffer token manipulation methods
             * a LongSeries<T> exists to enable 64 bit indexing e.g. file-IO random access virtualization and other large
               contiguous or sparse things
-            * some symbol liberties:
-                - `(myseries as Series<T>)` __α__ `{it:T-> foo(it)}` is an infix, lazy .map analog of a series
-                - `(myseries as Series<T>).`\`▶\` visually noticable forward-iterator accessor denoting kotlin stdlib
-                  collections/functional facade for a given purpose, typically filters, maps, or folds
-                - left identity anchors, respectively __\`↺\`__ e.g. "columnname".\`↺\` to functionalize a constant or
-                  other value in situations where sometimes a lambda might be generative but constant can be distinctly
-                  picked out from in the code
+            * helper operators:
+                - `(myseries as Series<T>)` __α__ `{it:T-> foo(it)}` is an infix projection operator for Series
+                - `(myseries as Series<T>).`\`▶\` is the iterable bridge to Kotlin collection traversal and folds
+                - left identity anchors, respectively __\`↺\`__ e.g. `"columnname".\`↺\`` to keep a constant visible
 
 * [x] Cursor lazy and memory-resident Dataframes lending strongly typed columns, with names, splittability,
   combinability, transforms.
@@ -97,24 +94,24 @@ The harness lives under `src/brcTest/kotlin/borg/trikeshed/brc/BrcHarnessTest.kt
     - `join(cursor1,cursor2)` will combine the columns with presumably bad results for differing row lengths- though
       myShortCursor.infinite can be used here
 
-* [x] ~~ISAM~~ FlatFile Columnar Dataframes Storage @see http://github.com/jnorthrup/columnar
+* [x] FlatFile Columnar Dataframes Storage @see http://github.com/jnorthrup/columnar
     - now with a native port. the jvm rewrite of columnar is also a full rewrite, streamlined and simplified lacking
       NIO specialization.
-    - the kotlin-native ~~isam~~ FlatFile is linux-posix-64bit specific mmap code.
-    - the columnar project has a lot more bells and whistles and is battle hardened
-    - the default construction of an ~~ISAM~~ FlatFile volume are tested to be correct in a single threaded environment
+    - the kotlin-native FlatFile is linux-posix-64bit specific mmap code.
+    - the columnar project has more features and is battle hardened
+    - the default construction of a FlatFile volume is tested to be correct in a single threaded environment
         - [x] the jvm version employs a lock-seek-reed-unlock strategy
         - [x] the native version uses [linux] `mmap` with readonly memory.
-            - [x] in practice this is copmatible with macos posix until you look into liburing integration, so the uring
-              attempt was made a seperate linux-only class from the IsamVolume
+            - [x] in practice this is compatible with macos posix until you look into liburing integration, so the uring
+              attempt was made a separate linux-only class from the IsamVolume
             - [ ] the posix code holds up well under mingw however the mmap calls are significantly different so this
-              may warrant a seperate lock-seek-read-unlock strategy for windows, or someone with ambition to port the
+              may warrant a separate lock-seek-read-unlock strategy for windows, or someone with ambition to port the
               mmap calls
 
 * [x] Duck-typing CSV-Cursor which includes varchar
   width sizing and narrowing numerical of types and float/integer detection on imported columns. supports
-  explicit ~~ISAM~~ FlatFile transcription on initial scan. heap stores only index to first records for CSV cursors.
-    - exmaples tbd
+  explicit FlatFile transcription on initial scan. heap stores only index to first records for CSV cursors.
+    - examples tbd
 
 
 * [x] JSON indexer/reifier/path-selector written for simplicity and speed. This is not a serdes library.
@@ -128,9 +125,9 @@ The harness lives under `src/brcTest/kotlin/borg/trikeshed/brc/BrcHarnessTest.kt
           behavior
     * `JsonParser.reify(Series<Char>)` parse and return the expression as nested maps and arrays and values
         * Js Arrays return as Series<Any?>, Js Objects return as Map<String,Any?> ; all Js Values return as Any?
-        * for better or worse, non-string ParseDoubleOrNull not only does a cheap withotu string allocation costs but is
+        * for better or worse, non-string ParseDoubleOrNull not only does a cheap without string allocation costs but is
           also the source of parsed nulls when the Double parser falls through.
-    * `JsonParser.jsPath(Series<Char>,JsPath)` ~~ghetto jq~~ will traverse the index to the depth of the path provided.
+    * `JsonParser.jsPath(Series<Char>,JsPath)` is a path selector over the indexed JSON structure.
         * `JsPathElement` is an `Either<String,Int>` created by `List<*>::toJsPath()` extension function
         * optional reified param will return the value at the path reified as a kotlin type else just a segment JsIndex
         * String keys will abort on Arrays but Int keys will fetch the nth index from either a json object or Array
@@ -157,4 +154,3 @@ The harness lives under `src/brcTest/kotlin/borg/trikeshed/brc/BrcHarnessTest.kt
   behave like B+Tree but the block size makes no attempt at uniformity or balancing nodes. A chunked list iterator could
   approximate the layout of a B+Tree cheaply. 
     
-

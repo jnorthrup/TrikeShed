@@ -1,19 +1,19 @@
 @file:OptIn(ExperimentalUnsignedTypes::class, ExperimentalForeignApi::class, ExperimentalForeignApi::class,
-    ExperimentalForeignApi::class, ExperimentalForeignApi::class
+    ExperimentalForeignApi::class, ExperimentalForeignApi::class, ExperimentalForeignApi::class
 )
 
 package borg.trikeshed.tilting.zran
 
 import borg.trikeshed.common.collections.binarySearch
-import borg.trikeshed.isam.meta.PlatformCodec.Companion.readULong
-import borg.trikeshed.isam.meta.PlatformCodec.Companion.readUShort
-import borg.trikeshed.isam.meta.PlatformCodec.Companion.writeULong
-import borg.trikeshed.isam.meta.PlatformCodec.Companion.writeUShort
 import borg.trikeshed.lib.*
 import borg.trikeshed.lib.CZero.nz
 import borg.trikeshed.lib.CZero.z
 import borg.trikeshed.native.HasPosixErr.Companion.posixFailOn
 import borg.trikeshed.native.HasPosixErr.Companion.posixRequires
+import borg.trikeshed.platform.PlatformCodec.Companion.readULong
+import borg.trikeshed.platform.PlatformCodec.Companion.readUShort
+import borg.trikeshed.platform.PlatformCodec.Companion.writeULong
+import borg.trikeshed.platform.PlatformCodec.Companion.writeUShort
 import kotlinx.cinterop.*
 import platform.posix.*
 import platform.zlib.*
@@ -144,7 +144,7 @@ class GzIndex {
 
 
     fun writeIndex(indexFname: String): Int {
-        return withIndexFile(indexFname, "wb") { indexFp ->
+        return withIndexFile(indexFname, "wb") { indexFp: CPointer<FILE> ->
             "kzra".encodeToByteArray()
                 .usePinned { fwrite(it.addressOf(0), 1u, "kzra".encodeToByteArray().size.toULong(), indexFp) }
             list.forEach { writeULong(it.output).usePinned { fwrite(it.addressOf(0), 1u, __ulSz, indexFp) } }
@@ -210,7 +210,7 @@ class GzIndex {
                     window.usePinned { fread(it.addressOf(0), 1u, windowSizes[i].toULong(), stdin) }
                     window.leftIdentity
                 } else fun(): UByteArray {
-                    return withIndexFile(indexFname) { indexFp ->
+                    return withIndexFile(indexFname) { indexFp  ->
                         fseek(indexFp, windowOffsets[i].toLong(), SEEK_SET)
                         val window = UByteArray(windowSizes[i].toInt())
                         window.usePinned {
@@ -236,6 +236,8 @@ class GzIndex {
                 block(indexFp!!)
             }
         } finally {
+
+
             fclose(indexFp)
         }
     }

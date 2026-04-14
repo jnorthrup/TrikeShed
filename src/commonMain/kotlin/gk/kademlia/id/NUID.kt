@@ -71,7 +71,7 @@ interface NUID<Primitive : Comparable<Primitive>> {
                     override val netmask: NetMask<Byte>
                         get() = object : NetMask<Byte> {
                             override val bits: Int
-                                get() = size.toInt()
+                                get() = size
                         }
                 }
 
@@ -79,7 +79,7 @@ interface NUID<Primitive : Comparable<Primitive>> {
                     override val netmask: NetMask<UByte>
                         get() = object : NetMask<UByte> {
                             override val bits: Int
-                                get() = size.toInt()
+                                get() = size
                         }
                 }
 
@@ -87,7 +87,7 @@ interface NUID<Primitive : Comparable<Primitive>> {
                     override val netmask: NetMask<Short>
                         get() = object : NetMask<Short> {
                             override val bits: Int
-                                get() = size.toInt()
+                                get() = size
                         }
                 }
 
@@ -95,7 +95,7 @@ interface NUID<Primitive : Comparable<Primitive>> {
                     override val netmask: NetMask<UShort>
                         get() = object : NetMask<UShort> {
                             override val bits: Int
-                                get() = size.toInt()
+                                get() = size
                         }
                 }
 
@@ -103,7 +103,7 @@ interface NUID<Primitive : Comparable<Primitive>> {
                     override val netmask: NetMask<Int>
                         get() = object : NetMask<Int> {
                             override val bits: Int
-                                get() = size.toInt()
+                                get() = size
                         }
                 }
 
@@ -111,7 +111,7 @@ interface NUID<Primitive : Comparable<Primitive>> {
                     override val netmask: NetMask<UInt>
                         get() = object : NetMask<UInt> {
                             override val bits: Int
-                                get() = size.toInt()
+                                get() = size
                         }
                 }
 
@@ -119,7 +119,7 @@ interface NUID<Primitive : Comparable<Primitive>> {
                     override val netmask: NetMask<Long>
                         get() = object : NetMask<Long> {
                             override val bits: Int
-                                get() = size.toInt()
+                                get() = size
                         }
                 }
 
@@ -127,7 +127,7 @@ interface NUID<Primitive : Comparable<Primitive>> {
                     override val netmask: NetMask<ULong>
                         get() = object : NetMask<ULong> {
                             override val bits: Int
-                                get() = size.toInt()
+                                get() = size
                         }
                 }
 
@@ -135,7 +135,7 @@ interface NUID<Primitive : Comparable<Primitive>> {
                     override val netmask: NetMask<BigInt>
                         get() = object : NetMask<BigInt> {
                             override val bits: Int
-                                get() = size.toInt()
+                                get() = size
                         }
                 }
             }
