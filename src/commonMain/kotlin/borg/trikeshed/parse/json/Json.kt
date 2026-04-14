@@ -2,7 +2,7 @@
 
 package borg.trikeshed.parse.json
 
-import borg.trikeshed.common.collections.s_
+import borg.trikeshed.common.collections._l
 
 import borg.trikeshed.lib.CharSeries.Companion.unbrace
 import borg.trikeshed.lib.CharSeries.Companion.unquote
@@ -53,7 +53,7 @@ val JsContext.segments: Iterable<JsIndex>
         val (openIdx, closeIdx) = element.first
         val commaIdxs: Series<Int> = element.second
         // boundaries: [openIdx, ...commaIdxs..., closeIdx]
-        val boundaries: List<Int> = listOf(openIdx) + commaIdxs.toList() + listOf(closeIdx)
+        val boundaries: List<Int> = _l[openIdx, commaIdxs, closeIdx]
         // generate segments: for each pair (b1, b2), the content is from b1+1 to b2 (exclusive)
         return boundaries.zipWithNext().map { (prev, curr) ->
             (prev + 1) j curr
@@ -142,7 +142,7 @@ object JsonParser {
                 //if obj we create k-v pairs otherwise we create values
 
                 //iterate  segments exclusive of src first and last and commas in the middle
-                val boundaries: List<Int> = listOf(openIdx) + commaIdxs.toList() + listOf(closeIdx)
+                val boundaries: List<Int> = _l[openIdx, commaIdxs, closeIdx]
                 if (commaIdxs.isEmpty()) {
                     val (before, after) = boundaries
                     val possiblyEmpty = src.clone().lim(after).pos(before + 1).trim

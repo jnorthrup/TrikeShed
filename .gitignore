@@ -41,3 +41,4 @@ default/
 # Tool/AI working dirs
 .git.bfg-report/
 .qwen/
+/.claude/

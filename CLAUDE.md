@@ -42,7 +42,19 @@ When your changes create orphans:
 
 The test: Every changed line should trace directly to the user's request.
 
-## 4. Goal-Driven Execution
+## 4. No Snap Deletions
+
+**Never delete files on impulse. Ever.**
+
+- Deletion is a destructive operation with high blast radius. Always confirm with the user before removing files.
+- When cleaning up redundancy: first collapse imports to native equivalents, verify the build passes, THEN mark files for deletion.
+- Dead code should be mentioned, not silently removed — unless the user explicitly asked for cleanup.
+- If a file appears unused, investigate before deleting. It may be loaded dynamically, used by tests, or referenced by external tooling.
+- "This looks like a duplicate" is not sufficient justification to delete — trace the dependents first.
+
+Rule: Build the new path, verify it works, then ask before removing the old one.
+
+## 5. Goal-Driven Execution
 
 **Define success criteria. Loop until verified.**
 

@@ -1,21 +1,11 @@
+@file:OptIn(ExperimentalForeignApi::class)
+
 package borg.trikeshed.common
-
 import kotlinx.cinterop.ExperimentalForeignApi
-import kotlinx.cinterop.toKString
-import platform.posix.getenv as posix_getenv
+import kotlinx.cinterop.cstr
 
-@OptIn(ExperimentalForeignApi::class)
+//kotlinx.cinterop.CValuesRef<platform.posix.fenv_t>?
 actual object System {
-    actual fun getenv(name: String, string: String): String? = posix_getenv(name)?.toKString()
-
-    actual val homedir: String by lazy {
-        getenv("HOME", "false")
-            ?: getenv("USERPROFILE", "false")
-            ?: run {
-                val homedrive = getenv("HOMEDRIVE", "false")
-                val homepath = getenv("HOMEPATH", "false")
-                if (homedrive != null && homepath != null) "$homedrive$homepath" else null
-            }
-            ?: error("Failed to determine home directory")
-    }
+    actual fun getenv(name: String, defaultVal: String?): String?   = (getenv(name)?:defaultVal?.cstr) as String?
+    actual val homedir: String = getenv("HOME") ?: "/tmp"
 }

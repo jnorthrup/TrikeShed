@@ -1,5 +1,0 @@
-# format:  coords WS .. EOL names WS .. EOL TypeMememento WS .. [EOL]
-# last coord is the recordlen
-0 10 10 14
-col0 col1
-IoString IoFloat

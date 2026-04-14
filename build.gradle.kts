@@ -167,6 +167,11 @@ kotlin {
                 // JMH dependencies for benchmarking
                 implementation("org.openjdk.jmh:jmh-core:1.37")
                 implementation("org.openjdk.jmh:jmh-generator-annprocess:1.37")
+
+                // Money/carlos JVM port from mp
+                implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.18.0")
+                implementation("com.squareup.okhttp3:okhttp:4.11.0")
+                implementation("org.bouncycastle:bcprov-jdk15on:1.70")
             }
 
             // Include JMH benchmark sources in jvmMain for compilation

@@ -2,7 +2,8 @@
 
 package borg.trikeshed.num
 
-import borg.trikeshed.isam.meta.PlatformCodec.Companion.readUInt
+import borg.trikeshed.common.collections.s_
+import borg.trikeshed.platform.PlatformCodec.Companion.readUInt
 import borg.trikeshed.lib.CZero.nz
 import borg.trikeshed.lib.CZero.z
 import borg.trikeshed.lib.Series
@@ -34,8 +35,8 @@ class BigInt private constructor(private val sign: Boolean?, private val magnitu
             value.absoluteValue.let { absValue ->
                 val low = (absValue and 0xFFFF_FFFFL).toUInt() // Lower 32 bits
                 val high = ((absValue ushr 32) and 0xFFFF_FFFFL).toUInt() // Upper 32 bits
-                if (high.nz) arrayOf(high, low) else arrayOf(low)
-            }.toSeries()
+                if (high.nz) s_[high, low] else s_[low]
+            }
         }
     )
 
@@ -50,8 +51,8 @@ class BigInt private constructor(private val sign: Boolean?, private val magnitu
         magnitude = if (value.z) emptySeries() else value.let { absValue ->
             val low = (absValue and 0xFFFF_FFFFUL).toUInt()
             val high = ((absValue shr 32) and 0xFFFF_FFFFUL).toUInt()
-            if (high.nz) arrayOf(high, low) else arrayOf(low)
-        }.toSeries()
+            if (high.nz) s_[high, low] else s_[low]
+        }
     )
 
     constructor(value: String) : this(
@@ -324,5 +325,3 @@ class BigInt private constructor(private val sign: Boolean?, private val magnitu
         }
     }
 }
-
-

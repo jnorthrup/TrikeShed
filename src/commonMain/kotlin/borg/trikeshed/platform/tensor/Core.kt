@@ -62,20 +62,22 @@ class Tensor private constructor(
         /**
          * Create a tensor filled with ones
          */
-        fun ones(shape: TensorShape, dtype: DType): Tensor {
-            val tensor = uninit(shape, dtype)
-            // Simplified - handles F32 only
-            if (dtype == DType.F32) {
-                val ones = FloatArray(shape.numel()) { 1.0f }
-                // Copy float data into byte array
-                val byteBuffer = ByteArray(ones.size * 4)
-                ones.forEachIndexed { i, f ->
-                    val bytes = f.toBits().toByteArray()
-                    bytes.copyInto(byteBuffer, i * 4)
-                }
-            }
-            return tensor
-        }
+
+         fun ones(shape: TensorShape, dtype: DType): Tensor {
+                 val tensor = uninit(shape, dtype)
+                 if (dtype == DType.F32) {
+                         val byteBuffer = tensor.asBytesMut()
+                         val count = shape.numel()
+                         for (i in 0 until count) {
+                                 val bits = 1.0f.toBits()
+                                 byteBuffer[i * 4 + 0] = (bits shr 24).toByte()
+                                 byteBuffer[i * 4 + 1] = (bits shr 16).toByte()
+                                 byteBuffer[i * 4 + 2] = (bits shr 8).toByte()
+                                 byteBuffer[i * 4 + 3] = bits.toByte()
+                             }
+                     }
+                 return tensor
+             }
 
         /**
          * Compute strides for row-major layout
