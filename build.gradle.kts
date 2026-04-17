@@ -12,6 +12,10 @@ group = "org.bereft"
 version = "1.0"
 val enableNativeSharedLib = providers.gradleProperty("native.sharedLib").orNull == "true"
 
+// Opt-in gate for building BRC native executables. Defaults to false so root build
+// won't attempt to link BRC binaries unless explicitly enabled.
+val enableBrcBinaries = providers.gradleProperty("enableBrcBinaries").orNull == "true"
+
 val focusedTransportSlice = providers.gradleProperty("focusedTransportSlice").orNull == "true"
 
 repositories {
@@ -60,6 +64,35 @@ kotlin {
                         baseName = "trikeshed"
                     }
                 }
+                if (enableBrcBinaries) {
+                    binaries.executable("brcCsvNative") {
+                        entryPoint = "borg.trikeshed.brc.brcCsvNativeMain"
+                    }
+                    binaries.executable("autoresearchNative") {
+                        entryPoint = "borg.trikeshed.autoresearch.autoresearchNativeMain"
+                    }
+                    binaries.executable("brcCursorNative") {
+                        entryPoint = "borg.trikeshed.brc.brcCursorNativeMain"
+                    }
+                    binaries.executable("brcDuckDbNative") {
+                        entryPoint = "borg.trikeshed.brc.brcDuckDbNativeMain"
+                    }
+                    binaries.executable("brcIsamNative") {
+                        entryPoint = "borg.trikeshed.brc.brcIsamNativeMain"
+                    }
+                }
+                // Local DuckDB cinterop removed from root build; if a local libs/duckdb is available,
+                // include it via settings.gradle.kts as a composite build and add a proper cinterop there.
+            }
+        }
+    } else if (hostOs == "Linux") {
+        linuxX64("linux") {
+            if (enableNativeSharedLib) {
+                binaries.sharedLib {
+                    baseName = "trikeshed"
+                }
+            }
+            if (enableBrcBinaries) {
                 binaries.executable("brcCsvNative") {
                     entryPoint = "borg.trikeshed.brc.brcCsvNativeMain"
                 }
@@ -75,31 +108,6 @@ kotlin {
                 binaries.executable("brcIsamNative") {
                     entryPoint = "borg.trikeshed.brc.brcIsamNativeMain"
                 }
-                // Local DuckDB cinterop removed from root build; if a local libs/duckdb is available,
-                // include it via settings.gradle.kts as a composite build and add a proper cinterop there.
-            }
-        }
-    } else if (hostOs == "Linux") {
-        linuxX64("linux") {
-            if (enableNativeSharedLib) {
-                binaries.sharedLib {
-                    baseName = "trikeshed"
-                }
-            }
-            binaries.executable("brcCsvNative") {
-                entryPoint = "borg.trikeshed.brc.brcCsvNativeMain"
-            }
-            binaries.executable("autoresearchNative") {
-                entryPoint = "borg.trikeshed.autoresearch.autoresearchNativeMain"
-            }
-            binaries.executable("brcCursorNative") {
-                entryPoint = "borg.trikeshed.brc.brcCursorNativeMain"
-            }
-            binaries.executable("brcDuckDbNative") {
-                entryPoint = "borg.trikeshed.brc.brcDuckDbNativeMain"
-            }
-            binaries.executable("brcIsamNative") {
-                entryPoint = "borg.trikeshed.brc.brcIsamNativeMain"
             }
 
         }
