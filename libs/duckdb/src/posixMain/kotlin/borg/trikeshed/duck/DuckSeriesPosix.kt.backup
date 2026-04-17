@@ -1,0 +1,296 @@
+/**
+ * DuckSeries — SQL queries returning trikeshed Series.
+ *
+ * POSIX implementation using DuckDB C API.
+ * Requires: `brew install duckdb` (macOS) or equivalent on Linux.
+ */
+@file:OptIn(ExperimentalForeignApi::class)
+package borg.trikeshed.duck
+
+import borg.trikeshed.lib.*
+import kotlinx.cinterop.*
+import duckdb.*
+
+/**
+ * Native implementation using DuckDB C API.
+ *
+ * Zero-copy: directly wraps DuckDB column pointers in Series.
+ */
+actual class DuckSeries private constructor(
+    private val dbVar: CPointerVarOf<duckdb_database>?,
+    private val connVar: CPointerVarOf<duckdb_connection>?
+) {
+    actual constructor(path: String?) : this(
+        if (path != null && path.isNotEmpty()) {
+            val dbPtr = nativeHeap.alloc<CPointerVarOf<duckdb_database>>()
+            val openResult = duckdb_open(path, dbPtr.ptr)
+            if (openResult != DUCKDB_SUCCESS) {
+                error("Failed to open DuckDB database: $path")
+            }
+            val connPtr = nativeHeap.alloc<CPointerVarOf<duckdb_connection>>()
+            val connResult = duckdb_connect(dbPtr.value, connPtr.ptr)
+            if (connResult != DUCKDB_SUCCESS) {
+                duckdb_close(dbPtr.value)
+                error("Failed to connect to DuckDB database")
+            }
+            Pair(dbPtr, connPtr)
+        } else {
+            // In-memory database
+            val dbPtr = nativeHeap.alloc<CPointerVarOf<duckdb_database>>()
+            val openResult = duckdb_open("", dbPtr.ptr)
+            if (openResult != DUCKDB_SUCCESS) {
+                error("Failed to open in-memory DuckDB database")
+            }
+            val connPtr = nativeHeap.alloc<CPointerVarOf<duckdb_connection>>()
+            val connResult = duckdb_connect(dbPtr.value, connPtr.ptr)
+            if (connResult != DUCKDB_SUCCESS) {
+                duckdb_close(dbPtr.value)
+                error("Failed to connect to in-memory DuckDB database")
+            }
+            Pair(dbPtr, connPtr)
+        }.let { (db, conn) ->
+            db to conn
+        }
+    )
+
+    actual fun query(sql: String, vararg args: Any?): Series<Any?> {
+        val conn = connVar ?: error("Not connected")
+
+        val stmtPtr = nativeHeap.alloc<CPointerVarOf<duckdb_prepared_statement>>()
+        val prepareResult = duckdb_prepare(conn.value, sql, stmtPtr.ptr)
+        if (prepareResult != DUCKDB_SUCCESS) {
+            error("Failed to prepare statement: $sql")
+        }
+
+        // Bind parameters if provided
+        args.forEachIndexed { index, arg ->
+            bindParameter(stmtPtr.value, index, arg)
+        }
+
+        val resultPtr = nativeHeap.alloc<CPointerVarOf<duckdb_result>>()
+        val executeResult = duckdb_execute_prepared(stmtPtr.value, resultPtr.ptr)
+
+        if (executeResult != DUCKDB_SUCCESS) {
+            val error = duckdb_result_error(resultPtr.value)?.toKString()
+            duckdb_destroy_prepare(stmtPtr.ptr)
+            duckdb_destroy_result(resultPtr.ptr)
+            error("Failed to execute query: $error")
+        }
+
+        // Extract first column
+        val rowCount = duckdb_row_count(resultPtr.ptr).toInt()
+        val values = mutableListOf<Any?>()
+
+        if (rowCount > 0) {
+            val columnType = duckdb_column_type(resultPtr.ptr, 0)
+            val nullMask = duckdb_nullmask_data(resultPtr.ptr, 0)
+            val columnData = duckdb_column_data(resultPtr.ptr, 0)
+
+            for (row in 0 until rowCount) {
+                if (nullMask != null && nullMask[row]) {
+                    values.add(null)
+                } else {
+                    values.add(extractValue(columnData, columnType, row))
+                }
+            }
+        }
+
+        duckdb_destroy_result(resultPtr.ptr)
+        duckdb_destroy_prepare(stmtPtr.ptr)
+
+        return values.size j { values[it] }
+    }
+
+    actual fun columns(sql: String, vararg args: Any?): Map<String, Series<Any?>> {
+        val conn = connVar ?: error("Not connected")
+
+        val stmtPtr = nativeHeap.alloc<CPointerVarOf<duckdb_prepared_statement>>()
+        val prepareResult = duckdb_prepare(conn.value, sql, stmtPtr.ptr)
+        if (prepareResult != DUCKDB_SUCCESS) {
+            error("Failed to prepare statement: $sql")
+        }
+
+        // Bind parameters if provided
+        args.forEachIndexed { index, arg ->
+            bindParameter(stmtPtr.value, index, arg)
+        }
+
+        val resultPtr = nativeHeap.alloc<CPointerVarOf<duckdb_result>>()
+        val executeResult = duckdb_execute_prepared(stmtPtr.value, resultPtr.ptr)
+
+        if (executeResult != DUCKDB_SUCCESS) {
+            val error = duckdb_result_error(resultPtr.value)?.toKString()
+            duckdb_destroy_prepare(stmtPtr.ptr)
+            duckdb_destroy_result(resultPtr.ptr)
+            error("Failed to execute query: $error")
+        }
+
+        val colCount = duckdb_column_count(resultPtr.ptr).toInt()
+        val rowCount = duckdb_row_count(resultPtr.ptr).toInt()
+
+        if (colCount == 0 || rowCount == 0) {
+            duckdb_destroy_result(resultPtr.ptr)
+            duckdb_destroy_prepare(stmtPtr.ptr)
+            return emptyMap()
+        }
+
+        val result = mutableMapOf<String, Series<Any?>>()
+
+        for (col in 0 until colCount) {
+            val colName = duckdb_column_name(resultPtr.ptr, col)?.toKString() ?: "col$col"
+            val columnType = duckdb_column_type(resultPtr.ptr, col)
+            val nullMask = duckdb_nullmask_data(resultPtr.ptr, col)
+            val columnData = duckdb_column_data(resultPtr.ptr, col)
+
+            val values = mutableListOf<Any?>()
+            for (row in 0 until rowCount) {
+                if (nullMask != null && nullMask[row]) {
+                    values.add(null)
+                } else {
+                    values.add(extractValue(columnData, columnType, row))
+                }
+            }
+            result[colName] = values.size j { values[it] }
+        }
+
+        duckdb_destroy_result(resultPtr.ptr)
+        duckdb_destroy_prepare(stmtPtr.ptr)
+
+        return result
+    }
+
+    actual fun execute(sql: String, vararg args: Any?): Long {
+        val conn = connVar ?: error("Not connected")
+
+        val stmtPtr = nativeHeap.alloc<CPointerVarOf<duckdb_prepared_statement>>()
+        val prepareResult = duckdb_prepare(conn.value, sql, stmtPtr.ptr)
+        if (prepareResult != DUCKDB_SUCCESS) {
+            error("Failed to prepare statement: $sql")
+        }
+
+        // Bind parameters if provided
+        args.forEachIndexed { index, arg ->
+            bindParameter(stmtPtr.value, index, arg)
+        }
+
+        val resultPtr = nativeHeap.alloc<CPointerVarOf<duckdb_result>>()
+        val executeResult = duckdb_execute_prepared(stmtPtr.value, resultPtr.ptr)
+
+        if (executeResult != DUCKDB_SUCCESS) {
+            val error = duckdb_result_error(resultPtr.value)?.toKString()
+            duckdb_destroy_prepare(stmtPtr.ptr)
+            duckdb_destroy_result(resultPtr.ptr)
+            error("Failed to execute query: $error")
+        }
+
+        val rowsChanged = duckdb_rows_changed(resultPtr.ptr)
+
+        duckdb_destroy_result(resultPtr.ptr)
+        duckdb_destroy_prepare(stmtPtr.ptr)
+
+        return rowsChanged
+    }
+
+    actual fun close() {
+        connVar?.let {
+            duckdb_disconnect(it.value)
+        }
+        dbVar?.let {
+            duckdb_close(it.value)
+        }
+    }
+
+    private fun bindParameter(stmt: duckdb_prepared_statement, index: Int, arg: Any?) {
+        if (arg == null) {
+            val result = duckdb_bind_null(stmt, index.toLong())
+            if (result != DUCKDB_SUCCESS) {
+                error("Failed to bind null parameter at index $index")
+            }
+            return
+        }
+
+        val result = when (arg) {
+            is Boolean -> duckdb_bind_boolean(stmt, index.toLong(), arg)
+            is Byte -> duckdb_bind_int8(stmt, index.toLong(), arg)
+            is Short -> duckdb_bind_int16(stmt, index.toLong(), arg)
+            is Int -> duckdb_bind_int32(stmt, index.toLong(), arg)
+            is Long -> duckdb_bind_int64(stmt, index.toLong(), arg)
+            is Float -> duckdb_bind_float(stmt, index.toLong(), arg)
+            is Double -> duckdb_bind_double(stmt, index.toLong(), arg)
+            is String -> duckdb_bind_varchar(stmt, index.toLong(), arg)
+            else -> error("Unsupported parameter type: ${arg::class.simpleName}")
+        }
+
+        if (result != DUCKDB_SUCCESS) {
+            error("Failed to bind parameter at index $index with value $arg")
+        }
+    }
+
+    private fun extractValue(data: CPointer<*>?, type: duckdb_type, row: Int): Any? {
+        if (data == null) return null
+
+        return when (type) {
+            DUCKDB_TYPE.DUCKDB_TYPE_BOOLEAN -> {
+                val ptr = data.reinterpret<BooleanVar>()
+                ptr[row]
+            }
+            DUCKDB_TYPE.DUCKDB_TYPE_TINYINT -> {
+                val ptr = data.reinterpret<ByteVar>()
+                ptr[row]
+            }
+            DUCKDB_TYPE.DUCKDB_TYPE_SMALLINT -> {
+                val ptr = data.reinterpret<ShortVar>()
+                ptr[row]
+            }
+            DUCKDB_TYPE.DUCKDB_TYPE_INTEGER -> {
+                val ptr = data.reinterpret<IntVar>()
+                ptr[row]
+            }
+            DUCKDB_TYPE.DUCKDB_TYPE_BIGINT -> {
+                val ptr = data.reinterpret<LongVar>()
+                ptr[row]
+            }
+            DUCKDB_TYPE.DUCKDB_TYPE_UTINYINT -> {
+                val ptr = data.reinterpret<UByteVar>()
+                ptr[row]
+            }
+            DUCKDB_TYPE.DUCKDB_TYPE_USMALLINT -> {
+                val ptr = data.reinterpret<UShortVar>()
+                ptr[row]
+            }
+            DUCKDB_TYPE.DUCKDB_TYPE_UINTEGER -> {
+                val ptr = data.reinterpret<UIntVar>()
+                ptr[row]
+            }
+            DUCKDB_TYPE.DUCKDB_TYPE_UBIGINT -> {
+                val ptr = data.reinterpret<ULongVar>()
+                ptr[row]
+            }
+            DUCKDB_TYPE.DUCKDB_TYPE_FLOAT -> {
+                val ptr = data.reinterpret<FloatVar>()
+                ptr[row]
+            }
+            DUCKDB_TYPE.DUCKDB_TYPE_DOUBLE -> {
+                val ptr = data.reinterpret<DoubleVar>()
+                ptr[row]
+            }
+            DUCKDB_TYPE.DUCKDB_TYPE_VARCHAR -> {
+                val ptr = data.reinterpret<CPointerVar<ByteVar>>()
+                ptr[row]?.toKString()
+            }
+            else -> {
+                // Fallback to string representation for complex types
+                val ptr = data.reinterpret<CPointerVar<ByteVar>>()
+                ptr[row]?.toKString()
+            }
+        }
+    }
+}
+
+actual fun duckOpen(path: String): DuckSeries {
+    return DuckSeries(path)
+}
+
+actual fun duckMemory(): DuckSeries {
+    return DuckSeries(null)
+}

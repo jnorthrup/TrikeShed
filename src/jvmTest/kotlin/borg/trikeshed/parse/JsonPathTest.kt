@@ -64,7 +64,7 @@ class JsonPathTest {
             val src = ("""[0,1,2,3]""").toSeries()
             val depths = mutableListOf<Int>()
             val element = index(src, depths)
-            val path: JsPath = _root_ide_package_.borg.trikeshed.common.collections._l[0].toJsPath
+            val path: JsPath = _l[0].toJsPath
             val expected = 0.0
             val context = element j src
             val result = jsPath(context, path, true, depths)
@@ -74,7 +74,7 @@ class JsonPathTest {
             val src = (""" [0 , 1,2 , 3 ] """).toSeries()
             val depths = mutableListOf<Int>()
             val element = index(src, depths)
-            val path: JsPath = _root_ide_package_.borg.trikeshed.common.collections._l[0].toJsPath
+            val path: JsPath = _l[0].toJsPath
             val result = jsPath(element j src, path, true, depths)
             val expected = 0.0
             assertEquals(expected, result)
@@ -84,21 +84,21 @@ class JsonPathTest {
     fun test0() {
         val src = ("""[0]""").toSeries()
         val element = index(src)
-        val path: JsPath = _root_ide_package_.borg.trikeshed.common.collections._l[0].toJsPath
+        val path: JsPath = _l[0].toJsPath
         val expected = 0.0
         val result = jsPath(element j src, path, true, mutableListOf())
         assertEquals(expected, result)
 
     }
     @Test fun test00() { val src = ("""{"0":0}""").toSeries()
-        val result = jsPath(index(src) j src, _root_ide_package_.borg.trikeshed.common.collections._l[0].toJsPath, true, mutableListOf())
+        val result = jsPath(index(src) j src, _l[0].toJsPath, true, mutableListOf())
         assertEquals(0.0, result) }
 
     @Test
     fun test1() {
         val src = ("""{"a":{"b":[1,2,3,4,5],"c":"hi","d":true},"e":false}""").toSeries()
         val element = index(src)
-        val path: JsPath = _root_ide_package_.borg.trikeshed.common.collections._l["a", "b", 2].toJsPath
+        val path: JsPath = _l["a", "b", 2].toJsPath
         val result = jsPath(element j src, path, true, mutableListOf())
         val expected = 3.0
         assertEquals(expected, result)
@@ -110,7 +110,7 @@ class JsonPathTest {
     fun test2() {
         val src = ("""{"a":{"b":[1,2,3,4,{"meh":[4,3,2,1]}],"c":"hi","d":true},"e":false}""").toSeries()
         val element = index(src)
-        val path: JsPath = _root_ide_package_.borg.trikeshed.common.collections._l[("a"), ("b"), (4), 0, (1)].toJsPath
+        val path: JsPath = _l[("a"), ("b"), (4), 0, (1)].toJsPath
         val result = jsPath(element j src, path, true, mutableListOf())
         val expected = 3.0
         assertEquals(expected, result)
@@ -119,7 +119,7 @@ class JsonPathTest {
     fun `handle empty jsarray`() {
         val src = ("""[0,[],[1],[[[ ]]]] """).toSeries()
         val element = index(src)
-        val path: JsPath = _root_ide_package_.borg.trikeshed.common.collections._l[3,0,0].toJsPath
+        val path: JsPath = _l[3,0,0].toJsPath
         val result = jsPath(element j src, path, true, mutableListOf())
         if (result is Join<*,*>) {
             val r = result
@@ -131,7 +131,7 @@ class JsonPathTest {
     fun `handle empty jsObject`() {
         val src = ("""[0,[],[1],[[{ }]]] """).toSeries()
         val element = index(src)
-        val path: JsPath = _root_ide_package_.borg.trikeshed.common.collections._l[3, 0, 0].toJsPath
+        val path: JsPath = _l[3, 0, 0].toJsPath
         val result = jsPath(element j src, path, true, mutableListOf())
         if (result is Map<*, *>) {
             val r = result
@@ -147,7 +147,7 @@ class JsonPathTest {
 
         val src = systemJson.toSeries()
         val element = index(src)
-        val path: JsPath = _root_ide_package_.borg.trikeshed.common.collections._l["bodies", 0, "name"].toJsPath
+        val path: JsPath = _l["bodies", 0, "name"].toJsPath
         val result = jsPath(element j src, path, true, mutableListOf())
         val expected = "Ooscs Chreou AA-A h0"
         assertEquals(expected, result)
