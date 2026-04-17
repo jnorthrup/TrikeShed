@@ -22,10 +22,52 @@ private object WasmNoopSeekHandle : SeekHandle {
 }
 
 actual object System {
-    actual fun getenv(name: String, string: String): String? = null
+//  System  actual fun getenv(name: String, string: String): String? = null
+
+/*    actual val homedir: String
+        get() = "/"*/
+
+    actual fun getenv(name: String, defaultVal: String?): String? {
+        // Try Node.js process.env, then Deno.env.get, then a user-provided global map __trikeshedEnv
+        val g: dynamic = js("globalThis")
+        try {
+            val process = g.process
+            if (process != undefined && process != null) {
+                val envObj = process.env
+                if (envObj != undefined && envObj != null) {
+                    val v = envObj[name]
+                    if (v != undefined && v != null) return v as String
+                }
+            }
+        } catch (_: Throwable) {
+        }
+
+        try {
+            val deno = js("typeof Deno !== 'undefined' ? Deno : undefined")
+            if (deno != undefined && deno != null) {
+                val v = deno.env?.get(name)
+                if (v != undefined && v != null) return v as String
+            }
+        } catch (_: Throwable) {
+        }
+
+        try {
+            val envMap = g.__trikeshedEnv
+            if (envMap != undefined && envMap != null) {
+                val v = envMap[name]
+                if (v != undefined && v != null) return v as String
+            }
+        } catch (_: Throwable) {
+        }
+
+        return defaultVal
+    }
 
     actual val homedir: String
-        get() = "/"
+        get() {
+            // Prefer HOME, then USERPROFILE (Windows), else use root as a safe fallback for WASM
+            return getenv("HOME", getenv("USERPROFILE", "/")) ?: "/"
+        }
 }
 
 actual object Files {
