@@ -1,4 +1,5 @@
 @file:Suppress("UNCHECKED_CAST", "ObjectPropertyName")
+@file:OptIn(ExperimentalUnsignedTypes::class)
 
 package borg.trikeshed.lib
 
@@ -253,8 +254,6 @@ value class IterableSeries<A>(val s: Series<A>) : Iterable<A>, Series<A> by s {
 /**
  * a macro to wrap as Iterable
  *
- * provides a big bright visible symbol that makes
- * conversions easy to follow along during reading the code
  */
 val <T> Series<T>.view: IterableSeries<T> get() = this as? IterableSeries ?: IterableSeries(this)
 

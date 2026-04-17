@@ -22,81 +22,23 @@ private object WasmNoopSeekHandle : SeekHandle {
 }
 
 actual object System {
-//  System  actual fun getenv(name: String, string: String): String? = null
-
-/*    actual val homedir: String
-        get() = "/"*/
 
     actual fun getenv(name: String, defaultVal: String?): String? {
-        // Try Node.js process.env, then Deno.env.get, then a user-provided global map __trikeshedEnv
-        val g: dynamic = js("typeof globalThis !== 'undefined' ? globalThis : null")
-        try {
-            val process: dynamic = js("typeof process !== 'undefined' ? process : null")
-            if (process != null) {
-                val envObj: dynamic = process.env
-                if (envObj != null) {
-                    val v = envObj[name]
-                    if (v != null) return v as String
-                }
-            }
-        } catch (_: Throwable) {
-        }
-
-        try {
-            val deno: dynamic = js("typeof Deno !== 'undefined' ? Deno : null")
-            if (deno != null) {
-                val v = deno.env?.get(name)
-                if (v != null) return v as String
-            }
-        } catch (_: Throwable) {
-        }
-
-        try {
-            if (g != null) {
-                val envMap: dynamic = g.__trikeshedEnv
-                if (envMap != null) {
-                    val v = envMap[name]
-                    if (v != null) return v as String
-                }
-            }
-        } catch (_: Throwable) {
-        }
-
+        // Kotlin/WASM JS interop is restricted; avoid dynamic/js calls here.
+        // For WASM, prefer returning the provided default. JS harnesses may set env via external globals.
         return defaultVal
     }
 
-    // Runtime helpers to configure a process-like env map for WASM/JS contexts
-    fun setEnv(name: String, value: String?) {
-        val g: dynamic = js("typeof globalThis !== 'undefined' ? globalThis : null")
-        if (g != null) {
-            var envMap: dynamic = g.__trikeshedEnv
-            if (envMap == null) {
-                envMap = js("{}")
-                g.__trikeshedEnv = envMap
-            }
-            envMap[name] = value
-        }
-    }
+    // Runtime helpers are no-ops in WASM. Tests or harnesses that need env variables
+    // should configure them on the host (e.g., globalThis.__trikeshedEnv) before running.
+    fun setEnv(name: String, value: String?) { /* no-op */ }
 
-    fun setEnvMap(map: dynamic) {
-        val g: dynamic = js("typeof globalThis !== 'undefined' ? globalThis : null")
-        if (g != null) {
-            g.__trikeshedEnv = map
-        }
-    }
+    fun setEnvMap(map: Map<String, String>?) { /* no-op */ }
 
-    fun clearEnv() {
-        val g: dynamic = js("typeof globalThis !== 'undefined' ? globalThis : null")
-        if (g != null) {
-            g.__trikeshedEnv = js("{}")
-        }
-    }
+    fun clearEnv() { /* no-op */ }
 
     actual val homedir: String
-        get() {
-            // Prefer HOME, then USERPROFILE (Windows), else use root as a safe fallback for WASM
-            return getenv("HOME", getenv("USERPROFILE", "/")) ?: "/"
-        }
+        get() = getenv("HOME", getenv("USERPROFILE", "/")) ?: "/"
 }
 
 actual object Files {

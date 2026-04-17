@@ -8,17 +8,19 @@ import kotlin.collections.contains
 class Trie(var root: Map<String, Node> = linkedMapOf()) {
     private var freeze: Boolean = false
     fun add(v: Int, vararg values: String) {
-        var children = root
-        for ((i, value) in values.withIndex()) {
+        var children: Map<String, Node> = root
+
+        values.forEachIndexed { i: Int, value: String ->
             val isLeaf = i == values.size - 1
             // add new node
             if (!children.contains(value)) {
-                val node = Node(value, isLeaf, v)
+                val node = Node(pathSeg = value, leaf = isLeaf, payload = v)
                 (children as MutableMap)[value] = node
                 children = node.children
             } else {
                 // exist, so traverse current path + set isLeaf if needed
-                val node = children[value]!!
+                val node: Node = children[value]!!
+
                 if (isLeaf != node.leaf) {
                     node.leaf = isLeaf
                 }
@@ -32,10 +34,10 @@ class Trie(var root: Map<String, Node> = linkedMapOf()) {
     operator fun get(vararg key: String): Int? = search(*key)?.payload
 
     fun frez(n: Node) {
-//        if (n.leaf) return
-        (n.children.entries).let { cnodes ->
-            n.children = borg.trikeshed.common.collections.associative.trie.ArrayMap.Companion.sorting(n.children)
-            for ((_, v) in cnodes) frez(v)
+
+        (n.children.entries).let { cnodes: Set<Map.Entry<String, Node>> ->
+            n.children = ArrayMap.sorting(n.children)
+            for ((_: String, v: Node) in cnodes) frez(v)
         }
     }
 
@@ -43,21 +45,21 @@ class Trie(var root: Map<String, Node> = linkedMapOf()) {
         if (!freeze) {
             freeze = true
             root.values.forEach { frez(it) }
-            root = borg.trikeshed.common.collections.associative.trie.ArrayMap.Companion.sorting(root)
+            root = ArrayMap.sorting(root)
         }
     }
 
     fun search(vararg segments: String): Node? {
-        var children = root// exist, so traverse current path, ending if is last value, and is leaf node
+        var children: Map<String, Node> = root// exist, so traverse current path, ending if is last value, and is leaf node
         // not at end, continue traversing
         // add new node
         if (children.isNotEmpty()) {
-            for ((i, value) in segments.withIndex()) {
+            for ((i: Int, value: String) in segments.withIndex()) {
                 val atLeaf = i == segments.lastIndex
                 // add new node
                 if (children.contains(value)) {
                     // exist, so traverse current path, ending if is last value, and is leaf node
-                    val node = children[value]!!
+                    val node: Node = children[value]!!
                     if (atLeaf) return if (node.leaf) {
                         node
                     } else {
