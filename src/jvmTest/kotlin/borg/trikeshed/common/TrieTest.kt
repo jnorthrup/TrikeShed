@@ -14,7 +14,7 @@ class TrieTest {
 
     @Test
     fun stringTrie() {
-        val trie = _root_ide_package_.borg.trikeshed.common.collections.associative.trie.Trie()
+        val trie = Trie()
         assertFalse(trie.contains(*emptyArray()))
 
         trie.add(d, "a", "b", "c")
