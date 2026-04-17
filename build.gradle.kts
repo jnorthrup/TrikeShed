@@ -118,12 +118,16 @@ kotlin {
             dependencies {
                 api("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
                 api("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1-0.6.x-compat")
+
             }
             // The old pseudo-common xio surface is retired in favor of JVM/NIO transport boundaries.
             kotlin.exclude("one/xio/NetworkChannel.kt")
             if (focusedTransportSlice) {
                 kotlin.exclude("borg/trikeshed/grad/**")
             }
+
+            // Include DuckDB local sources (if present) so DuckSeries expect/actuals compile in root build.
+            kotlin.srcDir("libs/duckdb/src/commonMain/kotlin")
         }
         val commonTest by getting {
             dependencies {
@@ -136,7 +140,10 @@ kotlin {
         }
         val nativeMain by creating { dependsOn(commonMain) }
         val nativeTest by creating { dependsOn(commonTest) }
-        val posixMain by creating { dependsOn(nativeMain) }
+        val posixMain by creating { dependsOn(nativeMain)
+            // Include DuckDB native/posix actuals when present so native targets compile
+            kotlin.srcDir("libs/duckdb/src/posixMain/kotlin")
+        }
         val posixTest by creating {
             dependsOn(nativeTest)
             // Current native duck test references unavailable symbols.
@@ -160,6 +167,12 @@ kotlin {
             // Include JMH benchmark sources in jvmMain for compilation
             kotlin.srcDir("src/jmhMain/kotlin")
             resources.srcDir("src/jmhMain/resources")
+
+            // Include local DuckDB JVM sources when available so tests can compile
+            kotlin.srcDir("libs/duckdb/src/jvmMain/kotlin")
+            // Exclude brc helpers and algorithms from the composite inclusion — those rely on other internal
+            // modules and cause compilation errors when pulled into the root jvmMain.
+            kotlin.exclude("borg/trikeshed/brc/**")
 
             // BRC-related excludes removed from root build (handled in specialized build or local modules)
             if (focusedTransportSlice) {

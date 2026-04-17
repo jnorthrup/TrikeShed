@@ -1,0 +1,1 @@
+{Bridgetown=26.9/27.6/28.3, Bulawayo=8.9/15.5/22.1, Conakry=29.8/30.5/31.2, Cracow=-5.4/3.6/12.6, Hamburg=-7.3/2.4/12.0, Istanbul=6.2/15.8/23.0, Palembang=35.6/37.2/38.8, Roseau=30.1/32.3/34.4, St. John's=-2.1/6.6/15.2}
