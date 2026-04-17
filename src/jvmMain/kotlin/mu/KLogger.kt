@@ -1,7 +1,7 @@
 package mu
 
+import borg.trikeshed.lib.*
 import org.slf4j.Logger
-import vec.util.logDebug
 
 class KLogger : Logger {
     fun debug(debugTxt: () -> String) {
