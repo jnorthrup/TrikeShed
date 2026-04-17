@@ -11,7 +11,7 @@ plugins {
 group = "org.bereft"
 version = "1.0"
 val enableNativeSharedLib = providers.gradleProperty("native.sharedLib").orNull == "true"
-val enableBrcTests = providers.gradleProperty("enableBrcTests").orNull == "true"
+
 val focusedTransportSlice = providers.gradleProperty("focusedTransportSlice").orNull == "true"
 
 repositories {
@@ -75,25 +75,8 @@ kotlin {
                 binaries.executable("brcIsamNative") {
                     entryPoint = "borg.trikeshed.brc.brcIsamNativeMain"
                 }
-                val duckdbHeader = file("/opt/homebrew/Cellar/duckdb/1.4.4/include/duckdb.h")
-                if (duckdbHeader.exists()) {
-                    compilations.getByName("main") {
-                        cinterops {
-                            create("duckdb") {
-                                defFile(file("duckdb_interop/duckdb.def"))
-                                compilerOpts("-I/opt/homebrew/include")
-                            }
-                        }
-                    }
-                    compilations.getByName("test") {
-                        cinterops {
-                            create("duckdb") {
-                                defFile(file("duckdb_interop/duckdb.def"))
-                                compilerOpts("-I/opt/homebrew/include")
-                            }
-                        }
-                    }
-                }
+                // Local DuckDB cinterop removed from root build; if a local libs/duckdb is available,
+                // include it via settings.gradle.kts as a composite build and add a proper cinterop there.
             }
         }
     } else if (hostOs == "Linux") {
@@ -118,13 +101,7 @@ kotlin {
             binaries.executable("brcIsamNative") {
                 entryPoint = "borg.trikeshed.brc.brcIsamNativeMain"
             }
-            compilations.getByName("main") {
-                cinterops {
-                    create("duckdb") {
-                        defFile(file("duckdb_interop/duckdb.def"))
-                    }
-                }
-            }
+
         }
     }
 
@@ -160,9 +137,7 @@ kotlin {
 
         val jvmMain by getting {
             dependencies {
-                // DuckDB JDBC - used for BRC benchmarks and DuckSeries tests
-                // Arrangement note: DuckDB integration is intended for test/benchmark use only
-                implementation("org.duckdb:duckdb_jdbc:1.5.1.0")
+                // DuckDB JDBC removed from root build; use version catalog or local libs/duckdb if present
 
                 // JMH dependencies for benchmarking
                 implementation("org.openjdk.jmh:jmh-core:1.37")
@@ -178,15 +153,11 @@ kotlin {
             kotlin.srcDir("src/jmhMain/kotlin")
             resources.srcDir("src/jmhMain/resources")
 
-            // WIP experimental implementations; excluded from default build.
-            kotlin.exclude("borg/trikeshed/brc/BrcDiscoveryOrder.kt")
-            kotlin.exclude("borg/trikeshed/brc/BrcHashArray.kt")
-            kotlin.exclude("borg/trikeshed/brc/BrcHeapBisect.kt")
-            kotlin.exclude("borg/trikeshed/brc/BrcPure.kt")
+            // BRC-related excludes removed from root build (handled in specialized build or local modules)
             if (focusedTransportSlice) {
                 kotlin.exclude("one/xio/AsioVisitor.kt")
-                kotlin.exclude("borg/trikeshed/brc/BrcDuckDbJvm.kt")
-                kotlin.exclude("borg/trikeshed/brc/BrcBenchmark.kt")
+
+
                 kotlin.exclude("one/xio/HttpHeaders.kt")
                 kotlin.exclude("one/xio/HttpMethod.kt")
                 kotlin.exclude("rxf/server/CookieRfc6265Util.kt")
@@ -232,13 +203,7 @@ kotlin {
         val wasmJsMain by getting { dependsOn(commonMain) }
         val wasmJsTest by getting { dependsOn(commonTest) }
 
-        // Keep heavy 1BRC regression tests opt-in for local benchmarking.
-        if (enableBrcTests) {
-            jvmTest {
-                kotlin.srcDir("src/brcTest/kotlin")
-                resources.srcDir("src/brcTest/resources")
-            }
-        }
+        // BRC regression test source-set removed from root build. Use dedicated build or set up local module if needed.
     }
 }
 
@@ -246,7 +211,7 @@ afterEvaluate {
     if (System.getProperty("os.name") == "Mac OS X") {
         val macosTarget = kotlin.targets.getByName("macos") as KotlinNativeTarget
         macosTarget.binaries.all {
-            linkerOpts.addAll(listOf("-L/opt/homebrew/lib", "-lduckdb"))
+            linkerOpts.addAll(listOf("-L/opt/homebrew/lib"))
         }
     }
 
@@ -268,28 +233,7 @@ afterEvaluate {
         }
     }
 
-    if (enableBrcTests) {
-        val jvmTestTask = tasks.named<Test>("jvmTest")
-        jvmTestTask.configure {
-            // Keep fast unit-test feedback in jvmTest; run BRC harness via brcTest.
-            exclude("**/BrcHarnessTest.class")
-        }
-
-        // configure regression test task
-        tasks.register<Test>("brcTest") {
-            description = "Runs the BRC regression/acceptance tests"
-            group = "verification"
-            testClassesDirs = jvmTestTask.get().testClassesDirs
-            classpath = jvmTestTask.get().classpath
-            include("**/BrcHarnessTest.class")
-            shouldRunAfter(jvmTestTask)
-        }
-
-        // ensure brcTest runs with "check"
-        tasks.named("check") {
-            dependsOn("brcTest")
-        }
-    }
+    // BRC regression tasks removed from root build. Use a dedicated task or module for BRC benchmarking.
 
     tasks.register<Test>("focusedTransportTest") {
         description = "Runs the focused JVM transport/routing slice."
@@ -332,7 +276,7 @@ afterEvaluate {
             classpath += files(jvmComp.output.classesDirs)
             classpath += files(tasks.getByName("jvmJar").outputs.files)
 
-            mainClass.set("borg.trikeshed.brc.BrcBenchmarkKt")
+            mainClass.set("org.openjdk.jmh.Main")
         }
 
     // Combined benchmark task
