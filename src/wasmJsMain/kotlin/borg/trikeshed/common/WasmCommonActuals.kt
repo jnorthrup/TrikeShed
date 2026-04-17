@@ -29,38 +29,67 @@ actual object System {
 
     actual fun getenv(name: String, defaultVal: String?): String? {
         // Try Node.js process.env, then Deno.env.get, then a user-provided global map __trikeshedEnv
-        val g: dynamic = js("globalThis")
+        val g: dynamic = js("typeof globalThis !== 'undefined' ? globalThis : null")
         try {
-            val process = g.process
-            if (process != undefined && process != null) {
-                val envObj = process.env
-                if (envObj != undefined && envObj != null) {
+            val process: dynamic = js("typeof process !== 'undefined' ? process : null")
+            if (process != null) {
+                val envObj: dynamic = process.env
+                if (envObj != null) {
                     val v = envObj[name]
-                    if (v != undefined && v != null) return v as String
+                    if (v != null) return v as String
                 }
             }
         } catch (_: Throwable) {
         }
 
         try {
-            val deno = js("typeof Deno !== 'undefined' ? Deno : undefined")
-            if (deno != undefined && deno != null) {
+            val deno: dynamic = js("typeof Deno !== 'undefined' ? Deno : null")
+            if (deno != null) {
                 val v = deno.env?.get(name)
-                if (v != undefined && v != null) return v as String
+                if (v != null) return v as String
             }
         } catch (_: Throwable) {
         }
 
         try {
-            val envMap = g.__trikeshedEnv
-            if (envMap != undefined && envMap != null) {
-                val v = envMap[name]
-                if (v != undefined && v != null) return v as String
+            if (g != null) {
+                val envMap: dynamic = g.__trikeshedEnv
+                if (envMap != null) {
+                    val v = envMap[name]
+                    if (v != null) return v as String
+                }
             }
         } catch (_: Throwable) {
         }
 
         return defaultVal
+    }
+
+    // Runtime helpers to configure a process-like env map for WASM/JS contexts
+    fun setEnv(name: String, value: String?) {
+        val g: dynamic = js("typeof globalThis !== 'undefined' ? globalThis : null")
+        if (g != null) {
+            var envMap: dynamic = g.__trikeshedEnv
+            if (envMap == null) {
+                envMap = js("{}")
+                g.__trikeshedEnv = envMap
+            }
+            envMap[name] = value
+        }
+    }
+
+    fun setEnvMap(map: dynamic) {
+        val g: dynamic = js("typeof globalThis !== 'undefined' ? globalThis : null")
+        if (g != null) {
+            g.__trikeshedEnv = map
+        }
+    }
+
+    fun clearEnv() {
+        val g: dynamic = js("typeof globalThis !== 'undefined' ? globalThis : null")
+        if (g != null) {
+            g.__trikeshedEnv = js("{}")
+        }
     }
 
     actual val homedir: String
