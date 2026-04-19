@@ -1,6 +1,7 @@
 package borg.trikeshed.parse.json
 
 import borg.trikeshed.common.TypeEvidence
+import borg.trikeshed.cursor.RowVec
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.size
 import borg.trikeshed.lib.toSeries
@@ -16,7 +17,8 @@ object JsonSupport {
     fun parse(
         text: String,
         nodeEvidence: MutableList<TypeEvidence>? = null,
-    ): Any? = JsonParser.reify(text.toSeries(), nodeEvidence)
+        rowVecCallback: ((RowVec) -> Unit)? = null,
+    ): Any? = JsonParser.reify(text.toSeries(), nodeEvidence, rowVecCallback)
 
     fun index(
         text: String,
