@@ -42,3 +42,4 @@ default/
 .git.bfg-report/
 .qwen/
 /.claude/
+.DS_Store
