@@ -12,10 +12,6 @@ group = "org.bereft"
 version = "1.0"
 val enableNativeSharedLib = providers.gradleProperty("native.sharedLib").orNull == "true"
 
-// Opt-in gate for building BRC native executables. Defaults to false so root build
-// won't attempt to link BRC binaries unless explicitly enabled.
-val enableBrcBinaries = providers.gradleProperty("enableBrcBinaries").orNull == "true"
-
 val focusedTransportSlice = providers.gradleProperty("focusedTransportSlice").orNull == "true"
 
 repositories {
@@ -64,22 +60,8 @@ kotlin {
                         baseName = "trikeshed"
                     }
                 }
-                if (enableBrcBinaries) {
-                    binaries.executable("brcCsvNative") {
-                        entryPoint = "borg.trikeshed.brc.brcCsvNativeMain"
-                    }
-                    binaries.executable("autoresearchNative") {
-                        entryPoint = "borg.trikeshed.autoresearch.autoresearchNativeMain"
-                    }
-                    binaries.executable("brcCursorNative") {
-                        entryPoint = "borg.trikeshed.brc.brcCursorNativeMain"
-                    }
-                    binaries.executable("brcDuckDbNative") {
-                        entryPoint = "borg.trikeshed.brc.brcDuckDbNativeMain"
-                    }
-                    binaries.executable("brcIsamNative") {
-                        entryPoint = "borg.trikeshed.brc.brcIsamNativeMain"
-                    }
+                binaries.executable("autoresearchNative") {
+                    entryPoint = "borg.trikeshed.autoresearch.autoresearchNativeMain"
                 }
                 // Local DuckDB cinterop removed from root build; if a local libs/duckdb is available,
                 // include it via settings.gradle.kts as a composite build and add a proper cinterop there.
@@ -92,22 +74,8 @@ kotlin {
                     baseName = "trikeshed"
                 }
             }
-            if (enableBrcBinaries) {
-                binaries.executable("brcCsvNative") {
-                    entryPoint = "borg.trikeshed.brc.brcCsvNativeMain"
-                }
-                binaries.executable("autoresearchNative") {
-                    entryPoint = "borg.trikeshed.autoresearch.autoresearchNativeMain"
-                }
-                binaries.executable("brcCursorNative") {
-                    entryPoint = "borg.trikeshed.brc.brcCursorNativeMain"
-                }
-                binaries.executable("brcDuckDbNative") {
-                    entryPoint = "borg.trikeshed.brc.brcDuckDbNativeMain"
-                }
-                binaries.executable("brcIsamNative") {
-                    entryPoint = "borg.trikeshed.brc.brcIsamNativeMain"
-                }
+            binaries.executable("autoresearchNative") {
+                entryPoint = "borg.trikeshed.autoresearch.autoresearchNativeMain"
             }
 
         }
@@ -170,11 +138,7 @@ kotlin {
 
             // Include local DuckDB JVM sources when available so tests can compile
             kotlin.srcDir("libs/duckdb/src/jvmMain/kotlin")
-            // Exclude brc helpers and algorithms from the composite inclusion — those rely on other internal
-            // modules and cause compilation errors when pulled into the root jvmMain.
-            kotlin.exclude("borg/trikeshed/brc/**")
 
-            // BRC-related excludes removed from root build (handled in specialized build or local modules)
             if (focusedTransportSlice) {
                 kotlin.exclude("one/xio/AsioVisitor.kt")
 
@@ -223,8 +187,6 @@ kotlin {
         val jsTest by getting { dependsOn(commonTest) }
         val wasmJsMain by getting { dependsOn(commonMain) }
         val wasmJsTest by getting { dependsOn(commonTest) }
-
-        // BRC regression test source-set removed from root build. Use dedicated build or set up local module if needed.
     }
 }
 
@@ -235,26 +197,6 @@ afterEvaluate {
             linkerOpts.addAll(listOf("-L/opt/homebrew/lib"))
         }
     }
-
-    // Task to print the JVM runtime classpath (used by brc harness scripts)
-    tasks.register("printJvmClasspath") {
-        dependsOn("jvmJar")
-        doLast {
-            val jvmMain =
-                kotlin.targets
-                    .getByName("jvm")
-                    .compilations
-                    .getByName("main")
-            val cp = jvmMain.runtimeDependencyFiles!!.files.joinToString(":") { it.absolutePath }
-            val jar =
-                tasks
-                    .getByName("jvmJar")
-                    .outputs.files.singleFile.absolutePath
-            println("$jar:$cp")
-        }
-    }
-
-    // BRC regression tasks removed from root build. Use a dedicated task or module for BRC benchmarking.
 
     tasks.register<Test>("focusedTransportTest") {
         description = "Runs the focused JVM transport/routing slice."

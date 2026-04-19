@@ -312,7 +312,7 @@ object CSVUtil {
      * Sample [file] for TypeEvidence, deduce column types, then return a [StreamSpec]
      * whose [StreamSpec.rows] streams typed [RowVec]s lazily without materialising.
      *
-     * Suitable for 1BRC-scale files (832M rows). Uses direct byte access on [LongSeries].
+     * Suitable for very large files. Uses direct byte access on [LongSeries].
      */
     fun streamSpec(
         file: LongSeries<Byte>,
