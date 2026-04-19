@@ -1,6 +1,6 @@
 package gk.kademlia.bitops.impl
 
-import gk.kademlia.bitops.BitOps
+import borg.trikeshed.platform.bitops.BitOps
 
 object ULongBitOps : BitOps<ULong> {
     override val one: ULong = 1.toULong()

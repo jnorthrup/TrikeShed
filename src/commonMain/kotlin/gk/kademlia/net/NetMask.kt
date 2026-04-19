@@ -2,7 +2,7 @@
 
 package gk.kademlia.net
 
-import gk.kademlia.bitops.BitOps
+import borg.trikeshed.platform.bitops.BitOps
 
 interface NetMask<P : Comparable<P>> {
 
@@ -43,7 +43,7 @@ interface NetMask<P : Comparable<P>> {
         (0 until bits).fold(0) { acc, i ->
             if (one == and(one, shr(xor1, i)))
                 acc.inc() else acc
-        }.toInt()
+        }
     }
 
     companion object {

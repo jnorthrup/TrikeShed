@@ -1,6 +1,6 @@
 package gk.kademlia.bitops.impl
 
-import gk.kademlia.bitops.BitOps
+import borg.trikeshed.platform.bitops.BitOps
 import kotlin.experimental.and
 import kotlin.experimental.xor
 

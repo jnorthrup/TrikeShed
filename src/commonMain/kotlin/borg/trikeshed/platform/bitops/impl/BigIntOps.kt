@@ -1,6 +1,6 @@
-package gk.kademlia.bitops.impl
+package borg.trikeshed.platform.bitops.impl
 
-import gk.kademlia.bitops.BitOps
+import borg.trikeshed.platform.bitops.BitOps
 import borg.trikeshed.num.BigInt as BigInteger
 
 object BigIntOps : BitOps<BigInteger> {

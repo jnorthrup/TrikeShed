@@ -1,8 +1,8 @@
 package borg.trikeshed.cursor
 
-import kotlinx.datetime.Clock
+import kotlin.time.Clock.System
 
 /**
  * POSIX implementation of currentTimeMillis.
  */
-actual fun currentTimeMillis(): Long = Clock.System.now().toEpochMilliseconds()
+actual fun currentTimeMillis(): Long = System.now().toEpochMilliseconds()

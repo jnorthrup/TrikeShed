@@ -1,6 +1,6 @@
 package gk.kademlia.bitops.impl
 
-import gk.kademlia.bitops.BitOps
+import borg.trikeshed.platform.bitops.BitOps
 
 object UIntBitOps : BitOps<UInt> {
     override val one: UInt = 1.toUInt()

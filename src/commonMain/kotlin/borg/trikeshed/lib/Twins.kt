@@ -3,10 +3,10 @@ package borg.trikeshed.lib
 import kotlin.jvm.JvmInline
 
 
-inline infix fun Int.j(b: Int): Twin<Int> = TwInt(((this.toLong() shl 32) or (b.toLong())))
-inline infix fun Short.j(b: Short): Twin<Short> = Twhort(((this.toInt() shl 16) or (b.toInt())))
-inline infix fun Byte.j(b: Byte): Twin<Byte> = Twyte(((this.toInt() shl 8) or (b.toInt())).toShort())
-inline infix fun Char.j(b: Char): Twin<Char> = Twhar(((this.code shl 16) or (b.code)))
+infix fun Int.j(b: Int): Twin<Int> = TwInt(((this.toLong() shl 32) or (b.toLong())))
+infix fun Short.j(b: Short): Twin<Short> = Twhort(((this.toInt() shl 16) or (b.toInt())))
+infix fun Byte.j(b: Byte): Twin<Byte> = Twyte(((this.toInt() shl 8) or (b.toInt())).toShort())
+infix fun Char.j(b: Char): Twin<Char> = Twhar(((this.code shl 16) or (b.code)))
 
 
 

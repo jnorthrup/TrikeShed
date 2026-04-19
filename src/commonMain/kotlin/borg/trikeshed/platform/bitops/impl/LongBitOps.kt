@@ -1,6 +1,6 @@
-package gk.kademlia.bitops.impl
+package borg.trikeshed.platform.bitops.impl
 
-import gk.kademlia.bitops.BitOps
+import borg.trikeshed.platform.bitops.BitOps
 
 object LongBitOps : BitOps<Long> {
     override val one: Long = 1.toLong()

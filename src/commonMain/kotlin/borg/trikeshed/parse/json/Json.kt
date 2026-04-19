@@ -1,4 +1,5 @@
-@file:Suppress("ControlFlowWithEmptyBody")
+@file:Suppress("ControlFlowWithEmptyBody", "UNCHECKED_CAST")
+
 
 package borg.trikeshed.parse.json
 
@@ -34,11 +35,11 @@ private fun parseJsonNumber(src: CharSeries): Any? {
     if (text.isEmpty()) return null
     if (text == "-0") return -0.0
 
-    if (text.contains('.') || text.contains('e', ignoreCase = true)) 
+    if (text.contains('.') || text.contains('e', ignoreCase = true))
         return text.toDoubleOrNull()
 
     val longValue = text.toLongOrNull()
-    if (longValue != null) 
+    if (longValue != null)
         return if (longValue in Int.MIN_VALUE..Int.MAX_VALUE) longValue.toInt() else longValue
 
     return text.toDoubleOrNull()
@@ -142,20 +143,20 @@ object JsonParser {
                 val (openIdx: Int, closeIdx: Int) = index.first
                 val commaIdxs: Series<Int> = index.second
 
-                val isObj = '{' == c
+                val isObj: Boolean = '{' == c
                 //if obj we create k-v pairs otherwise we create values
 
                 //iterate  segments exclusive of src first and last and commas in the middle
                 val boundaries: List<Int> = _l[openIdx, commaIdxs, closeIdx]
                 if (commaIdxs.isEmpty()) {
-                    val (before, after) = boundaries
-                    val possiblyEmpty = src.clone().lim(after).pos(before + 1).trim
+                    val (before: Int, after: Int) = boundaries
+                    val possiblyEmpty: CharSeries = src.clone().lim(after).pos(before + 1).trim
                     if (!possiblyEmpty.hasRemaining)
                         return if (isObj) emptyMap<String, Any?>()
                         else emptyArray<Any?>()
                 }
 
-                boundaries.zipWithNext().map { (before, after) ->
+                boundaries.zipWithNext().map { (before: Int, after: Int): Pair<Int, Int> ->
                     if (isObj) {
                         val tmp = CharSeries(src[before.inc() until after]).trim
                         require(tmp.seekTo('"')) {
@@ -175,15 +176,15 @@ object JsonParser {
                             }
                         }
                     } else reify(CharSeries(src[before.inc() until after]).trim)
-                }.let {
-                    if (isObj) it.associate {
-                        val join = it as Join<*, *>
-                        val (key, value) = join
-                        key.let {
+                }.let { it: List<Any?> ->
+                    if (isObj) it.associate { it: Any? ->
+                        val join: Join<*, *> = it as Join<*, *>
+                        val (key: Any?, value: Any?) = join
+                        key.let { it: Any? ->
                             it as? String ?: (it as? Series<Char>)?.asString() ?: (it as? CharSeries)?.asString()
                             ?: it
                         } to value
-                    } else it as? String ?: (it as? Series<Char>)?.asString() ?: (it as? CharSeries)?.asString()
+                    } else (it as? String) ?: (it as? Series<Char>)?.asString() ?: (it as? CharSeries)?.asString()
                     ?: it
                 }
             }
@@ -246,7 +247,7 @@ object JsonParser {
         val (element: JsElement, src) = context
         var counter = 0
         var r: Any? = Unit  //this is the payload
-        val cs = CharSeries(src).trim
+        val cs: CharSeries = CharSeries(src).trim
         logDebug { "select By Key $key from ${cs.asString()}" }
         if (unbrace(cs)) {
 
@@ -258,9 +259,9 @@ object JsonParser {
                 /*
                         we have arrived at a place where string has been trimmed and braces have been confirmed and descoped.
                         we are now in the payload of the obj  and we are testing keys to see if they match the desired key
-                        we are goign to forego escaped quotes for now, and just assume that the key is not source code.
+                        we are going to forego escaped quotes for now, and just assume that the key is not source code.
                         */
-                segment.also {
+                segment.debug {
                     logDebug { "segment is ${it.asString()} at index ${counter++}" }
                 }
                 val tmp = (segment.trim).slice
@@ -281,7 +282,7 @@ object JsonParser {
                 }
             }
         }
-        r.debug { logDebug { "final return is ${(r as? Series<Char>)?.asString() ?: r}" } }
+        r.debug { logDebug { "final return is ${( r as? Series<Char>)?.asString() ?: r}" } }
     }
 
 

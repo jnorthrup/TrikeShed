@@ -1,7 +1,11 @@
-package gk.kademlia.bitops
+package borg.trikeshed.platform.bitops
 
+import borg.trikeshed.platform.bitops.impl.IntBitOps
 import gk.kademlia.bitops.impl.*
 import borg.trikeshed.num.BigInt.Companion as BigInteger
+import borg.trikeshed.platform.bitops.impl.BigIntOps
+import borg.trikeshed.platform.bitops.impl.ByteBitOps
+import borg.trikeshed.platform.bitops.impl.LongBitOps
 
 interface BitOps<Primitive : Comparable<Primitive>> {
     val one: Primitive
