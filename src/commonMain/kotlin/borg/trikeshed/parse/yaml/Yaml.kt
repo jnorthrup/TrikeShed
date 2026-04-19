@@ -2,8 +2,17 @@
 
 package borg.trikeshed.parse.yaml
 
+import borg.trikeshed.common.TypeEvidence
+import borg.trikeshed.common.toRowVec
+import borg.trikeshed.cursor.RowVec
 import borg.trikeshed.lib.CharSeries
 import borg.trikeshed.lib.Series
+import borg.trikeshed.lib.asString
+import borg.trikeshed.lib.get
+import borg.trikeshed.lib.j
+import borg.trikeshed.lib.size
+import borg.trikeshed.lib.toSeries
+import borg.trikeshed.lib.α
 
 data class YamlSpan(
     val startLine: Int,
@@ -13,21 +22,40 @@ data class YamlSpan(
 sealed interface YamlNode {
     val span: YamlSpan
 
-    fun reify(): Any?
+    fun reify(
+        nodeEvidence: MutableList<TypeEvidence>? = null,
+        rowVecCallback: ((RowVec) -> Unit)? = null,
+    ): Any?
 }
 
 data class YamlScalarNode(
-    val value: String?,
+    val value: Series<Char>?,
     override val span: YamlSpan,
 ) : YamlNode {
-    override fun reify(): Any? = parseScalar(value)
+    override fun reify(
+        nodeEvidence: MutableList<TypeEvidence>?,
+        rowVecCallback: ((RowVec) -> Unit)?,
+    ): Any? {
+        val evidence = TypeEvidence.sample(value ?: "".toSeries())
+        nodeEvidence?.add(evidence)
+        rowVecCallback?.invoke(evidence.toRowVec())
+        return parseScalar(value)
+    }
 }
 
 data class YamlSequenceNode(
     val items: List<YamlNode>,
     override val span: YamlSpan,
 ) : YamlNode {
-    override fun reify(): Any? = items.map { it.reify() }
+    override fun reify(
+        nodeEvidence: MutableList<TypeEvidence>?,
+        rowVecCallback: ((RowVec) -> Unit)?,
+    ): Any? {
+        val evidence = TypeEvidence.sample("[]".toSeries())
+        nodeEvidence?.add(evidence)
+        rowVecCallback?.invoke(evidence.toRowVec())
+        return items.map { it.reify(nodeEvidence, rowVecCallback) }
+    }
 }
 
 data class YamlMappingEntry(
@@ -40,7 +68,15 @@ data class YamlMappingNode(
     val entries: List<YamlMappingEntry>,
     override val span: YamlSpan,
 ) : YamlNode {
-    override fun reify(): Any? = entries.associate { it.key to it.value.reify() }
+    override fun reify(
+        nodeEvidence: MutableList<TypeEvidence>?,
+        rowVecCallback: ((RowVec) -> Unit)?,
+    ): Any? {
+        val evidence = TypeEvidence.sample("{}".toSeries())
+        nodeEvidence?.add(evidence)
+        rowVecCallback?.invoke(evidence.toRowVec())
+        return entries.associate { it.key to it.value.reify(nodeEvidence, rowVecCallback) }
+    }
 }
 
 data class YamlDocument(
@@ -50,22 +86,30 @@ data class YamlDocument(
 private data class YamlLine(
     val number: Int,
     val indent: Int,
-    val content: String,
+    val content: Series<Char>,
 )
 
 object YamlParser {
-    fun parse(src: Series<Char>): YamlDocument = parse(CharSeries(src).asString())
-
-    fun parse(text: String): YamlDocument {
-        val lines = tokenize(text)
+    fun parse(src: Series<Char>): YamlDocument {
+        val lines = tokenize(src)
         require(lines.isNotEmpty()) { "YAML input is empty" }
         val parser = Parser(lines)
         return YamlDocument(parser.parseDocument())
     }
 
-    fun reify(src: Series<Char>): Any? = parse(src).root.reify()
+    fun parse(text: String): YamlDocument = parse(text.toSeries())
 
-    fun reify(text: String): Any? = parse(text).root.reify()
+    fun reify(
+        src: Series<Char>,
+        nodeEvidence: MutableList<TypeEvidence>? = null,
+        rowVecCallback: ((RowVec) -> Unit)? = null,
+    ): Any? = parse(src).root.reify(nodeEvidence, rowVecCallback)
+
+    fun reify(
+        text: String,
+        nodeEvidence: MutableList<TypeEvidence>? = null,
+        rowVecCallback: ((RowVec) -> Unit)? = null,
+    ): Any? = parse(text).root.reify(nodeEvidence, rowVecCallback)
 }
 
 private class Parser(
@@ -77,9 +121,7 @@ private class Parser(
 
     private fun parseBlock(expectedIndent: Int): YamlNode {
         val line = current() ?: error("Expected YAML content")
-        require(line.indent == expectedIndent) {
-            "Unexpected indentation at line ${line.number}: expected $expectedIndent but found ${line.indent}"
-        }
+        require(line.indent == expectedIndent) { "Unexpected indentation at line ${line.number}: expected $expectedIndent but found ${line.indent}" }
         return if (line.content.startsWith("- ")) parseSequence(expectedIndent) else parseMapping(expectedIndent)
     }
 
@@ -92,7 +134,7 @@ private class Parser(
             val line = current() ?: break
             if (line.indent != expectedIndent || !line.content.startsWith("- ")) break
 
-            val payload = line.content.removePrefix("- ").trimStart()
+            val payload = line.content.drop(2).trimStart()
             advance()
             val node = parseSequenceItem(line, payload, expectedIndent)
             items += node
@@ -102,7 +144,7 @@ private class Parser(
         return YamlSequenceNode(items, YamlSpan(start, end))
     }
 
-    private fun parseSequenceItem(line: YamlLine, payload: String, expectedIndent: Int): YamlNode {
+    private fun parseSequenceItem(line: YamlLine, payload: Series<Char>, expectedIndent: Int): YamlNode {
         if (payload.isEmpty()) {
             val child = current()
             return if (child != null && child.indent > expectedIndent) parseBlock(child.indent)
@@ -111,9 +153,9 @@ private class Parser(
 
         val separator = keyValueSeparator(payload)
         if (separator >= 0) {
-            val key = payload.substring(0, separator).trim()
-            val rest = payload.substring(separator + 1).trimStart()
-            val inlineNode =
+            val key = payload.slice(0, separator).trim().asString()
+            val rest = payload.drop(separator + 1).trimStart()
+            val inlineNode: YamlNode =
                 if (rest.isEmpty()) {
                     val child = current()
                     if (child != null && child.indent > expectedIndent) parseBlock(child.indent)
@@ -148,8 +190,8 @@ private class Parser(
 
             val separator = keyValueSeparator(line.content)
             require(separator >= 0) { "Expected key/value pair at line ${line.number}" }
-            val key = line.content.substring(0, separator).trim()
-            val rest = line.content.substring(separator + 1).trimStart()
+            val key = line.content.slice(0, separator).trim().asString()
+            val rest = line.content.drop(separator + 1).trimStart()
             advance()
 
             val valueNode =
@@ -168,13 +210,16 @@ private class Parser(
         return YamlMappingNode(entries, YamlSpan(start, end))
     }
 
-    private fun parseInlineValue(text: String, lineNumber: Int): YamlNode =
+    private fun parseInlineValue(text: Series<Char>, lineNumber: Int): YamlNode =
         when {
-            text == "[]" -> YamlSequenceNode(emptyList(), YamlSpan(lineNumber, lineNumber))
-            text == "{}" -> YamlMappingNode(emptyList(), YamlSpan(lineNumber, lineNumber))
+            text.matches("[]") -> YamlSequenceNode(emptyList(), YamlSpan(lineNumber, lineNumber))
+            text.matches("{}") -> YamlMappingNode(emptyList(), YamlSpan(lineNumber, lineNumber))
             text.startsWith("[") && text.endsWith("]") -> {
-                val parts = splitInlineList(text.substring(1, text.lastIndex))
-                YamlSequenceNode(parts.map { YamlScalarNode(it, YamlSpan(lineNumber, lineNumber)) }, YamlSpan(lineNumber, lineNumber))
+                val parts: Series<Series<Char>> = splitInlineList(text.slice(1, text.size - 1))
+                YamlSequenceNode(
+                    (parts α { it: Series<Char> ->
+
+                        YamlScalarNode(it, YamlSpan(lineNumber, lineNumber)) }) as List<YamlNode>, YamlSpan(lineNumber, lineNumber))
             }
             else -> YamlScalarNode(text, YamlSpan(lineNumber, lineNumber))
         }
@@ -186,40 +231,54 @@ private class Parser(
     }
 }
 
-private fun tokenize(text: String): List<YamlLine> =
-    text
-        .replace("\r\n", "\n")
-        .lineSequence()
-        .mapIndexedNotNull { idx, raw ->
-            val trimmed = raw.trim()
-            if (trimmed.isEmpty() || trimmed == "---" || trimmed == "...") return@mapIndexedNotNull null
-            if (trimmed.startsWith("#")) return@mapIndexedNotNull null
+private fun tokenize(text: Series<Char>): List<YamlLine> {
+    val lines = mutableListOf<YamlLine>()
+    var lineNumber = 1
+    var lineStart = 0
 
-            val indent = raw.indexOfFirst { !it.isWhitespace() }.takeIf { it >= 0 } ?: 0
-            YamlLine(idx + 1, indent, stripInlineComment(raw.substring(indent)).trimEnd())
+    fun emitLine(lineEndExclusive: Int) {
+        val raw = text.slice(lineStart, lineEndExclusive)
+        val trimmed = raw.trim()
+        if (trimmed.isEmpty() || trimmed.matches("---") || trimmed.matches("...")) return
+        if (trimmed.startsWith("#")) return
+
+        val indent = raw.leadingWhitespace()
+        val content = stripInlineComment(raw.drop(indent)).trimEnd()
+        lines += YamlLine(lineNumber, indent, content)
+    }
+
+    for (index in 0 until text.size) {
+        if (text[index] == '\n') {
+            val lineEnd = if (index > lineStart && text[index - 1] == '\r') index - 1 else index
+            emitLine(lineEnd)
+            lineStart = index + 1
+            lineNumber++
         }
-        .toList()
+    }
+    if (lineStart <= text.size) emitLine(text.size)
+    return lines
+}
 
-private fun stripInlineComment(text: String): String {
+private fun stripInlineComment(text: Series<Char>): Series<Char> {
     var inSingle = false
     var inDouble = false
-    for (index in text.indices) {
-        when (val ch = text[index]) {
+    for (index in 0 until text.size) {
+        when (text[index]) {
             '\'' -> if (!inDouble) inSingle = !inSingle
             '"' -> if (!inSingle) inDouble = !inDouble
             '#' -> if (!inSingle && !inDouble && (index == 0 || text[index - 1].isWhitespace())) {
-                return text.substring(0, index)
+                return text.slice(0, index)
             }
         }
     }
     return text
 }
 
-private fun keyValueSeparator(text: String): Int {
+private fun keyValueSeparator(text: Series<Char>): Int {
     var inSingle = false
     var inDouble = false
-    for (index in text.indices) {
-        when (val ch = text[index]) {
+    for (index in 0 until text.size) {
+        when (text[index]) {
             '\'' -> if (!inDouble) inSingle = !inSingle
             '"' -> if (!inSingle) inDouble = !inDouble
             ':' -> if (!inSingle && !inDouble) return index
@@ -228,47 +287,73 @@ private fun keyValueSeparator(text: String): Int {
     return -1
 }
 
-private fun splitInlineList(text: String): List<String> {
-    if (text.isBlank()) return emptyList()
-    val items = mutableListOf<String>()
-    val current = StringBuilder()
+private fun splitInlineList(text: Series<Char>): Series<Series<Char>> {
+    if (text.trim().isEmpty()) return 0 j {it:Int-> TODO("empty") }
+    val items = mutableListOf<Series<Char>>()
+    var itemStart = 0
     var inSingle = false
     var inDouble = false
-    for (ch in text) {
-        when (ch) {
-            '\'' -> if (!inDouble) {
-                inSingle = !inSingle
-                current.append(ch)
-            } else current.append(ch)
-            '"' -> if (!inSingle) {
-                inDouble = !inDouble
-                current.append(ch)
-            } else current.append(ch)
+    for (index in 0 until text.size) {
+        when (text[index]) {
+            '\'' -> if (!inDouble) inSingle = !inSingle
+            '"' -> if (!inSingle) inDouble = !inDouble
             ',' -> if (!inSingle && !inDouble) {
-                items += current.toString().trim()
-                current.clear()
-            } else {
-                current.append(ch)
+                val item = text.slice(itemStart, index).trim()
+                if (!item.isEmpty()) items += item
+                itemStart = index + 1
             }
-            else -> current.append(ch)
         }
     }
-    items += current.toString().trim()
-    return items.filter { it.isNotEmpty() }
+    val tail: Series<Char> = text.slice(itemStart).trim()
+    if (!tail.isEmpty()) items += tail
+    return items.toSeries()
 }
 
-private fun parseScalar(raw: String?): Any? {
+private fun parseScalar(raw: Series<Char>?): Any? {
     val value = raw?.trim() ?: return null
-    if (value.isEmpty() || value == "~" || value == "null") return null
-    if (value == "true") return true
-    if (value == "false") return false
+    if (value.isEmpty() || value.matches("~") || value.matches("null")) return null
+    if (value.matches("true")) return true
+    if (value.matches("false")) return false
 
-    if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith('\'') && value.endsWith('\''))) {
-        return value.substring(1, value.lastIndex)
+    if ((value.isQuoted('"')) || (value.isQuoted('\''))) {
+        return value.slice(1, value.size - 1).asString()
     }
 
-    value.toIntOrNull()?.let { return it }
-    value.toLongOrNull()?.let { return it }
-    value.toDoubleOrNull()?.let { return it }
-    return value
+    val text = value.asString()
+    text.toIntOrNull()?.let { return it }
+    text.toLongOrNull()?.let { return it }
+    text.toDoubleOrNull()?.let { return it }
+    return text
 }
+
+private fun Series<Char>.slice(start: Int, endExclusive: Int=a): Series<Char> =
+    if (endExclusive <= start) "".toSeries() else this[start until endExclusive]
+
+private fun Series<Char>.isEmpty(): Boolean = size == 0
+
+private fun Series<Char>.trim(): Series<Char> = CharSeries(this).trim.slice
+
+private fun Series<Char>.trimStart(): Series<Char> = CharSeries(this).apply {
+    while (hasRemaining && this[pos].isWhitespace()) pos++
+}.slice
+
+private fun Series<Char>.trimEnd(): Series<Char> = CharSeries(this).rtrim.slice
+
+private fun Series<Char>.drop(count: Int): Series<Char> = slice(count.coerceAtMost(size), size)
+
+private fun Series<Char>.startsWith(prefix: String): Boolean =
+    size >= prefix.length && prefix.indices.all { index -> this[index] == prefix[index] }
+
+private fun Series<Char>.endsWith(suffix: String): Boolean =
+    size >= suffix.length && suffix.indices.all { index -> this[size - suffix.length + index] == suffix[index] }
+
+private fun Series<Char>.leadingWhitespace(): Int {
+    for (index in 0 until size) if (!this[index].isWhitespace()) return index
+    return size
+}
+
+private fun Series<Char>.matches(literal: String): Boolean =
+    size == literal.length && literal.indices.all { index -> this[index] == literal[index] }
+
+private fun Series<Char>.isQuoted(quote: Char): Boolean =
+    size >= 2 && this[0] == quote && this[size - 1] == quote

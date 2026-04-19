@@ -66,8 +66,7 @@ actual object Files {
 
             if (lineBuffer.size() > 0) {
                 val tharr = lineBuffer.toByteArray()
-                if (!tharr.decodeToString().trim().isEmpty())
-                    yield((lineStartOffset j tharr))
+                yield(lineStartOffset j tharr)
             }
         }
     }

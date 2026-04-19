@@ -266,7 +266,7 @@ object CursorTensorReifier {
         val columnTypeCodes = IntArray(columnCount) { index -> tensorTypeCode(meta[selectedColumns[index]].b) }
 
         for (row in 0..<rowCount) {
-            val rowVec: Cursor = cursor[row]
+            val rowVec: RowVec = cursor.row(row)
             for (denseColumn in 0 until columnCount) {
                 val sourceColumn = selectedColumns[denseColumn]
                 val columnMeta: ColumnMeta = meta[sourceColumn]

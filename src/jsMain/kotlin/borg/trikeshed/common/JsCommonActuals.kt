@@ -5,6 +5,8 @@ import borg.trikeshed.lib.ByteSeries
 import borg.trikeshed.lib.Join
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.Series2
+import borg.trikeshed.lib.j
+import borg.trikeshed.lib.toSeries
 private val processObj: dynamic = js("process")
 
 
@@ -41,10 +43,30 @@ actual object Files {
     actual fun exists(filename: String): Boolean = jsExists(filename)
 
     actual fun streamLines(fileName: String, bufsize: Int): Sequence<Join<Long, ByteArray>> =
-        TODO("JS streamLines is stubbed; use readAllLines/readString instead")
+        streamByteLines(readAllBytes(fileName))
 
     actual fun iterateLines(fileName: String, bufsize: Int): Iterable<Join<Long, Series<Byte>>> =
-        TODO("JS iterateLines is stubbed; use readAllLines/readString instead")
+        streamLines(fileName, bufsize).map { (offset, bytes) -> offset j bytes.toSeries() }.asIterable()
+}
+
+private fun streamByteLines(bytes: ByteArray): Sequence<Join<Long, ByteArray>> = sequence {
+    var offset = 0L
+    var lineStart = 0L
+    val line = ArrayList<Byte>()
+
+    for (byte in bytes) {
+        line += byte
+        offset++
+        if (byte == '\n'.code.toByte()) {
+            yield(lineStart j line.toByteArray())
+            line.clear()
+            lineStart = offset
+        }
+    }
+
+    if (line.isNotEmpty()) {
+        yield(lineStart j line.toByteArray())
+    }
 }
 
 actual fun mktemp(): String = jsMktemp()
@@ -68,6 +90,7 @@ class JsSeekHandle : SeekHandle {
     private var nextHandle = 1L
 
     override fun open(filename: String, readOnly: Boolean): Long {
+        require(Files.exists(filename)) { "File does not exist: $filename" }
         val handle = nextHandle++
         handles[handle] = JsHandleState(filename)
         return handle

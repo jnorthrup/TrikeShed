@@ -1,6 +1,6 @@
 package borg.trikeshed.parse
 
-import borg.trikeshed.common.collections._l
+import borg.trikeshed.collections._l
 import borg.trikeshed.lib.Join
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.toSeries
@@ -65,7 +65,7 @@ class JsonPathTest {
             val depths = mutableListOf<Int>()
             val element = index(src, depths)
             val path: JsPath = _l[0].toJsPath
-            val expected = 0.0
+            val expected = 0
             val context = element j src
             val result = jsPath(context, path, true, depths)
             assertEquals(expected, result)
@@ -76,7 +76,7 @@ class JsonPathTest {
             val element = index(src, depths)
             val path: JsPath = _l[0].toJsPath
             val result = jsPath(element j src, path, true, depths)
-            val expected = 0.0
+            val expected = 0
             assertEquals(expected, result)
         }
     }
@@ -85,14 +85,14 @@ class JsonPathTest {
         val src = ("""[0]""").toSeries()
         val element = index(src)
         val path: JsPath = _l[0].toJsPath
-        val expected = 0.0
+        val expected = 0
         val result = jsPath(element j src, path, true, mutableListOf())
         assertEquals(expected, result)
 
     }
     @Test fun test00() { val src = ("""{"0":0}""").toSeries()
         val result = jsPath(index(src) j src, _l[0].toJsPath, true, mutableListOf())
-        assertEquals(0.0, result) }
+        assertEquals(0, result) }
 
     @Test
     fun test1() {
@@ -100,7 +100,7 @@ class JsonPathTest {
         val element = index(src)
         val path: JsPath = _l["a", "b", 2].toJsPath
         val result = jsPath(element j src, path, true, mutableListOf())
-        val expected = 3.0
+        val expected = 3
         assertEquals(expected, result)
 
     }
@@ -112,7 +112,7 @@ class JsonPathTest {
         val element = index(src)
         val path: JsPath = _l[("a"), ("b"), (4), 0, (1)].toJsPath
         val result = jsPath(element j src, path, true, mutableListOf())
-        val expected = 3.0
+        val expected = 3
         assertEquals(expected, result)
     }
     @Test

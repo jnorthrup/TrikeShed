@@ -4,7 +4,9 @@
 package borg.trikeshed.parse.json
 
 import borg.trikeshed.common.TypeEvidence
-import borg.trikeshed.common.collections._l
+import borg.trikeshed.common.toRowVec
+import borg.trikeshed.cursor.RowVec
+import borg.trikeshed.collections._l
 import borg.trikeshed.lib.*
 import borg.trikeshed.lib.CharSeries.Companion.unbrace
 import borg.trikeshed.lib.CharSeries.Companion.unquote
@@ -30,8 +32,8 @@ val List<*>.toJsPath: JsPath
         }
     }
 
-private fun parseJsonNumber(src: CharSeries): Any? {
-    val text = src.res.slice.asString().trim()
+private fun parseJsonNumber(src: Series<Char>): Any? {
+    val text = CharSeries(src).run { res.slice.asString().trim() }
 
     if (text.isEmpty()) return null
     if (text == "-0") return -0.0
@@ -136,11 +138,14 @@ object JsonParser {
         /** includes open and close braces, or both quotes, or the raw type*/
         src1: Series<Char>,
         nodeEvidence: MutableList<TypeEvidence>? = null,
+        rowVecCallback: ((RowVec) -> Unit)? = null,
     ): Any? {
-        val src: CharSeries = CharSeries(src1).trim
-        nodeEvidence?.add(TypeEvidence.sample(src))
+        val src: Series<Char> = CharSeries(src1).trim.slice
+        val evidence = TypeEvidence.sample(src)
+        nodeEvidence?.add(evidence)
+        rowVecCallback?.invoke(evidence.toRowVec())
 
-        return when (val c: Char = src.mk.get) {
+        return when (val c: Char = CharSeries(src).mk.get) {
             '{', '[' -> {
                 val index: JsElement = index(src)
                 val (openIdx: Int, closeIdx: Int) = index.first
@@ -153,7 +158,7 @@ object JsonParser {
                 val boundaries: List<Int> = _l[openIdx, commaIdxs, closeIdx]
                 if (commaIdxs.isEmpty()) {
                     val (before: Int, after: Int) = boundaries
-                    val possiblyEmpty: CharSeries = src.clone().lim(after).pos(before + 1).trim
+                    val possiblyEmpty: CharSeries = CharSeries(src).lim(after).pos(before + 1).trim
                     if (!possiblyEmpty.hasRemaining)
                         return if (isObj) emptyMap<String, Any?>()
                         else emptyList<Any?>()
@@ -173,31 +178,30 @@ object JsonParser {
                                 require(tmp.seekTo(':')) {
                                     "expected colon in ${tmp.take(40).asString()}"
                                 }
-                                tmp.slice.let { valueContext ->
-                                    tmp.lim(closeQuote).pos(openQuote).asString() j reify(valueContext, nodeEvidence)
+                                tmp.slice.let { valueContext: Series<Char> ->
+                                    tmp.lim(closeQuote).pos(openQuote).asString() j reify(valueContext, nodeEvidence, rowVecCallback)
                                 }
                             }
                         }
-                    } else reify(CharSeries(src[before.inc() until after]).trim, nodeEvidence)
+                    } else reify(CharSeries(src[before.inc() until after]).trim.slice, nodeEvidence, rowVecCallback)
                 }.let { it: List<Any?> ->
                     if (isObj) it.associate { it: Any? ->
                         val join: Join<*, *> = it as Join<*, *>
                         val (key: Any?, value: Any?) = join
                         key.let { it: Any? ->
-                            it as? String ?: (it as? Series<Char>)?.asString() ?: (it as? CharSeries)?.asString()
-                            ?: it
+                            it as? String ?: (it as? Series<Char>)?.asString() ?: it
                         } to value
-                    } else (it as? String) ?: (it as? Series<Char>)?.asString() ?: (it as? CharSeries)?.asString()
-                    ?: it
+                    } else (it as? String) ?: (it as? Series<Char>)?.asString() ?: it
                 }
             }
 
             '"' -> {
-                val beg = src.pos
-                val seekTo = src.seekTo('"', '\\')
+                val tmp = CharSeries(src).apply { pos = 1 }
+                val beg = tmp.pos
+                val seekTo = tmp.seekTo('"', '\\')
                 if (!seekTo) throw Exception("expected end of quoted string")
-                val end = src.pos - 1
-                src.lim(end).pos(beg).asString()
+                val end = tmp.pos - 1
+                tmp.lim(end).pos(beg).asString()
             }
 
             't', 'f' -> 't' == c
@@ -292,11 +296,11 @@ object JsonParser {
     private fun resumePath(
         pathTail: Series<Either<String, Int>>,
         reifyResult: Boolean,
-        tmp: CharSeries,
+        tmp: Series<Char>,
 
         ): Any? {
         return if (pathTail.isEmpty()) {
-            if (reifyResult) reify(tmp.slice) else tmp.slice
+            if (reifyResult) reify(tmp) else tmp
 
         } else {
             val depths1: MutableList<Int> = mutableListOf()
@@ -328,10 +332,11 @@ object JsonParser {
         val cs: CharSeries = CharSeries(src, pos, lim).trim
         val inObj: Boolean = cs[0] == '{'
         do {
-            val tmp = CharSeries(context.segments.elementAtOrNull(idx)?.toSeries() ?: break)
-            val value: CharSeries = if (inObj) {
-                if (!tmp.seekTo(':')) break
-                tmp.slice
+            val tmp = context.segments.elementAtOrNull(idx)?.toSeries() ?: break
+            val value: Series<Char> = if (inObj) {
+                val segment = CharSeries(tmp)
+                if (!segment.seekTo(':')) break
+                segment.slice
             } else tmp
 
             r = resumePath(pathTail, reifyResult, value)
