@@ -1,6 +1,6 @@
 package gk.kademlia.bitops.impl
 
-import gk.kademlia.bitops.BitOps
+import borg.trikeshed.platform.bitops.BitOps
 
 object UShortBitOps : BitOps<UShort> {
     override val one: UShort = 1.toUShort()

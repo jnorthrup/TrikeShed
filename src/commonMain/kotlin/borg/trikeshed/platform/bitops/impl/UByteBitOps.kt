@@ -1,6 +1,6 @@
 package gk.kademlia.bitops.impl
 
-import gk.kademlia.bitops.BitOps
+import borg.trikeshed.platform.bitops.BitOps
 
 object UByteBitOps : BitOps<UByte> {
     override val one: UByte = 1.toUByte()

@@ -1,6 +1,6 @@
 package gk.kademlia.id.impl
 
-import gk.kademlia.bitops.impl.BigIntOps
+import borg.trikeshed.platform.bitops.impl.BigIntOps
 import gk.kademlia.id.NUID
 import borg.trikeshed.num.BigInt as BigInteger
 

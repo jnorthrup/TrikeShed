@@ -2,8 +2,8 @@ package gk.kademlia.id
 
 import borg.trikeshed.lib.assert
 import borg.trikeshed.num.BigInt
-import gk.kademlia.bitops.BitOps
-import gk.kademlia.bitops.BitOps.Companion.minOps
+import borg.trikeshed.platform.bitops.BitOps
+import borg.trikeshed.platform.bitops.BitOps.Companion.minOps
 import gk.kademlia.id.impl.*
 import gk.kademlia.net.NetMask
 import kotlin.random.Random

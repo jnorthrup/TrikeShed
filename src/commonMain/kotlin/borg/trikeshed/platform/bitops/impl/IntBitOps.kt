@@ -1,9 +1,9 @@
-package gk.kademlia.bitops.impl
+package borg.trikeshed.platform.bitops.impl
 
-import gk.kademlia.bitops.BitOps
+import borg.trikeshed.platform.bitops.BitOps
 
 object IntBitOps : BitOps<Int> {
-    override val one: Int = 1.toInt()
+    override val one: Int = 1
     override val xor: (Int, Int) -> Int = Int::xor
     override val and: (Int, Int) -> Int = Int::and
     override val shl: (Int, Int) -> Int = Int::shl
