@@ -2,8 +2,14 @@
 
 package borg.trikeshed.parse.json
 
+<<<<<<< HEAD
 import borg.trikeshed.common.collections.s_
 
+=======
+import borg.trikeshed.common.TypeEvidence
+import borg.trikeshed.common.collections._l
+import borg.trikeshed.lib.*
+>>>>>>> d29fbc9 (Add YAML JSON parser interop)
 import borg.trikeshed.lib.CharSeries.Companion.unbrace
 import borg.trikeshed.lib.CharSeries.Companion.unquote
 import borg.trikeshed.lib.Either
@@ -129,8 +135,10 @@ object JsonParser {
     fun reify(
         /** includes open and close braces, or both quotes, or the raw type*/
         src1: Series<Char>,
+        nodeEvidence: MutableList<TypeEvidence>? = null,
     ): Any? {
         val src: CharSeries = CharSeries(src1).trim
+        nodeEvidence?.add(TypeEvidence.sample(src))
 
         return when (val c: Char = src.mk.get) {
             '{', '[' -> {
@@ -148,7 +156,7 @@ object JsonParser {
                     val possiblyEmpty = src.clone().lim(after).pos(before + 1).trim
                     if (!possiblyEmpty.hasRemaining)
                         return if (isObj) emptyMap<String, Any?>()
-                        else emptyArray<Any?>()
+                        else emptyList<Any?>()
                 }
 
                 boundaries.zipWithNext().map { (before, after) ->
@@ -166,16 +174,17 @@ object JsonParser {
                                     "expected colon in ${tmp.take(40).asString()}"
                                 }
                                 tmp.slice.let { valueContext ->
-                                    tmp.lim(closeQuote).pos(openQuote).asString() j reify(valueContext)
+                                    tmp.lim(closeQuote).pos(openQuote).asString() j reify(valueContext, nodeEvidence)
                                 }
                             }
                         }
-                    } else reify(CharSeries(src[before.inc() until after]).trim)
-                }.let {
-                    if (isObj) it.associate {
-                        val join = it as Join<*, *>
-                        val (key, value) = join
-                        key.let {
+<<<<<<< HEAD
+                    } else reify(CharSeries(src[before.inc() until after]).trim, nodeEvidence)
+                }.let { it: List<Any?> ->
+                    if (isObj) it.associate { it: Any? ->
+                        val join: Join<*, *> = it as Join<*, *>
+                        val (key: Any?, value: Any?) = join
+                        key.let { it: Any? ->
                             it as? String ?: (it as? Series<Char>)?.asString() ?: (it as? CharSeries)?.asString()
                             ?: it
                         } to value
