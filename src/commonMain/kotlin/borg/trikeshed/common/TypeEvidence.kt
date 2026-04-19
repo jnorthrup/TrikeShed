@@ -1,10 +1,23 @@
 package borg.trikeshed.common
 
+import borg.trikeshed.cursor.ColumnMeta
+import borg.trikeshed.cursor.MapTypeMemento
+import borg.trikeshed.cursor.RowVec
+import borg.trikeshed.cursor.SeqTypeMemento
+import borg.trikeshed.cursor.TypeMemento
+import borg.trikeshed.cursor.label
+import borg.trikeshed.cursor.joins
 import borg.trikeshed.isam.meta.IOMemento
+import borg.trikeshed.lib.j
+import borg.trikeshed.lib.get
+import borg.trikeshed.lib.Series
+import borg.trikeshed.lib.size
 
 data class
 /** This is a dragnet for a given line to record the counters of character classes */
 TypeEvidence(
+    var confix: String = "",
+    var structuralMemento: TypeMemento? = null,
     var digits: UShort = 0U,
     var periods: UShort = 0U,
     var exponent: UShort = 0U,
@@ -51,6 +64,35 @@ TypeEvidence(
     }
 
     companion object {
+        fun sample(src: Series<Char>): TypeEvidence =
+            TypeEvidence().apply {
+                confix = detectConfix(src)
+                structuralMemento = detectStructuralMemento(confix)
+                for (index in 0 until src.size) {
+                    this + src[index]
+                }
+                recordColumnLength(src.size)
+            }
+
+        private fun detectConfix(src: Series<Char>): String {
+            if (src.size < 2) return ""
+            val first = src[0]
+            val last = src[src.size - 1]
+            return when {
+                first == '{' && last == '}' -> "{}"
+                first == '[' && last == ']' -> "[]"
+                first == '"' && last == '"' -> "\"\""
+                first == '\'' && last == '\'' -> "''"
+                else -> ""
+            }
+        }
+
+        private fun detectStructuralMemento(confix: String): TypeMemento? =
+            when (confix) {
+                "{}" -> MapTypeMemento
+                "[]" -> SeqTypeMemento
+                else -> null
+            }
 
         /**
          * based on the process of eliminating illegal and oversized counters we deduce the most specific numerical primitives specializations of IoMemento jvm-primitives
@@ -68,6 +110,7 @@ TypeEvidence(
         fun deduce(typeEvidence: TypeEvidence): IOMemento {
 
             return when {
+                typeEvidence.dquotes > 0U || typeEvidence.quotes > 0U -> IOMemento.IoString
                 typeEvidence.empty > 0U || typeEvidence.alpha > 0U -> IOMemento.IoString
                 typeEvidence.truefalse > 0U -> IOMemento.IoBoolean
                 typeEvidence.digits.toUInt() == 0U -> IOMemento.IoString
@@ -111,6 +154,8 @@ TypeEvidence(
             }
         }
 
+        fun deduceMemento(typeEvidence: TypeEvidence): TypeMemento = typeEvidence.structuralMemento ?: deduce(typeEvidence)
+
         fun MutableList<TypeEvidence>.update(
             lineEvidence: MutableList<TypeEvidence>,
         ) {
@@ -141,3 +186,47 @@ TypeEvidence(
         }
     }
 }
+
+fun TypeEvidence.toRowVec(): RowVec {
+    val values = arrayOf<Any?>(
+        confix,
+        digits.toInt(),
+        periods.toInt(),
+        exponent.toInt(),
+        signs.toInt(),
+        special.toInt(),
+        alpha.toInt(),
+        truefalse.toInt(),
+        empty.toInt(),
+        quotes.toInt(),
+        dquotes.toInt(),
+        whitespaces.toInt(),
+        backslashes.toInt(),
+        linefeed.toInt(),
+        maxColumnLength.toInt(),
+        if (minColumnLength == UShort.MAX_VALUE) 0 else minColumnLength.toInt(),
+        TypeEvidence.deduceMemento(this).label,
+    )
+    val meta = TYPE_EVIDENCE_COLUMNS.size j { index: Int -> { TYPE_EVIDENCE_COLUMNS[index] } }
+    return values.size j { index: Int -> values[index] } joins meta
+}
+
+private val TYPE_EVIDENCE_COLUMNS = arrayOf(
+    ColumnMeta("confix", IOMemento.IoString),
+    ColumnMeta("digits", IOMemento.IoInt),
+    ColumnMeta("periods", IOMemento.IoInt),
+    ColumnMeta("exponent", IOMemento.IoInt),
+    ColumnMeta("signs", IOMemento.IoInt),
+    ColumnMeta("special", IOMemento.IoInt),
+    ColumnMeta("alpha", IOMemento.IoInt),
+    ColumnMeta("truefalse", IOMemento.IoInt),
+    ColumnMeta("empty", IOMemento.IoInt),
+    ColumnMeta("quotes", IOMemento.IoInt),
+    ColumnMeta("dquotes", IOMemento.IoInt),
+    ColumnMeta("whitespaces", IOMemento.IoInt),
+    ColumnMeta("backslashes", IOMemento.IoInt),
+    ColumnMeta("linefeed", IOMemento.IoInt),
+    ColumnMeta("maxColumnLength", IOMemento.IoInt),
+    ColumnMeta("minColumnLength", IOMemento.IoInt),
+    ColumnMeta("deducedType", IOMemento.IoString),
+)

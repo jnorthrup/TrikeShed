@@ -1,5 +1,6 @@
 package borg.trikeshed.parse.json
 
+import borg.trikeshed.common.TypeEvidence
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.size
 import borg.trikeshed.lib.toSeries
@@ -12,7 +13,10 @@ import borg.trikeshed.lib.toSeries
  * and lightweight jq/xpath-style path queries.
  */
 object JsonSupport {
-    fun parse(text: String): Any? = JsonParser.reify(text.toSeries())
+    fun parse(
+        text: String,
+        nodeEvidence: MutableList<TypeEvidence>? = null,
+    ): Any? = JsonParser.reify(text.toSeries(), nodeEvidence)
 
     fun index(
         text: String,
