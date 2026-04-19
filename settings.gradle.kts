@@ -12,14 +12,23 @@ pluginManagement {
 
 rootProject.name = "TrikeShed"
 
-// Attempt to reconcile with a local libs/duckdb composite build. If a local
-// libs/duckdb folder exists, include it so the project can reference a
-// local DuckDB build instead of an external JDBC artifact.
-// NOTE: composite inclusion causes circular task dependencies with the
-// local libs/duckdb module. Prefer adding its sources to root sourceSets
-// for local development. To enable composite builds, uncomment the block
-// below and ensure libs/duckdb does not depend on the root project.
-// if (file("libs/duckdb").exists()) {
-//     includeBuild("libs/duckdb")
-//     println("Including local libs/duckdb composite build")
-// }
+// Auto-include local libs as composite builds when present.
+// This scans the 'libs' directory and includes any subdirectory that appears
+// to be a standalone Gradle build (contains settings.gradle(.kts) or build.gradle(.kts)).
+// Avoids hardcoding names and makes local libs participate in root Gradle execution.
+//
+// Warning: ensure local libs do not depend on the root project to avoid cycles.
+if (file("libs").exists() && file("libs").isDirectory) {
+    file("libs").listFiles()?.forEach { sub ->
+        if (sub.isDirectory) {
+            val hasBuild = file("${sub.path}/settings.gradle.kts").exists() ||
+                           file("${sub.path}/settings.gradle").exists() ||
+                           file("${sub.path}/build.gradle.kts").exists() ||
+                           file("${sub.path}/build.gradle").exists()
+            if (hasBuild) {
+                includeBuild("libs/${sub.name}")
+                println("Including local libs composite build: ${sub.name}")
+            }
+        }
+    }
+}
