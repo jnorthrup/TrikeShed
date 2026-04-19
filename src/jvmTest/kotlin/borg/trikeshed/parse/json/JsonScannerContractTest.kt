@@ -148,4 +148,66 @@ data class JsonToken(
 
 enum class JsonTokenType { STRING, NUMBER, BOOLEAN, NULL }
 
-fun parseJsonToken(input: String): JsonToken? = TODO()
+fun parseJsonToken(input: String): JsonToken? {
+    val text = input.trim()
+    if (text.isEmpty()) return null
+
+    var index = 0
+    if (text.getOrNull(index) != '"') return null
+    index++
+
+    var escaped = false
+    while (index < text.length) {
+        val ch = text[index]
+        when {
+            escaped -> escaped = false
+            ch == '\\' -> escaped = true
+            ch == '"' -> break
+        }
+        index++
+    }
+
+    if (index >= text.length || text[index] != '"') return null
+    index++
+    while (index < text.length && text[index].isWhitespace()) index++
+    if (index >= text.length || text[index] != ':') return null
+    index++
+    while (index < text.length && text[index].isWhitespace()) index++
+    if (index >= text.length) return null
+
+    return when (text[index]) {
+        '"' -> {
+            index++
+            val value = StringBuilder()
+            escaped = false
+            while (index < text.length) {
+                val ch = text[index]
+                when {
+                    escaped -> {
+                        value.append('\\').append(ch)
+                        escaped = false
+                    }
+                    ch == '\\' -> escaped = true
+                    ch == '"' -> {
+                        index++
+                        while (index < text.length && text[index].isWhitespace()) index++
+                        if (index != text.length) return null
+                        return JsonToken(JsonTokenType.STRING, value.toString())
+                    }
+                    else -> value.append(ch)
+                }
+                index++
+            }
+            null
+        }
+        't' -> if (text.substring(index) == "true") JsonToken(JsonTokenType.BOOLEAN, "true") else null
+        'f' -> if (text.substring(index) == "false") JsonToken(JsonTokenType.BOOLEAN, "false") else null
+        'n' -> if (text.substring(index) == "null") JsonToken(JsonTokenType.NULL, "null") else null
+        else -> {
+            val raw = text.substring(index)
+            if (NUMBER_TOKEN.matches(raw)) JsonToken(JsonTokenType.NUMBER, raw) else null
+        }
+    }
+}
+
+private val NUMBER_TOKEN = Regex("-?(0|[1-9]\\d*)(\\.\\d+)?([eE][+-]?\\d+)?")

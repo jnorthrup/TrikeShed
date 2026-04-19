@@ -4,28 +4,29 @@ package borg.trikeshed.common
 
 import borg.trikeshed.lib.fromOctal
 import kotlinx.cinterop.ExperimentalForeignApi
-import kotlinx.cinterop.cstr
-import kotlinx.cinterop.toKStringFromUtf8
-import platform.posix.mkdtemp
-import platform.posix.unlink
+import kotlin.random.Random
+import platform.posix.mkdir as posixMkdir
+import platform.posix.remove
+import platform.posix.rmdir
 
 /** emulates shell command*/
 actual fun mktemp(): String {
-    //cinterop
-    val template = "/tmp/tmpXXXXXX".cstr
-    val res = mkdtemp(template)
-    return res?.toKStringFromUtf8() ?: throw IllegalStateException("mkdtemp failed")
-
+    return "/tmp/trikeshed-${Random.nextLong().toString(16)}.tmp"
 }
 
 actual fun rm(path: String): Boolean {
-    //cinterop
-    return unlink(path) == 0
+    return remove(path) == 0 || rmdir(path) == 0
 }
 
 actual fun  mkdir(path: String): Boolean {
-    //kotlin native posix make directory hierarchy
-    val res = platform.posix.mkdir(path, 777.fromOctal().toUShort())
-    return res == 0
-}
+    val normalized = path.trimEnd('/')
+    if (normalized.isEmpty()) return true
+    if (normalized == "/") return true
 
+    val parent = normalized.substringBeforeLast('/', "")
+    if (parent.isNotEmpty() && parent != normalized) {
+        mkdir(parent)
+    }
+
+    return Files.exists(normalized) || posixMkdir(normalized, 777.fromOctal().toUShort()) == 0
+}
