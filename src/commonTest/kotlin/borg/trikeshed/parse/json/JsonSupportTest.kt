@@ -1,5 +1,6 @@
 package borg.trikeshed.parse.json
 
+import borg.trikeshed.common.TypeEvidence
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -26,5 +27,17 @@ class JsonSupportTest {
 
         val root = JsonSupport.query(json, "")
         assertTrue(root is Map<*, *>)
+    }
+
+    @Test
+    fun `support facade can collect one shot node evidence`() {
+        val nodeEvidence = mutableListOf<TypeEvidence>()
+
+        val parsed = JsonSupport.parse("""{"id64":5532807773,"coords":{"x":157.0},"name":"A"}""", nodeEvidence)
+
+        assertTrue(parsed is Map<*, *>)
+        assertEquals(5, nodeEvidence.size)
+        assertTrue(nodeEvidence.first().dquotes > 0U)
+        assertTrue(nodeEvidence.any { it.digits > 0U })
     }
 }
