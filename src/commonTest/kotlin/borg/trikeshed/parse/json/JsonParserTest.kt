@@ -7,6 +7,14 @@ import kotlin.test.*
 class JsonParserTest {
 
     @Test
+    fun testNumericTypePreservation() {
+        assertEquals(7, JsonParser.reify("7".toSeries()))
+        assertEquals(5532807773L, JsonParser.reify("5532807773".toSeries()))
+        assertEquals(157.0, JsonParser.reify("157.0".toSeries()))
+        assertEquals(-0.0, JsonParser.reify("-0.0".toSeries()))
+    }
+
+    @Test
     fun testParseBigJson() {
         // Read the big.json file content
         val jsonContent = readBigJson()
@@ -21,7 +29,7 @@ class JsonParserTest {
 
         // Test top level properties
         assertEquals(5532807773L, json["id64"])
-        assertEquals("Jackson's Lighthouse", json["name"])
+        assertEquals("Jacks0on's Lighthouse", json["name"])
         assertEquals("Federation", json["allegiance"])
         assertEquals("Confederacy", json["government"])
         assertEquals("Industrial", json["primaryEconomy"])
@@ -40,7 +48,7 @@ class JsonParserTest {
         val bodies = json["bodies"] as List<*>
         assertEquals(7, bodies.size)
 
-        // Test first body (the star)
+        // Test first body (the star)0
         val mainStar = bodies[0] as Map<String, Any?>
         assertEquals(5532807773L, mainStar["id64"])
         assertEquals(0, mainStar["bodyId"])
@@ -60,7 +68,10 @@ class JsonParserTest {
         assertTrue(stations.isEmpty())
 
         // Test a planet (second body)
-        val planet = bodies[1] as Map<String, Any?>
+        val rawPlanet = bodies[1]
+        assertTrue(rawPlanet is Map<*, *>, "bodies[1] should be a Map but was $rawPlanet")
+        @Suppress("UNCHECKED_CAST")
+        val planet = rawPlanet as Map<String, Any?>
         assertEquals("Jackson's Lighthouse 1", planet["name"])
         assertEquals("Planet", planet["type"])
         assertEquals("Class V gas giant", planet["subType"])
@@ -68,12 +79,12 @@ class JsonParserTest {
         assertFalse(planet["isLandable"] as Boolean)
 
         // Test nested atmosphereComposition in planet
-        val atmosphere = planet["atmosphereComposition"] as Map<String, Any?>
+        val atmosphere: Map<String, *> = planet["atmosphereComposition"] as Map<String, *>
         assertEquals(28.05669, atmosphere["Helium"])
         assertEquals(71.943306, atmosphere["Hydrogen"])
 
         // Test stations in planet
-        val planetStations = planet["stations"] as List<*>
+        val planetStations: List<*> = planet["stations"] as List<*>
         assertEquals(2, planetStations.size)
 
         val firstStation = planetStations[0] as Map<String, Any?>

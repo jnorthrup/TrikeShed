@@ -3,21 +3,9 @@
 package borg.trikeshed.parse.json
 
 import borg.trikeshed.common.collections._l
-
+import borg.trikeshed.lib.*
 import borg.trikeshed.lib.CharSeries.Companion.unbrace
 import borg.trikeshed.lib.CharSeries.Companion.unquote
-import borg.trikeshed.lib.Either
-import borg.trikeshed.lib.Join
-import borg.trikeshed.lib.Series
-import borg.trikeshed.lib.Twin
-import borg.trikeshed.lib.combine
-import borg.trikeshed.lib.first
-import borg.trikeshed.lib.get
-import borg.trikeshed.lib.second
-import borg.trikeshed.lib.toSeries
-import borg.trikeshed.lib.view
-import borg.trikeshed.lib.α
-import borg.trikeshed.lib.*
 
 typealias JsElement = Join<Twin<Int>, Series<Int>> //(openIdx j closeIdx) j commaIdxs
 typealias JsIndex = Join<Twin<Int>, Series<Char>> //(twin j src)
@@ -39,6 +27,22 @@ val List<*>.toJsPath: JsPath
             else -> throw IllegalArgumentException("expected String or Int, got $it")
         }
     }
+
+private fun parseJsonNumber(src: CharSeries): Any? {
+    val text = src.res.slice.asString().trim()
+
+    if (text.isEmpty()) return null
+    if (text == "-0") return -0.0
+
+    if (text.contains('.') || text.contains('e', ignoreCase = true)) 
+        return text.toDoubleOrNull()
+
+    val longValue = text.toLongOrNull()
+    if (longValue != null) 
+        return if (longValue in Int.MIN_VALUE..Int.MAX_VALUE) longValue.toInt() else longValue
+
+    return text.toDoubleOrNull()
+}
 
 /** delimiter-exclusive segments in a splittable json element.
  *  e.g. ",1," in "[0,1,2,3]" would be "1"
@@ -194,7 +198,7 @@ object JsonParser {
 
             't', 'f' -> 't' == c
 //            'n' -> null
-            else -> src.res.slice.parseDoubleOrNull()
+            else -> parseJsonNumber(src)
         }
     }
 
@@ -221,16 +225,17 @@ object JsonParser {
     ): Any? {
         val (pathHead: JsPathElement, pathTail: JsPath) = path.first() j path.drop(1)
 
-        return pathHead.fold(
+        return if (pathHead.isLeft) {
             /** this, String branch, performs the search of a key by descending into each segment, and looking for a
              * key that matches, and then will recurse into that, or return the desired form
              */
-            selectByKey(context, pathTail, reifyResult),
+            selectByKey(context, pathTail, reifyResult)(pathHead.leftOrNull!!)
+        } else {
             /** this will check for enough segments to select the desired element, and
              *  then will recurse into that or return the desired form, discarding the
              *  segment key as necessary.  This works on both obj and array */
-            selectByIndex(context, pathTail, reifyResult)
-        )
+            selectByIndex(context, pathTail, reifyResult)(pathHead.rightOrNull!!)
+        }
     }
 
     private fun selectByKey(
@@ -292,13 +297,14 @@ object JsonParser {
         } else {
             val depths1: MutableList<Int> = mutableListOf()
 
-            val nextPath = pathTail.take(1).first()
+            val nextPath: Either<String, Int> = pathTail.take(1).first()
             if (nextPath.isLeft) logDebug { "descending with pathTail ${pathTail.size}" } else {
                 val rightOrNull = nextPath.rightOrNull
                 logDebug { "descending with pathTail ${pathTail.size} and index $rightOrNull" }
             }
+            val takeFirst: Int? = nextPath.rightOrNull?.takeIf { it > 0 }?.inc()
             jsPath(
-                index(tmp, depths1, nextPath.rightOrNull?.inc()) j tmp,
+                index(tmp, depths1, takeFirst) j tmp,
                 pathTail.debug { logDebug { "descending with pathTail ${pathTail.size}" } },
                 reifyResult,
                 depths1
@@ -312,11 +318,11 @@ object JsonParser {
         reifyResult: Boolean,
     ): (Int) -> Any? = { idx: Int ->
         var r: Any? = Unit
-        val (element: JsElement, src) = context
-        val (twin, _) = element
+        val (element: JsElement, src: Series<Char>) = context
+        val (twin: Twin<Int>, _: Series<Int>) = element
         val (pos, lim) = twin
-        val cs = CharSeries(src, pos, lim).trim
-        val inObj = cs[0] == '{'
+        val cs: CharSeries = CharSeries(src, pos, lim).trim
+        val inObj: Boolean = cs[0] == '{'
         do {
             val tmp = CharSeries(context.segments.elementAtOrNull(idx)?.toSeries() ?: break)
             val value: CharSeries = if (inObj) {
