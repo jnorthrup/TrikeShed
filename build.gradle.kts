@@ -49,14 +49,15 @@ kotlin {
     wasmJs {
         browser {
             testTask {
-                useKarma {
-                    useChromeHeadless()
-                    // Define a custom launcher that adds required flags and select it as the browser
-                    customLaunchers.put("ChromeHeadlessNoSandbox", mapOf(
-                        "base" to "ChromeHeadless",
-                        "flags" to listOf("--no-sandbox", "--disable-gpu", "--disable-dev-shm-usage")
-                    ))
-                    browsers = listOf("ChromeHeadlessNoSandbox")
+                val firefoxBin = project.file("/Applications/Firefox.app/Contents/MacOS/firefox")
+                if (firefoxBin.exists()) {
+                    useKarma {
+                        useFirefox()
+                    }
+                } else {
+                    useKarma {
+                        useChromeHeadless()
+                    }
                 }
             }
         }
@@ -264,10 +265,15 @@ afterEvaluate {
 
     // Set CHROME_BIN to wrapper that launches Chrome with required flags for headless runs
     val chromeWrapper = project.file("scripts/chrome-headless-wrapper.sh")
+    val firefoxBin = project.file("/Applications/Firefox.app/Contents/MacOS/firefox")
     tasks.matching { it.name == "wasmJsBrowserTest" || it.name.endsWith("BrowserTest") }.configureEach {
         (this as? org.gradle.api.tasks.testing.Test)?.let {
             // Make CHROME_BIN available to the test process so Karma uses the wrapper
             it.environment("CHROME_BIN", chromeWrapper.absolutePath)
+            // If a local Firefox binary exists, make FIREFOX_BIN available so Karma can use it
+            if (firefoxBin.exists()) {
+                it.environment("FIREFOX_BIN", firefoxBin.absolutePath)
+            }
         }
     }
 }
