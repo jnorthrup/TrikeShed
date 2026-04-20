@@ -50,8 +50,13 @@ kotlin {
         browser {
             testTask {
                 useKarma {
-                    // Use a custom Karma config file that defines a ChromeHeadless launcher with required flags
-                    configFile = file("$projectDir/karma.conf.js")
+                    useChromeHeadless()
+                    // Define a custom launcher that adds required flags and select it as the browser
+                    customLaunchers.put("ChromeHeadlessNoSandbox", mapOf(
+                        "base" to "ChromeHeadless",
+                        "flags" to listOf("--no-sandbox", "--disable-gpu", "--disable-dev-shm-usage")
+                    ))
+                    browsers = listOf("ChromeHeadlessNoSandbox")
                 }
             }
         }
@@ -260,8 +265,10 @@ afterEvaluate {
     // Set CHROME_BIN to wrapper that launches Chrome with required flags for headless runs
     val chromeWrapper = project.file("scripts/chrome-headless-wrapper.sh")
     tasks.matching { it.name == "wasmJsBrowserTest" || it.name.endsWith("BrowserTest") }.configureEach {
-        // Make CHROME_BIN available to the test process so Karma uses the wrapper
-        environment("CHROME_BIN", chromeWrapper.absolutePath)
+        (this as? org.gradle.api.tasks.testing.Test)?.let {
+            // Make CHROME_BIN available to the test process so Karma uses the wrapper
+            it.environment("CHROME_BIN", chromeWrapper.absolutePath)
+        }
     }
 }
 
