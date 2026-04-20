@@ -24,4 +24,4 @@ if [ -z "$CHROME_BIN" ]; then
   exit 2
 fi
 
-exec "$CHROME_BIN" --no-sandbox --disable-gpu "$@"
+exec "$CHROME_BIN" --headless --no-sandbox --disable-gpu --disable-dev-shm-usage --remote-debugging-port=9222 "$@"
