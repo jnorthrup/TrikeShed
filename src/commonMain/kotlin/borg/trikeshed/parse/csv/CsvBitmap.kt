@@ -116,7 +116,7 @@ object CsvBitmap {
             } while (inputX / 2 < input[inputY].size)
             inputX = 0
             inputY++
-        } while (maskedSoFar.toUInt() < inputSize.toUInt())
+        } while (maskedSoFar.toUInt() < inputSize)
         return input
     }
 }

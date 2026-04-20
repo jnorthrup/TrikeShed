@@ -1,8 +1,8 @@
 @file:Suppress("UNCHECKED_CAST")
 
-package borg.trikeshed.common.collections
+package borg.trikeshed.collections
 
-import borg.trikeshed.common.collections.HashSeriesSet.Companion.MutableHashSeriesSet
+import borg.trikeshed.collections.HashSeriesSet.Companion.MutableHashSeriesSet
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.iterator
@@ -97,8 +97,8 @@ open class HashSeriesSet<T : Any>  : SeriesSet<T> {
             }
 
             override fun remove(element: T): Boolean {
-                val bucketIndex = theSet.getBucketIndex(element)
-                val bucket = buckets[bucketIndex]
+                val bucketIndex: Int = theSet.getBucketIndex(element)
+                val bucket: Bucket<T> = buckets[bucketIndex]
                 val index = bucket.view.indexOf(element)
                 if (index != -1) {
                     buckets + (buckets.size   j { i :Int->
@@ -126,7 +126,7 @@ open class HashSeriesSet<T : Any>  : SeriesSet<T> {
             }
 
             private fun resize() {
-                val oldSeries = buckets as Series<Series<T>>
+                val oldSeries: Series<Series<T>> = buckets
                 buckets = theSet.createBuckets(buckets.size * 2)
                 theSet._size = 0
 
@@ -162,12 +162,9 @@ fun main1() {
     println("Set contains 20 after removal: ${testSet.contains(20)}")
 
     println("Set contents:")
-    for (item in testSet) {
+    for (item in testSet)
         println(item)
-    }
 
     println("Bucket contents:")
-    for (bucket in testSet.buckets) {
-        println(bucket.view.toList())
-    }
+    for (bucket: Bucket<Int> in testSet.buckets) println(bucket.view.toList())
 }

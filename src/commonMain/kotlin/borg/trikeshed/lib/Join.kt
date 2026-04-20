@@ -15,7 +15,7 @@ interface Join<A, B> {
     val pair: Pair<A, B>
         get() = Pair(a, b)
     /** debugger hack only, violates all common sense */
-    val list: List<Any?> get() = (this as? Series<out Any?>)?.toList() ?: emptyList()
+    val list: List<Any?> get() = (this as? Series<Any?>)?.toList() ?: emptyList()
 
     companion object {
         //the Join factory method
@@ -44,16 +44,16 @@ interface Join<A, B> {
 typealias Twin<T> = Join<T, T>
 
 //Twin factory method
-inline fun <T> Twin(a: T, b: T): Twin<T> = a j b
+fun <T> Twin(a: T, b: T): Twin<T> = a j b
 
 
 
 
-inline val <A> Join<A, *>.first: A get() = this.a
-inline val <B> Join<*, B>.second: B get() = this.b
+  val <A> Join<A, *>.first: A get() = this.a
+  val <B> Join<*, B>.second: B get() = this.b
 
 /**
  * exactly like "to" for "Join" but with a different (and shorter!) name
  */
-inline infix fun <A, B> A.j(b: B): Join<A, B> = Join(this, b)
+infix fun <A, B> A.j(b: B): Join<A, B> = Join(this, b)
 

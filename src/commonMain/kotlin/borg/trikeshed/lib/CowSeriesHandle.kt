@@ -13,7 +13,7 @@ inline val <reified T> Series<T>.cow: CowSeriesHandle<T> get() = CowSeriesHandle
 /**
  * CopyOnWriteSeries which creates a new copy of the backing Series on all mutation methods.
  *
- * this the envelope of a letter+envelope abstraction using CopyOnWriteSwappingSeries as the letter
+ * this the envelope of a letter+envelope abstraction using COWSeriesBody as the letter
  *
  * this contains a Long? immutable version attribute which is incremented during cloning, or stays null
  *

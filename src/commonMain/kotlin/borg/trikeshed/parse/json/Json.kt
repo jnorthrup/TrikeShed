@@ -21,10 +21,10 @@ typealias JsPath = Series<JsPathElement>
 
 //private fun logDebug(t: () -> String) {} //logging turned off for now
 
-fun JsIndex.toSeries(): Series<Char> = this.second [ a.a until a.b]
+fun JsIndex.toSeries(): Series<Char> = this.second[a.a until a.b]
 
 val List<*>.toJsPath: JsPath
-    get() = this.toSeries() α  {
+    get() = this.toSeries() α {
         when (it) {
             is String -> JsPathElement.left(it)
             is Int -> JsPathElement.right(it)
@@ -166,7 +166,7 @@ object JsonParser {
 
                 boundaries.zipWithNext().map { (before: Int, after: Int): Pair<Int, Int> ->
                     if (isObj) {
-                        val tmp = CharSeries(src[before.inc() until after]).trim
+                        val tmp: CharSeries = CharSeries(src[before.inc() until after]).trim
                         require(tmp.seekTo('"')) {
                             "malformed open quote in ${tmp.take(40).asString()}"
                         }
@@ -174,12 +174,16 @@ object JsonParser {
                             require(tmp.seekTo('"', '\\')) {
                                 "malformed close-quote in ${tmp.take(40).asString()}"
                             }
-                            (tmp.pos - 1).let { closeQuote ->
+                            (tmp.pos.dec()).let { closeQuote ->
                                 require(tmp.seekTo(':')) {
                                     "expected colon in ${tmp.take(40).asString()}"
                                 }
                                 tmp.slice.let { valueContext: Series<Char> ->
-                                    tmp.lim(closeQuote).pos(openQuote).asString() j reify(valueContext, nodeEvidence, rowVecCallback)
+                                    tmp.lim(closeQuote).pos(openQuote).asString() j reify(
+                                        valueContext,
+                                        nodeEvidence,
+                                        rowVecCallback,
+                                    )
                                 }
                             }
                         }
@@ -289,7 +293,7 @@ object JsonParser {
                 }
             }
         }
-        r.debug { logDebug { "final return is ${( r as? Series<Char>)?.asString() ?: r}" } }
+        r.debug { logDebug { "final return is ${(r as? Series<Char>)?.asString() ?: r}" } }
     }
 
 
@@ -315,7 +319,7 @@ object JsonParser {
                 index(tmp, depths1, takeFirst) j tmp,
                 pathTail.debug { logDebug { "descending with pathTail ${pathTail.size}" } },
                 reifyResult,
-                depths1
+                depths1,
             )
         }
     }
@@ -328,11 +332,11 @@ object JsonParser {
         var r: Any? = Unit
         val (element: JsElement, src: Series<Char>) = context
         val (twin: Twin<Int>, _: Series<Int>) = element
-        val (pos, lim) = twin
+        val (pos: Int, lim: Int) = twin
         val cs: CharSeries = CharSeries(src, pos, lim).trim
         val inObj: Boolean = cs[0] == '{'
         do {
-            val tmp = context.segments.elementAtOrNull(idx)?.toSeries() ?: break
+            val tmp: Series<Char> = context.segments.elementAtOrNull(idx)?.toSeries() ?: break
             val value: Series<Char> = if (inObj) {
                 val segment = CharSeries(tmp)
                 if (!segment.seekTo(':')) break

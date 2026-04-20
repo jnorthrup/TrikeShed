@@ -35,7 +35,7 @@ private fun storageOrNull(): Storage? =
 
 private fun normalizePath(path: String): String {
     val normalized = path.replace('\\', '/')
-    val parts = mutableListOf<String>()
+    val parts: MutableList<String> = mutableListOf<String>()
     for (part in normalized.split('/')) {
         when {
             part.isEmpty() || part == "." -> {}
@@ -47,10 +47,10 @@ private fun normalizePath(path: String): String {
 }
 
 private fun parentPath(path: String): String? {
-    val normalized = normalizePath(path)
-    val cut = normalized.lastIndexOf('/')
-    if (cut <= 0) return "/"
-    return normalized.substring(0, cut)
+    val normalized: String = normalizePath(path)
+    val cut: Int = normalized.lastIndexOf('/')
+    return if (cut <= 0) "/"
+    else normalized.substring(0, cut)
 }
 
 private fun fileKey(path: String): String = FILE_PREFIX + normalizePath(path)
@@ -318,7 +318,8 @@ actual fun rm(path: String): Boolean {
     val nestedDirPrefix = dirKey(normalized).trimEnd('/') + "/"
 
     val nestedFileKeys = storageKeys(nestedFilePrefix) + blobFallback.keys.filter { it.startsWith(nestedFilePrefix) }
-    val nestedDirKeys = storageKeys(nestedDirPrefix) + dirFallback.map(::dirKey).filter { it.startsWith(nestedDirPrefix) }
+    val nestedDirKeys =
+        storageKeys(nestedDirPrefix) + dirFallback.map(::dirKey).filter { it.startsWith(nestedDirPrefix) }
 
     nestedFileKeys.forEach { key ->
         storageRemove(key)

@@ -11,8 +11,9 @@ import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.pow
 
-typealias MetaSeries<I,T> =Join<I,(I)->T>
-typealias Series<T> = MetaSeries<Int,T>
+typealias MetaSeries<I, T> = Join<I, (I) -> T>
+typealias Series<T> = MetaSeries<Int, T>
+
 val <T> Series<T>.size: Int get() = a
 
 
@@ -180,7 +181,7 @@ fun <A, B> Series<A>.runningfold(initial: B, f: (acc: B, A, Int) -> B): Series<B
  *          if the Series is null then 0 is returned
  *          if the value is null then 0 is returned
  */
-inline fun Series<Int>.binarySearch(t: Int): Int = this.view.binarySearch(t)
+fun Series<Int>.binarySearch(t: Int): Int = this.view.binarySearch(t)
 
 /**splits a range into multiple parts for upstream reindexing utility
  * 0..11 / 3 produces [0..3, 4..7, 8..11].toSeries()
@@ -229,9 +230,9 @@ fun IntArray.binarySearch(i: Int): Int {
 /**
  * Series->Set */
 fun <S> Join<Int, (Int) -> S>.toSet(opt: MutableSet<S>? = null): MutableSet<S> = (
-        opt
-            ?: LinkedHashSet(size)
-        ).also { hs -> hs.addAll(this.view) }
+    opt
+        ?: LinkedHashSet(size)
+    ).also { hs -> hs.addAll(this.view) }
 
 // Series iterator for use in for loops
 operator fun <A> Series<A>.iterator(): Iterator<A> = object : Iterator<A> {
@@ -374,10 +375,7 @@ fun Series<Char>.parseLong(): Long {
     var sign = 1L
     var x = 0
     when (this[0]) {
-        '-' -> {
-            sign = -1L; x++
-        }
-
+        '-' -> { sign = -1L; x++ }
         '+' -> x++
     }
     var r = 0L

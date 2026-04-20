@@ -12,7 +12,7 @@ import kotlin.math.min
 //package vec
 
 @InternalCoroutinesApi
-typealias CircularQueue<T> = borg.trikeshed.common.collections.CirQlar<T>
+typealias CircularQueue<T> = CirQlar<T>
 
 /**
 
@@ -37,17 +37,17 @@ open class CirQlar<T>(
     val full: Boolean get() = tail >= maxSize
 
     /*override */  fun offer(e: T): Boolean {
-        val i = tail % maxSize
-        val tmp = evict?.run { al.takeIf { it.size < i }?.get(i) }
+        val i: Int = tail % maxSize
+        val tmp: Any? = evict?.run { al.takeIf { it.size < i }?.get(i) }
         al[i] = e
 
         if (++tail == 2 * maxSize) tail = maxSize
-        tmp?.let { t -> evict?.invoke(t as T) }
+        tmp?.let { t: Any -> evict.invoke(t as T) }
         return true
     }
 
     fun toList(): List<T> {
-        val iterator = iterator()
+        val iterator: Iterator<T> = iterator()
         return List(size) {
             val next = iterator.next()
             next
@@ -57,8 +57,8 @@ open class CirQlar<T>(
     /*override*/ fun poll(): T = TODO("Not yet implemented")
     /*override*/ fun peek(): T = TODO("Not yet implemented")
     /*override*/ fun add(k: T): Boolean = offer(k)
-    operator fun borg.trikeshed.common.collections.CirQlar<T>.plus(k: T): Boolean = offer(k)
-    operator fun borg.trikeshed.common.collections.CirQlar<T>.plusAssign(k: T) {
+    operator fun CirQlar<T>.plus(k: T): Boolean = offer(k)
+    operator fun CirQlar<T>.plusAssign(k: T) {
         offer(k)
     }
 

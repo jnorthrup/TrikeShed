@@ -1,4 +1,4 @@
-package gk.kademlia.codec
+package borg.trikeshed.platform.codec
 
 interface Codec<Evt, Serde> {
     fun send(event: Evt): Serde?

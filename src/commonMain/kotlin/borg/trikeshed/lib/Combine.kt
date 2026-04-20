@@ -2,7 +2,7 @@ package borg.trikeshed.lib
 
 import borg.trikeshed.common.collections.s_
 
-operator fun <A> Series<A>.plus(c: Series<A>): Series<A> = combine(borg.trikeshed.common.collections.s_[this, c])
+operator fun <A> Series<A>.plus(c: Series<A>): Series<A> = combine(s_[this, c])
 
 /**
 Series combine (series...)
@@ -46,7 +46,7 @@ fun <A> combine(catn: Series<Series<A>>): Series<A> {
                     in 2..4 -> stairs.indexOfFirst { it > i }
                     else -> stairs.binarySearch(i)
                 }
-                val series = catn[idx]
+                val series: Series<A> = catn[idx]
                 val offset = if (idx == 0) i else i - stairs[idx - 1]
                 series[offset]
             }

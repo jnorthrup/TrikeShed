@@ -65,8 +65,8 @@ class IsamMetaFileReader(val metafileFilename: String) :Usable{
             val end = coords[2 * index + 1].toInt()
             val ioMemento: IOMemento = IOMemento.valueOf(type)
             //use PlatformCodec to get the decoder and encoder
-            val decoder = ioMemento.createDecoder(end - begin)
-            val encoder = ioMemento.createEncoder(end - begin)
+            val decoder: (ByteArray) -> Any? = ioMemento.createDecoder(end - begin)
+            val encoder: (Any?) -> ByteArray = ioMemento.createEncoder(end - begin)
             RecordMeta(name, ioMemento, begin, end, decoder, encoder)
         }
     }
@@ -87,9 +87,9 @@ class IsamMetaFileReader(val metafileFilename: String) :Usable{
      */
     companion object {
         fun write(metafilename: String, recordMetas: Series<ColumnMeta>,varchars:Map<String,Int>): Series<RecordMeta> {
-            val lines = mutableListOf<String>()
+            val lines: MutableList<String> = mutableListOf<String>()
 
-            val result = sanitize(recordMetas,varchars)
+            val result: Series<RecordMeta> = sanitize(recordMetas,varchars)
             lines.add("# format:  coords WS .. EOL names WS .. EOL TypeMememento WS .. [EOL]")
             lines.add("# last coord is the recordlen")
             lines.add(result.view.joinToString(" ") { it.begin.toString() + " " + it.end })
@@ -100,13 +100,13 @@ class IsamMetaFileReader(val metafileFilename: String) :Usable{
         }
 
         fun sanitize(recordMetas: Series<ColumnMeta>, varchars: Map<String, Int>): Series<RecordMeta> {
-            val result = (if (recordMetas.view.any { !(it is RecordMeta) || (min(it.begin, it.end) < 0&&null==it.child) }) {
+            val result: Series<RecordMeta> = if (recordMetas.view.any { it !is RecordMeta || (min(it.begin, it.end) < 0&&null==it.child) }) {
                 var offset = 0
-                recordMetas.view.map { columnMeta: ColumnMeta ->
-                    val type: TypeMemento = columnMeta.type
-                    val len =  type.networkSize?: varchars[columnMeta.name]?: throw Exception("no network size for ${columnMeta.name}")
+                recordMetas.view.map { (name: String,type: TypeMemento): ColumnMeta ->
+                    val type: TypeMemento = type
+                    val len: Int =  type.networkSize?: varchars[name]?: throw Exception("no network size for $name")
                     val recordMeta = RecordMeta(
-                        columnMeta.name,
+                        name,
                         type as IOMemento,
                         offset,
                         offset + len,
@@ -117,7 +117,6 @@ class IsamMetaFileReader(val metafileFilename: String) :Usable{
                     recordMeta
                 }.toSeries()
             } else recordMetas as Series<RecordMeta>
-                    )
             return result
         }
 

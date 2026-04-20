@@ -1,4 +1,4 @@
-package borg.trikeshed.common.collections.associative.trie
+package borg.trikeshed.collections.associative.trie
 
 import borg.trikeshed.lib.*
 import borg.trikeshed.lib.commonPrefixWith
@@ -14,11 +14,11 @@ class RadixTree<C : Comparable<C>> {
     internal var root: Node<C>? = null
 
     internal class Node<C : Comparable<C>>(
-        var key: borg.trikeshed.lib.Series<C>,
+        var key: Series<C>,
         var term: Boolean = false,
         var children: MutableList<Node<C>> = mutableListOf()
     ) {
-        fun insert(s: borg.trikeshed.lib.Series<C>) {
+        fun insert(s: Series<C>) {
             var commonLength = 0
             val minLength = minOf(key.size, s.size)
 
@@ -33,10 +33,8 @@ class RadixTree<C : Comparable<C>> {
 
                 // This node's key is a prefix of the new string
                 commonLength == key.size -> {
-                    val remaining = s.drop(commonLength) as borg.trikeshed.lib.Series<C>
-                    val matchingChild = children.firstOrNull {
-                        it.key.isNotEmpty() && it.key[0] == remaining[0]
-                    }
+                    val remaining: Series<C> = s.drop(commonLength)
+                    val matchingChild: Node<C>? = children.firstOrNull { it.key.isNotEmpty() && it.key[0] == remaining[0] }
 
                     if (matchingChild != null) {
                         matchingChild.insert(remaining)
@@ -62,7 +60,7 @@ class RadixTree<C : Comparable<C>> {
             }
         }
 
-        fun collectKeys(prefix: borg.trikeshed.lib.Series<C>, result: MutableList<borg.trikeshed.lib.Series<C>>) {
+        fun collectKeys(prefix: Series<C>, result: MutableList<Series<C>>) {
             val currentKey = prefix + this.key
             if (term) {
                 result.add(currentKey)
@@ -73,7 +71,7 @@ class RadixTree<C : Comparable<C>> {
         }
     }
 
-    operator fun plus(s: borg.trikeshed.lib.Series<C>): borg.trikeshed.common.collections.associative.trie.RadixTree<C> {
+    operator fun plus(s: Series<C>): RadixTree<C> {
         if (s.isEmpty()) return this
 
         if (root == null) {
@@ -84,9 +82,9 @@ class RadixTree<C : Comparable<C>> {
         return this
     }
 
-    fun keys(): List<borg.trikeshed.lib.Series<C>> {
-        val result = mutableListOf<borg.trikeshed.lib.Series<C>>()
-        root?.collectKeys(borg.trikeshed.lib.emptySeries(), result)
+    fun keys(): List<Series<C>> {
+        val result = mutableListOf<Series<C>>()
+        root?.collectKeys(emptySeries(), result)
         return result
     }
 }

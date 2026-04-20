@@ -40,7 +40,7 @@ enum class IoPlatform {
 
     companion object {
         fun default(): IoPlatform = when {
-               ("os.name")?.contains("Linux") == true -> POSIX_PREAD
+            System.getProperty("os.name")?.contains("Linux") == true -> POSIX_PREAD
             else -> JVM_FILE_CHANNEL
         }
     }

@@ -270,7 +270,7 @@ object CSVUtil {
             lines α { line ->
                 //y axis here
 
-                val lserr: Series<Byte> = file.drop(line.a)[0 until line.b.size] as Series<Byte>
+                val lserr: Series<Byte> = file.drop(line.a)[0 until line.b.size]
                 line.b.withIndex() α { (x, b): IndexedValue<Int> ->
                     //x axis here
 
@@ -278,13 +278,13 @@ object CSVUtil {
                     CharSeries(
                         lserr[delimitRange.first.toInt() until delimitRange.endInclusive.inc().toInt()].decodeUtf8()
                     ) j {
-                        val air = delimitRange.asIntRange
+                        val air: IntRange = delimitRange.asIntRange
 
                         RecordMeta(
-                            headerNames[x],
-                            IoCharSeries,
-                            air.first,
-                            air.last.inc(),
+                            name = headerNames[x],
+                            type = IoCharSeries,
+                            begin = air.first,
+                            end = air.last.inc(),
                             child = successorMeta?.get(x)//this is an ISAM schema
                         )
                     }

@@ -40,9 +40,10 @@ fun combineMutable(a: Cursor, b: Cursor): MutableSeries<RowVec> = combine(a, b).
  * returns Series<Series<A?>>> where the meta is stripped out and the values are cast using
  *
  * it "as?" A return only A values and null for non-A values */
-inline operator fun <A : Any, IR : Any?, SrInnr : Series<Join<A, *>>, SrOutr : Series<SrInnr>, RC : KClass<A?>> SrOutr.div(
-    c: KClass<out A>,
-): Series<Series<A?>> = this α { it α Join<A, *>::a } α { it α { it } } α { it α { it } }
+operator fun <A : Any, SrInnr : Series<Join<A, *>>, SrOutr : Series<SrInnr>> SrOutr.div(
+    c: KClass<A>,
+): Series<Series<A?>> =
+    this α { it: SrInnr -> it α Join<A, *>::a } α { it: Series<A> -> it α { it: A -> it } } α { it: Series<A> -> it α { it: A -> it } }
 
 
 /** cursor get by IntRange -- return a Cursor with the columns specified by the IntRange */
@@ -107,7 +108,7 @@ fun Cursor.get(s: Series<ColumnExclusion>): Cursor {
 }
 
 //in columnar project this is meta.right
-val Series< ColumnMeta>.names get() = this α ColumnMeta::name
+val Series<ColumnMeta>.names get() = this α ColumnMeta::name
 
 /** head default 5 rows
  * just like unix head - print default 5 lines from cursor contents to stdout */
@@ -116,7 +117,7 @@ fun Cursor.head(last: Int = 5): Unit = show(0 until (max(0, min(last, size))))
 
 /** run head starting at random index */
 fun Cursor.showRandom(n: Int = 5) {
-    head(0);repeat(n) {
+    head(0); repeat(n) {
         if (size > 0) showValues(Random.nextInt(0, size).let { it..it })
     }
 }
@@ -128,27 +129,25 @@ fun Cursor.show(range: IntRange = 0 until size) {
     showValues(range)
 }
 
-fun Cursor.showValues(range: IntRange) {
-    try {
-        range.forEach { x: Int ->
-            val row: RowVec = row(x)
+fun Cursor.showValues(range: IntRange) = try {
+    range.forEach { x: Int ->
+        val row: RowVec = row(x)
 
-            val show=row α {(c,d)->
-                val meta=d()
-                meta.name to c
-                when(meta.type){
-                    IoCharSeries->meta.name to (c as Series<Char> ).asString()
-                    else-> c
-                }
-
-
+        val show: Series<Any?> = row α { (c: Any?, d: () -> ColumnMeta) ->
+            val meta: ColumnMeta = d()
+            meta.name to c
+            when (meta.type) {
+                IoCharSeries -> meta.name to (c as Series<Char>).asString()
+                else -> c
             }
 
-            println(show.toList())
+
         }
-    } catch (e: NoSuchElementException) {
-        println("cannot fully access range $range")
+
+        println(show.toList())
     }
+} catch (e: NoSuchElementException) {
+    println("cannot fully access range $range")
 }
 
 
@@ -173,10 +172,11 @@ operator fun Cursor.get(vararg i: Int): Cursor = size j { y: Int ->
  *
  */
 val Cursor.isNumerical: Boolean
-    get() = meta.view.all {
-        when (it.type) {
+    get() = meta.view.all { (_ : String, b: TypeMemento): ColumnMeta ->
+        when (b) {
             IoByte, IoShort, IoInt, IoFloat, IoDouble, IoLong -> true
             else -> false
+
         }
     }
 
