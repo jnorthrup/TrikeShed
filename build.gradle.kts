@@ -47,7 +47,14 @@ kotlin {
 
     @OptIn(ExperimentalWasmDsl::class)
     wasmJs {
-        browser()
+        browser {
+            testTask {
+                useKarma {
+                    // Use a custom Karma config file that defines a ChromeHeadless launcher with required flags
+                    configFile = file("$projectDir/karma.conf.js")
+                }
+            }
+        }
     }
 
     val hostOs = System.getProperty("os.name")
@@ -250,9 +257,11 @@ afterEvaluate {
         dependsOn(jmhTask)
     }
 
-    // Avoid failing when browser-based wasm tests can't start or discover tests (CI/host without browsers)
+    // Set CHROME_BIN to wrapper that launches Chrome with required flags for headless runs
+    val chromeWrapper = project.file("scripts/chrome-headless-wrapper.sh")
     tasks.matching { it.name == "wasmJsBrowserTest" || it.name.endsWith("BrowserTest") }.configureEach {
-        // disable browser-based tests on hosts that can't run ChromeHeadless
-        enabled = false
+        // Make CHROME_BIN available to the test process so Karma uses the wrapper
+        environment("CHROME_BIN", chromeWrapper.absolutePath)
     }
 }
+
