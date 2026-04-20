@@ -1,4 +1,4 @@
-package gk.kademlia.bitops.impl
+package borg.trikeshed.platform.bitops.impl
 
 import borg.trikeshed.platform.bitops.BitOps
 

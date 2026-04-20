@@ -1,4 +1,4 @@
-package borg.trikeshed.common.collections
+package borg.trikeshed.collections
 
 object _seq {
       operator fun <T> get(vararg t: T): Sequence<T> = sequence {

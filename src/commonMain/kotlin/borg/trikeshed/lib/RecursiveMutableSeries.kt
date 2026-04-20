@@ -1,5 +1,7 @@
 package borg.trikeshed.lib
 
+import borg.trikeshed.collections.s_
+
 class RecursiveMutableSeries<T> private constructor(private var data: Series<T>) : MutableSeries<T>, Series<T> {
 
     override fun set(index: Int, item: T) {
@@ -48,7 +50,7 @@ class RecursiveMutableSeries<T> private constructor(private var data: Series<T>)
     }
 
     override fun plus(item: T): MutableSeries<T> =
-        RecursiveMutableSeries(data + borg.trikeshed.common.collections.s_[item])
+        RecursiveMutableSeries(data + s_[item])
 
     override fun minus(item: T): MutableSeries<T> = RecursiveMutableSeries(
         size j { i ->

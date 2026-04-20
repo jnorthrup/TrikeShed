@@ -1,6 +1,6 @@
 @file:Suppress("UNCHECKED_CAST")
 
-package borg.trikeshed.common.collections
+package borg.trikeshed.collections
 
 /**
  * A [Set] that further provides a *total ordering* on its elements.
@@ -78,7 +78,7 @@ package borg.trikeshed.common.collections
  * @author  Josh Bloch
  * @see Set
  *
- * @see borg.trikeshed.common.collections.TreeSet
+ * @see TreeSet
  *
  * @see SortedMap
  *
@@ -135,7 +135,7 @@ interface SortedSet<E : Comparable<E>> : MutableSet<E> {
      * has a restricted range, and `fromElement` or
      * `toElement` lies outside the bounds of the range
      */
-    fun subSet(fromElement: E, toElement: E): borg.trikeshed.common.collections.SortedSet<E>
+    fun subSet(fromElement: E, toElement: E): SortedSet<E>
 
     /**
      * Returns a view of the portion of this set whose elements are
@@ -163,7 +163,7 @@ interface SortedSet<E : Comparable<E>> : MutableSet<E> {
      * restricted range, and `toElement` lies outside the
      * bounds of the range
      */
-    fun headSet(toElement: E): borg.trikeshed.common.collections.SortedSet<E>
+    fun headSet(toElement: E): SortedSet<E>
 
     /**
      * Returns a view of the portion of this set whose elements are
@@ -191,7 +191,7 @@ interface SortedSet<E : Comparable<E>> : MutableSet<E> {
      * restricted range, and `fromElement` lies outside the
      * bounds of the range
      */
-    fun tailSet(fromElement: E): borg.trikeshed.common.collections.SortedSet<E>
+    fun tailSet(fromElement: E): SortedSet<E>
 
     /**
      * Returns the first (lowest) element currently in this set.

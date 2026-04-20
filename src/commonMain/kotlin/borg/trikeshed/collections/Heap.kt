@@ -1,4 +1,4 @@
-package borg.trikeshed.common.collections
+package borg.trikeshed.collections
 
 class Heap<T> {
     private val list = mutableListOf<T>()

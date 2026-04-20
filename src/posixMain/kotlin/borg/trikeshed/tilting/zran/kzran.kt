@@ -4,7 +4,7 @@
 
 package borg.trikeshed.tilting.zran
 
-import borg.trikeshed.common.collections.binarySearch
+import borg.trikeshed.collections.binarySearch
 import borg.trikeshed.lib.*
 import borg.trikeshed.lib.CZero.nz
 import borg.trikeshed.lib.CZero.z

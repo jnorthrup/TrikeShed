@@ -1,3 +1,5 @@
+package borg.trikeshed.lib
+
 class HashTable<K, V>(private val capacity: Int = 16) {
     private class Entry<K, V>(val key: K, var value: V, var next: Entry<K, V>?)
 

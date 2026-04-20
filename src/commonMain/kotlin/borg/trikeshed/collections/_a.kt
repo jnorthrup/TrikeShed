@@ -1,6 +1,6 @@
 @file:Suppress("OPT_IN_USAGE", "UNCHECKED_CAST")
 
-package borg.trikeshed.common.collections
+package borg.trikeshed.collections
 
 object _a {
     operator fun get(vararg t: Boolean): BooleanArray = t

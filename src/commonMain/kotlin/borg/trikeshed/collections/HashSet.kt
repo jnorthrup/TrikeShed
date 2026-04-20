@@ -1,4 +1,4 @@
-package borg.trikeshed.common.collections
+package borg.trikeshed.collections
 
 class HashSet<T> : Set<T> {
     private var buckets: Array<Any?> = arrayOfNulls(16)
@@ -131,7 +131,7 @@ class HashSet<T> : Set<T> {
 }
 
 fun main() {
-    val arraySet = borg.trikeshed.common.collections.ArraySet<Int>()
+    val arraySet = ArraySet<Int>()
     arraySet.add(10)
     arraySet.add(20)
     arraySet.add(30)
@@ -139,7 +139,7 @@ fun main() {
     arraySet.remove(20)
     println("ArraySet contains 20 after removal: ${arraySet.contains(20)}") // Output: false
 
-    val hashSet = borg.trikeshed.common.collections.HashSet<String>()
+    val hashSet = HashSet<String>()
     hashSet.add("apple")
     hashSet.add("banana")
     hashSet.add("cherry")
