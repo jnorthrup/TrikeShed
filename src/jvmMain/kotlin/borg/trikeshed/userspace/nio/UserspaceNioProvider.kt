@@ -15,18 +15,7 @@ class UserspaceNioProvider : UserspaceNioSpi {
     class NioElement(val fd: Int) : AsyncContextElement(), EventListener {
         override val key get() = Key
 
-        companion object Key : AsyncContextKey<NioElement>()
-
-        override suspend fun open() {
-            requireState(ElementState.CREATED)
-            state = ElementState.OPEN
-        }
-
-        override suspend fun close() {
-            requireState(ElementState.OPEN)
-            state = ElementState.CLOSING
-            state = ElementState.CLOSED
-        }
+        companion object Key : AsyncContextKey<NioElement>("NioElementKey", 1L shl 10)
 
         override suspend fun onEvent(event: Any) {
             // Minimal marker hook for structured fanout.

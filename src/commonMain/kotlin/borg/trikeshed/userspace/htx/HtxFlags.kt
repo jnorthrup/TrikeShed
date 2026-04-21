@@ -1,26 +1,26 @@
 package borg.trikeshed.userspace.htx
 
+import borg.trikeshed.context.BitMasked
+
 /**
  * HTX start-line flags.
  */
-enum class HtxSlFlags(val bit: Int) {
-    IS_RESP(0),
-    XFER_LEN(1),
-    XFER_ENC(2),
-    CLEN(3),
-    CHNK(4),
-    VER_11(5),
-    BODYLESS(6),
-    HAS_SCHM(7),
-    SCHM_HTTP(8),
-    SCHM_HTTPS(9),
-    HAS_AUTHORITY(10),
-    NORMALIZED_URI(11),
-    CONN_UPG(12),
-    BODYLESS_RESP(13),
-    NOT_HTTP(14);
-
-    val mask: UInt get() = 1u shl bit
+enum class HtxSlFlags : BitMasked {
+    IS_RESP,
+    XFER_LEN,
+    XFER_ENC,
+    CLEN,
+    CHNK,
+    VER_11,
+    BODYLESS,
+    HAS_SCHM,
+    SCHM_HTTP,
+    SCHM_HTTPS,
+    HAS_AUTHORITY,
+    NORMALIZED_URI,
+    CONN_UPG,
+    BODYLESS_RESP,
+    NOT_HTTP;
 
     companion object {
         fun fromMask(mask: UInt): Set<HtxSlFlags> =
@@ -34,18 +34,17 @@ enum class HtxSlFlags(val bit: Int) {
 /**
  * HTX message flags.
  */
-enum class HtxFlags(val bit: Int) {
-    PARSING_ERROR(0),
-    PROCESSING_ERROR(1),
-    FRAGMENTED(2),
-    UNORDERED(3),
-    EOM(4); // End of message
+enum class HtxFlags : BitMasked {
+    NONE,
+    PARSING_ERROR,
+    PROCESSING_ERROR,
+    FRAGMENTED,
+    UNORDERED,
+    EOM; // End of message
 
-    val mask: UInt get() = 1u shl bit
+    override val mask: UInt get() = if (this == NONE) 0u else 1u shl (ordinal - 1)
 
     companion object {
-        val NONE: UInt = 0u
-
         fun fromMask(mask: UInt): Set<HtxFlags> =
             entries.filter { (mask and it.mask) != 0u }.toSet()
 

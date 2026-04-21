@@ -13,12 +13,6 @@ data class QuicConfig(
     val maxUdpPayloadSize: Int = 1350,
 )
 
-sealed class QuicError(message: String) : RuntimeException(message) {
-    class ConnectionFailed(host: String, port: Int) : QuicError("Failed to connect to $host:$port")
-    class ProtocolViolation(details: String) : QuicError(details)
-    class Closed : QuicError("QUIC element is closed")
-}
-
 val QuicKey: AsyncContextKey<QuicElement> = QuicElement.Key
 
 suspend fun openQuicElement(config: QuicConfig = QuicConfig()): QuicElement =

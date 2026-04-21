@@ -2,6 +2,7 @@ package borg.trikeshed.userspace.nio
 
 import borg.trikeshed.context.ElementState
 import borg.trikeshed.context.UserspaceNioSpi
+import borg.trikeshed.userspace.reactor.Interest
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
 import java.util.ServiceLoader
@@ -24,7 +25,7 @@ class UserspaceNioProviderTest {
         assertEquals(ElementState.CLOSED, element.state)
 
         val backend = NioSpiBackend(provider)
-        val token = Reactor(backend).register(fd = 42, interest = Interest.READABLE)
+        val token = Reactor(backend).register(fd = 42, interest = Interest.READ)
         assertTrue(token > 0)
         backend.unregister(42).getOrThrow()
     }

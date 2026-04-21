@@ -1,19 +1,38 @@
 package borg.trikeshed.context
 
 /**
- * Lifecycle states for any [AsyncContextElement].
- *
- * Each state encodes its ordinal as a bitmask for efficient comparison and
- * alignment with semantic methods.
+ * Interface for enums that represent bitmasks.
  */
-enum class ElementState(val mask: Int) {
-    CREATED(1 shl 0),
-    OPEN(1 shl 1),
-    CLOSING(1 shl 2),
-    CLOSED(1 shl 3);
+interface BitMasked {
+    val ordinal: Int
+    val mask: UInt get() = 1u shl ordinal
 
-    fun isAtLeast(other: ElementState): Boolean = this.ordinal >= other.ordinal
-    fun isAtMost(other: ElementState): Boolean = this.ordinal <= other.ordinal
-    fun isLessThan(other: ElementState): Boolean = this.ordinal < other.ordinal
-    fun isGreaterThan(other: ElementState): Boolean = this.ordinal > other.ordinal
+    fun isAtLeast(other: BitMasked): Boolean = this.ordinal >= other.ordinal
+    fun isAtMost(other: BitMasked): Boolean = this.ordinal <= other.ordinal
+    fun isLessThan(other: BitMasked): Boolean = this.ordinal < other.ordinal
+    fun isGreaterThan(other: BitMasked): Boolean = this.ordinal > other.ordinal
+}
+
+/**
+ * Interface for enums that represent Long bitmasks.
+ */
+interface BitMaskedLong {
+    val ordinal: Int
+    val mask: Long get() = 1L shl ordinal
+
+    fun isAtLeast(other: BitMaskedLong): Boolean = this.ordinal >= other.ordinal
+    fun isAtMost(other: BitMaskedLong): Boolean = this.ordinal <= other.ordinal
+    fun isLessThan(other: BitMaskedLong): Boolean = this.ordinal < other.ordinal
+    fun isGreaterThan(other: BitMaskedLong): Boolean = this.ordinal > other.ordinal
+}
+
+/**
+ * Lifecycle states for any [AsyncContextElement].
+ */
+enum class ElementState : BitMasked {
+    CREATED,
+    OPEN,
+    ACTIVE,
+    DRAINING,
+    CLOSED;
 }

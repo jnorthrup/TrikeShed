@@ -24,4 +24,10 @@ abstract class AsyncContextKey<E : AsyncContextElement>(
      * Test if a combined mask contains this key's semantic identity.
      */
     fun inMask(combinedMask: Long): Boolean = (combinedMask and mask) == mask
+
+    companion object {
+        val NioUserspaceKeyMask: Long = 1L shl 0
+        val LiburingKeyMask: Long = 1L shl 1
+        val FanoutDispatcherKeyMask: Long = 1L shl 2
+    }
 }
