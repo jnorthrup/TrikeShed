@@ -26,27 +26,16 @@ private suspend fun defaultHtxRequestHandler(request: HtxClientRequest): HtxClie
 
 suspend fun openHtxElement(
     requestHandler: HtxRequestHandler = ::defaultHtxRequestHandler,
-): AsyncContextElement =
+): HtxElement =
     HtxElement(requestHandler).also { it.open() }
 
 class HtxElement(
     private val requestHandler: HtxRequestHandler = ::defaultHtxRequestHandler,
 ) : AsyncContextElement() {
-    companion object Key : AsyncContextKey<HtxElement>()
+    companion object Key : AsyncContextKey<HtxElement>("HtxKey", 1L shl 5)
 
     override val key: AsyncContextKey<HtxElement>
         get() = Key
-
-    override suspend fun open() {
-        requireState(ElementState.CREATED)
-        state = ElementState.OPEN
-    }
-
-    override suspend fun close() {
-        requireState(ElementState.OPEN)
-        state = ElementState.CLOSING
-        state = ElementState.CLOSED
-    }
 
     suspend fun request(
         method: String = "GET",

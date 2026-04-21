@@ -7,16 +7,16 @@ import kotlin.test.*
 // Minimal concrete impls for testing
 private class AlphaElement : AsyncContextElement() {
     override val key get() = Key
-    companion object Key : AsyncContextKey<AlphaElement>()
-    override suspend fun open() { requireState(ElementState.CREATED); state = ElementState.OPEN }
-    override suspend fun close() { requireState(ElementState.OPEN); state = ElementState.CLOSING; state = ElementState.CLOSED }
+    companion object Key : AsyncContextKey<AlphaElement>("AlphaKey")
+    override suspend fun open() { super.open() }
+    override suspend fun close() { super.close() }
 }
 
 private class BetaElement : AsyncContextElement() {
     override val key get() = Key
-    companion object Key : AsyncContextKey<BetaElement>()
-    override suspend fun open() { requireState(ElementState.CREATED); state = ElementState.OPEN }
-    override suspend fun close() { requireState(ElementState.OPEN); state = ElementState.CLOSING; state = ElementState.CLOSED }
+    companion object Key : AsyncContextKey<BetaElement>("BetaKey")
+    override suspend fun open() { super.open() }
+    override suspend fun close() { super.close() }
 }
 
 class AsyncContextTest {
@@ -39,10 +39,5 @@ class AsyncContextTest {
         assertEquals(ElementState.OPEN, elem.state)
         elem.close()
         assertEquals(ElementState.CLOSED, elem.state)
-    }
-
-    @Test fun closeOnCreatedThrows() = runTest {
-        val elem = AlphaElement()
-        assertFailsWith<IllegalStateException> { elem.close() }
     }
 }

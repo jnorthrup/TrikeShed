@@ -17,7 +17,7 @@ class QuicElementTest {
 }
 
 private class OtherQuicElement : borg.trikeshed.context.AsyncContextElement() {
-    companion object Key : borg.trikeshed.context.AsyncContextKey<OtherQuicElement>()
+    companion object Key : borg.trikeshed.context.AsyncContextKey<OtherQuicElement>("OtherQuicKey")
     override val key: borg.trikeshed.context.AsyncContextKey<OtherQuicElement>
         get() = Key
 

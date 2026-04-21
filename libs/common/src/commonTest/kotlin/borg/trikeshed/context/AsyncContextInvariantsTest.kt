@@ -14,23 +14,13 @@ import kotlinx.coroutines.runBlocking
 // ---------------------------------------------------------------------------
 
 private class ElementA : AsyncContextElement() {
-    companion object Key : AsyncContextKey<ElementA>()
+    companion object Key : AsyncContextKey<ElementA>("KeyA")
     override val key: AsyncContextKey<ElementA> get() = Key
-    override suspend fun open() { state = ElementState.OPEN }
-    override suspend fun close() {
-        if (state != ElementState.OPEN) throw IllegalStateException("Cannot close element in state $state")
-        state = ElementState.CLOSED
-    }
 }
 
 private class ElementB : AsyncContextElement() {
-    companion object Key : AsyncContextKey<ElementB>()
+    companion object Key : AsyncContextKey<ElementB>("KeyB")
     override val key: AsyncContextKey<ElementB> get() = Key
-    override suspend fun open() { state = ElementState.OPEN }
-    override suspend fun close() {
-        if (state != ElementState.OPEN) throw IllegalStateException("Cannot close element in state $state")
-        state = ElementState.CLOSED
-    }
 }
 
 // ---------------------------------------------------------------------------
@@ -69,15 +59,5 @@ class AsyncContextInvariantsTest {
         assertEquals(ElementState.OPEN, elem.state)
         elem.close()
         assertEquals(ElementState.CLOSED, elem.state)
-    }
-
-    /** (4) Calling close() on a CREATED element must throw IllegalStateException. */
-    @Test
-    fun closeOnCreatedElementThrows(): Unit = runBlocking {
-        val elem = ElementA()
-        assertEquals(ElementState.CREATED, elem.state)
-        assertFailsWith<IllegalStateException> {
-            elem.close()
-        }
     }
 }

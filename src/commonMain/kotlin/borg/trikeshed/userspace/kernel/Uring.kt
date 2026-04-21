@@ -1,18 +1,35 @@
 package borg.trikeshed.userspace.kernel
 
+import borg.trikeshed.userspace.BitMasked
+
 /**
  * Kernel io_uring interface ported from literbike.
  * High-performance, zero-overhead interface to io_uring.
  */
 
-object UringConstants {
-    const val IORING_SETUP_IOPOLL = 1
-    const val IORING_SETUP_SQPOLL = 2
-    const val IORING_SETUP_SQ_AFF = 4
-    const val IORING_SETUP_CQSIZE = 8
-    const val IORING_SETUP_SINGLE_ISSUER = 4096
-    const val IORING_SETUP_DEFER_TASKRUN = 8192
+enum class UringSetupFlags : BitMasked {
+    IOPOLL,
+    SQPOLL,
+    SQ_AFF,
+    CQSIZE,
+    RESV1,
+    RESV2,
+    RESV3,
+    RESV4,
+    RESV5,
+    RESV6,
+    RESV7,
+    RESV8,
+    SINGLE_ISSUER,
+    DEFER_TASKRUN;
 
+    companion object {
+        fun toMask(flags: Iterable<UringSetupFlags>): UInt =
+            flags.fold(0u) { acc, flag -> acc or flag.mask }
+    }
+}
+
+object UringConstants {
     const val SYS_IO_URING_SETUP = 425L
     const val SYS_IO_URING_ENTER = 426L
     const val SYS_IO_URING_REGISTER = 427L
@@ -27,7 +44,11 @@ enum class OpCode(val code: Byte) {
     POLL_ADD(6),
     POLL_REMOVE(7),
     RECV(10),
-    SEND(11)
+    SEND(11);
+
+    companion object {
+        fun fromCode(code: Byte): OpCode? = entries.find { it.code == code }
+    }
 }
 
 /**

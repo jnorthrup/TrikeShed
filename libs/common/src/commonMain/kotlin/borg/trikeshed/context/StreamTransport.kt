@@ -1,8 +1,8 @@
-package borg.trikeshed.ccek.transport
+package borg.trikeshed.context
 
-import borg.trikeshed.ccek.KeyedService
 import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.channels.SendChannel
+import kotlin.coroutines.CoroutineContext
 
 /** A single logical stream — independent send/receive channels backed by whichever transport is installed. */
 data class StreamHandle(
@@ -12,7 +12,7 @@ data class StreamHandle(
 )
 
 /** Transport-agnostic multi-stream abstraction. Both SCTP-style and QUIC-style streams implement this. */
-interface StreamTransport : KeyedService {
+interface StreamTransport : CoroutineContext.Element {
     /** Open a new logical stream. */
     suspend fun openStream(): StreamHandle
     /** Count of currently open streams. */

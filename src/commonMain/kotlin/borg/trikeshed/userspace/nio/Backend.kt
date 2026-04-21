@@ -14,17 +14,6 @@ data class Completion(
     val opType: OpType
 )
 
-data class Interest(
-    val readable: Boolean,
-    val writable: Boolean
-) {
-    companion object {
-        val READABLE = Interest(true, false)
-        val WRITABLE = Interest(false, true)
-        val READ_WRITE = Interest(true, true)
-    }
-}
-
 interface NioObject {
     fun asRawFd(): Int?
     fun isOpen(): Boolean
@@ -36,8 +25,8 @@ interface NioBuffer : NioObject {
 }
 
 interface PlatformBackend {
-    fun register(fd: Int, token: Long, interest: Interest): Result<Unit>
-    fun reregister(fd: Int, token: Long, interest: Interest): Result<Unit>
+    fun register(fd: Int, token: Long, interest: borg.trikeshed.userspace.reactor.Interest): Result<Unit>
+    fun reregister(fd: Int, token: Long, interest: borg.trikeshed.userspace.reactor.Interest): Result<Unit>
     fun unregister(fd: Int): Result<Unit>
     fun submitRead(fd: Int, buf: ByteArray, userData: Long): Result<Unit>
     fun submitWrite(fd: Int, buf: ByteArray, userData: Long): Result<Unit>

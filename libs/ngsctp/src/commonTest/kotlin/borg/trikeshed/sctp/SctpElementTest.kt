@@ -17,7 +17,7 @@ class SctpElementTest {
 }
 
 private class OtherSctpElement : borg.trikeshed.context.AsyncContextElement() {
-    companion object Key : borg.trikeshed.context.AsyncContextKey<OtherSctpElement>()
+    companion object Key : borg.trikeshed.context.AsyncContextKey<OtherSctpElement>("OtherSctpKey")
     override val key: borg.trikeshed.context.AsyncContextKey<OtherSctpElement>
         get() = Key
 

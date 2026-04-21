@@ -1,5 +1,6 @@
 package borg.trikeshed.userspace.nio
 
+import borg.trikeshed.userspace.reactor.Interest
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock

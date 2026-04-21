@@ -190,9 +190,11 @@ kotlin {
             }
         }
 
-        val macosMain by getting { dependsOn(posixMain) }
-        val macosTest by getting {
-            dependsOn(posixTest)
+        if (hostOs == "Mac OS X") {
+            val macosMain by getting { dependsOn(posixMain) }
+            val macosTest by getting {
+                dependsOn(posixTest)
+            }
         }
 
         val jsMain by getting {

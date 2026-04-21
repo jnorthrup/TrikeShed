@@ -3,6 +3,9 @@ package borg.trikeshed.sctp
 import borg.trikeshed.context.AsyncContextElement
 import borg.trikeshed.context.AsyncContextKey
 import borg.trikeshed.context.ElementState
+import borg.trikeshed.context.StreamHandle
+import borg.trikeshed.context.StreamTransport
+import kotlinx.coroutines.channels.Channel
 
 enum class SctpChunkType { DATA, INIT, INIT_ACK, SACK, HEARTBEAT, COOKIE_ECHO, COOKIE_ACK }
 
@@ -27,25 +30,30 @@ data class SctpAssociation(val associationId: Long, val state: SctpState)
 
 val SctpKey: AsyncContextKey<SctpElement> = SctpElement.Key
 
-suspend fun openSctpElement(): AsyncContextElement =
+suspend fun openSctpElement(): SctpElement =
     SctpElement().also { it.open() }
 
-class SctpElement : AsyncContextElement() {
-    companion object Key : AsyncContextKey<SctpElement>()
+class SctpElement(
+    private val streams: MutableMap<Int, StreamHandle> = mutableMapOf(),
+) : AsyncContextElement(), StreamTransport {
+    companion object Key : AsyncContextKey<SctpElement>("SctpKey", 1L shl 3)
 
     override val key: AsyncContextKey<SctpElement>
         get() = Key
 
-    override suspend fun open() {
-        requireState(ElementState.CREATED)
-        state = ElementState.OPEN
+    override suspend fun openStream(): StreamHandle {
+        requireState(ElementState.OPEN)
+        val streamId = (streams.keys.maxOrNull() ?: -1) + 1
+        val streamHandle = StreamHandle(
+            id = streamId,
+            send = Channel(Channel.BUFFERED),
+            recv = Channel(Channel.BUFFERED),
+        )
+        streams[streamId] = streamHandle
+        return streamHandle
     }
 
-    override suspend fun close() {
-        requireState(ElementState.OPEN)
-        state = ElementState.CLOSING
-        state = ElementState.CLOSED
-    }
+    override val activeStreams: Int get() = streams.size
 
     suspend fun bind(port: Int): SctpAssociation {
         requireState(ElementState.OPEN)

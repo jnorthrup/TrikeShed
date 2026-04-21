@@ -27,14 +27,11 @@ private class RecordingListener(
         get() = Key
 
     override suspend fun open() {
-        requireState(ElementState.CREATED)
-        state = ElementState.OPEN
+        super.open()
     }
 
     override suspend fun close() {
-        requireState(ElementState.OPEN)
-        state = ElementState.CLOSING
-        state = ElementState.CLOSED
+        super.close()
     }
 
     override suspend fun onEvent(event: Any) {
@@ -66,9 +63,9 @@ class UserspaceNioEndToEndTest {
             listenerA.close()
             listenerB.close()
 
-            val quic = serverContext[QuicKey]
-            val sctp = serverContext[SctpKey]
-            val htx = serverContext[HtxKey]
+            val quic = serverContext[QuicKey] as? AsyncContextElement
+            val sctp = serverContext[SctpKey] as? AsyncContextElement
+            val htx = serverContext[HtxKey] as? AsyncContextElement
             assertNotNull(quic)
             assertNotNull(sctp)
             assertNotNull(htx)

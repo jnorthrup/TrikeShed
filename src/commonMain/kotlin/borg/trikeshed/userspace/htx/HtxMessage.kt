@@ -1,12 +1,14 @@
 package borg.trikeshed.userspace.htx
 
+import borg.trikeshed.collections.associative.trie.Trie
+
 /**
  * HTX message — complete HTTP message in internal format.
  * Blocks metadata at END; payloads at BEGINNING (ring buffer layout).
  */
 class HtxMessage(
     val blocks: MutableList<HtxBlockData> = mutableListOf(),
-    var flags: HtxFlags = HtxFlags(HtxFlags.NONE),
+    var flags: UInt = HtxFlags.NONE.mask,
 ) {
     fun isEmpty(): Boolean = blocks.isEmpty()
     fun size(): Int = blocks.size
@@ -21,7 +23,7 @@ class HtxMessage(
     }
     fun addEndHeaders() { blocks.add(HtxBlockData.EndHeaders) }
     fun addEndTrailers() { blocks.add(HtxBlockData.EndTrailers) }
-    fun setEom() { flags = HtxFlags(HtxFlags.EOM) }
+    fun setEom() { flags = HtxFlags.EOM.mask }
 
     fun startLine(): HtxStartLine? = blocks
         .filterIsInstance<HtxBlockData.StartLine>()
@@ -34,6 +36,20 @@ class HtxMessage(
     }
 
     companion object {
+        private val HTTP_TRIE = Trie().apply {
+            add(1, "HTTP/")
+            add(1, "GET ")
+            add(1, "POST ")
+            add(1, "PUT ")
+            add(1, "DELETE ")
+            add(1, "HEAD ")
+            add(1, "OPTIONS ")
+            add(1, "PATCH ")
+            add(1, "CONNECT ")
+            add(1, "TRACE ")
+            freeze()
+        }
+
         /**
          * Parse HTTP/1.x text into an HTX message.
          */
@@ -87,11 +103,15 @@ class HtxMessage(
             val preview = input.copyOf(minOf(input.size, 1024))
             val text = preview.decodeToString()
 
-            if (text.startsWith("HTTP/") || text.startsWith("GET ") || text.startsWith("POST ") ||
-                text.startsWith("PUT ") || text.startsWith("DELETE ") || text.startsWith("HEAD ") ||
-                text.startsWith("OPTIONS ") || text.startsWith("PATCH ") || text.startsWith("CONNECT ") ||
-                text.startsWith("TRACE ")
-            ) {
+            var found = false
+            for (key in HTTP_TRIE.root.keys) {
+                if (text.startsWith(key)) {
+                    found = true
+                    break
+                }
+            }
+
+            if (found) {
                 return parseHttp1(input) ?: HtxMessage()
             }
             // HTTP/2 connection preface
@@ -130,7 +150,8 @@ class HtxMessage(
         }
 
         private fun parseHeader(line: String): Pair<String, String>? {
-            val colonPos = line.indexOf(':') ?: return null
+            val colonPos = line.indexOf(':')
+            if (colonPos == -1) return null
             return line.substring(0, colonPos).trim() to line.substring(colonPos + 1).trim()
         }
     }
