@@ -133,6 +133,8 @@ kotlin {
 
         val jvmMain by getting {
             dependencies {
+                implementation("borg.trikeshed:common:0.1.0-SNAPSHOT")
+
                 // DuckDB JDBC removed from root build; use version catalog or local libs/duckdb if present
 
                 // JMH dependencies for benchmarking
@@ -166,6 +168,10 @@ kotlin {
                 implementation(kotlin("test-junit"))
                 implementation("org.junit.jupiter:junit-jupiter:5.9.0")
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
+                implementation("borg.trikeshed:server:0.1.0-SNAPSHOT")
+                implementation("borg.trikeshed:quic:0.1.0-SNAPSHOT")
+                implementation("borg.trikeshed:ngsctp:0.1.0-SNAPSHOT")
+                implementation("borg.trikeshed:htx-client:0.1.0-SNAPSHOT")
             }
             // WIP/experimental tests excluded from default build.
             kotlin.exclude("borg/trikeshed/signal/**")
