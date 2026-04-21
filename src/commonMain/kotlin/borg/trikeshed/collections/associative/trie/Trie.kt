@@ -35,7 +35,7 @@ class Trie(var root: Map<String, Node> = linkedMapOf()) {
 
     fun frez(n: Node) {
 
-        (n.children.entries).let { cnodes: Set<Map.Entry<String, Node>> ->
+        n.children.entries.let { cnodes: Set<Map.Entry<String, Node>> ->
             n.children = ArrayMap.sorting(n.children)
             for ((_: String, v: Node) in cnodes) frez(v)
         }

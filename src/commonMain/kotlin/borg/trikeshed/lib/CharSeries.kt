@@ -26,23 +26,23 @@ class CharSeries(
     private var _cacheLen: Int = 0
     private val CHAR_CACHE_WINDOW: Int = 4096
 
-    private inline fun raw(i: Int): Char {
+    private fun raw(i: Int): Char {
         val c = _charCache
         if (c != null) {
             val b = _cacheBase
             val l = _cacheLen
             if (i >= b && i < b + l) return c[i - b]
         }
-        return buf.b(i)
+        return b(i)
     }
 
 
 
     /** get, the verb - the char at the current position and increment position */
-    inline val get: Char
+    val get: Char
         get() {
             if (!hasRemaining) throw IndexOutOfBoundsException("pos: $pos, limit: $limit")
-            val c = get(pos); pos++; return c
+            val c = raw(pos); pos++; return c
         }
 
     //string ctor

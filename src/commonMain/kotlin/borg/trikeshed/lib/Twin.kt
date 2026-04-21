@@ -2,6 +2,8 @@
 
 package borg.trikeshed.lib
 
+import kotlin.jvm.JvmInline
+
 /**
  * Compact twin facades for (offset,length) pairs.
  * - TwinPacked packs absolute (start,len) into a Long.
