@@ -206,6 +206,8 @@ kotlin {
         val jsTest by getting { dependsOn(commonTest) }
         val wasmJsMain by getting { dependsOn(commonMain) }
         val wasmJsTest by getting { dependsOn(commonTest) }
+
+        // Couch recovery work now lives under libs/couch/ instead of custom root source sets.
     }
 }
 
