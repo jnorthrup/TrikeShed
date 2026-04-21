@@ -20,6 +20,23 @@ class CharSeries(
     var mark: Int = -1,
 ) : Series<Char> by buf { //delegate to the underlying series
 
+    // Small char-window cache to improve locality. Uses buf.b(index) fallback when cache miss.
+    private var _charCache: CharArray? = null
+    private var _cacheBase: Int = 0
+    private var _cacheLen: Int = 0
+    private val CHAR_CACHE_WINDOW: Int = 4096
+
+    private inline fun raw(i: Int): Char {
+        val c = _charCache
+        if (c != null) {
+            val b = _cacheBase
+            val l = _cacheLen
+            if (i >= b && i < b + l) return c[i - b]
+        }
+        return buf.b(i)
+    }
+
+
 
     /** get, the verb - the char at the current position and increment position */
     inline val get: Char
@@ -94,7 +111,7 @@ class CharSeries(
     /** skip whitespace */
     val skipWs: CharSeries get() = apply { while (hasRemaining && mk.get.isWhitespace()); res }
 
-    val rtrim: CharSeries get() = apply { while (rem > 0 && b(limit - 1).isWhitespace()) limit-- }
+    val rtrim: CharSeries get() = apply { while (rem > 0 && raw(limit - 1).isWhitespace()) limit-- }
 
 
     fun clone(): CharSeries = CharSeries(a j b).also { it.pos = pos; it.limit = limit; it.mark = mark }
@@ -105,7 +122,7 @@ class CharSeries(
         get() {
             var h = 1
             for (i in pos until limit) {
-                h = 31 * h + b(i).hashCode()
+                h = 31 * h + raw(i).hashCode()
             }
             return h
         }
@@ -119,7 +136,7 @@ class CharSeries(
             mark != other.mark -> return false
             size != other.size -> return false
             else -> {
-                for (i in 0 until size) if (b(i) != other.b(i)) return false
+                for (i in 0 until size) if (raw(i) != other.b(i)) return false
                 return true
             }
         }
@@ -153,8 +170,8 @@ class CharSeries(
     fun confixScope(pred: (Char) -> Boolean) {
         var p = pos
         var l = limit
-        while (p < l && pred(get(p))) p++
-        while (l > p && pred(get(l.dec()))) l--
+        while (p < l && pred(raw(p))) p++
+        while (l > p && pred(raw(l.dec()))) l--
         lim(l)
         pos(p)
     }
