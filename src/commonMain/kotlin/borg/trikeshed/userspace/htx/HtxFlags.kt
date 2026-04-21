@@ -1,35 +1,55 @@
 package borg.trikeshed.userspace.htx
 
-class HtxSlFlags(val bits: UInt) {
+/**
+ * HTX start-line flags.
+ */
+enum class HtxSlFlags(val bit: Int) {
+    IS_RESP(0),
+    XFER_LEN(1),
+    XFER_ENC(2),
+    CLEN(3),
+    CHNK(4),
+    VER_11(5),
+    BODYLESS(6),
+    HAS_SCHM(7),
+    SCHM_HTTP(8),
+    SCHM_HTTPS(9),
+    HAS_AUTHORITY(10),
+    NORMALIZED_URI(11),
+    CONN_UPG(12),
+    BODYLESS_RESP(13),
+    NOT_HTTP(14);
+
+    val mask: UInt get() = 1u shl bit
+
     companion object {
-        val IS_RESP: UInt        = 0x00000001u
-        val XFER_LEN: UInt       = 0x00000002u
-        val XFER_ENC: UInt       = 0x00000004u
-        val CLEN: UInt           = 0x00000008u
-        val CHNK: UInt           = 0x00000010u
-        val VER_11: UInt         = 0x00000020u
-        val BODYLESS: UInt       = 0x00000040u
-        val HAS_SCHM: UInt       = 0x00000080u
-        val SCHM_HTTP: UInt      = 0x00000100u
-        val SCHM_HTTPS: UInt     = 0x00000200u
-        val HAS_AUTHORITY: UInt  = 0x00000400u
-        val NORMALIZED_URI: UInt = 0x00000800u
-        val CONN_UPG: UInt       = 0x00001000u
-        val BODYLESS_RESP: UInt  = 0x00002000u
-        val NOT_HTTP: UInt       = 0x00004000u
+        fun fromMask(mask: UInt): Set<HtxSlFlags> =
+            entries.filter { (mask and it.mask) != 0u }.toSet()
+
+        fun toMask(flags: Iterable<HtxSlFlags>): UInt =
+            flags.fold(0u) { acc, flag -> acc or flag.mask }
     }
 }
 
 /**
  * HTX message flags.
  */
-class HtxFlags(val bits: UInt) {
+enum class HtxFlags(val bit: Int) {
+    PARSING_ERROR(0),
+    PROCESSING_ERROR(1),
+    FRAGMENTED(2),
+    UNORDERED(3),
+    EOM(4); // End of message
+
+    val mask: UInt get() = 1u shl bit
+
     companion object {
-        val NONE: UInt             = 0x00000000u
-        val PARSING_ERROR: UInt    = 0x00000001u
-        val PROCESSING_ERROR: UInt = 0x00000002u
-        val FRAGMENTED: UInt       = 0x00000004u
-        val UNORDERED: UInt        = 0x00000008u
-        val EOM: UInt              = 0x00000010u  // End of message
+        val NONE: UInt = 0u
+
+        fun fromMask(mask: UInt): Set<HtxFlags> =
+            entries.filter { (mask and it.mask) != 0u }.toSet()
+
+        fun toMask(flags: Iterable<HtxFlags>): UInt =
+            flags.fold(0u) { acc, flag -> acc or flag.mask }
     }
 }

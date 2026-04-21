@@ -6,7 +6,7 @@ package borg.trikeshed.userspace.htx
  */
 class HtxMessage(
     val blocks: MutableList<HtxBlockData> = mutableListOf(),
-    var flags: HtxFlags = HtxFlags(HtxFlags.NONE),
+    var flags: UInt = HtxFlags.NONE,
 ) {
     fun isEmpty(): Boolean = blocks.isEmpty()
     fun size(): Int = blocks.size
@@ -21,7 +21,7 @@ class HtxMessage(
     }
     fun addEndHeaders() { blocks.add(HtxBlockData.EndHeaders) }
     fun addEndTrailers() { blocks.add(HtxBlockData.EndTrailers) }
-    fun setEom() { flags = HtxFlags(HtxFlags.EOM) }
+    fun setEom() { flags = HtxFlags.EOM.mask }
 
     fun startLine(): HtxStartLine? = blocks
         .filterIsInstance<HtxBlockData.StartLine>()
@@ -130,7 +130,8 @@ class HtxMessage(
         }
 
         private fun parseHeader(line: String): Pair<String, String>? {
-            val colonPos = line.indexOf(':') ?: return null
+            val colonPos = line.indexOf(':')
+            if (colonPos == -1) return null
             return line.substring(0, colonPos).trim() to line.substring(colonPos + 1).trim()
         }
     }
