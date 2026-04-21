@@ -1,8 +1,7 @@
 package borg.trikeshed.dht.id.impl
 
-import borg.trikeshed.platform.bitops.impl.BigIntOps
-import borg.trikeshed.dht.id.NUID
 import borg.trikeshed.num.BigInt as BigInteger
+import borg.trikeshed.platform.bitops.impl.BigIntOps
 
 //import java.math.BigInteger
 

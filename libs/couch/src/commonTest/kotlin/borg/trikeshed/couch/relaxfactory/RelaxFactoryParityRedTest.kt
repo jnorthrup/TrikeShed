@@ -1,22 +1,7 @@
 package borg.trikeshed.couch.relaxfactory
 
-import borg.trikeshed.couch.compat.relaxfactory.CouchService
-import borg.trikeshed.couch.compat.relaxfactory.CouchServiceCompiler
-import borg.trikeshed.couch.compat.relaxfactory.CouchViewInvocation
-import borg.trikeshed.couch.compat.relaxfactory.CouchViewManifest
-import borg.trikeshed.couch.compat.relaxfactory.Descending
-import borg.trikeshed.couch.compat.relaxfactory.EndKey
-import borg.trikeshed.couch.compat.relaxfactory.EndKeyDocId
-import borg.trikeshed.couch.compat.relaxfactory.Group
-import borg.trikeshed.couch.compat.relaxfactory.GroupLevel
-import borg.trikeshed.couch.compat.relaxfactory.Key
-import borg.trikeshed.couch.compat.relaxfactory.Keys
-import borg.trikeshed.couch.compat.relaxfactory.Limit
-import borg.trikeshed.couch.compat.relaxfactory.Skip
-import borg.trikeshed.couch.compat.relaxfactory.StartKey
-import borg.trikeshed.couch.compat.relaxfactory.StartKeyDocId
-import borg.trikeshed.couch.compat.relaxfactory.View
-import borg.trikeshed.couch.miniduck.ViewRowVec
+import borg.trikeshed.couch.relaxfactory.*
+import borg.trikeshed.couch.relaxfactory.CouchServiceCompiler.compile
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -25,7 +10,7 @@ import kotlin.test.assertTrue
 class RelaxFactoryParityRedTest {
     @Test
     fun compilesRelaxFactoryStyleServiceIntoDesignDocumentAndViewManifest() {
-        val manifest: CouchViewManifest = CouchServiceCompiler.compile<VehicleViewService>(namespace = "acme")
+        val manifest: CouchViewManifest = compile<VehicleViewService>(namespace = "acme")
 
         assertEquals("acmevehicle", manifest.databaseName)
         assertEquals("_design/${VehicleViewService::class.qualifiedName}", manifest.designDocument.id)
@@ -42,7 +27,7 @@ class RelaxFactoryParityRedTest {
 
     @Test
     fun mapsParameterAnnotationsIntoRelaxFactoryCompatibleQueryTemplate() {
-        val manifest = CouchServiceCompiler.compile<VehicleViewService>(namespace = "acme")
+        val manifest = compile<VehicleViewService>(namespace = "acme")
         val view = manifest.views.getValue("pagedPrefixSearch")
 
         assertEquals(
@@ -53,7 +38,7 @@ class RelaxFactoryParityRedTest {
 
     @Test
     fun methodLevelAnnotationsOverrideParametersAndEncodeGroupLevelCorrectly() {
-        val manifest = CouchServiceCompiler.compile<VehicleViewService>(namespace = "acme")
+        val manifest = compile<VehicleViewService>(namespace = "acme")
         val view = manifest.views.getValue("brandCountByPrefix")
 
         assertTrue(view.template.contains("group=true"))
@@ -63,7 +48,8 @@ class RelaxFactoryParityRedTest {
 
     @Test
     fun invokesViewsUsingCouchDb11CounterpartPathsAndJsonEncodedArguments() {
-        val invocation: CouchViewInvocation = CouchServiceCompiler.compile<VehicleViewService>(namespace = "acme")
+        val invocation:
+            CouchViewInvocation = compile<VehicleViewService>(namespace = "acme")
             .views
             .getValue("matchingTuple")
             .invoke(VehicleDoc(model = "Golf", brand = "VW"))
@@ -76,7 +62,7 @@ class RelaxFactoryParityRedTest {
 
     @Test
     fun decodesReduceListAndMapReturnShapesWithRelaxFactoryParity() {
-        val manifest = CouchServiceCompiler.compile<VehicleViewService>(namespace = "acme")
+        val manifest = compile<VehicleViewService>(namespace = "acme")
 
         assertEquals(CouchViewInvocation.ReturnShape.ListValue, manifest.views.getValue("getItemsWithBrand").returnShape)
         assertEquals(CouchViewInvocation.ReturnShape.MapKeyValue, manifest.views.getValue("brandToModel").returnShape)

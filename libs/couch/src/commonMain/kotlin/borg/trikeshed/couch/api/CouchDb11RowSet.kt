@@ -26,6 +26,7 @@ data class CouchDb11RowSet(
             val arrayStart = json.indexOf('[', rowsKeyIndex)
             val arrayEnd = json.lastIndexOf(']')
             val rowsContent = json.substring(arrayStart + 1, arrayEnd)
+            println("DEBUG rowsContent: [$rowsContent]")
 
             val block = BlockRowVec.mutable()
 

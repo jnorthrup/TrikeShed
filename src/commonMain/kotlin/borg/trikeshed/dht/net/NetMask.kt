@@ -36,7 +36,7 @@ interface NetMask<P : Comparable<P>> {
         }
 
     /**
-     * reports the xor bits count betweeb alice and bob
+     * reports the xor bits count between alice and bob
      */
     fun distance(alice: P, bob: P): Int = ops.run {
         val xor1 = xor(alice, bob)

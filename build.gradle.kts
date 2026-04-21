@@ -185,16 +185,6 @@ kotlin {
             kotlin.exclude("borg/trikeshed/signal/**")
             kotlin.exclude("borg/trikeshed/strategy/**")
             if (focusedTransportSlice) {
-                // Focused transport slice: exclude all non-transport tests
-                kotlin.exclude("gk/kademlia/**")
-                kotlin.exclude("borg/trikeshed/parse/**")
-                kotlin.exclude("borg/trikeshed/num/**")
-                kotlin.exclude("borg/trikeshed/lib/**")
-                kotlin.exclude("borg/trikeshed/common/**")
-                kotlin.exclude("borg/trikeshed/duck/**")
-                kotlin.exclude("borg/trikeshed/indicator/**")
-                kotlin.exclude("borg/trikeshed/net/channelization/ChannelBlockExchangeTest.kt")
-                kotlin.exclude("borg/trikeshed/net/channelization/ChannelSessionTest.kt")
             }
         }
 

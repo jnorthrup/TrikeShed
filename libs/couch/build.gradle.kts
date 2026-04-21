@@ -38,6 +38,11 @@ kotlin {
                 implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1-0.6.x-compat")
             }
         }
+        val jvmMain by getting {
+            dependencies {
+                implementation(kotlin("reflect"))
+            }
+        }
         val commonTest by getting {
             dependencies {
                 implementation(kotlin("test"))
