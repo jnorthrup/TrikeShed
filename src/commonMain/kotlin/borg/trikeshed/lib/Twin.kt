@@ -20,7 +20,7 @@ value class TwinPacked(val packed: Long) {
     val len: Int get() = (packed and 0xffffffffL).toInt()
 
     fun toPair(): Pair<Int, Int> = start to len
-    override fun toString(): String = "TwinPacked(start=${'$'}start,len=${'$'}len)"
+    override fun toString(): String = "TwinPacked(start=$start,len=$len)"
 }
 
 @JvmInline
@@ -36,5 +36,5 @@ value class Twin8(val packed: Int) {
     val len: Int get() = packed and 0xFF
 
     fun toPacked(baseStart: Int): TwinPacked = TwinPacked.of(baseStart + offset, len)
-    override fun toString(): String = "Twin8(offset=${'$'}offset,len=${'$'}len)"
+    override fun toString(): String = "Twin8(offset=$offset,len=$len)"
 }
