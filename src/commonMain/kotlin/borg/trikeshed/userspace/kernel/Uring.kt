@@ -6,12 +6,12 @@ package borg.trikeshed.userspace.kernel
  */
 
 object UringConstants {
-    const val IORING_SETUP_IOPOLL = 1u shl 0
-    const val IORING_SETUP_SQPOLL = 1u shl 1
-    const val IORING_SETUP_SQ_AFF = 1u shl 2
-    const val IORING_SETUP_CQSIZE = 1u shl 3
-    const val IORING_SETUP_SINGLE_ISSUER = 1u shl 12
-    const val IORING_SETUP_DEFER_TASKRUN = 1u shl 13
+    const val IORING_SETUP_IOPOLL = 1
+    const val IORING_SETUP_SQPOLL = 2
+    const val IORING_SETUP_SQ_AFF = 4
+    const val IORING_SETUP_CQSIZE = 8
+    const val IORING_SETUP_SINGLE_ISSUER = 4096
+    const val IORING_SETUP_DEFER_TASKRUN = 8192
 
     const val SYS_IO_URING_SETUP = 425L
     const val SYS_IO_URING_ENTER = 426L

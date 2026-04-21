@@ -1,0 +1,29 @@
+openapi: 3.1.0
+info:
+  title: HTX General Server API
+  version: 0.1.0-SNAPSHOT
+  description: Authoritative OpenAPI contract for the minimal htx-general server surface currently exercised by htx-client.
+servers:
+  - url: http://127.0.0.1
+    description: Local htx-general server endpoint
+tags:
+  - name: system
+    description: Server health and readiness operations
+paths:
+  /health:
+    get:
+      tags:
+        - system
+      operationId: getHealth
+      summary: Health probe
+      description: Returns the liveness response exposed by the htx-general server stub.
+      responses:
+        '200':
+          description: Server is healthy.
+          content:
+            text/plain:
+              schema:
+                type: string
+                const: ok
+components:
+  schemas: {}
