@@ -31,6 +31,7 @@ kotlin {
         freeCompilerArgs =
             listOf(
                 "-opt-in=kotlin.RequiresOptIn",
+                "-opt-in=kotlin.ExperimentalUnsignedTypes",
                 "-Xsuppress-version-warnings",
                 "-Xexpect-actual-classes",
             )
