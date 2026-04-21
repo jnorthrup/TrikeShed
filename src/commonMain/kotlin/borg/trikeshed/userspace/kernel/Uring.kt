@@ -1,6 +1,6 @@
 package borg.trikeshed.userspace.kernel
 
-import borg.trikeshed.context.BitMasked
+import borg.trikeshed.userspace.BitMasked
 
 /**
  * Kernel io_uring interface ported from literbike.

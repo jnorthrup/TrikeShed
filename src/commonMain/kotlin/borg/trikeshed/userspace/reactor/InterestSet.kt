@@ -1,6 +1,6 @@
 package borg.trikeshed.userspace.reactor
 
-import borg.trikeshed.context.BitMasked
+import borg.trikeshed.userspace.BitMasked
 
 /**
  * I/O interest bitmask — ported from literbike reactor/operation.rs.

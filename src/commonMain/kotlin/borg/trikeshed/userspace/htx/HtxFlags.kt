@@ -1,6 +1,6 @@
 package borg.trikeshed.userspace.htx
 
-import borg.trikeshed.context.BitMasked
+import borg.trikeshed.userspace.BitMasked
 
 /**
  * HTX start-line flags.
