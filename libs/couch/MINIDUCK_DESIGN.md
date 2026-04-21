@@ -4,7 +4,9 @@ Goal: define the small DuckDB-like query/storage layer for `libs/couch` without 
 
 Design stance
 - algebra first: MiniDuck is composed from `Join`, `Series`, Tensor snapshots, and Manifold projections
-- columnar-ish logical model, document-oriented physical model
+- the true starting point is specialization of `RowVec` families, not secondary indexing
+- analytical/storage state should be modeled as child blackboard constructs hanging off parent `RowVec` families
+- chunky block execution should mirror DuckDB more closely than ad hoc row-at-a-time traversal
 - `Series<RowVec>` is the canonical query surface
 - infix/compositional DSL is acceptable; procedural builders are not
 - CouchDB-compatible endpoints remain the compatibility shell
@@ -20,16 +22,16 @@ It is an algebra of query/storage transforms built from:
 - Manifold charts/atlases for moving between semantic and lowered coordinate systems
 
 Three layers:
-1. Storage layer: WAL + snapshots + NDJSON segment files
-2. Logical relation layer: `Cursor` and metadata-aware row vectors
-3. Algebra layer: infix plans composed from Join/Series/Tensor/Manifold
+1. RowVec-family layer: specialize parent/child `RowVec` families for docs, views, blobs, JSON, YAML, and expansion shells
+2. Block layer: sealed chunky blocks of `Series<RowVec>` and child blackboard state
+3. Algebra layer: infix plans composed from Join/Series/Tensor/Manifold over those families and blocks
 4. Compatibility layer: CouchDB and RelaxFactory-shaped endpoints over the same algebra
 
 ## 2. Canonical data types
 
 Use existing TrikeShed primitives wherever possible, but tighten Tensor around the algebra the user asked for:
 - `ColumnMeta = Join<String, TypeMemento>`
-- `RowVec = Series2<Any?, () -> ColumnMeta>`
+- `RowVec = Series2<Any?, () -> ColumnMeta>` as the parent row abstraction
 - `Cursor = Series<RowVec>`
 - `Series<T> = Join<Int, (Int) -> T>`
 - `typealias Shape = Series<Int>`
@@ -67,7 +69,64 @@ enum class RelationKind {
 The engine should not invent a parallel row model.
 Everything normalizes into `Cursor`, then may lower into Tensor/Manifold views for optimized execution.
 
-## 3. Query algebra, not builder SQL
+### Hierarchical RowVec stance
+
+`RowVec` should be treated as the parent abstraction for hierarchical records, not just as a flat row.
+That means a row may expose a lazy `.child` hierarchy for nested structures such as:
+- arrays/lists
+- structs/objects
+- exploded or expanded document subtrees
+- JSON/YAML tree projections
+- blob-backed deferred payload effects
+- view rows that defer materialization of nested payloads
+
+Design consequences:
+- a parent `RowVec` may legitimately have zero visible scalar columns while still owning lazy children
+- zero-length parent records are valid if they act as carriers for deferred nested expansions
+- child rows should only materialize when traversal/projection actually demands them
+- Duck-style nested expanses are matched by walking the row hierarchy rather than eagerly flattening everything into one rectangular row
+- the parent row plus its descendants should be understood as a blackboard family, where children carry derived, blob, parse-tree, or expansion effects without forcing flattening at the parent
+
+This lets MiniDuck model nested document structure, lazy expansion, sparse/empty parents, and JSON/YAML/blob effects without abandoning the `Cursor = Series<RowVec>` surface.
+
+### RowVec family specialization first
+
+Before designing indexes, MiniDuck should define specialized `RowVec` families.
+Examples:
+- `DocRowVec`: visible scalar doc fields + child families for nested objects/arrays
+- `JsonRowVec`: parse-tree/projection family for JSON blobs
+- `YamlRowVec`: parse-tree/projection family for YAML blobs
+- `BlobRowVec`: zero-length or sparse parent with lazy content/metadata/effect children
+- `ViewRowVec`: Couch view-style key/value/doc shell with lazy child payload expansion
+- `BlockRowVec`: parent record representing a sealed analytical/storage block
+
+These families are the feature that makes later Duck-like expanses possible.
+Only after they exist should we talk about derived indexes or acceleration structures.
+
+## 8. Chunk/block model
+
+DuckDB thinks in chunks/blocks, so MiniDuck should too.
+Instead of treating NDJSON as a primary lazy-index problem, we should treat storage and analytics as sealed blocks composed of `RowVec` families.
+
+Proposed block abstraction:
+- a block is a parent blackboard construct
+- its visible rows are `Series<RowVec>`
+- its children hold:
+  - doc families
+  - JSON/YAML/blob specializations
+  - derived view/group summaries
+  - optional lowered tensor/manifold projections
+
+Properties:
+- append builds a mutable current block
+- seal produces an immutable read-many analytical/storage block
+- scans operate blockwise first, rowwise second
+- expansion walks child families lazily inside a block
+- indexes are derived children of sealed blocks, not the starting abstraction
+
+This is closer to DuckDB’s chunky execution model while keeping nested document effects intact.
+
+## 9. Query algebra, not builder SQL
 
 Acceptable surface:
 

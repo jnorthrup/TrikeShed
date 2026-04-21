@@ -7,12 +7,14 @@ Goal: lock down the RED use cases for a new couch module that is:
 - allowed to expose a mini DSL only when that surface is infix-composed rather than procedural/builder style
 
 Current state
-- RED tests only
-- No implementation has been added for the requested parity layer
+- RED tests only for RelaxFactory/CouchDB/transport parity suites beyond the MiniDuck DSL slice
+- First MiniDuck GREEN slice now exists in `src/commonMain/kotlin/borg/trikeshed/couch/miniduck/` and `src/commonMain/kotlin/borg/trikeshed/couch/minidsl/`
+- No implementation has been added yet for the requested RelaxFactory/CouchDB/transport parity layers
 - Existing exploratory files at repo root (`MiniSqlDsl.kt`, `couchdb_1_7_2_api.yaml`) remain untouched and are not part of the new module build yet
 - Fresh design docs now live at:
   - `MINIDUCK_DESIGN.md`
   - `WAL_DESIGN.md`
+  - `ROWVEC_FAMILIES_DESIGN.md`
 
 RED test suites
 - `src/commonTest/kotlin/borg/trikeshed/couch/relaxfactory/RelaxFactoryParityRedTest.kt`

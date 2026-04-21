@@ -1,0 +1,51 @@
+package borg.trikeshed.dht.routing
+
+import borg.trikeshed.lib.Join
+import borg.trikeshed.lib.leftIdentity
+import borg.trikeshed.dht.id.NUID
+import borg.trikeshed.dht.include.Address
+import borg.trikeshed.dht.include.Route
+import borg.trikeshed.dht.net.NetMask
+//import java.lang.Integer.min
+import kotlin.math.min
+
+/**
+ * once an agent knows its network id it can create a routeTable, the agent will also be
+ * responsible for assigning new GUIDS on all routes
+ * before touching the route table.
+ *
+ */
+open class RoutingTable<TNum : Comparable<TNum>, Sz : borg.trikeshed.dht.net.NetMask<TNum>>(
+    val agentNUID: borg.trikeshed.dht.id.NUID<TNum>, val optimal: Boolean = false,
+) {
+    private val bitOps = agentNUID.ops
+
+    /**
+     * contract is to have the route guid id fully realized in agent first
+     */
+    fun addRoute(other: borg.trikeshed.dht.include.Route<TNum>): Join<borg.trikeshed.dht.id.NUID<TNum>, borg.trikeshed.dht.include.Address>? = other.let { (g: borg.trikeshed.dht.id.NUID<TNum>) ->
+        min(agentNUID.netmask.distance(agentNUID.id!!, g.id!!), bucketCount).let {
+            if (it > 0)
+                buckets[it.dec()].getOrPut(g.id!!, other.leftIdentity)
+            else null
+        }
+    }
+
+    fun rmRoute(other: borg.trikeshed.dht.include.Route<TNum>): Join<borg.trikeshed.dht.id.NUID<TNum>, borg.trikeshed.dht.include.Address>? = other.let { (g: borg.trikeshed.dht.id.NUID<TNum>) ->
+        agentNUID.netmask.distance(agentNUID.id!!, g.id!!).let { origDistance ->
+            if (origDistance > 0)
+                buckets.takeIf { it.isNotEmpty() }?.get(min(bucketCount, origDistance.dec()))?.remove(g.id!!)
+            else null
+
+        }
+    }
+
+    fun bucketFor(g: borg.trikeshed.dht.id.NUID<TNum>): Int =
+        min(agentNUID.netmask.distance(agentNUID.id!!, g.id!!), bucketCount).dec()
+
+    open val bucketCount: Int = agentNUID.netmask.bits.let { if (optimal) it else it / 2 + 1 }
+    open val bucketSize: Int = agentNUID.netmask.bits.let { if (optimal) it else it / 2 + 1 }
+
+    val buckets: Array<MutableMap<TNum, borg.trikeshed.dht.include.Route<TNum>>> = Array(bucketCount) { linkedMapOf() }
+
+}

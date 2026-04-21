@@ -16,6 +16,7 @@ import borg.trikeshed.couch.compat.relaxfactory.Skip
 import borg.trikeshed.couch.compat.relaxfactory.StartKey
 import borg.trikeshed.couch.compat.relaxfactory.StartKeyDocId
 import borg.trikeshed.couch.compat.relaxfactory.View
+import borg.trikeshed.couch.miniduck.ViewRowVec
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse

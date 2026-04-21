@@ -8,10 +8,12 @@ group = "borg.trikeshed"
 version = "0.1.0-SNAPSHOT"
 
 repositories {
+    maven("https://oss.sonatype.org/content/repositories/snapshots/")
     mavenCentral()
     mavenLocal()
     gradlePluginPortal()
     google()
+    maven("https://www.jitpack.io")
 }
 
 kotlin {
@@ -29,7 +31,13 @@ kotlin {
     jvm()
 
     sourceSets {
-        val commonMain by getting
+        val commonMain by getting {
+            dependencies {
+                implementation("org.bereft:trikeshed-kjar:1.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
+                implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1-0.6.x-compat")
+            }
+        }
         val commonTest by getting {
             dependencies {
                 implementation(kotlin("test"))

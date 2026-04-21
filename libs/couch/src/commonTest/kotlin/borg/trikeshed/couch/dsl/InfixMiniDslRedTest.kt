@@ -9,7 +9,7 @@ import kotlin.test.assertTrue
 
 class InfixMiniDslRedTest {
     @Test
-    fun expressesViewQueriesAsInfixCompositionInsteadOfProceduralBuilders() {
+    fun expressesViewQueriesAsInfixCompositionInsteadOfProceduralBuilders() = with(CouchMiniDsl) {
         val design: DesignRef = "acmevehicle" design "vehicle-service"
         val view: ViewRef = design view "by_brand"
 
@@ -26,7 +26,7 @@ class InfixMiniDslRedTest {
     }
 
     @Test
-    fun supportsInfixReduceGroupingWithoutBuilderState() {
+    fun supportsInfixReduceGroupingWithoutBuilderState() = with(CouchMiniDsl) {
         val query =
             ("acmevehicle" design "vehicle-service" view "brand_count")
                 .group level 2

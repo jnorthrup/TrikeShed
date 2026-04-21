@@ -103,6 +103,13 @@ kotlin {
             }
             // The old pseudo-common xio surface is retired in favor of JVM/NIO transport boundaries.
             kotlin.exclude("one/xio/NetworkChannel.kt")
+            // WIP packages with unresolved refs — excluded until their deps land
+            kotlin.exclude("borg/trikeshed/ccek/**")
+            kotlin.exclude("borg/trikeshed/dht/**")
+            kotlin.exclude("borg/trikeshed/common/**")
+            kotlin.exclude("borg/trikeshed/signal/**")
+            kotlin.exclude("borg/trikeshed/userspace/**")
+            kotlin.exclude("borg/trikeshed/autoresearch/**")
             if (focusedTransportSlice) {
                 kotlin.exclude("borg/trikeshed/grad/**")
             }
@@ -132,6 +139,7 @@ kotlin {
         }
 
         val jvmMain by getting {
+            resources.srcDir("src/jvmMain/resources")
             dependencies {
                 implementation("borg.trikeshed:common:0.1.0-SNAPSHOT")
 

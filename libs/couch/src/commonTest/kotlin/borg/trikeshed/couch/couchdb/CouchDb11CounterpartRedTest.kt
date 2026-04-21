@@ -6,27 +6,29 @@ import borg.trikeshed.couch.api.CouchDb11Spec
 import borg.trikeshed.couch.api.CouchViewDefinition
 import borg.trikeshed.couch.api.ViewQuery
 import borg.trikeshed.couch.api.ViewQueryEncoder
+import borg.trikeshed.couch.miniduck.*
+import borg.trikeshed.lib.*
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class CouchDb11CounterpartRedTest {
     @Test
     fun serializesDesignDocsUsingCouch11CompatibleShape() {
-        val json = CouchDb11Spec.json.encodeToString(
-            CouchDb11DesignDocument.serializer(),
-            CouchDb11DesignDocument(
-                id = "_design/example",
-                language = "javascript",
-                views = mapOf(
-                    "by_brand" to CouchViewDefinition(
-                        map = "function(doc){emit(doc.brand, doc);}",
-                        reduce = "_count",
-                    ),
+        val doc = CouchDb11DesignDocument(
+            id = "_design/example",
+            language = "javascript",
+            views = mapOf(
+                "by_brand" to CouchViewDefinition(
+                    map = "function(doc){emit(doc.brand, doc);}",
+                    reduce = "_count",
                 ),
             ),
         )
+
+        val json = doc.toJson()
 
         assertTrue(json.contains("\"_id\":\"_design/example\""))
         assertTrue(json.contains("\"language\":\"javascript\""))
@@ -72,7 +74,7 @@ class CouchDb11CounterpartRedTest {
     }
 
     @Test
-    fun decodesMapViewRowSetsWithTotalRowsOffsetAndDocs() {
+    fun decodesMapViewRowSetsAsBlockRowVecOfViewRowVecsWithLazyDocChildren() {
         val json =
             """
             {
@@ -89,14 +91,25 @@ class CouchDb11CounterpartRedTest {
             }
             """.trimIndent()
 
-        val rowSet = CouchDb11Spec.json.decodeFromString(CouchDb11RowSet.serializer<String, VehicleValue>(), json)
+        val rowSet = CouchDb11RowSet.fromJson(json)
 
         assertEquals(3, rowSet.totalRows)
         assertEquals(1, rowSet.offset)
-        assertEquals("veh-1", rowSet.rows.single().id)
-        assertEquals("vw", rowSet.rows.single().key)
-        assertEquals("Golf", rowSet.rows.single().value.model)
-        assertEquals("veh-1", rowSet.rows.single().doc?.get("_id"))
+
+        val block = rowSet.rows  // BlockRowVec
+        assertEquals(1, block.rowCount)
+
+        val row = block.child!![0] as ViewRowVec
+        assertEquals("veh-1", row.id)
+        assertEquals("vw", row.key)
+
+        // doc child is a lazy DocRowVec
+        val docChild = row.child
+        assertNotNull(docChild)
+        val doc = docChild[0] as DocRowVec
+        assertEquals("veh-1", doc["_id"])
+        assertEquals("vw", doc["brand"])
+        assertEquals("Golf", doc["model"])
     }
 
     @Test
@@ -113,25 +126,15 @@ class CouchDb11CounterpartRedTest {
 
     @Test
     fun keepsViewRowsCompatibleWithRelaxFactoryTupleShape() {
-        val rowSet = CouchDb11RowSet(
-            totalRows = 1,
-            offset = 0,
-            rows = listOf(
-                CouchDb11RowSet.Row(
-                    id = "veh-2",
-                    key = "audi",
-                    value = VehicleValue("A4"),
-                    doc = mapOf("_id" to "veh-2", "brand" to "audi"),
-                ),
-            ),
+        val row = ViewRowVec(
+            id = "veh-2",
+            key = "audi",
+            value = mapOf("model" to "A4"),
         )
 
-        val tuple = rowSet.rows.single()
-        assertEquals("veh-2", tuple.id)
-        assertEquals("audi", tuple.key)
-        assertEquals("A4", tuple.value.model)
-        assertEquals("veh-2", tuple.doc?.get("_id"))
+        // scalar surface: [id, key, value]
+        assertEquals("veh-2", row[0])
+        assertEquals("audi", row[1])
+        assertEquals(mapOf("model" to "A4"), row[2])
     }
-
-    private data class VehicleValue(val model: String)
 }

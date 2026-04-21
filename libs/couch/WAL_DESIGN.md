@@ -118,22 +118,24 @@ This lets Couch compatibility keep `_rev`, while MiniDuck keeps efficient ordere
 ## 5. Physical representation
 
 Portable first cut:
-- line-delimited NDJSON segments for the log body
-- periodic sparse index of sequence -> byte offset
-- optional segment manifest
+- append into mutable NDJSON-backed working blocks
+- seal blocks into immutable read-many analytical/storage units
+- treat indexes as derived children of sealed blocks, not as the primary design center
+- keep a lightweight manifest for block discovery and replay cut points
 
 Suggested on-disk structure:
 
 ```text
 wal/
   MANIFEST.json
-  0000000000000001.ndjson
-  0000000000000001.idx
-  0000000000005000.ndjson
-  0000000000005000.idx
+  blocks/
+    0000000000000001.ndjson
+    0000000000005000.ndjson
+  snapshots/
+    0000000000005000.snapshot.json
 ```
 
-Each NDJSON row contains one `WalEntry` envelope.
+Each NDJSON row contains one `WalEntry` envelope, but the important abstraction is the sealed block, not a sparse lazy index.
 
 Example:
 
@@ -146,21 +148,24 @@ Why NDJSON for first cut:
 - replay-friendly
 - easy KMP encoding/decoding
 - aligns with prior design direction
+- works well as the serialized body format of sealed blocks
 
 ## 6. Replay model
 
-Replay consumes WAL entries into:
-- latest document map / memtable
-- revision map
-- design doc registry
-- secondary index/view invalidation queues
-- segment builder
+Replay consumes WAL entries into block-oriented blackboard state:
+- latest document family state
+- revision family state
+- design doc family state
+- JSON/YAML/blob child families
+- derived view/group summaries
+- block seal candidates
 
 Replay contract:
 1. read ordered entries
-2. apply idempotently
-3. stop at snapshot cut or head
-4. expose resulting state for scans and view materialization
+2. apply idempotently into the current mutable block family
+3. seal blocks at configured chunk boundaries or snapshot cuts
+4. stop at snapshot cut or head
+5. expose resulting state for scans and view materialization
 
 Need a pure applier surface:
 
@@ -207,7 +212,24 @@ It should be enough to:
 - seed MiniDuck scan sources
 - lower selected relations into tensor/manifold space without guessing shape after the fact
 
-## 8. Compaction model
+## 8. Locking model
+
+MiniDuck/WAL should model Duck-like many-reader/one-writer discipline around chunky blocks.
+
+Rules:
+- exactly one writer owns the mutable current block for a database/partition at a time
+- sealed blocks are immutable and therefore read-many without writer contention
+- readers never observe a partially sealed block
+- block sealing is the synchronization boundary, not every individual row read
+- derived children (views, summaries, JSON/YAML/blob projections) are published with the block or after an atomic version step
+
+This gives us:
+- simple append discipline
+- cheap concurrent scans over sealed blocks
+- blockwise replay/snapshot semantics
+- no need for eager per-row locks across analytical readers
+
+## 9. Compaction model
 
 Compaction has two jobs:
 1. reduce replay cost
