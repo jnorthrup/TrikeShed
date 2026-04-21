@@ -1,7 +1,7 @@
 package borg.trikeshed.ccek
 
-import borg.trikeshed.ccek.transport.NgSctpService
-import borg.trikeshed.ccek.transport.QuicChannelService
+import borg.trikeshed.quic.QuicElement
+import borg.trikeshed.sctp.SctpElement
 import borg.trikeshed.common.HomeDirService
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.size
@@ -21,10 +21,10 @@ class KeyedServiceTest {
 
     @Test
     fun baseComposition() = runTest {
-        val ctx = HomeDirService("~") + QuicChannelService()
+        val ctx = HomeDirService("~") + QuicElement()
         withContext(ctx) {
             assertNotNull(coroutineContext[HomeDirService.Key], "HomeDirService must be present")
-            assertNotNull(coroutineContext[QuicChannelService.Key], "QuicChannelService must be present")
+            assertNotNull(coroutineContext[QuicElement.Key], "QuicElement must be present")
         }
     }
 
@@ -43,12 +43,12 @@ class KeyedServiceTest {
 
     @Test
     fun transportCoexistence() = runTest {
-        val ctx = NgSctpService() + QuicChannelService()
+        val ctx = SctpElement() + QuicElement()
         withContext(ctx) {
-            val sctp = coroutineContext[NgSctpService.Key]
-            val quic = coroutineContext[QuicChannelService.Key]
-            assertNotNull(sctp, "NgSctpService must be present")
-            assertNotNull(quic, "QuicChannelService must be present")
+            val sctp = coroutineContext[SctpElement.Key]
+            val quic = coroutineContext[QuicElement.Key]
+            assertNotNull(sctp, "SctpElement must be present")
+            assertNotNull(quic, "QuicElement must be present")
             // SCTP-first fallback pattern
             val transport = sctp ?: quic
             assertNotNull(transport)

@@ -18,7 +18,7 @@ suspend fun buildServerContext(): CoroutineContext {
 }
 
 suspend fun closeServerContext(context: CoroutineContext) {
-    context[HtxKey]?.takeIf { it.state == ElementState.OPEN }?.close()
-    context[SctpKey]?.takeIf { it.state == ElementState.OPEN }?.close()
-    context[QuicKey]?.takeIf { it.state == ElementState.OPEN }?.close()
+    (context[HtxKey] as? borg.trikeshed.context.AsyncContextElement)?.takeIf { it.state == ElementState.OPEN }?.close()
+    (context[SctpKey] as? borg.trikeshed.context.AsyncContextElement)?.takeIf { it.state == ElementState.OPEN }?.close()
+    (context[QuicKey] as? borg.trikeshed.context.AsyncContextElement)?.takeIf { it.state == ElementState.OPEN }?.close()
 }

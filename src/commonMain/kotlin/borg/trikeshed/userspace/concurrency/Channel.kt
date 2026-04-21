@@ -28,7 +28,7 @@ enum class ChannelCapacity {
 
 class Channel<T>(val capacity: ChannelCapacity, val bufferSize: Int = 0) {
     private val kChannel = when (capacity) {
-        ChannelCapacity.Unbounded -> KChannel<T>(KChannel.UNBOUNDED)
+        ChannelCapacity.Unbounded -> KChannel<T>(KChannel.UNLIMITED)
         ChannelCapacity.Buffered -> KChannel<T>(bufferSize)
         ChannelCapacity.Rendezvous -> KChannel<T>(KChannel.RENDEZVOUS)
     }

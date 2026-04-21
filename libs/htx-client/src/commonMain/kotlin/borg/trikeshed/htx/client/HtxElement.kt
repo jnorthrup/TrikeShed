@@ -6,28 +6,36 @@ import borg.trikeshed.context.ElementState
 
 // Compromise: this standalone lib does not depend on the root project to avoid composite-build cycles.
 data class HtxClientMessage(val status: Int = 200, val body: String = "ok")
+data class HtxClientRequest(
+    val method: String,
+    val path: String,
+    val body: String = "",
+)
+
+typealias HtxRequestHandler = suspend (HtxClientRequest) -> HtxClientMessage
 
 val HtxKey: AsyncContextKey<HtxElement> = HtxElement.Key
 
-suspend fun openHtxElement(): AsyncContextElement =
-    HtxElement().also { it.open() }
+private suspend fun defaultHtxRequestHandler(request: HtxClientRequest): HtxClientMessage =
+    when {
+        request.method.isBlank() || request.path.isBlank() -> HtxClientMessage(status = 400, body = "invalid request")
+        request.method == "GET" && request.path == "/health" -> HtxClientMessage(status = 200, body = "ok")
+        request.path == "/health" -> HtxClientMessage(status = 405, body = "method not allowed")
+        else -> HtxClientMessage(status = 404, body = "not found")
+    }
 
-class HtxElement : AsyncContextElement() {
-    companion object Key : AsyncContextKey<HtxElement>()
+suspend fun openHtxElement(
+    requestHandler: HtxRequestHandler = ::defaultHtxRequestHandler,
+): HtxElement =
+    HtxElement(requestHandler).also { it.open() }
+
+class HtxElement(
+    private val requestHandler: HtxRequestHandler = ::defaultHtxRequestHandler,
+) : AsyncContextElement() {
+    companion object Key : AsyncContextKey<HtxElement>("HtxKey", 1L shl 5)
 
     override val key: AsyncContextKey<HtxElement>
         get() = Key
-
-    override suspend fun open() {
-        requireState(ElementState.CREATED)
-        state = ElementState.OPEN
-    }
-
-    override suspend fun close() {
-        requireState(ElementState.OPEN)
-        state = ElementState.CLOSING
-        state = ElementState.CLOSED
-    }
 
     suspend fun request(
         method: String = "GET",
@@ -35,6 +43,12 @@ class HtxElement : AsyncContextElement() {
         body: String = "",
     ): HtxClientMessage {
         requireState(ElementState.OPEN)
-        return HtxClientMessage(status = if (method.isBlank() || path.isBlank()) 400 else 200, body = body.ifEmpty { "ok" })
+        return requestHandler(
+            HtxClientRequest(
+                method = method.trim().uppercase(),
+                path = path,
+                body = body,
+            ),
+        )
     }
 }

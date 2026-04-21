@@ -29,14 +29,22 @@ class ServerContextFactoryTest {
     }
 
     @Test
-    fun requestRoundTripReturnsStubResponse() = runTest {
+    fun requestRoundTripMatchesTheServerHealthRoute() = runTest {
         val context = buildServerContext()
         val htx = context[HtxKey]
         assertNotNull(htx)
 
-        val response = htx.request(method = "GET", path = "/health")
-        assertEquals(200, response.status)
-        assertEquals("ok", response.body)
+        val health = htx.request(method = "GET", path = "/health")
+        assertEquals(200, health.status)
+        assertEquals("ok", health.body)
+
+        val wrongMethod = htx.request(method = "POST", path = "/health")
+        assertEquals(405, wrongMethod.status)
+        assertEquals("method not allowed", wrongMethod.body)
+
+        val missing = htx.request(method = "GET", path = "/healthz")
+        assertEquals(404, missing.status)
+        assertEquals("not found", missing.body)
 
         closeServerContext(context)
     }

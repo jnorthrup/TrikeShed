@@ -1,5 +1,7 @@
 package borg.trikeshed.ccek.transport
 
+import borg.trikeshed.quic.QuicElement
+import borg.trikeshed.sctp.SctpElement
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -8,59 +10,61 @@ import kotlin.test.assertTrue
 
 /**
  * TDD contract tests for [StreamTransport.openStream].
- *
- * Current state: ALL tests are RED — [QuicChannelService.openStream] and [NgSctpService.openStream]
- * both throw [NotImplementedError] via TODO(). Tests fail at runtime with NotImplementedError,
- * documenting the desired contract for the green phase.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class StreamTransportContractTest {
 
-    // ── QuicChannelService ────────────────────────────────────────────────
+    // ── QuicElement ────────────────────────────────────────────────
 
     @Test
     fun quicOpenStreamReturnsValidHandle() = runTest {
-        val service = QuicChannelService()
-        val handle = service.openStream() // NotImplementedError until implemented
+        val service = QuicElement()
+        service.open()
+        val handle = service.openStream()
         assertTrue(handle.id >= 0, "StreamHandle id must be non-negative")
     }
 
     @Test
     fun quicActiveStreamsIncrementsAfterOpen() = runTest {
-        val service = QuicChannelService()
+        val service = QuicElement()
+        service.open()
         val before = service.activeStreams
-        service.openStream() // NotImplementedError until implemented
+        service.openStream()
         assertTrue(service.activeStreams > before, "activeStreams must increment after openStream")
     }
 
     @Test
     fun quicStreamHandleSendChannelIsOpen() = runTest {
-        val service = QuicChannelService()
-        val handle = service.openStream() // NotImplementedError until implemented
+        val service = QuicElement()
+        service.open()
+        val handle = service.openStream()
         assertFalse(handle.send.isClosedForSend, "send channel must be open on new stream")
     }
 
     @Test
     fun quicStreamHandleRecvChannelIsOpen() = runTest {
-        val service = QuicChannelService()
-        val handle = service.openStream() // NotImplementedError until implemented
+        val service = QuicElement()
+        service.open()
+        val handle = service.openStream()
         assertFalse(handle.recv.isClosedForReceive, "recv channel must be open on new stream")
     }
 
-    // ── NgSctpService ─────────────────────────────────────────────────────
+    // ── SctpElement ─────────────────────────────────────────────────────
 
     @Test
     fun sctpOpenStreamReturnsValidHandle() = runTest {
-        val service = NgSctpService()
-        val handle = service.openStream() // NotImplementedError until implemented
+        val service = SctpElement()
+        service.open()
+        val handle = service.openStream()
         assertTrue(handle.id >= 0, "StreamHandle id must be non-negative")
     }
 
     @Test
     fun sctpActiveStreamsIncrementsAfterOpen() = runTest {
-        val service = NgSctpService()
+        val service = SctpElement()
+        service.open()
         val before = service.activeStreams
-        service.openStream() // NotImplementedError until implemented
+        service.openStream()
         assertTrue(service.activeStreams > before, "activeStreams must increment after openStream")
     }
 }
