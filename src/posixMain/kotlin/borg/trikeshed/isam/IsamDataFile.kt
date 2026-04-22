@@ -156,7 +156,33 @@ actual class IsamDataFile actual constructor(
             varChars: Map<String, Int>,
             transform: ((RowVec) -> RowVec)?,
         ): Unit {
-            TODO()
+            val metafilename = "$datafilename.meta"
+            val meta0: Series<RecordMeta> = if (Files.exists(metafilename)) {
+                val reader = IsamMetaFileReader(metafilename)
+                reader.open()
+                reader.constraints
+            } else {
+                val rows = msf.map { transform?.invoke(it) ?: it }.toList()
+                val cursor = rows.toSeries()
+                write(cursor, datafilename, varChars)
+                return
+            }
+
+            val last = meta0.last()
+            val rowLen = last.end
+
+            val data = PosixFile(
+                datafilename,
+                PosixOpenOpts.withFlags(PosixOpenOpts.O_WrOnly, PosixOpenOpts.O_Append, PosixOpenOpts.O_Creat)
+            )
+
+            msf.forEach { rowVec ->
+                val rv = transform?.invoke(rowVec) ?: rowVec
+                val rowBuf = ByteArray(rowLen)
+                WireProto.writeToBuffer(rv, rowBuf, meta0)
+                data.write(rowBuf)
+            }
+            data.close()
         }
     }
 }
