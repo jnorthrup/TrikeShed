@@ -26,7 +26,6 @@ data class CouchDb11RowSet(
             val arrayStart = json.indexOf('[', rowsKeyIndex)
             val arrayEnd = json.lastIndexOf(']')
             val rowsContent = json.substring(arrayStart + 1, arrayEnd)
-            println("DEBUG rowsContent: [$rowsContent]")
 
             val block = BlockRowVec.mutable()
 
@@ -214,10 +213,14 @@ data class CouchDb11RowSet(
             var inString = false
             var i = start
             while (i < s.length) {
+                val ch = s[i]
                 if (inString) {
-                    if (s[i] == '\\') i++ // skip escaped char
+                    when (ch) {
+                        '\\' -> i++ // skip escaped char
+                        '"' -> inString = false
+                    }
                 } else {
-                    when (s[i]) {
+                    when (ch) {
                         '"' -> inString = true
                         '{' -> depth++
                         '}' -> {
@@ -237,10 +240,14 @@ data class CouchDb11RowSet(
             var inString = false
             var i = start
             while (i < s.length) {
+                val ch = s[i]
                 if (inString) {
-                    if (s[i] == '\\') i++ // skip escaped char
+                    when (ch) {
+                        '\\' -> i++ // skip escaped char
+                        '"' -> inString = false
+                    }
                 } else {
-                    when (s[i]) {
+                    when (ch) {
                         '"' -> inString = true
                         '[' -> depth++
                         ']' -> {

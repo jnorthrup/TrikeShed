@@ -34,6 +34,8 @@ class ViewRowVec(
     val value: Any?,
     private val docLoader: (() -> RowVec)? = null,
 ) : RowVec() {
+    private var loadedChild: Series<RowVec>? = null
+
     // scalar surface: [id, key, value]
     override val size: Int get() = 3
     override fun get(index: Int): Any? = when (index) {
@@ -45,7 +47,13 @@ class ViewRowVec(
 
     /** Lazy doc expansion as a single-child Series. */
     override val child: Series<RowVec>?
-        get() = docLoader?.let { loader -> 1 j { loader() } }
+        get() {
+            loadedChild?.let { return it }
+            val loader = docLoader ?: return null
+            val row = loader()
+            val childSeries: Series<RowVec> = 1 j { _: Int -> row }
+            return childSeries.also { loadedChild = it }
+        }
 }
 
 /**
