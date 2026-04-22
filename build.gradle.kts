@@ -100,8 +100,6 @@ kotlin {
             dependencies {
                 api("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
                 api("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1-0.6.x-compat")
-                // Depend on the shared libs/common module for async context primitives
-                api(project(":libs:common"))
             }
         }
         val commonTest by getting {
@@ -128,6 +126,9 @@ kotlin {
                 implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.18.0")
                 implementation("com.squareup.okhttp3:okhttp:4.11.0")
                 implementation("org.bouncycastle:bcprov-jdk15on:1.70")
+
+                // Depend on libs/common JVM artifact for userspace/context implementations
+                implementation(project(":libs:common"))
             }
 
             // Include JMH benchmark sources in jvmMain for compilation
