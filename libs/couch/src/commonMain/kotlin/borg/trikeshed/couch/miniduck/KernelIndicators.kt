@@ -1,6 +1,6 @@
 package borg.trikeshed.couch.miniduck
 
-import borg.trikeshed.lib.Series
+import borg.trikeshed.lib.*
 import kotlin.math.ln
 import kotlin.math.pow
 import kotlin.math.sqrt
