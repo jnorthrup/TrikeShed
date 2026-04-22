@@ -26,8 +26,13 @@ if (file("libs").exists() && file("libs").isDirectory) {
                            file("${sub.path}/build.gradle.kts").exists() ||
                            file("${sub.path}/build.gradle").exists()
             if (hasBuild) {
-                includeBuild("libs/${sub.name}")
-                println("Including local libs composite build: ${sub.name}")
+                if (sub.name == "dreamer-kmm") {
+                    // Skip dreamer-kmm to avoid duplicate shim types during iterative development
+                    println("Skipping local libs composite build: ${sub.name}")
+                } else {
+                    includeBuild("libs/${sub.name}")
+                    println("Including local libs composite build: ${sub.name}")
+                }
             }
         }
     }

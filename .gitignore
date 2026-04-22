@@ -38,6 +38,9 @@ logs/
 *.dSYM/
 default/
 
+# JVM crash / heap dump garbage
+*.hprof*
+
 # Tool/AI working dirs
 .git.bfg-report/
 .qwen/

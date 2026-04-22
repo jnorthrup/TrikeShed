@@ -103,17 +103,6 @@ kotlin {
 
             }
             // The old pseudo-common xio surface is retired in favor of JVM/NIO transport boundaries.
-            kotlin.exclude("one/xio/NetworkChannel.kt")
-            // WIP packages with unresolved refs — excluded until their deps land
-            kotlin.exclude("borg/trikeshed/ccek/**")
-            kotlin.exclude("borg/trikeshed/dht/**")
-            kotlin.exclude("borg/trikeshed/common/**")
-            kotlin.exclude("borg/trikeshed/signal/**")
-            kotlin.exclude("borg/trikeshed/userspace/**")
-            kotlin.exclude("borg/trikeshed/autoresearch/**")
-            if (focusedTransportSlice) {
-                kotlin.exclude("borg/trikeshed/grad/**")
-            }
 
             // Include DuckDB local sources (if present) so DuckSeries expect/actuals compile in root build.
             kotlin.srcDir("libs/duckdb/src/commonMain/kotlin")
@@ -121,10 +110,6 @@ kotlin {
         val commonTest by getting {
             dependencies {
                 implementation(kotlin("test"))
-            }
-            if (focusedTransportSlice) {
-                // Focused transport slice: exclude non-transport common tests
-                kotlin.exclude("borg/trikeshed/parse/**")
             }
         }
         val nativeMain by creating { dependsOn(commonMain) }
@@ -135,8 +120,6 @@ kotlin {
         }
         val posixTest by creating {
             dependsOn(nativeTest)
-            // Current native duck test references unavailable symbols.
-            kotlin.exclude("borg/trikeshed/duck/DuckFFITest.kt")
         }
 
         val jvmMain by getting {
@@ -162,15 +145,6 @@ kotlin {
 
             // Include local DuckDB JVM sources when available so tests can compile
             kotlin.srcDir("libs/duckdb/src/jvmMain/kotlin")
-
-            if (focusedTransportSlice) {
-                kotlin.exclude("one/xio/AsioVisitor.kt")
-
-
-                kotlin.exclude("one/xio/HttpHeaders.kt")
-                kotlin.exclude("one/xio/HttpMethod.kt")
-                kotlin.exclude("rxf/server/CookieRfc6265Util.kt")
-            }
         }
         val jvmTest by getting {
             dependencies {
@@ -181,11 +155,6 @@ kotlin {
                 implementation("borg.trikeshed:quic:0.1.0-SNAPSHOT")
                 implementation("borg.trikeshed:ngsctp:0.1.0-SNAPSHOT")
                 implementation("borg.trikeshed:htx-client:0.1.0-SNAPSHOT")
-            }
-            // WIP/experimental tests excluded from default build.
-            kotlin.exclude("borg/trikeshed/signal/**")
-            kotlin.exclude("borg/trikeshed/strategy/**")
-            if (focusedTransportSlice) {
             }
         }
 
@@ -198,11 +167,6 @@ kotlin {
 
         val jsMain by getting {
             dependsOn(commonMain)
-            kotlin.exclude("borg/trikeshed/common/collections/**")
-            kotlin.exclude("borg/trikeshed/hide/collections/**")
-            kotlin.exclude("borg/trikeshed/http/SimpleHttpServer.kt")
-            kotlin.exclude("borg/trikeshed/lib/descriptiveSetNotation.kt")
-            kotlin.exclude("borg/trikeshed/lib/octals.kt")
         }
         val jsTest by getting { dependsOn(commonTest) }
         val wasmJsMain by getting { dependsOn(commonMain) }
