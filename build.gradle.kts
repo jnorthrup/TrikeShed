@@ -100,7 +100,8 @@ kotlin {
             dependencies {
                 api("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
                 api("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1-0.6.x-compat")
-
+                // Depend on the shared libs/common module for async context primitives
+                api(project(":libs:common"))
             }
         }
         val commonTest by getting {
