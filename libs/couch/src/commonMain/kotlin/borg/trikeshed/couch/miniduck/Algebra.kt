@@ -8,7 +8,7 @@ typealias Shape = Series<Int>
 /**
  * Tensor: a Join of a Shape with a function from Shape to T.
  * This is NOT the semantic center of MiniDuck — it is a lowering/execution backend only.
- * The user-facing abstraction is Cursor = Series<RowVec>.
+ * The user-facing abstraction is Cursor = Series<MiniRowVec>.
  */
 typealias Tensor<T> = Join<Shape, (Shape) -> T>
 

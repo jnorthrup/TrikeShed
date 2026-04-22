@@ -2,8 +2,8 @@ package borg.trikeshed.couch.miniduck
 
 import borg.trikeshed.lib.*
 
-/** MiniDuck cursor: a lazy indexed Series of RowVec. */
-typealias MiniCursor = Series<RowVec>
+/** MiniDuck cursor: a lazy indexed Series of MiniRowVec. */
+typealias MiniCursor = Series<MiniRowVec>
 
 /** Empty cursor — zero-size; any index access throws. */
 fun emptyMiniCursor(): MiniCursor = 0 j { _: Int -> throw IndexOutOfBoundsException("empty cursor") }
@@ -14,17 +14,17 @@ fun emptyMiniCursor(): MiniCursor = 0 j { _: Int -> throw IndexOutOfBoundsExcept
 // explicit named aliases that make the intent clear at call sites.
 
 /** Row access by index. Negative index counts from the end. */
-infix fun MiniCursor.at(y: Int): RowVec = b(if (y < 0) size + y else y)
+infix fun MiniCursor.at(y: Int): MiniRowVec = b(if (y < 0) size + y else y)
 
 /** Alias for [at]. */
-infix fun MiniCursor.row(y: Int): RowVec = at(y)
+infix fun MiniCursor.row(y: Int): MiniRowVec = at(y)
 
 // ── Column-slicing operators ──────────────────────────────────────────────────
-// These never return a single RowVec; they always return a MiniCursor (the
+// These never return a single MiniRowVec; they always return a MiniCursor (the
 // factory semantics that separate them from Series defaults).
 //
 // NOTE: operator get(vararg Int) is deliberately NOT defined here.
-// Adding it on Series<RowVec> would shadow Series<T>.get(Int) for single-Int
+// Adding it on Series<MiniRowVec> would shadow Series<T>.get(Int) for single-Int
 // calls (more-specific receiver wins in Kotlin), breaking cursor[i] row access.
 // Use .columns(vararg Int) for index projection and .at(i) for rows.
 

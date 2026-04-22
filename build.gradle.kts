@@ -102,10 +102,6 @@ kotlin {
                 api("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1-0.6.x-compat")
 
             }
-            // The old pseudo-common xio surface is retired in favor of JVM/NIO transport boundaries.
-
-            // Include DuckDB local sources (if present) so DuckSeries expect/actuals compile in root build.
-            kotlin.srcDir("libs/duckdb/src/commonMain/kotlin")
         }
         val commonTest by getting {
             dependencies {
@@ -115,8 +111,6 @@ kotlin {
         val nativeMain by creating { dependsOn(commonMain) }
         val nativeTest by creating { dependsOn(commonTest) }
         val posixMain by creating { dependsOn(nativeMain)
-            // Include DuckDB native/posix actuals when present so native targets compile
-            kotlin.srcDir("libs/duckdb/src/posixMain/kotlin")
         }
         val posixTest by creating {
             dependsOn(nativeTest)
@@ -125,10 +119,6 @@ kotlin {
         val jvmMain by getting {
             resources.srcDir("src/jvmMain/resources")
             dependencies {
-                implementation("borg.trikeshed:common:0.1.0-SNAPSHOT")
-
-                // DuckDB JDBC removed from root build; use version catalog or local libs/duckdb if present
-
                 // JMH dependencies for benchmarking
                 implementation("org.openjdk.jmh:jmh-core:1.37")
                 implementation("org.openjdk.jmh:jmh-generator-annprocess:1.37")

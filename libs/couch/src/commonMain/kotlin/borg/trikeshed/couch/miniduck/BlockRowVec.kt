@@ -12,9 +12,9 @@ import borg.trikeshed.lib.*
  * Children expose the row families stored inside this block.
  */
 class BlockRowVec private constructor(
-    private val rows: MutableList<RowVec>,
+    private val rows: MutableList<MiniRowVec>,
     private var _sealed: Boolean,
-) : RowVec() {
+) : MiniRowVec() {
 
     enum class State { MUTABLE, SEALED }
 
@@ -25,14 +25,14 @@ class BlockRowVec private constructor(
     override fun get(index: Int): Any? = throw IndexOutOfBoundsException("BlockRowVec is a shell; no scalar cells")
 
     /** Children are the rows stored in this block. */
-    override val child: Series<RowVec>
+    override val child: Series<MiniRowVec>
         get() = rows.size j { rows[it] }
 
     /** Number of rows in the block. */
     val rowCount: Int get() = rows.size
 
     /** Append a row. Throws if sealed. */
-    fun append(row: RowVec) {
+    fun append(row: MiniRowVec) {
         check(!_sealed) { "Cannot append to a sealed block" }
         rows.add(row)
     }

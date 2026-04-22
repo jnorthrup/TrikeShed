@@ -45,7 +45,7 @@ data class CouchDb11RowSet(
                     val value = parseJsonValue(valueStr)
                     val docStr = extractRawValueOrNull(rowJson, "doc")
 
-                    val docLoader: (() -> RowVec)? = docStr?.let { rawDoc ->
+                    val docLoader: (() -> MiniRowVec)? = docStr?.let { rawDoc ->
                         {
                             parseDocRowVec(rawDoc)
                         }

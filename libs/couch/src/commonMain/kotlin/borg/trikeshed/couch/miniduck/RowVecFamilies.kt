@@ -12,8 +12,8 @@ import borg.trikeshed.lib.*
 class DocRowVec(
     val keys: List<String>,
     val cells: List<Any?>,
-    override val child: Series<RowVec>? = null,
-) : RowVec() {
+    override val child: Series<MiniRowVec>? = null,
+) : MiniRowVec() {
     init { require(keys.size == cells.size) { "keys and cells must have same length" } }
 
     override val size: Int get() = cells.size
@@ -32,9 +32,9 @@ class ViewRowVec(
     val id: String,
     val key: Any?,
     val value: Any?,
-    private val docLoader: (() -> RowVec)? = null,
-) : RowVec() {
-    private var loadedChild: Series<RowVec>? = null
+    private val docLoader: (() -> MiniRowVec)? = null,
+) : MiniRowVec() {
+    private var loadedChild: Series<MiniRowVec>? = null
 
     // scalar surface: [id, key, value]
     override val size: Int get() = 3
@@ -46,12 +46,12 @@ class ViewRowVec(
     }
 
     /** Lazy doc expansion as a single-child Series. */
-    override val child: Series<RowVec>?
+    override val child: Series<MiniRowVec>?
         get() {
             loadedChild?.let { return it }
             val loader = docLoader ?: return null
             val row = loader()
-            val childSeries: Series<RowVec> = 1 j { _: Int -> row }
+            val childSeries: Series<MiniRowVec> = 1 j { _: Int -> row }
             return childSeries.also { loadedChild = it }
         }
 }
@@ -65,12 +65,12 @@ class ViewRowVec(
 class BlobRowVec(
     val bytes: ByteArray,
     val mimeType: String? = null,
-    private val childFactory: ((ByteArray) -> Series<RowVec>)? = null,
-) : RowVec() {
+    private val childFactory: ((ByteArray) -> Series<MiniRowVec>)? = null,
+) : MiniRowVec() {
     override val size: Int get() = 0
     override fun get(index: Int): Any? = throw IndexOutOfBoundsException("BlobRowVec is a shell")
 
-    override val child: Series<RowVec>?
+    override val child: Series<MiniRowVec>?
         get() = childFactory?.invoke(bytes)
 }
 
@@ -85,15 +85,15 @@ class BlobRowVec(
 class JsonRowVec(
     val nodeType: String,   // "object", "array", "string", "number", "boolean", "null"
     val rawValue: String,
-    private val childFactory: (() -> Series<RowVec>)? = null,
-) : RowVec() {
+    private val childFactory: (() -> Series<MiniRowVec>)? = null,
+) : MiniRowVec() {
     override val size: Int get() = 2
     override fun get(index: Int): Any? = when (index) {
         0 -> nodeType
         1 -> rawValue
         else -> throw IndexOutOfBoundsException(index)
     }
-    override val child: Series<RowVec>? get() = childFactory?.invoke()
+    override val child: Series<MiniRowVec>? get() = childFactory?.invoke()
 }
 
 /**
@@ -105,13 +105,13 @@ class JsonRowVec(
 class YamlRowVec(
     val nodeKind: String,    // "mapping", "sequence", "scalar"
     val scalarValue: String? = null,
-    private val childFactory: (() -> Series<RowVec>)? = null,
-) : RowVec() {
+    private val childFactory: (() -> Series<MiniRowVec>)? = null,
+) : MiniRowVec() {
     override val size: Int get() = 2
     override fun get(index: Int): Any? = when (index) {
         0 -> nodeKind
         1 -> scalarValue
         else -> throw IndexOutOfBoundsException(index)
     }
-    override val child: Series<RowVec>? get() = childFactory?.invoke()
+    override val child: Series<MiniRowVec>? get() = childFactory?.invoke()
 }
