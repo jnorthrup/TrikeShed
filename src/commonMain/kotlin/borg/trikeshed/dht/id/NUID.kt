@@ -4,7 +4,7 @@ import borg.trikeshed.lib.assert
 import borg.trikeshed.num.BigInt
 import borg.trikeshed.platform.bitops.BitOps
 import borg.trikeshed.platform.bitops.BitOps.Companion.minOps
-import gk.kademlia.id.impl.*
+import borg.trikeshed.dht.id.impl.*
 import borg.trikeshed.dht.net.NetMask
 import kotlin.random.Random
 

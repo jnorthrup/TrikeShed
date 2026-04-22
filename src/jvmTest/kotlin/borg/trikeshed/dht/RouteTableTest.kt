@@ -17,9 +17,9 @@ import kotlin.test.assertEquals
 
 class RouteTableTest {
 
-    private val nuid: borg.trikeshed.dht.id.WorkerNUID = _root_ide_package_.borg.trikeshed.dht.id.WorkerNUID(0)
+    private val nuid: borg.trikeshed.dht.id.WorkerNUID = borg.trikeshed.dht.id.WorkerNUID(0)
     private val nuid1: borg.trikeshed.dht.id.WorkerNUID =
-        _root_ide_package_.borg.trikeshed.dht.id.WorkerNUID(with(nuid) { ops.xor(nuid.capacity, id!!) })
+        borg.trikeshed.dht.id.WorkerNUID(with(nuid) { ops.xor(nuid.capacity, id!!) })
     private val d_ones: ByteArray = ByteArray(nuid.netmask.bits) { with(nuid.ops) { shl(one, it) } }
     private val upper: List<Byte> = d_ones.drop(1)
     private val d_twos: ByteArray = ByteArray(upper.size) { x -> with(nuid.ops) { xor(one, upper[x]) } }
@@ -29,14 +29,14 @@ class RouteTableTest {
     fun testRouteAdd() {
         val NUID = nuid
         var routingTable =
-            _root_ide_package_.borg.trikeshed.dht.routing.RoutingTable<Byte, borg.trikeshed.dht.net.NetMask.Companion.WarmSz>(
+            borg.trikeshed.dht.routing.RoutingTable<Byte, borg.trikeshed.dht.net.NetMask.Companion.WarmSz>(
                 NUID,
                 optimal = true
             )
 
         val other: Join<borg.trikeshed.dht.id.NUID<Byte>, borg.trikeshed.dht.include.Address> = nuid.run {
             val id1 = random(netmask.bits)
-            _root_ide_package_.borg.trikeshed.dht.id.WorkerNUID(id1) j "urn:$id1"
+            borg.trikeshed.dht.id.WorkerNUID(id1) j "urn:$id1"
         }
         routingTable.addRoute(other).run {
             routingTable.addRoute(nuid1 j "urn:null")

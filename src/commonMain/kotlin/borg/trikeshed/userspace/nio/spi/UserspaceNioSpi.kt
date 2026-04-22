@@ -1,7 +1,7 @@
 package borg.trikeshed.userspace.nio.spi
 
 import borg.trikeshed.userspace.nio.Completion
-import borg.trikeshed.userspace.nio.Interest
+import borg.trikeshed.userspace.reactor.Interest
 
 /**
  * SPI for TrikeShed Userspace NIO backends.

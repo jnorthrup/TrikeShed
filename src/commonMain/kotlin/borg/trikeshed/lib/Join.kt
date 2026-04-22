@@ -13,7 +13,7 @@ interface Join<A, B> {
     operator fun component2(): B = b
 
     val pair: Pair<A, B>
-        get() = Pair(a, b)
+        get() = a to b
     /** debugger hack only, violates all common sense */
     val list: List<Any?> get() = (this as? Series<Any?>)?.toList() ?: emptyList()
 

@@ -26,13 +26,14 @@ if (file("libs").exists() && file("libs").isDirectory) {
                            file("${sub.path}/build.gradle.kts").exists() ||
                            file("${sub.path}/build.gradle").exists()
             if (hasBuild) {
-                if (sub.name == "dreamer-kmm") {
-                    // Skip dreamer-kmm to avoid duplicate shim types during iterative development
-                    println("Skipping local libs composite build: ${sub.name}")
-                } else {
-                    includeBuild("libs/${sub.name}")
+                    includeBuild("libs/${sub.name}") {
+                        dependencySubstitution {
+                            substitute(module("org.bereft:trikeshed")).using(project(":"))
+                            substitute(module("org.bereft:trikeshed-kjar")).using(project(":"))
+                            substitute(module("borg.trikeshed:${sub.name}")).using(project(":"))
+                        }
+                    }
                     println("Including local libs composite build: ${sub.name}")
-                }
             }
         }
     }

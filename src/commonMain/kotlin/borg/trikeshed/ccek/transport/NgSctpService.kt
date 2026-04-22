@@ -1,5 +1,7 @@
 package borg.trikeshed.ccek.transport
 
+import borg.trikeshed.context.StreamHandle
+import borg.trikeshed.context.StreamTransport
 import kotlinx.coroutines.channels.Channel
 import kotlin.coroutines.CoroutineContext
 
