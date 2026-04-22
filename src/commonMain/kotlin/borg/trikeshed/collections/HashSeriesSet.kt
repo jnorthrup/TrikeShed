@@ -21,14 +21,28 @@ open class HashSeriesSet<T : Any>  : SeriesSet<T> {
         size j { 0 j { throw IndexOutOfBoundsException() } }
 
     override val a: Int
-        get() = TODO("Not yet implemented")
+        get() = _size
     override val b: (Int) -> T
-        get() = TODO("Not yet implemented")
+        get() = { index: Int ->
+            fun find(): T {
+                if (index < 0 || index >= _size) throw IndexOutOfBoundsException()
+                var remaining = index
+                var bi = 0
+                while (bi < buckets.size) {
+                    val bucket = buckets[bi]
+                    if (remaining < bucket.size) return bucket[remaining]
+                    remaining -= bucket.size
+                    bi++
+                }
+                throw IndexOutOfBoundsException()
+            }
+            find()
+        }
 
     override val size: Int get() = _size
     override fun isEmpty(): Boolean = _size == 0
     override fun containsAll(elements: Collection<T>): Boolean {
-        TODO("Not yet implemented")
+        return elements.all { contains(it) }
     }
 
     override fun contains(element: T): Boolean {
