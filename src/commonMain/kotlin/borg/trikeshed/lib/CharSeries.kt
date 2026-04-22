@@ -244,6 +244,22 @@ class CharSeries(
         return CharArray(rem, ::get)
     }
 
+    /** Split on whitespace into zero-copy CharSeries slices. */
+    fun splitWs(): Series<CharSeries> {
+        val parts = mutableListOf<CharSeries>()
+        var i = pos
+        // skip leading whitespace
+        while (i < limit && raw(i).isWhitespace()) i++
+        while (i < limit) {
+            val start = i
+            while (i < limit && !raw(i).isWhitespace()) i++
+            val buf = this[start until i]
+            parts.add(CharSeries(buf))
+            while (i < limit && raw(i).isWhitespace()) i++
+        }
+        return parts.toSeries()
+    }
+
     companion object {
 
         /**returns true and advances the position if the confix is {}*/

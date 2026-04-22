@@ -55,12 +55,12 @@ class IsamMetaFileReader(val metafileFilename: String) :Usable{
 //        val lines = buf.readBytes(size).decodeToString().lines().filterNot { it.trim().startsWith("#") }.map(String::trim)
         val lines = Files.readAllLines(metafileFilename).filterNot { it.trim().startsWith('#') }
         //split on \s+
-        val coords = lines[0].split("\\s+".toRegex())
-        val names = lines[1].split("\\s+".toRegex())
-        val types = lines[2].split("\\s+".toRegex())
+        val coords = CharSeries(lines[0]).trim.splitWs().α { it.asString() }
+        val names = CharSeries(lines[1]).trim.splitWs().α { it.asString() }
+        val types = CharSeries(lines[2]).trim.splitWs().α { it.asString() }
 
 
-        this@IsamMetaFileReader.constraints1 = names.zip(types).mapIndexed { index, (name, type) ->
+        this@IsamMetaFileReader.constraints1 = names.toList().zip(types.toList()).mapIndexed { index, (name, type) ->
             val begin = coords[2 * index].toInt()
             val end = coords[2 * index + 1].toInt()
             val ioMemento: IOMemento = IOMemento.valueOf(type)
