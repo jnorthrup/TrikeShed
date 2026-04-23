@@ -7,6 +7,15 @@ plugins {
 group = "borg.trikeshed"
 version = "0.1.0-SNAPSHOT"
 
+repositories {
+    mavenCentral()
+    mavenLocal()
+    maven("https://oss.sonatype.org/content/repositories/snapshots/")
+    gradlePluginPortal()
+    google()
+    maven("https://www.jitpack.io")
+}
+
 kotlin {
     @OptIn(ExperimentalKotlinGradlePluginApi::class)
     compilerOptions {
