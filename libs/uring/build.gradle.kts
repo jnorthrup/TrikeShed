@@ -24,7 +24,7 @@ kotlin {
     sourceSets {
         val commonMain by getting {
             dependencies {
-                api("borg.trikeshed:common:0.1.0-SNAPSHOT")
+                api(project(":libs:common"))
             }
         }
         val commonTest by getting {
