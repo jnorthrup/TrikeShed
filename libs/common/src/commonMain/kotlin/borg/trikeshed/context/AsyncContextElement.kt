@@ -1,5 +1,6 @@
 package borg.trikeshed.context
 
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlin.coroutines.CoroutineContext
@@ -13,9 +14,10 @@ import kotlin.coroutines.CoroutineContext
  * dispatching completions to all subscribers atomically from its perspective.
  */
 abstract class AsyncContextElement(
-    initialState: ElementState = ElementState.CREATED
+    initialState: ElementState = ElementState.CREATED,
+    parentJob: Job? = null
 ) : CoroutineContext.Element {
-    protected val supervisor = SupervisorJob()
+    protected val supervisor = SupervisorJob(parentJob)
 
     var state: ElementState = initialState
         protected set
