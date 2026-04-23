@@ -2,6 +2,8 @@
 
 package borg.trikeshed.lib
 
+import borg.trikeshed.cursor.ColumnMeta
+
 
 /**
  * Joins two things.  Pair semantics but distinct in the symbol naming

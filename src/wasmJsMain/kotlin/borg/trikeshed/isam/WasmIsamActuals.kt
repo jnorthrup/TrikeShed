@@ -1,11 +1,13 @@
 package borg.trikeshed.isam
 
 import borg.trikeshed.common.Files
-import borg.trikeshed.common.Usable
+import borg.trikeshed.common.*
 import borg.trikeshed.cursor.ColumnMeta
 import borg.trikeshed.cursor.Cursor
 import borg.trikeshed.cursor.RowVec
+import borg.trikeshed.cursor.meta
 import borg.trikeshed.lib.Join
+import borg.trikeshed.lib.*
 
 actual class IsamDataFile actual constructor(
     datafileFilename: String,
@@ -102,7 +104,6 @@ actual class IsamDataFile actual constructor(
                 offset += rowLen
             }
             Files.write(datafilename, out)
-        }
         }
     }
 }

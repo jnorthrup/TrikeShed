@@ -1,4 +1,5 @@
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
+import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 
 plugins {
     kotlin("multiplatform") version "2.4.0-Beta1"
@@ -30,6 +31,17 @@ kotlin {
     jvmToolchain(21)
     jvm()
 
+    js(IR) {
+        nodejs()
+        binaries.executable()
+    }
+
+    @OptIn(ExperimentalWasmDsl::class)
+    wasmJs {
+        nodejs()
+        binaries.executable()
+    }
+
     sourceSets {
         val commonMain by getting {
             dependencies {
@@ -47,5 +59,9 @@ kotlin {
                 implementation(kotlin("test-junit"))
             }
         }
+        val jsMain by getting
+        val jsTest by getting { dependsOn(commonTest) }
+        val wasmJsMain by getting
+        val wasmJsTest by getting { dependsOn(commonTest) }
     }
 }

@@ -1,6 +1,6 @@
 package borg.trikeshed.couch.relaxfactory
 
-import java.net.URLEncoder
+import borg.trikeshed.couch.internal.urlEncode
 
 class CouchViewInvocation(
     val path: String,
@@ -17,7 +17,7 @@ class CouchViewInvocation(
 
     fun invoke(vararg args: Any?): CouchViewInvocation {
         val encoded = args.mapIndexed { i, arg ->
-            val encodedVal = URLEncoder.encode(encodeValue(arg), "UTF-8")
+            val encodedVal = urlEncode(encodeValue(arg))
             "%${i + 1}\$s" to encodedVal
         }.toMap()
         // Replace %N$s placeholders with encoded values

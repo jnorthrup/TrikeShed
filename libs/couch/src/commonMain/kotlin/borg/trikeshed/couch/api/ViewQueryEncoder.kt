@@ -1,6 +1,6 @@
 package borg.trikeshed.couch.api
 
-import java.net.URLEncoder
+import borg.trikeshed.couch.internal.urlEncode
 
 /**
  * Encodes [ViewQuery] into a URL query string using CouchDB 1.1 parameter names.
@@ -8,7 +8,7 @@ import java.net.URLEncoder
 object ViewQueryEncoder {
     /**
      * URL-encodes query params. JSON values must be URL-encoded.
-     * Uses java.net.URLEncoder for encoding.
+     * Uses the multiplatform couch internal encoder.
      */
     fun encode(query: ViewQuery): String {
         val parts = mutableListOf<String>()
@@ -30,7 +30,7 @@ object ViewQueryEncoder {
         return parts.joinToString("&")
     }
 
-    private fun urlencode(s: String): String = URLEncoder.encode(s, "UTF-8")
+    private fun urlencode(s: String): String = urlEncode(s)
 
     /**
      * Convert a Kotlin value to its JSON representation for CouchDB query params.

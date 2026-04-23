@@ -1,6 +1,7 @@
 package borg.trikeshed.couch.miniduck
 
-import borg.trikeshed.lib.Series
+import borg.trikeshed.lib.*
+import borg.trikeshed.context.ElementState as ElementLifecycleState
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.async
 import kotlinx.coroutines.Dispatchers
@@ -13,7 +14,7 @@ data class StochasticPolicy(val name: String, val expectedReturn: Double, val vo
 // Minimal KernelStochasticTrainer with explicit lifecycle
 interface KernelStochasticTrainer {
     val lifecycleState: ElementLifecycleState
-n
+
     suspend fun open()
     suspend fun train(cursor: MiniCursor, params: Map<String, Any>): StochasticPolicy?
     suspend fun drain()
@@ -30,13 +31,19 @@ class NoOpTrainer : KernelStochasticTrainer {
     }
 
     override suspend fun train(cursor: MiniCursor, params: Map<String, Any>): StochasticPolicy? = withContext(Dispatchers.Default) {
-        // compute mean of log_return if present
-        val logSeries = try {
-            cursor["log_return"] as? Series<Double>
-        } catch (e: Exception) {
-            null
+        // build a Double series for "log_return" column if present
+        val logSeries: Series<Double> = cursor.size j { idx ->
+            val row = cursor.at(idx) as? DocRowVec
+            val v = row?.get("log_return")
+            when (v) {
+                is Number -> v.toDouble()
+                is String -> v.toDoubleOrNull() ?: Double.NaN
+                is Double -> v
+                else -> Double.NaN
+            }
         }
-        val mean = if (logSeries != null && logSeries.size > 0) {
+
+        val mean = if (logSeries.size > 0) {
             var s = 0.0
             var c = 0
             for (i in 0 until logSeries.size) {

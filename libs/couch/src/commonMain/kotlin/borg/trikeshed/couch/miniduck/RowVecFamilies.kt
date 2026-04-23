@@ -42,7 +42,7 @@ class ViewRowVec(
         0 -> id
         1 -> key
         2 -> value
-        else -> throw IndexOutOfBoundsException(index)
+        else -> throw IndexOutOfBoundsException(index.toString())
     }
 
     /** Lazy doc expansion as a single-child Series. */
@@ -91,7 +91,7 @@ class JsonRowVec(
     override fun get(index: Int): Any? = when (index) {
         0 -> nodeType
         1 -> rawValue
-        else -> throw IndexOutOfBoundsException(index)
+        else -> throw IndexOutOfBoundsException(index.toString())
     }
     override val child: Series<MiniRowVec>? get() = childFactory?.invoke()
 }
@@ -111,7 +111,7 @@ class YamlRowVec(
     override fun get(index: Int): Any? = when (index) {
         0 -> nodeKind
         1 -> scalarValue
-        else -> throw IndexOutOfBoundsException(index)
+        else -> throw IndexOutOfBoundsException(index.toString())
     }
     override val child: Series<MiniRowVec>? get() = childFactory?.invoke()
 }
