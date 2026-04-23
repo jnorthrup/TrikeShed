@@ -151,6 +151,47 @@ fun renderGeneratedSources(contract: HtxGeneralOperationContract): Map<String, S
                     }
                     """,
             ),
+        // Additional placeholders for TDD: Keys, Elements, SupervisorJobs
+        "$generatedPackagePath/Keys.kt" to
+            generatedKotlinFile(
+                packageName = "${generatedPackageRoot}",
+                body =
+                    """
+                    // Placeholder Keys generated for channelized IO
+                    package ${generatedPackageRoot}
+
+                    object GeneratedKeys {
+                        const val HTX_KEY = "htx-client"
+                    }
+                    """,
+            ),
+        "$generatedPackagePath/Elements.kt" to
+            generatedKotlinFile(
+                packageName = "${generatedPackageRoot}",
+                body =
+                    """
+                    // Placeholder Elements generated for channelized IO
+                    package ${generatedPackageRoot}
+
+                    class GeneratedElements {
+                        // placeholder element types for TDD
+                        fun placeholder() = "element"
+                    }
+                    """,
+            ),
+        "$generatedPackagePath/SupervisorJobs.kt" to
+            generatedKotlinFile(
+                packageName = "${generatedPackageRoot}",
+                body =
+                    """
+                    // Placeholder SupervisorJobs for channelized IO
+                    package ${generatedPackageRoot}
+
+                    object GeneratedSupervisorJobs {
+                        fun name() = "generated-supervisor"
+                    }
+                    """,
+            ),
     )
 
 val openApiGenerateHtxGeneralClient = tasks.register("openApiGenerateHtxGeneralClient") {
