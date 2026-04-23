@@ -15,13 +15,6 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.SupervisorJob
 import kotlin.coroutines.AbstractCoroutineContextElement
 import kotlin.coroutines.CoroutineContext
-import kursive.KursiveCharSeries
-import kursive.KursiveParser
-import kursive.bb
-import kursive.choice
-import kursive.parser
-import kursive.peekIsNot
-import kursive.std
 
 // ── element kinds ──────────────────────────────────────────────
 
@@ -231,46 +224,46 @@ object Narsive {
         "narsiveBudget" colon ('$'.s then std.wss then std.nums then (std.wss then ';'.s then std.wss then std.nums).opt then std.wss then '$'.s)
 
     /** truth : '%' num (';' num)? '%' */
-    val truth: KursiveParser[CharSeries] =
+    val truth: KursiveParser<CharSeries> =  
         "narsiveTruth" colon ('%'.s then std.wss then std.nums then (std.wss then ';'.s then std.wss then std.nums).opt then std.wss then '%'.s)
 
     /** relationship : '<' term copula term '>' */
-    val relationship: KursiveParser[CharSeries] =
+    val relationship: KursiveParser<CharSeries> =  
         "narsiveRelationship" colon ('<'.s then std.wss then term.s then std.wss then copula.s then std.wss then term.s then std.wss then '>'.s)
 
     /** operation : '(' '^' word (',' term)+ ')' */
-    val operation: KursiveParser[CharSeries] =
+    val operation: KursiveParser<CharSeries> =  
         "narsiveOperation" colon ('('.s then std.wss then '^'.s then word.s then (std.wss then ','.s then std.wss then term.s).repeat(1) then std.wss then ')'.s)
 
     /** compound : '(' conjunction (',' term){2,} ')' */
-    val compoundTerm: KursiveParser[CharSeries] =
+    val compoundTerm: KursiveParser<CharSeries> =  
         "narsiveCompoundTerm" colon ('('.s then std.wss then peekIsNot('^') then conjunction.s then (std.wss then ','.s then std.wss then term.s).repeat(2) then std.wss then ')'.s)
 
 //  term        : relationship | operation | compound | variable | quoted | word
 //  (defined above as lazy to allow forward references)
 
     /** statement : relationship | operation | term */
-    val statement: KursiveParser[CharSeries] =
+    val statement: KursiveParser<CharSeries> =  
         "narsiveStatement" colon choice("stmtAlt", relationship, operation, term)
 
     /** judgement : statement '.' tense? truth? */
-    val judgement: KursiveParser[CharSeries] =
+    val judgement: KursiveParser<CharSeries> =  
         "narsiveJudgement" colon (statement.s then std.wss then '.'.s then std.wss then tense.s.opt then std.wss then truth.s.opt)
 
     /** goal : statement '!' truth? */
-    val goal: KursiveParser[CharSeries] =
+    val goal: KursiveParser<CharSeries> =  
         "narsiveGoal" colon (statement.s then std.wss then '!'.s then std.wss then truth.s.opt)
 
     /** question : statement '?' tense? */
-    val questionSentence: KursiveParser[CharSeries] =
+    val questionSentence: KursiveParser<CharSeries> =  
         "narsiveQuestion" colon (statement.s then std.wss then '?'.s then std.wss then tense.s.opt)
 
     /** sentence : judgement | goal | question */
-    val sentence: KursiveParser[CharSeries] =
+    val sentence: KursiveParser<CharSeries> =  
         "narsiveSentence" colon choice("sentAlt", judgement, goal, questionSentence)
 
     /** task : budget? sentence */
-    val task: KursiveParser[CharSeries] =
+    val task: KursiveParser<CharSeries> =  
         "narsiveTask" colon (std.wss then budget.s.opt then std.wss then sentence.s then std.wss)
 
     // ── entry points ──
