@@ -46,6 +46,16 @@ kotlin {
         browser {
             testTask {
                 failOnNoDiscoveredTests = false
+                val firefoxBin = project.file("/Applications/Firefox.app/Contents/MacOS/firefox")
+                if (firefoxBin.exists()) {
+                    useKarma {
+                        useFirefox()
+                    }
+                } else {
+                    useKarma {
+                        useChromeHeadless()
+                    }
+                }
             }
         }
     }
