@@ -165,19 +165,7 @@ enum class NarsiveOperator(
             }
         }
     }
-}
 
-internal fun Series<Char>.narsiveOperatorOrNull(
-    accept: (NarsiveOperator) -> Boolean = { true },
-): NarsiveOperator? = NarsiveOperator.entries.firstOrNull { accept(it) && it.matches(this) }
-
-internal fun KursiveCharSeries.consumeNarsiveOperatorOrNull(
-    accept: (NarsiveOperator) -> Boolean = { true },
-): CharSeries? = NarsiveOperator.entries.firstNotNullOfOrNull { operator ->
-    if (accept(operator)) operator.tryConsume(this) else null
-}
-
-private fun Series<Char>.firstGlyphOrNull(): Series<Char>? = if (size == 0) null else 1 j { this[0] }
 
 private fun KursiveCharSeries.consumeAnyOf(vararg forms: String): CharSeries? {
     for (form in forms) {
@@ -213,7 +201,7 @@ object Narsive {
 
     // ── term (must be after structural productions that reference it) ──
     /** term : relationship | operation | compound | variable | quoted | word */
-    val term: KursiveParser<CharSequence> by lazy(LazyThreadSafetyMode.NONE) {
+    val term: KursiveParser<CharSeries> by lazy(LazyThreadSafetyMode.NONE) {
         choice("termAlt", relationship, operation, compoundTerm, variable, quoted, word)
     }
 
