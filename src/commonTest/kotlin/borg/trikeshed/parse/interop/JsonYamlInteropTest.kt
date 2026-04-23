@@ -1,6 +1,7 @@
 package borg.trikeshed.parse.interop
 
-import borg.trikeshed.parse.json.JsonSupport
+import borg.trikeshed.lib.toSeries
+import borg.trikeshed.parse.json.JsonParser
 import borg.trikeshed.parse.yaml.YamlParser
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -35,6 +36,6 @@ class JsonYamlInteropTest {
             nothing: null
             """.trimIndent()
 
-        assertEquals(JsonSupport.parse(json), YamlParser.reify(yaml))
+        assertEquals(JsonParser.reify(json.toSeries()), YamlParser.reify(yaml))
     }
 }

@@ -7,7 +7,7 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
 import kotlin.test.assertNotEquals
 import kotlin.test.assertSame
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.runTest
 
 // ---------------------------------------------------------------------------
 // Concrete test keys and elements (inside same module so sealed is fine)
@@ -40,7 +40,7 @@ class AsyncContextInvariantsTest {
 
     /** (2) Context built with KeyA[elemA] returns elemA on KeyA lookup and null on KeyB. */
     @Test
-    fun contextLookupReturnsCorrectElement(): Unit = runBlocking {
+    fun contextLookupReturnsCorrectElement() = runTest {
         val elemA = ElementA()
         // Build a CoroutineContext containing elemA
         val ctx: CoroutineContext = elemA
@@ -52,7 +52,7 @@ class AsyncContextInvariantsTest {
 
     /** (3) Element moves CREATED -> OPEN after open(), then OPEN -> CLOSED after close(). */
     @Test
-    fun elementLifecycleTransitions(): Unit = runBlocking {
+    fun elementLifecycleTransitions() = runTest {
         val elem = ElementA()
         assertEquals(ElementState.CREATED, elem.state)
         elem.open()

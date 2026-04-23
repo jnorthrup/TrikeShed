@@ -36,3 +36,6 @@ enum class ElementState : BitMasked {
     DRAINING,
     CLOSED;
 }
+
+/** Alias so tests and callers can use either name. */
+typealias ElementLifecycleState = ElementState

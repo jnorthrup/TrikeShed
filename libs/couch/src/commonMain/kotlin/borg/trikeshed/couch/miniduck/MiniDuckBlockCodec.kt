@@ -1,6 +1,29 @@
 package borg.trikeshed.couch.miniduck
 
 import borg.trikeshed.lib.*
+import borg.trikeshed.parse.json.JsonParser
+
+// Minimal JSON serializer for NDJSON block persistence — no external deps.
+private fun Any?.toJsonString(): String = when (this) {
+    null -> "null"
+    is Boolean -> toString()
+    is Number -> toString()
+    is String -> buildString {
+        append('"')
+        for (c in this@toJsonString) when (c) {
+            '"' -> append("\\\""); '\\' -> append("\\\\"); '\n' -> append("\\n")
+            '\r' -> append("\\r"); '\t' -> append("\\t")
+            else -> append(c)
+        }
+        append('"')
+    }
+    is Map<*, *> -> entries.joinToString(",", "{", "}") { (k, v) ->
+        k.toJsonString() + ":" + v.toJsonString()
+    }
+    is List<*> -> joinToString(",", "[", "]") { it.toJsonString() }
+    is ByteArray -> map { it.toInt() }.toJsonString()
+    else -> "\"$this\""
+}
 
 object MiniDuckBlockCodec {
     fun encode(block: BlockRowVec): String {
@@ -8,16 +31,14 @@ object MiniDuckBlockCodec {
 
         val lines = buildList {
             add(
-                MiniJson.stringify(
-                    linkedMapOf<String, Any?>(
+                linkedMapOf<String, Any?>(
                         "kind" to "MiniDuckBlock",
                         "sealed" to true,
                         "rowCount" to block.rowCount,
-                    ),
-                ),
+                    ).toJsonString(),
             )
             for (i in 0 until block.child.size) {
-                add(MiniJson.stringify(encodeRow(block.child[i])))
+                add(encodeRow(block.child[i]).toJsonString())
             }
         }
         return lines.joinToString("\n")
@@ -27,14 +48,14 @@ object MiniDuckBlockCodec {
         val lines = text.lineSequence().filter { it.isNotBlank() }.toList()
         require(lines.isNotEmpty()) { "MiniDuck block body is empty" }
 
-        val header = MiniJson.parse(lines.first()) as? Map<*, *>
+        val header = JsonParser.reify(lines.first().toSeries()) as? Map<*, *>
             ?: error("MiniDuck block header must be a JSON object")
         require(header["kind"] == "MiniDuckBlock") { "Unexpected block kind: ${header["kind"]}" }
         require(header["sealed"] == true) { "MiniDuck block body must be sealed" }
 
         val block = BlockRowVec.mutable()
         lines.drop(1).forEach { line ->
-            block.append(decodeRow(MiniJson.parse(line)))
+            block.append(decodeRow(JsonParser.reify(line.toSeries())))
         }
         return block.seal()
     }

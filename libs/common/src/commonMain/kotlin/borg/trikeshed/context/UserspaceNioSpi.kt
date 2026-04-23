@@ -8,5 +8,5 @@ interface UserspaceNioSpi {
     suspend fun open(fd: Int): NioUserspaceElement
     suspend fun close(element: NioUserspaceElement)
     /** Deliver event to every listener; structured — all must receive before return. */
-    suspend fun fanout(event: Any, listeners: List<NioUserspaceElement>)
+    suspend fun fanout(event: Any, listeners: List<AsyncContextElement>)
 }

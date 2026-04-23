@@ -1,6 +1,6 @@
 package borg.trikeshed.openapi
 
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -24,8 +24,7 @@ class OpenApiPipelineTddTest {
     """.trimIndent()
 
     @Test
-    fun speculativeGapBurndown_success_returnsAll() {
-        runBlocking {
+    fun speculativeGapBurndown_success_returnsAll() = runTest {
             val calls = listOf(
                 OpenApiCall(callId = "a", input = validOpenApi),
                 OpenApiCall(callId = "b", input = validOpenApi),
@@ -39,26 +38,23 @@ class OpenApiPipelineTddTest {
             )
 
             assertEquals(2, results.size)
-            assertTrue(results.all { it.analysis.isComplete })
-        }
+        assertTrue(results.all { it.analysis.isComplete })
     }
 
     @Test
-    fun speculativeGapBurndown_failure_throwsOpenApiCallFailure() {
-        runBlocking {
+    fun speculativeGapBurndown_failure_throwsOpenApiCallFailure() = runTest {
             val calls = listOf(
                 OpenApiCall(callId = "ok", input = validOpenApi),
                 OpenApiCall(callId = "bad", input = "not json")
             )
 
-            assertFailsWith<OpenApiCallFailure> {
-                speculativeGapBurndown(
-                    calls = calls,
-                    parallelism = 2,
-                    parser = { input -> input },
-                    truthAction = { parsed -> parsed.analysis }
-                )
-            }
+        assertFailsWith<OpenApiCallFailure> {
+            speculativeGapBurndown(
+                calls = calls,
+                parallelism = 2,
+                parser = { input -> input },
+                truthAction = { parsed -> parsed.analysis }
+            )
         }
     }
 }

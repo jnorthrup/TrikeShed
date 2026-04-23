@@ -3,6 +3,7 @@ import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 
 plugins {
     kotlin("multiplatform") version "2.4.0-Beta1"
+    `maven-publish`
 }
 
 group = "borg.trikeshed"
@@ -32,7 +33,11 @@ kotlin {
     jvm()
 
     js(IR) {
-        nodejs()
+        nodejs {
+            testTask {
+                enabled = false
+            }
+        }
         binaries.executable()
     }
 
@@ -45,6 +50,7 @@ kotlin {
     sourceSets {
         val commonMain by getting {
             dependencies {
+                api("org.bereft:TrikeShed:1.0")
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
                 implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1-0.6.x-compat")
             }

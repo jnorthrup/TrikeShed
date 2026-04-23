@@ -1,5 +1,6 @@
 package borg.trikeshed.userspace.nio
 
+import borg.trikeshed.context.AsyncContextElement
 import borg.trikeshed.context.NioUserspaceElement
 import borg.trikeshed.context.UserspaceNioSpi
 import kotlinx.coroutines.coroutineScope
@@ -23,7 +24,7 @@ class UserspaceNioProvider : UserspaceNioSpi {
         element.close()
     }
 
-    override suspend fun fanout(event: Any, listeners: List<NioUserspaceElement>) {
+    override suspend fun fanout(event: Any, listeners: List<AsyncContextElement>) {
         coroutineScope {
             listeners.forEach { listener ->
                 launch {

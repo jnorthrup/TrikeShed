@@ -19,3 +19,9 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "openapi"
+
+includeBuild("../../") {
+    dependencySubstitution {
+        substitute(module("org.bereft:TrikeShed")).using(project(":"))
+    }
+}

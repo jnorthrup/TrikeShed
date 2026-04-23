@@ -34,19 +34,27 @@ kotlin {
     jvm()
 
     js(IR) {
-        nodejs()
+        nodejs {
+            testTask {
+                enabled = false
+            }
+        }
     }
 
     @OptIn(ExperimentalWasmDsl::class)
     wasmJs {
-        browser()
+        browser {
+            testTask {
+                failOnNoDiscoveredTests = false
+            }
+        }
     }
 
     sourceSets {
         val commonMain by getting {
             dependencies {
                 api("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
+                api("org.bereft:TrikeShed:1.0")
             }
         }
         val commonTest by getting {

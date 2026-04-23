@@ -18,8 +18,14 @@ typealias AsyncContextElement = borg.trikeshed.context.AsyncContextElement
  * Subclass the canonical NioUserspaceElement so callers may extend it inside the
  * userspace package without reimplementing lifecycle semantics.
  */
-open class NioUserspaceElement : borg.trikeshed.context.NioUserspaceElement()
+open class NioUserspaceElement : borg.trikeshed.context.NioUserspaceElement() {
+    override val key: CoroutineContext.Key<*> get() = AsyncContextKey.NioUserspaceKey
+}
 
-open class LiburingElement : borg.trikeshed.context.LiburingElement()
+open class LiburingElement : borg.trikeshed.context.LiburingElement() {
+    override val key: CoroutineContext.Key<*> get() = AsyncContextKey.LiburingKey
+}
 
-open class FanoutDispatcherElement : borg.trikeshed.context.FanoutDispatcherElement()
+open class FanoutDispatcherElement : borg.trikeshed.context.FanoutDispatcherElement() {
+    override val key: CoroutineContext.Key<*> get() = AsyncContextKey.FanoutDispatcherKey
+}

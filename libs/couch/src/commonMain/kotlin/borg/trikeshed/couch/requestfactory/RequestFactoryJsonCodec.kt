@@ -1,5 +1,8 @@
 package borg.trikeshed.couch.requestfactory
 
+import borg.trikeshed.lib.toSeries
+import borg.trikeshed.parse.json.JsonParser
+
 object RequestFactoryJsonCodec {
     fun callToJson(call: RequestFactoryCall): String = buildJsonObject(
         listOf(
@@ -326,7 +329,9 @@ object RequestFactoryJsonCodec {
         else -> error("Unsupported transport value: $value")
     }
 
-    private fun parseObject(json: String): Map<String, Any?> = MiniJsonParser(json).parseObject()
+    private fun parseObject(json: String): Map<String, Any?> =
+        JsonParser.reify(json.toSeries()) as? Map<String, Any?>
+            ?: error("Expected JSON object: $json")
 
     private fun Map<String, Any?>.string(key: String): String = this[key] as String
     private fun Map<String, Any?>.boolean(key: String): Boolean = this[key] as Boolean
@@ -334,131 +339,4 @@ object RequestFactoryJsonCodec {
     private fun Map<String, Any?>.list(key: String): List<Any?> = (this[key] as? List<Any?>) ?: emptyList()
     private fun Map<String, Any?>.listOrEmpty(key: String): List<Any?> = (this[key] as? List<Any?>) ?: emptyList()
     private fun Map<String, Any?>.objectValue(key: String): Map<String, Any?> = this[key] as Map<String, Any?>
-
-    private class MiniJsonParser(private val source: String) {
-        private var index: Int = 0
-
-        fun parseObject(): Map<String, Any?> {
-            skipWhitespace()
-            expect('{')
-            val result = linkedMapOf<String, Any?>()
-            skipWhitespace()
-            if (peek() == '}') {
-                index++
-                return result
-            }
-            while (true) {
-                skipWhitespace()
-                val key = parseString()
-                skipWhitespace()
-                expect(':')
-                skipWhitespace()
-                result[key] = parseValue()
-                skipWhitespace()
-                when (peek()) {
-                    ',' -> index++
-                    '}' -> {
-                        index++
-                        return result
-                    }
-                    else -> error("Unexpected token at $index in $source")
-                }
-            }
-        }
-
-        private fun parseArray(): List<Any?> {
-            expect('[')
-            val result = mutableListOf<Any?>()
-            skipWhitespace()
-            if (peek() == ']') {
-                index++
-                return result
-            }
-            while (true) {
-                skipWhitespace()
-                result += parseValue()
-                skipWhitespace()
-                when (peek()) {
-                    ',' -> index++
-                    ']' -> {
-                        index++
-                        return result
-                    }
-                    else -> error("Unexpected array token at $index in $source")
-                }
-            }
-        }
-
-        private fun parseValue(): Any? = when (val token = peek()) {
-            '{' -> parseObject()
-            '[' -> parseArray()
-            '"' -> parseString()
-            't' -> parseLiteral("true", true)
-            'f' -> parseLiteral("false", false)
-            'n' -> parseLiteral("null", null)
-            '-', in '0'..'9' -> parseNumber()
-            else -> error("Unexpected value token '$token' at $index in $source")
-        }
-
-        private fun parseString(): String {
-            expect('"')
-            val out = StringBuilder()
-            while (index < source.length) {
-                val ch = source[index++]
-                when (ch) {
-                    '"' -> return out.toString()
-                    '\\' -> {
-                        val escaped = source[index++]
-                        out.append(
-                            when (escaped) {
-                                '"' -> '"'
-                                '\\' -> '\\'
-                                '/' -> '/'
-                                'b' -> '\b'
-                                'f' -> '\u000C'
-                                'n' -> '\n'
-                                'r' -> '\r'
-                                't' -> '\t'
-                                else -> escaped
-                            },
-                        )
-                    }
-                    else -> out.append(ch)
-                }
-            }
-            error("Unterminated string in $source")
-        }
-
-        private fun parseNumber(): Number {
-            val start = index
-            if (source[index] == '-') index++
-            while (index < source.length && source[index].isDigit()) index++
-            val isDouble = if (index < source.length && source[index] == '.') {
-                index++
-                while (index < source.length && source[index].isDigit()) index++
-                true
-            } else {
-                false
-            }
-            val raw = source.substring(start, index)
-            return if (isDouble) raw.toDouble() else raw.toLong()
-        }
-
-        private fun parseLiteral(literal: String, value: Any?): Any? {
-            require(source.startsWith(literal, index)) { "Expected $literal at $index in $source" }
-            index += literal.length
-            return value
-        }
-
-        private fun skipWhitespace() {
-            while (index < source.length && source[index].isWhitespace()) index++
-        }
-
-        private fun expect(expected: Char) {
-            require(peek() == expected) { "Expected '$expected' at $index in $source" }
-            index++
-        }
-
-        private fun peek(): Char = source.getOrElse(index) { '\u0000' }
-    }
 }

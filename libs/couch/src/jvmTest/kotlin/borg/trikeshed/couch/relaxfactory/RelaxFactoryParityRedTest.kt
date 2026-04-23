@@ -1,6 +1,5 @@
 package borg.trikeshed.couch.relaxfactory
 
-import borg.trikeshed.couch.relaxfactory.*
 import borg.trikeshed.couch.relaxfactory.CouchServiceCompiler.compile
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -48,8 +47,7 @@ class RelaxFactoryParityRedTest {
 
     @Test
     fun invokesViewsUsingCouchDb11CounterpartPathsAndJsonEncodedArguments() {
-        val invocation:
-            CouchViewInvocation = compile<VehicleViewService>(namespace = "acme")
+        val invocation: CouchViewInvocation = compile<VehicleViewService>(namespace = "acme")
             .views
             .getValue("matchingTuple")
             .invoke(VehicleDoc(model = "Golf", brand = "VW"))

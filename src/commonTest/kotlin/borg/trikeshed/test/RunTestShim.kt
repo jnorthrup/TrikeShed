@@ -1,5 +1,6 @@
 package borg.trikeshed.test
 
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.TestResult
+import kotlinx.coroutines.test.runTest as kotlinxRunTest
 
-fun <T> runTest(block: suspend () -> T): T = runBlocking { block() }
+fun runTest(block: suspend () -> Unit): TestResult = kotlinxRunTest { block() }

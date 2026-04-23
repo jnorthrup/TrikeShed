@@ -1,7 +1,7 @@
 package borg.trikeshed.context
 
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.runTest
 import kotlin.coroutines.CoroutineContext
 import kotlin.test.Test
 import kotlin.test.assertTrue
@@ -11,7 +11,7 @@ private object TestKey : CoroutineContext.Key<AsyncContextElement>
 
 class AsyncContextSupervisorTest {
     @Test
-    fun supervisorJobIsCancelledWhenParentCanceled() = runBlocking {
+    fun supervisorJobIsCancelledWhenParentCanceled() = runTest {
         val parent = Job()
         val element = object : AsyncContextElement(parentJob = parent) {
             override val key = TestKey
@@ -29,7 +29,7 @@ class AsyncContextSupervisorTest {
     }
 
     @Test
-    fun supervisorIsCancelledOnClose() = runBlocking {
+    fun supervisorIsCancelledOnClose() = runTest {
         val element = object : AsyncContextElement() {
             override val key = TestKey
             fun supervisorActive() = supervisor.isActive

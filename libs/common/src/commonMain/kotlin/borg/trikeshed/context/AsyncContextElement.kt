@@ -23,6 +23,9 @@ abstract class AsyncContextElement(
     var state: ElementState = initialState
         protected set
 
+    /** Alias for [state] — overrideable in anonymous test subclasses. */
+    open val lifecycleState: ElementLifecycleState get() = state
+
     /**
      * Ordered list of downstream fanout subscribers.
      * Each subscriber is an [AsyncContextElement] that will receive

@@ -128,8 +128,10 @@ For common code:
 - for this path, use internal `Json.kt` and `yaml.kt` helpers from `commonMain`; do not introduce Kotlin serialization here
 
 For `libs/couch` specifically:
-- prefer the self-contained module path for MiniDuck work
-- do not wire it back to unrelated root common sources unless the wider tree is green
+- `libs/couch` should be subsumed by `/TrikeShed` DRY precedence
+- remove overlap instead of duplicating shared algebra into `dreamer-kmm` or keeping parallel `libs/couch` shims
+- prefer canonical root TrikeShed algebra/types over local duplicates
+- standalone `libs/couch` must still build and publish cleanly via composite/published dependencies, without shadowing or forking canonical core types
 
 ## 8) How to change code here
 
@@ -171,3 +173,6 @@ Let rows expose lazy children.
 Seal for readers.
 Derive views and indexes afterward.
 Lower to tensors only when needed.
+
+
+	* /Trikeshed DRY PRECEDENCE OVER -> libs/**  <-- DRY  removes overlap from dreamer-kmm 
