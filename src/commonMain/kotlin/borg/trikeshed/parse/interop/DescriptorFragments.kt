@@ -164,8 +164,8 @@ object StructuredParserSupport {
                 }
                 is YamlScalarNode -> emptyList()
             }
-        val termination = if (node.span.endLine >= totalLines) ExtentTermination.EndOfInput else ExtentTermination.IndentDrop
-        val extent = YamlOpaqueExtent(node.span.startLine, node.span.endLine, depth, depth, termination)
+        val termination = if (node.span.b >= totalLines) ExtentTermination.EndOfInput else ExtentTermination.IndentDrop
+        val extent = YamlOpaqueExtent(node.span.a, node.span.b, depth, depth, termination)
         val evidence = sampleEvidence(value)
         return DescriptorFragment(
             key = key,
