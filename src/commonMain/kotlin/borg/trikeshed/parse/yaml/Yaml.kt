@@ -214,10 +214,9 @@ private class Parser(
             text.matches("{}") -> YamlMappingNode(emptyList(), YamlSpan(lineNumber, lineNumber))
             text.startsWith("[") && text.endsWith("]") -> {
                 val parts: Series<Series<Char>> = splitInlineList(text.slice(1, text.size - 1))
-                YamlSequenceNode(
-                    (parts α { it: Series<Char> ->
-                        YamlScalarNode(it, YamlSpan(lineNumber, lineNumber))
-                    }).view.toList(), YamlSpan(lineNumber, lineNumber))
+                val nodes = mutableListOf<YamlNode>()
+                for (i in 0 until parts.size) nodes += YamlScalarNode(parts[i], YamlSpan(lineNumber, lineNumber))
+                YamlSequenceNode(nodes, YamlSpan(lineNumber, lineNumber))
             }
             else -> YamlScalarNode(text, YamlSpan(lineNumber, lineNumber))
         }
