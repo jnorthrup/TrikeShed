@@ -33,19 +33,22 @@ val List<*>.toJsPath: JsPath
     }
 
 private fun parseJsonNumber(src: Series<Char>): Any? {
-    val text = CharSeries(src).run { res.slice.asString().trim() }
+    val value = CharSeries(src).trim.slice
 
-    if (text.isEmpty()) return null
-    if (text == "-0") return -0.0
+    if (value.isEmpty()) return null
+    if (value.size == 2 && value[0] == '-' && value[1] == '0') return -0.0
 
-    if (text.contains('.') || text.contains('e', ignoreCase = true))
-        return text.toDoubleOrNull()
+    var hasDotOrExp = false
+    for (i in 0 until value.size) {
+        val c = value[i]
+        if (c == '.' || c == 'e' || c == 'E') { hasDotOrExp = true; break }
+    }
 
-    val longValue = text.toLongOrNull()
-    if (longValue != null)
-        return if (longValue in Int.MIN_VALUE..Int.MAX_VALUE) longValue.toInt() else longValue
+    if (hasDotOrExp) return value.toDoubleOrNull()
 
-    return text.toDoubleOrNull()
+    value.toLongOrNull()?.let { return if (it in Int.MIN_VALUE..Int.MAX_VALUE) it.toInt() else it }
+
+    return value.toDoubleOrNull()
 }
 
 /** delimiter-exclusive segments in a splittable json element.
@@ -179,7 +182,7 @@ object JsonParser {
                                     "expected colon in ${tmp.take(40).asString()}"
                                 }
                                 tmp.slice.let { valueContext: Series<Char> ->
-                                    tmp.lim(closeQuote).pos(openQuote).asString() j reify(
+                                    tmp.lim(closeQuote).pos(openQuote).slice j reify(
                                         valueContext,
                                         nodeEvidence,
                                         rowVecCallback,
