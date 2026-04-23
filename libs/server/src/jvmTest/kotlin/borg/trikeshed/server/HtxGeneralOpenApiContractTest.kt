@@ -41,16 +41,21 @@ class HtxGeneralOpenApiContractTest {
         "borg.trikeshed.htx.client.generated.api",
         "borg.trikeshed.htx.client.generated.infrastructure",
         "borg.trikeshed.htx.client.generated.model",
+        "borg.trikeshed.htx.client.generated",
     )
     private val expectedOutputModes = listOf(
         "generated-api",
         "generated-support",
         "generated-model",
+        "generated-support",
     )
     private val expectedGeneratedFiles = listOf(
         "borg/trikeshed/htx/client/generated/api/HtxGeneralApi.kt",
         "borg/trikeshed/htx/client/generated/infrastructure/GeneratedRequest.kt",
         "borg/trikeshed/htx/client/generated/model/HealthStatus.kt",
+        "borg/trikeshed/htx/client/generated/Keys.kt",
+        "borg/trikeshed/htx/client/generated/Elements.kt",
+        "borg/trikeshed/htx/client/generated/SupervisorJobs.kt",
     )
     private val expectedDocumentedGeneratedFiles = expectedGeneratedFiles.map {
         "libs/htx-client/src/generated/kotlin/$it"
@@ -112,7 +117,7 @@ class HtxGeneralOpenApiContractTest {
             .findAll(contractText)
             .map { it.groupValues[1] }
             .toList()
-        val documentedFileNames = Regex("(?m)^        - (HtxGeneralApi\\.kt|GeneratedRequest\\.kt|HealthStatus\\.kt)\\s*$")
+        val documentedFileNames = Regex("(?m)^        - (HtxGeneralApi\\.kt|GeneratedRequest\\.kt|HealthStatus\\.kt|Keys\\.kt|Elements\\.kt|SupervisorJobs\\.kt)\\s*$")
             .findAll(contractText)
             .map { it.groupValues[1] }
             .toList()
@@ -127,7 +132,7 @@ class HtxGeneralOpenApiContractTest {
         assertTrue(contractText.contains("destination_module: libs/htx-client"))
         assertTrue(contractText.contains("destination_source_root: libs/htx-client/src/generated/kotlin"))
         assertTrue(contractText.contains("destination_package_root: borg.trikeshed.htx.client.generated"))
-        assertTrue(contractText.contains("output_count: 3"))
+        assertTrue(contractText.contains("output_count: 6"))
         assertTrue(contractText.contains("generated_outputs: checked-in"))
         assertTrue(contractText.contains("verification_only: false"))
         assertTrue(contractText.contains("verification_mode: non-mutating verification of checked-in generated sources"))
@@ -141,10 +146,11 @@ class HtxGeneralOpenApiContractTest {
                 "libs/htx-client/src/generated/kotlin/borg/trikeshed/htx/client/generated/api",
                 "libs/htx-client/src/generated/kotlin/borg/trikeshed/htx/client/generated/infrastructure",
                 "libs/htx-client/src/generated/kotlin/borg/trikeshed/htx/client/generated/model",
+                "libs/htx-client/src/generated/kotlin/borg/trikeshed/htx/client/generated",
             ),
             documentedPaths,
         )
-        assertEquals(listOf("HtxGeneralApi.kt", "GeneratedRequest.kt", "HealthStatus.kt"), documentedFileNames)
+        assertEquals(listOf("HtxGeneralApi.kt", "GeneratedRequest.kt", "HealthStatus.kt", "Keys.kt", "Elements.kt", "SupervisorJobs.kt"), documentedFileNames)
         assertTrue(buildText.contains("tasks.register(\"openApiGenerateHtxGeneralClient\")"))
         assertTrue(buildText.contains("tasks.register(\"verifyHtxGeneralClientGeneratedSources\")"))
         assertTrue(buildText.contains("val generatedSourceRoot = layout.projectDirectory.dir(\"src/generated/kotlin\")"))
@@ -235,7 +241,10 @@ class HtxGeneralOpenApiContractTest {
         assertTrue(contractText.contains("Checked-in generated outputs differ from the documented policy."))
         assertTrue(contractText.contains("Missing checked-in generated source <relativePath>."))
         assertTrue(contractText.contains("Generated source <relativePath> is stale."))
-        assertTrue(buildText.contains("check(actualRelativePaths == generatedOutputRelativePaths)"))
+        assertTrue(
+            buildText.contains("check(actualRelativePaths == generatedOutputRelativePaths)") ||
+                buildText.contains("check(actualRelativePaths == generatedOutputRelativePaths.sorted())"),
+        )
         assertTrue(buildText.contains("Checked-in generated outputs differ from the documented policy."))
         assertTrue(buildText.contains("Missing checked-in generated source \$relativePath."))
         assertTrue(buildText.contains("Generated source \$relativePath is stale."))
@@ -265,13 +274,13 @@ class HtxGeneralOpenApiContractTest {
 
     @Test
     fun codegenTaskExistsAndGeneratesTheDocumentedOutputs() {
-        val tasksOutput = runGradle("-p", "libs/htx-client", "tasks", "--all")
+        val tasksOutput = runGradle(":libs:htx-client:tasks", "--all")
         assertEquals(0, tasksOutput.exitCode, tasksOutput.output)
         assertTrue(tasksOutput.output.contains("Code generation tasks"), tasksOutput.output)
         assertTrue(tasksOutput.output.contains("openApiGenerateHtxGeneralClient"), tasksOutput.output)
         assertTrue(tasksOutput.output.contains("verifyHtxGeneralClientGeneratedSources"), tasksOutput.output)
 
-        val codegenOutput = runGradle("-p", "libs/htx-client", "openApiGenerateHtxGeneralClient")
+        val codegenOutput = runGradle(":libs:htx-client:openApiGenerateHtxGeneralClient")
         assertEquals(0, codegenOutput.exitCode, codegenOutput.output)
         assertTrue(
             codegenOutput.output.contains(":openApiGenerateHtxGeneralClient") ||
@@ -280,7 +289,7 @@ class HtxGeneralOpenApiContractTest {
         )
 
         val beforeVerifyContents = snapshotGeneratedContents()
-        val verifyOutput = runGradle("-p", "libs/htx-client", "verifyHtxGeneralClientGeneratedSources")
+        val verifyOutput = runGradle(":libs:htx-client:verifyHtxGeneralClientGeneratedSources")
         assertEquals(0, verifyOutput.exitCode, verifyOutput.output)
         assertTrue(verifyOutput.output.contains("verifyHtxGeneralClientGeneratedSources"), verifyOutput.output)
         assertEquals(beforeVerifyContents, snapshotGeneratedContents())
@@ -293,7 +302,7 @@ class HtxGeneralOpenApiContractTest {
             .map { it.relativeTo(generatedSourceRoot).invariantSeparatorsPath }
             .sorted()
             .toList()
-        assertEquals(expectedGeneratedFiles, actualGeneratedFiles)
+        assertEquals(expectedGeneratedFiles.sorted(), actualGeneratedFiles)
         assertGeneratedFilesAreNotIgnoredByGit()
         assertTrue(generatedApiFile.canonicalPath.startsWith(generatedSourceRoot.canonicalPath))
         assertTrue(generatedInfrastructureFile.canonicalPath.startsWith(generatedSourceRoot.canonicalPath))
@@ -319,13 +328,7 @@ class HtxGeneralOpenApiContractTest {
         assertTrue(modelText.contains("data class HealthStatus"))
         assertTrue(modelText.contains("body == \"ok\""))
 
-        val clientTestOutput = runGradle(
-            "-p",
-            "libs/htx-client",
-            "jvmTest",
-            "--tests",
-            "borg.trikeshed.htx.client.GeneratedHtxGeneralClientTest",
-        )
+        val clientTestOutput = runGradle(":libs:htx-client:jvmTest", "--tests", "borg.trikeshed.htx.client.GeneratedHtxGeneralClientTest")
         assertEquals(0, clientTestOutput.exitCode, clientTestOutput.output)
     }
 

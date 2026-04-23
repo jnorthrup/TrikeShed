@@ -8,6 +8,15 @@ plugins {
 group = "org.bereft"
 version = "1.0"
 
+repositories {
+    maven("https://oss.sonatype.org/content/repositories/snapshots/")
+    mavenCentral()
+    mavenLocal()
+    gradlePluginPortal()
+    google()
+    maven("https://www.jitpack.io")
+}
+
 kotlin {
     @OptIn(ExperimentalKotlinGradlePluginApi::class)
     compilerOptions {

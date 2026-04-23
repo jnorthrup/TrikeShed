@@ -24,7 +24,7 @@ generation:
   destination_module: libs/htx-client
   destination_source_root: libs/htx-client/src/generated/kotlin
   destination_package_root: borg.trikeshed.htx.client.generated
-  output_count: 3
+  output_count: 6
   repository_policy:
     generated_outputs: checked-in
     verification_only: false
@@ -48,6 +48,13 @@ generation:
       mode: generated-model
       files:
         - HealthStatus.kt
+    - package: borg.trikeshed.htx.client.generated
+      path: libs/htx-client/src/generated/kotlin/borg/trikeshed/htx/client/generated
+      mode: generated-support
+      files:
+        - Keys.kt
+        - Elements.kt
+        - SupervisorJobs.kt
 validation:
   codegen_run:
     passes_when:
@@ -61,6 +68,9 @@ validation:
         - libs/htx-client/src/generated/kotlin/borg/trikeshed/htx/client/generated/api/HtxGeneralApi.kt
         - libs/htx-client/src/generated/kotlin/borg/trikeshed/htx/client/generated/infrastructure/GeneratedRequest.kt
         - libs/htx-client/src/generated/kotlin/borg/trikeshed/htx/client/generated/model/HealthStatus.kt
+        - libs/htx-client/src/generated/kotlin/borg/trikeshed/htx/client/generated/Keys.kt
+        - libs/htx-client/src/generated/kotlin/borg/trikeshed/htx/client/generated/Elements.kt
+        - libs/htx-client/src/generated/kotlin/borg/trikeshed/htx/client/generated/SupervisorJobs.kt
     observable_criteria:
       - The task list for libs/htx-client includes openApiGenerateHtxGeneralClient.
       - The generation command exits with status 0.

@@ -25,6 +25,9 @@ val generatedOutputRelativePaths = listOf(
     "$generatedPackagePath/api/HtxGeneralApi.kt",
     "$generatedPackagePath/infrastructure/GeneratedRequest.kt",
     "$generatedPackagePath/model/HealthStatus.kt",
+    "$generatedPackagePath/Keys.kt",
+    "$generatedPackagePath/Elements.kt",
+    "$generatedPackagePath/SupervisorJobs.kt",
 )
 val generatedFileBanner =
     """
@@ -158,7 +161,6 @@ fun renderGeneratedSources(contract: HtxGeneralOperationContract): Map<String, S
                 body =
                     """
                     // Placeholder Keys generated for channelized IO
-                    package ${generatedPackageRoot}
 
                     object GeneratedKeys {
                         const val HTX_KEY = "htx-client"
@@ -171,7 +173,6 @@ fun renderGeneratedSources(contract: HtxGeneralOperationContract): Map<String, S
                 body =
                     """
                     // Placeholder Elements generated for channelized IO
-                    package ${generatedPackageRoot}
 
                     class GeneratedElements {
                         // placeholder element types for TDD
@@ -185,7 +186,6 @@ fun renderGeneratedSources(contract: HtxGeneralOperationContract): Map<String, S
                 body =
                     """
                     // Placeholder SupervisorJobs for channelized IO
-                    package ${generatedPackageRoot}
 
                     object GeneratedSupervisorJobs {
                         fun name() = "generated-supervisor"
@@ -243,7 +243,7 @@ val verifyHtxGeneralClientGeneratedSources = tasks.register("verifyHtxGeneralCli
                 emptyList()
             }
 
-        check(actualRelativePaths == generatedOutputRelativePaths) {
+        check(actualRelativePaths == generatedOutputRelativePaths.sorted()) {
             buildString {
                 appendLine("Checked-in generated outputs differ from the documented policy.")
                 appendLine("Expected: ${generatedOutputRelativePaths.joinToString()}")
