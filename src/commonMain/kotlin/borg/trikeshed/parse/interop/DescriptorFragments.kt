@@ -13,6 +13,7 @@ import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.toSeries
+import borg.trikeshed.lib.toList
 import borg.trikeshed.parse.json.JsonParser
 import borg.trikeshed.parse.yaml.YamlMappingNode
 import borg.trikeshed.parse.yaml.YamlNode
@@ -156,10 +157,10 @@ object StructuredParserSupport {
         val value = node.reify()
         val children =
             when (node) {
-                is YamlMappingNode -> node.entries.map { entry ->
+                is YamlMappingNode -> node.entries.toList().map { entry ->
                     describeYamlNode(entry.key, entry.value, depth + 1, totalLines)
                 }
-                is YamlSequenceNode -> node.items.mapIndexed { index, child ->
+                is YamlSequenceNode -> node.items.toList().mapIndexed { index, child ->
                     describeYamlNode(index.toString(), child, depth + 1, totalLines)
                 }
                 is YamlScalarNode -> emptyList()

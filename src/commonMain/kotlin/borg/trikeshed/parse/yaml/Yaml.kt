@@ -13,6 +13,7 @@ import borg.trikeshed.lib.get
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.size
 import borg.trikeshed.lib.toSeries
+import borg.trikeshed.lib.toList
 import borg.trikeshed.lib.α
 
  typealias YamlSpan = Twin<Int>
@@ -24,9 +25,10 @@ val YamlSpan.endLine: Int get() = this.b
 sealed interface YamlNode {
     val span: YamlSpan
 
+    // non-null defaults: avoid nullable plumbing at call sites
     fun reify(
-        nodeEvidence: MutableList<TypeEvidence>? = null,
-        rowVecCallback: ((RowVec) -> Unit)? = null,
+        nodeEvidence: MutableList<TypeEvidence> = mutableListOf(),
+        rowVecCallback: (RowVec) -> Unit = {},
     ): Any?
 }
 
@@ -35,28 +37,29 @@ data class YamlScalarNode(
     override val span: YamlSpan,
 ) : YamlNode {
     override fun reify(
-        nodeEvidence: MutableList<TypeEvidence>?,
-        rowVecCallback: ((RowVec) -> Unit)?,
+        nodeEvidence: MutableList<TypeEvidence>,
+        rowVecCallback: (RowVec) -> Unit,
     ): Any? {
         val evidence = TypeEvidence.sample(value ?: "".toSeries())
-        nodeEvidence?.add(evidence)
-        rowVecCallback?.invoke(evidence.toRowVec())
+        nodeEvidence.add(evidence)
+        rowVecCallback(evidence.toRowVec())
         return parseScalar(value)
     }
 }
 
 data class YamlSequenceNode(
-    val items: List<YamlNode>,
+    val items: Series<YamlNode>,
     override val span: YamlSpan,
 ) : YamlNode {
     override fun reify(
-        nodeEvidence: MutableList<TypeEvidence>?,
-        rowVecCallback: ((RowVec) -> Unit)?,
+        nodeEvidence: MutableList<TypeEvidence>,
+        rowVecCallback: (RowVec) -> Unit,
     ): Any? {
         val evidence = TypeEvidence.sample("[]".toSeries())
-        nodeEvidence?.add(evidence)
-        rowVecCallback?.invoke(evidence.toRowVec())
-        return items.map { it.reify(nodeEvidence, rowVecCallback) }
+        nodeEvidence.add(evidence)
+        rowVecCallback(evidence.toRowVec())
+        // materialize lazily-composed values as a List for callers
+        return (items α { it.reify(nodeEvidence, rowVecCallback) }).toList()
     }
 }
 
@@ -67,17 +70,18 @@ data class YamlMappingEntry(
 )
 
 data class YamlMappingNode(
-    val entries: List<YamlMappingEntry>,
+    val entries: Series<YamlMappingEntry>,
     override val span: YamlSpan,
 ) : YamlNode {
     override fun reify(
-        nodeEvidence: MutableList<TypeEvidence>?,
-        rowVecCallback: ((RowVec) -> Unit)?,
+        nodeEvidence: MutableList<TypeEvidence>,
+        rowVecCallback: (RowVec) -> Unit,
     ): Any? {
         val evidence = TypeEvidence.sample("{}".toSeries())
-        nodeEvidence?.add(evidence)
-        rowVecCallback?.invoke(evidence.toRowVec())
-        return entries.associate { it.key to it.value.reify(nodeEvidence, rowVecCallback) }
+        nodeEvidence.add(evidence)
+        rowVecCallback(evidence.toRowVec())
+        // materialize mapping into a standard Kotlin Map
+        return entries.toList().associate { it.key to it.value.reify(nodeEvidence, rowVecCallback) }
     }
 }
 
@@ -103,14 +107,14 @@ object YamlParser {
 
     fun reify(
         src: Series<Char>,
-        nodeEvidence: MutableList<TypeEvidence>? = null,
-        rowVecCallback: ((RowVec) -> Unit)? = null,
+        nodeEvidence: MutableList<TypeEvidence> = mutableListOf(),
+        rowVecCallback: (RowVec) -> Unit = {},
     ): Any? = parse(src).root.reify(nodeEvidence, rowVecCallback)
 
     fun reify(
         text: String,
-        nodeEvidence: MutableList<TypeEvidence>? = null,
-        rowVecCallback: ((RowVec) -> Unit)? = null,
+        nodeEvidence: MutableList<TypeEvidence> = mutableListOf(),
+        rowVecCallback: (RowVec) -> Unit = {},
     ): Any? = parse(text).root.reify(nodeEvidence, rowVecCallback)
 }
 
@@ -143,7 +147,7 @@ private class Parser(
             end = node.span.endLine
         }
 
-        return YamlSequenceNode(items, YamlSpan(start, end))
+        return YamlSequenceNode(items.toSeries(), YamlSpan(start, end))
     }
 
     private fun parseSequenceItem(line: YamlLine, payload: Series<Char>, expectedIndent: Int): YamlNode {
@@ -166,16 +170,17 @@ private class Parser(
                     parseInlineValue(rest, line.number)
                 }
 
-            val entries = mutableListOf(YamlMappingEntry(key, inlineNode, YamlSpan(line.number, inlineNode.span.endLine)))
+            val entriesList = mutableListOf(YamlMappingEntry(key, inlineNode, YamlSpan(line.number, inlineNode.span.endLine)))
             val child = current()
             if (child != null && child.indent > expectedIndent) {
                 val nested = parseBlock(child.indent)
                 if (nested is YamlMappingNode) {
-                    entries += nested.entries
-                    return YamlMappingNode(entries, YamlSpan(line.number, nested.span.endLine))
+                    // materialize nested entries and append
+                    entriesList.addAll(nested.entries.toList())
+                    return YamlMappingNode(entriesList.toSeries(), YamlSpan(line.number, nested.span.endLine))
                 }
             }
-            return YamlMappingNode(entries, YamlSpan(line.number, entries.maxOf { it.span.endLine }))
+            return YamlMappingNode(entriesList.toSeries(), YamlSpan(line.number, entriesList.maxOf { it.span.endLine }))
         }
 
         return parseInlineValue(payload, line.number)
@@ -209,17 +214,16 @@ private class Parser(
             end = valueNode.span.endLine
         }
 
-        return YamlMappingNode(entries, YamlSpan(start, end))
+        return YamlMappingNode(entries.toSeries(), YamlSpan(start, end))
     }
 
     private fun parseInlineValue(text: Series<Char>, lineNumber: Int): YamlNode =
         when {
-            text.matches("[]") -> YamlSequenceNode(emptyList(), YamlSpan(lineNumber, lineNumber))
-            text.matches("{}") -> YamlMappingNode(emptyList(), YamlSpan(lineNumber, lineNumber))
+            text.matches("[]") -> YamlSequenceNode(emptyList<YamlNode>().toSeries(), YamlSpan(lineNumber, lineNumber))
+            text.matches("{}") -> YamlMappingNode(emptyList<YamlMappingEntry>().toSeries(), YamlSpan(lineNumber, lineNumber))
             text.startsWith("[") && text.endsWith("]") -> {
                 val parts: Series<Series<Char>> = splitInlineList(text.slice(1, text.size - 1))
-                val nodes = mutableListOf<YamlNode>()
-                for (i in 0 until parts.size) nodes += YamlScalarNode(parts[i], YamlSpan(lineNumber, lineNumber))
+                val nodes: Series<YamlNode> = parts.α { it: Series<Char> -> YamlScalarNode(it, YamlSpan(lineNumber, lineNumber)) }
                 YamlSequenceNode(nodes, YamlSpan(lineNumber, lineNumber))
             }
             else -> YamlScalarNode(text, YamlSpan(lineNumber, lineNumber))
