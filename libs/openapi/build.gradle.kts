@@ -34,6 +34,7 @@ kotlin {
     jvm()
 
     js(IR) {
+        nodejs()
     }
 
     @OptIn(ExperimentalWasmDsl::class)
