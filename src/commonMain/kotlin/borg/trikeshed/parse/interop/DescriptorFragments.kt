@@ -158,7 +158,7 @@ object StructuredParserSupport {
         val children =
             when (node) {
                 is YamlMappingNode -> node.entries.toList().map { entry ->
-                    describeYamlNode(entry.key, entry.value, depth + 1, totalLines)
+                    describeYamlNode(entry.key.asString(), entry.value, depth + 1, totalLines)
                 }
                 is YamlSequenceNode -> node.items.toList().mapIndexed { index, child ->
                     describeYamlNode(index.toString(), child, depth + 1, totalLines)

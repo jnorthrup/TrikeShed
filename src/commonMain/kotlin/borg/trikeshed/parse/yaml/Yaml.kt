@@ -5,18 +5,9 @@ package borg.trikeshed.parse.yaml
 import borg.trikeshed.common.TypeEvidence
 import borg.trikeshed.common.toRowVec
 import borg.trikeshed.cursor.RowVec
-import borg.trikeshed.lib.CharSeries
-import borg.trikeshed.lib.Series
-import borg.trikeshed.lib.Twin
-import borg.trikeshed.lib.asString
-import borg.trikeshed.lib.get
-import borg.trikeshed.lib.j
-import borg.trikeshed.lib.size
-import borg.trikeshed.lib.toSeries
-import borg.trikeshed.lib.toList
-import borg.trikeshed.lib.α
+import borg.trikeshed.lib.*
 
- typealias YamlSpan = Twin<Int>
+typealias YamlSpan = Twin<Int>
 
 // convenience accessors for previous field names
 val YamlSpan.startLine: Int get() = this.a
@@ -64,7 +55,7 @@ data class YamlSequenceNode(
 }
 
 data class YamlMappingEntry(
-    val key: String,
+    val key: Series<Char>,
     val value: YamlNode,
     val span: YamlSpan,
 )
@@ -81,7 +72,7 @@ data class YamlMappingNode(
         nodeEvidence.add(evidence)
         rowVecCallback(evidence.toRowVec())
         // materialize mapping into a standard Kotlin Map
-        return entries.toList().associate { it.key to it.value.reify(nodeEvidence, rowVecCallback) }
+        return entries.view.associate { it.key.asString() to it.value.reify(nodeEvidence, rowVecCallback) }
     }
 }
 
@@ -159,7 +150,7 @@ private class Parser(
 
         val separator = keyValueSeparator(payload)
         if (separator >= 0) {
-            val key = payload.slice(0, separator).trim().asString()
+            val key = payload.slice(0, separator).trim()
             val rest = payload.drop(separator + 1).trimStart()
             val inlineNode: YamlNode =
                 if (rest.isEmpty()) {
@@ -197,7 +188,7 @@ private class Parser(
 
             val separator = keyValueSeparator(line.content)
             require(separator >= 0) { "Expected key/value pair at line ${line.number}" }
-            val key = line.content.slice(0, separator).trim().asString()
+            val key = line.content.slice(0, separator).trim()
             val rest = line.content.drop(separator + 1).trimStart()
             advance()
 
@@ -293,7 +284,7 @@ private fun keyValueSeparator(text: Series<Char>): Int {
 }
 
 private fun splitInlineList(text: Series<Char>): Series<Series<Char>> {
-    if (text.trim().isEmpty()) return emptyList<Series<Char>>().toSeries()
+    if (text.trim().isEmpty()) return 0 j {TODO()}
     val items = mutableListOf<Series<Char>>()
     var itemStart = 0
     var inSingle = false
@@ -324,43 +315,8 @@ private fun parseScalar(raw: Series<Char>?): Any? {
         return value.slice(1, value.size - 1).asString()
     }
 
-    val text = value.asString()
-    text.toIntOrNull()?.let { return it }
-    text.toLongOrNull()?.let { return it }
-    text.toDoubleOrNull()?.let { return it }
-    return text
+    value.toIntOrNull()?.let { return it }
+    value.toLongOrNull()?.let { return it }
+    value.toDoubleOrNull()?.let { return it }
+    return value.asString()
 }
-
-private fun Series<Char>.slice(start: Int, endExclusive: Int = Int.MAX_VALUE): Series<Char> {
-    val end = endExclusive.coerceAtMost(size)
-    return if (end <= start) "".toSeries() else this[start until end]
-}
-
-private fun Series<Char>.isEmpty(): Boolean = size == 0
-
-private fun Series<Char>.trim(): Series<Char> = CharSeries(this).trim.slice
-
-private fun Series<Char>.trimStart(): Series<Char> = CharSeries(this).apply {
-    while (hasRemaining && this[pos].isWhitespace()) pos++
-}.slice
-
-private fun Series<Char>.trimEnd(): Series<Char> = CharSeries(this).rtrim.slice
-
-private fun Series<Char>.drop(count: Int): Series<Char> = slice(count.coerceAtMost(size), size)
-
-private fun Series<Char>.startsWith(prefix: String): Boolean =
-    size >= prefix.length && prefix.indices.all { index -> this[index] == prefix[index] }
-
-private fun Series<Char>.endsWith(suffix: String): Boolean =
-    size >= suffix.length && suffix.indices.all { index -> this[size - suffix.length + index] == suffix[index] }
-
-private fun Series<Char>.leadingWhitespace(): Int {
-    for (index in 0 until size) if (!this[index].isWhitespace()) return index
-    return size
-}
-
-private fun Series<Char>.matches(literal: String): Boolean =
-    size == literal.length && literal.indices.all { index -> this[index] == literal[index] }
-
-private fun Series<Char>.isQuoted(quote: Char): Boolean =
-    size >= 2 && this[0] == quote && this[size - 1] == quote
