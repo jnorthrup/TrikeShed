@@ -7,6 +7,7 @@ import borg.trikeshed.common.toRowVec
 import borg.trikeshed.cursor.RowVec
 import borg.trikeshed.lib.CharSeries
 import borg.trikeshed.lib.Series
+import borg.trikeshed.lib.Twin
 import borg.trikeshed.lib.asString
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.j
@@ -14,10 +15,7 @@ import borg.trikeshed.lib.size
 import borg.trikeshed.lib.toSeries
 import borg.trikeshed.lib.α
 
-data class YamlSpan(
-    val startLine: Int,
-    val endLine: Int,
-)
+ typealias YamlSpan = Twin<Int>
 
 sealed interface YamlNode {
     val span: YamlSpan
@@ -219,7 +217,7 @@ private class Parser(
                 YamlSequenceNode(
                     (parts α { it: Series<Char> ->
                         YamlScalarNode(it, YamlSpan(lineNumber, lineNumber))
-                    }).toList(), YamlSpan(lineNumber, lineNumber))
+                    }).view.toList(), YamlSpan(lineNumber, lineNumber))
             }
             else -> YamlScalarNode(text, YamlSpan(lineNumber, lineNumber))
         }
