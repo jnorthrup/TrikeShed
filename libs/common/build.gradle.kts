@@ -1,8 +1,10 @@
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
+import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
 
 plugins {
     kotlin("multiplatform") version "2.4.0-Beta1"
+    `maven-publish`
 }
 
 group = "borg.trikeshed"
@@ -40,6 +42,13 @@ kotlin {
     wasmJs {
         nodejs()
         binaries.executable()
+    }
+
+    val hostOs = System.getProperty("os.name")
+    if (hostOs == "Mac OS X" && System.getProperty("os.arch") == "aarch64") {
+        macosArm64("macos")
+    } else if (hostOs == "Linux") {
+        linuxX64("linux")
     }
 
     sourceSets {

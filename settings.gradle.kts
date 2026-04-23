@@ -29,6 +29,9 @@ project(":libs:quic").projectDir = file("libs/quic")
 include(":libs:ngsctp")
 project(":libs:ngsctp").projectDir = file("libs/ngsctp")
 
+include(":libs:openapi")
+project(":libs:openapi").projectDir = file("libs/openapi")
+
 include(":libs:htx-client")
 project(":libs:htx-client").projectDir = file("libs/htx-client")
 

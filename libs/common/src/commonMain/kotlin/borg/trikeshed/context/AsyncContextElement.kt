@@ -1,5 +1,6 @@
 package borg.trikeshed.context
 
+import borg.trikeshed.context.ElementState.*
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
@@ -14,7 +15,7 @@ import kotlin.coroutines.CoroutineContext
  * dispatching completions to all subscribers atomically from its perspective.
  */
 abstract class AsyncContextElement(
-    initialState: ElementState = ElementState.CREATED,
+    initialState: ElementState = CREATED,
     parentJob: Job? = null
 ) : CoroutineContext.Element {
     protected val supervisor = SupervisorJob(parentJob)
@@ -31,8 +32,8 @@ abstract class AsyncContextElement(
 
     /** Transition CREATED -> OPEN. Idempotent if already OPEN or later. */
     open suspend fun open() {
-        if (state == ElementState.CREATED) {
-            state = ElementState.OPEN
+        if (state == CREATED) {
+            state = OPEN
         }
     }
 
@@ -41,8 +42,8 @@ abstract class AsyncContextElement(
      * then transition to [ElementState.CLOSED].
      */
     open suspend fun drain() {
-        if (state.isAtLeast(ElementState.OPEN) && state.isLessThan(ElementState.DRAINING)) {
-            state = ElementState.DRAINING
+        if (state.isAtLeast(OPEN) && state.isLessThan(DRAINING)) {
+            state = DRAINING
             // Implementation specific drain logic here
             close()
         }
@@ -50,12 +51,12 @@ abstract class AsyncContextElement(
 
     /** Transition OPEN -> DRAINING -> CLOSED. */
     open suspend fun close() {
-        if (state.isAtLeast(ElementState.OPEN) && state.isLessThan(ElementState.CLOSED)) {
-            if (state < ElementState.DRAINING) {
-                state = ElementState.DRAINING
+        if (state.isAtLeast(OPEN) && state.isLessThan(CLOSED)) {
+            if (state < DRAINING) {
+                state = DRAINING
             }
             supervisor.cancel()
-            state = ElementState.CLOSED
+            state = CLOSED
         }
     }
 

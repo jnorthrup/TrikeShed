@@ -2,6 +2,7 @@
 
 package borg.trikeshed.isam
 
+import borg.trikeshed.common.Files
 import borg.trikeshed.common.Usable
 import borg.trikeshed.cursor.Cursor
 import borg.trikeshed.cursor.RowVec

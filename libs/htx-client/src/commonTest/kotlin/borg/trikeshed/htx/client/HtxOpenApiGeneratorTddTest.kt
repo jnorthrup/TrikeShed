@@ -6,7 +6,7 @@ import java.io.File
 
 class HtxOpenApiGeneratorTddTest {
     @Test
-    fun generator_emits_keys_elements_and_supervisor_placeholders() {
+    fun generator_emits_real_keys_elements_and_supervisor_shapes() {
         val start = File(".").canonicalFile
         fun findInAncestors(startDir: File, relative: String, depth: Int = 8): File? {
             var cur: File? = startDir
@@ -28,8 +28,22 @@ class HtxOpenApiGeneratorTddTest {
         val elements = findInAncestors(start, elementsRelative) ?: findInAncestors(start, "src/generated/kotlin/$pkgPath/Elements.kt") ?: File(start, elementsRelative)
         val supervisor = findInAncestors(start, supervisorRelative) ?: findInAncestors(start, "src/generated/kotlin/$pkgPath/SupervisorJobs.kt") ?: File(start, supervisorRelative)
 
-        assertTrue(keys.exists(), "Expected generated Keys.kt (TODO: generator should emit Keys)")
-        assertTrue(elements.exists(), "Expected generated Elements.kt (TODO: generator should emit Elements)")
-        assertTrue(supervisor.exists(), "Expected generated SupervisorJobs.kt (TODO: generator should emit SupervisorJobs)")
+        assertTrue(keys.exists(), "Expected generated Keys.kt")
+        assertTrue(elements.exists(), "Expected generated Elements.kt")
+        assertTrue(supervisor.exists(), "Expected generated SupervisorJobs.kt")
+
+        val keysText = keys.readText()
+        val elementsText = elements.readText()
+        val supervisorText = supervisor.readText()
+
+        assertTrue(keysText.contains("object Keys"))
+        assertTrue(keysText.contains("AsyncContextKey<HtxElement> = HtxKey"))
+        assertTrue(keysText.contains("const val operationId: String = \"getHealth\""))
+
+        assertTrue(elementsText.contains("object Elements"))
+        assertTrue(elementsText.contains("suspend fun htx(): HtxElement = openHtxElementRuntime()"))
+
+        assertTrue(supervisorText.contains("object SupervisorJobs"))
+        assertTrue(supervisorText.contains("fun getHealth(parent: Job? = null): Job = SupervisorJob(parent)"))
     }
 }

@@ -9,6 +9,25 @@ servers:
 tags:
   - name: system
     description: Server health and readiness operations
+x-trikeshed-context:
+  client:
+    - name: htx
+      key: borg.trikeshed.htx.client.HtxKey
+      element: borg.trikeshed.htx.client.HtxElement
+      open: borg.trikeshed.htx.client.openHtxElement
+  server:
+    - name: htx
+      key: borg.trikeshed.htx.client.HtxKey
+      element: borg.trikeshed.htx.client.HtxElement
+      open: borg.trikeshed.htx.client.openHtxElement
+    - name: quic
+      key: borg.trikeshed.quic.QuicKey
+      element: borg.trikeshed.quic.QuicElement
+      open: borg.trikeshed.quic.openQuicElement
+    - name: sctp
+      key: borg.trikeshed.sctp.SctpKey
+      element: borg.trikeshed.sctp.SctpElement
+      open: borg.trikeshed.sctp.openSctpElement
 paths:
   /health:
     get:
@@ -17,6 +36,7 @@ paths:
       operationId: getHealth
       summary: Health probe
       description: Returns the liveness response exposed by the htx-general server stub.
+      x-trikeshed-supervisor: true
       responses:
         '200':
           description: Server is healthy.

@@ -1,6 +1,6 @@
 package borg.trikeshed.userspace.nio
 
-import borg.trikeshed.context.AsyncContextElement
+import borg.trikeshed.context.NioUserspaceElement
 import borg.trikeshed.context.UserspaceNioSpi
 import borg.trikeshed.userspace.reactor.Interest
 import kotlinx.coroutines.runBlocking
@@ -11,12 +11,12 @@ import java.util.concurrent.atomic.AtomicLong
 class NioSpiBackend(
     private val provider: UserspaceNioSpi = UserspaceNioProvider()
 ) : PlatformBackend {
-    private val elements = ConcurrentHashMap<Int, AsyncContextElement>()
+    private val elements = ConcurrentHashMap<Int, NioUserspaceElement>()
     private val registrations = ConcurrentHashMap<Int, Pair<Long, Interest>>()
     private val completions = ConcurrentLinkedQueue<Completion>()
     private val submittedCount = AtomicLong(0)
 
-    private fun elementFor(fd: Int): AsyncContextElement =
+    private fun elementFor(fd: Int): NioUserspaceElement =
         elements.computeIfAbsent(fd) { openedFd ->
             runBlocking { provider.open(openedFd) }
         }

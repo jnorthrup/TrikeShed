@@ -1,8 +1,7 @@
 package borg.trikeshed.userspace.nio
 
+import borg.trikeshed.context.NioUserspaceElement
 import borg.trikeshed.context.UserspaceNioSpi
-import borg.trikeshed.userspace.context.AsyncContextKey
-import borg.trikeshed.userspace.context.NioUserspaceElement
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 
@@ -12,8 +11,6 @@ class UserspaceNioProvider : UserspaceNioSpi {
     }
 
     class NioElement(val fd: Int) : NioUserspaceElement(), EventListener {
-        override val key get() = AsyncContextKey.NioUserspaceKey
-
         override suspend fun onEvent(event: Any) {
             // Minimal marker hook for structured fanout.
         }

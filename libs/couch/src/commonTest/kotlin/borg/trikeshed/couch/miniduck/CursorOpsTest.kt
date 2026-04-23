@@ -147,6 +147,33 @@ class CursorOpsTest {
         assertNull(row["missing"])
     }
 
+    @Test fun projectRetainsDeferredChildrenOnViewRows() {
+        val nested = DocRowVec(listOf("body"), listOf("hello"))
+        val base: MiniCursor = 1 j { ViewRowVec("doc1", "k", "v") { nested } }
+
+        val projected = base.project("id", "key", "value")
+        val row = projected[0] as DocRowVec
+
+        assertEquals("doc1", row["id"])
+        assertEquals("k", row["key"])
+        assertEquals("v", row["value"])
+        assertNotNull(row.child)
+        assertEquals(1, row.child!!.size)
+        assertSame(nested, row.child!![0])
+    }
+
+    @Test fun columnsRetainsDeferredChildrenOnBlobRows() {
+        val nested = JsonRowVec("object", "{}")
+        val base: MiniCursor = 1 j { BlobRowVec(byteArrayOf(0x7b, 0x7d)) { 1 j { nested } } }
+
+        val projected = base.columns(0)
+        val row = projected[0] as DocRowVec
+
+        assertNotNull(row.child)
+        assertEquals(1, row.child!!.size)
+        assertSame(nested, row.child!![0])
+    }
+
     // ── QueryPlan execute ─────────────────────────────────────────────────────
 
     @Test fun executeFilterPlanComposesCorrectly() {

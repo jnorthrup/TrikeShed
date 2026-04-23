@@ -89,6 +89,18 @@ class RowVecFamilyTest {
         assertSame(nested, doc.child!![0])
     }
 
+    @Test
+    fun docRowVecShellCanCarryDeferredChildren() {
+        val nested = DocRowVec(listOf("body"), listOf("hello"))
+        val shell = DocRowVec(emptyList(), emptyList(), child = 1 j { nested })
+
+        assertTrue(shell.isShell)
+        assertEquals(0, shell.size)
+        assertNotNull(shell.child)
+        assertEquals(1, shell.child!!.size)
+        assertSame(nested, shell.child!![0])
+    }
+
     // --- ViewRowVec ---
 
     @Test

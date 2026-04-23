@@ -40,7 +40,7 @@ fun MiniCursor.columns(vararg colIdx: Int): MiniCursor {
         DocRowVec(
             keys = projectedKeys,
             cells = projectedKeys.map { r.getValue(it) },
-            child = (r as? DocRowVec)?.child,
+            child = r.child,
         )
     }
 }
@@ -113,14 +113,14 @@ fun MiniCursor.orderBy(vararg specs: OrderSpec): MiniCursor {
  * Project: select named [keys] into DocRowVec rows.
  *
  * Values are extracted via [getValue]. Missing keys produce null cells.
- * Child hierarchy is preserved when the source row is a DocRowVec.
+ * Child hierarchy is preserved when the source row family provides one.
  */
 fun MiniCursor.project(vararg keys: String): MiniCursor = size j { rowIdx ->
     val row = at(rowIdx)
     DocRowVec(
         keys = keys.toList(),
         cells = keys.map { row.getValue(it) },
-        child = (row as? DocRowVec)?.child,
+        child = row.child,
     )
 }
 

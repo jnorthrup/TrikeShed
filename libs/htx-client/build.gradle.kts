@@ -1,6 +1,9 @@
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import java.io.File
 
+fun org.gradle.api.Project.projectOrModule(projectPath: String, moduleCoordinate: String): Any =
+    findProject(projectPath)?.let { project(projectPath) } ?: moduleCoordinate
+
 plugins {
     kotlin("multiplatform") version "2.4.0-Beta1"
 }
@@ -37,12 +40,80 @@ val generatedFileBanner =
      */
     """.trimIndent()
 
-data class HtxGeneralOperationContract(
+data class ContextBinding(
+    val name: String,
+    val keyFqn: String,
+    val elementFqn: String,
+    val openFqn: String,
+) {
+    val keySimple get() = keyFqn.substringAfterLast('.')
+    val elementSimple get() = elementFqn.substringAfterLast('.')
+    val keyImport get() = keyFqn
+    val elementImport get() = elementFqn
+    val openImport get() = openFqn
+    val openAlias get() = "open${name.replaceFirstChar { it.uppercase() }}ElementRuntime"
+}
+
+data class TrikeshedContract(
     val path: String,
     val method: String,
     val operationId: String,
     val responseBody: String,
+    val supervisorOperationIds: List<String>,
+    val clientBindings: List<ContextBinding>,
+    val serverBindings: List<ContextBinding>,
 )
+
+fun parseContextBindings(specText: String, role: String): List<ContextBinding> {
+    // Find the x-trikeshed-context: block, then the named sub-list under <role>:.
+    // The sub-list ends at the next same-indent key (another role or end of the extension block).
+    val contextStart = specText.indexOf("x-trikeshed-context:")
+    if (contextStart < 0) return emptyList()
+    val afterContext = specText.substring(contextStart)
+    // Match "  <role>:\n" and capture indented lines up to the next "  \w" sibling key or end.
+    val blockRegex = Regex("""(?m)^  $role:\n((?:(?:    |\t).*\n?)*)""")
+    val block = blockRegex.find(afterContext)?.groupValues?.get(1) ?: return emptyList()
+    val entryRegex = Regex("""- name:\s*(\S+)\s*\n\s+key:\s*(\S+)\s*\n\s+element:\s*(\S+)\s*\n\s+open:\s*(\S+)""")
+    return entryRegex.findAll(block).map { m ->
+        ContextBinding(
+            name = m.groupValues[1],
+            keyFqn = m.groupValues[2],
+            elementFqn = m.groupValues[3],
+            openFqn = m.groupValues[4],
+        )
+    }.toList()
+}
+
+fun parseTrikeshedContract(specText: String, specPath: String): TrikeshedContract {
+    require(specText.contains("title: HTX General Server API")) {
+        "Expected HTX General Server API title in $specPath"
+    }
+
+    val path = Regex("""(?m)^  (/[^:]+):\s*$""").find(specText)?.groupValues?.get(1)
+        ?: error("Unable to resolve a path from $specPath")
+    val method = Regex("""(?m)^    ([a-z]+):\s*$""").find(specText)?.groupValues?.get(1)?.uppercase()
+        ?: error("Unable to resolve an HTTP method from $specPath")
+    val operationId = Regex("""(?m)^      operationId:\s*([A-Za-z0-9_]+)\s*$""")
+        .find(specText)?.groupValues?.get(1)
+        ?: error("Unable to resolve operationId from $specPath")
+    val responseBody = Regex("""(?m)^                const:\s*(.+?)\s*$""")
+        .find(specText)?.groupValues?.get(1)?.trim()?.removeSurrounding("\"")
+        ?: error("Unable to resolve response body contract from $specPath")
+
+    // Collect all operationIds that carry x-trikeshed-supervisor: true.
+    val supervisorIds = Regex("""(?ms)operationId:\s*(\S+).*?x-trikeshed-supervisor:\s*true""")
+        .findAll(specText).map { it.groupValues[1] }.toList()
+
+    return TrikeshedContract(
+        path = path,
+        method = method,
+        operationId = operationId,
+        responseBody = responseBody,
+        supervisorOperationIds = supervisorIds,
+        clientBindings = parseContextBindings(specText, "client"),
+        serverBindings = parseContextBindings(specText, "server"),
+    )
+}
 
 fun writeGeneratedFile(file: File, content: String) {
     file.parentFile.mkdirs()
@@ -51,36 +122,6 @@ fun writeGeneratedFile(file: File, content: String) {
 
 fun String.asKotlinStringLiteral(): String =
     replace("\\", "\\\\").replace("\"", "\\\"")
-
-fun parseHtxGeneralOpenApiContract(specText: String, specPath: String): HtxGeneralOperationContract {
-    require(specText.contains("title: HTX General Server API")) {
-        "Expected HTX General Server API title in $specPath"
-    }
-
-    val path = Regex("(?m)^  (/[^:]+):\\s*$").find(specText)?.groupValues?.get(1)
-        ?: error("Unable to resolve a path from $specPath")
-    val method = Regex("(?m)^    ([a-z]+):\\s*$").find(specText)?.groupValues?.get(1)?.uppercase()
-        ?: error("Unable to resolve an HTTP method from $specPath")
-    val operationId = Regex("(?m)^      operationId:\\s*([A-Za-z0-9_]+)\\s*$")
-        .find(specText)
-        ?.groupValues
-        ?.get(1)
-        ?: error("Unable to resolve operationId from $specPath")
-    val responseBody = Regex("(?m)^                const:\\s*(.+?)\\s*$")
-        .find(specText)
-        ?.groupValues
-        ?.get(1)
-        ?.trim()
-        ?.removeSurrounding("\"")
-        ?: error("Unable to resolve response body contract from $specPath")
-
-    return HtxGeneralOperationContract(
-        path = path,
-        method = method,
-        operationId = operationId,
-        responseBody = responseBody,
-    )
-}
 
 fun generatedKotlinFile(packageName: String, body: String): String =
     buildString {
@@ -92,8 +133,47 @@ fun generatedKotlinFile(packageName: String, body: String): String =
         appendLine()
     }
 
-fun renderGeneratedSources(contract: HtxGeneralOperationContract): Map<String, String> =
-    mapOf(
+fun renderGeneratedSources(contract: TrikeshedContract): Map<String, String> {
+    val bindings = contract.clientBindings
+
+    // Keys.kt — one val per binding, keyed by name
+    val keysImports = buildString {
+        appendLine("import borg.trikeshed.context.AsyncContextKey")
+        bindings.forEach { b ->
+            appendLine("import ${b.keyImport}")
+            appendLine("import ${b.elementImport}")
+        }
+    }.trimEnd()
+    val keysBody = buildString {
+        bindings.forEach { b ->
+            appendLine("    val ${b.name}: AsyncContextKey<${b.elementSimple}> = ${b.keySimple}")
+        }
+        append("    const val operationId: String = \"${contract.operationId.asKotlinStringLiteral()}\"")
+    }
+
+    // Elements.kt — one suspend fun per binding
+    val elementsImports = buildString {
+        bindings.forEach { b ->
+            appendLine("import ${b.elementImport}")
+            appendLine("import ${b.openImport} as ${b.openAlias}")
+        }
+    }.trimEnd()
+    val elementsBody = buildString {
+        bindings.forEachIndexed { i, b ->
+            if (i > 0) appendLine()
+            append("    suspend fun ${b.name}(): ${b.elementSimple} = ${b.openAlias}()")
+        }
+    }
+
+    // SupervisorJobs.kt — one fun per supervisor operationId
+    val supervisorBody = buildString {
+        contract.supervisorOperationIds.forEachIndexed { i, opId ->
+            if (i > 0) appendLine()
+            append("    fun $opId(parent: Job? = null): Job = SupervisorJob(parent)")
+        }
+    }
+
+    return mapOf(
         "$generatedPackagePath/api/HtxGeneralApi.kt" to
             generatedKotlinFile(
                 packageName = "${generatedPackageRoot}.api",
@@ -154,45 +234,23 @@ fun renderGeneratedSources(contract: HtxGeneralOperationContract): Map<String, S
                     }
                     """,
             ),
-        // Additional placeholders for TDD: Keys, Elements, SupervisorJobs
         "$generatedPackagePath/Keys.kt" to
             generatedKotlinFile(
-                packageName = "${generatedPackageRoot}",
-                body =
-                    """
-                    // Placeholder Keys generated for channelized IO
-
-                    object GeneratedKeys {
-                        const val HTX_KEY = "htx-client"
-                    }
-                    """,
+                packageName = generatedPackageRoot,
+                body = "$keysImports\n\nobject Keys {\n$keysBody\n}",
             ),
         "$generatedPackagePath/Elements.kt" to
             generatedKotlinFile(
-                packageName = "${generatedPackageRoot}",
-                body =
-                    """
-                    // Placeholder Elements generated for channelized IO
-
-                    class GeneratedElements {
-                        // placeholder element types for TDD
-                        fun placeholder() = "element"
-                    }
-                    """,
+                packageName = generatedPackageRoot,
+                body = "$elementsImports\n\nobject Elements {\n$elementsBody\n}",
             ),
         "$generatedPackagePath/SupervisorJobs.kt" to
             generatedKotlinFile(
-                packageName = "${generatedPackageRoot}",
-                body =
-                    """
-                    // Placeholder SupervisorJobs for channelized IO
-
-                    object GeneratedSupervisorJobs {
-                        fun name() = "generated-supervisor"
-                    }
-                    """,
+                packageName = generatedPackageRoot,
+                body = "import kotlinx.coroutines.Job\nimport kotlinx.coroutines.SupervisorJob\n\nobject SupervisorJobs {\n$supervisorBody\n}",
             ),
     )
+}
 
 val openApiGenerateHtxGeneralClient = tasks.register("openApiGenerateHtxGeneralClient") {
     group = "code generation"
@@ -205,7 +263,7 @@ val openApiGenerateHtxGeneralClient = tasks.register("openApiGenerateHtxGeneralC
         val specFile = htxGeneralOpenApiSpec.asFile
         require(specFile.exists()) { "Missing authoritative OpenAPI input: ${specFile.path}" }
 
-        val contract = parseHtxGeneralOpenApiContract(specFile.readText(), specFile.path)
+        val contract = parseTrikeshedContract(specFile.readText(), specFile.path)
         val generatedPackageDir = generatedSourceRoot.asFile.resolve(generatedPackagePath)
         delete(generatedPackageDir)
 
@@ -230,7 +288,7 @@ val verifyHtxGeneralClientGeneratedSources = tasks.register("verifyHtxGeneralCli
         val specFile = htxGeneralOpenApiSpec.asFile
         require(specFile.exists()) { "Missing authoritative OpenAPI input: ${specFile.path}" }
 
-        val expectedSources = renderGeneratedSources(parseHtxGeneralOpenApiContract(specFile.readText(), specFile.path))
+        val expectedSources = renderGeneratedSources(parseTrikeshedContract(specFile.readText(), specFile.path))
         val generatedPackageDir = generatedSourceRoot.asFile.resolve(generatedPackagePath)
         val actualRelativePaths =
             if (generatedPackageDir.exists()) {
@@ -282,7 +340,7 @@ kotlin {
         val commonMain by getting {
             kotlin.srcDir(generatedSourceRoot)
             dependencies {
-                api(project(":libs:common"))
+                api(projectOrModule(":libs:common", "borg.trikeshed:common"))
             }
         }
         val commonTest by getting {

@@ -45,7 +45,6 @@ kotlin {
     sourceSets {
         val commonMain by getting {
             dependencies {
-                implementation(project(":libs:common"))
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
                 implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1-0.6.x-compat")
             }
@@ -66,9 +65,5 @@ kotlin {
                 implementation(kotlin("test-junit"))
             }
         }
-        val jsMain by getting
-        val jsTest by getting { dependsOn(commonTest) }
-        val wasmJsMain by getting
-        val wasmJsTest by getting { dependsOn(commonTest) }
     }
 }
