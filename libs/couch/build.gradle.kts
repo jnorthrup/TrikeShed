@@ -33,11 +33,6 @@ kotlin {
     jvm()
 
     js(IR) {
-        nodejs {
-            testTask {
-                enabled = false
-            }
-        }
         binaries.executable()
     }
 
