@@ -40,3 +40,6 @@ project(":libs:server").projectDir = file("libs/server")
 
 include(":libs:uring")
 project(":libs:uring").projectDir = file("libs/uring")
+
+include(":libs:kursive")
+project(":libs:kursive").projectDir = file("libs/kursive")

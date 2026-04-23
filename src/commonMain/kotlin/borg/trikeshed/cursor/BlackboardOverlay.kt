@@ -362,10 +362,8 @@ fun blackboardContext(
     tags: Map<String, String> = emptyMap()
 ): BlackboardContext = BlackboardContext(id, columnOverlays, provenance, tags)
 
-// ============================================================================
-// Extension functions for Cursor and RowVec overlay access
-// ============================================================================
-// Note: Complex Cursor/RowVec extension functions require deeper understanding
+// ==// Extension functions for Cursor and RowVec overlay access
+// ==// Note: Complex Cursor/RowVec extension functions require deeper understanding
 // of the TrikeShed DSL patterns. The core overlay types (CellOverlay, ColumnOverlay,
 // BlackboardContext, etc.) are fully functional and can be used directly.
 
