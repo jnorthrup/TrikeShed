@@ -288,7 +288,7 @@ private fun keyValueSeparator(text: Series<Char>): Int {
 }
 
 private fun splitInlineList(text: Series<Char>): Series<Series<Char>> {
-    if (text.trim().isEmpty()) return 0 j {it:Int-> TODO("empty") }
+    if (text.trim().isEmpty()) return emptyList<Series<Char>>().toSeries()
     val items = mutableListOf<Series<Char>>()
     var itemStart = 0
     var inSingle = false
@@ -326,8 +326,10 @@ private fun parseScalar(raw: Series<Char>?): Any? {
     return text
 }
 
-private fun Series<Char>.slice(start: Int, endExclusive: Int=a): Series<Char> =
-    if (endExclusive <= start) "".toSeries() else this[start until endExclusive]
+private fun Series<Char>.slice(start: Int, endExclusive: Int = Int.MAX_VALUE): Series<Char> {
+    val end = endExclusive.coerceAtMost(size)
+    return if (end <= start) "".toSeries() else this[start until end]
+}
 
 private fun Series<Char>.isEmpty(): Boolean = size == 0
 
