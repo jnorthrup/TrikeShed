@@ -8,6 +8,7 @@ import borg.trikeshed.cursor.TypeMemento
 import borg.trikeshed.cursor.label
 import borg.trikeshed.cursor.joins
 import borg.trikeshed.isam.meta.IOMemento
+import borg.trikeshed.lib.Join
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.Series
@@ -108,48 +109,24 @@ TypeEvidence(
          * maximum digits in a byte range would be: 3
          */
         fun deduce(typeEvidence: TypeEvidence): IOMemento {
+            val digits = typeEvidence.digits.toUInt()
+            val periods = typeEvidence.periods.toUInt()
+            val exponent = typeEvidence.exponent.toUInt()
+            val signs = typeEvidence.signs.toUInt()
+            val special = typeEvidence.special.toUInt()
+            val maxColumnLength = typeEvidence.maxColumnLength.toUInt()
 
             return when {
                 typeEvidence.dquotes > 0U || typeEvidence.quotes > 0U -> IOMemento.IoString
                 typeEvidence.empty > 0U || typeEvidence.alpha > 0U -> IOMemento.IoString
                 typeEvidence.truefalse > 0U -> IOMemento.IoBoolean
-                typeEvidence.digits.toUInt() == 0U -> IOMemento.IoString
-                typeEvidence.periods.toUInt() == 0U
-                        && typeEvidence.exponent.toUInt() == 0U
-                        && typeEvidence.signs.toUInt() <= 1U
-                        && typeEvidence.special.toUInt() == 0U
-                        && typeEvidence.maxColumnLength <= 3U +typeEvidence.signs-> IOMemento.IoByte
-
-                typeEvidence.periods.toUInt() == 0U
-                        && typeEvidence.exponent.toUInt() == 0U
-                        && typeEvidence.signs.toUInt() <= 1U
-                        && typeEvidence.special.toUInt() == 0U
-                        && typeEvidence.maxColumnLength <= 5U +typeEvidence.signs-> IOMemento.IoShort
-
-                typeEvidence.periods.toUInt() == 0U
-                        && typeEvidence.exponent.toUInt() == 0U
-                        && typeEvidence.signs.toUInt() <= 1U
-                        && typeEvidence.special.toUInt() == 0U
-                        && typeEvidence.maxColumnLength <= 10U +typeEvidence.signs-> IOMemento.IoInt
-
-                typeEvidence.periods.toUInt() == 0U
-                        && typeEvidence.exponent.toUInt() == 0U
-                        && typeEvidence.signs.toUInt() <= 1U
-                        && typeEvidence.special.toUInt() == 0U
-                        && typeEvidence.maxColumnLength <= 19U +typeEvidence.signs-> IOMemento.IoLong
-
-                typeEvidence.periods.toUInt() == 1U
-                        && typeEvidence.exponent.toUInt() == 0U
-                        && typeEvidence.signs <= 1U
-                        && typeEvidence.special.toUInt() == 0U
-                        && typeEvidence.maxColumnLength <= 34U +typeEvidence.signs+ typeEvidence.exponent.toUInt() -> IOMemento.IoFloat
-
-                typeEvidence.periods.toUInt() == 1U
-                        && typeEvidence.exponent <= 1U
-                        && typeEvidence.signs <= 1U
-                        && typeEvidence.special.toUInt() == 0U
-                        && typeEvidence.maxColumnLength <= 66U +typeEvidence.signs+ typeEvidence.exponent.toUInt() -> IOMemento.IoDouble
-
+                digits == 0U -> IOMemento.IoString
+                periods == 0U && exponent == 0U && signs <= 1U && special == 0U && maxColumnLength <= 3U + signs -> IOMemento.IoByte
+                periods == 0U && exponent == 0U && signs <= 1U && special == 0U && maxColumnLength <= 5U + signs -> IOMemento.IoShort
+                periods == 0U && exponent == 0U && signs <= 1U && special == 0U && maxColumnLength <= 10U + signs -> IOMemento.IoInt
+                periods == 0U && exponent == 0U && signs <= 1U && special == 0U && maxColumnLength <= 19U + signs -> IOMemento.IoLong
+                periods == 1U && exponent == 0U && signs <= 1U && special == 0U && maxColumnLength <= 34U + signs + exponent -> IOMemento.IoFloat
+                periods == 1U && exponent <= 1U && signs <= 1U && special == 0U && maxColumnLength <= 66U + signs + exponent -> IOMemento.IoDouble
                 else -> IOMemento.IoString
             }
         }
@@ -187,6 +164,92 @@ TypeEvidence(
     }
 }
 
+// ── XOR scan layer ──────────────────────────────────────────────────────────
+// Slot layout: each character-class counter maps to one slot.
+// XOR prefix scan is deterministic, nonreversionary, non-conditional.
+
+/** Number of evidence slots — one per character-class counter */
+const val EVIDENCE_SLOTS = 14
+
+/** Slot names for column metadata */
+val EVIDENCE_SLOT_NAMES = arrayOf(
+    "digits", "periods", "exponent", "signs", "special", "alpha",
+    "truefalse", "empty", "quotes", "dquotes", "whitespaces", "backslashes",
+    "linefeed", "maxColumnLength",
+)
+
+/**
+ * Pack evidence into a ShortArray using XOR prefix scan.
+ * Each slot is the running XOR of the character-class counter encoded as UShort.
+ * Nonreversionary: slot[i] = slot[i-1] xor counter[i].
+ * Non-conditional: straight-line core loop, no branches.
+ */
+fun TypeEvidence.toShortArray(): ShortArray {
+    val raw = intArrayOf(
+        digits.toInt(), periods.toInt(), exponent.toInt(), signs.toInt(),
+        special.toInt(), alpha.toInt(), truefalse.toInt(), empty.toInt(),
+        quotes.toInt(), dquotes.toInt(), whitespaces.toInt(), backslashes.toInt(),
+        linefeed.toInt(), maxColumnLength.toInt(),
+    )
+    val out = ShortArray(EVIDENCE_SLOTS)
+    var acc = 0
+    for (i in 0 until EVIDENCE_SLOTS) {
+        acc = acc xor raw[i]
+        out[i] = acc.toShort()
+    }
+    return out
+}
+
+/**
+ * Recover the raw counter at slot [index] from an XOR-scanned array.
+ * Inverse of prefix scan: raw[i] = out[i] xor out[i-1].
+ */
+fun ShortArray.xorSlotAt(index: Int): UShort {
+    val prev = if (index == 0) 0 else this[index - 1].toInt()
+    return (this[index].toInt() xor prev).toUShort()
+}
+
+/**
+ * Deduce IOMemento from an XOR-scanned evidence array.
+ * Uses [xorSlotAt] to recover counters then applies the same narrowing rules
+ * as [TypeEvidence.deduce].
+ */
+fun ShortArray.deduceFromEvidence(): IOMemento {
+    // Recover counters as UInt for safe unsigned arithmetic and comparisons
+    val digits = xorSlotAt(0).toUInt()
+    val periods = xorSlotAt(1).toUInt()
+    val exponent = xorSlotAt(2).toUInt()
+    val signs = xorSlotAt(3).toUInt()
+    val special = xorSlotAt(4).toUInt()
+    val alpha = xorSlotAt(5).toUInt()
+    val truefalse = xorSlotAt(6).toUInt()
+    val empty = xorSlotAt(7).toUInt()
+    val quotes = xorSlotAt(8).toUInt()
+    val dquotes = xorSlotAt(9).toUInt()
+    val maxColumnLength = xorSlotAt(13).toUInt()
+
+    return when {
+        dquotes > 0U || quotes > 0U -> IOMemento.IoString
+        empty > 0U || alpha > 0U -> IOMemento.IoString
+        truefalse > 0U -> IOMemento.IoBoolean
+        digits == 0U -> IOMemento.IoString
+        periods == 0U && exponent == 0U && signs <= 1U && special == 0U && maxColumnLength <= 3U + signs -> IOMemento.IoByte
+        periods == 0U && exponent == 0U && signs <= 1U && special == 0U && maxColumnLength <= 5U + signs -> IOMemento.IoShort
+        periods == 0U && exponent == 0U && signs <= 1U && special == 0U && maxColumnLength <= 10U + signs -> IOMemento.IoInt
+        periods == 0U && exponent == 0U && signs <= 1U && special == 0U && maxColumnLength <= 19U + signs -> IOMemento.IoLong
+        periods == 1U && exponent == 0U && signs <= 1U && special == 0U && maxColumnLength <= 34U + signs + exponent -> IOMemento.IoFloat
+        periods == 1U && exponent <= 1U && signs <= 1U && special == 0U && maxColumnLength <= 66U + signs + exponent -> IOMemento.IoDouble
+        else -> IOMemento.IoString
+    }
+}
+
+/**
+ * Deduce the structural TypeMemento from a scanned evidence array.
+ * Checks confix from the source TypeEvidence (structural memento takes precedence).
+ */
+fun TypeEvidence.deduceMementoFromScan(): TypeMemento =
+    structuralMemento ?: toShortArray().deduceFromEvidence()
+
 fun TypeEvidence.toRowVec(): RowVec {
     val values = arrayOf<Any?>(
         confix,
@@ -207,7 +270,7 @@ fun TypeEvidence.toRowVec(): RowVec {
         if (minColumnLength == UShort.MAX_VALUE) 0 else minColumnLength.toInt(),
         TypeEvidence.deduceMemento(this).label,
     )
-    val meta = TYPE_EVIDENCE_COLUMNS.size j { index: Int -> { TYPE_EVIDENCE_COLUMNS[index] } }
+    val meta: Series< () -> ColumnMeta> = TYPE_EVIDENCE_COLUMNS.size j { index: Int -> { TYPE_EVIDENCE_COLUMNS[index] } }
     return values.size j { index: Int -> values[index] } joins meta
 }
 
