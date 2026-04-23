@@ -17,6 +17,10 @@ import borg.trikeshed.lib.α
 
  typealias YamlSpan = Twin<Int>
 
+// convenience accessors for previous field names
+val YamlSpan.startLine: Int get() = this.a
+val YamlSpan.endLine: Int get() = this.b
+
 sealed interface YamlNode {
     val span: YamlSpan
 
