@@ -218,8 +218,8 @@ private class Parser(
                 val parts: Series<Series<Char>> = splitInlineList(text.slice(1, text.size - 1))
                 YamlSequenceNode(
                     (parts α { it: Series<Char> ->
-
-                        YamlScalarNode(it, YamlSpan(lineNumber, lineNumber)) }) as List<YamlNode>, YamlSpan(lineNumber, lineNumber))
+                        YamlScalarNode(it, YamlSpan(lineNumber, lineNumber))
+                    }).toList(), YamlSpan(lineNumber, lineNumber))
             }
             else -> YamlScalarNode(text, YamlSpan(lineNumber, lineNumber))
         }
