@@ -30,7 +30,7 @@ data class BinaryExpr(val left: Expr, val op: String, val right: Expr) : Expr
 
 data class Column(val expr: Expr, val alias: Identifier? = null) : SqlNode
 data class TableRef(val name: Identifier, val alias: Identifier? = null) : SqlNode
-data class SelectStmt(val columns: List<Column>, val from: TableRef?, val where: Expr?) : SqlNode
+data class SelectStmt(val columns: Series<Column>, val from: TableRef?, val where: Expr?) : SqlNode
 
 /**
  * Small recursive-descent parser for a SELECT subset (SELECT ... FROM ... WHERE ...)
@@ -206,17 +206,17 @@ class SqlParser(private val cs: CharSeries) {
         return Column(expr as Expr, alias)
     }
 
-    private fun parseSelectList(): List<Column> {
+    private fun parseSelectList(): Series<Column> {
         skipWs()
         val cols = mutableListOf<Column>()
-        if (peek() == '*') { cs.pos++ ; cols += Column(LitExpr(StringLiteral("*".toSeries())), null); return cols }
+        if (peek() == '*') { cs.pos++ ; cols += Column(LitExpr(StringLiteral("*".toSeries())), null); return cols.toSeries() }
         while (true) {
             val c = parseColumn() ?: break
             cols += c
             skipWs()
             if (peek() == ',') { cs.pos++; continue } else break
         }
-        return cols
+        return cols.toSeries()
     }
 
     private fun parseTableRef(): TableRef? {
