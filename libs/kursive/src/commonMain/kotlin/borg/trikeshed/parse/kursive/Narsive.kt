@@ -218,21 +218,9 @@ object Narsive {
 
     // ── operator productions ──
 
-    val copula: KursiveParser<CharSeries> =
-        "narsiveCopula" colon parser("cop") { input -> input.consumeNarsiveOperatorOrNull { it.isCopula } }
-
-    val conjunction: KursiveParser<CharSeries> =
-        "narsiveConjunction" colon parser("conj") { input -> input.consumeNarsiveOperatorOrNull { it.isConjunction } }
-
-    val tense: KursiveParser<CharSeries> =
-        "narsiveTense" colon parser("tens") { input -> input.consumeNarsiveOperatorOrNull { it.isTense } }
-
-    val variable: KursiveParser<CharSeries> =
-        "narsiveVariable" colon (kInput@{ input -> input.consumeNarsiveOperatorOrNull { it.isVariable } != null } then word.s)
-
-    // ── term (must be before structural productions that reference it) ──
+    // ── term (must be after structural productions that reference it) ──
     /** term : relationship | operation | compound | variable | quoted | word */
-    val term: KursiveParser<CharSeries> by lazy(LazyThreadSafetyMode.NONE) {
+    val term: KursiveParser<CharSequence> by lazy(LazyThreadSafetyMode.NONE) {
         choice("termAlt", relationship, operation, compoundTerm, variable, quoted, word)
     }
 

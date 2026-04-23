@@ -3,9 +3,11 @@ package borg.trikeshed.parse.kursive.sql
 import borg.trikeshed.lib.CharSeries
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.asString
+import borg.trikeshed.lib.get
+import borg.trikeshed.lib.parseDoubleOrNull
+import borg.trikeshed.lib.parseLong
 import borg.trikeshed.lib.toSeries
-import borg.trikeshed.lib.toDoubleOrNull
-import borg.trikeshed.lib.toLongOrNull
+import borg.trikeshed.lib.view
 
 // Compact SQL AST and parser using CharSeries (zero-copy views)
 sealed interface SqlNode
@@ -111,8 +113,9 @@ class SqlParser(private val cs: CharSeries) {
             while (cs.pos < cs.limit && cs[cs.pos].isDigit()) { cs.pos++; seen = true }
         }
         if (!seen) { cs.pos = start; return null }
-        val slice = cs[start until cs.pos]
-        val num = slice.toDoubleOrNull() ?: slice.toLongOrNull()
+        val slice: Series<Char> = cs[start until cs.pos]
+
+        val num  = slice.parseDoubleOrNull() ?:slice.parseLong()
         val value = when (num) {
             is Long -> if (num in Int.MIN_VALUE..Int.MAX_VALUE) num.toInt() else num
             is Double -> num

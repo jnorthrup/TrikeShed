@@ -4,6 +4,7 @@
 package borg.trikeshed.lib
 
 import borg.trikeshed.collections.binarySearch
+import borg.trikeshed.common.TypeEvidence
 import kotlin.jvm.JvmInline
 import kotlin.jvm.JvmName
 import kotlin.math.max
@@ -581,3 +582,26 @@ fun <T : Comparable<T>> Series<T>.commonPrefixWith(other: Series<T>): Series<T> 
     if (size == 0) this else this[0 until shortestLength(other)]
 
 fun <T> Series<T>.firstOrNull(): T? = takeUnless { it.isEmpty() }?.first()
+
+import borg.trikeshed.isam.meta.IOMemento
+
+fun Series<Char>.parseLongOrNull(): Long? {
+    // Use TypeEvidence to decide whether this Series looks like an integer-like value.
+    val evidence = TypeEvidence.sample(this)
+    val deduced = TypeEvidence.deduce(evidence)
+    return when (deduced) {
+        IOMemento.IoByte,
+        IOMemento.IoUByte,
+        IOMemento.IoShort,
+        IOMemento.IoUShort,
+        IOMemento.IoInt,
+        IOMemento.IoUInt,
+        IOMemento.IoLong,
+        IOMemento.IoULong -> try {
+            this.parseLong()
+        } catch (e: Throwable) {
+            null
+        }
+        else -> null
+    }
+}
