@@ -200,8 +200,16 @@ class SqlParser(private val cs: CharSeries) {
             if (alias == null) { cs.pos = save2 }
         } else {
             val maybe = parseIdentifier()
-            if (maybe != null) alias = maybe
-            else cs.pos = save2
+            if (maybe != null) {
+                // don't treat SQL keywords as an alias (e.g., FROM, WHERE)
+                val nameStr = maybe.name.asString().uppercase()
+                val reserved = setOf("FROM", "WHERE", "GROUP", "ORDER", "HAVING", "LIMIT", "OFFSET", "JOIN", "ON", "AS", "UNION", "DISTINCT")
+                if (nameStr in reserved) {
+                    cs.pos = save2
+                } else {
+                    alias = maybe
+                }
+            } else cs.pos = save2
         }
         return Column(expr as Expr, alias)
     }
@@ -231,8 +239,15 @@ class SqlParser(private val cs: CharSeries) {
             if (alias == null) cs.pos = save
         } else {
             val maybe = parseIdentifier()
-            if (maybe != null) alias = maybe
-            else cs.pos = save
+            if (maybe != null) {
+                val nameStr = maybe.name.asString().uppercase()
+                val reserved = setOf("FROM", "WHERE", "GROUP", "ORDER", "HAVING", "LIMIT", "OFFSET", "JOIN", "ON", "AS", "UNION", "DISTINCT")
+                if (nameStr in reserved) {
+                    cs.pos = save
+                } else {
+                    alias = maybe
+                }
+            } else cs.pos = save
         }
         return TableRef(name, alias)
     }

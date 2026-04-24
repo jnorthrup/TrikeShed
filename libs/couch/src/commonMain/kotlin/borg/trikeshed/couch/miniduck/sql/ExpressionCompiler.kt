@@ -34,8 +34,8 @@ fun compileExpression(expr: Expr, ctx: PlannerContext): (RowAccessor) -> Any? {
                 "-" -> if (l is Number && r is Number) l.toDouble() - r.toDouble() else null
                 "*" -> if (l is Number && r is Number) l.toDouble() * r.toDouble() else null
                 "/" -> if (l is Number && r is Number && r.toDouble() != 0.0) l.toDouble() / r.toDouble() else null
-                "=" -> l == r
-                "!=", "<>" -> l != r
+                "=" -> if (l is Number && r is Number) compareNumbers(l, r) == 0 else l == r
+                "!=", "<>" -> if (l is Number && r is Number) compareNumbers(l, r) != 0 else l != r
                 ">" -> compareNumbers(l, r) > 0
                 "<" -> compareNumbers(l, r) < 0
                 ">=" -> compareNumbers(l, r) >= 0

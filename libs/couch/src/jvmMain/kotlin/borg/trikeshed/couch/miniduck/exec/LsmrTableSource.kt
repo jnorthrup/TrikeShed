@@ -1,7 +1,7 @@
 package borg.trikeshed.couch.miniduck.exec
 
 import borg.trikeshed.userspace.database.LsmrDatabase
-
+import borg.trikeshed.lib.*
 import borg.trikeshed.couch.miniduck.schema.TableSchema
 
 /**
@@ -11,8 +11,17 @@ import borg.trikeshed.couch.miniduck.schema.TableSchema
  *  - miniduck:table:{table}:row:{idx} -> serialized row bytes
  */
 import borg.trikeshed.couch.miniduck.runBlockingCommon
+import borg.trikeshed.couch.miniduck.MiniDuckBlockCodec
+import borg.trikeshed.couch.miniduck.BlockRowVec
+import borg.trikeshed.couch.miniduck.DocRowVec
+import borg.trikeshed.couch.miniduck.MiniRowVec
+import borg.trikeshed.lib.*
 
-class LsmrTableSource(private val db: LsmrDatabase) : TableSource {
+actual class LsmrTableSource actual constructor(private val db: LsmrDatabase, private val blockSizeThreshold: Int) : TableSource {
+
+    private val mutableBlocks = mutableMapOf<String, BlockRowVec>()
+    private fun blockCountKey(table: String) = "miniduck:table:$table:blockcount"
+    private fun blockKey(table: String, idx: Int) = "miniduck:table:$table:block:$idx"
 
     private fun countKey(table: String) = "miniduck:table:$table:count"
     private fun rowKey(table: String, idx: Int) = "miniduck:table:$table:row:$idx"
@@ -55,10 +64,50 @@ class LsmrTableSource(private val db: LsmrDatabase) : TableSource {
 
     // Suspend-aware open that reads from the LSMR db without blocking.
     override suspend fun openSuspend(execCtx: ExecutionContext, tableName: String): Cursor {
-        val count = db.get(countKey(tableName))?.let { String(it, Charsets.UTF_8).toIntOrNull() } ?: 0
-        val rows = (0 until count).mapNotNull { i ->
-            db.get(rowKey(tableName, i))?.let { deserializeRow(it) }
+        // Prefer block-based storage (chunked sealed BlockRowVecs). Fallback to legacy per-row storage if no blocks found.
+        val rows = mutableListOf<MiniRowVec>()
+
+        val blockCountRaw = db.get(blockCountKey(tableName))
+        if (blockCountRaw != null) {
+            val blockCount = String(blockCountRaw, Charsets.UTF_8).toIntOrNull() ?: 0
+            for (i in 0 until blockCount) {
+                val raw = db.get(blockKey(tableName, i)) ?: continue
+                val block = MiniDuckBlockCodec.decode(String(raw, Charsets.UTF_8))
+                // map child rows to schema-aware keys when possible
+                val schemaNames = execCtx.schemaManager.getTableSuspend(tableName)?.columns?.map { it.name }
+                for (j in 0 until block.child.size) {
+                    val childRow = block.child[j]
+                    val mapped = if (childRow is DocRowVec && schemaNames != null && schemaNames.isNotEmpty()) {
+                        DocRowVec(schemaNames.take(childRow.keys.size), childRow.cells)
+                    } else childRow
+                    rows.add(mapped)
+                }
+            }
+        } else {
+            // Legacy per-row layout
+            val count = db.get(countKey(tableName))?.let { String(it, Charsets.UTF_8).toIntOrNull() } ?: 0
+            for (i in 0 until count) {
+                db.get(rowKey(tableName, i))?.let { bytes ->
+                    val list = deserializeRow(bytes)
+                    val keys = execCtx.schemaManager.getTableSuspend(tableName)?.columns?.map { it.name }
+                        ?: List(list.size) { idx -> "c$idx" }
+                    rows.add(DocRowVec(keys.take(list.size), list))
+                }
+            }
         }
+
+        // include in-memory mutable block if present
+        mutableBlocks[tableName]?.let { blk ->
+            val schemaNames = execCtx.schemaManager.getTableSuspend(tableName)?.columns?.map { it.name }
+            for (j in 0 until blk.child.size) {
+                val childRow = blk.child[j]
+                val mapped = if (childRow is DocRowVec && schemaNames != null && schemaNames.isNotEmpty()) {
+                    DocRowVec(schemaNames.take(childRow.keys.size), childRow.cells)
+                } else childRow
+                rows.add(mapped)
+            }
+        }
+
         val schema = execCtx.schemaManager.getTableSuspend(tableName) ?: TableSchema(tableName, emptyList())
         var idx = -1
         return object : Cursor {
@@ -69,7 +118,7 @@ class LsmrTableSource(private val db: LsmrDatabase) : TableSource {
 
             override val row: RowAccessor
                 get() = object : RowAccessor {
-                    override fun get(index: Int): Any? = rows.getOrNull(idx)?.getOrNull(index)
+                    override fun get(index: Int): Any? = rows.getOrNull(idx)?.let { try { it.get(index) } catch (e: Throwable) { null } }
                     override fun get(name: String): Any? {
                         val colIndex = schema.columns.indexOfFirst { it.name == name }
                         return if (colIndex >= 0) get(colIndex) else null
@@ -85,21 +134,48 @@ class LsmrTableSource(private val db: LsmrDatabase) : TableSource {
 
     fun seedRows(tableName: String, rows: List<List<Any?>>) {
         runBlockingCommon {
-            rows.forEachIndexed { i, r ->
-                db.put(rowKey(tableName, i), serializeRow(r))
+            // Attempt to read an existing schema from the LSMR keyspace so seeded rows
+            // can use real column names (e.g., id,name) instead of generic c0,c1.
+            val schemaRaw = db.get("miniduck:schema:$tableName")
+            val keysForRows: List<String> = if (schemaRaw != null) {
+                val s = String(schemaRaw, Charsets.UTF_8)
+                val parts = s.split('|', limit = 2)
+                val colsPart = if (parts.size > 1) parts[1] else parts[0]
+                if (colsPart.isEmpty()) emptyList() else colsPart.split(',')
+            } else {
+                emptyList()
             }
-            db.put(countKey(tableName), rows.size.toString().toByteArray(Charsets.UTF_8))
+
+            // Write all provided rows as a single sealed block (chunked storage)
+            val block = BlockRowVec.mutable()
+            rows.forEach { r ->
+                val keys = if (keysForRows.isNotEmpty()) keysForRows.take(r.size) else (0 until r.size).map { idx -> "c$idx" }
+                block.append(DocRowVec(keys, r))
+            }
+            val sealed = block.seal()
+            db.put(blockKey(tableName, 0), MiniDuckBlockCodec.encode(sealed).toByteArray(Charsets.UTF_8))
+            db.put(blockCountKey(tableName), "1".toByteArray(Charsets.UTF_8))
         }
     }
 
     override suspend fun insertSuspend(execCtx: ExecutionContext, tableName: String, row: List<Any?>) {
         // Ensure schema has enough columns (use generic names if not present)
         val cols = (0 until row.size).map { idx -> "c$idx" }
-        execCtx.schemaManager.ensureColumnsSuspend(tableName, cols)
-        val raw = db.get(countKey(tableName))
-        val curCount = raw?.let { String(it, Charsets.UTF_8).toIntOrNull() } ?: 0
-        db.put(rowKey(tableName, curCount), serializeRow(row))
-        db.put(countKey(tableName), (curCount + 1).toString().toByteArray(Charsets.UTF_8))
+        val schema = execCtx.schemaManager.ensureColumnsSuspend(tableName, cols)
+        val keys = schema.columns.take(row.size).map { it.name }
+        val doc = DocRowVec(keys, row)
+
+        val blk = mutableBlocks.getOrPut(tableName) { BlockRowVec.mutable() }
+        blk.append(doc)
+
+        if (blk.rowCount >= blockSizeThreshold) {
+            val sealed = blk.seal()
+            val rawCount = db.get(blockCountKey(tableName))
+            val blockIndex = rawCount?.let { String(it, Charsets.UTF_8).toIntOrNull() } ?: 0
+            db.put(blockKey(tableName, blockIndex), MiniDuckBlockCodec.encode(sealed).toByteArray(Charsets.UTF_8))
+            db.put(blockCountKey(tableName), (blockIndex + 1).toString().toByteArray(Charsets.UTF_8))
+            mutableBlocks[tableName] = BlockRowVec.mutable()
+        }
     }
 
     // Backwards-compatible synchronous wrapper for insert
