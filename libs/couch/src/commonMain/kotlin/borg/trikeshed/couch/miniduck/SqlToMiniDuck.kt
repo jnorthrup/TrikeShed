@@ -5,6 +5,8 @@ import borg.trikeshed.lib.*
 import borg.trikeshed.couch.miniduck.plan.*
 import borg.trikeshed.couch.miniduck.schema.SchemaManager
 import borg.trikeshed.couch.miniduck.exec.RowAccessor
+import borg.trikeshed.couch.miniduck.exec.Cursor
+import borg.trikeshed.couch.miniduck.exec.ExecutionContext
 
 /**
  * Planner configuration and entry point for SQL → MiniDuck transform.
@@ -14,9 +16,33 @@ data class PlannerConfig(val autoCreateSchema: Boolean = true)
 class PlannerContext(val schemaManager: SchemaManager, val config: PlannerConfig = PlannerConfig())
 
 fun transformSelect(stmt: SelectStmt, ctx: PlannerContext): PlanNode {
-    val from = stmt.from ?: throw IllegalArgumentException("Only queries with a single FROM table are supported")
-    val tableName = from.name.asString()
-    var node: PlanNode = TableScanNode(tableName, from.alias?.asString())
+    // Support queries without FROM (e.g., SELECT 1) by providing a single-row source.
+    var node: PlanNode = if (stmt.from == null) {
+        object : PlanNode {
+            override fun open(execCtx: ExecutionContext): Cursor {
+                return object : Cursor {
+                    var emitted = false
+                    override fun next(): Boolean {
+                        if (emitted) return false
+                        emitted = true
+                        return true
+                    }
+
+                    override val row: RowAccessor
+                        get() = object : RowAccessor {
+                            override fun get(index: Int): Any? = null
+                            override fun get(name: String): Any? = null
+                        }
+
+                    override fun close() {}
+                }
+            }
+        }
+    } else {
+        val from = stmt.from!!
+        val tableName = from.name.asString()
+        TableScanNode(tableName, from.alias?.asString())
+    }
 
     // WHERE -> FilterNode
     stmt.where?.let { expr ->
