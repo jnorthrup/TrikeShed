@@ -2,6 +2,7 @@ package borg.trikeshed.couch.miniduck.exec
 
 import borg.trikeshed.couch.miniduck.schema.SchemaManager
 import borg.trikeshed.couch.miniduck.sql.PlannerConfig
+import borg.trikeshed.couch.miniduck.runBlockingCommon
 
 /**
  * Execution context and cursor/row accessor abstractions.
@@ -10,7 +11,17 @@ import borg.trikeshed.couch.miniduck.sql.PlannerConfig
 
 // A source of table data used at execution time.
 interface TableSource {
+    // Existing synchronous API (abstract): implementers provide this.
     fun open(execCtx: ExecutionContext, tableName: String): Cursor
+
+    /** Optional insert API; default not supported. Implementers may override to support writes. */
+    fun insert(execCtx: ExecutionContext, tableName: String, row: List<Any?>) {
+        throw UnsupportedOperationException("insert not supported")
+    }
+
+    // Suspend-aware defaults that bridge to the synchronous API for backward compatibility.
+    suspend fun openSuspend(execCtx: ExecutionContext, tableName: String): Cursor = runBlockingCommon { open(execCtx, tableName) }
+    suspend fun insertSuspend(execCtx: ExecutionContext, tableName: String, row: List<Any?>) = runBlockingCommon { insert(execCtx, tableName, row) }
 }
 
 data class ExecutionContext(
