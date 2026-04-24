@@ -1,0 +1,123 @@
+package borg.trikeshed.couch
+
+import borg.trikeshed.couch.handle.*
+import kotlinx.coroutines.*
+import kotlinx.coroutines.test.runTest
+import kotlin.test.*
+
+/**
+ * Red test: ConcurrentWriteSeal — multiple writers + readers;
+ * assert no torn state and that sealing blocks further mutation.
+ *
+ * Donor pattern: go-stopper State.Apply atomic counter for admission
+ * + eclipse-collections FixedSizeCollection rejection after seal.
+ * Atomic state transition ensures readers never see partial writes.
+ *
+ * Will fail to compile until CollectionHandle exists with coroutine-safe
+ * seal semantics.
+ */
+class ConcurrentWriteSealTest {
+
+    private fun doc(v: Int) = borg.trikeshed.couch.miniduck.DocRowVec(
+        listOf("v"), listOf(v)
+    )
+
+    @Test
+    fun concurrentAppendsAllLand() = runTest {
+        val h = CollectionHandle.open()
+        val n = 100
+
+        coroutineScope {
+            repeat(n) { i ->
+                launch(Dispatchers.Default) {
+                    h.append(doc(i))
+                }
+            }
+        }
+
+        assertEquals(n, h.rowCount)
+    }
+
+    @Test
+    fun sealIsAtomicAndBlocksFurtherAppends() = runTest {
+        val h = CollectionHandle.open()
+        h.append(doc(1))
+        h.seal()
+
+        assertFailsWith<IllegalStateException> {
+            h.append(doc(2))
+        }
+        assertEquals(1, h.rowCount)
+    }
+
+    @Test
+    fun readersSeeConsistentSnapshotDuringMutation() = runTest {
+        val h = CollectionHandle.open()
+        // pre-populate
+        repeat(10) { h.append(doc(it)) }
+
+        val snapBefore = h.snapshot()
+        assertEquals(10, snapBefore.size)
+
+        // concurrent mutations
+        coroutineScope {
+            repeat(10) { i ->
+                launch(Dispatchers.Default) { h.append(doc(100 + i)) }
+            }
+        }
+
+        // original snapshot unchanged
+        assertEquals(10, snapBefore.size)
+        // handle now has 20
+        assertEquals(20, h.rowCount)
+    }
+
+    @Test
+    fun sealDuringConcurrentWritesRejectsLateAppends() = runTest {
+        val h = CollectionHandle.open()
+        val rejections = kotlinx.coroutines.channels.Channel<Int>(100)
+
+        coroutineScope {
+            // launch many writers
+            repeat(50) { i ->
+                launch(Dispatchers.Default) {
+                    try {
+                        h.append(doc(i))
+                    } catch (_: IllegalStateException) {
+                        rejections.trySend(i)
+                    }
+                }
+            }
+            // seal after a brief delay to race with writers
+            delay(1)
+            h.seal()
+        }
+
+        // handle is sealed and row count is consistent
+        assertEquals(Handle.State.SEALED, h.state)
+        assertTrue(h.rowCount in 1..50, "rowCount=${h.rowCount} should be between 1 and 50")
+        rejections.close()
+    }
+
+    @Test
+    fun noTornStateInSnapshot() = runTest {
+        val h = CollectionHandle.open()
+        // write 50 rows
+        repeat(50) { h.append(doc(it)) }
+
+        val snapshots = mutableListOf<borg.trikeshed.lib.Series<borg.trikeshed.couch.miniduck.MiniRowVec>>()
+        // take 5 snapshots concurrently
+        coroutineScope {
+            repeat(5) {
+                launch(Dispatchers.Default) {
+                    snapshots.add(h.snapshot())
+                }
+            }
+        }
+
+        // all snapshots should be the same size (50)
+        snapshots.forEach { snap ->
+            assertEquals(50, snap.size)
+        }
+    }
+}
