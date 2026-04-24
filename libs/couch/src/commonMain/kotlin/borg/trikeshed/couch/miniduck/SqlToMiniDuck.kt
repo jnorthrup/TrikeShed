@@ -40,8 +40,8 @@ fun transformSelect(stmt: SelectStmt, ctx: PlannerContext): PlanNode {
         }
     } else {
         val from = stmt.from!!
-        val tableName = from.name.asString()
-        TableScanNode(tableName, from.alias?.asString())
+        val tableName = from.name
+        TableScanNode(tableName, from.alias)
     }
 
     // WHERE -> FilterNode
@@ -67,8 +67,8 @@ fun transformSelect(stmt: SelectStmt, ctx: PlannerContext): PlanNode {
         val names = ArrayList<String>()
         for (col in stmt.columns) {
             projections.add(compileExpression(col.expr, ctx))
-            val name = col.alias?.asString() ?: when (val e = col.expr) {
-                is ColumnRef -> e.id.asString()
+            val name = col.alias ?: when (val e = col.expr) {
+                is ColumnRef -> e.id
                 is LitExpr -> {
                     val lit = e.lit
                     if (lit is StringLiteral) lit.asString() else "expr"

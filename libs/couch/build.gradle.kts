@@ -46,8 +46,7 @@ kotlin {
     sourceSets {
         val commonMain by getting {
             dependencies {
-                api("org.bereft:TrikeShed:1.0")
-                api(project(":libs:kursive"))
+                api(project(":")) // root core published coordinates
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
                 implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1-0.6.x-compat")
             }

@@ -7,7 +7,7 @@ import borg.trikeshed.couch.miniduck.exec.RowAccessor
 fun compileExpression(expr: Expr, ctx: PlannerContext): (RowAccessor) -> Any? {
     // Column reference
     if (expr is ColumnRef) {
-        return { row: RowAccessor -> row.get(expr.id.asString()) }
+        return { row: RowAccessor -> row.get(expr.id) }
     }
 
     // Literal

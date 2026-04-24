@@ -1,4 +1,4 @@
-@file:Suppress("ControlFlowWithEmptyBody", "UNCHECKED_CAST")
+@file:Suppress("ControlFlowWithEmptyBody", "UNCHECKED_CAST", "CAST_NEVER_SUCCEEDS")
 
 
 package borg.trikeshed.parse.json
@@ -222,8 +222,8 @@ object JsonParser {
                             '\\' -> sb.append('\\')
                             '"' -> sb.append('"')
                             'u' -> {
-                                val hexChars = CharArray(4) { tmp.get() }
-                                val code = String(hexChars).toInt(16)
+                                val hexChars: CharArray = tmp.run{ CharArray (4,::get)  }
+                                val code: Int = (hexChars.contentToString()).toInt(16)
                                 sb.append(code.toChar())
                             }
                             else -> sb.append(esc)
