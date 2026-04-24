@@ -1,11 +1,10 @@
 package borg.trikeshed.isam
 
-import borg.trikeshed.cursor.Cursor
-import borg.trikeshed.cursor.RowVec
-import borg.trikeshed.cursor.ColumnMeta
+import borg.trikeshed.cursor.*
 import borg.trikeshed.isam.meta.IOMemento
 import borg.trikeshed.isam.RecordMeta
 import borg.trikeshed.lib.*
+import borg.trikeshed.platform.PlatformCodec
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardOpenOption
@@ -14,12 +13,12 @@ import java.nio.file.StandardOpenOption
  * JVM implementation of the Columnar ISAM. This was moved from commonMain because it uses java.nio APIs.
  * Kept minimal helper stubs for indexing and schema discovery so it compiles cleanly.
  */
-class ColumnarIsam private constructor(
+class ColumnarIsam internal constructor(
     override val a: Int,
     override val b: (Int) -> RowVec,
-    override val datafileFilename: String,
-    override val metafile: IsamMetaFileReader,
-    override val indexModifier: IndexModifier
+    val datafileFilename: String,
+    val metafile: IsamMetaFileReader,
+    val indexModifier: IndexModifier
 ) : borg.trikeshed.common.Usable, Cursor {
     init {
         require(a == metafile.constraints.size) { "Column count mismatch" }
@@ -56,13 +55,13 @@ class ColumnarIsam private constructor(
             try {
                 out.use { stream ->
                     // header: numColumns, then per-column begin/end
-                    stream.write(Int.toByteArray(constraints.size))
+                    stream.write(PlatformCodec.writeInt(constraints.size))
                     for (c in constraints) {
                         // attempt to coerce begin/end via sanitize later in metafile writer if needed
                         val begin = (c as? RecordMeta)?.begin ?: -1
                         val end = (c as? RecordMeta)?.end ?: -1
-                        stream.write(Int.toByteArray(begin))
-                        stream.write(Int.toByteArray(end))
+                        stream.write(PlatformCodec.writeInt(begin))
+                        stream.write(PlatformCodec.writeInt(end))
                     }
 
                     // serialize rows column-wise
@@ -70,9 +69,8 @@ class ColumnarIsam private constructor(
                         val row = transform?.invoke(cursor.at(i)) ?: cursor.at(i)
                         for (ci in 0 until constraints.size) {
                             val col = constraints[ci]
-                            val name = col.name
                             val encoder = (col.type as? IOMemento)?.createEncoder((col.type.networkSize ?: 0)) ?: { _: Any? -> ByteArray(0) }
-                            val bytes = encoder(row[name])
+                            val bytes = encoder(row[ci])
                             stream.write(bytes)
                         }
                     }
@@ -113,7 +111,7 @@ class ColumnarIsam private constructor(
                         for (ci in 0 until constraints.size) {
                             val col = constraints[ci]
                             val encoder = (col.type as? IOMemento)?.createEncoder((col.type.networkSize ?: 0)) ?: { _: Any? -> ByteArray(0) }
-                            stream.write(encoder(r[col.name]))
+                            stream.write(encoder(r[ci]))
                         }
                     }
                 }
@@ -126,12 +124,11 @@ class ColumnarIsam private constructor(
 
 /** Simple column-major row view backed by a ColumnarIsam. */
 class ColumnarCursor(
-    private val isam: ColumnarIsam,
-    override val size: Int
+    private val isam: ColumnarIsam
 ) : Cursor {
     override val a: Int get() = isam.a
-    override fun at(index: Int): RowVec {
-        require(index in 0 until size) { "Index out of bounds" }
+    override val b: (Int) -> RowVec get() = { index ->
+        require(index in 0 until a) { "Index out of bounds" }
         val cells = (0 until isam.a).map { col ->
             val constraint = isam.metafile.constraints[col]
             val width = constraint.end - constraint.begin
@@ -140,13 +137,8 @@ class ColumnarCursor(
             val slice = data.sliceArray(offset until (offset + width))
             constraint.decoder(slice)
         }
-        return RowVec(
-            keys = (0 until isam.a).map { isam.metafile.constraints[it].name },
-            cells = cells
-        )
+        cells.toSeries().joins(isam.metafile.constraints.α { c -> { c } })
     }
-
-    override val child: Series<RowVec>? get() = null
 }
 
 /** Build ColumnarIsam from an existing data+meta pair (open). */
@@ -156,8 +148,7 @@ fun openColumnarIsam(
 ): ColumnarIsam {
     val reader = IsamMetaFileReader(metafile)
     val data = Files.readAllBytes(Path.of(datafile))
-    val view = data.toSeries()
-    val numColumns = view.readIntAt(0)
+    val numColumns = PlatformCodec.readInt(data.copyOfRange(0, 4))
     val recordLen = reader.recordlen
     val numRows = if (recordLen > 0) (data.size - 8 - numColumns * 8) / recordLen else 0
 
@@ -165,13 +156,14 @@ fun openColumnarIsam(
     require(constraints.size == numColumns) { "Constraint count mismatch" }
 
     val accessor: (Int) -> RowVec = { idx ->
-        val cells = constraints.mapIndexed { col, c ->
+        val cells = (0 until constraints.size).map { col ->
+            val c = constraints[col]
             val width = c.end - c.begin
             val offset = 8 + col * 8 + idx * width
             val slice = data.sliceArray(offset until (offset + width))
             c.decoder(slice)
         }
-        RowVec(keys = constraints.map { it.name }, cells = cells)
+        cells.toSeries().joins(constraints.α { c -> { c } })
     }
 
     return ColumnarIsam(
