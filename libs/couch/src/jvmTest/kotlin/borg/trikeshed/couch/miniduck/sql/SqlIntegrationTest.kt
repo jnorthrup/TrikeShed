@@ -12,7 +12,8 @@ import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
-class SqlIntegrationTest {
+// JVM-specific integration test using LSMR-backed table source. Common in-memory test is in commonTest.
+class SqlIntegrationLsmrTest {
     @Test
     fun parsePlanExecuteAgainstLsmr() = runTest {
         val db = LsmrDatabase(LsmrConfig(path = "", memtableThreshold = 1024))

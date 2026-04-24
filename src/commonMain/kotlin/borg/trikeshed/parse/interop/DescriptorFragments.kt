@@ -1,27 +1,9 @@
 package borg.trikeshed.parse.interop
 
-import borg.trikeshed.common.TypeEvidence
-import borg.trikeshed.cursor.ColumnMeta
-import borg.trikeshed.cursor.RowVec
-import borg.trikeshed.cursor.TreeCursor
-import borg.trikeshed.cursor.TypeMemento
-import borg.trikeshed.cursor.joins
-import borg.trikeshed.cursor.label
-import borg.trikeshed.isam.meta.IOMemento
-import borg.trikeshed.lib.CharSeries
-import borg.trikeshed.lib.Series
-import borg.trikeshed.lib.get
-import borg.trikeshed.lib.j
-import borg.trikeshed.lib.toSeries
-import borg.trikeshed.lib.toList
-import borg.trikeshed.lib.asString
-import borg.trikeshed.parse.json.JsonParser
-import borg.trikeshed.parse.yaml.YamlMappingNode
-import borg.trikeshed.parse.yaml.YamlNode
-import borg.trikeshed.parse.yaml.YamlParser
-import borg.trikeshed.parse.yaml.YamlScalarNode
-import borg.trikeshed.parse.yaml.YamlSequenceNode
-
+import borg.trikeshed.common.* 
+import borg.trikeshed.cursor.*            
+import borg.trikeshed.lib.* 
+import borg.trikeshed.parse.json.* 
 enum class ReificationFlavor {
     Generic,
     JsonConfix,
@@ -33,7 +15,7 @@ enum class ExtentTermination {
     ConfixClose,
     IndentDrop,
     EndOfInput,
-}
+}               
 
 sealed interface OpaqueExtent {
     val flavor: ReificationFlavor

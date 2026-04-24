@@ -1,7 +1,7 @@
 package borg.trikeshed.couch.miniduck
 
 import borg.trikeshed.lib.*
-import borg.trikeshed.parse.json.JsonParser
+import borg.trikeshed.parse.json.*
 
 // Minimal JSON serializer for NDJSON block persistence — no external deps.
 private fun Any?.toJsonString(): String = when (this) {

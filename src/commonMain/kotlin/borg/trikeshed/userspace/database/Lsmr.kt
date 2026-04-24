@@ -17,6 +17,7 @@ class LsmrDatabase(val config: LsmrConfig) {
     private val memtable = mutableMapOf<String, ByteArray>()
     private var memtableSize = 0
     private val segments = mutableListOf<MutableMap<String, ByteArray>>()
+    private val segmentFiles = mutableListOf<String>()
     private val mutex = Mutex()
 
     suspend fun put(id: String, value: ByteArray) {
@@ -34,9 +35,16 @@ class LsmrDatabase(val config: LsmrConfig) {
     suspend fun get(id: String): ByteArray? {
         mutex.withLock {
             memtable[id]?.let { return it }
-            // Search segments newest-first
+            // Search in-memory segments newest-first
             for (seg in segments.asReversed()) {
                 seg[id]?.let { return it }
+            }
+            // Search on-disk segment files newest-first (if path provided)
+            if (config.path.isNotBlank()) {
+                for (fname in segmentFiles.asReversed()) {
+                    val v = loadKeyFromSegment(config.path, fname, id)
+                    if (v != null) return v
+                }
             }
             return null
         }
@@ -48,6 +56,14 @@ class LsmrDatabase(val config: LsmrConfig) {
                 // drop oldest segments first
                 segments.removeAt(0)
             }
+            // if we also limit segmentFiles, drop oldest files
+            if (config.path.isNotBlank()) {
+                while (segmentFiles.size > max) {
+                    // best-effort: delete file if exists (platform impl may ignore)
+                    val removed = segmentFiles.removeAt(0)
+                    try { deleteSegmentFile(config.path, removed) } catch (_: Throwable) {}
+                }
+            }
         }
     }
 
@@ -56,8 +72,20 @@ class LsmrDatabase(val config: LsmrConfig) {
         // Move current memtable to a new in-memory segment
         val newSegment = memtable.toMutableMap()
         segments.add(newSegment)
+
+        // Persist to disk if path provided
+        if (config.path.isNotBlank()) {
+            // commonMain cannot reference java.lang.System; use a multiplatform-safe
+            // pseudo-unique id instead of currentTimeMillis. Random long is
+            // sufficient for generating a unique filename in this small scope.
+            val fname = "segment-${kotlin.random.Random.Default.nextLong()}-${segments.size}.seg"
+            segmentFiles.add(fname)
+            persistSegmentToDisk(config.path, fname, newSegment)
+        }
+
         compactIfNeeded()
         memtable.clear()
         memtableSize = 0
     }
 }
+

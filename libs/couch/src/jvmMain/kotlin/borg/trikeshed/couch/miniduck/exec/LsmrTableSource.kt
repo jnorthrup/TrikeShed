@@ -55,12 +55,41 @@ class LsmrTableSource(private val db: LsmrDatabase, private val blockSizeThresho
                 token.startsWith("S") -> {
                     val rest = token.substring(1)
                     val idx = rest.indexOf(':')
-                    if (idx >= 0) rest.substring(idx + 1) else rest
+                    if (idx >= 0) {
+                        val lenStr = rest.substring(0, idx)
+                        val data = rest.substring(idx + 1)
+                        val len = lenStr.toIntOrNull()
+                        if (len != null && len <= data.length) {
+                            data.substring(0, len)
+                        } else {
+                            // fallback to whatever is present if length parse failed or data shorter than declared
+                            data
+                        }
+                    } else rest
                 }
                 else -> token
             }
         }
     }
+
+    private fun parseBlockCount(raw: ByteArray?): Int = raw?.let { String(it, Charsets.UTF_8).toIntOrNull() } ?: 0
+
+    /**
+     * Persist any in-memory mutable block for [tableName] as a sealed block in the DB.
+     * This is useful for tests and deterministic flush points.
+     */
+    suspend fun flushMutableSuspend(tableName: String) {
+        val blk = mutableBlocks[tableName] ?: return
+        if (blk.rowCount <= 0) return
+        val sealed = blk.seal()
+        val rawCount = db.get(blockCountKey(tableName))
+        val blockIndex = parseBlockCount(rawCount)
+        db.put(blockKey(tableName, blockIndex), MiniDuckBlockCodec.encode(sealed).toByteArray(Charsets.UTF_8))
+        db.put(blockCountKey(tableName), (blockIndex + 1).toString().toByteArray(Charsets.UTF_8))
+        mutableBlocks[tableName] = BlockRowVec.mutable()
+    }
+
+    fun flushMutable(tableName: String) = runBlockingCommon { flushMutableSuspend(tableName) }
 
     // Suspend-aware open that reads from the LSMR db without blocking.
     override suspend fun openSuspend(execCtx: ExecutionContext, tableName: String): Cursor {
