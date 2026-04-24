@@ -1,5 +1,6 @@
 package borg.trikeshed.couch.finance
 
+import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
@@ -159,7 +160,8 @@ class RegimeDetectorTest {
         val trendStep = (end - start) / (length - 1)
         for (i in 1 until length - 1) {
             val trend = start + i * trendStep
-            val noise = (Math.random() - 0.5) * 2 * volatility * trend
+            val noise = (Random.Default.nextDouble() - 0.5) * 2 * volatility * trend
+
             prices[i] = trend + noise
         }
 

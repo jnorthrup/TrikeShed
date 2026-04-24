@@ -115,7 +115,7 @@ object MiniDuckBlockCodec {
         return when (map.string("type")) {
             "DocRowVec" -> DocRowVec(
                 keys = map.stringList("keys"),
-                cells = map.anyList("cells"),
+                cells = map.anyList("cells").map { if (it is String) unescapeJson(it) else it },
                 child = map.childSeries(),
             )
             "ViewRowVec" -> {
@@ -201,4 +201,36 @@ object MiniDuckBlockCodec {
         ?: error("Field '$name' must be an array")
 
     private fun List<MiniRowVec>.toSeries(): Series<MiniRowVec> = size j { idx -> this[idx] }
+
+    private fun unescapeJson(s: String): String {
+        val sb = StringBuilder(s.length)
+        var i = 0
+        while (i < s.length) {
+            val c = s[i]
+            if (c == '\\' && i + 1 < s.length) {
+                val next = s[i + 1]
+                when (next) {
+                    'n' -> sb.append('\n')
+                    'r' -> sb.append('\r')
+                    't' -> sb.append('\t')
+                    '\\' -> sb.append('\\')
+                    '"' -> sb.append('"')
+                    'u' -> {
+                        if (i + 5 <= s.length) {
+                            val hex = s.substring(i + 2, i + 6)
+                            val code = hex.toIntOrNull(16) ?: throw Exception("Invalid unicode escape: \\$hex")
+                            sb.append(code.toChar())
+                            i += 4
+                        } else throw Exception("Invalid unicode escape")
+                    }
+                    else -> sb.append(next)
+                }
+                i += 2
+            } else {
+                sb.append(c)
+                i++
+            }
+        }
+        return sb.toString()
+    }
 }

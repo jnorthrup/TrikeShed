@@ -208,7 +208,31 @@ object JsonParser {
                 val seekTo = tmp.seekTo('"', '\\')
                 if (!seekTo) throw Exception("expected end of quoted string")
                 val end = tmp.pos - 1
-                tmp.lim(end).pos(beg).asString()
+                // prepare to read only the quoted content
+                tmp.lim(end).pos(beg)
+                val sb = StringBuilder()
+                while (tmp.hasRemaining) {
+                    val c = tmp.get
+                    if (c == '\\') {
+                        if (!tmp.hasRemaining) throw Exception("invalid escape in string")
+                        when (val esc = tmp.get) {
+                            'n' -> sb.append('\n')
+                            'r' -> sb.append('\r')
+                            't' -> sb.append('\t')
+                            '\\' -> sb.append('\\')
+                            '"' -> sb.append('"')
+                            'u' -> {
+                                val hexChars = CharArray(4) { tmp.get() }
+                                val code = String(hexChars).toInt(16)
+                                sb.append(code.toChar())
+                            }
+                            else -> sb.append(esc)
+                        }
+                    } else {
+                        sb.append(c)
+                    }
+                }
+                sb.toString()
             }
 
             't', 'f' -> 't' == c
