@@ -126,7 +126,7 @@ enum class NarsiveOperator(
     SIMILARITY("<->", "↔", "⟷"),
     EQUIVALENCE("<=>", "⇔", "⟺"),
     IMPLICATION("==>", "⇒", "⟹"),
-    PREDICTIVE_IMPLICATION("=/>", "⇝", "⤳"),
+    PREDICTIVE_IMPLICATION("/>", "⇝", "⤳"),
     CONCURRENT_IMPLICATION("=|>", "⇢", "⤇"),
     INTERSECTION("&&", "∧", "⋀"),
     UNION("||", "∨", "⋁"),
@@ -165,7 +165,9 @@ enum class NarsiveOperator(
             }
         }
     }
+}
 
+// ── operator lexing helpers ─────────────────────────────────────────────
 
 private fun KursiveCharSeries.consumeAnyOf(vararg forms: String): CharSeries? {
     for (form in forms) {
@@ -177,10 +179,17 @@ private fun KursiveCharSeries.consumeAnyOf(vararg forms: String): CharSeries? {
     return null
 }
 
-// ── standard shorthands ─────────────────────────────────────────
+internal fun Series<Char>.narsiveOperatorOrNull(
+    accept: (NarsiveOperator) -> Boolean = { true },
+): NarsiveOperator? = NarsiveOperator.entries.firstOrNull { accept(it) && it.matches(this) }
 
-val wss: KursiveStep get() = ws.s
-val nums: KursiveStep get() = numeric.s
+internal fun KursiveCharSeries.consumeNarsiveOperatorOrNull(
+    accept: (NarsiveOperator) -> Boolean = { true },
+): CharSeries? = NarsiveOperator.entries.firstNotNullOfOrNull { operator ->
+    if (accept(operator)) operator.tryConsume(this) else null
+}
+
+private fun Series<Char>.firstGlyphOrNull(): Series<Char>? = if (size == 0) null else 1 j { this[0] }
 
 // ── narsive grammar ─────────────────────────────────────────────
 
@@ -199,11 +208,36 @@ object Narsive {
 
     // ── operator productions ──
 
-    // ── term (must be after structural productions that reference it) ──
-    /** term : relationship | operation | compound | variable | quoted | word */
-    val term: KursiveParser<CharSeries> by lazy(LazyThreadSafetyMode.NONE) {
-        choice("termAlt", relationship, operation, compoundTerm, variable, quoted, word)
-    }
+    /** copula : any isCopula operator */
+    val copula: KursiveParser<CharSeries> =
+        "narsiveCopula" colon parser("copula") { input -> input.consumeNarsiveOperatorOrNull { it.isCopula } }
+
+    /** conjunction : any isConjunction operator */
+    val conjunction: KursiveParser<CharSeries> =
+        "narsiveConjunction" colon parser("conjunction") { input -> input.consumeNarsiveOperatorOrNull { it.isConjunction } }
+
+    /** tense : any isTense operator */
+    val tense: KursiveParser<CharSeries> =
+        "narsiveTense" colon parser("tense") { input -> input.consumeNarsiveOperatorOrNull { it.isTense } }
+
+    /** variable : any isVariable operator followed by a word atom */
+    val variable: KursiveParser<CharSeries> =
+        "narsiveVariable" colon parser("variable") { input ->
+            val prefix = input.consumeNarsiveOperatorOrNull { it.isVariable }
+            prefix?.let { std.takeWhile("varName", min = 0) { c -> c.isLetterOrDigit() || c == '_' }(input); it }
+        }
+
+    // ── term (lazy for mutual recursion with relationship/operation/compoundTerm) ──
+
+    /** term : relationship | operation | compoundTerm | variable | quoted | word
+     *  Uses indirect step to break the mutual-recursion init cycle.
+     *  [termStep] reads [_term] at parse time, not at lazy-init time.
+     */
+    private var _term: KursiveParser<CharSeries>? = null
+    private val termStep: KursiveStep get() = { input -> _term!!(input) != null }
+    private val termParser: KursiveParser<CharSeries> get() = _term!!
+
+    val term: KursiveParser<CharSeries> get() = _term!!
 
     // ── structural productions ──
 
@@ -212,47 +246,59 @@ object Narsive {
         "narsiveBudget" colon ('$'.s then std.wss then std.nums then (std.wss then ';'.s then std.wss then std.nums).opt then std.wss then '$'.s)
 
     /** truth : '%' num (';' num)? '%' */
-    val truth: KursiveParser<CharSeries> =  
+    val truth: KursiveParser<CharSeries> =
         "narsiveTruth" colon ('%'.s then std.wss then std.nums then (std.wss then ';'.s then std.wss then std.nums).opt then std.wss then '%'.s)
 
     /** relationship : '<' term copula term '>' */
-    val relationship: KursiveParser<CharSeries> =  
-        "narsiveRelationship" colon ('<'.s then std.wss then term.s then std.wss then copula.s then std.wss then term.s then std.wss then '>'.s)
+    val relationship: KursiveParser<CharSeries> by lazy(LazyThreadSafetyMode.NONE) {
+        "narsiveRelationship" colon ('<'.s then std.wss then termStep then std.wss then copula.s then std.wss then termStep then std.wss then '>'.s)
+    }
 
     /** operation : '(' '^' word (',' term)+ ')' */
-    val operation: KursiveParser<CharSeries> =  
-        "narsiveOperation" colon ('('.s then std.wss then '^'.s then word.s then (std.wss then ','.s then std.wss then term.s).repeat(1) then std.wss then ')'.s)
+    val operation: KursiveParser<CharSeries> by lazy(LazyThreadSafetyMode.NONE) {
+        "narsiveOperation" colon ('('.s then std.wss then '^'.s then word.s then (std.wss then ','.s then std.wss then termStep).repeat(1) then std.wss then ')'.s)
+    }
 
     /** compound : '(' conjunction (',' term){2,} ')' */
-    val compoundTerm: KursiveParser<CharSeries> =  
-        "narsiveCompoundTerm" colon ('('.s then std.wss then peekIsNot('^') then conjunction.s then (std.wss then ','.s then std.wss then term.s).repeat(2) then std.wss then ')'.s)
-
-//  term        : relationship | operation | compound | variable | quoted | word
-//  (defined above as lazy to allow forward references)
+    val compoundTerm: KursiveParser<CharSeries> by lazy(LazyThreadSafetyMode.NONE) {
+        "narsiveCompoundTerm" colon ('('.s then std.wss then peekIsNot('^') then conjunction.s then (std.wss then ','.s then std.wss then termStep).repeat(2) then std.wss then ')'.s)
+    }
 
     /** statement : relationship | operation | term */
-    val statement: KursiveParser<CharSeries> =  
-        "narsiveStatement" colon choice("stmtAlt", relationship, operation, term)
+    val statement: KursiveParser<CharSeries> by lazy(LazyThreadSafetyMode.NONE) {
+        "narsiveStatement" colon choice("stmtAlt", relationship, operation, termParser)
+    }
 
     /** judgement : statement '.' tense? truth? */
-    val judgement: KursiveParser<CharSeries> =  
+    val judgement: KursiveParser<CharSeries> by lazy(LazyThreadSafetyMode.NONE) {
         "narsiveJudgement" colon (statement.s then std.wss then '.'.s then std.wss then tense.s.opt then std.wss then truth.s.opt)
+    }
 
     /** goal : statement '!' truth? */
-    val goal: KursiveParser<CharSeries> =  
+    val goal: KursiveParser<CharSeries> by lazy(LazyThreadSafetyMode.NONE) {
         "narsiveGoal" colon (statement.s then std.wss then '!'.s then std.wss then truth.s.opt)
+    }
 
     /** question : statement '?' tense? */
-    val questionSentence: KursiveParser<CharSeries> =  
+    val questionSentence: KursiveParser<CharSeries> by lazy(LazyThreadSafetyMode.NONE) {
         "narsiveQuestion" colon (statement.s then std.wss then '?'.s then std.wss then tense.s.opt)
+    }
 
     /** sentence : judgement | goal | question */
-    val sentence: KursiveParser<CharSeries> =  
+    val sentence: KursiveParser<CharSeries> by lazy(LazyThreadSafetyMode.NONE) {
         "narsiveSentence" colon choice("sentAlt", judgement, goal, questionSentence)
+    }
 
     /** task : budget? sentence */
-    val task: KursiveParser<CharSeries> =  
+    val task: KursiveParser<CharSeries> by lazy(LazyThreadSafetyMode.NONE) {
         "narsiveTask" colon (std.wss then budget.s.opt then std.wss then sentence.s then std.wss)
+    }
+
+    // ── resolve lateinit ──
+
+    init {
+        _term = choice("narsiveTerm", relationship, operation, compoundTerm, variable, quoted, word)
+    }
 
     // ── entry points ──
 
@@ -299,17 +345,3 @@ fun Long.narsiveOperators(): Set<NarsiveOperator> =
 
 fun Iterable<NarsiveOperator>.narsiveMask(): Long =
     fold(0L) { acc, operator -> acc or operator.mask }
-
-// ── operator lexing helpers ─────────────────────────────────────────────
-
-internal fun Series<Char>.narsiveOperatorOrNull(
-    accept: (NarsiveOperator) -> Boolean = { true },
-): NarsiveOperator? = NarsiveOperator.entries.firstOrNull { accept(it) && it.matches(this) }
-
-internal fun KursiveCharSeries.consumeNarsiveOperatorOrNull(
-    accept: (NarsiveOperator) -> Boolean = { true },
-): CharSeries? = NarsiveOperator.entries.firstNotNullOfOrNull { operator ->
-    if (accept(operator)) operator.tryConsume(this) else null
-}
-
-private fun Series<Char>.firstGlyphOrNull(): Series<Char>? = if (size == 0) null else 1 j { this[0] }

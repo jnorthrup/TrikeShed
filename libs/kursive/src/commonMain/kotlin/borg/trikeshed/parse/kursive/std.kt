@@ -3,7 +3,7 @@ package borg.trikeshed.parse.kursive
 import borg.trikeshed.lib.CharSeries
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.emptySeries
-import borg.trikeshed.lib.toSeries
+import borg.trikeshed.lib.*
 
 object std {
     val ws: KursiveParser<CharSeries> = parser("ws") { input ->

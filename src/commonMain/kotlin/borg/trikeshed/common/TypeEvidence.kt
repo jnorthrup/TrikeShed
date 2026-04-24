@@ -38,21 +38,24 @@ TypeEvidence(
     /**minimum length of the column observed across the file */
     var minColumnLength: UShort = UShort.MAX_VALUE,
 ) {
+    /**
+     * Non-conditional character class determination via lookup table + bitmask extraction.
+     * Each input char maps to exactly one single-bit category (XOR); the counter update
+     * is a straight-line extract-and-add with no branches.
+     */
     operator fun plus(char: Char): TypeEvidence = apply {
-        when (char) {
-            in '0'..'9' -> digits++
-            '.' -> periods++
-            'e', 'E' -> exponent++
-            '+', '-' -> signs++
-            't', 'r', 'u', 'f', 'a', 'l', 's', 'T', 'R', 'U', 'F', 'A', 'L', 'S' -> truefalse++
-            in 'a'..'z', in 'A'..'Z' -> alpha++
-            '"' -> dquotes++
-            '\'' -> quotes++
-            '\\' -> backslashes++
-            ' ', '\t' -> whitespaces++
-            '\r', ',', '\n' -> {}
-            else -> special++
-        }
+        val cat = if (char.code < CHAR_CATEGORY.size) CHAR_CATEGORY[char.code] else CAT_SPECIAL
+        digits = (digits + (cat and CAT_DIGIT).toUInt()).toUShort()
+        periods = (periods + ((cat and CAT_PERIOD) shr 1).toUInt()).toUShort()
+        exponent = (exponent + ((cat and CAT_EXPONENT) shr 2).toUInt()).toUShort()
+        signs = (signs + ((cat and CAT_SIGN) shr 3).toUInt()).toUShort()
+        truefalse = (truefalse + ((cat and CAT_TRUEFALSE) shr 4).toUInt()).toUShort()
+        alpha = (alpha + ((cat and CAT_ALPHA) shr 5).toUInt()).toUShort()
+        dquotes = (dquotes + ((cat and CAT_DQUOTE) shr 6).toUInt()).toUShort()
+        quotes = (quotes + ((cat and CAT_QUOTE) shr 7).toUInt()).toUShort()
+        backslashes = (backslashes + ((cat and CAT_BACKSLASH) shr 8).toUInt()).toUShort()
+        whitespaces = (whitespaces + ((cat and CAT_WHITESPACE) shr 9).toUInt()).toUShort()
+        special = (special + ((cat and CAT_SPECIAL) shr 10).toUInt()).toUShort()
     }
 
     /**
@@ -164,91 +167,36 @@ TypeEvidence(
     }
 }
 
-// ── XOR scan layer ──────────────────────────────────────────────────────────
-// Slot layout: each character-class counter maps to one slot.
-// XOR prefix scan is deterministic, nonreversionary, non-conditional.
+/** Non-conditional character class determination — single-bit (XOR) encoding */
+private const val CAT_DIGIT = 1        // bit 0
+private const val CAT_PERIOD = 2       // bit 1
+private const val CAT_EXPONENT = 4     // bit 2
+private const val CAT_SIGN = 8         // bit 3
+private const val CAT_TRUEFALSE = 16   // bit 4
+private const val CAT_ALPHA = 32       // bit 5
+private const val CAT_DQUOTE = 64      // bit 6
+private const val CAT_QUOTE = 128      // bit 7
+private const val CAT_BACKSLASH = 256  // bit 8
+private const val CAT_WHITESPACE = 512 // bit 9
+private const val CAT_SPECIAL = 1024   // bit 10
 
-/** Number of evidence slots — one per character-class counter */
-const val EVIDENCE_SLOTS = 14
-
-/** Slot names for column metadata */
-val EVIDENCE_SLOT_NAMES = arrayOf(
-    "digits", "periods", "exponent", "signs", "special", "alpha",
-    "truefalse", "empty", "quotes", "dquotes", "whitespaces", "backslashes",
-    "linefeed", "maxColumnLength",
-)
-
-/**
- * Pack evidence into a ShortArray using XOR prefix scan.
- * Each slot is the running XOR of the character-class counter encoded as UShort.
- * Nonreversionary: slot[i] = slot[i-1] xor counter[i].
- * Non-conditional: straight-line core loop, no branches.
- */
-fun TypeEvidence.toShortArray(): ShortArray {
-    val raw = intArrayOf(
-        digits.toInt(), periods.toInt(), exponent.toInt(), signs.toInt(),
-        special.toInt(), alpha.toInt(), truefalse.toInt(), empty.toInt(),
-        quotes.toInt(), dquotes.toInt(), whitespaces.toInt(), backslashes.toInt(),
-        linefeed.toInt(), maxColumnLength.toInt(),
-    )
-    val out = ShortArray(EVIDENCE_SLOTS)
-    var acc = 0
-    for (i in 0 until EVIDENCE_SLOTS) {
-        acc = acc xor raw[i]
-        out[i] = acc.toShort()
-    }
-    return out
-}
-
-/**
- * Recover the raw counter at slot [index] from an XOR-scanned array.
- * Inverse of prefix scan: raw[i] = out[i] xor out[i-1].
- */
-fun ShortArray.xorSlotAt(index: Int): UShort {
-    val prev = if (index == 0) 0 else this[index - 1].toInt()
-    return (this[index].toInt() xor prev).toUShort()
-}
-
-/**
- * Deduce IOMemento from an XOR-scanned evidence array.
- * Uses [xorSlotAt] to recover counters then applies the same narrowing rules
- * as [TypeEvidence.deduce].
- */
-fun ShortArray.deduceFromEvidence(): IOMemento {
-    // Recover counters as UInt for safe unsigned arithmetic and comparisons
-    val digits = xorSlotAt(0).toUInt()
-    val periods = xorSlotAt(1).toUInt()
-    val exponent = xorSlotAt(2).toUInt()
-    val signs = xorSlotAt(3).toUInt()
-    val special = xorSlotAt(4).toUInt()
-    val alpha = xorSlotAt(5).toUInt()
-    val truefalse = xorSlotAt(6).toUInt()
-    val empty = xorSlotAt(7).toUInt()
-    val quotes = xorSlotAt(8).toUInt()
-    val dquotes = xorSlotAt(9).toUInt()
-    val maxColumnLength = xorSlotAt(13).toUInt()
-
-    return when {
-        dquotes > 0U || quotes > 0U -> IOMemento.IoString
-        empty > 0U || alpha > 0U -> IOMemento.IoString
-        truefalse > 0U -> IOMemento.IoBoolean
-        digits == 0U -> IOMemento.IoString
-        periods == 0U && exponent == 0U && signs <= 1U && special == 0U && maxColumnLength <= 3U + signs -> IOMemento.IoByte
-        periods == 0U && exponent == 0U && signs <= 1U && special == 0U && maxColumnLength <= 5U + signs -> IOMemento.IoShort
-        periods == 0U && exponent == 0U && signs <= 1U && special == 0U && maxColumnLength <= 10U + signs -> IOMemento.IoInt
-        periods == 0U && exponent == 0U && signs <= 1U && special == 0U && maxColumnLength <= 19U + signs -> IOMemento.IoLong
-        periods == 1U && exponent == 0U && signs <= 1U && special == 0U && maxColumnLength <= 34U + signs + exponent -> IOMemento.IoFloat
-        periods == 1U && exponent <= 1U && signs <= 1U && special == 0U && maxColumnLength <= 66U + signs + exponent -> IOMemento.IoDouble
-        else -> IOMemento.IoString
+/** Pre-computed lookup table: each ASCII char maps to exactly one single-bit category. */
+private val CHAR_CATEGORY: IntArray = IntArray(128) { c ->
+    when (c.toChar()) {
+        in '0'..'9' -> CAT_DIGIT
+        '.' -> CAT_PERIOD
+        'e', 'E' -> CAT_EXPONENT
+        '+', '-' -> CAT_SIGN
+        't', 'r', 'u', 'f', 'a', 'l', 's', 'T', 'R', 'U', 'F', 'A', 'L', 'S' -> CAT_TRUEFALSE
+        in 'a'..'z', in 'A'..'Z' -> CAT_ALPHA
+        '"' -> CAT_DQUOTE
+        '\'' -> CAT_QUOTE
+        '\\' -> CAT_BACKSLASH
+        ' ', '\t' -> CAT_WHITESPACE
+        '\r', ',', '\n' -> 0
+        else -> CAT_SPECIAL
     }
 }
-
-/**
- * Deduce the structural TypeMemento from a scanned evidence array.
- * Checks confix from the source TypeEvidence (structural memento takes precedence).
- */
-fun TypeEvidence.deduceMementoFromScan(): TypeMemento =
-    structuralMemento ?: toShortArray().deduceFromEvidence()
 
 fun TypeEvidence.toRowVec(): RowVec {
     val values = arrayOf<Any?>(

@@ -2,6 +2,8 @@
 
 package borg.trikeshed.lib
 
+import kotlin.math.pow
+
 /**
  * Centralized Series<Char> helpers backed by CharSeries.
  * Moved out of Yaml.kt to avoid duplicate inline implementations and reduce GC churn.
@@ -125,6 +127,6 @@ fun Series<Char>.toDoubleOrNull(): Double? {
     }
     if (idx != n) return null
     var value = (intPart.toDouble() + if (fracDiv > 1.0) fracPart / fracDiv else 0.0) * sign
-    if (exp != 0) value *= Math.pow(10.0, (expSign * exp).toDouble())
+    if (exp != 0) value *= 10.0.pow((expSign * exp).toDouble())
     return value
 }

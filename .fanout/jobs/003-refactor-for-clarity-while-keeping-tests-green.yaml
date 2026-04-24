@@ -1,0 +1,15 @@
+acceptance:
+- tests remain green after refactor
+attempts: 0
+completed_at: ''
+dependencies:
+- '002'
+description: Improve code structure and readability, then run tests to ensure all
+  still pass.
+history: []
+id: '003'
+last_run_at: ''
+last_summary: ''
+last_verdict: ''
+name: refactor for clarity while keeping tests green
+status: pending

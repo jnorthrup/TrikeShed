@@ -29,7 +29,7 @@ class ManifoldTest {
 
     @Test
     fun `atlas selects the first matching chart`() {
-        val located = manifold.locate(17.0)
+        val located: ChartedPoint<Double, Double>? = manifold.locate(17.0)
 
         assertNotNull(located)
         assertEquals("shifted", located.a.name)

@@ -1,0 +1,15 @@
+acceptance:
+- full suite passes; no regressions
+attempts: 0
+completed_at: ''
+dependencies:
+- '005'
+description: Run the full test suite to confirm no regressions and that the overall
+  feature remains green.
+history: []
+id: '006'
+last_run_at: ''
+last_summary: ''
+last_verdict: ''
+name: final verification and regression check
+status: pending

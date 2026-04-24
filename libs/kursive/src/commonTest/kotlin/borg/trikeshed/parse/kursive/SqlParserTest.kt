@@ -1,9 +1,11 @@
 package borg.trikeshed.parse.kursive.sql
 
+import borg.trikeshed.lib.get
+import borg.trikeshed.lib.size
 import borg.trikeshed.lib.toSeries
 import kotlin.test.Test
-import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertEquals
 
 class SqlParserTest {
     @Test

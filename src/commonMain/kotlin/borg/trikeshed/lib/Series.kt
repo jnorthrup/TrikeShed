@@ -1,10 +1,11 @@
-@file:Suppress("UNCHECKED_CAST", "ObjectPropertyName")
+@file:Suppress("UNCHECKED_CAST", "ObjectPropertyName", "NonAsciiCharacters")
 @file:OptIn(ExperimentalUnsignedTypes::class)
 
 package borg.trikeshed.lib
 
-import borg.trikeshed.collections.binarySearch
+
 import borg.trikeshed.common.TypeEvidence
+import borg.trikeshed.isam.meta.IOMemento
 import kotlin.jvm.JvmInline
 import kotlin.jvm.JvmName
 import kotlin.math.max
@@ -581,9 +582,8 @@ val <T : Comparable<T>> Series<T>.cpb: CSeries<T>
 fun <T : Comparable<T>> Series<T>.commonPrefixWith(other: Series<T>): Series<T> =
     if (size == 0) this else this[0 until shortestLength(other)]
 
-fun <T> Series<T>.firstOrNull(): T? = takeUnless { it.isEmpty() }?.first()
+fun <T> Series<T>.firstOrNull(): T? = takeUnless({ a>0 } )?.b(0)
 
-import borg.trikeshed.isam.meta.IOMemento
 
 fun Series<Char>.parseLongOrNull(): Long? {
     // Use TypeEvidence to decide whether this Series looks like an integer-like value.

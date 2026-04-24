@@ -1,0 +1,15 @@
+acceptance:
+- new tests fail (red) for uncovered edge cases
+attempts: 0
+completed_at: ''
+dependencies:
+- '003'
+description: Identify missing edge cases and add tests that validate boundary conditions,
+  then confirm they fail initially.
+history: []
+id: '004'
+last_run_at: ''
+last_summary: ''
+last_verdict: ''
+name: add edge-case tests to increase coverage
+status: pending
