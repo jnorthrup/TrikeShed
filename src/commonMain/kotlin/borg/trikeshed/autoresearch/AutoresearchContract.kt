@@ -1,5 +1,8 @@
 package borg.trikeshed.autoresearch
 
+import borg.trikeshed.parse.json.JsonParser
+import borg.trikeshed.lib.toSeries
+
 enum class AutoresearchTask(val wireName: String) {
     X_TO_X("x_to_x"),
     SCALAR_1X1_TO_16X16("scalar_1x1_to_16x16"),
@@ -126,17 +129,25 @@ data class AutoresearchResult(
         const val SCHEMA: String = "trikeshed.autoresearch.result.v1"
 
         fun fromJsonLine(jsonLine: String): AutoresearchResult {
-            val metricsObject = extractJsonObject(jsonLine, "metrics")
+            val parsedAny = try { JsonParser.reify(jsonLine.toSeries()) } catch (e: Exception) {
+                throw IllegalArgumentException("Invalid AutoresearchResult JSON: $e")
+            }
+            val parsed = parsedAny as? Map<*, *> ?: error("AutoresearchResult JSON is not an object")
+            val metricsAny = parsed["metrics"] as? Map<*, *> ?: error("Autoresearch result missing object field: metrics")
+            val metricsMap: Map<String, String> = metricsAny.entries.associate { (k, v) ->
+                (k as? String ?: k.toString()) to (v as? String ?: (v as? Number)?.toString() ?: v?.toString() ?: "")
+            }
+
             return AutoresearchResult(
-                experimentId = extractJsonString(jsonLine, "experiment_id"),
-                branch = extractJsonString(jsonLine, "branch"),
-                stage = extractJsonString(jsonLine, "stage"),
-                theme = extractJsonString(jsonLine, "theme"),
-                timestamp = extractJsonString(jsonLine, "timestamp"),
-                metrics = AutoresearchMetrics.fromJsonObject(metricsObject),
-                verdict = AutoresearchVerdict.fromWireName(extractJsonString(jsonLine, "verdict")),
-                evidencePath = extractJsonString(jsonLine, "evidence_path"),
-                schema = extractJsonString(jsonLine, "schema"),
+                experimentId = parsed["experiment_id"] as? String ?: error("Autoresearch result missing string field: experiment_id"),
+                branch = parsed["branch"] as? String ?: error("Autoresearch result missing string field: branch"),
+                stage = parsed["stage"] as? String ?: error("Autoresearch result missing string field: stage"),
+                theme = parsed["theme"] as? String ?: error("Autoresearch result missing string field: theme"),
+                timestamp = parsed["timestamp"] as? String ?: error("Autoresearch result missing string field: timestamp"),
+                metrics = AutoresearchMetrics.fromJsonObject(metricsMap),
+                verdict = AutoresearchVerdict.fromWireName(parsed["verdict"] as? String ?: error("Autoresearch result missing string field: verdict")),
+                evidencePath = parsed["evidence_path"] as? String ?: error("Autoresearch result missing string field: evidence_path"),
+                schema = parsed["schema"] as? String ?: SCHEMA,
             )
         }
     }
