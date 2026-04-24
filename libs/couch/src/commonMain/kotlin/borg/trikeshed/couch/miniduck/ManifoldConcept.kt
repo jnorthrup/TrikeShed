@@ -21,7 +21,7 @@ import borg.trikeshed.lib.j
 class ManifoldConcept(
     val angular: Long,
     val budget: BudgetCoord,
-    private val payload: MiniRowVec,
+    val payload: MiniRowVec = DocRowVec(emptyList(), emptyList()),
 ) : MiniRowVec() {
 
     /** Scalar surface: [angular, packed_budget_as_int, radial_energy_bits]. */
@@ -44,10 +44,10 @@ class ManifoldConcept(
      */
     fun decay(factor: Float): ManifoldConcept = ManifoldConcept(
         angular = angular,
-        budget = BudgetCoord(
-            p = budget.p * factor,
-            d = budget.d * factor,
-            q = budget.q * factor,
+        budget = BudgetCoord.invoke(
+            budget.p * factor,
+            budget.d * factor,
+            budget.q * factor,
         ),
         payload = payload,
     )
@@ -58,10 +58,10 @@ class ManifoldConcept(
      */
     fun reinforce(factor: Float): ManifoldConcept = ManifoldConcept(
         angular = angular,
-        budget = BudgetCoord(
-            p = min(1f, budget.p + factor * (1f - budget.p)),
-            d = min(1f, budget.d + factor * (1f - budget.d)),
-            q = min(1f, budget.q + factor * (1f - budget.q)),
+        budget = BudgetCoord.invoke(
+            minOf(1f, budget.p + factor * (1f - budget.p)),
+            minOf(1f, budget.d + factor * (1f - budget.d)),
+            minOf(1f, budget.q + factor * (1f - budget.q)),
         ),
         payload = payload,
     )
@@ -69,23 +69,21 @@ class ManifoldConcept(
     companion object {
         /**
          * Hamming distance between two angular addresses.
-         * This is the geodesic distance on the Hamming hypersphere --
-         * the number of bits that differ.
+         * Geodesic distance on the Hamming hypersphere -- number of differing bits.
          */
         fun hamming(a: Long, b: Long): Int {
             var xor = a xor b
             var count = 0
             while (xor != 0L) {
                 count++
-                xor = xor and (xor - 1L) // clear lowest set bit
+                xor = xor and (xor - 1L)
             }
             return count
         }
 
         /**
          * Angular walk: flip the specified bits on the hypersphere.
-         * Produces a new angular address that is Hamming-distance |bits|
-         * from the origin.
+         * Produces a new angular address at Hamming-distance |bits| from origin.
          */
         fun angularWalk(origin: Long, bits: Set<Int>): Long {
             var result = origin
@@ -96,3 +94,6 @@ class ManifoldConcept(
         }
     }
 }
+
+/** Top-level Hamming distance -- delegates to ManifoldConcept.hamming. */
+fun hamming(a: Long, b: Long): Int = ManifoldConcept.hamming(a, b)

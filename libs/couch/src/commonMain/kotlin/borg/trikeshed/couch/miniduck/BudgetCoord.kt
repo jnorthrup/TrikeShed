@@ -2,6 +2,7 @@ package borg.trikeshed.couch.miniduck
 
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.pow
 
 /**
  * BudgetCoord: compressed angular-radial coordinate for NARS manifold.
@@ -23,6 +24,12 @@ class BudgetCoord private constructor(
 
     /** Average confidence = radial energy on the manifold. 1.0 = origin (deepest imprint). */
     val radialEnergy: Float get() = (p + d + q) / 3f
+
+    /** Geometric mean of PDQ -- the energy scalar. */
+    fun energy(): Float = ((p * d * q).toDouble()).pow(1.0 / 3.0).toFloat()
+
+    /** Pack to UInt. */
+    fun pack(): UInt = packed
 
     override fun compareTo(other: BudgetCoord): Int =
         radialEnergy.compareTo(other.radialEnergy)

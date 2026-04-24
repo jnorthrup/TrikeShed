@@ -17,7 +17,7 @@ import borg.trikeshed.couch.miniduck.DocRowVec
 import borg.trikeshed.couch.miniduck.MiniRowVec
 import borg.trikeshed.lib.*
 
-actual class LsmrTableSource actual constructor(private val db: LsmrDatabase, private val blockSizeThreshold: Int) : TableSource {
+class LsmrTableSource(private val db: LsmrDatabase, private val blockSizeThreshold: Int = 128) : TableSource {
 
     private val mutableBlocks = mutableMapOf<String, BlockRowVec>()
     private fun blockCountKey(table: String) = "miniduck:table:$table:blockcount"

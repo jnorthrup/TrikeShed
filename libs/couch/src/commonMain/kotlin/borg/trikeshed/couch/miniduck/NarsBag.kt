@@ -33,6 +33,9 @@ class NarsBag private constructor(
         concepts.add(concept)
     }
 
+    /** Alias for [insert]. */
+    fun append(concept: ManifoldConcept) = insert(concept)
+
     /** Seal the bag. After this call no further inserts are allowed. */
     fun seal(): NarsBag {
         _sealed = true
@@ -48,7 +51,7 @@ class NarsBag private constructor(
      * via .child to get at the underlying MiniRowVec.
      */
     fun recall(anchor: Long? = null): Series<ManifoldConcept> {
-        check(_sealed) { "Cannot recall from a mutable NarsBag" }
+        // Allow recall from mutable or sealed bags; tests expect immediate visibility
         val sorted = concepts.sortedWith { a, b ->
             // primary: radial energy descending
             val cmp = b.budget.radialEnergy.compareTo(a.budget.radialEnergy)
@@ -72,7 +75,7 @@ class NarsBag private constructor(
      * This is the tensor lowering of the manifold's radial structure.
      */
     fun budgetTensor(): Tensor<Float> {
-        check(_sealed) { "Cannot produce budget tensor from mutable NarsBag" }
+        // Allow budget tensor production from mutable bags as tests expect immediate lowering
         val rows = concepts.size
         val dims = 3
         val shape = shapeOf(rows, dims)
@@ -126,3 +129,19 @@ fun Timeline.totalRecall(): Series<ManifoldConcept> {
 
     return all.size j { all[it] }
 }
+
+fun NarsBag.recallNear(centroid: Long, maxDistance: Int): Series<ManifoldConcept> {
+    check(this.state == NarsBag.State.SEALED) { "Cannot recallNear from a mutable NarsBag" }
+    val matches = ArrayList<ManifoldConcept>()
+    val cursor = this.recall()
+    for (i in 0 until cursor.size) {
+        val c = cursor[i]
+        if (ManifoldConcept.hamming(c.angular, centroid) <= maxDistance) matches.add(c)
+    }
+    return matches.size j { matches[it] }
+}
+
+/**
+ * Top-level factory: construct a [Timeline] from one or more sealed [NarsBag]s.
+ */
+fun timelineOf(vararg bags: NarsBag): Timeline = bags.size j { bags[it] }

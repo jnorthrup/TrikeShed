@@ -29,7 +29,7 @@ fun MiniRowVec.getValue(key: String): Any? = when (this) {
         "scalarValue" -> scalarValue
         else -> null
     }
-    is BlockRowVec, is BlobRowVec -> null
+    is BlockRowVec, is BlobRowVec, is ManifoldConcept -> null
 }
 
 /**

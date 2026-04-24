@@ -16,6 +16,7 @@ data class LsmrConfig(
 class LsmrDatabase(val config: LsmrConfig) {
     private val memtable = mutableMapOf<String, ByteArray>()
     private var memtableSize = 0
+    private val segments = mutableListOf<MutableMap<String, ByteArray>>()
     private val mutex = Mutex()
 
     suspend fun put(id: String, value: ByteArray) {
@@ -32,13 +33,30 @@ class LsmrDatabase(val config: LsmrConfig) {
 
     suspend fun get(id: String): ByteArray? {
         mutex.withLock {
-            return memtable[id]
-            // In a real implementation, we would also check segments on disk
+            memtable[id]?.let { return it }
+            // Search segments newest-first
+            for (seg in segments.asReversed()) {
+                seg[id]?.let { return it }
+            }
+            return null
+        }
+    }
+
+    private fun compactIfNeeded() {
+        config.maxSegments?.let { max ->
+            while (segments.size > max) {
+                // drop oldest segments first
+                segments.removeAt(0)
+            }
         }
     }
 
     private suspend fun flushMemtable() {
-        // Implementation for flushing to disk
+        if (memtable.isEmpty()) return
+        // Move current memtable to a new in-memory segment
+        val newSegment = memtable.toMutableMap()
+        segments.add(newSegment)
+        compactIfNeeded()
         memtable.clear()
         memtableSize = 0
     }

@@ -1,31 +1,34 @@
 package borg.trikeshed.couch.miniduck.sql
 
 import borg.trikeshed.parse.kursive.sql.SqlParser
-import borg.trikeshed.couch.miniduck.exec.InMemoryTableSource
+import borg.trikeshed.couch.miniduck.exec.LsmrTableSource
 import borg.trikeshed.couch.miniduck.exec.ExecutionContext
-import borg.trikeshed.couch.miniduck.schema.InMemorySchemaManager
+import borg.trikeshed.couch.miniduck.schema.LsmrSchemaManager
 import borg.trikeshed.couch.miniduck.schema.TableSchema
 import borg.trikeshed.couch.miniduck.schema.ColumnSchema
+import borg.trikeshed.userspace.database.LsmrDatabase
+import borg.trikeshed.userspace.database.LsmrConfig
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
-// Platform-agnostic integration test using in-memory table source. JVM-specific LSMR test lives in jvmTest.
 class SqlIntegrationTest {
     @Test
-    fun parsePlanExecuteAgainstInMemory() = runTest {
-        val schemaManager = InMemorySchemaManager()
-        val tableSource = InMemoryTableSource()
+    fun parsePlanExecuteAgainstLsmr() = runTest {
+        val db = LsmrDatabase(LsmrConfig(path = "", memtableThreshold = 1024))
+        val schemaManager = LsmrSchemaManager(db)
+        val tableSource = LsmrTableSource(db)
 
         // Seed schema and rows
-        val schema = TableSchema("users", listOf(ColumnSchema(0, "id"), ColumnSchema(1, "name")))
-        schemaManager.createTableSuspend(schema)
-        tableSource.addTable(schema, listOf(listOf(1, "alice"), listOf(2, "bob"), listOf(3, "carol")))
+        schemaManager.createTable(TableSchema("users", listOf(ColumnSchema(0, "id"), ColumnSchema(1, "name"))))
+        tableSource.seedRows("users", listOf(listOf(1, "alice"), listOf(2, "bob"), listOf(3, "carol")))
 
         val execCtx = ExecutionContext(schemaManager, PlannerConfig(), tableSource)
 
         val sql = "SELECT id, name FROM users WHERE id = 2"
         val stmt = SqlParser.parse(sql) ?: throw AssertionError("parse failed")
+        println("Parsed stmt: ${'$'}stmt")
+        println("From: ${'$'}{stmt.from}")
         val plan = transformSelect(stmt, PlannerContext(schemaManager))
 
         val cur = plan.open(execCtx)

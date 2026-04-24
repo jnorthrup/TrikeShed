@@ -97,6 +97,17 @@ object MiniDuckBlockCodec {
             "sealed" to (row.state == BlockRowVec.State.SEALED),
             "child" to encodeChildren(row.child),
         )
+        is ManifoldConcept -> linkedMapOf(
+            "type" to "ManifoldConcept",
+            "angular" to row.angular,
+            "budget" to row.budget.packed.toInt(),
+            "child" to encodeChildren(row.child),
+        )
+        else -> linkedMapOf(
+            "type" to "Unknown",
+            "class" to (row?.toString() ?: "null"),
+            "child" to encodeChildren(row?.child),
+        )
     }
 
     private fun decodeRow(value: Any?): MiniRowVec {
@@ -131,7 +142,10 @@ object MiniDuckBlockCodec {
                 },
             )
             "BlobRowVec" -> BlobRowVec(
-                bytes = map.intList("bytes").map { it.toByte() }.toByteArray(),
+                bytes = run {
+                    val ints = map.intList("bytes")
+                    ByteArray(ints.size) { idx -> ints[idx].toByte() }
+                },
                 mimeType = map["mimeType"] as String?,
                 childFactory = map.childRows().takeIf { it.isNotEmpty() }?.let { rows ->
                     { rows.toSeries() }
@@ -142,6 +156,14 @@ object MiniDuckBlockCodec {
                 map.childRows().forEach(block::append)
                 if (map["sealed"] == true) block.seal()
                 else block
+            }
+            "ManifoldConcept" -> {
+                val payload = map.childRows().firstOrNull() ?: DocRowVec(emptyList(), emptyList())
+                ManifoldConcept(
+                    angular = (map["angular"] as? Number)?.toLong() ?: 0L,
+                    budget = BudgetCoord.unpack(((map["budget"] as? Number)?.toInt() ?: 0).toUInt()),
+                    payload = payload,
+                )
             }
             else -> error("Unsupported MiniDuck row type: ${map["type"]}")
         }
