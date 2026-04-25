@@ -27,7 +27,7 @@ The WAL is not responsible for:
 ## 2. Core interface
 
 ```kotlin
-interface LSTMWal {
+interface LSMRWal {
     val headSequence: Long
     val durableSequence: Long
 
@@ -40,7 +40,7 @@ interface LSTMWal {
 ```
 
 Naming note:
-- if we keep the earlier `LSTMWAL` spelling, it should still mean a log-structured/memtable-oriented WAL, not an ML artifact
+- if we keep the earlier `LSMRWAL` spelling, it should still mean a log-structured/memtable-oriented WAL, not an ML artifact
 
 ## 3. Entry model
 
@@ -303,7 +303,7 @@ Crash safety requirements:
 ## 12. First GREEN slices
 
 1. Define `WalEntry`, `SnapshotRequest`, `WalSnapshot`, `CompactionPlan`, `CompactionResult`
-2. Define in-memory `LSTMWal` fake for RED tests
+2. Define in-memory `LSMRWal` fake for RED tests
 3. Define NDJSON codec for `WalEntry`
 4. Add replay applier for latest-doc state
 5. Add snapshot cut generation from replay state
@@ -312,7 +312,7 @@ Crash safety requirements:
 ## 13. Recommended file targets
 
 When implementation starts, prefer:
-- `libs/couch/src/commonMain/kotlin/borg/trikeshed/couch/wal/LSTMWal.kt`
+- `libs/couch/src/commonMain/kotlin/borg/trikeshed/couch/wal/LSMRWal.kt`
 - `libs/couch/src/commonMain/kotlin/borg/trikeshed/couch/wal/WalEntry.kt`
 - `libs/couch/src/commonMain/kotlin/borg/trikeshed/couch/wal/WalSnapshot.kt`
 - `libs/couch/src/commonMain/kotlin/borg/trikeshed/couch/wal/WalReplay.kt`
