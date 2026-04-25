@@ -183,58 +183,16 @@ private fun String.escapeJson(): String = buildString(length + 8) {
 }
 
 private fun extractJsonString(jsonLine: String, key: String): String {
-    val marker = "\"$key\":\""
-    val start = jsonLine.indexOf(marker)
-    require(start >= 0) { "Autoresearch result missing string field: $key" }
-    val builder = StringBuilder()
-    var index = start + marker.length
-    var escaped = false
-    while (index < jsonLine.length) {
-        val ch = jsonLine[index++]
-        if (escaped) {
-            builder.append(
-                when (ch) {
-                    '\\' -> '\\'
-                    '"' -> '"'
-                    'n' -> '\n'
-                    'r' -> '\r'
-                    't' -> '\t'
-                    else -> ch
-                },
-            )
-            escaped = false
-            continue
-        }
-        when (ch) {
-            '\\' -> escaped = true
-            '"' -> return builder.toString()
-            else -> builder.append(ch)
-        }
-    }
-    error("Autoresearch result field did not terminate: $key")
+    val parsed = JsonParser.reify(jsonLine.toSeries()) as? Map<*, *> ?: error("Invalid JSON")
+    return parsed[key] as? String ?: error("Autoresearch result missing string field: $key")
 }
 
 private fun extractJsonObject(jsonLine: String, key: String): Map<String, String> {
-    val marker = "\"$key\":{"
-    val start = jsonLine.indexOf(marker)
-    require(start >= 0) { "Autoresearch result missing object field: $key" }
-    val bodyStart = start + marker.length
-    var depth = 1
-    var index = bodyStart
-    while (index < jsonLine.length && depth > 0) {
-        when (jsonLine[index]) {
-            '{' -> depth++
-            '}' -> depth--
-        }
-        index++
+    val parsed = JsonParser.reify(jsonLine.toSeries()) as? Map<*, *> ?: error("Invalid JSON")
+    val obj = parsed[key] as? Map<*, *> ?: error("Autoresearch result missing object field: $key")
+    return obj.entries.associate { (k, v) ->
+        (k as? String ?: k.toString()) to (v as? String ?: (v as? Number)?.toString() ?: v?.toString() ?: "")
     }
-    require(depth == 0) { "Autoresearch result object field did not terminate: $key" }
-    val objectBody = jsonLine.substring(bodyStart, index - 1)
-    return Regex("\"([^\"]+)\":([^,}]+)")
-        .findAll(objectBody)
-        .associate { match ->
-            match.groupValues[1] to match.groupValues[2].trim()
-        }
 }
 
 private fun Map<String, String>.requireDouble(key: String): Double =
