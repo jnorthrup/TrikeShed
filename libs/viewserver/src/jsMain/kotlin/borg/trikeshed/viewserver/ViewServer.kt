@@ -10,7 +10,7 @@ fun main() {
 
     rl.on("line", { line: dynamic ->
         try {
-            val cmd = JSON.parse(line as String)
+            val cmd = JSON.parse<dynamic>(line as String)
             val op = cmd[0] as String
             when (op) {
                 "reset" -> {
