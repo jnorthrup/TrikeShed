@@ -69,3 +69,22 @@ kotlin {
         }
     }
 }
+
+// Quick validation runner used during local development. Not added to published plugin API.
+// Usage: ./gradlew :libs:couch:quickValidate
+tasks.register<org.gradle.api.tasks.JavaExec>("quickValidate") {
+    group = "verification"
+    description = "Run a quick jvmMain validation of MiniDuck encode/decode"
+    dependsOn("compileKotlinJvm")
+    // compiled classes for JVM target
+    val classesDir = file("${'$'}{buildDir.path}/classes/kotlin/jvm/main")
+    // try to find the runtime classpath for the jvm target
+    val runtimeConfiguration = configurations.findByName("jvmRuntimeClasspath")
+        ?: configurations.findByName("jvmMainRuntimeClasspath")
+        ?: configurations.findByName("runtimeClasspath")
+        ?: throw IllegalStateException("Could not locate jvm runtime classpath configuration")
+    // For quick local validation, use compiled classes only (may still require kotlin stdlib at runtime).
+    classpath = files(classesDir)
+    mainClass.set("borg.trikeshed.couch.miniduck.MiniDuckQuickValidateKt")
+    jvmArgs = listOf("-Xmx1g")
+}
