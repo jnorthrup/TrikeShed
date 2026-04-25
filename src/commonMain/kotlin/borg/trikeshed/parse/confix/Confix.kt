@@ -7,16 +7,8 @@
     "unused",
     "MemberVisibilityCanBePrivate",
 )
-
 package borg.trikeshed.parse.confix
 
-import kotlinx.coroutines.CompletableJob
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.launch
-import kotlin.coroutines.AbstractCoroutineContextElement
-import kotlin.coroutines.CoroutineContext
 
 /* ═══════════════════════════════════════════════════════════════════════════
  *  Confix — one algebra, three syntaxes (JSON, CBOR, YAML).
@@ -39,61 +31,18 @@ import kotlin.coroutines.CoroutineContext
 /* ─── kernel algebra — rely on canonical definitions in borg.trikeshed.lib ────────────── */
 
 import borg.trikeshed.lib.*
-import borg.trikeshed.lib.get
-
-// Kernel algebra types and Series extensions are defined in borg.trikeshed.lib to avoid duplication.
-
-inline infix fun <X, C> Series<X>.α(crossinline f: (X) -> C): Series<C> =
-    size j { i: Int -> f(this[i]) }
-
-/** left identity anchor */
-val <T> T.`↺`: () -> T get() = { this }
-
-/** Either: sum type without stdlib */
-sealed interface Either<out L, out R> {
-    class Left<L>(val value: L) : Either<L, Nothing>
-    class Right<R>(val value: R) : Either<Nothing, R>
-}
-
-/** empty Series — size 0, indexer is an unreachable guard */
-fun <T> emptySeries(): Series<T> = 0 j { _: Int -> error("empty") }
-
-/** Series from IntArray */
-fun IntArray.asSeries(): Series<Int> = size j { i: Int -> this[i] }
-
-/** Series from CharArray */
-fun CharArray.asSeries(): Series<Char> = size j { i: Int -> this[i] }
-
-/** Series from ByteArray */
-fun ByteArray.asSeries(): Series<Byte> = size j { i: Int -> this[i] }
-
-/** Series over a slice of a Series */
-fun <T> Series<T>.slice(from: Int, untilX: Int): Series<T> {
-    val s = this
-    val n = untilX - from
-    return n j { i: Int -> s[from + i] }
-}
-
-/** Series of Chars from a CharSequence (no stdlib collection materialization) */
-fun CharSequence.asSeries(): Series<Char> = length j { i: Int -> this[i] }
+import borg.trikeshed.parse.json.*
+import borg.trikeshed.userspace.concurrency.ParseLifecycle
+import borg.trikeshed.userspace.concurrency.ParseScope
+import borg.trikeshed.userspace.concurrency.ParseScopeKey
+import kotlinx.coroutines.*
+import kotlin.coroutines.AbstractCoroutineContextElement
+import kotlin.coroutines.CoroutineContext
 
 
-/* ─── JSON/CBOR/YAML shared model (exactly the preload aliases) ─────────── */
-
-/** (openIdx j closeIdx) j commaIdxs — one value in the src */
-typealias JsElement = Join<Twin<Int>, Series<Int>>
-
-/** (openIdx j closeIdx) j src — an addressed span inside a char stream */
-typealias JsIndex = Join<Twin<Int>, Series<Char>>
-
-/** element j src — a value carrying its backing stream */
-typealias JsContext = Join<JsElement, Series<Char>>
-
-/** path element: "name" or index */
-typealias JsPathElement = Either<String, Int>
-
-/** series of path elements */
-typealias JsPath = Series<JsPathElement>
+/** Series of Chars from a CharSequence — use root's CharSequence.toSeries() */
+@Suppress("unused")
+fun CharSequence.asSeries(): Series<Char> = toSeries()
 
 
 /** tag byte encoded into commas[0] when the producer wants to signal kind.
@@ -217,142 +166,130 @@ object JsonScan {
 
     /** scan a char Series into Series<JsElement>. The root element is at index 0. */
     fun scan(src: Series<Char>): Series<JsElement> {
-        val n = src.size
+        val cs = CharSeries(src)
         val out = ElemBuf()
-        val i = IntHolder(0)
-        skipWs(src, i, n)
-        parseValue(src, i, n, out)
-        skipWs(src, i, n)
+        cs.skipWs
+        parseValue(cs, out)
+        cs.skipWs
         return out.toSeries()
     }
 
-    private class IntHolder(var v: Int)
-
-    private fun skipWs(s: Series<Char>, h: IntHolder, n: Int) {
-        while (h.v < n) {
-            val c = s[h.v]
-            if (c == ' ' || c == '\t' || c == '\n' || c == '\r') h.v++ else return
+    private fun parseValue(cs: CharSeries, out: ElemBuf): Int {
+        cs.skipWs
+        if (!cs.hasRemaining) error("eof in json")
+        val c = cs[cs.pos]
+        return when (c) {
+            '{' -> parseObject(cs, out)
+            '[' -> parseArray(cs, out)
+            '"' -> parseString(cs, out)
+            't', 'f' -> parseBool(cs, out)
+            'n' -> parseNull(cs, out)
+            else -> parseNumber(cs, out)
         }
     }
 
-    private fun parseValue(s: Series<Char>, h: IntHolder, n: Int, out: ElemBuf): Int {
-        skipWs(s, h, n)
-        if (h.v >= n) error("eof in json")
-        val c = s[h.v]
-        return when {
-            c == '{' -> parseObject(s, h, n, out)
-            c == '[' -> parseArray(s, h, n, out)
-            c == '"' -> parseString(s, h, n, out)
-            c == 't' || c == 'f' -> parseBool(s, h, n, out)
-            c == 'n' -> parseNull(s, h, n, out)
-            else -> parseNumber(s, h, n, out)
-        }
-    }
-
-    private fun parseObject(s: Series<Char>, h: IntHolder, n: Int, out: ElemBuf): Int {
-        val open = h.v; h.v++  // consume '{'
+    private fun parseObject(cs: CharSeries, out: ElemBuf): Int {
+        val open = cs.pos; cs.inc()  // consume '{'
         val idx = out.beginTagged(open, Tag.OBJECT)
-        skipWs(s, h, n)
-        if (h.v < n && s[h.v] == '}') {
-            val close = h.v; h.v++
+        cs.skipWs
+        if (cs.hasRemaining && cs[cs.pos] == '}') {
+            val close = cs.pos; cs.inc()
             out.endOf(idx, close, Tag.OBJECT); return idx
         }
-        while (h.v < n) {
-            skipWs(s, h, n)
+        while (cs.hasRemaining) {
+            cs.skipWs
             // record comma position = start of key
-            out.addComma(h.v)
-            parseString(s, h, n, out)        // key
-            skipWs(s, h, n)
-            if (h.v >= n || s[h.v] != ':') error("expected ':' at ${h.v}")
-            h.v++
-            parseValue(s, h, n, out)         // value
-            skipWs(s, h, n)
-            if (h.v < n && s[h.v] == ',') { h.v++; continue }
-            if (h.v < n && s[h.v] == '}') {
-                val close = h.v; h.v++
+            out.addComma(cs.pos)
+            parseString(cs, out)         // key
+            cs.skipWs
+            if (!cs.hasRemaining || cs[cs.pos] != ':') error("expected ':' at ${cs.pos}")
+            cs.inc()
+            parseValue(cs, out)          // value
+            cs.skipWs
+            if (cs.hasRemaining && cs[cs.pos] == ',') { cs.inc(); continue }
+            if (cs.hasRemaining && cs[cs.pos] == '}') {
+                val close = cs.pos; cs.inc()
                 out.endOf(idx, close, Tag.OBJECT); return idx
             }
-            error("expected ',' or '}' at ${h.v}")
+            error("expected ',' or '}' at ${cs.pos}")
         }
         error("unterminated object")
     }
 
-    private fun parseArray(s: Series<Char>, h: IntHolder, n: Int, out: ElemBuf): Int {
-        val open = h.v; h.v++
+    private fun parseArray(cs: CharSeries, out: ElemBuf): Int {
+        val open = cs.pos; cs.inc()
         val idx = out.beginTagged(open, Tag.ARRAY)
-        skipWs(s, h, n)
-        if (h.v < n && s[h.v] == ']') {
-            val close = h.v; h.v++
+        cs.skipWs
+        if (cs.hasRemaining && cs[cs.pos] == ']') {
+            val close = cs.pos; cs.inc()
             out.endOf(idx, close, Tag.ARRAY); return idx
         }
-        while (h.v < n) {
-            skipWs(s, h, n)
-            out.addComma(h.v)   // start of each element
-            parseValue(s, h, n, out)
-            skipWs(s, h, n)
-            if (h.v < n && s[h.v] == ',') { h.v++; continue }
-            if (h.v < n && s[h.v] == ']') {
-                val close = h.v; h.v++
+        while (cs.hasRemaining) {
+            cs.skipWs
+            out.addComma(cs.pos)   // start of each element
+            parseValue(cs, out)
+            cs.skipWs
+            if (cs.hasRemaining && cs[cs.pos] == ',') { cs.inc(); continue }
+            if (cs.hasRemaining && cs[cs.pos] == ']') {
+                val close = cs.pos; cs.inc()
                 out.endOf(idx, close, Tag.ARRAY); return idx
             }
-            error("expected ',' or ']' at ${h.v}")
+            error("expected ',' or ']' at ${cs.pos}")
         }
         error("unterminated array")
     }
 
-    private fun parseString(s: Series<Char>, h: IntHolder, n: Int, out: ElemBuf): Int {
-        val open = h.v
-        if (s[h.v] != '"') error("expected '\"' at ${h.v}")
+    private fun parseString(cs: CharSeries, out: ElemBuf): Int {
+        val open = cs.pos
+        if (cs[cs.pos] != '"') error("expected '\"' at ${cs.pos}")
         val idx = out.beginTagged(open, Tag.STRING)
-        h.v++
-        while (h.v < n) {
-            val c = s[h.v]
-            if (c == '\\') { h.v += 2; continue }
-            if (c == '"') {
-                val close = h.v; h.v++
-                out.endOf(idx, close, Tag.STRING); return idx
-            }
-            h.v++
-        }
-        error("unterminated string")
-    }
-
-    private fun parseBool(s: Series<Char>, h: IntHolder, n: Int, out: ElemBuf): Int {
-        val open = h.v
-        return if (s[h.v] == 't') {
-            if (h.v + 3 >= n) error("bad bool")
-            val idx = out.beginTagged(open, Tag.BOOL_TRUE)
-            h.v += 4
-            out.endOf(idx, h.v - 1, Tag.BOOL_TRUE); idx
-        } else {
-            if (h.v + 4 >= n) error("bad bool")
-            val idx = out.beginTagged(open, Tag.BOOL_FALSE)
-            h.v += 5
-            out.endOf(idx, h.v - 1, Tag.BOOL_FALSE); idx
-        }
-    }
-
-    private fun parseNull(s: Series<Char>, h: IntHolder, n: Int, out: ElemBuf): Int {
-        val open = h.v
-        if (h.v + 3 >= n) error("bad null")
-        val idx = out.beginTagged(open, Tag.NULL)
-        h.v += 4
-        out.endOf(idx, h.v - 1, Tag.NULL)
-        @Suppress("UNUSED_VARIABLE") val _s = s
+        cs.inc()  // skip opening quote
+        // Use CharSeries.seekTo with escape-aware scanning
+        if (!cs.seekTo('"', '\\')) error("unterminated string")
+        // cs.pos now points past the closing quote
+        val close = cs.pos - 1
+        out.endOf(idx, close, Tag.STRING)
         return idx
     }
 
-    private fun parseNumber(s: Series<Char>, h: IntHolder, n: Int, out: ElemBuf): Int {
-        val open = h.v
-        val idx = out.beginTagged(open, Tag.NUMBER)
-        if (s[h.v] == '-' || s[h.v] == '+') h.v++
-        while (h.v < n) {
-            val c = s[h.v]
-            val num = (c in '0'..'9') || c == '.' || c == 'e' || c == 'E' || c == '+' || c == '-'
-            if (!num) break
-            h.v++
+    private fun parseBool(cs: CharSeries, out: ElemBuf): Int {
+        val open = cs.pos
+        return if (cs[cs.pos] == 't') {
+            if (cs.pos + 3 >= cs.limit) error("bad bool")
+            val idx = out.beginTagged(open, Tag.BOOL_TRUE)
+            cs.pos(cs.pos + 4)
+            out.endOf(idx, cs.pos - 1, Tag.BOOL_TRUE); idx
+        } else {
+            if (cs.pos + 4 >= cs.limit) error("bad bool")
+            val idx = out.beginTagged(open, Tag.BOOL_FALSE)
+            cs.pos(cs.pos + 5)
+            out.endOf(idx, cs.pos - 1, Tag.BOOL_FALSE); idx
         }
-        out.endOf(idx, h.v - 1, Tag.NUMBER)
+    }
+
+    private fun parseNull(cs: CharSeries, out: ElemBuf): Int {
+        val open = cs.pos
+        if (cs.pos + 3 >= cs.limit) error("bad null")
+        // validate exact token 'null'
+        if (cs[cs.pos] != 'n' || cs[cs.pos + 1] != 'u' || cs[cs.pos + 2] != 'l' || cs[cs.pos + 3] != 'l') error("bad null")
+        val idx = out.beginTagged(open, Tag.NULL)
+        cs.pos(cs.pos + 4)
+        out.endOf(idx, cs.pos - 1, Tag.NULL)
+        return idx
+    }
+
+    private fun parseNumber(cs: CharSeries, out: ElemBuf): Int {
+        val open = cs.pos
+        val idx = out.beginTagged(open, Tag.NUMBER)
+        val c = cs[cs.pos]
+        if (c == '-' || c == '+') cs.inc()
+        while (cs.hasRemaining) {
+            val ch = cs[cs.pos]
+            val num = (ch in '0'..'9') || ch == '.' || ch == 'e' || ch == 'E' || ch == '+' || ch == '-'
+            if (!num) break
+            cs.inc()
+        }
+        out.endOf(idx, cs.pos - 1, Tag.NUMBER)
         return idx
     }
 }
@@ -460,10 +397,15 @@ object YamlScan {
     }
 
     private fun parseSeq(st: ScanState, out: ElemBuf, indent: Int): Int {
-        val open = st.pos
+        // st.pos on entry is the first non-space char (after consumeIndent in parseBlock).
+        // compute the start-of-line position for this sequence from the known indent
+        var nextLineStart = (st.pos - indent).coerceAtLeast(0)
+        val open = nextLineStart
         val idx = out.beginTagged(open, Tag.ARRAY)
         var lastClose = open
         while (!st.atEof()) {
+            // position at start of the (next) line before inspection
+            st.pos = nextLineStart
             st.skipBlankLines()
             val here = st.lineIndent()
             if (here < indent) break
@@ -500,6 +442,8 @@ object YamlScan {
             println("DEBUG parseSeq: childOpen=$childOpen")
             out.addComma(childOpen)
             lastClose = out.closeOf(childIdx).coerceAtLeast(open)
+            // nextLineStart should point to the start of the next line (parse* helpers set st.pos there)
+            nextLineStart = st.pos
         }
         out.endOf(idx, lastClose, Tag.ARRAY)
         return idx
@@ -640,13 +584,12 @@ object YamlScan {
 
 
 /* ═══════════════════════════════════════════════════════════════════════════
- *  CBOR tokenizer → Series<JsElement> over a Series<Char>
+ *  CBOR tokenizer → Series<JsElement> over a Series<Byte>
  *
- *  CBOR is binary; to stay in the single JsContext model, we require the
- *  CBOR bytes to be projected into a Series<Char> by widening (byte.toInt()
- *  .toChar()). The tokenizer walks major types and emits (open j close) j
- *  commas exactly like JSON. Close index is inclusive of the last content
- *  byte of the item.
+ *  CBOR is binary; the scanner operates directly on bytes via ByteSeries
+ *  and uses NetworkOrder for multi-byte big-endian reads. The tokenizer
+ *  walks major types and emits (open j close) j commas exactly like JSON.
+ *  Close index is inclusive of the last content byte of the item.
  *
  *  Major types (RFC 8949):
  *   0: unsigned int       1: negative int     2: byte string
@@ -656,105 +599,99 @@ object YamlScan {
 
 object CborScan {
 
-    fun scan(src: Series<Char>): Series<JsElement> {
-        val n = src.size
+    fun scan(src: Series<Byte>): Series<JsElement> {
+        val ba = src.toArray()
+        val bs = ByteSeries(ba)
         val out = ElemBuf()
-        val h = IntHolder(0)
-        parseItem(src, h, n, out)
+        parseItem(ba, bs, out)
         return out.toSeries()
     }
 
-    private class IntHolder(var v: Int)
-
-    private fun u8(s: Series<Char>, i: Int): Int = s[i].code and 0xFF
-
-    private fun readLen(s: Series<Char>, h: IntHolder, ai: Int): Long {
+    private fun readLen(ba: ByteArray, bs: ByteSeries, ai: Int): Long {
         return when (ai) {
             in 0..23 -> ai.toLong()
-            24 -> { val v = u8(s, h.v).toLong(); h.v += 1; v }
-            25 -> { val v = ((u8(s, h.v) shl 8) or u8(s, h.v + 1)).toLong(); h.v += 2; v }
+            24 -> (bs.get.toInt() and 0xFF).toLong()
+            25 -> {
+                val p = bs.pos; bs.pos(p + 2)
+                (ba.networkOrderGetShortAt(p).toInt() and 0xFFFF).toLong()
+            }
             26 -> {
-                val v = ((u8(s, h.v).toLong() shl 24) or
-                         (u8(s, h.v + 1).toLong() shl 16) or
-                         (u8(s, h.v + 2).toLong() shl 8) or
-                         u8(s, h.v + 3).toLong())
-                h.v += 4; v
+                val p = bs.pos; bs.pos(p + 4)
+                ba.networkOrderGetIntAt(p).toLong() and 0xFFFFFFFFL
             }
             27 -> {
-                var v = 0L
-                var k = 0
-                while (k < 8) { v = (v shl 8) or u8(s, h.v + k).toLong(); k++ }
-                h.v += 8; v
+                val p = bs.pos; bs.pos(p + 8)
+                ba.networkOrderGetLongAt(p)
             }
             31 -> -1L  // indefinite
             else -> error("bad cbor additional info $ai")
         }
     }
 
-    private fun parseItem(s: Series<Char>, h: IntHolder, n: Int, out: ElemBuf): Int {
-        val open = h.v
-        if (h.v >= n) error("cbor eof")
-        val ib = u8(s, h.v); h.v++
+    private fun parseItem(ba: ByteArray, bs: ByteSeries, out: ElemBuf): Int {
+        val open = bs.pos
+        if (!bs.hasRemaining) error("cbor eof")
+        val ib = bs.get.toInt() and 0xFF
         val mt = ib ushr 5
         val ai = ib and 0x1F
         return when (mt) {
             0 -> {                                   // unsigned int
                 val idx = out.beginTagged(open, Tag.NUMBER)
-                readLen(s, h, ai)
-                out.endOf(idx, h.v - 1, Tag.NUMBER); idx
+                readLen(ba, bs, ai)
+                out.endOf(idx, bs.pos - 1, Tag.NUMBER); idx
             }
             1 -> {                                   // negative int
                 val idx = out.beginTagged(open, Tag.NUMBER)
-                readLen(s, h, ai)
-                out.endOf(idx, h.v - 1, Tag.NUMBER); idx
+                readLen(ba, bs, ai)
+                out.endOf(idx, bs.pos - 1, Tag.NUMBER); idx
             }
             2 -> {                                   // byte string
                 val idx = out.beginTagged(open, Tag.BYTES)
-                val len = readLen(s, h, ai)
-                if (len < 0L) parseIndefinite(s, h, n, out, Tag.BYTES)
-                else h.v += len.toInt()
-                out.endOf(idx, h.v - 1, Tag.BYTES); idx
+                val len = readLen(ba, bs, ai)
+                if (len < 0L) parseIndefinite(ba, bs, out, Tag.BYTES)
+                else bs.pos(bs.pos + len.toInt())
+                out.endOf(idx, bs.pos - 1, Tag.BYTES); idx
             }
             3 -> {                                   // text string
                 val idx = out.beginTagged(open, Tag.STRING)
-                val len = readLen(s, h, ai)
-                if (len < 0L) parseIndefinite(s, h, n, out, Tag.STRING)
-                else h.v += len.toInt()
-                out.endOf(idx, h.v - 1, Tag.STRING); idx
+                val len = readLen(ba, bs, ai)
+                if (len < 0L) parseIndefinite(ba, bs, out, Tag.STRING)
+                else bs.pos(bs.pos + len.toInt())
+                out.endOf(idx, bs.pos - 1, Tag.STRING); idx
             }
             4 -> {                                   // array
                 val idx = out.beginTagged(open, Tag.ARRAY)
-                val len = readLen(s, h, ai)
+                val len = readLen(ba, bs, ai)
                 if (len < 0L) {
-                    while (h.v < n && u8(s, h.v) != 0xFF) {
-                        out.addComma(h.v); parseItem(s, h, n, out)
+                    while (bs.hasRemaining && (ba[bs.pos].toInt() and 0xFF) != 0xFF) {
+                        out.addComma(bs.pos); parseItem(ba, bs, out)
                     }
-                    if (h.v < n) h.v++
+                    if (bs.hasRemaining) bs.pos(bs.pos + 1)
                 } else {
                     var k = 0L
-                    while (k < len) { out.addComma(h.v); parseItem(s, h, n, out); k++ }
+                    while (k < len) { out.addComma(bs.pos); parseItem(ba, bs, out); k++ }
                 }
-                out.endOf(idx, h.v - 1, Tag.ARRAY); idx
+                out.endOf(idx, bs.pos - 1, Tag.ARRAY); idx
             }
             5 -> {                                   // map
                 val idx = out.beginTagged(open, Tag.OBJECT)
-                val len = readLen(s, h, ai)
+                val len = readLen(ba, bs, ai)
                 if (len < 0L) {
-                    while (h.v < n && u8(s, h.v) != 0xFF) {
-                        out.addComma(h.v); parseItem(s, h, n, out); parseItem(s, h, n, out)
+                    while (bs.hasRemaining && (ba[bs.pos].toInt() and 0xFF) != 0xFF) {
+                        out.addComma(bs.pos); parseItem(ba, bs, out); parseItem(ba, bs, out)
                     }
-                    if (h.v < n) h.v++
+                    if (bs.hasRemaining) bs.pos(bs.pos + 1)
                 } else {
                     var k = 0L
                     while (k < len) {
-                        out.addComma(h.v); parseItem(s, h, n, out); parseItem(s, h, n, out); k++
+                        out.addComma(bs.pos); parseItem(ba, bs, out); parseItem(ba, bs, out); k++
                     }
                 }
-                out.endOf(idx, h.v - 1, Tag.OBJECT); idx
+                out.endOf(idx, bs.pos - 1, Tag.OBJECT); idx
             }
             6 -> {                                   // tag: consume tag value, then inner item
-                readLen(s, h, ai)
-                parseItem(s, h, n, out)
+                readLen(ba, bs, ai)
+                parseItem(ba, bs, out)
             }
             7 -> {                                   // simple / float
                 val tag = when (ai) {
@@ -768,26 +705,26 @@ object CborScan {
                 }
                 val idx = out.beginTagged(open, tag)
                 when (ai) {
-                    25 -> h.v += 2
-                    26 -> h.v += 4
-                    27 -> h.v += 8
-                    24 -> h.v += 1
+                    25 -> bs.pos(bs.pos + 2)
+                    26 -> bs.pos(bs.pos + 4)
+                    27 -> bs.pos(bs.pos + 8)
+                    24 -> bs.pos(bs.pos + 1)
                     else -> { /* simple value, no payload */ }
                 }
-                out.endOf(idx, h.v - 1, tag); idx
+                out.endOf(idx, bs.pos - 1, tag); idx
             }
             else -> error("cbor major type $mt")
         }
     }
 
-    private fun parseIndefinite(s: Series<Char>, h: IntHolder, n: Int, out: ElemBuf, tag: Int) {
-        while (h.v < n && u8(s, h.v) != 0xFF) {
-            val ib = u8(s, h.v); h.v++
+    private fun parseIndefinite(ba: ByteArray, bs: ByteSeries, out: ElemBuf, tag: Int) {
+        while (bs.hasRemaining && (ba[bs.pos].toInt() and 0xFF) != 0xFF) {
+            val ib = bs.get.toInt() and 0xFF
             val ai = ib and 0x1F
-            val len = readLen(s, h, ai)
-            if (len >= 0) h.v += len.toInt()
+            val len = readLen(ba, bs, ai)
+            if (len >= 0) bs.pos(bs.pos + len.toInt())
         }
-        if (h.v < n) h.v++
+        if (bs.hasRemaining) bs.pos(bs.pos + 1)
         @Suppress("UNUSED_PARAMETER") val t = tag
         @Suppress("UNUSED_PARAMETER") val o = out
     }
@@ -826,7 +763,7 @@ object Reify {
     /** commas series with the leading tag sentinel stripped, if present. */
     fun realCommas(e: JsElement): Series<Int> {
         val c = e.b
-        return if (c.size > 0 && c[0] < 0) c.slice(1, c.size) else c
+        return if (c.size > 0 && c[0] < 0) c[1 until c.size] else c
     }
 
     /** slice of src between open..close inclusive (exclusive of delimiters if applicable) */
@@ -1147,8 +1084,15 @@ object Path {
                 var p = keyElem.a.b + 1
                 // skip colon, whitespace and newlines so childElementAt starts at the real value
                 while (p < src.size && (src[p] == ' ' || src[p] == ':' || src[p] == '\t' || src[p] == '\n' || src[p] == '\r')) p++
+                // if value starts with a sequence marker on the next line, use the line start as the open anchor
+                if (p < src.size && src[p] == '-') {
+                    var p2 = p
+                    while (p2 > 0 && src[p2 - 1] != '\n' && src[p2 - 1] != '\r') p2--
+                    p = p2
+                }
                 println("DEBUG stepByName: found key at $keyOpen; value starts at $p (char='${if (p < src.size) src[p] else ' ' }')")
                 val valElem = childElementAt(p, src)
+                println("DEBUG stepByName: valElem for name='${name}' -> open=${valElem.a.a} close=${valElem.a.b} tag=${Reify.tagOf(valElem, src)}")
                 return valElem j src
             }
             i++
@@ -1164,7 +1108,8 @@ object Path {
         val first = sub[0]
         // If the first char is non-printable it's likely CBOR — prefer the shortest matching candidate
         if (first.code <= 0x1F) {
-            val all = CborScan.scan(src)
+            val bytes = ByteArray(src.size) { i -> src[i].code.toByte() }
+            val all = CborScan.scan(bytes.toSeries())
             var k = 0
             var best: JsElement? = null
             var bestLen = Int.MAX_VALUE
@@ -1193,22 +1138,61 @@ object Path {
         } catch (_: Throwable) {
             // ignore and try YAML below
         }
-        // Try YAML full-scan and pick the element whose open==start, preferring STRING or the shortest span
+        // Try YAML full-scan and pick the element whose open==start, or that contains start (prefer STRING or the shortest span)
         try {
             val all = YamlScan.scan(src)
             var k = 0
-            var bestAny: JsElement? = null
-            var bestAnyLen = Int.MAX_VALUE
+            var bestExactNonNull: JsElement? = null
+            var bestExactNonNullLen = Int.MAX_VALUE
+            var bestExactAny: JsElement? = null
+            var bestExactAnyLen = Int.MAX_VALUE
+            var bestExactContainer: JsElement? = null
+            var bestExactContainerLen = Int.MAX_VALUE
+            var bestContainNonNull: JsElement? = null
+            var bestContainNonNullLen = Int.MAX_VALUE
+            var bestContainAny: JsElement? = null
+            var bestContainAnyLen = Int.MAX_VALUE
             while (k < all.size) {
                 val cand = all[k]
+                val len = cand.a.b - cand.a.a
+                val tag = Reify.tagOf(cand, src)
                 if (cand.a.a == start) {
-                    val len = cand.a.b - cand.a.a
-                    if (Reify.tagOf(cand, src) == Tag.STRING) return cand
-                    if (len < bestAnyLen) { bestAny = cand; bestAnyLen = len }
+                    // prefer container exact matches (OBJECT/ARRAY) over scalars
+                    if (tag == Tag.OBJECT || tag == Tag.ARRAY) {
+                        if (len < bestExactContainerLen) { bestExactContainer = cand; bestExactContainerLen = len }
+                    }
+                    if (tag != Tag.NULL) {
+                        if (len < bestExactNonNullLen) { bestExactNonNull = cand; bestExactNonNullLen = len }
+                    }
+                    if (len < bestExactAnyLen) { bestExactAny = cand; bestExactAnyLen = len }
+                } else if (cand.a.a <= start && cand.a.b >= start) {
+                    if (tag != Tag.NULL) {
+                        if (len < bestContainNonNullLen) { bestContainNonNull = cand; bestContainNonNullLen = len }
+                    }
+                    if (len < bestContainAnyLen) { bestContainAny = cand; bestContainAnyLen = len }
                 }
                 k++
             }
-            if (bestAny != null) return bestAny
+            if (bestExactContainer != null) {
+                println("DEBUG childElementAt: start=$start -> chosen bestExactContainer elem open=${bestExactContainer.a.a} close=${bestExactContainer.a.b} tag=${Reify.tagOf(bestExactContainer, src)}")
+                return bestExactContainer
+            }
+            if (bestExactNonNull != null) {
+                println("DEBUG childElementAt: start=$start -> chosen bestExactNonNull elem open=${bestExactNonNull.a.a} close=${bestExactNonNull.a.b} tag=${Reify.tagOf(bestExactNonNull, src)}")
+                return bestExactNonNull
+            }
+            if (bestExactAny != null) {
+                println("DEBUG childElementAt: start=$start -> chosen bestExactAny elem open=${bestExactAny.a.a} close=${bestExactAny.a.b} tag=${Reify.tagOf(bestExactAny, src)}")
+                return bestExactAny
+            }
+            if (bestContainNonNull != null) {
+                println("DEBUG childElementAt: start=$start -> chosen bestContainNonNull elem open=${bestContainNonNull.a.a} close=${bestContainNonNull.a.b} tag=${Reify.tagOf(bestContainNonNull, src)}")
+                return bestContainNonNull
+            }
+            if (bestContainAny != null) {
+                println("DEBUG childElementAt: start=$start -> chosen bestContainAny elem open=${bestContainAny.a.a} close=${bestContainAny.a.b} tag=${Reify.tagOf(bestContainAny, src)}")
+                return bestContainAny
+            }
         } catch (_: Throwable) {
             // ignore
         }
@@ -1220,7 +1204,8 @@ object Path {
             val commas: Series<Int> = c0.b.size j { k: Int -> val v = c0.b[k]; if (v < 0) v else v + start }
             return adj j commas
         } catch (_: Throwable) {
-            val all = CborScan.scan(src)
+            val bytes = ByteArray(src.size) { i -> src[i].code.toByte() }
+            val all = CborScan.scan(bytes.toSeries())
             var k = 0
             var best: JsElement? = null
             var bestLen = Int.MAX_VALUE
@@ -1253,7 +1238,10 @@ enum class Syntax { JSON, CBOR, YAML }
 
 fun tokenize(syntax: Syntax, src: Series<Char>): Series<JsElement> = when (syntax) {
     Syntax.JSON -> JsonScan.scan(src)
-    Syntax.CBOR -> CborScan.scan(src)
+    Syntax.CBOR -> {
+        val bytes = ByteArray(src.size) { i -> src[i].code.toByte() }
+        CborScan.scan(bytes.toSeries())
+    }
     Syntax.YAML -> YamlScan.scan(src)
 }
 
@@ -1269,46 +1257,22 @@ fun contextOf(syntax: Syntax, src: Series<Char>): JsContext {
  *  CCEK SupervisoryJob — single context Element orchestrating all three
  *  tokenizers with explicit lifecycle and structured fanout.
  *
- *  Keys are singleton identity objects. Lifecycle is forward-only:
- *     CREATED → OPEN → ACTIVE → DRAINING → CLOSED
+ *  Delegates lifecycle management to root's ParseScope/ParseLifecycle.
  *  Fanout is structured concurrency (coroutineScope { launch {...} }).
  * ═══════════════════════════════════════════════════════════════════════════ */
-
-enum class Lifecycle { CREATED, OPEN, ACTIVE, DRAINING, CLOSED }
 
 /** A subscriber consuming rooted contexts as they arrive from any syntax. */
 fun interface ConfixSubscriber {
     suspend fun onContext(syntax: Syntax, ctx: JsContext)
 }
 
-/** singleton routing identity */
-object ConfixKey : CoroutineContext.Key<ConfixElement>
-
 /** Source bundle: one per syntax, each paired with its Series<Char>. */
 class ConfixSource(val syntax: Syntax, val src: Series<Char>)
 
-/** tiny growable subscriber registry (no stdlib collection) */
-private class SubArray {
-    var data: Array<ConfixSubscriber?> = arrayOfNulls(4)
-    var size: Int = 0
-    fun add(s: ConfixSubscriber) {
-        if (size == data.size) {
-            val n = arrayOfNulls<ConfixSubscriber>(data.size * 2)
-            var i = 0; while (i < size) { n[i] = data[i]; i++ }
-            data = n
-        }
-        data[size++] = s
-    }
-    fun asSeries(): Series<ConfixSubscriber> {
-        val n = size; val d = data
-        return n j { i: Int -> d[i]!! }
-    }
-}
-
 /**
  * Single CCEK SupervisoryJob element. Holds:
- *   - identity key (ConfixKey)
- *   - forward-only lifecycle
+ *   - identity key (ParseScopeKey via ParseScope delegation)
+ *   - forward-only lifecycle delegated to ParseScope
  *   - supervisor job so one syntax failure does not cancel siblings
  *   - subscriber fanout
  *   - pointer to the source bundle (JSON + CBOR + YAML) — all three reduce to
@@ -1317,27 +1281,34 @@ private class SubArray {
 class ConfixElement(
     private val sources: Series<ConfixSource>,
     parent: CoroutineContext? = null,
-) : AbstractCoroutineContextElement(ConfixKey) {
+) : AbstractCoroutineContextElement(ParseScopeKey) {
 
-    val supervisor: CompletableJob =
-        if (parent == null) SupervisorJob() else SupervisorJob(parent[Job])
+    /**
+     * Internal ParseScope that owns the lifecycle state machine.
+     * Uses a dummy source/span since ConfixElement fans out to its own sources.
+     */
+    private val parseScope = ParseScope(
+        source = 0 j { _: Int -> '\u0000' },
+        span = 0 j 0,
+        parentContext = parent
+    )
 
-    private var _state: Lifecycle = Lifecycle.CREATED
-    val lifecycleState: Lifecycle get() = _state
+    val supervisor: CompletableJob get() = parseScope.supervisor
 
-    private val subs = SubArray()
-    val fanoutSubscribers: Series<ConfixSubscriber> get() = subs.asSeries()
+    val lifecycleState: ParseLifecycle get() = parseScope.lifecycleState
+
+    private val subs = mutableListOf<ConfixSubscriber>()
 
     fun subscribe(s: ConfixSubscriber) {
-        check(_state == Lifecycle.CREATED || _state == Lifecycle.OPEN) {
-            "cannot subscribe in state $_state"
+        val st = parseScope.lifecycleState
+        check(st == ParseLifecycle.CREATED || st == ParseLifecycle.OPEN) {
+            "cannot subscribe in state $st"
         }
         subs.add(s)
     }
 
     fun open() {
-        check(_state == Lifecycle.CREATED) { "open() requires CREATED, was $_state" }
-        _state = Lifecycle.OPEN
+        parseScope.open()
     }
 
     /**
@@ -1346,19 +1317,18 @@ class ConfixElement(
      * cancel the others (SupervisorJob semantics).
      */
     suspend fun activate() {
-        check(_state == Lifecycle.OPEN) { "activate() requires OPEN, was $_state" }
-        _state = Lifecycle.ACTIVE
+        parseScope.activate()
         coroutineScope {
             val n = sources.size
             var i = 0
             while (i < n) {
                 val srcBundle = sources[i]
-                launch(supervisor) {
+                launch(parseScope.supervisor) {
                     val ctx = contextOf(srcBundle.syntax, srcBundle.src)
-                    val subsSnap = fanoutSubscribers
+                    val subsSnap = subs.toList()
                     var k = 0
                     while (k < subsSnap.size) {
-                        launch(supervisor) { subsSnap[k].onContext(srcBundle.syntax, ctx) }
+                        launch(parseScope.supervisor) { subsSnap[k].onContext(srcBundle.syntax, ctx) }
                         k++
                     }
                 }
@@ -1369,7 +1339,7 @@ class ConfixElement(
 
     /** Issue a path query against every source; returns Series<JsContext?> aligned with sources. */
     fun query(path: JsPath): Series<JsContext?> {
-        check(_state != Lifecycle.CLOSED) { "query on CLOSED" }
+        check(parseScope.lifecycleState != ParseLifecycle.CLOSED) { "query on CLOSED" }
         val n = sources.size
         val cached = arrayOfNulls<JsContext>(n)
         var i = 0
@@ -1382,14 +1352,11 @@ class ConfixElement(
     }
 
     fun drain() {
-        if (_state == Lifecycle.CLOSED) return
-        _state = Lifecycle.DRAINING
+        parseScope.drain()
     }
 
     fun close() {
-        if (_state == Lifecycle.CLOSED) return
-        _state = Lifecycle.CLOSED
-        supervisor.complete()
+        parseScope.close()
     }
 }
 
@@ -1412,8 +1379,8 @@ fun sources(vararg src: ConfixSource): Series<ConfixSource> {
     return n j { i: Int -> src[i] }
 }
 
-fun jsonSource(text: CharSequence): ConfixSource = ConfixSource(Syntax.JSON, text.asSeries())
-fun yamlSource(text: CharSequence): ConfixSource = ConfixSource(Syntax.YAML, text.asSeries())
+fun jsonSource(text: CharSequence): ConfixSource = ConfixSource(Syntax.JSON, text.toSeries())
+fun yamlSource(text: CharSequence): ConfixSource = ConfixSource(Syntax.YAML, text.toSeries())
 fun cborSource(bytes: ByteArray): ConfixSource {
     // widen bytes → chars without stdlib collection
     val n = bytes.size

@@ -21,9 +21,9 @@ class CursorTensorTest {
         ).toSeries()
 
         return arrayOf(
-            arrayOf<Any?>(100.0, 10.0).toSeries().joins(metaFns),
-            arrayOf<Any?>(101.5, 20.0).toSeries().joins(metaFns),
-            arrayOf<Any?>(99.0, 15.0).toSeries().joins(metaFns),
+            arrayOf<Any?>(100.0, 10.0).toSeries().j(metaFns),
+            arrayOf<Any?>(101.5, 20.0).toSeries().j(metaFns),
+            arrayOf<Any?>(99.0, 15.0).toSeries().j(metaFns),
         ).toSeries()
     }
 

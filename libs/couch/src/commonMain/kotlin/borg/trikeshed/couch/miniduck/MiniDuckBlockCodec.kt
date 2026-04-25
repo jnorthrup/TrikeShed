@@ -92,6 +92,42 @@ object MiniDuckBlockCodec {
             "mimeType" to row.mimeType,
             "child" to encodeChildren(row.child),
         )
+        is GcsRowVec -> linkedMapOf(
+            "type" to "GcsRowVec",
+            "bucket" to row.bucket,
+            "key" to row.key,
+            "size" to row.byteSize,
+            "contentType" to row.contentType,
+            "etag" to row.etag,
+            "lastModified" to row.lastModified,
+            "versionId" to row.versionId,
+            "metadata" to row.metadata,
+            "child" to encodeChildren(row.blob),
+        )
+        is S3RowVec -> linkedMapOf(
+            "type" to "S3RowVec",
+            "bucket" to row.bucket,
+            "key" to row.key,
+            "size" to row.byteSize,
+            "contentType" to row.contentType,
+            "etag" to row.etag,
+            "lastModified" to row.lastModified,
+            "versionId" to row.versionId,
+            "metadata" to row.metadata,
+            "child" to encodeChildren(row.blob),
+        )
+        is AlibabaRowVec -> linkedMapOf(
+            "type" to "AlibabaRowVec",
+            "bucket" to row.bucket,
+            "key" to row.key,
+            "size" to row.byteSize,
+            "contentType" to row.contentType,
+            "etag" to row.etag,
+            "lastModified" to row.lastModified,
+            "versionId" to row.versionId,
+            "metadata" to row.metadata,
+            "child" to encodeChildren(row.blob),
+        )
         is BlockRowVec -> linkedMapOf(
             "type" to "BlockRowVec",
             "sealed" to (row.state == BlockRowVec.State.SEALED),
@@ -151,6 +187,39 @@ object MiniDuckBlockCodec {
                     { rows.toSeries() }
                 },
             )
+            "GcsRowVec" -> GcsRowVec(
+                bucket = map.string("bucket"),
+                key = map.string("key"),
+                byteSize = map.long("size"),
+                contentType = map["contentType"] as String?,
+                etag = map["etag"] as String?,
+                lastModified = map["lastModified"] as String?,
+                versionId = map["versionId"] as String?,
+                metadata = map.metadataMap("metadata"),
+                blob = map.childSeries(),
+            )
+            "S3RowVec" -> S3RowVec(
+                bucket = map.string("bucket"),
+                key = map.string("key"),
+                byteSize = map.long("size"),
+                contentType = map["contentType"] as String?,
+                etag = map["etag"] as String?,
+                lastModified = map["lastModified"] as String?,
+                versionId = map["versionId"] as String?,
+                metadata = map.metadataMap("metadata"),
+                blob = map.childSeries(),
+            )
+            "AlibabaRowVec" -> AlibabaRowVec(
+                bucket = map.string("bucket"),
+                key = map.string("key"),
+                byteSize = map.long("size"),
+                contentType = map["contentType"] as String?,
+                etag = map["etag"] as String?,
+                lastModified = map["lastModified"] as String?,
+                versionId = map["versionId"] as String?,
+                metadata = map.metadataMap("metadata"),
+                blob = map.childSeries(),
+            )
             "BlockRowVec" -> {
                 val block = BlockRowVec.mutable()
                 map.childRows().forEach(block::append)
@@ -187,6 +256,15 @@ object MiniDuckBlockCodec {
             is Number -> it.toInt()
             else -> error("Field '$name' must contain numbers")
         }
+    }
+
+    private fun Map<*, *>.long(name: String): Long = (this[name] as? Number)?.toLong()
+        ?: error("Missing or non-numeric field '$name'")
+
+    private fun Map<*, *>.metadataMap(name: String): Map<String, String>? {
+        @Suppress("UNCHECKED_CAST")
+        val raw = this[name] as? Map<*, *> ?: return null
+        return raw.mapKeys { it.key.toString() }.mapValues { it.value.toString() }
     }
 
     private fun Map<*, *>.childRows(): List<MiniRowVec> =

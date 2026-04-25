@@ -203,9 +203,12 @@ infix operator fun IntRange.div(denominator: Int): Series<IntRange> =
 
 operator fun <T> Series<T>.div(d: Int): Series<Series<T>> { //split into d parts
     val subSize = size / d
+    val remainder = size % d
     return d j { x: Int ->
-        subSize j { i: Int ->
-            this[i + x * subSize]
+        val offset = x * subSize
+        val partSize = subSize + if (x == d - 1 && remainder > 0) remainder else 0
+        partSize j { i: Int ->
+            this[i + offset]
         }
     }
 }

@@ -1,27 +1,27 @@
 package borg.trikeshed.lib
 
-interface Either<Left, Right> {
-    val leftOrNull: Left? get() = null
-    val rightOrNull: Right? get() = null
-    val isLeft: Boolean get() = leftOrNull != null
-    val isRight: Boolean get() = rightOrNull != null
 
-    fun <T> fold(ifLeft: (Left) -> T, ifRight: (Right) -> T): T = leftOrNull?.let(ifLeft) ?: ifRight(rightOrNull!!)
+/** Either: sum type without stdlib */
+sealed interface Either<out L, out R> {
+    class Left<L>(val value: L) : Either<L, Nothing>
+    class Right<R>(val value: R) : Either<Nothing, R>
 
-    fun <T> mapLeft(f: (Left) -> T): Either<T, Right> = leftOrNull?.let(f)?.let(::left) ?: right(rightOrNull!!)
-    fun <T> mapRight(f: (Right) -> T): Either<Left, T> = rightOrNull?.let(f)?.let(::right) ?: left(leftOrNull!!)
-    fun <T> map(f: (Right) -> T): Either<Left, T> = mapRight(f)
+    val isLeft: Boolean get() = this is Left
+    val isRight: Boolean get() = this is Right
+    val leftOrNull: L? get() = (this as? Left)?.value
+    val rightOrNull: R? get() = (this as? Right)?.value
 
-    fun <T> flatMapLeft(f: (Left) -> Either<T, Right>): Either<T, Right> = leftOrNull?.let(f) ?: right(rightOrNull!!)
-    fun <T> flatMapRight(f: (Right) -> Either<Left, T>): Either<Left, T> = rightOrNull?.let(f) ?: left(leftOrNull!!)
+    fun <T> fold(ifLeft: (L) -> T, ifRight: (R) -> T): T =
+        if (isLeft) ifLeft(leftOrNull!!) else ifRight(rightOrNull!!)
+
+    fun <T> mapLeft(f: (L) -> T): Either<T, R> =
+        if (isLeft) Left(f(leftOrNull!!)) else Right(rightOrNull!!)
+
+    fun <T> mapRight(f: (R) -> T): Either<L, T> =
+        if (isRight) Right(f(rightOrNull!!)) else Left(leftOrNull!!)
 
     companion object {
-        fun <Left, Right> left(left: Left): Either<Left, Right> = object : Either<Left, Right> {
-            override val leftOrNull: Left get() = left
-        }
-
-        fun <Left, Right> right(right: Right): Either<Left, Right> = object : Either<Left, Right> {
-            override val rightOrNull: Right get() = right
-        }
+        fun <L, R> left(value: L): Either<L, R> = Left(value)
+        fun <L, R> right(value: R): Either<L, R> = Right(value)
     }
 }

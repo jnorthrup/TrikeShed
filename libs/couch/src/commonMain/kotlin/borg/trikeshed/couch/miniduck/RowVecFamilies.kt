@@ -115,3 +115,131 @@ class YamlRowVec(
     }
     override val child: Series<MiniRowVec>? get() = childFactory?.invoke()
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * Object store RowVec family — shell rows that carry cloud blob metadata.
+ *
+ * GcsRowVec   — Google Cloud Storage
+ * S3RowVec    — AWS S3
+ * AlibabaRowVec — Alibaba Cloud OSS
+ *
+ * These are shells (size=0): scalar surface is empty, meaning lives in
+ * the lazy child (a BlobRowVec holding the actual bytes).  Metadata fields
+ * are stored as constructor parameters and serialised through the codec.
+ *
+ * NOTE: the blob's byte-size is stored in field `byteSize` (not `size`)
+ * to avoid conflicting with MiniRowVec.size: Int.
+ * The blob bytes live in `blob: Series<MiniRowVec>?` (not `child`)
+ * to avoid conflicting with MiniRowVec.child: Series<MiniRowVec>?.
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+/** Cloud provider identity for object-store adapters. */
+enum class ObjectStoreProvider {
+    GCS,
+    S3,
+    ALIBABA,
+}
+
+/** Base shell row for object-store blobs.  All fields are constructor params. */
+sealed class ObjectStoreRowVec(
+    open val bucket: String,
+    open val key: String,
+    open val byteSize: Long,
+    open val contentType: String?,
+    open val etag: String?,
+    open val lastModified: String?,
+    open val versionId: String?,
+    open val metadata: Map<String, String>?,
+    open val blob: Series<MiniRowVec>?,
+) : MiniRowVec() {
+    override val size: Int get() = 0
+    override fun get(index: Int): Any? = throw IndexOutOfBoundsException("ObjectStoreRowVec is a shell")
+    override val child: Series<MiniRowVec>? get() = blob
+    abstract val provider: ObjectStoreProvider
+
+    companion object {
+        /** Factory for GCS blobs. */
+        fun gcs(
+            bucket: String,
+            key: String,
+            byteSize: Long,
+            contentType: String?,
+            etag: String? = null,
+            lastModified: String? = null,
+            versionId: String? = null,
+            metadata: Map<String, String>? = null,
+            blob: Series<MiniRowVec>? = null,
+        ): ObjectStoreRowVec = GcsRowVec(bucket, key, byteSize, contentType, etag, lastModified, versionId, metadata, blob)
+
+        /** Factory for AWS S3 blobs. */
+        fun s3(
+            bucket: String,
+            key: String,
+            byteSize: Long,
+            contentType: String?,
+            etag: String? = null,
+            lastModified: String? = null,
+            versionId: String? = null,
+            metadata: Map<String, String>? = null,
+            blob: Series<MiniRowVec>? = null,
+        ): ObjectStoreRowVec = S3RowVec(bucket, key, byteSize, contentType, etag, lastModified, versionId, metadata, blob)
+
+        /** Factory for Alibaba Cloud OSS blobs. */
+        fun alibaba(
+            bucket: String,
+            key: String,
+            byteSize: Long,
+            contentType: String?,
+            etag: String? = null,
+            lastModified: String? = null,
+            versionId: String? = null,
+            metadata: Map<String, String>? = null,
+            blob: Series<MiniRowVec>? = null,
+        ): ObjectStoreRowVec = AlibabaRowVec(bucket, key, byteSize, contentType, etag, lastModified, versionId, metadata, blob)
+    }
+}
+
+/** GCS blob metadata row. */
+class GcsRowVec(
+    override val bucket: String,
+    override val key: String,
+    override val byteSize: Long,
+    override val contentType: String?,
+    override val etag: String? = null,
+    override val lastModified: String? = null,
+    override val versionId: String? = null,
+    override val metadata: Map<String, String>? = null,
+    override val blob: Series<MiniRowVec>? = null,
+) : ObjectStoreRowVec(bucket, key, byteSize, contentType, etag, lastModified, versionId, metadata, blob) {
+    override val provider: ObjectStoreProvider get() = ObjectStoreProvider.GCS
+}
+
+/** AWS S3 blob metadata row. */
+class S3RowVec(
+    override val bucket: String,
+    override val key: String,
+    override val byteSize: Long,
+    override val contentType: String?,
+    override val etag: String? = null,
+    override val lastModified: String? = null,
+    override val versionId: String? = null,
+    override val metadata: Map<String, String>? = null,
+    override val blob: Series<MiniRowVec>? = null,
+) : ObjectStoreRowVec(bucket, key, byteSize, contentType, etag, lastModified, versionId, metadata, blob) {
+    override val provider: ObjectStoreProvider get() = ObjectStoreProvider.S3
+}
+
+/** Alibaba Cloud OSS blob metadata row. */
+class AlibabaRowVec(
+    override val bucket: String,
+    override val key: String,
+    override val byteSize: Long,
+    override val contentType: String?,
+    override val etag: String? = null,
+    override val lastModified: String? = null,
+    override val versionId: String? = null,
+    override val metadata: Map<String, String>? = null,
+    override val blob: Series<MiniRowVec>? = null,
+) : ObjectStoreRowVec(bucket, key, byteSize, contentType, etag, lastModified, versionId, metadata, blob) {
+    override val provider: ObjectStoreProvider get() = ObjectStoreProvider.ALIBABA
+}

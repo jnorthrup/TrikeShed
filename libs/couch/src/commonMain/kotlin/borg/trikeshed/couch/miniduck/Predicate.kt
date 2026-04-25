@@ -10,6 +10,7 @@ package borg.trikeshed.couch.miniduck
  *   YamlRowVec  — "nodeKind", "scalarValue"
  *   BlockRowVec — null (shell, no scalars)
  *   BlobRowVec  — null (shell, no scalars)
+ *   ObjectStoreRowVec — null (shell, no scalars)
  */
 fun MiniRowVec.getValue(key: String): Any? = when (this) {
     is DocRowVec -> this[key]
@@ -29,7 +30,7 @@ fun MiniRowVec.getValue(key: String): Any? = when (this) {
         "scalarValue" -> scalarValue
         else -> null
     }
-    is BlockRowVec, is BlobRowVec, is ManifoldConcept -> null
+    is BlockRowVec, is BlobRowVec, is ManifoldConcept, is ObjectStoreRowVec, is LazyChildRowVec -> null
 }
 
 /**

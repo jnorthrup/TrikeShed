@@ -137,7 +137,7 @@ class ColumnarCursor(
             val slice = data.sliceArray(offset until (offset + width))
             constraint.decoder(slice)
         }
-        cells.toSeries().joins(isam.metafile.constraints.α { c -> { c } })
+        cells.toSeries().j(isam.metafile.constraints.α { c -> { c } })
     }
 }
 
@@ -163,7 +163,7 @@ fun openColumnarIsam(
             val slice = data.sliceArray(offset until (offset + width))
             c.decoder(slice)
         }
-        cells.toSeries().joins(constraints.α { c -> { c } })
+        cells.toSeries().j(constraints.α { c -> { c } })
     }
 
     return ColumnarIsam(
