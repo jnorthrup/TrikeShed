@@ -10,6 +10,7 @@
 
 package borg.trikeshed.parse.confix
 
+import borg.trikeshed.common.System
 import kotlinx.coroutines.CompletableJob
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
@@ -43,8 +44,7 @@ import borg.trikeshed.lib.get
 
 // Kernel algebra types and Series extensions are defined in borg.trikeshed.lib to avoid duplication.
 
-inline infix fun <X, C> Series<X>.α(crossinline f: (X) -> C): Series<C> =
-    size j { i: Int -> f(this[i]) }
+inline infix fun <X, C> Series<X>.α(crossinline f: (X) -> C): Series<C> = size j { i: Int -> f(this[i]) }
 
 /** left identity anchor */
 val <T> T.`↺`: () -> T get() = { this }
@@ -123,7 +123,9 @@ class IntBuf(initial: Int = 16) {
         if (size == data.size) {
             val n = IntArray(data.size * 2)
             var i = 0
-            while (i < size) { n[i] = data[i]; i++ }
+            while (i < size) {
+                n[i] = data[i]; i++
+            }
             data = n
         }
         data[size++] = v
@@ -137,7 +139,9 @@ class IntBuf(initial: Int = 16) {
 
     fun snapshot(): IntArray {
         val out = IntArray(size)
-        var i = 0; while (i < size) { out[i] = data[i]; i++ }
+        var i = 0; while (i < size) {
+            out[i] = data[i]; i++
+        }
         return out
     }
 }
@@ -159,7 +163,10 @@ class ElemBuf(initial: Int = 16) {
     }
 
     private fun IntArray.copyGrow(n: Int): IntArray {
-        val x = IntArray(n); var i = 0; while (i < size) { x[i] = this[i]; i++ }; return x
+        val x = IntArray(n);
+        var i = 0; while (i < size) {
+            x[i] = this[i]; i++
+        }; return x
     }
 
     /** begin a new element; returns its index. Caller fills commas via [addComma] then calls [endOf]. */
@@ -172,7 +179,9 @@ class ElemBuf(initial: Int = 16) {
         return idx
     }
 
-    fun addComma(pos: Int) { commas.add(pos) }
+    fun addComma(pos: Int) {
+        commas.add(pos)
+    }
 
     fun endOf(elemIdx: Int, closeIdx: Int, tagOrZero: Int) {
         // Tag is stored as the first "comma" when non-zero; real commas follow.
@@ -191,16 +200,25 @@ class ElemBuf(initial: Int = 16) {
     }
 
     // expose element open/close indexes for callers that need precise child anchors
-    fun openOf(elemIdx: Int): Int { return opens[elemIdx] }
-    fun closeOf(elemIdx: Int): Int { return closes[elemIdx] }
+    fun openOf(elemIdx: Int): Int {
+        return opens[elemIdx]
+    }
+
+    fun closeOf(elemIdx: Int): Int {
+        return closes[elemIdx]
+    }
 
     fun toSeries(): Series<JsElement> {
         val n = size
-        val o = opens; val c = closes; val h = commaHeads; val t = commaTails
+        val o = opens;
+        val c = closes;
+        val h = commaHeads;
+        val t = commaTails
         val pool = commas.data
         val poolSize = commas.size
         return n j { i: Int ->
-            val head = h[i]; val tail = t[i]
+            val head = h[i];
+            val tail = t[i]
             val len = tail - head
             val commaSeries: Series<Int> = len j { k: Int -> pool[head + k] }
             (o[i] j c[i]) j commaSeries
@@ -267,7 +285,9 @@ object JsonScan {
             h.v++
             parseValue(s, h, n, out)         // value
             skipWs(s, h, n)
-            if (h.v < n && s[h.v] == ',') { h.v++; continue }
+            if (h.v < n && s[h.v] == ',') {
+                h.v++; continue
+            }
             if (h.v < n && s[h.v] == '}') {
                 val close = h.v; h.v++
                 out.endOf(idx, close, Tag.OBJECT); return idx
@@ -290,7 +310,9 @@ object JsonScan {
             out.addComma(h.v)   // start of each element
             parseValue(s, h, n, out)
             skipWs(s, h, n)
-            if (h.v < n && s[h.v] == ',') { h.v++; continue }
+            if (h.v < n && s[h.v] == ',') {
+                h.v++; continue
+            }
             if (h.v < n && s[h.v] == ']') {
                 val close = h.v; h.v++
                 out.endOf(idx, close, Tag.ARRAY); return idx
@@ -307,7 +329,9 @@ object JsonScan {
         h.v++
         while (h.v < n) {
             val c = s[h.v]
-            if (c == '\\') { h.v += 2; continue }
+            if (c == '\\') {
+                h.v += 2; continue
+            }
             if (c == '"') {
                 val close = h.v; h.v++
                 out.endOf(idx, close, Tag.STRING); return idx
@@ -380,17 +404,27 @@ object YamlScan {
         parseBlock(st, out, indent = 0)
         // diagnostic: dump tokens
         val elems = out.toSeries()
-        System.err.println("DEBUG YamlScan: produced ${elems.size} elements")
+        println("DEBUG YamlScan: produced ${elems.size} elements")
         var i = 0
         while (i < elems.size) {
             val el = elems[i]
             val commas = el.b
             val csStr = if (commas.size == 0) "[]" else {
-                val sb = StringBuilder(); sb.append('['); var k = 0
-                while (k < commas.size) { if (k > 0) sb.append(','); sb.append(commas[k]); k++ }
+                val sb = StringBuilder(); sb.append('[');
+                var k = 0
+                while (k < commas.size) {
+                    if (k > 0) sb.append(','); sb.append(commas[k]); k++
+                }
                 sb.append(']'); sb.toString()
             }
-            System.err.println("DEBUG YamlScan: elem[$i] open=${el.a.a} close=${el.a.b} tag=${Reify.tagOf(el, src)} commas=${csStr}")
+            println(
+                "DEBUG YamlScan: elem[$i] open=${el.a.a} close=${el.a.b} tag=${
+                    Reify.tagOf(
+                        el,
+                        src,
+                    )
+                } commas=${csStr}",
+            )
             i++
         }
         return elems
@@ -402,8 +436,11 @@ object YamlScan {
         fun atEof(): Boolean = pos >= n
 
         fun lineIndent(): Int {
-            var i = pos; var k = 0
-            while (i < n && s[i] == ' ') { k++; i++ }
+            var i = pos;
+            var k = 0
+            while (i < n && s[i] == ' ') {
+                k++; i++
+            }
             return k
         }
 
@@ -416,13 +453,17 @@ object YamlScan {
                     // blank or comment line
                     while (pos < n && s[pos] != '\n') pos++
                     if (pos < n) pos++
-                } else { pos = start; return }
+                } else {
+                    pos = start; return
+                }
             }
         }
 
         fun consumeIndent(k: Int) {
             var c = 0
-            while (c < k && pos < n && s[pos] == ' ') { pos++; c++ }
+            while (c < k && pos < n && s[pos] == ' ') {
+                pos++; c++
+            }
         }
 
         fun readLineEnd(): Int {
@@ -460,10 +501,15 @@ object YamlScan {
     }
 
     private fun parseSeq(st: ScanState, out: ElemBuf, indent: Int): Int {
-        val open = st.pos
+        // st.pos on entry is the first non-space char (after consumeIndent in parseBlock).
+        // compute the start-of-line position for this sequence from the known indent
+        var nextLineStart = (st.pos - indent).coerceAtLeast(0)
+        val open = nextLineStart
         val idx = out.beginTagged(open, Tag.ARRAY)
         var lastClose = open
         while (!st.atEof()) {
+            // position at start of the (next) line before inspection
+            st.pos = nextLineStart
             st.skipBlankLines()
             val here = st.lineIndent()
             if (here < indent) break
@@ -473,10 +519,10 @@ object YamlScan {
             if (st.peek() == ' ') st.pos++
             val childIndent = indent + 2
             val ch = st.peek()
-            System.err.println("DEBUG parseSeq: at pos=${st.pos} ch='$ch' (indent=$indent)")
+            println("DEBUG parseSeq: at pos=${st.pos} ch='$ch' (indent=$indent)")
             val childIdx = if (ch == '{' || ch == '[' || ch == '"' || ch == '\'') {
                 val ci = parseFlowLine(st, out)
-                System.err.println("DEBUG parseSeq: parseFlowLine -> childIdx=$ci")
+                println("DEBUG parseSeq: parseFlowLine -> childIdx=$ci")
                 ci
             } else {
                 // try inline scalar on same line first
@@ -487,19 +533,21 @@ object YamlScan {
                     // rewind and parse a one-element inline map by recursing at this column
                     st.pos = scalarStart
                     val ci = parseMapOrScalar(st, out, childIndent)
-                    System.err.println("DEBUG parseSeq: parseMapOrScalar -> childIdx=$ci")
+                    println("DEBUG parseSeq: parseMapOrScalar -> childIdx=$ci")
                     ci
                 } else {
                     val ci = parseScalarLine(st, out)
-                    System.err.println("DEBUG parseSeq: parseScalarLine -> childIdx=$ci")
+                    println("DEBUG parseSeq: parseScalarLine -> childIdx=$ci")
                     ci
                 }
             }
             // append comma using child's open index
             val childOpen = out.openOf(childIdx)
-            System.err.println("DEBUG parseSeq: childOpen=$childOpen")
+            println("DEBUG parseSeq: childOpen=$childOpen")
             out.addComma(childOpen)
             lastClose = out.closeOf(childIdx).coerceAtLeast(open)
+            // nextLineStart should point to the start of the next line (parse* helpers set st.pos there)
+            nextLineStart = st.pos
         }
         out.endOf(idx, lastClose, Tag.ARRAY)
         return idx
@@ -533,7 +581,10 @@ object YamlScan {
             // value: inline or next-line block
             val valueIdx = if (st.pos < st.n && st.s[st.pos] != '\n' && st.s[st.pos] != '\r') {
                 val ch = st.s[st.pos]
-                if (ch == '{' || ch == '[' || ch == '"' || ch == '\'') parseFlowLine(st, out) else parseScalarLine(st, out)
+                if (ch == '{' || ch == '[' || ch == '"' || ch == '\'') parseFlowLine(st, out) else parseScalarLine(
+                    st,
+                    out,
+                )
             } else {
                 // newline: child block
                 if (st.pos < st.n) st.pos++  // eat newline
@@ -549,7 +600,9 @@ object YamlScan {
             // ensure next is a key
             val p = st.pos
             val c2 = st.readToColon()
-            if (c2 >= st.n || st.s[c2] != ':') { st.pos = p; break }
+            if (c2 >= st.n || st.s[c2] != ':') {
+                st.pos = p; break
+            }
             st.pos = p
         }
         out.endOf(idx, lastClose, Tag.OBJECT)
@@ -581,8 +634,10 @@ object YamlScan {
             '"', '\'' -> Tag.STRING
             else -> Tag.NUMBER
         }
+        println("DEBUG parseFlowLine: open=$open end=${end - 1} ch='$ch' tag=$tag")
         val idx = out.beginTagged(open, tag)
         out.endOf(idx, end - 1, tag)
+        println("DEBUG parseFlowLine: emitted idx=$idx open=${out.openOf(idx)} close=${out.closeOf(idx)} tag=$tag")
         st.pos = if (end < st.n) end + 1 else end
         @Suppress("UNUSED_VARIABLE") val _s = sub
         return idx
@@ -594,15 +649,24 @@ object YamlScan {
         if (ch == '"' || ch == '\'') return Tag.STRING
         // peek token
         if (ch == 't' || ch == 'T') return if (lineIs(st, "true") || lineIs(st, "True")) Tag.BOOL_TRUE else Tag.STRING
-        if (ch == 'f' || ch == 'F') return if (lineIs(st, "false") || lineIs(st, "False")) Tag.BOOL_FALSE else Tag.STRING
-        if (ch == 'n' || ch == 'N') return if (lineIs(st, "null") || lineIs(st, "Null") || lineIs(st, "~")) Tag.NULL else Tag.STRING
+        if (ch == 'f' || ch == 'F') return if (lineIs(st, "false") || lineIs(
+                st,
+                "False",
+            )
+        ) Tag.BOOL_FALSE else Tag.STRING
+        if (ch == 'n' || ch == 'N') return if (lineIs(st, "null") || lineIs(st, "Null") || lineIs(
+                st,
+                "~",
+            )
+        ) Tag.NULL else Tag.STRING
         if (ch == '~') return Tag.NULL
         if (ch == '-' || ch == '+' || (ch in '0'..'9')) return if (lineIsNumber(st)) Tag.NUMBER else Tag.STRING
         return Tag.STRING
     }
 
     private fun lineIs(st: ScanState, kw: String): Boolean {
-        var i = 0; var p = st.pos
+        var i = 0;
+        var p = st.pos
         while (i < kw.length && p < st.n) {
             if (st.s[p] != kw[i]) return false
             p++; i++
@@ -671,21 +735,31 @@ object CborScan {
     private fun readLen(s: Series<Char>, h: IntHolder, ai: Int): Long {
         return when (ai) {
             in 0..23 -> ai.toLong()
-            24 -> { val v = u8(s, h.v).toLong(); h.v += 1; v }
-            25 -> { val v = ((u8(s, h.v) shl 8) or u8(s, h.v + 1)).toLong(); h.v += 2; v }
+            24 -> {
+                val v = u8(s, h.v).toLong(); h.v += 1; v
+            }
+
+            25 -> {
+                val v = ((u8(s, h.v) shl 8) or u8(s, h.v + 1)).toLong(); h.v += 2; v
+            }
+
             26 -> {
-                val v = ((u8(s, h.v).toLong() shl 24) or
-                         (u8(s, h.v + 1).toLong() shl 16) or
-                         (u8(s, h.v + 2).toLong() shl 8) or
-                         u8(s, h.v + 3).toLong())
+                val v = ((u8(s, h.v).toLong() shl 24) or (u8(s, h.v + 1).toLong() shl 16) or (u8(
+                    s,
+                    h.v + 2,
+                ).toLong() shl 8) or u8(s, h.v + 3).toLong())
                 h.v += 4; v
             }
+
             27 -> {
                 var v = 0L
                 var k = 0
-                while (k < 8) { v = (v shl 8) or u8(s, h.v + k).toLong(); k++ }
+                while (k < 8) {
+                    v = (v shl 8) or u8(s, h.v + k).toLong(); k++
+                }
                 h.v += 8; v
             }
+
             31 -> -1L  // indefinite
             else -> error("bad cbor additional info $ai")
         }
@@ -703,11 +777,13 @@ object CborScan {
                 readLen(s, h, ai)
                 out.endOf(idx, h.v - 1, Tag.NUMBER); idx
             }
+
             1 -> {                                   // negative int
                 val idx = out.beginTagged(open, Tag.NUMBER)
                 readLen(s, h, ai)
                 out.endOf(idx, h.v - 1, Tag.NUMBER); idx
             }
+
             2 -> {                                   // byte string
                 val idx = out.beginTagged(open, Tag.BYTES)
                 val len = readLen(s, h, ai)
@@ -715,6 +791,7 @@ object CborScan {
                 else h.v += len.toInt()
                 out.endOf(idx, h.v - 1, Tag.BYTES); idx
             }
+
             3 -> {                                   // text string
                 val idx = out.beginTagged(open, Tag.STRING)
                 val len = readLen(s, h, ai)
@@ -722,6 +799,7 @@ object CborScan {
                 else h.v += len.toInt()
                 out.endOf(idx, h.v - 1, Tag.STRING); idx
             }
+
             4 -> {                                   // array
                 val idx = out.beginTagged(open, Tag.ARRAY)
                 val len = readLen(s, h, ai)
@@ -732,10 +810,13 @@ object CborScan {
                     if (h.v < n) h.v++
                 } else {
                     var k = 0L
-                    while (k < len) { out.addComma(h.v); parseItem(s, h, n, out); k++ }
+                    while (k < len) {
+                        out.addComma(h.v); parseItem(s, h, n, out); k++
+                    }
                 }
                 out.endOf(idx, h.v - 1, Tag.ARRAY); idx
             }
+
             5 -> {                                   // map
                 val idx = out.beginTagged(open, Tag.OBJECT)
                 val len = readLen(s, h, ai)
@@ -752,10 +833,12 @@ object CborScan {
                 }
                 out.endOf(idx, h.v - 1, Tag.OBJECT); idx
             }
+
             6 -> {                                   // tag: consume tag value, then inner item
                 readLen(s, h, ai)
                 parseItem(s, h, n, out)
             }
+
             7 -> {                                   // simple / float
                 val tag = when (ai) {
                     20 -> Tag.BOOL_FALSE
@@ -772,10 +855,12 @@ object CborScan {
                     26 -> h.v += 4
                     27 -> h.v += 8
                     24 -> h.v += 1
-                    else -> { /* simple value, no payload */ }
+                    else -> { /* simple value, no payload */
+                    }
                 }
                 out.endOf(idx, h.v - 1, tag); idx
             }
+
             else -> error("cbor major type $mt")
         }
     }
@@ -830,21 +915,24 @@ object Reify {
     }
 
     /** slice of src between open..close inclusive (exclusive of delimiters if applicable) */
-    fun spanOf(e: JsElement, src: Series<Char>): Series<Char> =
-        src.slice(e.a.a, e.a.b + 1)
+    fun spanOf(e: JsElement, src: Series<Char>): Series<Char> = src.slice(e.a.a, e.a.b + 1)
 
     /** materialize a text span into a String. Only place we allocate a String. */
     fun textOf(e: JsElement, src: Series<Char>): String {
-        val a = e.a.a; val b = e.a.b
+        val a = e.a.a;
+        val b = e.a.b
         val ca = CharArray(b - a + 1)
         var i = 0
-        while (i < ca.size) { ca[i] = src[a + i]; i++ }
+        while (i < ca.size) {
+            ca[i] = src[a + i]; i++
+        }
         return ca.concatToString()
     }
 
     /** reify the value rooted at [ctx] */
     fun reify(ctx: JsContext): Any? {
-        val e = ctx.a; val src = ctx.b
+        val e = ctx.a;
+        val src = ctx.b
         return when (tagOf(e, src)) {
             Tag.OBJECT -> reifyObject(e, src)
             Tag.ARRAY -> reifyArray(e, src)
@@ -858,7 +946,8 @@ object Reify {
     }
 
     private fun reifyString(e: JsElement, src: Series<Char>): String {
-        val a = e.a.a; val b = e.a.b
+        val a = e.a.a;
+        val b = e.a.b
         // quoted JSON/YAML strings
         if (a <= b && (src[a] == '"' || src[a] == '\'')) {
             val quote = src[a]
@@ -867,7 +956,9 @@ object Reify {
             if (end < start) return ""
             val ca = CharArray(end - start + 1)
             var i = 0
-            while (i < ca.size) { ca[i] = src[start + i]; i++ }
+            while (i < ca.size) {
+                ca[i] = src[start + i]; i++
+            }
             val raw = ca.concatToString()
             if (quote == '"' && raw.contains('\\')) {
                 val u = unescapeJsonString(raw)
@@ -887,21 +978,28 @@ object Reify {
                 var p = a + 1
                 val len = when (ai) {
                     in 0..23 -> ai
-                    24 -> { val v = src[p].code and 0xFF; p += 1; v }
-                    25 -> { val v = ((src[p].code and 0xFF) shl 8) or (src[p + 1].code and 0xFF); p += 2; v }
+                    24 -> {
+                        val v = src[p].code and 0xFF; p += 1; v
+                    }
+
+                    25 -> {
+                        val v = ((src[p].code and 0xFF) shl 8) or (src[p + 1].code and 0xFF); p += 2; v
+                    }
+
                     26 -> {
-                        val v = ((src[p].code and 0xFF) shl 24) or
-                                ((src[p + 1].code and 0xFF) shl 16) or
-                                ((src[p + 2].code and 0xFF) shl 8) or
-                                (src[p + 3].code and 0xFF)
+                        val v =
+                            ((src[p].code and 0xFF) shl 24) or ((src[p + 1].code and 0xFF) shl 16) or ((src[p + 2].code and 0xFF) shl 8) or (src[p + 3].code and 0xFF)
                         p += 4; v
                     }
+
                     else -> -1
                 }
                 if (len >= 0) {
                     val ca = CharArray(len)
                     var i = 0
-                    while (i < len && p + i <= b) { ca[i] = src[p + i]; i++ }
+                    while (i < len && p + i <= b) {
+                        ca[i] = src[p + i]; i++
+                    }
                     return ca.concatToString()
                 }
             }
@@ -910,7 +1008,9 @@ object Reify {
         // fallback: return raw trimmed scalar (YAML unquoted plain scalar)
         val ca = CharArray(b - a + 1)
         var i = 0
-        while (i < ca.size) { ca[i] = src[a + i]; i++ }
+        while (i < ca.size) {
+            ca[i] = src[a + i]; i++
+        }
         return ca.concatToString().trim()
     }
 
@@ -945,6 +1045,7 @@ object Reify {
                             i += 4
                         }
                     }
+
                     else -> out.append(e)
                 }
             } else {
@@ -972,20 +1073,37 @@ object Reify {
                 // unsigned or negative integer
                 val value: Long = when (ai) {
                     in 0..23 -> ai.toLong()
-                    24 -> { if (p < src.size) { val v = src[p].code and 0xFF; p += 1; v.toLong() } else -1L }
-                    25 -> { if (p + 1 < src.size) { val v = ((src[p].code and 0xFF) shl 8) or (src[p + 1].code and 0xFF); p += 2; v.toLong() } else -1L }
-                    26 -> { if (p + 3 < src.size) {
-                        val v = ((src[p].code and 0xFF) shl 24) or
-                                ((src[p + 1].code and 0xFF) shl 16) or
-                                ((src[p + 2].code and 0xFF) shl 8) or
-                                (src[p + 3].code and 0xFF)
-                        p += 4; v.toLong()
-                    } else -1L }
-                    27 -> { if (p + 7 < src.size) {
-                        var v = 0L; var k = 0
-                        while (k < 8) { v = (v shl 8) or (src[p + k].code and 0xFF).toLong(); k++ }
-                        p += 8; v
-                    } else -1L }
+                    24 -> {
+                        if (p < src.size) {
+                            val v = src[p].code and 0xFF; p += 1; v.toLong()
+                        } else -1L
+                    }
+
+                    25 -> {
+                        if (p + 1 < src.size) {
+                            val v = ((src[p].code and 0xFF) shl 8) or (src[p + 1].code and 0xFF); p += 2; v.toLong()
+                        } else -1L
+                    }
+
+                    26 -> {
+                        if (p + 3 < src.size) {
+                            val v =
+                                ((src[p].code and 0xFF) shl 24) or ((src[p + 1].code and 0xFF) shl 16) or ((src[p + 2].code and 0xFF) shl 8) or (src[p + 3].code and 0xFF)
+                            p += 4; v.toLong()
+                        } else -1L
+                    }
+
+                    27 -> {
+                        if (p + 7 < src.size) {
+                            var v = 0L;
+                            var k = 0
+                            while (k < 8) {
+                                v = (v shl 8) or (src[p + k].code and 0xFF).toLong(); k++
+                            }
+                            p += 8; v
+                        } else -1L
+                    }
+
                     else -> -1L
                 }
                 if (value >= 0L) {
@@ -1067,6 +1185,22 @@ object Path {
         var i = 0
         while (i < path.size && cur != null) {
             val seg = path[i]
+            // diagnostic: print current element and segment
+            try {
+                val segDesc = when (seg) {
+                    is Either.Left -> "name=${seg.value}"
+                    is Either.Right -> "idx=${seg.value}"
+                }
+                println(
+                    "DEBUG Path.resolve: step $i curOpen=${cur.a.a} curClose=${cur.a.b} curTag=${
+                        Reify.tagOf(
+                            cur.a,
+                            cur.b,
+                        )
+                    } seg=${segDesc}",
+                )
+            } catch (_: Throwable) {
+            }
             cur = step(cur, seg)
             i++
         }
@@ -1074,7 +1208,8 @@ object Path {
     }
 
     private fun step(ctx: JsContext, seg: JsPathElement): JsContext? {
-        val e = ctx.a; val src = ctx.b
+        val e = ctx.a;
+        val src = ctx.b
         return when (val s = seg) {
             is Either.Left -> stepByName(e, src, s.value)
             is Either.Right -> stepByIndex(e, src, s.value)
@@ -1083,26 +1218,30 @@ object Path {
 
     private fun stepByIndex(e: JsElement, src: Series<Char>, idx: Int): JsContext? {
         val tag = Reify.tagOf(e, src)
-        System.err.println("DEBUG stepByIndex: elementOpen=${e.a.a}, tag=${tag}")
+        println("DEBUG stepByIndex: elementOpen=${e.a.a}, tag=${tag}")
         if (tag != Tag.ARRAY) {
-            System.err.println("DEBUG stepByIndex: not an array (tag=$tag)")
+            println("DEBUG stepByIndex: not an array (tag=$tag)")
             return null
         }
         val cs = Reify.realCommas(e)
         // diagnostic: print comma list
         val csStr = if (cs.size == 0) "[]" else run {
-            val sb = StringBuilder(); sb.append('['); var k = 0
-            while (k < cs.size) { if (k > 0) sb.append(','); sb.append(cs[k]); k++ }
+            val sb = StringBuilder(); sb.append('[');
+            var k = 0
+            while (k < cs.size) {
+                if (k > 0) sb.append(','); sb.append(cs[k]); k++
+            }
             sb.append(']'); sb.toString()
         }
-        System.err.println("DEBUG stepByIndex: commas=${csStr}")
+        println("DEBUG stepByIndex: commas=${csStr}")
         // iterate commas, skipping negative sentinels; map logical index -> Nth positive entry
-        var i = 0; var found = 0
+        var i = 0;
+        var found = 0
         while (i < cs.size) {
             val v = cs[i]
             if (v >= 0) {
                 if (found == idx) {
-                    System.err.println("DEBUG stepByIndex: idx=$idx -> selected child open=$v")
+                    println("DEBUG stepByIndex: idx=$idx -> selected child open=$v")
                     val child = childElementAt(v, src)
                     return child j src
                 }
@@ -1110,7 +1249,7 @@ object Path {
             }
             i++
         }
-        System.err.println("DEBUG stepByIndex: index=$idx out of bounds (found=$found)")
+        println("DEBUG stepByIndex: index=$idx out of bounds (found=$found)")
         return null
     }
 
@@ -1131,29 +1270,42 @@ object Path {
                 sb.append(']')
                 sb.toString()
             }
-            System.err.println("DEBUG stepByName: elementOpen=${e.a.a}, searching for name='${name}', commas=${csStr}")
+            println("DEBUG stepByName: elementOpen=${e.a.a}, searching for name='${name}', commas=${csStr}")
         } catch (ex: Throwable) {
-            System.err.println("DEBUG stepByName: failed to get commas for element=${e.a.a}: ${ex.message}")
+            println("DEBUG stepByName: failed to get commas for element=${e.a.a}: ${ex.message}")
         }
         var i = 0
         while (i < cs.size) {
             val keyOpen = cs[i]
-            if (keyOpen < 0) { i++; continue }
+            if (keyOpen < 0) {
+                i++; continue
+            }
             val keyElem = childElementAt(keyOpen, src)
             val keyText = stripQuotes(Reify.textOf(keyElem, src))
-            System.err.println("DEBUG stepByName: checking keyOpen=$keyOpen keyText='${keyText}'")
+            println("DEBUG stepByName: checking keyOpen=$keyOpen keyText='${keyText}'")
             if (keyText == name) {
                 // value follows key + ':'
                 var p = keyElem.a.b + 1
                 // skip colon, whitespace and newlines so childElementAt starts at the real value
                 while (p < src.size && (src[p] == ' ' || src[p] == ':' || src[p] == '\t' || src[p] == '\n' || src[p] == '\r')) p++
-                System.err.println("DEBUG stepByName: found key at $keyOpen; value starts at $p (char='${if (p < src.size) src[p] else ' ' }')")
+                println("DEBUG stepByName: found key at $keyOpen; value starts at $p (char='${if (p < src.size) src[p] else ' '}')")
                 val valElem = childElementAt(p, src)
+                try {
+                    println(
+                        "DEBUG stepByName: valElem for name='${name}' -> open=${valElem.a.a} close=${valElem.a.b} tag=${
+                            Reify.tagOf(
+                                valElem,
+                                src,
+                            )
+                        }",
+                    )
+                } catch (_: Throwable) {
+                }
                 return valElem j src
             }
             i++
         }
-        System.err.println("DEBUG stepByName: name='${name}' not found in elementOpen=${e.a.a}")
+        println("DEBUG stepByName: name='${name}' not found in elementOpen=${e.a.a}")
         return null
     }
 
@@ -1172,7 +1324,9 @@ object Path {
                 val cand = all[k]
                 if (cand.a.a == start) {
                     val len = cand.a.b - cand.a.a
-                    if (len < bestLen) { best = cand; bestLen = len }
+                    if (len < bestLen) {
+                        best = cand; bestLen = len
+                    }
                     if (Reify.tagOf(cand, src) == Tag.STRING) return cand
                 }
                 k++
@@ -1193,22 +1347,87 @@ object Path {
         } catch (_: Throwable) {
             // ignore and try YAML below
         }
-        // Try YAML full-scan and pick the element whose open==start, preferring STRING or the shortest span
+        // Try YAML full-scan and pick the element whose open==start, or that contains start (prefer STRING or the shortest span)
         try {
             val all = YamlScan.scan(src)
             var k = 0
-            var bestAny: JsElement? = null
-            var bestAnyLen = Int.MAX_VALUE
+            var bestExactNonNull: JsElement? = null
+            var bestExactNonNullLen = Int.MAX_VALUE
+            var bestExactAny: JsElement? = null
+            var bestExactAnyLen = Int.MAX_VALUE
+            var bestContainNonNull: JsElement? = null
+            var bestContainNonNullLen = Int.MAX_VALUE
+            var bestContainAny: JsElement? = null
+            var bestContainAnyLen = Int.MAX_VALUE
             while (k < all.size) {
                 val cand = all[k]
+                val len = cand.a.b - cand.a.a
+                val tag = Reify.tagOf(cand, src)
                 if (cand.a.a == start) {
-                    val len = cand.a.b - cand.a.a
-                    if (Reify.tagOf(cand, src) == Tag.STRING) return cand
-                    if (len < bestAnyLen) { bestAny = cand; bestAnyLen = len }
+                    if (tag != Tag.NULL) {
+                        if (len < bestExactNonNullLen) {
+                            bestExactNonNull = cand; bestExactNonNullLen = len
+                        }
+                    }
+                    if (len < bestExactAnyLen) {
+                        bestExactAny = cand; bestExactAnyLen = len
+                    }
+                } else if (cand.a.a <= start && cand.a.b >= start) {
+                    if (tag != Tag.NULL) {
+                        if (len < bestContainNonNullLen) {
+                            bestContainNonNull = cand; bestContainNonNullLen = len
+                        }
+                    }
+                    if (len < bestContainAnyLen) {
+                        bestContainAny = cand; bestContainAnyLen = len
+                    }
                 }
                 k++
             }
-            if (bestAny != null) return bestAny
+            if (bestExactNonNull != null) {
+                println(
+                    "DEBUG childElementAt: start=$start -> chosen bestExactNonNull elem open=${bestExactNonNull.a.a} close=${bestExactNonNull.a.b} tag=${
+                        Reify.tagOf(
+                            bestExactNonNull,
+                            src,
+                        )
+                    }",
+                )
+                return bestExactNonNull
+            }
+            if (bestExactAny != null) {
+                println(
+                    "DEBUG childElementAt: start=$start -> chosen bestExactAny elem open=${bestExactAny.a.a} close=${bestExactAny.a.b} tag=${
+                        Reify.tagOf(
+                            bestExactAny,
+                            src,
+                        )
+                    }",
+                )
+                return bestExactAny
+            }
+            if (bestContainNonNull != null) {
+                println(
+                    "DEBUG childElementAt: start=$start -> chosen bestContainNonNull elem open=${bestContainNonNull.a.a} close=${bestContainNonNull.a.b} tag=${
+                        Reify.tagOf(
+                            bestContainNonNull,
+                            src,
+                        )
+                    }",
+                )
+                return bestContainNonNull
+            }
+            if (bestContainAny != null) {
+                println(
+                    "DEBUG childElementAt: start=$start -> chosen bestContainAny elem open=${bestContainAny.a.a} close=${bestContainAny.a.b} tag=${
+                        Reify.tagOf(
+                            bestContainAny,
+                            src,
+                        )
+                    }",
+                )
+                return bestContainAny
+            }
         } catch (_: Throwable) {
             // ignore
         }
@@ -1218,28 +1437,105 @@ object Path {
             val c0 = scanned[0]
             val adj = (c0.a.a + start) j (c0.a.b + start)
             val commas: Series<Int> = c0.b.size j { k: Int -> val v = c0.b[k]; if (v < 0) v else v + start }
-            return adj j commas
+            val candidate = adj j commas
+            println(
+                "DEBUG childElementAt: start=$start -> JSON micro-scan returned elem open=${candidate.a.a} close=${candidate.a.b} tag=${
+                    Reify.tagOf(
+                        candidate,
+                        src,
+                    )
+                }",
+            )
+            return candidate
         } catch (_: Throwable) {
             val all = CborScan.scan(src)
             var k = 0
-            var best: JsElement? = null
-            var bestLen = Int.MAX_VALUE
+            var bestExactNonNull: JsElement? = null
+            var bestExactNonNullLen = Int.MAX_VALUE
+            var bestExactAny: JsElement? = null
+            var bestExactAnyLen = Int.MAX_VALUE
+            var bestContainNonNull: JsElement? = null
+            var bestContainNonNullLen = Int.MAX_VALUE
+            var bestContainAny: JsElement? = null
+            var bestContainAnyLen = Int.MAX_VALUE
             while (k < all.size) {
                 val cand = all[k]
+                val len = cand.a.b - cand.a.a
+                val tag = Reify.tagOf(cand, src)
                 if (cand.a.a == start) {
-                    val len = cand.a.b - cand.a.a
-                    if (len < bestLen) { best = cand; bestLen = len }
+                    if (tag != Tag.NULL) {
+                        if (len < bestExactNonNullLen) {
+                            bestExactNonNull = cand; bestExactNonNullLen = len
+                        }
+                    }
+                    if (len < bestExactAnyLen) {
+                        bestExactAny = cand; bestExactAnyLen = len
+                    }
+                } else if (cand.a.a <= start && cand.a.b >= start) {
+                    if (tag != Tag.NULL) {
+                        if (len < bestContainNonNullLen) {
+                            bestContainNonNull = cand; bestContainNonNullLen = len
+                        }
+                    }
+                    if (len < bestContainAnyLen) {
+                        bestContainAny = cand; bestContainAnyLen = len
+                    }
                 }
                 k++
             }
-            if (best != null) return best
+            if (bestExactNonNull != null) {
+                println(
+                    "DEBUG childElementAt: start=$start -> chosen CBOR bestExactNonNull elem open=${bestExactNonNull.a.a} close=${bestExactNonNull.a.b} tag=${
+                        Reify.tagOf(
+                            bestExactNonNull,
+                            src,
+                        )
+                    }",
+                )
+                return bestExactNonNull
+            }
+            if (bestExactAny != null) {
+                println(
+                    "DEBUG childElementAt: start=$start -> chosen CBOR bestExactAny elem open=${bestExactAny.a.a} close=${bestExactAny.a.b} tag=${
+                        Reify.tagOf(
+                            bestExactAny,
+                            src,
+                        )
+                    }",
+                )
+                return bestExactAny
+            }
+            if (bestContainNonNull != null) {
+                println(
+                    "DEBUG childElementAt: start=$start -> chosen CBOR bestContainNonNull elem open=${bestContainNonNull.a.a} close=${bestContainNonNull.a.b} tag=${
+                        Reify.tagOf(
+                            bestContainNonNull,
+                            src,
+                        )
+                    }",
+                )
+                return bestContainNonNull
+            }
+            if (bestContainAny != null) {
+                println(
+                    "DEBUG childElementAt: start=$start -> chosen CBOR bestContainAny elem open=${bestContainAny.a.a} close=${bestContainAny.a.b} tag=${
+                        Reify.tagOf(
+                            bestContainAny,
+                            src,
+                        )
+                    }",
+                )
+                return bestContainAny
+            }
             throw IllegalStateException("cannot locate child at $start in any scan")
         }
     }
 
     private fun stripQuotes(s: String): String {
-        if (s.length >= 2 && (s[0] == '"' || s[0] == '\'') && s[s.length - 1] == s[0])
-            return s.substring(1, s.length - 1)
+        if (s.length >= 2 && (s[0] == '"' || s[0] == '\'') && s[s.length - 1] == s[0]) return s.substring(
+            1,
+            s.length - 1,
+        )
         return s
     }
 }
@@ -1294,13 +1590,17 @@ private class SubArray {
     fun add(s: ConfixSubscriber) {
         if (size == data.size) {
             val n = arrayOfNulls<ConfixSubscriber>(data.size * 2)
-            var i = 0; while (i < size) { n[i] = data[i]; i++ }
+            var i = 0; while (i < size) {
+                n[i] = data[i]; i++
+            }
             data = n
         }
         data[size++] = s
     }
+
     fun asSeries(): Series<ConfixSubscriber> {
-        val n = size; val d = data
+        val n = size;
+        val d = data
         return n j { i: Int -> d[i]!! }
     }
 }
@@ -1319,8 +1619,7 @@ class ConfixElement(
     parent: CoroutineContext? = null,
 ) : AbstractCoroutineContextElement(ConfixKey) {
 
-    val supervisor: CompletableJob =
-        if (parent == null) SupervisorJob() else SupervisorJob(parent[Job])
+    val supervisor: CompletableJob = if (parent == null) SupervisorJob() else SupervisorJob(parent[Job])
 
     private var _state: Lifecycle = Lifecycle.CREATED
     val lifecycleState: Lifecycle get() = _state
@@ -1419,7 +1718,9 @@ fun cborSource(bytes: ByteArray): ConfixSource {
     val n = bytes.size
     val ca = CharArray(n)
     var i = 0
-    while (i < n) { ca[i] = (bytes[i].toInt() and 0xFF).toChar(); i++ }
+    while (i < n) {
+        ca[i] = (bytes[i].toInt() and 0xFF).toChar(); i++
+    }
     val series: Series<Char> = n j { k: Int -> ca[k] }
     return ConfixSource(Syntax.CBOR, series)
 }
