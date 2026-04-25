@@ -44,6 +44,15 @@ project(":libs:uring").projectDir = file("libs/uring")
 include(":libs:kursive")
 project(":libs:kursive").projectDir = file("libs/kursive")
 
+include(":libs:cmc")
+project(":libs:cmc").projectDir = file("libs/cmc")
+
+include(":libs:krak")
+project(":libs:krak").projectDir = file("libs/krak")
+
+include(":libs:rhood")
+project(":libs:rhood").projectDir = file("libs/rhood")
+
 // Integration harness project for end-to-end SQL→MiniDuck validation
 include(":integration-scratch")
 project(":integration-scratch").projectDir = file("integration-scratch")
