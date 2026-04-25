@@ -95,7 +95,7 @@ class ConcurrentWriteSealTest {
         }
 
         // handle is sealed and row count is consistent
-        assertEquals(Handle.State.SEALED, h.state)
+        assertEquals(HandleState.SEALED, h.state)
         assertTrue(h.rowCount in 1..50, "rowCount=${h.rowCount} should be between 1 and 50")
         rejections.close()
     }

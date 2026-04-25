@@ -10,7 +10,7 @@ import kotlin.test.*
  * Donor pattern: go-stopper two-phase State machine (Running→Stopping→Stopped)
  * mapped to OPEN→SEALED→CLOSED with atomic admission gate.
  *
- * Will fail to compile until CollectionHandle, Snapshot, and Handle.State exist.
+ * Will fail to compile until CollectionHandle, Snapshot, and HandleState exist.
  */
 class CollectionHandleTest {
 
@@ -23,7 +23,7 @@ class CollectionHandleTest {
     @Test
     fun handleStartsOpen() {
         val h = CollectionHandle.open()
-        assertEquals(Handle.State.OPEN, h.state)
+        assertEquals(HandleState.OPEN, h.state)
     }
 
     @Test
@@ -48,7 +48,7 @@ class CollectionHandleTest {
         val h = CollectionHandle.open()
         h.append(doc("x" to 1))
         h.seal()
-        assertEquals(Handle.State.SEALED, h.state)
+        assertEquals(HandleState.SEALED, h.state)
     }
 
     @Test
@@ -75,7 +75,7 @@ class CollectionHandleTest {
         h.append(doc("x" to 1))
         h.seal()
         h.close()
-        assertEquals(Handle.State.CLOSED, h.state)
+        assertEquals(HandleState.CLOSED, h.state)
     }
 
     @Test
@@ -93,7 +93,7 @@ class CollectionHandleTest {
         val h = CollectionHandle.open()
         h.append(doc("x" to 1))
         h.close()
-        assertEquals(Handle.State.CLOSED, h.state)
+        assertEquals(HandleState.CLOSED, h.state)
     }
 
     @Test

@@ -1,13 +1,7 @@
 package borg.trikeshed.parse.kursive.sql
 
-import borg.trikeshed.lib.CharSeries
-import borg.trikeshed.lib.Series
-import borg.trikeshed.lib.asString
-import borg.trikeshed.lib.get
-import borg.trikeshed.lib.parseDoubleOrNull
-import borg.trikeshed.lib.parseLong
-import borg.trikeshed.lib.toSeries
-import borg.trikeshed.lib.view
+import borg.trikeshed.collections._s
+import borg.trikeshed.lib.*
 
 // Compact SQL AST and parser using CharSeries (zero-copy views)
 sealed interface SqlNode
@@ -46,7 +40,7 @@ class SqlParser(private val cs: CharSeries) {
 
             // fallback: simple regex-based parser for SELECT <cols> FROM <table> [WHERE <simple comparison>]
             // tolerant fallback parsing (case-insensitive, whitespace tolerant)
-            println("SqlParser.parse fallback invoked with: [" + text + "]")
+            println("SqlParser.parse fallback invoked with: [$text]")
             val selUp = text.uppercase()
             val selIndex = selUp.indexOf("SELECT")
             val fromIndex = selUp.indexOf("FROM")
@@ -59,17 +53,17 @@ class SqlParser(private val cs: CharSeries) {
             val wherePart = if (parts.size > 1) parts[1].trim() else null
             println("colsPart=[$colsPart], tablePart=[$tablePart], wherePart=[$wherePart]")
 
-            val cols: List<Column> = if (colsPart == "*") {
-                listOf(Column(LitExpr(StringLiteral("*".toSeries())), null))
-            } else {
-                colsPart.split(',').map { col -> Column(ColumnRef(Identifier(col.trim().toSeries())), null) }
-            }
+            val cols: List<Column> =
+                if (colsPart == "*") listOf(Column(LitExpr(StringLiteral("*".toSeries())), null)) else colsPart.split(
+                    ',',
+                ).map { col -> Column(ColumnRef(Identifier(col.trim().toSeries())), null) }
 
             val from = TableRef(Identifier(tablePart.toSeries()))
 
             var whereExpr: Expr? = null
             if (!wherePart.isNullOrEmpty()) {
-                val comp = Regex("(?i)^\\s*([A-Za-z_][A-Za-z0-9_]*)\\s*(=|!=|<>|>=|<=|>|<)\\s*('([^']*)'|\\d+(?:\\.\\d+)?)\\s*")
+                val comp =
+                    Regex("(?i)^\\s*([A-Za-z_][A-Za-z0-9_]*)\\s*(=|!=|<>|>=|<=|>|<)\\s*('([^']*)'|\\d+(?:\\.\\d+)?)\\s*")
                 val cm = comp.matchEntire(wherePart)
                 if (cm != null) {
                     val colName = cm.groupValues[1]
@@ -99,13 +93,19 @@ class SqlParser(private val cs: CharSeries) {
         val save = cs.pos
         val k = keyword.uppercase()
         for (i in k.indices) {
-            if (cs.pos + i >= cs.limit) { cs.pos = save; return false }
-            if (cs[cs.pos + i].uppercaseChar() != k[i]) { cs.pos = save; return false }
+            if (cs.pos + i >= cs.limit) {
+                cs.pos = save; return false
+            }
+            if (cs[cs.pos + i].uppercaseChar() != k[i]) {
+                cs.pos = save; return false
+            }
         }
         val next = cs.pos + k.length
         if (next < cs.limit) {
             val nc = cs[next]
-            if (!nc.isWhitespace() && nc != ',' && nc != '(' && nc != ')' && nc != ';') { cs.pos = save; return false }
+            if (!nc.isWhitespace() && nc != ',' && nc != '(' && nc != ')' && nc != ';') {
+                cs.pos = save; return false
+            }
         }
         cs.pos += k.length
         return true
@@ -154,15 +154,21 @@ class SqlParser(private val cs: CharSeries) {
         val start = cs.pos
         var seen = false
         if (cs.pos < cs.limit && (cs[cs.pos] == '+' || cs[cs.pos] == '-')) cs.pos++
-        while (cs.pos < cs.limit && cs[cs.pos].isDigit()) { cs.pos++; seen = true }
+        while (cs.pos < cs.limit && cs[cs.pos].isDigit()) {
+            cs.pos++; seen = true
+        }
         if (cs.pos < cs.limit && cs[cs.pos] == '.') {
             cs.pos++
-            while (cs.pos < cs.limit && cs[cs.pos].isDigit()) { cs.pos++; seen = true }
+            while (cs.pos < cs.limit && cs[cs.pos].isDigit()) {
+                cs.pos++; seen = true
+            }
         }
-        if (!seen) { cs.pos = start; return null }
+        if (!seen) {
+            cs.pos = start; return null
+        }
         val slice: Series<Char> = cs[start until cs.pos]
 
-        val num  = slice.parseDoubleOrNull() ?:slice.parseLong()
+        val num = slice.parseDoubleOrNull() ?: slice.parseLong()
         val value = when (num) {
             is Long -> if (num in Int.MIN_VALUE..Int.MAX_VALUE) num.toInt() else num
             is Double -> num
@@ -194,10 +200,14 @@ class SqlParser(private val cs: CharSeries) {
             val save = cs.pos
             var ok = true
             for (ch in op) {
-                if (cs.pos >= cs.limit || cs[cs.pos].uppercaseChar() != ch.uppercaseChar()) { ok = false; break }
+                if (cs.pos >= cs.limit || cs[cs.pos].uppercaseChar() != ch.uppercaseChar()) {
+                    ok = false; break
+                }
                 cs.pos++
             }
-            if (!ok) { cs.pos = save; continue }
+            if (!ok) {
+                cs.pos = save; continue
+            }
             skipWs()
             val right = parseTerm() ?: run { cs.pos = save; return left }
             left = BinaryExpr(left, op, right)
@@ -215,7 +225,9 @@ class SqlParser(private val cs: CharSeries) {
                 skipWs()
                 val right = parseComparison() ?: run { cs.pos = save; break }
                 left = BinaryExpr(left, "AND", right)
-            } else { cs.pos = save; break }
+            } else {
+                cs.pos = save; break
+            }
         }
         return left
     }
@@ -229,7 +241,9 @@ class SqlParser(private val cs: CharSeries) {
                 skipWs()
                 val right = parseAnd() ?: run { cs.pos = save; break }
                 left = BinaryExpr(left, "OR", right)
-            } else { cs.pos = save; break }
+            } else {
+                cs.pos = save; break
+            }
         }
         return left
     }
@@ -244,13 +258,16 @@ class SqlParser(private val cs: CharSeries) {
         if (matchKeyword("AS")) {
             skipWs()
             alias = parseIdentifier()
-            if (alias == null) { cs.pos = save2 }
+            if (alias == null) {
+                cs.pos = save2
+            }
         } else {
             val maybe = parseIdentifier()
             if (maybe != null) {
                 // don't treat SQL keywords as an alias (e.g., FROM, WHERE)
                 val nameStr = maybe.name.asString().uppercase()
-                val reserved = setOf("FROM", "WHERE", "GROUP", "ORDER", "HAVING", "LIMIT", "OFFSET", "JOIN", "ON", "AS", "UNION", "DISTINCT")
+                val reserved =
+                    _s["FROM", "WHERE", "GROUP", "ORDER", "HAVING", "LIMIT", "OFFSET", "JOIN", "ON", "AS", "UNION", "DISTINCT"]
                 if (nameStr in reserved) {
                     cs.pos = save2
                 } else {
@@ -264,12 +281,16 @@ class SqlParser(private val cs: CharSeries) {
     private fun parseSelectList(): Series<Column> {
         skipWs()
         val cols = mutableListOf<Column>()
-        if (peek() == '*') { cs.pos++ ; cols += Column(LitExpr(StringLiteral("*".toSeries())), null); return cols.toSeries() }
+        if (peek() == '*') {
+            cs.pos++; cols += Column(LitExpr(StringLiteral("*".toSeries())), null); return cols.toSeries()
+        }
         while (true) {
             val c = parseColumn() ?: break
             cols += c
             skipWs()
-            if (peek() == ',') { cs.pos++; continue } else break
+            if (peek() == ',') {
+                cs.pos++; continue
+            } else break
         }
         return cols.toSeries()
     }
@@ -288,7 +309,20 @@ class SqlParser(private val cs: CharSeries) {
             val maybe = parseIdentifier()
             if (maybe != null) {
                 val nameStr = maybe.name.asString().uppercase()
-                val reserved = setOf("FROM", "WHERE", "GROUP", "ORDER", "HAVING", "LIMIT", "OFFSET", "JOIN", "ON", "AS", "UNION", "DISTINCT")
+                val reserved = setOf(
+                    "FROM",
+                    "WHERE",
+                    "GROUP",
+                    "ORDER",
+                    "HAVING",
+                    "LIMIT",
+                    "OFFSET",
+                    "JOIN",
+                    "ON",
+                    "AS",
+                    "UNION",
+                    "DISTINCT",
+                )
                 if (nameStr in reserved) {
                     cs.pos = save
                 } else {

@@ -7,51 +7,56 @@ import borg.trikeshed.lib.j
 /**
  * JVM-specific CollectionHandle with @Volatile for state
  */
-/** Global Handle namespace used by tests for state enum. */
-object Handle {
-    enum class State { OPEN, SEALED, CLOSED }
-}
-
-class CollectionHandle private constructor() {
+actual class CollectionHandle private constructor() {
 
     @Volatile
-    private var _state: Handle.State = Handle.State.OPEN
+    private var _state: HandleState = HandleState.OPEN
 
     private val rows: MutableList<MiniRowVec> = mutableListOf()
 
-    val state: Handle.State get() = _state
+    private val lock = Any()
 
-    val rowCount: Int get() = rows.size
+    actual val state: HandleState get() = _state
 
-    companion object {
-        fun open(): CollectionHandle = CollectionHandle()
+    actual val rowCount: Int get() = rows.size
+
+    actual companion object {
+        actual fun open(): CollectionHandle = CollectionHandle()
     }
 
     /** Append a row to the open handle. Throws if not OPEN. */
-    fun append(row: MiniRowVec) {
-        check(_state == Handle.State.OPEN) { "Cannot append unless OPEN" }
-        rows.add(row)
+    actual fun append(row: MiniRowVec) {
+        synchronized(lock) {
+            check(_state == HandleState.OPEN) { "Cannot append unless OPEN" }
+            rows.add(row)
+        }
     }
 
     /** Seal the handle so no further appends are allowed; snapshots remain available. */
-    fun seal() {
-        check(_state == Handle.State.OPEN) { "Can only seal from OPEN state" }
-        _state = Handle.State.SEALED
+    actual fun seal() {
+        synchronized(lock) {
+            check(_state == HandleState.OPEN) { "Can only seal from OPEN state" }
+            _state = HandleState.SEALED
+        }
     }
 
     /** Close the handle. After close, snapshot and append are illegal. */
-    fun close() {
-        // allow sealing as part of close transition
-        if (_state == Handle.State.OPEN) _state = Handle.State.SEALED
-        _state = Handle.State.CLOSED
+    actual fun close() {
+        synchronized(lock) {
+            // allow sealing as part of close transition
+            if (_state == HandleState.OPEN) _state = HandleState.SEALED
+            _state = HandleState.CLOSED
+        }
     }
 
     /** Present an immutable snapshot Series of the current rows.
      * If handle is CLOSED, snapshot is not allowed.
      */
-    fun snapshot(): Series<MiniRowVec> {
-        check(_state != Handle.State.CLOSED) { "Cannot snapshot a CLOSED handle" }
-        val snap = rows.toList()
-        return snap.size j { i: Int -> snap[i] }
+    actual fun snapshot(): Series<MiniRowVec> {
+        synchronized(lock) {
+            check(_state != HandleState.CLOSED) { "Cannot snapshot a CLOSED handle" }
+            val snap = rows.toList()
+            return snap.size j { i: Int -> snap[i] }
+        }
     }
 }

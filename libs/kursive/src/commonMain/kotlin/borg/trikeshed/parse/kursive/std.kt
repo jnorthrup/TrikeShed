@@ -116,7 +116,7 @@ object std {
             if (separator(input) == null) break
             val next = item(input)
             if (next == null) {
-                input.rewind(checkpoint)
+                input.rewindTo(checkpoint)
                 break
             }
             items.add(next)

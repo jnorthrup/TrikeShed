@@ -5,7 +5,7 @@ import java.util.concurrent.atomic.AtomicInteger
 /**
  * JVM-specific AdmissionControl implementation using AtomicInteger and @Volatile for correctness
  */
-class AdmissionControl(private val capacity: Int) {
+actual class AdmissionControl actual constructor(private val capacity: Int) {
 
     private val permits = AtomicInteger(capacity)
 
@@ -13,7 +13,7 @@ class AdmissionControl(private val capacity: Int) {
     @Volatile
     private var _state: State = State.OPEN
 
-    fun tryAcquire(): Boolean {
+    actual fun tryAcquire(): Boolean {
         if (_state != State.OPEN) return false
         if (capacity <= 0) return false
         while (true) {
@@ -23,18 +23,18 @@ class AdmissionControl(private val capacity: Int) {
         }
     }
 
-    fun release() {
+    actual fun release() {
         permits.updateAndGet { cur ->
             val next = cur + 1
             if (capacity >= 0) minOf(next, capacity) else next
         }
     }
 
-    fun seal() {
+    actual fun seal() {
         _state = State.SEALED
     }
 
-    fun close() {
+    actual fun close() {
         _state = State.CLOSED
     }
 }

@@ -169,16 +169,6 @@ enum class NarsiveOperator(
 
 // ── operator lexing helpers ─────────────────────────────────────────────
 
-private fun KursiveCharSeries.consumeAnyOf(vararg forms: String): CharSeries? {
-    for (form in forms) {
-        val checkpoint = checkpoint()
-        val start = pos
-        if (consume(form.toSeries())) return slice(start)
-        rewind(checkpoint)
-    }
-    return null
-}
-
 internal fun Series<Char>.narsiveOperatorOrNull(
     accept: (NarsiveOperator) -> Boolean = { true },
 ): NarsiveOperator? = NarsiveOperator.entries.firstOrNull { accept(it) && it.matches(this) }
@@ -189,7 +179,6 @@ internal fun KursiveCharSeries.consumeNarsiveOperatorOrNull(
     if (accept(operator)) operator.tryConsume(this) else null
 }
 
-private fun Series<Char>.firstGlyphOrNull(): Series<Char>? = if (size == 0) null else 1 j { this[0] }
 
 // ── narsive grammar ─────────────────────────────────────────────
 

@@ -44,6 +44,14 @@ class InMemoryBlockStore : BlockStore {
         return id
     }
 
+    /**
+     * Put a block with a specific blockId — used by WAL replay to reconstruct
+     * the exact blockId that was originally assigned.
+     */
+    fun putWithId(collection: String, blockId: String, block: BlockRowVec) {
+        collections.getOrPut(collection) { mutableMapOf() }[blockId] = block
+    }
+
     override fun get(collection: String, blockId: String): BlockRowVec? =
         collections[collection]?.get(blockId)
 

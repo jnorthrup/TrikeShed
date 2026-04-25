@@ -8,10 +8,9 @@
     "MemberVisibilityCanBePrivate",
 )
 
-package borg.trikeshed.confix
+package borg.trikeshed.parse.confix
 
 import kotlinx.coroutines.CompletableJob
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.coroutineScope
@@ -40,6 +39,7 @@ import kotlin.coroutines.CoroutineContext
 /* ─── kernel algebra — rely on canonical definitions in borg.trikeshed.lib ────────────── */
 
 import borg.trikeshed.lib.*
+import borg.trikeshed.lib.get
 
 // Kernel algebra types and Series extensions are defined in borg.trikeshed.lib to avoid duplication.
 
@@ -165,21 +165,21 @@ class ElemBuf(initial: Int = 16) {
     /** begin a new element; returns its index. Caller fills commas via [addComma] then calls [endOf]. */
     fun begin(openIdx: Int): Int {
         if (size == opens.size) grow()
-        opens[size] = openIdx
-        commaHeads[size] = commas.size
-        return size
+        val idx = size
+        opens[idx] = openIdx
+        commaHeads[idx] = commas.size
+        size = idx + 1
+        return idx
     }
 
     fun addComma(pos: Int) { commas.add(pos) }
 
     fun endOf(elemIdx: Int, closeIdx: Int, tagOrZero: Int) {
         // Tag is stored as the first "comma" when non-zero; real commas follow.
-        // But since Tag constants are negative and commas are positive, we prepend
-        // by splicing: we can only append chronologically, so we record tag BEFORE begin().
-        // Callers should call tagBefore() prior to begin() for correctness. See helpers.
+        // End of element finalizes close index and the comma tail. Do not shrink size.
         closes[elemIdx] = closeIdx
         commaTails[elemIdx] = commas.size
-        size = elemIdx + 1
+        if (size < elemIdx + 1) size = elemIdx + 1
         @Suppress("UNUSED_PARAMETER") val _t = tagOrZero
     }
 
@@ -189,6 +189,10 @@ class ElemBuf(initial: Int = 16) {
         commas.add(tag)
         return i
     }
+
+    // expose element open/close indexes for callers that need precise child anchors
+    fun openOf(elemIdx: Int): Int { return opens[elemIdx] }
+    fun closeOf(elemIdx: Int): Int { return closes[elemIdx] }
 
     fun toSeries(): Series<JsElement> {
         val n = size
@@ -452,11 +456,9 @@ object YamlScan {
             if (st.peek() != '-') break
             st.pos++  // consume '-'
             if (st.peek() == ' ') st.pos++
-            out.addComma(st.pos)
-            // child value: either a nested block (on next lines) or a scalar/flow
             val childIndent = indent + 2
             val ch = st.peek()
-            if (ch == '{' || ch == '[' || ch == '"' || ch == '\'') {
+            val childIdx = if (ch == '{' || ch == '[' || ch == '"' || ch == '\'') {
                 parseFlowLine(st, out)
             } else {
                 // try inline scalar on same line first
@@ -471,7 +473,10 @@ object YamlScan {
                     parseScalarLine(st, out)
                 }
             }
-            lastClose = st.pos.coerceAtLeast(open)
+            // append comma using child's open index
+            val childOpen = out.openOf(childIdx)
+            out.addComma(childOpen)
+            lastClose = out.closeOf(childIdx).coerceAtLeast(open)
         }
         out.endOf(idx, lastClose, Tag.ARRAY)
         return idx
@@ -492,27 +497,26 @@ object YamlScan {
         var lastClose = open
         var here = indent
         while (!st.atEof() && here >= indent) {
-            // already positioned at key start
-            out.addComma(st.pos)
             // key (string-like): emit a STRING element spanning until ':'
             val keyOpen = st.pos
             val keyColon = st.readToColon()
             val keyClose = if (keyColon > keyOpen) keyColon - 1 else keyOpen
             val keyIdx = out.beginTagged(keyOpen, Tag.STRING)
             out.endOf(keyIdx, keyClose, Tag.STRING)
+            // record comma as key's open
+            out.addComma(out.openOf(keyIdx))
             st.pos = keyColon + 1  // consume ':'
             while (st.pos < st.n && st.s[st.pos] == ' ') st.pos++
             // value: inline or next-line block
-            if (st.pos < st.n && st.s[st.pos] != '\n' && st.s[st.pos] != '\r') {
+            val valueIdx = if (st.pos < st.n && st.s[st.pos] != '\n' && st.s[st.pos] != '\r') {
                 val ch = st.s[st.pos]
-                if (ch == '{' || ch == '[' || ch == '"' || ch == '\'') parseFlowLine(st, out)
-                else parseScalarLine(st, out)
+                if (ch == '{' || ch == '[' || ch == '"' || ch == '\'') parseFlowLine(st, out) else parseScalarLine(st, out)
             } else {
                 // newline: child block
                 if (st.pos < st.n) st.pos++  // eat newline
                 parseBlock(st, out, indent + 2)
             }
-            lastClose = (st.pos - 1).coerceAtLeast(open)
+            lastClose = out.closeOf(valueIdx).coerceAtLeast(open)
             st.skipBlankLines()
             if (st.atEof()) break
             here = st.lineIndent()
@@ -831,21 +835,143 @@ object Reify {
     }
 
     private fun reifyString(e: JsElement, src: Series<Char>): String {
-        // trim quotes for JSON/YAML string, keep raw for CBOR tokens
         val a = e.a.a; val b = e.a.b
-        val q = if (a <= b && (src[a] == '"' || src[a] == '\'')) 1 else 0
-        val start = a + q
-        val endX = b - q + 1
-        if (endX <= start) return ""
-        val ca = CharArray(endX - start)
+        // quoted JSON/YAML strings
+        if (a <= b && (src[a] == '"' || src[a] == '\'')) {
+            val quote = src[a]
+            val start = a + 1
+            val end = b - 1
+            if (end < start) return ""
+            val ca = CharArray(end - start + 1)
+            var i = 0
+            while (i < ca.size) { ca[i] = src[start + i]; i++ }
+            val raw = ca.concatToString()
+            if (quote == '"' && raw.contains('\\')) {
+                val u = unescapeJsonString(raw)
+                println("DEBUG reifyString: raw=\"$raw\" -> unescaped=\"$u\"")
+                return u
+            }
+            return if (quote == '"') unescapeJsonString(raw) else unescapeYamlSingleQuoted(raw)
+        }
+
+        // possible CBOR text string (major type 3) encoded in-place, try to decode header
+        val tag = tagOf(e, src)
+        if (tag == Tag.STRING || tag == Tag.BYTES) {
+            val ib = src[a].code and 0xFF
+            val mt = ib ushr 5
+            val ai = ib and 0x1F
+            if (mt == 3) {
+                var p = a + 1
+                val len = when (ai) {
+                    in 0..23 -> ai
+                    24 -> { val v = src[p].code and 0xFF; p += 1; v }
+                    25 -> { val v = ((src[p].code and 0xFF) shl 8) or (src[p + 1].code and 0xFF); p += 2; v }
+                    26 -> {
+                        val v = ((src[p].code and 0xFF) shl 24) or
+                                ((src[p + 1].code and 0xFF) shl 16) or
+                                ((src[p + 2].code and 0xFF) shl 8) or
+                                (src[p + 3].code and 0xFF)
+                        p += 4; v
+                    }
+                    else -> -1
+                }
+                if (len >= 0) {
+                    val ca = CharArray(len)
+                    var i = 0
+                    while (i < len && p + i <= b) { ca[i] = src[p + i]; i++ }
+                    return ca.concatToString()
+                }
+            }
+        }
+
+        // fallback: return raw trimmed scalar (YAML unquoted plain scalar)
+        val ca = CharArray(b - a + 1)
         var i = 0
-        while (i < ca.size) { ca[i] = src[start + i]; i++ }
-        return ca.concatToString()
+        while (i < ca.size) { ca[i] = src[a + i]; i++ }
+        return ca.concatToString().trim()
+    }
+
+    // helper: unescape JSON-style quotes (handles \n, \uXXXX, etc.)
+    private fun unescapeJsonString(s: String): String {
+        val out = StringBuilder(s.length)
+        var i = 0
+        while (i < s.length) {
+            val c = s[i]
+            if (c == '\\' && i + 1 < s.length) {
+                i++
+                val e = s[i]
+                when (e) {
+                    'n' -> out.append('\n')
+                    't' -> out.append('\t')
+                    'r' -> out.append('\r')
+                    'b' -> out.append('\b')
+                    'f' -> out.append('\u000C')
+                    '\\' -> out.append('\\')
+                    '/' -> out.append('/')
+                    '"' -> out.append('"')
+                    'u' -> {
+                        if (i + 4 < s.length) {
+                            var code = 0
+                            var k = 1
+                            while (k <= 4) {
+                                val ch = s[i + k]
+                                code = (code shl 4) or (ch.digitToIntOrNull(16) ?: 0)
+                                k++
+                            }
+                            out.append(code.toChar())
+                            i += 4
+                        }
+                    }
+                    else -> out.append(e)
+                }
+            } else {
+                out.append(c)
+            }
+            i++
+        }
+        return out.toString()
+    }
+
+    private fun unescapeYamlSingleQuoted(s: String): String {
+        // YAML single-quoted scalar: replace doubled single-quotes with a single quote
+        return s.replace("''", "'")
     }
 
     private fun reifyNumber(e: JsElement, src: Series<Char>): Double {
+        // Attempt CBOR numeric decoding when the element looks like a CBOR-encoded value
+        val a = e.a.a
+        if (a < src.size) {
+            val ib = src[a].code and 0xFF
+            val mt = ib ushr 5
+            val ai = ib and 0x1F
+            var p = a + 1
+            if (mt == 0 || mt == 1) {
+                // unsigned or negative integer
+                val value: Long = when (ai) {
+                    in 0..23 -> ai.toLong()
+                    24 -> { if (p < src.size) { val v = src[p].code and 0xFF; p += 1; v.toLong() } else -1L }
+                    25 -> { if (p + 1 < src.size) { val v = ((src[p].code and 0xFF) shl 8) or (src[p + 1].code and 0xFF); p += 2; v.toLong() } else -1L }
+                    26 -> { if (p + 3 < src.size) {
+                        val v = ((src[p].code and 0xFF) shl 24) or
+                                ((src[p + 1].code and 0xFF) shl 16) or
+                                ((src[p + 2].code and 0xFF) shl 8) or
+                                (src[p + 3].code and 0xFF)
+                        p += 4; v.toLong()
+                    } else -1L }
+                    27 -> { if (p + 7 < src.size) {
+                        var v = 0L; var k = 0
+                        while (k < 8) { v = (v shl 8) or (src[p + k].code and 0xFF).toLong(); k++ }
+                        p += 8; v
+                    } else -1L }
+                    else -> -1L
+                }
+                if (value >= 0L) {
+                    return if (mt == 0) value.toDouble() else (-(value.toDouble()) - 1.0)
+                }
+            }
+        }
+        // Fallback: textual numeric span
         val t = textOf(e, src)
-        // kotlin common exposes String.toDouble
         return t.trim().toDouble()
     }
 
@@ -935,10 +1061,21 @@ object Path {
     private fun stepByIndex(e: JsElement, src: Series<Char>, idx: Int): JsContext? {
         if (Reify.tagOf(e, src) != Tag.ARRAY) return null
         val cs = Reify.realCommas(e)
-        if (idx < 0 || idx >= cs.size) return null
-        val start = cs[idx]
-        val child = childElementAt(start, src)
-        return child j src
+        // iterate commas, skipping negative sentinels; map logical index -> Nth positive entry
+        var i = 0; var found = 0
+        while (i < cs.size) {
+            val v = cs[i]
+            if (v >= 0) {
+                if (found == idx) {
+                    println("Path.stepByIndex: idx=$idx -> selected child open=$v")
+                    val child = childElementAt(v, src)
+                    return child j src
+                }
+                found++
+            }
+            i++
+        }
+        return null
     }
 
     private fun stepByName(e: JsElement, src: Series<Char>, name: String): JsContext? {
@@ -947,6 +1084,7 @@ object Path {
         var i = 0
         while (i < cs.size) {
             val keyOpen = cs[i]
+            if (keyOpen < 0) { i++; continue }
             val keyElem = childElementAt(keyOpen, src)
             val keyText = stripQuotes(Reify.textOf(keyElem, src))
             if (keyText == name) {
@@ -961,14 +1099,63 @@ object Path {
         return null
     }
 
-    /** minimal JSON-flavored child element at an absolute offset in src */
+    /** minimal JSON/YAML/CBOR-flavored child element at an absolute offset in src */
     private fun childElementAt(start: Int, src: Series<Char>): JsElement {
         val sub = src.slice(start, src.size)
-        val scanned = JsonScan.scan(sub)
-        val c0 = scanned[0]
-        val adj = (c0.a.a + start) j (c0.a.b + start)
-        val commas: Series<Int> = c0.b.size j { k: Int -> val v = c0.b[k]; if (v < 0) v else v + start }
-        return adj j commas
+        if (sub.size == 0) throw IllegalStateException("empty child slice at $start")
+        val first = sub[0]
+        // If the first char is non-printable it's likely CBOR
+        if (first.code <= 0x1F) {
+            val all = CborScan.scan(src)
+            var k = 0
+            while (k < all.size) {
+                val cand = all[k]
+                if (cand.a.a == start) return cand
+                k++
+            }
+            throw IllegalStateException("cannot locate child at $start in CBOR scan")
+        }
+        // Heuristic: try JSON-like starters quickly
+        try {
+            if (first == '{' || first == '[' || first == '"' || first == '\'' || first == '-' || first == '+' || (first >= '0' && first <= '9') || first == 't' || first == 'f' || first == 'n') {
+                val scanned = JsonScan.scan(sub)
+                val c0 = scanned[0]
+                val adj = (c0.a.a + start) j (c0.a.b + start)
+                val commas: Series<Int> = c0.b.size j { k: Int -> val v = c0.b[k]; if (v < 0) v else v + start }
+                return adj j commas
+            }
+        } catch (_: Throwable) {
+            // ignore and try YAML below
+        }
+        // Try YAML full-scan and pick the element whose open==start
+        try {
+            val all = YamlScan.scan(src)
+            var k = 0
+            while (k < all.size) {
+                val cand = all[k]
+                if (cand.a.a == start) return cand
+                k++
+            }
+        } catch (_: Throwable) {
+            // ignore
+        }
+        // Fallback: try JSON again to surface better error
+        try {
+            val scanned = JsonScan.scan(sub)
+            val c0 = scanned[0]
+            val adj = (c0.a.a + start) j (c0.a.b + start)
+            val commas: Series<Int> = c0.b.size j { k: Int -> val v = c0.b[k]; if (v < 0) v else v + start }
+            return adj j commas
+        } catch (_: Throwable) {
+            val all = CborScan.scan(src)
+            var k = 0
+            while (k < all.size) {
+                val cand = all[k]
+                if (cand.a.a == start) return cand
+                k++
+            }
+            throw IllegalStateException("cannot locate child at $start in any scan")
+        }
     }
 
     private fun stripQuotes(s: String): String {

@@ -1,7 +1,7 @@
 package borg.trikeshed.couch.instrument
 
 import borg.trikeshed.couch.handle.CollectionHandle
-import borg.trikeshed.couch.handle.Handle
+import borg.trikeshed.couch.handle.HandleState
 import borg.trikeshed.couch.miniduck.MiniRowVec
 import borg.trikeshed.lib.Series
 import java.util.concurrent.locks.ReentrantLock
@@ -41,7 +41,7 @@ class InstrumentedHandle(private val probes: Probes) {
     fun snapshot(): Series<MiniRowVec> {
         val snap = underlying.snapshot()
         probes.snapshotCount.incrementAndGet()
-        if (underlying.state == Handle.State.SEALED) probes.readCount.incrementAndGet()
+        if (underlying.state == HandleState.SEALED) probes.readCount.incrementAndGet()
         return snap
     }
 

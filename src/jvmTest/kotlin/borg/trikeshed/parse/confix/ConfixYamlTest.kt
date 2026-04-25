@@ -1,5 +1,11 @@
-package borg.trikeshed.confix
+package borg.trikeshed.parse.confix
 
+import borg.trikeshed.parse.confix.Path
+import borg.trikeshed.parse.confix.Reify
+import borg.trikeshed.parse.confix.Syntax
+import borg.trikeshed.parse.confix.asSeries
+import borg.trikeshed.parse.confix.contextOf
+import borg.trikeshed.parse.confix.path
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
