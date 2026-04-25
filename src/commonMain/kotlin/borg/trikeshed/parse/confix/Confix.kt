@@ -378,7 +378,22 @@ object YamlScan {
         val st = ScanState(src, n)
         st.skipBlankLines()
         parseBlock(st, out, indent = 0)
-        return out.toSeries()
+        // diagnostic: dump tokens
+        val elems = out.toSeries()
+        System.err.println("DEBUG YamlScan: produced ${elems.size} elements")
+        var i = 0
+        while (i < elems.size) {
+            val el = elems[i]
+            val commas = el.b
+            val csStr = if (commas.size == 0) "[]" else {
+                val sb = StringBuilder(); sb.append('['); var k = 0
+                while (k < commas.size) { if (k > 0) sb.append(','); sb.append(commas[k]); k++ }
+                sb.append(']'); sb.toString()
+            }
+            System.err.println("DEBUG YamlScan: elem[$i] open=${el.a.a} close=${el.a.b} tag=${Reify.tagOf(el, src)} commas=${csStr}")
+            i++
+        }
+        return elems
     }
 
     private class ScanState(val s: Series<Char>, val n: Int) {
@@ -458,8 +473,11 @@ object YamlScan {
             if (st.peek() == ' ') st.pos++
             val childIndent = indent + 2
             val ch = st.peek()
+            System.err.println("DEBUG parseSeq: at pos=${st.pos} ch='$ch' (indent=$indent)")
             val childIdx = if (ch == '{' || ch == '[' || ch == '"' || ch == '\'') {
-                parseFlowLine(st, out)
+                val ci = parseFlowLine(st, out)
+                System.err.println("DEBUG parseSeq: parseFlowLine -> childIdx=$ci")
+                ci
             } else {
                 // try inline scalar on same line first
                 val scalarStart = st.pos
@@ -468,13 +486,18 @@ object YamlScan {
                 if (colonAt >= 0) {
                     // rewind and parse a one-element inline map by recursing at this column
                     st.pos = scalarStart
-                    parseMapOrScalar(st, out, childIndent)
+                    val ci = parseMapOrScalar(st, out, childIndent)
+                    System.err.println("DEBUG parseSeq: parseMapOrScalar -> childIdx=$ci")
+                    ci
                 } else {
-                    parseScalarLine(st, out)
+                    val ci = parseScalarLine(st, out)
+                    System.err.println("DEBUG parseSeq: parseScalarLine -> childIdx=$ci")
+                    ci
                 }
             }
             // append comma using child's open index
             val childOpen = out.openOf(childIdx)
+            System.err.println("DEBUG parseSeq: childOpen=$childOpen")
             out.addComma(childOpen)
             lastClose = out.closeOf(childIdx).coerceAtLeast(open)
         }
@@ -1059,15 +1082,27 @@ object Path {
     }
 
     private fun stepByIndex(e: JsElement, src: Series<Char>, idx: Int): JsContext? {
-        if (Reify.tagOf(e, src) != Tag.ARRAY) return null
+        val tag = Reify.tagOf(e, src)
+        System.err.println("DEBUG stepByIndex: elementOpen=${e.a.a}, tag=${tag}")
+        if (tag != Tag.ARRAY) {
+            System.err.println("DEBUG stepByIndex: not an array (tag=$tag)")
+            return null
+        }
         val cs = Reify.realCommas(e)
+        // diagnostic: print comma list
+        val csStr = if (cs.size == 0) "[]" else run {
+            val sb = StringBuilder(); sb.append('['); var k = 0
+            while (k < cs.size) { if (k > 0) sb.append(','); sb.append(cs[k]); k++ }
+            sb.append(']'); sb.toString()
+        }
+        System.err.println("DEBUG stepByIndex: commas=${csStr}")
         // iterate commas, skipping negative sentinels; map logical index -> Nth positive entry
         var i = 0; var found = 0
         while (i < cs.size) {
             val v = cs[i]
             if (v >= 0) {
                 if (found == idx) {
-                    println("Path.stepByIndex: idx=$idx -> selected child open=$v")
+                    System.err.println("DEBUG stepByIndex: idx=$idx -> selected child open=$v")
                     val child = childElementAt(v, src)
                     return child j src
                 }
@@ -1075,27 +1110,50 @@ object Path {
             }
             i++
         }
+        System.err.println("DEBUG stepByIndex: index=$idx out of bounds (found=$found)")
         return null
     }
 
     private fun stepByName(e: JsElement, src: Series<Char>, name: String): JsContext? {
         if (Reify.tagOf(e, src) != Tag.OBJECT) return null
         val cs = Reify.realCommas(e)
+        // diagnostic logging: print comma list and name we're searching for
+        try {
+            val csStr = if (cs.size == 0) "[]" else {
+                val sb = StringBuilder()
+                sb.append('[')
+                var k = 0
+                while (k < cs.size) {
+                    if (k > 0) sb.append(',')
+                    sb.append(cs[k])
+                    k++
+                }
+                sb.append(']')
+                sb.toString()
+            }
+            System.err.println("DEBUG stepByName: elementOpen=${e.a.a}, searching for name='${name}', commas=${csStr}")
+        } catch (ex: Throwable) {
+            System.err.println("DEBUG stepByName: failed to get commas for element=${e.a.a}: ${ex.message}")
+        }
         var i = 0
         while (i < cs.size) {
             val keyOpen = cs[i]
             if (keyOpen < 0) { i++; continue }
             val keyElem = childElementAt(keyOpen, src)
             val keyText = stripQuotes(Reify.textOf(keyElem, src))
+            System.err.println("DEBUG stepByName: checking keyOpen=$keyOpen keyText='${keyText}'")
             if (keyText == name) {
                 // value follows key + ':'
                 var p = keyElem.a.b + 1
-                while (p < src.size && (src[p] == ' ' || src[p] == ':' || src[p] == '\t')) p++
+                // skip colon, whitespace and newlines so childElementAt starts at the real value
+                while (p < src.size && (src[p] == ' ' || src[p] == ':' || src[p] == '\t' || src[p] == '\n' || src[p] == '\r')) p++
+                System.err.println("DEBUG stepByName: found key at $keyOpen; value starts at $p (char='${if (p < src.size) src[p] else ' ' }')")
                 val valElem = childElementAt(p, src)
                 return valElem j src
             }
             i++
         }
+        System.err.println("DEBUG stepByName: name='${name}' not found in elementOpen=${e.a.a}")
         return null
     }
 
@@ -1104,20 +1162,28 @@ object Path {
         val sub = src.slice(start, src.size)
         if (sub.size == 0) throw IllegalStateException("empty child slice at $start")
         val first = sub[0]
-        // If the first char is non-printable it's likely CBOR
+        // If the first char is non-printable it's likely CBOR — prefer the shortest matching candidate
         if (first.code <= 0x1F) {
             val all = CborScan.scan(src)
             var k = 0
+            var best: JsElement? = null
+            var bestLen = Int.MAX_VALUE
             while (k < all.size) {
                 val cand = all[k]
-                if (cand.a.a == start) return cand
+                if (cand.a.a == start) {
+                    val len = cand.a.b - cand.a.a
+                    if (len < bestLen) { best = cand; bestLen = len }
+                    if (Reify.tagOf(cand, src) == Tag.STRING) return cand
+                }
                 k++
             }
+            if (best != null) return best
             throw IllegalStateException("cannot locate child at $start in CBOR scan")
         }
-        // Heuristic: try JSON-like starters quickly
+        // Heuristic: try JSON-like starters quickly (but avoid misclassifying YAML '-' sequence markers)
         try {
-            if (first == '{' || first == '[' || first == '"' || first == '\'' || first == '-' || first == '+' || (first >= '0' && first <= '9') || first == 't' || first == 'f' || first == 'n') {
+            val isSignNumber = (first == '-' || first == '+') && sub.size > 1 && (sub[1] in '0'..'9')
+            if (first == '{' || first == '[' || first == '"' || first == '\'' || isSignNumber || (first >= '0' && first <= '9') || first == 't' || first == 'f' || first == 'n') {
                 val scanned = JsonScan.scan(sub)
                 val c0 = scanned[0]
                 val adj = (c0.a.a + start) j (c0.a.b + start)
@@ -1127,15 +1193,22 @@ object Path {
         } catch (_: Throwable) {
             // ignore and try YAML below
         }
-        // Try YAML full-scan and pick the element whose open==start
+        // Try YAML full-scan and pick the element whose open==start, preferring STRING or the shortest span
         try {
             val all = YamlScan.scan(src)
             var k = 0
+            var bestAny: JsElement? = null
+            var bestAnyLen = Int.MAX_VALUE
             while (k < all.size) {
                 val cand = all[k]
-                if (cand.a.a == start) return cand
+                if (cand.a.a == start) {
+                    val len = cand.a.b - cand.a.a
+                    if (Reify.tagOf(cand, src) == Tag.STRING) return cand
+                    if (len < bestAnyLen) { bestAny = cand; bestAnyLen = len }
+                }
                 k++
             }
+            if (bestAny != null) return bestAny
         } catch (_: Throwable) {
             // ignore
         }
@@ -1149,11 +1222,17 @@ object Path {
         } catch (_: Throwable) {
             val all = CborScan.scan(src)
             var k = 0
+            var best: JsElement? = null
+            var bestLen = Int.MAX_VALUE
             while (k < all.size) {
                 val cand = all[k]
-                if (cand.a.a == start) return cand
+                if (cand.a.a == start) {
+                    val len = cand.a.b - cand.a.a
+                    if (len < bestLen) { best = cand; bestLen = len }
+                }
                 k++
             }
+            if (best != null) return best
             throw IllegalStateException("cannot locate child at $start in any scan")
         }
     }

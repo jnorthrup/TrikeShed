@@ -95,6 +95,17 @@ class KursiveCharSeries private constructor(
 
     fun skipWhitespace(): KursiveCharSeries = apply { while (peek()?.isWhitespace() == true) source.pos++ }
 
+    /** Try each string in order; return first successful match's CharSeries slice. Backtracks on failure. */
+    internal fun consumeAnyOf(vararg forms: String): CharSeries? {
+        for (form in forms) {
+            val cp = checkpoint()
+            val start = pos
+            if (consume(form.toSeries())) return slice(start)
+            rewind(cp)
+        }
+        return null
+    }
+
     fun trace(): NarsiveTrace = sink.snapshot()
 
     internal fun emit(name: Series<Char>, start: Int, endExclusive: Int) {
@@ -312,3 +323,7 @@ private val KURSIVE_EVIDENCE_COLUMNS = arrayOf(
     ColumnMeta("minColumnLength", IOMemento.IoInt),
     ColumnMeta("deducedType", IOMemento.IoString),
 )
+
+/** First character as a single-element Series, or null if empty */
+internal fun Series<Char>.firstGlyphOrNull(): Series<Char>? =
+    if (size == 0) null else 1 j { this[0] }
