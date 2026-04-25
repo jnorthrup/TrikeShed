@@ -138,6 +138,7 @@ class LsmrTableSource(private val db: LsmrDatabase, private val blockSizeThresho
         }
 
         val schema = execCtx.schemaManager.getTableSuspend(tableName) ?: TableSchema(tableName, emptyList())
+        val nameToIndex: Map<String, Int> = schema.columns.mapIndexed { i, c -> c.name to i }.toMap()
         var idx = -1
         return object : Cursor {
             override fun next(): Boolean {
@@ -149,7 +150,7 @@ class LsmrTableSource(private val db: LsmrDatabase, private val blockSizeThresho
                 get() = object : RowAccessor {
                     override fun get(index: Int): Any? = rows.getOrNull(idx)?.let { try { it.get(index) } catch (e: Throwable) { null } }
                     override fun get(name: String): Any? {
-                        val colIndex = schema.columns.indexOfFirst { it.name == name }
+                        val colIndex = nameToIndex[name] ?: -1
                         return if (colIndex >= 0) get(colIndex) else null
                     }
                 }

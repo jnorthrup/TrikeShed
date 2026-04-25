@@ -37,7 +37,6 @@ class CharSeries(
     }
 
 
-
     /** get, the verb - the char at the current position and increment position */
     val get: Char
         get() {
@@ -236,7 +235,7 @@ class CharSeries(
     operator fun dec(): CharSeries = apply { require(pos > 0) { "Underflow" }; pos-- }
 
     /** advance 1*/
-    operator fun inc(): CharSeries = apply { require(hasRemaining) { "Overflow" };pos++ }
+    operator fun inc(): CharSeries = apply { require(hasRemaining) { "Overflow" }; pos++ }
 
     //toArray override
     fun toArray(): CharArray {
@@ -335,8 +334,9 @@ operator fun Series<Byte>.div(delim: Byte): Series<Series<Byte>> { //lazy split
         this[p until l]
     }
 
-
 }
+
+
 
 val Series<Char>.cs: CharSequence
     get() = object : CharSequence {

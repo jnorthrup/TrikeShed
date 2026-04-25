@@ -60,13 +60,13 @@ private fun parseJsonNumber(src: Series<Char>): Any? {
  */
 val JsContext.segments: Iterable<JsIndex>
     get() {
-        val (element, src) = this
-        val (openIdx, closeIdx) = element.first
+        val (element: JsElement, src: Series<Char>) = this
+        val (openIdx: Int, closeIdx: Int) = element.first
         val commaIdxs: Series<Int> = element.second
         // boundaries: [openIdx, ...commaIdxs..., closeIdx]
         val boundaries: List<Int> = _l[openIdx, commaIdxs, closeIdx]
         // generate segments: for each pair (b1, b2), the content is from b1+1 to b2 (exclusive)
-        return boundaries.zipWithNext().map { (prev, curr) ->
+        return boundaries.zipWithNext().map { (prev: Int, curr: Int): Pair<Int, Int> ->
             (prev + 1) j curr
         } α { it j src }
     }

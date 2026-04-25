@@ -89,10 +89,12 @@ fun compilePredicate(expr: Expr, ctx: PlannerContext): (RowAccessor) -> Boolean 
 }
 
 fun compareNumbers(a: Any?, b: Any?): Int {
-    val ad = (a as? Number)?.toDouble()
-    val bd = (b as? Number)?.toDouble()
-    if (ad != null && bd != null) {
-        return ad.compareTo(bd)
+    val an = a as? Number
+    val bn = b as? Number
+    if (an != null && bn != null) {
+        val aIntegral = an is Long || an is Int || an is Short || an is Byte
+        val bIntegral = bn is Long || bn is Int || bn is Short || bn is Byte
+        return if (aIntegral && bIntegral) an.toLong().compareTo(bn.toLong()) else an.toDouble().compareTo(bn.toDouble())
     }
     val asStr = a?.toString()
     val bsStr = b?.toString()

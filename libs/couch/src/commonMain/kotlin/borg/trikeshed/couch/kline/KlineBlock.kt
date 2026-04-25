@@ -1,0 +1,88 @@
+package borg.trikeshed.couch.kline
+
+import borg.trikeshed.couch.miniduck.DocRowVec
+import borg.trikeshed.couch.miniduck.MiniCursor
+import borg.trikeshed.couch.miniduck.MiniRowVec
+import borg.trikeshed.lib.Series
+import borg.trikeshed.lib.j
+import borg.trikeshed.lib.size
+
+/**
+ * KlineBlock: DuckDB-style mutable→sealed chunk of klines.
+ *
+ * One writer appends klines during MUTABLE phase.
+ * Seal() is the irreversible sync boundary — readers only see sealed blocks.
+ *
+ * Donor patterns:
+ *   - TradePairEventMuxer: accumulates CandlestickEvents in ArrayList,
+ *     then flushes to ISAM on episode cutoff
+ *   - BlockRowVec: the MUTABLE→SEALED state machine already established
+ *     in TrikeShed miniduck
+ *   - DataBinanceVision.klines: the schema (Open_time, Open, High, Low, Close, Volume)
+ *
+ * Single-timespan invariant: all klines in a block must share the same TimeSpan.
+ * The block may also enforce a single symbol (currently not enforced; symbol is
+ * carried per-row as in the donor).
+ */
+class KlineBlock private constructor(
+    private val rows: MutableList<Kline>,
+    private var _state: State,
+    private val timespan: TimeSpan?,
+) {
+
+    enum class State { MUTABLE, SEALED }
+
+    val state: State get() = _state
+    val rowCount: Int get() = rows.size
+
+    companion object {
+        /** Create a new mutable block. Optionally enforce a single timespan. */
+        fun mutable(timespan: TimeSpan? = null): KlineBlock =
+            KlineBlock(mutableListOf(), State.MUTABLE, timespan)
+    }
+
+    /**
+     * Append a kline to this mutable block.
+     *
+     * @throws IllegalStateException if the block is sealed.
+     * @throws IllegalArgumentException if the kline's timespan doesn't match the block's.
+     */
+    fun append(kline: Kline) {
+        check(_state == State.MUTABLE) { "Cannot append to sealed block" }
+        if (timespan != null && kline.timespan != timespan) {
+            throw IllegalArgumentException(
+                "Mixed timespan: block expects $timespan but got ${kline.timespan}"
+            )
+        }
+        rows.add(kline)
+    }
+
+    /**
+     * Seal the block — irreversible.
+     * Returns this same block for fluent usage.
+     *
+     * @throws IllegalStateException if already sealed.
+     */
+    fun seal(): KlineBlock {
+        check(_state == State.MUTABLE) { "Already sealed" }
+        _state = State.SEALED
+        return this
+    }
+
+    /**
+     * Present the sealed block as a MiniCursor of DocRowVec.
+     *
+     * Each row is a Kline.toDocRowVec() — the standard OHLCV keys.
+     * The cursor is a lazy Series: rows are projected on access.
+     *
+     * @throws IllegalStateException if the block is not sealed.
+     */
+    fun asCursor(): MiniCursor {
+        check(_state == State.SEALED) { "Block must be sealed before presenting as cursor" }
+        // Snapshot the rows list to avoid concurrent modification
+        val snapshot = rows.toList()
+        return snapshot.size j { i: Int ->
+            snapshot[i].toDocRowVec()
+        }
+    }
+}

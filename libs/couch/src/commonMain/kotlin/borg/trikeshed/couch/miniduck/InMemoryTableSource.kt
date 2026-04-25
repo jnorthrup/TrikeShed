@@ -29,6 +29,7 @@ class InMemoryTableSource : TableSource {
     override fun open(execCtx: ExecutionContext, tableName: String): Cursor {
         val rows = tables[tableName] ?: emptyList<List<Any?>>()
         val schema = execCtx.schemaManager.getTable(tableName) ?: schemas[tableName]
+        val nameToIndex: Map<String, Int> = schema?.columns?.mapIndexed { i, c -> c.name to i }?.toMap() ?: emptyMap()
 
         return object : Cursor {
             var idx = -1
@@ -46,7 +47,7 @@ class InMemoryTableSource : TableSource {
                     override fun get(index: Int): Any? = rows.getOrNull(idx)?.getOrNull(index)
 
                     override fun get(name: String): Any? {
-                        val colIndex = schema?.columns?.indexOfFirst { it.name == name } ?: -1
+                        val colIndex = nameToIndex[name] ?: -1
                         return if (colIndex >= 0) get(colIndex) else null
                     }
                 }

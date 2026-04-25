@@ -42,7 +42,15 @@ fun compareKeys(a: Any?, b: Any?): Int = when {
     a == null && b == null -> 0
     a == null -> -1
     b == null -> 1
-    a is Number && b is Number -> a.toDouble().compareTo(b.toDouble())
+    a is Number && b is Number -> run {
+        val aIntegral = a is Long || a is Int || a is Short || a is Byte
+        val bIntegral = b is Long || b is Int || b is Short || b is Byte
+        if (aIntegral && bIntegral) {
+            a.toLong().compareTo(b.toLong())
+        } else {
+            a.toDouble().compareTo(b.toDouble())
+        }
+    }
     else -> a.toString().compareTo(b.toString())
 }
 
