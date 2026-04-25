@@ -1,3 +1,5 @@
+@file:Suppress("UNCHECKED_CAST")
+
 package borg.trikeshed.cursor
 
 // import the IoMemento enum
@@ -16,8 +18,14 @@ typealias RowVec = Series2<Any?, () -> ColumnMeta>
 /** Cursors are a columnar abstraction composed of Series of Joined value+meta pairs (RecordMeta) */
 typealias Cursor = Series<RowVec>
 
-/** Series joins: combine row values with column metadata providers into a RowVec. */
-infix fun Series<Any?>.joins(meta: Series<() -> ColumnMeta>): RowVec = this.zip(meta)
+/** Pair row values with column metadata providers into a RowVec. */
+infix fun Series<Any?>.j(meta: Series<() -> ColumnMeta>): RowVec = this.zip(meta)
+
+/**
+ * Joins a Series of scalar values with a Series of column metadata providers into a RowVec.
+ * This is a convenience alias used across the codebase where the name 'joins' is preferred.
+ */
+infix fun Series<Any?>.joins(meta: Series<() -> ColumnMeta>): RowVec = this j meta
 
 /** Cursors combine: combine a series of RowVec into a Cursor. */
 val Series<RowVec>.cursor: Cursor get() = this
@@ -27,6 +35,12 @@ fun combine(a: Cursor, b: Cursor): Cursor = borg.trikeshed.lib.combine(a, b)
 
 /** Mutable wrapper for combined cursors; no performance guarantees. */
 fun combineMutable(a: Cursor, b: Cursor): MutableSeries<RowVec> = combine(a, b).cow
+
+/** Project the scalar values from a RowVec, discarding column metadata. */
+val RowVec.values: Series<Any?> get() = this α { it.a }
+
+/** α-conversion over a Cursor — apply a transform to each RowVec. */
+infix fun <C> Cursor.α(xform: (RowVec) -> C): Series<C> = size j { xform(row(it)) }
 
 ///**
 // * overload unary minus operator for Cursor to strip out the meta and return a series of values-only
