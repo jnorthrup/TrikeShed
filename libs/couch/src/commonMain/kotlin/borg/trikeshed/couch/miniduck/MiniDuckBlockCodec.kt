@@ -115,7 +115,7 @@ object MiniDuckBlockCodec {
         return when (map.string("type")) {
             "DocRowVec" -> DocRowVec(
                 keys = map.stringList("keys"),
-                cells = map.anyList("cells").map { if (it is String) unescapeJson(it) else it },
+                cells = map.anyList("cells"),
                 child = map.childSeries(),
             )
             "ViewRowVec" -> {

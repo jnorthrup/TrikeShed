@@ -37,28 +37,11 @@ import kotlin.coroutines.CoroutineContext
  * ═══════════════════════════════════════════════════════════════════════════ */
 
 
-/* ─── kernel algebra (self-contained, no stdlib collections) ────────────── */
+/* ─── kernel algebra — rely on canonical definitions in borg.trikeshed.lib ────────────── */
 
-interface Join<A, B> {
-    val a: A
-    val b: B
-    operator fun component1(): A = a
-    operator fun component2(): B = b
-}
+import borg.trikeshed.lib.*
 
-private class JoinImpl<A, B>(override val a: A, override val b: B) : Join<A, B>
-
-@Suppress("FunctionName")
-fun <A, B> Join(a: A, b: B): Join<A, B> = JoinImpl(a, b)
-
-inline infix fun <A, B> A.j(b: B): Join<A, B> = Join(this, b)
-
-typealias Twin<T> = Join<T, T>
-typealias Series<T> = Join<Int, (Int) -> T>
-typealias Series2<A, B> = Series<Join<A, B>>
-
-val <T> Series<T>.size: Int get() = a
-operator fun <T> Series<T>.get(i: Int): T = b(i)
+// Kernel algebra types and Series extensions are defined in borg.trikeshed.lib to avoid duplication.
 
 inline infix fun <X, C> Series<X>.α(crossinline f: (X) -> C): Series<C> =
     size j { i: Int -> f(this[i]) }

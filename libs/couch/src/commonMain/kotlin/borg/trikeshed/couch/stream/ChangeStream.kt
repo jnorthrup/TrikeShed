@@ -31,6 +31,7 @@ sealed class Change<out T> {
 class ChangeEmitter<T> {
     private val listeners: MutableMap<Int, (Change<T>) -> Unit> = linkedMapOf()
     private var nextToken = 0
+    private var sealed: Boolean = false
 
     /** Register a listener. Returns a token which can be used to unregister. */
     fun register(cb: (Change<T>) -> Unit): Int {
@@ -44,6 +45,10 @@ class ChangeEmitter<T> {
     }
 
     fun emit(change: Change<T>) {
+        // if already sealed, ignore subsequent events
+        if (sealed) return
+        // Mark sealed if this is the seal event so later emits are ignored
+        if (change is Change.Seal) sealed = true
         // iterate over snapshot to avoid concurrent-modification surprises
         val snapshot = listeners.values.toList()
         for (cb in snapshot) cb(change)

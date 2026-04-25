@@ -75,7 +75,7 @@ class KlineStreamTest {
         )
 
         val row: DocRowVec = kline.toDocRowVec()
-        assertEquals(7, row.size)
+        assertEquals(8, row.size)
         assertEquals("ETH-USD", row["symbol"])
         assertEquals(TimeSpan.Minutes5, row["timespan"])
         assertEquals(1714000000L, row["openTime"])

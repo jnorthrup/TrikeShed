@@ -1,5 +1,6 @@
 package borg.trikeshed.couch.miniduck
 
+import borg.trikeshed.lib.*
 import kotlin.test.Test
 import kotlin.test.assertEquals
 

@@ -25,6 +25,7 @@ class SqlIntegrationTest {
         val execCtx = ExecutionContext(schemaManager, PlannerConfig(), tableSource)
 
         val sql = "SELECT id, name FROM users WHERE id = 2"
+        println("SqlParser.class location: " + SqlParser::class.java.protectionDomain.codeSource.location)
         val stmt = SqlParser.parse(sql) ?: throw AssertionError("parse failed")
         val plan = transformSelect(stmt, PlannerContext(schemaManager))
 

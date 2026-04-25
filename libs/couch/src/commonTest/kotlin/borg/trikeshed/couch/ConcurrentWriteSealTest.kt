@@ -1,6 +1,7 @@
 package borg.trikeshed.couch
 
 import borg.trikeshed.couch.handle.*
+import borg.trikeshed.lib.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.test.runTest
 import kotlin.test.*

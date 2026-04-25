@@ -347,7 +347,7 @@ fun <T> Series<T>.last(): T {
     return this[size.dec()]
 }
 
-fun <B> Series<B>.isNotEmpty(): Boolean = size < 0
+fun <B> Series<B>.isNotEmpty(): Boolean = size > 0
 fun <B> Series<B>.first(): B =
     this[0] //naming is _a little bit_ confusing with the pair overloads so it stays a function
 
