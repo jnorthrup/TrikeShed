@@ -4,19 +4,21 @@ package borg.trikeshed.tinybtrfs
  * DiskAdapter: platform-specific backing storage for BPlusTree nodes.
  *
  * CommonMain-only protocol: implementations live in platform modules (jvmMain/posixMain).
+ *
+ * Node identifiers are Strings to allow backend-specific ids (file names, block ids).
  */
 interface DiskAdapter {
     /** Read bytes for node id, or null if not present. */
-    fun readNode(nodeId: Long): ByteArray?
+    fun readNode(nodeId: String): ByteArray?
 
     /** Write node bytes. */
-    fun writeNode(nodeId: Long, bytes: ByteArray)
+    fun writeNode(nodeId: String, bytes: ByteArray)
 
     /** Allocate a new node id (persistent store should guarantee uniqueness). */
-    fun allocateNode(): Long
+    fun allocateNode(): String
 
     /** Free node id. */
-    fun freeNode(nodeId: Long)
+    fun freeNode(nodeId: String)
 }
 
 /**
@@ -24,10 +26,14 @@ interface DiskAdapter {
  * want a trivial memory-backed store.
  */
 class InMemoryDiskAdapter : DiskAdapter {
-    private val store = mutableMapOf<Long, ByteArray>()
+    private val store = mutableMapOf<String, ByteArray>()
     private var nextId = 1L
-    override fun readNode(nodeId: Long): ByteArray? = store[nodeId]
-    override fun writeNode(nodeId: Long, bytes: ByteArray) { store[nodeId] = bytes }
-    override fun allocateNode(): Long = nextId++
-    override fun freeNode(nodeId: Long) { store.remove(nodeId) }
+    override fun readNode(nodeId: String): ByteArray? = store[nodeId]
+    override fun writeNode(nodeId: String, bytes: ByteArray) { store[nodeId] = bytes }
+    override fun allocateNode(): String {
+        val id = "node-${nextId++}"
+        store[id] = ByteArray(0)
+        return id
+    }
+    override fun freeNode(nodeId: String) { store.remove(nodeId) }
 }
