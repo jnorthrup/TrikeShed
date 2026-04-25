@@ -17,6 +17,9 @@ rootProject.name = "TrikeShed"
 include(":libs:common")
 project(":libs:common").projectDir = file("libs/common")
 
+include(":libs:viewserver")
+project(":libs:viewserver").projectDir = file("libs/viewserver")
+
 include(":libs:couch")
 project(":libs:couch").projectDir = file("libs/couch")
 
@@ -40,9 +43,6 @@ project(":libs:server").projectDir = file("libs/server")
 
 include(":libs:uring")
 project(":libs:uring").projectDir = file("libs/uring")
-
-include(":libs:kursive")
-project(":libs:kursive").projectDir = file("libs/kursive")
 
 include(":libs:cmc")
 project(":libs:cmc").projectDir = file("libs/cmc")
