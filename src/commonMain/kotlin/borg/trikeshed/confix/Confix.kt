@@ -61,7 +61,7 @@ val <T> Series<T>.size: Int get() = a
 operator fun <T> Series<T>.get(i: Int): T = b(i)
 
 inline infix fun <X, C> Series<X>.α(crossinline f: (X) -> C): Series<C> =
-    size j { i -> f(this[i]) }
+    size j { i: Int -> f(this[i]) }
 
 /** left identity anchor */
 val <T> T.`↺`: () -> T get() = { this }
@@ -73,26 +73,26 @@ sealed interface Either<out L, out R> {
 }
 
 /** empty Series — size 0, indexer is an unreachable guard */
-fun <T> emptySeries(): Series<T> = 0 j { _ -> error("empty") }
+fun <T> emptySeries(): Series<T> = 0 j { _: Int -> error("empty") }
 
 /** Series from IntArray */
-fun IntArray.asSeries(): Series<Int> = size j { i -> this[i] }
+fun IntArray.asSeries(): Series<Int> = size j { i: Int -> this[i] }
 
 /** Series from CharArray */
-fun CharArray.asSeries(): Series<Char> = size j { i -> this[i] }
+fun CharArray.asSeries(): Series<Char> = size j { i: Int -> this[i] }
 
 /** Series from ByteArray */
-fun ByteArray.asSeries(): Series<Byte> = size j { i -> this[i] }
+fun ByteArray.asSeries(): Series<Byte> = size j { i: Int -> this[i] }
 
 /** Series over a slice of a Series */
 fun <T> Series<T>.slice(from: Int, untilX: Int): Series<T> {
     val s = this
     val n = untilX - from
-    return n j { i -> s[from + i] }
+    return n j { i: Int -> s[from + i] }
 }
 
 /** Series of Chars from a CharSequence (no stdlib collection materialization) */
-fun CharSequence.asSeries(): Series<Char> = length j { i -> this[i] }
+fun CharSequence.asSeries(): Series<Char> = length j { i: Int -> this[i] }
 
 
 /* ─── JSON/CBOR/YAML shared model (exactly the preload aliases) ─────────── */
@@ -149,7 +149,7 @@ class IntBuf(initial: Int = 16) {
     fun toSeries(): Series<Int> {
         val n = size
         val d = data
-        return n j { i -> d[i] }
+        return n j { i: Int -> d[i] }
     }
 
     fun snapshot(): IntArray {
@@ -212,10 +212,10 @@ class ElemBuf(initial: Int = 16) {
         val o = opens; val c = closes; val h = commaHeads; val t = commaTails
         val pool = commas.data
         val poolSize = commas.size
-        return n j { i ->
+        return n j { i: Int ->
             val head = h[i]; val tail = t[i]
             val len = tail - head
-            val commaSeries: Series<Int> = len j { k -> pool[head + k] }
+            val commaSeries: Series<Int> = len j { k: Int -> pool[head + k] }
             (o[i] j c[i]) j commaSeries
         }.also { _ -> @Suppress("UNUSED_VARIABLE") val _p = poolSize }
     }
@@ -873,7 +873,7 @@ object Reify {
         // matching confix, which reuses JsonScan at the child span.
         val cs = realCommas(e)
         val n = cs.size
-        return n j { i ->
+        return n j { i: Int ->
             val childOpen = cs[i]
             // build a minimal sub-scan starting at childOpen to recover a JsElement.
             val sub = src.slice(childOpen, src.size)
@@ -881,7 +881,7 @@ object Reify {
             val cj = singleton[0]
             val adj = (cj.a.a + childOpen) j (cj.a.b + childOpen)
             val ccommas = cj.b
-            val adjustedCommas: Series<Int> = ccommas.size j { k ->
+            val adjustedCommas: Series<Int> = ccommas.size j { k: Int ->
                 val v = ccommas[k]
                 if (v < 0) v else v + childOpen
             }
@@ -894,7 +894,7 @@ object Reify {
     private fun reifyObject(e: JsElement, src: Series<Char>): Series2<String, Any?> {
         val cs = realCommas(e)
         val n = cs.size
-        return n j { i ->
+        return n j { i: Int ->
             val keyOpen = cs[i]
             // reuse JsonScan starting at keyOpen to re-discover key element + ':' + value element
             val sub = src.slice(keyOpen, src.size)
@@ -902,7 +902,7 @@ object Reify {
             val keyScanned = JsonScan.scan(sub)
             val k0 = keyScanned[0]
             val keyAdj = (k0.a.a + keyOpen) j (k0.a.b + keyOpen)
-            val keyCommas: Series<Int> = k0.b.size j { k -> val v = k0.b[k]; if (v < 0) v else v + keyOpen }
+            val keyCommas: Series<Int> = k0.b.size j { k: Int -> val v = k0.b[k]; if (v < 0) v else v + keyOpen }
             val keyElem: JsElement = keyAdj j keyCommas
             val key = reifyString(keyElem, src)
             // find ':' after keyElem
@@ -912,7 +912,7 @@ object Reify {
             val valScanned = JsonScan.scan(sub2)
             val v0 = valScanned[0]
             val valAdj = (v0.a.a + p) j (v0.a.b + p)
-            val valCommas: Series<Int> = v0.b.size j { k -> val v = v0.b[k]; if (v < 0) v else v + p }
+            val valCommas: Series<Int> = v0.b.size j { k: Int -> val v = v0.b[k]; if (v < 0) v else v + p }
             val valElem: JsElement = valAdj j valCommas
             val value = reify(valElem j src)
             key j value
@@ -984,7 +984,7 @@ object Path {
         val scanned = JsonScan.scan(sub)
         val c0 = scanned[0]
         val adj = (c0.a.a + start) j (c0.a.b + start)
-        val commas: Series<Int> = c0.b.size j { k -> val v = c0.b[k]; if (v < 0) v else v + start }
+        val commas: Series<Int> = c0.b.size j { k: Int -> val v = c0.b[k]; if (v < 0) v else v + start }
         return adj j commas
     }
 
@@ -1052,7 +1052,7 @@ private class SubArray {
     }
     fun asSeries(): Series<ConfixSubscriber> {
         val n = size; val d = data
-        return n j { i -> d[i]!! }
+        return n j { i: Int -> d[i]!! }
     }
 }
 
@@ -1129,7 +1129,7 @@ class ConfixElement(
             cached[i] = contextOf(sb.syntax, sb.src)
             i++
         }
-        return n j { k -> cached[k]?.let { Path.resolve(it, path) } }
+        return n j { k: Int -> cached[k]?.let { Path.resolve(it, path) } }
     }
 
     fun drain() {
@@ -1160,7 +1160,7 @@ fun path(vararg segs: Any): JsPath {
 
 fun sources(vararg src: ConfixSource): Series<ConfixSource> {
     val n = src.size
-    return n j { i -> src[i] }
+    return n j { i: Int -> src[i] }
 }
 
 fun jsonSource(text: CharSequence): ConfixSource = ConfixSource(Syntax.JSON, text.asSeries())
@@ -1171,6 +1171,6 @@ fun cborSource(bytes: ByteArray): ConfixSource {
     val ca = CharArray(n)
     var i = 0
     while (i < n) { ca[i] = (bytes[i].toInt() and 0xFF).toChar(); i++ }
-    val series: Series<Char> = n j { k -> ca[k] }
+    val series: Series<Char> = n j { k: Int -> ca[k] }
     return ConfixSource(Syntax.CBOR, series)
 }
