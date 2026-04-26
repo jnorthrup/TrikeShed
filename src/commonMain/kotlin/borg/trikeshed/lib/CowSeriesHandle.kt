@@ -29,8 +29,8 @@ class CowSeriesHandle<T>(
         observer?.invoke(old j new)
     }
 
-    override val a: Int get() = letter.a
-    override val b: (Int) -> T get() = letter.b
+    override val a: Int by letter::a
+    override val b: (Int) -> T by letter::b
     override fun set(index: Int, item: T) {
         letter = letter.set(index, item)
     }

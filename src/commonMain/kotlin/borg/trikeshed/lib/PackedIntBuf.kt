@@ -119,20 +119,11 @@ class DeltaPositionSeries(
 ) : Series<Int> {
     override val a: Int get() = packed.size + 1
 
-    override val b: (Int) -> Int = DeltaPosFn(base, packed)
-}
-
-private class DeltaPosFn(private val base: Int, private val packed: PackedIntBuf) : (Int) -> Int {
-    private var pos = base
-    private var idx = -1
-
-    override fun invoke(i: Int): Int {
-        if (i == 0) { pos = base; idx = 0; return base }
-        if (i <= idx) { pos = base; idx = 0 }
-        while (idx < i) {
-            pos += packed[idx]
-            idx++
+    override val b: (Int) -> Int = { i: Int ->
+        var pos = base
+        for (k in 0..<i) {
+            pos += packed[k]
         }
-        return pos
+        pos
     }
 }

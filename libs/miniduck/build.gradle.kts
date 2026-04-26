@@ -82,6 +82,5 @@ kotlin {
     }
     sourceSets.commonMain.dependencies {
         implementation(kotlin("test"))
-        implementation(kotlin("test-junit"))
     }
 }
