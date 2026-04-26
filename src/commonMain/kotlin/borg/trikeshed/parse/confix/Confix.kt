@@ -835,7 +835,7 @@ object Reify {
                     }
                     else -> -1
                 }
-                if (len >= 0) {
+                if (len >= 0 && p + len - 1 <= b) {
                     val ca = CharArray(len)
                     var i = 0
                     while (i < len && p + i <= b) { ca[i] = src[p + i]; i++ }
@@ -1076,7 +1076,28 @@ object Path {
         while (i < cs.size) {
             val keyOpen = cs[i]
             if (keyOpen < 0) { i++; continue }
-            val keyElem = childElementAt(keyOpen, src)
+            var keyElem = childElementAt(keyOpen, src)
+            // childElementAt prefers containers (OBJECT/ARRAY) over STRING when
+            // both share the same open position (common in YAML block keys where
+            // the key starts the same line as the parent container). For key
+            // lookup we always want the STRING element, not the container.
+            val keyTag = Reify.tagOf(keyElem, src)
+            if (keyTag == Tag.OBJECT || keyTag == Tag.ARRAY) {
+                try {
+                    val all = YamlScan.scan(src)
+                    var k = 0
+                    var found: JsElement? = null
+                    while (k < all.size) {
+                        val cand = all[k]
+                        if (cand.a.a == keyOpen && Reify.tagOf(cand, src) == Tag.STRING) {
+                            found = cand
+                            break
+                        }
+                        k++
+                    }
+                    if (found != null) keyElem = found
+                } catch (_: Throwable) { /* keep original keyElem */ }
+            }
             val keyText = stripQuotes(Reify.textOf(keyElem, src))
             println("DEBUG stepByName: checking keyOpen=$keyOpen keyText='${keyText}'")
             if (keyText == name) {
