@@ -18,6 +18,9 @@ interface SeekHandle {
     /** Read bytes at specific offset. Returns bytes read or -1 for EOF. */
     fun pread(handle: Long, buf: ByteArray, offset: Int, length: Int, fileOffset: Long): Int
 
+    /** Write bytes at specific offset. Returns bytes written. */
+    fun pwrite(handle: Long, buf: ByteArray, offset: Int, length: Int, fileOffset: Long): Int
+
     /** File size in bytes, or -1 if unknown. */
     fun size(handle: Long): Long
 

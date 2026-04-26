@@ -1,8 +1,10 @@
 package borg.trikeshed.couch.miniduck
 
+import kotlinx.coroutines.runBlocking
+
 /**
- * Platform-agnostic declaration for a small helper that allows calling suspend APIs
- * from synchronous code paths in tests and legacy APIs. Each platform provides an
- * `actual` implementation.
+ * Calls `runBlocking` from kotlinx-coroutines-core.
+ * On JVM this uses the real coroutine runner.
+ * On Native targets this throws — native code should use coroutines directly.
  */
-expect fun <T> runBlockingCommon(block: suspend () -> T): T
+fun <T> runBlockingCommon(block: suspend () -> T): T = runBlocking { block() }

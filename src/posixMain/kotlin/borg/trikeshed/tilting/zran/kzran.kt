@@ -52,7 +52,7 @@ class GzIndex {
         if (index < 0 || index >= list.size) {
             throw IndexOutOfBoundsException("Index out of bounds: $index")
         }
-        return list[index].window
+        return list[index].lazyWindow
     }
 
     @OptIn(ExperimentalUnsignedTypes::class)
@@ -150,7 +150,7 @@ class GzIndex {
             list.forEach { writeULong(it.output).usePinned { fwrite(it.addressOf(0), 1u, __ulSz, indexFp) } }
             writeULong(ULong.MAX_VALUE).usePinned { fwrite(it.addressOf(0), 1u, __ulSz, indexFp) }
             list.forEach { writeULong(it.input).usePinned { fwrite(it.addressOf(0), 1u, __ulSz, indexFp) } }
-            list.forEach { writeUShort(it.winsize).usePinned { fwrite(it.addressOf(0), 1u, __usSz, indexFp) } }
+            list.forEach { writeUShort(it.winsize.toUShort()).usePinned { fwrite(it.addressOf(0), 1u, __usSz, indexFp) } }
             list.forEach { it.window.apply { usePinned { fwrite(it.addressOf(0), 1u, size.toULong(), indexFp) } } }
             0
         }
@@ -203,24 +203,20 @@ class GzIndex {
 
         val isStdin = (indexFname == "-")
 
-        for (i: Int in pointOutput.indices)
+        for (i: Int in pointOutput.indices) {
             list += Point(pointOutput[i], pointInput[i], UByteArray(0),
                 windowSupplier = if (isStdin) {
-                    val window = UByteArray(windowSizes[i].toInt())
-                    window.usePinned { fread(it.addressOf(0), 1u, windowSizes[i].toULong(), stdin) }
-                    window.leftIdentity
-                } else fun(): UByteArray {
-                    return withIndexFile(indexFname) { indexFp  ->
+                    { val window = UByteArray(windowSizes[i].toInt())
+                      window.usePinned { fread(it.addressOf(0), 1u, windowSizes[i].toULong(), stdin!!) }
+                      window }
+                } else {
+                    { withIndexFile(indexFname) { indexFp ->
                         fseek(indexFp, windowOffsets[i].toLong(), SEEK_SET)
                         val window = UByteArray(windowSizes[i].toInt())
-                        window.usePinned {
-                            fread(it.addressOf(0), 1u, windowSizes[i].toULong(), indexFp)
-                        }
-                        window
-                    }
-                }
-            )
-        0
+                        window.usePinned { fread(it.addressOf(0), 1u, windowSizes[i].toULong(), indexFp) }
+                        window } }
+                })
+        }; 0
     }
 
     /**
@@ -229,7 +225,8 @@ class GzIndex {
     private fun <T> withIndexFile(indexFname: String?, mode: String = "rb", block: (CPointer<FILE>) -> T): T {
         try {
             return if (indexFname == null || indexFname == "-") {
-                block(stdin!!)
+                val stdinFp = stdin ?: error("stdin is not available")
+                block(stdinFp)
             } else {
                 val indexFp = fopen(indexFname, mode)
                 posixFailOn(indexFp == null) { ("Error: could not open index file $indexFname") }
@@ -300,12 +297,13 @@ fun createindex(args: Array<String>) {
         }
     }
 
-    val gzFile = gzFileName?.let { fopen(gzFileName, "rb") } ?: stdin
-    ?: throw IllegalStateException("Error: could not open gzip file $gzFileName")
+        val gzFile = gzFileName?.let { fopen(gzFileName, "rb") }
+            ?: (stdin ?: error("stdin is not available"))
+        posixRequires(gzFile != null) { "Error: could not open gzip file $gzFileName" }
 
     val gzIndex = GzIndex()
-    gzIndex.build(gzFile, span)
-    fclose(gzFile)
+    gzIndex.build(gzFile!!, span)
+    fclose(gzFile!!)
 
     gzIndex.fpName = indexFileName
     if (indexFileName != null) gzIndex.writeIndex(indexFileName)
@@ -345,19 +343,20 @@ fun decode(args: Array<String>) {
 
     if (gzFileName == null && indexFileName == null) throw IllegalStateException("stdin used twice")
 
-    val gzFile = gzFileName?.let { fopen(gzFileName, "rb") } ?: stdin
-    ?: throw IllegalStateException("Error: could not open gzip file $gzFileName")
+    val gzFile = gzFileName?.let { fopen(gzFileName, "rb") }
+        ?: (stdin ?: error("stdin is not available"))
+    posixRequires(gzFile != null) { "Error: could not open gzip file $gzFileName" }
 
     val gzIndex = GzIndex()
     gzIndex.fpName = indexFileName
     posixRequires(gzIndex.readIndex(indexFileName).z) { "Error: could not read index file $indexFileName" }
 
-    val outputStream = outfile?.let { fopen(it, "wb") } ?: stdout
-    ?: throw IllegalStateException("Error: could not open output file $outfile")
+    val outputStream = outfile?.let { fopen(it, "wb") } ?: (stdout ?: error("stdout is not available"))
+    posixRequires(outputStream != null) { "Error: could not open output file $outfile" }
 
     for (i in start until end) {
         val window = gzIndex.getWindow(i.toInt())
-        window.usePinned { fwrite(it.addressOf(0), 1u, window.size.toULong(), stdout) }
+        window.usePinned { fwrite(it.addressOf(0), 1u, window.size.toULong(), outputStream!!) }
     }
 
     val list = gzIndex.list
@@ -399,7 +398,7 @@ fun decode(args: Array<String>) {
         val buf = UByteArray(1)
         for (uByte in ofsrc) {
             buf[0] = uByte
-            fwrite(buf.refTo(0), 1u, 1UL, outputStream).also {
+            fwrite(buf.refTo(0), 1u, 1UL, outputStream!!).also {
                 posixRequires(it == 1UL) { "Error: could not write to $outfile" }
             }
         }

@@ -43,6 +43,13 @@ kotlin {
         binaries.executable()
     }
 
+    val hostOs = System.getProperty("os.name")
+    if (hostOs == "Mac OS X" && System.getProperty("os.arch") == "aarch64") {
+        macosArm64("macos")
+    } else if (hostOs == "Linux") {
+        linuxX64("linux")
+    }
+
     sourceSets {
         val commonMain by getting {
             dependencies {
@@ -68,6 +75,16 @@ kotlin {
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
             }
         }
+
+        // POSIX source set shared by all native targets
+        val posixMain by creating {
+            dependsOn(commonMain)
+        }
+
+        // Each native target depends on posixMain + commonMain
+        // Attach posixMain to any native main source sets present for the current host
+        findByName("macosMain")?.let { it.dependsOn(posixMain) }
+        findByName("linuxMain")?.let { it.dependsOn(posixMain) }
     }
 }
 

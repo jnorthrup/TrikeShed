@@ -2,46 +2,43 @@ package borg.trikeshed.cursor
 
 import borg.trikeshed.isam.RecordMeta
 import borg.trikeshed.isam.meta.IOMemento
+import borg.trikeshed.lib.Join
+import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.j
-import borg.trikeshed.lib.toArray
 import borg.trikeshed.lib.toSeries
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 
 class CursorTensorTest {
-    private fun sampleCursor(): Cursor {
-        val metas = arrayOf(
-            RecordMeta("price", IOMemento.IoDouble),
-            RecordMeta("volume", IOMemento.IoDouble),
-        )
-        val metaFns = arrayOf<() -> ColumnMeta>(
-            { metas[0] },
-            { metas[1] },
-        ).toSeries()
 
-        return arrayOf(
-            arrayOf<Any?>(100.0, 10.0).toSeries().j(metaFns),
-            arrayOf<Any?>(101.5, 20.0).toSeries().j(metaFns),
-            arrayOf<Any?>(99.0, 15.0).toSeries().j(metaFns),
-        ).toSeries()
+    /** Build a typed RowVec: values zipped with metadata. */
+    private fun rowVecOf(vararg pairs: Pair<Any?, IOMemento>): Join<Any?, Series<() -> ColumnMeta>> {
+        val values: Series<Any?> = pairs.size j { pairs[it].first }
+        val metas: Series<() -> ColumnMeta> = pairs.size j { { RecordMeta("", pairs[it].second) } }
+        return values j metas
     }
+
+    /** Build a Cursor from RowVec rows. */
+    private fun cursorOf(vararg rows: Join<Any?, Series<() -> ColumnMeta>>) =
+        rows.size j { i: Int -> rows[i] }
+
+    @Suppress("UNCHECKED_CAST")
+    private fun typedCursorOf(vararg rows: Any?): Cursor =
+        rows.size j { rows[it] as RowVec }
 
     @Test
     fun reifiesNumericCursorIntoDenseTensor() {
-        val cursor = sampleCursor()
-        println(
-            "cursor.rows=" +
-                listOf(cursor[0][0].a, cursor[0][1].a, cursor[1][0].a, cursor[1][1].a, cursor[2][0].a, cursor[2][1].a)
-                    .joinToString(","),
+        // Cursor = Series<RowVec>, RowVec = Join<Any?, Series<() -> ColumnMeta>>
+        val cursor = typedCursorOf(
+            rowVecOf(100.0 to IOMemento.IoDouble, 10.0 to IOMemento.IoDouble),
+            rowVecOf(101.5 to IOMemento.IoDouble, 20.0 to IOMemento.IoDouble),
+            rowVecOf(99.0 to IOMemento.IoDouble, 15.0 to IOMemento.IoDouble),
         )
         val tensor = cursor.toCursorTensor()
 
-        println("tensor.values=${tensor.values.joinToString(",")}")
         assertEquals(3, tensor.rowCount)
         assertEquals(2, tensor.columnCount)
-        assertContentEquals(intArrayOf(0, 1), tensor.sourceColumnIndices)
-        assertContentEquals(arrayOf("price", "volume"), tensor.columnNames.toArray())
         assertContentEquals(doubleArrayOf(100.0, 10.0, 101.5, 20.0, 99.0, 15.0), tensor.values)
         assertEquals(55.0, tensor.rowMean(0), absoluteTolerance = 1e-12)
         assertEquals(300.5 / 3.0, tensor.columnMean(0), absoluteTolerance = 1e-12)

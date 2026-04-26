@@ -2,19 +2,40 @@ package borg.trikeshed.couch.handle
 
 import borg.trikeshed.couch.miniduck.MiniRowVec
 import borg.trikeshed.lib.Series
+import borg.trikeshed.lib.j
 
-/** Multiplatform declarations — platform-specific implementations provided in platform source sets */
-// Using top-level HandleState enum; platform-specific actual provided in jvmMain
+/**
+ * In-memory collection handle for appending rows and producing immutable snapshots.
+ * Thread-unsafe — use synchronization at the call site when needed.
+ */
+class CollectionHandle private constructor() {
+    private var _state: HandleState = HandleState.OPEN
+    private val rows: MutableList<MiniRowVec> = mutableListOf()
 
-expect class CollectionHandle {
-    val state: HandleState
-    val rowCount: Int
+    val state: HandleState get() = _state
+    val rowCount: Int get() = rows.size
+
     companion object {
-        fun open(): CollectionHandle
+        fun open(): CollectionHandle = CollectionHandle()
     }
-    fun append(row: MiniRowVec)
-    fun seal()
-    fun close()
-    fun snapshot(): Series<MiniRowVec>
-}
 
+    fun append(row: MiniRowVec) {
+        check(_state == HandleState.OPEN) { "Cannot append unless OPEN" }
+        rows.add(row)
+    }
+
+    fun seal() {
+        check(_state == HandleState.OPEN) { "Can only seal from OPEN state" }
+        _state = HandleState.SEALED
+    }
+
+    fun close() {
+        if (_state == HandleState.OPEN) _state = HandleState.SEALED
+        _state = HandleState.CLOSED
+    }
+
+    fun snapshot(): Series<MiniRowVec> {
+        check(_state != HandleState.CLOSED) { "Cannot snapshot a CLOSED handle" }
+        return rows.size j { rows[it] }
+    }
+}

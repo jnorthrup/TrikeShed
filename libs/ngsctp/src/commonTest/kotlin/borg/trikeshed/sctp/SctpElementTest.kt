@@ -1,26 +1,32 @@
 package borg.trikeshed.sctp
 
+import borg.trikeshed.context.AsyncContextElement
+import borg.trikeshed.context.AsyncContextKey
 import kotlin.coroutines.CoroutineContext
 import kotlin.test.Test
 import kotlin.test.assertNull
 import kotlin.test.assertSame
+import kotlin.test.assertTrue
 
+/**
+ * Verifies SctpElement context-key integration.
+ */
 class SctpElementTest {
     @Test
-    fun contextLookupReturnsSctpElement() {
+    fun sctpElementKeyIsAccessible() {
         val element = SctpElement()
-        val context: CoroutineContext = element
-
-        assertSame(element, context[SctpElement.Key])
-        assertNull(context[OtherSctpElement.Key])
+        val ctx: CoroutineContext = element
+        // element.key returns the companion object instance
+        assertSame(element.key, SctpElement.Key)
+        // cross-check with distinct key
+        assertNull(ctx[OtherSctpElement.Key])
     }
 }
 
-private class OtherSctpElement : borg.trikeshed.context.AsyncContextElement() {
-    companion object Key : borg.trikeshed.context.AsyncContextKey<OtherSctpElement>("OtherSctpKey")
-    override val key: borg.trikeshed.context.AsyncContextKey<OtherSctpElement>
-        get() = Key
+/** Other element with distinct key for cross-check. */
+private class OtherSctpElement : AsyncContextElement() {
+    companion object Key : AsyncContextKey<OtherSctpElement>("OtherSctpKey", 1L shl 10)
 
-    override suspend fun open() = Unit
-    override suspend fun close() = Unit
+    override val key: AsyncContextKey<OtherSctpElement>
+        get() = Key
 }

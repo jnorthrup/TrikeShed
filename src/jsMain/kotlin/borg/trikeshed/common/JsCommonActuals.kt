@@ -81,7 +81,7 @@ actual fun readLinesSeq(path: String): Sequence<String> =
 actual fun readLines(path: String): List<String> = Files.readAllLines(path)
 
 private data class JsHandleState(
-    val filename: String,
+    val fd: Int,
     var position: Long = 0,
 )
 
@@ -90,43 +90,40 @@ class JsSeekHandle : SeekHandle {
     private var nextHandle = 1L
 
     override fun open(filename: String, readOnly: Boolean): Long {
-        require(Files.exists(filename)) { "File does not exist: $filename" }
+        require(jsExists(filename)) { "File does not exist: $filename" }
+        val fd = jsOpen(filename, readOnly)
         val handle = nextHandle++
-        handles[handle] = JsHandleState(filename)
+        handles[handle] = JsHandleState(fd)
         return handle
     }
 
     override fun close(handle: Long) {
-        handles.remove(handle)
+        handles.remove(handle)?.let { jsClose(it.fd) }
     }
 
     override fun pread(handle: Long, buf: ByteArray, offset: Int, length: Int, fileOffset: Long): Int {
         val state = handles[handle] ?: return -1
-        val bytes = if (Files.exists(state.filename)) Files.readAllBytes(state.filename) else ByteArray(0)
-        val start = fileOffset.toInt().coerceAtLeast(0)
-        if (start >= bytes.size) return -1
-        val count = minOf(length, bytes.size - start)
-        for (i in 0 until count) {
-            buf[offset + i] = bytes[start + i]
-        }
-        return count
+        return jsPread(state.fd, buf, offset, length, fileOffset)
+    }
+
+    override fun pwrite(handle: Long, buf: ByteArray, offset: Int, length: Int, fileOffset: Long): Int {
+        val state = handles[handle] ?: return -1
+        return jsPwrite(state.fd, buf, offset, length, fileOffset)
     }
 
     override fun size(handle: Long): Long {
         val state = handles[handle] ?: return -1
-        return if (Files.exists(state.filename)) Files.readAllBytes(state.filename).size.toLong() else 0L
+        // Get size by seeking to end
+        val buf = ByteArray(1)
+        var pos = 0L
+        while (jsPread(state.fd, buf, 0, 1, pos) == 1) pos++
+        return pos
     }
 
     override fun read(handle: Long, buf: ByteArray, offset: Int, length: Int): Int {
         val state = handles[handle] ?: return -1
-        val bytes = if (Files.exists(state.filename)) Files.readAllBytes(state.filename) else ByteArray(0)
-        val start = state.position.toInt().coerceAtLeast(0)
-        if (start >= bytes.size) return -1
-        val count = minOf(length, bytes.size - start)
-        for (i in 0 until count) {
-            buf[offset + i] = bytes[start + i]
-        }
-        state.position += count.toLong()
+        val count = jsPread(state.fd, buf, offset, length, state.position)
+        if (count > 0) state.position += count
         return count
     }
 
@@ -169,21 +166,6 @@ actual class FileBuffer actual constructor(
     actual fun size(): Long = delegate.size()
 
     actual fun get(index: Long): Byte = delegate.get(index)
-
-    actual fun put(index: Long, value: Byte) {
-        val bytes = if (Files.exists(filename)) Files.readAllBytes(filename) else ByteArray(0)
-        val absolute = (initialOffset + index).toInt()
-        val updated = if (absolute < bytes.size) {
-            bytes[absolute] = value
-            bytes
-        } else {
-            ByteArray(absolute + 1).also { expanded ->
-                bytes.copyInto(expanded)
-                expanded[absolute] = value
-            }
-        }
-        Files.write(filename, updated)
-    }
 }
 
 actual class SeekFileBuffer actual constructor(
@@ -213,25 +195,6 @@ actual class SeekFileBuffer actual constructor(
     actual fun size(): Long = delegate.size()
 
     actual fun get(index: Long): Byte = delegate.get(index)
-
-    actual fun seek(pos: Long) {
-        delegate.seek(pos)
-    }
-
-    actual fun put(index: Long, value: Byte) {
-        val bytes = if (Files.exists(filename)) Files.readAllBytes(filename) else ByteArray(0)
-        val absolute = (initialOffset + index).toInt()
-        val updated = if (absolute < bytes.size) {
-            bytes[absolute] = value
-            bytes
-        } else {
-            ByteArray(absolute + 1).also { expanded ->
-                bytes.copyInto(expanded)
-                expanded[absolute] = value
-            }
-        }
-        Files.write(filename, updated)
-    }
 
     actual fun readv(requests: Series2<Long, ByteSeries>): IntArray = delegate.readv(requests)
 }

@@ -203,9 +203,6 @@ private object WasmBrowserSeekHandle : SeekHandle {
     private var nextHandle = 1L
 
     override fun open(filename: String, readOnly: Boolean): Long {
-        if (!Files.exists(filename)) {
-            throw IllegalArgumentException("File does not exist: $filename")
-        }
         val handle = nextHandle++
         handles[handle] = HandleState(filename = normalizePath(filename))
         return handle
@@ -217,19 +214,35 @@ private object WasmBrowserSeekHandle : SeekHandle {
 
     override fun pread(handle: Long, buf: ByteArray, offset: Int, length: Int, fileOffset: Long): Int {
         val state = handles[handle] ?: return -1
-        val bytes = Files.readAllBytes(state.filename)
+        val bytes = readBlob(state.filename) ?: return -1
+        val decoded = decodeHex(bytes)
         val start = fileOffset.toInt().coerceAtLeast(0)
-        if (start >= bytes.size) return -1
-        val count = minOf(length, bytes.size - start)
+        if (start >= decoded.size) return -1
+        val count = minOf(length, decoded.size - start)
         for (index in 0 until count) {
-            buf[offset + index] = bytes[start + index]
+            buf[offset + index] = decoded[start + index]
         }
         return count
     }
 
+    override fun pwrite(handle: Long, buf: ByteArray, offset: Int, length: Int, fileOffset: Long): Int {
+        val state = handles[handle] ?: return -1
+        // Read-modify-write: localStorage has no partial overwrite
+        val existing = decodeHex(readBlob(state.filename) ?: "")
+        val start = fileOffset.toInt().coerceAtLeast(0)
+        val end = (start + length).coerceAtMost(existing.size)
+        val updated = ByteArray(maxOf(existing.size, end))
+        existing.copyInto(updated)
+        for (i in 0 until length) {
+            if (start + i < updated.size) updated[start + i] = buf[offset + i]
+        }
+        writeBlob(state.filename, encodeHex(updated))
+        return length
+    }
+
     override fun size(handle: Long): Long {
         val state = handles[handle] ?: return -1
-        return Files.readAllBytes(state.filename).size.toLong()
+        return decodeHex(readBlob(state.filename) ?: "").size.toLong()
     }
 
     override fun read(handle: Long, buf: ByteArray, offset: Int, length: Int): Int {
@@ -377,21 +390,6 @@ actual class FileBuffer actual constructor(
     actual fun size(): Long = delegate.size()
 
     actual fun get(index: Long): Byte = delegate.get(index)
-
-    actual fun put(index: Long, value: Byte) {
-        val bytes = Files.readAllBytes(filename)
-        val absolute = (initialOffset + index).toInt()
-        val updated =
-            if (absolute < bytes.size) {
-                bytes.also { it[absolute] = value }
-            } else {
-                ByteArray(absolute + 1).also { expanded ->
-                    bytes.copyInto(expanded)
-                    expanded[absolute] = value
-                }
-            }
-        Files.write(filename, updated)
-    }
 }
 
 actual class SeekFileBuffer actual constructor(
@@ -424,21 +422,6 @@ actual class SeekFileBuffer actual constructor(
 
     actual fun seek(pos: Long) {
         delegate.seek(pos)
-    }
-
-    actual fun put(index: Long, value: Byte) {
-        val bytes = Files.readAllBytes(filename)
-        val absolute = (initialOffset + index).toInt()
-        val updated =
-            if (absolute < bytes.size) {
-                bytes.also { it[absolute] = value }
-            } else {
-                ByteArray(absolute + 1).also { expanded ->
-                    bytes.copyInto(expanded)
-                    expanded[absolute] = value
-                }
-            }
-        Files.write(filename, updated)
     }
 
     actual fun readv(requests: Series2<Long, ByteSeries>): IntArray = delegate.readv(requests)

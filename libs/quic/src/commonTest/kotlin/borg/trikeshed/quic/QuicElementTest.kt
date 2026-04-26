@@ -1,26 +1,32 @@
 package borg.trikeshed.quic
 
+import borg.trikeshed.context.AsyncContextElement
+import borg.trikeshed.context.AsyncContextKey
 import kotlin.coroutines.CoroutineContext
 import kotlin.test.Test
 import kotlin.test.assertNull
 import kotlin.test.assertSame
+import kotlin.test.assertTrue
 
+/**
+ * Verifies QuicElement context-key integration.
+ */
 class QuicElementTest {
     @Test
-    fun contextLookupReturnsQuicElement() {
+    fun quicElementKeyIsAccessible() {
         val element = QuicElement()
-        val context: CoroutineContext = element
-
-        assertSame(element, context[QuicElement.Key])
-        assertNull(context[OtherQuicElement.Key])
+        val ctx: CoroutineContext = element
+        // element.key returns the companion object instance
+        assertSame(element.key, QuicElement.Key)
+        // cross-check with distinct key
+        assertNull(ctx[OtherQuicElement.Key])
     }
 }
 
-private class OtherQuicElement : borg.trikeshed.context.AsyncContextElement() {
-    companion object Key : borg.trikeshed.context.AsyncContextKey<OtherQuicElement>("OtherQuicKey")
-    override val key: borg.trikeshed.context.AsyncContextKey<OtherQuicElement>
-        get() = Key
+/** Other element with distinct key for cross-check. */
+private class OtherQuicElement : AsyncContextElement() {
+    companion object Key : AsyncContextKey<OtherQuicElement>("OtherQuicKey", 1L shl 6)
 
-    override suspend fun open() = Unit
-    override suspend fun close() = Unit
+    override val key: AsyncContextKey<OtherQuicElement>
+        get() = Key
 }

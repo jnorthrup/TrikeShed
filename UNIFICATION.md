@@ -265,18 +265,22 @@ shell). But they could share a `ShellRowVec` base if more shell types emerge.
 - **U3** ✅ `Cursor.α(xform)` + `RowVec.values` — Cursor.kt, single-step projection now available
 - **U1** ✅ `ObjectStoreRowVec.companion` factory methods (`.gcs()`, `.s3()`, `.alibaba()`) — adapters updated to use
   factory; subclasses preserved as thin codec-compatible wrappers
+- **U2** ✅ `LazyChildRowVec` abstract base class — `loadChild` helper shared across ViewRowVec, BlobRowVec, JsonRowVec, YamlRowVec; added to Predicate.kt dispatch
+- **U5** ✅ `Series.div(Int)` remainder fix — remainder elements now go to last partition; `5 div 2` produces `[2, 3]` not `[2, 2]`
+- **U6** ✅ `Reducer<T, R>` interface — placed in `lib/Series.kt` (shared across modules); `Series.fold(Reducer)` overload; `RowReducer` moved to `lib` (was in GroupBy.kt); `Reducer<in T, R>` with `in` variance for contravariance
+- **U7** ✅ `toSeries()` deduplication — removed 9 dead overloads (BooleanArray, ShortArray, LongArray, FloatArray, CharArray, UByteArray, UShortArray, ULongArray, closedRange variant); kept List, ByteArray, IntArray, UIntArray, DoubleArray, String, CharSequence, Sequence, ClosedRange<Int>
 
 ## Implementation Order
 
 | # | Unification                                     | Risk     | Est. Lines         | Status  |
 |---|-------------------------------------------------|----------|--------------------|---------|
 | 1 | ObjectStoreRowVec factory (remove 3 subclasses) | Low      | -45                | ✅ Done  |
-| 2 | Lazy child base class                           | Medium   | -20, +shared infra | Pending |
+| 2 | Lazy child base class                           | Medium   | -20, +shared infra | ✅ Done  |
 | 3 | `α` on Cursor                                   | Low      | +10                | ✅ Done  |
 | 4 | `j` as universal constructor (rename `joins`)   | Medium   | -5, +clarity       | ✅ Done  |
-| 5 | `div` / `groupBy` shared algebra                | Medium   | -15                | Pending |
-| 6 | Typed reducers                                  | High     | larger refactor    | Pending |
-| 7 | `toSeries()` dedup                              | Low      | -10                | Pending |
+| 5 | `div` / `groupBy` shared algebra               | Medium   | -15                | ✅ Done  |
+| 6 | Typed reducers                                  | High     | larger refactor    | ✅ Done  |
+| 7 | `toSeries()` dedup                              | Low      | -10                | ✅ Done  |
 | 8 | ShellRowVec base                                | Very Low | future-proofing    | Pending |
 
 **Recommended start:** Unifications 1 → 3 → 4 → 2 → 5

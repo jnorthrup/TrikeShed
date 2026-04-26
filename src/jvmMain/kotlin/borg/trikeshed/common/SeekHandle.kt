@@ -31,6 +31,14 @@ class FileChannelSeekHandle : SeekHandle {
         return raf.read(buf, offset, length)
     }
 
+    override fun pwrite(handle: Long, buf: ByteArray, offset: Int, length: Int, fileOffset: Long): Int {
+        val raf = channels[handle] ?: return -1
+        val prev = raf.filePointer
+        raf.seek(fileOffset)
+        raf.write(buf, offset, length)
+        return length
+    }
+
     override fun size(handle: Long): Long {
         return channels[handle]?.length() ?: -1
     }
@@ -75,6 +83,12 @@ class NioSeekHandle : SeekHandle {
         val channel = channels[handle] ?: return -1
         val buffer = ByteBuffer.wrap(buf, offset, length)
         return channel.read(buffer, fileOffset)
+    }
+
+    override fun pwrite(handle: Long, buf: ByteArray, offset: Int, length: Int, fileOffset: Long): Int {
+        val channel = channels[handle] ?: return -1
+        val buffer = ByteBuffer.wrap(buf, offset, length)
+        return channel.write(buffer, fileOffset)
     }
 
     override fun size(handle: Long): Long {

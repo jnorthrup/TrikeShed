@@ -164,6 +164,18 @@ operator fun <T> Series<T>.get(i: Int): T = b(i)
  */
 fun <A, B> Series<A>.fold(z: B, f: (acc: B, A) -> B): B = this.view.fold(z, f)
 
+/** Fold a Series using a typed Reducer. */
+fun <T, R> Series<T>.fold(r: Reducer<T, R>): R = toList().fold(r.zero) { acc, element -> r.combine(acc, element) }
+
+/** Typed reducer interface: combines elements of type T into result type R. */
+interface Reducer<in T, R> {
+    val zero: R
+    fun combine(acc: R, element: T): R
+}
+
+/** Untyped row reducer — kept for backward compatibility with Cursor.groupBy(IntArray, RowReducer). */
+typealias RowReducer = (Any?, Any?) -> Any?
+
 
 /**
  * runningfold function for Series (like fold but with the index)
@@ -327,18 +339,10 @@ class IntHeap(series: Series<Int>) {
 
 fun <T> List<T>.toSeries(): Series<T> = size j ::get
 
-fun BooleanArray.toSeries(): Series<Boolean> = size j ::get
 fun ByteArray.toSeries(): Series<Byte> = size j ::get
-fun ShortArray.toSeries(): Series<Short> = size j ::get
 fun IntArray.toSeries(): Series<Int> = size j ::get
-fun LongArray.toSeries(): Series<Long> = size j ::get
-fun FloatArray.toSeries(): Series<Float> = size j ::get
-fun DoubleArray.toSeries(): Series<Double> = size j ::get
-fun CharArray.toSeries(): Series<Char> = size j ::get
-fun UByteArray.toSeries(): Series<UByte> = size j ::get
-fun UShortArray.toSeries(): Series<UShort> = size j ::get
 fun UIntArray.toSeries(): Series<UInt> = size j ::get
-fun ULongArray.toSeries(): Series<ULong> = size j ::get
+fun DoubleArray.toSeries(): Series<Double> = size j ::get
 
 fun String.toSeries(): Series<Char> = (this as CharSequence).toSeries()
 fun CharSequence.toSeries(): Series<Char> = length j ::get

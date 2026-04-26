@@ -71,9 +71,8 @@ class SeekFileBufferCommon(
     fun get(index: Long): Byte = b(index)
 
     fun put(index: Long, value: Byte) {
-        // Write-through for now — could buffer for batching
         val buf = byteArrayOf(value)
-        handle.pread(fd, buf, 0, 1, initialOffset + index) // Need pwrite variant
+        handle.pwrite(fd, buf, 0, 1, initialOffset + index)
     }
 
     /** Seek to position — invalidates window. For external ISAM patterns. */

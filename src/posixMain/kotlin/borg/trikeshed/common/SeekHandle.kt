@@ -42,6 +42,18 @@ class PreadSeekHandle : SeekHandle {
         }
     }
 
+    override fun pwrite(handle: Long, buf: ByteArray, offset: Int, length: Int, fileOffset: Long): Int {
+        val fd = fds[handle] ?: return -1
+        return buf.usePinned { pinned ->
+            platform.posix.pwrite(
+                fd,
+                pinned.addressOf(offset),
+                length.toULong(),
+                fileOffset
+            ).toInt()
+        }
+    }
+
     override fun size(handle: Long): Long {
         val fd = fds[handle] ?: return -1
         memScoped {

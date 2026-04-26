@@ -2,8 +2,6 @@ package borg.trikeshed.cursor
 
 import borg.trikeshed.lib.*
 
-typealias RowReducer = (Any?, Any?) -> Any?
-
 @PublishedApi internal data class GroupState(
     val keys: List<List<Any?>>,
     val slabs: List<IntArray>,
