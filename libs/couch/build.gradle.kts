@@ -75,6 +75,21 @@ kotlin {
                 implementation(kotlin("test-junit"))
             }
         }
+        // jsTest is independent of commonTest in KMP K2 (applyDefaultHierarchyTemplate=false)
+        // — needs its own coroutines-test dependency for runTest, delay, launch, etc.
+        val jsTest by getting {
+            dependencies {
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0-rc01")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0-rc01")
+            }
+        }
+        // wasmJsTest is also independent — same coroutines needs as jsTest
+        val wasmJsTest by getting {
+            dependencies {
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0-rc01")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0-rc01")
+            }
+        }
 
         val posixMain by creating {
             dependsOn(commonMain)

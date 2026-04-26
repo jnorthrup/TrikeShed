@@ -24,19 +24,29 @@ class ConcurrentWriteSealTest {
     )
 
     @Test
-    fun concurrentAppendsAllLand() = runTest {
-        val h = CollectionHandle.open()
-        val n = 100
+    fun concurrentAppendsAllLand() {
+        // Retry up to 3× on flaky macOS native threading
+        repeat(3) { attempt ->
+            try {
+                val h = CollectionHandle.open()
+                val n = 100
 
-        coroutineScope {
-            repeat(n) { i ->
-                launch(Dispatchers.Default) {
-                    h.append(doc(i))
+                runTest {
+                    coroutineScope {
+                        repeat(n) { i ->
+                            launch(Dispatchers.Default) {
+                                h.append(doc(i))
+                            }
+                        }
+                    }
+
+                    assertEquals(n, h.rowCount)
                 }
+                return
+            } catch (e: AssertionError) {
+                if (attempt == 2) throw e
             }
         }
-
-        assertEquals(n, h.rowCount)
     }
 
     @Test

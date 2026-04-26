@@ -1,5 +1,6 @@
 package borg.trikeshed.miniduck.columnar
 
+import borg.trikeshed.test.TODOError
 import kotlin.test.*
 
 class IsamVolumeGenerationTest {
@@ -8,13 +9,13 @@ class IsamVolumeGenerationTest {
             generateIsam(emptyList(), emptyList())
         }
     }
-    
+
     @Test fun `IsamVolume.generate fails when schema empty`() {
         assertFailsWith<TODOError> {
             generateIsam(listOf(mapOf("x" to 1L)), emptyList())
         }
     }
-    
+
     @Test fun `IsamVolume.generate creates correct file structure`() {
         assertFailsWith<TODOError> {
             generateIsam(listOf(mapOf("x" to 1L)), listOf(ColumnSchema("x", ColumnType.Long)))

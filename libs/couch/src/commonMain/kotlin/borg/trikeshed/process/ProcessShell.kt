@@ -1,4 +1,4 @@
-package borg.trikeshed.couch.process
+package borg.trikeshed.process
 
 /**
  * Process shell for executing external commands.

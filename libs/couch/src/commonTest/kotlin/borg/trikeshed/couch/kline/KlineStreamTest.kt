@@ -6,6 +6,7 @@ import borg.trikeshed.userspace.concurrency.Channel
 import borg.trikeshed.userspace.concurrency.ChannelCapacity
 import kotlin.test.*
 import kotlinx.coroutines.*
+import kotlinx.coroutines.test.*
 
 /**
  * Red test: Continuous kline (OHLCV candle) production → channel → BlockRowVec → MiniCursor.
@@ -32,7 +33,7 @@ class KlineStreamTest {
     // ── 1. A single kline round-trips through a channel ──────────────────
 
     @Test
-    fun singleKlineThroughChannel() = runBlocking {
+    fun singleKlineThroughChannel() = runTest {
         val ch: Channel<Kline> = Channel.buffered(64)
         val kline = Kline(
             symbol = "BTC-USD",
@@ -150,13 +151,13 @@ class KlineStreamTest {
     // ── 5. Collector drains channel into sealed blocks of fixed capacity ─
 
     @Test
-    fun collectorDrainsIntoBlocks() = runBlocking {
+    fun collectorDrainsIntoBlocks() = runTest {
         val ch: Channel<Kline> = Channel.buffered(128)
         val collector = KlineCollector(blockCapacity = 3)
 
         // Launch collector in background — it drains channel into blocks
         val blocks = mutableListOf<KlineBlock>()
-        val collectorJob = launch(Dispatchers.Default) {
+        backgroundScope.launch {
             collector.collect(ch) { block ->
                 blocks.add(block)
             }
@@ -177,7 +178,10 @@ class KlineStreamTest {
         }
         ch.close()
 
-        collectorJob.join()
+        // Wait for collector to finish processing
+        advanceUntilIdle()
+        // Allow final block sealing to complete after channel close
+        yield()
 
         // 10 klines / blockCapacity=3 → 4 blocks (3, 3, 3, 1)
         assertEquals(4, blocks.size)
@@ -213,12 +217,12 @@ class KlineStreamTest {
     // ── 7. Continuous production — blocks emitted as stream ──────────────
 
     @Test
-    fun continuousProductionStreamsMultipleBlocks() = runBlocking {
+    fun continuousProductionStreamsMultipleBlocks() = runTest {
         val ch: Channel<Kline> = Channel.buffered(256)
         val collector = KlineCollector(blockCapacity = 4)
 
         val blocks = mutableListOf<KlineBlock>()
-        val collectorJob = launch(Dispatchers.Default) {
+        backgroundScope.launch {
             collector.collect(ch) { block ->
                 blocks.add(block)
             }
@@ -253,7 +257,9 @@ class KlineStreamTest {
         }
         ch.close()
 
-        collectorJob.join()
+        advanceUntilIdle()
+        // Allow final block sealing to complete after channel close
+        yield()
 
         // 10 klines / blockCapacity=4 → 3 blocks (4, 4, 2)
         assertEquals(3, blocks.size)
@@ -273,17 +279,17 @@ class KlineStreamTest {
     // ── 8. Empty production yields no blocks ─────────────────────────────
 
     @Test
-    fun emptyProductionYieldsNoBlocks() = runBlocking {
+    fun emptyProductionYieldsNoBlocks() = runTest {
         val ch: Channel<Kline> = Channel.buffered(16)
         val collector = KlineCollector(blockCapacity = 4)
 
         val blocks = mutableListOf<KlineBlock>()
-        val collectorJob = launch(Dispatchers.Default) {
+        backgroundScope.launch {
             collector.collect(ch) { block -> blocks.add(block) }
         }
 
         ch.close()  // no klines sent
-        collectorJob.join()
+        advanceUntilIdle()
 
         assertEquals(0, blocks.size)
     }

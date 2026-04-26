@@ -2,12 +2,11 @@ package borg.trikeshed.userspace.network
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 /** HTX block algebra tests — stubs live in TransportSearchRedTest. */
-class HtxSearchRedTest {
+class HtxSearchTest {
 
     @Test fun htxBlockType_count() {
         assertEquals(4, HtxBlockType.entries.size)

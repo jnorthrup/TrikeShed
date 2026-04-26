@@ -1,4 +1,4 @@
-package borg.trikeshed.couch.process
+package borg.trikeshed.process
 
 external interface ExecSyncOptions {
     var encoding: String

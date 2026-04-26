@@ -2,22 +2,26 @@
 
 package borg.trikeshed.lib
 
+import kotlin.jvm.JvmInline
 import kotlin.math.ln
 
 /**
- * Densified Join64 — register-dense pair packed into a single Long.
+ * Densified Join64 — register-dense Twin<Int> packed into a single Long.
  *
  * Packs two 32-bit unsigned values into one Long for cache-friendly,
  * register-dense access. Used in the densification seam between the
  * compiler's sparse pointer-chasing Join and the cursor's indexed RowVec.
+ *
+ * @see TwInt — the canonical dense-packed Int twin (same layout, wider scope)
  */
-class DensifiedJoin(private val payload: Long) {
-    fun unpackA(): Int = (payload ushr 32).toInt()
-    fun unpackB(): Int = payload.toInt()
+@JvmInline
+value class DensifiedJoin(private val payload: Long) : Twin<Int> {
+    override val a: Int get() = (payload ushr 32).toInt()
+    override val b: Int get() = payload.toInt()
 
     companion object {
-        fun packU32s(a: Int, b: Int): DensifiedJoin =
-            DensifiedJoin(((a.toLong() and 0xFFFFFFFFL) shl 32) or (b.toLong() and 0xFFFFFFFFL))
+        operator fun invoke(a: Int, b: Int): DensifiedJoin =
+            DensifiedJoin(packInts(a, b))
     }
 }
 

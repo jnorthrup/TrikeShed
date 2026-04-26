@@ -1,4 +1,4 @@
-package borg.trikeshed.couch.process
+package borg.trikeshed.process
 
 actual class ProcessShell {
     actual fun exec(command: String, args: List<String>): ProcessResult {

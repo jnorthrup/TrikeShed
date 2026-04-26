@@ -80,4 +80,8 @@ kotlin {
         findByName("macosMain")?.let { it.dependsOn(posixMain) }
         findByName("linuxMain")?.let { it.dependsOn(posixMain) }
     }
+    sourceSets.commonMain.dependencies {
+        implementation(kotlin("test"))
+        implementation(kotlin("test-junit"))
+    }
 }
