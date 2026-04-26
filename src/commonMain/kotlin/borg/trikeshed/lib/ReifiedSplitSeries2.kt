@@ -40,6 +40,26 @@ class ReifiedSplitSeries2<A, B>(
 
     /** Select a single column's meta/right value. */
     fun rightAt(col: Int): B = rightSeries[col]
+
+    // ── Structure-preserving transforms ──────────────────────────────────
+
+    /** Transform left values, preserving split structure. */
+    inline fun <C> mapLeft(crossinline f: (A) -> C): ReifiedSplitSeries2<C, B> =
+        ReifiedSplitSeries2(
+            leftSeries.size j { f(leftSeries[it]) },
+            rightSeries
+        )
+
+    /** Transform right values, preserving split structure. */
+    inline fun <C> mapRight(crossinline f: (B) -> C): ReifiedSplitSeries2<A, C> =
+        ReifiedSplitSeries2(
+            leftSeries,
+            rightSeries.size j { f(rightSeries[it]) }
+        )
+
+    /** Swap left/right halves. */
+    fun swap(): ReifiedSplitSeries2<B, A> =
+        ReifiedSplitSeries2(rightSeries, leftSeries)
 }
 
 // ============================================================================

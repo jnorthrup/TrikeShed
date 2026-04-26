@@ -9,19 +9,19 @@ import kotlin.jvm.JvmStatic
 // Pack helpers — reusable bit-shuffle primitives
 // ============================================================================
 
-fun packBytes(a: Byte, b: Byte): Short =
+inline fun packBytes(a: Byte, b: Byte): Short =
     ((a.toInt() and 0xFF shl 8) or (b.toInt() and 0xFF)).toShort()
 
-fun packShorts(a: Short, b: Short): Int =
+inline fun packShorts(a: Short, b: Short): Int =
     ((a.toInt() and 0xFFFF) shl 16) or (b.toInt() and 0xFFFF)
 
-fun packChars(a: Char, b: Char): Int =
+inline fun packChars(a: Char, b: Char): Int =
     (a.code shl 16) or b.code
 
-fun packInts(a: Int, b: Int): Long =
+inline fun packInts(a: Int, b: Int): Long =
     (a.toLong() shl 32) or (b.toLong() and 0xFFFF_FFFFL)
 
-fun packFloats(a: Float, b: Float): Long =
+inline fun packFloats(a: Float, b: Float): Long =
     (a.toBits().toLong() shl 32) or (b.toBits().toLong() and 0xFFFF_FFFFL)
 
 // ============================================================================

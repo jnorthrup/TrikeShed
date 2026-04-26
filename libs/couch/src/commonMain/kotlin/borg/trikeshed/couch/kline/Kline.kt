@@ -59,3 +59,55 @@ data class Kline(
         cells = listOf(symbol, timespan, openTime, open, high, low, close, volume),
     )
 }
+
+/**
+ * Extended kline with all 12 fields from Binance CSV / REST API.
+ *
+ * Donor: dreamer-kmm exchange module — ExtendedKline was originally defined
+ * there.  Moved here so the domain type lives alongside [Kline] in the
+ * canonical [borg.trikeshed.couch.kline] package.
+ *
+ * Schema matches Binance kline CSV columns:
+ *   Open_time, Open, High, Low, Close, Volume, Close_time,
+ *   Quote_asset_volume, Number_of_trades,
+ *   Taker_buy_base_asset_volume, Taker_buy_quote_asset_volume, Ignore
+ */
+data class ExtendedKline(
+    val symbol: String,
+    val timespan: TimeSpan,
+    val openTime: Long,
+    val open: Double,
+    val high: Double,
+    val low: Double,
+    val close: Double,
+    val volume: Double,
+    val closeTime: Long,
+    val quoteAssetVolume: Double,
+    val trades: Int,
+    val takerBuyBaseVolume: Double,
+    val takerBuyQuoteVolume: Double,
+) {
+    companion object {
+        /** Full 12-field schema keys for DocRowVec projection. */
+        val schemaKeys = listOf(
+            "symbol", "timespan", "openTime",
+            "open", "high", "low", "close", "volume",
+            "closeTime", "quoteAssetVolume", "trades",
+            "takerBuyBaseVolume", "takerBuyQuoteVolume"
+        )
+    }
+
+    /** Downcast to the base [Kline] (OHLCV subset). */
+    fun toKline(): Kline = Kline(symbol, timespan, openTime, open, high, low, close, volume)
+
+    /** Project as a DocRowVec with all 12 Binance fields. */
+    fun toDocRowVec(): DocRowVec = DocRowVec(
+        keys = schemaKeys,
+        cells = listOf(
+            symbol, timespan, openTime,
+            open, high, low, close, volume,
+            closeTime, quoteAssetVolume, trades,
+            takerBuyBaseVolume, takerBuyQuoteVolume
+        ),
+    )
+}

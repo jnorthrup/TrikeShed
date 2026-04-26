@@ -1,6 +1,6 @@
 package borg.trikeshed.couch.wal
 
-import borg.trikeshed.couch.Series
+import borg.trikeshed.lib.Series
 
 /**
  * Minimal, compile-safe skeleton for the LSMR WAL interface.
