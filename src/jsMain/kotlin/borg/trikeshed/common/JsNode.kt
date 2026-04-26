@@ -7,6 +7,7 @@ private val fs: dynamic = js("require('fs')")
 private val os: dynamic = js("require('os')")
 private val path: dynamic = js("require('path')")
 private val processObj: dynamic = js("process")
+private val Buffer: dynamic = js("globalThis.Buffer")
 
 internal fun jsCwd(): String = processObj.cwd() as String
 
@@ -80,7 +81,7 @@ internal fun jsPread(fd: Int, buf: ByteArray, offset: Int, length: Int, fileOffs
 
 /** Write exactly like POSIX pwrite: fileOffset is independent of the fd's internal position. */
 internal fun jsPwrite(fd: Int, buf: ByteArray, offset: Int, length: Int, fileOffset: Long): Int {
-    val nodeBuf = Buffer.from(buf.subarray(offset, offset + length))
+    val nodeBuf: dynamic = Buffer.from(buf.copyOfRange(offset, offset + length))
     return fs.writeSync(fd, nodeBuf, 0, length, fileOffset) as Int
 }
 

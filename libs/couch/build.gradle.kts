@@ -58,6 +58,16 @@ kotlin {
                 implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1-0.6.x-compat")
             }
         }
+        val jsMain by getting {
+            dependencies {
+            }
+        }
+
+        val wasmJsMain by getting {
+            dependencies {
+            }
+        }
+
         val jvmMain by getting {
             dependencies {
                 implementation(kotlin("reflect"))

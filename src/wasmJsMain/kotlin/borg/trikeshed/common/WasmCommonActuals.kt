@@ -390,6 +390,10 @@ actual class FileBuffer actual constructor(
     actual fun size(): Long = delegate.size()
 
     actual fun get(index: Long): Byte = delegate.get(index)
+
+    actual fun put(index: Long, value: Byte) {
+        delegate.put(index, value)
+    }
 }
 
 actual class SeekFileBuffer actual constructor(
@@ -422,6 +426,10 @@ actual class SeekFileBuffer actual constructor(
 
     actual fun seek(pos: Long) {
         delegate.seek(pos)
+    }
+
+    actual fun put(index: Long, value: Byte) {
+        delegate.put(index, value)
     }
 
     actual fun readv(requests: Series2<Long, ByteSeries>): IntArray = delegate.readv(requests)

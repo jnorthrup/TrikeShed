@@ -12,46 +12,16 @@ pluginManagement {
 
 rootProject.name = "TrikeShed"
 
-// Explicitly include essential library subprojects to ensure the
-// borg.trikeshed.* packages are available during multi-module compilation.
-include(":libs:common")
-project(":libs:common").projectDir = file("libs/common")
+// Auto-include all libs/ subprojects — each must have a build.gradle.kts.
+// Exclude standalone composites that manage their own includeBuild references.
+val standaloneLibs = setOf("dreamer-kmm", "dreamer-test-runner", "kursive")
 
-include(":libs:viewserver")
-project(":libs:viewserver").projectDir = file("libs/viewserver")
-
-include(":libs:couch")
-project(":libs:couch").projectDir = file("libs/couch")
-
-include(":libs:dreamer-kmm")
-project(":libs:dreamer-kmm").projectDir = file("libs/dreamer-kmm")
-
-include(":libs:quic")
-project(":libs:quic").projectDir = file("libs/quic")
-
-include(":libs:ngsctp")
-project(":libs:ngsctp").projectDir = file("libs/ngsctp")
-
-include(":libs:openapi")
-project(":libs:openapi").projectDir = file("libs/openapi")
-
-include(":libs:htx-client")
-project(":libs:htx-client").projectDir = file("libs/htx-client")
-
-include(":libs:server")
-project(":libs:server").projectDir = file("libs/server")
-
-include(":libs:uring")
-project(":libs:uring").projectDir = file("libs/uring")
-
-include(":libs:cmc")
-project(":libs:cmc").projectDir = file("libs/cmc")
-
-include(":libs:krak")
-project(":libs:krak").projectDir = file("libs/krak")
-
-include(":libs:rhood")
-project(":libs:rhood").projectDir = file("libs/rhood")
+file("libs").listFiles()?.filter { it.isDirectory }?.forEach { dir ->
+    if (dir.name !in standaloneLibs && file("libs/${dir.name}/build.gradle.kts").exists()) {
+        include(":libs:${dir.name}")
+        project(":libs:${dir.name}").projectDir = dir
+    }
+}
 
 // Integration harness project for end-to-end SQL→MiniDuck validation
 include(":integration-scratch")

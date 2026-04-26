@@ -166,6 +166,10 @@ actual class FileBuffer actual constructor(
     actual fun size(): Long = delegate.size()
 
     actual fun get(index: Long): Byte = delegate.get(index)
+
+    actual fun put(index: Long, value: Byte) {
+        throw UnsupportedOperationException("put not supported in JS")
+    }
 }
 
 actual class SeekFileBuffer actual constructor(
@@ -197,4 +201,12 @@ actual class SeekFileBuffer actual constructor(
     actual fun get(index: Long): Byte = delegate.get(index)
 
     actual fun readv(requests: Series2<Long, ByteSeries>): IntArray = delegate.readv(requests)
+
+    actual fun seek(pos: Long) {
+        throw UnsupportedOperationException("seek not supported in JS")
+    }
+
+    actual fun put(index: Long, value: Byte) {
+        throw UnsupportedOperationException("put not supported in JS")
+    }
 }
