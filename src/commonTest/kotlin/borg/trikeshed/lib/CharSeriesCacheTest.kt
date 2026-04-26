@@ -14,7 +14,7 @@ class CharSeriesCacheTest {
         assertEquals(s, cs1.asString())
         assertTrue(cs1 == cs2)
         val arr = cs1.toArray()
-        assertEquals(s, String(arr))
+        assertEquals(s, arr.concatToString())
     }
 
     @Test

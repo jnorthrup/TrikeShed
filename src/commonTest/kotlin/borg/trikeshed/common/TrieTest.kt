@@ -1,9 +1,9 @@
 package borg.trikeshed.common
 
 import borg.trikeshed.collections.associative.trie.Trie
-import junit.framework.TestCase.assertFalse
-import junit.framework.TestCase.assertTrue
-import org.junit.Test
+import kotlin.test.Test
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 
 /**
