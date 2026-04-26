@@ -18,3 +18,9 @@ operator fun <A, B> Series<Series2<A, B>>.unaryMinus(): Series<Series<A>> =
 
 //right join
 operator fun <A, B> Series<Series2<A, B>>.unaryPlus(): Series<Series<B>> = this α Series2<A, B>::right
+
+/** Promote a single Join into a one-element Series2 for pipeline composition. */
+fun <A, B> Join<A, B>.toSeries2(): Series2<A, B> = object : Series2<A, B> {
+    override val a: Int get() = 1
+    override val b: (Int) -> Join<A, B> get() = { this@toSeries2 }
+}
