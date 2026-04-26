@@ -536,7 +536,7 @@ infix fun <T, R> List<T>.zip(other: Series<R>): List<Join<T, R>> =
 @JvmName("vvzip2")
 @Suppress("UNCHECKED_CAST")
 infix fun <T, O, R : Series2<T, O>> Series<T>.zip(o: Series<O>): R =
-    (min(size, o.size) j { x: Int -> (this[x] j o[x]) }) as R
+    ReifiedSplitSeries2(this, o) as R
 
 
 fun <T : Comparable<T>> Series<T>.startsWith(other: Series<T>): Boolean = shortestLength(other) == other.size

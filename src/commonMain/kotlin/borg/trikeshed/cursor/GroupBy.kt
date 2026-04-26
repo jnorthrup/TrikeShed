@@ -15,7 +15,8 @@ import borg.trikeshed.lib.*
     val clusters = linkedMapOf<List<Any?>, IntAccumulator>()
     for (r in 0 until size) {
         val row = this[r]
-        val key = axis.map { row[it].a }
+        val rowValues = (row as ReifiedSplitSeries2<*, *>).leftSeries as Series<Any?>
+        val key = axis.map { rowValues[it] }
         clusters.getOrPut(key) { IntAccumulator() }.add(r)
     }
     val keys = clusters.keys.toList()

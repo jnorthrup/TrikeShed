@@ -267,7 +267,7 @@ object CursorTensorReifier {
 
         for (row in 0..<rowCount) {
             val rowVec: RowVec = cursor.row(row)
-            val rowValues: Series<Any?> = rowVec.left
+            val rowValues: Series<Any?> = (rowVec as ReifiedSplitSeries2<*, *>).leftSeries as Series<Any?>
             for (denseColumn in 0 until columnCount) {
                 val sourceColumn = selectedColumns[denseColumn]
                 val columnMeta: ColumnMeta = meta[sourceColumn]
