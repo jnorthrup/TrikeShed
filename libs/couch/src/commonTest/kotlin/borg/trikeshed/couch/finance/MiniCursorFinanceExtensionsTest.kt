@@ -1,7 +1,7 @@
 package borg.trikeshed.couch.finance
 
-import borg.trikeshed.couch.miniduck.DocRowVec
-import borg.trikeshed.couch.miniduck.at
+import borg.trikeshed.miniduck.DocRowVec
+import borg.trikeshed.miniduck.at
 import borg.trikeshed.lib.size
 import kotlin.test.Test
 import kotlin.test.assertEquals

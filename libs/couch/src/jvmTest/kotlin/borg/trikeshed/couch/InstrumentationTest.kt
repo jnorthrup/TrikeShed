@@ -22,7 +22,7 @@ class InstrumentationTest {
         val probes = Probes()
         val handle = InstrumentedHandle(probes)
 
-        val doc = borg.trikeshed.couch.miniduck.DocRowVec(
+        val doc = borg.trikeshed.miniduck.DocRowVec(
             listOf("x"), listOf(1)
         )
         handle.append(doc)
@@ -34,7 +34,7 @@ class InstrumentationTest {
         val probes = Probes()
         val handle = InstrumentedHandle(probes)
 
-        val doc = borg.trikeshed.couch.miniduck.DocRowVec(
+        val doc = borg.trikeshed.miniduck.DocRowVec(
             listOf("x"), listOf(1)
         )
         handle.append(doc)
@@ -57,7 +57,7 @@ class InstrumentationTest {
 
         val threads = (1..10).map {
             Thread {
-                val doc = borg.trikeshed.couch.miniduck.DocRowVec(
+                val doc = borg.trikeshed.miniduck.DocRowVec(
                     listOf("i"), listOf(it)
                 )
                 handle.append(doc)
@@ -89,7 +89,7 @@ class InstrumentationTest {
         val handle = InstrumentedHandle(probes)
 
         handle.append(
-            borg.trikeshed.couch.miniduck.DocRowVec(listOf("x"), listOf(1))
+            borg.trikeshed.miniduck.DocRowVec(listOf("x"), listOf(1))
         )
         handle.seal()
         handle.snapshot() // snapshot after seal counts as read

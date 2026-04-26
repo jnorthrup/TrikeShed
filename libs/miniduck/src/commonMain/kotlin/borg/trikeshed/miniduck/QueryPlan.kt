@@ -1,0 +1,107 @@
+package borg.trikeshed.miniduck
+
+/**
+ * MiniDuck query plan — immutable sealed tree.
+ *
+ * Leaf nodes (ScanPlan, ViewQueryPlan) identify the underlying relation.
+ * Transform nodes (FilterPlan, ProjectPlan, OrderPlan, LimitPlan) wrap an
+ * upstream plan and derive [source] from it, keeping the relation identity
+ * visible at every node without duplication.
+ *
+ * Execute the full tree with [execute].
+ */
+data class RelationRef(
+    val database: String,
+    val name: String,
+    val kind: RelationKind,
+)
+
+enum class RelationKind {
+    DOCS,
+    ALL_DOCS,
+    VIEW,
+    INDEX,
+    SEGMENT,
+}
+
+sealed interface QueryPlan {
+    val source: RelationRef
+}
+
+// ── Leaf plans ────────────────────────────────────────────────────────────────
+
+data class ScanPlan(
+    override val source: RelationRef,
+) : QueryPlan
+
+data class ViewQueryPlan(
+    override val source: RelationRef,
+    val designDocument: String,
+    val viewName: String,
+    val parameters: Map<String, String> = emptyMap(),
+) : QueryPlan {
+    val database: String get() = source.database
+
+    fun withParameter(name: String, value: Any?): ViewQueryPlan =
+        copy(parameters = parameters + (name to value.toString()))
+}
+
+// ── Transform plans ───────────────────────────────────────────────────────────
+
+data class FilterPlan(
+    val upstream: QueryPlan,
+    val predicate: Predicate,
+) : QueryPlan {
+    override val source: RelationRef get() = upstream.source
+}
+
+data class ProjectPlan(
+    val upstream: QueryPlan,
+    val columns: List<String>,
+) : QueryPlan {
+    override val source: RelationRef get() = upstream.source
+}
+
+data class OrderPlan(
+    val upstream: QueryPlan,
+    val specs: List<OrderSpec>,
+) : QueryPlan {
+    override val source: RelationRef get() = upstream.source
+}
+
+data class LimitPlan(
+    val upstream: QueryPlan,
+    val limit: Int,
+    val offset: Int = 0,
+) : QueryPlan {
+    override val source: RelationRef get() = upstream.source
+}
+
+// ── Infix plan builders ───────────────────────────────────────────────────────
+
+infix fun QueryPlan.filter(pred: Predicate): FilterPlan = FilterPlan(this, pred)
+infix fun QueryPlan.project(columns: List<String>): ProjectPlan = ProjectPlan(this, columns)
+infix fun QueryPlan.orderBy(specs: List<OrderSpec>): OrderPlan = OrderPlan(this, specs)
+infix fun QueryPlan.limit(n: Int): LimitPlan = LimitPlan(this, n)
+infix fun QueryPlan.offset(n: Int): LimitPlan =
+    (this as? LimitPlan)?.copy(offset = n) ?: LimitPlan(this, Int.MAX_VALUE, n)
+
+// ── Plan execution ────────────────────────────────────────────────────────────
+
+/**
+ * Execute a [QueryPlan] tree against a [base] MiniCursor (the scan/relation source).
+ *
+ * Leaf plans return [base] unchanged — the caller is responsible for supplying
+ * the correct base cursor for the leaf's [RelationRef].
+ *
+ * Transform plans recurse: each node applies its operation to the result of
+ * executing its upstream.
+ */
+fun execute(plan: QueryPlan, base: MiniCursor): MiniCursor = when (plan) {
+    is ScanPlan -> base
+    is ViewQueryPlan -> base
+    is FilterPlan -> execute(plan.upstream, base).where(plan.predicate)
+    is ProjectPlan -> execute(plan.upstream, base).project(*plan.columns.toTypedArray())
+    is OrderPlan -> execute(plan.upstream, base).orderBy(*plan.specs.toTypedArray())
+    is LimitPlan -> execute(plan.upstream, base).drop(plan.offset).take(plan.limit)
+}

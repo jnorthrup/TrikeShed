@@ -15,7 +15,7 @@ import kotlin.test.*
 class CollectionHandleTest {
 
     private fun doc(vararg pairs: Pair<String, Any?>) =
-        borg.trikeshed.couch.miniduck.DocRowVec(
+        borg.trikeshed.miniduck.DocRowVec(
             pairs.map { it.first },
             pairs.map { it.second },
         )
@@ -40,7 +40,7 @@ class CollectionHandleTest {
         h.append(doc("b" to 20))
         val snap = h.snapshot()
         assertEquals(2, snap.size)
-        assertEquals(10, (snap[0] as borg.trikeshed.couch.miniduck.DocRowVec)["a"])
+        assertEquals(10, (snap[0] as borg.trikeshed.miniduck.DocRowVec)["a"])
     }
 
     @Test

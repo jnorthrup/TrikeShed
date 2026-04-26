@@ -1,6 +1,6 @@
 package borg.trikeshed.couch.kline
 
-import borg.trikeshed.couch.miniduck.*
+import borg.trikeshed.miniduck.*
 import borg.trikeshed.lib.*
 import borg.trikeshed.userspace.concurrency.Channel
 import borg.trikeshed.userspace.concurrency.ChannelCapacity

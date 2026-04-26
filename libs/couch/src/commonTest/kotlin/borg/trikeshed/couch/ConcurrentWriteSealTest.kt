@@ -19,7 +19,7 @@ import kotlin.test.*
  */
 class ConcurrentWriteSealTest {
 
-    private fun doc(v: Int) = borg.trikeshed.couch.miniduck.DocRowVec(
+    private fun doc(v: Int) = borg.trikeshed.miniduck.DocRowVec(
         listOf("v"), listOf(v)
     )
 
@@ -106,7 +106,7 @@ class ConcurrentWriteSealTest {
         // write 50 rows
         repeat(50) { h.append(doc(it)) }
 
-        val snapshots = mutableListOf<borg.trikeshed.lib.Series<borg.trikeshed.couch.miniduck.MiniRowVec>>()
+        val snapshots = mutableListOf<borg.trikeshed.lib.Series<borg.trikeshed.miniduck.MiniRowVec>>()
         // take 5 snapshots concurrently
         coroutineScope {
             repeat(5) {

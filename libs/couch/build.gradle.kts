@@ -54,6 +54,7 @@ kotlin {
         val commonMain by getting {
             dependencies {
                 api(project(":"))
+                api(project(":libs:miniduck"))
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0-rc01")
                 implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1-0.6.x-compat")
             }

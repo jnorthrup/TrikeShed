@@ -1,6 +1,6 @@
 package borg.trikeshed.couch.kline
 
-import borg.trikeshed.couch.miniduck.DocRowVec
+import borg.trikeshed.miniduck.DocRowVec
 
 /**
  * Standard kline (OHLCV candle) timespans.

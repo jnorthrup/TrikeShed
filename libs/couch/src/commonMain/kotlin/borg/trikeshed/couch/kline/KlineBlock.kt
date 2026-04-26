@@ -1,8 +1,8 @@
 package borg.trikeshed.couch.kline
 
-import borg.trikeshed.couch.miniduck.DocRowVec
-import borg.trikeshed.couch.miniduck.MiniCursor
-import borg.trikeshed.couch.miniduck.MiniRowVec
+import borg.trikeshed.miniduck.DocRowVec
+import borg.trikeshed.miniduck.MiniCursor
+import borg.trikeshed.miniduck.MiniRowVec
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.size

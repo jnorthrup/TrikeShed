@@ -6,7 +6,7 @@ import borg.trikeshed.couch.api.CouchDb11Spec
 import borg.trikeshed.couch.api.CouchViewDefinition
 import borg.trikeshed.couch.api.ViewQuery
 import borg.trikeshed.couch.api.ViewQueryEncoder
-import borg.trikeshed.couch.miniduck.*
+import borg.trikeshed.miniduck.*
 import borg.trikeshed.lib.*
 import kotlin.test.Test
 import kotlin.test.assertEquals

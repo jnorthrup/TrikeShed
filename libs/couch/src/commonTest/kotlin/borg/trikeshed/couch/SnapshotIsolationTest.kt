@@ -17,7 +17,7 @@ import kotlin.test.*
 class SnapshotIsolationTest {
 
     private fun doc(vararg pairs: Pair<String, Any?>) =
-        borg.trikeshed.couch.miniduck.DocRowVec(
+        borg.trikeshed.miniduck.DocRowVec(
             pairs.map { it.first },
             pairs.map { it.second },
         )
@@ -45,7 +45,7 @@ class SnapshotIsolationTest {
 
         val snap1 = h.snapshot()
         assertEquals(1, snap1.size)
-        assertEquals(10, (snap1[0] as borg.trikeshed.couch.miniduck.DocRowVec)["v"])
+        assertEquals(10, (snap1[0] as borg.trikeshed.miniduck.DocRowVec)["v"])
 
         h.append(doc("v" to 20))
 
@@ -78,9 +78,9 @@ class SnapshotIsolationTest {
         h.append(doc("name" to "bob"))
         val snap2 = h.snapshot()
 
-        assertEquals("alice", (snap1[0] as borg.trikeshed.couch.miniduck.DocRowVec)["name"])
-        assertEquals("alice", (snap2[0] as borg.trikeshed.couch.miniduck.DocRowVec)["name"])
-        assertEquals("bob", (snap2[1] as borg.trikeshed.couch.miniduck.DocRowVec)["name"])
+        assertEquals("alice", (snap1[0] as borg.trikeshed.miniduck.DocRowVec)["name"])
+        assertEquals("alice", (snap2[0] as borg.trikeshed.miniduck.DocRowVec)["name"])
+        assertEquals("bob", (snap2[1] as borg.trikeshed.miniduck.DocRowVec)["name"])
     }
 
     @Test

@@ -1,6 +1,6 @@
 package borg.trikeshed.couch.handle
 
-import borg.trikeshed.couch.miniduck.MiniRowVec
+import borg.trikeshed.miniduck.MiniRowVec
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.j
 

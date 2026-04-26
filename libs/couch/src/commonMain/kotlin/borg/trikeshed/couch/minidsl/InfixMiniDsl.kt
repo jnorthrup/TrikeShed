@@ -1,9 +1,9 @@
 package borg.trikeshed.couch.minidsl
 
-import borg.trikeshed.couch.miniduck.QueryPlan
-import borg.trikeshed.couch.miniduck.RelationKind
-import borg.trikeshed.couch.miniduck.RelationRef
-import borg.trikeshed.couch.miniduck.ViewQueryPlan
+import borg.trikeshed.miniduck.QueryPlan
+import borg.trikeshed.miniduck.RelationKind
+import borg.trikeshed.miniduck.RelationRef
+import borg.trikeshed.miniduck.ViewQueryPlan
 
 /**
  * Infix-only MiniDuck surface.

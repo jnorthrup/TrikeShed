@@ -2,7 +2,7 @@ package borg.trikeshed.couch.instrument
 
 import borg.trikeshed.couch.handle.CollectionHandle
 import borg.trikeshed.couch.handle.HandleState
-import borg.trikeshed.couch.miniduck.MiniRowVec
+import borg.trikeshed.miniduck.MiniRowVec
 import borg.trikeshed.lib.Series
 import java.util.concurrent.locks.ReentrantLock
 

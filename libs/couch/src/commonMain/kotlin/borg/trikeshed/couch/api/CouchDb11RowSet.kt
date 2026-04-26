@@ -1,9 +1,9 @@
 package borg.trikeshed.couch.api
 
-import borg.trikeshed.couch.miniduck.BlockRowVec
-import borg.trikeshed.couch.miniduck.DocRowVec
-import borg.trikeshed.couch.miniduck.MiniRowVec
-import borg.trikeshed.couch.miniduck.ViewRowVec
+import borg.trikeshed.miniduck.BlockRowVec
+import borg.trikeshed.miniduck.DocRowVec
+import borg.trikeshed.miniduck.MiniRowVec
+import borg.trikeshed.miniduck.ViewRowVec
 import borg.trikeshed.lib.toSeries
 import borg.trikeshed.parse.json.JsonParser
 
