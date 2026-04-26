@@ -1,6 +1,9 @@
 package borg.trikeshed.miniduck
 
 import borg.trikeshed.lib.*
+import borg.trikeshed.cursor.ColumnMeta
+import borg.trikeshed.cursor.RowVec
+import borg.trikeshed.isam.meta.IOMemento
 
 /**
  * MiniRowVec: the foundational row abstraction for MiniDuck.
@@ -33,6 +36,28 @@ sealed class MiniRowVec {
 
 /** Expose the row as a Series<Any?> for uniform Cursor traversal. */
 fun MiniRowVec.asSeries(): Series<Any?> = size j { this[it] }
+
+/** Bridge into TrikeShed RowVec for columnar operations (select, valueAt, etc.).
+ *  Values are the scalar cells; metas are plain ColumnMeta stubs keyed by index.
+ *  Shell rows (size=0) produce an empty RowVec. */
+fun MiniRowVec.toRowVec(): RowVec {
+    val sz = size
+    if (sz == 0) return ReifiedSplitSeries2(
+        leftSeries  = 0 j { _ -> throw IndexOutOfBoundsException("empty row") },
+        rightSeries = 0 j { _ -> throw IndexOutOfBoundsException("empty row") }
+    )
+    return ReifiedSplitSeries2(
+        leftSeries  = sz j { this[it] },
+        rightSeries = sz j { i -> { ColumnMeta("col$i", IOMemento.IoString) } }
+    )
+}
+
+/** Wrap any TrikeShed RowVec as a MiniRowVec — the reverse bridge.
+ *  Enables ReifiedSplitSeries2.select(vararg) results to flow back into MiniCursor. */
+class WrappedRowVec(val inner: RowVec, override val child: Series<MiniRowVec>? = null) : MiniRowVec() {
+    override val size: Int get() = inner.a
+    override fun get(index: Int): Any? = (inner as ReifiedSplitSeries2<*, *>).leftSeries[index]
+}
 
 /* ═══════════════════════════════════════════════════════════════════════════
  * Lazy child infrastructure.

@@ -1,6 +1,7 @@
 package borg.trikeshed.miniduck
 
 import borg.trikeshed.lib.*
+import borg.trikeshed.cursor.RowVec
 
 /** MiniDuck cursor: a lazy indexed Series of MiniRowVec. */
 typealias MiniCursor = Series<MiniRowVec>
@@ -28,20 +29,27 @@ infix fun MiniCursor.row(y: Int): MiniRowVec = at(y)
 // calls (more-specific receiver wins in Kotlin), breaking cursor[i] row access.
 // Use .columns(vararg Int) for index projection and .at(i) for rows.
 
-/** Project columns by positional index vararg. First row's DocRowVec keys are used for naming. */
+/** Project columns by positional index vararg.  Bridges through TrikeShed
+ *  ReifiedSplitSeries2.select — zero per-cell allocation. */
 fun MiniCursor.columns(vararg colIdx: Int): MiniCursor {
     if (size == 0) return emptyMiniCursor()
     val exemplar = at(0)
     val projectedKeys: List<String> = colIdx.map { i ->
-        (exemplar as? DocRowVec)?.keys?.getOrNull(i) ?: i.toString()
+        (exemplar as? DocRowVec)?.keys?.getOrNull(i) ?: "col$i"
     }
     return size j { rowIdx ->
         val r = at(rowIdx)
-        DocRowVec(
-            keys = projectedKeys,
-            cells = projectedKeys.map { r.getValue(it) },
-            child = r.child,
-        )
+        if (r.isShell) {
+            DocRowVec(keys = projectedKeys, cells = List(colIdx.size) { null }, child = r.child)
+        } else {
+            val split = r.toRowVec() as ReifiedSplitSeries2<*, *>
+            val selected = split.select(*colIdx)
+            DocRowVec(
+                keys = projectedKeys,
+                cells = List(colIdx.size) { i -> selected.valueAt(i) },
+                child = r.child,
+            )
+        }
     }
 }
 
