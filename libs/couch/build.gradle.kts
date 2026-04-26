@@ -53,21 +53,11 @@ kotlin {
     sourceSets {
         val commonMain by getting {
             dependencies {
-                api(project(":")) // root core published coordinates
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
+                api(project(":"))
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0-rc01")
                 implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1-0.6.x-compat")
             }
         }
-        val jsMain by getting {
-            dependencies {
-            }
-        }
-
-        val wasmJsMain by getting {
-            dependencies {
-            }
-        }
-
         val jvmMain by getting {
             dependencies {
                 implementation(kotlin("reflect"))
@@ -76,42 +66,33 @@ kotlin {
         val commonTest by getting {
             dependencies {
                 implementation(kotlin("test"))
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0-rc01")
             }
         }
         val jvmTest by getting {
             dependencies {
                 implementation(kotlin("test-junit"))
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
             }
         }
 
-        // POSIX source set shared by all native targets
         val posixMain by creating {
             dependsOn(commonMain)
         }
 
-        // Each native target depends on posixMain + commonMain
-        // Attach posixMain to any native main source sets present for the current host
         findByName("macosMain")?.let { it.dependsOn(posixMain) }
         findByName("linuxMain")?.let { it.dependsOn(posixMain) }
     }
 }
 
-// Quick validation runner used during local development. Not added to published plugin API.
-// Usage: ./gradlew :libs:couch:quickValidate
 tasks.register<org.gradle.api.tasks.JavaExec>("quickValidate") {
     group = "verification"
     description = "Run a quick jvmMain validation of MiniDuck encode/decode"
     dependsOn("compileKotlinJvm")
-    // compiled classes for JVM target
     val classesDir = file("${'$'}{buildDir.path}/classes/kotlin/jvm/main")
-    // try to find the runtime classpath for the jvm target
     val runtimeConfiguration = configurations.findByName("jvmRuntimeClasspath")
         ?: configurations.findByName("jvmMainRuntimeClasspath")
         ?: configurations.findByName("runtimeClasspath")
         ?: throw IllegalStateException("Could not locate jvm runtime classpath configuration")
-    // For quick local validation, use compiled classes only (may still require kotlin stdlib at runtime).
     classpath = files(classesDir)
     mainClass.set("borg.trikeshed.couch.miniduck.MiniDuckQuickValidateKt")
     jvmArgs = listOf("-Xmx1g")
