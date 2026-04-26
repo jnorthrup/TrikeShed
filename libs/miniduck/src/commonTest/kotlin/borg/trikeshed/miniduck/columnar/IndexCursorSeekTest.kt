@@ -1,61 +1,32 @@
 package borg.trikeshed.miniduck.columnar
 
-import borg.trikeshed.test.TODOError
 import kotlin.test.*
 
 class IndexCursorSeekTest {
-    @Test fun `IndexCursor preScan builds lookup structure`() {
+    @Test fun `IndexCursor seek fails when not implemented`() {
         val cursor = object : IndexCursor {
-            override fun preScan(indexPath: String) { TODO("Not implemented") }
-            override fun seek(target: Long): Boolean { TODO("Not implemented") }
-            override fun next(): Boolean { TODO("Not implemented") }
-            override fun current(): Long { TODO("Not implemented") }
-            override fun close() { TODO("Not implemented") }
+            override fun seek(blockOffset: Long) { error("Not implemented") }
+            override fun next(): Boolean { error("Not implemented") }
+            override fun current(): Long { error("Not implemented") }
         }
-        assertFailsWith<TODOError> { cursor.preScan("/nonexistent") }
+        assertFails { cursor.seek(100) }
     }
-    
-    @Test fun `IndexCursor seek fails when not preScanned`() {
+
+    @Test fun `IndexCursor next fails when not implemented`() {
         val cursor = object : IndexCursor {
-            override fun preScan(indexPath: String) { TODO("Not implemented") }
-            override fun seek(target: Long): Boolean { TODO("Not implemented") }
-            override fun next(): Boolean { TODO("Not implemented") }
-            override fun current(): Long { TODO("Not implemented") }
-            override fun close() { TODO("Not implemented") }
+            override fun seek(blockOffset: Long) { error("Not implemented") }
+            override fun next(): Boolean { error("Not implemented") }
+            override fun current(): Long { error("Not implemented") }
         }
-        assertFailsWith<TODOError> { cursor.seek(100) }
+        assertFails { cursor.next() }
     }
-    
-    @Test fun `IndexCursor next fails when not preScanned`() {
+
+    @Test fun `IndexCursor current fails when not implemented`() {
         val cursor = object : IndexCursor {
-            override fun preScan(indexPath: String) { TODO("Not implemented") }
-            override fun seek(target: Long): Boolean { TODO("Not implemented") }
-            override fun next(): Boolean { TODO("Not implemented") }
-            override fun current(): Long { TODO("Not implemented") }
-            override fun close() { TODO("Not implemented") }
+            override fun seek(blockOffset: Long) { error("Not implemented") }
+            override fun next(): Boolean { error("Not implemented") }
+            override fun current(): Long { error("Not implemented") }
         }
-        assertFailsWith<TODOError> { cursor.next() }
-    }
-    
-    @Test fun `IndexCursor current fails when not preScanned`() {
-        val cursor = object : IndexCursor {
-            override fun preScan(indexPath: String) { TODO("Not implemented") }
-            override fun seek(target: Long): Boolean { TODO("Not implemented") }
-            override fun next(): Boolean { TODO("Not implemented") }
-            override fun current(): Long { TODO("Not implemented") }
-            override fun close() { TODO("Not implemented") }
-        }
-        assertFailsWith<TODOError> { cursor.current() }
-    }
-    
-    @Test fun `IndexCursor close releases resources`() {
-        val cursor = object : IndexCursor {
-            override fun preScan(indexPath: String) { TODO("Not implemented") }
-            override fun seek(target: Long): Boolean { TODO("Not implemented") }
-            override fun next(): Boolean { TODO("Not implemented") }
-            override fun current(): Long { TODO("Not implemented") }
-            override fun close() { TODO("Not implemented") }
-        }
-        assertFailsWith<TODOError> { cursor.close() }
+        assertFails { cursor.current() }
     }
 }

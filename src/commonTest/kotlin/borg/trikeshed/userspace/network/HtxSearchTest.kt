@@ -19,7 +19,10 @@ class HtxSearchTest {
     @Test fun htxBlockType_headers() {
         assertEquals(HtxBlockType.HEADERS, HtxBlockType.HEADERS)
     }
-
+//    ┌─ /btw — 2 queued comment(s) ─────────────
+//   don't forget to also check the error log
+//    also the port for the metrics endpoint
+//    └────────────────────────────────────────────────
     @Test fun htxBlockType_data() {
         assertEquals(HtxBlockType.DATA, HtxBlockType.DATA)
     }
@@ -32,7 +35,7 @@ class HtxSearchTest {
         val a = HtxBlock(HtxBlockType.DATA, byteArrayOf(1, 2, 3))
         val b = HtxBlock(HtxBlockType.DATA, byteArrayOf(1, 2, 3))
         val c = HtxBlock(HtxBlockType.DATA, byteArrayOf(4, 5, 6))
-        assertTrue(a == b)
+        assertEquals(a, b)
         assertTrue(a != c)
     }
 

@@ -8,8 +8,11 @@ fun <A, B> join(a: Series<A>, b: Series<B>): Series2<A, B> = a.zip(b)
 /** Mutable wrapper for pairwise join; no performance guarantees. */
 fun <A, B> joinMutable(a: Series<A>, b: Series<B>): MutableSeries<Join<A, B>> = join(a, b).cow
 
-val <T, I> Series2<T, I>.left: Series<T> get() = this.α(Join<T, I>::a)
-val <T, I> Series2<I, T>.right: Series<T> get() = this.α(Join<I, T>::b)
+val <T, I> Series2<T, I>.left: Series<T>
+    get() = (this as? ReifiedSplitSeries2<T, I>)?.leftSeries ?: this.α(Join<T, I>::a)
+
+val <T, I> Series2<I, T>.right: Series<T>
+    get() = (this as? ReifiedSplitSeries2<I, T>)?.rightSeries ?: this.α(Join<I, T>::b)
 
 
 //left join

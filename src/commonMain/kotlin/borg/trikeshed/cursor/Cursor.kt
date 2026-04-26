@@ -36,8 +36,11 @@ fun combine(a: Cursor, b: Cursor): Cursor = borg.trikeshed.lib.combine(a, b)
 /** Mutable wrapper for combined cursors; no performance guarantees. */
 fun combineMutable(a: Cursor, b: Cursor): MutableSeries<RowVec> = combine(a, b).cow
 
-/** Project the scalar values from a RowVec, discarding column metadata. */
-val RowVec.values: Series<Any?> get() = this α { it.a }
+/** Project the scalar values from a RowVec, discarding column metadata.
+ *  Short-circuits to leftSeries for ReifiedSplitSeries2 — zero Join allocation. */
+val RowVec.values: Series<Any?>
+    get() = (this as? ReifiedSplitSeries2<*, *>)?.leftSeries as? Series<Any?>
+        ?: this.α { it.a }
 
 /** α-conversion over a Cursor — apply a transform to each RowVec. */
 inline infix fun <C> Cursor.α(crossinline xform: (RowVec) -> C): Series<C> = size j { xform(row(it)) }
