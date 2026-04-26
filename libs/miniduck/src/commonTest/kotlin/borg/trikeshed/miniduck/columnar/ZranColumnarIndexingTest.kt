@@ -7,28 +7,28 @@ class ZranColumnarIndexingTest {
     @Test fun `ZranIndex curates columnar index per column`() {
         assertFailsWith<TODOError> {
             // Zran should build separate skip tables for each column
-            TODO("Zran columnar indexing not implemented")
+            throw TODOError("Zran columnar indexing not implemented")
         }
     }
     
     @Test fun `ZranIndex supports per-column seek`() {
         assertFailsWith<TODOError> {
             // Should allow seeking within individual columns
-            TODO("Zran per-column seek not implemented")
+            throw TODOError("Zran per-column seek not implemented")
         }
     }
     
     @Test fun `ZranIndex maintains column independence`() {
         assertFailsWith<TODOError> {
             // Column indexes should be independent for parallel access
-            TODO("Zran column independence not implemented")
+            throw TODOError("Zran column independence not implemented")
         }
     }
     
     @Test fun `ZranIndex optimizes for columnar scans`() {
         assertFailsWith<TODOError> {
             // Should optimize skip tables for sequential column access
-            TODO("Zran columnar scan optimization not implemented")
+            throw TODOError("Zran columnar scan optimization not implemented")
         }
     }
 }

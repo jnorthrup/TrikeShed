@@ -1,3 +1,3 @@
 package borg.trikeshed.test
 
-class TODOError : AssertionError("Not yet implemented")
+class TODOError(message: String = "Not yet implemented") : AssertionError(message)

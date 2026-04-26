@@ -1,7 +1,9 @@
 package borg.trikeshed.miniduck.columnar
 
+import borg.trikeshed.test.TODOError
+
 class IsamVolume
 
 fun generateIsam(rows: Iterable<Map<String, Any?>>, schema: List<ColumnSchema>): IsamVolume {
-    TODO("IsamVolume.generate not yet implemented")
+    throw TODOError("IsamVolume.generate not yet implemented")
 }
