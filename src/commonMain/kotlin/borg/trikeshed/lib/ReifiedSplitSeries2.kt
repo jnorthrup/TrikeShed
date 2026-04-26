@@ -24,6 +24,22 @@ class ReifiedSplitSeries2<A, B>(
 
     override val b: (Int) -> Join<A, B>
         get() = { i -> leftSeries[i] j rightSeries[i] }
+
+    // ── Column selection ──────────────────────────────────────────────
+
+    /** Select a subset of columns by index, returning a new split-series.
+     *  Zero per-cell Join allocation — values/metas indexed directly. */
+    fun select(vararg indices: Int): ReifiedSplitSeries2<A, B> =
+        ReifiedSplitSeries2(
+            indices.size j { leftSeries[indices[it]] },
+            indices.size j { rightSeries[indices[it]] }
+        )
+
+    /** Select a single column's value.  Zero allocation — direct Series index. */
+    fun valueAt(col: Int): A = leftSeries[col]
+
+    /** Select a single column's meta/right value. */
+    fun rightAt(col: Int): B = rightSeries[col]
 }
 
 // ============================================================================

@@ -172,11 +172,9 @@ fun Cursor.showValues(range: IntRange) = try {
 infix fun Cursor.at(y: Int): RowVec = b(if (y < 0) size - y else y)
 infix fun Cursor.row(y: Int): RowVec = at(y)
 
-/** Cursor get by Int vararg -- return a Cursor with the columns specified by the vararg */
+/** Cursor get by Int vararg — select columns by index, zero per-cell Join allocation. */
 operator fun Cursor.get(vararg i: Int): Cursor = size j { y: Int ->
-    i.size j { x: Int ->
-        row(y)[i[x]]
-    }
+    (row(y) as ReifiedSplitSeries2<*, *>).select(*i) as RowVec
 }
 
 
