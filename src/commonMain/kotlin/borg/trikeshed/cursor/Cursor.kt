@@ -40,7 +40,7 @@ fun combineMutable(a: Cursor, b: Cursor): MutableSeries<RowVec> = combine(a, b).
 val RowVec.values: Series<Any?> get() = this α { it.a }
 
 /** α-conversion over a Cursor — apply a transform to each RowVec. */
-infix fun <C> Cursor.α(xform: (RowVec) -> C): Series<C> = size j { xform(row(it)) }
+inline infix fun <C> Cursor.α(crossinline xform: (RowVec) -> C): Series<C> = size j { xform(row(it)) }
 
 ///**
 // * overload unary minus operator for Cursor to strip out the meta and return a series of values-only

@@ -107,21 +107,21 @@ inline val <T> T.leftIdentity: () -> T get() = { this }
 
 fun <T> T.rightIdentity(t: T): T = t
 
-infix fun <C, B : (Int) -> C> IntArray.α(m: B): Series<C> = this.size j { m(this[it]) }
+inline infix fun <C> IntArray.α(crossinline m: (Int) -> C): Series<C> = this.size j { m(this[it]) }
 
-infix fun <C, B : (Long) -> C> LongArray.α(m: B): Series<C> = this.size j { m(this[it]) }
+inline infix fun <C> LongArray.α(crossinline m: (Long) -> C): Series<C> = this.size j { m(this[it]) }
 
-infix fun <C, B : (Float) -> C> FloatArray.α(m: B): Series<C> = this.size j { m(this[it]) }
+inline infix fun <C> FloatArray.α(crossinline m: (Float) -> C): Series<C> = this.size j { m(this[it]) }
 
-infix fun <C, B : (Double) -> C> DoubleArray.α(m: B): Series<C> = this.size j { m(this[it]) }
+inline infix fun <C> DoubleArray.α(crossinline m: (Double) -> C): Series<C> = this.size j { m(this[it]) }
 
-infix fun <C, B : (Short) -> C> ShortArray.α(m: B): Series<C> = this.size j { m(this[it]) }
+inline infix fun <C> ShortArray.α(crossinline m: (Short) -> C): Series<C> = this.size j { m(this[it]) }
 
-infix fun <C, B : (Byte) -> C> ByteArray.α(m: B): Series<C> = this.size j { m(this[it]) }
+inline infix fun <C> ByteArray.α(crossinline m: (Byte) -> C): Series<C> = this.size j { m(this[it]) }
 
-infix fun <C, B : (Char) -> C> CharArray.α(m: B): Series<C> = this.size j { m(this[it]) }
+inline infix fun <C> CharArray.α(crossinline m: (Char) -> C): Series<C> = this.size j { m(this[it]) }
 
-infix fun <C, B : (Boolean) -> C> BooleanArray.α(m: B): Series<C> = this.size j { m(this[it]) }
+inline infix fun <C> BooleanArray.α(crossinline m: (Boolean) -> C): Series<C> = this.size j { m(this[it]) }
 
 /**
  * series get by iterable
@@ -355,8 +355,7 @@ fun <T> Series<T>.last(): T {
 }
 
 fun <B> Series<B>.isNotEmpty(): Boolean = size > 0
-fun <B> Series<B>.first(): B =
-    this[0] //naming is _a little bit_ confusing with the pair overloads so it stays a function
+fun <B> Series<B>.first(): B = this[0] //naming is _a little bit_ confusing with the pair overloads so it stays a function
 
 fun <B> Series<B>.drop(front: Int): Series<B> = get(min(front, size) until size)
 fun <B> Series<B>.dropLast(back: Int): Series<B> = get(0 until max(0, size - back))
@@ -375,7 +374,7 @@ fun <T> Series<T>.reversed(): Series<T> {
     return size j { it: Int -> this.b((szCapture - it)) }
 }
 
-object EmptySeries : Series<Nothing> by 0 j { x: Int -> TODO("empty Series Access Violation") }
+object EmptySeries : Series<Nothing> by 0 j { _ -> TODO("empty Series Access Violation") }
 
 fun <T> emptySeries(): Series<T> = EmptySeries as Series<T>
 
@@ -383,7 +382,7 @@ fun Series<Char>.parseLong(): Long {
 //handles +-
     var sign = 1L
     var x = 0
-    when (this[0]) {
+    when (this.first()) {
         '-' -> { sign = -1L; x++ }
         '+' -> x++
     }
@@ -469,10 +468,7 @@ fun Series<Char>.parseDouble(): Double {
     var digitsAfterDecimal = 0
 
     when (this[x]) {
-        '-' -> {
-            isNegative = true; x++
-        }
-
+        '-' -> { isNegative = true; x++ }
         '+' -> x++
     }
 
