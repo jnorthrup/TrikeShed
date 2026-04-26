@@ -15,8 +15,8 @@ import kotlinx.coroutines.test.runTest
 
 enum class HtxBlockType { MESSAGE, HEADERS, DATA, TRAILERS }
 data class HtxBlock(val blockType: HtxBlockType, val payloadBytes: ByteArray = ByteArray(0), val streamId: Int = 0) {
-    override fun equals(other: Any?) = other is HtxBlock && blockType == other.blockType && payloadBytes.contentEquals(other.payloadBytes)
-    override fun hashCode() = 31 * blockType.hashCode() + payloadBytes.contentHashCode()
+    override fun equals(other: Any?) = other is HtxBlock && blockType == other.blockType && streamId == other.streamId && payloadBytes.contentEquals(other.payloadBytes)
+    override fun hashCode() = 31 * (31 * blockType.hashCode() + streamId) + payloadBytes.contentHashCode()
 }
 interface HtxStartLine
 object HttpMethod { val GET = "GET"; val POST = "POST"; val PUT = "PUT"; val DELETE = "DELETE" }
@@ -24,7 +24,7 @@ interface HtxMessage { val startLine: HtxStartLine; val headers: Map<String, Str
 
 enum class ElementState { CLOSED, OPEN, ERROR }
 
-data class StreamHandle(val id: Int, val send: SendHandle? = null, val recv: RecvHandle? = null)
+data class StreamHandle(val id: Int, val send: SendHandle? = SendHandle(id), val recv: RecvHandle? = RecvHandle(id))
 data class SendHandle(val streamId: Int)
 data class RecvHandle(val streamId: Int)
 

@@ -17,7 +17,7 @@ import kotlin.test.assertTrue
 
 interface BranchDispatch { val branchId: Int; val block: HtxBlock }
 interface ParseSupervisor { val id: Int; fun process(dispatch: BranchDispatch): Unit }
-class BranchDispatchStub(override val branchId: Int, override val block: HtxBlock) : BranchDispatch
+data class BranchDispatchStub(override val branchId: Int, override val block: HtxBlock) : BranchDispatch
 
 class ReactorSupervisorStub(override val id: Int = 0) : ReactorSupervisor {
     private val _branches = mutableMapOf<Int, BranchDispatch>()
