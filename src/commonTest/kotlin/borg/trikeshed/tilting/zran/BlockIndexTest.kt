@@ -89,7 +89,9 @@ internal class MemoryBlockIndex(
             val out = (pts[mid]["decompressedOffset"] as Long).toULong()
             if (out <= decompressedOffset) lo = mid else hi = mid - 1
         }
-        return pts[lo]
+        val candidate = pts[lo]
+        val candidateOffset = (candidate["decompressedOffset"] as Long).toULong()
+        return if (candidateOffset <= decompressedOffset) candidate else null
     }
 }
 
