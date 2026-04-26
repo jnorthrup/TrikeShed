@@ -1,12 +1,13 @@
 package borg.trikeshed.integration
 
 import borg.trikeshed.couch.kline.KlineBlock
-import borg.trikeshed.couch.miniduck.MiniCursor
-import borg.trikeshed.couch.miniduck.MiniRowVec
-import borg.trikeshed.couch.miniduck.at
-import borg.trikeshed.couch.miniduck.exec.Cursor
-import borg.trikeshed.couch.miniduck.exec.RowAccessor
 import borg.trikeshed.lib.size
+import borg.trikeshed.miniduck.DocRowVec
+import borg.trikeshed.miniduck.MiniCursor
+import borg.trikeshed.miniduck.MiniRowVec
+import borg.trikeshed.miniduck.at
+import borg.trikeshed.miniduck.exec.Cursor
+import borg.trikeshed.miniduck.exec.RowAccessor
 
 /**
  * BinanceCursor: wraps a list of sealed KlineBlocks and presents them
@@ -75,7 +76,7 @@ class BinanceCursor(
         get() {
             val cur = cursors.getOrNull(blockIdx) ?: throw IllegalStateException("No current block")
             // block.asCursor() returns MiniCursor whose rows are DocRowVec (MiniRowVec subtype)
-            val docRow: MiniRowVec = cur at rowIdx
+            val docRow: MiniRowVec = cur at  rowIdx
             return MiniRowVecRowAccessor(docRow)
         }
 
@@ -93,6 +94,6 @@ class MiniRowVecRowAccessor(
     override fun get(index: Int): Any? = row.get(index)
     override fun get(name: String): Any? {
         // DocRowVec supports name lookup; other MiniRowVec subtypes may not
-        return (row as? borg.trikeshed.couch.miniduck.DocRowVec)?.get(name)
+        return (row as? DocRowVec)?.get(name)
     }
 }

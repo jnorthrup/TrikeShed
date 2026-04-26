@@ -14,6 +14,7 @@ repositories {
 
 dependencies {
     implementation(project(":libs:couch"))
+    implementation(project(":libs:miniduck"))
     implementation(kotlin("stdlib"))
     implementation("com.squareup.okhttp3:okhttp:4.11.0")
     testImplementation(kotlin("test"))

@@ -2,9 +2,9 @@ package borg.trikeshed.integration
 
 import borg.trikeshed.couch.kline.Kline
 import borg.trikeshed.couch.kline.TimeSpan
-import borg.trikeshed.couch.miniduck.DocRowVec
-import borg.trikeshed.couch.miniduck.MiniCursor
-import borg.trikeshed.couch.miniduck.at
+import borg.trikeshed.miniduck.DocRowVec
+import borg.trikeshed.miniduck.MiniCursor
+import borg.trikeshed.miniduck.at
 import borg.trikeshed.couch.kline.KlineBlock
 import borg.trikeshed.couch.kline.KlineCollector
 import borg.trikeshed.userspace.concurrency.Channel

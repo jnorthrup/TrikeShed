@@ -4,9 +4,9 @@ import borg.trikeshed.couch.kline.Kline
 import borg.trikeshed.couch.kline.KlineBlock
 import borg.trikeshed.couch.kline.KlineCollector
 import borg.trikeshed.couch.kline.TimeSpan
-import borg.trikeshed.couch.miniduck.MiniCursor
-import borg.trikeshed.couch.miniduck.at
-import borg.trikeshed.couch.miniduck.emptyMiniCursor
+import borg.trikeshed.miniduck.MiniCursor
+import borg.trikeshed.miniduck.at
+import borg.trikeshed.miniduck.emptyMiniCursor
 import borg.trikeshed.lib.j
 import borg.trikeshed.userspace.concurrency.Channel
 import borg.trikeshed.userspace.concurrency.ChannelCapacity

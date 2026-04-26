@@ -1,16 +1,16 @@
 package borg.trikeshed.integration
 
 import borg.trikeshed.parse.kursive.sql.SqlParser
-import borg.trikeshed.couch.miniduck.exec.ExecutionContext
-import borg.trikeshed.couch.miniduck.exec.LsmrTableSource
-import borg.trikeshed.couch.miniduck.schema.LsmrSchemaManager
-import borg.trikeshed.couch.miniduck.schema.TableSchema
-import borg.trikeshed.couch.miniduck.schema.ColumnSchema
+import borg.trikeshed.miniduck.exec.ExecutionContext
+import borg.trikeshed.miniduck.exec.LsmrTableSource
+import borg.trikeshed.miniduck.schema.LsmrSchemaManager
+import borg.trikeshed.miniduck.schema.TableSchema
+import borg.trikeshed.miniduck.schema.ColumnSchema
 import borg.trikeshed.userspace.database.LsmrDatabase
 import borg.trikeshed.userspace.database.LsmrConfig
-import borg.trikeshed.couch.miniduck.sql.PlannerContext
-import borg.trikeshed.couch.miniduck.sql.PlannerConfig
-import borg.trikeshed.couch.miniduck.sql.transformSelect
+import borg.trikeshed.miniduck.sql.PlannerContext
+import borg.trikeshed.miniduck.sql.PlannerConfig
+import borg.trikeshed.miniduck.sql.transformSelect
 
 fun main() {
     val db = LsmrDatabase(LsmrConfig(path = "", memtableThreshold = 1024))
