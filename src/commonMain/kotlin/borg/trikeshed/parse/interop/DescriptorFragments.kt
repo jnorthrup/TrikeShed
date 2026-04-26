@@ -182,7 +182,7 @@ object StructuredParserSupport {
                     describeJsonFragment(text, member.valueStart, member.valueEndExclusive, depth + 1, member.key, member.termination)
                 }
                 '[' -> splitArrayElements(text, start, end).mapIndexed { index, element ->
-                    describeJsonFragment(text, element.first, element.second, depth + 1, index.toString(), jsonTermination(text, element.second, end))
+                    describeJsonFragment(text, element.a, element.b, depth + 1, index.toString(), jsonTermination(text, element.b, end))
                 }
                 else -> emptyList()
             }
@@ -328,12 +328,12 @@ private data class JsonMember(
     val termination: ExtentTermination,
 )
 
-private fun trimBounds(text: Series<Char>, startInclusive: Int, endExclusive: Int): Pair<Int, Int> {
+private fun trimBounds(text: Series<Char>, startInclusive: Int, endExclusive: Int): Twin<Int> {
     var start = startInclusive
     var end = endExclusive
     while (start < end && text[start].isWhitespace()) start++
     while (end > start && text[end - 1].isWhitespace()) end--
-    return start to end
+    return start j end
 }
 
 private fun splitObjectMembers(text: CharSeries, startInclusive: Int, endExclusive: Int): List<JsonMember> {
@@ -355,11 +355,11 @@ private fun splitObjectMembers(text: CharSeries, startInclusive: Int, endExclusi
     }
 }
 
-private fun splitArrayElements(text: CharSeries, startInclusive: Int, endExclusive: Int): List<Pair<Int, Int>> =
+private fun splitArrayElements(text: CharSeries, startInclusive: Int, endExclusive: Int): List<Twin<Int>> =
     splitTopLevelSegments(text, startInclusive + 1, endExclusive - 1)
 
-private fun splitTopLevelSegments(text: Series<Char>, startInclusive: Int, endExclusive: Int): List<Pair<Int, Int>> {
-    val segments = mutableListOf<Pair<Int, Int>>()
+private fun splitTopLevelSegments(text: Series<Char>, startInclusive: Int, endExclusive: Int): List<Twin<Int>> {
+    val segments = mutableListOf<Twin<Int>>()
     var insideQuote = false
     var escapeNext = false
     var nesting = 0
@@ -389,7 +389,7 @@ private fun splitTopLevelSegments(text: Series<Char>, startInclusive: Int, endEx
     }
 
     val tail = trimBounds(text, segmentStart, endExclusive)
-    if (tail.first < tail.second) segments += tail
+    if (tail.a < tail.b) segments += tail
     return segments
 }
 

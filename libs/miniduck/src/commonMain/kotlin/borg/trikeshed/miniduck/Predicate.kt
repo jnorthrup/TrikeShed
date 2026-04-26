@@ -30,7 +30,7 @@ fun MiniRowVec.getValue(key: String): Any? = when (this) {
         "scalarValue" -> scalarValue
         else -> null
     }
-    is BlockRowVec, is BlobRowVec, is ManifoldConcept, is ObjectStoreRowVec, is LazyChildRowVec, is WrappedRowVec -> null
+    is BlockRowVec, is BlobRowVec, is ManifoldConcept, is ObjectStoreRowVec, is LazyChildRowVec, is WrappedRowVec, is CsvRowVec -> null
 }
 
 /**

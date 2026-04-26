@@ -116,6 +116,29 @@ class YamlRowVec(
     override val child: Series<MiniRowVec>? get() = childFactory?.invoke()
 }
 
+/**
+ * CsvRowVec: parse-tree row over a CSV string blob.
+ *
+ * Scalar cells: [nodeKind, rawValue].
+ * Children: sub-nodes for nested rows or column groups.
+ *
+ * nodeKind: "header", "row", or "cell"
+ * rawValue: the raw CSV line or cell value
+ */
+class CsvRowVec(
+    val nodeKind: String,    // "header", "row", "cell"
+    val rawValue: String,
+    private val childFactory: (() -> Series<MiniRowVec>)? = null,
+) : MiniRowVec() {
+    override val size: Int get() = 2
+    override fun get(index: Int): Any? = when (index) {
+        0 -> nodeKind
+        1 -> rawValue
+        else -> throw IndexOutOfBoundsException(index.toString())
+    }
+    override val child: Series<MiniRowVec>? get() = childFactory?.invoke()
+}
+
 /* ═══════════════════════════════════════════════════════════════════════════
  * Object store RowVec family — shell rows that carry cloud blob metadata.
  *

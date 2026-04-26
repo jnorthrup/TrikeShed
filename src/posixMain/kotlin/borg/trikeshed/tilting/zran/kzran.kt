@@ -19,6 +19,11 @@ import platform.posix.*
 import platform.zlib.*
 import kotlin.math.max
 
+// platform.zstd does not exist in Kotlin/Native stdlib.
+// Stub all zstd symbols as throws until an expect/actual is wired:
+//   expect: ZstdIndex/ZstdBlockIndex via JNI (JVM) or cinterop (native)
+// Until then: any call to ZstdIndex or ZstdBlockIndex throws on entry.
+
 
 const val RAW = -15
 const val ZLIB = 15
@@ -403,4 +408,95 @@ fun decode(args: Array<String>) {
             }
         }
     }
+}
+
+// ================================================================================
+// ZstdIndex — mirrors GzIndex exactly but for ZSTD compression
+// ================================================================================
+
+// ================================================================================
+// ZstdIndex — STUB: platform.zstd does not exist in Kotlin/Native.
+// All operations throw. Real implementation needs:
+//   expect/actual with JNI (JVM) or cinterop (native).
+// ================================================================================
+
+@PublishedApi
+internal inline fun <T> zstdNotAvailable(): Nothing =
+    error("ZstdIndex requires a zstd implementation. " +
+          "Wire via expect/actual: JNI (JVM) or cinterop (native). " +
+          "See: https://github.com/facebook/zstd/tree/v1.5.5/contrib/cmake")
+
+/** Stub type alias — maps to Any at runtime since platform.zstd doesn't exist. */
+@PublishedApi
+internal typealias ZstdDCtx = Any
+
+@ExperimentalUnsignedTypes
+class ZstdIndex {
+    val have: Int get() = zstdNotAvailable()
+    val mode: Int get() = zstdNotAvailable()
+    var length: ULong = 0u
+        get() = zstdNotAvailable()
+    var list: MutableList<Point> = mutableListOf()
+        get() = zstdNotAvailable()
+
+    var fpName: String? = null
+
+    val indexFp: CPointer<FILE> by lazy {
+        val name = fpName ?: "-"
+        val fp = fpName?.let { fopen(name, "rb") } ?: stdin
+        posixRequires(fp != null) { "Error: could not open index file $name" }
+        fp!!
+    }
+
+    fun getWindow(index: Int): UByteArray = zstdNotAvailable()
+
+    fun build(zstdFile: CPointer<FILE>, span: ULong): Int = zstdNotAvailable()
+
+    fun writeIndex(indexFname: String): Int = zstdNotAvailable()
+
+    fun readIndex(indexFname: String?): Int = zstdNotAvailable()
+
+    private fun <T> withIndexFile(indexFname: String?, mode: String = "rb", block: (CPointer<FILE>) -> T): T =
+        zstdNotAvailable()
+
+    fun prepareIndexEntry(index: Int): ZstdDCtx = zstdNotAvailable()
+}
+
+// ================================================================================
+// ZstdBlockIndex — mirrors GzBlockIndex but for ZSTD compression provider
+// ================================================================================
+
+// ================================================================================
+// ZstdBlockIndex — STUB: ZstdIndex is stubbed, so all ZstdBlockIndex operations
+// that touch zstdIndex.list or call zstdIndex.* throw. Interface is preserved.
+// Real ZstdBlockIndex mirrors GzBlockIndex exactly once zstd is wired.
+// ================================================================================
+
+class ZstdBlockIndex : BlockIndex {
+
+    override val provider: CompressionProvider = CompressionProvider.ZSTD
+
+    /** The underlying ZstdIndex (currently stubbed — all ops throw). */
+    val zstdIndex = ZstdIndex()
+
+    /** Line table: parallel list of decompressed offsets, one per point. */
+    private var _lineTable: List<Long> = emptyList()
+
+    override val lineTable: Series<Long>
+        get() = _lineTable.size j { i: Int -> _lineTable[i] }
+
+    override val pointSeries: Series<PointRowVec>
+        get() = zstdNotAvailable()
+
+    fun build(zstdFileName: String?, span: ULong): Int = zstdNotAvailable()
+
+    fun readIndex(indexFname: String?): Boolean = zstdNotAvailable()
+
+    fun writeIndex(indexFname: String): Int = zstdNotAvailable()
+
+    fun getWindow(index: Int): UByteArray = zstdNotAvailable()
+
+    override fun seekLine(lineIndex: Int): PointRowVec? = zstdNotAvailable()
+
+    override fun seekByte(decompressedOffset: ULong): PointRowVec? = zstdNotAvailable()
 }
