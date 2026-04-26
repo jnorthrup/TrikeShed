@@ -6,6 +6,7 @@ import borg.trikeshed.lib.Join
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.toSeries
+import borg.trikeshed.lib.zip
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -13,23 +14,21 @@ import kotlin.test.assertEquals
 class CursorTensorTest {
 
     /** Build a typed RowVec: values zipped with metadata. */
-    private fun rowVecOf(vararg pairs: Pair<Any?, IOMemento>): Join<Any?, Series<() -> ColumnMeta>> {
+    @Suppress("UNCHECKED_CAST")
+    private fun rowVecOf(vararg pairs: Pair<Any?, IOMemento>): RowVec {
         val values: Series<Any?> = pairs.size j { pairs[it].first }
         val metas: Series<() -> ColumnMeta> = pairs.size j { { RecordMeta("", pairs[it].second) } }
-        return values j metas
+        return values.zip(metas) as RowVec
     }
 
-    /** Build a Cursor from RowVec rows. */
-    private fun cursorOf(vararg rows: Join<Any?, Series<() -> ColumnMeta>>) =
-        rows.size j { i: Int -> rows[i] }
-
+    /** Build a Cursor from vararg rows (safe-cast to RowVec). */
     @Suppress("UNCHECKED_CAST")
     private fun typedCursorOf(vararg rows: Any?): Cursor =
-        rows.size j { rows[it] as RowVec }
+        Join<Int, (Int) -> RowVec>(rows.size) { i: Int -> rows[i] as RowVec } as Cursor
 
     @Test
     fun reifiesNumericCursorIntoDenseTensor() {
-        // Cursor = Series<RowVec>, RowVec = Join<Any?, Series<() -> ColumnMeta>>
+        // Cursor = Series<RowVec>, RowVec = Series2<Any?, () -> ColumnMeta>
         val cursor = typedCursorOf(
             rowVecOf(100.0 to IOMemento.IoDouble, 10.0 to IOMemento.IoDouble),
             rowVecOf(101.5 to IOMemento.IoDouble, 20.0 to IOMemento.IoDouble),
