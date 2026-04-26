@@ -1,35 +1,32 @@
 package borg.trikeshed.couch.miniduck.sql
 
 import borg.trikeshed.parse.kursive.sql.SqlParser
-import borg.trikeshed.couch.miniduck.exec.LsmrTableSource
+import borg.trikeshed.couch.miniduck.exec.InMemoryTableSource
 import borg.trikeshed.couch.miniduck.exec.ExecutionContext
-import borg.trikeshed.couch.miniduck.schema.LsmrSchemaManager
+import borg.trikeshed.couch.miniduck.schema.InMemorySchemaManager
 import borg.trikeshed.couch.miniduck.schema.TableSchema
 import borg.trikeshed.couch.miniduck.schema.ColumnSchema
-import borg.trikeshed.userspace.database.LsmrDatabase
-import borg.trikeshed.userspace.database.LsmrConfig
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
-// JVM-specific integration test using LSMR-backed table source. Common in-memory test is in commonTest.
-class SqlIntegrationLsmrTest {
+// Platform-agnostic integration test using in-memory table source. JVM-specific LSMR test lives in jvmTest.
+class SqlIntegrationTest {
     @Test
-    fun parsePlanExecuteAgainstLsmr() = runTest {
-        val db = LsmrDatabase(LsmrConfig(path = "", memtableThreshold = 1024))
-        val schemaManager = LsmrSchemaManager(db)
-        val tableSource = LsmrTableSource(db)
+    fun parsePlanExecuteAgainstInMemory() = runTest {
+        val schemaManager = InMemorySchemaManager()
+        val tableSource = InMemoryTableSource()
 
         // Seed schema and rows
-        schemaManager.createTable(TableSchema("users", listOf(ColumnSchema(0, "id"), ColumnSchema(1, "name"))))
-        tableSource.seedRows("users", listOf(listOf(1, "alice"), listOf(2, "bob"), listOf(3, "carol")))
+        val schema = TableSchema("users", listOf(ColumnSchema(0, "id"), ColumnSchema(1, "name")))
+        schemaManager.createTableSuspend(schema)
+        tableSource.addTable(schema, listOf(listOf(1, "alice"), listOf(2, "bob"), listOf(3, "carol")))
 
         val execCtx = ExecutionContext(schemaManager, PlannerConfig(), tableSource)
 
         val sql = "SELECT id, name FROM users WHERE id = 2"
+        println("SqlParser.class location: " + SqlParser::class.java.protectionDomain.codeSource.location)
         val stmt = SqlParser.parse(sql) ?: throw AssertionError("parse failed")
-        println("Parsed stmt: ${'$'}stmt")
-        println("From: ${'$'}{stmt.from}")
         val plan = transformSelect(stmt, PlannerContext(schemaManager))
 
         val cur = plan.open(execCtx)
