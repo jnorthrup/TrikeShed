@@ -14,8 +14,14 @@ class Htx {
         const val TICKET_LEN = 32
 
         /**
-         * Verifies an HTX access ticket.
-         * Placeholder for actual constant-time crypto implementation.
+         * Verifies an HTX access ticket with constant-time comparison.
+         *
+         * Uses bitwise XOR accumulator — no short-circuit, no early exit.
+         * Each byte is compared independently, the diff accumulator holds
+         * the OR of all per-byte XOR results.  Final check `diff == 0`.
+         *
+         * TODO: X25519 DH between serverPrivKey and clientPubKey to derive
+         *       the shared secret, rather than using serverPrivKey directly.
          */
         fun verifyAccessTicket(
             serverPrivKey: ByteArray,
@@ -24,9 +30,13 @@ class Htx {
             receivedTicket: ByteArray,
             currentHour: Long
         ): Boolean {
-            // In a real implementation, we would use X25519 and HKDF-SHA256
             val expectedTicket = computeTicketForHour(serverPrivKey, ticketKeyId, currentHour)
-            return receivedTicket.contentEquals(expectedTicket)
+            if (receivedTicket.size != expectedTicket.size) return false
+            var diff = 0
+            for (i in receivedTicket.indices) {
+                diff = diff or (receivedTicket[i].toInt() xor expectedTicket[i].toInt())
+            }
+            return diff == 0
         }
 
         /**
