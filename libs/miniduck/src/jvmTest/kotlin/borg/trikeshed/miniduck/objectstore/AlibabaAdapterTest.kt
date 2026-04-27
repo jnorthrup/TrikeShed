@@ -10,7 +10,8 @@ import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
-fun <T> runBlocking(block: suspend () -> T): T = runBlockingCommon(block)
+@Suppress("unused")
+private fun <T> rb(block: suspend () -> T): T = runBlockingCommon(block)
 
 class AlibabaAdapterTest {
 
@@ -26,7 +27,7 @@ class AlibabaAdapterTest {
 
     @Test
     fun `AlibabaAdapter list returns AlibabaRowVec with bucket and key fields`() {
-        runBlocking {
+        rb {
             val adapter = AlibabaAdapter(AlibabaAdapter.Config(
                 endpoint = "oss-us-west-1.aliyuncs.com",
                 bucket = "test-bucket",
@@ -54,7 +55,7 @@ class AlibabaAdapterTest {
 
     @Test
     fun `AlibabaAdapter get returns AlibabaRowVec with BlobRowVec child`() {
-        runBlocking {
+        rb {
             val adapter = AlibabaAdapter(AlibabaAdapter.Config(
                 endpoint = "oss-us-west-1.aliyuncs.com",
                 bucket = "test-bucket",
@@ -77,7 +78,7 @@ class AlibabaAdapterTest {
 
     @Test
     fun `AlibabaAdapter put stores bytes and returns true`() {
-        runBlocking {
+        rb {
             var putCalled = false
             var putArgs: Pair<String, ByteArray>? = null
             val adapter = AlibabaAdapter(AlibabaAdapter.Config(
@@ -103,7 +104,7 @@ class AlibabaAdapterTest {
 
     @Test
     fun `AlibabaAdapter delete calls client delete and returns true`() {
-        runBlocking {
+        rb {
             var deleteCalled = false
             var deleteArgs: String? = null
             val adapter = AlibabaAdapter(AlibabaAdapter.Config(
@@ -127,7 +128,7 @@ class AlibabaAdapterTest {
 
     @Test
     fun `AlibabaAdapter list with empty result returns empty ObjectListResult`() {
-        runBlocking {
+        rb {
             val adapter = AlibabaAdapter(AlibabaAdapter.Config(
                 endpoint = "oss-us-west-1.aliyuncs.com",
                 bucket = "test-bucket",
@@ -142,7 +143,7 @@ class AlibabaAdapterTest {
 
     @Test
     fun `AlibabaAdapter get returns null for missing object`() {
-        runBlocking {
+        rb {
             val adapter = AlibabaAdapter(AlibabaAdapter.Config(
                 endpoint = "oss-us-west-1.aliyuncs.com",
                 bucket = "test-bucket",

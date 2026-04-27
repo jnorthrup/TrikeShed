@@ -14,7 +14,7 @@ rootProject.name = "TrikeShed"
 
 // Auto-include all libs/ subprojects — each must have a build.gradle.kts.
 // Exclude standalone composites that manage their own includeBuild references.
-val standaloneLibs = setOf("dreamer-kmm", "dreamer-test-runner", "kursive", "openapi", "dreamer-dashboard")
+val standaloneLibs = setOf("dreamer-kmm", "dreamer-test-runner", "openapi", "dreamer-dashboard")
 
 file("libs").listFiles()?.filter { it.isDirectory }?.forEach { dir ->
     if (dir.name !in standaloneLibs && file("libs/${dir.name}/build.gradle.kts").exists()) {
@@ -22,6 +22,10 @@ file("libs").listFiles()?.filter { it.isDirectory }?.forEach { dir ->
         project(":libs:${dir.name}").projectDir = dir
     }
 }
+
+// Viewserver — nested under couch, JS-only Node.js CouchDB view server
+include(":libs:couch:viewserver")
+project(":libs:couch:viewserver").projectDir = file("libs/couch/viewserver")
 
 // Integration harness project for end-to-end SQL→MiniDuck validation
 include(":integration-scratch")

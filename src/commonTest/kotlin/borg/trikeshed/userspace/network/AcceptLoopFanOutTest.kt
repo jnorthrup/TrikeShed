@@ -1,6 +1,7 @@
 package borg.trikeshed.userspace.network
 
 import kotlinx.coroutines.*
+import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlin.test.Test
@@ -55,7 +56,7 @@ class AcceptLoopFanOutTest {
 
     /** coroutineScope: all children complete before scope exits. */
     @Test
-    fun coroutineScope_awaitsAllChildren() = runBlocking {
+    fun coroutineScope_awaitsAllChildren() = runTest {
         val results = mutableListOf<Int>()
         coroutineScope {
             async { delay(10); results.add(1) }
@@ -69,7 +70,7 @@ class AcceptLoopFanOutTest {
 
     /** Cancel parent scope → all in-flight children cancelled. */
     @Test
-    fun parentCancel_cancelsAllChildren() = runBlocking {
+    fun parentCancel_cancelsAllChildren() = runTest {
         val handler = ClientHandler()
         val job = launch {
             coroutineScope {
@@ -89,7 +90,7 @@ class AcceptLoopFanOutTest {
 
     /** Semaphore.withPermit caps concurrent in-flight. */
     @Test
-    fun semaphore_capsConcurrent() = runBlocking {
+    fun semaphore_capsConcurrent() = runTest {
         val maxConcurrent = 2
         val semaphore = Semaphore(maxConcurrent)
         val handler = ClientHandler()
@@ -111,7 +112,7 @@ class AcceptLoopFanOutTest {
 
     /** Semaphore.withPermit releases after block, serializes correctly. */
     @Test
-    fun semaphore_serializesWithPermitOne() = runBlocking {
+    fun semaphore_serializesWithPermitOne() = runTest {
         val sem = Semaphore(1)
         val order = mutableListOf<String>()
 
@@ -136,7 +137,7 @@ class AcceptLoopFanOutTest {
 
     /** Accept loop fan-out: one accept → one handler, structured. */
     @Test
-    fun acceptLoop_structuredFanOut() = runBlocking {
+    fun acceptLoop_structuredFanOut() = runTest {
         val server = ServerChannelStub(maxClients = 3)
         val handler = ClientHandler()
         val semaphore = Semaphore(10)

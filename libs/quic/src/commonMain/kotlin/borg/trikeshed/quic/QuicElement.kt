@@ -218,7 +218,7 @@ class QuicElement(
     val config: QuicConfig = QuicConfig(),
    val streams: MutableMap<Int, StreamHandle> = mutableMapOf(),
 ) : AsyncContextElement(), StreamTransport {
-    companion object Key : AsyncContextKey<QuicElement>("QuicKey", 1L shl 4)
+    companion object Key : AsyncContextKey<QuicElement>()
 
     override val key: AsyncContextKey<QuicElement>
         get() = Key

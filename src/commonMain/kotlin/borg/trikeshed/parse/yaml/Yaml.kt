@@ -141,13 +141,13 @@ object YamlParser {
             Tag.NULL -> YamlScalarNode(null, open j close)
             Tag.ARRAY -> {
                 // children are the comma-delimited sub-elements
-                val childIndices = extractChildIndices(elemIdx, elems)
+                val childIndices = extractChildIndices(elemIdx, elems, src)
                 val children = childIndices α { childIdx -> buildYamlNode(elems, src, childIdx) }
                 YamlSequenceNode(children, open j close)
             }
             Tag.OBJECT -> {
                 // children alternate key/value; group into YamlMappingEntry pairs
-                val childIndices = extractChildIndices(elemIdx, elems)
+                val childIndices = extractChildIndices(elemIdx, elems, src)
                 val entries = buildMappingEntries(childIndices, elems, src)
                 YamlMappingNode(entries, open j close)
             }
@@ -159,9 +159,9 @@ object YamlParser {
         }
     }
 
-    fun extractChildIndices(parentIdx: Int, elems: Series<JsElement>): Series<Int> {
+    fun extractChildIndices(parentIdx: Int, elems: Series<JsElement>, src: Series<Char>): Series<Int> {
         val parent = elems[parentIdx]
-        val commas = Reify.realCommas(parent)  // open positions of child keys (negatives filtered)
+        val commas = Reify.realCommas(parent, src)  // open positions of child keys (negatives filtered)
         val n = commas.size
         return n j { i: Int ->
             val openPos = commas[i]

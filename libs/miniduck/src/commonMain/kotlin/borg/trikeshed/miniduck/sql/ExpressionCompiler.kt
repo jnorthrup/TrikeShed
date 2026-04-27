@@ -1,13 +1,13 @@
 package borg.trikeshed.miniduck.sql
 
-import borg.trikeshed.parse.jursive.sql.*
-import borg.trikeshed.miniduck.exec.RowAccessor
+import borg.trikeshed.parse.kursive.sql.*
+import borg.trikeshed.miniduck.exec.*
 
 // Simple expression/predicate compiler used by the planner. Keep it small and explicit
 fun compileExpression(expr: Expr, ctx: PlannerContext): (RowAccessor) -> Any? {
     // Column reference
     if (expr is ColumnRef) {
-        return { row: RowAccessor -> row.get(expr.id) }
+        return { row: RowAccessor -> row.get(expr.id.s) }
     }
 
     // Literal

@@ -16,8 +16,11 @@ external class Storage {
     fun removeItem(key: String)
     fun key(index: Int): String?
 }
-const val FILE_PREFIX = "trikeshed:browser:file:"const val DIR_PREFIX = "trikeshed:browser:dir:"
-val blobFallback = linkedMapOf<String, String>()val dirFallback = linkedSetOf<String>()val envFallback = linkedMapOf<String, String>()
+const val FILE_PREFIX = "trikeshed:browser:file:"
+const val DIR_PREFIX = "trikeshed:browser:dir:"
+val blobFallback = linkedMapOf<String, String>()
+val dirFallback = linkedSetOf<String>()
+val envFallback = linkedMapOf<String, String>()
 fun storageOrNull(): Storage? =
     try {
         browserLocalStorage

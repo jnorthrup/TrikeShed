@@ -2,7 +2,11 @@ package borg.trikeshed.common
 
 import kotlin.js.Date
 import kotlin.random.Random
-val fs: dynamic = js("require('fs')")val os: dynamic = js("require('os')")val path: dynamic = js("require('path')")val processObj: dynamic = js("process")val Buffer: dynamic = js("globalThis.Buffer")
+val fs: dynamic = js("require('fs')")
+val os: dynamic = js("require('os')")
+val path: dynamic = js("require('path')")
+val processObj: dynamic = js("process")
+val Buffer: dynamic = js("globalThis.Buffer")
 
 internal fun jsCwd(): String = processObj.cwd() as String
 

@@ -25,7 +25,8 @@ typealias JsPath = borg.trikeshed.parse.confix.JsPath
 object JsonParser {
     fun reify(src: Series<Char>): Any? {
         val ctx = contextOf(Syntax.JSON, src)
-        return materialize(Reify.reify(ctx, Syntax.JSON))
+        val tag = Reify.tagOf(ctx.a, ctx.b)
+        return materialize(Reify.reify(ctx, Syntax.JSON), tag)
     }
 
     /** Scan JSON and return the top-level JsElement (index 0). */
@@ -39,8 +40,9 @@ object JsonParser {
     fun reify(src: Series<Char>, evidence: MutableList<TypeEvidence>?, callback: ((RowVec) -> Unit)?): Any? {
         val ctx = contextOf(Syntax.JSON, src)
         val result = Reify.reify(ctx, Syntax.JSON)
+        val tag = Reify.tagOf(ctx.a, ctx.b)
         // ignore evidence/callback for now — real impl would collect during walk
-        return materialize(result)
+        return materialize(result, tag)
     }
 
     /** Path traversal over JSON context. */
@@ -48,7 +50,7 @@ object JsonParser {
         val resolved = Path.resolve(ctx, path)
         return if (resolved != null) {
             val reified = Reify.reify(resolved, Syntax.JSON)
-            materialize(reified)
+            materialize(reified, Reify.tagOf(resolved.a, resolved.b))
         } else {
             null
         }
@@ -57,7 +59,7 @@ object JsonParser {
     fun parse(text: String): Map<String, Any?> {
         val ctx = contextOf(Syntax.JSON, text.asSeries())
         @Suppress("UNCHECKED_CAST")
-        return materialize(Reify.reify(ctx, Syntax.JSON)) as? Map<String, Any?> ?: emptyMap()
+        return materialize(Reify.reify(ctx, Syntax.JSON), Reify.tagOf(ctx.a, ctx.b)) as? Map<String, Any?> ?: emptyMap()
     }
 }
 
@@ -75,7 +77,7 @@ object JsonParser {
  *   if it's an (Int)→Join<A,B>  → Series2 (map)
  *   if it's an (Int)→A          → Series  (list)
  */
-@Suppress("UNCHECKED_CAST")fun materialize(node: Any?): Any? {
+@Suppress("UNCHECKED_CAST")fun materialize(node: Any?, tag: Tag? = null): Any? {
     if (node == null) return null
 
     // node = Join<Int, F> where F is either (Int)->Join<A,B> (map) or (Int)->A (list)
@@ -85,9 +87,13 @@ object JsonParser {
 
     return when (second) {
         is Function1<*, *> -> {
+            if (size == 0) return when (tag) {
+                Tag.ARRAY -> ArrayList<Any?>(0)
+                else -> LinkedHashMap<String, Any?>(0)
+            }
             val fn = second as (Int) -> Any?
             val at0 = fn(0)
-            if (at0 is Join<*, *>) {
+            if (at0 is Join<*, *> && (at0 as Join<*, *>).a is String) {
                 // Series2: key-value pairs
                 @Suppress("UNCHECKED_CAST")
                 val mapFn = second as (Int) -> Join<String, Any?>

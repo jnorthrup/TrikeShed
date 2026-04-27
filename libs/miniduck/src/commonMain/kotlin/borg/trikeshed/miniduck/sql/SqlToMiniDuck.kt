@@ -1,7 +1,7 @@
 package borg.trikeshed.miniduck.sql
 
-import borg.trikeshed.parse.jursive.sql.*
-import borg.trikeshed.lib.*
+import borg.trikeshed.parse.kursive.sql.*
+import borg.trikeshed.lib.iterator
 import borg.trikeshed.miniduck.plan.*
 import borg.trikeshed.miniduck.schema.SchemaManager
 import borg.trikeshed.miniduck.exec.RowAccessor
@@ -15,7 +15,7 @@ import borg.trikeshed.miniduck.exec.ExecutionContext
 data class PlannerConfig(val autoCreateSchema: Boolean = true)
 class PlannerContext(val schemaManager: SchemaManager, val config: PlannerConfig = PlannerConfig())
 
-fun transformSelect(stmt: SelectStmt, ctx: PlannerContext): PlanNode {
+fun transformSelect(stmt: borg.trikeshed.parse.kursive.sql.SelectStmt, ctx: PlannerContext): PlanNode {
     // Support queries without FROM (e.g., SELECT 1) by providing a single-row source.
     var node: PlanNode = if (stmt.from == null) {
         object : PlanNode {
@@ -40,8 +40,8 @@ fun transformSelect(stmt: SelectStmt, ctx: PlannerContext): PlanNode {
         }
     } else {
         val from = stmt.from!!
-        val tableName = from.name
-        TableScanNode(tableName, from.alias)
+        val tableName = from.name.s
+        TableScanNode(tableName, from.alias?.s)
     }
 
     // WHERE -> FilterNode
@@ -67,8 +67,8 @@ fun transformSelect(stmt: SelectStmt, ctx: PlannerContext): PlanNode {
         val names = ArrayList<String>()
         for (col in stmt.columns) {
             projections.add(compileExpression(col.expr, ctx))
-            val name = col.alias ?: when (val e = col.expr) {
-                is ColumnRef -> e.id
+            val name = col.alias?.asString() ?: when (val e = col.expr) {
+                is ColumnRef -> e.id.s
                 is LitExpr -> {
                     val lit = e.lit
                     if (lit is StringLiteral) lit.asString() else "expr"

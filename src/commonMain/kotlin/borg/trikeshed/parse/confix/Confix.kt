@@ -220,7 +220,8 @@ object JsonScan {
             '"' -> parseString(cs, out)
             't', 'f' -> parseBool(cs, out)
             'n' -> parseNull(cs, out)
-            else -> parseNumber(cs, out)
+            '-', '+', in '0'..'9' -> parseNumber(cs, out)
+            else -> error("unexpected char '${c}' in json at position ${cs.pos}")
         }
     }
 
@@ -902,22 +903,88 @@ object Reify {
         }
     }
 
-    /** commas series with ALL tag sentinels (negative values) stripped.
-     *  The global comma pool mixes child element tags with parent commas;
-     *  we keep only positive indices that actually refer to positions or element indices. */
-    fun realCommas(e: JsElement): Series<Int> {
-        val c = e.b
-        // count positive entries and build a lazy filter
-        var posCount = 0; var ci = 0
-        while (ci < c.size) { if (c[ci] >= 0) posCount++; ci++ }
-        return posCount j { i: Int ->
-            var skipped = 0; var k = 0
-            while (k < c.size) {
-                if (c[k] >= 0) { if (skipped == i) return@j c[k]; skipped++ }
-                k++
+    /** Direct child positions found by scanning the element's source span.
+     *  Avoids comma-buffer leak from nested child elements. */
+    fun realCommas(e: JsElement, src: Series<Char>): Series<Int> {
+        val open = e.a.a; val close = e.a.b
+        // Count direct children by scanning within [open, close]
+        var count = 0
+        var p = open + 1
+        while (p < close) {
+            val ch = src[p]
+            when {
+                ch == '"' || ch == '\'' -> { count++; p = skipString(src, p, close) }
+                ch == '{' || ch == '[' -> { count++; p = skipBracket(src, p, close) }
+                ch == ' ' || ch == '\t' || ch == '\n' || ch == '\r' || ch == ',' || ch == ':' -> p++
+                ch == 't' || ch == 'f' || ch == 'n' -> { count++; p = skipLiteral(src, p, close) }
+                ch == '-' || ch == '+' || (ch in '0'..'9') -> { count++; p = skipNumber(src, p, close) }
+                else -> p++  // skip any other char
             }
-            -1 // unreachable for valid i < posCount
         }
+        val finalCount = count
+        return finalCount j { i: Int ->
+            var found = 0; var q = open + 1
+            while (q < close) {
+                val ch = src[q]
+                val isStart = when (ch) {
+                    '"', '\'' -> true
+                    '{', '[' -> true
+                    't', 'f', 'n' -> true
+                    '-', '+' -> true
+                    in '0'..'9' -> true
+                    else -> false
+                }
+                if (isStart) {
+                    if (found == i) return@j q
+                    found++
+                    q = when (ch) {
+                        '"', '\'' -> skipString(src, q, close)
+                        '{', '[' -> skipBracket(src, q, close)
+                        't', 'f', 'n' -> skipLiteral(src, q, close)
+                        else -> skipNumber(src, q, close)
+                    }
+                } else {
+                    q++
+                }
+            }
+            -1
+        }
+    }
+
+    private fun skipString(src: Series<Char>, start: Int, limit: Int): Int {
+        val quote = src[start]; var p = start + 1
+        while (p < limit && src[p] != quote) {
+            if (src[p] == '\\') p++ // skip escaped char
+            p++
+        }
+        return if (p < limit) p + 1 else limit  // skip closing quote
+    }
+
+    private fun skipBracket(src: Series<Char>, start: Int, limit: Int): Int {
+        val open = src[start]; val close = if (open == '{') '}' else ']'
+        var depth = 1; var p = start + 1
+        while (p < limit && depth > 0) {
+            when (src[p]) {
+                open -> depth++
+                close -> depth--
+                '"', '\'' -> p = skipString(src, p, limit) - 1
+            }
+            p++
+        }
+        return p
+    }
+
+    private fun skipLiteral(src: Series<Char>, start: Int, limit: Int): Int {
+        var p = start
+        while (p < limit && src[p] in 'a'..'z') p++
+        return p
+    }
+
+    private fun skipNumber(src: Series<Char>, start: Int, limit: Int): Int {
+        var p = start
+        if (p < limit && (src[p] == '-' || src[p] == '+')) p++
+        while (p < limit && (src[p] in '0'..'9' || src[p] == '.' || src[p] == 'e' || src[p] == 'E' || src[p] == '+' || src[p] == '-')) p++
+        return p
     }
 
     /** slice of src between open..close inclusive (exclusive of delimiters if applicable) */
@@ -1105,18 +1172,19 @@ object Reify {
 
     /** child JsElement at commas[k] — for arrays, each comma is an element open */
    fun reifyArray(e: JsElement, src: Series<Char>, syntax: Syntax): Series<Any?> {
-        val cs = realCommas(e)
+        val cs = realCommas(e, src)
         return cs.size j { i: Int -> reify(reifyChildAt(src, cs[i]) j src, syntax) }
     }
 
-    /** object has commas in key-position pairs; keys sit at comma[k], values follow */
+    /** object has keys at even child indices, values at odd indices */
    fun reifyObject(e: JsElement, src: Series<Char>, syntax: Syntax): Series2<String, Any?> {
-        val cs = realCommas(e)
-        return cs.size j { i: Int ->
-            val keyElem = reifyChildAt(src, cs[i])
+        val all = realCommas(e, src)
+        val keyCount = all.size / 2
+        return keyCount j { i: Int ->
+            val keyElem = reifyChildAt(src, all[i * 2])
             val key = reifyString(keyElem, src, syntax)
-            var p = keyElem.a.b + 1  // key close+1, skip ':'
-            while (p < src.size && (src[p] == ' ' || src[p] == ':' || src[p] == '\t')) p++
+            var p = keyElem.a.b + 1  // key close+1, skip ':' and whitespace
+            while (p < src.size && (src[p] == ' ' || src[p] == ':' || src[p] == '\t' || src[p] == '\n' || src[p] == '\r')) p++
             val valElem = reifyChildAt(src, p)
             key j reify(valElem j src, syntax)
         }
@@ -1157,7 +1225,7 @@ object Path {
         if (tag != Tag.ARRAY) {
             return null
         }
-        val cs = Reify.realCommas(e)
+        val cs = Reify.realCommas(e, src)
         // diagnostic: print comma list
         val csStr = if (cs.size == 0) "[]" else run {
             val sb = StringBuilder(); sb.append('['); var k = 0
@@ -1182,7 +1250,7 @@ object Path {
 
    fun stepByName(e: JsElement, src: Series<Char>, name: String): JsContext? {
         if (Reify.tagOf(e, src) != Tag.OBJECT) return null
-        val cs = Reify.realCommas(e)
+        val cs = Reify.realCommas(e, src)
         // diagnostic logging: print comma list and name we're searching for
         try {
             val csStr = if (cs.size == 0) "[]" else {

@@ -10,7 +10,8 @@ import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
-fun <T> runBlocking(block: suspend () -> T): T = runBlockingCommon(block)
+@Suppress("unused")
+private fun <T> rb(block: suspend () -> T): T = runBlockingCommon(block)
 
 class GcsAdapterTest {
 
@@ -26,7 +27,7 @@ class GcsAdapterTest {
 
     @Test
     fun `GcsAdapter list returns GcsRowVec with bucket and key fields`() {
-        runBlocking {
+        rb {
             val adapter = GcsAdapter(GcsAdapter.Config(
                 projectId = "test-project",
                 bucket = "test-bucket",
@@ -54,7 +55,7 @@ class GcsAdapterTest {
 
     @Test
     fun `GcsAdapter get returns GcsRowVec with BlobRowVec child`() {
-        runBlocking {
+        rb {
             val adapter = GcsAdapter(GcsAdapter.Config(
                 projectId = "test-project",
                 bucket = "test-bucket",
@@ -77,7 +78,7 @@ class GcsAdapterTest {
 
     @Test
     fun `GcsAdapter put stores bytes and returns true`() {
-        runBlocking {
+        rb {
             var putCalled = false
             var putArgs: Triple<String, String, ByteArray>? = null
             val adapter = GcsAdapter(GcsAdapter.Config(
@@ -104,7 +105,7 @@ class GcsAdapterTest {
 
     @Test
     fun `GcsAdapter delete calls storage delete and returns true`() {
-        runBlocking {
+        rb {
             var deleteCalled = false
             var deleteArgs: Pair<String, String>? = null
             val adapter = GcsAdapter(GcsAdapter.Config(
@@ -129,7 +130,7 @@ class GcsAdapterTest {
 
     @Test
     fun `GcsAdapter list with empty result returns empty ObjectListResult`() {
-        runBlocking {
+        rb {
             val adapter = GcsAdapter(GcsAdapter.Config(
                 projectId = "test-project",
                 bucket = "test-bucket",
@@ -144,7 +145,7 @@ class GcsAdapterTest {
 
     @Test
     fun `GcsAdapter get returns null for missing object`() {
-        runBlocking {
+        rb {
             val adapter = GcsAdapter(GcsAdapter.Config(
                 projectId = "test-project",
                 bucket = "test-bucket",

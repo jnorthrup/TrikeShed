@@ -3,6 +3,7 @@
 package borg.trikeshed.lib
 
 import borg.trikeshed.lib.CZero.nz
+import borg.trikeshed.parse.confix.asSeries
 
 /**
  * char based spiritual successor to ByteBuffer for parsing
@@ -325,3 +326,9 @@ val Series<Char>.cs: CharSequence
         override fun toString(): String = asString()
         override fun subSequence(startIndex: Int, endIndex: Int): CharSequence = this@cs[startIndex until endIndex].cs
     }
+
+val String.s: Series<Char> get() = this.asSeries()
+@get:kotlin.jvm.JvmName("sFromCharSeries")
+val Series<Char>.s: String get() = asString()
+@get:kotlin.jvm.JvmName("sFromByteSeries")
+val Series<Byte>.s: String get() = asString()

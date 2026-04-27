@@ -16,7 +16,7 @@ class HtxElementTest {
     }
 }
 class OtherHtxElement : borg.trikeshed.context.AsyncContextElement() {
-    companion object Key : borg.trikeshed.context.AsyncContextKey<OtherHtxElement>("OtherHtxKey")
+    companion object Key : borg.trikeshed.context.AsyncContextKey<OtherHtxElement>()
     override val key: borg.trikeshed.context.AsyncContextKey<OtherHtxElement>
         get() = Key
 

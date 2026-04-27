@@ -10,7 +10,8 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
-fun <T> runBlocking(block: suspend () -> T): T = runBlockingCommon(block)
+@Suppress("unused")
+private fun <T> rb(block: suspend () -> T): T = runBlockingCommon(block)
 
 class FakeObjectStoreAdapter : ObjectStoreAdapter {
     override val provider: ObjectStoreProvider = ObjectStoreProvider.S3
@@ -69,7 +70,7 @@ class ObjectStoreAdapterTest {
 
     @Test
     fun `list returns rows with lazy blob child`() {
-        runBlocking {
+        rb {
             val adapter = FakeObjectStoreAdapter()
             adapter.put("b", "a/1.txt", byteArrayOf(0x01.toByte(), 0x02.toByte()), mapOf("contentType" to "text/plain"))
             adapter.put("b", "a/2.txt", byteArrayOf(0x03.toByte(), 0x04.toByte()), mapOf("contentType" to "text/plain"))
@@ -88,7 +89,7 @@ class ObjectStoreAdapterTest {
 
     @Test
     fun `get returns row with blob child containing object bytes`() {
-        runBlocking {
+        rb {
             val adapter = FakeObjectStoreAdapter()
             val bytes = byteArrayOf(0xCA.toByte(), 0xFE.toByte(), 0xBA.toByte(), 0xBE.toByte())
             adapter.put("bucket", "obj/key", bytes, null)
@@ -104,7 +105,7 @@ class ObjectStoreAdapterTest {
 
     @Test
     fun `put stores bytes and get retrieves them`() {
-        runBlocking {
+        rb {
             val adapter = FakeObjectStoreAdapter()
             val bytes = "hello world".toByteArray()
 
@@ -121,7 +122,7 @@ class ObjectStoreAdapterTest {
 
     @Test
     fun `delete removes stored object`() {
-        runBlocking {
+        rb {
             val adapter = FakeObjectStoreAdapter()
             adapter.put("b", "k", byteArrayOf(0x01.toByte()), null)
 
@@ -135,7 +136,7 @@ class ObjectStoreAdapterTest {
 
     @Test
     fun `get returns null for missing object`() {
-        runBlocking {
+        rb {
             val adapter = FakeObjectStoreAdapter()
 
             val result = adapter.get("nonexistent-bucket", "nonexistent-key")
@@ -146,7 +147,7 @@ class ObjectStoreAdapterTest {
 
     @Test
     fun `list returns empty when bucket has no objects`() {
-        runBlocking {
+        rb {
             val adapter = FakeObjectStoreAdapter()
 
             val result = adapter.list("empty-bucket", "", 100)
@@ -157,7 +158,7 @@ class ObjectStoreAdapterTest {
 
     @Test
     fun `list respects maxKeys limit`() {
-        runBlocking {
+        rb {
             val adapter = FakeObjectStoreAdapter()
             repeat(10) { i ->
                 adapter.put("b", "f$i.txt", byteArrayOf(i.toByte()), null)
@@ -171,7 +172,7 @@ class ObjectStoreAdapterTest {
 
     @Test
     fun `list filters by prefix`() {
-        runBlocking {
+        rb {
             val adapter = FakeObjectStoreAdapter()
             adapter.put("b", "logs/2025-01.log", byteArrayOf(0x01.toByte()), null)
             adapter.put("b", "logs/2025-02.log", byteArrayOf(0x02.toByte()), null)
@@ -188,7 +189,7 @@ class ObjectStoreAdapterTest {
 
     @Test
     fun `provider identity is set correctly`() {
-        runBlocking {
+        rb {
             val adapter = FakeObjectStoreAdapter()
             assertEquals(ObjectStoreProvider.S3, adapter.provider)
         }

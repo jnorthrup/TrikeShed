@@ -15,8 +15,8 @@ repositories {
 dependencies {
     implementation(project(":libs:couch"))
     implementation(project(":libs:miniduck"))
+    implementation(project(":libs:kursive"))
     implementation(kotlin("stdlib"))
-    implementation("com.squareup.okhttp3:okhttp:4.11.0")
     testImplementation(kotlin("test"))
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
 }

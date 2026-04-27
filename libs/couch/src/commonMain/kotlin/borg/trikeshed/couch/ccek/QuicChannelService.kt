@@ -13,8 +13,7 @@ import kotlinx.coroutines.channels.Channel
  * RFC 9000 §5.1: 0–20 bytes; servers choose the final length.
  * Short-header packets (1-RTT) use the destination connection ID chosen by the receiver.
  */
-@JvmInline
-value class QuicConnectionId(val bytes: ByteArray) {
+class QuicConnectionId(val bytes: ByteArray) {
     init { require(bytes.size in 0..20) { "Connection ID must be 0-20 bytes, got ${bytes.size}" } }
 
     companion object {

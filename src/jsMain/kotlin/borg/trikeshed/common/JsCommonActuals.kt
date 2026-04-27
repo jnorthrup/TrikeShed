@@ -1,12 +1,11 @@
 package borg.trikeshed.common
 
-import borg.trikeshed.common.processObj
 import borg.trikeshed.lib.ByteSeries
 import borg.trikeshed.lib.Join
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.Series2
 import borg.trikeshed.lib.j
-import borg.trikeshed.lib.toSeriesval processObj: dynamic = js("process")
+import borg.trikeshed.lib.toSeries
 
 
 actual object System {
@@ -14,7 +13,7 @@ actual object System {
     actual val homedir: String
         get() = jsHomeDir()
 
-    actual fun getenv(name: String, defaultVal: String?): String? = processObj.env.get( name)?:defaultVal
+    actual fun getenv(name: String, defaultVal: String?): String? = (processObj.env[name] as? String) ?: defaultVal
 }
 
 actual object Files {

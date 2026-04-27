@@ -1,6 +1,6 @@
 package borg.trikeshed.parse.yaml
 
-import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
+import borg.trikeshed.parse.json.JsonParser
 import java.nio.file.Path
 import kotlin.random.Random
 import kotlin.test.Test
@@ -8,12 +8,11 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class YamlBigJsonParityTest {
-   val mapper = jacksonObjectMapper()
 
     @Test
     fun bigJsonYamlRoundTrip_matchesRandomLeafSamples() {
         val jsonText = java.nio.file.Files.readString(Path.of("src/commonTest/resources/big.json"))
-        val original = mapper.readValue(jsonText, Any::class.java)
+        val original = JsonParser.parse(jsonText)
         val yaml = renderYaml(original)
         val reparsed = YamlParser.reify(yaml)
 

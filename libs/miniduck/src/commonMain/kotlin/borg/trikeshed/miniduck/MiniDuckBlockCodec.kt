@@ -3,7 +3,8 @@ package borg.trikeshed.miniduck
 import borg.trikeshed.lib.*
 import borg.trikeshed.parse.json.*
 
-// Minimal JSON serializer for NDJSON block persistence — no external deps.fun Any?.toJsonString(): String = when (this) {
+// Minimal JSON serializer for NDJSON block persistence — no external deps.
+fun Any?.toJsonString(): String = when (this) {
     null -> "null"
     is Boolean -> toString()
     is Number -> toString()

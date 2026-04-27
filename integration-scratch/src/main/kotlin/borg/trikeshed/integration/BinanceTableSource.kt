@@ -16,6 +16,7 @@ import borg.trikeshed.miniduck.schema.SchemaManager
 import borg.trikeshed.miniduck.schema.TableSchema
 import borg.trikeshed.userspace.concurrency.Channel
 import borg.trikeshed.userspace.concurrency.ChannelCapacity
+import java.net.HttpURLConnection
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -53,7 +54,7 @@ class BinanceTableSource(
         )
     )
 
-   val schemaManager = object : SchemaManager {
+   val schemaManager: SchemaManager = object : SchemaManager {
         override suspend fun getTableSuspend(name: String): TableSchema? =
             if (name == symbol) ohlcvSchema else null
 
@@ -67,7 +68,7 @@ class BinanceTableSource(
 
     // Lazily fetched blocks
    val blocks = mutableListOf<KlineBlock>()
-    @Volatilevar fetched = false
+    @Volatile var fetched = false
 
     init {
         require(symbol.isNotBlank()) { "symbol must not be blank" }
@@ -131,7 +132,7 @@ class BinanceTableSource(
     }
 
    fun fetchCsv(urlStr: String): String {
-        val conn = URI(urlStr).toURL().openConnection() as java.net.HttpURLConnection
+        val conn = URI(urlStr).toURL().openConnection() as HttpURLConnection
         conn.connectTimeout = 10_000
         conn.readTimeout = 30_000
         return try {

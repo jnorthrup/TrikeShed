@@ -196,10 +196,6 @@ class TensorGraph {
         operations.add(op)
     }
 
-    fun setOutputShape(shape: List<Int>) {
-        outputShape = shape
-    }
-
     fun optimize(): List<TensorOp> {
         val optimized = operations.toMutableList()
 

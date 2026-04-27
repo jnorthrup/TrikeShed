@@ -314,7 +314,7 @@ class SctpElement(
    val streams: MutableMap<Int, StreamHandle> = mutableMapOf(),
    val associations: MutableMap<Long, SctpState> = mutableMapOf(),
 ) : AsyncContextElement(), StreamTransport {
-    companion object Key : AsyncContextKey<SctpElement>("SctpKey", 1L shl 3)
+    companion object Key : AsyncContextKey<SctpElement>()
 
     override val key: AsyncContextKey<SctpElement>
         get() = Key

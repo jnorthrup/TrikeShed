@@ -6,5 +6,5 @@ import borg.trikeshed.context.AsyncContextKey
 class LiburingFacadeElement : AsyncContextElement() {
     override val key get() = Key
 
-    companion object Key : AsyncContextKey<LiburingFacadeElement>("LiburingFacadeKey", 1L shl 11)
+    companion object Key : AsyncContextKey<LiburingFacadeElement>()
 }

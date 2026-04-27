@@ -24,7 +24,7 @@ class QuicElementTest {
 }
 
 /** Other element with distinct key for cross-check. */class OtherQuicElement : AsyncContextElement() {
-    companion object Key : AsyncContextKey<OtherQuicElement>("OtherQuicKey", 1L shl 6)
+    companion object Key : AsyncContextKey<OtherQuicElement>()
 
     override val key: AsyncContextKey<OtherQuicElement>
         get() = Key

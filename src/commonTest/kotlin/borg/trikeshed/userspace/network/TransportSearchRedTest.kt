@@ -282,7 +282,7 @@ class TransportSearchRedTest {
 
     @Test
     fun quicConfig_congestionControl() {
-        val cfg = QuicConfig(s_["cubic", "bbr"])
+        val cfg = QuicConfig(congestionControl = s_["cubic", "bbr"])
         assertEquals(2, cfg.congestionControl.size)
         assertEquals("cubic", cfg.congestionControl.first())
     }

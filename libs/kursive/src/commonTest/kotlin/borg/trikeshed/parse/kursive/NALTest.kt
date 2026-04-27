@@ -1,13 +1,11 @@
 package borg.trikeshed.parse.kursive
 
-import borg.trikeshed.lib.asString
-import borg.trikeshed.lib.get
-import borg.trikeshed.lib.size
-import borg.trikeshed.lib.toSeries
+import borg.trikeshed.lib.*
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
+
 
 /**
  * TDD suite for NAL 1-9 (Non-Axiomatic Logic) inference rules.
@@ -25,26 +23,26 @@ class NALTest {
      */
     @Test
     fun nal1ParsesInheritanceRelationship() {
-        val source = "<bird --> animal>.".toSeries()
-        val parsed = Narsive.parseSentence(source)
+        val source: Series<Char> = "<bird --> animal>.".toSeries()
+        val parsed: Join<CharSeries, NarsiveTrace>? = Narsive.parseSentence(source)
         assertNotNull(parsed)
 
-        val elements = parsed.b.elements(source).toList()
-        assertTrue(elements.any { it.kind == NarsiveElementKind.RELATIONSHIP })
-        assertTrue(elements.any { it.kind == NarsiveElementKind.COPULA })
+        val elements: Series<NarsiveElement> = parsed.b.elements(source)
+        assertTrue(elements.view.any { it.kind == NarsiveElementKind.RELATIONSHIP })
+        assertTrue(elements.view.any { it.kind == NarsiveElementKind.COPULA })
 
-        val operators = elements.operatorMask().narsiveOperators()
+        val operators: Set<NarsiveOperator> = elements.operatorMask().narsiveOperators()
         assertTrue(NarsiveOperator.INHERITANCE in operators, "Should have INHERITANCE operator")
     }
 
     @Test
     fun nal1SupervisorJobHasInheritanceCopula() {
-        val source = "<bird --> animal>.".toSeries()
-        val parsed = Narsive.parseSentence(source)
+        val source: Series<Char> = "<bird --> animal>.".toSeries()
+        val parsed: Join<CharSeries, NarsiveTrace>? = Narsive.parseSentence(source)
         assertNotNull(parsed)
 
-        val job = parsed.supervisorJob(source)
-        val copulas = job.fanout(NarsiveElementKind.COPULA)
+        val job: NarsiveSupervisorJob = parsed.supervisorJob(source)
+        val copulas: Series<NarsiveElement> = job.fanout(NarsiveElementKind.COPULA)
         assertEquals(1, copulas.size, "Should have one copula element")
         assertTrue(copulas[0].operatorOrNull() == NarsiveOperator.INHERITANCE)
     }
@@ -57,12 +55,12 @@ class NALTest {
      */
     @Test
     fun nal2ParsesSimilarityRelationship() {
-        val source = "<robin --> bird> <-> <robin --> bird>.".toSeries()
-        val parsed = Narsive.parseSentence(source)
+        val source: Series<Char> = "<robin --> bird> <-> <robin --> bird>.".s
+        val parsed: Join<CharSeries, NarsiveTrace>? = Narsive.parseSentence(source)
         assertNotNull(parsed)
 
-        val elements = parsed.b.elements(source).toList()
-        val operators = elements.operatorMask().narsiveOperators()
+        val elements: Series<NarsiveElement> = parsed.b.elements(source)
+        val operators: Set<NarsiveOperator> = elements.operatorMask().narsiveOperators()
         assertTrue(NarsiveOperator.SIMILARITY in operators, "Should have SIMILARITY operator")
     }
 
@@ -74,7 +72,7 @@ class NALTest {
 
         val job = parsed.supervisorJob(source)
         val copulas = job.fanout(NarsiveElementKind.COPULA)
-        assertTrue(copulas.any { it.operatorOrNull() == NarsiveOperator.SIMILARITY })
+        assertTrue(copulas.view.any { it.operatorOrNull() == NarsiveOperator.SIMILARITY })
     }
 
     // ── NAL3: Implication ────────────────────────────────────────────────
@@ -89,7 +87,7 @@ class NALTest {
         val parsed = Narsive.parseSentence(source)
         assertNotNull(parsed)
 
-        val elements = parsed.b.elements(source).toList()
+        val elements = parsed.b.elements(source)
         val operators = elements.operatorMask().narsiveOperators()
         assertTrue(NarsiveOperator.IMPLICATION in operators, "Should have IMPLICATION operator")
     }
@@ -100,7 +98,7 @@ class NALTest {
         val parsed = Narsive.parseSentence(source)
         assertNotNull(parsed)
 
-        val elements = parsed.b.elements(source).toList()
+        val elements = parsed.b.elements(source)
         val operators = elements.operatorMask().narsiveOperators()
         assertTrue(NarsiveOperator.EQUIVALENCE in operators, "Should have EQUIVALENCE operator")
     }
@@ -113,7 +111,7 @@ class NALTest {
 
         val job = parsed.supervisorJob(source)
         val copulas = job.fanout(NarsiveElementKind.COPULA)
-        assertTrue(copulas.any { it.operatorOrNull() == NarsiveOperator.IMPLICATION })
+        assertTrue(copulas.view.any { it.operatorOrNull() == NarsiveOperator.IMPLICATION })
     }
 
     // ── NAL4: Predictive Implication ────────────────────────────────────
@@ -128,22 +126,22 @@ class NALTest {
         val parsed = Narsive.parseSentence(source)
         assertNotNull(parsed)
 
-        val elements = parsed.b.elements(source).toList()
+        val elements = parsed.b.elements(source)
         val operators = elements.operatorMask().narsiveOperators()
         assertTrue(NarsiveOperator.PREDICTIVE_IMPLICATION in operators, "Should have PREDICTIVE_IMPLICATION operator")
     }
 
     @Test
     fun nal4PredictiveImplicationWithFutureTense() {
-        val source = "<S /> <P>. :/:" .toSeries()
+        val source = "<S /> <P>. :/:".toSeries()
         val parsed = Narsive.parseSentence(source)
         assertNotNull(parsed)
 
         val job = parsed.supervisorJob(source)
         val copulas = job.fanout(NarsiveElementKind.COPULA)
         val tenses = job.fanout(NarsiveElementKind.TENSE)
-        assertTrue(copulas.any { it.operatorOrNull() == NarsiveOperator.PREDICTIVE_IMPLICATION })
-        assertTrue(tenses.any { it.operatorOrNull() == NarsiveOperator.FUTURE })
+        assertTrue(copulas.view.any { it.operatorOrNull() == NarsiveOperator.PREDICTIVE_IMPLICATION })
+        assertTrue(tenses.view.any { it.operatorOrNull() == NarsiveOperator.FUTURE })
     }
 
     // ── NAL5: Concurrent Implication ────────────────────────────────────
@@ -158,7 +156,7 @@ class NALTest {
         val parsed = Narsive.parseSentence(source)
         assertNotNull(parsed)
 
-        val elements = parsed.b.elements(source).toList()
+        val elements = parsed.b.elements(source)
         val operators = elements.operatorMask().narsiveOperators()
         assertTrue(NarsiveOperator.CONCURRENT_IMPLICATION in operators, "Should have CONCURRENT_IMPLICATION operator")
     }
@@ -171,7 +169,7 @@ class NALTest {
 
         val job = parsed.supervisorJob(source)
         val copulas = job.fanout(NarsiveElementKind.COPULA)
-        assertTrue(copulas.any { it.operatorOrNull() == NarsiveOperator.CONCURRENT_IMPLICATION })
+        assertTrue(copulas.view.any { it.operatorOrNull() == NarsiveOperator.CONCURRENT_IMPLICATION })
     }
 
     // ── NAL6: Conjunction ────────────────────────────────────────────────
@@ -186,33 +184,33 @@ class NALTest {
         val parsed = Narsive.parseSentence(source)
         assertNotNull(parsed)
 
-        val elements = parsed.b.elements(source).toList()
-        assertTrue(elements.any { it.kind == NarsiveElementKind.COMPOUND_TERM })
+        val elements = parsed.b.elements(source)
+        assertTrue(elements.view.any { it.kind == NarsiveElementKind.COMPOUND_TERM })
         val operators = elements.operatorMask().narsiveOperators()
         assertTrue(NarsiveOperator.INTERSECTION in operators, "Should have INTERSECTION (&&) operator")
     }
 
     @Test
     fun nal6ConjunctionComposesMultipleTerms() {
-        val source = "(&&, <A>, <B>, <C>).".toSeries()
-        val parsed = Narsive.parseSentence(source)
+        val source: Series<Char> = "(&&, <A>, <B>, <C>).".toSeries()
+        val parsed: Join<CharSeries, NarsiveTrace>? = Narsive.parseSentence(source)
         assertNotNull(parsed)
 
-        val job = parsed.supervisorJob(source)
-        val conjunctions = job.fanout(NarsiveElementKind.CONJUNCTION)
-        assertTrue(conjunctions.any { it.operatorOrNull() == NarsiveOperator.INTERSECTION })
+        val job: NarsiveSupervisorJob = parsed.supervisorJob(source)
+        val conjunctions: Series<NarsiveElement> = job.fanout(NarsiveElementKind.CONJUNCTION)
+        assertTrue(conjunctions.view.any { it.operatorOrNull() == NarsiveOperator.INTERSECTION })
     }
 
     @Test
     fun nal6NestedConjunctions() {
-        val source = "(&&, <bird --> animal>, <animal --> mortal>).".toSeries()
-        val parsed = Narsive.parseSentence(source)
+        val source: Series<Char> = "(&&, <bird --> animal>, <animal --> mortal>).".s
+        val parsed: Join<CharSeries, NarsiveTrace>? = Narsive.parseSentence(source)
         assertNotNull(parsed)
 
-        val elements = parsed.b.elements(source).toList()
-        assertTrue(elements.any { it.kind == NarsiveElementKind.COMPOUND_TERM })
+        val elements = parsed.b.elements(source)
+        assertTrue(elements.view.any { it.kind == NarsiveElementKind.COMPOUND_TERM })
         // NAL6 allows deriving: if bird is animal and animal is mortal, bird is mortal
-        val relationships = elements.filter { it.kind == NarsiveElementKind.RELATIONSHIP }
+        val relationships: List<NarsiveElement> = elements.view.filter { it.kind == NarsiveElementKind.RELATIONSHIP }
         assertTrue(relationships.size >= 2, "Should have nested relationships in conjunction")
     }
 
@@ -224,25 +222,25 @@ class NALTest {
      */
     @Test
     fun nal7ParsesDisjunctionCompoundTerm() {
-        val source = "(||, <bird>, <reptile>).".toSeries()
-        val parsed = Narsive.parseSentence(source)
+        val source: Series<Char> = "(||, <bird>, <reptile>).".toSeries()
+        val parsed: Join<CharSeries, NarsiveTrace>? = Narsive.parseSentence(source)
         assertNotNull(parsed)
 
-        val elements = parsed.b.elements(source).toList()
-        assertTrue(elements.any { it.kind == NarsiveElementKind.COMPOUND_TERM })
+        val elements: Series<NarsiveElement> = parsed.b.elements(source)
+        assertTrue(elements.view.any { it.kind == NarsiveElementKind.COMPOUND_TERM })
         val operators = elements.operatorMask().narsiveOperators()
         assertTrue(NarsiveOperator.UNION in operators, "Should have UNION (||) operator")
     }
 
     @Test
     fun nal7SupervisorJobFansOutDisjunction() {
-        val source = "(||, <A>, <B>).".toSeries()
-        val parsed = Narsive.parseSentence(source)
+        val source: Series<Char> = "(||, <A>, <B>).".toSeries()
+        val parsed: Join<CharSeries, NarsiveTrace>? = Narsive.parseSentence(source)
         assertNotNull(parsed)
 
         val job = parsed.supervisorJob(source)
         val conjunctions = job.fanout(NarsiveElementKind.CONJUNCTION)
-        assertTrue(conjunctions.any { it.operatorOrNull() == NarsiveOperator.UNION })
+        assertTrue(conjunctions.view.any { it.operatorOrNull() == NarsiveOperator.UNION })
     }
 
     // ── NAL8: Product ───────────────────────────────────────────────────
@@ -257,8 +255,8 @@ class NALTest {
         val parsed = Narsive.parseSentence(source)
         assertNotNull(parsed)
 
-        val elements = parsed.b.elements(source).toList()
-        assertTrue(elements.any { it.kind == NarsiveElementKind.COMPOUND_TERM })
+        val elements = parsed.b.elements(source)
+        assertTrue(elements.view.any { it.kind == NarsiveElementKind.COMPOUND_TERM })
         val operators = elements.operatorMask().narsiveOperators()
         assertTrue(NarsiveOperator.PRODUCT in operators, "Should have PRODUCT (*) operator")
     }
@@ -270,8 +268,8 @@ class NALTest {
         assertNotNull(parsed)
 
         val job = parsed.supervisorJob(source)
-        val elements = job.elements.toList()
-        assertTrue(elements.any { it.kind == NarsiveElementKind.COMPOUND_TERM })
+        val elements = job.elements
+        assertTrue(elements.view.any { it.kind == NarsiveElementKind.COMPOUND_TERM })
     }
 
     // ── NAL9: Set Operations ─────────────────────────────────────────────
@@ -287,7 +285,7 @@ class NALTest {
         val parsed = Narsive.parseSentence(source)
         assertNotNull(parsed)
 
-        val elements = parsed.b.elements(source).toList()
+        val elements = parsed.b.elements(source)
         val operators = elements.operatorMask().narsiveOperators()
         // Note: Sequential &&/ may use same intersection operator but with different semantics
         assertTrue(operators.any { it == NarsiveOperator.INTERSECTION || it == NarsiveOperator.SEQUENTIAL })
@@ -306,30 +304,33 @@ class NALTest {
 
     @Test
     fun nal9ParallelComposition() {
-        val source = "(&|, <A>, <B>).".toSeries()
-        val parsed = Narsive.parseSentence(source)
+        val source: Series<Char> = "(&|, <A>, <B>).".toSeries()
+        val parsed: Join<CharSeries, NarsiveTrace>? = Narsive.parseSentence(source)
         assertNotNull(parsed)
 
-        val job = parsed.supervisorJob(source)
-        val elements = job.elements.toList()
+        val job: NarsiveSupervisorJob = parsed.supervisorJob(source)
+        val elements: Series<NarsiveElement> = job.elements
         // Should parse &| as parallel operator
-        val operators = elements.operatorMask().narsiveOperators()
-        assertTrue(NarsiveOperator.PARALLEL in operators || elements.any {
-            it.kind == NarsiveElementKind.CONJUNCTION && it.operatorOrNull() == NarsiveOperator.PARALLEL
-        }, "Should recognize PARALLEL operator")
+        val operators: Set<NarsiveOperator> = elements.operatorMask().narsiveOperators()
+        assertTrue(
+            NarsiveOperator.PARALLEL in operators || elements.view.any {
+                it.kind == NarsiveElementKind.CONJUNCTION && it.operatorOrNull() == NarsiveOperator.PARALLEL
+            },
+            "Should recognize PARALLEL operator",
+        )
     }
 
     // ── Cross-cutting tests ─────────────────────────────────────────────
 
     @Test
     fun nalLevelRecoversOperatorFromParsedElements() {
-        val source = "<bird --> animal>.".toSeries()
-        val parsed = Narsive.parseSentence(source)
+        val source: Series<Char> = "<bird --> animal>.".toSeries()
+        val parsed: Join<CharSeries, NarsiveTrace>? = Narsive.parseSentence(source)
         assertNotNull(parsed)
 
-        val elements = parsed.b.elements(source)
-        for (element in elements) {
-            val nalLevel = NALLevel.fromOperator(element.operatorOrNull()!!)
+        val elements: Series<NarsiveElement> = parsed.b.elements(source)
+        for (element: NarsiveElement in elements) {
+            val nalLevel: NALLevel? = NALLevel.fromOperator(element.operatorOrNull()!!)
             assertNotNull(nalLevel, "Element operator ${element.operatorOrNull()} should map to a NAL level")
         }
     }
@@ -345,9 +346,9 @@ class NALTest {
         // NAL8 (product)
         val nal8 = "(A * B)."
 
-        val results = Narsive.parseTasks("$nal1\n$nal3\n$nal6\n$nal8")
+        val results: Series<Join<CharSeries, NarsiveTrace>> = Narsive.parseTasks("$nal1\n$nal3\n$nal6\n$nal8")
         assertEquals(4, results.size, "Should parse all NAL level examples")
-        results.forEachIndexed { index, result ->
+        results.α { (index: CharSeries, result: NarsiveTrace) ->
             assertNotNull(result, "Result $index should not be null")
         }
     }
@@ -362,9 +363,9 @@ class NALTest {
             (A * B).
         """.trimIndent()
 
-        val tasks = Narsive.parseTasks(text)
-        tasks.forEachIndexed { index, task ->
-            val job = task.supervisorJob(task.a)
+        val tasks: Series2<CharSeries, NarsiveTrace> = Narsive.parseTasks(text)
+        for ((index: Int, task: Join<CharSeries, NarsiveTrace>) in tasks.view.withIndex()) {
+            val job: NarsiveSupervisorJob = task.supervisorJob(task.a)
             assertTrue(job.elements.size > 0, "Task $index should have elements")
             assertTrue(job.concurrentResolutions().size > 0, "Task $index should have concurrent resolutions")
         }

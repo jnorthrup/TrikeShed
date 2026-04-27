@@ -151,7 +151,7 @@ enum class NarsiveOperator(
 
     fun matches(lexeme: Series<Char>): Boolean = forms.any { it == lexeme.asString() }
 
-    fun tryConsume(input: KursiveCharSeries): CharSeries? = input.consumeAnyOf(*orderedForms)
+    fun tryConsume(input: JursiveCharSeries): CharSeries? = input.consumeAnyOf(*orderedForms)
 
     fun render(mode: NarsiveRenderMode = NarsiveRenderMode.MATCHING_UNICODE, matched: Series<Char>? = null): Series<Char> = when (mode) {
         NarsiveRenderMode.ASCII -> asciiForm.toSeries()
@@ -173,7 +173,7 @@ internal fun Series<Char>.narsiveOperatorOrNull(
     accept: (NarsiveOperator) -> Boolean = { true },
 ): NarsiveOperator? = NarsiveOperator.entries.firstOrNull { accept(it) && it.matches(this) }
 
-internal fun KursiveCharSeries.consumeNarsiveOperatorOrNull(
+internal fun JursiveCharSeries.consumeNarsiveOperatorOrNull(
     accept: (NarsiveOperator) -> Boolean = { true },
 ): CharSeries? = NarsiveOperator.entries.firstNotNullOfOrNull { operator ->
     if (accept(operator)) operator.tryConsume(this) else null
@@ -315,7 +315,7 @@ fun NarsiveTrace.elements(source: Series<Char>): Series<NarsiveElement> =
     }
 
 fun Join<CharSeries, NarsiveTrace>.supervisorJob(source: Series<Char>): NarsiveSupervisorJob {
-    val elements = b.elements(source)
+    val elements: Series<NarsiveElement> = b.elements(source)
     var first: NarsiveElement? = null
     var root: NarsiveElement? = null
     for (index in 0 until elements.size) {

@@ -126,7 +126,8 @@ class TrainingPane(private val box: Box) {
     }
 }
 
-// Shared factory for list optionsfun makeListOpts(top: Int, height: String): dynamic {
+// Shared factory for list options
+fun makeListOpts(top: Int, height: String): dynamic {
     val opts = js("({})")
     opts.top = top
     opts.left = 1

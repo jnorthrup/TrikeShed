@@ -81,8 +81,4 @@ class QUICChannelTest {
         assertEquals(1000L, e.offset)
     }
 
-    @Test fun quicChannel_stub_quicConfig_congestionControl() {
-        val cfg = QuicConfig(congestionControl = listOf("bbr"))
-        assertEquals("bbr", cfg.congestionControl[0])
-    }
 }

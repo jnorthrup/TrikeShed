@@ -171,9 +171,8 @@ fun encodeHeader(hdr: HtxBlockData.Header): ByteArray {
     hdr.value.copyInto(result, pos)
     return result
 }
-fun encodeDataBlock(d: HtxBlockData.Data): ByteArray = d.bytesfun encodeTrailerData(t: HtxBlockData.Trailer): ByteArray = encodeHeader(
-    HtxBlockData.Header(t.name, t.value)
-)
+fun encodeDataBlock(d: HtxBlockData.Data): ByteArray = throw NotImplementedError("RED: encodeDataBlock")
+fun encodeTrailerData(t: HtxBlockData.Trailer): ByteArray = throw NotImplementedError("RED: encodeTrailerData")
 
 // ── Internal payload decoding helpers ────────────────────────────
 fun HtxMessage.Companion.parsePayload(payload: ByteArray): HtxMessage? {

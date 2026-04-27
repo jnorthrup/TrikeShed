@@ -1,18 +1,18 @@
 package borg.trikeshed.parse.kursive
 
-import borg.trikeshed.cursor.name
+import borg.trikeshed.cursor.*
 import borg.trikeshed.lib.asString
 import borg.trikeshed.lib.get
-import borg.trikeshed.lib.size
+import borg.trikeshed.lib.*
 import borg.trikeshed.lib.toList
 import borg.trikeshed.lib.toSeries
-import kotlin.test.Test
+import kotlin.test.*
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class NarsiveParserTest {
-   fun labels(trace: NarsiveTrace): List<String> = trace.toList().map { it.a.asString() }
+    fun labels(trace: NarsiveTrace): List<String> = trace.toList().map { it.a.asString() }
 
     @Test
     fun parsesTaskWithBudgetTruthAndRelationshipInSitu() {

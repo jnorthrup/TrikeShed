@@ -1,6 +1,6 @@
 package borg.trikeshed.concurrency
 
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -65,21 +65,21 @@ class RingChannel<T>(capacity: Int) {
 class ChannelBackedByRingTest {
 
     /** backendPush fills the ring; recv drains it. */
-    @Test fun ringChannel_backendPush_thenRecv() = runBlocking {
+    @Test fun ringChannel_backendPush_thenRecv() = runTest {
         val ch = RingChannel<Int>(8)
         assertTrue(ch.backendPush(42))
         assertEquals(42, ch.recv())
     }
 
     /** recv returns null when channel is closed and ring is empty. */
-    @Test fun ringChannel_recv_returnsNullWhenClosed() = runBlocking {
+    @Test fun ringChannel_recv_returnsNullWhenClosed() = runTest {
         val ch = RingChannel<Int>(8)
         ch.close()
         assertEquals(null, ch.recv())
     }
 
     /** send fills ring; backendPop drains it for the backend to write. */
-    @Test fun ringChannel_send_thenBackendPop() = runBlocking {
+    @Test fun ringChannel_send_thenBackendPop() = runTest {
         val ch = RingChannel<Int>(4)
         ch.send(1); ch.send(2)
         assertEquals(1, ch.backendPop())
@@ -98,14 +98,14 @@ class ChannelBackedByRingTest {
     }
 
     /** close wakes suspended recv with null. */
-    @Test fun ringChannel_close_wakesRecv() = runBlocking {
+    @Test fun ringChannel_close_wakesRecv() = runTest {
         val ch = RingChannel<Int>(8)
         ch.close()
         assertEquals(null, ch.recv())
     }
 
     /** Backend (NIO/uring) pushes data into ring; consumer recvs. */
-    @Test fun ringChannel_backendToConsumer_flow() = runBlocking {
+    @Test fun ringChannel_backendToConsumer_flow() = runTest {
         val ch = RingChannel<Int>(8)
         // Simulate NIO read completion: backend pushes bytes
         ch.backendPush(10)

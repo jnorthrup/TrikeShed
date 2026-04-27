@@ -14,7 +14,8 @@ fun Long.fmt(): String {
     return s
 }
 
-// Kotlin/JS polyfill for toFixedfun Double.toFixed(digits: Int): String {
+// Kotlin/JS polyfill for toFixed
+fun Double.toFixed(digits: Int): String {
     val mult = when (digits) {
         0 -> 1.0; 1 -> 10.0; 2 -> 100.0; 3 -> 1000.0; else -> 1.0
     }

@@ -22,7 +22,7 @@ class ConfixDebugTest {
         while (i < elems.size) {
             val e = elems[i]
             println("elem[$i] open=${e.a.a} close=${e.a.b} tag=${Reify.tagOf(e, series)}")
-            val cs = Reify.realCommas(e)
+            val cs = Reify.realCommas(e, series)
             var j = 0
             while (j < cs.size) { println("  comma[$j]=${cs[j]}"); j++ }
             i++

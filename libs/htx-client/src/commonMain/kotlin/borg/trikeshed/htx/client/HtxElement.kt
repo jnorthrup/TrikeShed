@@ -31,7 +31,7 @@ suspend fun openHtxElement(
 class HtxElement(
    val requestHandler: HtxRequestHandler = ::defaultHtxRequestHandler,
 ) : AsyncContextElement() {
-    companion object Key : AsyncContextKey<HtxElement>("HtxKey", 1L shl 5)
+    companion object Key : AsyncContextKey<HtxElement>()
 
     override val key: AsyncContextKey<HtxElement>
         get() = Key

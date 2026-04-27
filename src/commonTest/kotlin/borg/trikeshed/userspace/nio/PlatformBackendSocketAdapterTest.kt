@@ -50,7 +50,7 @@ class PlatformBackendSocketAdapterTest {
             override suspend fun close() {}
         }
         try {
-            kotlinx.coroutines.runBlocking { sock.read(ByteArray(1024), 0, 1024) }
+            kotlinx.coroutines.test.runTest { sock.read(ByteArray(1024), 0, 1024) }
             fail("Expected NotImplementedError for read")
         } catch (e: NotImplementedError) {
             // RED: PlatformBackend has no real socket read adapter
@@ -67,7 +67,7 @@ class PlatformBackendSocketAdapterTest {
             override suspend fun close() {}
         }
         try {
-            kotlinx.coroutines.runBlocking { sock.write("GET /".toByteArray(), 0, 5) }
+            kotlinx.coroutines.test.runTest { sock.write("GET /".encodeToByteArray(), 0, 5) }
             fail("Expected NotImplementedError for write")
         } catch (e: NotImplementedError) {
             // RED: PlatformBackend has no real socket write adapter
@@ -84,7 +84,7 @@ class PlatformBackendSocketAdapterTest {
             override suspend fun close() {}
         }
         try {
-            kotlinx.coroutines.runBlocking { server.accept() }
+            kotlinx.coroutines.test.runTest { server.accept() }
             fail("Expected NotImplementedError for accept")
         } catch (e: NotImplementedError) {
             // RED: no server accept adapter
