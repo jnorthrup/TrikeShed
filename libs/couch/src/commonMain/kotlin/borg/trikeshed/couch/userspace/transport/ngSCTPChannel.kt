@@ -3,6 +3,8 @@ package borg.trikeshed.couch.userspace.transport
 import borg.trikeshed.couch.htx.HtxBlock
 import borg.trikeshed.couch.userspace.nio.SessionContext
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.consumeAsFlow
 import kotlin.coroutines.AbstractCoroutineContextElement
 import kotlin.coroutines.CoroutineContext
 
@@ -46,6 +48,12 @@ class ngSCTPChannel(
     suspend fun recv(): Result<HtxBlock> = runCatching {
         recvChannel.receive()
     }
+
+    /**
+     * Stream as a Flow — for use with collect{} etc.
+     * The flow emits received blocks until the channel is closed.
+     */
+    fun stream(): Flow<HtxBlock> = recvChannel.consumeAsFlow()
 
     companion object {
         /** Singleton key for ngSCTPChannel in CoroutineContext. */

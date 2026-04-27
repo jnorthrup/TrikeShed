@@ -445,7 +445,9 @@ object YamlScan {
                 if (colonAt >= 0) {
                     // rewind and parse a one-element inline map by recursing at this column
                     st.pos = scalarStart
+                    val savedPoolSize = out.commasSize()
                     val ci = parseMapOrScalar(st, out, childIndent)
+                    out.truncateCommas(savedPoolSize)  // discard nested map commas
                     println("DEBUG parseSeq: parseMapOrScalar -> childIdx=$ci")
                     ci
                 } else {
@@ -508,7 +510,16 @@ object YamlScan {
             if (st.atEof()) break
             here = st.lineIndent()
             if (here < indent) break
-            if (here > indent) break  // stray over-indent; stop map here
+            if (here > indent) {
+                // Could be a multiline plain scalar continuation — check for colon
+                val colonCheck = st.readToColon()
+                if (colonCheck < st.n && st.s[colonCheck] == ':') {
+                    break  // genuine over-indent key
+                }
+                // Multiline continuation — skip this line and loop again
+                st.readLineEnd()
+                continue
+            }
             st.consumeIndent(here)
             // ensure next is a key
             val p = st.pos

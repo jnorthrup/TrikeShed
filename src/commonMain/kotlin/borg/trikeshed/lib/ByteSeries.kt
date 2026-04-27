@@ -117,22 +117,26 @@ class ByteSeries(
         return result
     }
 
-    fun asString(upto: Int = Int.MAX_VALUE): String = toArray().decodeToChars().asString().take(upto)
+    fun asString(upto: Int = Int.MAX_VALUE): String =
+        ((limit - pos) j { x: Int -> this[x + pos] }).toArray().decodeToString().take(upto)
 
     override fun toString(): String {
         val take = asString().take(4)
         return "ByteSeries(position=$pos, limit=$limit, mark=$mark, cacheCode=$cacheCode, take-4=${take})"
     }
 
+    /** mutating operation to shrink the buffer  */
+    fun confixScope(pred: (Byte) -> Boolean) {
+        var p = pos
+        var l = limit
+        while (p < l && pred(this[p])) p++
+        while (l > p && pred(this[l - 1])) l--
+        lim(l)
+        pos(p)
+    }
+
     val trim: ByteSeries
-        get() = apply {
-            var p = pos
-            var l = limit
-            while (p < l && this[p].toInt().toChar().isWhitespace()) p++
-            while (l > p && this[l - 1].toInt().toChar().isWhitespace()) l--
-            lim(l)
-            pos(p)
-        }
+        get() = apply { confixScope { it.toInt().toChar().isWhitespace() } }
 
     val isEmpty: Boolean get() = pos == limit
 
@@ -149,10 +153,72 @@ class ByteSeries(
         return false
     }
 
+    fun seekTo(lit: Series<Byte>): Boolean {
+        val anchor = pos
+        var i = 0
+        while (hasRemaining) {
+            if (get == lit[i]) {
+                i++
+                if (i == lit.size) return true
+            } else {
+                i = 0
+            }
+        }
+        pos = anchor
+        return false
+    }
+
     operator fun dec(): ByteSeries = apply { require(pos > 0) { "Underflow" }; pos-- }
     operator fun inc(): ByteSeries = apply { require(hasRemaining) { "Overflow" }; pos++ }
 
+    /** Split on whitespace into zero-copy ByteSeries slices. */
+    fun splitWs(): Series<ByteSeries> {
+        val parts = mutableListOf<ByteSeries>()
+        var i = pos
+        while (i < limit && this[i].toInt().toChar().isWhitespace()) i++
+        while (i < limit) {
+            val start = i
+            while (i < limit && !this[i].toInt().toChar().isWhitespace()) i++
+            parts.add(ByteSeries(this[start until i]))
+            while (i < limit && this[i].toInt().toChar().isWhitespace()) i++
+        }
+        return parts.toSeries()
+    }
+
     fun toArray(): ByteArray = ByteArray(rem, ::get)
+
+    companion object {
+
+        /** returns true and advances the position if the confix is {} */
+        fun unbrace(it: ByteSeries): Boolean {
+            val chlit = byteArrayOf('{'.code.toByte(), '}'.code.toByte(), ' '.code.toByte())
+            return confixFeature(it, chlit)
+        }
+
+        /** returns true and advances the position if the confix is [] */
+        fun unbracket(it: ByteSeries): Boolean {
+            val chlit = byteArrayOf('['.code.toByte(), ']'.code.toByte(), ' '.code.toByte())
+            return confixFeature(it, chlit)
+        }
+
+        /** returns true and advances the position if the series is quoted */
+        fun unquote(it: ByteSeries): Boolean {
+            val chlit = byteArrayOf('"'.code.toByte(), '"'.code.toByte(), ' '.code.toByte())
+            return confixFeature(it, chlit)
+        }
+
+        private fun confixFeature(client: ByteSeries, chlit: ByteArray): Boolean {
+            logNone { "confix ${chlit.decodeToString()} before: ${client.asString()}" }
+            var x = 0
+            client.confixScope { test: Byte ->
+                val target = chlit[x]
+                (target == test && x < 2).apply { if (this) x++ }
+            }
+            return x == 2.debug {
+                logNone { "confix ${chlit.decodeToString()}  after: ${client.asString()}" }
+            }
+        }
+    }
 }
 
 /**
