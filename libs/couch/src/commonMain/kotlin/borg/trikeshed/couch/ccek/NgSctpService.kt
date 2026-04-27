@@ -5,6 +5,29 @@ import borg.trikeshed.context.StreamTransport
 import kotlinx.coroutines.channels.Channel
 import kotlin.coroutines.CoroutineContext
 
+/** Multi-homing path state for SCTP failover (RFC 4960 §6.4). */
+enum class PathState {
+    /** Path is actively used for data transmission. */
+    ACTIVE,
+    /** Path has failed heartbeats and is not used. */
+    INACTIVE,
+    /** Path has not yet been probed. */
+    UNKNOWN,
+}
+
+/**
+ * Per-path status for multi-homing failover tracking.
+ *
+ * @param address The destination address (host:port or IP).
+ * @param state Current path state.
+ * @param failures Consecutive heartbeat failures on this path.
+ */
+data class PathStatus(
+    val address: String,
+    val state: PathState = PathState.UNKNOWN,
+    val failures: Int = 0,
+)
+
 /**
  * SCTP-semantics transport CCEK service (Design 3 — ngSCTP spirit).
  *
@@ -21,6 +44,43 @@ data class NgSctpService(
     val congestionControl: String = "cubic"          // cubic | hstcp | rack — deterministic only
 ) : StreamTransport {
     companion object Key : CoroutineContext.Key<NgSctpService>
+
+    /** Per-path failover tracking — lazy-initialized from [paths] on first access. */
+    private val _pathStatuses: MutableMap<String, PathStatus> by lazy {
+        paths.associateTo(mutableMapOf()) { it to PathStatus(address = it) }
+    }
+
+    /** Current primary path — first ACTIVE path, or null if none are active. */
+    val primaryPath: PathStatus?
+        get() = _pathStatuses.values.firstOrNull { it.state == PathState.ACTIVE }
+            ?: _pathStatuses.values.firstOrNull { it.state == PathState.UNKNOWN }
+
+    /**
+     * Mark [failedPath] as INACTIVE and return the next available ACTIVE path
+     * for failover. Returns null if no paths remain.
+     */
+    fun failover(failedPath: String): PathStatus? {
+        val current = _pathStatuses[failedPath] ?: return primaryPath
+        _pathStatuses[failedPath] = current.copy(
+            state = PathState.INACTIVE,
+            failures = current.failures + 1,
+        )
+        return primaryPath
+    }
+
+    /** Mark [path] as ACTIVE (recovery after successful heartbeat probe). */
+    fun recoverPath(path: String): PathStatus {
+        val current = _pathStatuses[path] ?: PathStatus(address = path)
+        val recovered = current.copy(
+            state = PathState.ACTIVE,
+            failures = 0,
+        )
+        _pathStatuses[path] = recovered
+        return recovered
+    }
+
+    /** All path statuses, indexed by address. */
+    val pathStatuses: Map<String, PathStatus> get() = _pathStatuses
 
     // Public handle as non-negative Long (stream ID)
     var handle: Long = 0
