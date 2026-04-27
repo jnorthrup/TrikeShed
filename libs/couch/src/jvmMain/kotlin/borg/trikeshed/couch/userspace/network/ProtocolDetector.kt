@@ -13,13 +13,18 @@ import borg.trikeshed.couch.htx.HtxBlockType
  * - "GET " / "HEAD " / "POST " / "PUT " / "DELETE " / "OPTIONS " / "PATCH " → HTTP
  * - 0x16 (TLS handshake) → TLS
  * - "SSH-" → SSH
- * - 0x00 0x00 0x?? "SPDY" → HTTP/2 (not implemented — returns null)
+ * - "PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n" → HTTP/2 (connection preface, RFC 7540 §3.5)
  * - empty → null (need more data)
  */
 class ProtocolDetector {
 
     private val buf = StringBuilder()
     private var tlsDetected = false
+
+    companion object {
+        /** HTTP/2 connection preface (RFC 7540 §3.5): 24-byte magic string. */
+        private const val H2_PREFACE = "PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n"
+    }
 
     /**
      * Feed a chunk of bytes into the detector.
@@ -40,6 +45,12 @@ class ProtocolDetector {
     fun protocol(): Protocol? {
         if (tlsDetected) return Protocol.TLS
         val s = buf.toString()
+
+        // HTTP/2 connection preface (RFC 7540 §3.5): 24-byte magic
+        if (s.length >= H2_PREFACE.length && s.startsWith(H2_PREFACE)) {
+            return Protocol.HTTP2
+        }
+
         return when {
             s.startsWith("GET ") || s.startsWith("HEAD ") ||
             s.startsWith("POST ") || s.startsWith("PUT ") ||
@@ -50,8 +61,7 @@ class ProtocolDetector {
 
             s.isEmpty() -> null
 
-            // TLS detection: first byte = 0x16 (TLS Handshake)
-            // We receive bytes so check first byte
+            // Need more data to disambiguate
             else -> null
         }
     }
