@@ -217,6 +217,76 @@ data class SctpSackChunk(
     }
 }
 
+// ── COOKIE_ECHO / COOKIE_ACK chunks (RFC 4960 §3.3.10-3.3.11) ────────────────
+
+/**
+ * SCTP COOKIE_ECHO chunk (RFC 4960 §3.3.10).
+ *
+ * Carries the opaque cookie received in INIT_ACK back to the server.
+ * The cookie is variable-length; the chunk length encodes its size.
+ */
+data class SctpCookieEchoChunk(
+    val cookie: ByteArray,
+) {
+    val chunkLength: UShort get() = (HEADER_LENGTH + cookie.size.toUShort()).toUShort()
+
+    val header: SctpChunkHeader
+        get() = SctpChunkHeader(SctpChunkType.COOKIE_ECHO, length = chunkLength)
+
+    fun encode(): ByteArray {
+        val buf = ByteArray(chunkLength.toInt())
+        var off = 0
+        buf[off++] = SctpChunkType.COOKIE_ECHO.ordinal.toByte()  // type
+        buf[off++] = 0                                              // flags
+        putUShort(buf, off, chunkLength); off += 2                 // length
+        cookie.forEachIndexed { i, b -> buf[off + i] = b }
+        return buf
+    }
+
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is SctpCookieEchoChunk) return false
+        return cookie.contentEquals(other.cookie)
+    }
+
+    override fun hashCode(): Int = cookie.contentHashCode()
+
+    companion object {
+        const val HEADER_LENGTH: UShort = 4u
+
+        fun decode(bytes: ByteArray): SctpCookieEchoChunk {
+            require(bytes.size >= HEADER_LENGTH.toInt()) { "COOKIE_ECHO too short: ${bytes.size} < $HEADER_LENGTH" }
+            val totalLen = getUShort(bytes, 2).toInt()
+            require(bytes.size >= totalLen) { "COOKIE_ECHO truncated: ${bytes.size} < $totalLen" }
+            val cookie = bytes.copyOfRange(HEADER_LENGTH.toInt(), totalLen)
+            return SctpCookieEchoChunk(cookie)
+        }
+    }
+}
+
+/**
+ * SCTP COOKIE_ACK chunk (RFC 4960 §3.3.11).
+ *
+ * Sent by the server upon successfully validating a COOKIE_ECHO.
+ * Fixed 4-byte chunk with no payload.
+ */
+object SctpCookieAckChunk {
+    const val CHUNK_LENGTH: UShort = 4u
+
+    val header: SctpChunkHeader
+        get() = SctpChunkHeader(SctpChunkType.COOKIE_ACK, length = CHUNK_LENGTH)
+
+    fun encode(): ByteArray = byteArrayOf(
+        SctpChunkType.COOKIE_ACK.ordinal.toByte(),  // type
+        0,                                            // flags
+        0, 4,                                         // length = 4 (big-endian)
+    )
+
+    fun decode(bytes: ByteArray) {
+        require(bytes.size >= CHUNK_LENGTH.toInt()) { "COOKIE_ACK too short: ${bytes.size} < $CHUNK_LENGTH" }
+    }
+}
+
 // ── Primitive encoding helpers (big-endian) ─────────────────────────────────
 
 private fun putUShort(buf: ByteArray, off: Int, value: UShort) {
@@ -246,6 +316,7 @@ suspend fun openSctpElement(): SctpElement =
 
 class SctpElement(
     private val streams: MutableMap<Int, StreamHandle> = mutableMapOf(),
+    private val associations: MutableMap<Long, SctpState> = mutableMapOf(),
 ) : AsyncContextElement(), StreamTransport {
     companion object Key : AsyncContextKey<SctpElement>("SctpKey", 1L shl 3)
 
@@ -266,13 +337,64 @@ class SctpElement(
 
     override val activeStreams: Int get() = streams.size
 
+    private fun assocId(host: String, port: Int): Long =
+        (host.hashCode().toLong() shl 32) xor port.toLong()
+
+    // ── Server side ──────────────────────────────────────────────────────
+
+    /** Begin listening — server stays CLOSED per RFC 4960 §5.2.2 cookie mechanism. */
     suspend fun bind(port: Int): SctpAssociation {
         requireState(ElementState.OPEN)
-        return SctpAssociation(associationId = port.toLong(), state = SctpState.CLOSED)
+        val id = port.toLong()
+        associations[id] = SctpState.CLOSED
+        return SctpAssociation(associationId = id, state = SctpState.CLOSED)
     }
 
+    /**
+     * Server handles incoming COOKIE_ECHO: validates cookie, responds with
+     * COOKIE_ACK, transitions CLOSED → ESTABLISHED (RFC 4960 §5.2.2 step 5).
+     */
+    suspend fun handleCookieEcho(associationId: Long, chunk: SctpCookieEchoChunk): SctpState {
+        val current = associations[associationId] ?: error("Unknown association: $associationId")
+        check(current == SctpState.CLOSED) { "Expected CLOSED, got $current" }
+        // In a real impl: validate the cookie here
+        associations[associationId] = SctpState.ESTABLISHED
+        return SctpState.ESTABLISHED
+    }
+
+    // ── Client side (4-way handshake) ────────────────────────────────────
+
+    /**
+     * Initiate connection — sends INIT, enters COOKIE_WAIT (RFC 4960 §5.2.1 step 2).
+     * Caller must progress through [handleInitAck] → [handleCookieAck].
+     */
     suspend fun connect(host: String, port: Int): SctpAssociation {
         requireState(ElementState.OPEN)
-        return SctpAssociation(associationId = (host.hashCode().toLong() shl 32) xor port.toLong(), state = SctpState.ESTABLISHED)
+        val id = assocId(host, port)
+        associations[id] = SctpState.COOKIE_WAIT
+        return SctpAssociation(associationId = id, state = SctpState.COOKIE_WAIT)
+    }
+
+    /**
+     * Client receives INIT_ACK: sends COOKIE_ECHO, transitions
+     * COOKIE_WAIT → COOKIE_ECHOED (RFC 4960 §5.2.1 step 4).
+     */
+    suspend fun handleInitAck(associationId: Long, initAck: SctpInitAckChunk, cookie: ByteArray): SctpState {
+        val current = associations[associationId] ?: error("Unknown association: $associationId")
+        check(current == SctpState.COOKIE_WAIT) { "Expected COOKIE_WAIT, got $current" }
+        // In a real impl: send COOKIE_ECHO(cookie) on the wire
+        associations[associationId] = SctpState.COOKIE_ECHOED
+        return SctpState.COOKIE_ECHOED
+    }
+
+    /**
+     * Client receives COOKIE_ACK: handshake complete,
+     * COOKIE_ECHOED → ESTABLISHED (RFC 4960 §5.2.1 step 7).
+     */
+    suspend fun handleCookieAck(associationId: Long): SctpState {
+        val current = associations[associationId] ?: error("Unknown association: $associationId")
+        check(current == SctpState.COOKIE_ECHOED) { "Expected COOKIE_ECHOED, got $current" }
+        associations[associationId] = SctpState.ESTABLISHED
+        return SctpState.ESTABLISHED
     }
 }
