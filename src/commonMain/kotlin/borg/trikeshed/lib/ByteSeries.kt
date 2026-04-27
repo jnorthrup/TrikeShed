@@ -37,12 +37,26 @@ class ByteSeries(
     var mark: Int = -1,
 ) : Series<Byte> by buf {
 
-    inline val get: Byte
+    // Small byte-window cache to improve locality. Uses buf.b(index) fallback when cache miss.
+    private var _byteCache: ByteArray? = null
+    private var _cacheBase: Int = 0
+    private var _cacheLen: Int = 0
+    private val BYTE_CACHE_WINDOW: Int = 4096
+
+    private fun raw(i: Int): Byte {
+        val c = _byteCache
+        if (c != null) {
+            val b = _cacheBase
+            val l = _cacheLen
+            if (i >= b && i < b + l) return c[i - b]
+        }
+        return b(i)
+    }
+
+    val get: Byte
         get() {
             if (!hasRemaining) throw IndexOutOfBoundsException("pos: $pos, limit: $limit")
-            val c = get(pos)
-            pos++
-            return c
+            val c = raw(pos); pos++; return c
         }
 
     constructor(s: String) : this(s.toSeries().encodeToByteArray().toSeries())
@@ -80,15 +94,15 @@ class ByteSeries(
     fun lim(i: Int): ByteSeries = apply { limit = i }
 
     val skipWs: ByteSeries get() = apply { while (hasRemaining && get.toInt().toChar().isWhitespace()); res }
-    val rtrim: ByteSeries get() = apply { while (rem > 0 && this[limit - 1].toInt().toChar().isWhitespace()) limit-- }
+    val rtrim: ByteSeries get() = apply { while (rem > 0 && raw(limit - 1).toInt().toChar().isWhitespace()) limit-- }
 
-    fun clone(): ByteSeries = ByteSeries(this.toArray() α { it }).also { it.pos = pos; it.limit = limit; it.mark = mark }
+    fun clone(): ByteSeries = ByteSeries(a j b).also { it.pos = pos; it.limit = limit; it.mark = mark }
 
     val cacheCode: Int
         get() {
             var h = 1
             for (i in pos until limit) {
-                h = 31 * h + this[i].hashCode()
+                h = 31 * h + raw(i).hashCode()
             }
             return h
         }
@@ -118,7 +132,7 @@ class ByteSeries(
     }
 
     fun asString(upto: Int = Int.MAX_VALUE): String =
-        ((limit - pos) j { x: Int -> this[x + pos] }).toArray().decodeToString().take(upto)
+        ((limit - pos) j { x: Int -> raw(x + pos) }).toArray().decodeToString().take(upto)
 
     override fun toString(): String {
         val take = asString().take(4)
@@ -129,8 +143,8 @@ class ByteSeries(
     fun confixScope(pred: (Byte) -> Boolean) {
         var p = pos
         var l = limit
-        while (p < l && pred(this[p])) p++
-        while (l > p && pred(this[l - 1])) l--
+        while (p < l && pred(raw(p))) p++
+        while (l > p && pred(raw(l - 1))) l--
         lim(l)
         pos(p)
     }
@@ -175,12 +189,12 @@ class ByteSeries(
     fun splitWs(): Series<ByteSeries> {
         val parts = mutableListOf<ByteSeries>()
         var i = pos
-        while (i < limit && this[i].toInt().toChar().isWhitespace()) i++
+        while (i < limit && raw(i).toInt().toChar().isWhitespace()) i++
         while (i < limit) {
             val start = i
-            while (i < limit && !this[i].toInt().toChar().isWhitespace()) i++
+            while (i < limit && !raw(i).toInt().toChar().isWhitespace()) i++
             parts.add(ByteSeries(this[start until i]))
-            while (i < limit && this[i].toInt().toChar().isWhitespace()) i++
+            while (i < limit && raw(i).toInt().toChar().isWhitespace()) i++
         }
         return parts.toSeries()
     }
@@ -255,4 +269,24 @@ fun Series<Byte>.startsWith(s: String): Boolean {
 fun Series<Byte>.endsWith(s: String): Boolean {
     val join = s.encodeToByteArray() α { it }
     return join.size <= size && join.zip(this.reversed()).view.all { it.first == it.second }
+}
+
+operator fun Series<Byte>.div(delim: Byte): Series<Series<Byte>> { //lazy split
+    val intList = mutableListOf<Int>()
+    for (x in 0 until size) if (this[x] == delim) intList.add(x)
+
+    /**
+     * iarr is an index of delimitted endings of the ByteSeries.
+     */
+    val iarr: IntArray = intList.toIntArray()
+
+    return iarr α { x ->
+        val p = if (x == 0) 0 else iarr[x.dec()].inc() //start of next
+        val l = //is x last index?
+            if (x == iarr.lastIndex)
+                this.size
+            else
+                iarr[x].dec()
+        this[p until l]
+    }
 }
