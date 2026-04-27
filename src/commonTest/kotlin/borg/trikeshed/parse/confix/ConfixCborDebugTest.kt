@@ -36,7 +36,7 @@ class ConfixCborDebugTest {
         println("resolved: $resolved")
         if (resolved != null) {
             println("resolved open=${resolved.a.a} close=${resolved.a.b}")
-            val v = Reify.reify(resolved)
+            val v = Reify.reify(resolved, src.syntax)
             println("reified value = $v")
         }
     }

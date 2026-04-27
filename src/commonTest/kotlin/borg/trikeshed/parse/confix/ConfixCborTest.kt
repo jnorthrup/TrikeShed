@@ -13,7 +13,7 @@ class ConfixCborTest {
         val ctx = contextOf(src.syntax, src.src)
         val resolved = Path.resolve(ctx, path(1))
         assertNotNull(resolved)
-        val v = Reify.reify(resolved)
+        val v = Reify.reify(resolved, src.syntax)
         // Expecting numeric value 2 (reified as Double)
         assertEquals(2.0, v)
     }
@@ -24,7 +24,7 @@ class ConfixCborTest {
         val bytes = byteArrayOf(0x62.toByte(), 'h'.code.toByte(), 'i'.code.toByte())
         val src = cborSource(bytes)
         val ctx = contextOf(src.syntax, src.src)
-        val v = Reify.reify(ctx)
+        val v = Reify.reify(ctx, src.syntax)
         // Expecting decoded text 'hi'
         assertEquals("hi", v)
     }
