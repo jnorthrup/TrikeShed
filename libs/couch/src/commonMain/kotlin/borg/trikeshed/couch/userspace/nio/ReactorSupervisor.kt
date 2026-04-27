@@ -87,10 +87,9 @@ class ReactorSupervisor(
         check(_state == ReactorState.ACTIVE) { "Cannot launch branch in state $_state" }
         val branch = BranchScope(name, channel, supervisor)
         _branches[name] = branch
-        // Build context: start with supervisor, add each palette element
-        var ctx: CoroutineContext = supervisor
-        for ((k, v) in _contextPalette) {
-            ctx = ctx + ContextElementImpl(k, v)
+        // Build context: fold palette entries into supervisor
+        val ctx: CoroutineContext = _contextPalette.entries.fold(supervisor as CoroutineContext) { acc, (k, v) ->
+            acc + ContextElementImpl(k, v)
         }
         return CoroutineScope(ctx).launch {
             block()
