@@ -1,4 +1,4 @@
-@file:Suppress("UNCHECKED_CAST", "ObjectPropertyName", "NonAsciiCharacters")
+@file:Suppress("UNCHECKED_CAST", "ObjectPropertyName", "NonAsciiCharacters", "FunctionName")
 @file:OptIn(ExperimentalUnsignedTypes::class)
 
 package borg.trikeshed.lib
