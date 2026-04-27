@@ -32,9 +32,6 @@ kotlin {
         val commonMain by getting {
             dependencies {
                 api("org.bereft:trikeshed")
-                api("borg.trikeshed:common")
-                api("borg.trikeshed:couch")
-                api("borg.trikeshed:miniduck")
                 api("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
             }
         }

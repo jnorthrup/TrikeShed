@@ -11,16 +11,27 @@ class SplitPane(screen: Screen) {
     init {
         val halfWidth = screen.width / 2
 
-        left = Box.box(js("({ top: 0, left: 0, width: $halfWidth, height: '100%'," +
-            " border: { type: 'line' }, label: ' TRADING '," +
-            " tags: true, style: { border: { fg: 'green' } } })"))
-
-        right = Box.box(js("({ top: 0, left: ${halfWidth + 1}, width: ${halfWidth - 2}, height: '100%'," +
-            " border: { type: 'line' }, label: ' TRAINING '," +
-            " tags: true, style: { border: { fg: 'cyan' } } })"))
+        left = box(makeBoxOpts(0, 0, halfWidth, " TRADING ", "green"))
+        right = box(makeBoxOpts(halfWidth + 1, 0, halfWidth - 2, " TRAINING ", "cyan"))
 
         screen.append(left)
         screen.append(right)
+    }
+
+    private fun makeBoxOpts(top: Int, _left: Int, width: Int, label: String, borderColor: String): dynamic {
+        val opts = js("({})")
+        opts.top = top
+        opts.left = _left
+        opts.width = width
+        opts.height = "100%"
+        opts.border = js("({ type: 'line' })")
+        opts.label = label
+        opts.tags = true
+        val style = js("({})")
+        style.border = js("({ fg: '' })")
+        style.border.fg = borderColor
+        opts.style = style
+        return opts
     }
 }
 
@@ -38,9 +49,7 @@ class TradingPane(private val box: Box) {
     )
 
     init {
-        log = BlessedList.list(js("({ top: 11, left: 1, width: '100%-2', height: '100%-12'," +
-            " tags: true, scrollable: true, mouse: true," +
-            " style: { selected: { bg: 'blue' }, item: { fg: 'white' } } })"))
+        log = list(makeListOpts(11, "100%-12"))
         box.append(log)
     }
 
@@ -90,9 +99,7 @@ class TrainingPane(private val box: Box) {
     )
 
     init {
-        log = BlessedList.list(js("({ top: 11, left: 1, width: '100%-2', height: '100%-12'," +
-            " tags: true, scrollable: true, mouse: true," +
-            " style: { selected: { bg: 'blue' }, item: { fg: 'white' } } })"))
+        log = list(makeListOpts(11, "100%-12"))
         box.append(log)
     }
 
@@ -117,4 +124,18 @@ class TrainingPane(private val box: Box) {
         }
         log.scroll(1)
     }
+}
+
+// Shared factory for list options
+private fun makeListOpts(top: Int, height: String): dynamic {
+    val opts = js("({})")
+    opts.top = top
+    opts.left = 1
+    opts.width = "100%-2"
+    opts.height = height
+    opts.tags = true
+    opts.scrollable = true
+    opts.mouse = true
+    opts.style = js("({ selected: { bg: 'blue' }, item: { fg: 'white' } })")
+    return opts
 }

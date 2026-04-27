@@ -2,7 +2,13 @@
 @file:JsNonModule
 package dreamer.dashboard
 
-// ── Screen (full terminal canvas) ──────────────────────────────────────────
+// ── Top-level factory functions (these are `blessed.screen()`, `blessed.box()`, etc.) ──
+external fun screen(opts: dynamic = definedExternally): Screen
+external fun box(opts: dynamic = definedExternally): Box
+external fun list(opts: dynamic = definedExternally): BlessedList
+external fun text(opts: dynamic = definedExternally): BlessedText
+
+// ── Screen ─────────────────────────────────────────────────────────────────
 external class Screen {
     val width: Int
     val height: Int
@@ -10,24 +16,18 @@ external class Screen {
     fun destroy()
     fun key(keys: Array<String>, handler: (ch: String, key: dynamic) -> Unit)
     fun append(element: dynamic)
-    companion object {
-        fun screen(opts: dynamic = definedExternally): Screen
-    }
 }
 
-// ── Box (rectangular container) ───────────────────────────────────────────
+// ── Box ────────────────────────────────────────────────────────────────────
 external class Box {
     fun setContent(text: String)
     fun setLabel(text: String)
     fun append(element: dynamic)
     fun hide()
     fun show()
-    companion object {
-        fun box(opts: dynamic = definedExternally): Box
-    }
 }
 
-// ── List (scrollable item list for logs) ──────────────────────────────────
+// ── List ───────────────────────────────────────────────────────────────────
 external class BlessedList {
     fun addItem(text: String)
     fun setItems(items: Array<String>)
@@ -37,18 +37,12 @@ external class BlessedList {
     fun setLabel(text: String)
     fun hide()
     fun show()
-    companion object {
-        fun list(opts: dynamic = definedExternally): BlessedList
-    }
 }
 
-// ── Text (single-line or multi-line static text) ──────────────────────────
+// ── Text ───────────────────────────────────────────────────────────────────
 external class BlessedText {
     fun setContent(text: String)
     fun setLabel(text: String)
     fun hide()
     fun show()
-    companion object {
-        fun text(opts: dynamic = definedExternally): BlessedText
-    }
 }

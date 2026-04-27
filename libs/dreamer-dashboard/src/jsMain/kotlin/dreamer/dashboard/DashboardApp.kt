@@ -12,13 +12,17 @@ import kotlinx.coroutines.*
  * Same source compiles to JS and Wasm nodejs targets.
  *
  * Usage:
- *   cd libs/dreamer-dashboard && npm install && ./gradlew jsNodeRun
+ *   cd libs/dreamer-dashboard && npm install && ./gradlew jsNodeDevelopmentRun
  *
  * Quit: q or Ctrl-C
  */
 fun main() {
     // ── Create blessed screen ────────────────────────────────────────
-    val screen = Screen.screen(js("({ smartCSR: true, title: 'Dreamer Dashboard', fullUnicode: true })"))
+    val screenOpts = js("({})")
+    screenOpts.smartCSR = true
+    screenOpts.title = "Dreamer Dashboard"
+    screenOpts.fullUnicode = true
+    val screen = screen(screenOpts)
 
     val state = DashboardState()
 
@@ -28,9 +32,15 @@ fun main() {
     val trainingPane = TrainingPane(split.right)
 
     // ── Footer ───────────────────────────────────────────────────────
-    val footer = BlessedText.text(js("({ bottom: 0, left: 0, width: '100%', height: 1," +
-        " content: ' {cyan-fg}q{/cyan-fg} quit  |  {green-fg}r{/green-fg} refresh  |  dreamer-dashboard v0.1'," +
-        " tags: true, style: { fg: 'white', bg: 'black' } })"))
+    val footerOpts = js("({})")
+    footerOpts.bottom = 0
+    footerOpts.left = 0
+    footerOpts.width = "100%"
+    footerOpts.height = 1
+    footerOpts.content = " {cyan-fg}q{/cyan-fg} quit  |  {green-fg}r{/green-fg} refresh  |  dreamer-dashboard v0.1"
+    footerOpts.tags = true
+    footerOpts.style = js("({ fg: 'white', bg: 'black' })")
+    val footer = text(footerOpts)
     screen.append(footer)
 
     // ── Render loop (250ms ticks) ────────────────────────────────────
@@ -56,7 +66,6 @@ fun main() {
     }
 
     screen.key(arrayOf("r")) { _, _ ->
-        // force full redraw
         screen.render()
     }
 

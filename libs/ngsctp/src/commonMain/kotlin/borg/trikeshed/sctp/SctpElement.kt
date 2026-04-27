@@ -28,6 +28,134 @@ sealed class SctpError(message: String) : RuntimeException(message) {
 
 data class SctpAssociation(val associationId: Long, val state: SctpState)
 
+// ── SCTP Chunk encoding (RFC 4960) ──────────────────────────────────────────
+
+/** Opaque chunk header: type (1 byte) + flags (1) + length (2) = 4 bytes. */
+data class SctpChunkHeader(
+    val type: SctpChunkType,
+    val flags: UByte = 0u,
+    val length: UShort,
+)
+
+/**
+ * SCTP INIT chunk (RFC 4960 §3.3.2).
+ *
+ * Fixed fields (16 bytes):
+ *   Initiate Tag            (32 bits)
+ *   Advertised Receiver Window Credit (32 bits)
+ *   Number of Outbound Streams   (16 bits)
+ *   Number of Inbound Streams    (16 bits)
+ *   Initial TSN              (32 bits)
+ *
+ * Followed by optional variable-length parameters.
+ */
+data class SctpInitChunk(
+    val initiateTag: UInt,
+    val aRwnd: UInt,
+    val outboundStreams: UShort,
+    val inboundStreams: UShort,
+    val initialTsn: UInt,
+) {
+    val header: SctpChunkHeader
+        get() = SctpChunkHeader(SctpChunkType.INIT, length = CHUNK_FIXED_LENGTH)
+
+    fun encode(): ByteArray {
+        val buf = ByteArray(CHUNK_FIXED_LENGTH.toInt())
+        var off = 0
+        buf[off++] = SctpChunkType.INIT.ordinal.toByte()  // type
+        buf[off++] = 0                                      // flags
+        putUShort(buf, off, CHUNK_FIXED_LENGTH); off += 2  // length
+        putUInt(buf, off, initiateTag); off += 4
+        putUInt(buf, off, aRwnd); off += 4
+        putUShort(buf, off, outboundStreams); off += 2
+        putUShort(buf, off, inboundStreams); off += 2
+        putUInt(buf, off, initialTsn)
+        return buf
+    }
+
+    companion object {
+        const val CHUNK_FIXED_LENGTH: UShort = 20u  // 4 header + 16 fixed fields
+
+        fun decode(bytes: ByteArray): SctpInitChunk {
+            require(bytes.size >= CHUNK_FIXED_LENGTH.toInt()) { "INIT too short: ${bytes.size} < $CHUNK_FIXED_LENGTH" }
+            var off = 4  // skip type+flags+length
+            val initiateTag = getUInt(bytes, off); off += 4
+            val aRwnd       = getUInt(bytes, off); off += 4
+            val outStreams  = getUShort(bytes, off); off += 2
+            val inStreams   = getUShort(bytes, off); off += 2
+            val initialTsn  = getUInt(bytes, off)
+            return SctpInitChunk(initiateTag, aRwnd, outStreams, inStreams, initialTsn)
+        }
+    }
+}
+
+/**
+ * SCTP INIT_ACK chunk (RFC 4960 §3.3.3).
+ *
+ * Identical fixed fields to INIT, with type=2.
+ */
+data class SctpInitAckChunk(
+    val initiateTag: UInt,
+    val aRwnd: UInt,
+    val outboundStreams: UShort,
+    val inboundStreams: UShort,
+    val initialTsn: UInt,
+) {
+    val header: SctpChunkHeader
+        get() = SctpChunkHeader(SctpChunkType.INIT_ACK, length = CHUNK_FIXED_LENGTH)
+
+    fun encode(): ByteArray {
+        val buf = ByteArray(CHUNK_FIXED_LENGTH.toInt())
+        var off = 0
+        buf[off++] = SctpChunkType.INIT_ACK.ordinal.toByte()  // type
+        buf[off++] = 0                                          // flags
+        putUShort(buf, off, CHUNK_FIXED_LENGTH); off += 2      // length
+        putUInt(buf, off, initiateTag); off += 4
+        putUInt(buf, off, aRwnd); off += 4
+        putUShort(buf, off, outboundStreams); off += 2
+        putUShort(buf, off, inboundStreams); off += 2
+        putUInt(buf, off, initialTsn)
+        return buf
+    }
+
+    companion object {
+        const val CHUNK_FIXED_LENGTH: UShort = 20u
+
+        fun decode(bytes: ByteArray): SctpInitAckChunk {
+            require(bytes.size >= CHUNK_FIXED_LENGTH.toInt()) { "INIT_ACK too short: ${bytes.size} < $CHUNK_FIXED_LENGTH" }
+            var off = 4
+            val initiateTag = getUInt(bytes, off); off += 4
+            val aRwnd       = getUInt(bytes, off); off += 4
+            val outStreams  = getUShort(bytes, off); off += 2
+            val inStreams   = getUShort(bytes, off); off += 2
+            val initialTsn  = getUInt(bytes, off)
+            return SctpInitAckChunk(initiateTag, aRwnd, outStreams, inStreams, initialTsn)
+        }
+    }
+}
+
+// ── Primitive encoding helpers (big-endian) ─────────────────────────────────
+
+private fun putUShort(buf: ByteArray, off: Int, value: UShort) {
+    val v = value.toInt()
+    buf[off]     = (v shr 8).toByte()
+    buf[off + 1] = v.toByte()
+}
+
+private fun putUInt(buf: ByteArray, off: Int, value: UInt) {
+    var v = value
+    repeat(4) { i -> buf[off + 3 - i] = v.toByte(); v = v shr 8 }
+}
+
+private fun getUShort(buf: ByteArray, off: Int): UShort =
+    ((buf[off].toInt() and 0xFF) shl 8 or (buf[off + 1].toInt() and 0xFF)).toUShort()
+
+private fun getUInt(buf: ByteArray, off: Int): UInt {
+    var v = 0u
+    repeat(4) { i -> v = (v shl 8) or (buf[off + i].toInt() and 0xFF).toUInt() }
+    return v
+}
+
 val SctpKey: AsyncContextKey<SctpElement> = SctpElement.Key
 
 suspend fun openSctpElement(): SctpElement =
