@@ -21,8 +21,8 @@ class BlockBinaryAvailabilityTest {
         val version = runCmd("zstd", "--version")
         assertNotNull(version, "zstd CLI must be available. Install: brew install zstd")
         assertTrue(
-            version!!.contains("zstd", ignoreCase = true),
-            "zstd version output should contain 'zstd': $version"
+            version!!.contains("Zstandard", ignoreCase = true),
+            "zstd version output should contain 'Zstandard': $version"
         )
     }
 
