@@ -332,22 +332,7 @@ object YamlScan {
         val st = ScanState(src, n)
         st.skipBlankLines()
         parseBlock(st, out, indent = 0)
-        // diagnostic: dump tokens
-        val elems = out.toSeries()
-        println("DEBUG YamlScan: produced ${elems.size} elements")
-        var i = 0
-        while (i < elems.size) {
-            val el = elems[i]
-            val commas = el.b
-            val csStr = if (commas.size == 0) "[]" else {//dedupe this
-                val sb = StringBuilder(); sb.append('['); var k = 0
-                while (k < commas.size) { if (k > 0) sb.append(','); sb.append(commas[k]); k++ }
-                sb.append(']'); sb.toString()
-            }
-            println("DEBUG YamlScan: elem[$i] open=${el.a.a} close=${el.a.b} tag=${Reify.tagOf(el, src)} commas=${csStr}")
-            i++
-        }
-        return elems
+        return out.toSeries()
     }
 
     private class ScanState(val s: Series<Char>, val n: Int) {
@@ -432,11 +417,8 @@ object YamlScan {
             if (st.peek() == ' ') st.pos++
             val childIndent = indent + 2
             val ch = st.peek()
-            println("DEBUG parseSeq: at pos=${st.pos} ch='$ch' (indent=$indent)")
             val childIdx = if (ch == '{' || ch == '[' || ch == '"' || ch == '\'') {
-                val ci = parseFlowLine(st, out)
-                println("DEBUG parseSeq: parseFlowLine -> childIdx=$ci")
-                ci
+                parseFlowLine(st, out)
             } else {
                 // try inline scalar on same line first
                 val scalarStart = st.pos
@@ -448,18 +430,13 @@ object YamlScan {
                     val savedPoolSize = out.commasSize()
                     val ci = parseMapOrScalar(st, out, childIndent)
                     out.truncateCommas(savedPoolSize)  // discard nested map commas
-                    println("DEBUG parseSeq: parseMapOrScalar -> childIdx=$ci")
                     ci
                 } else {
-                    val ci = parseScalarLine(st, out)
-                    println("DEBUG parseSeq: parseScalarLine -> childIdx=$ci")
-                    ci
+                    parseScalarLine(st, out)
                 }
             }
             // append comma using child's open index
-            val childOpen = out.openOf(childIdx)
-            println("DEBUG parseSeq: childOpen=$childOpen")
-            out.addComma(childOpen)
+            out.addComma(out.openOf(childIdx))
             lastClose = out.closeOf(childIdx).coerceAtLeast(open)
             // nextLineStart should point to the start of the next line (parse* helpers set st.pos there)
             nextLineStart = st.pos
@@ -821,11 +798,12 @@ object CsvScan {
                 continue
             }
 
-            // One JsElement per line. Record comma positions (at the comma char).
+            // One JsElement per line. Record field-start positions (at lineOpen + after each comma).
             val idx = out.begin(lineOpen)
+            out.addComma(lineOpen)  // first field starts at line open
             var pos = lineOpen
             while (pos < lineClose) {
-                if (cs[pos] == ',') out.addComma(pos)
+                if (cs[pos] == ',') out.addComma(pos + 1)  // next field starts after comma
                 pos++
             }
 
@@ -845,8 +823,8 @@ object CsvScan {
         val commas = e.b
         val n = commas.size
         if (fieldIdx < 0 || fieldIdx >= n) return null
-        // Field k spans [commas[k]+1 .. (commas[k+1] ? close)) where close = e.a.b
-        val fieldStart = commas[fieldIdx] + 1  // skip the comma itself
+        // commas[k] = field-start position; commas[k+1] = next field start, e.a.b = line close
+        val fieldStart = commas[fieldIdx]
         val fieldEnd = if (fieldIdx + 1 < n) commas[fieldIdx + 1] else e.a.b
         var end = fieldEnd
         // trim trailing whitespace
@@ -933,14 +911,14 @@ object Reify {
         return ca.concatToString()
     }
 
-    /** reify the value rooted at [ctx] */
-    fun reify(ctx: JsContext): Any? {
+    /** reify the value rooted at [ctx], using [syntax] to discriminate CBOR vs text decode paths. */
+    fun reify(ctx: JsContext, syntax: Syntax = Syntax.JSON): Any? {
         val e = ctx.a; val src = ctx.b
         return when (tagOf(e, src)) {
-            Tag.OBJECT -> reifyObject(e, src)
-            Tag.ARRAY -> reifyArray(e, src)
-            Tag.STRING, Tag.BYTES -> reifyString(e, src)
-            Tag.NUMBER -> reifyNumber(e, src)
+            Tag.OBJECT -> reifyObject(e, src, syntax)
+            Tag.ARRAY -> reifyArray(e, src, syntax)
+            Tag.STRING, Tag.BYTES -> reifyString(e, src, syntax)
+            Tag.NUMBER -> reifyNumber(e, src, syntax)
             Tag.BOOL_TRUE -> true
             Tag.BOOL_FALSE -> false
             Tag.NULL -> null
@@ -948,7 +926,7 @@ object Reify {
         }
     }
 
-    private fun reifyString(e: JsElement, src: Series<Char>): String {
+    private fun reifyString(e: JsElement, src: Series<Char>, syntax: Syntax): String {
         val a = e.a.a; val b = e.a.b
         // quoted JSON/YAML strings
         if (a <= b && (src[a] == '"' || src[a] == '\'')) {
@@ -962,38 +940,39 @@ object Reify {
             val raw = ca.concatToString()
             if (quote == '"' && raw.contains('\\')) {
                 val u = unescapeJsonString(raw)
-                println("DEBUG reifyString: raw=\"$raw\" -> unescaped=\"$u\"")
                 return u
             }
             return if (quote == '"') unescapeJsonString(raw) else unescapeYamlSingleQuoted(raw)
         }
 
-        // possible CBOR text string (major type 3) encoded in-place, try to decode header
-        val tag = tagOf(e, src)
-        if (tag == Tag.STRING || tag == Tag.BYTES) {
-            val ib = src[a].code and 0xFF
-            val mt = ib ushr 5
-            val ai = ib and 0x1F
-            if (mt == 3) {
-                var p = a + 1
-                val len = when (ai) {
-                    in 0..23 -> ai
-                    24 -> { val v = src[p].code and 0xFF; p += 1; v }
-                    25 -> { val v = ((src[p].code and 0xFF) shl 8) or (src[p + 1].code and 0xFF); p += 2; v }
-                    26 -> {
-                        val v = ((src[p].code and 0xFF) shl 24) or
-                                ((src[p + 1].code and 0xFF) shl 16) or
-                                ((src[p + 2].code and 0xFF) shl 8) or
-                                (src[p + 3].code and 0xFF)
-                        p += 4; v
+        // CBOR text string decode — only when source is CBOR binary
+        if (syntax == Syntax.CBOR) {
+            val tag = tagOf(e, src)
+            if (tag == Tag.STRING || tag == Tag.BYTES) {
+                val ib = src[a].code and 0xFF
+                val mt = ib ushr 5
+                val ai = ib and 0x1F
+                if (mt == 3) {
+                    var p = a + 1
+                    val len = when (ai) {
+                        in 0..23 -> ai
+                        24 -> { val v = src[p].code and 0xFF; p += 1; v }
+                        25 -> { val v = ((src[p].code and 0xFF) shl 8) or (src[p + 1].code and 0xFF); p += 2; v }
+                        26 -> {
+                            val v = ((src[p].code and 0xFF) shl 24) or
+                                    ((src[p + 1].code and 0xFF) shl 16) or
+                                    ((src[p + 2].code and 0xFF) shl 8) or
+                                    (src[p + 3].code and 0xFF)
+                            p += 4; v
+                        }
+                        else -> -1
                     }
-                    else -> -1
-                }
-                if (len >= 0 && p + len - 1 <= b) {
-                    val ca = CharArray(len)
-                    var i = 0
-                    while (i < len && p + i <= b) { ca[i] = src[p + i]; i++ }
-                    return ca.concatToString()
+                    if (len >= 0 && p + len - 1 <= b) {
+                        val ca = CharArray(len)
+                        var i = 0
+                        while (i < len && p + i <= b) { ca[i] = src[p + i]; i++ }
+                        return ca.concatToString()
+                    }
                 }
             }
         }
@@ -1050,10 +1029,10 @@ object Reify {
         return s.replace("''", "'")
     }
 
-    private fun reifyNumber(e: JsElement, src: Series<Char>): Double {
-        // Attempt CBOR numeric decoding when the element looks like a CBOR-encoded value
+    private fun reifyNumber(e: JsElement, src: Series<Char>, syntax: Syntax): Number {
+        // CBOR numeric decode — only when source is CBOR binary
         val a = e.a.a
-        if (a < src.size) {
+        if (syntax == Syntax.CBOR && a < src.size) {
             val ib = src[a].code and 0xFF
             val mt = ib ushr 5
             val ai = ib and 0x1F
@@ -1083,61 +1062,41 @@ object Reify {
                 }
             }
         }
-        // Fallback: textual numeric span
-        val t = textOf(e, src)
-        return t.trim().toDouble()
+        // Fallback: textual numeric span — try Long first, then Double
+        val t = textOf(e, src).trim()
+        t.toLongOrNull()?.let { return it }
+        return t.toDouble()
+    }
+
+    /** Re-scan from [childOpen] in [src] to recover a JsElement with global offsets. */
+    private fun reifyChildAt(src: Series<Char>, childOpen: Int): JsElement {
+        val sub = src.slice(childOpen, src.size)
+        val singleton = JsonScan.scan(sub)
+        val cj = singleton[0]
+        val adj = (cj.a.a + childOpen) j (cj.a.b + childOpen)
+        val ccommas = cj.b
+        val adjustedCommas: Series<Int> = ccommas.size j { k: Int ->
+            val v = ccommas[k]; if (v < 0) v else v + childOpen
+        }
+        return adj j adjustedCommas
     }
 
     /** child JsElement at commas[k] — for arrays, each comma is an element open */
-    private fun reifyArray(e: JsElement, src: Series<Char>): Series<Any?> {
-        // We don't have the enclosing ElemBuf anymore — so we mini-scan children on
-        // demand using the JSON-flavored rules. For objects/arrays this requires
-        // matching confix, which reuses JsonScan at the child span.
+    private fun reifyArray(e: JsElement, src: Series<Char>, syntax: Syntax): Series<Any?> {
         val cs = realCommas(e)
-        val n = cs.size
-        return n j { i: Int ->
-            val childOpen = cs[i]
-            // build a minimal sub-scan starting at childOpen to recover a JsElement.
-            val sub = src.slice(childOpen, src.size)
-            val singleton = JsonScan.scan(sub)
-            val cj = singleton[0]
-            val adj = (cj.a.a + childOpen) j (cj.a.b + childOpen)
-            val ccommas = cj.b
-            val adjustedCommas: Series<Int> = ccommas.size j { k: Int ->
-                val v = ccommas[k]
-                if (v < 0) v else v + childOpen
-            }
-            val child: JsElement = adj j adjustedCommas
-            reify(child j src)
-        }
+        return cs.size j { i: Int -> reify(reifyChildAt(src, cs[i]) j src, syntax) }
     }
 
     /** object has commas in key-position pairs; keys sit at comma[k], values follow */
-    private fun reifyObject(e: JsElement, src: Series<Char>): Series2<String, Any?> {
+    private fun reifyObject(e: JsElement, src: Series<Char>, syntax: Syntax): Series2<String, Any?> {
         val cs = realCommas(e)
-        val n = cs.size
-        return n j { i: Int ->
-            val keyOpen = cs[i]
-            // reuse JsonScan starting at keyOpen to re-discover key element + ':' + value element
-            val sub = src.slice(keyOpen, src.size)
-            // parse key
-            val keyScanned = JsonScan.scan(sub)
-            val k0 = keyScanned[0]
-            val keyAdj = (k0.a.a + keyOpen) j (k0.a.b + keyOpen)
-            val keyCommas: Series<Int> = k0.b.size j { k: Int -> val v = k0.b[k]; if (v < 0) v else v + keyOpen }
-            val keyElem: JsElement = keyAdj j keyCommas
-            val key = reifyString(keyElem, src)
-            // find ':' after keyElem
-            var p = keyAdj.b + 1
+        return cs.size j { i: Int ->
+            val keyElem = reifyChildAt(src, cs[i])
+            val key = reifyString(keyElem, src, syntax)
+            var p = keyElem.a.b + 1  // key close+1, skip ':'
             while (p < src.size && (src[p] == ' ' || src[p] == ':' || src[p] == '\t')) p++
-            val sub2 = src.slice(p, src.size)
-            val valScanned = JsonScan.scan(sub2)
-            val v0 = valScanned[0]
-            val valAdj = (v0.a.a + p) j (v0.a.b + p)
-            val valCommas: Series<Int> = v0.b.size j { k: Int -> val v = v0.b[k]; if (v < 0) v else v + p }
-            val valElem: JsElement = valAdj j valCommas
-            val value = reify(valElem j src)
-            key j value
+            val valElem = reifyChildAt(src, p)
+            key j reify(valElem j src, syntax)
         }
     }
 }
@@ -1173,9 +1132,7 @@ object Path {
 
     private fun stepByIndex(e: JsElement, src: Series<Char>, idx: Int): JsContext? {
         val tag = Reify.tagOf(e, src)
-        println("DEBUG stepByIndex: elementOpen=${e.a.a}, tag=${tag}")
         if (tag != Tag.ARRAY) {
-            println("DEBUG stepByIndex: not an array (tag=$tag)")
             return null
         }
         val cs = Reify.realCommas(e)
@@ -1185,14 +1142,12 @@ object Path {
             while (k < cs.size) { if (k > 0) sb.append(','); sb.append(cs[k]); k++ }
             sb.append(']'); sb.toString()
         }
-        println("DEBUG stepByIndex: commas=${csStr}")
         // iterate commas, skipping negative sentinels; map logical index -> Nth positive entry
         var i = 0; var found = 0
         while (i < cs.size) {
             val v = cs[i]
             if (v >= 0) {
                 if (found == idx) {
-                    println("DEBUG stepByIndex: idx=$idx -> selected child open=$v")
                     val child = childElementAt(v, src)
                     return child j src
                 }
@@ -1200,7 +1155,6 @@ object Path {
             }
             i++
         }
-        println("DEBUG stepByIndex: index=$idx out of bounds (found=$found)")
         return null
     }
 
@@ -1221,9 +1175,7 @@ object Path {
                 sb.append(']')
                 sb.toString()
             }
-            println("DEBUG stepByName: elementOpen=${e.a.a}, searching for name='${name}', commas=${csStr}")
         } catch (ex: Throwable) {
-            println("DEBUG stepByName: failed to get commas for element=${e.a.a}: ${ex.message}")
         }
         var i = 0
         while (i < cs.size) {
@@ -1252,7 +1204,6 @@ object Path {
                 } catch (_: Throwable) { /* keep original keyElem */ }
             }
             val keyText = stripQuotes(Reify.textOf(keyElem, src))
-            println("DEBUG stepByName: checking keyOpen=$keyOpen keyText='${keyText}'")
             if (keyText == name) {
                 // value follows key + ':'
                 var p = keyElem.a.b + 1
@@ -1264,14 +1215,11 @@ object Path {
                     while (p2 > 0 && src[p2 - 1] != '\n' && src[p2 - 1] != '\r') p2--
                     p = p2
                 }
-                println("DEBUG stepByName: found key at $keyOpen; value starts at $p (char='${if (p < src.size) src[p] else ' ' }')")
                 val valElem = childElementAt(p, src)
-                println("DEBUG stepByName: valElem for name='${name}' -> open=${valElem.a.a} close=${valElem.a.b} tag=${Reify.tagOf(valElem, src)}")
                 return valElem j src
             }
             i++
         }
-        println("DEBUG stepByName: name='${name}' not found in elementOpen=${e.a.a}")
         return null
     }
 
@@ -1348,23 +1296,18 @@ object Path {
                 k++
             }
             if (bestExactContainer != null) {
-                println("DEBUG childElementAt: start=$start -> chosen bestExactContainer elem open=${bestExactContainer.a.a} close=${bestExactContainer.a.b} tag=${Reify.tagOf(bestExactContainer, src)}")
                 return bestExactContainer
             }
             if (bestExactNonNull != null) {
-                println("DEBUG childElementAt: start=$start -> chosen bestExactNonNull elem open=${bestExactNonNull.a.a} close=${bestExactNonNull.a.b} tag=${Reify.tagOf(bestExactNonNull, src)}")
                 return bestExactNonNull
             }
             if (bestExactAny != null) {
-                println("DEBUG childElementAt: start=$start -> chosen bestExactAny elem open=${bestExactAny.a.a} close=${bestExactAny.a.b} tag=${Reify.tagOf(bestExactAny, src)}")
                 return bestExactAny
             }
             if (bestContainNonNull != null) {
-                println("DEBUG childElementAt: start=$start -> chosen bestContainNonNull elem open=${bestContainNonNull.a.a} close=${bestContainNonNull.a.b} tag=${Reify.tagOf(bestContainNonNull, src)}")
                 return bestContainNonNull
             }
             if (bestContainAny != null) {
-                println("DEBUG childElementAt: start=$start -> chosen bestContainAny elem open=${bestContainAny.a.a} close=${bestContainAny.a.b} tag=${Reify.tagOf(bestContainAny, src)}")
                 return bestContainAny
             }
         } catch (_: Throwable) {

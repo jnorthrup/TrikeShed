@@ -25,7 +25,7 @@ typealias JsPath = borg.trikeshed.parse.confix.JsPath
 object JsonParser {
     fun reify(src: Series<Char>): Any? {
         val ctx = contextOf(Syntax.JSON, src)
-        return materialize(Reify.reify(ctx))
+        return materialize(Reify.reify(ctx, Syntax.JSON))
     }
 
     /** Scan JSON and return the top-level JsElement (index 0). */
@@ -38,7 +38,7 @@ object JsonParser {
     /** Reify with optional TypeEvidence collector and RowVec callback. */
     fun reify(src: Series<Char>, evidence: MutableList<TypeEvidence>?, callback: ((RowVec) -> Unit)?): Any? {
         val ctx = contextOf(Syntax.JSON, src)
-        val result = Reify.reify(ctx)
+        val result = Reify.reify(ctx, Syntax.JSON)
         // ignore evidence/callback for now — real impl would collect during walk
         return materialize(result)
     }
@@ -47,7 +47,7 @@ object JsonParser {
     fun jsPath(ctx: JsContext, path: JsPath, flat: Boolean = false, data: List<Int>? = null): Any? {
         val resolved = Path.resolve(ctx, path)
         return if (resolved != null) {
-            val reified = Reify.reify(resolved)
+            val reified = Reify.reify(resolved, Syntax.JSON)
             materialize(reified)
         } else {
             null
@@ -57,7 +57,7 @@ object JsonParser {
     fun parse(text: String): Map<String, Any?> {
         val ctx = contextOf(Syntax.JSON, text.asSeries())
         @Suppress("UNCHECKED_CAST")
-        return materialize(Reify.reify(ctx)) as? Map<String, Any?> ?: emptyMap()
+        return materialize(Reify.reify(ctx, Syntax.JSON)) as? Map<String, Any?> ?: emptyMap()
     }
 }
 
@@ -119,5 +119,5 @@ fun queryPath(ctx: JsContext, path: JsPath): JsContext? = Path.resolve(ctx, path
 fun parse(text: String): Map<String, Any?> {
     val ctx = contextOf(Syntax.JSON, text.asSeries())
     @Suppress("UNCHECKED_CAST")
-    return materialize(Reify.reify(ctx)) as? Map<String, Any?> ?: emptyMap()
+    return materialize(Reify.reify(ctx, Syntax.JSON)) as? Map<String, Any?> ?: emptyMap()
 }
