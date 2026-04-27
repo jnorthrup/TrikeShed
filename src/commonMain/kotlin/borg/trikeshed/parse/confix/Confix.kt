@@ -199,6 +199,17 @@ object JsonScan {
         return out.toSeries()
     }
 
+    /** Parse exactly one JSON value starting at global position [startPos] in [src].
+     *  Returns the JsElement with positions already in the global coordinate space
+     *  (no offset adjustment needed). Used by [Reify.reifyChildAt] to avoid full re-scan. */
+    fun parseOne(src: Series<Char>, startPos: Int): JsElement {
+        val cs = CharSeries(src)
+        cs.pos(startPos)
+        val out = ElemBuf(1)  // single-element buffer — no grow overhead
+        parseValue(cs, out)
+        return out.toSeries()[0]
+    }
+
     private fun parseValue(cs: CharSeries, out: ElemBuf): Int {
         cs.skipWs
         if (!cs.hasRemaining) error("eof in json")
@@ -913,14 +924,22 @@ object Reify {
     fun spanOf(e: JsElement, src: Series<Char>): Series<Char> =
         src.slice(e.a.a, e.a.b + 1)
 
-    /** materialize a text span into a String. Only place we allocate a String. */
+    /** materialize a text span into a String — reuses a pooled CharArray. */
     fun textOf(e: JsElement, src: Series<Char>): String {
         val a = e.a.a; val b = e.a.b
-        val ca = CharArray(b - a + 1)
+        val len = b - a + 1
+        if (len <= 0) return ""
+        val ca = textBuf.let {
+            if (it.size < len) textBuf = CharArray(len)
+            textBuf
+        }
         var i = 0
-        while (i < ca.size) { ca[i] = src[a + i]; i++ }
-        return ca.concatToString()
+        while (i < len) { ca[i] = src[a + i]; i++ }
+        return ca.concatToString(0, len)
     }
+
+    /** Thread-local CharArray buffer for textOf — avoids per-span allocation. */
+    private var textBuf: CharArray = CharArray(256)
 
     /** reify the value rooted at [ctx], using [syntax] to discriminate CBOR vs text decode paths. */
     fun reify(ctx: JsContext, syntax: Syntax = Syntax.JSON): Any? {
@@ -1080,18 +1099,9 @@ object Reify {
         return t.toDouble()
     }
 
-    /** Re-scan from [childOpen] in [src] to recover a JsElement with global offsets. */
-    private fun reifyChildAt(src: Series<Char>, childOpen: Int): JsElement {
-        val sub = src.slice(childOpen, src.size)
-        val singleton = JsonScan.scan(sub)
-        val cj = singleton[0]
-        val adj = (cj.a.a + childOpen) j (cj.a.b + childOpen)
-        val ccommas = cj.b
-        val adjustedCommas: Series<Int> = ccommas.size j { k: Int ->
-            val v = ccommas[k]; if (v < 0) v else v + childOpen
-        }
-        return adj j adjustedCommas
-    }
+    /** Parse one child at global position [childOpen] — no slice, no offset adjust. */
+    private fun reifyChildAt(src: Series<Char>, childOpen: Int): JsElement =
+        JsonScan.parseOne(src, childOpen)
 
     /** child JsElement at commas[k] — for arrays, each comma is an element open */
     private fun reifyArray(e: JsElement, src: Series<Char>, syntax: Syntax): Series<Any?> {
