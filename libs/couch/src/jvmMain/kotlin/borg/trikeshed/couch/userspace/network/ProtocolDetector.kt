@@ -19,13 +19,17 @@ import borg.trikeshed.couch.htx.HtxBlockType
 class ProtocolDetector {
 
     private val buf = StringBuilder()
+    private var tlsDetected = false
 
     /**
      * Feed a chunk of bytes into the detector.
      */
     fun feed(bytes: ByteArray) {
         // Peek at first byte for TLS handshake (0x16 = 0b00010110)
-        if (buf.isEmpty() && bytes.isNotEmpty() && bytes[0] == 0x16.toByte()) return
+        if (buf.isEmpty() && bytes.isNotEmpty() && bytes[0] == 0x16.toByte()) {
+            tlsDetected = true
+            return
+        }
         buf.append(String(bytes))
     }
 
@@ -34,6 +38,7 @@ class ProtocolDetector {
      * Once non-null, stays non-null for the lifetime of this detector.
      */
     fun protocol(): Protocol? {
+        if (tlsDetected) return Protocol.TLS
         val s = buf.toString()
         return when {
             s.startsWith("GET ") || s.startsWith("HEAD ") ||
@@ -56,6 +61,7 @@ class ProtocolDetector {
      */
     fun reset() {
         buf.clear()
+        tlsDetected = false
     }
 }
 
