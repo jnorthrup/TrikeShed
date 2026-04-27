@@ -48,6 +48,88 @@ enum class QuicShortPacketType(val code: UByte) {
     ONE_RTT_NO_SPIN(0x00u),  // spin bit clear
 }
 
+// ── Variable-length integer encoding (RFC 9000 §16) ──────────────────────────
+
+/**
+ * QUIC variable-length integer encoding (RFC 9000 §16).
+ * Encodes a 62-bit unsigned integer in 1, 2, 4, or 8 bytes.
+ *
+ * Two high bits of the first byte determine length:
+ *   00 → 1 byte  (value fits in 6 bits,  0..63)
+ *   01 → 2 bytes (value fits in 14 bits, 0..16383)
+ *   10 → 4 bytes (value fits in 30 bits, 0..1073741823)
+ *   11 → 8 bytes (value fits in 62 bits, 0..4611686018427387903)
+ */
+object QuicVarInt {
+    const val MAX_VALUE: ULong = 0x3FFF_FFFF_FFFF_FFFFuL  // 2^62 - 1
+
+    /** Return the number of bytes needed to encode [value]. */
+    fun encodedLen(value: ULong): Int = when {
+        value <= 63uL          -> 1
+        value <= 16383uL       -> 2
+        value <= 1073741823uL  -> 4
+        else                   -> 8
+    }
+
+    /** Encode [value] into [dst] starting at [offset]. Returns number of bytes written. */
+    fun encode(value: ULong, dst: ByteArray, offset: Int = 0): Int {
+        require(value <= MAX_VALUE) { "QUIC varint overflow: $value > $MAX_VALUE" }
+        return when {
+            value <= 63uL -> {
+                dst[offset] = value.toByte()
+                1
+            }
+            value <= 16383uL -> {
+                dst[offset]     = (value shr 8).toByte().let { (it.toInt() or 0x40).toByte() }
+                dst[offset + 1] = value.toByte()
+                2
+            }
+            value <= 1073741823uL -> {
+                dst[offset]     = (value shr 24).toByte().let { (it.toInt() or 0x80).toByte() }
+                dst[offset + 1] = (value shr 16).toByte()
+                dst[offset + 2] = (value shr 8).toByte()
+                dst[offset + 3] = value.toByte()
+                4
+            }
+            else -> {
+                dst[offset]     = (value shr 56).toByte().let { (it.toInt() or 0xC0).toByte() }
+                dst[offset + 1] = (value shr 48).toByte()
+                dst[offset + 2] = (value shr 40).toByte()
+                dst[offset + 3] = (value shr 32).toByte()
+                dst[offset + 4] = (value shr 24).toByte()
+                dst[offset + 5] = (value shr 16).toByte()
+                dst[offset + 6] = (value shr 8).toByte()
+                dst[offset + 7] = value.toByte()
+                8
+            }
+        }
+    }
+
+    /** Decode a QUIC varint from [src] at [offset]. Returns (value, bytesConsumed). */
+    fun decode(src: ByteArray, offset: Int = 0): Pair<ULong, Int> {
+        val first = src[offset].toInt() and 0xFF
+        val tag = first shr 6
+        return when (tag) {
+            0 -> (first.toULong() and 0x3Fu) to 1
+            1 -> {
+                val value = ((first and 0x3F) shl 8) or (src[offset + 1].toInt() and 0xFF)
+                value.toULong() to 2
+            }
+            2 -> {
+                var value = 0L
+                repeat(4) { i -> value = (value shl 8) or (src[offset + i].toInt() and 0xFF).toLong() }
+                (value and 0x3FFFFFFF).toULong() to 4
+            }
+            3 -> {
+                var value = 0L
+                repeat(8) { i -> value = (value shl 8) or (src[offset + i].toInt() and 0xFF).toLong() }
+                (value and 0x3FFFFFFF_FFFFFFFFL).toULong() to 8
+            }
+            else -> error("unreachable")
+        }
+    }
+}
+
 // ── Packet Header sealed hierarchy (RFC 9000 §17) ─────────────────────────────
 
 /**
