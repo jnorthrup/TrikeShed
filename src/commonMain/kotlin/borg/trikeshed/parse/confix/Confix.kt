@@ -823,15 +823,18 @@ object CsvScan {
         val commas = e.b
         val n = commas.size
         if (fieldIdx < 0 || fieldIdx >= n) return null
-        // commas[k] = field-start position; commas[k+1] = next field start, e.a.b = line close
+        // commas[k] = field-start position; commas[k+1]-1 = field end (excl. comma), e.a.b = line close
         val fieldStart = commas[fieldIdx]
-        val fieldEnd = if (fieldIdx + 1 < n) commas[fieldIdx + 1] else e.a.b
+        val fieldEnd = if (fieldIdx + 1 < n) commas[fieldIdx + 1] - 1 else e.a.b
+        var start = fieldStart
         var end = fieldEnd
+        // trim leading whitespace
+        while (start < end && src[start].isWhitespace()) start++
         // trim trailing whitespace
-        while (end > fieldStart && src[end - 1].isWhitespace()) end--
-        if (end <= fieldStart) return null
-        val len = end - fieldStart
-        val chars = CharArray(len) { src[fieldStart + it] }
+        while (end > start && src[end - 1].isWhitespace()) end--
+        if (end <= start) return null
+        val len = end - start
+        val chars = CharArray(len) { src[start + it] }
         return chars.concatToString()
     }
 
@@ -1062,8 +1065,9 @@ object Reify {
                 }
             }
         }
-        // Fallback: textual numeric span — try Long first, then Double
+        // Fallback: textual numeric span — try Int, then Long, then Double
         val t = textOf(e, src).trim()
+        t.toIntOrNull()?.let { return it }
         t.toLongOrNull()?.let { return it }
         return t.toDouble()
     }
