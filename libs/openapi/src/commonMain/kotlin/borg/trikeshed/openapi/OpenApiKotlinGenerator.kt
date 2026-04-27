@@ -132,6 +132,5 @@ fun renderImports(vararg imports: String): String {
     val sorted = imports.filter { it.isNotBlank() }.sorted().distinct()
     return if (sorted.isEmpty()) "" else sorted.joinToString("\n") { "import $it" } + "\n"
 }
-
-private fun String.indented(spaces: Int): String =
+fun String.indented(spaces: Int): String =
     lines().joinToString("\n") { " ".repeat(spaces) + it }

@@ -108,7 +108,7 @@ object StructuredParserSupport {
 
     fun describeYamlRowTree(text: String): TreeCursor = describeYamlText(text).toTreeCursor()
 
-    private fun describeValueFragment(
+    fun describeValueFragment(
         key: String?,
         value: Any?,
         depth: Int,
@@ -133,7 +133,7 @@ object StructuredParserSupport {
         )
     }
 
-    private fun describeYamlNode(
+    fun describeYamlNode(
         key: String?,
         node: YamlNode,
         depth: Int,
@@ -163,7 +163,7 @@ object StructuredParserSupport {
         )
     }
 
-    private fun describeJsonFragment(
+    fun describeJsonFragment(
         text: CharSeries,
         startInclusive: Int,
         endExclusive: Int,
@@ -203,7 +203,7 @@ object StructuredParserSupport {
         )
     }
 
-    private fun sampleEvidence(value: Any?): TypeEvidence =
+    fun sampleEvidence(value: Any?): TypeEvidence =
         when (value) {
             is Map<*, *> -> TypeEvidence.sample("{}".toSeries())
             is List<*> -> TypeEvidence.sample("[]".toSeries())
@@ -228,7 +228,7 @@ fun DescriptorFragment.toTreeCursor(path: String = "$"): TreeCursor =
 
 fun DescriptorFragment.rowVecTree(path: String = "$"): Sequence<RowVec> = toTreeCursor(path).flatten()
 
-private fun DescriptorFragment.toRowVec(path: String): RowVec {
+fun DescriptorFragment.toRowVec(path: String): RowVec {
     val extentFlavor = extent?.flavor?.name ?: ReificationFlavor.Generic.name
     val (extentStart, extentEnd, indentDepth) =
         when (val value = extent) {
@@ -269,7 +269,7 @@ private fun DescriptorFragment.toRowVec(path: String): RowVec {
     return values.size j { index: Int -> values[index] } joins meta
 }
 
-private fun childPath(parent: String, key: String?): String =
+fun childPath(parent: String, key: String?): String =
     when {
         key == null -> parent
         key.all(Char::isDigit) -> "$parent[$key]"
@@ -277,7 +277,7 @@ private fun childPath(parent: String, key: String?): String =
         else -> "$parent.$key"
     }
 
-private val DESCRIPTOR_ROW_COLUMNS = arrayOf(
+val DESCRIPTOR_ROW_COLUMNS = arrayOf(
     ColumnMeta("identity", IOMemento.IoString),
     ColumnMeta("path", IOMemento.IoString),
     ColumnMeta("key", IOMemento.IoString),
@@ -307,7 +307,7 @@ private val DESCRIPTOR_ROW_COLUMNS = arrayOf(
     ColumnMeta("minColumnLength", IOMemento.IoInt),
 )
 
-private fun escape(value: String): String =
+fun escape(value: String): String =
     buildString(value.length) {
         value.forEach { ch ->
             when (ch) {
@@ -321,14 +321,14 @@ private fun escape(value: String): String =
         }
     }
 
-private data class JsonMember(
+data class JsonMember(
     val key: String,
     val valueStart: Int,
     val valueEndExclusive: Int,
     val termination: ExtentTermination,
 )
 
-private fun trimBounds(text: Series<Char>, startInclusive: Int, endExclusive: Int): Twin<Int> {
+fun trimBounds(text: Series<Char>, startInclusive: Int, endExclusive: Int): Twin<Int> {
     var start = startInclusive
     var end = endExclusive
     while (start < end && text[start].isWhitespace()) start++
@@ -336,7 +336,7 @@ private fun trimBounds(text: Series<Char>, startInclusive: Int, endExclusive: In
     return start j end
 }
 
-private fun splitObjectMembers(text: CharSeries, startInclusive: Int, endExclusive: Int): List<JsonMember> {
+fun splitObjectMembers(text: CharSeries, startInclusive: Int, endExclusive: Int): List<JsonMember> {
     val bodyStart = startInclusive + 1
     val bodyEnd = endExclusive - 1
     val segments = splitTopLevelSegments(text, bodyStart, bodyEnd)
@@ -355,10 +355,10 @@ private fun splitObjectMembers(text: CharSeries, startInclusive: Int, endExclusi
     }
 }
 
-private fun splitArrayElements(text: CharSeries, startInclusive: Int, endExclusive: Int): List<Twin<Int>> =
+fun splitArrayElements(text: CharSeries, startInclusive: Int, endExclusive: Int): List<Twin<Int>> =
     splitTopLevelSegments(text, startInclusive + 1, endExclusive - 1)
 
-private fun splitTopLevelSegments(text: Series<Char>, startInclusive: Int, endExclusive: Int): List<Twin<Int>> {
+fun splitTopLevelSegments(text: Series<Char>, startInclusive: Int, endExclusive: Int): List<Twin<Int>> {
     val segments = mutableListOf<Twin<Int>>()
     var insideQuote = false
     var escapeNext = false
@@ -393,7 +393,7 @@ private fun splitTopLevelSegments(text: Series<Char>, startInclusive: Int, endEx
     return segments
 }
 
-private fun findTopLevelColon(text: Series<Char>, startInclusive: Int, endExclusive: Int): Int {
+fun findTopLevelColon(text: Series<Char>, startInclusive: Int, endExclusive: Int): Int {
     var insideQuote = false
     var escapeNext = false
     var nesting = 0
@@ -419,7 +419,7 @@ private fun findTopLevelColon(text: Series<Char>, startInclusive: Int, endExclus
     return -1
 }
 
-private fun jsonTermination(text: Series<Char>, segmentEndExclusive: Int, parentEndExclusive: Int): ExtentTermination {
+fun jsonTermination(text: Series<Char>, segmentEndExclusive: Int, parentEndExclusive: Int): ExtentTermination {
     var index = segmentEndExclusive
     while (index < parentEndExclusive && text[index].isWhitespace()) index++
     return when {

@@ -98,7 +98,7 @@ class AutoresearchHarnessTest {
         assertEquals(AutoresearchVerdict.HOLD, hold)
     }
 
-    private fun configFor(
+   fun configFor(
         tempDir: Path,
         theme: String,
         experimentId: String,

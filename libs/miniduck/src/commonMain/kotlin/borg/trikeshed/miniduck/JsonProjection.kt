@@ -15,8 +15,7 @@ fun MiniCursor.toJson(): String {
     }
     return sb.toString()
 }
-
-private fun rowToJson(row: MiniRowVec): String = when (row) {
+fun rowToJson(row: MiniRowVec): String = when (row) {
     is DocRowVec -> {
         val children = row.child
         val sb = StringBuilder("{")
@@ -51,8 +50,7 @@ private fun rowToJson(row: MiniRowVec): String = when (row) {
         sb.toString()
     }
 }
-
-private fun valueToJson(v: Any?): String = when (v) {
+fun valueToJson(v: Any?): String = when (v) {
     null -> "null"
     is String -> "\"${escapeJson(v)}\""
     is Long, is Int, is Short, is Byte -> v.toString()

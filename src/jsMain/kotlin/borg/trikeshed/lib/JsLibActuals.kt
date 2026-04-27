@@ -10,7 +10,7 @@ actual fun assert(value: Boolean) {
 }
 
 actual class IntAccumulator actual constructor(initialCapacity: Int) {
-    private val values = ArrayList<Int>(initialCapacity.coerceAtLeast(0))
+   val values = ArrayList<Int>(initialCapacity.coerceAtLeast(0))
 
     actual fun add(value: Int) {
         values.add(value)

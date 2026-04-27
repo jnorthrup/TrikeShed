@@ -138,7 +138,7 @@ class COWSeriesBody<T>(
     operator fun get(range: IntRange): COWSeriesBody<T> = copy(backing = backing[range])
 
     /** create a new copy of this, with the given item inserted at the given index */
-    private fun copy(backing: Join<Int, (Int) -> T> = this.backing, version: Long? = this.version?.inc()): COWSeriesBody<T> =
+   fun copy(backing: Join<Int, (Int) -> T> = this.backing, version: Long? = this.version?.inc()): COWSeriesBody<T> =
         COWSeriesBody(backing, version)
 }
 

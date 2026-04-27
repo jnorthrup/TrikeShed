@@ -24,7 +24,7 @@ import kotlin.math.max
 
 
 /** made immutable by series. */
-class BigInt private constructor(private val sign: Boolean?, private val magnitude: Series<UInt>) : Number(),
+class BigInt constructor(val sign: Boolean?, val magnitude: Series<UInt>) : Number(),
     Comparable<BigInt> {
 
 
@@ -40,7 +40,7 @@ class BigInt private constructor(private val sign: Boolean?, private val magnitu
         }
     )
 
-    private constructor(
+    constructor(
         value: ULong,
         /**This parameter is not used within the constructor but
          *  ensures that the method signatures for ULong and Long
@@ -243,7 +243,7 @@ class BigInt private constructor(private val sign: Boolean?, private val magnitu
         return plus(negatedSubtrahend)
     }
 
-    private fun processMagnitudes(addend: BigInt, addition: Boolean): Series<UInt> {
+    fun processMagnitudes(addend: BigInt, addition: Boolean): Series<UInt> {
         val m1 = magnitude.reversed()
         val m2 = addend.magnitude.reversed()
 

@@ -7,7 +7,7 @@ enum class HttpMethod {
     Get, Post, Put, Delete, Head, Options, Connect, Patch, Trace, Unknown;
 
     companion object {
-        private val BY_NAME = entries.associateBy { it.name.uppercase() }
+       val BY_NAME = entries.associateBy { it.name.uppercase() }
 
         fun fromBytes(b: ByteArray): HttpMethod? {
             val s = b.decodeToString()

@@ -43,9 +43,7 @@ fun main(args: Array<String>) {
 
     println("Done — ${sources.size} files generated.")
 }
-
-private fun List<String>.option(key: String): String? =
+fun List<String>.option(key: String): String? =
     indexOf(key).takeIf { it >= 0 }?.let { get(it + 1) }
-
-private fun List<String>.require(key: String): String =
+fun List<String>.require(key: String): String =
     option(key) ?: throw IllegalArgumentException("Missing required argument: $key")

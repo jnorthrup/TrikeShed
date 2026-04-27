@@ -164,12 +164,10 @@ fun interface AutoresearchExperimentSurface {
         samples: List<AutoresearchExample>,
     ): AutoresearchModel
 }
-
-private fun StringBuilder.appendJsonField(name: String, value: String) {
+fun StringBuilder.appendJsonField(name: String, value: String) {
     append('"').append(name).append("\":\"").append(value.escapeJson()).append('"')
 }
-
-private fun String.escapeJson(): String = buildString(length + 8) {
+fun String.escapeJson(): String = buildString(length + 8) {
     for (ch in this@escapeJson) {
         when (ch) {
             '\\' -> append("\\\\")
@@ -181,21 +179,17 @@ private fun String.escapeJson(): String = buildString(length + 8) {
         }
     }
 }
-
-private fun extractJsonString(jsonLine: String, key: String): String {
+fun extractJsonString(jsonLine: String, key: String): String {
     val parsed = JsonParser.reify(jsonLine.toSeries()) as? Map<*, *> ?: error("Invalid JSON")
     return parsed[key] as? String ?: error("Autoresearch result missing string field: $key")
 }
-
-private fun extractJsonObject(jsonLine: String, key: String): Map<String, String> {
+fun extractJsonObject(jsonLine: String, key: String): Map<String, String> {
     val parsed = JsonParser.reify(jsonLine.toSeries()) as? Map<*, *> ?: error("Invalid JSON")
     val obj = parsed[key] as? Map<*, *> ?: error("Autoresearch result missing object field: $key")
     return obj.entries.associate { (k, v) ->
         (k as? String ?: k.toString()) to (v as? String ?: (v as? Number)?.toString() ?: v?.toString() ?: "")
     }
 }
-
-private fun Map<String, String>.requireDouble(key: String): Double =
+fun Map<String, String>.requireDouble(key: String): Double =
     this[key]?.toDoubleOrNull() ?: error("Autoresearch result missing numeric field: $key")
-
-private fun Map<String, String>.requireInt(key: String): Int = requireDouble(key).toInt()
+fun Map<String, String>.requireInt(key: String): Int = requireDouble(key).toInt()

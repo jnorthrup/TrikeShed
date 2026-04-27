@@ -23,12 +23,11 @@ data class ClientGenConfig(
     val requestClassName get() = "GeneratedRequest"
     val httpMethodName get() = "HttpMethod"
 
-    private val apiSuffix get() = moduleSuffix.replaceFirstChar { it.uppercase() }
+   val apiSuffix get() = moduleSuffix.replaceFirstChar { it.uppercase() }
 }
 
 // ── helpers ───────────────────────────────────────────────────────────────────
-
-private fun String.indented(spaces: Int): String =
+fun String.indented(spaces: Int): String =
     lines().joinToString("\n") { " ".repeat(spaces) + it }
 
 // ── operation contract rendering ─────────────────────────────────────────────
@@ -209,7 +208,7 @@ fun renderClientApi(
         appendLine()
         appendLine("/** Default implementation — caller provides the low-level call. */")
         appendLine("class ${cfg.defaultImplName}(")
-        appendLine("    private val call: suspend (${cfg.requestClassName}) -> String,")
+        appendLine("   val call: suspend (${cfg.requestClassName}) -> String,")
         appendLine(") : ${cfg.apiInterfaceName} {")
         ops.forEach { op ->
             val params = op.toKotlinParams()
@@ -237,8 +236,7 @@ fun renderClientApi(
 }
 
 // ── Models.kt ───────────────────────────────────────────────────────────────
-
-private fun successSchema(op: ResolvedOperation): ResolvedSchema? =
+fun successSchema(op: ResolvedOperation): ResolvedSchema? =
     op.primarySuccessResponse()?.contentTypes?.firstOrNull()?.schema
 
 fun renderClientModels(
@@ -275,8 +273,7 @@ fun renderClientModels(
         }
     }
 }
-
-private fun renderSchemaAsDataClass(name: String, schema: ResolvedSchema): String {
+fun renderSchemaAsDataClass(name: String, schema: ResolvedSchema): String {
     val props: List<ResolvedSchema.Prop> = when (schema) {
         is ResolvedSchema.Obj -> schema.properties
         is ResolvedSchema.Ref -> emptyList()

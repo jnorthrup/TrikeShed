@@ -1,8 +1,8 @@
 package borg.trikeshed.collections
 
 class Heap<T> {
-    private val list = mutableListOf<T>()
-    private val comparator: Comparator<T>
+   val list = mutableListOf<T>()
+   val comparator: Comparator<T>
 
     constructor() {
         comparator = Comparator { a, b -> "$a".compareTo("$b") }

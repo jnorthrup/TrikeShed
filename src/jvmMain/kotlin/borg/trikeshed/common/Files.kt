@@ -180,7 +180,7 @@ actual object Files {
                 } while (true)
             }
 
-            private fun unrecycle(): ByteArray {
+           fun unrecycle(): ByteArray {
                 val iterator = recycler.takeUnless { it.isEmpty() }?.iterator()
                 val attempt = iterator?.next()
                 val byteArray = attempt?.also { iterator.remove() } ?: ByteArray(bufsize)

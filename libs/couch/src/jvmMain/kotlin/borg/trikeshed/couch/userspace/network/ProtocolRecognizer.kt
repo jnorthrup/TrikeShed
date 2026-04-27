@@ -20,12 +20,12 @@ import kotlinx.coroutines.coroutineScope
  *   }
  */
 class ProtocolRecognizer(
-    private val channel: KChannel<HtxBlock>,
-    private val realm: String,
+   val channel: KChannel<HtxBlock>,
+   val realm: String,
 ) : BranchDispatch() {
 
-    private val detector = ProtocolDetector()
-    private var sessionId: String? = null
+   val detector = ProtocolDetector()
+   var sessionId: String? = null
 
     /**
      * Run the protocol recognition loop.
@@ -63,8 +63,7 @@ class ProtocolRecognizer(
  * Extract the payload bytes from an HtxBlock.
  * The block carries addr/info metadata; the actual data is read from the
  * block store via the addr field.
- */
-private fun HtxBlock.payloadBytes(): ByteArray {
+ */fun HtxBlock.payloadBytes(): ByteArray {
     // HtxBlock.addr points to the block data in the block store.
     // Read bytes from block store — placeholder returns zeros of valueLen.
     return ByteArray(valueLen)

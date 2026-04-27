@@ -105,7 +105,7 @@ object RequestFactoryJsonCodec {
         )
     }
 
-    private fun factoryLiteral(factory: RequestFactorySpec): String = buildJsonObject(
+   fun factoryLiteral(factory: RequestFactorySpec): String = buildJsonObject(
         listOf(
             "name" to stringLiteral(factory.name),
             "servletPath" to stringLiteral(factory.servletPath),
@@ -114,7 +114,7 @@ object RequestFactoryJsonCodec {
         ),
     )
 
-    private fun contextLiteral(context: RequestContextSpec): String = buildJsonObject(
+   fun contextLiteral(context: RequestContextSpec): String = buildJsonObject(
         listOf(
             "name" to stringLiteral(context.name),
             "serviceType" to stringLiteral(context.serviceType),
@@ -123,7 +123,7 @@ object RequestFactoryJsonCodec {
         ),
     )
 
-    private fun methodLiteral(method: RequestMethodSpec): String = buildJsonObject(
+   fun methodLiteral(method: RequestMethodSpec): String = buildJsonObject(
         listOf(
             "name" to stringLiteral(method.name),
             "kind" to stringLiteral(method.kind.name),
@@ -132,7 +132,7 @@ object RequestFactoryJsonCodec {
         ),
     )
 
-    private fun parameterLiteral(parameter: ParameterSpec): String = buildJsonObject(
+   fun parameterLiteral(parameter: ParameterSpec): String = buildJsonObject(
         listOf(
             "name" to stringLiteral(parameter.name),
             "type" to stringLiteral(parameter.type),
@@ -140,7 +140,7 @@ object RequestFactoryJsonCodec {
         ),
     )
 
-    private fun proxyLiteral(proxy: ProxySpec): String = when (proxy) {
+   fun proxyLiteral(proxy: ProxySpec): String = when (proxy) {
         is EntityProxySpec -> buildJsonObject(
             listOf(
                 "name" to stringLiteral(proxy.name),
@@ -161,7 +161,7 @@ object RequestFactoryJsonCodec {
         )
     }
 
-    private fun propertyLiteral(property: PropertySpec): String = buildJsonObject(
+   fun propertyLiteral(property: PropertySpec): String = buildJsonObject(
         listOf(
             "name" to stringLiteral(property.name),
             "type" to stringLiteral(property.type),
@@ -169,7 +169,7 @@ object RequestFactoryJsonCodec {
         ),
     )
 
-    private fun validationLiteral(validation: ValidationRuleSpec): String = buildJsonObject(
+   fun validationLiteral(validation: ValidationRuleSpec): String = buildJsonObject(
         listOf(
             "targetType" to stringLiteral(validation.targetType),
             "constraint" to stringLiteral(validation.constraint),
@@ -177,7 +177,7 @@ object RequestFactoryJsonCodec {
         ),
     )
 
-    private fun entityDeltaLiteral(delta: EntityDelta): String = buildJsonObject(
+   fun entityDeltaLiteral(delta: EntityDelta): String = buildJsonObject(
         listOf(
             "type" to stringLiteral(delta.type),
             "id" to transportLiteral(delta.id),
@@ -186,7 +186,7 @@ object RequestFactoryJsonCodec {
         ),
     )
 
-    private fun constraintViolationLiteral(violation: ConstraintViolation): String = buildJsonObject(
+   fun constraintViolationLiteral(violation: ConstraintViolation): String = buildJsonObject(
         listOf(
             "path" to stringLiteral(violation.path),
             "message" to stringLiteral(violation.message),
@@ -194,11 +194,11 @@ object RequestFactoryJsonCodec {
         ),
     )
 
-    private fun transportArrayLiteral(values: List<TransportValue>): String = arrayLiteral(values.map(::transportLiteral))
+   fun transportArrayLiteral(values: List<TransportValue>): String = arrayLiteral(values.map(::transportLiteral))
 
-    private fun stringArrayLiteral(values: List<String>): String = arrayLiteral(values.map(::stringLiteral))
+   fun stringArrayLiteral(values: List<String>): String = arrayLiteral(values.map(::stringLiteral))
 
-    private fun transportLiteral(value: TransportValue?): String = when (value) {
+   fun transportLiteral(value: TransportValue?): String = when (value) {
         null,
         TransportValue.NullValue,
         -> "null"
@@ -210,17 +210,17 @@ object RequestFactoryJsonCodec {
         is TransportValue.ObjectValue -> objectLiteral(value.values.mapValues { transportLiteral(it.value) })
     }
 
-    private fun objectLiteral(values: Map<String, String>): String = buildJsonObject(values.entries.map { it.key to it.value })
+   fun objectLiteral(values: Map<String, String>): String = buildJsonObject(values.entries.map { it.key to it.value })
 
-    private fun arrayLiteral(values: List<String>): String = values.joinToString(prefix = "[", postfix = "]", separator = ",")
+   fun arrayLiteral(values: List<String>): String = values.joinToString(prefix = "[", postfix = "]", separator = ",")
 
-    private fun buildJsonObject(entries: List<Pair<String, String>>): String = entries.joinToString(prefix = "{", postfix = "}", separator = ",") {
+   fun buildJsonObject(entries: List<Pair<String, String>>): String = entries.joinToString(prefix = "{", postfix = "}", separator = ",") {
         stringLiteral(it.first) + ":" + it.second
     }
 
-    private fun stringOrNullLiteral(value: String?): String = value?.let(::stringLiteral) ?: "null"
+   fun stringOrNullLiteral(value: String?): String = value?.let(::stringLiteral) ?: "null"
 
-    private fun stringLiteral(value: String): String = buildString {
+   fun stringLiteral(value: String): String = buildString {
         append('"')
         value.forEach { ch ->
             when (ch) {
@@ -235,34 +235,34 @@ object RequestFactoryJsonCodec {
         append('"')
     }
 
-    private fun toFactory(map: Map<String, Any?>): RequestFactorySpec = RequestFactorySpec(
+   fun toFactory(map: Map<String, Any?>): RequestFactorySpec = RequestFactorySpec(
         name = map.string("name"),
         servletPath = map.string("servletPath"),
         requestPath = map.string("requestPath"),
         eventBusType = map["eventBusType"] as String?,
     )
 
-    private fun toContext(map: Map<String, Any?>): RequestContextSpec = RequestContextSpec(
+   fun toContext(map: Map<String, Any?>): RequestContextSpec = RequestContextSpec(
         name = map.string("name"),
         serviceType = map.string("serviceType"),
         serviceAnnotation = (map["serviceAnnotation"] as String?)?.let(ServiceAnnotation::valueOf),
         methods = map.list("methods").map { toMethod(it as Map<String, Any?>) },
     )
 
-    private fun toMethod(map: Map<String, Any?>): RequestMethodSpec = RequestMethodSpec(
+   fun toMethod(map: Map<String, Any?>): RequestMethodSpec = RequestMethodSpec(
         name = map.string("name"),
         kind = RequestMethodKind.valueOf(map.string("kind")),
         returnType = map.string("returnType"),
         parameters = map.list("parameters").map { toParameter(it as Map<String, Any?>) },
     )
 
-    private fun toParameter(map: Map<String, Any?>): ParameterSpec = ParameterSpec(
+   fun toParameter(map: Map<String, Any?>): ParameterSpec = ParameterSpec(
         name = map.string("name"),
         type = map.string("type"),
         annotations = map.listOrEmpty("annotations").map { it as String },
     )
 
-    private fun toProxy(map: Map<String, Any?>): ProxySpec {
+   fun toProxy(map: Map<String, Any?>): ProxySpec {
         val properties = map.list("properties").map { toProperty(it as Map<String, Any?>) }
         val extraTypes = map.listOrEmpty("extraTypes").map { it as String }
         return if (map.containsKey("idProperty") || map.containsKey("versionProperty")) {
@@ -284,19 +284,19 @@ object RequestFactoryJsonCodec {
         }
     }
 
-    private fun toProperty(map: Map<String, Any?>): PropertySpec = PropertySpec(
+   fun toProperty(map: Map<String, Any?>): PropertySpec = PropertySpec(
         name = map.string("name"),
         type = map.string("type"),
         readOnly = map.booleanOrDefault("readOnly", false),
     )
 
-    private fun toValidation(map: Map<String, Any?>): ValidationRuleSpec = ValidationRuleSpec(
+   fun toValidation(map: Map<String, Any?>): ValidationRuleSpec = ValidationRuleSpec(
         targetType = map.string("targetType"),
         constraint = map.string("constraint"),
         message = map["message"] as String?,
     )
 
-    private fun toEntityDelta(value: Any?): EntityDelta {
+   fun toEntityDelta(value: Any?): EntityDelta {
         val map = value as Map<String, Any?>
         val properties = (map["properties"] as? Map<String, Any?>).orEmpty().mapValues { toTransportValue(it.value) }
         return EntityDelta(
@@ -307,7 +307,7 @@ object RequestFactoryJsonCodec {
         )
     }
 
-    private fun toConstraintViolation(value: Any?): ConstraintViolation {
+   fun toConstraintViolation(value: Any?): ConstraintViolation {
         val map = value as Map<String, Any?>
         return ConstraintViolation(
             path = map.string("path"),
@@ -316,7 +316,7 @@ object RequestFactoryJsonCodec {
         )
     }
 
-    private fun toTransportValue(value: Any?): TransportValue = when (value) {
+   fun toTransportValue(value: Any?): TransportValue = when (value) {
         null -> TransportValue.NullValue
         is String -> TransportValue.StringValue(value)
         is Boolean -> TransportValue.BooleanValue(value)
@@ -329,14 +329,14 @@ object RequestFactoryJsonCodec {
         else -> error("Unsupported transport value: $value")
     }
 
-    private fun parseObject(json: String): Map<String, Any?> =
+   fun parseObject(json: String): Map<String, Any?> =
         JsonParser.reify(json.toSeries()) as? Map<String, Any?>
             ?: error("Expected JSON object: $json")
 
-    private fun Map<String, Any?>.string(key: String): String = this[key] as String
-    private fun Map<String, Any?>.boolean(key: String): Boolean = this[key] as Boolean
-    private fun Map<String, Any?>.booleanOrDefault(key: String, default: Boolean): Boolean = this[key] as? Boolean ?: default
-    private fun Map<String, Any?>.list(key: String): List<Any?> = (this[key] as? List<Any?>) ?: emptyList()
-    private fun Map<String, Any?>.listOrEmpty(key: String): List<Any?> = (this[key] as? List<Any?>) ?: emptyList()
-    private fun Map<String, Any?>.objectValue(key: String): Map<String, Any?> = this[key] as Map<String, Any?>
+   fun Map<String, Any?>.string(key: String): String = this[key] as String
+   fun Map<String, Any?>.boolean(key: String): Boolean = this[key] as Boolean
+   fun Map<String, Any?>.booleanOrDefault(key: String, default: Boolean): Boolean = this[key] as? Boolean ?: default
+   fun Map<String, Any?>.list(key: String): List<Any?> = (this[key] as? List<Any?>) ?: emptyList()
+   fun Map<String, Any?>.listOrEmpty(key: String): List<Any?> = (this[key] as? List<Any?>) ?: emptyList()
+   fun Map<String, Any?>.objectValue(key: String): Map<String, Any?> = this[key] as Map<String, Any?>
 }

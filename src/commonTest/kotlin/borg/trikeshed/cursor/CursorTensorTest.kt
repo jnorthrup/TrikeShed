@@ -15,7 +15,7 @@ class CursorTensorTest {
 
     /** Build a typed RowVec: values zipped with metadata. */
     @Suppress("UNCHECKED_CAST")
-    private fun rowVecOf(vararg pairs: Pair<Any?, IOMemento>): RowVec {
+   fun rowVecOf(vararg pairs: Pair<Any?, IOMemento>): RowVec {
         val values: Series<Any?> = pairs.size j { pairs[it].first }
         val metas: Series<() -> ColumnMeta> = pairs.size j { { RecordMeta("", pairs[it].second) } }
         return values.zip(metas) as RowVec
@@ -23,7 +23,7 @@ class CursorTensorTest {
 
     /** Build a Cursor from vararg rows (safe-cast to RowVec). */
     @Suppress("UNCHECKED_CAST")
-    private fun typedCursorOf(vararg rows: Any?): Cursor =
+   fun typedCursorOf(vararg rows: Any?): Cursor =
         Join<Int, (Int) -> RowVec>(rows.size) { i: Int -> rows[i] as RowVec } as Cursor
 
     @Test

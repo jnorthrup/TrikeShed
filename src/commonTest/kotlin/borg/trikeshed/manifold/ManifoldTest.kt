@@ -7,7 +7,7 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
 class ManifoldTest {
-    private val shifted = Chart<Double, Double>(
+   val shifted = Chart<Double, Double>(
         name = "shifted",
         dimension = 1,
         contains = { point: Double -> point > 5.0 },
@@ -15,7 +15,7 @@ class ManifoldTest {
         embed = { coordinates: Coordinates<Double> -> coordinates[0] + 10.0 },
     )
 
-    private val identity = Chart<Double, Double>(
+   val identity = Chart<Double, Double>(
         name = "identity",
         dimension = 1,
         contains = { point: Double -> point <= 20.0 },
@@ -23,7 +23,7 @@ class ManifoldTest {
         embed = { coordinates: Coordinates<Double> -> coordinates[0] },
     )
 
-    private val manifold = Manifold(
+   val manifold = Manifold(
         Atlas(2 j { index: Int -> if (index == 0) shifted else identity })
     )
 

@@ -2,7 +2,7 @@ package borg.trikeshed.collections
 
 
 class Stack<T>(src: List<T> = listOf()) {
-    private val list: MutableList<T> = src.toMutableList()
+   val list: MutableList<T> = src.toMutableList()
 
     fun push(t: T): Stack<T> = apply { list.add(t) }
     fun pop(): T = list.removeAt(list.size - 1)

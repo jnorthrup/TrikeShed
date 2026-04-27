@@ -10,8 +10,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
-
-private fun <T> runBlocking(block: suspend () -> T): T = runBlockingCommon(block)
+fun <T> runBlocking(block: suspend () -> T): T = runBlockingCommon(block)
 
 class AlibabaAdapterTest {
 
@@ -187,8 +186,8 @@ class FakeAlibabaOssClient(
     val putHook: ((key: String, bytes: ByteArray) -> Unit)? = null,
     val deleteHook: ((key: String) -> Unit)? = null,
 ) : AlibabaOssClient {
-    private var listIdx = 0
-    private var getIdx = 0
+   var listIdx = 0
+   var getIdx = 0
 
     override fun listObjects(prefix: String): List<AlibabaOssObjectMetadata> {
         return if (listIdx < listResults.size) {

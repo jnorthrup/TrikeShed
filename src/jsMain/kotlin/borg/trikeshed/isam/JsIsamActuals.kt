@@ -15,7 +15,7 @@ actual class IsamDataFile actual constructor(
     actual val datafileFilename: String = datafileFilename
     actual val metafile: IsamMetaFileReader = metafile
 
-    private val recordlen: Int get() = metafile.recordlen
+   val recordlen: Int get() = metafile.recordlen
 
     actual override val a: Int
         get() = if (Files.exists(datafileFilename) && recordlen > 0) {

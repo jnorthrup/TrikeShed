@@ -9,7 +9,7 @@ package borg.trikeshed.couch.crypto
 
 // ── X25519 (RFC 7748) ────────────────────────────────────────────────────────────
 
-/** 32-byte X25519 private key (scalar clamped per RFC 7748 §5). */
+/** 32-byte X25519key (scalar clamped per RFC 7748 §5). */
 expect class X25519PrivateKey(raw: ByteArray) {
     val raw: ByteArray
 }
@@ -24,7 +24,7 @@ expect fun x25519GenerateKeyPair(): Pair<X25519PrivateKey, X25519PublicKey>
 
 /**
  * X25519 Diffie-Hellman: scalar * u-coordinate → shared secret.
- * [ours] is the private scalar, [theirs] is the peer's public u-coordinate.
+ * [ours] is thescalar, [theirs] is the peer's public u-coordinate.
  * Returns 32-byte shared secret per RFC 7748 §6.1.
  */
 expect fun x25519Dh(ours: X25519PrivateKey, theirs: X25519PublicKey): ByteArray

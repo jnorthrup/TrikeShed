@@ -19,7 +19,7 @@ import kotlin.test.*
  */
 class BlockAggregateQueryTest {
 
-    private fun empCursor(): MiniCursor {
+   fun empCursor(): MiniCursor {
         val rows = listOf(
             DocRowVec(listOf("name", "dept", "salary"), listOf("alice", "eng", 120000)),
             DocRowVec(listOf("name", "dept", "salary"), listOf("bob", "eng", 110000)),

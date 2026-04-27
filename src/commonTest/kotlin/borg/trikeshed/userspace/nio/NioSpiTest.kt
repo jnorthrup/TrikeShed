@@ -65,7 +65,7 @@ interface NioSpi {
 // SPEC: NioSpi on commonMain — deterministic JVM backend, never on Linux
 // ================================================================================
 
-class NioSpiRedTest {
+class NioSpiTest {
 
     /** NioSpi lifecycle: open → register ops → submit → completions → close. */
     @Test fun nioSpi_lifecycle_openOpsClose() {

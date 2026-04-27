@@ -209,5 +209,4 @@ fun parseJsonToken(input: String): JsonToken? {
         }
     }
 }
-
-private val NUMBER_TOKEN = Regex("-?(0|[1-9]\\d*)(\\.\\d+)?([eE][+-]?\\d+)?")
+val NUMBER_TOKEN = Regex("-?(0|[1-9]\\d*)(\\.\\d+)?([eE][+-]?\\d+)?")

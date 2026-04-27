@@ -18,8 +18,7 @@ data class MvccSnapshot(
 
 /**
  * Metadata about a block's put operation — used to filter by snapshot sequence.
- */
-private data class BlockMeta(
+ */data class BlockMeta(
     val blockId: String,
     val collection: String,
     val putSeq: Long,
@@ -38,8 +37,8 @@ private data class BlockMeta(
  */
 class MvccBlockStore {
 
-    private var sequence = 0L
-    private val blocks = mutableListOf<BlockMeta>()
+   var sequence = 0L
+   val blocks = mutableListOf<BlockMeta>()
 
     /**
      * Put a sealed block into [collection]. Returns the assigned blockId.

@@ -15,8 +15,7 @@ data class HtxClientRequest(
 typealias HtxRequestHandler = suspend (HtxClientRequest) -> HtxClientMessage
 
 val HtxKey: AsyncContextKey<HtxElement> = HtxElement.Key
-
-private suspend fun defaultHtxRequestHandler(request: HtxClientRequest): HtxClientMessage =
+suspend fun defaultHtxRequestHandler(request: HtxClientRequest): HtxClientMessage =
     when {
         request.method.isBlank() || request.path.isBlank() -> HtxClientMessage(status = 400, body = "invalid request")
         request.method == "GET" && request.path == "/health" -> HtxClientMessage(status = 200, body = "ok")
@@ -30,7 +29,7 @@ suspend fun openHtxElement(
     HtxElement(requestHandler).also { it.open() }
 
 class HtxElement(
-    private val requestHandler: HtxRequestHandler = ::defaultHtxRequestHandler,
+   val requestHandler: HtxRequestHandler = ::defaultHtxRequestHandler,
 ) : AsyncContextElement() {
     companion object Key : AsyncContextKey<HtxElement>("HtxKey", 1L shl 5)
 

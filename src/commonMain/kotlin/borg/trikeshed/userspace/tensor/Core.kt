@@ -21,7 +21,7 @@ enum class DType(val sizeBytes: Int) {
 /**
  * Shape of a tensor
  */
-class TensorShape(private val dims: List<Int>) {
+class TensorShape(val dims: List<Int>) {
     companion object {
         fun create(dims: List<Int>): TensorShape = TensorShape(dims)
     }
@@ -35,8 +35,8 @@ class TensorShape(private val dims: List<Int>) {
 /**
  * Basic tensor structure
  */
-class Tensor private constructor(
-    private val data: ByteArray,
+class Tensor constructor(
+    val data: ByteArray,
     val shape: TensorShape,
     val dtype: DType,
     val strides: List<Int>
@@ -82,7 +82,7 @@ class Tensor private constructor(
         /**
          * Compute strides for row-major layout
          */
-        private fun computeStrides(shape: TensorShape, dtype: DType): List<Int> {
+        fun computeStrides(shape: TensorShape, dtype: DType): List<Int> {
             val strides = mutableListOf<Int>()
             var stride = dtype.sizeBytes
 

@@ -78,7 +78,7 @@ TypeEvidence(
                 recordColumnLength(src.size)
             }
 
-        private fun detectConfix(src: Series<Char>): String {
+        fun detectConfix(src: Series<Char>): String {
             if (src.size < 2) return ""
             val first = src[0]
             val last = src[src.size - 1]
@@ -91,7 +91,7 @@ TypeEvidence(
             }
         }
 
-        private fun detectStructuralMemento(confix: String): TypeMemento? =
+        fun detectStructuralMemento(confix: String): TypeMemento? =
             when (confix) {
                 "{}" -> MapTypeMemento
                 "[]" -> SeqTypeMemento
@@ -168,20 +168,20 @@ TypeEvidence(
 }
 
 /** Non-conditional character class determination — single-bit (XOR) encoding */
-private const val CAT_DIGIT = 1        // bit 0
-private const val CAT_PERIOD = 2       // bit 1
-private const val CAT_EXPONENT = 4     // bit 2
-private const val CAT_SIGN = 8         // bit 3
-private const val CAT_TRUEFALSE = 16   // bit 4
-private const val CAT_ALPHA = 32       // bit 5
-private const val CAT_DQUOTE = 64      // bit 6
-private const val CAT_QUOTE = 128      // bit 7
-private const val CAT_BACKSLASH = 256  // bit 8
-private const val CAT_WHITESPACE = 512 // bit 9
-private const val CAT_SPECIAL = 1024   // bit 10
+const val CAT_DIGIT = 1        // bit 0
+const val CAT_PERIOD = 2       // bit 1
+const val CAT_EXPONENT = 4     // bit 2
+const val CAT_SIGN = 8         // bit 3
+const val CAT_TRUEFALSE = 16   // bit 4
+const val CAT_ALPHA = 32       // bit 5
+const val CAT_DQUOTE = 64      // bit 6
+const val CAT_QUOTE = 128      // bit 7
+const val CAT_BACKSLASH = 256  // bit 8
+const val CAT_WHITESPACE = 512 // bit 9
+const val CAT_SPECIAL = 1024   // bit 10
 
 /** Pre-computed lookup table: each ASCII char maps to exactly one single-bit category. */
-private val CHAR_CATEGORY: IntArray = IntArray(128) { c ->
+val CHAR_CATEGORY: IntArray = IntArray(128) { c ->
     when (c.toChar()) {
         in '0'..'9' -> CAT_DIGIT
         '.' -> CAT_PERIOD
@@ -222,7 +222,7 @@ fun TypeEvidence.toRowVec(): RowVec {
     return values.size j { index: Int -> values[index] } joins meta
 }
 
-private val TYPE_EVIDENCE_COLUMNS = arrayOf(
+val TYPE_EVIDENCE_COLUMNS = arrayOf(
     ColumnMeta("confix", IOMemento.IoString),
     ColumnMeta("digits", IOMemento.IoInt),
     ColumnMeta("periods", IOMemento.IoInt),

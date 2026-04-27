@@ -41,9 +41,9 @@ data class SelectStmt(
 
 /** SQL parser entry point — basic string-based parser for common SELECT forms */
 object SqlParser {
-    private val simpleComp = Regex("(?i)^\\s*([A-Za-z_][A-Za-z0-9_]*)\\s*(=|!=|<>|>=|<=|>|<)\\s*('([^']*)'|\\d+(?:\\.\\d+)?)\\s*")
+   val simpleComp = Regex("(?i)^\\s*([A-Za-z_][A-Za-z0-9_]*)\\s*(=|!=|<>|>=|<=|>|<)\\s*('([^']*)'|\\d+(?:\\.\\d+)?)\\s*")
 
-    private fun parseLiteral(token: String): Expr {
+   fun parseLiteral(token: String): Expr {
         val t = token.trim()
         return if (t.startsWith("'") && t.endsWith("'") && t.length >= 2) {
             LitExpr(StringLiteral(t.substring(1, t.length - 1)))
@@ -53,7 +53,7 @@ object SqlParser {
         }
     }
 
-    private fun parseWhereClause(where: String): Expr? {
+   fun parseWhereClause(where: String): Expr? {
         // very small subset: single comparison, optionally AND/OR combined
         val w = where.trim()
         // try parenthesis-free AND/OR split

@@ -10,8 +10,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
-
-private fun <T> runBlocking(block: suspend () -> T): T = runBlockingCommon(block)
+fun <T> runBlocking(block: suspend () -> T): T = runBlockingCommon(block)
 
 class GcsAdapterTest {
 
@@ -167,8 +166,8 @@ class FakeGcsStorage(
     val putHook: ((bucket: String, key: String, bytes: ByteArray, contentType: String?) -> Unit)? = null,
     val deleteHook: ((bucket: String, key: String) -> Unit)? = null,
 ) : GcsStorageClient {
-    private var listIdx = 0
-    private var getIdx = 0
+   var listIdx = 0
+   var getIdx = 0
 
     override fun listBlobs(bucket: String, prefix: String): List<GcsBlobMetadata> {
         return if (listIdx < listResults.size) listResults[listIdx++] else emptyList()

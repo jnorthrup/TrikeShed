@@ -252,7 +252,7 @@ fun <S> Join<Int, (Int) -> S>.toSet(opt: MutableSet<S>? = null): MutableSet<S> =
 
 // Series iterator for use in for loops
 operator fun <A> Series<A>.iterator(): Iterator<A> = object : Iterator<A> {
-    private var current = 0
+   var current = 0
     override fun hasNext(): Boolean = current < size
     override fun next(): A {
         if (!hasNext()) throw NoSuchElementException()
@@ -282,8 +282,8 @@ infix operator fun <T> Series<T>.contains(it: Char): Boolean = this.view contain
  * IntHeap is a heap of integers
  */
 class IntHeap(series: Series<Int>) {
-    private var heap: IntArray = IntArray(series.size)
-    private var size = 0
+   var heap: IntArray = IntArray(series.size)
+   var size = 0
 
     init {
         for (i in series) add(i)
@@ -376,7 +376,7 @@ fun <T> Series<T>.reversed(): Series<T> {
 
 object EmptySeries : Series<Nothing> by 0 j { _ -> TODO("empty Series Access Violation") }
 
-fun <T> emptySeries(): Series<T> = EmptySeries as Series<T>
+inline fun<reified T>  emptySeries(): Series< T> = EmptySeries as Series<T>
 
 fun Series<Char>.parseLong(): Long {
 //handles +-
@@ -565,8 +565,7 @@ fun <T : Comparable<T>> Series<T>.compareTo(other: Series<T>): Int {
     }
     return this.size.compareTo(other.size)
 }
-
-private fun <T : Comparable<T>> Series<T>.shortestLength(other: Series<T>): Int {
+fun <T : Comparable<T>> Series<T>.shortestLength(other: Series<T>): Int {
     val shortestLength = min(this.size, other.size)
     var i = 0
     while (i < shortestLength && this[i] == other[i]) i++

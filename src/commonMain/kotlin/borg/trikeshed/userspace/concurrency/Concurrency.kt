@@ -27,7 +27,7 @@ interface Job : borg.trikeshed.ccek.KeyedService {
  * Similar to [CompletableDeferred] in Kotlin.
  */
 class SuspendToken<T>(initial: T? = null) {
-    private val deferred = CompletableDeferred<T>()
+   val deferred = CompletableDeferred<T>()
 
     init {
         if (initial != null) {

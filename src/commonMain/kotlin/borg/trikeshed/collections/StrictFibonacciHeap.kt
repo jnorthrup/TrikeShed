@@ -3,11 +3,11 @@ package borg.trikeshed.collections
 import kotlin.math.ln
 
 class StrictFibonacciHeap<T : Comparable<T>> {
-    private var root: Node<T>? = null
-    private var minNode: Node<T>? = null
-    private var size = 0
-    private val activeRoots = mutableListOf<Node<T>>()
-    private val rankList = mutableListOf<MutableList<Node<T>>>()
+   var root: Node<T>? = null
+   var minNode: Node<T>? = null
+   var size = 0
+   val activeRoots = mutableListOf<Node<T>>()
+   val rankList = mutableListOf<MutableList<Node<T>>>()
 
     class Node<T : Comparable<T>>(
         var key: T,
@@ -85,7 +85,7 @@ class StrictFibonacciHeap<T : Comparable<T>> {
         maintainInvariants()
     }
 
-    private fun link(child: Node<T>, parent: Node<T>) {
+   fun link(child: Node<T>, parent: Node<T>) {
         child.parent = parent
         if (parent.child == null) {
             parent.child = child
@@ -100,7 +100,7 @@ class StrictFibonacciHeap<T : Comparable<T>> {
         parent.rank++
     }
 
-    private fun unlink(node: Node<T>) {
+   fun unlink(node: Node<T>) {
         if (node.right == node) {
             node.parent?.child = null
         } else {
@@ -114,7 +114,7 @@ class StrictFibonacciHeap<T : Comparable<T>> {
         node.right = null
     }
 
-    private fun cut(node: Node<T>) {
+   fun cut(node: Node<T>) {
         unlink(node)
         link(node, root!!)
         node.loss = 0
@@ -122,7 +122,7 @@ class StrictFibonacciHeap<T : Comparable<T>> {
         activeRoots.add(node)
     }
 
-    private fun cascadingCut(node: Node<T>) {
+   fun cascadingCut(node: Node<T>) {
         val parent = node.parent
         if (parent != null)
             if (node.isActive) {
@@ -137,7 +137,7 @@ class StrictFibonacciHeap<T : Comparable<T>> {
             }
     }
 
-    private fun consolidate() {
+   fun consolidate() {
         val maxRank = (log2(size.toDouble()) + 1)
         val ranks = Array<Node<T>?>(maxRank) { null }
 
@@ -172,7 +172,7 @@ class StrictFibonacciHeap<T : Comparable<T>> {
         root = minNode
     }
 
-    private fun maintainInvariants() {
+   fun maintainInvariants() {
         while (activeRoots.size > 2 * log2(size.toDouble()) + 6) {
             val x = activeRoots.removeAt(activeRoots.lastIndex)
             val y = activeRoots.removeAt(activeRoots.lastIndex)
@@ -218,5 +218,5 @@ class StrictFibonacciHeap<T : Comparable<T>> {
         deleteMin()
     }
 
-    private fun log2(n: Double): Int = (ln(n) / ln(2.0)).toInt()
+   fun log2(n: Double): Int = (ln(n) / ln(2.0)).toInt()
 }

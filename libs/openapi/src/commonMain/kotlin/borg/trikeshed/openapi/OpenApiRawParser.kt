@@ -3,12 +3,8 @@ package borg.trikeshed.openapi
 import borg.trikeshed.lib.toSeries
 import borg.trikeshed.parse.json.JsonParser
 
-// ── type aliases over plain Kotlin maps ──────────────────────────────────────
-private typealias JsonMap = Map<String, Any?>
-
-private fun Any?.asMap(): JsonMap? = this as? JsonMap
-private fun Any?.asString(): String? = this as? String
-private fun Any?.asList(): List<Any?>? = this as? List<Any?>
+// ── type aliases over plain Kotlin maps ──────────────────────────────────────typealias JsonMap = Map<String, Any?>
+fun Any?.asMap(): JsonMap? = this as? JsonMapfun Any?.asString(): String? = this as? Stringfun Any?.asList(): List<Any?>? = this as? List<Any?>
 
 // ── domain model ─────────────────────────────────────────────────────────────
 
@@ -155,7 +151,7 @@ data class OpenApiRawDocument(val root: JsonMap) {
         return OpenApiGapAnalysis(tokens = tokens, gaps = gaps)
     }
 
-    private fun resolveRef(ref: String): Any? {
+   fun resolveRef(ref: String): Any? {
         if (!ref.startsWith("#/")) return null
         var current: Any? = root
         for (segment in ref.removePrefix("#/").split('/')) {

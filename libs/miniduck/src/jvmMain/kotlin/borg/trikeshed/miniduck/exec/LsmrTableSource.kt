@@ -17,16 +17,16 @@ import borg.trikeshed.miniduck.DocRowVec
 import borg.trikeshed.miniduck.MiniRowVec
 import borg.trikeshed.lib.*
 
-class LsmrTableSource(private val db: LsmrDatabase, private val blockSizeThreshold: Int = 128) : TableSource {
+class LsmrTableSource(private val db: LsmrDatabase,val blockSizeThreshold: Int = 128) : TableSource {
 
-    private val mutableBlocks = mutableMapOf<String, BlockRowVec>()
-    private fun blockCountKey(table: String) = "miniduck:table:$table:blockcount"
-    private fun blockKey(table: String, idx: Int) = "miniduck:table:$table:block:$idx"
+   val mutableBlocks = mutableMapOf<String, BlockRowVec>()
+   fun blockCountKey(table: String) = "miniduck:table:$table:blockcount"
+   fun blockKey(table: String, idx: Int) = "miniduck:table:$table:block:$idx"
 
-    private fun countKey(table: String) = "miniduck:table:$table:count"
-    private fun rowKey(table: String, idx: Int) = "miniduck:table:$table:row:$idx"
+   fun countKey(table: String) = "miniduck:table:$table:count"
+   fun rowKey(table: String, idx: Int) = "miniduck:table:$table:row:$idx"
 
-    private fun serializeRow(row: List<Any?>): ByteArray {
+   fun serializeRow(row: List<Any?>): ByteArray {
         val parts = row.map { v ->
             when (v) {
                 null -> "N"
@@ -42,7 +42,7 @@ class LsmrTableSource(private val db: LsmrDatabase, private val blockSizeThresho
         return s.toByteArray(Charsets.UTF_8)
     }
 
-    private fun deserializeRow(bytes: ByteArray): List<Any?> {
+   fun deserializeRow(bytes: ByteArray): List<Any?> {
         val s = String(bytes, Charsets.UTF_8)
         if (s.isEmpty()) return emptyList()
         return s.split("\u001F").map { token ->
@@ -72,7 +72,7 @@ class LsmrTableSource(private val db: LsmrDatabase, private val blockSizeThresho
         }
     }
 
-    private fun parseBlockCount(raw: ByteArray?): Int = raw?.let { String(it, Charsets.UTF_8).toIntOrNull() } ?: 0
+   fun parseBlockCount(raw: ByteArray?): Int = raw?.let { String(it, Charsets.UTF_8).toIntOrNull() } ?: 0
 
     /**
      * Persist any in-memory mutable block for [tableName] as a sealed block in the DB.

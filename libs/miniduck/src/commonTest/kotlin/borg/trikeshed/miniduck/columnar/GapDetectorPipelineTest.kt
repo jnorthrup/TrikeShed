@@ -16,11 +16,8 @@ import kotlin.test.*
 /* ═══════════════════════════════════════════════════════════════════════
    SYNTHETIC TEST DATA
    ═══════════════════════════════════════════════════════════════════════ */
-
-private val INTERVAL_1M = 60_000L
-private val INTERVAL_5M = 300_000L
-
-private fun klineRow(openTime: Long): DocRowVec = DocRowVec(
+val INTERVAL_1M = 60_000Lval INTERVAL_5M = 300_000L
+fun klineRow(openTime: Long): DocRowVec = DocRowVec(
     keys = listOf("openTime", "open", "high", "low", "close", "volume", "symbol", "interval"),
     cells = listOf<Any?>(openTime, 69000.0, 69100.0, 68900.0, 69000.0, 100.0, "BTCUSDT", "1m"),
 )

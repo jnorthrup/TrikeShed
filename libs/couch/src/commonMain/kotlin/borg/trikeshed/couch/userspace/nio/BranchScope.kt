@@ -25,7 +25,7 @@ class BranchScope(
     parentJob: CompletableJob? = null,
 ) : CompletableJob by SupervisorJob(parentJob) {
 
-    private val _channel = channel
+   val _channel = channel
 
     /**
      * Process loop — reads HtxBlocks from channel and dispatches.

@@ -20,9 +20,9 @@ interface ParseSupervisor { val id: Int; fun process(dispatch: BranchDispatch): 
 data class BranchDispatchStub(override val branchId: Int, override val block: HtxBlock) : BranchDispatch
 
 class ReactorSupervisorStub(override val id: Int = 0) : ReactorSupervisor {
-    private val _branches = mutableMapOf<Int, BranchDispatch>()
+   val _branches = mutableMapOf<Int, BranchDispatch>()
     var isOpen = false
-        private set
+       set
 
     override fun open() { isOpen = true }
     override fun close() { isOpen = false; _branches.clear() }

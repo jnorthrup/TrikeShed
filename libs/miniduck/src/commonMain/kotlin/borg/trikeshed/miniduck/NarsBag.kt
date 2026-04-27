@@ -15,9 +15,9 @@ import borg.trikeshed.lib.*
  * exposing the P/D/Q values for each concept -- this is the "lowering target"
  * for numerical kernels, not the primary access path.
  */
-class NarsBag private constructor(
-    private val concepts: MutableList<ManifoldConcept>,
-    private var _sealed: Boolean,
+class NarsBag constructor(
+    val concepts: MutableList<ManifoldConcept>,
+    var _sealed: Boolean,
 ) {
 
     enum class State { MUTABLE, SEALED }

@@ -8,7 +8,7 @@ package borg.trikeshed.couch.htx
  */
 object HtxCrc32 {
     // Pre-computed lookup table (256 entries, reflected polynomial)
-    private val TABLE: IntArray by lazy {
+   val TABLE: IntArray by lazy {
         IntArray(256) { n ->
             var c = n
             for (k in 0 until 8) {

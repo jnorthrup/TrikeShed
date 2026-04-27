@@ -43,9 +43,9 @@ data class WalEntry(
  */
 class InMemoryBlockWal {
 
-    private val entries = mutableListOf<WalEntry>()
+   val entries = mutableListOf<WalEntry>()
     var headSequence: Long = 0L
-        private set
+       set
 
     /**
      * Append an operation to the WAL. Returns the assigned sequence number.
@@ -98,7 +98,7 @@ class InMemoryBlockWal {
         entries.removeAll { it.seq < keepFromSeq }
     }
 
-    private fun applyOp(store: BlockStore, op: WalOp) {
+   fun applyOp(store: BlockStore, op: WalOp) {
         when (op) {
             is WalOp.Put -> {
                 // Use the blockId from the WAL entry, not the auto-generated one

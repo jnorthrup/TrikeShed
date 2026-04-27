@@ -36,7 +36,7 @@ class HtxMessage(
     }
 
     companion object {
-        private val HTTP_TRIE = Trie().apply {
+       val HTTP_TRIE = Trie().apply {
             add(1, "HTTP/")
             add(1, "GET ")
             add(1, "POST ")
@@ -121,7 +121,7 @@ class HtxMessage(
             return HtxMessage()
         }
 
-        private fun parseRequestLine(line: String): Triple<HttpMethod, String, Pair<Int, Int>>? {
+       fun parseRequestLine(line: String): Triple<HttpMethod, String, Pair<Int, Int>>? {
             val parts = line.split(' ', limit = 3)
             if (parts.size < 3) return null
             val method = HttpMethod.fromString(parts[0]) ?: return null
@@ -130,7 +130,7 @@ class HtxMessage(
             return Triple(method, uri, version)
         }
 
-        private fun parseStatusLine(line: String): Triple<Int, String, Pair<Int, Int>>? {
+       fun parseStatusLine(line: String): Triple<Int, String, Pair<Int, Int>>? {
             val parts = line.split(' ', limit = 3)
             if (parts.size < 2 || !parts[0].startsWith("HTTP/")) return null
             val version = parseVersion(parts[0]) ?: return null
@@ -139,7 +139,7 @@ class HtxMessage(
             return Triple(status, reason, version)
         }
 
-        private fun parseVersion(s: String): Pair<Int, Int>? {
+       fun parseVersion(s: String): Pair<Int, Int>? {
             if (!s.startsWith("HTTP/")) return null
             val rest = s.substring(5)
             val parts = rest.split('.', limit = 2)
@@ -149,12 +149,11 @@ class HtxMessage(
             return major to minor
         }
 
-        private fun parseHeader(line: String): Pair<String, String>? {
+       fun parseHeader(line: String): Pair<String, String>? {
             val colonPos = line.indexOf(':')
             if (colonPos == -1) return null
             return line.substring(0, colonPos).trim() to line.substring(colonPos + 1).trim()
         }
     }
 }
-
-private enum class ParseState { RequestLine, Headers, Body }
+enum class ParseState { RequestLine, Headers, Body }

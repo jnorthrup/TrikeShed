@@ -15,7 +15,7 @@ import kotlin.math.pow
  *
  * Angular coordinate is separate (Long NUID address) -- see ManifoldConcept.
  */
-class BudgetCoord private constructor(
+class BudgetCoord constructor(
     val packed: UInt,
     val p: Float,
     val d: Float,
@@ -35,9 +35,9 @@ class BudgetCoord private constructor(
         radialEnergy.compareTo(other.radialEnergy)
 
     companion object {
-        private const val MASK10 = 0x3FF
-        private const val BITS = 10
-        private const val SCALE = 1023f
+        const val MASK10 = 0x3FF
+        const val BITS = 10
+        const val SCALE = 1023f
 
         /** Create from three float components, clamped to [0,1]. */
         operator fun invoke(p: Float, d: Float, q: Float): BudgetCoord {

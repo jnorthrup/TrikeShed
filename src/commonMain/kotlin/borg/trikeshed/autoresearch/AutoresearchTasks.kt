@@ -58,7 +58,7 @@ object AutoresearchTasks {
             )
         }
 
-    private fun inputFor(
+   fun inputFor(
         task: AutoresearchTask,
         sampleIndex: Int,
         sampleCount: Int,
@@ -77,7 +77,7 @@ object AutoresearchTasks {
             -> doubleArrayOf(phase(sampleIndex, sampleCount, seed))
         }
 
-    private fun scalarInput(
+   fun scalarInput(
         sampleIndex: Int,
         sampleCount: Int,
         seed: Int,
@@ -87,12 +87,12 @@ object AutoresearchTasks {
         return -1.0 + (2.0 * normalized) + (seed * 0.0005) + offset
     }
 
-    private fun phase(sampleIndex: Int, sampleCount: Int, seed: Int): Double {
+   fun phase(sampleIndex: Int, sampleCount: Int, seed: Int): Double {
         val normalized = if (sampleCount == 1) 0.0 else sampleIndex.toDouble() / (sampleCount - 1).toDouble()
         return (-PI) + (2.0 * PI * normalized) + (seed * 0.002)
     }
 
-    private fun deterministicNoise(sampleIndex: Int, seed: Int): Double {
+   fun deterministicNoise(sampleIndex: Int, seed: Int): Double {
         val lane = ((sampleIndex * 17) + (seed * 13)) % 11
         return (lane - 5).toDouble() * 0.01
     }

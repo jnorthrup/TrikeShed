@@ -32,7 +32,7 @@ class Region(
  */
 class Tablespace(val name: String) {
 
-    private val _regions = mutableListOf<Region>()
+   val _regions = mutableListOf<Region>()
     val regions: List<Region> get() = _regions.toList()
 
     fun addRegion(region: Region) {

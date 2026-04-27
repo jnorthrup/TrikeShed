@@ -332,7 +332,7 @@ object CSVUtil {
         sampleSize: Int = 1000,
     ): Sequence<RowVec> = streamSpec(file, delim, header, sampleSize).rows
 
-    private fun buildStreamSpec(
+   fun buildStreamSpec(
         file: LongSeries<Byte>,
         delim: Char,
         header: Boolean,

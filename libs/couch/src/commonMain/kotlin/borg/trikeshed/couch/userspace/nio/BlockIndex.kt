@@ -87,7 +87,7 @@ class MemoryBlockIndex(
     override val provider: CompressionProvider,
     points: List<Point>,
 ) : BlockIndex {
-    private val pts: List<PointRowVec> = points.map { pointRowVecOf(it) }
+   val pts: List<PointRowVec> = points.map { pointRowVecOf(it) }
     override val pointSeries: Series<PointRowVec> = pts.size j { pts[it] }
     override val lineTable: Series<Long> = pts.size j { pts[it]["decompressedOffset"] as Long }
 

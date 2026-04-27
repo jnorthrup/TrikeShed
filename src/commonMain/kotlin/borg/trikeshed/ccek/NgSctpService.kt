@@ -24,10 +24,10 @@ data class NgSctpService(
 
     // Public handle as non-negative Long (stream ID)
     var handle: Long = 0
-        private set
+       set
 
     // Backing map for stream handles
-    private val _streams: MutableMap<Int, StreamHandle> = streams
+   val _streams: MutableMap<Int, StreamHandle> = streams
 
     override val key: CoroutineContext.Key<*> get() = Key
 

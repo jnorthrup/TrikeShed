@@ -17,9 +17,8 @@ import kotlinx.coroutines.withTimeout
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
-
-private class RecordingListener(
-    private val sink: Channel<Any>,
+class RecordingListener(
+   val sink: Channel<Any>,
 ) : AsyncContextElement(), UserspaceNioProvider.EventListener {
     companion object Key : AsyncContextKey<RecordingListener>()
 

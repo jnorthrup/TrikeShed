@@ -8,7 +8,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class YamlBigJsonParityTest {
-    private val mapper = jacksonObjectMapper()
+   val mapper = jacksonObjectMapper()
 
     @Test
     fun bigJsonYamlRoundTrip_matchesRandomLeafSamples() {
@@ -32,7 +32,7 @@ class YamlBigJsonParityTest {
         }
     }
 
-    private fun renderYaml(value: Any?, indent: Int = 0): String {
+   fun renderYaml(value: Any?, indent: Int = 0): String {
         val prefix = " ".repeat(indent)
         return when (value) {
             null -> "null"
@@ -50,7 +50,7 @@ class YamlBigJsonParityTest {
         }
     }
 
-    private fun renderListItem(value: Any?, indent: Int): String {
+   fun renderListItem(value: Any?, indent: Int): String {
         val prefix = " ".repeat(indent)
         return when {
             isInline(value) -> "$prefix- ${renderYaml(value, indent + 2)}"
@@ -80,7 +80,7 @@ class YamlBigJsonParityTest {
         }
     }
 
-    private fun quoteYaml(value: String): String =
+   fun quoteYaml(value: String): String =
         buildString(value.length + 2) {
             append('"')
             value.forEach { ch ->
@@ -96,7 +96,7 @@ class YamlBigJsonParityTest {
             append('"')
         }
 
-    private fun isInline(value: Any?): Boolean =
+   fun isInline(value: Any?): Boolean =
         value == null ||
             value is String ||
             value is Number ||
@@ -104,7 +104,7 @@ class YamlBigJsonParityTest {
             (value is Map<*, *> && value.isEmpty()) ||
             (value is List<*> && value.isEmpty())
 
-    private fun collectLeafPaths(value: Any?, prefix: List<Any>, output: MutableList<List<Any>>) {
+   fun collectLeafPaths(value: Any?, prefix: List<Any>, output: MutableList<List<Any>>) {
         when (value) {
             is Map<*, *> -> value.forEach { (key, child) -> collectLeafPaths(child, prefix + key.toString(), output) }
             is List<*> -> value.forEachIndexed { index, child -> collectLeafPaths(child, prefix + index, output) }
@@ -112,7 +112,7 @@ class YamlBigJsonParityTest {
         }
     }
 
-    private fun resolvePath(root: Any?, path: List<Any>): Any? {
+   fun resolvePath(root: Any?, path: List<Any>): Any? {
         var current = root
         for (segment in path) {
             current = when {
@@ -124,7 +124,7 @@ class YamlBigJsonParityTest {
         return current
     }
 
-    private fun assertEquivalent(path: List<Any>, left: Any?, right: Any?) {
+   fun assertEquivalent(path: List<Any>, left: Any?, right: Any?) {
         when {
             left is Number && right is Number -> {
                 if (left is Double || left is Float || right is Double || right is Float) {

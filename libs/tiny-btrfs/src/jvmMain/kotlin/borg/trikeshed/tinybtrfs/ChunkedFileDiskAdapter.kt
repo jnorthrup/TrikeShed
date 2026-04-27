@@ -18,8 +18,8 @@ import java.util.concurrent.atomic.AtomicLong
  * production allocator should persist metadata.
  */
 class ChunkedFileDiskAdapter(
-    private val file: File,
-    private val chunkSize: Int = 4096,
+   val file: File,
+   val chunkSize: Int = 4096,
     preallocateSize: Long = 0L,
     allocationStrategy: String = "on_demand",
 ) : DiskAdapter {
@@ -32,11 +32,11 @@ class ChunkedFileDiskAdapter(
         }
     }
 
-    private val raf = RandomAccessFile(file, "rw")
-    private val nextOffset = AtomicLong(raf.length())
-    private val freeList = ConcurrentLinkedQueue<Long>()
+   val raf = RandomAccessFile(file, "rw")
+   val nextOffset = AtomicLong(raf.length())
+   val freeList = ConcurrentLinkedQueue<Long>()
 
-    private fun parseOffset(nodeId: String): Long {
+   fun parseOffset(nodeId: String): Long {
         if (!nodeId.startsWith("off:")) throw IllegalArgumentException("invalid node id: $nodeId")
         return nodeId.substringAfter("off:").toLong()
     }

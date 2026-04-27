@@ -6,8 +6,7 @@ import borg.trikeshed.lib.Join
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.Series2
 import borg.trikeshed.lib.j
-import borg.trikeshed.lib.toSeries
-private val processObj: dynamic = js("process")
+import borg.trikeshed.lib.toSeriesval processObj: dynamic = js("process")
 
 
 actual object System {
@@ -48,8 +47,7 @@ actual object Files {
     actual fun iterateLines(fileName: String, bufsize: Int): Iterable<Join<Long, Series<Byte>>> =
         streamLines(fileName, bufsize).map { (offset, bytes) -> offset j bytes.toSeries() }.asIterable()
 }
-
-private fun streamByteLines(bytes: ByteArray): Sequence<Join<Long, ByteArray>> = sequence {
+fun streamByteLines(bytes: ByteArray): Sequence<Join<Long, ByteArray>> = sequence {
     var offset = 0L
     var lineStart = 0L
     val line = ArrayList<Byte>()
@@ -79,15 +77,14 @@ actual fun readLinesSeq(path: String): Sequence<String> =
     Files.readAllLines(path).asSequence()
 
 actual fun readLines(path: String): List<String> = Files.readAllLines(path)
-
-private data class JsHandleState(
+data class JsHandleState(
     val fd: Int,
     var position: Long = 0,
 )
 
 class JsSeekHandle : SeekHandle {
-    private val handles = mutableMapOf<Long, JsHandleState>()
-    private var nextHandle = 1L
+   val handles = mutableMapOf<Long, JsHandleState>()
+   var nextHandle = 1L
 
     override fun open(filename: String, readOnly: Boolean): Long {
         require(jsExists(filename)) { "File does not exist: $filename" }
@@ -145,7 +142,7 @@ actual class FileBuffer actual constructor(
     actual val readOnly: Boolean,
     actual val closeChannelOnMap: Boolean,
 ) : LongSeries<Byte> {
-    private val delegate = SeekFileBufferCommon(filename, initialOffset, blkSize, readOnly)
+   val delegate = SeekFileBufferCommon(filename, initialOffset, blkSize, readOnly)
 
     actual override val a: Long
         get() = delegate.a
@@ -178,7 +175,7 @@ actual class SeekFileBuffer actual constructor(
     actual val blkSize: Long,
     actual val readOnly: Boolean,
 ) : LongSeries<Byte> {
-    private val delegate = SeekFileBufferCommon(filename, initialOffset, blkSize, readOnly)
+   val delegate = SeekFileBufferCommon(filename, initialOffset, blkSize, readOnly)
 
     actual override val a: Long
         get() = delegate.a

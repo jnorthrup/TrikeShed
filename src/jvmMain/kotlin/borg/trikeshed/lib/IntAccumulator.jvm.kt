@@ -4,10 +4,10 @@ import java.lang.foreign.Arena
 import java.lang.foreign.ValueLayout.JAVA_INT
 
 actual class IntAccumulator actual constructor(initialCapacity: Int) : AutoCloseable {
-    private var arena = Arena.ofConfined()
-    private var seg = arena.allocate(initialCapacity.toLong() * Int.SIZE_BYTES)
-    private var _size = 0
-    private var capacity = initialCapacity
+   var arena = Arena.ofConfined()
+   var seg = arena.allocate(initialCapacity.toLong() * Int.SIZE_BYTES)
+   var _size = 0
+   var capacity = initialCapacity
 
     actual fun add(value: Int) {
         if (_size >= capacity) grow()
@@ -21,7 +21,7 @@ actual class IntAccumulator actual constructor(initialCapacity: Int) : AutoClose
 
     actual override fun close() = arena.close()
 
-    private fun grow() {
+   fun grow() {
         val newCapacity = capacity * 2
         val newArena = Arena.ofConfined()
         val newSeg = newArena.allocate(newCapacity.toLong() * Int.SIZE_BYTES)

@@ -106,7 +106,7 @@ class HtxTicketDhRedTest {
 
     // ── helper ───────────────────────────────────────────────────────
 
-    private fun deriveTicketFromRawKey(
+   fun deriveTicketFromRawKey(
         rawKey: ByteArray,
         ticketKeyId: ByteArray,
         hour: Long,

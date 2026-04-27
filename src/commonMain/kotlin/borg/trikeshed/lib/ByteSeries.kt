@@ -38,12 +38,12 @@ class ByteSeries(
 ) : Series<Byte> by buf {
 
     // Small byte-window cache to improve locality. Uses buf.b(index) fallback when cache miss.
-    private var _byteCache: ByteArray? = null
-    private var _cacheBase: Int = 0
-    private var _cacheLen: Int = 0
-    private val BYTE_CACHE_WINDOW: Int = 4096
+   var _byteCache: ByteArray? = null
+   var _cacheBase: Int = 0
+   var _cacheLen: Int = 0
+   val BYTE_CACHE_WINDOW: Int = 4096
 
-    private fun raw(i: Int): Byte {
+   fun raw(i: Int): Byte {
         val c = _byteCache
         if (c != null) {
             val b = _cacheBase
@@ -221,7 +221,7 @@ class ByteSeries(
             return confixFeature(it, chlit)
         }
 
-        private fun confixFeature(client: ByteSeries, chlit: ByteArray): Boolean {
+       fun confixFeature(client: ByteSeries, chlit: ByteArray): Boolean {
             logNone { "confix ${chlit.decodeToString()} before: ${client.asString()}" }
             var x = 0
             client.confixScope { test: Byte ->

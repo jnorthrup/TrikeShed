@@ -3,10 +3,10 @@ package borg.trikeshed.collections
 import kotlin.math.max
 
 class TreeSet<E : Comparable<E>> : NavigableSet<E> {
-    private var root: Node<E>? = null
+   var root: Node<E>? = null
     override var size: Int = 0
 
-    private class Node<E>(var element: E) {
+   class Node<E>(var element: E) {
         var left: Node<E>? = null
         var right: Node<E>? = null
         var height: Int = 1
@@ -18,7 +18,7 @@ class TreeSet<E : Comparable<E>> : NavigableSet<E> {
         return size != oldSize
     }
 
-    private fun insert(node: Node<E>?, element: E): Node<E> {
+   fun insert(node: Node<E>?, element: E): Node<E> {
         if (node == null) {
             size++
             return Node(element)
@@ -33,7 +33,7 @@ class TreeSet<E : Comparable<E>> : NavigableSet<E> {
         return balance(node)
     }
 
-    private fun balance(node: Node<E>): Node<E> {
+   fun balance(node: Node<E>): Node<E> {
         updateHeight(node)
         val balance = getBalance(node)
 
@@ -52,7 +52,7 @@ class TreeSet<E : Comparable<E>> : NavigableSet<E> {
         }
     }
 
-    private fun rightRotate(y: Node<E>): Node<E> {
+   fun rightRotate(y: Node<E>): Node<E> {
         val x = y.left!!
         val T2 = x.right
 
@@ -65,7 +65,7 @@ class TreeSet<E : Comparable<E>> : NavigableSet<E> {
         return x
     }
 
-    private fun leftRotate(x: Node<E>): Node<E> {
+   fun leftRotate(x: Node<E>): Node<E> {
         val y = x.right!!
         val T2 = y.left
 
@@ -78,13 +78,13 @@ class TreeSet<E : Comparable<E>> : NavigableSet<E> {
         return y
     }
 
-    private fun updateHeight(node: Node<E>) {
+   fun updateHeight(node: Node<E>) {
         node.height = max(height(node.left), height(node.right)) + 1
     }
 
-    private fun height(node: Node<E>?): Int = node?.height ?: 0
+   fun height(node: Node<E>?): Int = node?.height ?: 0
 
-    private fun getBalance(node: Node<E>?): Int = if (node == null) 0 else height(node.left) - height(node.right)
+   fun getBalance(node: Node<E>?): Int = if (node == null) 0 else height(node.left) - height(node.right)
 
     override fun remove(element: E): Boolean {
         val oldSize = size
@@ -92,7 +92,7 @@ class TreeSet<E : Comparable<E>> : NavigableSet<E> {
         return size != oldSize
     }
 
-    private fun delete(node: Node<E>?, element: E): Node<E>? {
+   fun delete(node: Node<E>?, element: E): Node<E>? {
         if (node == null) return null
 
         when {
@@ -118,7 +118,7 @@ class TreeSet<E : Comparable<E>> : NavigableSet<E> {
         return balance(node)
     }
 
-    private fun minValueNode(node: Node<E>): Node<E> {
+   fun minValueNode(node: Node<E>): Node<E> {
         var current = node
         while (current.left != null) {
             current = current.left!!
@@ -155,7 +155,7 @@ class TreeSet<E : Comparable<E>> : NavigableSet<E> {
         return maxValueNode(root!!).element
     }
 
-    private fun maxValueNode(node: Node<E>): Node<E> {
+   fun maxValueNode(node: Node<E>): Node<E> {
         var current = node
         while (current.right != null) {
             current = current.right!!
@@ -282,14 +282,14 @@ class TreeSet<E : Comparable<E>> : NavigableSet<E> {
     }
 
     override fun iterator(): MutableIterator<E> = object : MutableIterator<E> {
-        private val stack = mutableListOf<Node<E>>()
-        private var current = root
+       val stack = mutableListOf<Node<E>>()
+       var current = root
 
         init {
             pushLeft(current)
         }
 
-        private fun pushLeft(node: Node<E>?) {
+       fun pushLeft(node: Node<E>?) {
             var current = node
             while (current != null) {
                 stack.add(current)

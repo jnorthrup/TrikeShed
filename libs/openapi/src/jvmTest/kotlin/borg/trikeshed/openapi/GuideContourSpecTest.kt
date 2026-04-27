@@ -89,7 +89,7 @@ class GuideContourSpecTest {
         )
     }
 
-    private fun assertGuideSpec(
+   fun assertGuideSpec(
         file: File,
         expectedTitle: String,
         expectedServer: String,

@@ -96,21 +96,21 @@ object AutoresearchHarness {
         }
     }
 
-    private fun normalizeExperimentId(
+   fun normalizeExperimentId(
         config: AutoresearchRunConfig,
         task: AutoresearchTask,
     ): String = config.experimentId.ifBlank {
         "${config.stage}_${config.theme}_${task.wireName}_seed${config.seed}_b${config.fixedRunBudget}"
     }
 
-    private fun normalizeBranch(
+   fun normalizeBranch(
         config: AutoresearchRunConfig,
         task: AutoresearchTask,
     ): String = config.branch.ifBlank {
         "exp/${config.stage}/${task.wireName}/seed${config.seed}"
     }
 
-    private fun buildEvidencePath(evidenceDirectory: String, experimentId: String): String {
+   fun buildEvidencePath(evidenceDirectory: String, experimentId: String): String {
         val trimmed = evidenceDirectory.trimEnd('/')
         return if (trimmed.isEmpty()) {
             "${sanitizeToken(experimentId)}.txt"
@@ -119,14 +119,14 @@ object AutoresearchHarness {
         }
     }
 
-    private fun appendJsonLine(path: String, jsonLine: String) {
+   fun appendJsonLine(path: String, jsonLine: String) {
         ensureParentDirectory(path)
         val existing = if (Files.exists(path)) Files.readString(path) else ""
         val separator = if (existing.isEmpty() || existing.endsWith("\n")) "" else "\n"
         Files.write(path, existing + separator + jsonLine + "\n")
     }
 
-    private fun writeEvidence(
+   fun writeEvidence(
         evidencePath: String,
         task: AutoresearchTask,
         config: AutoresearchRunConfig,
@@ -156,14 +156,14 @@ object AutoresearchHarness {
         Files.write(evidencePath, body)
     }
 
-    private fun ensureParentDirectory(path: String) {
+   fun ensureParentDirectory(path: String) {
         val parent = path.substringBeforeLast('/', "")
         if (parent.isNotEmpty()) {
             ensureDirectory(parent)
         }
     }
 
-    private fun ensureDirectory(path: String) {
+   fun ensureDirectory(path: String) {
         if (path.isEmpty() || Files.exists(path)) {
             return
         }
@@ -183,7 +183,7 @@ object AutoresearchHarness {
         }
     }
 
-    private fun sanitizeToken(token: String): String = buildString(token.length) {
+   fun sanitizeToken(token: String): String = buildString(token.length) {
         for (ch in token) {
             append(
                 when {

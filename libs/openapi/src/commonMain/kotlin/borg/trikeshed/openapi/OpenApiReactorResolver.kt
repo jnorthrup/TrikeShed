@@ -1,15 +1,8 @@
 package borg.trikeshed.openapi
 
 // ── helpers ──────────────────────────────────────────────────────────────────
-
-private typealias JMap = Map<String, Any?>
-private typealias JList = List<Any?>
-
-private fun Any?.asMap(): JMap? = this as? JMap
-private fun Any?.asStr(): String? = this as? String
-private fun Any?.asBool(): Boolean? = this as? Boolean
-private fun Any?.asNum(): Number? = this as? Number
-private fun Any?.asList(): JList? = this as? List<Any?>
+typealias JMap = Map<String, Any?>typealias JList = List<Any?>
+fun Any?.asMap(): JMap? = this as? JMapfun Any?.asStr(): String? = this as? Stringfun Any?.asBool(): Boolean? = this as? Booleanfun Any?.asNum(): Number? = this as? Numberfun Any?.asList(): JList? = this as? List<Any?>
 
 // ── reference resolution ──────────────────────────────────────────────────────
 
@@ -44,8 +37,7 @@ fun OpenApiRawDocument.resolveAllRefs(): Map<String, Any?> {
     }
     return walkAndResolve(root, ::doResolve).let { it as? Map<String, Any?> }!!
 }
-
-private fun walkAndResolve(node: Any?, resolveRef: (String) -> Any?): Any? {
+fun walkAndResolve(node: Any?, resolveRef: (String) -> Any?): Any? {
     return when (node) {
         null -> null
         is Map<*, *> -> {
@@ -67,8 +59,7 @@ private fun walkAndResolve(node: Any?, resolveRef: (String) -> Any?): Any? {
 }
 
 // ── schema resolver ────────────────────────────────────────────────────────────
-
-private fun resolveSchemaImpl(node: Any?, description: String?, resolveRef: (String) -> Any?): ResolvedSchema {
+fun resolveSchemaImpl(node: Any?, description: String?, resolveRef: (String) -> Any?): ResolvedSchema {
     if (node == null) return ResolvedSchema.Generic(description)
 
     val map = node.asMap() ?: return ResolvedSchema.Generic(description)
@@ -137,8 +128,7 @@ private fun resolveSchemaImpl(node: Any?, description: String?, resolveRef: (Str
         else -> ResolvedSchema.Generic(description)
     }
 }
-
-private fun resolveProperties(
+fun resolveProperties(
     props: JMap?,
     description: String?,
     resolveRef: (String) -> Any?,
@@ -253,8 +243,7 @@ fun parseTrikeshedContext(specText: String): TrikeshedContext? {
         supervisorOperationIds = supervisorIds,
     )
 }
-
-private fun parseBindingsFromSection(specText: String, role: String): List<ContextBinding> {
+fun parseBindingsFromSection(specText: String, role: String): List<ContextBinding> {
     val blockRegex = Regex("""(?m)^  $role:\n((?:(?:    |\t).*\n?)*)""")
     val block = blockRegex.find(specText)?.groupValues?.get(1) ?: return emptyList()
     val entryRegex = Regex("""- name:\s*(\S+)\s*\n\s+key:\s*(\S+)\s*\n\s+element:\s*(\S+)\s*\n\s+open:\s*(\S+)""")
@@ -267,16 +256,14 @@ private fun parseBindingsFromSection(specText: String, role: String): List<Conte
         )
     }.toList()
 }
-
-private fun parseSupervisorIds(specText: String): List<String> =
+fun parseSupervisorIds(specText: String): List<String> =
     Regex("""(?ms)operationId:\s*(\S+).*?x-trikeshed-supervisor:\s*true""")
         .findAll(specText)
         .map { it.groupValues[1] }
         .toList()
 
 // ── request body resolver ───────────────────────────────────────────────────
-
-private fun OpenApiRawDocument.resolveRequestBody(node: Any?): ResolvedRequestBody? {
+fun OpenApiRawDocument.resolveRequestBody(node: Any?): ResolvedRequestBody? {
     val map = node.asMap() ?: return null
     val content = map["content"].asMap() ?: return null
     val contentTypes = resolveContent(content)
@@ -288,8 +275,7 @@ private fun OpenApiRawDocument.resolveRequestBody(node: Any?): ResolvedRequestBo
 }
 
 // ── operation resolver ────────────────────────────────────────────────────────
-
-private fun OpenApiRawDocument.resolveOperation(rawOp: OpenApiRawOperation): ResolvedOperation? {
+fun OpenApiRawDocument.resolveOperation(rawOp: OpenApiRawOperation): ResolvedOperation? {
     val opMap = rawOp.operation
     if (opMap == null || opMap.isEmpty()) return null
 

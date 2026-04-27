@@ -32,9 +32,9 @@ class ViewRowVec(
     val id: String,
     val key: Any?,
     val value: Any?,
-    private val docLoader: (() -> MiniRowVec)? = null,
+   val docLoader: (() -> MiniRowVec)? = null,
 ) : MiniRowVec() {
-    private var loadedChild: Series<MiniRowVec>? = null
+   var loadedChild: Series<MiniRowVec>? = null
 
     // scalar surface: [id, key, value]
     override val size: Int get() = 3
@@ -65,7 +65,7 @@ class ViewRowVec(
 class BlobRowVec(
     val bytes: ByteArray,
     val mimeType: String? = null,
-    private val childFactory: ((ByteArray) -> Series<MiniRowVec>)? = null,
+   val childFactory: ((ByteArray) -> Series<MiniRowVec>)? = null,
 ) : MiniRowVec() {
     override val size: Int get() = 0
     override fun get(index: Int): Any? = throw IndexOutOfBoundsException("BlobRowVec is a shell")
@@ -85,7 +85,7 @@ class BlobRowVec(
 class JsonRowVec(
     val nodeType: String,   // "object", "array", "string", "number", "boolean", "null"
     val rawValue: String,
-    private val childFactory: (() -> Series<MiniRowVec>)? = null,
+   val childFactory: (() -> Series<MiniRowVec>)? = null,
 ) : MiniRowVec() {
     override val size: Int get() = 2
     override fun get(index: Int): Any? = when (index) {
@@ -105,7 +105,7 @@ class JsonRowVec(
 class YamlRowVec(
     val nodeKind: String,    // "mapping", "sequence", "scalar"
     val scalarValue: String? = null,
-    private val childFactory: (() -> Series<MiniRowVec>)? = null,
+   val childFactory: (() -> Series<MiniRowVec>)? = null,
 ) : MiniRowVec() {
     override val size: Int get() = 2
     override fun get(index: Int): Any? = when (index) {
@@ -128,7 +128,7 @@ class YamlRowVec(
 class CsvRowVec(
     val nodeKind: String,    // "header", "row", "cell"
     val rawValue: String,
-    private val childFactory: (() -> Series<MiniRowVec>)? = null,
+   val childFactory: (() -> Series<MiniRowVec>)? = null,
 ) : MiniRowVec() {
     override val size: Int get() = 2
     override fun get(index: Int): Any? = when (index) {

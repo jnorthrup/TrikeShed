@@ -64,7 +64,7 @@ class WrappedRowVec(val inner: RowVec, override val child: Series<MiniRowVec>? =
  *
  * Seven RowVec families share the same lazy-loading pattern for `child`:
  *   DocRowVec   — constructor param, no caching (children come from parent)
- *   ViewRowVec  — double-checked loading + caching via private var
+ *   ViewRowVec  — double-checked loading + caching viavar
  *   BlobRowVec  — factory function called on every child access (no caching)
  *   JsonRowVec  — same: factory called every access (no caching)
  *   YamlRowVec  — same: factory called every access (no caching)
@@ -73,7 +73,7 @@ class WrappedRowVec(val inner: RowVec, override val child: Series<MiniRowVec>? =
  *
  * `loadChild` unifies the caching variant (ViewRowVec).
  * Subclasses that want caching implement:
- *   private var cached: Series<MiniRowVec>? = null
+ *  var cached: Series<MiniRowVec>? = null
  *   override val child: Series<MiniRowVec>? get() = loadChild(cached) { factory()?.also { cached = it } }
  *
  * `LazyChildRowVec` is the abstract base for subclasses that carry a deferred
@@ -88,7 +88,7 @@ class WrappedRowVec(val inner: RowVec, override val child: Series<MiniRowVec>? =
  * in their `child` getter:
  *
  * ```
- * private var cached: Series<MiniRowVec>? = null
+ *var cached: Series<MiniRowVec>? = null
  * override val child: Series<MiniRowVec>? get() = loadChild(cached) { factory() }
  * ```
  */

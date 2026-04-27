@@ -145,7 +145,7 @@ class RegimeDetectorTest {
     }
 
     // Helper function to generate price series with desired properties
-    private fun generatePriceSeries(
+   fun generatePriceSeries(
         start: Double,
         roi: Double,
         volatility: Double,

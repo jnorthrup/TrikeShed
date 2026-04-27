@@ -19,11 +19,11 @@ class PackedIntBuf(
 ) {
     init { require(bitsPerValue in 1..32) { "bitsPerValue must be 1..32" } }
 
-    private var words: LongArray
+   var words: LongArray
     var size: Int = 0
-        private set
+       set
 
-    private val mask: Long = if (bitsPerValue == 32) -1L else (1L shl bitsPerValue) - 1
+   val mask: Long = if (bitsPerValue == 32) -1L else (1L shl bitsPerValue) - 1
 
     init {
         val wordCapacity = ((capacity.toLong() * bitsPerValue + 63) / 64).toInt().coerceAtLeast(1)
@@ -45,7 +45,7 @@ class PackedIntBuf(
         size++
     }
 
-    private fun grow() {
+   fun grow() {
         val n = LongArray((words.size * 2).coerceAtLeast(1))
         var i = 0; while (i < words.size) { n[i] = words[i]; i++ }
         words = n
@@ -84,15 +84,15 @@ class PackedIntBuf(
 // ============================================================================
 
 class PackedIntSeries(
-    private val words: LongArray,
+   val words: LongArray,
     override val a: Int,
-    private val bitsPerValue: Int
+   val bitsPerValue: Int
 ) : Series<Int> {
     override val b: (Int) -> Int get() = { i -> getImpl(i) }
 
-    private val mask: Long = if (bitsPerValue == 32) -1L else (1L shl bitsPerValue) - 1
+   val mask: Long = if (bitsPerValue == 32) -1L else (1L shl bitsPerValue) - 1
 
-    private fun getImpl(i: Int): Int {
+   fun getImpl(i: Int): Int {
         val bitPos = i.toLong() * bitsPerValue
         val wordIdx = (bitPos shr 6).toInt()
         val shift = (bitPos and 63).toInt()
@@ -114,8 +114,8 @@ class PackedIntSeries(
 // ============================================================================
 
 class DeltaPositionSeries(
-    private val base: Int,
-    private val packed: PackedIntBuf
+   val base: Int,
+   val packed: PackedIntBuf
 ) : Series<Int> {
     override val a: Int get() = packed.size + 1
 

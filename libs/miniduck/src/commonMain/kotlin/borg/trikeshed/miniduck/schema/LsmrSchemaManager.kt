@@ -7,7 +7,7 @@ import borg.trikeshed.userspace.database.LsmrDatabase
  */
 class LsmrSchemaManager(private val db: LsmrDatabase) : SchemaManager {
 
-    private fun keyForTable(name: String) = "miniduck:schema:$name"
+   fun keyForTable(name: String) = "miniduck:schema:$name"
 
     override suspend fun getTableSuspend(name: String): TableSchema? {
         val raw = db.get(keyForTable(name)) ?: return null

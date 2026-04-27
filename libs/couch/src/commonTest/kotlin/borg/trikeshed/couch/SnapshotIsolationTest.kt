@@ -16,7 +16,7 @@ import kotlin.test.*
  */
 class SnapshotIsolationTest {
 
-    private fun doc(vararg pairs: Pair<String, Any?>) =
+   fun doc(vararg pairs: Pair<String, Any?>) =
         borg.trikeshed.miniduck.DocRowVec(
             pairs.map { it.first },
             pairs.map { it.second },

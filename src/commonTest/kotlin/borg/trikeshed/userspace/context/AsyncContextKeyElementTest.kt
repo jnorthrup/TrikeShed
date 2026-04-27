@@ -86,7 +86,7 @@ class AsyncContextKeyElementTest {
 
     // --- Concrete anonymous element tests ---
 
-    private fun makeNioElement(state: ElementLifecycleState = ElementLifecycleState.CREATED) =
+   fun makeNioElement(state: ElementLifecycleState = ElementLifecycleState.CREATED) =
         object : NioUserspaceElement() {
             override val lifecycleState = state
             override val fanoutSubscribers = emptyList<AsyncContextElement>()
@@ -95,7 +95,7 @@ class AsyncContextKeyElementTest {
             override suspend fun close() {}
         }
 
-    private fun makeLiburingElement() =
+   fun makeLiburingElement() =
         object : LiburingElement() {
             override val lifecycleState = ElementLifecycleState.CREATED
             override val fanoutSubscribers = emptyList<AsyncContextElement>()
@@ -104,7 +104,7 @@ class AsyncContextKeyElementTest {
             override suspend fun close() {}
         }
 
-    private fun makeFanoutElement() =
+   fun makeFanoutElement() =
         object : FanoutDispatcherElement() {
             override val lifecycleState = ElementLifecycleState.CREATED
             override val fanoutSubscribers = emptyList<AsyncContextElement>()

@@ -17,13 +17,13 @@ import kotlin.test.assertEquals
 
 class RouteTableTest {
 
-    private val nuid: borg.trikeshed.dht.id.WorkerNUID = borg.trikeshed.dht.id.WorkerNUID(0)
-    private val nuid1: borg.trikeshed.dht.id.WorkerNUID =
+   val nuid: borg.trikeshed.dht.id.WorkerNUID = borg.trikeshed.dht.id.WorkerNUID(0)
+   val nuid1: borg.trikeshed.dht.id.WorkerNUID =
         borg.trikeshed.dht.id.WorkerNUID(with(nuid) { ops.xor(nuid.capacity, id!!) })
-    private val d_ones: ByteArray = ByteArray(nuid.netmask.bits) { with(nuid.ops) { shl(one, it) } }
-    private val upper: List<Byte> = d_ones.drop(1)
-    private val d_twos: ByteArray = ByteArray(upper.size) { x -> with(nuid.ops) { xor(one, upper[x]) } }
-    private val d_twos_point_one: ByteArray = ByteArray(upper.size) { x -> with(nuid.ops) { xor(shl(one, x), upper[x]) } }
+   val d_ones: ByteArray = ByteArray(nuid.netmask.bits) { with(nuid.ops) { shl(one, it) } }
+   val upper: List<Byte> = d_ones.drop(1)
+   val d_twos: ByteArray = ByteArray(upper.size) { x -> with(nuid.ops) { xor(one, upper[x]) } }
+   val d_twos_point_one: ByteArray = ByteArray(upper.size) { x -> with(nuid.ops) { xor(shl(one, x), upper[x]) } }
 
     @Test
     fun testRouteAdd() {

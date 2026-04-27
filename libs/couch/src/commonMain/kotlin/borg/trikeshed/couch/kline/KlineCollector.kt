@@ -18,7 +18,7 @@ import borg.trikeshed.userspace.concurrency.Channel
  * ```
  */
 class KlineCollector(
-    private val blockCapacity: Int = 100,
+   val blockCapacity: Int = 100,
 ) {
     /**
      * Drain [channel] into sealed blocks, invoking [onBlock] for each sealed block.

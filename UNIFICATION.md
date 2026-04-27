@@ -29,7 +29,7 @@ class AlibabaRowVec(...) : ObjectStoreRowVec(...) {
 `provider`. Replace the 3 classes with a single factory:
 
 ```kotlin
-class ObjectStoreRowVec private constructor(
+class ObjectStoreRowVecconstructor(
     override val provider: ObjectStoreProvider,
     override val bucket: String,
     override val key: String,
@@ -91,8 +91,7 @@ protected fun <T : MiniRowVec> loadChild(
 
 ViewRowVec's double-checked pattern becomes:
 
-```kotlin
-private var loadedChild: Series<MiniRowVec>? = null
+```kotlinvar loadedChild: Series<MiniRowVec>? = null
 override val child: Series<MiniRowVec>? get() = loadChild(loadedChild) { docLoader?.invoke() }
 ```
 
@@ -361,7 +360,7 @@ THE INTERFACE CONTRACT (structurally pure, semantically deferred)
         
         ViewRowVec — RowVecFamilies.kt:31-57
 
-     private var loadedChild: Series<MiniRowVec>? = null   ← MUTABLE CACHE                                                                                                                                                              
+    var loadedChild: Series<MiniRowVec>? = null   ← MUTABLE CACHE                                                                                                                                                              
      docLoader: (() -> MiniRowVec)?                       ← EFFECT (I/O function)                                                                                                                                                       
                                                                                                                                                                                                                                         
      - First access to child calls docLoader() — effectful I/O                                                                                                                                                                          
@@ -392,8 +391,8 @@ THE INTERFACE CONTRACT (structurally pure, semantically deferred)
                                                                                                                                                                                                                                         
      IntHeap — Series.kt:269-323                                                                                                                                                                                                        
                                                                                                                                                                                                                                         
-     private var heap: IntArray = IntArray(series.size)   ← MUTABLE                                                                                                                                                                     
-     private var size: Int                               ← MUTABLE COUNTER                                                                                                                                                              
+    var heap: IntArray = IntArray(series.size)   ← MUTABLE                                                                                                                                                                     
+    var size: Int                               ← MUTABLE COUNTER                                                                                                                                                              
      add() / remove()                                     ← MUTATES internal state                                                                                                                                                      
                                                                                                                                                                                                                                         
      - NOT referentially transparent                                                                                                                                                                                                    

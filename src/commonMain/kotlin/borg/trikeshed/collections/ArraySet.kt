@@ -1,8 +1,8 @@
 package borg.trikeshed.collections
 
 class ArraySet<T> : Set<T> {
-    private var elements: Array<Any?> = arrayOfNulls(10)
-    private var currentSize = 0
+   var elements: Array<Any?> = arrayOfNulls(10)
+   var currentSize = 0
 
     override val size: Int
         get() = currentSize
@@ -17,7 +17,7 @@ class ArraySet<T> : Set<T> {
 
     override fun iterator(): Iterator<T> {
         return object : Iterator<T> {
-            private var index = 0
+           var index = 0
             override fun hasNext(): Boolean = index < currentSize
             override fun next(): T {
                 if (!hasNext()) throw NoSuchElementException()
@@ -47,7 +47,7 @@ class ArraySet<T> : Set<T> {
     }
 
     // Ensures there is enough space in the array
-    private fun ensureCapacity() {
+   fun ensureCapacity() {
         if (currentSize >= elements.size) {
             val newCapacity = elements.size * 2
             val newElements = arrayOfNulls<Any?>(newCapacity)

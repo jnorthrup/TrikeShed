@@ -75,8 +75,7 @@ object JsonParser {
  *   if it's an (Int)→Join<A,B>  → Series2 (map)
  *   if it's an (Int)→A          → Series  (list)
  */
-@Suppress("UNCHECKED_CAST")
-private fun materialize(node: Any?): Any? {
+@Suppress("UNCHECKED_CAST")fun materialize(node: Any?): Any? {
     if (node == null) return null
 
     // node = Join<Int, F> where F is either (Int)->Join<A,B> (map) or (Int)->A (list)

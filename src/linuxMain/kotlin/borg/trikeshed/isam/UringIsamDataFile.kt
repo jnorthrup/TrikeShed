@@ -41,10 +41,10 @@
     41|//    } // unfortunately due to separation of ctor and open, this is not immutable
     42|//
     43|//    val constraints: Series<RecordMeta> by lazy { metafile.constraints }
-    44|//    private lateinit var data: COpaquePointer
+    44|//   lateinit var data: COpaquePointer
     45|//    var fileSize: Long = -1
     46|//
-    47|//    private var first = true
+    47|//   var first = true
     48|//    override fun open() {
     49|//        if (!first) return
     50|//        memScoped {

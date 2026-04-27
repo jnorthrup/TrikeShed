@@ -5,15 +5,15 @@ import kotlin.test.*
 
 class IndicatorTest {
     // Synthetic sine wave for testing — predictable, continuous
-    private fun sineWave(n: Int, period: Int = 20, amplitude: Double = 100.0, phase: Double = 0.0): Series<Double> =
+   fun sineWave(n: Int, period: Int = 20, amplitude: Double = 100.0, phase: Double = 0.0): Series<Double> =
         n j { i: Int -> amplitude * kotlin.math.sin(2.0 * kotlin.math.PI * i / period + phase) + amplitude }
 
     // Simple uptrend for testing trend-following indicators
-    private fun uptrend(n: Int, start: Double = 100.0, slope: Double = 0.5): Series<Double> =
+   fun uptrend(n: Int, start: Double = 100.0, slope: Double = 0.5): Series<Double> =
         n j { i: Int -> start + slope * i }
 
     // Volatile series for testing
-    private fun volatile(n: Int, seed: Double = 100.0): Series<Double> =
+   fun volatile(n: Int, seed: Double = 100.0): Series<Double> =
         n j { i: Int ->
             val v = kotlin.math.sin(i * 0.7) * 20 + kotlin.math.cos(i * 1.3) * 15
             seed + v + (i % 5) * 2.0

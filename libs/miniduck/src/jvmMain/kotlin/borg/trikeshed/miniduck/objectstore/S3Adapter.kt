@@ -14,7 +14,7 @@ import borg.trikeshed.lib.j
 class S3Adapter(
     val region: String,
     val bucket: String,
-    private val s3Client: S3Client,
+   val s3Client: S3Client,
 ) : ObjectStoreAdapter {
 
     constructor(config: Config) : this(config.region, config.bucket, config.s3Client)

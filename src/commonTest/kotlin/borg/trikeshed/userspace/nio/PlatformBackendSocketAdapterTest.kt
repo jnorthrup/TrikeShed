@@ -38,7 +38,7 @@ interface ListeningSocket {
 // SPEC: suspend socket I/O — real read/write through NIO or io_uring
 // ================================================================================
 
-class PlatformBackendSocketAdapterRedTest {
+class PlatformBackendSocketAdapterTest {
 
     /** ConnectedSocket via NIO adapter should read bytes from OS fd. */
     @Test fun connectedSocket_read_notImplemented() {

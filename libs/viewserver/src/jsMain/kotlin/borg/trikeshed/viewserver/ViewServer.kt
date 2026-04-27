@@ -11,8 +11,7 @@ fun interface KotlinMapFunction {
     fun map(ctx: JsContext, emit: (Any?, Any?) -> Unit)
 }
 
-// Registry of named Kotlin map functions (register compiled views here before starting)
-private val functionRegistry: MutableMap<String, KotlinMapFunction> = mutableMapOf()
+// Registry of named Kotlin map functions (register compiled views here before starting)val functionRegistry: MutableMap<String, KotlinMapFunction> = mutableMapOf()
 
 fun registerViewFunction(name: String, fn: KotlinMapFunction) {
     functionRegistry[name] = fn

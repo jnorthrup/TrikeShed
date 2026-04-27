@@ -7,7 +7,7 @@ import kotlin.test.assertTrue
 
 class MiniDuckBlockCodecJvmTest {
 
-    private fun <T> at(series: borg.trikeshed.lib.Series<T>, idx: Int): T {
+   fun <T> at(series: borg.trikeshed.lib.Series<T>, idx: Int): T {
         val it = series.iterator()
         var i = 0
         while (i < idx) { it.next(); i++ }

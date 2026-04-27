@@ -11,7 +11,7 @@ tags:
 - name: Market Data
   description: Public market data endpoints.
 - name: Account Data
-  description: Private account, balance, history, and reporting endpoints.
+  description:account, balance, history, and reporting endpoints.
 - name: Trading
   description: Order lifecycle and trading endpoints.
 - name: Funding
@@ -1241,7 +1241,7 @@ paths:
       summary: Get Websockets Token
       description: 'An authentication token must be requested via this REST API endpoint in order to connect to and authenticate
         with our Websockets API . The token should be used within 15 minutes of creation, but it does not expire once a successful
-        Websockets connection and private subscription has been made and is maintained. API Key Permissions Required: WebSocket
+        Websockets connection andsubscription has been made and is maintained. API Key Permissions Required: WebSocket
         interface - On'
       responses:
         '200':

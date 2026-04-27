@@ -22,7 +22,7 @@ interface PlatformCodec {
 
     companion object {
         // Use Long constant - works on both JVM and Native
-        private const val TEST_INT = 0x01020304
+       const val TEST_INT = 0x01020304
         val isLittleEndian: Boolean = (TEST_INT.toByte().toInt() and 0xFF) == 0x04
         val isNetworkEndian: Boolean = !isLittleEndian
 

@@ -49,7 +49,7 @@ class GzBlockIndex : BlockIndex {
 
     /** Line table: parallel list of decompressed offsets, one per point.
      *  This is populated lazily after build() is called. */
-    private var _lineTable: List<Long> = emptyList()
+   var _lineTable: List<Long> = emptyList()
 
     override val lineTable: Series<Long>
         get() = _lineTable.size j { i: Int -> _lineTable[i] }

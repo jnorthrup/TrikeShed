@@ -18,7 +18,7 @@ class SplitPane(screen: Screen) {
         screen.append(right)
     }
 
-    private fun makeBoxOpts(top: Int, _left: Int, width: Int, label: String, borderColor: String): dynamic {
+   fun makeBoxOpts(top: Int, _left: Int, width: Int, label: String, borderColor: String): dynamic {
         val opts = js("({})")
         opts.top = top
         opts.left = _left
@@ -39,8 +39,8 @@ class SplitPane(screen: Screen) {
  * Left pane — Robinhood live trading status.
  */
 class TradingPane(private val box: Box) {
-    private val log: BlessedList
-    private val glyphs = arrayOf(
+   val log: BlessedList
+   val glyphs = arrayOf(
         "{yellow-fg}◌ CREATED{/yellow-fg}",
         "{white-fg}○ OPEN{/white-fg}",
         "{green-fg}◉ ACTIVE{/green-fg}",
@@ -89,8 +89,8 @@ $htable
  * Right pane — Binance training + genome optimization status.
  */
 class TrainingPane(private val box: Box) {
-    private val log: BlessedList
-    private val glyphs = arrayOf(
+   val log: BlessedList
+   val glyphs = arrayOf(
         "{yellow-fg}◌ CREATED{/yellow-fg}",
         "{white-fg}○ OPEN{/white-fg}",
         "{cyan-fg}◉ ACTIVE{/cyan-fg}",
@@ -126,8 +126,7 @@ class TrainingPane(private val box: Box) {
     }
 }
 
-// Shared factory for list options
-private fun makeListOpts(top: Int, height: String): dynamic {
+// Shared factory for list optionsfun makeListOpts(top: Int, height: String): dynamic {
     val opts = js("({})")
     opts.top = top
     opts.left = 1

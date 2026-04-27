@@ -41,7 +41,7 @@ class BlockBinaryAvailabilityTest {
     // ========================================================================
 
     /** Run a command and return its stdout, or null if the command fails. */
-    private fun runCmd(vararg args: String): String? {
+   fun runCmd(vararg args: String): String? {
         return try {
             val pb = java.lang.ProcessBuilder(args.toList())
             pb.redirectErrorStream(true)

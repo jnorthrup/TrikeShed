@@ -301,10 +301,10 @@ fun provenance(
  * Builder for provenance records.
  */
 class ProvenanceBuilder(
-    private var source: String,
-    private var timestamp: Long,
-    private var transformations: MutableList<String>,
-    private var creator: String?
+   var source: String,
+   var timestamp: Long,
+   var transformations: MutableList<String>,
+   var creator: String?
 ) {
     fun source(source: String) { this.source = source }
     fun timestamp(timestamp: Long) { this.timestamp = timestamp }

@@ -10,8 +10,8 @@ import java.nio.ByteBuffer
  * For high-performance batching, use IoUringSeekHandle on Linux via JNI/JEP 436.
  */
 class FileChannelSeekHandle : SeekHandle {
-    private val channels = mutableMapOf<Long, RandomAccessFile>()
-    private var nextId: Long = 1
+   val channels = mutableMapOf<Long, RandomAccessFile>()
+   var nextId: Long = 1
 
     override fun open(filename: String, readOnly: Boolean): Long {
         val mode = if (readOnly) "r" else "rw"
@@ -60,8 +60,8 @@ class FileChannelSeekHandle : SeekHandle {
  * Avoids RandomAccessFile overhead for bulk operations.
  */
 class NioSeekHandle : SeekHandle {
-    private val channels = mutableMapOf<Long, java.nio.channels.FileChannel>()
-    private var nextId: Long = 1
+   val channels = mutableMapOf<Long, java.nio.channels.FileChannel>()
+   var nextId: Long = 1
 
     override fun open(filename: String, readOnly: Boolean): Long {
         val path = java.nio.file.Paths.get(filename)

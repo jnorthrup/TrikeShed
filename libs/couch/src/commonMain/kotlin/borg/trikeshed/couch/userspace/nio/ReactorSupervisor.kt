@@ -33,17 +33,17 @@ class ReactorSupervisor(
     val supervisor: CompletableJob = SupervisorJob()
 
     // State transitions are driven from the reactor thread only (single-threaded access).
-    private var _state: ReactorState = ReactorState.CREATED
+   var _state: ReactorState = ReactorState.CREATED
     val state: ReactorState get() = _state
 
     // Each registered protocol recognizer or branch lives here
-    private val _branches = mutableMapOf<String, BranchScope>()
+   val _branches = mutableMapOf<String, BranchScope>()
 
     // Fanout: keyed by session id → SessionContext (IS a CoroutineContext.Element)
-    private val _sessions = mutableMapOf<String, SessionContext>()
+   val _sessions = mutableMapOf<String, SessionContext>()
 
     // Context keys injected into all branch coroutines
-    private val _contextPalette = mutableMapOf<CoroutineContext.Key<*>, Any?>()
+   val _contextPalette = mutableMapOf<CoroutineContext.Key<*>, Any?>()
 
     enum class ReactorState {
         CREATED,
@@ -139,10 +139,9 @@ class ReactorSupervisor(
 
 /**
  * A wrapper that holds a key/value pair as a CoroutineContext.Element.
- */
-private data class ContextElementImpl(
+ */data class ContextElementImpl(
     override val key: CoroutineContext.Key<*>,
-    private val value: Any?,
+   val value: Any?,
 ) : AbstractCoroutineContextElement(key) {
     @Suppress("UNCHECKED_CAST")
     fun <T> get(): T? = value as T?

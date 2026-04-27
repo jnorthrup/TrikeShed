@@ -188,7 +188,7 @@ class MvccSnapshotTest {
 
     // ── Helpers ──────────────────────────────────────────────────────────
 
-    private fun sealedBlock(name: String): BlockRowVec {
+   fun sealedBlock(name: String): BlockRowVec {
         val block = BlockRowVec.mutable()
         block.append(DocRowVec(listOf("name"), listOf(name)))
         return block.seal()

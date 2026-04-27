@@ -1,10 +1,10 @@
 package borg.trikeshed.lib
 
 class HashTable<K, V>(private val capacity: Int = 16) {
-    private class Entry<K, V>(val key: K, var value: V, var next: Entry<K, V>?)
+   class Entry<K, V>(val key: K, var value: V, var next: Entry<K, V>?)
 
-    private val buckets: Array<Entry<K, V>?> = arrayOfNulls(capacity)
-    private var size = 0
+   val buckets: Array<Entry<K, V>?> = arrayOfNulls(capacity)
+   var size = 0
 
     fun put(key: K, value: V) {
         val index = indexFor(hash(key))
@@ -70,11 +70,11 @@ class HashTable<K, V>(private val capacity: Int = 16) {
         return size
     }
 
-    private fun hash(key: K): Int {
+   fun hash(key: K): Int {
         return key?.hashCode() ?: 0
     }
 
-    private fun indexFor(hash: Int): Int {
+   fun indexFor(hash: Int): Int {
         return (hash and 0x7FFFFFFF) % capacity
     }
 }

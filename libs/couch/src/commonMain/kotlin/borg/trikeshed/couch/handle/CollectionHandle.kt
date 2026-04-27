@@ -8,9 +8,9 @@ import borg.trikeshed.lib.j
  * In-memory collection handle for appending rows and producing immutable snapshots.
  * Thread-unsafe — use synchronization at the call site when needed.
  */
-class CollectionHandle private constructor() {
-    private var _state: HandleState = HandleState.OPEN
-    private val rows: MutableList<MiniRowVec> = mutableListOf()
+class CollectionHandle constructor() {
+    var _state: HandleState = HandleState.OPEN
+    val rows: MutableList<MiniRowVec> = mutableListOf()
 
     val state: HandleState get() = _state
     val rowCount: Int get() = rows.size

@@ -18,7 +18,7 @@ class SessionContext(
     override val key: CoroutineContext.Key<SessionContext> = SessionContextKey,
 ) : AbstractCoroutineContextElement(key) {
 
-    private val _handlers = mutableMapOf<String, MessageHandler>()
+   val _handlers = mutableMapOf<String, MessageHandler>()
 
     /**
      * Register a handler for a given tag (HtxBlockType.name).

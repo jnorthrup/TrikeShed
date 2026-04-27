@@ -26,8 +26,8 @@ data class BackendCompletion(
 /** Ring storage — the common abstraction both backends push/pop. */
 class RingBuf<T>(val capacity: Int) {
     @Suppress("UNCHECKED_CAST")
-    private val buf = arrayOfNulls<Any?>(capacity)
-    private var h = 0; private var t = 0; private val mask = capacity - 1
+   val buf = arrayOfNulls<Any?>(capacity)
+   var h = 0;var t = 0;val mask = capacity - 1
     val size: Int get() = (t - h) and mask
     val isEmpty: Boolean get() = h == t
     val isFull: Boolean get() = ((t + 1) and mask) == h
@@ -69,7 +69,7 @@ class IoFacade(
 // SPEC: IoFacade mediates RingChannel ↔ backend, platform dispatch is deterministic
 // ================================================================================
 
-class IoFacadeMediatorRedTest {
+class IoFacadeMediatorTest {
 
     /** IoFacade holds a readRing and writeRing — the common abstraction. */
     @Test fun ioFacade_holdsReadWriteRings() {

@@ -13,10 +13,8 @@ external class JsFloat64Array(length: Int) {
     operator fun get(index: Int): Double
     operator fun set(index: Int, value: Double)
 }
-
-private fun JsFloat64Array.toDoubleArray(): DoubleArray = DoubleArray(length) { index -> this[index] }
-
-private fun DoubleArray.toFloat64Array(): JsFloat64Array = JsFloat64Array(size).also { typed ->
+fun JsFloat64Array.toDoubleArray(): DoubleArray = DoubleArray(length) { index -> this[index] }
+fun DoubleArray.toFloat64Array(): JsFloat64Array = JsFloat64Array(size).also { typed ->
     for (index in indices) {
         typed[index] = this[index]
     }

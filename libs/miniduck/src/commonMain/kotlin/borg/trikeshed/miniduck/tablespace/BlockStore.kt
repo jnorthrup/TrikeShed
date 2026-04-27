@@ -35,8 +35,8 @@ interface BlockStore {
  */
 class InMemoryBlockStore : BlockStore {
 
-    private val collections = mutableMapOf<String, MutableMap<String, BlockRowVec>>()
-    private var counter = 0L
+   val collections = mutableMapOf<String, MutableMap<String, BlockRowVec>>()
+   var counter = 0L
 
     override fun put(collection: String, block: BlockRowVec): String {
         val id = "blk-${counter++}"

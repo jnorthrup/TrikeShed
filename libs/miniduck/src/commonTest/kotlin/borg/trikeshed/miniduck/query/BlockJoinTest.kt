@@ -20,7 +20,7 @@ import kotlin.test.*
  */
 class BlockJoinTest {
 
-    private fun usersCursor(): MiniCursor {
+   fun usersCursor(): MiniCursor {
         val rows = listOf(
             DocRowVec(listOf("id", "name"), listOf(1, "alice")),
             DocRowVec(listOf("id", "name"), listOf(2, "bob")),
@@ -29,7 +29,7 @@ class BlockJoinTest {
         return rows.size j { rows[it] }
     }
 
-    private fun ordersCursor(): MiniCursor {
+   fun ordersCursor(): MiniCursor {
         val rows = listOf(
             DocRowVec(listOf("orderId", "userId", "amount"), listOf(101, 1, 50.0)),
             DocRowVec(listOf("orderId", "userId", "amount"), listOf(102, 2, 75.0)),

@@ -33,7 +33,7 @@ data class CouchDb11DesignDocument(
         return sb.toString()
     }
 
-    private fun escape(s: String): String = s
+   fun escape(s: String): String = s
         .replace("\\", "\\\\")
         .replace("\"", "\\\"")
         .replace("\n", "\\n")

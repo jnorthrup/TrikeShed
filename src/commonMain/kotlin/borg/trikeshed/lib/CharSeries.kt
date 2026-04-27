@@ -21,12 +21,12 @@ class CharSeries(
 ) : Series<Char> by buf { //delegate to the underlying series
 
     // Small char-window cache to improve locality. Uses buf.b(index) fallback when cache miss.
-    private var _charCache: CharArray? = null
-    private var _cacheBase: Int = 0
-    private var _cacheLen: Int = 0
-    private val CHAR_CACHE_WINDOW: Int = 4096
+   var _charCache: CharArray? = null
+   var _cacheBase: Int = 0
+   var _cacheLen: Int = 0
+   val CHAR_CACHE_WINDOW: Int = 4096
 
-    private fun raw(i: Int): Char {
+   fun raw(i: Int): Char {
         val c = _charCache
         if (c != null) {
             val b = _cacheBase
@@ -281,7 +281,7 @@ class CharSeries(
 
         }
 
-        private fun confixFeature(client: CharSeries, chlit: String): Boolean {
+       fun confixFeature(client: CharSeries, chlit: String): Boolean {
             logNone { "confix $chlit before: ${client.asString()}" }
             var x = 0
             client.confixScope { test: Char ->

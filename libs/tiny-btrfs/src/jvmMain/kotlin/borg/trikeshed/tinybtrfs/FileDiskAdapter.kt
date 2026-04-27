@@ -12,7 +12,7 @@ import java.util.UUID
 class FileDiskAdapter(private val dir: File) : DiskAdapter {
     init { if (!dir.exists()) dir.mkdirs() }
 
-    private fun fileFor(nodeId: String) = File(dir, nodeId)
+   fun fileFor(nodeId: String) = File(dir, nodeId)
 
     override fun readNode(nodeId: String): ByteArray? {
         val f = fileFor(nodeId)

@@ -193,7 +193,7 @@ class PosixFile(
         be able to use some mapping flags (e.g., MAP_SYNC).
 
         MAP_PRIVATE
-        Create a private copy-on-write mapping.  Updates to the
+        Create acopy-on-write mapping.  Updates to the
         mapping are not visible to other processes mapping the
         same file, and are not carried through to the underlying
         file.  It is unspecified whether changes made to the file
@@ -343,7 +343,7 @@ class PosixFile(
         reserved one might get SIGSEGV upon a write if no physical
         memory is available.  See also the discussion of the file
         /proc/sys/vm/overcommit_memory in proc(5).  In kernels
-        before 2.6, this flag had effect only for private writable
+        before 2.6, this flag had effect only forwritable
         mappings.
 
         MAP_POPULATE (since Linux 2.5.46)
@@ -353,7 +353,7 @@ class PosixFile(
         call doesn't fail if the mapping cannot be populated (for
         example, due to limitations on the number of mapped huge
         pages when using MAP_HUGETLB).  MAP_POPULATE is supported
-        for private mappings only since Linux 2.6.23.
+        formappings only since Linux 2.6.23.
 
         MAP_STACK (since Linux 2.6.27)
         Allocate the mapping at an address suitable for a process

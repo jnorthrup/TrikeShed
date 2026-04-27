@@ -21,7 +21,7 @@ interface Reactor {
 }
 
 class SimpleReactor : Reactor {
-    private val channels = mutableListOf<NioChannel?>()
+   val channels = mutableListOf<NioChannel?>()
 
     override fun register(channel: NioChannel): Int {
         channels.add(channel)

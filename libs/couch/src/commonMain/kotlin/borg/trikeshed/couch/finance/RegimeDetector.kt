@@ -68,7 +68,7 @@ data class RegimeStats(
  * and applies the Dreamer threshold cascade.
  */
 class RegimeDetector(
-    private val thresholds: RegimeThresholds = RegimeThresholds(),
+   val thresholds: RegimeThresholds = RegimeThresholds(),
 ) {
     /**
      * Classify the market regime from a price [history].

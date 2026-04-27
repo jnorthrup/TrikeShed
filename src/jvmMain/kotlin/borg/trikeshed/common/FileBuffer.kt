@@ -23,9 +23,9 @@ actual class FileBuffer actual constructor(
     actual val closeChannelOnMap: Boolean
 ) : LongSeries<Byte> {
 
-    private var arena: Arena? = null
-    private var segment: MemorySegment? = null
-    private var fileSize: Long = 0
+   var arena: Arena? = null
+   var segment: MemorySegment? = null
+   var fileSize: Long = 0
 
     actual override val a: Long get() = if (blkSize == -1L) fileSize - initialOffset else blkSize
 

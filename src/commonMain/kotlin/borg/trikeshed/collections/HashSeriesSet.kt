@@ -15,9 +15,9 @@ typealias Bucket<T> = Series<T>
 
 open class HashSeriesSet<T : Any>  : SeriesSet<T> {
      open var buckets: Series<Bucket<T>> = createBuckets(16)
-    private var _size: Int = 0
+   var _size: Int = 0
 
-    private fun createBuckets(size: Int): Series<Series<T>> =
+   fun createBuckets(size: Int): Series<Series<T>> =
         size j { 0 j { throw IndexOutOfBoundsException() } }
 
     override val a: Int
@@ -51,8 +51,8 @@ open class HashSeriesSet<T : Any>  : SeriesSet<T> {
     }
 
     override fun iterator(): Iterator<T> = object : Iterator<T> {
-        private var bucketIndex = 0
-        private var elementIndex = 0
+       var bucketIndex = 0
+       var elementIndex = 0
 
         override fun hasNext(): Boolean {
             while (bucketIndex < buckets.size) {
@@ -71,13 +71,13 @@ open class HashSeriesSet<T : Any>  : SeriesSet<T> {
         }
     }
 
-    private fun getBucketIndex(element: T): Int =
+   fun getBucketIndex(element: T): Int =
         (element.hashCode() and 0x7FFFFFFF) % buckets.size
 
 
     companion object {
         class MutableHashSeriesSet<T : Any>(
-            private val theSet: HashSeriesSet<T> = HashSeriesSet<T>(),
+           val theSet: HashSeriesSet<T> = HashSeriesSet<T>(),
 
             ) : MutableSeriesSet<T>, SeriesSet<T> by theSet {
 
@@ -139,7 +139,7 @@ open class HashSeriesSet<T : Any>  : SeriesSet<T> {
                 theSet._size = 0
             }
 
-            private fun resize() {
+           fun resize() {
                 val oldSeries: Series<Series<T>> = buckets
                 buckets = theSet.createBuckets(buckets.size * 2)
                 theSet._size = 0

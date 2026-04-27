@@ -19,7 +19,7 @@ import kotlin.test.*
  */
 class ConcurrentWriteSealTest {
 
-    private fun doc(v: Int) = borg.trikeshed.miniduck.DocRowVec(
+   fun doc(v: Int) = borg.trikeshed.miniduck.DocRowVec(
         listOf("v"), listOf(v)
     )
 

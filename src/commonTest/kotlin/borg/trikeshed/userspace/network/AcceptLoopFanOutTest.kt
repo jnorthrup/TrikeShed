@@ -21,7 +21,7 @@ import kotlin.test.assertTrue
 data class ClientConnection(val id: Long, val address: String)
 
 class ServerChannelStub(private val maxClients: Int = 10) {
-    private var nextId = 0L
+   var nextId = 0L
     var isBound = false
     var isClosed = false
 
@@ -51,7 +51,7 @@ class ClientHandler {
 // SPEC: Structured concurrency fan-out — coroutineScope + Semaphore throttle
 // ================================================================================
 
-class AcceptLoopFanOutRedTest {
+class AcceptLoopFanOutTest {
 
     /** coroutineScope: all children complete before scope exits. */
     @Test

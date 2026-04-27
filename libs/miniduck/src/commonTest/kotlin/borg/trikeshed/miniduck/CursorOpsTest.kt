@@ -5,7 +5,7 @@ import kotlin.test.*
 
 class CursorOpsTest {
 
-    private fun cursor(vararg rows: Pair<String, Any?>): MiniCursor =
+   fun cursor(vararg rows: Pair<String, Any?>): MiniCursor =
         rows.size j { DocRowVec(listOf("key", "val"), listOf(rows[it].first, rows[it].second)) }
 
     // ── where ────────────────────────────────────────────────────────────────

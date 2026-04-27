@@ -12,7 +12,7 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class NarsiveParserTest {
-    private fun labels(trace: NarsiveTrace): List<String> = trace.toList().map { it.a.asString() }
+   fun labels(trace: NarsiveTrace): List<String> = trace.toList().map { it.a.asString() }
 
     @Test
     fun parsesTaskWithBudgetTruthAndRelationshipInSitu() {

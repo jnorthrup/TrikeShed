@@ -181,7 +181,7 @@ class BlockWalTest {
 
     // ── Helpers ──────────────────────────────────────────────────────────
 
-    private fun buildBlock(name: String): BlockRowVec {
+   fun buildBlock(name: String): BlockRowVec {
         val block = BlockRowVec.mutable()
         block.append(DocRowVec(listOf("name"), listOf(name)))
         return block.seal()

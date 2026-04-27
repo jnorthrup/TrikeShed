@@ -6,8 +6,7 @@ import kotlin.coroutines.CoroutineContext
 import kotlin.test.Test
 import kotlin.test.assertTrue
 import kotlin.test.assertFalse
-
-private object TestKey : CoroutineContext.Key<AsyncContextElement>
+object TestKey : CoroutineContext.Key<AsyncContextElement>
 
 class AsyncContextSupervisorTest {
     @Test

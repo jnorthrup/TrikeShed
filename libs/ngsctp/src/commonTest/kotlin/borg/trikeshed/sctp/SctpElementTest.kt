@@ -23,8 +23,7 @@ class SctpElementTest {
     }
 }
 
-/** Other element with distinct key for cross-check. */
-private class OtherSctpElement : AsyncContextElement() {
+/** Other element with distinct key for cross-check. */class OtherSctpElement : AsyncContextElement() {
     companion object Key : AsyncContextKey<OtherSctpElement>("OtherSctpKey", 1L shl 10)
 
     override val key: AsyncContextKey<OtherSctpElement>

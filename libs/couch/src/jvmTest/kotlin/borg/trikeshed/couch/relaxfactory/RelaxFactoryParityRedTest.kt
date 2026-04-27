@@ -67,7 +67,7 @@ class RelaxFactoryParityRedTest {
         assertEquals(CouchViewInvocation.ReturnShape.ScalarValue, manifest.views.getValue("countMatchingBrand").returnShape)
     }
 
-    private interface VehicleViewService : CouchService<VehicleDoc> {
+   interface VehicleViewService : CouchService<VehicleDoc> {
         @View(map = "function(doc){emit(doc.brand, doc);}")
         fun getItemsWithBrand(@Key brand: String): List<VehicleDoc>
 
@@ -104,7 +104,7 @@ class RelaxFactoryParityRedTest {
         fun anyMatching(@Keys vararg keys: String): List<VehicleDoc>
     }
 
-    private data class VehicleDoc(
+   data class VehicleDoc(
         val model: String,
         val brand: String,
     )

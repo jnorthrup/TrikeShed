@@ -16,9 +16,9 @@ import kotlin.test.assertTrue
 
 class Ring<T>(val capacity: Int) {
     @Suppress("UNCHECKED_CAST")
-    private val buf = arrayOfNulls<Any?>(capacity)
-    private var h = 0; private var t = 0
-    private val mask = capacity - 1
+   val buf = arrayOfNulls<Any?>(capacity)
+   var h = 0;var t = 0
+   val mask = capacity - 1
     val size: Int get() = (t - h) and mask
     val isEmpty: Boolean get() = h == t
     val isFull: Boolean get() = ((t + 1) and mask) == h
@@ -30,7 +30,7 @@ class Ring<T>(val capacity: Int) {
 /** Channel facade: Ring storage + platform backend (NIO or io_uring). */
 class RingChannel<T>(capacity: Int) {
     internal val ring = Ring<T>(capacity)
-    var isClosed = false; private set
+    var isClosed = false;set
 
     /** Push from backend (NIO read completion or io_uring CQE). */
     fun backendPush(value: T): Boolean = ring.push(value)
@@ -62,7 +62,7 @@ class RingChannel<T>(capacity: Int) {
 // SPEC: RingChannel — Ring<T> storage with backend push/pop, suspend recv/send
 // ================================================================================
 
-class ChannelBackedByRingRedTest {
+class ChannelBackedByRingTest {
 
     /** backendPush fills the ring; recv drains it. */
     @Test fun ringChannel_backendPush_thenRecv() = runBlocking {

@@ -16,7 +16,7 @@ interface CoinMarketCapAPIApi {
 
 /** Default implementation — caller provides the low-level call. */
 class DefaultCoinMarketCapAPIApi(
-    private val call: suspend (GeneratedRequest) -> String,
+   val call: suspend (GeneratedRequest) -> String,
 ) : CoinMarketCapAPIApi {
     override suspend fun cmcEndpointOverview(): String = call(CoinMarketCapAPIApiContract.CmcEndpointOverview.request)
 }
@@ -27,5 +27,5 @@ object CoinMarketCapAPIApiContract {
               const val operationId: String = "cmcEndpointOverview"
               val request: GeneratedRequest = GeneratedRequest(method = HttpMethod.GET, path = "/api/documentation/pro-api-reference/endpoint-overview")
           }
-  
+
 }

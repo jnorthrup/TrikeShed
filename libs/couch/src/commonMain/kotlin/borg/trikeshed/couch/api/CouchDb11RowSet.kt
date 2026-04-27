@@ -47,26 +47,26 @@ data class CouchDb11RowSet(
             )
         }
 
-        private fun parseDocRowVec(map: Map<String, Any?>): DocRowVec {
+       fun parseDocRowVec(map: Map<String, Any?>): DocRowVec {
             val keys = map.keys.toList()
             val cells = keys.map { key -> map[key] }
             return DocRowVec(keys = keys, cells = cells)
         }
 
-        private fun Map<String, Any?>.string(name: String): String =
+       fun Map<String, Any?>.string(name: String): String =
             this[name] as? String ?: error("Missing string field '$name'")
 
-        private fun Map<String, Any?>.int(name: String): Int = when (val value = this[name]) {
+       fun Map<String, Any?>.int(name: String): Int = when (val value = this[name]) {
             is Int -> value
             is Long -> value.toInt()
             is Double -> value.toInt()
             else -> error("Missing numeric field '$name'")
         }
 
-        private fun Map<String, Any?>.list(name: String): List<Any?> =
+       fun Map<String, Any?>.list(name: String): List<Any?> =
             this[name] as? List<Any?> ?: emptyList()
 
-        private fun Map<String, Any?>.mapValueOrNull(name: String): Map<String, Any?>? =
+       fun Map<String, Any?>.mapValueOrNull(name: String): Map<String, Any?>? =
             this[name] as? Map<String, Any?>
     }
 }

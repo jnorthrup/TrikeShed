@@ -49,7 +49,7 @@ class IsamMetaFileReader(val metafileFilename: String) :Usable{
         constraints1.toSeries()
     }
 
-    private lateinit var constraints1: List<RecordMeta>
+   lateinit var constraints1: List<RecordMeta>
     override fun open() {
         //use readBytes and decodeString to read the lines into
 //        val lines = buf.readBytes(size).decodeToString().lines().filterNot { it.trim().startsWith("#") }.map(String::trim)

@@ -39,8 +39,7 @@ fun autoresearchNativeMain(args: Array<String>) {
     val result = AutoresearchHarness.runExperiment(task, config, MutableAutoresearchExperiment)
     println(result.toJsonLine())
 }
-
-private fun parseOptions(args: Array<String>): Map<String, String> {
+fun parseOptions(args: Array<String>): Map<String, String> {
     val options = linkedMapOf<String, String>()
     var index = 0
     while (index < args.size) {
@@ -69,8 +68,7 @@ private fun parseOptions(args: Array<String>): Map<String, String> {
     }
     return options
 }
-
-private fun printUsage() {
+fun printUsage() {
     println(
         """
         usage: autoresearchNativeMain [--stage convergence_4x4] [--theme M0_identity|M1_sine]

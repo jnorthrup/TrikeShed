@@ -24,10 +24,10 @@ import borg.trikeshed.lib.size
  * The block may also enforce a single symbol (currently not enforced; symbol is
  * carried per-row as in the donor).
  */
-class KlineBlock private constructor(
-    private val rows: MutableList<Kline>,
-    private var _state: State,
-    private val timespan: TimeSpan?,
+class KlineBlock constructor(
+    val rows: MutableList<Kline>,
+    var _state: State,
+    val timespan: TimeSpan?,
 ) {
 
     enum class State { MUTABLE, SEALED }

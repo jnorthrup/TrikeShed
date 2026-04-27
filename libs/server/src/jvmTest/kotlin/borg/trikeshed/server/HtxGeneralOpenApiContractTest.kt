@@ -11,45 +11,45 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class HtxGeneralOpenApiContractTest {
-    private val spec = File("openapi/htx-general.openapi.yaml")
-    private val contract = File("openapi/htx-general-htx-client.codegen-contract.yaml")
-    private val repoRoot = spec.canonicalFile.parentFile.parentFile.parentFile.parentFile
-    private val clientBuild = File(repoRoot, "libs/htx-client/build.gradle.kts")
-    private val clientReadme = File(repoRoot, "libs/htx-client/README.md")
-    private val clientGeneratedTest = File(
+   val spec = File("openapi/htx-general.openapi.yaml")
+   val contract = File("openapi/htx-general-htx-client.codegen-contract.yaml")
+   val repoRoot = spec.canonicalFile.parentFile.parentFile.parentFile.parentFile
+   val clientBuild = File(repoRoot, "libs/htx-client/build.gradle.kts")
+   val clientReadme = File(repoRoot, "libs/htx-client/README.md")
+   val clientGeneratedTest = File(
         repoRoot,
         "libs/htx-client/src/commonTest/kotlin/borg/trikeshed/htx/client/GeneratedHtxGeneralClientTest.kt",
     )
-    private val compatibilityTest = File(
+   val compatibilityTest = File(
         "src/jvmTest/kotlin/borg/trikeshed/server/HtxGeneralClientServerCompatibilityTest.kt",
     )
-    private val generatedSourceRoot = File(repoRoot, "libs/htx-client/src/generated/kotlin")
-    private val generatedPackageRoot = File(generatedSourceRoot, "borg/trikeshed/htx/client/generated")
-    private val generatedApiFile = File(
+   val generatedSourceRoot = File(repoRoot, "libs/htx-client/src/generated/kotlin")
+   val generatedPackageRoot = File(generatedSourceRoot, "borg/trikeshed/htx/client/generated")
+   val generatedApiFile = File(
         generatedSourceRoot,
         "borg/trikeshed/htx/client/generated/api/HtxGeneralApi.kt",
     )
-    private val generatedInfrastructureFile = File(
+   val generatedInfrastructureFile = File(
         generatedSourceRoot,
         "borg/trikeshed/htx/client/generated/infrastructure/GeneratedRequest.kt",
     )
-    private val generatedModelFile = File(
+   val generatedModelFile = File(
         generatedSourceRoot,
         "borg/trikeshed/htx/client/generated/model/HealthStatus.kt",
     )
-    private val expectedOutputPackages = listOf(
+   val expectedOutputPackages = listOf(
         "borg.trikeshed.htx.client.generated.api",
         "borg.trikeshed.htx.client.generated.infrastructure",
         "borg.trikeshed.htx.client.generated.model",
         "borg.trikeshed.htx.client.generated",
     )
-    private val expectedOutputModes = listOf(
+   val expectedOutputModes = listOf(
         "generated-api",
         "generated-support",
         "generated-model",
         "generated-support",
     )
-    private val expectedGeneratedFiles = listOf(
+   val expectedGeneratedFiles = listOf(
         "borg/trikeshed/htx/client/generated/api/HtxGeneralApi.kt",
         "borg/trikeshed/htx/client/generated/infrastructure/GeneratedRequest.kt",
         "borg/trikeshed/htx/client/generated/model/HealthStatus.kt",
@@ -57,7 +57,7 @@ class HtxGeneralOpenApiContractTest {
         "borg/trikeshed/htx/client/generated/Elements.kt",
         "borg/trikeshed/htx/client/generated/SupervisorJobs.kt",
     )
-    private val expectedDocumentedGeneratedFiles = expectedGeneratedFiles.map {
+   val expectedDocumentedGeneratedFiles = expectedGeneratedFiles.map {
         "libs/htx-client/src/generated/kotlin/$it"
     }
 
@@ -364,19 +364,19 @@ class HtxGeneralOpenApiContractTest {
         }
     }
 
-    private fun snapshotGeneratedContents(): Map<String, String> =
+   fun snapshotGeneratedContents(): Map<String, String> =
         expectedGeneratedFiles.associateWith { relativePath ->
             File(generatedSourceRoot, relativePath).readText()
         }
 
-    private fun assertGeneratedFilesAreNotIgnoredByGit() {
+   fun assertGeneratedFilesAreNotIgnoredByGit() {
         expectedDocumentedGeneratedFiles.forEach { relativePath ->
             val gitOutput = runCommand("git", "check-ignore", relativePath)
             assertEquals(1, gitOutput.exitCode, gitOutput.output)
         }
     }
 
-    private fun runGradle(vararg arguments: String): GradleRun {
+   fun runGradle(vararg arguments: String): GradleRun {
         val process = ProcessBuilder(
             listOf(File(repoRoot, "gradlew").absolutePath, "--no-daemon") + arguments,
         )
@@ -394,7 +394,7 @@ class HtxGeneralOpenApiContractTest {
         )
     }
 
-    private fun runCommand(vararg arguments: String): CommandRun {
+   fun runCommand(vararg arguments: String): CommandRun {
         val process = ProcessBuilder(arguments.toList())
             .directory(repoRoot)
             .redirectErrorStream(true)
@@ -410,12 +410,12 @@ class HtxGeneralOpenApiContractTest {
         )
     }
 
-    private data class GradleRun(
+   data class GradleRun(
         val exitCode: Int,
         val output: String,
     )
 
-    private data class CommandRun(
+   data class CommandRun(
         val exitCode: Int,
         val output: String,
     )

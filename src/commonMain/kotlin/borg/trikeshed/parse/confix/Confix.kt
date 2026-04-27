@@ -79,9 +79,9 @@ enum class Tag(val code: Int) {
 
 class IntBuf(initial: Int = 16) {
     var data: IntArray = IntArray(initial)
-        private set
+       set
     var size: Int = 0
-        private set
+       set
 
     fun add(v: Int) {
         if (size == data.size) {
@@ -112,14 +112,14 @@ class IntBuf(initial: Int = 16) {
 }
 
 class ElemBuf(initial: Int = 16) {
-    private var opens: IntArray = IntArray(initial)
-    private var closes: IntArray = IntArray(initial)
-    private var commaHeads: IntArray = IntArray(initial) // start offset into commas pool
-    private var commaTails: IntArray = IntArray(initial) // end offset (exclusive)
+   var opens: IntArray = IntArray(initial)
+   var closes: IntArray = IntArray(initial)
+   var commaHeads: IntArray = IntArray(initial) // start offset into commas pool
+   var commaTails: IntArray = IntArray(initial) // end offset (exclusive)
     var commas: IntBuf = IntBuf(initial * 2)
-        private set
+       set
     var size: Int = 0
-        private set
+       set
 
     fun commasSize(): Int = commas.size
 
@@ -127,13 +127,13 @@ class ElemBuf(initial: Int = 16) {
         commas.resize(n)
     }
 
-    private fun grow() {
+   fun grow() {
         val n = opens.size * 2
         opens = opens.copyGrow(n); closes = closes.copyGrow(n)
         commaHeads = commaHeads.copyGrow(n); commaTails = commaTails.copyGrow(n)
     }
 
-    private fun IntArray.copyGrow(n: Int): IntArray {
+   fun IntArray.copyGrow(n: Int): IntArray {
         val x = IntArray(n); var i = 0; while (i < size) { x[i] = this[i]; i++ }; return x
     }
 
@@ -210,7 +210,7 @@ object JsonScan {
         return out.toSeries()[0]
     }
 
-    private fun parseValue(cs: CharSeries, out: ElemBuf): Int {
+   fun parseValue(cs: CharSeries, out: ElemBuf): Int {
         cs.skipWs
         if (!cs.hasRemaining) error("eof in json")
         val c = cs[cs.pos]
@@ -224,7 +224,7 @@ object JsonScan {
         }
     }
 
-    private fun parseObject(cs: CharSeries, out: ElemBuf): Int {
+   fun parseObject(cs: CharSeries, out: ElemBuf): Int {
         val open = cs.pos; cs.inc()  // consume '{'
         val idx = out.beginTagged(open, Tag.OBJECT)
         cs.skipWs
@@ -252,7 +252,7 @@ object JsonScan {
         error("unterminated object")
     }
 
-    private fun parseArray(cs: CharSeries, out: ElemBuf): Int {
+   fun parseArray(cs: CharSeries, out: ElemBuf): Int {
         val open = cs.pos; cs.inc()
         val idx = out.beginTagged(open, Tag.ARRAY)
         cs.skipWs
@@ -275,7 +275,7 @@ object JsonScan {
         error("unterminated array")
     }
 
-    private fun parseString(cs: CharSeries, out: ElemBuf): Int {
+   fun parseString(cs: CharSeries, out: ElemBuf): Int {
         val open = cs.pos
         if (cs[cs.pos] != '"') error("expected '\"' at ${cs.pos}")
         val idx = out.beginTagged(open, Tag.STRING)
@@ -288,7 +288,7 @@ object JsonScan {
         return idx
     }
 
-    private fun parseBool(cs: CharSeries, out: ElemBuf): Int {
+   fun parseBool(cs: CharSeries, out: ElemBuf): Int {
         val open = cs.pos
         return if (cs[cs.pos] == 't') {
             if (cs.pos + 3 >= cs.limit) error("bad bool")
@@ -303,7 +303,7 @@ object JsonScan {
         }
     }
 
-    private fun parseNull(cs: CharSeries, out: ElemBuf): Int {
+   fun parseNull(cs: CharSeries, out: ElemBuf): Int {
         val open = cs.pos
         if (cs.pos + 3 >= cs.limit) error("bad null")
         // validate exact token 'null'
@@ -314,7 +314,7 @@ object JsonScan {
         return idx
     }
 
-    private fun parseNumber(cs: CharSeries, out: ElemBuf): Int {
+   fun parseNumber(cs: CharSeries, out: ElemBuf): Int {
         val open = cs.pos
         val idx = out.beginTagged(open, Tag.NUMBER)
         val c = cs[cs.pos]
@@ -354,7 +354,7 @@ object YamlScan {
         return out.toSeries()
     }
 
-    private class ScanState(val s: Series<Char>, val n: Int) {
+   class ScanState(val s: Series<Char>, val n: Int) {
         var pos: Int = 0
         fun peek(): Char = if (pos < n) s[pos] else '\u0000'
         fun atEof(): Boolean = pos >= n
@@ -399,7 +399,7 @@ object YamlScan {
         }
     }
 
-    private fun parseBlock(st: ScanState, out: ElemBuf, indent: Int): Int {
+   fun parseBlock(st: ScanState, out: ElemBuf, indent: Int): Int {
         st.skipBlankLines()
         val here = st.lineIndent()
         if (st.atEof() || here < indent) {
@@ -417,7 +417,7 @@ object YamlScan {
         }
     }
 
-    private fun parseSeq(st: ScanState, out: ElemBuf, indent: Int): Int {
+   fun parseSeq(st: ScanState, out: ElemBuf, indent: Int): Int {
         // st.pos on entry is the first non-space char (after consumeIndent in parseBlock).
         // compute the start-of-line position for this sequence from the known indent
         var nextLineStart = (st.pos - indent).coerceAtLeast(0)
@@ -464,7 +464,7 @@ object YamlScan {
         return idx
     }
 
-    private fun parseMapOrScalar(st: ScanState, out: ElemBuf, indent: Int): Int {
+   fun parseMapOrScalar(st: ScanState, out: ElemBuf, indent: Int): Int {
         // Look for "key:" on this line
         val startOfKey = st.pos
         val colon = st.readToColon()
@@ -527,7 +527,7 @@ object YamlScan {
         return idx
     }
 
-    private fun parseScalarLine(st: ScanState, out: ElemBuf): Int {
+   fun parseScalarLine(st: ScanState, out: ElemBuf): Int {
         val open = st.pos
         // classify
         val tag = classifyScalar(st)
@@ -537,7 +537,7 @@ object YamlScan {
         return idx
     }
 
-    private fun parseFlowLine(st: ScanState, out: ElemBuf): Int {
+   fun parseFlowLine(st: ScanState, out: ElemBuf): Int {
         // delegate a single inline JSON-ish value to JsonScan by slicing the rest of the line
         val open = st.pos
         var end = st.pos
@@ -559,7 +559,7 @@ object YamlScan {
         return idx
     }
 
-    private fun classifyScalar(st: ScanState): Tag {
+   fun classifyScalar(st: ScanState): Tag {
         val p = st.pos
         val ch = if (p < st.n) st.s[p] else '\u0000'
         if (ch == '"' || ch == '\'') return Tag.STRING
@@ -572,7 +572,7 @@ object YamlScan {
         return Tag.STRING
     }
 
-    private fun lineIs(st: ScanState, kw: String): Boolean {
+   fun lineIs(st: ScanState, kw: String): Boolean {
         var i = 0; var p = st.pos
         while (i < kw.length && p < st.n) {
             if (st.s[p] != kw[i]) return false
@@ -584,7 +584,7 @@ object YamlScan {
         return p >= st.n || st.s[p] == '\n' || st.s[p] == '\r' || st.s[p] == '#'
     }
 
-    private fun lineIsNumber(st: ScanState): Boolean {
+   fun lineIsNumber(st: ScanState): Boolean {
         var p = st.pos
         if (p < st.n && (st.s[p] == '-' || st.s[p] == '+')) p++
         var digits = 0
@@ -599,7 +599,7 @@ object YamlScan {
         return digits > 0 && (p >= st.n || st.s[p] == '\n' || st.s[p] == '\r' || st.s[p] == '#')
     }
 
-    private fun scanInlineColon(st: ScanState): Int {
+   fun scanInlineColon(st: ScanState): Int {
         var p = st.pos
         while (p < st.n && st.s[p] != '\n' && st.s[p] != '\r') {
             if (st.s[p] == ':') return p
@@ -634,7 +634,7 @@ object CborScan {
         return out.toSeries()
     }
 
-    private fun readLen(ba: ByteArray, bs: ByteSeries, ai: Int): Long {
+   fun readLen(ba: ByteArray, bs: ByteSeries, ai: Int): Long {
         return when (ai) {
             in 0..23 -> ai.toLong()
             24 -> (bs.get.toInt() and 0xFF).toLong()
@@ -655,7 +655,7 @@ object CborScan {
         }
     }
 
-    private fun parseItem(ba: ByteArray, bs: ByteSeries, out: ElemBuf): Int {
+   fun parseItem(ba: ByteArray, bs: ByteSeries, out: ElemBuf): Int {
         val open = bs.pos
         if (!bs.hasRemaining) error("cbor eof")
         val ib = bs.get.toInt() and 0xFF
@@ -744,7 +744,7 @@ object CborScan {
         }
     }
 
-    private fun parseIndefinite(ba: ByteArray, bs: ByteSeries, out: ElemBuf, tag: Tag) {
+   fun parseIndefinite(ba: ByteArray, bs: ByteSeries, out: ElemBuf, tag: Tag) {
         while (bs.hasRemaining && (ba[bs.pos].toInt() and 0xFF) != 0xFF) {
             val ib = bs.get.toInt() and 0xFF
             val ai = ib and 0x1F
@@ -797,7 +797,7 @@ object CsvScan {
         return out.toSeries()
     }
 
-    private fun scanLines(cs: CharSeries, out: ElemBuf) {
+   fun scanLines(cs: CharSeries, out: ElemBuf) {
         while (cs.hasRemaining) {
             val lineOpen = cs.pos
             // advance to end-of-line (LF or CR+LF)
@@ -939,7 +939,7 @@ object Reify {
     }
 
     /** Thread-local CharArray buffer for textOf — avoids per-span allocation. */
-    private var textBuf: CharArray = CharArray(256)
+   var textBuf: CharArray = CharArray(256)
 
     /** reify the value rooted at [ctx], using [syntax] to discriminate CBOR vs text decode paths. */
     fun reify(ctx: JsContext, syntax: Syntax = Syntax.JSON): Any? {
@@ -956,7 +956,7 @@ object Reify {
         }
     }
 
-    private fun reifyString(e: JsElement, src: Series<Char>, syntax: Syntax): String {
+   fun reifyString(e: JsElement, src: Series<Char>, syntax: Syntax): String {
         val a = e.a.a; val b = e.a.b
         // quoted JSON/YAML strings
         if (a <= b && (src[a] == '"' || src[a] == '\'')) {
@@ -1015,7 +1015,7 @@ object Reify {
     }
 
     // helper: unescape JSON-style quotes (handles \n, \uXXXX, etc.)
-    private fun unescapeJsonString(s: String): String {
+   fun unescapeJsonString(s: String): String {
         val out = StringBuilder(s.length)
         var i = 0
         while (i < s.length) {
@@ -1054,12 +1054,12 @@ object Reify {
         return out.toString()
     }
 
-    private fun unescapeYamlSingleQuoted(s: String): String {
+   fun unescapeYamlSingleQuoted(s: String): String {
         // YAML single-quoted scalar: replace doubled single-quotes with a single quote
         return s.replace("''", "'")
     }
 
-    private fun reifyNumber(e: JsElement, src: Series<Char>, syntax: Syntax): Number {
+   fun reifyNumber(e: JsElement, src: Series<Char>, syntax: Syntax): Number {
         // CBOR numeric decode — only when source is CBOR binary
         val a = e.a.a
         if (syntax == Syntax.CBOR && a < src.size) {
@@ -1100,17 +1100,17 @@ object Reify {
     }
 
     /** Parse one child at global position [childOpen] — no slice, no offset adjust. */
-    private fun reifyChildAt(src: Series<Char>, childOpen: Int): JsElement =
+   fun reifyChildAt(src: Series<Char>, childOpen: Int): JsElement =
         JsonScan.parseOne(src, childOpen)
 
     /** child JsElement at commas[k] — for arrays, each comma is an element open */
-    private fun reifyArray(e: JsElement, src: Series<Char>, syntax: Syntax): Series<Any?> {
+   fun reifyArray(e: JsElement, src: Series<Char>, syntax: Syntax): Series<Any?> {
         val cs = realCommas(e)
         return cs.size j { i: Int -> reify(reifyChildAt(src, cs[i]) j src, syntax) }
     }
 
     /** object has commas in key-position pairs; keys sit at comma[k], values follow */
-    private fun reifyObject(e: JsElement, src: Series<Char>, syntax: Syntax): Series2<String, Any?> {
+   fun reifyObject(e: JsElement, src: Series<Char>, syntax: Syntax): Series2<String, Any?> {
         val cs = realCommas(e)
         return cs.size j { i: Int ->
             val keyElem = reifyChildAt(src, cs[i])
@@ -1144,7 +1144,7 @@ object Path {
         return cur
     }
 
-    private fun step(ctx: JsContext, seg: JsPathElement): JsContext? {
+   fun step(ctx: JsContext, seg: JsPathElement): JsContext? {
         val e = ctx.a; val src = ctx.b
         return when (val s = seg) {
             is Either.Left -> stepByName(e, src, s.value)
@@ -1152,7 +1152,7 @@ object Path {
         }
     }
 
-    private fun stepByIndex(e: JsElement, src: Series<Char>, idx: Int): JsContext? {
+   fun stepByIndex(e: JsElement, src: Series<Char>, idx: Int): JsContext? {
         val tag = Reify.tagOf(e, src)
         if (tag != Tag.ARRAY) {
             return null
@@ -1180,7 +1180,7 @@ object Path {
         return null
     }
 
-    private fun stepByName(e: JsElement, src: Series<Char>, name: String): JsContext? {
+   fun stepByName(e: JsElement, src: Series<Char>, name: String): JsContext? {
         if (Reify.tagOf(e, src) != Tag.OBJECT) return null
         val cs = Reify.realCommas(e)
         // diagnostic logging: print comma list and name we're searching for
@@ -1246,7 +1246,7 @@ object Path {
     }
 
     /** minimal JSON/YAML/CBOR-flavored child element at an absolute offset in src */
-    private fun childElementAt(start: Int, src: Series<Char>): JsElement {
+   fun childElementAt(start: Int, src: Series<Char>): JsElement {
         val sub = src.slice(start, src.size)
         if (sub.size == 0) throw IllegalStateException("empty child slice at $start")
         val first = sub[0]
@@ -1361,7 +1361,7 @@ object Path {
         }
     }
 
-    private fun stripQuotes(s: String): String {
+   fun stripQuotes(s: String): String {
         if (s.length >= 2 && (s[0] == '"' || s[0] == '\'') && s[s.length - 1] == s[0])
             return s.substring(1, s.length - 1)
         return s
@@ -1418,7 +1418,7 @@ class ConfixSource(val syntax: Syntax, val src: Series<Char>)
  *     the same JsContext algebra.
  */
 class ConfixElement(
-    private val sources: Series<ConfixSource>,
+   val sources: Series<ConfixSource>,
     parent: CoroutineContext? = null,
 ) : AbstractCoroutineContextElement(ParseScopeKey) {
 
@@ -1426,7 +1426,7 @@ class ConfixElement(
      * Internal ParseScope that owns the lifecycle state machine.
      * Uses a dummy source/span since ConfixElement fans out to its own sources.
      */
-    private val parseScope = ParseScope(
+   val parseScope = ParseScope(
         source = 0 j { _: Int -> '\u0000' },
         span = 0 j 0,
         parentContext = parent
@@ -1436,7 +1436,7 @@ class ConfixElement(
 
     val lifecycleState: ParseLifecycle get() = parseScope.lifecycleState
 
-    private val subs = mutableListOf<ConfixSubscriber>()
+   val subs = mutableListOf<ConfixSubscriber>()
 
     fun subscribe(s: ConfixSubscriber) {
         val st = parseScope.lifecycleState

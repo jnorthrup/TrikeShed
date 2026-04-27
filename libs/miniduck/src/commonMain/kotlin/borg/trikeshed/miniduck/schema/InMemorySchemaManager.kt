@@ -6,7 +6,7 @@ import borg.trikeshed.miniduck.runBlockingCommon
  * An in-memory implementation of SchemaManager for simple usage.
  */
 class InMemorySchemaManager : SchemaManager {
-    private val tables = mutableMapOf<String, TableSchema>()
+   val tables = mutableMapOf<String, TableSchema>()
 
     // suspend implementations for async interface
     override suspend fun getTableSuspend(name: String): TableSchema? = tables[name]

@@ -46,7 +46,7 @@ data class NgSctpService(
     companion object Key : CoroutineContext.Key<NgSctpService>
 
     /** Per-path failover tracking — lazy-initialized from [paths] on first access. */
-    private val _pathStatuses: MutableMap<String, PathStatus> by lazy {
+   val _pathStatuses: MutableMap<String, PathStatus> by lazy {
         paths.associateTo(mutableMapOf()) { it to PathStatus(address = it) }
     }
 
@@ -84,10 +84,10 @@ data class NgSctpService(
 
     // Public handle as non-negative Long (stream ID)
     var handle: Long = 0
-        private set
+       set
 
     // Backing map for stream handles
-    private val _streams: MutableMap<Int, StreamHandle> = streams
+   val _streams: MutableMap<Int, StreamHandle> = streams
 
     override val key: CoroutineContext.Key<*> get() = Key
 

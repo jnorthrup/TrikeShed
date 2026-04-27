@@ -13,7 +13,7 @@ import borg.trikeshed.lib.j
 class AlibabaAdapter(
     val endpoint: String,
     val bucket: String,
-    private val ossClient: AlibabaOssClient,
+   val ossClient: AlibabaOssClient,
 ) : ObjectStoreAdapter {
 
     constructor(config: Config) : this(config.endpoint, config.bucket, config.ossClient!!)

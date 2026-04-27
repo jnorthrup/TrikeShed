@@ -41,7 +41,7 @@ an application may check the completion queue for event completions without ente
 When the system call returns that a certain amount of SQEs have been consumed and submitted, it's safe to reuse SQE
 entries in the ring. This is true even if the actual IO submission had to be punted to async context, which means
 that the SQE may in fact not have been submitted yet. If the kernel requires later use of a particular SQE entry, it
-will have made a private copy of it.
+will have made acopy of it.
 
 sig is a pointer to a signal mask (see sigprocmask(2)); if sig is not NULL, io_uring_enter() first replaces the current
 signal mask by the one pointed to by sig, then waits for events to become available in the completion queue, and then
@@ -382,7 +382,7 @@ enum class UringOpcode {
      * @param file_index if set to a positive number, the file won't be installed into the normal
      * file table as usual but will be placed into the fixed file table at index `file_index - 1`. In this case,
      * instead of returning a file descriptor, the result will contain either 0 on success or an error.
-     * @return an fd opened or zero if private and success
+     * @return an fd opened or zero ifand success
      * @exception EBADF (minus) If there is already a file registered at this index, the request will fail.
      * @see`IOSQE_FIXED_FILE`
      * @see `IORING_REGISTER_FILES`

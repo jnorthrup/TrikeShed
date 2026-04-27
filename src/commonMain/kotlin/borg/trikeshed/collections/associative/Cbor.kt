@@ -21,7 +21,7 @@ object Cbor {
         return buf.toByteArray()
     }
 
-    private fun Item.encode(buf: ByteBuf) {
+   fun Item.encode(buf: ByteBuf) {
         when (this) {
             is Item.Num -> {
                 if (value >= 0) encodeHead(buf, 0, value)
@@ -60,7 +60,7 @@ object Cbor {
         }
     }
 
-    private fun encodeHead(buf: ByteBuf, major: Int, value: Long) {
+   fun encodeHead(buf: ByteBuf, major: Int, value: Long) {
         val mt = major shl 5
         when {
             value < 24 -> buf.write(mt or value.toInt())
@@ -73,7 +73,7 @@ object Cbor {
 
     fun decode(bytes: ByteArray): Item = Reader(bytes, 0).readItem()
 
-    private class Reader(val data: ByteArray, var pos: Int) {
+   class Reader(val data: ByteArray, var pos: Int) {
 
         fun readItem(): Item {
             val head = u8()
@@ -103,7 +103,7 @@ object Cbor {
             }
         }
 
-        private fun readArgument(additional: Int): Long = when (additional) {
+       fun readArgument(additional: Int): Long = when (additional) {
             in 0..23 -> additional.toLong()
             24 -> u8().toLong()
             25 -> u16().toLong()
@@ -112,13 +112,13 @@ object Cbor {
             else -> error("Invalid CBOR additional info: $additional")
         }
 
-        private fun readArray(count: Int): Item.Arr {
+       fun readArray(count: Int): Item.Arr {
             val items = ArrayList<Item>(count)
             for (i in 0 until count) items.add(readItem())
             return Item.Arr(items.size j { items[it] })
         }
 
-        private fun readMap(count: Int): Item.Map {
+       fun readMap(count: Int): Item.Map {
             val keys = ArrayList<String>(count)
             val vals = ArrayList<Item>(count)
             for (i in 0 until count) {
@@ -129,7 +129,7 @@ object Cbor {
             return Item.Map(keys.size j { keys[it] j vals[it] })
         }
 
-        private fun readIndefBytes(): Item.Bin {
+       fun readIndefBytes(): Item.Bin {
             val chunks = ArrayList<ByteArray>()
             while (true) {
                 if (u8() == 0xFF) break
@@ -140,7 +140,7 @@ object Cbor {
             return Item.Bin(concat(chunks))
         }
 
-        private fun readIndefText(): Item.Str {
+       fun readIndefText(): Item.Str {
             val sb = StringBuilder()
             while (true) {
                 if (u8() == 0xFF) break
@@ -151,7 +151,7 @@ object Cbor {
             return Item.Str(sb.toString())
         }
 
-        private fun readIndefArray(): Item.Arr {
+       fun readIndefArray(): Item.Arr {
             val items = ArrayList<Item>()
             while (true) {
                 if (u8() == 0xFF) break
@@ -161,7 +161,7 @@ object Cbor {
             return Item.Arr(items.size j { items[it] })
         }
 
-        private fun readIndefMap(): Item.Map {
+       fun readIndefMap(): Item.Map {
             val keys = ArrayList<String>()
             val vals = ArrayList<Item>()
             while (true) {
@@ -174,7 +174,7 @@ object Cbor {
             return Item.Map(keys.size j { keys[it] j vals[it] })
         }
 
-        private fun readSimple(additional: Int, argument: Long): Item = when (additional) {
+       fun readSimple(additional: Int, argument: Long): Item = when (additional) {
             20 -> Item.Bool(false)
             21 -> Item.Bool(true)
             22 -> Item.Nil
@@ -185,24 +185,24 @@ object Cbor {
             else -> error("Unknown CBOR simple value: $additional")
         }
 
-        private fun u8(): Int = data[pos++].toInt() and 0xFF
-        private fun u16(): Int = (u8() shl 8) or u8()
-        private fun u32(): Int = (u8() shl 24) or (u8() shl 16) or (u8() shl 8) or u8()
-        private fun u64(): Long = (u32().toLong() shl 32) or (u32().toLong() and 0xFFFFFFFFL)
+       fun u8(): Int = data[pos++].toInt() and 0xFF
+       fun u16(): Int = (u8() shl 8) or u8()
+       fun u32(): Int = (u8() shl 24) or (u8() shl 16) or (u8() shl 8) or u8()
+       fun u64(): Long = (u32().toLong() shl 32) or (u32().toLong() and 0xFFFFFFFFL)
 
-        private fun readBytes(n: Int): ByteArray {
+       fun readBytes(n: Int): ByteArray {
             val result = data.copyOfRange(pos, pos + n)
             pos += n
             return result
         }
 
-        private fun readUtf8(n: Int): String {
+       fun readUtf8(n: Int): String {
             val result = data.decodeToString(pos, pos + n)
             pos += n
             return result
         }
 
-        private fun readFloat16(): Double {
+       fun readFloat16(): Double {
             val bits = u16()
             val sign = (bits shr 15) and 1
             val exp = (bits shr 10) and 0x1F
@@ -219,9 +219,8 @@ object Cbor {
         }
     }
 }
-
-private class ByteBuf {
-    private val buf = ArrayList<Byte>(256)
+class ByteBuf {
+   val buf = ArrayList<Byte>(256)
     fun write(b: Int) { buf.add(b.toByte()) }
     fun write(b: Byte) { buf.add(b) }
     fun write(bytes: ByteArray) { bytes.forEach { buf.add(it) } }
@@ -234,16 +233,14 @@ private class ByteBuf {
     fun writeDouble(v: Double) { writeLong(v.toRawBits()) }
     fun toByteArray(): ByteArray = buf.toByteArray()
 }
-
-private fun concat(chunks: List<ByteArray>): ByteArray {
+fun concat(chunks: List<ByteArray>): ByteArray {
     val size = chunks.sumOf { it.size }
     val result = ByteArray(size)
     var off = 0
     for (c in chunks) { c.copyInto(result, off); off += c.size }
     return result
 }
-
-private fun pow(base: Double, exp: Int): Double {
+fun pow(base: Double, exp: Int): Double {
     var result = 1.0
     var b = base
     var e = exp

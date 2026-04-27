@@ -18,12 +18,12 @@ import borg.trikeshed.couch.htx.HtxBlockType
  */
 class ProtocolDetector {
 
-    private val buf = StringBuilder()
-    private var tlsDetected = false
+   val buf = StringBuilder()
+   var tlsDetected = false
 
     companion object {
         /** HTTP/2 connection preface (RFC 7540 §3.5): 24-byte magic string. */
-        private const val H2_PREFACE = "PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n"
+       const val H2_PREFACE = "PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n"
     }
 
     /**

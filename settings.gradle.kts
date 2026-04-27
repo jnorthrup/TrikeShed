@@ -14,7 +14,7 @@ rootProject.name = "TrikeShed"
 
 // Auto-include all libs/ subprojects — each must have a build.gradle.kts.
 // Exclude standalone composites that manage their own includeBuild references.
-val standaloneLibs = setOf("dreamer-kmm", "dreamer-test-runner", "kursive", "openapi")
+val standaloneLibs = setOf("dreamer-kmm", "dreamer-test-runner", "kursive", "openapi", "dreamer-dashboard")
 
 file("libs").listFiles()?.filter { it.isDirectory }?.forEach { dir ->
     if (dir.name !in standaloneLibs && file("libs/${dir.name}/build.gradle.kts").exists()) {

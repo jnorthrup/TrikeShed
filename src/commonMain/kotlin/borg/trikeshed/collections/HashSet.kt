@@ -1,9 +1,9 @@
 package borg.trikeshed.collections
 
 class HashSet<T> : Set<T> {
-    private var buckets: Array<Any?> = arrayOfNulls(16)
-    private var flags: IntArray = IntArray(16) // 0 = empty, 1 = occupied, 2 = deleted
-    private var currentSize = 0
+   var buckets: Array<Any?> = arrayOfNulls(16)
+   var flags: IntArray = IntArray(16) // 0 = empty, 1 = occupied, 2 = deleted
+   var currentSize = 0
 
     override val size: Int
         get() = currentSize
@@ -29,8 +29,8 @@ class HashSet<T> : Set<T> {
 
     override fun iterator(): Iterator<T> {
         return object : Iterator<T> {
-            private var index = -1
-            private fun findNext() {
+           var index = -1
+           fun findNext() {
                 index++
                 while (index < buckets.size && flags[index] != 1) {
                     index++
@@ -109,12 +109,12 @@ class HashSet<T> : Set<T> {
     }
 
     // Computes the index in the array for a given hash
-    private fun indexFor(hash: Int): Int {
+   fun indexFor(hash: Int): Int {
         return (hash and 0x7FFFFFFF) % buckets.size
     }
 
     // Resizes the internal array when load factor exceeds threshold
-    private fun resize() {
+   fun resize() {
         val oldBuckets = buckets
         val oldFlags = flags
         buckets = arrayOfNulls(buckets.size * 2)

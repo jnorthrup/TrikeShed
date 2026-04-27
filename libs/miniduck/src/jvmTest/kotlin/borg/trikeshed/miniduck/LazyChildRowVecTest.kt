@@ -17,10 +17,10 @@ import kotlin.test.assertSame
 class LazyChildRowVecTest {
 
     // A minimal concrete subclass to exercise the shared helper
-    private class TestLazyRowVec(
-        private val loader: () -> Series<MiniRowVec>?,
+   class TestLazyRowVec(
+       val loader: () -> Series<MiniRowVec>?,
     ) : LazyChildRowVec() {
-        private var cached: Series<MiniRowVec>? = null
+       var cached: Series<MiniRowVec>? = null
 
         override val size: Int get() = 0
         override fun get(index: Int): Any? =

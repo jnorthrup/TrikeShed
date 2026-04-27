@@ -10,8 +10,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
-
-private fun <T> runBlocking(block: suspend () -> T): T = runBlockingCommon(block)
+fun <T> runBlocking(block: suspend () -> T): T = runBlockingCommon(block)
 
 class S3AdapterTest {
 
@@ -167,8 +166,8 @@ class FakeS3Client(
     val putHook: ((bucket: String, key: String, bytes: ByteArray) -> Unit)? = null,
     val deleteHook: ((bucket: String, key: String) -> Unit)? = null,
 ) : S3Client {
-    private var listIdx = 0
-    private var getIdx = 0
+   var listIdx = 0
+   var getIdx = 0
 
     override fun listObjectsV2(bucket: String, prefix: String): List<S3ObjectMetadata> {
         return if (listIdx < listResults.size) listResults[listIdx++] else emptyList()

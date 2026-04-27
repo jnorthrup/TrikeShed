@@ -19,17 +19,17 @@ class SeekFileBufferCommon(
     val initialOffset: Long = 0,
     val blkSize: Long = -1,
     val readOnly: Boolean = true,
-    private val handle: SeekHandle = platformSeekHandle(),
+   val handle: SeekHandle = platformSeekHandle(),
 ) : LongSeries<Byte> {
 
-    private var fd: Long = -1
-    private var fileSize: Long = 0
+   var fd: Long = -1
+   var fileSize: Long = 0
 
     /** Windowed read buffer — 64KB amortizes syscalls, stays in L3. */
-    private val window = ByteArray(BUFFER_SIZE)
-    private var windowBase: Long = -1
-    private var windowLimit: Long = -1
-    private var windowPosition: Int = 0
+   val window = ByteArray(BUFFER_SIZE)
+   var windowBase: Long = -1
+   var windowLimit: Long = -1
+   var windowPosition: Int = 0
 
     companion object {
         const val BUFFER_SIZE = 65536
@@ -102,7 +102,7 @@ class SeekFileBufferCommon(
         return results
     }
 
-    private fun fillWindow(pos: Long) {
+   fun fillWindow(pos: Long) {
         val remaining = (fileSize - pos).coerceAtLeast(0)
         val toRead = remaining.coerceAtMost(BUFFER_SIZE.toLong()).toInt()
         if (toRead == 0) {

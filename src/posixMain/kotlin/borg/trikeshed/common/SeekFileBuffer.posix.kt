@@ -21,12 +21,12 @@ actual class SeekFileBuffer actual constructor(
     actual val readOnly: Boolean,
 ) : LongSeries<Byte> {
 
-    private var fd: Int = -1
-    private var fileSize: Long = 0L
+   var fd: Int = -1
+   var fileSize: Long = 0L
 
-    private val buf = ByteArray(BUFFER_SIZE)
-    private var bufBase: Long = -1L
-    private var bufLimit: Long = -1L
+   val buf = ByteArray(BUFFER_SIZE)
+   var bufBase: Long = -1L
+   var bufLimit: Long = -1L
 
     companion object {
         const val BUFFER_SIZE = 65536
@@ -42,7 +42,7 @@ actual class SeekFileBuffer actual constructor(
             buf[(abs - bufBase).toInt()]
         }
 
-    private fun fillBuffer(pos: Long) {
+   fun fillBuffer(pos: Long) {
         val toRead = (fileSize - pos).coerceIn(0L, BUFFER_SIZE.toLong()).toInt()
         if (toRead == 0) throw IndexOutOfBoundsException("Position $pos beyond file size $fileSize")
         val read = buf.usePinned { pinned ->

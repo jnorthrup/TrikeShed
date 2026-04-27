@@ -70,12 +70,12 @@ class ParseScope(
     val supervisor: CompletableJob =
         if (parentContext == null) SupervisorJob() else SupervisorJob(parentContext[Job])
 
-    private var _state: ParseLifecycle = ParseLifecycle.CREATED
+   var _state: ParseLifecycle = ParseLifecycle.CREATED
     val lifecycleState: ParseLifecycle get() = _state
 
-    private val subs = mutableListOf<ParseSubscriber>()
-    private val children = mutableListOf<ParseScope>()
-    private val results = mutableListOf<Any?>()
+   val subs = mutableListOf<ParseSubscriber>()
+   val children = mutableListOf<ParseScope>()
+   val results = mutableListOf<Any?>()
 
     val subscriberCount: Int get() = subs.size
     val childCount: Int get() = children.size

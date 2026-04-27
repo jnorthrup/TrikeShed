@@ -8,7 +8,7 @@ import kotlin.test.assertTrue
 
 class OpenApiPipelineTddTest {
 
-    private val validOpenApi = """
+   val validOpenApi = """
         {
           "openapi": "3.0.0",
           "info": { "title": "test", "version": "0.1.0" },

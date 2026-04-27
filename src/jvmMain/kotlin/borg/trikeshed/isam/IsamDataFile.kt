@@ -24,18 +24,18 @@ actual class IsamDataFile actual constructor(
         metafile.open()
         metafile
     }
-    private val data: SeekableByteChannel by lazy {
+   val data: SeekableByteChannel by lazy {
         Files.newByteChannel(
             Paths.get(datafileFilename),
             READ
         )
     }
 
-    private val recordlen: Int by lazy { metafile.recordlen }
-    private val fileSize: Long get() = data.size()
+   val recordlen: Int by lazy { metafile.recordlen }
+   val fileSize: Long get() = data.size()
     actual override val a: Int by lazy { fileSize.toInt() / recordlen }
 
-    private val constraints: Series<RecordMeta> get() = metafile.constraints
+   val constraints: Series<RecordMeta> get() = metafile.constraints
     override fun toString(): String =
         "IsamDataFile(metafile=$metafile, recordlen=$recordlen, constraints=$constraints," +
                 " datafileFilename='$datafileFilename', fileSize=$fileSize)"
@@ -55,7 +55,7 @@ actual class IsamDataFile actual constructor(
             constraint.decoder(s)!! j { constraint }
         }
     }
-    private val lock: ReentrantLock = ReentrantLock()
+   val lock: ReentrantLock = ReentrantLock()
 
     actual override fun open() {
 

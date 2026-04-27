@@ -14,7 +14,7 @@ import kotlinx.coroutines.withContext
  * @param V the functional type of the handler itself (e.g., suspend (Request) -> Response).
  */
 class HandlerRegistry<K, V : Function<*>>(
-    private val handlers: Map<K, V>
+   val handlers: Map<K, V>
 ) : CoroutineContext.Element {
 
     override val key: CoroutineContext.Key<*> get() = Key

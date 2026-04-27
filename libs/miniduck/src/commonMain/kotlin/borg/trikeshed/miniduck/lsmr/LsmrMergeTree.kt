@@ -86,9 +86,9 @@ data class SortedRun(
  */
 class LsmrMergeTree {
 
-    private val l0Buffer = mutableListOf<LsmrEntry>()
-    private val l1Runs = mutableListOf<SortedRun>()
-    private val l2Runs = mutableListOf<SortedRun>()
+   val l0Buffer = mutableListOf<LsmrEntry>()
+   val l1Runs = mutableListOf<SortedRun>()
+   val l2Runs = mutableListOf<SortedRun>()
 
     // ── Write path ───────────────────────────────────────────────────────
 

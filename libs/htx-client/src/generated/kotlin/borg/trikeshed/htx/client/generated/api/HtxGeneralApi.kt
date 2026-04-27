@@ -14,7 +14,7 @@ interface HtxGeneralApi {
 }
 
 class DefaultHtxGeneralApi(
-    private val call: suspend (GeneratedRequest) -> String,
+   val call: suspend (GeneratedRequest) -> String,
 ) : HtxGeneralApi {
     override suspend fun getHealth(): HealthStatus =
         HealthStatus(call(HtxGeneralApiContract.GetHealth.request))

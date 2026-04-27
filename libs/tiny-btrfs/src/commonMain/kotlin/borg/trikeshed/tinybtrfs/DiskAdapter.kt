@@ -26,8 +26,8 @@ interface DiskAdapter {
  * want a trivial memory-backed store.
  */
 class InMemoryDiskAdapter : DiskAdapter {
-    private val store = mutableMapOf<String, ByteArray>()
-    private var nextId = 1L
+   val store = mutableMapOf<String, ByteArray>()
+   var nextId = 1L
     override fun readNode(nodeId: String): ByteArray? = store[nodeId]
     override fun writeNode(nodeId: String, bytes: ByteArray) { store[nodeId] = bytes }
     override fun allocateNode(): String {

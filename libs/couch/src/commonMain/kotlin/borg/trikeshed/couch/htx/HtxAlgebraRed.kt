@@ -41,8 +41,7 @@ fun isResponse(msg: HtxMessage): Boolean =
 
 // ── Serialization algebra ───────────────────────────────────────
 
-/** HTX frame magic: "HTX\0" */
-private const val HTX_MAGIC: Int = 0x48545800.toInt()
+/** HTX frame magic: "HTX\0" */const val HTX_MAGIC: Int = 0x48545800.toInt()
 
 /** Serialize an HtxMessage to a framed binary format with CRC32 checksum. */
 fun HtxMessage.serialize(): ByteArray {
@@ -76,8 +75,7 @@ fun HtxMessage.Companion.deserialize(bytes: ByteArray): HtxMessage? {
 }
 
 // ── Internal payload encoding helpers ────────────────────────────
-
-private fun HtxMessage.buildPayload(): ByteArray {
+fun HtxMessage.buildPayload(): ByteArray {
     val blocks = this.blocks
     // flags(4) + blockCount(2) + blocks...
     val parts = mutableListOf<ByteArray>()
@@ -104,8 +102,7 @@ private fun HtxMessage.buildPayload(): ByteArray {
     }
     return result
 }
-
-private fun encodeBlock(bd: HtxBlockData): ByteArray {
+fun encodeBlock(bd: HtxBlockData): ByteArray {
     val data = when (bd) {
         is HtxBlockData.StartLine -> encodeStartLine(bd)
         is HtxBlockData.Header -> encodeHeader(bd)
@@ -123,8 +120,7 @@ private fun encodeBlock(bd: HtxBlockData): ByteArray {
     data.copyInto(result, 3)
     return result
 }
-
-private fun encodeStartLine(sl: HtxBlockData.StartLine): ByteArray {
+fun encodeStartLine(sl: HtxBlockData.StartLine): ByteArray {
     val s = sl.sl
     val parts = mutableListOf<ByteArray>()
     parts.add(byteArrayOf(if (s.isRequest) 1.toByte() else 0.toByte()))
@@ -163,8 +159,7 @@ private fun encodeStartLine(sl: HtxBlockData.StartLine): ByteArray {
     }
     return result
 }
-
-private fun encodeHeader(hdr: HtxBlockData.Header): ByteArray {
+fun encodeHeader(hdr: HtxBlockData.Header): ByteArray {
     val total = 2 + hdr.name.size + 2 + hdr.value.size
     val result = ByteArray(total)
     var pos = 0
@@ -176,15 +171,12 @@ private fun encodeHeader(hdr: HtxBlockData.Header): ByteArray {
     hdr.value.copyInto(result, pos)
     return result
 }
-
-private fun encodeDataBlock(d: HtxBlockData.Data): ByteArray = d.bytes
-private fun encodeTrailerData(t: HtxBlockData.Trailer): ByteArray = encodeHeader(
+fun encodeDataBlock(d: HtxBlockData.Data): ByteArray = d.bytesfun encodeTrailerData(t: HtxBlockData.Trailer): ByteArray = encodeHeader(
     HtxBlockData.Header(t.name, t.value)
 )
 
 // ── Internal payload decoding helpers ────────────────────────────
-
-private fun HtxMessage.Companion.parsePayload(payload: ByteArray): HtxMessage? {
+fun HtxMessage.Companion.parsePayload(payload: ByteArray): HtxMessage? {
     if (payload.size < 6) return null // flags(4) + count(2) minimum
     var pos = 0
     val flags = readInt32BE(payload, pos).toUInt(); pos += 4
@@ -201,8 +193,7 @@ private fun HtxMessage.Companion.parsePayload(payload: ByteArray): HtxMessage? {
     }
     return msg
 }
-
-private fun decodeBlock(typeCode: UByte, data: ByteArray): HtxBlockData? {
+fun decodeBlock(typeCode: UByte, data: ByteArray): HtxBlockData? {
     val type = HtxBlockType.fromCode(typeCode)
     return when (type) {
         HtxBlockType.ReqSl, HtxBlockType.ResSl -> decodeStartLine(type, data)
@@ -214,8 +205,7 @@ private fun decodeBlock(typeCode: UByte, data: ByteArray): HtxBlockData? {
         HtxBlockType.Unused -> null
     }
 }
-
-private fun decodeStartLine(type: HtxBlockType, data: ByteArray): HtxBlockData? {
+fun decodeStartLine(type: HtxBlockType, data: ByteArray): HtxBlockData? {
     if (data.isEmpty()) return null
     val isReq = data[0].toInt() != 0
     var pos = 1
@@ -240,8 +230,7 @@ private fun decodeStartLine(type: HtxBlockType, data: ByteArray): HtxBlockData? 
         HtxBlockData.StartLine(HtxStartLine.response(status, reason, verMajor, verMinor))
     }
 }
-
-private fun decodeHeaderBlock(data: ByteArray): HtxBlockData? {
+fun decodeHeaderBlock(data: ByteArray): HtxBlockData? {
     if (data.size < 4) return null
     var pos = 0
     val nameLen = ((data[pos].toInt() and 0xFF) shl 8) or (data[pos + 1].toInt() and 0xFF); pos += 2
@@ -252,22 +241,19 @@ private fun decodeHeaderBlock(data: ByteArray): HtxBlockData? {
     val value = data.copyOfRange(pos, pos + valueLen)
     return HtxBlockData.Header(name, value)
 }
-
-private fun decodeTrailerBlock(data: ByteArray): HtxBlockData? {
+fun decodeTrailerBlock(data: ByteArray): HtxBlockData? {
     val hdr = decodeHeaderBlock(data) as? HtxBlockData.Header ?: return null
     return HtxBlockData.Trailer(hdr.name, hdr.value)
 }
 
 // ── Big-endian primitives ────────────────────────────────────────
-
-private fun writeInt32BE(buf: ByteArray, offset: Int, value: Int) {
+fun writeInt32BE(buf: ByteArray, offset: Int, value: Int) {
     buf[offset]     = ((value ushr 24) and 0xFF).toByte()
     buf[offset + 1] = ((value ushr 16) and 0xFF).toByte()
     buf[offset + 2] = ((value ushr 8) and 0xFF).toByte()
     buf[offset + 3] = (value and 0xFF).toByte()
 }
-
-private fun readInt32BE(buf: ByteArray, offset: Int): Int =
+fun readInt32BE(buf: ByteArray, offset: Int): Int =
     ((buf[offset].toInt() and 0xFF) shl 24) or
     ((buf[offset + 1].toInt() and 0xFF) shl 16) or
     ((buf[offset + 2].toInt() and 0xFF) shl 8) or

@@ -15,7 +15,7 @@ import borg.trikeshed.lib.j
 class GcsAdapter(
     val projectId: String,
     val bucket: String,
-    private val storage: GcsStorageClient,
+   val storage: GcsStorageClient,
 ) : ObjectStoreAdapter {
 
     constructor(config: Config) : this(config.projectId, config.bucket, config.storage!!)

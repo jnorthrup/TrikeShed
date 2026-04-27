@@ -17,7 +17,7 @@ import borg.trikeshed.test.TODOError
  * Or via range:
  *   ic.range(startOpenTime, endOpenTime).forEach { row -> ... }
  */
-class IsamCursor private constructor() {
+class IsamCursor constructor() {
 
     companion object {
         /**

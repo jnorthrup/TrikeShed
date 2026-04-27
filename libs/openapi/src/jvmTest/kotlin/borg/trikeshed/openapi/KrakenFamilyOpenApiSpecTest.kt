@@ -62,7 +62,7 @@ class KrakenFamilyOpenApiSpecTest {
         )
     }
 
-    private fun assertSpec(file: File, title: String, server: String, paths: List<String>) {
+   fun assertSpec(file: File, title: String, server: String, paths: List<String>) {
         assertTrue(file.exists(), "Expected ${file.path} to exist")
 
         val text = file.readText()

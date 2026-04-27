@@ -5,7 +5,7 @@ import kotlin.collections.Map.Entry as Map_Entry
 
 
 class ArrayMap<K : Comparable<K>, V>(
-    private val entre: Array<out Map_Entry<K, V>>,
+   val entre: Array<out Map_Entry<K, V>>,
     val keyComparator: Comparator<K> = naturalOrder(),
     val valComparator: Comparator<Map_Entry<K, V>> =
         Comparator<Map_Entry<K, V>> { (o1: K), (o2: K) ->
@@ -30,7 +30,7 @@ class ArrayMap<K : Comparable<K>, V>(
     override fun containsKey(key: K): Boolean = 0 <= binIndexOf(key)
 
     override fun containsValue(value: V): Boolean = entre.any { (_, v) -> (v?.equals(value) ?: false) }
-    private fun binIndexOf(key1: K) = entre.binarySearch(comparatorKeyShim(key1), valComparator)
+   fun binIndexOf(key1: K) = entre.binarySearch(comparatorKeyShim(key1), valComparator)
 
     override fun get(key: K): V? = binIndexOf(key).takeIf { it >= 0 }?.let { ix -> entre[ix].value }
 

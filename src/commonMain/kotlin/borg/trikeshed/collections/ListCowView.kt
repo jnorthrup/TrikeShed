@@ -5,9 +5,9 @@ import kotlinx.coroutines.sync.Mutex
 /** a mutable listView of a List which performs a copy to MutableList on first mutation.  not threadsafe or concurrent. */
 class ListCowView<T>(private var list: List<T> = emptyList()) : List<T>, AbstractMutableList<T>() {
     //keep our inital list until a mutable operation, then replace with .toMutableList
-   private var once: Mutex? = Mutex()
+  var once: Mutex? = Mutex()
 
-  private  var guardFunction:(()->Unit)? = {
+  var guardFunction:(()->Unit)? = {
         if (list !is MutableList<T>) {
             list = list.toMutableList()
         }

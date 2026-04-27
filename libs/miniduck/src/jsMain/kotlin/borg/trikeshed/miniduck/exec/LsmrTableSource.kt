@@ -6,9 +6,9 @@ import borg.trikeshed.userspace.database.LsmrDatabase
  * JS platform actual for LsmrTableSource. Delegate to InMemoryTableSource for tests/runtime
  * so common expect APIs compile and JS tests can run without a full LSMR implementation.
  */
-class LsmrTableSource(private val db: LsmrDatabase, private val blockSizeThreshold: Int = 128) : TableSource {
+class LsmrTableSource(private val db: LsmrDatabase,val blockSizeThreshold: Int = 128) : TableSource {
 
-    private val delegate = InMemoryTableSource()
+   val delegate = InMemoryTableSource()
 
     override fun open(execCtx: ExecutionContext, tableName: String): Cursor = delegate.open(execCtx, tableName)
 

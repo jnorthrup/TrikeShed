@@ -14,7 +14,7 @@ package borg.trikeshed.platform.tensor
  */
 class MlirContext {
     // FFI handle for MLIRContext pointer
-    private val raw: Long = 0L
+   val raw: Long = 0L
 
     companion object {
         fun create(): MlirContext = MlirContext()

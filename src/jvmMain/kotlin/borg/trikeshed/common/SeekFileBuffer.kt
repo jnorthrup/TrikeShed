@@ -28,13 +28,13 @@ actual class SeekFileBuffer actual constructor(
     actual val readOnly: Boolean,
 ) : LongSeries<Byte> {
 
-    private var channel: FileChannel? = null
-    private var fileSize: Long = 0
+   var channel: FileChannel? = null
+   var fileSize: Long = 0
 
     /** Buffer for windowed reads — large enough to amortize syscalls, small enough for cache. */
-    private val buffer = ByteBuffer.allocateDirect(BUFFER_SIZE)
-    private var bufferBase: Long = -1
-    private var bufferLimit: Long = -1
+   val buffer = ByteBuffer.allocateDirect(BUFFER_SIZE)
+   var bufferBase: Long = -1
+   var bufferLimit: Long = -1
 
     companion object {
         const val BUFFER_SIZE = 65536
@@ -81,7 +81,7 @@ actual class SeekFileBuffer actual constructor(
         return results
     }
 
-    private fun fillBuffer(pos: Long) {
+   fun fillBuffer(pos: Long) {
         buffer.clear()
         val remaining = (fileSize - pos).coerceAtLeast(0)
         val toRead = remaining.coerceAtMost(BUFFER_SIZE.toLong()).toInt()

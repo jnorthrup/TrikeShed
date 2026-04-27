@@ -12,8 +12,8 @@ import platform.posix.*
  * No file position state — each operation is absolute.
  */
 class PreadSeekHandle : SeekHandle {
-    private val fds = mutableMapOf<Long, Int>()
-    private var nextId: Long = 1
+   val fds = mutableMapOf<Long, Int>()
+   var nextId: Long = 1
 
     override fun open(filename: String, readOnly: Boolean): Long {
         val flags = if (readOnly) O_RDONLY else O_RDWR

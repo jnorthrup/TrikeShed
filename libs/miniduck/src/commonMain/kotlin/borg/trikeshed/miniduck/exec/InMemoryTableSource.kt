@@ -6,8 +6,8 @@ import borg.trikeshed.miniduck.schema.TableSchema
  * Simple in-memory table source useful for tests and examples.
  */
 class InMemoryTableSource : TableSource {
-    private val tables = mutableMapOf<String, MutableList<List<Any?>>>()
-    private val schemas = mutableMapOf<String, TableSchema>()
+   val tables = mutableMapOf<String, MutableList<List<Any?>>>()
+   val schemas = mutableMapOf<String, TableSchema>()
 
     fun addTable(schema: TableSchema, rows: List<List<Any?>>) {
         schemas[schema.name] = schema

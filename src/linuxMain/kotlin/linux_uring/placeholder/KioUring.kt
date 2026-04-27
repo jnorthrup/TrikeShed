@@ -239,8 +239,7 @@ fun get_file_size(fd: Int): posix_off_t = memScoped {
     }
     return st.st_size
 }
-
-private fun MemScope.getBlockDeviceBlockSize(fd: Int): off_t {
+fun MemScope.getBlockDeviceBlockSize(fd: Int): off_t {
     val bytes: LongVar = alloc()
     posixRequires(posix_ioctl(fd, PlatformLinuxBLKGETSIZE64, bytes.ptr).z) { ("ioctl") }
     return bytes.value /* = kotlin.Long */

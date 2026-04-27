@@ -45,7 +45,7 @@ class Htx {
          * T   = HMAC-SHA256(key=PRK, data=TICKET_V1_CONTEXT || hour_be || 0x01)
          * Result is T truncated to TICKET_LEN (32 bytes).
          */
-        private fun computeTicketForHour(
+       fun computeTicketForHour(
             sharedSecret: ByteArray,
             ticketKeyId: ByteArray,
             hour: Long

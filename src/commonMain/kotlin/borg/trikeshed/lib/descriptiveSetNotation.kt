@@ -1,8 +1,5 @@
 package borg.trikeshed.lib
-
-private fun <E> Set<E>.disjointUnion(other: Set<E>) = union(other).toSet()
-private fun <E> Set<E>.cartesianProduct(other: Set<E>) = flatMap { a -> other.map { b -> a to b } }.toSet()
-private fun <E> Set<E>.symmetricDifference(other: Set<E>): Set<E> {
+fun <E> Set<E>.disjointUnion(other: Set<E>) = union(other).toSet()fun <E> Set<E>.cartesianProduct(other: Set<E>) = flatMap { a -> other.map { b -> a to b } }.toSet()fun <E> Set<E>.symmetricDifference(other: Set<E>): Set<E> {
     val result = HashSet(this)
     for (element in other) if (!result.remove(element)) result.add(element)
     return result

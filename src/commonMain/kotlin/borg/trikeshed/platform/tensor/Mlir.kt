@@ -8,7 +8,7 @@ package borg.trikeshed.platform.tensor
  * MLIR context for managing tensor operations
  */
 class MLIRContext {
-    private var initialized = false
+   var initialized = false
 
     companion object {
         fun create(): MLIRContext = MLIRContext()

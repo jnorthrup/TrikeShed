@@ -30,12 +30,12 @@ object ViewQueryEncoder {
         return parts.joinToString("&")
     }
 
-    private fun urlencode(s: String): String = urlEncode(s)
+   fun urlencode(s: String): String = urlEncode(s)
 
     /**
      * Convert a Kotlin value to its JSON representation for CouchDB query params.
      */
-    private fun toJson(value: Any?): String = when (value) {
+   fun toJson(value: Any?): String = when (value) {
         null -> "null"
         is String -> "\"$value\""
         is Number -> value.toString()

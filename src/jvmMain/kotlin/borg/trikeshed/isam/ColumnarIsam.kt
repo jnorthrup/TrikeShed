@@ -124,7 +124,7 @@ class ColumnarIsam internal constructor(
 
 /** Simple column-major row view backed by a ColumnarIsam. */
 class ColumnarCursor(
-    private val isam: ColumnarIsam
+   val isam: ColumnarIsam
 ) : Cursor {
     override val a: Int get() = isam.a
     override val b: (Int) -> RowVec get() = { index ->

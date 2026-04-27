@@ -2,7 +2,7 @@ package borg.trikeshed.lib
 
 import borg.trikeshed.collections.s_
 
-class RecursiveMutableSeries<T> private constructor(private var data: Series<T>) : MutableSeries<T>, Series<T> {
+class RecursiveMutableSeries<T> constructor(var data: Series<T>) : MutableSeries<T>, Series<T> {
 
     override fun set(index: Int, item: T) {
         data = size j { i: Int ->
@@ -67,7 +67,7 @@ class RecursiveMutableSeries<T> private constructor(private var data: Series<T>)
     }
 
 
-    private tailrec fun indexOfFirst(predicate: (T) -> Boolean, index: Int = 0): Int = when {
+    tailrec fun indexOfFirst(predicate: (T) -> Boolean, index: Int = 0): Int = when {
         index >= size -> -1
         predicate(data[index]) -> index
         else -> indexOfFirst(predicate, index + 1)

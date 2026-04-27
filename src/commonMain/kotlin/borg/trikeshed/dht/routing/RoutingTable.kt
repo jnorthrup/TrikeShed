@@ -18,7 +18,7 @@ import kotlin.math.min
 open class RoutingTable<TNum : Comparable<TNum>, Sz : borg.trikeshed.dht.net.NetMask<TNum>>(
     val agentNUID: borg.trikeshed.dht.id.NUID<TNum>, val optimal: Boolean = false,
 ) {
-    private val bitOps = agentNUID.ops
+   val bitOps = agentNUID.ops
 
     /**
      * contract is to have the route guid id fully realized in agent first

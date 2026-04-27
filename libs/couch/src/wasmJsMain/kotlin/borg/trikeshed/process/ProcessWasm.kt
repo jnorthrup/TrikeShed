@@ -8,8 +8,7 @@ external interface ChildProcessModule {
     fun execSync(command: String, options: ExecSyncOptions = definedExternally): String
 }
 
-external fun require(module: String): ChildProcessModule
-private val utf8Encoding: ExecSyncOptions = js("({encoding: 'utf8'})")
+external fun require(module: String): ChildProcessModuleval utf8Encoding: ExecSyncOptions = js("({encoding: 'utf8'})")
 
 actual class ProcessShell {
     actual fun exec(command: String, args: List<String>): ProcessResult {

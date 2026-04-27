@@ -21,8 +21,8 @@ import kotlin.coroutines.CoroutineContext
 enum class NarsiveElementKind(
     val parserName: String,
     val isRoot: Boolean = false,
-    private val operatorLexeme: (Series<Char>) -> Series<Char>? = { null },
-    private val operatorAccept: (NarsiveOperator) -> Boolean = { false },
+   val operatorLexeme: (Series<Char>) -> Series<Char>? = { null },
+   val operatorAccept: (NarsiveOperator) -> Boolean = { false },
 ) : CoroutineContext.Key<NarsiveElement> {
     TASK("narsiveTask", true),
     SENTENCE("narsiveSentence", true),
@@ -87,7 +87,7 @@ class NarsiveSupervisorJob(
     val root: NarsiveElement,
     val elements: Series<NarsiveElement>,
 ) : AbstractCoroutineContextElement(Job), Job {
-    private val supervisor = SupervisorJob()
+   val supervisor = SupervisorJob()
 
     override fun isActive(): Boolean = supervisor.isActive
 
@@ -141,8 +141,8 @@ enum class NarsiveOperator(
     INDEPENDENT_VARIABLE("$"),
     ;
 
-    private val forms: Array<String> = (listOfNotNull(asciiForm, unicodeForm) + aliases.asList()).toTypedArray()
-    private val orderedForms: Array<String> = forms.sortedByDescending(String::length).toTypedArray()
+   val forms: Array<String> = (listOfNotNull(asciiForm, unicodeForm) + aliases.asList()).toTypedArray()
+   val orderedForms: Array<String> = forms.sortedByDescending(String::length).toTypedArray()
 
     val isCopula: Boolean get() = ordinal <= CONCURRENT_IMPLICATION.ordinal
     val isConjunction: Boolean get() = ordinal in INTERSECTION.ordinal..PRODUCT.ordinal
@@ -222,9 +222,9 @@ object Narsive {
      *  Uses indirect step to break the mutual-recursion init cycle.
      *  [termStep] reads [_term] at parse time, not at lazy-init time.
      */
-    private var _term: KursiveParser<CharSeries>? = null
-    private val termStep: KursiveStep get() = { input -> _term!!(input) != null }
-    private val termParser: KursiveParser<CharSeries> get() = _term!!
+   var _term: KursiveParser<CharSeries>? = null
+   val termStep: KursiveStep get() = { input -> _term!!(input) != null }
+   val termParser: KursiveParser<CharSeries> get() = _term!!
 
     val term: KursiveParser<CharSeries> get() = _term!!
 

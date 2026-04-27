@@ -128,8 +128,7 @@ data class WamEnv(
 }
 
 // ─── Item ↔ Kotlin value conversion (Cbor side) ───────────────────────────────
-
-private fun Item.toTrikeValue(): Any? = when (this) {
+fun Item.toTrikeValue(): Any? = when (this) {
     is Item.Nil -> null
     is Item.Str -> value
     is Item.Num -> value
@@ -140,8 +139,7 @@ private fun Item.toTrikeValue(): Any? = when (this) {
     is Item.Arr -> (0 until size).map { get(it).toTrikeValue() }
     is Item.Tag -> item.toTrikeValue()
 }
-
-private fun Any?.toTrikeItem(): Item = when (this) {
+fun Any?.toTrikeItem(): Item = when (this) {
     null -> Item.Nil
     is String -> Item.Str(this)
     is Long -> Item.Num(this)
@@ -181,10 +179,10 @@ private fun Any?.toTrikeItem(): Item = when (this) {
  * (WamAcc, WamEnv, WamPc) so state is isolated yet composable.
  */
 class UnifyCodec(
-    private val format: Format,
+   val format: Format,
 ) {
-    private var state: ElementState = ElementState.CREATED
-    private var scope: CoroutineScope? = null
+   var state: ElementState = ElementState.CREATED
+   var scope: CoroutineScope? = null
 
     val lifecycleState: ElementState get() = state
 
@@ -376,9 +374,9 @@ class UnifyCodec(
         )
     }
 
-    // ── Private helpers ─────────────────────────────────────────────────────
+    // ──helpers ─────────────────────────────────────────────────────
 
-    private tailrec fun queryYamlNode(node: YamlNode, segments: List<String>): Any? {
+   tailrec fun queryYamlNode(node: YamlNode, segments: List<String>): Any? {
         if (segments.isEmpty()) return when (node) {
             is YamlScalarNode -> node.value?.asString()
             is YamlSequenceNode -> (0 until node.items.size).map {
@@ -409,7 +407,7 @@ class UnifyCodec(
         }
     }
 
-    private tailrec fun queryCborItem(
+   tailrec fun queryCborItem(
         item: Item,
         segments: List<String>,
         svc: CborCodecService,

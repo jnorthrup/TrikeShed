@@ -25,7 +25,7 @@ class ParseSupervisor(
     val supervisor: CompletableJob = SupervisorJob()
 
     // State transitions are single-threaded (driven from parse supervisor coroutine).
-    private var _state: ParseState = ParseState.CREATED
+   var _state: ParseState = ParseState.CREATED
     val state: ParseState get() = _state
 
     enum class ParseState {

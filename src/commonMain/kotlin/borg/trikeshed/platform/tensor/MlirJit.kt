@@ -25,7 +25,7 @@ data class JitResult(
  * ORC JIT compiler state
  */
 class OrcJit {
-    private val contexts = mutableMapOf<String, JitSession>()
+   val contexts = mutableMapOf<String, JitSession>()
 
     companion object {
         fun create(): OrcJit = OrcJit()
@@ -44,7 +44,7 @@ class OrcJit {
  * JIT session
  */
 class JitSession(val name: String) {
-    private val compiledSymbols = mutableMapOf<String, JitSymbol>()
+   val compiledSymbols = mutableMapOf<String, JitSymbol>()
 
     fun registerSymbol(name: String, symbol: JitSymbol) {
         compiledSymbols[name] = symbol
@@ -94,7 +94,7 @@ class MlirOrcBuilder(
     val context: MLIRContext,
     val session: JitSession
 ) {
-    private val pendingOps = mutableListOf<TensorOp>()
+   val pendingOps = mutableListOf<TensorOp>()
 
     companion object {
         fun create(context: MLIRContext, session: JitSession): MlirOrcBuilder {
@@ -156,7 +156,7 @@ sealed class JitError(message: String) : Throwable(message) {
  * Execute a JIT compiled operation on tensors
  */
 class JitExecutor {
-    private val jit = OrcJit.create()
+   val jit = OrcJit.create()
 
     companion object {
         fun create(): JitExecutor = JitExecutor()
@@ -178,9 +178,9 @@ class JitExecutor {
  * Builder for tensor computation graphs that can be compiled via MLIR+ORC
  */
 class TensorGraph {
-    private val operations = mutableListOf<TensorOp>()
-    private val inputs = mutableListOf<Triple<String, List<Int>, String>>()
-    private var outputShape: List<Int> = emptyList()
+   val operations = mutableListOf<TensorOp>()
+   val inputs = mutableListOf<Triple<String, List<Int>, String>>()
+   var outputShape: List<Int> = emptyList()
 
     companion object {
         fun create(): TensorGraph = TensorGraph()

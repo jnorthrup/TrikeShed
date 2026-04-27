@@ -18,7 +18,7 @@ import zlinux_uring.IORING_ENTER_SQ_WAKEUP
  * When the system call returns that a certain amount of SQEs have been consumed and submitted, it's safe to reuse SQE
  * entries in the ring. This is true even if the actual IO submission had to be punted to async context, which means
  * that the SQE may in fact not have been submitted yet. If the kernel requires later use of a particular SQE entry, it
- * will have made a private copy of it.
+ * will have made acopy of it.
  */
 enum class UringEnter(val modeFlag: UInt) {
     /**If this flag is set, then the system call will wait for the specificied number of events in min_complete before

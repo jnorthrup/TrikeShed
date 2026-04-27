@@ -9,14 +9,14 @@ import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.AtomicLong
 
 class NioSpiBackend(
-    private val provider: UserspaceNioSpi = UserspaceNioProvider()
+   val provider: UserspaceNioSpi = UserspaceNioProvider()
 ) : PlatformBackend {
-    private val elements = ConcurrentHashMap<Int, NioUserspaceElement>()
-    private val registrations = ConcurrentHashMap<Int, Pair<Long, Interest>>()
-    private val completions = ConcurrentLinkedQueue<Completion>()
-    private val submittedCount = AtomicLong(0)
+   val elements = ConcurrentHashMap<Int, NioUserspaceElement>()
+   val registrations = ConcurrentHashMap<Int, Pair<Long, Interest>>()
+   val completions = ConcurrentLinkedQueue<Completion>()
+   val submittedCount = AtomicLong(0)
 
-    private fun elementFor(fd: Int): NioUserspaceElement =
+   fun elementFor(fd: Int): NioUserspaceElement =
         elements.computeIfAbsent(fd) { openedFd ->
             runBlocking { provider.open(openedFd) }
         }

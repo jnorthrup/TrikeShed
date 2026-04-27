@@ -32,14 +32,14 @@ import java.util.zip.ZipInputStream
  * Exposes columns: symbol, timespan, openTime, open, high, low, close, volume
  */
 class BinanceTableSource(
-    private val symbol: String,
-    private val interval: String = "1h",
-    private val startDate: LocalDate,
-    private val endDate: LocalDate,
-    private val blockCapacity: Int = 500,
+   val symbol: String,
+   val interval: String = "1h",
+   val startDate: LocalDate,
+   val endDate: LocalDate,
+   val blockCapacity: Int = 500,
 ) : TableSource {
 
-    private val ohlcvSchema = TableSchema(
+   val ohlcvSchema = TableSchema(
         name = symbol,
         columns = listOf(
             ColumnSchema(0, "symbol"),
@@ -53,7 +53,7 @@ class BinanceTableSource(
         )
     )
 
-    private val schemaManager = object : SchemaManager {
+   val schemaManager = object : SchemaManager {
         override suspend fun getTableSuspend(name: String): TableSchema? =
             if (name == symbol) ohlcvSchema else null
 
@@ -66,8 +66,8 @@ class BinanceTableSource(
     }
 
     // Lazily fetched blocks
-    private val blocks = mutableListOf<KlineBlock>()
-    @Volatile private var fetched = false
+   val blocks = mutableListOf<KlineBlock>()
+    @Volatilevar fetched = false
 
     init {
         require(symbol.isNotBlank()) { "symbol must not be blank" }
@@ -92,7 +92,7 @@ class BinanceTableSource(
     fun getSchema(): TableSchema = ohlcvSchema
     fun getSchemaManager(): SchemaManager = schemaManager
 
-    private suspend fun fetchAll(onBlock: (KlineBlock) -> Unit) {
+   suspend fun fetchAll(onBlock: (KlineBlock) -> Unit) {
         val channel: Channel<Kline> = Channel(ChannelCapacity.Unbounded)
         val collector = KlineCollector(blockCapacity)
 
@@ -108,7 +108,7 @@ class BinanceTableSource(
         fetcher.join()
     }
 
-    private suspend fun fetchKlines(channel: Channel<Kline>) {
+   suspend fun fetchKlines(channel: Channel<Kline>) {
         val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd")
         var date = startDate
         while (!date.isAfter(endDate)) {
@@ -125,12 +125,12 @@ class BinanceTableSource(
         }
     }
 
-    private fun buildUrl(date: LocalDate): String {
+   fun buildUrl(date: LocalDate): String {
         val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd")
         return "https://data.binance.vision/data/spot/daily/klines/$symbol/$interval/$symbol-$interval-${date.format(formatter)}.csv"
     }
 
-    private fun fetchCsv(urlStr: String): String {
+   fun fetchCsv(urlStr: String): String {
         val conn = URI(urlStr).toURL().openConnection() as java.net.HttpURLConnection
         conn.connectTimeout = 10_000
         conn.readTimeout = 30_000
@@ -155,7 +155,7 @@ class BinanceTableSource(
         }
     }
 
-    private fun parseCsv(csv: String): List<Kline> {
+   fun parseCsv(csv: String): List<Kline> {
         val timespan = intervalToTimeSpan(interval)
         return csv.lineSequence()
             .filter { it.isNotBlank() }
@@ -180,7 +180,7 @@ class BinanceTableSource(
             .toList()
     }
 
-    private fun intervalToTimeSpan(interval: String): TimeSpan = when (interval) {
+   fun intervalToTimeSpan(interval: String): TimeSpan = when (interval) {
         "1m"  -> TimeSpan.Minutes1
         "3m"  -> TimeSpan.Minutes3
         "5m"  -> TimeSpan.Minutes5

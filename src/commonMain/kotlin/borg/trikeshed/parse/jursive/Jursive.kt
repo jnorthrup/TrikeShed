@@ -25,11 +25,11 @@ import borg.trikeshed.isam.meta.IOMemento
 typealias NarsiveEvent = Join<Series<Char>, Twin<Int>>
 typealias NarsiveTrace = Series<NarsiveEvent>
 
-internal class SeriesBuffer<T>(
+class SeriesBuffer<T>(
     capacity: Int = 8,
 ) : Series<T> {
-    private var buf: Array<Any?> = arrayOfNulls(capacity)
-    private var count: Int = 0
+    var buf: Array<Any?> = arrayOfNulls(capacity)
+    var count: Int = 0
 
     override val a: Int get() = count
     override val b: (Int) -> T get() = { index -> buf[index] as T }
@@ -54,9 +54,9 @@ internal class SeriesBuffer<T>(
 }
 //TODO DRY THESE INTO ON ABSTRACTION
 
-class JursiveCharSeries private constructor(
-    private val source: CharSeries,
-    private val sink: SeriesBuffer<NarsiveEvent>,
+class JursiveCharSeries constructor(
+    val source: CharSeries,
+    val sink: SeriesBuffer<NarsiveEvent>,
 ) : Series<Char> by source {
 
     constructor(source: Series<Char>) : this(CharSeries(source), SeriesBuffer())
@@ -96,7 +96,7 @@ class JursiveCharSeries private constructor(
     fun skipWhitespace(): JursiveCharSeries = apply { while (peek()?.isWhitespace() == true) source.pos++ }
 
     /** Try each string in order; return first successful match's CharSeries slice. Backtracks on failure. */
-    internal fun consumeAnyOf(vararg forms: String): CharSeries? {
+    fun consumeAnyOf(vararg forms: String): CharSeries? {
         for (form in forms) {
             val cp = checkpoint()
             val start = pos
@@ -108,7 +108,7 @@ class JursiveCharSeries private constructor(
 
     fun trace(): NarsiveTrace = sink.snapshot()
 
-    internal fun emit(name: Series<Char>, start: Int, endExclusive: Int) {
+    fun emit(name: Series<Char>, start: Int, endExclusive: Int) {
         sink.add(name j (start j endExclusive))
     }
 }
@@ -206,7 +206,7 @@ fun <T> choice(name: Series<Char>, vararg options: KursiveParser<T>): KursivePar
 
 fun <T> choice(name: String, vararg options: KursiveParser<T>): KursiveParser<T> = choice(name.toSeries(), *options)
 
-private fun Series<Char>.joinName(separator: Char, other: Series<Char>): Series<Char> = this + s_[separator] + other
+fun Series<Char>.joinName(separator: Char, other: Series<Char>): Series<Char> = this + s_[separator] + other
 
 infix fun <T> KursiveParser<T>.or(other: KursiveParser<T>): KursiveParser<T> =
     parser(name.joinName('|', other.name)) { input ->
@@ -251,14 +251,14 @@ fun NarsiveTrace.evidence(source: Series<Char>): Series<TypeEvidence> =
 
 fun NarsiveTrace.rowVecs(source: Series<Char>): Series<RowVec> = evidence(source) α TypeEvidence::toKursiveRowVec
 
-private fun Series<Char>.toKursiveEvidence(): TypeEvidence = TypeEvidence().apply {
+fun Series<Char>.toKursiveEvidence(): TypeEvidence = TypeEvidence().apply {
     confix = detectKursiveConfix(this@toKursiveEvidence)
     structuralMemento = detectKursiveStructuralMemento(confix)
     for (index in 0 until this@toKursiveEvidence.size) this + this@toKursiveEvidence[index]
     recordColumnLength(this@toKursiveEvidence.size)
 }
 
-private fun detectKursiveConfix(src: Series<Char>): String {
+fun detectKursiveConfix(src: Series<Char>): String {
     if (src.size < 2) return ""
     val first = src[0]
     val last = src[src.size - 1]
@@ -273,14 +273,14 @@ private fun detectKursiveConfix(src: Series<Char>): String {
     }
 }
 
-private fun detectKursiveStructuralMemento(confix: String): TypeMemento? =
+fun detectKursiveStructuralMemento(confix: String): TypeMemento? =
     when (confix) {
         "{}" -> MapTypeMemento
         "[]" -> SeqTypeMemento
         else -> null
     }
 
-private fun TypeEvidence.toKursiveRowVec(): RowVec {
+fun TypeEvidence.toKursiveRowVec(): RowVec {
     val values = arrayOf<Any?>(
         confix,
         digits.toInt(),
@@ -304,7 +304,7 @@ private fun TypeEvidence.toKursiveRowVec(): RowVec {
     return values.size j { index: Int -> values[index] } joins meta
 }
 
-private val KURSIVE_EVIDENCE_COLUMNS = arrayOf(
+val KURSIVE_EVIDENCE_COLUMNS = arrayOf(
     ColumnMeta("confix", IOMemento.IoString),
     ColumnMeta("digits", IOMemento.IoInt),
     ColumnMeta("periods", IOMemento.IoInt),
@@ -325,5 +325,5 @@ private val KURSIVE_EVIDENCE_COLUMNS = arrayOf(
 )
 
 /** First character as a single-element Series, or null if empty */
-internal fun Series<Char>.firstGlyphOrNull(): Series<Char>? =
+fun Series<Char>.firstGlyphOrNull(): Series<Char>? =
     if (size == 0) null else 1 j { this[0] }

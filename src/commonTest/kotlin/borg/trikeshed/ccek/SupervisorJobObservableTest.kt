@@ -28,9 +28,9 @@ interface Observable<out T> {
 }
 
 class MutableObservable<T>(initial: T) : Observable<T> {
-    private var _value: T = initial
+   var _value: T = initial
     override val value: T get() = _value
-    private val callbacks = mutableListOf<(T) -> Unit>()
+   val callbacks = mutableListOf<(T) -> Unit>()
 
     fun update(newValue: T) {
         _value = newValue
@@ -54,8 +54,8 @@ interface SupervisorJob {
 }
 
 class SupervisorJobStub(override val key: Any) : SupervisorJob {
-    override var lifecycle: FanoutLifecycle = FanoutLifecycle.CLOSED; private set
-    override var fanoutSubscribers: Int = 0; private set
+    override var lifecycle: FanoutLifecycle = FanoutLifecycle.CLOSED;set
+    override var fanoutSubscribers: Int = 0;set
 
     override fun open() { lifecycle = FanoutLifecycle.OPEN }
     override fun drain() { lifecycle = FanoutLifecycle.DRAINING }
@@ -67,7 +67,7 @@ class SupervisorJobStub(override val key: Any) : SupervisorJob {
 // SPEC: Forward-only lifecycle, singleton keys, draw-through fanout
 // ================================================================================
 
-class SupervisorJobObservableRedTest {
+class SupervisorJobObservableTest {
 
     /** Lifecycle is forward-only: CLOSED → OPEN → DRAINING → CLOSED. Never backward. */
     @Test

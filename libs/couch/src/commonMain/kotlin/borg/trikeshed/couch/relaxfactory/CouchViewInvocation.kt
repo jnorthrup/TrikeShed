@@ -6,8 +6,8 @@ class CouchViewInvocation(
     val path: String,
     val template: String,
     val returnShape: CouchViewInvocation.ReturnShape,
-    private val encodeValue: (Any?) -> String,
-    private val databaseName: String = "",
+   val encodeValue: (Any?) -> String,
+   val databaseName: String = "",
 ) {
     enum class ReturnShape {
         ListValue,

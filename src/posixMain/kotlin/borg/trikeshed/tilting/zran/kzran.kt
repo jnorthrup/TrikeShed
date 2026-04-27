@@ -227,7 +227,7 @@ class GzIndex {
     /**
      * opens the index file
      */
-    private fun <T> withIndexFile(indexFname: String?, mode: String = "rb", block: (CPointer<FILE>) -> T): T {
+   fun <T> withIndexFile(indexFname: String?, mode: String = "rb", block: (CPointer<FILE>) -> T): T {
         try {
             return if (indexFname == null || indexFname == "-") {
                 val stdinFp = stdin ?: error("stdin is not available")
@@ -455,7 +455,7 @@ class ZstdIndex {
 
     fun readIndex(indexFname: String?): Int = zstdNotAvailable()
 
-    private fun <T> withIndexFile(indexFname: String?, mode: String = "rb", block: (CPointer<FILE>) -> T): T =
+   fun <T> withIndexFile(indexFname: String?, mode: String = "rb", block: (CPointer<FILE>) -> T): T =
         zstdNotAvailable()
 
     fun prepareIndexEntry(index: Int): ZstdDCtx = zstdNotAvailable()
@@ -479,7 +479,7 @@ class ZstdBlockIndex : BlockIndex {
     val zstdIndex = ZstdIndex()
 
     /** Line table: parallel list of decompressed offsets, one per point. */
-    private var _lineTable: List<Long> = emptyList()
+   var _lineTable: List<Long> = emptyList()
 
     override val lineTable: Series<Long>
         get() = _lineTable.size j { i: Int -> _lineTable[i] }

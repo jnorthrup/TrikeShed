@@ -45,8 +45,7 @@ val Long.humanReadableByteCountSI: String
         val seriesDoubleConstant = seriesConstant.toDouble()
         return unitizer(seriesConstant, seriesDoubleConstant)
     }
-
-private fun Long.unitizer(seriesConstant: Int, seriesDoubleConstant: Double): String {
+fun Long.unitizer(seriesConstant: Int, seriesDoubleConstant: Double): String {
     if (this == Long.MIN_VALUE) return (Long.MIN_VALUE + 1).humanReadableByteCountIEC
     if (this < 0) return "-" + (-this).humanReadableByteCountIEC
     if (this < seriesConstant) return this.toString() + " B"

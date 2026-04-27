@@ -83,13 +83,13 @@ class SqlParser(private val cs: CharSeries) {
         }
     }
 
-    private fun skipWs() {
+   fun skipWs() {
         while (cs.pos < cs.limit && cs[cs.pos].isWhitespace()) cs.pos++
     }
 
-    private fun peek(): Char = if (cs.pos < cs.limit) cs[cs.pos] else '\u0000'
+   fun peek(): Char = if (cs.pos < cs.limit) cs[cs.pos] else '\u0000'
 
-    private fun matchKeyword(keyword: String): Boolean {
+   fun matchKeyword(keyword: String): Boolean {
         val save = cs.pos
         val k = keyword.uppercase()
         for (i in k.indices) {
@@ -111,7 +111,7 @@ class SqlParser(private val cs: CharSeries) {
         return true
     }
 
-    private fun parseIdentifier(): Identifier? {
+   fun parseIdentifier(): Identifier? {
         skipWs()
         if (peek() == '"') {
             val tmp = CharSeries(cs, cs.pos, cs.limit)
@@ -136,7 +136,7 @@ class SqlParser(private val cs: CharSeries) {
         return null
     }
 
-    private fun parseStringLiteral(): StringLiteral? {
+   fun parseStringLiteral(): StringLiteral? {
         skipWs()
         if (peek() != '\'') return null
         val tmp = CharSeries(cs, cs.pos, cs.limit)
@@ -149,7 +149,7 @@ class SqlParser(private val cs: CharSeries) {
         return StringLiteral(value)
     }
 
-    private fun parseNumberLit(): NumericLiteral? {
+   fun parseNumberLit(): NumericLiteral? {
         skipWs()
         val start = cs.pos
         var seen = false
@@ -177,7 +177,7 @@ class SqlParser(private val cs: CharSeries) {
         return NumericLiteral(value as Number)
     }
 
-    private fun parseTerm(): Expr? {
+   fun parseTerm(): Expr? {
         skipWs()
         if (peek() == '(') {
             cs.pos++
@@ -192,7 +192,7 @@ class SqlParser(private val cs: CharSeries) {
         return null
     }
 
-    private fun parseComparison(): Expr? {
+   fun parseComparison(): Expr? {
         var left = parseTerm() ?: return null
         skipWs()
         val ops = listOf("!=", "<>", ">=", "<=", "=", ">", "<", "LIKE")
@@ -216,7 +216,7 @@ class SqlParser(private val cs: CharSeries) {
         return left
     }
 
-    private fun parseAnd(): Expr? {
+   fun parseAnd(): Expr? {
         var left = parseComparison() ?: return null
         while (true) {
             val save = cs.pos
@@ -232,7 +232,7 @@ class SqlParser(private val cs: CharSeries) {
         return left
     }
 
-    private fun parseExpr(): Expr? {
+   fun parseExpr(): Expr? {
         var left = parseAnd() ?: return null
         while (true) {
             val save = cs.pos
@@ -248,7 +248,7 @@ class SqlParser(private val cs: CharSeries) {
         return left
     }
 
-    private fun parseColumn(): Column? {
+   fun parseColumn(): Column? {
         skipWs()
         val save = cs.pos
         val expr = parseTerm() ?: return null
@@ -278,7 +278,7 @@ class SqlParser(private val cs: CharSeries) {
         return Column(expr as Expr, alias)
     }
 
-    private fun parseSelectList(): Series<Column> {
+   fun parseSelectList(): Series<Column> {
         skipWs()
         val cols = mutableListOf<Column>()
         if (peek() == '*') {
@@ -295,7 +295,7 @@ class SqlParser(private val cs: CharSeries) {
         return cols.toSeries()
     }
 
-    private fun parseTableRef(): TableRef? {
+   fun parseTableRef(): TableRef? {
         skipWs()
         val name = parseIdentifier() ?: return null
         skipWs()

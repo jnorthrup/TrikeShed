@@ -22,19 +22,19 @@ import borg.trikeshed.miniduck.exec.RowAccessor
  * @param blocks sealed KlineBlocks; each block's asCursor() is a MiniCursor of DocRowVec.
  */
 class BinanceCursor(
-    private val blocks: List<KlineBlock>,
+   val blocks: List<KlineBlock>,
 ) : Cursor {
 
     // Cursor position: block index, row index within block
-    private var blockIdx = 0
-    private var rowIdx = -1
+   var blockIdx = 0
+   var rowIdx = -1
 
     // Lazily built flat cursors
-    private val cursors: List<MiniCursor> by lazy {
+   val cursors: List<MiniCursor> by lazy {
         blocks.map { it.asCursor() }
     }
 
-    private var totalRows: Int = -1
+   var totalRows: Int = -1
 
     init {
         require(blocks.all { it.state == KlineBlock.State.SEALED }) {
@@ -89,7 +89,7 @@ class BinanceCursor(
  * Adapts a [MiniRowVec] to the [RowAccessor] interface used by plan nodes.
  */
 class MiniRowVecRowAccessor(
-    private val row: MiniRowVec,
+   val row: MiniRowVec,
 ) : RowAccessor {
     override fun get(index: Int): Any? = row.get(index)
     override fun get(name: String): Any? {

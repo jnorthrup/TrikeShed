@@ -8,7 +8,7 @@ import borg.trikeshed.htx.client.generated.infrastructure.GeneratedRequest
 import kotlin.coroutines.CoroutineContext
 
 class HtxGeneralServerAdapter(
-    private val context: CoroutineContext,
+   val context: CoroutineContext,
 ) {
     suspend fun execute(request: GeneratedRequest): HtxClientMessage {
         val htx = requireNotNull(context[HtxKey]) { "Expected HtxKey to be present in the server context" }

@@ -6,7 +6,7 @@ import kotlin.collections.contains
  * Created by kenny on 6/6/16.
  */
 class Trie(var root: Map<String, Node> = linkedMapOf()) {
-    private var freeze: Boolean = false
+   var freeze: Boolean = false
     fun add(v: Int, vararg values: String) {
         var children: Map<String, Node> = root
 

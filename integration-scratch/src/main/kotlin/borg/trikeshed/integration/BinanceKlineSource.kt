@@ -33,11 +33,11 @@ import java.util.zip.ZipInputStream
  * is a DocRowVec with keys: symbol, timespan, openTime, open, high, low, close, volume
  */
 class BinanceKlineSource(
-    private val symbol: String,
-    private val interval: String = "1h",
-    private val startDate: LocalDate,
-    private val endDate: LocalDate,
-    private val blockCapacity: Int = 500,
+   val symbol: String,
+   val interval: String = "1h",
+   val startDate: LocalDate,
+   val endDate: LocalDate,
+   val blockCapacity: Int = 500,
 ) {
     init {
         require(symbol.isNotBlank()) { "symbol must not be blank" }
@@ -61,7 +61,7 @@ class BinanceKlineSource(
      */
     fun open(): MiniCursor = fetchCursor()
 
-    private suspend fun fetchAll(onBlock: (KlineBlock) -> Unit) {
+   suspend fun fetchAll(onBlock: (KlineBlock) -> Unit) {
         val channel: Channel<Kline> = Channel(ChannelCapacity.Unbounded)
         val collector = KlineCollector(blockCapacity)
 
@@ -77,7 +77,7 @@ class BinanceKlineSource(
         fetcher.join()
     }
 
-    private suspend fun fetchKlines(channel: Channel<Kline>) {
+   suspend fun fetchKlines(channel: Channel<Kline>) {
         val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd")
         var date = startDate
         while (!date.isAfter(endDate)) {
@@ -94,12 +94,12 @@ class BinanceKlineSource(
         }
     }
 
-    private fun buildUrl(date: LocalDate): String {
+   fun buildUrl(date: LocalDate): String {
         val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd")
         return "https://data.binance.vision/data/spot/daily/klines/$symbol/$interval/$symbol-$interval-${date.format(formatter)}.csv"
     }
 
-    private fun fetchCsv(urlStr: String): String {
+   fun fetchCsv(urlStr: String): String {
         val conn = URI(urlStr).toURL().openConnection() as java.net.HttpURLConnection
         conn.connectTimeout = 10_000
         conn.readTimeout = 30_000
@@ -124,7 +124,7 @@ class BinanceKlineSource(
         }
     }
 
-    private fun parseCsv(csv: String): List<Kline> {
+   fun parseCsv(csv: String): List<Kline> {
         val timespan = intervalToTimeSpan(interval)
         return csv.lineSequence()
             .filter { it.isNotBlank() }
@@ -149,7 +149,7 @@ class BinanceKlineSource(
             .toList()
     }
 
-    private fun intervalToTimeSpan(interval: String): TimeSpan = when (interval) {
+   fun intervalToTimeSpan(interval: String): TimeSpan = when (interval) {
         "1m"  -> TimeSpan.Minutes1
         "3m"  -> TimeSpan.Minutes3
         "5m"  -> TimeSpan.Minutes5
@@ -177,7 +177,7 @@ class BinanceKlineSource(
      * So `totalRows j { rowIdx -> ... }` produces Join<Int, (Int) -> MiniRowVec>
      * which is Series<MiniRowVec> = MiniCursor
      */
-    private fun blocksToCursor(blocks: List<KlineBlock>): MiniCursor {
+   fun blocksToCursor(blocks: List<KlineBlock>): MiniCursor {
         val totalRows = blocks.sumOf { it.rowCount }
         if (totalRows == 0) return emptyMiniCursor()
 

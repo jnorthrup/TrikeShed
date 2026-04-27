@@ -188,7 +188,7 @@ fun renderGeneratedSources(contract: TrikeshedContract): Map<String, String> {
                     }
 
                     class DefaultHtxGeneralApi(
-                        private val call: suspend (GeneratedRequest) -> String,
+                       val call: suspend (GeneratedRequest) -> String,
                     ) : HtxGeneralApi {
                         override suspend fun ${contract.operationId}(): HealthStatus =
                             HealthStatus(call(HtxGeneralApiContract.GetHealth.request))

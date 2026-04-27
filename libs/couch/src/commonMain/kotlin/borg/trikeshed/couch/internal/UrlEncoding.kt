@@ -1,6 +1,5 @@
 package borg.trikeshed.couch.internal
-
-private val unreservedChars: Set<Char> = (
+val unreservedChars: Set<Char> = (
     ('A'..'Z') + ('a'..'z') + ('0'..'9') + listOf('-', '_', '.', '~')
 ).toSet()
 

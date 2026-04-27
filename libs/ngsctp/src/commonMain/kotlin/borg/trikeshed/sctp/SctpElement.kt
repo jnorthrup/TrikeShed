@@ -288,22 +288,18 @@ object SctpCookieAckChunk {
 }
 
 // ── Primitive encoding helpers (big-endian) ─────────────────────────────────
-
-private fun putUShort(buf: ByteArray, off: Int, value: UShort) {
+fun putUShort(buf: ByteArray, off: Int, value: UShort) {
     val v = value.toInt()
     buf[off]     = (v shr 8).toByte()
     buf[off + 1] = v.toByte()
 }
-
-private fun putUInt(buf: ByteArray, off: Int, value: UInt) {
+fun putUInt(buf: ByteArray, off: Int, value: UInt) {
     var v = value
     repeat(4) { i -> buf[off + 3 - i] = v.toByte(); v = v shr 8 }
 }
-
-private fun getUShort(buf: ByteArray, off: Int): UShort =
+fun getUShort(buf: ByteArray, off: Int): UShort =
     ((buf[off].toInt() and 0xFF) shl 8 or (buf[off + 1].toInt() and 0xFF)).toUShort()
-
-private fun getUInt(buf: ByteArray, off: Int): UInt {
+fun getUInt(buf: ByteArray, off: Int): UInt {
     var v = 0u
     repeat(4) { i -> v = (v shl 8) or (buf[off + i].toInt() and 0xFF).toUInt() }
     return v
@@ -315,8 +311,8 @@ suspend fun openSctpElement(): SctpElement =
     SctpElement().also { it.open() }
 
 class SctpElement(
-    private val streams: MutableMap<Int, StreamHandle> = mutableMapOf(),
-    private val associations: MutableMap<Long, SctpState> = mutableMapOf(),
+   val streams: MutableMap<Int, StreamHandle> = mutableMapOf(),
+   val associations: MutableMap<Long, SctpState> = mutableMapOf(),
 ) : AsyncContextElement(), StreamTransport {
     companion object Key : AsyncContextKey<SctpElement>("SctpKey", 1L shl 3)
 
@@ -337,7 +333,7 @@ class SctpElement(
 
     override val activeStreams: Int get() = streams.size
 
-    private fun assocId(host: String, port: Int): Long =
+   fun assocId(host: String, port: Int): Long =
         (host.hashCode().toLong() shl 32) xor port.toLong()
 
     // ── Server side ──────────────────────────────────────────────────────

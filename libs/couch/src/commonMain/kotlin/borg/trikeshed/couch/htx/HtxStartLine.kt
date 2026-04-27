@@ -70,7 +70,7 @@ data class HtxStartLine(
             )
         }
 
-        private fun parseHttpVersion(versionStr: String): Pair<Int, Int> {
+       fun parseHttpVersion(versionStr: String): Pair<Int, Int> {
             // Expect "HTTP/1.1" or "HTTP/2" or "HTTP/3"
             val trimmed = versionStr.trim()
             if (!trimmed.startsWith("HTTP/", ignoreCase = true)) {

@@ -17,7 +17,7 @@ import borg.trikeshed.test.TODOError
  *
  * @param path  directory path where the volume files live
  */
-class IsamVolume private constructor(
+class IsamVolume constructor(
     val path: String,
 ) {
     /** Number of blocks in this volume. */

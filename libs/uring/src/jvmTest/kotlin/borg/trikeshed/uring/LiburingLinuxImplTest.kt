@@ -44,7 +44,7 @@ data class UringSqe(
 // SPEC: Actual liburing implementation on Linux — CInterop + ring buffer mapping
 // ================================================================================
 
-class LiburingLinuxImplRedTest {
+class LiburingLinuxImplTest {
 
     /** The Linux implementation must map io_uring SQ/CQ rings via mmap. */
     @Test fun liburing_ringBufferMapping() {

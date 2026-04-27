@@ -28,8 +28,7 @@ value class QuicConnectionId(val bytes: ByteArray) {
 
 // ── QUIC short-header framing (RFC 9000 §17.3) ──────────────────────────────────
 
-/** First byte for a short-header QUIC packet with spin bit set (0x40). */
-private const val SHORT_HEADER_MASK: Byte = 0x40
+/** First byte for a short-header QUIC packet with spin bit set (0x40). */const val SHORT_HEADER_MASK: Byte = 0x40
 
 /**
  * Framed QUIC short-header packet.
@@ -64,7 +63,7 @@ data class QuicShortFrame(
  * - ioUringFd = -1 means epoll fallback mode
  */
 data class QuicChannelService(
-    private val _streams: MutableMap<Int, StreamHandle> = mutableMapOf(),
+   val _streams: MutableMap<Int, StreamHandle> = mutableMapOf(),
     val ioUringFd: Int = -1,          // -1 = epoll fallback
     val xdpProg: String? = null,      // XDP prog name for hardware packet steering, null = software only
     val connectionId: QuicConnectionId = QuicConnectionId.generate(),

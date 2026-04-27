@@ -22,10 +22,10 @@ class ngSCTPChannel(
 ) : AbstractCoroutineContextElement(ngSCTPChannelKey) {
 
     /** Per-stream send channel — rendezvous so sender suspends until receiver is ready. */
-    private val sendChannel = Channel<HtxBlock>(Channel.RENDEZVOUS)
+   val sendChannel = Channel<HtxBlock>(Channel.RENDEZVOUS)
 
     /** Per-stream recv channel — rendezvous so receiver suspends until sender is ready. */
-    private val recvChannel = Channel<HtxBlock>(Channel.RENDEZVOUS)
+   val recvChannel = Channel<HtxBlock>(Channel.RENDEZVOUS)
 
     /** Bidirectional stream channel — alias for send side. */
     val channel: Channel<HtxBlock> get() = sendChannel
@@ -78,9 +78,9 @@ class ngSCTPChannel(
  * the stickyness key — injected into all session-scoped coroutines.
  */
 class ngSCTPMultiplexer(
-    private val realm: String,
+   val realm: String,
 ) {
-    private val _channels = mutableMapOf<String, ngSCTPChannel>()
+   val _channels = mutableMapOf<String, ngSCTPChannel>()
 
     /** Look up or create a session channel by sessionId. */
     fun channel(sessionId: String): ngSCTPChannel =

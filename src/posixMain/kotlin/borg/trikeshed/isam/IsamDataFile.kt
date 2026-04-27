@@ -34,10 +34,10 @@ actual class IsamDataFile actual constructor(
 
     } // unfortunately due to seperatoin of ctor and open, this is not immutable
     val constraints: Series<RecordMeta> by lazy { metafile.constraints }
-    private lateinit var data: COpaquePointer
+   lateinit var data: COpaquePointer
     var fileSize: Long = -1
 
-    private var first = true
+   var first = true
     actual override fun open() {
         if (!first) return
         memScoped {

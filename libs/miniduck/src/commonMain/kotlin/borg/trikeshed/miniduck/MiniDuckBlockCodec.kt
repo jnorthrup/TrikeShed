@@ -3,8 +3,7 @@ package borg.trikeshed.miniduck
 import borg.trikeshed.lib.*
 import borg.trikeshed.parse.json.*
 
-// Minimal JSON serializer for NDJSON block persistence — no external deps.
-private fun Any?.toJsonString(): String = when (this) {
+// Minimal JSON serializer for NDJSON block persistence — no external deps.fun Any?.toJsonString(): String = when (this) {
     null -> "null"
     is Boolean -> toString()
     is Number -> toString()
@@ -60,7 +59,7 @@ object MiniDuckBlockCodec {
         return block.seal()
     }
 
-    private fun encodeRow(row: MiniRowVec): Map<String, Any?> = when (row) {
+   fun encodeRow(row: MiniRowVec): Map<String, Any?> = when (row) {
         is DocRowVec -> linkedMapOf(
             "type" to "DocRowVec",
             "keys" to row.keys,
@@ -146,7 +145,7 @@ object MiniDuckBlockCodec {
         )
     }
 
-    private fun decodeRow(value: Any?): MiniRowVec {
+   fun decodeRow(value: Any?): MiniRowVec {
         val map = value as? Map<*, *> ?: error("MiniDuck row body must be a JSON object")
         return when (map.string("type")) {
             "DocRowVec" -> DocRowVec(
@@ -238,49 +237,49 @@ object MiniDuckBlockCodec {
         }
     }
 
-    private fun encodeChildren(child: Series<MiniRowVec>?): List<Any?>? = child?.let { series ->
+   fun encodeChildren(child: Series<MiniRowVec>?): List<Any?>? = child?.let { series ->
         buildList {
             for (i in 0 until series.size) add(encodeRow(series[i]))
         }
     }
 
-    private fun Map<*, *>.string(name: String): String = this[name] as? String
+   fun Map<*, *>.string(name: String): String = this[name] as? String
         ?: error("Missing string field '$name'")
 
-    private fun Map<*, *>.stringList(name: String): List<String> = this[name].asList(name).map { it as? String ?: error("Field '$name' must contain strings") }
+   fun Map<*, *>.stringList(name: String): List<String> = this[name].asList(name).map { it as? String ?: error("Field '$name' must contain strings") }
 
-    private fun Map<*, *>.anyList(name: String): List<Any?> = this[name].asList(name)
+   fun Map<*, *>.anyList(name: String): List<Any?> = this[name].asList(name)
 
-    private fun Map<*, *>.intList(name: String): List<Int> = this[name].asList(name).map {
+   fun Map<*, *>.intList(name: String): List<Int> = this[name].asList(name).map {
         when (it) {
             is Number -> it.toInt()
             else -> error("Field '$name' must contain numbers")
         }
     }
 
-    private fun Map<*, *>.long(name: String): Long = (this[name] as? Number)?.toLong()
+   fun Map<*, *>.long(name: String): Long = (this[name] as? Number)?.toLong()
         ?: error("Missing or non-numeric field '$name'")
 
-    private fun Map<*, *>.metadataMap(name: String): Map<String, String>? {
+   fun Map<*, *>.metadataMap(name: String): Map<String, String>? {
         @Suppress("UNCHECKED_CAST")
         val raw = this[name] as? Map<*, *> ?: return null
         return raw.mapKeys { it.key.toString() }.mapValues { it.value.toString() }
     }
 
-    private fun Map<*, *>.childRows(): List<MiniRowVec> =
+   fun Map<*, *>.childRows(): List<MiniRowVec> =
         (this["child"] as? List<*>)?.map { decodeRow(it) } ?: emptyList()
 
-    private fun Map<*, *>.childSeries(): Series<MiniRowVec>? {
+   fun Map<*, *>.childSeries(): Series<MiniRowVec>? {
         val rows = childRows()
         return if (rows.isEmpty()) null else rows.toSeries()
     }
 
-    private fun Any?.asList(name: String): List<Any?> = this as? List<Any?>
+   fun Any?.asList(name: String): List<Any?> = this as? List<Any?>
         ?: error("Field '$name' must be an array")
 
-    private fun List<MiniRowVec>.toSeries(): Series<MiniRowVec> = size j { idx -> this[idx] }
+   fun List<MiniRowVec>.toSeries(): Series<MiniRowVec> = size j { idx -> this[idx] }
 
-    private fun unescapeJson(s: String): String {
+   fun unescapeJson(s: String): String {
         val sb = StringBuilder(s.length)
         var i = 0
         while (i < s.length) {

@@ -71,8 +71,7 @@ actual fun hkdfExpand(prk: ByteArray, info: ByteArray, length: Int): ByteArray {
 }
 
 // ── AES-256-GCM (NIST SP 800-38D) ────────────────────────────────────────────────
-
-private const val GCM_TAG_LEN = 16
+const val GCM_TAG_LEN = 16
 
 actual fun aes256GcmEncrypt(
     key: ByteArray,

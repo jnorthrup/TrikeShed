@@ -8,32 +8,23 @@ import borg.trikeshed.lib.j
 import borg.trikeshed.lib.toSeries
 import kotlin.random.Random
 
-@JsName("localStorage")
-private external val browserLocalStorage: Storage?
-
-private external class Storage {
+@JsName("localStorage")external val browserLocalStorage: Storage?
+external class Storage {
     val length: Int
     fun getItem(key: String): String?
     fun setItem(key: String, value: String)
     fun removeItem(key: String)
     fun key(index: Int): String?
 }
-
-private const val FILE_PREFIX = "trikeshed:browser:file:"
-private const val DIR_PREFIX = "trikeshed:browser:dir:"
-
-private val blobFallback = linkedMapOf<String, String>()
-private val dirFallback = linkedSetOf<String>()
-private val envFallback = linkedMapOf<String, String>()
-
-private fun storageOrNull(): Storage? =
+const val FILE_PREFIX = "trikeshed:browser:file:"const val DIR_PREFIX = "trikeshed:browser:dir:"
+val blobFallback = linkedMapOf<String, String>()val dirFallback = linkedSetOf<String>()val envFallback = linkedMapOf<String, String>()
+fun storageOrNull(): Storage? =
     try {
         browserLocalStorage
     } catch (_: Throwable) {
         null
     }
-
-private fun normalizePath(path: String): String {
+fun normalizePath(path: String): String {
     val normalized = path.replace('\\', '/')
     val parts: MutableList<String> = mutableListOf<String>()
     for (part in normalized.split('/')) {
@@ -45,19 +36,15 @@ private fun normalizePath(path: String): String {
     }
     return "/" + parts.joinToString("/")
 }
-
-private fun parentPath(path: String): String? {
+fun parentPath(path: String): String? {
     val normalized: String = normalizePath(path)
     val cut: Int = normalized.lastIndexOf('/')
     return if (cut <= 0) "/"
     else normalized.substring(0, cut)
 }
-
-private fun fileKey(path: String): String = FILE_PREFIX + normalizePath(path)
-
-private fun dirKey(path: String): String = DIR_PREFIX + normalizePath(path)
-
-private fun storageGet(key: String): String? =
+fun fileKey(path: String): String = FILE_PREFIX + normalizePath(path)
+fun dirKey(path: String): String = DIR_PREFIX + normalizePath(path)
+fun storageGet(key: String): String? =
     storageOrNull()?.let {
         try {
             it.getItem(key)
@@ -65,8 +52,7 @@ private fun storageGet(key: String): String? =
             null
         }
     }
-
-private fun storageSet(key: String, value: String): Boolean {
+fun storageSet(key: String, value: String): Boolean {
     val storage = storageOrNull() ?: return false
     return try {
         storage.setItem(key, value)
@@ -75,8 +61,7 @@ private fun storageSet(key: String, value: String): Boolean {
         false
     }
 }
-
-private fun storageRemove(key: String): Boolean {
+fun storageRemove(key: String): Boolean {
     val storage = storageOrNull() ?: return false
     return try {
         storage.removeItem(key)
@@ -85,8 +70,7 @@ private fun storageRemove(key: String): Boolean {
         false
     }
 }
-
-private fun storageKeys(prefix: String): List<String> {
+fun storageKeys(prefix: String): List<String> {
     val storage = storageOrNull() ?: return emptyList()
     val keys = mutableListOf<String>()
     for (index in 0 until storage.length) {
@@ -99,13 +83,11 @@ private fun storageKeys(prefix: String): List<String> {
     }
     return keys
 }
-
-private fun readBlob(path: String): String? {
+fun readBlob(path: String): String? {
     val key = fileKey(path)
     return storageGet(key) ?: blobFallback[key]
 }
-
-private fun writeBlob(path: String, hex: String) {
+fun writeBlob(path: String, hex: String) {
     val key = fileKey(path)
     if (!storageSet(key, hex)) {
         blobFallback[key] = hex
@@ -113,15 +95,13 @@ private fun writeBlob(path: String, hex: String) {
         blobFallback.remove(key)
     }
 }
-
-private fun removeBlob(path: String): Boolean {
+fun removeBlob(path: String): Boolean {
     val key = fileKey(path)
     val removedStorage = storageRemove(key)
     val removedFallback = blobFallback.remove(key) != null
     return removedStorage || removedFallback
 }
-
-private fun markDirectory(path: String) {
+fun markDirectory(path: String) {
     val normalized = normalizePath(path)
     if (!storageSet(dirKey(normalized), "1")) {
         dirFallback += normalized
@@ -129,20 +109,17 @@ private fun markDirectory(path: String) {
         dirFallback.remove(normalized)
     }
 }
-
-private fun unmarkDirectory(path: String): Boolean {
+fun unmarkDirectory(path: String): Boolean {
     val normalized = normalizePath(path)
     val removedStorage = storageRemove(dirKey(normalized))
     val removedFallback = dirFallback.remove(normalized)
     return removedStorage || removedFallback
 }
-
-private fun directoryExists(path: String): Boolean {
+fun directoryExists(path: String): Boolean {
     val normalized = normalizePath(path)
     return storageGet(dirKey(normalized)) != null || normalized in dirFallback
 }
-
-private fun ensureParentDirectories(path: String) {
+fun ensureParentDirectories(path: String) {
     var current = parentPath(path)
     while (current != null && current != "/") {
         markDirectory(current)
@@ -150,8 +127,7 @@ private fun ensureParentDirectories(path: String) {
     }
     markDirectory("/")
 }
-
-private fun encodeHex(bytes: ByteArray): String {
+fun encodeHex(bytes: ByteArray): String {
     val chars = CharArray(bytes.size * 2)
     val digits = "0123456789abcdef"
     var out = 0
@@ -162,8 +138,7 @@ private fun encodeHex(bytes: ByteArray): String {
     }
     return chars.concatToString()
 }
-
-private fun decodeHex(value: String): ByteArray {
+fun decodeHex(value: String): ByteArray {
     if (value.isEmpty()) return ByteArray(0)
     val size = value.length / 2
     return ByteArray(size) { index ->
@@ -172,8 +147,7 @@ private fun decodeHex(value: String): ByteArray {
         ((hi shl 4) or lo).toByte()
     }
 }
-
-private fun streamByteLines(bytes: ByteArray): Sequence<Join<Long, ByteArray>> = sequence {
+fun streamByteLines(bytes: ByteArray): Sequence<Join<Long, ByteArray>> = sequence {
     var offset = 0L
     var lineStart = 0L
     val line = ArrayList<Byte>()
@@ -192,15 +166,14 @@ private fun streamByteLines(bytes: ByteArray): Sequence<Join<Long, ByteArray>> =
         yield(lineStart j line.toByteArray())
     }
 }
-
-private object WasmBrowserSeekHandle : SeekHandle {
-    private data class HandleState(
+object WasmBrowserSeekHandle : SeekHandle {
+   data class HandleState(
         val filename: String,
         var position: Long = 0,
     )
 
-    private val handles = mutableMapOf<Long, HandleState>()
-    private var nextHandle = 1L
+   val handles = mutableMapOf<Long, HandleState>()
+   var nextHandle = 1L
 
     override fun open(filename: String, readOnly: Boolean): Long {
         val handle = nextHandle++
@@ -369,7 +342,7 @@ actual class FileBuffer actual constructor(
     actual val readOnly: Boolean,
     actual val closeChannelOnMap: Boolean,
 ) : LongSeries<Byte> {
-    private val delegate = SeekFileBufferCommon(filename, initialOffset, blkSize, readOnly, WasmBrowserSeekHandle)
+   val delegate = SeekFileBufferCommon(filename, initialOffset, blkSize, readOnly, WasmBrowserSeekHandle)
 
     actual override val a: Long
         get() = delegate.a
@@ -402,7 +375,7 @@ actual class SeekFileBuffer actual constructor(
     actual val blkSize: Long,
     actual val readOnly: Boolean,
 ) : LongSeries<Byte> {
-    private val delegate = SeekFileBufferCommon(filename, initialOffset, blkSize, readOnly, WasmBrowserSeekHandle)
+   val delegate = SeekFileBufferCommon(filename, initialOffset, blkSize, readOnly, WasmBrowserSeekHandle)
 
     actual override val a: Long
         get() = delegate.a

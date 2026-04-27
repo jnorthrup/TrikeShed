@@ -53,7 +53,7 @@ object CouchServiceCompiler {
         )
     }
 
-    private fun detectReturnShape(func: KFunction<*>): CouchViewInvocation.ReturnShape {
+   fun detectReturnShape(func: KFunction<*>): CouchViewInvocation.ReturnShape {
         val retType = func.returnType.jvmErasure
         return when {
             retType == Map::class -> CouchViewInvocation.ReturnShape.MapKeyValue
@@ -63,7 +63,7 @@ object CouchServiceCompiler {
         }
     }
 
-    private fun buildTemplate(func: KFunction<*>, designDocId: String): String {
+   fun buildTemplate(func: KFunction<*>, designDocId: String): String {
         val params = func.valueParameters
         val methodAnnotations = func.annotations
 

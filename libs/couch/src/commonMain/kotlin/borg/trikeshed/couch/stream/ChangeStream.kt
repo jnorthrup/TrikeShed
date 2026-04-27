@@ -29,9 +29,9 @@ sealed class Change<out T> {
  * Very small synchronous emitter for test use.
  */
 class ChangeEmitter<T> {
-    private val listeners: MutableMap<Int, (Change<T>) -> Unit> = linkedMapOf()
-    private var nextToken = 0
-    private var sealed: Boolean = false
+   val listeners: MutableMap<Int, (Change<T>) -> Unit> = linkedMapOf()
+   var nextToken = 0
+   var sealed: Boolean = false
 
     /** Register a listener. Returns a token which can be used to unregister. */
     fun register(cb: (Change<T>) -> Unit): Int {

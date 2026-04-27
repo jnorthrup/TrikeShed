@@ -11,9 +11,9 @@ import borg.trikeshed.lib.*
  *
  * Children expose the row families stored inside this block.
  */
-class BlockRowVec private constructor(
-    private val rows: MutableList<MiniRowVec>,
-    private var _sealed: Boolean,
+class BlockRowVec constructor(
+    val rows: MutableList<MiniRowVec>,
+    var _sealed: Boolean,
 ) : MiniRowVec() {
 
     enum class State { MUTABLE, SEALED }

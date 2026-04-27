@@ -25,8 +25,8 @@ class RequestFactoryHtxClient {
 }
 
 class RequestFactoryHtxServer(
-    private val service: RequestFactoryTransportService,
-    private val bridge: HtxRequestFactoryBridge = HtxRequestFactoryBridge(),
+   val service: RequestFactoryTransportService,
+   val bridge: HtxRequestFactoryBridge = HtxRequestFactoryBridge(),
 ) {
     fun handle(rawRequest: String): String {
         val plan = bridge.decode(rawRequest)

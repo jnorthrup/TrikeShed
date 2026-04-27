@@ -191,12 +191,12 @@ class WasmDoubleTensor(
  * Converts Cursor values into a dense numeric tensor.
  */
 object CursorTensorReifier {
-    private fun tensorTypeCode(type: TypeMemento): Int = when (type) {
+   fun tensorTypeCode(type: TypeMemento): Int = when (type) {
         is IOMemento -> type.ordinal
         else -> CursorTensorLayout.TYPE_UNKNOWN
     }
 
-    private fun isNumeric(type: TypeMemento): Boolean = when (type) {
+   fun isNumeric(type: TypeMemento): Boolean = when (type) {
         is IOMemento -> when (type) {
             IOMemento.IoBoolean,
             IOMemento.IoByte,
@@ -215,7 +215,7 @@ object CursorTensorReifier {
         else -> false
     }
 
-    private fun Any?.toTensorDouble(columnName: String, row: Int, column: Int): Double = when (this) {
+   fun Any?.toTensorDouble(columnName: String, row: Int, column: Int): Double = when (this) {
         null -> Double.NaN
         is Double -> this
         is Float -> toDouble()
@@ -233,7 +233,7 @@ object CursorTensorReifier {
         )
     }
 
-    private fun selectNumericColumns(meta: Series<ColumnMeta>): IntArray {
+   fun selectNumericColumns(meta: Series<ColumnMeta>): IntArray {
         val selected = mutableListOf<Int>()
         (0 until meta.size).forEach { column ->
             val value: ColumnMeta = meta[column]

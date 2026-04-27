@@ -16,7 +16,7 @@ import kotlinx.coroutines.channels.Channel
  * - ioUringFd = -1 means epoll fallback mode
  */
 data class QuicChannelService(
-    private val _streams: MutableMap<Int, StreamHandle> = mutableMapOf(),
+   val _streams: MutableMap<Int, StreamHandle> = mutableMapOf(),
     val ioUringFd: Int = -1,          // -1 = epoll fallback
     val xdpProg: String? = null       // XDP prog name for hardware packet steering, null = software only
 ) : StreamTransport {

@@ -14,10 +14,10 @@ import java.io.InputStream
  * We only consume fields 0-5 (OHLCV) for now.
  */
 class BinanceCsvParser(
-    private val symbol: String,
-    private val interval: String,
+   val symbol: String,
+   val interval: String,
 ) {
-    private val timespan: TimeSpan = intervalToTimeSpan(interval)
+   val timespan: TimeSpan = intervalToTimeSpan(interval)
 
     /** Parse a single CSV line. Returns null if blank or malformed. */
     fun parseCsvLine(line: String): Kline? {
@@ -47,7 +47,7 @@ class BinanceCsvParser(
             .mapNotNull { parseCsvLine(it) }
             .toList()
 
-    private fun intervalToTimeSpan(interval: String): TimeSpan = when (interval) {
+   fun intervalToTimeSpan(interval: String): TimeSpan = when (interval) {
         "1m"  -> TimeSpan.Minutes1
         "3m"  -> TimeSpan.Minutes3
         "5m"  -> TimeSpan.Minutes5

@@ -23,7 +23,7 @@ interface KernelStochasticTrainer {
 
 // No-op trainer used for tests: calculates a trivial expectedReturn as mean of log returns
 class NoOpTrainer : KernelStochasticTrainer {
-    private var state = ElementLifecycleState.CREATED
+   var state = ElementLifecycleState.CREATED
     override val lifecycleState: ElementLifecycleState get() = state
 
     override suspend fun open() {

@@ -19,13 +19,11 @@ actual suspend fun loadKeyFromSegment(rootPath: String, fileName: String, key: S
 actual fun deleteSegmentFile(rootPath: String, fileName: String) {
     rm(segmentPath(rootPath, fileName))
 }
-
-private fun segmentPath(rootPath: String, fileName: String): String =
+fun segmentPath(rootPath: String, fileName: String): String =
     if (rootPath.isEmpty()) fileName
     else if (rootPath.endsWith('/')) "$rootPath$fileName"
     else "$rootPath/$fileName"
-
-private fun encodeSegment(entries: Map<String, ByteArray>): ByteArray {
+fun encodeSegment(entries: Map<String, ByteArray>): ByteArray {
     val totalSize = entries.entries.sumOf { (key, value) -> 4 + key.encodeToByteArray().size + 4 + value.size }
     val bytes = ByteArray(totalSize)
     var pos = 0
@@ -40,8 +38,7 @@ private fun encodeSegment(entries: Map<String, ByteArray>): ByteArray {
     }
     return bytes
 }
-
-private fun decodeSegment(bytes: ByteArray, key: String): ByteArray? {
+fun decodeSegment(bytes: ByteArray, key: String): ByteArray? {
     var pos = 0
     while (pos + 8 <= bytes.size) {
         val keyLength = readInt(bytes, pos)
@@ -60,16 +57,14 @@ private fun decodeSegment(bytes: ByteArray, key: String): ByteArray? {
     }
     return null
 }
-
-private fun writeInt(bytes: ByteArray, pos: Int, value: Int): Int {
+fun writeInt(bytes: ByteArray, pos: Int, value: Int): Int {
     bytes[pos] = ((value ushr 24) and 0xFF).toByte()
     bytes[pos + 1] = ((value ushr 16) and 0xFF).toByte()
     bytes[pos + 2] = ((value ushr 8) and 0xFF).toByte()
     bytes[pos + 3] = (value and 0xFF).toByte()
     return pos + 4
 }
-
-private fun readInt(bytes: ByteArray, pos: Int): Int =
+fun readInt(bytes: ByteArray, pos: Int): Int =
     ((bytes[pos].toInt() and 0xFF) shl 24) or
         ((bytes[pos + 1].toInt() and 0xFF) shl 16) or
         ((bytes[pos + 2].toInt() and 0xFF) shl 8) or

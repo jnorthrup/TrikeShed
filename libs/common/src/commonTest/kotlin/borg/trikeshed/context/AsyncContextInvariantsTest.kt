@@ -12,13 +12,11 @@ import kotlinx.coroutines.test.runTest
 // ---------------------------------------------------------------------------
 // Concrete test keys and elements (inside same module so sealed is fine)
 // ---------------------------------------------------------------------------
-
-private class ElementA : AsyncContextElement() {
+class ElementA : AsyncContextElement() {
     companion object Key : AsyncContextKey<ElementA>("KeyA")
     override val key: AsyncContextKey<ElementA> get() = Key
 }
-
-private class ElementB : AsyncContextElement() {
+class ElementB : AsyncContextElement() {
     companion object Key : AsyncContextKey<ElementB>("KeyB")
     override val key: AsyncContextKey<ElementB> get() = Key
 }

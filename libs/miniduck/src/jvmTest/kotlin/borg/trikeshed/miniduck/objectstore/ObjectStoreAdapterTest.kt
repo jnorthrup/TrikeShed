@@ -10,13 +10,12 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
-
-private fun <T> runBlocking(block: suspend () -> T): T = runBlockingCommon(block)
+fun <T> runBlocking(block: suspend () -> T): T = runBlockingCommon(block)
 
 class FakeObjectStoreAdapter : ObjectStoreAdapter {
     override val provider: ObjectStoreProvider = ObjectStoreProvider.S3
-    private val stored = mutableMapOf<String, ByteArray>()
-    private val storedMeta = mutableMapOf<String, Map<String, String>>()
+   val stored = mutableMapOf<String, ByteArray>()
+   val storedMeta = mutableMapOf<String, Map<String, String>>()
 
     override suspend fun list(bucket: String, prefix: String, maxKeys: Int): ObjectListResult {
         val objects = stored.keys
