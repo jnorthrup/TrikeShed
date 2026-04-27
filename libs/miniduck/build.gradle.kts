@@ -66,6 +66,7 @@ kotlin {
             dependencies {
                 implementation(kotlin("test"))
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0-rc01")
+                implementation(project(":libs:couch"))
             }
         }
         val jvmTest by getting {
