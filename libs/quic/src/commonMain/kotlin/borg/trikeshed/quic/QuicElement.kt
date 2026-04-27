@@ -11,7 +11,42 @@ data class QuicConfig(
     val alpn: List<String> = emptyList(),
     val maxIdleTimeoutMs: Long = 30000,
     val maxUdpPayloadSize: Int = 1350,
+    val initialVersion: QuicVersion = QuicVersions.VERSION_1,
 )
+
+/**
+ * QUIC version numbers (RFC 9000 §15).
+ * VERSION_1 = 0x00000001 is the current standard.
+ * Version negotiation uses 0x00000000 as a sentinel.
+ */
+typealias QuicVersion = UInt
+
+object QuicVersions {
+    const val NEGOTIATION: UInt = 0x0000_0000u
+    const val VERSION_1: UInt   = 0x0000_0001u
+    const val DRAFT_29: UInt    = 0xff00_001du
+    const val DRAFT_27: UInt    = 0xff00_001bu
+}
+
+/**
+ * QUIC long header packet types (RFC 9000 §17.2).
+ * The two high bits of the first byte determine long vs short header.
+ */
+enum class QuicLongPacketType(val code: UByte) {
+    INITIAL(0x00u),
+    ZERO_RTT(0x01u),
+    HANDSHAKE(0x02u),
+    RETRY(0x03u),
+}
+
+/**
+ * QUIC short header packet type (RFC 9000 §17.3).
+ * Short header packets always have bit 7 clear.
+ */
+enum class QuicShortPacketType(val code: UByte) {
+    ONE_RTT(0x40u),  // spin bit set
+    ONE_RTT_NO_SPIN(0x00u),  // spin bit clear
+}
 
 val QuicKey: AsyncContextKey<QuicElement> = QuicElement.Key
 
