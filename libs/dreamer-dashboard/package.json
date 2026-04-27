@@ -1,0 +1,8 @@
+{
+  "name": "dreamer-dashboard",
+  "version": "0.1.0",
+  "private": true,
+  "dependencies": {
+    "blessed": "0.1.81"
+  }
+}
