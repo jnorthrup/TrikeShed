@@ -84,6 +84,11 @@ class IntBuf(initial: Int = 16) {
         data[size++] = v
     }
 
+    fun resize(newSize: Int) {
+        require(newSize <= data.size) { "cannot grow via resize — use add()" }
+        size = newSize
+    }
+
     fun toSeries(): Series<Int> {
         val n = size
         val d = data
@@ -106,6 +111,12 @@ class ElemBuf(initial: Int = 16) {
         private set
     var size: Int = 0
         private set
+
+    fun commasSize(): Int = commas.size
+
+    fun truncateCommas(n: Int) {
+        commas.resize(n)
+    }
 
     private fun grow() {
         val n = opens.size * 2
@@ -485,9 +496,12 @@ object YamlScan {
                 val ch = st.s[st.pos]
                 if (ch == '{' || ch == '[' || ch == '"' || ch == '\'') parseFlowLine(st, out) else parseScalarLine(st, out)
             } else {
-                // newline: child block
+                // newline: child block — save/restore pool to prevent nested commas leaking
                 if (st.pos < st.n) st.pos++  // eat newline
-                parseBlock(st, out, indent + 2)
+                val savedPoolSize = out.commasSize()
+                val vi = parseBlock(st, out, indent + 2)
+                out.truncateCommas(savedPoolSize)  // discard any commas added by nested block
+                vi
             }
             lastClose = out.closeOf(valueIdx).coerceAtLeast(open)
             st.skipBlankLines()
