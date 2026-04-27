@@ -40,20 +40,22 @@ class IsamVolume private constructor(
 
     /** The block-offset index for this volume. */
     fun index(): ZranIndex = throw TODOError("IsamVolume.index not yet implemented")
-}
 
-/**
- * Generate an IsamVolume from a sorted MiniCursor.
- *
- * Each row is converted to a fixed-width binary record (128 bytes).
- * Rows are packed into blocks of 4096 records each.
- * Each block is zstd-compressed and written to the .data file.
- * A .bzran index maps openTime ranges to block byte offsets.
- *
- * @param cursor     sorted MiniCursor (MUST be sorted by openTime ascending)
- * @param schema     column schema — openTime column must have ZranIndex plugin
- * @param tempDir    directory to write volume files
- */
-fun generateIsam(cursor: MiniCursor, schema: List<ColumnSchema>, tempDir: String): IsamVolume {
-    throw TODOError("generateIsam not yet implemented")
+    companion object {
+        /**
+         * Generate an IsamVolume from a sorted MiniCursor.
+         *
+         * Each row is converted to a fixed-width binary record (128 bytes).
+         * Rows are packed into blocks of 4096 records each.
+         * Each block is zstd-compressed and written to the .data file.
+         * A .bzran index maps openTime ranges to block byte offsets.
+         *
+         * @param cursor     sorted MiniCursor (MUST be sorted by openTime ascending)
+         * @param schema     column schema — openTime column must have ZranIndex plugin
+         * @param tempDir    directory to write volume files
+         */
+        fun generateIsam(cursor: MiniCursor, schema: List<ColumnSchema>, tempDir: String): IsamVolume {
+            throw TODOError("IsamVolume.generateIsam not yet implemented")
+        }
+    }
 }

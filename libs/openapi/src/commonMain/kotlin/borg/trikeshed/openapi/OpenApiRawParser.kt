@@ -36,6 +36,8 @@ data class OpenApiGapAnalysis(
 }
 
 data class OpenApiRawDocument(val root: JsonMap) {
+    /** Expose root map directly for resolver use. */
+    val raw: JsonMap get() = root
 
     val version: String? get() = root["openapi"].asString()
     val info: JsonMap? get() = root["info"].asMap()
@@ -177,14 +179,22 @@ class OpenApiParseException(message: String, cause: Throwable? = null) :
 
 object OpenApiRawParser {
     fun parse(text: String): OpenApiRawDocument {
-        val root = try {
-            @Suppress("UNCHECKED_CAST")
-            JsonParser.reify(text.toSeries()) as? Map<String, Any?>
-                ?: throw OpenApiParseException("Parsed OpenAPI document root is not a JSON object")
-        } catch (e: OpenApiParseException) {
-            throw e
-        } catch (cause: Throwable) {
-            throw OpenApiParseException("Failed to parse OpenAPI JSON", cause)
+        val root: Map<String, Any?> = when {
+            text.isBlank() -> throw OpenApiParseException("OpenAPI spec text is blank")
+            text.trimStart().startsWith("{") -> {
+                try {
+                    @Suppress("UNCHECKED_CAST")
+                    JsonParser.reify(text.trimStart().toSeries()) as? Map<String, Any?>
+                        ?: throw OpenApiParseException("Parsed JSON root is not a JSON object")
+                } catch (cause: Throwable) {
+                    throw OpenApiParseException("Failed to parse OpenAPI JSON", cause)
+                }
+            }
+            else -> {
+                @Suppress("UNCHECKED_CAST")
+                (Yaml.parse(text) as? Map<String, Any?>)
+                    ?: throw OpenApiParseException("Parsed YAML root is not a YAML map")
+            }
         }
 
         val version = root["openapi"].asString()

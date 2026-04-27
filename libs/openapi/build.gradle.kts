@@ -1,5 +1,6 @@
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
+import java.io.File
 
 plugins {
     kotlin("multiplatform") version "2.4.0-Beta1"
@@ -17,6 +18,49 @@ repositories {
     maven("https://www.jitpack.io")
 }
 
+val specFiles = mapOf(
+    "cmc"  to layout.projectDirectory.file("../cmc/endpoint-overview/openapi/coinmarketcap.openapi.yaml"),
+    "krak" to layout.projectDirectory.file("../krak/rest-api/openapi/kraken.openapi.yaml"),
+    "rhood" to layout.projectDirectory.file("../rhood/robinhood.openapi.yaml"),
+)
+
+// ── self-hosting: run the generator from existing JVM classes ─────────────────
+
+// Step 2: run the generator using java -cp (no separate JAR packaging needed)
+val codegenClassesDir = layout.buildDirectory.dir("classes/kotlin/jvm/main")
+
+// ── per-spec generation tasks ─────────────────────────────────────────────────
+
+specFiles.forEach { (name, specFile) ->
+    val outputDir = layout.projectDirectory.dir("../${name}-generated/src/generated/kotlin")
+
+    tasks.register<Exec>("openApiGenerate${name.replaceFirstChar { it.uppercase() }}") {
+        group = "openapi-codegen"
+        description = "Generates Kotlin client+server sources from the $name OpenAPI spec."
+        dependsOn("compileKotlinJvm")
+
+        val classes = codegenClassesDir.get().asFile
+        val spec = specFile.asFile
+        val out = outputDir.asFile
+
+        // build classpath: compiled openapi classes + all runtime deps
+        val runtimeFiles = configurations.getByName("jvmRuntimeClasspath").files
+        val cpSeparator = File.pathSeparator
+        val fullClasspath = (listOf(classes.absolutePath) + runtimeFiles.map { it.absolutePath })
+            .joinToString(cpSeparator)
+
+        commandLine("java", "-cp", fullClasspath, "borg.trikeshed.openapi.GenerateSourcesKt",
+            "--spec", spec.absolutePath,
+            "--target", name,
+            "--output", out.absolutePath,
+            "--sides", "client,server",
+        )
+
+        doLast {
+            println("Generated: $out")
+        }
+    }
+}
 kotlin {
     @OptIn(ExperimentalKotlinGradlePluginApi::class)
     compilerOptions {
