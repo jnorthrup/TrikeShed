@@ -45,7 +45,7 @@ class ProtocolRecognizer(
                 reactor.withSessionContext<Unit>(sid) {
                     register(proto.name, object : MessageHandler() {
                         override suspend fun handle(block: HtxBlock) {
-                            // delegate to parse supervisor
+                            println("ProtocolRecognizer[$realm/$sid]: $proto addr=${block.addr} len=${block.valueLen}")
                         }
                     })
                 }
