@@ -11,7 +11,6 @@ package borg.trikeshed.parse.confix
 
 
 /* ═══════════════════════════════════════════════════════════════════════════
- *  Confix — one algebra, three syntaxes (JSON, CBOR, YAML).
  *
  *  Zero stdlib collections. Only primitive arrays (IntArray/CharArray/ByteArray)
  *  and Join/Series composition from the kernel algebra. Everything reduces to:
@@ -31,13 +30,20 @@ package borg.trikeshed.parse.confix
 /* ─── kernel algebra — rely on canonical definitions in borg.trikeshed.lib ────────────── */
 
 import borg.trikeshed.lib.*
-import borg.trikeshed.parse.json.*
 import borg.trikeshed.userspace.concurrency.ParseLifecycle
 import borg.trikeshed.userspace.concurrency.ParseScope
 import borg.trikeshed.userspace.concurrency.ParseScopeKey
 import kotlinx.coroutines.*
 import kotlin.coroutines.AbstractCoroutineContextElement
 import kotlin.coroutines.CoroutineContext
+
+// ── element type aliases (break circular import from parse.json) ──
+typealias JsElement = Join<Twin<Int>, Series<Int>>      // (open j close) j commas
+typealias JsIndex = Join<Twin<Int>, Series<Char>>       // (twin j src)
+typealias JsContext = Join<JsElement, Series<Char>>      // element j src
+typealias JsPathElement = Either<String, Int>
+typealias JsPath = Series<JsPathElement>
+
 
 
 /** Series of Chars from a CharSequence — use root's CharSequence.toSeries() */
@@ -863,6 +869,7 @@ object Reify {
             '{' -> Tag.OBJECT
             '[' -> Tag.ARRAY
             '"' -> Tag.STRING
+            '\'' -> Tag.STRING
             't' -> Tag.BOOL_TRUE
             'f' -> Tag.BOOL_FALSE
             'n' -> Tag.NULL
@@ -870,10 +877,22 @@ object Reify {
         }
     }
 
-    /** commas series with the leading tag sentinel stripped, if present. */
+    /** commas series with ALL tag sentinels (negative values) stripped.
+     *  The global comma pool mixes child element tags with parent commas;
+     *  we keep only positive indices that actually refer to positions or element indices. */
     fun realCommas(e: JsElement): Series<Int> {
         val c = e.b
-        return if (c.size > 0 && c[0] < 0) c[1 until c.size] else c
+        // count positive entries and build a lazy filter
+        var posCount = 0; var ci = 0
+        while (ci < c.size) { if (c[ci] >= 0) posCount++; ci++ }
+        return posCount j { i: Int ->
+            var skipped = 0; var k = 0
+            while (k < c.size) {
+                if (c[k] >= 0) { if (skipped == i) return@j c[k]; skipped++ }
+                k++
+            }
+            -1 // unreachable for valid i < posCount
+        }
     }
 
     /** slice of src between open..close inclusive (exclusive of delimiters if applicable) */
@@ -980,17 +999,16 @@ object Reify {
                     '/' -> out.append('/')
                     '"' -> out.append('"')
                     'u' -> {
-                        if (i + 4 < s.length) {
-                            var code = 0
-                            var k = 1
-                            while (k <= 4) {
-                                val ch = s[i + k]
-                                code = (code shl 4) or (ch.digitToIntOrNull(16) ?: 0)
-                                k++
-                            }
-                            out.append(code.toChar())
-                            i += 4
+                        var code = 0
+                        var consumed = 0
+                        while (consumed < 4 && i + 1 + consumed < s.length) {
+                            val ch = s[i + 1 + consumed]
+                            val d = ch.digitToIntOrNull(16) ?: break
+                            code = (code shl 4) or d
+                            consumed++
                         }
+                        out.append(code.toChar())
+                        i += consumed
                     }
                     else -> out.append(e)
                 }
@@ -1259,7 +1277,7 @@ object Path {
         // Heuristic: try JSON-like starters quickly (but avoid misclassifying YAML '-' sequence markers)
         try {
             val isSignNumber = (first == '-' || first == '+') && sub.size > 1 && (sub[1] in '0'..'9')
-            if (first == '{' || first == '[' || first == '"' || first == '\'' || isSignNumber || (first >= '0' && first <= '9') || first == 't' || first == 'f' || first == 'n') {
+            if (first == '{' || first == '[' || first == '"' || /* single-quote routed to YAML */ isSignNumber || (first >= '0' && first <= '9') || first == 't' || first == 'f' || first == 'n') {
                 val scanned = JsonScan.scan(sub)
                 val c0 = scanned[0]
                 val adj = (c0.a.a + start) j (c0.a.b + start)

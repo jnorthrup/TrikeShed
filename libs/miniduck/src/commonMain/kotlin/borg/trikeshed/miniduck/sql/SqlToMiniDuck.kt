@@ -1,6 +1,6 @@
 package borg.trikeshed.miniduck.sql
 
-import borg.trikeshed.parse.kursive.sql.*
+import borg.trikeshed.parse.jursive.sql.*
 import borg.trikeshed.lib.*
 import borg.trikeshed.miniduck.plan.*
 import borg.trikeshed.miniduck.schema.SchemaManager

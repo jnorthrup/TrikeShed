@@ -1,6 +1,6 @@
 package borg.trikeshed.miniduck
 
-import borg.trikeshed.parse.kursive.sql.SqlParser
+import borg.trikeshed.parse.jursive.sql.SqlParser
 import borg.trikeshed.miniduck.exec.ExecutionContext
 import borg.trikeshed.miniduck.exec.Cursor
 import borg.trikeshed.miniduck.exec.RowAccessor

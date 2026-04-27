@@ -192,7 +192,7 @@ object OpenApiRawParser {
             }
             else -> {
                 @Suppress("UNCHECKED_CAST")
-                (Yaml.parse(text) as? Map<String, Any?>)
+                (borg.trikeshed.parse.yaml.parse(text) as? Map<String, Any?>)
                     ?: throw OpenApiParseException("Parsed YAML root is not a YAML map")
             }
         }

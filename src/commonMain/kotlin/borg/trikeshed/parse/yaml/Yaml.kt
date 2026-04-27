@@ -161,10 +161,18 @@ object YamlParser {
 
     private fun extractChildIndices(parentIdx: Int, elems: Series<JsElement>): Series<Int> {
         val parent = elems[parentIdx]
-        val commas = Reify.realCommas(parent)
-        // wrap the comma indices as a lazy Series
+        val commas = Reify.realCommas(parent)  // open positions of child keys (negatives filtered)
         val n = commas.size
-        return n j { i: Int -> commas[i] }
+        return n j { i: Int ->
+            val openPos = commas[i]
+            // Search forward from parentIdx+1 for element with matching open position
+            var k = parentIdx + 1
+            while (k < elems.size) {
+                if (elems[k].a.a == openPos) return@j k
+                k++
+            }
+            -1 // not found
+        }
     }
 
     private fun buildMappingEntries(
@@ -174,18 +182,18 @@ object YamlParser {
     ): Series<YamlMappingEntry> {
         val n = childIndices.size
         if (n == 0) return 0 j { TODO() }
-        val list = ArrayList<YamlMappingEntry>(n / 2)
+        val list = ArrayList<YamlMappingEntry>(n)
         var i = 0
-        while (i + 1 < n) {
+        while (i < n) {
             val keyIdx = childIndices[i]
-            val valIdx = childIndices[i + 1]
+            val valIdx = keyIdx + 1  // value follows key by element index
             val keyElem = elems[keyIdx]
             val valElem = elems[valIdx]
             val keySpan = keyElem.a
             val keyText = Reify.textOf(keyElem, src)
             val valNode = buildYamlNode(elems, src, valIdx)
             list.add(YamlMappingEntry(keyText.asSeries(), valNode, keySpan.a j valElem.a.b))
-            i += 2
+            i++
         }
         return list.toSeries()
     }

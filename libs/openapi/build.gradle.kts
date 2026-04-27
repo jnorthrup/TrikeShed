@@ -1,6 +1,5 @@
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
-import java.io.File
 
 plugins {
     kotlin("multiplatform") version "2.4.0-Beta1"
@@ -24,43 +23,6 @@ val specFiles = mapOf(
     "rhood" to layout.projectDirectory.file("../rhood/robinhood.openapi.yaml"),
 )
 
-// ── self-hosting: run the generator from existing JVM classes ─────────────────
-
-// Step 2: run the generator using java -cp (no separate JAR packaging needed)
-val codegenClassesDir = layout.buildDirectory.dir("classes/kotlin/jvm/main")
-
-// ── per-spec generation tasks ─────────────────────────────────────────────────
-
-specFiles.forEach { (name, specFile) ->
-    val outputDir = layout.projectDirectory.dir("../${name}-generated/src/generated/kotlin")
-
-    tasks.register<Exec>("openApiGenerate${name.replaceFirstChar { it.uppercase() }}") {
-        group = "openapi-codegen"
-        description = "Generates Kotlin client+server sources from the $name OpenAPI spec."
-        dependsOn("compileKotlinJvm")
-
-        val classes = codegenClassesDir.get().asFile
-        val spec = specFile.asFile
-        val out = outputDir.asFile
-
-        // build classpath: compiled openapi classes + all runtime deps
-        val runtimeFiles = configurations.getByName("jvmRuntimeClasspath").files
-        val cpSeparator = File.pathSeparator
-        val fullClasspath = (listOf(classes.absolutePath) + runtimeFiles.map { it.absolutePath })
-            .joinToString(cpSeparator)
-
-        commandLine("java", "-cp", fullClasspath, "borg.trikeshed.openapi.GenerateSourcesKt",
-            "--spec", spec.absolutePath,
-            "--target", name,
-            "--output", out.absolutePath,
-            "--sides", "client,server",
-        )
-
-        doLast {
-            println("Generated: $out")
-        }
-    }
-}
 kotlin {
     @OptIn(ExperimentalKotlinGradlePluginApi::class)
     compilerOptions {
@@ -104,6 +66,9 @@ kotlin {
             dependencies {
                 api("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
                 api("org.bereft:TrikeShed:1.0")
+                // confix lives in the root TrikeShed source (src/commonMain); openapi
+                // accesses it transitively via the TrikeShed published API. No extra
+                // dependency needed here.
             }
         }
         val commonTest by getting {
@@ -115,6 +80,35 @@ kotlin {
         val jvmTest by getting {
             dependencies {
                 implementation(kotlin("test-junit"))
+            }
+        }
+    }
+}
+
+// Register generation tasks after project evaluation.
+// Using JavaExec with classpath from the resolved jvmJar + runtime classpath.
+afterEvaluate {
+    val jvmMainClasspath = configurations.getByName("jvmRuntimeClasspath")
+
+    specFiles.forEach { (name, specFile) ->
+        val outputDir = layout.projectDirectory.dir("../${name}-generated/src/generated/kotlin")
+
+        tasks.register<JavaExec>("openApiGenerate${name.replaceFirstChar { it.uppercase() }}") {
+            group = "openapi-codegen"
+            description = "Generates Kotlin client+server sources from the $name OpenAPI spec."
+            dependsOn("jvmMainClasses")
+
+            classpath = jvmMainClasspath + files(layout.buildDirectory.dir("classes/kotlin/jvm/main"))
+            mainClass.set("borg.trikeshed.openapi.GenerateSourcesKt")
+            args(
+                "--spec", specFile.asFile.absolutePath,
+                "--target", name,
+                "--output", outputDir.asFile.absolutePath,
+                "--sides", "client,server",
+            )
+
+            doLast {
+                println("Generated: ${outputDir.asFile}")
             }
         }
     }

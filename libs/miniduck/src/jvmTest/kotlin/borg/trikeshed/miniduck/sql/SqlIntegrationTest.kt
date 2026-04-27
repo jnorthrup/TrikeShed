@@ -1,6 +1,6 @@
 package borg.trikeshed.miniduck.sql
 
-import borg.trikeshed.parse.kursive.sql.SqlParser
+import borg.trikeshed.parse.jursive.sql.SqlParser
 import borg.trikeshed.miniduck.exec.InMemoryTableSource
 import borg.trikeshed.miniduck.exec.ExecutionContext
 import borg.trikeshed.miniduck.schema.InMemorySchemaManager

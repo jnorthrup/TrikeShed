@@ -1,6 +1,6 @@
 package borg.trikeshed.miniduck.sql
 
-import borg.trikeshed.parse.kursive.sql.*
+import borg.trikeshed.parse.jursive.sql.*
 import borg.trikeshed.miniduck.exec.RowAccessor
 
 // Simple expression/predicate compiler used by the planner. Keep it small and explicit

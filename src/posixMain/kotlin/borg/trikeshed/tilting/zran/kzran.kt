@@ -421,13 +421,12 @@ fun decode(args: Array<String>) {
 // ================================================================================
 
 @PublishedApi
-internal inline fun <T> zstdNotAvailable(): Nothing =
+internal inline fun zstdNotAvailable(): Nothing =
     error("ZstdIndex requires a zstd implementation. " +
           "Wire via expect/actual: JNI (JVM) or cinterop (native). " +
           "See: https://github.com/facebook/zstd/tree/v1.5.5/contrib/cmake")
 
 /** Stub type alias — maps to Any at runtime since platform.zstd doesn't exist. */
-@PublishedApi
 internal typealias ZstdDCtx = Any
 
 @ExperimentalUnsignedTypes

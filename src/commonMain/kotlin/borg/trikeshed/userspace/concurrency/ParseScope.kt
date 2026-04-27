@@ -17,7 +17,7 @@ import kotlin.coroutines.CoroutineContext
 /* ═══════════════════════════════════════════════════════════════════════════
  *  ParseScope — CCEK infrastructure for concurrent parse trees.
  *
- *  Lives in root TrikeShed so both kursive and Confix can use it.
+ *  Lives in root TrikeShed so both jursive and Confix can use it.
  *  Generic over source carrier type (CharSeries, ByteSeries, etc.).
  *
  *  A ParseScope is a CoroutineContext.Element that:
