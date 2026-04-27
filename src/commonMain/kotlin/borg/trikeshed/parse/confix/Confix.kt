@@ -54,15 +54,24 @@ fun CharSequence.asSeries(): Series<Char> = toSeries()
 /** tag byte encoded into commas[0] when the producer wants to signal kind.
  *  Uses negative sentinels so positive comma positions remain unambiguous.
  *  The tag channel is optional — when absent, reifier infers from src[open]. */
-object Tag {
-    const val OBJECT: Int = -1
-    const val ARRAY: Int = -2
-    const val STRING: Int = -3
-    const val NUMBER: Int = -4
-    const val BOOL_TRUE: Int = -5
-    const val BOOL_FALSE: Int = -6
-    const val NULL: Int = -7
-    const val BYTES: Int = -8          // CBOR byte string; reifier decodes hex-escaped chars
+enum class Tag(val code: Int) {
+    OBJECT(-1),
+    ARRAY(-2),
+    STRING(-3),
+    NUMBER(-4),
+    BOOL_TRUE(-5),
+    BOOL_FALSE(-6),
+    NULL(-7),
+    BYTES(-8);          // CBOR byte string; reifier decodes hex-escaped chars
+
+    companion object {
+        /** Decode a tag code back to a Tag, or null for unknown/positive values. */
+        fun fromCode(code: Int): Tag? = when (code) {
+            -1 -> OBJECT; -2 -> ARRAY; -3 -> STRING; -4 -> NUMBER
+            -5 -> BOOL_TRUE; -6 -> BOOL_FALSE; -7 -> NULL; -8 -> BYTES
+            else -> null
+        }
+    }
 }
 
 
@@ -140,19 +149,18 @@ class ElemBuf(initial: Int = 16) {
 
     fun addComma(pos: Int) { commas.add(pos) }
 
-    fun endOf(elemIdx: Int, closeIdx: Int, tagOrZero: Int) {
-        // Tag is stored as the first "comma" when non-zero; real commas follow.
+    fun endOf(elemIdx: Int, closeIdx: Int, tag: Tag) {
         // End of element finalizes close index and the comma tail. Do not shrink size.
         closes[elemIdx] = closeIdx
         commaTails[elemIdx] = commas.size
         if (size < elemIdx + 1) size = elemIdx + 1
-        @Suppress("UNUSED_PARAMETER") val _t = tagOrZero
+        @Suppress("UNUSED_PARAMETER") val _t = tag
     }
 
     /** Prefer: call [beginTagged] which writes the tag into commas[head] first. */
-    fun beginTagged(openIdx: Int, tag: Int): Int {
+    fun beginTagged(openIdx: Int, tag: Tag): Int {
         val i = begin(openIdx)
-        commas.add(tag)
+        commas.add(tag.code)
         return i
     }
 
@@ -540,7 +548,7 @@ object YamlScan {
         return idx
     }
 
-    private fun classifyScalar(st: ScanState): Int {
+    private fun classifyScalar(st: ScanState): Tag {
         val p = st.pos
         val ch = if (p < st.n) st.s[p] else '\u0000'
         if (ch == '"' || ch == '\'') return Tag.STRING
@@ -725,7 +733,7 @@ object CborScan {
         }
     }
 
-    private fun parseIndefinite(ba: ByteArray, bs: ByteSeries, out: ElemBuf, tag: Int) {
+    private fun parseIndefinite(ba: ByteArray, bs: ByteSeries, out: ElemBuf, tag: Tag) {
         while (bs.hasRemaining && (ba[bs.pos].toInt() and 0xFF) != 0xFF) {
             val ib = bs.get.toInt() and 0xFF
             val ai = ib and 0x1F
@@ -863,11 +871,11 @@ object CsvScan {
 object Reify {
 
     /** Returns the element's tag (inferred from commas[0] if negative, else from src[open]). */
-    fun tagOf(e: JsElement, src: Series<Char>): Int {
+    fun tagOf(e: JsElement, src: Series<Char>): Tag {
         val commas = e.b
         if (commas.size > 0) {
             val c0 = commas[0]
-            if (c0 < 0) return c0
+            if (c0 < 0) Tag.fromCode(c0)?.let { return it }
         }
         val open = e.a.a
         if (open >= src.size) return Tag.NULL
