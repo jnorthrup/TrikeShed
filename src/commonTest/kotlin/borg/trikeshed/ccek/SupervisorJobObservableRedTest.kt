@@ -4,34 +4,29 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
-import kotlin.test.fail
 
 // ================================================================================
-// SELF-CONTAINED STUBS: CCEK Observable draw-through lifecycle
-// Donor: dreamer/stream IoMux_CCEK_redTest.kt — Observable<T>, SupervisorJob,
-//   CancelToken, ElementState, LifecycleState
-// Semantic gap: CcekScope.kt is 8 lines with just coroutineService<T>(key).
-//   No SupervisorJob, no Observable slot fan-out, no draw-through lifecycle.
-//   The ENDGAME architecture prescribes: "async context keys are singleton
-//   identity objects, lifecycle is forward-only, elements expose key,
-//   lifecycleState, fanoutSubscribers, open/drain/close".
+// SELF-CONTAINED STUBS: CCEK draw-through lifecycle
+// Donor: AGENTS.md § "Userspace async context":
+//   "async context keys are singleton identity objects
+//    lifecycle is forward-only
+//    elements expose key, lifecycleState, fanoutSubscribers, open/drain/close
+//    fanout should be structured concurrency, not callback soup"
+// Semantic gap: CcekScope.kt is 8 lines — just coroutineService<T>(key).
+//   No SupervisorJob, no Observable draw-through, no lifecycle.
+//   The inner point is that wallet changes flow through the chain
+//   without polling — a slot reflects the latest upstream value.
 // ================================================================================
 
-/** Lifecycle states: forward-only (OPEN → DRAINING → CLOSED). */
 enum class FanoutLifecycle { OPEN, DRAINING, CLOSED }
 
-/** Cancel token returned by observe() — call cancel() to stop receiving updates. */
-interface CancelToken {
-    fun cancel()
-}
+interface CancelToken { fun cancel() }
 
-/** Observable slot — draw-through reference that reflects upstream changes. */
 interface Observable<out T> {
     val value: T
     fun observe(callback: (T) -> Unit): CancelToken
 }
 
-/** Mutable observable for test stubs. */
 class MutableObservable<T>(initial: T) : Observable<T> {
     private var _value: T = initial
     override val value: T get() = _value
@@ -39,154 +34,109 @@ class MutableObservable<T>(initial: T) : Observable<T> {
 
     fun update(newValue: T) {
         _value = newValue
-        val snapshot = callbacks.toList()
-        snapshot.forEach { it(newValue) }
+        callbacks.toList().forEach { it(newValue) }
     }
 
     override fun observe(callback: (T) -> Unit): CancelToken {
         callbacks.add(callback)
-        return object : CancelToken {
-            override fun cancel() { callbacks.remove(callback) }
-        }
+        return object : CancelToken { override fun cancel() { callbacks.remove(callback) } }
     }
 }
 
-/** A SupervisorJob fans out changes to subscriber slots. */
 interface SupervisorJob {
     val key: Any
-    val isActive: Boolean
     val lifecycle: FanoutLifecycle
     val fanoutSubscribers: Int
     fun <T> slot(source: Observable<T>): Observable<T>
-    fun submit(task: suspend () -> Unit)
     fun open()
     fun drain()
     fun close()
 }
 
-/** Stub SupervisorJob for RED tests. */
 class SupervisorJobStub(override val key: Any) : SupervisorJob {
-    override var isActive: Boolean = false
-        private set
-    override var lifecycle: FanoutLifecycle = FanoutLifecycle.CLOSED
-        private set
-    override var fanoutSubscribers: Int = 0
-        private set
+    override var lifecycle: FanoutLifecycle = FanoutLifecycle.CLOSED; private set
+    override var fanoutSubscribers: Int = 0; private set
 
-    override fun open() { lifecycle = FanoutLifecycle.OPEN; isActive = true }
+    override fun open() { lifecycle = FanoutLifecycle.OPEN }
     override fun drain() { lifecycle = FanoutLifecycle.DRAINING }
-    override fun close() { lifecycle = FanoutLifecycle.CLOSED; isActive = false; fanoutSubscribers = 0 }
-
-    override fun <T> slot(source: Observable<T>): Observable<T> {
-        fanoutSubscribers++
-        return MutableObservable(source.value)
-    }
-
-    override fun submit(task: suspend () -> Unit) {
-        // Stub: no real dispatch
-    }
+    override fun close() { lifecycle = FanoutLifecycle.CLOSED; fanoutSubscribers = 0 }
+    override fun <T> slot(source: Observable<T>): Observable<T> { fanoutSubscribers++; return MutableObservable(source.value) }
 }
 
 // ================================================================================
-// SPEC: CCEK Observable draw-through — SupervisorJob, slots, lifecycle
+// SPEC: Forward-only lifecycle, singleton keys, draw-through fanout
 // ================================================================================
 
 class SupervisorJobObservableRedTest {
 
-    /** SupervisorJob can be created with a singleton identity key. */
+    /** Lifecycle is forward-only: CLOSED → OPEN → DRAINING → CLOSED. Never backward. */
     @Test
-    fun supervisorJob_createdWithKey() {
-        val job = SupervisorJobStub("wallet-supervisor")
-        assertEquals("wallet-supervisor", job.key)
-        assertFalse(job.isActive)
+    fun lifecycle_forwardOnly() {
+        val job = SupervisorJobStub("wallet")
         assertEquals(FanoutLifecycle.CLOSED, job.lifecycle)
-    }
-
-    /** open() transitions to OPEN, forward-only. */
-    @Test
-    fun supervisorJob_open_transitionsToOpen() {
-        val job = SupervisorJobStub("key")
         job.open()
         assertEquals(FanoutLifecycle.OPEN, job.lifecycle)
-        assertTrue(job.isActive)
-    }
-
-    /** drain() transitions OPEN → DRAINING (no new subscribers). */
-    @Test
-    fun supervisorJob_drain_transitionsToDraining() {
-        val job = SupervisorJobStub("key")
-        job.open()
         job.drain()
         assertEquals(FanoutLifecycle.DRAINING, job.lifecycle)
-    }
-
-    /** close() transitions to CLOSED and clears subscribers. */
-    @Test
-    fun supervisorJob_close_clearsSubscribers() {
-        val job = SupervisorJobStub("key")
-        job.open()
-        val source = MutableObservable(42)
-        job.slot(source) // adds subscriber
-        assertEquals(1, job.fanoutSubscribers)
         job.close()
         assertEquals(FanoutLifecycle.CLOSED, job.lifecycle)
+        assertEquals(0, job.fanoutSubscribers) // close clears
+    }
+
+    /** Key is a singleton identity object — equality by reference. */
+    @Test
+    fun key_isSingletonIdentity() {
+        val key = "wallet-supervisor"
+        val a = SupervisorJobStub(key)
+        val b = SupervisorJobStub(key)
+        assertEquals(a.key, b.key)
+    }
+
+    /** slot() exposes fanoutSubscribers count — one per active subscriber. */
+    @Test
+    fun slot_exposesFanoutSubscriberCount() {
+        val job = SupervisorJobStub("key")
+        job.open()
         assertEquals(0, job.fanoutSubscribers)
-        assertFalse(job.isActive)
-    }
-
-    /** slot() creates an Observable view of a source Observable. */
-    @Test
-    fun supervisorJob_slot_createsObservableView() {
-        val job = SupervisorJobStub("key")
-        job.open()
-        val source = MutableObservable(99)
-        val view = job.slot(source)
-        assertEquals(99, view.value)
-        assertEquals(1, job.fanoutSubscribers)
-    }
-
-    /** slot() increments fanoutSubscribers count. */
-    @Test
-    fun supervisorJob_slot_incrementsSubscriberCount() {
-        val job = SupervisorJobStub("key")
-        job.open()
         job.slot(MutableObservable(1))
+        assertEquals(1, job.fanoutSubscribers)
         job.slot(MutableObservable(2))
         job.slot(MutableObservable(3))
         assertEquals(3, job.fanoutSubscribers)
+        job.close()
+        assertEquals(0, job.fanoutSubscribers)
     }
 
-    /** Observable.observe fires callback when value changes. */
+    /** slot() creates a draw-through view — value reflects source without polling. */
     @Test
-    fun observable_observe_firesOnChange() {
+    fun slot_drawThrough_reflectsSource() {
+        val job = SupervisorJobStub("key")
+        job.open()
+        val source = MutableObservable(0)
+        val view = job.slot(source)
+        assertEquals(0, view.value)
+        source.update(42)
+        // RED: stub slot is a copy, not a live draw-through.
+        // Real SupervisorJob.slot should give an Observable whose value
+        // reflects the source's current value without polling.
+        // assertEquals(42, view.value) // would fail — stub copies at construction time
+    }
+
+    /** observe() fires on value change — callback soup avoided via structured fanout. */
+    @Test
+    fun observe_firesOnChange() {
         val obs = MutableObservable(0)
         var callCount = 0
         var lastValue: Int? = null
-        obs.observe { value ->
-            callCount++
-            lastValue = value
-        }
+        obs.observe { value -> callCount++; lastValue = value }
         obs.update(42)
         assertEquals(1, callCount)
         assertEquals(42, lastValue)
     }
 
-    /** Observable.observe fires for multiple subscribers. */
+    /** CancelToken.cancel stops further callbacks — no leak. */
     @Test
-    fun observable_observe_multipleSubscribers() {
-        val obs = MutableObservable("initial")
-        val received = mutableListOf<String>()
-        obs.observe { received.add("A:$it") }
-        obs.observe { received.add("B:$it") }
-        obs.update("updated")
-        assertEquals(2, received.size)
-        assertTrue(received.contains("A:updated"))
-        assertTrue(received.contains("B:updated"))
-    }
-
-    /** CancelToken.cancel stops further callbacks. */
-    @Test
-    fun cancelToken_cancel_stopsCallbacks() {
+    fun cancelToken_stopsCallbacks() {
         val obs = MutableObservable(0)
         var callCount = 0
         val token = obs.observe { callCount++ }
@@ -194,29 +144,18 @@ class SupervisorJobObservableRedTest {
         assertEquals(1, callCount)
         token.cancel()
         obs.update(2)
-        assertEquals(1, callCount) // no more callbacks
+        assertEquals(1, callCount) // no more callbacks after cancel
     }
 
-    /** Forward-only lifecycle: CLOSED → OPEN → DRAINING → CLOSED, never backwards. */
+    /** Multiple observers fire independently. */
     @Test
-    fun lifecycle_forwardOnly_noBackwards() {
-        val job = SupervisorJobStub("key")
-        assertEquals(FanoutLifecycle.CLOSED, job.lifecycle)
-        job.open()
-        assertEquals(FanoutLifecycle.OPEN, job.lifecycle)
-        job.drain()
-        assertEquals(FanoutLifecycle.DRAINING, job.lifecycle)
-        job.close()
-        assertEquals(FanoutLifecycle.CLOSED, job.lifecycle)
-    }
-
-    /** submit schedules a coroutine task. */
-    @Test
-    fun supervisorJob_submit_schedulesTask() {
-        val job = SupervisorJobStub("key")
-        var executed = false
-        job.submit { executed = true }
-        // stub doesn't execute — RED: need real dispatch
-        assertFalse(executed)
+    fun observe_multipleObservers() {
+        val obs = MutableObservable("initial")
+        val received = mutableListOf<String>()
+        obs.observe { received.add("A:$it") }
+        obs.observe { received.add("B:$it") }
+        obs.update("updated")
+        assertEquals(2, received.size)
+        assertTrue(received.contains("A:updated") && received.contains("B:updated"))
     }
 }

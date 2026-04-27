@@ -48,6 +48,85 @@ enum class QuicShortPacketType(val code: UByte) {
     ONE_RTT_NO_SPIN(0x00u),  // spin bit clear
 }
 
+// ── Packet Header sealed hierarchy (RFC 9000 §17) ─────────────────────────────
+
+/**
+ * QUIC packet header — sealed class hierarchy modeling RFC 9000 §17.
+ * Long header (bit 7=1): used before 1-RTT keys are established.
+ * Short header (bit 7=0): used after 1-RTT keys are negotiated.
+ */
+sealed class QuicPacketHeader(
+    open val dstConnectionId: ByteArray,
+) {
+    /**
+     * RFC 9000 §17.2 — Long Header Packet.
+     * Present during connection establishment (Initial, Handshake, 0-RTT, Retry).
+     */
+    sealed class Long(
+        val version: QuicVersion,
+        override val dstConnectionId: ByteArray,
+        val srcConnectionId: ByteArray,
+    ) : QuicPacketHeader(dstConnectionId) {
+
+        /** Client initial packet — carries CRYPTO frame with TLS ClientHello */
+        class Initial(
+            val token: ByteArray,
+            val packetNumber: ULong,
+            val payload: ByteArray,
+            version: QuicVersion,
+            dstConnectionId: ByteArray,
+            srcConnectionId: ByteArray,
+        ) : Long(version, dstConnectionId, srcConnectionId)
+
+        /** 0-RTT early data — resumption of a prior connection */
+        class ZeroRtt(
+            val packetNumber: ULong,
+            val payload: ByteArray,
+            version: QuicVersion,
+            dstConnectionId: ByteArray,
+            srcConnectionId: ByteArray,
+        ) : Long(version, dstConnectionId, srcConnectionId)
+
+        /** Handshake packet — carries remaining TLS handshake messages */
+        class Handshake(
+            val packetNumber: ULong,
+            val payload: ByteArray,
+            version: QuicVersion,
+            dstConnectionId: ByteArray,
+            srcConnectionId: ByteArray,
+        ) : Long(version, dstConnectionId, srcConnectionId)
+
+        /** Stateless retry — server responds to Initial with address validation */
+        class Retry(
+            val retryToken: ByteArray,
+            val retryIntegrityTag: ByteArray,
+            version: QuicVersion,
+            dstConnectionId: ByteArray,
+            srcConnectionId: ByteArray,
+        ) : Long(version, dstConnectionId, srcConnectionId)
+    }
+
+    /**
+     * RFC 9000 §17.3 — Short Header Packet.
+     * Used after 1-RTT keys are negotiated. Protected payload.
+     */
+    data class Short(
+        override val dstConnectionId: ByteArray,
+        val spinBit: Boolean = false,
+        val reservedBits: UByte = 0u,
+        val keyPhase: Boolean = false,
+        val packetNumberLength: UByte = 2u,
+        val packetNumber: ULong,
+        val protectedPayload: ByteArray,
+    ) : QuicPacketHeader(dstConnectionId)
+
+    // ── helpers ────────────────────────────────────────────────────────────
+
+    /** The first byte encodes header form (bit 7) and fixed bit (bit 6). */
+    val headerFormBit: Boolean get() = true  // long header
+    val fixedBit: Boolean get() = true       // always 1 in QUIC v1
+}
+
 val QuicKey: AsyncContextKey<QuicElement> = QuicElement.Key
 
 suspend fun openQuicElement(config: QuicConfig = QuicConfig()): QuicElement =

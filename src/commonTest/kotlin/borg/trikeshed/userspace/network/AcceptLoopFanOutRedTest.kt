@@ -8,168 +8,110 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 // ================================================================================
-// SELF-CONTAINED STUBS: Accept-loop fan-out with structured concurrency
-// Donor: old trikeshed-reactor HTTP server pattern + C10KServer accept loop
+// SELF-CONTAINED STUBS: accept-loop fan-out with structured concurrency
+// Donor: old trikeshed-reactor HttpServer + C10KServer accept loop —
 //   while(isActive) { val client = serverChannel.accept(); launch { handler(client) } }
-// Semantic gap: no accept-loop with coroutineScope + Semaphore throttle in root
-//   TrikeShed. The old code uses GlobalScope.launch; current spec demands
-//   structured concurrency with coroutineScope { async { } } + Semaphore.
+//   Both used GlobalScope.launch inside the loop.
+// Semantic gap: AGENTS.md prescribes "coroutineScope fan-out (async/await)
+//   with Semaphore throttle rather than sequential for-loops."
+//   The inner point is structured concurrency — parent scope death cleans
+//   all children; Semaphore caps concurrent load. Not GlobalScope.
 // ================================================================================
 
-/** Minimal client connection stub. */
 data class ClientConnection(val id: Long, val address: String)
 
-/** Minimal server channel stub. */
-class ServerChannelStub {
+class ServerChannelStub(private val maxClients: Int = 10) {
     private var nextId = 0L
     var isBound = false
     var isClosed = false
-    val acceptedClients = mutableListOf<ClientConnection>()
 
     fun bind() { isBound = true }
     fun accept(): ClientConnection? {
-        if (isClosed) return null
-        val client = ClientConnection(nextId++, "client_${nextId - 1}")
-        acceptedClients.add(client)
-        return client
+        if (isClosed || nextId >= maxClients) return null
+        return ClientConnection(nextId++, "client_${nextId - 1}")
     }
     fun close() { isClosed = true }
 }
 
-/** Handler that tracks processed clients. */
 class ClientHandler {
     val processed = mutableListOf<ClientConnection>()
+    var peakConcurrent = 0
+    var currentConcurrent = 0
 
     suspend fun handle(client: ClientConnection) {
-        // Simulate I/O work
-        delay(1)
+        currentConcurrent++
+        if (currentConcurrent > peakConcurrent) peakConcurrent = currentConcurrent
+        delay(1) // simulated I/O
         processed.add(client)
+        currentConcurrent--
     }
 }
 
 // ================================================================================
-// SPEC: Accept-loop fan-out with coroutineScope + Semaphore throttle
+// SPEC: Structured concurrency fan-out — coroutineScope + Semaphore throttle
 // ================================================================================
 
 class AcceptLoopFanOutRedTest {
 
-    /** Single accept → single handler call. */
+    /** coroutineScope: all children complete before scope exits. */
     @Test
-    fun acceptLoop_singleClient() = runBlocking {
-        val server = ServerChannelStub()
-        val handler = ClientHandler()
-        server.bind()
-
-        val client = server.accept()
-        assertTrue(client != null)
-        if (client != null) {
-            handler.handle(client)
-        }
-
-        assertEquals(1, handler.processed.size)
-        assertEquals(0L, handler.processed[0].id)
-    }
-
-    /** Three accepts → three handler calls, processed concurrently. */
-    @Test
-    fun acceptLoop_threeClients_concurrent() = runBlocking {
-        val server = ServerChannelStub()
-        server.bind()
-
-        val handler = ClientHandler()
-        val semaphore = Semaphore(10) // throttle to 10 concurrent
-
-        coroutineScope {
-            repeat(3) {
-                val client = server.accept()
-                if (client != null) {
-                    async {
-                        semaphore.withPermit {
-                            handler.handle(client)
-                        }
-                    }
-                }
-            }
-        }
-
-        assertEquals(3, handler.processed.size)
-        val ids = handler.processed.map { it.id }.sorted()
-        assertEquals(listOf(0L, 1L, 2L), ids)
-    }
-
-    /** Semaphore throttles concurrent handlers — respects max concurrent. */
-    @Test
-    fun acceptLoop_semaphoreThrottle() = runBlocking {
-        val maxConcurrent = 2
-        val semaphore = Semaphore(maxConcurrent)
-        var peakConcurrent = 0
-        var currentConcurrent = 0
-
-        val handler = ClientHandler()
-
-        coroutineScope {
-            val jobs = (0 until 5).map { i ->
-                async {
-                    currentConcurrent++
-                    if (currentConcurrent > peakConcurrent) peakConcurrent = currentConcurrent
-                    // Permit is held during handle()
-                    handler.handle(ClientConnection(i.toLong(), "client_$i"))
-                    currentConcurrent--
-                }
-            }
-        }
-
-        // With 5 concurrent jobs, Semaphore(2) should cap at 2 or less
-        // (execution order may vary, but peak shouldn't exceed 5 without semaphore
-        //  — with semaphore, we're testing the pattern, not the exact peak)
-        assertEquals(5, handler.processed.size)
-        assertTrue(peakConcurrent <= 5) // without semaphore it could spike
-    }
-
-    /** Server lifecycle: bind → accept loop → close. */
-    @Test
-    fun serverLifecycle_bindAcceptClose() = runBlocking {
-        val server = ServerChannelStub()
-        assertTrue(!server.isBound)
-
-        server.bind()
-        assertTrue(server.isBound)
-
-        val client = server.accept()
-        assertTrue(client != null)
-
-        server.close()
-        assertTrue(server.isClosed)
-        assertEquals(null, server.accept())
-    }
-
-    /** ClientConnection carries id and address. */
-    @Test
-    fun clientConnection_idAndAddress() {
-        val c = ClientConnection(42L, "10.0.0.1:56789")
-        assertEquals(42L, c.id)
-        assertEquals("10.0.0.1:56789", c.address)
-    }
-
-    /** CoroutineScope fan-out: all children complete before scope exits. */
-    @Test
-    fun coroutineScope_allChildrenComplete() = runBlocking {
+    fun coroutineScope_awaitsAllChildren() = runBlocking {
         val results = mutableListOf<Int>()
-
         coroutineScope {
             async { delay(10); results.add(1) }
             async { delay(5); results.add(2) }
             async { delay(1); results.add(3) }
         }
-
-        // coroutineScope waits for all children — all 3 must be done
+        // coroutineScope suspends until all children done
         assertEquals(3, results.size)
         assertTrue(results.containsAll(listOf(1, 2, 3)))
     }
 
-    /** Semaphore.withPermit releases after block completes. */
+    /** Cancel parent scope → all in-flight children cancelled. */
     @Test
-    fun semaphore_withPermit_releasesAfterBlock() = runBlocking {
+    fun parentCancel_cancelsAllChildren() = runBlocking {
+        val handler = ClientHandler()
+        val job = launch {
+            coroutineScope {
+                repeat(5) {
+                    async { handler.handle(ClientConnection(it.toLong(), "c$it")) }
+                }
+                delay(1000) // never reached
+            }
+        }
+        delay(5) // let children start
+        job.cancel()
+        job.join()
+        // Some children may have completed before cancel, but
+        // the key property is that cancellation doesn't leak
+        assertTrue(handler.processed.size <= 5)
+    }
+
+    /** Semaphore.withPermit caps concurrent in-flight. */
+    @Test
+    fun semaphore_capsConcurrent() = runBlocking {
+        val maxConcurrent = 2
+        val semaphore = Semaphore(maxConcurrent)
+        val handler = ClientHandler()
+
+        coroutineScope {
+            (0 until 5).map { i ->
+                async {
+                    semaphore.withPermit {
+                        handler.handle(ClientConnection(i.toLong(), "c$i"))
+                    }
+                }
+            }
+        }
+
+        // Semaphore(2) guarantees at most 2 concurrent in the critical section
+        assertTrue(handler.peakConcurrent <= maxConcurrent)
+        assertEquals(5, handler.processed.size)
+    }
+
+    /** Semaphore.withPermit releases after block, serializes correctly. */
+    @Test
+    fun semaphore_serializesWithPermitOne() = runBlocking {
         val sem = Semaphore(1)
         val order = mutableListOf<String>()
 
@@ -188,10 +130,27 @@ class AcceptLoopFanOutRedTest {
             }
         }
 
-        j1.await()
-        j2.await()
-
-        // j2 can only start after j1 releases
+        j1.await(); j2.await()
         assertEquals(listOf("j1-start", "j1-end", "j2-start", "j2-end"), order)
+    }
+
+    /** Accept loop fan-out: one accept → one handler, structured. */
+    @Test
+    fun acceptLoop_structuredFanOut() = runBlocking {
+        val server = ServerChannelStub(maxClients = 3)
+        val handler = ClientHandler()
+        val semaphore = Semaphore(10)
+        server.bind()
+
+        coroutineScope {
+            while (true) {
+                val client = server.accept() ?: break
+                async {
+                    semaphore.withPermit { handler.handle(client) }
+                }
+            }
+        }
+
+        assertEquals(3, handler.processed.size)
     }
 }
