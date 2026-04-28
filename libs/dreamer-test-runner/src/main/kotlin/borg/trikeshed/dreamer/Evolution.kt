@@ -83,12 +83,42 @@ fun crossover(p1: Genome, p2: Genome, random: Random): Pair<Genome, Genome> {
         }
     }
 
-    // Always carry overrides specially
-    val overrides1 = p1.backing["overrides"] as? MutableMap<String, MutableMap<String, Any?>>
-    val overrides2 = p2.backing["overrides"] as? MutableMap<String, MutableMap<String, Any?>>
-    if (overrides1 != null || overrides2 != null) {
-        child1Backing["overrides"] = if (random.nextBoolean()) overrides1 else overrides2
-        child2Backing["overrides"] = if (random.nextBoolean()) overrides1 else overrides2
+    // Always carry overrides specially.
+    // Use erasure-tolerant casts (MutableMap erased to Map at runtime) and
+    // deep-copy inner maps to ensure the child genome's overrides are fully mutable.
+    // This mirrors the Genome.overridesFor pattern: the inner override maps
+    // may have been loaded from JSON/persistence as non-MutableMap implementations.
+    @Suppress("UNCHECKED_CAST")
+    val overrides1Raw = p1.backing["overrides"] as? Map<String, Map<String, Any?>>
+    @Suppress("UNCHECKED_CAST")
+    val overrides2Raw = p2.backing["overrides"] as? Map<String, Map<String, Any?>>
+    if (overrides1Raw != null || overrides2Raw != null) {
+        // Deep-copy: outer cast to Map (erasure-tolerant), inner deep-copy to HashMap
+        val copy1 = overrides1Raw?.entries?.associate { it.key to HashMap(it.value) }
+            ?: emptyMap()
+        val copy2 = overrides2Raw?.entries?.associate { it.key to HashMap(it.value) }
+            ?: emptyMap()
+        // When only one parent has overrides, both children must inherit them.
+        // When both have overrides, each child inherits a different parent's version.
+        val child1HasOverrides = copy1.isNotEmpty()
+        val child2HasOverrides = copy2.isNotEmpty()
+        when {
+            child1HasOverrides && child2HasOverrides -> {
+                // Both: XOR so each child gets a different parent
+                child1Backing["overrides"] = copy1
+                child2Backing["overrides"] = copy2
+            }
+            child1HasOverrides -> {
+                // Only p1: both children get p1's overrides
+                child1Backing["overrides"] = copy1
+                child2Backing["overrides"] = copy1
+            }
+            child2HasOverrides -> {
+                // Only p2: both children get p2's overrides
+                child1Backing["overrides"] = copy2
+                child2Backing["overrides"] = copy2
+            }
+        }
     }
 
     return Genome(child1Backing) to Genome(child2Backing)
