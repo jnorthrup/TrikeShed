@@ -96,36 +96,3 @@ class DreamerElementTddTest {
         assertTrue(position.unrealizedPnL(currentPrice = 3100.0) > 0)
     }
 }
-
-// ── Concrete element definitions (stub until dreamer-kmm implementation) ──────
-
-data class PaperAccount(
-    val balance: Double,
-) : AsyncContextElement() {
-    companion object Key : AsyncContextKey<PaperAccount>()
-    override val key: AsyncContextKey<PaperAccount> get() = Key
-}
-
-enum class OrderStatus { PENDING, FILLED, CANCELLED, REJECTED }
-
-data class PaperOrder(
-    val symbol: String,
-    val quantity: Double,
-    val price: Double,
-    val status: OrderStatus = OrderStatus.PENDING,
-) : AsyncContextElement() {
-    companion object Key : AsyncContextKey<PaperOrder>()
-    override val key: AsyncContextKey<PaperOrder> get() = Key
-}
-
-data class PaperPosition(
-    val symbol: String,
-    val quantity: Double,
-    val entryPrice: Double,
-) : AsyncContextElement() {
-    companion object Key : AsyncContextKey<PaperPosition>()
-    override val key: AsyncContextKey<PaperPosition> get() = Key
-
-    fun unrealizedPnL(currentPrice: Double): Double =
-        (currentPrice - entryPrice) * quantity
-}
