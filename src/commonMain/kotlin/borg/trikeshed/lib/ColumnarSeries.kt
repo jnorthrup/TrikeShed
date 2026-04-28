@@ -15,7 +15,7 @@ class DoubleSeries(private var data: DoubleArray) : MutableSeries<Double> {
     constructor(initialCapacity: Int) : this(DoubleArray(initialCapacity) { 0.0 })
 
     override val a: Int get() = data.size
-    override val b: (Int) -> Double = data::get
+    override val b: (Int) -> Double = { i -> data[i] }
 
     val array: DoubleArray get() = data
 
@@ -83,7 +83,7 @@ class LongSeries(private var data: LongArray) : MutableSeries<Long> {
     constructor(initialCapacity: Int) : this(LongArray(initialCapacity) { 0L })
 
     override val a: Int get() = data.size
-    override val b: (Int) -> Long = data::get
+    override val b: (Int) -> Long = { i -> data[i] }
 
     override fun set(index: Int, item: Long) { data[index] = item }
 
@@ -134,7 +134,7 @@ class IntSeries(private var data: IntArray) : MutableSeries<Int> {
     constructor(initialCapacity: Int) : this(IntArray(initialCapacity) { 0 })
 
     override val a: Int get() = data.size
-    override val b: (Int) -> Int = data::get
+    override val b: (Int) -> Int = { i -> data[i] }
 
     override fun set(index: Int, item: Int) { data[index] = item }
 
@@ -185,7 +185,7 @@ class FloatSeries(private var data: FloatArray) : MutableSeries<Float> {
     constructor(initialCapacity: Int) : this(FloatArray(initialCapacity) { 0f })
 
     override val a: Int get() = data.size
-    override val b: (Int) -> Float = data::get
+    override val b: (Int) -> Float = { i -> data[i] }
 
     override fun set(index: Int, item: Float) { data[index] = item }
 
