@@ -54,6 +54,31 @@ class EvolutionTest {
         assertTrue(computeStochasticFitness(backtestResult(deeperDrawdown)) < computeStochasticFitness(backtestResult(baseMetrics)))
     }
 
+    @Test
+    fun `crossoverGenome takes low sorted keys from left and high sorted keys from right`() {
+        val left = Genome(mutableMapOf("A" to 1.0, "B" to 2.0, "C" to 3.0, "D" to 4.0))
+        val right = Genome(mutableMapOf("A" to 10.0, "B" to 20.0, "C" to 30.0, "D" to 40.0))
+
+        val child = crossoverGenome(left, right)
+
+        assertEquals(1.0, child["A"])
+        assertEquals(2.0, child["B"])
+        assertEquals(30.0, child["C"])
+        assertEquals(40.0, child["D"])
+    }
+
+    @Test
+    fun `mutateGenome applies numeric deltas without mutating parent`() {
+        val parent = Genome(mutableMapOf("HARVEST_TAKE_PERCENT" to 0.70, "ENABLE_CRASH_PROTECTION" to true))
+
+        val mutant = mutateGenome(parent, mapOf("HARVEST_TAKE_PERCENT" to -0.05, "NEW_PARAM" to 2.0))
+
+        assertEquals(0.70, parent["HARVEST_TAKE_PERCENT"])
+        assertEquals(0.65, mutant["HARVEST_TAKE_PERCENT"] as Double, 0.000001)
+        assertEquals(true, mutant["ENABLE_CRASH_PROTECTION"])
+        assertEquals(2.0, mutant["NEW_PARAM"])
+    }
+
     private fun backtestResult(metrics: BacktestMetrics): BacktestResult = BacktestResult(
         symbol = "BTCUSDT",
         initialCapital = 10_000.0,

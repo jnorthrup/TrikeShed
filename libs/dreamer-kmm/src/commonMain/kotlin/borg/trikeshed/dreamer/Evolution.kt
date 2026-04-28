@@ -25,6 +25,32 @@ fun computeStochasticFitness(result: BacktestResult): Double =
  */
 fun fitnessFromResult(result: BacktestResult): Double = computeStochasticFitness(result)
 
+/** Deterministic one-point crossover over sorted genome keys. */
+fun crossoverGenome(left: Genome, right: Genome): Genome {
+    val keys = (left.backing.keys + right.backing.keys).distinct().sorted()
+    val pivot = keys.size / 2
+    val child = Genome(mutableMapOf())
+    keys.forEachIndexed { index, key ->
+        val source = if (index < pivot) left else right
+        val fallback = if (index < pivot) right else left
+        child[key] = source.backing[key] ?: fallback.backing[key]
+    }
+    return child
+}
+
+/** Copy a genome and apply additive numeric deltas for mutation/search steps. */
+fun mutateGenome(parent: Genome, deltas: Map<String, Double>): Genome {
+    val mutant = Genome(parent.backing.toMutableMap())
+    deltas.forEach { (key, delta) ->
+        val current = mutant.backing[key]
+        mutant[key] = when (current) {
+            is Number -> current.toDouble() + delta
+            else -> delta
+        }
+    }
+    return mutant
+}
+
 /** Replay each genome over the same archive data and produce evaluation records. */
 suspend fun evaluatePopulation(
     genomes: List<Genome>,
