@@ -273,6 +273,100 @@ fun computeBacktestMetrics(
     )
 }
 
+/**
+ * Run a full back-test simulation over a MiniCursor of kline bars.
+ *
+ * Iterates each bar in the cursor, converts it to a [PortfolioInput] via
+ * [klineBarToPortfolioInput], feeds it to the [TradingEngine], records the
+ * resulting [CycleResult], and computes aggregate [BacktestMetrics] at the end.
+ *
+ * @param cursor    MiniCursor of kline bars (DocRowVec rows, from KlineBlock.asCursor())
+ * @param engine    pre-configured [TradingEngine] (genome + mode + capital)
+ * @param initialCapital  starting portfolio value in USD
+ * @param onCycle   optional callback invoked after each tick with the cycle result
+ * @return [BacktestResult] with all cycles and aggregate metrics
+ */
+suspend fun simulateTicks(
+    cursor: MiniCursor,
+    engine: TradingEngine,
+    initialCapital: Double,
+    onCycle: (CycleResult) -> Unit = {},
+): BacktestResult {
+    val n = cursor.size
+    if (n == 0) {
+        return BacktestResult(
+            symbol = "",
+            initialCapital = initialCapital,
+            cycles = emptyList(),
+            metrics = BacktestMetrics(
+                totalTicks = 0,
+                totalReturn = 0.0,
+                sharpeRatio = 0.0,
+                maxDrawdown = 0.0,
+                maxDrawdownTicks = 0,
+                totalHarvested = 0.0,
+                totalTrades = 0,
+                avgHarvestPerTick = 0.0,
+            ),
+        )
+    }
+
+    // Derive symbol from the first bar
+    val firstRow: DocRowVec = (cursor at 0) as DocRowVec
+    val symbol: String = firstRow["symbol"] as? String ?: "UNKNOWN"
+
+    // Derive initial quantity from initial capital / first close price
+    val firstClose: Double = firstRow["close"] as? Double ?: firstRow["open"] as? Double ?: 1.0
+    val initialQuantity = initialCapital / firstClose
+
+    val cycles = mutableListOf<CycleResult>()
+
+    for (i in 0 until n) {
+        val input = klineBarToPortfolioInput(cursor, i, currentQuantity = initialQuantity)
+        val rows = portfolioInputToRows(input)
+
+        // Current holdings value is sum of all row values
+        var holdingsValue = 0.0
+        rows.forEach { holdingsValue += it.Value }
+        val totalValue = holdingsValue + engine.cashBalance
+
+        val result = engine.update(
+            portfolioSummary = rows,
+            api = null,
+            cashBalanceIn = engine.cashBalance,
+            holdingDetails = null,
+        )
+
+        val row: DocRowVec = (cursor at i) as DocRowVec
+        val openTime: Long = row["openTime"] as? Long ?: 0L
+
+        val cycle = CycleResult(
+            tick = i,
+            openTime = openTime,
+            cashBalance = engine.cashBalance,
+            holdingsValue = holdingsValue,
+            totalValue = totalValue,
+            anyTradesThisCycle = result.anyTradesThisCycle,
+            harvestedAmount = result.harvestedAmount,
+            tradedSymbols = result.tradedSymbols,
+            rebalanceScheduled = engine.rebalanceState.isNotEmpty(),
+            engineSnapshot = engine.getStateSnapshot(),
+        )
+        cycles.add(cycle)
+        onCycle(cycle)
+    }
+
+    val closes = closesFromCursor(cursor)
+    val metrics = computeBacktestMetrics(cycles, initialCapital, closes)
+
+    return BacktestResult(
+        symbol = symbol,
+        initialCapital = initialCapital,
+        cycles = cycles,
+        metrics = metrics,
+    )
+}
+
 private fun emptyBacktestResult(genome: Genome, initialCapital: Double): BacktestResult =
     BacktestResult(
         symbol = "",
