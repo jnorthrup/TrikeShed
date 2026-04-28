@@ -1,5 +1,7 @@
 package borg.trikeshed.dreamer
 
+import java.util.HashMap
+
 enum class Mode { LIVE, SHADOW }
 
 // Minimal models for standalone testing
@@ -47,7 +49,25 @@ class Genome(val backing: MutableMap<String, Any?> = mutableMapOf()) {
         }
     }
 
-    fun overridesFor(symbol: String): MutableMap<String, Any?>? = (backing["overrides"] as? MutableMap<String, MutableMap<String, Any?>>)?.get(symbol)
+    /**
+     * Safely look up per-symbol parameter overrides.
+     *
+     * Tolerates any [Map] subtype for the outer overrides map — including
+     * [Map] implementations returned by JSON parsers (e.g. [LinkedHashMap]) that
+     * are not [MutableMap].  The inner symbol-level map is also accessed via
+     * safe cast, so no [ClassCastException] can propagate from this method.
+     */
+    fun overridesFor(symbol: String): MutableMap<String, Any?>? {
+        val overrides = backing["overrides"] ?: return null
+        // Safe cast: tolerate any Map subtype for outer (type erasure makes cast always succeed at runtime)
+        @Suppress("UNCHECKED_CAST")
+        val outer = overrides as? Map<String, Map<String, Any?>> ?: return null
+        val inner = outer[symbol] ?: return null
+        // Safe cast: return value of Map.get() is Map<String, Any?>, not MutableMap
+        // Coerce to MutableMap to satisfy return type while preserving read access
+        @Suppress("UNCHECKED_CAST")
+        return inner as? MutableMap<String, Any?> ?: HashMap(inner)
+    }
 }
 
 fun defaultGenome(): Genome {
