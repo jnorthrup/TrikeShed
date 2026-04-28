@@ -1,4 +1,4 @@
-@file:Deprecated("Moved to libs/kursive; prefer borg.trikeshed.parse.kursive in libs/kursive")
+@file:Suppress("unused", "DEPRECATION")
 package borg.trikeshed.parse.kursive
 
 import borg.trikeshed.common.TypeEvidence
