@@ -51,6 +51,10 @@ fun mutateGenome(parent: Genome, deltas: Map<String, Double>): Genome {
     return mutant
 }
 
+/** Strongest stochastic back-test evaluations first, preserving evaluation records. */
+fun rankEvaluationsByFitness(evaluations: List<GenomeEvaluation>): List<GenomeEvaluation> =
+    evaluations.sortedByDescending { it.fitness }
+
 /** Replay each genome over the same archive data and produce evaluation records. */
 suspend fun evaluatePopulation(
     genomes: List<Genome>,

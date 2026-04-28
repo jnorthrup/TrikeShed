@@ -79,6 +79,48 @@ class EvolutionTest {
         assertEquals(2.0, mutant["NEW_PARAM"])
     }
 
+    @Test
+    fun `rankEvaluationsByFitness orders strongest stochastic backtests first`() {
+        val weak = GenomeEvaluation(
+            genome = Genome(mutableMapOf("id" to "weak")),
+            result = backtestResult(metrics(totalReturn = 0.02, sharpeRatio = 0.5, sortinoRatio = 0.5, maxDrawdown = 0.30)),
+            fitness = 0.72,
+        )
+        val strong = GenomeEvaluation(
+            genome = Genome(mutableMapOf("id" to "strong")),
+            result = backtestResult(metrics(totalReturn = 0.08, sharpeRatio = 1.5, sortinoRatio = 2.0, maxDrawdown = 0.10)),
+            fitness = 3.48,
+        )
+        val middle = GenomeEvaluation(
+            genome = Genome(mutableMapOf("id" to "middle")),
+            result = backtestResult(metrics(totalReturn = 0.04, sharpeRatio = 1.0, sortinoRatio = 1.0, maxDrawdown = 0.20)),
+            fitness = 1.84,
+        )
+
+        val ranked = rankEvaluationsByFitness(listOf(weak, strong, middle))
+
+        assertSame(strong, ranked[0])
+        assertSame(middle, ranked[1])
+        assertSame(weak, ranked[2])
+    }
+
+    private fun metrics(
+        totalReturn: Double,
+        sharpeRatio: Double,
+        sortinoRatio: Double,
+        maxDrawdown: Double,
+    ): BacktestMetrics = BacktestMetrics(
+        totalTicks = 4,
+        totalReturn = totalReturn,
+        sharpeRatio = sharpeRatio,
+        sortinoRatio = sortinoRatio,
+        maxDrawdown = maxDrawdown,
+        maxDrawdownTicks = 1,
+        totalHarvested = 0.0,
+        totalTrades = 0,
+        avgHarvestPerTick = 0.0,
+    )
+
     private fun backtestResult(metrics: BacktestMetrics): BacktestResult = BacktestResult(
         symbol = "BTCUSDT",
         initialCapital = 10_000.0,
