@@ -30,14 +30,6 @@ kotlin {
     jvmToolchain(21)
     jvm()
 
-    linuxX64()
-    linuxArm64()
-    val hostOs = System.getProperty("os.name")
-    if (hostOs == "Mac OS X") {
-        macosArm64()
-        macosX64()
-    }
-
     sourceSets {
         val commonMain by getting {
             dependencies {
@@ -49,21 +41,13 @@ kotlin {
             dependencies {
                 implementation(project(":"))
                 implementation(kotlin("test"))
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
             }
         }
         val jvmTest by getting {
             dependencies {
                 implementation(kotlin("test-junit"))
             }
-        }
-
-        // nativeMain intermediate source set
-        val nativeMain by creating { dependsOn(commonMain) }
-        val linuxX64Main by getting { dependsOn(nativeMain) }
-        val linuxArm64Main by getting { dependsOn(nativeMain) }
-        if (hostOs == "Mac OS X") {
-            val macosArm64Main by getting { dependsOn(nativeMain) }
-            val macosX64Main by getting { dependsOn(nativeMain) }
         }
     }
 }
