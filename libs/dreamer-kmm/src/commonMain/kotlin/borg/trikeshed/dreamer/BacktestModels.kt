@@ -1,13 +1,12 @@
 package borg.trikeshed.dreamer
 
-import borg.trikeshed.couch.kline.Kline
-import borg.trikeshed.couch.kline.TimeSpan
-import borg.trikeshed.miniduck.DocRowVec
-import borg.trikeshed.miniduck.MiniCursor
-import borg.trikeshed.miniduck.at
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.size
+import borg.trikeshed.miniduck.DocRowVec
+import borg.trikeshed.miniduck.MiniCursor
+import borg.trikeshed.miniduck.at
+import kotlin.math.sqrt
 
 /**
  * Back-test input derived from a single kline bar.
@@ -196,3 +195,97 @@ fun closesFromCursor(cursor: MiniCursor): List<Double> {
         row["close"] as? Double ?: row["open"] as? Double ?: 0.0
     }
 }
+
+/**
+ * Compute aggregate [BacktestMetrics] from cycle results.
+ */
+fun computeBacktestMetrics(
+    cycles: List<CycleResult>,
+    initialCapital: Double,
+    closePrices: List<Double>,
+): BacktestMetrics {
+    if (cycles.isEmpty()) {
+        return BacktestMetrics(
+            totalTicks = 0,
+            totalReturn = 0.0,
+            sharpeRatio = 0.0,
+            maxDrawdown = 0.0,
+            maxDrawdownTicks = 0,
+            totalHarvested = 0.0,
+            totalTrades = 0,
+            avgHarvestPerTick = 0.0,
+        )
+    }
+
+    val totalTicks = cycles.size
+    val finalTotal = cycles.lastOrNull()?.totalValue ?: initialCapital
+    val totalReturn = if (initialCapital > 0.0) (finalTotal - initialCapital) / initialCapital else 0.0
+
+    // Daily/cycle returns for Sharpe
+    val returns = cycles.mapIndexed { i, c ->
+        if (i == 0) 0.0
+        else {
+            val prev = cycles[i - 1].totalValue
+            if (prev > 0.0) (c.totalValue - prev) / prev else 0.0
+        }
+    }.drop(1) // drop first zero
+
+    val meanReturn = if (returns.isNotEmpty()) returns.average() else 0.0
+    val variance = if (returns.size > 1) {
+        returns.map { (it - meanReturn) * (it - meanReturn) }.average()
+    } else 0.0
+    val stdReturn = sqrt(variance)
+    // Annualized Sharpe (252 trading days per year, assumes 1 bar = 1 day for now)
+    val sharpeRatio = if (stdReturn > 0.0) (meanReturn / stdReturn) * sqrt(252.0) else 0.0
+
+    // Max drawdown
+    var peak = initialCapital
+    var maxDrawdown = 0.0
+    var maxDrawdownTicks = 0
+    var currentDrawdownTicks = 0
+    for (cycle in cycles) {
+        if (cycle.totalValue > peak) {
+            peak = cycle.totalValue
+            currentDrawdownTicks = 0
+        } else {
+            val drawdown = (peak - cycle.totalValue) / peak
+            if (drawdown > maxDrawdown) {
+                maxDrawdown = drawdown
+                maxDrawdownTicks = currentDrawdownTicks
+            }
+            currentDrawdownTicks++
+        }
+    }
+
+    val totalHarvested = cycles.sumOf { it.harvestedAmount }
+    val totalTrades = cycles.count { it.anyTradesThisCycle }
+    val avgHarvestPerTick = if (totalTicks > 0) totalHarvested / totalTicks else 0.0
+
+    return BacktestMetrics(
+        totalTicks = totalTicks,
+        totalReturn = totalReturn,
+        sharpeRatio = sharpeRatio,
+        maxDrawdown = maxDrawdown,
+        maxDrawdownTicks = maxDrawdownTicks,
+        totalHarvested = totalHarvested,
+        totalTrades = totalTrades,
+        avgHarvestPerTick = avgHarvestPerTick,
+    )
+}
+
+private fun emptyBacktestResult(genome: Genome, initialCapital: Double): BacktestResult =
+    BacktestResult(
+        symbol = "",
+        initialCapital = initialCapital,
+        cycles = emptyList(),
+        metrics = BacktestMetrics(
+            totalTicks = 0,
+            totalReturn = 0.0,
+            sharpeRatio = 0.0,
+            maxDrawdown = 0.0,
+            maxDrawdownTicks = 0,
+            totalHarvested = 0.0,
+            totalTrades = 0,
+            avgHarvestPerTick = 0.0,
+        ),
+    )

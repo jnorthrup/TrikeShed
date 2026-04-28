@@ -13,12 +13,16 @@ kotlin {
     }
 
     jvm()
+
+    jvmToolchain(21)
     js()
 
     sourceSets {
         commonMain {
             dependencies {
                 api(project(":"))
+                api(project(":libs:miniduck"))
+                api(project(":libs:couch"))
             }
         }
         commonTest {

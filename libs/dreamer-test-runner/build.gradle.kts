@@ -8,8 +8,6 @@ repositories {
 
 dependencies {
     implementation(project(":libs:dreamer-kmm"))
-    implementation(project(":libs:couch"))
-    implementation(project(":libs:miniduck"))
     // borg.trikeshed.lib (Series, size, j, Twin, Join) lives in root commonMain
     implementation(project(":"))
     testImplementation(kotlin("test"))
