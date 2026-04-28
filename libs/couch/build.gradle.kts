@@ -101,7 +101,7 @@ kotlin {
     }
 }
 
-tasks.register<org.gradle.api.tasks.JavaExec>("quickValidate") {
+tasks.register<JavaExec>("quickValidate") {
     group = "verification"
     description = "Run a quick jvmMain validation of MiniDuck encode/decode"
     dependsOn("compileKotlinJvm")
