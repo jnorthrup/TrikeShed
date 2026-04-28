@@ -12,14 +12,17 @@ import borg.trikeshed.userspace.concurrency.ChannelCapacity
 import borg.trikeshed.lib.size
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
+import java.time.LocalDate
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
@@ -343,5 +346,87 @@ class BinanceKlineTddTest {
 
         val row1: DocRowVec = (cursor at 1) as DocRowVec
         assertEquals(20800.0, row1.cells[3] as Double, 0.001)
+    }
+
+    @Test
+    fun `BinanceKlineSource buildUrl uses Binance daily zip archive URL`() {
+        val source = BinanceKlineSource(
+            symbol = "BTCUSDT",
+            interval = "1h",
+            startDate = LocalDate.parse("2024-01-01"),
+            endDate = LocalDate.parse("2024-01-01"),
+        )
+
+        assertEquals(
+            "https://data.binance.vision/data/spot/daily/klines/BTCUSDT/1h/BTCUSDT-1h-2024-01-01.zip",
+            source.buildUrl(LocalDate.parse("2024-01-01")),
+        )
+    }
+
+    @Test
+    fun `BinanceKlineSource fanout respects maxConcurrentFetches`() = runBlocking {
+        var active = 0
+        var maxActive = 0
+        val source = BinanceKlineSource(
+            symbol = "BTCUSDT",
+            interval = "1h",
+            startDate = LocalDate.parse("2024-01-01"),
+            endDate = LocalDate.parse("2024-01-10"),
+            blockCapacity = 100,
+            maxConcurrentFetches = 2,
+            csvFetcher = {
+                active++
+                maxActive = maxOf(maxActive, active)
+                delay(25)
+                active--
+                "1704067200000,1.0,2.0,0.5,1.5,100.0,0,0,0,0,0,0"
+            },
+        )
+
+        val blocks = mutableListOf<KlineBlock>()
+        source.fetchAll { blocks.add(it) }
+
+        assertTrue(maxActive <= 2, "maxActive=$maxActive")
+        assertEquals(10, blocks.sumOf { it.rowCount })
+    }
+
+    @Test
+    fun `BinanceKlineSource throws visible failure when every requested day misses`() {
+        val ex = assertFailsWith<BinanceKlineFetchException> {
+            BinanceKlineSource(
+                symbol = "BTCUSDT",
+                interval = "1h",
+                startDate = LocalDate.parse("2024-01-01"),
+                endDate = LocalDate.parse("2024-01-03"),
+                csvFetcher = { url -> throw IllegalStateException("Not found: $url") },
+            ).fetchCursor()
+        }
+
+        assertEquals("BTCUSDT", ex.symbol)
+        assertEquals("1h", ex.interval)
+        assertEquals(LocalDate.parse("2024-01-01"), ex.startDate)
+        assertEquals(LocalDate.parse("2024-01-03"), ex.endDate)
+        assertEquals(3, ex.failedUrls.size)
+        assertTrue(ex.message!!.contains("no Binance kline data", ignoreCase = true))
+    }
+
+    @Test
+    fun `BinanceKlineSource tolerates partial missed days when at least one day has rows`() {
+        var calls = 0
+        val cursor = BinanceKlineSource(
+            symbol = "BTCUSDT",
+            interval = "1h",
+            startDate = LocalDate.parse("2024-01-01"),
+            endDate = LocalDate.parse("2024-01-02"),
+            blockCapacity = 10,
+            csvFetcher = { url ->
+                calls++
+                if (url.contains("2024-01-01")) throw IllegalStateException("Not found: $url")
+                "1704153600000,20500.0,21000.0,20300.0,20800.0,1500.5,0,0,0,0,0,0"
+            },
+        ).fetchCursor()
+
+        assertEquals(2, calls)
+        assertEquals(1, cursor.size)
     }
 }

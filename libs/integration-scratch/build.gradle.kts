@@ -26,3 +26,9 @@ application {
     // main class will be set in source as RunSqlIntegrationKt
     mainClass.set("borg.trikeshed.integration.RunSqlIntegrationKt")
 }
+
+tasks.register<JavaExec>("runBinanceStochastic") {
+    group = "application"
+    classpath = sourceSets["main"].runtimeClasspath
+    mainClass.set("borg.trikeshed.integration.RunBinanceStochasticKlineCacheKt")
+}

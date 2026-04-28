@@ -1,10 +1,11 @@
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
+import org.jetbrains.kotlin.gradle.targets.js.dsl.KotlinJsTargetDsl
 
 plugins {
     kotlin("multiplatform") version "2.4.0-Beta2"
-    id("com.github.ben-manes.versions") version "0.53.0"
+    id("com.github.ben-manes.versions") version "0.54.0"
     `maven-publish`
 }
 
@@ -39,9 +40,7 @@ kotlin {
 
     jvm {}
 
-    js(IR) {
-        nodejs()
-    }
+    js { nodejs() }
 
     @OptIn(ExperimentalWasmDsl::class) wasmJs {
         browser {
