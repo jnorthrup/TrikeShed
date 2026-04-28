@@ -136,7 +136,7 @@ class MiniDuckBlockAlgebraTest {
         val nested = DocRowVec(listOf("b"), listOf(2))
         var accessed = false
         val doc = DocRowVec(listOf("a"), listOf(1), child = 1 j { accessed = true; nested })
-        assertNull(doc.child) // lazy — not accessed yet
+        assertFalse(accessed) // lazy — not accessed yet
     }
 
     // ── ViewRowVec docLoader deferred ─────────────────────────────────────────
