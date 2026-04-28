@@ -141,6 +141,21 @@ class RunCycleTest {
         assertTrue(metrics.maxDrawdown < 0.14, "maxDrawdown=${metrics.maxDrawdown} should be ~13.6%")
     }
 
+    @Test
+    fun `computeBacktestMetrics maxDrawdownTicks counts peak to trough duration`() {
+        val cycles = listOf(
+            CycleResult(0, 0L, 0.0, 100.0, 100.0, false, 0.0, emptyList(), false, emptyMap()),
+            CycleResult(1, 1L, 0.0, 120.0, 120.0, false, 0.0, emptyList(), false, emptyMap()),
+            CycleResult(2, 2L, 0.0, 115.0, 115.0, false, 0.0, emptyList(), false, emptyMap()),
+            CycleResult(3, 3L, 0.0, 110.0, 110.0, false, 0.0, emptyList(), false, emptyMap()),
+            CycleResult(4, 4L, 0.0, 108.0, 108.0, false, 0.0, emptyList(), false, emptyMap()),
+        )
+
+        val metrics = computeBacktestMetrics(cycles, 100.0, doubleSeriesOf(listOf(100.0, 120.0, 115.0, 110.0, 108.0)))
+
+        assertEquals(3, metrics.maxDrawdownTicks)
+    }
+
     // ── 4. simulateTicks end-to-end ─────────────────────────────────────
 
     @Test

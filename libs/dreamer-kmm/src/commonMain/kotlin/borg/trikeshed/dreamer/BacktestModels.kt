@@ -225,20 +225,19 @@ fun computeBacktestMetrics(
 
     // Max drawdown
     var peak = initialCapital
+    var peakIndex = -1
     var maxDrawdown = 0.0
     var maxDrawdownTicks = 0
-    var currentDrawdownTicks = 0
-    for (cycle in cycles) {
+    for ((index, cycle) in cycles.withIndex()) {
         if (cycle.totalValue > peak) {
             peak = cycle.totalValue
-            currentDrawdownTicks = 0
+            peakIndex = index
         } else {
             val drawdown = (peak - cycle.totalValue) / peak
             if (drawdown > maxDrawdown) {
                 maxDrawdown = drawdown
-                maxDrawdownTicks = currentDrawdownTicks
+                maxDrawdownTicks = index - peakIndex
             }
-            currentDrawdownTicks++
         }
     }
 
