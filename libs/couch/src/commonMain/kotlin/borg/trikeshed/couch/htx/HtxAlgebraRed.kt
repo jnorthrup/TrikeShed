@@ -253,25 +253,77 @@ fun readInt32BE(buf: ByteArray, offset: Int): Int =
     ((buf[offset + 2].toInt() and 0xFF) shl 8) or
     (buf[offset + 3].toInt() and 0xFF)
 
-fun HtxMessage.toHttp1(): ByteArray =
-    throw NotImplementedError("RED: HtxMessage.toHttp1")
+fun HtxMessage.toHttp1(): ByteArray {
+    val sb = StringBuilder()
+    val sl = this.startLine() ?: return byteArrayOf()
+    if (sl.isRequest) {
+        val methodName = sl.method?.name?.uppercase() ?: ""
+        val uri = sl.uri.decodeToString()
+        val ver = "${sl.version.first}.${sl.version.second}"
+        sb.append("$methodName $uri HTTP/$ver\r\n")
+    } else {
+        val ver = "${sl.version.first}.${sl.version.second}"
+        val status = sl.status ?: 200
+        val reason = sl.reason.decodeToString()
+        sb.append("HTTP/$ver $status $reason\r\n")
+    }
 
-fun parseHttp1(bytes: ByteArray): HtxMessage? =
-    throw NotImplementedError("RED: parseHttp1 (free function)")
+    val hdrs = headers(this).toList()
+    val dataList = dataBlocks(this).toList()
+    val bodyLen = dataList.sumOf { it.bytes.size }
+    val hasContentLength = hdrs.any { it.first.decodeToString().equals("Content-Length", ignoreCase = true) }
 
-fun normalizeToHtx(bytes: ByteArray): HtxMessage =
-    throw NotImplementedError("RED: normalizeToHtx (free function)")
+    for ((name, value) in hdrs) {
+        sb.append("${name.decodeToString()}: ${value.decodeToString()}\r\n")
+    }
+    if (bodyLen > 0 && !hasContentLength) {
+        sb.append("Content-Length: $bodyLen\r\n")
+    }
+    sb.append("\r\n")
+
+    val headerBytes = sb.toString().encodeToByteArray()
+    if (bodyLen == 0) return headerBytes
+
+    val out = ByteArray(headerBytes.size + bodyLen)
+    headerBytes.copyInto(out, 0)
+    var pos = headerBytes.size
+    for (d in dataList) {
+        d.bytes.copyInto(out, pos)
+        pos += d.bytes.size
+    }
+    return out
+}
+
+fun parseHttp1(bytes: ByteArray): HtxMessage? = HtxMessage.parseHttp1(bytes)
+
+fun normalizeToHtx(bytes: ByteArray): HtxMessage = HtxMessage.normalizeToHtx(bytes)
 
 // ── Transformation algebra ──────────────────────────────────────
 
-fun HtxMessage.mergeTrailers(): HtxMessage =
-    throw NotImplementedError("RED: HtxMessage.mergeTrailers")
+fun HtxMessage.mergeTrailers(): HtxMessage {
+    val newBlocks = mutableListOf<HtxBlockData>()
+    for (b in this.blocks) {
+        when (b) {
+            is HtxBlockData.Trailer -> newBlocks.add(HtxBlockData.Header(b.name, b.value))
+            is HtxBlockData.EndTrailers -> {
+                // drop
+            }
+            else -> newBlocks.add(b)
+        }
+    }
+    return HtxMessage(blocks = newBlocks.toMutableList(), flags = this.flags)
+}
 
-fun HtxMessage.stripBody(): HtxMessage =
-    throw NotImplementedError("RED: HtxMessage.stripBody")
+fun HtxMessage.stripBody(): HtxMessage {
+    val newBlocks = this.blocks.filter { it !is HtxBlockData.Data }.toMutableList()
+    val newMsg = HtxMessage(blocks = newBlocks, flags = this.flags)
+    newMsg.setEom()
+    return newMsg
+}
 
-fun HtxMessage.withFlag(flag: HtxFlags): HtxMessage =
-    throw NotImplementedError("RED: HtxMessage.withFlag")
+fun HtxMessage.withFlag(flag: HtxFlags): HtxMessage {
+    return HtxMessage(blocks = this.blocks.toMutableList(), flags = (this.flags or flag.mask))
+}
 
 // ── Construction algebra (DSL factories) ────────────────────────
 
@@ -280,8 +332,20 @@ class HtxMessageBuilder {
     fun header(name: ByteArray, value: ByteArray) { headers.add(name to value) }
 }
 
-fun request(method: HttpMethod, uri: ByteArray, block: HtxMessageBuilder.() -> Unit = {}): HtxMessage =
-    throw NotImplementedError("RED: request factory")
+fun request(method: HttpMethod, uri: ByteArray, block: HtxMessageBuilder.() -> Unit = {}): HtxMessage {
+    val bld = HtxMessageBuilder().apply(block)
+    val msg = HtxMessage()
+    msg.addStartLine(HtxStartLine.request(method, uri))
+    for ((n, v) in bld.headers) msg.addHeader(n, v)
+    msg.addEndHeaders()
+    return msg
+}
 
-fun response(status: Int, reason: ByteArray, block: HtxMessageBuilder.() -> Unit = {}): HtxMessage =
-    throw NotImplementedError("RED: response factory")
+fun response(status: Int, reason: ByteArray, block: HtxMessageBuilder.() -> Unit = {}): HtxMessage {
+    val bld = HtxMessageBuilder().apply(block)
+    val msg = HtxMessage()
+    msg.addStartLine(HtxStartLine.response(status, reason))
+    for ((n, v) in bld.headers) msg.addHeader(n, v)
+    msg.addEndHeaders()
+    return msg
+}
