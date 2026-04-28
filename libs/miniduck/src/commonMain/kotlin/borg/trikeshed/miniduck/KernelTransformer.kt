@@ -32,15 +32,24 @@ class ExampleKernelTransformer : KernelFeatureTransformer {
         val smaLong = sma(closeSeries, longW)
         val vol = rollingStd(logs, volW)
 
-        // Widen each row with appended columns
+        // Widen each row with appended columns (include stochastic if available)
         return cursor.size j { i ->
             val row = cursor.at(i)
             val baseDoc = row as? DocRowVec
             val baseKeys = baseDoc?.keys ?: emptyList()
             val baseCells = baseDoc?.cells ?: emptyList()
 
-            val newKeys = baseKeys + listOf("log_return", "sma_short", "sma_long", "rolling_vol")
-            val newCells = baseCells + listOf(logs[i], smaShort[i], smaLong[i], vol[i])
+            // Optionally include precomputed stochastic from harness cache when symbol/timeframe provided
+            val symbol = params["symbol"] as? String ?: params["sym"] as? String
+            val timeframe = params["timeframe"] as? String ?: params["tf"] as? String
+            val kP = (params["kPeriod"] as? Int) ?: 14
+            val dP = (params["dPeriod"] as? Int) ?: 3
+            val stoch = if (symbol != null && timeframe != null) HarnessStochasticCache.get(symbol, timeframe, kP, dP) else null
+            val stochK = stoch?.k?.get(i) ?: Double.NaN
+            val stochD = stoch?.d?.get(i) ?: Double.NaN
+
+            val newKeys = baseKeys + listOf("log_return", "sma_short", "sma_long", "rolling_vol", "stoch_k", "stoch_d")
+            val newCells = baseCells + listOf(logs[i], smaShort[i], smaLong[i], vol[i], stochK, stochD)
             DocRowVec(keys = newKeys, cells = newCells, child = baseDoc?.child)
         }
     }

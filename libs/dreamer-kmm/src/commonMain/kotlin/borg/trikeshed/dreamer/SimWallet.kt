@@ -187,6 +187,19 @@ class SimWallet {
         return 0.0 // Placeholder for more complex drawdown logic if needed
     }
 
+    // Route fiat balances to canonical fiat#0 slot (non-destructive if not present).
+    // This helps harness IO unify on a primary fiat channel without changing existing symbols.
+    fun routeFiatToFiat0(fiatSymbol: String) {
+        val amt = balances.remove(fiatSymbol) ?: 0.0
+        if (amt != 0.0) balances["fiat#0"] = (balances["fiat#0"] ?: 0.0) + amt
+        val lockedAmt = locked.remove(fiatSymbol) ?: 0.0
+        if (lockedAmt != 0.0) locked["fiat#0"] = (locked["fiat#0"] ?: 0.0) + lockedAmt
+        val realizedAmt = realized.remove(fiatSymbol) ?: 0.0
+        if (realizedAmt != 0.0) realized["fiat#0"] = (realized["fiat#0"] ?: 0.0) + realizedAmt
+        val cost = costBasis.remove(fiatSymbol) ?: 0.0
+        if (cost != 0.0) costBasis["fiat#0"] = (costBasis["fiat#0"] ?: 0.0) + cost
+    }
+
     fun reset() {
         balances.clear()
         locked.clear()
