@@ -1,5 +1,5 @@
-@Suppress("unused", "DEPRECATION")
-package borg.trikeshed.parse.kursive
+@file:Suppress("unused", "DEPRECATION")
+package borg.trikeshed.parse.kursive.legacy
 
 import borg.trikeshed.lib.CharSeries
 import borg.trikeshed.lib.Series

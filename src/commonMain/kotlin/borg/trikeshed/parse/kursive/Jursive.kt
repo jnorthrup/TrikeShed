@@ -1,5 +1,5 @@
 @file:Suppress("unused", "DEPRECATION")
-package borg.trikeshed.parse.kursive
+package borg.trikeshed.parse.kursive.legacy
 
 import borg.trikeshed.common.TypeEvidence
 import borg.trikeshed.cursor.ColumnMeta
