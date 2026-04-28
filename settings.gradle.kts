@@ -19,6 +19,3 @@ file("libs").listFiles()?.filter { it.isDirectory }?.forEach { dir ->
 // Nested modules
 include(":libs:couch:viewserver")
 project(":libs:couch:viewserver").projectDir = file("libs/couch/viewserver")
-
-include(":integration-scratch")
-project(":integration-scratch").projectDir = file("integration-scratch")
