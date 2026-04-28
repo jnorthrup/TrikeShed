@@ -4,6 +4,7 @@ import borg.trikeshed.collections.associative.trie.Trie
 import kotlin.test.Test
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import kotlin.test.assertEquals
 
 
 /**
@@ -23,11 +24,14 @@ class TrieTest {
         assertFalse(trie.contains("a"))
         assertFalse(trie.contains("a", "b"))
         assertTrue(trie.contains("a", "b", "c"))
+        assertEquals(d, trie["a", "b", "c"])
 
         trie.add(d, "a", "b")
         assertTrue(trie.contains("a", "b"))
+        assertEquals(d, trie["a", "b"])
 
         trie.add(d, "a", "b", "d", "e")
         assertTrue(trie.contains("a", "b", "d", "e"))
+        assertEquals(d, trie["a", "b", "d", "e"])
     }
 }
