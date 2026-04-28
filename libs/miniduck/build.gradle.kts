@@ -1,6 +1,5 @@
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
-import org.jetbrains.kotlin.gradle.plugin.KotlinJsCompilerType
 
 plugins {
     kotlin("multiplatform")
@@ -79,8 +78,8 @@ kotlin {
         val posixMain by creating {
             dependsOn(commonMain)
         }
-        findByName("macosMain")?.let { it.dependsOn(posixMain) }
-        findByName("linuxMain")?.let { it.dependsOn(posixMain) }
+        findByName("macosMain")?.dependsOn(posixMain)
+        findByName("linuxMain")?.dependsOn(posixMain)
     }
     sourceSets.commonMain.dependencies {
         implementation(kotlin("test"))

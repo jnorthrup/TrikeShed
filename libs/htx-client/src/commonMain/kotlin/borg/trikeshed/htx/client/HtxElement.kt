@@ -6,10 +6,46 @@ import borg.trikeshed.context.ElementState
 
 // Compromise: this standalone lib does not depend on the root project to avoid composite-build cycles.
 data class HtxClientMessage(val status: Int = 200, val body: String = "ok")
+/**
+ * aria2c switch equivalents for the HTX client.
+ *
+ * Maps to the most commonly used aria2c options from BinancePipelineMacos:
+ *   -Z  --force-serialization        (always on for this pipeline)
+ *   -c  --continue                   (resume partial download)
+ *   --save-not-found=false           (404 is not a retryable error)
+ *   -x15 --max-connection-per-server=15
+ *   -j15 --max-concurrent-downloads=15
+ *   -s15 --split=15
+ *   -d  --dir=<dir>
+ */
+data class Aria2Switches(
+    val continueDownload: Boolean = true,
+    val saveNotFound: Boolean = false,
+    val maxConnectionsPerServer: Int = 15,
+    val maxConcurrentDownloads: Int = 15,
+    val split: Int = 15,
+    val dir: String? = null,
+) {
+    /** Render as an aria2c argument list. Uris are appended separately. */
+    fun toArgs(): List<String> = buildList {
+        add("-Z")  // --force-serialization (always on for this pipeline)
+        if (continueDownload) add("-c")
+        if (!saveNotFound) add("--save-not-found=false")
+        add("-x$maxConnectionsPerServer")
+        add("-j$maxConcurrentDownloads")
+        add("-s$split")
+        dir?.let { add("-d"); add(it) }
+    }
+}
+
 data class HtxClientRequest(
     val method: String,
     val path: String,
     val body: String = "",
+    /** aria2c switch equivalents. When present, the transport layer dispatches via aria2c. */
+    val switches: Aria2Switches? = null,
+    /** URI(s) to fetch — only used when [switches] is set (aria2c dispatch). */
+    val uris: List<String> = emptyList(),
 )
 
 typealias HtxRequestHandler = suspend (HtxClientRequest) -> HtxClientMessage
