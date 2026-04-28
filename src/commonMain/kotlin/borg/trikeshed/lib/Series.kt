@@ -345,6 +345,13 @@ class IntHeap(series: Series<Int>) {
 
 fun <T> List<T>.toSeries(): Series<T> = size j ::get
 
+/** Alias for List<T>.toSeries() — bridges from legacy List-based construction. */
+fun <T> seriesOf(list: List<T>): Series<T> = list.toSeries()
+
+/** Alias for List<Any?>.toSeries() — bridges from legacy nullable List construction. */
+@Suppress("UNCHECKED_CAST")
+fun seriesOfAny(list: List<Any?>): Series<Any?> = list.toSeries()
+
 fun ByteArray.toSeries(): Series<Byte> = size j ::get
 fun IntArray.toSeries(): Series<Int> = size j ::get
 fun UIntArray.toSeries(): Series<UInt> = size j ::get

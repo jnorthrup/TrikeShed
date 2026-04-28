@@ -56,18 +56,15 @@ internal fun ByteArray.putU64LE(pos: Int, v: ULong) {
     this[pos + 7] = ((v shr 56) and 0xFFu).toByte()
 }
 
-internal fun ByteArray.getU64LE(pos: Int): ULong {
-    var r = 0UL
-    r = r or this[pos + 0].toULong()
-    r = r or (this[pos + 1].toULong() shl 8)
-    r = r or (this[pos + 2].toULong() shl 16)
-    r = r or (this[pos + 3].toULong() shl 24)
-    r = r or (this[pos + 4].toULong() shl 32)
-    r = r or (this[pos + 5].toULong() shl 40)
-    r = r or (this[pos + 6].toULong() shl 48)
-    r = r or (this[pos + 7].toULong() shl 56)
-    return r
-}
+internal fun ByteArray.getU64LE(pos: Int): ULong =
+    ((this[pos + 0].toLong() and 0xFFL)
+        or ((this[pos + 1].toLong() and 0xFFL) shl 8)
+        or ((this[pos + 2].toLong() and 0xFFL) shl 16)
+        or ((this[pos + 3].toLong() and 0xFFL) shl 24)
+        or ((this[pos + 4].toLong() and 0xFFL) shl 32)
+        or ((this[pos + 5].toLong() and 0xFFL) shl 40)
+        or ((this[pos + 6].toLong() and 0xFFL) shl 48)
+        or ((this[pos + 7].toLong() and 0xFFL) shl 56)).toULong()
 
 internal fun ByteArray.putU32LE(pos: Int, v: UInt) {
     this[pos + 0] = (v and 0xFFu).toByte()
@@ -76,14 +73,11 @@ internal fun ByteArray.putU32LE(pos: Int, v: UInt) {
     this[pos + 3] = ((v shr 24) and 0xFFu).toByte()
 }
 
-internal fun ByteArray.getU32LE(pos: Int): UInt {
-    var r = 0u
-    r = r or this[pos + 0].toUInt()
-    r = r or (this[pos + 1].toUInt() shl 8)
-    r = r or (this[pos + 2].toUInt() shl 16)
-    r = r or (this[pos + 3].toUInt() shl 24)
-    return r
-}
+internal fun ByteArray.getU32LE(pos: Int): UInt =
+    ((this[pos + 0].toInt() and 0xFF)
+        or ((this[pos + 1].toInt() and 0xFF) shl 8)
+        or ((this[pos + 2].toInt() and 0xFF) shl 16)
+        or ((this[pos + 3].toInt() and 0xFF) shl 24)).toUInt()
 
 internal fun ByteArray.putU16LE(pos: Int, v: UShort) {
     val vi = v.toInt()
@@ -323,19 +317,32 @@ fun encodeLeaf(leaf: BtrfsLeaf, buf: ByteArray, generation: ULong = 0UL) {
     // Calculate total item space: key(20) + dataOffset(4) + dataSize(4) + data(variable)
     val dataSpace = sorted.sumOf { 20 + 4 + 4 + it.data.size }
     // Align start to 8-byte boundary from the end of the buffer
-    val alignedStart = (BTRFS_NODE_SIZE - dataSpace) and 0x7.inv()
+    val alignedStart = ((BTRFS_NODE_SIZE.toULong() - dataSpace.toULong()) and 0x7uL.inv()).toInt()
 
     buf.putU32LE(16, numItems.toUInt())
     for (i in 0..7) buf[20 + i] = 0
     buf.putU16LE(22, alignedStart.toUShort())
 
-    var offset = alignedStart
+    // Encode items sequentially from alignedStart upward.
+    // Each item: [key(20)][dataOffset(4)][dataSize(4)][data(variable)]
+    // dataOffset field = position of THIS item's data start (= current offset + 28)
+    // The backward chain: Item N's dataOffset = Item(N-1)'s key position
+    // First item (smallest key, at alignedStart): dataOffset = 0xFFFFFFFF (no prev)
+    // Subsequent items: dataOffset = prevKeyPos
+    var prevKeyPos = 0xFFFFFFFFU  // sentinel: no previous item
+    var currentPos = alignedStart
     for (item in sorted) {
-        offset = (offset + 7) and 0x7.inv()  // 8-align before each item
-        encodeKey(item.key, buf, offset); offset += 20
-        buf.putU32LE(offset, item.dataOffset); offset += 4
-        buf.putU32LE(offset, item.dataSize);   offset += 4
-        item.data.copyInto(buf, offset);       offset += item.data.size
+        encodeKey(item.key, buf, currentPos)
+        // dataOffset field: where this item's data starts = currentPos + 28
+        buf.putU32LE(currentPos + 20, prevKeyPos)
+        // dataSize field
+        buf.putU32LE(currentPos + 24, item.dataSize)
+        // Copy data after the header
+        item.data.copyInto(buf, currentPos + 28)
+        // Advance: next item's key is at currentPos + item total size (28 + dataSize)
+        val itemSize = 28 + item.data.size
+        prevKeyPos = currentPos.toUInt()
+        currentPos += itemSize
     }
 
     // Checksum over bytes 24..BTRFS_NODE_SIZE-1
@@ -370,13 +377,16 @@ fun decodeLeaf(buf: ByteArray): BtrfsLeaf {
     val items = ArrayList<BtrfsItem>(numItems)
     var offset = firstOffset
     repeat(numItems) {
-        offset = (offset + 7) and 0x7.inv()
-        val key = decodeKey(buf, offset); offset += 20
-        val dataOff = buf.getU32LE(offset); offset += 4
-        val dataSz  = buf.getU32LE(offset).toInt(); offset += 4
-        val dataEnd = minOf(offset + dataSz, buf.size)
-        val data = buf.copyOfRange(offset, dataEnd); offset = dataEnd
-        items.add(BtrfsItem(key, dataOff, dataSz.toUInt(), data))
+        val key = decodeKey(buf, offset)
+        val dataOff = buf.getU32LE(offset + 20).toInt()
+        val dataSz  = buf.getU32LE(offset + 24).toInt()
+        // dataOff is the position of the PREVIOUS item's key (backward chain)
+        // For the first item, dataOff = 0xFFFFFFFF (no previous)
+        val dataEnd = minOf(offset + 28 + dataSz, buf.size)
+        val data = buf.copyOfRange(offset + 28, dataEnd)
+        items.add(BtrfsItem(key, dataOff.toUInt(), dataSz.toUInt(), data))
+        // Follow the backward chain: next item's key is at dataOff
+        offset = dataOff
     }
     return BtrfsLeaf(items.toSeries())
 }
@@ -404,11 +414,12 @@ fun encodeInternal(node: BtrfsInternal, buf: ByteArray, generation: ULong = 0UL)
 
     // Child pointer = 28 bytes each; pack from end of buffer
     val childSpace = numItems * 28
-    val startOffset = (BTRFS_NODE_SIZE - childSpace) and 0x7.inv()
+    val startOffset = ((BTRFS_NODE_SIZE.toULong() - childSpace.toULong()) and 0x7uL.inv()).toInt()
     buf.putU16LE(22, startOffset.toUShort())
 
     var offset = startOffset
     for (child in sorted) {
+        offset = ((offset.toULong() + 7uL) and 0x7uL.inv()).toInt()
         encodeKey(child.key, buf, offset); offset += 20
         buf.putU64LE(offset, child.blockPtr); offset += 8
     }
@@ -445,6 +456,7 @@ fun decodeInternal(buf: ByteArray): BtrfsInternal {
     val children = ArrayList<BtrfsChildPointer>(numItems)
     var offset = firstOffset
     repeat(numItems) {
+        offset = ((offset.toULong() + 7uL) and 0x7uL.inv()).toInt()
         val key = decodeKey(buf, offset); offset += 20
         val blockPtr = buf.getU64LE(offset); offset += 8
         children.add(BtrfsChildPointer(key j blockPtr))

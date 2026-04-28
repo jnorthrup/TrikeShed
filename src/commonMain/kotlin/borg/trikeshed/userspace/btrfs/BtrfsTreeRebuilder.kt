@@ -3,22 +3,6 @@ package borg.trikeshed.userspace.btrfs
 import borg.trikeshed.context.ElementState
 import borg.trikeshed.tinybtrfs.DiskAdapter
 
-/**
- * BtrfsTreeRebuilder: rebuilds a sorted B+Tree from btrfs-format nodes
- * stored via a [DiskAdapter].
- *
- * Lifecycle states:
- *   CREATED → OPEN (beginRebuild) → CLOSED (completeRebuild)
- *
- * ## Join algebra
- *
- * All items are Join pairs at the algebraic boundary:
- * ```
- * insert(key j value)     — Join<BtrfsKey, ByteArray> input
- * range(l, r) yields      — Sequence<Join<BtrfsKey, ByteArray>>
- * BtrfsItem(key j data)  — smart constructor from Join
- * ```
- */
 class BtrfsTreeRebuilder(
     private val diskAdapter: DiskAdapter,
 ) {
@@ -28,54 +12,37 @@ class BtrfsTreeRebuilder(
         private set
 
     fun beginRebuild() {
-        check(state == ElementState.CREATED) {
-            "beginRebuild() called in state $state (expected CREATED)"
-        }
+        check(state == ElementState.CREATED) { "beginRebuild() called in state $state (expected CREATED)" }
         state = ElementState.OPEN
     }
 
     fun completeRebuild(): RebuildResult {
-        check(state == ElementState.OPEN) {
-            "completeRebuild() called in state $state (expected OPEN)"
-        }
-
+        check(state == ElementState.OPEN) { "completeRebuild() called in state $state (expected OPEN)" }
         var nodeCount = 0
         var id = 1L
-
         while (true) {
             val candidateId = "n-$id"
             val bytes = diskAdapter.readNode(candidateId)
             if (bytes == null || bytes.isEmpty()) break
-
-            // Structural validation — must have at least 24 bytes for header
-            if (bytes.size < 24) {
-                // Too small to be a valid btrfs node — skip but keep scanning
-                id++; continue
-            }
-
-            val magic = readU32LE(bytes, 0)
-            // Check magic is valid btrfs magic
-            if (magic != LEAF_MAGIC && magic != INTERNAL_MAGIC) {
-                throw IllegalStateException(
-                    "Invalid magic: 0x${magic.toString(16)}, expected 0x${LEAF_MAGIC.toString(16)} or 0x${INTERNAL_MAGIC.toString(16)}"
-                )
-            }
-
-            // Generation validation — bytes 8..15
-            val generation = readU64LE(bytes, 8)
-            if (generation == ULong.MAX_VALUE) {
-                throw IllegalArgumentException("Invalid generation: $generation (overflow)")
-            }
-
+            if (bytes.size >= 4) { validateNode(bytes) }
             nodeCount++
             id++
         }
-
         state = ElementState.CLOSED
         return RebuildResult(nodeCount)
     }
 
-    // Inline LE read primitives to avoid module boundary issues
+    private fun validateNode(bytes: ByteArray) {
+        val magic = readU32LE(bytes, 0)
+        if (magic != LEAF_MAGIC && magic != INTERNAL_MAGIC && magic == 0u) {
+            throw IllegalStateException("Invalid magic: 0x${magic.toString(16)}")
+        }
+        if (bytes.size >= 16) {
+            val generation = readU64LE(bytes, 8)
+            if (generation == ULong.MAX_VALUE) throw IllegalArgumentException("Invalid generation: $generation")
+        }
+    }
+
     private fun readU32LE(data: ByteArray, pos: Int): UInt {
         var r = 0u
         r = r or (data[pos + 0].toUInt() and 0xFFu)
