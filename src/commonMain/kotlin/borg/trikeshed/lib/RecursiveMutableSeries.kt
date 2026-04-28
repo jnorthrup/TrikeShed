@@ -46,7 +46,7 @@ class RecursiveMutableSeries<T> constructor(var data: Series<T>) : MutableSeries
         this.view.withIndex().firstOrNull { it.value == item }?.index?.let { removeAt(it) } != null
 
     override fun clear() {
-        data = 0 j { it: Int -> TODO("it OOB")}
+        data = Join.emptySeriesOf<T>()
     }
 
     override fun plus(item: T): MutableSeries<T> =
