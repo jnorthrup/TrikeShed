@@ -1,53 +1,103 @@
 package borg.trikeshed.server
 
+import borg.trikeshed.context.AsyncContextElement
+import borg.trikeshed.context.AsyncContextKey
+import borg.trikeshed.context.ElementState
+import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
-import java.io.File
 
+/**
+ * TDD spec for server OpenAPI-generated shapes and buildServerContext/closeServerContext.
+ */
 class OpenApiGeneratorTddTest {
+
+    // ── buildServerContext ──────────────────────────────────────────────────────
+
     @Test
-    fun server_generator_emits_real_keys_elements_and_supervisor_shapes() {
-        val start = File(".").canonicalFile
-        fun findInAncestors(startDir: File, relative: String, depth: Int = 8): File? {
-            var cur: File? = startDir
-            for (i in 0..depth) {
-                if (cur == null) break
-                val candidate = File(cur, relative)
-                if (candidate.exists()) return candidate
-                cur = cur.parentFile
-            }
-            return null
-        }
+    fun `buildServerContext creates QuicElement, SctpElement, HtxElement`() = runTest {
+        val ctx = buildServerContext()
+        assertNotNull(ctx[borg.trikeshed.quic.QuicKey])
+        assertNotNull(ctx[borg.trikeshed.sctp.SctpKey])
+        assertNotNull(ctx[borg.trikeshed.htx.client.HtxKey])
+    }
 
-        val pkgPath = "borg/trikeshed/server/generated"
-        val keysRelative = "libs/server/src/generated/kotlin/$pkgPath/Keys.kt"
-        val elementsRelative = "libs/server/src/generated/kotlin/$pkgPath/Elements.kt"
-        val supervisorRelative = "libs/server/src/generated/kotlin/$pkgPath/SupervisorJobs.kt"
+    @Test
+    fun `buildServerContext elements are OPEN`() = runTest {
+        val ctx = buildServerContext()
+        val htx = ctx[borg.trikeshed.htx.client.HtxKey]
+        assertEquals(ElementState.OPEN, (htx as AsyncContextElement).state)
+    }
 
-        val keys = findInAncestors(start, keysRelative) ?: findInAncestors(start, "src/generated/kotlin/$pkgPath/Keys.kt") ?: File(start, keysRelative)
-        val elements = findInAncestors(start, elementsRelative) ?: findInAncestors(start, "src/generated/kotlin/$pkgPath/Elements.kt") ?: File(start, elementsRelative)
-        val supervisor = findInAncestors(start, supervisorRelative) ?: findInAncestors(start, "src/generated/kotlin/$pkgPath/SupervisorJobs.kt") ?: File(start, supervisorRelative)
+    @Test
+    fun `closeServerContext closes open elements`() = runTest {
+        val ctx = buildServerContext()
+        closeServerContext(ctx)
+        val htx = ctx[borg.trikeshed.htx.client.HtxKey] as AsyncContextElement
+        assertEquals(ElementState.CLOSED, htx.state)
+    }
 
-        assertTrue(keys.exists(), "Expected generated Keys.kt in server generated sources")
-        assertTrue(elements.exists(), "Expected generated Elements.kt in server generated sources")
-        assertTrue(supervisor.exists(), "Expected generated SupervisorJobs.kt in server generated sources")
+    @Test
+    fun `closeServerContext is idempotent`() = runTest {
+        val ctx = buildServerContext()
+        closeServerContext(ctx)
+        closeServerContext(ctx) // must not throw
+    }
 
-        val keysText = keys.readText()
-        val elementsText = elements.readText()
-        val supervisorText = supervisor.readText()
+    // ── Generated Keys ───────────────────────────────────────────────────────
 
-        assertTrue(keysText.contains("object Keys"))
-        assertTrue(keysText.contains("AsyncContextKey<HtxElement> = HtxKey"))
-        assertTrue(keysText.contains("AsyncContextKey<QuicElement> = QuicKey"))
-        assertTrue(keysText.contains("AsyncContextKey<SctpElement> = SctpKey"))
-        assertTrue(keysText.contains("const val operationId: String = \"getHealth\""))
+    @Test
+    fun `generated Keys has htx quic sctp keys`() {
+        val keys = borg.trikeshed.server.generated.Keys
+        assertTrue(keys.htx is AsyncContextKey<*>)
+        assertTrue(keys.quic is AsyncContextKey<*>)
+        assertTrue(keys.sctp is AsyncContextKey<*>)
+    }
 
-        assertTrue(elementsText.contains("object Elements"))
-        assertTrue(elementsText.contains("suspend fun htx(): HtxElement = openHtxElementRuntime()"))
-        assertTrue(elementsText.contains("suspend fun quic(): QuicElement = openQuicElementRuntime()"))
-        assertTrue(elementsText.contains("suspend fun sctp(): SctpElement = openSctpElementRuntime()"))
+    @Test
+    fun `generated Keys htx resolves from server context`() = runTest {
+        val ctx = buildServerContext()
+        val htxKey = borg.trikeshed.server.generated.Keys.htx
+        assertSame(ctx[borg.trikeshed.htx.client.HtxKey], ctx[htxKey])
+    }
 
-        assertTrue(supervisorText.contains("object SupervisorJobs"))
-        assertTrue(supervisorText.contains("fun getHealth(parent: Job? = null): Job = SupervisorJob(parent)"))
+    @Test
+    fun `generated Keys quic resolves from server context`() = runTest {
+        val ctx = buildServerContext()
+        val quicKey = borg.trikeshed.server.generated.Keys.quic
+        assertSame(ctx[borg.trikeshed.quic.QuicKey], ctx[quicKey])
+    }
+
+    @Test
+    fun `generated Keys sctp resolves from server context`() = runTest {
+        val ctx = buildServerContext()
+        val sctpKey = borg.trikeshed.server.generated.Keys.sctp
+        assertSame(ctx[borg.trikeshed.sctp.SctpKey], ctx[sctpKey])
+    }
+
+    // ── Generated Elements ───────────────────────────────────────────────────
+
+    @Test
+    fun `generated Elements htx creates HtxElement in OPEN state`() = runTest {
+        val elem = borg.trikeshed.server.generated.Elements.htx()
+        assertTrue(elem is borg.trikeshed.htx.client.HtxElement)
+        assertEquals(ElementState.OPEN, elem.state)
+    }
+
+    // ── Generated SupervisorJobs ─────────────────────────────────────────────
+
+    @Test
+    fun `generated SupervisorJobs getHealth returns Job`() {
+        val job = borg.trikeshed.server.generated.SupervisorJobs.getHealth()
+        assertNotNull(job)
+    }
+
+    @Test
+    fun `getHealth accepts null parent`() {
+        val job = borg.trikeshed.server.generated.SupervisorJobs.getHealth(null)
+        assertNotNull(job)
     }
 }

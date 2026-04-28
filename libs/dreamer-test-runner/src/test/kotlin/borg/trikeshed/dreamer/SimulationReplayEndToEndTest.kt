@@ -201,4 +201,77 @@ class SimulationReplayEndToEndTest {
         assertEquals(2.0, eth.quantity)
         assertEquals(2050.0, eth.price, 0.001) // close price
     }
+
+    // ── 7. adaptCursorToMiniCursor ──────────────────────────────────────────
+
+    @Test
+    fun `adaptCursorToMiniCursor produces same rows as direct asCursor`() {
+        // Build a multi-block KlineBlock chain and verify adaptCursorToMiniCursor
+        // produces an equivalent MiniCursor to calling asCursor() directly.
+        val klines = listOf(
+            Kline("BTC-USD", TimeSpan.Hours1, 1000L, 20000.0, 21000.0, 19900.0, 20500.0, 100.0),
+            Kline("BTC-USD", TimeSpan.Hours1, 2000L, 20500.0, 21500.0, 20400.0, 21000.0, 110.0),
+            Kline("BTC-USD", TimeSpan.Hours1, 3000L, 21000.0, 22000.0, 20900.0, 21500.0, 120.0),
+        )
+        val block = KlineBlock.mutable()
+        klines.forEach { block.append(it) }
+        val sealed = block.seal()
+
+        // Reference: direct asCursor() path
+        val directCursor: MiniCursor = sealed.asCursor()
+        assertEquals(3, directCursor.size)
+
+        // Wrapped as BinanceCursor-style exec.Cursor
+        val execCursor = BinanceSingleBlockCursor(sealed)
+        assertEquals(3, execCursor.rowCount())
+
+        val adapted = adaptCursorToMiniCursor(execCursor, 3)
+        assertEquals(3, adapted.size)
+
+        // Values must match
+        val row0: DocRowVec = (adapted at 0) as DocRowVec
+        assertEquals("BTC-USD", row0["symbol"])
+        assertEquals(1000L, row0["openTime"])
+        assertEquals(20500.0, row0["close"])
+
+        val row1: DocRowVec = (adapted at 1) as DocRowVec
+        assertEquals(21000.0, row1["close"])
+
+        val row2: DocRowVec = (adapted at 2) as DocRowVec
+        assertEquals(21500.0, row2["close"])
+    }
+
+    @Test
+    fun `adaptCursorToMiniCursor empty cursor returns empty MiniCursor`() {
+        val emptyBlock = KlineBlock.mutable()
+        val sealed = emptyBlock.seal()
+        val execCursor = BinanceSingleBlockCursor(sealed)
+        assertEquals(0, execCursor.rowCount())
+
+        val adapted = adaptCursorToMiniCursor(execCursor, 0)
+        assertEquals(0, adapted.size)
+    }
+}
+
+/**
+ * Single-block cursor that wraps a sealed KlineBlock as an exec.Cursor.
+ * Used to test adaptCursorToMiniCursor without a full BinanceCursor dependency.
+ */
+private class BinanceSingleBlockCursor(private val block: KlineBlock) :
+    borg.trikeshed.miniduck.exec.Cursor {
+    private val miniCursor: MiniCursor = block.asCursor()
+    private var idx = -1
+
+    fun rowCount(): Int = block.rowCount
+
+    override fun next(): Boolean {
+        if (idx < 0) { idx = 0; return block.rowCount > 0 }
+        if (idx + 1 < miniCursor.size) { idx++; return true }
+        return false
+    }
+
+    override val row: borg.trikeshed.miniduck.exec.RowAccessor
+        get() = MiniRowVecRowAccessor(miniCursor at idx)
+
+    override fun close() {}
 }

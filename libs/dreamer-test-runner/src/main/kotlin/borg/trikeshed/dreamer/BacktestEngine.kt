@@ -221,16 +221,31 @@ fun adaptCursorToMiniCursor(
     cursor: borg.trikeshed.miniduck.exec.Cursor,
     rowCount: Int,
 ): MiniCursor {
-    // Collect all rows into a snapshot list
+    // Collect all rows into a snapshot list.
+    // BinanceCursor.row returns a MiniRowVecRowAccessor whose `row` property
+    // is the underlying MiniRowVec (always DocRowVec for kline data).
     val rows = mutableListOf<DocRowVec>()
     while (cursor.next()) {
-        val row = cursor.row
-        // MiniRowVecRowAccessor wraps MiniRowVec; we need DocRowVec
-        val mr = (row as? borg.trikeshed.miniduck.MiniRowVec) ?: continue
+        val accessor = cursor.row
+        // Named cast to our internal wrapper (fast path for BinanceCursor and test helpers)
+        val mr = (accessor as? MiniRowVecRowAccessor)?.row ?: continue
+        @Suppress("UNCHECKED_CAST")
         if (mr is DocRowVec) rows.add(mr)
     }
     cursor.close()
     return rows.size j { i: Int -> rows[i] }
+}
+
+/**
+ * RowAccessor wrapper that holds a MiniRowVec.
+ * BinanceCursor returns this from its `row` property.
+ * Marked internal so it can be matched in adaptCursorToMiniCursor.
+ */
+internal class MiniRowVecRowAccessor(
+    val row: borg.trikeshed.miniduck.MiniRowVec,
+) : borg.trikeshed.miniduck.exec.RowAccessor {
+    override fun get(index: Int): Any? = row.get(index)
+    override fun get(name: String): Any? = (row as? DocRowVec)?.get(name)
 }
 
 /**
