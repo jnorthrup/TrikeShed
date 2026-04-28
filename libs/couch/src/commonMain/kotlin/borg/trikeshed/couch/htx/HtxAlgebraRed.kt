@@ -9,35 +9,30 @@ package borg.trikeshed.couch.htx
  */
 // ── Search algebra ──────────────────────────────────────────────
 
-fun byBlockType(msg: HtxMessage, type: HtxBlockType): Sequence<HtxBlockData> =
-    throw NotImplementedError("RED: byBlockType")
+fun byBlockType(msg: HtxMessage, type: HtxBlockType): Sequence<HtxBlockData> = sequence {
+    for (b in msg.blocks) {
+        if (b.blockType == type) yield(b)
+    }
+}
 
-fun startLine(msg: HtxMessage): HtxStartLine? =
-    throw NotImplementedError("RED: startLine")
+fun startLine(msg: HtxMessage): HtxStartLine? = msg.startLine()
 
-fun headers(msg: HtxMessage): Sequence<Pair<ByteArray, ByteArray>> =
-    throw NotImplementedError("RED: headers")
+fun headers(msg: HtxMessage): Sequence<Pair<ByteArray, ByteArray>> = msg.headers()
 
-fun dataBlocks(msg: HtxMessage): Sequence<HtxBlockData.Data> =
-    throw NotImplementedError("RED: dataBlocks")
+fun dataBlocks(msg: HtxMessage): Sequence<HtxBlockData.Data> = msg.blocks.filterIsInstance<HtxBlockData.Data>().asSequence()
 
-fun trailers(msg: HtxMessage): Sequence<HtxBlockData.Trailer> =
-    throw NotImplementedError("RED: trailers")
+fun trailers(msg: HtxMessage): Sequence<HtxBlockData.Trailer> = msg.blocks.filterIsInstance<HtxBlockData.Trailer>().asSequence()
 
 fun findHeader(msg: HtxMessage, name: ByteArray): ByteArray? =
-    throw NotImplementedError("RED: findHeader")
+    msg.headers().firstOrNull { it.first.decodeToString().equals(name.decodeToString(), ignoreCase = true) }?.second
 
-fun blockCount(msg: HtxMessage): Int =
-    throw NotImplementedError("RED: blockCount")
+fun blockCount(msg: HtxMessage): Int = msg.blocks.size
 
-fun hasFlag(msg: HtxMessage, flag: HtxFlags): Boolean =
-    throw NotImplementedError("RED: hasFlag")
+fun hasFlag(msg: HtxMessage, flag: HtxFlags): Boolean = (msg.flags and flag.mask) != 0u
 
-fun isRequest(msg: HtxMessage): Boolean =
-    throw NotImplementedError("RED: isRequest")
+fun isRequest(msg: HtxMessage): Boolean = msg.startLine()?.isRequest ?: false
 
-fun isResponse(msg: HtxMessage): Boolean =
-    throw NotImplementedError("RED: isResponse")
+fun isResponse(msg: HtxMessage): Boolean = msg.startLine()?.isRequest == false && msg.startLine() != null
 
 // ── Serialization algebra ───────────────────────────────────────
 
