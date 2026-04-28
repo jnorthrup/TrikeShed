@@ -132,7 +132,7 @@ class MiniDuckBlockAlgebraTest {
     }
 
     @Test
-    fun `DocRowVec child is deferred (lazy)`() {
+    fun `DocRowVec child is deferred lazy`() {
         val nested = DocRowVec(listOf("b"), listOf(2))
         var accessed = false
         val doc = DocRowVec(listOf("a"), listOf(1), child = 1 j { accessed = true; nested })
