@@ -325,24 +325,20 @@ fun encodeLeaf(leaf: BtrfsLeaf, buf: ByteArray, generation: ULong = 0UL) {
 
     // Encode items sequentially from alignedStart upward.
     // Each item: [key(20)][dataOffset(4)][dataSize(4)][data(variable)]
-    // dataOffset field = position of THIS item's data start (= current offset + 28)
-    // The backward chain: Item N's dataOffset = Item(N-1)'s key position
-    // First item (smallest key, at alignedStart): dataOffset = 0xFFFFFFFF (no prev)
-    // Subsequent items: dataOffset = prevKeyPos
-    var prevKeyPos = 0xFFFFFFFFU  // sentinel: no previous item
+    // dataOffset field = position of NEXT item's key (forward chain).
+    // Last item's dataOffset = its own position (sentinel: no next item).
     var currentPos = alignedStart
-    for (item in sorted) {
+    val itemSizes = sorted.map { 28 + it.data.size }
+
+    for (i in sorted.indices) {
+        val item = sorted[i]
         encodeKey(item.key, buf, currentPos)
-        // dataOffset field: where this item's data starts = currentPos + 28
-        buf.putU32LE(currentPos + 20, prevKeyPos)
-        // dataSize field
+        // dataOffset = position of next item's key; last item self-references
+        val nextPos: UInt = if (i + 1 < sorted.size) (currentPos + itemSizes[i]).toUInt() else currentPos.toUInt()
+        buf.putU32LE(currentPos + 20, nextPos)
         buf.putU32LE(currentPos + 24, item.dataSize)
-        // Copy data after the header
         item.data.copyInto(buf, currentPos + 28)
-        // Advance: next item's key is at currentPos + item total size (28 + dataSize)
-        val itemSize = 28 + item.data.size
-        prevKeyPos = currentPos.toUInt()
-        currentPos += itemSize
+        currentPos += itemSizes[i]
     }
 
     // Checksum over bytes 24..BTRFS_NODE_SIZE-1
@@ -380,12 +376,12 @@ fun decodeLeaf(buf: ByteArray): BtrfsLeaf {
         val key = decodeKey(buf, offset)
         val dataOff = buf.getU32LE(offset + 20).toInt()
         val dataSz  = buf.getU32LE(offset + 24).toInt()
-        // dataOff is the position of the PREVIOUS item's key (backward chain)
-        // For the first item, dataOff = 0xFFFFFFFF (no previous)
+        // dataOff is the position of the NEXT item's key (forward chain).
+        // Last item's dataOff = its own position (sentinel: no next).
         val dataEnd = minOf(offset + 28 + dataSz, buf.size)
         val data = buf.copyOfRange(offset + 28, dataEnd)
         items.add(BtrfsItem(key, dataOff.toUInt(), dataSz.toUInt(), data))
-        // Follow the backward chain: next item's key is at dataOff
+        // Follow the forward chain: next item's key is at dataOff
         offset = dataOff
     }
     return BtrfsLeaf(items.toSeries())
