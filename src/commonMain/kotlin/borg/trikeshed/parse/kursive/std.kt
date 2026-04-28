@@ -1,3 +1,4 @@
+@file:Deprecated("Moved to libs/kursive; prefer borg.trikeshed.parse.kursive in libs/kursive")
 package borg.trikeshed.parse.kursive
 
 import borg.trikeshed.lib.CharSeries
