@@ -51,7 +51,7 @@ data class BacktestMetrics(
     val totalTicks: Int,
     val totalReturn: Double,        // pct: (final - initial) / initial
     val sharpeRatio: Double,        // annualized: mean(ret) / std(ret) * sqrt(252)
-    val sortinoRatio: Double,       // annualized: mean(ret) / downside deviation * sqrt(252)
+    val sortinoRatio: Double = 0.0, // annualized: mean(ret) / downside deviation * sqrt(252)
     val maxDrawdown: Double,        // pct: max peak - trough / peak
     val maxDrawdownTicks: Int,      // ticks in drawdown
     val totalHarvested: Double,

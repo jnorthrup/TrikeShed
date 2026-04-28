@@ -30,7 +30,7 @@ import kotlin.math.sqrt
  * @param initialCapital starting cash balance
  * @param onCycle        optional callback invoked after each tick with the [CycleResult]
  */
-suspend fun simulateTicks(
+suspend fun simulateTicksMiniCursor(
     cursor: MiniCursor,
     engine: TradingEngine,
     initialCapital: Double,
@@ -125,6 +125,7 @@ fun computeBacktestMetrics(
             totalTicks = 0,
             totalReturn = 0.0,
             sharpeRatio = 0.0,
+            sortinoRatio = 0.0,
             maxDrawdown = 0.0,
             maxDrawdownTicks = 0,
             totalHarvested = 0.0,
@@ -154,6 +155,12 @@ fun computeBacktestMetrics(
     // Annualized Sharpe (252 trading days per year, assumes 1 bar = 1 day for now)
     val sharpeRatio = if (stdReturn > 0.0) (meanReturn / stdReturn) * sqrt(252.0) else 0.0
 
+    val downsideVariance = if (returns.isNotEmpty()) {
+        returns.map { if (it < 0.0) it * it else 0.0 }.average()
+    } else 0.0
+    val downsideDeviation = sqrt(downsideVariance)
+    val sortinoRatio = if (downsideDeviation > 0.0) (meanReturn / downsideDeviation) * sqrt(252.0) else 0.0
+
     // Max drawdown
     var peak = initialCapital
     var maxDrawdown = 0.0
@@ -181,6 +188,7 @@ fun computeBacktestMetrics(
         totalTicks = totalTicks,
         totalReturn = totalReturn,
         sharpeRatio = sharpeRatio,
+        sortinoRatio = sortinoRatio,
         maxDrawdown = maxDrawdown,
         maxDrawdownTicks = maxDrawdownTicks,
         totalHarvested = totalHarvested,
@@ -198,6 +206,7 @@ private fun emptyBacktestResult(genome: Genome, initialCapital: Double): Backtes
             totalTicks = 0,
             totalReturn = 0.0,
             sharpeRatio = 0.0,
+            sortinoRatio = 0.0,
             maxDrawdown = 0.0,
             maxDrawdownTicks = 0,
             totalHarvested = 0.0,
@@ -269,5 +278,5 @@ suspend fun simulateTicksFromCursor(
     onCycle: ((CycleResult) -> Unit)? = null,
 ): BacktestResult {
     val mini = adaptCursorToMiniCursor(cursor, rowCount)
-    return simulateTicks(mini, engine, initialCapital, onCycle)
+    return simulateTicksMiniCursor(mini, engine, initialCapital, onCycle)
 }
