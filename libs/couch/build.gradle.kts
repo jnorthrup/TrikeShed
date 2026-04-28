@@ -68,7 +68,6 @@ kotlin {
             dependencies {
                 implementation(kotlin("test"))
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:${rootProject.providers.gradleProperty("versions.kotlinx-coroutines-test").get()}")
-                implementation(project(":libs:couch:viewserver"))
             }
         }
         val jvmTest by getting {
