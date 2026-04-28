@@ -197,6 +197,7 @@ fun decodeBlock(typeCode: UByte, data: ByteArray): HtxBlockData? {
         HtxBlockType.Eoh -> HtxBlockData.EndHeaders
         HtxBlockType.Eot -> HtxBlockData.EndTrailers
         HtxBlockType.Unused -> null
+        HtxBlockType.DHTX_REQ, HtxBlockType.DHTX_RES -> null
     }
 }
 fun decodeStartLine(type: HtxBlockType, data: ByteArray): HtxBlockData? {

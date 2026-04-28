@@ -30,7 +30,7 @@ class SctpElementTddTest {
     }
 
     @Test
-    fun `SctpElement key returns SctpElement.Key singleton`() {
+    fun `SctpElement key returns SctpElementKey singleton`() {
         val elem = SctpElement()
         assertSame(SctpElement.Key, elem.key)
     }

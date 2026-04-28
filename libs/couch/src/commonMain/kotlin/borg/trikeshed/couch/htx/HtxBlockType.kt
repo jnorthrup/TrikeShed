@@ -12,7 +12,11 @@ enum class HtxBlockType(val code: UByte) {
     Data(4u),     // Data block
     Tlr(5u),      // Trailer name/value
     Eot(6u),      // End-of-trailers
-    Unused(15u);  // Unused/removed block
+    Unused(15u),  // Unused/removed block
+    // Binance HTX extended types
+    DHTX_REQ(16u), // Dedicated HTX request block
+    DHTX_RES(17u), // Dedicated HTX response block
+    ;
 
     companion object {
         fun fromCode(code: UByte): HtxBlockType =

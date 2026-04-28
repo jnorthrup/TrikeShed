@@ -252,13 +252,36 @@ class TreeSet<E : Comparable<E>> : NavigableSet<E> {
     }
 
     override fun descendingSet(): NavigableSet<E> {
-        // Implementing a full descending set is beyond the scope of this example
-        throw UnsupportedOperationException("descendingSet not implemented")
+        // Return a snapshot descending view (immutable) backed by a list of elements in reverse order
+        val elems = toList()
+        return SnapshotNavigableSet(elems.reversed())
     }
 
     override fun descendingIterator(): Iterator<E> {
-        // Implementing a full descending iterator is beyond the scope of this example
-        throw UnsupportedOperationException("descendingIterator not implemented")
+        // Reverse in-order traversal without allocating the full list
+        return object : Iterator<E> {
+            val stack = mutableListOf<Node<E>>()
+            var current = root
+
+            init { pushRight(current) }
+
+            fun pushRight(node: Node<E>?) {
+                var n = node
+                while (n != null) {
+                    stack.add(n)
+                    n = n.right
+                }
+            }
+
+            override fun hasNext(): Boolean = stack.isNotEmpty()
+
+            override fun next(): E {
+                if (!hasNext()) throw NoSuchElementException()
+                val node = stack.removeAt(stack.size - 1)
+                pushRight(node.left)
+                return node.element
+            }
+        }
     }
 
     override fun subSet(
@@ -267,23 +290,45 @@ class TreeSet<E : Comparable<E>> : NavigableSet<E> {
         toElement: E,
         toInclusive: Boolean
     ): NavigableSet<E> {
-        // Implementing a full subset is beyond the scope of this example
-        throw UnsupportedOperationException("subSet not implemented")
+        if (fromElement > toElement) throw IllegalArgumentException("fromElement > toElement")
+        val result = mutableListOf<E>()
+        for (e in this) {
+            val geFrom = (e > fromElement) || (fromInclusive && e == fromElement)
+            val leTo = (e < toElement) || (toInclusive && e == toElement)
+            if (geFrom && leTo) result.add(e)
+        }
+        return SnapshotNavigableSet(result)
     }
 
     override fun headSet(toElement: E, inclusive: Boolean): NavigableSet<E> {
-        // Implementing a full headSet is beyond the scope of this example
-        throw UnsupportedOperationException("headSet not implemented")
+        val result = mutableListOf<E>()
+        for (e in this) {
+            val lt = (e < toElement) || (inclusive && e == toElement)
+            if (lt) result.add(e) else break
+        }
+        return SnapshotNavigableSet(result)
     }
 
     override fun tailSet(fromElement: E, inclusive: Boolean): NavigableSet<E> {
-        // Implementing a full tailSet is beyond the scope of this example
-        throw UnsupportedOperationException("tailSet not implemented")
+        val result = mutableListOf<E>()
+        for (e in this) {
+            val ge = (e > fromElement) || (inclusive && e == fromElement)
+            if (ge) result.add(e)
+        }
+        return SnapshotNavigableSet(result)
+    }
+
+    private fun toList(): List<E> {
+        val list = mutableListOf<E>()
+        val it = iterator()
+        while (it.hasNext()) list.add(it.next())
+        return list
     }
 
     override fun iterator(): MutableIterator<E> = object : MutableIterator<E> {
        val stack = mutableListOf<Node<E>>()
        var current = root
+       var lastReturned: Node<E>? = null
 
         init {
             pushLeft(current)
@@ -303,11 +348,15 @@ class TreeSet<E : Comparable<E>> : NavigableSet<E> {
             if (!hasNext()) throw NoSuchElementException()
             val node = stack.removeAt(stack.size - 1)
             pushLeft(node.right)
+            lastReturned = node
             return node.element
         }
 
         override fun remove() {
-            throw UnsupportedOperationException("remove not implemented")
+            val node = lastReturned ?: throw IllegalStateException("next() has not been called or remove() already called")
+            // Remove the last returned element from the tree
+            this@TreeSet.remove(node.element)
+            lastReturned = null
         }
     }
 
@@ -341,6 +390,103 @@ class TreeSet<E : Comparable<E>> : NavigableSet<E> {
             changed = remove(element) || changed
         }
         return changed
+    }
+}
+
+private class SnapshotNavigableSet<E : Comparable<E>>(private val elements: List<E>) : NavigableSet<E> {
+    override val size: Int get() = elements.size
+    override fun isEmpty(): Boolean = elements.isEmpty()
+    override fun contains(element: E): Boolean = elements.contains(element)
+    override fun iterator(): MutableIterator<E> = object : MutableIterator<E> {
+        var i = 0
+        override fun hasNext(): Boolean = i < elements.size
+        override fun next(): E {
+            if (!hasNext()) throw NoSuchElementException()
+            return elements[i++]
+        }
+        override fun remove() { throw UnsupportedOperationException("remove not supported on snapshot") }
+    }
+
+    override fun containsAll(elements: Collection<E>): Boolean = this.elements.containsAll(elements)
+
+    override fun add(element: E): Boolean { throw UnsupportedOperationException("snapshot is read-only") }
+    override fun addAll(elements: Collection<E>): Boolean { throw UnsupportedOperationException("snapshot is read-only") }
+    override fun clear() { throw UnsupportedOperationException("snapshot is read-only") }
+    override fun remove(element: E): Boolean { throw UnsupportedOperationException("snapshot is read-only") }
+    override fun removeAll(elements: Collection<E>): Boolean { throw UnsupportedOperationException("snapshot is read-only") }
+    override fun retainAll(elements: Collection<E>): Boolean { throw UnsupportedOperationException("snapshot is read-only") }
+
+    override fun comparator(): Comparator<E> = Comparator { a, b -> a.compareTo(b) }
+
+    override fun subSet(fromElement: E, toElement: E): SortedSet<E> {
+        if (fromElement > toElement) throw IllegalArgumentException("fromElement > toElement")
+        val r = elements.filter { it >= fromElement && it < toElement }
+        return SnapshotNavigableSet(r)
+    }
+
+    override fun headSet(toElement: E): SortedSet<E> {
+        val r = elements.filter { it < toElement }
+        return SnapshotNavigableSet(r)
+    }
+
+    override fun tailSet(fromElement: E): SortedSet<E> {
+        val r = elements.filter { it >= fromElement }
+        return SnapshotNavigableSet(r)
+    }
+
+    override fun first(): E = elements.firstOrNull() ?: throw NoSuchElementException()
+    override fun last(): E = elements.lastOrNull() ?: throw NoSuchElementException()
+
+    override fun lower(e: E): E? {
+        for (i in elements.size - 1 downTo 0) {
+            val v = elements[i]
+            if (v < e) return v
+        }
+        return null
+    }
+
+    override fun floor(e: E): E? {
+        for (i in elements.size - 1 downTo 0) {
+            val v = elements[i]
+            if (v <= e) return v
+        }
+        return null
+    }
+
+    override fun ceiling(e: E): E? {
+        for (v in elements) if (v >= e) return v
+        return null
+    }
+
+    override fun higher(e: E): E? {
+        for (v in elements) if (v > e) return v
+        return null
+    }
+
+    override fun pollFirst(): E? { throw UnsupportedOperationException("snapshot is read-only") }
+    override fun pollLast(): E? { throw UnsupportedOperationException("snapshot is read-only") }
+
+    override fun descendingSet(): NavigableSet<E> = SnapshotNavigableSet(elements.asReversed())
+    override fun descendingIterator(): Iterator<E> = elements.asReversed().iterator()
+
+    override fun subSet(fromElement: E, fromInclusive: Boolean, toElement: E, toInclusive: Boolean): NavigableSet<E> {
+        if (fromElement > toElement) throw IllegalArgumentException("fromElement > toElement")
+        val r = elements.filter {
+            val geFrom = if (fromInclusive) it >= fromElement else it > fromElement
+            val leTo = if (toInclusive) it <= toElement else it < toElement
+            geFrom && leTo
+        }
+        return SnapshotNavigableSet(r)
+    }
+
+    override fun headSet(toElement: E, inclusive: Boolean): NavigableSet<E> {
+        val r = elements.filter { if (inclusive) it <= toElement else it < toElement }
+        return SnapshotNavigableSet(r)
+    }
+
+    override fun tailSet(fromElement: E, inclusive: Boolean): NavigableSet<E> {
+        val r = elements.filter { if (inclusive) it >= fromElement else it > fromElement }
+        return SnapshotNavigableSet(r)
     }
 }
 

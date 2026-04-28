@@ -22,7 +22,7 @@ import kotlin.test.assertTrue
 class BPlusTreeContractTest {
 
     @Test
-    fun `BPlusTree insert produces new root (copy-on-write)`() {
+    fun `BPlusTree insert produces new root copy-on-write`() {
         // btrfs is a COW filesystem — insert never mutates existing nodes
         assertTrue(true)
     }

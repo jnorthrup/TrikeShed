@@ -57,7 +57,7 @@ class NALParserContractTest {
     }
 
     @Test
-    fun `truthValue frequency is clamped to 0..1`() {
+    fun `truthValue frequency is clamped to 0_1`() {
         // Frequencies outside [0,1] are clamped
         assertTrue(true)
     }

@@ -161,15 +161,27 @@ object YamlParser {
 
     private fun extractChildIndices(parentIdx: Int, elems: Series<JsElement>, src: Series<Char>): Series<Int> {
         val parent = elems[parentIdx]
-        val commas = Combinators.realCommas(parent, src)  // open positions of child keys (negatives filtered)
-        val n = commas.size
-        return n j { i: Int ->
-            val openPos = commas[i]
-            // Search forward from parentIdx+1 for element with matching open position
-            var k = parentIdx + 1
-            while (k < elems.size) {
-                if (elems[k].a.a == openPos) return@j k
-                k++
+        val storedCommas = parent.b  // parser-recorded child positions
+        // filter to positive entries only (skip tag sentinels)
+        var count = 0; var k = 0
+        while (k < storedCommas.size) { if (storedCommas[k] >= 0) count++; k++ }
+        return count j { i: Int ->
+            var idx = 0; var seen = 0
+            while (idx < storedCommas.size) {
+                val openPos = storedCommas[idx]
+                if (openPos >= 0) {
+                    if (seen == i) {
+                        // Search forward from parentIdx+1 for element with matching open position
+                        var kk = parentIdx + 1
+                        while (kk < elems.size) {
+                            if (elems[kk].a.a == openPos) return@j kk
+                            kk++
+                        }
+                        return@j -1
+                    }
+                    seen++
+                }
+                idx++
             }
             -1 // not found
         }

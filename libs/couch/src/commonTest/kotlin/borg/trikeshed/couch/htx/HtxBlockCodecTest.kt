@@ -2,6 +2,7 @@ package borg.trikeshed.couch.htx
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 /**
  * TDD spec for HtxBlock field packing/unpacking algebra.

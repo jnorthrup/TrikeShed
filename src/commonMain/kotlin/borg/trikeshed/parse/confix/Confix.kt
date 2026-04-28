@@ -1254,23 +1254,32 @@ object Path {
         if (tag != Tag.ARRAY) {
             return null
         }
-        val cs = Combinators.realCommas(e, src)
-        // diagnostic: print comma list
-        val csStr = if (cs.size == 0) "[]" else run {
-            val sb = StringBuilder(); sb.append('['); var k = 0
-            while (k < cs.size) { if (k > 0) sb.append(','); sb.append(cs[k]); k++ }
-            sb.append(']'); sb.toString()
-        }
-        // iterate commas, skipping negative sentinels; map logical index -> Nth positive entry
-        var i = 0; var found = 0
-        while (i < cs.size) {
-            val v = cs[i]
-            if (v >= 0) {
-                if (found == idx) {
-                    val child = childElementAt(v, src)
-                    return child j src
+        // realCommas works for JSON (detects brackets/strings/literals by char class).
+        // For YAML, realCommas returns empty because sequence items are plain identifiers
+        // with '-' prefix that skipKind doesn't classify. Fall back to stored commas.
+        val rc = Combinators.realCommas(e, src)
+        val cs = if (rc.size > 0) rc else {
+            // Extract positive entries from stored comma series
+            val stored = e.b
+            var count = 0; var j = 0
+            while (j < stored.size) { if (stored[j] >= 0) count++; j++ }
+            count j { k: Int ->
+                var ii = 0; var seen = 0
+                while (ii < stored.size) {
+                    if (stored[ii] >= 0) {
+                        if (seen == k) return@j stored[ii]
+                        seen++
+                    }
+                    ii++
                 }
-                found++
+                -1
+            }
+        }
+        var i = 0
+        while (i < cs.size) {
+            if (i == idx) {
+                val child = childElementAt(cs[i], src)
+                return child j src
             }
             i++
         }
@@ -1279,27 +1288,29 @@ object Path {
 
    fun stepByName(e: JsElement, src: Series<Char>, name: String): JsContext? {
         if (Combinators.tagOf(e, src) != Tag.OBJECT) return null
-        val cs = Combinators.realCommas(e, src)
-        // diagnostic logging: print comma list and name we're searching for
-        try {
-            val csStr = if (cs.size == 0) "[]" else {
-                val sb = StringBuilder()
-                sb.append('[')
-                var k = 0
-                while (k < cs.size) {
-                    if (k > 0) sb.append(',')
-                    sb.append(cs[k])
-                    k++
+        // realCommas works for JSON (detects quoted strings by char class).
+        // For YAML, realCommas returns empty for mapping keys that are plain identifiers.
+        // Fall back to stored comma series in that case.
+        val rc = Combinators.realCommas(e, src)
+        val keyPositions: Series<Int> = if (rc.size > 0) rc else {
+            val stored = e.b
+            var count = 0; var j = 0
+            while (j < stored.size) { if (stored[j] >= 0) count++; j++ }
+            count j { k: Int ->
+                var ii = 0; var seen = 0
+                while (ii < stored.size) {
+                    if (stored[ii] >= 0) {
+                        if (seen == k) return@j stored[ii]
+                        seen++
+                    }
+                    ii++
                 }
-                sb.append(']')
-                sb.toString()
+                -1
             }
-        } catch (ex: Throwable) {
         }
         var i = 0
-        while (i < cs.size) {
-            val keyOpen = cs[i]
-            if (keyOpen < 0) { i++; continue }
+        while (i < keyPositions.size) {
+            val keyOpen = keyPositions[i]
             var keyElem = childElementAt(keyOpen, src)
             // childElementAt prefers containers (OBJECT/ARRAY) over STRING when
             // both share the same open position (common in YAML block keys where

@@ -1,6 +1,5 @@
 package borg.trikeshed.dreamer
 
-import java.util.HashMap
 
 enum class Mode { LIVE, SHADOW }
 

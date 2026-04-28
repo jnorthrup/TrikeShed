@@ -38,7 +38,7 @@ class QuicElementTddTest {
     }
 
     @Test
-    fun `QuicElement key returns QuicElement.Key singleton`() {
+    fun `QuicElement key returns QuicElementKey singleton`() {
         val elem = QuicElement()
         assertSame(QuicElement.Key, elem.key)
     }
@@ -119,7 +119,7 @@ class QuicElementTddTest {
     // ── QuicKey alias ─────────────────────────────────────────────────────────
 
     @Test
-    fun `QuicKey is AsyncContextKey<QuicElement>`() {
+    fun `QuicKey is AsyncContextKey of QuicElement`() {
         assertTrue(QuicKey is borg.trikeshed.context.AsyncContextKey<QuicElement>)
     }
 
@@ -138,28 +138,28 @@ class QuicElementTddTest {
 class QuicVarIntCodecTest {
 
     @Test
-    fun `encodedLen 1-byte for values 0..63`() {
+    fun `encodedLen 1-byte for values 0_to_63`() {
         for (v in listOf(0uL, 1uL, 32uL, 63uL)) {
             assertEquals(1, QuicVarInt.encodedLen(v), "v=$v")
         }
     }
 
     @Test
-    fun `encodedLen 2-byte for values 64..16383`() {
+    fun `encodedLen 2-byte for values 64_to_16383`() {
         for (v in listOf(64uL, 100uL, 8_192uL, 16_383uL)) {
             assertEquals(2, QuicVarInt.encodedLen(v), "v=$v")
         }
     }
 
     @Test
-    fun `encodedLen 4-byte for values 16384..1073741823`() {
+    fun `encodedLen 4-byte for values 16384 to 1073741823`() {
         for (v in listOf(16_384uL, 1_000_000uL, 1_073_741_823uL)) {
             assertEquals(4, QuicVarInt.encodedLen(v), "v=$v")
         }
     }
 
     @Test
-    fun `encodedLen 8-byte for values 1073741824..MAX_VALUE`() {
+    fun `encodedLen 8-byte for values 1073741824 to MAX_VALUE`() {
         for (v in listOf(1_073_741_824uL, 1_000_000_000_000uL, QuicVarInt.MAX_VALUE)) {
             assertEquals(8, QuicVarInt.encodedLen(v), "v=$v")
         }
@@ -302,6 +302,7 @@ class QuicPacketHeaderTest {
         val hdr = QuicPacketHeader.Short(
             dstConnectionId = cid,
             packetNumber = 42u,
+            protectedPayload = ByteArray(0),
         )
         assertEquals(4, hdr.dstConnectionId.size)
         assertEquals(42uL, hdr.packetNumber)
@@ -310,7 +311,7 @@ class QuicPacketHeaderTest {
 
     @Test
     fun `Short spinBit defaults false`() {
-        val hdr = QuicPacketHeader.Short(byteArrayOf(1), packetNumber = 0u)
+        val hdr = QuicPacketHeader.Short(byteArrayOf(1), packetNumber = 0u, protectedPayload = ByteArray(0))
         assertFalse(hdr.spinBit)
     }
 

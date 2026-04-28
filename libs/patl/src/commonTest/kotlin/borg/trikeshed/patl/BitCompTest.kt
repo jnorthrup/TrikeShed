@@ -49,8 +49,8 @@ class BitCompTest {
         // 0x20 (00100000) vs 0x00 (00000000): xor 0x20, bit 5
         val exA: (String) -> Series<Byte> = { s -> 1 j { i -> s[i].code.toByte() } }
         val bc = BitComp(exA)
-        val a = String(charArrayOf(0x20.toChar()))
-        val b = String(charArrayOf(0x00.toChar()))
+        val a = charArrayOf(0x20.toChar()).concatToString()
+        val b = charArrayOf(0x00.toChar()).concatToString()
         assertTrue(bc.mismatch(a, b) == 5u)
     }
 }

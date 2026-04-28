@@ -90,13 +90,38 @@ open class CirQlar<T>(
         } else x] as T
     })
 
-    /*override*/ fun iterator(): MutableIterator<T> = object : MutableIterator<T> {
+    fun removeAt(index: Int): T {
+        val s = size
+        if (index < 0 || index >= s) throw IndexOutOfBoundsException("index $index size $s")
         val v = toVect0r()
+        val removed = v.b(index)
+        val remaining = mutableListOf<T>()
+        for (i in 0 until s) if (i != index) remaining.add(v.b(i))
+        for (i in al.indices) al[i] = null
+        for (i in 0 until remaining.size) {
+            al[i] = remaining[i] as Any?
+        }
+        tail = remaining.size
+        return removed
+    }
+
+    /*override*/ fun iterator(): MutableIterator<T> = object : MutableIterator<T> {
         var i = 0
-        override fun hasNext(): Boolean = i < v.size
-        override fun next(): T = v.b(i++)
+        var lastReturnedIndex: Int? = null
+        override fun hasNext(): Boolean = i < this@CirQlar.size
+        override fun next(): T {
+            if (!hasNext()) throw NoSuchElementException()
+            val value = toVect0r().b(i)
+            lastReturnedIndex = i
+            i++
+            return value
+        }
         override fun remove(): Unit {
-            throw UnsupportedOperationException("remove not supported")
+            val idx = lastReturnedIndex ?: throw IllegalStateException("next() has not been called or remove() already called")
+            removeAt(idx)
+            // After removal, next element shifts into idx, so set i = idx to continue correctly
+            i = idx
+            lastReturnedIndex = null
         }
     }
 }
