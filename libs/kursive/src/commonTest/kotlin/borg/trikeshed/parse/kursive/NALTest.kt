@@ -23,7 +23,7 @@ class NALTest {
      */
     @Test
     fun nal1ParsesInheritanceRelationship() {
-        val source: Series<Char> = "<bird --> animal>.".toSeries()
+        val source: Series<Char> = "(bird --> animal).".toSeries()
         val parsed: Join<CharSeries, NarsiveTrace>? = Narsive.parseSentence(source)
         assertNotNull(parsed)
 
@@ -37,7 +37,7 @@ class NALTest {
 
     @Test
     fun nal1SupervisorJobHasInheritanceCopula() {
-        val source: Series<Char> = "<bird --> animal>.".toSeries()
+        val source: Series<Char> = "(bird --> animal).".toSeries()
         val parsed: Join<CharSeries, NarsiveTrace>? = Narsive.parseSentence(source)
         assertNotNull(parsed)
 
@@ -55,7 +55,7 @@ class NALTest {
      */
     @Test
     fun nal2ParsesSimilarityRelationship() {
-        val source: Series<Char> = "<robin --> bird> <-> <robin --> bird>.".s
+        val source: Series<Char> = "((robin --> bird) <-> (robin --> bird)).".s
         val parsed: Join<CharSeries, NarsiveTrace>? = Narsive.parseSentence(source)
         assertNotNull(parsed)
 
@@ -66,7 +66,7 @@ class NALTest {
 
     @Test
     fun nal2SimilarityIsSymmetric() {
-        val source = "<bird <-> robin>.".toSeries()
+        val source = "(bird <-> robin).".toSeries()
         val parsed = Narsive.parseSentence(source)
         assertNotNull(parsed)
 
@@ -83,7 +83,7 @@ class NALTest {
      */
     @Test
     fun nal3ParsesImplication() {
-        val source = "<bird --> animal> ==> <robin --> animal>.".toSeries()
+        val source = "((bird --> animal) ==> (robin --> animal)).".toSeries()
         val parsed = Narsive.parseSentence(source)
         assertNotNull(parsed)
 
@@ -94,7 +94,7 @@ class NALTest {
 
     @Test
     fun nal3ParsesEquivalence() {
-        val source = "<bird --> animal> <=> <robin --> animal>.".toSeries()
+        val source = "((bird --> animal) <=> (robin --> animal)).".toSeries()
         val parsed = Narsive.parseSentence(source)
         assertNotNull(parsed)
 
@@ -105,7 +105,7 @@ class NALTest {
 
     @Test
     fun nal3SupervisorJobFansOutImplicationCopula() {
-        val source = "<S --> P> ==> <Q --> R>.".toSeries()
+        val source = "((S --> P) ==> (Q --> R)).".toSeries()
         val parsed = Narsive.parseSentence(source)
         assertNotNull(parsed)
 
@@ -122,7 +122,7 @@ class NALTest {
      */
     @Test
     fun nal4ParsesPredictiveImplication() {
-        val source = "<rain /> <wet-ground>.".toSeries()
+        val source = "(rain /> wet-ground).".toSeries()
         val parsed = Narsive.parseSentence(source)
         assertNotNull(parsed)
 
@@ -133,7 +133,7 @@ class NALTest {
 
     @Test
     fun nal4PredictiveImplicationWithFutureTense() {
-        val source = "<S /> <P>. :/:".toSeries()
+        val source = "(S /> P). :/:".toSeries()
         val parsed = Narsive.parseSentence(source)
         assertNotNull(parsed)
 
@@ -152,7 +152,7 @@ class NALTest {
      */
     @Test
     fun nal5ParsesConcurrentImplication() {
-        val source = "<bell --> ringing> =|> <bell --> sound>.".toSeries()
+        val source = "((bell --> ringing) =|> (bell --> sound)).".toSeries()
         val parsed = Narsive.parseSentence(source)
         assertNotNull(parsed)
 
@@ -163,7 +163,7 @@ class NALTest {
 
     @Test
     fun nal5SupervisorJobDerivesConcurrentImplication() {
-        val source = "<A =|> B>.".toSeries()
+        val source = "(A =|> B).".toSeries()
         val parsed = Narsive.parseSentence(source)
         assertNotNull(parsed)
 
@@ -180,7 +180,7 @@ class NALTest {
      */
     @Test
     fun nal6ParsesConjunctionCompoundTerm() {
-        val source = "(&&, <bird>, <can-fly>).".toSeries()
+        val source = "(&&, bird, can-fly).".toSeries()
         val parsed = Narsive.parseSentence(source)
         assertNotNull(parsed)
 
@@ -192,7 +192,7 @@ class NALTest {
 
     @Test
     fun nal6ConjunctionComposesMultipleTerms() {
-        val source: Series<Char> = "(&&, <A>, <B>, <C>).".toSeries()
+        val source: Series<Char> = "(&&, A, B, C).".toSeries()
         val parsed: Join<CharSeries, NarsiveTrace>? = Narsive.parseSentence(source)
         assertNotNull(parsed)
 
@@ -203,7 +203,7 @@ class NALTest {
 
     @Test
     fun nal6NestedConjunctions() {
-        val source: Series<Char> = "(&&, <bird --> animal>, <animal --> mortal>).".s
+        val source: Series<Char> = "(&&, (bird --> animal), (animal --> mortal)).".s
         val parsed: Join<CharSeries, NarsiveTrace>? = Narsive.parseSentence(source)
         assertNotNull(parsed)
 
@@ -222,7 +222,7 @@ class NALTest {
      */
     @Test
     fun nal7ParsesDisjunctionCompoundTerm() {
-        val source: Series<Char> = "(||, <bird>, <reptile>).".toSeries()
+        val source: Series<Char> = "(||, bird, reptile).".toSeries()
         val parsed: Join<CharSeries, NarsiveTrace>? = Narsive.parseSentence(source)
         assertNotNull(parsed)
 
@@ -234,7 +234,7 @@ class NALTest {
 
     @Test
     fun nal7SupervisorJobFansOutDisjunction() {
-        val source: Series<Char> = "(||, <A>, <B>).".toSeries()
+        val source: Series<Char> = "(||, A, B).".toSeries()
         val parsed: Join<CharSeries, NarsiveTrace>? = Narsive.parseSentence(source)
         assertNotNull(parsed)
 
@@ -251,7 +251,7 @@ class NALTest {
      */
     @Test
     fun nal8ParsesProductCompoundTerm() {
-        val source = "(bird * color).".toSeries()
+        val source = "(*, bird, color).".toSeries()
         val parsed = Narsive.parseSentence(source)
         assertNotNull(parsed)
 
@@ -263,7 +263,7 @@ class NALTest {
 
     @Test
     fun nal8ProductRepresentsOrderedPair() {
-        val source = "(X * Y).".toSeries()
+        val source = "(*, X, Y).".toSeries()
         val parsed = Narsive.parseSentence(source)
         assertNotNull(parsed)
 
@@ -281,7 +281,7 @@ class NALTest {
      */
     @Test
     fun nal9ParsesSequentialComposition() {
-        val source = "(&&, <A>, <B>).".toSeries()  // using intersection as sequential placeholder
+        val source = "(&&, A, B).".toSeries()  // using intersection as sequential placeholder
         val parsed = Narsive.parseSentence(source)
         assertNotNull(parsed)
 
@@ -293,7 +293,7 @@ class NALTest {
 
     @Test
     fun nal9SupervisorJobForSequentialComposition() {
-        val source = "(&&, <step1>, <step2>).".toSeries()
+        val source = "(&&, step1, step2).".toSeries()
         val parsed = Narsive.parseSentence(source)
         assertNotNull(parsed)
 
@@ -304,7 +304,7 @@ class NALTest {
 
     @Test
     fun nal9ParallelComposition() {
-        val source: Series<Char> = "(&|, <A>, <B>).".toSeries()
+        val source: Series<Char> = "(&|, A, B).".toSeries()
         val parsed: Join<CharSeries, NarsiveTrace>? = Narsive.parseSentence(source)
         assertNotNull(parsed)
 
@@ -324,27 +324,30 @@ class NALTest {
 
     @Test
     fun nalLevelRecoversOperatorFromParsedElements() {
-        val source: Series<Char> = "<bird --> animal>.".toSeries()
+        val source: Series<Char> = "(bird --> animal).".toSeries()
         val parsed: Join<CharSeries, NarsiveTrace>? = Narsive.parseSentence(source)
         assertNotNull(parsed)
 
         val elements: Series<NarsiveElement> = parsed.b.elements(source)
         for (element: NarsiveElement in elements) {
-            val nalLevel: NALLevel? = NALLevel.fromOperator(element.operatorOrNull()!!)
-            assertNotNull(nalLevel, "Element operator ${element.operatorOrNull()} should map to a NAL level")
+            val operator = element.operatorOrNull()
+            if (operator != null) {
+                val nalLevel: NALLevel? = NALLevel.fromOperator(operator)
+                assertNotNull(nalLevel, "Element operator $operator should map to a NAL level")
+            }
         }
     }
 
     @Test
     fun allNalLevelsParseFromTaskString() {
         // NAL1
-        val nal1 = "<A --> B>."
+        val nal1 = "(A --> B)."
         // NAL3 (implication)
-        val nal3 = "<A --> B> ==> <C --> D>."
+        val nal3 = "((A --> B) ==> (C --> D))."
         // NAL6 (conjunction)
-        val nal6 = "(&&, <A>, <B>)."
+        val nal6 = "(&&, A, B)."
         // NAL8 (product)
-        val nal8 = "(A * B)."
+        val nal8 = "(*, A, B)."
 
         val results: Series<Join<CharSeries, NarsiveTrace>> = Narsive.parseTasks("$nal1\n$nal3\n$nal6\n$nal8")
         assertEquals(4, results.size, "Should parse all NAL level examples")
@@ -356,11 +359,11 @@ class NALTest {
     @Test
     fun nalSupervisorJobSupportsAllLevelsFanout() {
         val text = """
-            <bird --> animal>.
-            <bird <-> robin>.
-            <bird --> can-fly> ==> <robin --> can-fly>.
-            (&&, <A>, <B>).
-            (A * B).
+            (bird --> animal).
+            (bird <-> robin).
+            ((bird --> can-fly) ==> (robin --> can-fly)).
+            (&&, A, B).
+            (*, A, B).
         """.trimIndent()
 
         val tasks: Series2<CharSeries, NarsiveTrace> = Narsive.parseTasks(text)

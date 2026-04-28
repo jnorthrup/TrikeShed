@@ -238,9 +238,9 @@ object Narsive {
     val truth: KursiveParser<CharSeries> =
         "narsiveTruth" colon ('%'.s then std.wss then std.nums then (std.wss then ';'.s then std.wss then std.nums).opt then std.wss then '%'.s)
 
-    /** relationship : '<' term copula term '>' */
+    /** relationship : '(' term copula term ')' */
     val relationship: KursiveParser<CharSeries> by lazy(LazyThreadSafetyMode.NONE) {
-        "narsiveRelationship" colon ('<'.s then std.wss then termStep then std.wss then copula.s then std.wss then termStep then std.wss then '>'.s)
+        "narsiveRelationship" colon ('('.s then std.wss then termStep then std.wss then copula.s then std.wss then termStep then std.wss then ')'.s)
     }
 
     /** operation : '(' '^' word (',' term)+ ')' */
