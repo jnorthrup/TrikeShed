@@ -181,7 +181,7 @@ object YamlParser {
         src: Series<Char>,
     ): Series<YamlMappingEntry> {
         val n = childIndices.size
-        if (n == 0) return 0 j { TODO() }
+        if (n == 0) return Join.emptySeriesOf<YamlMappingEntry>()
         val list = ArrayList<YamlMappingEntry>(n)
         var i = 0
         while (i < n) {
