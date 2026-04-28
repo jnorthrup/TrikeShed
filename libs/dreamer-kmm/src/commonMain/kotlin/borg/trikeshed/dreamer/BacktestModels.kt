@@ -131,22 +131,7 @@ fun multiSymbolKlineToPortfolioInput(
     cursor: MiniCursor,
     barIndex: Int,
     holdings: Map<String, Double>,
-): List<PortfolioInput> {
-    val row: DocRowVec = (cursor at barIndex) as DocRowVec
-    val symbol: String = row["symbol"] as? String ?: "UNKNOWN"
-    val openTime: Long = row["openTime"] as? Long ?: 0L
-    val price: Double = row["close"] as? Double ?: row["open"] as? Double ?: 0.0
-    val quantity: Double = holdings[symbol] ?: 0.0
-    return listOf(
-        PortfolioInput(
-            symbol = symbol,
-            openTime = openTime,
-            quantity = quantity,
-            price = price,
-            value = quantity * price,
-        )
-    )
-}
+): List<PortfolioInput> = allSymbolsAtBar(cursor, barIndex, holdings)
 
 /**
  * Collect all [PortfolioInput] rows at the same bar position (openTime) as [barIndex].

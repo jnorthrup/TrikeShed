@@ -238,7 +238,7 @@ class RunCycleTest {
     // ── 6. multiSymbolKlineToPortfolioInput ────────────────────────────
 
     @Test
-    fun `allSymbolsAtBar collects all symbols at same openTime`() {
+    fun `multiSymbolKlineToPortfolioInput collects all symbols at same openTime`() {
         // Build cursor with BTC and ETH at same openTime
         val klines = listOf(
             Kline("BTC-USD", TimeSpan.Hours1, 1000L, 20000.0, 21000.0, 19900.0, 20500.0, 100.0),
@@ -249,7 +249,7 @@ class RunCycleTest {
         val cursor = klinesToCursor(klines)
         val holdings = mapOf("BTC-USD" to 0.5, "ETH-USD" to 2.0)
 
-        val inputs = allSymbolsAtBar(cursor, barIndex = 0, holdings = holdings)
+        val inputs = multiSymbolKlineToPortfolioInput(cursor, barIndex = 0, holdings = holdings)
 
         // Should collect BTC + ETH at openTime=1000
         assertEquals(2, inputs.size)
@@ -260,5 +260,11 @@ class RunCycleTest {
         assertEquals(1000L, btc.openTime)
         assertEquals(0.5, btc.quantity)
         assertEquals(20500.0, btc.price, 0.001)
+
+        val eth = inputs.first { it.symbol == "ETH-USD" }
+        assertEquals(1000L, eth.openTime)
+        assertEquals(2.0, eth.quantity)
+        assertEquals(2050.0, eth.price, 0.001)
+        assertEquals(4100.0, eth.value, 0.001)
     }
 }
