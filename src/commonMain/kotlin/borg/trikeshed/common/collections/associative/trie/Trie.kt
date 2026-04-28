@@ -22,10 +22,9 @@ class Trie(var root: Map<String, Node> = linkedMapOf()) {
                 // exist, so traverse current path + set isLeaf if needed
                 val node: Node = children[value]!!
 
-                if (isLeaf != node.leaf) {
-                    node.leaf = isLeaf
-                }
                 if (isLeaf) {
+                    // once a node becomes a leaf it should stay a leaf; do not clear a previous leaf when inserting deeper keys
+                    node.leaf = true
                     // update payload for leaf nodes when re-added
                     node.payload = v
                 }

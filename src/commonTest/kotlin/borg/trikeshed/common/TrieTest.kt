@@ -34,4 +34,30 @@ class TrieTest {
         assertTrue(trie.contains("a", "b", "d", "e"))
         assertEquals(d, trie["a", "b", "d", "e"])
     }
+
+    @Test
+    fun addOrderPreservesLeaf() {
+        val p = 42
+        val trie = Trie()
+        trie.add(p, "x", "y")
+        assertTrue(trie.contains("x", "y"))
+        trie.add(p, "x", "y", "z")
+        assertTrue(trie.contains("x", "y"))
+        assertTrue(trie.contains("x", "y", "z"))
+    }
+
+    @Test
+    fun getMissingReturnsNull() {
+        val trie = Trie()
+        assertEquals(null, trie["no", "such"])
+    }
+
+    @Test
+    fun duplicateAddUpdatesPayload() {
+        val trie = Trie()
+        trie.add(1, "k")
+        assertEquals(1, trie["k"])
+        trie.add(2, "k")
+        assertEquals(2, trie["k"])
+    }
 }
