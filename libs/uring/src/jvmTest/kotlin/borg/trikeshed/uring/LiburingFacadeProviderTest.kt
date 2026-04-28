@@ -2,7 +2,7 @@ package borg.trikeshed.uring
 
 import borg.trikeshed.context.ElementState
 import borg.trikeshed.context.LiburingFacadeSpi
-import borg.trikeshed.context.loadLiburingFacadeSpi
+import borg.trikeshed.context.*
 import kotlinx.coroutines.test.runTest
 import java.util.ServiceLoader
 import kotlin.test.Test
