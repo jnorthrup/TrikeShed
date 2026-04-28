@@ -53,8 +53,8 @@ kotlin {
         val commonMain by getting {
             dependencies {
                 api(project(":"))
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0-rc01")
-                implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1-0.6.x-compat")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:${rootProject.providers.gradleProperty("versions.kotlinx-coroutines-core").get()}")
+                implementation("org.jetbrains.kotlinx:kotlinx-datetime:${rootProject.providers.gradleProperty("versions.kotlinx-datetime").get()}")
             }
         }
         val jvmMain by getting {
@@ -65,7 +65,7 @@ kotlin {
         val commonTest by getting {
             dependencies {
                 implementation(kotlin("test"))
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0-rc01")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:${rootProject.providers.gradleProperty("versions.kotlinx-coroutines-test").get()}")
                 implementation(project(":libs:couch"))
             }
         }

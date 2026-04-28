@@ -15,6 +15,11 @@ val enableNativeSharedLib = providers.gradleProperty("native.sharedLib").orNull 
 
 val focusedTransportSlice = providers.gradleProperty("focusedTransportSlice").orNull == "true"
 
+// Centralized dependency versions available to all subprojects via project.extra
+extra["versions.kotlinx-coroutines-core"] = "1.11.0-rc02"
+extra["versions.kotlinx-coroutines-test"] = "1.11.0-rc02"
+extra["versions.kotlinx-datetime"] = "0.8.0-rc02-0.6.x-compat"
+
 repositories {
     maven("https://oss.sonatype.org/content/repositories/snapshots/")
     mavenCentral()

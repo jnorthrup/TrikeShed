@@ -19,7 +19,7 @@ dependencies {
     implementation(project(":"))
     implementation(kotlin("stdlib"))
     testImplementation(kotlin("test"))
-    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:${rootProject.providers.gradleProperty("versions.kotlinx-coroutines-test").get()}")
 }
 
 application {
@@ -29,6 +29,6 @@ application {
 
 tasks.register<JavaExec>("runBinanceStochastic") {
     group = "application"
-    classpath = sourceSets["main"].runtimeClasspath
+    classpath = sourceSets.getByName("main").runtimeClasspath
     mainClass.set("borg.trikeshed.integration.RunBinanceStochasticKlineCacheKt")
 }

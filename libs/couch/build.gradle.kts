@@ -32,7 +32,7 @@ kotlin {
     jvmToolchain(21)
     jvm()
 
-    js(IR) {
+    js {
         nodejs()
         binaries.executable()
     }
@@ -55,8 +55,8 @@ kotlin {
             dependencies {
                 api(project(":"))
                 api(project(":libs:miniduck"))
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0-rc01")
-                implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1-0.6.x-compat")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:${rootProject.providers.gradleProperty("versions.kotlinx-coroutines-core").get()}")
+                implementation("org.jetbrains.kotlinx:kotlinx-datetime:${rootProject.providers.gradleProperty("versions.kotlinx-datetime").get()}")
             }
         }
         val jvmMain by getting {
@@ -67,28 +67,28 @@ kotlin {
         val commonTest by getting {
             dependencies {
                 implementation(kotlin("test"))
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0-rc01")
-                implementation(project(":libs:couch:viewserver"))
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:${rootProject.providers.gradleProperty("versions.kotlinx-coroutines-test").get()}")
             }
         }
         val jvmTest by getting {
             dependencies {
                 implementation(kotlin("test-junit"))
+                implementation(project(":libs:couch:viewserver"))
             }
         }
         // jsTest is independent of commonTest in KMP K2 (applyDefaultHierarchyTemplate=false)
         // — needs its own coroutines-test dependency for runTest, delay, launch, etc.
         val jsTest by getting {
             dependencies {
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0-rc01")
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0-rc01")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:${rootProject.providers.gradleProperty("versions.kotlinx-coroutines-core").get()}")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:${rootProject.providers.gradleProperty("versions.kotlinx-coroutines-test").get()}")
             }
         }
         // wasmJsTest is also independent — same coroutines needs as jsTest
         val wasmJsTest by getting {
             dependencies {
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0-rc01")
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0-rc01")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:${rootProject.providers.gradleProperty("versions.kotlinx-coroutines-core").get()}")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:${rootProject.providers.gradleProperty("versions.kotlinx-coroutines-test").get()}")
             }
         }
 

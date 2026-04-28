@@ -41,7 +41,7 @@ kotlin {
             dependencies {
                 implementation(project(":"))
                 implementation(kotlin("test"))
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:${rootProject.providers.gradleProperty("versions.kotlinx-coroutines-core").get()}")
             }
         }
         val jvmTest by getting {

@@ -33,7 +33,7 @@ kotlin {
     jvmToolchain(21)
     jvm()
 
-    js(IR) {
+    js {
         nodejs()
         binaries.executable()
     }
@@ -54,13 +54,13 @@ kotlin {
     sourceSets {
         val commonMain by getting {
             dependencies {
-                api("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
+                api("org.jetbrains.kotlinx:kotlinx-coroutines-core:${rootProject.providers.gradleProperty("versions.kotlinx-coroutines-core").get()}")
             }
         }
         val commonTest by getting {
             dependencies {
                 implementation(kotlin("test"))
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:${rootProject.providers.gradleProperty("versions.kotlinx-coroutines-test").get()}")
             }
         }
         val jvmTest by getting {

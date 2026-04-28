@@ -39,7 +39,7 @@ kotlin {
 
     jvm()
 
-    js(IR) {
+    js {
         nodejs()
     }
 
@@ -64,7 +64,7 @@ kotlin {
     sourceSets {
         val commonMain by getting {
             dependencies {
-                api("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
+                api("org.jetbrains.kotlinx:kotlinx-coroutines-core:${rootProject.providers.gradleProperty("versions.kotlinx-coroutines-core").get()}")
                 api(project(":"))
                 // confix lives in the root TrikeShed source (src/commonMain); openapi
                 // accesses it transitively via the TrikeShed published API. No extra
@@ -74,7 +74,7 @@ kotlin {
         val commonTest by getting {
             dependencies {
                 implementation(kotlin("test"))
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:${rootProject.providers.gradleProperty("versions.kotlinx-coroutines-test").get()}")
             }
         }
         val jvmTest by getting {

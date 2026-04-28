@@ -33,7 +33,7 @@ kotlin {
     jvmToolchain(21)
     jvm()
 
-    js(IR) { nodejs() }
+    js { nodejs() }
 
     @OptIn(ExperimentalWasmDsl::class)
     wasmJs { nodejs() }
