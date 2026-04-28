@@ -104,6 +104,23 @@ class EvolutionTest {
         assertSame(weak, ranked[2])
     }
 
+    @Test
+    fun `evolvePopulation preserves elite and fills next generation from ranked parents`() {
+        val eliteGenome = Genome(mutableMapOf("A" to 1.0, "B" to 2.0, "C" to 3.0, "D" to 4.0))
+        val mateGenome = Genome(mutableMapOf("A" to 10.0, "B" to 20.0, "C" to 30.0, "D" to 40.0))
+        val elite = GenomeEvaluation(eliteGenome, backtestResult(metrics(0.10, 2.0, 3.0, 0.10)), fitness = 5.0)
+        val mate = GenomeEvaluation(mateGenome, backtestResult(metrics(0.02, 0.5, 0.5, 0.20)), fitness = 0.82)
+
+        val next = evolvePopulation(listOf(mate, elite), mutationDeltas = mapOf("A" to 0.5, "C" to -1.0))
+
+        assertEquals(2, next.size)
+        assertSame(eliteGenome, next[0])
+        assertEquals(1.5, next[1]["A"] as Double, 0.000001)
+        assertEquals(2.0, next[1]["B"] as Double, 0.000001)
+        assertEquals(29.0, next[1]["C"] as Double, 0.000001)
+        assertEquals(40.0, next[1]["D"] as Double, 0.000001)
+    }
+
     private fun metrics(
         totalReturn: Double,
         sharpeRatio: Double,
