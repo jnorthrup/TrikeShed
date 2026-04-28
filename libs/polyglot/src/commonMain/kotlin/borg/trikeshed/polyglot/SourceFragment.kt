@@ -2,6 +2,8 @@ package borg.trikeshed.polyglot
 
 import borg.trikeshed.common.TypeEvidence
 import borg.trikeshed.cursor.RowVec
+import borg.trikeshed.cursor.ColumnMeta
+import borg.trikeshed.isam.meta.IOMemento
 import borg.trikeshed.lib.Join
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.Twin
@@ -97,7 +99,32 @@ data class SourceFragment(
     val meta: NodeMeta = NodeMeta(),
 ) {
     /** RowVec projection for the Cursor algebra. */
-    fun toRowVec(): RowVec = TODO("SourceFragment.toRowVec")
+    fun toRowVec(): RowVec {
+        val values = arrayOf<Any?>(
+            lang.label,
+            span.a,
+            span.b,
+            kind.name,
+            name ?: "",
+            TypeEvidence.deduceMemento(evidence).label,
+        )
+        val metas: Series<() -> ColumnMeta> = listOf(
+            ColumnMeta("lang", IOMemento.IoString),
+            ColumnMeta("spanStart", IOMemento.IoInt),
+            ColumnMeta("spanEnd", IOMemento.IoInt),
+            ColumnMeta("kind", IOMemento.IoString),
+            ColumnMeta("name", IOMemento.IoString),
+            ColumnMeta("deducedType", IOMemento.IoString),
+        ).size j { i: Int -> { listOf(
+            ColumnMeta("lang", IOMemento.IoString),
+            ColumnMeta("spanStart", IOMemento.IoInt),
+            ColumnMeta("spanEnd", IOMemento.IoInt),
+            ColumnMeta("kind", IOMemento.IoString),
+            ColumnMeta("name", IOMemento.IoString),
+            ColumnMeta("deducedType", IOMemento.IoString),
+        )[i] } }
+        return values.size j { index: Int -> values[index] } joins metas
+    }
 
     /** Flatten to a depth-first RowVec sequence. */
     fun flatten(): Sequence<RowVec> = sequence {
@@ -121,7 +148,10 @@ data class UniversalAst(
     val root: SourceFragment,
     val diagnostics: List<String> = emptyList(),
 ) {
-    fun toCursor(): borg.trikeshed.cursor.Cursor = TODO("UniversalAst.toCursor")
+    fun toCursor(): borg.trikeshed.cursor.Cursor {
+        val rows = root.flatten().toList()
+        return rows.size j { i: Int -> rows[i] }
+    }
 }
 
 /**
