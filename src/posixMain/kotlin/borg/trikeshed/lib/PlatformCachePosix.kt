@@ -1,31 +1,17 @@
 @file:OptIn(ExperimentalForeignApi::class)
 @file:Suppress("NonAsciiCharacters")
-
 package borg.trikeshed.lib
-
-import kotlinx.cinterop.ExperimentalForeignApi
-import kotlinx.cinterop.allocArray
-import kotlinx.cinterop.memScoped
-import kotlinx.cinterop.toKString
-import platform.posix.fclose
-import platform.posix.fgets
-import platform.posix.fopen
-
-/**
- * Reads L1 data cache size from `/sys/devices/system/cpu/cpu0/cache/index0/size`
- * and cache line size from `.../coherency_line_size`.
- */
+import kotlinx.cinterop.*
+import platform.posix.*
+@OptIn(ExperimentalForeignApi::class)
 actual val platformCacheTopology: CacheTopology by lazy {
-    val l1Bytes = readSysFsCacheFile("index0/size")?.readableUnitsToNumber()?.toLong()
-    val lineBytes = readSysFsCacheFile("index0/coherency_line_size")?.readableUnitsToNumber()?.toInt()
-    if (l1Bytes != null) CacheTopology(l1Bytes, lineBytes) else CacheTopology.UNKNOWN
+    val fromSys = readFromSysFs(); if (fromSys != null) return@lazy fromSys
+    CacheTopology(sysconf(_SC_LEVEL1_DCACHE_SIZE).takeIf { it > 0 }, sysconf(_SC_LEVEL1_ICACHE_SIZE).takeIf { it > 0 }, sysconf(_SC_LEVEL2_CACHE_SIZE).takeIf { it > 0 }, sysconf(_SC_LEVEL3_CACHE_SIZE).takeIf { it > 0 }, null, sysconf(_SC_NPROCESSORS_ONLN).takeIf { it > 0 }?.toInt())
 }
-
-private fun readSysFsCacheFile(suffix: String): String? {
-    val path = "/sys/devices/system/cpu/cpu0/cache/$suffix"
-    val fp = fopen(path, "r") ?: return null
-    val buf = memScoped { allocArray(256) }
-    val result = fgets(buf, 256, fp)
-    fclose(fp)
-    return result?.toKString()?.trim()
+private fun readSysFsCacheFile(suffix: String): String? { val p = "/sys/devices/system/cpu/cpu0/cache/$suffix"; val fp = fopen(p, "r") ?: return null; val b = memScoped { allocArray(256) }; val r = fgets(b, 256, fp); fclose(fp); return r?.toKString()?.trim() }
+private fun readFromSysFs(): CacheTopology? {
+    if (readSysFsCacheFile("index0/type") == null) return null
+    var l1d: Long? = null; var l1i: Long? = null; var l2: Long? = null; var l3: Long? = null; var line: Int? = null
+    for (i in 0..3) { val p = "index$i"; val t = readSysFsCacheFile("$p/type")?.trim() ?: break; val l = readSysFsCacheFile("$p/level")?.trim()?.toIntOrNull() ?: break; val s = readSysFsCacheFile("$p/size")?.trim()?.readableUnitsToNumber()?.toLong(); if (line == null) line = readSysFsCacheFile("$p/coherency_line_size")?.trim()?.toIntOrNull(); when { l == 1 && t == "Data" -> l1d = s; l == 1 && t == "Instruction" -> l1i = s; l == 2 -> l2 = s; l == 3 -> l3 = s } }
+    return CacheTopology(l1d, l1i, l2, l3, line, null)
 }
