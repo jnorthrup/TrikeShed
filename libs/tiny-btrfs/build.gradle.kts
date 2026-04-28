@@ -1,4 +1,5 @@
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
+import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 
 plugins {
     kotlin("multiplatform")
@@ -34,6 +35,17 @@ kotlin {
 
     js(IR) {
         nodejs()
+    }
+
+    @OptIn(ExperimentalWasmDsl::class)
+    wasmJs {
+        nodejs()
+    }
+
+    // macOS native target — only registers on macOS hosts
+    val hostOs = System.getProperty("os.name")
+    if (hostOs == "Mac OS X") {
+        macosArm64()
     }
 
     sourceSets {
