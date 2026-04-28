@@ -163,7 +163,29 @@ kotlin {
     }
 }
 
+subprojects {
+    repositories {
+        maven("https://oss.sonatype.org/content/repositories/snapshots/")
+        mavenCentral()
+        mavenLocal()
+        gradlePluginPortal()
+        google()
+        maven("https://www.jitpack.io")
+    }
+}
+
 afterEvaluate {
+    subprojects {
+        repositories {
+            maven("https://oss.sonatype.org/content/repositories/snapshots/")
+            mavenCentral()
+            mavenLocal()
+            gradlePluginPortal()
+            google()
+            maven("https://www.jitpack.io")
+        }
+    }
+
     if (System.getProperty("os.name") == "Mac OS X") {
         val macosTarget = kotlin.targets.getByName("macos") as KotlinNativeTarget
         macosTarget.binaries.all {
