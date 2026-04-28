@@ -28,6 +28,9 @@ kotlin {
         )
     }
 
+    jvmToolchain(21)
+    jvm()
+
     js(IR) {
         nodejs()
         binaries.executable()

@@ -1,7 +1,7 @@
 package borg.trikeshed.parse.confix
 
 import borg.trikeshed.parse.confix.Path
-import borg.trikeshed.parse.confix.Reify
+import borg.trikeshed.parse.confix.Combinators
 import borg.trikeshed.parse.confix.Syntax
 import borg.trikeshed.parse.confix.asSeries
 import borg.trikeshed.parse.confix.contextOf
@@ -23,7 +23,7 @@ class ConfixYamlTest {
             val ctx = contextOf(Syntax.YAML, yaml.asSeries())
             val res = Path.resolve(ctx, path("list", 1))
             assertNotNull(res)
-            val v = Reify.reify(res)
+            val v = Combinators.reify(res)
             // Expecting decoded newline; current Confix returns raw escape -> RED
             assertEquals("two\nline", v)
         }
@@ -40,7 +40,7 @@ class ConfixYamlTest {
             val ctx = contextOf(Syntax.YAML, yaml.asSeries())
             val res = Path.resolve(ctx, path("map", "nested", 1))
             assertNotNull(res)
-            val v = Reify.reify(res)
+            val v = Combinators.reify(res)
             assertEquals("b", v)
         }
     }

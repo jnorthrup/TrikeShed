@@ -76,51 +76,6 @@ enum class Tag(val code: Int) {
             -5 -> BOOL_TRUE; -6 -> BOOL_FALSE; -7 -> NULL; -8 -> BYTES
             else -> null
         }
-
-        /** Bijection: Char → Tag code for first-character dispatch (128-entry lookup).
-         *  Unmapped chars default to NUMBER (matching the else branch in tagOf). */
-        private val charToCode: ByteArray by lazy {
-            val a = ByteArray(128) { NUMBER.code.toByte() }
-            a[123] = OBJECT.code.toByte()    // '{'
-            a[91]  = ARRAY.code.toByte()     // '['
-            a[34]  = STRING.code.toByte()    // '"'
-            a[39]  = STRING.code.toByte()    // '\''
-            a[116] = BOOL_TRUE.code.toByte() // 't'
-            a[102] = BOOL_FALSE.code.toByte()// 'f'
-            a[110] = NULL.code.toByte()      // 'n'
-            // digits 0-9 already default to NUMBER; '-' likewise
-            a
-        }
-
-        /** Fast tag lookup from first character — avoids 8-way when dispatch. */
-        fun fromChar(ch: Char): Tag {
-            val ci = ch.code
-            if (ci < 128) fromCode(charToCode[ci].toInt())?.let { return it }
-            return NUMBER
-        }
-
-        /** Bijection: Char → skip behavior index for realCommas scanner.
-         *  0=whitespace/punct (just advance), 1=string, 2=bracket, 3=literal, 4=number.
-         *  Used to collapse 5-way character dispatch to a single table lookup. */
-        private val charToSkip: ByteArray by lazy {
-            val a = ByteArray(128) { 0 }  // default: whitespace/punct
-            a[34]  = 1  // '"'
-            a[39]  = 1  // '\''
-            a[123] = 2  // '{'
-            a[91]  = 2  // '['
-            a[116] = 3  // 't'
-            a[102] = 3  // 'f'
-            a[110] = 3  // 'n'
-            a[45]  = 4  // '-'
-            a[43]  = 4  // '+'
-            for (d in 48..57) a[d] = 4  // '0'-'9'
-            a
-        }
-
-        fun skipKind(ch: Char): Int {
-            val ci = ch.code
-            return if (ci < 128) charToSkip[ci].toInt() else 0
-        }
     }
 }
 
@@ -251,7 +206,7 @@ object JsonScan {
 
     /** Parse exactly one JSON value starting at global position [startPos] in [src].
      *  Returns the JsElement with positions already in the global coordinate space
-     *  (no offset adjustment needed). Used by [Reify.reifyChildAt] to avoid full re-scan. */
+     *  (no offset adjustment needed). Used by [Combinators.reifyChildAt] to avoid full re-scan. */
     fun parseOne(src: Series<Char>, startPos: Int): JsElement {
         val cs = CharSeries(src)
         cs.pos(startPos)
@@ -930,7 +885,50 @@ object CsvScan {
  *  arrays become Series<Any?>, objects become Series2<String,Any?>.
  * ═══════════════════════════════════════════════════════════════════════════ */
 
-object Reify {
+object Combinators {
+
+    // ── Bijection tables (std → TrikeShed) ──────────────────────────────────
+
+    /** Bijection: Char → Tag. 128-entry lookup; unmapped chars default to NUMBER. */
+    private val charToTagTable: ByteArray by lazy {
+        val a = ByteArray(128) { Tag.NUMBER.code.toByte() }
+        a[123] = Tag.OBJECT.code.toByte()    // '{'
+        a[91]  = Tag.ARRAY.code.toByte()     // '['
+        a[34]  = Tag.STRING.code.toByte()    // '"'
+        a[39]  = Tag.STRING.code.toByte()    // '''
+        a[116] = Tag.BOOL_TRUE.code.toByte() // 't'
+        a[102] = Tag.BOOL_FALSE.code.toByte()// 'f'
+        a[110] = Tag.NULL.code.toByte()      // 'n'
+        // digits 0-9, '-' default to NUMBER
+        a
+    }
+
+    /** α: Char → Tag. Single lookup, 2 branches max. */
+    fun charToTag(ch: Char): Tag {
+        val ci = ch.code
+        if (ci < 128) Tag.fromCode(charToTagTable[ci].toInt())?.let { return it }
+        return Tag.NUMBER
+    }
+
+    /** Bijection: Char → skip behavior index.
+     *  0=whitespace (advance), 1=string, 2=bracket, 3=literal, 4=number. */
+    private val charToSkipTable: ByteArray by lazy {
+        val a = ByteArray(128) { 0 }
+        a[34]  = 1; a[39]  = 1   // '"'  '''
+        a[123] = 2; a[91]  = 2   // '{'  '['
+        a[116] = 3; a[102] = 3; a[110] = 3  // 't' 'f' 'n'
+        a[45]  = 4; a[43]  = 4   // '-'  '+'
+        for (d in 48..57) a[d] = 4  // '0'-'9'
+        a
+    }
+
+    /** α: Char → skip kind. Single lookup, 2 branches max. */
+    fun skipKind(ch: Char): Int {
+        val ci = ch.code
+        return if (ci < 128) charToSkipTable[ci].toInt() else 0
+    }
+
+    // ── Tag inference ─────────────────────────────────────────────────────
 
     /** Returns the element's tag (inferred from commas[0] if negative, else from src[open]).
      *  Uses Char→Tag bijection lookup for monomorphic dispatch (2-branch max). */
@@ -942,7 +940,7 @@ object Reify {
         }
         val open = e.a.a
         if (open >= src.size) return Tag.NULL
-        return Tag.fromChar(src[open])
+        return Combinators.charToTag(src[open])
     }
 
     /** Direct child positions found by scanning the element's source span.
@@ -953,7 +951,7 @@ object Reify {
         var count = 0
         var p = open + 1
         while (p < close) {
-            val kind = Tag.skipKind(src[p])
+            val kind = Combinators.skipKind(src[p])
             if (kind != 0) { count++; p = skipByKind(kind, src, p, close) }
             else p++
         }
@@ -962,7 +960,7 @@ object Reify {
         return finalCount j { i: Int ->
             var found = 0; var q = open + 1
             while (q < close) {
-                val kind = Tag.skipKind(src[q])
+                val kind = Combinators.skipKind(src[q])
                 if (kind != 0) {
                     if (found == i) return@j q
                     found++
@@ -1262,11 +1260,11 @@ object Path {
     }
 
    fun stepByIndex(e: JsElement, src: Series<Char>, idx: Int): JsContext? {
-        val tag = Reify.tagOf(e, src)
+        val tag = Combinators.tagOf(e, src)
         if (tag != Tag.ARRAY) {
             return null
         }
-        val cs = Reify.realCommas(e, src)
+        val cs = Combinators.realCommas(e, src)
         // diagnostic: print comma list
         val csStr = if (cs.size == 0) "[]" else run {
             val sb = StringBuilder(); sb.append('['); var k = 0
@@ -1290,8 +1288,8 @@ object Path {
     }
 
    fun stepByName(e: JsElement, src: Series<Char>, name: String): JsContext? {
-        if (Reify.tagOf(e, src) != Tag.OBJECT) return null
-        val cs = Reify.realCommas(e, src)
+        if (Combinators.tagOf(e, src) != Tag.OBJECT) return null
+        val cs = Combinators.realCommas(e, src)
         // diagnostic logging: print comma list and name we're searching for
         try {
             val csStr = if (cs.size == 0) "[]" else {
@@ -1317,7 +1315,7 @@ object Path {
             // both share the same open position (common in YAML block keys where
             // the key starts the same line as the parent container). For key
             // lookup we always want the STRING element, not the container.
-            val keyTag = Reify.tagOf(keyElem, src)
+            val keyTag = Combinators.tagOf(keyElem, src)
             if (keyTag == Tag.OBJECT || keyTag == Tag.ARRAY) {
                 try {
                     val all = YamlScan.scan(src)
@@ -1325,7 +1323,7 @@ object Path {
                     var found: JsElement? = null
                     while (k < all.size) {
                         val cand = all[k]
-                        if (cand.a.a == keyOpen && Reify.tagOf(cand, src) == Tag.STRING) {
+                        if (cand.a.a == keyOpen && Combinators.tagOf(cand, src) == Tag.STRING) {
                             found = cand
                             break
                         }
@@ -1334,7 +1332,7 @@ object Path {
                     if (found != null) keyElem = found
                 } catch (_: Throwable) { /* keep original keyElem */ }
             }
-            val keyText = stripQuotes(Reify.textOf(keyElem, src))
+            val keyText = stripQuotes(Combinators.textOf(keyElem, src))
             if (keyText == name) {
                 // value follows key + ':'
                 var p = keyElem.a.b + 1
@@ -1371,7 +1369,7 @@ object Path {
                 if (cand.a.a == start) {
                     val len = cand.a.b - cand.a.a
                     if (len < bestLen) { best = cand; bestLen = len }
-                    if (Reify.tagOf(cand, src) == Tag.STRING) return cand
+                    if (Combinators.tagOf(cand, src) == Tag.STRING) return cand
                 }
                 k++
             }
@@ -1408,7 +1406,7 @@ object Path {
             while (k < all.size) {
                 val cand = all[k]
                 val len = cand.a.b - cand.a.a
-                val tag = Reify.tagOf(cand, src)
+                val tag = Combinators.tagOf(cand, src)
                 if (cand.a.a == start) {
                     // prefer container exact matches (OBJECT/ARRAY) over scalars
                     if (tag == Tag.OBJECT || tag == Tag.ARRAY) {

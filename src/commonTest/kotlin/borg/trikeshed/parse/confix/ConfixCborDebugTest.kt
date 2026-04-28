@@ -3,7 +3,7 @@ package borg.trikeshed.parse.confix
 import borg.trikeshed.lib.*
 import borg.trikeshed.lib.get
 import borg.trikeshed.parse.confix.Path
-import borg.trikeshed.parse.confix.Reify
+import borg.trikeshed.parse.confix.Combinators
 import borg.trikeshed.parse.confix.cborSource
 import borg.trikeshed.parse.confix.path
 import borg.trikeshed.parse.confix.tokenize
@@ -36,7 +36,7 @@ class ConfixCborDebugTest {
         println("resolved: $resolved")
         if (resolved != null) {
             println("resolved open=${resolved.a.a} close=${resolved.a.b}")
-            val v = Reify.reify(resolved, src.syntax)
+            val v = Combinators.reify(resolved, src.syntax)
             println("reified value = $v")
         }
     }

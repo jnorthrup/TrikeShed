@@ -25,8 +25,8 @@ typealias JsPath = borg.trikeshed.parse.confix.JsPath
 object JsonParser {
     fun reify(src: Series<Char>): Any? {
         val ctx = contextOf(Syntax.JSON, src)
-        val tag = Reify.tagOf(ctx.a, ctx.b)
-        return materialize(Reify.reify(ctx, Syntax.JSON), tag)
+        val tag = Combinators.tagOf(ctx.a, ctx.b)
+        return materialize(Combinators.reify(ctx, Syntax.JSON), tag)
     }
 
     /** Scan JSON and return the top-level JsElement (index 0). */
@@ -39,8 +39,8 @@ object JsonParser {
     /** Reify with optional TypeEvidence collector and RowVec callback. */
     fun reify(src: Series<Char>, evidence: MutableList<TypeEvidence>?, callback: ((RowVec) -> Unit)?): Any? {
         val ctx = contextOf(Syntax.JSON, src)
-        val result = Reify.reify(ctx, Syntax.JSON)
-        val tag = Reify.tagOf(ctx.a, ctx.b)
+        val result = Combinators.reify(ctx, Syntax.JSON)
+        val tag = Combinators.tagOf(ctx.a, ctx.b)
         // ignore evidence/callback for now — real impl would collect during walk
         return materialize(result, tag)
     }
@@ -49,8 +49,8 @@ object JsonParser {
     fun jsPath(ctx: JsContext, path: JsPath, flat: Boolean = false, data: List<Int>? = null): Any? {
         val resolved = Path.resolve(ctx, path)
         return if (resolved != null) {
-            val reified = Reify.reify(resolved, Syntax.JSON)
-            materialize(reified, Reify.tagOf(resolved.a, resolved.b))
+            val reified = Combinators.reify(resolved, Syntax.JSON)
+            materialize(reified, Combinators.tagOf(resolved.a, resolved.b))
         } else {
             null
         }
@@ -59,7 +59,7 @@ object JsonParser {
     fun parse(text: String): Map<String, Any?> {
         val ctx = contextOf(Syntax.JSON, text.asSeries())
         @Suppress("UNCHECKED_CAST")
-        return materialize(Reify.reify(ctx, Syntax.JSON), Reify.tagOf(ctx.a, ctx.b)) as? Map<String, Any?> ?: emptyMap()
+        return materialize(Combinators.reify(ctx, Syntax.JSON), Combinators.tagOf(ctx.a, ctx.b)) as? Map<String, Any?> ?: emptyMap()
     }
 }
 
@@ -77,18 +77,20 @@ object JsonParser {
  *   if it's an (Int)→Join<A,B>  → Series2 (map)
  *   if it's an (Int)→A          → Series  (list)
  */
-@Suppress("UNCHECKED_CAST")fun materialize(node: Any?, tag: Tag? = null): Any? {
+@Suppress("UNCHECKED_CAST")
+fun materialize(node: Any?, tag: Tag? = null): Any? {
     if (node == null) return null
 
     // node = Join<Int, F> where F is either (Int)->Join<A,B> (map) or (Int)->A (list)
-    // Access .second which is the function
-    val second = (node as? Join<Int, *>)?.second ?: return node
-    val size = (node as? Join<Int, *>)?.first ?: return node
+    val join = node as? Join<Int, *> ?: return node
+    val second = join.second ?: return node
+    val size = join.first
 
     return when (second) {
         is Function1<*, *> -> {
             if (size == 0) return when (tag) {
                 Tag.ARRAY -> ArrayList<Any?>(0)
+                Tag.OBJECT -> LinkedHashMap<String, Any?>(0)
                 else -> LinkedHashMap<String, Any?>(0)
             }
             val fn = second as (Int) -> Any?
@@ -124,5 +126,5 @@ fun queryPath(ctx: JsContext, path: JsPath): JsContext? = Path.resolve(ctx, path
 fun parse(text: String): Map<String, Any?> {
     val ctx = contextOf(Syntax.JSON, text.asSeries())
     @Suppress("UNCHECKED_CAST")
-    return materialize(Reify.reify(ctx, Syntax.JSON)) as? Map<String, Any?> ?: emptyMap()
+    return materialize(Combinators.reify(ctx, Syntax.JSON)) as? Map<String, Any?> ?: emptyMap()
 }

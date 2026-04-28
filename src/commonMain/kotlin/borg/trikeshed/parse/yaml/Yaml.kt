@@ -134,7 +134,7 @@ object YamlParser {
     private fun buildYamlNode(elems: Series<JsElement>, src: Series<Char>, elemIdx: Int): YamlNode {
         if (elemIdx >= elems.size) return YamlScalarNode(null, 0 j 0)
         val elem = elems[elemIdx]
-        val tag = Reify.tagOf(elem, src)
+        val tag = Combinators.tagOf(elem, src)
         val (open, close) = elem.a
         val commas = elem.b
         return when (tag) {
@@ -153,7 +153,7 @@ object YamlParser {
             }
             else -> {
                 // scalar
-                val text = Reify.textOf(elem, src)
+                val text = Combinators.textOf(elem, src)
                 YamlScalarNode(text.asSeries(), open j close)
             }
         }
@@ -161,7 +161,7 @@ object YamlParser {
 
     private fun extractChildIndices(parentIdx: Int, elems: Series<JsElement>, src: Series<Char>): Series<Int> {
         val parent = elems[parentIdx]
-        val commas = Reify.realCommas(parent, src)  // open positions of child keys (negatives filtered)
+        val commas = Combinators.realCommas(parent, src)  // open positions of child keys (negatives filtered)
         val n = commas.size
         return n j { i: Int ->
             val openPos = commas[i]
@@ -190,7 +190,7 @@ object YamlParser {
             val keyElem = elems[keyIdx]
             val valElem = elems[valIdx]
             val keySpan = keyElem.a
-            val keyText = Reify.textOf(keyElem, src)
+            val keyText = Combinators.textOf(keyElem, src)
             val valNode = buildYamlNode(elems, src, valIdx)
             list.add(YamlMappingEntry(keyText.asSeries(), valNode, keySpan.a j valElem.a.b))
             i++

@@ -1,5 +1,7 @@
 package borg.trikeshed.userspace.btrfs
 
+import borg.trikeshed.lib.Join
+import borg.trikeshed.lib.j
 import borg.trikeshed.tinybtrfs.BPlusTree
 import borg.trikeshed.tinybtrfs.DiskAdapter
 import kotlinx.coroutines.sync.Mutex
@@ -7,71 +9,74 @@ import kotlinx.coroutines.sync.withLock
 
 /**
  * BtrfsTreeRebuilder: rebuilds a sorted B+Tree from an unordered sequence of
- * (BtrfsKey, ByteArray) pairs stored via a DiskAdapter.
+ * (BtrfsKey, ByteArray) pairs stored via a [DiskAdapter].
  *
- * Wraps a BPlusTree and provides:
- * - Sorted invariant enforcement on insert
- * - Persistence of root node via DiskAdapter
- * - Range queries
+ * Algebraic signature:
+ * - insert: (BtrfsKey, ByteArray) → Boolean   [sorted order enforced]
+ * - find:   BtrfsKey → ByteArray?
+ * - range:  (BtrfsKey, BtrfsKey) → Sequence<Join<BtrfsKey, ByteArray>>
+ *
+ * The [BtrfsItem] smart constructor accepts a Join<BtrfsKey, ByteArray> spec
+ * via the universal `a j b` binary constructor.
  */
 class BtrfsTreeRebuilder(
-    private val diskAdapter: DiskAdapter
+    private val diskAdapter: DiskAdapter,
 ) {
     private val mutex = Mutex()
     private var rootNodeId: String? = null
     private val tree = BPlusTree<BtrfsKey, ByteArray>(order = 32)
 
-    /** Insert a key/value pair. Throws if keys are not in sorted order. */
-    suspend fun insert(key: BtrfsKey, value: ByteArray): Boolean {
-        mutex.withLock {
-            if (rootNodeId == null) {
-                rootNodeId = diskAdapter.allocateNode()
-            }
-            // Sorted invariant: new key must be >= last key
-            val allKeys = tree.root.keys
-            val lastKey = if (allKeys.isNotEmpty()) allKeys[allKeys.size - 1] else null
-            require(lastKey == null || key >= lastKey) {
-                "Items must be inserted in sorted order: lastKey=$lastKey, key=$key"
-            }
-            tree.put(key, value)
-            persistRoot()
-            return true
+    /**
+     * Insert (key, value) in sorted order.
+     * @throws IllegalStateException if key < last inserted key (unsorted insertion)
+     */
+    suspend fun insert(key: BtrfsKey, value: ByteArray): Boolean = mutex.withLock {
+        if (rootNodeId == null) {
+            rootNodeId = diskAdapter.allocateNode()
         }
+        val lastKey = tree.root.keys.lastOrNull()
+        require(lastKey == null || key >= lastKey) {
+            "BtrfsTreeRebuilder requires sorted insertion: lastKey=$lastKey, attempted key=$key"
+        }
+        tree.put(key, value)
+        persistRoot()
+        true
     }
 
-    /** Find a value by key. Returns null if not found. */
-    suspend fun find(key: BtrfsKey): ByteArray? {
-        mutex.withLock {
-            return tree.get(key)
-        }
+    /** Exact lookup. Returns null if key not present. */
+    suspend fun find(key: BtrfsKey): ByteArray? = mutex.withLock {
+        tree.get(key)
     }
 
-    /** Range query: all (key, value) where start <= key < end. */
-    suspend fun range(start: BtrfsKey, end: BtrfsKey): Sequence<Pair<BtrfsKey, ByteArray>> {
-        return sequence {
-            val allKeys = tree.root.keys
-            for (i in allKeys.indices) {
-                val k = allKeys[i]
-                if (k >= start && k < end) {
-                    val v = tree.get(k)
-                    if (v != null) yield(Pair(k, v))
-                }
+    /**
+     * Range query [start, end) — returns a Sequence of Join pairs.
+     * Use `for ((k j v) in rebuilder.range(...))` to destructure.
+     */
+    suspend fun range(
+        start: BtrfsKey,
+        end: BtrfsKey,
+    ): Sequence<Join<BtrfsKey, ByteArray>> = sequence {
+        val keys = tree.root.keys
+        for (i in keys.indices) {
+            val k = keys[i]
+            if (k >= start && k < end) {
+                val v = tree.get(k)
+                if (v != null) yield(k j v)
             }
         }
     }
 
     private suspend fun persistRoot() {
-        val rootId = rootNodeId ?: return
-        val allKeys = tree.root.keys
-        val items = mutableListOf<BtrfsItem>()
-        for (i in allKeys.indices) {
-            val k = allKeys[i]
-            val v = tree.get(k)
-            items.add(BtrfsItem(k, 0u, v?.size?.toUInt() ?: 0u, v ?: ByteArray(0)))
+        val id = rootNodeId ?: return
+        val keys = tree.root.keys
+        // Build leaf items: BtrfsItem(key j data) uses smart constructor = Join<BtrfsKey, ByteArray>
+        val items = keys.map { k ->
+            val data = tree.get(k) ?: ByteArray(0)
+            BtrfsItem(k j data)
         }
-        val leafNode = BtrfsLeaf(items)
-        val buf = ByteArray(4096)
-        encodeLeaf(leafNode, buf)
-        diskAdapter.writeNode(rootId, buf)
+        val leaf = BtrfsLeaf(items)
+        val buf = ByteArray(BTRFS_NODE_SIZE)
+        encodeLeaf(leaf, buf)
+        diskAdapter.writeNode(id, buf)
     }
 }

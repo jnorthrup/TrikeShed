@@ -22,7 +22,7 @@ class ConfixYamlDebugStringTest {
         var j = 0
         while (j < elems.size) {
             val e = elems[j]
-            println("elem[$j] open=${e.a.a} close=${e.a.b} tag=${Reify.tagOf(e, src)}")
+            println("elem[$j] open=${e.a.a} close=${e.a.b} tag=${Combinators.tagOf(e, src)}")
             val cs = e.b
             var k = 0
             while (k < cs.size) { println("  raw[$k]=${cs[k]}"); k++ }
@@ -33,8 +33,8 @@ class ConfixYamlDebugStringTest {
         val res = Path.resolve(ctx, path("list", 1))
         println("resolve -> $res")
         if (res != null) {
-            println("resolved span open=${res.a.a} close=${res.a.b} tag=${Reify.tagOf(res.a, res.b)}")
-            val v = Reify.reify(res)
+            println("resolved span open=${res.a.a} close=${res.a.b} tag=${Combinators.tagOf(res.a, res.b)}")
+            val v = Combinators.reify(res)
             println("reified -> $v")
             assertEquals("two\nline", v)
         }

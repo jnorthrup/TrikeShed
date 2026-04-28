@@ -86,7 +86,7 @@ class ConfixCsvTest {
         // Element 1 = first kline
         assertEquals(1700000000000L, CsvScan.fieldLong(elems[1], src, 0))
         // Element 2 = blank line — tag should be NULL
-        assertEquals(Tag.NULL, Reify.tagOf(elems[2], src))
+        assertEquals(Tag.NULL, Combinators.tagOf(elems[2], src))
         // Element 3 = second kline
         assertEquals(1700000060000L, CsvScan.fieldLong(elems[3], src, 0))
     }

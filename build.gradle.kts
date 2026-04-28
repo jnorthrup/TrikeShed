@@ -104,6 +104,7 @@ kotlin {
             dependencies {
                 implementation(kotlin("test"))
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
+                implementation(project(":libs:miniduck"))
             }
         }
         val nativeMain by creating { dependsOn(commonMain) }

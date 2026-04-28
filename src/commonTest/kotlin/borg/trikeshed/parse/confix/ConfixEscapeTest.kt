@@ -1,7 +1,7 @@
 package borg.trikeshed.parse.confix
 
 import borg.trikeshed.parse.confix.Path
-import borg.trikeshed.parse.confix.Reify
+import borg.trikeshed.parse.confix.Combinators
 import borg.trikeshed.parse.confix.Syntax
 import borg.trikeshed.parse.confix.asSeries
 import borg.trikeshed.parse.confix.contextOf
@@ -27,56 +27,56 @@ class ConfixEscapeTest {
     @Test
     fun jsonNewline() {
         val ctx = contextOf(Syntax.JSON, """{"v":"a\nb"}""".asSeries())
-        val v = Reify.reify(Path.resolve(ctx, path("v"))!!)
+        val v = Combinators.reify(Path.resolve(ctx, path("v"))!!)
         assertEquals("a\nb", v)
     }
 
     @Test
     fun jsonTab() {
         val ctx = contextOf(Syntax.JSON, """{"v":"a\tb"}""".asSeries())
-        val v = Reify.reify(Path.resolve(ctx, path("v"))!!)
+        val v = Combinators.reify(Path.resolve(ctx, path("v"))!!)
         assertEquals("a\tb", v)
     }
 
     @Test
     fun jsonCarriageReturn() {
         val ctx = contextOf(Syntax.JSON, """{"v":"a\rb"}""".asSeries())
-        val v = Reify.reify(Path.resolve(ctx, path("v"))!!)
+        val v = Combinators.reify(Path.resolve(ctx, path("v"))!!)
         assertEquals("a\rb", v)
     }
 
     @Test
     fun jsonBackslash() {
         val ctx = contextOf(Syntax.JSON, """{"v":"a\\b"}""".asSeries())
-        val v = Reify.reify(Path.resolve(ctx, path("v"))!!)
+        val v = Combinators.reify(Path.resolve(ctx, path("v"))!!)
         assertEquals("a\\b", v)
     }
 
     @Test
     fun jsonEscapedQuote() {
         val ctx = contextOf(Syntax.JSON, """{"v":"a\"b"}""".asSeries())
-        val v = Reify.reify(Path.resolve(ctx, path("v"))!!)
+        val v = Combinators.reify(Path.resolve(ctx, path("v"))!!)
         assertEquals("a\"b", v)
     }
 
     @Test
     fun jsonEscapedSlash() {
         val ctx = contextOf(Syntax.JSON, """{"v":"a\/b"}""".asSeries())
-        val v = Reify.reify(Path.resolve(ctx, path("v"))!!)
+        val v = Combinators.reify(Path.resolve(ctx, path("v"))!!)
         assertEquals("a/b", v)
     }
 
     @Test
     fun jsonBackspace() {
         val ctx = contextOf(Syntax.JSON, """{"v":"a\bb"}""".asSeries())
-        val v = Reify.reify(Path.resolve(ctx, path("v"))!!)
+        val v = Combinators.reify(Path.resolve(ctx, path("v"))!!)
         assertEquals("a\u0008b", v)
     }
 
     @Test
     fun jsonFormFeed() {
         val ctx = contextOf(Syntax.JSON, """{"v":"a\fb"}""".asSeries())
-        val v = Reify.reify(Path.resolve(ctx, path("v"))!!)
+        val v = Combinators.reify(Path.resolve(ctx, path("v"))!!)
         assertEquals("a\u000Cb", v)
     }
 
@@ -85,28 +85,28 @@ class ConfixEscapeTest {
     @Test
     fun jsonUnicodeAscii() {
         val ctx = contextOf(Syntax.JSON, """{"v":"\u0041"}""".asSeries())
-        val v = Reify.reify(Path.resolve(ctx, path("v"))!!)
+        val v = Combinators.reify(Path.resolve(ctx, path("v"))!!)
         assertEquals("A", v)
     }
 
     @Test
     fun jsonUnicodeLowercase() {
         val ctx = contextOf(Syntax.JSON, """{"v":"\u0061"}""".asSeries())
-        val v = Reify.reify(Path.resolve(ctx, path("v"))!!)
+        val v = Combinators.reify(Path.resolve(ctx, path("v"))!!)
         assertEquals("a", v)
     }
 
     @Test
     fun jsonUnicodeDigit() {
         val ctx = contextOf(Syntax.JSON, """{"v":"\u0031"}""".asSeries())
-        val v = Reify.reify(Path.resolve(ctx, path("v"))!!)
+        val v = Combinators.reify(Path.resolve(ctx, path("v"))!!)
         assertEquals("1", v)
     }
 
     @Test
     fun jsonUnicodeSpace() {
         val ctx = contextOf(Syntax.JSON, """{"v":"\u0020"}""".asSeries())
-        val v = Reify.reify(Path.resolve(ctx, path("v"))!!)
+        val v = Combinators.reify(Path.resolve(ctx, path("v"))!!)
         assertEquals(" ", v)
     }
 
@@ -114,14 +114,14 @@ class ConfixEscapeTest {
     fun jsonUnicodeHighBmp() {
         // ⍰ = U+2370 APL FUNCTIONAL SYMBOL QUAD QUESTION
         val ctx = contextOf(Syntax.JSON, """{"v":"\u2370"}""".asSeries())
-        val v = Reify.reify(Path.resolve(ctx, path("v"))!!)
+        val v = Combinators.reify(Path.resolve(ctx, path("v"))!!)
         assertEquals("\u2370", v)
     }
 
     @Test
     fun jsonUnicodeNull() {
         val ctx = contextOf(Syntax.JSON, """{"v":"\u0000"}""".asSeries())
-        val v = Reify.reify(Path.resolve(ctx, path("v"))!!)
+        val v = Combinators.reify(Path.resolve(ctx, path("v"))!!)
         assertEquals("\u0000", v)
     }
 
@@ -129,7 +129,7 @@ class ConfixEscapeTest {
     fun jsonUnicodeEmoji() {
         // 😀 = U+1F600 (surrogate pair in JSON: \uD83D\uDE00)
         val ctx = contextOf(Syntax.JSON, """{"v":"\uD83D\uDE00"}""".asSeries())
-        val v = Reify.reify(Path.resolve(ctx, path("v"))!!)
+        val v = Combinators.reify(Path.resolve(ctx, path("v"))!!)
         assertEquals("\uD83D\uDE00", v)
     }
 
@@ -137,7 +137,7 @@ class ConfixEscapeTest {
     fun jsonUnicodeMixHexDigits() {
         // U+ABCD
         val ctx = contextOf(Syntax.JSON, """{"v":"\uABCD"}""".asSeries())
-        val v = Reify.reify(Path.resolve(ctx, path("v"))!!)
+        val v = Combinators.reify(Path.resolve(ctx, path("v"))!!)
         assertEquals("\uABCD", v)
     }
 
@@ -146,21 +146,21 @@ class ConfixEscapeTest {
     @Test
     fun jsonMultipleEscapes() {
         val ctx = contextOf(Syntax.JSON, """{"v":"a\nb\tc\\d\"e"}""".asSeries())
-        val v = Reify.reify(Path.resolve(ctx, path("v"))!!)
+        val v = Combinators.reify(Path.resolve(ctx, path("v"))!!)
         assertEquals("a\nb\tc\\d\"e", v)
     }
 
     @Test
     fun jsonEscapeOnly() {
         val ctx = contextOf(Syntax.JSON, """{"v":"\n"}""".asSeries())
-        val v = Reify.reify(Path.resolve(ctx, path("v"))!!)
+        val v = Combinators.reify(Path.resolve(ctx, path("v"))!!)
         assertEquals("\n", v)
     }
 
     @Test
     fun jsonUnicodeOnly() {
         val ctx = contextOf(Syntax.JSON, """{"v":"\u0041"}""".asSeries())
-        val v = Reify.reify(Path.resolve(ctx, path("v"))!!)
+        val v = Combinators.reify(Path.resolve(ctx, path("v"))!!)
         assertEquals("A", v)
     }
 
@@ -170,7 +170,7 @@ class ConfixEscapeTest {
     fun yamlDoubleQuotedNewline() {
         val yaml = "v: \"a\\nb\"\n"
         val ctx = contextOf(Syntax.YAML, yaml.asSeries())
-        val v = Reify.reify(Path.resolve(ctx, path("v"))!!)
+        val v = Combinators.reify(Path.resolve(ctx, path("v"))!!)
         assertEquals("a\nb", v)
     }
 
@@ -178,7 +178,7 @@ class ConfixEscapeTest {
     fun yamlDoubleQuotedTab() {
         val yaml = "v: \"a\\tb\"\n"
         val ctx = contextOf(Syntax.YAML, yaml.asSeries())
-        val v = Reify.reify(Path.resolve(ctx, path("v"))!!)
+        val v = Combinators.reify(Path.resolve(ctx, path("v"))!!)
         assertEquals("a\tb", v)
     }
 
@@ -186,7 +186,7 @@ class ConfixEscapeTest {
     fun yamlDoubleQuotedBackslash() {
         val yaml = "v: \"a\\\\b\"\n"
         val ctx = contextOf(Syntax.YAML, yaml.asSeries())
-        val v = Reify.reify(Path.resolve(ctx, path("v"))!!)
+        val v = Combinators.reify(Path.resolve(ctx, path("v"))!!)
         assertEquals("a\\b", v)
     }
 
@@ -194,7 +194,7 @@ class ConfixEscapeTest {
     fun yamlDoubleQuotedUnicode() {
         val yaml = "v: \"\\u0041\"\n"
         val ctx = contextOf(Syntax.YAML, yaml.asSeries())
-        val v = Reify.reify(Path.resolve(ctx, path("v"))!!)
+        val v = Combinators.reify(Path.resolve(ctx, path("v"))!!)
         assertEquals("A", v)
     }
 
@@ -204,7 +204,7 @@ class ConfixEscapeTest {
     fun yamlSingleQuotedPlain() {
         val yaml = "v: 'hello'\n"
         val ctx = contextOf(Syntax.YAML, yaml.asSeries())
-        val v = Reify.reify(Path.resolve(ctx, path("v"))!!)
+        val v = Combinators.reify(Path.resolve(ctx, path("v"))!!)
         assertEquals("hello", v)
     }
 
@@ -213,7 +213,7 @@ class ConfixEscapeTest {
         // YAML single-quoted: '' → literal single quote
         val yaml = "v: 'it''s'\n"
         val ctx = contextOf(Syntax.YAML, yaml.asSeries())
-        val v = Reify.reify(Path.resolve(ctx, path("v"))!!)
+        val v = Combinators.reify(Path.resolve(ctx, path("v"))!!)
         assertEquals("it's", v)
     }
 
@@ -222,7 +222,7 @@ class ConfixEscapeTest {
         // Single-quoted YAML does NOT interpret backslash escapes
         val yaml = "v: 'a\\nb'\n"
         val ctx = contextOf(Syntax.YAML, yaml.asSeries())
-        val v = Reify.reify(Path.resolve(ctx, path("v"))!!)
+        val v = Combinators.reify(Path.resolve(ctx, path("v"))!!)
         assertEquals("a\\nb", v)
     }
 
@@ -231,7 +231,7 @@ class ConfixEscapeTest {
     @Test
     fun jsonEmptyString() {
         val ctx = contextOf(Syntax.JSON, """{"v":""}""".asSeries())
-        val v = Reify.reify(Path.resolve(ctx, path("v"))!!)
+        val v = Combinators.reify(Path.resolve(ctx, path("v"))!!)
         assertEquals("", v)
     }
 
@@ -255,7 +255,7 @@ class ConfixEscapeTest {
     @Test
     fun jsonAllEscapesConsecutive() {
         val ctx = contextOf(Syntax.JSON, """{"v":"\n\t\r\\\"\/\b\f\u0041"}""".asSeries())
-        val v = Reify.reify(Path.resolve(ctx, path("v"))!!)
+        val v = Combinators.reify(Path.resolve(ctx, path("v"))!!)
         assertEquals("\n\t\r\\\"\u002F\u0008\u000CA", v)
     }
 
@@ -263,7 +263,7 @@ class ConfixEscapeTest {
     fun jsonUnicodeShort() {
         // \u with fewer than 4 hex digits — should decode what's available
         val ctx = contextOf(Syntax.JSON, """{"v":"\u41"}""".asSeries())
-        val v = Reify.reify(Path.resolve(ctx, path("v"))!!)
+        val v = Combinators.reify(Path.resolve(ctx, path("v"))!!)
         // \u41: only 2 hex digits, decodes to 0x41 = 'A'
         assertEquals("A", v)
     }
@@ -273,7 +273,7 @@ class ConfixEscapeTest {
         // \u followed by non-hex chars — digitToIntOrNull returns null → break,
         // code=0 (null char emitted), then remaining chars (GHIJ) appended as plain text.
         val ctx = contextOf(Syntax.JSON, """{"v":"\uGHIJ"}""".asSeries())
-        val v = Reify.reify(Path.resolve(ctx, path("v"))!!)
+        val v = Combinators.reify(Path.resolve(ctx, path("v"))!!)
         assertEquals("\u0000GHIJ", v)
     }
 }
