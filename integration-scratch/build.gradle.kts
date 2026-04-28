@@ -16,6 +16,7 @@ dependencies {
     implementation(project(":libs:couch"))
     implementation(project(":libs:miniduck"))
     implementation(project(":libs:kursive"))
+    implementation(project(":"))
     implementation(kotlin("stdlib"))
     testImplementation(kotlin("test"))
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")

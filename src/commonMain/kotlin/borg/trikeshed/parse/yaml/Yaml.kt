@@ -15,7 +15,7 @@ val YamlSpan.startLine: Int get() = this.a
 val YamlSpan.endLine: Int get() = this.b
 
 /** Parse a YAML scalar string value into a primitive */
-fun parseScalar(raw: Series<Char>?): Any? {
+private fun parseScalar(raw: Series<Char>?): Any? {
     val value = raw?.trim() ?: return null
     if (value.isEmpty() || value.matches("~") || value.matches("null")) return null
     if (value.matches("true")) return true
@@ -29,7 +29,7 @@ fun parseScalar(raw: Series<Char>?): Any? {
     return value.asString()
 }
 
-fun Series<Char>.isQuoted(q: Char): Boolean =
+private fun Series<Char>.isQuoted(q: Char): Boolean =
     size >= 2 && this[0] == q && this[size - 1] == q
 
 /** AST node types used by DescriptorFragments.describeYamlNode */
@@ -131,7 +131,7 @@ object YamlParser {
      *  elems[i].a = (open j close) for that element's span.
      *  commas track child membership.
      */
-    fun buildYamlNode(elems: Series<JsElement>, src: Series<Char>, elemIdx: Int): YamlNode {
+    private fun buildYamlNode(elems: Series<JsElement>, src: Series<Char>, elemIdx: Int): YamlNode {
         if (elemIdx >= elems.size) return YamlScalarNode(null, 0 j 0)
         val elem = elems[elemIdx]
         val tag = Reify.tagOf(elem, src)
@@ -159,7 +159,7 @@ object YamlParser {
         }
     }
 
-    fun extractChildIndices(parentIdx: Int, elems: Series<JsElement>, src: Series<Char>): Series<Int> {
+    private fun extractChildIndices(parentIdx: Int, elems: Series<JsElement>, src: Series<Char>): Series<Int> {
         val parent = elems[parentIdx]
         val commas = Reify.realCommas(parent, src)  // open positions of child keys (negatives filtered)
         val n = commas.size
@@ -175,7 +175,7 @@ object YamlParser {
         }
     }
 
-    fun buildMappingEntries(
+    private fun buildMappingEntries(
         childIndices: Series<Int>,
         elems: Series<JsElement>,
         src: Series<Char>,

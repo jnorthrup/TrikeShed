@@ -2,7 +2,7 @@ import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 
 plugins {
-    kotlin("multiplatform") version "2.4.0-Beta1"
+    kotlin("multiplatform")
     `maven-publish`
 }
 
@@ -55,7 +55,6 @@ kotlin {
             dependencies {
                 api(project(":"))
                 api(project(":libs:miniduck"))
-                api(project(":libs:common"))
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0-rc01")
                 implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1-0.6.x-compat")
             }

@@ -1,11 +1,8 @@
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import java.io.File
 
-fun org.gradle.api.Project.projectOrModule(projectPath: String, moduleCoordinate: String): Any =
-    findProject(projectPath)?.let { project(projectPath) } ?: moduleCoordinate
-
 plugins {
-    kotlin("multiplatform") version "2.4.0-Beta1"
+    kotlin("multiplatform")
 }
 
 group = "borg.trikeshed"
@@ -36,10 +33,10 @@ kotlin {
         val commonMain by getting {
             dependencies {
                 api("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
-                api(projectOrModule(":libs:common", "borg.trikeshed:common"))
-                api(projectOrModule(":libs:quic", "borg.trikeshed:quic"))
-                api(projectOrModule(":libs:ngsctp", "borg.trikeshed:ngsctp"))
-                api(projectOrModule(":libs:htx-client", "borg.trikeshed:htx-client"))
+                api(project(":"))
+                api(project(":libs:quic"))
+                api(project(":libs:ngsctp"))
+                api(project(":libs:htx-client"))
             }
         }
         val commonTest by getting {

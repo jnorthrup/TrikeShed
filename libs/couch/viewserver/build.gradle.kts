@@ -1,7 +1,7 @@
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 
 plugins {
-    kotlin("multiplatform") version "2.4.0-Beta1"
+    kotlin("multiplatform")
     `maven-publish`
 }
 
@@ -36,7 +36,7 @@ kotlin {
     sourceSets {
         val commonMain by getting {
             dependencies {
-                implementation(project(":libs:common"))
+                implementation(project(":"))
                 implementation(project(":libs:couch"))
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
             }

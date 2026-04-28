@@ -1,11 +1,8 @@
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import java.io.File
 
-fun org.gradle.api.Project.projectOrModule(projectPath: String, moduleCoordinate: String): Any =
-    findProject(projectPath)?.let { project(projectPath) } ?: moduleCoordinate
-
 plugins {
-    kotlin("multiplatform") version "2.4.0-Beta1"
+    kotlin("multiplatform")
 }
 
 group = "borg.trikeshed"
@@ -340,7 +337,7 @@ kotlin {
         val commonMain by getting {
             kotlin.srcDir(generatedSourceRoot)
             dependencies {
-                api(projectOrModule(":libs:common", "borg.trikeshed:common"))
+                api(project(":"))
             }
         }
         val commonTest by getting {

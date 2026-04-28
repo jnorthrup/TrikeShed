@@ -1,10 +1,7 @@
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 
-fun org.gradle.api.Project.projectOrModule(projectPath: String, moduleCoordinate: String): Any =
-    findProject(projectPath)?.let { project(projectPath) } ?: moduleCoordinate
-
 plugins {
-    kotlin("multiplatform") version "2.4.0-Beta1"
+    kotlin("multiplatform")
     `maven-publish`
 }
 
@@ -37,7 +34,7 @@ kotlin {
     sourceSets {
         val commonMain by getting {
             dependencies {
-                api(projectOrModule(":libs:common", "borg.trikeshed:common"))
+                api(project(":"))
             }
         }
         val commonTest by getting {

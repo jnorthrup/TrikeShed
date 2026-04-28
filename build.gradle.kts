@@ -3,7 +3,7 @@ import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
 
 plugins {
-    kotlin("multiplatform") version "2.4.0-Beta1"
+    kotlin("multiplatform") version "2.4.0-Beta2"
     id("com.github.ben-manes.versions") version "0.53.0"
     `maven-publish`
 }
@@ -100,7 +100,6 @@ kotlin {
             dependencies {
                 api("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
                 api("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1-0.6.x-compat")
-                api(project(":libs:common"))
             }
         }
         val commonTest by getting {
@@ -127,7 +126,6 @@ kotlin {
                 implementation("org.bouncycastle:bcprov-jdk15on:1.70")
 
                 // Depend on libs/common JVM artifact for userspace/context implementations
-                implementation(project(":libs:common"))
             }
 
             // Include JMH benchmark sources in jvmMain for compilation

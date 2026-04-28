@@ -2,7 +2,7 @@ import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 
 plugins {
-    kotlin("multiplatform") version "2.4.0-Beta1"
+    kotlin("multiplatform")
 }
 
 group = "org.bereft"
@@ -65,7 +65,7 @@ kotlin {
         val commonMain by getting {
             dependencies {
                 api("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
-                api("org.bereft:TrikeShed:1.0")
+                api(project(":"))
                 // confix lives in the root TrikeShed source (src/commonMain); openapi
                 // accesses it transitively via the TrikeShed published API. No extra
                 // dependency needed here.
