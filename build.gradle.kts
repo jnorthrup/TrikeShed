@@ -24,30 +24,26 @@ repositories {
 }
 
 kotlin {
-    @OptIn(ExperimentalKotlinGradlePluginApi::class)
-    compilerOptions {
+    @OptIn(ExperimentalKotlinGradlePluginApi::class) compilerOptions {
         apiVersion.set(org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_4)
         languageVersion.set(org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_4)
-        freeCompilerArgs =
-            listOf(
-                "-opt-in=kotlin.RequiresOptIn",
-                "-opt-in=kotlin.ExperimentalUnsignedTypes",
-                "-Xsuppress-version-warnings",
-                "-Xexpect-actual-classes",
-            )
+        freeCompilerArgs = listOf(
+            "-opt-in=kotlin.RequiresOptIn",
+            "-opt-in=kotlin.ExperimentalUnsignedTypes",
+            "-Xsuppress-version-warnings",
+            "-Xexpect-actual-classes",
+        )
     }
 
     jvmToolchain(21)
 
-    jvm {
-    }
+    jvm {}
 
     js(IR) {
         nodejs()
     }
 
-    @OptIn(ExperimentalWasmDsl::class)
-    wasmJs {
+    @OptIn(ExperimentalWasmDsl::class) wasmJs {
         browser {
             testTask {
                 val firefoxBin = project.file("/Applications/Firefox.app/Contents/MacOS/firefox")
@@ -81,19 +77,20 @@ kotlin {
                 // include it via settings.gradle.kts as a composite build and add a proper cinterop there.
             }
         }
-    } else if (hostOs == "Linux") {
-        linuxX64("linux") {
-            if (enableNativeSharedLib) {
-                binaries.sharedLib {
-                    baseName = "trikeshed"
+    } else
+        if (hostOs == "Linux") {
+            linuxX64("linux") {
+                if (enableNativeSharedLib) {
+                    binaries.sharedLib {
+                        baseName = "trikeshed"
+                    }
                 }
-            }
-            binaries.executable("autoresearchNative") {
-                entryPoint = "borg.trikeshed.autoresearch.autoresearchNativeMain"
-            }
+                binaries.executable("autoresearchNative") {
+                    entryPoint = "borg.trikeshed.autoresearch.autoresearchNativeMain"
+                }
 
+            }
         }
-    }
 
     sourceSets {
         val commonMain by getting {
@@ -110,7 +107,8 @@ kotlin {
         }
         val nativeMain by creating { dependsOn(commonMain) }
         val nativeTest by creating { dependsOn(commonTest) }
-        val posixMain by creating { dependsOn(nativeMain)
+        val posixMain by creating {
+            dependsOn(nativeMain)
         }
         val posixTest by creating {
             dependsOn(nativeTest)
@@ -160,8 +158,6 @@ kotlin {
         val jsTest by getting { dependsOn(commonTest) }
         val wasmJsMain by getting { dependsOn(commonMain) }
         val wasmJsTest by getting { dependsOn(commonTest) }
-
-        // Couch recovery work now lives under libs/couch/ instead of custom root source sets.
     }
 }
 
@@ -176,11 +172,7 @@ afterEvaluate {
     tasks.register<Test>("focusedTransportTest") {
         description = "Runs the focused JVM transport/routing slice."
         group = "verification"
-        val jvmTestComp =
-            kotlin.targets
-                .getByName("jvm")
-                .compilations
-                .getByName("test")
+        val jvmTestComp = kotlin.targets.getByName("jvm").compilations.getByName("test")
         val jvmTestTask = tasks.named<Test>("jvmTest")
         testClassesDirs = jvmTestTask.get().testClassesDirs
         classpath =
@@ -195,27 +187,22 @@ afterEvaluate {
     }
 
     // JMH task configuration
-    val jmhTask =
-        tasks.register<JavaExec>("jmh") {
-            description = "Runs JMH benchmarks"
-            group = "benchmark"
+    val jmhTask = tasks.register<JavaExec>("jmh") {
+        description = "Runs JMH benchmarks"
+        group = "benchmark"
 
-            // Depend on compilation
-            dependsOn("compileKotlinJvm")
-            dependsOn("jvmJar")
+        // Depend on compilation
+        dependsOn("compileKotlinJvm")
+        dependsOn("jvmJar")
 
-            // Setup classpath with JMH dependencies and compiled classes
-            val jvmComp =
-                kotlin.targets
-                    .getByName("jvm")
-                    .compilations
-                    .getByName("main")
-            classpath = jvmComp.runtimeDependencyFiles ?: files()
-            classpath += files(jvmComp.output.classesDirs)
-            classpath += files(tasks.getByName("jvmJar").outputs.files)
+        // Setup classpath with JMH dependencies and compiled classes
+        val jvmComp = kotlin.targets.getByName("jvm").compilations.getByName("main")
+        classpath = jvmComp.runtimeDependencyFiles ?: files()
+        classpath += files(jvmComp.output.classesDirs)
+        classpath += files(tasks.getByName("jvmJar").outputs.files)
 
-            mainClass.set("org.openjdk.jmh.Main")
-        }
+        mainClass.set("org.openjdk.jmh.Main")
+    }
 
     // Combined benchmark task
     tasks.register("benchmark") {
