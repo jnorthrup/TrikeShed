@@ -69,6 +69,39 @@ data class BacktestResult(
     val metrics: BacktestMetrics,
 )
 
+/** Stable scalar report over a [BacktestResult] for back-test summaries. */
+data class BacktestReport(
+    val symbol: String,
+    val initialCapital: Double,
+    val finalEquity: Double,
+    val totalReturn: Double,
+    val sharpeRatio: Double,
+    val sortinoRatio: Double,
+    val maxDrawdown: Double,
+    val maxDrawdownTicks: Int,
+    val totalTrades: Int,
+    val totalHarvested: Double,
+    val totalTicks: Int,
+)
+
+/** Build a stable summary layer from a back-test result plus its aggregate metrics. */
+fun BacktestResult.toBacktestReport(): BacktestReport {
+    val finalEquity = cycles.lastOrNull()?.totalValue ?: initialCapital
+    return BacktestReport(
+        symbol = symbol,
+        initialCapital = initialCapital,
+        finalEquity = finalEquity,
+        totalReturn = metrics.totalReturn,
+        sharpeRatio = metrics.sharpeRatio,
+        sortinoRatio = metrics.sortinoRatio,
+        maxDrawdown = metrics.maxDrawdown,
+        maxDrawdownTicks = metrics.maxDrawdownTicks,
+        totalTrades = metrics.totalTrades,
+        totalHarvested = metrics.totalHarvested,
+        totalTicks = metrics.totalTicks,
+    )
+}
+
 /**
  * Convert a single MiniCursor row (a DocRowVec kline bar) into a [PortfolioInput].
  *

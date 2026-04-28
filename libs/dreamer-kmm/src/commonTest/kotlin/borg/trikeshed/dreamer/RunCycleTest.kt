@@ -265,6 +265,45 @@ class RunCycleTest {
         assertEquals(180.0, metrics.totalHarvested, 0.001)
     }
 
+    @Test
+    fun `BacktestReport summarizes result metrics and final equity`() {
+        val cycles = listOf(
+            CycleResult(0, 1000L, 2_500.0, 7_500.0, 10_000.0, false, 0.0, emptyList(), false, emptyMap()),
+            CycleResult(1, 2000L, 3_000.0, 8_000.0, 11_000.0, true, 120.0, listOf("BTC-USD"), false, emptyMap()),
+        )
+        val metrics = BacktestMetrics(
+            totalTicks = 2,
+            totalReturn = 0.10,
+            sharpeRatio = 1.25,
+            sortinoRatio = 1.75,
+            maxDrawdown = 0.05,
+            maxDrawdownTicks = 1,
+            totalHarvested = 120.0,
+            totalTrades = 1,
+            avgHarvestPerTick = 60.0,
+        )
+        val result = BacktestResult(
+            symbol = "BTC-USD",
+            initialCapital = 10_000.0,
+            cycles = cycles,
+            metrics = metrics,
+        )
+
+        val report = result.toBacktestReport()
+
+        assertEquals("BTC-USD", report.symbol)
+        assertEquals(10_000.0, report.initialCapital, 0.001)
+        assertEquals(11_000.0, report.finalEquity, 0.001)
+        assertEquals(0.10, report.totalReturn, 0.001)
+        assertEquals(1.25, report.sharpeRatio, 0.001)
+        assertEquals(1.75, report.sortinoRatio, 0.001)
+        assertEquals(0.05, report.maxDrawdown, 0.001)
+        assertEquals(1, report.maxDrawdownTicks)
+        assertEquals(1, report.totalTrades)
+        assertEquals(120.0, report.totalHarvested, 0.001)
+        assertEquals(2, report.totalTicks)
+    }
+
     // ── 6. multiSymbolKlineToPortfolioInput ────────────────────────────
 
     @Test
