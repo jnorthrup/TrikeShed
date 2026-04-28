@@ -18,6 +18,8 @@ class TrieTest {
         assertFalse(trie.contains(*emptyArray()))
 
         trie.add(d, "a", "b", "c")
+        // empty lookup should still be false after entries exist
+        assertFalse(trie.contains(*emptyArray()))
         assertFalse(trie.contains("a"))
         assertFalse(trie.contains("a", "b"))
         assertTrue(trie.contains("a", "b", "c"))

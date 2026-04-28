@@ -50,7 +50,10 @@ class Trie(var root: Map<String, Node> = linkedMapOf()) {
     }
 
     fun search(vararg segments: String): Node? {
-        var children: Map<String, Node> = root// exist, so traverse current path, ending if is last value, and is leaf node
+        // empty lookup should simply return null (no payload)
+        if (segments.isEmpty()) return null
+
+        var children: Map<String, Node> = root // exist, so traverse current path, ending if is last value, and is leaf node
         // not at end, continue traversing
         // add new node
         if (children.isNotEmpty()) {
