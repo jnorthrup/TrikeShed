@@ -41,13 +41,13 @@ class ChunkedMutableSeries<T>(
         return stairs
     }
 
-    private fun chunkIndexAndOffset(index: Int): Pair<Int, Int> {
+    private fun chunkIndexAndOffset(index: Int): Twin<Int> {
         val stairs = stairsArray()
         if (stairs.isEmpty()) throw IndexOutOfBoundsException("index $index, empty series")
         val ci = stairs.indexOfFirst { it > index }
         if (ci < 0) throw IndexOutOfBoundsException("index $index, total $totalSize")
         val offset = if (ci == 0) index else index - stairs[ci - 1]
-        return ci to offset
+        return autoTwin(ci, offset)
     }
 
     // ── Series interface ─────────────────────────────────────────────────

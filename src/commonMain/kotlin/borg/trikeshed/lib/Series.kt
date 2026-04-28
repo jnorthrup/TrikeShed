@@ -541,7 +541,18 @@ infix fun <T, O, R : Series2<T, O>> Series<T>.zip(o: Series<O>): R =
 
 fun <T : Comparable<T>> Series<T>.startsWith(other: Series<T>): Boolean = shortestLength(other) == other.size
 
-fun <T> Series<T>.zipWithNext(): Series<Twin<T>> = size.dec() j { x: Int -> this[x] j this[x + 1] }
+fun <T> Series<T>.zipWithNext(): Series<Twin<T>> = size.dec() j { x: Int -> autoTwin(this[x], this[x + 1]) }
+
+/**
+ * zipWithNext with an [AutoTwinContext] that accumulates strategy data.
+ *
+ * The context probes the first element's runtime type and locks in a
+ * monomorphic packer, eliminating per-element [is] checks for the
+ * remainder of the Series.  Use when the Series is known to be
+ * homogeneous and denser than the generic [autoTwin] fallback.
+ */
+fun <T> Series<T>.zipWithNext(ctx: AutoTwinContext<T>): Series<Twin<T>> =
+    size.dec() j { x: Int -> ctx.pack(this[x], this[x + 1]) }
 
 
 fun <T> Series<T>.compareTo(other: Series<T>, comparator: Comparator<T>): Int {

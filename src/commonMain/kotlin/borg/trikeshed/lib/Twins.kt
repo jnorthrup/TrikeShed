@@ -59,10 +59,11 @@ value class Twyte(private val capture: Short) : Twin<Byte> {
 // ============================================================================
 // autoTwin — single entry point that selects the densest representation
 //
-// Overloads + generic fallback.  Callers get the tightest pack automatically.
-// For types without a dense representation (Long, Double, Any?), falls back
-// to PairJoin — a @JvmInline value class wrapping a Pair, so still only 1
-// allocation (the Pair itself).
+// Concrete overloads win at compile time when types are known (e.g. Int.j(Int)).
+// The generic fallback does runtime type dispatch so that callers in generic
+// contexts (zipWithNext<Int>, Twin<Int> from type parameter T) still produce
+// the dense value class — preventing megamorphic dispatch on Twin<T>.a/.b
+// within a single Series<Twin<T>>.
 // ============================================================================
 
 fun autoTwin(a: Byte,   b: Byte):   Twin<Byte>   = Twyte(packBytes(a, b))
@@ -70,7 +71,25 @@ fun autoTwin(a: Short,  b: Short):  Twin<Short>  = Twhort(packShorts(a, b))
 fun autoTwin(a: Char,   b: Char):   Twin<Char>   = Twhar(packChars(a, b))
 fun autoTwin(a: Int,    b: Int):    Twin<Int>    = TwInt(packInts(a, b))
 fun autoTwin(a: Float,  b: Float):  Twin<Float>  = TwInt(packFloats(a, b)) as Twin<Float>
-fun <T> autoTwin(a: T,  b: T):      Twin<T>      = Join.Companion.PairJoin(a to b) as Twin<T>
+
+/**
+ * Generic fallback with runtime type dispatch.
+ *
+ * When called from a generic context (type parameter T not known at compile
+ * time), runtime [is] checks select the same dense value class that the
+ * concrete overloads would produce.  This ensures every [Twin<Int>] in a
+ * [Series] is a [TwInt], avoiding megamorphic dispatch on [Twin.a]/[Twin.b].
+ */
+fun <T> autoTwin(a: T, b: T): Twin<T> {
+    return when {
+        a is Int    && b is Int    -> TwInt(packInts(a, b))     as Twin<T>
+        a is Short  && b is Short  -> Twhort(packShorts(a, b))  as Twin<T>
+        a is Byte   && b is Byte   -> Twyte(packBytes(a, b))    as Twin<T>
+        a is Char   && b is Char   -> Twhar(packChars(a, b))    as Twin<T>
+        a is Float  && b is Float  -> TwInt(packFloats(a, b))   as Twin<T>
+        else                       -> Join.Companion.PairJoin(a, b) as Twin<T>
+    }
+}
 
 // ============================================================================
 // Infix j overloads — delegate to autoTwin for identical-type pairs

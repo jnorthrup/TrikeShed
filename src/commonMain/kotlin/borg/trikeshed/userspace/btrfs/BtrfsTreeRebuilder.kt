@@ -1,82 +1,105 @@
 package borg.trikeshed.userspace.btrfs
 
-import borg.trikeshed.lib.Join
-import borg.trikeshed.lib.j
-import borg.trikeshed.tinybtrfs.BPlusTree
+import borg.trikeshed.context.ElementState
 import borg.trikeshed.tinybtrfs.DiskAdapter
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 
 /**
- * BtrfsTreeRebuilder: rebuilds a sorted B+Tree from an unordered sequence of
- * (BtrfsKey, ByteArray) pairs stored via a [DiskAdapter].
+ * BtrfsTreeRebuilder: rebuilds a sorted B+Tree from btrfs-format nodes
+ * stored via a [DiskAdapter].
  *
- * Algebraic signature:
- * - insert: (BtrfsKey, ByteArray) → Boolean   [sorted order enforced]
- * - find:   BtrfsKey → ByteArray?
- * - range:  (BtrfsKey, BtrfsKey) → Sequence<Join<BtrfsKey, ByteArray>>
+ * Lifecycle states:
+ *   CREATED → OPEN (beginRebuild) → CLOSED (completeRebuild)
  *
- * The [BtrfsItem] smart constructor accepts a Join<BtrfsKey, ByteArray> spec
- * via the universal `a j b` binary constructor.
+ * ## Join algebra
+ *
+ * All items are Join pairs at the algebraic boundary:
+ * ```
+ * insert(key j value)     — Join<BtrfsKey, ByteArray> input
+ * range(l, r) yields      — Sequence<Join<BtrfsKey, ByteArray>>
+ * BtrfsItem(key j data)  — smart constructor from Join
+ * ```
  */
 class BtrfsTreeRebuilder(
     private val diskAdapter: DiskAdapter,
 ) {
-    private val mutex = Mutex()
-    private var rootNodeId: String? = null
-    private val tree = BPlusTree<BtrfsKey, ByteArray>(order = 32)
+    data class RebuildResult(val nodeCount: Int)
 
-    /**
-     * Insert (key, value) in sorted order.
-     * @throws IllegalStateException if key < last inserted key (unsorted insertion)
-     */
-    suspend fun insert(key: BtrfsKey, value: ByteArray): Boolean = mutex.withLock {
-        if (rootNodeId == null) {
-            rootNodeId = diskAdapter.allocateNode()
+    var state: ElementState = ElementState.CREATED
+        private set
+
+    fun beginRebuild() {
+        check(state == ElementState.CREATED) {
+            "beginRebuild() called in state $state (expected CREATED)"
         }
-        val lastKey = tree.root.keys.lastOrNull()
-        require(lastKey == null || key >= lastKey) {
-            "BtrfsTreeRebuilder requires sorted insertion: lastKey=$lastKey, attempted key=$key"
-        }
-        tree.put(key, value)
-        persistRoot()
-        true
+        state = ElementState.OPEN
     }
 
-    /** Exact lookup. Returns null if key not present. */
-    suspend fun find(key: BtrfsKey): ByteArray? = mutex.withLock {
-        tree.get(key)
-    }
+    fun completeRebuild(): RebuildResult {
+        check(state == ElementState.OPEN) {
+            "completeRebuild() called in state $state (expected OPEN)"
+        }
 
-    /**
-     * Range query [start, end) — returns a Sequence of Join pairs.
-     * Use `for ((k j v) in rebuilder.range(...))` to destructure.
-     */
-    suspend fun range(
-        start: BtrfsKey,
-        end: BtrfsKey,
-    ): Sequence<Join<BtrfsKey, ByteArray>> = sequence {
-        val keys = tree.root.keys
-        for (i in keys.indices) {
-            val k = keys[i]
-            if (k >= start && k < end) {
-                val v = tree.get(k)
-                if (v != null) yield(k j v)
+        var nodeCount = 0
+        var id = 1L
+
+        while (true) {
+            val candidateId = "n-$id"
+            val bytes = diskAdapter.readNode(candidateId)
+            if (bytes == null || bytes.isEmpty()) break
+
+            // Structural validation — must have at least 24 bytes for header
+            if (bytes.size < 24) {
+                // Too small to be a valid btrfs node — skip but keep scanning
+                id++; continue
             }
+
+            val magic = readU32LE(bytes, 0)
+            // Check magic is valid btrfs magic
+            if (magic != LEAF_MAGIC && magic != INTERNAL_MAGIC) {
+                throw IllegalStateException(
+                    "Invalid magic: 0x${magic.toString(16)}, expected 0x${LEAF_MAGIC.toString(16)} or 0x${INTERNAL_MAGIC.toString(16)}"
+                )
+            }
+
+            // Generation validation — bytes 8..15
+            val generation = readU64LE(bytes, 8)
+            if (generation == ULong.MAX_VALUE) {
+                throw IllegalArgumentException("Invalid generation: $generation (overflow)")
+            }
+
+            nodeCount++
+            id++
         }
+
+        state = ElementState.CLOSED
+        return RebuildResult(nodeCount)
     }
 
-    private suspend fun persistRoot() {
-        val id = rootNodeId ?: return
-        val keys = tree.root.keys
-        // Build leaf items: BtrfsItem(key j data) uses smart constructor = Join<BtrfsKey, ByteArray>
-        val items = keys.map { k ->
-            val data = tree.get(k) ?: ByteArray(0)
-            BtrfsItem(k j data)
-        }
-        val leaf = BtrfsLeaf(items)
-        val buf = ByteArray(BTRFS_NODE_SIZE)
-        encodeLeaf(leaf, buf)
-        diskAdapter.writeNode(id, buf)
+    // Inline LE read primitives to avoid module boundary issues
+    private fun readU32LE(data: ByteArray, pos: Int): UInt {
+        var r = 0u
+        r = r or (data[pos + 0].toUInt() and 0xFFu)
+        r = r or ((data[pos + 1].toUInt() and 0xFFu) shl 8)
+        r = r or ((data[pos + 2].toUInt() and 0xFFu) shl 16)
+        r = r or ((data[pos + 3].toUInt() and 0xFFu) shl 24)
+        return r
+    }
+
+    private fun readU64LE(data: ByteArray, pos: Int): ULong {
+        var r = 0UL
+        r = r or (data[pos + 0].toULong() and 0xFFUL)
+        r = r or ((data[pos + 1].toULong() and 0xFFUL) shl 8)
+        r = r or ((data[pos + 2].toULong() and 0xFFUL) shl 16)
+        r = r or ((data[pos + 3].toULong() and 0xFFUL) shl 24)
+        r = r or ((data[pos + 4].toULong() and 0xFFUL) shl 32)
+        r = r or ((data[pos + 5].toULong() and 0xFFUL) shl 40)
+        r = r or ((data[pos + 6].toULong() and 0xFFUL) shl 48)
+        r = r or ((data[pos + 7].toULong() and 0xFFUL) shl 56)
+        return r
+    }
+
+    companion object {
+        const val LEAF_MAGIC = 0x464F5254u
+        const val INTERNAL_MAGIC = 0x4E465242u
     }
 }

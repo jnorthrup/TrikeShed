@@ -5,6 +5,24 @@ typealias Series2<A, B> = Series<Join<A, B>>
 /** Explicit helper for pairwise series join. */
 fun <A, B> join(a: Series<A>, b: Series<B>): Series2<A, B> = a.zip(b)
 
+/**
+ * Pairwise join with [ReificationContext].
+ *
+ * When [ctx] is non-null and [ReificationContext.maxDepth] would force
+ * materialization, the input series are materialized ([cow]) before
+ * zipping.  This flattens nested stair shapes, trading memory for
+ * shallower access on the resulting Series2.
+ *
+ * @param ctx  reification depth cap; null preserves original behavior
+ */
+fun <A, B> join(a: Series<A>, b: Series<B>, ctx: ReificationContext?): Series2<A, B> {
+    if (ctx == null) return join(a, b)
+    val ra = if (ctx.maxDepth <= 0 && a !is CowSeriesHandle<*>) a.materialize() else a
+    val rb = if (ctx.maxDepth <= 0 && b !is CowSeriesHandle<*>) b.materialize() else b
+    @Suppress("UNCHECKED_CAST")
+    return join(ra as Series<A>, rb as Series<B>)
+}
+
 /** Mutable wrapper for pairwise join; no performance guarantees. */
 fun <A, B> joinMutable(a: Series<A>, b: Series<B>): MutableSeries<Join<A, B>> = join(a, b).cow
 

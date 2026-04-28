@@ -904,7 +904,7 @@ object Combinators {
     }
 
     /** α: Char → Tag. Single lookup, 2 branches max. */
-    fun charToTag(ch: Char): Tag {
+    private fun charToTag(ch: Char): Tag {
         val ci = ch.code
         if (ci < 128) Tag.fromCode(charToTagTable[ci].toInt())?.let { return it }
         return Tag.NUMBER
@@ -923,7 +923,7 @@ object Combinators {
     }
 
     /** α: Char → skip kind. Single lookup, 2 branches max. */
-    fun skipKind(ch: Char): Int {
+    private fun skipKind(ch: Char): Int {
         val ci = ch.code
         return if (ci < 128) charToSkipTable[ci].toInt() else 0
     }
@@ -944,33 +944,23 @@ object Combinators {
     }
 
     /** Direct child positions found by scanning the element's source span.
-     *  Uses Char→skipKind bijection to collapse 5-way dispatch to single lookup. */
+     *  Single pass: collects positions into an [IntBuf], returns materialized [Series<Int>].
+     *  Materialization avoids the O(k × span) re-scan that the old two-pass lazy approach
+     *  incurred on every indexed access (e.g. [reifyObject] with N keys re-scanned N×2 times). */
     fun realCommas(e: JsElement, src: Series<Char>): Series<Int> {
         val open = e.a.a; val close = e.a.b
-        // Pass 1: count direct children
-        var count = 0
+        val buf = IntBuf(16)  // most elements have ≤16 children — no growth in common case
         var p = open + 1
         while (p < close) {
             val kind = Combinators.skipKind(src[p])
-            if (kind != 0) { count++; p = skipByKind(kind, src, p, close) }
-            else p++
-        }
-        val finalCount = count
-        // Pass 2: resolve child positions by index
-        return finalCount j { i: Int ->
-            var found = 0; var q = open + 1
-            while (q < close) {
-                val kind = Combinators.skipKind(src[q])
-                if (kind != 0) {
-                    if (found == i) return@j q
-                    found++
-                    q = skipByKind(kind, src, q, close)
-                } else {
-                    q++
-                }
+            if (kind != 0) {
+                buf.add(p)
+                p = skipByKind(kind, src, p, close)
+            } else {
+                p++
             }
-            -1
         }
+        return buf.toSeries()
     }
 
     /** Dispatch skip function by kind index — 5-way branch, monomorphic per call site. */
@@ -1018,7 +1008,7 @@ object Combinators {
     }
 
     /** slice of src between open..close inclusive (exclusive of delimiters if applicable) */
-    fun spanOf(e: JsElement, src: Series<Char>): Series<Char> =
+    private fun spanOf(e: JsElement, src: Series<Char>): Series<Char> =
         src.slice(e.a.a, e.a.b + 1)
 
     /** materialize a text span into a String — reuses a pooled CharArray. */
@@ -1036,7 +1026,7 @@ object Combinators {
     }
 
     /** Thread-local CharArray buffer for textOf — avoids per-span allocation. */
-   var textBuf: CharArray = CharArray(256)
+   private var textBuf: CharArray = CharArray(256)
 
     /** reify the value rooted at [ctx], using [syntax] to discriminate CBOR vs text decode paths. */
     fun reify(ctx: JsContext, syntax: Syntax = Syntax.JSON): Any? {
@@ -1062,7 +1052,7 @@ object Combinators {
         }
     }
 
-   fun reifyString(e: JsElement, src: Series<Char>, syntax: Syntax): String {
+   private fun reifyString(e: JsElement, src: Series<Char>, syntax: Syntax): String {
         val a = e.a.a; val b = e.a.b
         // quoted JSON/YAML strings
         if (a <= b && (src[a] == '"' || src[a] == '\'')) {
@@ -1121,7 +1111,7 @@ object Combinators {
     }
 
     // helper: unescape JSON-style quotes (handles \n, \uXXXX, etc.)
-   fun unescapeJsonString(s: String): String {
+   private fun unescapeJsonString(s: String): String {
         val out = StringBuilder(s.length)
         var i = 0
         while (i < s.length) {
@@ -1160,12 +1150,12 @@ object Combinators {
         return out.toString()
     }
 
-   fun unescapeYamlSingleQuoted(s: String): String {
+   private fun unescapeYamlSingleQuoted(s: String): String {
         // YAML single-quoted scalar: replace doubled single-quotes with a single quote
         return s.replace("''", "'")
     }
 
-   fun reifyNumber(e: JsElement, src: Series<Char>, syntax: Syntax): Number {
+   private fun reifyNumber(e: JsElement, src: Series<Char>, syntax: Syntax): Number {
         // CBOR numeric decode — only when source is CBOR binary
         val a = e.a.a
         if (syntax == Syntax.CBOR && a < src.size) {
@@ -1206,17 +1196,17 @@ object Combinators {
     }
 
     /** Parse one child at global position [childOpen] — no slice, no offset adjust. */
-   fun reifyChildAt(src: Series<Char>, childOpen: Int): JsElement =
+   private fun reifyChildAt(src: Series<Char>, childOpen: Int): JsElement =
         JsonScan.parseOne(src, childOpen)
 
     /** child JsElement at commas[k] — for arrays, each comma is an element open */
-   fun reifyArray(e: JsElement, src: Series<Char>, syntax: Syntax): Series<Any?> {
+   private fun reifyArray(e: JsElement, src: Series<Char>, syntax: Syntax): Series<Any?> {
         val cs = realCommas(e, src)
         return cs.size j { i: Int -> reify(reifyChildAt(src, cs[i]) j src, syntax) }
     }
 
     /** object has keys at even child indices, values at odd indices */
-   fun reifyObject(e: JsElement, src: Series<Char>, syntax: Syntax): Series2<String, Any?> {
+   private fun reifyObject(e: JsElement, src: Series<Char>, syntax: Syntax): Series2<String, Any?> {
         val all = realCommas(e, src)
         val keyCount = all.size / 2
         return keyCount j { i: Int ->

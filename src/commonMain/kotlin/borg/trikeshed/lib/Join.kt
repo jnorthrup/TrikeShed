@@ -26,11 +26,10 @@ interface Join<A, B> {
             override inline val b: B get() = _b
         }
 
-
-        @JvmInline
-        value class PairJoin<A, B>(override val pair: Pair<A, B>) : Join<A, B> {
-            override val a: A get() = first;
-            override val b: B get() = second;
+        // PairJoin: stores the two values directly (not a Pair, to avoid PairJoin(pair) recursion)
+        // Not @JvmInline since it has 2 fields (value class requires 1 param)
+        class PairJoin<A, B>(override val a: A, override val b: B) : Join<A, B> {
+            override val pair: Pair<A, B> get() = a to b
         }
 
         @JvmInline
@@ -39,7 +38,7 @@ interface Join<A, B> {
             override val b: V get() = entry.value
         }
 
-        operator fun <A, B> invoke(pair:Pair<A,B> ) : Join<A, B>  = PairJoin(pair)
+        operator fun <A, B> invoke(pair:Pair<A,B> ) : Join<A, B>  = PairJoin(pair.first, pair.second)
         operator fun <A, B> invoke(pair:Map.Entry<A,B> ) : Join<A, B>  = EntryJoin(pair)
 
         fun <B> emptySeriesOf(): Series<B> = EmptySeries as Series<B>
@@ -48,15 +47,18 @@ interface Join<A, B> {
 
 typealias Twin<T> = Join<T, T>
 
-//Twin factory method
-fun <T> Twin(a: T, b: T): Twin<T> = a j b
+//Twin factory method — routes through autoTwin for densest representation
+fun <T> Twin(a: T, b: T): Twin<T> = autoTwin(a, b)
+
+/** Twin factory with an [AutoTwinContext] — use when building many Twins of the same runtime type. */
+fun <T> Twin(a: T, b: T, ctx: AutoTwinContext<T>): Twin<T> = ctx.pack(a, b)
 
 
 val <A> Join<A, *>.first: A get() = this.a
 val <B> Join<*, B>.second: B get() = this.b
 
 /**
- * exactly like "to" for "Join" but with a different (and shorter!) name
+ * exactly like "to" for "Join" but with a different (and shorter!) name.
+ * Uses [Join.Companion.PairJoin] for zero allocation beyond the Pair itself.
  */
-infix fun <A, B> A.j(b: B): Join<A, B> = Join(this, b)
-
+infix fun <A, B> A.j(b: B): Join<A, B> = Join(this to b)

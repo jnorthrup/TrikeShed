@@ -9,6 +9,9 @@ import kotlin.properties.Delegates
 // inline factory value for CopyOnWriteSeries
 inline val <reified T> Series<T>.cow: CowSeriesHandle<T> get() = CowSeriesHandle(COWSeriesBody(this))
 
+/** Non-reified materialization — usable from generic functions. */
+fun <T> Series<T>.materialize(): CowSeriesHandle<T> = CowSeriesHandle(COWSeriesBody(this))
+
 
 /**
  * CopyOnWriteSeries which creates a new copy of the backing Series on all mutation methods.
