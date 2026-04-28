@@ -135,7 +135,7 @@ fun makeListOpts(top: Int, height: String): dynamic {
     opts.height = height
     opts.tags = true
     opts.scrollable = true
-    opts.mouse = true
+    opts.mouse = false  // disable mouse to prevent noise
     opts.style = js("({ selected: { bg: 'blue' }, item: { fg: 'white' } })")
     return opts
 }

@@ -19,9 +19,11 @@ import kotlinx.coroutines.*
 fun main() {
     // ── Create blessed screen ────────────────────────────────────────
     val screenOpts = js("({})")
-    screenOpts.smartCSR = true
+    screenOpts.smartCSR = false  // disable cursor save/restore — more compatible
     screenOpts.title = "Dreamer Dashboard"
-    screenOpts.fullUnicode = true
+    screenOpts.fullUnicode = false  // ASCII-only for max compatibility
+    screenOpts.mouse = false  // disable mouse events to prevent noise
+    screenOpts.autoPadding = true
     val screen = screen(screenOpts)
 
     val state = DashboardState()
