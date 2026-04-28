@@ -64,5 +64,5 @@ class ArrayMap<K : Comparable<K>, V>(
 
 class ShimEntry<K, V>(private val key1: K) : Map_Entry<K, V> {
     override val key: K get() = key1
-    override val value: V get() = TODO("Not yet implemented")
+    override val value: V get() = throw NoSuchElementException("ShimEntry has no value")
 }
