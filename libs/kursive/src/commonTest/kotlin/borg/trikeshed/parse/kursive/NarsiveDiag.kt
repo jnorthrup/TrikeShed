@@ -25,7 +25,7 @@ class NarsiveDiag {
 
     @Test
     fun diagSimpleRelationship() {
-        val r: Join<CharSeries, NarsiveTrace>? = Narsive.relationship.parse("<bird --> animal>")
+        val r: Join<CharSeries, NarsiveTrace>? = Narsive.relationship.parse("(bird --> animal)")
         assertNotNull(r)
         // relationship should include 'bird' and the copula lexeme
         val lex: String = r.a.s

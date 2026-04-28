@@ -16,7 +16,7 @@ class NarsiveParserTest {
 
     @Test
     fun parsesTaskWithBudgetTruthAndRelationshipInSitu() {
-        val source = """$0.8;0.5$ <bird --> animal>. %1.0;0.9%""".toSeries()
+        val source = """$0.8;0.5$ (bird --> animal). %1.0;0.9%""".toSeries()
         val parsed = Narsive.parseTask(source)
         assertNotNull(parsed)
 
@@ -34,7 +34,7 @@ class NarsiveParserTest {
         assertTrue(elements.any { it.kind == NarsiveElementKind.TRUTH })
 
         val evidence = parsed.b.evidence(source).toList()
-        assertTrue(evidence.any { it.confix == "<>" })
+        assertTrue(evidence.any { it.confix == "()" })
         assertTrue(evidence.any { it.digits > 0U })
 
         val rowVecs = parsed.b.rowVecs(source)
@@ -44,7 +44,7 @@ class NarsiveParserTest {
 
     @Test
     fun parsesQuestionFromSeriesRootWithoutTruthLeak() {
-        val source = """<bird --> animal>?""".toSeries()
+        val source = """(bird --> animal)?""".toSeries()
         val parsed = Narsive.parseSentence(source)
         assertNotNull(parsed)
 
@@ -68,7 +68,7 @@ class NarsiveParserTest {
 
     @Test
     fun nestedCompoundDoesNotPoisonGrammarWithLeftRecursion() {
-        val source = """(&&,<bird --> animal>,<animal --> mortal>).""".toSeries()
+        val source = """(&&,(bird --> animal),(animal --> mortal)).""".toSeries()
         val parsed = Narsive.parseSentence(source)
         assertNotNull(parsed)
 
@@ -80,7 +80,7 @@ class NarsiveParserTest {
 
     @Test
     fun supervisorJobFansOutByParserKey() {
-        val source = """$0.8;0.5$ <bird --> animal>. %1.0;0.9%""".toSeries()
+        val source = """$0.8;0.5$ (bird --> animal). %1.0;0.9%""".toSeries()
         val parsed = Narsive.parseTask(source)
         assertNotNull(parsed)
 
@@ -94,7 +94,7 @@ class NarsiveParserTest {
 
     @Test
     fun stringAndSeriesInputsShareTheSameStreamRootShape() {
-        val text = """<bird --> animal>?"""
+        val text = """(bird --> animal)?"""
         val fromString = Narsive.parseSentence(text)
         val fromSeries = Narsive.parseSentence(text.toSeries())
 
@@ -106,7 +106,7 @@ class NarsiveParserTest {
 
     @Test
     fun bitmaskedOperatorEnumRecoversUnicodeOperatorsFromParsedElements() {
-        val source = """<bird → animal>. ◷""".toSeries()
+        val source = """(bird → animal). ◷""".toSeries()
         val parsed = Narsive.parseSentence(source)
         assertNotNull(parsed)
 
@@ -125,8 +125,8 @@ class NarsiveParserTest {
     @Test
     fun lineChunkingParsesMultipleTasksIndependently() {
         val text = """
-            <bird --> animal>.
-            <cat --> mammal>.
+            (bird --> animal).
+            (cat --> mammal).
         """.trimIndent()
         val results = Narsive.parseTasks(text)
         assertEquals(2, results.size)
@@ -143,8 +143,8 @@ class NarsiveParserTest {
     @Test
     fun lineChunkingParsesMixedTaskTypes() {
         val text = """
-            $0.9$ <swan --> bird>. %1.0;0.8%
-            <xyz ? abc>
+            $0.9$ (swan --> bird). %1.0;0.8%
+            (xyz ? abc)
         """.trimIndent()
         val results = Narsive.parseTasks(text)
         assertEquals(2, results.size)
@@ -156,7 +156,7 @@ class NarsiveParserTest {
     @Test
     fun lineChunkingProducesSupervisorJobsWithCorrectFanout() {
         val text = """
-            $0.8;0.5$ <bird --> animal>. %1.0;0.9%
+            $0.8;0.5$ (bird --> animal). %1.0;0.9%
             (^say,hello,?x).
         """.trimIndent()
         val results = Narsive.parseTasks(text)
@@ -177,7 +177,7 @@ class NarsiveParserTest {
 
     @Test
     fun colonSyntaxProducesNamedParserTraces() {
-        val source = "<bird --> animal>?".toSeries()
+        val source = "(bird --> animal)?".toSeries()
         val parsed = Narsive.parseSentence(source)
         assertNotNull(parsed)
         val names = labels(parsed.b)
