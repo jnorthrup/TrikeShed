@@ -64,12 +64,62 @@ enum class Tag(val code: Int) {
     NULL(-7),
     BYTES(-8);          // CBOR byte string; reifier decodes hex-escaped chars
 
+    /** Dispatch kind for bijection: 0=map, 1=list, 2=scalar — collapses 8-way branch to 3-way. */
+    val kind: Int get() = when (this) {
+        OBJECT -> 0; ARRAY -> 1; else -> 2
+    }
+
     companion object {
         /** Decode a tag code back to a Tag, or null for unknown/positive values. */
         fun fromCode(code: Int): Tag? = when (code) {
             -1 -> OBJECT; -2 -> ARRAY; -3 -> STRING; -4 -> NUMBER
             -5 -> BOOL_TRUE; -6 -> BOOL_FALSE; -7 -> NULL; -8 -> BYTES
             else -> null
+        }
+
+        /** Bijection: Char → Tag code for first-character dispatch (128-entry lookup).
+         *  Unmapped chars default to NUMBER (matching the else branch in tagOf). */
+        private val charToCode: ByteArray by lazy {
+            val a = ByteArray(128) { NUMBER.code.toByte() }
+            a[123] = OBJECT.code.toByte()    // '{'
+            a[91]  = ARRAY.code.toByte()     // '['
+            a[34]  = STRING.code.toByte()    // '"'
+            a[39]  = STRING.code.toByte()    // '\''
+            a[116] = BOOL_TRUE.code.toByte() // 't'
+            a[102] = BOOL_FALSE.code.toByte()// 'f'
+            a[110] = NULL.code.toByte()      // 'n'
+            // digits 0-9 already default to NUMBER; '-' likewise
+            a
+        }
+
+        /** Fast tag lookup from first character — avoids 8-way when dispatch. */
+        fun fromChar(ch: Char): Tag {
+            val ci = ch.code
+            if (ci < 128) fromCode(charToCode[ci].toInt())?.let { return it }
+            return NUMBER
+        }
+
+        /** Bijection: Char → skip behavior index for realCommas scanner.
+         *  0=whitespace/punct (just advance), 1=string, 2=bracket, 3=literal, 4=number.
+         *  Used to collapse 5-way character dispatch to a single table lookup. */
+        private val charToSkip: ByteArray by lazy {
+            val a = ByteArray(128) { 0 }  // default: whitespace/punct
+            a[34]  = 1  // '"'
+            a[39]  = 1  // '\''
+            a[123] = 2  // '{'
+            a[91]  = 2  // '['
+            a[116] = 3  // 't'
+            a[102] = 3  // 'f'
+            a[110] = 3  // 'n'
+            a[45]  = 4  // '-'
+            a[43]  = 4  // '+'
+            for (d in 48..57) a[d] = 4  // '0'-'9'
+            a
+        }
+
+        fun skipKind(ch: Char): Int {
+            val ci = ch.code
+            return if (ci < 128) charToSkip[ci].toInt() else 0
         }
     }
 }
@@ -882,7 +932,8 @@ object CsvScan {
 
 object Reify {
 
-    /** Returns the element's tag (inferred from commas[0] if negative, else from src[open]). */
+    /** Returns the element's tag (inferred from commas[0] if negative, else from src[open]).
+     *  Uses Char→Tag bijection lookup for monomorphic dispatch (2-branch max). */
     fun tagOf(e: JsElement, src: Series<Char>): Tag {
         val commas = e.b
         if (commas.size > 0) {
@@ -891,64 +942,45 @@ object Reify {
         }
         val open = e.a.a
         if (open >= src.size) return Tag.NULL
-        return when (src[open]) {
-            '{' -> Tag.OBJECT
-            '[' -> Tag.ARRAY
-            '"' -> Tag.STRING
-            '\'' -> Tag.STRING
-            't' -> Tag.BOOL_TRUE
-            'f' -> Tag.BOOL_FALSE
-            'n' -> Tag.NULL
-            else -> Tag.NUMBER
-        }
+        return Tag.fromChar(src[open])
     }
 
     /** Direct child positions found by scanning the element's source span.
-     *  Avoids comma-buffer leak from nested child elements. */
+     *  Uses Char→skipKind bijection to collapse 5-way dispatch to single lookup. */
     fun realCommas(e: JsElement, src: Series<Char>): Series<Int> {
         val open = e.a.a; val close = e.a.b
-        // Count direct children by scanning within [open, close]
+        // Pass 1: count direct children
         var count = 0
         var p = open + 1
         while (p < close) {
-            val ch = src[p]
-            when {
-                ch == '"' || ch == '\'' -> { count++; p = skipString(src, p, close) }
-                ch == '{' || ch == '[' -> { count++; p = skipBracket(src, p, close) }
-                ch == ' ' || ch == '\t' || ch == '\n' || ch == '\r' || ch == ',' || ch == ':' -> p++
-                ch == 't' || ch == 'f' || ch == 'n' -> { count++; p = skipLiteral(src, p, close) }
-                ch == '-' || ch == '+' || (ch in '0'..'9') -> { count++; p = skipNumber(src, p, close) }
-                else -> p++  // skip any other char
-            }
+            val kind = Tag.skipKind(src[p])
+            if (kind != 0) { count++; p = skipByKind(kind, src, p, close) }
+            else p++
         }
         val finalCount = count
+        // Pass 2: resolve child positions by index
         return finalCount j { i: Int ->
             var found = 0; var q = open + 1
             while (q < close) {
-                val ch = src[q]
-                val isStart = when (ch) {
-                    '"', '\'' -> true
-                    '{', '[' -> true
-                    't', 'f', 'n' -> true
-                    '-', '+' -> true
-                    in '0'..'9' -> true
-                    else -> false
-                }
-                if (isStart) {
+                val kind = Tag.skipKind(src[q])
+                if (kind != 0) {
                     if (found == i) return@j q
                     found++
-                    q = when (ch) {
-                        '"', '\'' -> skipString(src, q, close)
-                        '{', '[' -> skipBracket(src, q, close)
-                        't', 'f', 'n' -> skipLiteral(src, q, close)
-                        else -> skipNumber(src, q, close)
-                    }
+                    q = skipByKind(kind, src, q, close)
                 } else {
                     q++
                 }
             }
             -1
         }
+    }
+
+    /** Dispatch skip function by kind index — 5-way branch, monomorphic per call site. */
+    private fun skipByKind(kind: Int, src: Series<Char>, pos: Int, limit: Int): Int = when (kind) {
+        1 -> skipString(src, pos, limit)
+        2 -> skipBracket(src, pos, limit)
+        3 -> skipLiteral(src, pos, limit)
+        else -> skipNumber(src, pos, limit)  // kind=4
     }
 
     private fun skipString(src: Series<Char>, start: Int, limit: Int): Int {
@@ -1011,15 +1043,24 @@ object Reify {
     /** reify the value rooted at [ctx], using [syntax] to discriminate CBOR vs text decode paths. */
     fun reify(ctx: JsContext, syntax: Syntax = Syntax.JSON): Any? {
         val e = ctx.a; val src = ctx.b
-        return when (tagOf(e, src)) {
-            Tag.OBJECT -> reifyObject(e, src, syntax)
-            Tag.ARRAY -> reifyArray(e, src, syntax)
-            Tag.STRING, Tag.BYTES -> reifyString(e, src, syntax)
-            Tag.NUMBER -> reifyNumber(e, src, syntax)
-            Tag.BOOL_TRUE -> true
-            Tag.BOOL_FALSE -> false
-            Tag.NULL -> null
-            else -> null
+        val tag = tagOf(e, src)
+        return when (tag.kind) {
+            0 -> {  // OBJECT
+                val r = reifyObject(e, src, syntax)
+                if (r.first == 0) LinkedHashMap<String, Any?>(0) else r
+            }
+            1 -> {  // ARRAY
+                val r = reifyArray(e, src, syntax)
+                if (r.first == 0) ArrayList<Any?>(0) else r
+            }
+            else -> when (tag) {  // scalars — sub-dispatch on specific tag
+                Tag.STRING, Tag.BYTES -> reifyString(e, src, syntax)
+                Tag.NUMBER -> reifyNumber(e, src, syntax)
+                Tag.BOOL_TRUE -> true
+                Tag.BOOL_FALSE -> false
+                Tag.NULL -> null
+                else -> null
+            }
         }
     }
 
