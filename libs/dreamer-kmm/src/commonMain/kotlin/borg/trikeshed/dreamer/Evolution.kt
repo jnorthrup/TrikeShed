@@ -55,6 +55,27 @@ fun mutateGenome(parent: Genome, deltas: Map<String, Double>): Genome {
 fun rankEvaluationsByFitness(evaluations: List<GenomeEvaluation>): List<GenomeEvaluation> =
     evaluations.sortedByDescending { it.fitness }
 
+/**
+ * Build the next stochastic generation from evaluated parents.
+ * The fittest genome is kept as elite; remaining slots are crossover children of the top parents.
+ */
+fun evolvePopulation(
+    evaluations: List<GenomeEvaluation>,
+    mutationDeltas: Map<String, Double> = emptyMap(),
+): List<Genome> {
+    val ranked = rankEvaluationsByFitness(evaluations)
+    if (ranked.isEmpty()) return emptyList()
+    if (ranked.size == 1) return listOf(ranked[0].genome)
+
+    val elite = ranked[0].genome
+    val mate = ranked[1].genome
+    val next = mutableListOf(elite)
+    while (next.size < ranked.size) {
+        next += mutateGenome(crossoverGenome(elite, mate), mutationDeltas)
+    }
+    return next
+}
+
 /** Replay each genome over the same archive data and produce evaluation records. */
 suspend fun evaluatePopulation(
     genomes: List<Genome>,
