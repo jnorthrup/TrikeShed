@@ -115,7 +115,7 @@ class HtxElementTddTest {
     }
 
     @Test
-    fun `request returns 405 for wrong method on /health`() = runTest {
+    fun `request returns 405 for wrong method on health endpoint`() = runTest {
         val elem = openHtxElement()
         val msg = elem.request("POST", "/health")
         assertEquals(405, msg.status)
@@ -140,7 +140,7 @@ class HtxElementTddTest {
     // ── HtxKey is AsyncContextKey<HtxElement> ───────────────────────────────
 
     @Test
-    fun `HtxKey is AsyncContextKey<HtxElement>`() {
+    fun `HtxKey is AsyncContextKey of HtxElement`() {
         assertTrue(HtxKey is AsyncContextKey<HtxElement>)
     }
 

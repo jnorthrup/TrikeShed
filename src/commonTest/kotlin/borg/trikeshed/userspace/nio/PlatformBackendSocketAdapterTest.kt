@@ -1,6 +1,5 @@
 package borg.trikeshed.userspace.nio
 
-import borg.trikeshed.userspace.reactor.Interest
 import kotlin.test.Test
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
@@ -104,7 +103,7 @@ class PlatformBackendSocketAdapterTest {
             override fun pollCompletion(): Result<Completion?> = Result.success(null)
         }
         // Stub: all operations succeed vacuously
-        assertNotNull(backend.register(0, 0L, Interest.READ))
+        assertNotNull(backend.register(0, 0L, Interest.READABLE))
         assertNotNull(backend.pollCompletion())
     }
 

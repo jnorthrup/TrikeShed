@@ -5,10 +5,11 @@ import kotlinx.cinterop.*
 import platform.posix.*
 @OptIn(ExperimentalForeignApi::class)
 actual val platformCacheTopology: CacheTopology by lazy {
-    val fromSys = readFromSysFs(); if (fromSys != null) return@lazy fromSys
-    CacheTopology(sysconf(_SC_LEVEL1_DCACHE_SIZE).takeIf { it > 0 }, sysconf(_SC_LEVEL1_ICACHE_SIZE).takeIf { it > 0 }, sysconf(_SC_LEVEL2_CACHE_SIZE).takeIf { it > 0 }, sysconf(_SC_LEVEL3_CACHE_SIZE).takeIf { it > 0 }, null, sysconf(_SC_NPROCESSORS_ONLN).takeIf { it > 0 }?.toInt())
+    val fromSys = readFromSysFs()
+    if (fromSys != null) return@lazy fromSys
+    CacheTopology.UNKNOWN
 }
-private fun readSysFsCacheFile(suffix: String): String? { val p = "/sys/devices/system/cpu/cpu0/cache/$suffix"; val fp = fopen(p, "r") ?: return null; val b = memScoped { allocArray(256) }; val r = fgets(b, 256, fp); fclose(fp); return r?.toKString()?.trim() }
+private fun readSysFsCacheFile(suffix: String): String? { val p = "/sys/devices/system/cpu/cpu0/cache/$suffix"; val fp = fopen(p, "r") ?: return null; val b = memScoped { allocArray<ByteVar>(256) }; val r = fgets(b, 256, fp); fclose(fp); return r?.toKString()?.trim() }
 private fun readFromSysFs(): CacheTopology? {
     if (readSysFsCacheFile("index0/type") == null) return null
     var l1d: Long? = null; var l1i: Long? = null; var l2: Long? = null; var l3: Long? = null; var line: Int? = null

@@ -5,11 +5,7 @@ import kotlinx.cinterop.alloc
 import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.ptr
 import platform.posix.sysconf
-import platform.posix._SC_LEVEL1_DCACHE_SIZE
-import platform.posix._SC_LEVEL1_ICACHE_SIZE
-import platform.posix._SC_LEVEL2_CACHE_SIZE
-import platform.posix._SC_LEVEL3_CACHE_SIZE
-import platform.posix._SC_NPROCESSORS_ONLN
+import platform.posix.*
 
 /**
  * Native cache interrogation via POSIX sysconf.

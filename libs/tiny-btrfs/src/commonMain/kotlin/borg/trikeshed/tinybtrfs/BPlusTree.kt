@@ -1,3 +1,5 @@
+@file:Suppress("UNCHECKED_CAST")
+
 package borg.trikeshed.tinybtrfs
 
 import borg.trikeshed.tinybtrfs.algebra.*

@@ -60,11 +60,15 @@ open class CirQlar<T>(
         val v = toVect0r()
         val first = v.b(0)
         val newSize = s - 1
+        // Eagerly materialize remaining elements — toVect0r lambda reads al
+        // at invocation time, and we clear al below.
+        val remaining = mutableListOf<T>()
+        for (i in 1 until s) remaining.add(v.b(i))
         // clear underlying array
         for (i in al.indices) al[i] = null
         // write remaining elements back starting at 0
         for (i in 0 until newSize) {
-            al[i] = v.b(i + 1) as Any?
+            al[i] = remaining[i] as Any?
         }
         tail = newSize
         return first

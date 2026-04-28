@@ -30,7 +30,7 @@ class HtxBlockCodecTest {
     @Test
     fun `nameLen roundtrip max 255`() {
         for (len in listOf(0, 1, 127, 255)) {
-            val block = HtxBlock(HtxBlockType.DHTX_REQ, len, 0, 0u)
+            val block = HtxBlock(HtxBlockType.ReqSl, len, 0, 0u)
             assertEquals(len, block.nameLen, "len=$len")
         }
     }
@@ -38,7 +38,7 @@ class HtxBlockCodecTest {
     @Test
     fun `valueLen roundtrip max 0xFFFFF`() {
         for (len in listOf(0, 1, 1024, 0x7FFF, 0xFFFFF)) {
-            val block = HtxBlock(HtxBlockType.DHTX_REQ, 0, len, 0u)
+            val block = HtxBlock(HtxBlockType.ReqSl, 0, len, 0u)
             assertEquals(len, block.valueLen, "len=$len")
         }
     }
@@ -47,7 +47,7 @@ class HtxBlockCodecTest {
     fun `addr is preserved verbatim`() {
         val addrs = listOf(0u, 1u, 0xFFFF_FFFFu, 0x8000_0000u)
         for (addr in addrs) {
-            val block = HtxBlock(HtxBlockType.DHTX_RES, 0, 0, addr)
+            val block = HtxBlock(HtxBlockType.ResSl, 0, 0, addr)
             assertEquals(addr, block.addr, "addr=$addr")
         }
     }
@@ -55,12 +55,12 @@ class HtxBlockCodecTest {
     @Test
     fun `all fields roundtrip simultaneously`() {
         val block = HtxBlock(
-            type    = HtxBlockType.DHTX_REQ,
+            type    = HtxBlockType.ReqSl,
             nameLen = 64,
             valueLen = 0xABCDE,
             addr    = 0x1_0000u,
         )
-        assertEquals(HtxBlockType.DHTX_REQ, block.blockType)
+        assertEquals(HtxBlockType.ReqSl, block.blockType)
         assertEquals(64, block.nameLen)
         assertEquals(0xABCDE, block.valueLen)
         assertEquals(0x1_0000u, block.addr)
@@ -71,7 +71,7 @@ class HtxBlockCodecTest {
     @Test
     fun `valueLen overflow truncated to 20 bits`() {
         // 0x10_0000 = bit 20 set — only 20 bits available
-        val block = HtxBlock(HtxBlockType.DHTX_REQ, 0, 0x10_0000, 0u)
+        val block = HtxBlock(HtxBlockType.ReqSl, 0, 0x10_0000, 0u)
         // valueLen should be 0 because info bits [27..8] overflow into type bits
         assertEquals(0x10_0000 and 0x0F_FFFF, block.valueLen)
     }
@@ -81,7 +81,7 @@ class HtxBlockCodecTest {
     @Test
     fun `nameLen overflow truncated to 8 bits`() {
         // 0x100 = bit 8 set — only 8 bits available
-        val block = HtxBlock(HtxBlockType.DHTX_REQ, 0x100, 0, 0u)
+        val block = HtxBlock(HtxBlockType.ReqSl, 0x100, 0, 0u)
         assertEquals(0x100 and 0xFF, block.nameLen)
     }
 
@@ -89,21 +89,21 @@ class HtxBlockCodecTest {
 
     @Test
     fun `info encodes type in high 4 bits`() {
-        val block = HtxBlock(HtxBlockType.DHTX_RES, 0, 0, 0u)
+        val block = HtxBlock(HtxBlockType.ResSl, 0, 0, 0u)
         val infoType = block.info shr 28
-        assertEquals(HtxBlockType.DHTX_RES.code.toUInt(), infoType)
+        assertEquals(HtxBlockType.ResSl.code.toUInt(), infoType)
     }
 
     @Test
     fun `info encodes nameLen in low byte`() {
-        val block = HtxBlock(HtxBlockType.DHTX_REQ, 99, 0, 0u)
+        val block = HtxBlock(HtxBlockType.ReqSl, 99, 0, 0u)
         val infoNameLen = (block.info and 0xFFu).toInt()
         assertEquals(99, infoNameLen)
     }
 
     @Test
     fun `info encodes valueLen in middle 20 bits`() {
-        val block = HtxBlock(HtxBlockType.DHTX_REQ, 0, 0x12345, 0u)
+        val block = HtxBlock(HtxBlockType.ReqSl, 0, 0x12345, 0u)
         val infoValueLen = (block.info shr 8) and 0x0F_FFFFu
         assertEquals(0x12345u, infoValueLen)
     }

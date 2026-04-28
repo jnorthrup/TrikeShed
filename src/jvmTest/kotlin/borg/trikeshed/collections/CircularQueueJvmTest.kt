@@ -1,5 +1,8 @@
+@file:OptIn(kotlinx.coroutines.InternalCoroutinesApi::class)
+
 package borg.trikeshed.collections
 
+import kotlinx.coroutines.InternalCoroutinesApi
 import kotlin.test.Test
 import kotlin.test.assertEquals
 

@@ -3,6 +3,7 @@ package borg.trikeshed.parse.kursive
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 
 /**
  * TDD spec for NAL (Narsive Abstract Language) parser invariants.

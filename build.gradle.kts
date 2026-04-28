@@ -38,6 +38,8 @@ kotlin {
             "-opt-in=kotlin.ExperimentalUnsignedTypes",
             "-Xsuppress-version-warnings",
             "-Xexpect-actual-classes",
+            // Kotlin 2.4 blocks user code in kotlin.* package — allow our non-JVM JvmInline stubs
+            "-Xallow-kotlin-package",
         )
     }
 
