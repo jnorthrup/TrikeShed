@@ -12,26 +12,26 @@ package borg.trikeshed.tinybtrfs
 class BPlusTree<K : Comparable<K>, V>(private val order: Int = 32) {
     init { require(order >= 3) { "order must be >= 3" } }
 
-   sealed class Node {
+    sealed class Node<K, V> {
         abstract val keys: MutableList<K>
         abstract fun isLeaf(): Boolean
     }
 
-   inner class LeafNode : Node() {
+    inner class LeafNode : Node<K, V>() {
         override val keys = mutableListOf<K>()
         val values = mutableListOf<V?>()
         var next: LeafNode? = null
         override fun isLeaf() = true
     }
 
-   inner class InternalNode : Node() {
+    inner class InternalNode : Node<K, V>() {
         override val keys = mutableListOf<K>()
-        val children = mutableListOf<Node>()
+        val children = mutableListOf<Node<K, V>>()
         override fun isLeaf() = false
     }
 
-   var root: Node = LeafNode()
-   var _size = 0
+    var root: Node<K, V> = LeafNode()
+    var _size = 0
 
     /** Insert or replace a key/value. */
     fun put(key: K, value: V) {
@@ -58,7 +58,7 @@ class BPlusTree<K : Comparable<K>, V>(private val order: Int = 32) {
     fun size(): Int = _size
 
     /** Internal insert. Returns Triple(left, pivot, right) when a split occurs. */
-   fun insert(node: Node, key: K, value: V): Triple<Node, K, Node>? {
+    fun insert(node: Node<K, V>, key: K, value: V): Triple<Node<K, V>, K, Node<K, V>>? {
         if (node.isLeaf()) {
             val leaf = node as LeafNode
             val idx = leaf.keys.binarySearch(key)
@@ -120,7 +120,7 @@ class BPlusTree<K : Comparable<K>, V>(private val order: Int = 32) {
         }
     }
 
-   fun findLeaf(node: Node, key: K): Node {
+    fun findLeaf(node: Node<K, V>, key: K): Node<K, V> {
         var cur = node
         while (!cur.isLeaf()) {
             val internal = cur as InternalNode

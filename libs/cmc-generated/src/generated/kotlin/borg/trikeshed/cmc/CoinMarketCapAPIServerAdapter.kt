@@ -16,7 +16,7 @@ class CoinMarketCapAPIServerAdapter(private val context: CoroutineContext) {
 
     fun execute(request: borg.trikeshed.cmc.infrastructure.GeneratedRequest): ServerMessage {
         return when (request.operationId) {
-            CmcEndpointOverview -> {
+            Contract.CmcEndpointOverview.operationId -> {
                 ServerMessage(status = 501, body = "cmcEndpointOverview not implemented")
             }
             else -> ServerMessage(status = 404, body = "Unknown operation: ${request.operationId}")
