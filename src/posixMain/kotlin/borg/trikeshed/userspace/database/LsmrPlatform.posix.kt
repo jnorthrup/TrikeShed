@@ -12,7 +12,7 @@ actual suspend fun loadKeyFromSegment(
     fileName: String,
     key: String
 ): ByteArray? {
-    TODO("Not yet implemented")
+    throw NotImplementedError("loadKeyFromSegment not implemented on POSIX")
 }
 
 actual fun deleteSegmentFile(rootPath: String, fileName: String) {

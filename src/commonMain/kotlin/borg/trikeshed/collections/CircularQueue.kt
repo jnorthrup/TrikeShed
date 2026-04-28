@@ -54,8 +54,26 @@ open class CirQlar<T>(
         }
     }
 
-    /*override*/ fun poll(): T = TODO("Not yet implemented")
-    /*override*/ fun peek(): T = TODO("Not yet implemented")
+    /*override*/ fun poll(): T {
+        val s = size
+        if (s == 0) throw NoSuchElementException("CircularQueue empty")
+        val v = toVect0r()
+        val first = v.b(0)
+        val newSize = s - 1
+        // clear underlying array
+        for (i in al.indices) al[i] = null
+        // write remaining elements back starting at 0
+        for (i in 0 until newSize) {
+            al[i] = v.b(i + 1) as Any?
+        }
+        tail = newSize
+        return first
+    }
+    /*override*/ fun peek(): T {
+        val s = size
+        if (s == 0) throw NoSuchElementException("CircularQueue empty")
+        return toVect0r().b(0)
+    }
     /*override*/ fun add(k: T): Boolean = offer(k)
     operator fun CirQlar<T>.plus(k: T): Boolean = offer(k)
     operator fun CirQlar<T>.plusAssign(k: T) {
@@ -73,7 +91,9 @@ open class CirQlar<T>(
         var i = 0
         override fun hasNext(): Boolean = i < v.size
         override fun next(): T = v.b(i++)
-        override fun remove(): Unit = TODO("Not yet implemented")
+        override fun remove(): Unit {
+            throw UnsupportedOperationException("remove not supported")
+        }
     }
 }
 

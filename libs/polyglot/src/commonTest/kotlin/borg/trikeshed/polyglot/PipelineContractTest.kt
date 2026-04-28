@@ -198,11 +198,13 @@ class PipelineContractTest {
         assertEquals(1, ast.diagnostics.size)
     }
 
-    @Test fun `UniversalAst toCursor is RED TODO`() {
+    @Test fun `UniversalAst toCursor flattens SourceFragment tree`() {
         val ast = UniversalAst(LangId.JAVA, SourceFragment(
             LangId.JAVA, 0 j 10, NodeKind.CLASS, "Main", TypeEvidence()
         ))
-        assertFailsWith<NotImplementedError> { ast.toCursor() }
+        val cursor = ast.toCursor()
+        assertNotNull(cursor)
+        assertTrue(cursor.size >= 1)
     }
 
     @Test fun `LangParser interface defines parse and parseFile contracts`() {

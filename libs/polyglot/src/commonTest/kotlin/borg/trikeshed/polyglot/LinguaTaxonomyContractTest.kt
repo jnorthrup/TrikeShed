@@ -47,9 +47,10 @@ class LinguaTaxonomyContractTest {
         assertEquals(42, fp.corpusLength)
     }
 
-    @Test fun `LangFingerprint toRowVec is RED TODO`() {
-        val fp = LangFingerprint(TypeEvidence(), 0)
-        assertFailsWith<NotImplementedError> { fp.toRowVec() }
+    @Test fun `LangFingerprint toRowVec projects corpusLength`() {
+        val fp = LangFingerprint(TypeEvidence(), 42)
+        val row = fp.toRowVec()
+        assertEquals(42, row[row.size - 1].a)
     }
 
     @Test fun `LangFingerprint LANG_FP_COLUMNS has 18 columns`() {
@@ -88,10 +89,8 @@ class LinguaTaxonomyContractTest {
 
     /* ─── confidence() ───────────────────────────────────────────── */
 
-    @Test fun `confidence is RED TODO`() {
-        assertFailsWith<NotImplementedError> {
-            confidence(TypeEvidence(), TypeEvidence())
-        }
+    @Test fun `confidence 1.0 for identical evidence`() {
+        assertEquals(1.0, confidence(TypeEvidence(), TypeEvidence()))
     }
 
     /* ─── LangEntry ──────────────────────────────────────────────── */
@@ -114,13 +113,16 @@ class LinguaTaxonomyContractTest {
         assertEquals("#!/usr/bin/env python3", entry.shebang)
     }
 
-    @Test fun `LangEntry classify is RED TODO`() {
+    @Test fun `LangEntry classify returns ClassificationResult`() {
         val entry = LangEntry(
             LangId.RUST, LangFingerprint(TypeEvidence(), 10),
             LangClassifier { TypeEvidence() },
             listOf(".rs"), null
         )
-        assertFailsWith<NotImplementedError> { entry.classify("fn main() {}".toSeries()) }
+        val r = entry.classify("fn main() {}".toSeries())
+        assertEquals(LangId.RUST, r.lang)
+        assertTrue(r.confidence >= 0.0)
+        assertTrue(r.confidence <= 1.0)
     }
 
     /* ─── LangRegistry ───────────────────────────────────────────── */
@@ -176,18 +178,28 @@ class LinguaTaxonomyContractTest {
         assertEquals(1, s.a)
     }
 
-    @Test fun `LangRegistry classifyAll is RED TODO`() {
+    @Test fun `LangRegistry classifyAll returns results list`() {
         LangRegistry.reset()
-        assertFailsWith<NotImplementedError> {
-            LangRegistry.classifyAll("source text".toSeries())
-        }
+        LangRegistry.register(LangId.HASKELL, LangFingerprint(TypeEvidence(), 60), LangClassifier { TypeEvidence() }, listOf(".hs"))
+        val results = LangRegistry.classifyAll("source text".toSeries())
+        assertEquals(1, results.size)
     }
 
-    @Test fun `LangRegistry bestMatch is RED TODO`() {
+    @Test fun `LangRegistry bestMatch returns top result`() {
         LangRegistry.reset()
-        assertFailsWith<NotImplementedError> {
-            LangRegistry.bestMatch("source text".toSeries())
-        }
+        LangRegistry.register(
+            LangId.PYTHON, LangFingerprint(TypeEvidence().apply { whitespaces = 100U }, 300),
+            LangClassifier { TypeEvidence().apply { whitespaces = 90U } },
+            listOf(".py")
+        )
+        LangRegistry.register(
+            LangId.JAVASCRIPT, LangFingerprint(TypeEvidence().apply { dquotes = 50U }, 100),
+            LangClassifier { TypeEvidence().apply { dquotes = 5U } },
+            listOf(".js")
+        )
+        val best = LangRegistry.bestMatch("def foo():".toSeries())
+        assertNotNull(best)
+        assertEquals(LangId.PYTHON, best?.lang)
     }
 
     /* ─── Use case: full registration → classification flow ──────── */
@@ -204,16 +216,13 @@ class LinguaTaxonomyContractTest {
             LangClassifier { TypeEvidence().apply { special = 38U } },
             listOf(".rs")
         )
-        // RED: classifyAll and confidence both TODO
-        assertFailsWith<NotImplementedError> {
-            val results = LangRegistry.classifyAll("fn main() {}".toSeries())
-            assertEquals(2, results.size)
-            // Kotlin classifier returns alpha=75, which is closer to Kotlin fingerprint alpha=80
-            // than Rust fingerprint alpha=0 → higher confidence → first
-            assertEquals(LangId.KOTLIN, results[0].lang)
-            assertTrue(results[0].confidence >= 0.0)
-            assertTrue(results[0].confidence <= 1.0)
-        }
+        val results = LangRegistry.classifyAll("fn main() {}".toSeries())
+        assertEquals(2, results.size)
+        // Kotlin classifier returns alpha=75, which is closer to Kotlin fingerprint alpha=80
+        // than Rust fingerprint alpha=0 → higher confidence → first
+        assertEquals(LangId.KOTLIN, results[0].lang)
+        assertTrue(results[0].confidence >= 0.0)
+        assertTrue(results[0].confidence <= 1.0)
     }
 
     @Test fun `usecase bestMatch returns top result`() {

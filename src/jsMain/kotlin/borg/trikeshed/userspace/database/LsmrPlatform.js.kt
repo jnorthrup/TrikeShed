@@ -4,14 +4,14 @@ actual suspend fun persistSegmentToDisk(
     rootPath: String,
     fileName: String,
     entries: Map<String, ByteArray>
-):Unit = TODO()
+): Unit = throw NotImplementedError("persistSegmentToDisk not implemented on JS")
 
 actual suspend fun loadKeyFromSegment(
     rootPath: String,
     fileName: String,
     key: String
 ): ByteArray? {
-    TODO("Not yet implemented")
+    throw NotImplementedError("loadKeyFromSegment not implemented on JS")
 }
 
-actual fun deleteSegmentFile(rootPath: String, fileName: String):Unit= TODO()
+actual fun deleteSegmentFile(rootPath: String, fileName: String): Unit = throw NotImplementedError("deleteSegmentFile not implemented on JS")

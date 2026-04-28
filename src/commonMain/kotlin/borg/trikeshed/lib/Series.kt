@@ -387,7 +387,7 @@ fun <T> Series<T>.reversed(): Series<T> {
     return size j { it: Int -> this.b((szCapture - it)) }
 }
 
-object EmptySeries : Series<Nothing> by 0 j { _ -> TODO("empty Series Access Violation") }
+object EmptySeries : Series<Nothing> by 0 j { _ -> throw NoSuchElementException("empty Series Access Violation") }
 
 inline fun<reified T>  emptySeries(): Series< T> = EmptySeries as Series<T>
 

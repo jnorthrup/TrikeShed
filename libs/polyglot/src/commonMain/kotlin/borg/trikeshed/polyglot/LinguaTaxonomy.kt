@@ -64,8 +64,31 @@ data class LangFingerprint(
     val corpusLength: Int,
 ) {
     /** RowVec projection — same columns as TypeEvidence.toRowVec(). */
-    fun toRowVec(): RowVec =
-        TODO("LangFingerprint.toRowVec — 18-column RowVec with evidence + corpusLength")
+    fun toRowVec(): RowVec {
+        val ev = evidence
+        val values = arrayOf<Any?>(
+            ev.confix,
+            ev.digits.toInt(),
+            ev.periods.toInt(),
+            ev.exponent.toInt(),
+            ev.signs.toInt(),
+            ev.special.toInt(),
+            ev.alpha.toInt(),
+            ev.truefalse.toInt(),
+            ev.empty.toInt(),
+            ev.quotes.toInt(),
+            ev.dquotes.toInt(),
+            ev.whitespaces.toInt(),
+            ev.backslashes.toInt(),
+            ev.linefeed.toInt(),
+            ev.maxColumnLength.toInt(),
+            if (ev.minColumnLength == UShort.MAX_VALUE) 0 else ev.minColumnLength.toInt(),
+            TypeEvidence.deduceMemento(ev).label,
+            corpusLength
+        )
+        val meta: Series<() -> ColumnMeta> = LANG_FP_COLUMNS.size j { index: Int -> { LANG_FP_COLUMNS[index] } }
+        return values.size j { index: Int -> values[index] } joins meta
+    }
 
     companion object {
         val LANG_FP_COLUMNS = arrayOf(
@@ -125,8 +148,54 @@ data class ClassificationResult(
  * Average across all counters, then invert: 1.0 - averageDelta.
  * Returns 0.0–1.0 where 1.0 is a perfect match.
  */
-fun confidence(live: TypeEvidence, ref: TypeEvidence): Double =
-    TODO("confidence — 13-counter inverse normalized delta, 0.0–1.0")
+fun confidence(live: TypeEvidence, ref: TypeEvidence): Double {
+    val liveVals = listOf(
+        live.digits.toDouble(),
+        live.periods.toDouble(),
+        live.exponent.toDouble(),
+        live.signs.toDouble(),
+        live.special.toDouble(),
+        live.alpha.toDouble(),
+        live.truefalse.toDouble(),
+        live.empty.toDouble(),
+        live.quotes.toDouble(),
+        live.dquotes.toDouble(),
+        live.whitespaces.toDouble(),
+        live.backslashes.toDouble(),
+        live.linefeed.toDouble(),
+        live.maxColumnLength.toDouble(),
+        if (live.minColumnLength == UShort.MAX_VALUE) 0.0 else live.minColumnLength.toDouble()
+    )
+    val refVals = listOf(
+        ref.digits.toDouble(),
+        ref.periods.toDouble(),
+        ref.exponent.toDouble(),
+        ref.signs.toDouble(),
+        ref.special.toDouble(),
+        ref.alpha.toDouble(),
+        ref.truefalse.toDouble(),
+        ref.empty.toDouble(),
+        ref.quotes.toDouble(),
+        ref.dquotes.toDouble(),
+        ref.whitespaces.toDouble(),
+        ref.backslashes.toDouble(),
+        ref.linefeed.toDouble(),
+        ref.maxColumnLength.toDouble(),
+        if (ref.minColumnLength == UShort.MAX_VALUE) 0.0 else ref.minColumnLength.toDouble()
+    )
+
+    val diffs = liveVals.zip(refVals) { l, r ->
+        val denom = maxOf(1.0, maxOf(l, r))
+        kotlin.math.abs(l - r) / denom
+    }
+    val avg = if (diffs.isEmpty()) 1.0 else diffs.average()
+    val score = 1.0 - avg
+    return when {
+        score < 0.0 -> 0.0
+        score > 1.0 -> 1.0
+        else -> score
+    }
+}
 
 /**
  * A registered language with its fingerprint, classifier, and parser hint.
@@ -147,8 +216,11 @@ data class LangEntry(
      * Run classification on live source text.
      * Returns the TypeEvidence row + confidence against the reference fingerprint.
      */
-    fun classify(source: Series<Char>): ClassificationResult =
-        TODO("LangEntry.classify — run classifier, compute confidence against fingerprint")
+    fun classify(source: Series<Char>): ClassificationResult {
+        val ev = classifier.classify(source)
+        val conf = confidence(ev, fingerprint.evidence)
+        return ClassificationResult(id, ev, conf)
+    }
 }
 
 /** Thread-safe append-only language registry. */
@@ -183,9 +255,9 @@ object LangRegistry {
      * Returns ClassificationResults sorted by confidence descending.
      */
     fun classifyAll(source: Series<Char>): List<ClassificationResult> =
-        TODO("classifyAll — speculative fanout: run all classifiers, sort by confidence desc")
+        entries.map { it.classify(source) }.sortedByDescending { it.confidence }
 
     /** Top-ranked classification, or null if registry is empty. */
     fun bestMatch(source: Series<Char>): ClassificationResult? =
-        TODO("bestMatch — top result from classifyAll, or null if empty")
+        classifyAll(source).firstOrNull()
 }

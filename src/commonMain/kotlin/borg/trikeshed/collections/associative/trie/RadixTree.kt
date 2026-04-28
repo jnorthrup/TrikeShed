@@ -84,7 +84,7 @@ class RadixTree<C : Comparable<C>> {
 
     fun keys(): List<Series<C>> {
         val result = mutableListOf<Series<C>>()
-        root?.collectKeys(prefix = 0 j { TODO("OOB") }, result = result)
+        root?.collectKeys(prefix = Join.emptySeriesOf<C>(), result = result)
         return result
     }
 }
