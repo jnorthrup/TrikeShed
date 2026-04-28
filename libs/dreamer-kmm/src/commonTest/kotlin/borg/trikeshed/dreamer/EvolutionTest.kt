@@ -32,4 +32,32 @@ class EvolutionTest {
         assertEquals(2, evaluations[0].result.metrics.totalTicks)
         assertTrue(evaluations.all { it.fitness == fitnessFromResult(it.result) })
     }
+
+    @Test
+    fun `computeStochasticFitness rewards Sortino and penalizes drawdown`() {
+        val baseMetrics = BacktestMetrics(
+            totalTicks = 4,
+            totalReturn = 0.10,
+            sharpeRatio = 1.0,
+            sortinoRatio = 2.0,
+            maxDrawdown = 0.20,
+            maxDrawdownTicks = 2,
+            totalHarvested = 0.0,
+            totalTrades = 0,
+            avgHarvestPerTick = 0.0,
+        )
+        val strongerDownsideProfile = baseMetrics.copy(sortinoRatio = 4.0)
+        val deeperDrawdown = baseMetrics.copy(maxDrawdown = 0.60)
+
+        assertTrue(computeStochasticFitness(backtestResult(baseMetrics)) > 0.0)
+        assertTrue(computeStochasticFitness(backtestResult(strongerDownsideProfile)) > computeStochasticFitness(backtestResult(baseMetrics)))
+        assertTrue(computeStochasticFitness(backtestResult(deeperDrawdown)) < computeStochasticFitness(backtestResult(baseMetrics)))
+    }
+
+    private fun backtestResult(metrics: BacktestMetrics): BacktestResult = BacktestResult(
+        symbol = "BTCUSDT",
+        initialCapital = 10_000.0,
+        cycles = emptyList(),
+        metrics = metrics,
+    )
 }

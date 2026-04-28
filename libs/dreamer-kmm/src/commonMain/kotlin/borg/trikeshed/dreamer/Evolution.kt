@@ -10,11 +10,20 @@ data class GenomeEvaluation(
 )
 
 /**
- * Minimal stochastic fitness scalar over a back-test result.
- * Rewards return and Sharpe while penalizing drawdown.
+ * Stochastic fitness scalar over a back-test result.
+ * Rewards return, Sharpe, and downside-volatility-adjusted Sortino while penalizing drawdown.
  */
-fun fitnessFromResult(result: BacktestResult): Double =
-    result.metrics.totalReturn + result.metrics.sharpeRatio - result.metrics.maxDrawdown
+fun computeStochasticFitness(result: BacktestResult): Double =
+    result.metrics.totalReturn +
+        result.metrics.sharpeRatio +
+        result.metrics.sortinoRatio -
+        result.metrics.maxDrawdown
+
+/**
+ * Minimal stochastic fitness scalar over a back-test result.
+ * Rewards return and risk-adjusted upside while penalizing drawdown.
+ */
+fun fitnessFromResult(result: BacktestResult): Double = computeStochasticFitness(result)
 
 /** Replay each genome over the same archive data and produce evaluation records. */
 suspend fun evaluatePopulation(
