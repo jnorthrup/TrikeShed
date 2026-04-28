@@ -19,7 +19,7 @@ class PatriciaTrieMapTest {
     fun `single insert then get returns value`() {
         val trie = PatriciaTrieMap<String, Int>(BitComp(stringBytes))
         trie["hello"] = 42
-        assertEquals(42, trie["hello"])
+        assertTrue(trie["hello"] == 42)
     }
 
     @Test
@@ -27,8 +27,8 @@ class PatriciaTrieMapTest {
         val trie = PatriciaTrieMap<String, Int>(BitComp(stringBytes))
         trie["abc"] = 1
         trie["abd"] = 2
-        assertEquals(1, trie["abc"])
-        assertEquals(2, trie["abd"])
+        assertTrue(trie["abc"] == 1)
+        assertTrue(trie["abd"] == 2)
     }
 
     @Test
@@ -36,9 +36,8 @@ class PatriciaTrieMapTest {
         val trie = PatriciaTrieMap<String, Int>(BitComp(stringBytes))
         trie["abcde"] = 1
         trie["abxyz"] = 2
-        // "abcde" and "abxyz" share prefix "ab", split at "c" vs "x"
-        assertEquals(1, trie["abcde"])
-        assertEquals(2, trie["abxyz"])
+        assertTrue(trie["abcde"] == 1)
+        assertTrue(trie["abxyz"] == 2)
     }
 
     @Test
@@ -46,7 +45,7 @@ class PatriciaTrieMapTest {
         val trie = PatriciaTrieMap<String, Int>(BitComp(stringBytes))
         trie["key"] = 1
         trie["key"] = 99
-        assertEquals(99, trie["key"])
+        assertTrue(trie["key"] == 99)
     }
 
     @Test
@@ -54,20 +53,20 @@ class PatriciaTrieMapTest {
         val trie = PatriciaTrieMap<String, Int>(BitComp(stringBytes))
         trie["ab"] = 1
         trie["abc"] = 2
-        assertEquals(1, trie["ab"])
-        assertEquals(2, trie["abc"])
+        assertTrue(trie["ab"] == 1)
+        assertTrue(trie["abc"] == 2)
     }
 
     @Test
     fun `size reflects insertions`() {
         val trie = PatriciaTrieMap<String, Int>(BitComp(stringBytes))
-        assertEquals(0, trie.size)
+        assertTrue(trie.size == 0)
         trie["a"] = 1
-        assertEquals(1, trie.size)
+        assertTrue(trie.size == 1)
         trie["b"] = 2
-        assertEquals(2, trie.size)
-        trie["a"] = 3  // overwrite, size unchanged
-        assertEquals(2, trie.size)
+        assertTrue(trie.size == 2)
+        trie["a"] = 3
+        assertTrue(trie.size == 2)
     }
 
     @Test
@@ -84,6 +83,6 @@ class PatriciaTrieMapTest {
     fun `empty key gets and sets`() {
         val trie = PatriciaTrieMap<String, Int>(BitComp(stringBytes))
         trie[""] = 99
-        assertEquals(99, trie[""])
+        assertTrue(trie[""] == 99)
     }
 }
