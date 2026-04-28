@@ -1,5 +1,6 @@
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
+import org.jetbrains.kotlin.gradle.plugin.KotlinJsCompilerType
 
 plugins {
     kotlin("multiplatform")
@@ -31,7 +32,7 @@ kotlin {
     jvmToolchain(21)
     jvm()
 
-    js(IR) {
+    js()  {
         nodejs()
         binaries.executable()
     }

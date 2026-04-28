@@ -32,6 +32,10 @@ kotlin {
     jvmToolchain(21)
     jvm()
 
+    js(IR) {
+        nodejs()
+    }
+
     sourceSets {
         val commonMain by getting {
             dependencies {
