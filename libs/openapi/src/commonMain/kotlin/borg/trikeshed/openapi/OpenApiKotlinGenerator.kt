@@ -122,7 +122,7 @@ fun ResolvedOperation.successKotlinType(): String =
     primarySuccessResponse()?.contentTypes?.firstOrNull()?.schema?.toKotlinType() ?: "String"
 
 fun ResolvedOperation.hasRequestBody(): Boolean =
-    requestBody != null && requestBody!!.contentTypes.isNotEmpty()
+    requestBody != null && requestBody.contentTypes.isNotEmpty()
 
 fun ResolvedOperation.contractClassName(): String = operationId.toPascalCase()
 fun ResolvedOperation.apiMethodName(): String = operationId.toCamelCase()

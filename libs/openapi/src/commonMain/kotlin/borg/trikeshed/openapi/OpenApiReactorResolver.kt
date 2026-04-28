@@ -5,23 +5,6 @@ package borg.trikeshed.openapi
 // ── reference resolution ──────────────────────────────────────────────────────
 
 /**
- * Walks an OpenAPI JSON tree and resolves every $ref to its target value.
- * Handles JSON Pointer (RFC 6901): #/components/schemas/Foo → root["components"]["schemas"]["Foo"]
- * Handles ~0 → ~ and ~1 → / in ref path segments.
- */
-fun OpenApiRawDocument.resolveRef(ref: String): Any? {
-    if (!ref.startsWith("#/")) return null
-    var current: Any? = root
-    for (segment in ref.removePrefix("#/").split('/')) {
-        val key = segment
-            .replace("~1", "/")
-            .replace("~0", "~")
-        current = current.asMap()?.get(key) ?: return null
-    }
-    return current
-}
-
-/**
  * Walks the full document tree and resolves every $ref in place,
  * producing a new map with all references materialised.
  */
@@ -33,6 +16,7 @@ fun OpenApiRawDocument.resolveAllRefs(): Map<String, Any?> {
         cache[ref] = result
         return result
     }
+    @Suppress("UNCHECKED_CAST")
     return walkAndResolve(root, ::doResolve).let { it as? Map<String, Any?> }!!
 }
 fun walkAndResolve(node: Any?, resolveRef: (String) -> Any?): Any? {
@@ -275,7 +259,7 @@ fun OpenApiRawDocument.resolveRequestBody(node: Any?): ResolvedRequestBody? {
 // ── operation resolver ────────────────────────────────────────────────────────
 fun OpenApiRawDocument.resolveOperation(rawOp: OpenApiRawOperation): ResolvedOperation? {
     val opMap = rawOp.operation
-    if (opMap == null || opMap.isEmpty()) return null
+    if (opMap.isEmpty()) return null
 
     val operationId = opMap["operationId"].asStr() ?: return null
 

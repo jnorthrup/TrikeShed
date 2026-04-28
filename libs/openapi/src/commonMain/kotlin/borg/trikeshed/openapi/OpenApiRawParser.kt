@@ -5,6 +5,7 @@ import borg.trikeshed.parse.json.JsonParser
 
 // ── type aliases over plain Kotlin maps ──────────────────────────────────────
 typealias JsonMap = Map<String, Any?>
+@Suppress("UNCHECKED_CAST")
 fun Any?.asMap(): JsonMap? = this as? JsonMap
 fun Any?.asString(): String? = this as? String
 fun Any?.asStr(): String? = this as? String
@@ -193,9 +194,7 @@ object OpenApiRawParser {
                 }
             }
             else -> {
-                @Suppress("UNCHECKED_CAST")
-                (borg.trikeshed.parse.yaml.parse(text) as? Map<String, Any?>)
-                    ?: throw OpenApiParseException("Parsed YAML root is not a YAML map")
+                borg.trikeshed.parse.yaml.parse(text)
             }
         }
 
