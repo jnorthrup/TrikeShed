@@ -41,4 +41,16 @@ class TrieJvmTest {
             trie.add(d, "y")
         }
     }
+
+    @Test
+    fun payloadUpdatesOnAdd() {
+        val p1 = 1
+        val p2 = 2
+        val trie = Trie()
+        trie.add(p1, "a", "b", "c")
+        // add a leaf for the prefix with a different payload
+        trie.add(p2, "a", "b")
+        assertEquals(p2, trie["a", "b"]) // prefix payload should have been updated
+        assertEquals(p1, trie["a", "b", "c"]) // deeper node keeps its original payload
+    }
 }

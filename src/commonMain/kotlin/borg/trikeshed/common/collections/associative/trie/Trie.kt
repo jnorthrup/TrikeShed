@@ -25,6 +25,10 @@ class Trie(var root: Map<String, Node> = linkedMapOf()) {
                 if (isLeaf != node.leaf) {
                     node.leaf = isLeaf
                 }
+                if (isLeaf) {
+                    // update payload for leaf nodes when re-added
+                    node.payload = v
+                }
                 children = node.children
             }
         }
@@ -84,7 +88,7 @@ class Trie(var root: Map<String, Node> = linkedMapOf()) {
         class Node(
             val pathSeg: String,
             var leaf: Boolean,
-            val payload: Int,
+            var payload: Int,
             var children: Map<String, Node> = linkedMapOf()
         )
     }
