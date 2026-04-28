@@ -236,6 +236,21 @@ class RunCycleTest {
     }
 
     @Test
+    fun `BacktestMetrics sortinoRatio uses downside volatility only`() {
+        val cycles = listOf(
+            CycleResult(0, 0L, 0.0, 100.0, 100.0, false, 0.0, emptyList(), false, emptyMap()),
+            CycleResult(1, 1L, 0.0, 110.0, 110.0, false, 0.0, emptyList(), false, emptyMap()),
+            CycleResult(2, 2L, 0.0, 104.5, 104.5, false, 0.0, emptyList(), false, emptyMap()),
+            CycleResult(3, 3L, 0.0, 114.95, 114.95, false, 0.0, emptyList(), false, emptyMap()),
+        )
+
+        val metrics = computeBacktestMetrics(cycles, 100.0, doubleSeriesOf(listOf(100.0, 110.0, 104.5, 114.95)))
+
+        assertTrue(metrics.sortinoRatio > metrics.sharpeRatio)
+        assertTrue(metrics.sortinoRatio > 20.0, "sortinoRatio=${metrics.sortinoRatio} should reward limited downside")
+    }
+
+    @Test
     fun `BacktestMetrics totalTrades counts harvest ticks`() {
         val cycles = listOf(
             CycleResult(0, 0L, 0.0, 10_000.0, 10_000.0, false, 0.0, emptyList(), false, emptyMap()),

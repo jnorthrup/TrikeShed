@@ -51,6 +51,7 @@ data class BacktestMetrics(
     val totalTicks: Int,
     val totalReturn: Double,        // pct: (final - initial) / initial
     val sharpeRatio: Double,        // annualized: mean(ret) / std(ret) * sqrt(252)
+    val sortinoRatio: Double,       // annualized: mean(ret) / downside deviation * sqrt(252)
     val maxDrawdown: Double,        // pct: max peak - trough / peak
     val maxDrawdownTicks: Int,      // ticks in drawdown
     val totalHarvested: Double,
@@ -194,6 +195,7 @@ fun computeBacktestMetrics(
             totalTicks = 0,
             totalReturn = 0.0,
             sharpeRatio = 0.0,
+            sortinoRatio = 0.0,
             maxDrawdown = 0.0,
             maxDrawdownTicks = 0,
             totalHarvested = 0.0,
@@ -223,6 +225,13 @@ fun computeBacktestMetrics(
     // Annualized Sharpe (252 trading days per year, assumes 1 bar = 1 day for now)
     val sharpeRatio = if (stdReturn > 0.0) (meanReturn / stdReturn) * sqrt(252.0) else 0.0
 
+    val downsideVariance = if (returns.isNotEmpty()) {
+        returns.map { if (it < 0.0) it * it else 0.0 }.average()
+    } else 0.0
+    val downsideDeviation = sqrt(downsideVariance)
+    // Annualized Sortino, using zero as the minimum acceptable cycle return.
+    val sortinoRatio = if (downsideDeviation > 0.0) (meanReturn / downsideDeviation) * sqrt(252.0) else 0.0
+
     // Max drawdown
     var peak = initialCapital
     var peakIndex = -1
@@ -249,6 +258,7 @@ fun computeBacktestMetrics(
         totalTicks = totalTicks,
         totalReturn = totalReturn,
         sharpeRatio = sharpeRatio,
+        sortinoRatio = sortinoRatio,
         maxDrawdown = maxDrawdown,
         maxDrawdownTicks = maxDrawdownTicks,
         totalHarvested = totalHarvested,
@@ -286,6 +296,7 @@ suspend fun simulateTicks(
                 totalTicks = 0,
                 totalReturn = 0.0,
                 sharpeRatio = 0.0,
+                sortinoRatio = 0.0,
                 maxDrawdown = 0.0,
                 maxDrawdownTicks = 0,
                 totalHarvested = 0.0,
@@ -360,6 +371,7 @@ private fun emptyBacktestResult(genome: Genome, initialCapital: Double): Backtes
             totalTicks = 0,
             totalReturn = 0.0,
             sharpeRatio = 0.0,
+            sortinoRatio = 0.0,
             maxDrawdown = 0.0,
             maxDrawdownTicks = 0,
             totalHarvested = 0.0,
