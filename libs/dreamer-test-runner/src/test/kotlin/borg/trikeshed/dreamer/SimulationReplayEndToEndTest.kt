@@ -160,4 +160,45 @@ class SimulationReplayEndToEndTest {
         assertTrue(result.metrics.totalReturn > 0.0, "Expected positive return but got ${result.metrics.totalReturn}")
         assertEquals(2, result.metrics.totalTicks)
     }
+
+    // ── 4. Multi-symbol simulation ─────────────────────────────────────────
+
+    /**
+     * Verify multi-symbol simulation: allSymbolsAtBar collects all symbol inputs
+     * at the same openTime, and simulateTicks processes them through the engine.
+     */
+    @Test
+    fun `multi-symbol simulation produces correct per-symbol values`() = runBlocking {
+        // Build cursor: BTC and ETH at same openTime, then BTC and ETH at second openTime
+        val klines = listOf(
+            Kline("BTC-USD", TimeSpan.Hours1, 1000L, 20000.0, 21000.0, 19900.0, 20500.0, 100.0),
+            Kline("ETH-USD", TimeSpan.Hours1, 1000L, 2000.0, 2100.0, 1900.0, 2050.0, 1000.0),
+            Kline("BTC-USD", TimeSpan.Hours1, 2000L, 20500.0, 21500.0, 20400.0, 21000.0, 110.0),
+            Kline("ETH-USD", TimeSpan.Hours1, 2000L, 2050.0, 2150.0, 2000.0, 2100.0, 1100.0),
+        )
+        // Inline conversion: List<Kline> → MiniCursor
+        val block = KlineBlock.mutable()
+        klines.forEach { block.append(it) }
+        block.seal()
+        val cursor: MiniCursor = block.asCursor()
+        assertEquals(4, cursor.size)
+
+        // Verify allSymbolsAtBar returns both symbols for first bar
+        val holdings = mapOf("BTC-USD" to 0.5, "ETH-USD" to 2.0)
+        val inputs = allSymbolsAtBar(cursor, barIndex = 0, holdings = holdings)
+
+        assertEquals(2, inputs.size)
+        val symbols = inputs.map { it.symbol }.toSet()
+        assertEquals(setOf("BTC-USD", "ETH-USD"), symbols)
+
+        val btc = inputs.first { it.symbol == "BTC-USD" }
+        assertEquals(1000L, btc.openTime)
+        assertEquals(0.5, btc.quantity)
+        assertEquals(20500.0, btc.price, 0.001) // close price
+
+        val eth = inputs.first { it.symbol == "ETH-USD" }
+        assertEquals(1000L, eth.openTime)
+        assertEquals(2.0, eth.quantity)
+        assertEquals(2050.0, eth.price, 0.001) // close price
+    }
 }

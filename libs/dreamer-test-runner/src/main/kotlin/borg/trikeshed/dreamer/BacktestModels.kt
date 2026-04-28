@@ -113,10 +113,20 @@ fun portfolioInputToRows(input: PortfolioInput): List<PortfolioRow> = listOf(
 )
 
 /**
- * Convert a MiniCursor of multi-symbol kline bars (one symbol per row)
- * into a [PortfolioInput] for a given bar index.
+ * Convert a MiniCursor row at [barIndex] into a [PortfolioInput].
  *
- * Used when the cursor contains per-bar close prices for all symbols in the portfolio.
+ * This is the single-symbol accessor for a flat cursor where each row is one
+ * symbol's bar. For the current simulation model, each barIndex gives one
+ * symbol's bar at that position. The cursor is expected to be filtered to a
+ * single symbol for the standard back-test path; [klineBarToPortfolioInput]
+ * is the preferred helper there.
+ *
+ * For true multi-symbol cursors (interleaved or multi-row per bar), use
+ * [allSymbolsAtBar] to collect all symbol rows sharing the same openTime.
+ *
+ * @param cursor   MiniCursor of kline bars (DocRowVec rows)
+ * @param barIndex index of the bar row to convert
+ * @param holdings map of symbol → quantity (used to compute value)
  */
 fun multiSymbolKlineToPortfolioInput(
     cursor: MiniCursor,
@@ -124,9 +134,6 @@ fun multiSymbolKlineToPortfolioInput(
     holdings: Map<String, Double>,
 ): List<PortfolioInput> {
     val row: DocRowVec = (cursor at barIndex) as DocRowVec
-    // The cursor may have multiple rows per bar if symbols are interleaved.
-    // We assume the cursor is already filtered to one symbol for the simple case.
-    // For multi-symbol: each row in the cursor is one symbol's bar.
     val symbol: String = row["symbol"] as? String ?: "UNKNOWN"
     val openTime: Long = row["openTime"] as? Long ?: 0L
     val price: Double = row["close"] as? Double ?: row["open"] as? Double ?: 0.0
@@ -140,6 +147,42 @@ fun multiSymbolKlineToPortfolioInput(
             value = quantity * price,
         )
     )
+}
+
+/**
+ * Collect all [PortfolioInput] rows at the same bar position (openTime) as [barIndex].
+ *
+ * Scans the cursor to find all rows sharing the same [openTime] as the row at
+ * [barIndex], returning one [PortfolioInput] per distinct symbol found.
+ * Use this for true multi-symbol back-tests where the cursor holds rows for
+ * multiple symbols at the same timestamp.
+ *
+ * @param cursor    MiniCursor of kline bars (DocRowVec rows, possibly interleaved symbols)
+ * @param barIndex reference bar index; all rows with the same openTime are collected
+ * @param holdings  map of symbol → quantity
+ */
+fun allSymbolsAtBar(
+    cursor: MiniCursor,
+    barIndex: Int,
+    holdings: Map<String, Double>,
+): List<PortfolioInput> {
+    val refRow: DocRowVec = (cursor at barIndex) as DocRowVec
+    val refOpenTime: Long = refRow["openTime"] as? Long ?: 0L
+
+    return (0 until cursor.size).mapNotNull { i ->
+        val row: DocRowVec = (cursor at i) as DocRowVec
+        if ((row["openTime"] as? Long) != refOpenTime) return@mapNotNull null
+        val symbol: String = row["symbol"] as? String ?: "UNKNOWN"
+        val price: Double = row["close"] as? Double ?: row["open"] as? Double ?: 0.0
+        val quantity: Double = holdings[symbol] ?: 0.0
+        PortfolioInput(
+            symbol = symbol,
+            openTime = refOpenTime,
+            quantity = quantity,
+            price = price,
+            value = quantity * price,
+        )
+    }.distinctBy { it.symbol }
 }
 
 /**

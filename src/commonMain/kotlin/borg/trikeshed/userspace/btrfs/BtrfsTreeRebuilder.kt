@@ -33,13 +33,17 @@ class BtrfsTreeRebuilder(
     }
 
     private fun validateNode(bytes: ByteArray) {
-        val magic = readU32LE(bytes, 0)
-        if (magic != LEAF_MAGIC && magic != INTERNAL_MAGIC && magic == 0u) {
-            throw IllegalStateException("Invalid magic: 0x${magic.toString(16)}")
-        }
-        if (bytes.size >= 16) {
+        // Generation overflow check: needs at least 8 bytes (generation at offset 8)
+        if (bytes.size >= 8) {
             val generation = readU64LE(bytes, 8)
             if (generation == ULong.MAX_VALUE) throw IllegalArgumentException("Invalid generation: $generation")
+        }
+        // Magic check: needs at least 16 bytes for a full btrfs header
+        if (bytes.size >= 16) {
+            val magic = readU32LE(bytes, 0)
+            if (magic != LEAF_MAGIC && magic != INTERNAL_MAGIC) {
+                throw IllegalStateException("Invalid magic: 0x${magic.toString(16)}")
+            }
         }
     }
 

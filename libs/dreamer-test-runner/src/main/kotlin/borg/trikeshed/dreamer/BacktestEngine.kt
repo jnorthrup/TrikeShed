@@ -18,18 +18,12 @@ import kotlin.math.sqrt
  *
  * Architecture (dreamer-kmm):
  *   Binance archive data
- *     → KlineCsvParser → KlineBlock → Cursor (BinanceCursor / MiniCursor)
+ *     → BinanceCsvParser → KlineBlock → asCursor() → MiniCursor
  *     → klineBarToPortfolioInput → PortfolioInput
  *     → runCycle(TradingEngine.update) → CycleResult
  *     → BacktestResult + BacktestMetrics (back-test report)
  *
- * Usage:
- * ```kotlin
- * val cursor: MiniCursor = klineSource.fetchCursor()
- * val engine = TradingEngine(defaultGenome(), Mode.SHADOW, initialCapital = 10_000.0)
- * val result = simulateTicks(cursor, engine, initialCapital)
- * println(result.metrics.sharpeRatio)
- * ```
+ * For multi-block cursors (BinanceCursor), use [simulateTicksFromCursor].
  *
  * @param cursor         MiniCursor of kline bars (DocRowVec rows with openTime, open, high, low, close, volume)
  * @param engine         pre-configured [TradingEngine] in SHADOW mode
@@ -211,3 +205,54 @@ private fun emptyBacktestResult(genome: Genome, initialCapital: Double): Backtes
             avgHarvestPerTick = 0.0,
         ),
     )
+
+/**
+ * Adapts a [Cursor] (e.g. [BinanceCursor]) to a [MiniCursor] for use with [simulateTicks].
+ *
+ * Scans the cursor once to collect all rows into memory as DocRowVec instances,
+ * then presents them as a flat MiniCursor.  Use this when running a back-test
+ * over multi-block Binance archive data where [BinanceCursor] spans many sealed
+ * KlineBlocks.
+ *
+ * @param cursor     any Cursor whose rows implement [borg.trikeshed.miniduck.MiniRowVec]
+ * @param rowCount   total number of rows (from cursor.rowCount())
+ */
+fun adaptCursorToMiniCursor(
+    cursor: borg.trikeshed.miniduck.exec.Cursor,
+    rowCount: Int,
+): MiniCursor {
+    // Collect all rows into a snapshot list
+    val rows = mutableListOf<DocRowVec>()
+    while (cursor.next()) {
+        val row = cursor.row
+        // MiniRowVecRowAccessor wraps MiniRowVec; we need DocRowVec
+        val mr = (row as? borg.trikeshed.miniduck.MiniRowVec) ?: continue
+        if (mr is DocRowVec) rows.add(mr)
+    }
+    cursor.close()
+    return rows.size j { i: Int -> rows[i] }
+}
+
+/**
+ * Back-test simulation over a multi-block [Cursor] such as [BinanceCursor].
+ *
+ * Draw-through:
+ *   BinanceCursor(blocks) → adaptCursorToMiniCursor → MiniCursor
+ *     → simulateTicks → BacktestResult
+ *
+ * @param cursor           flat cursor over sealed KlineBlocks (e.g. BinanceCursor)
+ * @param engine           pre-configured [TradingEngine] in SHADOW mode
+ * @param initialCapital   starting cash balance
+ * @param rowCount         total row count (call cursor.rowCount() before passing)
+ * @param onCycle          optional per-tick callback
+ */
+suspend fun simulateTicksFromCursor(
+    cursor: borg.trikeshed.miniduck.exec.Cursor,
+    engine: TradingEngine,
+    initialCapital: Double,
+    rowCount: Int,
+    onCycle: ((CycleResult) -> Unit)? = null,
+): BacktestResult {
+    val mini = adaptCursorToMiniCursor(cursor, rowCount)
+    return simulateTicks(mini, engine, initialCapital, onCycle)
+}

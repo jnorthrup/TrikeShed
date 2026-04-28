@@ -238,20 +238,27 @@ class RunCycleRedTest {
     // ── 6. multiSymbolKlineToPortfolioInput ────────────────────────────
 
     @Test
-    fun `multiSymbolKlineToPortfolioInput extracts holdings correctly`() {
-        // Build a two-row cursor: row 0 = BTC, row 1 = ETH
+    fun `allSymbolsAtBar collects all symbols at same openTime`() {
+        // Build cursor with BTC and ETH at same openTime
         val klines = listOf(
             Kline("BTC-USD", TimeSpan.Hours1, 1000L, 20000.0, 21000.0, 19900.0, 20500.0, 100.0),
             Kline("ETH-USD", TimeSpan.Hours1, 1000L, 2000.0, 2100.0, 1900.0, 2050.0, 1000.0),
+            // BTC at a different time
+            Kline("BTC-USD", TimeSpan.Hours1, 2000L, 21000.0, 22000.0, 20900.0, 21500.0, 110.0),
         )
         val cursor = klinesToCursor(klines)
         val holdings = mapOf("BTC-USD" to 0.5, "ETH-USD" to 2.0)
 
-        val inputs = multiSymbolKlineToPortfolioInput(cursor, 0, holdings)
+        val inputs = allSymbolsAtBar(cursor, barIndex = 0, holdings = holdings)
 
-        assertEquals(1, inputs.size)
-        assertEquals("BTC-USD", inputs[0].symbol)
-        assertEquals(0.5, inputs[0].quantity)
-        assertEquals(20500.0, inputs[0].price) // close
+        // Should collect BTC + ETH at openTime=1000
+        assertEquals(2, inputs.size)
+        val symbols = inputs.map { it.symbol }.toSet()
+        assertEquals(setOf("BTC-USD", "ETH-USD"), symbols)
+
+        val btc = inputs.first { it.symbol == "BTC-USD" }
+        assertEquals(1000L, btc.openTime)
+        assertEquals(0.5, btc.quantity)
+        assertEquals(20500.0, btc.price, 0.001)
     }
 }
