@@ -23,7 +23,7 @@ class PackedIntBuf(
     var size: Int = 0
        set
 
-   val mask: Long = if (bitsPerValue == 32) -1L else (1L shl bitsPerValue) - 1
+   val mask: Long = if (bitsPerValue == 32) (1L shl 32) - 1 else (1L shl bitsPerValue) - 1
 
     init {
         val wordCapacity = ((capacity.toLong() * bitsPerValue + 63) / 64).toInt().coerceAtLeast(1)
@@ -90,7 +90,7 @@ class PackedIntSeries(
 ) : Series<Int> {
     override val b: (Int) -> Int get() = { i -> getImpl(i) }
 
-   val mask: Long = if (bitsPerValue == 32) -1L else (1L shl bitsPerValue) - 1
+   val mask: Long = if (bitsPerValue == 32) (1L shl 32) - 1 else (1L shl bitsPerValue) - 1
 
    fun getImpl(i: Int): Int {
         val bitPos = i.toLong() * bitsPerValue
