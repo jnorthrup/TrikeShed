@@ -3,8 +3,14 @@ package borg.trikeshed.openapi
 import borg.trikeshed.lib.toSeries
 import borg.trikeshed.parse.json.JsonParser
 
-// ── type aliases over plain Kotlin maps ──────────────────────────────────────typealias JsonMap = Map<String, Any?>
-fun Any?.asMap(): JsonMap? = this as? JsonMapfun Any?.asString(): String? = this as? Stringfun Any?.asList(): List<Any?>? = this as? List<Any?>
+// ── type aliases over plain Kotlin maps ──────────────────────────────────────
+typealias JsonMap = Map<String, Any?>
+fun Any?.asMap(): JsonMap? = this as? JsonMap
+fun Any?.asString(): String? = this as? String
+fun Any?.asStr(): String? = this as? String
+fun Any?.asBool(): Boolean? = this as? Boolean
+fun Any?.asNum(): Number? = this as? Number
+fun Any?.asList(): List<Any?>? = this as? List<Any?>
 
 // ── domain model ─────────────────────────────────────────────────────────────
 

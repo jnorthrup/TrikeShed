@@ -1,8 +1,6 @@
 package borg.trikeshed.openapi
 
 // ── helpers ──────────────────────────────────────────────────────────────────
-typealias JMap = Map<String, Any?>typealias JList = List<Any?>
-fun Any?.asMap(): JMap? = this as? JMapfun Any?.asStr(): String? = this as? Stringfun Any?.asBool(): Boolean? = this as? Booleanfun Any?.asNum(): Number? = this as? Numberfun Any?.asList(): JList? = this as? List<Any?>
 
 // ── reference resolution ──────────────────────────────────────────────────────
 
@@ -129,7 +127,7 @@ fun resolveSchemaImpl(node: Any?, description: String?, resolveRef: (String) -> 
     }
 }
 fun resolveProperties(
-    props: JMap?,
+    props: JsonMap?,
     description: String?,
     resolveRef: (String) -> Any?,
 ): List<ResolvedSchema.Prop> {

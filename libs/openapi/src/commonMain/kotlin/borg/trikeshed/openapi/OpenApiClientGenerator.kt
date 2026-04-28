@@ -26,10 +26,6 @@ data class ClientGenConfig(
    val apiSuffix get() = moduleSuffix.replaceFirstChar { it.uppercase() }
 }
 
-// ── helpers ───────────────────────────────────────────────────────────────────
-fun String.indented(spaces: Int): String =
-    lines().joinToString("\n") { " ".repeat(spaces) + it }
-
 // ── operation contract rendering ─────────────────────────────────────────────
 
 /**
