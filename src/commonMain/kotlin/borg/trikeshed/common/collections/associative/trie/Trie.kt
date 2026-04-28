@@ -8,6 +8,7 @@ import kotlin.collections.contains
 class Trie(var root: Map<String, Node> = linkedMapOf()) {
    var freeze: Boolean = false
     fun add(v: Int, vararg values: String) {
+        if (freeze) throw IllegalStateException("Trie is frozen")
         var children: Map<String, Node> = root
 
         values.forEachIndexed { i: Int, value: String ->
