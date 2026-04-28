@@ -5,6 +5,7 @@ import borg.trikeshed.cursor.RowVec
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.size
 import borg.trikeshed.lib.toSeries
+import borg.trikeshed.parse.confix.toJsPath
 
 /**
  * Static-link friendly JSON facade for Dreamer and other JS/Wasm consumers.
@@ -26,7 +27,7 @@ object JsonSupport {
         takeFirst: Int? = null,
     ): JsElement = JsonParser.index(text.toSeries(), depths, takeFirst)
 
-    fun pathOf(vararg steps: Any?): JsPath = steps.asList().toJsPath
+    fun pathOf(vararg steps: Any?): JsPath = steps.asList().toJsPath()
 
     fun query(
         text: String,
@@ -44,7 +45,7 @@ object JsonSupport {
         path: List<*>,
         reifyResult: Boolean = true,
         depths: MutableList<Int>? = null,
-    ): Any? = query(text, path.toJsPath, reifyResult, depths)
+     ): Any? = query(text, path.toJsPath(), reifyResult, depths)
 
     fun query(
         text: String,
@@ -100,6 +101,6 @@ object JsonSupport {
         }
 
         flushSegment()
-        return steps.toJsPath
+        return steps.toJsPath()
     }
 }

@@ -49,7 +49,7 @@ class Reactor(private val backend: PlatformBackend) {
                 if (deferred != null) {
                     completion.result.fold(
                         onSuccess = { deferred.complete(it) },
-                        onFailure = { deferred.completeWith(Result.failure(it)) }
+                        onFailure = { deferred.completeExceptionally(it) }
                     )
                 }
             }

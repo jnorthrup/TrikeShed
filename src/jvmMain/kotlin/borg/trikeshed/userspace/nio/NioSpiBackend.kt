@@ -2,7 +2,7 @@ package borg.trikeshed.userspace.nio
 
 import borg.trikeshed.context.NioUserspaceElement
 import borg.trikeshed.context.UserspaceNioSpi
-import borg.trikeshed.userspace.reactor.Interest
+import borg.trikeshed.userspace.nio.Interest
 import kotlinx.coroutines.runBlocking
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentLinkedQueue
