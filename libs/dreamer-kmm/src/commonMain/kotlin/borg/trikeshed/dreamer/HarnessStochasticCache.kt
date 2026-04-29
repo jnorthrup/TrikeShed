@@ -1,24 +1,14 @@
 package borg.trikeshed.dreamer
 
-import borg.trikeshed.lib.Series
-import borg.trikeshed.lib.j
-import borg.trikeshed.indicator.Stochastic
+import borg.trikeshed.miniduck.HarnessStochasticCache as MiniduckCache
 import borg.trikeshed.miniduck.MiniCursor
-import borg.trikeshed.miniduck.DocRowVec
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
+import borg.trikeshed.indicator.Stochastic
 
 /**
- * Lightweight harness-local draw-through stochastic cache.
- * Computes Stochastic.Result once per (symbol,timeframe,k,d) and stores in-memory
- * so transformers can read the precomputed series without recomputing.
+ * Legacy wrapper: delegate dreamer-facing API to the miniduck implementation so
+ * the cache lives in libs:miniduck (avoids circular module dependencies).
  */
-data class HarnessStochasticKey(val symbol: String, val timeframe: String, val kPeriod: Int = 14, val dPeriod: Int = 3)
-
 object HarnessStochasticCache {
-    private val mutex = Mutex()
-    private val values = mutableMapOf<HarnessStochasticKey, Stochastic.Result>()
-
     suspend fun ensureCached(
         symbol: String,
         timeframe: String,
@@ -26,35 +16,10 @@ object HarnessStochasticCache {
         dPeriod: Int = 3,
         cursorSupplier: () -> MiniCursor,
     ) {
-        val key = HarnessStochasticKey(symbol, timeframe, kPeriod, dPeriod)
-        mutex.withLock {
-            if (!values.containsKey(key)) {
-                val cursor = cursorSupplier()
-                val highs = cursor.ohlcSeries("high")
-                val lows = cursor.ohlcSeries("low")
-                val closes = cursor.ohlcSeries("close")
-                val res = Stochastic.compute(highs, lows, closes, kPeriod, dPeriod)
-                values[key] = res
-            }
-        }
+        MiniduckCache.ensureCached(symbol, timeframe, kPeriod, dPeriod, cursorSupplier)
     }
 
     fun get(symbol: String, timeframe: String, kPeriod: Int = 14, dPeriod: Int = 3): Stochastic.Result? {
-        return values[HarnessStochasticKey(symbol, timeframe, kPeriod, dPeriod)]
-    }
-}
-
-/** Extract an OHLC column as a Double Series. */
-private fun MiniCursor.ohlcSeries(column: String): Series<Double> {
-    val n = a
-    return n j { index: Int ->
-        val row = at(index) as? DocRowVec
-            ?: throw IllegalArgumentException("row $index is not DocRowVec")
-        val value = row[column]
-        when (value) {
-            is Number -> value.toDouble()
-            is String -> value.toDouble()
-            else -> throw IllegalArgumentException("row $index column $column is not numeric: $value")
-        }
+        return MiniduckCache.get(symbol, timeframe, kPeriod, dPeriod)
     }
 }
