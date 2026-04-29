@@ -5,6 +5,7 @@ import borg.trikeshed.couch.kline.Kline
 import borg.trikeshed.couch.kline.KlineBlock
 import borg.trikeshed.couch.kline.TimeSpan
 import borg.trikeshed.cursor.at
+import borg.trikeshed.lib.size
 import borg.trikeshed.miniduck.getValue
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -48,10 +49,12 @@ class ControlHarnessTest {
         assertEquals(4, simulation.simTimeLimit)
         assertEquals(SimulationDepthMode.SHORT, simulation.options.depthMode)
         assertEquals(SimulationSweepMode.MICRO_GRID, simulation.options.sweepMode)
-        assertEquals(listOf(tradingPair("BTC", "USDT"), tradingPair("ETH", "USDT")), simulation.tradedPairs)
+        assertEquals(listOf("BTC", "ETH"), simulation.tradedPairs.map { it.a })
+        assertEquals(listOf("USDT", "USDT"), simulation.tradedPairs.map { it.b })
 
         val btcFrame = frame.pairs.first()
-        assertEquals(btc.key j 3, btcFrame.route)
+        assertEquals(btc.key, btcFrame.route.a)
+        assertEquals(3, btcFrame.route.b)
         assertEquals(0.25, btcFrame.walletFree.at(0).getValue("BTC"))
         assertEquals(-1_000.0, btcFrame.walletFree.at(0).getValue("USDT"))
         assertEquals(-1e-10, btcFrame.walletFree.at(0).getValue("ETH"))

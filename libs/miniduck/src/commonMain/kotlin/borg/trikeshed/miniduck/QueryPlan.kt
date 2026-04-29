@@ -1,5 +1,9 @@
 package borg.trikeshed.miniduck
 
+import borg.trikeshed.cursor.RowVec
+import borg.trikeshed.cursor.cursor
+import borg.trikeshed.cursor.get
+import borg.trikeshed.cursor.row
 import borg.trikeshed.lib.*
 
 /** Specification for ordering a column. */
@@ -109,22 +113,25 @@ fun execute(plan: QueryPlan, base: MiniCursor): MiniCursor = when (plan) {
     is ViewQueryPlan -> base
     is FilterPlan -> {
         val upstreamResult = execute(plan.upstream, base)
-        val filteredList = upstreamResult.toList().filter { plan.predicate(it) }
-        filteredList.size j { filteredList[it] }
+        val filteredList: List<RowVec> = upstreamResult.toList().filter { plan.predicate.matches(it) }
+        (filteredList.size j { i: Int -> filteredList[i] }).cursor
     }
     is ProjectPlan -> execute(plan.upstream, base).get(*plan.columns.toTypedArray())
     is OrderPlan -> {
         val upstream = execute(plan.upstream, base)
-        val sortedList = upstream.toList().sortedWith(compareBy({ 
-            val colIdx = upstream.meta.view.indexOfFirst { it.name == it.column }
-            { row: RowVec -> row[colIdx].a } as (RowVec) -> Comparable?
-        }(it), it.desc))
-        sortedList.size j { sortedList[it] }.cursor
+        val sortedList: List<RowVec> = upstream.toList().sortedWith { left, right ->
+            for (spec in plan.specs) {
+                val cmp = compareKeys(left.getValue(spec.column), right.getValue(spec.column))
+                if (cmp != 0) return@sortedWith if (spec.desc) -cmp else cmp
+            }
+            0
+        }
+        (sortedList.size j { i: Int -> sortedList[i] }).cursor
     }
     is LimitPlan -> {
         val upstream = execute(plan.upstream, base)
-        val from = plan.offset
-        val until = plan.offset + plan.limit
-        (until - from) j { i -> upstream.row(from + i) }.cursor
+        val from = plan.offset.coerceIn(0, upstream.size)
+        val until = (plan.offset + plan.limit).coerceIn(from, upstream.size)
+        ((until - from) j { i: Int -> upstream.row(from + i) }).cursor
     }
 }

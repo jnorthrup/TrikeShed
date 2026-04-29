@@ -240,7 +240,7 @@ private fun MiniCursor.pancake(): MiniCursor {
             val row = source.at(rowIndex)
             for (cellIndex in 0 until row.size) {
                 val cell = row[cellIndex]
-                keys += "${cell.b().name}/$rowIndex"
+                keys += "${cell.b().a}/$rowIndex"
                 cells += cell.a
             }
         }
