@@ -55,6 +55,7 @@ kotlin {
             dependencies {
                 api(project(":"))
                 api(project(":libs:miniduck"))
+                implementation(project(":libs:kursive"))
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:${rootProject.providers.gradleProperty("versions.kotlinx-coroutines-core").get()}")
                 implementation("org.jetbrains.kotlinx:kotlinx-datetime:${rootProject.providers.gradleProperty("versions.kotlinx-datetime").get()}")
             }
