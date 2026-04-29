@@ -104,7 +104,6 @@ kotlin {
                 api("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
                 api("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1-0.6.x-compat")
                 api(project(":libs:tiny-btrfs"))
-                api(project(":libs:kursive"))
             }
         }
         val commonTest by getting {
