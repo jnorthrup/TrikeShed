@@ -44,6 +44,7 @@ kotlin {
                 implementation(kotlin("test"))
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:${rootProject.providers.gradleProperty("versions.kotlinx-coroutines-test").get()}")
             }
+            kotlin.srcDir("src/generated/kotlin")
         }
         val jvmTest by getting {
             dependencies {

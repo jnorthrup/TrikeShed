@@ -73,7 +73,7 @@ class JursiveInteropTddTest {
 
     @Test
     fun `json is not a function`() {
-        assertFalse(isLikelyJsFn('''{"key": "value"}'''.trimIndent()))
+        assertFalse(isLikelyJsFn("""{"key": "value"}"""))
     }
 
     @Test

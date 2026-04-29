@@ -1,8 +1,10 @@
-package borg.trikeshed.miniduck
+package borg.trikeshed.dreamer
 
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.j
 import borg.trikeshed.indicator.Stochastic
+import borg.trikeshed.miniduck.MiniCursor
+import borg.trikeshed.miniduck.DocRowVec
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 

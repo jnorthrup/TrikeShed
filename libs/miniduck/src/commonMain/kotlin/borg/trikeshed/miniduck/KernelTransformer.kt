@@ -1,6 +1,7 @@
 package borg.trikeshed.miniduck
 
 import borg.trikeshed.lib.*
+import borg.trikeshed.dreamer.HarnessStochasticCache
 
 /** Simple KernelFeatureTransformer for MiniCursor that appends technical indicators.
  *  Expects source rows to be DocRowVec with a numeric "close" field.

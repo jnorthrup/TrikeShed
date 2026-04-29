@@ -36,7 +36,7 @@ class IntNodeStoreTest {
     }
 
     @Test
-    fun `getChild dispatches on id 0 for left, 1 for right`() {
+    fun `getChild dispatches on id 0 for left and 1 for right`() {
         val store = IntNodeStore()
         store.initRoot()
         val left = store.append(parent = 0, parentId = 0, leftChild = IntNodeStore.NULL, rightChild = IntNodeStore.NULL, skip = 0)

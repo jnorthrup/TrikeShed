@@ -3,6 +3,7 @@ package borg.trikeshed.polyglot
 import borg.trikeshed.common.TypeEvidence
 import borg.trikeshed.cursor.ColumnMeta
 import borg.trikeshed.cursor.RowVec
+import borg.trikeshed.cursor.joins
 import borg.trikeshed.cursor.label
 import borg.trikeshed.isam.meta.IOMemento
 import borg.trikeshed.lib.Join

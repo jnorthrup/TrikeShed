@@ -122,7 +122,7 @@ private fun parseKlineLine(
             t--
         }
         if (t <= b) return null
-        return String(arr, b, t - b)
+        return arr.concatToString(b, t)
     }
 
     val f0 = field(0)?.toLongOrNull() ?: return null

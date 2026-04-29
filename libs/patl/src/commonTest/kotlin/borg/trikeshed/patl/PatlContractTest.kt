@@ -22,13 +22,13 @@ class PatlContractTest {
     }
 
     @Test
-    fun `PatriciaTrieMap insert returns new map (persistent)`() {
+    fun `PatriciaTrieMap insert returns new map persistent`() {
         // insert() does not mutate — returns new version
         assertTrue(true)
     }
 
     @Test
-    fun `PatriciaTrieMap delete returns new map (persistent)`() {
+    fun `PatriciaTrieMap delete returns new map persistent`() {
         // delete() does not mutate — returns new version
         assertTrue(true)
     }

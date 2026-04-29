@@ -1,6 +1,6 @@
 package borg.trikeshed.dreamer
 
-import borg.trikeshed.common.System
+import kotlin.time.Clock
 
 class TradingEngine(
     val genome: Genome,
@@ -72,7 +72,7 @@ class TradingEngine(
                 stateChanged = true
             }
             if (!lastActionTimestamps.containsKey(row.Symbol) && (baselines[row.Symbol] ?: 0.0) > 0.0) {
-                lastActionTimestamps[row.Symbol] = System.currentTimeMillis()
+                lastActionTimestamps[row.Symbol] = Clock.System.now().toEpochMilliseconds()
                 stateChanged = true
             }
         }
@@ -104,7 +104,7 @@ class TradingEngine(
             val baseline = baselines[sym] ?: portfolioSummary.first().Value
             val dev = (portfolioSummary.first().Value - baseline) / baseline
             if (dev > rebalanceTrigger) {
-                rebalanceState[sym] = mapOf("scheduledAt" to System.currentTimeMillis())
+                rebalanceState[sym] = mapOf("scheduledAt" to Clock.System.now().toEpochMilliseconds())
                 stateChanged = true
             }
         }

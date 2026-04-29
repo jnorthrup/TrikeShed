@@ -161,30 +161,32 @@ object YamlParser {
 
     private fun extractChildIndices(parentIdx: Int, elems: Series<JsElement>, src: Series<Char>): Series<Int> {
         val parent = elems[parentIdx]
-        val storedCommas = parent.b  // parser-recorded child positions
-        // filter to positive entries only (skip tag sentinels)
-        var count = 0; var k = 0
-        while (k < storedCommas.size) { if (storedCommas[k] >= 0) count++; k++ }
-        return count j { i: Int ->
-            var idx = 0; var seen = 0
-            while (idx < storedCommas.size) {
-                val openPos = storedCommas[idx]
-                if (openPos >= 0) {
-                    if (seen == i) {
-                        // Search forward from parentIdx+1 for element with matching open position
-                        var kk = parentIdx + 1
-                        while (kk < elems.size) {
-                            if (elems[kk].a.a == openPos) return@j kk
-                            kk++
-                        }
-                        return@j -1
-                    }
-                    seen++
+        val parentOpen = parent.a.a
+        val parentClose = parent.a.b
+        // Structural walk: elements are emitted in depth-first order by YamlScan.
+        // Direct children of parent are elements after parentIdx that are within parent's span,
+        // but NOT within any earlier sibling's span.
+        val result = mutableListOf<Int>()
+        var kk = parentIdx + 1
+        while (kk < elems.size) {
+            val elem = elems[kk]
+            val eOpen = elem.a.a
+            val eClose = elem.a.b
+            if (eOpen >= parentClose) break  // past parent
+            // It's a direct child if within parent span
+            if (eOpen >= parentOpen && eClose <= parentClose) {
+                result.add(kk)
+                // Skip this child's descendants: advance past all elements within child's span
+                val childClose = eClose
+                kk++
+                while (kk < elems.size && elems[kk].a.a < childClose) {
+                    kk++
                 }
-                idx++
+            } else {
+                kk++
             }
-            -1 // not found
         }
+        return result.size j { i: Int -> result[i] }
     }
 
     private fun buildMappingEntries(
@@ -194,18 +196,18 @@ object YamlParser {
     ): Series<YamlMappingEntry> {
         val n = childIndices.size
         if (n == 0) return Join.emptySeriesOf<YamlMappingEntry>()
-        val list = ArrayList<YamlMappingEntry>(n)
+        val list = ArrayList<YamlMappingEntry>(n / 2)
         var i = 0
-        while (i < n) {
+        while (i + 1 < n) {
             val keyIdx = childIndices[i]
-            val valIdx = keyIdx + 1  // value follows key by element index
+            val valIdx = childIndices[i + 1]  // value follows key in structural walk
             val keyElem = elems[keyIdx]
             val valElem = elems[valIdx]
             val keySpan = keyElem.a
             val keyText = Combinators.textOf(keyElem, src)
             val valNode = buildYamlNode(elems, src, valIdx)
             list.add(YamlMappingEntry(keyText.asSeries(), valNode, keySpan.a j valElem.a.b))
-            i++
+            i += 2
         }
         return list.toSeries()
     }

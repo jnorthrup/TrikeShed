@@ -452,10 +452,7 @@ object YamlScan {
                 if (colonAt >= 0) {
                     // rewind and parse a one-element inline map by recursing at this column
                     st.pos = scalarStart
-                    val savedPoolSize = out.commasSize()
-                    val ci = parseMapOrScalar(st, out, childIndent)
-                    out.truncateCommas(savedPoolSize)  // discard nested map commas
-                    ci
+                    parseMapOrScalar(st, out, childIndent)
                 } else {
                     parseScalarLine(st, out)
                 }
@@ -500,12 +497,9 @@ object YamlScan {
                 val ch = st.s[st.pos]
                 if (ch == '{' || ch == '[' || ch == '"' || ch == '\'') parseFlowLine(st, out) else parseScalarLine(st, out)
             } else {
-                // newline: child block — save/restore pool to prevent nested commas leaking
+                // newline: child block
                 if (st.pos < st.n) st.pos++  // eat newline
-                val savedPoolSize = out.commasSize()
-                val vi = parseBlock(st, out, indent + 2)
-                out.truncateCommas(savedPoolSize)  // discard any commas added by nested block
-                vi
+                parseBlock(st, out, indent + 2)
             }
             lastClose = out.closeOf(valueIdx).coerceAtLeast(open)
             st.skipBlankLines()
@@ -1251,66 +1245,89 @@ object Path {
 
    fun stepByIndex(e: JsElement, src: Series<Char>, idx: Int): JsContext? {
         val tag = Combinators.tagOf(e, src)
-        if (tag != Tag.ARRAY) {
+        if (tag != Tag.ARRAY) return null
+
+        // Strategy: prefer stored commas for YAML (authoritative), realCommas for JSON (char-class scan).
+        // Heuristic: if stored commas have few positives (≤ realCommas count), they're from a clean
+        // YAML/JSON full-scan. If stored has many more positives than realCommas, they're polluted
+        // (JSON micro-scan includes nested child commas) — use realCommas instead.
+        val rc = Combinators.realCommas(e, src)
+        val stored = e.b
+        var storedPosCount = 0; var ii = 0
+        while (ii < stored.size) { if (stored[ii] >= 0) storedPosCount++; ii++ }
+
+        val useStored = storedPosCount > 0 && (rc.size == 0 || storedPosCount <= rc.size)
+
+        if (useStored) {
+            var found = 0; var i = 0
+            while (i < stored.size) {
+                if (stored[i] >= 0) {
+                    if (found == idx) return childElementAt(stored[i], src) j src
+                    found++
+                }
+                i++
+            }
             return null
         }
-        // realCommas works for JSON (detects brackets/strings/literals by char class).
-        // For YAML, realCommas returns empty because sequence items are plain identifiers
-        // with '-' prefix that skipKind doesn't classify. Fall back to stored commas.
-        val rc = Combinators.realCommas(e, src)
-        val cs = if (rc.size > 0) rc else {
-            // Extract positive entries from stored comma series
-            val stored = e.b
-            var count = 0; var j = 0
-            while (j < stored.size) { if (stored[j] >= 0) count++; j++ }
-            count j { k: Int ->
-                var ii = 0; var seen = 0
-                while (ii < stored.size) {
-                    if (stored[ii] >= 0) {
-                        if (seen == k) return@j stored[ii]
-                        seen++
-                    }
-                    ii++
-                }
-                -1
-            }
-        }
-        var i = 0
-        while (i < cs.size) {
-            if (i == idx) {
-                val child = childElementAt(cs[i], src)
-                return child j src
-            }
-            i++
-        }
+
+        // JSON path: realCommas gives correct positions
+        if (idx < rc.size) return childElementAt(rc[idx], src) j src
         return null
     }
 
    fun stepByName(e: JsElement, src: Series<Char>, name: String): JsContext? {
         if (Combinators.tagOf(e, src) != Tag.OBJECT) return null
-        // realCommas works for JSON (detects quoted strings by char class).
-        // For YAML, realCommas returns empty for mapping keys that are plain identifiers.
-        // Fall back to stored comma series in that case.
-        val rc = Combinators.realCommas(e, src)
-        val keyPositions: Series<Int> = if (rc.size > 0) rc else {
-            val stored = e.b
-            var count = 0; var j = 0
-            while (j < stored.size) { if (stored[j] >= 0) count++; j++ }
-            count j { k: Int ->
+
+        // Two-pass key lookup:
+        // 1. Stored comma series — has parser-recorded key positions (works for YAML
+        //    plain-identifier keys that realCommas can't detect via char-class scan).
+        //    For JSON micro-scan elements, stored commas include nested child commas,
+        //    so extra entries are iterated but non-key positions won't match key text.
+        // 2. realCommas fallback — char-class re-scan (works for JSON where stored commas
+        //    may be polluted by nested children and the key positions happen to overlap).
+
+        val stored = e.b
+        var positiveCount = 0; var jj = 0
+        while (jj < stored.size) { if (stored[jj] >= 0) positiveCount++; jj++ }
+
+        // Pass 1: stored commas
+        if (positiveCount > 0) {
+            val result = lookupKeyInPositions(positiveCount, { k ->
                 var ii = 0; var seen = 0
                 while (ii < stored.size) {
                     if (stored[ii] >= 0) {
-                        if (seen == k) return@j stored[ii]
+                        if (seen == k) return@lookupKeyInPositions stored[ii]
                         seen++
                     }
                     ii++
                 }
                 -1
-            }
+            }, e, src, name)
+            if (result != null) return result
         }
+
+        // Pass 2: realCommas
+        val rc = Combinators.realCommas(e, src)
+        if (rc.size > 0) {
+            val result = lookupKeyInPositions(rc.size, { k -> rc[k] }, e, src, name)
+            if (result != null) return result
+        }
+
+        return null
+    }
+
+    /** Iterate key positions, resolve each to a key element, match against name */
+    private fun lookupKeyInPositions(
+        count: Int,
+        getPosition: (Int) -> Int,
+        e: JsElement,
+        src: Series<Char>,
+        name: String
+    ): JsContext? {
         var i = 0
-        while (i < keyPositions.size) {
-            val keyOpen = keyPositions[i]
+        while (i < count) {
+            val keyOpen = getPosition(i)
+            if (keyOpen < 0) { i++; continue }
             var keyElem = childElementAt(keyOpen, src)
             // childElementAt prefers containers (OBJECT/ARRAY) over STRING when
             // both share the same open position (common in YAML block keys where

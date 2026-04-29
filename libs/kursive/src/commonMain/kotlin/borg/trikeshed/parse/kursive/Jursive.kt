@@ -206,6 +206,8 @@ fun <T> choice(name: Series<Char>, vararg options: KursiveParser<T>): KursivePar
 
 fun <T> choice(name: String, vararg options: KursiveParser<T>): KursiveParser<T> = choice(name.toSeries(), *options)
 
+fun Series<Char>.joinName(separator: Char, other: Series<Char>): Series<Char> = this + s_[separator] + other
+
 infix fun <T> KursiveParser<T>.or(other: KursiveParser<T>): KursiveParser<T> =
     parser(name.joinName('|', other.name)) { input ->
         this(input) ?: other(input)

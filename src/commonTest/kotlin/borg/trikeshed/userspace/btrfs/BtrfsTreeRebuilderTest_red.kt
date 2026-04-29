@@ -57,7 +57,8 @@ class BtrfsTreeRebuilderTest_red {
 
         // Insert a node directly into buffer
         val nodeId = buf.allocateNode()
-        buf.writeNode(nodeId, byteArrayOf(1, 2, 3, 4))
+        // Write valid magic: LEAF_MAGIC = 0x464F5254 (little-endian: 0x54, 0x52, 0x4F, 0x46)
+        buf.writeNode(nodeId, byteArrayOf(0x54, 0x52, 0x4F, 0x46))
 
         rebuilder.beginRebuild()
         val result = rebuilder.completeRebuild()
@@ -93,8 +94,13 @@ class BtrfsTreeRebuilderTest_red {
         val rebuilder = BtrfsTreeRebuilder(buf)
 
         val nodeId = buf.allocateNode()
-        // Write node with generation = -1 (invalid)
-        buf.writeNode(nodeId, byteArrayOf(0xFF.toByte(), 0xFF.toByte(), 0xFF.toByte(), 0xFF.toByte(), 0xFF.toByte(), 0xFF.toByte(), 0xFF.toByte(), 0xFF.toByte()))
+        // Write valid magic (4 bytes) + padding (4 bytes) + generation = -1 (8 bytes) = 16 bytes total
+        // INTERNAL_MAGIC = 0x4E465242 → LE bytes: 0x42, 0x52, 0x46, 0x4E
+        // Generation at offset 8: ULong.MAX_VALUE → LE bytes: 0xFF x 8
+        val magicBytes = byteArrayOf(0x42, 0x52, 0x46, 0x4E)
+        val padBytes = ByteArray(4)  // 4 bytes padding (e.g. level, type, etc.)
+        val genBytes = ByteArray(8) { 0xFF.toByte() }  // ULong.MAX_VALUE
+        buf.writeNode(nodeId, magicBytes + padBytes + genBytes)  // 16 bytes total
 
         rebuilder.beginRebuild()
         try {
