@@ -86,7 +86,7 @@ actual class IsamDataFile actual constructor(
                 return (fileSize / recordlen).toInt()
             }
         }
-    actual override val b:(Int)-> RowVec /*(Int) -> Join<Int, (Int) -> Join<Any?, () -> ColumnMeta>>*/ = { row ->
+    actual override val b:(Int)-> RowVec /*(Int) -> Join<Int, (Int) -> Join<Any?, ()`ColumnMeta↻`>>*/ = { row ->
         memScoped {
             val d2 = data.toLong() + (row * recordlen)
 

@@ -50,7 +50,7 @@ data class Projection<T>(
 ) {
     companion object {
         fun lib(): Projection<Join<*, *>> = Projection("lib", "Join<A,B>", 1.0)
-        fun cursor(): Projection<Join<*, *>> = Projection("cursor", "Join<Any?,()->ColumnMeta>", 4.0)
+        fun cursor(): Projection<Join<*, *>> = Projection("cursor", "Join<Any?,()`ColumnMeta↻`>", 4.0)
         fun wam(): Projection<Join<*, *>> = Projection("wam", "Join<Map<String,String>,Boolean>", 16.0)
         // CCEK uses CoroutineContext.Key and Element — referenced as string only
         fun ccek(): Projection<Join<*, *>> = Projection("ccek", "Join<Key<*>,Element>", 8.0)

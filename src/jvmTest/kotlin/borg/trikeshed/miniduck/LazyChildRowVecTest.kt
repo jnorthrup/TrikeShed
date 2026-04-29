@@ -1,10 +1,10 @@
 package borg.trikeshed.miniduck
 
+import borg.trikeshed.cursor.RowVec
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.j
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertNotSame
 import kotlin.test.assertSame
 
 /**
@@ -18,16 +18,16 @@ class LazyChildRowVecTest {
 
     // A minimal concrete subclass to exercise the shared helper
    class TestLazyRowVec(
-       val loader: () -> Series<MiniRowVec>?,
+        val loader: () -> Series<RowVec>?,
     ) : LazyChildRowVec() {
-       var cached: Series<MiniRowVec>? = null
+       var cached: Series<RowVec>? = null
 
         override val size: Int get() = 0
         override fun get(index: Int): Any? =
             throw IndexOutOfBoundsException("TestLazyRowVec is a shell")
 
         // Expose loadChild for test — pattern: cached var + loadChild helper
-        override val child: Series<MiniRowVec>?
+        override val child: Series<RowVec>?
             get() = loadChild(cached) { loader()?.also { cached = it } }
     }
 
@@ -40,7 +40,7 @@ class LazyChildRowVecTest {
     @Test
     fun `loadChild returns the same Series on every access (caching)`() {
         var callCount = 0
-        val factory: () -> Series<MiniRowVec>? = {
+        val factory: () -> Series<RowVec>? = {
             callCount++
             1 j { _: Int -> DocRowVec(emptyList(), emptyList()) }
         }

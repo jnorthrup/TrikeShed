@@ -1,10 +1,10 @@
 package borg.trikeshed.integration
 
 import borg.trikeshed.couch.kline.KlineBlock
+import borg.trikeshed.cursor.RowVec
 import borg.trikeshed.lib.size
 import borg.trikeshed.miniduck.DocRowVec
 import borg.trikeshed.miniduck.MiniCursor
-import borg.trikeshed.miniduck.MiniRowVec
 import borg.trikeshed.miniduck.at
 import borg.trikeshed.miniduck.exec.Cursor
 import borg.trikeshed.miniduck.exec.RowAccessor
@@ -76,7 +76,7 @@ class BinanceCursor(
         get() {
             val cur = cursors.getOrNull(blockIdx) ?: throw IllegalStateException("No current block")
             // block.asCursor() returns MiniCursor whose rows are DocRowVec (MiniRowVec subtype)
-            val docRow: MiniRowVec = cur at  rowIdx
+            val docRow: RowVec = cur at  rowIdx
             return MiniRowVecRowAccessor(docRow)
         }
 
@@ -89,7 +89,7 @@ class BinanceCursor(
  * Adapts a [MiniRowVec] to the [RowAccessor] interface used by plan nodes.
  */
 class MiniRowVecRowAccessor(
-   val row: MiniRowVec,
+    val row: RowVec,
 ) : RowAccessor {
     override fun get(index: Int): Any? = row.get(index)
     override fun get(name: String): Any? {

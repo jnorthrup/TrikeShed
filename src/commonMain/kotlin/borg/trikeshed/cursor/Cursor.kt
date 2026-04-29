@@ -12,29 +12,27 @@ import kotlin.math.min
 import kotlin.random.Random
 import kotlin.reflect.KClass
 
-typealias RowVec = Series2<Any?, () -> ColumnMeta>
+typealias RowVec = Series2<Any?, `ColumnMeta↻`>
 //val RowVec.left get() =  this α Join<*, () -> RecordMeta>::a
 
 /** Cursors are a columnar abstraction composed of Series of Joined value+meta pairs (RecordMeta) */
 typealias Cursor = Series<RowVec>
 
 /** Pair row values with column metadata providers into a RowVec. */
-infix fun Series<Any?>.j(meta: Series<() -> ColumnMeta>): RowVec = this.zip(meta)
+infix fun Series<Any?>.j(meta: Series<`ColumnMeta↻`>): RowVec =
+    this.zip(meta).debug { if (a != meta.a) logDebug("RowVec size mismatch detected".leftIdentity) }
 
 /**
  * Joins a Series of scalar values with a Series of column metadata providers into a RowVec.
  * This is a convenience alias used across the codebase where the name 'joins' is preferred.
  */
-infix fun Series<Any?>.joins(meta: Series<() -> ColumnMeta>): RowVec = this j meta
+infix fun Series<Any?>.joins(meta: Series<`ColumnMeta↻`>): RowVec = this j meta
 
 /** Cursors combine: combine a series of RowVec into a Cursor. */
 val Series<RowVec>.cursor: Cursor get() = this
 
 /** Explicit helper to combine two cursors (row concatenation). */
 fun combine(a: Cursor, b: Cursor): Cursor = borg.trikeshed.lib.combine(a, b)
-
-/** Mutable wrapper for combined cursors; no performance guarantees. */
-fun combineMutable(a: Cursor, b: Cursor): MutableSeries<RowVec> = combine(a, b).cow
 
 /** Project the scalar values from a RowVec, discarding column metadata.
  *  Short-circuits to leftSeries for ReifiedSplitSeries2 — zero Join allocation. */
@@ -78,7 +76,7 @@ operator fun Cursor.get(i: IntRange): Cursor {
 
 /** get meta for a cursor from row 0 */
 val Cursor.meta: Series<ColumnMeta>
-    get() = row(0) α { (_, b): Join<*, () -> ColumnMeta> ->
+    get() = row(0) α { (_, b): Join<*, `ColumnMeta↻`> ->
         b()
     }
 
@@ -150,7 +148,7 @@ fun Cursor.showValues(range: IntRange) = try {
     range.forEach { x: Int ->
         val row: RowVec = row(x)
 
-        val show: Series<Any?> = row α { (c: Any?, d: () -> ColumnMeta) ->
+        val show: Series<Any?> = row α { (c: Any?, d: `ColumnMeta↻`) ->
             val meta: ColumnMeta = d()
             meta.name to c
             when (meta.type) {
@@ -187,7 +185,7 @@ operator fun Cursor.get(vararg i: Int): Cursor = size j { y: Int ->
  *
  */
 val Cursor.isNumerical: Boolean
-    get() = meta.view.all { (_ : String, b: TypeMemento): ColumnMeta ->
+    get() = meta.view.all { (_: String, b: TypeMemento): ColumnMeta ->
         when (b) {
             IoByte, IoShort, IoInt, IoFloat, IoDouble, IoLong -> true
             else -> false

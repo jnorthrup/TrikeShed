@@ -69,16 +69,16 @@ class CompressedNodeStore(
 ) {
     val size: Int get() = parentid.a
 
-    inline fun getParent(index: Int): Int = parentid.b(index) and IntNodeStore.PARENT_MASK
-    inline fun getLeftChild(index: Int): Int = leftChild.b(index)
-    inline fun getRightChild(index: Int): Int = rightChild.b(index)
-    inline fun getChild(index: Int, id: Int): Int =
+    fun getParent(index: Int): Int = parentid.b(index) and IntNodeStore.PARENT_MASK
+    fun getLeftChild(index: Int): Int = leftChild.b(index)
+    fun getRightChild(index: Int): Int = rightChild.b(index)
+    fun getChild(index: Int, id: Int): Int =
         if (id == 0) getLeftChild(index) else getRightChild(index)
-    inline fun getSkip(index: Int): Int = skip.b(index)
+    fun getSkip(index: Int): Int = skip.b(index)
 
     companion object {
         fun empty(): CompressedNodeStore {
-            val e = (0 j { 0 }) as Series<Int>  // empty series
+            val e :Series<Int> =emptySeries()
             return CompressedNodeStore(e, e, e, e)
         }
     }

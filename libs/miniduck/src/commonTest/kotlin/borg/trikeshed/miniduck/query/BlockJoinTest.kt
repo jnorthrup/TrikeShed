@@ -1,5 +1,6 @@
 package borg.trikeshed.miniduck.query
 
+import borg.trikeshed.cursor.RowVec
 import borg.trikeshed.miniduck.*
 import borg.trikeshed.lib.*
 import kotlin.test.*
@@ -89,11 +90,11 @@ class BlockJoinTest {
     fun hashJoinNoMatchesReturnsEmpty() {
         val left = listOf(
             DocRowVec(listOf("k", "v"), listOf(99, "x")),
-        ).let { list -> list.size j { i: Int -> list[i] as MiniRowVec } }
+        ).let { list -> list.size j { i: Int -> list[i] as RowVec } }
 
         val right = listOf(
             DocRowVec(listOf("k", "v"), listOf(1, "a")),
-        ).let { list -> list.size j { i: Int -> list[i] as MiniRowVec } }
+        ).let { list -> list.size j { i: Int -> list[i] as RowVec } }
 
         val joined = left.hashJoin(right, "k", "k")
         assertEquals(0, joined.size)
@@ -124,12 +125,12 @@ class BlockJoinTest {
         val left = listOf(
             DocRowVec(listOf("k", "a"), listOf(1, "x")),
             DocRowVec(listOf("k", "a"), listOf(1, "y")),
-        ).let { list -> list.size j { i: Int -> list[i] as MiniRowVec } }
+        ).let { list -> list.size j { i: Int -> list[i] as RowVec } }
 
         val right = listOf(
             DocRowVec(listOf("k", "b"), listOf(1, "p")),
             DocRowVec(listOf("k", "b"), listOf(1, "q")),
-        ).let { list -> list.size j { i: Int -> list[i] as MiniRowVec } }
+        ).let { list -> list.size j { i: Int -> list[i] as RowVec } }
 
         val joined = left.hashJoin(right, "k", "k")
         // 2×2 = 4 rows
@@ -142,11 +143,11 @@ class BlockJoinTest {
     fun hashJoinOmitsRightJoinColumn() {
         val left = listOf(
             DocRowVec(listOf("uid", "val"), listOf(1, "x")),
-        ).let { list -> list.size j { i: Int -> list[i] as MiniRowVec } }
+        ).let { list -> list.size j { i: Int -> list[i] as RowVec } }
 
         val right = listOf(
             DocRowVec(listOf("id", "extra"), listOf(1, "y")),
-        ).let { list -> list.size j { i: Int -> list[i] as MiniRowVec } }
+        ).let { list -> list.size j { i: Int -> list[i] as RowVec } }
 
         val joined = left.hashJoin(right, "uid", "id")
         val row = joined.at(0) as DocRowVec
@@ -165,11 +166,11 @@ class BlockJoinTest {
     fun hashJoinNullKeysDontMatch() {
         val left = listOf(
             DocRowVec(listOf("k", "a"), listOf(null, "x")),
-        ).let { list -> list.size j { i: Int -> list[i] as MiniRowVec } }
+        ).let { list -> list.size j { i: Int -> list[i] as RowVec } }
 
         val right = listOf(
             DocRowVec(listOf("k", "b"), listOf(null, "y")),
-        ).let { list -> list.size j { i: Int -> list[i] as MiniRowVec } }
+        ).let { list -> list.size j { i: Int -> list[i] as RowVec } }
 
         val joined = left.hashJoin(right, "k", "k")
         // null != null in join semantics

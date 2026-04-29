@@ -1,8 +1,4 @@
-package borg.trikeshed.miniduck
-
-import borg.trikeshed.lib.*
-
-/**
+/*
  * BlockRowVec: DuckDB-style mutable -> sealed chunky block.
  *
  * State machine:
@@ -11,7 +7,14 @@ import borg.trikeshed.lib.*
  *
  * Children expose the row families stored inside this block.
  */
-class BlockRowVec constructor(
+package borg.trikeshed.miniduck
+
+import borg.trikeshed.lib.Series
+import borg.trikeshed.lib.j
+import borg.trikeshed.miniduck.MiniCursor
+import borg.trikeshed.miniduck.MiniRowVec
+
+class BlockRowVec(
     val rows: MutableList<MiniRowVec>,
     var _sealed: Boolean,
 ) : MiniRowVec() {
@@ -22,10 +25,12 @@ class BlockRowVec constructor(
 
     /** BlockRowVec is itself a zero-length shell; its content is in children. */
     override val size: Int get() = 0
-    override fun get(index: Int): Any? = throw IndexOutOfBoundsException("BlockRowVec is a shell; no scalar cells")
+
+    override fun get(index: Int): Any? =
+        throw IndexOutOfBoundsException("BlockRowVec is a shell; no scalar cells at index $index")
 
     /** Children are the rows stored in this block. */
-    override val child: Series<MiniRowVec>
+    override val child: Series<MiniRowVec>?
         get() = rows.size j { rows[it] }
 
     /** Number of rows in the block. */

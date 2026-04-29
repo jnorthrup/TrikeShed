@@ -7,6 +7,7 @@ import borg.trikeshed.lib.j
  * Column metadata as a Join of name and type memento.
  */
 typealias ColumnMeta = Join<String, TypeMemento>
+typealias `ColumnMeta↻` = ()->ColumnMeta
 
 /** Factory for ColumnMeta as Join<String, TypeMemento> */
 fun ColumnMeta(name: String, type: TypeMemento): ColumnMeta = name j type

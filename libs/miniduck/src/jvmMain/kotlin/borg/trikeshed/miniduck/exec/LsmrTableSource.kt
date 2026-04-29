@@ -1,8 +1,10 @@
 package borg.trikeshed.miniduck.exec
 
+import borg.trikeshed.cursor.RowVec
 import borg.trikeshed.userspace.database.LsmrDatabase
 import borg.trikeshed.lib.*
 import borg.trikeshed.miniduck.schema.TableSchema
+import borg.trikeshed.miniduck.WrappedRowVec
 
 /**
  * TableSource backed by the LsmrDatabase. Simple row serialization for primitives and strings.
@@ -14,8 +16,6 @@ import borg.trikeshed.miniduck.runBlockingCommon
 import borg.trikeshed.miniduck.MiniDuckBlockCodec
 import borg.trikeshed.miniduck.BlockRowVec
 import borg.trikeshed.miniduck.DocRowVec
-import borg.trikeshed.miniduck.MiniRowVec
-import borg.trikeshed.lib.*
 
 class LsmrTableSource(private val db: LsmrDatabase,val blockSizeThreshold: Int = 128) : TableSource {
 
@@ -94,7 +94,7 @@ class LsmrTableSource(private val db: LsmrDatabase,val blockSizeThreshold: Int =
     // Suspend-aware open that reads from the LSMR db without blocking.
     override suspend fun openSuspend(execCtx: ExecutionContext, tableName: String): Cursor {
         // Prefer block-based storage (chunked sealed BlockRowVecs). Fallback to legacy per-row storage if no blocks found.
-        val rows = mutableListOf<MiniRowVec>()
+        val rows = mutableListOf<RowVec>()
 
         val blockCountRaw = db.get(blockCountKey(tableName))
         if (blockCountRaw != null) {
@@ -106,9 +106,16 @@ class LsmrTableSource(private val db: LsmrDatabase,val blockSizeThreshold: Int =
                 val schemaNames = execCtx.schemaManager.getTableSuspend(tableName)?.columns?.map { it.name }
                 for (j in 0 until block.child.size) {
                     val childRow = block.child[j]
-                    val mapped = if (childRow is DocRowVec && schemaNames != null && schemaNames.isNotEmpty()) {
-                        DocRowVec(schemaNames.take(childRow.keys.size), childRow.cells)
-                    } else childRow
+                    val mapped = when {
+                        childRow is WrappedRowVec && childRow.inner is DocRowVec && schemaNames != null && schemaNames.isNotEmpty() -> {
+                            val docRow = childRow.inner as DocRowVec
+                            DocRowVec(schemaNames.take(docRow.keys.size), docRow.cells)
+                        }
+                        childRow is DocRowVec && schemaNames != null && schemaNames.isNotEmpty() -> {
+                            DocRowVec(schemaNames.take(childRow.keys.size), childRow.cells)
+                        }
+                        else -> childRow
+                    }
                     rows.add(mapped)
                 }
             }
@@ -130,9 +137,16 @@ class LsmrTableSource(private val db: LsmrDatabase,val blockSizeThreshold: Int =
             val schemaNames = execCtx.schemaManager.getTableSuspend(tableName)?.columns?.map { it.name }
             for (j in 0 until blk.child.size) {
                 val childRow = blk.child[j]
-                val mapped = if (childRow is DocRowVec && schemaNames != null && schemaNames.isNotEmpty()) {
-                    DocRowVec(schemaNames.take(childRow.keys.size), childRow.cells)
-                } else childRow
+                val mapped = when {
+                    childRow is WrappedRowVec && childRow.inner is DocRowVec && schemaNames != null && schemaNames.isNotEmpty() -> {
+                        val docRow = childRow.inner as DocRowVec
+                        DocRowVec(schemaNames.take(docRow.keys.size), docRow.cells)
+                    }
+                    childRow is DocRowVec && schemaNames != null && schemaNames.isNotEmpty() -> {
+                        DocRowVec(schemaNames.take(childRow.keys.size), childRow.cells)
+                    }
+                    else -> childRow
+                }
                 rows.add(mapped)
             }
         }
@@ -180,7 +194,7 @@ class LsmrTableSource(private val db: LsmrDatabase,val blockSizeThreshold: Int =
             val block = BlockRowVec.mutable()
             rows.forEach { r ->
                 val keys = if (keysForRows.isNotEmpty()) keysForRows.take(r.size) else (0 until r.size).map { idx -> "c$idx" }
-                block.append(DocRowVec(keys, r))
+                block.append(WrappedRowVec(DocRowVec(keys, r)))
             }
             val sealed = block.seal()
             db.put(blockKey(tableName, 0), MiniDuckBlockCodec.encode(sealed).toByteArray(Charsets.UTF_8))
@@ -196,7 +210,7 @@ class LsmrTableSource(private val db: LsmrDatabase,val blockSizeThreshold: Int =
         val doc = DocRowVec(keys, row)
 
         val blk = mutableBlocks.getOrPut(tableName) { BlockRowVec.mutable() }
-        blk.append(doc)
+        blk.append(WrappedRowVec(doc))
 
         if (blk.rowCount >= blockSizeThreshold) {
             val sealed = blk.seal()

@@ -2,7 +2,7 @@ package borg.trikeshed.couch.instrument
 
 import borg.trikeshed.couch.handle.CollectionHandle
 import borg.trikeshed.couch.handle.HandleState
-import borg.trikeshed.miniduck.MiniRowVec
+import borg.trikeshed.cursor.RowVec
 import borg.trikeshed.lib.Series
 import java.util.concurrent.locks.ReentrantLock
 
@@ -14,7 +14,7 @@ class InstrumentedHandle(val probes: Probes) {
    val lock = ReentrantLock()
    val inFlight = java.util.concurrent.atomic.AtomicLong(0)
 
-    fun append(row: MiniRowVec) {
+    fun append(row: RowVec) {
         inFlight.incrementAndGet()
         // give other threads a chance to increment inFlight so we can detect overlap
         Thread.yield()
@@ -38,7 +38,7 @@ class InstrumentedHandle(val probes: Probes) {
         }
     }
 
-    fun snapshot(): Series<MiniRowVec> {
+    fun snapshot(): Series<RowVec> {
         val snap = underlying.snapshot()
         probes.snapshotCount.incrementAndGet()
         if (underlying.state == HandleState.SEALED) probes.readCount.incrementAndGet()

@@ -3,13 +3,7 @@ package borg.trikeshed.dreamer
 import borg.trikeshed.couch.kline.Kline
 import borg.trikeshed.couch.kline.KlineBlock
 import borg.trikeshed.couch.kline.TimeSpan
-import borg.trikeshed.miniduck.DocRowVec
 import borg.trikeshed.miniduck.MiniCursor
-import borg.trikeshed.miniduck.MiniRowVec
-import borg.trikeshed.miniduck.at
-import borg.trikeshed.lib.Series
-import borg.trikeshed.lib.j
-import borg.trikeshed.lib.size
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals

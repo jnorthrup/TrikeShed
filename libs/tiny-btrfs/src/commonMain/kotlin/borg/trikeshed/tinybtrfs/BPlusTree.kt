@@ -2,7 +2,10 @@
 
 package borg.trikeshed.tinybtrfs
 
-import borg.trikeshed.tinybtrfs.algebra.*
+import borg.trikeshed.lib.Join
+import borg.trikeshed.lib.Series
+import borg.trikeshed.lib.Twin
+import borg.trikeshed.lib.j
 
 /**
  * Tiny B+Tree skeleton (commonMain)
@@ -16,7 +19,7 @@ import borg.trikeshed.tinybtrfs.algebra.*
  * Dense-array backing: internal nodes use Array<Any?> for keys/values/children
  * with explicit counts.  Public surface exposes Series<K>, Series<V>, Join, Twin.
  */
-class BPlusTree<K : Comparable<K>, V>(private val order: Int = 32) {
+class BPlusTree<K : Comparable<K>, V>(  val order: Int = 32) {
     init { require(order >= 3) { "order must be >= 3" } }
 
     sealed class Node<K, V> {
@@ -34,10 +37,10 @@ class BPlusTree<K : Comparable<K>, V>(private val order: Int = 32) {
         var next: LeafNode? = null
 
         override val keySeries: Series<K>
-            get() = keysCount j { i -> _keys[i] as K }
+            get() = keysCount j { i: Int -> _keys[i] as K }
 
         val valueSeries: Series<V?>
-            get() = keysCount j { i -> _values[i] as V? }
+            get() = keysCount j  { i: Int -> _values[i] as V? }
 
         override fun isLeaf() = true
 
@@ -213,11 +216,11 @@ class BPlusTree<K : Comparable<K>, V>(private val order: Int = 32) {
 
     /** Insert or replace a key/value. */
     fun put(key: K, value: V) {
-        val existed = get(key) != null
-        val split = insert(root, key, value)
+        val existed: Boolean = get(key) != null
+        val split: Join<K, Twin<Node<K, V>>>? = insert(root, key, value)
         if (split != null) {
-            val (pivot, twins) = split
-            val (left, right) = twins
+            val (pivot: K, twins: Twin<Node<K, V>>) = split
+            val (left: Node<K, V>, right: Node<K, V>) = twins
             val newRoot = InternalNode()
             newRoot.insertKeyAt(0, pivot)
             newRoot.addChild(left)
@@ -229,7 +232,7 @@ class BPlusTree<K : Comparable<K>, V>(private val order: Int = 32) {
 
     /** Lookup value by key. */
     fun get(key: K): V? {
-        val leaf = findLeaf(root, key) as LeafNode
+        val leaf: BPlusTree<K, V>.LeafNode = findLeaf(root, key) as LeafNode
         val idx = leaf.binarySearchKeys(key)
         return if (idx >= 0) leaf.valueAt(idx) else null
     }
@@ -243,7 +246,7 @@ class BPlusTree<K : Comparable<K>, V>(private val order: Int = 32) {
      */
     fun insert(node: Node<K, V>, key: K, value: V): Join<K, Twin<Node<K, V>>>? {
         if (node.isLeaf()) {
-            val leaf = node as LeafNode
+            val leaf: BPlusTree<K, V>.LeafNode = node as LeafNode
             val idx = leaf.binarySearchKeys(key)
             if (idx >= 0) {
                 leaf.setValueAt(idx, value)
@@ -253,7 +256,7 @@ class BPlusTree<K : Comparable<K>, V>(private val order: Int = 32) {
             leaf.insertAt(insertAt, key, value)
             if (leaf.keysCount > order) {
                 val mid = leaf.keysCount / 2
-                val right = leaf.splitAt(mid)
+                val right: BPlusTree<K, V>.LeafNode = leaf.splitAt(mid)
                 right.next = leaf.next
                 leaf.next = right
                 val pivot = right.keyAt(0)
@@ -261,7 +264,7 @@ class BPlusTree<K : Comparable<K>, V>(private val order: Int = 32) {
             }
             return null
         } else {
-            val internal = node as InternalNode
+            val internal: BPlusTree<K, V>.InternalNode = node as InternalNode
             val idx = internal.binarySearchKeys(key)
             var childIndex = if (idx >= 0) idx + 1 else -idx - 1
             if (childIndex < 0) childIndex = 0

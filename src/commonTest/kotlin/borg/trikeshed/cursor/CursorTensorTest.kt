@@ -17,7 +17,7 @@ class CursorTensorTest {
     @Suppress("UNCHECKED_CAST")
    fun rowVecOf(vararg pairs: Pair<Any?, IOMemento>): RowVec {
         val values: Series<Any?> = pairs.size j { pairs[it].first }
-        val metas: Series<() -> ColumnMeta> = pairs.size j { { RecordMeta("", pairs[it].second) } }
+        val metas: Series<()`ColumnMeta↻`> = pairs.size j { { RecordMeta("", pairs[it].second) } }
         return values.zip(metas) as RowVec
     }
 
@@ -28,7 +28,7 @@ class CursorTensorTest {
 
     @Test
     fun reifiesNumericCursorIntoDenseTensor() {
-        // Cursor = Series<RowVec>, RowVec = Series2<Any?, () -> ColumnMeta>
+        // Cursor = Series<RowVec>, RowVec = Series2<Any?, ()`ColumnMeta↻`>
         val cursor = typedCursorOf(
             rowVecOf(100.0 to IOMemento.IoDouble, 10.0 to IOMemento.IoDouble),
             rowVecOf(101.5 to IOMemento.IoDouble, 20.0 to IOMemento.IoDouble),

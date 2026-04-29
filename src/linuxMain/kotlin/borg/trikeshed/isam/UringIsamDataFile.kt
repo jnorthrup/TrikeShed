@@ -118,7 +118,7 @@ package borg.trikeshed.isam
 //        /**exact same function but writes the file with IoUring set-up and writes and native heap */
 //        fun write (cursor: Cursor, datafilename: String, var): Unit {
 //            val metafilename = "$datafilename.meta"
-//            IsamMetaFileReader.write(metafilename, cursor.meta.map { columnMeta: ColumnMeta -> columnMeta as RecordMeta })
+//            IsamMetaFileReader.write(metafilename, cursor.meta.map { columnMeta: ColumnMeta`ColumnMeta↻` as RecordMeta })
 //
 //
 //            // Create a file for writing

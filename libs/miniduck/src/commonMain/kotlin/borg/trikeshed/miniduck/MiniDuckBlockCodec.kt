@@ -1,5 +1,6 @@
 package borg.trikeshed.miniduck
 
+import borg.trikeshed.cursor.RowVec
 import borg.trikeshed.lib.*
 import borg.trikeshed.parse.json.*
 
@@ -60,7 +61,7 @@ object MiniDuckBlockCodec {
         return block.seal()
     }
 
-   fun encodeRow(row: MiniRowVec): Map<String, Any?> = when (row) {
+   fun encodeRow(row: RowVec): Map<String, Any?> = when (row) {
         is DocRowVec -> linkedMapOf(
             "type" to "DocRowVec",
             "keys" to row.keys,
@@ -146,7 +147,7 @@ object MiniDuckBlockCodec {
         )
     }
 
-   fun decodeRow(value: Any?): MiniRowVec {
+   fun decodeRow(value: Any?): RowVec {
         val map = value as? Map<*, *> ?: error("MiniDuck row body must be a JSON object")
         return when (map.string("type")) {
             "DocRowVec" -> DocRowVec(
@@ -238,7 +239,7 @@ object MiniDuckBlockCodec {
         }
     }
 
-   fun encodeChildren(child: Series<MiniRowVec>?): List<Any?>? = child?.let { series ->
+   fun encodeChildren(child: Series<RowVec>?): List<Any?>? = child?.let { series ->
         buildList {
             for (i in 0 until series.size) add(encodeRow(series[i]))
         }
@@ -267,10 +268,10 @@ object MiniDuckBlockCodec {
         return raw.mapKeys { it.key.toString() }.mapValues { it.value.toString() }
     }
 
-   fun Map<*, *>.childRows(): List<MiniRowVec> =
+   fun Map<*, *>.childRows(): List<RowVec> =
         (this["child"] as? List<*>)?.map { decodeRow(it) } ?: emptyList()
 
-   fun Map<*, *>.childSeries(): Series<MiniRowVec>? {
+   fun Map<*, *>.childSeries(): Series<RowVec>? {
         val rows = childRows()
         return if (rows.isEmpty()) null else rows.toSeries()
     }
@@ -278,7 +279,7 @@ object MiniDuckBlockCodec {
    fun Any?.asList(name: String): List<Any?> = this as? List<Any?>
         ?: error("Field '$name' must be an array")
 
-   fun List<MiniRowVec>.toSeries(): Series<MiniRowVec> = size j { idx -> this[idx] }
+   fun List<RowVec>.toSeries(): Series<RowVec> = size j { idx -> this[idx] }
 
    fun unescapeJson(s: String): String {
         val sb = StringBuilder(s.length)

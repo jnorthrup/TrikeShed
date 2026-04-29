@@ -1,6 +1,5 @@
 package borg.trikeshed.miniduck
 
-import borg.trikeshed.cursor.Cursor
 import borg.trikeshed.cursor.*
 import borg.trikeshed.lib.*
 
@@ -15,13 +14,13 @@ fun MiniCursor.toJson(): String {
     val sb = StringBuilder()
     for (i in 0 until this.size) {
         if (i > 0) sb.append('\n')
-        val row = this.row(i) as MiniRowVec
+        val row = this.row(i) as RowVec
         sb.append(rowToJson(row))
     }
     return sb.toString()
 }
 
-fun rowToJson(row: MiniRowVec): String = when (row) {
+fun rowToJson(row: RowVec): String = when (row) {
     is DocRowVec -> {
         val children = row.child
         val sb = StringBuilder("{")
@@ -65,6 +64,5 @@ fun valueToJson(v: Any?): String = when (v) {
     is Float -> if (v.isInfinite() || v.isNaN()) "null" else v.toString()
     is Boolean -> v.toString()
     is DocRowVec -> rowToJson(v)
-    is MiniRowVec -> rowToJson(v)
     else -> '"' + escapeJson(v.toString()) + '"'
 }

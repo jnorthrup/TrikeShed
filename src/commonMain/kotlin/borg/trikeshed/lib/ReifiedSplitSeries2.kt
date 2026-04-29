@@ -15,13 +15,9 @@ package borg.trikeshed.lib
 // Use rowVec.right for meta-only scans (Cursor.meta already does this).
 // ============================================================================
 
-class ReifiedSplitSeries2<A, B>(
-    val leftSeries: Series<A>,
-    val rightSeries: Series<B>
-) : Series2<A, B> {
+class ReifiedSplitSeries2<A, B>(val leftSeries: Series<A>, val rightSeries: Series<B>) : Series2<A, B> {
 
     override val a: Int get() = minOf(leftSeries.a, rightSeries.a)
-
     override val b: (Int) -> Join<A, B>
         get() = { i -> leftSeries[i] j rightSeries[i] }
 
@@ -32,7 +28,7 @@ class ReifiedSplitSeries2<A, B>(
     fun select(vararg indices: Int): ReifiedSplitSeries2<A, B> =
         ReifiedSplitSeries2(
             indices.size j { leftSeries[indices[it]] },
-            indices.size j { rightSeries[indices[it]] }
+            indices.size j { rightSeries[indices[it]] },
         )
 
     /** Select a single column's value.  Zero allocation — direct Series index. */
@@ -47,25 +43,30 @@ class ReifiedSplitSeries2<A, B>(
     inline fun <C> mapLeft(crossinline f: (A) -> C): ReifiedSplitSeries2<C, B> =
         ReifiedSplitSeries2(
             leftSeries.size j { f(leftSeries[it]) },
-            rightSeries
+            rightSeries,
         )
 
     /** Transform right values, preserving split structure. */
     inline fun <C> mapRight(crossinline f: (B) -> C): ReifiedSplitSeries2<A, C> =
         ReifiedSplitSeries2(
             leftSeries,
-            rightSeries.size j { f(rightSeries[it]) }
+            rightSeries.size j { f(rightSeries[it]) },
         )
 
     /** Swap left/right halves. */
     fun swap(): ReifiedSplitSeries2<B, A> =
         ReifiedSplitSeries2(rightSeries, leftSeries)
+
+    companion object {
+        operator fun <A, B> invoke(it: Series2<A, B>) = ReifiedSplitSeries2(it.left, it.right);
+
+        fun <A, B : A> invoke(twin: Twin<Series<A>>): ReifiedSplitSeries2<A, A> = ReifiedSplitSeries2(twin.a, twin.b)
+        fun <A, B : A> invoke(twin: Series<Twin<A>>): ReifiedSplitSeries2<A, A> =
+            ReifiedSplitSeries2(twin.right, twin.left)
+
+
+        fun <A, B> Series2<A, B>.reify(): ReifiedSplitSeries2<A, B> = ReifiedSplitSeries2<A, B>(this).reify()
+        fun <A, B : A> Twin<Series<A>>.reify(): ReifiedSplitSeries2<A, B> = invoke<A, B>(this).reify()
+        fun <A, B : A> Series<Twin<A>>.reify(): ReifiedSplitSeries2<A, B> = invoke<A, B>(this).reify()
+    }
 }
-
-// ============================================================================
-// Factory — promote any Series2 to a ReifiedSplitSeries2 by materializing
-// its left and right projections.  One-time cost; pays back in hot loops.
-// ============================================================================
-
-fun <A, B> Series2<A, B>.reify(): ReifiedSplitSeries2<A, B> =
-    ReifiedSplitSeries2(this.left, this.right)

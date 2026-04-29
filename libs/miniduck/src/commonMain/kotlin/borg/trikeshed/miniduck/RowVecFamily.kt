@@ -59,7 +59,7 @@ class WrappedRowVec(val inner: RowVec, override val child: Series<MiniRowVec>? =
     override fun get(index: Int): Any? = (inner as ReifiedSplitSeries2<*, *>).leftSeries[index]
 }
 
-/* ═══════════════════════════════════════════════════════════════════════════
+/* ═════════════════════════════════════════════════════════════════════════════
  * Lazy child infrastructure.
  *
  * Seven RowVec families share the same lazy-loading pattern for `child`:
@@ -79,7 +79,7 @@ class WrappedRowVec(val inner: RowVec, override val child: Series<MiniRowVec>? =
  * `LazyChildRowVec` is the abstract base for subclasses that carry a deferred
  * child family. Leaf rows that never load children (e.g. scalar-only rows)
  * extend MiniRowVec directly and override `child` with `null`.
- * ═══════════════════════════════════════════════════════════════════════════ */
+ * ════════════════════════════════════════════════════════════════════════════ */
 
 /**
  * Abstract base for rows that carry a lazy child family.
@@ -88,7 +88,7 @@ class WrappedRowVec(val inner: RowVec, override val child: Series<MiniRowVec>? =
  * in their `child` getter:
  *
  * ```
- *var cached: Series<MiniRowVec>? = null
+ * var cached: Series<MiniRowVec>? = null
  * override val child: Series<MiniRowVec>? get() = loadChild(cached) { factory() }
  * ```
  */

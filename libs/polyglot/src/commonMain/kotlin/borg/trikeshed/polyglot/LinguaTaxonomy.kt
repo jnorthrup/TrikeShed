@@ -1,16 +1,14 @@
+@file:Suppress("EnumEntryName", "UNCHECKED_CAST")
+
 package borg.trikeshed.polyglot
 
 import borg.trikeshed.common.TypeEvidence
-import borg.trikeshed.common.toRowVec
-import borg.trikeshed.cursor.ColumnMeta
-import borg.trikeshed.cursor.RowVec
-import borg.trikeshed.cursor.label
-import borg.trikeshed.cursor.joins
+import borg.trikeshed.cursor.*
 import borg.trikeshed.isam.meta.IOMemento
 import borg.trikeshed.lib.Series
-import borg.trikeshed.lib.get
 import borg.trikeshed.lib.j
-import borg.trikeshed.lib.size
+import borg.trikeshed.lib.α
+import kotlin.math.abs
 
 /* ═══════════════════════════════════════════════════════════════════════════
  *  Polyglot taxonomy — speculative language classification via SupervisorJob fanout.
@@ -52,7 +50,7 @@ enum class LangId(val label: String) {
 /**
  * Reference fingerprint: a TypeEvidence row over the language's keyword + operator corpus.
  *
- * Derived by running [borg.trikeshed.common.TypeEvidence.sample] over a
+ * Derived by running [TypeEvidence.sample] over a
  * concatenation of every keyword, operator symbol, and common delimiter for
  * the language. This is the "template" that live source scans are compared against.
  *
@@ -85,33 +83,35 @@ data class LangFingerprint(
             ev.maxColumnLength.toInt(),
             if (ev.minColumnLength == UShort.MAX_VALUE) 0 else ev.minColumnLength.toInt(),
             TypeEvidence.deduceMemento(ev).label,
-            corpusLength
+            corpusLength,
         )
-        val meta: Series<() -> ColumnMeta> = LANG_FP_COLUMNS.size j { index: Int -> { LANG_FP_COLUMNS[index] } }
+        val meta: Series<`ColumnMeta↻`> =
+            (LANG_FP_COLUMNS.entries α LANG_FP_COLUMNS::columnMeta) as Series<`ColumnMeta↻`>
         return values.size j { index: Int -> values[index] } joins meta
     }
 
-    companion object {
-        val LANG_FP_COLUMNS = arrayOf(
-            ColumnMeta("confix", IOMemento.IoString),
-            ColumnMeta("digits", IOMemento.IoInt),
-            ColumnMeta("periods", IOMemento.IoInt),
-            ColumnMeta("exponent", IOMemento.IoInt),
-            ColumnMeta("signs", IOMemento.IoInt),
-            ColumnMeta("special", IOMemento.IoInt),
-            ColumnMeta("alpha", IOMemento.IoInt),
-            ColumnMeta("truefalse", IOMemento.IoInt),
-            ColumnMeta("empty", IOMemento.IoInt),
-            ColumnMeta("quotes", IOMemento.IoInt),
-            ColumnMeta("dquotes", IOMemento.IoInt),
-            ColumnMeta("whitespaces", IOMemento.IoInt),
-            ColumnMeta("backslashes", IOMemento.IoInt),
-            ColumnMeta("linefeed", IOMemento.IoInt),
-            ColumnMeta("maxColumnLength", IOMemento.IoInt),
-            ColumnMeta("minColumnLength", IOMemento.IoInt),
-            ColumnMeta("deducedType", IOMemento.IoString),
-            ColumnMeta("corpusLength", IOMemento.IoInt),
-        )
+
+    enum class LANG_FP_COLUMNS(ioMemento: IOMemento) {
+        confix(IOMemento.IoString),
+        digits(IOMemento.IoInt),
+        periods(IOMemento.IoInt),
+        exponent(IOMemento.IoInt),
+        signs(IOMemento.IoInt),
+        special(IOMemento.IoInt),
+        alpha(IOMemento.IoInt),
+        truefalse(IOMemento.IoInt),
+        empty(IOMemento.IoInt),
+        quotes(IOMemento.IoInt),
+        dquotes(IOMemento.IoInt),
+        whitespaces(IOMemento.IoInt),
+        backslashes(IOMemento.IoInt),
+        linefeed(IOMemento.IoInt),
+        maxColumnLength(IOMemento.IoInt),
+        minColumnLength(IOMemento.IoInt),
+        deducedType(IOMemento.IoString),
+        corpusLength(IOMemento.IoInt), ;
+
+        val columnMeta: ColumnMeta = name j ioMemento
     }
 }
 
@@ -165,7 +165,7 @@ fun confidence(live: TypeEvidence, ref: TypeEvidence): Double {
         live.backslashes.toDouble(),
         live.linefeed.toDouble(),
         live.maxColumnLength.toDouble(),
-        if (live.minColumnLength == UShort.MAX_VALUE) 0.0 else live.minColumnLength.toDouble()
+        if (live.minColumnLength == UShort.MAX_VALUE) 0.0 else live.minColumnLength.toDouble(),
     )
     val refVals = listOf(
         ref.digits.toDouble(),
@@ -182,12 +182,12 @@ fun confidence(live: TypeEvidence, ref: TypeEvidence): Double {
         ref.backslashes.toDouble(),
         ref.linefeed.toDouble(),
         ref.maxColumnLength.toDouble(),
-        if (ref.minColumnLength == UShort.MAX_VALUE) 0.0 else ref.minColumnLength.toDouble()
+        if (ref.minColumnLength == UShort.MAX_VALUE) 0.0 else ref.minColumnLength.toDouble(),
     )
 
     val diffs = liveVals.zip(refVals) { l, r ->
         val denom = maxOf(1.0, maxOf(l, r))
-        kotlin.math.abs(l - r) / denom
+        abs(l - r) / denom
     }
     val avg = if (diffs.isEmpty()) 1.0 else diffs.average()
     val score = 1.0 - avg
@@ -239,7 +239,9 @@ object LangRegistry {
     fun all(): List<LangEntry> = entries.toList()
 
     /** Reset for test isolation. */
-    fun reset() { entries.clear() }
+    fun reset() {
+        entries.clear()
+    }
 
     fun series(): Series<LangEntry> = entries.size j { i: Int -> entries[i] }
 

@@ -26,7 +26,7 @@ actual class IsamDataFile actual constructor(
             0
         }
 
-    actual override val b: (Int) -> Join<Int, (Int) -> Join<Any?, () -> ColumnMeta>> = { row ->
+    actual override val b: (Int) -> Join<Int, (Int) -> Join<Any?, ()`ColumnMeta↻`>> = { row ->
         val bytes = Files.readAllBytes(datafileFilename)
         val base = row * recordlen
         metafile.constraints.size j { col ->

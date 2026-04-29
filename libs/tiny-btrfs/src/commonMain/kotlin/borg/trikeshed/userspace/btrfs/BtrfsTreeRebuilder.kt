@@ -1,6 +1,8 @@
 package borg.trikeshed.userspace.btrfs
 
-import borg.trikeshed.tinybtrfs.DiskAdapter
+import borg.trikeshed.lib.*
+
+import borg.trikeshed.tinybtrfs.*
 
 /**
  * Rebuild a B+Tree from a set of key/value pairs.

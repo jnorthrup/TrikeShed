@@ -1,5 +1,6 @@
 package borg.trikeshed.miniduck
 
+import borg.trikeshed.cursor.RowVec
 import borg.trikeshed.lib.*
 import kotlin.test.*
 
@@ -8,7 +9,7 @@ class MiniDuckBlockCodecRoundTripTest {
     // ── helpers ──────────────────────────────────────────────────────────
 
     /** Create a sealed block containing the given rows and return the NDJSON. */
-    private fun encodeBlock(vararg rows: MiniRowVec): String {
+    private fun encodeBlock(vararg rows: RowVec): String {
         val block = BlockRowVec.mutable()
         rows.forEach(block::append)
         block.seal()
@@ -20,7 +21,7 @@ class MiniDuckBlockCodecRoundTripTest {
         MiniDuckBlockCodec.decode(text)
 
     /** Round-trip helper: encode rows → decode → return decoded block. */
-    private fun roundTrip(vararg rows: MiniRowVec): BlockRowVec =
+    private fun roundTrip(vararg rows: RowVec): BlockRowVec =
         decodeBlock(encodeBlock(*rows))
 
     // ── DocRowVec ────────────────────────────────────────────────────────
@@ -252,7 +253,7 @@ class MiniDuckBlockCodecRoundTripTest {
 
     @Test
     fun mixedBlockRoundTrip() {
-        val rows: List<MiniRowVec> = listOf(
+        val rows: List<RowVec> = listOf(
             DocRowVec(listOf("name"), listOf("Bob")),
             ViewRowVec("id-1", "k1", 42),
             JsonRowVec("string", "\"test\""),

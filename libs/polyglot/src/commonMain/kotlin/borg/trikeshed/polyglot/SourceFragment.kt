@@ -110,7 +110,7 @@ data class SourceFragment(
             name ?: "",
             TypeEvidence.deduceMemento(evidence).label,
         )
-        val metas: Series<() -> ColumnMeta> = listOf(
+        val metas: Series<()`ColumnMeta↻`> = listOf(
             ColumnMeta("lang", IOMemento.IoString),
             ColumnMeta("spanStart", IOMemento.IoInt),
             ColumnMeta("spanEnd", IOMemento.IoInt),

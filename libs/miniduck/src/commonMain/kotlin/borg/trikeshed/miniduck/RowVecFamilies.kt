@@ -16,12 +16,12 @@ import borg.trikeshed.lib.*
 class DocRowVec(
     val keys: List<String>,
     val cells: List<Any?>,
-    override val child: Series<MiniRowVec>? = null,
-) : MiniRowVec() {
+    val child: Series<RowVec>? = null,
+) : RowVec {
     init { require(keys.size == cells.size) { "keys and cells must have same length" } }
 
-    override val size: Int get() = cells.size
-    override fun get(index: Int): Any? = cells[index]
+    val size: Int get() = cells.size
+    fun get(index: Int): Any? = cells[index]
 
     /** Look up a field by name. Returns null if not found. */
     operator fun get(key: String): Any? = cells.getOrNull(keys.indexOf(key))
@@ -55,13 +55,13 @@ class ViewRowVec(
     val id: String,
     val key: Any?,
     val value: Any?,
-   val docLoader: (() -> MiniRowVec)? = null,
-) : MiniRowVec() {
-   var loadedChild: Series<MiniRowVec>? = null
+    val docLoader: (() -> RowVec)? = null,
+) : RowVec() {
+   var loadedChild: Series<RowVec>? = null
 
     // scalar surface: [id, key, value]
-    override val size: Int get() = 3
-    override fun get(index: Int): Any? = when (index) {
+    val size: Int get() = 3
+    fun get(index: Int): Any? = when (index) {
         0 -> id
         1 -> key
         2 -> value
@@ -69,12 +69,12 @@ class ViewRowVec(
     }
 
     /** Lazy doc expansion as a single-child Series. */
-    override val child: Series<MiniRowVec>?
+    val child: Series<RowVec>?
         get() {
             loadedChild?.let { return it }
             val loader = docLoader ?: return null
             val row = loader()
-            val childSeries: Series<MiniRowVec> = 1 j { _: Int -> row }
+            val childSeries: Series<RowVec> = 1 j { _: Int -> row }
             return childSeries.also { loadedChild = it }
         }
 }
@@ -88,12 +88,12 @@ class ViewRowVec(
 class BlobRowVec(
     val bytes: ByteArray,
     val mimeType: String? = null,
-   val childFactory: ((ByteArray) -> Series<MiniRowVec>)? = null,
-) : MiniRowVec() {
-    override val size: Int get() = 0
-    override fun get(index: Int): Any? = throw IndexOutOfBoundsException("BlobRowVec is a shell")
+    val childFactory: ((ByteArray) -> Series<RowVec>)? = null,
+) : RowVec() {
+    val size: Int get() = 0
+    fun get(index: Int): Any? = throw IndexOutOfBoundsException("BlobRowVec is a shell")
 
-    override val child: Series<MiniRowVec>?
+    val child: Series<RowVec>?
         get() = childFactory?.invoke(bytes)
 }
 
@@ -108,15 +108,15 @@ class BlobRowVec(
 class JsonRowVec(
     val nodeType: String,   // "object", "array", "string", "number", "boolean", "null"
     val rawValue: String,
-   val childFactory: (() -> Series<MiniRowVec>)? = null,
-) : MiniRowVec() {
-    override val size: Int get() = 2
-    override fun get(index: Int): Any? = when (index) {
+    val childFactory: (() -> Series<RowVec>)? = null,
+) : RowVec() {
+    val size: Int get() = 2
+    fun get(index: Int): Any? = when (index) {
         0 -> nodeType
         1 -> rawValue
         else -> throw IndexOutOfBoundsException(index.toString())
     }
-    override val child: Series<MiniRowVec>? get() = childFactory?.invoke()
+    val child: Series<RowVec>? get() = childFactory?.invoke()
 }
 
 /**
@@ -128,15 +128,15 @@ class JsonRowVec(
 class YamlRowVec(
     val nodeKind: String,    // "mapping", "sequence", "scalar"
     val scalarValue: String? = null,
-   val childFactory: (() -> Series<MiniRowVec>)? = null,
-) : MiniRowVec() {
-    override val size: Int get() = 2
-    override fun get(index: Int): Any? = when (index) {
+    val childFactory: (() -> Series<RowVec>)? = null,
+) : RowVec() {
+    val size: Int get() = 2
+    fun get(index: Int): Any? = when (index) {
         0 -> nodeKind
         1 -> scalarValue
         else -> throw IndexOutOfBoundsException(index.toString())
     }
-    override val child: Series<MiniRowVec>? get() = childFactory?.invoke()
+    val child: Series<RowVec>? get() = childFactory?.invoke()
 }
 
 /**
@@ -151,15 +151,15 @@ class YamlRowVec(
 class CsvRowVec(
     val nodeKind: String,    // "header", "row", "cell"
     val rawValue: String,
-   val childFactory: (() -> Series<MiniRowVec>)? = null,
-) : MiniRowVec() {
-    override val size: Int get() = 2
-    override fun get(index: Int): Any? = when (index) {
+    val childFactory: (() -> Series<RowVec>)? = null,
+) : RowVec() {
+    val size: Int get() = 2
+    fun get(index: Int): Any? = when (index) {
         0 -> nodeKind
         1 -> rawValue
         else -> throw IndexOutOfBoundsException(index.toString())
     }
-    override val child: Series<MiniRowVec>? get() = childFactory?.invoke()
+    val child: Series<RowVec>? get() = childFactory?.invoke()
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -196,11 +196,11 @@ sealed class ObjectStoreRowVec(
     open val lastModified: String?,
     open val versionId: String?,
     open val metadata: Map<String, String>?,
-    open val blob: Series<MiniRowVec>?,
-) : MiniRowVec() {
-    override val size: Int get() = 0
-    override fun get(index: Int): Any? = throw IndexOutOfBoundsException("ObjectStoreRowVec is a shell")
-    override val child: Series<MiniRowVec>? get() = blob
+    open val blob: Series<RowVec>?,
+) : RowVec() {
+    val size: Int get() = 0
+    fun get(index: Int): Any? = throw IndexOutOfBoundsException("ObjectStoreRowVec is a shell")
+    val child: Series<RowVec>? get() = blob
     abstract val provider: ObjectStoreProvider
 
     companion object {
@@ -214,7 +214,7 @@ sealed class ObjectStoreRowVec(
             lastModified: String? = null,
             versionId: String? = null,
             metadata: Map<String, String>? = null,
-            blob: Series<MiniRowVec>? = null,
+            blob: Series<RowVec>? = null,
         ): ObjectStoreRowVec = GcsRowVec(bucket, key, byteSize, contentType, etag, lastModified, versionId, metadata, blob)
 
         /** Factory for AWS S3 blobs. */
@@ -227,7 +227,7 @@ sealed class ObjectStoreRowVec(
             lastModified: String? = null,
             versionId: String? = null,
             metadata: Map<String, String>? = null,
-            blob: Series<MiniRowVec>? = null,
+            blob: Series<RowVec>? = null,
         ): ObjectStoreRowVec = S3RowVec(bucket, key, byteSize, contentType, etag, lastModified, versionId, metadata, blob)
 
         /** Factory for Alibaba Cloud OSS blobs. */
@@ -240,7 +240,7 @@ sealed class ObjectStoreRowVec(
             lastModified: String? = null,
             versionId: String? = null,
             metadata: Map<String, String>? = null,
-            blob: Series<MiniRowVec>? = null,
+            blob: Series<RowVec>? = null,
         ): ObjectStoreRowVec = AlibabaRowVec(bucket, key, byteSize, contentType, etag, lastModified, versionId, metadata, blob)
     }
 }
@@ -255,7 +255,7 @@ class GcsRowVec(
     override val lastModified: String? = null,
     override val versionId: String? = null,
     override val metadata: Map<String, String>? = null,
-    override val blob: Series<MiniRowVec>? = null,
+    override val blob: Series<RowVec>? = null,
 ) : ObjectStoreRowVec(bucket, key, byteSize, contentType, etag, lastModified, versionId, metadata, blob) {
     override val provider: ObjectStoreProvider get() = ObjectStoreProvider.GCS
 }
@@ -270,7 +270,7 @@ class S3RowVec(
     override val lastModified: String? = null,
     override val versionId: String? = null,
     override val metadata: Map<String, String>? = null,
-    override val blob: Series<MiniRowVec>? = null,
+    override val blob: Series<RowVec>? = null,
 ) : ObjectStoreRowVec(bucket, key, byteSize, contentType, etag, lastModified, versionId, metadata, blob) {
     override val provider: ObjectStoreProvider get() = ObjectStoreProvider.S3
 }
@@ -285,7 +285,7 @@ class AlibabaRowVec(
     override val lastModified: String? = null,
     override val versionId: String? = null,
     override val metadata: Map<String, String>? = null,
-    override val blob: Series<MiniRowVec>? = null,
+    override val blob: Series<RowVec>? = null,
 ) : ObjectStoreRowVec(bucket, key, byteSize, contentType, etag, lastModified, versionId, metadata, blob) {
     override val provider: ObjectStoreProvider get() = ObjectStoreProvider.ALIBABA
 }

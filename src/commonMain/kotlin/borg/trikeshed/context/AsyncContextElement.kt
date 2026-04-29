@@ -1,6 +1,7 @@
 package borg.trikeshed.context
 
 import borg.trikeshed.context.ElementState.*
+import kotlinx.coroutines.CompletableJob
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
@@ -18,7 +19,11 @@ abstract class AsyncContextElement(
     initialState: ElementState = CREATED,
     parentJob: Job? = null
 ) : CoroutineContext.Element {
-    protected val supervisor = SupervisorJob(parentJob)
+    /** Parent job passed to the internal SupervisorJob, or null. */
+    protected val parentJob: Job? = parentJob
+
+    /** SupervisorJob for this element's coroutine scope. */
+    open val supervisor: CompletableJob = SupervisorJob(parentJob)
 
     var state: ElementState = initialState
         protected set

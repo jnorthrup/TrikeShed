@@ -1,17 +1,10 @@
 package borg.trikeshed.common
 
-import borg.trikeshed.cursor.ColumnMeta
-import borg.trikeshed.cursor.MapTypeMemento
-import borg.trikeshed.cursor.RowVec
-import borg.trikeshed.cursor.SeqTypeMemento
-import borg.trikeshed.cursor.TypeMemento
-import borg.trikeshed.cursor.label
-import borg.trikeshed.cursor.joins
+import borg.trikeshed.cursor.*
 import borg.trikeshed.isam.meta.IOMemento
-import borg.trikeshed.lib.Join
-import borg.trikeshed.lib.j
-import borg.trikeshed.lib.get
 import borg.trikeshed.lib.Series
+import borg.trikeshed.lib.get
+import borg.trikeshed.lib.j
 import borg.trikeshed.lib.size
 
 data class
@@ -218,7 +211,7 @@ fun TypeEvidence.toRowVec(): RowVec {
         if (minColumnLength == UShort.MAX_VALUE) 0 else minColumnLength.toInt(),
         TypeEvidence.deduceMemento(this).label,
     )
-    val meta: Series< () -> ColumnMeta> = TYPE_EVIDENCE_COLUMNS.size j { index: Int -> { TYPE_EVIDENCE_COLUMNS[index] } }
+    val meta: Series<`ColumnMeta↻`> = TYPE_EVIDENCE_COLUMNS.size j { index: Int -> { TYPE_EVIDENCE_COLUMNS[index] } }
     return values.size j { index: Int -> values[index] } joins meta
 }
 

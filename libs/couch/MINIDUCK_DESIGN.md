@@ -31,7 +31,7 @@ Three layers:
 
 Use existing TrikeShed primitives wherever possible, but tighten Tensor around the algebra the user asked for:
 - `ColumnMeta = Join<String, TypeMemento>`
-- `RowVec = Series2<Any?, () -> ColumnMeta>` as the parent row abstraction
+- `RowVec = Series2<Any?, ()`ColumnMeta↻`>` as the parent row abstraction
 - `Cursor = Series<RowVec>`
 - `Series<T> = Join<Int, (Int) -> T>`
 - `typealias Shape = Series<Int>`

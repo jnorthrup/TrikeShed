@@ -120,7 +120,7 @@ infix fun <C> Cursor.α(xform: (RowVec) -> C): Series<C> =
     size j { i -> xform(row(i)) }
 ```
 
-Then Cursor projection becomes: `cursor α { row -> row.α(Join<*, () -> ColumnMeta>::a) }` — or with further unification
+Then Cursor projection becomes: `cursor α { row -> row.α(Join<*, ()`ColumnMeta↻`>::a) }` — or with further unification
 of the RowVec alpha:
 
 ```kotlin
@@ -153,7 +153,7 @@ there's also `Series<Any?>.joins(meta)` which is the same shape.
 
 ```kotlin
 // Instead of: values.joins(meta) — rename to:
-infix fun <T> Series<T>.j(meta: Series<() -> ColumnMeta>): RowVec = this.zip(meta)
+infix fun <T> Series<T>.j(meta: Series<()`ColumnMeta↻`>): RowVec = this.zip(meta)
 ```
 
 This makes `j` the universal constructor:
@@ -348,7 +348,7 @@ THE INTERFACE CONTRACT (structurally pure, semantically deferred)
           transform                                                                                                                                                                     
           - Cursor.get(IntRange/Int/String) — pure column projection
         
-        RowVec = Series2<Any?, () -> ColumnMeta> — Cursor.kt:
+        RowVec = Series2<Any?, ()`ColumnMeta↻`> — Cursor.kt:
         15                                                                                                                                                                            
         - values — Cursor.kt:40 — pure: this α {
         it.a }                                                                                                                                                                                    

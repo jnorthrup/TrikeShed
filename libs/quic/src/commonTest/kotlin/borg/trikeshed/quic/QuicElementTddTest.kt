@@ -1,15 +1,12 @@
 package borg.trikeshed.quic
 
 import borg.trikeshed.context.AsyncContextElement
+import borg.trikeshed.context.AsyncContextKey
 import borg.trikeshed.context.ElementState
 import borg.trikeshed.context.StreamTransport
 import kotlinx.coroutines.test.runTest
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertNotEquals
-import kotlin.test.assertSame
-import kotlin.test.assertTrue
+import kotlin.coroutines.CoroutineContext
+import kotlin.test.*
 
 /**
  * TDD spec for QUIC element lifecycle, varint encoding, and packet header algebra.
@@ -120,13 +117,13 @@ class QuicElementTddTest {
 
     @Test
     fun `QuicKey is AsyncContextKey of QuicElement`() {
-        assertTrue(QuicKey is borg.trikeshed.context.AsyncContextKey<QuicElement>)
+        assertTrue(QuicKey is AsyncContextKey<QuicElement>)
     }
 
     @Test
     fun `QuicKey resolves QuicElement from context`() = runTest {
         val elem = openQuicElement()
-        val ctx = elem as kotlin.coroutines.CoroutineContext
+        val ctx = elem as CoroutineContext
         assertSame(elem, ctx[QuicKey])
     }
 }
@@ -212,15 +209,17 @@ class QuicVarIntCodecTest {
 
     @Test
     fun `encode with offset does not clobber following bytes`() {
-        val buf = byteArrayOf(0, 0, 0xFF.toByte(), 0xFF.toByte(), 0, 0, 0, 0)
-        QuicVarInt.encode(42uL, buf, offset = 2)
-        // First two bytes untouched, bytes 2-3 = 42, bytes 4-7 untouched
+        val buf = byteArrayOf(0, 0, 0xFF.toByte(), 0xFF.toByte(), 0xFF.toByte(), 0xFF.toByte(), 0, 0)
+        QuicVarInt.encode(100uL, buf, offset = 2)
+        // First two bytes untouched, bytes 2-3 = 100 (2-byte encoding), bytes 4-7 untouched
         assertEquals(0, buf[0])
         assertEquals(0, buf[1])
-        assertEquals(42, buf[2].toInt() and 0xFF)
-        assertEquals(0, buf[3])
+        assertEquals(0x40, buf[2].toInt() and 0xFF)  // 100 >> 8 | 0x40 = 0x40
+        assertEquals(100, buf[3].toInt() and 0xFF)    // 100 & 0xFF = 100
         assertEquals(0xFF.toByte(), buf[4])
         assertEquals(0xFF.toByte(), buf[5])
+        assertEquals(0, buf[6])
+        assertEquals(0, buf[7])
     }
 
     @Test

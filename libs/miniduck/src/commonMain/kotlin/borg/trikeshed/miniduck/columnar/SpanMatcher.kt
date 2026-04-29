@@ -3,7 +3,6 @@ package borg.trikeshed.miniduck.columnar
 import borg.trikeshed.lib.*
 import borg.trikeshed.miniduck.DocRowVec
 import borg.trikeshed.miniduck.MiniCursor
-import borg.trikeshed.miniduck.MiniRowVec
 import borg.trikeshed.miniduck.getValue
 import borg.trikeshed.miniduck.toRowVec
 
