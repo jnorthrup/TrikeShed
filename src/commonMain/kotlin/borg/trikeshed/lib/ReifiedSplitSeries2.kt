@@ -2,6 +2,8 @@
 
 package borg.trikeshed.lib
 
+import kotlin.jvm.JvmName
+
 // ============================================================================
 // ReifiedSplitSeries2 — concrete Series2 that stores two Series directly.
 //
@@ -60,13 +62,16 @@ class ReifiedSplitSeries2<A, B>(val leftSeries: Series<A>, val rightSeries: Seri
     companion object {
         operator fun <A, B> invoke(it: Series2<A, B>) = ReifiedSplitSeries2(it.left, it.right);
 
-        fun <A, B : A> invoke(twin: Twin<Series<A>>): ReifiedSplitSeries2<A, A> = ReifiedSplitSeries2(twin.a, twin.b)
-        fun <A, B : A> invoke(twin: Series<Twin<A>>): ReifiedSplitSeries2<A, A> =
+        @JvmName("invokeTwinSeries")
+        fun <A> invoke(twin: Twin<Series<A>>): ReifiedSplitSeries2<A, A> = ReifiedSplitSeries2(twin.a, twin.b)
+        @JvmName("invokeSeriesTwin")
+        fun <A> invoke(twin: Series<Twin<A>>): ReifiedSplitSeries2<A, A> =
             ReifiedSplitSeries2(twin.right, twin.left)
 
-
         fun <A, B> Series2<A, B>.reify(): ReifiedSplitSeries2<A, B> = ReifiedSplitSeries2<A, B>(this).reify()
-        fun <A, B : A> Twin<Series<A>>.reify(): ReifiedSplitSeries2<A, B> = invoke<A, B>(this).reify()
-        fun <A, B : A> Series<Twin<A>>.reify(): ReifiedSplitSeries2<A, B> = invoke<A, B>(this).reify()
+        @JvmName("reifyTwinSeries")
+        fun <A> Twin<Series<A>>.reify(): ReifiedSplitSeries2<A, A> = ReifiedSplitSeries2(this.a, this.b)
+        @JvmName("reifySeriesTwin")
+        fun <A> Series<Twin<A>>.reify(): ReifiedSplitSeries2<A, A> = ReifiedSplitSeries2(this.right, this.left)
     }
 }

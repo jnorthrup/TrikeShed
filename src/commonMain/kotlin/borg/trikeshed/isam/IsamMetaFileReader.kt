@@ -4,8 +4,6 @@ import borg.trikeshed.common.Files
 import borg.trikeshed.common.Usable
 import borg.trikeshed.cursor.ColumnMeta
 import borg.trikeshed.cursor.TypeMemento
-import borg.trikeshed.cursor.name
-import borg.trikeshed.cursor.type
 import borg.trikeshed.isam.meta.IOMemento
 import borg.trikeshed.lib.*
 import kotlin.math.min
@@ -39,6 +37,7 @@ IoType :=  IoInstant | IoDouble | IoString | IoInt
  * the binary file format follows this sample
  *
  */
+@Deprecated("Use borg.trikeshed.parse.confix.Isam3FileReader for ISAM3 YAML metadata")
 class IsamMetaFileReader(val metafileFilename: String) :Usable{
 
     val recordlen: Int by lazy {
@@ -55,9 +54,9 @@ class IsamMetaFileReader(val metafileFilename: String) :Usable{
 //        val lines = buf.readBytes(size).decodeToString().lines().filterNot { it.trim().startsWith("#") }.map(String::trim)
         val lines = Files.readAllLines(metafileFilename).filterNot { it.trim().startsWith('#') }
         //split on \s+
-        val coords = CharSeries(lines[0]).trim.splitWs().α { it.asString() }
-        val names = CharSeries(lines[1]).trim.splitWs().α { it.asString() }
-        val types = CharSeries(lines[2]).trim.splitWs().α { it.asString() }
+        val coords: Series<String> = CharSeries(lines[0]).trim.splitWs() α CharSeries::asString
+        val names: Series<String> = CharSeries(lines[1]).trim.splitWs() α CharSeries::asString
+        val types: Series<String> = CharSeries(lines[2]).trim.splitWs() α CharSeries::asString
 
 
         this@IsamMetaFileReader.constraints1 = names.toList().zip(types.toList()).mapIndexed { index, (name, type) ->

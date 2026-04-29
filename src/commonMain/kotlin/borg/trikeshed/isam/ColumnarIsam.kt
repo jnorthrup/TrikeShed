@@ -8,53 +8,51 @@ import borg.trikeshed.cursor.RowVec
 import borg.trikeshed.cursor.at
 import borg.trikeshed.cursor.meta
 import borg.trikeshed.cursor.name
+import borg.trikeshed.cursor.j
+import borg.trikeshed.isam.meta.IOMemento
 import borg.trikeshed.lib.Series
+import borg.trikeshed.lib.emptySeries
 import borg.trikeshed.lib.get
+import borg.trikeshed.lib.getOrNull
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.size
+import borg.trikeshed.lib.toList
 import borg.trikeshed.lib.toSeries
-import borg.trikeshed.lib.α
+import borg.trikeshed.lib.view
 
-private const val COLUMNAR_MANIFEST = "# trikeshed-columnar-isam-v1"
-private const val NO_COLUMN_GROUPS = "-"
+private const val ISAM3_LAYOUT_SUFFIX = ".isam3.yaml"
 
-/** Single fixed-width column file plus its own metadata. */
-data class ColumnarIsamColumn(
-    val fileName: String,
-    val meta: RecordMeta,
-    val width: Int,
-    val bytes: ByteArray,
-)
-
-/**
- * Common columnar ISAM: a row cursor assembled from a Join/Series of single-column files.
- *
- * Creation writes one data file and one `.meta` file per column. The manifest at
- * [datafileFilename] only records row count and column file names. This keeps the
- * hot IO shape column-native: consumers can scan one descriptor per requested
- * column instead of dragging a row descriptor through every read.
- */
 class ColumnarIsam internal constructor(
-    private val rowCount: Int,
-    val columns: Series<ColumnarIsamColumn>,
+    private val layout: Isam3Layout,
+    private val stores: Series<Isam3StoreHandle>,
     val datafileFilename: String,
-    val indexModifier: IndexModifier,
-    val columnGroups: String = "",
+    private val viewName: String,
 ) : Usable, Cursor {
-    override val a: Int get() = rowCount
+    private val resolvedColumns: Series<Isam3ResolvedColumn> = layout.resolvedColumns(viewName)
+    private val storeIndex: Map<String, Isam3StoreHandle> = stores.view.associateBy { it.file.name }
+
+    override val a: Int get() = stores.getOrNull(0)?.rowCount ?: 0
 
     override val b: (Int) -> RowVec = { rowIndex ->
-        require(rowIndex in 0 until rowCount) { "Row index out of bounds: $rowIndex" }
-        columns.size j { columnIndex: Int ->
-            val column = columns[columnIndex]
-            val offset = rowIndex * column.width
-            val slice = column.bytes.copyOfRange(offset, offset + column.width)
-            column.meta.decoder(slice) j { column.meta }
+        require(rowIndex in 0 until a) { "Row index out of bounds: $rowIndex" }
+        val values: Series<Any?> = resolvedColumns.size j { columnIndex: Int ->
+            val resolved = resolvedColumns[columnIndex]
+            val store = storeIndex[resolved.file] ?: error("Missing store ${resolved.file}")
+            val begin = rowIndex * store.rowWidth + resolved.begin
+            val slice = store.bytes.copyOfRange(begin, begin + resolved.meta.end - resolved.meta.begin)
+            resolved.type.createDecoder(resolved.meta.end - resolved.meta.begin)(slice)
         }
+        val metas: Series<() -> ColumnMeta> = resolvedColumns.size j { columnIndex: Int ->
+            { resolvedColumns[columnIndex].meta as ColumnMeta }
+        }
+        values.j(metas)
     }
 
     override fun open() {
-        require(Files.exists(datafileFilename)) { "Columnar manifest missing: $datafileFilename" }
+        require(Files.exists(datafileFilename)) { "ISAM3 layout missing: $datafileFilename" }
+        stores.view.forEach { store ->
+            require(Files.exists(store.path)) { "ISAM3 store missing: ${store.path}" }
+        }
     }
 
     override fun close() = Unit
@@ -67,41 +65,53 @@ class ColumnarIsam internal constructor(
             varChars: Map<String, Int> = emptyMap(),
             transform: ((RowVec) -> RowVec)? = null,
         ) {
+            require(cursor.size > 0) { "ColumnarIsam.write requires at least one row" }
+            val baseName = baseNameFor(datafilename)
+            val layoutPath = resolveLayoutPath(datafilename)
+            val sampleRow = transform?.invoke(cursor.at(0)) ?: cursor.at(0)
+            val schemaMeta = sampleRow.size j { index: Int -> sampleRow[index].b() }
+            val constraints = IsamMetaFileReader.sanitize(schemaMeta, varChars)
+            val layout = Isam3Layout.fromConstraints(baseName, constraints)
+
+            Files.write(layoutPath, layout.render())
+
+            val constraintByName = constraints.toList().associateBy { it.name }
+            val indexByName = schemaMeta.toList().withIndex().associate { indexed -> indexed.value.name to indexed.index }
             val rowCount = cursor.size
-            val constraints = buildColumnMeta(cursor, transform, varChars)
-            val columnFiles = MutableList(constraints.size) { columnIndex: Int ->
-                columnFileName(datafilename, columnIndex, constraints[columnIndex].name)
+            val viewRows = (0 until rowCount).map { rowIndex ->
+                transform?.invoke(cursor.at(rowIndex)) ?: cursor.at(rowIndex)
             }
 
-            for (columnIndex in 0 until constraints.size) {
-                val meta = constraints[columnIndex]
-                val width = meta.end - meta.begin
-                val columnBytes = ByteArray(rowCount * width)
-                for (rowIndex in 0 until rowCount) {
-                    val row = transform?.invoke(cursor.at(rowIndex)) ?: cursor.at(rowIndex)
-                    val encoded = meta.encoder(row[columnIndex].a)
-                    require(encoded.size == width) {
-                        "Encoded column ${meta.name} width ${encoded.size} != declared width $width"
+            layout.partitions.view.forEach { partition ->
+                partition.files.view.forEach { file ->
+                    val bytes = ByteArray(rowCount * file.rowWidth)
+                    for (rowIndex in 0 until rowCount) {
+                        val row = viewRows[rowIndex]
+                        for (group in file.groups.view) {
+                            for (placement in group.placements.view) {
+                                val meta = constraintByName[placement.name] ?: error("Missing constraint for ${placement.name}")
+                                val columnIndex = indexByName[placement.name] ?: -1
+                                require(columnIndex >= 0) { "Missing column ${placement.name} in cursor" }
+                                val encoded = meta.encoder(row[columnIndex].a)
+                                require(encoded.size >= placement.width) {
+                                    "Encoded column ${meta.name} width ${encoded.size} < declared width ${placement.width}"
+                                }
+                                val offset = rowIndex * file.rowWidth + placement.begin
+                                encoded.copyInto(bytes, offset, 0, placement.width)
+                            }
+                        }
                     }
-                    encoded.copyInto(columnBytes, rowIndex * width)
+                    Files.write(filePath(baseName, file.name), bytes)
                 }
-                val columnFile = columnFiles[columnIndex]
-                Files.write(columnFile, columnBytes)
-                IsamMetaFileReader.write("$columnFile.meta", 1 j { _: Int -> meta }, varChars)
             }
-
-            val manifest = buildList {
-                add(COLUMNAR_MANIFEST)
-                add(rowCount.toString())
-                add(constraints.size.toString())
-                add(NO_COLUMN_GROUPS)
-                columnFiles.forEach(::add)
-            }
-            Files.write(datafilename, manifest)
 
             if (indexModifier != IndexModifier.None) {
-                val summary = createIndexBlocks((0 until rowCount).map { cursor.at(it) }, constraints, indexModifier).second
-                Files.write("$datafilename.idx", summary)
+                val summary = createIndexBlocks(
+                    rows = (0 until rowCount).map { cursor.at(it) },
+                    constraints = constraints,
+                    indexModifier = indexModifier,
+                ).second
+                Files.write("$layoutPath.idx", summary)
             }
         }
 
@@ -112,9 +122,8 @@ class ColumnarIsam internal constructor(
             transform: ((RowVec) -> RowVec)? = null,
         ) {
             val existing = openColumnarIsam(datafilename)
-            val mergedRows = (0 until existing.size).map { existing.at(it) } +
-                rows.map { transform?.invoke(it) ?: it }
-            write(mergedRows.toSeries(), datafilename, indexModifier)
+            val mergedRows = (0 until existing.size).map { existing.at(it) } + rows.map { transform?.invoke(it) ?: it }
+            write(mergedRows.toList().toSeries(), datafilename, indexModifier)
         }
     }
 }
@@ -127,32 +136,32 @@ class ColumnarCursor(
 }
 
 fun openColumnarIsam(datafile: String): ColumnarIsam {
-    val lines = Files.readAllLines(datafile)
-    require(lines.isNotEmpty() && lines[0] == COLUMNAR_MANIFEST) { "Invalid Columnar ISAM manifest: $datafile" }
-    val rowCount = lines.getOrNull(1)?.toIntOrNull() ?: error("Missing row count in $datafile")
-    val columnCount = lines.getOrNull(2)?.toIntOrNull() ?: error("Missing column count in $datafile")
-    val columnGroups = lines.getOrNull(3)?.takeUnless { it == NO_COLUMN_GROUPS }.orEmpty()
-    val columnFiles = lines.drop(4)
-    require(columnFiles.size == columnCount) { "Column manifest count mismatch" }
-
-    val columns = columnCount j { columnIndex: Int ->
-        val columnFile = columnFiles[columnIndex]
-        val metaReader = IsamMetaFileReader("$columnFile.meta")
-        val meta = metaReader.constraints[0]
-        val bytes = Files.readAllBytes(columnFile)
-        val width = meta.end - meta.begin
-        require(width > 0) { "Invalid column width for ${meta.name}: $width" }
-        require(bytes.size == rowCount * width) { "Column ${meta.name} byte count mismatch" }
-        ColumnarIsamColumn(columnFile, meta, width, bytes)
-    }
-
-    return ColumnarIsam(rowCount, columns, datafile, IndexModifier.None, columnGroups)
+    val layoutPath = resolveLayoutPath(datafile)
+    val layout = readLayout(layoutPath)
+    val baseName = baseNameFor(layoutPath)
+    val storeHandles = layout.partitions.view.flatMap { partition ->
+        partition.files.view.map { file ->
+            val path = filePath(baseName, file.name)
+            val bytes = Files.readAllBytes(path)
+            val rowWidth = file.rowWidth
+            require(rowWidth > 0 || bytes.isEmpty()) { "Invalid row width for ${file.name}: $rowWidth" }
+            val rowCount = if (rowWidth == 0) 0 else {
+                require(bytes.size % rowWidth == 0) { "File ${file.name} byte count mismatch" }
+                bytes.size / rowWidth
+            }
+            Isam3StoreHandle(file, path, bytes, rowCount)
+        }
+    }.toList()
+    val rowCount = storeHandles.firstOrNull()?.rowCount ?: 0
+    require(storeHandles.all { it.rowCount == rowCount }) { "Row count mismatch across ISAM3 stores" }
+    val stores = storeHandles.toSeries()
+    return ColumnarIsam(layout, stores, layoutPath, layout.defaultViewName())
 }
 
 fun openColumnarIsam(
     datafile: String,
     metafile: String,
-): ColumnarIsam = openColumnarIsam(datafile)
+): ColumnarIsam = openColumnarIsam(if (Files.exists(metafile)) metafile else datafile)
 
 fun columnarFrom(cursor: Cursor, datafile: String): ColumnarIsam {
     ColumnarIsam.write(cursor, datafile)
@@ -166,31 +175,41 @@ fun columnarFrom(cursor: Cursor, datafile: String, modifier: IndexModifier): Col
 
 enum class IndexModifier { None }
 
-fun buildColumnMeta(
-    cursor: Cursor,
-    transform: ((RowVec) -> RowVec)? = null,
-    varChars: Map<String, Int> = emptyMap(),
-): Series<RecordMeta> {
-    val meta: Series<ColumnMeta> = if (transform != null && cursor.size > 0) {
-        val row = transform(cursor.at(0))
-        row.size j { index: Int -> row[index].b() }
-    } else {
-        cursor.meta
-    }
-    return IsamMetaFileReader.sanitize(meta, varChars)
-}
-
 fun createIndexBlocks(
     rows: List<RowVec>,
     constraints: Series<RecordMeta>,
     indexModifier: IndexModifier,
 ): Pair<ByteArray, ByteArray> = Pair(ByteArray(0), ByteArray(0))
 
-private fun columnFileName(prefix: String, index: Int, name: String): String =
-    "$prefix.${index.toString().padStart(4, '0')}.${safeFileSegment(name)}.col"
-
-private fun safeFileSegment(value: String): String = buildString(value.length) {
-    for (char in value) {
-        append(if (char.isLetterOrDigit() || char == '_' || char == '-') char else '_')
+private fun readLayout(layoutPath: String): Isam3Layout {
+    val lines = Files.readAllLines(layoutPath)
+    val first = lines.firstOrNull()?.trim() ?: error("Missing layout file: $layoutPath")
+    return when {
+        first == "isam: 3" -> Isam3Layout.read(layoutPath)
+        first.startsWith("# trikeshed-columnar-isam-v1") -> error("Legacy columnar layout is not supported by the new isam:3 writer")
+        else -> error("Unrecognized ISAM layout: $layoutPath")
     }
+}
+
+private fun resolveLayoutPath(base: String): String = when {
+    base.endsWith(".yaml") || base.endsWith(".yml") -> base
+    else -> "$base$ISAM3_LAYOUT_SUFFIX"
+}
+
+private fun baseNameFor(layoutPath: String): String = when {
+    layoutPath.endsWith(ISAM3_LAYOUT_SUFFIX) -> layoutPath.removeSuffix(ISAM3_LAYOUT_SUFFIX)
+    layoutPath.endsWith(".yaml") -> layoutPath.removeSuffix(".yaml")
+    layoutPath.endsWith(".yml") -> layoutPath.removeSuffix(".yml")
+    else -> layoutPath
+}
+
+private fun filePath(baseName: String, fileName: String): String = "$baseName.$fileName.col"
+
+internal data class Isam3StoreHandle(
+    val file: Isam3File,
+    val path: String,
+    val bytes: ByteArray,
+    val rowCount: Int,
+) {
+    val rowWidth: Int get() = file.rowWidth
 }

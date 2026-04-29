@@ -38,9 +38,8 @@ object MiniDuckBlockCodec {
                         "rowCount" to block.rowCount,
                     ).toJsonString(),
             )
-            for (i in 0 until block.child.size) {
-                add(encodeRow(block.child[i]).toJsonString())
-            }
+            for (i in 0 until (block.child?.size ?: 0))
+                add(encodeRow(block.child!![i] as RowVec).toJsonString())
         }
         return lines.joinToString("\n")
     }

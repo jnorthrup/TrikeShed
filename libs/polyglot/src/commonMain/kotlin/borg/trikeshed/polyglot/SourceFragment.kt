@@ -1,16 +1,11 @@
 package borg.trikeshed.polyglot
 
 import borg.trikeshed.common.TypeEvidence
-import borg.trikeshed.cursor.ColumnMeta
-import borg.trikeshed.cursor.RowVec
-import borg.trikeshed.cursor.joins
-import borg.trikeshed.cursor.label
+import borg.trikeshed.cursor.*
 import borg.trikeshed.isam.meta.IOMemento
-import borg.trikeshed.lib.Join
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.Twin
 import borg.trikeshed.lib.j
-import borg.trikeshed.lib.size
 
 /* ═══════════════════════════════════════════════════════════════════════════
  *  SourceFragment — the universal AST node intermediate representation.
@@ -110,7 +105,7 @@ data class SourceFragment(
             name ?: "",
             TypeEvidence.deduceMemento(evidence).label,
         )
-        val metas: Series<()`ColumnMeta↻`> = listOf(
+        val metas: Series<`ColumnMeta↻`> = listOf(
             ColumnMeta("lang", IOMemento.IoString),
             ColumnMeta("spanStart", IOMemento.IoInt),
             ColumnMeta("spanEnd", IOMemento.IoInt),
