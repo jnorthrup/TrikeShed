@@ -1,6 +1,5 @@
 package borg.trikeshed.dreamer
 
-import borg.trikeshed.couch.kline.TimeSpan
 import borg.trikeshed.lib.size
 import kotlin.test.Test
 import kotlin.test.assertEquals

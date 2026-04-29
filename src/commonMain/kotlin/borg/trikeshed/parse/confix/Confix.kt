@@ -1146,7 +1146,18 @@ object Combinators {
 
    private fun unescapeYamlSingleQuoted(s: String): String {
         // YAML single-quoted scalar: replace doubled single-quotes with a single quote
-        return s.replace("''", "'")
+        val out = StringBuilder(s.length)
+        var index = 0
+        while (index < s.length) {
+            if (s[index] == '\'' && index + 1 < s.length && s[index + 1] == '\'') {
+                out.append('\'')
+                index += 2
+            } else {
+                out.append(s[index])
+                index++
+            }
+        }
+        return out.toString()
     }
 
    private fun reifyNumber(e: JsElement, src: Series<Char>, syntax: Syntax): Number {

@@ -1,6 +1,5 @@
 package borg.trikeshed.dreamer
 
-import borg.trikeshed.couch.kline.TimeSpan
 import borg.trikeshed.indicator.Stochastic
 import borg.trikeshed.miniduck.MiniCursor
 import borg.trikeshed.miniduck.columnar.SpanMatcher

@@ -1,9 +1,6 @@
 package borg.trikeshed.dreamer
 
 import borg.trikeshed.context.ElementState
-import borg.trikeshed.couch.kline.Kline
-import borg.trikeshed.couch.kline.KlineBlock
-import borg.trikeshed.couch.kline.TimeSpan
 import borg.trikeshed.cursor.at
 import borg.trikeshed.lib.size
 import borg.trikeshed.miniduck.getValue

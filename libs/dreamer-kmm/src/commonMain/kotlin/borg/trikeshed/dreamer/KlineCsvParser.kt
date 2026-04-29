@@ -1,7 +1,5 @@
 package borg.trikeshed.dreamer
 
-import borg.trikeshed.couch.kline.ExtendedKline
-import borg.trikeshed.couch.kline.TimeSpan
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.asString
 import borg.trikeshed.lib.j

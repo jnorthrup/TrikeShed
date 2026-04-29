@@ -28,7 +28,7 @@ fun storageOrNull(): Storage? =
         null
     }
 fun normalizePath(path: String): String {
-    val normalized = path.replace('\\', '/')
+    val normalized = path.replaceChar('\\', '/')
     val parts: MutableList<String> = mutableListOf<String>()
     for (part in normalized.split('/')) {
         when {
@@ -259,7 +259,7 @@ actual object System {
 
 actual object Files {
     actual fun readAllLines(filename: String): List<String> =
-        readString(filename).replace("\r\n", "\n").split('\n').let { parts ->
+        readString(filename).normalizeCrLf().split('\n').let { parts ->
             if (parts.isNotEmpty() && parts.last().isEmpty()) parts.dropLast(1) else parts
         }
 
@@ -291,6 +291,30 @@ actual object Files {
 
     actual fun iterateLines(fileName: String, bufsize: Int): Iterable<Join<Long, Series<Byte>>> =
         streamLines(fileName, bufsize).map { (offset, bytes) -> offset j bytes.toSeries() }.asIterable()
+}
+
+private fun String.replaceChar(old: Char, new: Char): String {
+    val out = StringBuilder(length)
+    for (index in indices) {
+        val c = this[index]
+        out.append(if (c == old) new else c)
+    }
+    return out.toString()
+}
+
+private fun String.normalizeCrLf(): String {
+    val out = StringBuilder(length)
+    var index = 0
+    while (index < length) {
+        if (this[index] == '\r' && index + 1 < length && this[index + 1] == '\n') {
+            out.append('\n')
+            index += 2
+        } else {
+            out.append(this[index])
+            index++
+        }
+    }
+    return out.toString()
 }
 
 actual fun mktemp(): String {

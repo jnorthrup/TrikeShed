@@ -1,7 +1,5 @@
 package borg.trikeshed.dreamer
 
-import borg.trikeshed.couch.kline.KlineBlock
-import borg.trikeshed.couch.kline.TimeSpan
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.size
 

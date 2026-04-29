@@ -1,8 +1,5 @@
 package borg.trikeshed.dreamer
 
-import borg.trikeshed.couch.kline.Kline
-import borg.trikeshed.couch.kline.KlineBlock
-import borg.trikeshed.couch.kline.TimeSpan
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals

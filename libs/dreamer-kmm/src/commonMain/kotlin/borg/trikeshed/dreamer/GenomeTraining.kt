@@ -1,6 +1,5 @@
 package borg.trikeshed.dreamer
 
-import borg.trikeshed.couch.kline.KlineBlock
 
 data class GenomeTrainingCandidate(
     val genome: Genome,

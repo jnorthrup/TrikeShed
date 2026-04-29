@@ -38,8 +38,6 @@ kotlin {
         commonMain {
             dependencies {
                 implementation(project(":"))
-                implementation(project(":libs:miniduck"))
-                implementation(project(":libs:couch"))
             }
         }
         commonTest {

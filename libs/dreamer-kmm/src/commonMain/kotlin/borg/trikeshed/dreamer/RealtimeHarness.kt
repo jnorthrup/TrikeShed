@@ -1,6 +1,5 @@
 package borg.trikeshed.dreamer
 
-import borg.trikeshed.couch.kline.KlineBlock
 import borg.trikeshed.miniduck.MiniCursor
 import borg.trikeshed.miniduck.getValue
 import borg.trikeshed.cursor.RowVec

@@ -3,7 +3,6 @@ package borg.trikeshed.dreamer
 import borg.trikeshed.context.AsyncContextElement
 import borg.trikeshed.context.AsyncContextKey
 import borg.trikeshed.context.ElementState
-import borg.trikeshed.couch.kline.KlineBlock
 import borg.trikeshed.cursor.RowVec
 import borg.trikeshed.cursor.at
 import borg.trikeshed.lib.Join

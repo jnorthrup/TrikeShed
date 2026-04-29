@@ -1,6 +1,5 @@
 package borg.trikeshed.dreamer
 
-import borg.trikeshed.couch.kline.TimeSpan
 
 /** One genome's replay output and scalar score for evolutionary search. */
 data class GenomeEvaluation(

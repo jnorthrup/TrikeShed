@@ -102,7 +102,7 @@ object StructuredParserSupport {
 
     fun describeYamlText(text: String): DescriptorFragment {
         val document = YamlParser.parse(text)
-        val totalLines = text.replace("\r\n", "\n").lines().size
+        val totalLines = text.normalizeCrLf().lines().size
         return describeYamlNode(null, document.root, 0, totalLines)
     }
 
@@ -215,6 +215,21 @@ object StructuredParserSupport {
             }
             else -> TypeEvidence.sample(value.toString().toSeries())
         }
+}
+
+private fun String.normalizeCrLf(): String {
+    val out = StringBuilder(length)
+    var index = 0
+    while (index < length) {
+        if (this[index] == '\r' && index + 1 < length && this[index + 1] == '\n') {
+            out.append('\n')
+            index += 2
+        } else {
+            out.append(this[index])
+            index++
+        }
+    }
+    return out.toString()
 }
 
 fun DescriptorFragment.toTreeCursor(path: String = "$"): TreeCursor =
