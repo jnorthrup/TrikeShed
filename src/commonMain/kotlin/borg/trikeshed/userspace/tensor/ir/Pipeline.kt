@@ -40,7 +40,11 @@ fun lowerTensorToLinalg(): LoweringPass = { region ->
                         val genOp = GenericOp.create(
                             inputs = emptyList(),
                             outputs = emptyList(),
-                            region = { bodyBlock.operations.forEach { this.addOp(it) } },
+                            region = {
+                                val inner = block()
+                                bodyBlock.operations.forEach { op -> inner.addOp(op) }
+                                inner.terminator = bodyBlock.terminator
+                            },
                             indexingMaps = emptyList(),
                             iteratorTypes = emptyList()
                         )
