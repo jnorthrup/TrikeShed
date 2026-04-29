@@ -245,13 +245,13 @@ data class Pipeline(
     companion object {
         /** Standard bottom-up pipeline: tensor → LLVM */
         fun standard(): Pipeline {
-            val s1: (Region) -> Region = { r -> lowerTensorToLinalg()(r) }
-            val s2: (Region) -> Region = { r -> lowerLinalgToScfVector()(r) }
-            val s3: (Region) -> Region = { r -> vectorizeScfLoops()(r) }
-            val s4: (Region) -> Region = { r -> bufferize()(r) }
-            val s5: (Region) -> Region = { r -> lowerMemrefToArith()(r) }
-            val s6: (Region) -> Region = { r -> canonicalize()(r) }
-            val s7: (Region) -> Region = { r -> lowerFuncToLLVM()(r) }
+            val s1 = lowerTensorToLinalg()
+            val s2 = lowerLinalgToScfVector()
+            val s3 = vectorizeScfLoops()
+            val s4 = bufferize()
+            val s5 = lowerMemrefToArith()
+            val s6 = canonicalize()
+            val s7 = lowerFuncToLLVM()
             return Pipeline(listOf(s1, s2, s3, s4, s5, s6, s7))
         }
 
@@ -260,10 +260,10 @@ data class Pipeline(
          * tensor → linalg → memref → arith → LLVM
          */
         fun jit(): Pipeline {
-            val s1: (Region) -> Region = { r -> lowerTensorToLinalg()(r) }
-            val s2: (Region) -> Region = { r -> bufferize()(r) }
-            val s3: (Region) -> Region = { r -> lowerMemrefToArith()(r) }
-            val s4: (Region) -> Region = { r -> canonicalize()(r) }
+            val s1 = lowerTensorToLinalg()
+            val s2 = bufferize()
+            val s3 = lowerMemrefToArith()
+            val s4 = canonicalize()
             return Pipeline(listOf(s1, s2, s3, s4))
         }
 
