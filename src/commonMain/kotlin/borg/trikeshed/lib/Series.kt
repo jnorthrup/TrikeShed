@@ -158,6 +158,11 @@ fun <T> Series<T>.getOrNull(i: Int): T? = if (i < size) this[i] else null
  */
 operator fun <T> Series<T>.get(i: Int): T = b(i)
 
+/**
+ * Infixed element access. Equivalent to `get(index)`.
+ */
+infix fun <T> Series<T>.at(index: Int): T = get(index)
+
 /** Check if the Series contains [element]. */
 operator fun <T> Series<T>.contains(element: T): Boolean {
     for (i in 0 until size) if (b(i) == element) return true

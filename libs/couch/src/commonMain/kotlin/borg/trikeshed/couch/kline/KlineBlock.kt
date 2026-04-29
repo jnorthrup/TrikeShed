@@ -6,6 +6,9 @@ import borg.trikeshed.miniduck.MiniRowVec
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.size
+import borg.trikeshed.cursor.Cursor
+import borg.trikeshed.cursor.ColumnMeta
+import borg.trikeshed.isam.meta.IOMemento
 
 /**
  * KlineBlock: DuckDB-style mutable→sealed chunk of klines.
@@ -83,6 +86,36 @@ class KlineBlock constructor(
         val snapshot = rows.toList()
         return snapshot.size j { i: Int ->
             snapshot[i].toDocRowVec()
+        }
+    }
+
+    /**
+     * Present the sealed block as a columnar Cursor (cursor.RowVec rows).
+     *
+     * Each row is projected as a RowVec of values joined with ColumnMeta
+     * inferred from the cell values. This allows feeding blocks into
+     * Columnar/ISAM paths without going through MiniCursor.
+     */
+    fun asColumnarCursor(): borg.trikeshed.cursor.Cursor {
+        check(_state == State.SEALED) { "Block must be sealed before presenting as cursor" }
+        val snapshot = rows.toList()
+        return snapshot.size j { i: Int ->
+            val k = snapshot[i]
+            val cells: List<Any?> = listOf(k.symbol, k.timespan.toString(), k.openTime, k.open, k.high, k.low, k.close, k.volume)
+            val values = cells.toSeries()
+            val meta = cells.size j { idx: Int ->
+                val v = cells[idx]
+                val t = when (v) {
+                    is Double -> IOMemento.IoDouble
+                    is Float -> IOMemento.IoFloat
+                    is Long -> IOMemento.IoLong
+                    is Int -> IOMemento.IoInt
+                    is Boolean -> IOMemento.IoBoolean
+                    else -> IOMemento.IoString
+                }
+                { borg.trikeshed.cursor.ColumnMeta(Kline.schemaKeys[idx], t) }
+            }
+            values.j(meta)
         }
     }
 }

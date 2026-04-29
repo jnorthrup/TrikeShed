@@ -277,6 +277,8 @@ suspend fun simulateTicksFromCursor(
     rowCount: Int,
     onCycle: ((CycleResult) -> Unit)? = null,
 ): BacktestResult {
+    // adapt exec.Cursor -> MiniCursor (existing fast path), then convert to columnar Cursor
     val mini = adaptCursorToMiniCursor(cursor, rowCount)
-    return simulateTicksMiniCursor(mini, engine, initialCapital, onCycle)
+    val col = miniCursorToColumnar(mini)
+    return simulateTicks(col, engine, initialCapital, onCycle ?: {})
 }

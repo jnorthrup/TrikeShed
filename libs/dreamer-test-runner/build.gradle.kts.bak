@@ -1,0 +1,29 @@
+plugins {
+    kotlin("jvm")
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation(project(":libs:dreamer-kmm"))
+    // KMP commonMain deps (miniduck, couch) are NOT re-exported transitively by dreamer-kmm's JVM jar
+    // — direct dependencies required so dreamer-test-runner's JVM compiler can see them.
+    implementation(project(":libs:miniduck"))
+    implementation(project(":libs:couch"))
+    // borg.trikeshed.lib (Series, size, j, Twin, Join) lives in root commonMain
+    implementation(project(":"))
+    testImplementation(kotlin("test"))
+    testImplementation(kotlin("test-junit"))
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:${rootProject.providers.gradleProperty("versions.kotlinx-coroutines-core").get()}")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:${rootProject.providers.gradleProperty("versions.kotlinx-coroutines-test").get()}")
+}
+
+tasks.test {
+    useJUnit()
+}
+
+kotlin {
+    jvmToolchain(21)
+}
