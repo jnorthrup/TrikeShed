@@ -15,7 +15,9 @@ kotlin {
     jvm()
 
     jvmToolchain(21)
-    js()
+    js {
+        nodejs()
+    }
 
     sourceSets {
         commonMain {
