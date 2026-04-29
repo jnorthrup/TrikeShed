@@ -1,14 +1,15 @@
 package borg.trikeshed.couch.kline
 
-import borg.trikeshed.miniduck.DocRowVec
-import borg.trikeshed.miniduck.MiniCursor
-import borg.trikeshed.miniduck.MiniRowVec
-import borg.trikeshed.lib.Series
-import borg.trikeshed.lib.j
-import borg.trikeshed.lib.size
-import borg.trikeshed.cursor.Cursor
-import borg.trikeshed.cursor.ColumnMeta
-import borg.trikeshed.isam.meta.IOMemento
+    import borg.trikeshed.miniduck.DocRowVec
+    import borg.trikeshed.miniduck.MiniCursor
+    import borg.trikeshed.miniduck.MiniRowVec
+    import borg.trikeshed.lib.Series
+    import borg.trikeshed.lib.j
+    import borg.trikeshed.lib.size
+    import borg.trikeshed.lib.toSeries
+    import borg.trikeshed.cursor.Cursor
+    import borg.trikeshed.cursor.ColumnMeta
+    import borg.trikeshed.isam.meta.IOMemento
 
 /**
  * KlineBlock: DuckDB-style mutable→sealed chunk of klines.
@@ -115,7 +116,7 @@ class KlineBlock constructor(
                 }
                 { borg.trikeshed.cursor.ColumnMeta(Kline.schemaKeys[idx], t) }
             }
-            values.j(meta)
+            (values.j(meta) as borg.trikeshed.cursor.RowVec)
         }
     }
 }

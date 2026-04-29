@@ -33,7 +33,7 @@ kotlin {
         val commonMain by getting {
             dependencies {
                 api("org.jetbrains.kotlinx:kotlinx-coroutines-core:${rootProject.providers.gradleProperty("versions.kotlinx-coroutines-core").get()}")
-                api(project(":"))
+                api("org.bereft:TrikeShed:1.0")
                 api(project(":libs:quic"))
                 api(project(":libs:ngsctp"))
                 api(project(":libs:htx-client"))

@@ -337,6 +337,7 @@ kotlin {
         val commonMain by getting {
             kotlin.srcDir(generatedSourceRoot)
             dependencies {
+                api("org.bereft:TrikeShed:1.0")
                 api(project(":"))
             }
         }

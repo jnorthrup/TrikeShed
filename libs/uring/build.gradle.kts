@@ -34,7 +34,7 @@ kotlin {
     sourceSets {
         val commonMain by getting {
             dependencies {
-                api(project(":"))
+                api("org.bereft:TrikeShed:1.0")
             }
         }
         val commonTest by getting {

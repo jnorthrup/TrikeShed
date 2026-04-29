@@ -65,6 +65,7 @@ kotlin {
         val commonMain by getting {
             dependencies {
                 api("org.jetbrains.kotlinx:kotlinx-coroutines-core:${rootProject.providers.gradleProperty("versions.kotlinx-coroutines-core").get()}")
+                api("org.bereft:TrikeShed:1.0")
                 api(project(":"))
                 // confix lives in the root TrikeShed source (src/commonMain); openapi
                 // accesses it transitively via the TrikeShed published API. No extra

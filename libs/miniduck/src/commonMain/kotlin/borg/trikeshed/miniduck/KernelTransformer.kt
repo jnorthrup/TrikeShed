@@ -1,17 +1,22 @@
 package borg.trikeshed.miniduck
 
+import borg.trikeshed.cursor.Cursor
+import borg.trikeshed.cursor.*
 import borg.trikeshed.lib.*
 import borg.trikeshed.indicator.Stochastic
 import borg.trikeshed.miniduck.HarnessStochasticCache
 
-/** Simple KernelFeatureTransformer for MiniCursor that appends technical indicators.
+/**
+ * Simple KernelFeatureTransformer for MiniCursor that appends technical indicators.
  *  Expects source rows to be DocRowVec with a numeric "close" field.
  */
 interface KernelFeatureTransformer {
     fun transform(cursor: MiniCursor, params: Map<String, Any>): MiniCursor
 }
 
-/** Example transformer: adds log_return, sma_short, sma_long, rolling_vol columns. */
+/**
+ * Example transformer: adds log_return, sma_short, sma_long, rolling_vol columns.
+ */
 class ExampleKernelTransformer : KernelFeatureTransformer {
     override fun transform(cursor: MiniCursor, params: Map<String, Any>): MiniCursor {
         val shortW = (params["short_ma"] as? Int) ?: 10
@@ -20,7 +25,7 @@ class ExampleKernelTransformer : KernelFeatureTransformer {
 
         // Extract close price series
         val closeSeries: Series<Double> = cursor.size j { i ->
-            val row = cursor.at(i)
+            val row = cursor.row(i)
             val v = (row as? DocRowVec)?.get("close")
             when (v) {
                 is Number -> v.toDouble()
@@ -35,8 +40,8 @@ class ExampleKernelTransformer : KernelFeatureTransformer {
         val vol = rollingStd(logs, volW)
 
         // Widen each row with appended columns (include stochastic if available)
-        return cursor.size j { i ->
-            val row = cursor.at(i)
+        return cursor.size j { i -> 
+            val row = cursor.row(i)
             val baseDoc = row as? DocRowVec
             val baseKeys = baseDoc?.keys ?: emptyList()
             val baseCells = baseDoc?.cells ?: emptyList()
@@ -51,7 +56,8 @@ class ExampleKernelTransformer : KernelFeatureTransformer {
 
             val newKeys = baseKeys + listOf("log_return", "sma_short", "sma_long", "rolling_vol", "stoch_k", "stoch_d")
             val newCells = baseCells + listOf(logs[i], smaShort[i], smaLong[i], vol[i], stochK, stochD)
-            DocRowVec(keys = newKeys, cells = newCells, child = baseDoc?.child)
+            val widenedDoc = DocRowVec(keys = newKeys, cells = newCells, child = baseDoc?.child)
+            widenedDoc.toRowVec()
         }
     }
 }

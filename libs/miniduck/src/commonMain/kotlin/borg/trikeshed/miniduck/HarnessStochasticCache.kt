@@ -1,5 +1,7 @@
 package borg.trikeshed.miniduck
 
+import borg.trikeshed.cursor.Cursor
+import borg.trikeshed.cursor.*
 import borg.trikeshed.lib.*
 import borg.trikeshed.indicator.Stochastic
 import kotlinx.coroutines.sync.Mutex
@@ -41,17 +43,17 @@ object HarnessStochasticCache {
     }
 }
 
-/** Extract an OHLC column as a Double Series. */
-private fun MiniCursor.ohlcSeries(column: String): Series<Double> {
-    val n = size
-    return n j { index: Int ->
-        val row = at(index) as? DocRowVec
-            ?: throw IllegalArgumentException("row $index is not DocRowVec")
-        val value = row[column]
-        when (value) {
-            is Number -> value.toDouble()
-            is String -> value.toDouble()
-            else -> throw IllegalArgumentException("row $index column $column is not numeric: $value")
+    /** Extract an OHLC column as a Double Series. */
+    private fun MiniCursor.ohlcSeries(column: String): Series<Double> {
+        val n = this.size
+        return n j { index: Int ->
+            val row = this.row(index) as? DocRowVec
+                ?: throw IllegalArgumentException("row $index is not DocRowVec")
+            val value = row[column]
+            when (value) {
+                is Number -> value.toDouble()
+                is String -> value.toDouble()
+                else -> throw IllegalArgumentException("row $index column $column is not numeric: $value")
+            }
         }
     }
-}

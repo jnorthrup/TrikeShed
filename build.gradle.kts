@@ -1,7 +1,7 @@
+
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
-import org.jetbrains.kotlin.gradle.targets.js.dsl.KotlinJsTargetDsl
 
 plugins {
     kotlin("multiplatform") version "2.4.0-Beta2"
@@ -66,10 +66,11 @@ kotlin {
         }
     }
 
-    val hostOs = System.getProperty("os.name")
+    val hostOs: String  = System.getProperty("os.name")
+    val hostArch: String = System.getProperty("os.arch")
 
     if (hostOs == "Mac OS X") {
-        if (System.getProperty("os.arch") == "aarch64") {
+        if (hostArch == "aarch64") {
             macosArm64("macos") {
                 if (enableNativeSharedLib) {
                     binaries.sharedLib {
@@ -82,10 +83,9 @@ kotlin {
                 // Local DuckDB cinterop removed from root build; if a local libs/duckdb is available,
                 // include it via settings.gradle.kts as a composite build and add a proper cinterop there.
             }
-        }
-    } else
-        if (hostOs == "Linux") {
-            linuxX64("linux") {
+        } else {
+            // Intel mac
+            macosX64("macos") {
                 if (enableNativeSharedLib) {
                     binaries.sharedLib {
                         baseName = "trikeshed"
@@ -94,16 +94,37 @@ kotlin {
                 binaries.executable("autoresearchNative") {
                     entryPoint = "borg.trikeshed.autoresearch.autoresearchNativeMain"
                 }
-
             }
         }
+    }
+    if (hostOs == "Linux") {
+        linuxX64("linux") {
+            if (enableNativeSharedLib) {
+                binaries.sharedLib {
+                    baseName = "trikeshed"
+                }
+            }
+            binaries.executable("autoresearchNative") {
+                entryPoint = "borg.trikeshed.autoresearch.autoresearchNativeMain"
+            }
+        }
+        linuxArm64("linuxArm64") {
+            if (enableNativeSharedLib) {
+                binaries.sharedLib {
+                    baseName = "trikeshed"
+                }
+            }
+            binaries.executable("autoresearchNative") {
+                entryPoint = "borg.trikeshed.autoresearch.autoresearchNativeMain"
+            }
+        }
+    }
 
     sourceSets {
         val commonMain by getting {
             dependencies {
                 api("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
                 api("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1-0.6.x-compat")
-                api(project(":libs:tiny-btrfs"))
             }
         }
         val commonTest by getting {

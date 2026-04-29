@@ -21,6 +21,7 @@ java {
 }
 
 dependencies {
+    api("org.bereft:TrikeShed:1.0")
     api(project(":"))
     testImplementation(kotlin("test"))
 }

@@ -1,5 +1,9 @@
 package borg.trikeshed.miniduck
 
+import borg.trikeshed.cursor.Cursor
+import borg.trikeshed.cursor.*
+import borg.trikeshed.lib.*
+
 /**
  * JsonProjection: MiniCursor -> NDJSON string.
  *
@@ -9,12 +13,14 @@ package borg.trikeshed.miniduck
  */
 fun MiniCursor.toJson(): String {
     val sb = StringBuilder()
-    for (i in 0 until a) {
+    for (i in 0 until this.size) {
         if (i > 0) sb.append('\n')
-        sb.append(rowToJson(b(i)))
+        val row = this.row(i) as MiniRowVec
+        sb.append(rowToJson(row))
     }
     return sb.toString()
 }
+
 fun rowToJson(row: MiniRowVec): String = when (row) {
     is DocRowVec -> {
         val children = row.child
@@ -34,9 +40,9 @@ fun rowToJson(row: MiniRowVec): String = when (row) {
             } else {
                 valueToJson(cell)
             }
-            sb.append("\"${escapeJson(key)}\":${jsonVal}")
+            sb.append('"').append(escapeJson(key)).append('"').append(':').append(jsonVal)
         }
-        sb.append("}")
+        sb.append('}')
         sb.toString()
     }
     is JsonRowVec -> row.rawValue
@@ -46,18 +52,19 @@ fun rowToJson(row: MiniRowVec): String = when (row) {
             if (i > 0) sb.append(",")
             sb.append(valueToJson(row[i]))
         }
-        sb.append("]")
+        sb.append(']')
         sb.toString()
     }
 }
+
 fun valueToJson(v: Any?): String = when (v) {
     null -> "null"
-    is String -> "\"${escapeJson(v)}\""
+    is String -> '"' + escapeJson(v) + '"'
     is Long, is Int, is Short, is Byte -> v.toString()
-    is Double -> v.toString()
-    is Float -> v.toString()
+    is Double -> if (v.isInfinite() || v.isNaN()) "null" else v.toString()
+    is Float -> if (v.isInfinite() || v.isNaN()) "null" else v.toString()
     is Boolean -> v.toString()
     is DocRowVec -> rowToJson(v)
     is MiniRowVec -> rowToJson(v)
-    else -> "\"${escapeJson(v.toString())}\""
+    else -> '"' + escapeJson(v.toString()) + '"'
 }

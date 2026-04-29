@@ -52,10 +52,11 @@ kotlin {
     sourceSets {
         val commonMain by getting {
             dependencies {
-                api(project(":"))
+                api("org.bereft:TrikeShed:1.0")
                 implementation(project(":libs:kursive"))
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:${rootProject.providers.gradleProperty("versions.kotlinx-coroutines-core").get()}")
                 implementation("org.jetbrains.kotlinx:kotlinx-datetime:${rootProject.providers.gradleProperty("versions.kotlinx-datetime").get()}")
+                api(project(":"))
             }
         }
         val jvmMain by getting {
