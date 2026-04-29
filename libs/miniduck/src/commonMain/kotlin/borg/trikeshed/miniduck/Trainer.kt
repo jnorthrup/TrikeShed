@@ -87,8 +87,9 @@ suspend fun executeKernelOptimizingHarness(
                     try {
                         val raw = cacheProvider(sym, tf)
                         // ensure draw-through stochastic cached for this symbol/timeframe with defaults
-                        // compute with default k/d periods so transformers can read from HarnessStochasticCache
-                        borg.trikeshed.dreamer.HarnessStochasticCache.ensureCached(sym, tf, 14, 3) { raw }
+                        try {
+                            HarnessStochasticCache.ensureCached(sym, tf, 14, 3) { raw }
+                        } catch (_: Throwable) { /* ignore cache errors in harness */ }
                         val enriched = transformer.transform(raw, params)
                         trainer.train(enriched, params)
                     } catch (e: Exception) {

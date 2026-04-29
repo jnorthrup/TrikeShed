@@ -1,5 +1,7 @@
 package borg.trikeshed.collections.associative.trie
 
+import borg.trikeshed.lib.toArray
+import borg.trikeshed.lib.toSeries
 import kotlin.test.Test
 import kotlin.test.assertTrue
 

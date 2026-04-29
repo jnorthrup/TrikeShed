@@ -1,3 +1,5 @@
+import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
+
 plugins {
     kotlin("multiplatform")
 }
@@ -19,12 +21,25 @@ kotlin {
         nodejs()
     }
 
+    @OptIn(ExperimentalWasmDsl::class)
+    wasmJs {
+        nodejs()
+        binaries.executable()
+    }
+
+    val hostOs = System.getProperty("os.name")
+    if (hostOs == "Mac OS X" && System.getProperty("os.arch") == "aarch64") {
+        macosArm64("macos")
+    } else if (hostOs == "Linux") {
+        linuxX64("linux")
+    }
+
     sourceSets {
         commonMain {
             dependencies {
-                api(project(":"))
-                api(project(":libs:miniduck"))
-                api(project(":libs:couch"))
+                implementation(project(":"))
+                implementation(project(":libs:miniduck"))
+                implementation(project(":libs:couch"))
             }
         }
         commonTest {
