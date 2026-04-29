@@ -102,6 +102,10 @@ class UserspaceMemoryBuffer(
     /** Number of chunks currently allocated (active nodes). */
     fun chunkCount(): Int = store.size
 
+    /** Snapshot active node bytes for read-only rebuild/inspection passes. */
+    fun nodeSnapshot(): List<Pair<String, ByteArray>> =
+        store.entries.map { it.key to it.value.copyOf() }
+
     /** Number of freed chunk IDs available for reuse. */
     fun freeCount(): Int = freeList.size
 
