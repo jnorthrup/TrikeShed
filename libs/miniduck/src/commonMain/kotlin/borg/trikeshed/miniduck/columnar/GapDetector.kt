@@ -6,6 +6,7 @@ import borg.trikeshed.miniduck.DocRowVec
 import borg.trikeshed.miniduck.MiniCursor
 import borg.trikeshed.miniduck.columnar.GapDetector.openTime
 import borg.trikeshed.miniduck.getValue
+import borg.trikeshed.miniduck.toRowVec
 
 /**
  * Find gaps in a sorted kline stream.
@@ -47,7 +48,7 @@ object GapDetector {
             DocRowVec(
                 keys = listOf("openTime", "expected", "actual", "missingMs"),
                 cells = listOf(g.openTime, g.expected, g.actual, g.missingMs),
-            )
+            ).toRowVec()
         }
     }
 

@@ -1,5 +1,7 @@
 package borg.trikeshed.miniduck.query
 
+import borg.trikeshed.cursor.RowVec
+import borg.trikeshed.cursor.values
 import borg.trikeshed.miniduck.*
 import borg.trikeshed.lib.*
 
@@ -62,7 +64,7 @@ fun MiniCursor.groupBy(keyColumn: String, vararg aggs: Agg): MiniCursor {
         rows.add(DocRowVec(keys = outputKeys, cells = cells))
     }
 
-    return rows.size j { rows[it] }
+    return rows.size j { rows[it].toRowVec() }
 }
 
 // ── HASH JOIN ───────────────────────────────────────────────────────────────
@@ -97,24 +99,26 @@ fun MiniCursor.hashJoin(
     // Phase 2: probe with left side
     val resultRows = mutableListOf<DocRowVec>()
     for (i in 0 until size) {
-        val leftRow = at(i) as? DocRowVec ?: continue
+        val leftRow = at(i)
         val probeKey = leftRow.getValue(leftKey) ?: continue
 
         val matches = hashTable[probeKey] ?: continue
         for (matchIdx in matches) {
-            val rightRow = right.at(matchIdx) as? DocRowVec ?: continue
+            val rightRow = right.at(matchIdx)
 
             // Merge: left columns + right columns (excluding right join key)
-            val mergedKeys = leftRow.keys + rightRow.keys.filter { it != rightKey }
-            val mergedCells = leftRow.cells + rightRow.keys.indices
-                .filter { rightRow.keys[it] != rightKey }
-                .map { rightRow.cells[it] }
+            val rightKeys = rightRow.keys()
+            val rightCells = rightRow.cells()
+            val mergedKeys = leftRow.keys() + rightKeys.filter { it != rightKey }
+            val mergedCells = leftRow.cells() + rightKeys.indices
+                .filter { rightKeys[it] != rightKey }
+                .map { rightCells[it] }
 
             resultRows.add(DocRowVec(keys = mergedKeys, cells = mergedCells))
         }
     }
 
-    return resultRows.size j { resultRows[it] }
+    return resultRows.size j { resultRows[it].toRowVec() }
 }
 
 /** Infix alias for [hashJoin]. */
@@ -130,3 +134,7 @@ fun MiniCursor.join(
     leftKey: String,
     rightKey: String,
 ): MiniCursor = hashJoin(right, leftKey, rightKey)
+
+private fun RowVec.keys(): List<String> = List(size) { index -> b(index).b().a }
+
+private fun RowVec.cells(): List<Any?> = values.toList()

@@ -33,8 +33,8 @@ class NoOpTrainer : KernelStochasticTrainer {
     override suspend fun train(cursor: MiniCursor, params: Map<String, Any>): StochasticPolicy? = withContext(Dispatchers.Default) {
         // build a Double series for "log_return" column if present
         val logSeries: Series<Double> = cursor.size j { idx ->
-            val row = cursor.at(idx) as? DocRowVec
-            val v = row?.get("log_return")
+            val row = cursor.at(idx)
+            val v = row.getValue("log_return")
             when (v) {
                 is Number -> v.toDouble()
                 is String -> v.toDoubleOrNull() ?: Double.NaN

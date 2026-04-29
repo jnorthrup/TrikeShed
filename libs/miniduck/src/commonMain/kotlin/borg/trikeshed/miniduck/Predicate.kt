@@ -1,5 +1,16 @@
 package borg.trikeshed.miniduck
 
+import borg.trikeshed.cursor.RowVec
+import borg.trikeshed.lib.size
+
+fun RowVec.getValue(key: String): Any? {
+    for (index in 0 until size) {
+        val cell = b(index)
+        if (cell.b().a == key) return cell.a
+    }
+    return null
+}
+
 /**
  * Extract a named scalar from any MiniRowVec subtype without Map allocation.
  *
@@ -57,27 +68,29 @@ fun compareKeys(a: Any?, b: Any?): Int = when {
 
 /** Sealed predicate tree — each node is an immutable value, evaluated via [matches]. */
 sealed interface Predicate {
-    fun matches(row: MiniRowVec): Boolean
+    fun matches(row: RowVec): Boolean
+    fun matches(row: MiniRowVec): Boolean = matches(row.toRowVec())
+    operator fun invoke(row: RowVec): Boolean = matches(row)
 }
 
 data class Eq(val column: String, val value: Any?) : Predicate {
-    override fun matches(row: MiniRowVec) = row.getValue(column) == value
+    override fun matches(row: RowVec) = row.getValue(column) == value
 }
 
 data class Gt(val column: String, val value: Comparable<*>) : Predicate {
-    override fun matches(row: MiniRowVec) = compareKeys(row.getValue(column), value) > 0
+    override fun matches(row: RowVec) = compareKeys(row.getValue(column), value) > 0
 }
 
 data class Lt(val column: String, val value: Comparable<*>) : Predicate {
-    override fun matches(row: MiniRowVec) = compareKeys(row.getValue(column), value) < 0
+    override fun matches(row: RowVec) = compareKeys(row.getValue(column), value) < 0
 }
 
 data class Ge(val column: String, val value: Comparable<*>) : Predicate {
-    override fun matches(row: MiniRowVec) = compareKeys(row.getValue(column), value) >= 0
+    override fun matches(row: RowVec) = compareKeys(row.getValue(column), value) >= 0
 }
 
 data class Le(val column: String, val value: Comparable<*>) : Predicate {
-    override fun matches(row: MiniRowVec) = compareKeys(row.getValue(column), value) <= 0
+    override fun matches(row: RowVec) = compareKeys(row.getValue(column), value) <= 0
 }
 
 data class Between(
@@ -85,26 +98,26 @@ data class Between(
     val lower: Comparable<*>,
     val upper: Comparable<*>,
 ) : Predicate {
-    override fun matches(row: MiniRowVec): Boolean {
+    override fun matches(row: RowVec): Boolean {
         val v = row.getValue(column) ?: return false
         return compareKeys(v, lower) >= 0 && compareKeys(v, upper) <= 0
     }
 }
 
 data class InList(val column: String, val values: List<Any?>) : Predicate {
-    override fun matches(row: MiniRowVec) = row.getValue(column) in values
+    override fun matches(row: RowVec) = row.getValue(column) in values
 }
 
 data class And(val left: Predicate, val right: Predicate) : Predicate {
-    override fun matches(row: MiniRowVec) = left.matches(row) && right.matches(row)
+    override fun matches(row: RowVec) = left.matches(row) && right.matches(row)
 }
 
 data class Or(val left: Predicate, val right: Predicate) : Predicate {
-    override fun matches(row: MiniRowVec) = left.matches(row) || right.matches(row)
+    override fun matches(row: RowVec) = left.matches(row) || right.matches(row)
 }
 
 data class Not(val inner: Predicate) : Predicate {
-    override fun matches(row: MiniRowVec) = !inner.matches(row)
+    override fun matches(row: RowVec) = !inner.matches(row)
 }
 
 infix fun Predicate.and(other: Predicate): Predicate = And(this, other)

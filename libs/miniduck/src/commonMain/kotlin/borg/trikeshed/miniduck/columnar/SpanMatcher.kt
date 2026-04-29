@@ -5,6 +5,7 @@ import borg.trikeshed.miniduck.DocRowVec
 import borg.trikeshed.miniduck.MiniCursor
 import borg.trikeshed.miniduck.MiniRowVec
 import borg.trikeshed.miniduck.getValue
+import borg.trikeshed.miniduck.toRowVec
 
 /**
  * Find overlapping time spans between two sorted kline cursors.
@@ -146,7 +147,7 @@ object SpanMatcher {
             DocRowVec(
                 keys = listOf("aStart", "aEnd", "bStart", "bEnd", "aRows", "bRows"),
                 cells = listOf(s.aStart, s.aEnd, s.bStart, s.bEnd, s.aRows, s.bRows),
-            )
+            ).toRowVec()
         }
     }
 

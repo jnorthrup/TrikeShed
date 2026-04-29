@@ -1,5 +1,9 @@
 package borg.trikeshed.miniduck
 
+import borg.trikeshed.cursor.ColumnMeta
+import borg.trikeshed.cursor.RowVec
+import borg.trikeshed.cursor.j
+import borg.trikeshed.isam.meta.IOMemento
 import borg.trikeshed.lib.*
 
 /**
@@ -21,6 +25,25 @@ class DocRowVec(
 
     /** Look up a field by name. Returns null if not found. */
     operator fun get(key: String): Any? = cells.getOrNull(keys.indexOf(key))
+}
+
+fun DocRowVec.toRowVec(): RowVec {
+    val values = cells.toSeries()
+    val meta = keys.size j { index: Int ->
+        { ColumnMeta(keys[index], cells.getOrNull(index).toIOMemento()) }
+    }
+    return values.j(meta)
+}
+
+private fun Any?.toIOMemento(): IOMemento = when (this) {
+    is Double -> IOMemento.IoDouble
+    is Float -> IOMemento.IoFloat
+    is Long -> IOMemento.IoLong
+    is Int -> IOMemento.IoInt
+    is Boolean -> IOMemento.IoBoolean
+    is ByteArray -> IOMemento.IoByteArray
+    null -> IOMemento.IoNothing
+    else -> IOMemento.IoString
 }
 
 /**

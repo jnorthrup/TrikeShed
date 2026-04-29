@@ -1,7 +1,7 @@
 package borg.trikeshed.dreamer
 
 import borg.trikeshed.couch.kline.TimeSpan
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertSame
@@ -9,7 +9,7 @@ import kotlin.test.assertTrue
 
 class EvolutionTest {
     @Test
-    fun `evaluatePopulation replays each genome over archive csv`() = runBlocking<Unit> {
+    fun `evaluatePopulation replays each genome over archive csv`() = runTest {
         val csv = """
             open_time,open,high,low,close,volume,close_time,quote_asset_volume,number_of_trades,taker_buy_base_volume,taker_buy_quote_volume,ignore
             1704067200000,100.0,102.0,99.0,101.0,10.0,1704070799999,1010.0,12,5.0,505.0,0

@@ -8,6 +8,7 @@ import borg.trikeshed.lib.*
 import borg.trikeshed.miniduck.schema.ColumnSchema
 import borg.trikeshed.miniduck.schema.TableSchema
 import borg.trikeshed.miniduck.toJson
+import borg.trikeshed.miniduck.toRowVec
 
 /**
  * Region: a named locality (datacenter, zone, rack) backed by a BlockStore.
@@ -59,7 +60,7 @@ class Tablespace(val name: String) {
                 }
             }
         }
-        return rows.size j { rows[it] }
+        return rows.size j { index: Int -> rows[index].toRowVec() }
     }
 
     /**
@@ -78,12 +79,8 @@ class Tablespace(val name: String) {
         val cursor = scan(collection)
         for (i in 0 until cursor.size) {
             val row = cursor[i]
-            if (row is DocRowVec) {
-                val keys = (0 until row.size).mapNotNull { idx ->
-                    // DocRowVec exposes keys in the first N entries
-                    row.keys.getOrNull(idx)
-                }
-                seen.addAll(keys)
+            for (idx in 0 until row.size) {
+                seen.add(row.b(idx).b().a)
             }
         }
         return TableSchema(

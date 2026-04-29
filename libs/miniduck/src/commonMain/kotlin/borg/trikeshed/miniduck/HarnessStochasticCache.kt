@@ -47,9 +47,8 @@ object HarnessStochasticCache {
     private fun MiniCursor.ohlcSeries(column: String): Series<Double> {
         val n = this.size
         return n j { index: Int ->
-            val row = this.row(index) as? DocRowVec
-                ?: throw IllegalArgumentException("row $index is not DocRowVec")
-            val value = row[column]
+            val row = this.row(index)
+            val value = row.getValue(column)
             when (value) {
                 is Number -> value.toDouble()
                 is String -> value.toDouble()

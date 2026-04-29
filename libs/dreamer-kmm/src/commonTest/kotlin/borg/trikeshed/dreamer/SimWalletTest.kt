@@ -2,6 +2,7 @@ package borg.trikeshed.dreamer
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 class SimWalletTest {
 
@@ -105,5 +106,21 @@ class SimWalletTest {
 
         assertEquals(0.0, wallet.netQuantity("BTC"))
         assertEquals(100.0, wallet.realizedPnl("BTC"))
+    }
+
+    @Test
+    fun `journal records wallet actions and mark to market snapshots`() {
+        val wallet = SimWallet()
+        wallet.record("USDT", 1000.0)
+        wallet.placeOrder("BTC", "USDT", OrderSide.BUY, OrderType.LIMIT, 50000.0, 0.01)
+        wallet.processBar("BTCUSDT", 51000.0, 49000.0, 49500.0)
+        val worth = wallet.markToMarket(mapOf("BTC" to 50000.0, "USDT" to 1.0), note = "debug tick")
+
+        val journal = wallet.journal()
+        assertTrue(journal.any { it.action == WalletAction.RECORD && it.symbol == "USDT" })
+        assertTrue(journal.any { it.action == WalletAction.ORDER_ACCEPTED && it.symbol == "BTCUSDT" })
+        assertTrue(journal.any { it.action == WalletAction.ORDER_FILLED && it.symbol == "BTCUSDT" })
+        assertEquals(worth, journal.last().netValue)
+        assertEquals("debug tick", journal.last().note)
     }
 }

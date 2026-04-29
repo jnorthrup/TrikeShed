@@ -3,9 +3,10 @@ package borg.trikeshed.dreamer
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.size
-import borg.trikeshed.miniduck.DocRowVec
 import borg.trikeshed.miniduck.MiniCursor
-import borg.trikeshed.miniduck.at
+import borg.trikeshed.miniduck.getValue
+import borg.trikeshed.cursor.RowVec
+import borg.trikeshed.cursor.at
 import kotlin.math.sqrt
 
 /**
@@ -118,10 +119,10 @@ fun klineBarToPortfolioInput(
     barIndex: Int,
     currentQuantity: Double,
 ): PortfolioInput {
-    val row: DocRowVec = (cursor at barIndex) as DocRowVec
-    val symbol: String = row["symbol"] as? String ?: "UNKNOWN"
-    val openTime: Long = row["openTime"] as? Long ?: 0L
-    val price: Double = row["close"] as? Double ?: row["open"] as? Double ?: 0.0
+    val row = cursor.at(barIndex)
+    val symbol: String = row.stringValue("symbol", "UNKNOWN")
+    val openTime: Long = row.longValue("openTime")
+    val price: Double = row.doubleValue("close").takeIf { it > 0.0 } ?: row.doubleValue("open")
     val value = currentQuantity * price
     return PortfolioInput(
         symbol = symbol,
@@ -184,14 +185,14 @@ fun allSymbolsAtBar(
     barIndex: Int,
     holdings: Map<String, Double>,
 ): List<PortfolioInput> {
-    val refRow: DocRowVec = (cursor at barIndex) as DocRowVec
-    val refOpenTime: Long = refRow["openTime"] as? Long ?: 0L
+    val refRow = cursor.at(barIndex)
+    val refOpenTime: Long = refRow.longValue("openTime")
 
     return (0 until cursor.size).mapNotNull { i ->
-        val row: DocRowVec = (cursor at i) as DocRowVec
-        if ((row["openTime"] as? Long) != refOpenTime) return@mapNotNull null
-        val symbol: String = row["symbol"] as? String ?: "UNKNOWN"
-        val price: Double = row["close"] as? Double ?: row["open"] as? Double ?: 0.0
+        val row = cursor.at(i)
+        if (row.longValue("openTime") != refOpenTime) return@mapNotNull null
+        val symbol: String = row.stringValue("symbol", "UNKNOWN")
+        val price: Double = row.doubleValue("close").takeIf { it > 0.0 } ?: row.doubleValue("open")
         val quantity: Double = holdings[symbol] ?: 0.0
         PortfolioInput(
             symbol = symbol,
@@ -210,8 +211,8 @@ fun allSymbolsAtBar(
 fun closesFromCursor(cursor: MiniCursor): List<Double> {
     val n = cursor.size
     return List(n) { i: Int ->
-        val row: DocRowVec = (cursor at i) as DocRowVec
-        row["close"] as? Double ?: row["open"] as? Double ?: 0.0
+        val row = cursor.at(i)
+        row.doubleValue("close").takeIf { it > 0.0 } ?: row.doubleValue("open")
     }
 }
 
@@ -340,11 +341,11 @@ suspend fun simulateTicks(
     }
 
     // Derive symbol from the first bar
-    val firstRow: DocRowVec = (cursor at 0) as DocRowVec
-    val symbol: String = firstRow["symbol"] as? String ?: "UNKNOWN"
+    val firstRow = cursor.at(0)
+    val symbol: String = firstRow.stringValue("symbol", "UNKNOWN")
 
     // Derive initial quantity from initial capital / first close price
-    val firstClose: Double = firstRow["close"] as? Double ?: firstRow["open"] as? Double ?: 1.0
+    val firstClose: Double = firstRow.doubleValue("close").takeIf { it > 0.0 } ?: firstRow.doubleValue("open").takeIf { it > 0.0 } ?: 1.0
     val initialQuantity = initialCapital / firstClose
 
     val cycles = mutableListOf<CycleResult>()
@@ -365,8 +366,8 @@ suspend fun simulateTicks(
             holdingDetails = null,
         )
 
-        val row: DocRowVec = (cursor at i) as DocRowVec
-        val openTime: Long = row["openTime"] as? Long ?: 0L
+        val row = cursor.at(i)
+        val openTime: Long = row.longValue("openTime")
 
         val cycle = CycleResult(
             tick = i,
@@ -412,3 +413,20 @@ private fun emptyBacktestResult(genome: Genome, initialCapital: Double): Backtes
             avgHarvestPerTick = 0.0,
         ),
     )
+
+private fun RowVec.stringValue(name: String, default: String): String =
+    getValue(name) as? String ?: default
+
+private fun RowVec.longValue(name: String): Long = when (val value = getValue(name)) {
+    is Long -> value
+    is Number -> value.toLong()
+    is String -> value.toLongOrNull() ?: 0L
+    else -> 0L
+}
+
+private fun RowVec.doubleValue(name: String): Double = when (val value = getValue(name)) {
+    is Double -> value
+    is Number -> value.toDouble()
+    is String -> value.toDoubleOrNull() ?: 0.0
+    else -> 0.0
+}

@@ -8,7 +8,8 @@ import borg.trikeshed.lib.j
 import borg.trikeshed.lib.size
 import borg.trikeshed.miniduck.DocRowVec
 import borg.trikeshed.miniduck.ExampleKernelTransformer
-import borg.trikeshed.miniduck.at
+import borg.trikeshed.miniduck.getValue
+import borg.trikeshed.miniduck.toRowVec
 import kotlinx.coroutines.test.runTest
 import kotlin.math.abs
 import kotlin.test.Test
@@ -24,7 +25,7 @@ class HarnessStochasticCacheTest {
             DocRowVec(keys = listOf("high", "low", "close"), cells = listOf(102.0, 101.0, 101.5)),
             DocRowVec(keys = listOf("high", "low", "close"), cells = listOf(103.0, 102.0, 102.5)),
         )
-        val cursor: Cursor = rows.size j { i -> rows[i] }
+        val cursor: Cursor = rows.size j { i -> rows[i].toRowVec() }
 
         val symbol = "SYM"
         val timeframe = "1d"
@@ -38,19 +39,19 @@ class HarnessStochasticCacheTest {
         assertNotNull(cached, "HarnessStochasticCache.get returned null")
 
         // Build expected series directly from the cursor
-        val highs: Series<Double> = cursor.size j { i ->  ((cursor  ["high"])at i)   as Double }
-        val lows: Series<Double> = cursor.size j { i ->   ((cursor   ["low"])at i)    as Double }
-        val closes: Series<Double> = cursor.size j { i -> ((cursor ["close"])at i)  as Double }
+        val highs: Series<Double> = cursor.size j { i -> cursor.at(i).getValue("high") as Double }
+        val lows: Series<Double> = cursor.size j { i -> cursor.at(i).getValue("low") as Double }
+        val closes: Series<Double> = cursor.size j { i -> cursor.at(i).getValue("close") as Double }
 
         val expected = Stochastic.compute(highs, lows, closes, k, d)
 
         // Compare cached vs expected
         for (i in 0 until cached.k.size) {
-            val gotK = cached.k[i]
-            val expK = expected.k[i]
+            val gotK = cached.k.b(i)
+            val expK = expected.k.b(i)
             assertTrue(abs(gotK - expK) < 1e-9, "stoch k mismatch at $i: got=$gotK expected=$expK")
-            val gotD = cached.d[i]
-            val expD = expected.d[i]
+            val gotD = cached.d.b(i)
+            val expD = expected.d.b(i)
             assertTrue(abs(gotD - expD) < 1e-9, "stoch d mismatch at $i: got=$gotD expected=$expD")
         }
 
@@ -58,11 +59,11 @@ class HarnessStochasticCacheTest {
         val transformer = ExampleKernelTransformer()
         val transformed = transformer.transform(cursor, mapOf("symbol" to symbol, "timeframe" to timeframe, "kPeriod" to k, "dPeriod" to d))
         for (i in 0 until transformed.size) {
-            val row = transformed at i
-            val stK = (row["stoch_k"] as? Double) ?: Double.NaN
-            val stD = (row["stoch_d"] as? Double) ?: Double.NaN
-            assertTrue(abs(stK - expected.k[i]) < 1e-9, "transformed stoch_k mismatch at $i: got=$stK expected=${expected.k[i]}")
-            assertTrue(abs(stD - expected.d[i]) < 1e-9, "transformed stoch_d mismatch at $i: got=$stD expected=${expected.d[i]}")
+            val row = transformed.at(i)
+            val stK = (row.getValue("stoch_k") as? Double) ?: Double.NaN
+            val stD = (row.getValue("stoch_d") as? Double) ?: Double.NaN
+            assertTrue(abs(stK - expected.k.b(i)) < 1e-9, "transformed stoch_k mismatch at $i: got=$stK expected=${expected.k.b(i)}")
+            assertTrue(abs(stD - expected.d.b(i)) < 1e-9, "transformed stoch_d mismatch at $i: got=$stD expected=${expected.d.b(i)}")
         }
     }
 }

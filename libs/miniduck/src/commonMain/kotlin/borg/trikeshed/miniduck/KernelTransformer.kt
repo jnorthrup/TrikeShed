@@ -26,7 +26,7 @@ class ExampleKernelTransformer : KernelFeatureTransformer {
         // Extract close price series
         val closeSeries: Series<Double> = cursor.size j { i ->
             val row = cursor.row(i)
-            val v = (row as? DocRowVec)?.get("close")
+            val v = row.getValue("close")
             when (v) {
                 is Number -> v.toDouble()
                 is String -> v.toDoubleOrNull() ?: Double.NaN
@@ -42,9 +42,8 @@ class ExampleKernelTransformer : KernelFeatureTransformer {
         // Widen each row with appended columns (include stochastic if available)
         return cursor.size j { i -> 
             val row = cursor.row(i)
-            val baseDoc = row as? DocRowVec
-            val baseKeys = baseDoc?.keys ?: emptyList()
-            val baseCells = baseDoc?.cells ?: emptyList()
+            val baseKeys = row.keys()
+            val baseCells = row.cells()
 
             val symbol = params["symbol"] as? String ?: params["sym"] as? String
             val timeframe = params["timeframe"] as? String ?: params["tf"] as? String
@@ -56,8 +55,12 @@ class ExampleKernelTransformer : KernelFeatureTransformer {
 
             val newKeys = baseKeys + listOf("log_return", "sma_short", "sma_long", "rolling_vol", "stoch_k", "stoch_d")
             val newCells = baseCells + listOf(logs[i], smaShort[i], smaLong[i], vol[i], stochK, stochD)
-            val widenedDoc = DocRowVec(keys = newKeys, cells = newCells, child = baseDoc?.child)
+            val widenedDoc = DocRowVec(keys = newKeys, cells = newCells)
             widenedDoc.toRowVec()
         }
     }
 }
+
+private fun borg.trikeshed.cursor.RowVec.keys(): List<String> = List(size) { index -> this[index].b().name }
+
+private fun borg.trikeshed.cursor.RowVec.cells(): List<Any?> = List(size) { index -> this[index].a }

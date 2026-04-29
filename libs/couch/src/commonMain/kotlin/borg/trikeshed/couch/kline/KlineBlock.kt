@@ -3,6 +3,7 @@ package borg.trikeshed.couch.kline
     import borg.trikeshed.miniduck.DocRowVec
     import borg.trikeshed.miniduck.MiniCursor
     import borg.trikeshed.miniduck.MiniRowVec
+    import borg.trikeshed.miniduck.toRowVec
     import borg.trikeshed.lib.Series
     import borg.trikeshed.lib.j
     import borg.trikeshed.lib.size
@@ -86,7 +87,7 @@ class KlineBlock constructor(
         // Snapshot the rows list to avoid concurrent modification
         val snapshot = rows.toList()
         return snapshot.size j { i: Int ->
-            snapshot[i].toDocRowVec()
+            snapshot[i].toDocRowVec().toRowVec()
         }
     }
 

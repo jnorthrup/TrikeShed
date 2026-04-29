@@ -6,11 +6,10 @@ import borg.trikeshed.couch.kline.TimeSpan
 import borg.trikeshed.miniduck.DocRowVec
 import borg.trikeshed.miniduck.MiniCursor
 import borg.trikeshed.miniduck.MiniRowVec
-import borg.trikeshed.miniduck.at
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.size
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -159,7 +158,7 @@ class RunCycleTest {
     // ── 4. simulateTicks end-to-end ─────────────────────────────────────
 
     @Test
-    fun `simulateTicks returns BacktestResult with correct symbol and initial capital`() = runBlocking<Unit> {
+    fun `simulateTicks returns BacktestResult with correct symbol and initial capital`() = runTest {
         val klines = listOf(
             Kline("BTC-USD", TimeSpan.Hours1, 1704067200000L, 20500.0, 21000.0, 20300.0, 20800.0, 1500.5),
             Kline("BTC-USD", TimeSpan.Hours1, 1704070800000L, 20800.0, 21200.0, 20700.0, 21100.0, 1600.0),
@@ -176,7 +175,7 @@ class RunCycleTest {
     }
 
     @Test
-    fun `simulateTicks captures correct cycle count`() = runBlocking<Unit> {
+    fun `simulateTicks captures correct cycle count`() = runTest {
         val klines = listOf(
             Kline("BTC-USD", TimeSpan.Hours1, 1704067200000L, 20500.0, 21000.0, 20300.0, 20800.0, 1500.5),
             Kline("BTC-USD", TimeSpan.Hours1, 1704070800000L, 20800.0, 21200.0, 20700.0, 21100.0, 1600.0),
@@ -193,7 +192,7 @@ class RunCycleTest {
     }
 
     @Test
-    fun `simulateTicks zero-bar cursor returns empty BacktestResult`() = runBlocking<Unit> {
+    fun `simulateTicks zero-bar cursor returns empty BacktestResult`() = runTest {
         val emptyKlines: List<Kline> = emptyList()
         val cursor = klinesToCursor(emptyKlines)
 
@@ -205,7 +204,7 @@ class RunCycleTest {
     }
 
     @Test
-    fun `simulateTicks onCycle callback fires each tick`() = runBlocking<Unit> {
+    fun `simulateTicks onCycle callback fires each tick`() = runTest {
         val klines = listOf(
             Kline("BTC-USD", TimeSpan.Hours1, 1704067200000L, 20500.0, 21000.0, 20300.0, 20800.0, 1500.5),
             Kline("BTC-USD", TimeSpan.Hours1, 1704070800000L, 20800.0, 21200.0, 20700.0, 21100.0, 1600.0),

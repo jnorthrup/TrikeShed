@@ -21,17 +21,45 @@ data class FilledOrder(
     val filledAt: Long
 )
 
+enum class WalletAction {
+    RECORD,
+    ORDER_ACCEPTED,
+    ORDER_REJECTED,
+    ORDER_CANCELLED,
+    ORDER_FILLED,
+    MARK_TO_MARKET,
+    SIGNAL,
+    RESET,
+}
+
+data class WalletJournalEntry(
+    val index: Int,
+    val action: WalletAction,
+    val symbol: String,
+    val quantity: Double = 0.0,
+    val price: Double = 0.0,
+    val free: Map<String, Double> = emptyMap(),
+    val locked: Map<String, Double> = emptyMap(),
+    val realized: Map<String, Double> = emptyMap(),
+    val netValue: Double = 0.0,
+    val note: String = "",
+    val at: Long = 0L,
+)
+
 class SimWallet {
     private val balances = mutableMapOf<String, Double>()
     private val locked = mutableMapOf<String, Double>()
     private val pending = mutableListOf<Order>()
     private val realized = mutableMapOf<String, Double>()
     private val costBasis = mutableMapOf<String, Double>()
+    private val journal = mutableListOf<WalletJournalEntry>()
     private var peakNetValue = 0.0
     private var orderIdCounter = 0
 
     fun record(symbol: String, quantity: Double, costBasis: Double = 0.0) {
         balances[symbol] = (balances[symbol] ?: 0.0) + quantity
+        if (costBasis != 0.0) this.costBasis[symbol] = (this.costBasis[symbol] ?: 0.0) + costBasis
+        appendJournal(WalletAction.RECORD, symbol, quantity = quantity, note = "record balance")
     }
 
     fun placeOrder(
@@ -45,13 +73,19 @@ class SimWallet {
         if (side == OrderSide.BUY) {
             val cost = price * quantity
             val available = freeBalance(quote)
-            if (available < cost) return null
+            if (available < cost) {
+                appendJournal(WalletAction.ORDER_REJECTED, "$base$quote", quantity, price, "insufficient $quote")
+                return null
+            }
 
             locked[quote] = (locked[quote] ?: 0.0) + cost
             balances[quote] = (balances[quote] ?: 0.0) - cost
         } else {
             val available = freeBalance(base)
-            if (available < quantity) return null
+            if (available < quantity) {
+                appendJournal(WalletAction.ORDER_REJECTED, "$base$quote", quantity, price, "insufficient $base")
+                return null
+            }
 
             locked[base] = (locked[base] ?: 0.0) + quantity
             balances[base] = (balances[base] ?: 0.0) - quantity
@@ -60,6 +94,7 @@ class SimWallet {
         val orderId = "order-${++orderIdCounter}"
         val order = Order(orderId, base, quote, side, type, price, quantity, 0L)
         pending.add(order)
+        appendJournal(WalletAction.ORDER_ACCEPTED, "$base$quote", quantity, price, "${side.name} ${type.name} $orderId")
         return order
     }
 
@@ -78,6 +113,7 @@ class SimWallet {
                     balances[order.base] = (balances[order.base] ?: 0.0) + order.quantity
                 }
                 it.remove()
+                appendJournal(WalletAction.ORDER_CANCELLED, "${order.base}${order.quote}", order.quantity, order.price, order.id)
                 break
             }
         }
@@ -125,6 +161,7 @@ class SimWallet {
                     locked[order.base] = (locked[order.base] ?: 0.0) - order.quantity
                     balances[order.quote] = (balances[order.quote] ?: 0.0) + (order.price * order.quantity)
                 }
+                appendJournal(WalletAction.ORDER_FILLED, orderSymbol, order.quantity, order.price, order.id)
             }
         }
         return fills
@@ -180,6 +217,18 @@ class SimWallet {
         return total
     }
 
+    fun markToMarket(prices: Map<String, Double>, note: String = ""): Double {
+        val total = worth(prices)
+        appendJournal(WalletAction.MARK_TO_MARKET, "portfolio", netValue = total, note = note)
+        return total
+    }
+
+    fun recordSignal(symbol: String, note: String, price: Double = 0.0, quantity: Double = 0.0) {
+        appendJournal(WalletAction.SIGNAL, symbol, quantity = quantity, price = price, note = note)
+    }
+
+    fun journal(): List<WalletJournalEntry> = journal.toList()
+
     fun peakNetValue(): Double = peakNetValue
 
     fun autoDrawdown(): Double {
@@ -207,5 +256,31 @@ class SimWallet {
         realized.clear()
         costBasis.clear()
         peakNetValue = 0.0
+        appendJournal(WalletAction.RESET, "wallet", note = "reset")
     }
+
+    private fun appendJournal(
+        action: WalletAction,
+        symbol: String,
+        quantity: Double = 0.0,
+        price: Double = 0.0,
+        note: String = "",
+        netValue: Double = 0.0,
+    ) {
+        journal += WalletJournalEntry(
+            index = journal.size,
+            action = action,
+            symbol = symbol,
+            quantity = quantity,
+            price = price,
+            free = balances.sortedSnapshot(),
+            locked = locked.sortedSnapshot(),
+            realized = realized.sortedSnapshot(),
+            netValue = netValue,
+            note = note,
+        )
+    }
+
+    private fun Map<String, Double>.sortedSnapshot(): Map<String, Double> =
+        keys.sorted().associateWith { key -> this[key] ?: 0.0 }
 }
