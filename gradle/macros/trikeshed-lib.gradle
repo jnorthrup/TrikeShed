@@ -245,6 +245,7 @@ switch (project.path) {
         kmpFull()
         group = "com.vsiwest"
         extensions.getByName("kotlin").sourceSets.getByName("jsMain").dependencies {
+            implementation libPeer("dreamer-kmm")
             implementation npm("blessed", "0.1.81")
         }
         break

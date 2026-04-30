@@ -44,6 +44,9 @@ class StochasticBag(
     private val kPeriod: Int = 14,
     private val dPeriod: Int = 3,
 ) {
+    private val random = Random(seed)
+    private var cachedSpans: List<PairSpanWindow>? = null
+
     suspend fun warm() {
         sources.forEach { source ->
             HarnessStochasticCache.ensureCached(
@@ -61,7 +64,6 @@ class StochasticBag(
         require(maxWindows >= 0) { "maxWindows must be non-negative" }
         require(spanLength > 0) { "spanLength must be positive" }
         warm()
-        val random = Random(seed)
         val windows = sources
             .filter { it.cursor.size > 0 }
             .shuffled(random)
@@ -74,14 +76,7 @@ class StochasticBag(
                 source.window(start, end, stochastic)
             }
 
-        val spans = mutableListOf<PairSpanWindow>()
-        for (i in 0 until sources.size) {
-            for (j in i + 1 until sources.size) {
-                spans += spanWindows(sources[i], sources[j])
-            }
-        }
-
-        return StochasticBagSelection(windows, spans)
+        return StochasticBagSelection(windows, spans())
     }
 
     private fun KlineSeriesSource.window(start: Int, end: Int, stochastic: Stochastic.Result?): StochasticWindow {
@@ -110,6 +105,17 @@ class StochasticBag(
                 bRows = row.intValue("bRows"),
             )
         }
+    }
+
+    private fun spans(): List<PairSpanWindow> {
+        cachedSpans?.let { return it }
+        val spans = mutableListOf<PairSpanWindow>()
+        for (i in 0 until sources.size) {
+            for (j in i + 1 until sources.size) {
+                spans += spanWindows(sources[i], sources[j])
+            }
+        }
+        return spans.toList().also { cachedSpans = it }
     }
 }
 

@@ -21,6 +21,21 @@ class RealtimeHarnessTest {
     }
 
     @Test
+    fun `stochastic bag advances repeated draws from one seeded cache`() = runTest {
+        val left = source("BTC", prices = (0 until 16).map { 100.0 + it })
+        val right = source("ETH", prices = (0 until 16).map { 10.0 + it * 0.1 })
+        val bag = StochasticBag(listOf(left, right), seed = 19)
+
+        val first = bag.select(maxWindows = 2, spanLength = 4)
+        val second = bag.select(maxWindows = 2, spanLength = 4)
+        val replay = StochasticBag(listOf(left, right), seed = 19).select(maxWindows = 2, spanLength = 4)
+
+        assertEquals(first, replay)
+        assertTrue(first.windows != second.windows)
+        assertEquals(first.spans, second.spans)
+    }
+
+    @Test
     fun `realtime harness replays sealed kline blocks through Dreamer agent`() = runTest {
         val btc = block("BTC", listOf(100.0, 102.0, 104.0, 106.0))
         val eth = block("ETH", listOf(10.0, 9.8, 10.1, 10.4))
@@ -59,6 +74,33 @@ class RealtimeHarnessTest {
         assertEquals(4, result.evaluations.size)
         assertEquals(Genome.WIDTH, result.champion.doubles.size)
         assertTrue(result.evaluations.first().fitness >= result.evaluations.last().fitness)
+    }
+
+    @Test
+    fun `stochastic trainer emits full bag span training snapshot`() = runTest {
+        val trainer = StochasticBagSpanTrainer(
+            StochasticTrainingConfig(
+                bases = listOf("BTC", "ETH", "SOL"),
+                rowsPerSeries = 48,
+                populationSize = 4,
+                spanLength = 8,
+                seed = 23,
+            )
+        )
+
+        val first = trainer.runGeneration()
+        val second = trainer.runGeneration()
+
+        assertEquals(1, first.generation)
+        assertEquals(2, second.generation)
+        assertEquals(3, first.pairCount)
+        assertEquals(4, first.evaluations)
+        assertTrue(first.totalWindows > 0)
+        assertTrue(first.totalSpans > 0)
+        assertTrue(first.bestTotalValue > 0.0)
+        assertTrue(first.sampleWindows.isNotEmpty())
+        assertTrue(first.sampleSpans.isNotEmpty())
+        assertTrue(first.bestFitness == first.bestFitness)
     }
 
     private fun source(base: String, prices: List<Double>): KlineSeriesSource {

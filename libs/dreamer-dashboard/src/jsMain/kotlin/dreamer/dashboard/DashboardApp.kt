@@ -3,10 +3,10 @@ package dreamer.dashboard
 import kotlinx.coroutines.*
 
 /**
- * Dreamer Dashboard — split-pane terminal UI for dual SupervisorJob monitoring.
+ * Dreamer Dashboard — split-pane terminal UI for stochastic bag/span training.
  *
- * Left pane:  Robinhood live trading (balance, holdings, trade log)
- * Right pane: Binance archive replay (training progress, genome fitness)
+ * Left pane:  Dreamer paper replay measurement
+ * Right pane: stochastic bag/span training progress
  *
  * Built with blessed (npm) via Kotlin/JS externals.
  * Same source compiles to JS and Wasm nodejs targets.
@@ -39,7 +39,7 @@ fun main() {
     footerOpts.left = 0
     footerOpts.width = "100%"
     footerOpts.height = 1
-    footerOpts.content = " {cyan-fg}q{/cyan-fg} quit  |  {green-fg}r{/green-fg} refresh  |  dreamer-dashboard v0.1"
+    footerOpts.content = " {cyan-fg}q{/cyan-fg} quit  |  {green-fg}r{/green-fg} refresh  |  stochastic bag/span training"
     footerOpts.tags = true
     footerOpts.style = js("({ fg: 'white', bg: 'black' })")
     val footer = text(footerOpts)
@@ -48,6 +48,7 @@ fun main() {
     // ── Render loop (250ms ticks) ────────────────────────────────────
     val scope = CoroutineScope(Dispatchers.Default)
     var running = true
+    state.start(scope)
 
     scope.launch {
         while (running) {
@@ -62,6 +63,7 @@ fun main() {
     // ── Key bindings ─────────────────────────────────────────────────
     screen.key(arrayOf("q", "C-c")) { _, _ ->
         running = false
+        state.stop()
         scope.cancel()
         screen.destroy()
         println("Dreamer Dashboard closed.")

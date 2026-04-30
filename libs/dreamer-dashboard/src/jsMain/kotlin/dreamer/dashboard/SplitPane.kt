@@ -1,8 +1,7 @@
 package dreamer.dashboard
 
 /**
- * Horizontal split-pane layout: left (trading) | right (training).
- * Both are blessed Box containers consuming half the terminal width.
+ * Horizontal split-pane layout: paper validation | bag/span training.
  */
 class SplitPane(screen: Screen) {
     val left: Box
@@ -11,7 +10,7 @@ class SplitPane(screen: Screen) {
     init {
         val halfWidth = screen.width / 2
 
-        left = box(makeBoxOpts(0, 0, halfWidth, " TRADING ", "green"))
+        left = box(makeBoxOpts(0, 0, halfWidth, " PAPER ", "green"))
         right = box(makeBoxOpts(halfWidth + 1, 0, halfWidth - 2, " TRAINING ", "cyan"))
 
         screen.append(left)
@@ -36,7 +35,7 @@ class SplitPane(screen: Screen) {
 }
 
 /**
- * Left pane — Robinhood live trading status.
+ * Left pane: paper replay measurement from the current champion.
  */
 class TradingPane(private val box: Box) {
    val log: BlessedList
@@ -55,26 +54,19 @@ class TradingPane(private val box: Box) {
 
     fun render(state: DashboardState) {
         val g = glyphs.getOrElse(state.tradingLifecycle) { "?" }
-        val holdingsTotal = state.holdings.entries.sumOf { (sym, qty) ->
-            qty * (state.prices[sym] ?: 0.0)
-        }
-        val totalValue = state.cashBalance + holdingsTotal
-
-        val htable = state.holdings.entries.joinToString("\n") { (sym, qty) ->
-            val px = state.prices[sym] ?: 0.0
-            "  $sym  ${qty.fmt(4)} @ ${px.fmt(0)} = ${(qty * px).fmt()}"
-        }
 
         box.setContent("""
-            $g  |  total ${totalValue.fmt()}
-            ──────────────────────────────
-            Balance:      ${state.cashBalance.fmt()}
-            Holdings:     ${state.holdings.size} assets (${holdingsTotal.fmt()})
-            Harvested:    ${state.totalHarvested.fmt()}
+            $g  |  generation ${state.genomeVersion}
+            ------------------------------
+            Paper value:  ${state.finalTotalValue.fmt()}
+            Paper PnL:    ${state.bestPnl.fmt()}
             Trades:       ${state.totalTrades}
-            Drawdown:     ${(state.maxDrawdownPercent * 100).fmt(1)}%
-            ──────────────────────────────
-$htable
+            Cycles:       ${state.totalCycles.fmt()}
+            Pairs:        ${state.pairCount}
+            Rows/pair:    ${state.rowsPerSeries.fmt()}
+            ------------------------------
+            Windows:      ${state.totalWindows.fmt()}
+            Spans:        ${state.totalSpans.fmt()}
         """.trimIndent())
 
         while (state.tradeLogRendered < state.tradeLog.size) {
@@ -86,7 +78,7 @@ $htable
 }
 
 /**
- * Right pane — Binance training + genome optimization status.
+ * Right pane: stochastic bag/span training and champion parameters.
  */
 class TrainingPane(private val box: Box) {
    val log: BlessedList
@@ -108,14 +100,16 @@ class TrainingPane(private val box: Box) {
 
         box.setContent("""
             $g  |  bars ${state.barsReplayed.fmt()}
-            ──────────────────────────────
+            ------------------------------
+            Population:  ${state.populationSize}
+            Fitness:     ${state.bestFitness.num()}
             Genome:      v${state.genomeVersion}
-            Take %:      ${state.genomeTakePercent}%
-            Best PnL:    ${state.bestPnl.fmt()}
-            ──────────────────────────────
-            ISAM:        zstd blocks (RED)
-            Cursor:      in-memory fallback
-            Strategy:    harvest+rebalance
+            Take:        ${state.genomeTakePercent.num()}
+            Min surplus: ${state.genomeMinSurplus.num()}
+            Rebalance:   ${state.genomeRebalanceTrigger.num()}
+            ------------------------------
+            Feed:        generated Binance CSV
+            Strategy:    Dreamer 1.2 paper
         """.trimIndent())
 
         while (state.trainingLogRendered < state.trainingLog.size) {

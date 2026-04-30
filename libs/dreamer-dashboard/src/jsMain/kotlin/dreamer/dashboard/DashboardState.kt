@@ -1,5 +1,12 @@
 package dreamer.dashboard
 
+import borg.trikeshed.dreamer.StochasticBagSpanTrainer
+import borg.trikeshed.dreamer.StochasticTrainingConfig
+import borg.trikeshed.dreamer.StochasticTrainingSnapshot
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+
 /** Number formatting for Kotlin/JS (no String.format). */
 fun Double.fmt(d: Int = 2): String {
     val fixed = this.toFixed(d)
@@ -13,6 +20,10 @@ fun Long.fmt(): String {
     val s = this.toString().reversed().chunked(3).joinToString(",").reversed()
     return s
 }
+
+fun Int.fmt(): String = this.toLong().fmt()
+
+fun Double.num(d: Int = 4): String = this.toFixed(d)
 
 // Kotlin/JS polyfill for toFixed
 fun Double.toFixed(digits: Int): String {
@@ -31,60 +42,103 @@ fun Double.toFixed(digits: Int): String {
 }
 
 /**
- * Self-contained demo state for the dashboard.
- * Simulates Robinhood trading + Binance training without
- * requiring dreamer-kmm's engine types to exist yet.
- *
- * When dreamer-kmm's SharedEngineState/TradingSupervisorJob
- * are implemented, swap this out for the real thing.
+ * Visible state for the archive replay -> stochastic bag/span -> Dreamer paper
+ * training loop. The work runs continuously until the UI is closed.
  */
 class DashboardState {
-    // ── Trading (left pane) ────────────────────────────────────────────
-    var cashBalance: Double = 12345.67
-    val holdings = mutableMapOf(
-        "BTC" to 0.42, "ETH" to 2.10, "SOL" to 15.0
+    private val trainer = StochasticBagSpanTrainer(
+        StochasticTrainingConfig(
+            rowsPerSeries = 720,
+            populationSize = 8,
+            spanLength = 64,
+            seed = 12_301,
+        )
     )
-    val prices = mutableMapOf(
-        "BTC" to 69100.0, "ETH" to 3820.0, "SOL" to 142.0
-    )
+
+    private var started = false
+    private var running = true
+
+    var cashBalance: Double = 10_000.0
+    var finalTotalValue: Double = 0.0
+    var bestFitness: Double = 0.0
     var totalTrades: Int = 0
-    var totalHarvested: Double = 0.0
-    var maxDrawdownPercent: Double = 0.0
+    var totalWindows: Int = 0
+    var totalSpans: Int = 0
+    var totalCycles: Int = 0
+    var pairCount: Int = 0
+    var rowsPerSeries: Int = 0
+    var populationSize: Int = 0
     var tradingLifecycle: Int = 2  // 2 = ACTIVE
     val tradeLog = mutableListOf<String>()
     var tradeLogRendered: Int = 0
 
-    // ── Training (right pane) ──────────────────────────────────────────
     var barsReplayed: Long = 0L
-    var genomeTakePercent: Int = 70
-    var genomeVersion: Int = 1
+    var genomeTakePercent: Double = 0.0
+    var genomeMinSurplus: Double = 0.0
+    var genomeRebalanceTrigger: Double = 0.0
+    var genomeVersion: Int = 0
     var bestPnl: Double = 0.0
     var trainingLifecycle: Int = 2  // 2 = ACTIVE
     val trainingLog = mutableListOf<String>()
     var trainingLogRendered: Int = 0
 
-    // ── Simulation tick ────────────────────────────────────────────────
+    fun start(scope: CoroutineScope) {
+        if (started) return
+        started = true
+        scope.launch {
+            while (running) {
+                trainingLifecycle = 2
+                val snapshot = trainer.runGeneration()
+                apply(snapshot)
+                delay(25)
+            }
+        }
+    }
+
     fun tick() {
-        if (kotlin.random.Random.nextDouble() < 0.3) {
-            totalTrades++
-            val harvested = kotlin.random.Random.nextDouble() * 50 + 10
-            totalHarvested += harvested
-            cashBalance += harvested - kotlin.random.Random.nextDouble() * 5
-            tradeLog.add("cycle=$totalTrades harvested=${harvested.fmt()} cash=${cashBalance.fmt()}")
-            if (tradeLog.size > 50) tradeLog.removeAt(0)
-        }
+        // Rendering is decoupled from training. The coroutine above mutates the
+        // latest snapshot; blessed only needs a steady paint loop.
+    }
 
-        for ((sym, price) in prices.toMap()) {
-            prices[sym] = price * (1.0 + (kotlin.random.Random.nextDouble() - 0.5) * 0.002)
-        }
+    fun stop() {
+        running = false
+        tradingLifecycle = 4
+        trainingLifecycle = 4
+    }
 
-        barsReplayed += (100..500).random().toLong()
-        if (kotlin.random.Random.nextDouble() < 0.15) {
-            genomeVersion++
-            genomeTakePercent = (65..95).random()
-            bestPnl += kotlin.random.Random.nextDouble() * 100
-            trainingLog.add("genome_v$genomeVersion take=${genomeTakePercent}% pnl=${bestPnl.fmt()} bars=${barsReplayed.fmt()}")
-            if (trainingLog.size > 50) trainingLog.removeAt(0)
-        }
+    private fun apply(snapshot: StochasticTrainingSnapshot) {
+        genomeVersion = snapshot.generation
+        pairCount = snapshot.pairCount
+        rowsPerSeries = snapshot.rowsPerSeries
+        populationSize = snapshot.populationSize
+        totalCycles = snapshot.totalCycles
+        totalWindows = snapshot.totalWindows
+        totalSpans = snapshot.totalSpans
+        totalTrades = snapshot.bestTrades
+        finalTotalValue = snapshot.bestTotalValue
+        bestPnl = snapshot.bestProfit
+        bestFitness = snapshot.bestFitness
+        barsReplayed = snapshot.totalCycles.toLong() * snapshot.evaluations.toLong()
+        genomeTakePercent = snapshot.championTakePercent
+        genomeMinSurplus = snapshot.championMinSurplus
+        genomeRebalanceTrigger = snapshot.championRebalanceTrigger
+
+        tradeLog.add(
+            "gen=${snapshot.generation} value=${snapshot.bestTotalValue.fmt()} " +
+                "pnl=${snapshot.bestProfit.fmt()} trades=${snapshot.bestTrades}"
+        )
+        snapshot.sampleSpans.forEach { tradeLog.add("span $it") }
+        trim(tradeLog)
+
+        trainingLog.add(
+            "gen=${snapshot.generation} fitness=${snapshot.bestFitness.num()} " +
+                "windows=${snapshot.totalWindows.fmt()} spans=${snapshot.totalSpans.fmt()}"
+        )
+        snapshot.sampleWindows.forEach { trainingLog.add("bag $it") }
+        trim(trainingLog)
+    }
+
+    private fun trim(log: MutableList<String>) {
+        while (log.size > 80) log.removeAt(0)
     }
 }
