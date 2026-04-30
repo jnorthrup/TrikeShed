@@ -64,7 +64,7 @@ data class LangFingerprint(
     /** RowVec projection — same columns as TypeEvidence.toRowVec(). */
     fun toRowVec(): RowVec {
         val ev = evidence
-        val values = arrayOf<Any?>(
+        val values: Series<Any?> = s_[
             ev.confix,
             ev.digits.toInt(),
             ev.periods.toInt(),
@@ -82,11 +82,11 @@ data class LangFingerprint(
             ev.maxColumnLength.toInt(),
             if (ev.minColumnLength == UShort.MAX_VALUE) 0 else ev.minColumnLength.toInt(),
             TypeEvidence.deduceMemento(ev).label,
-            corpusLength,
-        )
+            corpusLength
+        ]
         val meta: Series<`ColumnMeta↻`> =
-            (LANG_FP_COLUMNS.entries α LANG_FP_COLUMNS::columnMeta) as Series<`ColumnMeta↻`>
-        return values.size j { index: Int -> values[index] } joins meta
+            (LANG_FP_COLUMNS.entries α { it.columnMeta.leftIdentity }) as Series<`ColumnMeta↻`>
+        return values joins meta
     }
 
 
