@@ -2,10 +2,7 @@
 
 package borg.trikeshed.tinybtrfs
 
-import borg.trikeshed.lib.Join
-import borg.trikeshed.lib.Series
-import borg.trikeshed.lib.Twin
-import borg.trikeshed.lib.j
+import borg.trikeshed.lib.*
 
 /**
  * Tiny B+Tree skeleton (commonMain)
@@ -40,7 +37,10 @@ class BPlusTree<K : Comparable<K>, V>(  val order: Int = 32) {
             get() = keysCount j { i: Int -> _keys[i] as K }
 
         val valueSeries: Series<V?>
-            get() = keysCount j  { i: Int -> _values[i] as V? }
+            get() = keysCount j { i: Int -> _values[i] as V? }
+
+        /** Joined key/value view. */
+        val entries: Series2<K, V?> get() = ReifiedSplitSeries2(keySeries, valueSeries)
 
         override fun isLeaf() = true
 
@@ -122,6 +122,12 @@ class BPlusTree<K : Comparable<K>, V>(  val order: Int = 32) {
                 @Suppress("UNCHECKED_CAST")
                 _children[i] as Node<K, V>
             }
+
+        /** Joined key/child view. Note: internal nodes have childrenCount = keysCount + 1. */
+        val entries: Series2<K?, Node<K, V>> get() {
+            val ks: Series<K?> = (keysCount + 1) j { i -> if (i < keysCount) keyAt(i) else null }
+            return ReifiedSplitSeries2(ks, childSeries)
+        }
 
         override fun isLeaf() = false
 

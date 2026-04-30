@@ -107,24 +107,24 @@ object QuicVarInt {
     }
 
     /** Decode a QUIC varint from [src] at [offset]. Returns (value, bytesConsumed). */
-    fun decode(src: ByteArray, offset: Int = 0): Pair<ULong, Int> {
+    fun decode(src: ByteArray, offset: Int = 0): Join<ULong, Int> {
         val first = src[offset].toInt() and 0xFF
         val tag = first shr 6
         return when (tag) {
-            0 -> (first.toULong() and 0x3Fu) to 1
+            0 -> (first.toULong() and 0x3Fu) j 1
             1 -> {
                 val value = ((first and 0x3F) shl 8) or (src[offset + 1].toInt() and 0xFF)
-                value.toULong() to 2
+                value.toULong() j 2
             }
             2 -> {
                 var value = 0L
                 repeat(4) { i -> value = (value shl 8) or (src[offset + i].toInt() and 0xFF).toLong() }
-                (value and 0x3FFFFFFF).toULong() to 4
+                (value and 0x3FFFFFFF).toULong() j 4
             }
             3 -> {
                 var value = 0L
                 repeat(8) { i -> value = (value shl 8) or (src[offset + i].toInt() and 0xFF).toLong() }
-                (value and 0x3FFFFFFF_FFFFFFFFL).toULong() to 8
+                (value and 0x3FFFFFFF_FFFFFFFFL).toULong() j 8
             }
             else -> error("unreachable")
         }
