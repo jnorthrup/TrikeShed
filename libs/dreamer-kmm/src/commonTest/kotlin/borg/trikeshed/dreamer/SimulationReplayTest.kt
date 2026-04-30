@@ -1,5 +1,6 @@
 package borg.trikeshed.dreamer
 
+import borg.trikeshed.lib.*
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -31,7 +32,7 @@ class SimulationReplayTest {
         assertEquals(10_000.0, result.initialCapital)
         assertEquals(3, result.cycles.size)
         assertEquals(3, result.metrics.totalTicks)
-        assertEquals(1704067200000L, result.cycles.first().openTime)
+        assertEquals(1704067200000L, result.cycles[0].openTime)
         assertTrue(result.metrics.totalReturn > 0.03, "totalReturn=${result.metrics.totalReturn}")
     }
 }

@@ -37,11 +37,11 @@ data class StochasticBagSelection(
 )
 
 class StochasticBag(
-    val sources: List<KlineSeriesSource>,
-    val seed: Int = 1,
+    public val sources: List<KlineSeriesSource>,
+    public val seed: Int = 1,
 ) {
-    val random = Random(seed)
-    var cachedSpans: List<PairSpanWindow>? = null
+    public val random = Random(seed)
+    public var cachedSpans: List<PairSpanWindow>? = null
 
     suspend fun select(maxWindows: Int, spanLength: Int): StochasticBagSelection {
         require(maxWindows >= 0) { "maxWindows must be non-negative" }
@@ -65,7 +65,7 @@ class StochasticBag(
         return StochasticBagSelection(windows, selectedSpans)
     }
 
-    fun KlineSeriesSource.rowSpan(start: Int, end: Int): KlineRowSpan {
+    public fun KlineSeriesSource.rowSpan(start: Int, end: Int): KlineRowSpan {
         val first = cursor.at(start)
         val last = cursor.at((end - 1).coerceAtLeast(start))
         return KlineRowSpan(
@@ -78,7 +78,7 @@ class StochasticBag(
         )
     }
 
-    fun spanWindows(left: KlineSeriesSource, right: KlineSeriesSource): List<PairSpanWindow> {
+    public fun spanWindows(left: KlineSeriesSource, right: KlineSeriesSource): List<PairSpanWindow> {
         val spans = SpanMatcher.find(left.cursor, right.cursor)
         return List(spans.size) { index ->
             val row = spans.at(index)
@@ -95,7 +95,7 @@ class StochasticBag(
         }
     }
 
-    fun spans(): List<PairSpanWindow> {
+    public fun spans(): List<PairSpanWindow> {
         cachedSpans?.let { return it }
         val spans = mutableListOf<PairSpanWindow>()
         for (i in 0 until sources.size) {
