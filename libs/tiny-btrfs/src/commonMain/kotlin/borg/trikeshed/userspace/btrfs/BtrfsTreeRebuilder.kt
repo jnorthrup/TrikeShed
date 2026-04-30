@@ -22,7 +22,7 @@ class BtrfsTreeRebuilder(
     fun completeRebuild(): BtrfsRebuildResult {
         check(state == ElementState.OPEN) { "Cannot complete rebuild from state=$state" }
         val nodes = buffer.nodeSnapshot()
-        nodes.forEach { (_, bytes) -> validateNode(bytes) }
+        nodes.view.forEach { (_, bytes) -> validateNode(bytes) }
         state = ElementState.CLOSED
         return BtrfsRebuildResult(nodeCount = nodes.size)
     }
@@ -84,11 +84,11 @@ data class BtrfsByteKey(
 @Suppress("UNUSED_PARAMETER")
 fun BPlusTree<BtrfsByteKey, Series<Byte>>.rebuildFromSorted(
     diskAdapter: DiskAdapter,
-    kvPairs: List<Pair<Series<Byte>, Series<Byte>>>,
+    kvPairs: Series<Join<Series<Byte>, Series<Byte>>>,
 ) {
     // For simplicity, we'll just do individual inserts.
     // A more sophisticated bulk-loading algorithm could be implemented here.
-    for ((key, value) in kvPairs) {
+    kvPairs.view.forEach { (key, value) ->
         put(BtrfsByteKey(key), value)
     }
 }

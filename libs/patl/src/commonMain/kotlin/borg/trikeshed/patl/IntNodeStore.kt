@@ -24,6 +24,9 @@ class IntNodeStore(
 ) {
     val size: Int get() = links.a
 
+    /** Joined view of all nodes: (links j meta). */
+    val nodes: Series2<Long, Long> get() = links zip meta
+
     /** Append a new node. Returns its index. */
     fun append(
         parent: Int,

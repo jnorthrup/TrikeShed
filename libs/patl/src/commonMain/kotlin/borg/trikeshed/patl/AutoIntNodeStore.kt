@@ -30,10 +30,10 @@ object AutoIntNodeStore {
 
     /** Pack one field: scan for bit-width (unsigned range), then pack. */
     private fun packField(store: IntNodeStore, n: Int, extract: (Int) -> Int): Series<Int> {
+        val series: Series<Int> = n j extract
         var max = 0
         var min = 0
-        for (i in 0 until n) {
-            val v = extract(i)
+        series.view.forEach { v ->
             if (v > max) max = v
             if (v < min) min = v
         }
@@ -49,7 +49,7 @@ object AutoIntNodeStore {
         val bits = if (unsignedMax <= 0L) 1
             else (64 - unsignedMax.countLeadingZeroBits()).toInt().coerceAtLeast(1)
         val buf = PackedIntBuf(bits.coerceAtMost(32))
-        for (i in 0 until n) buf.add(extract(i))
+        series.view.forEach { buf.add(it) }
         return buf.toSeries()
     }
 }

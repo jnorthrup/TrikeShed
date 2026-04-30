@@ -1,7 +1,11 @@
 package borg.trikeshed.polyglot
 
+import borg.trikeshed.collections.s_
+import borg.trikeshed.lib.*
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
@@ -34,12 +38,12 @@ class MlirTaxonomyContractTest {
     /* ─── MlirOp ─────────────────────────────────────────────────── */
 
     @Test fun `MlirOp qualifiedName is dialect_op_dot_name`() {
-        val op = MlirOp(MlirDialect.ARITH, "addf", listOf("f32", "f32"), listOf("f32"))
+        val op = MlirOp(MlirDialect.ARITH, "addf", s_["f32", "f32"], s_["f32"])
         assertEquals("arith.addf", op.qualifiedName)
     }
 
     @Test fun `MlirOp toString includes types`() {
-        val op = MlirOp(MlirDialect.MEMREF, "load", listOf("memref<?xf32>"), listOf("f32"))
+        val op = MlirOp(MlirDialect.MEMREF, "load", s_["memref<?xf32>"], s_["f32"])
         val s = op.toString()
         assertTrue(s.contains("memref.load"))
         assertTrue(s.contains("memref<?xf32>"))
@@ -142,11 +146,15 @@ class MlirTaxonomyContractTest {
     /* ─── nodeToMlir — callables ─────────────────────────────────── */
 
     @Test fun `FUNCTION maps to func_dot_func`() {
-        assertEquals(listOf(FuncOps.func), nodeToMlir(NodeKind.FUNCTION))
+        val ops = nodeToMlir(NodeKind.FUNCTION)
+        assertEquals(1, ops.size)
+        assertEquals(FuncOps.func, ops[0])
     }
 
     @Test fun `METHOD maps to func_dot_func`() {
-        assertEquals(listOf(FuncOps.func), nodeToMlir(NodeKind.METHOD))
+        val ops = nodeToMlir(NodeKind.METHOD)
+        assertEquals(1, ops.size)
+        assertEquals(FuncOps.func, ops[0])
     }
 
     /* ─── nodeToMlir — memory ────────────────────────────────────── */
@@ -170,7 +178,9 @@ class MlirTaxonomyContractTest {
     }
 
     @Test fun `ASSIGN maps to memref_store`() {
-        assertEquals(listOf(MemrefOps.store), nodeToMlir(NodeKind.ASSIGN))
+        val ops = nodeToMlir(NodeKind.ASSIGN)
+        assertEquals(1, ops.size)
+        assertEquals(MemrefOps.store, ops[0])
     }
 
     /* ─── nodeToMlir — control flow ──────────────────────────────── */
@@ -180,19 +190,27 @@ class MlirTaxonomyContractTest {
     }
 
     @Test fun `RETURN maps to func_dot_return`() {
-        assertEquals(listOf(FuncOps.ret), nodeToMlir(NodeKind.RETURN))
+        val ops = nodeToMlir(NodeKind.RETURN)
+        assertEquals(1, ops.size)
+        assertEquals(FuncOps.ret, ops[0])
     }
 
     @Test fun `IF maps to scf_dot_if`() {
-        assertEquals(listOf(ScfOps.ifOp), nodeToMlir(NodeKind.IF))
+        val ops = nodeToMlir(NodeKind.IF)
+        assertEquals(1, ops.size)
+        assertEquals(ScfOps.ifOp, ops[0])
     }
 
     @Test fun `LOOP maps to scf_dot_for`() {
-        assertEquals(listOf(ScfOps.forLoop), nodeToMlir(NodeKind.LOOP))
+        val ops = nodeToMlir(NodeKind.LOOP)
+        assertEquals(1, ops.size)
+        assertEquals(ScfOps.forLoop, ops[0])
     }
 
     @Test fun `WHILE maps to scf_dot_while`() {
-        assertEquals(listOf(ScfOps.whileLoop), nodeToMlir(NodeKind.WHILE))
+        val ops = nodeToMlir(NodeKind.WHILE)
+        assertEquals(1, ops.size)
+        assertEquals(ScfOps.whileLoop, ops[0])
     }
 
     @Test fun `FOR maps to scf_for and affine_for candidates`() {
@@ -225,18 +243,22 @@ class MlirTaxonomyContractTest {
     }
 
     @Test fun `CALL maps to func_dot_call`() {
-        assertEquals(listOf(FuncOps.call), nodeToMlir(NodeKind.CALL))
+        val ops = nodeToMlir(NodeKind.CALL)
+        assertEquals(1, ops.size)
+        assertEquals(FuncOps.call, ops[0])
     }
 
     @Test fun `LITERAL maps to arith_dot_constant`() {
-        assertEquals(listOf(ArithOps.constant), nodeToMlir(NodeKind.LITERAL))
+        val ops = nodeToMlir(NodeKind.LITERAL)
+        assertEquals(1, ops.size)
+        assertEquals(ArithOps.constant, ops[0])
     }
 
     @Test fun `BINARY_OP maps to multiple arith candidates`() {
         val ops = nodeToMlir(NodeKind.BINARY_OP)
         assertTrue(ops.size >= 10, "BINARY_OP should map to many arith candidates, got ${ops.size}")
-        assertTrue(ops.all { it.dialect == MlirDialect.ARITH }, "all BINARY_OP candidates must be arith dialect")
-        assertTrue(ops.contains(ArithOps.addf))
+        assertTrue(ops.view.all { it.dialect == MlirDialect.ARITH }, "all BINARY_OP candidates must be arith dialect")
+        assertTrue(ops.view.contains(ArithOps.addf))
         assertTrue(ops.contains(ArithOps.mulf))
         assertTrue(ops.contains(ArithOps.cmpf))
     }
@@ -267,7 +289,7 @@ class MlirTaxonomyContractTest {
         for (kind in listOf(NodeKind.FUNCTION, NodeKind.RETURN, NodeKind.IF,
             NodeKind.LOOP, NodeKind.CALL, NodeKind.LITERAL, NodeKind.ASSIGN, NodeKind.VARIABLE))
         {
-            assertTrue(kind in mlirRelevantKinds, "$kind should be mlir-relevant")
+            assertTrue(mlirRelevantKinds.view.contains(kind), "$kind should be mlir-relevant")
         }
     }
 
@@ -275,7 +297,7 @@ class MlirTaxonomyContractTest {
         for (kind in listOf(NodeKind.COMMENT, NodeKind.IMPORT, NodeKind.UNKNOWN,
             NodeKind.TYPE_ANNOTATION, NodeKind.TYPE_DECL))
         {
-            assertTrue(kind !in mlirRelevantKinds, "$kind should NOT be mlir-relevant")
+            assertFalse(mlirRelevantKinds.view.contains(kind), "$kind should NOT be mlir-relevant")
         }
     }
 
@@ -289,7 +311,7 @@ class MlirTaxonomyContractTest {
     @Test fun `every NodeKind has a nodeToMlir entry no exception`() {
         for (kind in NodeKind.entries) {
             val result: Any = try { nodeToMlir(kind) } catch (e: Exception) { e }
-            assertTrue(result is List<*>, "nodeToMlir($kind) threw or returned non-List: $result")
+            assertTrue(result is Join<*, *>, "nodeToMlir($kind) threw or returned non-Join: $result")
         }
     }
 
