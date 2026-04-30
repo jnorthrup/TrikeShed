@@ -1,0 +1,355 @@
+buildscript {
+    repositories {
+        gradlePluginPortal()
+        mavenCentral()
+        google()
+        maven { url = uri("https://oss.sonatype.org/content/repositories/snapshots/") }
+        maven { url = uri("https://www.jitpack.io") }
+    }
+    dependencies {
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:2.4.0-Beta2"
+    }
+}
+
+def trikeshedVersion = "1.0"
+def libVersion = "0.1.0-SNAPSHOT"
+def kotlinVersion = "2.4.0-Beta2"
+
+def prop = { String name ->
+    def value = rootProject.providers.gradleProperty(name).orNull
+    if (value != null) return value
+    if (rootProject.ext.has(name)) return rootProject.ext.get(name).toString()
+    throw new GradleException("Missing Gradle property: ${name}")
+}
+
+def rootPeer = {
+    rootProject.name == "TrikeShed" && project.path != ":"
+        ? project(":")
+        : "org.bereft:TrikeShed:${trikeshedVersion}"
+}
+
+def libPeer = { String name ->
+    rootProject.findProject(":libs:${name}") ?: "borg.trikeshed:${name}:${libVersion}"
+}
+
+def nestedLibPeer = { String path, String artifact ->
+    rootProject.findProject(path) ?: "borg.trikeshed:${artifact}:${libVersion}"
+}
+
+repositories {
+    mavenCentral()
+    mavenLocal()
+    google()
+    gradlePluginPortal()
+    maven { url = uri("https://oss.sonatype.org/content/repositories/snapshots/") }
+    maven { url = uri("https://www.jitpack.io") }
+}
+
+def configureCompiler = { kotlinExt, boolean expectActual ->
+    kotlinExt.compilerOptions {
+        apiVersion.set("KOTLIN_2_4")
+        languageVersion.set("KOTLIN_2_4")
+        def args = [
+            "-opt-in=kotlin.RequiresOptIn",
+            "-Xsuppress-version-warnings",
+        ]
+        if (expectActual) args.add("-Xexpect-actual-classes")
+        freeCompilerArgs.addAll(args)
+    }
+}
+
+def standardFullTargets = { kotlinExt, boolean executables ->
+    kotlinExt.jvmToolchain(21)
+    kotlinExt.jvm()
+    kotlinExt.js {
+        nodejs()
+        if (executables) binaries.executable()
+    }
+    kotlinExt.wasmJs {
+        nodejs()
+        if (executables) binaries.executable()
+    }
+    def hostOs = System.getProperty("os.name")
+    def hostArch = System.getProperty("os.arch")
+    if (hostOs == "Mac OS X" && hostArch == "aarch64") {
+        kotlinExt.macosArm64("macos")
+    } else if (hostOs == "Linux") {
+        kotlinExt.linuxX64("linux")
+    }
+}
+
+def jvmOnlyTarget = { kotlinExt ->
+    kotlinExt.jvmToolchain(21)
+    kotlinExt.jvm()
+}
+
+def standardSourceSets = { kotlinExt, String rootMode, boolean coroutinesMain, boolean datetimeMain ->
+    def ss = kotlinExt.sourceSets
+    ss.getByName("commonMain").dependencies {
+        if (rootMode == "implementation") {
+            implementation rootPeer()
+        } else if (rootMode != "none") {
+            api rootPeer()
+        }
+        if (coroutinesMain) {
+            implementation "org.jetbrains.kotlinx:kotlinx-coroutines-core:${prop("versions.kotlinx-coroutines-core")}"
+        }
+        if (datetimeMain) {
+            implementation "org.jetbrains.kotlinx:kotlinx-datetime:${prop("versions.kotlinx-datetime")}"
+        }
+    }
+    ss.getByName("commonTest").dependencies {
+        implementation "org.jetbrains.kotlin:kotlin-test:${kotlinVersion}"
+        implementation "org.jetbrains.kotlinx:kotlinx-coroutines-test:${prop("versions.kotlinx-coroutines-test")}"
+    }
+    ss.findByName("jvmTest")?.dependencies {
+        implementation "org.jetbrains.kotlin:kotlin-test-junit:${kotlinVersion}"
+    }
+    if (ss.findByName("jsTest") != null) ss.getByName("jsTest").dependsOn(ss.getByName("commonTest"))
+    if (ss.findByName("wasmJsTest") != null) ss.getByName("wasmJsTest").dependsOn(ss.getByName("commonTest"))
+}
+
+def kmpFull = { Map options = [:] ->
+    def rootMode = options.get("rootMode", "api")
+    def coroutinesMain = options.get("coroutinesMain", true)
+    def datetimeMain = options.get("datetimeMain", false)
+    pluginManager.apply("org.jetbrains.kotlin.multiplatform")
+    pluginManager.apply("maven-publish")
+    group = "borg.trikeshed"
+    version = libVersion
+    def kotlinExt = extensions.getByName("kotlin")
+    configureCompiler(kotlinExt, true)
+    standardFullTargets(kotlinExt, true)
+    standardSourceSets(kotlinExt, rootMode, coroutinesMain, datetimeMain)
+}
+
+def kmpJvm = { Map options = [:] ->
+    def rootMode = options.get("rootMode", "api")
+    def coroutinesMain = options.get("coroutinesMain", false)
+    pluginManager.apply("org.jetbrains.kotlin.multiplatform")
+    pluginManager.apply("maven-publish")
+    group = "borg.trikeshed"
+    version = libVersion
+    def kotlinExt = extensions.getByName("kotlin")
+    configureCompiler(kotlinExt, true)
+    jvmOnlyTarget(kotlinExt)
+    standardSourceSets(kotlinExt, rootMode, coroutinesMain, false)
+}
+
+def plainJvm = { boolean applyApplication = false ->
+    pluginManager.apply("org.jetbrains.kotlin.jvm")
+    pluginManager.apply("java-library")
+    pluginManager.apply("maven-publish")
+    if (applyApplication) pluginManager.apply("application")
+    group = "borg.trikeshed"
+    version = libVersion
+    def kotlinExt = extensions.getByName("kotlin")
+    kotlinExt.jvmToolchain(21)
+    kotlinExt.compilerOptions {
+        apiVersion.set("KOTLIN_2_4")
+        languageVersion.set("KOTLIN_2_4")
+        freeCompilerArgs.addAll(
+            "-opt-in=kotlin.RequiresOptIn",
+            "-Xsuppress-version-warnings",
+        )
+    }
+    dependencies {
+        api rootPeer()
+        testImplementation "org.jetbrains.kotlin:kotlin-test:${kotlinVersion}"
+        testImplementation "org.jetbrains.kotlinx:kotlinx-coroutines-test:${prop("versions.kotlinx-coroutines-test")}"
+    }
+}
+
+switch (project.path) {
+    case ":libs:common":
+        kmpFull()
+        break
+    case ":libs:dreamer-kmm":
+        kmpFull(rootMode: "implementation", coroutinesMain: false)
+        break
+    case ":libs:kursive":
+    case ":libs:patl":
+    case ":libs:tiny-btrfs":
+        kmpFull()
+        break
+    case ":libs:ngsctp":
+    case ":libs:quic":
+    case ":libs:uring":
+        kmpJvm()
+        break
+    case ":libs:polyglot":
+        kmpJvm()
+        extensions.getByName("kotlin").sourceSets.getByName("commonTest").dependencies {
+            implementation rootPeer()
+            implementation "org.jetbrains.kotlinx:kotlinx-coroutines-core:${prop("versions.kotlinx-coroutines-core")}"
+        }
+        break
+    case ":libs:concurrency":
+        plainJvm()
+        break
+    case ":libs:cmc-generated":
+        plainJvm()
+        kotlin.sourceSets.main.kotlin.srcDir("src/generated/kotlin")
+        dependencies {
+            implementation "org.jetbrains.kotlin:kotlin-stdlib:${kotlinVersion}"
+            implementation "org.jetbrains.kotlinx:kotlinx-coroutines-core:${prop("versions.kotlinx-coroutines-core")}"
+        }
+        break
+    case ":libs:dreamer-test-runner":
+        plainJvm()
+        dependencies {
+            implementation libPeer("dreamer-kmm")
+            implementation libPeer("miniduck")
+            implementation libPeer("couch")
+            testImplementation "org.jetbrains.kotlin:kotlin-test-junit:${kotlinVersion}"
+            testImplementation "org.jetbrains.kotlinx:kotlinx-coroutines-core:${prop("versions.kotlinx-coroutines-core")}"
+        }
+        tasks.named("test") {
+            useJUnit()
+        }
+        break
+    case ":libs:integration-scratch":
+        plainJvm(true)
+        dependencies {
+            implementation libPeer("couch")
+            implementation libPeer("miniduck")
+            implementation libPeer("kursive")
+            implementation "org.jetbrains.kotlin:kotlin-stdlib:${kotlinVersion}"
+        }
+        application {
+            mainClass = "borg.trikeshed.integration.RunSqlIntegrationKt"
+        }
+        tasks.register("runBinanceStochastic", JavaExec) {
+            group = "application"
+            classpath = sourceSets.main.runtimeClasspath
+            mainClass = "borg.trikeshed.integration.RunBinanceStochasticKlineCacheKt"
+        }
+        break
+    case ":libs:cpu-cache":
+        kmpFull(rootMode: "none", coroutinesMain: false)
+        def cpuKotlin = extensions.getByName("kotlin")
+        if (System.getProperty("os.name") == "Mac OS X" && cpuKotlin.targets.findByName("macosX64") == null) {
+            cpuKotlin.macosX64()
+        }
+        if (cpuKotlin.targets.findByName("linux") == null) cpuKotlin.linuxX64("linux")
+        if (cpuKotlin.targets.findByName("linuxArm64") == null) cpuKotlin.linuxArm64()
+        tasks.register("interrogateCpu", JavaExec) {
+            group = "cpu-cache"
+            description = "Interrogate CPU cache topology and print Confix JSON"
+            def jvmCompilation = cpuKotlin.targets.getByName("jvm").compilations.getByName("main")
+            classpath = jvmCompilation.output.classesDirs + jvmCompilation.compileDependencyFiles
+            mainClass = "borg.trikeshed.cpucache.MainKt"
+        }
+        break
+    case ":libs:dreamer-dashboard":
+        kmpFull()
+        group = "com.vsiwest"
+        extensions.getByName("kotlin").sourceSets.getByName("jsMain").dependencies {
+            implementation npm("blessed", "0.1.81")
+        }
+        break
+    case ":libs:miniduck":
+        kmpFull(datetimeMain: true)
+        def miniduckKotlin = extensions.getByName("kotlin")
+        def miniduckSets = miniduckKotlin.sourceSets
+        miniduckSets.getByName("commonMain").dependencies {
+            implementation libPeer("kursive")
+            implementation "org.jetbrains.kotlin:kotlin-test:${kotlinVersion}"
+        }
+        miniduckSets.getByName("jvmMain").dependencies {
+            implementation "org.jetbrains.kotlin:kotlin-reflect:${kotlinVersion}"
+        }
+        miniduckSets.getByName("commonTest").dependencies {
+            implementation libPeer("couch")
+        }
+        def miniduckPosix = miniduckSets.create("posixMain")
+        miniduckPosix.dependsOn(miniduckSets.getByName("commonMain"))
+        miniduckSets.findByName("macosMain")?.dependsOn(miniduckPosix)
+        miniduckSets.findByName("linuxMain")?.dependsOn(miniduckPosix)
+        break
+    case ":libs:couch":
+        kmpFull(datetimeMain: true)
+        def couchKotlin = extensions.getByName("kotlin")
+        def couchSets = couchKotlin.sourceSets
+        couchSets.getByName("commonMain").dependencies {
+            api libPeer("miniduck")
+            implementation libPeer("kursive")
+        }
+        couchSets.getByName("jvmMain").dependencies {
+            implementation "org.jetbrains.kotlin:kotlin-reflect:${kotlinVersion}"
+        }
+        couchSets.getByName("jvmTest").dependencies {
+            implementation nestedLibPeer(":libs:couch:viewserver", "couch-viewserver")
+        }
+        couchSets.getByName("jsTest").dependencies {
+            implementation "org.jetbrains.kotlinx:kotlinx-coroutines-core:${prop("versions.kotlinx-coroutines-core")}"
+            implementation "org.jetbrains.kotlinx:kotlinx-coroutines-test:${prop("versions.kotlinx-coroutines-test")}"
+        }
+        couchSets.getByName("wasmJsTest").dependencies {
+            implementation "org.jetbrains.kotlinx:kotlinx-coroutines-core:${prop("versions.kotlinx-coroutines-core")}"
+            implementation "org.jetbrains.kotlinx:kotlinx-coroutines-test:${prop("versions.kotlinx-coroutines-test")}"
+        }
+        def couchPosix = couchSets.create("posixMain")
+        couchPosix.dependsOn(couchSets.getByName("commonMain"))
+        couchSets.findByName("macosMain")?.dependsOn(couchPosix)
+        couchSets.findByName("linuxMain")?.dependsOn(couchPosix)
+        tasks.register("quickValidate", JavaExec) {
+            group = "verification"
+            description = "Run a quick jvmMain validation of MiniDuck encode/decode"
+            dependsOn("compileKotlinJvm")
+            def runtimeConfiguration = configurations.findByName("jvmRuntimeClasspath")
+                ?: configurations.findByName("jvmMainRuntimeClasspath")
+                ?: configurations.findByName("runtimeClasspath")
+            if (runtimeConfiguration == null) {
+                throw new GradleException("Could not locate jvm runtime classpath configuration")
+            }
+            classpath = runtimeConfiguration
+            mainClass = "borg.trikeshed.couch.miniduck.MiniDuckQuickValidateKt"
+            jvmArgs = ["-Xmx1g"]
+        }
+        break
+    case ":libs:couch:viewserver":
+        kmpFull()
+        def viewKotlin = extensions.getByName("kotlin")
+        def viewSets = viewKotlin.sourceSets
+        viewSets.getByName("commonMain").dependencies {
+            implementation libPeer("couch")
+            implementation libPeer("kursive")
+        }
+        viewSets.getByName("jsMain").kotlin.srcDir("${layout.buildDirectory.get().asFile}/dukat")
+        tasks.register("generateDts", Exec) {
+            group = "build"
+            description = "Run TypeScript compiler (npx tsc) to emit declaration files for user JS"
+            commandLine("npx", "tsc", "-p", "tsconfig.json")
+            workingDir = projectDir
+        }
+        tasks.register("generateKotlinExterns", Exec) {
+            group = "build"
+            description = "Convert .d.ts outputs from tsc into Kotlin externs using dukat."
+            dependsOn("generateDts")
+            commandLine("npx", "dukat", "build/dts", "-o", "${layout.buildDirectory.get().asFile}/dukat")
+            workingDir = projectDir
+        }
+        break
+    case ":libs:server":
+        kmpJvm(coroutinesMain: true)
+        def serverSets = extensions.getByName("kotlin").sourceSets
+        serverSets.getByName("commonMain").dependencies {
+            api libPeer("quic")
+            api libPeer("ngsctp")
+            api libPeer("htx-client")
+        }
+        serverSets.getByName("commonTest").kotlin.srcDir("src/generated/kotlin")
+        break
+    case ":libs:openapi":
+        kmpFull()
+        group = "org.bereft"
+        version = trikeshedVersion
+        break
+    case ":libs:htx-client":
+        kmpJvm()
+        break
+    default:
+        kmpFull()
+        break
+}
