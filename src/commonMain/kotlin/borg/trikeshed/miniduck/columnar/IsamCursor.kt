@@ -1,7 +1,7 @@
 package borg.trikeshed.miniduck.columnar
 
+import borg.trikeshed.cursor.Cursor
 import borg.trikeshed.miniduck.DocRowVec
-import borg.trikeshed.miniduck.MiniCursor
 import borg.trikeshed.test.TODOError
 
 /**
@@ -59,7 +59,7 @@ class IsamCursor constructor() {
      * @param start  inclusive lower bound (openTime >= start)
      * @param end    exclusive upper bound (openTime < end)
      */
-    fun range(start: Long, end: Long): MiniCursor = throw TODOError("IsamCursor.range not yet implemented")
+    fun range(start: Long, end: Long): Cursor = throw TODOError("IsamCursor.range not yet implemented")
 
     /**
      * Release all resources held by this cursor.

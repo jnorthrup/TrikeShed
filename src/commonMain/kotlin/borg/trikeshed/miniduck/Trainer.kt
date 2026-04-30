@@ -1,5 +1,6 @@
 package borg.trikeshed.miniduck
 
+import borg.trikeshed.cursor.Cursor
 import borg.trikeshed.lib.*
 import borg.trikeshed.context.ElementState as ElementLifecycleState
 import kotlinx.coroutines.coroutineScope
@@ -16,7 +17,7 @@ interface KernelStochasticTrainer {
     val lifecycleState: ElementLifecycleState
 
     suspend fun open()
-    suspend fun train(cursor: MiniCursor, params: Map<String, Any>): StochasticPolicy?
+    suspend fun train(cursor: Cursor, params: Map<String, Any>): StochasticPolicy?
     suspend fun drain()
     suspend fun close()
 }
@@ -30,7 +31,7 @@ class NoOpTrainer : KernelStochasticTrainer {
         if (state == ElementLifecycleState.CREATED) state = ElementLifecycleState.OPEN
     }
 
-    override suspend fun train(cursor: MiniCursor, params: Map<String, Any>): StochasticPolicy? = withContext(Dispatchers.Default) {
+    override suspend fun train(cursor: Cursor, params: Map<String, Any>): StochasticPolicy? = withContext(Dispatchers.Default) {
         // build a Double series for "log_return" column if present
         val logSeries: Series<Double> = cursor.size j { idx ->
             val row = cursor.at(idx)
@@ -75,7 +76,7 @@ suspend fun executeKernelOptimizingHarness(
     symbols: List<String>,
     timeframes: List<String>,
     searchSpace: List<Map<String, Any>>, // list of param maps
-    cacheProvider: (String, String) -> MiniCursor,
+    cacheProvider: (String, String) -> Cursor,
     transformer: KernelFeatureTransformer,
     trainer: KernelStochasticTrainer
 ): List<StochasticPolicy> = coroutineScope {

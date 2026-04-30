@@ -23,7 +23,7 @@ object HarnessStochasticCache {
         timeframe: String,
         kPeriod: Int = 14,
         dPeriod: Int = 3,
-        cursorSupplier: () -> MiniCursor,
+        cursorSupplier: () -> Cursor,
     ) {
         val key = HarnessStochasticKey(symbol, timeframe, kPeriod, dPeriod)
         mutex.withLock {
@@ -44,7 +44,7 @@ object HarnessStochasticCache {
 }
 
     /** Extract an OHLC column as a Double Series. */
-    private fun MiniCursor.ohlcSeries(column: String): Series<Double> {
+    private fun Cursor.ohlcSeries(column: String): Series<Double> {
         val n = this.size
         return n j { index: Int ->
             val row = this.row(index)

@@ -1,9 +1,7 @@
 package borg.trikeshed.dreamer
 
-import borg.trikeshed.lib.Series
-import borg.trikeshed.lib.j
-import borg.trikeshed.lib.size
-import borg.trikeshed.miniduck.MiniCursor
+import borg.trikeshed.cursor.Cursor
+import borg.trikeshed.lib.*
 import borg.trikeshed.miniduck.getValue
 import borg.trikeshed.cursor.RowVec
 import borg.trikeshed.cursor.at
@@ -66,7 +64,7 @@ data class BacktestMetrics(
 data class BacktestResult(
     val symbol: String,
     val initialCapital: Double,
-    val cycles: List<CycleResult>,
+    val cycles: Series<CycleResult>,
     val metrics: BacktestMetrics,
 )
 
@@ -87,7 +85,7 @@ data class BacktestReport(
 
 /** Build a stable summary layer from a back-test result plus its aggregate metrics. */
 fun BacktestResult.toBacktestReport(): BacktestReport {
-    val finalEquity = cycles.lastOrNull()?.totalValue ?: initialCapital
+    val finalEquity = if (cycles.isNotEmpty()) cycles.last().totalValue else initialCapital
     return BacktestReport(
         symbol = symbol,
         initialCapital = initialCapital,
@@ -115,14 +113,14 @@ fun BacktestResult.toBacktestReport(): BacktestReport {
  * @param currentQuantity quantity of the asset held (fixed for back-test simulation)
  */
 fun klineBarToPortfolioInput(
-    cursor: MiniCursor,
+    cursor: Cursor,
     barIndex: Int,
     currentQuantity: Double,
 ): PortfolioInput {
     val row = cursor.at(barIndex)
     val symbol: String = row.stringValue("symbol", "UNKNOWN")
     val openTime: Long = row.longValue("openTime")
-    val price: Double = row.doubleValue("close").takeIf { it > 0.0 } ?: row.doubleValue("open")
+    val price: Double = row.doubleValue("close").takeIf{ it > 0.0 } ?: row.doubleValue("open")
     val value = currentQuantity * price
     return PortfolioInput(
         symbol = symbol,
@@ -163,7 +161,7 @@ fun portfolioInputToRows(input: PortfolioInput): List<PortfolioRow> = listOf(
  * @param holdings map of symbol → quantity (used to compute value)
  */
 fun multiSymbolKlineToPortfolioInput(
-    cursor: MiniCursor,
+    cursor: Cursor,
     barIndex: Int,
     holdings: Map<String, Double>,
 ): List<PortfolioInput> = allSymbolsAtBar(cursor, barIndex, holdings)
@@ -181,7 +179,7 @@ fun multiSymbolKlineToPortfolioInput(
  * @param holdings  map of symbol → quantity
  */
 fun allSymbolsAtBar(
-    cursor: MiniCursor,
+    cursor: Cursor,
     barIndex: Int,
     holdings: Map<String, Double>,
 ): List<PortfolioInput> {
@@ -208,21 +206,18 @@ fun allSymbolsAtBar(
  * Project a MiniCursor of kline rows into a flat [List] of close prices.
  * Convenience for building price arrays for metrics.
  */
-fun closesFromCursor(cursor: MiniCursor): List<Double> {
-    val n = cursor.size
-    return List(n) { i: Int ->
-        val row = cursor.at(i)
+fun closesFromCursor(cursor: Cursor): Series<Double> =
+    cursor α { row ->
         row.doubleValue("close").takeIf { it > 0.0 } ?: row.doubleValue("open")
     }
-}
 
 /**
  * Compute aggregate [BacktestMetrics] from cycle results.
  */
 fun computeBacktestMetrics(
-    cycles: List<CycleResult>,
+    cycles: Series<CycleResult>,
     initialCapital: Double,
-    closePrices: List<Double>,
+    closePrices: Series<Double>,
 ): BacktestMetrics {
     if (cycles.isEmpty()) {
         return BacktestMetrics(
@@ -239,28 +234,32 @@ fun computeBacktestMetrics(
     }
 
     val totalTicks = cycles.size
-    val finalTotal = cycles.lastOrNull()?.totalValue ?: initialCapital
+    val finalTotal = if (cycles.isNotEmpty()) cycles.last().totalValue else initialCapital
     val totalReturn = if (initialCapital > 0.0) (finalTotal - initialCapital) / initialCapital else 0.0
 
     // Daily/cycle returns for Sharpe
-    val returns = cycles.mapIndexed { i, c ->
-        if (i == 0) 0.0
-        else {
-            val prev = cycles[i - 1].totalValue
-            if (prev > 0.0) (c.totalValue - prev) / prev else 0.0
-        }
-    }.drop(1) // drop first zero
+    val returns: Series<Double> = cycles.zipWithNext() α { (prev, curr) ->
+        if (prev.totalValue > 0.0) (curr.totalValue - prev.totalValue) / prev.totalValue else 0.0
+    }
 
-    val meanReturn = if (returns.isNotEmpty()) returns.average() else 0.0
+    val meanReturn = if (returns.isNotEmpty()) {
+        var sum = 0.0
+        returns.view.forEach { sum += it }
+        sum / returns.size
+    } else 0.0
     val variance = if (returns.size > 1) {
-        returns.map { (it - meanReturn) * (it - meanReturn) }.average()
+        var sumSq = 0.0
+        returns.view.forEach { val diff = it - meanReturn; sumSq += diff * diff }
+        sumSq / returns.size
     } else 0.0
     val stdReturn = sqrt(variance)
     // Annualized Sharpe (252 trading days per year, assumes 1 bar = 1 day for now)
     val sharpeRatio = if (stdReturn > 0.0) (meanReturn / stdReturn) * sqrt(252.0) else 0.0
 
     val downsideVariance = if (returns.isNotEmpty()) {
-        returns.map { if (it < 0.0) it * it else 0.0 }.average()
+        var sumDownSq = 0.0
+        returns.view.forEach { if (it < 0.0) sumDownSq += it * it }
+        sumDownSq / returns.size
     } else 0.0
     val downsideDeviation = sqrt(downsideVariance)
     // Annualized Sortino, using zero as the minimum acceptable cycle return.
@@ -271,7 +270,7 @@ fun computeBacktestMetrics(
     var peakIndex = -1
     var maxDrawdown = 0.0
     var maxDrawdownTicks = 0
-    for ((index, cycle) in cycles.withIndex()) {
+    cycles.view.forEachIndexed { index, cycle ->
         if (cycle.totalValue > peak) {
             peak = cycle.totalValue
             peakIndex = index
@@ -284,8 +283,12 @@ fun computeBacktestMetrics(
         }
     }
 
-    val totalHarvested = cycles.sumOf { it.harvestedAmount }
-    val totalTrades = cycles.count { it.anyTradesThisCycle }
+    var totalHarvested = 0.0
+    var totalTrades = 0
+    cycles.view.forEach {
+        totalHarvested += it.harvestedAmount
+        if (it.anyTradesThisCycle) totalTrades++
+    }
     val avgHarvestPerTick = if (totalTicks > 0) totalHarvested / totalTicks else 0.0
 
     return BacktestMetrics(
@@ -315,7 +318,7 @@ fun computeBacktestMetrics(
  * @return [BacktestResult] with all cycles and aggregate metrics
  */
 suspend fun simulateTicks(
-    cursor: MiniCursor,
+    cursor: Cursor,
     engine: TradingEngine,
     initialCapital: Double,
     onCycle: (CycleResult) -> Unit = {},
@@ -325,7 +328,7 @@ suspend fun simulateTicks(
         return BacktestResult(
             symbol = "",
             initialCapital = initialCapital,
-            cycles = emptyList(),
+            cycles = emptySeries(),
             metrics = BacktestMetrics(
                 totalTicks = 0,
                 totalReturn = 0.0,
@@ -348,7 +351,7 @@ suspend fun simulateTicks(
     val firstClose: Double = firstRow.doubleValue("close").takeIf { it > 0.0 } ?: firstRow.doubleValue("open").takeIf { it > 0.0 } ?: 1.0
     val initialQuantity = initialCapital / firstClose
 
-    val cycles = mutableListOf<CycleResult>()
+    val cycleArray = arrayOfNulls<CycleResult>(n)
 
     for (i in 0 until n) {
         val input = klineBarToPortfolioInput(cursor, i, currentQuantity = initialQuantity)
@@ -381,10 +384,11 @@ suspend fun simulateTicks(
             rebalanceScheduled = engine.rebalanceState.isNotEmpty(),
             engineSnapshot = engine.getStateSnapshot(),
         )
-        cycles.add(cycle)
+        cycleArray[i] = cycle
         onCycle(cycle)
     }
 
+    val cycles: Series<CycleResult> = (cycleArray as Array<CycleResult>).toSeries()
     val closes = closesFromCursor(cursor)
     val metrics = computeBacktestMetrics(cycles, initialCapital, closes)
 
@@ -395,12 +399,11 @@ suspend fun simulateTicks(
         metrics = metrics,
     )
 }
-
-private fun emptyBacktestResult(genome: Genome, initialCapital: Double): BacktestResult =
+ public fun emptyBacktestResult(genome: Genome, initialCapital: Double): BacktestResult =
     BacktestResult(
         symbol = "",
         initialCapital = initialCapital,
-        cycles = emptyList(),
+        cycles = emptySeries(),
         metrics = BacktestMetrics(
             totalTicks = 0,
             totalReturn = 0.0,
@@ -413,20 +416,23 @@ private fun emptyBacktestResult(genome: Genome, initialCapital: Double): Backtes
             avgHarvestPerTick = 0.0,
         ),
     )
-
-private fun RowVec.stringValue(name: String, default: String): String =
+ public fun RowVec.stringValue(name: String, default: String): String =
     getValue(name) as? String ?: default
-
-private fun RowVec.longValue(name: String): Long = when (val value = getValue(name)) {
+ public fun RowVec.longValue(name: String): Long = when (val value = getValue(name)) {
     is Long -> value
     is Number -> value.toLong()
     is String -> value.toLongOrNull() ?: 0L
     else -> 0L
 }
-
-private fun RowVec.doubleValue(name: String): Double = when (val value = getValue(name)) {
+ public fun RowVec.doubleValue(name: String): Double = when (val value = getValue(name)) {
     is Double -> value
     is Number -> value.toDouble()
     is String -> value.toDoubleOrNull() ?: 0.0
     else -> 0.0
+}
+ public fun RowVec.intValue(name: String): Int = when (val value = getValue(name)) {
+    is Int -> value
+    is Number -> value.toInt()
+    is String -> value.toIntOrNull() ?: 0
+    else -> 0
 }

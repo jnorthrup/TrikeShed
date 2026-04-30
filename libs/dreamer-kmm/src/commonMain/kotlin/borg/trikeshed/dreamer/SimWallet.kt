@@ -47,14 +47,14 @@ data class WalletJournalEntry(
 )
 
 class SimWallet {
-    private val balances = mutableMapOf<String, Double>()
-    private val locked = mutableMapOf<String, Double>()
-    private val pending = mutableListOf<Order>()
-    private val realized = mutableMapOf<String, Double>()
-    private val costBasis = mutableMapOf<String, Double>()
-    private val journal = mutableListOf<WalletJournalEntry>()
-    private var peakNetValue = 0.0
-    private var orderIdCounter = 0
+    public val balances = mutableMapOf<String, Double>()
+    public val locked = mutableMapOf<String, Double>()
+    public val pending = mutableListOf<Order>()
+    public val realized = mutableMapOf<String, Double>()
+    public val costBasis = mutableMapOf<String, Double>()
+    public val journal = mutableListOf<WalletJournalEntry>()
+    public var peakNetValue = 0.0
+    public var orderIdCounter = 0
 
     fun record(symbol: String, quantity: Double, costBasis: Double = 0.0) {
         balances[symbol] = (balances[symbol] ?: 0.0) + quantity
@@ -259,7 +259,7 @@ class SimWallet {
         appendJournal(WalletAction.RESET, "wallet", note = "reset")
     }
 
-    private fun appendJournal(
+    public fun appendJournal(
         action: WalletAction,
         symbol: String,
         quantity: Double = 0.0,
@@ -281,6 +281,6 @@ class SimWallet {
         )
     }
 
-    private fun Map<String, Double>.sortedSnapshot(): Map<String, Double> =
+    public fun Map<String, Double>.sortedSnapshot(): Map<String, Double> =
         keys.sorted().associateWith { key -> this[key] ?: 0.0 }
 }

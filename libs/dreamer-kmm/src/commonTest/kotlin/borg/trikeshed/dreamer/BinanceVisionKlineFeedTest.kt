@@ -1,6 +1,7 @@
 package borg.trikeshed.dreamer
 
-import borg.trikeshed.lib.size
+import borg.trikeshed.collections.s_
+import borg.trikeshed.lib.*
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -13,22 +14,22 @@ class BinanceVisionKlineFeedTest {
 
         val plan = feed.plan(
             key = key,
-            months = listOf(ArchiveMonth(2024, 1)),
-            days = listOf(ArchiveDay(2024, 2, 3)),
+            months = s_[ArchiveMonth(2024, 1)],
+            days = s_[ArchiveDay(2024, 2, 3)],
         )
 
         assertEquals("BTCUSDT", plan.key.symbol)
         assertEquals(
             "https://data.binance.vision/data/spot/monthly/klines/BTCUSDT/1m/BTCUSDT-1m-2024-01.zip",
-            plan.monthly.single().url,
+            plan.monthly[0].url,
         )
         assertEquals(
             "/tmp/mpdata/import/monthly/klines/BTCUSDT/1m/BTCUSDT-1m-2024-01.zip.CHECKSUM",
-            plan.monthly.single().checksumCachePath,
+            plan.monthly[0].checksumCachePath,
         )
         assertEquals(
             "https://data.binance.vision/data/spot/daily/klines/BTCUSDT/1m/BTCUSDT-1m-2024-02-03.zip.CHECKSUM",
-            plan.daily.single().checksumUrl,
+            plan.daily[0].checksumUrl,
         )
     }
 

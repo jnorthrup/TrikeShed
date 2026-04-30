@@ -3,22 +3,20 @@ package borg.trikeshed.miniduck
 import borg.trikeshed.cursor.Cursor
 import borg.trikeshed.cursor.*
 import borg.trikeshed.lib.*
-import borg.trikeshed.indicator.Stochastic
-import borg.trikeshed.miniduck.HarnessStochasticCache
 
 /**
  * Simple KernelFeatureTransformer for MiniCursor that appends technical indicators.
  *  Expects source rows to be DocRowVec with a numeric "close" field.
  */
 interface KernelFeatureTransformer {
-    fun transform(cursor: MiniCursor, params: Map<String, Any>): MiniCursor
+    fun transform(cursor: Cursor, params: Map<String, Any>): Cursor
 }
 
 /**
  * Example transformer: adds log_return, sma_short, sma_long, rolling_vol columns.
  */
 class ExampleKernelTransformer : KernelFeatureTransformer {
-    override fun transform(cursor: MiniCursor, params: Map<String, Any>): MiniCursor {
+    override fun transform(cursor: Cursor, params: Map<String, Any>): Cursor {
         val shortW = (params["short_ma"] as? Int) ?: 10
         val longW = (params["long_ma"] as? Int) ?: 50
         val volW = (params["vol_window"] as? Int) ?: 20
@@ -40,7 +38,7 @@ class ExampleKernelTransformer : KernelFeatureTransformer {
         val vol = rollingStd(logs, volW)
 
         // Widen each row with appended columns (include stochastic if available)
-        return cursor.size j { i -> 
+        return cursor.size j { i ->
             val row = cursor.row(i)
             val baseKeys = row.keys()
             val baseCells = row.cells()

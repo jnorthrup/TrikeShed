@@ -6,10 +6,8 @@ import borg.trikeshed.cursor.RowVec
 import borg.trikeshed.isam.meta.IOMemento
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.j
-import borg.trikeshed.lib.size
 import borg.trikeshed.lib.toSeries
 import borg.trikeshed.miniduck.DocRowVec
-import borg.trikeshed.miniduck.MiniCursor
 import borg.trikeshed.miniduck.toRowVec
 
 enum class TimeSpan(val seconds: Long, val binanceInterval: String) {
@@ -69,9 +67,9 @@ data class ExtendedKline(
     fun toKline(): Kline = Kline(symbol, timespan, openTime, open, high, low, close, volume)
 }
 
-class KlineBlock private constructor(
-    private val mutableRows: MutableList<Kline>,
-    private var mutableState: State,
+class KlineBlock public constructor(
+    public val mutableRows: MutableList<Kline>,
+    public var mutableState: State,
     val timespan: TimeSpan?,
 ) {
     enum class State { MUTABLE, SEALED }
@@ -99,7 +97,7 @@ class KlineBlock private constructor(
         return this
     }
 
-    fun asCursor(): MiniCursor {
+    fun asCursor(): Cursor {
         check(mutableState == State.SEALED) { "Block must be sealed before presenting as cursor" }
         val snapshot = rows
         return snapshot.size j { index: Int -> snapshot[index].toDocRowVec().toRowVec() }

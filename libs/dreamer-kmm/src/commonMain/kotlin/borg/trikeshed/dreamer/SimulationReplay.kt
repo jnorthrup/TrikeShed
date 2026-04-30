@@ -7,9 +7,9 @@ import borg.trikeshed.lib.size
  * Replays Binance archive CSV through the block/cursor back-test path.
  */
 class SimulationReplay(
-    private val genome: Genome = defaultGenome(),
-    private val mode: Mode = Mode.SHADOW,
-    private val initialCapital: Double,
+    public val genome: Genome = defaultGenome(),
+    public val mode: Mode = Mode.SHADOW,
+    public val initialCapital: Double,
 ) {
     suspend fun replayCsv(
         csvText: String,

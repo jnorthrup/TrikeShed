@@ -11,7 +11,7 @@ import borg.trikeshed.lib.*
  * DocRowVec produces {key: value, ...}
  * Other MiniRowVec types are projected via their scalar surface.
  */
-fun MiniCursor.toJson(): String {
+fun Cursor.toJson(): String {
     val sb = StringBuilder()
     for (i in 0 until this.size) {
         if (i > 0) sb.append('\n')

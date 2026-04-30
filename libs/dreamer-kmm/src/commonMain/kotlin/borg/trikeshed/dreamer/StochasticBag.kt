@@ -1,16 +1,14 @@
 package borg.trikeshed.dreamer
 
-import borg.trikeshed.miniduck.MiniCursor
-import borg.trikeshed.miniduck.columnar.SpanMatcher
-import borg.trikeshed.miniduck.getValue
-import borg.trikeshed.cursor.RowVec
+import borg.trikeshed.cursor.Cursor
 import borg.trikeshed.cursor.at
 import borg.trikeshed.lib.size
+import borg.trikeshed.miniduck.columnar.SpanMatcher
 import kotlin.random.Random
 
 data class KlineSeriesSource(
     val key: KlineSeriesKey,
-    val cursor: MiniCursor,
+    val cursor: Cursor,
 )
 
 data class KlineRowSpan(
@@ -39,11 +37,11 @@ data class StochasticBagSelection(
 )
 
 class StochasticBag(
-    private val sources: List<KlineSeriesSource>,
-    private val seed: Int = 1,
+    public val sources: List<KlineSeriesSource>,
+    public val seed: Int = 1,
 ) {
-    private val random = Random(seed)
-    private var cachedSpans: List<PairSpanWindow>? = null
+    public val random = Random(seed)
+    public var cachedSpans: List<PairSpanWindow>? = null
 
     suspend fun select(maxWindows: Int, spanLength: Int): StochasticBagSelection {
         require(maxWindows >= 0) { "maxWindows must be non-negative" }
@@ -67,7 +65,7 @@ class StochasticBag(
         return StochasticBagSelection(windows, selectedSpans)
     }
 
-    private fun KlineSeriesSource.rowSpan(start: Int, end: Int): KlineRowSpan {
+    public fun KlineSeriesSource.rowSpan(start: Int, end: Int): KlineRowSpan {
         val first = cursor.at(start)
         val last = cursor.at((end - 1).coerceAtLeast(start))
         return KlineRowSpan(
@@ -80,7 +78,7 @@ class StochasticBag(
         )
     }
 
-    private fun spanWindows(left: KlineSeriesSource, right: KlineSeriesSource): List<PairSpanWindow> {
+    public fun spanWindows(left: KlineSeriesSource, right: KlineSeriesSource): List<PairSpanWindow> {
         val spans = SpanMatcher.find(left.cursor, right.cursor)
         return List(spans.size) { index ->
             val row = spans.at(index)
@@ -97,7 +95,7 @@ class StochasticBag(
         }
     }
 
-    private fun spans(): List<PairSpanWindow> {
+    public fun spans(): List<PairSpanWindow> {
         cachedSpans?.let { return it }
         val spans = mutableListOf<PairSpanWindow>()
         for (i in 0 until sources.size) {
@@ -106,23 +104,5 @@ class StochasticBag(
             }
         }
         return spans.toList().also { cachedSpans = it }
-    }
-}
-
-private fun RowVec.longValue(key: String): Long {
-    val value = getValue(key)
-    return when (value) {
-        is Long -> value
-        is Number -> value.toLong()
-        else -> error("$key must be numeric, got $value")
-    }
-}
-
-private fun RowVec.intValue(key: String): Int {
-    val value = getValue(key)
-    return when (value) {
-        is Int -> value
-        is Number -> value.toInt()
-        else -> error("$key must be numeric, got $value")
     }
 }
