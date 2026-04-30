@@ -5,6 +5,7 @@ import borg.trikeshed.context.AsyncContextKey
 import borg.trikeshed.context.ElementState
 import borg.trikeshed.context.StreamHandle
 import borg.trikeshed.context.StreamTransport
+import borg.trikeshed.lib.*
 import kotlinx.coroutines.channels.Channel
 
 enum class SctpChunkType { DATA, INIT, INIT_ACK, SACK, HEARTBEAT, COOKIE_ECHO, COOKIE_ACK }
@@ -26,7 +27,11 @@ sealed class SctpError(message: String) : RuntimeException(message) {
     class Closed : SctpError("SCTP element is closed")
 }
 
-data class SctpAssociation(val associationId: Long, val state: SctpState)
+typealias SctpAssociation = Join<Long, SctpState>
+
+fun SctpAssociation(associationId: Long, state: SctpState): SctpAssociation = associationId j state
+val SctpAssociation.associationId: Long get() = a
+val SctpAssociation.state: SctpState get() = b
 
 // ── SCTP Chunk encoding (RFC 4960) ──────────────────────────────────────────
 
@@ -141,10 +146,11 @@ data class SctpInitAckChunk(
  * start = (gapStartBlock * 1) — how many TSNs after cumulative are NOT received before the gap.
  * end   = (gapEndBlock * 1)   — how many TSNs after cumulative are received at the gap end.
  */
-data class SctpGapAckBlock(
-    val start: UShort,
-    val end: UShort,
-)
+typealias SctpGapAckBlock = Join<UShort, UShort>
+
+fun SctpGapAckBlock(start: UShort, end: UShort): SctpGapAckBlock = start j end
+val SctpGapAckBlock.start: UShort get() = a
+val SctpGapAckBlock.end: UShort get() = b
 
 /**
  * SCTP SACK chunk (RFC 4960 §3.3.4).
@@ -160,8 +166,8 @@ data class SctpGapAckBlock(
 data class SctpSackChunk(
     val cumulativeTsnAck: UInt,
     val aRwnd: UInt,
-    val gapAckBlocks: List<SctpGapAckBlock> = emptyList(),
-    val duplicateTsns: List<UInt> = emptyList(),
+    val gapAckBlocks: Series<SctpGapAckBlock> = Join.emptySeriesOf(),
+    val duplicateTsns: Series<UInt> = Join.emptySeriesOf(),
 ) {
     val chunkLength: UShort
         get() = (FIXED_LENGTH + 8 * gapAckBlocks.size + 4 * duplicateTsns.size).toUShort()
@@ -179,11 +185,11 @@ data class SctpSackChunk(
         putUInt(buf, off, aRwnd); off += 4
         putUShort(buf, off, gapAckBlocks.size.toUShort()); off += 2
         putUShort(buf, off, duplicateTsns.size.toUShort()); off += 2
-        for (gap in gapAckBlocks) {
+        gapAckBlocks.view.forEach { gap ->
             putUShort(buf, off, gap.start); off += 2
             putUShort(buf, off, gap.end); off += 2
         }
-        for (dup in duplicateTsns) {
+        duplicateTsns.view.forEach { dup ->
             putUInt(buf, off, dup); off += 4
         }
         return buf
@@ -200,17 +206,14 @@ data class SctpSackChunk(
             val numGaps         = getUShort(bytes, off).toInt(); off += 2
             val numDups         = getUShort(bytes, off).toInt(); off += 2
 
-            val gaps = buildList(numGaps) {
-                repeat(numGaps) {
-                    val start = getUShort(bytes, off); off += 2
-                    val end   = getUShort(bytes, off); off += 2
-                    add(SctpGapAckBlock(start, end))
-                }
+            val gaps: Series<SctpGapAckBlock> = numGaps j {
+                val start = getUShort(bytes, off); off += 2
+                val end   = getUShort(bytes, off); off += 2
+                SctpGapAckBlock(start, end)
             }
-            val dups = buildList(numDups) {
-                repeat(numDups) {
-                    add(getUInt(bytes, off)); off += 4
-                }
+            val dups: Series<UInt> = numDups j {
+                val res = getUInt(bytes, off); off += 4
+                res
             }
             return SctpSackChunk(cumulativeTsnAck, aRwnd, gaps, dups)
         }

@@ -2,6 +2,8 @@ package borg.trikeshed.sctp
 
 import borg.trikeshed.context.AsyncContextElement
 import borg.trikeshed.context.ElementState
+import borg.trikeshed.lib.*
+import borg.trikeshed.collections.s_
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -274,8 +276,8 @@ class SctpChunkCodecTest {
         val original = SctpSackChunk(
             cumulativeTsnAck = 0x1_0000u,
             aRwnd = 16384u,
-            gapAckBlocks = emptyList(),
-            duplicateTsns = emptyList(),
+            gapAckBlocks = Join.emptySeriesOf(),
+            duplicateTsns = Join.emptySeriesOf(),
         )
         val encoded = original.encode()
         val decoded = SctpSackChunk.decode(encoded)
@@ -290,11 +292,11 @@ class SctpChunkCodecTest {
         val original = SctpSackChunk(
             cumulativeTsnAck = 0x2_0000u,
             aRwnd = 16384u,
-            gapAckBlocks = listOf(
+            gapAckBlocks = s_[
                 SctpGapAckBlock(start = 1u, end = 5u),
                 SctpGapAckBlock(start = 10u, end = 12u),
-            ),
-            duplicateTsns = listOf(0x1_FFFEu),
+            ],
+            duplicateTsns = s_[0x1_FFFEu],
         )
         val encoded = original.encode()
         val decoded = SctpSackChunk.decode(encoded)

@@ -4,6 +4,8 @@ import borg.trikeshed.context.AsyncContextElement
 import borg.trikeshed.context.AsyncContextKey
 import borg.trikeshed.context.ElementState
 import borg.trikeshed.context.StreamTransport
+import borg.trikeshed.lib.*
+import borg.trikeshed.collections.s_
 import kotlinx.coroutines.test.runTest
 import kotlin.coroutines.CoroutineContext
 import kotlin.test.*
@@ -108,7 +110,7 @@ class QuicElementTddTest {
 
     @Test
     fun `openQuicElement applies custom config`() = runTest {
-        val elem = openQuicElement(QuicConfig(alpn = listOf("h3")))
+        val elem = openQuicElement(QuicConfig(alpn = s_["h3"]))
         assertEquals(1, elem.config.alpn.size)
         assertEquals("h3", elem.config.alpn[0])
     }
