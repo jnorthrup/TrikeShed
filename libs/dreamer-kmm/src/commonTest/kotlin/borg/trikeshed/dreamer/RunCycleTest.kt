@@ -1,6 +1,8 @@
 package borg.trikeshed.dreamer
 
+import borg.trikeshed.collections.s_
 import borg.trikeshed.cursor.Cursor
+import borg.trikeshed.lib.*
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -28,9 +30,9 @@ class RunCycleTest {
     }
 
     /**
-     * Helper to build a [List] of [Double] from a [List].
+     * Helper to build a [Series] of [Double] from a [List].
      */
-    private fun doubleSeriesOf(values: List<Double>): List<Double> = values
+    private fun doubleSeriesOf(values: List<Double>): Series<Double> = values.toSeries()
 
     // ── 1. klineBarToPortfolioInput ─────────────────────────────────────
 
@@ -92,7 +94,7 @@ class RunCycleTest {
 
     @Test
     fun `computeBacktestMetrics returns zero for empty cycles`() {
-        val metrics = computeBacktestMetrics(emptyList(), 10_000.0, doubleSeriesOf(emptyList()))
+        val metrics = computeBacktestMetrics(emptySeries(), 10_000.0, doubleSeriesOf(emptyList()))
 
         assertEquals(0, metrics.totalTicks)
         assertEquals(0.0, metrics.totalReturn)
@@ -104,10 +106,10 @@ class RunCycleTest {
     @Test
     fun `computeBacktestMetrics totalReturn reflects final vs initial value`() {
         // 10k → 11k → 2 ticks
-        val cycles = listOf(
+        val cycles = s_[
             CycleResult(0, 0L, 0.0, 10_000.0, 10_000.0, false, 0.0, emptyList(), false, emptyMap()),
             CycleResult(1, 0L, 0.0, 11_000.0, 11_000.0, false, 0.0, emptyList(), false, emptyMap()),
-        )
+        ]
         // Price series: 10_000 then 11_000
         val closes = doubleSeriesOf(listOf(10_000.0, 11_000.0))
         val metrics = computeBacktestMetrics(cycles, 10_000.0, closes)
@@ -119,12 +121,12 @@ class RunCycleTest {
     fun `computeBacktestMetrics maxDrawdown correct for equity curve`() {
         // Equity: 100 → 110 → 95 → 105
         // Peak: 100, 110, then drawdown to 95 (maxDD = 15/110 ≈ 13.6%)
-        val cycles = listOf(
+        val cycles = s_[
             CycleResult(0, 0L, 0.0, 100.0, 100.0, false, 0.0, emptyList(), false, emptyMap()),
             CycleResult(1, 0L, 0.0, 110.0, 110.0, false, 0.0, emptyList(), false, emptyMap()),
             CycleResult(2, 0L, 0.0, 95.0,  95.0,  false, 0.0, emptyList(), false, emptyMap()),
             CycleResult(3, 0L, 0.0, 105.0, 105.0, false, 0.0, emptyList(), false, emptyMap()),
-        )
+        ]
         val closes = doubleSeriesOf(listOf(100.0, 110.0, 95.0, 105.0))
         val metrics = computeBacktestMetrics(cycles, 100.0, closes)
 
@@ -134,13 +136,13 @@ class RunCycleTest {
 
     @Test
     fun `computeBacktestMetrics maxDrawdownTicks counts peak to trough duration`() {
-        val cycles = listOf(
+        val cycles = s_[
             CycleResult(0, 0L, 0.0, 100.0, 100.0, false, 0.0, emptyList(), false, emptyMap()),
             CycleResult(1, 1L, 0.0, 120.0, 120.0, false, 0.0, emptyList(), false, emptyMap()),
             CycleResult(2, 2L, 0.0, 115.0, 115.0, false, 0.0, emptyList(), false, emptyMap()),
             CycleResult(3, 3L, 0.0, 110.0, 110.0, false, 0.0, emptyList(), false, emptyMap()),
             CycleResult(4, 4L, 0.0, 108.0, 108.0, false, 0.0, emptyList(), false, emptyMap()),
-        )
+        ]
 
         val metrics = computeBacktestMetrics(cycles, 100.0, doubleSeriesOf(listOf(100.0, 120.0, 115.0, 110.0, 108.0)))
 
@@ -180,7 +182,7 @@ class RunCycleTest {
 
         assertEquals(3, result.metrics.totalTicks)
         assertEquals(3, result.cycles.size)
-        assertTrue(result.cycles.all { it.tick >= 0 })
+        assertTrue(result.cycles.view.all { it.tick >= 0 })
     }
 
     @Test
@@ -217,7 +219,7 @@ class RunCycleTest {
 
     @Test
     fun `BacktestMetrics sharpeRatio is zero for flat equity`() {
-        val cycles = (0 until 10).map { i ->
+        val cycles: Series<CycleResult> = 10 j { i ->
             CycleResult(i, i.toLong() * 3600_000, 0.0, 10_000.0, 10_000.0, false, 0.0, emptyList(), false, emptyMap())
         }
         val closes = doubleSeriesOf(List(10) { 10_000.0 })
@@ -228,12 +230,12 @@ class RunCycleTest {
 
     @Test
     fun `BacktestMetrics sortinoRatio uses downside volatility only`() {
-        val cycles = listOf(
+        val cycles = s_[
             CycleResult(0, 0L, 0.0, 100.0, 100.0, false, 0.0, emptyList(), false, emptyMap()),
             CycleResult(1, 1L, 0.0, 110.0, 110.0, false, 0.0, emptyList(), false, emptyMap()),
             CycleResult(2, 2L, 0.0, 104.5, 104.5, false, 0.0, emptyList(), false, emptyMap()),
             CycleResult(3, 3L, 0.0, 114.95, 114.95, false, 0.0, emptyList(), false, emptyMap()),
-        )
+        ]
 
         val metrics = computeBacktestMetrics(cycles, 100.0, doubleSeriesOf(listOf(100.0, 110.0, 104.5, 114.95)))
 
@@ -243,12 +245,12 @@ class RunCycleTest {
 
     @Test
     fun `BacktestMetrics totalTrades counts harvest ticks`() {
-        val cycles = listOf(
+        val cycles = s_[
             CycleResult(0, 0L, 0.0, 10_000.0, 10_000.0, false, 0.0, emptyList(), false, emptyMap()),
             CycleResult(1, 0L, 0.0, 10_000.0, 10_000.0, true, 100.0, listOf("BTC-USD"), false, emptyMap()),
             CycleResult(2, 0L, 0.0, 10_000.0, 10_000.0, false, 0.0, emptyList(), false, emptyMap()),
             CycleResult(3, 0L, 0.0, 10_000.0, 10_000.0, true, 80.0, listOf("BTC-USD"), false, emptyMap()),
-        )
+        ]
         val closes = doubleSeriesOf(List(4) { 10_000.0 })
         val metrics = computeBacktestMetrics(cycles, 10_000.0, closes)
 
@@ -258,10 +260,10 @@ class RunCycleTest {
 
     @Test
     fun `BacktestReport summarizes result metrics and final equity`() {
-        val cycles = listOf(
+        val cycles = s_[
             CycleResult(0, 1000L, 2_500.0, 7_500.0, 10_000.0, false, 0.0, emptyList(), false, emptyMap()),
             CycleResult(1, 2000L, 3_000.0, 8_000.0, 11_000.0, true, 120.0, listOf("BTC-USD"), false, emptyMap()),
-        )
+        ]
         val metrics = BacktestMetrics(
             totalTicks = 2,
             totalReturn = 0.10,
