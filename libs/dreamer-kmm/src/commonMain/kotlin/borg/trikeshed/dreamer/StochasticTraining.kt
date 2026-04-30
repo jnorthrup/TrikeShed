@@ -28,6 +28,7 @@ data class StochasticTrainingSnapshot(
     val bestFitness: Double,
     val bestTotalValue: Double,
     val bestProfit: Double,
+    val bestDrawdown: Double,
     val bestTrades: Int,
     val totalCycles: Int,
     val totalWindows: Int,
@@ -47,8 +48,8 @@ private data class StochasticTrainingEvaluation(
 
 class StochasticBagSpanTrainer(
     private val config: StochasticTrainingConfig = StochasticTrainingConfig(),
+    private val inputs: List<HarnessReplayInput> = archiveInputs(config),
 ) {
-    private val inputs: List<HarnessReplayInput> = archiveInputs(config)
     private var generation: Int = 0
     private var population: List<Genome> = initialPopulation()
 
@@ -131,7 +132,8 @@ class StochasticBagSpanTrainer(
         val totalSpans = run.cycles.sumOf { it.frame.bag.spans.size }
         val lastBag = run.cycles.lastOrNull()?.frame?.bag
         val sampleWindows = lastBag?.windows.orEmpty().take(4).map { window ->
-            "${window.key.symbol}[${window.start},${window.endExclusive}) k=${window.k.short()} d=${window.d.short()}"
+            "${window.key.symbol}[${window.start},${window.endExclusive}) rows=${window.rowCount} " +
+                "t=${window.firstOpenTime}..${window.lastOpenTime}"
         }
         val sampleSpans = lastBag?.spans.orEmpty().take(4).map { span ->
             "${span.left.symbol}/${span.right.symbol} rows=${span.aRows}:${span.bRows}"
@@ -145,6 +147,7 @@ class StochasticBagSpanTrainer(
             bestFitness = fitness,
             bestTotalValue = run.finalTotalValue,
             bestProfit = run.finalTotalValue - config.initialCapital,
+            bestDrawdown = run.maxDrawdown(config.initialCapital),
             bestTrades = tradeCount,
             totalCycles = run.cycles.size,
             totalWindows = totalWindows,

@@ -21,7 +21,7 @@ class RealtimeHarnessTest {
     }
 
     @Test
-    fun `stochastic bag advances repeated draws from one seeded cache`() = runTest {
+    fun `stochastic bag advances repeated draws from one seeded sampler`() = runTest {
         val left = source("BTC", prices = (0 until 16).map { 100.0 + it })
         val right = source("ETH", prices = (0 until 16).map { 10.0 + it * 0.1 })
         val bag = StochasticBag(listOf(left, right), seed = 19)
@@ -33,6 +33,7 @@ class RealtimeHarnessTest {
         assertEquals(first, replay)
         assertTrue(first.windows != second.windows)
         assertEquals(first.spans, second.spans)
+        assertTrue(first.windows.all { it.rowCount == 4 })
     }
 
     @Test
@@ -57,7 +58,7 @@ class RealtimeHarnessTest {
         assertEquals(0, result.cycles.first().frame.tick)
         assertEquals(2, result.cycles.first().frame.rows.size)
         assertTrue(result.finalTotalValue > 0.0)
-        assertTrue(result.cycles.all { it.frame.bag.windows.isNotEmpty() })
+        assertTrue(result.cycles.all { it.frame.bag.windows.size == 1 })
         assertTrue(result.walletJournal.any { it.action == WalletAction.MARK_TO_MARKET })
     }
 
@@ -84,6 +85,7 @@ class RealtimeHarnessTest {
                 rowsPerSeries = 48,
                 populationSize = 4,
                 spanLength = 8,
+                initialCapital = 100.0,
                 seed = 23,
             )
         )
@@ -98,6 +100,8 @@ class RealtimeHarnessTest {
         assertTrue(first.totalWindows > 0)
         assertTrue(first.totalSpans > 0)
         assertTrue(first.bestTotalValue > 0.0)
+        assertEquals(first.bestTotalValue - 100.0, first.bestProfit, 0.001)
+        assertTrue(first.bestDrawdown >= 0.0)
         assertTrue(first.sampleWindows.isNotEmpty())
         assertTrue(first.sampleSpans.isNotEmpty())
         assertTrue(first.bestFitness == first.bestFitness)

@@ -1,6 +1,5 @@
 package borg.trikeshed.dreamer
 
-import borg.trikeshed.indicator.Stochastic
 import borg.trikeshed.miniduck.MiniCursor
 import borg.trikeshed.miniduck.columnar.SpanMatcher
 import borg.trikeshed.miniduck.getValue
@@ -14,12 +13,13 @@ data class KlineSeriesSource(
     val cursor: MiniCursor,
 )
 
-data class StochasticWindow(
+data class KlineRowSpan(
     val key: KlineSeriesKey,
     val start: Int,
     val endExclusive: Int,
-    val k: Double,
-    val d: Double,
+    val firstOpenTime: Long,
+    val lastOpenTime: Long,
+    val rowCount: Int,
 )
 
 data class PairSpanWindow(
@@ -34,36 +34,20 @@ data class PairSpanWindow(
 )
 
 data class StochasticBagSelection(
-    val windows: List<StochasticWindow>,
+    val windows: List<KlineRowSpan>,
     val spans: List<PairSpanWindow>,
 )
 
 class StochasticBag(
     private val sources: List<KlineSeriesSource>,
     private val seed: Int = 1,
-    private val kPeriod: Int = 14,
-    private val dPeriod: Int = 3,
 ) {
     private val random = Random(seed)
     private var cachedSpans: List<PairSpanWindow>? = null
 
-    suspend fun warm() {
-        sources.forEach { source ->
-            HarnessStochasticCache.ensureCached(
-                symbol = source.key.symbol,
-                timeframe = source.key.b.binanceInterval,
-                kPeriod = kPeriod,
-                dPeriod = dPeriod,
-            ) {
-                source.cursor
-            }
-        }
-    }
-
     suspend fun select(maxWindows: Int, spanLength: Int): StochasticBagSelection {
         require(maxWindows >= 0) { "maxWindows must be non-negative" }
         require(spanLength > 0) { "spanLength must be positive" }
-        warm()
         val windows = sources
             .filter { it.cursor.size > 0 }
             .shuffled(random)
@@ -72,21 +56,27 @@ class StochasticBag(
                 val lastStart = (source.cursor.size - spanLength).coerceAtLeast(0)
                 val start = if (lastStart == 0) 0 else random.nextInt(0, lastStart + 1)
                 val end = (start + spanLength).coerceAtMost(source.cursor.size)
-                val stochastic = HarnessStochasticCache.get(source.key.symbol, source.key.b.binanceInterval, kPeriod, dPeriod)
-                source.window(start, end, stochastic)
+                source.rowSpan(start, end)
             }
 
-        return StochasticBagSelection(windows, spans())
+        val pairSpans = spans()
+        val selectedSpans = when {
+            pairSpans.isEmpty() -> emptyList()
+            else -> listOf(pairSpans[random.nextInt(pairSpans.size)])
+        }
+        return StochasticBagSelection(windows, selectedSpans)
     }
 
-    private fun KlineSeriesSource.window(start: Int, end: Int, stochastic: Stochastic.Result?): StochasticWindow {
-        val sample = (end - 1).coerceAtLeast(start)
-        return StochasticWindow(
+    private fun KlineSeriesSource.rowSpan(start: Int, end: Int): KlineRowSpan {
+        val first = cursor.at(start)
+        val last = cursor.at((end - 1).coerceAtLeast(start))
+        return KlineRowSpan(
             key = key,
             start = start,
             endExclusive = end,
-            k = stochastic?.k?.let { it.b(sample.coerceAtMost(it.size - 1)) } ?: 0.0,
-            d = stochastic?.d?.let { it.b(sample.coerceAtMost(it.size - 1)) } ?: 0.0,
+            firstOpenTime = first.longValue("openTime"),
+            lastOpenTime = last.longValue("openTime"),
+            rowCount = end - start,
         )
     }
 

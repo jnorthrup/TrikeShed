@@ -71,7 +71,7 @@ class RealtimeHarness(
             val rows = sources.map { source ->
                 source.portfolioInputAt(tick, quantities[source.key.symbol] ?: 0.0)
             }
-            val selection = bag.select(maxWindows = sources.size, spanLength = stochasticSpanLength)
+            val selection = bag.select(maxWindows = 1, spanLength = stochasticSpanLength)
             val openTime = rows.minOfOrNull { it.openTime } ?: 0L
             val frame = HarnessFrame(tick, openTime, rows, selection)
             val result = agent.run(rows)
