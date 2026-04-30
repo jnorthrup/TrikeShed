@@ -101,7 +101,7 @@ class KlineBlock public constructor(
     fun asCursor(): Cursor {
         check(mutableState == State.SEALED) { "Block must be sealed before presenting as cursor" }
         val snapshot = rows
-        return snapshot.size j { index: Int -> snapshot[index].toDocRowVec().toRowVec() }
+        return snapshot.size j { index: Int -> snapshot[index].toTrikeRowVec() }
     }
 
     fun asColumnarCursor(): Cursor {
