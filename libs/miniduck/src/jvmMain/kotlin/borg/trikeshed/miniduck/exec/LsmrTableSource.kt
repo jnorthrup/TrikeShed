@@ -1,21 +1,18 @@
 package borg.trikeshed.miniduck.exec
 
-import borg.trikeshed.cursor.RowVec
-import borg.trikeshed.userspace.database.LsmrDatabase
-import borg.trikeshed.lib.*
-import borg.trikeshed.miniduck.schema.TableSchema
-import borg.trikeshed.miniduck.WrappedRowVec
-
 /**
  * TableSource backed by the LsmrDatabase. Simple row serialization for primitives and strings.
  * Keys used:
  *  - miniduck:table:{table}:count -> number of rows (as UTF-8 decimal)
  *  - miniduck:table:{table}:row:{idx} -> serialized row bytes
  */
-import borg.trikeshed.miniduck.runBlockingCommon
-import borg.trikeshed.miniduck.MiniDuckBlockCodec
-import borg.trikeshed.miniduck.BlockRowVec
-import borg.trikeshed.miniduck.DocRowVec
+import borg.trikeshed.cursor.RowVec
+import borg.trikeshed.lib.get
+import borg.trikeshed.lib.iterator
+import borg.trikeshed.lib.size
+import borg.trikeshed.miniduck.*
+import borg.trikeshed.miniduck.schema.TableSchema
+import borg.trikeshed.userspace.database.LsmrDatabase
 
 class LsmrTableSource(private val db: LsmrDatabase,val blockSizeThreshold: Int = 128) : TableSource {
 
@@ -104,10 +101,10 @@ class LsmrTableSource(private val db: LsmrDatabase,val blockSizeThreshold: Int =
                 val block = MiniDuckBlockCodec.decode(String(raw, Charsets.UTF_8))
                 // map child rows to schema-aware keys when possible
                 val schemaNames = execCtx.schemaManager.getTableSuspend(tableName)?.columns?.map { it.name }
-                for (j in 0 until block.child.size) {
-                    val childRow = block.child[j]
+                for (j in 0 until block.child?.size?:0) {
+                    val childRow = block.child?.get(j)
                     val mapped = when {
-                        childRow is WrappedRowVec && childRow.inner is DocRowVec && schemaNames != null && schemaNames.isNotEmpty() -> {
+                        childRow is WrappedRowVec && false && schemaNames != null && schemaNames.isNotEmpty() -> {
                             val docRow = childRow.inner as DocRowVec
                             DocRowVec(schemaNames.take(docRow.keys.size), docRow.cells)
                         }
