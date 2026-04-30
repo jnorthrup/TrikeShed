@@ -1,6 +1,5 @@
 package borg.trikeshed.miniduck
 
-import borg.trikeshed.cursor.RowVec
 import borg.trikeshed.lib.*
 import borg.trikeshed.parse.json.*
 
@@ -39,7 +38,7 @@ object MiniDuckBlockCodec {
                     ).toJsonString(),
             )
             for (i in 0 until (block.child?.size ?: 0))
-                add(encodeRow(block.child!![i] as RowVec).toJsonString())
+                add(encodeRow(block.child!![i]).toJsonString())
         }
         return lines.joinToString("\n")
     }
@@ -60,7 +59,7 @@ object MiniDuckBlockCodec {
         return block.seal()
     }
 
-   fun encodeRow(row: RowVec): Map<String, Any?> = when (row) {
+   fun encodeRow(row: MiniRowVec): Map<String, Any?> = when (row) {
         is DocRowVec -> linkedMapOf(
             "type" to "DocRowVec",
             "keys" to row.keys,
@@ -141,12 +140,12 @@ object MiniDuckBlockCodec {
         )
         else -> linkedMapOf(
             "type" to "Unknown",
-            "class" to (row?.toString() ?: "null"),
-            "child" to encodeChildren(row?.child),
+            "class" to row.toString(),
+            "child" to encodeChildren(row.child),
         )
     }
 
-   fun decodeRow(value: Any?): RowVec {
+   fun decodeRow(value: Any?): MiniRowVec {
         val map = value as? Map<*, *> ?: error("MiniDuck row body must be a JSON object")
         return when (map.string("type")) {
             "DocRowVec" -> DocRowVec(
@@ -238,7 +237,7 @@ object MiniDuckBlockCodec {
         }
     }
 
-   fun encodeChildren(child: Series<RowVec>?): List<Any?>? = child?.let { series ->
+   fun encodeChildren(child: Series<MiniRowVec>?): List<Any?>? = child?.let { series ->
         buildList {
             for (i in 0 until series.size) add(encodeRow(series[i]))
         }
@@ -267,10 +266,10 @@ object MiniDuckBlockCodec {
         return raw.mapKeys { it.key.toString() }.mapValues { it.value.toString() }
     }
 
-   fun Map<*, *>.childRows(): List<RowVec> =
+   fun Map<*, *>.childRows(): List<MiniRowVec> =
         (this["child"] as? List<*>)?.map { decodeRow(it) } ?: emptyList()
 
-   fun Map<*, *>.childSeries(): Series<RowVec>? {
+   fun Map<*, *>.childSeries(): Series<MiniRowVec>? {
         val rows = childRows()
         return if (rows.isEmpty()) null else rows.toSeries()
     }
@@ -278,7 +277,7 @@ object MiniDuckBlockCodec {
    fun Any?.asList(name: String): List<Any?> = this as? List<Any?>
         ?: error("Field '$name' must be an array")
 
-   fun List<RowVec>.toSeries(): Series<RowVec> = size j { idx -> this[idx] }
+   fun List<MiniRowVec>.toSeries(): Series<MiniRowVec> = size j { idx -> this[idx] }
 
    fun unescapeJson(s: String): String {
         val sb = StringBuilder(s.length)

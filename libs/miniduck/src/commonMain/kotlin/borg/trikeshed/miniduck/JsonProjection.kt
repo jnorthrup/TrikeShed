@@ -14,13 +14,22 @@ fun MiniCursor.toJson(): String {
     val sb = StringBuilder()
     for (i in 0 until this.size) {
         if (i > 0) sb.append('\n')
-        val row = this.row(i) as RowVec
-        sb.append(rowToJson(row))
+        sb.append(rowToJson(this.row(i)))
     }
     return sb.toString()
 }
 
-fun rowToJson(row: RowVec): String = when (row) {
+fun rowToJson(row: RowVec): String {
+    val sb = StringBuilder("[")
+    for (i in 0 until row.size) {
+        if (i > 0) sb.append(",")
+        sb.append(valueToJson(row[i]))
+    }
+    sb.append(']')
+    return sb.toString()
+}
+
+fun rowToJson(row: MiniRowVec): String = when (row) {
     is DocRowVec -> {
         val children = row.child
         val sb = StringBuilder("{")
@@ -63,6 +72,6 @@ fun valueToJson(v: Any?): String = when (v) {
     is Double -> if (v.isInfinite() || v.isNaN()) "null" else v.toString()
     is Float -> if (v.isInfinite() || v.isNaN()) "null" else v.toString()
     is Boolean -> v.toString()
-    is DocRowVec -> rowToJson(v)
+    is MiniRowVec -> rowToJson(v)
     else -> '"' + escapeJson(v.toString()) + '"'
 }

@@ -1,7 +1,6 @@
 package borg.trikeshed.miniduck
 
 import borg.trikeshed.cursor.ColumnMeta
-import borg.trikeshed.cursor.RowVec
 import borg.trikeshed.lib.Join
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.j
@@ -26,10 +25,18 @@ import borg.trikeshed.isam.meta.IOMemento
 class ManifoldConcept(
     val angular: Long,
     val budget: BudgetCoord,
-    val payload: RowVec = DocRowVec(emptyList(), emptyList()),
-) : Series2<Any?, () -> ColumnMeta> {
+    val payload: MiniRowVec = DocRowVec(emptyList(), emptyList()),
+) : MiniRowVec(), Series2<Any?, () -> ColumnMeta> {
 
+    override val size: Int get() = 3
     override val a: Int get() = 3
+
+    override fun get(index: Int): Any? = when (index) {
+        0 -> angular
+        1 -> budget.packed
+        2 -> budget.radialEnergy
+        else -> throw IndexOutOfBoundsException(index.toString())
+    }
 
     override val b: (Int) -> Join<Any?, () -> ColumnMeta> get() = fun(index: Int): Join<Any?, () -> ColumnMeta> {
         return when (index) {
@@ -41,8 +48,8 @@ class ManifoldConcept(
     }
 
     /** Child is the payload wrapped as a single-element Series. */
-    val child: Series<RowVec>
-        get() = 1 j { payload }
+    override val child: Series<MiniRowVec>
+        get() = 1 j { WrappedRowVec(payload.toRowVec()) }
 
     /**
      * Decay: multiply all budget dimensions by factor.
