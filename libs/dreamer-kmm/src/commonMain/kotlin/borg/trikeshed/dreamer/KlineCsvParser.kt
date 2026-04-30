@@ -92,15 +92,13 @@ fun klinesFromCsv(
     val count = result.size
     return count j { i -> result[i] }
 }
-
-private fun skipNl(arr: CharArray, pos: Int, n: Int): Int {
+ public fun skipNl(arr: CharArray, pos: Int, n: Int): Int {
     var p = pos
     if (p < n && arr[p] == '\r') p++
     if (p < n && arr[p] == '\n') p++
     return p
 }
-
-private fun parseKlineLine(
+ public fun parseKlineLine(
     arr: CharArray,
     starts: List<Int>,
     lineEnd: Int,

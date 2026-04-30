@@ -1,11 +1,6 @@
 package borg.trikeshed.dreamer
 
-import borg.trikeshed.miniduck.DocRowVec
-import borg.trikeshed.miniduck.MiniCursor
-import borg.trikeshed.miniduck.MiniRowVec
-import borg.trikeshed.lib.Series
-import borg.trikeshed.lib.j
-import borg.trikeshed.lib.size
+import borg.trikeshed.cursor.Cursor
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -26,7 +21,7 @@ import kotlin.test.assertTrue
 class RunCycleTest {
 
     /** Build a sealed KlineBlock from a list of klines and return its MiniCursor. */
-    private fun klinesToCursor(klines: List<Kline>): MiniCursor {
+    private fun klinesToCursor(klines: List<Kline>): Cursor {
         val block = KlineBlock.mutable()
         klines.forEach { block.append(it) }
         return block.seal().asCursor()

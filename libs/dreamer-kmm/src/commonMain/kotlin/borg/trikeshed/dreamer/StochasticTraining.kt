@@ -39,19 +39,18 @@ data class StochasticTrainingSnapshot(
     val sampleWindows: List<String>,
     val sampleSpans: List<String>,
 )
-
-private data class StochasticTrainingEvaluation(
+ public data class StochasticTrainingEvaluation(
     val genome: Genome,
     val run: HarnessRunResult,
     val fitness: Double,
 )
 
 class StochasticBagSpanTrainer(
-    private val config: StochasticTrainingConfig = StochasticTrainingConfig(),
-    private val inputs: List<HarnessReplayInput> = archiveInputs(config),
+    public val config: StochasticTrainingConfig = StochasticTrainingConfig(),
+    public val inputs: List<HarnessReplayInput> = archiveInputs(config),
 ) {
-    private var generation: Int = 0
-    private var population: List<Genome> = initialPopulation()
+    public var generation: Int = 0
+    public var population: List<Genome> = initialPopulation()
 
     suspend fun runGeneration(): StochasticTrainingSnapshot {
         require(population.isNotEmpty()) { "population must not be empty" }
@@ -78,7 +77,7 @@ class StochasticBagSpanTrainer(
         return snapshot
     }
 
-    private fun initialPopulation(): List<Genome> {
+    public fun initialPopulation(): List<Genome> {
         val seed = defaultGenome()
         if (config.populationSize <= 1) return listOf(seed)
         val random = Random(config.seed)
@@ -87,7 +86,7 @@ class StochasticBagSpanTrainer(
         }
     }
 
-    private fun nextPopulation(
+    public fun nextPopulation(
         evaluations: List<StochasticTrainingEvaluation>,
         random: Random,
     ): List<Genome> {
@@ -102,7 +101,7 @@ class StochasticBagSpanTrainer(
         }
     }
 
-    private fun mutate(parent: Genome, salt: Int, random: Random): Genome {
+    public fun mutate(parent: Genome, salt: Int, random: Random): Genome {
         val keys = arrayOf(
             "HARVEST_TAKE_PERCENT",
             "MIN_SURPLUS_FOR_HARVEST",
@@ -123,7 +122,7 @@ class StochasticBagSpanTrainer(
         return next
     }
 
-    private fun StochasticTrainingEvaluation.snapshot(
+    public fun StochasticTrainingEvaluation.snapshot(
         completedGeneration: Int,
         evaluationCount: Int,
     ): StochasticTrainingSnapshot {
@@ -160,14 +159,14 @@ class StochasticBagSpanTrainer(
         )
     }
 
-    private fun HarnessRunResult.trainingFitness(initialCapital: Double, genome: Genome): Double {
+    public fun HarnessRunResult.trainingFitness(initialCapital: Double, genome: Genome): Double {
         val profit = if (initialCapital > 0.0) (finalTotalValue - initialCapital) / initialCapital else 0.0
         val trades = cycles.count { it.result.anyTradesThisCycle }.toDouble()
         val drawdownPenalty = maxDrawdown(initialCapital) * genome.getDouble("FITNESS_DRAWDOWN_PENALTY", 1.0)
         return profit + trades * 0.001 - drawdownPenalty
     }
 
-    private fun HarnessRunResult.maxDrawdown(initialCapital: Double): Double {
+    public fun HarnessRunResult.maxDrawdown(initialCapital: Double): Double {
         var peak = initialCapital
         var maxDrawdown = 0.0
         cycles.forEach { cycle ->
@@ -181,8 +180,7 @@ class StochasticBagSpanTrainer(
         return maxDrawdown
     }
 }
-
-private fun archiveInputs(config: StochasticTrainingConfig): List<HarnessReplayInput> {
+ public fun archiveInputs(config: StochasticTrainingConfig): List<HarnessReplayInput> {
     val feed = BinanceVisionKlineFeed()
     return config.bases.mapIndexed { index, base ->
         val key = klineSeriesKey(base, config.quote, config.timespan)
@@ -198,8 +196,7 @@ private fun archiveInputs(config: StochasticTrainingConfig): List<HarnessReplayI
         HarnessReplayInput(key, parsed.block)
     }
 }
-
-private fun generatedArchiveCsv(
+ public fun generatedArchiveCsv(
     symbol: String,
     rows: Int,
     timespan: TimeSpan,
@@ -244,8 +241,7 @@ private fun generatedArchiveCsv(
     }
     return out.toString()
 }
-
-private fun Double.short(): String {
+ public fun Double.short(): String {
     val rounded = kotlin.math.round(this * 100.0) / 100.0
     return rounded.toString()
 }

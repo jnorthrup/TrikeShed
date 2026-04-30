@@ -13,8 +13,8 @@ data class GenomeTrainingResult(
 )
 
 class GenomeTrainer(
-    private val initialCapital: Double,
-    private val mutationStep: Double = 0.01,
+    public val initialCapital: Double,
+    public val mutationStep: Double = 0.01,
 ) {
     suspend fun trainOneDimensional(
         key: KlineSeriesKey,
@@ -46,7 +46,7 @@ class GenomeTrainer(
         return evaluate(candidates, inputs)
     }
 
-    private suspend fun evaluate(
+    public suspend fun evaluate(
         candidates: List<Genome>,
         inputs: List<HarnessReplayInput>,
     ): GenomeTrainingResult {
@@ -69,16 +69,14 @@ class GenomeTrainer(
         )
     }
 }
-
-private fun HarnessRunResult.fitness(initialCapital: Double, genome: Genome): Double {
+ public fun HarnessRunResult.fitness(initialCapital: Double, genome: Genome): Double {
     val totalReturn = if (initialCapital > 0.0) (finalTotalValue - initialCapital) / initialCapital else 0.0
     val tradeScore = cycles.count { it.result.anyTradesThisCycle }.toDouble()
     val drawdown = maxDrawdown(initialCapital)
     val penalty = genome.getDouble("FITNESS_DRAWDOWN_PENALTY", 1.0)
     return totalReturn + (tradeScore * 0.001) - (drawdown * penalty)
 }
-
-private fun HarnessRunResult.maxDrawdown(initialCapital: Double): Double {
+ public fun HarnessRunResult.maxDrawdown(initialCapital: Double): Double {
     var peak = initialCapital
     var maxDrawdown = 0.0
     cycles.forEach { cycle ->

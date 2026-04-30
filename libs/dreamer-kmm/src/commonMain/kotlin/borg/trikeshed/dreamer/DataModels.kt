@@ -84,7 +84,7 @@ class Genome(
         return booleanValue(v, default)
     }
 
-    private fun booleanValue(v: Any?, default: Boolean): Boolean {
+    public fun booleanValue(v: Any?, default: Boolean): Boolean {
         return when (v) {
             is Boolean -> v
             is String -> v.equals("true", ignoreCase = true)
@@ -241,7 +241,7 @@ class Genome(
             "EVOLUTION_INTERVAL_MINUTES",
         )
 
-        private val ORDINALS: Map<String, Int> = PARAM_NAMES.withIndex().associate { it.value to it.index } +
+        public val ORDINALS: Map<String, Int> = PARAM_NAMES.withIndex().associate { it.value to it.index } +
             mapOf(
                 "FORCED_HARVEST_TIMEOUT_MS" to FORCED_HARVEST_TIMEOUT_MS,
                 "REBALANCE_COOLDOWN_MS" to REBALANCE_COOLDOWN_MS,
@@ -249,9 +249,9 @@ class Genome(
                 "REFRESH_INTERVAL_MS" to REFRESH_INTERVAL_MS,
             )
 
-        private const val MIN_45_MS = 45.0 * 60.0 * 1000.0
-        private const val MIN_30_MS = 30.0 * 60.0 * 1000.0
-        private const val MIN_25_MS = 25.0 * 60.0 * 1000.0
+        public const val MIN_45_MS = 45.0 * 60.0 * 1000.0
+        public const val MIN_30_MS = 30.0 * 60.0 * 1000.0
+        public const val MIN_25_MS = 25.0 * 60.0 * 1000.0
 
         val DEFAULT_DOUBLES = doubleArrayOf(
             0.001, 0.035, 0.70, 3.0, 0.25, 1.00, MIN_45_MS,

@@ -1,9 +1,8 @@
 package borg.trikeshed.miniduck.columnar
 
+import borg.trikeshed.cursor.Cursor
 import borg.trikeshed.lib.*
 import borg.trikeshed.miniduck.DocRowVec
-import borg.trikeshed.miniduck.MiniCursor
-import borg.trikeshed.miniduck.MiniRowVec
 import borg.trikeshed.miniduck.getValue
 import borg.trikeshed.miniduck.toRowVec
 
@@ -27,7 +26,7 @@ import borg.trikeshed.miniduck.toRowVec
  */
 object SpanMatcher {
 
-    fun find(a: MiniCursor, b: MiniCursor): MiniCursor {
+    fun find(a: Cursor, b: Cursor): Cursor {
         if (a.size == 0 || b.size == 0) return 0 j { _: Int -> throw IndexOutOfBoundsException("empty") }
 
         val interval = inferInterval(a, b)
@@ -161,7 +160,7 @@ object SpanMatcher {
     )
 
     /** Extract openTime from a cursor row. */
-    private fun openTime(cursor: MiniCursor, index: Int): Long {
+    private fun openTime(cursor: Cursor, index: Int): Long {
         val row = cursor.b(index)
         val t = row.getValue("openTime")
         return when (t) {
@@ -172,7 +171,7 @@ object SpanMatcher {
     }
 
     /** Infer interval from whichever cursor has ≥2 rows. */
-    private fun inferInterval(a: MiniCursor, b: MiniCursor): Long {
+    private fun inferInterval(a: Cursor, b: Cursor): Long {
         if (a.size >= 2) return openTime(a, 1) - openTime(a, 0)
         if (b.size >= 2) return openTime(b, 1) - openTime(b, 0)
         return 60_000L
@@ -182,7 +181,7 @@ object SpanMatcher {
      * Split a cursor into contiguous segments.
      * Returns list of index-lists — each is a gap-free run.
      */
-    private fun splitSegments(cursor: MiniCursor, interval: Long, tolerance: Long): List<List<Int>> {
+    private fun splitSegments(cursor: Cursor, interval: Long, tolerance: Long): List<List<Int>> {
         if (cursor.size == 0) return emptyList()
         val segments = mutableListOf<List<Int>>()
         var current = mutableListOf(0)

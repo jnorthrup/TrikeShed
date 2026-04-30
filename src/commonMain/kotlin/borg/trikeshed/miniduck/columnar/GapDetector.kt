@@ -1,10 +1,9 @@
 package borg.trikeshed.miniduck.columnar
 
+import borg.trikeshed.cursor.Cursor
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.size
 import borg.trikeshed.miniduck.DocRowVec
-import borg.trikeshed.miniduck.MiniCursor
-import borg.trikeshed.miniduck.columnar.GapDetector.openTime
 import borg.trikeshed.miniduck.getValue
 import borg.trikeshed.miniduck.toRowVec
 
@@ -21,7 +20,7 @@ import borg.trikeshed.miniduck.toRowVec
 object GapDetector {
 
 
-    fun find(cursor: MiniCursor, intervalMs: Long): MiniCursor {
+    fun find(cursor: Cursor, intervalMs: Long): Cursor {
         if (cursor.size < 2) return 0 j { _: Int -> throw IndexOutOfBoundsException("empty") }
 
         val tolerance = (intervalMs * 0.1).toLong()
@@ -52,7 +51,7 @@ object GapDetector {
         }
     }
 
-    private fun openTime(cursor: MiniCursor, index: Int): Long {
+    private fun openTime(cursor: Cursor, index: Int): Long {
         val row = cursor.b(index)
         val t = row.getValue("openTime")
         return when (t) {

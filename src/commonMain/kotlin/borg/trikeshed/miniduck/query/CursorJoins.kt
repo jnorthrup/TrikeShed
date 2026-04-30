@@ -1,5 +1,6 @@
 package borg.trikeshed.miniduck.query
 
+import borg.trikeshed.cursor.Cursor
 import borg.trikeshed.cursor.RowVec
 import borg.trikeshed.cursor.values
 import borg.trikeshed.miniduck.*
@@ -25,7 +26,7 @@ import borg.trikeshed.lib.*
  * Usage:
  *   cursor.groupBy("dept", Agg.count(), Agg.sum("salary"))
  */
-fun MiniCursor.groupBy(keyColumn: String, vararg aggs: Agg): MiniCursor {
+fun Cursor.groupBy(keyColumn: String, vararg aggs: Agg): Cursor {
     if (size == 0) return emptyMiniCursor()
 
     // Phase 1: collect groups
@@ -80,11 +81,11 @@ fun MiniCursor.groupBy(keyColumn: String, vararg aggs: Agg): MiniCursor {
  * Usage:
  *   orders.hashJoin(users, "userId", "id")
  */
-fun MiniCursor.hashJoin(
-    right: MiniCursor,
+fun Cursor.hashJoin(
+    right: Cursor,
     leftKey: String,
     rightKey: String,
-): MiniCursor {
+): Cursor {
     if (size == 0 || right.size == 0) return emptyMiniCursor()
 
     // Phase 1: build hash table from right side
@@ -122,18 +123,18 @@ fun MiniCursor.hashJoin(
 }
 
 /** Infix alias for [hashJoin]. */
-infix fun MiniCursor.join(
-    other: Pair<MiniCursor, Pair<String, String>>,
-): MiniCursor = hashJoin(other.first, other.second.first, other.second.second)
+infix fun Cursor.join(
+    other: Pair<Cursor, Pair<String, String>>,
+): Cursor = hashJoin(other.first, other.second.first, other.second.second)
 
 /**
  * Convenience: `cursor.join(other, leftKey, rightKey)`.
  */
-fun MiniCursor.join(
-    right: MiniCursor,
+fun Cursor.join(
+    right: Cursor,
     leftKey: String,
     rightKey: String,
-): MiniCursor = hashJoin(right, leftKey, rightKey)
+): Cursor = hashJoin(right, leftKey, rightKey)
 
 private fun RowVec.keys(): List<String> = List(size) { index -> b(index).b().a }
 

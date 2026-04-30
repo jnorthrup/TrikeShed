@@ -1,9 +1,7 @@
 package borg.trikeshed.dreamer
 
-import borg.trikeshed.lib.Series
-import borg.trikeshed.lib.j
+import borg.trikeshed.cursor.Cursor
 import borg.trikeshed.lib.size
-import borg.trikeshed.miniduck.MiniCursor
 import borg.trikeshed.miniduck.getValue
 import borg.trikeshed.cursor.RowVec
 import borg.trikeshed.cursor.at
@@ -115,7 +113,7 @@ fun BacktestResult.toBacktestReport(): BacktestReport {
  * @param currentQuantity quantity of the asset held (fixed for back-test simulation)
  */
 fun klineBarToPortfolioInput(
-    cursor: MiniCursor,
+    cursor: Cursor,
     barIndex: Int,
     currentQuantity: Double,
 ): PortfolioInput {
@@ -163,7 +161,7 @@ fun portfolioInputToRows(input: PortfolioInput): List<PortfolioRow> = listOf(
  * @param holdings map of symbol → quantity (used to compute value)
  */
 fun multiSymbolKlineToPortfolioInput(
-    cursor: MiniCursor,
+    cursor: Cursor,
     barIndex: Int,
     holdings: Map<String, Double>,
 ): List<PortfolioInput> = allSymbolsAtBar(cursor, barIndex, holdings)
@@ -181,7 +179,7 @@ fun multiSymbolKlineToPortfolioInput(
  * @param holdings  map of symbol → quantity
  */
 fun allSymbolsAtBar(
-    cursor: MiniCursor,
+    cursor: Cursor,
     barIndex: Int,
     holdings: Map<String, Double>,
 ): List<PortfolioInput> {
@@ -208,7 +206,7 @@ fun allSymbolsAtBar(
  * Project a MiniCursor of kline rows into a flat [List] of close prices.
  * Convenience for building price arrays for metrics.
  */
-fun closesFromCursor(cursor: MiniCursor): List<Double> {
+fun closesFromCursor(cursor: Cursor): List<Double> {
     val n = cursor.size
     return List(n) { i: Int ->
         val row = cursor.at(i)
@@ -315,7 +313,7 @@ fun computeBacktestMetrics(
  * @return [BacktestResult] with all cycles and aggregate metrics
  */
 suspend fun simulateTicks(
-    cursor: MiniCursor,
+    cursor: Cursor,
     engine: TradingEngine,
     initialCapital: Double,
     onCycle: (CycleResult) -> Unit = {},

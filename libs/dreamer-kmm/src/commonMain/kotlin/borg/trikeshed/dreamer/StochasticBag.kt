@@ -1,16 +1,14 @@
 package borg.trikeshed.dreamer
 
-import borg.trikeshed.miniduck.MiniCursor
-import borg.trikeshed.miniduck.columnar.SpanMatcher
-import borg.trikeshed.miniduck.getValue
-import borg.trikeshed.cursor.RowVec
+import borg.trikeshed.cursor.Cursor
 import borg.trikeshed.cursor.at
 import borg.trikeshed.lib.size
+import borg.trikeshed.miniduck.columnar.SpanMatcher
 import kotlin.random.Random
 
 data class KlineSeriesSource(
     val key: KlineSeriesKey,
-    val cursor: MiniCursor,
+    val cursor: Cursor,
 )
 
 data class KlineRowSpan(

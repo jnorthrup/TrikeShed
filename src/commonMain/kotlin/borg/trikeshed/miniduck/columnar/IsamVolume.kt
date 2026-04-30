@@ -1,8 +1,6 @@
 package borg.trikeshed.miniduck.columnar
 
-import borg.trikeshed.miniduck.DocRowVec
-import borg.trikeshed.miniduck.MiniCursor
-import borg.trikeshed.miniduck.MiniRowVec
+import borg.trikeshed.cursor.Cursor
 import borg.trikeshed.test.TODOError
 
 /**
@@ -54,7 +52,7 @@ class IsamVolume constructor(
          * @param schema     column schema — openTime column must have ZranIndex plugin
          * @param tempDir    directory to write volume files
          */
-        fun generateIsam(cursor: MiniCursor, schema: List<ColumnSchema>, tempDir: String): IsamVolume {
+        fun generateIsam(cursor: Cursor, schema: List<ColumnSchema>, tempDir: String): IsamVolume {
             throw TODOError("IsamVolume.generateIsam not yet implemented")
         }
     }
