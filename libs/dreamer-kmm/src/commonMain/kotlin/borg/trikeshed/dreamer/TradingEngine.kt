@@ -33,14 +33,14 @@ class TradingEngine(
         (snapshot["baselines"] as? Map<String, Any?>)?.forEach { (k, v) -> (v as? Number)?.toDouble()?.let { baselines[k] = it } }
     }
 
-    fun getGenomicParam(key: String, symbol: String? = null): Double {
+    fun getGenomicParam(param: GenomeParam, symbol: String? = null): Double {
         if (symbol != null) {
             val ov = genome.overridesFor(symbol)
-            val v = ov?.get(key)
+            val v = ov?.get(param.storageKey) ?: ov?.get(param.name)
             if (v is Number) return v.toDouble()
-            if (v is String) return v.toDoubleOrNull() ?: genome.getDouble(key)
+            if (v is String) return v.toDoubleOrNull() ?: genome.getDouble(param)
         }
-        return genome.getDouble(key)
+        return genome.getDouble(param)
     }
 
     suspend fun _placeBuy(api: ApiClient?, symbol: String, quantity: String, expectedPrice: Double? = null): Any? {
@@ -81,15 +81,17 @@ class TradingEngine(
         for (row in portfolioSummary) {
             val baseline = baselines[row.Symbol] ?: row.Value
             val surplus = row.Value - baseline
-            val minSurplus = getGenomicParam("MIN_SURPLUS_FOR_HARVEST", row.Symbol)
+            val minSurplus = getGenomicParam(GenomeParam.MIN_SURPLUS_FOR_HARVEST, row.Symbol)
             val enableHarvest = genome.getBoolean("ENABLE_PORTFOLIO_HARVEST", true)
 
             if (enableHarvest && surplus >= minSurplus && surplus > 0.0) {
-                val takePercent = getGenomicParam("HARVEST_TAKE_PERCENT", row.Symbol)
+                val takePercent = getGenomicParam(GenomeParam.HARVEST_TAKE_PERCENT, row.Symbol)
                 val take = surplus * takePercent
                 harvestedAmount += take
                 totalHarvested += take
                 cashBalance += take
+                // Mark harvested portion as consumed by raising baseline to avoid repeated harvesting of the same surplus
+                baselines[row.Symbol] = baseline + take
                 anyTradesThisCycle = true
                 stateChanged = true
                 tradedSymbols.add(row.Symbol)
@@ -98,7 +100,7 @@ class TradingEngine(
 
         // Rebalance scheduling - not implemented (left as red)
         // If FLAT_REBALANCE_TRIGGER_PERCENT is small and deviation exists, schedule
-        val rebalanceTrigger = getGenomicParam("FLAT_REBALANCE_TRIGGER_PERCENT", portfolioSummary.firstOrNull()?.Symbol ?: "")
+        val rebalanceTrigger = getGenomicParam(GenomeParam.FLAT_REBALANCE_TRIGGER_PERCENT, portfolioSummary.firstOrNull()?.Symbol ?: "")
         if (rebalanceTrigger > 0 && portfolioSummary.isNotEmpty()) {
             val sym = portfolioSummary.first().Symbol
             val baseline = baselines[sym] ?: portfolioSummary.first().Value

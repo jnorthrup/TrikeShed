@@ -3,6 +3,7 @@ package borg.trikeshed.dreamer
 import borg.trikeshed.cursor.Cursor
 import borg.trikeshed.cursor.ColumnMeta
 import borg.trikeshed.cursor.RowVec
+import borg.trikeshed.cursor.joins
 import borg.trikeshed.isam.meta.IOMemento
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.j
@@ -130,7 +131,7 @@ class KlineBlock public constructor(
                 }
                 { ColumnMeta(Kline.schemaKeys[columnIndex], type) }
             }
-            values.j(meta) as RowVec
+            values.joins(meta)
         }
     }
 }

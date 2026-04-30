@@ -350,6 +350,9 @@ suspend fun simulateTicks(
     // Derive initial quantity from initial capital / first close price
     val firstClose: Double = firstRow.doubleValue("close").takeIf { it > 0.0 } ?: firstRow.doubleValue("open").takeIf { it > 0.0 } ?: 1.0
     val initialQuantity = initialCapital / firstClose
+    // Treat initialCapital as total starting portfolio value. Pre-fund holdings and adjust engine cash to avoid double-counting.
+    val initialHoldingsValue = initialQuantity * firstClose
+    engine.cashBalance = initialCapital - initialHoldingsValue
 
     val cycleArray = arrayOfNulls<CycleResult>(n)
 
