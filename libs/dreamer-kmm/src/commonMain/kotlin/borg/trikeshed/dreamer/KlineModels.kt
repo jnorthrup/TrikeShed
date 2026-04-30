@@ -10,6 +10,8 @@ import borg.trikeshed.lib.j
 import borg.trikeshed.lib.toSeries
 import borg.trikeshed.miniduck.DocRowVec
 import borg.trikeshed.miniduck.toRowVec
+import borg.trikeshed.lib.toSeries
+import borg.trikeshed.dreamer.adapter.*
 
 enum class TimeSpan(val seconds: Long, val binanceInterval: String) {
     Seconds30(30L, "30s"),
@@ -100,7 +102,7 @@ class KlineBlock public constructor(
 
     fun asCursor(): Cursor {
         check(mutableState == State.SEALED) { "Block must be sealed before presenting as cursor" }
-        val snapshot = rows
+        val snapshot = rows.toTypedArray()
         return snapshot.size j { index: Int -> snapshot[index].toTrikeRowVec() }
     }
 
