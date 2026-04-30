@@ -2,6 +2,7 @@ package borg.trikeshed.userspace.btrfs
 
 import borg.trikeshed.context.AsyncContextElement
 import borg.trikeshed.context.ElementState
+import borg.trikeshed.lib.*
 import borg.trikeshed.tinybtrfs.DiskAdapter
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -103,8 +104,10 @@ class UserspaceMemoryBuffer(
     fun chunkCount(): Int = store.size
 
     /** Snapshot active node bytes for read-only rebuild/inspection passes. */
-    fun nodeSnapshot(): List<Pair<String, ByteArray>> =
-        store.entries.map { it.key to it.value.copyOf() }
+    fun nodeSnapshot(): Series<Join<String, ByteArray>> {
+        val entries = store.entries.toList()
+        return entries.size j { i -> entries[i].key j entries[i].value.copyOf() }
+    }
 
     /** Number of freed chunk IDs available for reuse. */
     fun freeCount(): Int = freeList.size
