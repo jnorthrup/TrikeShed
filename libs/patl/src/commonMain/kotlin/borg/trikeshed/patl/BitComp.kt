@@ -2,7 +2,7 @@
 
 package borg.trikeshed.patl
 
-import borg.trikeshed.lib.Series
+import borg.trikeshed.lib.*
 
 typealias word_t = UInt
 
@@ -28,18 +28,17 @@ class BitComp<K>(val extract: (K) -> Series<Byte>) {
     fun mismatch(a: K, b: K): word_t {
         val sa = extract(a)
         val sb = extract(b)
-        val lenA = sa.a
-        val lenB = sb.a
+        val lenA = sa.size
+        val lenB = sb.size
         val minLen = minOf(lenA, lenB)
-        var i = 0
-        while (i < minLen) {
-            val ba = sa.b(i).toUInt()
-            val bb = sb.b(i).toUInt()
+
+        val pairs: Series<Twin<Byte>> = sa zip sb
+        for (i in 0 until minLen) {
+            val (ba, bb) = pairs[i]
             if (ba != bb) {
-                val xor = ba xor bb
+                val xor = ba.toUInt() xor bb.toUInt()
                 return (i * 8).toUInt() + xor.countTrailingZeroBits().toUInt()
             }
-            i++
         }
         // All bytes matched up to the shorter length.
         // If lengths are equal, the keys are identical.

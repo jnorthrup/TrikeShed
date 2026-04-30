@@ -2,12 +2,11 @@
 
 package borg.trikeshed.polyglot
 
+import borg.trikeshed.collections.s_
 import borg.trikeshed.common.TypeEvidence
 import borg.trikeshed.cursor.*
 import borg.trikeshed.isam.meta.IOMemento
-import borg.trikeshed.lib.Series
-import borg.trikeshed.lib.j
-import borg.trikeshed.lib.α
+import borg.trikeshed.lib.*
 import kotlin.math.abs
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -150,7 +149,7 @@ data class ClassificationResult(
  * Returns 0.0–1.0 where 1.0 is a perfect match.
  */
 fun confidence(live: TypeEvidence, ref: TypeEvidence): Double {
-    val liveVals = listOf(
+    val liveVals: Series<Double> = s_[
         live.digits.toDouble(),
         live.periods.toDouble(),
         live.exponent.toDouble(),
@@ -165,9 +164,9 @@ fun confidence(live: TypeEvidence, ref: TypeEvidence): Double {
         live.backslashes.toDouble(),
         live.linefeed.toDouble(),
         live.maxColumnLength.toDouble(),
-        if (live.minColumnLength == UShort.MAX_VALUE) 0.0 else live.minColumnLength.toDouble(),
-    )
-    val refVals = listOf(
+        if (live.minColumnLength == UShort.MAX_VALUE) 0.0 else live.minColumnLength.toDouble()
+    ]
+    val refVals: Series<Double> = s_[
         ref.digits.toDouble(),
         ref.periods.toDouble(),
         ref.exponent.toDouble(),
@@ -182,14 +181,18 @@ fun confidence(live: TypeEvidence, ref: TypeEvidence): Double {
         ref.backslashes.toDouble(),
         ref.linefeed.toDouble(),
         ref.maxColumnLength.toDouble(),
-        if (ref.minColumnLength == UShort.MAX_VALUE) 0.0 else ref.minColumnLength.toDouble(),
-    )
+        if (ref.minColumnLength == UShort.MAX_VALUE) 0.0 else ref.minColumnLength.toDouble()
+    ]
 
-    val diffs = liveVals.zip(refVals) { l, r ->
+    val diffs: Series<Double> = (liveVals zip refVals) α { (l: Double, r: Double) ->
         val denom = maxOf(1.0, maxOf(l, r))
         abs(l - r) / denom
     }
-    val avg = if (diffs.isEmpty()) 1.0 else diffs.average()
+    val avg = if (diffs.isEmpty()) 1.0 else {
+        var sum = 0.0
+        diffs.view.forEach { sum += it }
+        sum / diffs.size
+    }
     val score = 1.0 - avg
     return when {
         score < 0.0 -> 0.0
@@ -209,7 +212,7 @@ data class LangEntry(
     val fingerprint: LangFingerprint,
     val classifier: LangClassifier,
     /** Canonical file extensions (e.g. [".kt", ".kts"]) — fallback, not primary. */
-    val extensions: List<String>,
+    val extensions: Series<String>,
     /** Canonical shebang line prefix, or null. */
     val shebang: String?,
 ) {
@@ -232,11 +235,11 @@ object LangRegistry {
         id: LangId,
         fingerprint: LangFingerprint,
         classifier: LangClassifier,
-        extensions: List<String>,
+        extensions: Series<String>,
         shebang: String? = null,
     ): LangEntry = LangEntry(id, fingerprint, classifier, extensions, shebang).also { entries.add(it) }
 
-    fun all(): List<LangEntry> = entries.toList()
+    fun all(): Series<LangEntry> = entries.toSeries()
 
     /** Reset for test isolation. */
     fun reset() {
@@ -245,7 +248,9 @@ object LangRegistry {
 
     fun series(): Series<LangEntry> = entries.size j { i: Int -> entries[i] }
 
-    fun byExtension(ext: String): LangEntry? = entries.find { ext in it.extensions }
+    fun byExtension(ext: String): LangEntry? = entries.find { entry ->
+        entry.extensions.view.contains(ext)
+    }
 
     fun byId(id: LangId): LangEntry? = entries.find { it.id == id }
 
@@ -257,8 +262,10 @@ object LangRegistry {
      *
      * Returns ClassificationResults sorted by confidence descending.
      */
-    fun classifyAll(source: Series<Char>): List<ClassificationResult> =
-        entries.map { it.classify(source) }.sortedByDescending { it.confidence }
+    fun classifyAll(source: Series<Char>): Series<ClassificationResult> {
+        val results = entries.map { it.classify(source) }.sortedByDescending { it.confidence }
+        return results.toSeries()
+    }
 
     /** Top-ranked classification, or null if registry is empty. */
     fun bestMatch(source: Series<Char>): ClassificationResult? =

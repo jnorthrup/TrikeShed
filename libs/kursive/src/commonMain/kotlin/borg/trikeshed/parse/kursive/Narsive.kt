@@ -3,9 +3,7 @@ package borg.trikeshed.parse.kursive
 import borg.trikeshed.context.BitMaskedLong
 import borg.trikeshed.lib.CharSeries
 import borg.trikeshed.lib.Join
-import borg.trikeshed.lib.Series
-import borg.trikeshed.lib.Twin
-import borg.trikeshed.lib.asString
+import borg.trikeshed.lib.*
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.size
@@ -97,7 +95,7 @@ class NarsiveSupervisorJob(
 
     fun fanout(key: CoroutineContext.Key<*>): Series<NarsiveElement> {
         val matches = SeriesBuffer<NarsiveElement>()
-        for (index in 0 until elements.size) if (elements[index].key === key) matches.add(elements[index])
+        elements.view.forEach { if (it.key === key) matches.add(it) }
         return matches.snapshot()
     }
 
@@ -318,8 +316,7 @@ fun Join<CharSeries, NarsiveTrace>.supervisorJob(source: Series<Char>): NarsiveS
     val elements: Series<NarsiveElement> = b.elements(source)
     var first: NarsiveElement? = null
     var root: NarsiveElement? = null
-    for (index in 0 until elements.size) {
-        val element = elements[index]
+    elements.view.forEach { element ->
         if (first == null) first = element
         if (element.kind.isRoot) root = element
     }
