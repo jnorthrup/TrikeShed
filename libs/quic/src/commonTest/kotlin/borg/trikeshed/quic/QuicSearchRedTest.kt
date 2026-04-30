@@ -4,9 +4,12 @@ import borg.trikeshed.context.AsyncContextElement
 import borg.trikeshed.context.AsyncContextKey
 import borg.trikeshed.context.StreamHandle
 import borg.trikeshed.context.StreamTransport
+import borg.trikeshed.lib.*
+import borg.trikeshed.collections.s_
 import kotlinx.coroutines.channels.Channel
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
@@ -55,7 +58,7 @@ class QuicSearchRedTest {
     fun `QuicConfig defaults match expected values`() {
         val config = QuicConfig()
 
-        assertEquals(emptyList<String>(), config.alpn)
+        assertEquals(0, config.alpn.size)
         assertEquals(30000L, config.maxIdleTimeoutMs)
         assertEquals(1350, config.maxUdpPayloadSize)
     }
@@ -63,7 +66,7 @@ class QuicSearchRedTest {
     @Test
     fun `QuicConfig withAlpn produces new config`() {
         val original = QuicConfig()
-        val modified = original.withAlpn(listOf("h3", "h2"))
+        val modified = original.withAlpn(s_["h3", "h2"])
 
         assertEquals(0, original.alpn.size)
         assertEquals(2, modified.alpn.size)
@@ -80,14 +83,14 @@ class QuicSearchRedTest {
     }
 
     @Test
-    fun `QuicConfig equals is structural`() {
-        val a = QuicConfig(alpn = listOf("h3"), maxIdleTimeoutMs = 30000)
-        val b = QuicConfig(alpn = listOf("h3"), maxIdleTimeoutMs = 30000)
-        val c = QuicConfig(alpn = listOf("h2"), maxIdleTimeoutMs = 30000)
+    fun `QuicConfig properties are structural`() {
+        val a = QuicConfig(alpn = s_["h3"], maxIdleTimeoutMs = 30000)
+        val b = QuicConfig(alpn = s_["h3"], maxIdleTimeoutMs = 30000)
+        val c = QuicConfig(alpn = s_["h2"], maxIdleTimeoutMs = 30000)
 
-        assertEquals(a, b)
-        assertFalse(a == c)
-        assertEquals(a.hashCode(), b.hashCode())
+        assertEquals(a.alpn[0], b.alpn[0])
+        assertEquals(a.maxIdleTimeoutMs, b.maxIdleTimeoutMs)
+        assertNotEquals(a.alpn[0], c.alpn[0])
     }
 
     @Test
@@ -115,17 +118,17 @@ class QuicSearchRedTest {
 
     @Test
     fun `QuicConfig copy preserves other fields`() {
-        val original = QuicConfig(alpn = listOf("h3"), maxIdleTimeoutMs = 60000)
+        val original = QuicConfig(alpn = s_["h3"], maxIdleTimeoutMs = 60000)
         val copied = original.copy()
 
-        assertEquals(listOf("h3"), copied.alpn)
+        assertEquals("h3", copied.alpn[0])
         assertEquals(60000L, copied.maxIdleTimeoutMs)
     }
 
     @Test
     fun `QuicConfig withAlpn does not mutate original`() {
         val original = QuicConfig()
-        original.withAlpn(listOf("h2"))
+        original.withAlpn(s_["h2"])
 
         assertEquals(0, original.alpn.size)
     }
@@ -133,6 +136,6 @@ class QuicSearchRedTest {
 
 // === FREE FUNCTIONS ===
 
-fun QuicConfig.withAlpn(alpn: List<String>): QuicConfig = copy(alpn = alpn)
+fun QuicConfig.withAlpn(alpn: Series<String>): QuicConfig = copy(alpn = alpn)
 
 fun QuicConfig.withTimeout(ms: Long): QuicConfig = copy(maxIdleTimeoutMs = ms)

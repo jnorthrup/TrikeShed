@@ -1,11 +1,10 @@
 package borg.trikeshed.polyglot
 
+import borg.trikeshed.collections.s_
 import borg.trikeshed.common.TypeEvidence
 import borg.trikeshed.cursor.*
 import borg.trikeshed.isam.meta.IOMemento
-import borg.trikeshed.lib.Series
-import borg.trikeshed.lib.Twin
-import borg.trikeshed.lib.j
+import borg.trikeshed.lib.*
 
 /* ═══════════════════════════════════════════════════════════════════════════
  *  SourceFragment — the universal AST node intermediate representation.
@@ -92,46 +91,39 @@ data class SourceFragment(
     val kind: NodeKind,
     val name: String?,
     val evidence: TypeEvidence,
-    val children: List<SourceFragment> = emptyList(),
+    val children: Series<SourceFragment> = Join.emptySeriesOf(),
     val meta: NodeMeta = NodeMeta(),
 ) {
     /** RowVec projection for the Cursor algebra. */
     fun toRowVec(): RowVec {
-        val values = arrayOf<Any?>(
+        val values: Series<Any?> = s_[
             lang.label,
             span.a,
             span.b,
             kind.name,
             name ?: "",
-            TypeEvidence.deduceMemento(evidence).label,
-        )
-        val metas: Series<`ColumnMeta↻`> = listOf(
+            TypeEvidence.deduceMemento(evidence).label
+        ]
+        val metas: Series<`ColumnMeta↻`> = s_[
             ColumnMeta("lang", IOMemento.IoString),
             ColumnMeta("spanStart", IOMemento.IoInt),
             ColumnMeta("spanEnd", IOMemento.IoInt),
             ColumnMeta("kind", IOMemento.IoString),
             ColumnMeta("name", IOMemento.IoString),
             ColumnMeta("deducedType", IOMemento.IoString),
-        ).size j { i: Int -> { listOf(
-            ColumnMeta("lang", IOMemento.IoString),
-            ColumnMeta("spanStart", IOMemento.IoInt),
-            ColumnMeta("spanEnd", IOMemento.IoInt),
-            ColumnMeta("kind", IOMemento.IoString),
-            ColumnMeta("name", IOMemento.IoString),
-            ColumnMeta("deducedType", IOMemento.IoString),
-        )[i] } }
-        return values.size j { index: Int -> values[index] } joins metas
+        ] α { it.leftIdentity }
+        return values joins metas
     }
 
     /** Flatten to a depth-first RowVec sequence. */
-    fun flatten(): Sequence<RowVec> = sequence {
+    fun flatten(): Sequence<RowVec> = sequence<RowVec> {
         yield(toRowVec())
-        for (child in children) yieldAll(child.flatten())
+        children.view.forEach { yieldAll(it.flatten()) }
     }
 
     /** Project children as lazy joins (index into parent's span). */
     fun childSpans(): Series<Twin<Int>> =
-        children.size j { i: Int -> children[i].span }
+        children α { it.span }
 }
 
 /**
@@ -143,11 +135,11 @@ data class SourceFragment(
 data class UniversalAst(
     val lang: LangId,
     val root: SourceFragment,
-    val diagnostics: List<String> = emptyList(),
+    val diagnostics: Series<String> = Join.emptySeriesOf(),
 ) {
     fun toCursor(): borg.trikeshed.cursor.Cursor {
         val rows = root.flatten().toList()
-        return rows.size j { i: Int -> rows[i] }
+        return rows.toSeries()
     }
 }
 
