@@ -80,7 +80,7 @@ class ControlSimulation(
     val wallet: SimWallet = SimWallet(),
 ) {
     var simTimeIndex: Int = 0
-        private set
+        public set
 
     val tradedPairs: List<TradingPair> = inputs.map { input -> input.key.a }
     val simTimeLimit: Int = minOf(inputs.minOfOrNull { input -> input.block.rowCount } ?: 0, options.depthMode.maxTicks)
@@ -101,9 +101,9 @@ class ControlSimulation(
 }
 
 class ControlHarness(
-    private val horizonDepth: Int,
-    private val valueSymbol: String = "USDT",
-    private val subscribers: List<AsyncContextElement> = emptyList(),
+    public val horizonDepth: Int,
+    public val valueSymbol: String = "USDT",
+    public val subscribers: List<AsyncContextElement> = emptyList(),
 ) : AsyncContextElement() {
     companion object Key : AsyncContextKey<ControlHarness>()
 
@@ -165,7 +165,7 @@ class ControlHarness(
         )
     }
 
-    private fun pairFrame(
+    public fun pairFrame(
         source: KlineSeriesSource,
         universe: List<TradingPair>,
         wallet: SimWallet,
@@ -212,8 +212,7 @@ fun horizonIndex(index: Int, viewPoints: Int, datapoints: Int): Int {
     val compressed = (dpDouble - 1.0 - sin((vpDouble - index) / vpDouble * (PI / 2.0)) * dpDouble - 1.0).toInt()
     return max(index.coerceAtMost(datapoints - 1), compressed).coerceIn(0, datapoints - 1)
 }
-
-private fun MiniCursor.horizonOhlcv(rowLimit: Int, depth: Int): MiniCursor {
+ public fun MiniCursor.horizonOhlcv(rowLimit: Int, depth: Int): MiniCursor {
     val source = this
     return depth j { depthIndex: Int ->
         val row = source.at(horizonIndex(depthIndex, depth, rowLimit))
@@ -229,8 +228,7 @@ private fun MiniCursor.horizonOhlcv(rowLimit: Int, depth: Int): MiniCursor {
         ).toRowVec()
     }
 }
-
-private fun MiniCursor.pancake(): MiniCursor {
+ public fun MiniCursor.pancake(): MiniCursor {
     val source = this
     return 1 j { _: Int ->
         val keys = mutableListOf<String>()
@@ -246,8 +244,7 @@ private fun MiniCursor.pancake(): MiniCursor {
         DocRowVec(keys, cells).toRowVec()
     }
 }
-
-private fun MiniCursor.ochlAt(index: Int): MiniCursor {
+ public fun MiniCursor.ochlAt(index: Int): MiniCursor {
     val row = at(index)
     return 1 j { _: Int ->
         DocRowVec(
@@ -262,8 +259,7 @@ private fun MiniCursor.ochlAt(index: Int): MiniCursor {
         ).toRowVec()
     }
 }
-
-private fun MiniCursor.rowDoublesInto(out: MutableList<Double>) {
+ public fun MiniCursor.rowDoublesInto(out: MutableList<Double>) {
     val row = at(0)
     for (index in 0 until row.size) {
         val value = row[index].a
@@ -272,25 +268,5 @@ private fun MiniCursor.rowDoublesInto(out: MutableList<Double>) {
             is String -> value.toDouble()
             else -> error("Pancake materialization requires numeric cells, got $value")
         }
-    }
-}
-
-private fun RowVec.doubleValue(key: String): Double {
-    val value = getValue(key)
-    return when (value) {
-        is Double -> value
-        is Number -> value.toDouble()
-        is String -> value.toDouble()
-        else -> error("$key must be numeric, got $value")
-    }
-}
-
-private fun RowVec.longValue(key: String): Long {
-    val value = getValue(key)
-    return when (value) {
-        is Long -> value
-        is Number -> value.toLong()
-        is String -> value.toLong()
-        else -> error("$key must be numeric, got $value")
     }
 }

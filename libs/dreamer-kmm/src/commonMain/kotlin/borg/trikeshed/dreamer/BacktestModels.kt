@@ -122,7 +122,7 @@ fun klineBarToPortfolioInput(
     val row = cursor.at(barIndex)
     val symbol: String = row.stringValue("symbol", "UNKNOWN")
     val openTime: Long = row.longValue("openTime")
-    val price: Double = row.doubleValue("close").takeIf { it > 0.0 } ?: row.doubleValue("open")
+    val price: Double = row.doubleValue("close").takeIf{ it > 0.0 } ?: row.doubleValue("open")
     val value = currentQuantity * price
     return PortfolioInput(
         symbol = symbol,
@@ -395,8 +395,7 @@ suspend fun simulateTicks(
         metrics = metrics,
     )
 }
-
-private fun emptyBacktestResult(genome: Genome, initialCapital: Double): BacktestResult =
+ public fun emptyBacktestResult(genome: Genome, initialCapital: Double): BacktestResult =
     BacktestResult(
         symbol = "",
         initialCapital = initialCapital,
@@ -413,20 +412,23 @@ private fun emptyBacktestResult(genome: Genome, initialCapital: Double): Backtes
             avgHarvestPerTick = 0.0,
         ),
     )
-
-private fun RowVec.stringValue(name: String, default: String): String =
+ public fun RowVec.stringValue(name: String, default: String): String =
     getValue(name) as? String ?: default
-
-private fun RowVec.longValue(name: String): Long = when (val value = getValue(name)) {
+ public fun RowVec.longValue(name: String): Long = when (val value = getValue(name)) {
     is Long -> value
     is Number -> value.toLong()
     is String -> value.toLongOrNull() ?: 0L
     else -> 0L
 }
-
-private fun RowVec.doubleValue(name: String): Double = when (val value = getValue(name)) {
+ public fun RowVec.doubleValue(name: String): Double = when (val value = getValue(name)) {
     is Double -> value
     is Number -> value.toDouble()
     is String -> value.toDoubleOrNull() ?: 0.0
     else -> 0.0
+}
+ public fun RowVec.intValue(name: String): Int = when (val value = getValue(name)) {
+    is Int -> value
+    is Number -> value.toInt()
+    is String -> value.toIntOrNull() ?: 0
+    else -> 0
 }
