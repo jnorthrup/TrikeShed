@@ -1,6 +1,5 @@
 package borg.trikeshed.dreamer
 
-import borg.trikeshed.lib.*
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -141,7 +140,7 @@ class EvolutionTest {
     private fun backtestResult(metrics: BacktestMetrics): BacktestResult = BacktestResult(
         symbol = "BTCUSDT",
         initialCapital = 10_000.0,
-        cycles = Join.emptySeriesOf(),
+        cycles = emptyList(),
         metrics = metrics,
     )
 }

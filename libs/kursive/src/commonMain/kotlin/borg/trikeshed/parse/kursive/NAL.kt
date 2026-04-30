@@ -1,6 +1,7 @@
 package borg.trikeshed.parse.kursive
 
-import borg.trikeshed.lib.toSeries
+import borg.trikeshed.lib.*
+import borg.trikeshed.collections.s_
 
 /**
  * NAL (Non-Axiomatic Logic) levels 1-9, each corresponding to a different
@@ -22,7 +23,7 @@ enum class NALLevel(
     val label: String,
     val description: String,
     val primaryOperator: NarsiveOperator,
-    val additionalOperators: List<NarsiveOperator> = emptyList(),
+    val additionalOperators: Series<NarsiveOperator> = Join.emptySeriesOf(),
 ) {
     /** NAL1: Inheritance -- > Subject inherits from Object */
     NAL1(
@@ -43,7 +44,7 @@ enum class NALLevel(
         "implication",
         "Forward implication: if S then P (==>), or equivalence (<=>)",
         NarsiveOperator.IMPLICATION,
-        listOf(NarsiveOperator.EQUIVALENCE),
+        s_[NarsiveOperator.EQUIVALENCE],
     ),
 
     /** NAL4: Predictive Implication /> Temporal forward implication */
@@ -86,18 +87,18 @@ enum class NALLevel(
         "set-operations",
         "Sequential (&&/) and parallel (&&|) compound terms",
         NarsiveOperator.SEQUENTIAL,
-        listOf(NarsiveOperator.PARALLEL),
+        s_[NarsiveOperator.PARALLEL],
     );
 
     /** All operators valid for this NAL level */
-    val operators: List<NarsiveOperator> = listOf(primaryOperator) + additionalOperators
+    val operators: Series<NarsiveOperator> = s_[primaryOperator] + additionalOperators
 
     /** Check if a given operator belongs to this NAL level */
-    infix fun hasOperator(op: NarsiveOperator): Boolean = op in operators
+    infix fun hasOperator(op: NarsiveOperator): Boolean = operators.view.contains(op)
 
     companion object {
         /** Find NAL level by operator */
-        fun fromOperator(op: NarsiveOperator): NALLevel? = entries.firstOrNull { op in it.operators }
+        fun fromOperator(op: NarsiveOperator): NALLevel? = entries.firstOrNull { it.operators.view.contains(op) }
 
         /** Parse a NAL level string like "NAL1" or "nal1" */
         fun fromString(label: String): NALLevel? {

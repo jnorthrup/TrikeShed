@@ -5,10 +5,11 @@ import borg.trikeshed.context.AsyncContextKey
 import borg.trikeshed.context.ElementState
 import borg.trikeshed.context.StreamHandle
 import borg.trikeshed.context.StreamTransport
+import borg.trikeshed.lib.*
 import kotlinx.coroutines.channels.Channel
 
 data class QuicConfig(
-    val alpn: List<String> = emptyList(),
+    val alpn: Series<String> = Join.emptySeriesOf(),
     val maxIdleTimeoutMs: Long = 30000,
     val maxUdpPayloadSize: Int = 1350,
     val initialVersion: QuicVersion = QuicVersions.VERSION_1,

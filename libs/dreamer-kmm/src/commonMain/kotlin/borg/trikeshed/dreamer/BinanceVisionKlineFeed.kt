@@ -5,26 +5,22 @@ import borg.trikeshed.lib.Join
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.size
-import borg.trikeshed.lib.α
-import borg.trikeshed.lib.plus
 
 typealias TradingPair = Join<String, String>
 typealias KlineSeriesKey = Join<TradingPair, TimeSpan>
 
-class ArchiveMonth(override val a: Int, override val b: Int) : Join<Int, Int> {
-    init { require(b in 1..12) { "month must be in 1..12, got $b" } }
-    val year: Int get() = a
-    val month: Int get() = b
+data class ArchiveMonth(val year: Int, val month: Int) {
+    init { require(month in 1..12) { "month must be in 1..12, got $month" } }
+
     val label: String get() = "$year-${month.twoDigits()}"
 }
 
-class ArchiveDay(val year: Int, val month: Int, val day: Int) : Join<Int, Join<Int, Int>> {
+data class ArchiveDay(val year: Int, val month: Int, val day: Int) {
     init {
         require(month in 1..12) { "month must be in 1..12, got $month" }
         require(day in 1..31) { "day must be in 1..31, got $day" }
     }
-    override val a: Int get() = year
-    override val b: Join<Int, Int> get() = month j day
+
     val label: String get() = "$year-${month.twoDigits()}-${day.twoDigits()}"
 }
 
@@ -37,10 +33,10 @@ data class BinanceVisionArchiveRef(
 
 data class BinanceVisionArchivePlan(
     val key: KlineSeriesKey,
-    val monthly: Series<BinanceVisionArchiveRef>,
-    val daily: Series<BinanceVisionArchiveRef>,
+    val monthly: List<BinanceVisionArchiveRef>,
+    val daily: List<BinanceVisionArchiveRef>,
 ) {
-    val refs: Series<BinanceVisionArchiveRef> get() = monthly + daily
+    val refs: List<BinanceVisionArchiveRef> get() = monthly + daily
 }
 
 data class KlineFeedResult(
@@ -52,12 +48,7 @@ data class KlineFeedResult(
 }
 
 interface KlineFeed {
-    fun plan(
-        key: KlineSeriesKey,
-        months: Series<ArchiveMonth>,
-        days: Series<ArchiveDay> = Join.emptySeriesOf(),
-    ): BinanceVisionArchivePlan
-
+    fun plan(key: KlineSeriesKey, months: List<ArchiveMonth>, days: List<ArchiveDay> = emptyList()): BinanceVisionArchivePlan
     fun parseCachedCsv(key: KlineSeriesKey, csvText: String): KlineFeedResult
 }
 
@@ -68,14 +59,14 @@ class BinanceVisionKlineFeed(
 
     override fun plan(
         key: KlineSeriesKey,
-        months: Series<ArchiveMonth>,
-        days: Series<ArchiveDay>,
+        months: List<ArchiveMonth>,
+        days: List<ArchiveDay>,
     ): BinanceVisionArchivePlan {
-        val symbol: String = key.symbol
-        val interval: String = key.b.binanceInterval
+        val symbol = key.symbol
+        val interval = key.b.binanceInterval
         return BinanceVisionArchivePlan(
             key = key,
-            monthly = months α { month ->
+            monthly = months.map { month ->
                 archiveRef(
                     pathKind = "monthly",
                     symbol = symbol,
@@ -83,7 +74,7 @@ class BinanceVisionKlineFeed(
                     label = month.label,
                 )
             },
-            daily = days α { day ->
+            daily = days.map { day ->
                 archiveRef(
                     pathKind = "daily",
                     symbol = symbol,

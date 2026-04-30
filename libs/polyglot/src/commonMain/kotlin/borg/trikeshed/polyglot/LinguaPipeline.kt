@@ -86,7 +86,7 @@ fun classify(ast: UniversalAst): UniversalAst {
     fun rec(sf: SourceFragment): SourceFragment {
         val sample = (sf.name ?: "").toSeries()
         val ev = TypeEvidence.sample(sample)
-        val children = sf.children.map { rec(it) }
+        val children = sf.children α { rec(it) }
         return sf.copy(evidence = ev, children = children)
     }
     return UniversalAst(ast.lang, rec(ast.root), ast.diagnostics)
@@ -104,7 +104,7 @@ fun unify(ast: UniversalAst): DescriptorFragment {
     fun rec(sf: SourceFragment, depth: Int): DescriptorFragment {
         val evidence = sf.evidence
         val memento = TypeEvidence.deduceMemento(evidence)
-        val children = sf.children.map { rec(it, depth + 1) }
+        val children = sf.children.view.map { rec(it, depth + 1) }
         return DescriptorFragment(sf.name, depth, memento, evidence, null, children)
     }
     return rec(ast.root, 0)
