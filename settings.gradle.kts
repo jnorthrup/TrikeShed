@@ -17,5 +17,7 @@ file("libs").listFiles()?.filter { it.isDirectory }?.forEach { dir ->
 }
 
 // Nested modules
+include(":libs:combined-client")
+project(":libs:combined-client").projectDir = file("libs/combined-client")
 include(":libs:couch:viewserver")
 project(":libs:couch:viewserver").projectDir = file("libs/couch/viewserver")
