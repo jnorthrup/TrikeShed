@@ -1,0 +1,302 @@
+package borg.trikeshed.dreamer
+
+import borg.trikeshed.collections.s_
+import borg.trikeshed.lib.*
+import kotlinx.coroutines.test.runTest
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
+
+/**
+ * End-to-end integration tests for the full back-test pipeline:
+ *   Binance archive CSV → KlineCsvParser → KlineBlock → Cursor → simulateTicks
+ *     → BacktestResult → BacktestReport
+ *
+ * These tests exercise the complete chain from archive data through to
+ * aggregate metrics, verifying that each adapter and transformation
+ * composes correctly.
+ */
+class BacktestIntegrationTest {
+
+    /**
+     * Full-chain test: CSV text → parse → block → seal → cursor → simulateTicks → BacktestReport
+     *
+     * This pins the entire chain end-to-end and catches integration regressions
+     * where any adapter change breaks the downstream report.
+     */
+    @Test
+    fun `full pipeline produces BacktestReport from Binance archive CSV`() = runTest {
+        val csv = """
+            open_time,open,high,low,close,volume,close_time,quote_asset_volume,number_of_trades,taker_buy_base_volume,taker_buy_quote_volume,ignore
+            1704067200000,42000.0,42500.0,41800.0,42300.0,150.0,1704070799999,6345000.0,3200,75.0,3167250.0,0
+            1704070800000,42300.0,43100.0,42100.0,42900.0,180.0,1704074399999,7722000.0,4100,90.0,3861000.0,0
+            1704074400000,42900.0,43200.0,42500.0,42800.0,140.0,1704077999999,5992000.0,2800,70.0,2996000.0,0
+            1704078000000,42800.0,43500.0,42700.0,43400.0,200.0,1704081599999,8680000.0,5200,100.0,4340000.0,0
+        """.trimIndent()
+
+        val replay = SimulationReplay(
+            genome = defaultGenome(),
+            mode = Mode.SHADOW,
+            initialCapital = 10_000.0,
+        )
+        val result = replay.replayCsv(csvText = csv, symbol = "BTCUSDT", timespan = TimeSpan.Hours1)
+        val report = result.toBacktestReport()
+
+        // Verify report fields
+        assertEquals("BTCUSDT", report.symbol)
+        assertEquals(10_000.0, report.initialCapital, 0.001)
+        assertEquals(4, report.totalTicks)
+        assertTrue(report.finalEquity > 0.0, "finalEquity should be positive: ${report.finalEquity}")
+        assertTrue(report.totalReturn > 0.0, "totalReturn should be positive with rising prices: ${report.totalReturn}")
+
+        // Verify metrics are wired through
+        assertEquals(result.metrics.totalReturn, report.totalReturn, 0.001)
+        assertEquals(result.metrics.sharpeRatio, report.sharpeRatio, 0.001)
+        assertEquals(result.metrics.maxDrawdown, report.maxDrawdown, 0.001)
+        assertEquals(result.metrics.totalTicks, report.totalTicks)
+    }
+
+    /**
+     * Verifies that a rising price series triggers harvest activity in the engine.
+     *
+     * The genome has ENABLE_PORTFOLIO_HARVEST=true and a small MIN_SURPLUS_FOR_HARVEST,
+     * so surplus above baseline should trigger harvest. This test confirms the
+     * TradingEngine harvest logic is exercised in the simulateTicks path.
+     */
+    @Test
+    fun `simulateTicks triggers harvest when price rises above baseline`() = runTest {
+        // Build a strongly rising price series to ensure surplus triggers harvest
+        val klines = (0 until 10).map { i ->
+            val price = 100.0 + i * 10.0  // 100 → 190
+            Kline(
+                symbol = "TESTUSDT",
+                timespan = TimeSpan.Hours1,
+                openTime = 1_704_067_200_000L + i * 3_600_000L,
+                open = price - 1.0,
+                high = price + 2.0,
+                low = price - 2.0,
+                close = price,
+                volume = 50.0 + i,
+            )
+        }
+        val block = KlineBlock.mutable(TimeSpan.Hours1)
+        klines.forEach { block.append(it) }
+        val cursor = block.seal().asCursor()
+
+        // Use genome with harvest enabled and low surplus threshold
+        val genome = defaultGenome()
+        genome[GenomeParam.MIN_SURPLUS_FOR_HARVEST] = 0.001  // very low threshold
+        genome[GenomeParam.HARVEST_TAKE_PERCENT] = 0.50
+        genome[GenomeParam.TARGET_ADJUST_PERCENT] = 0.001
+
+        val engine = TradingEngine(genome, Mode.SHADOW, initialCapital = 10_000.0)
+        val result = simulateTicks(cursor, engine, initialCapital = 10_000.0)
+
+        // At least some cycles should have harvest activity
+        val harvestCycles = result.cycles.view.filter { it.harvestedAmount > 0.0 }
+        assertTrue(harvestCycles.isNotEmpty(), "Expected harvest activity with rising prices, got 0 harvest cycles")
+
+        val totalHarvested = harvestCycles.sumOf { it.harvestedAmount }
+        assertTrue(totalHarvested > 0.0, "Total harvested should be positive: $totalHarvested")
+
+        // Trades count should be > 0
+        assertTrue(result.metrics.totalTrades > 0, "totalTrades should be > 0: ${result.metrics.totalTrades}")
+        assertTrue(result.metrics.totalHarvested > 0.0, "totalHarvested should be > 0: ${result.metrics.totalHarvested}")
+    }
+
+    /**
+     * End-to-end: BinanceVisionKlineFeed.parseCachedCsv → simulateTicks → BacktestReport
+     *
+     * Exercises the full production path from CSV text through the KlineFeed
+     * adapter, ensuring parseCachedCsv output composes with simulateTicks.
+     */
+    @Test
+    fun `KlineFeed parseCachedCsv composes with simulateTicks pipeline`() = runTest {
+        val csv = """
+            open_time,open,high,low,close,volume,close_time,quote_asset_volume,number_of_trades,taker_buy_base_volume,taker_buy_quote_volume,ignore
+            1704067200000,2500.0,2550.0,2490.0,2530.0,500.0,1704070799999,1265000.0,800,250.0,632500.0,0
+            1704070800000,2530.0,2600.0,2520.0,2580.0,600.0,1704074399999,1548000.0,900,300.0,774000.0,0
+            1704074400000,2580.0,2610.0,2550.0,2570.0,450.0,1704077999999,1156500.0,750,225.0,578250.0,0
+        """.trimIndent()
+
+        val feed = BinanceVisionKlineFeed()
+        val key = klineSeriesKey("ETH", "USDT", TimeSpan.Hours1)
+        val parsed = feed.parseCachedCsv(key, csv)
+
+        // Verify parsing
+        assertEquals("ETHUSDT", parsed.key.symbol)
+        assertTrue(parsed.block.state == KlineBlock.State.SEALED)
+        assertEquals(3, parsed.block.rowCount)
+
+        // Run through simulateTicks
+        val engine = TradingEngine(defaultGenome(), Mode.SHADOW, initialCapital = 5_000.0)
+        val result = simulateTicks(parsed.block.asCursor(), engine, initialCapital = 5_000.0)
+        val report = result.toBacktestReport()
+
+        assertEquals("ETHUSDT", report.symbol)
+        assertEquals(5_000.0, report.initialCapital, 0.001)
+        assertEquals(3, report.totalTicks)
+        assertTrue(report.finalEquity > 0.0)
+    }
+
+    /**
+     * Multi-symbol end-to-end: two symbols through archive CSV → KlineBlock →
+     * RealtimeHarness replay → verify both symbols produce trading cycles.
+     *
+     * This tests the RealtimeHarness multi-symbol path which uses DreamerAgent
+     * and StochasticBag together.
+     */
+    @Test
+    fun `RealtimeHarness multi-symbol end-to-end produces BacktestReport-quality metrics`() = runTest {
+        val config = StochasticTrainingConfig(
+            bases = listOf("BTC", "ETH"),
+            rowsPerSeries = 20,
+            populationSize = 2,
+            spanLength = 4,
+            initialCapital = 10_000.0,
+            seed = 42,
+        )
+
+        val inputs = archiveInputs(config)
+        assertEquals(2, inputs.size)
+        inputs.forEach { input ->
+            assertTrue(input.block.state == KlineBlock.State.SEALED)
+            assertEquals(20, input.block.rowCount)
+        }
+
+        val genome = defaultGenome()
+        val harness = RealtimeHarness(
+            genome = genome,
+            initialCapital = config.initialCapital,
+            mode = Mode.SHADOW,
+            stochasticSeed = config.seed,
+            stochasticSpanLength = config.spanLength,
+        )
+
+        val runResult = harness.replay(inputs)
+
+        // Verify multi-symbol cycles
+        assertTrue(runResult.cycles.size > 0, "Should have cycles")
+        assertEquals(20, runResult.cycles.size)
+
+        // Each cycle should have 2 rows (BTC + ETH)
+        runResult.cycles.forEach { cycle ->
+            assertEquals(2, cycle.frame.rows.size)
+            val symbols = cycle.frame.rows.map { it.symbol }.toSet()
+            assertTrue(symbols.contains("BTCUSDT") || symbols.contains("ETHUSDT"),
+                "Each cycle should have BTCUSDT or ETHUSDT: $symbols")
+        }
+
+        // Verify wallet journal has mark-to-market entries
+        assertTrue(runResult.walletJournal.any { it.action == WalletAction.MARK_TO_MARKET })
+
+        // Compute fitness from run result (same metric used in stochastic training)
+        val fitness = runResult.fitness(config.initialCapital, genome)
+        assertTrue(fitness.isFinite(), "Fitness should be finite: $fitness")
+
+        // Compute max drawdown
+        val maxDD = runResult.maxDrawdown(config.initialCapital)
+        assertTrue(maxDD >= 0.0, "Max drawdown should be non-negative: $maxDD")
+    }
+
+    /**
+     * Evolution pipeline end-to-end: evaluatePopulation → pick champion → BacktestReport
+     *
+     * Verifies that the evolutionary search can produce genome evaluations
+     * and that the best genome's result can be converted to a BacktestReport.
+     */
+    @Test
+    fun `evaluatePopulation produces BacktestReport from champion genome`() = runTest {
+        val csv = generatedArchiveCsv(
+            symbol = "SOLUSDT",
+            rows = 30,
+            timespan = TimeSpan.Minutes5,
+            startOpenTime = 1_704_067_200_000L,
+            assetIndex = 2,
+            seed = 99,
+        )
+
+        val genomes = listOf(
+            defaultGenome(),
+            mutateGenome(defaultGenome(), mapOf("HARVEST_TAKE_PERCENT" to 0.80)),
+            mutateGenome(defaultGenome(), mapOf("MIN_SURPLUS_FOR_HARVEST" to 0.001)),
+        )
+
+        val evaluations = evaluatePopulation(
+            genomes = genomes,
+            csvText = csv,
+            symbol = "SOLUSDT",
+            timespan = TimeSpan.Minutes5,
+            initialCapital = 10_000.0,
+        )
+
+        assertEquals(3, evaluations.size)
+
+        // Pick champion and produce report
+        val champion = evaluations.first()
+        val report = champion.result.toBacktestReport()
+
+        assertEquals("SOLUSDT", report.symbol)
+        assertEquals(10_000.0, report.initialCapital, 0.001)
+        assertEquals(30, report.totalTicks)
+        assertTrue(report.finalEquity > 0.0)
+        assertTrue(champion.fitness.isFinite())
+    }
+
+    /**
+     * Verifies that simulateTicks works with the columnar cursor produced
+     * by KlineBlock.asColumnarCursor(). This tests the alternative cursor
+     * implementation path.
+     */
+    @Test
+    fun `simulateTicks works with columnar cursor from asColumnarCursor`() = runTest {
+        val klines = listOf(
+            Kline("BTCUSDT", TimeSpan.Hours1, 1704067200000L, 42000.0, 42500.0, 41800.0, 42300.0, 150.0),
+            Kline("BTCUSDT", TimeSpan.Hours1, 1704070800000L, 42300.0, 43100.0, 42100.0, 42900.0, 180.0),
+        )
+        val block = KlineBlock.mutable(TimeSpan.Hours1)
+        klines.forEach { block.append(it) }
+        block.seal()
+
+        val columnarCursor = block.asColumnarCursor()
+        assertEquals(2, columnarCursor.size)
+
+        val engine = TradingEngine(defaultGenome(), Mode.SHADOW, initialCapital = 10_000.0)
+        val result = simulateTicks(columnarCursor, engine, initialCapital = 10_000.0)
+
+        assertEquals("BTCUSDT", result.symbol)
+        assertEquals(2, result.cycles.size)
+        assertEquals(2, result.metrics.totalTicks)
+    }
+
+    /**
+     * Flat equity should produce zero Sharpe and zero total return through
+     * the full simulateTicks pipeline, not just hand-built metrics.
+     */
+    @Test
+    fun `simulateTicks flat equity produces zero Sharpe and near-zero return`() = runTest {
+        // Flat prices: all at 100.0
+        val klines = (0 until 8).map { i ->
+            Kline(
+                symbol = "FLATUSDT",
+                timespan = TimeSpan.Hours1,
+                openTime = 1_704_067_200_000L + i * 3_600_000L,
+                open = 100.0,
+                high = 100.0,
+                low = 100.0,
+                close = 100.0,
+                volume = 10.0,
+            )
+        }
+        val block = KlineBlock.mutable(TimeSpan.Hours1)
+        klines.forEach { block.append(it) }
+        val cursor = block.seal().asCursor()
+
+        val engine = TradingEngine(defaultGenome(), Mode.SHADOW, initialCapital = 10_000.0)
+        val result = simulateTicks(cursor, engine, initialCapital = 10_000.0)
+
+        assertEquals(0.0, result.metrics.sharpeRatio, 0.001, "Flat equity should produce zero Sharpe")
+        assertTrue(result.metrics.totalReturn < 0.001, "Flat equity should produce near-zero return")
+    }
+}
