@@ -11,16 +11,19 @@ import borg.trikeshed.sctp.SctpElement
 
 /**
  * A combined client element that composes Quic, SCTP, and HTX (HTTP) clients.
- * It also supports dispatching IPFS and Reactor commands by translating them into
+ * It also supports dispatching IPFS commands by translating them into
  * underlying tasks, primarily leveraging Aria2c for HTX/IPFS multi-protocol transfers.
  *
  * This element acts as a SupervisorJob articulation assembly context.
+ * Note: the child elements (quic, sctp, htx) have their lifecycles managed
+ * by this combined element. However, because they are constructed internally by default,
+ * they are not individually addressable in a `CoroutineContext` hierarchy unless
+ * explicitly overridden and bound by the caller.
  */
-class CombinedClientElement(
+open class CombinedClientElement(
     val quic: QuicElement = QuicElement(),
     val sctp: SctpElement = SctpElement(),
-    val htx: HtxElement = HtxElement(),
-    val reactor: ReactorElement = ReactorElement()
+    val htx: HtxElement = HtxElement()
 ) : AsyncContextElement() {
     companion object Key : AsyncContextKey<CombinedClientElement>()
 
@@ -31,11 +34,9 @@ class CombinedClientElement(
         quic.open()
         sctp.open()
         htx.open()
-        reactor.open()
     }
 
     override suspend fun close() {
-        reactor.close()
         htx.close()
         sctp.close()
         quic.close()
@@ -45,24 +46,19 @@ class CombinedClientElement(
     suspend fun executeRpc(command: String, args: List<String>): String {
         requireState(ElementState.OPEN)
         return when (command.lowercase()) {
-            "quic" -> "QUIC target executed: " + args.joinToString(" ")
-            "sctp" -> "SCTP target executed: " + args.joinToString(" ")
+            "quic" -> throw UnsupportedOperationException("QUIC transport layer not mature yet")
+            "sctp" -> throw UnsupportedOperationException("SCTP transport layer not mature yet")
             "ipfs", "htx" -> {
                 // IPFS and HTX use aria2c premise
-                val request = HtxClientRequest(
+                val response = htx.request(
                     method = "GET",
                     path = args.firstOrNull() ?: "/",
                     switches = Aria2Switches(continueDownload = true),
                     uris = args
                 )
-                // Passing the correct request object
-                val response = htx.requestHandler(request)
                 "HTX/IPFS target executed. Status: ${response.status}"
             }
-            "reactor" -> {
-                reactor.process(args.firstOrNull() ?: "")
-                "Reactor target executed: " + args.joinToString(" ")
-            }
+            "reactor" -> throw UnsupportedOperationException("Reactor target has been removed")
             else -> "Unknown command: $command"
         }
     }

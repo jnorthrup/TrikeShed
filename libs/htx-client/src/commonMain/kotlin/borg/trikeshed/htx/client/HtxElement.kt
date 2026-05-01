@@ -76,6 +76,8 @@ class HtxElement(
         method: String = "GET",
         path: String = "/",
         body: String = "",
+        switches: Aria2Switches? = null,
+        uris: List<String> = emptyList(),
     ): HtxClientMessage {
         requireState(ElementState.OPEN)
         return requestHandler(
@@ -83,6 +85,8 @@ class HtxElement(
                 method = method.trim().uppercase(),
                 path = path,
                 body = body,
+                switches = switches,
+                uris = uris,
             ),
         )
     }

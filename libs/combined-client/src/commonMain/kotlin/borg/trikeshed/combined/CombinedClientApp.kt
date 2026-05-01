@@ -7,21 +7,21 @@ import borg.trikeshed.htx.client.Aria2Switches
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.consumeEach
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.supervisorScope
+import kotlinx.coroutines.CoroutineScope
 
 /**
  * The app orchestrates the runtime session RPC job.
  * It parses aria2c arguments to instantiate the underlying CombinedClientElement.
  */
 class CombinedClientApp(
-    val args: List<String> = emptyList()
+    val args: List<String> = emptyList(),
+    val combinedClient: CombinedClientElement = CombinedClientElement()
 ) : AsyncContextElement() {
     companion object Key : AsyncContextKey<CombinedClientApp>()
 
     override val key: AsyncContextKey<CombinedClientApp> get() = Key
 
     val switches: Aria2Switches
-    val combinedClient = CombinedClientElement()
 
     init {
         var continueDownload = false
@@ -32,7 +32,14 @@ class CombinedClientApp(
             when (arg) {
                 "-c" -> continueDownload = true
                 "--save-not-found=true" -> saveNotFound = true
-                "-d" -> if (i + 1 < args.size) dir = args[i + 1]
+                "-d" -> {
+                    if (i + 1 < args.size) {
+                        val nextArg = args[i + 1]
+                        if (!nextArg.startsWith("-")) {
+                            dir = nextArg
+                        }
+                    }
+                }
             }
         }
 
@@ -45,7 +52,12 @@ class CombinedClientApp(
 
     override suspend fun open() {
         super.open()
-        combinedClient.open()
+        try {
+            combinedClient.open()
+        } catch (e: Exception) {
+            close()
+            throw e
+        }
     }
 
     override suspend fun close() {
@@ -54,24 +66,23 @@ class CombinedClientApp(
     }
 
     /**
-     * Starts an RPC session using a SupervisorJob.
+     * Starts an RPC session.
      * Commands sent to [rpcChannel] are processed by the CombinedClientElement.
+     * Returns the launched Job which can be cancelled, or closes naturally when the channel is closed.
      */
-    suspend fun startRpcSession(rpcChannel: Channel<String>) {
+    fun startRpcSession(rpcChannel: Channel<String>): kotlinx.coroutines.Job {
         requireState(ElementState.OPEN)
-        supervisorScope {
-            launch {
-                rpcChannel.consumeEach { commandStr ->
-                    val parts = commandStr.split(" ")
-                    if (parts.isNotEmpty()) {
-                        val command = parts[0]
-                        val cmdArgs = if (parts.size > 1) parts.drop(1) else emptyList()
-                        try {
-                            val result = combinedClient.executeRpc(command, cmdArgs)
-                            println("RPC Result: $result")
-                        } catch (e: Exception) {
-                            println("RPC Error processing command '$commandStr': ${e.message}")
-                        }
+        return CoroutineScope(supervisor).launch {
+            rpcChannel.consumeEach { commandStr ->
+                val parts = commandStr.split(" ")
+                if (parts.isNotEmpty()) {
+                    val command = parts[0]
+                    val cmdArgs = if (parts.size > 1) parts.drop(1) else emptyList()
+                    try {
+                        val result = combinedClient.executeRpc(command, cmdArgs)
+                        println("RPC Result: $result")
+                    } catch (e: Throwable) {
+                        println("RPC Error processing command '$commandStr': ${e.message}")
                     }
                 }
             }
