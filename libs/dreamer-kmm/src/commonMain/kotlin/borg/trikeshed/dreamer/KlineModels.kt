@@ -1,9 +1,9 @@
 package borg.trikeshed.dreamer
 
-import borg.trikeshed.collections.s_
 import borg.trikeshed.cursor.Cursor
 import borg.trikeshed.cursor.RowVec
 import borg.trikeshed.cursor.cellsToRowVec
+import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.toSeries
 
@@ -37,12 +37,13 @@ data class Kline(
     val volume: Double,
 ) {
     companion object {
-        val schemaKeys = listOf("symbol", "timespan", "openTime", "open", "high", "low", "close", "volume")
+        private val schemaList = listOf("symbol", "timespan", "openTime", "open", "high", "low", "close", "volume")
+        val schemaKeys: Series<String> = schemaList.toSeries()
     }
 
     fun toRowVec(): RowVec = cellsToRowVec(
-        cells = listOf(symbol, timespan, openTime, open, high, low, close, volume),
-        keys = schemaKeys,
+        cells = listOf(symbol, timespan.toString(), openTime, open, high, low, close, volume).toSeries(),
+        keys = Kline.schemaKeys,
     )
 }
 
@@ -106,7 +107,7 @@ class KlineBlock(
         return snapshot.size j { rowIndex: Int ->
             val kline: Kline = snapshot[rowIndex]
             cellsToRowVec(
-                cells = s_(
+                cells = listOf(
                     kline.symbol,
                     kline.timespan.toString(),
                     kline.openTime,
@@ -115,7 +116,7 @@ class KlineBlock(
                     kline.low,
                     kline.close,
                     kline.volume,
-                ),
+                ).toSeries(),
                 keys = Kline.schemaKeys,
             )
         }

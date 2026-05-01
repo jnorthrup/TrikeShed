@@ -92,15 +92,16 @@ open class HashSeriesSet<T : Any>  : SeriesSet<T> {
                 if (  contains(element)) return false
 
                 val bucketIndex = theSet.getBucketIndex(element)
-                theSet.buckets +( buckets.size j { i ->
+                val newBuckets: Series<Series<T>> = buckets.size j { i: Int ->
                     if (i == bucketIndex) {
-                        buckets[i].size.inc() j { j ->
+                        buckets[i].size.inc() j { j: Int ->
                             if (j == buckets[i].size) element else buckets[i][j]
                         }
                     } else {
                         buckets[i]
                     }
-                })
+                }
+                buckets = newBuckets
                 theSet._size++
 
                 if (theSet._size > buckets.size * 0.75) {
@@ -115,9 +116,9 @@ open class HashSeriesSet<T : Any>  : SeriesSet<T> {
                 val bucket: Bucket<T> = buckets[bucketIndex]
                 val index = bucket.view.indexOf(element)
                 if (index != -1) {
-                    buckets + (buckets.size   j { i :Int->
+                    val newBuckets: Series<Series<T>> = buckets.size j { i: Int ->
                         if (i == bucketIndex) {
-                            bucket.size.dec() j { j:Int ->
+                            bucket.size.dec() j { j: Int ->
                                 when {
                                     j < index -> bucket[j]
                                     j >= index -> bucket[j + 1]
@@ -127,7 +128,8 @@ open class HashSeriesSet<T : Any>  : SeriesSet<T> {
                         } else {
                             buckets[i]
                         }
-                    })
+                    }
+                    buckets = newBuckets
                     theSet._size--
                     return true
                 }
