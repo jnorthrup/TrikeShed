@@ -1,9 +1,10 @@
 package borg.trikeshed.concurrency
 
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertTrue
+import borg.trikeshed.miniduck.*
+import borg.trikeshed.miniduck.tablespace.*
+import borg.trikeshed.lib.*
+import kotlin.test.*
+import borg.trikeshed.cursor.*
 
 /**
  * TDD spec for MvccBlockStore — MVCC snapshot isolation for block storage.
@@ -14,45 +15,88 @@ import kotlin.test.assertTrue
  *   - Snapshot isolation: non-repeatable reads prevented
  *   - Write-write conflicts detected at commit time
  *
- * NOTE: Currently MvccBlockStore lives in jvmMain. This spec pins the
- * expected algebra when it migrates to commonMain per AGENTS.md DRY precedence.
  */
 class MvccBlockStoreContractTest {
 
     @Test
-    fun `mvcc block store has versioned snapshots`() {
+    fun mvccBlockStoreHasVersionedSnapshots() {
+        val mvcc = MvccBlockStore()
+        val snap1 = mvcc.snapshot()
+        assertEquals(0L, snap1.seq)
+
+        mvcc.put("docs", sealedBlock("alice"))
+        val snap2 = mvcc.snapshot()
+        assertEquals(1L, snap2.seq)
+
         // Each read returns a snapshot at a particular version
-        assertTrue(true, "snapshot(version) -> BlockSnapshot")
+        assertTrue(snap1.seq < snap2.seq)
     }
 
     @Test
-    fun `snapshot is immutable once created`() {
+    fun snapshotIsImmutableOnceCreated() {
+        val mvcc = MvccBlockStore()
+        val snap = mvcc.snapshot()
+        val docs1 = mvcc.listAt(snap, "docs")
+
+        mvcc.put("docs", sealedBlock("alice"))
+
+        val docs2 = mvcc.listAt(snap, "docs")
+
         // A snapshot never sees writes that committed after its creation
-        assertTrue(true)
+        assertEquals(docs1.size, docs2.size)
     }
 
     @Test
-    fun `write creates new version, does not clobber existing`() {
+    fun writeCreatesNewVersionDoesNotClobberExisting() {
+        val mvcc = MvccBlockStore()
+        val blk1 = sealedBlock("v1")
+        val blk2 = sealedBlock("v2")
+
+        val id1 = mvcc.put("docs", blk1)
+        val snap1 = mvcc.snapshot()
+        val id2 = mvcc.put("docs", blk2)
+        val snap2 = mvcc.snapshot()
+
         // write(key, value) produces a new version
-        // concurrent writes to same key produce different versions
+        assertTrue(snap1.seq < snap2.seq)
+        assertEquals(1, mvcc.listAt(snap1, "docs").size)
+        assertEquals(2, mvcc.listAt(snap2, "docs").size)
+    }
+
+    @Test
+    fun commitDetectsWriteWriteConflicts() {
+        // Transactions and conflict detection are planned but not yet implemented
         assertTrue(true)
     }
 
     @Test
-    fun `commit detects write-write conflicts`() {
-        // If two transactions wrote to the same key, one must retry
-        assertTrue(true)
-    }
+    fun readDoesNotBlockWriteAndViceVersa() {
+        val mvcc = MvccBlockStore()
+        mvcc.put("docs", sealedBlock("alice"))
+        val snap = mvcc.snapshot()
 
-    @Test
-    fun `read does not block write and vice versa`() {
+        mvcc.put("docs", sealedBlock("bob"))
+
         // MVCC: readers and writers never block each other
-        assertTrue(true)
+        val loaded = mvcc.scanAt(snap, "docs")
+        assertEquals(1, loaded.size)
+
+        // Use values projection
+        val values = loaded.row(0).values.toList()
+        assertTrue(values.contains("alice"))
     }
 
     @Test
-    fun `snapshot releases when closed`() {
+    fun snapshotReleasesWhenClosed() {
         // Snapshots hold resources; must be closed
         assertTrue(true)
+    }
+
+    // ── Helpers ──────────────────────────────────────────────────────────
+
+    fun sealedBlock(name: String): BlockRowVec {
+        val block = BlockRowVec.mutable()
+        block.append(DocRowVec(listOf("name"), listOf(name)))
+        return block.seal()
     }
 }

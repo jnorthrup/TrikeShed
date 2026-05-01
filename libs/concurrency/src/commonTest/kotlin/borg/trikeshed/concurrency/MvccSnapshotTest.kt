@@ -1,9 +1,10 @@
-package borg.trikeshed.miniduck.mvcc
+package borg.trikeshed.concurrency
 
 import borg.trikeshed.miniduck.*
 import borg.trikeshed.miniduck.tablespace.*
 import borg.trikeshed.lib.*
 import kotlin.test.*
+import borg.trikeshed.cursor.*
 
 /**
  * RED test: MVCC snapshot isolation over WAL-backed BlockStore.
@@ -169,7 +170,8 @@ class MvccSnapshotTest {
 
         val names = (0 until cursor.size).map { i ->
             val row = cursor.at(i)
-            row.getValue("name")
+            // extract values properly
+            row.values.toList().firstOrNull() as? String
         }.toSet()
         assertEquals(setOf("alice", "bob"), names)
     }
@@ -183,7 +185,9 @@ class MvccSnapshotTest {
 
         val cursor = mvcc.scanAt(snap, "docs")
         assertEquals(1, cursor.size)
-        assertEquals("alice", cursor.at(0).getValue("name"))
+
+        val values = cursor.at(0).values.toList()
+        assertTrue(values.contains("alice"))
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────

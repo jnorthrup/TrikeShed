@@ -185,7 +185,7 @@ switch (project.path) {
         }
         break
     case ":libs:concurrency":
-        plainJvm()
+        kmpFull()
         break
     case ":libs:cmc-generated":
         plainJvm()
