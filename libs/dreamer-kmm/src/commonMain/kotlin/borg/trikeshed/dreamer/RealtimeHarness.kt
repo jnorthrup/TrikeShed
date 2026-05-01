@@ -1,6 +1,13 @@
 package borg.trikeshed.dreamer
 
+import borg.trikeshed.cursor.intValue
+
+import borg.trikeshed.cursor.doubleValue
+
+import borg.trikeshed.cursor.stringValue
+
 import borg.trikeshed.cursor.at
+import borg.trikeshed.cursor.longValue
 import borg.trikeshed.lib.size
 
 data class HarnessReplayInput(
@@ -116,7 +123,6 @@ class RealtimeHarness(
         )
     }
 }
-
 
  fun baseAsset(symbol: String): String =
     if (symbol.endsWith("USDT") && symbol.length > 4) symbol.substring(0, symbol.length - 4) else symbol

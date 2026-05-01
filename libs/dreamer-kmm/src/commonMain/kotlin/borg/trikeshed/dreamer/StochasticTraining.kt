@@ -47,7 +47,7 @@ data class StochasticTrainingSnapshot(
 
 class StochasticBagSpanTrainer(
     public val config: StochasticTrainingConfig = StochasticTrainingConfig(),
-    public val inputs: List<HarnessReplayInput> = archiveInputs(config),
+    public val inputs: List<HarnessReplayInput>,
 ) {
     public var generation: Int = 0
     public var population: List<Genome> = initialPopulation()
@@ -66,7 +66,7 @@ class StochasticBagSpanTrainer(
             StochasticTrainingEvaluation(
                 genome = genome,
                 run = run,
-                fitness = run.trainingFitness(config.initialCapital, genome),
+                fitness = run.fitness(config.initialCapital, genome),
             )
         }.sortedByDescending { it.fitness }
 
@@ -159,77 +159,9 @@ class StochasticBagSpanTrainer(
         )
     }
 
-    public fun HarnessRunResult.trainingFitness(initialCapital: Double, genome: Genome): Double {
-        val profit = if (initialCapital > 0.0) (finalTotalValue - initialCapital) / initialCapital else 0.0
-        val trades = cycles.count { it.result.anyTradesThisCycle }.toDouble()
-        val drawdownPenalty = maxDrawdown(initialCapital) * genome.getDouble("FITNESS_DRAWDOWN_PENALTY", 1.0)
-        return profit + trades * 0.001 - drawdownPenalty
-    }
-
     // maxDrawdown is provided by GenomeTraining.kt's HarnessRunResult.maxDrawdown extension
 }
- public fun archiveInputs(config: StochasticTrainingConfig): List<HarnessReplayInput> {
-    val feed = BinanceVisionKlineFeed()
-    return config.bases.mapIndexed { index, base ->
-        val key = klineSeriesKey(base, config.quote, config.timespan)
-        val csv = generatedArchiveCsv(
-            symbol = key.symbol,
-            rows = config.rowsPerSeries,
-            timespan = config.timespan,
-            startOpenTime = config.startOpenTime,
-            assetIndex = index,
-            seed = config.seed,
-        )
-        val parsed = feed.parseCachedCsv(key, csv)
-        HarnessReplayInput(key, parsed.block)
-    }
-}
- public fun generatedArchiveCsv(
-    symbol: String,
-    rows: Int,
-    timespan: TimeSpan,
-    startOpenTime: Long,
-    assetIndex: Int,
-    seed: Int,
-): String {
-    require(rows > 0) { "rows must be positive" }
-    val random = Random(seed + assetIndex * 65_537)
-    val intervalMillis = timespan.seconds * 1_000L
-    val basePrices = doubleArrayOf(69_000.0, 3_800.0, 142.0, 580.0, 0.62, 0.54, 98.0, 7.2)
-    var price = basePrices[assetIndex % basePrices.size]
-    val out = StringBuilder()
-    out.append("open_time,open,high,low,close,volume,close_time,quote_asset_volume,number_of_trades,taker_buy_base_volume,taker_buy_quote_volume,ignore\n")
-    for (row in 0 until rows) {
-        val openTime = startOpenTime + row * intervalMillis
-        val open = price
-        val drift = 0.00005 * (assetIndex + 1)
-        val wave = sin((row + assetIndex * 13).toDouble() / 17.0) * 0.0025 +
-            cos((row + assetIndex * 7).toDouble() / 43.0) * 0.0012
-        val noise = random.nextDouble(-0.0018, 0.0018)
-        val close = max(0.000001, open * (1.0 + drift + wave + noise))
-        val high = max(open, close) * (1.0 + random.nextDouble(0.0002, 0.0030))
-        val low = min(open, close) * (1.0 - random.nextDouble(0.0002, 0.0030))
-        val volume = 100.0 + assetIndex * 19.0 + row % 37 + random.nextDouble(0.0, 25.0)
-        val quoteVolume = volume * close
-        val trades = 25 + (row + assetIndex * 11) % 95
-        val takerBase = volume * random.nextDouble(0.35, 0.65)
-        val takerQuote = takerBase * close
-        out.append(openTime).append(',')
-            .append(open).append(',')
-            .append(high).append(',')
-            .append(low).append(',')
-            .append(close).append(',')
-            .append(volume).append(',')
-            .append(openTime + intervalMillis - 1).append(',')
-            .append(quoteVolume).append(',')
-            .append(trades).append(',')
-            .append(takerBase).append(',')
-            .append(takerQuote).append(",0\n")
-        price = close
-    }
-    return out.toString()
-}
- public fun Double.short(): String {
+public fun Double.short(): String {
     val rounded = kotlin.math.round(this * 100.0) / 100.0
     return rounded.toString()
 }

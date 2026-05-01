@@ -9,49 +9,85 @@ private fun epochMillis(): Long = try {
     0L
 }
 
+/**
+ * Orchestrates backtesting and shadow trading by tracking portfolio state.
+ *
+ * **Concurrency Contract**: This class is not thread-safe. All access and mutations
+ * must be synchronized externally or guaranteed to run sequentially within a single-threaded context.
+ */
+data class EngineState(
+    val baselines: Map<String, Double> = emptyMap(),
+    val lastActionTimestamps: Map<String, Long> = emptyMap(),
+    val rebalanceState: Map<String, Any> = emptyMap(),
+    /** Crash protection state per symbol: stores the trough value at CP activation */
+    val crashProtectionState: Map<String, Double> = emptyMap(),
+    val cashBalance: Double = 0.0,
+    val holdings: Map<String, Holding> = emptyMap(),
+    val totalHarvested: Double = 0.0
+)
+
+/**
+ * Orchestrates backtesting and shadow trading by tracking portfolio state.
+ *
+ * **Concurrency Contract**: This class is not thread-safe. All access and mutations
+ * must be synchronized externally or guaranteed to run sequentially within a single-threaded context.
+ */
 class TradingEngine(
     val genome: Genome,
     val mode: Mode = Mode.SHADOW,
     initialCapital: Double = 0.0,
-    initialHoldings: MutableMap<String, Holding> = mutableMapOf()
+    initialHoldings: Map<String, Holding> = emptyMap()
 ) {
-    val baselines: MutableMap<String, Double> = mutableMapOf()
-    val lastActionTimestamps: MutableMap<String, Long> = mutableMapOf()
-    val rebalanceState: MutableMap<String, Any> = mutableMapOf()
+    var state = EngineState(
+        cashBalance = initialCapital,
+        holdings = initialHoldings.toMap()
+    )
 
-    /** Crash protection state per symbol: stores the trough value at CP activation */
-    val crashProtectionState: MutableMap<String, Double> = mutableMapOf()
-
-    var cashBalance: Double = initialCapital
-    val holdings: MutableMap<String, Holding> = initialHoldings
-    var totalHarvested: Double = 0.0
+    val baselines get() = state.baselines
+    val lastActionTimestamps get() = state.lastActionTimestamps
+    val rebalanceState get() = state.rebalanceState
+    val crashProtectionState get() = state.crashProtectionState
+    var cashBalance: Double
+        get() = state.cashBalance
+        set(value) { state = state.copy(cashBalance = value) }
+    val holdings get() = state.holdings
+    val totalHarvested get() = state.totalHarvested
 
     /** Check if a symbol is currently in crash protection mode */
-    fun isCrashProtected(symbol: String): Boolean = symbol in crashProtectionState
+    fun isCrashProtected(symbol: String): Boolean = symbol in state.crashProtectionState
 
     fun loadPersistedState(data: Map<String, Any?>?) {
         if (data == null) return
-        @Suppress("UNCHECKED_CAST")
-        (data["baselines"] as? Map<String, Any?>)?.forEach { (k, v) -> (v as? Number)?.toDouble()?.let { baselines[k] = it } }
-        @Suppress("UNCHECKED_CAST")
-        (data["crashProtectionState"] as? Map<String, Any?>)?.forEach { (k, v) -> (v as? Number)?.toDouble()?.let { crashProtectionState[k] = it } }
+        val newBaselines = state.baselines.toMutableMap()
+        (data["baselines"] as? Map<String, Any?>)?.forEach { (k, v) -> (v as? Number)?.toDouble()?.let { newBaselines[k] = it } }
+        val newCpState = state.crashProtectionState.toMutableMap()
+        (data["crashProtectionState"] as? Map<String, Any?>)?.forEach { (k, v) -> (v as? Number)?.toDouble()?.let { newCpState[k] = it } }
+        state = state.copy(baselines = newBaselines, crashProtectionState = newCpState)
     }
 
     fun getStateSnapshot(): Map<String, Any?> = mapOf(
-        "baselines" to baselines.toMap(),
-        "holdings" to holdings.mapValues { it.value.rawQuantity },
-        "cashBalance" to cashBalance,
-        "crashProtectionState" to crashProtectionState.toMap(),
+        "baselines" to state.baselines.toMap(),
+        "holdings" to state.holdings.mapValues { it.value.rawQuantity },
+        "cashBalance" to state.cashBalance,
+        "crashProtectionState" to state.crashProtectionState.toMap(),
     )
 
     fun injectSimulationState(snapshot: Map<String, Any?>) {
-        snapshot["cashBalance"]?.let { if (it is Number) cashBalance = it.toDouble() }
-        @Suppress("UNCHECKED_CAST")
-        (snapshot["holdings"] as? Map<String, Any?>)?.forEach { (k, v) -> if (v is Number) holdings[k] = Holding(v.toDouble()) }
-        @Suppress("UNCHECKED_CAST")
-        (snapshot["baselines"] as? Map<String, Any?>)?.forEach { (k, v) -> (v as? Number)?.toDouble()?.let { baselines[k] = it } }
-        @Suppress("UNCHECKED_CAST")
-        (snapshot["crashProtectionState"] as? Map<String, Any?>)?.forEach { (k, v) -> (v as? Number)?.toDouble()?.let { crashProtectionState[k] = it } }
+        var newCash = state.cashBalance
+        snapshot["cashBalance"]?.let { if (it is Number) newCash = it.toDouble() }
+        val newHoldings = state.holdings.toMutableMap()
+        (snapshot["holdings"] as? Map<String, Any?>)?.forEach { (k, v) -> if (v is Number) newHoldings[k] = Holding(v.toDouble()) }
+        val newBaselines = state.baselines.toMutableMap()
+        (snapshot["baselines"] as? Map<String, Any?>)?.forEach { (k, v) -> (v as? Number)?.toDouble()?.let { newBaselines[k] = it } }
+        val newCpState = state.crashProtectionState.toMutableMap()
+        (snapshot["crashProtectionState"] as? Map<String, Any?>)?.forEach { (k, v) -> (v as? Number)?.toDouble()?.let { newCpState[k] = it } }
+
+        state = state.copy(
+            cashBalance = newCash,
+            holdings = newHoldings,
+            baselines = newBaselines,
+            crashProtectionState = newCpState
+        )
     }
 
     fun getGenomicParam(param: GenomeParam, symbol: String? = null): Double {
@@ -75,8 +111,17 @@ class TradingEngine(
     }
 
     suspend fun update(portfolioSummary: List<PortfolioRow>, api: ApiClient?, cashBalanceIn: Double, holdingDetails: Map<String, Holding>?): EngineResult {
-        cashBalance = cashBalanceIn
-        if (mode == Mode.LIVE && holdingDetails != null) holdingDetails.forEach { (k, v) -> holdings[k] = v }
+        // BacktestModels.simulateTicks relies on `cashBalanceIn` to override the cash balance
+        // to avoid double counting the initial holdings. We MUST respect cashBalanceIn.
+        var newCash = cashBalanceIn
+        val newHoldings = state.holdings.toMutableMap()
+        val newBaselines = state.baselines.toMutableMap()
+        val newLastAction = state.lastActionTimestamps.toMutableMap()
+        val newRebalance = state.rebalanceState.toMutableMap()
+        val newCpState = state.crashProtectionState.toMutableMap()
+        var newTotalHarvested = state.totalHarvested
+
+        if (mode == Mode.LIVE && holdingDetails != null) holdingDetails.forEach { (k, v) -> newHoldings[k] = v }
 
         var anyTradesThisCycle = false
         var stateChanged = false
@@ -85,51 +130,48 @@ class TradingEngine(
 
         var currentHoldingsValue = 0.0
         portfolioSummary.forEach { currentHoldingsValue += it.Value }
-        val currentTotalValue = currentHoldingsValue + cashBalance
+        val currentTotalValue = currentHoldingsValue + newCash
 
         portfolioSummary.forEach { row ->
-            if (row.Value > 1.0 && (baselines[row.Symbol] ?: 0.0) <= 0.0) {
-                baselines[row.Symbol] = row.Value
+            if (row.Value > 1.0 && (newBaselines[row.Symbol] ?: 0.0) <= 0.0) {
+                newBaselines[row.Symbol] = row.Value
                 stateChanged = true
             }
-            if (!lastActionTimestamps.containsKey(row.Symbol) && (baselines[row.Symbol] ?: 0.0) > 0.0) {
-                lastActionTimestamps[row.Symbol] = epochMillis()
+            if (!newLastAction.containsKey(row.Symbol) && (newBaselines[row.Symbol] ?: 0.0) > 0.0) {
+                newLastAction[row.Symbol] = epochMillis()
                 stateChanged = true
             }
         }
 
         // ── Crash protection: detect, suppress, recover ──
-        // Phase 1: Check exit conditions for existing CP (partial recovery)
         val cpRecoveryPercent = getGenomicParam(GenomeParam.CRASH_PROTECTION_PARTIAL_RECOVERY_PERCENT,
             portfolioSummary.firstOrNull()?.Symbol ?: "")
         for (row in portfolioSummary) {
-            val trough = crashProtectionState[row.Symbol] ?: continue
-            val baseline = baselines[row.Symbol] ?: continue
+            val trough = newCpState[row.Symbol] ?: continue
+            val baseline = newBaselines[row.Symbol] ?: continue
             val drop = baseline - trough
             if (drop <= 0.0) continue
             val recoveryNeeded = drop * cpRecoveryPercent
             if (row.Value >= trough + recoveryNeeded) {
-                // Partial recovery achieved: exit CP, reset baseline
                 val newBaseline = row.Value
-                baselines[row.Symbol] = newBaseline
-                crashProtectionState.remove(row.Symbol)
+                newBaselines[row.Symbol] = newBaseline
+                newCpState.remove(row.Symbol)
                 stateChanged = true
             }
         }
 
-        // Phase 2: Detect new crash entries (before harvest)
         val cpTriggerAsset = getGenomicParam(GenomeParam.CP_TRIGGER_ASSET_PERCENT,
             portfolioSummary.firstOrNull()?.Symbol ?: "")
         val cpMinNegDev = getGenomicParam(GenomeParam.CP_TRIGGER_MIN_NEGATIVE_DEV_PERCENT,
             portfolioSummary.firstOrNull()?.Symbol ?: "")
         if (cpTriggerAsset > 0.0) {
             for (row in portfolioSummary) {
-                if (row.Symbol in crashProtectionState) continue  // already in CP
-                val baseline = baselines[row.Symbol] ?: continue
+                if (row.Symbol in newCpState) continue
+                val baseline = newBaselines[row.Symbol] ?: continue
                 if (baseline <= 0.0) continue
-                val deviation = (row.Value - baseline) / baseline  // negative during drawdown
+                val deviation = (row.Value - baseline) / baseline
                 if (deviation < 0.0 && -deviation >= cpTriggerAsset && -deviation >= cpMinNegDev) {
-                    crashProtectionState[row.Symbol] = row.Value  // record trough
+                    newCpState[row.Symbol] = row.Value
                     stateChanged = true
                 }
             }
@@ -137,10 +179,9 @@ class TradingEngine(
 
         // Harvest logic
         for (row in portfolioSummary) {
-            // Crash protection: suppress harvest for symbols in CP
-            if (row.Symbol in crashProtectionState) continue
+            if (row.Symbol in newCpState) continue
 
-            val baseline = baselines[row.Symbol] ?: row.Value
+            val baseline = newBaselines[row.Symbol] ?: row.Value
             val surplus = row.Value - baseline
             val minSurplus = getGenomicParam(GenomeParam.MIN_SURPLUS_FOR_HARVEST, row.Symbol)
             val enableHarvest = genome.getBoolean("ENABLE_PORTFOLIO_HARVEST", true)
@@ -149,46 +190,38 @@ class TradingEngine(
                 val takePercent = getGenomicParam(GenomeParam.HARVEST_TAKE_PERCENT, row.Symbol)
                 val take = surplus * takePercent
                 harvestedAmount += take
-                totalHarvested += take
-                cashBalance += take
-                // Mark harvested portion as consumed by raising baseline to avoid repeated harvesting of the same surplus
-                baselines[row.Symbol] = baseline + take
+                newTotalHarvested += take
+                newCash += take
+                newBaselines[row.Symbol] = baseline + take
                 anyTradesThisCycle = true
                 stateChanged = true
                 tradedSymbols.add(row.Symbol)
             }
         }
 
-        // ── Rebalance execution: act on previously scheduled rebalances ──
-        // If a rebalance was scheduled on a prior cycle, execute it now:
-        // reset the baseline to the current value so harvest surplus tracking
-        // resumes from the rebalanced anchor.
-        val toExecute = rebalanceState.keys.toList()
+        val toExecute = newRebalance.keys.toList()
         for (sym in toExecute) {
             val row = portfolioSummary.find { it.Symbol == sym }
             if (row != null && row.Value > 0.0) {
-                baselines[sym] = row.Value
-                rebalanceState.remove(sym)
+                newBaselines[sym] = row.Value
+                newRebalance.remove(sym)
                 stateChanged = true
             }
         }
 
-        // ── Rebalance scheduling ──
-        // If FLAT_REBALANCE_TRIGGER_PERCENT is small and deviation exists, schedule
         val rebalanceTrigger = getGenomicParam(GenomeParam.FLAT_REBALANCE_TRIGGER_PERCENT, portfolioSummary.firstOrNull()?.Symbol ?: "")
         if (rebalanceTrigger > 0 && portfolioSummary.isNotEmpty()) {
             for (row in portfolioSummary) {
-                val baseline = baselines[row.Symbol] ?: row.Value
+                val baseline = newBaselines[row.Symbol] ?: row.Value
                 if (baseline <= 0.0) continue
                 val dev = (row.Value - baseline) / baseline
-                if (dev > rebalanceTrigger && row.Symbol !in rebalanceState) {
-                    rebalanceState[row.Symbol] = mapOf("scheduledAt" to epochMillis())
+                if (dev > rebalanceTrigger && row.Symbol !in newRebalance) {
+                    newRebalance[row.Symbol] = mapOf("scheduledAt" to epochMillis())
                     stateChanged = true
                 }
             }
         }
 
-        // ── Reinvest: use harvested cash to buy dip symbols ──
         var reinvestedAmount = 0.0
         val reinvestedSymbols = mutableListOf<String>()
         val reinvestPct = getGenomicParam(GenomeParam.HARVEST_ALLOC_REINVEST_PERCENT,
@@ -200,23 +233,21 @@ class TradingEngine(
 
         if (reinvestPct > 0.0 && harvestedAmount > 0.0) {
             val reinvestBudget = harvestedAmount * reinvestPct
-            // Find symbols with negative deviation (below baseline, not in CP)
             val dipSymbols = portfolioSummary.filter { row ->
-                row.Symbol !in crashProtectionState &&
-                (baselines[row.Symbol] ?: 0.0) > 0.0 &&
-                ((row.Value - (baselines[row.Symbol] ?: row.Value)) / (baselines[row.Symbol] ?: row.Value)) < -minNegDev
+                row.Symbol !in newCpState &&
+                (newBaselines[row.Symbol] ?: 0.0) > 0.0 &&
+                ((row.Value - (newBaselines[row.Symbol] ?: row.Value)) / (newBaselines[row.Symbol] ?: row.Value)) < -minNegDev
             }
             if (dipSymbols.isNotEmpty()) {
                 val perSymbol = reinvestBudget / dipSymbols.size
                 if (perSymbol >= minBuy) {
                     for (row in dipSymbols) {
-                        val buyAmount = perSymbol.coerceAtMost(cashBalance)
+                        val buyAmount = perSymbol.coerceAtMost(newCash)
                         if (buyAmount >= minBuy) {
-                            cashBalance -= buyAmount
+                            newCash -= buyAmount
                             reinvestedAmount += buyAmount
-                            // Add to holdings (simulated: quantity = buyAmount / price)
-                            val existingQty = holdings[row.Symbol]?.rawQuantity ?: 0.0
-                            holdings[row.Symbol] = Holding(existingQty + buyAmount / row.Price)
+                            val existingQty = newHoldings[row.Symbol]?.rawQuantity ?: 0.0
+                            newHoldings[row.Symbol] = Holding(existingQty + buyAmount / row.Price)
                             reinvestedSymbols.add(row.Symbol)
                             anyTradesThisCycle = true
                             stateChanged = true
@@ -225,6 +256,17 @@ class TradingEngine(
                 }
             }
         }
+
+        state = state.copy(
+            cashBalance = newCash,
+            holdings = newHoldings,
+            baselines = newBaselines,
+            lastActionTimestamps = newLastAction,
+            rebalanceState = newRebalance,
+            crashProtectionState = newCpState,
+            totalHarvested = newTotalHarvested
+        )
+
 
         return EngineResult(anyTradesThisCycle, harvestedAmount, tradedSymbols, emptyList(), false, stateChanged,
             reinvestedAmount = reinvestedAmount, reinvestedSymbols = reinvestedSymbols)

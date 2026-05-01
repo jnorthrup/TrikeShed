@@ -80,8 +80,7 @@ class RealtimeHarnessTest {
 
     @Test
     fun `stochastic trainer emits full bag span training snapshot`() = runTest {
-        val trainer = StochasticBagSpanTrainer(
-            StochasticTrainingConfig(
+        val config = StochasticTrainingConfig(
                 bases = listOf("BTC", "ETH", "SOL"),
                 rowsPerSeries = 48,
                 populationSize = 4,
@@ -89,7 +88,7 @@ class RealtimeHarnessTest {
                 initialCapital = 100.0,
                 seed = 23,
             )
-        )
+        val trainer = StochasticBagSpanTrainer(config = config, inputs = archiveInputs(config))
 
         val first = trainer.runGeneration()
         val second = trainer.runGeneration()
@@ -126,7 +125,7 @@ class RealtimeHarnessTest {
             seed = 57,
         )
 
-        val trainer = StochasticBagSpanTrainer(config)
+        val trainer = StochasticBagSpanTrainer(config = config, inputs = archiveInputs(config))
 
         // Run 3 generations
         val gen1 = trainer.runGeneration()
