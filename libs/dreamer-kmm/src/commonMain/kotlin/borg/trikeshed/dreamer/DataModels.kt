@@ -51,7 +51,7 @@ enum class GenomeParam(
     ORACLE_VOLATILITY_THRESHOLD,
     EVOLUTION_INTERVAL_MINUTES;
 
-    val storageKey: String get() = name ?: this@GenomeParam.name
+    val storageKey: String get() = name
 
     companion object {
         val byKey: Map<String, GenomeParam> = values().flatMap { param ->

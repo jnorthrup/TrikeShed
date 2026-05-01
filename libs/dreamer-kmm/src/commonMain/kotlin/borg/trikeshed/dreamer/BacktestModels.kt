@@ -391,7 +391,10 @@ suspend fun simulateTicks(
         onCycle(cycle)
     }
 
-    val cycles: Series<CycleResult> = (cycleArray as Array<CycleResult>).toSeries()
+    // Every slot is written by the loop above; build non-null array explicitly
+    @Suppress("UNCHECKED_CAST")
+    val nonNull = Array(n) { cycleArray[it]!! }
+    val cycles: Series<CycleResult> = nonNull.toSeries()
     val closes = closesFromCursor(cursor)
     val metrics = computeBacktestMetrics(cycles, initialCapital, closes)
 
@@ -523,7 +526,10 @@ suspend fun simulateMultiSymbolTicks(
         onCycle(cycle)
     }
 
-    val cycles: Series<CycleResult> = (cycleArray as Array<CycleResult>).toSeries()
+    // Every slot is written by the loop above; build non-null array explicitly
+    @Suppress("UNCHECKED_CAST")
+    val nonNull = Array(tickCount) { cycleArray[it]!! }
+    val cycles: Series<CycleResult> = nonNull.toSeries()
     val closes = closesFromCursor(cursor)
     val metrics = computeBacktestMetrics(cycles, initialCapital, closes)
 
