@@ -14,13 +14,12 @@ class GeneratedHtxGeneralClientTest {
         val api = DefaultHtxGeneralApi { request ->
             assertEquals(HttpMethod.GET, request.method)
             assertEquals("/health", request.path)
-            HtxGeneralApiContract.GetHealth.responseBody
+            "ok"
         }
 
         val response = api.getHealth()
 
         assertEquals("getHealth", HtxGeneralApiContract.GetHealth.operationId)
-        assertEquals("ok", response.body)
-        assertTrue(response.ok)
+        assertEquals("ok", response)
     }
 }
