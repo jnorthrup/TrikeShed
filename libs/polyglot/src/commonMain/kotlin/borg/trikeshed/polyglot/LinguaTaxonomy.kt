@@ -10,15 +10,15 @@ import borg.trikeshed.lib.*
 import kotlin.math.abs
 
 /* ═══════════════════════════════════════════════════════════════════════════
- *  Polyglot taxonomy — speculative language classification via SupervisorJob fanout.
+ *  Polyglot taxonomy — speculative language classification.
  *
  *  Every registered language carries:
  *    - a reference [LangFingerprint] — TypeEvidence row over its keyword corpus
  *    - a [LangClassifier] — scanner that produces a TypeEvidence row from live source
  *
- *  Classification is speculative: all N classifiers run concurrently under
- *  ParseScope.fanoutParsers(). Each emits a [ClassificationResult] with a
- *  confidence score. The highest-scoring result selects the parser.
+ *  Classification is speculative: all N classifiers run sequentially. Each emits
+ *  a [ClassificationResult] with a confidence score. The highest-scoring result
+ *  selects the parser.
  *
  *  The registry emits Series<RowVec> so it participates in Cursor algebra
  *  directly. Fingerprints are additive TypeEvidence rows, not scalar scores.
@@ -166,6 +166,11 @@ fun confidence(live: TypeEvidence, ref: TypeEvidence): Double {
         live.maxColumnLength.toDouble(),
         if (live.minColumnLength == UShort.MAX_VALUE) 0.0 else live.minColumnLength.toDouble()
     ]
+
+    var liveSum = 0.0
+    liveVals.view.forEach { liveSum += it }
+    if (liveSum == 0.0) return 0.0
+
     val refVals: Series<Double> = s_[
         ref.digits.toDouble(),
         ref.periods.toDouble(),
@@ -227,47 +232,73 @@ data class LangEntry(
     }
 }
 
-/** Thread-safe append-only language registry. */
-object LangRegistry {
-    private val entries = mutableListOf<LangEntry>()
-
+interface LangRegistry {
     fun register(
         id: LangId,
         fingerprint: LangFingerprint,
         classifier: LangClassifier,
         extensions: Series<String>,
         shebang: String? = null,
-    ): LangEntry = LangEntry(id, fingerprint, classifier, extensions, shebang).also { entries.add(it) }
+    ): LangEntry
 
-    fun all(): Series<LangEntry> = entries.toSeries()
+    fun all(): Series<LangEntry>
+    fun reset()
+    fun series(): Series<LangEntry>
+    fun byExtension(ext: String): LangEntry?
+    fun byId(id: LangId): LangEntry?
+    fun classifyAll(source: Series<Char>): Series<ClassificationResult>
+    fun bestMatch(source: Series<Char>): ClassificationResult?
+}
+
+/** Thread-safe append-only language registry implementation. */
+class ConcurrentLangRegistry : LangRegistry {
+    private val entries = mutableListOf<LangEntry>()
+    private var sealed = false
+
+    fun seal() {
+        sealed = true
+    }
+
+    override fun register(
+        id: LangId,
+        fingerprint: LangFingerprint,
+        classifier: LangClassifier,
+        extensions: Series<String>,
+        shebang: String?,
+    ): LangEntry {
+        if (sealed) throw IllegalStateException("LangRegistry is sealed and cannot be modified")
+        return LangEntry(id, fingerprint, classifier, extensions, shebang).also { entries.add(it) }
+    }
+
+    override fun all(): Series<LangEntry> = entries.toSeries()
 
     /** Reset for test isolation. */
-    fun reset() {
+    override fun reset() {
+        if (sealed) throw IllegalStateException("LangRegistry is sealed and cannot be reset")
         entries.clear()
     }
 
-    fun series(): Series<LangEntry> = entries.size j { i: Int -> entries[i] }
+    override fun series(): Series<LangEntry> = entries.size j { i: Int -> entries[i] }
 
-    fun byExtension(ext: String): LangEntry? = entries.find { entry ->
+    override fun byExtension(ext: String): LangEntry? = entries.find { entry ->
         entry.extensions.view.contains(ext)
     }
 
-    fun byId(id: LangId): LangEntry? = entries.find { it.id == id }
+    override fun byId(id: LangId): LangEntry? = entries.find { it.id == id }
 
     /**
-     * Speculative classification: run all registered classifiers concurrently.
+     * Speculative classification: run all registered classifiers sequentially.
      *
-     * Under ParseScope.fanoutParsers(), each classifier gets a child scope.
      * Results are collected and ranked by confidence. The top result wins.
      *
      * Returns ClassificationResults sorted by confidence descending.
      */
-    fun classifyAll(source: Series<Char>): Series<ClassificationResult> {
+    override fun classifyAll(source: Series<Char>): Series<ClassificationResult> {
         val results = entries.map { it.classify(source) }.sortedByDescending { it.confidence }
         return results.toSeries()
     }
 
     /** Top-ranked classification, or null if registry is empty. */
-    fun bestMatch(source: Series<Char>): ClassificationResult? =
+    override fun bestMatch(source: Series<Char>): ClassificationResult? =
         classifyAll(source).firstOrNull()
 }
