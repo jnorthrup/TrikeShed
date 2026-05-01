@@ -578,3 +578,112 @@ suspend fun simulateMultiSymbolTicks(
     is String -> value.toIntOrNull() ?: 0
     else -> 0
 }
+
+/**
+ * Aggregate summary across multiple back-test runs (e.g. multi-symbol, multi-gen, multi-timespan).
+ *
+ * Averages Sharpe/Sortino, sums ticks/trades/harvested, weights returns by initial capital,
+ * and reports the max single-run drawdown and best/worst returns.
+ */
+data class BacktestAggregateReport(
+    val runCount: Int,
+    val totalTicks: Int,
+    val avgTotalReturn: Double,     // capital-weighted mean return
+    val avgSharpeRatio: Double,     // arithmetic mean
+    val avgSortinoRatio: Double,    // arithmetic mean
+    val maxDrawdown: Double,        // worst single-run drawdown
+    val maxDrawdownTicks: Int,      // ticks of worst drawdown
+    val totalTrades: Int,           // sum across all runs
+    val totalHarvested: Double,      // sum across all runs
+    val bestReturn: Double,          // best single-run return
+    val worstReturn: Double,        // worst single-run return
+    val bestGenome: Map<String, Any?>? = null,  // genome of best run, if available
+)
+
+/**
+ * Roll up one or more [BacktestReport] into an aggregate summary.
+ * Pass [bestGenome] to carry forward the champion genome from the best run.
+ */
+fun aggregateReports(
+    reports: List<BacktestReport>,
+    bestGenome: Map<String, Any?>? = null,
+): BacktestAggregateReport {
+    if (reports.isEmpty()) {
+        return BacktestAggregateReport(
+            runCount = 0,
+            totalTicks = 0,
+            avgTotalReturn = 0.0,
+            avgSharpeRatio = 0.0,
+            avgSortinoRatio = 0.0,
+            maxDrawdown = 0.0,
+            maxDrawdownTicks = 0,
+            totalTrades = 0,
+            totalHarvested = 0.0,
+            bestReturn = 0.0,
+            worstReturn = 0.0,
+            bestGenome = bestGenome,
+        )
+    }
+    if (reports.size == 1) {
+        val r = reports[0]
+        return BacktestAggregateReport(
+            runCount = 1,
+            totalTicks = r.totalTicks,
+            avgTotalReturn = r.totalReturn,
+            avgSharpeRatio = r.sharpeRatio,
+            avgSortinoRatio = r.sortinoRatio,
+            maxDrawdown = r.maxDrawdown,
+            maxDrawdownTicks = r.maxDrawdownTicks,
+            totalTrades = r.totalTrades,
+            totalHarvested = r.totalHarvested,
+            bestReturn = r.totalReturn,
+            worstReturn = r.totalReturn,
+            bestGenome = bestGenome,
+        )
+    }
+
+    val totalTicks = reports.sumOf { it.totalTicks }
+    val totalTrades = reports.sumOf { it.totalTrades }
+    val totalHarvested = reports.sumOf { it.totalHarvested }
+
+    // Capital-weighted average return (each run weighted by its initial capital)
+    val totalCapital = reports.sumOf { it.initialCapital }
+    val avgTotalReturn = if (totalCapital > 0.0) {
+        reports.sumOf { it.totalReturn * it.initialCapital } / totalCapital
+    } else 0.0
+
+    val avgSharpeRatio = reports.map { it.sharpeRatio }.average()
+    val avgSortinoRatio = reports.map { it.sortinoRatio }.average()
+
+    val worst = reports.minByOrNull { it.totalReturn }!!
+    val best = reports.maxByOrNull { it.totalReturn }!!
+
+    val maxDrawdownReport = reports.maxByOrNull { it.maxDrawdown }!!
+    return BacktestAggregateReport(
+        runCount = reports.size,
+        totalTicks = totalTicks,
+        avgTotalReturn = avgTotalReturn,
+        avgSharpeRatio = avgSharpeRatio,
+        avgSortinoRatio = avgSortinoRatio,
+        maxDrawdown = maxDrawdownReport.maxDrawdown,
+        maxDrawdownTicks = maxDrawdownReport.maxDrawdownTicks,
+        totalTrades = totalTrades,
+        totalHarvested = totalHarvested,
+        bestReturn = best.totalReturn,
+        worstReturn = worst.totalReturn,
+        bestGenome = bestGenome,
+    )
+}
+
+/**
+ * Build an aggregate report from a list of [GenomeEvaluation] by extracting
+ * each genome's [BacktestResult] and rolling it up.
+ */
+fun aggregateEvaluations(
+    evaluations: List<GenomeEvaluation>,
+    bestGenome: Map<String, Any?>? = null,
+): BacktestAggregateReport {
+    val reports = evaluations.map { it.result.toBacktestReport() }
+    val championGenome = evaluations.maxByOrNull { it.fitness }?.genome?.backing
+    return aggregateReports(reports, bestGenome ?: championGenome)
+}

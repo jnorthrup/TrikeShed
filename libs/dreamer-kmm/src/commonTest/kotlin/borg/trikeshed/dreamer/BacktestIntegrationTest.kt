@@ -396,4 +396,95 @@ class BacktestIntegrationTest {
         // All fitnesses should be finite
         assertTrue(generationFitnesses.all { it.isFinite() })
     }
+
+    @Test
+    fun `aggregateReports empty list returns zero fields`() {
+        val agg = aggregateReports(emptyList())
+        assertEquals(0, agg.runCount)
+        assertEquals(0.0, agg.avgTotalReturn)
+        assertEquals(0.0, agg.avgSharpeRatio)
+        assertEquals(0, agg.totalTicks)
+    }
+
+    @Test
+    fun `aggregateReports single report passthrough preserves all fields`() {
+        val report = BacktestReport(
+            symbol = "ETHUSDT",
+            initialCapital = 10_000.0,
+            finalEquity = 11_500.0,
+            totalReturn = 0.15,
+            sharpeRatio = 1.2,
+            sortinoRatio = 1.8,
+            maxDrawdown = 0.05,
+            maxDrawdownTicks = 3,
+            totalTrades = 7,
+            totalHarvested = 320.0,
+            totalTicks = 30,
+        )
+        val agg = aggregateReports(listOf(report))
+        assertEquals(1, agg.runCount)
+        assertEquals(0.15, agg.avgTotalReturn, 0.001)
+        assertEquals(1.2, agg.avgSharpeRatio, 0.001)
+        assertEquals(1.8, agg.avgSortinoRatio, 0.001)
+        assertEquals(0.05, agg.maxDrawdown, 0.001)
+        assertEquals(7, agg.totalTrades)
+        assertEquals(320.0, agg.totalHarvested, 0.001)
+        assertEquals(0.15, agg.bestReturn, 0.001)
+        assertEquals(0.15, agg.worstReturn, 0.001)
+    }
+
+    @Test
+    fun `aggregateReports two reports averages SharpeSortino and capital-weights return`() {
+        val r1 = BacktestReport("A", 10_000.0, 11_000.0, 0.10, 1.0, 1.5, 0.05, 2, 5, 100.0, 20)
+        val r2 = BacktestReport("B", 30_000.0, 33_000.0, 0.10, 2.0, 2.5, 0.08, 4, 10, 300.0, 40)
+        val agg = aggregateReports(listOf(r1, r2))
+
+        assertEquals(2, agg.runCount)
+        // Capital-weighted return: (0.10*10000 + 0.10*30000) / 40000 = 0.10
+        assertEquals(0.10, agg.avgTotalReturn, 0.001)
+        // Arithmetic mean Sharpe: (1.0 + 2.0) / 2 = 1.5
+        assertEquals(1.5, agg.avgSharpeRatio, 0.001)
+        assertEquals(2.0, agg.avgSortinoRatio, 0.001)
+        // Max drawdown is worst: max(0.05, 0.08) = 0.08
+        assertEquals(0.08, agg.maxDrawdown, 0.001)
+        assertEquals(15, agg.totalTrades)
+        assertEquals(400.0, agg.totalHarvested, 0.001)
+        assertEquals(0.10, agg.bestReturn, 0.001)
+        assertEquals(0.10, agg.worstReturn, 0.001)
+    }
+
+    @Test
+    fun `aggregateReports best and worst return pinned correctly across runs`() {
+        val r1 = BacktestReport("A", 10_000.0, 13_000.0, 0.30, 1.0, 1.0, 0.02, 1, 3, 50.0, 10)
+        val r2 = BacktestReport("B", 10_000.0, 10_500.0, 0.05, 0.5, 0.5, 0.10, 5, 8, 20.0, 10)
+        val r3 = BacktestReport("C", 10_000.0, 12_000.0, 0.20, 0.8, 0.8, 0.05, 3, 5, 30.0, 10)
+        val agg = aggregateReports(listOf(r1, r2, r3))
+
+        assertEquals(0.30, agg.bestReturn, 0.001)
+        assertEquals(0.05, agg.worstReturn, 0.001)
+        // Equal capital weighting → simple avg of returns: (0.30+0.05+0.20)/3 ≈ 0.1833
+        assertEquals(0.1833, agg.avgTotalReturn, 0.001)
+    }
+
+    @Test
+    fun `aggregateEvaluations extracts champion genome backing map`() = runTest {
+        val csv = generatedArchiveCsv(
+            symbol = "BTCUSDT",
+            rows = 20,
+            timespan = TimeSpan.Minutes1,
+            startOpenTime = 1_704_067_200_000L,
+            assetIndex = 0,
+            seed = 7,
+        )
+        val genomes = listOf(
+            Genome(mutableMapOf("FITNESS_DRAWDOWN_PENALTY" to 0.5)),
+            Genome(mutableMapOf("FITNESS_DRAWDOWN_PENALTY" to 2.0)),
+        )
+        val evals = evaluatePopulation(genomes, csv, "BTCUSDT", TimeSpan.Minutes1, 10_000.0)
+        val agg = aggregateEvaluations(evals)
+
+        assertEquals(2, agg.runCount)
+        assertNotNull(agg.bestGenome)
+        assertTrue(agg.bestGenome!!.isNotEmpty())
+    }
 }
