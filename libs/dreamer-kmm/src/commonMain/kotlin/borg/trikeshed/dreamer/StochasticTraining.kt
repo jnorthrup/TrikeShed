@@ -166,19 +166,7 @@ class StochasticBagSpanTrainer(
         return profit + trades * 0.001 - drawdownPenalty
     }
 
-    public fun HarnessRunResult.maxDrawdown(initialCapital: Double): Double {
-        var peak = initialCapital
-        var maxDrawdown = 0.0
-        cycles.forEach { cycle ->
-            if (cycle.totalValue > peak) {
-                peak = cycle.totalValue
-            } else if (peak > 0.0) {
-                val drawdown = (peak - cycle.totalValue) / peak
-                if (drawdown > maxDrawdown) maxDrawdown = drawdown
-            }
-        }
-        return maxDrawdown
-    }
+    // maxDrawdown is provided by GenomeTraining.kt's HarnessRunResult.maxDrawdown extension
 }
  public fun archiveInputs(config: StochasticTrainingConfig): List<HarnessReplayInput> {
     val feed = BinanceVisionKlineFeed()
