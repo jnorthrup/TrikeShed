@@ -72,13 +72,13 @@ The module is correctly standalone with zero TrikeShed algebra dependency.
 
 ## Path to Stable
 
-- [ ] Fix `macosMain` TODO stub — provide real implementation or confirm arch-specific override is always used
-- [ ] Fix `linuxMain` TODO stub — consolidate from `linuxX64Main`/`linuxArm64Main`
-- [ ] Remove unused imports in native actuals
-- [ ] Remove or repurpose dead `nativeMain` actual
-- [ ] Add macOS native `sysctl` interop for cache sizes (currently JVM-only)
-- [ ] Add `commonTest` for `CpuCacheTopology` and `toConfix()`
-- [ ] Document platform coverage matrix in code comments
-- [ ] Consider adding a `windowsMain` actual (currently no Windows support)
-- [ ] Add gradle task to run native binary `interrogateCpu` (currently JVM-only task)
-- [ ] Mark stable once all platform actuals return real data (or documented null fallbacks)
+- [x] Fix `macosMain` TODO stub — provide real implementation or confirm arch-specific override is always used
+- [x] Fix `linuxMain` TODO stub — consolidate from `linuxX64Main`/`linuxArm64Main`
+- [x] Remove unused imports in native actuals
+- [x] Remove or repurpose dead `nativeMain` actual
+- [x] Add macOS native `sysctl` interop for cache sizes (currently JVM-only)
+- [x] Add `commonTest` for `CpuCacheTopology` and `toConfix()`
+- [x] Document platform coverage matrix in code comments
+- [x] Consider adding a `windowsMain` actual (currently no Windows support)
+- [x] Add gradle task to run native binary `interrogateCpu` (currently JVM-only task)
+- [x] Mark stable once all platform actuals return real data (or documented null fallbacks)

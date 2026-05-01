@@ -1,3 +1,5 @@
+#!/bin/bash
+cat << 'INNER_EOF' > libs/cpu-cache/src/commonMain/kotlin/borg/trikeshed/cpucache/CpuCacheTopology.kt
 package borg.trikeshed.cpucache
 
 /**
@@ -43,3 +45,4 @@ fun CpuCacheTopology.toConfix(): String = buildString {
     appendLine("  \"coreCount\": ${coreCount ?: "null"}")
     append("}")
 }
+INNER_EOF

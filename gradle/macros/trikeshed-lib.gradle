@@ -229,10 +229,53 @@ switch (project.path) {
         kmpFull(rootMode: "none", coroutinesMain: false)
         def cpuKotlin = extensions.getByName("kotlin")
         if (System.getProperty("os.name") == "Mac OS X" && cpuKotlin.targets.findByName("macosX64") == null) {
-            cpuKotlin.macosX64()
+            cpuKotlin.macosX64("macos") {
+                binaries.executable("interrogateCpuNative") {
+                    entryPoint = "borg.trikeshed.cpucache.main"
+                }
+            }
         }
-        if (cpuKotlin.targets.findByName("linux") == null) cpuKotlin.linuxX64("linux")
-        if (cpuKotlin.targets.findByName("linuxArm64") == null) cpuKotlin.linuxArm64()
+        if (cpuKotlin.targets.findByName("linux") == null) {
+            cpuKotlin.linuxX64("linux") {
+                binaries.executable("interrogateCpuNative") {
+                    entryPoint = "borg.trikeshed.cpucache.main"
+                }
+            }
+        } else {
+            def linuxTarget = cpuKotlin.targets.getByName("linux")
+            linuxTarget.binaries.executable("interrogateCpuNative") {
+                entryPoint = "borg.trikeshed.cpucache.main"
+            }
+        }
+        if (cpuKotlin.targets.findByName("linuxArm64") == null) {
+            cpuKotlin.linuxArm64("linuxArm64") {
+                binaries.executable("interrogateCpuNative") {
+                    entryPoint = "borg.trikeshed.cpucache.main"
+                }
+            }
+        } else {
+            def linuxArm64Target = cpuKotlin.targets.getByName("linuxArm64")
+            linuxArm64Target.binaries.executable("interrogateCpuNative") {
+                entryPoint = "borg.trikeshed.cpucache.main"
+            }
+        }
+        tasks.register("interrogateCpuNative", Exec) {
+            group = "cpu-cache"
+            description = "Interrogate CPU cache topology using Native binary and print Confix JSON"
+            def isMac = System.getProperty("os.name") == "Mac OS X"
+            def isArm = System.getProperty("os.arch") == "aarch64"
+            def targetName = "linux"
+            if (isMac) {
+                targetName = isArm ? "macosArm64" : "macosX64"
+            } else if (isArm) {
+                targetName = "linuxArm64"
+            }
+            if (targetName == "macosX64") targetName = "macos"
+            def capitalizedName = targetName.substring(0, 1).toUpperCase() + targetName.substring(1)
+            dependsOn("linkInterrogateCpuNativeReleaseExecutable${capitalizedName}")
+            def buildDir = layout.buildDirectory.get().asFile
+            commandLine("${buildDir}/bin/${targetName}/interrogateCpuNativeReleaseExecutable/interrogateCpuNative.kexe")
+        }
         tasks.register("interrogateCpu", JavaExec) {
             group = "cpu-cache"
             description = "Interrogate CPU cache topology and print Confix JSON"
