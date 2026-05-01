@@ -90,12 +90,12 @@
 
 ## Path to Stable
 
-- [ ] NarsiveElementKind/Element KDoc pass
-- [ ] NarsiveSupervisorJob API cleanup (full Job or query-only)
-- [ ] Nars3Machine channel fix (buffered, race-free)
-- [ ] LocalAtom/ChannelizedAtom merge or differentiation
-- [ ] Narsive._term visibility fix
-- [ ] userspace.concurrency.Job decoupling
-- [ ] TypeEvidence column schema consistency test
-- [ ] Fuzz testing for parser robustness
-- [ ] Performance benchmark for large NAL programs (>1000 lines)
+- [x] NarsiveElementKind/Element KDoc pass
+- [x] NarsiveSupervisorJob API cleanup (full Job or query-only)
+- [x] Nars3Machine channel fix (buffered, race-free)
+- [x] LocalAtom/ChannelizedAtom merge or differentiation
+- [x] Narsive._term visibility fix
+- [x] userspace.concurrency.Job decoupling
+- [x] TypeEvidence column schema consistency test
+- [x] Fuzz testing for parser robustness
+- [x] Performance benchmark for large NAL programs (>1000 lines)
