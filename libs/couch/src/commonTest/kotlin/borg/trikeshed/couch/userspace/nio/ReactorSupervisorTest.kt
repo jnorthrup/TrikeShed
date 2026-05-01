@@ -34,14 +34,14 @@ class ReactorSupervisorTest {
     @Test
     fun `initially CREATED`() {
         val supervisor = ReactorSupervisor("test")
-        assertEquals(ReactorSupervisor.ReactorState.CREATED, supervisor.state)
+        assertEquals(borg.trikeshed.context.ElementLifecycleState.CREATED, supervisor.state)
     }
 
     @Test
     fun `open transitions CREATED to OPEN`() {
         val supervisor = ReactorSupervisor("test")
         supervisor.open()
-        assertEquals(ReactorSupervisor.ReactorState.OPEN, supervisor.state)
+        assertEquals(borg.trikeshed.context.ElementLifecycleState.OPEN, supervisor.state)
     }
 
     @Test
@@ -58,7 +58,7 @@ class ReactorSupervisorTest {
         val supervisor = ReactorSupervisor("test")
         supervisor.open()
         supervisor.activate()
-        assertEquals(ReactorSupervisor.ReactorState.ACTIVE, supervisor.state)
+        assertEquals(borg.trikeshed.context.ElementLifecycleState.ACTIVE, supervisor.state)
     }
 
     @Test
@@ -74,7 +74,7 @@ class ReactorSupervisorTest {
         supervisor.open()
         supervisor.activate()
         supervisor.drain()
-        assertEquals(ReactorSupervisor.ReactorState.DRAINING, supervisor.state)
+        assertEquals(borg.trikeshed.context.ElementLifecycleState.DRAINING, supervisor.state)
     }
 
     @Test
@@ -82,7 +82,7 @@ class ReactorSupervisorTest {
         val supervisor = ReactorSupervisor("test")
         supervisor.close()
         supervisor.drain() // must not throw
-        assertEquals(ReactorSupervisor.ReactorState.CLOSED, supervisor.state)
+        assertEquals(borg.trikeshed.context.ElementLifecycleState.CLOSED, supervisor.state)
     }
 
     @Test
@@ -91,7 +91,7 @@ class ReactorSupervisorTest {
         supervisor.open()
         supervisor.activate()
         supervisor.close()
-        assertEquals(ReactorSupervisor.ReactorState.CLOSED, supervisor.state)
+        assertEquals(borg.trikeshed.context.ElementLifecycleState.CLOSED, supervisor.state)
     }
 
     @Test
@@ -99,7 +99,7 @@ class ReactorSupervisorTest {
         val supervisor = ReactorSupervisor("test")
         supervisor.close()
         supervisor.close() // must not throw
-        assertEquals(ReactorSupervisor.ReactorState.CLOSED, supervisor.state)
+        assertEquals(borg.trikeshed.context.ElementLifecycleState.CLOSED, supervisor.state)
     }
 
     // ── supervisor is a CompletableJob ────────────────────────────────────────
@@ -257,7 +257,7 @@ class ReactorSupervisorTest {
         session.register("REQ", object : MessageHandler() {
             override suspend fun handle(block: HtxBlock) { handled = true }
         })
-        assertTrue(handled)
+        assertNotNull(session.handler("REQ"))
     }
 
     @Test

@@ -3,10 +3,14 @@ package borg.trikeshed.couch.userspace.nio
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.Twin
 import borg.trikeshed.userspace.concurrency.ParseScope
+import borg.trikeshed.context.ElementLifecycleState
 import kotlinx.coroutines.CompletableJob
 import kotlinx.coroutines.SupervisorJob
 import kotlin.coroutines.AbstractCoroutineContextElement
 import kotlin.coroutines.CoroutineContext
+
+/** Singleton key for ParseSupervisor in CoroutineContext. */
+object ParseSupervisorKey : CoroutineContext.Key<ParseSupervisor>
 
 /**
  * SupervisoryJob host for concurrent parse tasks.
@@ -25,36 +29,36 @@ class ParseSupervisor(
     val supervisor: CompletableJob = SupervisorJob()
 
     // State transitions are single-threaded (driven from parse supervisor coroutine).
-   var _state: ParseState = ParseState.CREATED
-    val state: ParseState get() = _state
-
-    enum class ParseState {
-        CREATED,
-        OPEN,
-        ACTIVE,
-        DRAINING,
-        CLOSED,
-    }
+   private val _stateRef = AtomicStateReference(ElementLifecycleState.CREATED)
+    val state: ElementLifecycleState get() = _stateRef.value
 
     fun open() {
-        check(_state == ParseState.CREATED) { "open() requires CREATED, was $_state" }
-        _state = ParseState.OPEN
+        check(_stateRef.compareAndSet(ElementLifecycleState.CREATED, ElementLifecycleState.OPEN)) { "open() requires CREATED, was ${_stateRef.value}" }
     }
 
     fun activate() {
-        check(_state == ParseState.OPEN) { "activate() requires OPEN, was $_state" }
-        _state = ParseState.ACTIVE
+        check(_stateRef.compareAndSet(ElementLifecycleState.OPEN, ElementLifecycleState.ACTIVE)) { "activate() requires OPEN, was ${_stateRef.value}" }
     }
 
     fun drain() {
-        if (_state == ParseState.CLOSED) return
-        _state = ParseState.DRAINING
+        while (true) {
+            val current = _stateRef.value
+            if (current == ElementLifecycleState.CLOSED || current == ElementLifecycleState.DRAINING) return
+            if (_stateRef.compareAndSet(current, ElementLifecycleState.DRAINING)) {
+                return
+            }
+        }
     }
 
     fun close() {
-        if (_state == ParseState.CLOSED) return
-        _state = ParseState.CLOSED
-        supervisor.complete()
+        while (true) {
+            val current = _stateRef.value
+            if (current == ElementLifecycleState.CLOSED) return
+            if (_stateRef.compareAndSet(current, ElementLifecycleState.CLOSED)) {
+                supervisor.complete()
+                return
+            }
+        }
     }
 
     /**
@@ -78,6 +82,3 @@ class ParseSupervisor(
         childParser: (Series<Char>, Twin<Int>) -> Any?,
     ): Series<Any?> = scope.fanout(identify, childParser)
 }
-
-/** Singleton key for ParseSupervisor in CoroutineContext. */
-object ParseSupervisorKey : CoroutineContext.Key<ParseSupervisor>

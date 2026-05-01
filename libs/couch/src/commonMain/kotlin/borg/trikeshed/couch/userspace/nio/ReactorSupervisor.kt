@@ -2,6 +2,7 @@ package borg.trikeshed.couch.userspace.nio
 
 import borg.trikeshed.lib.Series
 import borg.trikeshed.couch.htx.HtxBlock
+import borg.trikeshed.context.ElementLifecycleState
 import kotlinx.coroutines.CompletableJob
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -11,6 +12,9 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlin.coroutines.AbstractCoroutineContextElement
 import kotlin.coroutines.CoroutineContext
+
+/** Singleton key for ReactorSupervisor in CoroutineContext. */
+object ReactorSupervisorKey : CoroutineContext.Key<ReactorSupervisor>
 
 /**
  * Reactor as SupervisoryJob host.
@@ -32,9 +36,9 @@ class ReactorSupervisor(
 
     val supervisor: CompletableJob = SupervisorJob()
 
-    // State transitions are driven from the reactor thread only (single-threaded access).
-   var _state: ReactorState = ReactorState.CREATED
-    val state: ReactorState get() = _state
+    // Single-threaded state transitions via a confined primitive if available
+   private val _stateRef = AtomicStateReference(ElementLifecycleState.CREATED)
+    val state: ElementLifecycleState get() = _stateRef.value
 
     // Each registered protocol recognizer or branch lives here
    val _branches = mutableMapOf<String, BranchScope>()
@@ -45,34 +49,34 @@ class ReactorSupervisor(
     // Context keys injected into all branch coroutines
    val _contextPalette = mutableMapOf<CoroutineContext.Key<*>, Any?>()
 
-    enum class ReactorState {
-        CREATED,
-        OPEN,
-        ACTIVE,
-        DRAINING,
-        CLOSED,
-    }
-
     fun open() {
-        check(_state == ReactorState.CREATED) { "open() requires CREATED, was $_state" }
-        _state = ReactorState.OPEN
+        check(_stateRef.compareAndSet(ElementLifecycleState.CREATED, ElementLifecycleState.OPEN)) { "open() requires CREATED, was ${_stateRef.value}" }
     }
 
     fun activate() {
-        check(_state == ReactorState.OPEN) { "activate() requires OPEN, was $_state" }
-        _state = ReactorState.ACTIVE
+        check(_stateRef.compareAndSet(ElementLifecycleState.OPEN, ElementLifecycleState.ACTIVE)) { "activate() requires OPEN, was ${_stateRef.value}" }
     }
 
     fun drain() {
-        if (_state == ReactorState.CLOSED) return
-        _state = ReactorState.DRAINING
-        supervisor.complete()
+        while (true) {
+            val current = _stateRef.value
+            if (current == ElementLifecycleState.CLOSED || current == ElementLifecycleState.DRAINING) return
+            if (_stateRef.compareAndSet(current, ElementLifecycleState.DRAINING)) {
+                supervisor.complete()
+                return
+            }
+        }
     }
 
     fun close() {
-        if (_state == ReactorState.CLOSED) return
-        _state = ReactorState.CLOSED
-        supervisor.complete()
+        while (true) {
+            val current = _stateRef.value
+            if (current == ElementLifecycleState.CLOSED) return
+            if (_stateRef.compareAndSet(current, ElementLifecycleState.CLOSED)) {
+                supervisor.complete()
+                return
+            }
+        }
     }
 
     /**
@@ -84,7 +88,7 @@ class ReactorSupervisor(
         channel: KChannel<HtxBlock>,
         block: suspend CoroutineScope.() -> Unit,
     ): Job {
-        check(_state == ReactorState.ACTIVE) { "Cannot launch branch in state $_state" }
+        check(_stateRef.value == ElementLifecycleState.ACTIVE) { "Cannot launch branch in state ${_stateRef.value}" }
         val branch = BranchScope(name, channel, supervisor)
         _branches[name] = branch
         // Build context: fold palette entries into supervisor
@@ -146,6 +150,3 @@ class ReactorSupervisor(
     @Suppress("UNCHECKED_CAST")
     fun <T> get(): T? = value as T?
 }
-
-/** Singleton key for ReactorSupervisor in CoroutineContext. */
-object ReactorSupervisorKey : CoroutineContext.Key<ReactorSupervisor>
