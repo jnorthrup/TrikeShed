@@ -46,6 +46,12 @@ data class WalletJournalEntry(
     val at: Long = 0L,
 )
 
+/**
+ * Simulated wallet for tracking cash and holdings.
+ *
+ * **Concurrency Contract**: This class is not thread-safe. All access and mutations
+ * must be synchronized externally or guaranteed to run sequentially within a single-threaded context.
+ */
 class SimWallet {
     public val balances = mutableMapOf<String, Double>()
     public val locked = mutableMapOf<String, Double>()

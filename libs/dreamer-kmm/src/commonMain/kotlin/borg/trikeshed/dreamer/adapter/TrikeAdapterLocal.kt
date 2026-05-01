@@ -4,10 +4,12 @@ import borg.trikeshed.cursor.ColumnMeta
 import borg.trikeshed.cursor.Cursor
 import borg.trikeshed.cursor.RowVec
 import borg.trikeshed.cursor.j
+import borg.trikeshed.cursor.joins
 import borg.trikeshed.dreamer.Kline
 import borg.trikeshed.isam.meta.IOMemento
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.j
+import borg.trikeshed.lib.toSeries
 import borg.trikeshed.lib.α
 import borg.trikeshed.miniduck.DocRowVec
 import borg.trikeshed.miniduck.toRowVec
@@ -32,6 +34,22 @@ fun cellsToTrikeRowVec(cells: Array<Any?>, schema: List<Pair<String, IOMemento>>
     val providers = schema.toColumnMetaProviders()
     val cellSeries = cells.size j { index: Int -> cells[index] }
     return cellSeries j providers
+}
+
+fun cellsToTrikeRowVec(cells: List<Any?>, keys: List<String>): RowVec {
+    val values: Series<Any?> = cells.toSeries()
+    val meta: Series<() -> ColumnMeta> = cells.size j { idx: Int ->
+        val type = when (cells[idx]) {
+            is Double -> IOMemento.IoDouble
+            is Float -> IOMemento.IoFloat
+            is Long -> IOMemento.IoLong
+            is Int -> IOMemento.IoInt
+            is Boolean -> IOMemento.IoBoolean
+            else -> IOMemento.IoString
+        }
+        { ColumnMeta(keys[idx], type) }
+    }
+    return values.joins(meta)
 }
 
 /**

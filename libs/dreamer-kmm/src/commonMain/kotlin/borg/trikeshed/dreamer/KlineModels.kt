@@ -1,6 +1,7 @@
 package borg.trikeshed.dreamer
 
 import borg.trikeshed.cursor.Cursor
+import borg.trikeshed.dreamer.adapter.toTrikeRowVec
 import borg.trikeshed.cursor.ColumnMeta
 import borg.trikeshed.cursor.RowVec
 import borg.trikeshed.cursor.joins

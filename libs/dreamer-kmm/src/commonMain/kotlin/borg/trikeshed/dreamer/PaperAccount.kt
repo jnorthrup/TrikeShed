@@ -1,8 +1,5 @@
 package borg.trikeshed.dreamer
 
-import borg.trikeshed.context.AsyncContextElement
-import borg.trikeshed.context.AsyncContextKey
-
 /**
  * Simulated account state: cash balance and open positions.
  *
@@ -13,7 +10,4 @@ import borg.trikeshed.context.AsyncContextKey
  */
 data class PaperAccount(
     val balance: Double,
-) : AsyncContextElement() {
-    companion object Key : AsyncContextKey<PaperAccount>()
-    override val key: AsyncContextKey<PaperAccount> get() = Key
-}
+)

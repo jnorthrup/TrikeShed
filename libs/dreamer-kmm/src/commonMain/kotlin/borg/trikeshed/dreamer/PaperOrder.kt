@@ -1,8 +1,5 @@
 package borg.trikeshed.dreamer
 
-import borg.trikeshed.context.AsyncContextElement
-import borg.trikeshed.context.AsyncContextKey
-
 /**
  * Simulated order with a lifecycle: PENDING → FILLED | CANCELLED | REJECTED.
  *
@@ -19,7 +16,4 @@ data class PaperOrder(
     val quantity: Double,
     val price: Double,
     val status: OrderStatus = OrderStatus.PENDING,
-) : AsyncContextElement() {
-    companion object Key : AsyncContextKey<PaperOrder>()
-    override val key: AsyncContextKey<PaperOrder> get() = Key
-}
+)
