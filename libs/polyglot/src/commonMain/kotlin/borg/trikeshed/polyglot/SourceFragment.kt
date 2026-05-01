@@ -102,7 +102,13 @@ data class SourceFragment(
             span.b,
             kind.name,
             name ?: "",
-            TypeEvidence.deduceMemento(evidence).label
+            TypeEvidence.deduceMemento(evidence).label,
+            meta.visibility ?: "",
+            meta.mutability ?: "",
+            meta.lifetime ?: "",
+            meta.async,
+            meta.generic,
+            meta.extern
         ]
         val metas: Series<`ColumnMeta↻`> = s_[
             ColumnMeta("lang", IOMemento.IoString),
@@ -111,6 +117,12 @@ data class SourceFragment(
             ColumnMeta("kind", IOMemento.IoString),
             ColumnMeta("name", IOMemento.IoString),
             ColumnMeta("deducedType", IOMemento.IoString),
+            ColumnMeta("meta_visibility", IOMemento.IoString),
+            ColumnMeta("meta_mutability", IOMemento.IoString),
+            ColumnMeta("meta_lifetime", IOMemento.IoString),
+            ColumnMeta("meta_async", IOMemento.IoBoolean),
+            ColumnMeta("meta_generic", IOMemento.IoBoolean),
+            ColumnMeta("meta_extern", IOMemento.IoBoolean),
         ] α { it.leftIdentity }
         return values joins metas
     }

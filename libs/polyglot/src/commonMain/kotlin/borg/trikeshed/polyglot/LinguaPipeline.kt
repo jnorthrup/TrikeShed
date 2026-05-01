@@ -8,10 +8,10 @@ import borg.trikeshed.parse.interop.DescriptorFragment
 import borg.trikeshed.parse.interop.rowVecTree
 
 /* ═══════════════════════════════════════════════════════════════════════════
- *  Polyglot pipeline — five-stage funnel from source text to MLIR-ready blocks.
+ *  Polyglot pipeline — four-stage funnel from source text to MLIR-ready blocks.
  *
- *  Stage 0: DETECT       Speculative language classification via SupervisorJob fanout.
- *                         All N LangClassifiers run concurrently. Winner selected by
+ *  Stage 0: DETECT       Speculative language classification.
+ *                         All N LangClassifiers run sequentially. Winner selected by
  *                         TypeEvidence confidence score.
  *  Stage 1: PARSE         Winning LangParser → UniversalAst → SourceFragment tree.
  *  Stage 2: CLASSIFY      TypeEvidence scan per fragment → classified SourceFragment tree.
@@ -21,21 +21,20 @@ import borg.trikeshed.parse.interop.rowVecTree
  *
  *  Each stage runs in a ParseScope under SupervisorJob. Stages fan out
  *  concurrently where span independence allows. Classification (stage 0)
- *  is the first fanout — all languages race, best confidence wins.
+ *  runs sequentially across languages, best confidence wins.
  * ═══════════════════════════════════════════════════════════════════════════ */
 
 /**
  * Stage 0: Speculative language detection.
  *
- * Feeds source text to all registered [LangClassifier] instances concurrently.
- * Under ParseScope.fanoutParsers(), each classifier runs in a child scope.
+ * Feeds source text to all registered [LangClassifier] instances sequentially.
  * Results are ranked by TypeEvidence confidence against each language's
  * reference fingerprint. The top result selects the parser for stage 1.
  *
  * Returns the best ClassificationResult, or null if registry is empty.
  */
-fun detect(source: Series<Char>): ClassificationResult? =
-    LangRegistry.bestMatch(source)
+fun detect(registry: LangRegistry, source: Series<Char>): ClassificationResult? =
+    registry.bestMatch(source)
 
 /**
  * Stage 0b: Detect with a confidence floor.
@@ -43,8 +42,8 @@ fun detect(source: Series<Char>): ClassificationResult? =
  * Returns null if no language exceeds [minConfidence], preventing
  * false-positive parses on unrecognized input.
  */
-fun detectOrNull(source: Series<Char>, minConfidence: Double = 0.3): ClassificationResult? {
-    val best = LangRegistry.bestMatch(source) ?: return null
+fun detectOrNull(registry: LangRegistry, source: Series<Char>, minConfidence: Double = 0.3): ClassificationResult? {
+    val best = registry.bestMatch(source) ?: return null
     return if (best.confidence >= minConfidence) best else null
 }
 
@@ -82,9 +81,9 @@ fun parse(lang: LangId, source: Series<Char>): Result<UniversalAst> {
  * populating [SourceFragment.evidence]. This is the character-class
  * fingerprint layer — XOR bitmask extraction from CHAR_CATEGORY[128].
  */
-fun classify(ast: UniversalAst): UniversalAst {
+fun classify(ast: UniversalAst, source: Series<Char>): UniversalAst {
     fun rec(sf: SourceFragment): SourceFragment {
-        val sample = (sf.name ?: "").toSeries()
+        val sample = source[sf.span.a until sf.span.b]
         val ev = TypeEvidence.sample(sample)
         val children = sf.children α { rec(it) }
         return sf.copy(evidence = ev, children = children)
@@ -122,37 +121,27 @@ fun mapRegions(fragment: DescriptorFragment): Cursor {
 }
 
 /**
- * Stage 5: Lower region blocks to MLIR operations.
+ * End-to-end pipeline: source text → Region Blocks (Cursor).
  *
- * Each SourceFragment with a mlir-relevant NodeKind maps through [nodeToMlir].
- * The resulting [MlirOp] sequence is emitted as MLIR IR, then compiled via
- * [borg.trikeshed.userspace.tensor.MlirOrcBuilder] and ORC JIT.
- *
- * Only [mlirRelevantKinds] survive lowering — IMPORTS, COMMENTS, TYPE_ANNOTATIONS
- * are discarded. STRUCT/CLASS/TRAIT nodes are lowered to memref + function tables.
- */
-fun lower(cursor: Cursor): Unit = Unit
-
-/**
- * End-to-end pipeline: source text → MLIR ops.
- *
- * Five stages, each a suspend function participating in ParseScope fanout.
+ * Four stages, each a suspend function participating in ParseScope fanout.
  * The entire pipeline runs under a single root SupervisorJob scope.
+ *
+ * Note: Stage 5 (MLIR lowering) has been moved out of this pipeline.
  *
  * Stage 0 (detect) fans out to all N languages. The winner's parser
  * drives stages 1–5. If detection confidence is below [minConfidence],
  * the pipeline returns null (unrecognized input).
  */
 suspend fun pipeline(
+    registry: LangRegistry,
     source: Series<Char>,
     minConfidence: Double = 0.3,
 ) {
-    val detection = detectOrNull(source, minConfidence)
+    val detection = detectOrNull(registry, source, minConfidence)
         ?: return // unrecognized input — no language matched
 
     parse(detection.lang, source)
-        .map { ast -> classify(ast) }
+        .map { ast -> classify(ast, source) }
         .map { ast -> unify(ast) }
         .map { frag -> mapRegions(frag) }
-        .map { cursor -> lower(cursor) }
 }
