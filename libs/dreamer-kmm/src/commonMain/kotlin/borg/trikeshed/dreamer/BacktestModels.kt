@@ -1,14 +1,11 @@
 package borg.trikeshed.dreamer
 
 import borg.trikeshed.cursor.Cursor
-import borg.trikeshed.lib.*
-import borg.trikeshed.miniduck.getValue
-import borg.trikeshed.cursor.RowVec
-import borg.trikeshed.cursor.stringValue
-import borg.trikeshed.cursor.longValue
 import borg.trikeshed.cursor.doubleValue
-import borg.trikeshed.cursor.intValue
+import borg.trikeshed.cursor.longValue
+import borg.trikeshed.cursor.stringValue
 import borg.trikeshed.cursor.at
+import borg.trikeshed.lib.*
 import kotlin.math.sqrt
 
 /**
@@ -18,8 +15,8 @@ import kotlin.math.sqrt
  * [PortfolioInput] is what the [TradingEngine] consumes on each cycle:
  * a list of [PortfolioRow] one per symbol, with current price and quantity.
  *
- * The adapter [klineBarToPortfolioInput] converts a DocRowVec row
- * (projected from a KlineBlock/MiniCursor) into this form.
+ * The adapter [klineBarToPortfolioInput] converts a cursor row
+ * projected from a [KlineBlock] into this form.
  */
 data class PortfolioInput(
     val symbol: String,
@@ -107,13 +104,13 @@ fun BacktestResult.toBacktestReport(): BacktestReport {
 }
 
 /**
- * Convert a single MiniCursor row (a DocRowVec kline bar) into a [PortfolioInput].
+ * Convert a single cursor row (a kline bar) into a [PortfolioInput].
  *
  * The row must have keys: symbol, openTime, quantity, price.
  * For back-testing with a single symbol, quantity is derived from
  * initial capital / initial price on the first bar, then held constant.
  *
- * @param cursor   MiniCursor of kline bars (DocRowVec rows)
+ * @param cursor   cursor of kline bars (row projections)
  * @param barIndex index of the bar to convert
  * @param currentQuantity quantity of the asset held (fixed for back-test simulation)
  */
@@ -125,7 +122,7 @@ fun klineBarToPortfolioInput(
     val row = cursor.at(barIndex)
     val symbol: String = row.stringValue("symbol", "UNKNOWN")
     val openTime: Long = row.longValue("openTime")
-    val price: Double = row.doubleValue("close").takeIf{ it > 0.0 } ?: row.doubleValue("open")
+    val price: Double = row.doubleValue("close").takeIf { it > 0.0 } ?: row.doubleValue("open")
     val value = currentQuantity * price
     return PortfolioInput(
         symbol = symbol,
@@ -150,7 +147,7 @@ fun portfolioInputToRows(input: PortfolioInput): List<PortfolioRow> = listOf(
 )
 
 /**
- * Convert a MiniCursor row at [barIndex] into a [PortfolioInput].
+ * Convert a cursor row at [barIndex] into a [PortfolioInput].
  *
  * This is the single-symbol accessor for a flat cursor where each row is one
  * symbol's bar. For the current simulation model, each barIndex gives one
@@ -161,7 +158,7 @@ fun portfolioInputToRows(input: PortfolioInput): List<PortfolioRow> = listOf(
  * For true multi-symbol cursors (interleaved or multi-row per bar), use
  * [allSymbolsAtBar] to collect all symbol rows sharing the same openTime.
  *
- * @param cursor   MiniCursor of kline bars (DocRowVec rows)
+ * @param cursor   cursor of kline bars (row projections)
  * @param barIndex index of the bar row to convert
  * @param holdings map of symbol → quantity (used to compute value)
  */
@@ -179,7 +176,7 @@ fun multiSymbolKlineToPortfolioInput(
  * Use this for true multi-symbol back-tests where the cursor holds rows for
  * multiple symbols at the same timestamp.
  *
- * @param cursor    MiniCursor of kline bars (DocRowVec rows, possibly interleaved symbols)
+ * @param cursor    cursor of kline bars (possibly interleaved symbols)
  * @param barIndex reference bar index; all rows with the same openTime are collected
  * @param holdings  map of symbol → quantity
  */
@@ -208,7 +205,7 @@ fun allSymbolsAtBar(
 }
 
 /**
- * Project a MiniCursor of kline rows into a flat [List] of close prices.
+ * Project a cursor of kline rows into a flat [List] of close prices.
  * Convenience for building price arrays for metrics.
  */
 fun closesFromCursor(cursor: Cursor): Series<Double> =
@@ -316,7 +313,7 @@ fun computeBacktestMetrics(
  * [klineBarToPortfolioInput], feeds it to the [TradingEngine], records the
  * resulting [CycleResult], and computes aggregate [BacktestMetrics] at the end.
  *
- * @param cursor    MiniCursor of kline bars (DocRowVec rows, from KlineBlock.asCursor())
+ * @param cursor    cursor of kline bars, from [KlineBlock.asCursor]
  * @param engine    pre-configured [TradingEngine] (genome + mode + capital)
  * @param initialCapital  starting portfolio value in USD
  * @param onCycle   optional callback invoked after each tick with the cycle result

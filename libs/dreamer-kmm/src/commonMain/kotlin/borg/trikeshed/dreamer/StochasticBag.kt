@@ -4,10 +4,9 @@ import borg.trikeshed.cursor.Cursor
 import borg.trikeshed.cursor.longValue
 import borg.trikeshed.cursor.intValue
 import borg.trikeshed.cursor.doubleValue
-import borg.trikeshed.cursor.stringValue
 import borg.trikeshed.cursor.at
+import borg.trikeshed.cursor.SpanMatcher
 import borg.trikeshed.lib.size
-import borg.trikeshed.miniduck.columnar.SpanMatcher
 import kotlin.random.Random
 
 data class KlineSeriesSource(

@@ -1,18 +1,9 @@
 package borg.trikeshed.dreamer
 
 import borg.trikeshed.cursor.Cursor
-import borg.trikeshed.dreamer.adapter.toTrikeRowVec
-import borg.trikeshed.cursor.ColumnMeta
 import borg.trikeshed.cursor.RowVec
-import borg.trikeshed.cursor.joins
-import borg.trikeshed.isam.meta.IOMemento
-import borg.trikeshed.lib.Series
+import borg.trikeshed.cursor.cellsToRowVec
 import borg.trikeshed.lib.j
-import borg.trikeshed.lib.toSeries
-import borg.trikeshed.miniduck.DocRowVec
-import borg.trikeshed.miniduck.toRowVec
-import borg.trikeshed.lib.toSeries
-import borg.trikeshed.dreamer.adapter.*
 
 enum class TimeSpan(val seconds: Long, val binanceInterval: String) {
     Seconds30(30L, "30s"),
@@ -47,9 +38,9 @@ data class Kline(
         val schemaKeys = listOf("symbol", "timespan", "openTime", "open", "high", "low", "close", "volume")
     }
 
-    fun toDocRowVec(): DocRowVec = DocRowVec(
-        keys = schemaKeys,
+    fun toRowVec(): RowVec = cellsToRowVec(
         cells = listOf(symbol, timespan, openTime, open, high, low, close, volume),
+        keys = schemaKeys,
     )
 }
 
@@ -104,7 +95,7 @@ class KlineBlock public constructor(
     fun asCursor(): Cursor {
         check(mutableState == State.SEALED) { "Block must be sealed before presenting as cursor" }
         val snapshot = rows.toTypedArray()
-        return snapshot.size j { index: Int -> snapshot[index].toTrikeRowVec() }
+        return snapshot.size j { index: Int -> snapshot[index].toRowVec() }
     }
 
     fun asColumnarCursor(): Cursor {
@@ -112,29 +103,19 @@ class KlineBlock public constructor(
         val snapshot = rows
         return snapshot.size j { rowIndex: Int ->
             val kline = snapshot[rowIndex]
-            val cells: List<Any?> = listOf(
-                kline.symbol,
-                kline.timespan.toString(),
-                kline.openTime,
-                kline.open,
-                kline.high,
-                kline.low,
-                kline.close,
-                kline.volume,
+            cellsToRowVec(
+                cells = listOf(
+                    kline.symbol,
+                    kline.timespan.toString(),
+                    kline.openTime,
+                    kline.open,
+                    kline.high,
+                    kline.low,
+                    kline.close,
+                    kline.volume,
+                ),
+                keys = Kline.schemaKeys,
             )
-            val values: Series<Any?> = cells.toSeries()
-            val meta = cells.size j { columnIndex: Int ->
-                val type = when (cells[columnIndex]) {
-                    is Double -> IOMemento.IoDouble
-                    is Float -> IOMemento.IoFloat
-                    is Long -> IOMemento.IoLong
-                    is Int -> IOMemento.IoInt
-                    is Boolean -> IOMemento.IoBoolean
-                    else -> IOMemento.IoString
-                }
-                { ColumnMeta(Kline.schemaKeys[columnIndex], type) }
-            }
-            values.joins(meta)
         }
     }
 }

@@ -3,7 +3,6 @@ package borg.trikeshed.dreamer
 import borg.trikeshed.collections.s_
 import borg.trikeshed.cursor.RowVec
 import borg.trikeshed.lib.*
-import borg.trikeshed.miniduck.toRowVec
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals

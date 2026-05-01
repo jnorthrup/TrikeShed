@@ -61,7 +61,6 @@ src/commonMain/kotlin/borg/trikeshed/dreamer/
                               KlineSeriesSource cursors, SpanMatcher integration
   GenomeTraining.kt        — GenomeTrainer: 1D and pair-bag parameter sweep
   PairGraph.kt             — BFS shortest-path finder for trade pair routing
-  CursorBacktestAdapters.kt— Backward-compat shim (MiniCursor → Cursor)
   TrikeAdapterLocal.kt     — In-package RowVec adapter helpers (cells→RowVec, Kline→RowVec)
   ApiClient.kt             — ApiClient interface (placeBuy/placeSell/getBalance/etc.)
   TweezeArchive.kt         — Binance symbol parser (rawSymbol → base/quote pair)

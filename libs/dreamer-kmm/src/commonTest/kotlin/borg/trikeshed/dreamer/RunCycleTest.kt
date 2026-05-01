@@ -15,14 +15,14 @@ import kotlin.test.assertTrue
  * These pin the algebra and catch regressions as the pipeline grows.
  *
  * Architecture chain under test:
- *   KlineBlock → asCursor() → MiniCursor (DocRowVec rows)
+ *   KlineBlock → asCursor() → Cursor rows
  *     → klineBarToPortfolioInput → PortfolioInput
  *     → simulateTicks(TradingEngine) → BacktestResult
  *     → BacktestMetrics (total return, Sharpe, max drawdown)
  */
 class RunCycleTest {
 
-    /** Build a sealed KlineBlock from a list of klines and return its MiniCursor. */
+    /** Build a sealed KlineBlock from a list of klines and return its cursor. */
     private fun klinesToCursor(klines: List<Kline>): Cursor {
         val block = KlineBlock.mutable()
         klines.forEach { block.append(it) }

@@ -2,8 +2,8 @@ package borg.trikeshed.dreamer
 
 import borg.trikeshed.context.ElementState
 import borg.trikeshed.cursor.at
+import borg.trikeshed.cursor.getValue
 import borg.trikeshed.lib.size
-import borg.trikeshed.miniduck.getValue
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
