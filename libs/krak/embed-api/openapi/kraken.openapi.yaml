@@ -3309,3 +3309,10 @@ paths:
       security:
       - apiKeyAuth: []
         apiSignAuth: []
+
+x-trikeshed-context:
+  client:
+    - name: default
+      key: borg.trikeshed.test.DefaultKey
+      element: borg.trikeshed.test.DefaultElement
+      open: borg.trikeshed.test.openDefaultElement

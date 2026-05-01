@@ -1501,3 +1501,10 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/GenericObject'
+
+x-trikeshed-context:
+  client:
+    - name: default
+      key: borg.trikeshed.test.DefaultKey
+      element: borg.trikeshed.test.DefaultElement
+      open: borg.trikeshed.test.openDefaultElement
