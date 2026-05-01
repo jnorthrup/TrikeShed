@@ -2,7 +2,7 @@
 
 package borg.trikeshed.num
 
-import borg.trikeshed.common.collections.s_
+import borg.trikeshed.collections.s_
 import borg.trikeshed.platform.PlatformCodec.Companion.readUInt
 import borg.trikeshed.lib.CZero.nz
 import borg.trikeshed.lib.CZero.z

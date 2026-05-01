@@ -1,6 +1,6 @@
 @file:Suppress("UNCHECKED_CAST")
 
-package borg.trikeshed.common.collections
+package borg.trikeshed.collections
 
 import borg.trikeshed.lib.Join
 import borg.trikeshed.lib.j
@@ -12,7 +12,7 @@ import kotlin.math.min
 //package vec
 
 @InternalCoroutinesApi
-typealias CircularQueue<T> = borg.trikeshed.common.collections.CirQlar<T>
+typealias CircularQueue<T> = borg.trikeshed.collections.CirQlar<T>
 
 /**
 
@@ -57,8 +57,8 @@ open class CirQlar<T>(
     /*override*/ fun poll(): T = TODO("Not yet implemented")
     /*override*/ fun peek(): T = TODO("Not yet implemented")
     /*override*/ fun add(k: T): Boolean = offer(k)
-    operator fun borg.trikeshed.common.collections.CirQlar<T>.plus(k: T): Boolean = offer(k)
-    operator fun borg.trikeshed.common.collections.CirQlar<T>.plusAssign(k: T) {
+    operator fun borg.trikeshed.collections.CirQlar<T>.plus(k: T): Boolean = offer(k)
+    operator fun borg.trikeshed.collections.CirQlar<T>.plusAssign(k: T) {
         offer(k)
     }
 

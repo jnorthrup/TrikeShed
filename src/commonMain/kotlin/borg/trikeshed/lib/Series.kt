@@ -3,7 +3,7 @@
 
 package borg.trikeshed.lib
 
-import borg.trikeshed.common.collections.binarySearch
+import borg.trikeshed.collections.binarySearch
 import borg.trikeshed.isam.meta.IOMemento.*
 import kotlin.jvm.JvmInline
 import kotlin.jvm.JvmName

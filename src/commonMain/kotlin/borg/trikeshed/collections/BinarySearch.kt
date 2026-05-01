@@ -1,6 +1,6 @@
-package borg.trikeshed.common.collections
+package borg.trikeshed.collections
 
-import borg.trikeshed.common.collections.binarySearch
+import borg.trikeshed.collections.binarySearch
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.size

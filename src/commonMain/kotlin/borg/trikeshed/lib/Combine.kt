@@ -1,8 +1,8 @@
 package borg.trikeshed.lib
 
-import borg.trikeshed.common.collections.s_
+import borg.trikeshed.collections.s_
 
-operator fun <A> Series<A>.plus(c: Series<A>): Series<A> = combine(borg.trikeshed.common.collections.s_[this, c])
+operator fun <A> Series<A>.plus(c: Series<A>): Series<A> = combine(borg.trikeshed.collections.s_[this, c])
 
 /**
 Series combine (series...)

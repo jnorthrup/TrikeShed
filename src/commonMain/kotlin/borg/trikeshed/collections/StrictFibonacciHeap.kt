@@ -1,4 +1,4 @@
-package borg.trikeshed.common.collections
+package borg.trikeshed.collections
 
 import kotlin.math.ln
 
@@ -187,7 +187,7 @@ class StrictFibonacciHeap<T : Comparable<T>> {
         }
     }
 
-    fun meld(other: borg.trikeshed.common.collections.StrictFibonacciHeap<T>) {
+    fun meld(other: borg.trikeshed.collections.StrictFibonacciHeap<T>) {
         if (other.root == null) return
         if (root == null) {
             root = other.root

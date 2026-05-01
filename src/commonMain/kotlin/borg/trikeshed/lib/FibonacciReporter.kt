@@ -1,6 +1,6 @@
 package borg.trikeshed.lib
 
-import borg.trikeshed.common.Usable
+import borg.trikeshed.Usable
 import kotlin.time.Clock
 import kotlin.jvm.JvmOverloads
 import kotlin.math.max

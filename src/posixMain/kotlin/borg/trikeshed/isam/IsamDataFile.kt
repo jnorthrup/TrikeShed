@@ -2,7 +2,7 @@
 
 package borg.trikeshed.isam
 
-import borg.trikeshed.common.Usable
+import borg.trikeshed.Usable
 import borg.trikeshed.cursor.Cursor
 import borg.trikeshed.cursor.RowVec
 import borg.trikeshed.cursor.meta

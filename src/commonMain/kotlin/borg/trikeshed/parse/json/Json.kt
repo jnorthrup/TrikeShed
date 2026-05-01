@@ -3,8 +3,8 @@
 
 package borg.trikeshed.parse.json
 
-import borg.trikeshed.common.TypeEvidence
-import borg.trikeshed.common.toRowVec
+import borg.trikeshed.TypeEvidence
+import borg.trikeshed.toRowVec
 import borg.trikeshed.cursor.RowVec
 import borg.trikeshed.collections._l
 import borg.trikeshed.lib.*

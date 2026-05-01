@@ -2,7 +2,7 @@
 
 package borg.trikeshed.lib
 
-import borg.trikeshed.common.collections.s_
+import borg.trikeshed.collections.s_
 import kotlin.properties.Delegates
 
 
@@ -105,7 +105,7 @@ class COWSeriesBody<T>(
     }
 
     /** create a new copy of this, with the given item appended */
-    fun append(item: T): COWSeriesBody<T> = copy(backing + borg.trikeshed.common.collections.s_[item])
+    fun append(item: T): COWSeriesBody<T> = copy(backing + borg.trikeshed.collections.s_[item])
 
     /** create a new copy of this, with the given item removed */
     fun remove(item: T): COWSeriesBody<T> {

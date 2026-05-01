@@ -2,7 +2,7 @@
 
 package borg.trikeshed.isam
 
-import borg.trikeshed.common.*
+import borg.trikeshed.*
 import borg.trikeshed.lib.CharSeries
 import borg.trikeshed.cursor.*
 import borg.trikeshed.isam.meta.IOMemento

@@ -87,6 +87,11 @@ kotlin {
         }
     } else if (hostOs == "Linux") {
         linuxX64("linux") {
+            compilations.getByName("main") {
+                val zlinux_uring by cinterops.creating {
+                    defFile(project.file("io_uring_interop/zlinux_uring.def"))
+                }
+            }
             if (enableNativeSharedLib) {
                 binaries.sharedLib {
                     baseName = "trikeshed"
@@ -149,6 +154,8 @@ kotlin {
             // Current native duck test references unavailable symbols.
             kotlin.exclude("borg/trikeshed/duck/DuckFFITest.kt")
         }
+        val linuxMain by getting { dependsOn(posixMain) }
+        val linuxTest by getting { dependsOn(posixTest) }
 
         val jvmMain by getting {
             dependencies {
@@ -207,8 +214,8 @@ kotlin {
             }
         }
 
-        val macosMain by getting { dependsOn(posixMain) }
-        val macosTest by getting {
+        val macosMain = sourceSets.findByName("macosMain"); macosMain?.dependsOn(sourceSets.getByName("posixMain"))
+        val macosTest = sourceSets.findByName("macosTest"); macosTest?.run {
             dependsOn(posixTest)
         }
 

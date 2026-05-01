@@ -1,4 +1,4 @@
-package borg.trikeshed.common.collections.associative.trie
+package borg.trikeshed.collections.associative.trie
 
 import borg.trikeshed.lib.*
 import borg.trikeshed.lib.commonPrefixWith
@@ -73,7 +73,7 @@ class RadixTree<C : Comparable<C>> {
         }
     }
 
-    operator fun plus(s: borg.trikeshed.lib.Series<C>): borg.trikeshed.common.collections.associative.trie.RadixTree<C> {
+    operator fun plus(s: borg.trikeshed.lib.Series<C>): borg.trikeshed.collections.associative.trie.RadixTree<C> {
         if (s.isEmpty()) return this
 
         if (root == null) {

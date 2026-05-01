@@ -1,4 +1,4 @@
-package borg.trikeshed.common.collections
+package borg.trikeshed.collections
 
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.j

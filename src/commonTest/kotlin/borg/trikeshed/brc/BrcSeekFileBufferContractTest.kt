@@ -1,7 +1,7 @@
 package borg.trikeshed.brc
 
-import borg.trikeshed.common.SeekFileBuffer
-import borg.trikeshed.common.use
+import borg.trikeshed.SeekFileBuffer
+import borg.trikeshed.use
 import kotlin.test.Test
 import kotlin.test.assertTrue
 
