@@ -389,4 +389,29 @@ class RunCycleTest {
 
         assertEquals(listOf(0, 1), seenTicks)
     }
+
+    // ── 8. Rebalance scheduling ──────────────────────────────────────
+
+    @Test
+    fun `simulateTicks schedules rebalance when value deviates from baseline`() = runTest {
+        // Build a strongly rising series: baseline will be set on first bar,
+        // subsequent bars should exceed FLAT_REBALANCE_TRIGGER_PERCENT deviation
+        val klines = listOf(
+            Kline("BTCUSDT", TimeSpan.Hours1, 1000L, 100.0, 101.0, 99.0, 100.0, 50.0),
+            Kline("BTCUSDT", TimeSpan.Hours1, 2000L, 100.0, 101.0, 99.0, 100.0, 50.0),
+            Kline("BTCUSDT", TimeSpan.Hours1, 3000L, 100.0, 200.0, 99.0, 180.0, 50.0),
+        )
+        val cursor = klinesToCursor(klines)
+
+        // Set a very low rebalance trigger so deviation is guaranteed to exceed it
+        val genome = defaultGenome()
+        genome[GenomeParam.FLAT_REBALANCE_TRIGGER_PERCENT] = 0.01 // 1% deviation triggers rebalance
+
+        val engine = TradingEngine(genome, Mode.SHADOW, initialCapital = 10_000.0)
+        val result = simulateTicks(cursor, engine, initialCapital = 10_000.0)
+
+        // At least one cycle should have rebalanceScheduled=true
+        val rebalanceTicks = result.cycles.view.filter { it.rebalanceScheduled }
+        assertTrue(rebalanceTicks.isNotEmpty(), "Expected rebalance scheduling on large price deviation")
+    }
 }
