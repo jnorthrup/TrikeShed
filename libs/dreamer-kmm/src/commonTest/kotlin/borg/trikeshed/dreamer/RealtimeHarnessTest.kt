@@ -3,6 +3,7 @@ package borg.trikeshed.dreamer
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class RealtimeHarnessTest {
@@ -105,6 +106,68 @@ class RealtimeHarnessTest {
         assertTrue(first.sampleWindows.isNotEmpty())
         assertTrue(first.sampleSpans.isNotEmpty())
         assertTrue(first.bestFitness == first.bestFitness)
+    }
+
+    /**
+     * Full stochastic training → champion → deploy pipeline.
+     *
+     * Runs multiple training generations, picks the champion genome, then
+     * runs a final SimulationReplay with the champion to produce a BacktestReport.
+     * This is the production deployment path.
+     */
+    @Test
+    fun `stochastic training champion deploys through SimulationReplay`() = runTest {
+        val config = StochasticTrainingConfig(
+            bases = listOf("BTC", "ETH"),
+            rowsPerSeries = 24,
+            populationSize = 4,
+            spanLength = 4,
+            initialCapital = 10_000.0,
+            seed = 57,
+        )
+
+        val trainer = StochasticBagSpanTrainer(config)
+
+        // Run 3 generations
+        val gen1 = trainer.runGeneration()
+        val gen2 = trainer.runGeneration()
+        val gen3 = trainer.runGeneration()
+
+        assertEquals(1, gen1.generation)
+        assertEquals(2, gen2.generation)
+        assertEquals(3, gen3.generation)
+
+        // Champion is the first genome in the current population
+        val champion = trainer.population.first()
+        assertNotNull(champion)
+
+        // Deploy champion through SimulationReplay on BTC data
+        val btcCsv = generatedArchiveCsv(
+            symbol = "BTCUSDT",
+            rows = 50,
+            timespan = config.timespan,
+            startOpenTime = config.startOpenTime,
+            assetIndex = 0,
+            seed = config.seed,
+        )
+
+        val replay = SimulationReplay(
+            genome = champion,
+            mode = Mode.SHADOW,
+            initialCapital = config.initialCapital,
+        )
+        val result = replay.replayCsv(
+            csvText = btcCsv,
+            symbol = "BTCUSDT",
+            timespan = config.timespan,
+        )
+        val report = result.toBacktestReport()
+
+        assertEquals("BTCUSDT", report.symbol)
+        assertEquals(10_000.0, report.initialCapital, 0.001)
+        assertEquals(50, report.totalTicks)
+        assertTrue(report.finalEquity > 0.0)
+        assertTrue(report.totalReturn.isFinite())
     }
 
     private fun source(base: String, prices: List<Double>): KlineSeriesSource {
