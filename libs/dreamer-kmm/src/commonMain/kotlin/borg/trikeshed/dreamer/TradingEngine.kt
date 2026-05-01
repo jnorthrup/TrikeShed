@@ -31,7 +31,9 @@ class TradingEngine(
 
     fun loadPersistedState(data: Map<String, Any?>?) {
         if (data == null) return
+        @Suppress("UNCHECKED_CAST")
         (data["baselines"] as? Map<String, Any?>)?.forEach { (k, v) -> (v as? Number)?.toDouble()?.let { baselines[k] = it } }
+        @Suppress("UNCHECKED_CAST")
         (data["crashProtectionState"] as? Map<String, Any?>)?.forEach { (k, v) -> (v as? Number)?.toDouble()?.let { crashProtectionState[k] = it } }
     }
 
@@ -44,8 +46,11 @@ class TradingEngine(
 
     fun injectSimulationState(snapshot: Map<String, Any?>) {
         snapshot["cashBalance"]?.let { if (it is Number) cashBalance = it.toDouble() }
+        @Suppress("UNCHECKED_CAST")
         (snapshot["holdings"] as? Map<String, Any?>)?.forEach { (k, v) -> if (v is Number) holdings[k] = Holding(v.toDouble()) }
+        @Suppress("UNCHECKED_CAST")
         (snapshot["baselines"] as? Map<String, Any?>)?.forEach { (k, v) -> (v as? Number)?.toDouble()?.let { baselines[k] = it } }
+        @Suppress("UNCHECKED_CAST")
         (snapshot["crashProtectionState"] as? Map<String, Any?>)?.forEach { (k, v) -> (v as? Number)?.toDouble()?.let { crashProtectionState[k] = it } }
     }
 
