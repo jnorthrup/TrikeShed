@@ -299,4 +299,101 @@ class BacktestIntegrationTest {
         assertEquals(0.0, result.metrics.sharpeRatio, 0.001, "Flat equity should produce zero Sharpe")
         assertTrue(result.metrics.totalReturn < 0.001, "Flat equity should produce near-zero return")
     }
+
+    /**
+     * Verify Sharpe and Sortino are non-zero for a volatile equity curve.
+     * Uses a sinusoidal price series that goes up and down, producing
+     * both positive and negative returns.
+     */
+    @Test
+    fun `computeBacktestMetrics produces non-zero Sharpe and Sortino for volatile equity curve`() {
+        // Build 60-cycle Series with oscillating totalValue (10000 → 10500 → 10000 → ...)
+        val n = 60
+        val cycles = (0 until n).map { i ->
+            val peak = if (i % 20 < 10) 1.0 else 0.0
+            val frac = (i % 10) / 10.0
+            val totalValue = 10_000.0 + 500.0 * peak * frac
+            CycleResult(
+                tick = i,
+                openTime = 1_704_067_200_000L + i * 3600_000L,
+                cashBalance = 0.0,
+                holdingsValue = totalValue,
+                totalValue = totalValue,
+                anyTradesThisCycle = false,
+                harvestedAmount = 0.0,
+                tradedSymbols = emptyList(),
+                rebalanceScheduled = false,
+                engineSnapshot = emptyMap(),
+            )
+        }
+        val series: Series<CycleResult> = cycles.toSeries()
+        val closePrices: Series<Double> = cycles.map { it.totalValue / 100.0 }.toSeries()
+
+        val metrics = computeBacktestMetrics(series, initialCapital = 10_000.0, closePrices = closePrices)
+
+        assertTrue(metrics.sharpeRatio != 0.0, "Volatile equity should produce non-zero Sharpe")
+        assertTrue(metrics.sortinoRatio != 0.0, "Volatile equity should produce non-zero Sortino")
+        assertTrue(metrics.maxDrawdown > 0.0, "Oscillating equity should have drawdown > 0")
+        assertTrue(metrics.maxDrawdownTicks > 0, "Drawdown should span at least 1 tick")
+    }
+
+    /**
+     * Multi-generation evolution produces improving fitness.
+     *
+     * Creates a population of diverse genomes, runs evaluatePopulation over
+     * synthetic data for 3 generations, and verifies that the elite genome's
+     * fitness is non-decreasing across generations.
+     */
+    @Test
+    fun `multi-generation evolution improves or maintains elite fitness`() = runTest {
+        val csv = generatedArchiveCsv(
+            symbol = "BTCUSDT",
+            rows = 30,
+            timespan = TimeSpan.Minutes1,
+            startOpenTime = 1_704_067_200_000L,
+            assetIndex = 0,
+            seed = 42,
+        )
+
+        // Create a diverse initial population with different harvest thresholds
+        val initialPopulation = (0 until 6).map { i ->
+            Genome(mutableMapOf(
+                "FLAT_HARVEST_TRIGGER_PERCENT" to 0.01 + i * 0.02,
+                "FLAT_TAKE_PERCENT" to 0.05 + i * 0.01,
+                "FLAT_SURPLUS_INVEST_PERCENT" to 0.50,
+            ))
+        }
+
+        var currentPopulation = initialPopulation
+        val generationFitnesses = mutableListOf<Double>()
+
+        for (gen in 1..3) {
+            val evaluations = evaluatePopulation(
+                genomes = currentPopulation,
+                csvText = csv,
+                symbol = "BTCUSDT",
+                timespan = TimeSpan.Minutes1,
+                initialCapital = 10_000.0,
+            )
+            val ranked = rankEvaluationsByFitness(evaluations)
+            val eliteFitness = ranked.first().fitness
+            generationFitnesses.add(eliteFitness)
+
+            currentPopulation = evolvePopulation(
+                evaluations = evaluations,
+                mutationDeltas = mapOf("FLAT_HARVEST_TRIGGER_PERCENT" to 0.005),
+            )
+        }
+
+        // Fitness should be non-decreasing (elite is always preserved)
+        for (i in 1 until generationFitnesses.size) {
+            assertTrue(
+                generationFitnesses[i] >= generationFitnesses[i - 1] - 1e-10,
+                "Gen ${i + 1} fitness (${generationFitnesses[i]}) should >= gen $i fitness (${generationFitnesses[i - 1]})"
+            )
+        }
+
+        // All fitnesses should be finite
+        assertTrue(generationFitnesses.all { it.isFinite() })
+    }
 }
