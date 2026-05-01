@@ -15,23 +15,6 @@ import kotlin.test.fail
 //   not enumerating every NIO channel shape.
 // ================================================================================
 
-sealed class SocketAddress {
-    data class Inet(val host: String, val port: Int) : SocketAddress()
-    data class Unix(val path: String) : SocketAddress()
-}
-
-interface ConnectedSocket {
-    val remoteAddress: SocketAddress
-    suspend fun read(buf: ByteArray, offset: Int, len: Int): Int
-    suspend fun write(buf: ByteArray, offset: Int, len: Int): Int
-    suspend fun close()
-}
-
-interface ListeningSocket {
-    val bindAddress: SocketAddress
-    suspend fun accept(): ConnectedSocket?
-    suspend fun close()
-}
 
 // ================================================================================
 // SPEC: suspend socket I/O — real read/write through NIO or io_uring
