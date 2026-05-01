@@ -186,7 +186,7 @@ class StrictFibonacciHeap<T : Comparable<T>> {
         }
     }
 
-    fun meld(other: StrictFibonacciHeap<T>) {
+    fun meld(other: borg.trikeshed.collections.StrictFibonacciHeap<T>) {
         if (other.root == null) return
         if (root == null) {
             root = other.root

@@ -2,13 +2,13 @@
 
 package borg.trikeshed.parse.csv
 
-import borg.trikeshed.common.LongSeries
-import borg.trikeshed.common.TypeEvidence
-import borg.trikeshed.common.TypeEvidence.Companion.deduce
-import borg.trikeshed.common.TypeEvidence.Companion.update
-import borg.trikeshed.common.drop
-import borg.trikeshed.common.get
-import borg.trikeshed.common.size
+import borg.trikeshed.LongSeries
+import borg.trikeshed.TypeEvidence
+import borg.trikeshed.TypeEvidence.Companion.deduce
+import borg.trikeshed.TypeEvidence.Companion.update
+import borg.trikeshed.drop
+import borg.trikeshed.get
+import borg.trikeshed.size
 import borg.trikeshed.cursor.ColumnMeta
 import borg.trikeshed.cursor.Cursor
 import borg.trikeshed.cursor.RowVec

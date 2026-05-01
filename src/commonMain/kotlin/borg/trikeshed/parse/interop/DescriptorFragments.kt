@@ -1,7 +1,14 @@
 package borg.trikeshed.parse.interop
 
-import borg.trikeshed.common.* 
-import borg.trikeshed.cursor.*            
+import borg.trikeshed.TypeEvidence
+import borg.trikeshed.cursor.ColumnMeta
+import borg.trikeshed.cursor.MapTypeMemento
+import borg.trikeshed.cursor.RowVec
+import borg.trikeshed.cursor.SeqTypeMemento
+import borg.trikeshed.cursor.TreeCursor
+import borg.trikeshed.cursor.TypeMemento
+import borg.trikeshed.cursor.joins
+import borg.trikeshed.cursor.label
 import borg.trikeshed.isam.meta.IOMemento
 import borg.trikeshed.lib.* 
 import borg.trikeshed.parse.json.* 

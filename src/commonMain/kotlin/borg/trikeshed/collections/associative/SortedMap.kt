@@ -257,7 +257,7 @@ interface SortedMap<K, V> : MutableMap<K, V> {
      * range, and `fromKey` or `toKey` lies
      * outside the bounds of the range
      */
-    fun subMap(fromKey: K, toKey: K): SortedMap<K, V>?
+    fun subMap(fromKey: K, toKey: K): borg.trikeshed.collections.associative.SortedMap<K, V>?
 
     /**
      * Returns a view of the portion of this map whose keys are
@@ -285,7 +285,7 @@ interface SortedMap<K, V> : MutableMap<K, V> {
      * restricted range, and `toKey` lies outside the
      * bounds of the range
      */
-    fun headMap(toKey: K): SortedMap<K, V>?
+    fun headMap(toKey: K): borg.trikeshed.collections.associative.SortedMap<K, V>?
 
     /**
      * Returns a view of the portion of this map whose keys are
@@ -313,7 +313,7 @@ interface SortedMap<K, V> : MutableMap<K, V> {
      * restricted range, and `fromKey` lies outside the
      * bounds of the range
      */
-    fun tailMap(fromKey: K): SortedMap<K, V>?
+    fun tailMap(fromKey: K): borg.trikeshed.collections.associative.SortedMap<K, V>?
 
     /**
      * Returns the first (lowest) key currently in this map.

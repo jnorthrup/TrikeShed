@@ -1,6 +1,6 @@
 package borg.trikeshed.parse.yaml
 
-import borg.trikeshed.common.TypeEvidence
+import borg.trikeshed.TypeEvidence
 import borg.trikeshed.cursor.name
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.size

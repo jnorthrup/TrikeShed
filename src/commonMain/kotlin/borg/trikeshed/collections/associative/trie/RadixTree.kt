@@ -71,7 +71,7 @@ class RadixTree<C : Comparable<C>> {
         }
     }
 
-    operator fun plus(s: Series<C>): RadixTree<C> {
+    operator fun plus(s: borg.trikeshed.lib.Series<C>): borg.trikeshed.collections.associative.trie.RadixTree<C> {
         if (s.isEmpty()) return this
 
         if (root == null) {

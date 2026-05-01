@@ -108,7 +108,7 @@ class COWSeriesBody<T>(
     }
 
     /** create a new copy of this, with the given item appended */
-    fun append(item: T): COWSeriesBody<T> = copy(backing + s_[item])
+    fun append(item: T): COWSeriesBody<T> = copy(backing + borg.trikeshed.collections.s_[item])
 
     /** create a new copy of this, with the given item removed */
     fun remove(item: T): COWSeriesBody<T> {

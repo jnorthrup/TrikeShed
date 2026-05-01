@@ -35,7 +35,7 @@ class ArrayMap<K : Comparable<K>, V>(
     override fun get(key: K): V? = binIndexOf(key).takeIf { it >= 0 }?.let { ix -> entre[ix].value }
 
     fun comparatorKeyShim(key: K): Map_Entry<K, V> =
-        ShimEntry(key)
+        borg.trikeshed.collections.associative.trie.ShimEntry(key)
 
     override fun isEmpty(): Boolean = run(entre::isEmpty)
 
@@ -50,10 +50,10 @@ class ArrayMap<K : Comparable<K>, V>(
             cmp: Comparator<K> = naturalOrder(),
             valComparator: Comparator<Map_Entry<K, V>> =
                 compareBy { it.key },
-        ): ArrayMap<K, V> {
+        ): borg.trikeshed.collections.associative.trie.ArrayMap<K, V> {
             val entre = map.entries.toTypedArray()
             entre.sortWith(valComparator)
-            return ArrayMap(
+            return borg.trikeshed.collections.associative.trie.ArrayMap(
                 entre,
                 cmp,
                 valComparator

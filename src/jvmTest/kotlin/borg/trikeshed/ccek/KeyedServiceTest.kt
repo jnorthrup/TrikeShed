@@ -1,8 +1,8 @@
 package borg.trikeshed.ccek
 
-import borg.trikeshed.quic.QuicElement
-import borg.trikeshed.sctp.SctpElement
-import borg.trikeshed.common.HomeDirService
+import borg.trikeshed.ccek.transport.NgSctpService
+import borg.trikeshed.ccek.transport.QuicChannelService
+import borg.trikeshed.HomeDirService
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.size
 import borg.trikeshed.signal.IndicatorContextService

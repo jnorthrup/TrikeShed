@@ -1,6 +1,6 @@
 package borg.trikeshed.autoresearch
 
-import borg.trikeshed.common.Files
+import borg.trikeshed.Files
 import kotlinx.datetime.Clock
 
 fun autoresearchNativeMain(args: Array<String>) {

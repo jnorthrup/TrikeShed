@@ -1,11 +1,4 @@
-@file:Suppress("UNCHECKED_CAST")
-
 package borg.trikeshed.collections
-
-import borg.trikeshed.lib.Join
-import borg.trikeshed.lib.Series
-import borg.trikeshed.lib.toList
-import borg.trikeshed.lib.α
 
 /**
  * missing stdlib map convenience operator

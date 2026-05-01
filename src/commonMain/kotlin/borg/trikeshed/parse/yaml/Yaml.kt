@@ -2,8 +2,8 @@
 
 package borg.trikeshed.parse.yaml
 
-import borg.trikeshed.common.TypeEvidence
-import borg.trikeshed.common.toRowVec
+import borg.trikeshed.TypeEvidence
+import borg.trikeshed.toRowVec
 import borg.trikeshed.cursor.RowVec
 import borg.trikeshed.lib.*
 import borg.trikeshed.parse.confix.*

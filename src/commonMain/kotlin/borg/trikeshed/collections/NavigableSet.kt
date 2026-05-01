@@ -1,7 +1,7 @@
 package borg.trikeshed.collections
 
 /**
- * A [SortedSet] extended with navigation methods reporting
+ * A [borg.trikeshed.collections.SortedSet] extended with navigation methods reporting
  * closest matches for given search targets. Methods [.lower],
  * [.floor], [.ceiling], and [.higher] return elements
  * respectively less than, less than or equal, greater than or equal,
@@ -54,7 +54,7 @@ package borg.trikeshed.collections
  * @param <E> the type of elements maintained by this set
  * @since 1.6
 </E> */
-interface NavigableSet<E:Comparable<E>> : SortedSet<E> {
+interface NavigableSet<E:Comparable<E>> : borg.trikeshed.collections.SortedSet<E> {
     /**
      * Returns the greatest element in this set strictly less than the
      * given element, or `null` if there is no such element.
@@ -144,7 +144,7 @@ interface NavigableSet<E:Comparable<E>> : SortedSet<E> {
      *
      * @return a reverse order view of this set
      */
-    fun descendingSet(): NavigableSet<E>
+    fun descendingSet(): borg.trikeshed.collections.NavigableSet<E>
 
     /**
      * Returns an iterator over the elements in this set, in descending order.
@@ -192,7 +192,7 @@ interface NavigableSet<E:Comparable<E>> : SortedSet<E> {
     fun subSet(
         fromElement: E, fromInclusive: Boolean,
         toElement: E, toInclusive: Boolean,
-    ): NavigableSet<E>
+    ): borg.trikeshed.collections.NavigableSet<E>
 
     /**
      * Returns a view of the portion of this set whose elements are less than
@@ -222,7 +222,7 @@ interface NavigableSet<E:Comparable<E>> : SortedSet<E> {
      * restricted range, and `toElement` lies outside the
      * bounds of the range
      */
-    fun headSet(toElement: E, inclusive: Boolean): NavigableSet<E>
+    fun headSet(toElement: E, inclusive: Boolean): borg.trikeshed.collections.NavigableSet<E>
 
     /**
      * Returns a view of the portion of this set whose elements are greater
@@ -252,7 +252,7 @@ interface NavigableSet<E:Comparable<E>> : SortedSet<E> {
      * restricted range, and `fromElement` lies outside the
      * bounds of the range
      */
-    fun tailSet(fromElement: E, inclusive: Boolean): NavigableSet<E>
+    fun tailSet(fromElement: E, inclusive: Boolean): borg.trikeshed.collections.NavigableSet<E>
 
 
 }/*

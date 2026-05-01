@@ -12,7 +12,7 @@ import kotlin.math.min
 //package vec
 
 @InternalCoroutinesApi
-typealias CircularQueue<T> = CirQlar<T>
+typealias CircularQueue<T> = borg.trikeshed.collections.CirQlar<T>
 
 /**
 
@@ -79,8 +79,8 @@ open class CirQlar<T>(
         return toVect0r().b(0)
     }
     /*override*/ fun add(k: T): Boolean = offer(k)
-    operator fun CirQlar<T>.plus(k: T): Boolean = offer(k)
-    operator fun CirQlar<T>.plusAssign(k: T) {
+    operator fun borg.trikeshed.collections.CirQlar<T>.plus(k: T): Boolean = offer(k)
+    operator fun borg.trikeshed.collections.CirQlar<T>.plusAssign(k: T) {
         offer(k)
     }
 

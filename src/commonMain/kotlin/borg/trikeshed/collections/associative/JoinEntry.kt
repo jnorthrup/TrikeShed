@@ -14,6 +14,8 @@ value class JoinEntry<A, B>(val join: Join<A, B>) : Map.Entry<A, B> {
 }
 
 
-inline val <A, B> Join<A, B>.entry: JoinEntry<A, B>
-    get() = JoinEntry(this)
+inline val <A, B> Join<A, B>.entry: borg.trikeshed.collections.associative.JoinEntry<A, B>
+    get() = borg.trikeshed.collections.associative.JoinEntry(
+        this
+    )
 

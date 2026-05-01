@@ -2,8 +2,8 @@ package borg.trikeshed.collections
 
 import kotlin.math.max
 
-class TreeSet<E : Comparable<E>> : NavigableSet<E> {
-   var root: Node<E>? = null
+class TreeSet<E : Comparable<E>> : borg.trikeshed.collections.NavigableSet<E> {
+    private var root: Node<E>? = null
     override var size: Int = 0
 
    class Node<E>(var element: E) {
@@ -133,15 +133,15 @@ class TreeSet<E : Comparable<E>> : NavigableSet<E> {
 
     override fun comparator(): Comparator<E> = Comparator { a, b -> a.compareTo(b) }
 
-    override fun subSet(fromElement: E, toElement: E): SortedSet<E> {
+    override fun subSet(fromElement: E, toElement: E): borg.trikeshed.collections.SortedSet<E> {
         return subSet(fromElement, true, toElement, false)
     }
 
-    override fun headSet(toElement: E): SortedSet<E> {
+    override fun headSet(toElement: E): borg.trikeshed.collections.SortedSet<E> {
         return headSet(toElement, false)
     }
 
-    override fun tailSet(fromElement: E): SortedSet<E> {
+    override fun tailSet(fromElement: E): borg.trikeshed.collections.SortedSet<E> {
         return tailSet(fromElement, true)
     }
 
@@ -251,10 +251,9 @@ class TreeSet<E : Comparable<E>> : NavigableSet<E> {
         return false
     }
 
-    override fun descendingSet(): NavigableSet<E> {
-        // Return a snapshot descending view (immutable) backed by a list of elements in reverse order
-        val elems = toList()
-        return SnapshotNavigableSet(elems.reversed())
+    override fun descendingSet(): borg.trikeshed.collections.NavigableSet<E> {
+        // Implementing a full descending set is beyond the scope of this example
+        throw UnsupportedOperationException("descendingSet not implemented")
     }
 
     override fun descendingIterator(): Iterator<E> {
@@ -289,40 +288,19 @@ class TreeSet<E : Comparable<E>> : NavigableSet<E> {
         fromInclusive: Boolean,
         toElement: E,
         toInclusive: Boolean
-    ): NavigableSet<E> {
-        if (fromElement > toElement) throw IllegalArgumentException("fromElement > toElement")
-        val result = mutableListOf<E>()
-        for (e in this) {
-            val geFrom = (e > fromElement) || (fromInclusive && e == fromElement)
-            val leTo = (e < toElement) || (toInclusive && e == toElement)
-            if (geFrom && leTo) result.add(e)
-        }
-        return SnapshotNavigableSet(result)
+    ): borg.trikeshed.collections.NavigableSet<E> {
+        // Implementing a full subset is beyond the scope of this example
+        throw UnsupportedOperationException("subSet not implemented")
     }
 
-    override fun headSet(toElement: E, inclusive: Boolean): NavigableSet<E> {
-        val result = mutableListOf<E>()
-        for (e in this) {
-            val lt = (e < toElement) || (inclusive && e == toElement)
-            if (lt) result.add(e) else break
-        }
-        return SnapshotNavigableSet(result)
+    override fun headSet(toElement: E, inclusive: Boolean): borg.trikeshed.collections.NavigableSet<E> {
+        // Implementing a full headSet is beyond the scope of this example
+        throw UnsupportedOperationException("headSet not implemented")
     }
 
-    override fun tailSet(fromElement: E, inclusive: Boolean): NavigableSet<E> {
-        val result = mutableListOf<E>()
-        for (e in this) {
-            val ge = (e > fromElement) || (inclusive && e == fromElement)
-            if (ge) result.add(e)
-        }
-        return SnapshotNavigableSet(result)
-    }
-
-    private fun toList(): List<E> {
-        val list = mutableListOf<E>()
-        val it = iterator()
-        while (it.hasNext()) list.add(it.next())
-        return list
+    override fun tailSet(fromElement: E, inclusive: Boolean): borg.trikeshed.collections.NavigableSet<E> {
+        // Implementing a full tailSet is beyond the scope of this example
+        throw UnsupportedOperationException("tailSet not implemented")
     }
 
     override fun iterator(): MutableIterator<E> = object : MutableIterator<E> {

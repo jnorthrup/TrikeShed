@@ -33,7 +33,13 @@ fun crossoverGenome(left: Genome, right: Genome): Genome {
         out[i] = if (i < pivot) left.doubles[i] else right.doubles[i]
     }
 
-    val child = Genome(out)
+    // Use the factory so init does NOT overwrite the crossover result
+    val child = Genome.fromDoubles(out, mutableMapOf())
+
+    // Apply key-based crossover for string-key overrides.
+    // IMPORTANT: clear backing first so that set() below only writes to backing
+    // and does NOT overwrite the already-populated doubles array.
+    child.backing.clear()
     val keys = (left.backing.keys + right.backing.keys).distinct().sorted()
     val keyPivot = keys.size / 2
     keys.forEachIndexed { index, key ->

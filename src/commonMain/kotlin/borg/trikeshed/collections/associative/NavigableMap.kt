@@ -3,7 +3,7 @@ package borg.trikeshed.collections.associative
 import borg.trikeshed.collections.NavigableSet
 
 /**
- * A [SortedMap] extended with navigation methods returning the
+ * A [borg.trikeshed.collections.associative.SortedMap] extended with navigation methods returning the
  * closest matches for given search targets. Methods
  * [.lowerEntry], [.floorEntry], [.ceilingEntry],
  * and [.higherEntry] return `Map.Entry` objects
@@ -53,7 +53,7 @@ import borg.trikeshed.collections.NavigableSet
  * implement `NavigableMap`, but extensions and implementations
  * of this interface are encouraged to override these methods to return
  * `NavigableMap`.  Similarly,
- * [.keySet] can be overridden to return [NavigableSet].
+ * [.keySet] can be overridden to return [borg.trikeshed.collections.NavigableSet].
  *
  *
  * This interface is a member of the
@@ -66,7 +66,7 @@ import borg.trikeshed.collections.NavigableSet
  * @param <V> the type of mapped values
  * @since 1.6
 </V></K> */
-interface NavigableMap<K : Comparable<K>, V> : SortedMap<K, V> {
+interface NavigableMap<K : Comparable<K>, V> : borg.trikeshed.collections.associative.SortedMap<K, V> {
     /**
      * Returns a key-value mapping associated with the greatest key
      * strictly less than the given key, or `null` if there is
@@ -235,10 +235,10 @@ interface NavigableMap<K : Comparable<K>, V> : SortedMap<K, V> {
      *
      * @return a reverse order view of this map
      */
-    fun descendingMap(): NavigableMap<K, V>?
+    fun descendingMap(): borg.trikeshed.collections.associative.NavigableMap<K, V>?
 
     /**
-     * Returns a [NavigableSet] view of the keys contained in this map.
+     * Returns a [borg.trikeshed.collections.NavigableSet] view of the keys contained in this map.
      * The set's iterator returns the keys in ascending order.
      * The set is backed by the map, so changes to the map are reflected in
      * the set, and vice-versa.  If the map is modified while an iteration
@@ -250,10 +250,10 @@ interface NavigableMap<K : Comparable<K>, V> : SortedMap<K, V> {
      *
      * @return a navigable set view of the keys in this map
      */
-    fun navigableKeySet(): NavigableSet<K>?
+    fun navigableKeySet(): borg.trikeshed.collections.NavigableSet<K>?
 
     /**
-     * Returns a reverse order [NavigableSet] view of the keys contained in this map.
+     * Returns a reverse order [borg.trikeshed.collections.NavigableSet] view of the keys contained in this map.
      * The set's iterator returns the keys in descending order.
      * The set is backed by the map, so changes to the map are reflected in
      * the set, and vice-versa.  If the map is modified while an iteration
@@ -265,7 +265,7 @@ interface NavigableMap<K : Comparable<K>, V> : SortedMap<K, V> {
      *
      * @return a reverse order navigable set view of the keys in this map
      */
-    fun descendingKeySet(): NavigableSet<K>?
+    fun descendingKeySet(): borg.trikeshed.collections.NavigableSet<K>?
 
     /**
      * Returns a view of the portion of this map whose keys range from
@@ -305,7 +305,7 @@ interface NavigableMap<K : Comparable<K>, V> : SortedMap<K, V> {
     fun subMap(
         fromKey: K, fromInclusive: Boolean,
         toKey: K, toInclusive: Boolean,
-    ): NavigableMap<K, V>?
+    ): borg.trikeshed.collections.associative.NavigableMap<K, V>?
 
     /**
      * Returns a view of the portion of this map whose keys are less than (or
@@ -335,7 +335,7 @@ interface NavigableMap<K : Comparable<K>, V> : SortedMap<K, V> {
      * restricted range, and `toKey` lies outside the
      * bounds of the range
      */
-    fun headMap(toKey: K, inclusive: Boolean): NavigableMap<K, V>?
+    fun headMap(toKey: K, inclusive: Boolean): borg.trikeshed.collections.associative.NavigableMap<K, V>?
 
     /**
      * Returns a view of the portion of this map whose keys are greater than (or
@@ -365,7 +365,7 @@ interface NavigableMap<K : Comparable<K>, V> : SortedMap<K, V> {
      * restricted range, and `fromKey` lies outside the
      * bounds of the range
      */
-    fun tailMap(fromKey: K, inclusive: Boolean): NavigableMap<K, V>?
+    fun tailMap(fromKey: K, inclusive: Boolean): borg.trikeshed.collections.associative.NavigableMap<K, V>?
 
     /**
      * {@inheritDoc}
@@ -377,7 +377,7 @@ interface NavigableMap<K : Comparable<K>, V> : SortedMap<K, V> {
      * @throws NullPointerException     {@inheritDoc}
      * @throws IllegalArgumentException {@inheritDoc}
      */
-    override fun subMap(fromKey: K, toKey: K): SortedMap<K, V>?
+    override fun subMap(fromKey: K, toKey: K): borg.trikeshed.collections.associative.SortedMap<K, V>?
 
     /**
      * {@inheritDoc}
@@ -389,7 +389,7 @@ interface NavigableMap<K : Comparable<K>, V> : SortedMap<K, V> {
      * @throws NullPointerException     {@inheritDoc}
      * @throws IllegalArgumentException {@inheritDoc}
      */
-    override fun headMap(toKey: K): SortedMap<K, V>?
+    override fun headMap(toKey: K): borg.trikeshed.collections.associative.SortedMap<K, V>?
 
     /**
      * {@inheritDoc}
@@ -401,6 +401,6 @@ interface NavigableMap<K : Comparable<K>, V> : SortedMap<K, V> {
      * @throws NullPointerException     {@inheritDoc}
      * @throws IllegalArgumentException {@inheritDoc}
      */
-    override fun tailMap(fromKey: K): SortedMap<K, V>?
+    override fun tailMap(fromKey: K): borg.trikeshed.collections.associative.SortedMap<K, V>?
     override val size: Int
 }

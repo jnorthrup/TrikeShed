@@ -1,6 +1,7 @@
-package borg.trikeshed.isam
+@file:OptIn(kotlinx.cinterop.ExperimentalForeignApi::class)
+package borg.trikeshed.isam//package borg.trikeshed.isam
 //
-//import borg.trikeshed.common.Usable
+//import borg.trikeshed.Usable
 //import borg.trikeshed.cursor.*
 //import borg.trikeshed.isam.meta.IOMemento
 //import borg.trikeshed.lib.*
@@ -41,10 +42,10 @@ package borg.trikeshed.isam
 //    } // unfortunately due to separation of ctor and open, this is not immutable
 //
 //    val constraints: Series<RecordMeta> by lazy { metafile.constraints }
-//   lateinit var data: COpaquePointer
+//    private lateinit var data: COpaquePointer
 //    var fileSize: Long = -1
 //
-//   var first = true
+//    private var first = true
 //    override fun open() {
 //        if (!first) return
 //        memScoped {
@@ -118,7 +119,7 @@ package borg.trikeshed.isam
 //        /**exact same function but writes the file with IoUring set-up and writes and native heap */
 //        fun write (cursor: Cursor, datafilename: String, var): Unit {
 //            val metafilename = "$datafilename.meta"
-//            IsamMetaFileReader.write(metafilename, cursor.meta.map { columnMeta: ColumnMeta`ColumnMeta↻` as RecordMeta })
+//            IsamMetaFileReader.write(metafilename, cursor.meta.map { columnMeta: ColumnMeta -> columnMeta as RecordMeta })
 //
 //
 //            // Create a file for writing
@@ -202,4 +203,3 @@ package borg.trikeshed.isam
 //
 //
 //
-

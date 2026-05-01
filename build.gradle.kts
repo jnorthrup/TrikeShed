@@ -99,6 +99,11 @@ kotlin {
     }
     if (hostOs == "Linux") {
         linuxX64("linux") {
+            compilations.getByName("main") {
+                val zlinux_uring by cinterops.creating {
+                    defFile(project.file("io_uring_interop/zlinux_uring.def"))
+                }
+            }
             if (enableNativeSharedLib) {
                 binaries.sharedLib {
                     baseName = "trikeshed"
@@ -142,6 +147,10 @@ kotlin {
         val posixTest by creating {
             dependsOn(nativeTest)
         }
+        if (hostOs == "Linux") {
+            val linuxMain by getting { dependsOn(posixMain) }
+            val linuxTest by getting { dependsOn(posixTest) }
+        }
 
         val jvmMain by getting {
             resources.srcDir("src/jvmMain/resources")
@@ -174,11 +183,9 @@ kotlin {
             }
         }
 
-        if (hostOs == "Mac OS X") {
-            val macosMain by getting { dependsOn(posixMain) }
-            val macosTest by getting {
-                dependsOn(posixTest)
-            }
+        val macosMain = sourceSets.findByName("macosMain"); macosMain?.dependsOn(sourceSets.getByName("posixMain"))
+        val macosTest = sourceSets.findByName("macosTest"); macosTest?.run {
+            dependsOn(posixTest)
         }
 
         val jsMain by getting {

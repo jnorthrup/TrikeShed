@@ -235,6 +235,17 @@ class Genome(
     fun copyGenome(): Genome = Genome(doubles.copyOf(), overrides.mapValuesTo(mutableMapOf()) { it.value.copyOf() }, backing.toMutableMap())
 
     companion object {
+        /**
+         * Factory that skips the init block — used by crossover operations that have
+         * already populated the doubles array. Does NOT populate backing from doubles;
+         * callers must do so.
+         */
+        fun fromDoubles(doubles: DoubleArray, overrides: MutableMap<String, DoubleArray>): Genome {
+            val g = Genome(DEFAULT_DOUBLES.copyOf(), overrides, mutableMapOf())
+            System.arraycopy(doubles, 0, g.doubles, 0, WIDTH)
+            return g
+        }
+
         val WIDTH: Int = GenomeParam.values().size
 
         val PARAM_NAMES: Array<String> = GenomeParam.values().map { it.storageKey }.toTypedArray()

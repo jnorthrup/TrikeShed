@@ -78,7 +78,7 @@ package borg.trikeshed.collections
  * @author  Josh Bloch
  * @see Set
  *
- * @see TreeSet
+ * @see borg.trikeshed.collections.TreeSet
  *
  * @see SortedMap
  *
@@ -135,7 +135,7 @@ interface SortedSet<E : Comparable<E>> : MutableSet<E> {
      * has a restricted range, and `fromElement` or
      * `toElement` lies outside the bounds of the range
      */
-    fun subSet(fromElement: E, toElement: E): SortedSet<E>
+    fun subSet(fromElement: E, toElement: E): borg.trikeshed.collections.SortedSet<E>
 
     /**
      * Returns a view of the portion of this set whose elements are
@@ -163,7 +163,7 @@ interface SortedSet<E : Comparable<E>> : MutableSet<E> {
      * restricted range, and `toElement` lies outside the
      * bounds of the range
      */
-    fun headSet(toElement: E): SortedSet<E>
+    fun headSet(toElement: E): borg.trikeshed.collections.SortedSet<E>
 
     /**
      * Returns a view of the portion of this set whose elements are
@@ -191,7 +191,7 @@ interface SortedSet<E : Comparable<E>> : MutableSet<E> {
      * restricted range, and `fromElement` lies outside the
      * bounds of the range
      */
-    fun tailSet(fromElement: E): SortedSet<E>
+    fun tailSet(fromElement: E): borg.trikeshed.collections.SortedSet<E>
 
     /**
      * Returns the first (lowest) element currently in this set.
