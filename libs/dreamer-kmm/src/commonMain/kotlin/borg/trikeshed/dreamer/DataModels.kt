@@ -236,13 +236,21 @@ class Genome(
 
     companion object {
         /**
-         * Factory that skips the init block — used by crossover operations that have
-         * already populated the doubles array. Does NOT populate backing from doubles;
-         * callers must do so.
+         * Factory that skips the standard init block — used by crossover operations
+         * that have already populated the doubles array. After copying [doubles] into
+         * the new Genome's [doubles] field, this factory also populates [backing]
+         * from the passed [doubles] so that string-key lookups return the correct
+         * crossed/mutated values.
          */
         fun fromDoubles(doubles: DoubleArray, overrides: MutableMap<String, DoubleArray>): Genome {
             val g = Genome(DEFAULT_DOUBLES.copyOf(), overrides, mutableMapOf())
             System.arraycopy(doubles, 0, g.doubles, 0, WIDTH)
+            // Populate backing from the passed doubles so that string-key lookups
+            // (e.g. g["HARVEST_TAKE_PERCENT"]) return the crossed/mutated values,
+            // not the DEFAULT values that init seeded before System.arraycopy.
+            GenomeParam.values().forEachIndexed { index, param ->
+                g.backing[param.storageKey] = doubles[index]
+            }
             return g
         }
 
