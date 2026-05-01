@@ -329,4 +329,64 @@ class RunCycleTest {
         assertEquals(2050.0, eth.price, 0.001)
         assertEquals(4100.0, eth.value, 0.001)
     }
+
+    // ── 7. simulateMultiSymbolTicks ──────────────────────────────────
+
+    @Test
+    fun `simulateMultiSymbolTicks groups bars by openTime and runs engine per tick`() = runTest {
+        // 3 timestamps × 2 symbols = 6 rows in the cursor
+        val klines = listOf(
+            Kline("BTCUSDT", TimeSpan.Minutes1, 1000L, 100.0, 102.0, 99.0, 101.0, 50.0),
+            Kline("ETHUSDT", TimeSpan.Minutes1, 1000L, 10.0, 10.5, 9.8, 10.2, 500.0),
+            Kline("BTCUSDT", TimeSpan.Minutes1, 2000L, 101.0, 103.0, 100.0, 102.0, 60.0),
+            Kline("ETHUSDT", TimeSpan.Minutes1, 2000L, 10.2, 10.8, 10.0, 10.5, 600.0),
+            Kline("BTCUSDT", TimeSpan.Minutes1, 3000L, 102.0, 104.0, 101.0, 103.0, 70.0),
+            Kline("ETHUSDT", TimeSpan.Minutes1, 3000L, 10.5, 11.0, 10.2, 10.8, 700.0),
+        )
+        val cursor = klinesToCursor(klines)
+
+        val engine = TradingEngine(defaultGenome(), Mode.SHADOW, initialCapital = 10_000.0)
+        val result = simulateMultiSymbolTicks(cursor, engine, initialCapital = 10_000.0)
+
+        assertEquals("MULTI", result.symbol)
+        assertEquals(10_000.0, result.initialCapital, 0.001)
+        // 3 unique openTimes → 3 ticks
+        assertEquals(3, result.cycles.size)
+        assertEquals(3, result.metrics.totalTicks)
+
+        // Each cycle should reflect the first openTime
+        assertEquals(1000L, result.cycles[0].openTime)
+        assertEquals(2000L, result.cycles[1].openTime)
+        assertEquals(3000L, result.cycles[2].openTime)
+    }
+
+    @Test
+    fun `simulateMultiSymbolTicks empty cursor returns empty result`() = runTest {
+        val cursor = klinesToCursor(emptyList())
+        val engine = TradingEngine(defaultGenome(), Mode.SHADOW, initialCapital = 10_000.0)
+        val result = simulateMultiSymbolTicks(cursor, engine, initialCapital = 10_000.0)
+
+        assertEquals("MULTI", result.symbol)
+        assertEquals(0, result.cycles.size)
+        assertEquals(0, result.metrics.totalTicks)
+    }
+
+    @Test
+    fun `simulateMultiSymbolTicks onCycle callback fires per unique openTime`() = runTest {
+        val klines = listOf(
+            Kline("BTCUSDT", TimeSpan.Minutes1, 1000L, 100.0, 101.0, 99.0, 100.5, 50.0),
+            Kline("ETHUSDT", TimeSpan.Minutes1, 1000L, 10.0, 10.5, 9.8, 10.2, 500.0),
+            Kline("BTCUSDT", TimeSpan.Minutes1, 2000L, 100.5, 102.0, 100.0, 101.5, 60.0),
+            Kline("ETHUSDT", TimeSpan.Minutes1, 2000L, 10.2, 10.8, 10.0, 10.6, 600.0),
+        )
+        val cursor = klinesToCursor(klines)
+        val engine = TradingEngine(defaultGenome(), Mode.SHADOW, initialCapital = 10_000.0)
+        val seenTicks = mutableListOf<Int>()
+
+        simulateMultiSymbolTicks(cursor, engine, initialCapital = 10_000.0) { cycle ->
+            seenTicks.add(cycle.tick)
+        }
+
+        assertEquals(listOf(0, 1), seenTicks)
+    }
 }

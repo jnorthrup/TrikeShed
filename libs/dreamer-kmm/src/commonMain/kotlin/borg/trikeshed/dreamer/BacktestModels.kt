@@ -402,6 +402,135 @@ suspend fun simulateTicks(
         metrics = metrics,
     )
 }
+/**
+ * Run a full multi-symbol back-test simulation over a cursor of kline bars.
+ *
+ * Unlike [simulateTicks] which assumes one bar per tick (single-symbol),
+ * this groups bars by `openTime` so each tick may have multiple symbol rows.
+ *
+ * @param cursor         MiniCursor of kline bars (possibly interleaved symbols)
+ * @param engine         pre-configured [TradingEngine]
+ * @param initialCapital starting portfolio value in USD
+ * @param initialHoldings map of symbol → quantity to seed holdings
+ * @param onCycle        optional callback invoked after each tick
+ * @return [BacktestResult] with symbol set to "MULTI" and aggregate metrics
+ */
+suspend fun simulateMultiSymbolTicks(
+    cursor: Cursor,
+    engine: TradingEngine,
+    initialCapital: Double,
+    initialHoldings: Map<String, Double> = emptyMap(),
+    onCycle: (CycleResult) -> Unit = {},
+): BacktestResult {
+    val n = cursor.size
+    if (n == 0) {
+        return BacktestResult(
+            symbol = "MULTI",
+            initialCapital = initialCapital,
+            cycles = emptySeries(),
+            metrics = BacktestMetrics(
+                totalTicks = 0,
+                totalReturn = 0.0,
+                sharpeRatio = 0.0,
+                sortinoRatio = 0.0,
+                maxDrawdown = 0.0,
+                maxDrawdownTicks = 0,
+                totalHarvested = 0.0,
+                totalTrades = 0,
+                avgHarvestPerTick = 0.0,
+            ),
+        )
+    }
+
+    // Collect unique openTimes in order, and build an index of first row for each
+    val openTimes = linkedSetOf<Long>()
+    val firstRowAtTime = linkedMapOf<Long, Int>()
+    for (i in 0 until n) {
+        val row = cursor.at(i)
+        val ot = row.longValue("openTime")
+        if (ot !in openTimes) {
+            openTimes.add(ot)
+            firstRowAtTime[ot] = i
+        }
+    }
+
+    // Seed holdings: allocate initial capital equally across found symbols
+    val symbols = (0 until n).map { cursor.at(it).stringValue("symbol", "UNKNOWN") }.toSet()
+    val holdings = if (initialHoldings.isNotEmpty()) initialHoldings.toMutableMap() else {
+        val perSymbol = initialCapital / symbols.size
+        val result = mutableMapOf<String, Double>()
+        for (i in 0 until n) {
+            val row = cursor.at(i)
+            val sym = row.stringValue("symbol", "UNKNOWN")
+            if (sym !in result) {
+                val price = row.doubleValue("close").takeIf { it > 0.0 } ?: row.doubleValue("open").coerceAtLeast(1.0)
+                result[sym] = perSymbol / price
+            }
+        }
+        result
+    }
+
+    // Adjust engine cash: subtract holdings value to avoid double-counting
+    var initialHoldingsValue = 0.0
+    for (i in 0 until n) {
+        val row = cursor.at(i)
+        val sym = row.stringValue("symbol", "UNKNOWN")
+        val price = row.doubleValue("close").takeIf { it > 0.0 } ?: row.doubleValue("open").coerceAtLeast(1.0)
+        val qty = holdings[sym] ?: 0.0
+        initialHoldingsValue += qty * price
+        break // Only first row per symbol matters for initial value
+    }
+    engine.cashBalance = initialCapital - initialHoldingsValue
+
+    val tickCount = openTimes.size
+    val cycleArray = arrayOfNulls<CycleResult>(tickCount)
+    val timeList = openTimes.toList()
+
+    for (tick in 0 until tickCount) {
+        val openTime = timeList[tick]
+        val barIndex = firstRowAtTime[openTime] ?: tick
+        val inputs = multiSymbolKlineToPortfolioInput(cursor, barIndex, holdings)
+        val rows = inputs.flatMap(::portfolioInputToRows)
+
+        var holdingsValue = 0.0
+        rows.forEach { holdingsValue += it.Value }
+        val totalValue = holdingsValue + engine.cashBalance
+
+        val result = engine.update(
+            portfolioSummary = rows,
+            api = null,
+            cashBalanceIn = engine.cashBalance,
+            holdingDetails = null,
+        )
+
+        val cycle = CycleResult(
+            tick = tick,
+            openTime = openTime,
+            cashBalance = engine.cashBalance,
+            holdingsValue = holdingsValue,
+            totalValue = totalValue,
+            anyTradesThisCycle = result.anyTradesThisCycle,
+            harvestedAmount = result.harvestedAmount,
+            tradedSymbols = result.tradedSymbols,
+            rebalanceScheduled = engine.rebalanceState.isNotEmpty(),
+            engineSnapshot = engine.getStateSnapshot(),
+        )
+        cycleArray[tick] = cycle
+        onCycle(cycle)
+    }
+
+    val cycles: Series<CycleResult> = (cycleArray as Array<CycleResult>).toSeries()
+    val closes = closesFromCursor(cursor)
+    val metrics = computeBacktestMetrics(cycles, initialCapital, closes)
+
+    return BacktestResult(
+        symbol = "MULTI",
+        initialCapital = initialCapital,
+        cycles = cycles,
+        metrics = metrics,
+    )
+}
+
  public fun emptyBacktestResult(genome: Genome, initialCapital: Double): BacktestResult =
     BacktestResult(
         symbol = "",
