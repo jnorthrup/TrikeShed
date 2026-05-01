@@ -175,4 +175,49 @@ class SimulationReplayTest {
         assertEquals(result.metrics.sharpeRatio, report.sharpeRatio, 0.001)
         assertEquals(result.metrics.maxDrawdown, report.maxDrawdown, 0.001)
     }
+
+    /**
+     * SimulationReplay.toBacktestReport() convenience: one call from CSV to report,
+     * without explicit intermediate result variable.
+     */
+    @Test
+    fun `toBacktestReport convenience composes csv and report in one expression`() = runTest {
+        val csvText = csv(
+            "1704067200000,100.0,102.0,99.0,101.0,10.0,1704070799999,1010.0,12,5.0,505.0,0",
+            "1704070800000,101.0,104.0,100.0,103.0,12.0,1704074399999,1236.0,18,6.0,618.0,0",
+        )
+        val replay = SimulationReplay(genome = defaultGenome(), mode = Mode.SHADOW, initialCapital = 10_000.0)
+        val report = replay.toBacktestReport(csvText, "BTCUSDT", TimeSpan.Hours1)
+
+        assertEquals("BTCUSDT", report.symbol)
+        assertEquals(10_000.0, report.initialCapital, 0.001)
+        assertEquals(2, report.totalTicks)
+        assertTrue(report.finalEquity > 0.0)
+        assertTrue(report.totalReturn.isFinite())
+        assertTrue(report.sharpeRatio.isFinite())
+    }
+
+    /**
+     * SimulationReplay with declining prices produces negative totalReturn and
+     * positive maxDrawdown — pinned via toBacktestReport().
+     */
+    @Test
+    fun `toBacktestReport declining prices produces negative return and drawdown`() = runTest {
+        val csvText = csv(
+            "1704067200000,100.0,101.0,98.0,100.0,10.0,1704070799999,1000.0,10,5.0,500.0,0",
+            "1704070800000,100.0,99.0,96.0,97.0,12.0,1704074399999,1164.0,15,6.0,582.0,0",
+            "1704074400000,97.0,96.0,92.0,93.0,14.0,1704077999999,1302.0,20,7.0,651.0,0",
+        )
+        val report = SimulationReplay(
+            genome = defaultGenome(),
+            mode = Mode.SHADOW,
+            initialCapital = 10_000.0,
+        ).toBacktestReport(csvText, "BTCUSDT", TimeSpan.Hours1)
+
+        assertTrue(report.totalReturn < 0.0,
+            "Declining prices → negative totalReturn: ${report.totalReturn}")
+        assertTrue(report.maxDrawdown > 0.0,
+            "Declining prices → drawdown: ${report.maxDrawdown}")
+        assertEquals(3, report.totalTicks)
+    }
 }

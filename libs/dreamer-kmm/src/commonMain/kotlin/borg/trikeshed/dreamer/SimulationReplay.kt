@@ -28,4 +28,8 @@ class SimulationReplay(
         val engine = TradingEngine(genome, mode, initialCapital = initialCapital)
         return simulateTicks(block.seal().asCursor(), engine, initialCapital)
     }
+
+	/** Build a [BacktestReport] from this replay's result. */
+	suspend fun toBacktestReport(csvText: String, symbol: String, timespan: TimeSpan): BacktestReport =
+		replayCsv(csvText, symbol, timespan).toBacktestReport()
 }
