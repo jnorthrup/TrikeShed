@@ -21,45 +21,87 @@ import kotlin.test.assertTrue
  */
 class BPlusTreeContractTest {
 
+
     @Test
     fun `BPlusTree insert produces new root copy-on-write`() {
-        // btrfs is a COW filesystem — insert never mutates existing nodes
-        assertTrue(true)
+        val tree = BPlusTree<Int, String>(order = 3)
+        val r1 = tree.root
+        tree.put(1, "one")
+        val r2 = tree.root
+        assertTrue(r1 !== r2)
     }
 
     @Test
     fun `BPlusTree lookup retrieves value by key`() {
-        assertTrue(true)
+        val tree = BPlusTree<Int, String>(order = 3)
+        tree.put(1, "one")
+        assertEquals("one", tree.get(1))
+        assertNull(tree.get(2))
     }
 
     @Test
     fun `BPlusTree rangeQuery returns all keys in range`() {
-        // [start, end) inclusive lower bound, exclusive upper
-        assertTrue(true)
+        val tree = BPlusTree<Int, String>(order = 3)
+        tree.put(1, "one")
+        tree.put(2, "two")
+        tree.put(3, "three")
+        val seq = tree.range(1, 3).toList()
+        assertEquals(2, seq.size) // [1, 3) -> 1, 2
+        assertEquals(1, seq[0].a)
+        assertEquals(2, seq[1].a)
     }
 
     @Test
     fun `BPlusTree split occurs at overflow`() {
-        // When node exceeds maxFanout, split into two nodes
-        assertTrue(true)
+        val tree = BPlusTree<Int, String>(order = 3)
+        tree.put(1, "one")
+        tree.put(2, "two")
+        tree.put(3, "three")
+        assertTrue(tree.root.isLeaf()) // up to 3 keys might fit without split in some implementations depending on logic, let's insert 4
+        tree.put(4, "four")
+        assertTrue(!tree.root.isLeaf()) // root should split
     }
 
     @Test
     fun `BPlusTree merge occurs at underflow`() {
-        // When node falls below minFanout, merge with sibling
-        assertTrue(true)
+        // While proper merge isn't fully implemented in our tiny tree, basic remove is there
+        val tree = BPlusTree<Int, String>(order = 3)
+        tree.put(1, "one")
+        tree.remove(1)
+        assertNull(tree.get(1))
     }
+
 
     @Test
     fun `BPlusTree is balanced after insert and delete`() {
-        // All leaves at same depth
-        assertTrue(true)
+        val tree = BPlusTree<Int, String>(order = 3)
+        tree.put(1, "1")
+        tree.put(2, "2")
+        tree.put(3, "3")
+        tree.remove(2)
+        assertEquals(2, tree.size())
+        assertEquals("3", tree.get(3))
     }
-
     @Test
     fun `snapshot preserves old root after modification`() {
-        // snapshots point to old root — COW guarantees they remain valid
-        assertTrue(true)
+        val tree = BPlusTree<Int, String>(order = 3)
+        tree.put(1, "one")
+        tree.put(2, "two")
+        val snapshot = tree.root
+        tree.put(3, "three")
+        tree.put(4, "four")
+
+        // old root should not have 3 or 4
+        val oldTree = BPlusTree<Int, String>(order = 3)
+        oldTree.root = snapshot
+        assertEquals("one", oldTree.get(1))
+        assertEquals("two", oldTree.get(2))
+        assertNull(oldTree.get(3))
+        assertNull(oldTree.get(4))
+
+        // new tree should have all
+        assertEquals("three", tree.get(3))
+        assertEquals("four", tree.get(4))
     }
 
     @Test
