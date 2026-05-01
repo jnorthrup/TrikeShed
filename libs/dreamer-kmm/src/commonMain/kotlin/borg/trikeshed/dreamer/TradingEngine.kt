@@ -98,16 +98,32 @@ class TradingEngine(
             }
         }
 
-        // Rebalance scheduling - not implemented (left as red)
+        // ── Rebalance execution: act on previously scheduled rebalances ──
+        // If a rebalance was scheduled on a prior cycle, execute it now:
+        // reset the baseline to the current value so harvest surplus tracking
+        // resumes from the rebalanced anchor.
+        val toExecute = rebalanceState.keys.toList()
+        for (sym in toExecute) {
+            val row = portfolioSummary.find { it.Symbol == sym }
+            if (row != null && row.Value > 0.0) {
+                baselines[sym] = row.Value
+                rebalanceState.remove(sym)
+                stateChanged = true
+            }
+        }
+
+        // ── Rebalance scheduling ──
         // If FLAT_REBALANCE_TRIGGER_PERCENT is small and deviation exists, schedule
         val rebalanceTrigger = getGenomicParam(GenomeParam.FLAT_REBALANCE_TRIGGER_PERCENT, portfolioSummary.firstOrNull()?.Symbol ?: "")
         if (rebalanceTrigger > 0 && portfolioSummary.isNotEmpty()) {
-            val sym = portfolioSummary.first().Symbol
-            val baseline = baselines[sym] ?: portfolioSummary.first().Value
-            val dev = (portfolioSummary.first().Value - baseline) / baseline
-            if (dev > rebalanceTrigger) {
-                rebalanceState[sym] = mapOf("scheduledAt" to Clock.System.now().toEpochMilliseconds())
-                stateChanged = true
+            for (row in portfolioSummary) {
+                val baseline = baselines[row.Symbol] ?: row.Value
+                if (baseline <= 0.0) continue
+                val dev = (row.Value - baseline) / baseline
+                if (dev > rebalanceTrigger && row.Symbol !in rebalanceState) {
+                    rebalanceState[row.Symbol] = mapOf("scheduledAt" to Clock.System.now().toEpochMilliseconds())
+                    stateChanged = true
+                }
             }
         }
 
