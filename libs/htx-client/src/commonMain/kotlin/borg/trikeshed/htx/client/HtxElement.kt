@@ -72,6 +72,8 @@ class HtxElement(
         method: String = "GET",
         path: String = "/",
         body: String = "",
+        switches: Aria2Switches? = null,
+        uris: List<String> = emptyList(),
     ): HtxClientMessage {
         check(state == ElementState.OPEN || state == ElementState.ACTIVE || state == ElementState.DRAINING) { "Expected OPEN, ACTIVE, or DRAINING but was $state" }
         return requestHandler(
@@ -79,6 +81,8 @@ class HtxElement(
                 method = method.trim().uppercase(),
                 path = path,
                 body = body,
+                switches = switches,
+                uris = uris,
             ),
         )
     }
