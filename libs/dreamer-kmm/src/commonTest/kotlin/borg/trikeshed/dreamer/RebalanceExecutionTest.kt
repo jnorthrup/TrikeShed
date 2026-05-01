@@ -31,7 +31,7 @@ class RebalanceExecutionTest {
     }
 
     @Test
-    fun `rebalance execution resets baseline to current value`() {
+    fun `rebalance execution resets baseline to current value`() = runTest {
         val genome = defaultGenome()
         genome[GenomeParam.FLAT_REBALANCE_TRIGGER_PERCENT] = 0.01 // 1% triggers rebalance
         genome[GenomeParam.MIN_SURPLUS_FOR_HARVEST] = 100.0 // high threshold to isolate rebalance
@@ -40,13 +40,13 @@ class RebalanceExecutionTest {
 
         // First row: establishes baseline at 100.0 * qty
         val rows1 = listOf(PortfolioRow("BTCUSDT", 100.0, 100.0, 10_000.0))
-        runTest { engine.update(rows1, null, 0.0, null) }
+        engine.update(rows1, null, 0.0, null)
 
         assertEquals(10_000.0, engine.baselines["BTCUSDT"]!!, 1.0)
 
         // Second row: 10% increase — exceeds 1% rebalance trigger
         val rows2 = listOf(PortfolioRow("BTCUSDT", 100.0, 110.0, 11_000.0))
-        runTest { engine.update(rows2, null, 0.0, null) }
+        engine.update(rows2, null, 0.0, null)
 
         // Rebalance should be scheduled
         assertTrue(engine.rebalanceState.containsKey("BTCUSDT"),
@@ -54,7 +54,7 @@ class RebalanceExecutionTest {
 
         // Third row: rebalance executes, baseline resets
         val rows3 = listOf(PortfolioRow("BTCUSDT", 100.0, 112.0, 11_200.0))
-        runTest { engine.update(rows3, null, 0.0, null) }
+        engine.update(rows3, null, 0.0, null)
 
         // After execution, baseline should have been reset to current value
         // (the value at the time of execution, which is row2 or row3 value)
@@ -63,7 +63,7 @@ class RebalanceExecutionTest {
     }
 
     @Test
-    fun `rebalance clears rebalanceState after execution`() {
+    fun `rebalance clears rebalanceState after execution`() = runTest {
         val genome = defaultGenome()
         genome[GenomeParam.FLAT_REBALANCE_TRIGGER_PERCENT] = 0.01
         genome[GenomeParam.MIN_SURPLUS_FOR_HARVEST] = 100_000.0 // suppress harvest
@@ -71,20 +71,14 @@ class RebalanceExecutionTest {
         val engine = TradingEngine(genome, Mode.SHADOW, initialCapital = 10_000.0)
 
         // Cycle 1: set baseline
-        runTest {
-            engine.update(listOf(PortfolioRow("BTCUSDT", 100.0, 100.0, 10_000.0)), null, 0.0, null)
-        }
+        engine.update(listOf(PortfolioRow("BTCUSDT", 100.0, 100.0, 10_000.0)), null, 0.0, null)
 
         // Cycle 2: trigger rebalance
-        runTest {
-            engine.update(listOf(PortfolioRow("BTCUSDT", 100.0, 110.0, 11_000.0)), null, 0.0, null)
-        }
+        engine.update(listOf(PortfolioRow("BTCUSDT", 100.0, 110.0, 11_000.0)), null, 0.0, null)
         assertTrue(engine.rebalanceState.containsKey("BTCUSDT"))
 
         // Cycle 3: rebalance executes and clears state
-        runTest {
-            engine.update(listOf(PortfolioRow("BTCUSDT", 100.0, 112.0, 11_200.0)), null, 0.0, null)
-        }
+        engine.update(listOf(PortfolioRow("BTCUSDT", 100.0, 112.0, 11_200.0)), null, 0.0, null)
         assertFalse(engine.rebalanceState.containsKey("BTCUSDT"),
             "rebalanceState should be cleared after execution")
     }

@@ -27,7 +27,7 @@ class CrashProtectionTest {
     }
 
     @Test
-    fun `crash protection activates when value drops below trigger threshold`() {
+    fun `crash protection activates when value drops below trigger threshold`() = runTest {
         val genome = defaultGenome()
         genome[GenomeParam.CP_TRIGGER_ASSET_PERCENT] = 0.10  // 10% drop triggers CP
         genome[GenomeParam.CP_TRIGGER_MIN_NEGATIVE_DEV_PERCENT] = 0.05
@@ -36,16 +36,12 @@ class CrashProtectionTest {
         val engine = TradingEngine(genome, Mode.SHADOW, initialCapital = 10_000.0)
 
         // Cycle 1: set baseline at 10_000
-        runTest {
-            engine.update(listOf(PortfolioRow("BTCUSDT", 100.0, 100.0, 10_000.0)), null, 0.0, null)
-        }
+        engine.update(listOf(PortfolioRow("BTCUSDT", 100.0, 100.0, 10_000.0)), null, 0.0, null)
         assertEquals(10_000.0, engine.baselines["BTCUSDT"]!!, 1.0)
         assertFalse(engine.isCrashProtected("BTCUSDT"))
 
         // Cycle 2: 15% drop — triggers CP
-        runTest {
-            engine.update(listOf(PortfolioRow("BTCUSDT", 85.0, 85.0, 8_500.0)), null, 0.0, null)
-        }
+        engine.update(listOf(PortfolioRow("BTCUSDT", 85.0, 85.0, 8_500.0)), null, 0.0, null)
         assertTrue(engine.isCrashProtected("BTCUSDT"),
             "Should enter crash protection after 15% drop")
     }
@@ -80,7 +76,7 @@ class CrashProtectionTest {
     }
 
     @Test
-    fun `crash protection exits on partial recovery`() {
+    fun `crash protection exits on partial recovery`() = runTest {
         val genome = defaultGenome()
         genome[GenomeParam.CP_TRIGGER_ASSET_PERCENT] = 0.10
         genome[GenomeParam.CP_TRIGGER_MIN_NEGATIVE_DEV_PERCENT] = 0.05
@@ -90,27 +86,21 @@ class CrashProtectionTest {
         val engine = TradingEngine(genome, Mode.SHADOW, initialCapital = 10_000.0)
 
         // Cycle 1: baseline at 10_000
-        runTest {
-            engine.update(listOf(PortfolioRow("BTCUSDT", 100.0, 100.0, 10_000.0)), null, 0.0, null)
-        }
+        engine.update(listOf(PortfolioRow("BTCUSDT", 100.0, 100.0, 10_000.0)), null, 0.0, null)
 
         // Cycle 2: 20% drop → CP activates
-        runTest {
-            engine.update(listOf(PortfolioRow("BTCUSDT", 80.0, 80.0, 8_000.0)), null, 0.0, null)
-        }
+        engine.update(listOf(PortfolioRow("BTCUSDT", 80.0, 80.0, 8_000.0)), null, 0.0, null)
         assertTrue(engine.isCrashProtected("BTCUSDT"))
 
         // Cycle 3: partial recovery to 8800 (10% recovery from 8000 trough, which is 30% of the 2000 drop)
         // With 30% recovery threshold: need value >= 8000 + 0.30 * 2000 = 8600
-        runTest {
-            engine.update(listOf(PortfolioRow("BTCUSDT", 88.0, 88.0, 8_800.0)), null, 0.0, null)
-        }
+        engine.update(listOf(PortfolioRow("BTCUSDT", 88.0, 88.0, 8_800.0)), null, 0.0, null)
         assertFalse(engine.isCrashProtected("BTCUSDT"),
             "Should exit CP after partial recovery to 8800 (40% of 2000 drop recovered)")
     }
 
     @Test
-    fun `crash protection resets baseline on exit`() {
+    fun `crash protection resets baseline on exit`() = runTest {
         val genome = defaultGenome()
         genome[GenomeParam.CP_TRIGGER_ASSET_PERCENT] = 0.10
         genome[GenomeParam.CRASH_PROTECTION_PARTIAL_RECOVERY_PERCENT] = 0.30
@@ -119,20 +109,14 @@ class CrashProtectionTest {
         val engine = TradingEngine(genome, Mode.SHADOW, initialCapital = 10_000.0)
 
         // Cycle 1: baseline at 10_000
-        runTest {
-            engine.update(listOf(PortfolioRow("BTCUSDT", 100.0, 100.0, 10_000.0)), null, 0.0, null)
-        }
+        engine.update(listOf(PortfolioRow("BTCUSDT", 100.0, 100.0, 10_000.0)), null, 0.0, null)
         val originalBaseline = engine.baselines["BTCUSDT"]!!
 
         // Cycle 2: 20% drop → CP
-        runTest {
-            engine.update(listOf(PortfolioRow("BTCUSDT", 80.0, 80.0, 8_000.0)), null, 0.0, null)
-        }
+        engine.update(listOf(PortfolioRow("BTCUSDT", 80.0, 80.0, 8_000.0)), null, 0.0, null)
 
         // Cycle 3: partial recovery → CP exits, baseline resets
-        runTest {
-            engine.update(listOf(PortfolioRow("BTCUSDT", 88.0, 88.0, 8_800.0)), null, 0.0, null)
-        }
+        engine.update(listOf(PortfolioRow("BTCUSDT", 88.0, 88.0, 8_800.0)), null, 0.0, null)
         val newBaseline = engine.baselines["BTCUSDT"]!!
         assertTrue(newBaseline < originalBaseline,
             "Baseline should be reset below original after CP exit: was $newBaseline vs $originalBaseline")
