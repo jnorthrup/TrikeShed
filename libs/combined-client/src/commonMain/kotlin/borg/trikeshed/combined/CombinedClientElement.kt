@@ -52,8 +52,7 @@ class CombinedClientElement(
                 val request = HtxClientRequest(
                     method = "GET",
                     path = args.firstOrNull() ?: "/",
-                    switches = Aria2Switches(continueDownload = true),
-                    uris = args
+                    // uris and switches decoupled from HtxClientRequest
                 )
                 // Passing the correct request object
                 val response = htx.requestHandler(request)

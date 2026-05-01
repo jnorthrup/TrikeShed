@@ -2,7 +2,10 @@ package borg.trikeshed.server
 
 import borg.trikeshed.htx.client.HtxClientMessage
 import borg.trikeshed.htx.client.HtxKey
- import kotlin.coroutines.CoroutineContext
+ import borg.trikeshed.htx.client.generated.infrastructure.GeneratedRequest
+import borg.trikeshed.htx.client.generated.api.HtxGeneralApi
+import borg.trikeshed.htx.client.generated.api.DefaultHtxGeneralApi
+import kotlin.coroutines.CoroutineContext
 
 class HtxGeneralServerAdapter(
    val context: CoroutineContext,
