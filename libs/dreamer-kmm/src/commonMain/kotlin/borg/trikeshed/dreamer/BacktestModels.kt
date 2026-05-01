@@ -252,18 +252,18 @@ fun computeBacktestMetrics(
         returns.view.forEach { val diff = it - meanReturn; sumSq += diff * diff }
         sumSq / returns.size
     } else 0.0
-    val stdReturn = sqrt(variance)
+    val stdReturn = sqrt(if (variance < 0) 0.0 else variance)
     // Annualized Sharpe (252 trading days per year, assumes 1 bar = 1 day for now)
-    val sharpeRatio = if (stdReturn > 0.0) (meanReturn / stdReturn) * sqrt(252.0) else 0.0
+    val sharpeRatio = if (stdReturn > 0.0 && meanReturn.isFinite()) (meanReturn / stdReturn) * sqrt(252.0) else 0.0
 
     val downsideVariance = if (returns.isNotEmpty()) {
         var sumDownSq = 0.0
         returns.view.forEach { if (it < 0.0) sumDownSq += it * it }
         sumDownSq / returns.size
     } else 0.0
-    val downsideDeviation = sqrt(downsideVariance)
+    val downsideDeviation = sqrt(if (downsideVariance < 0) 0.0 else downsideVariance)
     // Annualized Sortino, using zero as the minimum acceptable cycle return.
-    val sortinoRatio = if (downsideDeviation > 0.0) (meanReturn / downsideDeviation) * sqrt(252.0) else 0.0
+    val sortinoRatio = if (downsideDeviation > 0.0 && meanReturn.isFinite()) (meanReturn / downsideDeviation) * sqrt(252.0) else 0.0
 
     // Max drawdown
     var peak = initialCapital
@@ -274,7 +274,7 @@ fun computeBacktestMetrics(
         if (cycle.totalValue > peak) {
             peak = cycle.totalValue
             peakIndex = index
-        } else {
+        } else if (peak > 0.0) {
             val drawdown = (peak - cycle.totalValue) / peak
             if (drawdown > maxDrawdown) {
                 maxDrawdown = drawdown

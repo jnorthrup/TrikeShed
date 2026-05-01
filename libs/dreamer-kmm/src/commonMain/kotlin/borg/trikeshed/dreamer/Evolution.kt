@@ -63,7 +63,8 @@ fun rankEvaluationsByFitness(evaluations: List<GenomeEvaluation>): List<GenomeEv
 
 /**
  * Build the next stochastic generation from evaluated parents.
- * The fittest genome is kept as elite; remaining slots are crossover children of the top parents.
+ * The fittest genome is kept as elite; remaining slots are crossover children
+ * drawn from the top half of ranked parents to preserve diversity.
  */
 fun evolvePopulation(
     evaluations: List<GenomeEvaluation>,
@@ -74,9 +75,17 @@ fun evolvePopulation(
     if (ranked.size == 1) return listOf(ranked[0].genome)
 
     val elite = ranked[0].genome
-    val mate = ranked[1].genome
     val next = mutableListOf(elite)
+
+    // Select parents from the top half to maintain diversity; pair elite with
+    // diverse partners rather than always crossing elite×ranked[1].
+    val parentPool = ranked.take(if (ranked.size / 2 < 2) 2 else ranked.size / 2)
+    var parentIndex = 1  // start after elite
+
     while (next.size < ranked.size) {
+        // Rotate through the parent pool so every parent gets used as a mate
+        val mate = parentPool[parentIndex % parentPool.size].genome
+        parentIndex++
         next += mutateGenome(crossoverGenome(elite, mate), mutationDeltas)
     }
     return next
