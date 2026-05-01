@@ -18,7 +18,7 @@ class SqlIntegrationTest {
         val tableSource = InMemoryTableSource()
 
         // Seed schema and rows
-        val schema = TableSchema("users", listOf(ColumnSchema(0, "id"), ColumnSchema(1, "name")))
+        val schema = TableSchema("users", listOf(ColumnSchema(id = 0, name = "id"), ColumnSchema(id = 1, name = "name")))
         schemaManager.createTableSuspend(schema)
         tableSource.addTable(schema, listOf(listOf(1, "alice"), listOf(2, "bob"), listOf(3, "carol")))
 

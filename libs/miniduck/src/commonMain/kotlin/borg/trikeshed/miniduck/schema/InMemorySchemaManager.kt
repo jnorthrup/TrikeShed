@@ -19,7 +19,7 @@ class InMemorySchemaManager : SchemaManager {
         run {
             val existing = tables[table]
             if (existing == null) {
-                val newCols = cols.mapIndexed { i, n -> ColumnSchema(i, n) }
+                val newCols = cols.mapIndexed { i, n -> ColumnSchema(id = i, name = n) }
                 val ts = TableSchema(table, newCols)
                 tables[table] = ts
                 return ts
@@ -27,7 +27,7 @@ class InMemorySchemaManager : SchemaManager {
             val existingNames = existing.columns.map { it.name }.toMutableList()
             var nextId = (existing.columns.maxByOrNull { it.id }?.id ?: -1) + 1
             val added = cols.filter { !existingNames.contains(it) }.map {
-                ColumnSchema(nextId++, it)
+                ColumnSchema(id = nextId++, name = it)
             }
             if (added.isNotEmpty()) {
                 tables[table] = TableSchema(table, existing.columns + added)

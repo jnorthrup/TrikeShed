@@ -7,7 +7,7 @@ import borg.trikeshed.miniduck.runBlockingCommon
  * Placed under package "...schema" so other code can import borg.trikeshed.miniduck.schema.*
  */
 
-data class ColumnSchema(val id: Int, val name: String)
+data class ColumnSchema(val id: Int = -1, val name: String, val type: borg.trikeshed.miniduck.columnar.ColumnType = borg.trikeshed.miniduck.columnar.ColumnType.Long, val indexPluginName: String? = null) { init { require(name.isNotEmpty()) { "ColumnSchema name must not be empty" } } }
 data class TableSchema(val name: String, val columns: List<ColumnSchema>)
 
 interface SchemaManager {

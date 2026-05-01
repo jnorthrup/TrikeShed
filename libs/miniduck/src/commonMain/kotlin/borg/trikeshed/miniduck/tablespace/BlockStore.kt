@@ -22,6 +22,9 @@ interface BlockStore {
     /** Get a block by [collection] and [blockId]. Returns null if not found. */
     fun get(collection: String, blockId: String): BlockRowVec?
 
+    /** Put a block with a specific blockId. */
+    fun putWithId(collection: String, blockId: String, block: BlockRowVec)
+
     /** List all blockIds in [collection]. */
     fun list(collection: String): List<String>
 
@@ -48,7 +51,7 @@ class InMemoryBlockStore : BlockStore {
      * Put a block with a specific blockId — used by WAL replay to reconstruct
      * the exact blockId that was originally assigned.
      */
-    fun putWithId(collection: String, blockId: String, block: BlockRowVec) {
+    override fun putWithId(collection: String, blockId: String, block: BlockRowVec) {
         collections.getOrPut(collection) { mutableMapOf() }[blockId] = block
     }
 
