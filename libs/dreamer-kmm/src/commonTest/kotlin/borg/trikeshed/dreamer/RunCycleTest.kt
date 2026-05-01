@@ -444,4 +444,77 @@ class RunCycleTest {
         val rebalanceTicks = result.cycles.view.filter { it.rebalanceScheduled }
         assertTrue(rebalanceTicks.isNotEmpty(), "Expected rebalance scheduling on large price deviation")
     }
+
+    // ── 10. Edge cases ──────────────────────────────────────────────
+
+    @Test
+    fun `computeBacktestMetrics with single cycle returns zero return and zero sharpe`() {
+        val cycles = s_[
+            CycleResult(0, 0L, 0.0, 10_000.0, 10_000.0, false, 0.0, emptyList(), false, emptyMap()),
+        ]
+        val closes = doubleSeriesOf(listOf(10_000.0))
+        val metrics = computeBacktestMetrics(cycles, 10_000.0, closes)
+
+        assertEquals(1, metrics.totalTicks)
+        assertEquals(0.0, metrics.totalReturn, 0.001, "Single cycle: totalReturn should be 0")
+        assertEquals(0.0, metrics.sharpeRatio, 0.001, "Single cycle: no pairwise returns, sharpe=0")
+        assertEquals(0.0, metrics.sortinoRatio, 0.001, "Single cycle: sortino=0")
+        assertEquals(0.0, metrics.maxDrawdown, 0.001, "Single cycle: no drawdown possible")
+        assertEquals(0, metrics.maxDrawdownTicks, "Single cycle: no drawdown ticks")
+    }
+
+    @Test
+    fun `toBacktestReport with empty cycles returns initialCapital as finalEquity`() {
+        val metrics = BacktestMetrics(
+            totalTicks = 0, totalReturn = 0.0, sharpeRatio = 0.0,
+            sortinoRatio = 0.0, maxDrawdown = 0.0, maxDrawdownTicks = 0,
+            totalHarvested = 0.0, totalTrades = 0, avgHarvestPerTick = 0.0,
+        )
+        val result = BacktestResult(
+            symbol = "BTCUSDT",
+            initialCapital = 25_000.0,
+            cycles = emptySeries(),
+            metrics = metrics,
+        )
+        val report = result.toBacktestReport()
+
+        assertEquals(25_000.0, report.finalEquity, 0.001,
+            "Empty cycles should report initialCapital as finalEquity")
+        assertEquals(0.0, report.totalReturn, 0.001)
+    }
+
+    @Test
+    fun `klineBarToPortfolioInput uses open price when close is zero`() {
+        val klines = listOf(
+            Kline("BTC-USD", TimeSpan.Hours1, 1704067200000L, 20500.0, 21000.0, 20300.0, 0.0, 1500.5),
+        )
+        val cursor = klinesToCursor(klines)
+        val input = klineBarToPortfolioInput(cursor, 0, currentQuantity = 1.0)
+
+        assertEquals(20500.0, input.price, 0.001,
+            "Should fall back to open price when close is 0")
+        assertEquals(20500.0, input.value, 0.001)
+    }
+
+    @Test
+    fun `simulateMultiSymbolTicks with 3 symbols produces correct tick count`() = runTest {
+        val klines = listOf(
+            Kline("BTCUSDT", TimeSpan.Minutes1, 1000L, 100.0, 101.0, 99.0, 100.5, 50.0),
+            Kline("ETHUSDT", TimeSpan.Minutes1, 1000L, 10.0, 10.5, 9.8, 10.2, 500.0),
+            Kline("SOLUSDT", TimeSpan.Minutes1, 1000L, 150.0, 151.0, 149.0, 150.5, 200.0),
+            Kline("BTCUSDT", TimeSpan.Minutes1, 2000L, 100.5, 102.0, 100.0, 101.5, 60.0),
+            Kline("ETHUSDT", TimeSpan.Minutes1, 2000L, 10.2, 10.8, 10.0, 10.6, 600.0),
+            Kline("SOLUSDT", TimeSpan.Minutes1, 2000L, 150.5, 152.0, 149.5, 151.0, 210.0),
+        )
+        val cursor = klinesToCursor(klines)
+        val engine = TradingEngine(defaultGenome(), Mode.SHADOW, initialCapital = 15_000.0)
+        val result = simulateMultiSymbolTicks(cursor, engine, initialCapital = 15_000.0)
+
+        assertEquals("MULTI", result.symbol)
+        assertEquals(2, result.cycles.size, "2 unique openTimes → 2 ticks")
+        assertEquals(2, result.metrics.totalTicks)
+        // First cycle should have 3 symbol rows
+        assertEquals(1000L, result.cycles[0].openTime)
+        assertEquals(2000L, result.cycles[1].openTime)
+    }
 }
