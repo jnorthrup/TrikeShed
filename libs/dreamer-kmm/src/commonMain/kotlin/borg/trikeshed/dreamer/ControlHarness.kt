@@ -11,6 +11,7 @@ import borg.trikeshed.cursor.longValue
 import borg.trikeshed.lib.Join
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.size
+import borg.trikeshed.lib.toSeries
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -198,7 +199,7 @@ fun SimWallet.walletFree(
             else -> -1e-10
         }
     }
-    return 1 j { _: Int -> cellsToRowVec(cells, keys) }
+    return 1 j { _: Int -> cellsToRowVec(cells.toSeries(), keys.toSeries()) }
 }
 
 fun horizonIndex(index: Int, viewPoints: Int, datapoints: Int): Int {
@@ -221,8 +222,8 @@ public fun Cursor.horizonOhlcv(rowLimit: Int, depth: Int): Cursor {
                 row.doubleValue("low"),
                 row.doubleValue("close"),
                 row.doubleValue("volume"),
-            ),
-            keys = listOf("open", "high", "low", "close", "volume"),
+            ).toSeries(),
+            keys = listOf("open", "high", "low", "close", "volume").toSeries(),
         )
     }
 }
@@ -239,7 +240,7 @@ public fun Cursor.pancake(): Cursor {
                 cells += cell.a
             }
         }
-        cellsToRowVec(cells, keys)
+        cellsToRowVec(cells.toSeries(), keys.toSeries())
     }
 }
 public fun Cursor.ochlAt(index: Int): Cursor {
@@ -252,8 +253,8 @@ public fun Cursor.ochlAt(index: Int): Cursor {
                 row.doubleValue("close"),
                 row.doubleValue("high"),
                 row.doubleValue("low"),
-            ),
-            keys = listOf("openTime", "open/0", "close/0", "high/0", "low/0"),
+            ).toSeries(),
+            keys = listOf("openTime", "open/0", "close/0", "high/0", "low/0").toSeries(),
         )
     }
 }

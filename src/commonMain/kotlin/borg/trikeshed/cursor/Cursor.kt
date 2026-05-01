@@ -1,4 +1,4 @@
-@file:Suppress("UNCHECKED_CAST")
+@file:Suppress("UNCHECKED_CAST", "FunctionName", "NonAsciiCharacters")
 
 package borg.trikeshed.cursor
 
@@ -155,10 +155,7 @@ fun Cursor.showValues(range: IntRange) = try {
                 IoCharSeries -> meta.name to (c as Series<Char>).asString()
                 else -> c
             }
-
-
         }
-
         println(show.toList())
     }
 } catch (e: NoSuchElementException) {
@@ -189,7 +186,6 @@ val Cursor.isNumerical: Boolean
         when (b) {
             IoByte, IoShort, IoInt, IoFloat, IoDouble, IoLong -> true
             else -> false
-
         }
     }
 

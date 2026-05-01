@@ -7,8 +7,8 @@
  */
 package borg.trikeshed.couch.finance
 
+import borg.trikeshed.cursor.Cursor
 import borg.trikeshed.miniduck.DocRowVec
-import borg.trikeshed.miniduck.MiniCursor
 import borg.trikeshed.miniduck.getValue
 import borg.trikeshed.miniduck.toRowVec
 import borg.trikeshed.cursor.at
@@ -21,7 +21,7 @@ import borg.trikeshed.lib.size
  *
  * @param closeColumn The column name for the price data (default: "close")
  */
-fun DoubleArray.toPriceCursor(closeColumn: String = "close"): MiniCursor =
+fun DoubleArray.toPriceCursor(closeColumn: String = "close"): Cursor =
     size j { index ->
         DocRowVec(
             keys = listOf(closeColumn),
@@ -35,7 +35,7 @@ fun DoubleArray.toPriceCursor(closeColumn: String = "close"): MiniCursor =
  * @param column The column name to extract (default: "close")
  * @return A Series<Double> with the column values, or Double.NaN for missing/invalid values
  */
-fun MiniCursor.doubleSeries(column: String = "close"): Series<Double> =
+fun Cursor.doubleSeries(column: String = "close"): Series<Double> =
     size j { index ->
         when (val value = at(index).getValue(column)) {
             is Number -> value.toDouble()

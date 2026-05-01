@@ -1,8 +1,8 @@
 package borg.trikeshed.miniduck.columnar
 
+import borg.trikeshed.cursor.Cursor
 import borg.trikeshed.lib.j
 import borg.trikeshed.miniduck.DocRowVec
-import borg.trikeshed.miniduck.MiniCursor
 import kotlin.test.*
 
 /**
@@ -10,7 +10,7 @@ import kotlin.test.*
  */
 class IsamVolumeGenerationTest {
     @Test fun `IsamVolume-generate fails when cursor empty`() {
-        val empty: MiniCursor = 0 j { throw IndexOutOfBoundsException("empty") }
+        val empty: Cursor = 0 j { throw IndexOutOfBoundsException("empty") }
         val schema = listOf(ColumnSchema(name = "openTime", type = ColumnType.Long))
         val tempDir = "/tmp/test_isam_${kotlin.random.Random.nextLong()}"
         assertFails {
@@ -19,7 +19,7 @@ class IsamVolumeGenerationTest {
     }
 
     @Test fun `IsamVolume-generate fails when schema empty`() {
-        val rows: MiniCursor = 1 j { DocRowVec(listOf("x"), listOf(1L)) }
+        val rows: Cursor = 1 j { DocRowVec(listOf("x"), listOf(1L)) }
         val emptySchema = emptyList<ColumnSchema>()
         val tempDir = "/tmp/test_isam_${kotlin.random.Random.nextLong()}"
         assertFails {
@@ -28,7 +28,7 @@ class IsamVolumeGenerationTest {
     }
 
     @Test fun `IsamVolume-generate creates correct file structure`() {
-        val rows: MiniCursor = 1 j { DocRowVec(listOf("openTime"), listOf(1709251200000L)) }
+        val rows: Cursor = 1 j { DocRowVec(listOf("openTime"), listOf(1709251200000L)) }
         val schema = listOf(ColumnSchema(name = "openTime", type = ColumnType.Long))
         val tempDir = "/tmp/test_isam_${kotlin.random.Random.nextLong()}"
         assertFails {

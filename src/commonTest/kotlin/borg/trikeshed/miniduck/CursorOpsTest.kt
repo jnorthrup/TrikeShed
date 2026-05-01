@@ -1,11 +1,12 @@
 package borg.trikeshed.miniduck
 
+import borg.trikeshed.cursor.Cursor
 import borg.trikeshed.lib.*
 import kotlin.test.*
 
 class CursorOpsTest {
 
-   fun cursor(vararg rows: Pair<String, Any?>): MiniCursor =
+   fun cursor(vararg rows: Pair<String, Any?>): Cursor =
         rows.size j { DocRowVec(listOf("key", "val"), listOf(rows[it].first, rows[it].second)) }
 
     // ── where ────────────────────────────────────────────────────────────────
@@ -104,7 +105,7 @@ class CursorOpsTest {
     }
 
     @Test fun orderByNullSortsFirst() {
-        val rows: MiniCursor = 3 j {
+        val rows: Cursor = 3 j {
             when (it) {
                 0 -> DocRowVec(listOf("v"), listOf(null))
                 1 -> DocRowVec(listOf("v"), listOf(1))
@@ -116,7 +117,7 @@ class CursorOpsTest {
     }
 
     @Test fun orderByMultiSpec() {
-        val rows: MiniCursor = 3 j {
+        val rows: Cursor = 3 j {
             when (it) {
                 0 -> DocRowVec(listOf("grp", "val"), listOf("b", 1))
                 1 -> DocRowVec(listOf("grp", "val"), listOf("a", 2))
@@ -132,7 +133,7 @@ class CursorOpsTest {
     // ── project ──────────────────────────────────────────────────────────────
 
     @Test fun projectSelectsNamedColumns() {
-        val c: MiniCursor = 1 j { DocRowVec(listOf("name", "age", "city"), listOf("Alice", 30, "NY")) }
+        val c: Cursor = 1 j { DocRowVec(listOf("name", "age", "city"), listOf("Alice", 30, "NY")) }
         val r = c.project("name", "age")
         val row = r[0] as DocRowVec
         assertEquals(2, row.size)
@@ -142,14 +143,14 @@ class CursorOpsTest {
     }
 
     @Test fun projectMissingKeyProducesNull() {
-        val c: MiniCursor = 1 j { DocRowVec(listOf("x"), listOf(1)) }
+        val c: Cursor = 1 j { DocRowVec(listOf("x"), listOf(1)) }
         val row = c.project("x", "missing")[0] as DocRowVec
         assertNull(row["missing"])
     }
 
     @Test fun projectRetainsDeferredChildrenOnViewRows() {
         val nested = DocRowVec(listOf("body"), listOf("hello"))
-        val base: MiniCursor = 1 j { ViewRowVec("doc1", "k", "v") { nested } }
+        val base: Cursor = 1 j { ViewRowVec("doc1", "k", "v") { nested } }
 
         val projected = base.project("id", "key", "value")
         val row = projected[0] as DocRowVec
@@ -164,7 +165,7 @@ class CursorOpsTest {
 
     @Test fun columnsRetainsDeferredChildrenOnBlobRows() {
         val nested = JsonRowVec("object", "{}")
-        val base: MiniCursor = 1 j { BlobRowVec(byteArrayOf(0x7b, 0x7d)) { 1 j { nested } } }
+        val base: Cursor = 1 j { BlobRowVec(byteArrayOf(0x7b, 0x7d)) { 1 j { nested } } }
 
         val projected = base.columns(0)
         val row = projected[0] as DocRowVec
@@ -186,7 +187,7 @@ class CursorOpsTest {
     }
 
     @Test fun executeProjectPlan() {
-        val base: MiniCursor = 1 j { DocRowVec(listOf("a", "b"), listOf(1, 2)) }
+        val base: Cursor = 1 j { DocRowVec(listOf("a", "b"), listOf(1, 2)) }
         val ref = RelationRef("db", "t", RelationKind.DOCS)
         val plan = ScanPlan(ref) project listOf("a")
         val result = execute(plan, base)

@@ -6,12 +6,9 @@ import borg.trikeshed.cursor.ColumnMeta
 import borg.trikeshed.cursor.Cursor
 import borg.trikeshed.cursor.RowVec
 import borg.trikeshed.cursor.at
-import borg.trikeshed.cursor.meta
 import borg.trikeshed.cursor.name
 import borg.trikeshed.cursor.j
-import borg.trikeshed.isam.meta.IOMemento
 import borg.trikeshed.lib.Series
-import borg.trikeshed.lib.emptySeries
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.getOrNull
 import borg.trikeshed.lib.j

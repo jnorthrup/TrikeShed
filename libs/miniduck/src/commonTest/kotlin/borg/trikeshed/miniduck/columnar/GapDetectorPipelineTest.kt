@@ -1,9 +1,9 @@
 package borg.trikeshed.miniduck.columnar
 
+import borg.trikeshed.cursor.Cursor
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.size
 import borg.trikeshed.miniduck.DocRowVec
-import borg.trikeshed.miniduck.MiniCursor
 import borg.trikeshed.miniduck.at
 import kotlin.test.*
 
@@ -39,8 +39,8 @@ class GapDetectorPipelineTest {
             klineRow(1709251440000L),
             klineRow(1709251500000L),
         )
-        val cursor: MiniCursor = rows.size j { i -> rows[i] }
-        val result: MiniCursor = GapDetector.find(cursor, INTERVAL_1M)
+        val cursor: Cursor = rows.size j { i -> rows[i] }
+        val result: Cursor = GapDetector.find(cursor, INTERVAL_1M)
         assertEquals(0, result.size)
     }
 
@@ -56,8 +56,8 @@ class GapDetectorPipelineTest {
             klineRow(1709251800000L),
             klineRow(1709251860000L),
         )
-        val cursor: MiniCursor = rows.size j { i -> rows[i] }
-        val result: MiniCursor = GapDetector.find(cursor, INTERVAL_1M)
+        val cursor: Cursor = rows.size j { i -> rows[i] }
+        val result: Cursor = GapDetector.find(cursor, INTERVAL_1M)
         assertEquals(1, result.size)
     }
 
@@ -73,8 +73,8 @@ class GapDetectorPipelineTest {
             klineRow(1709251800000L),
             klineRow(1709251860000L),
         )
-        val cursor: MiniCursor = rows.size j { i -> rows[i] }
-        val result: MiniCursor = GapDetector.find(cursor, INTERVAL_1M)
+        val cursor: Cursor = rows.size j { i -> rows[i] }
+        val result: Cursor = GapDetector.find(cursor, INTERVAL_1M)
         assertEquals(1709251380000L, (result.at(0) as DocRowVec)["openTime"])
         assertEquals(1709251440000L, (result.at(0) as DocRowVec)["expected"])
         assertEquals(1709251680000L, (result.at(0) as DocRowVec)["actual"])
@@ -90,8 +90,8 @@ class GapDetectorPipelineTest {
             klineRow(1709251380000L),
             klineRow(1709251441000L),  // +1s
         )
-        val cursor: MiniCursor = rows.size j { i -> rows[i] }
-        val result: MiniCursor = GapDetector.find(cursor, INTERVAL_1M)
+        val cursor: Cursor = rows.size j { i -> rows[i] }
+        val result: Cursor = GapDetector.find(cursor, INTERVAL_1M)
         assertEquals(0, result.size)
     }
 
@@ -102,8 +102,8 @@ class GapDetectorPipelineTest {
             val jitter = if (i % 2 == 0) (INTERVAL_1M / 10) else 0L
             klineRow(base + jitter)
         }
-        val cursor: MiniCursor = rows.size j { i -> rows[i] }
-        val result: MiniCursor = GapDetector.find(cursor, INTERVAL_1M)
+        val cursor: Cursor = rows.size j { i -> rows[i] }
+        val result: Cursor = GapDetector.find(cursor, INTERVAL_1M)
         assertEquals(0, result.size)
     }
 
@@ -114,22 +114,22 @@ class GapDetectorPipelineTest {
             val jitter = if (i == 50) (INTERVAL_1M * 11 / 100) else 0L
             klineRow(base + jitter)
         }
-        val cursor: MiniCursor = rows.size j { i -> rows[i] }
-        val result: MiniCursor = GapDetector.find(cursor, INTERVAL_1M)
+        val cursor: Cursor = rows.size j { i -> rows[i] }
+        val result: Cursor = GapDetector.find(cursor, INTERVAL_1M)
         assertEquals(1, result.size)
     }
 
     /** Empty cursor returns empty result. */
     @Test fun `empty cursor returns zero gaps`() {
-        val empty: MiniCursor = 0 j { _: Int -> throw IndexOutOfBoundsException("empty") }
-        val result: MiniCursor = GapDetector.find(empty, INTERVAL_1M)
+        val empty: Cursor = 0 j { _: Int -> throw IndexOutOfBoundsException("empty") }
+        val result: Cursor = GapDetector.find(empty, INTERVAL_1M)
         assertEquals(0, result.size)
     }
 
     /** Single-row cursor returns zero gaps. */
     @Test fun `single row returns zero gaps`() {
-        val cursor: MiniCursor = 1 j { _: Int -> klineRow(1709251200000L) }
-        val result: MiniCursor = GapDetector.find(cursor, INTERVAL_1M)
+        val cursor: Cursor = 1 j { _: Int -> klineRow(1709251200000L) }
+        val result: Cursor = GapDetector.find(cursor, INTERVAL_1M)
         assertEquals(0, result.size)
     }
 
@@ -141,8 +141,8 @@ class GapDetectorPipelineTest {
             klineRow(1709251800000L),
             klineRow(1709252700000L),  // gap: expected 1709252100000
         )
-        val cursor: MiniCursor = rows.size j { i -> rows[i] }
-        val result: MiniCursor = GapDetector.find(cursor, INTERVAL_5M)
+        val cursor: Cursor = rows.size j { i -> rows[i] }
+        val result: Cursor = GapDetector.find(cursor, INTERVAL_5M)
         assertEquals(1, result.size)
     }
 
@@ -158,9 +158,9 @@ class GapDetectorPipelineTest {
             klineRow(1709251800000L),
             klineRow(1709251860000L),
         )
-        val cursor: MiniCursor = rows.size j { i -> rows[i] }
-        val result: MiniCursor = GapDetector.find(cursor, INTERVAL_1M)
-        val projected: MiniCursor = result.size j { i -> result.at(i) }
+        val cursor: Cursor = rows.size j { i -> rows[i] }
+        val result: Cursor = GapDetector.find(cursor, INTERVAL_1M)
+        val projected: Cursor = result.size j { i -> result.at(i) }
         assertEquals(1, projected.size)
     }
 }

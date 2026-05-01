@@ -88,7 +88,7 @@ class LsmrTableSource(private val db: LsmrDatabase,val blockSizeThreshold: Int =
     // Suspend-aware open that reads from the LSMR db without blocking.
     override suspend fun openSuspend(execCtx: ExecutionContext, tableName: String): Cursor {
         // Prefer block-based storage (chunked sealed BlockRowVecs). Fallback to legacy per-row storage if no blocks found.
-        val rows = mutableListOf<borg.trikeshed.miniduck.RowVec>()
+        val rows = mutableListOf<MiniRowVec>()
 
         val blockCountRaw = db.get(blockCountKey(tableName))
         if (blockCountRaw != null) {

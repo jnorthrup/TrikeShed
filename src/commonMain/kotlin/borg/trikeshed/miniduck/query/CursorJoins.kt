@@ -27,7 +27,7 @@ import borg.trikeshed.lib.*
  *   cursor.groupBy("dept", Agg.count(), Agg.sum("salary"))
  */
 fun Cursor.groupBy(keyColumn: String, vararg aggs: Agg): Cursor {
-    if (size == 0) return emptyMiniCursor()
+    if (size == 0) return emptyCursor()
 
     // Phase 1: collect groups
     val groups = linkedMapOf<Any?, MutableList<Int>>()
@@ -86,7 +86,7 @@ fun Cursor.hashJoin(
     leftKey: String,
     rightKey: String,
 ): Cursor {
-    if (size == 0 || right.size == 0) return emptyMiniCursor()
+    if (size == 0 || right.size == 0) return emptyCursor()
 
     // Phase 1: build hash table from right side
     val hashTable = mutableMapOf<Any?, MutableList<Int>>()

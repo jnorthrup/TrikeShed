@@ -3,8 +3,8 @@ package borg.trikeshed.integration
 import borg.trikeshed.couch.kline.Kline
 import borg.trikeshed.couch.kline.KlineBlock
 import borg.trikeshed.couch.kline.TimeSpan
+import borg.trikeshed.cursor.Cursor
 import borg.trikeshed.lib.size
-import borg.trikeshed.miniduck.MiniCursor
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -28,7 +28,7 @@ class BinanceStochasticKlineCacheTest {
         )
         var loads = 0
         val provider = object : BinanceKlineProvider {
-            override suspend fun open(key: BinanceKlineKey): MiniCursor {
+            override suspend fun open(key: BinanceKlineKey): Cursor {
                 loads++
                 return syntheticTwentyRowCursor(key)
             }
@@ -51,7 +51,7 @@ class BinanceStochasticKlineCacheTest {
         val eth = BinanceKlineKey("ETHUSDT", "1h", LocalDate.parse("2024-01-01"), LocalDate.parse("2024-01-01"))
         var loads = 0
         val provider = object : BinanceKlineProvider {
-            override suspend fun open(key: BinanceKlineKey): MiniCursor {
+            override suspend fun open(key: BinanceKlineKey): Cursor {
                 loads++
                 return syntheticTwentyRowCursor(key)
             }
@@ -70,7 +70,7 @@ class BinanceStochasticKlineCacheTest {
         val key = BinanceKlineKey("BTCUSDT", "1h", LocalDate.parse("2024-01-01"), LocalDate.parse("2024-01-01"))
         var loads = 0
         val provider = object : BinanceKlineProvider {
-            override suspend fun open(key: BinanceKlineKey): MiniCursor {
+            override suspend fun open(key: BinanceKlineKey): Cursor {
                 loads++
                 delay(100)
                 return syntheticTwentyRowCursor(key)
@@ -118,7 +118,7 @@ class BinanceStochasticKlineCacheTest {
         val loaded = runBinanceStochasticKlineCache(
             args = args,
             provider = object : BinanceKlineProvider {
-                override suspend fun open(key: BinanceKlineKey): MiniCursor = syntheticTwentyRowCursor(key)
+                override suspend fun open(key: BinanceKlineKey): Cursor = syntheticTwentyRowCursor(key)
             },
         )
 
@@ -129,7 +129,7 @@ class BinanceStochasticKlineCacheTest {
     }
 }
 
-private fun syntheticTwentyRowCursor(key: BinanceKlineKey): MiniCursor {
+private fun syntheticTwentyRowCursor(key: BinanceKlineKey): Cursor {
     val block = KlineBlock.mutable()
     repeat(20) { i ->
         block.append(

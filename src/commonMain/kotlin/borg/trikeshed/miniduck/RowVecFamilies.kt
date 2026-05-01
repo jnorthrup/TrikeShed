@@ -2,9 +2,13 @@ package borg.trikeshed.miniduck
 
 import borg.trikeshed.cursor.ColumnMeta
 import borg.trikeshed.cursor.RowVec
-import borg.trikeshed.cursor.j
+import borg.trikeshed.cursor.TypeMemento
+import borg.trikeshed.cursor.`ColumnMeta↻`
 import borg.trikeshed.isam.meta.IOMemento
-import borg.trikeshed.lib.*
+import borg.trikeshed.lib.ReifiedSplitSeries2
+import borg.trikeshed.lib.Series
+import borg.trikeshed.lib.j
+import borg.trikeshed.lib.toSeries
 
 /**
  * DocRowVec: flat document fields with optional lazy nested children.
@@ -28,11 +32,11 @@ class DocRowVec(
 }
 
 fun DocRowVec.toRowVec(): RowVec {
-    val values = cells.toSeries()
-    val meta = keys.size j { index: Int ->
-        { ColumnMeta(keys[index], cells.getOrNull(index).toIOMemento()) }
+    val values: Series<Any?> = cells.toSeries()
+    val meta: Series<`ColumnMeta↻`> = keys.size j { index: Int ->
+        { @Suppress("UNCHECKED_CAST") (keys[index] j cells.getOrNull(index).toIOMemento() as TypeMemento) }
     }
-    return values.j(meta)
+    return ReifiedSplitSeries2(values, meta)
 }
 
 private fun Any?.toIOMemento(): IOMemento = when (this) {

@@ -4,10 +4,10 @@ import borg.trikeshed.couch.kline.Kline
 import borg.trikeshed.couch.kline.KlineBlock
 import borg.trikeshed.couch.kline.KlineCollector
 import borg.trikeshed.couch.kline.TimeSpan
+import borg.trikeshed.cursor.Cursor
 import borg.trikeshed.lib.j
-import borg.trikeshed.miniduck.MiniCursor
 import borg.trikeshed.cursor.at
-import borg.trikeshed.miniduck.emptyMiniCursor
+import borg.trikeshed.miniduck.emptyCursor
 import borg.trikeshed.userspace.concurrency.Channel
 import borg.trikeshed.userspace.concurrency.ChannelCapacity
 import kotlinx.coroutines.CancellationException
@@ -74,7 +74,7 @@ class BinanceKlineSource(
      * Fetch all klines synchronously and return a flat MiniCursor.
      * Each row is a DocRowVec with keys: symbol, timespan, openTime, open, high, low, close, volume
      */
-    fun fetchCursor(): MiniCursor {
+    fun fetchCursor(): Cursor {
         val blocks = mutableListOf<KlineBlock>()
         runBlocking {
             fetchAll { block -> blocks.add(block) }
@@ -85,7 +85,7 @@ class BinanceKlineSource(
     /**
      * Alias for [fetchCursor] — returns a MiniCursor ready for projection / SQL.
      */
-    fun open(): MiniCursor = fetchCursor()
+    fun open(): Cursor = fetchCursor()
 
    suspend fun fetchAll(onBlock: (KlineBlock) -> Unit) = coroutineScope {
         val channel: Channel<Kline> = Channel(ChannelCapacity.Unbounded)
@@ -209,9 +209,9 @@ class BinanceKlineSource(
      * Convert a list of sealed KlineBlocks into a single flat MiniCursor.
      * Uses the `j` infix constructor (Join factory) for lazy indexed access.
      */
-   fun blocksToCursor(blocks: List<KlineBlock>): MiniCursor {
+   fun blocksToCursor(blocks: List<KlineBlock>): Cursor {
         val totalRows = blocks.sumOf { it.rowCount }
-        if (totalRows == 0) return emptyMiniCursor()
+        if (totalRows == 0) return emptyCursor()
 
         return totalRows j { rowIdx: Int ->
             var remaining = rowIdx

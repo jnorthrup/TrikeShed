@@ -1,6 +1,6 @@
 package borg.trikeshed.couch.kline
 
-    import borg.trikeshed.miniduck.MiniCursor
+    import borg.trikeshed.cursor.Cursor
     import borg.trikeshed.miniduck.toRowVec
     import borg.trikeshed.lib.j
     import borg.trikeshed.lib.toSeries
@@ -76,7 +76,7 @@ class KlineBlock constructor(
      *
      * @throws IllegalStateException if the block is not sealed.
      */
-    fun asCursor(): MiniCursor {
+    fun asCursor(): Cursor {
         check(_state == State.SEALED) { "Block must be sealed before presenting as cursor" }
         // Snapshot the rows list to avoid concurrent modification
         val snapshot = rows.toList()
@@ -109,7 +109,7 @@ class KlineBlock constructor(
                     is Boolean -> IOMemento.IoBoolean
                     else -> IOMemento.IoString
                 }
-                { borg.trikeshed.cursor.ColumnMeta(Kline.schemaKeys[idx], t) }
+                { Kline.schemaKeys[idx] j t }
             }
             (values.j(meta) as borg.trikeshed.cursor.RowVec)
         }

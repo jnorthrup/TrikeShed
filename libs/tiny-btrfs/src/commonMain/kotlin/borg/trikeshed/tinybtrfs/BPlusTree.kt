@@ -40,7 +40,7 @@ class BPlusTree<K : Comparable<K>, V>(
         fun clone(): LeafNode {
             val copy = LeafNode()
             copy.keysCount = keysCount
-                        for (i in 0 until keysCount) {
+            for (i in 0 until keysCount) {
                 copy._keys[i] = _keys[i]
                 copy._values[i] = _values[i]
             }
@@ -89,7 +89,6 @@ class BPlusTree<K : Comparable<K>, V>(
             return copy
         }
 
-
         fun removeAt(index: Int): LeafNode {
             val copy = clone()
             for (i in index until copy.keysCount - 1) {
@@ -120,16 +119,6 @@ class BPlusTree<K : Comparable<K>, V>(
             right.keysCount = rightLen
 
             return Twin(left, right)
-        }
-
-        fun removeAt(index: Int) {
-            for (i in index until keysCount - 1) {
-                _keys[i] = _keys[i + 1]
-                _values[i] = _values[i + 1]
-            }
-            _keys[keysCount - 1] = null
-            _values[keysCount - 1] = null
-            keysCount--
         }
     }
 
@@ -221,6 +210,7 @@ class BPlusTree<K : Comparable<K>, V>(
             copy.childrenCount++
             return copy
         }
+
         fun removeKeyAndChildAt(keyIndex: Int, childIndex: Int): InternalNode {
             val copy = clone()
             for (i in keyIndex until copy.keysCount - 1) {
@@ -236,7 +226,6 @@ class BPlusTree<K : Comparable<K>, V>(
             copy.childrenCount--
             return copy
         }
-
 
         fun splitAt(mid: Int): Join<K, Twin<InternalNode>> {
             val pivotKey = _keys[mid] as K
@@ -267,26 +256,34 @@ class BPlusTree<K : Comparable<K>, V>(
 
             return pivotKey j Twin(left, right)
         }
+    }
 
-        fun removeAt(index: Int) {
-            for (i in index until keysCount - 1) {
-                _keys[i] = _keys[i + 1]
-                _children[i + 1] = _children[i + 2]
+    private var _size = 0
+
+    var root: Node<K, V> = LeafNode()
+        set(value) {
+            field = value
+            _size = countEntries(value)
+        }
+
+    init {
+        _size = 0
+    }
+
+    private fun countEntries(node: Node<K, V>): Int = when (node) {
+        is LeafNode -> node.keysCount
+        is InternalNode -> {
+            var total = 0
+            for (i in 0 until node.childrenCount) {
+                total += countEntries(node.childAt(i))
             }
-            _keys[keysCount - 1] = null
-            _children[childrenCount - 1] = null
-            keysCount--
-            childrenCount--
+            total
         }
     }
 
-    var root: Node<K, V> = LeafNode()
-    var _size = 0
-
     fun put(key: K, value: V) {
-        val existed: Boolean = get(key) != null
         val result = insert(root, key, value)
-        if (result is Join<*, *>) {
+        root = if (result is Join<*, *>) {
             val split = result as Join<K, Twin<Node<K, V>>>
             val pivot: K = split.a
             val twins: Twin<Node<K, V>> = split.b
@@ -296,11 +293,10 @@ class BPlusTree<K : Comparable<K>, V>(
             newRoot = newRoot.insertKeyAt(0, pivot)
             newRoot = newRoot.addChild(left)
             newRoot = newRoot.addChild(right)
-            root = newRoot
+            newRoot
         } else {
-            root = result as Node<K, V>
+            result as Node<K, V>
         }
-        if (!existed) _size++
     }
 
     fun get(key: K): V? {
@@ -310,41 +306,24 @@ class BPlusTree<K : Comparable<K>, V>(
     }
 
     fun remove(key: K): Boolean {
-        return delete(root, key)
-    }
+        val existed = get(key) != null
+        if (!existed) return false
 
-    private fun delete(node: Node<K, V>, key: K): Boolean {
-        if (node.isLeaf()) {
-            val leaf = node as LeafNode
-            val idx = leaf.binarySearchKeys(key)
-            if (idx >= 0) {
-                leaf.removeAt(idx)
-                _size--
-                return true
+        val newRoot = delete(root, key)
+        root = if (newRoot != null) {
+            if (!newRoot.isLeaf() && (newRoot as InternalNode).keysCount == 0 && newRoot.childrenCount == 1) {
+                newRoot.childAt(0)
+            } else {
+                newRoot
             }
-            return false
         } else {
-            val internal = node as InternalNode
-            val idx = internal.binarySearchKeys(key)
-            var childIndex = if (idx >= 0) idx + 1 else -idx - 1
-            if (childIndex < 0) childIndex = 0
-            if (childIndex >= internal.childrenCount) childIndex = internal.childrenCount - 1
-            val child = internal.childAt(childIndex)
-
-            val deleted = delete(child, key)
-
-            // Simplistic deletion strategy: we do not fully rebalance nodes
-            // since it was not fully implemented/required to pass basic tests.
-            // The requirement "Add BPlusTree delete -- Implement remove" is fulfilled.
-            // If the root becomes empty but has a child, promote child.
-            if (node == root && internal.keysCount == 0 && internal.childrenCount > 0) {
-                root = internal.childAt(0)
-            }
-            return deleted
+            LeafNode()
         }
+        return true
     }
 
     fun size(): Int = _size
+
     fun range(start: K, end: K): Sequence<Join<K, V>> = sequence {
         val stack = mutableListOf<Join<Node<K, V>, Int>>()
         var cur = root
@@ -372,7 +351,6 @@ class BPlusTree<K : Comparable<K>, V>(
                 leafIdx++
             }
 
-            // Advance to next leaf using stack
             var nextNode: Node<K, V>? = null
             while (stack.isNotEmpty()) {
                 val parentJoin = stack.removeLast()
@@ -398,26 +376,6 @@ class BPlusTree<K : Comparable<K>, V>(
         }
     }
 
-
-
-    fun remove(key: K): Boolean {
-        val existed = get(key) != null
-        if (!existed) return false
-
-        val newRoot = delete(root, key)
-        if (newRoot != null) {
-            if (!newRoot.isLeaf() && (newRoot as InternalNode).keysCount == 0 && newRoot.childrenCount == 1) {
-                root = newRoot.childAt(0)
-            } else {
-                root = newRoot
-            }
-        } else {
-            root = LeafNode()
-        }
-        _size--
-        return true
-    }
-
     private fun delete(node: Node<K, V>, key: K): Node<K, V>? {
         if (node.isLeaf()) {
             val leaf = node as LeafNode
@@ -438,9 +396,7 @@ class BPlusTree<K : Comparable<K>, V>(
             val child = internal.childAt(childIndex)
             val newChild = delete(child, key)
 
-
             if (newChild == null) {
-                // Child became empty, just remove it and its key
                 val keyIdxToRemove = if (childIndex == 0) 0 else childIndex - 1
                 return internal.removeKeyAndChildAt(keyIdxToRemove, childIndex)
             } else {
@@ -450,11 +406,8 @@ class BPlusTree<K : Comparable<K>, V>(
                 if (newChild.isLeaf()) {
                     val leafChild = newChild as LeafNode
                     if (leafChild.keysCount < minKeys) {
-                        // try to borrow or merge with right sibling
                         if (childIndex < newInternal.childrenCount - 1) {
                             val rightSibling = newInternal.childAt(childIndex + 1) as LeafNode
-
-                            // Merge
                             if (leafChild.keysCount + rightSibling.keysCount <= order) {
                                 var merged = leafChild
                                 for (i in 0 until rightSibling.keysCount) {
@@ -466,7 +419,6 @@ class BPlusTree<K : Comparable<K>, V>(
                         }
                     }
                 } else {
-                    // Internal node underflow (simpler version)
                     val intChild = newChild as InternalNode
                     if (intChild.keysCount < minKeys) {
                         if (childIndex < newInternal.childrenCount - 1) {
@@ -476,10 +428,10 @@ class BPlusTree<K : Comparable<K>, V>(
                                 val pivot = newInternal.keyAt(childIndex)
                                 merged = merged.insertKeyAt(merged.keysCount, pivot)
 
-                                for(i in 0 until rightSibling.keysCount) {
+                                for (i in 0 until rightSibling.keysCount) {
                                     merged = merged.insertKeyAt(merged.keysCount, rightSibling.keyAt(i))
                                 }
-                                for(i in 0 until rightSibling.childrenCount) {
+                                for (i in 0 until rightSibling.childrenCount) {
                                     merged = merged.addChild(rightSibling.childAt(i))
                                 }
 
@@ -491,16 +443,9 @@ class BPlusTree<K : Comparable<K>, V>(
                 }
                 return newInternal
             }
-
-            // Real B+Tree would do merging/rebalancing here for underflow,
-            // but this passes the basic structure for 'remove'.
         }
     }
 
-
-    /**
-     * Internal insert. Returns either the new Node<K, V> or Join<K, Twin<Node<K,V>>> when a split occurs.
-     */
     fun insert(node: Node<K, V>, key: K, value: V): Any {
         if (node.isLeaf()) {
             val leaf: BPlusTree<K, V>.LeafNode = node as LeafNode
@@ -513,10 +458,10 @@ class BPlusTree<K : Comparable<K>, V>(
             if (newLeaf.keysCount > order) {
                 val mid = newLeaf.keysCount / 2
                 val (left, right) = newLeaf.splitAt(mid)
-                                val pivot = right.keyAt(0)
+                val pivot = right.keyAt(0)
                 return pivot j Twin(left, right)
             }
-                        return newLeaf
+            return newLeaf
         } else {
             val internal: BPlusTree<K, V>.InternalNode = node as InternalNode
             val idx = internal.binarySearchKeys(key)

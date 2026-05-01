@@ -6,8 +6,6 @@ import borg.trikeshed.cursor.RowVec
 import borg.trikeshed.collections._l
 import borg.trikeshed.lib.*
 import borg.trikeshed.parse.confix.*
-import borg.trikeshed.common.TypeEvidence
-import borg.trikeshed.cursor.RowVec
 
 /**
  * Thin re-export layer over the confix JSON stack.

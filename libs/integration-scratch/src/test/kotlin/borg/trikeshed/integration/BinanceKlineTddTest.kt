@@ -2,11 +2,12 @@ package borg.trikeshed.integration
 
 import borg.trikeshed.couch.kline.Kline
 import borg.trikeshed.couch.kline.TimeSpan
-import borg.trikeshed.miniduck.DocRowVec
-import borg.trikeshed.miniduck.MiniCursor
-import borg.trikeshed.miniduck.at
+import borg.trikeshed.miniduck.getValue
+import borg.trikeshed.cursor.at
 import borg.trikeshed.couch.kline.KlineBlock
 import borg.trikeshed.couch.kline.KlineCollector
+import borg.trikeshed.cursor.Cursor
+import borg.trikeshed.lib.get
 import borg.trikeshed.userspace.concurrency.Channel
 import borg.trikeshed.userspace.concurrency.ChannelCapacity
 import borg.trikeshed.lib.size
@@ -188,7 +189,7 @@ class BinanceKlineTddTest {
     }
 
     // ---------------------------------------------------------------------------
-    // 4. KlineBlock → MiniCursor → DocRowVec
+    // 4. KlineBlock → MiniCursor → cursor.RowVec
     // ---------------------------------------------------------------------------
 
     @Test
@@ -198,27 +199,27 @@ class BinanceKlineTddTest {
         block.append(Kline("BTCUSDT", TimeSpan.Hours1, 1704070800000L, 20800.0, 21200.0, 20700.0, 21100.0, 1600.0))
         block.seal()
 
-        val cursor: MiniCursor = block.asCursor()
+        val cursor: Cursor = block.asCursor()
 
         assertEquals(2, cursor.size)
     }
 
     @Test
-    fun `KlineBlock asCursor returns DocRowVec with correct schema keys`() {
+    fun `KlineBlock asCursor returns RowVec with correct schema keys`() {
         val block = KlineBlock.mutable()
         block.append(Kline("ETHUSDT", TimeSpan.Days1, 1704067200000L, 3000.0, 3100.0, 2950.0, 3050.0, 50000.0))
         block.seal()
 
-        val cursor: MiniCursor = block.asCursor()
-        val row: DocRowVec = (cursor at 0) as DocRowVec
+        val cursor: Cursor = block.asCursor()
+        val row = cursor at 0
 
         assertEquals(
             listOf("symbol", "timespan", "openTime", "open", "high", "low", "close", "volume"),
-            row.keys,
+            List(row.size) { row[it].b().a },
         )
-        assertEquals("ETHUSDT", row.cells[0])
-        assertEquals(TimeSpan.Days1, row.cells[1])
-        assertEquals(3000.0, row.cells[3] as Double, 0.001)
+        assertEquals("ETHUSDT", row.getValue("symbol"))
+        assertEquals(TimeSpan.Days1, row.getValue("timespan"))
+        assertEquals(3000.0, row.getValue("open") as Double, 0.001)
     }
 
     @Test
@@ -331,21 +332,21 @@ class BinanceKlineTddTest {
         klines.forEach { block.append(it) }
         block.seal()
 
-        // Present as MiniCursor / DocRowVec
-        val cursor: MiniCursor = block.asCursor()
+        // Present as MiniCursor / cursor.RowVec
+        val cursor: Cursor = block.asCursor()
         assertEquals(2, cursor.size)
 
-        val row0: DocRowVec = (cursor at 0) as DocRowVec
-        assertEquals("BTCUSDT", row0.cells[0])
-        assertEquals(20500.0, row0.cells[3] as Double, 0.001)
-        assertEquals(21000.0, row0.cells[4] as Double, 0.001)
-        assertEquals(20300.0, row0.cells[5] as Double, 0.001)
-        assertEquals(20800.0, row0.cells[6] as Double, 0.001)
-        assertEquals(1500.5, row0.cells[7] as Double, 0.001)
-        assertEquals(TimeSpan.Hours1, row0.cells[1])
+        val row0 = cursor at 0
+        assertEquals("BTCUSDT", row0.getValue("symbol"))
+        assertEquals(20500.0, row0.getValue("open") as Double, 0.001)
+        assertEquals(21000.0, row0.getValue("high") as Double, 0.001)
+        assertEquals(20300.0, row0.getValue("low") as Double, 0.001)
+        assertEquals(20800.0, row0.getValue("close") as Double, 0.001)
+        assertEquals(1500.5, row0.getValue("volume") as Double, 0.001)
+        assertEquals(TimeSpan.Hours1, row0.getValue("timespan"))
 
-        val row1: DocRowVec = (cursor at 1) as DocRowVec
-        assertEquals(20800.0, row1.cells[3] as Double, 0.001)
+        val row1 = cursor at 1
+        assertEquals(20800.0, row1.getValue("open") as Double, 0.001)
     }
 
     @Test

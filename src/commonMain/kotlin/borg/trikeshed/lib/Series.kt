@@ -3,8 +3,9 @@
 
 package borg.trikeshed.lib
 
+import borg.trikeshed.TypeEvidence
 import borg.trikeshed.collections.binarySearch
-import borg.trikeshed.isam.meta.IOMemento.*
+import borg.trikeshed.isam.meta.IOMemento
 import kotlin.jvm.JvmInline
 import kotlin.jvm.JvmName
 import kotlin.math.max
@@ -103,6 +104,7 @@ fun <T> Array<T>.toSeries(): Join<Int, (Int) -> T> = size j ::get
 // in kotlin, val a: ()->B  wraps a B.  in lambda calculus which is left identity ?  in kotlin, a: ()->B  is right identity.  left identity is: val a: ()->B = { b }  right identity is:  val a: ()->B = b
 
 inline val <T> T.leftIdentity: () -> T get() = { this }
+inline val <T> T.`↻`: () -> T get() = this.leftIdentity
 
 fun <T> T.rightIdentity(t: T): T = t
 

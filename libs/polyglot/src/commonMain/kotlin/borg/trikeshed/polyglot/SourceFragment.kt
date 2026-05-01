@@ -5,6 +5,7 @@ import borg.trikeshed.common.TypeEvidence
 import borg.trikeshed.cursor.*
 import borg.trikeshed.isam.meta.IOMemento
 import borg.trikeshed.lib.*
+import borg.trikeshed.lib.j
 
 /* ═══════════════════════════════════════════════════════════════════════════
  *  SourceFragment — the universal AST node intermediate representation.
@@ -111,18 +112,18 @@ data class SourceFragment(
             meta.extern
         ]
         val metas: Series<`ColumnMeta↻`> = s_[
-            ColumnMeta("lang", IOMemento.IoString),
-            ColumnMeta("spanStart", IOMemento.IoInt),
-            ColumnMeta("spanEnd", IOMemento.IoInt),
-            ColumnMeta("kind", IOMemento.IoString),
-            ColumnMeta("name", IOMemento.IoString),
-            ColumnMeta("deducedType", IOMemento.IoString),
-            ColumnMeta("meta_visibility", IOMemento.IoString),
-            ColumnMeta("meta_mutability", IOMemento.IoString),
-            ColumnMeta("meta_lifetime", IOMemento.IoString),
-            ColumnMeta("meta_async", IOMemento.IoBoolean),
-            ColumnMeta("meta_generic", IOMemento.IoBoolean),
-            ColumnMeta("meta_extern", IOMemento.IoBoolean),
+            "lang" j IOMemento.IoString,
+            "spanStart" j IOMemento.IoInt,
+            "spanEnd" j IOMemento.IoInt,
+            "kind" j IOMemento.IoString,
+            "name" j IOMemento.IoString,
+            "deducedType" j IOMemento.IoString,
+            "meta_visibility" j IOMemento.IoString,
+            "meta_mutability" j IOMemento.IoString,
+            "meta_lifetime" j IOMemento.IoString,
+            "meta_async" j IOMemento.IoBoolean,
+            "meta_generic" j IOMemento.IoBoolean,
+            "meta_extern" j IOMemento.IoBoolean,
         ] α { it.leftIdentity }
         return values joins metas
     }

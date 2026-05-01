@@ -2,16 +2,15 @@ package borg.trikeshed.parse.interop
 
 import borg.trikeshed.TypeEvidence
 import borg.trikeshed.cursor.ColumnMeta
-import borg.trikeshed.cursor.MapTypeMemento
 import borg.trikeshed.cursor.RowVec
-import borg.trikeshed.cursor.SeqTypeMemento
 import borg.trikeshed.cursor.TreeCursor
 import borg.trikeshed.cursor.TypeMemento
 import borg.trikeshed.cursor.joins
 import borg.trikeshed.cursor.label
 import borg.trikeshed.isam.meta.IOMemento
-import borg.trikeshed.lib.* 
-import borg.trikeshed.parse.json.* 
+import borg.trikeshed.lib.*
+import borg.trikeshed.lib.j
+import borg.trikeshed.parse.json.*
 import borg.trikeshed.parse.yaml.*
 enum class ReificationFlavor {
     Generic,
@@ -24,7 +23,7 @@ enum class ExtentTermination {
     ConfixClose,
     IndentDrop,
     EndOfInput,
-}               
+}
 
 sealed interface OpaqueExtent {
     val flavor: ReificationFlavor
@@ -287,7 +286,7 @@ fun DescriptorFragment.toRowVec(path: String): RowVec {
         evidence.maxColumnLength.toInt(),
         if (evidence.minColumnLength == UShort.MAX_VALUE) 0 else evidence.minColumnLength.toInt(),
     )
-    val meta = DESCRIPTOR_ROW_COLUMNS.size j { index: Int -> { DESCRIPTOR_ROW_COLUMNS[index] } }
+    val meta = DESCRIPTOR_ROW_COLUMNS.size j { index: Int -> { @Suppress("UNCHECKED_CAST") (DESCRIPTOR_ROW_COLUMNS[index] as ColumnMeta) } }
     return values.size j { index: Int -> values[index] } joins meta
 }
 
@@ -300,33 +299,33 @@ fun childPath(parent: String, key: String?): String =
     }
 
 val DESCRIPTOR_ROW_COLUMNS = arrayOf(
-    ColumnMeta("identity", IOMemento.IoString),
-    ColumnMeta("path", IOMemento.IoString),
-    ColumnMeta("key", IOMemento.IoString),
-    ColumnMeta("depth", IOMemento.IoInt),
-    ColumnMeta("extentFlavor", IOMemento.IoString),
-    ColumnMeta("extentStart", IOMemento.IoInt),
-    ColumnMeta("extentEnd", IOMemento.IoInt),
-    ColumnMeta("indentDepth", IOMemento.IoInt),
-    ColumnMeta("termination", IOMemento.IoString),
-    ColumnMeta("confix", IOMemento.IoString),
-    ColumnMeta("typeMemento", IOMemento.IoString),
-    ColumnMeta("childCount", IOMemento.IoInt),
-    ColumnMeta("digits", IOMemento.IoInt),
-    ColumnMeta("periods", IOMemento.IoInt),
-    ColumnMeta("exponent", IOMemento.IoInt),
-    ColumnMeta("signs", IOMemento.IoInt),
-    ColumnMeta("special", IOMemento.IoInt),
-    ColumnMeta("alpha", IOMemento.IoInt),
-    ColumnMeta("truefalse", IOMemento.IoInt),
-    ColumnMeta("empty", IOMemento.IoInt),
-    ColumnMeta("quotes", IOMemento.IoInt),
-    ColumnMeta("dquotes", IOMemento.IoInt),
-    ColumnMeta("whitespaces", IOMemento.IoInt),
-    ColumnMeta("backslashes", IOMemento.IoInt),
-    ColumnMeta("linefeed", IOMemento.IoInt),
-    ColumnMeta("maxColumnLength", IOMemento.IoInt),
-    ColumnMeta("minColumnLength", IOMemento.IoInt),
+    "identity" j IOMemento.IoString,
+    "path" j IOMemento.IoString,
+    "key" j IOMemento.IoString,
+    "depth" j IOMemento.IoInt,
+    "extentFlavor" j IOMemento.IoString,
+    "extentStart" j IOMemento.IoInt,
+    "extentEnd" j IOMemento.IoInt,
+    "indentDepth" j IOMemento.IoInt,
+    "termination" j IOMemento.IoString,
+    "confix" j IOMemento.IoString,
+    "typeMemento" j IOMemento.IoString,
+    "childCount" j IOMemento.IoInt,
+    "digits" j IOMemento.IoInt,
+    "periods" j IOMemento.IoInt,
+    "exponent" j IOMemento.IoInt,
+    "signs" j IOMemento.IoInt,
+    "special" j IOMemento.IoInt,
+    "alpha" j IOMemento.IoInt,
+    "truefalse" j IOMemento.IoInt,
+    "empty" j IOMemento.IoInt,
+    "quotes" j IOMemento.IoInt,
+    "dquotes" j IOMemento.IoInt,
+    "whitespaces" j IOMemento.IoInt,
+    "backslashes" j IOMemento.IoInt,
+    "linefeed" j IOMemento.IoInt,
+    "maxColumnLength" j IOMemento.IoInt,
+    "minColumnLength" j IOMemento.IoInt,
 )
 
 fun escape(value: String): String =

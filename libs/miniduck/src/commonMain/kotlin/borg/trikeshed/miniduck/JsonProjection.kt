@@ -10,7 +10,7 @@ import borg.trikeshed.lib.*
  * DocRowVec produces {key: value, ...}
  * Other MiniRowVec types are projected via their scalar surface.
  */
-fun MiniCursor.toJson(): String {
+fun Cursor.toJson(): String {
     val sb = StringBuilder()
     for (i in 0 until this.size) {
         if (i > 0) sb.append('\n')
@@ -29,7 +29,7 @@ fun rowToJson(row: RowVec): String {
     return sb.toString()
 }
 
-fun rowToJson(row: RowVec): String = when (row) {
+fun rowToJson(row: MiniRowVec): String = when (row) {
     is DocRowVec -> {
         val children = row.child
         val sb = StringBuilder("{")
@@ -72,6 +72,6 @@ fun valueToJson(v: Any?): String = when (v) {
     is Double -> if (v.isInfinite() || v.isNaN()) "null" else v.toString()
     is Float -> if (v.isInfinite() || v.isNaN()) "null" else v.toString()
     is Boolean -> v.toString()
-    is RowVec -> rowToJson(v)
+    is MiniRowVec -> rowToJson(v)
     else -> '"' + escapeJson(v.toString()) + '"'
 }

@@ -1,5 +1,6 @@
 package borg.trikeshed.miniduck.query
 
+import borg.trikeshed.cursor.Cursor
 import borg.trikeshed.cursor.RowVec
 import borg.trikeshed.miniduck.*
 import borg.trikeshed.lib.*
@@ -20,7 +21,7 @@ import kotlin.test.*
  */
 class BlockAggregateQueryTest {
 
-   fun empCursor(): MiniCursor {
+   fun empCursor(): Cursor {
         val rows = listOf(
             DocRowVec(listOf("name", "dept", "salary"), listOf("alice", "eng", 120000)),
             DocRowVec(listOf("name", "dept", "salary"), listOf("bob", "eng", 110000)),
@@ -133,7 +134,7 @@ class BlockAggregateQueryTest {
 
     @Test
     fun groupByEmptyCursorReturnsEmpty() {
-        val cursor = emptyMiniCursor()
+        val cursor = emptyCursor()
         val grouped = cursor.groupBy("dept", Agg.count())
         assertEquals(0, grouped.size)
     }

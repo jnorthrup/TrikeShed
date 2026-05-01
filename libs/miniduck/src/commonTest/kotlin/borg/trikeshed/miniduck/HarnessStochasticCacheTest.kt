@@ -1,6 +1,6 @@
 package borg.trikeshed.miniduck
 
-import borg.trikeshed.dreamer.HarnessStochasticCache
+import borg.trikeshed.cursor.Cursor
 import borg.trikeshed.indicator.Stochastic
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.at
@@ -21,7 +21,7 @@ class HarnessStochasticCacheTest {
             DocRowVec(keys = listOf("high", "low", "close"), cells = listOf(102.0, 101.0, 101.5)),
             DocRowVec(keys = listOf("high", "low", "close"), cells = listOf(103.0, 102.0, 102.5)),
         )
-        val cursor: MiniCursor = rows.size j { i: Int -> rows[i] }
+        val cursor: Cursor = rows.size j { i: Int -> rows[i] }
 
         val symbol = "SYM"
         val timeframe = "1d"

@@ -1,8 +1,8 @@
 package borg.trikeshed.miniduck.tablespace
 
-import borg.trikeshed.cursor.RowVec
+import borg.trikeshed.cursor.Cursor
 import borg.trikeshed.miniduck.BlockRowVec
-import borg.trikeshed.miniduck.MiniCursor
+import borg.trikeshed.miniduck.MiniRowVec
 import borg.trikeshed.lib.*
 import borg.trikeshed.miniduck.schema.ColumnSchema
 import borg.trikeshed.miniduck.schema.TableSchema
@@ -47,8 +47,8 @@ class Tablespace(val name: String) {
      * Order: region-sequential, block-sequential, row-sequential.
      * For custom ordering, pipe the cursor through CursorOps (orderBy, etc.).
      */
-    fun scan(collection: String): MiniCursor {
-        val rows = mutableListOf<RowVec>()
+    fun scan(collection: String): Cursor {
+        val rows = mutableListOf<MiniRowVec>()
         for (region in _regions) {
             for (blockId in region.store.list(collection)) {
                 val block = region.store.get(collection, blockId) ?: continue

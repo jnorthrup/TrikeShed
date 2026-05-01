@@ -1,9 +1,11 @@
 package borg.trikeshed.dreamer
 
+import borg.trikeshed.collections.s_
 import borg.trikeshed.cursor.Cursor
 import borg.trikeshed.cursor.RowVec
 import borg.trikeshed.cursor.cellsToRowVec
 import borg.trikeshed.lib.j
+import borg.trikeshed.lib.toSeries
 
 enum class TimeSpan(val seconds: Long, val binanceInterval: String) {
     Seconds30(30L, "30s"),
@@ -62,9 +64,9 @@ data class ExtendedKline(
     fun toKline(): Kline = Kline(symbol, timespan, openTime, open, high, low, close, volume)
 }
 
-class KlineBlock public constructor(
-    public val mutableRows: MutableList<Kline>,
-    public var mutableState: State,
+class KlineBlock(
+    val mutableRows: MutableList<Kline>,
+    var mutableState: State,
     val timespan: TimeSpan?,
 ) {
     enum class State { MUTABLE, SEALED }
@@ -102,9 +104,9 @@ class KlineBlock public constructor(
         check(mutableState == State.SEALED) { "Block must be sealed before presenting as cursor" }
         val snapshot = rows
         return snapshot.size j { rowIndex: Int ->
-            val kline = snapshot[rowIndex]
+            val kline: Kline = snapshot[rowIndex]
             cellsToRowVec(
-                cells = listOf(
+                cells = s_(
                     kline.symbol,
                     kline.timespan.toString(),
                     kline.openTime,

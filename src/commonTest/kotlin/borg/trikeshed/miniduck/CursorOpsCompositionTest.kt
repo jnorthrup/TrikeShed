@@ -1,5 +1,6 @@
 package borg.trikeshed.miniduck
 
+import borg.trikeshed.cursor.Cursor
 import borg.trikeshed.lib.*
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -13,7 +14,7 @@ import kotlin.test.assertEquals
 class CursorOpsCompositionTest {
 
     /** Build a 5-row cursor with keys "name" and "age". */
-    private fun sampleCursor(): MiniCursor = 5 j { i ->
+    private fun sampleCursor(): Cursor = 5 j { i ->
         DocRowVec(
             keys = listOf("name", "age"),
             cells = listOf(names[i], ages[i]),
@@ -128,7 +129,7 @@ class CursorOpsCompositionTest {
 
     @Test
     fun emptyCursorStaysEmpty() {
-        val c = emptyMiniCursor()
+        val c = emptyCursor()
         assertEquals(0, c.size)
         val taken = c.take(5)
         assertEquals(0, taken.size)

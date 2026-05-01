@@ -2,10 +2,6 @@ package borg.trikeshed.isam
 
 import borg.trikeshed.common.Files
 import borg.trikeshed.cursor.ColumnMeta
-import borg.trikeshed.cursor.Cursor
-import borg.trikeshed.cursor.RowVec
-import borg.trikeshed.cursor.meta
-import borg.trikeshed.cursor.name
 import borg.trikeshed.isam.meta.IOMemento
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.emptySeries

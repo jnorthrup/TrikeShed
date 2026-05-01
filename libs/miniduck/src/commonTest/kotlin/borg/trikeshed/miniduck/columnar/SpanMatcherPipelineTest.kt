@@ -1,9 +1,9 @@
 package borg.trikeshed.miniduck.columnar
 
+import borg.trikeshed.cursor.Cursor
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.size
 import borg.trikeshed.miniduck.DocRowVec
-import borg.trikeshed.miniduck.MiniCursor
 import borg.trikeshed.miniduck.at
 import kotlin.test.*
 
@@ -41,9 +41,9 @@ class SpanMatcherPipelineTest {
             klineRow(1709251320000L),
             klineRow(1709251380000L),
         )
-        val cursorA: MiniCursor = rowsA.size j { i -> rowsA[i] }
-        val cursorB: MiniCursor = rowsB.size j { i -> rowsB[i] }
-        val spans: MiniCursor = SpanMatcher.find(cursorA, cursorB)
+        val cursorA: Cursor = rowsA.size j { i -> rowsA[i] }
+        val cursorB: Cursor = rowsB.size j { i -> rowsB[i] }
+        val spans: Cursor = SpanMatcher.find(cursorA, cursorB)
         assertEquals(1, spans.size)
     }
 
@@ -62,9 +62,9 @@ class SpanMatcherPipelineTest {
             klineRow(1709251440000L),
             klineRow(1709251500000L),
         )
-        val cursorA: MiniCursor = rowsA.size j { i -> rowsA[i] }
-        val cursorB: MiniCursor = rowsB.size j { i -> rowsB[i] }
-        val spans: MiniCursor = SpanMatcher.find(cursorA, cursorB)
+        val cursorA: Cursor = rowsA.size j { i -> rowsA[i] }
+        val cursorB: Cursor = rowsB.size j { i -> rowsB[i] }
+        val spans: Cursor = SpanMatcher.find(cursorA, cursorB)
         assertEquals(1, spans.size)
     }
 
@@ -83,9 +83,9 @@ class SpanMatcherPipelineTest {
             klineRow(1709251440000L),
             klineRow(1709251500000L),
         )
-        val cursorA: MiniCursor = rowsA.size j { i -> rowsA[i] }
-        val cursorB: MiniCursor = rowsB.size j { i -> rowsB[i] }
-        val spans: MiniCursor = SpanMatcher.find(cursorA, cursorB)
+        val cursorA: Cursor = rowsA.size j { i -> rowsA[i] }
+        val cursorB: Cursor = rowsB.size j { i -> rowsB[i] }
+        val spans: Cursor = SpanMatcher.find(cursorA, cursorB)
         assertEquals(1709251260000L, (spans.at(0) as DocRowVec)["aStart"])
         assertEquals(1709251380000L, (spans.at(0) as DocRowVec)["aEnd"])
         assertEquals(1709251260000L, (spans.at(0) as DocRowVec)["bStart"])
@@ -107,9 +107,9 @@ class SpanMatcherPipelineTest {
             klineRow(1709251620000L),
             klineRow(1709251680000L),
         )
-        val cursorA: MiniCursor = rowsA.size j { i -> rowsA[i] }
-        val cursorC: MiniCursor = rowsC.size j { i -> rowsC[i] }
-        val spans: MiniCursor = SpanMatcher.find(cursorA, cursorC)
+        val cursorA: Cursor = rowsA.size j { i -> rowsA[i] }
+        val cursorC: Cursor = rowsC.size j { i -> rowsC[i] }
+        val spans: Cursor = SpanMatcher.find(cursorA, cursorC)
         assertEquals(0, spans.size)
     }
 
@@ -128,9 +128,9 @@ class SpanMatcherPipelineTest {
             klineRow(1709251320000L),
             klineRow(1709251380000L),
         )
-        val cursorD: MiniCursor = rowsD.size j { i -> rowsD[i] }
-        val cursorB: MiniCursor = rowsB.size j { i -> rowsB[i] }
-        val spans: MiniCursor = SpanMatcher.find(cursorD, cursorB)
+        val cursorD: Cursor = rowsD.size j { i -> rowsD[i] }
+        val cursorB: Cursor = rowsB.size j { i -> rowsB[i] }
+        val spans: Cursor = SpanMatcher.find(cursorD, cursorB)
         assertEquals(2, spans.size)
     }
 
@@ -148,9 +148,9 @@ class SpanMatcherPipelineTest {
             klineRow(1709251320000L),
             klineRow(1709251380000L),
         )
-        val cursorD: MiniCursor = rowsD.size j { i -> rowsD[i] }
-        val cursorB: MiniCursor = rowsB.size j { i -> rowsB[i] }
-        val spans: MiniCursor = SpanMatcher.find(cursorD, cursorB)
+        val cursorD: Cursor = rowsD.size j { i -> rowsD[i] }
+        val cursorB: Cursor = rowsB.size j { i -> rowsB[i] }
+        val spans: Cursor = SpanMatcher.find(cursorD, cursorB)
         assertEquals(1709251200000L, (spans.at(0) as DocRowVec)["aStart"])
         assertEquals(1709251320000L, (spans.at(0) as DocRowVec)["aEnd"])
         assertEquals(2, (spans.at(0) as DocRowVec)["aRows"])
@@ -170,9 +170,9 @@ class SpanMatcherPipelineTest {
             klineRow(1709251320000L),
             klineRow(1709251380000L),
         )
-        val cursorD: MiniCursor = rowsD.size j { i -> rowsD[i] }
-        val cursorB: MiniCursor = rowsB.size j { i -> rowsB[i] }
-        val spans: MiniCursor = SpanMatcher.find(cursorD, cursorB)
+        val cursorD: Cursor = rowsD.size j { i -> rowsD[i] }
+        val cursorB: Cursor = rowsB.size j { i -> rowsB[i] }
+        val spans: Cursor = SpanMatcher.find(cursorD, cursorB)
         assertEquals(1709251380000L, (spans.at(1) as DocRowVec)["aStart"])
         assertEquals(1709251500000L, (spans.at(1) as DocRowVec)["aEnd"])
         assertEquals(2, (spans.at(1) as DocRowVec)["aRows"])
@@ -181,18 +181,18 @@ class SpanMatcherPipelineTest {
     /** Empty cursor A returns zero spans. */
     @Test fun `empty cursor A returns zero spans`() {
         val rowsB = listOf(klineRow(1709251200000L))
-        val emptyA: MiniCursor = 0 j { _: Int -> throw IndexOutOfBoundsException("empty") }
-        val cursorB: MiniCursor = rowsB.size j { i -> rowsB[i] }
-        val spans: MiniCursor = SpanMatcher.find(emptyA, cursorB)
+        val emptyA: Cursor = 0 j { _: Int -> throw IndexOutOfBoundsException("empty") }
+        val cursorB: Cursor = rowsB.size j { i -> rowsB[i] }
+        val spans: Cursor = SpanMatcher.find(emptyA, cursorB)
         assertEquals(0, spans.size)
     }
 
     /** Empty cursor B returns zero spans. */
     @Test fun `empty cursor B returns zero spans`() {
         val rowsA = listOf(klineRow(1709251200000L))
-        val emptyB: MiniCursor = 0 j { _: Int -> throw IndexOutOfBoundsException("empty") }
-        val cursorA: MiniCursor = rowsA.size j { i -> rowsA[i] }
-        val spans: MiniCursor = SpanMatcher.find(cursorA, emptyB)
+        val emptyB: Cursor = 0 j { _: Int -> throw IndexOutOfBoundsException("empty") }
+        val cursorA: Cursor = rowsA.size j { i -> rowsA[i] }
+        val spans: Cursor = SpanMatcher.find(cursorA, emptyB)
         assertEquals(0, spans.size)
     }
 
@@ -209,9 +209,9 @@ class SpanMatcherPipelineTest {
             klineRow(1709251260000L),
             klineRow(1709251320000L),
         )
-        val cursorA: MiniCursor = rowsA.size j { i -> rowsA[i] }
-        val cursorBearly: MiniCursor = rowsBearly.size j { i -> rowsBearly[i] }
-        val spans: MiniCursor = SpanMatcher.find(cursorA, cursorBearly)
+        val cursorA: Cursor = rowsA.size j { i -> rowsA[i] }
+        val cursorBearly: Cursor = rowsBearly.size j { i -> rowsBearly[i] }
+        val spans: Cursor = SpanMatcher.find(cursorA, cursorBearly)
         assertEquals(1, spans.size)
         assertEquals(1709251200000L, (spans.at(0) as DocRowVec)["aStart"])
         assertEquals(1709251200000L, (spans.at(0) as DocRowVec)["bStart"])
@@ -234,9 +234,9 @@ class SpanMatcherPipelineTest {
             klineRow(1709251440000L),
             klineRow(1709251500000L),
         )
-        val cursorA: MiniCursor = rowsA.size j { i -> rowsA[i] }
-        val cursorBend: MiniCursor = rowsBend.size j { i -> rowsBend[i] }
-        val spans: MiniCursor = SpanMatcher.find(cursorA, cursorBend)
+        val cursorA: Cursor = rowsA.size j { i -> rowsA[i] }
+        val cursorBend: Cursor = rowsBend.size j { i -> rowsBend[i] }
+        val spans: Cursor = SpanMatcher.find(cursorA, cursorBend)
         assertEquals(1, spans.size)
         assertEquals(1709251380000L, (spans.at(0) as DocRowVec)["aEnd"])
         assertEquals(1709251380000L, (spans.at(0) as DocRowVec)["bEnd"])
@@ -248,10 +248,10 @@ class SpanMatcherPipelineTest {
     @Test fun `result is a MiniCursor enabling further algebra`() {
         val rowsA = listOf(klineRow(1709251200000L), klineRow(1709251260000L))
         val rowsB = listOf(klineRow(1709251200000L), klineRow(1709251260000L))
-        val cursorA: MiniCursor = rowsA.size j { i -> rowsA[i] }
-        val cursorB: MiniCursor = rowsB.size j { i -> rowsB[i] }
-        val spans: MiniCursor = SpanMatcher.find(cursorA, cursorB)
-        val projected: MiniCursor = spans.size j { i -> spans.at(i) }
+        val cursorA: Cursor = rowsA.size j { i -> rowsA[i] }
+        val cursorB: Cursor = rowsB.size j { i -> rowsB[i] }
+        val spans: Cursor = SpanMatcher.find(cursorA, cursorB)
+        val projected: Cursor = spans.size j { i -> spans.at(i) }
         assertEquals(1, projected.size)
     }
 }

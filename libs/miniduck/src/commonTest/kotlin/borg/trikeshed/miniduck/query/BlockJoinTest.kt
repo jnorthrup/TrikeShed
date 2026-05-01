@@ -1,5 +1,6 @@
 package borg.trikeshed.miniduck.query
 
+import borg.trikeshed.cursor.Cursor
 import borg.trikeshed.cursor.RowVec
 import borg.trikeshed.miniduck.*
 import borg.trikeshed.lib.*
@@ -21,7 +22,7 @@ import kotlin.test.*
  */
 class BlockJoinTest {
 
-   fun usersCursor(): MiniCursor {
+   fun usersCursor(): Cursor {
         val rows = listOf(
             DocRowVec(listOf("id", "name"), listOf(1, "alice")),
             DocRowVec(listOf("id", "name"), listOf(2, "bob")),
@@ -30,7 +31,7 @@ class BlockJoinTest {
         return rows.size j { rows[it] }
     }
 
-   fun ordersCursor(): MiniCursor {
+   fun ordersCursor(): Cursor {
         val rows = listOf(
             DocRowVec(listOf("orderId", "userId", "amount"), listOf(101, 1, 50.0)),
             DocRowVec(listOf("orderId", "userId", "amount"), listOf(102, 2, 75.0)),
@@ -104,7 +105,7 @@ class BlockJoinTest {
 
     @Test
     fun hashJoinEmptyLeftReturnsEmpty() {
-        val left = emptyMiniCursor()
+        val left = emptyCursor()
         val right = usersCursor()
         val joined = left.hashJoin(right, "id", "id")
         assertEquals(0, joined.size)
@@ -113,7 +114,7 @@ class BlockJoinTest {
     @Test
     fun hashJoinEmptyRightReturnsEmpty() {
         val left = usersCursor()
-        val right = emptyMiniCursor()
+        val right = emptyCursor()
         val joined = left.hashJoin(right, "id", "id")
         assertEquals(0, joined.size)
     }

@@ -1,5 +1,6 @@
 package borg.trikeshed.miniduck
 
+import borg.trikeshed.cursor.Cursor
 import borg.trikeshed.cursor.RowVec
 import borg.trikeshed.cursor.cursor
 import borg.trikeshed.cursor.get
@@ -108,7 +109,7 @@ infix fun QueryPlan.offset(n: Int): LimitPlan =
  * Transform plans recurse: each node applies its operation to the result of
  * executing its upstream.
  */
-fun execute(plan: QueryPlan, base: MiniCursor): MiniCursor = when (plan) {
+fun execute(plan: QueryPlan, base: Cursor): Cursor = when (plan) {
     is ScanPlan -> base
     is ViewQueryPlan -> base
     is FilterPlan -> {

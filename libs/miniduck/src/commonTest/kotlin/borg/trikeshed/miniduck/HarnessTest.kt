@@ -1,5 +1,6 @@
 package borg.trikeshed.miniduck
 
+import borg.trikeshed.cursor.Cursor
 import borg.trikeshed.lib.*
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -15,7 +16,7 @@ class HarnessTest {
             DocRowVec(keys = listOf("high", "low", "close"), cells = listOf(102.0, 102.0, 102.0)),
             DocRowVec(keys = listOf("high", "low", "close"), cells = listOf(103.0, 103.0, 103.0)),
         )
-        val cursor: MiniCursor = rows.size j { i -> rows[i] }
+        val cursor: Cursor = rows.size j { i -> rows[i] }
 
         val transformer = ExampleKernelTransformer()
         val trainer = NoOpTrainer()

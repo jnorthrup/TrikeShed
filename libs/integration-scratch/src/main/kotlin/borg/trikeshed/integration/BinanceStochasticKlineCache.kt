@@ -1,11 +1,11 @@
 package borg.trikeshed.integration
 
+import borg.trikeshed.cursor.Cursor
 import borg.trikeshed.indicator.Stochastic
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.size
-import borg.trikeshed.miniduck.DocRowVec
-import borg.trikeshed.miniduck.MiniCursor
+import borg.trikeshed.miniduck.getValue
 import borg.trikeshed.cursor.at
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -26,19 +26,19 @@ data class BinanceStochasticKey(
 
 data class BinanceStochasticKline(
     val key: BinanceStochasticKey,
-    val cursor: MiniCursor,
+    val cursor: Cursor,
     val stochastic: Stochastic.Result,
 )
 
 interface BinanceKlineProvider {
-    suspend fun open(key: BinanceKlineKey): MiniCursor
+    suspend fun open(key: BinanceKlineKey): Cursor
 }
 
 class BinanceKlineSourceProvider(
     private val blockCapacity: Int = 500,
     private val maxConcurrentFetches: Int = 4,
 ) : BinanceKlineProvider {
-    override suspend fun open(key: BinanceKlineKey): MiniCursor = BinanceKlineSource(
+    override suspend fun open(key: BinanceKlineKey): Cursor = BinanceKlineSource(
         symbol = key.symbol,
         interval = key.interval,
         startDate = key.startDate,
@@ -79,7 +79,7 @@ object ProcessLocalBinanceStochasticCache {
 }
 
 fun computeStochastic(
-    cursor: MiniCursor,
+    cursor: Cursor,
     kPeriod: Int = 14,
     dPeriod: Int = 3,
 ): Stochastic.Result {
@@ -89,12 +89,11 @@ fun computeStochastic(
     return Stochastic.compute(highs, lows, closes, kPeriod, dPeriod)
 }
 
-private fun MiniCursor.ohlcSeries(column: String): Series<Double> {
+private fun Cursor.ohlcSeries(column: String): Series<Double> {
     val n = size
     return n j { index: Int ->
-        val row = at(index) as? DocRowVec
-            ?: throw IllegalArgumentException("row $index is not DocRowVec")
-        val value = row[column]
+        val row = at(index)
+        val value = row.getValue(column)
         when (value) {
             is Number -> value.toDouble()
             is String -> value.toDouble()

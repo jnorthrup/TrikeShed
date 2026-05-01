@@ -1,9 +1,9 @@
 package borg.trikeshed.miniduck
 
 import borg.trikeshed.lib.*
-import borg.trikeshed.cursor.ColumnMeta
 import borg.trikeshed.cursor.RowVec
 import borg.trikeshed.isam.meta.IOMemento
+import borg.trikeshed.lib.j
 
 /**
  * MiniRowVec: the foundational row abstraction for MiniDuck.
@@ -48,7 +48,7 @@ fun MiniRowVec.toRowVec(): RowVec {
     )
     return ReifiedSplitSeries2(
         leftSeries  = sz j { this[it] },
-        rightSeries = sz j { i -> { ColumnMeta("col$i", IOMemento.IoString) } }
+        rightSeries = sz j { i -> { "col$i" j IOMemento.IoString } }
     )
 }
 

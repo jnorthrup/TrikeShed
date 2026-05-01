@@ -2,7 +2,6 @@ package borg.trikeshed.isam
 
 import borg.trikeshed.Files
 import borg.trikeshed.Usable
-import borg.trikeshed.cursor.ColumnMeta
 import borg.trikeshed.cursor.Cursor
 import borg.trikeshed.cursor.*
 import borg.trikeshed.lib.*

@@ -1,7 +1,6 @@
 package borg.trikeshed.parse.kursive
 
 import borg.trikeshed.common.TypeEvidence
-import borg.trikeshed.cursor.ColumnMeta
 import borg.trikeshed.cursor.MapTypeMemento
 import borg.trikeshed.cursor.RowVec
 import borg.trikeshed.cursor.SeqTypeMemento
@@ -305,23 +304,23 @@ fun TypeEvidence.toKursiveRowVec(): RowVec {
 }
 
 val KURSIVE_EVIDENCE_COLUMNS = arrayOf(
-    ColumnMeta("confix", IOMemento.IoString),
-    ColumnMeta("digits", IOMemento.IoInt),
-    ColumnMeta("periods", IOMemento.IoInt),
-    ColumnMeta("exponent", IOMemento.IoInt),
-    ColumnMeta("signs", IOMemento.IoInt),
-    ColumnMeta("special", IOMemento.IoInt),
-    ColumnMeta("alpha", IOMemento.IoInt),
-    ColumnMeta("truefalse", IOMemento.IoInt),
-    ColumnMeta("empty", IOMemento.IoInt),
-    ColumnMeta("quotes", IOMemento.IoInt),
-    ColumnMeta("dquotes", IOMemento.IoInt),
-    ColumnMeta("whitespaces", IOMemento.IoInt),
-    ColumnMeta("backslashes", IOMemento.IoInt),
-    ColumnMeta("linefeed", IOMemento.IoInt),
-    ColumnMeta("maxColumnLength", IOMemento.IoInt),
-    ColumnMeta("minColumnLength", IOMemento.IoInt),
-    ColumnMeta("deducedType", IOMemento.IoString),
+    "confix" j IOMemento.IoString,
+    "digits" j IOMemento.IoInt,
+    "periods" j IOMemento.IoInt,
+    "exponent" j IOMemento.IoInt,
+    "signs" j IOMemento.IoInt,
+    "special" j IOMemento.IoInt,
+    "alpha" j IOMemento.IoInt,
+    "truefalse" j IOMemento.IoInt,
+    "empty" j IOMemento.IoInt,
+    "quotes" j IOMemento.IoInt,
+    "dquotes" j IOMemento.IoInt,
+    "whitespaces" j IOMemento.IoInt,
+    "backslashes" j IOMemento.IoInt,
+    "linefeed" j IOMemento.IoInt,
+    "maxColumnLength" j IOMemento.IoInt,
+    "minColumnLength" j IOMemento.IoInt,
+    "deducedType" j IOMemento.IoString,
 )
 
 /** First character as a single-element Series, or null if empty */
