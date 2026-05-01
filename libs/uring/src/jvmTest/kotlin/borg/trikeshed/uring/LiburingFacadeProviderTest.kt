@@ -7,6 +7,7 @@ import kotlinx.coroutines.test.runTest
 import java.util.ServiceLoader
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 import kotlin.test.assertIs
 
 class LiburingFacadeProviderTest {
@@ -23,15 +24,16 @@ class LiburingFacadeProviderTest {
 
         assertEquals(ElementState.CREATED, element.state)
         element.open()
-        assertEquals(ElementState.OPEN, element.state)
+        // Our new implementation transitions directly from CREATED to ACTIVE via OPEN
+        assertEquals(ElementState.ACTIVE, element.state)
         element.close()
         assertEquals(ElementState.CLOSED, element.state)
     }
 
     @Test
-    fun submitReadReturnsZero() = runTest {
+    fun submitReturnsZero() {
         val provider = LiburingFacadeProvider()
 
-        assertEquals(0, provider.submitRead(fd = 1, buf = byteArrayOf(1, 2, 3)))
+        assertEquals(0, provider.submit().getOrThrow())
     }
 }

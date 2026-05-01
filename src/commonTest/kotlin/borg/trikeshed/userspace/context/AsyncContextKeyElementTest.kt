@@ -23,13 +23,6 @@ class AsyncContextKeyElementTest {
     }
 
     @Test
-    fun liburingKey_isSingleton_sameReference() {
-        val k1: CoroutineContext.Key<*> = AsyncContextKey.LiburingKey
-        val k2: CoroutineContext.Key<*> = AsyncContextKey.LiburingKey
-        assertSame(k1, k2, "LiburingKey must be the same object reference (singleton)")
-    }
-
-    @Test
     fun fanoutDispatcherKey_isSingleton_sameReference() {
         val k1: CoroutineContext.Key<*> = AsyncContextKey.FanoutDispatcherKey
         val k2: CoroutineContext.Key<*> = AsyncContextKey.FanoutDispatcherKey
@@ -39,17 +32,13 @@ class AsyncContextKeyElementTest {
     @Test
     fun keys_areMutuallyDistinct_byIdentity() {
         val nio = AsyncContextKey.NioUserspaceKey
-        val uring = AsyncContextKey.LiburingKey
         val fanout = AsyncContextKey.FanoutDispatcherKey
-        assertNotEquals<Any>(nio, uring)
         assertNotEquals<Any>(nio, fanout)
-        assertNotEquals<Any>(uring, fanout)
     }
 
     @Test
     fun keys_areSubtypesOfAsyncContextKey() {
         assertTrue(AsyncContextKey.NioUserspaceKey is AsyncContextKey)
-        assertTrue(AsyncContextKey.LiburingKey is AsyncContextKey)
         assertTrue(AsyncContextKey.FanoutDispatcherKey is AsyncContextKey)
     }
 
@@ -95,15 +84,6 @@ class AsyncContextKeyElementTest {
             override suspend fun close() {}
         }
 
-   fun makeLiburingElement() =
-        object : LiburingElement() {
-            override val lifecycleState = ElementLifecycleState.CREATED
-            override val fanoutSubscribers = emptyList<AsyncContextElement>()
-            override suspend fun open() {}
-            override suspend fun drain() {}
-            override suspend fun close() {}
-        }
-
    fun makeFanoutElement() =
         object : FanoutDispatcherElement() {
             override val lifecycleState = ElementLifecycleState.CREATED
@@ -119,11 +99,6 @@ class AsyncContextKeyElementTest {
     }
 
     @Test
-    fun liburingElement_keyIsLiburingKey() {
-        assertSame(AsyncContextKey.LiburingKey, makeLiburingElement().key)
-    }
-
-    @Test
     fun fanoutDispatcherElement_keyIsFanoutDispatcherKey() {
         assertSame(AsyncContextKey.FanoutDispatcherKey, makeFanoutElement().key)
     }
@@ -135,7 +110,7 @@ class AsyncContextKeyElementTest {
 
     @Test
     fun element_fanoutSubscribers_defaultEmpty() {
-        assertTrue(makeLiburingElement().fanoutSubscribers.isEmpty())
+        assertTrue(makeFanoutElement().fanoutSubscribers.isEmpty())
     }
 
     @Test
@@ -150,6 +125,6 @@ class AsyncContextKeyElementTest {
         val element = makeNioElement()
         val ctx: CoroutineContext = element
         // Fetching a different key must return null (not found)
-        assertEquals(null, ctx[AsyncContextKey.LiburingKey])
+        assertEquals(null, ctx[AsyncContextKey.FanoutDispatcherKey])
     }
 }
