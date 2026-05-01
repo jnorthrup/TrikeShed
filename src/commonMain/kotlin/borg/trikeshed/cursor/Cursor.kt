@@ -89,7 +89,7 @@ fun Cursor.meta(vararg s: String): Series<Int> {
 }
 
 /** cursor get by String vararg -- return a Cursor with the columns specified by the vararg */
-fun Cursor.get(vararg s: String): Cursor = this[meta(*s)]
+operator fun Cursor.get(vararg s: String): Cursor = this[meta(*s)]
 
 /** ColumnExclusion value class
  *
@@ -112,18 +112,18 @@ operator fun Cursor.minus(killbag: Series<Int>) {
 }
 
 /** cursor get by ColumnExclusion vararg -- return a Cursor with the columns excluded by the vararg */
-fun Cursor.get(s: Series<ColumnExclusion>): Cursor {
+operator fun Cursor.get(s: Series<ColumnExclusion>): Cursor {
 
-    val exclusionBag = mutableSetOf<Int>()
+    val exclusionBag: MutableSet<Int> = mutableSetOf<Int>()
     s.view.forEachIndexed { i: Int, it: ColumnExclusion ->
         exclusionBag.add(meta.view.indexOfFirst { it.name == it.name })
     }
-    val retained = ((0 until meta.size).toSet() - exclusionBag).toIntArray()
+    val retained: IntArray = ((0 until meta.size).toSet() - exclusionBag).toIntArray()
     return this[retained]
 }
 
 //in columnar project this is meta.right
-val Series<ColumnMeta>.names get() = this α ColumnMeta::name
+val Series<ColumnMeta>.names: Series<String> get() = this α ColumnMeta::name
 
 /** head default 5 rows
  * just like unix head - print default 5 lines from cursor contents to stdout */

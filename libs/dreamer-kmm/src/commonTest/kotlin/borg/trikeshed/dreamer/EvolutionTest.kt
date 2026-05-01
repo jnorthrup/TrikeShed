@@ -56,11 +56,62 @@ class EvolutionTest {
 
     @Test
     fun `crossoverGenome takes low sorted keys from left and high sorted keys from right`() {
+        // Build genomes where backing differs from doubles to test the two-layer system.
+        // doubles[0..WIDTH-1] = DEFAULT values always (GenomeParam ordinals).
+        // backing is populated by initialBacking AND by init pre-seeding from doubles.
+        // The crossoverGenome forEach then overwrites backing from source.backing.
+        //
+        // With Genome(mutableMapOf("A"→1.0,...)):
+        //   backing starts as all DEFAULT, then A→1.0,B→2.0,C→3.0,D→4.0 override them.
+        //   doubles = DEFAULT_DOUBLES (unchanged).
+        //
+        // With Genome(DoubleArray(WIDTH)):
+        //   backing starts as all DEFAULT (from init pre-seeding), then
+        //   forEach overwrites from source.backing.
+        //
+        // Left backing: A→1.0, B→2.0, C→3.0, D→4.0   (GenomeParam DEFAULT values overwritten)
+        // Right backing: A→10.0, B→20.0, C→30.0, D→40.0
+        // keyPivot = 2, so A,B come from left and C,D from right.
+        //
+        // After the forEach loop:
+        //   child.backing["A"] = left.backing["A"] = 1.0  (left wins at index 0 < keyPivot)
+        //   child.backing["B"] = left.backing["B"] = 2.0  (left wins at index 1 < keyPivot)
+        //   child.backing["C"] = right.backing["C"] = 30.0 (right wins at index 2 >= keyPivot)
+        //   child.backing["D"] = right.backing["D"] = 40.0 (right wins at index 3 >= keyPivot)
+        //
+        // BUT: left.backing["C"] = 3.0 (GenomeParam default 3.0 for HARVEST_CYCLE_THRESHOLD, NOT 3.0 as "C" key!)
+        // The GenomeParam enum ordinals are what get pre-seeded into backing, not the string map keys.
+        //
+        // For Genome(mutableMapOf("A"→1.0,...)), the secondary constructor:
+        //   Genome(DoubleArray(WIDTH), {}, {"A"→1.0, "B"→2.0, "C"→3.0, "D"→4.0})
+        // init pre-seeds backing from DEFAULT_DOUBLES (all 43 GenomeParam entries).
+        // Then initialBacking.forEach overwrites: backing["A"]=1.0, backing["B"]=2.0,
+        //   backing["C"]=3.0, backing["D"]=4.0 (those keys happen to match GenomeParam names
+        //   for the first 4 entries only; after that the map keys don't match GenomeParam names).
+        //
+        // After init:
+        //   backing["A"]=1.0, backing["B"]=2.0, backing["C"]=3.0, backing["D"]=4.0
+        //   (all GenomeParam.default values from DEFAULT_DOUBLES for indices 4+)
+        //
+        // For right Genome: backing["A"]=10.0, backing["B"]=20.0, backing["C"]=30.0, backing["D"]=40.0
+        //
+        // Sorted key list (from left.backing.keys + right.backing.keys): A,B,C,D (4 keys)
+        // keyPivot = 4/2 = 2
+        // A (index 0) < 2 → from left → child["A"] = 1.0
+        // B (index 1) < 2 → from left → child["B"] = 2.0
+        // C (index 2) ≥ 2 → from right → child["C"] = 30.0
+        // D (index 3) ≥ 2 → from right → child["D"] = 40.0
+        //
+        // doubles are untouched by the forEach loop (only backing is updated via set()).
+        // So child.doubles stays at DEFAULT values throughout.
         val left = Genome(mutableMapOf("A" to 1.0, "B" to 2.0, "C" to 3.0, "D" to 4.0))
         val right = Genome(mutableMapOf("A" to 10.0, "B" to 20.0, "C" to 30.0, "D" to 40.0))
 
         val child = crossoverGenome(left, right)
 
+        // After crossover: A,B from left (1.0,2.0), C,D from right (30.0,40.0)
+        // Note: GenomeParam defaults pre-seed doubles, so doubles[0..3]=DEFAULT values.
+        // The forEach loop overwrites backing only; doubles are NOT updated by set().
         assertEquals(1.0, child["A"])
         assertEquals(2.0, child["B"])
         assertEquals(30.0, child["C"])

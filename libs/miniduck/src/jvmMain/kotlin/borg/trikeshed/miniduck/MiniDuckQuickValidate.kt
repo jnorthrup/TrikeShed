@@ -1,5 +1,6 @@
 package borg.trikeshed.miniduck
 
+import borg.trikeshed.cursor.RowVec
 import borg.trikeshed.lib.*
 
 fun main() {

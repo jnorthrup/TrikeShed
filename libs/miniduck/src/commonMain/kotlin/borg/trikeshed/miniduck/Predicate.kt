@@ -23,7 +23,7 @@ fun RowVec.getValue(key: String): Any? {
  *   BlobRowVec  — null (shell, no scalars)
  *   ObjectStoreRowVec — null (shell, no scalars)
  */
-fun MiniRowVec.getValue(key: String): Any? = when (this) {
+fun borg.trikeshed.miniduck.RowVec.getValue(key: String): Any? = when (this) {
     is DocRowVec -> this[key]
     is ViewRowVec -> when (key) {
         "_id", "id" -> id
@@ -69,7 +69,7 @@ fun compareKeys(a: Any?, b: Any?): Int = when {
 /** Sealed predicate tree — each node is an immutable value, evaluated via [matches]. */
 sealed interface Predicate {
     fun matches(row: RowVec): Boolean
-    fun matches(row: MiniRowVec): Boolean = matches(row.toRowVec())
+    fun matches(row: borg.trikeshed.miniduck.RowVec): Boolean = matches(row.toRowVec())
     operator fun invoke(row: RowVec): Boolean = matches(row)
 }
 

@@ -2,7 +2,7 @@ package borg.trikeshed.couch.api
 
 import borg.trikeshed.miniduck.BlockRowVec
 import borg.trikeshed.miniduck.DocRowVec
-import borg.trikeshed.miniduck.MiniRowVec
+import borg.trikeshed.miniduck.RowVec
 import borg.trikeshed.miniduck.ViewRowVec
 import borg.trikeshed.lib.toSeries
 import borg.trikeshed.parse.json.JsonParser
@@ -28,7 +28,7 @@ data class CouchDb11RowSet(
                 val row = rawRow as? Map<String, Any?>
                     ?: error("CouchDB row entry must be a JSON object")
                 val docMap = row.mapValueOrNull("doc")
-                val docLoader: (() -> MiniRowVec)? = docMap?.let { map -> { parseDocRowVec(map) } }
+                val docLoader: (() -> RowVec)? = docMap?.let { map -> { parseDocRowVec(map) } }
 
                 block.append(
                     ViewRowVec(

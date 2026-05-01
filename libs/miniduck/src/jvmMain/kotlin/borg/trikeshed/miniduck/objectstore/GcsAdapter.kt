@@ -1,5 +1,6 @@
 package borg.trikeshed.miniduck.objectstore
 
+import borg.trikeshed.cursor.RowVec
 import borg.trikeshed.miniduck.BlobRowVec
 import borg.trikeshed.miniduck.ObjectStoreProvider
 import borg.trikeshed.miniduck.ObjectStoreRowVec

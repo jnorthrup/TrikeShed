@@ -1,6 +1,7 @@
 package borg.trikeshed.miniduck
 
 import borg.trikeshed.cursor.ColumnMeta
+import borg.trikeshed.cursor.RowVec
 import borg.trikeshed.lib.Join
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.j
@@ -25,8 +26,8 @@ import borg.trikeshed.isam.meta.IOMemento
 class ManifoldConcept(
     val angular: Long,
     val budget: BudgetCoord,
-    val payload: MiniRowVec = DocRowVec(emptyList(), emptyList()),
-) : MiniRowVec(), Series2<Any?, () -> ColumnMeta> {
+    val payload: RowVec = DocRowVec(emptyList(), emptyList()),
+) : RowVec(), Series2<Any?, () -> ColumnMeta> {
 
     override val size: Int get() = 3
     override val a: Int get() = 3
@@ -48,7 +49,7 @@ class ManifoldConcept(
     }
 
     /** Child is the payload wrapped as a single-element Series. */
-    override val child: Series<MiniRowVec>
+    override val child: Series<RowVec>
         get() = 1 j { WrappedRowVec(payload.toRowVec()) }
 
     /**

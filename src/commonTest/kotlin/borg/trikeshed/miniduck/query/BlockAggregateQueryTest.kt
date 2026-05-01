@@ -28,7 +28,7 @@ class BlockAggregateQueryTest {
             DocRowVec(listOf("name", "dept", "salary"), listOf("eve", "eng", 130000)),
             DocRowVec(listOf("name", "dept", "salary"), listOf("frank", "hr", 80000)),
         )
-        return rows.size j { idx: Int -> rows[idx] as MiniRowVec }
+        return rows.size j { idx: Int -> rows[idx] as RowVec }
     }
 
     // ── COUNT ────────────────────────────────────────────────────────────
@@ -146,7 +146,7 @@ class BlockAggregateQueryTest {
             DocRowVec(listOf("cat", "val"), listOf("x", 2)),
             DocRowVec(listOf("cat", "val"), listOf("x", 3)),
         )
-        val cursor = rows.size j { idx: Int -> rows[idx] as MiniRowVec }
+        val cursor = rows.size j { idx: Int -> rows[idx] as RowVec }
         val grouped = cursor.groupBy("cat", Agg.count(), Agg.sum("val"))
 
         assertEquals(1, grouped.size)
@@ -177,7 +177,7 @@ class BlockAggregateQueryTest {
             DocRowVec(listOf("cat", "val"), listOf(null, 2)),
             DocRowVec(listOf("cat", "val"), listOf("a", 3)),
         )
-        val cursor = rows.size j { idx: Int -> rows[idx] as MiniRowVec }
+        val cursor = rows.size j { idx: Int -> rows[idx] as RowVec }
         val grouped = cursor.groupBy("cat", Agg.count())
 
         assertEquals(2, grouped.size) // null group + "a" group

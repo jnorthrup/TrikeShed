@@ -9,15 +9,14 @@
  */
 package borg.trikeshed.miniduck
 
+import borg.trikeshed.cursor.RowVec
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.j
-import borg.trikeshed.miniduck.MiniCursor
-import borg.trikeshed.miniduck.MiniRowVec
 
 class BlockRowVec(
-    val rows: MutableList<MiniRowVec>,
+    val rows: MutableList<RowVec>,
     var _sealed: Boolean,
-) : MiniRowVec() {
+) : RowVec() {
 
     enum class State { MUTABLE, SEALED }
 
@@ -30,14 +29,14 @@ class BlockRowVec(
         throw IndexOutOfBoundsException("BlockRowVec is a shell; no scalar cells at index $index")
 
     /** Children are the rows stored in this block. */
-    override val child: Series<MiniRowVec>?
+    override val child: Series<RowVec>?
         get() = rows.size j { rows[it] }
 
     /** Number of rows in the block. */
     val rowCount: Int get() = rows.size
 
     /** Append a row. Throws if sealed. */
-    fun append(row: MiniRowVec) {
+    fun append(row: RowVec) {
         check(!_sealed) { "Cannot append to a sealed block" }
         rows.add(row)
     }

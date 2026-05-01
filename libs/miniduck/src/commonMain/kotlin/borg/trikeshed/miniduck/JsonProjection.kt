@@ -29,7 +29,7 @@ fun rowToJson(row: RowVec): String {
     return sb.toString()
 }
 
-fun rowToJson(row: MiniRowVec): String = when (row) {
+fun rowToJson(row: RowVec): String = when (row) {
     is DocRowVec -> {
         val children = row.child
         val sb = StringBuilder("{")
@@ -72,6 +72,6 @@ fun valueToJson(v: Any?): String = when (v) {
     is Double -> if (v.isInfinite() || v.isNaN()) "null" else v.toString()
     is Float -> if (v.isInfinite() || v.isNaN()) "null" else v.toString()
     is Boolean -> v.toString()
-    is MiniRowVec -> rowToJson(v)
+    is RowVec -> rowToJson(v)
     else -> '"' + escapeJson(v.toString()) + '"'
 }

@@ -108,6 +108,11 @@ class Genome(
 
     init {
         require(doubles.size == WIDTH) { "Genome doubles must have exactly $WIDTH elements, got ${doubles.size}" }
+        // Initialize backing from doubles so that backing is always populated
+        // regardless of which constructor was used (including Genome(DoubleArray)).
+        GenomeParam.values().forEachIndexed { index, param ->
+            backing[param.storageKey] = doubles[index]
+        }
         initialBacking.forEach { (key, value) -> this[key] = value }
         overrides.forEach { (symbol, values) ->
             require(values.size == WIDTH) { "Override for $symbol must have exactly $WIDTH elements, got ${values.size}" }
@@ -115,8 +120,11 @@ class Genome(
     }
 
     operator fun get(key: String): Any? {
+        // Check backing first so explicit string-key assignments always win,
+        // including for keys that happen to be GenomeParam names (e.g. "A","B","C","D").
+        backing[key]?.let { return it }
         val param = GenomeParam.fromKey(key)
-        return if (param != null) doubles[param.ordinal] else backing[key]
+        return if (param != null) doubles[param.ordinal] else null
     }
 
     operator fun set(key: String, value: Any?) {
@@ -124,6 +132,8 @@ class Genome(
         if (param != null && value is Number) {
             doubles[param.ordinal] = value.toDouble()
         }
+        // Always update backing so that backing["C"] reflects the latest value,
+        // even for GenomeParam keys whose doubles are updated above.
         backing[key] = value
     }
 

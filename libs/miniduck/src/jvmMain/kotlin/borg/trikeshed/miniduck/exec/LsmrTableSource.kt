@@ -7,9 +7,6 @@ package borg.trikeshed.miniduck.exec
  *  - miniduck:table:{table}:row:{idx} -> serialized row bytes
  */
 import borg.trikeshed.cursor.RowVec
-import borg.trikeshed.lib.get
-import borg.trikeshed.lib.iterator
-import borg.trikeshed.lib.size
 import borg.trikeshed.miniduck.*
 import borg.trikeshed.miniduck.schema.TableSchema
 import borg.trikeshed.userspace.database.LsmrDatabase
@@ -91,7 +88,7 @@ class LsmrTableSource(private val db: LsmrDatabase,val blockSizeThreshold: Int =
     // Suspend-aware open that reads from the LSMR db without blocking.
     override suspend fun openSuspend(execCtx: ExecutionContext, tableName: String): Cursor {
         // Prefer block-based storage (chunked sealed BlockRowVecs). Fallback to legacy per-row storage if no blocks found.
-        val rows = mutableListOf<borg.trikeshed.miniduck.MiniRowVec>()
+        val rows = mutableListOf<borg.trikeshed.miniduck.RowVec>()
 
         val blockCountRaw = db.get(blockCountKey(tableName))
         if (blockCountRaw != null) {

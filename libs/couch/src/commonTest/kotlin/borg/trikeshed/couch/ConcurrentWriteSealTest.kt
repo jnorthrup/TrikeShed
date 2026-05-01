@@ -116,7 +116,7 @@ class ConcurrentWriteSealTest {
         // write 50 rows
         repeat(50) { h.append(doc(it)) }
 
-        val snapshots = mutableListOf<borg.trikeshed.lib.Series<borg.trikeshed.miniduck.MiniRowVec>>()
+        val snapshots = mutableListOf<borg.trikeshed.lib.Series<borg.trikeshed.miniduck.RowVec>>()
         // take 5 snapshots concurrently
         coroutineScope {
             repeat(5) {

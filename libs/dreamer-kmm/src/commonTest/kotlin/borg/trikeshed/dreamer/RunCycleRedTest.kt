@@ -532,6 +532,38 @@ class RunCycleRedTest {
         assertEquals(105.0, closes[2])
     }
 
+    // ── 9b. Genome backing is populated after construction ────────────────────
+
+    @Test
+    fun `Genome backing is populated from doubles after construction`() {
+        val g = defaultGenome()
+        // backing must contain the genome parameters so that crossoverGenome and
+        // aggregateEvaluations can read them correctly
+        assertTrue(g.backing.isNotEmpty(),
+            "backing should be populated from doubles after construction; found ${g.backing.size} entries")
+        // The doubles are accessible both via GenomeParam ordinal and via backing string key
+        val harvestKey = "HARVEST_TAKE_PERCENT"
+        val fromBacking = g[harvestKey]
+        assertNotNull(fromBacking, "HARVEST_TAKE_PERCENT should be in backing")
+    }
+
+    @Test
+    fun `crossoverGenome child has populated backing after construction`() {
+        val left = defaultGenome()
+        val right = defaultGenome()
+        val child = crossoverGenome(left, right)
+        // Child's backing must contain genome parameters so aggregateEvaluations
+        // can extract bestGenome backing map for next-generation carry-forward.
+        // Child is constructed via Genome(DoubleArray) which bypasses initBacking.
+        assertTrue(child.backing.isNotEmpty(),
+            "crossoverGenome child backing must be populated from doubles; found ${child.backing.size} entries")
+        // Verify a known key is present and has the correct double value
+        val harvestKey = "HARVEST_TAKE_PERCENT"
+        val fromBacking = child[harvestKey]
+        assertNotNull(fromBacking, "HARVEST_TAKE_PERCENT must be in child's backing")
+        assertTrue(fromBacking is Double, "HARVEST_TAKE_PERCENT in backing should be a Double")
+    }
+
     // ── 10. simulateMultiSymbolTicks — multi-symbol back-test ─────────────────
 
     /**
