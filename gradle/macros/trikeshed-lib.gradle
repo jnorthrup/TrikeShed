@@ -170,10 +170,10 @@ switch (project.path) {
     case ":libs:kursive":
     case ":libs:patl":
     case ":libs:tiny-btrfs":
-        kmpFull()
-        break
     case ":libs:ngsctp":
     case ":libs:quic":
+        kmpFull()
+        break
     case ":libs:uring":
         kmpJvm()
         break
@@ -274,6 +274,8 @@ switch (project.path) {
         def couchSets = couchKotlin.sourceSets
         couchSets.getByName("commonMain").dependencies {
             api libPeer("miniduck")
+            api libPeer("quic")
+            api libPeer("ngsctp")
             implementation libPeer("tiny-btrfs")
             implementation libPeer("kursive")
         }

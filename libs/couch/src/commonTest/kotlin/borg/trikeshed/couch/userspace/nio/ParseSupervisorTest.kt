@@ -25,14 +25,14 @@ class ParseSupervisorTest {
     @Test
     fun `initially CREATED`() {
         val supervisor = ParseSupervisor()
-        assertEquals(ParseSupervisor.ParseState.CREATED, supervisor.state)
+        assertEquals(borg.trikeshed.context.ElementLifecycleState.CREATED, supervisor.state)
     }
 
     @Test
     fun `open transitions CREATED to OPEN`() {
         val supervisor = ParseSupervisor()
         supervisor.open()
-        assertEquals(ParseSupervisor.ParseState.OPEN, supervisor.state)
+        assertEquals(borg.trikeshed.context.ElementLifecycleState.OPEN, supervisor.state)
     }
 
     @Test
@@ -48,7 +48,7 @@ class ParseSupervisorTest {
         val supervisor = ParseSupervisor()
         supervisor.open()
         supervisor.activate()
-        assertEquals(ParseSupervisor.ParseState.ACTIVE, supervisor.state)
+        assertEquals(borg.trikeshed.context.ElementLifecycleState.ACTIVE, supervisor.state)
     }
 
     @Test
@@ -64,7 +64,7 @@ class ParseSupervisorTest {
         supervisor.open()
         supervisor.activate()
         supervisor.drain()
-        assertEquals(ParseSupervisor.ParseState.DRAINING, supervisor.state)
+        assertEquals(borg.trikeshed.context.ElementLifecycleState.DRAINING, supervisor.state)
     }
 
     @Test
@@ -72,7 +72,7 @@ class ParseSupervisorTest {
         val supervisor = ParseSupervisor()
         supervisor.close()
         supervisor.drain() // must not throw
-        assertEquals(ParseSupervisor.ParseState.CLOSED, supervisor.state)
+        assertEquals(borg.trikeshed.context.ElementLifecycleState.CLOSED, supervisor.state)
     }
 
     @Test
@@ -81,7 +81,7 @@ class ParseSupervisorTest {
         supervisor.open()
         supervisor.activate()
         supervisor.close()
-        assertEquals(ParseSupervisor.ParseState.CLOSED, supervisor.state)
+        assertEquals(borg.trikeshed.context.ElementLifecycleState.CLOSED, supervisor.state)
     }
 
     @Test
@@ -89,7 +89,7 @@ class ParseSupervisorTest {
         val supervisor = ParseSupervisor()
         supervisor.close()
         supervisor.close() // must not throw
-        assertEquals(ParseSupervisor.ParseState.CLOSED, supervisor.state)
+        assertEquals(borg.trikeshed.context.ElementLifecycleState.CLOSED, supervisor.state)
     }
 
     // ── supervisor CompletableJob ───────────────────────────────────────────────
