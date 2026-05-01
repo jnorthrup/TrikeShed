@@ -1,10 +1,13 @@
 package borg.trikeshed.dreamer
 
 import borg.trikeshed.collections.s_
+import borg.trikeshed.cursor.RowVec
 import borg.trikeshed.lib.*
+import borg.trikeshed.miniduck.toRowVec
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
@@ -527,5 +530,110 @@ class RunCycleRedTest {
         assertEquals(101.0, closes[0])
         assertEquals(103.0, closes[1])
         assertEquals(105.0, closes[2])
+    }
+
+    // ── 10. simulateMultiSymbolTicks — multi-symbol back-test ─────────────────
+
+    /**
+     * Build a multi-symbol interleaved cursor from two single-symbol KlineBlocks
+     * and verify simulateMultiSymbolTicks produces cycles with multiple symbols.
+     */
+    @Test
+    fun `simulateMultiSymbolTicks produces MULTI symbol result with two symbols`() = runTest {
+        val btcKlines = listOf(
+            Kline("BTCUSDT", TimeSpan.Hours1, 1704067200000L, 42000.0, 42500.0, 41800.0, 42300.0, 150.0),
+            Kline("BTCUSDT", TimeSpan.Hours1, 1704070800000L, 42300.0, 43100.0, 42100.0, 42900.0, 180.0),
+        )
+        val ethKlines = listOf(
+            Kline("ETHUSDT", TimeSpan.Hours1, 1704067200000L, 2500.0, 2550.0, 2490.0, 2530.0, 500.0),
+            Kline("ETHUSDT", TimeSpan.Hours1, 1704070800000L, 2530.0, 2600.0, 2520.0, 2580.0, 600.0),
+        )
+        val btcBlock = KlineBlock.mutable(TimeSpan.Hours1)
+        btcKlines.forEach { btcBlock.append(it) }
+        val ethBlock = KlineBlock.mutable(TimeSpan.Hours1)
+        ethKlines.forEach { ethBlock.append(it) }
+        btcBlock.seal()
+        ethBlock.seal()
+
+        // Interleave: BTC[0], ETH[0], BTC[1], ETH[1]
+        val interleaved = listOf(btcKlines[0], ethKlines[0], btcKlines[1], ethKlines[1])
+        val mixedBlock = KlineBlock.mutable(TimeSpan.Hours1)
+        interleaved.forEach { mixedBlock.append(it) }
+        mixedBlock.seal()
+        val cursor = mixedBlock.asCursor()
+        assertEquals(4, cursor.size)
+
+        val engine = TradingEngine(defaultGenome(), Mode.SHADOW, initialCapital = 10_000.0)
+        val result = simulateMultiSymbolTicks(cursor, engine, initialCapital = 10_000.0)
+
+        assertEquals("MULTI", result.symbol)
+        assertEquals(2, result.cycles.size, "2 ticks (2 unique openTimes)")
+        assertEquals(2, result.metrics.totalTicks)
+    }
+
+    /**
+     * Verify allSymbolsAtBar collects every distinct symbol at a given openTime.
+     */
+    @Test
+    fun `allSymbolsAtBar returns one input per distinct symbol at that openTime`() = runTest {
+        val btcKlines = listOf(
+            Kline("BTCUSDT", TimeSpan.Hours1, 1704067200000L, 42000.0, 42500.0, 41800.0, 42300.0, 150.0),
+        )
+        val ethKlines = listOf(
+            Kline("ETHUSDT", TimeSpan.Hours1, 1704067200000L, 2500.0, 2550.0, 2490.0, 2530.0, 500.0),
+        )
+        val block = KlineBlock.mutable(TimeSpan.Hours1)
+        block.append(btcKlines[0])
+        block.append(ethKlines[0])
+        block.seal()
+        val cursor = block.asCursor()
+
+        val holdings = mapOf("BTCUSDT" to 0.1, "ETHUSDT" to 1.0)
+        val inputs = allSymbolsAtBar(cursor, barIndex = 0, holdings = holdings)
+
+        assertEquals(2, inputs.size, "Both BTC and ETH share the same openTime")
+        assertTrue(inputs.any { it.symbol == "BTCUSDT" })
+        assertTrue(inputs.any { it.symbol == "ETHUSDT" })
+        // Verify each has correct quantity from holdings
+        val btcInput = inputs.first { it.symbol == "BTCUSDT" }
+        val ethInput = inputs.first { it.symbol == "ETHUSDT" }
+        assertEquals(0.1, btcInput.quantity, 0.001)
+        assertEquals(1.0, ethInput.quantity, 0.001)
+    }
+
+    /**
+     * allSymbolsAtBar on cursor with one symbol returns that symbol.
+     * Out-of-range barIndex wraps to index 0 via cursor.at() modulo semantics.
+     */
+    @Test
+    fun `allSymbolsAtBar returns single symbol when cursor has one symbol`() = runTest {
+        val block = KlineBlock.mutable(TimeSpan.Hours1)
+        block.append(Kline("BTCUSDT", TimeSpan.Hours1, 1704067200000L, 42000.0, 42500.0, 41800.0, 42300.0, 150.0))
+        block.seal()
+        val cursor = block.asCursor()
+
+        val holdings = mapOf("BTCUSDT" to 0.1)
+        val inputs = allSymbolsAtBar(cursor, barIndex = 0, holdings = holdings)
+
+        assertEquals(1, inputs.size)
+        assertEquals("BTCUSDT", inputs.first().symbol)
+        assertEquals(0.1, inputs.first().quantity, 0.001)
+    }
+
+    /**
+     * simulateMultiSymbolTicks with empty cursor returns empty result.
+     */
+    @Test
+    fun `simulateMultiSymbolTicks on empty cursor returns empty result`() = runTest {
+        val emptyBlock = KlineBlock.mutable(TimeSpan.Hours1)
+        emptyBlock.seal()
+        val cursor = emptyBlock.asCursor()
+
+        val engine = TradingEngine(defaultGenome(), Mode.SHADOW, initialCapital = 10_000.0)
+        val result = simulateMultiSymbolTicks(cursor, engine, initialCapital = 10_000.0)
+
+        assertEquals(0, result.cycles.size)
+        assertEquals(0, result.metrics.totalTicks)
+        assertEquals("MULTI", result.symbol)
     }
 }
