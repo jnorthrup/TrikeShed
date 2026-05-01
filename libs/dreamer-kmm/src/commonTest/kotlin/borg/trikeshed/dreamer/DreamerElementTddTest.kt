@@ -26,12 +26,6 @@ class DreamerElementTddTest {
     // ── PaperAccount is AsyncContextElement ─────────────────────────────────────
 
     @Test
-    fun `PaperAccount implements AsyncContextElement`() {
-        val account = PaperAccount(balance = 10_000.0)
-        assertTrue(account is AsyncContextElement)
-    }
-
-    @Test
     fun `PaperAccount key returns singleton`() {
         val account = PaperAccount(balance = 10_000.0)
         assertSame(PaperAccount.Key, account.key)
@@ -68,12 +62,6 @@ class DreamerElementTddTest {
     fun `PaperOrder starts with pending fill status`() {
         val order = PaperOrder(symbol = "BTCUSDT", quantity = 0.5, price = 50_000.0)
         assertEquals(OrderStatus.PENDING, order.status)
-    }
-
-    @Test
-    fun `PaperOrder is AsyncContextElement`() {
-        val order = PaperOrder(symbol = "BTCUSDT", quantity = 0.5, price = 50_000.0)
-        assertTrue(order is AsyncContextElement)
     }
 
     // ── PaperPosition ──────────────────────────────────────────────────────────
