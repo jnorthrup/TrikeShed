@@ -227,7 +227,15 @@ class Genome(
 
         val PARAM_NAMES: Array<String> = GenomeParam.values().map { it.storageKey }.toTypedArray()
 
-        val ORDINALS: Map<String, Int> = GenomeParam.byKey.mapValues { it.value.ordinal }
+        // Map parameter names to ordinals. Use ordinalOf for explicit keys to avoid
+        // referencing non-existent constant identifiers.
+        val ORDINALS: Map<String, Int> = PARAM_NAMES.withIndex().associate { it.value to it.index } +
+            mapOf(
+                "FORCED_HARVEST_TIMEOUT_MS" to ordinalOf("FORCED_HARVEST_TIMEOUT_MS"),
+                "REBALANCE_COOLDOWN_MS" to ordinalOf("REBALANCE_COOLDOWN_MS"),
+                "FORCE_REBALANCE_TIMEOUT_MS" to ordinalOf("FORCE_REBALANCE_TIMEOUT_MS"),
+                "REFRESH_INTERVAL_MS" to ordinalOf("REFRESH_INTERVAL_MS"),
+            )
 
         public val ORDINALS: Map<String, Int> = PARAM_NAMES.withIndex().associate { it.value to it.index } +
             mapOf(
