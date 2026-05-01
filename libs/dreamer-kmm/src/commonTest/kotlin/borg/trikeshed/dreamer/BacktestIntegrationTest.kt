@@ -485,6 +485,6 @@ class BacktestIntegrationTest {
 
         assertEquals(2, agg.runCount)
         assertNotNull(agg.bestGenome)
-        assertTrue(agg.bestGenome!!.isNotEmpty())
+        assertTrue(agg.bestGenome.isNotEmpty())
     }
 }
