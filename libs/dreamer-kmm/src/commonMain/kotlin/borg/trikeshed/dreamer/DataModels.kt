@@ -81,7 +81,9 @@ data class EngineResult(
     val tradedSymbols: List<String> = emptyList(),
     val postMortemEvents: List<Any?> = emptyList(),
     val killMe: Boolean = false,
-    val stateChanged: Boolean = false
+    val stateChanged: Boolean = false,
+    val reinvestedAmount: Double = 0.0,
+    val reinvestedSymbols: List<String> = emptyList()
 )
 
 /**

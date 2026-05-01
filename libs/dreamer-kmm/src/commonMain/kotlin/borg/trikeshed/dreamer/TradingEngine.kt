@@ -176,6 +176,45 @@ class TradingEngine(
             }
         }
 
-        return EngineResult(anyTradesThisCycle, harvestedAmount, tradedSymbols, emptyList(), false, stateChanged)
+        // ── Reinvest: use harvested cash to buy dip symbols ──
+        var reinvestedAmount = 0.0
+        val reinvestedSymbols = mutableListOf<String>()
+        val reinvestPct = getGenomicParam(GenomeParam.HARVEST_ALLOC_REINVEST_PERCENT,
+            portfolioSummary.firstOrNull()?.Symbol ?: "")
+        val minNegDev = getGenomicParam(GenomeParam.MIN_NEGATIVE_DEVIATION_FOR_REINVEST,
+            portfolioSummary.firstOrNull()?.Symbol ?: "")
+        val minBuy = getGenomicParam(GenomeParam.MIN_REINVEST_BUY_USD,
+            portfolioSummary.firstOrNull()?.Symbol ?: "")
+
+        if (reinvestPct > 0.0 && harvestedAmount > 0.0) {
+            val reinvestBudget = harvestedAmount * reinvestPct
+            // Find symbols with negative deviation (below baseline, not in CP)
+            val dipSymbols = portfolioSummary.filter { row ->
+                row.Symbol !in crashProtectionState &&
+                (baselines[row.Symbol] ?: 0.0) > 0.0 &&
+                ((row.Value - (baselines[row.Symbol] ?: row.Value)) / (baselines[row.Symbol] ?: row.Value)) < -minNegDev
+            }
+            if (dipSymbols.isNotEmpty()) {
+                val perSymbol = reinvestBudget / dipSymbols.size
+                if (perSymbol >= minBuy) {
+                    for (row in dipSymbols) {
+                        val buyAmount = perSymbol.coerceAtMost(cashBalance)
+                        if (buyAmount >= minBuy) {
+                            cashBalance -= buyAmount
+                            reinvestedAmount += buyAmount
+                            // Add to holdings (simulated: quantity = buyAmount / price)
+                            val existingQty = holdings[row.Symbol]?.rawQuantity ?: 0.0
+                            holdings[row.Symbol] = Holding(existingQty + buyAmount / row.Price)
+                            reinvestedSymbols.add(row.Symbol)
+                            anyTradesThisCycle = true
+                            stateChanged = true
+                        }
+                    }
+                }
+            }
+        }
+
+        return EngineResult(anyTradesThisCycle, harvestedAmount, tradedSymbols, emptyList(), false, stateChanged,
+            reinvestedAmount = reinvestedAmount, reinvestedSymbols = reinvestedSymbols)
     }
 }
