@@ -1,56 +1,95 @@
-# libs/miniduck — TODO
+# libs/miniduck -- todo.md
 
-## Intent
-Block-first columnar storage engine. RowVec families, MiniCursor, block codecs, ISAM indexes, column schemas, tablespace management, SQL→MiniDuck compilation. KMP full with posix source sets.
+## Boundary Audit
 
-## Status: ALPHA (large surface, core algebra solid, integration gaps)
+### Completed
+- [x] MiniRowVec sealed hierarchy with 10+ subtypes (Doc/View/Blob/Json/Yaml/Csv/Block/Manifold/ObjectStore/Wrapped)
+- [x] BlockRowVec MUTABLE->SEALED state machine
+- [x] MiniDuckBlockCodec NDJSON encode/decode with full RowVec family roundtrip
+- [x] QueryPlan sealed tree with execute() interpreter
+- [x] Predicate DSL (sealed tree, ColumnRef infix operators)
+- [x] SQL frontend: SqlToMiniDuck + ExpressionCompiler over kursive SQL AST
+- [x] PlanNode pull-model execution (TableScan/Filter/Project/Limit)
+- [x] ExecutionContext + TableSource + InMemoryTableSource
+- [x] CursorJoins: hashJoin, groupBy with Agg sealed class
+- [x] UnifyCodec: JSON/YAML/CBOR unified with CoroutineContext KEYS/ELEMENTS
+- [x] LSMR merge tree (L0/L1/L2 sorted runs, flush, merge, scan)
+- [x] Tablespace/Region/BlockStore/InMemoryBlockWal
+- [x] Object store adapter SPI + S3/GCS/Alibaba data classes
+- [x] ManifoldConcept, BudgetCoord, NarsBag, Timeline
+- [x] KernelTransformer + stochastic training harness
+- [x] GapDetector + SpanMatcher for kline time-series
 
-## Pure boundary audit
+### Boundary Issues
 
-### Keys (need creation)
-- No AsyncContextElement or Key types exist in miniduck currently.
-- `ColumnType` enum — column type discriminator. Should stay enum (schema metadata, not routing key).
-- `ColumnSchema` data class — pure schema value ✓
-- `IndexPluginRegistry` object — plugin registry. [ ] Consider if this should be a context Key so plugins are per-scope.
+1. **Two ColumnSchema classes** -- `columnar.ColumnSchema(name,type,plugin)` and
+   `schema.ColumnSchema(id,name)` are unrelated. Tablespace.discoverSchema() uses
+   `schema.ColumnSchema` but columnar operations use `columnar.ColumnSchema`.
+   These should either be unified or explicitly documented as separate concerns.
 
-### Elements (stateful — need AsyncContextElement wrapping)
-- `BlockStore` (tablespace/) — has put/get/remove with no lifecycle. [ ] Wrap as AsyncContextElement with sealing semantics.
-- `InMemoryBlockWal` — WAL append log. [ ] AsyncContextElement lifecycle.
-- `Tablespace` — manages blocks + WAL. [ ] The main stateful unit, should be a context Element.
-- `InMemoryTableSource` / `LsmrTableSource` (exec/) — execution context sources. [ ] Lifecycle elements.
+2. **Two SchemaManager hierarchies** -- `schema.SchemaManager` is an interface with
+   suspend+sync wrappers. `schema.InMemorySchemaManager` and `schema.LsmrSchemaManager`
+   implement it. But there is no integration between SchemaManager and the
+   columnar ColumnSchema. The SQL path uses SchemaManager; the ISAM path uses
+   columnar.ColumnSchema. These two worlds are not connected.
 
-### Statics that should stay static
-- `BlockRowVec` — value type extending Series2 ✓
-- `MiniCursor` — factory functions, pure ✓
-- `CursorOps` — pure cursor transforms ✓
-- `MiniDuckBlockCodec` — encode/decode, pure functions ✓
-- `RowVecFamily` / `RowVecFamilies` — type taxonomies ✓
-- `Predicate` — pure predicates ✓
-- `CursorJoins`, `Agg` — pure query algebra ✓
-- `JsonProjection`, `JsonEscape` — pure utilities ✓
-- `KernelTransformer`, `KernelIndicators` — pure transforms ✓
-- `ManifoldConcept` — data class ✓
+3. **IsamVolume/IsamCursor/ZranIndex/Lz4Index are all TODO stubs** -- every method
+   throws TODOError. The ISAM layer is sketched but unimplemented. Tests exist
+   for generation, roundtrip, and cursor API but they will fail until implemented.
 
-### Enums → evaluate
-- `ColumnType` — stays enum (schema metadata) ✓
-- `WireProto` (root) — wire format discriminator, stays enum ✓
-- `TypeMemento` (root cursor/) — type tag, stays enum ✓
+4. **SqlExecutor.kt is an empty stub** -- only imports, no class or function.
+   SQL execution goes through PlanNode.open(ExecutionContext) instead.
 
-### Schema management
-- `SchemaManager` interface + `InMemorySchemaManager` + `LsmrSchemaManager` — correct hierarchy
-- [ ] `LsmrSchemaManager` should be an AsyncContextElement with lifecycle (schema mutations need coordination)
+5. **CursorOps.kt is an empty file** -- just import aliases. Operations live in
+   CursorJoins.kt and QueryPlan.kt.
 
-## Integration partners
-- **couch**: couch `api` main; uses miniduck BlockRowVec, MiniCursor, ColumnSchema extensively. couch tests depend on miniduck.
-- **concurrency**: MvccBlockStore wraps miniduck BlockRowVec.
-- **dreamer-kmm**: uses MiniCursor, cursor extensions, at() for backtesting.
-- **root project**: root src has a parallel copy of ALL miniduck sources (under `src/commonMain/.../miniduck/`). This is the DRY problem.
-  - [ ] **DRY cleanup**: root project miniduck/ sources should be `expect/actual` or just import from this module. Per AGENTS.md: TrikeShed DRY precedence OVER libs/**
+6. **UnifyCodec lifecycle is not integrated with AsyncContextElement** -- UnifyCodec
+   manages its own `state: ElementState` but does NOT extend AsyncContextElement.
+   Compare with UserspaceBtrfsBuffer which does. Inconsistent.
 
-## Path to stable
-1. **DRY**: Resolve root-project miniduck duplication. Either root re-exports this module or root's copies become the canonical ones and this module is a thin dependency declaration.
-2. Create `TablespaceKey : AsyncContextKey<Tablespace>` — make Tablespace a lifecycle element
-3. Create `BlockStoreKey : AsyncContextKey<BlockStore>` — same
-4. Wire Tablespace lifecycle into couch ReactorSupervisor context palette
-5. Add SchemaManager lifecycle tests
-6. SQL→MiniDuck compilation integration test
+7. **InMemoryBlockWal.applyOp() casts to InMemoryBlockStore** -- replay only works
+   with InMemoryBlockStore, not the BlockStore interface. WAL replay against
+   other store implementations (S3-backed, etc.) will silently skip Put ops.
+
+8. **MvccBlockStore lives in `concurrency` module** -- but imports and depends on
+   miniduck types (BlockRowVec, MiniCursor, MiniRowVec, DocRowVec). This is a
+   cross-module dependency that should be documented.
+
+9. **LsmrSchemaManager depends on `userspace.database.LsmrDatabase`** -- a type
+   from another module. Creates a tight coupling between miniduck and whatever
+   module provides LsmrDatabase.
+
+10. **No delete operation on BPlusTree** -- the B+Tree has put/get/findLeaf/insert
+    but no remove. The contract tests mention delete and rebalancing but the
+    implementation is missing.
+
+### Integration Steps
+
+1. **Unify ColumnSchema** -- Merge `columnar.ColumnSchema` and `schema.ColumnSchema`
+   into a single type, or create an explicit adapter between them.
+
+2. **Implement ISAM layer** -- Fill in IsamVolume.generateIsam(), IsamCursor,
+   ZranIndex, Lz4Index with real zstd/lz4 compression and block indexing.
+
+3. **Wire SQL -> Tablespace** -- Complete SqlExecutor so SQL queries can run
+   against a Tablespace without manually constructing ExecutionContext.
+
+4. **Make UnifyCodec an AsyncContextElement** -- Extend the Key/Element pattern
+   for lifecycle consistency with the rest of TrikeShed.
+
+5. **Generalize WAL replay** -- Make InMemoryBlockWal.applyOp work against the
+   BlockStore interface (add putWithId to BlockStore SPI).
+
+6. **Add BPlusTree delete** -- Implement remove with rebalancing/merging to pass
+   the contract tests.
+
+## Path to Stable
+
+- **v0.1** (current): RowVec taxonomy, block codec, query plan, SQL frontend,
+  tablespace, WAL, object store adapters -- all in place but ISAM layer is stubs.
+- **v0.2**: Implement ISAM (ZranIndex + IsamVolume + IsamCursor), unify ColumnSchema,
+  complete SqlExecutor, generalize WAL replay.
+- **v0.3**: BPlusTree delete + rebalance, MVCC integration with concurrency module,
+  UnifyCodec as AsyncContextElement.
+- **v1.0**: All TODO stubs replaced, cross-module dependencies documented and
+  minimized, full test coverage on columnar path.

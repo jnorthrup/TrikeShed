@@ -390,7 +390,37 @@ class RunCycleTest {
         assertEquals(listOf(0, 1), seenTicks)
     }
 
-    // ── 8. Rebalance scheduling ──────────────────────────────────────
+    // ── 8. simulateMultiSymbolTicks cash accounting ─────────────────
+
+    @Test
+    fun `simulateMultiSymbolTicks cash accounts for all symbols not just first`() = runTest {
+        // Two symbols at same timestamps, equal capital allocation.
+        // BTC price=100, ETH price=10. initialCapital=10_000.
+        // Per-symbol allocation = 5000. BTC qty=50, ETH qty=500.
+        // holdingsValue = 50*100 + 500*10 = 5000 + 5000 = 10_000.
+        // So cash should be 0 and totalValue should equal initialCapital on tick 0.
+        val klines = listOf(
+            Kline("BTCUSDT", TimeSpan.Minutes1, 1000L, 100.0, 101.0, 99.0, 100.0, 50.0),
+            Kline("ETHUSDT", TimeSpan.Minutes1, 1000L, 10.0, 10.5, 9.8, 10.0, 500.0),
+            Kline("BTCUSDT", TimeSpan.Minutes1, 2000L, 100.0, 102.0, 99.0, 101.0, 60.0),
+            Kline("ETHUSDT", TimeSpan.Minutes1, 2000L, 10.0, 10.8, 9.8, 10.5, 600.0),
+        )
+        val cursor = klinesToCursor(klines)
+        val engine = TradingEngine(defaultGenome(), Mode.SHADOW, initialCapital = 10_000.0)
+        val result = simulateMultiSymbolTicks(cursor, engine, initialCapital = 10_000.0)
+
+        // First cycle: totalValue should equal initialCapital since prices haven't moved
+        val firstCycle = result.cycles[0]
+        // With both symbols accounted, totalValue ≈ initialCapital ± harvest adjustment
+        // The bug causes only BTC to be subtracted from cash, leaving cash = 5000 instead of ~0
+        val expectedHoldingsValue = 50.0 * 100.0 + 500.0 * 10.0  // 10_000
+        assertEquals(expectedHoldingsValue, firstCycle.holdingsValue, 100.0,
+            "holdingsValue on tick 0 should equal total allocated holdings value for both symbols")
+        assertEquals(10_000.0, firstCycle.totalValue, 100.0,
+            "totalValue on tick 0 should be ~initialCapital when prices haven't moved")
+    }
+
+    // ── 9. Rebalance scheduling ──────────────────────────────────────
 
     @Test
     fun `simulateTicks schedules rebalance when value deviates from baseline`() = runTest {

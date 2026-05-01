@@ -470,15 +470,19 @@ suspend fun simulateMultiSymbolTicks(
         result
     }
 
-    // Adjust engine cash: subtract holdings value to avoid double-counting
+    // Adjust engine cash: subtract holdings value to avoid double-counting.
+    // Only count the first occurrence of each symbol to avoid double-counting
+    // when the cursor has interleaved rows for multiple symbols.
     var initialHoldingsValue = 0.0
+    val seenSymbols = mutableSetOf<String>()
     for (i in 0 until n) {
         val row = cursor.at(i)
         val sym = row.stringValue("symbol", "UNKNOWN")
+        if (sym in seenSymbols) continue
+        seenSymbols += sym
         val price = row.doubleValue("close").takeIf { it > 0.0 } ?: row.doubleValue("open").coerceAtLeast(1.0)
         val qty = holdings[sym] ?: 0.0
         initialHoldingsValue += qty * price
-        break // Only first row per symbol matters for initial value
     }
     engine.cashBalance = initialCapital - initialHoldingsValue
 
