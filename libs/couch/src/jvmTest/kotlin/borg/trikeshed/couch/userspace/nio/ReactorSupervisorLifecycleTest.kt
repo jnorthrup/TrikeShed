@@ -27,15 +27,15 @@ class ReactorSupervisorLifecycleTest {
     fun `CREATED → OPEN → ACTIVE → DRAINING → CLOSED`() {
         val rs = ReactorSupervisor("test")
 
-        assertEquals(ReactorSupervisor.ReactorState.CREATED, rs.state)
+        assertEquals(borg.trikeshed.context.ElementLifecycleState.CREATED, rs.state)
         rs.open()
-        assertEquals(ReactorSupervisor.ReactorState.OPEN, rs.state)
+        assertEquals(borg.trikeshed.context.ElementLifecycleState.OPEN, rs.state)
         rs.activate()
-        assertEquals(ReactorSupervisor.ReactorState.ACTIVE, rs.state)
+        assertEquals(borg.trikeshed.context.ElementLifecycleState.ACTIVE, rs.state)
         rs.drain()
-        assertEquals(ReactorSupervisor.ReactorState.DRAINING, rs.state)
+        assertEquals(borg.trikeshed.context.ElementLifecycleState.DRAINING, rs.state)
         rs.close()
-        assertEquals(ReactorSupervisor.ReactorState.CLOSED, rs.state)
+        assertEquals(borg.trikeshed.context.ElementLifecycleState.CLOSED, rs.state)
     }
 
     // ── invalid transitions ─────────────────────────────────────────
@@ -65,18 +65,18 @@ class ReactorSupervisorLifecycleTest {
         rs.open()
         rs.activate()
         rs.close()
-        assertEquals(ReactorSupervisor.ReactorState.CLOSED, rs.state)
+        assertEquals(borg.trikeshed.context.ElementLifecycleState.CLOSED, rs.state)
         rs.drain() // should not throw
-        assertEquals(ReactorSupervisor.ReactorState.CLOSED, rs.state)
+        assertEquals(borg.trikeshed.context.ElementLifecycleState.CLOSED, rs.state)
     }
 
     @Test
     fun `close from CLOSED is no-op`() {
         val rs = ReactorSupervisor("test")
         rs.close()
-        assertEquals(ReactorSupervisor.ReactorState.CLOSED, rs.state)
+        assertEquals(borg.trikeshed.context.ElementLifecycleState.CLOSED, rs.state)
         rs.close() // should not throw
-        assertEquals(ReactorSupervisor.ReactorState.CLOSED, rs.state)
+        assertEquals(borg.trikeshed.context.ElementLifecycleState.CLOSED, rs.state)
     }
 
     @Test
@@ -91,7 +91,7 @@ class ReactorSupervisorLifecycleTest {
             val rs = ReactorSupervisor("test")
             init(rs)
             rs.close()
-            assertEquals(ReactorSupervisor.ReactorState.CLOSED, rs.state)
+            assertEquals(borg.trikeshed.context.ElementLifecycleState.CLOSED, rs.state)
         }
     }
 

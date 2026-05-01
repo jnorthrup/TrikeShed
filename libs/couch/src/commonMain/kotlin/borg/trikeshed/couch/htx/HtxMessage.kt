@@ -3,6 +3,11 @@ package borg.trikeshed.couch.htx
 import borg.trikeshed.collections.associative.trie.Trie
 
 /**
+ * Internal state machine for HTTP/1.x parsing.
+ */
+enum class HttpParseState { RequestLine, Headers, Body }
+
+/**
  * HTX message — complete HTTP message in internal format.
  * Blocks metadata at END; payloads at BEGINNING (ring buffer layout).
  */
@@ -56,38 +61,38 @@ class HtxMessage(
         fun parseHttp1(input: ByteArray): HtxMessage? {
             val text = input.decodeToString()
             val msg = HtxMessage()
-            var state = ParseState.RequestLine
+            var state = HttpParseState.RequestLine
 
             for (rawLine in text.lines()) {
                 val line = rawLine.trimEnd('\r')
                 when (state) {
-                    ParseState.RequestLine -> {
+                    HttpParseState.RequestLine -> {
                         val req = parseRequestLine(line)
                         if (req != null) {
                             val (method, uri, version) = req
                             msg.addStartLine(HtxStartLine.request(method, uri.encodeToByteArray(), version.first, version.second))
-                            state = ParseState.Headers
+                            state = HttpParseState.Headers
                             continue
                         }
                         val resp = parseStatusLine(line)
                         if (resp != null) {
                             val (status, reason, version) = resp
                             msg.addStartLine(HtxStartLine.response(status, reason.encodeToByteArray(), version.first, version.second))
-                            state = ParseState.Headers
+                            state = HttpParseState.Headers
                             continue
                         }
                         return null
                     }
-                    ParseState.Headers -> {
+                    HttpParseState.Headers -> {
                         if (line.isEmpty()) {
                             msg.addEndHeaders()
-                            state = ParseState.Body
+                            state = HttpParseState.Body
                             continue
                         }
                         val (name, value) = parseHeader(line) ?: continue
                         msg.addHeader(name.encodeToByteArray(), value.encodeToByteArray())
                     }
-                    ParseState.Body -> {
+                    HttpParseState.Body -> {
                         if (line.isNotEmpty()) msg.addData(line.encodeToByteArray())
                     }
                 }
@@ -156,4 +161,3 @@ class HtxMessage(
         }
     }
 }
-enum class ParseState { RequestLine, Headers, Body }
