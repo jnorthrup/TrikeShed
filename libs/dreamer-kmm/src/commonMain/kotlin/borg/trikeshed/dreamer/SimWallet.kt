@@ -231,9 +231,28 @@ class SimWallet {
 
     fun peakNetValue(): Double = peakNetValue
 
+    /**
+     * Compute max drawdown from the wallet journal's MARK_TO_MARKET entries.
+     *
+     * Scans all MARK_TO_MARKET entries, tracks the peak netValue seen so far,
+     * and returns the largest peak-to-trough decline as a fraction of the peak.
+     * Returns 0.0 if there are fewer than 2 mark-to-market entries.
+     */
     fun autoDrawdown(): Double {
-        // This usually requires a current worth to be calculated first or passed
-        return 0.0 // Placeholder for more complex drawdown logic if needed
+        val mtmEntries = journal.filter { it.action == WalletAction.MARK_TO_MARKET }
+        if (mtmEntries.size < 2) return 0.0
+        var peak = 0.0
+        var maxDd = 0.0
+        for (entry in mtmEntries) {
+            val value = entry.netValue
+            if (value > peak) {
+                peak = value
+            } else if (peak > 0.0) {
+                val dd = (peak - value) / peak
+                if (dd > maxDd) maxDd = dd
+            }
+        }
+        return maxDd
     }
 
     // Route fiat balances to canonical fiat#0 slot (non-destructive if not present).

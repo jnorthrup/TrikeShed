@@ -123,4 +123,69 @@ class SimWalletTest {
         assertEquals(worth, journal.last().netValue)
         assertEquals("debug tick", journal.last().note)
     }
+
+    // ── autoDrawdown from journal ──────────────────────────────────
+
+    @Test
+    fun `autoDrawdown returns zero for empty or single-entry journal`() {
+        val wallet = SimWallet()
+        assertEquals(0.0, wallet.autoDrawdown())
+
+        wallet.record("USDT", 1000.0)
+        wallet.markToMarket(emptyMap(), note = "only one entry")
+        assertEquals(0.0, wallet.autoDrawdown())
+    }
+
+    @Test
+    fun `autoDrawdown computes max peak-to-trough from mark-to-market entries`() {
+        val wallet = SimWallet()
+        wallet.record("USDT", 1000.0)
+        wallet.record("BTC", 0.01)
+
+        // Tick 0: BTC=50000 → worth = 1000 + 0.01*50000 = 1500
+        wallet.markToMarket(mapOf("BTC" to 50000.0), note = "t0")
+        // Tick 1: BTC=40000 → worth = 1000 + 0.01*40000 = 1400
+        wallet.markToMarket(mapOf("BTC" to 40000.0), note = "t1")
+        // Tick 2: BTC=60000 → worth = 1000 + 0.01*60000 = 1600 (new peak)
+        wallet.markToMarket(mapOf("BTC" to 60000.0), note = "t2")
+        // Tick 3: BTC=40000 → worth = 1000 + 0.01*40000 = 1400
+        // Peak=1600, drawdown=(1600-1400)/1600 = 12.5%
+        wallet.markToMarket(mapOf("BTC" to 40000.0), note = "t3")
+
+        val dd = wallet.autoDrawdown()
+        // Peak = 1600, trough = 1400, drawdown = 200/1600 = 0.125
+        assertTrue(dd > 0.12, "autoDrawdown should be ~12.5%, got $dd")
+        assertTrue(dd < 0.13, "autoDrawdown should be ~12.5%, got $dd")
+    }
+
+    @Test
+    fun `autoDrawdown is zero for monotonically rising equity`() {
+        val wallet = SimWallet()
+        wallet.record("USDT", 1000.0)
+        wallet.record("BTC", 0.01)
+
+        wallet.markToMarket(mapOf("BTC" to 40000.0), note = "t0")
+        wallet.markToMarket(mapOf("BTC" to 50000.0), note = "t1")
+        wallet.markToMarket(mapOf("BTC" to 60000.0), note = "t2")
+        wallet.markToMarket(mapOf("BTC" to 70000.0), note = "t3")
+
+        assertEquals(0.0, wallet.autoDrawdown())
+    }
+
+    @Test
+    fun `autoDrawdown ignores non-mtm journal entries`() {
+        val wallet = SimWallet()
+        wallet.record("USDT", 1000.0)
+        wallet.record("BTC", 0.01)
+
+        wallet.markToMarket(mapOf("BTC" to 50000.0), note = "t0") // 1500
+        // Non-MTM action — should not affect drawdown
+        wallet.recordSignal("BTC", note = "noise")
+        wallet.markToMarket(mapOf("BTC" to 20000.0), note = "t1") // 1200
+
+        val dd = wallet.autoDrawdown()
+        // Peak = 1500, trough = 1200, drawdown = 300/1500 = 20%
+        assertTrue(dd > 0.19, "autoDrawdown should be ~20%, got $dd")
+        assertTrue(dd < 0.21, "autoDrawdown should be ~20%, got $dd")
+    }
 }
