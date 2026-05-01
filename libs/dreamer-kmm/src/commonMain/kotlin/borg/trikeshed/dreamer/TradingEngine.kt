@@ -2,6 +2,13 @@ package borg.trikeshed.dreamer
 
 import kotlin.time.Clock
 
+/** Epoch milliseconds, with graceful fallback when Clock is unavailable (e.g. wasm/js test env). */
+private fun epochMillis(): Long = try {
+    Clock.System.now().toEpochMilliseconds()
+} catch (_: Throwable) {
+    0L
+}
+
 class TradingEngine(
     val genome: Genome,
     val mode: Mode = Mode.SHADOW,
@@ -81,7 +88,7 @@ class TradingEngine(
                 stateChanged = true
             }
             if (!lastActionTimestamps.containsKey(row.Symbol) && (baselines[row.Symbol] ?: 0.0) > 0.0) {
-                lastActionTimestamps[row.Symbol] = Clock.System.now().toEpochMilliseconds()
+                lastActionTimestamps[row.Symbol] = epochMillis()
                 stateChanged = true
             }
         }
@@ -170,7 +177,7 @@ class TradingEngine(
                 if (baseline <= 0.0) continue
                 val dev = (row.Value - baseline) / baseline
                 if (dev > rebalanceTrigger && row.Symbol !in rebalanceState) {
-                    rebalanceState[row.Symbol] = mapOf("scheduledAt" to Clock.System.now().toEpochMilliseconds())
+                    rebalanceState[row.Symbol] = mapOf("scheduledAt" to epochMillis())
                     stateChanged = true
                 }
             }
