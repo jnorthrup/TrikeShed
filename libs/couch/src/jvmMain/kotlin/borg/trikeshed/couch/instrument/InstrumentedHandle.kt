@@ -14,7 +14,7 @@ class InstrumentedHandle(val probes: Probes) {
    val lock = ReentrantLock()
    val inFlight = java.util.concurrent.atomic.AtomicLong(0)
 
-    fun append(row: RowVec) {
+    fun append(row: borg.trikeshed.miniduck.MiniRowVec) {
         inFlight.incrementAndGet()
         // give other threads a chance to increment inFlight so we can detect overlap
         Thread.yield()
@@ -38,7 +38,7 @@ class InstrumentedHandle(val probes: Probes) {
         }
     }
 
-    fun snapshot(): Series<RowVec> {
+    fun snapshot(): Series<borg.trikeshed.miniduck.MiniRowVec> {
         val snap = underlying.snapshot()
         probes.snapshotCount.incrementAndGet()
         if (underlying.state == HandleState.SEALED) probes.readCount.incrementAndGet()

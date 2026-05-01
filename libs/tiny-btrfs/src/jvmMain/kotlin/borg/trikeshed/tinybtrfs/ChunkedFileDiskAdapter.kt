@@ -4,6 +4,7 @@ import java.io.File
 import java.io.RandomAccessFile
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.AtomicLong
+import java.io.Closeable
 
 /**
  * ChunkedFileDiskAdapter: single-file chunk allocator for JVM platforms.
@@ -22,7 +23,12 @@ class ChunkedFileDiskAdapter(
    val chunkSize: Int = 4096,
     preallocateSize: Long = 0L,
     allocationStrategy: String = "on_demand",
-) : DiskAdapter {
+) : DiskAdapter, Closeable {
+
+    val metaFile = File(file.path + ".meta")
+    val raf: RandomAccessFile
+    val nextOffset: AtomicLong
+    val freeList = ConcurrentLinkedQueue<Long>()
 
     init {
         file.parentFile?.mkdirs()
@@ -30,11 +36,17 @@ class ChunkedFileDiskAdapter(
         if (preallocateSize > 0L && allocationStrategy == "preallocate_upfront") {
             RandomAccessFile(file, "rw").use { it.setLength(preallocateSize) }
         }
-    }
 
-   val raf = RandomAccessFile(file, "rw")
-   val nextOffset = AtomicLong(raf.length())
-   val freeList = ConcurrentLinkedQueue<Long>()
+        raf = RandomAccessFile(file, "rw")
+        nextOffset = AtomicLong(raf.length())
+
+        if (metaFile.exists()) {
+            val lines = metaFile.readLines()
+            lines.forEach {
+                if (it.isNotBlank()) freeList.add(it.toLong())
+            }
+        }
+    }
 
    fun parseOffset(nodeId: String): Long {
         if (!nodeId.startsWith("off:")) throw IllegalArgumentException("invalid node id: $nodeId")
@@ -80,5 +92,12 @@ class ChunkedFileDiskAdapter(
         freeList.add(off)
     }
 
-    fun close() { raf.close() }
+    override fun close() {
+        raf.close()
+        saveMeta()
+    }
+
+    private fun saveMeta() {
+        metaFile.writeText(freeList.joinToString("\n"))
+    }
 }

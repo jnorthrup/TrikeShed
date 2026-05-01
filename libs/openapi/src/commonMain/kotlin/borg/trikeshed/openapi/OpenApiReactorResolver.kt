@@ -210,14 +210,31 @@ fun resolveSecurity(security: Any?): List<SecurityRequirement> {
 
 // ── trikeshed context parser ─────────────────────────────────────────────────
 
-fun parseTrikeshedContext(specText: String): TrikeshedContext? {
-    val contextStart = specText.indexOf("x-trikeshed-context:")
-    if (contextStart < 0) return null
-    val afterContext = specText.substring(contextStart)
+fun parseTrikeshedContext(root: JsonMap): TrikeshedContext? {
+    val ctx = root["x-trikeshed-context"]?.asMap()
+    val supervisorIds = mutableListOf<String>()
 
-    val clientBindings = parseBindingsFromSection(afterContext, "client")
-    val serverBindings = parseBindingsFromSection(afterContext, "server")
-    val supervisorIds = parseSupervisorIds(specText)
+    val paths = root["paths"]?.asMap()
+    if (paths != null) {
+        for ((_, methodsNode) in paths) {
+            val methods = methodsNode.asMap() ?: continue
+            for ((methodName, opNode) in methods) {
+                if (methodName.startsWith("x-")) continue
+                val operation = opNode.asMap() ?: continue
+                if (operation["x-trikeshed-supervisor"]?.asBool() == true) {
+                    val opId = operation["operationId"]?.asStr()
+                    if (opId != null) {
+                        supervisorIds.add(opId)
+                    }
+                }
+            }
+        }
+    }
+
+    if (ctx == null && supervisorIds.isEmpty()) return null
+
+    val clientBindings = parseBindingsFromSectionMap(ctx?.get("client")?.asList())
+    val serverBindings = parseBindingsFromSectionMap(ctx?.get("server")?.asList())
 
     return TrikeshedContext(
         clientBindings = clientBindings,
@@ -225,24 +242,23 @@ fun parseTrikeshedContext(specText: String): TrikeshedContext? {
         supervisorOperationIds = supervisorIds,
     )
 }
-fun parseBindingsFromSection(specText: String, role: String): List<ContextBinding> {
-    val blockRegex = Regex("""(?m)^  $role:\n((?:(?:    |\t).*\n?)*)""")
-    val block = blockRegex.find(specText)?.groupValues?.get(1) ?: return emptyList()
-    val entryRegex = Regex("""- name:\s*(\S+)\s*\n\s+key:\s*(\S+)\s*\n\s+element:\s*(\S+)\s*\n\s+open:\s*(\S+)""")
-    return entryRegex.findAll(block).map { m ->
+
+fun parseBindingsFromSectionMap(list: List<Any?>?): List<ContextBinding> {
+    if (list == null) return emptyList()
+    return list.mapNotNull { item ->
+        val map = item.asMap() ?: return@mapNotNull null
+        val name = map["name"]?.asStr() ?: return@mapNotNull null
+        val key = map["key"]?.asStr() ?: return@mapNotNull null
+        val element = map["element"]?.asStr() ?: return@mapNotNull null
+        val open = map["open"]?.asStr() ?: return@mapNotNull null
         ContextBinding(
-            name = m.groupValues[1],
-            keyFqn = m.groupValues[2],
-            elementFqn = m.groupValues[3],
-            openFqn = m.groupValues[4],
+            name = name,
+            keyFqn = key,
+            elementFqn = element,
+            openFqn = open,
         )
-    }.toList()
+    }
 }
-fun parseSupervisorIds(specText: String): List<String> =
-    Regex("""(?ms)operationId:\s*(\S+).*?x-trikeshed-supervisor:\s*true""")
-        .findAll(specText)
-        .map { it.groupValues[1] }
-        .toList()
 
 // ── request body resolver ───────────────────────────────────────────────────
 fun OpenApiRawDocument.resolveRequestBody(node: Any?): ResolvedRequestBody? {
@@ -308,7 +324,7 @@ fun OpenApiRawDocument.resolve(): ResolvedOpenApiDocument {
     } ?: emptyList()
 
     val trikeshedTitle = root["x-trikeshed-title"].asStr()
-    val trikeshedContext = parseTrikeshedContext(root.toString())
+    val trikeshedContext = parseTrikeshedContext(root)
 
     val resolvedOps = operations().mapNotNull { rawOp ->
         resolveOperation(rawOp)

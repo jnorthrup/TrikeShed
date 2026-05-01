@@ -42,10 +42,6 @@ data class HtxClientRequest(
     val method: String,
     val path: String,
     val body: String = "",
-    /** aria2c switch equivalents. When present, the transport layer dispatches via aria2c. */
-    val switches: Aria2Switches? = null,
-    /** URI(s) to fetch — only used when [switches] is set (aria2c dispatch). */
-    val uris: List<String> = emptyList(),
 )
 
 typealias HtxRequestHandler = suspend (HtxClientRequest) -> HtxClientMessage
@@ -77,7 +73,7 @@ class HtxElement(
         path: String = "/",
         body: String = "",
     ): HtxClientMessage {
-        requireState(ElementState.OPEN)
+        check(state == ElementState.OPEN || state == ElementState.ACTIVE || state == ElementState.DRAINING) { "Expected OPEN, ACTIVE, or DRAINING but was $state" }
         return requestHandler(
             HtxClientRequest(
                 method = method.trim().uppercase(),

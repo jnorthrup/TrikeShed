@@ -14,6 +14,9 @@ import borg.trikeshed.lib.*
  * ```
  *
  * 16 bytes per node (2 × Long), zero boxing, algebraic composition via [TwInt].
+ * Note: This store is append-only. Deletion should be implemented via tombstoning or compaction at a higher level.
+ * Note: This store is append-only. Deletion should be implemented via tombstoning or compaction at a higher level.
+ * Note: This store is append-only. Deletion should be implemented via tombstoning or compaction at a higher level.
  * LSB of parentid encodes child-id (0=left, 1=right).
  */
 class IntNodeStore(

@@ -380,10 +380,10 @@ fun <B> Series<B>.dropLast(back: Int): Series<B> = get(0 until max(0, size - bac
 fun <B> Series<B>.take(exclusiveEnd: Int): Series<B> = get(0 until min(exclusiveEnd, size))
 
 //series foreachIndexed
-fun <T> Series<T>.forEachIndexed(action: (index: Int, T) -> Unit): Unit = this.view.forEachIndexed(action)
+fun <T> Series<T>.forEachIndexed(action: (index: Int, T) -> Unit): Unit { var index = 0; for (item in this.view) action(index++, item) }
 
 //series foreach
-fun <T> Series<T>.forEach(action: (T) -> Unit): Unit = this.view.forEach(action)
+fun <T> Series<T>.forEach(action: (T) -> Unit): Unit { for (item in this.view) action(item) }
 
 fun <T> Series<T>.isEmpty(): Boolean = a == 0
 

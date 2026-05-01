@@ -31,9 +31,7 @@ class YamlParserTest {
 
     @Test
     fun `parse coinmarketcap spec`() {
-        val file = File("../../libs/cmc/endpoint-overview/openapi/coinmarketcap.openapi.yaml")
-        if (file.exists()) {
-            val specText = file.readText()
+        val specText = java.io.File("../../libs/cmc/endpoint-overview/openapi/coinmarketcap.openapi.yaml").readText()
 
             val result = parse(specText)
             assertNotNull(result, "parsed result should not be null")

@@ -3,6 +3,65 @@ package borg.trikeshed.dreamer
 
 enum class Mode { LIVE, SHADOW }
 
+enum class GenomeParam(
+    val aliases: Set<String> = emptySet(),
+) {
+    TARGET_ADJUST_PERCENT,
+    FLAT_HARVEST_TRIGGER_PERCENT,
+    HARVEST_TAKE_PERCENT,
+    HARVEST_CYCLE_THRESHOLD,
+    MIN_SURPLUS_FOR_HARVEST,
+    MIN_SURPLUS_FOR_FORCED_HARVEST,
+    FORCED_HARVEST_TIMEOUT_MS( setOf("FORCED_HARVEST_TIMEOUT")),
+    PORTFOLIO_HARVEST_TRIGGER_DEVIATION_PERCENT,
+    PORTFOLIO_HARVEST_CONFIRMATION_CYCLES,
+    MIN_ASSET_SURPLUS_FOR_PORTFOLIO_HARVEST,
+    HARVEST_ALLOC_BTC_PERCENT,
+    HARVEST_ALLOC_ETH_PERCENT,
+    HARVEST_ALLOC_REINVEST_PERCENT,
+    HARVEST_ALLOC_CASH_PERCENT,
+    CRASH_FUND_THRESHOLD_PERCENT,
+    MIN_HARVEST_TO_ALLOCATE,
+    MIN_NEGATIVE_DEVIATION_FOR_REINVEST,
+    MIN_REINVEST_BUY_USD,
+    REINVEST_BASELINE_GROWTH_FACTOR,
+    MIN_BTC_BUY_USD,
+    MIN_ETH_BUY_USD,
+    FLAT_REBALANCE_TRIGGER_PERCENT,
+    PARTIAL_RECOVERY_PERCENT,
+    REBALANCE_POSITIVE_THRESHOLD,
+    MAX_REBALANCE_ATTEMPTS,
+    REBALANCE_COOLDOWN_MS( setOf("REBALANCE_COOLDOWN_MS")),
+    FORCE_REBALANCE_TIMEOUT_MS( setOf("FORCE_REBALANCE_TIMEOUT_MS")),
+    FORCE_REBALANCE_SHORTFALL_PERCENT,
+    MIN_PARTIAL_REBALANCE_USD,
+    MIN_FORCED_REBALANCE_USD,
+    SPAR_DRAG_COEFFICIENT,
+    CP_TRIGGER_ASSET_PERCENT,
+    CP_TRIGGER_MIN_NEGATIVE_DEV_PERCENT,
+    CRASH_PROTECTION_THRESHOLD_INCREASE,
+    CRASH_PROTECTION_PARTIAL_RECOVERY_PERCENT,
+    REFRESH_INTERVAL_MS( setOf("REFRESH_INTERVAL_MS")),
+    ALLOCATION_MODE,
+    REINVEST_WEIGHT_EXPONENT,
+    FITNESS_DRAWDOWN_PENALTY,
+    MIN_TRADES_FOR_PROMOTION,
+    EVOLUTION_CONSISTENCY_COUNT,
+    ORACLE_TREND_THRESHOLD,
+    ORACLE_VOLATILITY_THRESHOLD,
+    EVOLUTION_INTERVAL_MINUTES;
+
+    val storageKey: String get() = name ?: this@GenomeParam.name
+
+    companion object {
+        val byKey: Map<String, GenomeParam> = values().flatMap { param ->
+            (setOf(param.name, param.storageKey) + param.aliases).map { key -> key to param }
+        }.toMap()
+
+        fun fromKey(key: String): GenomeParam? = byKey[key]
+    }
+}
+
 // Minimal models for standalone testing
 
 data class PortfolioRow(
@@ -22,7 +81,9 @@ data class EngineResult(
     val tradedSymbols: List<String> = emptyList(),
     val postMortemEvents: List<Any?> = emptyList(),
     val killMe: Boolean = false,
-    val stateChanged: Boolean = false
+    val stateChanged: Boolean = false,
+    val reinvestedAmount: Double = 0.0,
+    val reinvestedSymbols: List<String> = emptyList()
 )
 
 /**
@@ -54,21 +115,32 @@ class Genome(
     }
 
     operator fun get(key: String): Any? {
-        val ordinal = ordinalOf(key)
-        return if (ordinal >= 0) doubles[ordinal] else backing[key]
+        val param = GenomeParam.fromKey(key)
+        return if (param != null) doubles[param.ordinal] else backing[key]
     }
 
     operator fun set(key: String, value: Any?) {
-        val ordinal = ordinalOf(key)
-        if (ordinal >= 0 && value is Number) {
-            doubles[ordinal] = value.toDouble()
+        val param = GenomeParam.fromKey(key)
+        if (param != null && value is Number) {
+            doubles[param.ordinal] = value.toDouble()
         }
         backing[key] = value
     }
 
+    operator fun get(param: GenomeParam): Double = doubles[param.ordinal]
+
+    operator fun set(param: GenomeParam, value: Double) {
+        doubles[param.ordinal] = value
+        backing[param.storageKey] = value
+    }
+
+    operator fun set(param: GenomeParam, value: Number) {
+        this[param] = value.toDouble()
+    }
+
     fun getDouble(key: String, default: Double = 0.0): Double {
-        val ordinal = ordinalOf(key)
-        if (ordinal >= 0) return doubles[ordinal]
+        val param = GenomeParam.fromKey(key)
+        if (param != null) return doubles[param.ordinal]
         val v = backing[key] ?: return default
         return when (v) {
             is Number -> v.toDouble()
@@ -76,6 +148,8 @@ class Genome(
             else -> default
         }
     }
+
+    fun getDouble(param: GenomeParam): Double = doubles[param.ordinal]
 
     fun getBoolean(key: String, default: Boolean = false): Boolean {
         if (key == "ENABLE_PORTFOLIO_HARVEST") return backing[key]?.let { booleanValue(it, default) } ?: true
@@ -105,9 +179,9 @@ class Genome(
         val packed = overrides[symbol]
         if (packed != null) {
             val resolved = mutableMapOf<String, Any?>()
-            for (i in 0 until WIDTH) {
-                val value = packed[i]
-                if (!value.isNaN()) resolved[PARAM_NAMES[i]] = value
+            for (param in GenomeParam.values()) {
+                val value = packed[param.ordinal]
+                if (!value.isNaN()) resolved[param.storageKey] = value
             }
             return resolved
         }
@@ -135,11 +209,15 @@ class Genome(
     }
 
     fun withOverride(symbol: String, key: String, value: Double): Genome {
-        val ordinal = ordinalOf(key)
-        require(ordinal >= 0) { "Unknown genome parameter: $key" }
+        val param = GenomeParam.fromKey(key)
+        require(param != null) { "Unknown genome parameter: $key" }
+        return withOverride(symbol, param, value)
+    }
+
+    fun withOverride(symbol: String, param: GenomeParam, value: Double): Genome {
         val nextOverrides = overrides.mapValuesTo(mutableMapOf()) { it.value.copyOf() }
         val target = nextOverrides[symbol] ?: DoubleArray(WIDTH) { Double.NaN }
-        target[ordinal] = value
+        target[param.ordinal] = value
         nextOverrides[symbol] = target
         return Genome(doubles.copyOf(), nextOverrides, backing.toMutableMap())
     }
@@ -147,106 +225,18 @@ class Genome(
     fun copyGenome(): Genome = Genome(doubles.copyOf(), overrides.mapValuesTo(mutableMapOf()) { it.value.copyOf() }, backing.toMutableMap())
 
     companion object {
-        const val WIDTH = 44
+        val WIDTH: Int = GenomeParam.values().size
 
-        const val TARGET_ADJUST_PERCENT = 0
-        const val FLAT_HARVEST_TRIGGER_PERCENT = 1
-        const val HARVEST_TAKE_PERCENT = 2
-        const val HARVEST_CYCLE_THRESHOLD = 3
-        const val MIN_SURPLUS_FOR_HARVEST = 4
-        const val MIN_SURPLUS_FOR_FORCED_HARVEST = 5
-        const val FORCED_HARVEST_TIMEOUT_MS = 6
-        const val PORTFOLIO_HARVEST_TRIGGER_DEVIATION_PERCENT = 7
-        const val PORTFOLIO_HARVEST_CONFIRMATION_CYCLES = 8
-        const val MIN_ASSET_SURPLUS_FOR_PORTFOLIO_HARVEST = 9
-        const val HARVEST_ALLOC_BTC_PERCENT = 10
-        const val HARVEST_ALLOC_ETH_PERCENT = 11
-        const val HARVEST_ALLOC_REINVEST_PERCENT = 12
-        const val HARVEST_ALLOC_CASH_PERCENT = 13
-        const val CRASH_FUND_THRESHOLD_PERCENT = 14
-        const val MIN_HARVEST_TO_ALLOCATE = 15
-        const val MIN_NEGATIVE_DEVIATION_FOR_REINVEST = 16
-        const val MIN_REINVEST_BUY_USD = 17
-        const val REINVEST_BASELINE_GROWTH_FACTOR = 18
-        const val MIN_BTC_BUY_USD = 19
-        const val MIN_ETH_BUY_USD = 20
-        const val FLAT_REBALANCE_TRIGGER_PERCENT = 21
-        const val PARTIAL_RECOVERY_PERCENT = 22
-        const val REBALANCE_POSITIVE_THRESHOLD = 23
-        const val MAX_REBALANCE_ATTEMPTS = 24
-        const val REBALANCE_COOLDOWN_MS = 25
-        const val FORCE_REBALANCE_TIMEOUT_MS = 26
-        const val FORCE_REBALANCE_SHORTFALL_PERCENT = 27
-        const val MIN_PARTIAL_REBALANCE_USD = 28
-        const val MIN_FORCED_REBALANCE_USD = 29
-        const val SPAR_DRAG_COEFFICIENT = 30
-        const val CP_TRIGGER_ASSET_PERCENT = 31
-        const val CP_TRIGGER_MIN_NEGATIVE_DEV_PERCENT = 32
-        const val CRASH_PROTECTION_THRESHOLD_INCREASE = 33
-        const val CRASH_PROTECTION_PARTIAL_RECOVERY_PERCENT = 34
-        const val REFRESH_INTERVAL_MS = 35
-        const val ALLOCATION_MODE = 36
-        const val REINVEST_WEIGHT_EXPONENT = 37
-        const val FITNESS_DRAWDOWN_PENALTY = 38
-        const val MIN_TRADES_FOR_PROMOTION = 39
-        const val EVOLUTION_CONSISTENCY_COUNT = 40
-        const val ORACLE_TREND_THRESHOLD = 41
-        const val ORACLE_VOLATILITY_THRESHOLD = 42
-        const val EVOLUTION_INTERVAL_MINUTES = 43
+        val PARAM_NAMES: Array<String> = GenomeParam.values().map { it.storageKey }.toTypedArray()
 
-        val PARAM_NAMES = arrayOf(
-            "TARGET_ADJUST_PERCENT",
-            "FLAT_HARVEST_TRIGGER_PERCENT",
-            "HARVEST_TAKE_PERCENT",
-            "HARVEST_CYCLE_THRESHOLD",
-            "MIN_SURPLUS_FOR_HARVEST",
-            "MIN_SURPLUS_FOR_FORCED_HARVEST",
-            "FORCED_HARVEST_TIMEOUT",
-            "PORTFOLIO_HARVEST_TRIGGER_DEVIATION_PERCENT",
-            "PORTFOLIO_HARVEST_CONFIRMATION_CYCLES",
-            "MIN_ASSET_SURPLUS_FOR_PORTFOLIO_HARVEST",
-            "HARVEST_ALLOC_BTC_PERCENT",
-            "HARVEST_ALLOC_ETH_PERCENT",
-            "HARVEST_ALLOC_REINVEST_PERCENT",
-            "HARVEST_ALLOC_CASH_PERCENT",
-            "CRASH_FUND_THRESHOLD_PERCENT",
-            "MIN_HARVEST_TO_ALLOCATE",
-            "MIN_NEGATIVE_DEVIATION_FOR_REINVEST",
-            "MIN_REINVEST_BUY_USD",
-            "REINVEST_BASELINE_GROWTH_FACTOR",
-            "MIN_BTC_BUY_USD",
-            "MIN_ETH_BUY_USD",
-            "FLAT_REBALANCE_TRIGGER_PERCENT",
-            "PARTIAL_RECOVERY_PERCENT",
-            "REBALANCE_POSITIVE_THRESHOLD",
-            "MAX_REBALANCE_ATTEMPTS",
-            "REBALANCE_COOLDOWN",
-            "FORCE_REBALANCE_TIMEOUT",
-            "FORCE_REBALANCE_SHORTFALL_PERCENT",
-            "MIN_PARTIAL_REBALANCE_USD",
-            "MIN_FORCED_REBALANCE_USD",
-            "SPAR_DRAG_COEFFICIENT",
-            "CP_TRIGGER_ASSET_PERCENT",
-            "CP_TRIGGER_MIN_NEGATIVE_DEV_PERCENT",
-            "CRASH_PROTECTION_THRESHOLD_INCREASE",
-            "CRASH_PROTECTION_PARTIAL_RECOVERY_PERCENT",
-            "REFRESH_INTERVAL",
-            "ALLOCATION_MODE",
-            "REINVEST_WEIGHT_EXPONENT",
-            "FITNESS_DRAWDOWN_PENALTY",
-            "MIN_TRADES_FOR_PROMOTION",
-            "EVOLUTION_CONSISTENCY_COUNT",
-            "ORACLE_TREND_THRESHOLD",
-            "ORACLE_VOLATILITY_THRESHOLD",
-            "EVOLUTION_INTERVAL_MINUTES",
-        )
-
-        public val ORDINALS: Map<String, Int> = PARAM_NAMES.withIndex().associate { it.value to it.index } +
+        // Map parameter names to ordinals. Use ordinalOf for explicit keys to avoid
+        // referencing non-existent constant identifiers.
+        val ORDINALS: Map<String, Int> = PARAM_NAMES.withIndex().associate { it.value to it.index } +
             mapOf(
-                "FORCED_HARVEST_TIMEOUT_MS" to FORCED_HARVEST_TIMEOUT_MS,
-                "REBALANCE_COOLDOWN_MS" to REBALANCE_COOLDOWN_MS,
-                "FORCE_REBALANCE_TIMEOUT_MS" to FORCE_REBALANCE_TIMEOUT_MS,
-                "REFRESH_INTERVAL_MS" to REFRESH_INTERVAL_MS,
+                "FORCED_HARVEST_TIMEOUT_MS" to ordinalOf("FORCED_HARVEST_TIMEOUT_MS"),
+                "REBALANCE_COOLDOWN_MS" to ordinalOf("REBALANCE_COOLDOWN_MS"),
+                "FORCE_REBALANCE_TIMEOUT_MS" to ordinalOf("FORCE_REBALANCE_TIMEOUT_MS"),
+                "REFRESH_INTERVAL_MS" to ordinalOf("REFRESH_INTERVAL_MS"),
             )
 
         public const val MIN_45_MS = 45.0 * 60.0 * 1000.0
@@ -266,7 +256,7 @@ class Genome(
             1.00, 1.0, 3.0, 0.8, 2.0, 5.0,
         )
 
-        fun ordinalOf(key: String): Int = ORDINALS[key] ?: -1
+        fun ordinalOf(key: String): Int = GenomeParam.fromKey(key)?.ordinal ?: -1
     }
 }
 

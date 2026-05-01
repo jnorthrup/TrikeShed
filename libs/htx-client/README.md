@@ -1,30 +1,74 @@
-# htx-client OpenAPI generation
+# libs/htx-client
 
-The htx-client generated surface for htx-general comes from one authoritative OpenAPI document:
+HTTP (HTX) client AsyncContextElement for TrikeShed.  An `HtxElement` wraps a
+suspend request handler and participates in the CoroutineContext lifecycle
+(created -> open -> closed).  The module also carries OpenAPI-generated client
+artifacts for the `htx-general` service contract.
 
-- `libs/server/openapi/htx-general.openapi.yaml`
+## What it is (mechanically)
 
-Regenerate the checked-in client artifacts with:
+- **HtxElement** — an `AsyncContextElement` that holds a typed
+  `HtxRequestHandler = suspend (HtxClientRequest) -> HtxClientMessage`.
+  Looked up in a `CoroutineContext` via the companion `HtxKey`.
+  `request()` requires `ElementState.OPEN`.
 
-- `./gradlew -p libs/htx-client openApiGenerateHtxGeneralClient`
+- **Aria2Switches / Aria2Help** — data class and help-text object that model
+  aria2c download flags (`-Z`, `-c`, `-x`, `-j`, `-s`, `-d`).  Used by
+  combined-client and server for multi-protocol transfer dispatch.
 
-Verify that the checked-in generated sources still match the authoritative contract with:
+- **Generated client surface** (`src/generated/kotlin/...`) — checked-in,
+  OpenAPI-generated Kotlin sources.  Regenerated from
+  `libs/server/openapi/htx-general.openapi.yaml` via the
+  `openApiGenerateHtxGeneralClient` Gradle task.  **Do not edit by hand.**
 
-- `./gradlew -p libs/htx-client verifyHtxGeneralClientGeneratedSources`
+## Source layout
 
-Repository policy:
+```
+src/
+  commonMain/kotlin/borg/trikeshed/htx/client/
+    HtxElement.kt           — HtxElement, HtxKey, HtxClientRequest/Message,
+                               defaultHtxRequestHandler, openHtxElement,
+                               Aria2Switches
+    Aria2Help.kt            — aria2c -h emulator for TDD / dev tooling
+  generated/kotlin/borg/trikeshed/htx/client/generated/
+    Keys.kt                 — re-exports HtxKey + operationId constant
+    Elements.kt             — factory: openHtxElement()
+    SupervisorJobs.kt       — per-operation SupervisorJob factory
+    api/HtxGeneralApi.kt    — HtxGeneralApi interface + DefaultHtxGeneralApi,
+                               HtxGeneralApiContract (GET /health)
+    infrastructure/
+      GeneratedRequest.kt   — HttpMethod enum, GeneratedRequest(method, path)
+    model/HealthStatus.kt   — HealthStatus(body), ok boolean
+  commonTest/kotlin/.../
+    HtxElementTest.kt             — CoroutineContext lookup correctness
+    HtxElementTddTest.kt          — lifecycle, request dispatch, Aria2Switches
+    HtxOpenApiGeneratorTddTest.kt — generated file presence + content shape
+    GeneratedHtxGeneralClientTest.kt — contract check against GET /health
+    Aria2HelpTddTest.kt           — help text coverage
+```
 
-- generated Kotlin sources live only under `libs/htx-client/src/generated/kotlin`
-- the generated outputs are checked in for review and must be committed after regeneration
-- verification is non-mutating: `verifyHtxGeneralClientGeneratedSources` checks for drift without rewriting files
-- this repo does not use a verify-only policy for these generated files
-- do not hand-edit generated files; regenerate them from the OpenAPI spec instead
-- compatibility with the htx-general server is exercised via `./gradlew -p libs/server jvmTest --tests borg.trikeshed.server.HtxGeneralClientServerCompatibilityTest`
+## Key / Element / Reactor status
 
-CI/local validation targets:
+| Shape            | Status   | Notes                                        |
+|------------------|----------|----------------------------------------------|
+| HtxKey           | Active   | `AsyncContextKey<HtxElement>` companion      |
+| HtxElement       | Active   | Lifecycle: CREATED -> OPEN -> CLOSED         |
+| ReactorSupervisor| None     | SupervisorJobs per-operation only            |
 
-- codegen drift gate: `./gradlew -p libs/htx-client verifyHtxGeneralClientGeneratedSources`
-- generated client contract check: `./gradlew -p libs/htx-client jvmTest --tests borg.trikeshed.htx.client.GeneratedHtxGeneralClientTest`
-- client/server compatibility check: `./gradlew -p libs/server jvmTest --tests borg.trikeshed.server.HtxGeneralClientServerCompatibilityTest.generatedClientRoundTripMatchesOpenApiContract`
-- route drift check: `./gradlew -p libs/server jvmTest --tests borg.trikeshed.server.HtxGeneralClientServerCompatibilityTest.adapterRejectsPathDriftWithConcreteFailureSignals`
-- reviewable contract suite: `./gradlew -p libs/server jvmTest --tests borg.trikeshed.server.HtxGeneralOpenApiContractTest`
+HtxElement `request()` enforces `requireState(OPEN)`; `open()` is idempotent.
+
+## Dependencies
+
+- `:libs:common` (AsyncContextElement, AsyncContextKey, ElementState)
+- kotlinx-coroutines (SupervisorJob in generated code)
+- No transport-layer deps (QUIC, SCTP) — purely HTTP request/response
+
+## OpenAPI code generation
+
+```
+./gradlew -p libs/htx-client openApiGenerateHtxGeneralClient
+./gradlew -p libs/htx-client verifyHtxGeneralClientGeneratedSources
+```
+
+Generated outputs are checked in for review and must be committed after
+regeneration.  Verification is non-mutating.
