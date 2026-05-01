@@ -1,23 +1,16 @@
 package borg.trikeshed.dreamer
 
-import borg.trikeshed.cursor.intValue
-
-import borg.trikeshed.cursor.doubleValue
-
-import borg.trikeshed.cursor.stringValue
-
 import borg.trikeshed.context.AsyncContextElement
-import borg.trikeshed.cursor.longValue
 import borg.trikeshed.context.AsyncContextKey
 import borg.trikeshed.context.ElementState
 import borg.trikeshed.cursor.Cursor
 import borg.trikeshed.cursor.at
+import borg.trikeshed.cursor.cellsToRowVec
+import borg.trikeshed.cursor.doubleValue
+import borg.trikeshed.cursor.longValue
 import borg.trikeshed.lib.Join
-import borg.trikeshed.lib.get
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.size
-import borg.trikeshed.miniduck.DocRowVec
-import borg.trikeshed.miniduck.toRowVec
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -205,7 +198,7 @@ fun SimWallet.walletFree(
             else -> -1e-10
         }
     }
-    return 1 j { _: Int -> DocRowVec(keys, cells).toRowVec() }
+    return 1 j { _: Int -> cellsToRowVec(cells, keys) }
 }
 
 fun horizonIndex(index: Int, viewPoints: Int, datapoints: Int): Int {
@@ -217,12 +210,11 @@ fun horizonIndex(index: Int, viewPoints: Int, datapoints: Int): Int {
     val compressed = (dpDouble - 1.0 - sin((vpDouble - index) / vpDouble * (PI / 2.0)) * dpDouble - 1.0).toInt()
     return max(index.coerceAtMost(datapoints - 1), compressed).coerceIn(0, datapoints - 1)
 }
- public fun Cursor.horizonOhlcv(rowLimit: Int, depth: Int): Cursor {
+public fun Cursor.horizonOhlcv(rowLimit: Int, depth: Int): Cursor {
     val source = this
     return depth j { depthIndex: Int ->
         val row = source.at(horizonIndex(depthIndex, depth, rowLimit))
-        DocRowVec(
-            keys = listOf("open", "high", "low", "close", "volume"),
+        cellsToRowVec(
             cells = listOf(
                 row.doubleValue("open"),
                 row.doubleValue("high"),
@@ -230,10 +222,11 @@ fun horizonIndex(index: Int, viewPoints: Int, datapoints: Int): Int {
                 row.doubleValue("close"),
                 row.doubleValue("volume"),
             ),
-        ).toRowVec()
+            keys = listOf("open", "high", "low", "close", "volume"),
+        )
     }
 }
- public fun Cursor.pancake(): Cursor {
+public fun Cursor.pancake(): Cursor {
     val source = this
     return 1 j { _: Int ->
         val keys = mutableListOf<String>()
@@ -241,19 +234,18 @@ fun horizonIndex(index: Int, viewPoints: Int, datapoints: Int): Int {
         for (rowIndex in 0 until source.size) {
             val row = source.at(rowIndex)
             for (cellIndex in 0 until row.size) {
-                val cell = row[cellIndex]
+                val cell = row.b(cellIndex)
                 keys += "${cell.b().a}/$rowIndex"
                 cells += cell.a
             }
         }
-        DocRowVec(keys, cells).toRowVec()
+        cellsToRowVec(cells, keys)
     }
 }
- public fun Cursor.ochlAt(index: Int): Cursor {
+public fun Cursor.ochlAt(index: Int): Cursor {
     val row = at(index)
     return 1 j { _: Int ->
-        DocRowVec(
-            keys = listOf("openTime", "open/0", "close/0", "high/0", "low/0"),
+        cellsToRowVec(
             cells = listOf(
                 row.longValue("openTime"),
                 row.doubleValue("open"),
@@ -261,13 +253,14 @@ fun horizonIndex(index: Int, viewPoints: Int, datapoints: Int): Int {
                 row.doubleValue("high"),
                 row.doubleValue("low"),
             ),
-        ).toRowVec()
+            keys = listOf("openTime", "open/0", "close/0", "high/0", "low/0"),
+        )
     }
 }
- public fun Cursor.rowDoublesInto(out: MutableList<Double>) {
+public fun Cursor.rowDoublesInto(out: MutableList<Double>) {
     val row = at(0)
     for (index in 0 until row.size) {
-        val value = row[index].a
+        val value = row.b(index).a
         out += when (value) {
             is Number -> value.toDouble()
             is String -> value.toDouble()
