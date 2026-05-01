@@ -187,4 +187,37 @@ class NarsiveParserTest {
         assertTrue("narsiveCopula" in names)
         assertTrue("narsiveQuestion" in names || "narsiveSentence" in names)
     }
+
+    @Test
+    fun typeEvidenceColumnCountMatchesSchema() {
+        val dummyEvidence = borg.trikeshed.common.TypeEvidence()
+        val rowVecFromKursive = dummyEvidence.toKursiveRowVec()
+
+        assertEquals(KURSIVE_EVIDENCE_COLUMNS.size, rowVecFromKursive.size)
+    }
+
+    @Test
+    fun fuzzTestingParsesGarbageWithoutCrashing() {
+        val chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 ()[]{}<>.?!@#\$%^&*-=+_\\|;:'\",/~`\n\t"
+        for (i in 0 until 100) {
+            val length = (1..50).random()
+            val text = (1..length).map { chars.random() }.joinToString("")
+            try {
+                Narsive.parseTask(text)
+            } catch (e: Exception) {
+                fail("Parser crashed on input: $text. Exception: ${e.message}")
+            }
+        }
+    }
+
+    @Test
+    fun benchmarkLargeNALProgramParsing() {
+        val line = "(bird --> animal). %1.0;0.9%"
+        val text = (1..2000).joinToString("\n") { line }
+        val time = kotlin.time.measureTime {
+            Narsive.parseTasks(text)
+        }
+        println("Parsed 2000 lines in $time")
+        assertTrue(time.inWholeMilliseconds > 0)
+    }
 }
