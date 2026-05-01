@@ -393,6 +393,7 @@ switch (project.path) {
         version = trikeshedVersion
         break
     case ":libs:htx-client":
+    case ":libs:jules-client":
         kmpJvm()
         extensions.getByName("kotlin").sourceSets.getByName("commonMain").kotlin.srcDir("src/generated/kotlin")
 
