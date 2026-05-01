@@ -3,9 +3,10 @@ package borg.trikeshed.integration
 import borg.trikeshed.couch.kline.KlineBlock
 import borg.trikeshed.cursor.RowVec
 import borg.trikeshed.lib.size
+import borg.trikeshed.lib.get
 import borg.trikeshed.miniduck.DocRowVec
 import borg.trikeshed.miniduck.MiniCursor
-import borg.trikeshed.miniduck.at
+import borg.trikeshed.cursor.at
 import borg.trikeshed.miniduck.exec.Cursor
 import borg.trikeshed.miniduck.exec.RowAccessor
 
@@ -91,7 +92,7 @@ class BinanceCursor(
 class MiniRowVecRowAccessor(
     val row: RowVec,
 ) : RowAccessor {
-    override fun get(index: Int): Any? = row.get(index)
+    override fun get(index: Int): Any? = row[index]
     override fun get(name: String): Any? {
         // DocRowVec supports name lookup; other MiniRowVec subtypes may not
         return (row as? DocRowVec)?.get(name)
