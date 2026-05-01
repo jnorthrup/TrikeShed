@@ -1,6 +1,6 @@
 package borg.trikeshed.openapi
 
-import kotlin.reflect.KClass
+import borg.trikeshed.common.System
 
 // ── naming utilities ─────────────────────────────────────────────────────────
 

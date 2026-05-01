@@ -2,6 +2,8 @@ package borg.trikeshed.couch.requestfactory
 
 import borg.trikeshed.couch.transport.htx.HtxRequest
 import borg.trikeshed.couch.transport.htx.HtxRequestFactoryBridge
+import kotlinx.coroutines.runBlocking
+import borg.trikeshed.ccek.CcekKeyService
 
 data class RequestFactoryHtxExchange(
     val request: HtxRequest,
@@ -33,8 +35,15 @@ class RequestFactoryHtxServer(
         require(plan.dispatchMode.isRequestFactory) { "Unsupported request path: ${plan.requestPath}" }
         require(plan.contentType == RequestFactoryTransportContract.CONTENT_TYPE) { "Unsupported content type: ${plan.contentType}" }
         val body = rawRequest.substringAfter("\r\n\r\n", "")
-        val call = RequestFactoryJsonCodec.callFromJson(body)
-        val response = service.invoke(call)
+        var call = RequestFactoryJsonCodec.callFromJson(body)
+        val ccekKey = plan.headers["x-ccek-key"]
+        val response = if (ccekKey != null) {
+            call = call.copy(ccekKey = ccekKey)
+            // Bind a CCEK keyed service into the coroutine context for the duration of the service invocation
+            runBlocking(CcekKeyService(ccekKey)) { service.invoke(call) }
+        } else {
+            service.invoke(call)
+        }
         val responseBody = RequestFactoryJsonCodec.responseToJson(response)
         return buildString {
             append("HTTP/1.1 200 OK\r\n")

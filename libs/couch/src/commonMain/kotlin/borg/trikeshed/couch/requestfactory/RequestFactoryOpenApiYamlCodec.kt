@@ -13,10 +13,30 @@ object RequestFactoryOpenApiYamlCodec {
         |info:
         |  title: GWT RequestFactory Transport
         |  version: latest
+        |components:
+        |  securitySchemes:
+        |    CCEK:
+        |      type: apiKey
+        |      in: header
+        |      name: X-CCEK-Key
+        |      description: TrikeShed CCEK keyed service header
+        |  schemas:
+        |    RequestFactoryCall:
+        |      type: object
         |paths:
         |  ${RequestFactoryTransportContract.PATH}:
         |    post:
         |      operationId: ${RequestFactoryTransportContract.OPERATION_ID}
+        |      summary: RequestFactory invoke endpoint with TrikeShed CCEK bindings
+        |      security:
+        |        - CCEK: []
+        |      parameters:
+        |        - name: X-CCEK-Key
+        |          in: header
+        |          required: false
+        |          schema:
+        |            type: string
+        |          description: "Optional CCEK key used to bind request to coroutine-scoped KeyedService"
         |      requestBody:
         |        required: true
         |        content:

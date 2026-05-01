@@ -10,6 +10,7 @@ data class RequestFactoryCall(
     val context: String,
     val method: String,
     val arguments: List<TransportValue>,
+    val ccekKey: String? = null,
 )
 
 data class RequestFactoryResponse(

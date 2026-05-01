@@ -103,7 +103,7 @@ These aliases support the project's lightweight JSON indexer/reifier/path select
 - segments stay cheap and sliceable
 - path selection is algebra over indexed structure, not reflection-driven object walking
 
-## Userspace async context algebra
+## Userspace async context algebra (aka CCEK meaning Coroutine, Context, Element, Key )
 
 The userspace side is modeled as explicit async context elements and fanout, not hidden ambient magic.
 

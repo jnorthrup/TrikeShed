@@ -6,9 +6,9 @@ package borg.trikeshed.openapi
  * Repository policy: this checked-in file must be regenerated, not edited by hand.
  */
 
-import borg.trikeshed.htx.client.HtxElement
-import borg.trikeshed.htx.client.openHtxElement as open_htx
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 
-object Elements {
-    suspend fun htx(): HtxElement = open_htx()
+object SupervisorJobs {
+    fun createSession(parent: Job? = null): Job = SupervisorJob(parent)
 }

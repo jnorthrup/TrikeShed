@@ -1,7 +1,7 @@
 package borg.trikeshed.openapi.model
 
 /**
- * Generated from /app/libs/jules-client/openapi/jules.openapi.yaml
+ * Generated from /Users/jim/work/TrikeShed/libs/jules-client/openapi/jules.openapi.yaml
  * by ./gradlew generateJulesSources.
  * Repository policy: this checked-in file must be regenerated, not edited by hand.
  */

@@ -1,7 +1,7 @@
 package borg.trikeshed.openapi.api
 
 /**
- * Generated from /app/libs/jules-client/openapi/jules.openapi.yaml
+ * Generated from /Users/jim/work/TrikeShed/libs/jules-client/openapi/jules.openapi.yaml
  * by ./gradlew generateJulesSources.
  * Repository policy: this checked-in file must be regenerated, not edited by hand.
  */
@@ -27,5 +27,5 @@ object JulesAPIApiContract {
               const val operationId: String = "createSession"
               val request: GeneratedRequest = GeneratedRequest(method = HttpMethod.POST, path = "/v1alpha/sessions")
           }
-
+  
 }

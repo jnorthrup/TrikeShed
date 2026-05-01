@@ -9,6 +9,7 @@ object RequestFactoryJsonCodec {
             "context" to stringLiteral(call.context),
             "method" to stringLiteral(call.method),
             "arguments" to transportArrayLiteral(call.arguments),
+            "ccekKey" to stringOrNullLiteral(call.ccekKey),
         ),
     )
 
@@ -18,6 +19,7 @@ object RequestFactoryJsonCodec {
             context = map.string("context"),
             method = map.string("method"),
             arguments = map.list("arguments").map(::toTransportValue),
+            ccekKey = map["ccekKey"] as String?,
         )
     }
 

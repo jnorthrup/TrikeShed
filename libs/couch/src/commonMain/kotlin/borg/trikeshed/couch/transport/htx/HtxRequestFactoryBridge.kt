@@ -10,6 +10,7 @@ data class InvocationPlan(
     val contentType: String,
     val dispatchMode: DispatchMode,
     val allowsRelaxFactoryStyleCouchServices: Boolean,
+    val headers: Map<String, String> = emptyMap(),
 )
 
 class HtxRequestFactoryBridge {
@@ -20,13 +21,17 @@ class HtxRequestFactoryBridge {
         val method = parts.getOrNull(0) ?: ""
         val requestPath = parts.getOrNull(1) ?: ""
 
-        var contentType = ""
-        for (line in lines.drop(1)) {
-            if (line.startsWith("Content-Type:", ignoreCase = true)) {
-                contentType = line.substringAfter(":").trim()
-                break
-            }
-        }
+        // collect header lines until blank line
+        val headerLines = lines.drop(1).takeWhile { it.isNotEmpty() }
+        val headers = headerLines.mapNotNull { line ->
+            val idx = line.indexOf(':')
+            if (idx == -1) return@mapNotNull null
+            val name = line.substring(0, idx).trim().lowercase()
+            val value = line.substring(idx + 1).trim()
+            name to value
+        }.toMap()
+
+        val contentType = headers["content-type"] ?: ""
 
         val isGwtRequest = method == "POST" && requestPath == "/gwtRequest"
         val dispatchMode = if (isGwtRequest) DispatchMode.REQUEST_FACTORY else DispatchMode.STANDARD
@@ -36,6 +41,8 @@ class HtxRequestFactoryBridge {
             contentType = contentType,
             dispatchMode = dispatchMode,
             allowsRelaxFactoryStyleCouchServices = isGwtRequest,
+            headers = headers,
         )
     }
 }
+

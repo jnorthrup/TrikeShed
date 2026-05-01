@@ -1,14 +1,10 @@
 package borg.trikeshed.cpucache
 
-import kotlinx.cinterop.ExperimentalForeignApi
-import kotlinx.cinterop.alloc
-import kotlinx.cinterop.memScoped
-import kotlinx.cinterop.ptr
-import kotlinx.cinterop.value
-import platform.posix.size_tVar
-import platform.posix.sysctlbyname
-import platform.posix.sysconf
+import kotlinx.cinterop.*
+import platform.darwin.sysctlbyname
 import platform.posix._SC_NPROCESSORS_ONLN
+import platform.posix.size_tVar
+import platform.posix.sysconf
 
 /**
  * macOS native cache interrogation via POSIX sysctlbyname.
