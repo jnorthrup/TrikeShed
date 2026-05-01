@@ -12,25 +12,34 @@ class TradingEngine(
     val lastActionTimestamps: MutableMap<String, Long> = mutableMapOf()
     val rebalanceState: MutableMap<String, Any> = mutableMapOf()
 
+    /** Crash protection state per symbol: stores the trough value at CP activation */
+    val crashProtectionState: MutableMap<String, Double> = mutableMapOf()
+
     var cashBalance: Double = initialCapital
     val holdings: MutableMap<String, Holding> = initialHoldings
     var totalHarvested: Double = 0.0
 
+    /** Check if a symbol is currently in crash protection mode */
+    fun isCrashProtected(symbol: String): Boolean = symbol in crashProtectionState
+
     fun loadPersistedState(data: Map<String, Any?>?) {
         if (data == null) return
         (data["baselines"] as? Map<String, Any?>)?.forEach { (k, v) -> (v as? Number)?.toDouble()?.let { baselines[k] = it } }
+        (data["crashProtectionState"] as? Map<String, Any?>)?.forEach { (k, v) -> (v as? Number)?.toDouble()?.let { crashProtectionState[k] = it } }
     }
 
     fun getStateSnapshot(): Map<String, Any?> = mapOf(
         "baselines" to baselines.toMap(),
         "holdings" to holdings.mapValues { it.value.rawQuantity },
         "cashBalance" to cashBalance,
+        "crashProtectionState" to crashProtectionState.toMap(),
     )
 
     fun injectSimulationState(snapshot: Map<String, Any?>) {
         snapshot["cashBalance"]?.let { if (it is Number) cashBalance = it.toDouble() }
         (snapshot["holdings"] as? Map<String, Any?>)?.forEach { (k, v) -> if (v is Number) holdings[k] = Holding(v.toDouble()) }
         (snapshot["baselines"] as? Map<String, Any?>)?.forEach { (k, v) -> (v as? Number)?.toDouble()?.let { baselines[k] = it } }
+        (snapshot["crashProtectionState"] as? Map<String, Any?>)?.forEach { (k, v) -> (v as? Number)?.toDouble()?.let { crashProtectionState[k] = it } }
     }
 
     fun getGenomicParam(param: GenomeParam, symbol: String? = null): Double {
@@ -77,8 +86,48 @@ class TradingEngine(
             }
         }
 
+        // ── Crash protection: detect, suppress, recover ──
+        // Phase 1: Check exit conditions for existing CP (partial recovery)
+        val cpRecoveryPercent = getGenomicParam(GenomeParam.CRASH_PROTECTION_PARTIAL_RECOVERY_PERCENT,
+            portfolioSummary.firstOrNull()?.Symbol ?: "")
+        for (row in portfolioSummary) {
+            val trough = crashProtectionState[row.Symbol] ?: continue
+            val baseline = baselines[row.Symbol] ?: continue
+            val drop = baseline - trough
+            if (drop <= 0.0) continue
+            val recoveryNeeded = drop * cpRecoveryPercent
+            if (row.Value >= trough + recoveryNeeded) {
+                // Partial recovery achieved: exit CP, reset baseline
+                val newBaseline = row.Value
+                baselines[row.Symbol] = newBaseline
+                crashProtectionState.remove(row.Symbol)
+                stateChanged = true
+            }
+        }
+
+        // Phase 2: Detect new crash entries (before harvest)
+        val cpTriggerAsset = getGenomicParam(GenomeParam.CP_TRIGGER_ASSET_PERCENT,
+            portfolioSummary.firstOrNull()?.Symbol ?: "")
+        val cpMinNegDev = getGenomicParam(GenomeParam.CP_TRIGGER_MIN_NEGATIVE_DEV_PERCENT,
+            portfolioSummary.firstOrNull()?.Symbol ?: "")
+        if (cpTriggerAsset > 0.0) {
+            for (row in portfolioSummary) {
+                if (row.Symbol in crashProtectionState) continue  // already in CP
+                val baseline = baselines[row.Symbol] ?: continue
+                if (baseline <= 0.0) continue
+                val deviation = (row.Value - baseline) / baseline  // negative during drawdown
+                if (deviation < 0.0 && -deviation >= cpTriggerAsset && -deviation >= cpMinNegDev) {
+                    crashProtectionState[row.Symbol] = row.Value  // record trough
+                    stateChanged = true
+                }
+            }
+        }
+
         // Harvest logic
         for (row in portfolioSummary) {
+            // Crash protection: suppress harvest for symbols in CP
+            if (row.Symbol in crashProtectionState) continue
+
             val baseline = baselines[row.Symbol] ?: row.Value
             val surplus = row.Value - baseline
             val minSurplus = getGenomicParam(GenomeParam.MIN_SURPLUS_FOR_HARVEST, row.Symbol)
