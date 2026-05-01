@@ -15,7 +15,7 @@ class LsmrSchemaManager(private val db: LsmrDatabase) : SchemaManager {
         val parts = s.split('|', limit = 2)
         val colsPart = if (parts.size > 1) parts[1] else parts[0]
         if (colsPart.isEmpty()) return TableSchema(name, emptyList())
-        val cols = colsPart.split(',').mapIndexed { idx, nm -> ColumnSchema(idx, nm) }
+        val cols = colsPart.split(',').mapIndexed { idx, nm -> ColumnSchema(id = idx, name = nm) }
         return TableSchema(name, cols)
     }
 
@@ -28,7 +28,7 @@ class LsmrSchemaManager(private val db: LsmrDatabase) : SchemaManager {
     override suspend fun ensureColumnsSuspend(table: String, cols: List<String>): TableSchema {
         val existing = getTableSuspend(table)
         if (existing == null) {
-            val newCols = cols.mapIndexed { i, n -> ColumnSchema(i, n) }
+            val newCols = cols.mapIndexed { i, n -> ColumnSchema(id = i, name = n) }
             val ts = TableSchema(table, newCols)
             createTableSuspend(ts)
             return ts
@@ -36,7 +36,7 @@ class LsmrSchemaManager(private val db: LsmrDatabase) : SchemaManager {
         val existingNames = existing.columns.map { it.name }.toMutableList()
         var nextId = (existing.columns.maxByOrNull { it.id }?.id ?: -1) + 1
         val added = cols.filter { !existingNames.contains(it) }.map {
-            ColumnSchema(nextId++, it)
+            ColumnSchema(id = nextId++, name = it)
         }
         if (added.isNotEmpty()) {
             val newSchema = TableSchema(table, existing.columns + added)

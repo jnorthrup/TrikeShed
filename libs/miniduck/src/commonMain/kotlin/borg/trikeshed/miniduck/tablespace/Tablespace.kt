@@ -84,7 +84,7 @@ class Tablespace(val name: String) {
         }
         return TableSchema(
             name = collection,
-            columns = seen.mapIndexed { idx, name -> ColumnSchema(idx, name) }
+            columns = seen.mapIndexed { idx, name -> ColumnSchema(id = idx, name = name) }
         )
     }
 }

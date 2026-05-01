@@ -102,7 +102,7 @@ class InMemoryBlockWal {
         when (op) {
             is WalOp.Put -> {
                 // Use the blockId from the WAL entry, not the auto-generated one
-                val collection = store as? InMemoryBlockStore ?: return
+                val collection = store
                 collection.putWithId(op.collection, op.blockId, op.block)
             }
             is WalOp.Remove -> {

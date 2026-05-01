@@ -180,30 +180,26 @@ fun Any?.toTrikeItem(): Item = when (this) {
  */
 class UnifyCodec(
    val format: Format,
-) {
-   var state: ElementState = ElementState.CREATED
-   var scope: CoroutineScope? = null
+   parentJob: kotlinx.coroutines.Job? = null
+) : borg.trikeshed.context.AsyncContextElement(parentJob = parentJob) {
 
-    val lifecycleState: ElementState get() = state
+    companion object Key : kotlin.coroutines.CoroutineContext.Key<UnifyCodec>
+    override val key: kotlin.coroutines.CoroutineContext.Key<*> get() = Key
+
+   var scope: CoroutineScope? = null
 
     // ── Lifecycle (matches Trainer.kt pattern) ─────────────────────────────
 
-    suspend fun open() {
-        check(state == ElementState.CREATED) { "open() in state $state" }
-        state = ElementState.OPEN
+    override suspend fun open() {
+        super.open()
     }
 
-    suspend fun drain() {
-        check(state.isAtLeast(ElementState.OPEN)) { "drain() in state $state" }
-        if (state == ElementState.OPEN) {
-            state = ElementState.DRAINING
-            state = ElementState.CLOSED
-        }
+    override suspend fun drain() {
+        super.drain()
     }
 
-    suspend fun close() {
-        check(state.isAtLeast(ElementState.OPEN)) { "close() in state $state" }
-        state = ElementState.CLOSED
+    override suspend fun close() {
+        super.close()
     }
 
     // ── Core WAM loop: parse → reify → query, unified ─────────────────────

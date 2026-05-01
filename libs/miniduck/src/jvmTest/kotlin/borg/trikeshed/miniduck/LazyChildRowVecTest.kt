@@ -18,16 +18,16 @@ class LazyChildRowVecTest {
 
     // A minimal concrete subclass to exercise the shared helper
    class TestLazyRowVec(
-        val loader: () -> Series<RowVec>?,
+        val loader: () -> Series<MiniRowVec>?,
     ) : LazyChildRowVec() {
-       var cached: Series<RowVec>? = null
+       var cached: Series<MiniRowVec>? = null
 
         override val size: Int get() = 0
         override fun get(index: Int): Any? =
             throw IndexOutOfBoundsException("TestLazyRowVec is a shell")
 
         // Expose loadChild for test — pattern: cached var + loadChild helper
-        override val child: Series<RowVec>?
+        override val child: Series<MiniRowVec>?
             get() = loadChild(cached) { loader()?.also { cached = it } }
     }
 
@@ -40,7 +40,7 @@ class LazyChildRowVecTest {
     @Test
     fun `loadChild returns the same Series on every access (caching)`() {
         var callCount = 0
-        val factory: () -> Series<RowVec>? = {
+        val factory: () -> Series<MiniRowVec>? = {
             callCount++
             1 j { _: Int -> DocRowVec(emptyList(), emptyList()) }
         }
