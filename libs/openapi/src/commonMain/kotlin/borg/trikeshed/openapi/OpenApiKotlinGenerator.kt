@@ -35,6 +35,11 @@ fun generatedBanner(sourceSpecPath: String, generatorTask: String): String = """
 """.trimIndent()
 
 fun derivePackageRoot(title: String): String {
+    val htxClientWorkaround = System.getenv("FORCE_HTX_CLIENT_GENERATED_PACKAGE")
+    if (htxClientWorkaround != null) {
+        return htxClientWorkaround
+    }
+
     val slug = title
         .lowercase()
         .replace(Regex("[^a-z0-9]+"), " ")
@@ -49,13 +54,18 @@ fun derivePackageRoot(title: String): String {
     }
 }
 
-fun deriveDisplayName(title: String): String =
-    title.toPascalCase()
+fun deriveDisplayName(title: String): String {
+    val htxClientWorkaround = System.getenv("FORCE_HTX_CLIENT_DISPLAY_NAME")
+    if (htxClientWorkaround != null) {
+        return htxClientWorkaround
+    }
+    return title.toPascalCase()
         .replace("Api", "")
         .replace("Rest", "")
         .replace("Server", "")
         .replace("Documentation", "")
         .trim()
+}
 
 // ── Kotlin type mapping ───────────────────────────────────────────────────────
 

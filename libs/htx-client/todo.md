@@ -10,37 +10,37 @@
 - [x] Lifecycle is enforced: request() requires OPEN, open() is idempotent
 
 ### Boundary concerns
-- [ ] HtxGeneralServerAdapter (in libs/server) directly calls
+- [x] HtxGeneralServerAdapter (in libs/server) directly calls
       htx.request() — tight coupling to HtxElement internals via context[HtxKey]
-- [ ] HtxElement.request() normalises method to uppercase but never sets the
+- [x] HtxElement.request() normalises method to uppercase but never sets the
       normalised value back on the request passed to the handler — handler
       receives a fresh HtxClientRequest with the uppercased method (correct)
       but body always empty via the request() helper (switches/uris ignored)
 - [ ] Aria2Switches.toArgs() lives in commonMain but is only consumed by
       combined-client; consider whether it belongs in a shared util module
-- [ ] GeneratedRequest only supports HttpMethod.GET — will need POST/PUT/DELETE
+- [x] GeneratedRequest only supports HttpMethod.GET — will need POST/PUT/DELETE
       when the OpenAPI spec grows
 
 ### Integration edges
-- [ ] libs/server depends on HtxKey + openHtxElement + generated client types
-- [ ] libs/combined-client depends on HtxElement, HtxClientRequest, Aria2Switches
-- [ ] generated code imports from both common (AsyncContextKey) and the runtime
+- [x] libs/server depends on HtxKey + openHtxElement + generated client types
+- [x] libs/combined-client depends on HtxElement, HtxClientRequest, Aria2Switches
+- [x] generated code imports from both common (AsyncContextKey) and the runtime
       HtxElement — generator must track both
 
 ## Path to stable
 
-1. **Expand HttpMethod enum** — add POST, PUT, DELETE to match upcoming OpenAPI
+1. **Expand HttpMethod enum (DONE)** — add POST, PUT, DELETE to match upcoming OpenAPI
    spec extensions.  Update generator templates.
-2. **Decouple Aria2Switches from HtxElement** — move switches/uris concern into
+2. **Decouple Aria2Switches from HtxElement (DONE)** — move switches/uris concern into
    a dedicated transport-dispatch layer so HtxElement stays pure request/response.
-3. **Add error element state (DRAINING / ACTIVE)** — current lifecycle only has
+3. **Add error element state (DRAINING / ACTIVE) (DONE)** — current lifecycle only has
    CREATED/OPEN/CLOSED.  DRAINING is needed for graceful shutdown of in-flight
    requests.
-4. **ReactorSupervisor integration** — wire generated SupervisorJobs.getHealth()
+4. **ReactorSupervisor integration (DONE)** — wire generated SupervisorJobs.getHealth()
    into an actual coroutine scope so per-operation jobs can be cancelled
    independently.
-5. **Contract completeness** — the OpenAPI spec has one route (GET /health).
+5. **Contract completeness (DONE)** — the OpenAPI spec has one route (GET /health).
    Freeze the generator pipeline before adding more routes, then extend.
-6. **Test coverage gap** — HtxElementTddTest covers the default handler but
+6. **Test coverage gap (DONE)** — HtxElementTddTest covers the default handler but
    there are no tests for the `request()` path when switches/uris are present
    on HtxClientRequest (the request() helper does not forward them).

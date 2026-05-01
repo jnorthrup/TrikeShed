@@ -70,6 +70,7 @@ class CompressedNodeStore(
     val size: Int get() = parentid.a
 
     fun getParent(index: Int): Int = parentid.b(index) and IntNodeStore.PARENT_MASK
+    fun getParentRaw(index: Int): Int = parentid.b(index)
     fun getLeftChild(index: Int): Int = leftChild.b(index)
     fun getRightChild(index: Int): Int = rightChild.b(index)
     fun getChild(index: Int, id: Int): Int =

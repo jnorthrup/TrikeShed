@@ -25,8 +25,7 @@ class HtxGeneralClientServerCompatibilityTest {
 
             val response = adapter.client().getHealth()
             assertEquals("getHealth", HtxGeneralApiContract.GetHealth.operationId)
-            assertEquals("ok", response.body)
-            assertTrue(response.ok)
+            assertEquals("ok", response)
         } finally {
             closeServerContext(context)
         }

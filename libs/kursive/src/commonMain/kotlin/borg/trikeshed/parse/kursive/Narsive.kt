@@ -8,14 +8,23 @@ import borg.trikeshed.lib.get
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.size
 import borg.trikeshed.lib.toSeries
-import borg.trikeshed.userspace.concurrency.Job
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlin.coroutines.AbstractCoroutineContextElement
 import kotlin.coroutines.CoroutineContext
 
 // ── element kinds ──────────────────────────────────────────────
 
+/**
+ * NarsiveElementKind categorizes parsed grammar nodes.
+ *
+ * It implements `CoroutineContext.Key<NarsiveElement>` to allow `NarsiveElement`
+ * to participate directly in context fanout. While using an enum as a Key is unusual,
+ * it provides strong invariants:
+ * - Singleton Guarantee: Enum instances are intrinsic singletons, safe for identity (`===`) checks in context folding.
+ * - Exhaustive Fanout: Using `NarsiveElementKind.entries` allows systematic fanout across all possible parser types.
+ */
 enum class NarsiveElementKind(
     val parserName: String,
     val isRoot: Boolean = false,
@@ -84,19 +93,16 @@ class NarsiveElement(
 class NarsiveSupervisorJob(
     val root: NarsiveElement,
     val elements: Series<NarsiveElement>,
-) : AbstractCoroutineContextElement(Job), Job {
+) {
    val supervisor = SupervisorJob()
-
-    override fun isActive(): Boolean = supervisor.isActive
-
-    override fun cancel(cause: CancellationException?) {
-        supervisor.cancel(cause)
-    }
+   private val fanoutCache = mutableMapOf<CoroutineContext.Key<*>, Series<NarsiveElement>>()
 
     fun fanout(key: CoroutineContext.Key<*>): Series<NarsiveElement> {
-        val matches = SeriesBuffer<NarsiveElement>()
-        elements.view.forEach { if (it.key === key) matches.add(it) }
-        return matches.snapshot()
+        return fanoutCache.getOrPut(key) {
+            val matches = SeriesBuffer<NarsiveElement>()
+            elements.view.forEach { if (it.key === key) matches.add(it) }
+            matches.snapshot()
+        }
     }
 
     fun fanout(kind: NarsiveElementKind): Series<NarsiveElement> = fanout(kind as CoroutineContext.Key<*>)
@@ -220,11 +226,11 @@ object Narsive {
      *  Uses indirect step to break the mutual-recursion init cycle.
      *  [termStep] reads [_term] at parse time, not at lazy-init time.
      */
-   var _term: KursiveParser<CharSeries>? = null
-   val termStep: KursiveStep get() = { input -> _term!!(input) != null }
-   val termParser: KursiveParser<CharSeries> get() = _term!!
+   private lateinit var _term: KursiveParser<CharSeries>
+   val termStep: KursiveStep get() = { input -> _term(input) != null }
+   val termParser: KursiveParser<CharSeries> get() = _term
 
-    val term: KursiveParser<CharSeries> get() = _term!!
+    val term: KursiveParser<CharSeries> get() = _term
 
     // ── structural productions ──
 

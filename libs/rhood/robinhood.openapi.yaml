@@ -1065,3 +1065,10 @@ paths:
           type: string
           format: uuid
         description: The ID of the order to cancel.
+
+x-trikeshed-context:
+  client:
+    - name: default
+      key: borg.trikeshed.test.DefaultKey
+      element: borg.trikeshed.test.DefaultElement
+      open: borg.trikeshed.test.openDefaultElement

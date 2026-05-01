@@ -39,26 +39,13 @@ abstract class Nars3Atom(
     abstract suspend fun process(input: Channel<Nars3Message>, output: Channel<Nars3Message>)
 }
 
-class LocalAtom(id: String, knowledge: Series<NarsiveElement>, resources: Nars3Budget) : Nars3Atom(id, knowledge, resources) {
+class Nars3RefeedingAtom(id: String, knowledge: Series<NarsiveElement>, resources: Nars3Budget) : Nars3Atom(id, knowledge, resources) {
     override suspend fun process(input: Channel<Nars3Message>, output: Channel<Nars3Message>) {
         for (msg in input) {
-            // Local processing, deduct from budget
+            // Processing, deduct from budget
             val newBudget = Nars3Budget(msg.budget.priority * 0.9f, msg.budget.durability * 0.9f, msg.budget.quality)
             if (newBudget.priority > 0.1f) {
-                output.send(msg.copy(content = "Local($id) -> ${msg.content}", budget = newBudget))
-            }
-        }
-        output.close()
-    }
-}
-
-class ChannelizedAtom(id: String, knowledge: Series<NarsiveElement>, resources: Nars3Budget) : Nars3Atom(id, knowledge, resources) {
-    override suspend fun process(input: Channel<Nars3Message>, output: Channel<Nars3Message>) {
-        for (msg in input) {
-            // Channelized processing, deduct from budget
-            val newBudget = Nars3Budget(msg.budget.priority * 0.9f, msg.budget.durability * 0.9f, msg.budget.quality)
-            if (newBudget.priority > 0.1f) {
-                output.send(msg.copy(content = "Channelized($id) -> ${msg.content}", budget = newBudget))
+                output.send(msg.copy(content = "Atom($id) -> ${msg.content}", budget = newBudget))
             }
         }
         output.close()
@@ -80,12 +67,12 @@ class Nars3Machine(private val scope: CoroutineScope) {
         machineScope.launch {
             if (atoms.isEmpty()) return@launch
 
-            var currentInput = Channel<Nars3Message>()
+            var currentInput = Channel<Nars3Message>(Channel.BUFFERED)
             val initialInput = currentInput
 
             for (i in 0 until atoms.size) {
                 val atom = atoms[i]
-                val currentOutput = Channel<Nars3Message>()
+                val currentOutput = Channel<Nars3Message>(Channel.BUFFERED)
 
                 launch {
                     atom.process(currentInput, currentOutput)
@@ -108,7 +95,6 @@ class Nars3Machine(private val scope: CoroutineScope) {
             // Feed initial input
             launch {
                 initialInput.send(initialKnowledge)
-                initialInput.close()
             }
         }
     }
