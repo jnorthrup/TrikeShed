@@ -237,14 +237,6 @@ class Genome(
                 "REFRESH_INTERVAL_MS" to ordinalOf("REFRESH_INTERVAL_MS"),
             )
 
-        public val ORDINALS: Map<String, Int> = PARAM_NAMES.withIndex().associate { it.value to it.index } +
-            mapOf(
-                "FORCED_HARVEST_TIMEOUT_MS" to FORCED_HARVEST_TIMEOUT_MS,
-                "REBALANCE_COOLDOWN_MS" to REBALANCE_COOLDOWN_MS,
-                "FORCE_REBALANCE_TIMEOUT_MS" to FORCE_REBALANCE_TIMEOUT_MS,
-                "REFRESH_INTERVAL_MS" to REFRESH_INTERVAL_MS,
-            )
-
         public const val MIN_45_MS = 45.0 * 60.0 * 1000.0
         public const val MIN_30_MS = 30.0 * 60.0 * 1000.0
         public const val MIN_25_MS = 25.0 * 60.0 * 1000.0
