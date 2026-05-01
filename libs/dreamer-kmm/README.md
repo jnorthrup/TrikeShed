@@ -29,7 +29,9 @@ implementation in this module).
 src/commonMain/kotlin/borg/trikeshed/dreamer/
   BacktestModels.kt        — PortfolioInput, CycleResult, BacktestMetrics,
                               BacktestResult, simulateTicks(), simulateMultiSymbolTicks(),
-                              computeBacktestMetrics(), RowVec accessor extensions
+                              computeBacktestMetrics(), closesFromCursor(),
+                              allSymbolsAtBar(), klineBarToPortfolioInput(),
+                              multiSymbolKlineToPortfolioInput(), toBacktestReport()
   KlineModels.kt           — Kline, ExtendedKline, KlineBlock (MUTABLE→SEALED),
                               TimeSpan enum, asCursor()/asColumnarCursor()
   DataModels.kt            — Mode, GenomeParam (45 params), Genome (DoubleArray +
@@ -73,8 +75,10 @@ src/commonTest/kotlin/borg/trikeshed/dreamer/
   ControlHarnessTest.kt       — Frame projection, horizon indexing, pancake
   BacktestIntegrationTest.kt  — Full backtest with metrics computation
   RunCycleTest.kt             — Single tick cycle tests
-  RealtimeHarnessTest.kt      — Multi-symbol harness replay
+  RunCycleRedTest.kt          — 25-test regression suite for full backtest pipeline
+  RealtimeHarnessTest.kt      — Multi-symbol harness replay + GenomeTrainer/StochasticBagSpanTrainer
   BinanceVisionKlineFeedTest.kt — Feed planning and CSV parsing
+  RebalanceExecutionTest.kt   — Engine rebalance execution
 ```
 
 ## Key/Element Pattern Status

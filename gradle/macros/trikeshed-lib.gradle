@@ -228,7 +228,7 @@ switch (project.path) {
     case ":libs:cpu-cache":
         kmpFull(rootMode: "none", coroutinesMain: false)
         def cpuKotlin = extensions.getByName("kotlin")
-        if (System.getProperty("os.name") == "Mac OS X" && cpuKotlin.targets.findByName("macosX64") == null) {
+        if (System.getProperty("os.name") == "Mac OS X" && cpuKotlin.targets.findByName("macos") == null) {
             cpuKotlin.macosX64("macos") {
                 binaries.executable("interrogateCpuNative") {
                     entryPoint = "borg.trikeshed.cpucache.main"
