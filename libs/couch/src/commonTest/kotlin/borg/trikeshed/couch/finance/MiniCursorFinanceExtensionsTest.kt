@@ -1,7 +1,7 @@
 package borg.trikeshed.couch.finance
 
 import borg.trikeshed.miniduck.DocRowVec
-import borg.trikeshed.miniduck.at
+
 import borg.trikeshed.lib.size
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -22,7 +22,7 @@ class MiniCursorFinanceExtensionsTest {
         val cursor = prices.toPriceCursor("price")
 
         assertEquals(3, cursor.size)
-        val row = cursor.at(0) as? DocRowVec
+        val row = cursor.b(0) as? DocRowVec
         assertEquals(listOf("price"), row?.keys)
     }
 
@@ -64,7 +64,7 @@ class MiniCursorFinanceExtensionsTest {
     fun testDoubleSeriesHandlesStringValues() {
         val cursor = doubleArrayOf(1.0, 2.0, 3.0).toPriceCursor()
         // Manually create a cursor with a string value in one column
-        val row = cursor.at(0) as? DocRowVec
+        val row = cursor.b(0) as? DocRowVec
         assertTrue(row != null)
     }
 }

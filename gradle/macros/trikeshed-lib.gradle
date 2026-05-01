@@ -274,6 +274,7 @@ switch (project.path) {
         def couchSets = couchKotlin.sourceSets
         couchSets.getByName("commonMain").dependencies {
             api libPeer("miniduck")
+            implementation libPeer("tiny-btrfs")
             implementation libPeer("kursive")
         }
         couchSets.getByName("jvmMain").dependencies {
