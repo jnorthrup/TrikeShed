@@ -42,21 +42,18 @@
    - **Fix**: Either complete the lifecycle (what does "closing" a PaperAccount mean?)
      or downgrade to plain data classes if lifecycle management is not needed here.
 
-4. **BacktestModels: dual location for RowVec extensions**
+4. **BacktestModels: dual location for RowVec extensions** ⚠️ ACKNOWLEDGED
    - stringValue/longValue/doubleValue/intValue defined in BacktestModels.kt
      (extension on RowVec from cursor package). This is a cross-package
      extension that should live in cursor or a shared utilities module.
-   - **Fix**: Move these to a shared RowVec accessor module or into cursor itself.
+   - **Fix**: Move to a shared RowVec accessor module or into cursor itself.
+     No current breakage — low priority.
 
-5. **TrikeAdapterLocal: duplicate files**
-   - `TrikeAdapterLocal.kt` exists at both `dreamer/` and `dreamer/adapter/`
-     with overlapping but not identical helpers.
-   - **Fix**: Consolidate into `adapter/` package. Remove the root-level copy.
+5. **TrikeAdapterLocal: duplicate location** ✅ RESOLVED
+   - Root-level `TrikeAdapterLocal.kt` deleted. Only `adapter/TrikeAdapterLocal.kt` remains.
 
-6. **CursorBacktestAdapters: dead shim**
-   - `miniCursorToColumnar` is an identity function. `simulateTicksMiniCursor`
-     just delegates. This exists only for backward compatibility.
-   - **Fix**: Migrate callers to `simulateTicks` directly, then delete this file.
+6. **CursorBacktestAdapters: dead shim** ✅ RESOLVED
+   - `CursorBacktestAdapters.kt` deleted. No dead shim remains.
 
 7. **StochasticTraining: generated archive CSV couples test and production**
    - `generatedArchiveCsv()` uses deterministic random with hardcoded base prices.
@@ -64,11 +61,8 @@
    - **Fix**: Separate synthetic data generation from the trainer. Allow real
      archive CSV to be injected.
 
-8. **GenomeTraining.maxDrawdown duplicated across files**
-   - Identical `HarnessRunResult.maxDrawdown()` defined in both
-     StochasticTraining.kt and GenomeTraining.kt.
-   - Identical `fitness()` defined in both files with different formulas.
-   - **Fix**: Extract to a shared metrics module.
+8. **GenomeTraining.maxDrawdown duplicated across files** ✅ RESOLVED
+   - Deduplicated into `BacktestMetricsUtils.kt` as canonical home.
 
 ## Integration Steps
 
