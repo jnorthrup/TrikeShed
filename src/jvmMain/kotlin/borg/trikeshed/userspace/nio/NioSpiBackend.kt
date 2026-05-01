@@ -1,22 +1,21 @@
 package borg.trikeshed.userspace.nio
 
-import borg.trikeshed.context.NioUserspaceElement
-import borg.trikeshed.context.UserspaceNioSpi
-import borg.trikeshed.userspace.nio.Interest
+import borg.trikeshed.context.NioUserspaceElement as CtxNioUserspaceElement
+import borg.trikeshed.context.UserspaceNioSpi as CtxUserspaceNioSpi
 import kotlinx.coroutines.runBlocking
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.AtomicLong
 
 class NioSpiBackend(
-   val provider: UserspaceNioSpi = UserspaceNioProvider()
+   val provider: CtxUserspaceNioSpi = UserspaceNioProvider()
 ) : PlatformBackend {
-   val elements = ConcurrentHashMap<Int, NioUserspaceElement>()
+   val elements = ConcurrentHashMap<Int, CtxNioUserspaceElement>()
    val registrations = ConcurrentHashMap<Int, Pair<Long, Interest>>()
    val completions = ConcurrentLinkedQueue<Completion>()
    val submittedCount = AtomicLong(0)
 
-   fun elementFor(fd: Int): NioUserspaceElement =
+   fun elementFor(fd: Int): CtxNioUserspaceElement =
         elements.computeIfAbsent(fd) { openedFd ->
             runBlocking { provider.open(openedFd) }
         }
