@@ -14,7 +14,6 @@ import kotlin.coroutines.CoroutineContext
  * Keys are compared by identity (===) not equality (==).
  *
  * Type safety: ctx[NioUserspaceKey] returns NioUserspaceElement? without unsafe cast.
- *              ctx[LiburingKey] returns LiburingElement? without unsafe cast.
  *              ctx[FanoutDispatcherKey] returns FanoutDispatcherElement? without unsafe cast.
  */
 sealed class AsyncContextKey {
@@ -25,13 +24,6 @@ sealed class AsyncContextKey {
      * Type-parameterized as Key<NioUserspaceElement> for safe context lookup.
      */
     object NioUserspaceKey : AsyncContextKey(), CoroutineContext.Key<NioUserspaceElement>
-
-    /**
-     * Key for liburing facade context elements.
-     * Singleton object: always compare by identity (===).
-     * Type-parameterized as Key<LiburingElement> for safe context lookup.
-     */
-    object LiburingKey : AsyncContextKey(), CoroutineContext.Key<LiburingElement>
 
     /**
      * Key for channelized fanout dispatcher context elements.

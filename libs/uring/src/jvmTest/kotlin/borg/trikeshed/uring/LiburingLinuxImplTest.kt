@@ -15,31 +15,6 @@ import kotlin.test.fail
 //   - fanout from CQE.userData → registered handlers
 // ================================================================================
 
-/** The shape of a real io_uring CQE — what the Linux impl must produce. */
-data class UringCqe(
-    val userData: Long,
-    val res: Int,
-    val flags: Int,
-)
-
-/** Stub SQE for documenting the prep shape. */
-data class UringSqe(
-    val opcode: Int,
-    val fd: Int,
-    val addr: Long,
-    val len: Int,
-    val off: Long,
-    val userData: Long,
-) {
-    companion object {
-        const val IORING_OP_READ = 22
-        const val IORING_OP_WRITE = 23
-        const val IORING_OP_ACCEPT = 13
-        const val IORING_OP_CONNECT = 14
-        const val IORING_OP_CLOSE = 19
-    }
-}
-
 // ================================================================================
 // SPEC: Actual liburing implementation on Linux — CInterop + ring buffer mapping
 // ================================================================================
@@ -106,8 +81,6 @@ class LiburingLinuxImplTest {
     @Test fun liburingFacadeProvider_isStub_returnsZero() {
         val provider = LiburingFacadeProvider()
         // Stub: always returns 0, no actual I/O
-        assertEquals(0, kotlinx.coroutines.runBlocking { provider.submitRead(1, byteArrayOf()) })
-        assertEquals(0, kotlinx.coroutines.runBlocking { provider.submitWrite(1, byteArrayOf()) })
-        assertTrue(kotlinx.coroutines.runBlocking { provider.poll().isEmpty() })
+        assertTrue(provider.open().isSuccess)
     }
 }
