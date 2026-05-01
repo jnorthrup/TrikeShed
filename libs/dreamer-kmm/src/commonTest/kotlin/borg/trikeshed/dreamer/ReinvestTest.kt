@@ -171,19 +171,35 @@ class ReinvestTest {
     }
 
     @Test
-    fun `simulateTicks reinvest affects backtest metrics`() = runTest {
-        // Two symbols: ETH harvests, BTC dips — reinvest targets BTC
+    fun `simulateMultiSymbolTicks reinvest affects backtest metrics`() = runTest {
+        // Two symbols: ETH rises (harvest source), BTC dips (reinvest target).
+        // Each openTime has exactly one ETH row and one BTC row.
+        // Tick 0 (1000L): baselines set for both
+        // Tick 1 (2000L): ETH=120 (+20% → harvest), BTC=90 (-10% → dip target)
+        // Tick 2 (3000L): ETH=130 (+33% from original → harvest), BTC=80 (-20% → dip)
+        // Tick 3 (4000L): ETH=110 (dip), BTC=90 (recovery from trough but still below baseline)
+        // Tick 4 (5000L): ETH=125 (recovery), BTC=100 (back to baseline)
         val klines = listOf(
+            // Tick 0: baselines
             Kline("ETHUSDT", TimeSpan.Hours1, 1000L, 100.0, 101.0, 99.0, 100.0, 50.0),
-            Kline("ETHUSDT", TimeSpan.Hours1, 2000L, 100.0, 120.0, 99.0, 120.0, 50.0),  // +20%
-            Kline("ETHUSDT", TimeSpan.Hours1, 3000L, 120.0, 130.0, 119.0, 130.0, 50.0),  // +30%
-            Kline("ETHUSDT", TimeSpan.Hours1, 4000L, 130.0, 110.0, 108.0, 110.0, 50.0),  // dip
-            Kline("ETHUSDT", TimeSpan.Hours1, 5000L, 110.0, 125.0, 109.0, 125.0, 50.0),  // recovery
+            Kline("BTCUSDT", TimeSpan.Hours1, 1000L, 100.0, 101.0, 99.0, 100.0, 50.0),
+            // Tick 1: ETH harvest, BTC dip
+            Kline("ETHUSDT", TimeSpan.Hours1, 2000L, 100.0, 120.0, 99.0, 120.0, 50.0),
+            Kline("BTCUSDT", TimeSpan.Hours1, 2000L, 100.0, 95.0,  88.0,  90.0, 50.0),
+            // Tick 2: ETH harvest again, BTC deeper dip
+            Kline("ETHUSDT", TimeSpan.Hours1, 3000L, 120.0, 135.0, 119.0, 130.0, 50.0),
+            Kline("BTCUSDT", TimeSpan.Hours1, 3000L,  90.0, 88.0,  78.0,  80.0, 50.0),
+            // Tick 3: ETH dips, BTC recovers somewhat
+            Kline("ETHUSDT", TimeSpan.Hours1, 4000L, 130.0, 115.0, 108.0, 110.0, 50.0),
+            Kline("BTCUSDT", TimeSpan.Hours1, 4000L,  80.0, 95.0,  79.0,  90.0, 50.0),
+            // Tick 4: ETH recovers, BTC back to baseline
+            Kline("ETHUSDT", TimeSpan.Hours1, 5000L, 110.0, 130.0, 109.0, 125.0, 50.0),
+            Kline("BTCUSDT", TimeSpan.Hours1, 5000L,  90.0, 105.0, 89.0, 100.0, 50.0),
         )
 
         val cursor = klinesToCursor(klines)
 
-        // With reinvest
+        // With reinvest: 80% of harvest proceeds go into dip symbols
         val genomeReinvest = defaultGenome()
         genomeReinvest[GenomeParam.MIN_SURPLUS_FOR_HARVEST] = 0.001
         genomeReinvest[GenomeParam.HARVEST_TAKE_PERCENT] = 0.50
@@ -192,23 +208,24 @@ class ReinvestTest {
         genomeReinvest[GenomeParam.MIN_REINVEST_BUY_USD] = 1.0
 
         val engine1 = TradingEngine(genomeReinvest, Mode.SHADOW, initialCapital = 10_000.0)
-        val result1 = simulateTicks(cursor, engine1, initialCapital = 10_000.0)
+        simulateMultiSymbolTicks(cursor, engine1, initialCapital = 10_000.0)
 
-        // Without reinvest
-        val cursor2 = klinesToCursor(klines)
+        // Without reinvest: all harvest proceeds stay as cash
         val genomeNoReinvest = defaultGenome()
         genomeNoReinvest[GenomeParam.MIN_SURPLUS_FOR_HARVEST] = 0.001
         genomeNoReinvest[GenomeParam.HARVEST_TAKE_PERCENT] = 0.50
         genomeNoReinvest[GenomeParam.HARVEST_ALLOC_REINVEST_PERCENT] = 0.0  // disabled
 
         val engine2 = TradingEngine(genomeNoReinvest, Mode.SHADOW, initialCapital = 10_000.0)
-        val result2 = simulateTicks(cursor2, engine2, initialCapital = 10_000.0)
+        simulateMultiSymbolTicks(cursor, engine2, initialCapital = 10_000.0)
 
-        // With reinvest enabled, the engine should have non-zero reinvest in its results
-        // and the cash balance should differ (reinvest spends cash to buy the dip)
+        // With reinvest, engine1 deploys harvested cash into BTC dips.
+        // Engine2 keeps all cash uninvested.
         val cashDiff = engine1.cashBalance != engine2.cashBalance
         val holdingsDiff = engine1.holdings != engine2.holdings
         assertTrue(cashDiff || holdingsDiff,
             "Reinvest should change engine state: cash1=${engine1.cashBalance} vs cash2=${engine2.cashBalance}, holdings differ=$holdingsDiff")
+        assertTrue(engine1.holdings.containsKey("BTCUSDT"),
+            "Engine with reinvest should hold BTCUSDT: holdings=${engine1.holdings}")
     }
 }
