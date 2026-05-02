@@ -2,6 +2,7 @@ package borg.trikeshed.miniduck
 
 import borg.trikeshed.cursor.RowVec
 import borg.trikeshed.cursor.cellsToRowVec
+import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.j
 
 // ── Typealiases ──────────────────────────────────────────────────────────────
@@ -36,7 +37,23 @@ typealias BlobRowVec = RowVec
 // ── Factory functions ────────────────────────────────────────────────────────
 
 /**
- * Create a DocRowVec from keys and cells lists.
+ * Create a DocRowVec from keys and cells Series.
+ */
+fun DocRowVec(keys: Series<String>, cells: Series<Any?>): RowVec {
+    require(keys.size == cells.size) { "Keys and cells must have same size" }
+    return cellsToRowVec(cells = cells, keys = keys)
+}
+
+/**
+ * Create a DocRowVec from column name-value pairs.
+ */
+fun DocRowVec(vararg columns: Pair<String, Any?>): RowVec = cellsToRowVec(
+    cells = columns.size j { columns[it].second },
+    keys = columns.size j { columns[it].first },
+)
+
+/**
+ * List convenience — wraps into Series internally.
  */
 fun DocRowVec(keys: List<String>, cells: List<Any?>): RowVec {
     require(keys.size == cells.size) { "Keys and cells must have same size" }
@@ -54,50 +71,35 @@ fun ViewRowVec(
     key: Any? = null,
     value: Any? = null,
     docLoader: (() -> RowVec)? = null,
-): RowVec {
-    val keys = listOf("id", "key", "value")
-    val cells = listOf(id, key, value)
-    return cellsToRowVec(
-        cells = cells.size j { cells[it] },
-        keys = keys.size j { keys[it] },
-    )
-}
+): RowVec = cellsToRowVec(
+    cells = 3 j { arrayOf(id, key, value)[it] },
+    keys = 3 j { arrayOf("id", "key", "value")[it] },
+)
 
 /**
  * Create a BlobRowVec from a ByteArray.
  */
-fun BlobRowVec(bytes: ByteArray, mimeType: String = "application/octet-stream"): RowVec {
-    val keys = listOf("bytes", "mimeType")
-    val cells = listOf(bytes, mimeType)
-    return cellsToRowVec(
-        cells = cells.size j { cells[it] },
-        keys = keys.size j { keys[it] },
+fun BlobRowVec(bytes: ByteArray, mimeType: String = "application/octet-stream"): RowVec =
+    cellsToRowVec(
+        cells = 2 j { arrayOf(bytes, mimeType)[it] },
+        keys = 2 j { arrayOf("bytes", "mimeType")[it] },
     )
-}
 
 /**
  * Create a JsonRowVec from node type and raw value.
  */
-fun JsonRowVec(nodeType: String, rawValue: String): RowVec {
-    val keys = listOf("nodeType", "rawValue")
-    val cells = listOf(nodeType, rawValue)
-    return cellsToRowVec(
-        cells = cells.size j { cells[it] },
-        keys = keys.size j { keys[it] },
-    )
-}
+fun JsonRowVec(nodeType: String, rawValue: String): RowVec = cellsToRowVec(
+    cells = 2 j { arrayOf(nodeType, rawValue)[it] },
+    keys = 2 j { arrayOf("nodeType", "rawValue")[it] },
+)
 
 /**
  * Create a YamlRowVec from tag and value.
  */
-fun YamlRowVec(tag: String, value: String?): RowVec {
-    val keys = listOf("tag", "value")
-    val cells = listOf(tag, value)
-    return cellsToRowVec(
-        cells = cells.size j { cells[it] },
-        keys = keys.size j { keys[it] },
-    )
-}
+fun YamlRowVec(tag: String, value: String?): RowVec = cellsToRowVec(
+    cells = 2 j { arrayOf(tag, value)[it] },
+    keys = 2 j { arrayOf("tag", "value")[it] },
+)
 
 // ── Extension functions ──────────────────────────────────────────────────────
 
@@ -129,7 +131,6 @@ class BlockBuilder {
     fun seal(): RowVec {
         check(!sealed) { "Already sealed" }
         sealed = true
-        // Return a minimal RowVec representing the sealed block (zero-width, row-count rows)
         return cellsToRowVec(
             cells = rows.size j { null },
             keys = rows.size j { "_block" },
@@ -144,9 +145,6 @@ fun mutable(): BlockBuilder = BlockBuilder()
 
 // ── Query Plan types ─────────────────────────────────────────────────────────
 
-/**
- * The kind of relation being referenced.
- */
 enum class RelationKind {
     DOCS,
     VIEW,
@@ -154,25 +152,16 @@ enum class RelationKind {
     LOCAL,
 }
 
-/**
- * A reference to a database relation (table, view, etc.).
- */
 data class RelationRef(
     val database: String,
     val name: String,
     val kind: RelationKind,
 )
 
-/**
- * Base interface for all query plans.
- */
 interface QueryPlan {
     val source: RelationRef
 }
 
-/**
- * A query plan for CouchDB view queries.
- */
 data class ViewQueryPlan(
     override val source: RelationRef,
     val designDocument: String = "",
@@ -180,11 +169,5 @@ data class ViewQueryPlan(
     val parameters: Map<String, String> = emptyMap(),
 ) : QueryPlan
 
-/**
- * Add or replace a query parameter, returning a new ViewQueryPlan.
- */
 fun ViewQueryPlan.withParameter(key: String, value: Any?): ViewQueryPlan =
     copy(parameters = parameters + (key to value.toString()))
-
-/** Stub exception for compile */
-class NotImplementedError(msg: String) : Error(msg)

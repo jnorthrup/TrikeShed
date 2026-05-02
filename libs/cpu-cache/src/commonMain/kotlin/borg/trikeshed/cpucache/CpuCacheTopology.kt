@@ -28,18 +28,3 @@ data class CpuCacheTopology(
  * Each platform source set provides an [actual] implementation.
  */
 expect fun interrogateCpuCache(): CpuCacheTopology
-
-/**
- * Format a [CpuCacheTopology] as Confix JSON —
- * a parseable medium consumable by TrikeShed's Confix parser.
- */
-fun CpuCacheTopology.toConfix(): String = buildString {
-    appendLine("{")
-    appendLine("  \"l1DataBytes\": ${l1DataBytes ?: "null"},")
-    appendLine("  \"l1InstructionBytes\": ${l1InstructionBytes ?: "null"},")
-    appendLine("  \"l2Bytes\": ${l2Bytes ?: "null"},")
-    appendLine("  \"l3Bytes\": ${l3Bytes ?: "null"},")
-    appendLine("  \"cacheLineBytes\": ${cacheLineBytes ?: "null"},")
-    appendLine("  \"coreCount\": ${coreCount ?: "null"}")
-    append("}")
-}

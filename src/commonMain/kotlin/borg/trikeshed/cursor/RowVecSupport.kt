@@ -56,12 +56,10 @@ fun cellsToRowVec(cells: Series<Any?>, keys: Series<String>): RowVec {
 }
 
 /** Column names extracted from the RowVec metadata. */
-val RowVec.keys: List<String>
-    get() = (0 until size).map { index -> b(index).b().name }
+val RowVec.keys: Series<String> get() = right α `ColumnMeta↻`::invoke α ColumnMeta::a
 
 /** Cell values as a flat List. Semantically identical to [values] but returns List<Any?>. */
-val RowVec.cells: List<Any?>
-    get() = values.toList()
+val RowVec.cells get() = values
 
 /** Child / nested row — deferred per architecture spec. Always null for now. */
 val RowVec.child: RowVec?

@@ -1,12 +1,22 @@
 package borg.trikeshed.cpucache
 
 /**
- * Entry point — interrogates CPU cache and prints Confix JSON to stdout.
- *
+ * CPU cache interrogation CLI.
+ * 
+ * Outputs topology in multiple formats via Confix integration:
+ * - Default: compact JSON (parseable by Confix JsonScan)
+ * - Pass --yaml flag for YAML output (parseable by Confix YamlScan)
+ * 
  * Platform-specific [interrogateCpuCache] is resolved at link time.
- * Output is parseable by TrikeShed's Confix parser (JSON-compatible).
  */
-fun main() {
+fun main(args: Array<String>) {
     val topology = interrogateCpuCache()
-    println(topology.toConfix())
+    
+    val format = if (args.isNotEmpty() && args[0] == "--yaml") "yaml" else "json"
+    val output = when (format) {
+        "yaml" -> CpuCacheConfix.toYaml(topology)
+        else -> CpuCacheConfix.toJson(topology)
+    }
+    
+    println(output)
 }
