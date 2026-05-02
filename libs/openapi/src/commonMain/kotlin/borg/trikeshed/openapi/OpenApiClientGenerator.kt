@@ -58,6 +58,7 @@ fun renderClientKeys(cfg: ClientGenConfig): String {
     val keyImports = buildString {
         appendLine("import borg.trikeshed.context.AsyncContextKey")
         bindings.forEach { b ->
+            appendLine("import ${b.elementImport}")
             appendLine("import ${b.keyFqn}")
         }
     }.trimEnd()

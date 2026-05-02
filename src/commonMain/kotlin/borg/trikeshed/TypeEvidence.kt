@@ -165,7 +165,7 @@ TypeEvidence(
  * Non-conditional character class determination — single-bit (XOR) encoding.
  * Each enum value maps to exactly one bit position for fast category testing.
  */
-enum class CharCategory : BitMasked {
+enum class CharCategory : BitMasked<UInt> {
     DIGIT,      // bit 0
     PERIOD,     // bit 1
     EXPONENT,   // bit 2
@@ -177,6 +177,8 @@ enum class CharCategory : BitMasked {
     BACKSLASH,  // bit 8
     WHITESPACE, // bit 9
     SPECIAL;    // bit 10
+
+    override val mask: UInt get() = 1u shl ordinal
 }
 
 /** Pre-computed lookup table: each ASCII char maps to exactly one single-bit category. */

@@ -1,3 +1,5 @@
+@file:Suppress("UNCHECKED_CAST")
+
 package borg.trikeshed.polyglot
 
 import borg.trikeshed.collections.s_
@@ -111,20 +113,21 @@ data class SourceFragment(
             meta.generic,
             meta.extern
         ]
-        val metas: Series<`ColumnMeta↻`> = s_[
-            "lang" j IOMemento.IoString,
-            "spanStart" j IOMemento.IoInt,
-            "spanEnd" j IOMemento.IoInt,
-            "kind" j IOMemento.IoString,
-            "name" j IOMemento.IoString,
-            "deducedType" j IOMemento.IoString,
-            "meta_visibility" j IOMemento.IoString,
-            "meta_mutability" j IOMemento.IoString,
-            "meta_lifetime" j IOMemento.IoString,
-            "meta_async" j IOMemento.IoBoolean,
-            "meta_generic" j IOMemento.IoBoolean,
-            "meta_extern" j IOMemento.IoBoolean,
-        ] α { it.leftIdentity }
+        val metas: Series<`ColumnMeta↻`> =
+            (s_[/*column metas*/
+                "lang" j IOMemento.IoString,
+                "spanStart" j IOMemento.IoInt,
+                "spanEnd" j IOMemento.IoInt,
+                "kind" j IOMemento.IoString,
+                "name" j IOMemento.IoString,
+                "deducedType" j IOMemento.IoString,
+                "meta_visibility" j IOMemento.IoString,
+                "meta_mutability" j IOMemento.IoString,
+                "meta_lifetime" j IOMemento.IoString,
+                "meta_async" j IOMemento.IoBoolean,
+                "meta_generic" j IOMemento.IoBoolean,
+                "meta_extern" j IOMemento.IoBoolean,
+            ] as Series<ColumnMeta>) α { it.leftIdentity }
         return values joins metas
     }
 

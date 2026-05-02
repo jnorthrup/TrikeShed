@@ -9,7 +9,7 @@ package borg.trikeshed.couch.finance
 
 import borg.trikeshed.cursor.Cursor
 import borg.trikeshed.miniduck.DocRowVec
-import borg.trikeshed.miniduck.getValue
+import borg.trikeshed.cursor.getValue
 import borg.trikeshed.miniduck.toRowVec
 import borg.trikeshed.cursor.at
 import borg.trikeshed.lib.Series

@@ -1,18 +1,20 @@
 package borg.trikeshed.userspace.reactor
 
-import borg.trikeshed.userspace.BitMasked
+import borg.trikeshed.context.BitMasked
 
 /**
  * I/O interest bitmask — ported from literbike reactor/operation.rs.
  *
  * Each state uses its ordinal for bitshifted comparison and alignment with semantic methods.
  */
-enum class Interest : BitMasked {
+enum class Interest : BitMasked<UInt> {
     READ,
     WRITE,
     ACCEPT,
     CONNECT,
     ERROR;
+
+    override val mask: UInt get() = 1u shl ordinal
 
     companion object {
         fun fromOperation(op: IOOperation): Interest = when (op) {

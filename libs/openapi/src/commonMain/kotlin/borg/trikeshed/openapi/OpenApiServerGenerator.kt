@@ -123,7 +123,7 @@ fun renderServerKeys(cfg: ServerGenConfig): String {
         appendLine(banner)
         appendLine()
         appendLine("import borg.trikeshed.context.AsyncContextKey")
-        bindings.forEach { b -> appendLine("import ${b.keyFqn}") }
+        bindings.forEach { b -> appendLine("import ${b.elementImport}"); appendLine("import ${b.keyFqn}") }
         appendLine()
         appendLine("object ${cfg.keysClassName} {")
         bindings.forEachIndexed { i, b ->

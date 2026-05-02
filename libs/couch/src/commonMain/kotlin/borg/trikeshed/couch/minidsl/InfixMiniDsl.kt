@@ -4,6 +4,7 @@ import borg.trikeshed.miniduck.QueryPlan
 import borg.trikeshed.miniduck.RelationKind
 import borg.trikeshed.miniduck.RelationRef
 import borg.trikeshed.miniduck.ViewQueryPlan
+import borg.trikeshed.miniduck.withParameter
 
 /**
  * Infix-only MiniDuck surface.

@@ -54,3 +54,15 @@ fun cellsToRowVec(cells: Series<Any?>, keys: Series<String>): RowVec {
     }
     return ReifiedSplitSeries2(values, meta)
 }
+
+/** Column names extracted from the RowVec metadata. */
+val RowVec.keys: List<String>
+    get() = (0 until size).map { index -> b(index).b().name }
+
+/** Cell values as a flat List. Semantically identical to [values] but returns List<Any?>. */
+val RowVec.cells: List<Any?>
+    get() = values.toList()
+
+/** Child / nested row — deferred per architecture spec. Always null for now. */
+val RowVec.child: RowVec?
+    get() = null

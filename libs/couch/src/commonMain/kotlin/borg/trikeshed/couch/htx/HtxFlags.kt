@@ -5,7 +5,7 @@ import borg.trikeshed.context.BitMasked
 /**
  * HTX start-line flags.
  */
-enum class HtxSlFlags : BitMasked {
+enum class HtxSlFlags : BitMasked<UInt> {
     IS_RESP,
     XFER_LEN,
     XFER_ENC,
@@ -22,6 +22,8 @@ enum class HtxSlFlags : BitMasked {
     BODYLESS_RESP,
     NOT_HTTP;
 
+    override val mask: UInt get() = 1u shl ordinal
+
     companion object {
         fun fromMask(mask: UInt): Set<HtxSlFlags> =
             entries.filter { (mask and it.mask) != 0u }.toSet()
@@ -34,7 +36,7 @@ enum class HtxSlFlags : BitMasked {
 /**
  * HTX message flags.
  */
-enum class HtxFlags : BitMasked {
+enum class HtxFlags : BitMasked<UInt> {
     NONE,
     PARSING_ERROR,
     PROCESSING_ERROR,

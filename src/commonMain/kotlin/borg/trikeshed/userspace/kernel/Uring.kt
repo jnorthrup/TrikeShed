@@ -1,13 +1,13 @@
 package borg.trikeshed.userspace.kernel
 
-import borg.trikeshed.userspace.BitMasked
+import borg.trikeshed.context.BitMasked
 
 /**
  * Kernel io_uring interface ported from literbike.
  * High-performance, zero-overhead interface to io_uring.
  */
 
-enum class UringSetupFlags : BitMasked {
+enum class UringSetupFlags : BitMasked<UInt> {
     IOPOLL,
     SQPOLL,
     SQ_AFF,
@@ -22,6 +22,8 @@ enum class UringSetupFlags : BitMasked {
     RESV8,
     SINGLE_ISSUER,
     DEFER_TASKRUN;
+
+    override val mask: UInt get() = 1u shl ordinal
 
     companion object {
         fun toMask(flags: Iterable<UringSetupFlags>): UInt =

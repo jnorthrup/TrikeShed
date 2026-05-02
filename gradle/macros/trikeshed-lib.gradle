@@ -99,7 +99,10 @@ def standardSourceSets = { kotlinExt, String rootMode, boolean coroutinesMain, b
         }
     }
     ss.getByName("commonTest").dependencies {
-        implementation rootPeer()
+        // Only depend on root project if rootMode is not "none"
+        if (rootMode != "none") {
+            implementation rootPeer()
+        }
         implementation "org.jetbrains.kotlin:kotlin-test:${kotlinVersion}"
         implementation "org.jetbrains.kotlinx:kotlinx-coroutines-test:${prop("versions.kotlinx-coroutines-test")}"
     }

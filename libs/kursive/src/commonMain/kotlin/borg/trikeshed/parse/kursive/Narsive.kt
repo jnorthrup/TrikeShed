@@ -145,6 +145,8 @@ enum class NarsiveOperator(
     INDEPENDENT_VARIABLE("$"),
     ;
 
+    override val mask: Long get() = 1L shl ordinal
+
    val forms: Array<String> = (listOfNotNull(asciiForm, unicodeForm) + aliases.asList()).toTypedArray()
    val orderedForms: Array<String> = forms.sortedByDescending(String::length).toTypedArray()
 
