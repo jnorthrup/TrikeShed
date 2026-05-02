@@ -3,6 +3,7 @@ package borg.trikeshed.context
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.j
 import kotlin.enums.EnumEntries
+import kotlin.jvm.JvmName
 
 /**
  * Interface for enums that represent bitmasks over primitive type P.
@@ -104,11 +105,17 @@ infix fun Int.div(bm: BitMasked<UInt>): UInt = (this / bm.mask.toInt()).toUInt()
 infix fun Int.rem(bm: BitMasked<UInt>): UInt = (this % bm.mask.toInt()).toUInt()
 
 // BitMasked<UInt> comparisons >> BitMasked<UInt>
+@JvmName("eqEnumUInt")
 inline infix fun <reified E> BitMasked<UInt>.eq(other: E): Boolean where E : Enum<E>, E : BitMasked<UInt> = this.mask == other.mask
+@JvmName("neEnumUInt")
 inline infix fun <reified E> BitMasked<UInt>.ne(other: E): Boolean where E : Enum<E>, E : BitMasked<UInt> = this.mask != other.mask
+@JvmName("ltEnumUInt")
 inline infix fun <reified E> BitMasked<UInt>.lt(other: E): Boolean where E : Enum<E>, E : BitMasked<UInt> = this.mask < other.mask
+@JvmName("gtEnumUInt")
 inline infix fun <reified E> BitMasked<UInt>.gt(other: E): Boolean where E : Enum<E>, E : BitMasked<UInt> = this.mask > other.mask
+@JvmName("leEnumUInt")
 inline infix fun <reified E> BitMasked<UInt>.le(other: E): Boolean where E : Enum<E>, E : BitMasked<UInt> = this.mask <= other.mask
+@JvmName("geEnumUInt")
 inline infix fun <reified E> BitMasked<UInt>.ge(other: E): Boolean where E : Enum<E>, E : BitMasked<UInt> = this.mask >= other.mask
 
 // BitMasked<UInt> comparisons >> UInt
@@ -163,16 +170,21 @@ fun BitMasked<UInt>.rotateLeft(bits: Int): UInt = (this.mask shl bits) or (this.
 fun BitMasked<UInt>.rotateRight(bits: Int): UInt = (this.mask shr bits) or (this.mask shl (32 - bits))
 
 // BitMasked<UInt> boolean logic
+@JvmName("andAlsoEnumUInt")
 inline infix fun <reified E> BitMasked<UInt>.andAlso(other: E): Boolean where E : Enum<E>, E : BitMasked<UInt> = (this.mask and other.mask) != 0u
+@JvmName("orElseEnumUInt")
 inline infix fun <reified E> BitMasked<UInt>.orElse(other: E): Boolean where E : Enum<E>, E : BitMasked<UInt> = (this.mask or other.mask) != 0u
 inline infix fun <reified E> BitMasked<UInt>.xorElse(other: E): Boolean where E : Enum<E>, E : BitMasked<UInt> = ((this.mask or other.mask) - (this.mask and other.mask)) != 0u
 infix fun BitMasked<UInt>.andAlso(mask: UInt): Boolean = (this.mask and mask) != 0u
 infix fun BitMasked<UInt>.orElse(mask: UInt): Boolean = (this.mask or mask) != 0u
+@JvmName("logicalNotUInt")
 fun BitMasked<UInt>.logicalNot(): Boolean = this.mask == 0u
 
 // BitMasked<UInt> conversion
 fun BitMasked<UInt>.toUInt(): UInt = this.mask
+@JvmName("toIntUInt")
 fun BitMasked<UInt>.toInt(): Int = this.mask.toInt()
+@JvmName("toLongUInt")
 fun BitMasked<UInt>.toLong(): Long = this.mask.toLong()
 
 // ========== Long operators: BitMasked<Long> ==========

@@ -1,12 +1,20 @@
 package borg.trikeshed.cpucache
 
 /**
- * Entry point — interrogates CPU cache and prints Confix JSON to stdout.
+ * Entry point — interrogates CPU cache and prints topology.
  *
  * Platform-specific [interrogateCpuCache] is resolved at link time.
- * Output is parseable by TrikeShed's Confix parser (JSON-compatible).
+ * Output formats:
+ *   - Default: Confix JSON (parseable by TrikeShed's Confix parser)
+ *   - --mlir: MLIR assembly format (cpu_cache dialect)
  */
-fun main() {
+fun main(args: Array<String>) {
     val topology = interrogateCpuCache()
-    println(topology.toConfix())
+    
+    val output = when {
+        args.isNotEmpty() && args[0] == "--mlir" -> topology.asMlir
+        else -> topology.toConfix()
+    }
+    
+    println(output)
 }
