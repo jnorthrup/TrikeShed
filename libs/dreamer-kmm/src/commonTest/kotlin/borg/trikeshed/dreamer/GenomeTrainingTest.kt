@@ -12,26 +12,6 @@ import kotlin.test.assertTrue
  */
 class GenomeTrainingTest {
 
-    private fun block(base: String, prices: List<Double>): KlineBlock {
-        val block = KlineBlock.mutable(TimeSpan.Minutes1)
-        prices.forEachIndexed { index, close ->
-            val open = if (index == 0) close else prices[index - 1]
-            block.append(
-                Kline(
-                    symbol = "${base}USDT",
-                    timespan = TimeSpan.Minutes1,
-                    openTime = 1_704_067_200_000L + (index * 60_000L),
-                    open = open,
-                    high = maxOf(open, close) + 1.0,
-                    low = minOf(open, close) - 1.0,
-                    close = close,
-                    volume = 100.0 + index,
-                )
-            )
-        }
-        return block.seal()
-    }
-
     @Test
     fun `trainOneDimensional evaluates 4 candidates and returns champion`() = runTest {
         val key = klineSeriesKey("BTC", "USDT", TimeSpan.Minutes1)

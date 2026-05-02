@@ -14,7 +14,7 @@ class RadixTreeTest {
         tree + "bar".toSeries()
         tree + "baz".toSeries()
         val keys = tree.keys()
-        val strings = keys.map { String(it.toArray()) }
+        val strings = keys.map { it.toArray().concatToString() }
         assertTrue(strings.contains("foo"))
         assertTrue(strings.contains("bar"))
         assertTrue(strings.contains("baz"))
@@ -25,7 +25,7 @@ class RadixTreeTest {
         val tree = RadixTree<Char>()
         tree + "ab".toSeries()
         tree + "abc".toSeries()
-        val keys = tree.keys().map { String(it.toArray()) }.toSet()
+        val keys = tree.keys().map { it.toArray().concatToString() }.toSet()
         assertTrue(keys.contains("ab"))
         assertTrue(keys.contains("abc"))
     }

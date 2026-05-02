@@ -1,3 +1,5 @@
+@file:Suppress("TestFunctionName")
+
 package borg.trikeshed.dreamer
 
 import kotlin.math.cos
@@ -5,6 +7,51 @@ import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.sin
 import kotlin.random.Random
+
+/**
+ * Build a sealed [KlineBlock] from a list of close prices.
+ *
+ * Each row uses the previous close as open; timestamps increment by 60s
+ * starting from [startOpenTime]. This is the shared test helper to avoid
+ * duplicating block() across test files.
+ */
+public fun block(
+    base: String,
+    prices: List<Double>,
+    startOpenTime: Long = 1_704_067_200_000L,
+    timespan: TimeSpan = TimeSpan.Minutes1,
+): KlineBlock {
+    val block = KlineBlock.mutable(timespan)
+    prices.forEachIndexed { index, close ->
+        val open = if (index == 0) close else prices[index - 1]
+        block.append(
+            Kline(
+                symbol = "${base}USDT",
+                timespan = timespan,
+                openTime = startOpenTime + (index * timespan.seconds * 1_000L),
+                open = open,
+                high = maxOf(open, close) + 1.0,
+                low = minOf(open, close) - 1.0,
+                close = close,
+                volume = 100.0 + index,
+            )
+        )
+    }
+    return block.seal()
+}
+
+/**
+ * Build a [KlineSeriesSource] from a list of close prices.
+ */
+public fun source(
+    base: String,
+    prices: List<Double>,
+    quote: String = "USDT",
+    timespan: TimeSpan = TimeSpan.Minutes1,
+): KlineSeriesSource {
+    val key = klineSeriesKey(base, quote, timespan)
+    return KlineSeriesSource(key, block(base, prices, timespan = timespan).asCursor())
+}
 
 public fun archiveInputs(config: StochasticTrainingConfig): List<HarnessReplayInput> {
     val feed = BinanceVisionKlineFeed()
