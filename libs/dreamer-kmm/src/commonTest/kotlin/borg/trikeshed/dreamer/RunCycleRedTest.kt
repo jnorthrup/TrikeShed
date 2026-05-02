@@ -9,6 +9,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
+import kotlin.math.sqrt
 
 /**
  * Regression test for the full Cursor → PortfolioInput → runCycle → CycleResult
@@ -861,5 +862,61 @@ class RunCycleRedTest {
         // it should be positive.
         assertTrue(finalWithReinvest >= finalNoReinvest,
             "Reinvest path ($finalWithReinvest) should >= no-reinvest ($finalNoReinvest)")
+    }
+
+    // ── 12. TimeSpan-aware Sharpe annualization ──────────────────────────────
+
+    @Test
+    fun `TimeSpan barsPerYear and annualizationFactor are correct`() {
+        // 1-day bars → 252 bars/year, sqrt(252) ≈ 15.87
+        assertEquals(252.0, TimeSpan.Days1.barsPerYear, 0.01)
+        assertEquals(sqrt(252.0), TimeSpan.Days1.annualizationFactor, 0.01)
+
+        // 1-hour bars → 252*24 = 6048 bars/year
+        assertEquals(6048.0, TimeSpan.Hours1.barsPerYear, 0.01)
+        assertTrue(TimeSpan.Hours1.annualizationFactor > TimeSpan.Days1.annualizationFactor,
+            "1h annualization factor should be larger than 1d (more bars per year)")
+
+        // 1-minute bars → 252*24*60 = 362880 bars/year
+        assertEquals(362880.0, TimeSpan.Minutes1.barsPerYear, 1.0)
+        assertTrue(TimeSpan.Minutes1.annualizationFactor > TimeSpan.Hours1.annualizationFactor)
+    }
+
+    @Test
+    fun `computeBacktestMetrics accepts custom annualization factor`() = runTest {
+        // Create a simple equity curve
+        val csvText = csv(
+            "1704067200000,100.0,102.0,99.0,103.0,10.0,1704070799999,1030.0,12,5.0,515.0,0",
+            "1704070800000,103.0,105.0,101.0,106.0,11.0,1704074399999,1166.0,15,6.0,636.0,0",
+            "1704074400000,106.0,108.0,103.0,109.0,12.0,1704077999999,1308.0,18,7.0,763.0,0",
+        )
+        val chars = csvText.length j { i: Int -> csvText[i] }
+        val klines = klinesFromCsv(chars, "BTCUSDT", TimeSpan.Hours1)
+        val block = KlineBlock.mutable()
+        klines.view.forEach { block.append(it.toKline()) }
+        block.seal()
+        val cursor = block.asCursor()
+
+        val engine = TradingEngine(defaultGenome(), Mode.SHADOW, initialCapital = 10_000.0)
+        val result = simulateTicks(cursor, engine, initialCapital = 10_000.0)
+
+        // Using default (sqrt(252)) — assumes daily bars
+        val metricsDaily = computeBacktestMetrics(result.cycles, 10_000.0, closesFromCursor(cursor))
+        // Using hourly annualization — should give different Sharpe
+        val metricsHourly = computeBacktestMetrics(
+            result.cycles, 10_000.0, closesFromCursor(cursor),
+            annualizationFactor = TimeSpan.Hours1.annualizationFactor
+        )
+
+        // Both should have the same totalReturn and maxDrawdown (those don't depend on annualization)
+        assertEquals(metricsDaily.totalReturn, metricsHourly.totalReturn, 0.001)
+        assertEquals(metricsDaily.maxDrawdown, metricsHourly.maxDrawdown, 0.001)
+
+        // Sharpe and Sortino should differ because annualization factors differ
+        // sqrt(252) ≈ 15.87 for daily, sqrt(6048) ≈ 77.77 for hourly
+        if (metricsDaily.sharpeRatio != 0.0) {
+            assertTrue(metricsHourly.sharpeRatio != metricsDaily.sharpeRatio,
+                "Hourly Sharpe (${metricsHourly.sharpeRatio}) should differ from daily (${metricsDaily.sharpeRatio})")
+        }
     }
 }

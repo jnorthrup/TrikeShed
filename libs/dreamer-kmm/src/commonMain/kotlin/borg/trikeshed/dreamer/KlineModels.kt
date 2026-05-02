@@ -24,6 +24,13 @@ enum class TimeSpan(val seconds: Long, val binanceInterval: String) {
     Days3(259200L, "3d"),
     Weeks1(604800L, "1w"),
     Months1(2592000L, "1M"),
+    ;
+
+    /** Number of bars in a 252 trading-day year, based on this timespan's duration. */
+    val barsPerYear: Double get() = (252.0 * 24.0 * 3600.0) / seconds.toDouble()
+
+    /** Annualization factor for Sharpe/Sortino: sqrt(barsPerYear). */
+    val annualizationFactor: Double get() = kotlin.math.sqrt(barsPerYear)
 }
 
 data class Kline(

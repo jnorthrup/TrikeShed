@@ -220,6 +220,7 @@ fun computeBacktestMetrics(
     cycles: Series<CycleResult>,
     initialCapital: Double,
     closePrices: Series<Double>,
+    annualizationFactor: Double = sqrt(252.0),
 ): BacktestMetrics {
     if (cycles.isEmpty()) {
         return BacktestMetrics(
@@ -255,8 +256,8 @@ fun computeBacktestMetrics(
         sumSq / returns.size
     } else 0.0
     val stdReturn = sqrt(if (variance < 0) 0.0 else variance)
-    // Annualized Sharpe (252 trading days per year, assumes 1 bar = 1 day for now)
-    val sharpeRatio = if (stdReturn > 0.0 && meanReturn.isFinite()) (meanReturn / stdReturn) * sqrt(252.0) else 0.0
+    // Annualized Sharpe using provided annualization factor (default sqrt(252) for daily bars)
+    val sharpeRatio = if (stdReturn > 0.0 && meanReturn.isFinite()) (meanReturn / stdReturn) * annualizationFactor else 0.0
 
     val downsideVariance = if (returns.isNotEmpty()) {
         var sumDownSq = 0.0
@@ -265,7 +266,7 @@ fun computeBacktestMetrics(
     } else 0.0
     val downsideDeviation = sqrt(if (downsideVariance < 0) 0.0 else downsideVariance)
     // Annualized Sortino, using zero as the minimum acceptable cycle return.
-    val sortinoRatio = if (downsideDeviation > 0.0 && meanReturn.isFinite()) (meanReturn / downsideDeviation) * sqrt(252.0) else 0.0
+    val sortinoRatio = if (downsideDeviation > 0.0 && meanReturn.isFinite()) (meanReturn / downsideDeviation) * annualizationFactor else 0.0
 
     // Max drawdown
     var peak = initialCapital
