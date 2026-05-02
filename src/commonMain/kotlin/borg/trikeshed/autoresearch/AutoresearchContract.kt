@@ -9,8 +9,7 @@ enum class AutoresearchTask(val wireName: String) {
     SINGLE_SINE("single_sine"),
     MIXED_SINE("mixed_sine"),
     NOISY_SINE("noisy_sine"),
-    PIECEWISE_SINE("piecewise_sine"),
-    ;
+    PIECEWISE_SINE("piecewise_sine");
 
     companion object {
         fun fromWireName(value: String): AutoresearchTask =
@@ -19,13 +18,25 @@ enum class AutoresearchTask(val wireName: String) {
     }
 }
 
-object AutoresearchStages {
-    const val CONVERGENCE_4X4: String = "convergence_4x4"
+enum class AutoresearchStage(val wireName: String) {
+    CONVERGENCE_4X4("convergence_4x4");
+
+    companion object {
+        fun fromWireName(value: String): AutoresearchStage =
+            entries.firstOrNull { it.wireName == value }
+                ?: error("Unknown autoresearch stage: $value")
+    }
 }
 
-object AutoresearchThemes {
-    const val M0_IDENTITY: String = "M0_identity"
-    const val M1_SINE: String = "M1_sine"
+enum class AutoresearchTheme(val wireName: String) {
+    M0_IDENTITY("M0_identity"),
+    M1_SINE("M1_sine");
+
+    companion object {
+        fun fromWireName(value: String): AutoresearchTheme =
+            entries.firstOrNull { it.wireName == value }
+                ?: error("Unknown autoresearch theme: $value")
+    }
 }
 
 data class AutoresearchExample(

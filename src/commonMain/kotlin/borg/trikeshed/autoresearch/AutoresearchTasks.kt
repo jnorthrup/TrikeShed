@@ -6,12 +6,12 @@ import kotlin.math.sin
 object AutoresearchTasks {
     fun tasksForTheme(theme: String): List<AutoresearchTask> =
         when (theme) {
-            AutoresearchThemes.M0_IDENTITY -> listOf(
+            AutoresearchTheme.M0_IDENTITY.wireName -> listOf(
                 AutoresearchTask.X_TO_X,
                 AutoresearchTask.SCALAR_1X1_TO_16X16,
             )
 
-            AutoresearchThemes.M1_SINE -> listOf(
+            AutoresearchTheme.M1_SINE.wireName -> listOf(
                 AutoresearchTask.SINGLE_SINE,
                 AutoresearchTask.MIXED_SINE,
                 AutoresearchTask.NOISY_SINE,

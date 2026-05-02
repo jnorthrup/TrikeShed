@@ -10,7 +10,7 @@ class AutoresearchHarnessTest {
     @Test
     fun `identity task convergence shape`() {
         val tempDir = JavaFiles.createTempDirectory("autoresearch-identity")
-        val config = configFor(tempDir, AutoresearchThemes.M0_IDENTITY, "identity-shape", 24)
+        val config = configFor(tempDir, AutoresearchTheme.M0_IDENTITY.wireName, "identity-shape", 24)
         val surface = AutoresearchExperimentSurface { _, _, _ ->
             AutoresearchModel { input: DoubleArray, _: Int -> input.copyOf() }
         }
@@ -27,7 +27,7 @@ class AutoresearchHarnessTest {
     @Test
     fun `sine task loading and execution shape`() {
         val tempDir = JavaFiles.createTempDirectory("autoresearch-sine")
-        val config = configFor(tempDir, AutoresearchThemes.M1_SINE, "sine-shape", 18)
+        val config = configFor(tempDir, AutoresearchTheme.M1_SINE.wireName, "sine-shape", 18)
         val samples = AutoresearchTasks.load(AutoresearchTask.MIXED_SINE, config)
         val surface = AutoresearchExperimentSurface { task, runConfig, _ ->
             AutoresearchModel { input: DoubleArray, sampleIndex: Int ->
@@ -49,8 +49,8 @@ class AutoresearchHarnessTest {
         val result = AutoresearchResult(
             experimentId = "exp-42",
             branch = "exp/convergence_4x4/x_to_x/42",
-            stage = AutoresearchStages.CONVERGENCE_4X4,
-            theme = AutoresearchThemes.M0_IDENTITY,
+            stage = AutoresearchStage.CONVERGENCE_4X4.wireName,
+            theme = AutoresearchTheme.M0_IDENTITY.wireName,
             timestamp = "2026-03-10T12:00:00Z",
             metrics = AutoresearchMetrics(
                 mse = 0.125,
@@ -72,7 +72,7 @@ class AutoresearchHarnessTest {
     @Test
     fun `verdict gating respects theme baselines`() {
         val promote = AutoresearchHarness.verdictFor(
-            AutoresearchThemes.M0_IDENTITY,
+            AutoresearchTheme.M0_IDENTITY.wireName,
             AutoresearchMetrics(
                 mse = 0.0,
                 mae = 0.0,
@@ -83,7 +83,7 @@ class AutoresearchHarnessTest {
             ),
         )
         val hold = AutoresearchHarness.verdictFor(
-            AutoresearchThemes.M1_SINE,
+            AutoresearchTheme.M1_SINE.wireName,
             AutoresearchMetrics(
                 mse = 0.5,
                 mae = 0.4,
@@ -105,13 +105,13 @@ class AutoresearchHarnessTest {
         budget: Int,
     ): AutoresearchRunConfig =
         AutoresearchRunConfig(
-            stage = AutoresearchStages.CONVERGENCE_4X4,
+            stage = AutoresearchStage.CONVERGENCE_4X4.wireName,
             theme = theme,
             fixedRunBudget = budget,
             seed = 7,
             resultsLogPath = tempDir.resolve("results.jsonl").toString(),
             evidenceDirectory = tempDir.resolve("evidence").toString(),
             experimentId = experimentId,
-            branch = "exp/${AutoresearchStages.CONVERGENCE_4X4}/$theme/$experimentId",
+            branch = "exp/${AutoresearchStage.CONVERGENCE_4X4.wireName}/$theme/$experimentId",
         )
 }

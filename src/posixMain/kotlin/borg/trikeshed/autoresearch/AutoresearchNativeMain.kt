@@ -10,8 +10,8 @@ fun autoresearchNativeMain(args: Array<String>) {
         return
     }
 
-    val stage = options["stage"] ?: AutoresearchStages.CONVERGENCE_4X4
-    val theme = options["theme"] ?: AutoresearchThemes.M0_IDENTITY
+    val stage = options["stage"] ?: AutoresearchStage.CONVERGENCE_4X4.wireName
+    val theme = options["theme"] ?: AutoresearchTheme.M0_IDENTITY.wireName
     val task = AutoresearchTask.fromWireName(
         options["task"] ?: AutoresearchTasks.defaultTaskForTheme(theme).wireName,
     )

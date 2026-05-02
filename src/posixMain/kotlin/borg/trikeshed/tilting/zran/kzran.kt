@@ -25,9 +25,13 @@ import kotlin.math.max
 // Until then: any call to ZstdIndex or ZstdBlockIndex throws on entry.
 
 
-const val RAW = -15
-const val ZLIB = 15
-const val GZIP = 31
+/** zlib/gzip encoding window bits for inflateInit2() */
+enum class EncodingFormat(val windowBits: Int) {
+    RAW(-15),
+    ZLIB(15),
+    GZIP(31)
+}
+
 const val WINSIZE = 32768U
 const val CHUNK = 16384
 val __usSz = UShort.SIZE_BYTES.toULong()
@@ -87,8 +91,8 @@ class GzIndex {
 
                 if (mode == 0) {
                     mode =
-                        if (strm.avail_in == 0u) RAW else if ((strm.next_in!![0] and 15u) == 8.toUByte())
-                            ZLIB else if (strm.next_in!![0] == 0x1f.toUByte()) GZIP else RAW
+                        if (strm.avail_in == 0u) EncodingFormat.RAW.windowBits else if ((strm.next_in!![0] and 15u) == 8.toUByte())
+                            EncodingFormat.ZLIB.windowBits else if (strm.next_in!![0] == 0x1f.toUByte()) EncodingFormat.GZIP.windowBits else EncodingFormat.RAW.windowBits
                     ret = inflateInit2(strm.ptr, mode)
                     if (ret != Z_OK)
                         break
@@ -101,7 +105,7 @@ class GzIndex {
             }
 
 
-            if (mode == RAW && list.isEmpty()) strm.data_type = 0x80 else {
+            if (mode == EncodingFormat.RAW.windowBits && list.isEmpty()) strm.data_type = 0x80 else {
                 val before = strm.avail_out
                 ret = inflate(strm.ptr, Z_BLOCK)
                 totout += before.toInt() - strm.avail_out.toInt()
@@ -135,8 +139,8 @@ class GzIndex {
                 list += point
                 last = totout.toULong()
             }
-            if (ret == Z_STREAM_END && mode == GZIP && (strm.avail_in.nz || ungetc(getc(gzFile), gzFile) != EOF))
-                ret = inflateReset2(strm.ptr, GZIP)
+            if (ret == Z_STREAM_END && mode == EncodingFormat.GZIP.windowBits && (strm.avail_in.nz || ungetc(getc(gzFile), gzFile) != EOF))
+                ret = inflateReset2(strm.ptr, EncodingFormat.GZIP.windowBits)
 
         } while (ret == Z_OK)
 

@@ -32,11 +32,14 @@ private val crc32cTable: UIntArray by lazy {
 }
 
 // =============================================================================
-// On-disk magic constants
+// On-disk node type identifiers
 // =============================================================================
 
-internal const val LEAF_MAGIC    = 0x464F5254u  // "TROF" LE = "BTRF" marker
-internal const val INTERNAL_MAGIC = 0x4E465242u  // "BRFN" LE = "BTRN" marker
+/** Btrfs node type with on-disk magic marker */
+enum class BtrfsNodeType(val magic: UInt) {
+    LEAF(0x464F5254u),    // "TROF" LE = "BTRF" marker
+    INTERNAL(0x4E465242u); // "BRFN" LE = "BTRN" marker
+}
 
 /** Btrfs node size constant (fixed 4 KiB pages). */
 const val BTRFS_NODE_SIZE = 4096
@@ -267,16 +270,16 @@ data class BtrfsNodeHeader(
     val numItems: UInt,
     val firstItemOffset: UShort,
 ) {
-    val isLeaf: Boolean get() = magic == LEAF_MAGIC
-    val isInternal: Boolean get() = magic == INTERNAL_MAGIC
+    val isLeaf: Boolean get() = magic == BtrfsNodeType.LEAF.magic
+    val isInternal: Boolean get() = magic == BtrfsNodeType.INTERNAL.magic
 }
 
 /** Decode node header from buf (buf must have at least 24 bytes). */
 fun decodeNodeHeader(buf: ByteArray): BtrfsNodeHeader {
     if (buf.size < 24) error("Buffer too small for node header: ${buf.size} < 24")
     val magic = buf.getU32LE(0)
-    if (magic != LEAF_MAGIC && magic != INTERNAL_MAGIC) {
-        error("Invalid magic: 0x${magic.toString(16)}, expected 0x${LEAF_MAGIC.toString(16)} or 0x${INTERNAL_MAGIC.toString(16)}")
+    if (magic != BtrfsNodeType.LEAF.magic && magic != BtrfsNodeType.INTERNAL.magic) {
+        error("Invalid magic: 0x${magic.toString(16)}, expected 0x${BtrfsNodeType.LEAF.magic.toString(16)} or 0x${BtrfsNodeType.INTERNAL.magic.toString(16)}")
     }
     return BtrfsNodeHeader(
         magic = magic,
@@ -311,7 +314,7 @@ fun encodeLeaf(leaf: BtrfsLeaf, buf: ByteArray, generation: ULong = 0UL) {
     val sorted = Array(leaf.items.size) { leaf.items[it] }.apply { sortBy { it.key } }
     val numItems = sorted.size
 
-    buf.putU32LE(0, LEAF_MAGIC)
+    buf.putU32LE(0, BtrfsNodeType.LEAF.magic)
     buf.putU64LE(8, generation)
 
     // Calculate total item space: key(20) + dataOffset(4) + dataSize(4) + data(variable)
@@ -352,7 +355,7 @@ fun encodeLeaf(leaf: BtrfsLeaf, buf: ByteArray, generation: ULong = 0UL) {
  */
 fun decodeLeaf(buf: ByteArray): BtrfsLeaf {
     if (buf.size < 24) throw IllegalStateException("Buffer too small for leaf: ${buf.size} < 24")
-    if (buf.getU32LE(0) != LEAF_MAGIC) {
+    if (buf.getU32LE(0) != BtrfsNodeType.LEAF.magic) {
         throw IllegalStateException("Invalid leaf magic: 0x${buf.getU32LE(0).toString(16)}")
     }
 
@@ -403,7 +406,7 @@ fun encodeInternal(node: BtrfsInternal, buf: ByteArray, generation: ULong = 0UL)
     val sorted = Array(node.children.size) { node.children[it] }.apply { sortBy { it.key } }
     val numItems = sorted.size
 
-    buf.putU32LE(0, INTERNAL_MAGIC)
+    buf.putU32LE(0, BtrfsNodeType.INTERNAL.magic)
     buf.putU64LE(8, generation)
     buf.putU32LE(16, numItems.toUInt())
     for (i in 0..7) buf[20 + i] = 0
@@ -430,7 +433,7 @@ fun encodeInternal(node: BtrfsInternal, buf: ByteArray, generation: ULong = 0UL)
  */
 fun decodeInternal(buf: ByteArray): BtrfsInternal {
     if (buf.size < 24) throw IllegalStateException("Buffer too small for internal: ${buf.size} < 24")
-    if (buf.getU32LE(0) != INTERNAL_MAGIC) {
+    if (buf.getU32LE(0) != BtrfsNodeType.INTERNAL.magic) {
         throw IllegalStateException("Invalid internal magic: 0x${buf.getU32LE(0).toString(16)}")
     }
 

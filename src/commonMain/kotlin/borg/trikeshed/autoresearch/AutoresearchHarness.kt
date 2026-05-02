@@ -11,8 +11,8 @@ object AutoresearchHarness {
         config: AutoresearchRunConfig,
         surface: AutoresearchExperimentSurface,
     ): AutoresearchResult {
-        require(config.stage == AutoresearchStages.CONVERGENCE_4X4) {
-            "Only ${AutoresearchStages.CONVERGENCE_4X4} is supported in the native-first slice"
+        require(config.stage == AutoresearchStage.CONVERGENCE_4X4.wireName) {
+            "Only ${AutoresearchStage.CONVERGENCE_4X4.wireName} is supported in the native-first slice"
         }
         require(config.fixedRunBudget > 0) { "Autoresearch fixed run budget must be positive" }
         require(task in AutoresearchTasks.tasksForTheme(config.theme)) {
@@ -85,8 +85,8 @@ object AutoresearchHarness {
 
     fun verdictFor(theme: String, metrics: AutoresearchMetrics): AutoresearchVerdict {
         val (maxMse, maxMae) = when (theme) {
-            AutoresearchThemes.M0_IDENTITY -> 1e-9 to 1e-6
-            AutoresearchThemes.M1_SINE -> 0.05 to 0.15
+            AutoresearchTheme.M0_IDENTITY.wireName -> 1e-9 to 1e-6
+            AutoresearchTheme.M1_SINE.wireName -> 0.05 to 0.15
             else -> error("Unsupported autoresearch theme: $theme")
         }
         return if (metrics.mse <= maxMse && metrics.mae <= maxMae) {

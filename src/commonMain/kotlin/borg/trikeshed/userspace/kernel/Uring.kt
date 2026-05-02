@@ -29,10 +29,11 @@ enum class UringSetupFlags : BitMasked {
     }
 }
 
-object UringConstants {
-    const val SYS_IO_URING_SETUP = 425L
-    const val SYS_IO_URING_ENTER = 426L
-    const val SYS_IO_URING_REGISTER = 427L
+/** io_uring system call numbers */
+enum class UringSyscall(val number: Long) {
+    SETUP(425L),
+    ENTER(426L),
+    REGISTER(427L);
 }
 
 enum class OpCode(val code: Byte) {

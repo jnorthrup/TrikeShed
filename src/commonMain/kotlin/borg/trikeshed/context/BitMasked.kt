@@ -1,5 +1,7 @@
 package borg.trikeshed.context
 
+import kotlin.enums.EnumEntries
+
 /**
  * Interface for enums that represent bitmasks.
  */
