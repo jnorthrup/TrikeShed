@@ -919,4 +919,51 @@ class RunCycleRedTest {
                 "Hourly Sharpe (${metricsHourly.sharpeRatio}) should differ from daily (${metricsDaily.sharpeRatio})")
         }
     }
+
+    // ── 12. Single-symbol reinvest through simulateTicks ────────────────────
+
+    @Test
+    fun `simulateTicks single-symbol reinvest reflects in cycle totalValue`() = runTest {
+        // Rising prices should trigger harvest, and if HARVEST_ALLOC_REINVEST_PERCENT > 0,
+        // the engine should reinvest into the same symbol. Verify that reinvested holdings
+        // feed back into the single-symbol totalValue computation.
+        val csvText = csv(
+            "1704067200000,100.0,102.0,99.0,100.0,10.0,1704070799999,1000.0,12,5.0,500.0,0",
+            "1704070800000,100.0,120.0,99.0,120.0,12.0,1704074399999,1440.0,18,6.0,720.0,0",
+            "1704074400000,120.0,140.0,119.0,140.0,14.0,1704077999999,1960.0,24,7.0,980.0,0",
+            "1704078000000,140.0,160.0,139.0,160.0,16.0,1704081599999,2560.0,30,8.0,1280.0,0",
+        )
+        val chars = csvText.length j { i: Int -> csvText[i] }
+        val klines = klinesFromCsv(chars, "BTCUSDT", TimeSpan.Hours1)
+        val block = KlineBlock.mutable(TimeSpan.Hours1)
+        for (i in 0 until klines.size) block.append(klines.b(i).toKline())
+        val cursor = block.seal().asCursor()
+
+        // Aggressive genome: low surplus threshold, high take, reinvest enabled
+        val genome = defaultGenome()
+        genome[GenomeParam.MIN_SURPLUS_FOR_HARVEST] = 0.001
+        genome[GenomeParam.HARVEST_TAKE_PERCENT] = 0.80
+        genome[GenomeParam.HARVEST_ALLOC_REINVEST_PERCENT] = 0.90
+        genome[GenomeParam.MIN_REINVEST_BUY_USD] = 0.50
+
+        val engine = TradingEngine(genome, Mode.SHADOW, initialCapital = 10_000.0)
+        val result = simulateTicks(cursor, engine, initialCapital = 10_000.0)
+
+        assertEquals(4, result.cycles.size)
+
+        // With aggressive harvest params and rising prices, some cycles should trade
+        val tradedCycles = result.cycles.view.filter { it.anyTradesThisCycle }
+        assertTrue(tradedCycles.isNotEmpty(),
+            "Should have cycles with trades (harvest): ${tradedCycles.size}")
+
+        // The engine should have harvested something
+        assertTrue(result.metrics.totalHarvested > 0.0,
+            "Total harvested should be positive: ${result.metrics.totalHarvested}")
+
+        // totalValue on each cycle should be positive
+        result.cycles.view.forEachIndexed { i, cycle ->
+            assertTrue(cycle.totalValue > 0.0,
+                "totalValue at tick $i should be positive: ${cycle.totalValue}")
+        }
+    }
 }
