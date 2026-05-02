@@ -501,8 +501,14 @@ suspend fun simulateMultiSymbolTicks(
         val inputs = multiSymbolKlineToPortfolioInput(cursor, barIndex, holdings)
         val rows = inputs.flatMap(::portfolioInputToRows)
 
+        // Holdings from cursor represent the original allocation.
+        // Engine holdings accumulate from reinvest buys — add their market value on top.
         var holdingsValue = 0.0
         rows.forEach { holdingsValue += it.Value }
+        for ((sym, holding) in engine.holdings) {
+            val price = inputs.find { it.symbol == sym }?.price ?: continue
+            holdingsValue += holding.rawQuantity * price
+        }
         val totalValue = holdingsValue + engine.cashBalance
 
         val result = engine.update(

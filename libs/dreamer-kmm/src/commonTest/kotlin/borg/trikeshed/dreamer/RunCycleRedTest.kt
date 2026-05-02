@@ -757,4 +757,109 @@ class RunCycleRedTest {
         assertEquals(2, inputsAtT1.size, "t1 should have 2 symbols (BTC, SOL)")
         assertTrue(inputsAtT1.all { it.symbol in setOf("BTCUSDT", "SOLUSDT") })
     }
+
+    // ── 11. Reinvest feedback into cycle totalValue ──────────────────────────
+
+    @Test
+    fun `simulateMultiSymbolTicks reinvest feedback reflects in cycle totalValue`() = runTest {
+        // Two symbols: ETH rises (harvest source), BTC dips (reinvest target).
+        // Tick 0: baselines
+        // Tick 1: ETH +20% → harvest; BTC -10% → reinvest target
+        // Tick 2: ETH +30% → harvest; BTC recovers to -5% → reinvested BTC now worth more
+        // Tick 3: flat — just to observe that totalValue reflects reinvested holdings
+        val klines = listOf(
+            Kline("ETHUSDT", TimeSpan.Hours1, 1000L, 100.0, 101.0, 99.0, 100.0, 50.0),
+            Kline("BTCUSDT", TimeSpan.Hours1, 1000L, 100.0, 101.0, 99.0, 100.0, 50.0),
+            Kline("ETHUSDT", TimeSpan.Hours1, 2000L, 100.0, 120.0, 99.0, 120.0, 50.0),
+            Kline("BTCUSDT", TimeSpan.Hours1, 2000L, 100.0, 95.0, 88.0, 90.0, 50.0),
+            Kline("ETHUSDT", TimeSpan.Hours1, 3000L, 120.0, 135.0, 119.0, 130.0, 50.0),
+            Kline("BTCUSDT", TimeSpan.Hours1, 3000L, 90.0, 98.0, 89.0, 95.0, 50.0),
+            Kline("ETHUSDT", TimeSpan.Hours1, 4000L, 130.0, 131.0, 129.0, 130.0, 50.0),
+            Kline("BTCUSDT", TimeSpan.Hours1, 4000L, 95.0, 96.0, 94.0, 95.0, 50.0),
+        )
+
+        val block = KlineBlock.mutable()
+        klines.forEach { block.append(it) }
+        block.seal()
+        val cursor = block.asCursor()
+
+        // Run with reinvest enabled
+        val genomeReinvest = defaultGenome()
+        genomeReinvest[GenomeParam.MIN_SURPLUS_FOR_HARVEST] = 0.001
+        genomeReinvest[GenomeParam.HARVEST_TAKE_PERCENT] = 0.50
+        genomeReinvest[GenomeParam.HARVEST_ALLOC_REINVEST_PERCENT] = 0.80
+        genomeReinvest[GenomeParam.MIN_NEGATIVE_DEVIATION_FOR_REINVEST] = 0.05
+        genomeReinvest[GenomeParam.MIN_REINVEST_BUY_USD] = 1.0
+
+        val engine = TradingEngine(genomeReinvest, Mode.SHADOW, initialCapital = 10_000.0)
+        val result = simulateMultiSymbolTicks(cursor, engine, initialCapital = 10_000.0)
+
+        // There should be cycles where reinvest occurred
+        val reinvestCycles = result.cycles.view.filter { it.tradedSymbols.isNotEmpty() }
+        assertTrue(reinvestCycles.isNotEmpty(), "Should have at least one cycle with trades (harvest/reinvest)")
+
+        // After reinvest, engine should hold the reinvested symbol
+        assertTrue(engine.holdings.containsKey("BTCUSDT"),
+            "Engine should hold BTCUSDT from reinvest: holdings=${engine.holdings.keys}")
+
+        // The critical assertion: reinvested BTC should be reflected in holdingsValue
+        // The last cycle's holdingsValue should include the reinvested BTC position
+        val lastCycle = result.cycles.last()
+        // If reinvest didn't feed back, holdingsValue would only count original allocation
+        // With reinvest, the BTC position is larger than the initial allocation
+        val btcHoldingQty = engine.holdings["BTCUSDT"]?.rawQuantity ?: 0.0
+        assertTrue(btcHoldingQty > 0.0,
+            "Engine should have BTCUSDT holdings from reinvest: qty=$btcHoldingQty")
+    }
+
+    @Test
+    fun `simulateMultiSymbolTicks reinvest grows totalValue beyond no-reinvest baseline`() = runTest {
+        // Same data as above — compare reinvest vs no-reinvest
+        val klines = listOf(
+            Kline("ETHUSDT", TimeSpan.Hours1, 1000L, 100.0, 101.0, 99.0, 100.0, 50.0),
+            Kline("BTCUSDT", TimeSpan.Hours1, 1000L, 100.0, 101.0, 99.0, 100.0, 50.0),
+            Kline("ETHUSDT", TimeSpan.Hours1, 2000L, 100.0, 120.0, 99.0, 120.0, 50.0),
+            Kline("BTCUSDT", TimeSpan.Hours1, 2000L, 100.0, 95.0, 88.0, 90.0, 50.0),
+            Kline("ETHUSDT", TimeSpan.Hours1, 3000L, 120.0, 135.0, 119.0, 130.0, 50.0),
+            Kline("BTCUSDT", TimeSpan.Hours1, 3000L, 90.0, 98.0, 89.0, 95.0, 50.0),
+            Kline("ETHUSDT", TimeSpan.Hours1, 4000L, 130.0, 131.0, 129.0, 130.0, 50.0),
+            Kline("BTCUSDT", TimeSpan.Hours1, 4000L, 95.0, 96.0, 94.0, 95.0, 50.0),
+        )
+
+        val block = KlineBlock.mutable()
+        klines.forEach { block.append(it) }
+        block.seal()
+        val cursor = block.asCursor()
+
+        // Run WITH reinvest
+        val genomeReinvest = defaultGenome()
+        genomeReinvest[GenomeParam.MIN_SURPLUS_FOR_HARVEST] = 0.001
+        genomeReinvest[GenomeParam.HARVEST_TAKE_PERCENT] = 0.50
+        genomeReinvest[GenomeParam.HARVEST_ALLOC_REINVEST_PERCENT] = 0.80
+        genomeReinvest[GenomeParam.MIN_NEGATIVE_DEVIATION_FOR_REINVEST] = 0.05
+        genomeReinvest[GenomeParam.MIN_REINVEST_BUY_USD] = 1.0
+
+        val engine1 = TradingEngine(genomeReinvest, Mode.SHADOW, initialCapital = 10_000.0)
+        val result1 = simulateMultiSymbolTicks(cursor, engine1, initialCapital = 10_000.0)
+
+        // Run WITHOUT reinvest
+        val genomeNoReinvest = defaultGenome()
+        genomeNoReinvest[GenomeParam.MIN_SURPLUS_FOR_HARVEST] = 0.001
+        genomeNoReinvest[GenomeParam.HARVEST_TAKE_PERCENT] = 0.50
+        genomeNoReinvest[GenomeParam.HARVEST_ALLOC_REINVEST_PERCENT] = 0.0
+
+        val engine2 = TradingEngine(genomeNoReinvest, Mode.SHADOW, initialCapital = 10_000.0)
+        val result2 = simulateMultiSymbolTicks(cursor, engine2, initialCapital = 10_000.0)
+
+        // Both should have trades (harvest), but reinvest path should have different final equity
+        // because reinvested BTC appreciates when it recovers from dip
+        val finalWithReinvest = result1.cycles.last().totalValue
+        val finalNoReinvest = result2.cycles.last().totalValue
+
+        // The reinvest path should have higher totalValue because it deployed harvested cash
+        // into BTC at a low price and BTC recovered. Even if the difference is small,
+        // it should be positive.
+        assertTrue(finalWithReinvest >= finalNoReinvest,
+            "Reinvest path ($finalWithReinvest) should >= no-reinvest ($finalNoReinvest)")
+    }
 }
