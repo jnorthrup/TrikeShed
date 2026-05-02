@@ -1,12 +1,24 @@
 package borg.trikeshed.miniduck
 
-import borg.trikeshed.cursor.ColumnMeta
 import borg.trikeshed.cursor.RowVec
+import borg.trikeshed.cursor.Series
+import borg.trikeshed.cursor.j
 import borg.trikeshed.cursor.`ColumnMeta↻`
 import borg.trikeshed.isam.meta.IOMemento
 import borg.trikeshed.lib.ReifiedSplitSeries2
 import borg.trikeshed.lib.Series
-import borg.trikeshed.lib.*
+
+/**
+ * MiniRowVec factory: creates a RowVec from parallel keys and values.
+ */
+fun MiniRowVec(keys: List<String>, cells: List<Any?>): MiniRowVec {
+    require(keys.size == cells.size) { "keys and cells must have same length" }
+    val values: Series<Any?> = cells.toSeries()
+    val meta: Series<`ColumnMeta↻`> = keys.size j { index: Int ->
+        { ColumnMeta(keys[index], cells.getOrNull(index).toIOMemento()) }
+    }
+    return values j meta
+}
 
 /**
  * DocRowVec: flat document fields with optional lazy nested children.

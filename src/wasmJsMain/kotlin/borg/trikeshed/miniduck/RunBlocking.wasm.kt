@@ -14,5 +14,5 @@ actual fun <T> runBlockingCommon(block: suspend () -> T): T {
         }
     })
     return outcome?.getOrThrow()
-        ?: throw UnsupportedOperationException("runBlockingCommon suspended on Wasm; this path expects synchronous completion")
+        ?: throw UnsupportedOperationException("runBlockingCommon suspended on wasm; this path expects synchronous completion")
 }
