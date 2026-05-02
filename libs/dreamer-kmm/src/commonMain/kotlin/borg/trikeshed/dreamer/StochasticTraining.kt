@@ -159,7 +159,7 @@ class StochasticBagSpanTrainer(
         )
     }
 
-    // maxDrawdown is provided by GenomeTraining.kt's HarnessRunResult.maxDrawdown extension
+    // maxDrawdown is provided by BacktestMetricsUtils.kt's HarnessRunResult.maxDrawdown extension
 }
 public fun Double.short(): String {
     val rounded = kotlin.math.round(this * 100.0) / 100.0

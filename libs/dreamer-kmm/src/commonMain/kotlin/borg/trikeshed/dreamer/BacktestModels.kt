@@ -546,8 +546,18 @@ suspend fun simulateMultiSymbolTicks(
     @Suppress("UNCHECKED_CAST")
     val nonNull = Array(tickCount) { cycleArray[it]!! }
     val cycles: Series<CycleResult> = nonNull.toSeries()
-    val closes = closesFromCursor(cursor)
-    val metrics = computeBacktestMetrics(cycles, initialCapital, closes, annualizationFactor)
+    // For multi-symbol, we need one close per tick (not per cursor row).
+    // Use average close price across symbols at each tick for the price series.
+    val tickCloses: Series<Double> = timeList.map { openTime ->
+        val prices = (0 until n).mapNotNull { i ->
+            val row = cursor.at(i)
+            if (row.longValue("openTime") == openTime) {
+                row.doubleValue("close").takeIf { it > 0.0 } ?: row.doubleValue("open")
+            } else null
+        }
+        if (prices.isNotEmpty()) prices.average() else 0.0
+    }.toSeries()
+    val metrics = computeBacktestMetrics(cycles, initialCapital, tickCloses, annualizationFactor)
 
     return BacktestResult(
         symbol = "MULTI",
