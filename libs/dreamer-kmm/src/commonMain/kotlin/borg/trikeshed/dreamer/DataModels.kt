@@ -244,10 +244,10 @@ class Genome(
          */
         fun fromDoubles(doubles: DoubleArray, overrides: MutableMap<String, DoubleArray>): Genome {
             val g = Genome(DEFAULT_DOUBLES.copyOf(), overrides, mutableMapOf())
-            System.arraycopy(doubles, 0, g.doubles, 0, WIDTH)
+            doubles.copyInto(g.doubles, startIndex = 0, endIndex = WIDTH)
             // Populate backing from the passed doubles so that string-key lookups
             // (e.g. g["HARVEST_TAKE_PERCENT"]) return the crossed/mutated values,
-            // not the DEFAULT values that init seeded before System.arraycopy.
+            // not the DEFAULT values that init seeded before the array copy.
             GenomeParam.values().forEachIndexed { index, param ->
                 g.backing[param.storageKey] = doubles[index]
             }
