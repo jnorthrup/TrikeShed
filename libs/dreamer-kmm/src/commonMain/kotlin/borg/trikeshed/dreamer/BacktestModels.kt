@@ -760,3 +760,47 @@ fun HarnessRunResult.toBacktestReport(
     symbol: String = "MULTI",
     initialCapital: Double,
 ): BacktestReport = toBacktestResult(symbol, initialCapital).toBacktestReport()
+
+/**
+ * Convert a [StochasticTrainingSnapshot] into a [BacktestReport].
+ *
+ * Since the snapshot carries aggregate scalars rather than the full equity curve,
+ * the resulting report has simplified metrics: Sharpe and Sortino are set to 0
+ * (insufficient data), while totalReturn and maxDrawdown are derived from the
+ * snapshot's bestTotalValue and bestDrawdown fields.
+ *
+ * For the full equity-curve report, use the [HarnessRunResult.toBacktestReport]
+ * adapter on the underlying harness run directly.
+ */
+fun StochasticTrainingSnapshot.toBacktestReport(
+    symbol: String = "MULTI",
+    initialCapital: Double,
+): BacktestReport {
+    val totalReturn = if (initialCapital > 0.0) (bestTotalValue - initialCapital) / initialCapital else 0.0
+    return BacktestReport(
+        symbol = symbol,
+        initialCapital = initialCapital,
+        finalEquity = bestTotalValue,
+        totalTicks = totalCycles,
+        totalReturn = totalReturn,
+        sharpeRatio = 0.0,
+        sortinoRatio = 0.0,
+        maxDrawdown = bestDrawdown,
+        maxDrawdownTicks = 0,
+        totalTrades = bestTrades,
+        totalHarvested = bestProfit.coerceAtLeast(0.0),
+    )
+}
+
+/**
+ * Aggregate multiple [StochasticTrainingSnapshot] runs into a single [BacktestAggregateReport].
+ * Each snapshot is converted via [toBacktestReport] and then aggregated.
+ */
+fun aggregateTrainingSnapshots(
+    snapshots: List<StochasticTrainingSnapshot>,
+    initialCapital: Double,
+    bestGenome: Map<String, Any?>? = null,
+): BacktestAggregateReport {
+    val reports = snapshots.map { it.toBacktestReport(initialCapital = initialCapital) }
+    return aggregateReports(reports, bestGenome)
+}

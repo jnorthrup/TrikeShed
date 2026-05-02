@@ -296,4 +296,84 @@ class BacktestAggregationTest {
         totalTrades = 0,
         avgHarvestPerTick = 0.0,
     )
+
+    // ── StochasticTrainingSnapshot → BacktestReport adapter ─────────────────
+
+    @Test
+    fun `StochasticTrainingSnapshot toBacktestReport produces report from training scalars`() {
+        val snapshot = StochasticTrainingSnapshot(
+            generation = 3,
+            pairCount = 2,
+            rowsPerSeries = 48,
+            populationSize = 4,
+            evaluations = 12,
+            bestFitness = 2.5,
+            bestTotalValue = 10_500.0,
+            bestProfit = 500.0,
+            bestDrawdown = 0.08,
+            bestTrades = 7,
+            totalCycles = 48,
+            totalWindows = 96,
+            totalSpans = 32,
+            championTakePercent = 0.70,
+            championMinSurplus = 0.50,
+            championRebalanceTrigger = 0.05,
+            sampleWindows = emptyList(),
+            sampleSpans = emptyList(),
+        )
+
+        val report = snapshot.toBacktestReport(symbol = "BTC+ETH", initialCapital = 10_000.0)
+
+        assertEquals("BTC+ETH", report.symbol)
+        assertEquals(10_000.0, report.initialCapital)
+        assertEquals(10_500.0, report.finalEquity, 0.001)
+        assertEquals(48, report.totalTicks)
+        assertEquals(0.05, report.totalReturn, 0.001)
+        assertEquals(0.08, report.maxDrawdown, 0.001)
+        assertEquals(7, report.totalTrades)
+        assertEquals(500.0, report.totalHarvested, 0.001)
+    }
+
+    @Test
+    fun `aggregateTrainingSnapshots rolls up multiple generations`() {
+        val gen1 = StochasticTrainingSnapshot(
+            generation = 1,
+            pairCount = 2,
+            rowsPerSeries = 48,
+            populationSize = 4,
+            evaluations = 4,
+            bestFitness = 1.0,
+            bestTotalValue = 10_200.0,
+            bestProfit = 200.0,
+            bestDrawdown = 0.12,
+            bestTrades = 3,
+            totalCycles = 48,
+            totalWindows = 48,
+            totalSpans = 16,
+            championTakePercent = 0.50,
+            championMinSurplus = 0.50,
+            championRebalanceTrigger = 0.05,
+            sampleWindows = emptyList(),
+            sampleSpans = emptyList(),
+        )
+        val gen2 = gen1.copy(
+            generation = 2,
+            bestTotalValue = 10_800.0,
+            bestProfit = 800.0,
+            bestDrawdown = 0.06,
+            bestTrades = 5,
+        )
+
+        val aggregate = aggregateTrainingSnapshots(
+            snapshots = listOf(gen1, gen2),
+            initialCapital = 10_000.0,
+        )
+
+        assertEquals(2, aggregate.runCount)
+        assertEquals(96, aggregate.totalTicks)  // 48 + 48
+        assertEquals(8, aggregate.totalTrades)  // 3 + 5
+        assertEquals(0.12, aggregate.maxDrawdown, 0.001)  // worst single-run
+        assertEquals(0.08, aggregate.bestReturn, 0.001)    // gen2: (10800-10000)/10000
+        assertEquals(0.02, aggregate.worstReturn, 0.001)   // gen1: (10200-10000)/10000
+    }
 }
