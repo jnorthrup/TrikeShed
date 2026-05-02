@@ -1,5 +1,6 @@
 package borg.trikeshed
 
+import borg.trikeshed.context.BitMasked
 import borg.trikeshed.cursor.*
 import borg.trikeshed.isam.meta.IOMemento
 import borg.trikeshed.lib.Series
@@ -37,18 +38,18 @@ TypeEvidence(
      * is a straight-line extract-and-add with no branches.
      */
     operator fun plus(char: Char): TypeEvidence = apply {
-        val cat = if (char.code < CHAR_CATEGORY.size) CHAR_CATEGORY[char.code] else CAT_SPECIAL
-        digits = (digits + (cat and CAT_DIGIT).toUInt()).toUShort()
-        periods = (periods + ((cat and CAT_PERIOD) shr 1).toUInt()).toUShort()
-        exponent = (exponent + ((cat and CAT_EXPONENT) shr 2).toUInt()).toUShort()
-        signs = (signs + ((cat and CAT_SIGN) shr 3).toUInt()).toUShort()
-        truefalse = (truefalse + ((cat and CAT_TRUEFALSE) shr 4).toUInt()).toUShort()
-        alpha = (alpha + ((cat and CAT_ALPHA) shr 5).toUInt()).toUShort()
-        dquotes = (dquotes + ((cat and CAT_DQUOTE) shr 6).toUInt()).toUShort()
-        quotes = (quotes + ((cat and CAT_QUOTE) shr 7).toUInt()).toUShort()
-        backslashes = (backslashes + ((cat and CAT_BACKSLASH) shr 8).toUInt()).toUShort()
-        whitespaces = (whitespaces + ((cat and CAT_WHITESPACE) shr 9).toUInt()).toUShort()
-        special = (special + ((cat and CAT_SPECIAL) shr 10).toUInt()).toUShort()
+        val cat = if (char.code < CHAR_CATEGORY.size) CHAR_CATEGORY[char.code] else CharCategory.SPECIAL.mask.toInt()
+        digits = (digits + (cat and CharCategory.DIGIT.mask.toInt()).toUInt()).toUShort()
+        periods = (periods + ((cat and CharCategory.PERIOD.mask.toInt()) shr 1).toUInt()).toUShort()
+        exponent = (exponent + ((cat and CharCategory.EXPONENT.mask.toInt()) shr 2).toUInt()).toUShort()
+        signs = (signs + ((cat and CharCategory.SIGN.mask.toInt()) shr 3).toUInt()).toUShort()
+        truefalse = (truefalse + ((cat and CharCategory.TRUEFALSE.mask.toInt()) shr 4).toUInt()).toUShort()
+        alpha = (alpha + ((cat and CharCategory.ALPHA.mask.toInt()) shr 5).toUInt()).toUShort()
+        dquotes = (dquotes + ((cat and CharCategory.DQUOTE.mask.toInt()) shr 6).toUInt()).toUShort()
+        quotes = (quotes + ((cat and CharCategory.QUOTE.mask.toInt()) shr 7).toUInt()).toUShort()
+        backslashes = (backslashes + ((cat and CharCategory.BACKSLASH.mask.toInt()) shr 8).toUInt()).toUShort()
+        whitespaces = (whitespaces + ((cat and CharCategory.WHITESPACE.mask.toInt()) shr 9).toUInt()).toUShort()
+        special = (special + ((cat and CharCategory.SPECIAL.mask.toInt()) shr 10).toUInt()).toUShort()
     }
 
     /**
@@ -160,36 +161,43 @@ TypeEvidence(
     }
 }
 
-/** Non-conditional character class determination — single-bit (XOR) encoding */
-const val CAT_DIGIT = 1        // bit 0
-const val CAT_PERIOD = 2       // bit 1
-const val CAT_EXPONENT = 4     // bit 2
-const val CAT_SIGN = 8         // bit 3
-const val CAT_TRUEFALSE = 16   // bit 4
-const val CAT_ALPHA = 32       // bit 5
-const val CAT_DQUOTE = 64      // bit 6
-const val CAT_QUOTE = 128      // bit 7
-const val CAT_BACKSLASH = 256  // bit 8
-const val CAT_WHITESPACE = 512 // bit 9
-const val CAT_SPECIAL = 1024   // bit 10
+/**
+ * Non-conditional character class determination — single-bit (XOR) encoding.
+ * Each enum value maps to exactly one bit position for fast category testing.
+ */
+enum class CharCategory : BitMasked {
+    DIGIT,      // bit 0
+    PERIOD,     // bit 1
+    EXPONENT,   // bit 2
+    SIGN,       // bit 3
+    TRUEFALSE,  // bit 4
+    ALPHA,      // bit 5
+    DQUOTE,     // bit 6
+    QUOTE,      // bit 7
+    BACKSLASH,  // bit 8
+    WHITESPACE, // bit 9
+    SPECIAL;    // bit 10
+}
 
 /** Pre-computed lookup table: each ASCII char maps to exactly one single-bit category. */
 val CHAR_CATEGORY: IntArray = IntArray(128) { c ->
     when (c.toChar()) {
-        in '0'..'9' -> CAT_DIGIT
-        '.' -> CAT_PERIOD
-        'e', 'E' -> CAT_EXPONENT
-        '+', '-' -> CAT_SIGN
-        't', 'r', 'u', 'f', 'a', 'l', 's', 'T', 'R', 'U', 'F', 'A', 'L', 'S' -> CAT_TRUEFALSE
-        in 'a'..'z', in 'A'..'Z' -> CAT_ALPHA
-        '"' -> CAT_DQUOTE
-        '\'' -> CAT_QUOTE
-        '\\' -> CAT_BACKSLASH
-        ' ', '\t' -> CAT_WHITESPACE
+        in '0'..'9' -> CharCategory.DIGIT.mask.toInt()
+        '.' -> CharCategory.PERIOD.mask.toInt()
+        'e', 'E' -> CharCategory.EXPONENT.mask.toInt()
+        '+', '-' -> CharCategory.SIGN.mask.toInt()
+        't', 'r', 'u', 'f', 'a', 'l', 's', 'T', 'R', 'U', 'F', 'A', 'L', 'S' -> CharCategory.TRUEFALSE.mask.toInt()
+        in 'a'..'z', in 'A'..'Z' -> CharCategory.ALPHA.mask.toInt()
+        '"' -> CharCategory.DQUOTE.mask.toInt()
+        '\'' -> CharCategory.QUOTE.mask.toInt()
+        '\\' -> CharCategory.BACKSLASH.mask.toInt()
+        ' ', '\t' -> CharCategory.WHITESPACE.mask.toInt()
         '\r', ',', '\n' -> 0
-        else -> CAT_SPECIAL
+        else -> CharCategory.SPECIAL.mask.toInt()
     }
 }
+
+/** Pre-computed lookup table: each ASCII char maps to exactly one single-bit category. */
 
 fun TypeEvidence.toRowVec(): RowVec {
     val values = arrayOf<Any?>(
