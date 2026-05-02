@@ -874,7 +874,7 @@ data class StochasticTrainingResult(
 
 /**
  * Comprehensive report from a stochastic back-test: evolution history +
- * aggregate metrics + optional champion validation report.
+ * aggregate metrics + optional champion validation report + equity metrics.
  */
 data class ComprehensiveStochasticReport(
     val snapshots: List<StochasticTrainingSnapshot>,
@@ -885,6 +885,10 @@ data class ComprehensiveStochasticReport(
     val championBacktestReport: BacktestReport,
     /** Optional validation report: champion genome replayed over full data via SimulationReplay. */
     val validationReport: BacktestReport? = null,
+    /** Equity curve metrics from the validation run (win rate, profit factor, Calmar, etc.). */
+    val equityMetrics: EquityMetrics? = null,
+    /** Optional evolved walk-forward result for true out-of-sample validation. */
+    val evolvedWalkForward: EvolvedWalkForwardResult? = null,
 )
 
 /**
@@ -1021,5 +1025,72 @@ suspend fun stochasticBacktest(
         aggregate = trainingResult.aggregate,
         championBacktestReport = championReport,
         validationReport = validationReport,
+    )
+}
+
+/**
+ * Full stochastic back-test with comprehensive analysis:
+ * stochastic training → equity metrics → evolved walk-forward validation.
+ *
+ * Chains:
+ * 1. [stochasticBacktest] — evolve population and produce champion
+ * 2. Champion replay → [BacktestResult.equityMetrics] for win rate, profit factor, Calmar, etc.
+ * 3. Evolved walk-forward validation (if [walkForwardFolds] > 1)
+ *
+ * @param feeds              map of base symbol → CSV text
+ * @param config             stochastic training configuration
+ * @param generations        number of evolutionary generations
+ * @param convergenceThreshold  minimum fitness improvement to continue (null = run all)
+ * @param walkForwardFolds   number of walk-forward windows (≥2 triggers evolved WFV)
+ * @return [ComprehensiveStochasticReport] with equity metrics and walk-forward attached
+ */
+suspend fun comprehensiveStochasticBacktest(
+    feeds: Map<String, String>,
+    config: StochasticTrainingConfig,
+    generations: Int = 5,
+    convergenceThreshold: Double? = null,
+    walkForwardFolds: Int = 3,
+): ComprehensiveStochasticReport {
+    val base = stochasticBacktest(feeds, config, generations, convergenceThreshold, validateChampion = true)
+
+    // Derive equity metrics from validation BacktestResult (replay champion over first feed)
+    val equityMetrics = if (feeds.isNotEmpty()) {
+        val firstFeed = feeds.entries.first()
+        val feed = BinanceVisionKlineFeed()
+        val key = klineSeriesKey(firstFeed.key, config.quote, config.timespan)
+        val parsed = feed.parseCachedCsv(key, firstFeed.value)
+        val klinesList = parsed.block.rows
+        val backtestResult = klinesToBacktestResult(
+            klines = klinesList,
+            genome = base.championGenome,
+            initialCapital = config.initialCapital,
+        )
+        backtestResult.equityMetrics()
+    } else null
+
+    // Run evolved walk-forward if we have data and folds >= 2
+    val evolvedWalkForward = if (walkForwardFolds >= 2 && feeds.isNotEmpty()) {
+        val firstFeed = feeds.entries.first()
+        val feed = BinanceVisionKlineFeed()
+        val key = klineSeriesKey(firstFeed.key, config.quote, config.timespan)
+        val parsed = feed.parseCachedCsv(key, firstFeed.value)
+        val klinesList = parsed.block.rows
+
+        val windowSize = klinesList.size / walkForwardFolds
+        if (windowSize >= 2) {
+            evolvedWalkForwardValidation(
+                klines = klinesList,
+                initialCapital = config.initialCapital,
+                windowSize = windowSize,
+                stepSize = windowSize,
+                trainingConfig = config,
+                trainingGenerations = generations.coerceAtMost(3),
+            )
+        } else null
+    } else null
+
+    return base.copy(
+        equityMetrics = equityMetrics,
+        evolvedWalkForward = evolvedWalkForward,
     )
 }
