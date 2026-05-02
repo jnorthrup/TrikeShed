@@ -43,12 +43,10 @@ val RowVec.values: Series<Any?>
 /** α-conversion over a Cursor — apply a transform to each RowVec. */
 inline infix fun <C> Cursor.α(crossinline xform: (RowVec) -> C): Series<C> = size j { xform(row(it)) }
 
-///**
-// * overload unary minus operator for Cursor to strip out the meta and return a series of values-only
-// *
-// * apparently this duplicates the unaryMinus() function above it, but it's not clear how to get the compiler to use that one
-// */
-//operator fun Cursor.unaryMinus(): Series<Series<*>> = this α { it α Join<*, () -> RecordMeta>::a }
+ /**
+  * overload unary minus operator for Cursor to strip out the meta and return a series of values-only
+  */
+operator fun Cursor.unaryMinus(): Series<Series<Any?>> =this α { it: RowVec -> it.values }
 
 /** Operator Cursor '/' Class<A>
  *

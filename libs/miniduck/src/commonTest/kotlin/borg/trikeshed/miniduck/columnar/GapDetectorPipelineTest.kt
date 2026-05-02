@@ -1,10 +1,12 @@
 package borg.trikeshed.miniduck.columnar
 
+import borg.trikeshed.collections.s_
 import borg.trikeshed.cursor.Cursor
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.size
 import borg.trikeshed.miniduck.DocRowVec
 import borg.trikeshed.cursor.at
+import borg.trikeshed.lib.get
 import kotlin.test.*
 
 /**
@@ -46,7 +48,7 @@ class GapDetectorPipelineTest {
 
     /** One 5-minute gap in 1m stream returns exactly one gap record. */
     @Test fun `5-minute gap returns one gap record`() {
-        val rows = listOf(
+        val rows = s_[
             klineRow(1709251200000L),
             klineRow(1709251260000L),
             klineRow(1709251320000L),
@@ -55,10 +57,10 @@ class GapDetectorPipelineTest {
             klineRow(1709251740000L),
             klineRow(1709251800000L),
             klineRow(1709251860000L),
-        )
+        ]
         val cursor: Cursor = rows.size j { i -> rows[i] }
         val result: Cursor = GapDetector.find(cursor, INTERVAL_1M)
-        assertEquals(1, result.size)
+        assertEquals(1, result.size )
     }
 
     /** Gap record fields are correct. */
