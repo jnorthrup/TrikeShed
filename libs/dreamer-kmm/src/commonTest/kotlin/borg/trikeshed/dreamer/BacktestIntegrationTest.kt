@@ -487,4 +487,80 @@ class BacktestIntegrationTest {
         assertNotNull(agg.bestGenome)
         assertTrue(agg.bestGenome.isNotEmpty())
     }
+
+    /**
+     * Stochastic determinism: running the same evolution pipeline with the
+     * same seed produces identical results. This pins the reproducibility
+     * property needed for stochastic back-testing confidence.
+     */
+    @Test
+    fun `evaluatePopulation is deterministic with same inputs`() = runTest {
+        val csv = generatedArchiveCsv(
+            symbol = "BTCUSDT",
+            rows = 20,
+            timespan = TimeSpan.Minutes1,
+            startOpenTime = 1_704_067_200_000L,
+            assetIndex = 0,
+            seed = 42,
+        )
+        val genomes = listOf(
+            defaultGenome(),
+            Genome(mutableMapOf("HARVEST_TAKE_PERCENT" to 0.30)),
+            Genome(mutableMapOf("FITNESS_DRAWDOWN_PENALTY" to 1.5)),
+        )
+
+        // Run twice with identical inputs
+        val run1 = evaluatePopulation(genomes, csv, "BTCUSDT", TimeSpan.Minutes1, 10_000.0)
+        val run2 = evaluatePopulation(genomes, csv, "BTCUSDT", TimeSpan.Minutes1, 10_000.0)
+
+        assertEquals(run1.size, run2.size)
+        for (i in run1.indices) {
+            assertEquals(run1[i].fitness, run2[i].fitness, 0.0,
+                "Fitness for genome $i should be identical across runs")
+            assertEquals(run1[i].result.metrics.totalReturn, run2[i].result.metrics.totalReturn, 0.0,
+                "totalReturn for genome $i should be identical across runs")
+            assertEquals(run1[i].result.metrics.totalTicks, run2[i].result.metrics.totalTicks,
+                "totalTicks for genome $i should be identical across runs")
+        }
+    }
+
+    /**
+     * Multi-generation evolution produces consistent champion across runs
+     * with the same seed and genomes.
+     */
+    @Test
+    fun `multi-generation evolution is deterministic with same seed`() = runTest {
+        val csv = generatedArchiveCsv(
+            symbol = "BTCUSDT",
+            rows = 25,
+            timespan = TimeSpan.Minutes1,
+            startOpenTime = 1_704_067_200_000L,
+            assetIndex = 0,
+            seed = 123,
+        )
+
+        suspend fun runEvolution(): List<Double> {
+            val genomes = (0 until 4).map { i ->
+                Genome(mutableMapOf("HARVEST_TAKE_PERCENT" to (0.10 + i * 0.15)))
+            }
+            var currentPop = genomes
+            val eliteFitnesses = mutableListOf<Double>()
+            for (gen in 1..3) {
+                val evals = evaluatePopulation(currentPop, csv, "BTCUSDT", TimeSpan.Minutes1, 10_000.0)
+                val ranked = rankEvaluationsByFitness(evals)
+                eliteFitnesses.add(ranked.first().fitness)
+                currentPop = evolvePopulation(evals, mapOf("HARVEST_TAKE_PERCENT" to 0.005))
+            }
+            return eliteFitnesses
+        }
+
+        val fitnesses1 = runEvolution()
+        val fitnesses2 = runEvolution()
+
+        assertEquals(fitnesses1.size, fitnesses2.size)
+        for (i in fitnesses1.indices) {
+            assertEquals(fitnesses1[i], fitnesses2[i], 0.0,
+                "Gen ${i + 1} elite fitness should be identical across runs")
+        }
+    }
 }
