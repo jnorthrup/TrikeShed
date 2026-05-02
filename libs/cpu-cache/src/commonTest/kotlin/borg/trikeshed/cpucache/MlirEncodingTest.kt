@@ -120,4 +120,79 @@ class CpuCacheMlirTest {
         assertTrue(instruction.toMlirAttribute().contains("Instruction"))
         assertTrue(unified.toMlirAttribute().contains("Unified"))
     }
+
+    @Test
+    fun testSysconfConstants() {
+        // Verify POSIX sysconf constants match <unistd.h>
+        assertTrue(CpuCacheMlir.SysconfConstants.LEVEL1_DCACHE_SIZE == 188)
+        assertTrue(CpuCacheMlir.SysconfConstants.LEVEL1_ICACHE_SIZE == 189)
+        assertTrue(CpuCacheMlir.SysconfConstants.LEVEL1_DCACHE_LINESIZE == 190)
+        assertTrue(CpuCacheMlir.SysconfConstants.LEVEL2_CACHE_SIZE == 191)
+        assertTrue(CpuCacheMlir.SysconfConstants.LEVEL3_CACHE_SIZE == 194)
+        assertTrue(CpuCacheMlir.SysconfConstants.NPROCESSORS_ONLN == 84)
+    }
+
+    @Test
+    fun testToLlvmDialectModule() {
+        val topology = CpuCacheTopology(
+            l1DataBytes = 32768,
+            l1InstructionBytes = 32768,
+            l2Bytes = 262144,
+            l3Bytes = 8388608,
+            cacheLineBytes = 64,
+            coreCount = 8
+        )
+        
+        val llvmMlir = CpuCacheMlir.toLlvmDialrectModule(topology)
+        
+        // Verify module structure
+        assertTrue(llvmMlir.startsWith("module {"), "Should start with module declaration")
+        assertTrue(llvmMlir.endsWith("}"), "Should end with closing brace")
+        
+        // Verify sysconf declarations
+        assertTrue(llvmMlir.contains("llvm.func @sysconf(i32) -> i64"), "Should declare sysconf")
+        assertTrue(llvmMlir.contains("llvm.func @printf(!llvm.ptr, ...) -> i32"), "Should declare printf")
+        
+        // Verify sysconf constants match POSIX values
+        assertTrue(llvmMlir.contains("188 : i32"), "Should use _SC_LEVEL1_DCACHE_SIZE constant")
+        assertTrue(llvmMlir.contains("189 : i32"), "Should use _SC_LEVEL1_ICACHE_SIZE constant")
+        assertTrue(llvmMlir.contains("190 : i32"), "Should use _SC_LEVEL1_DCACHE_LINESIZE constant")
+        assertTrue(llvmMlir.contains("191 : i32"), "Should use _SC_LEVEL2_CACHE_SIZE constant")
+        assertTrue(llvmMlir.contains("194 : i32"), "Should use _SC_LEVEL3_CACHE_SIZE constant")
+        assertTrue(llvmMlir.contains("84 : i32"), "Should use _SC_NPROCESSORS_ONLN constant")
+        
+        // Verify LLVM dialect call patterns
+        assertTrue(llvmMlir.contains("llvm.call @sysconf"), "Should call sysconf")
+        assertTrue(llvmMlir.contains("llvm.call @printf"), "Should call printf")
+        assertTrue(llvmMlir.contains("vararg(!llvm.func<i32 (!llvm.ptr, ...)>)"), "Should use variadic printf")
+        
+        // Verify global string constants
+        assertTrue(llvmMlir.contains("llvm.mlir.global"), "Should define global string constants")
+        assertTrue(llvmMlir.contains("!llvm.array<"), "Should use typed array literals for strings")
+        
+        // Verify opaque pointers (LLVM 15+ style)
+        assertTrue(llvmMlir.contains("!llvm.ptr"), "Should use opaque pointers")
+        assertTrue(llvmMlir.contains("llvm.mlir.addressof"), "Should use addressof for globals")
+    }
+
+    @Test
+    fun testToLlvmDialectModuleWithNulls() {
+        // Even with null values, LLVM module should be generated
+        // (it's a self-contained probe, not dependent on topology values)
+        val topology = CpuCacheTopology(
+            l1DataBytes = null,
+            l1InstructionBytes = null,
+            l2Bytes = null,
+            l3Bytes = null,
+            cacheLineBytes = null,
+            coreCount = null
+        )
+        
+        val llvmMlir = CpuCacheMlir.toLlvmDialrectModule(topology)
+        
+        // Should still generate complete module
+        assertTrue(llvmMlir.contains("llvm.func @sysconf"))
+        assertTrue(llvmMlir.contains("llvm.func @printf"))
+        assertTrue(llvmMlir.contains("llvm.func @main"))
+    }
 }

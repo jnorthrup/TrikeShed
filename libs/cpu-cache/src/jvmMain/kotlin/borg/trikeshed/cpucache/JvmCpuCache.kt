@@ -11,7 +11,7 @@ actual fun interrogateCpuCache(): CpuCacheTopology {
     return when {
         os.contains("linux") -> interrogateLinux()
         os.contains("mac") -> interrogateMacOs()
-        else -> CpuCacheTopology(null, null, null, null, null, null)
+        else -> interrogatePosixFallback()
     }
 }
 
@@ -81,4 +81,35 @@ private fun String.parseSize(): Long? {
         else -> return trimmed.toLongOrNull()
     }
     return trimmed.dropLast(1).toLongOrNull()?.times(multiplier)
+}
+
+/**
+ * Generic POSIX fallback using sysconf() via JNI.
+ * Attempts to load the native library and call sysconf directly.
+ * Falls back to Runtime.availableProcessors() for core count.
+ */
+private fun interrogatePosixFallback(): CpuCacheTopology {
+    return try {
+        SysconfInterop.interrogateSysconf()
+    } catch (e: UnsatisfiedLinkError) {
+        // JNI library not available, use runtime values only
+        CpuCacheTopology(
+            l1DataBytes = null,
+            l1InstructionBytes = null,
+            l2Bytes = null,
+            l3Bytes = null,
+            cacheLineBytes = null,
+            coreCount = Runtime.getRuntime().availableProcessors()
+        )
+    } catch (e: Exception) {
+        // Any other error, return partial topology
+        CpuCacheTopology(
+            l1DataBytes = null,
+            l1InstructionBytes = null,
+            l2Bytes = null,
+            l3Bytes = null,
+            cacheLineBytes = null,
+            coreCount = Runtime.getRuntime().availableProcessors()
+        )
+    }
 }
