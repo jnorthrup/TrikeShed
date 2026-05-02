@@ -1,0 +1,3 @@
+[submodule "libs/dreamer-kmm"]
+	path = libs/dreamer-kmm
+	url = https://github.com/jnorthrup/dreamer-kmm.git
