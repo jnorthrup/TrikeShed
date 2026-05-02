@@ -667,4 +667,94 @@ class RunCycleRedTest {
         assertEquals(0, result.metrics.totalTicks)
         assertEquals("MULTI", result.symbol)
     }
+
+    // ── 11. Multi-symbol edge cases: 3+ symbols, uneven timestamps ──────
+
+    /**
+     * allSymbolsAtBar with 3 symbols at the same openTime returns all 3.
+     */
+    @Test
+    fun `allSymbolsAtBar returns 3 inputs for 3 symbols sharing openTime`() = runTest {
+        val openTime = 1704067200000L
+        val block = KlineBlock.mutable(TimeSpan.Hours1)
+        block.append(Kline("BTCUSDT", TimeSpan.Hours1, openTime, 42000.0, 42500.0, 41800.0, 42300.0, 150.0))
+        block.append(Kline("ETHUSDT", TimeSpan.Hours1, openTime, 2500.0, 2550.0, 2490.0, 2530.0, 500.0))
+        block.append(Kline("SOLUSDT", TimeSpan.Hours1, openTime, 142.0, 145.0, 140.0, 143.0, 1000.0))
+        block.seal()
+        val cursor = block.asCursor()
+
+        val holdings = mapOf("BTCUSDT" to 0.1, "ETHUSDT" to 1.0, "SOLUSDT" to 5.0)
+        val inputs = allSymbolsAtBar(cursor, barIndex = 0, holdings = holdings)
+
+        assertEquals(3, inputs.size, "Should find all 3 symbols")
+        val symbols = inputs.map { it.symbol }.toSet()
+        assertTrue("BTCUSDT" in symbols)
+        assertTrue("ETHUSDT" in symbols)
+        assertTrue("SOLUSDT" in symbols)
+        // Verify quantities come from holdings
+        assertEquals(0.1, inputs.first { it.symbol == "BTCUSDT" }.quantity, 0.001)
+        assertEquals(1.0, inputs.first { it.symbol == "ETHUSDT" }.quantity, 0.001)
+        assertEquals(5.0, inputs.first { it.symbol == "SOLUSDT" }.quantity, 0.001)
+    }
+
+    /**
+     * simulateMultiSymbolTicks with 3 symbols interleaved at same timestamps
+     * produces correct tick count and cycle count.
+     */
+    @Test
+    fun `simulateMultiSymbolTicks with 3 symbols produces correct tick count`() = runTest {
+        val t0 = 1704067200000L
+        val t1 = 1704070800000L
+        val block = KlineBlock.mutable(TimeSpan.Hours1)
+        // tick 0: BTC, ETH, SOL
+        block.append(Kline("BTCUSDT", TimeSpan.Hours1, t0, 42000.0, 42500.0, 41800.0, 42300.0, 150.0))
+        block.append(Kline("ETHUSDT", TimeSpan.Hours1, t0, 2500.0, 2550.0, 2490.0, 2530.0, 500.0))
+        block.append(Kline("SOLUSDT", TimeSpan.Hours1, t0, 142.0, 145.0, 140.0, 143.0, 1000.0))
+        // tick 1: BTC, ETH, SOL
+        block.append(Kline("BTCUSDT", TimeSpan.Hours1, t1, 42300.0, 43100.0, 42100.0, 42900.0, 180.0))
+        block.append(Kline("ETHUSDT", TimeSpan.Hours1, t1, 2530.0, 2600.0, 2520.0, 2580.0, 600.0))
+        block.append(Kline("SOLUSDT", TimeSpan.Hours1, t1, 143.0, 148.0, 141.0, 147.0, 1100.0))
+        block.seal()
+        val cursor = block.asCursor()
+        assertEquals(6, cursor.size)
+
+        val engine = TradingEngine(defaultGenome(), Mode.SHADOW, initialCapital = 30_000.0)
+        val result = simulateMultiSymbolTicks(cursor, engine, initialCapital = 30_000.0)
+
+        assertEquals("MULTI", result.symbol)
+        assertEquals(2, result.cycles.size, "2 unique openTimes → 2 ticks")
+        assertEquals(2, result.metrics.totalTicks)
+    }
+
+    /**
+     * When symbols have different sets of timestamps, simulateMultiSymbolTicks
+     * groups by unique openTime. Only the symbols present at each timestamp are
+     * included in that tick's PortfolioInput list.
+     */
+    @Test
+    fun `allSymbolsAtBar with uneven timestamps returns only symbols at that openTime`() = runTest {
+        val t0 = 1704067200000L
+        val t1 = 1704070800000L
+        val block = KlineBlock.mutable(TimeSpan.Hours1)
+        // t0: BTC and ETH only (SOL has no bar at t0)
+        block.append(Kline("BTCUSDT", TimeSpan.Hours1, t0, 42000.0, 42500.0, 41800.0, 42300.0, 150.0))
+        block.append(Kline("ETHUSDT", TimeSpan.Hours1, t0, 2500.0, 2550.0, 2490.0, 2530.0, 500.0))
+        // t1: BTC and SOL only (ETH has no bar at t1)
+        block.append(Kline("BTCUSDT", TimeSpan.Hours1, t1, 42300.0, 43100.0, 42100.0, 42900.0, 180.0))
+        block.append(Kline("SOLUSDT", TimeSpan.Hours1, t1, 143.0, 148.0, 141.0, 147.0, 1100.0))
+        block.seal()
+        val cursor = block.asCursor()
+
+        val holdings = mapOf("BTCUSDT" to 0.1, "ETHUSDT" to 1.0, "SOLUSDT" to 5.0)
+
+        // At t0: only BTC and ETH
+        val inputsAtT0 = allSymbolsAtBar(cursor, barIndex = 0, holdings = holdings)
+        assertEquals(2, inputsAtT0.size, "t0 should have 2 symbols (BTC, ETH)")
+        assertTrue(inputsAtT0.all { it.symbol in setOf("BTCUSDT", "ETHUSDT") })
+
+        // At t1: BTC and SOL
+        val inputsAtT1 = allSymbolsAtBar(cursor, barIndex = 2, holdings = holdings)
+        assertEquals(2, inputsAtT1.size, "t1 should have 2 symbols (BTC, SOL)")
+        assertTrue(inputsAtT1.all { it.symbol in setOf("BTCUSDT", "SOLUSDT") })
+    }
 }
