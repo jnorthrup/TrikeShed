@@ -40,7 +40,7 @@ typealias BlobRowVec = RowVec
  * Create a DocRowVec from keys and cells Series.
  */
 fun DocRowVec(keys: Series<String>, cells: Series<Any?>): RowVec {
-    require(keys.size == cells.size) { "Keys and cells must have same size" }
+    require(keys.a == cells.a) { "Keys and cells must have same size" }
     return cellsToRowVec(cells = cells, keys = keys)
 }
 
