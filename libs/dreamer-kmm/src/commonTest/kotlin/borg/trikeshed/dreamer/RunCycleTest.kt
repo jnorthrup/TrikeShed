@@ -94,7 +94,7 @@ class RunCycleTest {
 
     @Test
     fun `computeBacktestMetrics returns zero for empty cycles`() {
-        val metrics = computeBacktestMetrics(emptySeries(), 10_000.0, doubleSeriesOf(emptyList()))
+        val metrics = computeBacktestMetrics(emptySeries(), 10_000.0)
 
         assertEquals(0, metrics.totalTicks)
         assertEquals(0.0, metrics.totalReturn)
@@ -110,9 +110,7 @@ class RunCycleTest {
             CycleResult(0, 0L, 0.0, 10_000.0, 10_000.0, false, 0.0, emptyList(), false, emptyMap()),
             CycleResult(1, 0L, 0.0, 11_000.0, 11_000.0, false, 0.0, emptyList(), false, emptyMap()),
         ]
-        // Price series: 10_000 then 11_000
-        val closes = doubleSeriesOf(listOf(10_000.0, 11_000.0))
-        val metrics = computeBacktestMetrics(cycles, 10_000.0, closes)
+        val metrics = computeBacktestMetrics(cycles, 10_000.0)
 
         assertEquals(0.10, metrics.totalReturn, 0.001) // +10%
     }
@@ -127,8 +125,7 @@ class RunCycleTest {
             CycleResult(2, 0L, 0.0, 95.0,  95.0,  false, 0.0, emptyList(), false, emptyMap()),
             CycleResult(3, 0L, 0.0, 105.0, 105.0, false, 0.0, emptyList(), false, emptyMap()),
         ]
-        val closes = doubleSeriesOf(listOf(100.0, 110.0, 95.0, 105.0))
-        val metrics = computeBacktestMetrics(cycles, 100.0, closes)
+        val metrics = computeBacktestMetrics(cycles, 100.0)
 
         assertTrue(metrics.maxDrawdown > 0.13, "maxDrawdown=${metrics.maxDrawdown} should be ~13.6%")
         assertTrue(metrics.maxDrawdown < 0.14, "maxDrawdown=${metrics.maxDrawdown} should be ~13.6%")
@@ -144,7 +141,7 @@ class RunCycleTest {
             CycleResult(4, 4L, 0.0, 108.0, 108.0, false, 0.0, emptyList(), false, emptyMap()),
         ]
 
-        val metrics = computeBacktestMetrics(cycles, 100.0, doubleSeriesOf(listOf(100.0, 120.0, 115.0, 110.0, 108.0)))
+        val metrics = computeBacktestMetrics(cycles, 100.0)
 
         assertEquals(3, metrics.maxDrawdownTicks)
     }
@@ -222,8 +219,7 @@ class RunCycleTest {
         val cycles: Series<CycleResult> = 10 j { i ->
             CycleResult(i, i.toLong() * 3600_000, 0.0, 10_000.0, 10_000.0, false, 0.0, emptyList(), false, emptyMap())
         }
-        val closes = doubleSeriesOf(List(10) { 10_000.0 })
-        val metrics = computeBacktestMetrics(cycles, 10_000.0, closes)
+        val metrics = computeBacktestMetrics(cycles, 10_000.0)
 
         assertEquals(0.0, metrics.sharpeRatio) // zero variance → zero Sharpe
     }
@@ -237,7 +233,7 @@ class RunCycleTest {
             CycleResult(3, 3L, 0.0, 114.95, 114.95, false, 0.0, emptyList(), false, emptyMap()),
         ]
 
-        val metrics = computeBacktestMetrics(cycles, 100.0, doubleSeriesOf(listOf(100.0, 110.0, 104.5, 114.95)))
+        val metrics = computeBacktestMetrics(cycles, 100.0)
 
         assertTrue(metrics.sortinoRatio > metrics.sharpeRatio)
         assertTrue(metrics.sortinoRatio > 20.0, "sortinoRatio=${metrics.sortinoRatio} should reward limited downside")
@@ -251,8 +247,7 @@ class RunCycleTest {
             CycleResult(2, 0L, 0.0, 10_000.0, 10_000.0, false, 0.0, emptyList(), false, emptyMap()),
             CycleResult(3, 0L, 0.0, 10_000.0, 10_000.0, true, 80.0, listOf("BTC-USD"), false, emptyMap()),
         ]
-        val closes = doubleSeriesOf(List(4) { 10_000.0 })
-        val metrics = computeBacktestMetrics(cycles, 10_000.0, closes)
+        val metrics = computeBacktestMetrics(cycles, 10_000.0)
 
         assertEquals(2, metrics.totalTrades)
         assertEquals(180.0, metrics.totalHarvested, 0.001)
@@ -452,8 +447,7 @@ class RunCycleTest {
         val cycles = s_[
             CycleResult(0, 0L, 0.0, 10_000.0, 10_000.0, false, 0.0, emptyList(), false, emptyMap()),
         ]
-        val closes = doubleSeriesOf(listOf(10_000.0))
-        val metrics = computeBacktestMetrics(cycles, 10_000.0, closes)
+        val metrics = computeBacktestMetrics(cycles, 10_000.0)
 
         assertEquals(1, metrics.totalTicks)
         assertEquals(0.0, metrics.totalReturn, 0.001, "Single cycle: totalReturn should be 0")

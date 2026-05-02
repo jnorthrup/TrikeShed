@@ -5,6 +5,7 @@ import borg.trikeshed.isam.meta.IOMemento
 import borg.trikeshed.lib.Join
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.j
+import borg.trikeshed.lib.size
 import borg.trikeshed.lib.toSeries
 import borg.trikeshed.lib.zip
 import kotlin.test.Test
@@ -17,7 +18,7 @@ class CursorTensorTest {
     @Suppress("UNCHECKED_CAST")
    fun rowVecOf(vararg pairs: Pair<Any?, IOMemento>): RowVec {
         val values: Series<Any?> = pairs.size j { pairs[it].first }
-        val metas: Series<()`ColumnMeta↻`> = pairs.size j { { RecordMeta("", pairs[it].second) } }
+        val metas: Series<ColumnMeta> = pairs.size j { RecordMeta("", pairs[it].second) }
         return values.zip(metas) as RowVec
     }
 

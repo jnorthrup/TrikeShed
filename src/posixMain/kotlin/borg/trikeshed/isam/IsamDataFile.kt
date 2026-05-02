@@ -2,6 +2,7 @@
 
 package borg.trikeshed.isam
 
+import borg.trikeshed.Files
 import borg.trikeshed.Usable
 import borg.trikeshed.cursor.Cursor
 import borg.trikeshed.cursor.RowVec
@@ -12,9 +13,6 @@ import kotlinx.cinterop.*
 import platform.posix.*
 import simple.PosixFile
 import simple.PosixOpenOpts
-import kotlin.collections.component1
-import kotlin.collections.component2
-import kotlin.collections.set
 
 actual class IsamDataFile actual constructor(
     datafileFilename: String,

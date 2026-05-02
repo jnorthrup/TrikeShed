@@ -224,7 +224,6 @@ fun closesFromCursor(cursor: Cursor): Series<Double> =
 fun computeBacktestMetrics(
     cycles: Series<CycleResult>,
     initialCapital: Double,
-    closePrices: Series<Double>,
     annualizationFactor: Double = sqrt(252.0),
 ): BacktestMetrics {
     if (cycles.isEmpty()) {
@@ -414,8 +413,7 @@ suspend fun simulateTicks(
     @Suppress("UNCHECKED_CAST")
     val nonNull = Array(n) { cycleArray[it]!! }
     val cycles: Series<CycleResult> = nonNull.toSeries()
-    val closes = closesFromCursor(cursor)
-    val metrics = computeBacktestMetrics(cycles, initialCapital, closes, annualizationFactor)
+    val metrics = computeBacktestMetrics(cycles, initialCapital, annualizationFactor)
 
     return BacktestResult(
         symbol = symbol,
@@ -558,18 +556,7 @@ suspend fun simulateMultiSymbolTicks(
     @Suppress("UNCHECKED_CAST")
     val nonNull = Array(tickCount) { cycleArray[it]!! }
     val cycles: Series<CycleResult> = nonNull.toSeries()
-    // For multi-symbol, we need one close per tick (not per cursor row).
-    // Use average close price across symbols at each tick for the price series.
-    val tickCloses: Series<Double> = timeList.map { openTime ->
-        val prices = (0 until n).mapNotNull { i ->
-            val row = cursor.at(i)
-            if (row.longValue("openTime") == openTime) {
-                row.doubleValue("close").takeIf { it > 0.0 } ?: row.doubleValue("open")
-            } else null
-        }
-        if (prices.isNotEmpty()) prices.average() else 0.0
-    }.toSeries()
-    val metrics = computeBacktestMetrics(cycles, initialCapital, tickCloses, annualizationFactor)
+    val metrics = computeBacktestMetrics(cycles, initialCapital, annualizationFactor)
 
     return BacktestResult(
         symbol = "MULTI",
@@ -766,12 +753,7 @@ fun HarnessRunResult.toBacktestResult(
         )
     }.toSeries()
 
-    // Build a dummy closes series (1 entry per tick) from totalValue, since
-    // HarnessRunResult doesn't carry raw price data. The closePrices param
-    // in computeBacktestMetrics is currently unused, but we provide a same-length
-    // series for API compatibility.
-    val closes: Series<Double> = cycleResults α { it.totalValue }
-    val metrics = computeBacktestMetrics(cycleResults, initialCapital, closes)
+    val metrics = computeBacktestMetrics(cycleResults, initialCapital)
 
     return BacktestResult(
         symbol = symbol,

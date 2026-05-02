@@ -205,8 +205,7 @@ class RunCycleRedTest {
             CycleResult(0, 0L, 5000.0, 5000.0, 10_000.0, false, 0.0, emptyList(), false, emptyMap()),
             CycleResult(1, 0L, 5000.0, 6000.0, 11_000.0, false, 0.0, emptyList(), false, emptyMap()),
         ]
-        val closes = doubleSeriesOf(listOf(10_000.0, 11_000.0))
-        val metrics = computeBacktestMetrics(cycles, 10_000.0, closes)
+        val metrics = computeBacktestMetrics(cycles, 10_000.0)
 
         assertEquals(0.10, metrics.totalReturn, 0.001)
     }
@@ -221,8 +220,7 @@ class RunCycleRedTest {
             CycleResult(2, 0L, 0.0, 95.0,  95.0,  false, 0.0, emptyList(), false, emptyMap()),
             CycleResult(3, 0L, 0.0, 105.0, 105.0, false, 0.0, emptyList(), false, emptyMap()),
         ]
-        val closes = doubleSeriesOf(listOf(100.0, 110.0, 95.0, 105.0))
-        val metrics = computeBacktestMetrics(cycles, 100.0, closes)
+        val metrics = computeBacktestMetrics(cycles, 100.0)
 
         assertTrue(metrics.maxDrawdown > 0.135 && metrics.maxDrawdown < 0.138,
             "maxDrawdown=${metrics.maxDrawdown} should be ≈ 13.6%")
@@ -235,8 +233,7 @@ class RunCycleRedTest {
             CycleResult(1, 0L, 0.0, 10_000.0, 10_000.0, false, 0.0, emptyList(), false, emptyMap()),
             CycleResult(2, 0L, 0.0, 10_000.0, 10_000.0, false, 0.0, emptyList(), false, emptyMap()),
         ]
-        val closes = doubleSeriesOf(listOf(10_000.0, 10_000.0, 10_000.0))
-        val metrics = computeBacktestMetrics(cycles, 10_000.0, closes)
+        val metrics = computeBacktestMetrics(cycles, 10_000.0)
 
         assertEquals(0.0, metrics.sharpeRatio, "Flat equity → zero variance → zero Sharpe")
     }
@@ -254,8 +251,7 @@ class RunCycleRedTest {
             CycleResult(2, 0L, 0.0, 110.0, 110.0, false, 0.0, emptyList(), false, emptyMap()),
             CycleResult(3, 0L, 0.0, 121.0, 121.0, false, 0.0, emptyList(), false, emptyMap()),
         ]
-        val closes = doubleSeriesOf(listOf(100.0, 110.0, 110.0, 121.0))
-        val metrics = computeBacktestMetrics(cycles, 100.0, closes)
+        val metrics = computeBacktestMetrics(cycles, 100.0)
 
         // Both ratios should be finite and positive for this up-only equity curve
         assertTrue(metrics.sharpeRatio > 0.0, "sharpe=${metrics.sharpeRatio} should be positive")
@@ -502,8 +498,7 @@ class RunCycleRedTest {
         val cycles = s_[
             CycleResult(0, 0L, 0.0, 10_000.0, 10_000.0, false, 0.0, emptyList(), false, emptyMap()),
         ]
-        val closes = doubleSeriesOf(listOf(10_000.0))
-        val metrics = computeBacktestMetrics(cycles, 10_000.0, closes)
+        val metrics = computeBacktestMetrics(cycles, 10_000.0)
 
         assertEquals(1, metrics.totalTicks)
         assertEquals(0.0, metrics.totalReturn, 0.001)
@@ -902,10 +897,10 @@ class RunCycleRedTest {
         val result = simulateTicks(cursor, engine, initialCapital = 10_000.0)
 
         // Using default (sqrt(252)) — assumes daily bars
-        val metricsDaily = computeBacktestMetrics(result.cycles, 10_000.0, closesFromCursor(cursor))
+        val metricsDaily = computeBacktestMetrics(result.cycles, 10_000.0)
         // Using hourly annualization — should give different Sharpe
         val metricsHourly = computeBacktestMetrics(
-            result.cycles, 10_000.0, closesFromCursor(cursor),
+            result.cycles, 10_000.0,
             annualizationFactor = TimeSpan.Hours1.annualizationFactor
         )
 

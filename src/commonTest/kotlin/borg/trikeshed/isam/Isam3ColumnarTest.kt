@@ -6,12 +6,14 @@ import borg.trikeshed.common.rm
 import borg.trikeshed.cursor.ColumnMeta
 import borg.trikeshed.cursor.Cursor
 import borg.trikeshed.cursor.RowVec
-import borg.trikeshed.cursor.j
 import borg.trikeshed.isam.meta.IOMemento
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.get
+import borg.trikeshed.lib.j
+import borg.trikeshed.lib.size
 import borg.trikeshed.lib.toList
 import borg.trikeshed.lib.toSeries
+import borg.trikeshed.lib.zip
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -194,11 +196,9 @@ class Isam3ColumnarTest {
 }
 
 private fun rowVecOf(vararg cells: CellSpec): RowVec {
-    val values: Series<Any?> = cells.size j { index: Int -> cells[index].value }
-    val metas: Series<() -> ColumnMeta> = cells.size j { index: Int ->
-        { RecordMeta(cells[index].name, cells[index].type) as ColumnMeta }
-    }
-    return values.j(metas)
+    val values: Series<Any?> = cells.size j { cells[it].value }
+    val metas: Series<() -> ColumnMeta> = cells.size j { { RecordMeta(cells[it].name, cells[it].type) } }
+    return values.zip(metas) as RowVec
 }
 
 private fun cursorOf(vararg rows: RowVec): Cursor = rows.toList().toSeries()

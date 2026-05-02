@@ -327,9 +327,8 @@ class BacktestIntegrationTest {
             )
         }
         val series: Series<CycleResult> = cycles.toSeries()
-        val closePrices: Series<Double> = cycles.map { it.totalValue / 100.0 }.toSeries()
 
-        val metrics = computeBacktestMetrics(series, initialCapital = 10_000.0, closePrices = closePrices)
+        val metrics = computeBacktestMetrics(series, initialCapital = 10_000.0)
 
         assertTrue(metrics.sharpeRatio != 0.0, "Volatile equity should produce non-zero Sharpe")
         assertTrue(metrics.sortinoRatio != 0.0, "Volatile equity should produce non-zero Sortino")
@@ -613,7 +612,7 @@ class BacktestIntegrationTest {
 
         // Step 3: Compute metrics with hourly annualization
         val hourlyMetrics = computeBacktestMetrics(
-            result.cycles, 10_000.0, closesFromCursor(cursor),
+            result.cycles, 10_000.0,
             annualizationFactor = TimeSpan.Hours1.annualizationFactor
         )
         assertEquals(result.metrics.totalReturn, hourlyMetrics.totalReturn, 0.001,
@@ -695,22 +694,14 @@ class BacktestIntegrationTest {
             initialCapital = 10_000.0,
         )
         val result = replay.replayCsv(csvText = csv1m, symbol = "BTCUSDT", timespan = TimeSpan.Minutes1)
-        val closes = closesFromCursor(result.cycles.let { cycles ->
-            // Re-derive cursor from the same CSV for close prices
-            val chars = csv1m.length j { i: Int -> csv1m[i] }
-            val klines = klinesFromCsv(chars, "BTCUSDT", TimeSpan.Minutes1)
-            val block = KlineBlock.mutable()
-            klines.view.forEach { block.append(it.toKline()) }
-            block.seal().asCursor()
-        })
 
         // Compute metrics with different annualization factors
         val sharpe1m = computeBacktestMetrics(
-            result.cycles, 10_000.0, closes,
+            result.cycles, 10_000.0,
             annualizationFactor = TimeSpan.Minutes1.annualizationFactor
         ).sharpeRatio
         val sharpe1d = computeBacktestMetrics(
-            result.cycles, 10_000.0, closes,
+            result.cycles, 10_000.0,
             annualizationFactor = TimeSpan.Days1.annualizationFactor
         ).sharpeRatio
 
