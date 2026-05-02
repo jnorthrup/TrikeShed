@@ -5,13 +5,6 @@ import borg.trikeshed.isam.meta.IOMemento
 import borg.trikeshed.lib.*
 import borg.trikeshed.lib.j
 
-sealed class MiniRowVec {
-    abstract val size: Int
-    abstract operator fun get(index: Int): Any?
-    abstract val child: Series<MiniRowVec>?
-    val isShell: Boolean get() = size == 0
-}
-
 /** Expose the row as a Series<Any?> for uniform Cursor traversal. */
 fun MiniRowVec.asSeries(): Series<Any?> = size j { this[it] }
 

@@ -4,7 +4,6 @@ val openapiRuntime: Configuration by configurations.creating
 
 dependencies {
     openapiRuntime(project(":libs:openapi"))
-    // kmpJvm uses api/implementation via sourceSets
 }
 
 val kotlinExt = extensions.getByName("kotlin") as org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
@@ -14,23 +13,29 @@ kotlinExt.sourceSets.getByName("commonMain").dependencies {
     api(project(":libs:htx-client"))
     api(project(":")) // Root for Confix parsing
 }
-kotlinExt.sourceSets.getByName("commonMain").kotlin.srcDir("src/generated/kotlin")
 
+// Generated sources go to build dir
+val generatedSrcDir = layout.buildDirectory.dir("generated-sources/jules-client")
+
+// Generate to build directory
 val openApiGenerateJulesClient by tasks.registering(JavaExec::class) {
     group = "openapi"
     description = "Generates htx-client API sources for Jules from the OpenAPI contract."
     dependsOn(":libs:openapi:jvmJar")
+    dependsOn(":libs:htx-client:jvmJar")
 
     val openApiSpec = layout.projectDirectory.file("openapi/jules.openapi.yaml")
-    val generatorJarPath = project(":libs:openapi").layout.buildDirectory.file("libs/openapi-jvm-1.0.jar") // Reverting to explicit since project version changes
-    val outputDir = layout.projectDirectory.dir("src/generated/kotlin")
+    val outputDir = generatedSrcDir.get()
 
     inputs.file(openApiSpec)
     inputs.files(project(":libs:openapi").tasks.named("jvmJar"))
+    inputs.files(project(":libs:htx-client").tasks.named("jvmJar"))
     inputs.files(openapiRuntime)
     outputs.dir(outputDir)
 
-    classpath = project(":libs:openapi").tasks.named("jvmJar").get().outputs.files + openapiRuntime
+    classpath = project(":libs:openapi").tasks.named("jvmJar").get().outputs.files +
+            project(":libs:htx-client").tasks.named("jvmJar").get().outputs.files +
+            openapiRuntime
     mainClass.set("borg.trikeshed.openapi.GenerateSourcesKt")
     args(
         "--spec", openApiSpec.asFile.absolutePath,
@@ -44,6 +49,9 @@ val openApiGenerateJulesClient by tasks.registering(JavaExec::class) {
         outputDir.asFile.mkdirs()
     }
 }
+
+// Add generated sources after generation task runs
+kotlinExt.sourceSets.getByName("commonMain").kotlin.srcDir(generatedSrcDir.map { it.asFile })
 
 val verifyJulesClientGeneratedSources by tasks.registering {
     group = "openapi"
