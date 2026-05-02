@@ -1,10 +1,11 @@
 package borg.trikeshed.couch.kline
 
-    import borg.trikeshed.cursor.Cursor
-    import borg.trikeshed.miniduck.toRowVec
-    import borg.trikeshed.lib.j
-    import borg.trikeshed.lib.toSeries
-    import borg.trikeshed.isam.meta.IOMemento
+     import borg.trikeshed.cursor.Cursor
+     import borg.trikeshed.miniduck.toRowVec
+     import borg.trikeshed.lib.get
+     import borg.trikeshed.lib.j
+     import borg.trikeshed.lib.toSeries
+     import borg.trikeshed.isam.meta.IOMemento
 
 /**
  * KlineBlock: DuckDB-style mutable→sealed chunk of klines.

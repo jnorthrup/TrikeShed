@@ -1,11 +1,15 @@
 package borg.trikeshed.userspace.btrfs
 
+import borg.trikeshed.collections._a
+import borg.trikeshed.collections.s_
 import borg.trikeshed.context.ElementState
-import borg.trikeshed.lib.*
+import borg.trikeshed.lib.get
+import borg.trikeshed.lib.j
+import borg.trikeshed.lib.size
+import borg.trikeshed.lib.view
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -55,16 +59,16 @@ class UserspaceBtrfsBufferTest_red {
 
         val key = BtrfsKey(1uL, 1u, 0uL)
         val data = byteArrayOf(0xDE.toByte(), 0xAD.toByte(), 0xBE.toByte(), 0xEF.toByte())
-        val item = BtrfsItem(key j data)
-        val leaf = BtrfsLeaf(listOf(item).toSeries())
+        val item: BtrfsItem = BtrfsItem(key, data)
+        val leaf = BtrfsLeaf(s_[item])
 
         val nodeId = buf.allocateNode()
         buf.writeLeaf(nodeId, leaf)
 
         val decoded = buf.readLeaf(nodeId)
         assertEquals(1, decoded.items.size)
-        assertEquals(key.objectId, decoded.items[0].key.objectId)
-        assertTrue(decoded.items[0].data.contentEquals(data))
+        assertEquals(key.objectId, decoded.items[0].a.objectId)
+        assertTrue(decoded.items[0].b.contentEquals(data))
 
         buf.close()
     }
@@ -74,16 +78,16 @@ class UserspaceBtrfsBufferTest_red {
         val buf = UserspaceBtrfsBuffer(chunkSize = 4096)
         buf.open()
 
-        val items = (1L..5L).map { i ->
-            BtrfsItem(BtrfsKey(i.toULong(), 1u, 0uL) j byteArrayOf(i.toByte()))
+        val items = 4 j { i:Int ->
+            BtrfsItem(BtrfsKey(i.inc().toULong(), 1u, 0uL), _a[(i.inc().toByte())])
         }
-        val leaf = BtrfsLeaf(items.toSeries())
+        val leaf = BtrfsLeaf(items)
         val nodeId = buf.allocateNode()
         buf.writeLeaf(nodeId, leaf)
 
         val decoded = buf.readLeaf(nodeId)
         assertEquals(5, decoded.items.size)
-        assertTrue(decoded.items.view.all { it.data.size == 1 })
+        assertTrue(decoded.items.view.all { it.b.size == 1 })
 
         buf.close()
     }

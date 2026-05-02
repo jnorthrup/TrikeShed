@@ -1,6 +1,8 @@
 package borg.trikeshed.couch.kline
 
+import borg.trikeshed.collections.s_
 import borg.trikeshed.miniduck.DocRowVec
+import borg.trikeshed.lib.Series
 
 /**
  * Standard kline (OHLCV candle) timespans.
@@ -38,14 +40,14 @@ data class Kline(
     val volume: Double,
 ) {
     companion object {
-        val schemaKeys = listOf(
+        val schemaKeys: Series<String> = s_[
             "symbol", "timespan", "openTime", "open", "high", "low", "close", "volume"
-        )
+        ]
     }
 
     fun toDocRowVec(): DocRowVec = DocRowVec(
         keys = schemaKeys,
-        cells = listOf(symbol, timespan, openTime, open, high, low, close, volume),
+        cells = s_[symbol, timespan, openTime, open, high, low, close, volume],
     )
 }
 
@@ -70,18 +72,18 @@ data class ExtendedKline(
     fun toKline(): Kline = Kline(symbol, timespan, openTime, open, high, low, close, volume)
 
     fun toDocRowVec(): DocRowVec = DocRowVec(
-        keys = listOf(
+        keys = s_[
             "symbol", "timespan", "openTime",
             "open", "high", "low", "close", "volume",
             "closeTime", "quoteAssetVolume", "trades",
             "takerBuyBaseVolume", "takerBuyQuoteVolume"
-        ),
-        cells = listOf(
+        ],
+        cells = s_[
             symbol, timespan, openTime,
             open, high, low, close, volume,
             closeTime, quoteAssetVolume, trades,
             takerBuyBaseVolume, takerBuyQuoteVolume
-        ),
+        ],
     )
 }
 

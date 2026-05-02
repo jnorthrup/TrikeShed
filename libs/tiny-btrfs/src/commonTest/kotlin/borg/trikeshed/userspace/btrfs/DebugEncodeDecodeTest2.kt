@@ -1,6 +1,9 @@
 package borg.trikeshed.userspace.btrfs
 
-import borg.trikeshed.lib.*
+import borg.trikeshed.collections.s_
+import borg.trikeshed.lib.get
+import borg.trikeshed.lib.size
+import kotlinx.coroutines.test.TestResult
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -14,8 +17,8 @@ class DebugEncodeDecodeTest2 {
     fun minimalEncodeDecode() = runTest {
         val key = BtrfsKey(1uL, 1u, 0uL)
         val data = byteArrayOf(0xDE.toByte(), 0xAD.toByte(), 0xBE.toByte(), 0xEF.toByte())
-        val item = BtrfsItem(key j data)
-        val leaf = BtrfsLeaf(listOf(item).toSeries())
+        val item = BtrfsItem(key, data)
+        val leaf = BtrfsLeaf(s_[item])
 
         val buf = ByteArray(BTRFS_NODE_SIZE)
 
@@ -56,8 +59,8 @@ class DebugEncodeDecodeTest2 {
 
         val key = BtrfsKey(1uL, 1u, 0uL)
         val data = byteArrayOf(0xDE.toByte(), 0xAD.toByte(), 0xBE.toByte(), 0xEF.toByte())
-        val item = BtrfsItem(key j data)
-        val leaf = BtrfsLeaf(listOf(item).toSeries())
+        val item = BtrfsItem(key, data)
+        val leaf = BtrfsLeaf(s_[item])
 
         // Encode
         encodeLeaf(leaf, buf, 0UL)
@@ -67,20 +70,21 @@ class DebugEncodeDecodeTest2 {
 
         // Compare
         assertEquals(1, decoded.items.size)
-        assertEquals(key.objectId, decoded.items[0].key.objectId)
-        assertTrue(decoded.items[0].data.contentEquals(data))
+        val item1: BtrfsItem = decoded.items[0]
+        assertEquals(key.objectId, item1.a.objectId)
+        assertTrue(item1.b.contentEquals(data))
         println("PASS: direct round-trip works")
     }
 
     @Test
-    fun viaBuffer() = runTest {
+    fun viaBuffer(): TestResult = runTest {
         val buf = UserspaceBtrfsBuffer(chunkSize = 4096)
         buf.open()
 
         val key = BtrfsKey(1uL, 1u, 0uL)
         val data = byteArrayOf(0xDE.toByte(), 0xAD.toByte(), 0xBE.toByte(), 0xEF.toByte())
-        val item = BtrfsItem(key j data)
-        val leaf = BtrfsLeaf(listOf(item).toSeries())
+        val item = BtrfsItem(key, data)
+        val leaf = BtrfsLeaf(s_[item])
 
         val nodeId = buf.allocateNode()
         buf.writeLeaf(nodeId, leaf)

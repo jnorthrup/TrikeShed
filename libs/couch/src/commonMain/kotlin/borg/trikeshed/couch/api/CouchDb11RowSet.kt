@@ -1,6 +1,8 @@
 package borg.trikeshed.couch.api
 
+import borg.trikeshed.cursor.RowVec
 import borg.trikeshed.miniduck.*
+import borg.trikeshed.lib.j
 import borg.trikeshed.lib.toSeries
 import borg.trikeshed.parse.json.JsonParser
 import borg.trikeshed.miniduck.mutable
@@ -26,7 +28,7 @@ data class CouchDb11RowSet(
                 val row = rawRow as? Map<String, Any?>
                     ?: error("CouchDB row entry must be a JSON object")
                 val docMap = row.mapValueOrNull("doc")
-                val docLoader: (() -> MiniRowVec)? = docMap?.let { map -> { parseDocRowVec(map) } }
+                val docLoader: (() -> RowVec)? = docMap?.let { map -> { parseDocRowVec(map) } }
 
                 block.append(
                     ViewRowVec(
@@ -45,9 +47,10 @@ data class CouchDb11RowSet(
             )
         }
 
-       fun parseDocRowVec(map: Map<String, Any?>): borg.trikeshed.cursor.RowVec {
-            val keys = map.keys.toList()
-            val cells = keys.map { key -> map[key] }
+        fun parseDocRowVec(map: Map<String, Any?>): borg.trikeshed.cursor.RowVec {
+            val entries = map.entries.toList()
+            val keys = entries.size j { index: Int -> entries[index].key }
+            val cells = entries.size j { index: Int -> entries[index].value }
             return DocRowVec(keys = keys, cells = cells).toRowVec()
         }
 

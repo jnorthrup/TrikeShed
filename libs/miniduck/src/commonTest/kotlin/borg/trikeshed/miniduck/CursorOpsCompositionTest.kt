@@ -1,6 +1,7 @@
 package borg.trikeshed.miniduck
 
 import borg.trikeshed.cursor.Cursor
+import borg.trikeshed.cursor.getValue
 import borg.trikeshed.lib.*
 import kotlin.test.Test
 import kotlin.test.assertEquals

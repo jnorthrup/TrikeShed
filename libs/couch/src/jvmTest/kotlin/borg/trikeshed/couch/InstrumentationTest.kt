@@ -1,7 +1,6 @@
 package borg.trikeshed.couch
 
 import borg.trikeshed.couch.instrument.*
-import java.util.concurrent.atomic.AtomicLong
 import kotlin.test.*
 
 /**

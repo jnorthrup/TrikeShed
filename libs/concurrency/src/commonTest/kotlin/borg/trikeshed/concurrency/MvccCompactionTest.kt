@@ -1,8 +1,6 @@
 package borg.trikeshed.concurrency
 
 import borg.trikeshed.miniduck.*
-import borg.trikeshed.miniduck.tablespace.*
-import borg.trikeshed.cursor.*
 import kotlin.test.*
 
 class MvccCompactionTest {

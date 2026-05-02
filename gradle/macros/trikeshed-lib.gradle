@@ -169,7 +169,18 @@ switch (project.path) {
         kmpFull()
         break
     case ":libs:dreamer-kmm":
-        kmpFull(rootMode: "implementation", coroutinesMain: false)
+        kmpFull(rootMode: "implementation", coroutinesMain: true, datetimeMain: true)
+        // Additional deps needed by dreamer-kmm beyond what kmpFull provides
+        extensions.getByName("kotlin").sourceSets.getByName("commonMain").dependencies {
+            api libPeer("miniduck")
+            api libPeer("kursive")
+            api libPeer("quic")
+            api libPeer("ngsctp")
+            implementation libPeer("couch")
+        }
+        extensions.getByName("kotlin").sourceSets.getByName("commonTest").dependencies {
+            implementation libPeer("miniduck")
+        }
         break
     case ":libs:kursive":
     case ":libs:patl":

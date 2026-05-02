@@ -1,6 +1,5 @@
 package borg.trikeshed.miniduck
 
-import borg.trikeshed.lib.Twin
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.size

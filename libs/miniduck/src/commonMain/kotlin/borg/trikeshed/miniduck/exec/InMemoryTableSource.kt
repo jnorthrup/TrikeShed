@@ -1,8 +1,9 @@
 package borg.trikeshed.miniduck.exec
 
 import borg.trikeshed.cursor.Cursor
+import borg.trikeshed.lib.emptySeries
 import borg.trikeshed.lib.j
-import borg.trikeshed.lib.size
+import borg.trikeshed.lib.toSeries
 import borg.trikeshed.miniduck.DocRowVec
 import borg.trikeshed.miniduck.toRowVec
 
@@ -20,13 +21,13 @@ class InMemoryTableSource : TableSource {
 
     override fun insert(execCtx: ExecutionContext, tableName: String, row: List<Any?>) {
         val list = tables.getOrPut(tableName) { mutableListOf() }
-        list.add(DocRowVec(emptyList(), row))
+        list.add(DocRowVec(emptySeries<String>(), row.toSeries()))
     }
 
     override suspend fun insertSuspend(execCtx: ExecutionContext, tableName: String, row: List<Any?>) = insert(execCtx, tableName, row)
 
     override fun seedRows(tableName: String, rows: List<List<Any?>>) {
         val list = tables.getOrPut(tableName) { mutableListOf() }
-        rows.forEach { r -> list.add(DocRowVec(emptyList(), r)) }
+        rows.forEach { r -> list.add(DocRowVec(emptySeries<String>(), r.toSeries())) }
     }
 }

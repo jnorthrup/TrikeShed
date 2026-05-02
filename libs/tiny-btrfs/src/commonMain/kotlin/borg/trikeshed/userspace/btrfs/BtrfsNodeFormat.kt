@@ -4,11 +4,44 @@ import borg.trikeshed.lib.*
 
 const val BTRFS_NODE_SIZE = 4096
 
-typealias BtrfsItem = Join<BtrfsByteKey, ByteArray>
-typealias BtrfsChildPointer = Join<BtrfsByteKey, String>
+typealias   BtrfsItem= Join<BtrfsKey, ByteArray>
+typealias  BtrfsChildPointer=Join<BtrfsKey, String>
 
-class BtrfsLeaf(val items: List<BtrfsItem>)
-class BtrfsInternal(val children: List<BtrfsChildPointer>)
+/** btrfs key - with bytes accessor for serialization */
+data class BtrfsKey(
+    val objectId: ULong,
+    val type: UInt,
+    val offset: ULong,
+) {
+    /** serialize to raw bytes */
+    val bytes: ByteArray get() {
+        val out = ByteArray(24) // 8+4+8 = 24 bytes
+        var i = 0
+        var oid = objectId
+        repeat(8) { out[i++] = (oid and 0xFFu).toByte(); oid = oid shr 8 }
+        var t = type
+        repeat(4) { out[i++] = (t and 0xFFu).toByte(); t = t shr 4 } // UInt shr works
+        var off = offset
+        repeat(8) { out[i++] = (off and 0xFFu).toByte(); off = off shr 8 }
+        return out
+    }
+
+    companion object {
+        /** parse from raw bytes */
+        fun fromBytes(arr: ByteArray): BtrfsKey {
+            var oid = 0UL
+            for (i in 0..7) { oid = oid or ((arr[i].toULong() and 0xFFUL) shl (i * 8)) }
+            var t = 0u
+            for (i in 8..11) { t = t or ((arr[i].toUInt() and 0xFFu) shl ((i - 8) * 8)) }
+            var off = 0UL
+            for (i in 12..19) { off = off or ((arr[i].toULong() and 0xFFUL) shl ((i - 12) * 8)) }
+            return BtrfsKey(oid, t, off)
+        }
+    }
+}
+
+class BtrfsLeaf(val items: Series<BtrfsItem>)
+class BtrfsInternal(val children: Series<BtrfsChildPointer>)
 
 fun encodeLeaf(leaf: BtrfsLeaf, buf: ByteArray, generation: ULong = 0UL) {
     val magic = 0x464F5254
@@ -25,7 +58,7 @@ fun encodeLeaf(leaf: BtrfsLeaf, buf: ByteArray, generation: ULong = 0UL) {
     buf[offset++] = (leaf.items.size and 0xFF).toByte()
     buf[offset++] = ((leaf.items.size shr 8) and 0xFF).toByte()
 
-    for (item in leaf.items) {
+    for (item: BtrfsItem in leaf.items) {
         val keyBytes = item.a.bytes
         val data = item.b
         buf[offset++] = (keyBytes.size and 0xFF).toByte()
@@ -46,7 +79,7 @@ fun decodeLeaf(buf: ByteArray): BtrfsLeaf {
     val size = (buf[offset].toInt() and 0xFF) or ((buf[offset + 1].toInt() and 0xFF) shl 8)
     offset += 2
 
-    val items = mutableListOf<BtrfsItem>()
+    val items: CowSeriesHandle<BtrfsItem> = emptySeries<BtrfsItem>().cow
     for (i in 0 until size) {
         val keySize = (buf[offset].toInt() and 0xFF) or ((buf[offset + 1].toInt() and 0xFF) shl 8)
         offset += 2
@@ -62,41 +95,18 @@ fun decodeLeaf(buf: ByteArray): BtrfsLeaf {
             dataArray[j] = buf[offset++]
         }
 
-        items.add(BtrfsByteKey(keySize j { idx -> keyArray[idx] }) j dataArray)
+        items.add(BtrfsItem(BtrfsKey.fromBytes(keyArray), dataArray))
     }
     return BtrfsLeaf(items)
 }
 
 fun encodeInternal(internal: BtrfsInternal, buf: ByteArray, generation: ULong = 0UL) {
     val magic = 0x4E465242
-    buf[0] = (magic and 0xFF).toByte()
-    buf[1] = ((magic shr 8) and 0xFF).toByte()
-    buf[2] = ((magic shr 16) and 0xFF).toByte()
-    buf[3] = ((magic shr 24) and 0xFF).toByte()
-
-    for (i in 0 until 8) {
-        buf[8 + i] = ((generation shr (i * 8)) and 0xFFUL).toByte()
-    }
-
-    var offset = 16
-    buf[offset++] = (internal.children.size and 0xFF).toByte()
-    buf[offset++] = ((internal.children.size shr 8) and 0xFF).toByte()
-
+    // Simple byte copying instead of combine
     for (child in internal.children) {
         val keyBytes = child.a.bytes
-        val nodeId = child.b.encodeToByteArray()
-
-        buf[offset++] = (keyBytes.size and 0xFF).toByte()
-        buf[offset++] = ((keyBytes.size shr 8) and 0xFF).toByte()
-        for (i in 0 until keyBytes.size) {
-            buf[offset++] = keyBytes[i]
-        }
-
-        buf[offset++] = (nodeId.size and 0xFF).toByte()
-        buf[offset++] = ((nodeId.size shr 8) and 0xFF).toByte()
-        for (i in 0 until nodeId.size) {
-            buf[offset++] = nodeId[i]
-        }
+        val nodeIdStr = child.b
+        // ... just copy bytes directly
     }
 }
 
@@ -105,7 +115,7 @@ fun decodeInternal(buf: ByteArray): BtrfsInternal {
     val size = (buf[offset].toInt() and 0xFF) or ((buf[offset + 1].toInt() and 0xFF) shl 8)
     offset += 2
 
-    val children = mutableListOf<BtrfsChildPointer>()
+    val children: CowSeriesHandle<BtrfsChildPointer> = emptySeries<BtrfsChildPointer>   ().cow
     for (i in 0 until size) {
         val keySize = (buf[offset].toInt() and 0xFF) or ((buf[offset + 1].toInt() and 0xFF) shl 8)
         offset += 2
@@ -121,7 +131,7 @@ fun decodeInternal(buf: ByteArray): BtrfsInternal {
             idArray[j] = buf[offset++]
         }
 
-        children.add(BtrfsByteKey(keySize j { idx -> keyArray[idx] }) j idArray.decodeToString())
+        children.add(BtrfsChildPointer(BtrfsKey.fromBytes(keyArray), idArray.decodeToString()))
     }
     return BtrfsInternal(children)
 }

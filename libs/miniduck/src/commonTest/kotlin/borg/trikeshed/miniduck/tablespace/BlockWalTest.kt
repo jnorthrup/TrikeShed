@@ -1,7 +1,6 @@
 package borg.trikeshed.miniduck.tablespace
 
 import borg.trikeshed.miniduck.*
-import borg.trikeshed.lib.*
 import kotlin.test.*
 
 /**

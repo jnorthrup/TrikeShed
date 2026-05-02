@@ -16,7 +16,9 @@ data class ViewQueryPlan(
     val designDocument: String,
     val viewName: String,
     val parameters: Map<String, String> = emptyMap(),
-) : QueryPlan()
+) : QueryPlan() {
+    val database: String get() = source.database
+}
 
 // Helper to attach a parameter to a QueryPlan; returns a new plan for the common stub.
 fun QueryPlan.withParameter(key: String, value: Any?): QueryPlan = when (this) {

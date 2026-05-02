@@ -5,10 +5,7 @@ import borg.trikeshed.isam.meta.IOMemento.*
 import borg.trikeshed.lib.*
 
 fun RowVec.getValue(key: String): Any? {//todo prepared context for binsearch?
-    for (index in 0 until size) {
-        val cell: Join<Any?, `ColumnMeta↻`> = b(index)
-        if (cell.b().a == key) return cell.a
-    }
+    for (index in 0 until size) b(index).let { cell-> if (cell.b().a == key) return cell.a }
     return null
 }
 

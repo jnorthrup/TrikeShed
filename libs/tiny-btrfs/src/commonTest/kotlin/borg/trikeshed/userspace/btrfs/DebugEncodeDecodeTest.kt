@@ -1,9 +1,9 @@
 package borg.trikeshed.userspace.btrfs
 
-import borg.trikeshed.lib.*
+import borg.trikeshed.collections.s_
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
-import kotlin.test.assertEquals
+
 
 class DebugEncodeDecodeTest {
     @Test
@@ -13,8 +13,8 @@ class DebugEncodeDecodeTest {
 
         val key = BtrfsKey(1uL, 1u, 0uL)
         val data = byteArrayOf(0xDE.toByte(), 0xAD.toByte(), 0xBE.toByte(), 0xEF.toByte())
-        val item: BtrfsItem = BtrfsItem(key j data)
-        val leaf = BtrfsLeaf(listOf(item).toSeries())
+        val item: BtrfsItem = BtrfsItem(key, data)
+        val leaf = BtrfsLeaf(s_[item])
 
         val nodeId = buf.allocateNode()
 

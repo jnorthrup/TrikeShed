@@ -1,6 +1,7 @@
 package borg.trikeshed.miniduck
 
 import borg.trikeshed.context.ElementState
+import borg.trikeshed.cursor.Cursor
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 
@@ -26,7 +27,7 @@ data class StochasticPolicy(
  * the supplied parameter map.
  */
 interface KernelFeatureTransformer {
-    fun transform(cursor: MiniCursor, params: Map<String, Any>): MiniCursor
+    fun transform(cursor: Cursor, params: Map<String, Any>): Cursor
 }
 
 // ── Stochastic Trainer ───────────────────────────────────────────────────────
@@ -41,7 +42,7 @@ interface KernelStochasticTrainer {
     val lifecycleState: ElementState
 
     suspend fun open()
-    suspend fun train(cursor: MiniCursor, params: Map<String, Any>): StochasticPolicy
+    suspend fun train(cursor: Cursor, params: Map<String, Any>): StochasticPolicy
     suspend fun drain()
     suspend fun close()
 }
@@ -63,7 +64,7 @@ suspend fun executeKernelOptimizingHarness(
     symbols: List<String>,
     timeframes: List<String>,
     searchSpace: List<Map<String, Any>>,
-    cacheProvider: (String, String) -> MiniCursor,
+    cacheProvider: (String, String) -> Cursor,
     transformer: KernelFeatureTransformer,
     trainer: KernelStochasticTrainer,
 ): List<StochasticPolicy> {
