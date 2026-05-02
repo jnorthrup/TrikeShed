@@ -727,4 +727,130 @@ class BacktestIntegrationTest {
                 "Sharpe ratio should scale with annualization factor")
         }
     }
+
+    // ── HarnessRunResult ↔ BacktestResult bridge tests ──────────────────────
+
+    /**
+     * RealtimeHarness.replay → HarnessRunResult.toBacktestResult → BacktestReport.
+     * Bridges the two simulation pipelines.
+     */
+    @Test
+    fun `HarnessRunResult toBacktestResult bridges RealtimeHarness into BacktestReport`() = runTest {
+        val btc = block("BTC", listOf(100.0, 102.0, 104.0, 106.0))
+        val eth = block("ETH", listOf(10.0, 9.8, 10.1, 10.4))
+        val harness = RealtimeHarness(
+            genome = defaultGenome(),
+            initialCapital = 10_000.0,
+            stochasticSeed = 11,
+            stochasticSpanLength = 2,
+        )
+        val harnessRun = harness.replay(
+            listOf(
+                HarnessReplayInput(klineSeriesKey("BTC", "USDT", TimeSpan.Minutes1), btc),
+                HarnessReplayInput(klineSeriesKey("ETH", "USDT", TimeSpan.Minutes1), eth),
+            )
+        )
+
+        val result = harnessRun.toBacktestResult(symbol = "BTC+ETH", initialCapital = 10_000.0)
+        assertEquals("BTC+ETH", result.symbol)
+        assertEquals(10_000.0, result.initialCapital)
+        assertEquals(4, result.cycles.size)
+        assertEquals(4, result.metrics.totalTicks)
+        assertTrue(result.metrics.totalReturn.isFinite())
+        assertTrue(result.metrics.sharpeRatio.isFinite())
+        assertTrue(result.metrics.maxDrawdown >= 0.0)
+
+        val report = result.toBacktestReport()
+        assertEquals("BTC+ETH", report.symbol)
+        assertEquals(10_000.0, report.initialCapital)
+        assertEquals(4, report.totalTicks)
+        assertTrue(report.finalEquity > 0.0)
+    }
+
+    @Test
+    fun `HarnessRunResult toBacktestResult empty run produces zero sentinel`() = runTest {
+        val emptyBlock = KlineBlock.mutable(TimeSpan.Minutes1).seal()
+        val harness = RealtimeHarness(
+            genome = defaultGenome(),
+            initialCapital = 10_000.0,
+        )
+        val harnessRun = harness.replay(
+            listOf(HarnessReplayInput(klineSeriesKey("BTC", "USDT", TimeSpan.Minutes1), emptyBlock))
+        )
+
+        val result = harnessRun.toBacktestResult(initialCapital = 10_000.0)
+        assertEquals(0, result.cycles.size)
+        assertEquals(0, result.metrics.totalTicks)
+        assertEquals(0.0, result.metrics.totalReturn)
+    }
+
+    /**
+     * HarnessRunResult.toBacktestReport convenience — one call from harness to report.
+     */
+    @Test
+    fun `HarnessRunResult toBacktestReport convenience produces stable summary`() = runTest {
+        val btc = block("BTC", listOf(100.0, 101.0, 103.0, 102.0, 105.0))
+        val harness = RealtimeHarness(
+            genome = defaultGenome(),
+            initialCapital = 10_000.0,
+        )
+        val harnessRun = harness.replay(
+            listOf(HarnessReplayInput(klineSeriesKey("BTC", "USDT", TimeSpan.Minutes1), btc))
+        )
+
+        val report = harnessRun.toBacktestReport(symbol = "BTCUSDT", initialCapital = 10_000.0)
+        assertEquals("BTCUSDT", report.symbol)
+        assertEquals(10_000.0, report.initialCapital)
+        assertEquals(5, report.totalTicks)
+        assertTrue(report.finalEquity > 0.0)
+        assertTrue(report.totalReturn.isFinite())
+        assertTrue(report.sharpeRatio.isFinite())
+    }
+
+    /**
+     * GenomeTrainer → HarnessRunResult → BacktestResult → aggregateReports.
+     * Full pipeline from training through to aggregate report.
+     */
+    @Test
+    fun `GenomeTrainer output feeds into aggregateReports via HarnessRunResult bridge`() = runTest {
+        val key = klineSeriesKey("BTC", "USDT", TimeSpan.Minutes1)
+        val trainer = GenomeTrainer(initialCapital = 10_000.0)
+        val trainingResult = trainer.trainOneDimensional(
+            key = key,
+            block = block("BTC", listOf(100.0, 101.0, 103.0, 102.0, 105.0)),
+        )
+
+        assertTrue(trainingResult.evaluations.isNotEmpty())
+
+        // Convert each candidate's HarnessRunResult into a BacktestReport
+        val reports = trainingResult.evaluations.map { candidate ->
+            candidate.result.toBacktestReport(symbol = "BTCUSDT", initialCapital = 10_000.0)
+        }
+
+        val aggregate = aggregateReports(reports, bestGenome = trainingResult.champion.backing)
+        assertEquals(reports.size, aggregate.runCount)
+        assertTrue(aggregate.totalTicks > 0)
+        assertTrue(aggregate.avgSharpeRatio.isFinite())
+        assertNotNull(aggregate.bestGenome)
+    }
+
+    private fun block(base: String, prices: List<Double>): KlineBlock {
+        val block = KlineBlock.mutable(TimeSpan.Minutes1)
+        prices.forEachIndexed { index, close ->
+            val open = if (index == 0) close else prices[index - 1]
+            block.append(
+                Kline(
+                    symbol = "${base}USDT",
+                    timespan = TimeSpan.Minutes1,
+                    openTime = 1_704_067_200_000L + (index * 60_000L),
+                    open = open,
+                    high = maxOf(open, close) + 1.0,
+                    low = minOf(open, close) - 1.0,
+                    close = close,
+                    volume = 100.0 + index,
+                )
+            )
+        }
+        return block.seal()
+    }
 }

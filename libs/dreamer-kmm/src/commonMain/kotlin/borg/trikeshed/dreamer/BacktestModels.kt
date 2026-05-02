@@ -683,3 +683,80 @@ fun aggregateEvaluations(
     val championGenome = evaluations.maxByOrNull { it.fitness }?.genome?.backing
     return aggregateReports(reports, bestGenome ?: championGenome)
 }
+
+/**
+ * Convert a [HarnessRunResult] (RealtimeHarness pipeline) into a [BacktestResult].
+ *
+ * This bridges the two simulation pipelines:
+ * - **BacktestModels path**: CSV → KlineBlock → Cursor → simulateTicks → BacktestResult
+ * - **RealtimeHarness path**: KlineBlock → replay → HarnessRunResult
+ *
+ * The adapter maps each [HarnessCycle] to a [CycleResult] and then runs
+ * [computeBacktestMetrics] over the resulting series, producing a result
+ * that can feed into [aggregateReports], [aggregateEvaluations], and [toBacktestReport].
+ *
+ * @param harnessRun  the [HarnessRunResult] from [RealtimeHarness.replay]
+ * @param symbol      symbol label for the result (defaults to "MULTI")
+ * @param initialCapital  starting capital used in the harness run
+ */
+fun HarnessRunResult.toBacktestResult(
+    symbol: String = "MULTI",
+    initialCapital: Double,
+): BacktestResult {
+    if (cycles.isEmpty()) {
+        return BacktestResult(
+            symbol = symbol,
+            initialCapital = initialCapital,
+            cycles = emptySeries(),
+            metrics = BacktestMetrics(
+                totalTicks = 0,
+                totalReturn = 0.0,
+                sharpeRatio = 0.0,
+                sortinoRatio = 0.0,
+                maxDrawdown = 0.0,
+                maxDrawdownTicks = 0,
+                totalHarvested = 0.0,
+                totalTrades = 0,
+                avgHarvestPerTick = 0.0,
+            ),
+        )
+    }
+
+    val cycleResults: Series<CycleResult> = cycles.mapIndexed { index, cycle ->
+        CycleResult(
+            tick = index,
+            openTime = cycle.frame.openTime,
+            cashBalance = if (index == cycles.lastIndex) finalCash else 0.0,
+            holdingsValue = cycle.totalValue - (if (index == cycles.lastIndex) finalCash else 0.0),
+            totalValue = cycle.totalValue,
+            anyTradesThisCycle = cycle.result.anyTradesThisCycle,
+            harvestedAmount = cycle.result.harvestedAmount,
+            tradedSymbols = cycle.result.tradedSymbols,
+            rebalanceScheduled = false,
+            engineSnapshot = emptyMap(),
+        )
+    }.toSeries()
+
+    // Build a dummy closes series (1 entry per tick) from totalValue, since
+    // HarnessRunResult doesn't carry raw price data. The closePrices param
+    // in computeBacktestMetrics is currently unused, but we provide a same-length
+    // series for API compatibility.
+    val closes: Series<Double> = cycleResults α { it.totalValue }
+    val metrics = computeBacktestMetrics(cycleResults, initialCapital, closes)
+
+    return BacktestResult(
+        symbol = symbol,
+        initialCapital = initialCapital,
+        cycles = cycleResults,
+        metrics = metrics,
+    )
+}
+
+/**
+ * Convenience: convert a [HarnessRunResult] directly to a [BacktestReport],
+ * bridging the RealtimeHarness path into the report aggregation pipeline.
+ */
+fun HarnessRunResult.toBacktestReport(
+    symbol: String = "MULTI",
+    initialCapital: Double,
+): BacktestReport = toBacktestResult(symbol, initialCapital).toBacktestReport()
