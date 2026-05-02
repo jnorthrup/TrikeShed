@@ -122,9 +122,9 @@ class UserspaceMemoryBufferTest {
     // Minimal serialization for the BPlusTree<Long, String> smoke test.
     private fun serializeTree(tree: BPlusTree<Long, String>): ByteArray {
         val sb = StringBuilder()
-        sb.append("${tree._size}\n")
+        sb.append("${tree.size()}\n")
         // Walk in-order and serialize each entry
-        for (i in 1L..tree._size.toLong()) {
+        for (i in 1L..tree.size().toLong()) {
             val v = tree.get(i)
             if (v != null) sb.append("$i=$v\n")
         }

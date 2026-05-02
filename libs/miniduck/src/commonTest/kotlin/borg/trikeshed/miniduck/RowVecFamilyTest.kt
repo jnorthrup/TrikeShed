@@ -52,7 +52,7 @@ class RowVecFamilyTest {
         repeat(5) { i -> block.append(DocRowVec(listOf("i"), listOf(i))) }
         assertEquals(5, block.rowCount)
         assertEquals(5, block.child.size)
-        for (i in 0 until 5) assertEquals(i, (block.child[i] as DocRowVec)["i"])
+        for (i in 0 until 5) assertEquals(i, block.child[i].getValue("i"))
     }
 
     // --- DocRowVec ---
@@ -142,14 +142,14 @@ class RowVecFamilyTest {
 
     @Test
     fun blobNoFactoryMeansNullChild() {
-        val blob = BlobRowVec(byteArrayOf())
+        val blob = BlobRowVec(byteArrayOf()).toRowVec()
         assertNull(blob.child)
     }
 
     @Test
     fun blobChildFactoryInvokedLazily() {
         var invoked = false
-        val blob = BlobRowVec(byteArrayOf(0x7b, 0x7d)) { bytes ->
+        val blob = BlobRowVec(byteArrayOf(0x7b, 0x7d)).toRowVec() { bytes ->
             invoked = true
             val json = JsonRowVec("object", "{}")
             1 j { json }

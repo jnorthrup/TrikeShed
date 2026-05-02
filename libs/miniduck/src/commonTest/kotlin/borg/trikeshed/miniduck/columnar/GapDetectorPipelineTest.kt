@@ -18,10 +18,10 @@ import kotlin.test.*
    ═══════════════════════════════════════════════════════════════════════ */
 val INTERVAL_1M = 60_000L
 val INTERVAL_5M = 300_000L
-private fun klineRow(openTime: Long): DocRowVec = DocRowVec(
+private fun klineRow(openTime: Long): borg.trikeshed.cursor.RowVec = DocRowVec(
     keys = listOf("openTime", "open", "high", "low", "close", "volume", "symbol", "interval"),
     cells = listOf<Any?>(openTime, 69000.0, 69100.0, 68900.0, 69000.0, 100.0, "BTCUSDT", "1m"),
-)
+).toRowVec()
 
 /* ═══════════════════════════════════════════════════════════════════════
    STAGE 0a: GAP DETECTION RED TESTS
@@ -75,10 +75,10 @@ class GapDetectorPipelineTest {
         )
         val cursor: Cursor = rows.size j { i -> rows[i] }
         val result: Cursor = GapDetector.find(cursor, INTERVAL_1M)
-        assertEquals(1709251380000L, (result.at(0) as DocRowVec)["openTime"])
-        assertEquals(1709251440000L, (result.at(0) as DocRowVec)["expected"])
-        assertEquals(1709251680000L, (result.at(0) as DocRowVec)["actual"])
-        assertEquals(240_000L, (result.at(0) as DocRowVec)["missingMs"])
+        assertEquals(1709251380000L, result.at(0).getValue("openTime"))
+        assertEquals(1709251440000L, result.at(0).getValue("expected"))
+        assertEquals(1709251680000L, result.at(0).getValue("actual"))
+        assertEquals(240_000L, result.at(0).getValue("missingMs"))
     }
 
     /** Jitter within 10% tolerance produces zero gaps. */

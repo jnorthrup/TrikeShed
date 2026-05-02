@@ -31,6 +31,19 @@ import borg.trikeshed.lib.size
  * @return [Series]<[ExtendedKline]> — one element per data row
  */
 fun klinesFromCsv(
+    csvText: String,
+    symbol: String,
+    timespan: TimeSpan,
+): Series<ExtendedKline> = klinesFromCsv(
+    csvText = csvText.length j { i: Int -> csvText[i] },
+    symbol = symbol,
+    timespan = timespan,
+)
+
+/**
+ * Parse Binance archive CSV from a [Series]<[Char]> character series.
+ */
+fun klinesFromCsv(
     csvText: Series<Char>,
     symbol: String,
     timespan: TimeSpan,

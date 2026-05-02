@@ -3,11 +3,12 @@
 package borg.trikeshed
 
 import borg.trikeshed.lib.fromOctal
-import kotlinx.cinterop.*
-import kotlin.random.*
+import kotlinx.cinterop.ExperimentalForeignApi
+import kotlinx.cinterop.convert
 import platform.posix.mkdir as posixMkdir
 import platform.posix.remove
-import platform.posix.*
+import platform.posix.rmdir
+import kotlin.random.Random
 
 /** emulates shell command*/
 actual fun mktemp(): String {
@@ -28,5 +29,5 @@ actual fun  mkdir(path: String): Boolean {
         mkdir(parent)
     }
 
-    return Files.exists(normalized) || posixMkdir(normalized, 777.fromOctal().toUInt()cmopile and fix) == 0
+    return Files.exists(normalized) || posixMkdir(normalized, 777.fromOctal().convert()) == 0
 }

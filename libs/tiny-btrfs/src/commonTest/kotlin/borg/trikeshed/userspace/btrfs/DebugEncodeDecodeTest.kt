@@ -14,7 +14,8 @@ class DebugEncodeDecodeTest {
         val key = BtrfsKey(1uL, 1u, 0uL)
         val data = byteArrayOf(0xDE.toByte(), 0xAD.toByte(), 0xBE.toByte(), 0xEF.toByte())
         val item: BtrfsItem = BtrfsItem(key j data)
-        val leaf = BtrfsLeaf(listOf(item) as List<BtrfsItem>)
+        val items: Series<BtrfsItem> = 1 j { item }
+        val leaf = BtrfsLeaf(items.toList())
 
         val nodeId = buf.allocateNode()
 

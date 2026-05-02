@@ -32,9 +32,9 @@ class MiniDuckBlockCodecRoundTripTest {
             keys = listOf("name", "age", "active"),
             cells = listOf("Alice", 30, true),
         )
-        val decoded = roundTrip(doc)
+        val decoded = roundTrip(doc.toRowVec())
         assertEquals(1, decoded.rowCount)
-        val out = decoded.child[0] as DocRowVec
+        val out = decoded.child!![0] as DocRowVec
         assertEquals(3, out.size)
         assertEquals(listOf("name", "age", "active"), out.keys)
         assertEquals("Alice", out.cells[0])
@@ -50,8 +50,8 @@ class MiniDuckBlockCodecRoundTripTest {
             cells = listOf("value"),
             child = 1 j { nested },
         )
-        val decoded = roundTrip(doc)
-        val out = decoded.child[0] as DocRowVec
+        val decoded = roundTrip(doc.toRowVec())
+        val out = decoded.child!![0] as DocRowVec
         assertEquals(listOf("top"), out.keys)
         assertNotNull(out.child)
         assertEquals(1, out.child!!.size)
@@ -64,10 +64,10 @@ class MiniDuckBlockCodecRoundTripTest {
 
     @Test
     fun viewRowVecRoundTrip() {
-        val view = ViewRowVec("doc-42", "sort-key", mapOf("val" to 1))
-        val decoded = roundTrip(view)
+        val view = ViewRowVec("doc-42", "sort-key", mapOf("val" to 1)).toRowVec()
+        val decoded = roundTrip(view.toRowVec())
         assertEquals(1, decoded.rowCount)
-        val out = decoded.child[0] as ViewRowVec
+        val out = decoded.child!![0] as ViewRowVec
         assertEquals("doc-42", out.id)
         assertEquals("sort-key", out.key)
         // value is a Map after JSON reification; check structure
@@ -80,9 +80,9 @@ class MiniDuckBlockCodecRoundTripTest {
     @Test
     fun jsonRowVecRoundTrip() {
         val json = JsonRowVec("object", "{\"a\":1}")
-        val decoded = roundTrip(json)
+        val decoded = roundTrip(json.toRowVec())
         assertEquals(1, decoded.rowCount)
-        val out = decoded.child[0] as JsonRowVec
+        val out = decoded.child!![0] as JsonRowVec
         assertEquals("object", out.nodeType)
         assertEquals("{\"a\":1}", out.rawValue)
     }
@@ -94,8 +94,8 @@ class MiniDuckBlockCodecRoundTripTest {
         val json = JsonRowVec("array", "[1,2]") {
             2 j { i -> if (i == 0) child1 else child2 }
         }
-        val decoded = roundTrip(json)
-        val out = decoded.child[0] as JsonRowVec
+        val decoded = roundTrip(json.toRowVec())
+        val out = decoded.child!![0] as JsonRowVec
         assertEquals("array", out.nodeType)
         assertEquals("[1,2]", out.rawValue)
         // Children should survive round-trip
@@ -112,9 +112,9 @@ class MiniDuckBlockCodecRoundTripTest {
     @Test
     fun yamlRowVecRoundTrip() {
         val yaml = YamlRowVec("scalar", "hello world")
-        val decoded = roundTrip(yaml)
+        val decoded = roundTrip(yaml.toRowVec())
         assertEquals(1, decoded.rowCount)
-        val out = decoded.child[0] as YamlRowVec
+        val out = decoded.child!![0] as YamlRowVec
         assertEquals("scalar", out.nodeKind)
         assertEquals("hello world", out.scalarValue)
     }
@@ -124,7 +124,7 @@ class MiniDuckBlockCodecRoundTripTest {
         val entry = YamlRowVec("scalar", "v1")
         val mapping = YamlRowVec("mapping", null) { 1 j { entry } }
         val decoded = roundTrip(mapping)
-        val out = decoded.child[0] as YamlRowVec
+        val out = decoded.child!![0] as YamlRowVec
         assertEquals("mapping", out.nodeKind)
         assertNull(out.scalarValue)
         assertNotNull(out.child)
@@ -140,9 +140,9 @@ class MiniDuckBlockCodecRoundTripTest {
     fun blobRowVecRoundTrip() {
         val bytes = byteArrayOf(0xDE.toByte(), 0xAD.toByte(), 0xBE.toByte(), 0xEF.toByte())
         val blob = BlobRowVec(bytes, "application/octet-stream")
-        val decoded = roundTrip(blob)
+        val decoded = roundTrip(blob.toRowVec())
         assertEquals(1, decoded.rowCount)
-        val out = decoded.child[0] as BlobRowVec
+        val out = decoded.child!![0] as BlobRowVec
         assertTrue(out.bytes.contentEquals(bytes))
         assertEquals("application/octet-stream", out.mimeType)
     }
@@ -161,9 +161,9 @@ class MiniDuckBlockCodecRoundTripTest {
             versionId = "v1",
             metadata = mapOf("x-custom" to "yes"),
         )
-        val decoded = roundTrip(gcs)
+        val decoded = roundTrip(gcs.toRowVec())
         assertEquals(1, decoded.rowCount)
-        val out = decoded.child[0] as GcsRowVec
+        val out = decoded.child!![0] as GcsRowVec
         assertEquals("my-bucket", out.bucket)
         assertEquals("path/to/object.txt", out.key)
         assertEquals(1024L, out.byteSize)
@@ -189,9 +189,9 @@ class MiniDuckBlockCodecRoundTripTest {
             versionId = null,
             metadata = null,
         )
-        val decoded = roundTrip(s3)
+        val decoded = roundTrip(s3.toRowVec())
         assertEquals(1, decoded.rowCount)
-        val out = decoded.child[0] as S3RowVec
+        val out = decoded.child!![0] as S3RowVec
         assertEquals("aws-bucket", out.bucket)
         assertEquals("data/report.csv", out.key)
         assertEquals(2048L, out.byteSize)
@@ -219,7 +219,7 @@ class MiniDuckBlockCodecRoundTripTest {
         )
         val decoded = roundTrip(ali)
         assertEquals(1, decoded.rowCount)
-        val out = decoded.child[0] as AlibabaRowVec
+        val out = decoded.child!![0] as AlibabaRowVec
         assertEquals("oss-bucket", out.bucket)
         assertEquals("archive/backup.zip", out.key)
         assertEquals(999999L, out.byteSize)
@@ -242,11 +242,11 @@ class MiniDuckBlockCodecRoundTripTest {
 
         val decoded = roundTrip(innerBlock)
         assertEquals(1, decoded.rowCount)
-        val out = decoded.child[0] as BlockRowVec
+        val out = decoded.child!![0] as BlockRowVec
         assertEquals(BlockRowVec.State.SEALED, out.state)
         assertEquals(2, out.rowCount)
-        assertEquals(1, (out.child[0] as DocRowVec).cells[0])
-        assertEquals(2, (out.child[1] as DocRowVec).cells[0])
+        assertEquals(1, (out.child!![0] as DocRowVec).cells[0])
+        assertEquals(2, (out.child!![1] as DocRowVec).cells[0])
     }
 
     // ── Mixed block with multiple different family types ─────────────────
@@ -278,57 +278,57 @@ class MiniDuckBlockCodecRoundTripTest {
         assertEquals(BlockRowVec.State.SEALED, decoded.state)
 
         // DocRowVec
-        val d = decoded.child[0] as DocRowVec
+        val d = decoded.child!![0] as DocRowVec
         assertEquals(listOf("name"), d.keys)
         assertEquals("Bob", d.cells[0])
 
         // ViewRowVec
-        val v = decoded.child[1] as ViewRowVec
+        val v = decoded.child!![1] as ViewRowVec
         assertEquals("id-1", v.id)
         assertEquals("k1", v.key)
         assertEquals(42, v.value)
 
         // JsonRowVec
-        val j = decoded.child[2] as JsonRowVec
+        val j = decoded.child!![2] as JsonRowVec
         assertEquals("string", j.nodeType)
         assertEquals("\"test\"", j.rawValue)
 
         // YamlRowVec
-        val y = decoded.child[3] as YamlRowVec
+        val y = decoded.child!![3] as YamlRowVec
         assertEquals("scalar", y.nodeKind)
         assertEquals("yaml-val", y.scalarValue)
 
         // BlobRowVec
-        val bl = decoded.child[4] as BlobRowVec
+        val bl = decoded.child!![4] as BlobRowVec
         assertTrue(bl.bytes.contentEquals(byteArrayOf(0x01, 0x02)))
         assertEquals("img/png", bl.mimeType)
 
         // GcsRowVec
-        val g = decoded.child[5] as GcsRowVec
+        val g = decoded.child!![5] as GcsRowVec
         assertEquals("b1", g.bucket)
         assertEquals("k1", g.key)
         assertEquals(10L, g.byteSize)
         assertEquals("text/plain", g.contentType)
 
         // S3RowVec
-        val s = decoded.child[6] as S3RowVec
+        val s = decoded.child!![6] as S3RowVec
         assertEquals("b2", s.bucket)
         assertEquals("k2", s.key)
         assertEquals(20L, s.byteSize)
         assertNull(s.contentType)
 
         // AlibabaRowVec
-        val a = decoded.child[7] as AlibabaRowVec
+        val a = decoded.child!![7] as AlibabaRowVec
         assertEquals("b3", a.bucket)
         assertEquals("k3", a.key)
         assertEquals(30L, a.byteSize)
         assertEquals("application/json", a.contentType)
 
         // Nested BlockRowVec
-        val nestedBlock = decoded.child[8] as BlockRowVec
+        val nestedBlock = decoded.child!![8] as BlockRowVec
         assertEquals(BlockRowVec.State.SEALED, nestedBlock.state)
         assertEquals(1, nestedBlock.rowCount)
-        assertEquals(true, (nestedBlock.child[0] as DocRowVec).cells[0])
+        assertEquals(true, (nestedBlock.child!![0] as DocRowVec).cells[0])
     }
 
     // ── ObjectStoreRowVec factory functions ──────────────────────────────
@@ -342,15 +342,15 @@ class MiniDuckBlockCodecRoundTripTest {
         val decoded = roundTrip(gcs, s3, ali)
         assertEquals(3, decoded.rowCount)
 
-        val dg = decoded.child[0] as GcsRowVec
+        val dg = decoded.child!![0] as GcsRowVec
         assertEquals("fb", dg.bucket)
         assertEquals(ObjectStoreProvider.GCS, dg.provider)
 
-        val ds = decoded.child[1] as S3RowVec
+        val ds = decoded.child!![1] as S3RowVec
         assertEquals("sb", ds.bucket)
         assertEquals(ObjectStoreProvider.S3, ds.provider)
 
-        val da = decoded.child[2] as AlibabaRowVec
+        val da = decoded.child!![2] as AlibabaRowVec
         assertEquals("ab", da.bucket)
         assertEquals(ObjectStoreProvider.ALIBABA, da.provider)
     }

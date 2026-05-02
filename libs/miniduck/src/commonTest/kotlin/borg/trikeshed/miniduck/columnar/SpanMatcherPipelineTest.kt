@@ -4,6 +4,7 @@ import borg.trikeshed.cursor.Cursor
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.size
 import borg.trikeshed.miniduck.DocRowVec
+import borg.trikeshed.miniduck.toRowVec
 import borg.trikeshed.cursor.at
 import kotlin.test.*
 
@@ -16,10 +17,10 @@ import kotlin.test.*
 /* ═══════════════════════════════════════════════════════════════════════
    SYNTHETIC TEST DATA
    ═══════════════════════════════════════════════════════════════════════ */
-private fun klineRow(openTime: Long): DocRowVec = DocRowVec(
+private fun klineRow(openTime: Long): borg.trikeshed.cursor.RowVec = DocRowVec(
     keys = listOf("openTime", "open", "high", "low", "close", "volume", "symbol", "interval"),
     cells = listOf<Any?>(openTime, 69000.0, 69100.0, 68900.0, 69000.0, 100.0, "BTCUSDT", "1m"),
-)
+).toRowVec()
 
 /* ═══════════════════════════════════════════════════════════════════════
    STAGE 1b: SPAN MATCHING RED TESTS

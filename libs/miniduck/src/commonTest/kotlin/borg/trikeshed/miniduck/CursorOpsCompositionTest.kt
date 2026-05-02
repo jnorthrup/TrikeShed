@@ -19,7 +19,7 @@ class CursorOpsCompositionTest {
             keys = listOf("name", "age"),
             cells = listOf(names[i], ages[i]),
             child = null,
-        )
+        ).toRowVec()
     }
 
     companion object {

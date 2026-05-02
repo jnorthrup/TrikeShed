@@ -124,7 +124,7 @@ class StochasticBagTest {
     }
 
     @Test
-    fun `spans with three sources produces C(3,2)=3 pairs`() {
+    fun `spans with three sources produces three pairs`() {
         val a = source("BTC", prices = listOf(100.0, 101.0, 102.0))
         val b = source("ETH", prices = listOf(10.0, 10.5, 10.4))
         val c = source("SOL", prices = listOf(142.0, 143.0, 144.0))

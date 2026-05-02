@@ -15,8 +15,8 @@ class CursorOpsTest {
         val c = cursor("a" to 1, "b" to 2, "c" to 3)
         val r = c.where(col("val") gt 1)
         assertEquals(2, r.size)
-        assertEquals("b", (r[0] as DocRowVec)["key"])
-        assertEquals("c", (r[1] as DocRowVec)["key"])
+        assertEquals("b", r[0].getValue("key"))
+        assertEquals("c", r[1].getValue("key"))
     }
 
     @Test fun whereEmptyResultWhenNothingMatches() {
@@ -28,14 +28,14 @@ class CursorOpsTest {
         val c = cursor("a" to 1, "b" to 5, "c" to 10)
         val r = c.where(col("val") gt 1 and (col("val") lt 10))
         assertEquals(1, r.size)
-        assertEquals("b", (r[0] as DocRowVec)["key"])
+        assertEquals("b", r[0].getValue("key"))
     }
 
     @Test fun whereNotNegates() {
         val c = cursor("x" to 1, "y" to 2)
         val r = c.where(!col("key").eq("x"))
         assertEquals(1, r.size)
-        assertEquals("y", (r[0] as DocRowVec)["key"])
+        assertEquals("y", r[0].getValue("key"))
     }
 
     @Test fun whereInListMatchesSet() {
@@ -56,7 +56,7 @@ class CursorOpsTest {
         val c = cursor("a" to 1, "b" to 2, "c" to 3)
         val r = c.take(2)
         assertEquals(2, r.size)
-        assertEquals("a", (r[0] as DocRowVec)["key"])
+        assertEquals("a", r[0].getValue("key"))
     }
 
     @Test fun takeBeyondSizeReturnsAll() {
@@ -76,7 +76,7 @@ class CursorOpsTest {
         val c = cursor("a" to 1, "b" to 2, "c" to 3)
         val r = c.drop(1)
         assertEquals(2, r.size)
-        assertEquals("b", (r[0] as DocRowVec)["key"])
+        assertEquals("b", r[0].getValue("key"))
     }
 
     @Test fun dropAllProducesEmpty() {
@@ -92,16 +92,16 @@ class CursorOpsTest {
     @Test fun orderByAscending() {
         val c = cursor("b" to 2, "a" to 1, "c" to 3)
         val r = c.orderBy("val")
-        assertEquals(1, (r[0] as DocRowVec)["val"])
-        assertEquals(2, (r[1] as DocRowVec)["val"])
-        assertEquals(3, (r[2] as DocRowVec)["val"])
+        assertEquals(1, r[0].getValue("val"))
+        assertEquals(2, r[1].getValue("val"))
+        assertEquals(3, r[2].getValue("val"))
     }
 
     @Test fun orderByDescending() {
         val c = cursor("b" to 2, "a" to 1, "c" to 3)
         val r = c.orderBy("val", desc = true)
-        assertEquals(3, (r[0] as DocRowVec)["val"])
-        assertEquals(1, (r[2] as DocRowVec)["val"])
+        assertEquals(3, r[0].getValue("val"))
+        assertEquals(1, r[2].getValue("val"))
     }
 
     @Test fun orderByNullSortsFirst() {
@@ -113,7 +113,7 @@ class CursorOpsTest {
             }
         }
         val r = rows.orderBy("v")
-        assertNull((r[0] as DocRowVec)["v"])
+        assertNull(r[0].getValue("v"))
     }
 
     @Test fun orderByMultiSpec() {
@@ -125,9 +125,9 @@ class CursorOpsTest {
             }
         }
         val r = rows.orderBy(OrderSpec("grp"), OrderSpec("val"))
-        assertEquals("a", (r[0] as DocRowVec)["grp"]); assertEquals(1, (r[0] as DocRowVec)["val"])
-        assertEquals("a", (r[1] as DocRowVec)["grp"]); assertEquals(2, (r[1] as DocRowVec)["val"])
-        assertEquals("b", (r[2] as DocRowVec)["grp"])
+        assertEquals("a", r[0].getValue("grp")); assertEquals(1, r[0].getValue("val"))
+        assertEquals("a", r[1].getValue("grp")); assertEquals(2, r[1].getValue("val"))
+        assertEquals("b", r[2].getValue("grp"))
     }
 
     // ── project ──────────────────────────────────────────────────────────────
@@ -165,7 +165,7 @@ class CursorOpsTest {
 
     @Test fun columnsRetainsDeferredChildrenOnBlobRows() {
         val nested = JsonRowVec("object", "{}")
-        val base: Cursor = 1 j { BlobRowVec(byteArrayOf(0x7b, 0x7d)) { 1 j { nested } } }
+        val base: Cursor = 1 j { BlobRowVec(byteArrayOf(0x7b, 0x7d)).toRowVec() { 1 j { nested } } }
 
         val projected = base.columns(0)
         val row = projected[0] as DocRowVec
@@ -183,7 +183,7 @@ class CursorOpsTest {
         val plan = ScanPlan(ref) filter (col("val") gt 2) limit 1
         val result = execute(plan, base)
         assertEquals(1, result.size)
-        assertEquals(5, (result[0] as DocRowVec)["val"])
+        assertEquals(5, result[0].getValue("val"))
     }
 
     @Test fun executeProjectPlan() {
@@ -202,7 +202,7 @@ class CursorOpsTest {
         val plan = ScanPlan(ref) orderBy listOf(OrderSpec("val")) offset 1 limit 1
         val result = execute(plan, base)
         assertEquals(1, result.size)
-        assertEquals(2, (result[0] as DocRowVec)["val"])
+        assertEquals(2, result[0].getValue("val"))
     }
 
     // ── compareKeys ──────────────────────────────────────────────────────────
@@ -238,6 +238,6 @@ class CursorOpsTest {
 
     @Test fun getValueOnShellsReturnsNull() {
         assertNull(BlockRowVec.mutable().getValue("anything"))
-        assertNull(BlobRowVec(byteArrayOf()).getValue("anything"))
+        assertNull(BlobRowVec(byteArrayOf()).toRowVec().getValue("anything"))
     }
 }

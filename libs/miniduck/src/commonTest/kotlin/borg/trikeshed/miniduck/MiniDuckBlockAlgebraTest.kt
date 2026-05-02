@@ -96,7 +96,7 @@ class MiniDuckBlockAlgebraTest {
 
     @Test
     fun `BlobRowVec is always shell`() {
-        val blob = BlobRowVec(byteArrayOf(1, 2, 3))
+        val blob = BlobRowVec(byteArrayOf(1, 2, 3)).toRowVec()
         assertTrue(blob.isShell)
     }
 
@@ -157,7 +157,7 @@ class MiniDuckBlockAlgebraTest {
     @Test
     fun `BlobRowVec child factory fires on child access`() {
         var invoked = false
-        val blob = BlobRowVec(byteArrayOf(0x7B, 0x7D)) {
+        val blob = BlobRowVec(byteArrayOf(0x7B, 0x7D)).toRowVec() {
             invoked = true
             1 j { JsonRowVec("number", "42") }
         }
