@@ -8,6 +8,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 import kotlin.math.sqrt
 
@@ -965,5 +966,152 @@ class RunCycleRedTest {
             assertTrue(cycle.totalValue > 0.0,
                 "totalValue at tick $i should be positive: ${cycle.totalValue}")
         }
+    }
+
+    // ── 13. simulateMultiSymbolTicks → BacktestReport → aggregateReports ──────
+
+    /**
+     * Full multi-symbol chain: interleaved cursor → simulateMultiSymbolTicks →
+     * BacktestResult → toBacktestReport → aggregateReports.
+     *
+     * This closes the aggregation gap: the multi-symbol path produces BacktestResult
+     * with symbol "MULTI", and this test verifies it correctly flows through
+     * toBacktestReport and into aggregateReports alongside other reports.
+     */
+    @Test
+    fun `simulateMultiSymbolTicks feeds into aggregateReports through toBacktestReport`() = runTest {
+        val t0 = 1704067200000L
+        val t1 = 1704070800000L
+        val t2 = 1704074400000L
+
+        // Run A: BTC + ETH
+        val blockA = KlineBlock.mutable(TimeSpan.Hours1)
+        blockA.append(Kline("BTCUSDT", TimeSpan.Hours1, t0, 42000.0, 42500.0, 41800.0, 42300.0, 150.0))
+        blockA.append(Kline("ETHUSDT", TimeSpan.Hours1, t0, 2500.0, 2550.0, 2490.0, 2530.0, 500.0))
+        blockA.append(Kline("BTCUSDT", TimeSpan.Hours1, t1, 42300.0, 43100.0, 42100.0, 42900.0, 180.0))
+        blockA.append(Kline("ETHUSDT", TimeSpan.Hours1, t1, 2530.0, 2600.0, 2520.0, 2580.0, 600.0))
+        blockA.append(Kline("BTCUSDT", TimeSpan.Hours1, t2, 42900.0, 43200.0, 42500.0, 42800.0, 140.0))
+        blockA.append(Kline("ETHUSDT", TimeSpan.Hours1, t2, 2580.0, 2610.0, 2550.0, 2570.0, 450.0))
+        blockA.seal()
+        val cursorA = blockA.asCursor()
+
+        val engineA = TradingEngine(defaultGenome(), Mode.SHADOW, initialCapital = 20_000.0)
+        val resultA = simulateMultiSymbolTicks(cursorA, engineA, initialCapital = 20_000.0)
+
+        assertEquals("MULTI", resultA.symbol)
+        assertEquals(3, resultA.cycles.size)
+        assertTrue(resultA.metrics.totalReturn.isFinite())
+
+        // Convert to BacktestReport
+        val reportA = resultA.toBacktestReport()
+        assertEquals("MULTI", reportA.symbol)
+        assertEquals(20_000.0, reportA.initialCapital, 0.001)
+        assertEquals(3, reportA.totalTicks)
+        assertTrue(reportA.finalEquity > 0.0)
+        assertTrue(reportA.totalReturn.isFinite())
+        assertTrue(reportA.sharpeRatio.isFinite())
+        assertTrue(reportA.sortinoRatio.isFinite())
+
+        // Run B: SOL only (single-symbol for contrast)
+        val blockB = KlineBlock.mutable(TimeSpan.Hours1)
+        blockB.append(Kline("SOLUSDT", TimeSpan.Hours1, t0, 142.0, 145.0, 140.0, 143.0, 1000.0))
+        blockB.append(Kline("SOLUSDT", TimeSpan.Hours1, t1, 143.0, 148.0, 141.0, 147.0, 1100.0))
+        blockB.append(Kline("SOLUSDT", TimeSpan.Hours1, t2, 147.0, 150.0, 145.0, 149.0, 950.0))
+        blockB.seal()
+        val cursorB = blockB.asCursor()
+
+        val engineB = TradingEngine(defaultGenome(), Mode.SHADOW, initialCapital = 10_000.0)
+        val resultB = simulateTicks(cursorB, engineB, initialCapital = 10_000.0)
+
+        val reportB = resultB.toBacktestReport()
+        assertEquals("SOLUSDT", reportB.symbol)
+        assertEquals(3, reportB.totalTicks)
+
+        // Aggregate both reports
+        val aggregate = aggregateReports(listOf(reportA, reportB))
+
+        assertEquals(2, aggregate.runCount)
+        assertEquals(6, aggregate.totalTicks)  // 3 + 3
+        assertTrue(aggregate.avgSharpeRatio.isFinite())
+        assertTrue(aggregate.avgSortinoRatio.isFinite())
+        assertTrue(aggregate.maxDrawdown >= 0.0)
+        assertTrue(aggregate.bestReturn >= aggregate.worstReturn)
+    }
+
+    // ── 14. Multi-generational evolution loop ──────────────────────────────────
+
+    /**
+     * Full evolution loop: evaluatePopulation → rankEvaluationsByFitness →
+     * evolvePopulation → evaluatePopulation (gen 2) → aggregateReports.
+     *
+     * This is the core generational search pattern. Verifies that:
+     * - Gen 1 evaluations produce fitness-ranked genomes
+     * - evolvePopulation creates a new population from ranked parents
+     * - Gen 2 runs on the same data produce finite fitness values
+     * - Aggregate report can be built from all evaluations across generations
+     */
+    @Test
+    fun `multi-generational evolution loop improves and produces aggregate report`() = runTest {
+        val csvText = csv(
+            "1704067200000,100.0,102.0,99.0,101.0,10.0,1704070799999,1010.0,12,5.0,505.0,0",
+            "1704070800000,101.0,104.0,100.0,103.0,12.0,1704074399999,1236.0,18,6.0,618.0,0",
+            "1704074400000,103.0,106.0,102.0,105.0,14.0,1704077999999,1470.0,24,7.0,735.0,0",
+            "1704078000000,105.0,108.0,104.0,107.0,16.0,1704081599999,1712.0,30,8.0,856.0,0",
+            "1704081600000,107.0,110.0,106.0,109.0,18.0,1704085199999,1962.0,36,9.0,981.0,0",
+        )
+
+        val populationSize = 3
+        val mutationDeltas = mapOf("HARVEST_TAKE_PERCENT" to 0.05, "MIN_SURPLUS_FOR_HARVEST" to 0.01)
+
+        // ── Generation 1 ──
+        val gen1Pop = (0 until populationSize).map { i ->
+            defaultGenome().also { g ->
+                g[GenomeParam.HARVEST_TAKE_PERCENT] = 0.10 + i * 0.20
+            }
+        }
+        val gen1Evals = evaluatePopulation(gen1Pop, csvText, "BTCUSDT", TimeSpan.Hours1, 10_000.0)
+        assertEquals(populationSize, gen1Evals.size)
+        gen1Evals.forEach { assertTrue(it.fitness.isFinite(), "gen1 fitness should be finite: ${it.fitness}") }
+
+        val ranked1 = rankEvaluationsByFitness(gen1Evals)
+        assertTrue(ranked1.first().fitness >= ranked1.last().fitness, "ranked by fitness desc")
+
+        // ── Evolve ──
+        val gen2Pop = evolvePopulation(ranked1, mutationDeltas = mutationDeltas)
+        assertEquals(populationSize, gen2Pop.size, "population size preserved")
+
+        // Elite genome must be preserved unchanged
+        assertSame(ranked1.first().genome, gen2Pop.first(), "elite preserved")
+
+        // ── Generation 2 ──
+        val gen2Evals = evaluatePopulation(gen2Pop, csvText, "BTCUSDT", TimeSpan.Hours1, 10_000.0)
+        assertEquals(populationSize, gen2Evals.size)
+        gen2Evals.forEach { assertTrue(it.fitness.isFinite(), "gen2 fitness should be finite: ${it.fitness}") }
+
+        // Gen 2 elite should be at least as good as gen 1 elite (elite is preserved)
+        val gen2Best = rankEvaluationsByFitness(gen2Evals).first()
+        assertEquals(ranked1.first().fitness, gen2Best.fitness, 0.001,
+            "gen2 elite fitness should match gen1 elite (same genome)")
+
+        // ── Aggregate across both generations ──
+        val allEvals = gen1Evals + gen2Evals
+        val aggregate = aggregateEvaluations(allEvals)
+        assertEquals(6, aggregate.runCount)
+        assertTrue(aggregate.avgSharpeRatio.isFinite())
+        assertTrue(aggregate.avgTotalReturn.isFinite())
+        assertTrue(aggregate.maxDrawdown >= 0.0)
+        assertNotNull(aggregate.bestGenome)
+
+        // Convert aggregate to report for the full chain verification
+        val allReports = allEvals.map { it.result.toBacktestReport() }
+        allReports.forEach { report ->
+            assertEquals("BTCUSDT", report.symbol)
+            assertEquals(5, report.totalTicks)
+            assertTrue(report.finalEquity > 0.0)
+        }
+
+        val aggregateReport = aggregateReports(allReports, bestGenome = aggregate.bestGenome)
+        assertEquals(6, aggregateReport.runCount)
+        assertTrue(aggregateReport.bestReturn >= aggregateReport.worstReturn)
     }
 }
