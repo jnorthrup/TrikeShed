@@ -240,6 +240,29 @@ class RunCycleTest {
     }
 
     @Test
+    fun `BacktestMetrics risk-free rate reduces Sharpe and Sortino`() {
+        // Volatile equity: 100 → 110 → 95 → 105 (has both up and down bars)
+        val cycles = s_[
+            CycleResult(0, 0L, 0.0, 100.0, 100.0, false, 0.0, emptyList(), false, emptyMap()),
+            CycleResult(1, 1L, 0.0, 110.0, 110.0, false, 0.0, emptyList(), false, emptyMap()),
+            CycleResult(2, 2L, 0.0, 95.0,  95.0,  false, 0.0, emptyList(), false, emptyMap()),
+            CycleResult(3, 3L, 0.0, 105.0, 105.0, false, 0.0, emptyList(), false, emptyMap()),
+        ]
+        val metricsZero = computeBacktestMetrics(cycles, 100.0)
+        val metricsRf = computeBacktestMetrics(cycles, 100.0, riskFreeRatePerBar = 0.05)
+
+        // Risk-free rate should reduce Sharpe (subtracts from excess return)
+        assertTrue(metricsRf.sharpeRatio < metricsZero.sharpeRatio,
+            "Sharpe with rf (${metricsRf.sharpeRatio}) should be < zero-rf (${metricsZero.sharpeRatio})")
+        assertTrue(metricsRf.sortinoRatio < metricsZero.sortinoRatio,
+            "Sortino with rf (${metricsRf.sortinoRatio}) should be < zero-rf (${metricsZero.sortinoRatio})")
+        // Total return should be unaffected
+        assertEquals(metricsZero.totalReturn, metricsRf.totalReturn, 0.001)
+        // Max drawdown should be unaffected
+        assertEquals(metricsZero.maxDrawdown, metricsRf.maxDrawdown, 0.001)
+    }
+
+    @Test
     fun `BacktestMetrics totalTrades counts harvest ticks`() {
         val cycles = s_[
             CycleResult(0, 0L, 0.0, 10_000.0, 10_000.0, false, 0.0, emptyList(), false, emptyMap()),

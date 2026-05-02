@@ -220,11 +220,19 @@ fun closesFromCursor(cursor: Cursor): Series<Double> =
 
 /**
  * Compute aggregate [BacktestMetrics] from cycle results.
+ *
+ * @param cycles             series of [CycleResult] from simulateTicks
+ * @param initialCapital     starting portfolio value
+ * @param annualizationFactor sqrt of bars-per-year (default sqrt(252) for daily bars)
+ * @param riskFreeRatePerBar risk-free rate per bar (e.g. 0.04/252 for 4% annual on daily bars).
+ *                           The annualized Sharpe subtracts this from mean bar return before
+ *                           dividing by standard deviation.
  */
 fun computeBacktestMetrics(
     cycles: Series<CycleResult>,
     initialCapital: Double,
     annualizationFactor: Double = sqrt(252.0),
+    riskFreeRatePerBar: Double = 0.0,
 ): BacktestMetrics {
     if (cycles.isEmpty()) {
         return BacktestMetrics(
@@ -260,8 +268,9 @@ fun computeBacktestMetrics(
         sumSq / returns.size
     } else 0.0
     val stdReturn = sqrt(if (variance < 0) 0.0 else variance)
-    // Annualized Sharpe using provided annualization factor (default sqrt(252) for daily bars)
-    val sharpeRatio = if (stdReturn > 0.0 && meanReturn.isFinite()) (meanReturn / stdReturn) * annualizationFactor else 0.0
+    // Annualized Sharpe: (meanReturn - riskFreeRatePerBar) / stdReturn * annualizationFactor
+    val excessReturn = meanReturn - riskFreeRatePerBar
+    val sharpeRatio = if (stdReturn > 0.0 && excessReturn.isFinite()) (excessReturn / stdReturn) * annualizationFactor else 0.0
 
     val downsideVariance = if (returns.isNotEmpty()) {
         var sumDownSq = 0.0
@@ -269,8 +278,8 @@ fun computeBacktestMetrics(
         sumDownSq / returns.size
     } else 0.0
     val downsideDeviation = sqrt(if (downsideVariance < 0) 0.0 else downsideVariance)
-    // Annualized Sortino, using zero as the minimum acceptable cycle return.
-    val sortinoRatio = if (downsideDeviation > 0.0 && meanReturn.isFinite()) (meanReturn / downsideDeviation) * annualizationFactor else 0.0
+    // Annualized Sortino: excessReturn / downsideDeviation * annualizationFactor
+    val sortinoRatio = if (downsideDeviation > 0.0 && excessReturn.isFinite()) (excessReturn / downsideDeviation) * annualizationFactor else 0.0
 
     // Max drawdown
     var peak = initialCapital
