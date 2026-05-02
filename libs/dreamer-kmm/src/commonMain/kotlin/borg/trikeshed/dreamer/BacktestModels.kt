@@ -833,3 +833,193 @@ fun aggregateTrainingSnapshots(
     val reports = snapshots.map { it.toBacktestReport(initialCapital = initialCapital) }
     return aggregateReports(reports, bestGenome)
 }
+
+// ── Stochastic Back-test Orchestration ─────────────────────────────────────
+
+/**
+ * Convert a map of (base symbol → CSV text) into sealed [HarnessReplayInput] blocks.
+ *
+ * This is the production adapter bridging BinanceVisionKlineFeed-style CSV output
+ * into the RealtimeHarness / StochasticBagSpanTrainer pipeline.
+ *
+ * @param feeds  map of base symbol (e.g. "BTC") to its CSV text
+ * @param config training config supplying quote, timespan, and archive parameters
+ * @return list of [HarnessReplayInput], one per symbol, with sealed blocks
+ */
+fun feedsToHarnessInputs(
+    feeds: Map<String, String>,
+    config: StochasticTrainingConfig,
+): List<HarnessReplayInput> {
+    if (feeds.isEmpty()) return emptyList()
+    val feed = BinanceVisionKlineFeed()
+    return feeds.map { (base, csvText) ->
+        val key = klineSeriesKey(base, config.quote, config.timespan)
+        val parsed = feed.parseCachedCsv(key, csvText)
+        HarnessReplayInput(key, parsed.block)
+    }
+}
+
+/**
+ * Result of a multi-generation stochastic training run.
+ *
+ * Carries the full evolution history ([snapshots]), the champion genome,
+ * and aggregate metrics across all generations.
+ */
+data class StochasticTrainingResult(
+    val snapshots: List<StochasticTrainingSnapshot>,
+    val championGenome: Genome,
+    val championTotalValue: Double,
+    val aggregate: BacktestAggregateReport,
+)
+
+/**
+ * Comprehensive report from a stochastic back-test: evolution history +
+ * aggregate metrics + optional champion validation report.
+ */
+data class ComprehensiveStochasticReport(
+    val snapshots: List<StochasticTrainingSnapshot>,
+    val championGenome: Genome,
+    val championTotalValue: Double,
+    val aggregate: BacktestAggregateReport,
+    /** Champion's BacktestReport from the training run (via StochasticTrainingSnapshot bridge). */
+    val championBacktestReport: BacktestReport,
+    /** Optional validation report: champion genome replayed over full data via SimulationReplay. */
+    val validationReport: BacktestReport? = null,
+)
+
+/**
+ * Run multi-generation stochastic training with optional convergence detection.
+ *
+ * Iterates [StochasticBagSpanTrainer.runGeneration] up to [generations] times,
+ * tracking the best fitness across generations. If [convergenceThreshold] is set,
+ * training stops early when the fitness improvement between consecutive generations
+ * falls below the threshold.
+ *
+ * @param trainer              configured trainer with inputs
+ * @param generations          maximum number of generations to run
+ * @param convergenceThreshold minimum fitness improvement to continue (null = run all)
+ * @return [StochasticTrainingResult] with evolution history and champion
+ */
+suspend fun StochasticBagSpanTrainer.runMultiGenerationTraining(
+    generations: Int,
+    convergenceThreshold: Double? = null,
+): StochasticTrainingResult {
+    require(generations > 0) { "generations must be positive" }
+    val snapshots = mutableListOf<StochasticTrainingSnapshot>()
+    var prevBestFitness = Double.NEGATIVE_INFINITY
+
+    for (gen in 1..generations) {
+        val snapshot = runGeneration()
+        snapshots += snapshot
+
+        if (convergenceThreshold != null && prevBestFitness.isFinite()) {
+            val improvement = kotlin.math.abs(snapshot.bestFitness - prevBestFitness)
+            if (improvement < convergenceThreshold && gen >= 2) break
+        }
+        prevBestFitness = snapshot.bestFitness
+    }
+
+    val champion = snapshots.last()
+    val championGenome = population.first()
+    val aggregate = aggregateTrainingSnapshots(
+        snapshots = snapshots,
+        initialCapital = config.initialCapital,
+        bestGenome = championGenome.backing,
+    )
+
+    return StochasticTrainingResult(
+        snapshots = snapshots,
+        championGenome = championGenome,
+        championTotalValue = champion.bestTotalValue,
+        aggregate = aggregate,
+    )
+}
+
+/**
+ * Run a full stochastic back-test pipeline from CSV feeds to comprehensive report.
+ *
+ * Chains:
+ * 1. [feedsToHarnessInputs] — convert CSV per symbol into sealed KlineBlocks
+ * 2. [StochasticBagSpanTrainer.runMultiGenerationTraining] — evolve population
+ * 3. Champion validation (optional) — replay champion over full data
+ * 4. [ComprehensiveStochasticReport] — aggregate everything
+ *
+ * @param feeds              map of base symbol → CSV text
+ * @param config             stochastic training configuration
+ * @param generations        number of evolutionary generations
+ * @param convergenceThreshold  minimum fitness improvement to continue (null = run all)
+ * @param validateChampion   if true, replay the champion genome over all input data
+ * @return [ComprehensiveStochasticReport]
+ */
+suspend fun stochasticBacktest(
+    feeds: Map<String, String>,
+    config: StochasticTrainingConfig,
+    generations: Int = 5,
+    convergenceThreshold: Double? = null,
+    validateChampion: Boolean = false,
+): ComprehensiveStochasticReport {
+    if (feeds.isEmpty()) {
+        val emptyGenome = defaultGenome()
+        val emptyReport = BacktestReport(
+            symbol = "MULTI",
+            initialCapital = config.initialCapital,
+            finalEquity = config.initialCapital,
+            totalReturn = 0.0,
+            sharpeRatio = 0.0,
+            sortinoRatio = 0.0,
+            maxDrawdown = 0.0,
+            maxDrawdownTicks = 0,
+            totalTrades = 0,
+            totalHarvested = 0.0,
+            totalTicks = 0,
+        )
+        val emptyAggregate = BacktestAggregateReport(
+            runCount = 0,
+            totalTicks = 0,
+            avgTotalReturn = 0.0,
+            avgSharpeRatio = 0.0,
+            avgSortinoRatio = 0.0,
+            maxDrawdown = 0.0,
+            maxDrawdownTicks = 0,
+            totalTrades = 0,
+            totalHarvested = 0.0,
+            bestReturn = 0.0,
+            worstReturn = 0.0,
+        )
+        return ComprehensiveStochasticReport(
+            snapshots = emptyList(),
+            championGenome = emptyGenome,
+            championTotalValue = 0.0,
+            aggregate = emptyAggregate,
+            championBacktestReport = emptyReport,
+        )
+    }
+
+    val inputs = feedsToHarnessInputs(feeds, config)
+    val trainer = StochasticBagSpanTrainer(config, inputs)
+    val trainingResult = trainer.runMultiGenerationTraining(generations, convergenceThreshold)
+
+    val championReport = trainingResult.snapshots.last().toBacktestReport(
+        initialCapital = config.initialCapital,
+    )
+
+    val validationReport = if (validateChampion) {
+        // Replay champion over the first symbol's data via SimulationReplay
+        val firstFeed = feeds.entries.first()
+        val key = klineSeriesKey(firstFeed.key, config.quote, config.timespan)
+        SimulationReplay(
+            genome = trainingResult.championGenome,
+            mode = Mode.SHADOW,
+            initialCapital = config.initialCapital,
+        ).replayCsv(firstFeed.value, key.symbol, config.timespan).toBacktestReport()
+    } else null
+
+    return ComprehensiveStochasticReport(
+        snapshots = trainingResult.snapshots,
+        championGenome = trainingResult.championGenome,
+        championTotalValue = trainingResult.championTotalValue,
+        aggregate = trainingResult.aggregate,
+        championBacktestReport = championReport,
+        validationReport = validationReport,
+    )
+}
