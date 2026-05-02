@@ -11,40 +11,105 @@ class MvccBlockStore {
     data class Snapshot(val seq: Long)
 
     private var seq: Long = 0L
-    private val store: MutableMap<String, MutableList<Pair<Long, BlockRowVec>>> = mutableMapOf()
+
+    data class BlockEntry(var putSeq: Long, val block: Any?, var removed: Boolean = false, var removeSeq: Long? = null)
+
+    private val store: MutableMap<String, MutableList<BlockEntry>> = mutableMapOf()
+
+    // simple WAL stub
+    data class WalEntry(val seq: Long)
+    class Wal { val entries: MutableList<WalEntry> = mutableListOf() }
+    val wal: Wal = Wal()
+
+    // exposed block meta for tests
+    data class BlockMeta(val putSeq: Long, val removed: Boolean, val removeSeq: Long?)
+    val blocks: List<BlockMeta>
+        get() = store.values.flatMap { list -> list.map { BlockMeta(it.putSeq, it.removed, it.removeSeq) } }
 
     fun snapshot(): Snapshot = Snapshot(seq)
 
-    fun put(key: String, block: BlockRowVec): Int {
+    /**
+     * Put a block into the named collection. Returns a stable 1-based insertion id for the key.
+     */
+    fun put(key: String, block: Any?): Int {
         seq += 1
         val list = store.getOrPut(key) { mutableListOf() }
-        list.add(seq to block)
-        return list.size
+        val entry = BlockEntry(seq, block)
+        list.add(entry)
+        wal.entries.add(WalEntry(seq))
+        return list.size // id is index+1
     }
 
-    fun listAt(snap: Snapshot, key: String): List<BlockRowVec> = store[key]
-        ?.filter { it.first <= snap.seq }
-        ?.map { it.second }
+    fun remove(key: String, id: Int) {
+        // id is 1-based insertion index for the key
+        val list = store[key] ?: return
+        val idx = id - 1
+        if (idx in list.indices) {
+            val e = list[idx]
+            seq += 1
+            e.removed = true
+            e.removeSeq = seq
+            wal.entries.add(WalEntry(seq))
+        }
+    }
+
+    fun compact(upToSeq: Long) {
+        // remove entries that are removed and have removeSeq < upToSeq
+        for ((k, list) in store) {
+            val retained = list.filter { !it.removed || (it.removeSeq != null && it.removeSeq!! >= upToSeq) || it.putSeq >= upToSeq }
+            store[k] = retained.toMutableList()
+        }
+        // compact WAL as well
+        wal.entries.removeAll { it.seq < upToSeq }
+    }
+
+    /**
+     * Return the list of insertion ids visible at the snapshot for the given key.
+     */
+    fun listAt(snap: Snapshot, key: String): List<Int> = store[key]
+        ?.mapIndexedNotNull { idx, entry ->
+            if (entry.putSeq <= snap.seq && !(entry.removed && (entry.removeSeq ?: Long.MAX_VALUE) <= snap.seq)) idx + 1 else null
+        }
         ?: emptyList()
+
+    /**
+     * Get the block at a particular insertion id if visible at the snapshot.
+     */
+    fun getAt(snap: Snapshot, key: String, id: Int): BlockRowVec? {
+        val list = store[key] ?: return null
+        val idx = id - 1
+        if (idx !in list.indices) return null
+        val entry = list[idx]
+        if (entry.putSeq > snap.seq) return null
+        if (entry.removed && (entry.removeSeq ?: Long.MAX_VALUE) <= snap.seq) return null
+        return entry.block as? BlockRowVec
+    }
 
     // Simple cursor-like structure used only by the tests that inspect rows/values
     class SimpleRow(val values: List<Any?>)
     class SimpleCursor(private val rows: List<SimpleRow>) {
         val size: Int get() = rows.size
-        fun row(i: Int): SimpleRow = rows[i]
+        fun at(i: Int): SimpleRow = rows[i]
     }
 
+    /**
+     * Scan visible blocks at snapshot and produce a simple cursor of rows (each row is the cells of a DocRowVec)
+     */
     fun scanAt(snap: Snapshot, key: String): SimpleCursor {
-        val blocks = listAt(snap, key)
+        val list = store[key] ?: return SimpleCursor(emptyList())
         val rows = mutableListOf<SimpleRow>()
-        for (b in blocks) {
-            val docs = try {
-                b.getSealedRows()
-            } catch (e: Throwable) {
-                emptyList<DocRowVec>()
-            }
-            for (d in docs) {
-                rows.add(SimpleRow(d.cells))
+        for (entry in list) {
+            if (entry.putSeq > snap.seq) continue
+            if (entry.removed && (entry.removeSeq ?: Long.MAX_VALUE) <= snap.seq) continue
+            val block = entry.block
+            when (block) {
+                is BlockRowVec -> {
+                    val docs = block.child ?: emptyList()
+                    for (d in docs) {
+                        rows.add(SimpleRow(d.cells))
+                    }
+                }
+                else -> rows.add(SimpleRow(listOf(block)))
             }
         }
         return SimpleCursor(rows)
