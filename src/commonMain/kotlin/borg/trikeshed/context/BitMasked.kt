@@ -216,11 +216,17 @@ infix fun Long.plus(bm: BitMasked<Long>): Long = this + bm.mask
 infix fun Long.minus(bm: BitMasked<Long>): Long = this - bm.mask
 
 // BitMasked<Long> comparisons >> BitMasked<Long>
+@JvmName("eqEnumLong")
 inline infix fun <reified E> BitMasked<Long>.eq(other: E): Boolean where E : Enum<E>, E : BitMasked<Long> = this.mask == other.mask
+@JvmName("neEnumLong")
 inline infix fun <reified E> BitMasked<Long>.ne(other: E): Boolean where E : Enum<E>, E : BitMasked<Long> = this.mask != other.mask
+@JvmName("ltEnumLong")
 inline infix fun <reified E> BitMasked<Long>.lt(other: E): Boolean where E : Enum<E>, E : BitMasked<Long> = this.mask < other.mask
+@JvmName("gtEnumLong")
 inline infix fun <reified E> BitMasked<Long>.gt(other: E): Boolean where E : Enum<E>, E : BitMasked<Long> = this.mask > other.mask
+@JvmName("leEnumLong")
 inline infix fun <reified E> BitMasked<Long>.le(other: E): Boolean where E : Enum<E>, E : BitMasked<Long> = this.mask <= other.mask
+@JvmName("geEnumLong")
 inline infix fun <reified E> BitMasked<Long>.ge(other: E): Boolean where E : Enum<E>, E : BitMasked<Long> = this.mask >= other.mask
 
 // BitMasked<Long> comparisons >> Long
@@ -232,14 +238,19 @@ infix fun BitMasked<Long>.le(mask: Long): Boolean = this.mask <= mask
 infix fun BitMasked<Long>.ge(mask: Long): Boolean = this.mask >= mask
 
 // BitMasked<Long> boolean logic
+@JvmName("andAlsoEnumLong")
 inline infix fun <reified E> BitMasked<Long>.andAlso(other: E): Boolean where E : Enum<E>, E : BitMasked<Long> = (this.mask and other.mask) != 0L
+@JvmName("orElseEnumLong")
 inline infix fun <reified E> BitMasked<Long>.orElse(other: E): Boolean where E : Enum<E>, E : BitMasked<Long> = (this.mask or other.mask) != 0L
 infix fun BitMasked<Long>.andAlso(mask: Long): Boolean = (this.mask and mask) != 0L
 infix fun BitMasked<Long>.orElse(mask: Long): Boolean = (this.mask or mask) != 0L
+@JvmName("logicalNotLong")
 fun BitMasked<Long>.logicalNot(): Boolean = this.mask == 0L
 
 // BitMasked<Long> conversion
+@JvmName("toLongLong")
 fun BitMasked<Long>.toLong(): Long = this.mask
+@JvmName("toIntLong")
 fun BitMasked<Long>.toInt(): Int = this.mask.toInt()
 fun BitMasked<Long>.toULong(): ULong = this.mask.toULong()
 
