@@ -362,9 +362,14 @@ suspend fun simulateTicks(
         val input = klineBarToPortfolioInput(cursor, i, currentQuantity = initialQuantity)
         val rows = portfolioInputToRows(input)
 
-        // Current holdings value is sum of all row values
+        // Current holdings value: original allocation + engine reinvested positions
         var holdingsValue = 0.0
         rows.forEach { holdingsValue += it.Value }
+        // Add market value of reinvested positions tracked by the engine
+        val price = input.price
+        for ((sym, holding) in engine.holdings) {
+            holdingsValue += holding.rawQuantity * price
+        }
         val totalValue = holdingsValue + engine.cashBalance
 
         val result = engine.update(
