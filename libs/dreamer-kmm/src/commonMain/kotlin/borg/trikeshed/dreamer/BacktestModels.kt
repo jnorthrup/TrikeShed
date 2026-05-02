@@ -43,6 +43,8 @@ data class CycleResult(
     val tradedSymbols: List<String>,
     val rebalanceScheduled: Boolean,
     val engineSnapshot: Map<String, Any?>,
+    val reinvestedAmount: Double = 0.0,
+    val reinvestedSymbols: List<String> = emptyList(),
 )
 
 /**
@@ -58,6 +60,7 @@ data class BacktestMetrics(
     val totalHarvested: Double,
     val totalTrades: Int,
     val avgHarvestPerTick: Double,
+    val totalReinvested: Double = 0.0,
 )
 
 /**
@@ -83,6 +86,7 @@ data class BacktestReport(
     val totalTrades: Int,
     val totalHarvested: Double,
     val totalTicks: Int,
+    val totalReinvested: Double = 0.0,
 )
 
 /** Build a stable summary layer from a back-test result plus its aggregate metrics. */
@@ -100,6 +104,7 @@ fun BacktestResult.toBacktestReport(): BacktestReport {
         totalTrades = metrics.totalTrades,
         totalHarvested = metrics.totalHarvested,
         totalTicks = metrics.totalTicks,
+        totalReinvested = metrics.totalReinvested,
     )
 }
 
@@ -288,8 +293,10 @@ fun computeBacktestMetrics(
 
     var totalHarvested = 0.0
     var totalTrades = 0
+    var totalReinvested = 0.0
     cycles.view.forEach {
         totalHarvested += it.harvestedAmount
+        totalReinvested += it.reinvestedAmount
         if (it.anyTradesThisCycle) totalTrades++
     }
     val avgHarvestPerTick = if (totalTicks > 0) totalHarvested / totalTicks else 0.0
@@ -304,6 +311,7 @@ fun computeBacktestMetrics(
         totalHarvested = totalHarvested,
         totalTrades = totalTrades,
         avgHarvestPerTick = avgHarvestPerTick,
+        totalReinvested = totalReinvested,
     )
 }
 
@@ -395,6 +403,8 @@ suspend fun simulateTicks(
             tradedSymbols = result.tradedSymbols,
             rebalanceScheduled = engine.rebalanceState.isNotEmpty(),
             engineSnapshot = engine.getStateSnapshot(),
+            reinvestedAmount = result.reinvestedAmount,
+            reinvestedSymbols = result.reinvestedSymbols,
         )
         cycleArray[i] = cycle
         onCycle(cycle)
@@ -537,6 +547,8 @@ suspend fun simulateMultiSymbolTicks(
             tradedSymbols = result.tradedSymbols,
             rebalanceScheduled = engine.rebalanceState.isNotEmpty(),
             engineSnapshot = engine.getStateSnapshot(),
+            reinvestedAmount = result.reinvestedAmount,
+            reinvestedSymbols = result.reinvestedSymbols,
         )
         cycleArray[tick] = cycle
         onCycle(cycle)
@@ -604,6 +616,7 @@ data class BacktestAggregateReport(
     val bestReturn: Double,          // best single-run return
     val worstReturn: Double,        // worst single-run return
     val bestGenome: Map<String, Any?>? = null,  // genome of best run, if available
+    val totalReinvested: Double = 0.0,  // sum across all runs
 )
 
 /**
@@ -628,6 +641,7 @@ fun aggregateReports(
             bestReturn = 0.0,
             worstReturn = 0.0,
             bestGenome = bestGenome,
+            totalReinvested = 0.0,
         )
     }
     if (reports.size == 1) {
@@ -645,12 +659,14 @@ fun aggregateReports(
             bestReturn = r.totalReturn,
             worstReturn = r.totalReturn,
             bestGenome = bestGenome,
+            totalReinvested = r.totalReinvested,
         )
     }
 
     val totalTicks = reports.sumOf { it.totalTicks }
     val totalTrades = reports.sumOf { it.totalTrades }
     val totalHarvested = reports.sumOf { it.totalHarvested }
+    val totalReinvested = reports.sumOf { it.totalReinvested }
 
     // Capital-weighted average return (each run weighted by its initial capital)
     val totalCapital = reports.sumOf { it.initialCapital }
@@ -678,6 +694,7 @@ fun aggregateReports(
         bestReturn = best.totalReturn,
         worstReturn = worst.totalReturn,
         bestGenome = bestGenome,
+        totalReinvested = totalReinvested,
     )
 }
 
@@ -744,6 +761,8 @@ fun HarnessRunResult.toBacktestResult(
             tradedSymbols = cycle.result.tradedSymbols,
             rebalanceScheduled = false,
             engineSnapshot = emptyMap(),
+            reinvestedAmount = cycle.result.reinvestedAmount,
+            reinvestedSymbols = cycle.result.reinvestedSymbols,
         )
     }.toSeries()
 

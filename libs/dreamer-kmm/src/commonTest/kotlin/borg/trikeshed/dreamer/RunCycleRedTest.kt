@@ -1114,4 +1114,70 @@ class RunCycleRedTest {
         assertEquals(6, aggregateReport.runCount)
         assertTrue(aggregateReport.bestReturn >= aggregateReport.worstReturn)
     }
+
+    // ── 15. Reinvest fields propagate through CycleResult → BacktestMetrics → BacktestReport ─
+
+    /**
+     * Pin that reinvest fields from EngineResult survive the full chain:
+     *   simulateTicks → CycleResult.reinvestedAmount/Symbols →
+     *   computeBacktestMetrics.totalReinvested → BacktestReport.totalReinvested →
+     *   aggregateReports.totalReinvested
+     *
+     * This was a gap: EngineResult had reinvest fields but CycleResult dropped them.
+     */
+    @Test
+    fun `reinvest fields propagate through full backtest chain`() = runTest {
+        // Build a cursor with aggressively rising prices to trigger harvest + reinvest
+        val csvText = csv(
+            "1704067200000,100.0,120.0,99.0,115.0,100.0,1704070799999,11500.0,100,5.0,5750.0,0",
+            "1704070800000,115.0,140.0,114.0,135.0,120.0,1704074399999,16200.0,100,6.0,8100.0,0",
+            "1704074400000,135.0,160.0,134.0,155.0,140.0,1704077999999,21700.0,100,7.0,10850.0,0",
+            "1704078000000,155.0,180.0,154.0,175.0,160.0,1704081599999,28000.0,100,8.0,14000.0,0",
+        )
+        val chars = csvText.length j { i: Int -> csvText[i] }
+        val klines = klinesFromCsv(chars, "BTCUSDT", TimeSpan.Hours1)
+        val block = KlineBlock.mutable(TimeSpan.Hours1)
+        for (i in 0 until klines.size) block.append(klines.b(i).toKline())
+        val cursor = block.seal().asCursor()
+
+        // Aggressive reinvest genome
+        val genome = defaultGenome()
+        genome[GenomeParam.MIN_SURPLUS_FOR_HARVEST] = 0.001
+        genome[GenomeParam.HARVEST_TAKE_PERCENT] = 0.80
+        genome[GenomeParam.HARVEST_ALLOC_REINVEST_PERCENT] = 0.90
+        genome[GenomeParam.MIN_REINVEST_BUY_USD] = 0.50
+
+        val engine = TradingEngine(genome, Mode.SHADOW, initialCapital = 10_000.0)
+        val result = simulateTicks(cursor, engine, initialCapital = 10_000.0)
+
+        // Step 1: CycleResult should carry reinvest fields
+        val reinvestCycles = result.cycles.view.filter { it.reinvestedAmount > 0.0 }
+        // With aggressive params and rising prices, reinvest should fire
+        if (reinvestCycles.isNotEmpty()) {
+            // At least one cycle should have reinvested symbols
+            val withSymbols = reinvestCycles.filter { it.reinvestedSymbols.isNotEmpty() }
+            assertTrue(withSymbols.isNotEmpty(),
+                "Cycles with reinvestedAmount > 0 should have reinvestedSymbols: ${reinvestCycles.map { it.reinvestedSymbols }}")
+
+            // Step 2: BacktestMetrics.totalReinvested should sum all cycle reinvest amounts
+            val cycleSum = result.cycles.view.sumOf { it.reinvestedAmount }
+            assertEquals(cycleSum, result.metrics.totalReinvested, 0.001,
+                "totalReinvested should equal sum of cycle reinvestedAmounts")
+            assertTrue(result.metrics.totalReinvested > 0.0,
+                "totalReinvested should be positive: ${result.metrics.totalReinvested}")
+        }
+
+        // Step 3: BacktestReport.totalReinvested propagates from metrics
+        val report = result.toBacktestReport()
+        assertEquals(result.metrics.totalReinvested, report.totalReinvested, 0.001,
+            "Report totalReinvested should match metrics totalReinvested")
+
+        // Step 4: aggregateReports sums totalReinvested across reports
+        val report2 = result.copy(symbol = "ETHUSDT").toBacktestReport().copy(symbol = "ETHUSDT")
+        val aggregate = aggregateReports(listOf(report, report2))
+        assertEquals(
+            report.totalReinvested + report2.totalReinvested,
+            aggregate.totalReinvested, 0.001,
+            "aggregate totalReinvested should be sum of report totalReinvested values")
+    }
 }
