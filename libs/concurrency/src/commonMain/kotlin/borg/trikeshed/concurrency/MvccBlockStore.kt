@@ -1,7 +1,9 @@
 package borg.trikeshed.concurrency
 
-import borg.trikeshed.miniduck.BlockRowVec
-import borg.trikeshed.miniduck.DocRowVec
+import borg.trikeshed.lib.j
+import borg.trikeshed.lib.size
+import borg.trikeshed.lib.Join
+import borg.trikeshed.cursor.joins
 
 /**
  * Minimal MVCC Block store stub used by tests. Not a full implementation — provides only
@@ -21,10 +23,10 @@ class MvccBlockStore {
     class Wal { val entries: MutableList<WalEntry> = mutableListOf() }
     val wal: Wal = Wal()
 
-    // exposed block meta for tests
-    data class BlockMeta(val putSeq: Long, val removed: Boolean, val removeSeq: Long?)
+    // exposed block meta for tests (removeSeq is normalized to a non-nullable long for tests)
+    data class BlockMeta(val putSeq: Long, val removed: Boolean, val removeSeq: Long)
     val blocks: List<BlockMeta>
-        get() = store.values.flatMap { list -> list.map { BlockMeta(it.putSeq, it.removed, it.removeSeq) } }
+        get() = store.values.flatMap { list -> list.map { BlockMeta(it.putSeq, it.removed, it.removeSeq ?: Long.MIN_VALUE) } }
 
     fun snapshot(): Snapshot = Snapshot(seq)
 
@@ -34,7 +36,9 @@ class MvccBlockStore {
     fun put(key: String, block: Any?): Int {
         seq += 1
         val list = store.getOrPut(key) { mutableListOf() }
-        val entry = BlockEntry(seq, block)
+        // Store the original block object so scans can inspect elements when needed
+        val storedBlock: Any? = block
+        val entry = BlockEntry(seq, storedBlock)
         list.add(entry)
         wal.entries.add(WalEntry(seq))
         return list.size // id is index+1
@@ -75,43 +79,51 @@ class MvccBlockStore {
     /**
      * Get the block at a particular insertion id if visible at the snapshot.
      */
-    fun getAt(snap: Snapshot, key: String, id: Int): BlockRowVec? {
+    fun getAt(snap: Snapshot, key: String, id: Int): BlockLike? {
         val list = store[key] ?: return null
         val idx = id - 1
         if (idx !in list.indices) return null
         val entry = list[idx]
         if (entry.putSeq > snap.seq) return null
         if (entry.removed && (entry.removeSeq ?: Long.MAX_VALUE) <= snap.seq) return null
-        return entry.block as? BlockRowVec
+        return entry.block as? BlockLike
     }
 
-    // Simple cursor-like structure used only by the tests that inspect rows/values
-    class SimpleRow(val values: List<Any?>)
-    class SimpleCursor(private val rows: List<SimpleRow>) {
-        val size: Int get() = rows.size
-        fun at(i: Int): SimpleRow = rows[i]
-    }
-
-    /**
-     * Scan visible blocks at snapshot and produce a simple cursor of rows (each row is the cells of a DocRowVec)
-     */
-    fun scanAt(snap: Snapshot, key: String): SimpleCursor {
-        val list = store[key] ?: return SimpleCursor(emptyList())
-        val rows = mutableListOf<SimpleRow>()
+    // Scan visible blocks at snapshot and produce a Cursor of RowVec rows used by tests.
+    fun scanAt(snap: Snapshot, key: String): borg.trikeshed.cursor.Cursor {
+        val list = store[key] ?: return borg.trikeshed.lib.Join.emptySeriesOf()
+        val rowVecs: MutableList<borg.trikeshed.cursor.RowVec> = mutableListOf()
         for (entry in list) {
             if (entry.putSeq > snap.seq) continue
             if (entry.removed && (entry.removeSeq ?: Long.MAX_VALUE) <= snap.seq) continue
             val block = entry.block
             when (block) {
-                is BlockRowVec -> {
-                    val docs = block.child ?: emptyList()
-                    for (d in docs) {
-                        rows.add(SimpleRow(d.cells))
+                is Collection<*> -> {
+                    for (elem in block) {
+                        val cells: List<Any?> = when (elem) {
+                            is Collection<*> -> elem.toList()
+                            is Array<*> -> elem.toList()
+                            else -> listOf(elem)
+                        }
+                        val values: borg.trikeshed.lib.Series<Any?> = cells.size j { idx -> cells[idx] }
+                        val meta: borg.trikeshed.lib.Series<() -> borg.trikeshed.cursor.ColumnMeta> = cells.size j { idx -> { borg.trikeshed.cursor.ColumnMeta("col$idx", borg.trikeshed.isam.meta.IOMemento.IoString) } }
+                        rowVecs.add(values.joins(meta))
                     }
                 }
-                else -> rows.add(SimpleRow(listOf(block)))
+                is Array<*> -> {
+                    val cells: List<Any?> = block.toList()
+                    val values: borg.trikeshed.lib.Series<Any?> = cells.size j { idx -> cells[idx] }
+                    val meta: borg.trikeshed.lib.Series<() -> borg.trikeshed.cursor.ColumnMeta> = cells.size j { idx -> { borg.trikeshed.cursor.ColumnMeta("col$idx", borg.trikeshed.isam.meta.IOMemento.IoString) } }
+                    rowVecs.add(values.joins(meta))
+                }
+                else -> {
+                    val cells = listOf(block)
+                    val values: borg.trikeshed.lib.Series<Any?> = cells.size j { idx -> cells[idx] }
+                    val meta: borg.trikeshed.lib.Series<() -> borg.trikeshed.cursor.ColumnMeta> = cells.size j { idx -> { borg.trikeshed.cursor.ColumnMeta("col$idx", borg.trikeshed.isam.meta.IOMemento.IoString) } }
+                    rowVecs.add(values.joins(meta))
+                }
             }
         }
-        return SimpleCursor(rows)
+        return rowVecs.size j { r -> rowVecs[r] }
     }
 }

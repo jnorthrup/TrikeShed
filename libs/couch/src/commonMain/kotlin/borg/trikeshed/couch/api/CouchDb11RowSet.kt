@@ -1,9 +1,6 @@
 package borg.trikeshed.couch.api
 
-import borg.trikeshed.miniduck.BlockRowVec
-import borg.trikeshed.miniduck.DocRowVec
-import borg.trikeshed.miniduck.MiniRowVec
-import borg.trikeshed.miniduck.ViewRowVec
+import borg.trikeshed.miniduck.*
 import borg.trikeshed.lib.toSeries
 import borg.trikeshed.parse.json.JsonParser
 import borg.trikeshed.miniduck.mutable
@@ -48,10 +45,10 @@ data class CouchDb11RowSet(
             )
         }
 
-       fun parseDocRowVec(map: Map<String, Any?>): DocRowVec {
+       fun parseDocRowVec(map: Map<String, Any?>): borg.trikeshed.cursor.RowVec {
             val keys = map.keys.toList()
             val cells = keys.map { key -> map[key] }
-            return DocRowVec(keys = keys, cells = cells)
+            return DocRowVec(keys = keys, cells = cells).toRowVec()
         }
 
        fun Map<String, Any?>.string(name: String): String =

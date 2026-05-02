@@ -1,6 +1,6 @@
 package borg.trikeshed.couch.handle
 
-import borg.trikeshed.miniduck.MiniRowVec
+import borg.trikeshed.miniduck.*
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.j
 
@@ -19,9 +19,15 @@ class CollectionHandle constructor() {
         fun open(): CollectionHandle = CollectionHandle()
     }
 
-    fun append(row: MiniRowVec) {
+    fun append(row: Any?) {
         check(_state == HandleState.OPEN) { "Cannot append unless OPEN" }
-        rows.add(row)
+        val rv: MiniRowVec = when (row) {
+            is borg.trikeshed.lib.Join<*,*> -> row as MiniRowVec
+            is borg.trikeshed.miniduck.DocRowVec -> row.toRowVec()
+            is borg.trikeshed.miniduck.ViewRowVec -> row.toRowVec()
+            else -> error("Unsupported row type: ${row?.let { it::class }}")
+        }
+        rows.add(rv)
     }
 
     fun seal() {

@@ -1,6 +1,7 @@
 package borg.trikeshed.miniduck.exec
 
 import borg.trikeshed.userspace.database.LsmrDatabase
+import borg.trikeshed.cursor.Cursor
 
 /**
  * JS platform actual for LsmrTableSource. Delegate to InMemoryTableSource for tests/runtime
