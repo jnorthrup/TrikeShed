@@ -563,4 +563,168 @@ class BacktestIntegrationTest {
                 "Gen ${i + 1} elite fitness should be identical across runs")
         }
     }
+
+    /**
+     * Full stochastic back-testing chain:
+     *   generated CSV → BinanceVisionKlineFeed → KlineBlock → Cursor
+     *     → simulateTicks (with TimeSpan-aware Sharpe) → BacktestResult
+     *     → computeBacktestMetrics (hourly annualization) → BacktestReport
+     *     → evaluatePopulation → rankEvaluationsByFitness → evolvePopulation
+     *     → aggregateReports → BacktestAggregateReport
+     *
+     * Validates that the entire chain from synthetic data through evolution
+     * and aggregation produces consistent, non-trivial results.
+     */
+    @Test
+    fun `full stochastic chain from generated CSV through evolution and aggregation`() = runTest {
+        // Generate synthetic hourly archive data for BTC
+        val csv = generatedArchiveCsv(
+            symbol = "BTCUSDT",
+            rows = 50,
+            timespan = TimeSpan.Hours1,
+            startOpenTime = 1_704_067_200_000L,
+            assetIndex = 0,
+            seed = 42,
+        )
+
+        // Step 1: Parse CSV → KlineBlock → Cursor
+        val chars = csv.length j { i: Int -> csv[i] }
+        val klines = klinesFromCsv(chars, "BTCUSDT", TimeSpan.Hours1)
+        assertTrue(klines.size > 0, "Should parse klines from generated CSV")
+        val block = KlineBlock.mutable()
+        klines.view.forEach { block.append(it.toKline()) }
+        block.seal()
+        val cursor = block.asCursor()
+        assertEquals(50, cursor.size, "Should have 50 bars")
+
+        // Step 2: Run single-symbol simulateTicks with default genome
+        val genome = defaultGenome()
+        genome[GenomeParam.MIN_SURPLUS_FOR_HARVEST] = 0.001
+        genome[GenomeParam.HARVEST_TAKE_PERCENT] = 0.30
+        val engine = TradingEngine(genome, Mode.SHADOW, initialCapital = 10_000.0)
+        val result = simulateTicks(cursor, engine, initialCapital = 10_000.0)
+
+        // Verify basic result structure
+        assertEquals("BTCUSDT", result.symbol)
+        assertEquals(10_000.0, result.initialCapital, 0.001)
+        assertEquals(50, result.metrics.totalTicks)
+        assertTrue(result.metrics.totalReturn.isFinite(),
+            "totalReturn should be finite: ${result.metrics.totalReturn}")
+
+        // Step 3: Compute metrics with hourly annualization
+        val hourlyMetrics = computeBacktestMetrics(
+            result.cycles, 10_000.0, closesFromCursor(cursor),
+            annualizationFactor = TimeSpan.Hours1.annualizationFactor
+        )
+        assertEquals(result.metrics.totalReturn, hourlyMetrics.totalReturn, 0.001,
+            "totalReturn should be same regardless of annualization")
+        // Sharpe should differ from daily (if non-zero)
+        if (result.metrics.sharpeRatio != 0.0) {
+            assertTrue(hourlyMetrics.sharpeRatio != result.metrics.sharpeRatio,
+                "Hourly Sharpe should differ from daily")
+        }
+
+        // Step 4: Evolution — evaluate population of diverse genomes
+        val genomes = (0 until 6).map { i ->
+            val g = defaultGenome()
+            g[GenomeParam.HARVEST_TAKE_PERCENT] = 0.05 + i * 0.10
+            g[GenomeParam.MIN_SURPLUS_FOR_HARVEST] = 0.001 + i * 0.002
+            g
+        }
+        val evaluations = evaluatePopulation(genomes, csv, "BTCUSDT", TimeSpan.Hours1, 10_000.0)
+        assertEquals(6, evaluations.size, "Should evaluate all 6 genomes")
+
+        // All evaluations should produce finite fitness
+        evaluations.forEach { eval ->
+            assertTrue(eval.fitness.isFinite(),
+                "Fitness should be finite: ${eval.fitness}")
+            assertTrue(eval.result.metrics.totalTicks > 0,
+                "Should have ticks in evaluation result")
+        }
+
+        // Step 5: Rank and verify ordering
+        val ranked = rankEvaluationsByFitness(evaluations)
+        for (i in 0 until ranked.size - 1) {
+            assertTrue(ranked[i].fitness >= ranked[i + 1].fitness,
+                "Ranked evaluations should be in descending fitness order")
+        }
+
+        // Step 6: Evolve population
+        val nextGen = evolvePopulation(evaluations, mapOf("HARVEST_TAKE_PERCENT" to 0.01))
+        assertEquals(6, nextGen.size, "Evolved population should have same size")
+
+        // Step 7: Aggregate reports
+        val reports = evaluations.map { it.result.toBacktestReport() }
+        val aggregate = aggregateReports(reports)
+        assertEquals(6, aggregate.runCount)
+        assertTrue(aggregate.totalTicks > 0)
+        assertTrue(aggregate.avgTotalReturn.isFinite())
+
+        // Step 8: Aggregate evaluations with champion genome
+        val evalAggregate = aggregateEvaluations(evaluations)
+        assertEquals(6, evalAggregate.runCount)
+        assertNotNull(evalAggregate.bestGenome, "Champion genome should be captured")
+
+        // Step 9: Run second generation and verify improvement potential
+        val gen2Evals = evaluatePopulation(nextGen, csv, "BTCUSDT", TimeSpan.Hours1, 10_000.0)
+        val gen2Ranked = rankEvaluationsByFitness(gen2Evals)
+        // At minimum, gen2 should produce valid results
+        assertTrue(gen2Ranked.first().fitness.isFinite(),
+            "Gen2 elite should have finite fitness")
+    }
+
+    /**
+     * Integration test: TimeSpan-aware Sharpe produces correct results
+     * for different bar durations on the same equity curve.
+     */
+    @Test
+    fun `TimeSpan-aware Sharpe scales correctly across bar durations`() = runTest {
+        // Generate CSV data at 1-minute resolution
+        val csv1m = generatedArchiveCsv(
+            symbol = "BTCUSDT",
+            rows = 30,
+            timespan = TimeSpan.Minutes1,
+            startOpenTime = 1_704_067_200_000L,
+            assetIndex = 0,
+            seed = 99,
+        )
+
+        val replay = SimulationReplay(
+            genome = defaultGenome(),
+            mode = Mode.SHADOW,
+            initialCapital = 10_000.0,
+        )
+        val result = replay.replayCsv(csvText = csv1m, symbol = "BTCUSDT", timespan = TimeSpan.Minutes1)
+        val closes = closesFromCursor(result.cycles.let { cycles ->
+            // Re-derive cursor from the same CSV for close prices
+            val chars = csv1m.length j { i: Int -> csv1m[i] }
+            val klines = klinesFromCsv(chars, "BTCUSDT", TimeSpan.Minutes1)
+            val block = KlineBlock.mutable()
+            klines.view.forEach { block.append(it.toKline()) }
+            block.seal().asCursor()
+        })
+
+        // Compute metrics with different annualization factors
+        val sharpe1m = computeBacktestMetrics(
+            result.cycles, 10_000.0, closes,
+            annualizationFactor = TimeSpan.Minutes1.annualizationFactor
+        ).sharpeRatio
+        val sharpe1d = computeBacktestMetrics(
+            result.cycles, 10_000.0, closes,
+            annualizationFactor = TimeSpan.Days1.annualizationFactor
+        ).sharpeRatio
+
+        // Both should be finite
+        assertTrue(sharpe1m.isFinite(), "1m Sharpe should be finite: $sharpe1m")
+        assertTrue(sharpe1d.isFinite(), "1d Sharpe should be finite: $sharpe1d")
+
+        // If there's any volatility, 1m annualization should give different Sharpe than 1d
+        if (sharpe1d != 0.0 && sharpe1m != 0.0) {
+            val ratio = sharpe1m / sharpe1d
+            // sqrt(362880) / sqrt(252) ≈ 37.96
+            val expectedRatio = TimeSpan.Minutes1.annualizationFactor / TimeSpan.Days1.annualizationFactor
+            assertEquals(expectedRatio, ratio, 0.01,
+                "Sharpe ratio should scale with annualization factor")
+        }
+    }
 }
