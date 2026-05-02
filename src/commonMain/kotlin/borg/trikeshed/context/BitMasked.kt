@@ -4,11 +4,10 @@ package borg.trikeshed.context
  * Interface for enums that represent bitmasks.
  */
 interface BitMasked {
-    val ordinal: Int
-    val mask: UInt get() = 1u shl ordinal
+    val mask: UInt get() = 1u shl (this as Enum<*>).ordinal
 
-    fun isAtLeast(other: BitMasked): Boolean = this.ordinal >= other.ordinal
-    fun isAtMost(other: BitMasked): Boolean = this.ordinal <= other.ordinal
-    fun isLessThan(other: BitMasked): Boolean = this.ordinal < other.ordinal
-    fun isGreaterThan(other: BitMasked): Boolean = this.ordinal > other.ordinal
+    fun isAtLeast(other: BitMasked): Boolean = (this as Enum<*>).ordinal >= (other as Enum<*>).ordinal
+    fun isAtMost(other: BitMasked): Boolean = (this as Enum<*>).ordinal <= (other as Enum<*>).ordinal
+    fun isLessThan(other: BitMasked): Boolean = (this as Enum<*>).ordinal < (other as Enum<*>).ordinal
+    fun isGreaterThan(other: BitMasked): Boolean = (this as Enum<*>).ordinal > (other as Enum<*>).ordinal
 }
