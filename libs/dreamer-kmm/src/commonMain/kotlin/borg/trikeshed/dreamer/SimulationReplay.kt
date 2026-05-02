@@ -28,7 +28,8 @@ class SimulationReplay(
 
         val engine = TradingEngine(genome, mode, initialCapital = initialCapital)
         return runBlockingCommon {
-            simulateTicks(block.seal().asCursor(), engine, initialCapital)
+            simulateTicks(block.seal().asCursor(), engine, initialCapital,
+                annualizationFactor = timespan.annualizationFactor)
         }
     }
 

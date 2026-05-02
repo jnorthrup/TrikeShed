@@ -2,8 +2,7 @@ package borg.trikeshed.couch.requestfactory
 
 import borg.trikeshed.couch.transport.htx.HtxRequest
 import borg.trikeshed.couch.transport.htx.HtxRequestFactoryBridge
-import kotlinx.coroutines.runBlocking
-import borg.trikeshed.ccek.CcekKeyService
+
 
 data class RequestFactoryHtxExchange(
     val request: HtxRequest,
@@ -37,13 +36,10 @@ class RequestFactoryHtxServer(
         val body = rawRequest.substringAfter("\r\n\r\n", "")
         var call = RequestFactoryJsonCodec.callFromJson(body)
         val ccekKey = plan.headers["x-ccek-key"]
-        val response = if (ccekKey != null) {
+        if (ccekKey != null) {
             call = call.copy(ccekKey = ccekKey)
-            // Bind a CCEK keyed service into the coroutine context for the duration of the service invocation
-            runBlocking(CcekKeyService(ccekKey)) { service.invoke(call) }
-        } else {
-            service.invoke(call)
         }
+        val response = service.invoke(call)
         val responseBody = RequestFactoryJsonCodec.responseToJson(response)
         return buildString {
             append("HTTP/1.1 200 OK\r\n")

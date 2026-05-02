@@ -324,6 +324,7 @@ suspend fun simulateTicks(
     cursor: Cursor,
     engine: TradingEngine,
     initialCapital: Double,
+    annualizationFactor: Double = sqrt(252.0),
     onCycle: (CycleResult) -> Unit = {},
 ): BacktestResult {
     val n = cursor.size
@@ -404,7 +405,7 @@ suspend fun simulateTicks(
     val nonNull = Array(n) { cycleArray[it]!! }
     val cycles: Series<CycleResult> = nonNull.toSeries()
     val closes = closesFromCursor(cursor)
-    val metrics = computeBacktestMetrics(cycles, initialCapital, closes)
+    val metrics = computeBacktestMetrics(cycles, initialCapital, closes, annualizationFactor)
 
     return BacktestResult(
         symbol = symbol,
@@ -431,6 +432,7 @@ suspend fun simulateMultiSymbolTicks(
     engine: TradingEngine,
     initialCapital: Double,
     initialHoldings: Map<String, Double> = emptyMap(),
+    annualizationFactor: Double = sqrt(252.0),
     onCycle: (CycleResult) -> Unit = {},
 ): BacktestResult {
     val n = cursor.size
@@ -545,7 +547,7 @@ suspend fun simulateMultiSymbolTicks(
     val nonNull = Array(tickCount) { cycleArray[it]!! }
     val cycles: Series<CycleResult> = nonNull.toSeries()
     val closes = closesFromCursor(cursor)
-    val metrics = computeBacktestMetrics(cycles, initialCapital, closes)
+    val metrics = computeBacktestMetrics(cycles, initialCapital, closes, annualizationFactor)
 
     return BacktestResult(
         symbol = "MULTI",

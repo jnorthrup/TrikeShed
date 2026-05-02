@@ -3,7 +3,7 @@ package borg.trikeshed.couch.requestfactory
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.runTest
 
 import borg.trikeshed.couch.runtime.Reactor
 import borg.trikeshed.couch.runtime.CouchRuntime
@@ -14,7 +14,7 @@ import borg.trikeshed.couch.transport.htx.HtxRequest
 class RequestFactoryCouchHostedIntegrationTest {
 
     @Test
-    fun reactorSelfHostCouch_roundtrip() = runBlocking {
+    fun reactorSelfHostCouch_roundtrip() = runTest {
         val reactor = Reactor("couch-realm")
         reactor.open()
         reactor.activate()

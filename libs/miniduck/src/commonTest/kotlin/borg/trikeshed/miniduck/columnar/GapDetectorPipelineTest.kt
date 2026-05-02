@@ -4,7 +4,7 @@ import borg.trikeshed.cursor.Cursor
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.size
 import borg.trikeshed.miniduck.DocRowVec
-import borg.trikeshed.miniduck.at
+import borg.trikeshed.cursor.at
 import kotlin.test.*
 
 /**

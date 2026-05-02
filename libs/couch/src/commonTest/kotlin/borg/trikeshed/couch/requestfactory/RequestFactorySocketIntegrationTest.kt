@@ -5,15 +5,38 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 import borg.trikeshed.userspace.nio.*
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.launch
-import java.io.ByteArrayOutputStream
 import kotlin.math.min
+
+/** Multiplatform byte accumulator — replaces java.io.ByteArrayOutputStream */
+private class ByteAccumulator(initialCapacity: Int = 256) {
+    private var buf = ByteArray(initialCapacity)
+    private var pos = 0
+
+    fun write(src: ByteArray, offset: Int, len: Int) {
+        ensureCapacity(pos + len)
+        src.copyInto(buf, pos, offset, offset + len)
+        pos += len
+    }
+
+    fun toByteArray(): ByteArray = buf.copyOf(pos)
+
+    fun toUtf8String(): String = buf.decodeToString(0, pos)
+
+    private fun ensureCapacity(needed: Int) {
+        if (needed > buf.size) {
+            val newBuf = ByteArray(maxOf(buf.size * 2, needed))
+            buf.copyInto(newBuf, 0, 0, pos)
+            buf = newBuf
+        }
+    }
+}
 
 class RequestFactorySocketIntegrationTest {
 
     @Test
-    fun socketRoundtrip_passesCcek() = runBlocking {
+    fun socketRoundtrip_passesCcek() = runTest {
         // create listening socket (platform-specific actual implementation)
         val server = createListeningSocket("127.0.0.1", 0)
         // get bound port
@@ -33,14 +56,14 @@ class RequestFactorySocketIntegrationTest {
             try {
                 val conn = server.accept() ?: return@launch
                 val readBuf = ByteArray(4096)
-                val data = ByteArrayOutputStream()
+                val data = ByteAccumulator()
                 var headersStr: String? = null
                 var contentLength = 0
                 while (true) {
                     val n = conn.read(readBuf, 0, readBuf.size)
                     if (n <= 0) break
                     data.write(readBuf, 0, n)
-                    val soFar = data.toString("UTF-8")
+                    val soFar = data.toUtf8String()
                     val idx = soFar.indexOf("\r\n\r\n")
                     if (idx != -1) {
                         headersStr = soFar.substring(0, idx)
@@ -56,24 +79,24 @@ class RequestFactorySocketIntegrationTest {
                                 if (name == "content-length") contentLength = value.toInt()
                             }
                         }
-                        val bodyBytesSoFar = rest.toByteArray(Charsets.UTF_8)
+                        val bodyBytesSoFar = rest.encodeToByteArray()
                         var needed = contentLength - bodyBytesSoFar.size
-                        val bodyOut = ByteArrayOutputStream()
-                        bodyOut.write(bodyBytesSoFar)
+                        val bodyOut = ByteAccumulator()
+                        bodyOut.write(bodyBytesSoFar, 0, bodyBytesSoFar.size)
                         while (needed > 0) {
                             val m = conn.read(readBuf, 0, min(readBuf.size, needed))
                             if (m <= 0) break
                             bodyOut.write(readBuf, 0, m)
                             needed -= m
                         }
-                        val rawRequest = headersStr + "\r\n\r\n" + String(bodyOut.toByteArray(), Charsets.UTF_8)
+                        val rawRequest = headersStr + "\r\n\r\n" + bodyOut.toUtf8String()
 
                         // handle request
                         val serverImpl = RequestFactoryHtxServer(service)
                         val response = serverImpl.handle(rawRequest)
 
                         // write response back
-                        val respBytes = response.toByteArray(Charsets.UTF_8)
+                        val respBytes = response.encodeToByteArray()
                         conn.write(respBytes, 0, respBytes.size)
 
                         conn.close()
@@ -103,20 +126,20 @@ class RequestFactorySocketIntegrationTest {
             append("Host: localhost\r\n")
             append("Content-Type: ${clientExchange.contentType}\r\n")
             append("X-CCEK-Key: sock-key\r\n")
-            append("Content-Length: ${body.toByteArray().size}\r\n\r\n")
+            append("Content-Length: ${body.encodeToByteArray().size}\r\n\r\n")
             append(body)
-        }.toByteArray(Charsets.UTF_8)
+        }.encodeToByteArray()
         client.write(reqBytes, 0, reqBytes.size)
 
         // read response
-        val respBuf = ByteArrayOutputStream()
+        val respBuf = ByteAccumulator()
         val tmp = ByteArray(4096)
         while (true) {
             val n = client.read(tmp, 0, tmp.size)
             if (n <= 0) break
             respBuf.write(tmp, 0, n)
         }
-        val respStr = respBuf.toString("UTF-8")
+        val respStr = respBuf.toUtf8String()
         val respBody = respStr.substringAfter("\r\n\r\n")
         val resp = RequestFactoryJsonCodec.responseFromJson(respBody)
         assertTrue(resp.success)

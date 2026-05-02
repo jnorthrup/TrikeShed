@@ -42,6 +42,8 @@ data class HtxClientRequest(
     val method: String,
     val path: String,
     val body: String = "",
+    val switches: Aria2Switches? = null,
+    val uris: List<String> = emptyList(),
 )
 
 typealias HtxRequestHandler = suspend (HtxClientRequest) -> HtxClientMessage

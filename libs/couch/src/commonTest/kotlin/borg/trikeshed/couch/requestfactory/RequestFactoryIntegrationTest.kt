@@ -12,7 +12,7 @@ import borg.trikeshed.parse.confix.Path
 import borg.trikeshed.parse.confix.Combinators
 import borg.trikeshed.parse.confix.asSeries
 
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.channels.Channel as KChannel
 
@@ -54,7 +54,7 @@ class RequestFactoryIntegrationTest {
             append("Host: localhost\r\n")
             append("Content-Type: ${exchange.contentType}\r\n")
             append("X-CCEK-Key: test-key\r\n")
-            append("Content-Length: ${body.toByteArray().size}\r\n\r\n")
+            append("Content-Length: ${body.encodeToByteArray().size}\r\n\r\n")
             append(body)
         }
 
@@ -76,7 +76,7 @@ class RequestFactoryIntegrationTest {
     }
 
     @Test
-    fun reactorHostedServer_roundtrip() = runBlocking {
+    fun reactorHostedServer_roundtrip() = runTest {
         val reactor = ReactorSupervisor("test-realm")
         reactor.open()
         reactor.activate()
@@ -98,7 +98,7 @@ class RequestFactoryIntegrationTest {
                 append("Host: localhost\r\n")
                 append("Content-Type: ${exchange.contentType}\r\n")
                 append("X-CCEK-Key: reactor-key\r\n")
-                append("Content-Length: ${body.toByteArray().size}\r\n\r\n")
+                append("Content-Length: ${body.encodeToByteArray().size}\r\n\r\n")
                 append(body)
             }
 
