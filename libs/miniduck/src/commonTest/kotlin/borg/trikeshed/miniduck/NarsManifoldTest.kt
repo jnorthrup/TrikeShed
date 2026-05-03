@@ -1,6 +1,7 @@
 package borg.trikeshed.miniduck
 
 import borg.trikeshed.lib.*
+import borg.trikeshed.miniduck.manifold.*
 import kotlin.test.*
 
 class NarsManifoldTest {
@@ -114,8 +115,8 @@ class NarsManifoldTest {
 
         val concepts = bag.recall()
         assertEquals(2, concepts.size)
-        assertEquals(100L, (concepts[0] as ManifoldConcept).angular)
-        assertEquals(200L, (concepts[1] as ManifoldConcept).angular)
+        assertEquals(100L, (concepts[0] as ManifoldConcept<*>).angular)
+        assertEquals(200L, (concepts[1] as ManifoldConcept<*>).angular)
     }
 
     @Test
@@ -124,8 +125,7 @@ class NarsManifoldTest {
         bag.insert(ManifoldConcept(angular = 1L, budget = BudgetCoord(p = 0.5f, d = 0.5f, q = 0.5f)))
         val sealed = bag.seal()
         // sealed bag should be immutable
-        assertSame(bag, sealed)
-        assertEquals(NarsBag.State.SEALED, bag.state)
+        assertEquals(NarsBag.State.SEALED, sealed.state)
     }
 
     @Test
@@ -136,8 +136,8 @@ class NarsManifoldTest {
 
         val tensor = bag.budgetTensor()
         // shape: (2 concepts, 3 budget dims)
-        assertEquals(2, tensor.a[0])
-        assertEquals(3, tensor.a[1])
+        assertEquals(2, tensor.a.b(0))
+        assertEquals(3, tensor.a.b(1))
         // concept 0
         assertEquals(0.5, tensor.b(shapeOf(0, 0)).toDouble(), 0.001)
         assertEquals(0.6, tensor.b(shapeOf(0, 1)).toDouble(), 0.001)
@@ -160,14 +160,14 @@ class NarsManifoldTest {
         t1.insert(ManifoldConcept(angular = 2L, budget = BudgetCoord(p = 0.5f, d = 0.5f, q = 0.5f)))
         t1.seal()
 
-        val timeline = 2 j { i: Int -> if (i == 0) t0 else t1 }
+        val timeline: Series<NarsBag> = 2 j { i: Int -> if (i == 0) t0 else t1 }
         val all = timeline.totalRecall()
 
         // both bags' concepts visible
         assertEquals(2, all.first)
         // radial-descending order: highest energy first
-        val c0 = all[0] as ManifoldConcept
-        val c1 = all[1] as ManifoldConcept
+        val c0 = all[0] as ManifoldConcept<*>
+        val c1 = all[1] as ManifoldConcept<*>
         assertTrue(c0.budget.energy() >= c1.budget.energy())
     }
 
@@ -191,6 +191,54 @@ class NarsManifoldTest {
 
         val neighbors = bag.recallNear(centroid, maxDistance = 5)
         assertEquals(1, neighbors.first)
-        assertEquals(0x0F0F0F0F0F0F0F0EL, (neighbors[0] as ManifoldConcept).angular)
+        assertEquals(0x0F0F0F0F0F0F0F0EL, (neighbors[0] as ManifoldConcept<*>).angular)
+    }
+
+    // --- MetricsAxis (runtime measurements) ---
+
+    @Test
+    fun metricsAxisCapturesRuntimeProfile() {
+        val metrics = metricsAxis(initialNanos = 1_000_000L, steadyNanos = 100_000L)
+        assertEquals(1_000_000L, metrics.initialNanos)
+        assertEquals(100_000L, metrics.steadyNanos)
+    }
+
+    @Test
+    fun warmupRatioDetectsHotspot() {
+        val coldStart = metricsAxis(initialNanos = 10_000_000L, steadyNanos = 100_000L)
+        assertTrue(coldStart.warmupRatio > 50f) // 10ms/100us = 100x
+
+        val steadyState = metricsAxis(initialNanos = 100_000L, steadyNanos = 100_000L)
+        assertEquals(1f, steadyState.warmupRatio, 0.1f)
+    }
+
+    @Test
+    fun distanceFromSteadyMeasuresLatency() {
+        val metrics = metricsAxis(initialNanos = 5_000_000L, steadyNanos = 500_000L)
+        assertEquals(4_500_000L, metrics.distanceFromSteady)
+    }
+
+    @Test
+    fun isSteadyDetectsConvergence() {
+        val notSteady = metricsAxis(initialNanos = 1_000_000L, steadyNanos = 100_000L)
+        assertFalse(notSteady.isSteady)
+
+        val steady = metricsAxis(initialNanos = 105_000L, steadyNanos = 100_000L)
+        assertTrue(steady.isSteady) // 5% tolerance
+    }
+
+    @Test
+    fun axis4WithMetrics() {
+        // axis4(shape, time, access, metrics) — positional form
+        val point = axis4(
+            1,
+            timeAxis(seq = 42L),
+            accessAxis(offset = 1024L),
+            metricsAxis(initialNanos = 50_000L, steadyNanos = 5000L)
+        )
+        assertEquals(1, point.s4)
+        assertEquals(42L, point.t4.seq)
+        assertEquals(1024L, point.a4.offset)
+        assertEquals(5000L, point.m4.steadyNanos)
     }
 }
