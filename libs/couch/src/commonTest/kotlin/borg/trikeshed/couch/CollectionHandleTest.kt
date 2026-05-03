@@ -40,7 +40,20 @@ class CollectionHandleTest {
         h.append(doc("b" to 20))
         val snap = h.snapshot()
         assertEquals(2, snap.size)
-        assertEquals(10, (snap[0] as borg.trikeshed.miniduck.DocRowVec)["a"])
+        assertEquals(10, snap[0]["a"])
+    }
+
+    @Test
+    fun metaSnapshotIndexesDocsByComparableKey() {
+        val h = CollectionHandle.open()
+        h.append(doc("name" to "alice", "age" to 30))
+        h.append(doc("name" to "bob", "age" to 25))
+
+        val snap = h.metaSnapshot { row -> row["name"] as String }
+
+        assertEquals(2, snap.size)
+        assertEquals(30, snap["alice"]["age"])
+        assertEquals(25, snap["bob"]["age"])
     }
 
     @Test

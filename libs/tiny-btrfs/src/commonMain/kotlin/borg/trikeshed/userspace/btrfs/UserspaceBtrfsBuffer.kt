@@ -2,7 +2,10 @@ package borg.trikeshed.userspace.btrfs
 
 import borg.trikeshed.context.AsyncContextElement
 import borg.trikeshed.context.ElementState
+import borg.trikeshed.tinybtrfs.BtrfsMount
 import borg.trikeshed.tinybtrfs.DiskAdapter
+import borg.trikeshed.tinybtrfs.NodeId
+import borg.trikeshed.tinybtrfs.toNodeId
 import kotlin.coroutines.CoroutineContext
 
 /**
@@ -19,7 +22,7 @@ import kotlin.coroutines.CoroutineContext
  * ## Join algebra throughout
  * - `BtrfsItem(Key j DataBytes)` — leaf item smart constructor
  * - `BtrfsChildPointer(Key j BlockPtr)` — internal node child pointer
- * - `encodeLeaf(BtrfsLeaf(items), buf)` — validates + writes with CRC32C
+ * - `encodeLeaf(items, buf)` — validates + writes with CRC32C
  * - `decodeLeaf(buf)` → `BtrfsLeaf` — validates + reads
  *
  * @param chunkSize fixed size of each memory block in bytes (default 4096 = BTRFS_NODE_SIZE)
@@ -32,13 +35,13 @@ class UserspaceBtrfsBuffer(
     companion object Key : CoroutineContext.Key<UserspaceBtrfsBuffer>
 
     /** In-memory block store: nodeId → ByteArray (size = chunkSize). */
-    private val store = mutableMapOf<String, ByteArray>()
+    private val store = mutableMapOf<NodeId, ByteArray>()
 
     /** Monotonic ID counter for allocation. */
     private var nextId = 1L
 
     /** Free-list of previously allocated but freed node IDs. */
-    private val freeList = ArrayDeque<String>()
+    private val freeList = ArrayDeque<NodeId>()
 
     init {
         require(chunkSize > 0) { "chunkSize must be positive" }
@@ -47,29 +50,29 @@ class UserspaceBtrfsBuffer(
 
     // ── DiskAdapter ──────────────────────────────────────────────────────────
 
-    override fun readNode(nodeId: String): ByteArray? {
+    override fun readNode(nodeId: NodeId): ByteArray? {
         check(state.isAtLeast(ElementState.OPEN)) { "Buffer not open (state=$state)" }
-        return store[nodeId]
+        return store[nodeId]?.copyOf()
     }
 
-    override fun writeNode(nodeId: String, bytes: ByteArray) {
+    override fun writeNode(nodeId: NodeId, bytes: ByteArray) {
         check(state.isAtLeast(ElementState.OPEN)) { "Buffer not open (state=$state)" }
         require(bytes.size <= chunkSize) { "Node bytes (${bytes.size}) > chunkSize ($chunkSize)" }
         // Pad to exactly chunkSize if smaller
         val toStore = if (bytes.size < chunkSize) {
             ByteArray(chunkSize).also { bytes.copyInto(it) }
         } else bytes
-        store[nodeId] = toStore
+        store[nodeId] = toStore.copyOf()
     }
 
-    override fun allocateNode(): String {
+    override fun allocateNode(): NodeId {
         check(state.isAtLeast(ElementState.OPEN)) { "Buffer not open (state=$state)" }
-        val id = if (freeList.isNotEmpty()) freeList.removeFirst() else "n-${nextId++}"
+        val id = if (freeList.isNotEmpty()) freeList.removeFirst() else "n-${nextId++}".toNodeId()
         store[id] = ByteArray(chunkSize)
         return id
     }
 
-    override fun freeNode(nodeId: String) {
+    override fun freeNode(nodeId: NodeId) {
         check(state.isAtLeast(ElementState.OPEN)) { "Buffer not open (state=$state)" }
         store.remove(nodeId)
         freeList.addLast(nodeId)
@@ -100,29 +103,32 @@ class UserspaceBtrfsBuffer(
     /** Total blocks ever allocated. */
     fun totalAllocated(): Long = nextId - 1
 
+    fun mount(
+        volatileReads: Boolean = false,
+        maxReadAttempts: Int = 3,
+    ): BtrfsMount = BtrfsMount(this, volatileReads, maxReadAttempts)
+
     /** Write a properly-formatted leaf node. */
-    fun writeLeaf(nodeId: String, leaf: BtrfsLeaf, generation: ULong = 0UL) {
+    fun writeLeaf(nodeId: NodeId, leaf: BtrfsLeaf, generation: ULong = 0UL) {
         val buf = ByteArray(chunkSize)
         encodeLeaf(leaf, buf, generation)
         writeNode(nodeId, buf)
     }
 
     /** Write a properly-formatted internal node. */
-    fun writeInternal(nodeId: String, internal: BtrfsInternal, generation: ULong = 0UL) {
+    fun writeInternal(nodeId: NodeId, internal: BtrfsInternal, generation: ULong = 0UL) {
         val buf = ByteArray(chunkSize)
         encodeInternal(internal, buf, generation)
         writeNode(nodeId, buf)
     }
 
     /** Read and decode a leaf node. */
-    fun readLeaf(nodeId: String): BtrfsLeaf {
-        val bytes = readNode(nodeId) ?: error("Node $nodeId not found")
-        return decodeLeaf(bytes)
+    fun readLeaf(nodeId: NodeId): BtrfsLeaf {
+        return mount().readLeaf(nodeId)
     }
 
     /** Read and decode an internal node. */
-    fun readInternal(nodeId: String): BtrfsInternal {
-        val bytes = readNode(nodeId) ?: error("Node $nodeId not found")
-        return decodeInternal(bytes)
+    fun readInternal(nodeId: NodeId): BtrfsInternal {
+        return mount().readInternal(nodeId)
     }
 }

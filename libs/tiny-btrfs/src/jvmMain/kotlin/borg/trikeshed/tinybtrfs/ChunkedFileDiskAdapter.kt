@@ -48,12 +48,13 @@ class ChunkedFileDiskAdapter(
         }
     }
 
-   fun parseOffset(nodeId: String): Long {
-        if (!nodeId.startsWith("off:")) throw IllegalArgumentException("invalid node id: $nodeId")
-        return nodeId.substringAfter("off:").toLong()
+   fun parseOffset(nodeId: NodeId): Long {
+        val text = nodeId.toString()
+        if (!text.startsWith("off:")) throw IllegalArgumentException("invalid node id: $nodeId")
+        return text.substringAfter("off:").toLong()
     }
 
-    override fun readNode(nodeId: String): ByteArray? {
+    override fun readNode(nodeId: NodeId): ByteArray? {
         val offset = parseOffset(nodeId)
         synchronized(raf) {
             val fileLen = raf.length()
@@ -66,7 +67,7 @@ class ChunkedFileDiskAdapter(
         }
     }
 
-    override fun writeNode(nodeId: String, bytes: ByteArray) {
+    override fun writeNode(nodeId: NodeId, bytes: ByteArray) {
         if (bytes.size > chunkSize) throw IllegalArgumentException("bytes exceed chunkSize: ${bytes.size} > $chunkSize")
         val offset = parseOffset(nodeId)
         synchronized(raf) {
@@ -76,18 +77,18 @@ class ChunkedFileDiskAdapter(
         }
     }
 
-    override fun allocateNode(): String {
+    override fun allocateNode(): NodeId {
         val freed = freeList.poll()
-        if (freed != null) return "off:$freed"
+        if (freed != null) return "off:$freed".toNodeId()
         val off = nextOffset.getAndAdd(chunkSize.toLong())
         synchronized(raf) {
             val needed = off + chunkSize
             if (raf.length() < needed) raf.setLength(needed)
         }
-        return "off:$off"
+        return "off:$off".toNodeId()
     }
 
-    override fun freeNode(nodeId: String) {
+    override fun freeNode(nodeId: NodeId) {
         val off = parseOffset(nodeId)
         freeList.add(off)
     }

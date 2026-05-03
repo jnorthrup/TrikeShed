@@ -45,7 +45,7 @@ class SnapshotIsolationTest {
 
         val snap1 = h.snapshot()
         assertEquals(1, snap1.size)
-        assertEquals(10, (snap1[0] as borg.trikeshed.miniduck.DocRowVec)["v"])
+        assertEquals(10, snap1[0]["v"])
 
         h.append(doc("v" to 20))
 
@@ -78,9 +78,9 @@ class SnapshotIsolationTest {
         h.append(doc("name" to "bob"))
         val snap2 = h.snapshot()
 
-        assertEquals("alice", (snap1[0] as borg.trikeshed.miniduck.DocRowVec)["name"])
-        assertEquals("alice", (snap2[0] as borg.trikeshed.miniduck.DocRowVec)["name"])
-        assertEquals("bob", (snap2[1] as borg.trikeshed.miniduck.DocRowVec)["name"])
+        assertEquals("alice", snap1[0]["name"])
+        assertEquals("alice", snap2[0]["name"])
+        assertEquals("bob", snap2[1]["name"])
     }
 
     @Test

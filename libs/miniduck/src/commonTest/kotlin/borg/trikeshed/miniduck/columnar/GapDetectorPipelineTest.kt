@@ -2,11 +2,12 @@ package borg.trikeshed.miniduck.columnar
 
 import borg.trikeshed.collections.s_
 import borg.trikeshed.cursor.Cursor
+import borg.trikeshed.cursor.at
+import borg.trikeshed.lib.get
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.size
 import borg.trikeshed.miniduck.DocRowVec
-import borg.trikeshed.cursor.at
-import borg.trikeshed.lib.get
+import borg.trikeshed.miniduck.toRowVec
 import kotlin.test.*
 
 /**

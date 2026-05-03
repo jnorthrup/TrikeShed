@@ -11,8 +11,12 @@ tiny-btrfs provides:
    Leaf nodes are linked for sequential scan.  Uses TrikeShed algebra
    (Series, Join, Twin, `j` infix) throughout.
 
-2. **DiskAdapter** -- Platform-neutral SPI for node persistence (read/write/allocate/free).
-   InMemoryDiskAdapter provided for tests.
+2. **DiskAdapter / BtrfsMount** -- Platform-neutral SPI for node persistence
+   (read/write/allocate/free) plus explicit mount read policy. InMemoryDiskAdapter
+   is provided for tests. `readNode()` is a snapshot boundary: adapters that own
+   mutable bytes copy on read/write. For mmap-like sources, mount with
+   `volatileReads = true`; the mount retries until two consecutive page images
+   match before decode.
 
 3. **Userspace buffer layer** -- Two lifecycle-managed DiskAdapter implementations
    that extend `AsyncContextElement`:

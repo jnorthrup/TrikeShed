@@ -4,6 +4,8 @@ import borg.trikeshed.context.AsyncContextElement
 import borg.trikeshed.context.ElementState
 import borg.trikeshed.lib.*
 import borg.trikeshed.tinybtrfs.DiskAdapter
+import borg.trikeshed.tinybtrfs.NodeId
+import borg.trikeshed.tinybtrfs.toNodeId
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import kotlin.coroutines.CoroutineContext
@@ -13,7 +15,7 @@ import kotlin.coroutines.CoroutineContext
  *
  * Extends [AsyncContextElement] to participate in the TrikeShed userspace element
  * lifecycle (CREATED → OPEN → DRAINING → CLOSED). Stores fixed-size memory chunks
- * keyed by String node IDs, with a free-list for chunk reuse.
+ * keyed by Series<Char>-backed node IDs, with a free-list for chunk reuse.
  *
  * Usage:
  * ```kotlin
@@ -37,13 +39,13 @@ class UserspaceMemoryBuffer(
     companion object Key : CoroutineContext.Key<UserspaceMemoryBuffer>
 
     /** In-memory chunk store: nodeId → ByteArray. */
-    private val store = mutableMapOf<String, ByteArray>()
+    private val store = mutableMapOf<NodeId, ByteArray>()
 
     /** Monotonic ID counter for allocation. */
     private var nextId = 1L
 
     /** Free-list of previously allocated but freed node IDs. */
-    private val freeList = ArrayDeque<String>()
+    private val freeList = ArrayDeque<NodeId>()
 
     init {
         require(chunkSize > 0) { "chunkSize must be positive, got $chunkSize" }
@@ -51,32 +53,32 @@ class UserspaceMemoryBuffer(
 
     // ── DiskAdapter ──────────────────────────────────────────────────────────
 
-    override fun readNode(nodeId: String): ByteArray? {
+    override fun readNode(nodeId: NodeId): ByteArray? {
         check(state.isAtLeast(ElementState.OPEN)) { "Buffer not open (state=$state)" }
-        return store[nodeId]
+        return store[nodeId]?.copyOf()
     }
 
-    override fun writeNode(nodeId: String, bytes: ByteArray) {
+    override fun writeNode(nodeId: NodeId, bytes: ByteArray) {
         check(state.isAtLeast(ElementState.OPEN)) { "Buffer not open (state=$state)" }
         check(bytes.size <= chunkSize) {
             "Node bytes (${bytes.size}) exceed chunk size ($chunkSize)"
         }
-        store[nodeId] = bytes
+        store[nodeId] = bytes.copyOf()
     }
 
-    override fun allocateNode(): String {
+    override fun allocateNode(): NodeId {
         check(state.isAtLeast(ElementState.OPEN)) { "Buffer not open (state=$state)" }
         // Reuse a freed ID if available, otherwise allocate fresh.
         val id = if (freeList.isNotEmpty()) {
             freeList.removeFirst()
         } else {
-            "n-${nextId++}"
+            "n-${nextId++}".toNodeId()
         }
         store[id] = ByteArray(0)
         return id
     }
 
-    override fun freeNode(nodeId: String) {
+    override fun freeNode(nodeId: NodeId) {
         check(state.isAtLeast(ElementState.OPEN)) { "Buffer not open (state=$state)" }
         store.remove(nodeId)
         freeList.addLast(nodeId)
@@ -104,7 +106,7 @@ class UserspaceMemoryBuffer(
     fun chunkCount(): Int = store.size
 
     /** Snapshot active node bytes for read-only rebuild/inspection passes. */
-    fun nodeSnapshot(): Series<Join<String, ByteArray>> {
+    fun nodeSnapshot(): Series<Join<NodeId, ByteArray>> {
         val entries = store.entries.toList()
         return entries.size j { i -> entries[i].key j entries[i].value.copyOf() }
     }

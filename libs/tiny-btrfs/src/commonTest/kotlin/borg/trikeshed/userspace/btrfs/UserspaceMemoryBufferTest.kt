@@ -1,6 +1,7 @@
 package borg.trikeshed.userspace.btrfs
 
 import borg.trikeshed.context.ElementState
+import borg.trikeshed.tinybtrfs.toNodeId
 import borg.trikeshed.tinybtrfs.BPlusTree
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -68,7 +69,7 @@ class UserspaceMemoryBufferTest {
     fun readBeforeOpenThrows() = runTest {
         val buf = UserspaceMemoryBuffer()
         try {
-            buf.readNode("any")
+            buf.readNode("any".toNodeId())
             assertTrue(false, "Expected exception")
         } catch (e: IllegalStateException) {
             // Expected — buffer not open

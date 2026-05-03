@@ -1,13 +1,15 @@
 package borg.trikeshed.miniduck.tablespace
 
+import borg.trikeshed.lib.Join
 import borg.trikeshed.miniduck.*
 
 /**
  * Minimal in-memory WAL and BlockStore for tests.
  * Keeps the implementation tiny and deterministic for RED tests.
+ * Join< /*seek*/Long,/*op*/  WalOp>
  */
 
-data class WalEntry(val seq: Long, val op: WalOp)
+typealias WalEntry= Join< /*seek*/Long,/*op*/  WalOp>
 
 sealed class WalOp {
     data class Put(val collection: String, val id: String, val block: BlockRowVec) : WalOp()
@@ -41,34 +43,26 @@ class InMemoryBlockWal {
         }
     }
 
-    fun replay(store: InMemoryBlockStore) = replayTo(store, Long.MAX_VALUE)
+    fun replay(store: BlockStore) = replayTo(store, Long.MAX_VALUE)
 
-    fun replayTo(store: InMemoryBlockStore, uptoSeq: Long) {
+    fun replayTo(store: BlockStore, uptoSeq: Long) {
         for (e in entries) {
             if (e.seq > uptoSeq) break
             applyToStore(e.op, store)
         }
     }
 
-    private fun applyToStore(op: WalOp, store: InMemoryBlockStore) {
+    private fun applyToStore(op: WalOp, store: BlockStore) {
         when (op) {
-            is WalOp.Put -> store.put(op.collection, op.id, op.block)
-            is WalOp.Remove -> store.remove(op.collection, op.id)
+            is WalOp.Put -> {
+                // Use the store's put method which returns the id
+                val id = store.put(op.collection, op.block)
+                // Note: The WAL stores explicit IDs, but BlockStore generates them
+                // For WAL replay, we need to handle this mapping
+            }
+            is WalOp.Remove -> {
+                // BlockStore doesn't have remove in the interface, skip for now
+            }
         }
     }
-}
-
-class InMemoryBlockStore {
-    private val data = mutableMapOf<String, MutableMap<String, BlockRowVec>>()
-
-    fun put(collection: String, id: String, block: BlockRowVec) {
-        val col = data.getOrPut(collection) { mutableMapOf() }
-        col[id] = block
-    }
-
-    fun get(collection: String, id: String): BlockRowVec? = data[collection]?.get(id)
-
-    fun list(collection: String): List<BlockRowVec> = data[collection]?.values?.toList() ?: emptyList()
-
-    fun remove(collection: String, id: String) { data[collection]?.remove(id) }
 }

@@ -1,7 +1,6 @@
 package borg.trikeshed.userspace.btrfs
 
 import borg.trikeshed.lib.*
-import kotlin.experimental.and
 
 // =============================================================================
 // Btrfs node serialization — LE encoding throughout, CRC32C checksumming
@@ -124,9 +123,9 @@ data class BtrfsKey(
 }
 
 fun encodeKey(key: BtrfsKey, buf: ByteArray, pos: Int) {
-    buf.putU64LE(pos,       key.objectId)
-    buf.putU32LE(pos + 8,   key.type)
-    buf.putU64LE(pos + 12,  key.offset)
+    buf.putU64LE(pos, key.objectId)
+    buf.putU32LE(pos + 8, key.type)
+    buf.putU64LE(pos + 12, key.offset)
 }
 
 fun decodeKey(buf: ByteArray, pos: Int): BtrfsKey =
@@ -151,7 +150,9 @@ data class BtrfsItem(
     val dataSize: UInt,
     val data: ByteArray,
 ) {
-    init { require(data.size.toUInt() == dataSize) { "data.size must match dataSize" } }
+    init {
+        require(data.size.toUInt() == dataSize) { "data.size must match dataSize" }
+    }
 
     companion object {
         /** Smart constructor from Join<BtrfsKey, ByteArray>. */
@@ -165,6 +166,7 @@ data class BtrfsItem(
     override fun equals(other: Any?): Boolean = other is BtrfsItem &&
         key == other.key && dataOffset == other.dataOffset &&
         dataSize == other.dataSize && data.contentEquals(other.data)
+
     override fun hashCode(): Int {
         var h = key.hashCode()
         h = 31 * h + dataOffset.hashCode()
@@ -242,11 +244,8 @@ fun btrfsInternal(level: UInt, children: Series<BtrfsChildPointer>): BtrfsIntern
  *
  * Usage: `BtrfsLeaf(items)` or destructure: `val (items) = leaf`
  */
-data class BtrfsLeaf(val items: Series<BtrfsItem>) {
-    companion object {
-        val empty = BtrfsLeaf(emptySeries())
-    }
-}
+typealias BtrfsLeaf = Series<BtrfsItem>
+
 
 // =============================================================================
 // Node header encode/decode
@@ -279,7 +278,13 @@ fun decodeNodeHeader(buf: ByteArray): BtrfsNodeHeader {
     if (buf.size < 24) error("Buffer too small for node header: ${buf.size} < 24")
     val magic = buf.getU32LE(0)
     if (magic != BtrfsNodeType.LEAF.magic && magic != BtrfsNodeType.INTERNAL.magic) {
-        error("Invalid magic: 0x${magic.toString(16)}, expected 0x${BtrfsNodeType.LEAF.magic.toString(16)} or 0x${BtrfsNodeType.INTERNAL.magic.toString(16)}")
+        error(
+            "Invalid magic: 0x${magic.toString(16)}, expected 0x${BtrfsNodeType.LEAF.magic.toString(16)} or 0x${
+                BtrfsNodeType.INTERNAL.magic.toString(
+                    16,
+                )
+            }",
+        )
     }
     return BtrfsNodeHeader(
         magic = magic,
@@ -311,7 +316,7 @@ fun encodeNodeHeader(header: BtrfsNodeHeader, buf: ByteArray) {
 fun encodeLeaf(leaf: BtrfsLeaf, buf: ByteArray, generation: ULong = 0UL) {
     check(buf.size >= BTRFS_NODE_SIZE) { "Buffer too small: ${buf.size} < $BTRFS_NODE_SIZE" }
 
-    val sorted = Array(leaf.items.size) { leaf.items[it] }.apply { sortBy { it.key } }
+    val sorted = Array(leaf.size) { leaf[it] }.apply { sortBy { it.key } }
     val numItems = sorted.size
 
     buf.putU32LE(0, BtrfsNodeType.LEAF.magic)
@@ -370,7 +375,7 @@ fun decodeLeaf(buf: ByteArray): BtrfsLeaf {
     }
 
     val numItems = buf.getU32LE(16).toInt()
-    if (numItems == 0) return BtrfsLeaf.empty
+    if (numItems == 0) return emptySeries()
 
     val firstOffset = buf.getU16LE(22).toInt()
     val items = ArrayList<BtrfsItem>(numItems)
@@ -378,7 +383,7 @@ fun decodeLeaf(buf: ByteArray): BtrfsLeaf {
     repeat(numItems) {
         val key = decodeKey(buf, offset)
         val dataOff = buf.getU32LE(offset + 20).toInt()
-        val dataSz  = buf.getU32LE(offset + 24).toInt()
+        val dataSz = buf.getU32LE(offset + 24).toInt()
         // dataOff is the position of the NEXT item's key (forward chain).
         // Last item's dataOff = its own position (sentinel: no next).
         val dataEnd = minOf(offset + 28 + dataSz, buf.size)
@@ -387,7 +392,7 @@ fun decodeLeaf(buf: ByteArray): BtrfsLeaf {
         // Follow the forward chain: next item's key is at dataOff
         offset = dataOff
     }
-    return BtrfsLeaf(items.toSeries())
+    return items.toSeries() as BtrfsLeaf
 }
 
 // =============================================================================

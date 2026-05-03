@@ -19,7 +19,7 @@ class BPlusTree<K : Comparable<K>, V>(
     sealed class Node<K, V> {
         abstract val keySeries: Series<K>
         abstract fun isLeaf(): Boolean
-        var id: String? = null
+        var id: NodeId? = null
     }
 
     inner class LeafNode : Node<K, V>() {

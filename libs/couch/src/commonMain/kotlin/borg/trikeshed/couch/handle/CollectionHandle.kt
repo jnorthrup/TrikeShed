@@ -1,17 +1,29 @@
 package borg.trikeshed.couch.handle
 
-import borg.trikeshed.cursor.RowVec
-import borg.trikeshed.miniduck.*
+import borg.trikeshed.lib.MetaSeries
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.j
+import borg.trikeshed.miniduck.DocRowVec
 
 /**
  * In-memory collection handle for appending rows and producing immutable snapshots.
  * Thread-unsafe — use synchronization at the call site when needed.
  */
+typealias DocMetaSeries = MetaSeries<Comparable<*>, DocRowVec>
+
+data class DocMetaCount(val count: Int) : Comparable<DocMetaCount> {
+    override fun compareTo(other: DocMetaCount): Int = count.compareTo(other.count)
+}
+
+val DocMetaSeries.size: Int
+    get() = (a as? DocMetaCount)?.count
+        ?: error("DocMetaSeries metadata must be DocMetaCount")
+
+operator fun DocMetaSeries.get(key: Comparable<*>): DocRowVec = b(key)
+
 class CollectionHandle constructor() {
     var _state: HandleState = HandleState.OPEN
-    val rows: MutableList<RowVec> = mutableListOf()
+    val rows: MutableList<DocRowVec> = mutableListOf()
 
     val state: HandleState get() = _state
     val rowCount: Int get() = rows.size
@@ -20,15 +32,9 @@ class CollectionHandle constructor() {
         fun open(): CollectionHandle = CollectionHandle()
     }
 
-    fun append(row: Any?) {
+    fun append(row: DocRowVec) {
         check(_state == HandleState.OPEN) { "Cannot append unless OPEN" }
-        val rv: RowVec = when (row) {
-            is borg.trikeshed.lib.Join<*,*> -> row as RowVec
-            is borg.trikeshed.miniduck.DocRowVec -> row.toRowVec()
-            is borg.trikeshed.miniduck.ViewRowVec -> row.toRowVec()
-            else -> error("Unsupported row type: ${row?.let { it::class }}")
-        }
-        rows.add(rv)
+        rows.add(row)
     }
 
     fun seal() {
@@ -41,8 +47,23 @@ class CollectionHandle constructor() {
         _state = HandleState.CLOSED
     }
 
-    fun snapshot(): Series<RowVec> {
+    fun snapshot(): Series<DocRowVec> {
         check(_state != HandleState.CLOSED) { "Cannot snapshot a CLOSED handle" }
-        return rows.size j { rows[it] }
+        val snapshot = rows.toList()
+        return snapshot.size j { snapshot[it] }
+    }
+
+    fun metaSnapshot(keyOf: (DocRowVec) -> Comparable<*>): DocMetaSeries {
+        check(_state != HandleState.CLOSED) { "Cannot snapshot a CLOSED handle" }
+        val snapshot = rows.toList()
+        val byKey = LinkedHashMap<Comparable<*>, DocRowVec>(snapshot.size)
+        snapshot.forEach { row ->
+            val key = keyOf(row)
+            check(key !in byKey) { "Duplicate doc key in snapshot: $key" }
+            byKey[key] = row
+        }
+        return DocMetaCount(snapshot.size) j { key: Comparable<*> ->
+            byKey[key] ?: error("Missing doc for key $key")
+        }
     }
 }

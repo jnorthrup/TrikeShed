@@ -1,5 +1,6 @@
 package borg.trikeshed.tinybtrfs
 
+import borg.trikeshed.lib.toSeries
 import java.io.File
 import java.util.UUID
 
@@ -12,28 +13,28 @@ import java.util.UUID
 class FileDiskAdapter(private val dir: File) : DiskAdapter {
     init { if (!dir.exists()) dir.mkdirs() }
 
-   fun fileFor(nodeId: String) = File(dir, nodeId)
+   fun fileFor(nodeId: NodeId) = File(dir, nodeId.toString())
 
-    override fun readNode(nodeId: String): ByteArray? {
+    override fun readNode(nodeId: NodeId): ByteArray? {
         val f = fileFor(nodeId)
         return if (f.exists()) f.readBytes() else null
     }
 
-    override fun writeNode(nodeId: String, bytes: ByteArray) {
+    override fun writeNode(nodeId: NodeId, bytes: ByteArray) {
         val f = fileFor(nodeId)
         f.parentFile?.mkdirs()
         f.writeBytes(bytes)
     }
 
-    override fun allocateNode(): String {
-        val id = UUID.randomUUID().toString()
+    override fun allocateNode(): NodeId {
+        val id = UUID.randomUUID().toString().toNodeId()
         val f = fileFor(id)
         f.parentFile?.mkdirs()
         f.writeBytes(ByteArray(0))
         return id
     }
 
-    override fun freeNode(nodeId: String) {
+    override fun freeNode(nodeId: NodeId) {
         fileFor(nodeId).delete()
     }
 }

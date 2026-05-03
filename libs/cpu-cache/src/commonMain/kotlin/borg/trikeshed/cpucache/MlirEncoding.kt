@@ -1,5 +1,7 @@
 package borg.trikeshed.cpucache
 
+import borg.trikeshed.mlir.*
+
 /**
  * MLIR dialect encoding for CPU cache topology.
  *
@@ -19,7 +21,7 @@ object CpuCacheMlir {
         L2("L2"),
         L3("L3");
 
-        fun toMlirAttribute(): String = "#cpu_cache.level<$mlirName>"
+        fun toMlirAttribute(): String = "#${MlirDialect.CPU_CACHE.namespace}.level<$mlirName>"
     }
 
     enum class CacheType(val mlirName: String) {
@@ -27,7 +29,7 @@ object CpuCacheMlir {
         INSTRUCTION("Instruction"),
         UNIFIED("Unified");
 
-        fun toMlirAttribute(): String = "#cpu_cache.type<$mlirName>"
+        fun toMlirAttribute(): String = "#${MlirDialect.CPU_CACHE.namespace}.type<$mlirName>"
     }
 
     /**
@@ -35,28 +37,28 @@ object CpuCacheMlir {
      */
     fun toMlirAssembly(topology: CpuCacheTopology): String {
         val sb = StringBuilder()
-        sb.appendLine("cpu_cache.topology {")
-        
+        sb.appendLine("${CpuCacheOps.topology.qualifiedName} {")
+
         topology.l1DataBytes?.let { size ->
-            sb.appendLine("  cpu_cache.level<L1, Data> { size: $size : i64 }")
+            sb.appendLine("  ${CpuCacheOps.level.qualifiedName}<L1, Data> { size: $size : i64 }")
         }
-        
+
         topology.l1InstructionBytes?.let { size ->
-            sb.appendLine("  cpu_cache.level<L1, Instruction> { size: $size : i64 }")
+            sb.appendLine("  ${CpuCacheOps.level.qualifiedName}<L1, Instruction> { size: $size : i64 }")
         }
-        
+
         topology.l2Bytes?.let { size ->
-            sb.appendLine("  cpu_cache.level<L2, Unified> { size: $size : i64 }")
+            sb.appendLine("  ${CpuCacheOps.level.qualifiedName}<L2, Unified> { size: $size : i64 }")
         }
-        
+
         topology.l3Bytes?.let { size ->
-            sb.appendLine("  cpu_cache.level<L3, Unified> { size: $size : i64 }")
+            sb.appendLine("  ${CpuCacheOps.level.qualifiedName}<L2, Unified> { size: $size : i64 }")
         }
-        
+
         topology.coreCount?.let { cores ->
-            sb.appendLine("  cpu_cache.properties { core_count: $cores : i32 }")
+            sb.appendLine("  ${CpuCacheOps.properties.qualifiedName} { core_count: $cores : i32 }")
         }
-        
+
         sb.append("}")
         return sb.toString()
     }
@@ -86,7 +88,7 @@ object CpuCacheMlir {
      * - Uses llvm.func to declare sysconf and printf
      * - Calls sysconf with hardcoded constant arguments
      * - Formats results via printf
-     * 
+     *
      * The generated module can be compiled with:
      *   mlir-translate --mlir-to-llvmir output.mlir | clang -x ir - -o cache_probe
      */
@@ -158,5 +160,5 @@ module {
 /**
  * Extension property: convert CpuCacheTopology to MLIR assembly format.
  */
-val CpuCacheTopology.asMlir: String 
+val CpuCacheTopology.asMlir: String
     get() = CpuCacheMlir.toMlirAssembly(this)
