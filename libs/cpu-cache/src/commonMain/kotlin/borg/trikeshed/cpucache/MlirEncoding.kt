@@ -1,6 +1,9 @@
 package borg.trikeshed.cpucache
 
-import borg.trikeshed.mlir.*
+private const val CPU_CACHE_NAMESPACE = "cpu_cache"
+private const val CPU_CACHE_TOPOLOGY_OP = "cpu_cache.topology"
+private const val CPU_CACHE_LEVEL_OP = "cpu_cache.level"
+private const val CPU_CACHE_PROPERTIES_OP = "cpu_cache.properties"
 
 /**
  * MLIR dialect encoding for CPU cache topology.
@@ -21,7 +24,7 @@ object CpuCacheMlir {
         L2("L2"),
         L3("L3");
 
-        fun toMlirAttribute(): String = "#${MlirDialect.CPU_CACHE.namespace}.level<$mlirName>"
+        fun toMlirAttribute(): String = "#$CPU_CACHE_NAMESPACE.level<$mlirName>"
     }
 
     enum class CacheType(val mlirName: String) {
@@ -29,7 +32,7 @@ object CpuCacheMlir {
         INSTRUCTION("Instruction"),
         UNIFIED("Unified");
 
-        fun toMlirAttribute(): String = "#${MlirDialect.CPU_CACHE.namespace}.type<$mlirName>"
+        fun toMlirAttribute(): String = "#$CPU_CACHE_NAMESPACE.type<$mlirName>"
     }
 
     /**
@@ -37,26 +40,26 @@ object CpuCacheMlir {
      */
     fun toMlirAssembly(topology: CpuCacheTopology): String {
         val sb = StringBuilder()
-        sb.appendLine("${CpuCacheOps.topology.qualifiedName} {")
+        sb.appendLine("$CPU_CACHE_TOPOLOGY_OP {")
 
         topology.l1DataBytes?.let { size ->
-            sb.appendLine("  ${CpuCacheOps.level.qualifiedName}<L1, Data> { size: $size : i64 }")
+            sb.appendLine("  $CPU_CACHE_LEVEL_OP<L1, Data> { size: $size : i64 }")
         }
 
         topology.l1InstructionBytes?.let { size ->
-            sb.appendLine("  ${CpuCacheOps.level.qualifiedName}<L1, Instruction> { size: $size : i64 }")
+            sb.appendLine("  $CPU_CACHE_LEVEL_OP<L1, Instruction> { size: $size : i64 }")
         }
 
         topology.l2Bytes?.let { size ->
-            sb.appendLine("  ${CpuCacheOps.level.qualifiedName}<L2, Unified> { size: $size : i64 }")
+            sb.appendLine("  $CPU_CACHE_LEVEL_OP<L2, Unified> { size: $size : i64 }")
         }
 
         topology.l3Bytes?.let { size ->
-            sb.appendLine("  ${CpuCacheOps.level.qualifiedName}<L2, Unified> { size: $size : i64 }")
+            sb.appendLine("  $CPU_CACHE_LEVEL_OP<L3, Unified> { size: $size : i64 }")
         }
 
         topology.coreCount?.let { cores ->
-            sb.appendLine("  ${CpuCacheOps.properties.qualifiedName} { core_count: $cores : i32 }")
+            sb.appendLine("  $CPU_CACHE_PROPERTIES_OP { core_count: $cores : i32 }")
         }
 
         sb.append("}")

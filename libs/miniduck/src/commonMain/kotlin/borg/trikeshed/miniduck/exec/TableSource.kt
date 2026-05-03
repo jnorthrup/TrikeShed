@@ -1,8 +1,6 @@
 package borg.trikeshed.miniduck.exec
 
-import borg.trikeshed.cursor.*
-
-/** Stub interface for table source operations */
+/** Stub interface for table source operations. */
 interface TableSource {
     fun open(execCtx: ExecutionContext, tableName: String): Cursor
     suspend fun openSuspend(execCtx: ExecutionContext, tableName: String): Cursor
@@ -17,8 +15,8 @@ interface TableSource {
     suspend fun scan(execCtx: ExecutionContext, table: String): Cursor = openSuspend(execCtx, table)
 }
 
-/** Stub interface for row accessor */
+/** Stub interface for a positioned row accessor. */
 interface RowAccessor {
-    operator fun get(row: Int, col: String): Any?
-    operator fun get(row: Int, col: Int): Any?
+    operator fun get(index: Int): Any?
+    operator fun get(name: String): Any?
 }

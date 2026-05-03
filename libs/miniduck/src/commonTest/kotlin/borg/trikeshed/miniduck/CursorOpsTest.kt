@@ -1,18 +1,20 @@
 package borg.trikeshed.miniduck
 
+import borg.trikeshed.collections.s_
 import borg.trikeshed.cursor.Cursor
 import borg.trikeshed.lib.*
+import borg.trikeshed.miniduck.where
 import kotlin.test.*
 
 class CursorOpsTest {
 
-   fun cursor(vararg rows: Pair<String, Any?>): Cursor =
-        rows.size j { DocRowVec(listOf("key", "val"), listOf(rows[it].first, rows[it].second)) }
+   fun cursor(vararg rows: Join<String, Any?>): Cursor =
+        rows.size j { DocRowVec(listOf("key", "val"), s_[rows[it].first, rows[it].second]) }
 
     // ── where ────────────────────────────────────────────────────────────────
 
     @Test fun whereFiltersMatchingRows() {
-        val c = cursor("a" to 1, "b" to 2, "c" to 3)
+        val c = cursor("a" j 1, "b" j 2, "c" j 3)
         val r = c.where(col("val") gt 1)
         assertEquals(2, r.size)
         assertEquals("b", r[0].getValue("key"))
@@ -20,77 +22,77 @@ class CursorOpsTest {
     }
 
     @Test fun whereEmptyResultWhenNothingMatches() {
-        val c = cursor("a" to 1, "b" to 2)
+        val c = cursor("a" j 1, "b" j 2)
         assertEquals(0, c.where(col("val") gt 99).size)
     }
 
     @Test fun whereAndCombinesTwoPredicates() {
-        val c = cursor("a" to 1, "b" to 5, "c" to 10)
+        val c = cursor("a" j 1, "b" j 5, "c" j 10)
         val r = c.where(col("val") gt 1 and (col("val") lt 10))
         assertEquals(1, r.size)
         assertEquals("b", r[0].getValue("key"))
     }
 
     @Test fun whereNotNegates() {
-        val c = cursor("x" to 1, "y" to 2)
+        val c = cursor("x" j 1, "y" j 2)
         val r = c.where(!col("key").eq("x"))
         assertEquals(1, r.size)
         assertEquals("y", r[0].getValue("key"))
     }
 
     @Test fun whereInListMatchesSet() {
-        val c = cursor("a" to 1, "b" to 2, "c" to 3)
+        val c = cursor("a" j 1, "b" j 2, "c" j 3)
         val r = c.where(col("key") inList listOf("a", "c"))
         assertEquals(2, r.size)
     }
 
     @Test fun whereBetweenIsInclusive() {
-        val c = cursor("a" to 1, "b" to 5, "c" to 10)
-        val r = c.where(col("val") between (1 to 5))
+        val c = cursor("a" j 1, "b" j 5, "c" j 10)
+        val r = c.where(col("val") between (1 j 5))
         assertEquals(2, r.size)
     }
 
     // ── take / drop ──────────────────────────────────────────────────────────
 
     @Test fun takeReturnsFirstN() {
-        val c = cursor("a" to 1, "b" to 2, "c" to 3)
+        val c = cursor("a" j 1, "b" j 2, "c" j 3)
         val r = c.take(2)
         assertEquals(2, r.size)
         assertEquals("a", r[0].getValue("key"))
     }
 
     @Test fun takeBeyondSizeReturnsAll() {
-        val c = cursor("a" to 1)
+        val c = cursor("a" j 1)
         assertEquals(1, c.take(100).size)
     }
 
     @Test fun takeZeroIsEmpty() {
-        assertEquals(0, cursor("a" to 1).take(0).size)
+        assertEquals(0, cursor("a" j 1).take(0).size)
     }
 
     @Test fun takeNegativeThrows() {
-        assertFailsWith<IllegalArgumentException> { cursor("a" to 1).take(-1) }
+        assertFailsWith<IllegalArgumentException> { cursor("a" j 1).take(-1) }
     }
 
     @Test fun dropSkipsFirstN() {
-        val c = cursor("a" to 1, "b" to 2, "c" to 3)
+        val c = cursor("a" j 1, "b" j 2, "c" j 3)
         val r = c.drop(1)
         assertEquals(2, r.size)
         assertEquals("b", r[0].getValue("key"))
     }
 
     @Test fun dropAllProducesEmpty() {
-        assertEquals(0, cursor("a" to 1).drop(5).size)
+        assertEquals(0, cursor("a" j 1).drop(5).size)
     }
 
     @Test fun dropNegativeThrows() {
-        assertFailsWith<IllegalArgumentException> { cursor("a" to 1).drop(-1) }
+        assertFailsWith<IllegalArgumentException> { cursor("a" j 1).drop(-1) }
     }
 
     // ── orderBy ──────────────────────────────────────────────────────────────
 
     @Test fun orderByAscending() {
-        val c = cursor("b" to 2, "a" to 1, "c" to 3)
+        val c = cursor("b" j 2, "a" j 1, "c" j 3)
         val r = c.orderBy("val")
         assertEquals(1, r[0].getValue("val"))
         assertEquals(2, r[1].getValue("val"))
@@ -98,7 +100,7 @@ class CursorOpsTest {
     }
 
     @Test fun orderByDescending() {
-        val c = cursor("b" to 2, "a" to 1, "c" to 3)
+        val c = cursor("b" j 2, "a" j 1, "c" j 3)
         val r = c.orderBy("val", desc = true)
         assertEquals(3, r[0].getValue("val"))
         assertEquals(1, r[2].getValue("val"))
@@ -178,7 +180,7 @@ class CursorOpsTest {
     // ── QueryPlan execute ─────────────────────────────────────────────────────
 
     @Test fun executeFilterPlanComposesCorrectly() {
-        val base = cursor("a" to 1, "b" to 5, "c" to 3)
+        val base = cursor("a" j 1, "b" j 5, "c" j 3)
         val ref = RelationRef("db", "things", RelationKind.DOCS)
         val plan = ScanPlan(ref) filter (col("val") gt 2) limit 1
         val result = execute(plan, base)
@@ -197,7 +199,7 @@ class CursorOpsTest {
     }
 
     @Test fun executeOrderOffsetLimit() {
-        val base = cursor("c" to 3, "a" to 1, "b" to 2)
+        val base = cursor("c" j 3, "a" j 1, "b" j 2)
         val ref = RelationRef("db", "t", RelationKind.DOCS)
         val plan = ScanPlan(ref) orderBy listOf(OrderSpec("val")) offset 1 limit 1
         val result = execute(plan, base)

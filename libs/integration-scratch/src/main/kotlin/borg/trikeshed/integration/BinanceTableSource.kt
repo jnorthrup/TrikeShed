@@ -97,6 +97,14 @@ class BinanceTableSource(
         return BinanceCursor(resolvedBlocksSuspend())
     }
 
+    override fun insert(execCtx: ExecutionContext, tableName: String, row: List<Any?>) {
+        error("BinanceTableSource is read-only")
+    }
+
+    override suspend fun insertSuspend(execCtx: ExecutionContext, tableName: String, row: List<Any?>) {
+        error("BinanceTableSource is read-only")
+    }
+
     fun getSchema(): TableSchema = ohlcvSchema
     fun getSchemaManager(): SchemaManager = schemaManager
 

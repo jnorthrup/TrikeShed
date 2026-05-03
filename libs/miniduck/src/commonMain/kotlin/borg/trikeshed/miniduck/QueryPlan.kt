@@ -1,30 +1,99 @@
 package borg.trikeshed.miniduck
 
-// Minimal QueryPlan and related types used by the Couch mini-DSL. These are stubs
-// sufficient for compile-time usage in the couch module.
+import borg.trikeshed.cursor.Cursor as MiniCursor
 
-enum class RelationKind { VIEW, TABLE, INDEX }
+/** Specification for ordering a column. */
+data class OrderSpec(
+    val column: String,
+    val desc: Boolean = false,
+)
 
-data class RelationRef(val database: String, val name: String, val kind: RelationKind)
+/** Relation identity for plan trees and DSL surfaces. */
+data class RelationRef(
+    val database: String,
+    val name: String,
+    val kind: RelationKind,
+)
 
-// Base query plan type
-open class QueryPlan
+enum class RelationKind {
+    DOCS,
+    ALL_DOCS,
+    VIEW,
+    INDEX,
+    SEGMENT,
+    TABLE,
+}
 
-// ViewQueryPlan carries enough data for the DSL to attach parameters
+sealed interface QueryPlan {
+    val source: RelationRef
+}
+
+data class ScanPlan(
+    override val source: RelationRef,
+) : QueryPlan
+
+// ViewQueryPlan carries enough data for the DSL to attach parameters.
 data class ViewQueryPlan(
-    val source: RelationRef,
+    override val source: RelationRef,
     val designDocument: String,
     val viewName: String,
     val parameters: Map<String, String> = emptyMap(),
-) : QueryPlan() {
+) : QueryPlan {
     val database: String get() = source.database
+
+    fun withParameter(name: String, value: Any?): ViewQueryPlan =
+        copy(parameters = parameters + (name to (value?.toString() ?: "")))
 }
 
-// Helper to attach a parameter to a QueryPlan; returns a new plan for the common stub.
+data class FilterPlan(
+    val upstream: QueryPlan,
+    val predicate: Predicate,
+) : QueryPlan {
+    override val source: RelationRef get() = upstream.source
+}
+
+data class ProjectPlan(
+    val upstream: QueryPlan,
+    val columns: List<String>,
+) : QueryPlan {
+    override val source: RelationRef get() = upstream.source
+}
+
+data class OrderPlan(
+    val upstream: QueryPlan,
+    val specs: List<OrderSpec>,
+) : QueryPlan {
+    override val source: RelationRef get() = upstream.source
+}
+
+data class LimitPlan(
+    val upstream: QueryPlan,
+    val limit: Int,
+    val offset: Int = 0,
+) : QueryPlan {
+    override val source: RelationRef get() = upstream.source
+}
+
 fun QueryPlan.withParameter(key: String, value: Any?): QueryPlan = when (this) {
     is ViewQueryPlan -> this.copy(parameters = this.parameters + (key to (value?.toString() ?: "")))
     else -> this
 }
 
-// Overload on ViewQueryPlan so DSL functions that expect ViewQueryPlan return the right type.
-fun ViewQueryPlan.withParameter(key: String, value: Any?): ViewQueryPlan = this.copy(parameters = this.parameters + (key to (value?.toString() ?: "")))
+fun ViewQueryPlan.withParameter(key: String, value: Any?): ViewQueryPlan =
+    this.copy(parameters = this.parameters + (key to (value?.toString() ?: "")))
+
+infix fun QueryPlan.filter(pred: Predicate): FilterPlan = FilterPlan(this, pred)
+infix fun QueryPlan.project(columns: List<String>): ProjectPlan = ProjectPlan(this, columns)
+infix fun QueryPlan.orderBy(specs: List<OrderSpec>): OrderPlan = OrderPlan(this, specs)
+infix fun QueryPlan.limit(n: Int): LimitPlan = LimitPlan(this, n)
+infix fun QueryPlan.offset(n: Int): LimitPlan =
+    (this as? LimitPlan)?.copy(offset = n) ?: LimitPlan(this, Int.MAX_VALUE, n)
+
+fun execute(plan: QueryPlan, base: MiniCursor): MiniCursor = when (plan) {
+    is ScanPlan -> base
+    is ViewQueryPlan -> base
+    is FilterPlan -> base.where(plan.predicate)
+    is ProjectPlan -> base.project(*plan.columns.toTypedArray())
+    is OrderPlan -> base.orderBy(*plan.specs.toTypedArray())
+    is LimitPlan -> base.drop(plan.offset).take(plan.limit)
+}

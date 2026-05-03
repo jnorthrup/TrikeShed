@@ -1,6 +1,10 @@
 package borg.trikeshed.miniduck.schema
 
-class InMemorySchemaManager : SchemaManager {
+import borg.trikeshed.userspace.database.LsmrDatabase
+
+class LsmrSchemaManager(
+    private val db: LsmrDatabase,
+) : SchemaManager {
     private val tables = linkedMapOf<String, TableSchema>()
 
     override fun getTable(name: String): TableSchema? = tables[name]

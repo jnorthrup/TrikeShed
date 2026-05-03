@@ -1,17 +1,12 @@
 package borg.trikeshed.miniduck
 
-import borg.trikeshed.cursor.ColumnMeta
-import borg.trikeshed.cursor.Cursor
-import borg.trikeshed.cursor.RowVec
-import borg.trikeshed.cursor.SimpleCursor
-import borg.trikeshed.cursor.getValue
-import borg.trikeshed.cursor.keys
+import borg.trikeshed.cursor.*
 import borg.trikeshed.isam.meta.IOMemento
+import borg.trikeshed.isam.meta.IOMemento.*
 import borg.trikeshed.lib.*
-import borg.trikeshed.parse.json.JsonSupport
+import borg.trikeshed.parse.json.*
 import kotlin.test.*
-import kotlin.test.Test
-import kotlin.test.assertEquals
+import kotlin.test.Test.*
 
 /**
  * Algebraic composition tests for CursorOps.
@@ -154,7 +149,7 @@ class CursorOpsCompositionTest {
 
     @Test
     fun thenChainsTransforms() {
-        val c = sampleCursor() then { it.take(3) } then { it.drop(1) }
+        val c = sampleCursor() then { it.take(3) } then  { it.drop(1) }
         assertEquals(2, c.size)
         assertEquals("bob", (c at 0).getValue("name"))
     }

@@ -3,6 +3,9 @@ package borg.trikeshed.lib
 
 typealias Predicate<T> = (self: T) -> Boolean
 
+
+
+
 //test operator
 operator fun <T> T.get(test: Predicate<T>): Boolean = test(this)
 
@@ -13,7 +16,6 @@ operator fun <T> Series<T>.get(test: Predicate<T>): Iterator<T> =
 //filter for indices
 operator fun <T> Series<T>.rem(test: Predicate<T>): Iterator<Int> =
     iterator { for (i in 0 until size) if (test(get(i))) yield(i) }
-
 
 //same as where above but transforming the result instead of testing it
 infix fun <T, R> Iterable<T>.select(from: (T) -> R) = let { source ->
@@ -47,6 +49,8 @@ infix fun <T, R> Iterable<T>.select(from: (T) -> R) = let { source ->
         }
     }
 }
+
+
 
 /** creates a filtered Iterable from an Iterable which pumps this.next inside of child hasNext() in a loop until
  * predicate is satisfied

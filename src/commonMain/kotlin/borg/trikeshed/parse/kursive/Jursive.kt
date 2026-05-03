@@ -1,4 +1,3 @@
-@file:Suppress("unused", "DEPRECATION")
 package borg.trikeshed.parse.kursive.legacy
 
 import borg.trikeshed.common.TypeEvidence
