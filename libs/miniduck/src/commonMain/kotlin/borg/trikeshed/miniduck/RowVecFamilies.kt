@@ -1,9 +1,8 @@
 package borg.trikeshed.miniduck
 
 import borg.trikeshed.cursor.ColumnMeta
-import borg.trikeshed.cursor.ColumnMeta as ColumnMetaFactory
+import borg.trikeshed.cursor.`ColumnMeta↻`
 import borg.trikeshed.cursor.RowVec
-import borg.trikeshed.cursor.joins
 import borg.trikeshed.isam.meta.IOMemento
 import borg.trikeshed.lib.*
 
@@ -15,13 +14,28 @@ class DocRowVec(
     val keys: Series<String>,
     val cells: Series<Any?>,
     child: Any? = null
-) {
+) : RowVec {
+    constructor(keys: List<String>, cells: List<*>, child: Any? = null) : this(
+        keys = keys.toSeries(),
+        cells = cells.toSeries(),
+        child = child,
+    )
+
     private val childSource: Any? = child
+    val x: RowVec = cells.size j { index: Int ->
+        cells[index] j { ColumnMeta(keys[index], IOMemento.IoString) }
+    }
+    override val a=x.a
+    override val b: (Int) -> Join<Any?, `ColumnMeta↻`> =x.b
     val child: Series<RowVec>?
         get() = childSeries(childSource)
+    val size: Int get() = cells.size
     val isShell: Boolean get() = keys.isEmpty() && cells.isEmpty()
     operator fun get(index: Int): Any? = cells.getOrNull(index)
-    operator fun get(name: String): Any? = keys.view.indexOfFirst { it == name }.let { if (it >= 0) cells[it] else null }
+    operator fun get(name: String): Any? =
+        keys.view.indexOfFirst { it == name }.let { if (it >= 0) cells[it] else null }
+
+    fun asSeries(): Series<Any?> = cells
 }
 
 // ViewRowVec used for CouchDB view rows
@@ -30,13 +44,22 @@ class ViewRowVec(
     val key: Any?,
     val value: Any?,
     val docLoader: (() -> RowVec)? = null,
-) {
+) : RowVec {
+    override val a: Int get() = 3
+    override val b: (Int) -> Join<Any?, () -> ColumnMeta>
+        get() = { index: Int ->
+            get(index) j { ColumnMeta ("col$index", IOMemento.IoString) }
+        }
     val child: Series<RowVec>?
-        get() = docLoader?.let { 1 j { loaderIndex: Int ->
-            require(loaderIndex == 0) { "ViewRowVec child only has one row" }
-            it.invoke()
-        } }
+        get() = docLoader?.let {
+            1 j { loaderIndex: Int ->
+                require(loaderIndex == 0) { "ViewRowVec child only has one row" }
+                it.invoke()
+            }
+        }
 
+    val size: Int get() = 3
+    val isShell: Boolean get() = false
     operator fun get(index: Int): Any? = when (index) {
         0 -> id
         1 -> key
@@ -48,9 +71,12 @@ class ViewRowVec(
 // BlockRowVec family: mutable builder and sealed representation
 sealed class BlockRowVec {
     enum class State { MUTABLE, SEALED }
+
     abstract val state: State
     abstract val rowCount: Int
     abstract val child: MutableSeries<RowVec>?
+    val size: Int get() = rowCount
+    val isShell: Boolean get() = rowCount == 0
 
     companion object {
         fun mutable(): MutableBlockRowVec = MutableBlockRowVec(emptySeries<RowVec>().cow)
@@ -63,7 +89,7 @@ class MutableBlockRowVec(override val child: MutableSeries<RowVec>) : BlockRowVe
 
     fun append(row: Any?) {
         val rv: RowVec = when (row) {
-            is Join<*,*> -> row as RowVec
+            is Join<*, *> -> row as RowVec
             is DocRowVec -> row.toRowVec()
             is ViewRowVec -> row.toRowVec()
             is BlockRowVec -> DocRowVec(singletonKey("block"), singletonCell(row.toString())).toRowVec()
@@ -72,7 +98,7 @@ class MutableBlockRowVec(override val child: MutableSeries<RowVec>) : BlockRowVe
         child.add(rv)
     }
 
-    fun seal(): BlockRowVec = SealedBlockRowVec(child α {it})
+    fun seal(): BlockRowVec = SealedBlockRowVec(child α { it })
 }
 
 class SealedBlockRowVec(private val rows: Series<RowVec>) : BlockRowVec() {
@@ -85,23 +111,9 @@ class SealedBlockRowVec(private val rows: Series<RowVec>) : BlockRowVec() {
 fun mutable(): MutableBlockRowVec = MutableBlockRowVec(emptySeries<RowVec>().cow)
 
 // Convert DocRowVec to the root RowVec type used across the codebase.
-fun DocRowVec.toRowVec(): RowVec {
-    val values: Series<Any?> = cells.size j { index: Int -> cells[index] }
-    val meta: Series<() -> ColumnMeta> = keys.size j { index: Int -> { ColumnMetaFactory(keys[index], IOMemento.IoString) } }
-    return values.joins(meta)
-}
+fun DocRowVec.toRowVec(): RowVec = this
 
-fun ViewRowVec.toRowVec(): RowVec {
-    val values: Series<Any?> = 3 j { index: Int ->
-        when (index) {
-            0 -> id
-            1 -> key
-            else -> value
-        }
-    }
-    val meta: Series<() -> ColumnMeta> = 3 j { index: Int -> { ColumnMetaFactory("col$index", IOMemento.IoString) } }
-    return values.joins(meta)
-}
+fun ViewRowVec.toRowVec(): RowVec = this
 
 // Utility extension used by tests
 fun Series<RowVec>?.toJson(): String {
