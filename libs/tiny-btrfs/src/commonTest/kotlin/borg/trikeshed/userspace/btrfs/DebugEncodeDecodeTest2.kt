@@ -77,7 +77,9 @@ class DebugEncodeDecodeTest2 {
         // Compare
         assertEquals(1, decoded.size)
         val a: BtrfsKey =  key
-        assertTrue(decoded[0].b.contentEquals(data))
+        val join: BtrfsItem = decoded[0]
+        val b = join.data
+        assertTrue(b.contentEquals(data))
         assertEquals<ULong>(key.objectId, a.objectId)
         println("PASS: direct round-trip works")
     }
