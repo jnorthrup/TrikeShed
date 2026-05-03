@@ -2,6 +2,8 @@ package borg.trikeshed.miniduck
 
 import borg.trikeshed.context.ElementState
 import borg.trikeshed.cursor.Cursor
+import borg.trikeshed.cursor.row
+import borg.trikeshed.lib.*
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 
@@ -88,4 +90,43 @@ suspend fun executeKernelOptimizingHarness(
         trainer.drain()
         trainer.close()
     }
+}
+
+// ── Concrete implementations ─────────────────────────────────────────────────
+
+/**
+ * Example transformer that attaches cached stochastic indicator columns (stoch_k, stoch_d)
+ * to each row. Params: symbol, timeframe, kPeriod (default 14), dPeriod (default 3).
+ * Falls back to the unmodified cursor if stochastic data is not yet cached.
+ */
+class ExampleKernelTransformer : KernelFeatureTransformer {
+    override fun transform(cursor: Cursor, params: Map<String, Any>): Cursor {
+        val symbol = params["symbol"] as? String ?: return cursor
+        val timeframe = params["timeframe"] as? String ?: return cursor
+        val kPeriod = (params["kPeriod"] as? Number)?.toInt() ?: 14
+        val dPeriod = (params["dPeriod"] as? Number)?.toInt() ?: 3
+
+        val stoch = HarnessStochasticCache.get(symbol, timeframe, kPeriod, dPeriod) ?: return cursor
+
+        return cursor.size j { i: Int ->
+            val src = cursor.row(i) as? DocRowVec
+            val baseKeys: List<String> = src?.keys?.toList() ?: emptyList()
+            val baseCells: List<Any?> = src?.asSeries()?.toList() ?: emptyList()
+            val kVal = if (i < stoch.k.size) stoch.k[i] else Double.NaN
+            val dVal = if (i < stoch.d.size) stoch.d[i] else Double.NaN
+            DocRowVec(baseKeys + listOf("stoch_k", "stoch_d"), baseCells + listOf(kVal, dVal))
+        }
+    }
+}
+
+/** No-op trainer: immediately returns a trivial policy without computation. */
+class NoOpTrainer : KernelStochasticTrainer {
+    override val lifecycleState: ElementState = ElementState.OPEN
+    override suspend fun open() {}
+    override suspend fun train(cursor: Cursor, params: Map<String, Any>): StochasticPolicy {
+        val name = "${params["symbol"] ?: "unknown"}/${params["timeframe"] ?: "??"}"
+        return StochasticPolicy(name = name, expectedReturn = 0.0, volatility = 0.0)
+    }
+    override suspend fun drain() {}
+    override suspend fun close() {}
 }
