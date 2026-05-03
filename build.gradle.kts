@@ -128,14 +128,14 @@ kotlin {
     sourceSets {
         val commonMain by getting {
             dependencies {
-                api("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
-                api("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1-0.6.x-compat")
+                api("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0-rc02")
+                api("org.jetbrains.kotlinx:kotlinx-datetime:0.8.0-rc02-0.6.x-compat")
             }
         }
         val commonTest by getting {
             dependencies {
                 implementation(kotlin("test"))
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0-rc02")
                 implementation(project(":libs:miniduck"))
             }
         }
@@ -174,8 +174,8 @@ kotlin {
         val jvmTest by getting {
             dependencies {
                 implementation(kotlin("test-junit"))
-                implementation("org.junit.jupiter:junit-jupiter:5.9.0")
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
+                implementation("org.junit.jupiter:junit-jupiter:6.1.0-RC1")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0-rc02")
                 implementation(project(":libs:server"))
                 implementation(project(":libs:quic"))
                 implementation(project(":libs:ngsctp"))

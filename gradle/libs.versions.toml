@@ -1,8 +1,8 @@
 [versions]
 # Kotlin & Coroutines
 kotlin = "2.4.0-Beta1"
-kotlinx-coroutines = "1.11.0-rc01"
-kotlinx-datetime = "0.7.1-0.6.x-compat"
+kotlinx-coroutines = "1.11.0-rc02"
+kotlinx-datetime = "0.8.0-rc02-0.6.x-compat"
 kotlinx-serialization = "1.3.0"
 kotlin-reflect = "1.8.0"
 
