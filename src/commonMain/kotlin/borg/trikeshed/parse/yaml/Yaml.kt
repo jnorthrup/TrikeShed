@@ -203,7 +203,7 @@ object YamlParser {
                 result.add(kk)
                 val childClose = eClose
                 kk++
-                while (kk < elems.size && elems[kk].a.a < childClose) {
+                while (kk < elems.size && elems[kk].a.a <= childClose) {
                     kk++
                 }
             } else {
