@@ -8,13 +8,19 @@ import borg.trikeshed.parse.kursive.JursiveCharSeries
  * the source looks like a JS function expression or arrow function.
  */
 fun isLikelyJsFn(src: String): Boolean {
-    val ks = JursiveCharSeries(src)
-    ks.skipWhitespace()
-    val first = ks.peek()
-    return when (first) {
-        'f' -> src.trimStart().startsWith("function")
+    val trimmed = src.trimStart()
+    if (trimmed.isEmpty()) return false
+    return when (trimmed.first()) {
+        'f' -> trimmed.startsWith("function")
         '(' -> true
-        '{' -> true
-        else -> src.trimStart().contains("=>")
+        '{' -> {
+            // Distinguish JS block (starts with return/var/let/const) from JSON object
+            val afterBrace = trimmed.drop(1).trimStart()
+            afterBrace.startsWith("return ") || afterBrace.startsWith("var ") ||
+                afterBrace.startsWith("let ") || afterBrace.startsWith("const ") ||
+                afterBrace.startsWith("if ") || afterBrace.startsWith("for ") ||
+                afterBrace.startsWith("while ") || afterBrace.startsWith("switch ")
+        }
+        else -> trimmed.contains("=>")
     }
 }

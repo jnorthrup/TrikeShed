@@ -389,6 +389,15 @@ object YamlScan {
             while (c < k && pos < n && s[pos] == ' ') { pos++; c++ }
         }
 
+        fun peekLineIndent(): Int {
+            var i = pos
+            while (i < n && s[i] != '\n' && s[i] != '\r') i++
+            if (i < n) i++ // skip newline
+            var k = 0
+            while (i < n && s[i] == ' ') { k++; i++ }
+            return if (i < n && s[i] != '\n' && s[i] != '\r' && s[i] != '#') k else lineIndent()
+        }
+
         fun readLineEnd(): Int {
             // returns close index (last non-newline char of line)
             var end = pos
@@ -409,6 +418,12 @@ object YamlScan {
         st.skipBlankLines()
         val here = st.lineIndent()
         if (st.atEof() || here < indent) {
+            // check for sequence dash at parent indent (indent - 2)
+            if (!st.atEof() && here >= 0 && here == indent - 2) {
+                st.consumeIndent(here)
+                if (st.peek() == '-') return parseSeq(st, out, here)
+                st.pos -= here  // restore
+            }
             // empty block → null
             val p = st.pos
             val idx = out.beginTagged(p, Tag.NULL)
@@ -1335,10 +1350,28 @@ object Path {
         src: Series<Char>,
         name: String
     ): JsContext? {
+        val parentOpen = e.a.a
+        val parentClose = e.a.b
         var i = 0
         while (i < count) {
             val keyOpen = getPosition(i)
             if (keyOpen < 0) { i++; continue }
+            // Skip keys that are inside a nested container (YAML comma leak guard)
+            // A key at position keyOpen is a direct child of element e only if
+            // it's not contained within a child OBJECT/ARRAY whose open > parentOpen.
+            // We check this by seeing if any child element range [co, cc) contains keyOpen
+            // where co > parentOpen and the child tag is OBJECT or ARRAY.
+            // Simple approach: skip if keyOpen is deeper-indented than the first key.
+            if (keyOpen > parentOpen && keyOpen < parentClose && i > 0) {
+                val prevKeyOpen = getPosition(0)
+                // If the first key was at indent X, direct children should be at indent X too.
+                // Count leading spaces for comparison.
+                var sp0 = 0; var p0 = prevKeyOpen
+                while (p0 > 0 && src[p0 - 1] == ' ') { sp0++; p0-- }
+                var spCur = 0; var pCur = keyOpen
+                while (pCur > 0 && src[pCur - 1] == ' ') { spCur++; pCur-- }
+                if (spCur > sp0) { i++; continue }  // deeper indent than siblings = nested child
+            }
             var keyElem = childElementAt(keyOpen, src)
             // childElementAt prefers containers (OBJECT/ARRAY) over STRING when
             // both share the same open position (common in YAML block keys where

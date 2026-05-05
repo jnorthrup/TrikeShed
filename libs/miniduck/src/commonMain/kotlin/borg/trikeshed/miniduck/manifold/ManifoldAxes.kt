@@ -113,7 +113,7 @@ val MetricsAxis.distanceFromSteady: Long get() = a - b
  * Whether asymptotically at steady state (within 5% of steadyNanos).
  */
 val MetricsAxis.isSteady: Boolean get() =
-    b > 0L && (a - b).toFloat() / b.toFloat() < 0.05f
+    b > 0L && (a - b).toFloat() / b.toFloat() <= 0.05f
 
 // FibOrdinal helpers
 val FibOrdinal.isSeed: Boolean get() = this == 0

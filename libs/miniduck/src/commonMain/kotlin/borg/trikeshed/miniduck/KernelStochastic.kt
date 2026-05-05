@@ -2,6 +2,7 @@ package borg.trikeshed.miniduck
 
 import borg.trikeshed.context.ElementState
 import borg.trikeshed.cursor.Cursor
+import borg.trikeshed.cursor.at
 import borg.trikeshed.cursor.row
 import borg.trikeshed.lib.*
 import kotlinx.coroutines.async
@@ -109,12 +110,14 @@ class ExampleKernelTransformer : KernelFeatureTransformer {
         val stoch = HarnessStochasticCache.get(symbol, timeframe, kPeriod, dPeriod) ?: return cursor
 
         return cursor.size j { i: Int ->
-            val src = cursor.row(i) as? JsonRowVec
             val kVal = if (i < stoch.k.size) stoch.k[i] else Double.NaN
             val dVal = if (i < stoch.d.size) stoch.d[i] else Double.NaN
-            val prevType = src?.nodeType ?: "stoch"
-            val prevVal = src?.rawValue ?: ""
-            JsonRowVec("$prevType:stoch_k=$kVal,stoch_d=$dVal", prevVal)
+            val src = cursor.at(i)
+            val srcKeys = (src as? DocRowVec)?.keys
+            val srcCells = (src as? DocRowVec)?.cells
+            val mergedKeys = (srcKeys?.let { k -> (0 until k.size).map { k[it] } } ?: emptyList()) + listOf("stoch_k", "stoch_d")
+            val mergedCells = (srcCells?.let { c -> (0 until c.size).map { c[it] } } ?: emptyList()) + listOf(kVal, dVal)
+            DocRowVec(keys = mergedKeys, cells = mergedCells).toRowVec()
         }
     }
 }

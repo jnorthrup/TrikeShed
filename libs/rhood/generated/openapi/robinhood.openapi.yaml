@@ -3,24 +3,12 @@ info:
   title: Robinhood Crypto Trading API
   version: 1.0.0
   description: OpenAPI document reconstructed from Robinhood Crypto Trading docs.
-servers:
-  - url: https://trading.robinhood.com
-tags:
-  - name: Account
-  - name: Market Data
-  - name: Trading
-security:
-  - x-api-key: []
-    x-signature: []
-    x-timestamp: []
 paths:
   /api/v2/crypto/trading/accounts/:
     get:
-      tags:
-        - Account
       operationId: v2GetAccounts
       summary: Get Accounts
-      description: Retrieve a paginated list of crypto trading accounts for the authenticated user. Returns account details including buying power, status, and fee tier information.
+      description: "Retrieve a paginated list of crypto trading accounts for the authenticated user. Returns account details including buying power, status, and fee tier information."
       responses:
         '200':
           description: OK
@@ -105,12 +93,9 @@ paths:
                       additionalProperties: true
   /api/v2/crypto/marketdata/best_bid_ask/:
     get:
-      tags:
-        - Market Data
       operationId: v2GetBestBidAsk
       summary: Get Best Price
-      description: Fetch a single bid and ask price per symbol, representing the best available price across our partner market makers. This price does not take into account order size, and may not be the
-        final execution price.
+      description: "Fetch a single bid and ask price per symbol, representing the best available price across our partner market makers. This price does not take into account order size, and may not be the final execution price."
       responses:
         '200':
           description: OK
@@ -158,14 +143,12 @@ paths:
           schema:
             type: string
             example: BTC-USD
-          description: List of trading pair symbol(s) to retrieve data for. Repeat the symbol parameter to request multiple symbols.
+          description: "List of trading pair symbol(s) to retrieve data for. Repeat the symbol parameter to request multiple symbols."
   /api/v2/crypto/trading/estimated_price/:
     get:
-      tags:
-        - Market Data
       operationId: v2GetEstimatedPrice
       summary: Get Estimated Price
-      description: Return the estimated total cost or credit for a symbol, book side, and quantity. Request ask quotes to estimate buy cost and bid quotes to estimate sell proceeds.
+      description: "Return the estimated total cost or credit for a symbol, book side, and quantity. Request ask quotes to estimate buy cost and bid quotes to estimate sell proceeds."
       responses:
         '200':
           description: OK
@@ -236,12 +219,9 @@ paths:
           description: Comma-separated quantity list, up to 10 items.
   /api/v2/crypto/trading/trading_pairs/:
     get:
-      tags:
-        - Trading
       operationId: v2GetTradingPairs
       summary: Get Trading Pairs
-      description: Fetch a paginated list of available trading pairs for crypto trading. Returns trading pair details including price increments, order size limits, and tradability status. Trading pairs
-        can be filtered by symbol.
+      description: "Fetch a paginated list of available trading pairs for crypto trading. Returns trading pair details including price increments, order size limits, and tradability status. Trading pairs can be filtered by symbol."
       responses:
         '200':
           description: OK
@@ -348,11 +328,9 @@ paths:
           description: Maximum number of results to return.
   /api/v2/crypto/trading/holdings/:
     get:
-      tags:
-        - Trading
       operationId: v2GetHoldings
       summary: Get Holdings
-      description: Retrieve a paginated list of crypto holdings for a specific account. Returns the total quantity and available quantity for each asset held in the account.
+      description: "Retrieve a paginated list of crypto holdings for a specific account. Returns the total quantity and available quantity for each asset held in the account."
       responses:
         '200':
           description: OK
@@ -459,8 +437,6 @@ paths:
           description: Maximum number of results to return.
   /api/v2/crypto/trading/orders/:
     get:
-      tags:
-        - Trading
       operationId: v2GetOrders
       summary: Get Orders
       description: Fetch a list of orders for the current user in a specific account.
@@ -704,11 +680,9 @@ paths:
               - pending
           description: Filter orders by state.
     post:
-      tags:
-        - Trading
       operationId: v2PlaceOrder
       summary: Place New Crypto Order
-      description: Place a new crypto trading order with an order type. This endpoint only supports placing orders on USD symbols that have is_api_tradable=true.
+      description: "Place a new crypto trading order with an order type. This endpoint only supports placing orders on USD symbols that have is_api_tradable=true."
       responses:
         '201':
           description: Created
@@ -940,8 +914,6 @@ paths:
                       type: string
   /api/v2/crypto/trading/orders/{order_id}/:
     get:
-      tags:
-        - Trading
       operationId: v2GetOrder
       summary: Get Order
       description: Fetch a single order by order_id for the requested account.
@@ -1108,8 +1080,6 @@ paths:
           description: The crypto account number that owns the order.
   /api/v2/crypto/trading/orders/{id}/cancel/:
     post:
-      tags:
-        - Trading
       operationId: v2CancelOrder
       summary: Cancel Open Crypto Order
       description: Cancels an open crypto trading order.
@@ -1253,8 +1223,6 @@ paths:
           description: The ID of the order to cancel.
   /api/v1/crypto/trading/accounts/:
     get:
-      tags:
-        - Account
       operationId: v1GetAccountDetails
       summary: Get Crypto Trading Account Details
       description: Fetches the Robinhood Crypto account details for the current user.
@@ -1313,8 +1281,6 @@ paths:
                       additionalProperties: true
   /api/v1/crypto/marketdata/best_bid_ask/:
     get:
-      tags:
-        - Market Data
       operationId: v1GetBestBidAsk
       summary: Get Best Price
       description: Fetch the best bid and ask for one or more trading pair symbols.
@@ -1365,11 +1331,9 @@ paths:
           schema:
             type: string
             example: BTC-USD
-          description: List of trading pair symbol(s) to retrieve data for. Repeat the parameter to request multiple symbols.
+          description: "List of trading pair symbol(s) to retrieve data for. Repeat the parameter to request multiple symbols."
   /api/v1/crypto/marketdata/estimated_price/:
     get:
-      tags:
-        - Market Data
       operationId: v1GetEstimatedPrice
       summary: Get Estimated Price
       description: Return the estimated total cost or credit for a symbol, side, and quantity list.
@@ -1443,8 +1407,6 @@ paths:
           description: Comma-separated quantity list, up to 10 items.
   /api/v1/crypto/trading/trading_pairs/:
     get:
-      tags:
-        - Trading
       operationId: v1GetTradingPairs
       summary: Get Crypto Trading Pairs
       description: Fetch a list of available crypto trading pairs.
@@ -1537,8 +1499,6 @@ paths:
           description: Maximum number of results to return.
   /api/v1/crypto/trading/holdings/:
     get:
-      tags:
-        - Trading
       operationId: v1GetHoldings
       summary: Get Crypto Holdings
       description: Fetch a list of holdings for the current user.
@@ -1625,8 +1585,6 @@ paths:
           description: Maximum number of results to return.
   /api/v1/crypto/trading/orders/:
     get:
-      tags:
-        - Trading
       operationId: v1GetOrders
       summary: Get Crypto Orders
       description: Fetch a list of orders for the current user.
@@ -1860,8 +1818,6 @@ paths:
             type: integer
           description: Maximum number of results to return.
     post:
-      tags:
-        - Trading
       operationId: v1PlaceOrder
       summary: Place New Crypto Order
       description: Place a new crypto trading order with an order type.
@@ -2072,8 +2028,6 @@ paths:
                       type: string
   /api/v1/crypto/trading/orders/{order_id}/:
     get:
-      tags:
-        - Trading
       operationId: v1GetOrder
       summary: Get Crypto Order
       description: Fetch a single crypto order by order ID.
@@ -2217,8 +2171,6 @@ paths:
           description: The ID of the order to fetch.
   /api/v1/crypto/trading/orders/{order_id}/cancel/:
     post:
-      tags:
-        - Trading
       operationId: v1CancelOrder
       summary: Cancel Open Crypto Order
       description: Cancels an open crypto trading order.
@@ -2360,29 +2312,3 @@ paths:
             type: string
             format: uuid
           description: The ID of the order to cancel.
-components:
-  securitySchemes:
-    x-api-key:
-      type: apiKey
-      in: header
-      name: x-api-key
-      description: Robinhood Crypto API key from the crypto account settings page.
-    x-signature:
-      type: apiKey
-      in: header
-      name: x-signature
-      description: Ed25519 request signature computed from api key, timestamp, path, method, and body.
-    x-timestamp:
-      type: apiKey
-      in: header
-      name: x-timestamp
-      description: Unix timestamp used when generating the signature.
-externalDocs:
-  description: Robinhood Crypto Trading docs
-  url: https://docs.robinhood.com/crypto/trading/
-x-trikeshed-context:
-  client:
-    - name: default
-      key: borg.trikeshed.test.DefaultKey
-      element: borg.trikeshed.test.DefaultElement
-      open: borg.trikeshed.test.openDefaultElement
