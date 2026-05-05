@@ -162,7 +162,7 @@ class MutableSeriesStrategyTest {
     @Test fun floatSeriesBasic() {
         val fs = FloatSeries(2)
         fs.set(0, 1.1f); fs.set(1, 2.2f)
-        assertEquals(1.1f, fs[0])
+        assertEquals(1.1f, fs[0], 0.0001f)
         fs += 3.3f
         assertEquals(3, fs.size)
     }

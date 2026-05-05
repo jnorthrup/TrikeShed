@@ -67,15 +67,12 @@ internal fun jsOpen(filename: String, readOnly: Boolean): Int {
 
 /** Read exactly like POSIX pread: fileOffset is independent of the fd's internal position. */
 internal fun jsPread(fd: Int, buf: ByteArray, offset: Int, length: Int, fileOffset: Long): Int {
-    val nodeBuf: dynamic = fs.readFileSync(fd, js("{encoding: null, flag: 'r'}"))
-    val size = (nodeBuf.length as Number).toInt()
-    val start = fileOffset.toInt().coerceAtLeast(0)
-    if (start >= size) return 0
-    val count = minOf(length, size - start)
-    for (i in 0 until count) {
-        buf[offset + i] = (nodeBuf[start + i] as Number).toByte()
+    val nodeBuf: dynamic = Buffer.alloc(length)
+    val bytesRead = (fs.readSync(fd, nodeBuf, 0, length, fileOffset.toInt()) as Number).toInt()
+    for (i in 0 until bytesRead) {
+        buf[offset + i] = (nodeBuf[i] as Number).toByte()
     }
-    return count
+    return bytesRead
 }
 
 /** Write exactly like POSIX pwrite: fileOffset is independent of the fd's internal position. */
