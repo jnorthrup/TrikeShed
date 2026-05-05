@@ -11,7 +11,7 @@ tags:
 - name: Market Data
   description: Public market data endpoints.
 - name: Account Data
-  description:account, balance, history, and reporting endpoints.
+  description: account, balance, history, and reporting endpoints.
 - name: Trading
   description: Order lifecycle and trading endpoints.
 - name: Funding

@@ -1,6 +1,8 @@
 package borg.trikeshed.mlir
 
-import borg.trikeshed.lib.*
+import borg.trikeshed.lib.Join
+import borg.trikeshed.lib.Series
+import borg.trikeshed.lib.view
 
 /**
  * Standard MLIR dialects.
@@ -24,10 +26,9 @@ enum class MlirDialect(val namespace: String) {
     VECTOR("vector"),       // vector.load, vector.store, vector.transfer_read
     SPIRV("spirv"),         // spirv.func, spirv.module
     STABLEHLO("stablehlo"), // stablehlo.add, stablehlo.softmax, stablehlo.convolution
-    CPU_CACHE("cpu_cache"), // cpu_cache.topology, cpu_cache.level
     ;
 
-    /** Fully-qualified op name: "func.func", "arith.addf", etc. */
+    /** Fully qualified op name: "func.func", "arith.addf", etc. */
     fun op(name: String): String = "$namespace.$name"
 }
 
@@ -51,13 +52,6 @@ data class MlirOp(
 }
 
 /* ─── Canonical MLIR ops ─────────────────────────────────────────────── */
-
-/** cpu_cache dialect ops — hardware topology description. */
-object CpuCacheOps {
-    val topology   = MlirOp(MlirDialect.CPU_CACHE, "topology")
-    val level      = MlirOp(MlirDialect.CPU_CACHE, "level")
-    val properties = MlirOp(MlirDialect.CPU_CACHE, "properties")
-}
 
 /** func dialect ops. */
 object FuncOps {

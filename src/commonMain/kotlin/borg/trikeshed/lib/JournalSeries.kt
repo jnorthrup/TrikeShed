@@ -60,7 +60,8 @@ class JournalSeries<T>(
     }
 
     override fun clear() {
-        // Journal each removal in reverse so rollback can reconstruct
+        // Discard prior journal entries so rollback only undoes the clear
+        journal.clear()
         for (i in backing.size - 1 downTo 0) {
             journal.add(Delta.Remove(i, backing[i]))
         }

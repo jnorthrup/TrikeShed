@@ -109,7 +109,8 @@ object YamlParser {
     fun parse(text: String): YamlDocument {
         val src = text.asSeries()
         val elems = YamlScan.scan(src)
-        val root = buildYamlNode(elems, src, 0)
+        val lineStarts = buildLineStarts(src)
+        val root = buildYamlNode(elems, src, 0, lineStarts)
         return YamlDocument(root)
     }
 
@@ -127,34 +128,62 @@ object YamlParser {
         rowVecCallback: (RowVec) -> Unit = {},
     ): Any? = parse(text).root.reify(nodeEvidence, rowVecCallback)
 
+    /** Build an IntArray of character positions at the start of each line (1-indexed: result[0]=0 for line 1). */
+    private fun buildLineStarts(src: Series<Char>): IntArray {
+        val buf = IntBuf(16)
+        buf.add(0)
+        var i = 0
+        while (i < src.size) {
+            if (src[i] == '\n') buf.add(i + 1)
+            i++
+        }
+        return buf.snapshot()
+    }
+
+    /** 1-based line number for a character offset using a pre-built lineStarts array. */
+    private fun lineOf(lineStarts: IntArray, offset: Int): Int {
+        var lo = 0; var hi = lineStarts.size - 1
+        while (lo < hi) {
+            val mid = (lo + hi + 1) / 2
+            if (lineStarts[mid] <= offset) lo = mid else hi = mid - 1
+        }
+        return lo + 1
+    }
+
     /** Convert a JsElement subtree rooted at element [elemIdx] into a YamlNode.
-     *  elems[i].a = (open j close) for that element's span.
-     *  commas track child membership.
+     *  elems[i].a = (open j close) character offsets; lineStarts converts them to 1-based line numbers.
      */
-    private fun buildYamlNode(elems: Series<JsElement>, src: Series<Char>, elemIdx: Int): YamlNode {
-        if (elemIdx >= elems.size) return YamlScalarNode(null, 0 j 0)
+    private fun buildYamlNode(elems: Series<JsElement>, src: Series<Char>, elemIdx: Int, lineStarts: IntArray): YamlNode {
+        if (elemIdx >= elems.size) return YamlScalarNode(null, 1 j 1)
         val elem = elems[elemIdx]
         val tag = Combinators.tagOf(elem, src)
         val (open, close) = elem.a
-        val commas = elem.b
+        val span = lineOf(lineStarts, open) j lineOf(lineStarts, close)
         return when (tag) {
-            Tag.NULL -> YamlScalarNode(null, open j close)
+            Tag.NULL -> YamlScalarNode(null, span)
             Tag.ARRAY -> {
-                // children are the comma-delimited sub-elements
                 val childIndices = extractChildIndices(elemIdx, elems, src)
-                val children = childIndices α { childIdx -> buildYamlNode(elems, src, childIdx) }
-                YamlSequenceNode(children, open j close)
+                val children = if (childIndices.size > 0) {
+                    childIndices α { childIdx -> buildYamlNode(elems, src, childIdx, lineStarts) }
+                } else {
+                    // Inline flow sequence (parseFlowLine emits no children): parse YAML-aware
+                    parseInlineSequence(src.slice(open, close + 1))
+                }
+                YamlSequenceNode(children, span)
             }
             Tag.OBJECT -> {
-                // children alternate key/value; group into YamlMappingEntry pairs
                 val childIndices = extractChildIndices(elemIdx, elems, src)
-                val entries = buildMappingEntries(childIndices, elems, src)
-                YamlMappingNode(entries, open j close)
+                val entries = if (childIndices.size > 0) {
+                    buildMappingEntries(childIndices, elems, src, lineStarts)
+                } else {
+                    // Inline flow mapping: parse YAML-aware
+                    parseInlineMapping(src.slice(open, close + 1))
+                }
+                YamlMappingNode(entries, span)
             }
             else -> {
-                // scalar
                 val text = Combinators.textOf(elem, src)
-                YamlScalarNode(text.asSeries(), open j close)
+                YamlScalarNode(text.asSeries(), span)
             }
         }
     }
@@ -163,20 +192,15 @@ object YamlParser {
         val parent = elems[parentIdx]
         val parentOpen = parent.a.a
         val parentClose = parent.a.b
-        // Structural walk: elements are emitted in depth-first order by YamlScan.
-        // Direct children of parent are elements after parentIdx that are within parent's span,
-        // but NOT within any earlier sibling's span.
         val result = mutableListOf<Int>()
         var kk = parentIdx + 1
         while (kk < elems.size) {
             val elem = elems[kk]
             val eOpen = elem.a.a
             val eClose = elem.a.b
-            if (eOpen >= parentClose) break  // past parent
-            // It's a direct child if within parent span
+            if (eOpen >= parentClose) break
             if (eOpen >= parentOpen && eClose <= parentClose) {
                 result.add(kk)
-                // Skip this child's descendants: advance past all elements within child's span
                 val childClose = eClose
                 kk++
                 while (kk < elems.size && elems[kk].a.a < childClose) {
@@ -193,6 +217,7 @@ object YamlParser {
         childIndices: Series<Int>,
         elems: Series<JsElement>,
         src: Series<Char>,
+        lineStarts: IntArray,
     ): Series<YamlMappingEntry> {
         val n = childIndices.size
         if (n == 0) return Join.emptySeriesOf<YamlMappingEntry>()
@@ -200,16 +225,88 @@ object YamlParser {
         var i = 0
         while (i + 1 < n) {
             val keyIdx = childIndices[i]
-            val valIdx = childIndices[i + 1]  // value follows key in structural walk
+            val valIdx = childIndices[i + 1]
             val keyElem = elems[keyIdx]
             val valElem = elems[valIdx]
-            val keySpan = keyElem.a
             val keyText = Combinators.textOf(keyElem, src)
-            val valNode = buildYamlNode(elems, src, valIdx)
-            list.add(YamlMappingEntry(keyText.asSeries(), valNode, keySpan.a j valElem.a.b))
+            val valNode = buildYamlNode(elems, src, valIdx, lineStarts)
+            val entryStart = lineOf(lineStarts, keyElem.a.a)
+            val entryEnd = lineOf(lineStarts, valElem.a.b)
+            list.add(YamlMappingEntry(keyText.asSeries(), valNode, entryStart j entryEnd))
             i += 2
         }
         return list.toSeries()
+    }
+
+    /** Parse a YAML inline flow sequence `[a, b, c]` into child YamlNodes.
+     *  Handles unquoted strings, numbers, booleans, and nested `[...]`.
+     *  src must span from `[` to `]` inclusive.
+     */
+    private fun parseInlineSequence(src: Series<Char>): Series<YamlNode> {
+        val items = mutableListOf<YamlNode>()
+        var start = 1
+        val end = src.size - 1
+        var depth = 0
+        var i = start
+        while (i <= end) {
+            when (src[i]) {
+                '[', '{' -> depth++
+                ']', '}' -> if (depth > 0) depth-- else { /* closing bracket of this seq */ }
+                ',' -> if (depth == 0) {
+                    items.add(parseInlineToken(src.slice(start, i)))
+                    start = i + 1
+                }
+            }
+            i++
+        }
+        if (start < end) items.add(parseInlineToken(src.slice(start, end)))
+        return items.toSeries()
+    }
+
+    private fun parseInlineMapping(src: Series<Char>): Series<YamlMappingEntry> {
+        val entries = mutableListOf<YamlMappingEntry>()
+        var start = 1
+        val end = src.size - 1
+        var depth = 0
+        var i = start
+        while (i <= end) {
+            when (src[i]) {
+                '[', '{' -> depth++
+                ']', '}' -> if (depth > 0) depth--
+                ',' -> if (depth == 0) {
+                    parseInlinePair(src.slice(start, i))?.let { entries.add(it) }
+                    start = i + 1
+                }
+            }
+            i++
+        }
+        if (start < end) parseInlinePair(src.slice(start, end))?.let { entries.add(it) }
+        return entries.toSeries()
+    }
+
+    private fun parseInlinePair(token: Series<Char>): YamlMappingEntry? {
+        val trimmed = token.trimInlineWhitespace()
+        val colon = (0 until trimmed.size).firstOrNull { trimmed[it] == ':' } ?: return null
+        val key = trimmed.slice(0, colon).trimInlineWhitespace()
+        val value = parseInlineToken(trimmed.slice(colon + 1, trimmed.size))
+        return YamlMappingEntry(key, value, 1 j 1)
+    }
+
+    private fun parseInlineToken(token: Series<Char>): YamlNode {
+        val t = token.trimInlineWhitespace()
+        if (t.size == 0) return YamlScalarNode(null, 1 j 1)
+        return when (t[0]) {
+            '[' -> YamlSequenceNode(parseInlineSequence(t), 1 j 1)
+            '{' -> YamlMappingNode(parseInlineMapping(t), 1 j 1)
+            else -> YamlScalarNode(t, 1 j 1)
+        }
+    }
+
+    private fun Series<Char>.trimInlineWhitespace(): Series<Char> {
+        var s = 0; var e = size
+        while (s < e && (this[s] == ' ' || this[s] == '\t')) s++
+        while (e > s && (this[e - 1] == ' ' || this[e - 1] == '\t')) e--
+        return if (s == 0 && e == size) this else slice(s, e)
     }
 
 }

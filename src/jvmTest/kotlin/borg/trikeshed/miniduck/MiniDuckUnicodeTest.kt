@@ -7,8 +7,8 @@ import kotlin.test.assertEquals
 class MiniDuckUnicodeTest {
     @Test
     fun unicodeEscapesRoundTrip() {
-        val smile = "" // unit separator char as a test (non-ASCII)
-        val doc = DocRowVec(listOf("greeting"), listOf("hello\u263A"))
+        val smile = "hello\u263A"
+        val doc = DocRowVec(listOf("greeting"), listOf(smile))
         val block = BlockRowVec.mutable()
         block.append(doc)
         val sealed = block.seal()
@@ -18,7 +18,6 @@ class MiniDuckUnicodeTest {
 
         val first = decoded.child[0]
         val docDecoded = first as DocRowVec
-        // expect the decoded string to contain the newline literal or converted char depending on parser
-        assertEquals("hello\u263A", docDecoded.cells[0])
+        assertEquals(smile, docDecoded.cells[0])
     }
 }

@@ -1,6 +1,5 @@
 package borg.trikeshed.miniduck
 
-import borg.trikeshed.collections.s_
 import borg.trikeshed.cursor.Cursor
 import borg.trikeshed.lib.*
 import borg.trikeshed.miniduck.where
@@ -9,7 +8,7 @@ import kotlin.test.*
 class CursorOpsTest {
 
    fun cursor(vararg rows: Join<String, Any?>): Cursor =
-        rows.size j { DocRowVec(listOf("key", "val"), s_[rows[it].first, rows[it].second]) }
+        rows.size j { DocRowVec(listOf("key", "val"), listOf(rows[it].a, rows[it].b)) }
 
     // ── where ────────────────────────────────────────────────────────────────
 

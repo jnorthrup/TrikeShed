@@ -300,18 +300,13 @@ operator fun Series<Char>.div(delim: Char): Series<Series<Char>> { //lazy split
     val intList = mutableListOf<Int>()
     for (x in 0 until size) if (this[x] == delim) intList.add(x)
 
-    /**
-     * iarr is an index of delimitted endings of the CharSeries.
-     */
     val iarr: IntArray = intList.toIntArray()
+    val n = iarr.size
 
-    return iarr α { x ->
-        val p = if (x == 0) 0 else iarr[x.dec()].inc() //start of next
-        val l = //is x last index?
-            if (x == iarr.lastIndex)
-                this.size
-            else
-                iarr[x].dec()
+    // N delimiters → N+1 segments
+    return (n + 1) j { x: Int ->
+        val p = if (x == 0) 0 else iarr[x - 1] + 1
+        val l = if (x == n) this.size else iarr[x]
         this[p until l]
     }
 }

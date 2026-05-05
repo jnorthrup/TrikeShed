@@ -116,11 +116,9 @@ fun ResolvedOperation.toQueryParamBlock(): String {
     val qps = parameters.filter { it.location == "query" }
     if (qps.isEmpty()) return ""
     return buildString {
-        appendLine("    queryParams[")
-        append("      ")
-        append(qps.joinToString(",\n      ") { "\"${it.name}\" to ${it.name}.toString()" })
-        appendLine()
-        append("    ]")
+        qps.forEach { p ->
+            appendLine("        if (${p.name} != null) queryParams[\"${p.name}\"] = ${p.name}.toString()")
+        }
     }
 }
 

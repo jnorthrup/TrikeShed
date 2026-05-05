@@ -136,7 +136,6 @@ kotlin {
             dependencies {
                 implementation(kotlin("test"))
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0-rc02")
-                implementation(project(":libs:miniduck"))
             }
         }
         val nativeMain by creating { dependsOn(commonMain) }
@@ -180,6 +179,7 @@ kotlin {
                 implementation(project(":libs:quic"))
                 implementation(project(":libs:ngsctp"))
                 implementation(project(":libs:htx-client"))
+                implementation(project(":libs:miniduck"))
             }
         }
 

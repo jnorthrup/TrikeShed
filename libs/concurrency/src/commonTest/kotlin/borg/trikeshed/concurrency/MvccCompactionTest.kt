@@ -1,6 +1,7 @@
 package borg.trikeshed.concurrency
 
 import borg.trikeshed.miniduck.*
+import borg.trikeshed.lib.*
 import kotlin.test.*
 
 class MvccCompactionTest {
@@ -33,7 +34,7 @@ class MvccCompactionTest {
 
     fun sealedBlock(name: String): BlockRowVec {
         val block = BlockRowVec.mutable()
-        block.append(DocRowVec(listOf("name"), listOf(name)))
+        block.append(KeyedRowVec(listOf("name"), listOf(name as Any?)))
         return block.seal()
     }
 }

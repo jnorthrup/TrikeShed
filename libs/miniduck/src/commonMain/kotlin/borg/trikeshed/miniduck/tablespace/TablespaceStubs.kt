@@ -9,6 +9,8 @@ import borg.trikeshed.lib.*
 
 interface BlockStore {
     fun put(collection: String, block: BlockRowVec): String?
+    fun putWithId(collection: String, id: String, block: BlockRowVec)
+    fun remove(collection: String, blockId: String)
     fun get(collection: String, blockId: String): BlockRowVec?
     fun list(collection: String): List<String>
 }
@@ -23,6 +25,14 @@ class InMemoryBlockStore : BlockStore {
         idCounter[collection] = id.toInt() + 1
         coll[id] = block
         return id
+    }
+
+    override fun putWithId(collection: String, id: String, block: BlockRowVec) {
+        store.getOrPut(collection) { mutableMapOf() }[id] = block
+    }
+
+    override fun remove(collection: String, blockId: String) {
+        store[collection]?.remove(blockId)
     }
 
     override fun get(collection: String, blockId: String): BlockRowVec? {

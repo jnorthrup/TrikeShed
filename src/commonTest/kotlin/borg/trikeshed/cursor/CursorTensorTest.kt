@@ -18,7 +18,7 @@ class CursorTensorTest {
     @Suppress("UNCHECKED_CAST")
    fun rowVecOf(vararg pairs: Pair<Any?, IOMemento>): RowVec {
         val values: Series<Any?> = pairs.size j { pairs[it].first }
-        val metas: Series<ColumnMeta> = pairs.size j { RecordMeta("", pairs[it].second) }
+        val metas: Series<() -> ColumnMeta> = pairs.size j { { RecordMeta("", pairs[it].second) } }
         return values.zip(metas) as RowVec
     }
 

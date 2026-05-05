@@ -27,11 +27,50 @@ fun Cursor.where(predicate: (RowVec) -> Boolean): Cursor {
     return filtered.size j { filtered[it] }
 }
 
-/** Project named columns. */
-fun Cursor.project(vararg columns: String): Cursor = this.get(*columns)
+/** Project named columns — family-aware so DocRowVec/ViewRowVec rows keep their child. */
+fun Cursor.project(vararg columns: String): Cursor {
+    val cursor = this
+    return size j { y: Int ->
+        val row = cursor.b(y)
+        when (row) {
+            is JsonRowVec -> JsonRowVec(
+                nodeType = row.nodeType,
+                rawValue = row.rawValue,
+                childFactory = row.child?.let { ch -> { ch } },
+            )
+            is ViewRowVec -> ViewRowVec(
+                id = if (columns.contains("id")) row.id else null,
+                key = if (columns.contains("key")) row.key else null,
+                value = if (columns.contains("value")) row.value else null,
+            )
+            else -> {
+                val vals = columns.joinToString(",") { col -> "${row.getValue(col)}" }
+                JsonRowVec("project", vals)
+            }
+        }
+    }
+}
 
-/** Project columns by index. */
-fun Cursor.columns(vararg indices: Int): Cursor = this.get(*indices)
+/** Project columns by index — family-aware so BlobRowVec rows keep their child. */
+fun Cursor.columns(vararg indices: Int): Cursor {
+    val cursor = this
+    return size j { y: Int ->
+        val row = cursor.b(y)
+        when (row) {
+            is JsonRowVec -> JsonRowVec(
+                nodeType = row.nodeType,
+                rawValue = row.rawValue,
+                childFactory = row.child?.let { ch -> { ch } },
+            )
+            is BlobRowVec -> BlobRowVec(
+                bytes = row.bytes,
+                mimeType = row.mimeType,
+                childFactory = row.child?.let { ch -> { _ -> ch } },
+            )
+            else -> indices.size j { x -> row[indices[x]] }
+        }
+    }
+}
 
 /** Order by specs. */
 fun Cursor.orderBy(vararg specs: OrderSpec): Cursor {
@@ -51,6 +90,9 @@ fun Cursor.orderBy(vararg specs: OrderSpec): Cursor {
 /** Order by a single column (ascending). */
 fun Cursor.orderBy(column: String): Cursor = orderBy(OrderSpec(column))
 
+/** Order by a single column with explicit direction. */
+fun Cursor.orderBy(column: String, desc: Boolean): Cursor = orderBy(OrderSpec(column, desc = desc))
+
 /** Chain transforms. */
 infix fun <T> Cursor.then(transform: (Cursor) -> T): T = transform(this)
 
@@ -66,9 +108,19 @@ operator fun Cursor.minus(columnName: String): Cursor {
     return this.get(*indices)
 }
 
-/** Explicit take/drop to help compiler inference. */
-fun Cursor.take(n: Int): Cursor = (this as Series<RowVec>).take(n)
-fun Cursor.drop(n: Int): Cursor = (this as Series<RowVec>).drop(n)
+/** Explicit take/drop — slice rows directly via the b accessor to avoid the IntRange column-select overload. */
+fun Cursor.take(n: Int): Cursor {
+    require(n >= 0) { "take count must be non-negative, got $n" }
+    val end = minOf(n, size)
+    return end j b
+}
+
+fun Cursor.drop(n: Int): Cursor {
+    require(n >= 0) { "drop count must be non-negative, got $n" }
+    val start = minOf(n, size)
+    val rowFn = b
+    return (size - start) j { i: Int -> rowFn(start + i) }
+}
 
 // Aggregation model
 interface Aggregation {
@@ -171,13 +223,12 @@ fun Cursor.groupBy(keyColumn: String, vararg aggregations: Aggregation): Cursor 
     val groupKeys = groups.keys.toList()
     val resultRows = groupKeys.map { key ->
         val accs = groups[key]!!
-        val keys = mutableListOf(keyColumn)
         val cells = mutableListOf<Any?>(key)
         aggregations.forEachIndexed { index, agg ->
-            keys.add(agg.outputColumn)
             cells.add(accs[index].getResult())
         }
-        DocRowVec(keys, cells)
+        // Store group-by result as JsonRowVec with nodeType="group"
+        JsonRowVec(nodeType = "group", rawValue = cells.joinToString(","))
     }
 
     return resultRows.size j { resultRows[it].toRowVec() }
@@ -202,19 +253,11 @@ fun Cursor.hashJoin(other: Cursor, leftKey: String, rightKey: String): Cursor {
         val key = leftRow.getValue(leftKey)
         val matches = rightIndex[key] ?: continue
         for (rightRow in matches) {
-            val keys = leftRow.keys.toList().toMutableList()
-            val cells = leftRow.cells.toList().toMutableList()
-
-            val rightKeys = rightRow.keys.toList()
-            val rightCells = rightRow.cells.toList()
-
-            rightKeys.forEachIndexed { index, k ->
-                if (k != rightKey) {
-                    keys.add(k)
-                    cells.add(rightCells[index])
-                }
-            }
-            resultRows.add(DocRowVec(keys, cells).toRowVec())
+            // Merge join result into a JsonRowVec
+            val leftType = (leftRow as? JsonRowVec)?.nodeType ?: "row"
+            val rightType = (rightRow as? JsonRowVec)?.nodeType ?: "row"
+            val merged = "left=$leftType,right=$rightType"
+            resultRows.add(JsonRowVec(nodeType = "join", rawValue = merged))
         }
     }
 
@@ -223,3 +266,17 @@ fun Cursor.hashJoin(other: Cursor, leftKey: String, rightKey: String): Cursor {
 
 /** Join alias. */
 fun Cursor.join(other: Cursor, leftKey: String, rightKey: String): Cursor = hashJoin(other, leftKey, rightKey)
+
+/**
+ * Compare two nullable key values for ordering.
+ * Nulls sort before non-nulls; numbers are compared across types (Int/Long/Double etc).
+ */
+@Suppress("UNCHECKED_CAST")
+fun compareKeys(a: Any?, b: Any?): Int = when {
+    a == null && b == null -> 0
+    a == null -> -1
+    b == null -> 1
+    a is Number && b is Number -> a.toDouble().compareTo(b.toDouble())
+    a is Comparable<*> -> (a as Comparable<Any?>).compareTo(b)
+    else -> a.toString().compareTo(b.toString())
+}

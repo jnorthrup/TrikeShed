@@ -175,4 +175,4 @@ Derive views and indexes afterward.
 Lower to tensors only when needed.
 
 
-	* /Trikeshed DRY PRECEDENCE OVER -> libs/**  <-- DRY  removes overlap from dreamer-kmm 
+ 

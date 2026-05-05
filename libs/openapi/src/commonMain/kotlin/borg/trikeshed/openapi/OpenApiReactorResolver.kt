@@ -313,25 +313,28 @@ fun OpenApiRawDocument.resolveOperation(rawOp: OpenApiRawOperation): ResolvedOpe
  * ResolvedOpenApiDocument — all refs inlined, schemas concrete, security flattened.
  */
 fun OpenApiRawDocument.resolve(): ResolvedOpenApiDocument {
-    val infoMap = info
+    // Resolve all $ref references upfront so parameters, schemas, etc.
+    // are already materialised before we walk the tree.
+    val derefDoc = OpenApiRawDocument(resolveAllRefs())
+    val infoMap = derefDoc.info
 
     val title = infoMap?.get("title").asStr() ?: "Unknown"
     val version = infoMap?.get("version").asStr() ?: "0.0.0"
     val description = infoMap?.get("description").asStr()
 
-    val servers = root["servers"].asList()?.mapNotNull {
+    val servers = derefDoc.root["servers"].asList()?.mapNotNull {
         it.asMap()?.get("url").asStr()
     } ?: emptyList()
 
-    val trikeshedTitle = root["x-trikeshed-title"].asStr()
-    val trikeshedContext = parseTrikeshedContext(root)
+    val trikeshedTitle = derefDoc.root["x-trikeshed-title"].asStr()
+    val trikeshedContext = parseTrikeshedContext(derefDoc.root)
 
-    val resolvedOps = operations().mapNotNull { rawOp ->
-        resolveOperation(rawOp)
+    val resolvedOps = derefDoc.operations().mapNotNull { rawOp ->
+        derefDoc.resolveOperation(rawOp)
     }
 
     return ResolvedOpenApiDocument(
-        rawRoot = root,
+        rawRoot = derefDoc.root,
         title = title,
         version = version,
         description = description,

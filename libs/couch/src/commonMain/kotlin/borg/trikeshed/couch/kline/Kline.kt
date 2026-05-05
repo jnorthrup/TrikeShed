@@ -1,7 +1,7 @@
 package borg.trikeshed.couch.kline
 
 import borg.trikeshed.collections.s_
-import borg.trikeshed.miniduck.DocRowVec
+import borg.trikeshed.miniduck.KeyedRowVec
 import borg.trikeshed.lib.Series
 
 /**
@@ -45,7 +45,7 @@ data class Kline(
         ]
     }
 
-    fun toDocRowVec(): DocRowVec = DocRowVec(
+    fun toDocRowVec(): KeyedRowVec = KeyedRowVec(
         keys = schemaKeys,
         cells = s_[symbol, timespan, openTime, open, high, low, close, volume],
     )
@@ -71,7 +71,7 @@ data class ExtendedKline(
 ) {
     fun toKline(): Kline = Kline(symbol, timespan, openTime, open, high, low, close, volume)
 
-    fun toDocRowVec(): DocRowVec = DocRowVec(
+    fun toDocRowVec(): KeyedRowVec = KeyedRowVec(
         keys = s_[
             "symbol", "timespan", "openTime",
             "open", "high", "low", "close", "volume",

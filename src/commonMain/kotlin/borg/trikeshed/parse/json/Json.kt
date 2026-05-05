@@ -41,10 +41,42 @@ object JsonParser {
     /** Reify with optional TypeEvidence collector and RowVec callback. */
     fun reify(src: Series<Char>, evidence: MutableList<TypeEvidence>?, callback: ((RowVec) -> Unit)?): Any? {
         val ctx = contextOf(Syntax.JSON, src)
+        if (evidence != null || callback != null) {
+            collectJsonEvidence(ctx.a, src, isKey = false, evidence, callback)
+        }
         val result = Combinators.reify(ctx, Syntax.JSON)
         val tag = Combinators.tagOf(ctx.a, ctx.b)
-        // ignore evidence/callback for now — real impl would collect during walk
         return materialize(result, tag)
+    }
+
+    private fun collectJsonEvidence(
+        e: JsElement,
+        src: Series<Char>,
+        isKey: Boolean,
+        evidence: MutableList<TypeEvidence>?,
+        callback: ((RowVec) -> Unit)?,
+    ) {
+        if (isKey) return
+        val ev = TypeEvidence.sample(src.slice(e.a.a, e.a.b + 1))
+        evidence?.add(ev)
+        callback?.invoke(ev.toRowVec())
+        val tag = Combinators.tagOf(e, src)
+        when (tag.kind) {
+            0 -> { // OBJECT: children alternate key/value
+                val all = Combinators.realCommas(e, src)
+                for (i in 0 until all.size) {
+                    val childElem = JsonScan.parseOne(src, all[i])
+                    collectJsonEvidence(childElem, src, isKey = (i % 2 == 0), evidence, callback)
+                }
+            }
+            1 -> { // ARRAY: all children are values
+                val all = Combinators.realCommas(e, src)
+                for (i in 0 until all.size) {
+                    val childElem = JsonScan.parseOne(src, all[i])
+                    collectJsonEvidence(childElem, src, isKey = false, evidence, callback)
+                }
+            }
+        }
     }
 
     /** Path traversal over JSON context. */

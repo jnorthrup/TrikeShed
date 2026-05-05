@@ -31,14 +31,13 @@ class InMemoryBlockWal {
     }
 
     fun readRange(start: Long, end: Long): List<WalEntry> =
-        entries.filter { it.seq >= start && it.seq < end }
+        entries.filter { it.a >= start && it.a < end }
 
-    fun readFrom(start: Long): List<WalEntry> = entries.filter { it.seq >= start }
+    fun readFrom(start: Long): List<WalEntry> = entries.filter { it.a >= start }
 
     fun compact(keepFromSeq: Long) {
-        val idx = entries.indexOfFirst { it.seq >= keepFromSeq }
+        val idx = entries.indexOfFirst { it.a >= keepFromSeq }
         if (idx > 0) {
-            // remove earlier entries
             for (i in 0 until idx) entries.removeAt(0)
         }
     }
@@ -47,22 +46,15 @@ class InMemoryBlockWal {
 
     fun replayTo(store: BlockStore, uptoSeq: Long) {
         for (e in entries) {
-            if (e.seq > uptoSeq) break
-            applyToStore(e.op, store)
+            if (e.a > uptoSeq) break
+            applyToStore(e.b, store)
         }
     }
 
     private fun applyToStore(op: WalOp, store: BlockStore) {
         when (op) {
-            is WalOp.Put -> {
-                // Use the store's put method which returns the id
-                val id = store.put(op.collection, op.block)
-                // Note: The WAL stores explicit IDs, but BlockStore generates them
-                // For WAL replay, we need to handle this mapping
-            }
-            is WalOp.Remove -> {
-                // BlockStore doesn't have remove in the interface, skip for now
-            }
+            is WalOp.Put -> store.putWithId(op.collection, op.id, op.block)
+            is WalOp.Remove -> store.remove(op.collection, op.id)
         }
     }
 }

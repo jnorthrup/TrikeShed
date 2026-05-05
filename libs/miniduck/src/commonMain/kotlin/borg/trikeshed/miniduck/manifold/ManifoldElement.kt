@@ -2,6 +2,7 @@ package borg.trikeshed.miniduck.manifold
 
 import borg.trikeshed.context.AsyncContextElement
 import borg.trikeshed.lib.Series
+import borg.trikeshed.manifold.ManifoldConcept
 import kotlinx.coroutines.CompletableJob
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job

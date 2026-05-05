@@ -2,6 +2,7 @@ package borg.trikeshed.miniduck
 
 import borg.trikeshed.cursor.RowVec
 import borg.trikeshed.cursor.getValue
+import borg.trikeshed.lib.Join
 
 typealias Predicate = (RowVec) -> Boolean
 
@@ -24,6 +25,12 @@ infix fun ColumnRef.inList(values: Iterable<Any?>): Predicate = { row -> row.get
 infix fun ColumnRef.between(bounds: Pair<Any?, Any?>): Predicate = { row ->
     val value = row.getValue(name)
     compareRowValue(value, bounds.first) >= 0 && compareRowValue(value, bounds.second) <= 0
+}
+
+@Suppress("UNCHECKED_CAST")
+infix fun <L, R> ColumnRef.between(bounds: Join<L, R>): Predicate = { row ->
+    val value = row.getValue(name)
+    compareRowValue(value, bounds.a) >= 0 && compareRowValue(value, bounds.b) <= 0
 }
 
 infix fun Predicate.and(other: Predicate): Predicate = { row -> this(row) && other(row) }

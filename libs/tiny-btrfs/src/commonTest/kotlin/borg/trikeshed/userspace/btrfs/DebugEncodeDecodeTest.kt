@@ -1,7 +1,7 @@
 package borg.trikeshed.userspace.btrfs
 
-import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.Join
+import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.j
 import borg.trikeshed.tinybtrfs.NodeId
 import kotlinx.coroutines.test.TestResult
@@ -18,10 +18,10 @@ class DebugEncodeDecodeTest {
             val buf = UserspaceBtrfsBuffer(chunkSize = 4096)
             buf.open()
 
-            val key = BtrfsKey(1uL, 1u, 0uL)
+            val key: BtrfsKeyAtom = 1uL j (1u j 0uL)
             val data: ByteArray = magic
-            val items: Series<Join<BtrfsKey, ByteArray>> = 1 j { key j data }
-            val leaf: Series<Join<BtrfsKey, ByteArray>> = items
+            val items: Series<Join<BtrfsKeyAtom, ByteArray>> = 1 j { key j data }
+            val leaf: Series<Join<BtrfsKeyAtom, ByteArray>> = items
 
             val nodeId: NodeId = buf.allocateNode()
 

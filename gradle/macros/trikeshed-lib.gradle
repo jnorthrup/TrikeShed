@@ -169,18 +169,7 @@ switch (project.path) {
         kmpFull()
         break
     case ":libs:dreamer-kmm":
-        kmpFull(rootMode: "implementation", coroutinesMain: true, datetimeMain: true)
-        // Additional deps needed by dreamer-kmm beyond what kmpFull provides
-        extensions.getByName("kotlin").sourceSets.getByName("commonMain").dependencies {
-            api libPeer("miniduck")
-            api libPeer("kursive")
-            api libPeer("quic")
-            api libPeer("ngsctp")
-            implementation libPeer("couch")
-        }
-        extensions.getByName("kotlin").sourceSets.getByName("commonTest").dependencies {
-            implementation libPeer("miniduck")
-        }
+        // dreamer-kmm has its own exceptional build.gradle.kts — standalone, root TrikeShed only
         break
     case ":libs:kursive":
     case ":libs:patl":
@@ -208,6 +197,83 @@ switch (project.path) {
         dependencies {
             implementation "org.jetbrains.kotlin:kotlin-stdlib:${kotlinVersion}"
             implementation "org.jetbrains.kotlinx:kotlinx-coroutines-core:${prop("versions.kotlinx-coroutines-core")}"
+        }
+
+        tasks.register("generateCmcProClient", JavaExec) {
+            group = "openapi"
+            description = "Generate CMC Pro API client from OpenAPI spec"
+            dependsOn(":libs:openapi:jvmJar")
+
+            def openApiProject = project(":libs:openapi")
+            def openApiJvmComp = openApiProject.extensions.getByName("kotlin").targets.getByName("jvm").compilations.getByName("main")
+            classpath = openApiProject.files(openApiJvmComp.output.classesDirs, openApiProject.tasks.getByName("jvmJar").outputs.files)
+            classpath += project.configurations.getByName("runtimeClasspath")
+
+            environment("FORCE_HTX_CLIENT_GENERATED_PACKAGE", "borg.trikeshed.cmc.pro.generated")
+            environment("FORCE_HTX_CLIENT_DISPLAY_NAME", "CmcPro")
+            mainClass = "borg.trikeshed.openapi.GenerateSourcesKt"
+
+            args = [
+                "--spec", "${project.rootDir}/libs/cmc/pro-api/openapi/coinmarketcap-pro.openapi.yaml",
+                "--target", "cmcProClient",
+                "--output", "${project.projectDir}/src/generated/kotlin",
+                "--sides", "client"
+            ]
+        }
+        break
+    case ":libs:rhood-generated":
+    case ":libs:krak-generated":
+        plainJvm()
+        kotlin.sourceSets.main.kotlin.srcDir("src/generated/kotlin")
+        dependencies {
+            implementation "org.jetbrains.kotlin:kotlin-stdlib:${kotlinVersion}"
+            implementation "org.jetbrains.kotlinx:kotlinx-coroutines-core:${prop('versions.kotlinx-coroutines-core')}"
+        }
+
+        // ── Robinhood ──
+        tasks.register("generateRobinhoodClient", JavaExec) {
+            group = "openapi"
+            description = "Generate Robinhood Crypto Trading API client from OpenAPI spec"
+            dependsOn(":libs:openapi:jvmJar")
+
+            def openApiProject = project(":libs:openapi")
+            def openApiJvmComp = openApiProject.extensions.getByName("kotlin").targets.getByName("jvm").compilations.getByName("main")
+            classpath = openApiProject.files(openApiJvmComp.output.classesDirs, openApiProject.tasks.getByName("jvmJar").outputs.files)
+            classpath += project.configurations.getByName("runtimeClasspath")
+
+            environment("FORCE_HTX_CLIENT_GENERATED_PACKAGE", "org.bereft.robinhood.generated")
+            environment("FORCE_HTX_CLIENT_DISPLAY_NAME", "Robinhood")
+            mainClass = "borg.trikeshed.openapi.GenerateSourcesKt"
+
+            args = [
+                "--spec", "${project.rootDir}/libs/rhood/generated/openapi/robinhood.openapi.yaml",
+                "--target", "robinhoodClient",
+                "--output", "${project.rootDir}/libs/rhood-generated/src/generated/kotlin",
+                "--sides", "client"
+            ]
+        }
+
+        // ── Kraken Spot REST ──
+        tasks.register("generateKrakenSpotClient", JavaExec) {
+            group = "openapi"
+            description = "Generate Kraken Spot REST API client from OpenAPI spec"
+            dependsOn(":libs:openapi:jvmJar")
+
+            def openApiProject = project(":libs:openapi")
+            def openApiJvmComp = openApiProject.extensions.getByName("kotlin").targets.getByName("jvm").compilations.getByName("main")
+            classpath = openApiProject.files(openApiJvmComp.output.classesDirs, openApiProject.tasks.getByName("jvmJar").outputs.files)
+            classpath += project.configurations.getByName("runtimeClasspath")
+
+            environment("FORCE_HTX_CLIENT_GENERATED_PACKAGE", "org.bereft.kraken.spot.generated")
+            environment("FORCE_HTX_CLIENT_DISPLAY_NAME", "KrakenSpot")
+            mainClass = "borg.trikeshed.openapi.GenerateSourcesKt"
+
+            args = [
+                "--spec", "${project.rootDir}/libs/krak/generated/openapi/kraken-spot.openapi.yaml",
+                "--target", "krakenSpotClient",
+                "--output", "${project.rootDir}/libs/krak-generated/src/generated/kotlin",
+                "--sides", "client"
+            ]
         }
         break
     case ":libs:dreamer-test-runner":

@@ -3,41 +3,43 @@ package borg.trikeshed.lib
 class RecursiveMutableSeries<T>(var data: Series<T>) : MutableSeries<T>, Series<T> {
 
     override fun set(index: Int, item: T) {
-        data = size j { i: Int ->
+        val old = data
+        data = old.a j { i: Int ->
             when (i) {
                 index -> item
-                else -> data[i]
+                else -> old[i]
             }
         }
     }
 
     override fun add(item: T) {
-        data = size j { i: Int ->
-            when {
-                i == size -> item
-                else -> data[i]
-            }
+        val old = data
+        val n = old.a
+        data = (n + 1) j { i: Int ->
+            if (i < n) old[i] else item
         }
     }
 
     override fun add(index: Int, item: T) {
-        data = size j { i: Int ->
+        val old = data
+        val n = old.a
+        data = (n + 1) j { i: Int ->
             when {
-                i > index -> data[i - 1]
-                i < index -> data[i]
+                i > index -> old[i - 1]
+                i < index -> old[i]
                 else -> item
             }
         }
     }
 
-    override fun removeAt(index: Int): T = data[index].also {
-        data = size j { i: Int ->
-            when {
-                i < index -> data[i]
-                i >= index && i < size - 1 -> data[i + 1]
-                else -> data[i]
-            }
+    override fun removeAt(index: Int): T {
+        val old = data
+        val n = old.a
+        val item = old[index]
+        data = (n - 1) j { i: Int ->
+            if (i < index) old[i] else old[i + 1]
         }
+        return item
     }
 
     override fun remove(item: T) =
@@ -75,6 +77,6 @@ class RecursiveMutableSeries<T>(var data: Series<T>) : MutableSeries<T>, Series<
             RecursiveMutableSeries(initial)
     }
 
-    override val a: Int by data::a
-    override val b: (Int) -> T by data::b
+    override val a: Int get() = data.a
+    override val b: (Int) -> T get() = data.b
 }

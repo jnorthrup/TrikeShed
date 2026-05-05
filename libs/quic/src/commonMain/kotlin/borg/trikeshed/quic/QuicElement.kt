@@ -7,6 +7,8 @@ import borg.trikeshed.context.StreamHandle
 import borg.trikeshed.context.StreamTransport
 import borg.trikeshed.lib.*
 import kotlinx.coroutines.channels.Channel
+import kotlin.coroutines.CoroutineContext
+import kotlin.random.Random
 
 data class QuicConfig(
     val alpn: Series<String> = Join.emptySeriesOf(),
@@ -14,6 +16,264 @@ data class QuicConfig(
     val maxUdpPayloadSize: Int = 1350,
     val initialVersion: QuicVersion = QuicVersions.VERSION_1,
 )
+
+// ── QUIC Connection ID (RFC 9000 §5.1) ──────────────────────────────────────────
+
+/**
+ * QUIC connection ID — opaque byte sequence identifying a connection.
+ * RFC 9000 §5.1: 0–20 bytes; servers choose the final length.
+ * Short-header packets (1-RTT) use the destination connection ID chosen by the receiver.
+ */
+class QuicConnectionId(val bytes: ByteArray) {
+    init { require(bytes.size in 0..20) { "Connection ID must be 0-20 bytes, got ${bytes.size}" } }
+
+    companion object {
+        /** Generate a random connection ID of [len] bytes (default 8). */
+        fun generate(len: Int = 8): QuicConnectionId {
+            require(len in 0..20) { "Connection ID length must be 0-20, got $len" }
+            return QuicConnectionId(Random.nextBytes(len))
+        }
+    }
+}
+
+// ── QUIC short-header framing (RFC 9000 §17.3) ──────────────────────────────────
+
+/** First byte for a short-header QUIC packet with spin bit set (0x40). */
+const val SHORT_HEADER_MASK: Byte = 0x40
+
+/**
+ * Framed QUIC short-header packet.
+ *
+ * Layout (bytes):
+ *   [0]       header byte (0x40 = short header, spin=1)
+ *   [1..n]    destination connection ID (variable length)
+ *   [n+1..]   protected payload
+ */
+data class QuicShortFrame(
+    val dstConnectionId: QuicConnectionId,
+    val payload: ByteArray,
+) {
+    val packet: ByteArray by lazy {
+        val idLen = dstConnectionId.bytes.size
+        val frame = ByteArray(1 + idLen + payload.size)
+        frame[0] = SHORT_HEADER_MASK
+        dstConnectionId.bytes.copyInto(frame, 1)
+        payload.copyInto(frame, 1 + idLen)
+        frame
+    }
+}
+
+/**
+ * Channelized QUIC transport CCEK service (Design 4 — io_uring + XDP).
+ *
+ * Key invariants (pure protocol engineering, no AI/ML):
+ * - Each QUIC stream maps to a Kotlin Channel<ByteArray> under structured concurrency
+ * - io_uring ring fd for zero-copy async I/O (system liburing / JNI binding)
+ * - XDP/eBPF for deterministic packet → per-core io_uring ring steering (hash-based, not ML)
+ * - Cancellation is free: parent scope death cleans all stream channels automatically
+ * - ioUringFd = -1 means epoll fallback mode
+ */
+data class QuicChannelService(
+    val _streams: MutableMap<Int, StreamHandle> = mutableMapOf(),
+    val ioUringFd: Int = -1,          // -1 = epoll fallback
+    val xdpProg: String? = null,      // XDP prog name for hardware packet steering, null = software only
+    val connectionId: QuicConnectionId = QuicConnectionId.generate(),
+) : StreamTransport {
+    companion object Key : CoroutineContext.Key<QuicChannelService>
+    override val key: CoroutineContext.Key<*> get() = Key
+
+    val streams: Map<Int, StreamHandle> get() = _streams
+
+    override suspend fun openStream(): StreamHandle {
+        val id = _streams.keys.maxOrNull()?.plus(1) ?: 0
+        val send = Channel<ByteArray>(Channel.BUFFERED)
+        val recv = Channel<ByteArray>(Channel.BUFFERED)
+        val handle = StreamHandle(id, send, recv)
+        _streams[id] = handle
+        return handle
+    }
+
+    override val activeStreams: Int get() = _streams.size
+
+    /** Frame [payload] as a QUIC short-header packet using this service's connection ID. */
+    fun frameShortHeader(payload: ByteArray): QuicShortFrame =
+        QuicShortFrame(connectionId, payload)
+}
+
+/**
+ * QUIC connection configuration — mirrors literbike `quic_config::QuicConfig`.
+ *
+ * All fields have sensible defaults that match the Rust reference implementation.
+ */
+data class QuicConfigV2(
+    /** Application-Layer Protocol Negotiation tokens, e.g. `listOf("h3".encodeToByteArray())`. */
+    val alpn: List<ByteArray> = listOf("h3".encodeToByteArray()),
+    /** Maximum idle timeout in milliseconds before the connection is silently closed. */
+    val maxIdleTimeoutMs: ULong = 30_000uL,
+    /** Maximum UDP datagram payload size (path MTU minus IP/UDP headers). */
+    val maxUdpPayloadSize: UInt = 1350u,
+    /** Enable Generic Segmentation Offload when the platform supports it. */
+    val enableGso: Boolean = true,
+    /** Enable Explicit Congestion Notification (ECN) markings. */
+    val enableEcn: Boolean = true,
+) {
+    companion object {
+        /** Convenience factory — returns the default configuration. */
+        fun default(): QuicConfigV2 = QuicConfigV2()
+    }
+
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is QuicConfigV2) return false
+        if (alpn.size != other.alpn.size) return false
+        for (i in alpn.indices) {
+            if (!alpn[i].contentEquals(other.alpn[i])) return false
+        }
+        return maxIdleTimeoutMs == other.maxIdleTimeoutMs &&
+                maxUdpPayloadSize == other.maxUdpPayloadSize &&
+                enableGso == other.enableGso &&
+                enableEcn == other.enableEcn
+    }
+
+    override fun hashCode(): Int {
+        var result = alpn.fold(1) { acc, bytes -> 31 * acc + bytes.contentHashCode() }
+        result = 31 * result + maxIdleTimeoutMs.hashCode()
+        result = 31 * result + maxUdpPayloadSize.hashCode()
+        result = 31 * result + enableGso.hashCode()
+        result = 31 * result + enableEcn.hashCode()
+        return result
+    }
+}
+
+/**
+ * Root QUIC error — mirrors literbike `quic_error::QuicError`.
+ *
+ * Every error category from the Rust source is represented as a sealed sub-hierarchy
+ * so that `when` exhaustiveness checking works in Kotlin.
+ */
+sealed class QuicErrorException(override val message: String, override val cause: Throwable? = null) : Exception(message, cause) {
+
+    // -- Connection errors ---------------------------------------------------
+
+    sealed class Connection(
+        msg: String,
+        cause: Throwable? = null
+    ) : QuicErrorException(msg, cause) {
+
+        data object NotConnected : Connection("QUIC connection not established")
+        data object ConnectionClosed : Connection("QUIC connection already closed")
+
+        class FlowControlBlocked(
+            val windowSize: ULong,
+            val attempted: ULong
+        ) : Connection("Connection flow control blocked: window=$windowSize, attempted=$attempted")
+
+        class HandshakeFailed(
+            cause: Throwable? = null
+        ) : Connection("QUIC handshake failed", cause)
+
+        class InvalidState(
+            val state: String
+        ) : Connection("Invalid state: $state")
+    }
+
+    // -- Stream errors -------------------------------------------------------
+
+    sealed class Stream(
+        msg: String,
+        cause: Throwable? = null
+    ) : QuicErrorException(msg, cause) {
+
+        class StreamNotFound(
+            val streamId: ULong
+        ) : Stream("Stream $streamId not found")
+
+        class StreamClosed(
+            val streamId: ULong
+        ) : Stream("Stream $streamId is closed")
+
+        class FlowControlBlocked(
+            val streamId: ULong,
+            val windowId: ULong,
+            val attempted: ULong
+        ) : Stream("Stream $streamId flow control blocked: window=$windowId, attempted=$attempted")
+
+        class InvalidStreamId(
+            val streamId: ULong
+        ) : Stream("Invalid stream ID: $streamId")
+
+        data object StreamLimitExceeded : Stream("Maximum number of streams exceeded")
+    }
+
+    // -- Protocol errors -----------------------------------------------------
+
+    sealed class Protocol(
+        msg: String,
+        cause: Throwable? = null
+    ) : QuicErrorException(msg, cause) {
+
+        class InvalidPacket(
+            val detail: String
+        ) : Protocol("Invalid packet: $detail")
+
+        class VersionMismatch(
+            val local: ULong,
+            val remote: ULong
+        ) : Protocol("QUIC version mismatch: local=$local, remote=$remote")
+
+        class Crypto(
+            val detail: String,
+            cause: Throwable? = null
+        ) : Protocol("Crypto error: $detail", cause)
+
+        class InvalidStreamId(
+            val streamId: ULong
+        ) : Protocol("Invalid stream ID: $streamId")
+    }
+
+    // -- Transport errors ----------------------------------------------------
+
+    sealed class Transport(
+        msg: String,
+        cause: Throwable? = null
+    ) : QuicErrorException(msg, cause) {
+
+        class Network(
+            val detail: String,
+            cause: Throwable? = null
+        ) : Transport("Network error: $detail", cause)
+
+        class PacketTooLarge(
+            val size: Int,
+            val mtu: Int
+        ) : Transport("Packet size $size exceeds MTU $mtu")
+    }
+
+    // -- Flow-control errors -------------------------------------------------
+
+    sealed class FlowControl(
+        msg: String
+    ) : QuicErrorException(msg) {
+
+        data object ConnectionBlocked : FlowControl("Connection-level flow control blocked by peer")
+
+        class StreamBlocked(
+            val streamId: ULong
+        ) : FlowControl("Stream $streamId flow control blocked by peer")
+    }
+
+    // -- Congestion-control errors -------------------------------------------
+
+    sealed class CongestionControl(
+        msg: String
+    ) : QuicErrorException(msg) {
+
+        class CongestionWindowBlocked(
+            val inFlight: ULong,
+            val window: ULong
+        ) : CongestionControl("Congestion window blocked: inFlight=$inFlight, window=$window")
+    }
+}
 
 /**
  * QUIC version numbers (RFC 9000 §15).
@@ -217,7 +477,7 @@ suspend fun openQuicElement(config: QuicConfig = QuicConfig()): QuicElement =
 
 class QuicElement(
     val config: QuicConfig = QuicConfig(),
-   val streams: MutableMap<Int, StreamHandle> = mutableMapOf(),
+    val streams: MutableMap<Int, StreamHandle> = mutableMapOf(),
 ) : AsyncContextElement(), StreamTransport {
     companion object Key : AsyncContextKey<QuicElement>()
 

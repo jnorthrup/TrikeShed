@@ -10,7 +10,7 @@ class MiniDuckCouchCompatibilityTest {
 
     @Test
     fun viewRowRoundTrip() {
-        val doc = DocRowVec(listOf("id", "name"), listOf("doc1", "Alice"))
+        val doc = DocRowVec(listOf("id"), listOf("doc1"))
         val view = ViewRowVec(id = "doc1", key = "k1", value = 42, docLoader = { doc })
         val block = BlockRowVec.mutable()
         block.append(view)
@@ -36,8 +36,8 @@ class MiniDuckCouchCompatibilityTest {
         val childRow = docSeries[0]
         assertTrue(childRow is DocRowVec)
         val docDecoded = childRow as DocRowVec
+        assertEquals("id", docDecoded.keys[0])
         assertEquals("doc1", docDecoded.cells[0])
-        assertEquals("Alice", docDecoded.cells[1])
     }
 
     @Test

@@ -1,6 +1,5 @@
 package borg.trikeshed.polyglot.nars3
 
-import borg.trikeshed.collections.s_
 import borg.trikeshed.lib.Series
 import borg.trikeshed.parse.kursive.NarsiveElement
 import borg.trikeshed.parse.kursive.nars3.Nars3Atom

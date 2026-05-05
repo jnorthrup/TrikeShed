@@ -44,7 +44,7 @@ The test: Every changed line should trace directly to the user's request.
 
 ## 4. No Snap Deletions
 
-**Never delete files on impulse. Ever.**
+**Never delete files on impulse. Ever.    Nor git reverts, git resets, any git destrctive commands, nor find -delete, nor heredoc stomps, nor bypass renaming  ** 
 
 - Deletion is a destructive operation with high blast radius. Always confirm with the user before removing files.
 - When cleaning up redundancy: first collapse imports to native equivalents, verify the build passes, THEN mark files for deletion.
@@ -53,6 +53,10 @@ The test: Every changed line should trace directly to the user's request.
 - "This looks like a duplicate" is not sufficient justification to delete — trace the dependents first.
 
 Rule: Build the new path, verify it works, then ask before removing the old one.
+
+  
+
+
 
 ## 5. Goal-Driven Execution
 
@@ -71,6 +75,15 @@ For multi-step tasks, state a brief plan:
 ```
 
 Strong success criteria let you loop independently. Weak criteria ("make it work") require constant clarification.
+
+## 6. Userspace Boundary
+
+**Effects live at the userspace boundary. Keep them explicit, not ambient.**
+
+- Userspace code (JVM-only I/O, platform adapters, test harnesses) must stay in `src/jvmMain/` or platform-specific source sets — never leak into `commonMain`.
+- JVM-only types (e.g. `java.nio.file.Path`, `java.io.File`) must not appear in common code. Use `expect/actual` or move to `jvmMain` source sets.
+- When a JVM-only helper is needed (e.g. file I/O, block codecs), create it in `libs/*/src/jvmMain/` and depend on it from the root project's `jvmTest/` — not from `commonMain`.
+- This prevents JVM snarls from breaking KMPP targets (JS, Native, Wasm).
 
 ---
 

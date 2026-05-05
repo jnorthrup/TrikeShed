@@ -36,7 +36,10 @@ class MiniDuckBlockCodecRoundTripTest {
         assertEquals(1, decoded.rowCount)
         val out = decoded.child!![0] as DocRowVec
         assertEquals(3, out.size)
-        assertEquals(listOf("name", "age", "active"), out.keys)
+        assertEquals(3, out.keys.size)
+        assertEquals("name", out.keys[0])
+        assertEquals("age", out.keys[1])
+        assertEquals("active", out.keys[2])
         assertEquals("Alice", out.cells[0])
         assertEquals(30, out.cells[1])
         assertEquals(true, out.cells[2])
@@ -52,11 +55,13 @@ class MiniDuckBlockCodecRoundTripTest {
         )
         val decoded = roundTrip(doc.toRowVec())
         val out = decoded.child!![0] as DocRowVec
-        assertEquals(listOf("top"), out.keys)
+        assertEquals(1, out.keys.size)
+        assertEquals("top", out.keys[0])
         assertNotNull(out.child)
         assertEquals(1, out.child!!.size)
         val inner = out.child!![0] as DocRowVec
-        assertEquals(listOf("x"), inner.keys)
+        assertEquals(1, inner.keys.size)
+        assertEquals("x", inner.keys[0])
         assertEquals(99, inner.cells[0])
     }
 
@@ -279,7 +284,8 @@ class MiniDuckBlockCodecRoundTripTest {
 
         // DocRowVec
         val d = decoded.child!![0] as DocRowVec
-        assertEquals(listOf("name"), d.keys)
+        assertEquals(1, d.keys.size)
+        assertEquals("name", d.keys[0])
         assertEquals("Bob", d.cells[0])
 
         // ViewRowVec

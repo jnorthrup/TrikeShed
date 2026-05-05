@@ -2,12 +2,8 @@ package borg.trikeshed.polyglot
 
 import borg.trikeshed.collections.s_
 import borg.trikeshed.lib.*
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertNotEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertNotNull
-import kotlin.test.assertTrue
+import borg.trikeshed.mlir.*
+import kotlin.test.*
 
 /**
  * RED contract tests for MlirTaxonomy.

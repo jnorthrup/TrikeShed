@@ -1,6 +1,7 @@
 package borg.trikeshed.miniduck
 
 import borg.trikeshed.lib.*
+import borg.trikeshed.manifold.*
 import borg.trikeshed.miniduck.manifold.*
 import kotlin.test.*
 

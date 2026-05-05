@@ -13,9 +13,9 @@ import kotlin.test.assertTrue
 class DebugEncodeDecodeTest2 {
     @Test
     fun minimalEncodeDecode() = runTest {
-        val key = BtrfsKey(1uL, 1u, 0uL)
+        val key: BtrfsKeyAtom = 1uL j (1u j 0uL)
         val data = byteArrayOf(0xDE.toByte(), 0xAD.toByte(), 0xBE.toByte(), 0xEF.toByte())
-        val leaf: Series<Join<BtrfsKey, ByteArray>> = 1 j { key j data }
+        val leaf: Series<Join<BtrfsKeyAtom, ByteArray>> = 1 j { key j data }
 
         val buf = ByteArray(BTRFS_NODE_SIZE)
 
@@ -63,10 +63,10 @@ class DebugEncodeDecodeTest2 {
     fun rawBufRoundTrip() = runTest {
         val buf = ByteArray(BTRFS_NODE_SIZE)
 
-        val key = BtrfsKey(1uL, 1u, 0uL)
+        val key: BtrfsKeyAtom = 1uL j (1u j 0uL)
         val data = byteArrayOf(0xDE.toByte(), 0xAD.toByte(), 0xBE.toByte(), 0xEF.toByte())
-        val items: Series<Join<BtrfsKey, ByteArray>> = 1 j { key j data }
-        val leaf: Series<Join<BtrfsKey, ByteArray>> = items
+        val items: Series<Join<BtrfsKeyAtom, ByteArray>> = 1 j { key j data }
+        val leaf: Series<Join<BtrfsKeyAtom, ByteArray>> = items
 
         // Encode
         encodeLeaf(leaf, buf, 0UL)
@@ -76,9 +76,9 @@ class DebugEncodeDecodeTest2 {
 
         // Compare
         assertEquals(1, decoded.size)
-        val a: BtrfsKey =  key
-        val join: BtrfsItem = decoded[0]
-        val b = join.data
+        val a: BtrfsKeyAtom =  key
+        val dashklsajhdsakl: BtrfsItem = decoded[0]
+        val b = dashklsajhdsakl.b
         assertTrue(b.contentEquals(data))
         assertEquals<ULong>(key.objectId, a.objectId)
         println("PASS: direct round-trip works")
@@ -89,10 +89,10 @@ class DebugEncodeDecodeTest2 {
         val buf = UserspaceBtrfsBuffer(chunkSize = 4096)
         buf.open()
 
-        val key = BtrfsKey(1uL, 1u, 0uL)
+        val key: BtrfsKeyAtom = 1uL j (1u j 0uL)
         val data: ByteArray = byteArrayOf(0xDE.toByte(), 0xAD.toByte(), 0xBE.toByte(), 0xEF.toByte())
-        val items: Series<Join<BtrfsKey, ByteArray>> = 1 j { key j data }
-        val leaf: Series<Join<BtrfsKey, ByteArray>> = items
+        val items: Series<Join<BtrfsKeyAtom, ByteArray>> = 1 j { key j data }
+        val leaf: Series<Join<BtrfsKeyAtom, ByteArray>> = items
 
         val nodeId = buf.allocateNode()
         buf.writeLeaf(nodeId, leaf)

@@ -4,6 +4,7 @@ import borg.trikeshed.cursor.Cursor
 import borg.trikeshed.indicator.Stochastic
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.at
+import borg.trikeshed.lib.get
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.size
 import kotlinx.coroutines.test.runTest

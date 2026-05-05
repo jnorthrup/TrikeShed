@@ -213,13 +213,15 @@ fun renderClientApi(
             val args = op.toKotlinArgs()
             val queryBlock = op.toQueryParamBlock()
             if (queryBlock.isNotEmpty()) {
-                append("    override suspend fun ${op.apiMethodName()}($params): $retType = run {")
-                append(queryBlock)
-                append("; call(${cfg.apiInterfaceName}Contract.${op.contractClassName()}.request.copy(queryParams = queryParams${if (args.isNotEmpty()) ", $args" else ""})) }")
+                appendLine("    override suspend fun ${op.apiMethodName()}($params): $retType = run {")
+                appendLine("        val queryParams = mutableMapOf<String, String>()")
+                appendLine(queryBlock)
+                appendLine("        call(${cfg.apiInterfaceName}Contract.${op.contractClassName()}.request.copy(queryParams = queryParams)) }")
             } else {
-                append("    override suspend fun ${op.apiMethodName()}($params): $retType =")
-                append(" call(${cfg.apiInterfaceName}Contract.${op.contractClassName()}.request${if (args.isNotEmpty()) ".copy($args)" else ""})")
+                appendLine("    override suspend fun ${op.apiMethodName()}($params): $retType =")
+                appendLine("        call(${cfg.apiInterfaceName}Contract.${op.contractClassName()}.request${if (args.isNotEmpty()) ".copy($args)" else ""})")
             }
+            appendLine()
         }
         appendLine()
         appendLine("}")

@@ -3,6 +3,7 @@ package borg.trikeshed.miniduck.columnar
 import borg.trikeshed.collections.s_
 import borg.trikeshed.cursor.Cursor
 import borg.trikeshed.cursor.at
+import borg.trikeshed.cursor.getValue
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.size

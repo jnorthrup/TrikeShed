@@ -67,8 +67,9 @@ class ChunkedMutableSeries<T>(
         val newChunk: Series<T> = oldChunk.size j { i ->
             if (i == offset) item else oldChunk[i]
         }
-        chunks = chunks.size j { i ->
-            if (i == ci) newChunk else chunks[i]
+        val oldChunks = chunks
+        chunks = oldChunks.size j { i ->
+            if (i == ci) newChunk else oldChunks[i]
         }
     }
 
@@ -87,14 +88,17 @@ class ChunkedMutableSeries<T>(
             val newLast: Series<T> = (lastChunk.size + 1) j { i ->
                 if (i < lastChunk.size) lastChunk[i] else item
             }
-            chunks = chunks.size j { i ->
-                if (i == lastIdx) newLast else chunks[i]
+            val oldChunks = chunks
+            chunks = oldChunks.size j { i ->
+                if (i == lastIdx) newLast else oldChunks[i]
             }
         } else {
             // Allocate new chunk
             val newChunk: Series<T> = 1 j { item }
-            chunks = (chunks.size + 1) j { i ->
-                if (i < chunks.size) chunks[i] else newChunk
+            val oldChunks = chunks
+            val oldLen = oldChunks.size
+            chunks = (oldLen + 1) j { i ->
+                if (i < oldLen) oldChunks[i] else newChunk
             }
         }
         totalSize++
@@ -115,8 +119,9 @@ class ChunkedMutableSeries<T>(
                 else -> oldChunk[i - 1]
             }
         }
-        chunks = chunks.size j { i ->
-            if (i == ci) newChunk else chunks[i]
+        val oldChunks = chunks
+        chunks = oldChunks.size j { i ->
+            if (i == ci) newChunk else oldChunks[i]
         }
         totalSize++
     }
@@ -128,15 +133,17 @@ class ChunkedMutableSeries<T>(
         if (oldChunk.size == 1) {
             // Remove the chunk entirely
             val nc = chunks.size - 1
+            val oldChunks = chunks
             chunks = nc j { i ->
-                if (i < ci) chunks[i] else chunks[i + 1]
+                if (i < ci) oldChunks[i] else oldChunks[i + 1]
             }
         } else {
             val newChunk: Series<T> = (oldChunk.size - 1) j { i ->
                 if (i < offset) oldChunk[i] else oldChunk[i + 1]
             }
-            chunks = chunks.size j { i ->
-                if (i == ci) newChunk else chunks[i]
+            val oldChunks = chunks
+            chunks = oldChunks.size j { i ->
+                if (i == ci) newChunk else oldChunks[i]
             }
         }
         totalSize--

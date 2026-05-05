@@ -109,12 +109,12 @@ class ExampleKernelTransformer : KernelFeatureTransformer {
         val stoch = HarnessStochasticCache.get(symbol, timeframe, kPeriod, dPeriod) ?: return cursor
 
         return cursor.size j { i: Int ->
-            val src = cursor.row(i) as? DocRowVec
-            val baseKeys: List<String> = src?.keys?.toList() ?: emptyList()
-            val baseCells: List<Any?> = src?.asSeries()?.toList() ?: emptyList()
+            val src = cursor.row(i) as? JsonRowVec
             val kVal = if (i < stoch.k.size) stoch.k[i] else Double.NaN
             val dVal = if (i < stoch.d.size) stoch.d[i] else Double.NaN
-            DocRowVec(baseKeys + listOf("stoch_k", "stoch_d"), baseCells + listOf(kVal, dVal))
+            val prevType = src?.nodeType ?: "stoch"
+            val prevVal = src?.rawValue ?: ""
+            JsonRowVec("$prevType:stoch_k=$kVal,stoch_d=$dVal", prevVal)
         }
     }
 }

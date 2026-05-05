@@ -1,0 +1,1566 @@
+openapi: 3.1.0
+info:
+  title: Kraken Futures REST API
+  version: current
+  description: Conservative OpenAPI 3.1 spec built from Kraken API Center Futures REST endpoint pages. This captures documented endpoint surfaces, summaries, and response descriptions from the live docs.
+servers:
+  - url: https://futures.kraken.com
+    description: Kraken API host
+tags:
+  - name: API Keys
+    description: API Keys endpoints.
+  - name: Charts
+    description: Charts endpoints.
+  - name: Analytics
+    description: Analytics endpoints.
+  - name: Candles
+    description: Candles endpoints.
+  - name: Account History
+    description: Account History endpoints.
+  - name: Market History
+    description: Market History endpoints.
+  - name: RFQs
+    description: RFQs endpoints.
+  - name: Assignment Program
+    description: Assignment Program endpoints.
+  - name: Order Management
+    description: Order Management endpoints.
+  - name: Account Information
+    description: Account Information endpoints.
+  - name: Fee Schedules
+    description: Fee Schedules endpoints.
+  - name: Historical Data
+    description: Historical Data endpoints.
+  - name: Market Data
+    description: Market Data endpoints.
+  - name: Instrument Details
+    description: Instrument Details endpoints.
+  - name: Multi-Collateral
+    description: Multi-Collateral endpoints.
+  - name: General
+    description: General endpoints.
+  - name: Trading Settings
+    description: Trading Settings endpoints.
+  - name: Subaccounts
+    description: Subaccounts endpoints.
+  - name: Trading
+    description: Trading endpoints.
+  - name: Transfers
+    description: Transfers endpoints.
+paths:
+  /derivatives/api/v3/api-keys/v3/check:
+    get:
+      tags:
+        - API Keys
+      operationId: checkV3ApiKey
+      summary: Check v3 API key
+      description: Verify API key access and return the authenticated key's details.
+      x-kraken-source: https://docs.kraken.com/api/docs/futures-api/auth/check-v-3-api-key
+      responses:
+        '200':
+          description: See Kraken docs.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '401':
+          description: See Kraken docs.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  /derivatives/api/v3/{tick_type}/{symbol}/{resolution}:
+    get:
+      tags:
+        - Charts
+      operationId: candles
+      summary: Market Candles
+      description: Candles for specified tick type, market, and resolution. List of available tick types can be fetched from the tick types endpoint. List of available markets can be fetched from the markets
+        endpoint. List of available resolutions can be fetched from the resolutions endpoint.
+      x-kraken-source: https://docs.kraken.com/api/docs/futures-api/charts/candles
+      responses:
+        '200':
+          description: See Kraken docs.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+      parameters:
+        - name: tick_type
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: symbol
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: resolution
+          in: path
+          required: true
+          schema:
+            type: string
+  /derivatives/api/v3/analytics/liquidity-pool:
+    get:
+      tags:
+        - Analytics
+      operationId: liquidityPoolStats
+      summary: Get liquidity pool statistic
+      description: Get liquidity pool statistic including usd value
+      x-kraken-source: https://docs.kraken.com/api/docs/futures-api/charts/liquidity-pool-stats
+      responses:
+        '200':
+          description: See Kraken docs.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '400':
+          description: See Kraken docs.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '404':
+          description: See Kraken docs.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  /derivatives/api/v3/analytics/{symbol}/{analytics_type}:
+    get:
+      tags:
+        - Analytics
+      operationId: marketAnalytics
+      summary: Market Analytics
+      description: Analytics data divided into time buckets
+      x-kraken-source: https://docs.kraken.com/api/docs/futures-api/charts/market-analytics
+      responses:
+        '200':
+          description: See Kraken docs.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '400':
+          description: See Kraken docs.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '404':
+          description: See Kraken docs.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+      parameters:
+        - name: symbol
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: analytics_type
+          in: path
+          required: true
+          schema:
+            type: string
+  /derivatives/api/v3/{tick_type}/{symbol}:
+    get:
+      tags:
+        - Candles
+      operationId: resolutions
+      summary: Resolutions
+      description: Candle resolutions available for specified tick type and market. List of available tick types can be fetched from the tick types endpoint. List of available markets can be fetched from
+        the markets endpoint.
+      x-kraken-source: https://docs.kraken.com/api/docs/futures-api/charts/resolutions
+      responses:
+        '200':
+          description: See Kraken docs.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+      parameters:
+        - name: tick_type
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: symbol
+          in: path
+          required: true
+          schema:
+            type: string
+  /derivatives/api/v3/{tick_type}:
+    get:
+      tags:
+        - Candles
+      operationId: symbols
+      summary: Markets
+      description: Markets available for specified tick type. List of available tick types can be fetched from the tick types endpoint.
+      x-kraken-source: https://docs.kraken.com/api/docs/futures-api/charts/symbols
+      responses:
+        '200':
+          description: See Kraken docs.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+      parameters:
+        - name: tick_type
+          in: path
+          required: true
+          schema:
+            type: string
+  /derivatives/api/v3/:
+    get:
+      tags:
+        - Candles
+      operationId: tickTypes
+      summary: Tick Types
+      description: Returns all available tick types to use with the markets endpoint.
+      x-kraken-source: https://docs.kraken.com/api/docs/futures-api/charts/tick-types
+      responses:
+        '200':
+          description: See Kraken docs.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  /derivatives/api/v3/account-log:
+    get:
+      tags:
+        - Account History
+      operationId: accountLog
+      summary: Get account log
+      description: Lists account log entries, paged by timestamp or by ID. To request entries by time range, use the since and before parameters. To request entries by ID range, use the from and to parameters.
+        Any combination of since , before , from and to can be used to restrict the requested range of entries.
+      x-kraken-source: https://docs.kraken.com/api/docs/futures-api/history/account-log
+      responses:
+        '200':
+          description: See Kraken docs.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '429':
+          description: See Kraken docs.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  /derivatives/api/v3/accountlogcsv:
+    get:
+      tags:
+        - Account History
+      operationId: accountLogCsv
+      summary: Account log (CSV)
+      description: Lists recent account log entries in CSV format.
+      x-kraken-source: https://docs.kraken.com/api/docs/futures-api/history/account-log-csv
+      responses:
+        '200':
+          description: See Kraken docs.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '401':
+          description: See Kraken docs.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '429':
+          description: See Kraken docs.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  /derivatives/api/v3/executions:
+    get:
+      tags:
+        - Account History
+      operationId: getExecutionEvents
+      summary: Get execution events
+      description: Lists executions/trades for authenticated account.
+      x-kraken-source: https://docs.kraken.com/api/docs/futures-api/history/get-execution-events
+      responses:
+        '200':
+          description: See Kraken docs.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  /derivatives/api/v3/orders:
+    get:
+      tags:
+        - Account History
+      operationId: getOrderEvents
+      summary: Get order events
+      description: Lists order events for authenticated account.
+      x-kraken-source: https://docs.kraken.com/api/docs/futures-api/history/get-order-events
+      responses:
+        '200':
+          description: See Kraken docs.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  /derivatives/api/v3/positions:
+    get:
+      tags:
+        - Account History
+      operationId: getPositionEvents
+      summary: Get position update events
+      description: Lists position events for authenticated account.
+      x-kraken-source: https://docs.kraken.com/api/docs/futures-api/history/get-position-events
+      responses:
+        '200':
+          description: See Kraken docs.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  /derivatives/api/v3/market/{tradeable}/executions:
+    get:
+      tags:
+        - Market History
+      operationId: getPublicExecutionEvents
+      summary: Get public execution events
+      description: Lists trades for a market.
+      x-kraken-source: https://docs.kraken.com/api/docs/futures-api/history/get-public-execution-events
+      responses:
+        '200':
+          description: See Kraken docs.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+      parameters:
+        - name: tradeable
+          in: path
+          required: true
+          schema:
+            type: string
+  /derivatives/api/v3/market/{tradeable}/orders:
+    get:
+      tags:
+        - Market History
+      operationId: getPublicOrderEvents
+      summary: Get public order events
+      description: Lists order events for a market.
+      x-kraken-source: https://docs.kraken.com/api/docs/futures-api/history/get-public-order-events
+      responses:
+        '200':
+          description: See Kraken docs.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+      parameters:
+        - name: tradeable
+          in: path
+          required: true
+          schema:
+            type: string
+  /derivatives/api/v3/market/{tradeable}/price:
+    get:
+      tags:
+        - Market History
+      operationId: getPublicPriceEvents
+      summary: Get public mark price events
+      description: Lists price events for a market.
+      x-kraken-source: https://docs.kraken.com/api/docs/futures-api/history/get-public-price-events
+      responses:
+        '200':
+          description: See Kraken docs.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+      parameters:
+        - name: tradeable
+          in: path
+          required: true
+          schema:
+            type: string
+  /derivatives/api/v3/triggers:
+    get:
+      tags:
+        - Account History
+      operationId: getTriggerEvents
+      summary: Get trigger events
+      description: Lists trigger events for authenticated account.
+      x-kraken-source: https://docs.kraken.com/api/docs/futures-api/history/get-trigger-events
+      responses:
+        '200':
+          description: See Kraken docs.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  /derivatives/api/v3/rfqs/open-rfqs/accept-offer/{rfqUid}:
+    post:
+      tags:
+        - RFQs
+      operationId: acceptRfqOffer
+      summary: Accept an offer on an open RFQ
+      description: 'Accept an offer on a specific open RFQ created by the authenticated account. Exactly one of bidAccepted or askAccepted must be provided. Note: This is currently available exclusively
+        in the Kraken Futures DEMO environment.'
+      x-kraken-source: https://docs.kraken.com/api/docs/futures-api/trading/accept-rfq-offer
+      responses:
+        '200':
+          description: See Kraken docs.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '404':
+          description: See Kraken docs.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+      parameters:
+        - name: rfqUid
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+  /derivatives/api/v3/assignmentprogram/add:
+    post:
+      tags:
+        - Assignment Program
+      operationId: addAssignmentProgram
+      summary: Add assignment preference
+      description: This endpoint adds an assignment program preference
+      x-kraken-source: https://docs.kraken.com/api/docs/futures-api/trading/add-assignment-program
+      responses:
+        '200':
+          description: See Kraken docs.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+  /derivatives/api/v3/cancelallorders:
+    post:
+      tags:
+        - Order Management
+      operationId: cancelAllOrders
+      summary: Cancel all orders
+      description: This endpoint allows cancelling orders which are associated with a future's contract or a margin account. If no arguments are specified all open orders will be cancelled.
+      x-kraken-source: https://docs.kraken.com/api/docs/futures-api/trading/cancel-all-orders
+      responses:
+        '200':
+          description: See Kraken docs.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+  /derivatives/api/v3/cancelallordersafter:
+    post:
+      tags:
+        - Order Management
+      operationId: cancelAllOrdersAfter
+      summary: Dead man's switch
+      description: This endpoint provides a Dead Man's Switch mechanism to protect the user from network malfunctions. The user can send a request with a timeout in seconds which will trigger a countdown
+        timer that will cancel all user orders when timeout expires. The user has to keep sending request to push back the timeout expiration or they can deactivate the mechanism by specifying a timeout
+        of zero (0). The recommended mechanism usage is making a call every 15 to 20 seconds and provide a timeout of 60 seconds. This allows the user to keep the orders in place on a brief network failure,
+        while keeping them safe in case of a network breakdown.
+      x-kraken-source: https://docs.kraken.com/api/docs/futures-api/trading/cancel-all-orders-after
+      responses:
+        '200':
+          description: See Kraken docs.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+  /derivatives/api/v3/cancelorder:
+    post:
+      tags:
+        - Order Management
+      operationId: cancelOrder
+      summary: Cancel order
+      description: This endpoint allows cancelling an open order for a Futures contract.
+      x-kraken-source: https://docs.kraken.com/api/docs/futures-api/trading/cancel-order
+      responses:
+        '200':
+          description: See Kraken docs.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+  /derivatives/api/v3/rfqs/cancel-offer/{rfqUid}:
+    delete:
+      tags:
+        - RFQs
+      operationId: cancelRfqOffer
+      summary: Cancel open offer on open RFQ
+      description: 'Cancel the current open offer on the specified open RFQ. Note: This is currently available exclusively in the Kraken Futures DEMO environment.'
+      x-kraken-source: https://docs.kraken.com/api/docs/futures-api/trading/cancel-rfq-offer
+      responses:
+        '200':
+          description: See Kraken docs.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '404':
+          description: See Kraken docs.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+      parameters:
+        - name: rfqUid
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+  /derivatives/api/v3/rfqs/open-rfqs/{rfqUid}:
+    delete:
+      tags:
+        - RFQs
+      operationId: cancelUserRfq
+      summary: Cancel an open RFQ
+      description: 'Cancel a specific open RFQ created by the authenticated account. Note: This is currently available exclusively in the Kraken Futures DEMO environment.'
+      x-kraken-source: https://docs.kraken.com/api/docs/futures-api/trading/cancel-user-rfq
+      responses:
+        '200':
+          description: See Kraken docs.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '404':
+          description: See Kraken docs.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+      parameters:
+        - name: rfqUid
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+  /derivatives/api/v3/rfqs/open-rfqs:
+    post:
+      tags:
+        - RFQs
+      operationId: createUserRfq
+      summary: Create a new RFQ
+      description: 'Create a new RFQ for the authenticated account. Note: This is currently available exclusively in the Kraken Futures DEMO environment.'
+      x-kraken-source: https://docs.kraken.com/api/docs/futures-api/trading/create-user-rfq
+      responses:
+        '200':
+          description: See Kraken docs.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '404':
+          description: See Kraken docs.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+    get:
+      tags:
+        - RFQs
+      operationId: getOpenRfqsForAccount
+      summary: List open RFQs for account
+      description: 'Retrieve all currently open RFQs created by the authenticated account. Note: This is currently available exclusively in the Kraken Futures DEMO environment.'
+      x-kraken-source: https://docs.kraken.com/api/docs/futures-api/trading/get-open-rfqs-for-account
+      responses:
+        '200':
+          description: See Kraken docs.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '404':
+          description: See Kraken docs.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  /derivatives/api/v3/assignmentprogram/delete:
+    post:
+      tags:
+        - Assignment Program
+      operationId: deleteAssignmentProgram
+      summary: Deletes assignment preference
+      description: This endpoint deletes an assignment program preference
+      x-kraken-source: https://docs.kraken.com/api/docs/futures-api/trading/delete-assignment-program
+      responses:
+        '200':
+          description: See Kraken docs.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+  /derivatives/api/v3/editorder:
+    post:
+      tags:
+        - Order Management
+      operationId: editOrderSpring
+      summary: Edit order
+      description: This endpoint allows editing an existing order for a currently listed Futures contract. When editing an order, if the trailingStopMaxDeviation and trailingStopDeviationUnit parameters
+        are sent unchanged, the system will recalculate a new stop price upon successful order modification.
+      x-kraken-source: https://docs.kraken.com/api/docs/futures-api/trading/edit-order-spring
+      responses:
+        '200':
+          description: See Kraken docs.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+  /derivatives/api/v3/accounts:
+    get:
+      tags:
+        - Account Information
+      operationId: getAccounts
+      summary: Get wallets
+      description: This endpoint returns key information relating to all your accounts which may either be cash accounts or margin accounts. This includes digital asset balances, instrument balances, margin
+        requirements, margin trigger estimates and auxiliary information such as available funds, PnL of open positions and portfolio value.
+      x-kraken-source: https://docs.kraken.com/api/docs/futures-api/trading/get-accounts
+      responses:
+        '200':
+          description: See Kraken docs.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  /derivatives/api/v3/assignmentprogram/current:
+    get:
+      tags:
+        - Assignment Program
+      operationId: getAssignmentProgramCurrent
+      summary: List assignment programs
+      description: This endpoint returns information on currently active assignment programs
+      x-kraken-source: https://docs.kraken.com/api/docs/futures-api/trading/get-assignment-program-current
+      responses:
+        '200':
+          description: See Kraken docs.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  /derivatives/api/v3/assignmentprogram/history:
+    get:
+      tags:
+        - Assignment Program
+      operationId: getAssignmentProgramHistory
+      summary: List assignment preferences history
+      description: This endpoint returns information on assignment program preferences change history
+      x-kraken-source: https://docs.kraken.com/api/docs/futures-api/trading/get-assignment-program-history
+      responses:
+        '200':
+          description: See Kraken docs.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  /derivatives/api/v3/feeschedules:
+    get:
+      tags:
+        - Fee Schedules
+      operationId: getFeeSchedulesV3
+      summary: Get fee schedules
+      description: This endpoint lists all fee schedules.
+      x-kraken-source: https://docs.kraken.com/api/docs/futures-api/trading/get-fee-schedules-v-3
+      responses:
+        '200':
+          description: See Kraken docs.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  /derivatives/api/v3/fills:
+    get:
+      tags:
+        - Historical Data
+      operationId: getFills
+      summary: Get your fills
+      description: This endpoint returns information on your filled orders for all futures contracts.
+      x-kraken-source: https://docs.kraken.com/api/docs/futures-api/trading/get-fills
+      responses:
+        '200':
+          description: See Kraken docs.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  /derivatives/api/v3/history:
+    get:
+      tags:
+        - Market Data
+      operationId: getHistory
+      summary: Get trade history
+      description: This endpoint returns the most recent 100 trades prior to the specified lastTime value up to past 7 days or recent trading engine restart (whichever is sooner). If no lastTime specified,
+        it will return 100 most recent trades.
+      x-kraken-source: https://docs.kraken.com/api/docs/futures-api/trading/get-history
+      responses:
+        '200':
+          description: See Kraken docs.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  /derivatives/api/v3/instruments:
+    get:
+      tags:
+        - Instrument Details
+      operationId: getInstruments
+      summary: Get instruments
+      description: Returns specifications for all currently listed markets and indices.
+      x-kraken-source: https://docs.kraken.com/api/docs/futures-api/trading/get-instruments
+      responses:
+        '200':
+          description: See Kraken docs.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  /derivatives/api/v3/leveragepreferences:
+    get:
+      tags:
+        - Multi-Collateral
+      operationId: getLeverageSetting
+      summary: Get leverage settings
+      description: Returns list of configured leverage preferences.
+      x-kraken-source: https://docs.kraken.com/api/docs/futures-api/trading/get-leverage-setting
+      responses:
+        '200':
+          description: See Kraken docs.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+    put:
+      tags:
+        - Multi-Collateral
+      operationId: setLeverageSetting
+      summary: Set leverage settings
+      description: 'Sets a contract''s margin mode, either "isolated" or "cross" margin. When specifying a max leverage, the contract''s margin mode will be isolated. Calling this endpoint can result in
+        the following error codes: 87: Contract does not exist 88: Contract not a multi-collateral futures contract 41: Would cause liquidation'
+      x-kraken-source: https://docs.kraken.com/api/docs/futures-api/trading/set-leverage-setting
+      responses:
+        '200':
+          description: See Kraken docs.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+  /derivatives/api/v3/notifications:
+    get:
+      tags:
+        - General
+      operationId: getNotifications
+      summary: Get notifications
+      description: This endpoint provides the platform's notifications.
+      x-kraken-source: https://docs.kraken.com/api/docs/futures-api/trading/get-notifications
+      responses:
+        '200':
+          description: See Kraken docs.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  /derivatives/api/v3/openorders:
+    get:
+      tags:
+        - Order Management
+      operationId: getOpenOrders
+      summary: Get open orders
+      description: This endpoint returns information on all open orders for all Futures contracts.
+      x-kraken-source: https://docs.kraken.com/api/docs/futures-api/trading/get-open-orders
+      responses:
+        '200':
+          description: See Kraken docs.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  /derivatives/api/v3/openpositions:
+    get:
+      tags:
+        - Account Information
+      operationId: getOpenPositions
+      summary: Get open positions
+      description: This endpoint returns the size and average entry price of all open positions in Futures contracts. This includes Futures contracts that have matured but have not yet been settled.
+      x-kraken-source: https://docs.kraken.com/api/docs/futures-api/trading/get-open-positions
+      responses:
+        '200':
+          description: See Kraken docs.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  /derivatives/api/v3/rfqs/{rfqUid}:
+    get:
+      tags:
+        - RFQs
+      operationId: getOpenRfq
+      summary: Retrieve a single open RFQ
+      description: 'Retrieve a specific open RFQ by its unique identifier Note: This is currently available exclusively in the Kraken Futures DEMO environment.'
+      x-kraken-source: https://docs.kraken.com/api/docs/futures-api/trading/get-open-rfq
+      responses:
+        '200':
+          description: See Kraken docs.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '404':
+          description: See Kraken docs.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+      parameters:
+        - name: rfqUid
+          in: path
+          required: true
+          schema:
+            type: string
+  /derivatives/api/v3/rfqs/open-offers:
+    get:
+      tags:
+        - RFQs
+      operationId: getOpenRfqOffers
+      summary: List open offers on open RFQs
+      description: 'Retrieve all open offers for the account on currently open RFQs Note: This is currently available exclusively in the Kraken Futures DEMO environment.'
+      x-kraken-source: https://docs.kraken.com/api/docs/futures-api/trading/get-open-rfq-offers
+      responses:
+        '200':
+          description: See Kraken docs.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '404':
+          description: See Kraken docs.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  /derivatives/api/v3/rfqs:
+    get:
+      tags:
+        - RFQs
+      operationId: getOpenRfqs
+      summary: List all open RFQs
+      description: 'Retrieve all currently open RFQs Note: This is currently available exclusively in the Kraken Futures DEMO environment.'
+      x-kraken-source: https://docs.kraken.com/api/docs/futures-api/trading/get-open-rfqs
+      responses:
+        '200':
+          description: See Kraken docs.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '404':
+          description: See Kraken docs.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  /derivatives/api/v3/orders/status:
+    post:
+      tags:
+        - Order Management
+      operationId: getOrderStatus
+      summary: Get Specific Orders' Status
+      description: Returns information on specified orders which are open or were filled/cancelled in the last 5 seconds.
+      x-kraken-source: https://docs.kraken.com/api/docs/futures-api/trading/get-order-status
+      responses:
+        '200':
+          description: See Kraken docs.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+  /derivatives/api/v3/orderbook:
+    get:
+      tags:
+        - Market Data
+      operationId: getOrderbook
+      summary: Get orderbook
+      description: This endpoint returns the entire non-cumulative order book of currently listed Futures contracts.
+      x-kraken-source: https://docs.kraken.com/api/docs/futures-api/trading/get-orderbook
+      responses:
+        '200':
+          description: See Kraken docs.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  /derivatives/api/v3/pnlpreferences:
+    get:
+      tags:
+        - Multi-Collateral
+      operationId: getPnlCurrencyPreference
+      summary: Get PNL currency preferences
+      description: The PNL currency preference is used to determine which currency to pay out when realizing PNL gains.
+      x-kraken-source: https://docs.kraken.com/api/docs/futures-api/trading/get-pnl-currency-preference
+      responses:
+        '200':
+          description: See Kraken docs.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+    put:
+      tags:
+        - Multi-Collateral
+      operationId: setPnlCurrencyPreference
+      summary: Set PNL currency preference
+      description: 'The PNL currency preference is used to determine which currency to pay out when realizing PNL gains. Calling this API can result in the following error codes: 87: Contract does not exist
+        88: Contract not a multi-collateral futures contract 89: Currency does not exist 90: Currency is not enabled for multi-collateral futures 41: Would cause liquidation'
+      x-kraken-source: https://docs.kraken.com/api/docs/futures-api/trading/set-pnl-currency-preference
+      responses:
+        '200':
+          description: See Kraken docs.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+  /derivatives/api/v3/portfolio-margining/parameters:
+    get:
+      tags:
+        - Account Information
+      operationId: getPortfolioMarginingParameters
+      summary: Get portfolio margin parameters
+      description: 'Retrieve current portfolio margin calculation parameters. Also includes user specific limits related to options trading. Note: This is currently available exclusively in the Kraken Futures
+        DEMO environment.'
+      x-kraken-source: https://docs.kraken.com/api/docs/futures-api/trading/get-portfolio-margining-parameters
+      responses:
+        '200':
+          description: See Kraken docs.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  /derivatives/api/v3/self-trade-strategy:
+    get:
+      tags:
+        - Trading Settings
+      operationId: getSelfTradeStrategy
+      summary: Get self trade strategy
+      description: Returns account-wide self-trade matching strategy.
+      x-kraken-source: https://docs.kraken.com/api/docs/futures-api/trading/get-self-trade-strategy
+      responses:
+        '200':
+          description: See Kraken docs.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+    put:
+      tags:
+        - Trading Settings
+      operationId: setSelfTradeStrategy
+      summary: Update self trade strategy
+      description: Updates account-wide self-trade matching behavior to given strategy.
+      x-kraken-source: https://docs.kraken.com/api/docs/futures-api/trading/set-self-trade-strategy
+      responses:
+        '200':
+          description: See Kraken docs.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+  /derivatives/api/v3/subaccount/{subaccountUid}/trading-enabled:
+    get:
+      tags:
+        - Subaccounts
+      operationId: getSubaccountTradingCapability
+      summary: Check subaccount trading status
+      description: Returns trading capability info for given subaccount.
+      x-kraken-source: https://docs.kraken.com/api/docs/futures-api/trading/get-subaccount-trading-capability
+      responses:
+        '200':
+          description: See Kraken docs.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '404':
+          description: See Kraken docs.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+      parameters:
+        - name: subaccountUid
+          in: path
+          required: true
+          schema:
+            type: string
+    put:
+      tags:
+        - Subaccounts
+      operationId: updateSubaccountTradingCapability
+      summary: Update subaccount trading status
+      description: Updates trading capabilities for given subaccount.
+      x-kraken-source: https://docs.kraken.com/api/docs/futures-api/trading/update-subaccount-trading-capability
+      responses:
+        '200':
+          description: See Kraken docs.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '404':
+          description: See Kraken docs.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+      parameters:
+        - name: subaccountUid
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+  /derivatives/api/v3/tickers/{symbol}:
+    get:
+      tags:
+        - Market Data
+      operationId: getTicker
+      summary: Get ticker by symbol
+      description: Get market data for contract or index by symbol
+      x-kraken-source: https://docs.kraken.com/api/docs/futures-api/trading/get-ticker
+      responses:
+        '200':
+          description: See Kraken docs.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '404':
+          description: See Kraken docs.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+      parameters:
+        - name: symbol
+          in: path
+          required: true
+          schema:
+            type: string
+  /derivatives/api/v3/tickers:
+    get:
+      tags:
+        - Market Data
+      operationId: getTickers
+      summary: Get tickers
+      description: This endpoint returns current market data for all currently listed Futures contracts and indices.
+      x-kraken-source: https://docs.kraken.com/api/docs/futures-api/trading/get-tickers
+      responses:
+        '200':
+          description: See Kraken docs.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  /derivatives/api/v3/trading/instruments:
+    get:
+      tags:
+        - Instrument Details
+      operationId: getTradingInstruments
+      summary: Get trading instruments
+      description: Returns specifications for all currently accessible markets and indices.
+      x-kraken-source: https://docs.kraken.com/api/docs/futures-api/trading/get-trading-instruments
+      responses:
+        '200':
+          description: See Kraken docs.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  /derivatives/api/v3/unwindqueue:
+    get:
+      tags:
+        - Account Information
+      operationId: getUnwindQueue
+      summary: Get position percentile of unwind queue
+      description: This endpoint returns the percentile of the open position in case of unwinding.
+      x-kraken-source: https://docs.kraken.com/api/docs/futures-api/trading/get-unwind-queue
+      responses:
+        '200':
+          description: See Kraken docs.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  /derivatives/api/v3/feeschedules/volumes:
+    get:
+      tags:
+        - Fee Schedules
+      operationId: getUserFeeScheduleVolumesV3
+      summary: Get fee schedule volumes
+      description: Returns your fee schedule volumes for each fee schedule.
+      x-kraken-source: https://docs.kraken.com/api/docs/futures-api/trading/get-user-fee-schedule-volumes-v-3
+      responses:
+        '200':
+          description: See Kraken docs.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  /derivatives/api/v3/historical-funding-rates:
+    get:
+      tags:
+        - Trading
+      operationId: historicalFundingRates
+      summary: Historical funding rates
+      description: Returns list of historical funding rates for given market.
+      x-kraken-source: https://docs.kraken.com/api/docs/futures-api/trading/historical-funding-rates
+      responses:
+        '200':
+          description: See Kraken docs.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '400':
+          description: See Kraken docs.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  /derivatives/api/v3/instruments/{symbol}/status:
+    get:
+      tags:
+        - Instrument Details
+      operationId: instrumentStatus
+      summary: Get instrument status
+      description: Returns price dislocation and volatility details for given market.
+      x-kraken-source: https://docs.kraken.com/api/docs/futures-api/trading/instrument-status
+      responses:
+        '200':
+          description: See Kraken docs.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+      parameters:
+        - name: symbol
+          in: path
+          required: true
+          schema:
+            type: string
+  /derivatives/api/v3/instruments/status:
+    get:
+      tags:
+        - Instrument Details
+      operationId: instrumentsStatus
+      summary: Get instrument status list
+      description: Returns price dislocation and volatility details for all markets.
+      x-kraken-source: https://docs.kraken.com/api/docs/futures-api/trading/instruments-status
+      responses:
+        '200':
+          description: See Kraken docs.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  /derivatives/api/v3/subaccounts:
+    get:
+      tags:
+        - Subaccounts
+      operationId: listSubaccounts
+      summary: Get subaccounts
+      description: Return information about subaccounts, including balances and UIDs.
+      x-kraken-source: https://docs.kraken.com/api/docs/futures-api/trading/list-subaccounts
+      responses:
+        '200':
+          description: See Kraken docs.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  /derivatives/api/v3/rfqs/place-offer/{rfqUid}:
+    post:
+      tags:
+        - RFQs
+      operationId: placeRfqOffer
+      summary: Place new offer on an open RFQ
+      description: 'Place a new offer on the specified open RFQ. At least one of bid or ask must be provided. Note: This is currently available exclusively in the Kraken Futures DEMO environment.'
+      x-kraken-source: https://docs.kraken.com/api/docs/futures-api/trading/place-rfq-offer
+      responses:
+        '200':
+          description: See Kraken docs.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '404':
+          description: See Kraken docs.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+      parameters:
+        - name: rfqUid
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+  /derivatives/api/v3/batchorder:
+    post:
+      tags:
+        - Order Management
+      operationId: sendBatchOrder
+      summary: Batch order management
+      description: This endpoint allows sending limit or stop order(s) and/or cancelling open order(s) and/or editing open order(s) for a currently listed Futures contract in batch. When editing an order,
+        if the trailingStopMaxDeviation and trailingStopDeviationUnit parameters are sent unchanged, the system will recalculate a new stop price upon successful order modification.
+      x-kraken-source: https://docs.kraken.com/api/docs/futures-api/trading/send-batch-order
+      responses:
+        '200':
+          description: See Kraken docs.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+  /derivatives/api/v3/sendorder:
+    post:
+      tags:
+        - Order Management
+      operationId: sendOrder
+      summary: Send order
+      description: This endpoint allows sending a limit, stop, take profit or immediate-or-cancel order for a currently listed Futures contract.
+      x-kraken-source: https://docs.kraken.com/api/docs/futures-api/trading/send-order
+      responses:
+        '200':
+          description: See Kraken docs.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+  /derivatives/api/v3/portfolio-margining/simulate:
+    post:
+      tags:
+        - Account Information
+      operationId: simulatePortfolio
+      summary: Calculate portfolio margin, pnl and greeks
+      description: 'For a given portfolio of balances and positions (futures and options), calculate the margin requirements, pnl and option greeks. Note: This is currently available exclusively in the
+        Kraken Futures DEMO environment.'
+      x-kraken-source: https://docs.kraken.com/api/docs/futures-api/trading/simulate-portfolio
+      responses:
+        '200':
+          description: See Kraken docs.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+  /derivatives/api/v3/transfer/subaccount:
+    post:
+      tags:
+        - Transfers
+      operationId: subAccountTransfer
+      summary: Initiate sub account transfer
+      description: This endpoint allows you to transfer funds between the current account and a sub account, between two margin accounts with the same collateral currency, or between a margin account and
+        your cash account.
+      x-kraken-source: https://docs.kraken.com/api/docs/futures-api/trading/sub-account-transfer
+      responses:
+        '200':
+          description: See Kraken docs.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+  /derivatives/api/v3/transfer:
+    post:
+      tags:
+        - Transfers
+      operationId: transfer
+      summary: Initiate wallet transfer
+      description: This endpoint allows you to transfer funds between two margin accounts with the same collateral currency, or between a margin account and your cash account.
+      x-kraken-source: https://docs.kraken.com/api/docs/futures-api/trading/transfer
+      responses:
+        '200':
+          description: See Kraken docs.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+  /derivatives/api/v3/withdrawal:
+    post:
+      tags:
+        - Transfers
+      operationId: withdrawal
+      summary: Initiate withdrawal to Spot wallet
+      description: This endpoint allows you to request to withdraw digital assets to your Kraken Spot wallet. Wallet names can be found in the 'accounts' structure in the Get Wallets /accounts response.
+      x-kraken-source: https://docs.kraken.com/api/docs/futures-api/trading/withdrawal
+      responses:
+        '200':
+          description: See Kraken docs.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+components:
+  securitySchemes:
+    apiKeyAuth:
+      type: apiKey
+      in: header
+      name: API-Key
+    apiSignAuth:
+      type: apiKey
+      in: header
+      name: API-Sign
+x-trikeshed-context:
+  client:
+    - name: default
+      key: borg.trikeshed.test.DefaultKey
+      element: borg.trikeshed.test.DefaultElement
+      open: borg.trikeshed.test.openDefaultElement

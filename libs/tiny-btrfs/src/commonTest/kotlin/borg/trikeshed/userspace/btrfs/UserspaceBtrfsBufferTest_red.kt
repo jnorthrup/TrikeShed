@@ -1,14 +1,8 @@
 package borg.trikeshed.userspace.btrfs
 
 import borg.trikeshed.collections._a
-import borg.trikeshed.collections.s_
 import borg.trikeshed.context.ElementState
-import borg.trikeshed.lib.get
-import borg.trikeshed.lib.Join
-import borg.trikeshed.lib.j
-import borg.trikeshed.lib.Series
-import borg.trikeshed.lib.size
-import borg.trikeshed.lib.view
+import borg.trikeshed.lib.*
 import borg.trikeshed.tinybtrfs.toNodeId
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -60,10 +54,10 @@ class UserspaceBtrfsBufferTest_red {
         val buf = UserspaceBtrfsBuffer(chunkSize = 4096)
         buf.open()
 
-        val key = BtrfsKey(1uL, 1u, 0uL)
+        val key: BtrfsKeyAtom = 1uL j (1u j 0uL)
         val data = byteArrayOf(0xDE.toByte(), 0xAD.toByte(), 0xBE.toByte(), 0xEF.toByte())
-        val items: Series<Join<BtrfsKey, ByteArray>> = 1 j { key j data }
-        val leaf: Series<Join<BtrfsKey, ByteArray>> = items
+        val items: Series<Join<BtrfsKeyAtom, ByteArray>> = 1 j { key j data }
+        val leaf: Series<Join<BtrfsKeyAtom, ByteArray>> = items
 
         val nodeId = buf.allocateNode()
         buf.writeLeaf(nodeId, leaf)
@@ -81,10 +75,10 @@ class UserspaceBtrfsBufferTest_red {
         val buf = UserspaceBtrfsBuffer(chunkSize = 4096)
         buf.open()
 
-        val items: Series<Join<BtrfsKey, ByteArray>> = 4 j { i:Int ->
-            BtrfsKey(i.inc().toULong(), 1u, 0uL) j _a[(i.inc().toByte())]
+        val items: Series<Join<BtrfsKeyAtom, ByteArray>> = 4 j { i:Int ->
+            (i.inc().toULong() j (1u j 0uL)) j _a[(i.inc().toByte())]
         }
-        val leaf: Series<Join<BtrfsKey, ByteArray>> = items
+        val leaf: Series<Join<BtrfsKeyAtom, ByteArray>> = items
         val nodeId = buf.allocateNode()
         buf.writeLeaf(nodeId, leaf)
 

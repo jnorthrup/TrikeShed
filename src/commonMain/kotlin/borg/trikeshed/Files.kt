@@ -1,8 +1,7 @@
 package borg.trikeshed
 
 import borg.trikeshed.lib.Join
-import borg.trikeshed.lib.Series
-
+import borg.trikeshed.lib.*
 /** not unlike nio.Files */
 expect object Files {
     fun readAllLines(filename: String): List<String>

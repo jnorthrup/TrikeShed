@@ -9,7 +9,7 @@ package borg.trikeshed.couch.finance
 
 import borg.trikeshed.collections.s_
 import borg.trikeshed.cursor.Cursor
-import borg.trikeshed.miniduck.DocRowVec
+import borg.trikeshed.miniduck.KeyedRowVec
 import borg.trikeshed.cursor.getValue
 import borg.trikeshed.miniduck.toRowVec
 import borg.trikeshed.cursor.at
@@ -24,7 +24,7 @@ import borg.trikeshed.lib.size
  */
 fun DoubleArray.toPriceCursor(closeColumn: String = "close"): Cursor =
     size j { index ->
-        DocRowVec(
+        KeyedRowVec(
             keys = s_[closeColumn],
             cells = s_[this[index] as Any?],
         ).toRowVec()

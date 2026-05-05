@@ -34,8 +34,8 @@ class SortedSeries<T>(
     override fun add(index: Int, item: T) { add(item) }
 
     override fun set(index: Int, item: T) {
-        val newSize = data.size; val old = data
-        data = newSize j { i -> when { i < index -> old[i]; i > index -> old[i]; else -> old[if (i + 1 < newSize) i + 1 else i] } }
+        val n = data.size; val old = data
+        data = (n - 1) j { i -> if (i < index) old[i] else old[i + 1] }
         add(item)
     }
 

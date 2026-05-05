@@ -47,16 +47,18 @@ class MergeMutableSeries<T>(
 
     override fun set(index: Int, item: T) {
         // Remove old from sorted, add new to pending
-        sorted = (sorted.size - 1) j { i ->
-            if (i < index) sorted[i] else sorted[i + 1]
+        val oldSorted = sorted
+        sorted = (oldSorted.size - 1) j { i ->
+            if (i < index) oldSorted[i] else oldSorted[i + 1]
         }
         pending.add(item)
     }
 
     override fun removeAt(index: Int): T {
         val item = sorted[index]
-        sorted = (sorted.size - 1) j { i ->
-            if (i < index) sorted[i] else sorted[i + 1]
+        val oldSorted = sorted
+        sorted = (oldSorted.size - 1) j { i ->
+            if (i < index) oldSorted[i] else oldSorted[i + 1]
         }
         totalSize--
         return item
@@ -102,22 +104,25 @@ class MergeMutableSeries<T>(
     fun compact() {
         if (pending.size == 0) return
 
-        // Sort pending in-place via a simple insertion sort (for small batches)
-        val sortedPending = sortPending()
-
-        // Two-pointer merge
-        val mergedSize = sorted.size + sortedPending.size
-        var si = 0
-        var pi = 0
-        sorted = mergedSize j { _ ->
-            when {
-                si >= sorted.size -> sortedPending[pi++]
-                pi >= sortedPending.size -> sorted[si++]
-                comparator(sorted[si], sortedPending[pi]) <= 0 -> sorted[si++]
+        val sortedPending = sortPending()  // pure array-backed series
+        val sSize = sorted.size
+        val pSize = sortedPending.size
+        val n = sSize + pSize
+        // Eagerly materialize to avoid double-access of mutable-counter lambda
+        val arr = arrayOfNulls<Any?>(n)
+        var si = 0; var pi = 0
+        @Suppress("UNCHECKED_CAST")
+        for (di in 0 until n) {
+            arr[di] = when {
+                si >= sSize -> sortedPending[pi++]
+                pi >= pSize -> sorted[si++]
+                comparator(sorted[si] as T, sortedPending[pi]) <= 0 -> sorted[si++]
                 else -> sortedPending[pi++]
             }
         }
-        totalSize = sorted.size
+        @Suppress("UNCHECKED_CAST")
+        sorted = n j { i -> arr[i] as T }
+        totalSize = n
         pending.clear()
     }
 

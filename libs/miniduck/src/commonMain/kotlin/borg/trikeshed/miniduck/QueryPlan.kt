@@ -92,8 +92,8 @@ infix fun QueryPlan.offset(n: Int): LimitPlan =
 fun execute(plan: QueryPlan, base: MiniCursor): MiniCursor = when (plan) {
     is ScanPlan -> base
     is ViewQueryPlan -> base
-    is FilterPlan -> base.where(plan.predicate)
-    is ProjectPlan -> base.project(*plan.columns.toTypedArray())
-    is OrderPlan -> base.orderBy(*plan.specs.toTypedArray())
-    is LimitPlan -> base.drop(plan.offset).take(plan.limit)
+    is FilterPlan -> execute(plan.upstream, base).where(plan.predicate)
+    is ProjectPlan -> execute(plan.upstream, base).project(*plan.columns.toTypedArray())
+    is OrderPlan -> execute(plan.upstream, base).orderBy(*plan.specs.toTypedArray())
+    is LimitPlan -> execute(plan.upstream, base).drop(plan.offset).take(plan.limit)
 }

@@ -46,8 +46,8 @@ class BlockWalTest {
         // read [2, 4) → sequences 2, 3
         val entries = wal.readRange(2L, 4L)
         assertEquals(2, entries.size)
-        assertEquals(2L, entries[0].seq)
-        assertEquals(3L, entries[1].seq)
+        assertEquals(2L, entries[0].a)
+        assertEquals(3L, entries[1].a)
     }
 
     @Test
@@ -65,8 +65,8 @@ class BlockWalTest {
 
         val from2 = wal.readFrom(2L)
         assertEquals(2, from2.size)
-        assertEquals(2L, from2[0].seq)
-        assertEquals(3L, from2[1].seq)
+        assertEquals(2L, from2[0].a)
+        assertEquals(3L, from2[1].a)
     }
 
     // ── Replay to reconstruct BlockStore ─────────────────────────────────
@@ -116,8 +116,8 @@ class BlockWalTest {
 
         val remaining = wal.readFrom(1L)
         assertEquals(2, remaining.size)
-        assertEquals(3L, remaining[0].seq)
-        assertEquals(4L, remaining[1].seq)
+        assertEquals(3L, remaining[0].a)
+        assertEquals(4L, remaining[1].a)
     }
 
     @Test

@@ -33,7 +33,8 @@ class DequeSeries<T> : MutableSeries<T> {
     }
 
     fun addFirst(item: T) {
-        front = s_[item] + front
+        // Append to front so deque[0] = front[size-1] (most recently prepended)
+        front = front + s_[item]
     }
 
     fun addLast(item: T) {
@@ -42,20 +43,23 @@ class DequeSeries<T> : MutableSeries<T> {
 
     fun removeFirst(): T {
         if (front.size > 0) {
-            val item = front[0]
-            front = if (front.size == 1) {
+            // deque[0] = front[size-1] (most recently addFirst'd is at end of front array)
+            val item = front[front.size - 1]
+            val oldFront = front
+            front = if (oldFront.size == 1) {
                 0 j { throw IndexOutOfBoundsException("empty Deque front") }
             } else {
-                (front.size - 1) j { i -> front[i + 1] }
+                (oldFront.size - 1) j { i -> oldFront[i] }  // drop last element
             }
             return item
         }
         // Front empty, take from back
         val item = back[0]
-        back = if (back.size == 1) {
+        val oldBack = back
+        back = if (oldBack.size == 1) {
             0 j { throw IndexOutOfBoundsException("empty Deque back") }
         } else {
-            (back.size - 1) j { i -> back[i + 1] }
+            (oldBack.size - 1) j { i -> oldBack[i + 1] }
         }
         return item
     }
@@ -63,19 +67,21 @@ class DequeSeries<T> : MutableSeries<T> {
     fun removeLast(): T {
         if (back.size > 0) {
             val item = back[back.size - 1]
-            back = if (back.size == 1) {
+            val oldBack = back
+            back = if (oldBack.size == 1) {
                 0 j { throw IndexOutOfBoundsException("empty Deque back") }
             } else {
-                (back.size - 1) j { i -> back[i] }
+                (oldBack.size - 1) j { i -> oldBack[i] }
             }
             return item
         }
-        // Back empty, take from front
-        val item = front[front.size - 1]
-        front = if (front.size == 1) {
+        // Back empty, take from front (last deque element = front[0])
+        val item = front[0]
+        val oldFront = front
+        front = if (oldFront.size == 1) {
             0 j { throw IndexOutOfBoundsException("empty Deque front") }
         } else {
-            (front.size - 1) j { i -> front[i] }
+            (oldFront.size - 1) j { i -> oldFront[i + 1] }  // drop first element
         }
         return item
     }
@@ -91,20 +97,22 @@ class DequeSeries<T> : MutableSeries<T> {
         if (index < front.size) {
             // Insert into front
             val revIdx = front.size - 1 - index
-            front = (front.size + 1) j { i ->
+            val oldFront = front
+            front = (oldFront.size + 1) j { i ->
                 when {
-                    i <= revIdx -> front[i]
+                    i <= revIdx -> oldFront[i]
                     i == revIdx + 1 -> item
-                    else -> front[i - 1]
+                    else -> oldFront[i - 1]
                 }
             }
         } else {
             val backIdx = index - front.size
-            back = (back.size + 1) j { i ->
+            val oldBack = back
+            back = (oldBack.size + 1) j { i ->
                 when {
-                    i < backIdx -> back[i]
+                    i < backIdx -> oldBack[i]
                     i == backIdx -> item
-                    else -> back[i - 1]
+                    else -> oldBack[i - 1]
                 }
             }
         }
@@ -113,13 +121,15 @@ class DequeSeries<T> : MutableSeries<T> {
     override fun set(index: Int, item: T) {
         if (index < front.size) {
             val revIdx = front.size - 1 - index
-            front = front.size j { i ->
-                if (i == revIdx) item else front[i]
+            val oldFront = front
+            front = oldFront.size j { i ->
+                if (i == revIdx) item else oldFront[i]
             }
         } else {
             val backIdx = index - front.size
-            back = back.size j { i ->
-                if (i == backIdx) item else back[i]
+            val oldBack = back
+            back = oldBack.size j { i ->
+                if (i == backIdx) item else oldBack[i]
             }
         }
     }
@@ -128,13 +138,15 @@ class DequeSeries<T> : MutableSeries<T> {
         val item = b(index)
         if (index < front.size) {
             val revIdx = front.size - 1 - index
-            front = (front.size - 1) j { i ->
-                if (i < revIdx) front[i] else front[i + 1]
+            val oldFront = front
+            front = (oldFront.size - 1) j { i ->
+                if (i < revIdx) oldFront[i] else oldFront[i + 1]
             }
         } else {
             val backIdx = index - front.size
-            back = (back.size - 1) j { i ->
-                if (i < backIdx) back[i] else back[i + 1]
+            val oldBack = back
+            back = (oldBack.size - 1) j { i ->
+                if (i < backIdx) oldBack[i] else oldBack[i + 1]
             }
         }
         return item

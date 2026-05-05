@@ -1,0 +1,217 @@
+openapi: 3.1.0
+info:
+  title: CoinMarketCap Pro API
+  version: v1
+servers:
+  - url: https://pro-api.coinmarketcap.com
+    description: CMC Pro API
+security:
+  - ApiKeyAuth: []
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-CMC_PRO_API_KEY
+  parameters:
+    startParam:
+      name: start
+      in: query
+      schema:
+        type: integer
+    limitParam:
+      name: limit
+      in: query
+      schema:
+        type: string
+    sortParam:
+      name: sort
+      in: query
+      schema:
+        type: string
+    sortDirParam:
+      name: sort_dir
+      in: query
+      schema:
+        type: string
+    convertParam:
+      name: convert
+      in: query
+      schema:
+        type: string
+    idParam:
+      name: id
+      in: query
+      schema:
+        type: string
+    symbolParam:
+      name: symbol
+      in: query
+      schema:
+        type: string
+    slugParam:
+      name: slug
+      in: query
+      schema:
+        type: string
+    intervalParam:
+      name: interval
+      in: query
+      schema:
+        type: string
+    timeStartParam:
+      name: time_start
+      in: query
+      schema:
+        type: string
+    timeEndParam:
+      name: time_end
+      in: query
+      schema:
+        type: string
+    countParam:
+      name: count
+      in: query
+      schema:
+        type: integer
+    amountParam:
+      name: amount
+      in: query
+      required: true
+      schema:
+        type: string
+paths:
+  /v1/cryptocurrency/map:
+    get:
+      operationId: cryptocurrencyMap
+      parameters:
+        - $ref: '#/components/parameters/symbolParam'
+        - $ref: '#/components/parameters/slugParam'
+        - $ref: '#/components/parameters/startParam'
+        - $ref: '#/components/parameters/limitParam'
+      responses:
+        200:
+          description: Map of cryptocurrencies
+  /v1/cryptocurrency/listings/latest:
+    get:
+      operationId: cryptocurrencyListingsLatest
+      parameters:
+        - $ref: '#/components/parameters/startParam'
+        - $ref: '#/components/parameters/limitParam'
+        - $ref: '#/components/parameters/sortParam'
+        - $ref: '#/components/parameters/sortDirParam'
+        - $ref: '#/components/parameters/convertParam'
+      responses:
+        200:
+          description: Latest listings
+  /v2/cryptocurrency/quotes/latest:
+    get:
+      operationId: cryptocurrencyQuotesLatestV2
+      parameters:
+        - $ref: '#/components/parameters/idParam'
+        - $ref: '#/components/parameters/symbolParam'
+        - $ref: '#/components/parameters/slugParam'
+        - $ref: '#/components/parameters/convertParam'
+      responses:
+        200:
+          description: Latest quotes
+  /v3/cryptocurrency/quotes/historical:
+    get:
+      operationId: cryptocurrencyQuotesHistoricalV3
+      parameters:
+        - $ref: '#/components/parameters/idParam'
+        - $ref: '#/components/parameters/symbolParam'
+        - $ref: '#/components/parameters/timeStartParam'
+        - $ref: '#/components/parameters/timeEndParam'
+        - $ref: '#/components/parameters/countParam'
+        - $ref: '#/components/parameters/intervalParam'
+        - $ref: '#/components/parameters/convertParam'
+      responses:
+        200:
+          description: Historical quotes
+  /v2/cryptocurrency/ohlcv/historical:
+    get:
+      operationId: cryptocurrencyOhlcvHistoricalV2
+      parameters:
+        - $ref: '#/components/parameters/idParam'
+        - $ref: '#/components/parameters/symbolParam'
+        - $ref: '#/components/parameters/timeStartParam'
+        - $ref: '#/components/parameters/timeEndParam'
+        - $ref: '#/components/parameters/countParam'
+        - $ref: '#/components/parameters/intervalParam'
+        - $ref: '#/components/parameters/convertParam'
+      responses:
+        200:
+          description: Historical OHLCV
+  /v2/cryptocurrency/info:
+    get:
+      operationId: cryptocurrencyInfoV2
+      parameters:
+        - $ref: '#/components/parameters/idParam'
+        - $ref: '#/components/parameters/symbolParam'
+        - $ref: '#/components/parameters/slugParam'
+      responses:
+        200:
+          description: Cryptocurrency metadata
+  /v1/exchange/map:
+    get:
+      operationId: exchangeMap
+      parameters:
+        - $ref: '#/components/parameters/slugParam'
+        - $ref: '#/components/parameters/startParam'
+        - $ref: '#/components/parameters/limitParam'
+      responses:
+        200:
+          description: Map of exchanges
+  /v1/exchange/listings/latest:
+    get:
+      operationId: exchangeListingsLatest
+      parameters:
+        - $ref: '#/components/parameters/startParam'
+        - $ref: '#/components/parameters/limitParam'
+        - $ref: '#/components/parameters/sortParam'
+        - $ref: '#/components/parameters/sortDirParam'
+        - $ref: '#/components/parameters/convertParam'
+      responses:
+        200:
+          description: Latest exchange listings
+  /v1/global-metrics/quotes/latest:
+    get:
+      operationId: globalMetricsQuotesLatest
+      parameters:
+        - $ref: '#/components/parameters/convertParam'
+      responses:
+        200:
+          description: Global metrics
+  /v3/fear-and-greed/latest:
+    get:
+      operationId: fearAndGreedLatest
+      parameters: []
+      responses:
+        200:
+          description: Fear and Greed index
+  /v1/k-line/candles:
+    get:
+      operationId: klineCandles
+      parameters:
+        - $ref: '#/components/parameters/symbolParam'
+        - $ref: '#/components/parameters/intervalParam'
+        - $ref: '#/components/parameters/timeStartParam'
+        - $ref: '#/components/parameters/timeEndParam'
+        - $ref: '#/components/parameters/countParam'
+        - $ref: '#/components/parameters/convertParam'
+      responses:
+        200:
+          description: Kline candle data
+  /v2/tools/price-conversion:
+    get:
+      operationId: priceConversionV2
+      parameters:
+        - $ref: '#/components/parameters/amountParam'
+        - $ref: '#/components/parameters/idParam'
+        - $ref: '#/components/parameters/symbolParam'
+        - $ref: '#/components/parameters/timeStartParam'
+        - $ref: '#/components/parameters/convertParam'
+      responses:
+        200:
+          description: Price conversion

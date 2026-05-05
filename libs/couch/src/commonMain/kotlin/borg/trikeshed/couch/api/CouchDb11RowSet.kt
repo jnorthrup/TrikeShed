@@ -5,7 +5,6 @@ import borg.trikeshed.miniduck.*
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.toSeries
 import borg.trikeshed.parse.json.JsonParser
-import borg.trikeshed.miniduck.mutable
 
 /**
  * CouchDB 1.1 view query result row set.
@@ -22,7 +21,7 @@ data class CouchDb11RowSet(
 
             val totalRows = root.int("total_rows")
             val offset = root.int("offset")
-            val block = mutable()
+            val block = BlockRowVec.mutable()
 
             root.list("rows").forEach { rawRow ->
                 val row = rawRow as? Map<String, Any?>
@@ -51,7 +50,7 @@ data class CouchDb11RowSet(
             val entries = map.entries.toList()
             val keys = entries.size j { index: Int -> entries[index].key }
             val cells = entries.size j { index: Int -> entries[index].value }
-            return DocRowVec(keys = keys, cells = cells).toRowVec()
+            return KeyedRowVec(keys, cells).toRowVec()
         }
 
        fun Map<String, Any?>.string(name: String): String =

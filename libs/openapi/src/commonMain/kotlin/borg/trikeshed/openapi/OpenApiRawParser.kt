@@ -158,7 +158,7 @@ data class OpenApiRawDocument(val root: JsonMap) {
         return OpenApiGapAnalysis(tokens = tokens, gaps = gaps)
     }
 
-   fun resolveRef(ref: String): Any? {
+    fun resolveRef(ref: String): Any? {
         if (!ref.startsWith("#/")) return null
         var current: Any? = root
         for (segment in ref.removePrefix("#/").split('/')) {
