@@ -3,7 +3,7 @@ package borg.trikeshed
 /**
  * a horrible hack to enable use() macro in kotlin mpp for our file messes
  */
-interface Usable {
+interface Usable : Closeable {
     /**
      * contract - does no harm if called more than once
      */
@@ -11,7 +11,7 @@ interface Usable {
     /**
      * contract - does no harm if called more than once
      */
-    fun close()
+    override fun close()
 }
 
 /** this is not present in stdlib for kotlin mpp, we extend the functionality to return a value as needed.*/
