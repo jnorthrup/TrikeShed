@@ -4,6 +4,6 @@ package borg.trikeshed.userspace.nio.file.attribute
 
 // Generated from Amazon Corretto JDK 25 java.base NIO public/protected API via javap.
 // Declarations intentionally mirror JDK taxonomy and contain no implementations.
-expect enum class AclEntryFlag {
+public enum class AclEntryFlag {
     FILE_INHERIT, DIRECTORY_INHERIT, NO_PROPAGATE_INHERIT, INHERIT_ONLY
 }

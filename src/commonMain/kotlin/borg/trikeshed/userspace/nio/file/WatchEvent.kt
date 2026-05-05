@@ -4,17 +4,17 @@ package borg.trikeshed.userspace.nio.file
 
 // Generated from Amazon Corretto JDK 25 java.base NIO public/protected API via javap.
 // Declarations intentionally mirror JDK taxonomy and contain no implementations.
-expect interface WatchEvent<T> {
+public interface WatchEvent<T> {
     fun kind(): borg.trikeshed.userspace.nio.file.WatchEvent.Kind<T>
     fun count(): Int
     fun context(): T
 
-    expect interface Kind<T> {
+    public interface Kind<T> {
         fun name(): String
         fun type(): java.lang.Class<T>
     }
 
-    expect interface Modifier {
+    public interface Modifier {
         fun name(): String
     }
 }

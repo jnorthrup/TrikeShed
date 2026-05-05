@@ -4,6 +4,6 @@ package borg.trikeshed.userspace.nio.file.attribute
 
 // Generated from Amazon Corretto JDK 25 java.base NIO public/protected API via javap.
 // Declarations intentionally mirror JDK taxonomy and contain no implementations.
-expect enum class PosixFilePermission {
+public enum class PosixFilePermission {
     OWNER_READ, OWNER_WRITE, OWNER_EXECUTE, GROUP_READ, GROUP_WRITE, GROUP_EXECUTE, OTHERS_READ, OTHERS_WRITE, OTHERS_EXECUTE
 }

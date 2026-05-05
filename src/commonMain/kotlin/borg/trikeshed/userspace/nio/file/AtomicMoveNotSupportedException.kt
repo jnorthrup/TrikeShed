@@ -4,6 +4,6 @@ package borg.trikeshed.userspace.nio.file
 
 // Generated from Amazon Corretto JDK 25 java.base NIO public/protected API via javap.
 // Declarations intentionally mirror JDK taxonomy and contain no implementations.
-expect open class AtomicMoveNotSupportedException : borg.trikeshed.userspace.nio.file.FileSystemException {
+public open class AtomicMoveNotSupportedException : borg.trikeshed.userspace.nio.file.FileSystemException {
     constructor(p0: String, p1: String, p2: String)
 }

@@ -4,6 +4,6 @@ package borg.trikeshed.userspace.nio.file
 
 // Generated from Amazon Corretto JDK 25 java.base NIO public/protected API via javap.
 // Declarations intentionally mirror JDK taxonomy and contain no implementations.
-expect enum class FileVisitResult {
+public enum class FileVisitResult {
     CONTINUE, TERMINATE, SKIP_SUBTREE, SKIP_SIBLINGS
 }

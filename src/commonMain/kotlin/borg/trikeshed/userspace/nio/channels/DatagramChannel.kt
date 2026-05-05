@@ -4,7 +4,7 @@ package borg.trikeshed.userspace.nio.channels
 
 // Generated from Amazon Corretto JDK 25 java.base NIO public/protected API via javap.
 // Declarations intentionally mirror JDK taxonomy and contain no implementations.
-expect abstract class DatagramChannel : borg.trikeshed.userspace.nio.channels.spi.AbstractSelectableChannel, borg.trikeshed.userspace.nio.channels.ByteChannel, borg.trikeshed.userspace.nio.channels.ScatteringByteChannel, borg.trikeshed.userspace.nio.channels.GatheringByteChannel, borg.trikeshed.userspace.nio.channels.MulticastChannel {
+public abstract class DatagramChannel : borg.trikeshed.userspace.nio.channels.spi.AbstractSelectableChannel, borg.trikeshed.userspace.nio.channels.ByteChannel, borg.trikeshed.userspace.nio.channels.ScatteringByteChannel, borg.trikeshed.userspace.nio.channels.GatheringByteChannel, borg.trikeshed.userspace.nio.channels.MulticastChannel {
     protected constructor(p0: borg.trikeshed.userspace.nio.channels.spi.SelectorProvider)
     fun validOps(): Int
     fun bind(p0: java.net.SocketAddress): borg.trikeshed.userspace.nio.channels.DatagramChannel

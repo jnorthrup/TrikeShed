@@ -4,7 +4,7 @@ package borg.trikeshed.userspace.nio.file.spi
 
 // Generated from Amazon Corretto JDK 25 java.base NIO public/protected API via javap.
 // Declarations intentionally mirror JDK taxonomy and contain no implementations.
-expect abstract class FileSystemProvider {
+public abstract class FileSystemProvider {
     protected constructor()
     fun getScheme(): String
     fun newFileSystem(p0: java.net.URI, p1: java.util.Map<String, *>): borg.trikeshed.userspace.nio.file.FileSystem

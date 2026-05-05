@@ -4,7 +4,7 @@ package borg.trikeshed.userspace.nio.channels
 
 // Generated from Amazon Corretto JDK 25 java.base NIO public/protected API via javap.
 // Declarations intentionally mirror JDK taxonomy and contain no implementations.
-expect abstract class SelectionKey {
+public abstract class SelectionKey {
     protected constructor()
     fun channel(): borg.trikeshed.userspace.nio.channels.SelectableChannel
     fun selector(): borg.trikeshed.userspace.nio.channels.Selector

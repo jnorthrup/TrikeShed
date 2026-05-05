@@ -4,7 +4,7 @@ package borg.trikeshed.userspace.nio.channels.spi
 
 // Generated from Amazon Corretto JDK 25 java.base NIO public/protected API via javap.
 // Declarations intentionally mirror JDK taxonomy and contain no implementations.
-expect abstract class SelectorProvider {
+public abstract class SelectorProvider {
     protected constructor()
     fun openDatagramChannel(): borg.trikeshed.userspace.nio.channels.DatagramChannel
     fun openDatagramChannel(p0: java.net.ProtocolFamily): borg.trikeshed.userspace.nio.channels.DatagramChannel

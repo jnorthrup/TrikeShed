@@ -4,7 +4,7 @@ package borg.trikeshed.userspace.nio.file
 
 // Generated from Amazon Corretto JDK 25 java.base NIO public/protected API via javap.
 // Declarations intentionally mirror JDK taxonomy and contain no implementations.
-expect class StandardWatchEventKinds {
+public class StandardWatchEventKinds {
     companion object {
         val OVERFLOW: borg.trikeshed.userspace.nio.file.WatchEvent.Kind<Any>
         val ENTRY_CREATE: borg.trikeshed.userspace.nio.file.WatchEvent.Kind<borg.trikeshed.userspace.nio.file.Path>

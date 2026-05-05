@@ -4,7 +4,7 @@ package borg.trikeshed.userspace.nio.file.attribute
 
 // Generated from Amazon Corretto JDK 25 java.base NIO public/protected API via javap.
 // Declarations intentionally mirror JDK taxonomy and contain no implementations.
-expect abstract class UserPrincipalLookupService {
+public abstract class UserPrincipalLookupService {
     protected constructor()
     fun lookupPrincipalByName(p0: String): borg.trikeshed.userspace.nio.file.attribute.UserPrincipal
     fun lookupPrincipalByGroupName(p0: String): borg.trikeshed.userspace.nio.file.attribute.GroupPrincipal

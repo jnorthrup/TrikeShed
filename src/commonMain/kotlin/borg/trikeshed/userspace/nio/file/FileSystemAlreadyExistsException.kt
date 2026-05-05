@@ -4,7 +4,7 @@ package borg.trikeshed.userspace.nio.file
 
 // Generated from Amazon Corretto JDK 25 java.base NIO public/protected API via javap.
 // Declarations intentionally mirror JDK taxonomy and contain no implementations.
-expect open class FileSystemAlreadyExistsException : RuntimeException {
+public open class FileSystemAlreadyExistsException : RuntimeException {
     constructor()
     constructor(p0: String)
 }

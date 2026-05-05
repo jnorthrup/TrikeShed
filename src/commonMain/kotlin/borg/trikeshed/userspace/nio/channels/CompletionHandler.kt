@@ -4,7 +4,7 @@ package borg.trikeshed.userspace.nio.channels
 
 // Generated from Amazon Corretto JDK 25 java.base NIO public/protected API via javap.
 // Declarations intentionally mirror JDK taxonomy and contain no implementations.
-expect interface CompletionHandler<V, A> {
+public interface CompletionHandler<V, A> {
     fun completed(p0: V, p1: A): Unit
     fun failed(p0: Throwable, p1: A): Unit
 }

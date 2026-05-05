@@ -4,7 +4,7 @@ package borg.trikeshed.userspace.nio.channels
 
 // Generated from Amazon Corretto JDK 25 java.base NIO public/protected API via javap.
 // Declarations intentionally mirror JDK taxonomy and contain no implementations.
-expect abstract class AsynchronousFileChannel {
+public abstract class AsynchronousFileChannel {
     protected constructor()
     fun size(): Long
     fun truncate(p0: Long): borg.trikeshed.userspace.nio.channels.AsynchronousFileChannel

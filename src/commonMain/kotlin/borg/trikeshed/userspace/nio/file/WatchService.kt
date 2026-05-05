@@ -4,7 +4,7 @@ package borg.trikeshed.userspace.nio.file
 
 // Generated from Amazon Corretto JDK 25 java.base NIO public/protected API via javap.
 // Declarations intentionally mirror JDK taxonomy and contain no implementations.
-expect interface WatchService : java.io.Closeable {
+public interface WatchService : java.io.Closeable {
     fun close(): Unit
     fun poll(): borg.trikeshed.userspace.nio.file.WatchKey
     fun poll(p0: Long, p1: java.util.concurrent.TimeUnit): borg.trikeshed.userspace.nio.file.WatchKey

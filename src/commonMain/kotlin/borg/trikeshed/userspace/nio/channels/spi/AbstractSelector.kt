@@ -4,7 +4,7 @@ package borg.trikeshed.userspace.nio.channels.spi
 
 // Generated from Amazon Corretto JDK 25 java.base NIO public/protected API via javap.
 // Declarations intentionally mirror JDK taxonomy and contain no implementations.
-expect abstract class AbstractSelector : borg.trikeshed.userspace.nio.channels.Selector {
+public abstract class AbstractSelector : borg.trikeshed.userspace.nio.channels.Selector {
     protected constructor(p0: borg.trikeshed.userspace.nio.channels.spi.SelectorProvider)
     fun close(): Unit
     protected fun implCloseSelector(): Unit

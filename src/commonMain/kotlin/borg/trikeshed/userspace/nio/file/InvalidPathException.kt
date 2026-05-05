@@ -4,7 +4,7 @@ package borg.trikeshed.userspace.nio.file
 
 // Generated from Amazon Corretto JDK 25 java.base NIO public/protected API via javap.
 // Declarations intentionally mirror JDK taxonomy and contain no implementations.
-expect open class InvalidPathException : IllegalArgumentException {
+public open class InvalidPathException : IllegalArgumentException {
     constructor(p0: String, p1: String, p2: Int)
     constructor(p0: String, p1: String)
     fun getInput(): String

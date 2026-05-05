@@ -4,7 +4,7 @@ package borg.trikeshed.userspace.nio
 
 // Generated from Amazon Corretto JDK 25 java.base NIO public/protected API via javap.
 // Declarations intentionally mirror JDK taxonomy and contain no implementations.
-expect abstract class ShortBuffer : borg.trikeshed.userspace.nio.Buffer, Comparable<borg.trikeshed.userspace.nio.ShortBuffer> {
+public abstract class ShortBuffer : borg.trikeshed.userspace.nio.Buffer, Comparable<borg.trikeshed.userspace.nio.ShortBuffer> {
     fun slice(): borg.trikeshed.userspace.nio.ShortBuffer
     fun slice(p0: Int, p1: Int): borg.trikeshed.userspace.nio.ShortBuffer
     fun duplicate(): borg.trikeshed.userspace.nio.ShortBuffer

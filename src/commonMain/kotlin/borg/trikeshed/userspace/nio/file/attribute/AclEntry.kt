@@ -4,7 +4,7 @@ package borg.trikeshed.userspace.nio.file.attribute
 
 // Generated from Amazon Corretto JDK 25 java.base NIO public/protected API via javap.
 // Declarations intentionally mirror JDK taxonomy and contain no implementations.
-expect class AclEntry {
+public class AclEntry {
     fun type(): borg.trikeshed.userspace.nio.file.attribute.AclEntryType
     fun principal(): borg.trikeshed.userspace.nio.file.attribute.UserPrincipal
     fun permissions(): java.util.Set<borg.trikeshed.userspace.nio.file.attribute.AclEntryPermission>
@@ -17,7 +17,7 @@ expect class AclEntry {
         fun newBuilder(p0: borg.trikeshed.userspace.nio.file.attribute.AclEntry): borg.trikeshed.userspace.nio.file.attribute.AclEntry.Builder
     }
 
-    expect class Builder {
+    public class Builder {
         fun build(): borg.trikeshed.userspace.nio.file.attribute.AclEntry
         fun setType(p0: borg.trikeshed.userspace.nio.file.attribute.AclEntryType): borg.trikeshed.userspace.nio.file.attribute.AclEntry.Builder
         fun setPrincipal(p0: borg.trikeshed.userspace.nio.file.attribute.UserPrincipal): borg.trikeshed.userspace.nio.file.attribute.AclEntry.Builder

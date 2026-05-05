@@ -4,7 +4,7 @@ package borg.trikeshed.userspace.nio.file.spi
 
 // Generated from Amazon Corretto JDK 25 java.base NIO public/protected API via javap.
 // Declarations intentionally mirror JDK taxonomy and contain no implementations.
-expect abstract class FileTypeDetector {
+public abstract class FileTypeDetector {
     protected constructor()
     fun probeContentType(p0: borg.trikeshed.userspace.nio.file.Path): String
 }

@@ -4,7 +4,7 @@ package borg.trikeshed.userspace.nio.channels
 
 // Generated from Amazon Corretto JDK 25 java.base NIO public/protected API via javap.
 // Declarations intentionally mirror JDK taxonomy and contain no implementations.
-expect abstract class AsynchronousServerSocketChannel {
+public abstract class AsynchronousServerSocketChannel {
     protected constructor(p0: borg.trikeshed.userspace.nio.channels.spi.AsynchronousChannelProvider)
     fun provider(): borg.trikeshed.userspace.nio.channels.spi.AsynchronousChannelProvider
     fun bind(p0: java.net.SocketAddress): borg.trikeshed.userspace.nio.channels.AsynchronousServerSocketChannel

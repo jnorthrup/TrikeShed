@@ -4,7 +4,7 @@ package borg.trikeshed.userspace.nio.file
 
 // Generated from Amazon Corretto JDK 25 java.base NIO public/protected API via javap.
 // Declarations intentionally mirror JDK taxonomy and contain no implementations.
-expect interface Path : Comparable<borg.trikeshed.userspace.nio.file.Path>, Iterable<borg.trikeshed.userspace.nio.file.Path>, borg.trikeshed.userspace.nio.file.Watchable {
+public interface Path : Comparable<borg.trikeshed.userspace.nio.file.Path>, Iterable<borg.trikeshed.userspace.nio.file.Path>, borg.trikeshed.userspace.nio.file.Watchable {
     fun getFileSystem(): borg.trikeshed.userspace.nio.file.FileSystem
     fun isAbsolute(): Boolean
     fun getRoot(): borg.trikeshed.userspace.nio.file.Path

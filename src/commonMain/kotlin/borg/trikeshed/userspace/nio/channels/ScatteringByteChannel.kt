@@ -4,7 +4,7 @@ package borg.trikeshed.userspace.nio.channels
 
 // Generated from Amazon Corretto JDK 25 java.base NIO public/protected API via javap.
 // Declarations intentionally mirror JDK taxonomy and contain no implementations.
-expect interface ScatteringByteChannel : borg.trikeshed.userspace.nio.channels.ReadableByteChannel {
+public interface ScatteringByteChannel : borg.trikeshed.userspace.nio.channels.ReadableByteChannel {
     fun read(p0: Array<borg.trikeshed.userspace.nio.ByteBuffer>, p1: Int, p2: Int): Long
     fun read(p0: Array<borg.trikeshed.userspace.nio.ByteBuffer>): Long
 }

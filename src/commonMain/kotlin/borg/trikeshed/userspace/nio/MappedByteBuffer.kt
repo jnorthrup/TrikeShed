@@ -4,7 +4,7 @@ package borg.trikeshed.userspace.nio
 
 // Generated from Amazon Corretto JDK 25 java.base NIO public/protected API via javap.
 // Declarations intentionally mirror JDK taxonomy and contain no implementations.
-expect abstract class MappedByteBuffer : borg.trikeshed.userspace.nio.ByteBuffer {
+public abstract class MappedByteBuffer : borg.trikeshed.userspace.nio.ByteBuffer {
     fun isLoaded(): Boolean
     fun load(): borg.trikeshed.userspace.nio.MappedByteBuffer
     fun force(): borg.trikeshed.userspace.nio.MappedByteBuffer

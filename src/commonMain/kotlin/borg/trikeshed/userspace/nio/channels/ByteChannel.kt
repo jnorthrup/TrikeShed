@@ -4,5 +4,5 @@ package borg.trikeshed.userspace.nio.channels
 
 // Generated from Amazon Corretto JDK 25 java.base NIO public/protected API via javap.
 // Declarations intentionally mirror JDK taxonomy and contain no implementations.
-expect interface ByteChannel : borg.trikeshed.userspace.nio.channels.ReadableByteChannel, borg.trikeshed.userspace.nio.channels.WritableByteChannel {
+public interface ByteChannel : borg.trikeshed.userspace.nio.channels.ReadableByteChannel, borg.trikeshed.userspace.nio.channels.WritableByteChannel {
 }

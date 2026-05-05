@@ -4,7 +4,7 @@ package borg.trikeshed.userspace.nio.charset
 
 // Generated from Amazon Corretto JDK 25 java.base NIO public/protected API via javap.
 // Declarations intentionally mirror JDK taxonomy and contain no implementations.
-expect class StandardCharsets {
+public class StandardCharsets {
     companion object {
         val US_ASCII: borg.trikeshed.userspace.nio.charset.Charset
         val ISO_8859_1: borg.trikeshed.userspace.nio.charset.Charset

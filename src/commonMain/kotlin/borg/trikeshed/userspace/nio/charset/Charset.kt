@@ -4,7 +4,7 @@ package borg.trikeshed.userspace.nio.charset
 
 // Generated from Amazon Corretto JDK 25 java.base NIO public/protected API via javap.
 // Declarations intentionally mirror JDK taxonomy and contain no implementations.
-expect abstract class Charset {
+public abstract class Charset {
     protected constructor(p0: String, p1: Array<String>)
     fun name(): String
     fun aliases(): java.util.Set<String>

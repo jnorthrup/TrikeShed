@@ -4,7 +4,7 @@ package borg.trikeshed.userspace.nio.file.attribute
 
 // Generated from Amazon Corretto JDK 25 java.base NIO public/protected API via javap.
 // Declarations intentionally mirror JDK taxonomy and contain no implementations.
-expect interface UserDefinedFileAttributeView : borg.trikeshed.userspace.nio.file.attribute.FileAttributeView {
+public interface UserDefinedFileAttributeView : borg.trikeshed.userspace.nio.file.attribute.FileAttributeView {
     fun name(): String
     fun list(): java.util.List<String>
     fun size(p0: String): Int

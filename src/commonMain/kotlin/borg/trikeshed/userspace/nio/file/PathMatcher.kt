@@ -4,6 +4,6 @@ package borg.trikeshed.userspace.nio.file
 
 // Generated from Amazon Corretto JDK 25 java.base NIO public/protected API via javap.
 // Declarations intentionally mirror JDK taxonomy and contain no implementations.
-expect interface PathMatcher {
+public interface PathMatcher {
     fun matches(p0: borg.trikeshed.userspace.nio.file.Path): Boolean
 }

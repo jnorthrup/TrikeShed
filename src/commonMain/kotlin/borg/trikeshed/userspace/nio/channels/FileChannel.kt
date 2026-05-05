@@ -4,7 +4,7 @@ package borg.trikeshed.userspace.nio.channels
 
 // Generated from Amazon Corretto JDK 25 java.base NIO public/protected API via javap.
 // Declarations intentionally mirror JDK taxonomy and contain no implementations.
-expect abstract class FileChannel : borg.trikeshed.userspace.nio.channels.spi.AbstractInterruptibleChannel, borg.trikeshed.userspace.nio.channels.SeekableByteChannel, borg.trikeshed.userspace.nio.channels.GatheringByteChannel, borg.trikeshed.userspace.nio.channels.ScatteringByteChannel {
+public abstract class FileChannel : borg.trikeshed.userspace.nio.channels.spi.AbstractInterruptibleChannel, borg.trikeshed.userspace.nio.channels.SeekableByteChannel, borg.trikeshed.userspace.nio.channels.GatheringByteChannel, borg.trikeshed.userspace.nio.channels.ScatteringByteChannel {
     protected constructor()
     fun read(p0: borg.trikeshed.userspace.nio.ByteBuffer): Int
     fun read(p0: Array<borg.trikeshed.userspace.nio.ByteBuffer>, p1: Int, p2: Int): Long
@@ -32,7 +32,7 @@ expect abstract class FileChannel : borg.trikeshed.userspace.nio.channels.spi.Ab
         fun `open`(p0: borg.trikeshed.userspace.nio.file.Path, vararg p1: borg.trikeshed.userspace.nio.file.OpenOption): borg.trikeshed.userspace.nio.channels.FileChannel
     }
 
-    expect open class MapMode {
+    public open class MapMode {
         override fun toString(): String
         companion object {
             val READ_ONLY: borg.trikeshed.userspace.nio.channels.FileChannel.MapMode

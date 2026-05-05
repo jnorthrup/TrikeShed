@@ -4,6 +4,6 @@ package borg.trikeshed.userspace.nio.channels
 
 // Generated from Amazon Corretto JDK 25 java.base NIO public/protected API via javap.
 // Declarations intentionally mirror JDK taxonomy and contain no implementations.
-expect open class ShutdownChannelGroupException : java.lang.IllegalStateException {
+public open class ShutdownChannelGroupException : java.lang.IllegalStateException {
     constructor()
 }

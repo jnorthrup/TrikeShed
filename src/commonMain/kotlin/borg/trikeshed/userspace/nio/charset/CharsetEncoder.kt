@@ -4,7 +4,7 @@ package borg.trikeshed.userspace.nio.charset
 
 // Generated from Amazon Corretto JDK 25 java.base NIO public/protected API via javap.
 // Declarations intentionally mirror JDK taxonomy and contain no implementations.
-expect abstract class CharsetEncoder {
+public abstract class CharsetEncoder {
     protected constructor(p0: borg.trikeshed.userspace.nio.charset.Charset, p1: Float, p2: Float, p3: ByteArray)
     protected constructor(p0: borg.trikeshed.userspace.nio.charset.Charset, p1: Float, p2: Float)
     fun charset(): borg.trikeshed.userspace.nio.charset.Charset

@@ -4,7 +4,7 @@ package borg.trikeshed.userspace.nio.channels
 
 // Generated from Amazon Corretto JDK 25 java.base NIO public/protected API via javap.
 // Declarations intentionally mirror JDK taxonomy and contain no implementations.
-expect abstract class FileLock {
+public abstract class FileLock {
     protected constructor(p0: borg.trikeshed.userspace.nio.channels.FileChannel, p1: Long, p2: Long, p3: Boolean)
     protected constructor(p0: borg.trikeshed.userspace.nio.channels.AsynchronousFileChannel, p1: Long, p2: Long, p3: Boolean)
     fun channel(): borg.trikeshed.userspace.nio.channels.FileChannel

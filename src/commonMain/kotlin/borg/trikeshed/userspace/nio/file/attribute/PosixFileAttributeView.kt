@@ -4,7 +4,7 @@ package borg.trikeshed.userspace.nio.file.attribute
 
 // Generated from Amazon Corretto JDK 25 java.base NIO public/protected API via javap.
 // Declarations intentionally mirror JDK taxonomy and contain no implementations.
-expect interface PosixFileAttributeView : borg.trikeshed.userspace.nio.file.attribute.BasicFileAttributeView, borg.trikeshed.userspace.nio.file.attribute.FileOwnerAttributeView {
+public interface PosixFileAttributeView : borg.trikeshed.userspace.nio.file.attribute.BasicFileAttributeView, borg.trikeshed.userspace.nio.file.attribute.FileOwnerAttributeView {
     fun name(): String
     fun readAttributes(): borg.trikeshed.userspace.nio.file.attribute.PosixFileAttributes
     fun setPermissions(p0: java.util.Set<borg.trikeshed.userspace.nio.file.attribute.PosixFilePermission>): Unit

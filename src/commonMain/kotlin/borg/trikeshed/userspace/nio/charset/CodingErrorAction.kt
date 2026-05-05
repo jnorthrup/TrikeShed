@@ -4,7 +4,7 @@ package borg.trikeshed.userspace.nio.charset
 
 // Generated from Amazon Corretto JDK 25 java.base NIO public/protected API via javap.
 // Declarations intentionally mirror JDK taxonomy and contain no implementations.
-expect class CodingErrorAction {
+public class CodingErrorAction {
     override fun toString(): String
     companion object {
         val IGNORE: borg.trikeshed.userspace.nio.charset.CodingErrorAction

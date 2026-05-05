@@ -4,6 +4,6 @@ package borg.trikeshed.userspace.nio
 
 // Generated from Amazon Corretto JDK 25 java.base NIO public/protected API via javap.
 // Declarations intentionally mirror JDK taxonomy and contain no implementations.
-expect open class BufferOverflowException : RuntimeException {
+public open class BufferOverflowException : RuntimeException {
     constructor()
 }

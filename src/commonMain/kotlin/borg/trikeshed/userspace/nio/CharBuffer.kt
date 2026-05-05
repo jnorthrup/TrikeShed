@@ -4,7 +4,7 @@ package borg.trikeshed.userspace.nio
 
 // Generated from Amazon Corretto JDK 25 java.base NIO public/protected API via javap.
 // Declarations intentionally mirror JDK taxonomy and contain no implementations.
-expect abstract class CharBuffer : borg.trikeshed.userspace.nio.Buffer, Comparable<borg.trikeshed.userspace.nio.CharBuffer>, java.lang.Appendable, CharSequence, java.lang.Readable {
+public abstract class CharBuffer : borg.trikeshed.userspace.nio.Buffer, Comparable<borg.trikeshed.userspace.nio.CharBuffer>, java.lang.Appendable, CharSequence, java.lang.Readable {
     fun read(p0: borg.trikeshed.userspace.nio.CharBuffer): Int
     fun slice(): borg.trikeshed.userspace.nio.CharBuffer
     fun slice(p0: Int, p1: Int): borg.trikeshed.userspace.nio.CharBuffer
