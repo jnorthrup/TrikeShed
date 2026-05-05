@@ -1,0 +1,12 @@
+@file:Suppress("EXPECT_ACTUAL_CLASSIFIERS_ARE_IN_BETA_WARNING", "RedundantVisibilityModifier", "unused")
+
+package borg.trikeshed.userspace.nio.file
+
+// Generated from Amazon Corretto JDK 25 java.base NIO public/protected API via javap.
+// Declarations intentionally mirror JDK taxonomy and contain no implementations.
+expect class Paths {
+    companion object {
+        fun `get`(p0: String, vararg p1: String): borg.trikeshed.userspace.nio.file.Path
+        fun `get`(p0: java.net.URI): borg.trikeshed.userspace.nio.file.Path
+    }
+}
