@@ -32,22 +32,9 @@ fun Cursor.project(vararg columns: String): Cursor {
     val cursor = this
     return size j { y: Int ->
         val row = cursor.b(y)
-        when (row) {
-            is JsonRowVec -> JsonRowVec(
-                nodeType = row.nodeType,
-                rawValue = row.rawValue,
-                childFactory = row.child?.let { ch -> { ch } },
-            )
-            is ViewRowVec -> ViewRowVec(
-                id = if (columns.contains("id")) row.id else null,
-                key = if (columns.contains("key")) row.key else null,
-                value = if (columns.contains("value")) row.value else null,
-            )
-            else -> {
-                val vals = columns.joinToString(",") { col -> "${row.getValue(col)}" }
-                JsonRowVec("project", vals)
-            }
-        }
+        val keys = columns.toList()
+        val values = keys.map { col -> rowValue(row, col) }
+        DocRowVec(keys, values, copiedChild(row))
     }
 }
 
@@ -56,19 +43,9 @@ fun Cursor.columns(vararg indices: Int): Cursor {
     val cursor = this
     return size j { y: Int ->
         val row = cursor.b(y)
-        when (row) {
-            is JsonRowVec -> JsonRowVec(
-                nodeType = row.nodeType,
-                rawValue = row.rawValue,
-                childFactory = row.child?.let { ch -> { ch } },
-            )
-            is BlobRowVec -> BlobRowVec(
-                bytes = row.bytes,
-                mimeType = row.mimeType,
-                childFactory = row.child?.let { ch -> { _ -> ch } },
-            )
-            else -> indices.size j { x -> row[indices[x]] }
-        }
+        val keys = indices.map { idx -> rowName(row, idx) }
+        val values = indices.map { idx -> rowCell(row, idx) }
+        DocRowVec(keys, values, copiedChild(row))
     }
 }
 
@@ -223,12 +200,13 @@ fun Cursor.groupBy(keyColumn: String, vararg aggregations: Aggregation): Cursor 
     val groupKeys = groups.keys.toList()
     val resultRows = groupKeys.map { key ->
         val accs = groups[key]!!
+        val keys = mutableListOf<String>(keyColumn)
         val cells = mutableListOf<Any?>(key)
         aggregations.forEachIndexed { index, agg ->
+            keys.add(agg.outputColumn)
             cells.add(accs[index].getResult())
         }
-        // Store group-by result as JsonRowVec with nodeType="group"
-        JsonRowVec(nodeType = "group", rawValue = cells.joinToString(","))
+        DocRowVec(keys, cells)
     }
 
     return resultRows.size j { resultRows[it].toRowVec() }
@@ -253,11 +231,11 @@ fun Cursor.hashJoin(other: Cursor, leftKey: String, rightKey: String): Cursor {
         val key = leftRow.getValue(leftKey)
         val matches = rightIndex[key] ?: continue
         for (rightRow in matches) {
-            // Merge join result into a JsonRowVec
-            val leftType = (leftRow as? JsonRowVec)?.nodeType ?: "row"
-            val rightType = (rightRow as? JsonRowVec)?.nodeType ?: "row"
-            val merged = "left=$leftType,right=$rightType"
-            resultRows.add(JsonRowVec(nodeType = "join", rawValue = merged))
+            val keys = mutableListOf<String>()
+            val cells = mutableListOf<Any?>()
+            appendRowData(keys, cells, leftRow)
+            appendJoinedRowData(keys, cells, rightRow, rightKey)
+            resultRows.add(DocRowVec(keys, cells))
         }
     }
 
@@ -279,4 +257,113 @@ fun compareKeys(a: Any?, b: Any?): Int = when {
     a is Number && b is Number -> a.toDouble().compareTo(b.toDouble())
     a is Comparable<*> -> (a as Comparable<Any?>).compareTo(b)
     else -> a.toString().compareTo(b.toString())
+}
+
+private fun rowName(row: RowVec, index: Int): String = when (row) {
+    is DocRowVec -> row.keys[index]
+    is ViewRowVec -> when (index) {
+        0 -> "id"
+        1 -> "key"
+        2 -> "value"
+        else -> "col$index"
+    }
+    is JsonRowVec -> when (index) {
+        0 -> "nodeType"
+        1 -> "rawValue"
+        else -> "col$index"
+    }
+    is YamlRowVec -> when (index) {
+        0 -> "nodeKind"
+        1 -> "scalarValue"
+        else -> "col$index"
+    }
+    is BlobRowVec -> when (index) {
+        0 -> "bytes"
+        1 -> "mimeType"
+        else -> "col$index"
+    }
+    else -> "col$index"
+}
+
+private fun rowCell(row: RowVec, index: Int): Any? = when (row) {
+    is DocRowVec -> row.cells[index]
+    is ViewRowVec -> when (index) {
+        0 -> row.id
+        1 -> row.key
+        2 -> row.value
+        else -> null
+    }
+    is JsonRowVec -> when (index) {
+        0 -> row.nodeType
+        1 -> row.rawValue
+        else -> null
+    }
+    is YamlRowVec -> when (index) {
+        0 -> row.nodeKind
+        1 -> row.scalarValue
+        else -> null
+    }
+    is BlobRowVec -> when (index) {
+        0 -> row.bytes
+        1 -> row.mimeType
+        else -> null
+    }
+    else -> row[index].a
+}
+
+private fun rowValue(row: RowVec, column: String): Any? = when (row) {
+    is DocRowVec -> row.getValue(column)
+    is ViewRowVec -> row.getValue(column)
+    is JsonRowVec -> when (column) {
+        "nodeType" -> row.nodeType
+        "rawValue" -> row.rawValue
+        else -> null
+    }
+    is YamlRowVec -> when (column) {
+        "nodeKind" -> row.nodeKind
+        "scalarValue" -> row.scalarValue
+        else -> null
+    }
+    else -> row.getValue(column)
+}
+
+private fun copiedChild(row: RowVec): Series<RowVec>? = when (row) {
+    is DocRowVec -> row.child
+    is ViewRowVec -> row.child
+    is JsonRowVec -> row.child
+    is YamlRowVec -> row.child
+    is BlobRowVec -> row.child
+    else -> null
+}
+
+private fun appendRowData(keys: MutableList<String>, cells: MutableList<Any?>, row: RowVec) {
+    when (row) {
+        is DocRowVec -> {
+            for (i in 0 until row.size) {
+                keys.add(row.keys[i])
+                cells.add(row.cells[i])
+            }
+        }
+        else -> {
+            for (i in 0 until row.size) {
+                keys.add(rowName(row, i))
+                cells.add(rowCell(row, i))
+            }
+        }
+    }
+}
+
+private fun appendJoinedRowData(keys: MutableList<String>, cells: MutableList<Any?>, row: RowVec, joinKey: String) {
+    when (row) {
+        is DocRowVec -> {
+            for (i in 0 until row.size) {
+                val key = row.keys[i]
+                if (key == joinKey) continue
+                if (keys.contains(key)) continue
+                keys.add(key)
+                cells.add(row.cells[i])
+            }
+        }
+        else -> appendRowData(keys, cells, row)
+    }
 }

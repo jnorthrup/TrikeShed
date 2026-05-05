@@ -4,6 +4,7 @@ package borg.trikeshed.cursor
 
 // import the IoMemento enum
 import borg.trikeshed.isam.meta.IOMemento.*
+import borg.trikeshed.isam.RecordMeta
 import borg.trikeshed.lib.*
 import kotlin.jvm.JvmInline
 import kotlin.jvm.JvmOverloads
@@ -74,8 +75,17 @@ operator fun Cursor.get(i: IntRange): Cursor {
 
 /** get meta for a cursor from row 0 */
 val Cursor.meta: Series<ColumnMeta>
-    get() = row(0) α { (_, b): Join<*, `ColumnMeta↻`> ->
-        b()
+    get() {
+        val first = row(0)
+        return first.size j { index ->
+            val cell = first[index]
+            when (val raw = cell.b as Any?) {
+                is RecordMeta -> raw as ColumnMeta
+                is Function0<*> -> raw.invoke() as ColumnMeta
+                is Join<*, *> -> raw as ColumnMeta
+                else -> error("Unsupported column meta for row $index")
+            }
+        }
     }
 
 /** create an Intarray of cursor meta by Strings of column names */
@@ -106,7 +116,7 @@ operator fun String.unaryMinus(): ColumnExclusion = ColumnExclusion(this)
 operator fun Cursor.minus(killbag: Series<Int>) {
     val toSet = (0 until meta.size).toSet()
     val ints = (toSet - killbag.toSet()).toIntArray()
-    this[ints]
+    this.get(*ints)
 }
 
 /** cursor get by ColumnExclusion vararg -- return a Cursor with the columns excluded by the vararg */
@@ -117,7 +127,7 @@ operator fun Cursor.get(s: Series<ColumnExclusion>): Cursor {
         exclusionBag.add(meta.view.indexOfFirst { it.name == it.name })
     }
     val retained: IntArray = ((0 until meta.size).toSet() - exclusionBag).toIntArray()
-    return this[retained]
+    return this.get(*retained)
 }
 
 //in columnar project this is meta.right
@@ -162,12 +172,20 @@ fun Cursor.showValues(range: IntRange) = try {
 
 
 /** gets the RowVec at y or if y is negative then -y from last */
-infix fun Cursor.at(y: Int): RowVec = b(if (y < 0) size - y else y)
+infix fun Cursor.at(y: Int): RowVec = b(if (y < 0) size + y else y)
 infix fun Cursor.row(y: Int): RowVec = at(y)
 
 /** Cursor get by Int vararg — select columns by index, zero per-cell Join allocation. */
-operator fun Cursor.get(vararg i: Int): Cursor = size j { y: Int ->
-    (row(y) as ReifiedSplitSeries2<*, *>).select(*i) as RowVec
+operator fun Cursor.get(vararg i: Int): Cursor = selectColumns(i)
+
+private fun Cursor.selectColumns(indices: IntArray): Cursor {
+    val selectedMeta = meta
+    val selectedNames = indices.size j { i: Int -> selectedMeta[indices[i]].name }
+    return size j { y: Int ->
+        val row = row(y)
+        val selectedValues = indices.size j { x: Int -> row[indices[x]].a }
+        cellsToRowVec(selectedValues, selectedNames)
+    }
 }
 
 

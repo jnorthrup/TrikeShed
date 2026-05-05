@@ -134,6 +134,12 @@ fun Series<RowVec>?.toJson(): String {
             }
         }
         json.append('}')
+        if (row is DocRowVec) {
+            val childJson = row.child.toJson()
+            if (childJson.isNotBlank()) {
+                json.append('\n').append(childJson)
+            }
+        }
     }
     return json.toString()
 }

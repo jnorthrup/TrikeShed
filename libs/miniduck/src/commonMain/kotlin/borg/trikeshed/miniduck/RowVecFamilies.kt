@@ -5,7 +5,6 @@ import borg.trikeshed.cursor.`ColumnMeta↻`
 import borg.trikeshed.cursor.RowVec
 import borg.trikeshed.isam.meta.IOMemento
 import borg.trikeshed.lib.*
-import kotlin.jvm.JvmInline
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // RowVec families — inline value classes over pure Joins
@@ -26,8 +25,7 @@ inline fun <T> s_(vararg elements: T): Series<T> = seriesOf(elements.toList()) a
 // Two-component family: nodeType + rawValue, with optional lazy child.
 // DocRowVec is a synonym (Confix naming).
 
-@JvmInline
-value class JsonRowVec private constructor(
+class JsonRowVec private constructor(
     private val capture: Join<String, Join<String?, (() -> Series<RowVec>)?>>,
 ) : RowVec {
     // ── primary constructor ──
@@ -68,8 +66,7 @@ value class JsonRowVec private constructor(
 // Three-component family: keys + cells + optional child, dynamic column access.
 // Inline value class over nested Joins — zero-allocation construction.
 
-@JvmInline
-value class DocRowVec private constructor(
+class DocRowVec private constructor(
     private val capture: Join<Series<String>, Join<Series<Any?>, Series<RowVec>?>>,
 ) : RowVec {
     constructor(keys: Series<String>, cells: Series<Any?>, child: Series<RowVec>? = null) : this(keys j (cells j child))
@@ -109,8 +106,7 @@ fun DocRowVec.toRowVec(): RowVec = this
 // ── ViewRowVec ─────────────────────────────────────────────────────────────────
 // Three-component family: id + key + value, with optional lazy doc child.
 
-@JvmInline
-value class ViewRowVec private constructor(
+class ViewRowVec private constructor(
     private val capture: Join<String?, Join<Any?, Join<Any?, (() -> RowVec)?>>>,
 ) : RowVec {
     constructor(
@@ -154,8 +150,7 @@ fun ViewRowVec.toRowVec(): RowVec = this
 // ── YamlRowVec ─────────────────────────────────────────────────────────────────
 // Two-component family: nodeKind + scalarValue, with optional lazy child.
 
-@JvmInline
-value class YamlRowVec private constructor(
+class YamlRowVec private constructor(
     private val capture: Join<String, Join<String?, (() -> Series<RowVec>)?>>,
 ) : RowVec {
     constructor(
@@ -188,8 +183,7 @@ fun YamlRowVec.toRowVec(): RowVec = this
 // ── BlobRowVec ─────────────────────────────────────────────────────────────────
 // Two-component family: bytes + mimeType, with optional child factory.
 
-@JvmInline
-value class BlobRowVec private constructor(
+class BlobRowVec private constructor(
     private val capture: Join<ByteArray, Join<String, ((ByteArray) -> Series<RowVec>)?>>,
 ) : RowVec {
     constructor(

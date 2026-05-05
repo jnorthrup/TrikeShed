@@ -2,10 +2,22 @@ package borg.trikeshed.cursor
 
 import borg.trikeshed.isam.meta.IOMemento
 import borg.trikeshed.isam.meta.IOMemento.*
+import borg.trikeshed.isam.RecordMeta
 import borg.trikeshed.lib.*
 
-fun RowVec.getValue(key: String): Any? {//todo prepared context for binsearch?
-    for (index in 0 until size) b(index).let { cell-> if (cell.b().a == key) return cell.a }
+fun RowVec.getValue(key: String): Any? {
+    for (index in 0 until size) {
+        val cell = b(index)
+        val meta = when (val raw = cell.b as Any?) {
+            is RecordMeta -> raw
+            is Function0<*> -> raw.invoke()
+            else -> null
+        }
+        when (meta) {
+            is RecordMeta -> if (meta.name == key) return cell.a
+            is Join<*, *> -> if (meta.a == key) return cell.a
+        }
+    }
     return null
 }
 

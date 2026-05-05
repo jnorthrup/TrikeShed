@@ -87,7 +87,10 @@ object MiniDuckBlockCodec {
     }
 
     private fun appendJsonRow(sb: StringBuilder, node: JsonRowVec) {
-        // DocRowVec is a synonym for JsonRowVec; both encode as "_type":"json"
+        if (node.rawValue == null) {
+            appendKeyed(sb, DocRowVec(listOf(node.nodeType), listOf(null), node.child))
+            return
+        }
         sb.append("""{"_type":"json","nodeType":""")
         appendJsonString(sb, node.nodeType)
         sb.append(""","rawValue":""")
@@ -120,6 +123,11 @@ object MiniDuckBlockCodec {
         appendJsonString(sb, blob.mimeType)
         sb.append(""","bytes":""")
         appendJsonString(sb, blob.bytes.toHex())
+        val ch = blob.child
+        if (ch != null) {
+            sb.append(""","_ch":""")
+            appendRowArray(sb, ch)
+        }
         sb.append('}')
     }
 
@@ -128,6 +136,11 @@ object MiniDuckBlockCodec {
         appendStrArray(sb, (0 until row.keys.size).map { row.keys[it] })
         sb.append(""","cells":""")
         appendTaggedArray(sb, (0 until row.cells.size).map { row.cells[it] })
+        val ch = row.child
+        if (ch != null) {
+            sb.append(""","_ch":""")
+            appendRowArray(sb, ch)
+        }
         sb.append('}')
     }
 
@@ -339,16 +352,24 @@ object MiniDuckBlockCodec {
     private fun decodeBlob(m: Map<String, Any?>): BlobRowVec {
         val mime = m["mime"] as? String ?: ""
         val hex = m["bytes"] as? String ?: ""
-        return BlobRowVec(hex.fromHex(), mime)
+        val chRaw = m["_ch"] as? List<*>
+        val childFactory: ((ByteArray) -> Series<RowVec>)? = chRaw?.let { list ->
+            { _ -> list.size j { i: Int -> decodeRow(encodeRowToString(list[i]!!)) ?: JsonRowVec("empty", null) } }
+        }
+        return BlobRowVec(hex.fromHex(), mime, childFactory)
     }
 
     @Suppress("UNCHECKED_CAST")
-     private fun decodeKeyed(m: Map<String, Any?>): DocRowVec {
+    private fun decodeKeyed(m: Map<String, Any?>): DocRowVec {
         val rawKeys = m["keys"] as? List<*> ?: emptyList<Any?>()
         val rawCells = m["cells"] as? List<*> ?: emptyList<Any?>()
         val keys: Series<String> = rawKeys.size j { i -> rawKeys[i] as? String ?: "" }
         val cells: Series<Any?> = rawCells.size j { i -> decodeTagged(rawCells[i]) }
-        return DocRowVec(keys, cells)
+        val chRaw = m["_ch"] as? List<*>
+        val childFactory: (() -> Series<RowVec>)? = chRaw?.let { list ->
+            { list.size j { i: Int -> decodeRow(encodeRowToString(list[i]!!)) ?: JsonRowVec("empty", null) } }
+        }
+        return DocRowVec(keys, cells, childFactory?.invoke())
     }
 
     @Suppress("UNCHECKED_CAST")

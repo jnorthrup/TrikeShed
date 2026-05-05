@@ -1,5 +1,10 @@
 package borg.trikeshed.miniduck
 
+import borg.trikeshed.cursor.RowVec
+import borg.trikeshed.lib.get
+import borg.trikeshed.lib.j
+import borg.trikeshed.lib.size
+import borg.trikeshed.lib.toList
 import java.nio.file.Path
 
 /**
@@ -24,6 +29,30 @@ object MiniDuckBlockFiles {
     /** Read a block from an NDJSON file. */
     fun read(path: Path): BlockRowVec {
         val text = path.toFile().readText()
-        return MiniDuckBlockCodec.decode(text)
+        val decoded = MiniDuckBlockCodec.decode(text)
+        val normalized = BlockRowVec.mutable()
+        for (i in 0 until decoded.child.size) {
+            normalized.append(normalizeRow(decoded.child[i]))
+        }
+        return normalized.seal()
+    }
+
+    private fun normalizeRow(row: RowVec, parentKind: String? = null): RowVec = when (row) {
+        is JsonRowVec -> {
+            val normalizedChild = row.child?.let { ch -> ch.size j { i: Int -> normalizeRow(ch[i], "doc") } }
+            if (parentKind == "blob") row else DocRowVec(listOf(row.nodeType), listOf(row.rawValue), normalizedChild)
+        }
+        is DocRowVec -> DocRowVec(
+            row.keys.toList(),
+            row.cells.toList(),
+            row.child?.let { ch -> ch.size j { i: Int -> normalizeRow(ch[i], "doc") } },
+        )
+        is ViewRowVec -> {
+            val normalizedChild = row.child?.let { ch -> ch.size j { i: Int -> normalizeRow(ch[i], "doc") } }
+            ViewRowVec(row.id, row.key, row.value) {
+                normalizedChild?.get(0) ?: JsonRowVec("empty", null)
+            }
+        }
+        else -> row
     }
 }
