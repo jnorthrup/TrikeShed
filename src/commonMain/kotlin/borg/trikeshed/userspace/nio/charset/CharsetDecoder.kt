@@ -2,30 +2,24 @@
 
 package borg.trikeshed.userspace.nio.charset
 
-// Generated from Amazon Corretto JDK 25 java.base NIO public/protected API via javap.
-// Declarations intentionally mirror JDK taxonomy and contain no implementations.
-public abstract class CharsetDecoder {
-    protected constructor(p0: borg.trikeshed.userspace.nio.charset.Charset, p1: Float, p2: Float)
-    fun charset(): borg.trikeshed.userspace.nio.charset.Charset
-    fun replacement(): String
-    fun replaceWith(p0: String): borg.trikeshed.userspace.nio.charset.CharsetDecoder
-    protected fun implReplaceWith(p0: String): Unit
-    fun malformedInputAction(): borg.trikeshed.userspace.nio.charset.CodingErrorAction
-    fun onMalformedInput(p0: borg.trikeshed.userspace.nio.charset.CodingErrorAction): borg.trikeshed.userspace.nio.charset.CharsetDecoder
-    protected fun implOnMalformedInput(p0: borg.trikeshed.userspace.nio.charset.CodingErrorAction): Unit
-    fun unmappableCharacterAction(): borg.trikeshed.userspace.nio.charset.CodingErrorAction
-    fun onUnmappableCharacter(p0: borg.trikeshed.userspace.nio.charset.CodingErrorAction): borg.trikeshed.userspace.nio.charset.CharsetDecoder
-    protected fun implOnUnmappableCharacter(p0: borg.trikeshed.userspace.nio.charset.CodingErrorAction): Unit
-    fun averageCharsPerByte(): Float
-    fun maxCharsPerByte(): Float
-    fun decode(p0: borg.trikeshed.userspace.nio.ByteBuffer, p1: borg.trikeshed.userspace.nio.CharBuffer, p2: Boolean): borg.trikeshed.userspace.nio.charset.CoderResult
-    fun flush(p0: borg.trikeshed.userspace.nio.CharBuffer): borg.trikeshed.userspace.nio.charset.CoderResult
-    protected fun implFlush(p0: borg.trikeshed.userspace.nio.CharBuffer): borg.trikeshed.userspace.nio.charset.CoderResult
-    fun reset(): borg.trikeshed.userspace.nio.charset.CharsetDecoder
-    protected fun implReset(): Unit
-    protected fun decodeLoop(p0: borg.trikeshed.userspace.nio.ByteBuffer, p1: borg.trikeshed.userspace.nio.CharBuffer): borg.trikeshed.userspace.nio.charset.CoderResult
-    fun decode(p0: borg.trikeshed.userspace.nio.ByteBuffer): borg.trikeshed.userspace.nio.CharBuffer
-    fun isAutoDetecting(): Boolean
-    fun isCharsetDetected(): Boolean
-    fun detectedCharset(): borg.trikeshed.userspace.nio.charset.Charset
+public abstract class CharsetDecoder protected constructor(
+    protected val charset: borg.trikeshed.userspace.nio.charset.Charset,
+    protected val averageCharsPerByteValue: Float,
+    protected val maxCharsPerByteValue: Float,
+) {
+    public open fun charset(): borg.trikeshed.userspace.nio.charset.Charset = charset
+    public abstract fun replacement(): String
+    public abstract fun replaceWith(p0: String): borg.trikeshed.userspace.nio.charset.CharsetDecoder
+    public abstract fun malformedInputAction(): borg.trikeshed.userspace.nio.charset.CodingErrorAction
+    public abstract fun onMalformedInput(p0: borg.trikeshed.userspace.nio.charset.CodingErrorAction): borg.trikeshed.userspace.nio.charset.CharsetDecoder
+    public abstract fun unmappableCharacterAction(): borg.trikeshed.userspace.nio.charset.CodingErrorAction
+    public abstract fun onUnmappableCharacter(p0: borg.trikeshed.userspace.nio.charset.CodingErrorAction): borg.trikeshed.userspace.nio.charset.CharsetDecoder
+    public open fun averageCharsPerByte(): Float = averageCharsPerByteValue
+    public open fun maxCharsPerByte(): Float = maxCharsPerByteValue
+    public abstract fun decode(p0: borg.trikeshed.userspace.nio.ByteBuffer): String
+    public abstract fun flush(p0: borg.trikeshed.userspace.nio.ByteBuffer): borg.trikeshed.userspace.nio.charset.CoderResult
+    public abstract fun reset(): borg.trikeshed.userspace.nio.charset.CharsetDecoder
+    public abstract fun isAutoDetecting(): Boolean
+    public abstract fun isCharsetDetected(): Boolean
+    public abstract fun detectedCharset(): borg.trikeshed.userspace.nio.charset.Charset
 }

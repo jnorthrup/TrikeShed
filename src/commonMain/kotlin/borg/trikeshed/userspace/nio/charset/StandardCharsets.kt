@@ -2,18 +2,16 @@
 
 package borg.trikeshed.userspace.nio.charset
 
-// Generated from Amazon Corretto JDK 25 java.base NIO public/protected API via javap.
-// Declarations intentionally mirror JDK taxonomy and contain no implementations.
 public class StandardCharsets {
-    companion object {
-        val US_ASCII: borg.trikeshed.userspace.nio.charset.Charset
-        val ISO_8859_1: borg.trikeshed.userspace.nio.charset.Charset
-        val UTF_8: borg.trikeshed.userspace.nio.charset.Charset
-        val UTF_16BE: borg.trikeshed.userspace.nio.charset.Charset
-        val UTF_16LE: borg.trikeshed.userspace.nio.charset.Charset
-        val UTF_16: borg.trikeshed.userspace.nio.charset.Charset
-        val UTF_32BE: borg.trikeshed.userspace.nio.charset.Charset
-        val UTF_32LE: borg.trikeshed.userspace.nio.charset.Charset
-        val UTF_32: borg.trikeshed.userspace.nio.charset.Charset
+    public companion object {
+        public val US_ASCII: Charset = Charset.forName("US-ASCII")
+        public val ISO_8859_1: Charset = Charset.forName("ISO-8859-1")
+        public val UTF_8: Charset = Charset.forName("UTF-8")
+        public val UTF_16BE: Charset = Charset.forName("UTF-16BE")
+        public val UTF_16LE: Charset = Charset.forName("UTF-16LE")
+        public val UTF_16: Charset = Charset.forName("UTF-16")
+        public val UTF_32BE: Charset = UTF_8
+        public val UTF_32LE: Charset = UTF_8
+        public val UTF_32: Charset = UTF_8
     }
 }

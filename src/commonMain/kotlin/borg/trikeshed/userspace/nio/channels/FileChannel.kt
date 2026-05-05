@@ -21,7 +21,7 @@ public abstract class FileChannel : borg.trikeshed.userspace.nio.channels.spi.Ab
     fun transferFrom(p0: borg.trikeshed.userspace.nio.channels.ReadableByteChannel, p1: Long, p2: Long): Long
     fun read(p0: borg.trikeshed.userspace.nio.ByteBuffer, p1: Long): Int
     fun write(p0: borg.trikeshed.userspace.nio.ByteBuffer, p1: Long): Int
-    fun map(p0: borg.trikeshed.userspace.nio.channels.FileChannel.MapMode, p1: Long, p2: Long): borg.trikeshed.userspace.nio.MappedByteBuffer
+    fun map(p0: borg.trikeshed.userspace.nio.channels.FileChannel.MapMode, p1: Long, p2: Long): borg.trikeshed.userspace.nio.ByteBuffer
     fun map(p0: borg.trikeshed.userspace.nio.channels.FileChannel.MapMode, p1: Long, p2: Long, p3: java.lang.foreign.Arena): java.lang.foreign.MemorySegment
     fun lock(p0: Long, p1: Long, p2: Boolean): borg.trikeshed.userspace.nio.channels.FileLock
     fun lock(): borg.trikeshed.userspace.nio.channels.FileLock
