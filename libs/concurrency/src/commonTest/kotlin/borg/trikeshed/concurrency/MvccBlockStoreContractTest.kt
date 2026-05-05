@@ -93,9 +93,7 @@ class MvccBlockStoreContractTest {
 
     // ── Helpers ──────────────────────────────────────────────────────────
 
-    fun sealedBlock(name: String): BlockRowVec {
-        val block = BlockRowVec.mutable()
-        block.append(KeyedRowVec(listOf("name"), listOf(name as Any?)))
-        return block.seal()
+    fun sealedBlock(name: String): List<Any?> {
+        return listOf(name as Any?)
     }
 }

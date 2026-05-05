@@ -266,6 +266,12 @@ class BlockRowVec private constructor(
 
 fun RowVec.toRowVec(): RowVec = this
 fun BlockRowVec.getValue(name: String): Any? = null
+fun Any?.blockRows(): Series<RowVec>? = when (this) {
+    is BlockRowVec -> child
+    else -> childSeries(this)
+}
+
+fun Any?.blockRowCount(): Int? = blockRows()?.size
 
 // ── Series<RowVec> JSON helper ────────────────────────────────────────────────
 

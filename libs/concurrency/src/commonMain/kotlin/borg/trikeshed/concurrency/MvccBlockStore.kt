@@ -86,7 +86,12 @@ class MvccBlockStore {
         val entry = list[idx]
         if (entry.putSeq > snap.seq) return null
         if (entry.removed && (entry.removeSeq ?: Long.MAX_VALUE) <= snap.seq) return null
-        return entry.block as? BlockLike
+        return when (val block = entry.block) {
+            is BlockLike -> block
+            is Collection<*> -> StoredBlockLike(block.size)
+            is Array<*> -> StoredBlockLike(block.size)
+            else -> null
+        }
     }
 
     // Scan visible blocks at snapshot and produce a Cursor of RowVec rows used by tests.
@@ -97,33 +102,33 @@ class MvccBlockStore {
             if (entry.putSeq > snap.seq) continue
             if (entry.removed && (entry.removeSeq ?: Long.MAX_VALUE) <= snap.seq) continue
             val block = entry.block
-            when (block) {
-                is Collection<*> -> {
-                    for (elem in block) {
-                        val cells: List<Any?> = when (elem) {
-                            is Collection<*> -> elem.toList()
-                            is Array<*> -> elem.toList()
-                            else -> listOf(elem)
-                        }
-                        val values: borg.trikeshed.lib.Series<Any?> = cells.size j { idx -> cells[idx] }
-                        val meta: borg.trikeshed.lib.Series<() -> borg.trikeshed.cursor.ColumnMeta> = cells.size j { idx -> { borg.trikeshed.cursor.ColumnMeta("col$idx", borg.trikeshed.isam.meta.IOMemento.IoString) } }
-                        rowVecs.add(values.joins(meta))
+            if (block is Collection<*>) {
+                for (elem in block) {
+                    val cells: List<Any?> = when (elem) {
+                        is Collection<*> -> elem.toList()
+                        is Array<*> -> elem.toList()
+                        else -> listOf(elem)
                     }
-                }
-                is Array<*> -> {
-                    val cells: List<Any?> = block.toList()
                     val values: borg.trikeshed.lib.Series<Any?> = cells.size j { idx -> cells[idx] }
                     val meta: borg.trikeshed.lib.Series<() -> borg.trikeshed.cursor.ColumnMeta> = cells.size j { idx -> { borg.trikeshed.cursor.ColumnMeta("col$idx", borg.trikeshed.isam.meta.IOMemento.IoString) } }
                     rowVecs.add(values.joins(meta))
                 }
-                else -> {
-                    val cells = listOf(block)
-                    val values: borg.trikeshed.lib.Series<Any?> = cells.size j { idx -> cells[idx] }
-                    val meta: borg.trikeshed.lib.Series<() -> borg.trikeshed.cursor.ColumnMeta> = cells.size j { idx -> { borg.trikeshed.cursor.ColumnMeta("col$idx", borg.trikeshed.isam.meta.IOMemento.IoString) } }
-                    rowVecs.add(values.joins(meta))
-                }
+            } else if (block is Array<*>) {
+                val cells: List<Any?> = block.toList()
+                val values: borg.trikeshed.lib.Series<Any?> = cells.size j { idx -> cells[idx] }
+                val meta: borg.trikeshed.lib.Series<() -> borg.trikeshed.cursor.ColumnMeta> = cells.size j { idx -> { borg.trikeshed.cursor.ColumnMeta("col$idx", borg.trikeshed.isam.meta.IOMemento.IoString) } }
+                rowVecs.add(values.joins(meta))
+            } else {
+                val cells = listOf(block)
+                val values: borg.trikeshed.lib.Series<Any?> = cells.size j { idx -> cells[idx] }
+                val meta: borg.trikeshed.lib.Series<() -> borg.trikeshed.cursor.ColumnMeta> = cells.size j { idx -> { borg.trikeshed.cursor.ColumnMeta("col$idx", borg.trikeshed.isam.meta.IOMemento.IoString) } }
+                rowVecs.add(values.joins(meta))
             }
         }
         return rowVecs.size j { r -> rowVecs[r] }
+    }
+
+    private class StoredBlockLike(private val rowCountValue: Int) : BlockLike {
+        override val rowCount: Int get() = rowCountValue
     }
 }
