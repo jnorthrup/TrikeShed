@@ -14,5 +14,6 @@ class SimpleCursor @JvmOverloads constructor(
             it.first as? IOMemento ?: IOMemento.IoString
         )
     },
-    val c: Join<Int, (Int) -> RowVec> = data α { it.zip(o) },
+    val metaProviders: Series<`ColumnMeta↻`> = o.size j { index: Int -> { o[index] } },
+    val c: Join<Int, (Int) -> RowVec> = data α { row -> (row α { it as Any? }) j metaProviders },
 ) : Cursor by c

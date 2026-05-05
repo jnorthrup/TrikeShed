@@ -3,7 +3,7 @@ package borg.trikeshed.parse.yaml
 import borg.trikeshed.parse.confix.Combinators
 import borg.trikeshed.parse.confix.YamlScan
 import borg.trikeshed.parse.confix.asSeries
-import borg.trikeshed.lib.toSeries
+import borg.trikeshed.lib.*
 import kotlin.test.Test
 import kotlin.test.assertEquals
 

@@ -197,6 +197,7 @@ switch (project.path) {
         dependencies {
             implementation "org.jetbrains.kotlin:kotlin-stdlib:${kotlinVersion}"
             implementation "org.jetbrains.kotlinx:kotlinx-coroutines-core:${prop("versions.kotlinx-coroutines-core")}"
+            implementation project(":libs:htx-client")
         }
 
         tasks.register("generateCmcProClient", JavaExec) {

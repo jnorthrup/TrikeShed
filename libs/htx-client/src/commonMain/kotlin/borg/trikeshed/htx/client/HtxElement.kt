@@ -3,6 +3,7 @@ package borg.trikeshed.htx.client
 import borg.trikeshed.context.AsyncContextElement
 import borg.trikeshed.context.AsyncContextKey
 import borg.trikeshed.context.ElementState
+import borg.trikeshed.htx.client.generated.infrastructure.GeneratedRequest
 
 // Compromise: this standalone lib does not depend on the root project to avoid composite-build cycles.
 data class HtxClientMessage(val status: Int = 200, val body: String = "ok")
@@ -49,7 +50,7 @@ data class HtxClientRequest(
 typealias HtxRequestHandler = suspend (HtxClientRequest) -> HtxClientMessage
 
 val HtxKey: AsyncContextKey<HtxElement> = HtxElement.Key
-suspend fun defaultHtxRequestHandler(request: HtxClientRequest): HtxClientMessage =
+fun defaultHtxRequestHandler(request: HtxClientRequest): HtxClientMessage =
     when {
         request.method.isBlank() || request.path.isBlank() -> HtxClientMessage(status = 400, body = "invalid request")
         request.method == "GET" && request.path == "/health" -> HtxClientMessage(status = 200, body = "ok")
@@ -65,6 +66,19 @@ suspend fun openHtxElement(
 class HtxElement(
    val requestHandler: HtxRequestHandler = ::defaultHtxRequestHandler,
 ) : AsyncContextElement() {
+    fun generatedCall(): suspend (GeneratedRequest) -> String = { request ->
+        val query = request.queryParams.entries.joinToString("&") { (key, value) -> "$key=$value" }
+        val path = if (query.isEmpty()) request.path else "${request.path}?$query"
+        val response = request(
+            method = request.method.name,
+            path = path,
+            body = request.body ?: "",
+        )
+        check(response.status == 200) {
+            "Expected 200 from HTX for ${request.method.name} ${request.path}, but got ${response.status} with body ${response.body}"
+        }
+        response.body
+    }
     companion object Key : AsyncContextKey<HtxElement>()
 
     override val key: AsyncContextKey<HtxElement>

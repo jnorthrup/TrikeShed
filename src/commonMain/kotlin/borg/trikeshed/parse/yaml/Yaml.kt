@@ -198,7 +198,7 @@ object YamlParser {
             val elem = elems[kk]
             val eOpen = elem.a.a
             val eClose = elem.a.b
-            if (eOpen >= parentClose) break
+            if (eOpen > parentClose) break
             if (eOpen >= parentOpen && eClose <= parentClose) {
                 result.add(kk)
                 val childClose = eClose
