@@ -229,8 +229,8 @@ From `trikeshed-lib.gradle` :libs:couch case:
 - **miniduck** (`api`) — MiniCursor, DocRowVec, BlockRowVec, ViewRowVec, MiniRowVec, ExecutionContext, TableSource, JsonParser
 - **tiny-btrfs** (`implementation`) — BPlusTree
 - **kursive** (`implementation`) — JursiveCharSeries parser
-- **kotlinx-coroutines-core** (from kmpFull) — coroutines, channels, SupervisorJob
-- **kotlinx-datetime** (from kmpFull datetimeMain: true) — Clock.System
+- **kotlinx-coroutines-core** (from kmpHost) — coroutines, channels, SupervisorJob
+- **kotlinx-datetime** (from kmpHost datetimeMain: true) — Clock.System
 - **kotlin-reflect** (jvmMain) — CouchServiceCompiler reflection
 - **couch-viewserver** (jvmTest) — nested subproject for integration testing
 

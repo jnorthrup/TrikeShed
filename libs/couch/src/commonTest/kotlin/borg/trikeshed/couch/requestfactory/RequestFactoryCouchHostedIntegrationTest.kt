@@ -16,8 +16,6 @@ class RequestFactoryCouchHostedIntegrationTest {
     @Test
     fun reactorSelfHostCouch_roundtrip() = runTest {
         val reactor = Reactor("couch-realm")
-        reactor.open()
-        reactor.activate()
 
         val runtime = CouchRuntime(reactor = reactor)
 
@@ -64,7 +62,5 @@ class RequestFactoryCouchHostedIntegrationTest {
         assertTrue(resp.success)
         val v = resp.value as? TransportValue.StringValue
         assertEquals("view-result", v?.value)
-
-        reactor.drain()
     }
 }

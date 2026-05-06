@@ -55,7 +55,7 @@ module is fully `inline`-friendly, zero-allocation data structure code.
 ## Dependencies
 
 - **Root project** (`org.bereft:TrikeShed`) — `api` dependency via
-  `trikeshed-lib.gradle` (`kmpFull()` with default `rootMode="api"`).
+  `trikeshed-lib.gradle` (`kmpHost()` with default `rootMode="api"`).
   Consumed symbols: `LongSeries`, `Series`, `TwInt`, `packInts`, `Series2`,
   `PackedIntBuf`, `PackedIntSeries`, `zip`, `j` infix, `emptySeries`.
 - **kotlinx-coroutines-core** — brought in by shared gradle macro (not used
@@ -64,5 +64,5 @@ module is fully `inline`-friendly, zero-allocation data structure code.
 
 ## Build
 
-Full KMP module (`kmpFull()`) — JVM, JS, wasmJs, one native target.
+Host KMP module (`kmpHost()`) — JVM, JS, wasmJs, one native target.
 Same target matrix as `libs/common`.

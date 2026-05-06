@@ -1,18 +1,13 @@
 package borg.trikeshed.brc
 
-import borg.trikeshed.Files
-import borg.trikeshed.SeekFileBuffer
-import borg.trikeshed.lib.asString
+import borg.trikeshed.*
+import borg.trikeshed.collections._a
 import borg.trikeshed.lib.j
-import borg.trikeshed.mktemp
-import borg.trikeshed.platformSeekHandle
-import borg.trikeshed.rm
-import borg.trikeshed.use
 import borg.trikeshed.userspace.ByteRegion
 import borg.trikeshed.userspace.nio.ByteBuffer
 import kotlin.test.Test
-import kotlin.test.assertTrue
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 class BrcSeekFileBufferContractTest {
 
@@ -36,11 +31,11 @@ class BrcSeekFileBufferContractTest {
 
     companion object {
         /** Deterministic 16-byte fixture used across the contract tests. */
-        val TEST_BYTES = byteArrayOf(
+        val TEST_BYTES = _a [
             0xDE.toByte(), 0xAD.toByte(), 0xBE.toByte(), 0xEF.toByte(),
             0xCA.toByte(), 0xFE.toByte(), 0xBA.toByte(), 0xBE.toByte(),
             0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08
-        )
+        ]
     }
 
     @Test

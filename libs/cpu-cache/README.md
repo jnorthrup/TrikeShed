@@ -82,7 +82,7 @@ module is pure query/serialization with no state, no lifecycle, and no async.
 
 ## Build
 
-Full KMP module (`kmpFull(rootMode="none", coroutinesMain=false)`) with extra
+Host KMP module (`kmpHost(rootMode="none", coroutinesMain=false)`) with extra
 targets:
 - JVM 21, JS (nodejs), wasmJs (nodejs)
 - macOS: macosArm64 (primary), macosX64 (additional)

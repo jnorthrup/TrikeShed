@@ -5,14 +5,7 @@ package borg.trikeshed.userspace
 import borg.trikeshed.userspace.nio.ByteBuffer
 import kotlinx.cinterop.addressOf
 import kotlinx.cinterop.usePinned
-import platform.posix.O_CREAT
-import platform.posix.O_RDONLY
-import platform.posix.O_RDWR
-import platform.posix.close
-import platform.posix.open
-import platform.posix.read
-import platform.posix.socket
-import platform.posix.write
+import platform.posix.*
 
 private class PosixUserspaceChannelBackend : UserspaceChannelBackend {
     override fun read(file: FileImpl, buffer: ByteBuffer, offset: Long): Int {

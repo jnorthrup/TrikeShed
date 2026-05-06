@@ -2,10 +2,16 @@
 
 package borg.trikeshed
 import kotlinx.cinterop.ExperimentalForeignApi
-import kotlinx.cinterop.cstr
+import kotlinx.cinterop.toKString
+import platform.posix.getenv as posix_getenv
 
-//kotlinx.cinterop.CValuesRef<platform.posix.fenv_t>?
 actual object System {
-    actual fun getenv(name: String, defaultVal: String?): String?   = (getenv(name)?:defaultVal?.cstr) as String?
-    actual val homedir: String = getenv("HOME") ?: "/tmp"
+    actual fun getenv(name: String, defaultVal: String?): String? {
+        val ptr = posix_getenv(name)
+        return ptr?.toKString() ?: defaultVal
+    }
+    actual val homedir: String = run {
+        val ptr = posix_getenv("HOME")
+        ptr?.toKString() ?: "/tmp"
+    }
 }

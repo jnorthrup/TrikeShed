@@ -50,7 +50,7 @@ consumer/validator of root-project types.
 ## Dependencies
 
 - **Root project** (`org.bereft:TrikeShed`) — `api` dependency via
-  `trikeshed-lib.gradle` (`kmpFull()` with default `rootMode="api"`).
+  `trikeshed-lib.gradle` (`kmpHost()` with default `rootMode="api"`).
   Brings in the full kernel algebra (`Series`, `TwInt`, `Join`, `Cursor`,
   `AsyncContextKey`, `AsyncContextElement`, `ElementState`, `BitMasked`, etc.).
 - **kotlinx-coroutines-core** — via shared gradle macro.
@@ -59,7 +59,7 @@ consumer/validator of root-project types.
 
 ## Build
 
-Configured via `../../gradle/macros/trikeshed-lib.gradle` as a full KMP module
-(`kmpFull()`) with JVM, JS, WASM, and native targets. Targets: JVM 21, JS
+Configured via `../../gradle/macros/trikeshed-lib.gradle` as a host KMP module
+(`kmpHost()`) with JVM, JS, WASM, and one host native target. Targets: JVM 21, JS
 (nodejs), wasmJs (nodejs), plus one native target (macosArm64 or linuxX64
 depending on host).
