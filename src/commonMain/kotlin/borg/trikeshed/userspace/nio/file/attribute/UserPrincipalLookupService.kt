@@ -6,6 +6,6 @@ package borg.trikeshed.userspace.nio.file.attribute
 // Declarations intentionally mirror JDK taxonomy and contain no implementations.
 public abstract class UserPrincipalLookupService {
     protected constructor()
-    fun lookupPrincipalByName(p0: String): borg.trikeshed.userspace.nio.file.attribute.UserPrincipal
-    fun lookupPrincipalByGroupName(p0: String): borg.trikeshed.userspace.nio.file.attribute.GroupPrincipal
+    fun lookupPrincipalByName(p0: String): borg.trikeshed.userspace.nio.file.attribute.UserPrincipal = TODO("NIO common stub")
+    fun lookupPrincipalByGroupName(p0: String): borg.trikeshed.userspace.nio.file.attribute.GroupPrincipal = TODO("NIO common stub")
 }

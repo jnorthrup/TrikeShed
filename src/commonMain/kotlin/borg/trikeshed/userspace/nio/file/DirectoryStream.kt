@@ -7,9 +7,9 @@ import borg.trikeshed.Closeable
 // Generated from Amazon Corretto JDK 25 java.base NIO public/protected API via javap.
 // Declarations intentionally mirror JDK taxonomy and contain no implementations.
 public interface DirectoryStream<T> : Closeable, Iterable<T> {
-    fun iterator(): java.util.Iterator<T>
+    fun iterator(): java.util.Iterator<T> = TODO("NIO common stub")
 
     public interface Filter<T> {
-        fun accept(p0: T): Boolean
+        fun accept(p0: T): Boolean = TODO("NIO common stub")
     }
 }

@@ -6,5 +6,5 @@ package borg.trikeshed.userspace.nio.file
 // Declarations intentionally mirror JDK taxonomy and contain no implementations.
 public class DirectoryIteratorException : java.util.ConcurrentModificationException {
     constructor(p0: java.io.IOException)
-    fun getCause(): java.io.IOException
+    fun getCause(): java.io.IOException = TODO("NIO common stub")
 }

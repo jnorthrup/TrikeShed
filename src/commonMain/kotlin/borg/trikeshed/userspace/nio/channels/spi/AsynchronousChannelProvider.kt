@@ -6,11 +6,11 @@ package borg.trikeshed.userspace.nio.channels.spi
 // Declarations intentionally mirror JDK taxonomy and contain no implementations.
 public abstract class AsynchronousChannelProvider {
     protected constructor()
-    fun openAsynchronousChannelGroup(p0: Int, p1: java.util.concurrent.ThreadFactory): borg.trikeshed.userspace.nio.channels.AsynchronousChannelGroup
-    fun openAsynchronousChannelGroup(p0: java.util.concurrent.ExecutorService, p1: Int): borg.trikeshed.userspace.nio.channels.AsynchronousChannelGroup
-    fun openAsynchronousServerSocketChannel(p0: borg.trikeshed.userspace.nio.channels.AsynchronousChannelGroup): borg.trikeshed.userspace.nio.channels.AsynchronousServerSocketChannel
-    fun openAsynchronousSocketChannel(p0: borg.trikeshed.userspace.nio.channels.AsynchronousChannelGroup): borg.trikeshed.userspace.nio.channels.AsynchronousSocketChannel
+    fun openAsynchronousChannelGroup(p0: Int, p1: java.util.concurrent.ThreadFactory): borg.trikeshed.userspace.nio.channels.AsynchronousChannelGroup = TODO("NIO common stub")
+    fun openAsynchronousChannelGroup(p0: java.util.concurrent.ExecutorService, p1: Int): borg.trikeshed.userspace.nio.channels.AsynchronousChannelGroup = TODO("NIO common stub")
+    fun openAsynchronousServerSocketChannel(p0: borg.trikeshed.userspace.nio.channels.AsynchronousChannelGroup): borg.trikeshed.userspace.nio.channels.AsynchronousServerSocketChannel = TODO("NIO common stub")
+    fun openAsynchronousSocketChannel(p0: borg.trikeshed.userspace.nio.channels.AsynchronousChannelGroup): borg.trikeshed.userspace.nio.channels.AsynchronousSocketChannel = TODO("NIO common stub")
     companion object {
-        fun provider(): borg.trikeshed.userspace.nio.channels.spi.AsynchronousChannelProvider
+        fun provider(): borg.trikeshed.userspace.nio.channels.spi.AsynchronousChannelProvider = TODO("NIO common stub")
     }
 }

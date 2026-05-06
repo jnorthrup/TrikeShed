@@ -71,7 +71,7 @@ public open class ByteBuffer protected constructor(
 
     public override fun duplicate(): ByteBuffer = ByteBuffer(backing, base, capacity, position0, limit0, mark0, readOnly, order0)
 
-    public override fun asReadOnlyBuffer(): ByteBuffer = ByteBuffer(backing, base, capacity, position0, limit0, mark0, true, order0)
+    public fun asReadOnlyBuffer(): ByteBuffer = ByteBuffer(backing, base, capacity, position0, limit0, mark0, true, order0)
 
     public fun get(): Byte = get(position0++)
 
@@ -209,7 +209,7 @@ public open class ByteBuffer protected constructor(
         return true
     }
 
-    public fun compareTo(other: ByteBuffer): Int {
+    public override fun compareTo(other: ByteBuffer): Int {
         val length = minOf(remaining(), other.remaining())
         for (i in 0 until length) {
             val a = get(position0 + i).toInt() and 0xFF
@@ -417,7 +417,7 @@ public open class ByteBuffer protected constructor(
         return this
     }
 
-    public override fun compareTo(other: Any): Int = if (other is ByteBuffer) compareTo(other) else throw ClassCastException("Cannot compare ByteBuffer with ${other?.javaClass}")
+    public fun compareTo(other: Any): Int = if (other is ByteBuffer) compareTo(other) else throw ClassCastException("Cannot compare ByteBuffer with $other")
 
     public companion object {
         public fun allocateDirect(p0: Int): ByteBuffer = allocate(p0)

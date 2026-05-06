@@ -5,6 +5,6 @@ package borg.trikeshed.userspace.nio.file.attribute
 // Generated from Amazon Corretto JDK 25 java.base NIO public/protected API via javap.
 // Declarations intentionally mirror JDK taxonomy and contain no implementations.
 public interface FileAttribute<T> {
-    fun name(): String
-    fun value(): T
+    fun name(): String = TODO("NIO common stub")
+    fun value(): T = TODO("NIO common stub")
 }

@@ -6,9 +6,9 @@ package borg.trikeshed.userspace.nio.file
 // Declarations intentionally mirror JDK taxonomy and contain no implementations.
 public class StandardWatchEventKinds {
     companion object {
-        val OVERFLOW: borg.trikeshed.userspace.nio.file.WatchEvent.Kind<Any>
-        val ENTRY_CREATE: borg.trikeshed.userspace.nio.file.WatchEvent.Kind<borg.trikeshed.userspace.nio.file.Path>
-        val ENTRY_DELETE: borg.trikeshed.userspace.nio.file.WatchEvent.Kind<borg.trikeshed.userspace.nio.file.Path>
-        val ENTRY_MODIFY: borg.trikeshed.userspace.nio.file.WatchEvent.Kind<borg.trikeshed.userspace.nio.file.Path>
+        val OVERFLOW: borg.trikeshed.userspace.nio.file.WatchEvent.Kind<Any> = TODO("NIO common stub")
+        val ENTRY_CREATE: borg.trikeshed.userspace.nio.file.WatchEvent.Kind<borg.trikeshed.userspace.nio.file.Path> = TODO("NIO common stub")
+        val ENTRY_DELETE: borg.trikeshed.userspace.nio.file.WatchEvent.Kind<borg.trikeshed.userspace.nio.file.Path> = TODO("NIO common stub")
+        val ENTRY_MODIFY: borg.trikeshed.userspace.nio.file.WatchEvent.Kind<borg.trikeshed.userspace.nio.file.Path> = TODO("NIO common stub")
     }
 }

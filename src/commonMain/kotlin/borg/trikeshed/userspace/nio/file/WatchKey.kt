@@ -5,9 +5,9 @@ package borg.trikeshed.userspace.nio.file
 // Generated from Amazon Corretto JDK 25 java.base NIO public/protected API via javap.
 // Declarations intentionally mirror JDK taxonomy and contain no implementations.
 public interface WatchKey {
-    fun isValid(): Boolean
-    fun pollEvents(): java.util.List<borg.trikeshed.userspace.nio.file.WatchEvent<*>>
-    fun reset(): Boolean
-    fun cancel(): Unit
-    fun watchable(): borg.trikeshed.userspace.nio.file.Watchable
+    fun isValid(): Boolean = TODO("NIO common stub")
+    fun pollEvents(): java.util.List<borg.trikeshed.userspace.nio.file.WatchEvent<*>> = TODO("NIO common stub")
+    fun reset(): Boolean = TODO("NIO common stub")
+    fun cancel(): Unit = TODO("NIO common stub")
+    fun watchable(): borg.trikeshed.userspace.nio.file.Watchable = TODO("NIO common stub")
 }

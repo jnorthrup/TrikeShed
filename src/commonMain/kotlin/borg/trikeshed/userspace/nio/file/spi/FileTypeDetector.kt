@@ -6,5 +6,5 @@ package borg.trikeshed.userspace.nio.file.spi
 // Declarations intentionally mirror JDK taxonomy and contain no implementations.
 public abstract class FileTypeDetector {
     protected constructor()
-    fun probeContentType(p0: borg.trikeshed.userspace.nio.file.Path): String
+    fun probeContentType(p0: borg.trikeshed.userspace.nio.file.Path): String = TODO("NIO common stub")
 }

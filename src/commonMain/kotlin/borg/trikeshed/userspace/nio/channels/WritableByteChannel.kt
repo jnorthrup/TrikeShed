@@ -5,5 +5,5 @@ package borg.trikeshed.userspace.nio.channels
 // Generated from Amazon Corretto JDK 25 java.base NIO public/protected API via javap.
 // Declarations intentionally mirror JDK taxonomy and contain no implementations.
 public interface WritableByteChannel : borg.trikeshed.userspace.nio.channels.Channel {
-    fun write(p0: borg.trikeshed.userspace.nio.ByteBuffer): Int
+    fun write(p0: borg.trikeshed.userspace.nio.ByteBuffer): Int = TODO("NIO common stub")
 }

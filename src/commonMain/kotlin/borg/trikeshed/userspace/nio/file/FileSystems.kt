@@ -6,13 +6,13 @@ package borg.trikeshed.userspace.nio.file
 // Declarations intentionally mirror JDK taxonomy and contain no implementations.
 public class FileSystems {
     companion object {
-        fun getDefault(): borg.trikeshed.userspace.nio.file.FileSystem
-        fun getFileSystem(p0: java.net.URI): borg.trikeshed.userspace.nio.file.FileSystem
-        fun newFileSystem(p0: java.net.URI, p1: java.util.Map<String, *>): borg.trikeshed.userspace.nio.file.FileSystem
-        fun newFileSystem(p0: java.net.URI, p1: java.util.Map<String, *>, p2: java.lang.ClassLoader): borg.trikeshed.userspace.nio.file.FileSystem
-        fun newFileSystem(p0: borg.trikeshed.userspace.nio.file.Path, p1: java.lang.ClassLoader): borg.trikeshed.userspace.nio.file.FileSystem
-        fun newFileSystem(p0: borg.trikeshed.userspace.nio.file.Path, p1: java.util.Map<String, *>): borg.trikeshed.userspace.nio.file.FileSystem
-        fun newFileSystem(p0: borg.trikeshed.userspace.nio.file.Path): borg.trikeshed.userspace.nio.file.FileSystem
-        fun newFileSystem(p0: borg.trikeshed.userspace.nio.file.Path, p1: java.util.Map<String, *>, p2: java.lang.ClassLoader): borg.trikeshed.userspace.nio.file.FileSystem
+        fun getDefault(): borg.trikeshed.userspace.nio.file.FileSystem = TODO("NIO common stub")
+        fun getFileSystem(p0: java.net.URI): borg.trikeshed.userspace.nio.file.FileSystem = TODO("NIO common stub")
+        fun newFileSystem(p0: java.net.URI, p1: java.util.Map<String, *>): borg.trikeshed.userspace.nio.file.FileSystem = TODO("NIO common stub")
+        fun newFileSystem(p0: java.net.URI, p1: java.util.Map<String, *>, p2: java.lang.ClassLoader): borg.trikeshed.userspace.nio.file.FileSystem = TODO("NIO common stub")
+        fun newFileSystem(p0: borg.trikeshed.userspace.nio.file.Path, p1: java.lang.ClassLoader): borg.trikeshed.userspace.nio.file.FileSystem = TODO("NIO common stub")
+        fun newFileSystem(p0: borg.trikeshed.userspace.nio.file.Path, p1: java.util.Map<String, *>): borg.trikeshed.userspace.nio.file.FileSystem = TODO("NIO common stub")
+        fun newFileSystem(p0: borg.trikeshed.userspace.nio.file.Path): borg.trikeshed.userspace.nio.file.FileSystem = TODO("NIO common stub")
+        fun newFileSystem(p0: borg.trikeshed.userspace.nio.file.Path, p1: java.util.Map<String, *>, p2: java.lang.ClassLoader): borg.trikeshed.userspace.nio.file.FileSystem = TODO("NIO common stub")
     }
 }

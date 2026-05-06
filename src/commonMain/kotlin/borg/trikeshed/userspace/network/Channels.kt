@@ -3,7 +3,7 @@ package borg.trikeshed.userspace.network
 import kotlin.concurrent.Volatile
 
 /**
- * Network channel abstractions ported from literbike.
+ * Small common network surface aligned to NIO naming.
  */
 
 class ChannelMetadata(
@@ -23,7 +23,10 @@ interface Channel {
     fun write(buf: ByteArray): Int
 }
 
-interface ChannelProvider {
-    fun createChannel(addr: String): Channel
+interface Channels {
+    fun open(addr: String): Channel
     fun providerName(): String
 }
+
+@Deprecated("Use Channels.", ReplaceWith("Channels"))
+typealias ChannelProvider = Channels

@@ -10,13 +10,13 @@ public open class Charset private constructor(
 
     public fun name(): String = delegate.name
 
-    public fun aliases(): java.util.Set<String> = java.util.LinkedHashSet<String>(delegate.aliases)
+    public fun aliases(): Set<String> = delegate.aliases
 
     public fun displayName(): String = name()
 
     public fun isRegistered(): Boolean = true
 
-    public fun displayName(p0: java.util.Locale): String = name()
+    public fun displayName(locale: Any?): String = name()
 
     public fun contains(p0: Charset): Boolean = delegate.contains(p0.delegate)
 
@@ -40,11 +40,11 @@ public open class Charset private constructor(
 
     public override fun hashCode(): Int = name().hashCode()
 
-    public override fun equals(p0: Any?): Boolean = p0 is Charset && delegate.contains(p0.delegate)
+    public override fun equals(p0: Any?): Boolean = p0 is Charset && delegate === p0.delegate
 
     public override fun toString(): String = name()
 
-    public fun compareTo(p0: Any): Int = if (p0 is Charset) compareTo(p0) else throw ClassCastException("Cannot compare Charset with ${p0?.javaClass}")
+    public fun compareTo(p0: Any): Int = if (p0 is Charset) compareTo(p0) else throw ClassCastException("Cannot compare Charset with $p0")
 
     public companion object {
         public fun isSupported(p0: String): Boolean = PlatformCharset.isSupported(p0)
@@ -53,11 +53,8 @@ public open class Charset private constructor(
 
         public fun forName(p0: String, p1: Charset): Charset = if (PlatformCharset.isSupported(p0)) Charset(PlatformCharset.forName(p0)) else p1
 
-        public fun availableCharsets(): java.util.SortedMap<String, Charset> = java.util.TreeMap<String, Charset>().apply {
-            for ((name, platformCharset) in PlatformCharset.availableCharsets()) {
-                put(name, Charset(platformCharset))
-            }
-        }
+        public fun availableCharsets(): Map<String, Charset> =
+            PlatformCharset.availableCharsets().mapValues { Charset(it.value) }
 
         public fun defaultCharset(): Charset = Charset(PlatformCharset.defaultCharset())
     }

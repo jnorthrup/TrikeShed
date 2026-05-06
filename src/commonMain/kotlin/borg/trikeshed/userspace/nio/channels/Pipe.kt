@@ -6,19 +6,19 @@ package borg.trikeshed.userspace.nio.channels
 // Declarations intentionally mirror JDK taxonomy and contain no implementations.
 public abstract class Pipe {
     protected constructor()
-    fun source(): borg.trikeshed.userspace.nio.channels.Pipe.SourceChannel
-    fun sink(): borg.trikeshed.userspace.nio.channels.Pipe.SinkChannel
+    fun source(): borg.trikeshed.userspace.nio.channels.Pipe.SourceChannel = TODO("NIO common stub")
+    fun sink(): borg.trikeshed.userspace.nio.channels.Pipe.SinkChannel = TODO("NIO common stub")
     companion object {
-        fun `open`(): borg.trikeshed.userspace.nio.channels.Pipe
+        fun `open`(): borg.trikeshed.userspace.nio.channels.Pipe = TODO("NIO common stub")
     }
 
     public abstract class SinkChannel : borg.trikeshed.userspace.nio.channels.spi.AbstractSelectableChannel, borg.trikeshed.userspace.nio.channels.WritableByteChannel, borg.trikeshed.userspace.nio.channels.GatheringByteChannel {
         protected constructor(p0: borg.trikeshed.userspace.nio.channels.spi.SelectorProvider)
-        fun validOps(): Int
+        fun validOps(): Int = TODO("NIO common stub")
     }
 
     public abstract class SourceChannel : borg.trikeshed.userspace.nio.channels.spi.AbstractSelectableChannel, borg.trikeshed.userspace.nio.channels.ReadableByteChannel, borg.trikeshed.userspace.nio.channels.ScatteringByteChannel {
         protected constructor(p0: borg.trikeshed.userspace.nio.channels.spi.SelectorProvider)
-        fun validOps(): Int
+        fun validOps(): Int = TODO("NIO common stub")
     }
 }

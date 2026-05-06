@@ -6,8 +6,8 @@ package borg.trikeshed.userspace.nio.file
 // Declarations intentionally mirror JDK taxonomy and contain no implementations.
 public open class SimpleFileVisitor<T> {
     protected constructor()
-    fun preVisitDirectory(p0: T, p1: borg.trikeshed.userspace.nio.file.attribute.BasicFileAttributes): borg.trikeshed.userspace.nio.file.FileVisitResult
-    fun visitFile(p0: T, p1: borg.trikeshed.userspace.nio.file.attribute.BasicFileAttributes): borg.trikeshed.userspace.nio.file.FileVisitResult
-    fun visitFileFailed(p0: T, p1: java.io.IOException): borg.trikeshed.userspace.nio.file.FileVisitResult
-    fun postVisitDirectory(p0: T, p1: java.io.IOException): borg.trikeshed.userspace.nio.file.FileVisitResult
+    fun preVisitDirectory(p0: T, p1: borg.trikeshed.userspace.nio.file.attribute.BasicFileAttributes): borg.trikeshed.userspace.nio.file.FileVisitResult = TODO("NIO common stub")
+    fun visitFile(p0: T, p1: borg.trikeshed.userspace.nio.file.attribute.BasicFileAttributes): borg.trikeshed.userspace.nio.file.FileVisitResult = TODO("NIO common stub")
+    fun visitFileFailed(p0: T, p1: java.io.IOException): borg.trikeshed.userspace.nio.file.FileVisitResult = TODO("NIO common stub")
+    fun postVisitDirectory(p0: T, p1: java.io.IOException): borg.trikeshed.userspace.nio.file.FileVisitResult = TODO("NIO common stub")
 }

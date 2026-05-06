@@ -2,7 +2,7 @@
 
 package borg.trikeshed.userspace.nio
 
-public sealed class ByteOrder(private val orderName: String) {
+public open class ByteOrder(private val orderName: String) {
     override fun toString(): String = orderName
 
     public companion object {

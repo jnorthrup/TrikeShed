@@ -7,8 +7,8 @@ package borg.trikeshed.userspace.nio.file
 public open class InvalidPathException : IllegalArgumentException {
     constructor(p0: String, p1: String, p2: Int)
     constructor(p0: String, p1: String)
-    fun getInput(): String
-    fun getReason(): String
-    fun getIndex(): Int
-    fun getMessage(): String
+    fun getInput(): String = TODO("NIO common stub")
+    fun getReason(): String = TODO("NIO common stub")
+    fun getIndex(): Int = TODO("NIO common stub")
+    fun getMessage(): String = TODO("NIO common stub")
 }

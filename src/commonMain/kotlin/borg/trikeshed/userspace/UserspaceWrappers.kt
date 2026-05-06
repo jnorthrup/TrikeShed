@@ -4,27 +4,21 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
-import kotlin.coroutines.CoroutineContext
 
 /**
- * Common high-level DSL and Coroutine integration for Userspace IO.
+ * Coroutine integration around the userspace Channel.
  */
-
-val CoroutineContext.userspaceRing: UserspaceRing
-    get() = this[UserspaceRing.Key] ?: throw IllegalStateException("UserspaceRing not found in context")
-
-class UserspaceIORunner(
-    val ring: UserspaceRing,
-    val scope: CoroutineScope
+class ChannelRunner(
+    val channel: Channel,
+    val scope: CoroutineScope,
 ) {
-    private val pendingOps = mutableMapOf<Long, CompletableDeferred<UserspaceIOResult>>()
+    private val pendingOps = mutableMapOf<Long, CompletableDeferred<SelectionResult>>()
     private var running = true
 
     fun start(): Job = scope.launch {
         while (running) {
-            val results = ring.wait(minComplete = 0)
-            for (res in results) {
-                pendingOps.remove(res.userData)?.complete(res)
+            for (result in channel.wait(minComplete = 0)) {
+                pendingOps.remove(result.userData)?.complete(result)
             }
             kotlinx.coroutines.yield()
         }
@@ -34,12 +28,15 @@ class UserspaceIORunner(
         running = false
     }
 
-    suspend fun runOp(block: (Long) -> Unit): UserspaceIOResult {
-        val deferred = CompletableDeferred<UserspaceIOResult>()
+    suspend fun runOp(block: (Long) -> Unit): SelectionResult {
+        val deferred = CompletableDeferred<SelectionResult>()
         val userData = deferred.hashCode().toLong()
         pendingOps[userData] = deferred
         block(userData)
-        ring.submit()
+        channel.submit()
         return deferred.await()
     }
 }
+
+@Deprecated("Use ChannelRunner.", ReplaceWith("ChannelRunner"))
+typealias UserspaceIORunner = ChannelRunner

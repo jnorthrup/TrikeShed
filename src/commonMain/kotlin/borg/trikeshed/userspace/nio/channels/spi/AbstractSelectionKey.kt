@@ -6,6 +6,6 @@ package borg.trikeshed.userspace.nio.channels.spi
 // Declarations intentionally mirror JDK taxonomy and contain no implementations.
 public abstract class AbstractSelectionKey : borg.trikeshed.userspace.nio.channels.SelectionKey {
     protected constructor()
-    fun isValid(): Boolean
-    fun cancel(): Unit
+    fun isValid(): Boolean = TODO("NIO common stub")
+    fun cancel(): Unit = TODO("NIO common stub")
 }

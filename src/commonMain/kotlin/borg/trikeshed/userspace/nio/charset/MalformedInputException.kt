@@ -6,6 +6,6 @@ package borg.trikeshed.userspace.nio.charset
 // Declarations intentionally mirror JDK taxonomy and contain no implementations.
 public open class MalformedInputException : borg.trikeshed.userspace.nio.charset.CharacterCodingException {
     constructor(p0: Int)
-    fun getInputLength(): Int
-    fun getMessage(): String
+    fun getInputLength(): Int = TODO("NIO common stub")
+    fun getMessage(): String = TODO("NIO common stub")
 }

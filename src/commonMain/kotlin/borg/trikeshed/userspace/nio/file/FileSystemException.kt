@@ -7,8 +7,8 @@ package borg.trikeshed.userspace.nio.file
 public open class FileSystemException : java.io.IOException {
     constructor(p0: String)
     constructor(p0: String, p1: String, p2: String)
-    fun getFile(): String
-    fun getOtherFile(): String
-    fun getReason(): String
-    fun getMessage(): String
+    fun getFile(): String = TODO("NIO common stub")
+    fun getOtherFile(): String = TODO("NIO common stub")
+    fun getReason(): String = TODO("NIO common stub")
+    fun getMessage(): String = TODO("NIO common stub")
 }

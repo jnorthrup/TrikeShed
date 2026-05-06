@@ -1,44 +1,73 @@
 package borg.trikeshed.userspace
 
-import kotlin.coroutines.CoroutineContext
+import borg.trikeshed.userspace.nio.ByteBuffer
 
-/**
- * High-level Userspace IO Facade for Trikeshed.
- * This commonMain implementation defines the unified model for high-performance I/O.
- */
+data class SelectionResult(val res: Int, val userData: Long)
 
-expect class UserspaceBuffer {
-    val size: Int
-    fun get(index: Int): Byte
-    fun put(index: Int, value: Byte)
+class File internal constructor(internal val impl: FileImpl) {
+    val id: Int get() = impl.id
+    fun isOpen(): Boolean = impl.isOpen()
+    fun close() = impl.close()
 }
 
-expect class UserspaceFD {
+class Channel internal constructor(private val impl: ChannelImpl) {
+    fun read(file: File, buffer: ByteBuffer, offset: Long, userData: Long) =
+        impl.read(file.impl, buffer, offset, userData)
+
+    fun write(file: File, buffer: ByteBuffer, offset: Long, userData: Long) =
+        impl.write(file.impl, buffer, offset, userData)
+
+    fun accept(file: File, userData: Long) =
+        impl.accept(file.impl, userData)
+
+    fun connect(file: File, address: String, port: Int, userData: Long) =
+        impl.connect(file.impl, address, port, userData)
+
+    fun close(file: File, userData: Long) =
+        impl.close(file.impl, userData)
+
+    fun submit(): Int = impl.submit()
+
+    fun wait(minComplete: Int = 1): List<SelectionResult> = impl.wait(minComplete)
+
+    fun peek(): List<SelectionResult> = impl.peek()
+}
+
+object Files {
+    fun open(path: String, readOnly: Boolean = true): File = File(FilesImpl.open(path, readOnly))
+}
+
+object Channels {
+    fun open(entries: Int = 256): Channel = Channel(ChannelsImpl.open(entries))
+
+    fun socket(domain: Int, type: Int, protocol: Int): File =
+        File(ChannelsImpl.socket(domain, type, protocol))
+
+    fun wrap(bytes: ByteArray): ByteBuffer = ByteBuffer.wrap(bytes)
+}
+
+internal expect class FileImpl(id: Int) {
     val id: Int
-    fun isInvalid(): Boolean
+    fun isOpen(): Boolean
+    fun close()
 }
 
-data class UserspaceIOResult(val res: Int, val userData: Long)
-
-interface UserspaceRing : CoroutineContext.Element {
-    override val key: CoroutineContext.Key<*> get() = Key
-    companion object Key : CoroutineContext.Key<UserspaceRing>
-
-    fun prepRead(fd: UserspaceFD, buffer: UserspaceBuffer, offset: Long, userData: Long)
-    fun prepWrite(fd: UserspaceFD, buffer: UserspaceBuffer, offset: Long, userData: Long)
-    fun prepAccept(fd: UserspaceFD, userData: Long)
-    fun prepConnect(fd: UserspaceFD, address: String, port: Int, userData: Long)
-    fun prepClose(fd: UserspaceFD, userData: Long)
+internal expect class ChannelImpl(entries: Int) {
+    fun read(file: FileImpl, buffer: ByteBuffer, offset: Long, userData: Long)
+    fun write(file: FileImpl, buffer: ByteBuffer, offset: Long, userData: Long)
+    fun accept(file: FileImpl, userData: Long)
+    fun connect(file: FileImpl, address: String, port: Int, userData: Long)
+    fun close(file: FileImpl, userData: Long)
     fun submit(): Int
-    fun wait(minComplete: Int = 1): List<UserspaceIOResult>
-    fun peek(): List<UserspaceIOResult>
+    fun wait(minComplete: Int = 1): List<SelectionResult>
+    fun peek(): List<SelectionResult>
 }
 
-interface UserspaceSPI {
-    fun createRing(entries: Int = 256): UserspaceRing
-    fun openFile(path: String, readOnly: Boolean = true): UserspaceFD
-    fun createSocket(domain: Int, type: Int, protocol: Int): UserspaceFD
-    fun wrapBuffer(byteArray: ByteArray): UserspaceBuffer
+internal expect object FilesImpl {
+    fun open(path: String, readOnly: Boolean = true): FileImpl
 }
 
-expect val userspaceSPI: UserspaceSPI
+internal expect object ChannelsImpl {
+    fun open(entries: Int = 256): ChannelImpl
+    fun socket(domain: Int, type: Int, protocol: Int): FileImpl
+}

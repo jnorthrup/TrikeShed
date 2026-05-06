@@ -6,7 +6,7 @@ package borg.trikeshed.userspace.nio.file
 // Declarations intentionally mirror JDK taxonomy and contain no implementations.
 public class Paths {
     companion object {
-        fun `get`(p0: String, vararg p1: String): borg.trikeshed.userspace.nio.file.Path
-        fun `get`(p0: java.net.URI): borg.trikeshed.userspace.nio.file.Path
+        fun `get`(p0: String, vararg p1: String): borg.trikeshed.userspace.nio.file.Path = TODO("NIO common stub")
+        fun `get`(p0: java.net.URI): borg.trikeshed.userspace.nio.file.Path = TODO("NIO common stub")
     }
 }

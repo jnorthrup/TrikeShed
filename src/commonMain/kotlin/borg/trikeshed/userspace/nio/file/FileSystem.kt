@@ -6,16 +6,16 @@ package borg.trikeshed.userspace.nio.file
 // Declarations intentionally mirror JDK taxonomy and contain no implementations.
 public abstract class FileSystem {
     protected constructor()
-    fun provider(): borg.trikeshed.userspace.nio.file.spi.FileSystemProvider
-    fun close(): Unit
-    fun isOpen(): Boolean
-    fun isReadOnly(): Boolean
-    fun getSeparator(): String
-    fun getRootDirectories(): Iterable<borg.trikeshed.userspace.nio.file.Path>
-    fun getFileStores(): Iterable<borg.trikeshed.userspace.nio.file.FileStore>
-    fun supportedFileAttributeViews(): java.util.Set<String>
-    fun getPath(p0: String, vararg p1: String): borg.trikeshed.userspace.nio.file.Path
-    fun getPathMatcher(p0: String): borg.trikeshed.userspace.nio.file.PathMatcher
-    fun getUserPrincipalLookupService(): borg.trikeshed.userspace.nio.file.attribute.UserPrincipalLookupService
-    fun newWatchService(): borg.trikeshed.userspace.nio.file.WatchService
+    fun provider(): borg.trikeshed.userspace.nio.file.spi.FileSystemProvider = TODO("NIO common stub")
+    fun close(): Unit = TODO("NIO common stub")
+    fun isOpen(): Boolean = TODO("NIO common stub")
+    fun isReadOnly(): Boolean = TODO("NIO common stub")
+    fun getSeparator(): String = TODO("NIO common stub")
+    fun getRootDirectories(): Iterable<borg.trikeshed.userspace.nio.file.Path> = TODO("NIO common stub")
+    fun getFileStores(): Iterable<borg.trikeshed.userspace.nio.file.FileStore> = TODO("NIO common stub")
+    fun supportedFileAttributeViews(): java.util.Set<String> = TODO("NIO common stub")
+    fun getPath(p0: String, vararg p1: String): borg.trikeshed.userspace.nio.file.Path = TODO("NIO common stub")
+    fun getPathMatcher(p0: String): borg.trikeshed.userspace.nio.file.PathMatcher = TODO("NIO common stub")
+    fun getUserPrincipalLookupService(): borg.trikeshed.userspace.nio.file.attribute.UserPrincipalLookupService = TODO("NIO common stub")
+    fun newWatchService(): borg.trikeshed.userspace.nio.file.WatchService = TODO("NIO common stub")
 }

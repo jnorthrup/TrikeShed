@@ -6,10 +6,10 @@ package borg.trikeshed.userspace.nio.channels.spi
 // Declarations intentionally mirror JDK taxonomy and contain no implementations.
 public abstract class AbstractSelector : borg.trikeshed.userspace.nio.channels.Selector {
     protected constructor(p0: borg.trikeshed.userspace.nio.channels.spi.SelectorProvider)
-    fun close(): Unit
+    fun close(): Unit = TODO("NIO common stub")
     protected fun implCloseSelector(): Unit
-    fun isOpen(): Boolean
-    fun provider(): borg.trikeshed.userspace.nio.channels.spi.SelectorProvider
+    fun isOpen(): Boolean = TODO("NIO common stub")
+    fun provider(): borg.trikeshed.userspace.nio.channels.spi.SelectorProvider = TODO("NIO common stub")
     protected fun cancelledKeys(): java.util.Set<borg.trikeshed.userspace.nio.channels.SelectionKey>
     protected fun register(p0: borg.trikeshed.userspace.nio.channels.spi.AbstractSelectableChannel, p1: Int, p2: Any): borg.trikeshed.userspace.nio.channels.SelectionKey
     protected fun deregister(p0: borg.trikeshed.userspace.nio.channels.spi.AbstractSelectionKey): Unit

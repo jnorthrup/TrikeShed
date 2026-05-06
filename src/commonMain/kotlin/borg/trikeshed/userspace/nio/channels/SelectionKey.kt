@@ -6,25 +6,25 @@ package borg.trikeshed.userspace.nio.channels
 // Declarations intentionally mirror JDK taxonomy and contain no implementations.
 public abstract class SelectionKey {
     protected constructor()
-    fun channel(): borg.trikeshed.userspace.nio.channels.SelectableChannel
-    fun selector(): borg.trikeshed.userspace.nio.channels.Selector
-    fun isValid(): Boolean
-    fun cancel(): Unit
-    fun interestOps(): Int
-    fun interestOps(p0: Int): borg.trikeshed.userspace.nio.channels.SelectionKey
-    fun interestOpsOr(p0: Int): Int
-    fun interestOpsAnd(p0: Int): Int
-    fun readyOps(): Int
-    fun isReadable(): Boolean
-    fun isWritable(): Boolean
-    fun isConnectable(): Boolean
-    fun isAcceptable(): Boolean
-    fun attach(p0: Any): Any
-    fun attachment(): Any
+    fun channel(): borg.trikeshed.userspace.nio.channels.SelectableChannel = TODO("NIO common stub")
+    fun selector(): borg.trikeshed.userspace.nio.channels.Selector = TODO("NIO common stub")
+    fun isValid(): Boolean = TODO("NIO common stub")
+    fun cancel(): Unit = TODO("NIO common stub")
+    fun interestOps(): Int = TODO("NIO common stub")
+    fun interestOps(p0: Int): borg.trikeshed.userspace.nio.channels.SelectionKey = TODO("NIO common stub")
+    fun interestOpsOr(p0: Int): Int = TODO("NIO common stub")
+    fun interestOpsAnd(p0: Int): Int = TODO("NIO common stub")
+    fun readyOps(): Int = TODO("NIO common stub")
+    fun isReadable(): Boolean = TODO("NIO common stub")
+    fun isWritable(): Boolean = TODO("NIO common stub")
+    fun isConnectable(): Boolean = TODO("NIO common stub")
+    fun isAcceptable(): Boolean = TODO("NIO common stub")
+    fun attach(p0: Any): Any = TODO("NIO common stub")
+    fun attachment(): Any = TODO("NIO common stub")
     companion object {
-        val OP_READ: Int
-        val OP_WRITE: Int
-        val OP_CONNECT: Int
-        val OP_ACCEPT: Int
+        val OP_READ: Int = TODO("NIO common stub")
+        val OP_WRITE: Int = TODO("NIO common stub")
+        val OP_CONNECT: Int = TODO("NIO common stub")
+        val OP_ACCEPT: Int = TODO("NIO common stub")
     }
 }
