@@ -165,7 +165,7 @@ class Isam3ColumnarTest {
             assertTrue(Files.exists(layoutPath))
             assertTrue(Files.readString(layoutPath).contains("isam: 3"))
             assertTrue(Files.exists("$base.time.col"))
-            assertTrue(Files.exists("$base.price.col"))
+            assertTrue(Files.exists("$base.ohlcv.col"))
 
             val reopened = openColumnarIsam(base)
             assertEquals(2, reopened.size)
@@ -190,7 +190,7 @@ class Isam3ColumnarTest {
         } finally {
             rm("$base.isam3.yaml")
             rm("$base.time.col")
-            rm("$base.price.col")
+            rm("$base.ohlcv.col")
         }
     }
 }

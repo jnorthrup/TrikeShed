@@ -417,6 +417,7 @@ class Isam3Layout(
         private fun clusterName(meta: RecordMeta): String {
             val lower = meta.name.lowercase()
             return when {
+                lower in OHLCV_COLUMNS -> "ohlcv"
                 "time" in lower -> "time"
                 "trade" in lower -> "trades"
                 "volume" in lower || "quote_asset" in lower -> "volume"
@@ -428,6 +429,8 @@ class Isam3Layout(
                 else -> meta.type.name.lowercase()
             }
         }
+
+        private val OHLCV_COLUMNS: Set<String> = setOf("open", "high", "low", "close", "volume")
 
         private fun typeNameOf(value: Any?): String = value?.let { it::class.simpleName ?: it::class.toString() } ?: "null"
 
