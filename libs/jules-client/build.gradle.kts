@@ -62,6 +62,7 @@ val verifyJulesClientGeneratedSources by tasks.registering {
     dependsOn(openApiGenerateJulesClient)
 }
 
-tasks.named("compileKotlinJvm").configure {
+// All KMP compile tasks must depend on generation since commonMain includes generated sources
+tasks.matching { it.name.startsWith("compileKotlin") || it.name.startsWith("compileCommonMain") }.configureEach {
     dependsOn(openApiGenerateJulesClient)
 }

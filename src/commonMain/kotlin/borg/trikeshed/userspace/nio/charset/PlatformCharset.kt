@@ -40,9 +40,21 @@ internal class PlatformCharset private constructor(
                     }
                 }
 
-                override fun encode(value: String): ByteArray = ByteArray(value.length) { i ->
-                    val code = value[i].code
-                    if (code <= 0xff) code.toByte() else '?'.code.toByte()
+                override fun encode(value: String): ByteArray {
+                    val bytes = mutableListOf<Byte>()
+                    var i = 0
+                    while (i < value.length) {
+                        val ch = value[i]
+                        if (ch.isHighSurrogate() && i + 1 < value.length && value[i + 1].isLowSurrogate()) {
+                            bytes.add('?'.code.toByte())
+                            i += 2
+                        } else {
+                            val code = ch.code
+                            bytes.add(if (code <= 0xff) code.toByte() else '?'.code.toByte())
+                            i++
+                        }
+                    }
+                    return bytes.toByteArray()
                 }
             },
         )

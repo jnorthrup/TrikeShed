@@ -58,7 +58,7 @@ def configureCompiler = { kotlinExt, boolean expectActual ->
     }
 }
 
-def standardFullTargets = { kotlinExt, boolean executables ->
+def standardKmpHostTargets = { kotlinExt, boolean executables ->
     kotlinExt.jvmToolchain(21)
     kotlinExt.jvm()
     kotlinExt.js {
@@ -113,7 +113,7 @@ def standardSourceSets = { kotlinExt, String rootMode, boolean coroutinesMain, b
     if (ss.findByName("wasmJsTest") != null) ss.getByName("wasmJsTest").dependsOn(ss.getByName("commonTest"))
 }
 
-def kmpFull = { Map options = [:] ->
+def kmpHost = { Map options = [:] ->
     def rootMode = options.get("rootMode", "api")
     def coroutinesMain = options.get("coroutinesMain", true)
     def datetimeMain = options.get("datetimeMain", false)
@@ -123,7 +123,7 @@ def kmpFull = { Map options = [:] ->
     version = libVersion
     def kotlinExt = extensions.getByName("kotlin")
     configureCompiler(kotlinExt, true)
-    standardFullTargets(kotlinExt, true)
+    standardKmpHostTargets(kotlinExt, true)
     standardSourceSets(kotlinExt, rootMode, coroutinesMain, datetimeMain)
 }
 
@@ -166,7 +166,7 @@ def plainJvm = { boolean applyApplication = false ->
 
 switch (project.path) {
     case ":libs:common":
-        kmpFull()
+        kmpHost()
         break
     case ":libs:dreamer-kmm":
         // dreamer-kmm has its own exceptional build.gradle.kts — standalone, root TrikeShed only
@@ -176,7 +176,7 @@ switch (project.path) {
     case ":libs:tiny-btrfs":
     case ":libs:ngsctp":
     case ":libs:quic":
-        kmpFull()
+        kmpHost()
         break
     case ":libs:uring":
         kmpJvm()
@@ -189,7 +189,7 @@ switch (project.path) {
         }
         break
     case ":libs:concurrency":
-        kmpFull()
+        kmpHost()
         break
     case ":libs:cmc-generated":
         plainJvm()
@@ -308,7 +308,7 @@ switch (project.path) {
         }
         break
     case ":libs:cpu-cache":
-        kmpFull(rootMode: "none", coroutinesMain: false)
+        kmpHost(rootMode: "none", coroutinesMain: false)
         def cpuKotlin = extensions.getByName("kotlin")
         if (System.getProperty("os.name") == "Mac OS X" && cpuKotlin.targets.findByName("macos") == null) {
             cpuKotlin.macosX64("macos") {
@@ -367,7 +367,7 @@ switch (project.path) {
         }
         break
     case ":libs:dreamer-dashboard":
-        kmpFull()
+        kmpHost()
         group = "com.vsiwest"
         extensions.getByName("kotlin").sourceSets.getByName("jsMain").dependencies {
             implementation libPeer("dreamer-kmm")
@@ -375,7 +375,7 @@ switch (project.path) {
         }
         break
     case ":libs:miniduck":
-        kmpFull(datetimeMain: true)
+        kmpHost(datetimeMain: true)
         def miniduckKotlin = extensions.getByName("kotlin")
         def miniduckSets = miniduckKotlin.sourceSets
         miniduckSets.getByName("commonMain").dependencies {
@@ -394,7 +394,7 @@ switch (project.path) {
         miniduckSets.findByName("linuxMain")?.dependsOn(miniduckPosix)
         break
     case ":libs:couch":
-        kmpFull(datetimeMain: true)
+        kmpHost(datetimeMain: true)
         def couchKotlin = extensions.getByName("kotlin")
         def couchSets = couchKotlin.sourceSets
         couchSets.getByName("commonMain").dependencies {
@@ -438,7 +438,7 @@ switch (project.path) {
         }
         break
     case ":libs:couch:viewserver":
-        kmpFull()
+        kmpHost()
         def viewKotlin = extensions.getByName("kotlin")
         def viewSets = viewKotlin.sourceSets
         viewSets.getByName("commonMain").dependencies {
@@ -472,13 +472,13 @@ switch (project.path) {
         serverSets.getByName("commonTest").kotlin.srcDir("../htx-client/src/generated/kotlin")
         break
     case ":libs:openapi":
-        kmpFull()
+        kmpHost()
         group = "org.bereft"
         version = trikeshedVersion
         break
     case ":libs:htx-client":
     case ":libs:jules-client":
-        kmpJvm()
+        kmpHost()
         extensions.getByName("kotlin").sourceSets.getByName("commonMain").kotlin.srcDir("src/generated/kotlin")
 
         tasks.register("openApiGenerateHtxGeneralClient", JavaExec) {
@@ -513,6 +513,6 @@ switch (project.path) {
         }
         break
     default:
-        kmpFull()
+        kmpHost()
         break
 }

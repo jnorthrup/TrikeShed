@@ -77,9 +77,6 @@ kotlin {
                         baseName = "trikeshed"
                     }
                 }
-                binaries.executable("autoresearchNative") {
-                    entryPoint = "borg.trikeshed.autoresearch.autoresearchNativeMain"
-                }
                 // Local DuckDB cinterop removed from root build; if a local libs/duckdb is available,
                 // include it via settings.gradle.kts as a composite build and add a proper cinterop there.
             }
@@ -90,9 +87,6 @@ kotlin {
                     binaries.sharedLib {
                         baseName = "trikeshed"
                     }
-                }
-                binaries.executable("autoresearchNative") {
-                    entryPoint = "borg.trikeshed.autoresearch.autoresearchNativeMain"
                 }
             }
         }
@@ -109,18 +103,12 @@ kotlin {
                     baseName = "trikeshed"
                 }
             }
-            binaries.executable("autoresearchNative") {
-                entryPoint = "borg.trikeshed.autoresearch.autoresearchNativeMain"
-            }
         }
         linuxArm64("linuxArm64") {
             if (enableNativeSharedLib) {
                 binaries.sharedLib {
                     baseName = "trikeshed"
                 }
-            }
-            binaries.executable("autoresearchNative") {
-                entryPoint = "borg.trikeshed.autoresearch.autoresearchNativeMain"
             }
         }
     }

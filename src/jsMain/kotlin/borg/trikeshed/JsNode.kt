@@ -61,7 +61,7 @@ internal fun jsMktemp(): String {
 
 /** Open a file and return a numeric file descriptor. */
 internal fun jsOpen(filename: String, readOnly: Boolean): Int {
-    val fd: dynamic = fs.openSync(filename, if (readOnly) "r" else "w+")
+    val fd: dynamic = fs.openSync(filename, if (readOnly) "r" else "r+")
     return fd as Int
 }
 
@@ -78,7 +78,9 @@ internal fun jsPread(fd: Int, buf: ByteArray, offset: Int, length: Int, fileOffs
 /** Write exactly like POSIX pwrite: fileOffset is independent of the fd's internal position. */
 internal fun jsPwrite(fd: Int, buf: ByteArray, offset: Int, length: Int, fileOffset: Long): Int {
     val nodeBuf: dynamic = Buffer.from(buf.copyOfRange(offset, offset + length))
-    return fs.writeSync(fd, nodeBuf, 0, length, fileOffset) as Int
+    val written = fs.writeSync(fd, nodeBuf, 0, length, fileOffset.toInt()) as Int
+    fs.fsyncSync(fd)
+    return written
 }
 
 /** Close a file descriptor. */

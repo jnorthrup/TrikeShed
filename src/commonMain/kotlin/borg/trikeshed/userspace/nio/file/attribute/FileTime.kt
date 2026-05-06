@@ -2,19 +2,49 @@
 
 package borg.trikeshed.userspace.nio.file.attribute
 
-// Generated from Amazon Corretto JDK 25 java.base NIO public/protected API via javap.
-// Declarations intentionally mirror JDK taxonomy and contain no implementations.
-public class FileTime : Comparable<borg.trikeshed.userspace.nio.file.attribute.FileTime> {
-    fun to(p0: kotlin.time.DurationUnit): Long = TODO("NIO common stub")
-    fun toMillis(): Long = TODO("NIO common stub")
-    fun toInstant(): kotlinx.datetime.Instant = TODO("NIO common stub")
-    override fun equals(p0: Any?): Boolean = TODO("NIO common stub")
-    override fun hashCode(): Int = TODO("NIO common stub")
-    override fun compareTo(p0: borg.trikeshed.userspace.nio.file.attribute.FileTime): Int = TODO("NIO common stub")
-    override fun toString(): String = TODO("NIO common stub")
+import kotlin.time.DurationUnit
+import kotlinx.datetime.Instant
+
+public class FileTime private constructor(private val millis: Long) : Comparable<FileTime> {
+
+    fun to(unit: DurationUnit): Long = when (unit) {
+        DurationUnit.MILLISECONDS -> millis
+        DurationUnit.SECONDS -> millis / 1000L
+        DurationUnit.MINUTES -> millis / 60_000L
+        DurationUnit.HOURS -> millis / 3_600_000L
+        DurationUnit.DAYS -> millis / 86_400_000L
+        DurationUnit.MICROSECONDS -> millis * 1000L
+        DurationUnit.NANOSECONDS -> millis * 1_000_000L
+        else -> millis
+    }
+
+    fun toMillis(): Long = millis
+
+    fun toInstant(): Instant = Instant.fromEpochMilliseconds(millis)
+
+    override fun equals(other: Any?): Boolean =
+        this === other || (other is FileTime && millis == other.millis)
+
+    override fun hashCode(): Int = millis.hashCode()
+
+    override fun compareTo(other: FileTime): Int = millis.compareTo(other.millis)
+
+    override fun toString(): String = toInstant().toString()
+
     companion object {
-        fun from(p0: Long, p1: kotlin.time.DurationUnit): borg.trikeshed.userspace.nio.file.attribute.FileTime = TODO("NIO common stub")
-        fun fromMillis(p0: Long): borg.trikeshed.userspace.nio.file.attribute.FileTime = TODO("NIO common stub")
-        fun from(p0: kotlinx.datetime.Instant): borg.trikeshed.userspace.nio.file.attribute.FileTime = TODO("NIO common stub")
+        fun from(value: Long, unit: DurationUnit): FileTime = when (unit) {
+            DurationUnit.MILLISECONDS -> FileTime(value)
+            DurationUnit.SECONDS -> FileTime(value * 1000L)
+            DurationUnit.MINUTES -> FileTime(value * 60_000L)
+            DurationUnit.HOURS -> FileTime(value * 3_600_000L)
+            DurationUnit.DAYS -> FileTime(value * 86_400_000L)
+            DurationUnit.MICROSECONDS -> FileTime(value / 1000L)
+            DurationUnit.NANOSECONDS -> FileTime(value / 1_000_000L)
+            else -> FileTime(value)
+        }
+
+        fun fromMillis(value: Long): FileTime = FileTime(value)
+
+        fun from(instant: Instant): FileTime = FileTime(instant.toEpochMilliseconds())
     }
 }

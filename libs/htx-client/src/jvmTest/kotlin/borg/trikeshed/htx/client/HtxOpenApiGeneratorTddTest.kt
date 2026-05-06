@@ -1,8 +1,7 @@
 package borg.trikeshed.htx.client
 
-import kotlin.test.Test
-import kotlin.test.assertTrue
 import java.io.File
+import kotlin.test.assertTrue
 
 class HtxOpenApiGeneratorTddTest {
     // @Test
