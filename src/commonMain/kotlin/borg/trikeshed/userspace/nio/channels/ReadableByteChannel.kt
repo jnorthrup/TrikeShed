@@ -2,8 +2,10 @@
 
 package borg.trikeshed.userspace.nio.channels
 
+import borg.trikeshed.userspace.ByteRegion
+
 // Generated from Amazon Corretto JDK 25 java.base NIO public/protected API via javap.
 // Declarations intentionally mirror JDK taxonomy and contain no implementations.
-public interface ReadableByteChannel : borg.trikeshed.userspace.nio.channels.Channel {
-    fun read(p0: borg.trikeshed.userspace.nio.ByteBuffer): Int = TODO("NIO common stub")
+public interface ReadableByteChannel : Channel {
+    fun read(dst: ByteRegion): Int = TODO("NIO common stub")
 }

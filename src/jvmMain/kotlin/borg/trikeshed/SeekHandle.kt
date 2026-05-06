@@ -1,7 +1,9 @@
 package borg.trikeshed
 
+import borg.trikeshed.lib.ByteSeries
+import borg.trikeshed.userspace.ByteRegion
 import java.io.RandomAccessFile
-import java.nio.ByteBuffer
+import java.nio.ByteBuffer as JavaByteBuffer
 
 /**
  * JVM FileChannel-based SeekHandle.
@@ -25,27 +27,38 @@ class FileChannelSeekHandle : SeekHandle {
         channels.remove(handle)?.close()
     }
 
-    override fun pread(handle: Long, buf: ByteArray, offset: Int, length: Int, fileOffset: Long): Int {
+    override fun pread(handle: Long, dst: ByteRegion, fileOffset: Long): Int {
         val raf = channels[handle] ?: return -1
+        val backing = dst.buffer.array()
+        val offset = dst.buffer.arrayOffset() + dst.start
         raf.seek(fileOffset)
-        return raf.read(buf, offset, length)
+        return raf.read(backing, offset, dst.size)
     }
 
-    override fun pwrite(handle: Long, buf: ByteArray, offset: Int, length: Int, fileOffset: Long): Int {
+    override fun pwrite(handle: Long, src: ByteSeries, fileOffset: Long): Int {
         val raf = channels[handle] ?: return -1
-        val prev = raf.filePointer
+        val bytes = src.toArray()
         raf.seek(fileOffset)
-        raf.write(buf, offset, length)
-        return length
+        raf.write(bytes, 0, bytes.size)
+        return bytes.size
     }
 
     override fun size(handle: Long): Long {
         return channels[handle]?.length() ?: -1
     }
 
-    override fun read(handle: Long, buf: ByteArray, offset: Int, length: Int): Int {
+    override fun read(handle: Long, dst: ByteRegion): Int {
         val raf = channels[handle] ?: return -1
-        return raf.read(buf, offset, length)
+        val backing = dst.buffer.array()
+        val offset = dst.buffer.arrayOffset() + dst.start
+        return raf.read(backing, offset, dst.size)
+    }
+
+    override fun write(handle: Long, src: ByteSeries): Int {
+        val raf = channels[handle] ?: return -1
+        val bytes = src.toArray()
+        raf.write(bytes, 0, bytes.size)
+        return bytes.size
     }
 
     override fun seek(handle: Long, position: Long): Long {
@@ -67,8 +80,15 @@ class NioSeekHandle : SeekHandle {
         val path = java.nio.file.Paths.get(filename)
         val channel = java.nio.channels.FileChannel.open(
             path,
-            if (readOnly) java.nio.file.StandardOpenOption.READ
-            else java.nio.file.StandardOpenOption.READ
+            if (readOnly) {
+                setOf(java.nio.file.StandardOpenOption.READ)
+            } else {
+                setOf(
+                    java.nio.file.StandardOpenOption.READ,
+                    java.nio.file.StandardOpenOption.WRITE,
+                    java.nio.file.StandardOpenOption.CREATE,
+                )
+            }
         )
         val id = nextId++
         channels[id] = channel
@@ -79,15 +99,18 @@ class NioSeekHandle : SeekHandle {
         channels.remove(handle)?.close()
     }
 
-    override fun pread(handle: Long, buf: ByteArray, offset: Int, length: Int, fileOffset: Long): Int {
+    override fun pread(handle: Long, dst: ByteRegion, fileOffset: Long): Int {
         val channel = channels[handle] ?: return -1
-        val buffer = ByteBuffer.wrap(buf, offset, length)
+        val backing = dst.buffer.array()
+        val offset = dst.buffer.arrayOffset() + dst.start
+        val buffer = JavaByteBuffer.wrap(backing, offset, dst.size)
         return channel.read(buffer, fileOffset)
     }
 
-    override fun pwrite(handle: Long, buf: ByteArray, offset: Int, length: Int, fileOffset: Long): Int {
+    override fun pwrite(handle: Long, src: ByteSeries, fileOffset: Long): Int {
         val channel = channels[handle] ?: return -1
-        val buffer = ByteBuffer.wrap(buf, offset, length)
+        val bytes = src.toArray()
+        val buffer = JavaByteBuffer.wrap(bytes)
         return channel.write(buffer, fileOffset)
     }
 
@@ -95,16 +118,24 @@ class NioSeekHandle : SeekHandle {
         return channels[handle]?.size() ?: -1
     }
 
-    override fun read(handle: Long, buf: ByteArray, offset: Int, length: Int): Int {
+    override fun read(handle: Long, dst: ByteRegion): Int {
         val channel = channels[handle] ?: return -1
-        val buffer = ByteBuffer.wrap(buf, offset, length)
+        val backing = dst.buffer.array()
+        val offset = dst.buffer.arrayOffset() + dst.start
+        val buffer = JavaByteBuffer.wrap(backing, offset, dst.size)
         return channel.read(buffer)
     }
 
+    override fun write(handle: Long, src: ByteSeries): Int {
+        val channel = channels[handle] ?: return -1
+        val buffer = JavaByteBuffer.wrap(src.toArray())
+        return channel.write(buffer)
+    }
+
     override fun seek(handle: Long, position: Long): Long {
-        // FileChannel doesn't maintain a position for pwrite/pread,
-        // so this is a no-op that returns the requested position
-        return position
+        val channel = channels[handle] ?: return -1
+        channel.position(position)
+        return channel.position()
     }
 }
 

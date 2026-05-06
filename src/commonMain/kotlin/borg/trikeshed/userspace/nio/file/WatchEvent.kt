@@ -4,14 +4,14 @@ package borg.trikeshed.userspace.nio.file
 
 // Generated from Amazon Corretto JDK 25 java.base NIO public/protected API via javap.
 // Declarations intentionally mirror JDK taxonomy and contain no implementations.
-public interface WatchEvent<T> {
+public interface WatchEvent<T : Any> {
     fun kind(): borg.trikeshed.userspace.nio.file.WatchEvent.Kind<T> = TODO("NIO common stub")
     fun count(): Int = TODO("NIO common stub")
     fun context(): T = TODO("NIO common stub")
 
-    public interface Kind<T> {
+    public interface Kind<T : Any> {
         fun name(): String = TODO("NIO common stub")
-        fun type(): java.lang.Class<T> = TODO("NIO common stub")
+        fun type(): kotlin.reflect.KClass<T> = TODO("NIO common stub")
     }
 
     public interface Modifier {

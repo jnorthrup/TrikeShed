@@ -2,18 +2,22 @@
 
 package borg.trikeshed.userspace.nio.channels.spi
 
+import borg.trikeshed.userspace.nio.channels.SelectableChannel
+import borg.trikeshed.userspace.nio.channels.Selector
+import borg.trikeshed.userspace.nio.channels.SelectionKey
+
 // Generated from Amazon Corretto JDK 25 java.base NIO public/protected API via javap.
 // Declarations intentionally mirror JDK taxonomy and contain no implementations.
-public abstract class AbstractSelectableChannel : borg.trikeshed.userspace.nio.channels.SelectableChannel {
-    protected constructor(p0: borg.trikeshed.userspace.nio.channels.spi.SelectorProvider)
-    fun provider(): borg.trikeshed.userspace.nio.channels.spi.SelectorProvider = TODO("NIO common stub")
-    fun isRegistered(): Boolean = TODO("NIO common stub")
-    fun keyFor(p0: borg.trikeshed.userspace.nio.channels.Selector): borg.trikeshed.userspace.nio.channels.SelectionKey = TODO("NIO common stub")
-    fun register(p0: borg.trikeshed.userspace.nio.channels.Selector, p1: Int, p2: Any): borg.trikeshed.userspace.nio.channels.SelectionKey = TODO("NIO common stub")
-    protected fun implCloseChannel(): Unit
-    protected fun implCloseSelectableChannel(): Unit
-    fun isBlocking(): Boolean = TODO("NIO common stub")
-    fun blockingLock(): Any = TODO("NIO common stub")
-    fun configureBlocking(p0: Boolean): borg.trikeshed.userspace.nio.channels.SelectableChannel = TODO("NIO common stub")
-    protected fun implConfigureBlocking(p0: Boolean): Unit
+public abstract class AbstractSelectableChannel : SelectableChannel {
+    protected constructor(provider: SelectorProvider) : super()
+    public abstract override fun provider(): SelectorProvider
+    public abstract override fun isRegistered(): Boolean
+    public abstract override fun keyFor(sel: Selector): SelectionKey
+    public abstract override fun register(sel: Selector, ops: Int, att: Any): SelectionKey
+    protected final override fun implCloseChannel(): Unit = implCloseSelectableChannel()
+    protected abstract fun implCloseSelectableChannel(): Unit
+    public abstract override fun isBlocking(): Boolean
+    public abstract override fun blockingLock(): Any
+    public abstract override fun configureBlocking(block: Boolean): SelectableChannel
+    protected abstract fun implConfigureBlocking(block: Boolean): Unit
 }

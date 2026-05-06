@@ -2,20 +2,21 @@
 
 package borg.trikeshed.userspace.nio.channels
 
+import borg.trikeshed.userspace.nio.channels.spi.AbstractSelectableChannel
+import borg.trikeshed.userspace.nio.channels.spi.SelectorProvider
 // Generated from Amazon Corretto JDK 25 java.base NIO public/protected API via javap.
 // Declarations intentionally mirror JDK taxonomy and contain no implementations.
-public abstract class ServerSocketChannel : borg.trikeshed.userspace.nio.channels.spi.AbstractSelectableChannel, borg.trikeshed.userspace.nio.channels.NetworkChannel {
-    protected constructor(p0: borg.trikeshed.userspace.nio.channels.spi.SelectorProvider)
-    fun validOps(): Int = TODO("NIO common stub")
-    fun bind(p0: java.net.SocketAddress): borg.trikeshed.userspace.nio.channels.ServerSocketChannel = TODO("NIO common stub")
-    fun bind(p0: java.net.SocketAddress, p1: Int): borg.trikeshed.userspace.nio.channels.ServerSocketChannel = TODO("NIO common stub")
-    fun <T> setOption(p0: java.net.SocketOption<T>, p1: T): borg.trikeshed.userspace.nio.channels.ServerSocketChannel = TODO("NIO common stub")
-    fun socket(): java.net.ServerSocket = TODO("NIO common stub")
-    fun accept(): borg.trikeshed.userspace.nio.channels.SocketChannel = TODO("NIO common stub")
-    fun getLocalAddress(): java.net.SocketAddress = TODO("NIO common stub")
-    fun setOption(p0: java.net.SocketOption, p1: Any): borg.trikeshed.userspace.nio.channels.NetworkChannel = TODO("NIO common stub")
+public abstract class ServerSocketChannel : AbstractSelectableChannel, NetworkChannel {
+    protected constructor(provider: SelectorProvider) : super(provider)
+    public abstract override fun validOps(): Int
+    public abstract override fun bind(address: String): ServerSocketChannel
+    fun bind(address: String, backlog: Int): ServerSocketChannel = TODO("NIO common stub")
+    public abstract override fun <T> setOption(option: String, value: T): ServerSocketChannel
+    fun accept(): SocketChannel = TODO("NIO common stub")
+    public abstract override fun getLocalAddress(): String
+
     companion object {
-        fun `open`(): borg.trikeshed.userspace.nio.channels.ServerSocketChannel = TODO("NIO common stub")
-        fun `open`(p0: java.net.ProtocolFamily): borg.trikeshed.userspace.nio.channels.ServerSocketChannel = TODO("NIO common stub")
+        fun `open`(): ServerSocketChannel = TODO("NIO common stub")
+        fun `open`(protocolFamily: String): ServerSocketChannel = TODO("NIO common stub")
     }
 }

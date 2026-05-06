@@ -1,16 +1,19 @@
 package borg.trikeshed.userspace.kernel
 
+import borg.trikeshed.lib.ByteSeries
+import borg.trikeshed.userspace.ByteRegion
 import kotlin.time.Duration
 
 /**
- * Small common reactor surface.
+ * Reactor-level readiness surface. Speaks ByteRegion/ByteSeries — no ByteArray calling conventions.
+ * Readiness polling is separated from buffer transfer so callers control buffer lifecycle.
  */
 
 interface SelectableChannelOps {
     suspend fun pollReadable(timeout: Duration? = null): Boolean
     suspend fun pollWritable(timeout: Duration? = null): Boolean
-    fun tryRead(buf: ByteArray): Int
-    fun tryWrite(buf: ByteArray): Int
+    fun tryRead(dst: ByteRegion): Int
+    fun tryWrite(src: ByteSeries): Int
 }
 
 interface Reactor {
@@ -21,7 +24,7 @@ interface Reactor {
 }
 
 class SimpleReactor : Reactor {
-   val channels = mutableListOf<SelectableChannelOps?>()
+    val channels = mutableListOf<SelectableChannelOps?>()
 
     override fun register(channel: SelectableChannelOps): Int {
         channels.add(channel)
@@ -29,9 +32,7 @@ class SimpleReactor : Reactor {
     }
 
     override fun unregister(id: Int) {
-        if (id in channels.indices) {
-            channels[id] = null
-        }
+        if (id in channels.indices) channels[id] = null
     }
 
     override suspend fun tick(maxWait: Duration?): Int {

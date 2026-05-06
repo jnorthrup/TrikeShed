@@ -417,8 +417,6 @@ public open class ByteBuffer protected constructor(
         return this
     }
 
-    public fun compareTo(other: Any): Int = if (other is ByteBuffer) compareTo(other) else throw ClassCastException("Cannot compare ByteBuffer with $other")
-
     public companion object {
         public fun allocateDirect(p0: Int): ByteBuffer = allocate(p0)
         public fun allocate(p0: Int): ByteBuffer = ByteBuffer(p0)

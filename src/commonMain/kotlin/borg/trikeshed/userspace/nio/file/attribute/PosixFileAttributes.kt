@@ -7,5 +7,5 @@ package borg.trikeshed.userspace.nio.file.attribute
 public interface PosixFileAttributes : borg.trikeshed.userspace.nio.file.attribute.BasicFileAttributes {
     fun owner(): borg.trikeshed.userspace.nio.file.attribute.UserPrincipal = TODO("NIO common stub")
     fun group(): borg.trikeshed.userspace.nio.file.attribute.GroupPrincipal = TODO("NIO common stub")
-    fun permissions(): java.util.Set<borg.trikeshed.userspace.nio.file.attribute.PosixFilePermission> = TODO("NIO common stub")
+    fun permissions(): Set<borg.trikeshed.userspace.nio.file.attribute.PosixFilePermission> = TODO("NIO common stub")
 }

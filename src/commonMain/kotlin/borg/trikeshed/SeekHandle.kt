@@ -1,6 +1,8 @@
 package borg.trikeshed
 
 import borg.trikeshed.ccek.KeyedService
+import borg.trikeshed.lib.ByteSeries
+import borg.trikeshed.userspace.ByteRegion
 import kotlin.coroutines.CoroutineContext
 
 /**
@@ -15,17 +17,20 @@ interface SeekHandle {
     /** Close the handle. */
     fun close(handle: Long)
 
-    /** Read bytes at specific offset. Returns bytes read or -1 for EOF. */
-    fun pread(handle: Long, buf: ByteArray, offset: Int, length: Int, fileOffset: Long): Int
+    /** Read bytes at specific offset into caller-owned mutable storage. Returns bytes read or -1 for EOF. */
+    fun pread(handle: Long, dst: ByteRegion, fileOffset: Long): Int
 
-    /** Write bytes at specific offset. Returns bytes written. */
-    fun pwrite(handle: Long, buf: ByteArray, offset: Int, length: Int, fileOffset: Long): Int
+    /** Write bytes from a protocol/view source at specific offset. Returns bytes written. */
+    fun pwrite(handle: Long, src: ByteSeries, fileOffset: Long): Int
 
     /** File size in bytes, or -1 if unknown. */
     fun size(handle: Long): Long
 
-    /** Sequential read from current position (for windowed buffer fills). Returns bytes read or -1. */
-    fun read(handle: Long, buf: ByteArray, offset: Int, length: Int): Int
+    /** Sequential read from current position into caller-owned mutable storage. Returns bytes read or -1. */
+    fun read(handle: Long, dst: ByteRegion): Int
+
+    /** Sequential write from a protocol/view source at the current position. Returns bytes written. */
+    fun write(handle: Long, src: ByteSeries): Int
 
     /** Seek to position for sequential access. Returns new position or -1. */
     fun seek(handle: Long, position: Long): Long

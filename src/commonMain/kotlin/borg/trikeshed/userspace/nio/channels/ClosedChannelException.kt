@@ -2,8 +2,10 @@
 
 package borg.trikeshed.userspace.nio.channels
 
+import borg.trikeshed.userspace.nio.IOException
+
 // Generated from Amazon Corretto JDK 25 java.base NIO public/protected API via javap.
 // Declarations intentionally mirror JDK taxonomy and contain no implementations.
-public open class ClosedChannelException : java.io.IOException {
+public open class ClosedChannelException : IOException {
     constructor()
 }

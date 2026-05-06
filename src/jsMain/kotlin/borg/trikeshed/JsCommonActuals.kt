@@ -7,6 +7,7 @@ import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.Series2
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.toSeries
+import borg.trikeshed.userspace.ByteRegion
 
 
 actual object System {
@@ -98,14 +99,17 @@ class JsSeekHandle : SeekHandle {
         handles.remove(handle)?.let { jsClose(it.fd) }
     }
 
-    override fun pread(handle: Long, buf: ByteArray, offset: Int, length: Int, fileOffset: Long): Int {
+    override fun pread(handle: Long, dst: ByteRegion, fileOffset: Long): Int {
         val state = handles[handle] ?: return -1
-        return jsPread(state.fd, buf, offset, length, fileOffset)
+        val backing = dst.buffer.array()
+        val offset = dst.buffer.arrayOffset() + dst.start
+        return jsPread(state.fd, backing, offset, dst.size, fileOffset)
     }
 
-    override fun pwrite(handle: Long, buf: ByteArray, offset: Int, length: Int, fileOffset: Long): Int {
+    override fun pwrite(handle: Long, src: ByteSeries, fileOffset: Long): Int {
         val state = handles[handle] ?: return -1
-        return jsPwrite(state.fd, buf, offset, length, fileOffset)
+        val bytes = src.toArray()
+        return jsPwrite(state.fd, bytes, 0, bytes.size, fileOffset)
     }
 
     override fun size(handle: Long): Long {
@@ -117,9 +121,19 @@ class JsSeekHandle : SeekHandle {
         return pos
     }
 
-    override fun read(handle: Long, buf: ByteArray, offset: Int, length: Int): Int {
+    override fun read(handle: Long, dst: ByteRegion): Int {
         val state = handles[handle] ?: return -1
-        val count = jsPread(state.fd, buf, offset, length, state.position)
+        val backing = dst.buffer.array()
+        val offset = dst.buffer.arrayOffset() + dst.start
+        val count = jsPread(state.fd, backing, offset, dst.size, state.position)
+        if (count > 0) state.position += count
+        return count
+    }
+
+    override fun write(handle: Long, src: ByteSeries): Int {
+        val state = handles[handle] ?: return -1
+        val bytes = src.toArray()
+        val count = jsPwrite(state.fd, bytes, 0, bytes.size, state.position)
         if (count > 0) state.position += count
         return count
     }
@@ -197,7 +211,7 @@ actual class SeekFileBuffer actual constructor(
 
     actual fun get(index: Long): Byte = delegate.get(index)
 
-    actual fun readv(requests: Series2<Long, ByteSeries>): IntArray = delegate.readv(requests)
+    actual fun readv(requests: Series2<Long, ByteRegion>): IntArray = delegate.readv(requests)
 
     actual fun seek(pos: Long) {
         throw UnsupportedOperationException("seek not supported in JS")

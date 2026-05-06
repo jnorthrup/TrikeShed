@@ -13,8 +13,8 @@ public abstract class FileStore {
     fun getUsableSpace(): Long = TODO("NIO common stub")
     fun getUnallocatedSpace(): Long = TODO("NIO common stub")
     fun getBlockSize(): Long = TODO("NIO common stub")
-    fun supportsFileAttributeView(p0: java.lang.Class<out borg.trikeshed.userspace.nio.file.attribute.FileAttributeView>): Boolean = TODO("NIO common stub")
+    fun supportsFileAttributeView(p0: kotlin.reflect.KClass<out borg.trikeshed.userspace.nio.file.attribute.FileAttributeView>): Boolean = TODO("NIO common stub")
     fun supportsFileAttributeView(p0: String): Boolean = TODO("NIO common stub")
-    fun <V : borg.trikeshed.userspace.nio.file.attribute.FileStoreAttributeView> getFileStoreAttributeView(p0: java.lang.Class<V>): V = TODO("NIO common stub")
+    fun <V : borg.trikeshed.userspace.nio.file.attribute.FileStoreAttributeView> getFileStoreAttributeView(p0: kotlin.reflect.KClass<V>): V = TODO("NIO common stub")
     fun getAttribute(p0: String): Any = TODO("NIO common stub")
 }

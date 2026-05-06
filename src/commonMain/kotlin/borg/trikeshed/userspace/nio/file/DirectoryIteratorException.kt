@@ -4,7 +4,7 @@ package borg.trikeshed.userspace.nio.file
 
 // Generated from Amazon Corretto JDK 25 java.base NIO public/protected API via javap.
 // Declarations intentionally mirror JDK taxonomy and contain no implementations.
-public class DirectoryIteratorException : java.util.ConcurrentModificationException {
-    constructor(p0: java.io.IOException)
-    fun getCause(): java.io.IOException = TODO("NIO common stub")
+public class DirectoryIteratorException : ConcurrentModificationException {
+    constructor(p0: borg.trikeshed.userspace.nio.IOException)
+    fun getCause(): borg.trikeshed.userspace.nio.IOException = TODO("NIO common stub")
 }

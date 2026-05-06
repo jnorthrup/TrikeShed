@@ -4,6 +4,7 @@ package borg.trikeshed.userspace.nio.charset
 
 // Generated from Amazon Corretto JDK 25 java.base NIO public/protected API via javap.
 // Declarations intentionally mirror JDK taxonomy and contain no implementations.
-public open class CharacterCodingException : java.io.IOException {
-    constructor()
+public open class CharacterCodingException : borg.trikeshed.userspace.nio.IOException {
+    constructor() : super()
+    constructor(message: String) : super(message)
 }

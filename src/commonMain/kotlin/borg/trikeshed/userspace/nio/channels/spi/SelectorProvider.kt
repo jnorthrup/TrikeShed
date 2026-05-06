@@ -2,20 +2,26 @@
 
 package borg.trikeshed.userspace.nio.channels.spi
 
+import borg.trikeshed.userspace.nio.channels.DatagramChannel
+import borg.trikeshed.userspace.nio.channels.Pipe
+import borg.trikeshed.userspace.nio.channels.ServerSocketChannel
+import borg.trikeshed.userspace.nio.channels.SocketChannel
+import borg.trikeshed.userspace.nio.channels.Channel
+
 // Generated from Amazon Corretto JDK 25 java.base NIO public/protected API via javap.
 // Declarations intentionally mirror JDK taxonomy and contain no implementations.
 public abstract class SelectorProvider {
     protected constructor()
-    fun openDatagramChannel(): borg.trikeshed.userspace.nio.channels.DatagramChannel = TODO("NIO common stub")
-    fun openDatagramChannel(p0: java.net.ProtocolFamily): borg.trikeshed.userspace.nio.channels.DatagramChannel = TODO("NIO common stub")
-    fun openPipe(): borg.trikeshed.userspace.nio.channels.Pipe = TODO("NIO common stub")
-    fun openSelector(): borg.trikeshed.userspace.nio.channels.spi.AbstractSelector = TODO("NIO common stub")
-    fun openServerSocketChannel(): borg.trikeshed.userspace.nio.channels.ServerSocketChannel = TODO("NIO common stub")
-    fun openSocketChannel(): borg.trikeshed.userspace.nio.channels.SocketChannel = TODO("NIO common stub")
-    fun inheritedChannel(): borg.trikeshed.userspace.nio.channels.Channel = TODO("NIO common stub")
-    fun openSocketChannel(p0: java.net.ProtocolFamily): borg.trikeshed.userspace.nio.channels.SocketChannel = TODO("NIO common stub")
-    fun openServerSocketChannel(p0: java.net.ProtocolFamily): borg.trikeshed.userspace.nio.channels.ServerSocketChannel = TODO("NIO common stub")
+    fun openDatagramChannel(): DatagramChannel = TODO("NIO common stub")
+    fun openDatagramChannel(protocolFamily: String): DatagramChannel = TODO("NIO common stub")
+    fun openPipe(): Pipe = TODO("NIO common stub")
+    fun openSelector(): AbstractSelector = TODO("NIO common stub")
+    fun openServerSocketChannel(): ServerSocketChannel = TODO("NIO common stub")
+    fun openSocketChannel(): SocketChannel = TODO("NIO common stub")
+    fun inheritedChannel(): Channel = TODO("NIO common stub")
+    fun openSocketChannel(protocolFamily: String): SocketChannel = TODO("NIO common stub")
+    fun openServerSocketChannel(protocolFamily: String): ServerSocketChannel = TODO("NIO common stub")
     companion object {
-        fun provider(): borg.trikeshed.userspace.nio.channels.spi.SelectorProvider = TODO("NIO common stub")
+        fun provider(): SelectorProvider = TODO("NIO common stub")
     }
 }

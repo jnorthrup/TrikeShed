@@ -1,51 +1,26 @@
 package borg.trikeshed.userspace.network
 
+import borg.trikeshed.lib.ByteSeries
+import borg.trikeshed.userspace.ByteRegion
+
 /**
- * Network protocol adapters ported from literbike.
+ * Protocol session surface — sits above the transport/handle layer.
+ * Implementations carry protocol role, lifecycle, and framing; not raw fd semantics.
+ * Previously called NetworkAdapter; renamed to avoid collision with kernel.SocketSyscalls.
  */
 
 enum class AdapterType {
     Http, Https, Quic, Ssh, WebSocket, Raw
 }
 
-interface NetworkAdapter {
+interface SessionChannel {
     fun adapterType(): AdapterType
     fun remoteAddr(): String
     fun isConnected(): Boolean
     fun close(): Result<Unit>
-    fun read(buf: ByteArray): Int
-    fun write(buf: ByteArray): Int
+    fun read(dst: ByteRegion): Int
+    fun write(src: ByteSeries): Int
 }
 
-class HttpAdapter(
-    private val remote: String
-) : NetworkAdapter {
-    private var connected = true
-
-    override fun adapterType() = AdapterType.Http
-    override fun remoteAddr() = remote
-    override fun isConnected() = connected
-    override fun close(): Result<Unit> {
-        connected = false
-        return Result.success(Unit)
-    }
-    override fun read(buf: ByteArray): Int = 0 // Implementation placeholder
-    override fun write(buf: ByteArray): Int = 0 // Implementation placeholder
-}
-
-class QuicAdapter(
-    private val remote: String,
-    val streamId: Long
-) : NetworkAdapter {
-    private var connected = true
-
-    override fun adapterType() = AdapterType.Quic
-    override fun remoteAddr() = remote
-    override fun isConnected() = connected
-    override fun close(): Result<Unit> {
-        connected = false
-        return Result.success(Unit)
-    }
-    override fun read(buf: ByteArray): Int = 0
-    override fun write(buf: ByteArray): Int = 0
-}
+@Deprecated("Use SessionChannel", ReplaceWith("SessionChannel"))
+typealias NetworkAdapter = SessionChannel

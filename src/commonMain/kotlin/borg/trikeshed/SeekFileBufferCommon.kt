@@ -1,7 +1,8 @@
 package borg.trikeshed
 
-import borg.trikeshed.lib.ByteSeries
 import borg.trikeshed.lib.Series2
+import borg.trikeshed.userspace.ByteRegion
+import borg.trikeshed.userspace.nio.ByteBuffer
 
 /**
  * Common seek-based file buffer with windowed reads.
@@ -71,8 +72,8 @@ class SeekFileBufferCommon(
     fun get(index: Long): Byte = b(index)
 
     fun put(index: Long, value: Byte) {
-        val buf = byteArrayOf(value)
-        handle.pwrite(fd, buf, 0, 1, initialOffset + index)
+        val src = ByteRegion.wrap(byteArrayOf(value)).asByteSeries()
+        handle.pwrite(fd, src, initialOffset + index)
     }
 
     /** Seek to position — invalidates window. For external ISAM patterns. */
@@ -85,7 +86,7 @@ class SeekFileBufferCommon(
     }
 
     /** Batch read scattered offsets in request order. */
-    fun readv(requests: Series2<Long, ByteSeries>): IntArray {
+    fun readv(requests: Series2<Long, ByteRegion>): IntArray {
         val results = IntArray(requests.a)
         if (requests.a == 0) return results
 
@@ -94,9 +95,7 @@ class SeekFileBufferCommon(
             val offset = request.a
             val dst = request.b
             val absolutePos = initialOffset + offset
-            // ByteSeries is read-focused; use remaining as requested read length.
-            val tmp = ByteArray(dst.rem)
-            val bytes = handle.pread(fd, tmp, 0, tmp.size, absolutePos)
+            val bytes = handle.pread(fd, dst, absolutePos)
             results[idx] = if (bytes < 0) 0 else bytes
         }
         return results
@@ -108,7 +107,7 @@ class SeekFileBufferCommon(
         if (toRead == 0) {
             throw IndexOutOfBoundsException("Position $pos beyond file size $fileSize")
         }
-        val bytesRead = handle.pread(fd, window, 0, toRead, pos)
+        val bytesRead = handle.pread(fd, ByteRegion(ByteBuffer.wrap(window), 0, toRead), pos)
         if (bytesRead <= 0) {
             throw IndexOutOfBoundsException("EOF at position $pos")
         }

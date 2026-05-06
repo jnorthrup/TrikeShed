@@ -3,8 +3,6 @@
 package borg.trikeshed.userspace.nio.file
 
 // Generated from Amazon Corretto JDK 25 java.base NIO public/protected API via javap.
-// Declarations intentionally mirror JDK taxonomy and contain no implementations.
-public class LinkPermission : java.security.BasicPermission {
-    constructor(p0: String)
-    constructor(p0: String, p1: String)
-}
+// Coerced to TrikeShed types — no java.* references.
+// java.security.BasicPermission has no KMP equivalent; simplified to a named permission.
+public class LinkPermission(name: String, actions: String? = null) : Exception("LinkPermission: $name" + (actions?.let { ", $it" } ?: ""))

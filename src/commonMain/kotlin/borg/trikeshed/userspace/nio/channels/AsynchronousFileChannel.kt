@@ -2,25 +2,31 @@
 
 package borg.trikeshed.userspace.nio.channels
 
+import borg.trikeshed.userspace.ByteRegion
+import borg.trikeshed.lib.ByteSeries
+import borg.trikeshed.userspace.nio.file.Path
+import borg.trikeshed.userspace.nio.file.OpenOption
+import borg.trikeshed.userspace.nio.file.attribute.FileAttribute
+
 // Generated from Amazon Corretto JDK 25 java.base NIO public/protected API via javap.
 // Declarations intentionally mirror JDK taxonomy and contain no implementations.
 public abstract class AsynchronousFileChannel {
     protected constructor()
     fun size(): Long = TODO("NIO common stub")
-    fun truncate(p0: Long): borg.trikeshed.userspace.nio.channels.AsynchronousFileChannel = TODO("NIO common stub")
-    fun force(p0: Boolean): Unit = TODO("NIO common stub")
-    fun <A> lock(p0: Long, p1: Long, p2: Boolean, p3: A, p4: borg.trikeshed.userspace.nio.channels.CompletionHandler<borg.trikeshed.userspace.nio.channels.FileLock, in A>): Unit = TODO("NIO common stub")
-    fun <A> lock(p0: A, p1: borg.trikeshed.userspace.nio.channels.CompletionHandler<borg.trikeshed.userspace.nio.channels.FileLock, in A>): Unit = TODO("NIO common stub")
-    fun lock(p0: Long, p1: Long, p2: Boolean): java.util.concurrent.Future<borg.trikeshed.userspace.nio.channels.FileLock> = TODO("NIO common stub")
-    fun lock(): java.util.concurrent.Future<borg.trikeshed.userspace.nio.channels.FileLock> = TODO("NIO common stub")
-    fun tryLock(p0: Long, p1: Long, p2: Boolean): borg.trikeshed.userspace.nio.channels.FileLock = TODO("NIO common stub")
-    fun tryLock(): borg.trikeshed.userspace.nio.channels.FileLock = TODO("NIO common stub")
-    fun <A> read(p0: borg.trikeshed.userspace.nio.ByteBuffer, p1: Long, p2: A, p3: borg.trikeshed.userspace.nio.channels.CompletionHandler<java.lang.Integer, in A>): Unit = TODO("NIO common stub")
-    fun read(p0: borg.trikeshed.userspace.nio.ByteBuffer, p1: Long): java.util.concurrent.Future<java.lang.Integer> = TODO("NIO common stub")
-    fun <A> write(p0: borg.trikeshed.userspace.nio.ByteBuffer, p1: Long, p2: A, p3: borg.trikeshed.userspace.nio.channels.CompletionHandler<java.lang.Integer, in A>): Unit = TODO("NIO common stub")
-    fun write(p0: borg.trikeshed.userspace.nio.ByteBuffer, p1: Long): java.util.concurrent.Future<java.lang.Integer> = TODO("NIO common stub")
+    fun truncate(size: Long): AsynchronousFileChannel = TODO("NIO common stub")
+    fun force(metaData: Boolean): Unit = TODO("NIO common stub")
+    fun <A> lock(position: Long, size: Long, shared: Boolean, attachment: A, handler: CompletionHandler<FileLock, in A>): Unit = TODO("NIO common stub")
+    fun <A> lock(attachment: A, handler: CompletionHandler<FileLock, in A>): Unit = TODO("NIO common stub")
+    fun lock(position: Long, size: Long, shared: Boolean): FileLock = TODO("NIO common stub")
+    fun lock(): FileLock = TODO("NIO common stub")
+    fun tryLock(position: Long, size: Long, shared: Boolean): FileLock = TODO("NIO common stub")
+    fun tryLock(): FileLock = TODO("NIO common stub")
+    fun <A> read(dst: ByteRegion, position: Long, attachment: A, handler: CompletionHandler<Int, in A>): Unit = TODO("NIO common stub")
+    fun read(dst: ByteRegion, position: Long): Int = TODO("NIO common stub")
+    fun <A> write(src: ByteSeries, position: Long, attachment: A, handler: CompletionHandler<Int, in A>): Unit = TODO("NIO common stub")
+    fun write(src: ByteSeries, position: Long): Int = TODO("NIO common stub")
     companion object {
-        fun `open`(p0: borg.trikeshed.userspace.nio.file.Path, p1: java.util.Set<out borg.trikeshed.userspace.nio.file.OpenOption>, p2: java.util.concurrent.ExecutorService, vararg p3: borg.trikeshed.userspace.nio.file.attribute.FileAttribute<*>): borg.trikeshed.userspace.nio.channels.AsynchronousFileChannel = TODO("NIO common stub")
-        fun `open`(p0: borg.trikeshed.userspace.nio.file.Path, vararg p1: borg.trikeshed.userspace.nio.file.OpenOption): borg.trikeshed.userspace.nio.channels.AsynchronousFileChannel = TODO("NIO common stub")
+        fun `open`(path: Path, options: Set<OpenOption>, vararg attrs: FileAttribute<*>): AsynchronousFileChannel = TODO("NIO common stub")
+        fun `open`(path: Path, vararg options: OpenOption): AsynchronousFileChannel = TODO("NIO common stub")
     }
 }

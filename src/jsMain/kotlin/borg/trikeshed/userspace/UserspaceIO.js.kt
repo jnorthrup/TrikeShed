@@ -7,39 +7,49 @@ private object JsFileRegistry {
     fun open(): FileImpl = FileImpl(nextId++)
 }
 
-internal actual class FileImpl actual constructor(actual val id: Int) {
+private class JsUserspaceChannelBackend : UserspaceChannelBackend {
+    override fun read(file: FileImpl, buffer: ByteBuffer, offset: Long): Int = -1
+    override fun write(file: FileImpl, buffer: ByteBuffer, offset: Long): Int = -1
+    override fun accept(file: FileImpl): Int = -1
+    override fun connect(file: FileImpl, address: String, port: Int): Int = -1
+    override fun close(file: FileImpl): Int = 0
+}
+
+internal actual fun openUserspaceChannelBackend(entries: Int): UserspaceChannelBackend = JsUserspaceChannelBackend()
+
+actual class FileImpl actual constructor(actual val id: Int) {
     actual fun isOpen(): Boolean = id >= 0
     actual fun close() {}
 }
 
-internal actual class ChannelImpl actual constructor(private val entries: Int) {
-    private val pendingResults = mutableListOf<SelectionResult>()
+internal actual class ChannelImpl actual constructor(entries: Int) {
+    private val facade = FunctionalUringFacade(entries, openUserspaceChannelBackend(entries))
 
     actual fun read(file: FileImpl, buffer: ByteBuffer, offset: Long, userData: Long) {
-        pendingResults.add(SelectionResult(-1, userData))
+        facade.read(file, buffer, offset, userData)
     }
 
     actual fun write(file: FileImpl, buffer: ByteBuffer, offset: Long, userData: Long) {
-        pendingResults.add(SelectionResult(-1, userData))
+        facade.write(file, buffer, offset, userData)
     }
 
     actual fun accept(file: FileImpl, userData: Long) {
-        pendingResults.add(SelectionResult(-1, userData))
+        facade.accept(file, userData)
     }
 
     actual fun connect(file: FileImpl, address: String, port: Int, userData: Long) {
-        pendingResults.add(SelectionResult(-1, userData))
+        facade.connect(file, address, port, userData)
     }
 
     actual fun close(file: FileImpl, userData: Long) {
-        pendingResults.add(SelectionResult(0, userData))
+        facade.close(file, userData)
     }
 
-    actual fun submit(): Int = pendingResults.size
+    actual fun submit(): Int = facade.submit()
 
-    actual fun wait(minComplete: Int): List<SelectionResult> = peek()
+    actual fun wait(minComplete: Int): List<SelectionResult> = facade.wait(minComplete)
 
-    actual fun peek(): List<SelectionResult> = pendingResults.toList().also { pendingResults.clear() }
+    actual fun peek(): List<SelectionResult> = facade.peek()
 }
 
 internal actual object FilesImpl {

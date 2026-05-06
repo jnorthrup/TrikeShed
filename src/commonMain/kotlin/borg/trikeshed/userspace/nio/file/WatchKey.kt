@@ -6,7 +6,7 @@ package borg.trikeshed.userspace.nio.file
 // Declarations intentionally mirror JDK taxonomy and contain no implementations.
 public interface WatchKey {
     fun isValid(): Boolean = TODO("NIO common stub")
-    fun pollEvents(): java.util.List<borg.trikeshed.userspace.nio.file.WatchEvent<*>> = TODO("NIO common stub")
+    fun pollEvents(): List<borg.trikeshed.userspace.nio.file.WatchEvent<*>> = TODO("NIO common stub")
     fun reset(): Boolean = TODO("NIO common stub")
     fun cancel(): Unit = TODO("NIO common stub")
     fun watchable(): borg.trikeshed.userspace.nio.file.Watchable = TODO("NIO common stub")

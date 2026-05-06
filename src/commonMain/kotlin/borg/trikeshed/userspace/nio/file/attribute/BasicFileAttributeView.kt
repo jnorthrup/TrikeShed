@@ -4,8 +4,8 @@ package borg.trikeshed.userspace.nio.file.attribute
 
 // Generated from Amazon Corretto JDK 25 java.base NIO public/protected API via javap.
 // Declarations intentionally mirror JDK taxonomy and contain no implementations.
-public interface BasicFileAttributeView : borg.trikeshed.userspace.nio.file.attribute.FileAttributeView {
-    fun name(): String = TODO("NIO common stub")
-    fun readAttributes(): borg.trikeshed.userspace.nio.file.attribute.BasicFileAttributes = TODO("NIO common stub")
-    fun setTimes(p0: borg.trikeshed.userspace.nio.file.attribute.FileTime, p1: borg.trikeshed.userspace.nio.file.attribute.FileTime, p2: borg.trikeshed.userspace.nio.file.attribute.FileTime): Unit = TODO("NIO common stub")
+public interface BasicFileAttributeView : FileAttributeView {
+    override fun name(): String = TODO("NIO common stub")
+    fun readAttributes(): BasicFileAttributes = TODO("NIO common stub")
+    fun setTimes(p0: FileTime, p1: FileTime, p2: FileTime): Unit = TODO("NIO common stub")
 }

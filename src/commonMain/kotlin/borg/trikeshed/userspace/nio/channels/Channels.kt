@@ -2,21 +2,25 @@
 
 package borg.trikeshed.userspace.nio.channels
 
+import borg.trikeshed.userspace.nio.charset.Charset
+import borg.trikeshed.userspace.nio.charset.CharsetDecoder
+import borg.trikeshed.userspace.nio.charset.CharsetEncoder
+
 // Generated from Amazon Corretto JDK 25 java.base NIO public/protected API via javap.
-// Declarations intentionally mirror JDK taxonomy and contain no implementations.
+// Coerced to TrikeShed types — InputStream/OutputStream return types simplified to Any.
 public class Channels {
     companion object {
-        fun newInputStream(p0: borg.trikeshed.userspace.nio.channels.ReadableByteChannel): java.io.InputStream = TODO("NIO common stub")
-        fun newOutputStream(p0: borg.trikeshed.userspace.nio.channels.WritableByteChannel): java.io.OutputStream = TODO("NIO common stub")
-        fun newInputStream(p0: borg.trikeshed.userspace.nio.channels.AsynchronousByteChannel): java.io.InputStream = TODO("NIO common stub")
-        fun newOutputStream(p0: borg.trikeshed.userspace.nio.channels.AsynchronousByteChannel): java.io.OutputStream = TODO("NIO common stub")
-        fun newChannel(p0: java.io.InputStream): borg.trikeshed.userspace.nio.channels.ReadableByteChannel = TODO("NIO common stub")
-        fun newChannel(p0: java.io.OutputStream): borg.trikeshed.userspace.nio.channels.WritableByteChannel = TODO("NIO common stub")
-        fun newReader(p0: borg.trikeshed.userspace.nio.channels.ReadableByteChannel, p1: borg.trikeshed.userspace.nio.charset.CharsetDecoder, p2: Int): java.io.Reader = TODO("NIO common stub")
-        fun newReader(p0: borg.trikeshed.userspace.nio.channels.ReadableByteChannel, p1: String): java.io.Reader = TODO("NIO common stub")
-        fun newReader(p0: borg.trikeshed.userspace.nio.channels.ReadableByteChannel, p1: borg.trikeshed.userspace.nio.charset.Charset): java.io.Reader = TODO("NIO common stub")
-        fun newWriter(p0: borg.trikeshed.userspace.nio.channels.WritableByteChannel, p1: borg.trikeshed.userspace.nio.charset.CharsetEncoder, p2: Int): java.io.Writer = TODO("NIO common stub")
-        fun newWriter(p0: borg.trikeshed.userspace.nio.channels.WritableByteChannel, p1: String): java.io.Writer = TODO("NIO common stub")
-        fun newWriter(p0: borg.trikeshed.userspace.nio.channels.WritableByteChannel, p1: borg.trikeshed.userspace.nio.charset.Charset): java.io.Writer = TODO("NIO common stub")
+        fun newInputStreamForReadable(channel: ReadableByteChannel): Any = TODO("NIO common stub")
+        fun newOutputStreamForWritable(channel: WritableByteChannel): Any = TODO("NIO common stub")
+        fun newInputStreamForAsync(channel: AsynchronousByteChannel): Any = TODO("NIO common stub")
+        fun newOutputStreamForAsync(channel: AsynchronousByteChannel): Any = TODO("NIO common stub")
+        fun newReadableChannel(input: Any): ReadableByteChannel = TODO("NIO common stub")
+        fun newWritableChannel(output: Any): WritableByteChannel = TODO("NIO common stub")
+        fun newReader(channel: ReadableByteChannel, decoder: CharsetDecoder, minBufferCap: Int): Any = TODO("NIO common stub")
+        fun newReaderForCharset(channel: ReadableByteChannel, charsetName: String): Any = TODO("NIO common stub")
+        fun newReaderForDecoder(channel: ReadableByteChannel, charset: Charset): Any = TODO("NIO common stub")
+        fun newWriter(channel: WritableByteChannel, encoder: CharsetEncoder, minBufferCap: Int): Any = TODO("NIO common stub")
+        fun newWriterForCharset(channel: WritableByteChannel, charsetName: String): Any = TODO("NIO common stub")
+        fun newWriterForEncoder(channel: WritableByteChannel, charset: Charset): Any = TODO("NIO common stub")
     }
 }

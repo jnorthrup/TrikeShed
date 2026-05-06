@@ -1,5 +1,6 @@
 package borg.trikeshed.userspace
 
+import borg.trikeshed.lib.ByteSeries
 import borg.trikeshed.userspace.nio.ByteBuffer
 
 data class SelectionResult(val res: Int, val userData: Long)
@@ -44,9 +45,12 @@ object Channels {
         File(ChannelsImpl.socket(domain, type, protocol))
 
     fun wrap(bytes: ByteArray): ByteBuffer = ByteBuffer.wrap(bytes)
+    fun wrapRegion(bytes: ByteArray): ByteRegion = ByteRegion.wrap(bytes)
+    fun region(buffer: ByteBuffer): ByteRegion = ByteRegion(buffer)
+    fun series(buffer: ByteBuffer): ByteSeries = buffer.asByteSeries()
 }
 
-internal expect class FileImpl(id: Int) {
+expect class FileImpl(id: Int) {
     val id: Int
     fun isOpen(): Boolean
     fun close()

@@ -4,10 +4,10 @@ package borg.trikeshed.userspace.nio.channels
 
 // Generated from Amazon Corretto JDK 25 java.base NIO public/protected API via javap.
 // Declarations intentionally mirror JDK taxonomy and contain no implementations.
-public interface NetworkChannel : borg.trikeshed.userspace.nio.channels.Channel {
-    fun bind(p0: java.net.SocketAddress): borg.trikeshed.userspace.nio.channels.NetworkChannel = TODO("NIO common stub")
-    fun getLocalAddress(): java.net.SocketAddress = TODO("NIO common stub")
-    fun <T> setOption(p0: java.net.SocketOption<T>, p1: T): borg.trikeshed.userspace.nio.channels.NetworkChannel = TODO("NIO common stub")
-    fun <T> getOption(p0: java.net.SocketOption<T>): T = TODO("NIO common stub")
-    fun supportedOptions(): java.util.Set<java.net.SocketOption<*>> = TODO("NIO common stub")
+public interface NetworkChannel : Channel {
+    fun bind(address: String): NetworkChannel = TODO("NIO common stub")
+    fun getLocalAddress(): String = TODO("NIO common stub")
+    fun <T> setOption(option: String, value: T): NetworkChannel = TODO("NIO common stub")
+    fun <T> getOption(option: String): T = TODO("NIO common stub")
+    fun supportedOptions(): Set<String> = TODO("NIO common stub")
 }

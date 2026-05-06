@@ -1,5 +1,8 @@
 package borg.trikeshed.userspace.kernel
 
+import borg.trikeshed.lib.ByteSeries
+import borg.trikeshed.userspace.ByteRegion
+
 /**
  * POSIX socket operations ported from literbike.
  */
@@ -10,8 +13,8 @@ interface PosixSocket {
     fun listen(backlog: Int): Result<Unit>
     fun accept(): Result<Pair<Int, String>>
     fun connect(host: String, port: Int): Result<Unit>
-    fun send(buf: ByteArray, flags: Int): Result<Int>
-    fun recv(buf: ByteArray, flags: Int): Result<Int>
+    fun send(src: ByteSeries, flags: Int): Result<Int>
+    fun recv(dst: ByteRegion, flags: Int): Result<Int>
     fun setNonblocking(nonblocking: Boolean): Result<Unit>
     fun setReuseAddr(reuse: Boolean): Result<Unit>
     fun setReusePort(reuse: Boolean): Result<Unit>

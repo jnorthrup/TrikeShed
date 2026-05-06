@@ -1,5 +1,6 @@
 package borg.trikeshed
 
+import borg.trikeshed.userspace.ByteRegion
 import borg.trikeshed.lib.ByteSeries
 import borg.trikeshed.lib.Join
 import borg.trikeshed.lib.Series
@@ -188,32 +189,35 @@ object WasmBrowserSeekHandle : SeekHandle {
         handles.remove(handle)
     }
 
-    override fun pread(handle: Long, buf: ByteArray, offset: Int, length: Int, fileOffset: Long): Int {
+    override fun pread(handle: Long, dst: ByteRegion, fileOffset: Long): Int {
         val state = handles[handle] ?: return -1
         val bytes = readBlob(state.filename) ?: return -1
         val decoded = decodeHex(bytes)
         val start = fileOffset.toInt().coerceAtLeast(0)
         if (start >= decoded.size) return -1
-        val count = minOf(length, decoded.size - start)
+        val count = minOf(dst.size, decoded.size - start)
+        val backing = dst.buffer.array()
+        val offset = dst.buffer.arrayOffset() + dst.start
         for (index in 0 until count) {
-            buf[offset + index] = decoded[start + index]
+            backing[offset + index] = decoded[start + index]
         }
         return count
     }
 
-    override fun pwrite(handle: Long, buf: ByteArray, offset: Int, length: Int, fileOffset: Long): Int {
+    override fun pwrite(handle: Long, src: ByteSeries, fileOffset: Long): Int {
         val state = handles[handle] ?: return -1
+        val bytes = src.toArray()
         // Read-modify-write: localStorage has no partial overwrite
         val existing = decodeHex(readBlob(state.filename) ?: "")
         val start = fileOffset.toInt().coerceAtLeast(0)
-        val end = (start + length).coerceAtMost(existing.size)
-        val updated = ByteArray(maxOf(existing.size, end))
+        val endExclusive = start + bytes.size
+        val updated = ByteArray(maxOf(existing.size, endExclusive))
         existing.copyInto(updated)
-        for (i in 0 until length) {
-            if (start + i < updated.size) updated[start + i] = buf[offset + i]
+        for (i in bytes.indices) {
+            updated[start + i] = bytes[i]
         }
         writeBlob(state.filename, encodeHex(updated))
-        return length
+        return bytes.size
     }
 
     override fun size(handle: Long): Long {
@@ -221,11 +225,18 @@ object WasmBrowserSeekHandle : SeekHandle {
         return decodeHex(readBlob(state.filename) ?: "").size.toLong()
     }
 
-    override fun read(handle: Long, buf: ByteArray, offset: Int, length: Int): Int {
+    override fun read(handle: Long, dst: ByteRegion): Int {
         val state = handles[handle] ?: return -1
-        val bytesRead = pread(handle, buf, offset, length, state.position)
+        val bytesRead = pread(handle, dst, state.position)
         if (bytesRead > 0) state.position += bytesRead.toLong()
         return bytesRead
+    }
+
+    override fun write(handle: Long, src: ByteSeries): Int {
+        val state = handles[handle] ?: return -1
+        val bytesWritten = pwrite(handle, src, state.position)
+        if (bytesWritten > 0) state.position += bytesWritten.toLong()
+        return bytesWritten
     }
 
     override fun seek(handle: Long, position: Long): Long {
@@ -432,5 +443,5 @@ actual class SeekFileBuffer actual constructor(
         delegate.put(index, value)
     }
 
-    actual fun readv(requests: Series2<Long, ByteSeries>): IntArray = delegate.readv(requests)
+    actual fun readv(requests: Series2<Long, ByteRegion>): IntArray = delegate.readv(requests)
 }

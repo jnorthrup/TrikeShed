@@ -4,8 +4,8 @@ package borg.trikeshed.userspace.nio.file.attribute
 
 // Generated from Amazon Corretto JDK 25 java.base NIO public/protected API via javap.
 // Declarations intentionally mirror JDK taxonomy and contain no implementations.
-public interface AclFileAttributeView : borg.trikeshed.userspace.nio.file.attribute.FileOwnerAttributeView {
-    fun name(): String = TODO("NIO common stub")
-    fun getAcl(): java.util.List<borg.trikeshed.userspace.nio.file.attribute.AclEntry> = TODO("NIO common stub")
-    fun setAcl(p0: java.util.List<borg.trikeshed.userspace.nio.file.attribute.AclEntry>): Unit = TODO("NIO common stub")
+public interface AclFileAttributeView : FileOwnerAttributeView {
+    override fun name(): String = TODO("NIO common stub")
+    fun getAcl(): List<AclEntry> = TODO("NIO common stub")
+    fun setAcl(p0: List<AclEntry>): Unit = TODO("NIO common stub")
 }

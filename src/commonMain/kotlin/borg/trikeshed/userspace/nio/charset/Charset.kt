@@ -44,8 +44,6 @@ public open class Charset private constructor(
 
     public override fun toString(): String = name()
 
-    public fun compareTo(p0: Any): Int = if (p0 is Charset) compareTo(p0) else throw ClassCastException("Cannot compare Charset with $p0")
-
     public companion object {
         public fun isSupported(p0: String): Boolean = PlatformCharset.isSupported(p0)
 

@@ -2,23 +2,26 @@
 
 package borg.trikeshed.userspace.nio.channels
 
+import borg.trikeshed.userspace.nio.channels.spi.AbstractSelectableChannel
+import borg.trikeshed.userspace.nio.channels.spi.SelectorProvider
 // Generated from Amazon Corretto JDK 25 java.base NIO public/protected API via javap.
 // Declarations intentionally mirror JDK taxonomy and contain no implementations.
 public abstract class Pipe {
     protected constructor()
-    fun source(): borg.trikeshed.userspace.nio.channels.Pipe.SourceChannel = TODO("NIO common stub")
-    fun sink(): borg.trikeshed.userspace.nio.channels.Pipe.SinkChannel = TODO("NIO common stub")
+    fun source(): Pipe.SourceChannel = TODO("NIO common stub")
+    fun sink(): Pipe.SinkChannel = TODO("NIO common stub")
+
     companion object {
-        fun `open`(): borg.trikeshed.userspace.nio.channels.Pipe = TODO("NIO common stub")
+        fun `open`(): Pipe = TODO("NIO common stub")
     }
 
-    public abstract class SinkChannel : borg.trikeshed.userspace.nio.channels.spi.AbstractSelectableChannel, borg.trikeshed.userspace.nio.channels.WritableByteChannel, borg.trikeshed.userspace.nio.channels.GatheringByteChannel {
-        protected constructor(p0: borg.trikeshed.userspace.nio.channels.spi.SelectorProvider)
-        fun validOps(): Int = TODO("NIO common stub")
+    public abstract class SinkChannel : AbstractSelectableChannel, WritableByteChannel, GatheringByteChannel {
+        protected constructor(provider: SelectorProvider) : super(provider)
+        public abstract override fun validOps(): Int
     }
 
-    public abstract class SourceChannel : borg.trikeshed.userspace.nio.channels.spi.AbstractSelectableChannel, borg.trikeshed.userspace.nio.channels.ReadableByteChannel, borg.trikeshed.userspace.nio.channels.ScatteringByteChannel {
-        protected constructor(p0: borg.trikeshed.userspace.nio.channels.spi.SelectorProvider)
-        fun validOps(): Int = TODO("NIO common stub")
+    public abstract class SourceChannel : AbstractSelectableChannel, ReadableByteChannel, ScatteringByteChannel {
+        protected constructor(provider: SelectorProvider) : super(provider)
+        public abstract override fun validOps(): Int
     }
 }

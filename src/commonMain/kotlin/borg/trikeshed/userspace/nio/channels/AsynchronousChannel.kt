@@ -4,6 +4,6 @@ package borg.trikeshed.userspace.nio.channels
 
 // Generated from Amazon Corretto JDK 25 java.base NIO public/protected API via javap.
 // Declarations intentionally mirror JDK taxonomy and contain no implementations.
-public interface AsynchronousChannel : borg.trikeshed.userspace.nio.channels.Channel {
-    fun close(): Unit = TODO("NIO common stub")
+public interface AsynchronousChannel : Channel {
+    override fun close(): Unit = TODO("NIO common stub")
 }

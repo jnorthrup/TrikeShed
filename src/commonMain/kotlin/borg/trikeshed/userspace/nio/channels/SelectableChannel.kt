@@ -2,17 +2,20 @@
 
 package borg.trikeshed.userspace.nio.channels
 
+import borg.trikeshed.userspace.nio.channels.spi.AbstractInterruptibleChannel
+import borg.trikeshed.userspace.nio.channels.spi.SelectorProvider
 // Generated from Amazon Corretto JDK 25 java.base NIO public/protected API via javap.
 // Declarations intentionally mirror JDK taxonomy and contain no implementations.
-public abstract class SelectableChannel : borg.trikeshed.userspace.nio.channels.spi.AbstractInterruptibleChannel, borg.trikeshed.userspace.nio.channels.Channel {
-    protected constructor()
-    fun provider(): borg.trikeshed.userspace.nio.channels.spi.SelectorProvider = TODO("NIO common stub")
-    fun validOps(): Int = TODO("NIO common stub")
-    fun isRegistered(): Boolean = TODO("NIO common stub")
-    fun keyFor(p0: borg.trikeshed.userspace.nio.channels.Selector): borg.trikeshed.userspace.nio.channels.SelectionKey = TODO("NIO common stub")
-    fun register(p0: borg.trikeshed.userspace.nio.channels.Selector, p1: Int, p2: Any): borg.trikeshed.userspace.nio.channels.SelectionKey = TODO("NIO common stub")
-    fun register(p0: borg.trikeshed.userspace.nio.channels.Selector, p1: Int): borg.trikeshed.userspace.nio.channels.SelectionKey = TODO("NIO common stub")
-    fun configureBlocking(p0: Boolean): borg.trikeshed.userspace.nio.channels.SelectableChannel = TODO("NIO common stub")
-    fun isBlocking(): Boolean = TODO("NIO common stub")
-    fun blockingLock(): Any = TODO("NIO common stub")
+public abstract class SelectableChannel protected constructor() : AbstractInterruptibleChannel(), Channel {
+    public abstract override fun close()
+    public abstract override fun isOpen(): Boolean
+    public abstract fun provider(): SelectorProvider
+    public abstract fun validOps(): Int
+    public abstract fun isRegistered(): Boolean
+    public abstract fun keyFor(sel: Selector): SelectionKey
+    public abstract fun register(sel: Selector, ops: Int, att: Any): SelectionKey
+    public abstract fun register(sel: Selector, ops: Int): SelectionKey
+    public abstract fun configureBlocking(block: Boolean): SelectableChannel
+    public abstract fun isBlocking(): Boolean
+    public abstract fun blockingLock(): Any
 }

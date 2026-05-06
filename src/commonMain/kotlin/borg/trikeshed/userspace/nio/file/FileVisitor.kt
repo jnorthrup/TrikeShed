@@ -7,6 +7,6 @@ package borg.trikeshed.userspace.nio.file
 public interface FileVisitor<T> {
     fun preVisitDirectory(p0: T, p1: borg.trikeshed.userspace.nio.file.attribute.BasicFileAttributes): borg.trikeshed.userspace.nio.file.FileVisitResult = TODO("NIO common stub")
     fun visitFile(p0: T, p1: borg.trikeshed.userspace.nio.file.attribute.BasicFileAttributes): borg.trikeshed.userspace.nio.file.FileVisitResult = TODO("NIO common stub")
-    fun visitFileFailed(p0: T, p1: java.io.IOException): borg.trikeshed.userspace.nio.file.FileVisitResult = TODO("NIO common stub")
-    fun postVisitDirectory(p0: T, p1: java.io.IOException): borg.trikeshed.userspace.nio.file.FileVisitResult = TODO("NIO common stub")
+    fun visitFileFailed(p0: T, p1: borg.trikeshed.userspace.nio.IOException): borg.trikeshed.userspace.nio.file.FileVisitResult = TODO("NIO common stub")
+    fun postVisitDirectory(p0: T, p1: borg.trikeshed.userspace.nio.IOException): borg.trikeshed.userspace.nio.file.FileVisitResult = TODO("NIO common stub")
 }

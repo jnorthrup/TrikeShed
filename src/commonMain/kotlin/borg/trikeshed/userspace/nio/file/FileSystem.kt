@@ -13,7 +13,7 @@ public abstract class FileSystem {
     fun getSeparator(): String = TODO("NIO common stub")
     fun getRootDirectories(): Iterable<borg.trikeshed.userspace.nio.file.Path> = TODO("NIO common stub")
     fun getFileStores(): Iterable<borg.trikeshed.userspace.nio.file.FileStore> = TODO("NIO common stub")
-    fun supportedFileAttributeViews(): java.util.Set<String> = TODO("NIO common stub")
+    fun supportedFileAttributeViews(): Set<String> = TODO("NIO common stub")
     fun getPath(p0: String, vararg p1: String): borg.trikeshed.userspace.nio.file.Path = TODO("NIO common stub")
     fun getPathMatcher(p0: String): borg.trikeshed.userspace.nio.file.PathMatcher = TODO("NIO common stub")
     fun getUserPrincipalLookupService(): borg.trikeshed.userspace.nio.file.attribute.UserPrincipalLookupService = TODO("NIO common stub")

@@ -1,9 +1,9 @@
 package borg.trikeshed
 
 import borg.trikeshed.lib.Series2
-import borg.trikeshed.lib.ByteSeries
 import borg.trikeshed.lib.Join
 import borg.trikeshed.lib.j
+import borg.trikeshed.userspace.ByteRegion
 
 /** An openable file buffer with seek semantics */
 expect class SeekFileBuffer(
@@ -28,10 +28,10 @@ expect class SeekFileBuffer(
     fun seek(pos: Long)
     /**
      * Batch read scattered offsets — sorted to minimize seeks (elevator).
-     * Each read goes into its corresponding buffer, advancing position.
+     * Each read goes into its corresponding buffer window.
      * Returns bytes read for each request (may be short on EOF).
      */
-    fun readv(requests: Series2<Long, ByteSeries>): IntArray
+    fun readv(requests: Series2<Long, ByteRegion>): IntArray
 }
 
 /** Open and use a SeekFileBuffer */
@@ -44,6 +44,6 @@ fun <T> SeekFileBuffer.use(block: (SeekFileBuffer) -> T): T {
     }
 }
 
-/** Convenience overload: `readv(0L j bs0, 4096L j bs1, ...)` */
-fun SeekFileBuffer.readv(vararg requests: Join<Long, ByteSeries>): IntArray =
+/** Convenience overload: `readv(0L j region0, 4096L j region1, ...)` */
+fun SeekFileBuffer.readv(vararg requests: Join<Long, ByteRegion>): IntArray =
     readv(requests.size j requests::get)

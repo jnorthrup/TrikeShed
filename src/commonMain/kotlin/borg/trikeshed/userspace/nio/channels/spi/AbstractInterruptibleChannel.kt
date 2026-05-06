@@ -6,9 +6,9 @@ package borg.trikeshed.userspace.nio.channels.spi
 // Declarations intentionally mirror JDK taxonomy and contain no implementations.
 public abstract class AbstractInterruptibleChannel {
     protected constructor()
-    fun close(): Unit = TODO("NIO common stub")
-    protected fun implCloseChannel(): Unit
-    fun isOpen(): Boolean = TODO("NIO common stub")
-    protected fun begin(): Unit
-    protected fun end(p0: Boolean): Unit
+    open fun close(): Unit = TODO("NIO common stub")
+    protected abstract fun implCloseChannel(): Unit
+    open fun isOpen(): Boolean = TODO("NIO common stub")
+    protected abstract fun begin(): Unit
+    protected abstract fun end(completed: Boolean): Unit
 }

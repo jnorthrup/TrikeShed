@@ -2,8 +2,8 @@
 
 package borg.trikeshed
 
-import borg.trikeshed.lib.ByteSeries
 import borg.trikeshed.lib.Series2
+import borg.trikeshed.userspace.ByteRegion
 import kotlinx.cinterop.*
 import platform.posix.*
 import simple.PosixOpenOpts
@@ -94,15 +94,16 @@ actual class SeekFileBuffer actual constructor(
         fillBuffer(initialOffset + pos)
     }
 
-    actual fun readv(requests: Series2<Long, ByteSeries>): IntArray {
+    actual fun readv(requests: Series2<Long, ByteRegion>): IntArray {
         val results = IntArray(requests.a)
         for (i in 0 until requests.a) {
             val req = requests.b(i)
-            val pos = req.a
+            val pos = initialOffset + req.a
             val dst = req.b
-            val tmp = ByteArray(dst.rem)
-            val read = tmp.usePinned { pinned ->
-                pread(fd, pinned.addressOf(0), tmp.size.convert(), pos)
+            val backing = dst.buffer.array()
+            val backingOffset = dst.buffer.arrayOffset() + dst.start
+            val read = backing.usePinned { pinned ->
+                pread(fd, pinned.addressOf(backingOffset), dst.size.convert(), pos)
             }
             results[i] = if (read < 0) 0 else read.toInt()
         }

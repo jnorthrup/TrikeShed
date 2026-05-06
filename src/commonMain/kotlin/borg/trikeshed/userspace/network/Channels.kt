@@ -1,5 +1,7 @@
 package borg.trikeshed.userspace.network
 
+import borg.trikeshed.lib.ByteSeries
+import borg.trikeshed.userspace.ByteRegion
 import kotlin.concurrent.Volatile
 
 /**
@@ -19,8 +21,8 @@ interface Channel {
     fun channelType(): String
     fun isConnected(): Boolean
     fun metadata(): ChannelMetadata?
-    fun read(buf: ByteArray): Int
-    fun write(buf: ByteArray): Int
+    fun read(dst: ByteRegion): Int
+    fun write(src: ByteSeries): Int
 }
 
 interface Channels {

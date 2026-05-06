@@ -2,19 +2,20 @@
 
 package borg.trikeshed.userspace.nio.channels
 
+import borg.trikeshed.userspace.nio.channels.spi.AsynchronousChannelProvider
 // Generated from Amazon Corretto JDK 25 java.base NIO public/protected API via javap.
 // Declarations intentionally mirror JDK taxonomy and contain no implementations.
 public abstract class AsynchronousChannelGroup {
-    protected constructor(p0: borg.trikeshed.userspace.nio.channels.spi.AsynchronousChannelProvider)
-    fun provider(): borg.trikeshed.userspace.nio.channels.spi.AsynchronousChannelProvider = TODO("NIO common stub")
+    protected constructor(provider: AsynchronousChannelProvider)
+    fun provider(): AsynchronousChannelProvider = TODO("NIO common stub")
     fun isShutdown(): Boolean = TODO("NIO common stub")
     fun isTerminated(): Boolean = TODO("NIO common stub")
     fun shutdown(): Unit = TODO("NIO common stub")
     fun shutdownNow(): Unit = TODO("NIO common stub")
-    fun awaitTermination(p0: Long, p1: java.util.concurrent.TimeUnit): Boolean = TODO("NIO common stub")
+    fun awaitTermination(timeout: Long): Boolean = TODO("NIO common stub")
     companion object {
-        fun withFixedThreadPool(p0: Int, p1: java.util.concurrent.ThreadFactory): borg.trikeshed.userspace.nio.channels.AsynchronousChannelGroup = TODO("NIO common stub")
-        fun withCachedThreadPool(p0: java.util.concurrent.ExecutorService, p1: Int): borg.trikeshed.userspace.nio.channels.AsynchronousChannelGroup = TODO("NIO common stub")
-        fun withThreadPool(p0: java.util.concurrent.ExecutorService): borg.trikeshed.userspace.nio.channels.AsynchronousChannelGroup = TODO("NIO common stub")
+        fun withFixedThreadPool(threadCount: Int): AsynchronousChannelGroup = TODO("NIO common stub")
+        fun withCachedThreadPool(initialSize: Int): AsynchronousChannelGroup = TODO("NIO common stub")
+        fun withThreadPool(): AsynchronousChannelGroup = TODO("NIO common stub")
     }
 }

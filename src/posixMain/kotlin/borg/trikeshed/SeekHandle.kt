@@ -2,6 +2,8 @@
 
 package borg.trikeshed
 
+import borg.trikeshed.lib.ByteSeries
+import borg.trikeshed.userspace.ByteRegion
 import kotlinx.cinterop.*
 import platform.posix.*
 
@@ -30,25 +32,28 @@ class PreadSeekHandle : SeekHandle {
         fds.remove(handle)?.let { platform.posix.close(it) }
     }
 
-    override fun pread(handle: Long, buf: ByteArray, offset: Int, length: Int, fileOffset: Long): Int {
+    override fun pread(handle: Long, dst: ByteRegion, fileOffset: Long): Int {
         val fd = fds[handle] ?: return -1
-        return buf.usePinned { pinned ->
+        val backing = dst.buffer.array()
+        val offset = dst.buffer.arrayOffset() + dst.start
+        return backing.usePinned { pinned ->
             platform.posix.pread(
                 fd,
                 pinned.addressOf(offset),
-                length.toULong(),
+                dst.size.toULong(),
                 fileOffset
             ).toInt()
         }
     }
 
-    override fun pwrite(handle: Long, buf: ByteArray, offset: Int, length: Int, fileOffset: Long): Int {
+    override fun pwrite(handle: Long, src: ByteSeries, fileOffset: Long): Int {
         val fd = fds[handle] ?: return -1
-        return buf.usePinned { pinned ->
+        val bytes = src.toArray()
+        return bytes.usePinned { pinned ->
             platform.posix.pwrite(
                 fd,
-                pinned.addressOf(offset),
-                length.toULong(),
+                pinned.addressOf(0),
+                bytes.size.toULong(),
                 fileOffset
             ).toInt()
         }
@@ -65,14 +70,25 @@ class PreadSeekHandle : SeekHandle {
         return -1
     }
 
-    override fun read(handle: Long, buf: ByteArray, offset: Int, length: Int): Int {
+    override fun read(handle: Long, dst: ByteRegion): Int {
         // pread at current position using lseek
         val fd = fds[handle] ?: return -1
         val pos = platform.posix.lseek(fd, 0, SEEK_CUR)
         if (pos < 0) return -1
-        return pread(handle, buf, offset, length, pos).also { bytesRead ->
+        return pread(handle, dst, pos).also { bytesRead ->
             if (bytesRead > 0) {
                 platform.posix.lseek(fd, pos + bytesRead, SEEK_SET)
+            }
+        }
+    }
+
+    override fun write(handle: Long, src: ByteSeries): Int {
+        val fd = fds[handle] ?: return -1
+        val pos = platform.posix.lseek(fd, 0, SEEK_CUR)
+        if (pos < 0) return -1
+        return pwrite(handle, src, pos).also { bytesWritten ->
+            if (bytesWritten > 0) {
+                platform.posix.lseek(fd, pos + bytesWritten, SEEK_SET)
             }
         }
     }

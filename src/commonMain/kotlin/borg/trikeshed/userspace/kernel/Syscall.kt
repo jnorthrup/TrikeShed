@@ -1,5 +1,8 @@
 package borg.trikeshed.userspace.kernel
 
+import borg.trikeshed.lib.ByteSeries
+import borg.trikeshed.userspace.ByteRegion
+
 /**
  * Unified Kernel Syscall Interface
  *
@@ -7,19 +10,23 @@ package borg.trikeshed.userspace.kernel
  */
 
 interface SyscallAdapter {
-    fun read(fd: Int, buf: ByteArray): Int
-    fun write(fd: Int, buf: ByteArray): Int
+    fun read(fd: Int, dst: ByteRegion): Int
+    fun write(fd: Int, src: ByteSeries): Int
     fun close(fd: Int)
 }
 
-interface NetworkAdapter {
+/** fd-level socket syscalls — not a protocol adapter. */
+interface SocketSyscalls {
     fun connect(host: String, port: Int): Int
     fun bind(host: String, port: Int): Int
     fun listen(fd: Int, backlog: Int)
     fun accept(fd: Int): Pair<Int, String>
-    fun send(fd: Int, buf: ByteArray, flags: Int): Int
-    fun recv(fd: Int, buf: ByteArray, flags: Int): Int
+    fun send(fd: Int, src: ByteSeries, flags: Int): Int
+    fun recv(fd: Int, dst: ByteRegion, flags: Int): Int
 }
+
+@Deprecated("Use SocketSyscalls", ReplaceWith("SocketSyscalls"))
+typealias NetworkAdapter = SocketSyscalls
 
 interface IoUringAdapter {
     fun submit(sqe: SyscallSqe): Long

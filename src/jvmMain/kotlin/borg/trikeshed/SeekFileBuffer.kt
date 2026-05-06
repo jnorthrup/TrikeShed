@@ -1,9 +1,9 @@
 package borg.trikeshed
 
-import borg.trikeshed.lib.ByteSeries
 import borg.trikeshed.lib.Series2
 import borg.trikeshed.lib.debug
 import borg.trikeshed.lib.logDebug
+import borg.trikeshed.userspace.ByteRegion
 import java.nio.ByteBuffer
 import java.nio.channels.FileChannel
 import java.nio.file.Paths
@@ -60,21 +60,20 @@ actual class SeekFileBuffer actual constructor(
     }
 
     /**
-     * Batch read scattered offsets — elevator-sorted to minimize seeks.
-     * Uses FileChannel.read(ByteBuffer[], offset) for gather I/O.
+     * Batch read scattered offsets in request order.
      *
-     * @param requests list of (absolute offset, destination buffer) pairs.
-     *                 Modifies buffers in place, returns bytes read per request.
+     * @param requests list of (absolute offset, destination buffer window) pairs.
+     *                 Modifies regions in place, returns bytes read per request.
      */
-    actual fun readv(requests: Series2<Long, ByteSeries>): IntArray {
+    actual fun readv(requests: Series2<Long, ByteRegion>): IntArray {
         val results = IntArray(requests.a) { 0 }
         if (requests.a == 0) return results
 
         for (i in 0 until requests.a) {
             val request = requests.b(i)
-            val pos = request.a
+            val pos = initialOffset + request.a
             val dst = request.b
-            val buf = ByteBuffer.allocateDirect(dst.rem)
+            val buf = ByteBuffer.wrap(dst.buffer.array(), dst.buffer.arrayOffset() + dst.start, dst.size)
             val bytesRead = channel!!.read(buf, pos)
             results[i] = if (bytesRead < 0) 0 else bytesRead
         }
