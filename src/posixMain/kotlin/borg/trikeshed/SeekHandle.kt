@@ -7,100 +7,136 @@ import borg.trikeshed.userspace.ByteRegion
 import kotlinx.cinterop.*
 import platform.posix.*
 
-/**
- * POSIX pread-based SeekHandle for native targets.
- *
- * Uses pread/pwrite for thread-safe random access without lseek.
- * No file position state — each operation is absolute.
- */
 class PreadSeekHandle : SeekHandle {
-   val fds = mutableMapOf<Long, Int>()
-   var nextId: Long = 1
+    private val fds = mutableMapOf<Long, Int>()
+    private var nextId: Long = 1
 
     override fun open(filename: String, readOnly: Boolean): Long {
-        val flags = if (readOnly) O_RDONLY else O_RDWR
-        val fd = platform.posix.open(filename, flags)
+        val fd = if (readOnly) open(filename, O_RDONLY) else open(filename, O_RDWR or O_CREAT, 438)
         if (fd < 0) {
             throw IllegalStateException("Failed to open $filename: $fd")
         }
-        val id = nextId++
-        fds[id] = fd
-        return id
+        return nextId++.also { fds[it] = fd }
     }
 
     override fun close(handle: Long) {
-        fds.remove(handle)?.let { platform.posix.close(it) }
+        fds.remove(handle)?.let(::close)
     }
 
     override fun pread(handle: Long, dst: ByteRegion, fileOffset: Long): Int {
         val fd = fds[handle] ?: return -1
         val backing = dst.buffer.array()
-        val offset = dst.buffer.arrayOffset() + dst.start
-        return backing.usePinned { pinned ->
-            platform.posix.pread(
-                fd,
-                pinned.addressOf(offset),
-                dst.size.toULong(),
-                fileOffset
-            ).toInt()
-        }
+        val start = dst.buffer.arrayOffset() + dst.start
+        return PosixUringIO.readAt(fd, backing, start, dst.size, fileOffset)
     }
 
     override fun pwrite(handle: Long, src: ByteSeries, fileOffset: Long): Int {
         val fd = fds[handle] ?: return -1
         val bytes = src.toArray()
-        return bytes.usePinned { pinned ->
-            platform.posix.pwrite(
-                fd,
-                pinned.addressOf(0),
-                bytes.size.toULong(),
-                fileOffset
-            ).toInt()
-        }
+        return PosixUringIO.writeAt(fd, bytes, 0, bytes.size, fileOffset)
     }
 
     override fun size(handle: Long): Long {
         val fd = fds[handle] ?: return -1
-        memScoped {
-            val stat = alloc<stat>()
-            if (fstat(fd, stat.ptr) == 0) {
-                return stat.st_size
-            }
+        return memScoped {
+            val statBuf = alloc<platform.posix.stat>()
+            if (fstat(fd, statBuf.ptr) == 0) statBuf.st_size else -1L
         }
-        return -1
     }
 
     override fun read(handle: Long, dst: ByteRegion): Int {
-        // pread at current position using lseek
         val fd = fds[handle] ?: return -1
-        val pos = platform.posix.lseek(fd, 0, SEEK_CUR)
+        val pos = lseek(fd, 0, SEEK_CUR)
         if (pos < 0) return -1
         return pread(handle, dst, pos).also { bytesRead ->
-            if (bytesRead > 0) {
-                platform.posix.lseek(fd, pos + bytesRead, SEEK_SET)
-            }
+            if (bytesRead > 0) lseek(fd, pos + bytesRead, SEEK_SET)
         }
     }
 
     override fun write(handle: Long, src: ByteSeries): Int {
         val fd = fds[handle] ?: return -1
-        val pos = platform.posix.lseek(fd, 0, SEEK_CUR)
+        val pos = lseek(fd, 0, SEEK_CUR)
         if (pos < 0) return -1
         return pwrite(handle, src, pos).also { bytesWritten ->
-            if (bytesWritten > 0) {
-                platform.posix.lseek(fd, pos + bytesWritten, SEEK_SET)
-            }
+            if (bytesWritten > 0) lseek(fd, pos + bytesWritten, SEEK_SET)
         }
     }
 
     override fun seek(handle: Long, position: Long): Long {
         val fd = fds[handle] ?: return -1
-        return platform.posix.lseek(fd, position, SEEK_SET)
+        return lseek(fd, position, SEEK_SET)
     }
 }
 
-/** POSIX actual: returns pread-based implementation. */
-actual fun platformSeekHandle(): SeekHandle = PreadSeekHandle()
+class UringSeekHandle : SeekHandle {
+    private val fds = mutableMapOf<Long, Int>()
+    private val positions = mutableMapOf<Long, Long>()
+    private var nextId: Long = 1
 
-/** io_uring not implemented yet — returns null to use pread fallback. */
-actual fun ioUringHandle(): SeekHandle? = null
+    fun isAvailable(): Boolean = PosixUringIO.isAvailable()
+
+    override fun open(filename: String, readOnly: Boolean): Long {
+        val fd = if (readOnly) open(filename, O_RDONLY) else open(filename, O_RDWR or O_CREAT, 438)
+        if (fd < 0) {
+            throw IllegalStateException("Failed to open $filename: $fd")
+        }
+        val id = nextId++
+        fds[id] = fd
+        positions[id] = 0L
+        return id
+    }
+
+    override fun close(handle: Long) {
+        positions.remove(handle)
+        fds.remove(handle)?.let { PosixUringIO.closeFd(it) }
+    }
+
+    override fun pread(handle: Long, dst: ByteRegion, fileOffset: Long): Int {
+        val fd = fds[handle] ?: return -1
+        val backing = dst.buffer.array()
+        val start = dst.buffer.arrayOffset() + dst.start
+        return PosixUringIO.readAt(fd, backing, start, dst.size, fileOffset)
+    }
+
+    override fun pwrite(handle: Long, src: ByteSeries, fileOffset: Long): Int {
+        val fd = fds[handle] ?: return -1
+        val bytes = src.toArray()
+        return PosixUringIO.writeAt(fd, bytes, 0, bytes.size, fileOffset)
+    }
+
+    override fun size(handle: Long): Long {
+        val fd = fds[handle] ?: return -1
+        return memScoped {
+            val statBuf = alloc<platform.posix.stat>()
+            if (fstat(fd, statBuf.ptr) == 0) statBuf.st_size else -1L
+        }
+    }
+
+    override fun read(handle: Long, dst: ByteRegion): Int {
+        val pos = positions[handle] ?: return -1
+        return pread(handle, dst, pos).also { bytesRead ->
+            if (bytesRead > 0) positions[handle] = pos + bytesRead
+        }
+    }
+
+    override fun write(handle: Long, src: ByteSeries): Int {
+        val pos = positions[handle] ?: return -1
+        return pwrite(handle, src, pos).also { bytesWritten ->
+            if (bytesWritten > 0) positions[handle] = pos + bytesWritten
+        }
+    }
+
+    override fun seek(handle: Long, position: Long): Long {
+        if (!fds.containsKey(handle)) return -1
+        positions[handle] = position
+        return position
+    }
+}
+
+private val posixUringSeekHandle: SeekHandle? by lazy {
+    UringSeekHandle().takeIf { it.isAvailable() }
+}
+
+actual fun platformSeekHandle(): SeekHandle = ioUringHandle() ?: PreadSeekHandle()
+
+actual fun ioUringHandle(): SeekHandle? = posixUringSeekHandle
