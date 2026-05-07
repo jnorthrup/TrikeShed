@@ -177,6 +177,7 @@ switch (project.path) {
     case ":libs:ngsctp":
     case ":libs:quic":
     case ":libs:ipfs":
+    case ":libs:tls":
         kmpHost()
         break
     case ":libs:uring":
