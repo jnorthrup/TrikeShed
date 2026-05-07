@@ -37,8 +37,7 @@ IoType :=  IoInstant | IoDouble | IoString | IoInt
  * the binary file format follows this sample
  *
  */
-@Deprecated("Use borg.trikeshed.parse.confix.Isam3FileReader for ISAM3 YAML metadata")
-class IsamMetaFileReader(val metafileFilename: String) :Usable{
+ class IsamMetaFileReader(val metafileFilename: String) :Usable{
 
     val recordlen: Int by lazy {
         constraints.last().end
