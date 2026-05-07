@@ -23,7 +23,8 @@ import borg.trikeshed.sctp.SctpElement
 open class CombinedClientElement(
     val quic: QuicElement = QuicElement(),
     val sctp: SctpElement = SctpElement(),
-    val htx: HtxElement = HtxElement()
+    val htx: HtxElement = HtxElement(),
+    val ipfs: borg.trikeshed.ipfs.IpfsElement? = null
 ) : AsyncContextElement() {
     companion object Key : AsyncContextKey<CombinedClientElement>()
 
@@ -48,14 +49,26 @@ open class CombinedClientElement(
         return when (command.lowercase()) {
             "quic" -> throw UnsupportedOperationException("QUIC transport layer not mature yet")
             "sctp" -> throw UnsupportedOperationException("SCTP transport layer not mature yet")
-            "ipfs", "htx" -> {
-                // IPFS and HTX use aria2c premise
-                val response = htx.request(
-                    method = "GET",
-                    path = args.firstOrNull() ?: "/",
-                    // uris and switches decoupled from HtxClientRequest
-                )
-                "HTX/IPFS target executed. Status: ${response.status}"
+            "ipfs" -> {
+                val uri = args.firstOrNull() ?: "/"
+                // Prefer in-repo IPFS reactor if available
+                ipfs?.let { svc ->
+                    val cid = CID(uri.toByteArray())
+                    val data = svc.get(cid)
+                    if (data != null) {
+                        "IPFS: found ${'$'}{data.size} bytes"
+                    } else {
+                        val response = htx.request(method = "GET", path = uri)
+                        "HTX/IPFS target executed. Status: ${'$'}{response.status}"
+                    }
+                } ?: run {
+                    val response = htx.request(method = "GET", path = uri)
+                    "HTX/IPFS target executed. Status: ${'$'}{response.status}"
+                }
+            }
+            "htx" -> {
+                val response = htx.request(method = "GET", path = args.firstOrNull() ?: "/")
+                "HTX target executed. Status: ${'$'}{response.status}"
             }
             "reactor" -> throw UnsupportedOperationException("Reactor target has been removed")
             else -> "Unknown command: $command"

@@ -12,6 +12,7 @@ kotlin {
                 implementation(project(":libs:quic"))
                 implementation(project(":libs:ngsctp"))
                 implementation(project(":libs:htx-client"))
+                implementation(project(":libs:ipfs"))
             }
         }
         val commonTest by getting {
