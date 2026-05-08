@@ -4,27 +4,29 @@ import borg.trikeshed.context.AsyncContextElement
 import borg.trikeshed.context.AsyncContextKey
 import borg.trikeshed.context.ElementState
 import borg.trikeshed.htx.client.HtxElement
-import borg.trikeshed.htx.client.HtxClientRequest
-import borg.trikeshed.htx.client.Aria2Switches
+import borg.trikeshed.htx.client.HtxTransport
 import borg.trikeshed.quic.QuicElement
 import borg.trikeshed.sctp.SctpElement
+import borg.trikeshed.ipfs.IpfsElement
+import borg.trikeshed.ipfs.CID
 
 /**
- * A combined client element that composes Quic, SCTP, and HTX (HTTP) clients.
- * It also supports dispatching IPFS commands by translating them into
- * underlying tasks, primarily leveraging Aria2c for HTX/IPFS multi-protocol transfers.
+ * A combined client element that composes Quic, SCTP, HTX, IPFS, and Couch transports
+ * under one SupervisorJob. The root assembly for the cross-module reactor.
  *
- * This element acts as a SupervisorJob articulation assembly context.
- * Note: the child elements (quic, sctp, htx) have their lifecycles managed
- * by this combined element. However, because they are constructed internally by default,
- * they are not individually addressable in a `CoroutineContext` hierarchy unless
- * explicitly overridden and bound by the caller.
+ * Protocol Elements (quic, sctp, htx, ipfs) are composed as CCEK siblings in the
+ * coroutine context. HtxElement uses registered transport handlers to dispatch
+ * requests to QuicElement, SctpElement, or TCP depending on the URI scheme.
+ *
+ * IpfsElement can access the CouchElement through cross-context key lookup,
+ * enabling DHT peer discovery from couch collections.
  */
 open class CombinedClientElement(
     val quic: QuicElement = QuicElement(),
     val sctp: SctpElement = SctpElement(),
     val htx: HtxElement = HtxElement(),
-    val ipfs: borg.trikeshed.ipfs.IpfsElement? = null
+    val ipfs: IpfsElement? = null,
+    val couch: Any? = null,
 ) : AsyncContextElement() {
     companion object Key : AsyncContextKey<CombinedClientElement>()
 
@@ -35,6 +37,13 @@ open class CombinedClientElement(
         quic.open()
         sctp.open()
         htx.open()
+
+        htx.registerTransport(HtxTransport.QUIC) { request ->
+            throw UnsupportedOperationException("QUIC transport forwarding not yet implemented — htx-general-client on QUIC")
+        }
+        htx.registerTransport(HtxTransport.SCTP) { request ->
+            throw UnsupportedOperationException("SCTP transport forwarding not yet implemented — htx-general-client on ngSCTP")
+        }
     }
 
     override suspend fun close() {
@@ -51,7 +60,6 @@ open class CombinedClientElement(
             "sctp" -> throw UnsupportedOperationException("SCTP transport layer not mature yet")
             "ipfs" -> {
                 val uri = args.firstOrNull() ?: "/"
-                // Prefer in-repo IPFS reactor if available
                 ipfs?.let { svc ->
                     val cid = CID(uri.toByteArray())
                     val data = svc.get(cid)
@@ -70,7 +78,11 @@ open class CombinedClientElement(
                 val response = htx.request(method = "GET", path = args.firstOrNull() ?: "/")
                 "HTX target executed. Status: ${'$'}{response.status}"
             }
-            "reactor" -> throw UnsupportedOperationException("Reactor target has been removed")
+            "couch" -> {
+                val path = args.firstOrNull() ?: "/"
+                val response = htx.request(method = "GET", path = path)
+                "Couch target executed via HTX. Status: ${'$'}{response.status}"
+            }
             else -> "Unknown command: $command"
         }
     }

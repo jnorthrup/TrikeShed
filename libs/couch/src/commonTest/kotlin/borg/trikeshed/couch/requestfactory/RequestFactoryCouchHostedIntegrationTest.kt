@@ -5,7 +5,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlinx.coroutines.test.runTest
 
-import borg.trikeshed.couch.runtime.Reactor
 import borg.trikeshed.couch.runtime.CouchRuntime
 import borg.trikeshed.couch.transport.htx.HtxRequest
 
@@ -15,9 +14,7 @@ class RequestFactoryCouchHostedIntegrationTest {
 
     @Test
     fun reactorSelfHostCouch_roundtrip() = runTest {
-        val reactor = Reactor("couch-realm")
-
-        val runtime = CouchRuntime(reactor = reactor)
+        val runtime = CouchRuntime()
 
         val clientCall = RequestFactoryCall(
             context = "db",

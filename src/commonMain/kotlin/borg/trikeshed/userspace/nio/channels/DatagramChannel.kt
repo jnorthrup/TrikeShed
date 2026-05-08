@@ -21,9 +21,9 @@ public abstract class DatagramChannel : AbstractSelectableChannel, ByteChannel, 
     fun getRemoteAddress(): String = TODO("NIO common stub")
     fun receive(dst: ByteRegion): String = TODO("NIO common stub")
     fun send(src: ByteBuffer, address: String): Int = TODO("NIO common stub")
-    public abstract override fun read(dst: ByteRegion): Int
-    public abstract override fun read(dsts: Array<out ByteRegion>, offset: Int, length: Int): Long
-    public abstract override fun read(dsts: Array<out ByteRegion>): Long
+    public abstract override fun read(dst: ByteBuffer): Int
+    public abstract override fun read(dsts: Array<out ByteBuffer>, offset: Int, length: Int): Long
+    public abstract override fun read(dsts: Array<out ByteBuffer>): Long
     public abstract override fun write(src: ByteBuffer): Int
     public abstract override fun write(srcs: Array<out ByteBuffer>, offset: Int, length: Int): Long
     public abstract override fun write(srcs: Array<out ByteBuffer>): Long

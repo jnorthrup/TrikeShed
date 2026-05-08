@@ -1,8 +1,6 @@
 package borg.trikeshed.couch.transport.htx
 
-import borg.trikeshed.couch.runtime.Reactor
-
-class HtxBackedCouchTransport(reactor: Reactor) {
+class HtxBackedCouchTransport {
     fun view(database: String, path: String): HtxCouchExchange {
         val request = HtxRequest(
             method = "GET",

@@ -72,8 +72,24 @@ actual object Files {
     }
 
     actual fun iterateLines(fileName: String, bufsize: Int): Iterable<Join<Long, Series<Byte>>> = TODO("iterateLines JVM")
-}
 
+    actual fun listDir(path: String): List<String> =
+        File(path).listFiles()?.map { it.name } ?: emptyList()
+
+    actual fun isDir(path: String): Boolean = File(path).isDirectory
+
+    actual fun isFile(path: String): Boolean = File(path).isFile
+
+    actual fun mkdirs(path: String) { File(path).mkdirs() }
+
+    actual fun deleteRecursively(path: String) { File(path).deleteRecursively() }
+
+    actual fun resolvePath(vararg parts: String): String = parts.joinToString(File.separator)
+
+    actual fun readZip(path: String): List<Pair<String, ByteArray>> = TODO("readZip JVM")
+
+    actual fun createTempDir(prefix: String): String =
+        java.nio.file.Files.createTempDirectory(prefix).toAbsolutePath().toString()
 }
 
 fun main() {

@@ -1,5 +1,8 @@
 package borg.trikeshed.ipfs
 
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.launch
+
 /**
  * Minimal in-process DHT service for prototype/testing.
  * Provides a simple provider registry keyed by CID bytes hex.

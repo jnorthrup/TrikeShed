@@ -1,6 +1,7 @@
 package borg.trikeshed.couch.btrfs
 
 import borg.trikeshed.context.AsyncContextElement
+import borg.trikeshed.context.AsyncContextKey
 import borg.trikeshed.context.ElementState
 import borg.trikeshed.couch.wal.CompactionPlan
 import borg.trikeshed.couch.wal.CompactionResult
@@ -10,11 +11,10 @@ import borg.trikeshed.couch.wal.WalEntry
 import borg.trikeshed.couch.wal.WalSnapshot
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.j
-import kotlin.coroutines.CoroutineContext
 
 class BtrfsWal(private val element: BtrfsSandboxElement) : AsyncContextElement(), LSMRWal {
-    companion object Key : CoroutineContext.Key<BtrfsWal>
-    override val key: CoroutineContext.Key<*> get() = Key
+    companion object Key : AsyncContextKey<BtrfsWal>()
+    override val key: AsyncContextKey<BtrfsWal> get() = Key
 
     private var nextSeq = 1L
 

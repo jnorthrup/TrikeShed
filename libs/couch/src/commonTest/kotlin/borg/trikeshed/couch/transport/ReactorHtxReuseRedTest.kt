@@ -1,30 +1,25 @@
 package borg.trikeshed.couch.transport
 
 import borg.trikeshed.couch.runtime.CouchRuntime
-import borg.trikeshed.couch.runtime.Reactor
 import borg.trikeshed.couch.transport.htx.HtxBackedCouchTransport
 import borg.trikeshed.couch.transport.htx.HtxCouchExchange
 import borg.trikeshed.couch.transport.htx.HtxRequestFactoryBridge
 import borg.trikeshed.couch.transport.htx.HtxRequest
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class ReactorHtxReuseRedTest {
     @Test
-    fun runtimeRequiresInjectedReactorAndDoesNotCreateRawSocketTransport() {
-        val reactor = Reactor()
-        val runtime = CouchRuntime(reactor = reactor)
+    fun runtimeCreatesTransportAndDoesNotCreateRawSocketTransport() {
+        val runtime = CouchRuntime()
 
-        assertSame(reactor, runtime.reactor)
         assertTrue(runtime.transport is HtxBackedCouchTransport)
     }
 
     @Test
     fun transportBuildsViewFetchAsHtxRequest() {
-        val reactor = Reactor()
-        val transport = HtxBackedCouchTransport(reactor)
+        val transport = HtxBackedCouchTransport()
 
         val exchange: HtxCouchExchange = transport.view(
             database = "acmevehicle",

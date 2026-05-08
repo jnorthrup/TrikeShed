@@ -5,20 +5,14 @@ import borg.trikeshed.context.AsyncContextKey
 import borg.trikeshed.context.ElementState
 import borg.trikeshed.htx.client.generated.infrastructure.GeneratedRequest
 
-// Compromise: this standalone lib does not depend on the root project to avoid composite-build cycles.
 data class HtxClientMessage(val status: Int = 200, val body: String = "ok")
-/**
- * aria2c switch equivalents for the HTX client.
- *
- * Maps to the most commonly used aria2c options from BinancePipelineMacos:
- *   -Z  --force-serialization        (always on for this pipeline)
- *   -c  --continue                   (resume partial download)
- *   --save-not-found=false           (404 is not a retryable error)
- *   -x15 --max-connection-per-server=15
- *   -j15 --max-concurrent-downloads=15
- *   -s15 --split=15
- *   -d  --dir=<dir>
- */
+
+enum class HtxTransport {
+    TCP,
+    QUIC,
+    SCTP,
+}
+
 data class Aria2Switches(
     val continueDownload: Boolean = true,
     val saveNotFound: Boolean = false,
@@ -27,9 +21,8 @@ data class Aria2Switches(
     val split: Int = 15,
     val dir: String? = null,
 ) {
-    /** Render as an aria2c argument list. Uris are appended separately. */
     fun toArgs(): List<String> = buildList {
-        add("-Z")  // --force-serialization (always on for this pipeline)
+        add("-Z")
         if (continueDownload) add("-c")
         if (!saveNotFound) add("--save-not-found=false")
         add("-x$maxConnectionsPerServer")
@@ -45,11 +38,20 @@ data class HtxClientRequest(
     val body: String = "",
     val switches: Aria2Switches? = null,
     val uris: List<String> = emptyList(),
+    val transport: HtxTransport? = null,
 )
 
 typealias HtxRequestHandler = suspend (HtxClientRequest) -> HtxClientMessage
 
 val HtxKey: AsyncContextKey<HtxElement> = HtxElement.Key
+
+fun selectTransport(uri: String): HtxTransport = when {
+    uri.startsWith("h3://")   -> HtxTransport.QUIC
+    uri.startsWith("quic://") -> HtxTransport.QUIC
+    uri.startsWith("sctp://") -> HtxTransport.SCTP
+    else                      -> HtxTransport.TCP
+}
+
 fun defaultHtxRequestHandler(request: HtxClientRequest): HtxClientMessage =
     when {
         request.method.isBlank() || request.path.isBlank() -> HtxClientMessage(status = 400, body = "invalid request")
@@ -64,8 +66,17 @@ suspend fun openHtxElement(
     HtxElement(requestHandler).also { it.open() }
 
 class HtxElement(
-   val requestHandler: HtxRequestHandler = ::defaultHtxRequestHandler,
+    val requestHandler: HtxRequestHandler = ::defaultHtxRequestHandler,
 ) : AsyncContextElement() {
+    private val transportHandlers = mutableMapOf<HtxTransport, HtxRequestHandler>(
+        HtxTransport.TCP to requestHandler,
+    )
+
+    fun registerTransport(transport: HtxTransport, handler: HtxRequestHandler) {
+        require(transport != HtxTransport.TCP) { "TCP handler is the default requestHandler; set via constructor" }
+        transportHandlers[transport] = handler
+    }
+
     fun generatedCall(): suspend (GeneratedRequest) -> String = { request ->
         val query = request.queryParams.entries.joinToString("&") { (key, value) -> "$key=$value" }
         val path = if (query.isEmpty()) request.path else "${request.path}?$query"
@@ -79,6 +90,7 @@ class HtxElement(
         }
         response.body
     }
+
     companion object Key : AsyncContextKey<HtxElement>()
 
     override val key: AsyncContextKey<HtxElement>
@@ -90,16 +102,22 @@ class HtxElement(
         body: String = "",
         switches: Aria2Switches? = null,
         uris: List<String> = emptyList(),
+        transport: HtxTransport? = null,
     ): HtxClientMessage {
-        check(state == ElementState.OPEN || state == ElementState.ACTIVE || state == ElementState.DRAINING) { "Expected OPEN, ACTIVE, or DRAINING but was $state" }
-        return requestHandler(
-            HtxClientRequest(
-                method = method.trim().uppercase(),
-                path = path,
-                body = body,
-                switches = switches,
-                uris = uris,
-            ),
+        check(state == ElementState.OPEN || state == ElementState.ACTIVE || state == ElementState.DRAINING) {
+            "Expected OPEN, ACTIVE, or DRAINING but was $state"
+        }
+        val resolvedTransport = transport ?: selectTransport(path)
+        val request = HtxClientRequest(
+            method = method.trim().uppercase(),
+            path = path,
+            body = body,
+            switches = switches,
+            uris = uris,
+            transport = resolvedTransport,
         )
+        val handler = transportHandlers[resolvedTransport]
+            ?: return HtxClientMessage(status = 501, body = "transport $resolvedTransport not registered")
+        return handler(request)
     }
 }
