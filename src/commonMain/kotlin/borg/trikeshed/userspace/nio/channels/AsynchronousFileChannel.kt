@@ -2,7 +2,7 @@
 
 package borg.trikeshed.userspace.nio.channels
 
-import borg.trikeshed.userspace.ByteRegion
+import borg.trikeshed.userspace.nio.ByteBuffer
 import borg.trikeshed.lib.ByteSeries
 import borg.trikeshed.userspace.nio.file.Path
 import borg.trikeshed.userspace.nio.file.OpenOption
@@ -21,8 +21,8 @@ public abstract class AsynchronousFileChannel {
     fun lock(): FileLock = TODO("NIO common stub")
     fun tryLock(position: Long, size: Long, shared: Boolean): FileLock = TODO("NIO common stub")
     fun tryLock(): FileLock = TODO("NIO common stub")
-    fun <A> read(dst: ByteRegion, position: Long, attachment: A, handler: CompletionHandler<Int, in A>): Unit = TODO("NIO common stub")
-    fun read(dst: ByteRegion, position: Long): Int = TODO("NIO common stub")
+    fun <A> read(dst: ByteBuffer, position: Long, attachment: A, handler: CompletionHandler<Int, in A>): Unit = TODO("NIO common stub")
+    fun read(dst: ByteBuffer, position: Long): Int = TODO("NIO common stub")
     fun <A> write(src: ByteSeries, position: Long, attachment: A, handler: CompletionHandler<Int, in A>): Unit = TODO("NIO common stub")
     fun write(src: ByteSeries, position: Long): Int = TODO("NIO common stub")
     companion object {

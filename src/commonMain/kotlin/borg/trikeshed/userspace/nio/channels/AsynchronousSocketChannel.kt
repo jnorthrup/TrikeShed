@@ -2,7 +2,7 @@
 
 package borg.trikeshed.userspace.nio.channels
 
-import borg.trikeshed.userspace.ByteRegion
+import borg.trikeshed.userspace.nio.ByteBuffer
 import borg.trikeshed.lib.ByteSeries
 import borg.trikeshed.userspace.nio.channels.spi.AsynchronousChannelProvider
 
@@ -18,10 +18,10 @@ public abstract class AsynchronousSocketChannel {
     fun getRemoteAddress(): String = TODO("NIO common stub")
     fun <A> connect(address: String, attachment: A, handler: CompletionHandler<Unit?, in A>): Unit = TODO("NIO common stub")
     fun connect(address: String): Unit? = TODO("NIO common stub")
-    fun <A> read(dst: ByteRegion, timeout: Long, attachment: A, handler: CompletionHandler<Int, in A>): Unit = TODO("NIO common stub")
-    fun <A> read(dst: ByteRegion, attachment: A, handler: CompletionHandler<Int, in A>): Unit = TODO("NIO common stub")
-    fun read(dst: ByteRegion): Int = TODO("NIO common stub")
-    fun <A> read(dsts: Array<out ByteRegion>, offset: Int, length: Int, timeout: Long, attachment: A, handler: CompletionHandler<Long, in A>): Unit = TODO("NIO common stub")
+    fun <A> read(dst: ByteBuffer, timeout: Long, attachment: A, handler: CompletionHandler<Int, in A>): Unit = TODO("NIO common stub")
+    fun <A> read(dst: ByteBuffer, attachment: A, handler: CompletionHandler<Int, in A>): Unit = TODO("NIO common stub")
+    fun read(dst: ByteBuffer): Int = TODO("NIO common stub")
+    fun <A> read(dsts: Array<out ByteBuffer>, offset: Int, length: Int, timeout: Long, attachment: A, handler: CompletionHandler<Long, in A>): Unit = TODO("NIO common stub")
     fun <A> write(src: ByteSeries, timeout: Long, attachment: A, handler: CompletionHandler<Int, in A>): Unit = TODO("NIO common stub")
     fun <A> write(src: ByteSeries, attachment: A, handler: CompletionHandler<Int, in A>): Unit = TODO("NIO common stub")
     fun write(src: ByteSeries): Int = TODO("NIO common stub")

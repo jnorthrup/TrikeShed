@@ -3,7 +3,7 @@
 package borg.trikeshed.userspace.nio.channels
 
 import borg.trikeshed.userspace.ByteRegion
-import borg.trikeshed.lib.ByteSeries
+import borg.trikeshed.userspace.nio.ByteBuffer
 import borg.trikeshed.userspace.nio.channels.spi.AbstractSelectableChannel
 import borg.trikeshed.userspace.nio.channels.spi.SelectorProvider
 
@@ -20,13 +20,13 @@ public abstract class DatagramChannel : AbstractSelectableChannel, ByteChannel, 
     fun disconnect(): DatagramChannel = TODO("NIO common stub")
     fun getRemoteAddress(): String = TODO("NIO common stub")
     fun receive(dst: ByteRegion): String = TODO("NIO common stub")
-    fun send(src: ByteSeries, address: String): Int = TODO("NIO common stub")
+    fun send(src: ByteBuffer, address: String): Int = TODO("NIO common stub")
     public abstract override fun read(dst: ByteRegion): Int
     public abstract override fun read(dsts: Array<out ByteRegion>, offset: Int, length: Int): Long
     public abstract override fun read(dsts: Array<out ByteRegion>): Long
-    public abstract override fun write(src: ByteSeries): Int
-    public abstract override fun write(srcs: Array<out ByteSeries>, offset: Int, length: Int): Long
-    public abstract override fun write(srcs: Array<out ByteSeries>): Long
+    public abstract override fun write(src: ByteBuffer): Int
+    public abstract override fun write(srcs: Array<out ByteBuffer>, offset: Int, length: Int): Long
+    public abstract override fun write(srcs: Array<out ByteBuffer>): Long
     public abstract override fun getLocalAddress(): String
 
     companion object {

@@ -2,11 +2,11 @@
 
 package borg.trikeshed.userspace.nio.channels
 
-import borg.trikeshed.lib.ByteSeries
+import borg.trikeshed.userspace.nio.ByteBuffer
 
 // Generated from Amazon Corretto JDK 25 java.base NIO public/protected API via javap.
 // Declarations intentionally mirror JDK taxonomy and contain no implementations.
 public interface GatheringByteChannel : WritableByteChannel {
-    fun write(srcs: Array<out ByteSeries>, offset: Int, length: Int): Long = TODO("NIO common stub")
-    fun write(srcs: Array<out ByteSeries>): Long = TODO("NIO common stub")
+    fun write(srcs: Array<out ByteBuffer>, offset: Int, length: Int): Long = TODO("NIO common stub")
+    fun write(srcs: Array<out ByteBuffer>): Long = TODO("NIO common stub")
 }
