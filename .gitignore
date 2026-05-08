@@ -10,7 +10,6 @@ build/
 .kotlin/
 
 # Project-specific
-docs/
 tmp/
 
 # Environment files
