@@ -1,0 +1,17 @@
+package borg.trikeshed.userspace.nio.channels.spi
+
+import borg.trikeshed.userspace.nio.ByteBuffer
+
+class WasmChannelOperations : ChannelOperations {
+
+    override fun openChannel(entries: Int): ChannelOperations.ChannelHandle = WasmChannelHandle()
+    override fun socket(domain: Int, type: Int, protocol: Int): Int = -1
+
+    private class WasmChannelHandle : ChannelOperations.ChannelHandle {
+        override val id: Int get() = 0
+        override fun read(buffer: ByteBuffer, offset: Long): Int = -1
+        override fun write(buffer: ByteBuffer, offset: Long): Int = -1
+        override fun submit(): Int = 0
+        override fun wait(minComplete: Int): List<ChannelResult> = emptyList()
+    }
+}
