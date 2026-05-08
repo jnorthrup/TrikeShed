@@ -8,6 +8,7 @@ import borg.trikeshed.lib.Series2
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.toSeries
 import borg.trikeshed.userspace.ByteRegion
+import kotlin.random.Random
 
 
 actual object System {
@@ -47,6 +48,39 @@ actual object Files {
 
     actual fun iterateLines(fileName: String, bufsize: Int): Iterable<Join<Long, Series<Byte>>> =
         streamLines(fileName, bufsize).map { (offset, bytes) -> offset j bytes.toSeries() }.asIterable()
+
+    actual fun listDir(path: String): List<String> {
+        val entries: dynamic = fs.readdirSync(path)
+        val result = mutableListOf<String>()
+        val length = entries.length as Int
+        for (i in 0 until length) result.add(entries[i] as String)
+        return result
+    }
+
+    actual fun isDir(path: String): Boolean {
+        val stat: dynamic = fs.statSync(path)
+        return (stat.isDirectory() as Boolean)
+    }
+
+    actual fun isFile(path: String): Boolean {
+        val stat: dynamic = fs.statSync(path)
+        return (stat.isFile() as Boolean)
+    }
+
+    actual fun mkdirs(path: String) { jsMkdir(path) }
+
+    actual fun deleteRecursively(path: String) { jsRm(path) }
+
+    actual fun resolvePath(vararg parts: String): String =
+        path.join(jsCwd(), parts.joinToString("/")) as String
+
+    actual fun readZip(path: String): List<Pair<String, ByteArray>> = TODO("readZip JS")
+
+    actual fun createTempDir(prefix: String): String {
+        val dir = path.join(os.tmpdir(), "$prefix-${Random.nextInt(1_000_000)}") as String
+        jsMkdir(dir)
+        return dir
+    }
 }
 fun streamByteLines(bytes: ByteArray): Sequence<Join<Long, ByteArray>> = sequence {
     var offset = 0L
@@ -68,16 +102,16 @@ fun streamByteLines(bytes: ByteArray): Sequence<Join<Long, ByteArray>> = sequenc
     }
 }
 
-actual fun mktemp(): String = jsMktemp()
+fun mktemp(): String = jsMktemp()
 
-actual fun rm(path: String): Boolean = jsRm(path)
+fun rm(path: String): Boolean = jsRm(path)
 
-actual fun mkdir(path: String): Boolean = jsMkdir(path)
+fun mkdir(path: String): Boolean = jsMkdir(path)
 
-actual fun readLinesSeq(path: String): Sequence<String> =
+fun readLinesSeq(path: String): Sequence<String> =
     Files.readAllLines(path).asSequence()
 
-actual fun readLines(path: String): List<String> = Files.readAllLines(path)
+fun readLines(path: String): List<String> = Files.readAllLines(path)
 data class JsHandleState(
     val fd: Int,
     var position: Long = 0,
@@ -183,41 +217,41 @@ actual class FileBuffer actual constructor(
     }
 }
 
-actual class SeekFileBuffer actual constructor(
-    actual val filename: String,
-    actual val initialOffset: Long,
-    actual val blkSize: Long,
-    actual val readOnly: Boolean,
+class SeekFileBuffer(
+    val filename: String,
+    val initialOffset: Long,
+    val blkSize: Long,
+    val readOnly: Boolean,
 ) : LongSeries<Byte> {
    val delegate = SeekFileBufferCommon(filename, initialOffset, blkSize, readOnly)
 
-    actual override val a: Long
+    override val a: Long
         get() = delegate.a
 
-    actual override val b: (Long) -> Byte
+    override val b: (Long) -> Byte
         get() = delegate.b
 
-    actual fun close() {
+    fun close() {
         delegate.close()
     }
 
-    actual fun open() {
+    fun open() {
         delegate.open()
     }
 
-    actual fun isOpen(): Boolean = delegate.isOpen()
+    fun isOpen(): Boolean = delegate.isOpen()
 
-    actual fun size(): Long = delegate.size()
+    fun size(): Long = delegate.size()
 
-    actual fun get(index: Long): Byte = delegate.get(index)
+    fun get(index: Long): Byte = delegate.get(index)
 
-    actual fun readv(requests: Series2<Long, ByteRegion>): IntArray = delegate.readv(requests)
+    fun readv(requests: Series2<Long, ByteRegion>): IntArray = delegate.readv(requests)
 
-    actual fun seek(pos: Long) {
+    fun seek(pos: Long) {
         throw UnsupportedOperationException("seek not supported in JS")
     }
 
-    actual fun put(index: Long, value: Byte) {
+    fun put(index: Long, value: Byte) {
         throw UnsupportedOperationException("put not supported in JS")
     }
 }
