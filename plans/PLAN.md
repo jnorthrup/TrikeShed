@@ -151,42 +151,70 @@ JS/Wasm: UnsupportedOperationException
 
 ## In Progress (On Par)
 
+### htx-general-client — Multi-Transport HTTP Client
+**`libs/htx-client/`** — `HtxElement` (105L, Pattern A) + generated `HtxGeneralApi`.
+
+HTX as the version-agnostic tokenizer powers all HTTP versions. The htx-general-client
+targets three transports under one Element:
+
+```
+HtxElement (htx-general-client)
+  │
+  ├─ TCP        → Channels.socket(SOCK_STREAM) → FunctionalUringFacade
+  ├─ QUIC       → QuicElement openStream() → UDP via uring
+  └─ ngSCTP     → SctpElement association → SCTP via uring
+  │
+  └─ IPFS       → IpfsElement DHT + content routing
+       └─ context access to CouchElement (collection state, views)
+```
+
+The client serializes requests to HTX blocks via `HtxAlgebraRed`. Transport selection
+is per-URI scheme: `https://` → TCP+TLS, `h3://` → QUIC, `sctp://` → ngSCTP.
+The same `HtxMessage` flows through any transport without re-tokenization.
+
+Aria2c-compatible `Aria2Switches` for download parallelism. Pluggable `HtxRequestHandler`
+typealias allows swapping in mock/fake/cache transports without changing the client.
+
+**Next:** Wire all three transports through `FunctionalUringFacade`. Connect
+`QuicElement` and `SctpElement` stream handles to the channelized fanout.
+
 ### QuicElement
 **`libs/quic/src/commonMain/.../quic/QuicElement.kt`** — 505 lines, Pattern A.
 
-Protocol types are complete:
-- `QuicVarInt` — RFC 9000 variable-length integer codec (1/2/4/8 byte)
-- `QuicPacketHeader` — sealed class with Initial, ZeroRtt, Handshake, Retry, Short
-- `QuicConfig`, `QuicConnectionId`, `QuicVersions`
-- `QuicErrorException` — full sealed error hierarchy (Connection, Stream, Protocol, Transport, FlowControl, CongestionControl)
+Protocol types are complete: `QuicVarInt`, `QuicPacketHeader` (sealed: Initial/ZeroRtt/Handshake/Retry/Short),
+`QuicConfig`, `QuicConnectionId`, `QuicVersions`, `QuicErrorException`.
 
-Transport is in-memory only:
-- `openStream()` → `Channel<ByteArray>` pairs
-- `connect(host, port)` → stub calling `openStream()`
-- `QuicChannelService` — legacy duplicate with `ioUringFd: Int = -1`, `xdpProg: String?` placeholders
+**Next:** Wire `connect()` to `FunctionalUringFacade` for real UDP. Map stream IDs to userData
+tokens for htx-general-client fanout. Eliminate legacy `QuicChannelService` duplicate.
 
-**Next:** Wire to `FunctionalUringFacade` for real UDP. Eliminate `QuicChannelService` duplicate. Stream IDs → userData tokens for fanout.
+### Couch — HTX over Shared Reactor
+**`libs/couch/`** — 93 files. HTX protocol internals (~850L) are rich. Transport layer is thin.
 
-### HtxClient
-**`libs/htx-client/src/commonMain/.../HtxElement.kt`** — 105 lines, Pattern A.
+HTX is couch's HTTP substrate. Couch serializes CouchDB operations (DocFetch, ViewFetch,
+DbCreate, etc.) as `HtxMessage` blocks, then dispatches through the same `Channel` surface
+as htx-general-client. Couch uses HTX as its tokenizer; htx-general-client uses couch's
+HTX parser.
 
-Aria2c-compatible `Aria2Switches` data class. Pluggable `HtxRequestHandler` typealias. Generated client code for `HtxGeneralApi`. Serialization via `Cbor`.
+**Next:** Wire `HtxBackedCouchTransport` through `FunctionalUringFacade`. Couch's
+`BtrfsSandboxElement` and `BtrfsWal` → Pattern A key convergence. `CollectionHandle`
+lifecycle → `ElementState` enum.
 
-**Next:** Wire HtxRequestHandler through `FunctionalUringFacade` instead of raw `Channel` I/O.
+### IPFS — Same Reactor, Cross-Context Access
+**`libs/ipfs/`** — 10 files, 200 lines.
 
-### DreamerElement
-**`libs/dreamer-kmm/src/commonMain/.../dreamer/engine/DreamerElement.kt`** — Pattern A.
+`IpfsElement` (Pattern A) shares the same uring ring and can access couch context
+Elements via `AsyncContextKey`:
 
-ISAM3 columnar reader via `platformSeekHandle()` → `openColumnarIsam()`. Cursor-based row access. `Genome` configuration. `HtxTransport` uses raw `Channel` I/O (socket → connect → write → read → close).
+```kotlin
+val couch = currentCoroutineContext()[CouchElement.Key]
+val knownPeers = couch?.collections?.get("peers")?.activeDocuments()
+```
 
-**Next:** Push `HtxTransport` I/O through `FunctionalUringFacade` path. The dreamer-kmm `HtxTransport` already implements `SelectableChannelOps` — bridge to facade.
+CombinedClient already composes `IpfsElement` + `HtxElement` as CCEK siblings.
+IPFS DHT queries and content routing use the same `Channel` surface as HTTP traffic.
 
-### CombinedClient
-**`libs/combined-client/src/commonMain/.../CombinedClientElement.kt`** — Pattern A.
-
-String-based command routing: `"http"`, `"htmx"`, `"reactor"`, `"ipfs"`. Composes `HtxElement` + `IpfsElement` together.
-
-**Next:** Unified uring path for all command transports. Single ring, single CQE loop, fanout by command token.
+**Next:** Flesh out `DhtService` with Kademlia routing. Wire `DhtTransport` through
+`FunctionalUringFacade` for UDP.
 
 ---
 
@@ -277,49 +305,92 @@ Also: root `context/ConcreteElements.kt` — `NioUserspaceElement`, `LiburingEle
 
 ---
 
-## Uring Primacy — The One Convergence
+## Cross-Module Reactor Convergence
 
 ### Current State
 
-The uring facade plumbing exists (`ChannelImpl` → `FunctionalUringFacade` → `PosixUringIO` → `Liburing` → `LiburingImpl`). **No upper-layer consumer calls through it.** Every protocol element uses raw `Channel` I/O or is stubbed.
+The uring facade plumbing exists (`ChannelImpl` → `FunctionalUringFacade` → `PosixUringIO` → `Liburing` → `LiburingImpl`).
+Upper-layer consumers use raw `Channel` I/O directly rather than going through the facade.
+Cross-module context access between Elements is not wired.
 
-### The Target
+### The Target — One Reactor, All Protocols
 
 ```
-                         LiburingImpl (platform actual)
-                              │
-                   io_uring_wait_cqe loop (Linux cinterop)
-                              │
-                  publish(userData → fanout handlers)
-                    ┌─────────┼─────────┐──────────┐───────────┐
-              QuicElement   HtxElement  TlsElement  IpfsElement  SctpElement
-              (stream mux)  (HTTP/1.1)  (handshake) (DHT UDP)    (SCTP conn)
-                    │            │           │           │            │
-              stream 0..N   request     encrypt/    DHT query    association
-                            dispatch     decrypt     /response
+                              LiburingImpl (platform actual)
+                                       │
+                            io_uring_wait_cqe loop
+                                       │
+                           publish(userData → fanout handlers)
+         ┌─────────────────────────────┼─────────────────────────────┐
+         │                             │                             │
+    htx-general-client           couch (CouchElement)            ipfs (IpfsElement)
+    (HtxElement)                 │                               │
+    │                            │                               │
+    │  ┌─────────────────────────┤                               │
+    │  │                         │                               │
+    ├──┤  TCP                    │   HtxMessage tokenizer        │   DHT queries
+    ├──┤  QUIC                   │   DocFetch/ViewFetch/DbCreate│   content routing
+    └──┤  ngSCTP                 │   via same Channel facade    │   peer store
+         │                       │                               │
+    HTTP 1-3 + DHTX              └─ context access ←─────────────┤
+    one tokenizer,                                        IpfsElement reads
+    all transports                                    CouchElement collections
+
+         ┌─────────────────────────────┼─────────────────────────────┐
+         │                             │                             │
+    TlsElement                   DreamerElement              CombinedClient
+    (handshake wrap/unwrap)      (ISAM3 columnar reader)    (command routing)
 ```
+
+HTX is the universal tokenizer. Any protocol element producing `HtxMessage` blocks
+can dispatch through any transport (TCP, QUIC, SCTP) without changing its message
+format. IPFS can access couch's `AsyncContextElement`s via `coroutineContext[Key]`,
+enabling DHT queries that introspect couch collections and vice versa.
 
 ### Step 1: Wire CQE Loop to FanoutDispatcher
 
-`LiburingImpl.waitCqe()` already calls `publish(completion)` which fans to handlers by `userData`. `FanoutDispatcherElement` (already in `ConcreteElements.kt`) becomes the dispatch point. `io_uring_wait_cqe` blocks; on CQE receipt, `publish()` resumes suspended coroutines via `Continuation` instead of just callback lambdas.
+`LiburingImpl.waitCqe()` already calls `publish(completion)` which fans to handlers
+by `userData`. `FanoutDispatcherElement` (already in `ConcreteElements.kt`) becomes
+the single dispatch point. On CQE receipt, `publish()` resumes suspended coroutines
+via `Continuation` — one loop, one ring, all protocol elements.
 
-### Step 2: Element Registration
+### Step 2: Element Registration + Cross-Context
 
 Each protocol element, on `open()`:
 - Obtains userData tokens from `LiburingElement` in context
 - Registers fanout handlers: `Liburing.registerFanoutHandler(token) { completion → resume continuation }`
-- Uses `AsyncContextKey` for type-safe context lookup
+- Exposes itself via `AsyncContextKey` for cross-module lookup:
+  ```kotlin
+  // IpfsElement can reach couch:
+  val couch = coroutineContext[CouchElement.Key]
+  // HtxClient can reach IPFS:
+  val ipfs = coroutineContext[IpfsElement.Key]
+  ```
 
 ### Step 3: Generalize ChannelRunner to FanoutDispatcher
 
-`ChannelRunner` (`UserspaceWrappers.kt`) pattern — poll completions, resume deferred futures — generalizes to `FanoutDispatcher`:
-- One ring, one wait loop, one dispatch surface
-- All elements share the ring
-- No `SimpleReactor` (deleted). No separate polling layer like epoll/kqueue
+`ChannelRunner` (`UserspaceWrappers.kt`) pattern — poll completions, resume deferred
+futures — generalizes to `FanoutDispatcher`. One ring, one wait loop, one dispatch
+surface. All elements share the ring. No `SimpleReactor` (deleted). No separate
+polling layer like epoll/kqueue.
 
-### Step 4: TlsEngine Over uring
+### Step 4: HTX as Transport-Agnostic Tokenizer
 
-`TlsEngine.wrap(plaintext: ByteRegion): ByteRegion` and `unwrap(ciphertext: ByteRegion): ByteRegion` operate on `ByteRegion` → `ByteBuffer` → `ByteArray` → native pin → `FunctionalUringFacade.write/read`. Encrypted bytes flow through the same uring ring as application data. No separate SSL BIO.
+HtxMessage block model is identical whether bytes arrived via TCP, QUIC stream, or
+SCTP association. `HtxMessage.normalizeToHtx()` detects the wire format and routes
+to the correct parser. The htx-general-client selects transport per URI scheme:
+
+```
+https://host/api  →  TCP + TlsElement.wrap/unwrap  →  Channel socket
+h3://host/api    →  QuicElement.openStream()        →  Channel UDP
+sctp://host/api  →  SctpElement.connect()           →  Channel SCTP
+```
+
+### Step 5: TlsEngine Over uring
+
+`TlsEngine.wrap/unwrap` operate on `ByteRegion` → `ByteBuffer` → `ByteArray` →
+native pin → `FunctionalUringFacade.write/read`. Encrypted bytes flow through the
+same uring ring as application data. No separate SSL BIO.
 
 ---
 
