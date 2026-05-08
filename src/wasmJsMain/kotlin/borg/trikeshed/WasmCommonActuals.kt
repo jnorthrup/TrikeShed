@@ -302,6 +302,32 @@ actual object Files {
 
     actual fun iterateLines(fileName: String, bufsize: Int): Iterable<Join<Long, Series<Byte>>> =
         streamLines(fileName, bufsize).map { (offset, bytes) -> offset j bytes.toSeries() }.asIterable()
+
+    actual fun listDir(path: String): List<String> {
+        val normalized = normalizePath(path).trimEnd('/') + "/"
+        val fileKeys = storageKeys(fileKey(normalized)) + blobFallback.keys.filter { it.startsWith(fileKey(normalized)) }
+        val dirKeys = storageKeys(dirKey(normalized)) + dirFallback.map(::dirKey).filter { it.startsWith(dirKey(normalized)) }
+        val entries = mutableListOf<String>()
+        for (key in fileKeys) entries.add(key.removePrefix(fileKey(normalized)).substringBefore('/'))
+        for (key in dirKeys) entries.add(key.removePrefix(dirKey(normalized)).substringBefore('/'))
+        return entries.distinct()
+    }
+
+    actual fun isDir(path: String): Boolean = directoryExists(path)
+
+    actual fun isFile(path: String): Boolean = readBlob(path) != null
+
+    actual fun mkdirs(path: String) { ensureParentDirectories(path) }
+
+    actual fun deleteRecursively(path: String) { rm(path) }
+
+    actual fun resolvePath(vararg parts: String): String =
+        normalizePath(parts.joinToString("/"))
+
+    actual fun readZip(path: String): List<Pair<String, ByteArray>> = TODO("readZip WASM")
+
+    actual fun createTempDir(prefix: String): String =
+        "/tmp/$prefix-${Random.nextLong().toString(16)}"
 }
 
 private fun String.replaceChar(old: Char, new: Char): String {
@@ -328,13 +354,13 @@ private fun String.normalizeCrLf(): String {
     return out.toString()
 }
 
-actual fun mktemp(): String {
+fun mktemp(): String {
     val name = "/tmp/wasm-${Random.nextLong().toString(16)}.tmp"
     Files.write(name, ByteArray(0))
     return name
 }
 
-actual fun rm(path: String): Boolean {
+fun rm(path: String): Boolean {
     val normalized = normalizePath(path)
     val fileRemoved = removeBlob(normalized)
 
@@ -358,16 +384,16 @@ actual fun rm(path: String): Boolean {
     return fileRemoved || dirRemoved || nestedFileKeys.isNotEmpty() || nestedDirKeys.isNotEmpty()
 }
 
-actual fun mkdir(path: String): Boolean {
+fun mkdir(path: String): Boolean {
     val normalized = normalizePath(path)
     ensureParentDirectories("$normalized/.dir")
     markDirectory(normalized)
     return true
 }
 
-actual fun readLinesSeq(path: String): Sequence<String> = Files.readAllLines(path).asSequence()
+fun readLinesSeq(path: String): Sequence<String> = Files.readAllLines(path).asSequence()
 
-actual fun readLines(path: String): List<String> = Files.readAllLines(path)
+fun readLines(path: String): List<String> = Files.readAllLines(path)
 
 actual fun platformSeekHandle(): SeekHandle = WasmBrowserSeekHandle
 
@@ -407,41 +433,41 @@ actual class FileBuffer actual constructor(
     }
 }
 
-actual class SeekFileBuffer actual constructor(
-    actual val filename: String,
-    actual val initialOffset: Long,
-    actual val blkSize: Long,
-    actual val readOnly: Boolean,
+class SeekFileBuffer(
+    val filename: String,
+    val initialOffset: Long,
+    val blkSize: Long,
+    val readOnly: Boolean,
 ) : LongSeries<Byte> {
    val delegate = SeekFileBufferCommon(filename, initialOffset, blkSize, readOnly, WasmBrowserSeekHandle)
 
-    actual override val a: Long
+    override val a: Long
         get() = delegate.a
 
-    actual override val b: (Long) -> Byte
+    override val b: (Long) -> Byte
         get() = delegate.b
 
-    actual fun close() {
+    fun close() {
         delegate.close()
     }
 
-    actual fun open() {
+    fun open() {
         delegate.open()
     }
 
-    actual fun isOpen(): Boolean = delegate.isOpen()
+    fun isOpen(): Boolean = delegate.isOpen()
 
-    actual fun size(): Long = delegate.size()
+    fun size(): Long = delegate.size()
 
-    actual fun get(index: Long): Byte = delegate.get(index)
+    fun get(index: Long): Byte = delegate.get(index)
 
-    actual fun seek(pos: Long) {
+    fun seek(pos: Long) {
         delegate.seek(pos)
     }
 
-    actual fun put(index: Long, value: Byte) {
+    fun put(index: Long, value: Byte) {
         delegate.put(index, value)
     }
 
-    actual fun readv(requests: Series2<Long, ByteRegion>): IntArray = delegate.readv(requests)
+    fun readv(requests: Series2<Long, ByteRegion>): IntArray = delegate.readv(requests)
 }

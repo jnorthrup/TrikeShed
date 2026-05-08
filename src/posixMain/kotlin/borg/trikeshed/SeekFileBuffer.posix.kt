@@ -14,11 +14,11 @@ import simple.PosixOpenOpts
  * Uses pread() for positional reads — no lseek needed, safe for scatter reads.
  * 64KB sliding window mirrors the JVM implementation.
  */
-actual class SeekFileBuffer actual constructor(
-    actual val filename: String,
-    actual val initialOffset: Long,
-    actual val blkSize: Long,
-    actual val readOnly: Boolean,
+class SeekFileBuffer(
+    val filename: String,
+    val initialOffset: Long,
+    val blkSize: Long,
+    val readOnly: Boolean,
 ) : LongSeries<Byte> {
 
    var fd: Int = -1
@@ -32,10 +32,10 @@ actual class SeekFileBuffer actual constructor(
         const val BUFFER_SIZE = 65536
     }
 
-    actual override val a: Long
+    override val a: Long
         get() = if (blkSize == -1L) fileSize - initialOffset else blkSize
 
-    actual override val b: (Long) -> Byte
+    override val b: (Long) -> Byte
         get() = { index ->
             val abs = initialOffset + index
             if (abs < bufBase || abs >= bufLimit) fillBuffer(abs)
@@ -53,7 +53,7 @@ actual class SeekFileBuffer actual constructor(
         bufLimit = pos + read
     }
 
-    actual fun open() {
+    fun open() {
         if (fd >= 0) return
         val flags = if (readOnly) PosixOpenOpts.withFlags(PosixOpenOpts.OpenReadOnly)
                     else PosixOpenOpts.withFlags(PosixOpenOpts.O_WrOnly)
@@ -68,7 +68,7 @@ actual class SeekFileBuffer actual constructor(
         bufLimit = -1L
     }
 
-    actual fun close() {
+    fun close() {
         if (fd < 0) return
         platform.posix.close(fd)
         fd = -1
@@ -76,13 +76,13 @@ actual class SeekFileBuffer actual constructor(
         bufLimit = -1L
     }
 
-    actual fun isOpen(): Boolean = fd >= 0
+    fun isOpen(): Boolean = fd >= 0
 
-    actual fun size(): Long = a
+    fun size(): Long = a
 
-    actual fun get(index: Long): Byte = b(index)
+    fun get(index: Long): Byte = b(index)
 
-    actual fun put(index: Long, value: Byte) {
+    fun put(index: Long, value: Byte) {
         val abs = initialOffset + index
         byteArrayOf(value).usePinned { pinned ->
             pwrite(fd, pinned.addressOf(0), 1.convert(), abs)
@@ -90,11 +90,11 @@ actual class SeekFileBuffer actual constructor(
         if (abs >= bufBase && abs < bufLimit) buf[(abs - bufBase).toInt()] = value
     }
 
-    actual fun seek(pos: Long) {
+    fun seek(pos: Long) {
         fillBuffer(initialOffset + pos)
     }
 
-    actual fun readv(requests: Series2<Long, ByteRegion>): IntArray {
+    fun readv(requests: Series2<Long, ByteRegion>): IntArray {
         val results = IntArray(requests.a)
         for (i in 0 until requests.a) {
             val req = requests.b(i)

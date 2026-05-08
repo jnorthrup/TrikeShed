@@ -102,5 +102,49 @@ actual object Files {
         return streamLines(fileName, bufsize).map { (offset, bytes) -> offset j bytes.toSeries() }.asIterable()
     }
 
+    actual fun listDir(path: String): List<String> =
+        memScoped {
+            val dp = opendir(path) ?: return@memScoped emptyList<String>()
+            try {
+                val result = mutableListOf<String>()
+                val buf = alloc<dirent>()
+                var entry = allocPointerTo<dirent>()
+                while (true) {
+                    val err = readdir_r(dp, buf.ptr, entry.ptr)
+                    if (err != 0) break
+                    val ent = entry.value
+                    if (ent == null) break
+                    val name = ent.pointed.d_name.toKString()
+                    if (name != "." && name != "..") result.add(name)
+                }
+                result
+            } finally {
+                closedir(dp)
+            }
+        }
+
+    actual fun isDir(path: String): Boolean = memScoped {
+        val st = alloc<stat>()
+        stat(path, st.ptr) == 0 && (st.st_mode.toInt() and S_IFMT) == S_IFDIR
+    }
+
+    actual fun isFile(path: String): Boolean = memScoped {
+        val st = alloc<stat>()
+        stat(path, st.ptr) == 0 && (st.st_mode.toInt() and S_IFMT) == S_IFREG
+    }
+
+    actual fun mkdirs(path: String) {
+        mkdir(path, 0x1FFu.toUShort())
+    }
+
+    actual fun deleteRecursively(path: String): Unit = TODO("deleteRecursively POSIX")
+
+    actual fun resolvePath(vararg parts: String): String = parts.joinToString("/")
+
+    actual fun readZip(path: String): List<Pair<String, ByteArray>> = TODO("readZip POSIX")
+
+    actual fun createTempDir(prefix: String): String =
+        "/tmp/$prefix-${generateSequence { ('a'..'z').random() }.take(8).joinToString("")}"
+
 
 }
