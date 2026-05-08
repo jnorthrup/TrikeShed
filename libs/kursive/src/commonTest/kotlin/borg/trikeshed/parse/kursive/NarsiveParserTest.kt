@@ -190,7 +190,7 @@ class NarsiveParserTest {
 
     @Test
     fun typeEvidenceColumnCountMatchesSchema() {
-        val dummyEvidence = borg.trikeshed.common.TypeEvidence()
+        val dummyEvidence = borg.trikeshed.TypeEvidence()
         val rowVecFromKursive = dummyEvidence.toKursiveRowVec()
 
         assertEquals(KURSIVE_EVIDENCE_COLUMNS.size, rowVecFromKursive.size)

@@ -3,7 +3,7 @@
 package borg.trikeshed.polyglot
 
 import borg.trikeshed.collections.s_
-import borg.trikeshed.common.TypeEvidence
+import borg.trikeshed.TypeEvidence
 import borg.trikeshed.cursor.*
 import borg.trikeshed.isam.meta.IOMemento
 import borg.trikeshed.lib.*

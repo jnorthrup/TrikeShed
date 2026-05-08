@@ -45,3 +45,4 @@ default/
 .qwen/
 /.claude/
 .DS_Store
+.deepseek/

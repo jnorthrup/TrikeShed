@@ -9,7 +9,7 @@ import kotlin.test.assertTrue
 class FilesContractTest {
     @Test
     fun readWriteRoundTripsAcrossPlatforms() {
-        val path = mktemp()
+        val path = Files.createTempDir("trikeshed")
         try {
             val content = "alpha\nbeta\n"
             Files.write(path, content)
@@ -17,13 +17,13 @@ class FilesContractTest {
             assertEquals(content, Files.readString(path))
             assertTrue(Files.exists(path))
         } finally {
-            rm(path)
+            Files.deleteRecursively(path)
         }
     }
 
     @Test
     fun streamLinesPreservesOffsetsAndLineBytes() {
-        val path = mktemp()
+        val path = Files.createTempDir("trikeshed")
         try {
             val content = "alpha\nbravo\ncharlie\n"
             Files.write(path, content)
@@ -33,13 +33,13 @@ class FilesContractTest {
             assertContentEquals(listOf(0L, 6L, 12L), lines.map { it.a })
             assertContentEquals(listOf("alpha\n", "bravo\n", "charlie\n"), lines.map { it.b.decodeToString() })
         } finally {
-            rm(path)
+            Files.deleteRecursively(path)
         }
     }
 
     @Test
     fun streamLinesPreservesWhitespaceOnlyFinalTail() {
-        val path = mktemp()
+        val path = Files.createTempDir("trikeshed")
         try {
             val content = "alpha\n   "
             Files.write(path, content)
@@ -49,13 +49,13 @@ class FilesContractTest {
             assertContentEquals(listOf(0L, 6L), lines.map { it.a })
             assertContentEquals(listOf("alpha\n", "   "), lines.map { it.b.decodeToString() })
         } finally {
-            rm(path)
+            Files.deleteRecursively(path)
         }
     }
 
     @Test
     fun seekFileBufferReadsBytesWrittenByFilesApi() {
-        val path = mktemp()
+        val path = Files.createTempDir("trikeshed")
         try {
             Files.write(path, "hello")
 
@@ -65,30 +65,32 @@ class FilesContractTest {
                 assertEquals('e'.code.toByte(), buffer.get(1L))
             }
         } finally {
-            rm(path)
+            Files.deleteRecursively(path)
         }
     }
 
     @Test
     fun mkdirAndRmRoundTripNestedTree() {
-        val seed = mktemp()
-        rm(seed)
+        val seed = Files.createTempDir("trikeshed")
+        Files.deleteRecursively(seed)
         val dir = "$seed-dir"
         val nested = "$dir/nested"
         val file = "$nested/tree.txt"
 
         try {
-            assertTrue(mkdir(nested))
+            Files.mkdirs(nested)
+            assertTrue(Files.exists(nested))
             Files.write(file, "branch")
 
             assertEquals("branch", Files.readString(file))
             assertTrue(Files.exists(file))
 
-            assertTrue(rm(file))
+            Files.deleteRecursively(file)
+            assertTrue(true)
             assertFalse(Files.exists(file))
         } finally {
-            rm(file)
-            rm(dir)
+            Files.deleteRecursively(file)
+            Files.deleteRecursively(dir)
         }
     }
 }

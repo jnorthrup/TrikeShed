@@ -1,7 +1,7 @@
 package borg.trikeshed.parse.confix
 
-import borg.trikeshed.common.Files
-import borg.trikeshed.common.Usable
+import borg.trikeshed.Files
+import borg.trikeshed.Usable
 import borg.trikeshed.cursor.ColumnMeta
 import borg.trikeshed.isam.Isam3Layout
 import borg.trikeshed.isam.Isam3Partition

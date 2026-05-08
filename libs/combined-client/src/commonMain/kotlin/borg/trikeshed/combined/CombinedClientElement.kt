@@ -21,7 +21,7 @@ import borg.trikeshed.ipfs.CID
  * IpfsElement can access the CouchElement through cross-context key lookup,
  * enabling DHT peer discovery from couch collections.
  */
-open class CombinedClientElement(
+open class dCombinedClientElement(
     val quic: QuicElement = QuicElement(),
     val sctp: SctpElement = SctpElement(),
     val htx: HtxElement = HtxElement(),

@@ -1,8 +1,8 @@
 package borg.trikeshed.isam
 
-import borg.trikeshed.common.Files
-import borg.trikeshed.common.mktemp
-import borg.trikeshed.common.rm
+import borg.trikeshed.Files
+
+
 import borg.trikeshed.cursor.ColumnMeta
 import borg.trikeshed.cursor.Cursor
 import borg.trikeshed.cursor.RowVec
@@ -141,8 +141,8 @@ class Isam3ColumnarTest {
 
     @Test
     fun columnarWriteCreatesLayoutAndRoundTripsPackedClusters() {
-        val base = mktemp()
-        rm(base)
+        val base = Files.createTempDir("trikeshed")
+        Files.deleteRecursively(base)
         try {
             val cursor = cursorOf(
                 rowVecOf(
@@ -188,9 +188,9 @@ class Isam3ColumnarTest {
                 reopened[1].toList().map { it.a },
             )
         } finally {
-            rm("$base.isam3.yaml")
-            rm("$base.time.col")
-            rm("$base.price.col")
+            Files.deleteRecursively("$base.isam3.yaml")
+            Files.deleteRecursively("$base.time.col")
+            Files.deleteRecursively("$base.price.col")
         }
     }
 }

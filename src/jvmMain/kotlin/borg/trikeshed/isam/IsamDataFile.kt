@@ -3,6 +3,7 @@
 package borg.trikeshed.isam
 
 import borg.trikeshed.Usable
+import borg.trikeshed.userspace.nio.file.spi.FileOperations
 import borg.trikeshed.cursor.*
 import borg.trikeshed.isam.meta.IOMemento
 import borg.trikeshed.lib.*
@@ -18,6 +19,7 @@ actual class IsamDataFile actual constructor(
     datafileFilename: String,
     metafileFilename: String,
     metafile: IsamMetaFileReader,
+    @Suppress("UNUSED_PARAMETER") fileOps: FileOperations,
 ) : Usable, Cursor {
     actual val datafileFilename = datafileFilename
     actual val metafile by lazy {
@@ -84,13 +86,13 @@ actual class IsamDataFile actual constructor(
 
 
     actual companion object {
-        actual fun write(cursor: Cursor, datafilename: String, varChars: Map<String, Int>) {
+        actual fun write(cursor: Cursor, datafilename: String, varChars: Map<String, Int>, fileOps: FileOperations) {
             val metafilename = "$datafilename.meta"
 
             //turn off debug logging in here
 //            fun logDebug(f: (String) -> Unit): Unit = Unit
 
-            val meta0 = IsamMetaFileReader.write(metafilename, cursor.meta, varChars)
+            val meta0 = IsamMetaFileReader.write(metafilename, cursor.meta, varChars, fileOps)
 
             //open RandomAccessDataFile
 
@@ -122,6 +124,7 @@ actual class IsamDataFile actual constructor(
             datafilename: String,
             varChars: Map<String, Int>,
             transform: ((RowVec) -> RowVec)?,
+            fileOps: FileOperations,
         ): Unit {
             val metafilename = "$datafilename.meta"
 
@@ -145,7 +148,7 @@ actual class IsamDataFile actual constructor(
             msf.forEach { rowVec1: RowVec ->
                 val rowVec = transform?.let { it(rowVec1) } ?: rowVec1
                 if (first) {
-                    meta0 = IsamMetaFileReader.write(metafilename, rowVec.right.α { it() }, varChars)
+                    meta0 = IsamMetaFileReader.write(metafilename, rowVec.right.α { it() }, varChars, fileOps)
                     last = meta0.last()
                     rowLen = last.end
                     rowBuffer = ByteArray(rowLen) { 0 }

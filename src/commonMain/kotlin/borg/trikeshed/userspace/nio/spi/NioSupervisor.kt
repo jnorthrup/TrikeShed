@@ -26,7 +26,14 @@ open class NioSupervisor : AsyncContextElement() {
     override suspend fun open() {
         if (state == ElementState.CREATED) {
             super.open()
+            platformNioProviders().forEach { register(it) }
             state = ElementState.ACTIVE
         }
     }
 }
+
+/**
+ * Returns the list of platform NIO providers to register in [NioSupervisor.open].
+ * Each platform provides an [actual] implementation returning its concrete SPI instances.
+ */
+expect fun platformNioProviders(): List<CoroutineContext.Element>

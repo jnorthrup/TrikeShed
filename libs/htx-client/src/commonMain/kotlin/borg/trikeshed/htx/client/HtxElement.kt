@@ -11,6 +11,7 @@ enum class HtxTransport {
     TCP,
     QUIC,
     SCTP,
+    HTTPS,
 }
 
 data class Aria2Switches(
@@ -36,6 +37,7 @@ data class HtxClientRequest(
     val method: String,
     val path: String,
     val body: String = "",
+    val headers: Map<String, String> = emptyMap(),
     val switches: Aria2Switches? = null,
     val uris: List<String> = emptyList(),
     val transport: HtxTransport? = null,
@@ -46,10 +48,12 @@ typealias HtxRequestHandler = suspend (HtxClientRequest) -> HtxClientMessage
 val HtxKey: AsyncContextKey<HtxElement> = HtxElement.Key
 
 fun selectTransport(uri: String): HtxTransport = when {
-    uri.startsWith("h3://")   -> HtxTransport.QUIC
-    uri.startsWith("quic://") -> HtxTransport.QUIC
-    uri.startsWith("sctp://") -> HtxTransport.SCTP
-    else                      -> HtxTransport.TCP
+    uri.startsWith("h3://")     -> HtxTransport.QUIC
+    uri.startsWith("quic://")   -> HtxTransport.QUIC
+    uri.startsWith("sctp://")   -> HtxTransport.SCTP
+    uri.startsWith("https://")  -> HtxTransport.HTTPS
+    uri.startsWith("http://")   -> HtxTransport.HTTPS
+    else                        -> HtxTransport.TCP
 }
 
 fun defaultHtxRequestHandler(request: HtxClientRequest): HtxClientMessage =
@@ -100,6 +104,7 @@ class HtxElement(
         method: String = "GET",
         path: String = "/",
         body: String = "",
+        headers: Map<String, String> = emptyMap(),
         switches: Aria2Switches? = null,
         uris: List<String> = emptyList(),
         transport: HtxTransport? = null,
@@ -112,6 +117,7 @@ class HtxElement(
             method = method.trim().uppercase(),
             path = path,
             body = body,
+            headers = headers,
             switches = switches,
             uris = uris,
             transport = resolvedTransport,

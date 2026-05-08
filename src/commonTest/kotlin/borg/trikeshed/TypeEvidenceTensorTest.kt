@@ -1,5 +1,6 @@
 package borg.trikeshed.common
 
+import borg.trikeshed.TypeEvidence
 import borg.trikeshed.cursor.MapTypeMemento
 import borg.trikeshed.cursor.SeqTypeMemento
 import borg.trikeshed.isam.meta.IOMemento

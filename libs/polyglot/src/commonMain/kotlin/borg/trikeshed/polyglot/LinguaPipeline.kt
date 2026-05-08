@@ -1,6 +1,6 @@
 package borg.trikeshed.polyglot
 
-import borg.trikeshed.common.TypeEvidence
+import borg.trikeshed.TypeEvidence
 import borg.trikeshed.cursor.Cursor
 import borg.trikeshed.cursor.RowVec
 import borg.trikeshed.lib.*

@@ -1,7 +1,7 @@
 package borg.trikeshed.isam
 
-import borg.trikeshed.Files
 import borg.trikeshed.Usable
+import borg.trikeshed.userspace.nio.file.spi.FileOperations
 import borg.trikeshed.cursor.ColumnMeta
 import borg.trikeshed.cursor.TypeMemento
 import borg.trikeshed.isam.meta.IOMemento
@@ -37,7 +37,7 @@ IoType :=  IoInstant | IoDouble | IoString | IoInt
  * the binary file format follows this sample
  *
  */
- class IsamMetaFileReader(val metafileFilename: String) :Usable{
+ class IsamMetaFileReader(val metafileFilename: String, private val fileOps: FileOperations) :Usable{
 
     val recordlen: Int by lazy {
         constraints.last().end
@@ -51,7 +51,7 @@ IoType :=  IoInstant | IoDouble | IoString | IoInt
     override fun open() {
         //use readBytes and decodeString to read the lines into
 //        val lines = buf.readBytes(size).decodeToString().lines().filterNot { it.trim().startsWith("#") }.map(String::trim)
-        val lines = Files.readAllLines(metafileFilename).filterNot { it.trim().startsWith('#') }
+        val lines = fileOps.readAllLines(metafileFilename).filterNot { it.trim().startsWith('#') }
         //split on \s+
         val coords: Series<String> = CharSeries(lines[0]).trim.splitWs() α CharSeries::asString
         val names: Series<String> = CharSeries(lines[1]).trim.splitWs() α CharSeries::asString
@@ -84,7 +84,7 @@ IoType :=  IoInstant | IoDouble | IoString | IoInt
      * 1. close the file descriptor
      */
     companion object {
-        fun write(metafilename: String, recordMetas: Series<ColumnMeta>,varchars:Map<String,Int>): Series<RecordMeta> {
+        fun write(metafilename: String, recordMetas: Series<ColumnMeta>, varchars: Map<String,Int>, fileOps: FileOperations): Series<RecordMeta> {
             val lines: MutableList<String> = mutableListOf<String>()
 
             val result: Series<RecordMeta> = sanitize(recordMetas,varchars)
@@ -93,7 +93,7 @@ IoType :=  IoInstant | IoDouble | IoString | IoInt
             lines.add(result.view.joinToString(" ") { it.begin.toString() + " " + it.end })
             lines.add(result.view.joinToString(" ") { it.name })
             lines.add(result.view.joinToString(" ") { it.type.name })
-            Files.write(metafilename, lines)
+            fileOps.write(metafilename, lines)
             return result
         }
 

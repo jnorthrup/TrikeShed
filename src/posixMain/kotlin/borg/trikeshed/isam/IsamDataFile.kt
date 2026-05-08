@@ -2,8 +2,8 @@
 
 package borg.trikeshed.isam
 
-import borg.trikeshed.Files
 import borg.trikeshed.Usable
+import borg.trikeshed.userspace.nio.file.spi.FileOperations
 import borg.trikeshed.cursor.Cursor
 import borg.trikeshed.cursor.RowVec
 import borg.trikeshed.cursor.meta
@@ -18,6 +18,7 @@ actual class IsamDataFile actual constructor(
     datafileFilename: String,
     metafileFilename: String,
     metafile: IsamMetaFileReader,
+    @Suppress("UNUSED_PARAMETER") fileOps: FileOperations,
 ) : Usable, Cursor {
 
     actual val datafileFilename: String = datafileFilename
@@ -109,10 +110,10 @@ actual class IsamDataFile actual constructor(
 
     actual companion object {
 
-        actual fun write(cursor: Cursor, datafilename: String, varChars: Map<String, Int>) {
+        actual fun write(cursor: Cursor, datafilename: String, varChars: Map<String, Int>, fileOps: FileOperations) {
             val metafilename = "$datafilename.meta"
 
-            val meta0 = IsamMetaFileReader.write(metafilename, cursor.meta, varChars)
+            val meta0 = IsamMetaFileReader.write(metafilename, cursor.meta, varChars, fileOps)
 
             //open RandomAccessDataFile
 
@@ -153,16 +154,17 @@ actual class IsamDataFile actual constructor(
             datafilename: String,
             varChars: Map<String, Int>,
             transform: ((RowVec) -> RowVec)?,
+            fileOps: FileOperations,
         ): Unit {
             val metafilename = "$datafilename.meta"
-            val meta0: Series<RecordMeta> = if (Files.exists(metafilename)) {
-                val reader = IsamMetaFileReader(metafilename)
+            val meta0: Series<RecordMeta> = if (fileOps.exists(metafilename)) {
+                val reader = IsamMetaFileReader(metafilename, fileOps)
                 reader.open()
                 reader.constraints
             } else {
                 val rows = msf.map { transform?.invoke(it) ?: it }.toList()
                 val cursor = rows.toSeries()
-                write(cursor, datafilename, varChars)
+                write(cursor, datafilename, varChars, fileOps)
                 return
             }
 

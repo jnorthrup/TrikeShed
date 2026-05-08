@@ -1,6 +1,6 @@
 package borg.trikeshed.lib
 
-import borg.trikeshed.common.TypeEvidence
+import borg.trikeshed.TypeEvidence
 import borg.trikeshed.isam.meta.IOMemento
 import kotlin.test.Test
 import kotlin.test.assertEquals

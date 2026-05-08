@@ -1,7 +1,7 @@
 package borg.trikeshed.userspace.database
 
-import borg.trikeshed.common.Files
-import borg.trikeshed.common.rm
+import borg.trikeshed.Files
+
 
 actual suspend fun persistSegmentToDisk(rootPath: String, fileName: String, entries: Map<String, ByteArray>) {
     val path = segmentPath(rootPath, fileName)
@@ -17,7 +17,7 @@ actual suspend fun loadKeyFromSegment(rootPath: String, fileName: String, key: S
 }
 
 actual fun deleteSegmentFile(rootPath: String, fileName: String) {
-    rm(segmentPath(rootPath, fileName))
+    Files.deleteRecursively(segmentPath(rootPath, fileName))
 }
 fun segmentPath(rootPath: String, fileName: String): String =
     if (rootPath.isEmpty()) fileName

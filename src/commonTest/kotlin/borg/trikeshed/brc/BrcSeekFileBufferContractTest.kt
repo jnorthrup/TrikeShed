@@ -23,7 +23,7 @@ class BrcSeekFileBufferContractTest {
      * Returns the temp file path.  Callers should [rm] it in a finally-block.
      */
     private fun createTestFixture(content: ByteArray = TEST_BYTES): String {
-        val path = mktemp()
+        val path = Files.createTempDir("trikeshed")
         // mktemp() creates an empty file — overwrite with real content.
         Files.write(path, content)
         return path
@@ -47,7 +47,7 @@ class BrcSeekFileBufferContractTest {
             }
             assertTrue(result, "SeekFileBuffer must report isOpen() = true inside use{}")
         } finally {
-            rm(path)
+            Files.deleteRecursively(path)
         }
     }
 
@@ -59,7 +59,7 @@ class BrcSeekFileBufferContractTest {
                 assertTrue(buf.size() > 0, "SeekFileBuffer.size() must be positive for non-empty file")
             }
         } finally {
-            rm(path)
+            Files.deleteRecursively(path)
         }
     }
 
@@ -75,7 +75,7 @@ class BrcSeekFileBufferContractTest {
                 )
             }
         } finally {
-            rm(path)
+            Files.deleteRecursively(path)
         }
     }
 
@@ -98,7 +98,7 @@ class BrcSeekFileBufferContractTest {
                 }
             }
         } finally {
-            rm(path)
+            Files.deleteRecursively(path)
         }
     }
 
@@ -126,7 +126,7 @@ class BrcSeekFileBufferContractTest {
                 assertEquals("6789", second.asByteSeries().asString())
             }
         } finally {
-            rm(path)
+            Files.deleteRecursively(path)
         }
     }
 
@@ -147,7 +147,7 @@ class BrcSeekFileBufferContractTest {
             assertEquals("defg", region.asByteSeries().asString())
         } finally {
             handle.close(fd)
-            rm(path)
+            Files.deleteRecursively(path)
         }
     }
 
@@ -175,7 +175,7 @@ class BrcSeekFileBufferContractTest {
             assertEquals("01WXYZ6789", Files.readAllBytes(path).decodeToString())
         } finally {
             handle.close(fd)
-            rm(path)
+            Files.deleteRecursively(path)
         }
     }
 }
