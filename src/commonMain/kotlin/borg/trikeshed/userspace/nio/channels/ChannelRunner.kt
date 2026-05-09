@@ -56,14 +56,15 @@ class ChannelRunner(
     }
 
     /**
-     * Launch the reactor event loop.
+     * Launch the reactor event loop in [scope].
      * Polls [ReactorOperations] and dispatches readiness signals
      * to suspended coroutines via CompletableDeferred completion.
      */
-    fun CoroutineScope.run(
+    fun run(
+        scope: CoroutineScope,
         pollTimeout: Duration = Duration.INFINITE,
         onSignal: suspend (ReactorSignal) -> Unit = {},
-    ): Job = launch {
+    ): Job = scope.launch {
         running = true
         while (isActive && running) {
             val signals = reactorOps.poll(pollTimeout)

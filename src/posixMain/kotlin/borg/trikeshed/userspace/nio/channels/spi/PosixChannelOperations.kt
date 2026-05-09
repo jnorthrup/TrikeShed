@@ -12,6 +12,17 @@ class PosixChannelOperations : ChannelOperations {
 
     override fun socket(domain: Int, type: Int, protocol: Int): Int = platform.posix.socket(domain, type, protocol)
 
+    override fun bind(fd: Int, port: Int): Int = memScoped {
+        val addr = alloc<sockaddr_in> {
+            sin_family = AF_INET.convert()
+            sin_port = ((port ushr 8) or ((port and 0xFF) shl 8)).convert()  // htons inline
+            sin_addr.s_addr = INADDR_ANY.convert()
+        }
+        platform.posix.bind(fd, addr.ptr.reinterpret(), sizeOf<sockaddr_in>().convert()).toInt()
+    }
+    override fun listen(fd: Int, backlog: Int): Int = platform.posix.listen(fd, backlog)
+    override fun accept(fd: Int): Int = platform.posix.accept(fd, null, null)
+
     private class PosixChannelHandle(private val entries: Int) : ChannelOperations.ChannelHandle {
         override val id: Int get() = 0
         override fun read(buffer: ByteBuffer, offset: Long): Int {

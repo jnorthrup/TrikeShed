@@ -15,6 +15,13 @@ interface ChannelOperations : CoroutineContext.Element {
     fun openChannel(entries: Int = 256): ChannelHandle
     fun socket(domain: Int, type: Int, protocol: Int): Int
 
+    /** Bind socket to address/port. Returns 0 on success, negative on error. */
+    fun bind(fd: Int, port: Int): Int
+    /** Listen for incoming connections. Returns 0 on success. */
+    fun listen(fd: Int, backlog: Int = 128): Int
+    /** Accept an incoming connection. Returns new fd, or -1 if none pending. */
+    fun accept(fd: Int): Int
+
     interface ChannelHandle {
         val id: Int
         fun read(buffer: ByteBuffer, offset: Long): Int

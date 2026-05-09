@@ -160,7 +160,7 @@ fun renderClientRequest(cfg: ClientGenConfig): String {
         appendLine()
         appendLine("/** HTTP method enum. */")
         appendLine("enum class ${cfg.httpMethodName} {")
-        listOf("GET", "POST", "PUT", "DELETE", "PATCH").forEach { appendLine("    $it,") }
+        listOf("GET", "POST", "PUT", "DELETE", "PATCH", "UPGRADE").forEach { appendLine("    $it,") }
         appendLine("}")
         appendLine()
         appendLine("/**")
@@ -173,6 +173,8 @@ fun renderClientRequest(cfg: ClientGenConfig): String {
         appendLine("    val queryParams: Map<String, String> = emptyMap(),")
         appendLine("    val body: String? = null,")
         appendLine("    val operationId: String? = null,")
+        appendLine("    val transport: String? = null,")
+        appendLine("    val headers: Map<String, String> = emptyMap(),")
         appendLine(")")
     }
 }

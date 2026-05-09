@@ -1,0 +1,231 @@
+openapi: "3.1.0"
+info:
+  title: TrikeShed Transport Sample
+  version: "1.0.0"
+  description: >
+    Sample API demonstrating WebSocket subscriptions, QUIC streams,
+    and SCTP multi-stream transport through the TrikeShed reactor.
+
+servers:
+  - url: http://localhost:8080
+    description: Local HTTP fallback
+  - url: wss://localhost:8080/ws
+    description: WebSocket endpoint
+  - url: quic://localhost:8443
+    description: QUIC endpoint
+  - url: sctp://localhost:9899
+    description: SCTP endpoint
+
+x-trikeshed-context:
+  client:
+    - name: htx
+      key: borg.trikeshed.htx.client.HtxKey
+      element: borg.trikeshed.htx.client.HtxElementCompat
+      open: borg.trikeshed.htx.client.openHtxElement
+    - name: tls
+      key: borg.trikeshed.tls.TlsElement
+      element: borg.trikeshed.tls.TlsElement
+      open: borg.trikeshed.tls.createTlsEngine
+    - name: quic
+      key: borg.trikeshed.quic.QuicKey
+      element: borg.trikeshed.quic.QuicElement
+      open: borg.trikeshed.quic.openQuicElement
+    - name: sctp
+      key: borg.trikeshed.quic.SctpKey
+      element: borg.trikeshed.sctp.SctpElement
+      open: borg.trikeshed.sctp.openSctpElement
+  server:
+    - name: reactor
+      key: borg.trikeshed.viewserver.ReactorCouchServer
+      element: borg.trikeshed.viewserver.ReactorCouchServer
+      open: borg.trikeshed.viewserver.openReactorCouchServer
+
+tags:
+  - name: websocket
+    description: WebSocket subscription endpoints
+  - name: quic
+    description: QUIC stream endpoints
+  - name: sctp
+    description: SCTP channel endpoints
+  - name: rest
+    description: Standard REST endpoints
+
+paths:
+  # ── REST (existing pattern) ──────────────────────────────────────
+  /market/ticker/{symbol}:
+    get:
+      operationId: getTicker
+      tags: [rest]
+      summary: Get current ticker price via HTTPS
+      parameters:
+        - name: symbol
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Ticker data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  symbol: { type: string }
+                  price:  { type: number }
+
+  # ── WebSocket subscriptions ──────────────────────────────────────
+  /ws/stream:
+    get:
+      operationId: subscribeToStream
+      tags: [websocket]
+      summary: Subscribe to real-time stream via WebSocket
+      description: >
+        Client sends an upgrade request. The reactor routes this to a
+        persistent WebSocket channel. The x-trikeshed-transport extension
+        tells the generator to emit a WS subscription client instead of
+        a one-shot HTTP call.
+      x-trikeshed-transport: websocket
+      x-trikeshed-channel:
+        type: subscribe
+        message: { type: "subscribe", channels: ["ticker", "matches"] }
+      parameters:
+        - name: channels
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [ticker, matches, level2, user, heartbeat]
+      responses:
+        '101':
+          description: WebSocket upgrade successful
+        '200':
+          description: Subscription confirmed
+
+  /ws/stream/{channel}:
+    get:
+      operationId: readChannelMessages
+      tags: [websocket]
+      summary: Read messages from a WS channel (reactive)
+      x-trikeshed-transport: websocket
+      x-trikeshed-channel:
+        type: read
+      parameters:
+        - name: channel
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Channel message
+          content:
+            application/json:
+              schema:
+                type: object
+
+  # ── QUIC streams ─────────────────────────────────────────────────
+  /quic/reliable/trade:
+    post:
+      operationId: sendTradeOrder
+      tags: [quic]
+      summary: Send a trade order over a reliable QUIC stream
+      x-trikeshed-transport: quic
+      x-trikeshed-stream:
+        mode: bidirectional
+        reliability: reliable
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema:
+              type: string
+              format: binary
+      responses:
+        '200':
+          description: Order acknowledged
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+
+  /quic/unreliable/price:
+    get:
+      operationId: streamPrices
+      tags: [quic]
+      summary: Stream price ticks over a unidirectional QUIC datagram
+      x-trikeshed-transport: quic
+      x-trikeshed-stream:
+        mode: unidirectional
+        reliability: unreliable
+      parameters:
+        - name: symbols
+          in: query
+          required: true
+          schema:
+            type: string
+            description: Comma-separated symbols
+      responses:
+        '200':
+          description: Price stream (push)
+
+  # ── SCTP multi-stream ────────────────────────────────────────────
+  /sctp/orderflow:
+    post:
+      operationId: openOrderFlowChannel
+      tags: [sctp]
+      summary: Open an SCTP multi-stream order flow channel
+      description: >
+        SCTP stream 0 carries order placement. Stream 1 carries
+        acknowledgements. Stream 2 carries fills. The x-trikeshed-sctp
+        extension maps stream IDs to operation contracts.
+      x-trikeshed-transport: sctp
+      x-trikeshed-sctp:
+        streams:
+          - streamId: 0
+            operationId: placeOrder
+            direction: client_to_server
+          - streamId: 1
+            operationId: ackOrder
+            direction: server_to_client
+          - streamId: 2
+            operationId: fillReport
+            direction: server_to_client
+
+  /sctp/orderflow/place:
+    post:
+      operationId: placeOrder
+      tags: [sctp]
+      summary: Place an order on SCTP stream 0
+      x-trikeshed-transport: sctp
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                symbol: { type: string }
+                side: { type: string }
+                quantity: { type: number }
+                price: { type: number }
+
+  /sctp/orderflow/fill:
+    get:
+      operationId: fillReport
+      tags: [sctp]
+      summary: Receive fill reports on SCTP stream 2
+      x-trikeshed-transport: sctp
+      x-trikeshed-stream: { direction: server_to_client }
+      responses:
+        '200':
+          description: Fill report
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  orderId: { type: string }
+                  filledQty: { type: number }
+                  fillPrice: { type: number }
