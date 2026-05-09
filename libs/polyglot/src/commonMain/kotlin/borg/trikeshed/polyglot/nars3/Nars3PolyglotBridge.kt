@@ -3,9 +3,9 @@ package borg.trikeshed.polyglot.nars3
 import borg.trikeshed.lib.*
 import borg.trikeshed.collections.s_
 import borg.trikeshed.polyglot.*
-import borg.trikeshed.parse.kursive.NarsiveElement
-import borg.trikeshed.parse.kursive.NarsiveElementKind
-import borg.trikeshed.parse.kursive.nars3.*
+import borg.trikeshed.parse.narsive.NarsiveElement
+import borg.trikeshed.parse.narsive.NarsiveElementKind
+import borg.trikeshed.parse.nars3.*
 
 /**
  * Bridges Polyglot UniversalAst fragments with NARS3 Machine Atoms.

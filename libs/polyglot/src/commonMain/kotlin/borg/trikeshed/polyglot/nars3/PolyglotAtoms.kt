@@ -1,10 +1,10 @@
 package borg.trikeshed.polyglot.nars3
 
 import borg.trikeshed.lib.Series
-import borg.trikeshed.parse.kursive.NarsiveElement
-import borg.trikeshed.parse.kursive.nars3.Nars3Atom
-import borg.trikeshed.parse.kursive.nars3.Nars3Budget
-import borg.trikeshed.parse.kursive.nars3.Nars3Message
+import borg.trikeshed.parse.narsive.NarsiveElement
+import borg.trikeshed.parse.nars3.Nars3Atom
+import borg.trikeshed.parse.nars3.Nars3Budget
+import borg.trikeshed.parse.nars3.Nars3Message
 import kotlinx.coroutines.channels.Channel
 
 /**
