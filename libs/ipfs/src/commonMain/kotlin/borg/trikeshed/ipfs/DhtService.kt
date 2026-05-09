@@ -2,6 +2,7 @@ package borg.trikeshed.ipfs
 
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
+import kotlin.collections.mutableSetOf
 
 /**
  * Minimal in-process DHT service for prototype/testing.
@@ -12,7 +13,7 @@ class DhtService(private val transport: DhtTransport? = null) {
 
     fun announceProvider(cid: CID, address: String) {
         val key = hex(cid.bytes)
-        providers.computeIfAbsent(key) { mutableSetOf() }.add(address)
+        providers.getOrPut(key) { mutableSetOf() }.add(address)
 
         transport?.let { t ->
             try {
@@ -32,5 +33,5 @@ class DhtService(private val transport: DhtTransport? = null) {
         return transport?.findProvidersRemote(cid) ?: emptyList()
     }
 
-    private fun hex(bytes: ByteArray): String = bytes.joinToString("") { "%02x".format(it) }
+    private fun hex(bytes: ByteArray): String = bytes.joinToString("") { (it.toInt() and 0xFF).toString(16).padStart(2, '0') }
 }
