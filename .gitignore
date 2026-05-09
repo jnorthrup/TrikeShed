@@ -46,3 +46,4 @@ default/
 /.claude/
 .DS_Store
 .deepseek/
+.env
