@@ -4,7 +4,9 @@ package borg.trikeshed.lib
 
 import kotlinx.cinterop.*
 
-actual class IntAccumulator actual constructor(initialCapacity: Int) {
+actual class IntAccumulator actual constructor(initialCapacity: Int) : kotlin.coroutines.CoroutineContext.Element {
+    actual override val key: kotlin.coroutines.CoroutineContext.Key<*> get() = Key
+    actual companion object Key : kotlin.coroutines.CoroutineContext.Key<IntAccumulator>
    var buf: CArrayPointer<IntVar> = nativeHeap.allocArray(initialCapacity)
    var _size = 0
    var capacity = initialCapacity

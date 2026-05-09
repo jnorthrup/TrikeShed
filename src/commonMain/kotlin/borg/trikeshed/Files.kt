@@ -4,6 +4,7 @@ import borg.trikeshed.lib.Join
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.j
 
+@Deprecated("Use FileOperations CCEK: coroutineContext[FileOperations.Key]")
 expect object Files {
     fun readAllLines(filename: String): List<String>
     fun readAllBytes(filename: String): ByteArray

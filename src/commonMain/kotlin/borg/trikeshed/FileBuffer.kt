@@ -1,40 +1,24 @@
 package borg.trikeshed
 
-import borg.trikeshed.lib.debug
-import borg.trikeshed.lib.logDebug
-
-
-fun <T> FileBuffer.use(block: (FileBuffer) -> T) {
-    open()
-    try {
-        block(this)
-    } finally {
-        close()
-    }
-}
-
-fun open(filename: String, initialOffset: Long = 0, blkSize: Long = -1, readOnly: Boolean = true, closeChannelOnMap: Boolean = true): FileBuffer {
-    logDebug { "pre-opening $filename" }
-    return FileBuffer(filename, initialOffset, blkSize, readOnly, closeChannelOnMap).apply {
-        logDebug { "this isOpen()=${isOpen()}" }
-        open().debug { logDebug { "call(ed) open()" } }
-        logDebug { "this isOpen()=${isOpen()}" }
-    }
-}
+import kotlin.coroutines.CoroutineContext
 
 /**
- * an openable and closeable mmap file.
+ * An openable, closeable, mmap-style file buffer.
  *
- *  get has no side effects but put has undefined effects on size and sync
+ * CCEK: register platform implementation via [Key] in the coroutine context.
+ * @deprecated Prefer resolving via `coroutineContext[FileBuffer.Key]` rather than direct construction.
  */
+@Deprecated("Resolve via FileBuffer.Key in coroutine context")
 expect class FileBuffer(
     filename: String,
     initialOffset: Long = 0,
-    /** blocksize or file-size if -1*/
     blkSize: Long = -1,
     readOnly: Boolean = true,
     closeChannelOnMap: Boolean = true,
-) : LongSeries<Byte> {
+) : LongSeries<Byte>, CoroutineContext.Element {
+    override val key: CoroutineContext.Key<*>
+    companion object Key : CoroutineContext.Key<FileBuffer>
+
     override val a: Long
     override val b: (Long) -> Byte
     val filename: String
@@ -43,17 +27,20 @@ expect class FileBuffer(
     val readOnly: Boolean
     val closeChannelOnMap: Boolean
     fun close()
-    fun open() //post-init open
+    fun open()
     fun isOpen(): Boolean
     fun size(): Long
     fun get(index: Long): Byte
     fun put(index: Long, value: Byte)
 }
 
-fun openFileBuffer(
-    filename: String,
-    initialOffset: Long = 0,
-    blkSize: Long = -1,
-    readOnly: Boolean = true,
-    closeChannelOnMap: Boolean = true,
-): FileBuffer = open(filename, initialOffset, blkSize, readOnly, closeChannelOnMap)
+fun <T> FileBuffer.use(block: (FileBuffer) -> T): T {
+    open()
+    try { return block(this) } finally { close() }
+}
+
+fun open(filename: String, initialOffset: Long = 0, blkSize: Long = -1, readOnly: Boolean = true, closeChannelOnMap: Boolean = true): FileBuffer =
+    FileBuffer(filename, initialOffset, blkSize, readOnly, closeChannelOnMap)
+
+fun openFileBuffer(filename: String, initialOffset: Long = 0, blkSize: Long = -1, readOnly: Boolean = true, closeChannelOnMap: Boolean = true): FileBuffer =
+    open(filename, initialOffset, blkSize, readOnly, closeChannelOnMap)

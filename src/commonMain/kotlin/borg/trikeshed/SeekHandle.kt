@@ -55,14 +55,15 @@ enum class IoPlatform {
 }
 
 /**
- * Get a SeekHandle for the current platform.
- * Callers can override via environment or system property.
+ * @deprecated Register SeekHandleService via NioSupervisor.open() instead.
  */
+@Deprecated("Register SeekHandleService via NioSupervisor for CCEK resolution")
 expect fun platformSeekHandle(): SeekHandle
 
 /**
- * Optional: Get io_uring handle if available, else fallback.
+ * @deprecated Register SeekHandleService via NioSupervisor.open() instead.
  */
+@Deprecated("Register a io_uring SeekHandleService via NioSupervisor")
 expect fun ioUringHandle(): SeekHandle?
 
 /** CCEK keyed service exposing an open SeekHandle to the coroutine context. */

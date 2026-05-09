@@ -446,6 +446,7 @@ switch (project.path) {
         viewSets.getByName("commonMain").dependencies {
             implementation libPeer("couch")
             implementation libPeer("kursive")
+            implementation libPeer("htx-client")
         }
         viewSets.getByName("jsMain").kotlin.srcDir("${layout.buildDirectory.get().asFile}/dukat")
         tasks.register("generateDts", Exec) {

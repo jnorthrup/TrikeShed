@@ -95,8 +95,7 @@ class ReactorCouchServer(
      * Start the server in [scope]. Creates a listening socket and enters the
      * accept-and-dispatch loop on the reactor.
      */
-    fun CoroutineScope.start(): kotlinx.coroutines.Job {
-        val scope = this
+    fun startIn(scope: kotlinx.coroutines.CoroutineScope): kotlinx.coroutines.Job {
         return scope.launch {
             val serverFd = channelOps.socket(2, 1, 0)
             channelOps.bind(serverFd, port)

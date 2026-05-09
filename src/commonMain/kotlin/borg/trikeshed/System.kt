@@ -2,6 +2,7 @@ package borg.trikeshed
 
 import kotlin.time.Clock
 
+@Deprecated("Use SystemOperations CCEK: coroutineContext[SystemOperations.Key]")
 expect object System {
     fun getenv(name: String, defaultVal: String? = null
     ): String?

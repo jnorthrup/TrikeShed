@@ -9,7 +9,9 @@ actual fun assert(value: Boolean) {
     if (!value) throw AssertionError(lazyMessage().toString())
 }
 
-actual class IntAccumulator actual constructor(initialCapacity: Int) {
+actual class IntAccumulator actual constructor(initialCapacity: Int) : kotlin.coroutines.CoroutineContext.Element {
+    actual override val key: kotlin.coroutines.CoroutineContext.Key<*> get() = Key
+    actual companion object Key : kotlin.coroutines.CoroutineContext.Key<IntAccumulator>
    val values = ArrayList<Int>(initialCapacity.coerceAtLeast(0))
 
     actual fun add(value: Int) {

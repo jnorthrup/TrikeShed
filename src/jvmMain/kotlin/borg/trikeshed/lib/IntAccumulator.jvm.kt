@@ -3,7 +3,10 @@ package borg.trikeshed.lib
 import java.lang.foreign.Arena
 import java.lang.foreign.ValueLayout.JAVA_INT
 
-actual class IntAccumulator actual constructor(initialCapacity: Int) : AutoCloseable {
+actual class IntAccumulator actual constructor(initialCapacity: Int) : AutoCloseable, kotlin.coroutines.CoroutineContext.Element {
+    actual override val key: kotlin.coroutines.CoroutineContext.Key<*> get() = Key
+    actual companion object Key : kotlin.coroutines.CoroutineContext.Key<IntAccumulator>
+
    var arena = Arena.ofConfined()
    var seg = arena.allocate(initialCapacity.toLong() * Int.SIZE_BYTES)
    var _size = 0
@@ -16,9 +19,7 @@ actual class IntAccumulator actual constructor(initialCapacity: Int) : AutoClose
     }
 
     actual val size: Int get() = _size
-
     actual fun toIntArray(): IntArray = IntArray(_size) { seg.getAtIndex(JAVA_INT, it.toLong()) }
-
     actual override fun close() = arena.close()
 
    fun grow() {
@@ -27,8 +28,6 @@ actual class IntAccumulator actual constructor(initialCapacity: Int) : AutoClose
         val newSeg = newArena.allocate(newCapacity.toLong() * Int.SIZE_BYTES)
         for (i in 0 until _size) newSeg.setAtIndex(JAVA_INT, i.toLong(), seg.getAtIndex(JAVA_INT, i.toLong()))
         arena.close()
-        arena = newArena
-        seg = newSeg
-        capacity = newCapacity
+        arena = newArena; seg = newSeg; capacity = newCapacity
     }
 }

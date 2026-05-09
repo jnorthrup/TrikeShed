@@ -399,39 +399,7 @@ actual fun platformSeekHandle(): SeekHandle = WasmBrowserSeekHandle
 
 actual fun ioUringHandle(): SeekHandle? = null
 
-actual class FileBuffer actual constructor(
-    actual val filename: String,
-    actual val initialOffset: Long,
-    actual val blkSize: Long,
-    actual val readOnly: Boolean,
-    actual val closeChannelOnMap: Boolean,
-) : LongSeries<Byte> {
-   val delegate = SeekFileBufferCommon(filename, initialOffset, blkSize, readOnly, WasmBrowserSeekHandle)
 
-    actual override val a: Long
-        get() = delegate.a
-
-    actual override val b: (Long) -> Byte
-        get() = delegate.b
-
-    actual fun close() {
-        delegate.close()
-    }
-
-    actual fun open() {
-        delegate.open()
-    }
-
-    actual fun isOpen(): Boolean = delegate.isOpen()
-
-    actual fun size(): Long = delegate.size()
-
-    actual fun get(index: Long): Byte = delegate.get(index)
-
-    actual fun put(index: Long, value: Byte) {
-        delegate.put(index, value)
-    }
-}
 
 class SeekFileBuffer(
     val filename: String,
