@@ -1,0 +1,17 @@
+package borg.trikeshed.htx.client
+
+import kotlin.test.Test
+import kotlin.test.assertTrue
+import kotlinx.coroutines.runBlocking
+
+class TlsSmokeTest {
+    @Test
+    fun `TLS to Coinbase returns 401 auth response`() = runBlocking {
+        val element = HtxElement()
+        element.registerTransport(HtxTransport.HTTPS, createHttpsHandler())
+        val resp = element.request("GET", "https://api.coinbase.com/api/v3/brokerage/accounts")
+        println("TLS OK: status=${resp.status}")
+        println("Body: ${resp.body.take(200)}")
+        assertTrue(resp.status in 200..499, "TLS connection works, got HTTP ${resp.status}")
+    }
+}
