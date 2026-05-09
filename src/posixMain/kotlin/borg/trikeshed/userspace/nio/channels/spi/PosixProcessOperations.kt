@@ -7,9 +7,14 @@ import platform.posix.*
 
 class PosixProcessOperations : ProcessOperations {
 
-    override fun exec(command: String, vararg args: String): ExecResult {
+    override suspend fun exec(
+        command: String,
+        args: List<String>,
+        stdin: ByteArray?,
+        env: Map<String, String>,
+    ): ProcessResult {
         val cmd = buildString { append(command); for (a in args) { append(" "); append(a) } }
-        val fp = popen("$cmd 2>&1", "r") ?: return ExecResult(-1, "", "popen() failed")
+        val fp = popen("$cmd 2>&1", "r") ?: return ProcessResult(-1, byteArrayOf(), "popen() failed".encodeToByteArray())
         val stdout = buildString {
             memScoped {
                 val buf = allocArray<ByteVar>(4096)
@@ -17,6 +22,6 @@ class PosixProcessOperations : ProcessOperations {
             }
         }
         val raw = pclose(fp)
-        return ExecResult(raw, stdout.trimEnd('\n'), "")
+        return ProcessResult(raw, stdout.trimEnd('\n').encodeToByteArray(), byteArrayOf())
     }
 }

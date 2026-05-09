@@ -8,10 +8,6 @@ import borg.trikeshed.userspace.nio.ByteBuffer
  * Common seek-based file buffer with windowed reads.
  *
  * Platform-agnostic: uses SeekHandle for all I/O.
- * JVM actual uses FileChannelSeekHandle.
- * POSIX actual uses PreadSeekHandle (pread for thread-safe random access).
- * Linux opt-in uses IoUringSeekHandle with batching.
- *
  * For bulk sequential scans, use FileBuffer with mmap.
  * For scattered ISAM reads, use SeekFileBuffer with elevator batching.
  */
@@ -21,7 +17,7 @@ class SeekFileBufferCommon(
     val blkSize: Long = -1,
     val readOnly: Boolean = true,
    val handle: SeekHandle = platformSeekHandle(),
-) : LongSeries<Byte> {
+) : LongSeries<Byte>, Usable {
 
    var fd: Long = -1
    var fileSize: Long = 0
@@ -48,7 +44,7 @@ class SeekFileBufferCommon(
             window[(absolutePos - windowBase).toInt()]
         }
 
-    fun open() {
+    override fun open() {
         if (isOpen()) return
         fd = handle.open(filename, readOnly)
         fileSize = handle.size(fd)
@@ -57,7 +53,7 @@ class SeekFileBufferCommon(
         windowPosition = 0
     }
 
-    fun close() {
+    override fun close() {
         if (!isOpen()) return
         handle.close(fd)
         fd = -1
@@ -89,7 +85,6 @@ class SeekFileBufferCommon(
     fun readv(requests: Series2<Long, ByteRegion>): IntArray {
         val results = IntArray(requests.a)
         if (requests.a == 0) return results
-
         for (idx in 0 until requests.a) {
             val request = requests.b(idx)
             val offset = request.a
@@ -116,3 +111,5 @@ class SeekFileBufferCommon(
         windowPosition = bytesRead
     }
 }
+
+// SeekFileBuffer is declared per-platform in JsCommonActuals/WasmCommonActuals/posixMain

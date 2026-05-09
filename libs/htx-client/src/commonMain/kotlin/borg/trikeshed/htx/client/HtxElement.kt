@@ -12,6 +12,7 @@ enum class HtxTransport {
     QUIC,
     SCTP,
     HTTPS,
+    WEBSOCKET,
 }
 
 data class Aria2Switches(
@@ -51,6 +52,8 @@ fun selectTransport(uri: String): HtxTransport = when {
     uri.startsWith("h3://")     -> HtxTransport.QUIC
     uri.startsWith("quic://")   -> HtxTransport.QUIC
     uri.startsWith("sctp://")   -> HtxTransport.SCTP
+    uri.startsWith("wss://")    -> HtxTransport.WEBSOCKET
+    uri.startsWith("ws://")     -> HtxTransport.WEBSOCKET
     uri.startsWith("https://")  -> HtxTransport.HTTPS
     uri.startsWith("http://")   -> HtxTransport.HTTPS
     else                        -> HtxTransport.TCP

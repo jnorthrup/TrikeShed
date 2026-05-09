@@ -481,6 +481,10 @@ switch (project.path) {
     case ":libs:htx-client":
     case ":libs:jules-client":
         kmpHost()
+        extensions.getByName("kotlin").sourceSets.getByName("commonMain").dependencies {
+            implementation project(":libs:tls")
+        }
+
         extensions.getByName("kotlin").sourceSets.getByName("commonMain").kotlin.srcDir("src/generated/kotlin")
 
         tasks.register("openApiGenerateHtxGeneralClient", JavaExec) {

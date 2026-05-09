@@ -1,12 +1,37 @@
 package borg.trikeshed.userspace.nio.channels.spi
 
+import java.io.ByteArrayOutputStream
+
 class JvmProcessOperations : ProcessOperations {
 
-    override fun exec(command: String, vararg args: String): ExecResult {
-        val pb = ProcessBuilder(command, *args).redirectErrorStream(true)
+    override suspend fun exec(
+        command: String,
+        args: List<String>,
+        stdin: ByteArray?,
+        env: Map<String, String>,
+    ): ProcessResult {
+        val pb = ProcessBuilder(command, *args.toTypedArray())
+        env.forEach { (k, v) -> pb.environment()[k] = v }
+
         val proc = pb.start()
-        val stdout = proc.inputStream.bufferedReader().readText()
+
+        // Feed stdin if provided
+        if (stdin != null) {
+            proc.outputStream.use { it.write(stdin); it.flush() }
+            proc.outputStream.close()
+        }
+
+        // Read stdout
+        val stdoutOut = ByteArrayOutputStream()
+        proc.inputStream.use { it.copyTo(stdoutOut) }
+
+        // Read stderr
+        val stderrOut = ByteArrayOutputStream()
+        if (!pb.redirectErrorStream()) {
+            proc.errorStream.use { it.copyTo(stderrOut) }
+        }
+
         val exitCode = proc.waitFor()
-        return ExecResult(exitCode, stdout, "")
+        return ProcessResult(exitCode, stdoutOut.toByteArray(), stderrOut.toByteArray())
     }
 }

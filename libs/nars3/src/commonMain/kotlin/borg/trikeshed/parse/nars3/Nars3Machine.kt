@@ -1,8 +1,8 @@
-package borg.trikeshed.parse.kursive.nars3
+package borg.trikeshed.parse.nars3
 
 import borg.trikeshed.lib.*
 import borg.trikeshed.collections.s_
-import borg.trikeshed.parse.kursive.*
+import borg.trikeshed.parse.narsive.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 

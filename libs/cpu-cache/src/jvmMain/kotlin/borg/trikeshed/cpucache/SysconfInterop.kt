@@ -46,3 +46,20 @@ object SysconfInterop {
         return CpuCacheTopology(l1d, l1i, l2, l3, line, cores)
     }
 }
+
+/**
+ * JVM actual — delegates to JNI sysconf(2) when native library is available,
+ * falls back to Runtime.availableProcessors() only.
+ */
+actual fun interrogateCpuCache(): CpuCacheTopology {
+    return try {
+        SysconfInterop.interrogateSysconf()
+    } catch (_: UnsatisfiedLinkError) {
+        CpuCacheTopology(
+            l1DataBytes = null, l1InstructionBytes = null,
+            l2Bytes = null, l3Bytes = null,
+            cacheLineBytes = null,
+            coreCount = Runtime.getRuntime().availableProcessors(),
+        )
+    }
+}

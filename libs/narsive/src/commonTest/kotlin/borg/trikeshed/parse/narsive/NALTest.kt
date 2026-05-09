@@ -1,4 +1,4 @@
-package borg.trikeshed.parse.kursive
+package borg.trikeshed.parse.narsive
 
 import borg.trikeshed.lib.*
 import kotlin.test.Test

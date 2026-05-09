@@ -1,7 +1,24 @@
-package borg.trikeshed.parse.kursive
+package borg.trikeshed.parse.narsive
 
 import borg.trikeshed.context.BitMaskedLong
 import borg.trikeshed.lib.CharSeries
+import borg.trikeshed.parse.kursive.JursiveCharSeries
+import borg.trikeshed.parse.kursive.KursiveParser
+import borg.trikeshed.parse.kursive.KursiveStep
+import borg.trikeshed.parse.kursive.NarsiveTrace
+import borg.trikeshed.parse.kursive.SeriesBuffer
+import borg.trikeshed.parse.kursive.choice
+import borg.trikeshed.parse.kursive.colon
+import borg.trikeshed.parse.kursive.firstGlyphOrNull
+import borg.trikeshed.parse.kursive.opt
+import borg.trikeshed.parse.kursive.parser
+import borg.trikeshed.parse.kursive.peekIsNot
+import borg.trikeshed.parse.kursive.repeat
+import borg.trikeshed.parse.kursive.s
+import borg.trikeshed.parse.kursive.parse
+import borg.trikeshed.parse.kursive.parseLines
+import borg.trikeshed.parse.kursive.std
+import borg.trikeshed.parse.kursive.then
 import borg.trikeshed.lib.Join
 import borg.trikeshed.lib.*
 import borg.trikeshed.lib.get
