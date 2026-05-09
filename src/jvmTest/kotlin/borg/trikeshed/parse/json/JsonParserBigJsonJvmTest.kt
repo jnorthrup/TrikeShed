@@ -1,6 +1,6 @@
 package borg.trikeshed.parse.json
 
-import borg.trikeshed.readLines
+import borg.trikeshed.Files
 import borg.trikeshed.lib.toSeries
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -80,5 +80,5 @@ class JsonParserBigJsonJvmTest {
         assertTrue(services.contains("Universal Cartographics"))
     }
 
-   fun readBigJson(): String = readLines("src/commonTest/resources/big.json").joinToString("\n")
+   fun readBigJson(): String = Files.readAllLines("src/commonTest/resources/big.json").joinToString("\n")
 }

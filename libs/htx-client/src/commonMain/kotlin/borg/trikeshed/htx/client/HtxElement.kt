@@ -2,131 +2,101 @@ package borg.trikeshed.htx.client
 
 import borg.trikeshed.context.AsyncContextElement
 import borg.trikeshed.context.AsyncContextKey
-import borg.trikeshed.context.ElementState
-import borg.trikeshed.htx.client.generated.infrastructure.GeneratedRequest
+import borg.trikeshed.lib.Series
+import borg.trikeshed.lib.j
 
-data class HtxClientMessage(val status: Int = 200, val body: String = "ok")
-
-enum class HtxTransport {
-    TCP,
-    QUIC,
-    SCTP,
-    HTTPS,
-    WEBSOCKET,
-}
-
-data class Aria2Switches(
-    val continueDownload: Boolean = true,
-    val saveNotFound: Boolean = false,
-    val maxConnectionsPerServer: Int = 15,
-    val maxConcurrentDownloads: Int = 15,
-    val split: Int = 15,
-    val dir: String? = null,
-) {
-    fun toArgs(): List<String> = buildList {
-        add("-Z")
-        if (continueDownload) add("-c")
-        if (!saveNotFound) add("--save-not-found=false")
-        add("-x$maxConnectionsPerServer")
-        add("-j$maxConcurrentDownloads")
-        add("-s$split")
-        dir?.let { add("-d"); add(it) }
-    }
-}
-
+/**
+ * Options for HTTP/HTTPS/WebSocket requests through the HTX transport layer.
+ *
+ * @property method  HTTP method (GET, POST, PUT, DELETE)
+ * @property path    Full URL (https://api.example.com/endpoint) or ws:// / wss://
+ * @property body    Request body string (null for GET)
+ * @property headers Additional headers (e.g. "X-CMC_PRO_API_KEY")
+ * @property transport  Transport selection
+ */
 data class HtxClientRequest(
-    val method: String,
+    val method: String = "GET",
     val path: String,
     val body: String = "",
     val headers: Map<String, String> = emptyMap(),
-    val switches: Aria2Switches? = null,
-    val uris: List<String> = emptyList(),
-    val transport: HtxTransport? = null,
+    val transport: HtxTransport = HtxTransport.HTTPS,
 )
 
-typealias HtxRequestHandler = suspend (HtxClientRequest) -> HtxClientMessage
+data class HtxClientMessage(val status: Int, val body: String)
 
-val HtxKey: AsyncContextKey<HtxElement> = HtxElement.Key
-
-fun selectTransport(uri: String): HtxTransport = when {
-    uri.startsWith("h3://")     -> HtxTransport.QUIC
-    uri.startsWith("quic://")   -> HtxTransport.QUIC
-    uri.startsWith("sctp://")   -> HtxTransport.SCTP
-    uri.startsWith("wss://")    -> HtxTransport.WEBSOCKET
-    uri.startsWith("ws://")     -> HtxTransport.WEBSOCKET
-    uri.startsWith("https://")  -> HtxTransport.HTTPS
-    uri.startsWith("http://")   -> HtxTransport.HTTPS
-    else                        -> HtxTransport.TCP
+/**
+ * Transport backends available for [HtxElement].
+ */
+enum class HtxTransport {
+    TCP, QUIC, SCTP, HTTPS, WEBSOCKET
 }
 
-fun defaultHtxRequestHandler(request: HtxClientRequest): HtxClientMessage =
-    when {
-        request.method.isBlank() || request.path.isBlank() -> HtxClientMessage(status = 400, body = "invalid request")
-        request.method == "GET" && request.path == "/health" -> HtxClientMessage(status = 200, body = "ok")
-        request.path == "/health" -> HtxClientMessage(status = 405, body = "method not allowed")
-        else -> HtxClientMessage(status = 404, body = "not found")
+/**
+ * Maps URI schemes to transport enums.
+ */
+private val schemeToTransport = mapOf(
+    "http://" to HtxTransport.HTTPS,
+    "https://" to HtxTransport.HTTPS,
+    "ws://" to HtxTransport.WEBSOCKET,
+    "wss://" to HtxTransport.WEBSOCKET,
+    "tcp://" to HtxTransport.TCP,
+    "quic://" to HtxTransport.QUIC,
+    "sctp://" to HtxTransport.SCTP,
+)
+
+fun selectTransport(uri: String): HtxTransport {
+    for ((scheme, transport) in schemeToTransport) {
+        if (uri.startsWith(scheme)) return transport
     }
+    return HtxTransport.HTTPS
+}
 
-suspend fun openHtxElement(
-    requestHandler: HtxRequestHandler = ::defaultHtxRequestHandler,
-): HtxElement =
-    HtxElement(requestHandler).also { it.open() }
+/** Handler type registered with [HtxElement]. */
+typealias HtxRequestHandler = suspend (HtxClientRequest) -> HtxClientMessage
 
-class HtxElement(
-    val requestHandler: HtxRequestHandler = ::defaultHtxRequestHandler,
-) : AsyncContextElement() {
-    private val transportHandlers = mutableMapOf<HtxTransport, HtxRequestHandler>(
-        HtxTransport.TCP to requestHandler,
-    )
+// ── Legacy compat (used by libs:server) ──────────────────────────
+
+val HtxKey: AsyncContextKey<HtxElementCompat> = HtxElementCompat.Key
+
+suspend fun openHtxElement(): HtxElementCompat =
+    HtxElementCompat().also { it.open() }
+
+class HtxElementCompat : AsyncContextElement() {
+    companion object Key : AsyncContextKey<HtxElementCompat>()
+    override val key: AsyncContextKey<HtxElementCompat> get() = Key
+
+    suspend fun request(method: String = "GET", path: String = "/", body: String = ""): HtxClientMessage {
+        // Stub for server compat — real transport goes through new API
+        return HtxClientMessage(status = 200, body = "ok")
+    }
+}
+
+// ── New (simplified) API ──────────────────────────────────────────
+
+@Suppress("unused")
+class HtxElement {
+    val transports = mutableMapOf<HtxTransport, HtxRequestHandler>()
 
     fun registerTransport(transport: HtxTransport, handler: HtxRequestHandler) {
-        require(transport != HtxTransport.TCP) { "TCP handler is the default requestHandler; set via constructor" }
-        transportHandlers[transport] = handler
+        transports[transport] = handler
     }
-
-    fun generatedCall(): suspend (GeneratedRequest) -> String = { request ->
-        val query = request.queryParams.entries.joinToString("&") { (key, value) -> "$key=$value" }
-        val path = if (query.isEmpty()) request.path else "${request.path}?$query"
-        val response = request(
-            method = request.method.name,
-            path = path,
-            body = request.body ?: "",
-        )
-        check(response.status == 200) {
-            "Expected 200 from HTX for ${request.method.name} ${request.path}, but got ${response.status} with body ${response.body}"
-        }
-        response.body
-    }
-
-    companion object Key : AsyncContextKey<HtxElement>()
-
-    override val key: AsyncContextKey<HtxElement>
-        get() = Key
 
     suspend fun request(
         method: String = "GET",
-        path: String = "/",
+        path: String,
         body: String = "",
         headers: Map<String, String> = emptyMap(),
-        switches: Aria2Switches? = null,
-        uris: List<String> = emptyList(),
         transport: HtxTransport? = null,
     ): HtxClientMessage {
-        check(state == ElementState.OPEN || state == ElementState.ACTIVE || state == ElementState.DRAINING) {
-            "Expected OPEN, ACTIVE, or DRAINING but was $state"
-        }
-        val resolvedTransport = transport ?: selectTransport(path)
-        val request = HtxClientRequest(
-            method = method.trim().uppercase(),
+        val req = HtxClientRequest(
+            method = method,
             path = path,
             body = body,
             headers = headers,
-            switches = switches,
-            uris = uris,
-            transport = resolvedTransport,
+            transport = transport ?: selectTransport(path),
         )
-        val handler = transportHandlers[resolvedTransport]
-            ?: return HtxClientMessage(status = 501, body = "transport $resolvedTransport not registered")
-        return handler(request)
+        val handler = transports[req.transport]
+            ?: error("No handler registered for transport ${req.transport}. Call registerTransport first.")
+        return handler(req)
     }
 }

@@ -7,6 +7,7 @@ import borg.trikeshed.parse.confix.contextOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import borg.trikeshed.viewserver.JsonSerializer
 
 class CouchViewServerProtocolTest {
 
@@ -132,6 +133,17 @@ class CouchViewServerProtocolTest {
         val server = CouchQueryServer(countingCompiler())
         val response = server.handle(CouchCommand.AddFun("not valid js {{{"))
         assertTrue(response is CouchResponse.Error)
+    }
+
+    private fun Map<String, Any?>.toJsonString(): String {
+        val sb = StringBuilder("{")
+        entries.forEachIndexed { i, (k, v) ->
+            if (i > 0) sb.append(",")
+            sb.append("\"$k\":")
+            sb.append(JsonSerializer.serializeValue(v))
+        }
+        sb.append("}")
+        return sb.toString()
     }
 
     private fun String.toSeries(): borg.trikeshed.lib.Series<Char> {

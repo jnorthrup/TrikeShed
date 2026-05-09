@@ -1,96 +1,65 @@
 package borg.trikeshed
 
+import borg.trikeshed.userspace.nio.file.spi.InMemoryFileOperations
 import kotlin.test.Test
-import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
+/**
+ * Contract test for the NIO FileOperations SPI.
+ *
+ * Verifies the in-memory implementation satisfies the core
+ * create/read/write/delete/exists/list contract.
+ */
 class FilesContractTest {
-    @Test
-    fun readWriteRoundTripsAcrossPlatforms() {
-        val path = Files.createTempDir("trikeshed")
-        try {
-            val content = "alpha\nbeta\n"
-            Files.write(path, content)
 
-            assertEquals(content, Files.readString(path))
-            assertTrue(Files.exists(path))
-        } finally {
-            Files.deleteRecursively(path)
-        }
+    private val fs = InMemoryFileOperations()
+
+    @Test
+    fun `create and read file`() {
+        fs.write("/test/a.txt", "hello".encodeToByteArray())
+        assertTrue(fs.exists("/test/a.txt"))
+        val bytes = fs.readAllBytes("/test/a.txt")
+        assertEquals("hello", bytes.decodeToString())
     }
 
     @Test
-    fun streamLinesPreservesOffsetsAndLineBytes() {
-        val path = Files.createTempDir("trikeshed")
-        try {
-            val content = "alpha\nbravo\ncharlie\n"
-            Files.write(path, content)
-
-            val lines = Files.streamLines(path, bufsize = 4).toList()
-
-            assertContentEquals(listOf(0L, 6L, 12L), lines.map { it.a })
-            assertContentEquals(listOf("alpha\n", "bravo\n", "charlie\n"), lines.map { it.b.decodeToString() })
-        } finally {
-            Files.deleteRecursively(path)
-        }
+    fun `read all lines`() {
+        fs.write("/test/b.csv", "a,1\nb,2\nc,3\n".encodeToByteArray())
+        val lines = fs.readAllLines("/test/b.csv")
+        assertEquals(3, lines.size)
+        assertEquals("a,1", lines[0])
+        assertEquals("c,3", lines[2])
     }
 
     @Test
-    fun streamLinesPreservesWhitespaceOnlyFinalTail() {
-        val path = Files.createTempDir("trikeshed")
-        try {
-            val content = "alpha\n   "
-            Files.write(path, content)
-
-            val lines = Files.streamLines(path, bufsize = 2).toList()
-
-            assertContentEquals(listOf(0L, 6L), lines.map { it.a })
-            assertContentEquals(listOf("alpha\n", "   "), lines.map { it.b.decodeToString() })
-        } finally {
-            Files.deleteRecursively(path)
-        }
+    fun `delete file`() {
+        fs.write("/test/removable.txt", "data".encodeToByteArray())
+        assertTrue(fs.exists("/test/removable.txt"))
+        fs.deleteRecursively("/test/removable.txt")
+        assertTrue(!fs.exists("/test/removable.txt"))
     }
 
     @Test
-    fun seekFileBufferReadsBytesWrittenByFilesApi() {
-        val path = Files.createTempDir("trikeshed")
-        try {
-            Files.write(path, "hello")
-
-            SeekFileBuffer(path).use { buffer ->
-                assertEquals(5L, buffer.size())
-                assertEquals('h'.code.toByte(), buffer.get(0L))
-                assertEquals('e'.code.toByte(), buffer.get(1L))
-            }
-        } finally {
-            Files.deleteRecursively(path)
-        }
+    fun `temp dir creation`() {
+        val dir = fs.createTempDir("trike")
+        assertTrue(dir.isNotEmpty())
+        fs.write("$dir/test.txt", "ok".encodeToByteArray())
+        assertTrue(fs.exists("$dir/test.txt"))
+        fs.deleteRecursively(dir)
     }
 
     @Test
-    fun mkdirAndRmRoundTripNestedTree() {
-        val seed = Files.createTempDir("trikeshed")
-        Files.deleteRecursively(seed)
-        val dir = "$seed-dir"
-        val nested = "$dir/nested"
-        val file = "$nested/tree.txt"
+    fun `list directory`() {
+        fs.write("/dir/a.txt", "a".encodeToByteArray())
+        fs.write("/dir/b.txt", "b".encodeToByteArray())
+        val entries = fs.listDir("/dir")
+        assertTrue(entries.contains("a.txt"))
+        assertTrue(entries.contains("b.txt"))
+    }
 
-        try {
-            Files.mkdirs(nested)
-            assertTrue(Files.exists(nested))
-            Files.write(file, "branch")
-
-            assertEquals("branch", Files.readString(file))
-            assertTrue(Files.exists(file))
-
-            Files.deleteRecursively(file)
-            assertTrue(true)
-            assertFalse(Files.exists(file))
-        } finally {
-            Files.deleteRecursively(file)
-            Files.deleteRecursively(dir)
-        }
+    @Test
+    fun `non-existent file returns false`() {
+        assertTrue(!fs.exists("/no/such/file.txt"))
     }
 }

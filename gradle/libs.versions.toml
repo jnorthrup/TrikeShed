@@ -1,8 +1,8 @@
 [versions]
 # Kotlin & Coroutines
 kotlin = "2.4.0-Beta2"
-kotlinx-coroutines = "1.11.0-rc02"
-kotlinx-datetime = "0.8.0-rc02-0.6.x-compat"
+kotlinx-coroutines = "1.11.0"
+kotlinx-datetime = "0.8.0-0.6.x-compat"
 kotlin-reflect = "1.8.0"
 
 # Kotlin Testing

@@ -16,9 +16,9 @@ import simple.PosixOpenOpts
  */
 class SeekFileBuffer(
     val filename: String,
-    val initialOffset: Long,
-    val blkSize: Long,
-    val readOnly: Boolean,
+    val initialOffset: Long = 0,
+    val blkSize: Long = -1,
+    val readOnly: Boolean = true,
 ) : LongSeries<Byte> {
 
    var fd: Int = -1

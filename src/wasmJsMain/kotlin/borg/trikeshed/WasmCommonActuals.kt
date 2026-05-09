@@ -435,9 +435,9 @@ actual class FileBuffer actual constructor(
 
 class SeekFileBuffer(
     val filename: String,
-    val initialOffset: Long,
-    val blkSize: Long,
-    val readOnly: Boolean,
+    val initialOffset: Long = 0,
+    val blkSize: Long = -1,
+    val readOnly: Boolean = true,
 ) : LongSeries<Byte> {
    val delegate = SeekFileBufferCommon(filename, initialOffset, blkSize, readOnly, WasmBrowserSeekHandle)
 

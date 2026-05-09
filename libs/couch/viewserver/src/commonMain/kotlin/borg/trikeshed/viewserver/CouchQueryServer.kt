@@ -107,7 +107,7 @@ object JsonSerializer {
         }
     }
 
-    private fun serializeValue(value: Any?): String = when (value) {
+    fun serializeValue(value: Any?): String = when (value) {
         null -> "null"
         is Boolean -> value.toString()
         is Number -> value.toString()
