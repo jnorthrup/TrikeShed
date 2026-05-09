@@ -1,0 +1,135 @@
+> Task :libs:narsive:kmpPartiallyResolvedDependenciesChecker
+> Task :libs:miniduck:kmpPartiallyResolvedDependenciesChecker
+> Task :libs:dreamer-kmm:kmpPartiallyResolvedDependenciesChecker
+> Task :libs:htx-client:kmpPartiallyResolvedDependenciesChecker
+> Task :libs:tls:kmpPartiallyResolvedDependenciesChecker
+> Task :kmpPartiallyResolvedDependenciesChecker
+> Task :libs:kursive:kmpPartiallyResolvedDependenciesChecker
+> Task :libs:tls:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :libs:miniduck:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :libs:narsive:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :libs:dreamer-kmm:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :libs:kursive:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :libs:htx-client:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :libs:miniduck:jvmProcessResources NO-SOURCE
+> Task :libs:narsive:jvmProcessResources NO-SOURCE
+> Task :libs:tls:jvmProcessResources NO-SOURCE
+> Task :libs:htx-client:jvmProcessResources NO-SOURCE
+> Task :libs:dreamer-kmm:jvmProcessResources NO-SOURCE
+> Task :libs:dreamer-kmm:processJvmMainResources SKIPPED
+> Task :libs:kursive:jvmProcessResources NO-SOURCE
+> Task :libs:miniduck:processJvmMainResources SKIPPED
+> Task :libs:narsive:processJvmMainResources SKIPPED
+> Task :libs:tls:processJvmMainResources SKIPPED
+> Task :libs:htx-client:processJvmMainResources SKIPPED
+> Task :libs:kursive:processJvmMainResources SKIPPED
+> Task :libs:htx-client:jvmTestProcessResources NO-SOURCE
+> Task :libs:htx-client:processJvmTestResources SKIPPED
+> Task :libs:dreamer-kmm:jvmTestProcessResources NO-SOURCE
+> Task :libs:dreamer-kmm:processJvmTestResources SKIPPED
+> Task :jvmProcessResources UP-TO-DATE
+> Task :processJvmMainResources SKIPPED
+
+> Task :compileKotlinJvm
+w: file:///Users/jim/work/TrikeShed/src/commonMain/kotlin/borg/trikeshed/FileBuffer.kt:20:49 'expect class FileBuffer : Join<Long, (Long) -> Byte>, CoroutineContext.Element' is deprecated. Resolve via FileBuffer.Key in coroutine context.
+w: file:///Users/jim/work/TrikeShed/src/commonMain/kotlin/borg/trikeshed/FileBuffer.kt:37:9 'expect class FileBuffer : Join<Long, (Long) -> Byte>, CoroutineContext.Element' is deprecated. Resolve via FileBuffer.Key in coroutine context.
+w: file:///Users/jim/work/TrikeShed/src/commonMain/kotlin/borg/trikeshed/FileBuffer.kt:37:32 'expect class FileBuffer : Join<Long, (Long) -> Byte>, CoroutineContext.Element' is deprecated. Resolve via FileBuffer.Key in coroutine context.
+w: file:///Users/jim/work/TrikeShed/src/commonMain/kotlin/borg/trikeshed/FileBuffer.kt:42:135 'expect class FileBuffer : Join<Long, (Long) -> Byte>, CoroutineContext.Element' is deprecated. Resolve via FileBuffer.Key in coroutine context.
+w: file:///Users/jim/work/TrikeShed/src/commonMain/kotlin/borg/trikeshed/FileBuffer.kt:43:5 'expect constructor(filename: String, initialOffset: Long = ..., blkSize: Long = ..., readOnly: Boolean = ..., closeChannelOnMap: Boolean = ...): FileBuffer' is deprecated. Resolve via FileBuffer.Key in coroutine context.
+w: file:///Users/jim/work/TrikeShed/src/commonMain/kotlin/borg/trikeshed/FileBuffer.kt:45:145 'expect class FileBuffer : Join<Long, (Long) -> Byte>, CoroutineContext.Element' is deprecated. Resolve via FileBuffer.Key in coroutine context.
+w: file:///Users/jim/work/TrikeShed/src/commonMain/kotlin/borg/trikeshed/SeekFileBufferCommon.kt:19:29 'expect fun platformSeekHandle(): SeekHandle' is deprecated. Register SeekHandleService via NioSupervisor for CCEK resolution.
+w: file:///Users/jim/work/TrikeShed/src/commonMain/kotlin/borg/trikeshed/SeekHandle.kt:51:13 'expect object System : Any' is deprecated. Use SystemOperations CCEK: coroutineContext[SystemOperations.Key].
+w: file:///Users/jim/work/TrikeShed/src/commonMain/kotlin/borg/trikeshed/System.kt:12:12 'expect object System : Any' is deprecated. Use SystemOperations CCEK: coroutineContext[SystemOperations.Key].
+w: file:///Users/jim/work/TrikeShed/src/commonMain/kotlin/borg/trikeshed/System.kt:13:12 'expect object System : Any' is deprecated. Use SystemOperations CCEK: coroutineContext[SystemOperations.Key].
+w: file:///Users/jim/work/TrikeShed/src/commonMain/kotlin/borg/trikeshed/System.kt:13:70 'expect object System : Any' is deprecated. Use SystemOperations CCEK: coroutineContext[SystemOperations.Key].
+w: file:///Users/jim/work/TrikeShed/src/commonMain/kotlin/borg/trikeshed/collections/_m.kt:14:107 Unchecked cast of 'Pair<K (of fun <K, V, P : Join<K, V>, T : Pair<K, V>> get), V (of fun <K, V, P : Join<K, V>, T : Pair<K, V>> get)>' to 'T (of fun <K, V, P : Join<K, V>, T : Pair<K, V>> get)'.
+w: file:///Users/jim/work/TrikeShed/src/commonMain/kotlin/borg/trikeshed/cursor/CursorTensor.kt:270:92 Unchecked cast of 'Join<Int, out (Int) -> Any?>' to 'Join<Int, (Int) -> Any?>'.
+w: file:///Users/jim/work/TrikeShed/src/commonMain/kotlin/borg/trikeshed/cursor/GroupBy.kt:15:44 'expect class IntAccumulator : CoroutineContext.Element' is deprecated. Resolve via IntAccumulator.Key in coroutine context.
+w: file:///Users/jim/work/TrikeShed/src/commonMain/kotlin/borg/trikeshed/cursor/GroupBy.kt:19:34 'expect constructor(initialCapacity: Int = ...): IntAccumulator' is deprecated. Resolve via IntAccumulator.Key in coroutine context.
+w: file:///Users/jim/work/TrikeShed/src/commonMain/kotlin/borg/trikeshed/cursor/SimpleCursor.kt:14:22 This cast can never succeed.
+w: file:///Users/jim/work/TrikeShed/src/commonMain/kotlin/borg/trikeshed/isam/IsamMetaFileReader.kt:117:32 Unchecked cast of 'Join<Int, (Int) -> Join<String, TypeMemento>>' to 'Join<Int, (Int) -> RecordMeta>'.
+w: file:///Users/jim/work/TrikeShed/src/commonMain/kotlin/borg/trikeshed/isam/meta/IOMemento.kt:92:42 Redundant call of conversion method.
+w: file:///Users/jim/work/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lib/Combine.kt:69:26 Unchecked cast of 'EmptySeries' to 'Join<Int, (Int) -> A (of fun <A> combine)>'.
+w: file:///Users/jim/work/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lib/IntAccumulator.kt:7:67 'expect class IntAccumulator : CoroutineContext.Element' is deprecated. Resolve via IntAccumulator.Key in coroutine context.
+w: file:///Users/jim/work/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lib/MergeMutableSeries.kt:119:39 No cast needed.
+w: file:///Users/jim/work/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lib/RecursiveMutableSeries.kt:76:57 Unchecked cast of 'EmptySeries' to 'Join<Int, (Int) -> T (of fun <T> create)>'.
+w: file:///Users/jim/work/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lib/Series2.kt:21:20 No cast needed.
+w: file:///Users/jim/work/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lib/Series2.kt:21:37 No cast needed.
+w: file:///Users/jim/work/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lib/Twins.kt:12:1 Expected performance impact from inlining is insignificant. Inlining works best for functions with parameters of function types.
+w: file:///Users/jim/work/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lib/Twins.kt:15:1 Expected performance impact from inlining is insignificant. Inlining works best for functions with parameters of function types.
+w: file:///Users/jim/work/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lib/Twins.kt:18:1 Expected performance impact from inlining is insignificant. Inlining works best for functions with parameters of function types.
+w: file:///Users/jim/work/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lib/Twins.kt:21:1 Expected performance impact from inlining is insignificant. Inlining works best for functions with parameters of function types.
+w: file:///Users/jim/work/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lib/Twins.kt:24:1 Expected performance impact from inlining is insignificant. Inlining works best for functions with parameters of function types.
+w: file:///Users/jim/work/TrikeShed/src/commonMain/kotlin/borg/trikeshed/parse/confix/Confix.kt:1634:17 'fun CoroutineScope.launch(context: Job, start: CoroutineStart = ..., block: suspend CoroutineScope.() -> Unit): Job' is deprecated. Passing a Job to coroutine builders breaks structured concurrency, leading to hard-to-diagnose errors. This pattern should be avoided. This overload will be deprecated with an error in the future.
+w: file:///Users/jim/work/TrikeShed/src/commonMain/kotlin/borg/trikeshed/parse/confix/Confix.kt:1639:25 'fun CoroutineScope.launch(context: Job, start: CoroutineStart = ..., block: suspend CoroutineScope.() -> Unit): Job' is deprecated. Passing a Job to coroutine builders breaks structured concurrency, leading to hard-to-diagnose errors. This pattern should be avoided. This overload will be deprecated with an error in the future.
+w: file:///Users/jim/work/TrikeShed/src/commonMain/kotlin/borg/trikeshed/parse/json/Json.kt:132:43 No cast needed.
+w: file:///Users/jim/work/TrikeShed/src/commonMain/kotlin/borg/trikeshed/parse/kursive/Jursive.kt:35:62 Unchecked cast of 'Any?' to 'T (of class SeriesBuffer<T>)'.
+w: file:///Users/jim/work/TrikeShed/src/commonMain/kotlin/borg/trikeshed/parse/kursive/Jursive.kt:53:63 Unchecked cast of 'Any?' to 'T (of class SeriesBuffer<T>)'.
+w: file:///Users/jim/work/TrikeShed/src/commonMain/kotlin/borg/trikeshed/parse/kursive/sql/SqlAst.kt:275:28 No cast needed.
+w: file:///Users/jim/work/TrikeShed/src/commonMain/kotlin/borg/trikeshed/userspace/concurrency/Channel.kt:36:40 This is a delicate API and its use requires care. Make sure you fully read and understand documentation of the declaration that is marked as a delicate API.
+w: file:///Users/jim/work/TrikeShed/src/commonMain/kotlin/borg/trikeshed/userspace/nio/charset/Charset.kt:39:35 The corresponding parameter in the supertype 'Comparable' is named 'other'. This may cause problems when calling this function with named arguments.
+w: file:///Users/jim/work/TrikeShed/src/commonMain/kotlin/borg/trikeshed/userspace/nio/charset/Charset.kt:43:32 The corresponding parameter in the supertype 'Any' is named 'other'. This may cause problems when calling this function with named arguments.
+w: file:///Users/jim/work/TrikeShed/src/commonMain/kotlin/borg/trikeshed/userspace/nio/file/SecureDirectoryStream.kt:9:39 Projection is redundant: the corresponding type parameter of 'Set<out OpenOption>' has the same variance.
+w: file:///Users/jim/work/TrikeShed/src/commonMain/kotlin/borg/trikeshed/userspace/nio/file/attribute/AclEntry.kt:12:25 The corresponding parameter in the supertype 'Any' is named 'other'. This may cause problems when calling this function with named arguments.
+w: file:///Users/jim/work/TrikeShed/src/commonMain/kotlin/borg/trikeshed/userspace/nio/file/attribute/FileTime.kt:18:9 'when' is exhaustive so 'else' is redundant here.
+w: file:///Users/jim/work/TrikeShed/src/commonMain/kotlin/borg/trikeshed/userspace/nio/file/attribute/FileTime.kt:23:22 'class Instant : Comparable<Instant>' is deprecated. Use kotlin.time.Instant instead.
+w: file:///Users/jim/work/TrikeShed/src/commonMain/kotlin/borg/trikeshed/userspace/nio/file/attribute/FileTime.kt:23:32 'class Instant : Comparable<Instant>' is deprecated. Use kotlin.time.Instant instead.
+w: file:///Users/jim/work/TrikeShed/src/commonMain/kotlin/borg/trikeshed/userspace/nio/file/attribute/FileTime.kt:32:51 'fun toString(): String' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///Users/jim/work/TrikeShed/src/commonMain/kotlin/borg/trikeshed/userspace/nio/file/attribute/FileTime.kt:43:13 'when' is exhaustive so 'else' is redundant here.
+w: file:///Users/jim/work/TrikeShed/src/commonMain/kotlin/borg/trikeshed/userspace/nio/file/attribute/FileTime.kt:48:27 'class Instant : Comparable<Instant>' is deprecated. Use kotlin.time.Instant instead.
+w: file:///Users/jim/work/TrikeShed/src/commonMain/kotlin/borg/trikeshed/userspace/nio/file/attribute/FileTime.kt:48:65 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///Users/jim/work/TrikeShed/src/commonMain/kotlin/borg/trikeshed/userspace/nio/file/spi/FileSystemProvider.kt:16:76 Projection is redundant: the corresponding type parameter of 'Set<out OpenOption>' has the same variance.
+w: file:///Users/jim/work/TrikeShed/src/commonMain/kotlin/borg/trikeshed/userspace/nio/file/spi/FileSystemProvider.kt:17:88 Projection is redundant: the corresponding type parameter of 'Set<out OpenOption>' has the same variance.
+w: file:///Users/jim/work/TrikeShed/src/commonMain/kotlin/borg/trikeshed/userspace/nio/file/spi/FileSystemProvider.kt:18:76 Projection is redundant: the corresponding type parameter of 'Set<out OpenOption>' has the same variance.
+w: file:///Users/jim/work/TrikeShed/src/commonMain/kotlin/borg/trikeshed/ws/Rfc6455Handshake.kt:43:51 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///Users/jim/work/TrikeShed/src/commonMain/kotlin/borg/trikeshed/ws/Rfc6455Handshake.kt:43:70 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///Users/jim/work/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/isam/IsamDataFile.kt:80:41 Redundant call of conversion method.
+
+> Task :compileJvmMainJava UP-TO-DATE
+> Task :jvmMainClasses
+> Task :jvmJar UP-TO-DATE
+> Task :libs:tls:compileKotlinJvm UP-TO-DATE
+> Task :libs:kursive:compileKotlinJvm UP-TO-DATE
+> Task :libs:tls:compileJvmMainJava NO-SOURCE
+> Task :libs:tls:jvmMainClasses UP-TO-DATE
+> Task :libs:kursive:compileJvmMainJava NO-SOURCE
+> Task :libs:kursive:jvmMainClasses UP-TO-DATE
+> Task :libs:tls:jvmJar UP-TO-DATE
+> Task :libs:kursive:jvmJar UP-TO-DATE
+> Task :libs:htx-client:compileKotlinJvm UP-TO-DATE
+> Task :libs:narsive:compileKotlinJvm UP-TO-DATE
+> Task :libs:narsive:compileJvmMainJava NO-SOURCE
+> Task :libs:narsive:jvmMainClasses UP-TO-DATE
+> Task :libs:htx-client:compileJvmMainJava NO-SOURCE
+> Task :libs:htx-client:jvmMainClasses UP-TO-DATE
+> Task :libs:miniduck:compileKotlinJvm UP-TO-DATE
+> Task :libs:miniduck:compileJvmMainJava NO-SOURCE
+> Task :libs:miniduck:jvmMainClasses UP-TO-DATE
+> Task :libs:htx-client:jvmJar UP-TO-DATE
+> Task :libs:narsive:jvmJar UP-TO-DATE
+> Task :libs:miniduck:jvmJar UP-TO-DATE
+> Task :libs:dreamer-kmm:compileKotlinJvm UP-TO-DATE
+> Task :libs:dreamer-kmm:compileJvmMainJava NO-SOURCE
+> Task :libs:dreamer-kmm:jvmMainClasses UP-TO-DATE
+> Task :libs:dreamer-kmm:jvmJar UP-TO-DATE
+> Task :libs:htx-client:compileTestKotlinJvm UP-TO-DATE
+> Task :libs:htx-client:compileJvmTestJava NO-SOURCE
+> Task :libs:htx-client:jvmTestClasses UP-TO-DATE
+> Task :libs:htx-client:jvmTest UP-TO-DATE
+> Task :libs:dreamer-kmm:compileTestKotlinJvm UP-TO-DATE
+> Task :libs:dreamer-kmm:compileJvmTestJava NO-SOURCE
+> Task :libs:dreamer-kmm:jvmTestClasses UP-TO-DATE
+> Task :libs:dreamer-kmm:jvmTest UP-TO-DATE
+
+[Incubating] Problems report is available at: file:///Users/jim/work/TrikeShed/build/reports/problems/problems-report.html
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 10.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/9.5.0/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD SUCCESSFUL in 7s
+27 actionable tasks: 8 executed, 19 up-to-date
+Consider enabling configuration cache to speed up this build: https://docs.gradle.org/9.5.0/userguide/configuration_cache_enabling.html

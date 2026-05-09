@@ -47,3 +47,4 @@ default/
 .DS_Store
 .deepseek/
 .env
+.gradle-home/

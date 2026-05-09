@@ -1,6 +1,6 @@
 package borg.trikeshed.server.generated
 
-import borg.trikeshed.htx.client.HtxElement
+import borg.trikeshed.htx.client.HtxElementCompat
 import borg.trikeshed.htx.client.openHtxElement as openHtxElementRuntime
 import borg.trikeshed.quic.QuicElement
 import borg.trikeshed.quic.openQuicElement as openQuicElementRuntime
@@ -8,7 +8,7 @@ import borg.trikeshed.sctp.SctpElement
 import borg.trikeshed.sctp.openSctpElement as openSctpElementRuntime
 
 object Elements {
-    suspend fun htx(): HtxElement = HtxElement()
+    suspend fun htx(): HtxElementCompat = openHtxElementRuntime()
     suspend fun quic(): QuicElement = openQuicElementRuntime()
     suspend fun sctp(): SctpElement = openSctpElementRuntime()
 }

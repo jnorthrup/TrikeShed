@@ -21,11 +21,19 @@ interface ChannelOperations : CoroutineContext.Element {
     fun listen(fd: Int, backlog: Int = 128): Int
     /** Accept an incoming connection. Returns new fd, or -1 if none pending. */
     fun accept(fd: Int): Int
+    /** Connect to remote host:port. Returns 0 on success, negative on error. */
+    fun connect(fd: Int, host: String, port: Int): Int
 
     interface ChannelHandle {
         val id: Int
+        /** File read at offset (pread). */
         fun read(buffer: ByteBuffer, offset: Long): Int
+        /** File write at offset (pwrite). */
         fun write(buffer: ByteBuffer, offset: Long): Int
+        /** Unified readv — memory, files, sockets. Kernel dispatches by fd. */
+        fun readv(fd: Int, buffer: ByteBuffer): Int = -1
+        /** Unified writev — memory, files, sockets. Kernel dispatches by fd. */
+        fun writev(fd: Int, buffer: ByteBuffer): Int = -1
         fun submit(): Int
         fun wait(minComplete: Int = 1): List<ChannelResult>
     }
