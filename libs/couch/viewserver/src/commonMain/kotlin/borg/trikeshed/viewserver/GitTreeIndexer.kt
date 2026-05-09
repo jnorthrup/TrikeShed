@@ -204,7 +204,7 @@ class GitTreeIndexer(
             val nullChar = body.indexOf('\u0000', space); if (nullChar < 0) break
             val path = body.substring(space + 1, nullChar)
             val shaBytes = body.substring(nullChar + 1, nullChar + 21)
-            val sha1 = shaBytes.map { b -> "%02x".format(b.code and 0xFF) }.joinToString("")
+            val sha1 = shaBytes.map { b -> (b.toInt() and 0xFF).toString(16).padStart(2, '0') }.joinToString("")
             entries.add(TreeEntry(path, sha1, mode))
             pos = nullChar + 21
         }
@@ -265,7 +265,7 @@ class GitTreeIndexer(
         return try {
             // Git objects are zlib-compressed. On JVM we can use java.util.zip.Inflater.
             // On commonMain, this is a stub that returns raw data if uncompressed.
-            String(data, 0, data.size).also { if (it.contains("blob") || it.contains("commit")) return@decompressZlib it }
+            data.decodeToString().also { if (it.contains("blob") || it.contains("commit")) return@decompressZlib it }
             // Fallback: try simple deflate (won't work for compressed objects)
             data.decodeToString()
         } catch (_: Exception) {

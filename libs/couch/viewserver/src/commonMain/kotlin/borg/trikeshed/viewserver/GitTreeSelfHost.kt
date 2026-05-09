@@ -56,8 +56,8 @@ class GitTreeSelfHost(
      */
     suspend fun boot(scope: CoroutineScope): Job {
         val server = ReactorCouchServer(
-            channelOps = borg.trikeshed.userspace.nio.channels.spi.JvmChannelOperations(),
-            reactorOps = borg.trikeshed.userspace.nio.channels.spi.JvmReactorOperations(),
+            channelOps = TODO("JvmChannelOperations — register via CCEK"),
+            reactorOps = TODO("JvmReactorOperations — register via CCEK"),
             couch = couch,
             store = store,
             wal = wal,
