@@ -8,6 +8,5 @@
 *.bat           text eol=crlf
 
 # Binary files should be left untouched
-*.jar           binary
 
-lfs *.jar
+*.jar filter=lfs diff=lfs merge=lfs -text
