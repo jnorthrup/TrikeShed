@@ -8,7 +8,7 @@ import borg.trikeshed.sctp.SctpElement
 import borg.trikeshed.sctp.openSctpElement as openSctpElementRuntime
 
 object Elements {
-    suspend fun htx(): HtxElement = openHtxElementRuntime()
+    suspend fun htx(): HtxElement = HtxElement()
     suspend fun quic(): QuicElement = openQuicElementRuntime()
     suspend fun sctp(): SctpElement = openSctpElementRuntime()
 }

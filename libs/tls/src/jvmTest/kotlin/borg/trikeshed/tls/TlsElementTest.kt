@@ -6,8 +6,7 @@ import kotlinx.coroutines.runBlocking
 class TlsElementTest {
     @Test
     fun openClose() = runBlocking {
-        val engine = TlsEngineJdk()
-        val elem = TlsElement(engine)
+        val elem = TlsElement()
         elem.open()
         assertTrue(true)
         elem.close()
