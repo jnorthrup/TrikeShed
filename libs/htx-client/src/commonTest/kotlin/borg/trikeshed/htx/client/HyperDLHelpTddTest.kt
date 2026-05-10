@@ -3,7 +3,7 @@ package borg.trikeshed.htx.client
 import kotlin.test.Test
 import kotlin.test.assertTrue
 
-class Aria2HelpTddTest {
+class HyperDLHelpTddTest {
     @Test
     fun helpContainsExpectedOptions() {
         val help = HyperDLHelp.helpText()

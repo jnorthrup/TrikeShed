@@ -162,6 +162,11 @@ object WebSocketFrame {
 
         // payload
         payload.copyInto(out, pos)
+        if (masked && maskingKey != null) {
+            for (i in pos until out.size) {
+                out[i] = (payload[i - pos].toInt() xor (maskingKey[(i - pos) % 4].toInt() and 0xFF)).toByte()
+            }
+        }
         return out
     }
 }

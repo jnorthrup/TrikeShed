@@ -245,7 +245,8 @@ internal object Sha1Common {
     fun hash(input: ByteArray): ByteArray {
         // Padding
         val msgLen = input.size.toLong() * 8
-        val padLen = if ((input.size % 64) < 56) 56 - (input.size % 64) else 120 - (input.size % 64)
+        val remainder = (input.size + 1) % 64
+        val padLen = if (remainder <= 56) 56 - remainder else 120 - remainder
         val padded = ByteArray(input.size + 1 + padLen + 8)
         input.copyInto(padded, 0, 0, input.size)
         padded[input.size] = 0x80.toByte()
@@ -290,7 +291,7 @@ internal object Sha1Common {
                     in 40..59 -> { f = (b and c) or (b and d) or (c and d); k = 0x8F1BBCDC.toInt() }
                     else -> { f = b xor c xor d; k = 0xCA62C1D6.toInt() }
                 }
-                val temp = (a shl 5) or (a ushr 27) + f + e + k + w[j]
+                val temp = ((a shl 5) or (a ushr 27)) + f + e + k + w[j]
                 e = d; d = c; c = (b shl 30) or (b ushr 2); b = a; a = temp
             }
 

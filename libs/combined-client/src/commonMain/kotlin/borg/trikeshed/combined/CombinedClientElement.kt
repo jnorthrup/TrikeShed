@@ -35,6 +35,14 @@ open class CombinedClientElement(
                 val h = htx ?: error("HTX element not configured")
                 h.request("GET", args.firstOrNull() ?: "/health").body
             }
+            "quic" -> {
+                quic.openStream()
+                "QUIC stream opened (${quic.activeStreams} active)"
+            }
+            "sctp" -> {
+                sctp.openStream()
+                "SCTP stream opened (${sctp.activeStreams} active)"
+            }
             else -> error("Unknown RPC target: $target")
         }
     }

@@ -1,0 +1,308 @@
+openapi: 3.1.0
+info:
+  title: Git Smart HTTP Protocol — TrikeShed Self-Host
+  version: 0.1.0-SNAPSHOT
+  description: |
+    OpenAPI contract for the Git smart HTTP wire protocol (fetch + push).
+
+    Covers the four endpoints defined in gitprotocol-http(5) and
+    gitprotocol-pack(5) that implement the server side of `git clone`,
+    `git fetch`, and `git push` over HTTP/S.
+
+    Wire format: pkt-line framed binary (Content-Type application/x-git-*).
+    Protocol versions: v1 (default) and v2 (negotiated via Git-Protocol header).
+
+    References:
+      - https://git-scm.com/docs/gitprotocol-http
+      - https://git-scm.com/docs/gitprotocol-pack
+      - https://git-scm.com/docs/gitprotocol-v2
+      - https://git-scm.com/docs/gitprotocol-common
+servers:
+  - url: http://127.0.0.1:9418
+    description: Local git-daemon port (TrikeShed native transport)
+  - url: https://git.example.com
+    description: Production git server (HTX-TLS transport)
+tags:
+  - name: fetch
+    description: git-upload-pack — clone, fetch, ls-remote
+  - name: push
+    description: git-receive-pack — push
+
+x-trikeshed-context:
+  server:
+    - name: couch
+      key: borg.trikeshed.couch.CouchElement
+      element: borg.trikeshed.couch.CouchElement
+  client:
+    - name: htx
+      key: borg.trikeshed.htx.client.HtxKey
+      element: borg.trikeshed.htx.client.HtxElement
+      open: borg.trikeshed.htx.client.openHtxElement
+
+# ── Paths ──────────────────────────────────────────────────────────
+
+paths:
+
+  # ── Ref advertisement (fetch) ───────────────────────────────────
+  /{repository}/info/refs:
+    get:
+      tags: [fetch]
+      operationId: getFetchRefs
+      summary: Advertise refs for fetch/clone
+      description: |
+        Responds with `application/x-git-upload-pack-advertisement`.
+
+        The first pkt-line contains `# service=git-upload-pack\n`,
+        followed by a flush-pkt (`0000`). Subsequent pkt-lines list
+        each ref as `<sha1> <refname>`, with the first ref carrying
+        the capability list after a NUL byte.
+
+        Protocol v2 negotiation: if the client sends `Git-Protocol: version=2`,
+        the server responds with the v2 capability advertisement instead.
+      x-trikeshed-supervisor: true
+      parameters:
+        - name: repository
+          in: path
+          required: true
+          schema: { type: string }
+          description: Git repository path (e.g. "trike_git.git")
+        - name: service
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [git-upload-pack]
+      responses:
+        '200':
+          description: Ref advertisement (pkt-line framed)
+          headers:
+            Content-Type:
+              schema:
+                type: string
+                enum: [application/x-git-upload-pack-advertisement]
+          content:
+            application/x-git-upload-pack-advertisement:
+              schema:
+                $ref: '#/components/schemas/PktLineStream'
+
+  # ── Fetch pack negotiation ──────────────────────────────────────
+  /{repository}/git-upload-pack:
+    post:
+      tags: [fetch]
+      operationId: uploadPack
+      summary: Fetch pack negotiation
+      description: |
+        Client sends `want`/`have` pkt-lines followed by `done`.
+        Server responds with `ACK`/`NAK` pkt-lines followed by a
+        packfile binary stream.
+
+        Protocol v2: the client sends `command=fetch` pkt-lines with
+        `want <oid>` or `want-ref <refname>`, followed by `done` + flush.
+      parameters:
+        - name: repository
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/x-git-upload-pack-request:
+            schema:
+              $ref: '#/components/schemas/PktLineStream'
+      responses:
+        '200':
+          description: Pack negotiation result + packfile
+          headers:
+            Content-Type:
+              schema:
+                type: string
+                enum: [application/x-git-upload-pack-result]
+          content:
+            application/x-git-upload-pack-result:
+              schema:
+                $ref: '#/components/schemas/PktLineStream'
+
+  # ── Ref advertisement (push) ────────────────────────────────────
+  /{repository}/info-refs-push:
+    get:
+      tags: [push]
+      operationId: getPushRefs
+      summary: Advertise refs for push
+      description: |
+        Same format as fetch ref advertisement but with
+        `application/x-git-receive-pack-advertisement` content type
+        and push-specific capabilities (`report-status`, `delete-refs`,
+        `atomic`, `push-options`).
+      parameters:
+        - name: repository
+          in: path
+          required: true
+          schema: { type: string }
+        - name: service
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [git-receive-pack]
+      responses:
+        '200':
+          description: Push ref advertisement
+          headers:
+            Content-Type:
+              schema:
+                type: string
+                enum: [application/x-git-receive-pack-advertisement]
+          content:
+            application/x-git-receive-pack-advertisement:
+              schema:
+                $ref: '#/components/schemas/PktLineStream'
+
+  # ── Push pack receive ───────────────────────────────────────────
+  /{repository}/git-receive-pack:
+    post:
+      tags: [push]
+      operationId: receivePack
+      summary: Receive push pack
+      description: |
+        Client sends reference update commands (`<old-oid> <new-oid> <refname>`)
+        followed by a packfile. Server validates, updates refs, and responds
+        with `unpack ok` or `unpack <error>`, then per-ref status lines
+        (`ok <refname>` or `ng <refname> <reason>`).
+      parameters:
+        - name: repository
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/x-git-receive-pack-request:
+            schema:
+              $ref: '#/components/schemas/PktLineStream'
+      responses:
+        '200':
+          description: Push result (unpack status + per-ref status)
+          headers:
+            Content-Type:
+              schema:
+                type: string
+                enum: [application/x-git-receive-pack-result]
+          content:
+            application/x-git-receive-pack-result:
+              schema:
+                $ref: '#/components/schemas/PktLineStream'
+
+# ── Components ─────────────────────────────────────────────────────
+
+components:
+  schemas:
+
+    PktLineStream:
+      type: string
+      format: binary
+      description: |
+        A stream of pkt-line framed data.
+
+        pkt-line = 4*(HEXDIG) (pkt-len-4)*(OCTET)
+        flush-pkt = "0000"
+        delimiter-pkt = "0001"
+
+        Each pkt-line is a length-prefixed binary chunk. The length
+        is 4 hex characters (e.g. "0006" for 6 bytes total, 2 bytes
+        of payload). A flush-pkt ("0000") terminates a message block.
+        A delimiter-pkt ("0001") separates sections in protocol v2.
+
+        Examples:
+          "000bfoobar\n"     → payload "foobar\n"
+          "0005a"           → payload "a"
+          "0000"            → flush (end of section)
+          "0001"            → delimiter (v2 capability boundary)
+
+    PktLine:
+      type: object
+      description: A single pkt-line parsed into structured form.
+      properties:
+        length:
+          type: integer
+          description: Total pkt-line length in bytes (includes 4-byte length prefix)
+        payload:
+          type: string
+          format: binary
+          description: Raw payload bytes (length - 4 bytes)
+        isFlush:
+          type: boolean
+          description: True if this is a flush-pkt ("0000")
+        isDelimiter:
+          type: boolean
+          description: True if this is a delimiter-pkt ("0001", v2 only)
+
+    GitRef:
+      type: object
+      description: A single ref from the advertisement.
+      properties:
+        objectId:
+          type: string
+          pattern: '^[0-9a-f]{40}$'
+          description: 40-char hex SHA-1 object ID
+        name:
+          type: string
+          description: Full ref name (e.g. "refs/heads/main")
+        capabilities:
+          type: array
+          items: { type: string }
+          description: Capabilities advertised with this ref (only on first ref in v1)
+
+    RefAdvertisement:
+      type: object
+      description: Structured view of the ref advertisement response.
+      properties:
+        service:
+          type: string
+          enum: [git-upload-pack, git-receive-pack]
+        refs:
+          type: array
+          items:
+            $ref: '#/components/schemas/GitRef'
+        protocolVersion:
+          type: integer
+          enum: [1, 2]
+          default: 1
+
+    CapabilityList:
+      type: string
+      description: |
+        Space-separated capability tokens.
+
+        Fetch capabilities: multi_ack, multi_ack_detailed, no-done,
+          thin-pack, side-band, side-band-64k, ofs-delta, shallow,
+          deepen-since, deepen-not, deepen-relative, no-progress,
+          include-tag, multi_ack_detailed, allow-tip-sha1-in-want,
+          allow-reachable-sha1-in-want, filter, object-info,
+          session-id, agent
+
+        Push capabilities: report-status, report-status-v2, delete-refs,
+          quiet, atomic, push-options, object-format, agent
+
+  # ── Custom content types ─────────────────────────────────────────
+
+  contentTypes:
+    application/x-git-upload-pack-advertisement:
+      description: |
+        Ref advertisement for fetch. First pkt-line: "# service=git-upload-pack\n",
+        then flush-pkt (0000), then ref listing pkt-lines.
+    application/x-git-upload-pack-request:
+      description: |
+        Client wants/haves pkt-lines for fetch negotiation.
+    application/x-git-upload-pack-result:
+      description: |
+        Server ACK/NAK pkt-lines followed by packfile binary.
+    application/x-git-receive-pack-advertisement:
+      description: |
+        Ref advertisement for push. Same format as fetch but with
+        push-specific capabilities.
+    application/x-git-receive-pack-request:
+      description: |
+        Client reference update commands followed by packfile.
+    application/x-git-receive-pack-result:
+      description: |
+        Server unpack status + per-ref ok/ng pkt-lines.

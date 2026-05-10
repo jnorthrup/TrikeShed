@@ -8,20 +8,19 @@ import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 
 /**
- * Multi-segment parallel downloader — aria2c-compatible via HTX-TLS transport.
+ * Multi-segment parallel downloader via HTX-TLS transport.
  *
  * Pattern A (CCEK + SupervisorJob + FSM):
- *   - companion object Key : AsyncContextKey<Aria2HtxDownloader>()
+ *   - companion object Key : AsyncContextKey<HyperDownloader>()
  *   - CREATED → OPEN → ACTIVE → DRAINING → CLOSED
- *   - Resolves HtxElement from coroutine context
  *   - Block chunk scavenging: failed segments retried under supervisor
  *
  * Usage:
  * ```
  * val element = HtxElement()
  * element.registerTransport(HtxTransport.HTTPS, createHttpsHandler())
- * val ctx = coroutineContext + element + Aria2HtxDownloader()
- * val downloader = ctx[Aria2HtxDownloader.Key]!!
+ * val ctx = coroutineContext + element + HyperDownloader(element, switches)
+ * val downloader = ctx[HyperDownloader.Key]!!
  * downloader.open()
  * val bytes = downloader.download("https://.../file.zip", split = 4)
  * downloader.close()
@@ -30,7 +29,8 @@ import kotlinx.coroutines.sync.withPermit
 class HyperDownloader(
     val element: HtxElement,
     private val switches: HyperDLSwitches = HyperDLSwitches(),
-) : AsyncContextElement() {
+    parentJob: kotlinx.coroutines.Job? = null,
+) : AsyncContextElement(parentJob = parentJob) {
     companion object Key : AsyncContextKey<HyperDownloader>()
     override val key: AsyncContextKey<HyperDownloader> get() = Key
 
@@ -53,23 +53,24 @@ class HyperDownloader(
         requireState(ElementState.ACTIVE)
 
         val el = element
+        val transport = selectTransport(url)
 
         // HEAD → Content-Length
-        val head = el.request("HEAD", url, transport = HtxTransport.HTTPS)
+        val head = el.request("HEAD", url, transport = transport)
         val contentLength = head.headers["content-length"]?.toLongOrNull()
             ?: error("Server did not provide Content-Length")
 
-        // aria2c rule: only split if file_size ≥ 2 × minSplitSize
-        // aria2c rule: effective connections per host capped by maxConnectionPerServer
+        // Split rule: only parallel-segment if file_size ≥ 2 × minSplitSize
+        // Effective connections per host capped by maxConnectionPerServer
         val perHostSplit = switches.split.coerceAtMost(switches.maxConnectionPerServer)
         val effectiveSplit = if (perHostSplit <= 1 || contentLength < 2 * switches.minSplitSize) 1 else perHostSplit
         if (effectiveSplit <= 1) {
-            val response = el.request("GET", url, transport = HtxTransport.HTTPS)
+            val response = el.request("GET", url, transport = transport)
             check(response.status in 200..299) { "Download failed: HTTP ${response.status}" }
             return@withContext response.body.encodeToByteArray()
         }
 
-        // aria2c rule: split points at multiples of pieceLength
+        // Split points at multiples of pieceLength
         val pieceMask = switches.pieceLength - 1
         val chunkSize = ((contentLength / effectiveSplit) and pieceMask.inv()).coerceAtLeast(switches.pieceLength)
         val semaphore = Semaphore(maxConcurrent.coerceAtMost(effectiveSplit))
@@ -95,7 +96,7 @@ class HyperDownloader(
                                     method = "GET",
                                     path = url,
                                     headers = mapOf("Range" to "bytes=$start-$end"),
-                                    transport = HtxTransport.HTTPS,
+                                    transport = transport,
                                 )
                                 check(response.status in 200..299 || response.status == 206) {
                                     "Segment $index failed: HTTP ${response.status}"

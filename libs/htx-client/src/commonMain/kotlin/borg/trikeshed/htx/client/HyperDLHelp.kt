@@ -1,14 +1,15 @@
 package borg.trikeshed.htx.client
 
 /**
- * A small aria2c -h emulator (approximate) used for TDD and developer tooling.
- * Keeps the minimal set of options the codebase relies on (see Aria2Switches).
+ * HyperDL CLI help text.
+ * Command-line interface compatible with aria2c options.
+ * Keeps the minimal set of options the codebase relies on (see HyperDLSwitches).
  */
 object HyperDLHelp {
     fun helpText(): String = """
-aria2c — lightweight multi-protocol & multi-source command-line download utility (emulation)
+hyperdl — multi-protocol & multi-source download utility (TrikeShed native)
 
-Usage: aria2c [OPTIONS] [URI]...
+Usage: hyperdl [OPTIONS] [URI]...
 
 General Options:
   -h, --help                      Show help and exit
@@ -20,6 +21,8 @@ General Options:
   -s, --split=<N>                 Number of connections per download (split) (default: 15)
   -d, --dir=<DIR>                 Directory to store downloads
   --header="Key: Value"           Add custom header
+
+RPC interface compatible with aria2 JSON-RPC protocol.
 """.trimIndent()
 
     fun printHelp() {

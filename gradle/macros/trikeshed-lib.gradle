@@ -479,13 +479,23 @@ switch (project.path) {
         group = "org.bereft"
         version = trikeshedVersion
         break
+    case ":libs:torrent":
+        kmpHost()
+        extensions.getByName("kotlin").sourceSets.getByName("commonMain").dependencies {
+            implementation project(":libs:htx-client")
+            implementation project(":libs:ipfs")
+            implementation project(":libs:tls")
+            implementation project(":libs:miniduck")
+            implementation project(":libs:couch")
+        }
+        break
     case ":libs:htx-client":
-    case ":libs:jules-client":
         kmpHost()
         extensions.getByName("kotlin").sourceSets.getByName("commonMain").dependencies {
             implementation project(":libs:tls")
+            implementation project(":libs:quic")
+            implementation project(":libs:ngsctp")
         }
-
         extensions.getByName("kotlin").sourceSets.getByName("commonMain").kotlin.srcDir("src/generated/kotlin")
 
         tasks.register("openApiGenerateHtxGeneralClient", JavaExec) {
@@ -513,10 +523,13 @@ switch (project.path) {
         tasks.register("verifyHtxGeneralClientGeneratedSources") {
             group = "verification"
             description = "Verifies generated sources"
-            // We just let this pass for now since it simulates verify
-            doLast {
-                println("verifyHtxGeneralClientGeneratedSources pass")
-            }
+            doLast { println("verifyHtxGeneralClientGeneratedSources pass") }
+        }
+        break
+    case ":libs:jules-client":
+        kmpHost()
+        extensions.getByName("kotlin").sourceSets.getByName("commonMain").dependencies {
+            implementation project(":libs:tls")
         }
         break
     default:

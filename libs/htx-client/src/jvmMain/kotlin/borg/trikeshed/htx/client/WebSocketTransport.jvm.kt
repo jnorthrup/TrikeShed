@@ -19,10 +19,14 @@ class JvmWsHandler : HtxRequestHandler {
     private var sock: java.net.Socket? = null
     private var input: java.io.InputStream? = null
     private var output: java.io.OutputStream? = null
+    private var pending = ByteArray(0)
 
     override suspend fun invoke(request: HtxClientRequest): HtxClientMessage {
         if (sock == null || sock!!.isClosed) {
             connect(request)
+        }
+        if (request.body.isNotBlank()) {
+            send(request.body)
         }
         return readMessage()
     }
@@ -61,46 +65,91 @@ class JvmWsHandler : HtxRequestHandler {
         output!!.write(handshake.encodeToByteArray())
         output!!.flush()
 
-        // Read response
-        val respBuf = ByteArray(4096)
-        val respLen = input!!.read(respBuf)
-        val response = ByteArray(respLen).also { respBuf.copyInto(it, 0, 0, respLen) }.decodeToString()
-
-        if (!Rfc6455Handshake.validateUpgradeResponse(response, key)) {
-            throw IllegalStateException("WebSocket upgrade failed: $response")
+        // Read response headers; preserve any post-header bytes for frame parsing.
+        val responseBytes = java.io.ByteArrayOutputStream()
+        while (true) {
+            val chunk = ByteArray(4096)
+            val read = input!!.read(chunk)
+            if (read <= 0) throw IllegalStateException("WebSocket upgrade failed: connection closed during handshake")
+            responseBytes.write(chunk, 0, read)
+            val bytes = responseBytes.toByteArray()
+            val headerEnd = findHeaderEnd(bytes)
+            if (headerEnd >= 0) {
+                val headerBytes = bytes.copyOfRange(0, headerEnd)
+                pending = if (headerEnd < bytes.size) bytes.copyOfRange(headerEnd, bytes.size) else byteArrayOf()
+                val response = headerBytes.decodeToString()
+                if (!Rfc6455Handshake.validateUpgradeResponse(response, key)) {
+                    throw IllegalStateException("WebSocket upgrade failed: $response")
+                }
+                return
+            }
         }
     }
 
     private suspend fun readMessage(): HtxClientMessage {
-        val buf = ByteArray(65536)
-        val len = input!!.read(buf)
-        if (len <= 0) return HtxClientMessage(status = 500, body = "connection closed")
+        while (true) {
+            val byteSeries = ByteSeries(pending)
+            val header = FrameHeader()
+            if (!WebSocketFrame.parseFrame(byteSeries, header)) {
+                if (!readIntoPending()) return HtxClientMessage(status = 500, body = "connection closed")
+                continue
+            }
+            val payload = WebSocketFrame.readPayload(byteSeries, header)
+            if (payload == null) {
+                if (!readIntoPending()) return HtxClientMessage(status = 500, body = "connection closed")
+                continue
+            }
 
-        val raw = buf.copyOf(len)
-        val byteSeries = ByteSeries(raw.toSeries())
-        val header = FrameHeader()
-        if (!WebSocketFrame.parseFrame(byteSeries, header)) {
-            return HtxClientMessage(status = 500, body = "incomplete frame")
+            pending = if (byteSeries.pos < pending.size) pending.copyOfRange(byteSeries.pos, pending.size) else byteArrayOf()
+
+            when (header.opcode) {
+                WebSocketFrame.OpCode.PING -> {
+                    sendFrame(WebSocketFrame.OpCode.PONG, payload)
+                    continue
+                }
+                WebSocketFrame.OpCode.PONG -> continue
+                WebSocketFrame.OpCode.CLOSE -> return HtxClientMessage(status = 500, body = "connection closed")
+                WebSocketFrame.OpCode.TEXT -> return HtxClientMessage(status = 200, body = payload.decodeToString())
+                WebSocketFrame.OpCode.BINARY,
+                WebSocketFrame.OpCode.CONTINUATION,
+                -> return HtxClientMessage(status = 200, body = "[binary:${payload.size}B]")
+            }
         }
-        val payload = WebSocketFrame.readPayload(byteSeries, header)
-            ?: return HtxClientMessage(status = 500, body = "incomplete payload")
-
-        return HtxClientMessage(
-            status = 200,
-            body = if (header.opcode == WebSocketFrame.OpCode.TEXT) payload.decodeToString() else "[binary:${payload.size}B]",
-        )
     }
 
     fun send(text: String) {
+        sendFrame(WebSocketFrame.OpCode.TEXT, text.encodeToByteArray())
+    }
+
+    private fun sendFrame(opcode: WebSocketFrame.OpCode, payload: ByteArray) {
         val frame = WebSocketFrame.buildFrame(
-            opcode = WebSocketFrame.OpCode.TEXT,
+            opcode = opcode,
             fin = true,
             masked = true,
             maskingKey = ByteArray(4) { (kotlin.random.Random.nextInt() and 0xFF).toByte() },
-            payload = text.encodeToByteArray(),
+            payload = payload,
         )
         output!!.write(frame)
         output!!.flush()
+    }
+
+    private fun readIntoPending(): Boolean {
+        val buf = ByteArray(65536)
+        val len = input!!.read(buf)
+        if (len <= 0) return false
+        val raw = buf.copyOf(len)
+        pending = if (pending.isEmpty()) raw else pending + raw
+        return true
+    }
+
+    private fun findHeaderEnd(bytes: ByteArray): Int {
+        if (bytes.size < 4) return -1
+        for (i in 0..bytes.size - 4) {
+            if (bytes[i] == '\r'.code.toByte() && bytes[i + 1] == '\n'.code.toByte() && bytes[i + 2] == '\r'.code.toByte() && bytes[i + 3] == '\n'.code.toByte()) {
+                return i + 4
+            }
+        }
+        return -1
     }
 
     fun close() {

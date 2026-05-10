@@ -7,7 +7,7 @@ data class HyperDLSwitches(
     val maxConcurrent: Int = 5,                      // -j: max parallel downloads
     val maxConnectionPerServer: Int = 1,             // -x: max conns to same host (default 1 since 1.10)
     val minSplitSize: Long = 20L * 1024 * 1024,     // -k: 20 MiB default, 2× threshold
-    val pieceLength: Long = 1024 * 1024,             // internal, aria2c defaults to 1 MiB
+    val pieceLength: Long = 1024 * 1024,             // internal, hyperdl defaults to 1 MiB
     val dir: String = ".",
     val out: String? = null,                         // -o: output filename
     val forceSequential: Boolean = false,            // -Z: sequential mode
