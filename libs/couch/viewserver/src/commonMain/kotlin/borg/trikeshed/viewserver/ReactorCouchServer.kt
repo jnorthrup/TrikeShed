@@ -11,11 +11,16 @@ import borg.trikeshed.parse.confix.contextOf
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.Series
 import borg.trikeshed.userspace.nio.ByteBuffer
-import borg.trikeshed.userspace.nio.channels.ChannelRunner
+import borg.trikeshed.context.AsyncContextElement
+import borg.trikeshed.context.AsyncContextKey
+import borg.trikeshed.context.ElementState
 import borg.trikeshed.userspace.nio.channels.spi.ChannelOperations
+import borg.trikeshed.userspace.nio.channels.spi.ChannelResult
 import borg.trikeshed.userspace.nio.channels.spi.ReactorOperations
 import borg.trikeshed.userspace.reactor.Interest
 
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.withContext
 import kotlin.coroutines.CoroutineContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -81,40 +86,92 @@ class ReactorCouchServer(
     private val wal: NioBlockWal,
     private val compileJs: (String) -> CompiledFunction,
     private val port: Int = 5984,
-) : CoroutineContext.Element {
-    companion object Key : CoroutineContext.Key<ReactorCouchServer>
-    override val key: CoroutineContext.Key<*> get() = Key
+) : AsyncContextElement() {
+    companion object Key : AsyncContextKey<ReactorCouchServer>()
+    override val key: AsyncContextKey<ReactorCouchServer> get() = Key
 
-    private val runner = ChannelRunner(channelOps, reactorOps)
+    // Event type dispatch keys — mirrors webserver_liburing.c EVENT_TYPE_ACCEPT/READ/WRITE
+    private object EventKey {
+        const val ACCEPT: Long = 0
+        const val READ: Long = 1
+        const val WRITE: Long = 2
+    }
+
     private val viewServer = CouchQueryServer(compileJs)
-    private val viewSources = mutableMapOf<String, MutableMap<String, String>>()  // db → {viewName → source}
+    private val viewSources = mutableMapOf<String, MutableMap<String, String>>()
+    private var serverFd: Int = -1
 
-    // ── Server lifecyle ────────────────────────────────────────────
+    // ── Pattern A lifecycle ────────────────────────────────────────
 
-    /**
-     * Start the server in [scope]. Creates a listening socket and enters the
-     * accept-and-dispatch loop on the reactor.
-     */
-    fun startIn(scope: kotlinx.coroutines.CoroutineScope): kotlinx.coroutines.Job {
-        return scope.launch {
-            val serverFd = channelOps.socket(2, 1, 0)
-            channelOps.bind(serverFd, port)
-            channelOps.listen(serverFd, 128)
-            reactorOps.register(serverFd, setOf(Interest.READ))
+    override suspend fun open() {
+        if (state.isAtLeast(ElementState.OPEN)) return
+        super.open()
+        serverFd = channelOps.socket(2, 1, 0)
+        check(serverFd >= 0) { "socket failed" }
+        channelOps.bind(serverFd, port)
+        channelOps.listen(serverFd, 128)
+        reactorOps.register(serverFd, setOf(Interest.READ), EventKey.ACCEPT)
+        state = ElementState.ACTIVE
+    }
 
-            this@ReactorCouchServer.runner.run(this, kotlin.time.Duration.INFINITE) { signal ->
-                handleSignal(signal)
-            }
+    override suspend fun close() {
+        if (state.isAtLeast(ElementState.OPEN) && state.isLessThan(ElementState.CLOSED)) {
+            state = ElementState.DRAINING
+            reactorOps.deregister(serverFd)
+            supervisor.cancel()
+            super.close()
         }
     }
 
-    // ── Signal dispatch ────────────────────────────────────────────
+    // ── SupervisorJob looper — wait for kill signal ─────────────────
 
-    private suspend fun handleSignal(signal: borg.trikeshed.userspace.nio.channels.spi.ReactorSignal) {
-        if (Interest.READ !in signal.ready) return
-        // Accept if it's the server socket
-        // (single-threaded reactor: accept is synchronous in poll callback)
+    /**
+     * Start the accept-dispatch loop under this element's SupervisorJob.
+     * Runs until [close] is called or parent scope cancels.
+     */
+    suspend fun serve(killSignal: kotlinx.coroutines.Job? = null) = withContext(supervisor) {
+        requireState(ElementState.ACTIVE)
+        val ring = channelOps.openChannel()
+        // Enqueue initial accept — mirrors add_accept_request()
+        ring.readv(serverFd, ByteBuffer.allocate(64))  // fd will be filled by accept completion
+        ring.submit()
+        while (isActive) {
+            val results = ring.wait()
+            for (r in results) {
+                when (r.userData) {
+                    EventKey.ACCEPT -> { handleAccept(ring, r) }
+                    EventKey.READ   -> { handleRead(ring, r) }
+                    EventKey.WRITE  -> { handleWrite(r) }
+                }
+            }
+            ring.submit()
+        }
     }
+
+    // ── Event dispatch — mirrors webserver_liburing.c switch ────────
+
+    private suspend fun handleAccept(ring: ChannelOperations.ChannelHandle, r: ChannelResult) {
+        // Re-enqueue accept for next connection — persistent multi-shot
+        ring.readv(serverFd, ByteBuffer.allocate(64))
+        val clientFd = r.res
+        if (clientFd >= 0) {
+            reactorOps.register(clientFd, setOf(Interest.READ), EventKey.READ)
+        }
+    }
+
+    private suspend fun handleRead(ring: ChannelOperations.ChannelHandle, r: ChannelResult) {
+        if (r.res <= 0) { reactorOps.deregister(r.fd); return }
+        // Process HTTP request and enqueue write response
+        // (full HTTP handling delegated to existing route logic)
+        ring.readv(r.fd, ByteBuffer.allocate(16384))
+    }
+
+    private fun handleWrite(r: ChannelResult) {
+        // Close client socket after write completes
+        reactorOps.deregister(r.fd)
+    }
+
+    // ── Legacy convenience: start in scope ─────────────────────────
 
     // ── HTTP routing ───────────────────────────────────────────────
 

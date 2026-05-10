@@ -4,7 +4,7 @@ package borg.trikeshed.htx.client
  * A small aria2c -h emulator (approximate) used for TDD and developer tooling.
  * Keeps the minimal set of options the codebase relies on (see Aria2Switches).
  */
-object Aria2Help {
+object HyperDLHelp {
     fun helpText(): String = """
 aria2c — lightweight multi-protocol & multi-source command-line download utility (emulation)
 

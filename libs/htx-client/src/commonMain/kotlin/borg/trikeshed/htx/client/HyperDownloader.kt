@@ -3,9 +3,6 @@ package borg.trikeshed.htx.client
 import borg.trikeshed.context.AsyncContextElement
 import borg.trikeshed.context.AsyncContextKey
 import borg.trikeshed.context.ElementState
-import borg.trikeshed.lib.Series
-import borg.trikeshed.lib.j
-import borg.trikeshed.lib.size
 import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
@@ -30,12 +27,12 @@ import kotlinx.coroutines.sync.withPermit
  * downloader.close()
  * ```
  */
-class Aria2HtxDownloader(
+class HyperDownloader(
     val element: HtxElement,
-    private val switches: Aria2Switches = Aria2Switches(),
+    private val switches: HyperDLSwitches = HyperDLSwitches(),
 ) : AsyncContextElement() {
-    companion object Key : AsyncContextKey<Aria2HtxDownloader>()
-    override val key: AsyncContextKey<Aria2HtxDownloader> get() = Key
+    companion object Key : AsyncContextKey<HyperDownloader>()
+    override val key: AsyncContextKey<HyperDownloader> get() = Key
 
     override suspend fun open() {
         if (state.isAtLeast(ElementState.OPEN)) return
@@ -57,26 +54,32 @@ class Aria2HtxDownloader(
 
         val el = element
 
-        if (split <= 1) {
-            val response = el.request("GET", url, transport = HtxTransport.HTTPS)
-            check(response.status in 200..299) { "Download failed: HTTP ${response.status}" }
-            return@withContext response.body.encodeToByteArray()
-        }
-
         // HEAD → Content-Length
         val head = el.request("HEAD", url, transport = HtxTransport.HTTPS)
         val contentLength = head.headers["content-length"]?.toLongOrNull()
             ?: error("Server did not provide Content-Length")
 
-        val chunkSize = contentLength / split
-        val semaphore = Semaphore(maxConcurrent.coerceAtMost(split))
+        // aria2c rule: only split if file_size ≥ 2 × minSplitSize
+        // aria2c rule: effective connections per host capped by maxConnectionPerServer
+        val perHostSplit = switches.split.coerceAtMost(switches.maxConnectionPerServer)
+        val effectiveSplit = if (perHostSplit <= 1 || contentLength < 2 * switches.minSplitSize) 1 else perHostSplit
+        if (effectiveSplit <= 1) {
+            val response = el.request("GET", url, transport = HtxTransport.HTTPS)
+            check(response.status in 200..299) { "Download failed: HTTP ${response.status}" }
+            return@withContext response.body.encodeToByteArray()
+        }
 
-        // Segment state: null = not started, ByteArray = completed, Int = retries remaining
-        val segments = Array<Any?>(split) { null }
+        // aria2c rule: split points at multiples of pieceLength
+        val pieceMask = switches.pieceLength - 1
+        val chunkSize = ((contentLength / effectiveSplit) and pieceMask.inv()).coerceAtLeast(switches.pieceLength)
+        val semaphore = Semaphore(maxConcurrent.coerceAtMost(effectiveSplit))
+
+        // Segment state: null = not started, ByteArray = completed
+        val segments = Array<Any?>(effectiveSplit) { null }
 
         // Scavenge loop: launch segments, retry failures
         while (true) {
-            val pending = (0 until split).filter { segments[it] !is ByteArray }
+            val pending = (0 until effectiveSplit).filter { segments[it] !is ByteArray }
             if (pending.isEmpty()) break
 
             val jobs = pending.map { index ->
@@ -86,7 +89,7 @@ class Aria2HtxDownloader(
                         while (attempt <= maxRetries) {
                             try {
                                 val start = index * chunkSize
-                                val end = if (index == split - 1) contentLength - 1
+                                val end = if (index == effectiveSplit - 1) contentLength - 1
                                     else start + chunkSize - 1
                                 val response = el.request(
                                     method = "GET",

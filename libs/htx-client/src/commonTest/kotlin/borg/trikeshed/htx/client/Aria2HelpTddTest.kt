@@ -6,7 +6,7 @@ import kotlin.test.assertTrue
 class Aria2HelpTddTest {
     @Test
     fun helpContainsExpectedOptions() {
-        val help = Aria2Help.helpText()
+        val help = HyperDLHelp.helpText()
         assertTrue(help.contains("-Z"), "help missing -Z")
         assertTrue(help.contains("-c"), "help missing -c")
         assertTrue(help.contains("--save-not-found"), "help missing --save-not-found")

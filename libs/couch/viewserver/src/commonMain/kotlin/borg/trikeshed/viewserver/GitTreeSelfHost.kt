@@ -6,6 +6,8 @@ import borg.trikeshed.htx.client.HtxTransport
 import borg.trikeshed.htx.client.createHttpsHandler
 import borg.trikeshed.miniduck.tablespace.NioBlockStore
 import borg.trikeshed.miniduck.tablespace.NioBlockWal
+import borg.trikeshed.userspace.nio.channels.spi.ChannelOperations
+import borg.trikeshed.userspace.nio.channels.spi.ReactorOperations
 import borg.trikeshed.userspace.nio.file.spi.FileOperations
 import borg.trikeshed.viewserver.ReactorCouchServer
 import kotlin.coroutines.EmptyCoroutineContext
@@ -55,9 +57,14 @@ class GitTreeSelfHost(
      * Blocking on the caller's coroutine scope.
      */
     suspend fun boot(scope: CoroutineScope): Job {
+        val ctx = scope.coroutineContext
+        val channelOps = ctx[ChannelOperations.Key]
+            ?: error("ChannelOperations not in context. Register via CCEK before boot().")
+        val reactorOps = ctx[ReactorOperations.Key]
+            ?: error("ReactorOperations not in context. Register via CCEK before boot().")
         val server = ReactorCouchServer(
-            channelOps = TODO("JvmChannelOperations — register via CCEK"),
-            reactorOps = TODO("JvmReactorOperations — register via CCEK"),
+            channelOps = channelOps,
+            reactorOps = reactorOps,
             couch = couch,
             store = store,
             wal = wal,
@@ -78,8 +85,9 @@ class GitTreeSelfHost(
         server.registerView("trike_git", "git_tree", "by_sha1",
             "function(doc){if(doc.sha1) emit(doc.sha1, null)}")
 
-        // Boot the server
-        val serverJob = server.startIn(scope)
+        // Boot the server — open lifecycle, then serve in scope
+        server.open()
+        val serverJob = scope.launch { server.serve() }
 
         // Create the sync engine
         val syncEngine = CouchSyncEngine(

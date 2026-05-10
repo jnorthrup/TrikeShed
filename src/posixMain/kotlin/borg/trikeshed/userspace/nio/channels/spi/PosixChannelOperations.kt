@@ -33,46 +33,49 @@ class PosixChannelOperations : ChannelOperations {
         platform.posix.connect(fd, addr.ptr.reinterpret(), sizeOf<sockaddr_in>().convert())
     }
 
-    fun handleFor(fd: Int): ChannelOperations.ChannelHandle = object : ChannelOperations.ChannelHandle {
+    fun handleFor(fd: Int): ChannelOperations.ChannelHandle = RingHandle(fd)
+
+    private class RingHandle(private val fd: Int) : ChannelOperations.ChannelHandle {
         override val id: Int get() = fd
+        private data class PendingOp(val f: Int, val buf: ByteBuffer, val read: Boolean, val user: Long)
+        private val pending = mutableListOf<PendingOp>()
+        private var lastResults: List<ChannelResult> = emptyList()
+
         override fun read(buffer: ByteBuffer, offset: Long): Int {
-            val backing = buffer.array()
             val off = buffer.arrayOffset()
-            return backing.usePinned { pread(fd, it.addressOf(off), buffer.remaining().convert(), offset) }.toInt()
+            return buffer.array().usePinned { pread(fd, it.addressOf(off), buffer.remaining().convert(), offset) }.toInt()
         }
         override fun write(buffer: ByteBuffer, offset: Long): Int {
-            val backing = buffer.array()
             val off = buffer.arrayOffset()
-            return backing.usePinned { pwrite(fd, it.addressOf(off), buffer.remaining().convert(), offset) }.toInt()
+            return buffer.array().usePinned { pwrite(fd, it.addressOf(off), buffer.remaining().convert(), offset) }.toInt()
         }
         override fun readv(fd: Int, buffer: ByteBuffer): Int {
-            val backing = buffer.array()
-            val off = buffer.arrayOffset()
-            val remaining = buffer.remaining().convert()
-            return memScoped {
-                backing.usePinned { pinned ->
-                    val iov = alloc<iovec>()
-                    iov.iov_base = pinned.addressOf(off)
-                    iov.iov_len = remaining
-                    platform.posix.readv(fd, iov.ptr, 1).toInt()
-                }
-            }
+            pending.add(PendingOp(fd, buffer, read = true, user = 0L))
+            return 0
         }
         override fun writev(fd: Int, buffer: ByteBuffer): Int {
-            val backing = buffer.array()
-            val off = buffer.arrayOffset()
-            val remaining = buffer.remaining().convert()
-            return memScoped {
-                backing.usePinned { pinned ->
-                    val iov = alloc<iovec>()
-                    iov.iov_base = pinned.addressOf(off)
-                    iov.iov_len = remaining
-                    platform.posix.writev(fd, iov.ptr, 1).toInt()
-                }
-            }
+            pending.add(PendingOp(fd, buffer, read = false, user = 0L))
+            return 0
         }
-        override fun submit(): Int = 0
-        override fun wait(minComplete: Int): List<ChannelResult> = emptyList()
+        override fun submit(): Int {
+            val completions = mutableListOf<ChannelResult>()
+            for (op in pending) {
+                val off = op.buf.arrayOffset()
+                val remaining = op.buf.remaining()
+                val backing = op.buf.array()
+                val f = op.f; val rd = op.read; val u = op.user
+                val res = backing.usePinned { pinned ->
+                    (if (rd) recv(f, pinned.addressOf(off), remaining.convert(), 0)
+                     else send(f, pinned.addressOf(off), remaining.convert(), 0)).toInt()
+                }
+                completions.add(ChannelResult(f, res, u))
+            }
+            val n = pending.size
+            pending.clear()
+            lastResults = completions
+            return n
+        }
+        override fun wait(minComplete: Int): List<ChannelResult> = lastResults
     }
 
     private class PosixChannelHandle(private val entries: Int) : ChannelOperations.ChannelHandle {
