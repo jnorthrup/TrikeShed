@@ -1,13 +1,13 @@
 @file:OptIn(ExperimentalForeignApi::class)
 
-package borg.trikeshed
+package borg.trikeshed.lib
 
+import kotlinx.cinterop.*
+import platform.posix.*
 import borg.trikeshed.lib.Join
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.toSeries
-import kotlinx.cinterop.*
-import platform.posix.*
 
 actual object Files {
     actual fun readAllLines(filename: String): List<String> =
@@ -15,6 +15,7 @@ actual object Files {
             if (parts.isNotEmpty() && parts.last().isEmpty()) parts.dropLast(1) else parts
         }
 
+    @OptIn(ExperimentalForeignApi::class)
     actual fun readAllBytes(filename: String): ByteArray = memScoped {
         val file = fopen(filename, "rb") ?: throw IllegalArgumentException("fopen($filename) failed")
         try {
@@ -102,6 +103,7 @@ actual object Files {
         return streamLines(fileName, bufsize).map { (offset, bytes) -> offset j bytes.toSeries() }.asIterable()
     }
 
+    @OptIn(ExperimentalForeignApi::class)
     actual fun listDir(path: String): List<String> =
         memScoped {
             val dp = opendir(path) ?: return@memScoped emptyList<String>()
@@ -128,6 +130,7 @@ actual object Files {
         stat(path, st.ptr) == 0 && (st.st_mode.toInt() and S_IFMT) == S_IFDIR
     }
 
+    @OptIn(ExperimentalForeignApi::class)
     actual fun isFile(path: String): Boolean = memScoped {
         val st = alloc<stat>()
         stat(path, st.ptr) == 0 && (st.st_mode.toInt() and S_IFMT) == S_IFREG

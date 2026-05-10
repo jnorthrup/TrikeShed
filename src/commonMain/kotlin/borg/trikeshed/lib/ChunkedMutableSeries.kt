@@ -2,7 +2,6 @@
 
 package borg.trikeshed.lib
 
-import borg.trikeshed.collections.s_
 
 /**
  * A MutableSeries backed by a tree of fixed-size chunks.

@@ -2,11 +2,9 @@ package borg.trikeshed.miniduck
 
 import borg.trikeshed.cursor.*
 import borg.trikeshed.isam.meta.IOMemento
-import borg.trikeshed.isam.meta.IOMemento.*
 import borg.trikeshed.lib.*
 import borg.trikeshed.parse.json.*
 import kotlin.test.*
-import kotlin.test.Test.*
 
 /**
  * Algebraic composition tests for CursorOps.

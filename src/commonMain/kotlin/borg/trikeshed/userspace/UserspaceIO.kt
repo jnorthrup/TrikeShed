@@ -8,6 +8,7 @@ class File internal constructor(internal val impl: FileImpl) {
     val id: Int get() = impl.id
     fun isOpen(): Boolean = impl.isOpen()
     fun close() = impl.close()
+    fun size(): Long = impl.size()
 }
 
 class Channel internal constructor(private val impl: ChannelImpl) {
@@ -48,6 +49,7 @@ expect class FileImpl(id: Int) {
     val id: Int
     fun isOpen(): Boolean
     fun close()
+    fun size(): Long
 }
 
 internal expect class ChannelImpl(entries: Int) {

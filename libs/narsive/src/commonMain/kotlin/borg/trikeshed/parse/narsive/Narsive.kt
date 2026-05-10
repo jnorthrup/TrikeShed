@@ -23,12 +23,9 @@ import borg.trikeshed.lib.Join
 import borg.trikeshed.lib.*
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.j
-import borg.trikeshed.lib.size
 import borg.trikeshed.lib.toSeries
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Job
+import borg.trikeshed.lib.size
 import kotlinx.coroutines.SupervisorJob
-import kotlin.coroutines.AbstractCoroutineContextElement
 import kotlin.coroutines.CoroutineContext
 
 // ── element kinds ──────────────────────────────────────────────

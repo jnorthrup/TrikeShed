@@ -8,9 +8,9 @@ import borg.trikeshed.couch.kline.KlineBlock
 import borg.trikeshed.couch.kline.KlineCollector
 import borg.trikeshed.cursor.Cursor
 import borg.trikeshed.lib.get
+import borg.trikeshed.lib.size
 import borg.trikeshed.userspace.concurrency.Channel
 import borg.trikeshed.userspace.concurrency.ChannelCapacity
-import borg.trikeshed.lib.size
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay

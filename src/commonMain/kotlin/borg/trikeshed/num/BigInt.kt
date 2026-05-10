@@ -11,16 +11,17 @@ import borg.trikeshed.lib.emptySeries
 import borg.trikeshed.lib.forEach
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.getOrNull
-import borg.trikeshed.lib.isEmpty
+import borg.trikeshed.lib.*
 import borg.trikeshed.lib.iterator
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.reversed
-import borg.trikeshed.lib.size
 import borg.trikeshed.lib.toSeries
 import borg.trikeshed.lib.α
 import borg.trikeshed.lib.view
+import borg.trikeshed.lib.size
 import kotlin.math.absoluteValue
 import kotlin.math.max
+import borg.trikeshed.lib.isEmpty
 
 
 /** made immutable by series. */

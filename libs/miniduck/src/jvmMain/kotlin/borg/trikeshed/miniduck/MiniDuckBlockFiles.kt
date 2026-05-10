@@ -3,8 +3,8 @@ package borg.trikeshed.miniduck
 import borg.trikeshed.cursor.RowVec
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.j
-import borg.trikeshed.lib.size
 import borg.trikeshed.lib.toList
+import borg.trikeshed.lib.size
 import java.nio.file.Path
 
 /**

@@ -4,11 +4,11 @@ import borg.trikeshed.lib.*
 import borg.trikeshed.lib.commonPrefixWith
 import borg.trikeshed.lib.drop
 import borg.trikeshed.lib.get
-import borg.trikeshed.lib.isEmpty
 import borg.trikeshed.lib.isNotEmpty
 import borg.trikeshed.lib.plus
-import borg.trikeshed.lib.size
 import borg.trikeshed.lib.take
+import borg.trikeshed.lib.size
+import borg.trikeshed.lib.isEmpty
 
 class RadixTree<C : Comparable<C>> {
     internal var root: Node<C>? = null

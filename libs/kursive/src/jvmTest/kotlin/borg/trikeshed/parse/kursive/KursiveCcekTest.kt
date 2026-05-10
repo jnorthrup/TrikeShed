@@ -5,8 +5,8 @@ import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.Twin
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.j
-import borg.trikeshed.lib.size
 import borg.trikeshed.lib.toSeries
+import borg.trikeshed.lib.size
 import borg.trikeshed.userspace.concurrency.ParseLifecycle
 import borg.trikeshed.userspace.concurrency.ParseScope
 import borg.trikeshed.userspace.concurrency.withParseScope

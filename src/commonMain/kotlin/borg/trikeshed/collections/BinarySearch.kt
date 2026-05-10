@@ -1,6 +1,5 @@
 package borg.trikeshed.collections
 
-import borg.trikeshed.collections.*
 import borg.trikeshed.lib.*
 
 

@@ -7,9 +7,9 @@ import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.iterator
 import borg.trikeshed.lib.j
-import borg.trikeshed.lib.plus
 import borg.trikeshed.lib.size
 import borg.trikeshed.lib.view
+import borg.trikeshed.lib.plus
 
 typealias Bucket<T> = Series<T>
 

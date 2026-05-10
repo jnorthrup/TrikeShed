@@ -18,8 +18,11 @@ private class WasmUserspaceChannelBackend : UserspaceChannelBackend {
 internal actual fun openUserspaceChannelBackend(entries: Int): UserspaceChannelBackend = WasmUserspaceChannelBackend()
 
 actual class FileImpl actual constructor(actual val id: Int) {
+    @PublishedApi internal var path: String = ""
+    @PublishedApi internal var knownSize: Long = -1L
     actual fun isOpen(): Boolean = id >= 0
     actual fun close() {}
+    actual fun size(): Long = knownSize
 }
 
 internal actual class ChannelImpl actual constructor(entries: Int) {
@@ -53,7 +56,8 @@ internal actual class ChannelImpl actual constructor(entries: Int) {
 }
 
 internal actual object FilesImpl {
-    actual fun open(path: String, readOnly: Boolean): FileImpl = WasmFileRegistry.open()
+    actual fun open(path: String, readOnly: Boolean): FileImpl =
+        WasmFileRegistry.open().also { it.path = path }
 }
 
 internal actual object ChannelsImpl {

@@ -8,10 +8,10 @@ import borg.trikeshed.lib.emptySeries
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.getOrNull
 import borg.trikeshed.lib.j
-import borg.trikeshed.lib.size
 import borg.trikeshed.lib.toList
 import borg.trikeshed.lib.toSeries
 import borg.trikeshed.lib.view
+import borg.trikeshed.lib.size
 import borg.trikeshed.parse.yaml.parse as parseYaml
 
 private val ISAM3_RESERVED_TOP_LEVEL = setOf("isam", "views", "defaults")

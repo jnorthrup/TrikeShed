@@ -1,15 +1,8 @@
 package borg.trikeshed.parse.confix
 
 import kotlin.test.Test
-import borg.trikeshed.lib.*
 import borg.trikeshed.lib.get
-import borg.trikeshed.parse.confix.Path
-import borg.trikeshed.parse.confix.Combinators
-import borg.trikeshed.parse.confix.Syntax
-import borg.trikeshed.parse.confix.asSeries
-import borg.trikeshed.parse.confix.contextOf
-import borg.trikeshed.parse.confix.path
-import borg.trikeshed.parse.confix.tokenize
+import borg.trikeshed.lib.*
 
 class ConfixYamlDebug2Test {
     @Test

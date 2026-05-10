@@ -74,7 +74,7 @@ object CSVUtil {
         var since = x
 
         val rlist = mutableListOf<DelimitRange>()
-        val size = file.size
+        val size = file.a
         while (x != end && x < size) {
             val c = input
             val char = c.toInt().toChar()
@@ -139,9 +139,9 @@ object CSVUtil {
         val meta = (newMeta ?: (segments.meta α { (it as RecordMeta).child!! })).debug {
             logDebug { "parseConformantmeta: ${it.toList()}" }
         }
-        return segments.size j { y: Int ->
+        return segments.a j { y: Int ->
             segments.row(y).let { rv: RowVec ->
-                rv.size j { x: Int ->
+                rv.a j { x: Int ->
                     val recordMeta = meta[x]
                     val type = recordMeta.type
                     val any = rv[x].a
@@ -172,7 +172,7 @@ object CSVUtil {
          * given column classes found in the file
          */
         fileEvidence: MutableList<TypeEvidence>? = null,
-    ): Cursor = file.size.let { upperBound ->
+    ): Cursor = file.a.let { upperBound ->
         //parse in the headers
         val hdrParsRes = parseLine(file, 0, upperBound)
         val header = hdrParsRes α ::DelimitRange
@@ -191,25 +191,26 @@ object CSVUtil {
 
             do {
                 val file1: LongSeries<Byte> = file.drop(datazero1)
-                if (file1.size < headerNames.size) break  // we can parse n commas as n+1 default fields but no less
+                val end = file1.a
+                if (end < headerNames.a) break  // we can parse n commas as n+1 default fields but no less
                 val lineEvidence =
                     fileEvidence?.let<MutableList<TypeEvidence>, MutableList<TypeEvidence>> { mutableListOf() }
-                val parsRes = parseLine(file1, 0, file1.size, lineEvidence)
+                val parsRes: IntArray = parseLine(file1, 0, end, lineEvidence)
                 lineEvidence?.apply { fileEvidence.update(lineEvidence) }
-                val line = parsRes α ::DelimitRange
+                val line: Series<DelimitRange> = parsRes α ::DelimitRange
                 val dstart: Long = datazero1
                 datazero1 += line.last().b.toLong()
-                if (line.size != header.size) {
-                    logDebug { "line.size: ${line.size}" }
-                    logDebug { "header.size: ${header.size}" }
+                if (line.a != header.a) {
+                    logDebug { "line.size: ${line.a}" }
+                    logDebug { "header.size: ${header.a}" }
                     logDebug { "headerNames: ${headerNames.toList()}" }
                     logDebug { "line: ${line α DelimitRange::pair}" }
-                    logDebug { "fileStart/End: $datazero1/${file.size}" }
+                    logDebug { "fileStart/End: $datazero1/${file.a}" }
                     throw Exception("line segments does not match header count")
                 }
                 val toArray = (line α { it.value }).toArray()
                 lines.add(dstart j toArray)
-            } while (datazero1 < file.size)
+            } while (datazero1 < file.a)
 
             val conversionSegments = (fileEvidence?.α { evidence ->
                 val deduce: IOMemento = deduce(evidence)

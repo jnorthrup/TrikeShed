@@ -2,6 +2,7 @@
 
 package borg.trikeshed.lib
 
+
 /**
  * A MutableSeries that batches inserts and lazily merge-sorts.
  *

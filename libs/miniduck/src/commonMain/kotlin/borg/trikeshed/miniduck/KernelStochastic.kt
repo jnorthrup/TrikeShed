@@ -3,7 +3,6 @@ package borg.trikeshed.miniduck
 import borg.trikeshed.context.ElementState
 import borg.trikeshed.cursor.Cursor
 import borg.trikeshed.cursor.at
-import borg.trikeshed.cursor.row
 import borg.trikeshed.lib.*
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope

@@ -1,9 +1,9 @@
 package borg.trikeshed.parse.confix
 
 import borg.trikeshed.lib.getOrNull
-import borg.trikeshed.lib.size
 import borg.trikeshed.lib.toList
 import borg.trikeshed.lib.view
+import borg.trikeshed.lib.size
 import kotlin.test.Test
 import kotlin.test.assertEquals
 

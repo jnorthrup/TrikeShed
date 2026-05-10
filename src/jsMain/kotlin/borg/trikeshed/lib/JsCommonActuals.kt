@@ -1,17 +1,17 @@
-package borg.trikeshed
+package borg.trikeshed.lib
 
+import borg.trikeshed.lib.long.LongSeries
+import borg.trikeshed.userspace.ByteRegion
+import kotlin.random.Random
 import borg.trikeshed.lib.ByteSeries
 import borg.trikeshed.lib.Files
 import borg.trikeshed.lib.Join
-import borg.trikeshed.lib.LongBackingSeries
 import borg.trikeshed.lib.SeekFileBufferCommon
 import borg.trikeshed.lib.SeekHandle
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.Series2
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.toSeries
-import borg.trikeshed.userspace.ByteRegion
-import kotlin.random.Random
 
 
 actual object System {
@@ -187,13 +187,12 @@ actual fun platformSeekHandle(): SeekHandle = JsSeekHandle()
 actual fun ioUringHandle(): SeekHandle? = null
 
 
-
 class SeekFileBuffer(
     val filename: String,
     val initialOffset: Long = 0,
     val blkSize: Long = -1,
     val readOnly: Boolean = true,
-) : LongBackingSeries<Byte> {
+) : LongSeries<Byte> {
    val delegate = SeekFileBufferCommon(filename, initialOffset, blkSize, readOnly)
 
     override val a: Long

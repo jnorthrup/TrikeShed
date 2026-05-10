@@ -1,12 +1,8 @@
 package borg.trikeshed.parse.confix
 
-import borg.trikeshed.lib.*
 import borg.trikeshed.lib.get
-import borg.trikeshed.parse.confix.Combinators
-import borg.trikeshed.parse.confix.Syntax
-import borg.trikeshed.parse.confix.asSeries
-import borg.trikeshed.parse.confix.tokenize
 import kotlin.test.Test
+import borg.trikeshed.lib.*
 
 class ConfixJsonDebugTest {
     @Test

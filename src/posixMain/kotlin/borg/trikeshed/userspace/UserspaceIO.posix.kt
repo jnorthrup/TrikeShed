@@ -47,6 +47,7 @@ actual class FileImpl actual constructor(actual val id: Int) {
     actual fun close() {
         if (id >= 0) PosixUringIO.closeFd(id)
     }
+    actual fun size(): Long = PosixUringIO.fileSize(id)
 }
 
 internal actual class ChannelImpl actual constructor(entries: Int) {

@@ -17,8 +17,8 @@ import borg.trikeshed.lib.α
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.plus
-import borg.trikeshed.lib.size
 import borg.trikeshed.lib.toSeries
+import borg.trikeshed.lib.size
 import borg.trikeshed.collections.s_
 import borg.trikeshed.isam.meta.IOMemento
 

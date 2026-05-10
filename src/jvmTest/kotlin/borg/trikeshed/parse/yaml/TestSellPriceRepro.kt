@@ -29,7 +29,7 @@ items:
             val text = Combinators.textOf(elem, src).replace("\n", "\\n").take(40)
             println("  [$i] tag=$tag open=${elem.a.a} close=${elem.a.b} text=\"$text\"")
         }
-        
+
         val result = YamlParser.reify(yaml) as Map<*, *>
         val items = result["items"] as List<*>
         val tea = items[0] as Map<*, *>

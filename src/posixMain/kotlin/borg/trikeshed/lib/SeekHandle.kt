@@ -1,10 +1,7 @@
 @file:OptIn(ExperimentalForeignApi::class)
 
-package borg.trikeshed
+package borg.trikeshed.lib
 
-import borg.trikeshed.lib.ByteSeries
-import borg.trikeshed.lib.SeekHandle
-import borg.trikeshed.lib.ioUringHandle
 import borg.trikeshed.userspace.ByteRegion
 import kotlinx.cinterop.*
 import platform.posix.*

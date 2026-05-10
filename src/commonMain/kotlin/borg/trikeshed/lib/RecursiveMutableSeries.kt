@@ -1,5 +1,6 @@
 package borg.trikeshed.lib
 
+
 class RecursiveMutableSeries<T>(var data: Series<T>) : MutableSeries<T>, Series<T> {
 
     override fun set(index: Int, item: T) {

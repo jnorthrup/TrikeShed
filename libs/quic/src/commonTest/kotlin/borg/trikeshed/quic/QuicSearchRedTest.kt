@@ -1,7 +1,5 @@
 package borg.trikeshed.quic
 
-import borg.trikeshed.context.AsyncContextElement
-import borg.trikeshed.context.AsyncContextKey
 import borg.trikeshed.context.StreamHandle
 import borg.trikeshed.context.StreamTransport
 import borg.trikeshed.lib.*
@@ -10,10 +8,6 @@ import kotlinx.coroutines.channels.Channel
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertIs
-import kotlin.test.assertNotNull
-import kotlin.test.assertNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 

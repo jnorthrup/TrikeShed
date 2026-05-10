@@ -3,7 +3,6 @@ package borg.trikeshed.parse.confix
 
 import borg.trikeshed.lib.*
 import kotlin.test.Test
-import kotlin.test.*
 
 class DebugKrakenShape {
     @Test
@@ -34,7 +33,7 @@ class DebugKrakenShape {
             val text = Combinators.textOf(e, src).take(40).replace("\n", "\\n")
             sb.appendLine("  [$i] tag=$tag open=${e.a.a} close=${e.a.b} text=[$text]")
         }
-        
+
         // Try to resolve "paths" via contextOf
         val ctx = contextOf(Syntax.YAML, src)
         val vPaths = Path.resolve(ctx, path("paths"))
@@ -44,13 +43,13 @@ class DebugKrakenShape {
             val text = Combinators.textOf(vPaths.a, src).take(40).replace("\n", "\\n")
             sb.appendLine("  tag=$tag text=[$text]")
         }
-        
+
         // Try each top-level key
         for (key in listOf("openapi", "servers", "tags", "paths")) {
             val resolved = Path.resolve(ctx, path(key))
             sb.appendLine("$key resolved: ${resolved != null}")
         }
-        
+
         java.io.File("/tmp/kraken_debug.txt").writeText(sb.toString())
     }
 }

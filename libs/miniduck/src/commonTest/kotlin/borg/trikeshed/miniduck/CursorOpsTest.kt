@@ -2,7 +2,6 @@ package borg.trikeshed.miniduck
 
 import borg.trikeshed.cursor.Cursor
 import borg.trikeshed.lib.*
-import borg.trikeshed.miniduck.where
 import kotlin.test.*
 
 class CursorOpsTest {

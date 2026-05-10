@@ -13,8 +13,10 @@ private class JvmStubChannelBackend : UserspaceChannelBackend {
 internal actual fun openUserspaceChannelBackend(entries: Int): UserspaceChannelBackend = JvmStubChannelBackend()
 
 actual class FileImpl actual constructor(actual val id: Int) {
+    @PublishedApi internal var path: String = ""
     actual fun isOpen(): Boolean = id >= 0
     actual fun close() {}
+    actual fun size(): Long = java.io.File(path).let { if (it.exists()) it.length() else -1L }
 }
 
 internal actual class ChannelImpl actual constructor(entries: Int) {
@@ -36,7 +38,8 @@ internal actual class ChannelImpl actual constructor(entries: Int) {
 
 internal actual object FilesImpl {
     private var nextId = 1
-    actual fun open(path: String, readOnly: Boolean): FileImpl = FileImpl(nextId++)
+    actual fun open(path: String, readOnly: Boolean): FileImpl =
+        FileImpl(nextId++).also { it.path = path }
 }
 
 internal actual object ChannelsImpl {

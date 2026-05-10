@@ -2,8 +2,8 @@ package borg.trikeshed.cursor
 
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.seriesOfAny
-import borg.trikeshed.lib.size
 import borg.trikeshed.lib.toSeries
+import borg.trikeshed.lib.size
 
 /**
  * Find overlapping time spans between two sorted kline cursors.

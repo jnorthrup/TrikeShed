@@ -1,5 +1,6 @@
 package borg.trikeshed.lib
 
+
 /**
  * A MutableSeries that records every mutation in a journal, enabling rollback.
  *

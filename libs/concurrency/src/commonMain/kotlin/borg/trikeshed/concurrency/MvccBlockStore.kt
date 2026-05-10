@@ -2,8 +2,8 @@ package borg.trikeshed.concurrency
 
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.size
-import borg.trikeshed.lib.Join
 import borg.trikeshed.cursor.joins
+import borg.trikeshed.lib.Join
 
 /**
  * Minimal MVCC Block store stub used by tests. Not a full implementation — provides only

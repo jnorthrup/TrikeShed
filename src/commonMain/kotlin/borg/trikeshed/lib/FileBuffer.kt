@@ -1,3 +1,5 @@
+@file:Suppress("DEPRECATION")
+
 package borg.trikeshed.lib
 
 import borg.trikeshed.lib.long.LongSeries
@@ -6,11 +8,12 @@ import kotlin.coroutines.CoroutineContext
 /**
  * An openable, closeable, mmap-style file buffer.
  *
- * CCEK: register platform implementation via [Key] in the coroutine context.
- * @deprecated Prefer resolving via `coroutineContext[FileBuffer.Key]` rather than direct construction.
+ * @deprecated Use [SeekFileBufferCommon] routed through [borg.trikeshed.userspace.Channel].
+ * FileBuffer's CoroutineContext.Element coupling is being removed —
+ * all file I/O now goes through the unified UringFacade.
  */
-@Deprecated("Resolve via FileBuffer.Key in coroutine context")
-  expect class FileBuffer(
+@Deprecated("Use SeekFileBufferCommon via Channel/UringFacade")
+expect class FileBuffer(
     filename: String,
     initialOffset: Long = 0,
     blkSize: Long = -1,
@@ -35,13 +38,16 @@ import kotlin.coroutines.CoroutineContext
     fun put(index: Long, value: Byte)
 }
 
+@Deprecated("Use SeekFileBufferCommon via Channel/UringFacade")
 fun <T> FileBuffer.use(block: (FileBuffer) -> T): T {
     open()
     try { return block(this) } finally { close() }
 }
 
+@Deprecated("Use SeekFileBufferCommon via Channel/UringFacade")
 fun open(filename: String, initialOffset: Long = 0, blkSize: Long = -1, readOnly: Boolean = true, closeChannelOnMap: Boolean = true): FileBuffer =
     FileBuffer(filename, initialOffset, blkSize, readOnly, closeChannelOnMap)
 
+@Deprecated("Use SeekFileBufferCommon via Channel/UringFacade")
 fun openFileBuffer(filename: String, initialOffset: Long = 0, blkSize: Long = -1, readOnly: Boolean = true, closeChannelOnMap: Boolean = true): FileBuffer =
     open(filename, initialOffset, blkSize, readOnly, closeChannelOnMap)

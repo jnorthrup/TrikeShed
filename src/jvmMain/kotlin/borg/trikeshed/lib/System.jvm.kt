@@ -1,4 +1,4 @@
-package borg.trikeshed
+package borg.trikeshed.lib
 
 actual object System {
     actual fun getenv(name: String, defaultVal: String?): String? = java.lang.System.getenv(name)?:defaultVal

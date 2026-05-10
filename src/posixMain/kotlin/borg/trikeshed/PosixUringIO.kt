@@ -68,6 +68,15 @@ internal object PosixUringIO {
         return close(fd)
     }
 
+    fun fileSize(fd: Int): Long {
+        kotlinx.cinterop.memScoped {
+            val st = kotlinx.cinterop.alloc<platform.posix.stat>()
+            if (platform.posix.fstat(fd, st.ptr) == 0)
+                return st.st_size
+        }
+        return -1L
+    }
+
     private fun ensureOpen(entries: Int): Boolean {
         if (entries <= openAttemptedEntries) return uringAvailable
         openAttemptedEntries = entries

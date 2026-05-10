@@ -1,6 +1,7 @@
 package borg.trikeshed.lib
 
 
+
 typealias Predicate<T> = (self: T) -> Boolean
 
 

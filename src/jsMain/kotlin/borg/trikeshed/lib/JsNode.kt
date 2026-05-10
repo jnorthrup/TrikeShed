@@ -1,7 +1,8 @@
-package borg.trikeshed
+package borg.trikeshed.lib
 
 import kotlin.js.Date
 import kotlin.random.Random
+
 val fs: dynamic = js("require('fs')")
 val os: dynamic = js("require('os')")
 val path: dynamic = js("require('path')")

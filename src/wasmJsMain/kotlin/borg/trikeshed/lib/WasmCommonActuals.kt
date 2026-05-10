@@ -1,16 +1,7 @@
-package borg.trikeshed
+package borg.trikeshed.lib
 
 import borg.trikeshed.userspace.ByteRegion
-import borg.trikeshed.lib.ByteSeries
-import borg.trikeshed.lib.Files
-import borg.trikeshed.lib.Join
-import borg.trikeshed.lib.LongBackingSeries
-import borg.trikeshed.lib.SeekFileBufferCommon
-import borg.trikeshed.lib.SeekHandle
-import borg.trikeshed.lib.Series
-import borg.trikeshed.lib.Series2
-import borg.trikeshed.lib.j
-import borg.trikeshed.lib.toSeries
+import borg.trikeshed.lib.long.LongSeries
 import kotlin.random.Random
 
 @JsName("localStorage")external val browserLocalStorage: Storage?
@@ -318,11 +309,8 @@ actual object Files {
     }
 
     actual fun isDir(path: String): Boolean = directoryExists(path)
-
     actual fun isFile(path: String): Boolean = readBlob(path) != null
-
     actual fun mkdirs(path: String) { ensureParentDirectories(path) }
-
     actual fun deleteRecursively(path: String) { rm(path) }
 
     actual fun resolvePath(vararg parts: String): String =
@@ -398,11 +386,9 @@ fun mkdir(path: String): Boolean {
 fun readLinesSeq(path: String): Sequence<String> = Files.readAllLines(path).asSequence()
 
 fun readLines(path: String): List<String> = Files.readAllLines(path)
-
 actual fun platformSeekHandle(): SeekHandle = WasmBrowserSeekHandle
 
 actual fun ioUringHandle(): SeekHandle? = null
-
 
 
 class SeekFileBuffer(
@@ -410,8 +396,8 @@ class SeekFileBuffer(
     val initialOffset: Long = 0,
     val blkSize: Long = -1,
     val readOnly: Boolean = true,
-) : LongBackingSeries<Byte> {
-   val delegate = SeekFileBufferCommon(filename, initialOffset, blkSize, readOnly, WasmBrowserSeekHandle)
+) : LongSeries<Byte> {
+   val delegate = SeekFileBufferCommon(filename, initialOffset, blkSize, readOnly)
 
     override val a: Long
         get() = delegate.a

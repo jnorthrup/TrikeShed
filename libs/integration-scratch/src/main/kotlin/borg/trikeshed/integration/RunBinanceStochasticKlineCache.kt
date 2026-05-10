@@ -1,6 +1,5 @@
 package borg.trikeshed.integration
 
-import borg.trikeshed.lib.size
 import kotlinx.coroutines.runBlocking
 import java.time.LocalDate
 

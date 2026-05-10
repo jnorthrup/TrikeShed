@@ -1,6 +1,6 @@
 package borg.trikeshed.openapi
 
-import borg.trikeshed.System
+import borg.trikeshed.lib.System
 
 // ── naming utilities ─────────────────────────────────────────────────────────
 

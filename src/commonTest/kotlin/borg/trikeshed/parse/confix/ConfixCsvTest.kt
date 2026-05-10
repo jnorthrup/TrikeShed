@@ -1,12 +1,10 @@
 package borg.trikeshed.parse.confix
 
-import borg.trikeshed.lib.*
 import borg.trikeshed.lib.get
-import borg.trikeshed.parse.confix.Tag
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertIs
 import kotlin.test.assertNull
+import borg.trikeshed.lib.*
 
 class ConfixCsvTest {
 

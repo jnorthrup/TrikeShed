@@ -4,7 +4,6 @@ package borg.trikeshed.parse.yaml
 import borg.trikeshed.lib.*
 import borg.trikeshed.parse.confix.*
 import kotlin.test.Test
-import kotlin.test.*
 import java.io.File
 
 class DebugYamlParser {
@@ -38,7 +37,7 @@ class DebugYamlParser {
             sb.appendLine("  [$i] tag=$tag open=${e.a.a} close=${e.a.b} text=[${text.take(30).replace("\n","\\n")}] commas=$commaVals")
         }
         File("/tmp/yaml_debug.txt").writeText(sb.toString())
-        
+
         // Now check what extractChildIndices returns for root (element 0)
         val doc = YamlParser.parse(yaml)
         val root = doc.root

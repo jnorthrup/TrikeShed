@@ -2,8 +2,8 @@ package borg.trikeshed.integration
 
 import borg.trikeshed.couch.kline.KlineBlock
 import borg.trikeshed.cursor.RowVec
-import borg.trikeshed.lib.size
 import borg.trikeshed.lib.get
+import borg.trikeshed.lib.size
 import borg.trikeshed.miniduck.getValue
 import borg.trikeshed.cursor.at
 import borg.trikeshed.miniduck.exec.Cursor

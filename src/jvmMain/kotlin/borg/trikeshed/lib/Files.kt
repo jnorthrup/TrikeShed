@@ -1,6 +1,6 @@
 @file:OptIn(ExperimentalTime::class)
 
-package borg.trikeshed
+package borg.trikeshed.lib
 
 import borg.trikeshed.lib.*
 import borg.trikeshed.lib.Files
