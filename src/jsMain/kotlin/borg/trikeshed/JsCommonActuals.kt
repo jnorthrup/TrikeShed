@@ -3,7 +3,7 @@ package borg.trikeshed
 import borg.trikeshed.lib.ByteSeries
 import borg.trikeshed.lib.Files
 import borg.trikeshed.lib.Join
-import borg.trikeshed.lib.LongSeries
+import borg.trikeshed.lib.LongBackingSeries
 import borg.trikeshed.lib.SeekFileBufferCommon
 import borg.trikeshed.lib.SeekHandle
 import borg.trikeshed.lib.Series
@@ -193,7 +193,7 @@ class SeekFileBuffer(
     val initialOffset: Long = 0,
     val blkSize: Long = -1,
     val readOnly: Boolean = true,
-) : LongSeries<Byte> {
+) : LongBackingSeries<Byte> {
    val delegate = SeekFileBufferCommon(filename, initialOffset, blkSize, readOnly)
 
     override val a: Long

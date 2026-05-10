@@ -8,7 +8,7 @@ package borg.trikeshed.lib
  * O(1) get, O(1) set, O(n) add/remove/insert (realloc + copy).
  * Zero boxing on read path — [b] returns primitive Double, not boxed.
  *
- * Variants: [LongSeries], [IntSeries], [FloatSeries] follow the same pattern.
+ * Variants: [LongBackingSeries], [IntSeries], [FloatSeries] follow the same pattern.
  */
 class DoubleSeries(private var data: DoubleArray) : MutableSeries<Double> {
 
@@ -78,7 +78,7 @@ class DoubleSeries(private var data: DoubleArray) : MutableSeries<Double> {
 /**
  * Dense columnar MutableSeries backed by a primitive LongArray.
  */
-class LongSeries(private var data: LongArray) : MutableSeries<Long> {
+  class LongBackingSeries(private var data: LongArray) : MutableSeries<Long> {
 
     constructor(initialCapacity: Int) : this(LongArray(initialCapacity) { 0L })
 

@@ -11,10 +11,8 @@ import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.pow
 
-typealias MetaSeries<I, T> = Join<I, (I) -> T>
 typealias Series<T> = MetaSeries<Int, T>
 
-val <T> Series<T>.size: Int get() = a
 
 
 /** α
@@ -154,12 +152,7 @@ operator fun <T> Series<T>.get(index: IntRange): Series<T> = ((index.last + 1) -
 fun <T> Series<T>.getOrNull(i: Int): T? = if (i < size) this[i] else null
 
 
-/** index operator for Series
- */
-operator fun <T> Series<T>.get(i: Int): T = b(i)
-
-/**
- * Infixed element access. Equivalent to `get(index)`.
+ /** Infixed element access. Equivalent to `get(index)`.
  */
 infix fun <T> Series<T>.at(index: Int): T = get(index)
 

@@ -1,5 +1,6 @@
 package borg.trikeshed.lib
 
+import borg.trikeshed.lib.long.LongSeries
 import kotlin.coroutines.CoroutineContext
 
 /**
@@ -9,7 +10,7 @@ import kotlin.coroutines.CoroutineContext
  * @deprecated Prefer resolving via `coroutineContext[FileBuffer.Key]` rather than direct construction.
  */
 @Deprecated("Resolve via FileBuffer.Key in coroutine context")
-expect class FileBuffer(
+  expect class FileBuffer(
     filename: String,
     initialOffset: Long = 0,
     blkSize: Long = -1,

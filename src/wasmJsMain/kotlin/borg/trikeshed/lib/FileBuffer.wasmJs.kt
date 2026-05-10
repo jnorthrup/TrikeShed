@@ -1,7 +1,6 @@
-package borg.trikeshed
+package borg.trikeshed.lib
 
-import borg.trikeshed.lib.FileBuffer
-import borg.trikeshed.lib.LongSeries
+import kotlin.coroutines.CoroutineContext
 
 actual class FileBuffer actual constructor(
     actual val filename: String,
@@ -9,9 +8,9 @@ actual class FileBuffer actual constructor(
     actual val blkSize: Long,
     actual val readOnly: Boolean,
     actual val closeChannelOnMap: Boolean,
-) : LongSeries<Byte>, kotlin.coroutines.CoroutineContext.Element {
-    actual override val key: kotlin.coroutines.CoroutineContext.Key<*> get() = Key
-    actual companion object Key : kotlin.coroutines.CoroutineContext.Key<FileBuffer>
+) : LongBackingSeries<Byte>, CoroutineContext.Element {
+    actual override val key: CoroutineContext.Key<*> get() = Key
+    actual companion object Key : CoroutineContext.Key<FileBuffer>
     actual override val a: Long get() = TODO("WasmFileBuffer.a")
     actual override val b: (Long) -> Byte get() = { TODO("WasmFileBuffer.b") }
     actual fun open() { TODO("WasmFileBuffer.open") }

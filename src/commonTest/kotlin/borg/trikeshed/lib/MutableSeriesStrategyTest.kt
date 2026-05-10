@@ -7,8 +7,6 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlin.test.assertFails
-import kotlin.test.assertNotNull
-import kotlin.test.assertNull
 import kotlin.test.assertFalse
 
 class MutableSeriesStrategyTest {
@@ -138,7 +136,7 @@ class MutableSeriesStrategyTest {
     }
 
     @Test fun longSeriesBasic() {
-        val ls = LongSeries(3)
+        val ls = LongBackingSeries(3)
         ls.set(0, 100L); ls.set(1, 200L); ls.set(2, 300L)
         assertEquals(3, ls.size)
         assertEquals(200L, ls[1])

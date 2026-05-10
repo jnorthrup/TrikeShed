@@ -1,3 +1,7 @@
+package borg.trikeshed.lib.long
+
+import borg.trikeshed.lib.*
+
 /**
  * Line scanning on LongSeries<Byte> — the lineSequence analog for file-backed byte streams.
  *
@@ -11,8 +15,6 @@
  * Each ByteSeries view delegates reads back to the parent LongSeries (windowed 64KB pread).
  * No bytes are copied until decodeUtf8() materializes a CharArray per line.
  */
-package borg.trikeshed.lib
-
 /**
  * Scan [LongSeries<Byte>] for newline boundaries.
  * Returns LongArray where each element is the START offset of a line.

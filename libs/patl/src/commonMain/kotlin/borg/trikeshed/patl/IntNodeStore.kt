@@ -6,7 +6,7 @@ import borg.trikeshed.lib.*
 
 /**
  * Dense patricia trie node storage: each node is two [TwInt] values
- * packed as Longs in parallel [LongSeries] arrays.
+ * packed as Longs in parallel [LongBackingSeries] arrays.
  *
  * ```
  * links[i] = packInts(leftChild, rightChild)   →  Long → TwInt
@@ -21,9 +21,9 @@ import borg.trikeshed.lib.*
  */
 class IntNodeStore(
     /** links: TwInt(leftChild, rightChild) packed as Long per node */
-    val links: LongSeries = LongSeries(0),
+    val links: LongBackingSeries = LongBackingSeries(0),
     /** meta: TwInt(parentid, skip) packed as Long per node */
-    val meta: LongSeries = LongSeries(0),
+    val meta: LongBackingSeries = LongBackingSeries(0),
 ) {
     val size: Int get() = links.a
 

@@ -1,15 +1,19 @@
-package borg.trikeshed.lib
+package borg.trikeshed.lib.long
+
+import borg.trikeshed.lib.*
 
 /** Series with long Indexes for large files */
-typealias LongSeries<T> = Join<Long, (Long) -> T>
+typealias LongSeries<T> = MetaSeries<Long,T>
 
-val <T> LongSeries<T>.size: Long get() = a
 
-operator fun <T> LongSeries<T>.get(i: Long): T = b(i)
 
+
+/** downconverts to Series
+ * - but you will have to window the LongSeries yourself
+ */
 operator fun <T> LongSeries<T>.get(exclusiveRange: IntRange): Series<T> {
     //perform fixup between the range and the Series x index
-    return (exclusiveRange.last - exclusiveRange.first) j { x -> this[(exclusiveRange.first + x).toLong()] }
+    return (exclusiveRange.last - exclusiveRange.first) j { x :Int-> this.get((exclusiveRange.first + x).toLong()) }
 }
 
 operator fun <T> LongSeries<T>.get(r: LongRange): LongSeries<T> {
@@ -22,7 +26,3 @@ fun <T> LongSeries<T>.slice(start: Long, end: Long = size): LongSeries<T> =
 
 fun <T> LongSeries<T>.drop(removeInitial: Long): LongSeries<T> = slice(removeInitial)
 fun <A> Series<A>.toLongSeries(): LongSeries<A> =  a.toLong() j { it:Long -> b(it.toInt())}
-
-
-
-

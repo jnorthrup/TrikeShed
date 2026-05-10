@@ -1,11 +1,15 @@
 @file:OptIn(ExperimentalForeignApi::class, ExperimentalForeignApi::class)
 
-package borg.trikeshed
-
-import borg.trikeshed.lib.FileBuffer
-import borg.trikeshed.lib.LongSeries
-import borg.trikeshed.lib.logDebug
-import kotlinx.cinterop.*
+package borg.trikeshed.lib
+import borg.trikeshed.lib.*
+import borg.trikeshed.lib.long.LongSeries
+import kotlinx.cinterop.ByteVar
+import kotlinx.cinterop.COpaquePointer
+import kotlinx.cinterop.ExperimentalForeignApi
+import kotlinx.cinterop.pointed
+import kotlinx.cinterop.toCPointer
+import kotlinx.cinterop.toLong
+import kotlinx.cinterop.value
 import platform.posix.munmap
 import simple.PosixFile
 import simple.PosixOpenOpts
@@ -15,12 +19,12 @@ actual class FileBuffer actual constructor(
     actual val initialOffset: Long,
     actual val blkSize: Long,
     actual val readOnly: Boolean,
-    actual val closeChannelOnMap: Boolean,
-) : LongSeries<Byte>, kotlin.coroutines.CoroutineContext.Element {
-    actual override val key: kotlin.coroutines.CoroutineContext.Key<*> get() = Key
-    actual companion object Key : kotlin.coroutines.CoroutineContext.Key<FileBuffer>
+    actual val closeChannelOnMap: Boolean) : LongSeries<Byte>  {
 
-    init { logDebug { "native FileBuffer: $filename, $initialOffset, $blkSize, $readOnly" } }
+
+    init {
+        logDebug { "native FileBuffer: $filename, $initialOffset, $blkSize, $readOnly" }
+    }
 
     @OptIn(ExperimentalForeignApi::class)
     var buffer: COpaquePointer? = null
@@ -46,9 +50,11 @@ actual class FileBuffer actual constructor(
 
     actual fun open(): Unit = memScoped {
         logDebug { "opening $filename" }
-        file = PosixFile(filename,
+        file = PosixFile(
+            filename,
             if (readOnly) PosixOpenOpts.withFlags(PosixOpenOpts.OpenReadOnly)
-            else PosixOpenOpts.withFlags(PosixOpenOpts.O_Rdwr))
+            else PosixOpenOpts.withFlags(PosixOpenOpts.O_Rdwr),
+        )
         val len: ULong = if (blkSize == (-1L)) file!!.size.toULong() else blkSize.toULong()
         buffer = file!!.mmap(len, offset = initialOffset)
     }

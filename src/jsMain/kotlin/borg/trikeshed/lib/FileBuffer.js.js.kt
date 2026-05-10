@@ -1,7 +1,6 @@
-package borg.trikeshed
+package borg.trikeshed.lib
 
-import borg.trikeshed.lib.FileBuffer
-import borg.trikeshed.lib.LongSeries
+import kotlin.coroutines.CoroutineContext
 
 actual class FileBuffer actual constructor(
     actual val filename: String,
@@ -9,9 +8,9 @@ actual class FileBuffer actual constructor(
     actual val blkSize: Long,
     actual val readOnly: Boolean,
     actual val closeChannelOnMap: Boolean,
-) : LongSeries<Byte>, kotlin.coroutines.CoroutineContext.Element {
-    actual override val key: kotlin.coroutines.CoroutineContext.Key<*> get() = Key
-    actual companion object Key : kotlin.coroutines.CoroutineContext.Key<FileBuffer>
+) : LongBackingSeries<Byte>, CoroutineContext.Element {
+    actual override val key: CoroutineContext.Key<*> get() = Key
+    actual companion object Key : CoroutineContext.Key<FileBuffer>
     actual override val a: Long get() = TODO("JsFileBuffer.a")
     actual override val b: (Long) -> Byte get() = { TODO("JsFileBuffer.b") }
     actual fun open() { TODO("JsFileBuffer.open") }
@@ -20,4 +19,16 @@ actual class FileBuffer actual constructor(
     actual fun size(): Long = 0
     actual fun get(index: Long): Byte = TODO("JsFileBuffer.get")
     actual fun put(index: Long, value: Byte) { TODO("JsFileBuffer.put") }
+    actual operator fun component1(): A {
+        TODO("Not yet implemented")
+    }
+
+    actual operator fun component2(): B {
+        TODO("Not yet implemented")
+    }
+
+    actual val pair: Pair<A, B>
+        get() = TODO("Not yet implemented")
+    actual val list: List<Any?>
+        get() = TODO("Not yet implemented")
 }

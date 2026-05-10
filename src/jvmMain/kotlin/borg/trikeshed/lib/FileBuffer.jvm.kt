@@ -1,7 +1,4 @@
-package borg.trikeshed
-
-import borg.trikeshed.lib.FileBuffer
-import borg.trikeshed.lib.LongSeries
+package borg.trikeshed.lib
 
 actual class FileBuffer actual constructor(
     actual val filename: String,
@@ -9,7 +6,7 @@ actual class FileBuffer actual constructor(
     actual val blkSize: Long,
     actual val readOnly: Boolean,
     actual val closeChannelOnMap: Boolean,
-) : LongSeries<Byte>, kotlin.coroutines.CoroutineContext.Element {
+) : LongBackingSeries<Byte>, kotlin.coroutines.CoroutineContext.Element {
     actual override val key: kotlin.coroutines.CoroutineContext.Key<*> get() = Key
     actual companion object Key : kotlin.coroutines.CoroutineContext.Key<FileBuffer>
     actual override val a: Long get() = TODO("JvmFileBuffer.a")

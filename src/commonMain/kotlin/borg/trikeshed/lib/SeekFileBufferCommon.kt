@@ -16,7 +16,7 @@ class SeekFileBufferCommon(
     val blkSize: Long = -1,
     val readOnly: Boolean = true,
     val handle: SeekHandle = platformSeekHandle(),
-) : LongSeries<Byte>, Usable {
+) : LongBackingSeries<Byte>, Usable {
 
    var fd: Long = -1
    var fileSize: Long = 0
