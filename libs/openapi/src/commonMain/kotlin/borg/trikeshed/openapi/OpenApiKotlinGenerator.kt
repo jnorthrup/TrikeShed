@@ -107,9 +107,50 @@ fun ResolvedOperation.toKotlinParams(): String {
 }
 
 fun ResolvedOperation.toKotlinArgs(): String {
-    val all = parameters.filter { it.location == "path" || it.location == "query" }
-    if (all.isEmpty()) return ""
-    return all.joinToString(", ") { "${it.name} = ${it.name}" }
+    val pathParams = parameters.filter { it.location == "path" }
+    if (pathParams.isEmpty()) return ""
+    // Generate path substitution: .let { it.replace("{name}", name).replace("{session}", session) }
+    return pathParams.joinToString(", ") { "${it.name} = ${it.name}" }
+}
+
+/**
+ * Generate path-substitution block for DefaultImpl override methods.
+ * Returns the call expression that substitutes path parameters into the request path.
+ */
+fun ResolvedOperation.toPathSubstitutionCall(cfg: ClientGenConfig): String {
+    val pathParams = parameters.filter { it.location == "path" }
+    val queryParams = parameters.filter { it.location == "query" }
+    val contractRef = "${cfg.apiInterfaceName}Contract.${contractClassName()}.request"
+
+    return buildString {
+        if (pathParams.isNotEmpty()) {
+            append("        val path = $contractRef.path")
+            pathParams.forEach { p ->
+                appendLine(".replace(\"{${p.name}}\", ${p.name})")
+            }
+            if (queryParams.isNotEmpty()) {
+                appendLine("        val queryParams = mapOf(")
+                queryParams.forEachIndexed { i, p ->
+                    val comma = if (i < queryParams.size - 1) "," else ""
+                    appendLine("            \"${p.name}\" to ${p.name}${comma}")
+                }
+                appendLine("        )")
+                append("        call($contractRef.copy(path = path, queryParams = queryParams))")
+            } else {
+                append("        call($contractRef.copy(path = path))")
+            }
+        } else if (queryParams.isNotEmpty()) {
+            appendLine("        val queryParams = mapOf(")
+            queryParams.forEachIndexed { i, p ->
+                val comma = if (i < queryParams.size - 1) "," else ""
+                appendLine("            \"${p.name}\" to ${p.name}${comma}")
+            }
+            appendLine("        )")
+            append("        call($contractRef.copy(queryParams = queryParams))")
+        } else {
+            append("        call($contractRef)")
+        }
+    }
 }
 
 fun ResolvedOperation.toQueryParamBlock(): String {

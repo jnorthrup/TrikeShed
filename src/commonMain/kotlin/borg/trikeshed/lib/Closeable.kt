@@ -1,4 +1,4 @@
-package borg.trikeshed
+package borg.trikeshed.lib
 
 /**
  * Common close-only resource contract.

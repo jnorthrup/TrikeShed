@@ -1,4 +1,6 @@
 package borg.trikeshed
 
-/** JVM typealias — delegates to [SeekFileBufferCommon]. */
+import borg.trikeshed.lib.SeekFileBufferCommon
+
+/** JVM typealias — delegates to [borg.trikeshed.lib.SeekFileBufferCommon]. */
 typealias SeekFileBuffer = SeekFileBufferCommon

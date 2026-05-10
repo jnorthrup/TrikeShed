@@ -2,6 +2,8 @@
 
 package borg.trikeshed
 
+import borg.trikeshed.lib.FileBuffer
+import borg.trikeshed.lib.LongSeries
 import borg.trikeshed.lib.logDebug
 import kotlinx.cinterop.*
 import platform.posix.munmap

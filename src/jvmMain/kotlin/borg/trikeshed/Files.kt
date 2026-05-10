@@ -3,6 +3,7 @@
 package borg.trikeshed
 
 import borg.trikeshed.lib.*
+import borg.trikeshed.lib.Files
 import java.io.ByteArrayOutputStream
 import java.io.File
 import kotlin.time.ExperimentalTime

@@ -1,9 +1,8 @@
 package borg.trikeshed.parse.json
 
-import borg.trikeshed.TypeEvidence
-import borg.trikeshed.toRowVec
+import borg.trikeshed.lib.TypeEvidence
+import borg.trikeshed.lib.toRowVec
 import borg.trikeshed.cursor.RowVec
-import borg.trikeshed.collections._l
 import borg.trikeshed.lib.*
 import borg.trikeshed.parse.confix.*
 

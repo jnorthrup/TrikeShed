@@ -2,7 +2,7 @@
 
 package borg.trikeshed.isam
 
-import borg.trikeshed.Usable
+import borg.trikeshed.lib.Usable
 import borg.trikeshed.userspace.nio.file.spi.FileOperations
 import borg.trikeshed.cursor.*
 import borg.trikeshed.isam.meta.IOMemento

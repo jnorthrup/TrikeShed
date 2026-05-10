@@ -1,5 +1,8 @@
 package borg.trikeshed
 
+import borg.trikeshed.lib.FileBuffer
+import borg.trikeshed.lib.LongSeries
+
 actual class FileBuffer actual constructor(
     actual val filename: String,
     actual val initialOffset: Long,

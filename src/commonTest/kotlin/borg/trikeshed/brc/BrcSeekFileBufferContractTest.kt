@@ -1,7 +1,7 @@
 package borg.trikeshed.brc
 
-import borg.trikeshed.SeekFileBufferCommon
-import borg.trikeshed.SeekHandle
+import borg.trikeshed.lib.SeekFileBufferCommon
+import borg.trikeshed.lib.SeekHandle
 import borg.trikeshed.userspace.ByteRegion
 import borg.trikeshed.lib.ByteSeries
 import kotlin.test.Test

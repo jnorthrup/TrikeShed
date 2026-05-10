@@ -1,6 +1,8 @@
-package borg.trikeshed.userspace
+package borg.trikeshed.userspace.nio
 
-import borg.trikeshed.userspace.nio.ByteBuffer
+import borg.trikeshed.userspace.Channel
+import borg.trikeshed.userspace.File
+import borg.trikeshed.userspace.SelectionResult
 
 /**
  * Compatibility names for the old userspace IO facade.

@@ -11,14 +11,7 @@
  * Each ByteSeries view delegates reads back to the parent LongSeries (windowed 64KB pread).
  * No bytes are copied until decodeUtf8() materializes a CharArray per line.
  */
-package borg.trikeshed
-
-import borg.trikeshed.lib.ByteSeries
-import borg.trikeshed.lib.CharSeries
-import borg.trikeshed.lib.Series
-import borg.trikeshed.lib.decodeUtf8
-import borg.trikeshed.lib.div
-import borg.trikeshed.lib.j
+package borg.trikeshed.lib
 
 /**
  * Scan [LongSeries<Byte>] for newline boundaries.

@@ -1,5 +1,6 @@
 package borg.trikeshed
 
+import borg.trikeshed.lib.Files
 import borg.trikeshed.lib.second
 import kotlin.io.path.createTempDirectory
 import kotlin.test.Test

@@ -200,8 +200,7 @@ fun renderClientApi(
         appendLine("interface ${cfg.apiInterfaceName} {")
         ops.forEach { op ->
             val params = op.toKotlinParams()
-            val retType = op.successKotlinType()
-            appendLine("    suspend fun ${op.apiMethodName()}($params): $retType")
+            appendLine("    suspend fun ${op.apiMethodName()}($params): String")
         }
         appendLine("}")
         appendLine()
@@ -211,17 +210,16 @@ fun renderClientApi(
         appendLine(") : ${cfg.apiInterfaceName} {")
         ops.forEach { op ->
             val params = op.toKotlinParams()
-            val retType = op.successKotlinType()
-            val args = op.toKotlinArgs()
-            val queryBlock = op.toQueryParamBlock()
-            if (queryBlock.isNotEmpty()) {
+            val retType = "String"
+            val pathParams = op.parameters.filter { it.location == "path" }
+            val queryParams = op.parameters.filter { it.location == "query" }
+            if (pathParams.isNotEmpty() || queryParams.isNotEmpty()) {
                 appendLine("    override suspend fun ${op.apiMethodName()}($params): $retType = run {")
-                appendLine("        val queryParams = mutableMapOf<String, String>()")
-                appendLine(queryBlock)
-                appendLine("        call(${cfg.apiInterfaceName}Contract.${op.contractClassName()}.request.copy(queryParams = queryParams)) }")
+                appendLine(op.toPathSubstitutionCall(cfg))
+                appendLine(" }")
             } else {
                 appendLine("    override suspend fun ${op.apiMethodName()}($params): $retType =")
-                appendLine("        call(${cfg.apiInterfaceName}Contract.${op.contractClassName()}.request${if (args.isNotEmpty()) ".copy($args)" else ""})")
+                appendLine("        call(${cfg.apiInterfaceName}Contract.${op.contractClassName()}.request)")
             }
             appendLine()
         }

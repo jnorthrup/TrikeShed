@@ -1,6 +1,6 @@
 package borg.trikeshed.parse.interop
 
-import borg.trikeshed.TypeEvidence
+import borg.trikeshed.lib.TypeEvidence
 import borg.trikeshed.cursor.ColumnMeta
 import borg.trikeshed.cursor.RowVec
 import borg.trikeshed.cursor.TreeCursor

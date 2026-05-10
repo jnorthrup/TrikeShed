@@ -1,4 +1,4 @@
-package borg.trikeshed.torrent.protocol
+package borg.trikeshed.torrent
 
 enum class MessageType(val id: Byte) {
     CHOKE(0), UNCHOKE(1), INTERESTED(2), NOT_INTERESTED(3),

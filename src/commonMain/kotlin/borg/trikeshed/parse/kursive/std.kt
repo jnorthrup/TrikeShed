@@ -1,8 +1,13 @@
-package borg.trikeshed.parse.kursive.legacy
+package borg.trikeshed.parse.kursive
 
 import borg.trikeshed.lib.CharSeries
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.*
+import borg.trikeshed.parse.kursive.legacy.KursiveParser
+import borg.trikeshed.parse.kursive.legacy.KursiveStep
+import borg.trikeshed.parse.kursive.legacy.SeriesBuffer
+import borg.trikeshed.parse.kursive.legacy.parser
+import borg.trikeshed.parse.kursive.legacy.s
 
 object std {
     val ws: KursiveParser<CharSeries> = parser("ws") { input ->
@@ -19,6 +24,7 @@ object std {
                 input.consume('\n')
                 input.slice(start)
             }
+
             else -> null
         }
     }

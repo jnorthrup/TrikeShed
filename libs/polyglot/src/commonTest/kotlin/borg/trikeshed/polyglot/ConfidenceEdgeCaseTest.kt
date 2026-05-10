@@ -1,6 +1,6 @@
 package borg.trikeshed.polyglot
 
-import borg.trikeshed.TypeEvidence
+import borg.trikeshed.lib.TypeEvidence
 import borg.trikeshed.lib.toSeries
 import kotlin.test.Test
 import kotlin.test.assertEquals

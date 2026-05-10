@@ -5,7 +5,7 @@ import borg.trikeshed.lib.Series
 import kotlin.coroutines.CoroutineContext
 
 /**
- * Platform filesystem operations — replaces [borg.trikeshed.Files] expect object.
+ * Platform filesystem operations — replaces [borg.trikeshed.lib.Files] expect object.
  *
  * Registered into [borg.trikeshed.context.SupervisorContextElement] by each platform.
  * Lives alongside [FileSystemProvider] in the NIO file SPI namespace.

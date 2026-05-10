@@ -1,4 +1,4 @@
-package borg.trikeshed
+package borg.trikeshed.lib
 
 /**
  * a horrible hack to enable use() macro in kotlin mpp for our file messes

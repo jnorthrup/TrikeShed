@@ -1,6 +1,6 @@
 package borg.trikeshed.userspace.nio.file.spi
 
-import borg.trikeshed.System
+import borg.trikeshed.lib.System
 
 class WasmSystemOperations : SystemOperations {
 

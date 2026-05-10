@@ -16,7 +16,7 @@ x-trikeshed-context:
   client:
     - name: htx
       key: borg.trikeshed.htx.client.HtxKey
-      element: borg.trikeshed.htx.client.HtxElement
+      element: borg.trikeshed.htx.client.HtxElementCompat
       open: borg.trikeshed.htx.client.openHtxElement
 paths:
   /v1alpha/sessions:

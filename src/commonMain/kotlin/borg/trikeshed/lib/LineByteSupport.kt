@@ -1,9 +1,4 @@
-package borg.trikeshed
-
-import borg.trikeshed.lib.Join
-import borg.trikeshed.lib.Series
-import borg.trikeshed.lib.j
-import borg.trikeshed.lib.toSeries
+package borg.trikeshed.lib
 
 internal fun byteLineSequence(bytes: ByteArray): Sequence<Join<Long, ByteArray>> =
     sequence {

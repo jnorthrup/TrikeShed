@@ -1,8 +1,7 @@
 package borg.trikeshed.polyglot
 
-import borg.trikeshed.TypeEvidence
+import borg.trikeshed.lib.TypeEvidence
 import borg.trikeshed.cursor.Cursor
-import borg.trikeshed.cursor.RowVec
 import borg.trikeshed.lib.*
 import borg.trikeshed.parse.interop.DescriptorFragment
 import borg.trikeshed.parse.interop.rowVecTree

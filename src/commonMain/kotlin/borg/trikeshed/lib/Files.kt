@@ -1,8 +1,4 @@
-package borg.trikeshed
-
-import borg.trikeshed.lib.Join
-import borg.trikeshed.lib.Series
-import borg.trikeshed.lib.j
+package borg.trikeshed.lib
 
 @Deprecated("Use FileOperations CCEK: coroutineContext[FileOperations.Key]")
 expect object Files {

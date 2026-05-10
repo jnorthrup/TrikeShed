@@ -1,7 +1,6 @@
 package borg.trikeshed.userspace.nio.file.spi
 
-import borg.trikeshed.Files
-import borg.trikeshed.lib.*
+import borg.trikeshed.lib.Files
 
 class WasmFileOperations : FileOperations {
 

@@ -1,10 +1,4 @@
-package borg.trikeshed
-
-import borg.trikeshed.lib.ByteSeries
-import borg.trikeshed.lib.Join
-import borg.trikeshed.lib.Twin
-import borg.trikeshed.lib.assert
-import borg.trikeshed.lib.j
+package borg.trikeshed.lib
 
 typealias BFrag = Join< /**endexclusive range*/ Twin<Int>, ByteArray>
 

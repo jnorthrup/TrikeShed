@@ -2,13 +2,13 @@
 
 package borg.trikeshed.parse.csv
 
-import borg.trikeshed.LongSeries
-import borg.trikeshed.TypeEvidence
-import borg.trikeshed.TypeEvidence.Companion.deduce
-import borg.trikeshed.TypeEvidence.Companion.update
-import borg.trikeshed.drop
-import borg.trikeshed.get
-import borg.trikeshed.size
+import borg.trikeshed.lib.LongSeries
+import borg.trikeshed.lib.TypeEvidence
+import borg.trikeshed.lib.TypeEvidence.Companion.deduce
+import borg.trikeshed.lib.TypeEvidence.Companion.update
+import borg.trikeshed.lib.drop
+import borg.trikeshed.lib.get
+import borg.trikeshed.lib.size
 import borg.trikeshed.cursor.ColumnMeta
 import borg.trikeshed.cursor.Cursor
 import borg.trikeshed.cursor.RowVec
@@ -27,14 +27,12 @@ import borg.trikeshed.lib.assert
 import borg.trikeshed.lib.debug
 import borg.trikeshed.lib.decodeUtf8
 import borg.trikeshed.lib.first
-import borg.trikeshed.lib.get
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.last
 import borg.trikeshed.lib.left
 import borg.trikeshed.lib.log
 import borg.trikeshed.lib.logDebug
 import borg.trikeshed.lib.right
-import borg.trikeshed.lib.size
 import borg.trikeshed.lib.toArray
 import borg.trikeshed.lib.toList
 import borg.trikeshed.lib.toSeries
@@ -333,10 +331,10 @@ object CSVUtil {
     ): Sequence<RowVec> = streamSpec(file, delim, header, sampleSize).rows
 
    fun buildStreamSpec(
-        file: LongSeries<Byte>,
-        delim: Char,
-        header: Boolean,
-        sampleSize: Int,
+       file: LongSeries<Byte>,
+       delim: Char,
+       header: Boolean,
+       sampleSize: Int,
     ): StreamSpec {
         val fileSize = file.a
 

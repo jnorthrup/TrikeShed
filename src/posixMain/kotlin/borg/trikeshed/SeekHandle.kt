@@ -3,6 +3,8 @@
 package borg.trikeshed
 
 import borg.trikeshed.lib.ByteSeries
+import borg.trikeshed.lib.SeekHandle
+import borg.trikeshed.lib.ioUringHandle
 import borg.trikeshed.userspace.ByteRegion
 import kotlinx.cinterop.*
 import platform.posix.*

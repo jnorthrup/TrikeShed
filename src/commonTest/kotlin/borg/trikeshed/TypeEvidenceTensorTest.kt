@@ -1,14 +1,12 @@
 package borg.trikeshed
 
-import borg.trikeshed.TypeEvidence
+import borg.trikeshed.lib.TypeEvidence
 import borg.trikeshed.cursor.MapTypeMemento
 import borg.trikeshed.cursor.SeqTypeMemento
 import borg.trikeshed.isam.meta.IOMemento
 import borg.trikeshed.lib.toSeries
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
-import kotlin.test.assertTrue
 
 class TypeEvidenceTensorTest {
 

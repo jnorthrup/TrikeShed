@@ -1,4 +1,4 @@
-package borg.trikeshed
+package borg.trikeshed.lib
 
 import kotlin.time.Clock
 

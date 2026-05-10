@@ -3,7 +3,7 @@ package borg.trikeshed.userspace.nio.file.spi
 import kotlin.coroutines.CoroutineContext
 
 /**
- * Platform system/env operations — replaces [borg.trikeshed.System] expect object.
+ * Platform system/env operations — replaces [borg.trikeshed.lib.System] expect object.
  */
 interface SystemOperations : CoroutineContext.Element {
     companion object Key : CoroutineContext.Key<SystemOperations>

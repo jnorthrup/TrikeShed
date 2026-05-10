@@ -1,6 +1,5 @@
-package borg.trikeshed
+package borg.trikeshed.lib
 
-import borg.trikeshed.lib.Series2
 import borg.trikeshed.userspace.ByteRegion
 import borg.trikeshed.userspace.nio.ByteBuffer
 
@@ -16,7 +15,7 @@ class SeekFileBufferCommon(
     val initialOffset: Long = 0,
     val blkSize: Long = -1,
     val readOnly: Boolean = true,
-   val handle: SeekHandle = platformSeekHandle(),
+    val handle: SeekHandle = platformSeekHandle(),
 ) : LongSeries<Byte>, Usable {
 
    var fd: Long = -1

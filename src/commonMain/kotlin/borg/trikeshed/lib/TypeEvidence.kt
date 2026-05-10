@@ -1,12 +1,8 @@
-package borg.trikeshed
+package borg.trikeshed.lib
 
 import borg.trikeshed.context.BitMasked
 import borg.trikeshed.cursor.*
 import borg.trikeshed.isam.meta.IOMemento
-import borg.trikeshed.lib.Series
-import borg.trikeshed.lib.get
-import borg.trikeshed.lib.j
-import borg.trikeshed.lib.size
 
 data class
 /** This is a dragnet for a given line to record the counters of character classes */

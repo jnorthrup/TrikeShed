@@ -1,6 +1,7 @@
 package borg.trikeshed
 
 import borg.trikeshed.lib.ByteSeries
+import borg.trikeshed.lib.SeekHandle
 import borg.trikeshed.userspace.ByteRegion
 
 /** JVM stub. Route through NIO FileChannel. */

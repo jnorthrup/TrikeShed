@@ -1,7 +1,6 @@
-package borg.trikeshed
+package borg.trikeshed.lib
 
 import borg.trikeshed.ccek.KeyedService
-import borg.trikeshed.lib.ByteSeries
 import borg.trikeshed.userspace.ByteRegion
 import kotlin.coroutines.CoroutineContext
 
