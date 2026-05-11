@@ -6,7 +6,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
-import java.nio.file.Files
+import java.nio.file.Files as JdkFiles
 
 class MiniDuckBlockIoTest {
     @Test
@@ -23,10 +23,10 @@ class MiniDuckBlockIoTest {
         block.append(blobRow)
         block.seal()
 
-        val file = Files.createTempFile("miniduck-block", ".ndjson")
+        val file = JdkFiles.createTempFile("miniduck-block", ".ndjson")
         MiniDuckBlockFiles.write(file, block)
 
-        val lines = Files.readAllLines(file)
+        val lines = JdkFiles.readAllLines(file)
         assertTrue(lines.size >= 2, "expected a header line plus at least one row line")
 
         val loaded = MiniDuckBlockFiles.read(file)
@@ -56,7 +56,7 @@ class MiniDuckBlockIoTest {
         val block = BlockRowVec.mutable()
         block.append(JsonRowVec("x", "1"))
 
-        val file = Files.createTempFile("miniduck-block-mutable", ".ndjson")
+        val file = JdkFiles.createTempFile("miniduck-block-mutable", ".ndjson")
         assertFailsWith<IllegalStateException> {
             MiniDuckBlockFiles.write(file, block)
         }
@@ -65,13 +65,13 @@ class MiniDuckBlockIoTest {
     @Test
     fun emptySealedBlockRoundTripsAsEmptyFileBody() {
         val block = BlockRowVec.mutable().seal()
-        val file = Files.createTempFile("miniduck-empty-block", ".ndjson")
+        val file = JdkFiles.createTempFile("miniduck-empty-block", ".ndjson")
 
         MiniDuckBlockFiles.write(file, block)
         val loaded = MiniDuckBlockFiles.read(file)
 
         assertEquals(BlockRowVec.State.SEALED, loaded.state)
         assertEquals(0, loaded.rowCount)
-        assertTrue(Files.readAllLines(file).isNotEmpty())
+        assertTrue(JdkFiles.readAllLines(file).isNotEmpty())
     }
 }

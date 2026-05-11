@@ -479,18 +479,22 @@ object MiniDuckBlockCodec {
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
+    private val HEX_DIGITS = "0123456789abcdef".toCharArray()
+
     private fun ByteArray.toHex(): String {
-        val sb = StringBuilder(size * 2)
-        for (b in this) {
-            val v = b.toInt() and 0xFF
-            sb.append("0123456789abcdef"[v ushr 4])
-            sb.append("0123456789abcdef"[v and 0xF])
+        val len = size
+        val chars = CharArray(len * 2)
+        var ci = 0
+        for (i in 0 until len) {
+            val v = this[i].toInt() and 0xFF
+            chars[ci++] = HEX_DIGITS[v ushr 4]
+            chars[ci++] = HEX_DIGITS[v and 0xF]
         }
-        return sb.toString()
+        return String(chars)
     }
 
     private fun String.fromHex(): ByteArray {
-        val len = length / 2
+        val len = length ushr 1
         val out = ByteArray(len)
         for (i in 0 until len) {
             out[i] = ((hexVal(this[i * 2]) shl 4) or hexVal(this[i * 2 + 1])).toByte()
@@ -498,10 +502,12 @@ object MiniDuckBlockCodec {
         return out
     }
 
-    private fun hexVal(c: Char): Int = when (c) {
-        in '0'..'9' -> c - '0'
-        in 'a'..'f' -> c - 'a' + 10
-        in 'A'..'F' -> c - 'A' + 10
-        else -> 0
+    private val HEX_LOOKUP = IntArray(256).also { arr ->
+        arr.fill(-1)
+        for (c in '0'..'9') arr[c.code] = c - '0'
+        for (c in 'a'..'f') arr[c.code] = c - 'a' + 10
+        for (c in 'A'..'F') arr[c.code] = c - 'A' + 10
     }
+
+    private fun hexVal(c: Char): Int = HEX_LOOKUP.getOrElse(c.code) { 0 }
 }

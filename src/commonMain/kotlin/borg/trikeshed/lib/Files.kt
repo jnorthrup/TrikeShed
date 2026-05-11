@@ -5,18 +5,39 @@ import borg.trikeshed.userspace.nio.file.spi.FileOperations
 /**
  * Platform filesystem accessor.
  *
- * Resolves to the platform [FileOperations] registered by [PlatformProviders].
+ * Resolves to the platform [FileOperations] registered during init.
  * Usage unchanged: `Files.readString("foo.txt")`, `Files.cwd()`, etc.
  *
- * The old expect/actual object is gone — this is a thin property delegating
- * to the NIO SPI [FileOperations] interface. No more dual-layer indirection.
+ * No expect/actual. Each platform's [PlatformProviders] assigns [fileOperations]
+ * during static init. Until then, calls throw.
  */
-val Files: FileOperations by lazy {
-    // Try to find a registered FileOperations. If none is registered yet
-    // (e.g. during static init), platforms register theirs eagerly.
-    // Fallback: each platform module provides an expect/actual for defaultFileOperations.
-    defaultFileOperations()
-}
+val Files: FileOperations
+    get() = fileOperations
 
-/** Platform hook — each target provides the default FileOperations instance. */
-internal expect fun defaultFileOperations(): FileOperations
+/**
+ * Mutable platform hook — each target's PlatformProviders sets this once during init.
+ */
+var fileOperations: FileOperations = UninitializedFileOperations
+    internal set
+
+private object UninitializedFileOperations : FileOperations {
+    override val key get() = FileOperations.Key
+    override fun readAllLines(filename: String): Nothing = error("FileOperations not initialized — call PlatformProviders.init() first")
+    override fun readAllBytes(filename: String): Nothing = error("FileOperations not initialized — call PlatformProviders.init() first")
+    override fun readString(filename: String): Nothing = error("FileOperations not initialized — call PlatformProviders.init() first")
+    override fun write(filename: String, bytes: ByteArray): Nothing = error("FileOperations not initialized")
+    override fun write(filename: String, lines: List<String>): Nothing = error("FileOperations not initialized")
+    override fun write(filename: String, string: String): Nothing = error("FileOperations not initialized")
+    override fun cwd(): Nothing = error("FileOperations not initialized")
+    override fun exists(filename: String): Nothing = error("FileOperations not initialized")
+    override fun streamLines(fileName: String, bufsize: Int): Nothing = error("FileOperations not initialized")
+    override fun iterateLines(fileName: String, bufsize: Int): Nothing = error("FileOperations not initialized")
+    override fun listDir(path: String): Nothing = error("FileOperations not initialized")
+    override fun isDir(path: String): Boolean = error("FileOperations not initialized")
+    override fun isFile(path: String): Boolean = error("FileOperations not initialized")
+    override fun mkdirs(path: String): Nothing = error("FileOperations not initialized")
+    override fun deleteRecursively(path: String): Nothing = error("FileOperations not initialized")
+    override fun resolvePath(vararg parts: String): Nothing = error("FileOperations not initialized")
+    override fun readZip(path: String): Nothing = error("FileOperations not initialized")
+    override fun createTempDir(prefix: String): Nothing = error("FileOperations not initialized")
+}

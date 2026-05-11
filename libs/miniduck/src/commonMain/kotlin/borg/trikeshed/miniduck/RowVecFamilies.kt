@@ -67,12 +67,17 @@ class JsonRowVec private constructor(
 
 class DocRowVec private constructor(
     private val capture: Join<Series<String>, Join<Series<Any?>, Series<RowVec>?>>,
+    private val keysList: List<String>?, /* cached for linear-scan getValue */
 ) : RowVec {
-    constructor(keys: Series<String>, cells: Series<Any?>, child: Series<RowVec>? = null) : this(keys j (cells j child))
+    constructor(keys: Series<String>, cells: Series<Any?>, child: Series<RowVec>? = null) : this(
+        keys j (cells j child),
+        if (keys.size <= 8) null else (0 until keys.size).map { keys[it] }
+    )
 
     @Suppress("UNCHECKED_CAST")
     constructor(keys: List<String>, cells: List<Any?>, child: Series<RowVec>? = null) : this(
-        (keys.size j { i: Int -> keys[i] }) j ((cells.size j { i: Int -> cells[i] }) j child)
+        (keys.size j { i: Int -> keys[i] }) j ((cells.size j { i: Int -> cells[i] }) j child),
+        keys /* already a List — cache it directly */
     )
 
     val keys: Series<String> get() = capture.a
@@ -93,6 +98,13 @@ class DocRowVec private constructor(
     operator fun get(name: String): Any? = getValue(name)
 
     fun getValue(name: String): Any? {
+        val cached = keysList
+        if (cached != null) {
+            for (i in cached.indices) {
+                if (cached[i] == name) return cells[i]
+            }
+            return null
+        }
         for (i in 0 until keys.size) {
             if (keys[i] == name) return cells[i]
         }
@@ -274,7 +286,8 @@ fun Any?.blockRowCount(): Int? = blockRows()?.size
 fun Series<RowVec>?.toJson(): String {
     val rows = this ?: return ""
     if (rows.isEmpty()) return ""
-    val json = StringBuilder()
+    // Pre-size StringBuilder based on estimated row bytes (128 chars/row)
+    val json = StringBuilder(rows.size * 128)
     for (rowIndex in 0 until rows.size) {
         if (json.isNotEmpty()) json.append('\n')
         val row = rows[rowIndex]

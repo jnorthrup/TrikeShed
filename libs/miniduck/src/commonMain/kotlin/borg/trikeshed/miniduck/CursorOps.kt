@@ -30,8 +30,19 @@ private fun compareComparableValues(left: Comparable<*>, right: Any): Int =
 
 /** Filter rows by predicate. */
 fun Cursor.where(predicate: (RowVec) -> Boolean): Cursor {
-    val filtered = this.view.filter(predicate)
-    return filtered.size j { filtered[it] }
+    // Two-pass: count matches, then compact into IntArray for O(1) random access.
+    // This avoids List<RowVec> allocation (only stores int indices, not references + object headers).
+    var count = 0
+    val bitmap = BooleanArray(size)
+    for (i in 0 until size) {
+        if (predicate(at(i))) { count++; bitmap[i] = true }
+    }
+    val indices = IntArray(count)
+    var j = 0
+    for (i in 0 until size) {
+        if (bitmap[i]) indices[j++] = i
+    }
+    return count j { idx -> at(indices[idx]) }
 }
 
 /** Project named columns — family-aware so DocRowVec/ViewRowVec rows keep their child. */
@@ -190,27 +201,24 @@ object Agg {
 fun Cursor.groupBy(keyColumn: String, vararg aggregations: Aggregation): Cursor {
     if (size == 0) return this
 
-    val groups = mutableMapOf<Any?, List<Accumulator>>()
+    val groups = mutableMapOf<Any?, MutableList<Accumulator>>()
+    val groupOrder = mutableListOf<Any?>()
 
     for (i in 0 until size) {
         val row = at(i)
         val key = row.getValue(keyColumn)
-        val accumulators = groups.getOrPut(key) { aggregations.map { it.createAccumulator() } }
+        if (key !in groups) groupOrder.add(key)
+        val accumulators = groups.getOrPut(key) { aggregations.map { it.createAccumulator() }.toMutableList() }
         aggregations.forEachIndexed { index, agg ->
             val value = if (agg.targetColumn == "*") null else row.getValue(agg.targetColumn)
             accumulators[index].add(value)
         }
     }
 
-    val groupKeys = groups.keys.toList()
-    val resultRows = groupKeys.map { key ->
+    val resultRows = groupOrder.map { key ->
         val accs = groups[key]!!
-        val keys = mutableListOf<String>(keyColumn)
-        val cells = mutableListOf<Any?>(key)
-        aggregations.forEachIndexed { index, agg ->
-            keys.add(agg.outputColumn)
-            cells.add(accs[index].getResult())
-        }
+        val keys = (aggregations.size + 1) j { i: Int -> if (i == 0) keyColumn else aggregations[i - 1].outputColumn }
+        val cells = (aggregations.size + 1) j { i: Int -> if (i == 0) key else accs[i - 1].getResult() }
         DocRowVec(keys, cells)
     }
 
@@ -230,7 +238,9 @@ fun Cursor.hashJoin(other: Cursor, leftKey: String, rightKey: String): Cursor {
         }
     }
 
-    val resultRows = mutableListOf<RowVec>()
+    // Pre-allocate result list to avoid resizing
+    val resultRows = ArrayList<RowVec>(this.size * 2)
+    // HashSet for O(1) join-key dedup across left columns
     for (i in 0 until this.size) {
         val leftRow = this.at(i)
         val key = leftRow.getValue(leftKey)
@@ -361,10 +371,12 @@ private fun appendRowData(keys: MutableList<String>, cells: MutableList<Any?>, r
 private fun appendJoinedRowData(keys: MutableList<String>, cells: MutableList<Any?>, row: RowVec, joinKey: String) {
     when (row) {
         is DocRowVec -> {
-            for (i in 0 until row.size) {
+            // Build a HashSet of already-emitted key names for O(1) dedup
+            val existingKeys = keys.toHashSet()
+            for (i in 0 until row.keys.size) {
                 val key = row.keys[i]
-                if (key == joinKey) continue
-                if (keys.contains(key)) continue
+                if (key == joinKey || key in existingKeys) continue
+                existingKeys.add(key)
                 keys.add(key)
                 cells.add(row.cells[i])
             }

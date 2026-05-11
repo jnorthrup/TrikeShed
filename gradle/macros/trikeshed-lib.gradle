@@ -493,6 +493,18 @@ switch (project.path) {
             implementation project(":libs:couch")
         }
         break
+    case ":libs:spokes":
+        kmpHost(rootMode: "none")
+        def spokesKotlin = extensions.getByName("kotlin")
+        def spokesSets = spokesKotlin.sourceSets
+        spokesSets.getByName("commonMain").dependencies {
+            implementation project(":libs:ipfs")
+            implementation project(":libs:torrent")
+        }
+        spokesSets.findByName("commonTest")?.dependencies {
+            implementation "org.jetbrains.kotlinx:kotlinx-coroutines-test:${prop("versions.kotlinx-coroutines-test")}"
+        }
+        break
     case ":libs:htx-client":
         kmpHost()
         extensions.getByName("kotlin").sourceSets.getByName("commonMain").dependencies {

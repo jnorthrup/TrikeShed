@@ -2,8 +2,7 @@
 
 package borg.trikeshed.lib
 
-import borg.trikeshed.userspace.nio.file.spi.FileOperations
-import borg.trikeshed.userspace.nio.file.spi.JvmFileOperations
 import kotlin.time.ExperimentalTime
 
-internal actual fun defaultFileOperations(): FileOperations = JvmFileOperations()
+// Files accessor is now in commonMain Files.kt
+// PlatformProviders.jvm.kt sets fileOperations = JvmFileOperations()

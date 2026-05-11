@@ -27,7 +27,7 @@ actual class IsamDataFile actual constructor(
         metafile
     }
    val data: SeekableByteChannel by lazy {
-        Files.newByteChannel(
+        java.nio.file.Files.newByteChannel(
             Paths.get(datafileFilename),
             READ
         )

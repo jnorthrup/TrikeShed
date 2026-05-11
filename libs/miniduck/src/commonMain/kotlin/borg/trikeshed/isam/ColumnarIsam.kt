@@ -28,6 +28,11 @@ class ColumnarIsam internal constructor(
     private val resolvedColumns: Series<Isam3ResolvedColumn> = layout.resolvedColumns(viewName)
     private val storeIndex: Map<String, Isam3StoreHandle> = stores.view.associateBy { it.file.name }
 
+    // cache: one Series<() -> ColumnMeta> built once (metadata is immutable per schema)
+    private val metaSeries: Series<() -> ColumnMeta> = resolvedColumns.size j { columnIndex: Int ->
+        { resolvedColumns[columnIndex].meta as ColumnMeta }
+    }
+
     override val a: Int get() = stores.getOrNull(0)?.rowCount ?: 0
 
     override val b: (Int) -> RowVec = { rowIndex ->
@@ -39,10 +44,7 @@ class ColumnarIsam internal constructor(
             val slice = store.bytes.copyOfRange(begin, begin + resolved.meta.end - resolved.meta.begin)
             resolved.type.createDecoder(resolved.meta.end - resolved.meta.begin)(slice)
         }
-        val metas: Series<() -> ColumnMeta> = resolvedColumns.size j { columnIndex: Int ->
-            { resolvedColumns[columnIndex].meta as ColumnMeta }
-        }
-        values.j(metas)
+        values.j(metaSeries)
     }
 
     override fun open() {
@@ -72,31 +74,29 @@ class ColumnarIsam internal constructor(
 
             Files.write(layoutPath, layout.render())
 
-            val constraintByName = constraints.toList().associateBy { it.name }
-            val indexByName = schemaMeta.toList().withIndex().associate { indexed -> indexed.value.name to indexed.index }
+            val constraintByName = constraints.view.associateBy { it.name }
+            val indexByName = schemaMeta.view.mapIndexed { idx, meta -> meta.name to idx }.toMap()
             val rowCount = cursor.size
-            val viewRows = (0 until rowCount).map { rowIndex ->
-                transform?.invoke(cursor.at(rowIndex)) ?: cursor.at(rowIndex)
-            }
 
             layout.partitions.view.forEach { partition ->
                 partition.files.view.forEach { file ->
                     val bytes = ByteArray(rowCount * file.rowWidth)
+                    var rowOffset = 0 // rowIndex * file.rowWidth
                     for (rowIndex in 0 until rowCount) {
-                        val row = viewRows[rowIndex]
+                        val row = transform?.invoke(cursor.at(rowIndex)) ?: cursor.at(rowIndex)
                         for (group in file.groups.view) {
                             for (placement in group.placements.view) {
                                 val meta = constraintByName[placement.name] ?: error("Missing constraint for ${placement.name}")
                                 val columnIndex = indexByName[placement.name] ?: -1
-                                require(columnIndex >= 0) { "Missing column ${placement.name} in cursor" }
+                                require(columnIndex >= 0) { "Missing column ${meta.name} in cursor" }
                                 val encoded = meta.encoder(row[columnIndex].a)
                                 require(encoded.size >= placement.width) {
                                     "Encoded column ${meta.name} width ${encoded.size} < declared width ${placement.width}"
                                 }
-                                val offset = rowIndex * file.rowWidth + placement.begin
-                                encoded.copyInto(bytes, offset, 0, placement.width)
+                                encoded.copyInto(bytes, rowOffset + placement.begin, 0, placement.width)
                             }
                         }
+                        rowOffset += file.rowWidth
                     }
                     Files.write(filePath(baseName, file.name), bytes)
                 }

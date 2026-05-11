@@ -1,13 +1,10 @@
 package borg.trikeshed.userspace.nio.file.spi
 
-import borg.trikeshed.lib.Join
-import borg.trikeshed.lib.Series
-import borg.trikeshed.lib.j
-import borg.trikeshed.lib.toSeries
+import borg.trikeshed.lib.*
 
 /**
- * JS platform FileOperations — inlined from the old actual object Files.
- * No delegation. No borg.trikeshed.lib.Files import. Direct Node.js fs/path calls.
+ * JS platform FileOperations — delegates to the Node.js helper functions
+ * defined in [borg.trikeshed.lib] (jsReadString, fs, path, etc).
  */
 class JsFileOperations : FileOperations {
 
@@ -66,20 +63,4 @@ class JsFileOperations : FileOperations {
         jsMkdir(dir)
         return dir
     }
-}
-
-private fun streamByteLines(bytes: ByteArray): Sequence<Join<Long, ByteArray>> = sequence {
-    var offset = 0L
-    var lineStart = 0L
-    val line = ArrayList<Byte>()
-    for (byte in bytes) {
-        line += byte
-        offset++
-        if (byte == '\n'.code.toByte()) {
-            yield(lineStart j line.toByteArray())
-            line.clear()
-            lineStart = offset
-        }
-    }
-    if (line.isNotEmpty()) yield(lineStart j line.toByteArray())
 }
