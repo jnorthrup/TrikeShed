@@ -43,4 +43,9 @@ enum class Packaging(val ext: String, val contentType: String) {
     MODULE("module", "application/json"),
     JS("js", "application/javascript"),
     TGZ("tgz", "application/gzip"),
+    // Rust/Cargo
+    CRATE("crate", "application/gzip"),
+    // OCaml/opam
+    OCAML("tar.gz", "application/gzip"),
+    OPAM("opam", "application/x-yaml"),
 }

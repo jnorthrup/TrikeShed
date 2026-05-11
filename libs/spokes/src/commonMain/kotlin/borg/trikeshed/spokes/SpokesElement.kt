@@ -110,13 +110,43 @@ data class CoordQuery(
     val maxResults: Int = 50,
 )
 
+enum class BuildSystem {
+    GRADLE,
+    CARGO,
+    OPAM,
+    ;
+
+    /** CLI command to build a project of this type from its root directory. */
+    fun buildCommand(): String = when (this) {
+        GRADLE -> "./gradlew assemble --no-daemon"
+        CARGO -> "cargo package --no-verify"
+        OPAM -> "dune build @install && opam pin add . --with-doc --with-test -y"
+    }
+
+    /** Output directory relative to project root where the artifact appears after build. */
+    fun outputDir(): String = when (this) {
+        GRADLE -> "build/libs/"
+        CARGO -> "target/package/"
+        OPAM -> "_build/default/"
+    }
+
+    /** File extension of the built artifact. */
+    fun artifactExt(): String = when (this) {
+        GRADLE -> "jar"
+        CARGO -> "crate"
+        OPAM -> "opam"
+    }
+}
+
 enum class Source {
     LOCAL_CACHE,
     GIT_BUILD,
     PASSTHROUGH,
+    CARGO_REGISTRY,
+    OPAM_REGISTRY,
 }
 
-class InMemoryArtifactRegistry : ArtifactRegistry {
+class InMemoryArtifactRegistry: ArtifactRegistry {
     override val localNodeAddress: String = "/ip4/127.0.0.1/tcp/4001"
     private val index = mutableMapOf<String, Source>()
     private val builds = mutableListOf<SpokesElement.GitBuildJob>()
