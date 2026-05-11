@@ -562,7 +562,9 @@ class PosixFile(
             val file = PosixFile(filename, flags)
             val len = bytes.size
             val buf = allocArray<ByteVar>(len)
-            bytes.forEachIndexed { index, byte -> buf[index] = byte }
+            bytes.usePinned { pinned ->
+                memcpy(buf, pinned.addressOf(0), len.convert())
+            }
             val written = write(file.fd, buf, len.convert())
             HasPosixErr.posixRequires(written == len.toLong()) { "writeBytes $filename" }
             file.close()
