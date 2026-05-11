@@ -32,8 +32,8 @@ fun ringHttpsHandler(channels: ChannelOperations, reactor: ReactorOperations): H
         override val id get() = fd
         override fun read(b: ByteBuffer, o: Long) = ring.read(b, o)
         override fun write(b: ByteBuffer, o: Long) = ring.write(b, o)
-        override fun readv(fd: Int, b: ByteBuffer) = ring.readv(fd, b)
-        override fun writev(fd: Int, b: ByteBuffer) = ring.writev(fd, b)
+        override fun readv(fd: Int, b: ByteBuffer, userData: Long) = ring.readv(fd, b, userData)
+        override fun writev(fd: Int, b: ByteBuffer, userData: Long) = ring.writev(fd, b, userData)
         override fun submit() = ring.submit()
         override fun wait(min: Int) = ring.wait(min)
     }

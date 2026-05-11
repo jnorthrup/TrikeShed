@@ -8,7 +8,7 @@ import platform.posix.*
 
 class PosixChannelOperations : ChannelOperations {
 
-    override fun openChannel(entries: Int): ChannelOperations.ChannelHandle = PosixChannelHandle(entries)
+    override fun openChannel(entries: Int): ChannelOperations.ChannelHandle = RingHandle(-1)
 
     override fun socket(domain: Int, type: Int, protocol: Int): Int = platform.posix.socket(domain, type, protocol)
 
@@ -32,6 +32,7 @@ class PosixChannelOperations : ChannelOperations {
         memcpy(addr.sin_addr.ptr, addrList[0]!!, 4u)
         platform.posix.connect(fd, addr.ptr.reinterpret(), sizeOf<sockaddr_in>().convert())
     }
+    override fun close(fd: Int): Int = platform.posix.close(fd)
 
     fun handleFor(fd: Int): ChannelOperations.ChannelHandle = RingHandle(fd)
 
@@ -42,25 +43,25 @@ class PosixChannelOperations : ChannelOperations {
         private var lastResults: List<ChannelResult> = emptyList()
 
         override fun read(buffer: ByteBuffer, offset: Long): Int {
-            val off = buffer.arrayOffset()
+            val off = buffer.arrayOffset() + buffer.position()
             return buffer.array().usePinned { pread(fd, it.addressOf(off), buffer.remaining().convert(), offset) }.toInt()
         }
         override fun write(buffer: ByteBuffer, offset: Long): Int {
-            val off = buffer.arrayOffset()
+            val off = buffer.arrayOffset() + buffer.position()
             return buffer.array().usePinned { pwrite(fd, it.addressOf(off), buffer.remaining().convert(), offset) }.toInt()
         }
-        override fun readv(fd: Int, buffer: ByteBuffer): Int {
-            pending.add(PendingOp(fd, buffer, read = true, user = 0L))
+        override fun readv(fd: Int, buffer: ByteBuffer, userData: Long): Int {
+            pending.add(PendingOp(fd, buffer, read = true, user = userData))
             return 0
         }
-        override fun writev(fd: Int, buffer: ByteBuffer): Int {
-            pending.add(PendingOp(fd, buffer, read = false, user = 0L))
+        override fun writev(fd: Int, buffer: ByteBuffer, userData: Long): Int {
+            pending.add(PendingOp(fd, buffer, read = false, user = userData))
             return 0
         }
         override fun submit(): Int {
             val completions = mutableListOf<ChannelResult>()
             for (op in pending) {
-                val off = op.buf.arrayOffset()
+                val off = op.buf.arrayOffset() + op.buf.position()
                 val remaining = op.buf.remaining()
                 val backing = op.buf.array()
                 val f = op.f; val rd = op.read; val u = op.user
@@ -76,21 +77,5 @@ class PosixChannelOperations : ChannelOperations {
             return n
         }
         override fun wait(minComplete: Int): List<ChannelResult> = lastResults
-    }
-
-    private class PosixChannelHandle(private val entries: Int) : ChannelOperations.ChannelHandle {
-        override val id: Int get() = 0
-        override fun read(buffer: ByteBuffer, offset: Long): Int {
-            val backing = buffer.array()
-            val off = buffer.arrayOffset()
-            return backing.usePinned { pread(id, it.addressOf(off), buffer.remaining().convert(), offset) }.toInt()
-        }
-        override fun write(buffer: ByteBuffer, offset: Long): Int {
-            val backing = buffer.array()
-            val off = buffer.arrayOffset()
-            return backing.usePinned { pwrite(id, it.addressOf(off), buffer.remaining().convert(), offset) }.toInt()
-        }
-        override fun submit(): Int = 0
-        override fun wait(minComplete: Int): List<ChannelResult> = emptyList()
     }
 }

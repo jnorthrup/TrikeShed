@@ -30,13 +30,18 @@ interface ChannelOperations : CoroutineContext.Element {
         fun read(buffer: ByteBuffer, offset: Long): Int
         /** File write at offset (pwrite). */
         fun write(buffer: ByteBuffer, offset: Long): Int
-        /** Unified readv — memory, files, sockets. Kernel dispatches by fd. */
-        fun readv(fd: Int, buffer: ByteBuffer): Int = -1
-        /** Unified writev — memory, files, sockets. Kernel dispatches by fd. */
-        fun writev(fd: Int, buffer: ByteBuffer): Int = -1
+        /** Async socket read — queues an SQE; userData echoed back in ChannelResult. */
+        fun readv(fd: Int, buffer: ByteBuffer, userData: Long = 0L): Int = -1
+        /** Async socket write — queues an SQE; userData echoed back in ChannelResult. */
+        fun writev(fd: Int, buffer: ByteBuffer, userData: Long = 0L): Int = -1
+        /** Async accept on a listening fd — queues an accept SQE. */
+        fun prepAccept(serverFd: Int, userData: Long = 0L): Int = -1
         fun submit(): Int
         fun wait(minComplete: Int = 1): List<ChannelResult>
     }
+
+    /** Close a file/socket descriptor. Returns 0 on success, negative on error. */
+    fun close(fd: Int): Int
 }
 
 data class ChannelResult(val fd: Int, val res: Int, val userData: Long)

@@ -8,9 +8,8 @@ class WasmChannelOperations : ChannelOperations {
     override fun bind(fd: Int, port: Int): Int = -1
     override fun listen(fd: Int, backlog: Int): Int = -1
     override fun accept(fd: Int): Int = -1
-    override fun connect(fd: Int, host: String, port: Int): Int {
-        TODO("Not yet implemented")
-    }
+    override fun connect(fd: Int, host: String, port: Int): Int = -1
+    override fun close(fd: Int): Int = -1
 
     private class WasmChannelHandle : ChannelOperations.ChannelHandle {
         override val id: Int get() = 0

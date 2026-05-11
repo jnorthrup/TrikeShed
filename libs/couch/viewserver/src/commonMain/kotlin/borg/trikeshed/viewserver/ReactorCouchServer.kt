@@ -17,7 +17,6 @@ import borg.trikeshed.context.ElementState
 import borg.trikeshed.userspace.nio.channels.spi.ChannelOperations
 import borg.trikeshed.userspace.nio.channels.spi.ChannelResult
 import borg.trikeshed.userspace.nio.channels.spi.ReactorOperations
-import borg.trikeshed.userspace.reactor.Interest
 
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
@@ -108,17 +107,31 @@ class ReactorCouchServer(
     companion object Key : AsyncContextKey<ReactorCouchServer>()
     override val key: AsyncContextKey<ReactorCouchServer> get() = Key
 
-    // Event type dispatch keys — mirrors webserver_liburing.c EVENT_TYPE_ACCEPT/READ/WRITE
+    // Event type dispatch tokens — encoded into userData so each SQE is identifiable.
+    // Encoding: (eventType shl 32) | (fd and 0xFFFFFFFFL)
     private object EventKey {
-        const val ACCEPT: Long = 0
-        const val READ: Long = 1
-        const val WRITE: Long = 2
+        const val ACCEPT: Long = 0L
+        const val READ: Long   = 1L
+        const val WRITE: Long  = 2L
+
+        fun encode(type: Long, fd: Int): Long = (type shl 32) or (fd.toLong() and 0xFFFFFFFFL)
+        fun type(ud: Long): Long = ud ushr 32
+        fun fd(ud: Long): Int = (ud and 0xFFFFFFFFL).toInt()
     }
 
     private val viewServer = CouchQueryServer(compileJs)
     /** db → viewName → (mapSource, reduceSource?) */
     private val viewSources = mutableMapOf<String, MutableMap<String, Pair<String, String?>>>()
     private var serverFd: Int = -1
+
+    /**
+     * Per-connection read accumulation: clientFd → bytes received so far.
+     * HTTP requests may arrive in fragments; we buffer until we see the full header block.
+     */
+    private val readAccum = mutableMapOf<Int, MutableList<Byte>>()
+
+    /** Read buffers currently in-flight (one per client fd). */
+    private val pendingReadBuffers = mutableMapOf<Int, ByteBuffer>()
 
     // ── Pattern A lifecycle ────────────────────────────────────────
 
@@ -129,65 +142,90 @@ class ReactorCouchServer(
         check(serverFd >= 0) { "socket failed" }
         channelOps.bind(serverFd, port)
         channelOps.listen(serverFd, 128)
-        reactorOps.register(serverFd, setOf(Interest.READ), EventKey.ACCEPT)
         state = ElementState.ACTIVE
     }
 
     override suspend fun close() {
         if (state.isAtLeast(ElementState.OPEN) && state.isLessThan(ElementState.CLOSED)) {
             state = ElementState.DRAINING
-            reactorOps.deregister(serverFd)
             supervisor.cancel()
             super.close()
         }
     }
 
-    // ── SupervisorJob looper — wait for kill signal ─────────────────
+    // ── SupervisorJob looper ────────────────────────────────────────
 
     /**
-     * Start the accept-dispatch loop under this element's SupervisorJob.
+     * Start the accept-dispatch loop.
      * Runs until [close] is called or parent scope cancels.
      */
     suspend fun serve(killSignal: kotlinx.coroutines.Job? = null) = withContext(supervisor) {
         requireState(ElementState.ACTIVE)
         val ring = channelOps.openChannel()
-        // Enqueue initial accept — mirrors add_accept_request()
-        ring.readv(serverFd, ByteBuffer.allocate(64))  // fd will be filled by accept completion
+        // Arm the first accept SQE.
+        ring.prepAccept(serverFd, EventKey.encode(EventKey.ACCEPT, serverFd))
         ring.submit()
         while (isActive) {
             val results = ring.wait()
             for (r in results) {
-                when (r.userData) {
-                    EventKey.ACCEPT -> { handleAccept(ring, r) }
-                    EventKey.READ   -> { handleRead(ring, r) }
-                    EventKey.WRITE  -> { handleWrite(r) }
+                when (EventKey.type(r.userData)) {
+                    EventKey.ACCEPT -> handleAccept(ring, r)
+                    EventKey.READ   -> handleRead(ring, r)
+                    EventKey.WRITE  -> handleWrite(r)
                 }
             }
             ring.submit()
         }
     }
 
-    // ── Event dispatch — mirrors webserver_liburing.c switch ────────
+    // ── Event dispatch ──────────────────────────────────────────────
 
-    private suspend fun handleAccept(ring: ChannelOperations.ChannelHandle, r: ChannelResult) {
-        // Re-enqueue accept for next connection — persistent multi-shot
-        ring.readv(serverFd, ByteBuffer.allocate(64))
+    private fun handleAccept(ring: ChannelOperations.ChannelHandle, r: ChannelResult) {
+        // Re-arm accept for the next connection (persistent multi-shot pattern).
+        ring.prepAccept(serverFd, EventKey.encode(EventKey.ACCEPT, serverFd))
         val clientFd = r.res
         if (clientFd >= 0) {
-            reactorOps.register(clientFd, setOf(Interest.READ), EventKey.READ)
+            // Enqueue the first read for this connection.
+            val buf = ByteBuffer.allocate(16384)
+            pendingReadBuffers[clientFd] = buf
+            ring.readv(clientFd, buf, EventKey.encode(EventKey.READ, clientFd))
         }
     }
 
-    private suspend fun handleRead(ring: ChannelOperations.ChannelHandle, r: ChannelResult) {
-        if (r.res <= 0) { reactorOps.deregister(r.fd); return }
-        // Process HTTP request and enqueue write response
-        // (full HTTP handling delegated to existing route logic)
-        ring.readv(r.fd, ByteBuffer.allocate(16384))
+    private fun handleRead(ring: ChannelOperations.ChannelHandle, r: ChannelResult) {
+        val clientFd = EventKey.fd(r.userData)
+        if (r.res <= 0) {
+            // EOF or error — clean up.
+            pendingReadBuffers.remove(clientFd)
+            readAccum.remove(clientFd)
+            channelOps.close(clientFd)
+            return
+        }
+        val buf = pendingReadBuffers.remove(clientFd) ?: return
+        val chunk = buf.array().copyOfRange(0, r.res)
+        val accum = readAccum.getOrPut(clientFd) { mutableListOf() }
+        accum.addAll(chunk.asList())
+
+        val raw = accum.toByteArray().decodeToString()
+        if (!raw.contains("\r\n\r\n")) {
+            // Partial request — re-arm read and wait for more data.
+            val nextBuf = ByteBuffer.allocate(16384)
+            pendingReadBuffers[clientFd] = nextBuf
+            ring.readv(clientFd, nextBuf, EventKey.encode(EventKey.READ, clientFd))
+            return
+        }
+        readAccum.remove(clientFd)
+
+        val response = parseHttpRequest(raw)?.let { route(it) }
+            ?: "HTTP/1.1 400 Bad Request\r\nContent-Length: 0\r\n\r\n"
+        val responseBytes = response.encodeToByteArray()
+        val writeBuf = ByteBuffer.wrap(responseBytes)
+        ring.writev(clientFd, writeBuf, EventKey.encode(EventKey.WRITE, clientFd))
     }
 
     private fun handleWrite(r: ChannelResult) {
-        // Close client socket after write completes
-        reactorOps.deregister(r.fd)
+        val clientFd = EventKey.fd(r.userData)
+        channelOps.close(clientFd)
     }
 
     // ── Legacy convenience: start in scope ─────────────────────────
@@ -333,7 +371,7 @@ class ReactorCouchServer(
         }
 
         // ── Reduce phase ───────────────────────────────────────────
-        if (reduceSource == null) return """{"rows":[]}"""
+        // reduceFn non-null: doReduce = true implies reduceSource != null
         val reduceFn = reduceSource
         viewServer.handle(CouchCommand.Reset)
         viewServer.handle(CouchCommand.AddFun(reduceFn))
