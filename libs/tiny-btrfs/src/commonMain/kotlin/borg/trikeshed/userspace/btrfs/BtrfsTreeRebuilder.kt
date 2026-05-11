@@ -31,7 +31,7 @@ class BtrfsTreeRebuilder(
         if (bytes.isEmpty() || bytes.size < 4) return
 
         val magic = bytes.u32LeAt(0)
-        check(magic == LEAF_MAGIC || magic == INTERNAL_MAGIC) {
+        check(magic == BTRFS_LEAF_MAGIC.toUInt() || magic == BTRFS_INTERNAL_MAGIC.toUInt()) {
             "Invalid btrfs node magic: 0x${magic.toString(16)}"
         }
 
@@ -41,9 +41,6 @@ class BtrfsTreeRebuilder(
         }
     }
 }
-
-private const val LEAF_MAGIC: UInt = 0x464F5254u
-private const val INTERNAL_MAGIC: UInt = 0x4E465242u
 
 private fun ByteArray.u32LeAt(offset: Int): UInt =
     ((this[offset].toInt() and 0xFF) or
@@ -86,9 +83,8 @@ fun BPlusTree<BtrfsByteKey, Series<Byte>>.rebuildFromSorted(
     diskAdapter: DiskAdapter,
     kvPairs: Series<Join<Series<Byte>, Series<Byte>>>,
 ) {
-    // For simplicity, we'll just do individual inserts.
-    // A more sophisticated bulk-loading algorithm could be implemented here.
-    kvPairs.view.forEach { (key, value) ->
-        put(BtrfsByteKey(key), value)
-    }
+    val sorted = buildList {
+        kvPairs.view.forEach { (key, value) -> add(BtrfsByteKey(key) to value) }
+    }.sortedBy { it.first }
+    bulkLoad(sorted)
 }

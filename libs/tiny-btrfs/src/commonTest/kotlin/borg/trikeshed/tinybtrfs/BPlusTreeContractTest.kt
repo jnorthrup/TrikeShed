@@ -106,7 +106,46 @@ class BPlusTreeContractTest {
 
     @Test
     fun `fanout bounds are respected`() {
-        // minFanout <= fanout <= maxFanout after rebalance
-        assertTrue(true)
+        val tree = BPlusTree<Int, String>(order = 4)
+        for (i in 0 until 128) {
+            tree.put(i, "v$i")
+        }
+        for (i in 0 until 128 step 3) {
+            tree.remove(i)
+        }
+
+        assertTrue(tree.validateFanoutBounds())
+    }
+
+    @Test
+    fun `bulkLoad produces same lookup results as individual inserts`() {
+        val pairs = (0 until 200).map { it to "v$it" }
+
+        val sequential = BPlusTree<Int, String>(order = 8)
+        pairs.forEach { (k, v) -> sequential.put(k, v) }
+
+        val bulk = BPlusTree<Int, String>(order = 8)
+        bulk.bulkLoad(pairs)
+
+        assertEquals(sequential.size(), bulk.size(), "size mismatch")
+        for ((k, expected) in pairs) {
+            assertEquals(expected, bulk.get(k), "lookup mismatch at key $k")
+        }
+        assertTrue(bulk.validateFanoutBounds(), "fanout invariant violated after bulkLoad")
+    }
+
+    @Test
+    fun `bulkLoad on empty input leaves tree empty`() {
+        val tree = BPlusTree<Int, String>(order = 4)
+        tree.bulkLoad(emptyList())
+        assertEquals(0, tree.size())
+    }
+
+    @Test
+    fun `bulkLoad single element works`() {
+        val tree = BPlusTree<Int, String>(order = 4)
+        tree.bulkLoad(listOf(42 to "answer"))
+        assertEquals(1, tree.size())
+        assertEquals("answer", tree.get(42))
     }
 }

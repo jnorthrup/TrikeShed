@@ -305,9 +305,13 @@ class BPlusTree<K : Comparable<K>, V>(
         return if (idx >= 0) leaf.valueAt(idx) else null
     }
 
+    fun containsKey(key: K): Boolean {
+        val leaf: BPlusTree<K, V>.LeafNode = findLeaf(root, key) as LeafNode
+        return leaf.binarySearchKeys(key) >= 0
+    }
+
     fun remove(key: K): Boolean {
-        val existed = get(key) != null
-        if (!existed) return false
+        if (!containsKey(key)) return false
 
         val newRoot = delete(root, key)
         root = if (newRoot != null) {
@@ -323,6 +327,156 @@ class BPlusTree<K : Comparable<K>, V>(
     }
 
     fun size(): Int = _size
+
+    /** Return the minimum key reachable from [node] — i.e. the first key in the leftmost leaf. */
+    private fun leftmostKey(node: Node<K, V>): K = when (node) {
+        is LeafNode -> node.keyAt(0)
+        is InternalNode -> leftmostKey(node.childAt(0))
+    }
+
+    /**
+     * Bulk-load the tree from a pre-sorted list of key/value pairs in O(n) time.
+     * The tree must be empty; call on a freshly-constructed instance.
+     *
+     * The algorithm builds leaf nodes left-to-right filling each to [order] keys,
+     * then builds internal levels bottom-up until a single root remains.
+     */
+    fun bulkLoad(sortedPairs: List<Pair<K, V>>) {
+        require(size() == 0) { "bulkLoad requires an empty tree" }
+        if (sortedPairs.isEmpty()) return
+
+        // --- pass 1: build leaf nodes ---
+        val leaves = mutableListOf<LeafNode>()
+        var cur = LeafNode()
+        for ((k, v) in sortedPairs) {
+            if (cur.keysCount == order) {
+                leaves.add(cur)
+                cur = LeafNode()
+            }
+            cur._keys[cur.keysCount] = k
+            cur._values[cur.keysCount] = v
+            cur.keysCount++
+        }
+        if (cur.keysCount > 0) leaves.add(cur)
+
+        if (leaves.size == 1) {
+            root = leaves[0]
+            return
+        }
+
+        // --- pass 2+: build internal levels bottom-up until one root ---
+        var currentLevel: List<Node<K, V>> = leaves
+        while (currentLevel.size > 1) {
+            val nextLevel = mutableListOf<InternalNode>()
+            var parent = InternalNode()
+            parent._children[0] = currentLevel[0]
+            parent.childrenCount = 1
+
+            for (i in 1 until currentLevel.size) {
+                val child = currentLevel[i]
+                val pivotKey: K = leftmostKey(child)
+                if (parent.childrenCount == order) {
+                    nextLevel.add(parent)
+                    parent = InternalNode()
+                    parent._children[0] = child
+                    parent.childrenCount = 1
+                } else {
+                    parent._keys[parent.keysCount] = pivotKey
+                    parent.keysCount++
+                    parent._children[parent.childrenCount] = child
+                    parent.childrenCount++
+                }
+            }
+            if (parent.childrenCount > 0) nextLevel.add(parent)
+
+            // Ensure every non-root internal node has >= 2 children.
+            // If the last node has only 1 child, borrow one from the penultimate.
+            if (nextLevel.size >= 2 && nextLevel.last().childrenCount == 1) {
+                val last = nextLevel.last()
+                val prev = nextLevel[nextLevel.size - 2]
+                val borrowedChild = prev.childAt(prev.childrenCount - 1)
+                val newSeparator: K = leftmostKey(last.childAt(0))
+                // Shift last's existing child to slot 1 and put borrowed child in slot 0.
+                last._children[1] = last._children[0]
+                last._children[0] = borrowedChild
+                last._keys[0] = newSeparator
+                last.keysCount = 1
+                last.childrenCount = 2
+                // Remove the borrowed child from prev.
+                prev._children[prev.childrenCount - 1] = null
+                prev._keys[prev.keysCount - 1] = null
+                prev.childrenCount--
+                prev.keysCount--
+            }
+
+            currentLevel = nextLevel
+        }
+
+        root = currentLevel[0]
+    }
+
+    fun validateFanoutBounds(): Boolean {
+        data class Validation<K>(
+            val ok: Boolean,
+            val minKey: K?,
+            val maxKey: K?,
+            val leafDepth: Int,
+        )
+
+        fun invalid(depth: Int): Validation<K> = Validation(false, null, null, depth)
+
+        fun walk(node: Node<K, V>, depth: Int, isRoot: Boolean): Validation<K> {
+            if (node.isLeaf()) {
+                val leaf = node as LeafNode
+                if (leaf.keysCount < 0 || leaf.keysCount > order) return invalid(depth)
+                if (!isRoot && leaf.keysCount == 0) return invalid(depth)
+                for (i in 1 until leaf.keysCount) {
+                    if (leaf.keyAt(i - 1).compareTo(leaf.keyAt(i)) >= 0) return invalid(depth)
+                }
+                val min = if (leaf.keysCount > 0) leaf.keyAt(0) else null
+                val max = if (leaf.keysCount > 0) leaf.keyAt(leaf.keysCount - 1) else null
+                return Validation(true, min, max, depth)
+            }
+
+            val internal = node as InternalNode
+            if (internal.childrenCount == 0) return invalid(depth)
+            if (internal.keysCount != internal.childrenCount - 1) return invalid(depth)
+            if (internal.childrenCount > order) return invalid(depth)
+            if (!isRoot && internal.childrenCount < 2) return invalid(depth)
+            for (i in 1 until internal.keysCount) {
+                if (internal.keyAt(i - 1).compareTo(internal.keyAt(i)) >= 0) return invalid(depth)
+            }
+
+            val children = ArrayList<Validation<K>>(internal.childrenCount)
+            for (i in 0 until internal.childrenCount) {
+                val childValidation = walk(internal.childAt(i), depth + 1, false)
+                if (!childValidation.ok) return invalid(depth)
+                children.add(childValidation)
+            }
+
+            val expectedLeafDepth = children[0].leafDepth
+            for (child in children) {
+                if (child.leafDepth != expectedLeafDepth) return invalid(depth)
+            }
+
+            for (i in 0 until internal.keysCount) {
+                val separator = internal.keyAt(i)
+                val leftMax = children[i].maxKey
+                val rightMin = children[i + 1].minKey
+                if (leftMax != null && leftMax.compareTo(separator) >= 0) return invalid(depth)
+                if (rightMin != null && rightMin.compareTo(separator) < 0) return invalid(depth)
+            }
+
+            return Validation(
+                ok = true,
+                minKey = children.first().minKey,
+                maxKey = children.last().maxKey,
+                leafDepth = expectedLeafDepth,
+            )
+        }
+
+        return walk(root, depth = 0, isRoot = true).ok
+    }
 
     fun range(start: K, end: K): Sequence<Join<K, V>> = sequence {
         val stack = mutableListOf<Join<Node<K, V>, Int>>()
@@ -346,7 +500,7 @@ class BPlusTree<K : Comparable<K>, V>(
             while (leafIdx < leaf.keysCount) {
                 val k = leaf.keyAt(leafIdx)
                 if (k >= end) return@sequence
-                val v = leaf.valueAt(leafIdx)!!
+                val v = leaf.valueAt(leafIdx) as V
                 yield(k j v)
                 leafIdx++
             }
@@ -411,7 +565,7 @@ class BPlusTree<K : Comparable<K>, V>(
                             if (leafChild.keysCount + rightSibling.keysCount <= order) {
                                 var merged = leafChild
                                 for (i in 0 until rightSibling.keysCount) {
-                                    merged = merged.insertAt(merged.keysCount, rightSibling.keyAt(i), rightSibling.valueAt(i)!!)
+                                    merged = merged.insertAt(merged.keysCount, rightSibling.keyAt(i), rightSibling.valueAt(i) as V)
                                 }
                                 newInternal = newInternal.setChildAt(childIndex, merged)
                                 newInternal = newInternal.removeKeyAndChildAt(childIndex, childIndex + 1)
