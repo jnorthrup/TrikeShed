@@ -72,7 +72,8 @@ actual object Files {
         }
     }
 
-    actual fun iterateLines(fileName: String, bufsize: Int): Iterable<Join<Long, Series<Byte>>> = TODO("iterateLines JVM")
+    actual fun iterateLines(fileName: String, bufsize: Int): Iterable<Join<Long, Series<Byte>>> =
+        streamLines(fileName, bufsize).map { (off, arr) -> off j arr.toSeries() }.asIterable()
 
     actual fun listDir(path: String): List<String> =
         File(path).listFiles()?.map { it.name } ?: emptyList()
