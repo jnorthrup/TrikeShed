@@ -109,6 +109,60 @@ miniduck/
 | KernelStochasticTrainer | -- | ElementState lifecycle in NoOpTrainer | Structured concurrency (coroutineScope) | Implemented (NoOp) |
 | UserspaceBtrfsBuffer | Companion Key | AsyncContextElement (CREATED->OPEN->DRAINING->CLOSED) | -- | In tiny-btrfs lib |
 
+## Architectural Position
+
+MiniDuck is not a database. It is a query engine that returns analytical cursors.
+Where DuckDB compiles SQL to a parallelized execution DAG over typed column vectors
+(C++ core, SIMD, language bindings), MiniDuck composes projections over `Cursor = Series<RowVec>`
+using the Join algebra and delivers the cursor to the caller for further composition.
+
+The benefits over a hybrid/immature JDBC approach (as current DuckDB Java bindings):
+- Cursor is a dataframe-shaped grid that looks the same whether row-aligned or column-aligned
+- No JDBC adapter layer, no ResultSet materialization, no driver version coupling
+- RowVec is `size j { i -> ... }` — a pair of size and function. Reordering, projecting,
+  and transposing cost the size of the IntArray permutation, never the data itself.
+- Every target (JVM, JS, WASM, native) gets the same cursor-shaped result, even if
+  autovectorization depth varies by platform. Autovec holds water where it can;
+  tailorkor/native is added only when a measured speedup justifies the path.
+
+## Capacity Planning: Debt vs Payback
+
+Each capability below carries implementation debt and a payback trigger. Review each
+opportunistically — when a workload demonstrates a clear win in context, move it from
+consideration to implementation. Do not build all at once; disproportionate wins come
+from reserved consideration, not from throwing resources at every feature simultaneously.
+
+| Capability | Debt | Payback Trigger | Review Criterion |
+|---|---|---|---|
+| **Zone maps (min/max per block)** | Low — ~20 lines per column type at write | Full-scan with predicates | Any scan that reads blocks with no matching rows |
+| **Bloom filters** | Low — bit array + hash | Equality predicates on large datasets | Hash join build cost on negative lookups |
+| **Dictionary encoding (strings)** | Medium — map string→int at block write | High-cardinality string columns repeated | Storage shrinks, decode cost < scan savings |
+| **RLE / bitpacking** | Medium — encode/decode per type | Numeric columns with locality or small ranges | Working set exceeds L1/L2 cache |
+| **FSST (string compression)** | High — symbol table build + decode | String-heavy workloads (logs, JSON) | Only after RLE/dict prove the pattern |
+| **ART indexes** | Medium — radix tree over column values | Point lookups on string/numeric keys | Port from `../columnar/` as planned |
+| **Additional joins (Perfect, IEJoin, ASOF, Range)** | Medium-High — algorithm + cardinality estimator | Queries that blow up on hash join | Perfect join for PK/FK; ASOF for time-series |
+| **Cost model + optimizer** | High — needs cardinality stats | ≥2 indexes + ≥2 join strategies | Zone maps ARE the first stats. Cannot exist without them. |
+| **MVCC** | High — version chain + conflict resolution | Concurrent readers + writers on same blocks | `MvccBlockStore` stubs exist. Needs WAL surface. |
+| **Full SQL surface** | Medium — parser is mechanical, optimizer is not | ORM / ad-hoc query surface | Parser is easy. Plan mapping is the hard part. |
+
+### Staging Priority
+
+1. **Zone maps → Bloom → Dictionary** — storage primitives, no transaction dependency,
+   pay back on every read. Zone maps feed the cost model directly.
+2. **Join strategies + cardinality** — forces the cost model to exist at a crude level.
+   Use zone map span ratios as primitive cardinality estimates.
+3. **ART indexes** — completes the pruning surface alongside zone maps and Bloom filters.
+4. **RLE/bitpacking → FSST** — storage compression, deferred until scan patterns justify it.
+5. **MVCC → full CBO** — high-ticket, only when concurrency and query complexity demand it.
+
+### Guardrail
+
+Every encoding, index, and join strategy must be expressible as a cursor transform.
+Zone maps are a filter on Series. Bloom filters are a probe. Dictionary is a map projection.
+If it cannot be written as a cursor operation, it does not belong in MiniDuck.
+RowVec algebra (`size j { i -> ... }`) must not change — all compression and indexing
+live behind the same indirection surface.
+
 ## Dependencies
 
 - `borg.trikeshed.cursor` -- Cursor, RowVec, ColumnMeta
