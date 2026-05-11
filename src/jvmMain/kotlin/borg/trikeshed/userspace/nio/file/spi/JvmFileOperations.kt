@@ -3,6 +3,7 @@ package borg.trikeshed.userspace.nio.file.spi
 import borg.trikeshed.lib.*
 import java.io.File
 import java.io.ByteArrayOutputStream
+import java.util.zip.ZipInputStream
 
 class JvmFileOperations : FileOperations {
 
@@ -75,7 +76,20 @@ class JvmFileOperations : FileOperations {
 
     override fun resolvePath(vararg parts: String): String = parts.joinToString(File.separator)
 
-    override fun readZip(path: String): List<Pair<String, ByteArray>> = TODO("readZip JVM")
+    override fun readZip(path: String): List<Pair<String, ByteArray>> {
+        val result = mutableListOf<Pair<String, ByteArray>>()
+        ZipInputStream(File(path).inputStream()).use { zis ->
+            var entry = zis.nextEntry
+            while (entry != null) {
+                if (!entry.isDirectory) {
+                    val bytes = zis.readBytes()
+                    result.add(entry.name to bytes)
+                }
+                entry = zis.nextEntry
+            }
+        }
+        return result
+    }
 
     override fun createTempDir(prefix: String): String =
         java.nio.file.Files.createTempDirectory(prefix).toAbsolutePath().toString()
