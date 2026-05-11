@@ -93,10 +93,10 @@ function(doc) {
         "byDate"     to (MAP_BY_DATE     to null),
     )
 
-    /** Register all cascade kline map views with [server] under [db]. */
+    /** Register all cascade kline map+reduce views with [server] under [db]. */
     fun registerWith(server: ReactorCouchServer, db: String = DEFAULT_DB) {
         for ((name, pair) in views) {
-            server.registerView(db, "klines", name, pair.first)
+            server.registerView(db, "klines", name, pair.first, pair.second)
         }
     }
 

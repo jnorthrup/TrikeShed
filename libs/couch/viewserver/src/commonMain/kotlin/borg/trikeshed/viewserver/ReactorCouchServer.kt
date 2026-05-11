@@ -27,6 +27,24 @@ import kotlinx.coroutines.launch
 
 // ── HTTP/1.1 request parser ──────────────────────────────────────────────
 
+/** Percent-decode a URL query parameter value (handles multi-byte UTF-8). */
+private fun urlDecode(value: String): String {
+    val bytes = mutableListOf<Byte>()
+    var i = 0
+    while (i < value.length) {
+        when (val ch = value[i]) {
+            '+' -> { bytes.add(' '.code.toByte()); i++ }
+            '%' -> if (i + 2 < value.length) {
+                val b = value.substring(i + 1, i + 3).toIntOrNull(16)
+                if (b != null) { bytes.add(b.toByte()); i += 3 }
+                else { bytes.addAll(ch.toString().encodeToByteArray().asList()); i++ }
+            } else { bytes.addAll(ch.toString().encodeToByteArray().asList()); i++ }
+            else -> { bytes.addAll(ch.toString().encodeToByteArray().asList()); i++ }
+        }
+    }
+    return bytes.toByteArray().decodeToString()
+}
+
 data class HttpRequest(
     val method: String,
     val path: String,
@@ -98,7 +116,8 @@ class ReactorCouchServer(
     }
 
     private val viewServer = CouchQueryServer(compileJs)
-    private val viewSources = mutableMapOf<String, MutableMap<String, String>>()
+    /** db → viewName → (mapSource, reduceSource?) */
+    private val viewSources = mutableMapOf<String, MutableMap<String, Pair<String, String?>>>()
     private var serverFd: Int = -1
 
     // ── Pattern A lifecycle ────────────────────────────────────────
@@ -176,8 +195,10 @@ class ReactorCouchServer(
     // ── HTTP routing ───────────────────────────────────────────────
 
     private fun route(request: HttpRequest): String {
-        val path = request.path.trim('/')
+        val (pathPart, queryPart) = request.path.split("?", limit = 2).let { it[0] to it.getOrElse(1) { "" } }
+        val path = pathPart.trim('/')
         val segments = path.split('/')
+        val queryParams = parseQueryParams(queryPart)
 
         return when {
             // GET /{db} — list all docs
@@ -193,7 +214,7 @@ class ReactorCouchServer(
                 handleBulkDocs(segments[0], request.body)
             // GET /{db}/_design/{ddoc}/_view/{view}
             segments.size == 5 && segments[1] == "_design" && segments[3] == "_view" ->
-                handleViewQuery(segments[0], segments[2], segments[4])
+                handleViewQuery(segments[0], segments[2], segments[4], queryParams)
             else -> """{"error":"not_found","reason":"unknown endpoint ${request.method} $path"}"""
         }
     }
@@ -240,8 +261,8 @@ class ReactorCouchServer(
 
     // ── View query ─────────────────────────────────────────────────
 
-    fun registerView(db: String, ddoc: String, viewName: String, source: String) {
-        viewSources.getOrPut(db) { mutableMapOf() }[viewName] = source
+    fun registerView(db: String, ddoc: String, viewName: String, mapSource: String, reduceSource: String? = null) {
+        viewSources.getOrPut(db) { mutableMapOf() }[viewName] = mapSource to reduceSource
     }
 
     /** Register all cascade kline views for in-process query via [KlineDesignDoc]. */
@@ -249,32 +270,97 @@ class ReactorCouchServer(
         KlineDesignDoc.registerWith(this, db)
     }
 
-    private fun handleViewQuery(db: String, ddoc: String, viewName: String): String {
-        val source = viewSources[db]?.get(viewName)
+    private fun handleViewQuery(db: String, ddoc: String, viewName: String, queryParams: Map<String, String> = emptyMap()): String {
+        val entry = viewSources[db]?.get(viewName)
             ?: return """{"error":"not_found","reason":"view $viewName not found in $db"}"""
+        val (mapSource, reduceSource) = entry
 
+        // ── Query parameters ───────────────────────────────────────
+        val doReduce = queryParams["reduce"]?.lowercase() != "false" && reduceSource != null
+        val group = queryParams["group"]?.lowercase() == "true"
+        val groupLevel = queryParams["group_level"]?.toIntOrNull()
+        val limit = queryParams["limit"]?.toIntOrNull()
+        val skip = queryParams["skip"]?.toIntOrNull() ?: 0
+        val descending = queryParams["descending"]?.lowercase() == "true"
+        val keyFilter = queryParams["key"]?.let { parseJsonValue(urlDecode(it)) }
+        val startKey = queryParams["startkey"]?.let { parseJsonValue(urlDecode(it)) }
+        val endKey = queryParams["endkey"]?.let { parseJsonValue(urlDecode(it)) }
+
+        // ── Map phase ──────────────────────────────────────────────
         viewServer.handle(CouchCommand.Reset)
-        viewServer.handle(CouchCommand.AddFun(source))
+        viewServer.handle(CouchCommand.AddFun(mapSource))
 
-        val ids = store.list(db)
-        val allResults = mutableListOf<List<List<Any?>>>()
-
-        for (id in ids) {
+        data class Row(val id: String, val key: Any?, val value: Any?)
+        val rows = mutableListOf<Row>()
+        for (id in store.list(db)) {
             val block = store.get(db, id) ?: continue
             val doc = blockToDoc(block)
             val response = viewServer.handle(CouchCommand.MapDoc(doc))
             if (response is CouchResponse.MapResults) {
-                allResults.addAll(response.perFunction)
+                for (kv in response.perFunction.firstOrNull() ?: emptyList()) {
+                    rows.add(Row(id, kv.getOrNull(0), kv.getOrNull(1)))
+                }
             }
         }
 
-        val total = allResults.sumOf { it.size }
-        val rows = allResults.joinToString(",") { fnResults ->
-            fnResults.joinToString(",") { kv ->
-                """{"id":"${kv.getOrNull(0)}","key":${jsonValue(kv.getOrNull(0))},"value":${jsonValue(kv.getOrNull(1))}}"""
+        // ── Filter ────────────────────────────────────────────────
+        val filtered = rows.filter { row ->
+            when {
+                keyFilter != null -> compareKeys(row.key, keyFilter) == 0
+                startKey != null || endKey != null -> {
+                    val afterStart = startKey == null || compareKeys(row.key, startKey) >= 0
+                    val beforeEnd = endKey == null || compareKeys(row.key, endKey) <= 0
+                    afterStart && beforeEnd
+                }
+                else -> true
             }
         }
-        return """{"total_rows":$total,"offset":0,"rows":[$rows]}"""
+
+        // ── Sort ──────────────────────────────────────────────────
+        val sorted = if (descending)
+            filtered.sortedWith { a, b -> compareKeys(b.key, a.key) }
+        else
+            filtered.sortedWith { a, b -> compareKeys(a.key, b.key) }
+
+        val paged = sorted.drop(skip)
+
+        if (!doReduce) {
+            val limited = if (limit != null) paged.take(limit) else paged
+            val rowJson = limited.joinToString(",") { row ->
+                """{"id":"${row.id}","key":${jsonValue(row.key)},"value":${jsonValue(row.value)}}"""
+            }
+            return """{"total_rows":${filtered.size},"offset":$skip,"rows":[$rowJson]}"""
+        }
+
+        // ── Reduce phase ───────────────────────────────────────────
+        if (reduceSource == null) return """{"rows":[]}"""
+        val reduceFn = reduceSource
+        viewServer.handle(CouchCommand.Reset)
+        viewServer.handle(CouchCommand.AddFun(reduceFn))
+
+        if (group || groupLevel != null) {
+            val level = groupLevel ?: Int.MAX_VALUE
+            val grouped = LinkedHashMap<Any?, MutableList<Any?>>()
+            for (row in paged) {
+                val gk = keyPrefix(row.key, level)
+                grouped.getOrPut(gk) { mutableListOf() }.add(row.value)
+            }
+            var groupedEntries = grouped.entries.toList()
+            if (descending) groupedEntries = groupedEntries.reversed()
+            val limitedGroups = if (limit != null) groupedEntries.take(limit) else groupedEntries
+
+            val rowJson = limitedGroups.joinToString(",") { (gk, values) ->
+                val r = viewServer.handle(CouchCommand.Reduce(listOf(reduceFn), values))
+                val result = if (r is CouchResponse.ReduceResult) r.value else null
+                """{"key":${jsonValue(gk)},"value":${jsonValue(result)}}"""
+            }
+            return """{"rows":[$rowJson]}"""
+        } else {
+            val values = paged.map { it.value }
+            val r = viewServer.handle(CouchCommand.Reduce(listOf(reduceFn), values))
+            val result = if (r is CouchResponse.ReduceResult) r.value else null
+            return """{"rows":[{"key":null,"value":${jsonValue(result)}}]}"""
+        }
     }
 
     // ── JSON helpers ───────────────────────────────────────────────
@@ -283,6 +369,58 @@ class ReactorCouchServer(
         val ctx = contextOf(Syntax.JSON, json.toSeries())
         @Suppress("UNCHECKED_CAST")
         return Combinators.reify(ctx) as? Map<String, Any?> ?: emptyMap()
+    }
+
+    private fun parseJsonValue(json: String): Any? {
+        val ctx = contextOf(Syntax.JSON, json.toSeries())
+        return Combinators.reify(ctx)
+    }
+
+    // ── Query param helpers ────────────────────────────────────────
+
+    private fun parseQueryParams(query: String): Map<String, String> {
+        if (query.isBlank()) return emptyMap()
+        return query.split('&').mapNotNull { pair ->
+            val eq = pair.indexOf('=')
+            if (pair.isBlank()) null
+            else if (eq < 0) urlDecode(pair) to ""
+            else urlDecode(pair.substring(0, eq)) to urlDecode(pair.substring(eq + 1))
+        }.toMap()
+    }
+
+    /** CouchDB collation rank: null=0 false=1 true=2 Number=3 String=4 Array=5 Object=6 */
+    private fun collationRank(v: Any?): Int = when (v) {
+        null -> 0
+        is Boolean -> if (v) 2 else 1
+        is Number -> 3
+        is String -> 4
+        is List<*> -> 5
+        is Map<*, *> -> 6
+        else -> 4
+    }
+
+    private fun compareKeys(a: Any?, b: Any?): Int {
+        val ra = collationRank(a); val rb = collationRank(b)
+        if (ra != rb) return ra.compareTo(rb)
+        return when {
+            a == null -> 0
+            a is Boolean && b is Boolean -> a.compareTo(b)
+            a is Number && b is Number -> a.toDouble().compareTo(b.toDouble())
+            a is String && b is String -> a.compareTo(b)
+            a is List<*> && b is List<*> -> {
+                val minLen = minOf(a.size, b.size)
+                for (i in 0 until minLen) {
+                    val c = compareKeys(a[i], b[i]); if (c != 0) return c
+                }
+                a.size.compareTo(b.size)
+            }
+            else -> jsonValue(a).compareTo(jsonValue(b))
+        }
+    }
+
+    private fun keyPrefix(key: Any?, level: Int): Any? = when {
+        key is List<*> && level < key.size -> key.take(level)
+        else -> key
     }
 
     // ── Document ↔ JSON ↔ BlockStore helpers ──────────────────────
