@@ -66,11 +66,19 @@ data class SelectPlan(
     private fun matchesWhere(row: RowAccessor, where: Expr?): Boolean {
         if (where == null) return true
         return when (where) {
-            is BinaryExpr -> when (where.op) {
+            is BinaryExpr -> when (where.op.uppercase()) {
+                "AND" -> matchesWhere(row, where.left) && matchesWhere(row, where.right)
+                "OR" -> matchesWhere(row, where.left) || matchesWhere(row, where.right)
                 "=", "==" -> valuesEqual(valueOf(where.left, row), valueOf(where.right, row))
-                else -> true
+                "!=", "<>" -> !valuesEqual(valueOf(where.left, row), valueOf(where.right, row))
+                ">" -> compareValues(valueOf(where.left, row), valueOf(where.right, row))?.let { it > 0 } ?: false
+                ">=" -> compareValues(valueOf(where.left, row), valueOf(where.right, row))?.let { it >= 0 } ?: false
+                "<" -> compareValues(valueOf(where.left, row), valueOf(where.right, row))?.let { it < 0 } ?: false
+                "<=" -> compareValues(valueOf(where.left, row), valueOf(where.right, row))?.let { it <= 0 } ?: false
+                else -> false
             }
-            else -> true
+            is LitExpr -> valueOf(where, row) as? Boolean ?: false
+            else -> false
         }
     }
 
@@ -81,13 +89,19 @@ data class SelectPlan(
             is NumericLiteral -> lit.value
             else -> null
         }
-        is BinaryExpr -> null
-        else -> null
+        is BinaryExpr -> matchesWhere(row, expr)
     }
 
     private fun valuesEqual(left: Any?, right: Any?): Boolean {
         if (left is Number && right is Number) return left.toDouble() == right.toDouble()
         return left == right
+    }
+
+    private fun compareValues(left: Any?, right: Any?): Int? = when {
+        left is Number && right is Number -> left.toDouble().compareTo(right.toDouble())
+        left is String && right is String -> left.compareTo(right)
+        left is Boolean && right is Boolean -> left.compareTo(right)
+        else -> null
     }
 
     private fun projectRow(
@@ -99,10 +113,17 @@ data class SelectPlan(
         val values = mutableListOf<Any?>()
 
         if (isSelectAll(columns)) {
-            val schemaColumns = schema?.columns ?: emptyList()
-            for (column in schemaColumns) {
-                names.add(column.name)
-                values.add(row[column.name])
+            val schemaColumns = schema?.columns
+            if (schemaColumns != null) {
+                for (column in schemaColumns) {
+                    names.add(column.name)
+                    values.add(row[column.name])
+                }
+            } else {
+                for (index in 0 until row.size) {
+                    names.add(row.columnName(index) ?: "col$index")
+                    values.add(row[index])
+                }
             }
             return DocRowVec(names, values)
         }

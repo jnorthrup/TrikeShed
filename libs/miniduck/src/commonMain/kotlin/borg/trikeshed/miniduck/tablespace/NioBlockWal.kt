@@ -2,9 +2,7 @@ package borg.trikeshed.miniduck.tablespace
 
 import borg.trikeshed.miniduck.BlockRowVec
 import borg.trikeshed.miniduck.MiniDuckBlockCodec
-import borg.trikeshed.parse.confix.Combinators
-import borg.trikeshed.parse.confix.Syntax
-import borg.trikeshed.parse.confix.contextOf
+import borg.trikeshed.parse.json.JsonParser
 import borg.trikeshed.lib.j
 import borg.trikeshed.userspace.nio.file.spi.FileOperations
 
@@ -37,7 +35,7 @@ class NioBlockWal(
         nextSeq++
         val encoded = MiniDuckBlockCodec.encode(block)
         val header = """{"seq":$nextSeq,"op":"put","collection":"$collection","id":"$id"}"""
-        fs.write(walPath, "$header\n$encoded\n")
+        appendText("$header\n$encoded\n")
         return nextSeq
     }
 
@@ -47,7 +45,7 @@ class NioBlockWal(
     fun appendRemove(collection: String, id: String): Long {
         nextSeq++
         val entry = """{"seq":$nextSeq,"op":"remove","collection":"$collection","id":"$id"}"""
-        fs.write(walPath, "$entry\n")
+        appendText("$entry\n")
         return nextSeq
     }
 
@@ -97,21 +95,31 @@ class NioBlockWal(
         val entries = mutableListOf<WalEntry>()
         var i = 0
         while (i < lines.size) {
-            val line = lines[i].trim()
-            if (line.isEmpty()) { i++; continue }
-            val header = parseWalHeader(line) ?: run { i++; continue }
-            var blockData: String? = null
-            if (header.op == "put" && i + 1 < lines.size) {
-                val next = lines[i + 1]
-                if (next.startsWith("{\"_type\":\"_block\"")) {
-                    blockData = next
-                    i++ // consume block line
-                }
+            val headerLine = lines[i].trim()
+            if (headerLine.isEmpty()) {
+                i++
+                continue
             }
-            entries.add(header.copy(blockData = blockData))
-            i++
+            val header = parseWalHeader(headerLine) ?: run {
+                i++
+                continue
+            }
+            if (header.op == "put") {
+                val blockLines = mutableListOf<String>()
+                var cursor = i + 1
+                while (cursor < lines.size) {
+                    val candidate = lines[cursor]
+                    if (candidate.isNotBlank() && parseWalHeader(candidate.trim()) != null) break
+                    if (candidate.isNotBlank()) blockLines += candidate
+                    cursor++
+                }
+                entries += header.copy(blockData = blockLines.joinToString("\n").ifEmpty { null })
+                i = cursor
+            } else {
+                entries += header
+                i++
+            }
         }
-        // Update nextSeq from the last entry
         if (entries.isNotEmpty()) {
             nextSeq = entries.last().seq
         }
@@ -120,18 +128,15 @@ class NioBlockWal(
 
     private fun parseWalHeader(line: String): WalEntry? {
         if (!line.startsWith("{")) return null
-        try {
-            val ctx = contextOf(Syntax.JSON, line.toSeries())
-            val reified = Combinators.reify(ctx)
-            @Suppress("UNCHECKED_CAST")
-            val m = reified as? Map<String, Any?> ?: return null
+        return try {
+            val m = JsonParser.parse(line)
             val seq = (m["seq"] as? Number)?.toLong() ?: return null
             val op = m["op"] as? String ?: return null
             val collection = m["collection"] as? String ?: ""
             val id = m["id"] as? String ?: ""
-            return WalEntry(seq, op, collection, id)
+            WalEntry(seq, op, collection, id)
         } catch (_: Exception) {
-            return null
+            null
         }
     }
 
@@ -147,8 +152,13 @@ class NioBlockWal(
         }
     }
 
+    private fun appendText(text: String) {
+        val existing = if (fs.exists(walPath)) fs.readString(walPath) else ""
+        fs.write(walPath, existing + text)
+    }
+
     private fun String.toSeries(): borg.trikeshed.lib.Series<Char> {
         val n = length
-        return (n j { i: Int -> this[i] }) as borg.trikeshed.lib.Series<Char>
+        return n j { i: Int -> this[i] }
     }
 }

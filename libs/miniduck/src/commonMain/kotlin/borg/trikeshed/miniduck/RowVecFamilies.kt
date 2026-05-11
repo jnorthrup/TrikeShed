@@ -18,8 +18,7 @@ import borg.trikeshed.lib.*
 
 // ── Series shorthand ───────────────────────────────────────────────────────────
 /** Inline Series constructor — s_["a", "b", "c"] creates Series<String>. */
-@Suppress("UNCHECKED_CAST")
-inline fun <T> s_(vararg elements: T): Series<T> = seriesOf(elements.toList()) as Series<T>
+fun <T> s_(vararg elements: T): Series<T> = seriesOf(elements.toList())
 
 // ── JsonRowVec / DocRowVec ────────────────────────────────────────────────────
 // Two-component family: nodeType + rawValue, with optional lazy child.
@@ -242,7 +241,10 @@ class BlockRowVec private constructor(
             is S3RowVec -> row
             is AlibabaRowVec -> row
             is BlockRowVec -> row
-            is Join<*, *> -> row as RowVec
+            is Join<*, *> -> {
+                @Suppress("UNCHECKED_CAST")
+                row as RowVec
+            }
             else -> JsonRowVec(row.toString(), null)
         }
         child.add(rv)

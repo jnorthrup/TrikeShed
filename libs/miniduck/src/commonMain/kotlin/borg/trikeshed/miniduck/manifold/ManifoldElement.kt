@@ -44,6 +44,9 @@ class ManifoldElement(parentJob: Job? = null) : AsyncContextElement(parentJob = 
     /** Access branch: topology, cache spans, index seeks */
     val accessBranch: CompletableJob = SupervisorJob(supervisor)
 
+    private fun branchScope(scope: CoroutineScope, branch: Job): CoroutineScope =
+        CoroutineScope(scope.coroutineContext.minusKey(Job) + branch)
+
     /**
      * Dispatch a MiniDuckPoint to its branches.
      * Each handler runs as an independent child coroutine of its branch.
@@ -56,9 +59,9 @@ class ManifoldElement(parentJob: Job? = null) : AsyncContextElement(parentJob = 
         onTime: (suspend (MiniDuckPoint) -> Unit)? = null,
         onAccess: (suspend (MiniDuckPoint) -> Unit)? = null,
     ) {
-        if (onShape != null) scope.launch(shapeBranch) { onShape(point) }
-        if (onTime  != null) scope.launch(timeBranch)  { onTime(point) }
-        if (onAccess != null) scope.launch(accessBranch) { onAccess(point) }
+        if (onShape != null) branchScope(scope, shapeBranch).launch { onShape(point) }
+        if (onTime  != null) branchScope(scope, timeBranch).launch { onTime(point) }
+        if (onAccess != null) branchScope(scope, accessBranch).launch { onAccess(point) }
     }
 
     /**
@@ -74,7 +77,7 @@ class ManifoldElement(parentJob: Job? = null) : AsyncContextElement(parentJob = 
         decayFactor: Float = 0.9f,
         onDerived: (ManifoldConcept<P>) -> Unit,
     ) {
-        scope.launch(timeBranch) {
+        branchScope(scope, timeBranch).launch {
             val derived = concept.decay(decayFactor)
             if (derived.budget.energy() >= energyFloor) {
                 onDerived(derived)
@@ -97,7 +100,7 @@ class ManifoldElement(parentJob: Job? = null) : AsyncContextElement(parentJob = 
     ) {
         for (i in 0 until steps.a) {
             val step = steps.b(i)
-            scope.launch(timeBranch) {
+            branchScope(scope, timeBranch).launch {
                 step.apply(concept, onDerived)
             }
         }

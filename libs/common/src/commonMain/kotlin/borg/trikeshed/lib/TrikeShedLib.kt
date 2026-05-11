@@ -9,4 +9,4 @@ import borg.trikeshed.cursor.get
 
 
 
-fun c1(c: Cursor)= c["close"] as Cursor
+fun c1(c: Cursor)= c["close"]

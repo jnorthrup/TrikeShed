@@ -2,6 +2,7 @@ package borg.trikeshed.miniduck
 
 import borg.trikeshed.cursor.RowVec
 import borg.trikeshed.lib.*
+import borg.trikeshed.parse.json.JsonParser
 import kotlin.test.*
 
 class MiniDuckBlockCodecRoundTripTest {
@@ -63,6 +64,23 @@ class MiniDuckBlockCodecRoundTripTest {
         assertEquals(1, inner.keys.size)
         assertEquals("x", inner.keys[0])
         assertEquals(99, inner.cells[0])
+    }
+
+    @Test
+    fun keyedEncodingUsesStructuredJsonForArraysAndTaggedValues() {
+        val encoded = encodeBlock(
+            DocRowVec(
+                keys = listOf("name", "meta"),
+                cells = listOf("alice", mapOf("score" to 7, "active" to true)),
+            ).toRowVec(),
+        )
+        val parsed = JsonParser.parse(encoded.lines()[1])
+
+        val keys = parsed["keys"] as? List<*> ?: fail("keys should decode as a JSON array")
+        val cells = parsed["cells"] as? List<*> ?: fail("cells should decode as a JSON array")
+        assertEquals(listOf("name", "meta"), keys)
+        val meta = cells[1] as? Map<*, *> ?: fail("tagged map cell should remain structured JSON")
+        assertEquals("m", meta["_k"])
     }
 
     // ── ViewRowVec ───────────────────────────────────────────────────────

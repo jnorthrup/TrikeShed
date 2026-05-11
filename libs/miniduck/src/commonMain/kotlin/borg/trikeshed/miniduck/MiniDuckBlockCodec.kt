@@ -31,7 +31,7 @@ object MiniDuckBlockCodec {
     fun encode(block: BlockRowVec): String {
         val sb = StringBuilder()
         sb.append("""{"_type":"_block"}""")
-        val rows = block.child ?: return sb.toString()
+        val rows = block.child
         for (i in 0 until rows.size) {
             sb.append('\n')
             appendRow(sb, rows[i])
@@ -68,15 +68,15 @@ object MiniDuckBlockCodec {
     }
 
     private fun appendView(sb: StringBuilder, view: ViewRowVec) {
-        sb.append("""{"_type":"view","id":""")
+        sb.append("{\"_type\":\"view\",\"id\":")
         appendTaggedValue(sb, view.id)
-        sb.append(""","key":""")
+        sb.append(",\"key\":")
         appendTaggedValue(sb, view.key)
-        sb.append(""","value":""")
+        sb.append(",\"value\":")
         appendTaggedValue(sb, view.value)
         val ch = view.child
         if (ch != null) {
-            sb.append(""","_ch":""")
+            sb.append(",\"_ch\":")
             appendRowArray(sb, ch)
         }
         sb.append('}')
@@ -91,54 +91,54 @@ object MiniDuckBlockCodec {
             appendKeyed(sb, DocRowVec(listOf(node.nodeType), listOf(null), node.child))
             return
         }
-        sb.append("""{"_type":"json","nodeType":""")
+        sb.append("{\"_type\":\"json\",\"nodeType\":")
         appendJsonString(sb, node.nodeType)
-        sb.append(""","rawValue":""")
+        sb.append(",\"rawValue\":")
         val rv = node.rawValue
         if (rv == null) sb.append("null") else appendJsonString(sb, rv)
         val ch = node.child
         if (ch != null) {
-            sb.append(""","_ch":""")
+            sb.append(",\"_ch\":")
             appendRowArray(sb, ch)
         }
         sb.append('}')
     }
 
     private fun appendYaml(sb: StringBuilder, node: YamlRowVec) {
-        sb.append("""{"_type":"yaml","nodeKind":""")
+        sb.append("{\"_type\":\"yaml\",\"nodeKind\":")
         appendJsonString(sb, node.nodeKind)
-        sb.append(""","scalarValue":""")
+        sb.append(",\"scalarValue\":")
         val sv = node.scalarValue
         if (sv == null) sb.append("null") else appendJsonString(sb, sv)
         val ch = node.child
         if (ch != null) {
-            sb.append(""","_ch":""")
+            sb.append(",\"_ch\":")
             appendRowArray(sb, ch)
         }
         sb.append('}')
     }
 
     private fun appendBlob(sb: StringBuilder, blob: BlobRowVec) {
-        sb.append("""{"_type":"blob","mime":""")
+        sb.append("{\"_type\":\"blob\",\"mime\":")
         appendJsonString(sb, blob.mimeType)
-        sb.append(""","bytes":""")
+        sb.append(",\"bytes\":")
         appendJsonString(sb, blob.bytes.toHex())
         val ch = blob.child
         if (ch != null) {
-            sb.append(""","_ch":""")
+            sb.append(",\"_ch\":")
             appendRowArray(sb, ch)
         }
         sb.append('}')
     }
 
     private fun appendKeyed(sb: StringBuilder, row: DocRowVec) {
-        sb.append("""{"_type":"keyed","keys":""")
+        sb.append("{\"_type\":\"keyed\",\"keys\":")
         appendStrArray(sb, (0 until row.keys.size).map { row.keys[it] })
-        sb.append(""","cells":""")
+        sb.append(",\"cells\":")
         appendTaggedArray(sb, (0 until row.cells.size).map { row.cells[it] })
         val ch = row.child
         if (ch != null) {
-            sb.append(""","_ch":""")
+            sb.append(",\"_ch\":")
             appendRowArray(sb, ch)
         }
         sb.append('}')
@@ -164,21 +164,21 @@ object MiniDuckBlockCodec {
         contentType: String?, etag: String?, lastModified: String?,
         versionId: String?, metadata: Map<String, String>?,
     ) {
-        sb.append("""{"_type":""")
+        sb.append("{\"_type\":")
         appendJsonString(sb, typeTag)
-        sb.append(""","bucket":""")
+        sb.append(",\"bucket\":")
         appendJsonString(sb, bucket)
-        sb.append(""","key":""")
+        sb.append(",\"key\":")
         appendJsonString(sb, key)
-        sb.append(""","byteSize":$byteSize,"contentType":""")
+        sb.append(",\"byteSize\":$byteSize,\"contentType\":")
         if (contentType == null) sb.append("null") else appendJsonString(sb, contentType)
-        sb.append(""","etag":""")
+        sb.append(",\"etag\":")
         if (etag == null) sb.append("null") else appendJsonString(sb, etag)
-        sb.append(""","lastModified":""")
+        sb.append(",\"lastModified\":")
         if (lastModified == null) sb.append("null") else appendJsonString(sb, lastModified)
-        sb.append(""","versionId":""")
+        sb.append(",\"versionId\":")
         if (versionId == null) sb.append("null") else appendJsonString(sb, versionId)
-        sb.append(""","metadata":""")
+        sb.append(",\"metadata\":")
         if (metadata == null) sb.append("null")
         else {
             sb.append('{')
@@ -196,10 +196,8 @@ object MiniDuckBlockCodec {
     }
 
     private fun appendNestedBlock(sb: StringBuilder, block: BlockRowVec) {
-        sb.append("""{"_type":"block","_ch":""")
-        val ch = block.child
-        if (ch != null) appendRowArray(sb, ch)
-        else sb.append("[]")
+        sb.append("{\"_type\":\"block\",\"_ch\":")
+        appendRowArray(sb, block.child)
         sb.append('}')
     }
 
@@ -231,14 +229,18 @@ object MiniDuckBlockCodec {
     private fun appendTaggedValue(sb: StringBuilder, v: Any?) {
         when (v) {
             null -> sb.append("""{"_k":"n"}""")
-            is String -> { sb.append("""{"_k":"s","v":"""); appendJsonString(sb, v); sb.append('}') }
+            is String -> {
+                sb.append("{\"_k\":\"s\",\"v\":")
+                appendJsonString(sb, v)
+                sb.append('}')
+            }
             is Int -> sb.append("""{"_k":"i","v":$v}""")
             is Long -> sb.append("""{"_k":"l","v":$v}""")
             is Double -> sb.append("""{"_k":"d","v":$v}""")
             is Float -> sb.append("""{"_k":"f","v":$v}""")
             is Boolean -> sb.append("""{"_k":"b","v":$v}""")
             is Map<*, *> -> {
-                sb.append("""{"_k":"m","v":{""")
+                sb.append("{\"_k\":\"m\",\"v\":{")
                 var first = true
                 for ((mk, mv) in v) {
                     if (!first) sb.append(',')
@@ -250,11 +252,15 @@ object MiniDuckBlockCodec {
                 sb.append("}}")
             }
             is List<*> -> {
-                sb.append("""{"_k":"a","v":[""")
+                sb.append("{\"_k\":\"a\",\"v\":[")
                 v.forEachIndexed { i, it -> if (i > 0) sb.append(','); appendTaggedValue(sb, it) }
                 sb.append("]}")
             }
-            else -> { sb.append("""{"_k":"s","v":"""); appendJsonString(sb, v.toString()); sb.append('}') }
+            else -> {
+                sb.append("{\"_k\":\"s\",\"v\":")
+                appendJsonString(sb, v.toString())
+                sb.append('}')
+            }
         }
     }
 

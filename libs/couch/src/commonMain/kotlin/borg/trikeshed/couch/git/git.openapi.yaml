@@ -1,0 +1,310 @@
+openapi: 3.1.0
+info:
+  title: Git Porcelain + Smart HTTP API
+  version: 1.0.0
+  description: "Git operations via two layers:\n- Porcelain: high-level commands (git status, log, commit, branch, checkout, add, reset, diff)\n- Smart HTTP: git-upload-pack and git-receive-pack for git clone/fetch/push\n"
+paths:
+  /health:
+    get:
+      operationId: getHealth
+      summary: Health probe
+      responses:
+        '200':
+          description: Server is healthy.
+          content:
+            text/plain:
+              schema:
+                type: string
+                const: ok
+  /git porcelain/status:
+    get:
+      operationId: gitStatus
+      summary: git status --porcelain=v2
+      description: Returns git status in porcelain v2 format for the working directory.
+      parameters:
+        - name: repo
+          in: query
+          required: true
+          schema:
+            type: string
+            example: /tmp/test-repo
+      responses:
+        '200':
+          description: git status output
+          content:
+            text/plain:
+              schema:
+                type: string
+  /git porcelain/log:
+    get:
+      operationId: gitLog
+      summary: git log with format
+      parameters:
+        - name: repo
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: n
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 10
+      responses:
+        '200':
+          description: git log output
+          content:
+            text/plain:
+              schema:
+                type: string
+  /git porcelain/commit:
+    post:
+      operationId: gitCommit
+      summary: git commit
+      description: Create a commit with the given message. Automatically stages all changes.
+      parameters:
+        - name: repo
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: message
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: git commit result
+          content:
+            text/plain:
+              schema:
+                type: string
+  /git porcelain/add:
+    post:
+      operationId: gitAdd
+      summary: git add
+      description: Stage files for commit.
+      parameters:
+        - name: repo
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: files
+          in: query
+          required: true
+          schema:
+            type: string
+            description: Space-separated list of files to stage
+      responses:
+        '200':
+          description: git add output
+          content:
+            text/plain:
+              schema:
+                type: string
+  /git porcelain/reset:
+    post:
+      operationId: gitReset
+      summary: git reset
+      parameters:
+        - name: repo
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: ref
+          in: query
+          required: false
+          schema:
+            type: string
+            default: HEAD
+      responses:
+        '200':
+          description: git reset output
+          content:
+            text/plain:
+              schema:
+                type: string
+  /git porcelain/diff:
+    get:
+      operationId: gitDiff
+      summary: git diff
+      parameters:
+        - name: repo
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: cached
+          in: query
+          required: false
+          schema:
+            type: boolean
+            default: false
+      responses:
+        '200':
+          description: git diff output
+          content:
+            text/plain:
+              schema:
+                type: string
+  /git porcelain/branch:
+    get:
+      operationId: gitBranch
+      summary: git branch -v
+      parameters:
+        - name: repo
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: git branch output
+          content:
+            text/plain:
+              schema:
+                type: string
+  /git porcelain/checkout:
+    post:
+      operationId: gitCheckout
+      summary: git checkout
+      parameters:
+        - name: repo
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: ref
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: git checkout output
+          content:
+            text/plain:
+              schema:
+                type: string
+  /git porcelain/init:
+    put:
+      operationId: gitInit
+      summary: git init
+      description: Initialize a new git repository.
+      parameters:
+        - name: repo
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: git init output
+          content:
+            text/plain:
+              schema:
+                type: string
+  /git porcelain/rev-parse:
+    get:
+      operationId: gitRevParse
+      summary: git rev-parse
+      parameters:
+        - name: repo
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: ref
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: SHA or ref name
+          content:
+            text/plain:
+              schema:
+                type: string
+  /git smart/info-refs:
+    get:
+      operationId: gitInfoRefs
+      summary: Git info-refs for git-upload-pack or git-receive-pack
+      description: "Returns the refs advertised by the server for the given service.\nUsed during git clone/fetch to discover available branches and tags.\n"
+      parameters:
+        - name: repo
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: service
+          in: query
+          required: true
+          schema:
+            type: string
+            enum:
+              - git-upload-pack
+              - git-receive-pack
+      responses:
+        '200':
+          description: git-upload-pack or git-receive-pack info refs
+          content:
+            application/x-git-upload-pack-advertisement:
+              schema:
+                type: string
+  /git smart/upload-pack:
+    post:
+      operationId: gitUploadPack
+      summary: git-upload-pack RPC
+      description: Handles git fetch / git clone by processing the upload-pack protocol.
+      parameters:
+        - name: repo
+          in: query
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/x-git-upload-pack-request:
+            schema:
+              type: string
+              format: binary
+      responses:
+        '200':
+          description: git-upload-pack response (pack file or status)
+          content:
+            application/x-git-upload-pack-result:
+              schema:
+                type: string
+                format: binary
+  /git smart/receive-pack:
+    post:
+      operationId: gitReceivePack
+      summary: git-receive-pack RPC
+      description: Handles git push by processing the git-receive-pack protocol.
+      parameters:
+        - name: repo
+          in: query
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/x-git-receive-pack-request:
+            schema:
+              type: string
+              format: binary
+      responses:
+        '200':
+          description: git-receive-pack response (ack or pack result)
+          content:
+            application/x-git-receive-pack-result:
+              schema:
+                type: string
+                format: binary

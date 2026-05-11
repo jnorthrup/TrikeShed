@@ -32,6 +32,23 @@ class FunctionalUringFacadeTest {
             ops += "close:${file.id}"
             return 55
         }
+
+        override fun sync(file: FileImpl, metaData: Boolean): Int {
+            TODO("Not yet implemented")
+        }
+
+        override fun truncate(file: FileImpl, size: Long): Int {
+            TODO("Not yet implemented")
+        }
+
+        override fun map(
+            file: FileImpl,
+            mode: String,
+            position: Long,
+            size: Long
+        ): Int {
+            TODO("Not yet implemented")
+        }
     }
 
     @Test

@@ -89,3 +89,40 @@ data class ExtendedKline(
 
 /** Re-export for type consistency. */
 typealias Klines = List<Kline>
+
+// ─── CouchDB document projection ──────────────────────────────────────────────
+
+/**
+ * Convert to a CouchDB document map suitable for the viewserver.
+ * Fields match what the cascade-style JS map functions reference:
+ *   symbol, timespan, openTime, open, high, low, close, volume.
+ */
+fun Kline.toDoc(): Map<String, Any?> = mapOf(
+    "_id"      to "kline/${symbol}/${timespan.binanceInterval}/${openTime}",
+    "symbol"   to symbol,
+    "timespan" to timespan.binanceInterval,
+    "openTime" to openTime,
+    "open"     to open,
+    "high"     to high,
+    "low"      to low,
+    "close"    to close,
+    "volume"   to volume,
+)
+
+/** Extended version — includes all 12 Binance fields. */
+fun ExtendedKline.toDoc(): Map<String, Any?> = mapOf(
+    "_id"                  to "kline/${symbol}/${timespan.binanceInterval}/${openTime}",
+    "symbol"               to symbol,
+    "timespan"             to timespan.binanceInterval,
+    "openTime"             to openTime,
+    "open"                 to open,
+    "high"                 to high,
+    "low"                  to low,
+    "close"                to close,
+    "volume"               to volume,
+    "closeTime"            to closeTime,
+    "quoteAssetVolume"     to quoteAssetVolume,
+    "trades"               to trades,
+    "takerBuyBaseVolume"   to takerBuyBaseVolume,
+    "takerBuyQuoteVolume"  to takerBuyQuoteVolume,
+)

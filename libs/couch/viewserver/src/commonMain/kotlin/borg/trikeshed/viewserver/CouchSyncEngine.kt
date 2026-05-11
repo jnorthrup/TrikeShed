@@ -74,4 +74,15 @@ class CouchSyncEngine(
         val ddoc = """{"_id":"_design/git_tree","language":"javascript","views":{"by_path":{"map":"function(doc){if(doc.path) emit(doc.path, null)}"},"by_sha1":{"map":"function(doc){if(doc.sha1) emit(doc.sha1, null)}"}}}"""
         htx.request("PUT", "$couchUrl/$database/_design/git_tree", body = ddoc, transport = HtxTransport.HTTPS)
     }
+
+    /** Push the kline cascade design document to a CouchDB instance. */
+    suspend fun registerKlineViews(htx: HtxElement, klineDb: String = "klines") {
+        htx.registerTransport(HtxTransport.HTTPS, createHttpsHandler())
+        htx.request(
+            "PUT",
+            "$couchUrl/$klineDb/${KlineDesignDoc.DESIGN_ID}",
+            body = KlineDesignDoc.toJson(),
+            transport = HtxTransport.HTTPS,
+        )
+    }
 }

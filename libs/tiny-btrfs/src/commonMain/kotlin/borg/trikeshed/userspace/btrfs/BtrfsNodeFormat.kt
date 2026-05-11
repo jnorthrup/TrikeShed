@@ -1,9 +1,21 @@
+@file:OptIn(ExperimentalUnsignedTypes::class)
+
 package borg.trikeshed.userspace.btrfs
 
 import borg.trikeshed.lib.*
 import borg.trikeshed.tinybtrfs.NodeId
 
 const val BTRFS_NODE_SIZE = 4096
+const val BTRFS_LEAF_MAGIC = 0x464F5254
+const val BTRFS_INTERNAL_MAGIC = 0x4E465242
+
+private fun readMagic(buf: ByteArray): Int {
+    require(buf.size >= 4) { "Node buffer too small: ${buf.size} < 4" }
+    return (buf[0].toInt() and 0xFF) or
+        ((buf[1].toInt() and 0xFF) shl 8) or
+        ((buf[2].toInt() and 0xFF) shl 16) or
+        ((buf[3].toInt() and 0xFF) shl 24)
+}
 
 fun crc32c(data: ByteArray, offset: Int = 0, length: Int = data.size - offset): UInt {
     if (length <= 0) return 0u
@@ -67,7 +79,7 @@ fun btrfsKeyFromBytes(arr: ByteArray): BtrfsKeyAtom {
 }
 
 fun encodeLeaf(leaf: BtrfsLeaf, buf: ByteArray, generation: ULong = 0UL) {
-    val magic = 0x464F5254
+    val magic = BTRFS_LEAF_MAGIC
     buf[0] = (magic and 0xFF).toByte()
     buf[1] = ((magic shr 8) and 0xFF).toByte()
     buf[2] = ((magic shr 16) and 0xFF).toByte()
@@ -98,6 +110,10 @@ fun encodeLeaf(leaf: BtrfsLeaf, buf: ByteArray, generation: ULong = 0UL) {
 }
 
 fun decodeLeaf(buf: ByteArray): BtrfsLeaf {
+    val magic = readMagic(buf)
+    require(magic == BTRFS_LEAF_MAGIC) {
+        "Invalid leaf magic: 0x${magic.toUInt().toString(16)}"
+    }
     var offset = 16
     val size = (buf[offset].toInt() and 0xFF) or ((buf[offset + 1].toInt() and 0xFF) shl 8)
     offset += 2
@@ -124,16 +140,41 @@ fun decodeLeaf(buf: ByteArray): BtrfsLeaf {
 }
 
 fun encodeInternal(internal: BtrfsInternal, buf: ByteArray, generation: ULong = 0UL) {
-    val magic = 0x4E465242
-    // Simple byte copying instead of combine
+    val magic = BTRFS_INTERNAL_MAGIC
+    buf[0] = (magic and 0xFF).toByte()
+    buf[1] = ((magic shr 8) and 0xFF).toByte()
+    buf[2] = ((magic shr 16) and 0xFF).toByte()
+    buf[3] = ((magic shr 24) and 0xFF).toByte()
+
+    for (i in 0 until 8) {
+        buf[8 + i] = ((generation shr (i * 8)) and 0xFFUL).toByte()
+    }
+
+    var offset = 16
+    buf[offset++] = (internal.size and 0xFF).toByte()
+    buf[offset++] = ((internal.size shr 8) and 0xFF).toByte()
+
     for (child in internal) {
         val keyBytes = child.a.bytes
         val nodeIdBytes = child.b.encodeToByteArray()
-        // ... just copy bytes directly
+        buf[offset++] = (keyBytes.size and 0xFF).toByte()
+        buf[offset++] = ((keyBytes.size shr 8) and 0xFF).toByte()
+        for (i in keyBytes.indices) {
+            buf[offset++] = keyBytes[i]
+        }
+        buf[offset++] = (nodeIdBytes.size and 0xFF).toByte()
+        buf[offset++] = ((nodeIdBytes.size shr 8) and 0xFF).toByte()
+        for (i in nodeIdBytes.indices) {
+            buf[offset++] = nodeIdBytes[i]
+        }
     }
 }
 
 fun decodeInternal(buf: ByteArray): BtrfsInternal {
+    val magic = readMagic(buf)
+    require(magic == BTRFS_INTERNAL_MAGIC) {
+        "Invalid internal magic: 0x${magic.toUInt().toString(16)}"
+    }
     var offset = 16
     val size = (buf[offset].toInt() and 0xFF) or ((buf[offset + 1].toInt() and 0xFF) shl 8)
     offset += 2

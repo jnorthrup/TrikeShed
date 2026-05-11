@@ -6,6 +6,7 @@ import borg.trikeshed.context.ElementState
 import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlin.concurrent.Volatile
 
 /**
  * Seekable media streaming client over BitTorrent.

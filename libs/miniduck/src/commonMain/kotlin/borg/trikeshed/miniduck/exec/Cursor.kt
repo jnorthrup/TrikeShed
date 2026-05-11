@@ -2,6 +2,7 @@ package borg.trikeshed.miniduck.exec
 
 import borg.trikeshed.cursor.RowVec
 import borg.trikeshed.cursor.getValue
+import borg.trikeshed.cursor.keys
 import borg.trikeshed.cursor.values
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.get
@@ -46,4 +47,6 @@ private class RowVecRowAccessor(
 ) : RowAccessor {
     override fun get(index: Int): Any? = row.values[index]
     override fun get(name: String): Any? = row.getValue(name)
+    override val size: Int get() = row.size
+    override fun columnName(index: Int): String? = if (index in 0 until row.keys.size) row.keys[index] else null
 }

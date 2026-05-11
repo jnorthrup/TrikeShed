@@ -112,6 +112,7 @@ class BPlusTreeContractTest {
         }
         for (i in 0 until 128 step 3) {
             tree.remove(i)
+            assertTrue(tree.validateFanoutBounds(), "fanout violated after removing $i")
         }
 
         assertTrue(tree.validateFanoutBounds())

@@ -417,11 +417,10 @@ class Isam3Layout(
         private fun clusterName(meta: RecordMeta): String {
             val lower = meta.name.lowercase()
             return when {
-                lower in OHLCV_COLUMNS -> "ohlcv"
                 "time" in lower -> "time"
+                lower in PRICE_COLUMNS -> "price"
                 "trade" in lower -> "trades"
                 "volume" in lower || "quote_asset" in lower -> "volume"
-                meta.name in setOf("Open", "High", "Low", "Close") -> "price"
                 meta.type == IOMemento.IoInstant -> "time"
                 meta.type == IOMemento.IoInt -> "trades"
                 meta.type == IOMemento.IoDouble -> "price"
@@ -430,7 +429,7 @@ class Isam3Layout(
             }
         }
 
-        private val OHLCV_COLUMNS: Set<String> = setOf("open", "high", "low", "close", "volume")
+        private val PRICE_COLUMNS: Set<String> = setOf("open", "high", "low", "close")
 
         private fun typeNameOf(value: Any?): String = value?.let { it::class.simpleName ?: it::class.toString() } ?: "null"
 

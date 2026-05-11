@@ -2,24 +2,31 @@ package borg.trikeshed.miniduck
 
 import borg.trikeshed.cursor.*
 import borg.trikeshed.lib.*
-import kotlin.comparisons.compareValues
-
 /** Equality predicate for Cursor.where. */
 fun Eq(column: String, value: Any?): (RowVec) -> Boolean = { it.getValue(column) == value }
 
 /** Greater-than-or-equal predicate for Cursor.where. */
 fun Ge(column: String, value: Any?): (RowVec) -> Boolean = {
-    val v = it.getValue(column) as? Comparable<Any?>
-    val target = value as? Comparable<Any?>
-    if (v != null && target != null) v >= target else false
+    compareCursorValues(it.getValue(column), value)?.let { result -> result >= 0 } ?: false
 }
 
 /** Greater-than predicate for Cursor.where. */
 fun Gt(column: String, value: Any?): (RowVec) -> Boolean = {
-    val v = it.getValue(column) as? Comparable<Any?>
-    val target = value as? Comparable<Any?>
-    if (v != null && target != null) v > target else false
+    compareCursorValues(it.getValue(column), value)?.let { result -> result > 0 } ?: false
 }
+
+private fun compareCursorValues(left: Any?, right: Any?): Int? = when {
+    left == null || right == null -> null
+    left is Number && right is Number -> left.toDouble().compareTo(right.toDouble())
+    left is String && right is String -> left.compareTo(right)
+    left is Boolean && right is Boolean -> left.compareTo(right)
+    left is Comparable<*> && left::class == right::class -> compareComparableValues(left, right)
+    else -> null
+}
+
+@Suppress("UNCHECKED_CAST")
+private fun compareComparableValues(left: Comparable<*>, right: Any): Int =
+    (left as Comparable<Any>).compareTo(right)
 
 /** Filter rows by predicate. */
 fun Cursor.where(predicate: (RowVec) -> Boolean): Cursor {
@@ -54,9 +61,7 @@ fun Cursor.orderBy(vararg specs: OrderSpec): Cursor {
     if (size == 0) return this
     val sorted = this.view.sortedWith { r1, r2 ->
         for (spec in specs) {
-            val v1 = r1.getValue(spec.column) as? Comparable<Any?>
-            val v2 = r2.getValue(spec.column) as? Comparable<Any?>
-            val res = compareValues(v1, v2)
+            val res = compareCursorValues(r1.getValue(spec.column), r2.getValue(spec.column)) ?: 0
             if (res != 0) return@sortedWith if (spec.desc) -res else res
         }
         0

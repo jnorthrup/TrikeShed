@@ -46,15 +46,17 @@ repositories {
 }
 
 def configureCompiler = { kotlinExt, boolean expectActual ->
-    kotlinExt.compilerOptions {
-        apiVersion.set("KOTLIN_2_4")
-        languageVersion.set("KOTLIN_2_4")
-        def args = [
-            "-opt-in=kotlin.RequiresOptIn",
-            "-Xsuppress-version-warnings",
-        ]
-        if (expectActual) args.add("-Xexpect-actual-classes")
-        freeCompilerArgs.addAll(args)
+    def args = [
+        "-opt-in=kotlin.RequiresOptIn",
+        "-Xsuppress-version-warnings",
+    ]
+    if (expectActual) args.add("-Xexpect-actual-classes")
+    tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompilationTask.class).configureEach {
+        compilerOptions {
+            apiVersion.set(org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_4)
+            languageVersion.set(org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_4)
+            freeCompilerArgs.addAll(args)
+        }
     }
 }
 
@@ -149,13 +151,15 @@ def plainJvm = { boolean applyApplication = false ->
     version = libVersion
     def kotlinExt = extensions.getByName("kotlin")
     kotlinExt.jvmToolchain(21)
-    kotlinExt.compilerOptions {
-        apiVersion.set("KOTLIN_2_4")
-        languageVersion.set("KOTLIN_2_4")
-        freeCompilerArgs.addAll(
-            "-opt-in=kotlin.RequiresOptIn",
-            "-Xsuppress-version-warnings",
-        )
+    tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompilationTask.class).configureEach {
+        compilerOptions {
+            apiVersion.set(org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_4)
+            languageVersion.set(org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_4)
+            freeCompilerArgs.addAll(
+                "-opt-in=kotlin.RequiresOptIn",
+                "-Xsuppress-version-warnings",
+            )
+        }
     }
     dependencies {
         api rootPeer()

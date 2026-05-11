@@ -244,6 +244,11 @@ class ReactorCouchServer(
         viewSources.getOrPut(db) { mutableMapOf() }[viewName] = source
     }
 
+    /** Register all cascade kline views for in-process query via [KlineDesignDoc]. */
+    fun registerKlineViews(db: String = KlineDesignDoc.DEFAULT_DB) {
+        KlineDesignDoc.registerWith(this, db)
+    }
+
     private fun handleViewQuery(db: String, ddoc: String, viewName: String): String {
         val source = viewSources[db]?.get(viewName)
             ?: return """{"error":"not_found","reason":"view $viewName not found in $db"}"""

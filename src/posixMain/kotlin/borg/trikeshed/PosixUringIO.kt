@@ -72,7 +72,7 @@ internal object PosixUringIO {
     fun fsync(fd: Int, entries: Int = 256): Int {
         if (fd < 0) return -1
         val userData = nextUserData++
-        if (ensureOpen(entries) && Liburing.prepFsync(fd, userData).isSuccess) {
+        if (ensureOpen(entries) && Liburing.prepFsync(fd, userData, datasync = false).isSuccess) {
             val submitted = Liburing.submit().getOrNull()
             if (submitted != null && submitted > 0) {
                 return Liburing.waitCqe().getOrNull()?.res ?: -1
@@ -84,13 +84,13 @@ internal object PosixUringIO {
     fun fdatasync(fd: Int, entries: Int = 256): Int {
         if (fd < 0) return -1
         val userData = nextUserData++
-        if (ensureOpen(entries) && Liburing.prepFdsync(fd, userData).isSuccess) {
+        if (ensureOpen(entries) && Liburing.prepFsync(fd, userData, datasync = true).isSuccess) {
             val submitted = Liburing.submit().getOrNull()
             if (submitted != null && submitted > 0) {
                 return Liburing.waitCqe().getOrNull()?.res ?: -1
             }
         }
-        return platform.posix.fdatasync(fd)
+        return platform.posix.fsync(fd)
     }
 
     fun ftruncate(fd: Int, size: Long, entries: Int = 256): Int {
@@ -99,7 +99,8 @@ internal object PosixUringIO {
     }
 
     fun mmap(addr: Long, length: Int, prot: Int, flags: Int, fd: Int, offset: Long): Long {
-        return platform.posix.mmap(addr, length.toULong(), prot, flags, fd, offset)
+        val base = if (addr == 0L) null else addr.toCPointer<ByteVar>()
+        return platform.posix.mmap(base, length.toULong(), prot, flags, fd, offset)?.toLong() ?: -1L
     }
 
     private fun ensureOpen(entries: Int): Boolean {

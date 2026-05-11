@@ -1,8 +1,8 @@
 package borg.trikeshed.htx.client
 
-import kotlin.test.Test
+import kotlinx.coroutines.test.runTest as runBlocking
+import kotlin.test.*
 import kotlin.test.assertEquals
-import kotlinx.coroutines.runBlocking
 
 class HtxElementTddTest {
 
@@ -10,8 +10,11 @@ class HtxElementTddTest {
     @Test
     fun `registerTransport and request dispatches to handler`() = runBlocking {
         val element = HtxElement()
-        element.registerTransport(HtxTransport.HTTPS) { req ->
-            HtxClientMessage(status = 201, body = "custom")
+        element.registerTransport(HtxTransport.HTTPS) { req: HtxClientRequest ->
+            HtxClientMessage(
+                status = 201,
+                body = "custom",
+            )
         }
         val resp = element.request("GET", "https://test.example/")
         assertEquals(201, resp.status)

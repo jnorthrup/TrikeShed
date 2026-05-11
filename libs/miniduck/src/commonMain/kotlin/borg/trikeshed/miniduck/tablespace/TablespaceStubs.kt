@@ -69,10 +69,8 @@ class Tablespace(val name: String) {
             for (blockId in blockIds) {
                 val block = region.store.get(collection, blockId) ?: continue
                 val child = block.child
-                if (child != null) {
-                    for (i in 0 until child.size) {
-                        allRows.add(child[i])
-                    }
+                for (i in 0 until child.size) {
+                    allRows.add(child[i])
                 }
             }
         }
@@ -91,13 +89,11 @@ class Tablespace(val name: String) {
             for (blockId in blockIds) {
                 val block = region.store.get(collection, blockId) ?: continue
                 val child = block.child
-                if (child != null) {
-                    for (i in 0 until child.size) {
-                        val row = child[i]
-                        for (j in 0 until row.size) {
-                            val meta = row[j]
-                            allKeys.add(meta.b().a)
-                        }
+                for (i in 0 until child.size) {
+                    val row = child[i]
+                    for (j in 0 until row.size) {
+                        val meta = row[j]
+                        allKeys.add(meta.b().a)
                     }
                 }
             }

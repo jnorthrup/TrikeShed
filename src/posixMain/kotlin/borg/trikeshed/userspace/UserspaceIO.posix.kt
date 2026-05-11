@@ -3,12 +3,12 @@
 package borg.trikeshed.userspace
 
 import borg.trikeshed.PosixUringIO
+import borg.trikeshed.userspace.UringOp.Companion.UringSubmission
 import borg.trikeshed.userspace.nio.ByteBuffer
 import platform.posix.O_CREAT
 import platform.posix.O_RDONLY
 import platform.posix.O_RDWR
 import platform.posix.open
-import platform.posix.socket
 
 private class PosixUserspaceChannelBackend(
     private val entries: Int,

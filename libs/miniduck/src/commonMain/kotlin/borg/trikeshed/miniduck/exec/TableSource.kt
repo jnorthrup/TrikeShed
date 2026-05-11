@@ -19,4 +19,6 @@ interface TableSource {
 interface RowAccessor {
     operator fun get(index: Int): Any?
     operator fun get(name: String): Any?
+    val size: Int get() = 0
+    fun columnName(index: Int): String? = null
 }

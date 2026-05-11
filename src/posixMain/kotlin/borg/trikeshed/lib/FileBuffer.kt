@@ -6,6 +6,7 @@ import kotlinx.cinterop.*
 import platform.posix.munmap
 import simple.PosixFile
 import simple.PosixOpenOpts
+import kotlin.coroutines.CoroutineContext
 
 actual class FileBuffer actual constructor(
     actual val filename: String,
@@ -13,7 +14,10 @@ actual class FileBuffer actual constructor(
     actual val blkSize: Long,
     actual val readOnly: Boolean,
     actual val closeChannelOnMap: Boolean,
-) : LongSeries<Byte>  {
+) : LongSeries<Byte>, CoroutineContext.Element {
+    actual override val key: CoroutineContext.Key<*> get() = Key
+    actual companion object Key : CoroutineContext.Key<FileBuffer>
+
     init {
         logDebug { "native FileBuffer: $filename, $initialOffset, $blkSize, $readOnly" }
     }
