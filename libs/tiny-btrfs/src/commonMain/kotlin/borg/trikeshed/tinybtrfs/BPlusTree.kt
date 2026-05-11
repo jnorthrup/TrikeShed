@@ -194,6 +194,12 @@ class BPlusTree<K : Comparable<K>, V>(
             return copy
         }
 
+        fun setKeyAt(index: Int, key: K): InternalNode {
+            val copy = clone()
+            copy._keys[index] = key
+            return copy
+        }
+
         fun insertChildAt(index: Int, child: Node<K, V>): InternalNode {
             val copy = clone()
             for (i in copy.childrenCount downTo index + 1) {
@@ -560,37 +566,115 @@ class BPlusTree<K : Comparable<K>, V>(
                 if (newChild.isLeaf()) {
                     val leafChild = newChild as LeafNode
                     if (leafChild.keysCount < minKeys) {
-                        if (childIndex < newInternal.childrenCount - 1) {
-                            val rightSibling = newInternal.childAt(childIndex + 1) as LeafNode
-                            if (leafChild.keysCount + rightSibling.keysCount <= order) {
+                        val hasRight = childIndex < newInternal.childrenCount - 1
+                        val hasLeft  = childIndex > 0
+
+                        when {
+                            // Borrow from right leaf sibling
+                            hasRight && (newInternal.childAt(childIndex + 1) as LeafNode).keysCount > minKeys -> {
+                                val right = newInternal.childAt(childIndex + 1) as LeafNode
+                                val borrowedKey   = right.keyAt(0)
+                                val borrowedValue = right.valueAt(0)
+                                val newLeaf  = leafChild.insertAt(leafChild.keysCount, borrowedKey, borrowedValue as V)
+                                val newRight = right.removeAt(0)
+                                newInternal = newInternal.setChildAt(childIndex,     newLeaf)
+                                newInternal = newInternal.setChildAt(childIndex + 1, newRight)
+                                newInternal = newInternal.setKeyAt(childIndex, newRight.keyAt(0))
+                            }
+                            // Merge with right leaf sibling
+                            hasRight && leafChild.keysCount + (newInternal.childAt(childIndex + 1) as LeafNode).keysCount <= order -> {
+                                val right = newInternal.childAt(childIndex + 1) as LeafNode
                                 var merged = leafChild
-                                for (i in 0 until rightSibling.keysCount) {
-                                    merged = merged.insertAt(merged.keysCount, rightSibling.keyAt(i), rightSibling.valueAt(i) as V)
+                                for (i in 0 until right.keysCount) {
+                                    merged = merged.insertAt(merged.keysCount, right.keyAt(i), right.valueAt(i) as V)
                                 }
                                 newInternal = newInternal.setChildAt(childIndex, merged)
                                 newInternal = newInternal.removeKeyAndChildAt(childIndex, childIndex + 1)
+                            }
+                            // Borrow from left leaf sibling
+                            hasLeft && (newInternal.childAt(childIndex - 1) as LeafNode).keysCount > minKeys -> {
+                                val left = newInternal.childAt(childIndex - 1) as LeafNode
+                                val borrowedKey   = left.keyAt(left.keysCount - 1)
+                                val borrowedValue = left.valueAt(left.keysCount - 1)
+                                val newLeaf = leafChild.insertAt(0, borrowedKey, borrowedValue as V)
+                                val newLeft = left.removeAt(left.keysCount - 1)
+                                newInternal = newInternal.setChildAt(childIndex - 1, newLeft)
+                                newInternal = newInternal.setChildAt(childIndex,     newLeaf)
+                                newInternal = newInternal.setKeyAt(childIndex - 1, newLeaf.keyAt(0))
+                            }
+                            // Merge with left leaf sibling
+                            hasLeft && (newInternal.childAt(childIndex - 1) as LeafNode).keysCount + leafChild.keysCount <= order -> {
+                                val left = newInternal.childAt(childIndex - 1) as LeafNode
+                                var merged = left
+                                for (i in 0 until leafChild.keysCount) {
+                                    merged = merged.insertAt(merged.keysCount, leafChild.keyAt(i), leafChild.valueAt(i) as V)
+                                }
+                                newInternal = newInternal.setChildAt(childIndex - 1, merged)
+                                newInternal = newInternal.removeKeyAndChildAt(childIndex - 1, childIndex)
                             }
                         }
                     }
                 } else {
                     val intChild = newChild as InternalNode
-                    if (intChild.keysCount < minKeys) {
-                        if (childIndex < newInternal.childrenCount - 1) {
-                            val rightSibling = newInternal.childAt(childIndex + 1) as InternalNode
-                            if (intChild.keysCount + rightSibling.keysCount + 1 <= order) {
-                                var merged = intChild
+                    // Internal nodes are valid with keysCount >= 1 (childrenCount >= 2).
+                    // Only rebalance when the node has dropped to 0 keys (1 child).
+                    if (intChild.keysCount < 1) {
+                        val hasRight = childIndex < newInternal.childrenCount - 1
+                        val hasLeft  = childIndex > 0
+
+                        when {
+                            // Borrow from right internal sibling (sibling must be able to spare a child)
+                            hasRight && (newInternal.childAt(childIndex + 1) as InternalNode).keysCount > 1 -> {
+                                val right      = newInternal.childAt(childIndex + 1) as InternalNode
+                                val sepIdx     = childIndex
+                                val parentSep  = newInternal.keyAt(sepIdx)
+                                val newLeaf    = intChild.insertKeyAt(intChild.keysCount, parentSep)
+                                val withChild  = newLeaf.addChild(right.childAt(0))
+                                val newRight   = right.removeKeyAndChildAt(0, 0)
+                                newInternal = newInternal.setChildAt(childIndex, withChild)
+                                newInternal = newInternal.setChildAt(childIndex + 1, newRight)
+                                newInternal = newInternal.setKeyAt(sepIdx, right.keyAt(0))
+                            }
+                            // Merge with right internal sibling (use childrenCount arithmetic to avoid overflow)
+                            hasRight && intChild.childrenCount + (newInternal.childAt(childIndex + 1) as InternalNode).childrenCount <= order -> {
+                                val right = newInternal.childAt(childIndex + 1) as InternalNode
                                 val pivot = newInternal.keyAt(childIndex)
-                                merged = merged.insertKeyAt(merged.keysCount, pivot)
-
-                                for (i in 0 until rightSibling.keysCount) {
-                                    merged = merged.insertKeyAt(merged.keysCount, rightSibling.keyAt(i))
+                                var merged = intChild.insertKeyAt(intChild.keysCount, pivot)
+                                for (i in 0 until right.keysCount) {
+                                    merged = merged.insertKeyAt(merged.keysCount, right.keyAt(i))
                                 }
-                                for (i in 0 until rightSibling.childrenCount) {
-                                    merged = merged.addChild(rightSibling.childAt(i))
+                                for (i in 0 until right.childrenCount) {
+                                    merged = merged.addChild(right.childAt(i))
                                 }
-
                                 newInternal = newInternal.setChildAt(childIndex, merged)
                                 newInternal = newInternal.removeKeyAndChildAt(childIndex, childIndex + 1)
+                            }
+                            // Borrow from left internal sibling
+                            hasLeft && (newInternal.childAt(childIndex - 1) as InternalNode).keysCount > 1 -> {
+                                val left      = newInternal.childAt(childIndex - 1) as InternalNode
+                                val sepIdx    = childIndex - 1
+                                val parentSep = newInternal.keyAt(sepIdx)
+                                val rightmost = left.childAt(left.childrenCount - 1)
+                                var updated = intChild.insertKeyAt(0, parentSep)
+                                updated = updated.insertChildAt(0, rightmost)
+                                val newLeft = left.removeKeyAndChildAt(left.keysCount - 1, left.childrenCount - 1)
+                                newInternal = newInternal.setChildAt(childIndex - 1, newLeft)
+                                newInternal = newInternal.setChildAt(childIndex,     updated)
+                                newInternal = newInternal.setKeyAt(sepIdx, left.keyAt(left.keysCount - 1))
+                            }
+                            // Merge with left internal sibling
+                            hasLeft && (newInternal.childAt(childIndex - 1) as InternalNode).childrenCount + intChild.childrenCount <= order -> {
+                                val left  = newInternal.childAt(childIndex - 1) as InternalNode
+                                val pivot = newInternal.keyAt(childIndex - 1)
+                                var merged = left.insertKeyAt(left.keysCount, pivot)
+                                for (i in 0 until intChild.keysCount) {
+                                    merged = merged.insertKeyAt(merged.keysCount, intChild.keyAt(i))
+                                }
+                                for (i in 0 until intChild.childrenCount) {
+                                    merged = merged.addChild(intChild.childAt(i))
+                                }
+                                newInternal = newInternal.setChildAt(childIndex - 1, merged)
+                                newInternal = newInternal.removeKeyAndChildAt(childIndex - 1, childIndex)
                             }
                         }
                     }
