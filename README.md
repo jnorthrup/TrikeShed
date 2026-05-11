@@ -8,55 +8,49 @@ Kernel algebra (`Join`, `Series<T>`, `Twin`, `α`, `j`) is defined in `lib/` and
 
 ## Layers
 
-```
-┌──────────────────────────────────────────────────────────────────────┐
-│  NIO COMPATIBILITY SURFACE  (nio/channels/, nio/file/)               │
-│  UringSocketChannel  UringFileChannel  UringServerSocketChannel      │
-│  COMPATIBILITY SURFACE ONLY.  DO NOT ROUTE NEW IO THROUGH HERE.      │
-├──────────────────────────────────────────────────────────────────────┤
-│  REAL TRANSPORT SUBSTRATE  (userspace/)                              │
-│                                                                      │
-│  File          handle lifecycle (open/close/isOpen/id)               │
-│  Channel       operation queue (read/write/accept/connect/close)     │
-│    │            submit/wait/peek                                     │
-│    └─ ChannelImpl  (expect → actual per platform)                    │
-│         └─ FunctionalUringFacade  (op batching + backend dispatch)   │
-│              └─ UserspaceChannelBackend  (expect → actual)           │
-│                   └─ Liburing  →  LiburingImpl  (expect → actual)    │
-│                                                                      │
-│  data types:                                                         │
-│    ByteBuffer  → NIO buffer backed by ByteArray                     │
-│    ByteRegion  → sub-range view of ByteBuffer                       │
-│    ByteSeries  → lazy Series<Byte> over ByteRegion (zero copy)      │
-├──────────────────────────────────────────────────────────────────────┤
-│  CHOREOGRAPHY  (context/)                                            │
-│                                                                      │
-│  AsyncContextElement   SupervisorJob, lifecycle, fanout subscribers  │
-│  AsyncContextKey<E>    type-safe context lookup                      │
-│  ConcreteElements      NioUserspaceElement, LiburingElement,         │
-│                        FanoutDispatcherElement                       │
-│  LiburingFacadeSpi     SPI for pluggable uring backends              │
-│  UserspaceNioSpi       SPI for pluggable NIO backends                │
-├──────────────────────────────────────────────────────────────────────┤
-│  KERNEL INTERFACES  (userspace/kernel/)                              │
-│                                                                      │
-│  SelectableChannelOps  pollReadable/pollWritable + tryRead/tryWrite │
-│  KernelUring           SQE/CQE abstraction ported from literbike     │
-│  KernelSQE / KernelCQE kernel uring structs                          │
-│  OpCode / UringSetupFlags                                            │
-├──────────────────────────────────────────────────────────────────────┤
-│  NETWORK PROTOCOL SURFACE  (userspace/network/)                     │
-│                                                                      │
-│  Channel               protocol session surface                      │
-│  ChannelMetadata       remoteAddr, localAddr, protocol               │
-│  ProtocolDetector      auto-detect protocol from first bytes         │
-├──────────────────────────────────────────────────────────────────────┤
-│  LIBRARY  (lib/)                                                     │
-│                                                                      │
-│  Join<A,B>  Series<T>  Twin<T>  ByteSeries  Cursor  HashSeriesSet   │
-│  RadixTree  CircularQueue  etc.                                      │
-│  Documented in PRELOAD.md                                            │
-└──────────────────────────────────────────────────────────────────────┘
+``` 
+
+┌────────────────────────────────────────────────────────────────────────┐
+│                         libs/integration                               │
+│                    SupervisorJob Reactor Loop                          │
+│  ┌─────────────────────────────────────────────────────────────────┐   │
+│  │                     libs/nars3 / libs/narsive                   │   │
+│  │              Reasoning Control Plane (TTL, routing, scheduling) │   │
+│  └─────────────────────────────────────────────────────────────────┘   │
+│                              │                                         │
+│  ┌───────────────────────────┼─────────────────────────────────────┐   │
+│  │                  NIO UringFacade Fabric (libs/uring)            │   │
+│  │  ┌─────────┐   ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌──────────┐ │   │
+│  │  │  SQE    │   │  SQE    │ │  SQE    │ │  SQE    │ │   SQE    │ │   │
+│  │  │ Market  │   │ Document│ │ Analytic│ │  Cache  │ │  Block   │ │   │
+│  │  │ Feed    │   │ Channel │ │ Channel │ │ Channel │ │ Channel  │ │   │
+│  │  └────┬────┘   └────┬────┘ └────┬────┘ └────┬────┘ └────┬─────┘ │   │
+│  │       └─────────────┴───────────┴───────────┴───────────┘       │   │
+│  │                              │                                  │   │
+│  │                       Channel Router                            │   │
+│  │                              │                                  │   │
+│  │  ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌──────────┐   │   │
+│  │  │  CQE    │ │  CQE    │ │  CQE    │ │  CQE    │ │   CQE    │   │   │
+│  │  │Exchange │ │  Couch  │ │ Duck    │ │ CPU L1  │ │ Btrfs/   │   │   │
+│  │  │ Adapters│ │  CDC    │ │ Redish  │ │ Cache   │ │ IPFS     │   │   │
+│  │  └─────────┘ └─────────┘ └─────────┘ └─────────┘ └──────────┘   │   │
+│  └─────────────────────────────────────────────────────────────────┘   │
+│                                                                        │
+│  Transport Layer (libs/quic + libs/ngsctp + libs/tls)                  │
+│  Storage Layer (libs/tiny-btrfs + libs/ipfs + S3 adapter)              │
+│  Polyglot Surface (libs/polyglot + libs/server)                        │
+└────────────────────────────────────────────────────────────────────────┘
+
+Target Source Sets:
+├─ src/linuxMain    → io_uring SQ/CQ, io_uring_cmd, ktls
+├─ src/posixMain    → epoll/kqueue fallback
+├─ src/jvmMain      → Netty/epoll native, Project Loom aware
+├─ src/jsMain       → WebTransport, WebSocket streams
+├─ src/wasmJsMain   → WASI io, SharedArrayBuffer rings
+└─ src/nativeMain   → bare metal, no OS abstraction where possible
+
+
+
 ```
 
 ---

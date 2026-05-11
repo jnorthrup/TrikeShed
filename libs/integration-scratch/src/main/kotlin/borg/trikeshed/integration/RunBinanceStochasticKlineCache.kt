@@ -1,7 +1,8 @@
 package borg.trikeshed.integration
 
-import kotlinx.coroutines.runBlocking
+import borg.trikeshed.lib.size
 import java.time.LocalDate
+import kotlinx.coroutines.runBlocking
 
 data class BinanceStochasticMainArgs(
     val symbol: String = "BTCUSDT",
