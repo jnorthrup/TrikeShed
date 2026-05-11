@@ -5,10 +5,16 @@ import borg.trikeshed.lib.Series
 import kotlin.coroutines.CoroutineContext
 
 /**
- * Platform filesystem operations — replaces [borg.trikeshed.lib.Files] expect object.
+ * Pure filesystem interface — the single source of truth for all file I/O.
  *
- * Registered into [borg.trikeshed.context.SupervisorContextElement] by each platform.
- * Lives alongside [FileSystemProvider] in the NIO file SPI namespace.
+ * No expect/actual. No static objects. Each platform provides one implementation
+ * registered via [PlatformProviders] into the coroutine context.
+ *
+ * Access via coroutine context:
+ *   val fs = coroutineContext[FileOperations.Key]
+ *   fs?.readString("config.yaml")
+ *
+ * Or use the top-level [borg.trikeshed.lib.Files] accessor property.
  */
 interface FileOperations : CoroutineContext.Element {
     companion object Key : CoroutineContext.Key<FileOperations>

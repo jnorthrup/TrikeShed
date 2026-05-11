@@ -8,6 +8,7 @@ import borg.trikeshed.miniduck.BlobRowVec
 import borg.trikeshed.miniduck.S3RowVec
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class HazelnutServiceTest {
@@ -112,10 +113,34 @@ class HazelnutServiceTest {
         assertEquals("idmg", row[0])
         assertEquals("t-42", row[1])
         assertEquals(3, row[6])
+        assertEquals(3, row["attachmentCount"])
+        assertTrue(row["labelCount"] == null)
         assertTrue(row.child != null)
+        assertSame(envelope.attachments, row.child)
         assertEquals(3, row.child!!.size)
         assertTrue(row.child!![0] is BlobRowVec)
         assertTrue(row.child!![1] is AlibabaRowVec)
         assertTrue(row.child!![2] is S3RowVec)
+    }
+
+    @Test
+    fun envelopeCanProjectWithoutServiceWrapper() {
+        val attachment = BlobRowVec(byteArrayOf(1), mimeType = "text/plain")
+        val envelope = HazelnutEnvelope(
+            forum = "idmg",
+            threadId = "t-7",
+            commentId = "c-3",
+            body = "service-free projection",
+            labels = mapOf("kind" to "note"),
+            attachments = 1 j { attachment },
+        )
+
+        val row = envelope.toRowVec()
+
+        assertEquals("idmg", row["forum"])
+        assertEquals(1, row["attachmentCount"])
+        assertTrue(row["labelCount"] == null)
+        assertSame(envelope.attachments, row.child)
+        assertSame(attachment, row.child!![0])
     }
 }

@@ -4,7 +4,6 @@ import borg.trikeshed.lib.long.LongSeries
 import borg.trikeshed.userspace.ByteRegion
 import kotlin.random.Random
 import borg.trikeshed.lib.ByteSeries
-import borg.trikeshed.lib.Files
 import borg.trikeshed.lib.Join
 import borg.trikeshed.lib.SeekFileBufferCommon
 import borg.trikeshed.lib.SeekHandle
@@ -12,6 +11,8 @@ import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.Series2
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.toSeries
+import borg.trikeshed.userspace.nio.file.spi.FileOperations
+import borg.trikeshed.userspace.nio.file.spi.JsFileOperations
 
 
 actual object System {
@@ -22,100 +23,13 @@ actual object System {
     actual fun getenv(name: String, defaultVal: String?): String? = (processObj.env[name] as? String) ?: defaultVal
 }
 
-actual object Files {
-    actual fun readAllLines(filename: String): List<String> =
-        jsReadString(filename).replace("\r\n", "\n").lines()
-
-    actual fun readAllBytes(filename: String): ByteArray = jsReadBytes(filename)
-
-    actual fun readString(filename: String): String = jsReadString(filename)
-
-    actual fun write(filename: String, bytes: ByteArray) {
-        jsWriteBytes(filename, bytes)
-    }
-
-    actual fun write(filename: String, lines: List<String>) {
-        write(filename, lines.joinToString("\n"))
-    }
-
-    actual fun write(filename: String, string: String) {
-        jsWriteString(filename, string)
-    }
-
-    actual fun cwd(): String = jsCwd()
-
-    actual fun exists(filename: String): Boolean = jsExists(filename)
-
-    actual fun streamLines(fileName: String, bufsize: Int): Sequence<Join<Long, ByteArray>> =
-        streamByteLines(readAllBytes(fileName))
-
-    actual fun iterateLines(fileName: String, bufsize: Int): Iterable<Join<Long, Series<Byte>>> =
-        streamLines(fileName, bufsize).map { (offset, bytes) -> offset j bytes.toSeries() }.asIterable()
-
-    actual fun listDir(path: String): List<String> {
-        val entries: dynamic = fs.readdirSync(path)
-        val result = mutableListOf<String>()
-        val length = entries.length as Int
-        for (i in 0 until length) result.add(entries[i] as String)
-        return result
-    }
-
-    actual fun isDir(path: String): Boolean {
-        val stat: dynamic = fs.statSync(path)
-        return (stat.isDirectory() as Boolean)
-    }
-
-    actual fun isFile(path: String): Boolean {
-        val stat: dynamic = fs.statSync(path)
-        return (stat.isFile() as Boolean)
-    }
-
-    actual fun mkdirs(path: String) { jsMkdir(path) }
-
-    actual fun deleteRecursively(path: String) { jsRm(path) }
-
-    actual fun resolvePath(vararg parts: String): String =
-        path.join(jsCwd(), parts.joinToString("/")) as String
-
-    actual fun readZip(path: String): List<Pair<String, ByteArray>> = TODO("readZip JS")
-
-    actual fun createTempDir(prefix: String): String {
-        val dir = path.join(os.tmpdir(), "$prefix-${Random.nextInt(1_000_000)}") as String
-        jsMkdir(dir)
-        return dir
-    }
-}
-fun streamByteLines(bytes: ByteArray): Sequence<Join<Long, ByteArray>> = sequence {
-    var offset = 0L
-    var lineStart = 0L
-    val line = ArrayList<Byte>()
-
-    for (byte in bytes) {
-        line += byte
-        offset++
-        if (byte == '\n'.code.toByte()) {
-            yield(lineStart j line.toByteArray())
-            line.clear()
-            lineStart = offset
-        }
-    }
-
-    if (line.isNotEmpty()) {
-        yield(lineStart j line.toByteArray())
-    }
-}
-
-fun mktemp(): String = jsMktemp()
-
-fun rm(path: String): Boolean = jsRm(path)
-
-fun mkdir(path: String): Boolean = jsMkdir(path)
+internal actual fun defaultFileOperations(): FileOperations = JsFileOperations()
 
 fun readLinesSeq(path: String): Sequence<String> =
     Files.readAllLines(path).asSequence()
 
 fun readLines(path: String): List<String> = Files.readAllLines(path)
-data class JsHandleState(
+ data class JsHandleState(
     val fd: Int,
     var position: Long = 0,
 )

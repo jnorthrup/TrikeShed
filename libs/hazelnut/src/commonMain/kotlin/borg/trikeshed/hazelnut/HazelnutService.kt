@@ -6,6 +6,8 @@ import borg.trikeshed.lib.emptySeries
 import borg.trikeshed.lib.size
 import borg.trikeshed.miniduck.DocRowVec
 
+private val hazelnutRowKeys = listOf("forum", "threadId", "commentId", "title", "body", "author", "attachmentCount")
+
 data class HazelnutEnvelope(
     val forum: String,
     val threadId: String,
@@ -37,6 +39,21 @@ interface HazelnutClient {
     fun query(query: HazelnutQuery): Series<HazelnutEnvelope>
 }
 
+fun HazelnutEnvelope.toRowVec(): DocRowVec =
+    DocRowVec(
+        keys = hazelnutRowKeys,
+        cells = listOf(
+            forum,
+            threadId,
+            commentId,
+            title,
+            body,
+            author,
+            attachments.size,
+        ),
+        child = attachments,
+    )
+
 class HazelnutService(
     private val client: HazelnutClient,
 ) {
@@ -44,20 +61,5 @@ class HazelnutService(
 
     fun sync(query: HazelnutQuery): Series<HazelnutEnvelope> = client.query(query)
 
-    fun project(envelope: HazelnutEnvelope): DocRowVec =
-        DocRowVec(
-            keys = listOf("forum", "threadId", "commentId", "title", "body", "author", "labelCount"),
-            cells = listOf(
-                envelope.forum,
-                envelope.threadId,
-                envelope.commentId,
-                envelope.title,
-                envelope.body,
-                envelope.author,
-                envelope.attachments.size,
-            ),
-            child = attachmentRows(envelope.attachments),
-        )
-
-    private fun attachmentRows(attachments: Series<RowVec>): Series<RowVec> = attachments
+    fun project(envelope: HazelnutEnvelope): DocRowVec = envelope.toRowVec()
 }
