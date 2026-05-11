@@ -5,7 +5,7 @@ import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.*
 import borg.trikeshed.parse.kursive.legacy.KursiveParser
 import borg.trikeshed.parse.kursive.legacy.KursiveStep
-import borg.trikeshed.parse.kursive.legacy.SeriesBuffer
+import borg.trikeshed.lib.SeriesBuffer
 import borg.trikeshed.parse.kursive.legacy.parser
 import borg.trikeshed.parse.kursive.legacy.s
 
