@@ -128,37 +128,61 @@ actual class IsamDataFile actual constructor(
         ): Unit {
             val metafilename = "$datafilename.meta"
 
-            // TODO("not assume we have to write this file for this call.  if it exists, verify it and use it")
             lateinit var meta0: Series<RecordMeta>
+            var rowLen = 0
+            lateinit var rowBuffer: ByteArray
+            var first = true
+
+            if (fileOps.exists(metafilename)) {
+                meta0 = IsamMetaFileReader(metafilename, fileOps).constraints
+                rowLen = meta0.last().end
+                rowBuffer = ByteArray(rowLen) { 0 }
+                first = false
+
+                if (fileOps.exists(datafilename)) {
+                    val fileSize = Files.size(Paths.get(datafilename))
+                    val alignment = fileSize % rowLen
+                    if (alignment != 0L) {
+                        println("WARN: file $datafilename is not aligned to recordlen $rowLen")
+                    } else {
+                        println("DEBUG: file $datafilename is aligned to recordlen $rowLen")
+                    }
+                }
+            }
 
             // open RandomAccessDataFile
-            val data =
-                Files.newOutputStream(Paths.get(datafilename), APPEND, WRITE, CREATE)
+            Files.newOutputStream(Paths.get(datafilename), APPEND, WRITE, CREATE).use { data ->
+                var fibLog: FibonacciReporter? = null
+                debug { fibLog = FibonacciReporter(size = null, noun = "appends") }
 
+                // write rows
+                msf.forEach { rowVec1: RowVec ->
+                    val rowVec = transform?.let { it(rowVec1) } ?: rowVec1
+                    if (first) {
+                        meta0 = IsamMetaFileReader.write(metafilename, rowVec.right.α { it() }, varChars, fileOps)
+                        rowLen = meta0.last().end
+                        rowBuffer = ByteArray(rowLen) { 0 }
+                        debug { logDebug { "toIsam: " + meta0.toList() } }
+                        first = false
+                    } else {
+                        // Verify schema matches
+                        val incomingMeta = rowVec.right.α { it() }
+                        if (incomingMeta.size != meta0.size) {
+                            throw IllegalArgumentException("Schema mismatch: incoming row has ${incomingMeta.size} columns, but file has ${meta0.size}")
+                        }
+                        for (i in 0 until meta0.size) {
+                            val inc = incomingMeta[i]
+                            val m0 = meta0[i]
+                            if (inc.name != m0.name || inc.type != m0.type) {
+                                throw IllegalArgumentException("Schema mismatch at column $i: expected ${m0.name}:${m0.type}, got ${inc.name}:${inc.type}")
+                            }
+                        }
+                    }
 
-            var last: RecordMeta
-
-            var rowLen = 0
-
-            lateinit var rowBuffer: ByteArray
-            var fibLog: FibonacciReporter? = null
-            debug { fibLog = FibonacciReporter(size = null, noun = "appends") }
-            var first = true
-            // write rows
-            msf.forEach { rowVec1: RowVec ->
-                val rowVec = transform?.let { it(rowVec1) } ?: rowVec1
-                if (first) {
-                    meta0 = IsamMetaFileReader.write(metafilename, rowVec.right.α { it() }, varChars, fileOps)
-                    last = meta0.last()
-                    rowLen = last.end
-                    rowBuffer = ByteArray(rowLen) { 0 }
-                    debug { logDebug { "toIsam: " + meta0.toList() } }
-                    first = false
+                    WireProto.writeToBuffer(rowVec, rowBuffer, meta0)
+                    data.write(rowBuffer)
+                    debug { fibLog?.report()?.let { println(it) } }
                 }
-
-                WireProto.writeToBuffer(rowVec, rowBuffer, meta0)
-                data.write(rowBuffer)
-                debug { fibLog?.report()?.let { println(it) } }
             }
         }
     }
