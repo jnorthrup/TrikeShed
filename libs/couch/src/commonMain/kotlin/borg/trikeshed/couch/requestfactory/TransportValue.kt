@@ -10,3 +10,14 @@ sealed interface TransportValue {
     data class ArrayValue(val values: List<TransportValue>) : TransportValue
     data class ObjectValue(val values: Map<String, TransportValue>) : TransportValue
 }
+
+/** Unwrap to a plain Kotlin value suitable for passing to [CouchViewInvocation.invoke]. */
+fun TransportValue.unwrap(): Any? = when (this) {
+    is TransportValue.NullValue -> null
+    is TransportValue.StringValue -> value
+    is TransportValue.BooleanValue -> value
+    is TransportValue.IntegerValue -> value
+    is TransportValue.NumberValue -> value
+    is TransportValue.ArrayValue -> values.map { it.unwrap() }
+    is TransportValue.ObjectValue -> values.mapValues { it.value.unwrap() }
+}
