@@ -20,6 +20,10 @@ interface LiburingFacade {
     fun prepAccept(fd: Int, userData: Long): Result<Unit>
     fun prepConnect(fd: Int, addrPtr: Long, addrLen: Int, userData: Long): Result<Unit>
     fun prepClose(fd: Int, userData: Long): Result<Unit>
+    fun prepFsync(fd: Int, userData: Long, datasync: Boolean): Result<Unit>
+    fun prepFtruncate(fd: Int, size: Long, userData: Long): Result<Unit>
+    fun prepMmap(fd: Int, addr: Long, len: Int, prot: Int, flags: Int, offset: Long, userData: Long): Result<Unit>
+    fun prepMunmap(addr: Long, len: Int, userData: Long): Result<Unit>
     fun submit(): Result<Int>
     fun waitCqe(): Result<UringCompletion>
     fun peekCqe(): Result<UringCompletion?>
@@ -59,6 +63,10 @@ internal expect object LiburingImpl : LiburingFacade {
     ): Result<Unit>
 
     override fun prepClose(fd: Int, userData: Long): Result<Unit>
+    override fun prepFsync(fd: Int, userData: Long, datasync: Boolean): Result<Unit>
+    override fun prepFtruncate(fd: Int, size: Long, userData: Long): Result<Unit>
+    override fun prepMmap(fd: Int, addr: Long, len: Int, prot: Int, flags: Int, offset: Long, userData: Long): Result<Unit>
+    override fun prepMunmap(addr: Long, len: Int, userData: Long): Result<Unit>
     override fun submit(): Result<Int>
     override fun waitCqe(): Result<UringCompletion>
     override fun peekCqe(): Result<UringCompletion?>

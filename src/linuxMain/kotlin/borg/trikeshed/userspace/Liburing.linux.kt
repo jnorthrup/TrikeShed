@@ -72,6 +72,30 @@ internal actual object LiburingImpl : LiburingFacade {
             io_uring_prep_close(sqe, fd)
         }
 
+    actual override fun prepFsync(fd: Int, userData: Long, datasync: Boolean): Result<Unit> =
+        prepare(userData) { sqe ->
+            sqe.pointed.user_data = userData.toULong()
+            io_uring_prep_fsync(sqe, fd, if (datasync) 1u else 0u)
+        }
+
+    actual override fun prepFtruncate(fd: Int, size: Long, userData: Long): Result<Unit> =
+        prepare(userData) { sqe ->
+            sqe.pointed.user_data = userData.toULong()
+            io_uring_prep_ftruncate(sqe, fd, size.toULong())
+        }
+
+    actual override fun prepMmap(fd: Int, addr: Long, len: Int, prot: Int, flags: Int, offset: Long, userData: Long): Result<Unit> =
+        prepare(userData) { sqe ->
+            sqe.pointed.user_data = userData.toULong()
+            io_uring_prep_mmap(sqe, fd, addr, len, prot, flags, offset)
+        }
+
+    actual override fun prepMunmap(addr: Long, len: Int, userData: Long): Result<Unit> =
+        prepare(userData) { sqe ->
+            sqe.pointed.user_data = userData.toULong()
+            io_uring_prep_munmap(sqe, addr, len)
+        }
+
     actual override fun submit(): Result<Int> {
         val currentRing = ring ?: return failure("liburing ring is not open")
         val rc = io_uring_submit(currentRing)

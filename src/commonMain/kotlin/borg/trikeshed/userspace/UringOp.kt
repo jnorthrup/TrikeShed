@@ -3,6 +3,8 @@
 package borg.trikeshed.userspace
 
 import borg.trikeshed.context.BitMasked
+import borg.trikeshed.context.or
+import borg.trikeshed.userspace.nio.ByteBuffer
 
 /**
  * io_uring kernel opcodes — mirrors linux/io_uring.h IORING_OP_*.
@@ -29,7 +31,8 @@ enum class UringOp(val desc: String) : BitMasked<Long> {
     ASYNC_CANCEL("cancel in-flight request by userData"),
     LINK_TIMEOUT("timeout for linked request chain"),
     CONNECT("initiate connection"),
-    FALLOCATE("fallocate — preallocate/ Punch hole"),
+    FALLOCATE("fallocate — preallocate/ punch hole"),
+    FTRUNCATE("ftruncate — truncate file to length"),
     OPENAT("openat — open file relative to dirfd"),
     CLOSE("close fd"),
     FILES_UPDATE("update registered file table"),
@@ -72,17 +75,16 @@ enum class UringOp(val desc: String) : BitMasked<Long> {
     val code: Int get() = ordinal
 
     companion object {
-        val CAP_MANDATORY: Long = READ.mask or WRITE.mask or CLOSE.mask or STATX.mask
-        val CAP_FILE_IO: Long = READ.mask or WRITE.mask or FSYNC.mask or FALLOCATE.mask or
-            READV.mask or WRITEV.mask or SPLICE.mask or TEE.mask
-        val CAP_NET_IO: Long = SEND.mask or RECV.mask or ACCEPT.mask or CONNECT.mask or
-            SENDMSG.mask or RECVMSG.mask or SHUTDOWN.mask
+        val CAP_MANDATORY: Long = READ or WRITE or CLOSE or STATX
+        val CAP_FILE_IO: Long = READ or WRITE or FSYNC or FALLOCATE or
+            READV or WRITEV or SPLICE or TEE
+        val CAP_NET_IO: Long = SEND or RECV or ACCEPT or CONNECT or
+            SENDMSG or RECVMSG or SHUTDOWN
 
-        fun caps(vararg ops: UringOp): Long = ops.fold(0L) { acc, op -> acc or op.mask }
-
+        fun caps(vararg ops: UringOp): Long = ops.fold(0L) { acc: Long, op: UringOp -> op or acc }
 
         /**
-         * One io_uring SQE. The **only** type crossing [FunctionalUringFacade].
+         * One io_uring SQE. The only type crossing [FunctionalUringFacade].
          * Fields map 1:1 to struct io_uring_sqe.
          */
         data class UringSubmission(
@@ -93,55 +95,57 @@ enum class UringOp(val desc: String) : BitMasked<Long> {
             val offset: Long,
             val flags: Int = 0,
             val userData: Long = 0,
+            val buffer: ByteBuffer? = null,
         )
 
         /** Convenience constructors. */
         object Submissions {
-            fun read(fd: Int, bufAddr: Long, len: Int, offset: Long, userData: Long) =
-                UringSubmission(UringOp.READ, fd, bufAddr, len, offset, 0, userData)
+            fun read(fd: Int, bufAddr: Long, len: Int, offset: Long, userData: Long): UringSubmission =
+                UringSubmission(READ, fd, bufAddr, len, offset, 0, userData)
 
-            fun write(fd: Int, bufAddr: Long, len: Int, offset: Long, userData: Long) =
-                UringSubmission(UringOp.WRITE, fd, bufAddr, len, offset, 0, userData)
+            fun write(fd: Int, bufAddr: Long, len: Int, offset: Long, userData: Long): UringSubmission =
+                UringSubmission(WRITE, fd, bufAddr, len, offset, 0, userData)
 
-            fun statx(fd: Int, bufAddr: Long, userData: Long) =
-                UringSubmission(UringOp.STATX, fd, bufAddr, 256, 0, 0, userData)
+            fun statx(fd: Int, bufAddr: Long, userData: Long): UringSubmission =
+                UringSubmission(STATX, fd, bufAddr, 256, 0, 0, userData)
 
             fun openat(dirFd: Int, pathAddr: Long, len: Int, flags: Int, userData: Long) =
-                UringSubmission(UringOp.OPENAT, dirFd, pathAddr, len, flags.toLong(), 0, userData)
+                UringSubmission(OPENAT, dirFd, pathAddr, len, flags.toLong(), 0, userData)
 
-            fun close(fd: Int, userData: Long) =
-                UringSubmission(UringOp.CLOSE, fd, 0, 0, 0, 0, userData)
+            fun close(fd: Int, userData: Long): UringSubmission =
+                UringSubmission(CLOSE, fd, 0, 0, 0, 0, userData)
 
-            fun fsync(fd: Int, userData: Long) =
-                UringSubmission(UringOp.FSYNC, fd, 0, 0, 0, 0, userData)
+            fun fsync(fd: Int, userData: Long): UringSubmission =
+                UringSubmission(FSYNC, fd, 0, 0, 0, 0, userData)
 
-            fun accept(fd: Int, addrBuf: Long, addrLen: Int, userData: Long) =
-                UringSubmission(UringOp.ACCEPT, fd, addrBuf, addrLen, 0, 0, userData)
+            fun accept(fd: Int, addrBuf: Long, addrLen: Int, userData: Long): UringSubmission =
+                UringSubmission(ACCEPT, fd, addrBuf, addrLen, 0, 0, userData)
 
-            fun connect(fd: Int, addrBuf: Long, addrLen: Int, userData: Long) =
-                UringSubmission(UringOp.CONNECT, fd, addrBuf, addrLen, 0, 0, userData)
+            fun connect(fd: Int, addrBuf: Long, addrLen: Int, userData: Long): UringSubmission =
+                UringSubmission(CONNECT, fd, addrBuf, addrLen, 0, 0, userData)
 
-            fun send(fd: Int, bufAddr: Long, len: Int, userData: Long) =
-                UringSubmission(UringOp.SEND, fd, bufAddr, len, 0, 0, userData)
+            fun send(fd: Int, bufAddr: Long, len: Int, userData: Long): UringSubmission =
+                UringSubmission(SEND, fd, bufAddr, len, 0, 0, userData)
 
-            fun recv(fd: Int, bufAddr: Long, len: Int, userData: Long) =
-                UringSubmission(UringOp.RECV, fd, bufAddr, len, 0, 0, userData)
+            fun recv(fd: Int, bufAddr: Long, len: Int, userData: Long): UringSubmission =
+                UringSubmission(RECV, fd, bufAddr, len, 0, 0, userData)
 
-            fun splice(fdIn: Int, offIn: Long, fdOut: Int, offOut: Long, len: Int, userData: Long) =
+            fun splice(fdIn: Int, offIn: Long, fdOut: Int, offOut: Long, len: Int, userData: Long): UringSubmission =
                 UringSubmission(
-                    UringOp.SPLICE,
+                    SPLICE,
                     fdIn,
                     (fdOut.toLong() shl 32) or (offIn and 0xFFFFFFFFL),
                     len,
                     offOut,
                     0,
-                    userData
+                    userData,
                 )
 
-            fun timeout(addr: Long, userData: Long) =
-                UringSubmission(UringOp.TIMEOUT, -1, addr, 1, 0, 0, userData)
+            fun timeout(addr: Long, userData: Long): UringSubmission =
+                UringSubmission(TIMEOUT, -1, addr, 1, 0, 0, userData)
 
-            fun nop(userData: Long) =
-                UringSubmission(UringOp.NOP, -1, 0, 0, 0, 0, userData)
+            fun nop(userData: Long): UringSubmission =
+                UringSubmission(NOP, -1, 0, 0, 0, 0, userData)
         }
-    }}
+    }
+}

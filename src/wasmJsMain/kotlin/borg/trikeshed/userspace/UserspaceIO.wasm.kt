@@ -13,6 +13,9 @@ private class WasmUserspaceChannelBackend : UserspaceChannelBackend {
     override fun accept(file: FileImpl): Int = -1
     override fun connect(file: FileImpl, address: String, port: Int): Int = -1
     override fun close(file: FileImpl): Int = 0
+    override fun sync(file: FileImpl, metaData: Boolean): Int = 0
+    override fun truncate(file: FileImpl, size: Long): Int = 0
+    override fun map(file: FileImpl, mode: String, position: Long, size: Long): Int = -1
 }
 
 internal actual fun openUserspaceChannelBackend(entries: Int): UserspaceChannelBackend = WasmUserspaceChannelBackend()
@@ -25,42 +28,11 @@ actual class FileImpl actual constructor(actual val id: Int) {
     actual fun size(): Long = knownSize
 }
 
-internal actual class ChannelImpl actual constructor(entries: Int) {
-    private val facade = FunctionalUringFacade(entries, openUserspaceChannelBackend(entries))
-
-    actual fun read(file: FileImpl, buffer: ByteBuffer, offset: Long, userData: Long) {
-        facade.read(file, buffer, offset, userData)
-    }
-
-    actual fun write(file: FileImpl, buffer: ByteBuffer, offset: Long, userData: Long) {
-        facade.write(file, buffer, offset, userData)
-    }
-
-    actual fun accept(file: FileImpl, userData: Long) {
-        facade.accept(file, userData)
-    }
-
-    actual fun connect(file: FileImpl, address: String, port: Int, userData: Long) {
-        facade.connect(file, address, port, userData)
-    }
-
-    actual fun close(file: FileImpl, userData: Long) {
-        facade.close(file, userData)
-    }
-
-    actual fun submit(): Int = facade.submit()
-
-    actual fun wait(minComplete: Int): List<SelectionResult> = facade.wait(minComplete)
-
-    actual fun peek(): List<SelectionResult> = facade.peek()
-}
-
 internal actual object FilesImpl {
     actual fun open(path: String, readOnly: Boolean): FileImpl =
         WasmFileRegistry.open().also { it.path = path }
 }
 
 internal actual object ChannelsImpl {
-    actual fun open(entries: Int): ChannelImpl = ChannelImpl(entries)
     actual fun socket(domain: Int, type: Int, protocol: Int): FileImpl = WasmFileRegistry.open()
 }

@@ -4,9 +4,9 @@ package borg.trikeshed.userspace.nio.channels
 
 // Generated from Amazon Corretto JDK 25 java.base NIO public/protected API via javap.
 // Declarations intentionally mirror JDK taxonomy and contain no implementations.
-public abstract class FileLock {
-    protected constructor(channel: FileChannel, position: Long, size: Long, shared: Boolean)
-    protected constructor(channel: AsynchronousFileChannel, position: Long, size: Long, shared: Boolean)
+public open class FileLock {
+    public constructor(channel: FileChannel, position: Long, size: Long, shared: Boolean)
+    public constructor(channel: AsynchronousFileChannel, position: Long, size: Long, shared: Boolean)
     fun channel(): FileChannel = TODO("NIO common stub")
     fun acquiredBy(): Channel = TODO("NIO common stub")
     fun position(): Long = TODO("NIO common stub")

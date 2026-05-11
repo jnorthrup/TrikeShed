@@ -1,18 +1,10 @@
-@file:OptIn(kotlinx.cinterop.ExperimentalForeignApi::class)
+@file:OptIn(ExperimentalForeignApi::class)
 
 package borg.trikeshed
 
 import borg.trikeshed.userspace.Liburing
-import kotlinx.cinterop.addressOf
-import kotlinx.cinterop.usePinned
-import platform.posix.EINVAL
-import platform.posix.ESPIPE
-import platform.posix.close
-import platform.posix.errno
-import platform.posix.pread
-import platform.posix.pwrite
-import platform.posix.read
-import platform.posix.write
+import kotlinx.cinterop.*
+import platform.posix.*
 
 internal object PosixUringIO {
     private var openAttemptedEntries: Int = 0
@@ -69,12 +61,45 @@ internal object PosixUringIO {
     }
 
     fun fileSize(fd: Int): Long {
-        kotlinx.cinterop.memScoped {
-            val st = kotlinx.cinterop.alloc<platform.posix.stat>()
-            if (platform.posix.fstat(fd, st.ptr) == 0)
+        memScoped {
+            val st: stat = alloc<stat>()
+            if (fstat(fd, st.ptr) == 0)
                 return st.st_size
         }
         return -1L
+    }
+
+    fun fsync(fd: Int, entries: Int = 256): Int {
+        if (fd < 0) return -1
+        val userData = nextUserData++
+        if (ensureOpen(entries) && Liburing.prepFsync(fd, userData).isSuccess) {
+            val submitted = Liburing.submit().getOrNull()
+            if (submitted != null && submitted > 0) {
+                return Liburing.waitCqe().getOrNull()?.res ?: -1
+            }
+        }
+        return platform.posix.fsync(fd)
+    }
+
+    fun fdatasync(fd: Int, entries: Int = 256): Int {
+        if (fd < 0) return -1
+        val userData = nextUserData++
+        if (ensureOpen(entries) && Liburing.prepFdsync(fd, userData).isSuccess) {
+            val submitted = Liburing.submit().getOrNull()
+            if (submitted != null && submitted > 0) {
+                return Liburing.waitCqe().getOrNull()?.res ?: -1
+            }
+        }
+        return platform.posix.fdatasync(fd)
+    }
+
+    fun ftruncate(fd: Int, size: Long, entries: Int = 256): Int {
+        if (fd < 0) return -1
+        return platform.posix.ftruncate(fd, size)
+    }
+
+    fun mmap(addr: Long, length: Int, prot: Int, flags: Int, fd: Int, offset: Long): Long {
+        return platform.posix.mmap(addr, length.toULong(), prot, flags, fd, offset)
     }
 
     private fun ensureOpen(entries: Int): Boolean {

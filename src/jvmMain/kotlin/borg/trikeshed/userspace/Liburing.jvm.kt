@@ -25,6 +25,18 @@ internal actual object LiburingImpl : LiburingFacade {
     actual override fun prepClose(fd: Int, userData: Long): Result<Unit> =
         delegate?.prepClose(fd, userData) ?: unsupported()
 
+    actual override fun prepFsync(fd: Int, userData: Long, datasync: Boolean): Result<Unit> =
+        delegate?.prepFsync(fd, userData, datasync) ?: unsupported()
+
+    actual override fun prepFtruncate(fd: Int, size: Long, userData: Long): Result<Unit> =
+        delegate?.prepFtruncate(fd, size, userData) ?: unsupported()
+
+    actual override fun prepMmap(fd: Int, addr: Long, len: Int, prot: Int, flags: Int, offset: Long, userData: Long): Result<Unit> =
+        delegate?.prepMmap(fd, addr, len, prot, flags, offset, userData) ?: unsupported()
+
+    actual override fun prepMunmap(addr: Long, len: Int, userData: Long): Result<Unit> =
+        delegate?.prepMunmap(addr, len, userData) ?: unsupported()
+
     actual override fun submit(): Result<Int> = delegate?.submit() ?: unsupported()
 
     actual override fun waitCqe(): Result<UringCompletion> = delegate?.waitCqe() ?: unsupported()

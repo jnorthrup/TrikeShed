@@ -2,8 +2,12 @@
 
 package borg.trikeshed.lib
 
+import borg.trikeshed.PosixUringIO
 import borg.trikeshed.userspace.ByteRegion
-import kotlinx.cinterop.*
+import kotlinx.cinterop.ExperimentalForeignApi
+import kotlinx.cinterop.alloc
+import kotlinx.cinterop.memScoped
+import kotlinx.cinterop.ptr
 import platform.posix.*
 
 class PreadSeekHandle : SeekHandle {
@@ -38,7 +42,7 @@ class PreadSeekHandle : SeekHandle {
     override fun size(handle: Long): Long {
         val fd = fds[handle] ?: return -1
         return memScoped {
-            val statBuf = alloc<platform.posix.stat>()
+            val statBuf = alloc<stat>()
             if (fstat(fd, statBuf.ptr) == 0) statBuf.st_size else -1L
         }
     }
@@ -68,8 +72,8 @@ class PreadSeekHandle : SeekHandle {
 }
 
 class UringSeekHandle : SeekHandle {
-    private val fds = mutableMapOf<Long, Int>()
-    private val positions = mutableMapOf<Long, Long>()
+    private val fds: MutableMap<Long, Int> = mutableMapOf<Long, Int>()
+    private val positions: MutableMap<Long, Long> = mutableMapOf<Long, Long>()
     private var nextId: Long = 1
 
     fun isAvailable(): Boolean = PosixUringIO.isAvailable()
@@ -98,28 +102,28 @@ class UringSeekHandle : SeekHandle {
     }
 
     override fun pwrite(handle: Long, src: ByteSeries, fileOffset: Long): Int {
-        val fd = fds[handle] ?: return -1
-        val bytes = src.toArray()
+        val fd: Int = fds[handle] ?: return -1
+        val bytes: ByteArray = src.toArray()
         return PosixUringIO.writeAt(fd, bytes, 0, bytes.size, fileOffset)
     }
 
     override fun size(handle: Long): Long {
-        val fd = fds[handle] ?: return -1
+        val fd: Int = fds[handle] ?: return -1
         return memScoped {
-            val statBuf = alloc<platform.posix.stat>()
+            val statBuf = alloc<stat>()
             if (fstat(fd, statBuf.ptr) == 0) statBuf.st_size else -1L
         }
     }
 
     override fun read(handle: Long, dst: ByteRegion): Int {
-        val pos = positions[handle] ?: return -1
+        val pos: Long = positions[handle] ?: return -1
         return pread(handle, dst, pos).also { bytesRead ->
             if (bytesRead > 0) positions[handle] = pos + bytesRead
         }
     }
 
     override fun write(handle: Long, src: ByteSeries): Int {
-        val pos = positions[handle] ?: return -1
+        val pos: Long = positions[handle] ?: return -1
         return pwrite(handle, src, pos).also { bytesWritten ->
             if (bytesWritten > 0) positions[handle] = pos + bytesWritten
         }

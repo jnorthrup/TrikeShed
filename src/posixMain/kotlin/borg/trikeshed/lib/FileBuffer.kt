@@ -1,15 +1,8 @@
 @file:OptIn(ExperimentalForeignApi::class, ExperimentalForeignApi::class)
 
 package borg.trikeshed.lib
-import borg.trikeshed.lib.*
 import borg.trikeshed.lib.long.LongSeries
-import kotlinx.cinterop.ByteVar
-import kotlinx.cinterop.COpaquePointer
-import kotlinx.cinterop.ExperimentalForeignApi
-import kotlinx.cinterop.pointed
-import kotlinx.cinterop.toCPointer
-import kotlinx.cinterop.toLong
-import kotlinx.cinterop.value
+import kotlinx.cinterop.*
 import platform.posix.munmap
 import simple.PosixFile
 import simple.PosixOpenOpts
@@ -19,9 +12,8 @@ actual class FileBuffer actual constructor(
     actual val initialOffset: Long,
     actual val blkSize: Long,
     actual val readOnly: Boolean,
-    actual val closeChannelOnMap: Boolean) : LongSeries<Byte>  {
-
-
+    actual val closeChannelOnMap: Boolean,
+) : LongSeries<Byte>  {
     init {
         logDebug { "native FileBuffer: $filename, $initialOffset, $blkSize, $readOnly" }
     }
@@ -48,11 +40,11 @@ actual class FileBuffer actual constructor(
         file = null; buffer = null
     }
 
-    actual fun open(): Unit = memScoped {
+    actual fun open(): Unit = memScoped  {
         logDebug { "opening $filename" }
         file = PosixFile(
-            filename,
-            if (readOnly) PosixOpenOpts.withFlags(PosixOpenOpts.OpenReadOnly)
+            path = filename,
+            O_FLAGS = if (readOnly) PosixOpenOpts.withFlags(PosixOpenOpts.OpenReadOnly)
             else PosixOpenOpts.withFlags(PosixOpenOpts.O_Rdwr),
         )
         val len: ULong = if (blkSize == (-1L)) file!!.size.toULong() else blkSize.toULong()

@@ -1,5 +1,6 @@
 package borg.trikeshed.userspace
 
+import borg.trikeshed.userspace.UringOp.Companion.UringSubmission
 import borg.trikeshed.userspace.nio.ByteBuffer
 
 /**
@@ -26,6 +27,12 @@ public interface UserspaceChannelBackend {
     fun connect(file: FileImpl, address: String, port: Int): Int
     @Deprecated("Use submitBatch with UringSubmission")
     fun close(file: FileImpl): Int
+    @Deprecated("Use submitBatch with UringSubmission")
+    fun sync(file: FileImpl, metaData: Boolean): Int
+    @Deprecated("Use submitBatch with UringSubmission")
+    fun truncate(file: FileImpl, size: Long): Int
+    @Deprecated("Use submitBatch with UringSubmission")
+    fun map(file: FileImpl, mode: String, position: Long, size: Long): Int
 
     /**
      * Submit a batch of [UringSubmission] entries and return completions.
@@ -104,6 +111,18 @@ public class FunctionalUringFacade(
         pushAny(PreparedChannelOp.Close(file, userData))
     }
 
+    fun sync(file: FileImpl, userData: Long, metaData: Boolean) {
+        pushAny(PreparedChannelOp.Sync(file, userData, metaData))
+    }
+
+    fun truncate(file: FileImpl, size: Long, userData: Long) {
+        pushAny(PreparedChannelOp.Truncate(file, size, userData))
+    }
+
+    fun map(file: FileImpl, mode: String, position: Long, size: Long, userData: Long) {
+        pushAny(PreparedChannelOp.Map(file, mode, position, size, userData))
+    }
+
     // -- Completion drain --
 
     fun submit(): Int {
@@ -136,6 +155,9 @@ public class FunctionalUringFacade(
                 is PreparedChannelOp.Accept -> backend.accept(op.file)
                 is PreparedChannelOp.Connect -> backend.connect(op.file, op.address, op.port)
                 is PreparedChannelOp.Close -> backend.close(op.file)
+                is PreparedChannelOp.Sync -> backend.sync(op.file, op.metaData)
+                is PreparedChannelOp.Truncate -> backend.truncate(op.file, op.size)
+                is PreparedChannelOp.Map -> backend.map(op.file, op.mode, op.position, op.size)
             }
             completions.addLast(SelectionResult(res, op.userData))
         }
@@ -187,6 +209,24 @@ internal sealed interface PreparedChannelOp {
         val file: FileImpl,
         override val userData: Long,
     ) : PreparedChannelOp
-}
 
-internal expect fun openUserspaceChannelBackend(entries: Int): UserspaceChannelBackend
+    data class Sync(
+        val file: FileImpl,
+        override val userData: Long,
+        val metaData: Boolean,
+    ) : PreparedChannelOp
+
+    data class Truncate(
+        val file: FileImpl,
+        val size: Long,
+        override val userData: Long,
+    ) : PreparedChannelOp
+
+    data class Map(
+        val file: FileImpl,
+        val mode: String,
+        val position: Long,
+        val size: Long,
+        override val userData: Long,
+    ) : PreparedChannelOp
+}
