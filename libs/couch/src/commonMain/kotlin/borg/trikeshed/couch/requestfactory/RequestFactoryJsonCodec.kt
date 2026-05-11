@@ -3,6 +3,8 @@ package borg.trikeshed.couch.requestfactory
 import borg.trikeshed.lib.toSeries
 import borg.trikeshed.parse.json.JsonParser
 
+@Suppress("UNCHECKED_CAST")
+
 object RequestFactoryJsonCodec {
     fun callToJson(call: RequestFactoryCall): String = buildJsonObject(
         listOf(

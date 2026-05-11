@@ -6,6 +6,8 @@ import borg.trikeshed.lib.j
 import borg.trikeshed.lib.toSeries
 import borg.trikeshed.parse.json.JsonParser
 
+@Suppress("UNCHECKED_CAST")
+
 /**
  * CouchDB 1.1 view query result row set.
  */
