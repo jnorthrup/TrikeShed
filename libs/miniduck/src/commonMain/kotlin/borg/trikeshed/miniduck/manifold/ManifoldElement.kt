@@ -7,7 +7,10 @@ import kotlinx.coroutines.CompletableJob
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.supervisorScope
+import kotlinx.coroutines.withContext
 import kotlin.coroutines.CoroutineContext
 
 /**
@@ -47,6 +50,9 @@ class ManifoldElement(parentJob: Job? = null) : AsyncContextElement(parentJob = 
     private fun branchScope(scope: CoroutineScope, branch: Job): CoroutineScope =
         CoroutineScope(scope.coroutineContext.minusKey(Job) + branch)
 
+    private fun branchContext(scope: CoroutineScope, branch: Job): CoroutineContext =
+        scope.coroutineContext.minusKey(Job) + branch
+
     /**
      * Dispatch a MiniDuckPoint to its branches.
      * Each handler runs as an independent child coroutine of its branch.
@@ -77,7 +83,7 @@ class ManifoldElement(parentJob: Job? = null) : AsyncContextElement(parentJob = 
         decayFactor: Float = 0.9f,
         onDerived: (ManifoldConcept<P>) -> Unit,
     ) {
-        branchScope(scope, timeBranch).launch {
+        withContext(branchContext(scope, timeBranch)) {
             val derived = concept.decay(decayFactor)
             if (derived.budget.energy() >= energyFloor) {
                 onDerived(derived)
@@ -98,10 +104,17 @@ class ManifoldElement(parentJob: Job? = null) : AsyncContextElement(parentJob = 
         scope: CoroutineScope,
         onDerived: (ManifoldConcept<P>) -> Unit,
     ) {
-        for (i in 0 until steps.a) {
-            val step = steps.b(i)
-            branchScope(scope, timeBranch).launch {
-                step.apply(concept, onDerived)
+        supervisorScope {
+            val branch = branchContext(scope, timeBranch)
+            val children = ArrayList<kotlinx.coroutines.Deferred<Unit>>(steps.a)
+            for (i in 0 until steps.a) {
+                val step = steps.b(i)
+                children += async(branch) {
+                    step.apply(concept, onDerived)
+                }
+            }
+            for (child in children) {
+                runCatching { child.await() }
             }
         }
     }

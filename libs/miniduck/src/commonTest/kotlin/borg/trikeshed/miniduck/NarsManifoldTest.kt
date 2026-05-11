@@ -3,6 +3,7 @@ package borg.trikeshed.miniduck
 import borg.trikeshed.lib.*
 import borg.trikeshed.manifold.*
 import borg.trikeshed.miniduck.manifold.*
+import kotlinx.coroutines.test.runTest
 import kotlin.test.*
 
 class NarsManifoldTest {
@@ -241,5 +242,48 @@ class NarsManifoldTest {
         assertEquals(42L, point.t4.seq)
         assertEquals(1024L, point.a4.offset)
         assertEquals(5000L, point.m4.steadyNanos)
+    }
+
+    @Test
+    fun deriveEmitsBeforeReturning() = runTest {
+        val element = ManifoldElement()
+        val concept = ManifoldConcept(
+            angular = 0x1111L,
+            budget = BudgetCoord(p = 0.9f, d = 0.8f, q = 0.7f),
+        )
+        val derived = mutableListOf<ManifoldConcept<Unit>>()
+
+        element.derive(concept, this, energyFloor = 0.05f, decayFactor = 0.5f) {
+            derived.add(it)
+        }
+
+        assertEquals(1, derived.size)
+        assertEquals(concept.angular, derived[0].angular)
+        assertEquals(0.45, derived[0].budget.p.toDouble(), 0.01)
+    }
+
+    @Test
+    fun deriveAllWaitsForSurvivingStepsDespiteSiblingFailure() = runTest {
+        val element = ManifoldElement()
+        val concept = ManifoldConcept(
+            angular = 0xAAAAAAAAL,
+            budget = BudgetCoord(p = 0.8f, d = 0.7f, q = 0.6f),
+        )
+        val emitted = mutableListOf<Long>()
+        val steps: Series<DeriverStep<Unit>> = 3 j { i: Int ->
+            when (i) {
+                0 -> decayStep(factor = 0.5f, floor = 0f)
+                1 -> angularShiftStep(0xFFL)
+                else -> DeriverStep { _, _ -> error("expected deriver sibling failure") }
+            }
+        }
+
+        element.deriveAll(concept, steps, this) {
+            emitted.add(it.angular)
+        }
+
+        assertEquals(2, emitted.size)
+        assertTrue(emitted.contains(concept.angular))
+        assertTrue(emitted.contains(concept.angular xor 0xFFL))
     }
 }

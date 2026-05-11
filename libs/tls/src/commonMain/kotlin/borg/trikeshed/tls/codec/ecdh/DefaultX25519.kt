@@ -86,7 +86,13 @@ class DefaultX25519 : X25519 {
         carry[9] = hh[9] ushr 25; hh[9] = hh[9] and 0x1FFFFFF; hh[0] += carry[9] * 19
         carry[0] = hh[0] ushr 26; hh[0] = hh[0] and 0x3FFFFFF; hh[1] += carry[0]
         val bytes = ByteArray(32)
-        for (i in 0..9) { val v = hh[i]; bytes[i * 4] = (v and 0xFF).toByte(); bytes[i * 4 + 1] = ((v ushr 8) and 0xFF).toByte(); if (i * 4 + 2 < 32) bytes[i * 4 + 2] = ((v ushr 16) and 0xFF).toByte(); if (i * 4 + 3 < 32) bytes[i * 4 + 3] = ((v ushr 24) and 0xFF).toByte() }
+        for (i in 0..9) {
+            val v = hh[i]
+            if (i * 4 < 32) bytes[i * 4] = (v and 0xFF).toByte()
+            if (i * 4 + 1 < 32) bytes[i * 4 + 1] = ((v ushr 8) and 0xFF).toByte()
+            if (i * 4 + 2 < 32) bytes[i * 4 + 2] = ((v ushr 16) and 0xFF).toByte()
+            if (i * 4 + 3 < 32) bytes[i * 4 + 3] = ((v ushr 24) and 0xFF).toByte()
+        }
         return bytes
     }
 

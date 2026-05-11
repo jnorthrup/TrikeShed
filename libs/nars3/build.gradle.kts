@@ -22,6 +22,7 @@ kotlin {
         }
         commonTest.dependencies {
             implementation(kotlin("test"))
+            implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:${property("versions.kotlinx-coroutines-test")}")
         }
     }
 }
