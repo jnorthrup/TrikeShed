@@ -11,7 +11,9 @@ import kotlinx.cinterop.nativeHeap
 import kotlinx.cinterop.ptr
 import kotlinx.cinterop.toCPointer
 import platform.posix.sockaddr
+import zlinux_uring.IORING_FSYNC_DATASYNC
 import zlinux_uring.io_uring
+import zlinux_uring.io_uring_cq_advance
 import zlinux_uring.io_uring_cqe
 import zlinux_uring.io_uring_cqe_seen
 import zlinux_uring.io_uring_get_sqe
@@ -19,6 +21,10 @@ import zlinux_uring.io_uring_peek_cqe
 import zlinux_uring.io_uring_prep_accept
 import zlinux_uring.io_uring_prep_close
 import zlinux_uring.io_uring_prep_connect
+import zlinux_uring.io_uring_prep_fsync
+import zlinux_uring.io_uring_prep_ftruncate
+import zlinux_uring.io_uring_prep_mmap
+import zlinux_uring.io_uring_prep_munmap
 import zlinux_uring.io_uring_prep_read
 import zlinux_uring.io_uring_prep_write
 import zlinux_uring.io_uring_queue_exit
@@ -75,13 +81,13 @@ internal actual object LiburingImpl : LiburingFacade {
     actual override fun prepFsync(fd: Int, userData: Long, datasync: Boolean): Result<Unit> =
         prepare(userData) { sqe ->
             sqe.pointed.user_data = userData.toULong()
-            io_uring_prep_fsync(sqe, fd, if (datasync) 1u else 0u)
+            io_uring_prep_fsync(sqe, fd, if (datasync) IORING_FSYNC_DATASYNC.toUInt() else 0u)
         }
 
     actual override fun prepFtruncate(fd: Int, size: Long, userData: Long): Result<Unit> =
         prepare(userData) { sqe ->
             sqe.pointed.user_data = userData.toULong()
-            io_uring_prep_ftruncate(sqe, fd, size.toULong())
+            io_uring_prep_ftruncate(sqe, fd, size)
         }
 
     actual override fun prepMmap(fd: Int, addr: Long, len: Int, prot: Int, flags: Int, offset: Long, userData: Long): Result<Unit> =
@@ -131,7 +137,8 @@ internal actual object LiburingImpl : LiburingFacade {
     }
 
     actual override fun cqAdvance(count: Int) {
-        // waitCqe/peekCqe mark completions seen immediately.
+        val currentRing = ring ?: return
+        io_uring_cq_advance(currentRing, count.toUInt())
     }
 
     actual override fun registerFanoutHandler(token: Long, handler: (UringCompletion) -> Unit) {
@@ -143,7 +150,11 @@ internal actual object LiburingImpl : LiburingFacade {
         if (handlers[token].isNullOrEmpty()) handlers.remove(token)
     }
 
-    actual override fun drain(): Result<Unit> = Result.success(Unit)
+    actual override fun drain(): Result<Unit> {
+        val currentRing = ring ?: return Result.success(Unit)
+        val rc = io_uring_submit(currentRing)
+        return if (rc < 0) failure("io_uring_submit (drain) failed", rc) else Result.success(Unit)
+    }
 
     actual override fun close(): Result<Unit> {
         val currentRing = ring ?: return Result.success(Unit)
