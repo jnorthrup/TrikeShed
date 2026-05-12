@@ -42,7 +42,7 @@ enum class DialectLevel {
     ;
 
     /** Canonical MLIR dialect name */
-    val mlirName: Stringget() = when (this) {
+    val mlirName: CharSequence get() = when (this) {
         Linalg -> "linalg"
         Tensor -> "tensor"
         Vector -> "vector"
@@ -244,7 +244,7 @@ class TensorTaxonomy {
         outputs: List<SSAValue>,
         region: Region.() -> Unit,
         indexingMaps: List<List<Int>>,
-        iteratorTypes: List<String>
+        iteratorTypes: List<CharSequence>
     ): SSAValue = add(GenericOp.create(inputs, outputs, region, indexingMaps, iteratorTypes))
 
     fun conv2d(lhs: SSAValue, rhs: SSAValue, output: SSAValue, strides: List<Int>, padding: List<List<Int>>) {
@@ -281,7 +281,7 @@ class TensorTaxonomy {
 
     /** Emit a complete function with the standard pipeline applied */
     fun emitFunction(
-        name: String,
+        name: CharSequence,
         inputTypes: List<IrType>,
         outputTypes: List<IrType>,
         bodyBuilder: (List<SSAValue>) -> SSAValue

@@ -7,7 +7,7 @@ import borg.trikeshed.lib.Series
 /**
  * Standard kline (OHLCV candle) timespans.
  */
-enum class TimeSpan(val seconds: Long, val binanceInterval: String) {
+enum class TimeSpan(val seconds: Long, val binanceInterval: CharSequence) {
     Seconds30(30L, "30s"),
     Minutes1(60L, "1m"),
     Minutes3(180L, "3m"),
@@ -30,7 +30,7 @@ enum class TimeSpan(val seconds: Long, val binanceInterval: String) {
  * A single kline (OHLCV candlestick).
  */
 data class Kline(
-    val symbol: String,
+    val symbol: CharSequence,
     val timespan: TimeSpan,
     val openTime: Long,
     val open: Double,
@@ -40,7 +40,7 @@ data class Kline(
     val volume: Double,
 ) {
     companion object {
-        val schemaKeys: Series<String> = s_[
+        val schemaKeys: Series<CharSequence> = s_[
             "symbol", "timespan", "openTime", "open", "high", "low", "close", "volume"
         ]
     }
@@ -55,7 +55,7 @@ data class Kline(
  * Extended kline with all 12 Binance fields.
  */
 data class ExtendedKline(
-    val symbol: String,
+    val symbol: CharSequence,
     val timespan: TimeSpan,
     val openTime: Long,
     val open: Double,
@@ -97,7 +97,7 @@ typealias Klines = List<Kline>
  * Fields match what the cascade-style JS map functions reference:
  *   symbol, timespan, openTime, open, high, low, close, volume.
  */
-fun Kline.toDoc(): Map<String, Any?> = mapOf(
+fun Kline.toDoc(): Map<CharSequence, Any?> = mapOf(
     "_id"      to "kline/${symbol}/${timespan.binanceInterval}/${openTime}",
     "symbol"   to symbol,
     "timespan" to timespan.binanceInterval,
@@ -110,7 +110,7 @@ fun Kline.toDoc(): Map<String, Any?> = mapOf(
 )
 
 /** Extended version — includes all 12 Binance fields. */
-fun ExtendedKline.toDoc(): Map<String, Any?> = mapOf(
+fun ExtendedKline.toDoc(): Map<CharSequence, Any?> = mapOf(
     "_id"                  to "kline/${symbol}/${timespan.binanceInterval}/${openTime}",
     "symbol"               to symbol,
     "timespan"             to timespan.binanceInterval,

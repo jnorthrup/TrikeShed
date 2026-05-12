@@ -11,7 +11,7 @@ import kotlin.Boolean
 import kotlin.Double
 import kotlin.Int
 import kotlin.Long
-import kotlin.String
+import kotlin.CharSequence
 import kotlin.collections.List
 import kotlin.collections.Map
 

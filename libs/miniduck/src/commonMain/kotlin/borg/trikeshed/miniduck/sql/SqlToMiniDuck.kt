@@ -1,26 +1,15 @@
 package borg.trikeshed.miniduck.sql
 
 import borg.trikeshed.cursor.RowVec
-import borg.trikeshed.lib.j
 import borg.trikeshed.lib.get
-import borg.trikeshed.lib.view
+import borg.trikeshed.lib.j
 import borg.trikeshed.lib.size
+import borg.trikeshed.lib.view
 import borg.trikeshed.miniduck.DocRowVec
-import borg.trikeshed.miniduck.exec.Cursor
-import borg.trikeshed.miniduck.exec.ExecutionContext
-import borg.trikeshed.miniduck.exec.RowAccessor
-import borg.trikeshed.miniduck.exec.SeriesCursor
-import borg.trikeshed.miniduck.exec.TableSource
+import borg.trikeshed.miniduck.exec.*
 import borg.trikeshed.miniduck.schema.SchemaManager
 import borg.trikeshed.miniduck.schema.TableSchema
-import borg.trikeshed.parse.kursive.sql.BinaryExpr
-import borg.trikeshed.parse.kursive.sql.Column
-import borg.trikeshed.parse.kursive.sql.ColumnRef
-import borg.trikeshed.parse.kursive.sql.Expr
-import borg.trikeshed.parse.kursive.sql.LitExpr
-import borg.trikeshed.parse.kursive.sql.NumericLiteral
-import borg.trikeshed.parse.kursive.sql.SelectStmt
-import borg.trikeshed.parse.kursive.sql.StringLiteral
+import borg.trikeshed.parse.kursive.sql.*
 
 data class PlannerContext(
     val schemaManager: SchemaManager? = null,
@@ -66,7 +55,7 @@ data class SelectPlan(
     private fun matchesWhere(row: RowAccessor, where: Expr?): Boolean {
         if (where == null) return true
         return when (where) {
-            is BinaryExpr -> when (where.op.uppercase()) {
+            is BinaryExpr -> when (where.op.toString().uppercase()) {
                 "AND" -> matchesWhere(row, where.left) && matchesWhere(row, where.right)
                 "OR" -> matchesWhere(row, where.left) || matchesWhere(row, where.right)
                 "=", "==" -> valuesEqual(valueOf(where.left, row), valueOf(where.right, row))
@@ -99,7 +88,7 @@ data class SelectPlan(
 
     private fun compareValues(left: Any?, right: Any?): Int? = when {
         left is Number && right is Number -> left.toDouble().compareTo(right.toDouble())
-        left is String && right is String -> left.compareTo(right)
+        left is CharSequence && right is CharSequence -> left.toString().compareTo(right.toString())
         left is Boolean && right is Boolean -> left.compareTo(right)
         else -> null
     }
@@ -116,12 +105,12 @@ data class SelectPlan(
             val schemaColumns = schema?.columns
             if (schemaColumns != null) {
                 for (column in schemaColumns) {
-                    names.add(column.name)
+                    names.add(column.name.toString())
                     values.add(row[column.name])
                 }
             } else {
                 for (index in 0 until row.size) {
-                    names.add(row.columnName(index) ?: "col$index")
+                    names.add(row.columnName(index)?.toString() ?: "col$index")
                     values.add(row[index])
                 }
             }
@@ -130,11 +119,11 @@ data class SelectPlan(
 
         for (column in columns.view) {
             val expr = column.expr
-            val alias = column.alias?.asString()
+            val alias: String? = column.alias?.asString()?.toString()
             when (expr) {
                 is ColumnRef -> {
-                    val name = alias ?: expr.id.asString()
-                    names.add(name)
+                    val name = alias ?: expr.id.asString().toString()
+                    names.add(name )
                     values.add(row[expr.id.asString()])
                 }
                 is LitExpr -> {

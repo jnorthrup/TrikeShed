@@ -3,7 +3,7 @@ package cbadvanced.main
 import cbadvanced.resolveDotenv
 import cbadvanced.runCoinbaseAuthProof
 
-suspend fun main(args: Array<String>) {
+suspend fun main(args: Array<CharSequence>) {
     val requestedProduct = args.firstOrNull()?.ifBlank { null }?.substringBefore("-USD") ?: "BTC"
     val resolution = resolveDotenv()
     val proof = runCoinbaseAuthProof(resolution.resolvedPath, requestedProduct)

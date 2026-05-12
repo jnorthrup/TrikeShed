@@ -33,8 +33,8 @@ class CommonTlsClientHandshake(
     private val x25519: X25519,
     private val hkdf: HkdfSha256,
     private val recordCodec: TlsRecordCodec,
-    private val serverName: String,
-    private val alpnProtocols: List<String> = listOf("h2", "http/1.1"),
+    private val serverName: CharSequence,
+    private val alpnProtocols: List<CharSequence> = listOf("h2", "http/1.1"),
 ) : TlsClientHandshake {
     override val key: kotlin.coroutines.CoroutineContext.Key<*> get() = TlsClientHandshake.Key
 
@@ -72,13 +72,13 @@ class CommonTlsClientHandshake(
         putExtension(51) { put16(clientKeyPair.publicKey.size + 4); put16(0x001D); putVar16(clientKeyPair.publicKey) }
         putExtension(13) { put16(4); put16(0x0804); put16(0x0403) }
         putExtension(0) {
-            val nb = serverName.encodeToByteArray()
+            val nb = serverName.toString().encodeToByteArray()
             val snEntry = ByteArray(3 + nb.size)
             snEntry[0] = 0; snEntry[1] = ((nb.size ushr 8) and 0xFF).toByte(); snEntry[2] = (nb.size and 0xFF).toByte()
             nb.copyInto(snEntry, 3); putVar16(snEntry)
         }
         if (alpnProtocols.isNotEmpty()) putExtension(16) {
-            putVar16(alpnProtocols.flatMap { listOf(it.encodeToByteArray().size.toByte()) + it.encodeToByteArray().toList() }.toByteArray())
+            putVar16(alpnProtocols.flatMap { listOf(it.toString().encodeToByteArray().size.toByte()) + it.toString().encodeToByteArray().toList() }.toByteArray())
         }
         toByteArray()
     }

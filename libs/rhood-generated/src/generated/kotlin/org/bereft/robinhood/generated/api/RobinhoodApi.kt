@@ -11,14 +11,14 @@ import org.bereft.robinhood.generated.infrastructure.HttpMethod
 
 /** Generated API interface for Robinhood. */
 interface RobinhoodApi {
-    suspend fun v2GetAccounts(): String
+    suspend fun v2GetAccounts(): CharSequence
 }
 
 /** Default implementation — caller provides the low-level call. */
 class DefaultRobinhoodApi(
-   val call: suspend (GeneratedRequest) -> String,
+   val call: suspend (GeneratedRequest) -> CharSequence,
 ) : RobinhoodApi {
-    override suspend fun v2GetAccounts(): String =
+    override suspend fun v2GetAccounts(): CharSequence =
         call(RobinhoodApiContract.V2GetAccounts.request)
 
 
@@ -27,8 +27,8 @@ class DefaultRobinhoodApi(
 /** Contract constants for each Robinhood operation. */
 object RobinhoodApiContract {
           object V2GetAccounts {
-              const val operationId: String = "v2GetAccounts"
+              const val operationId: CharSequence = "v2GetAccounts"
               val request: GeneratedRequest = GeneratedRequest(method = HttpMethod.GET, path = "/api/v2/crypto/trading/accounts/")
           }
-  
+
 }

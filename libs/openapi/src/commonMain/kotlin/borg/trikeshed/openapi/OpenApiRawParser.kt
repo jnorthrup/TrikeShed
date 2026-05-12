@@ -4,11 +4,11 @@ import borg.trikeshed.lib.toSeries
 import borg.trikeshed.parse.json.JsonParser
 
 // ── type aliases over plain Kotlin maps ──────────────────────────────────────
-typealias JsonMap = Map<String, Any?>
+typealias JsonMap = Map<CharSequence, Any?>
 @Suppress("UNCHECKED_CAST")
 fun Any?.asMap(): JsonMap? = this as? JsonMap
-fun Any?.asString(): String? = this as? String
-fun Any?.asStr(): String? = this as? String
+fun Any?.asString(): String? = (this as? CharSequence)?.toString()
+fun Any?.asStr(): CharSequence? = this as? CharSequence
 fun Any?.asBool(): Boolean? = this as? Boolean
 fun Any?.asNum(): Number? = this as? Number
 fun Any?.asList(): List<Any?>? = this as? List<Any?>
@@ -16,15 +16,15 @@ fun Any?.asList(): List<Any?>? = this as? List<Any?>
 // ── domain model ─────────────────────────────────────────────────────────────
 
 data class OpenApiToken(
-    val kind: String,
-    val value: String,
-    val location: String,
+    val kind: CharSequence,
+    val value: CharSequence,
+    val location: CharSequence,
 )
 
 data class OpenApiGap(
     val code: String,
-    val location: String,
-    val detail: String,
+    val location: CharSequence,
+    val detail: CharSequence,
 )
 
 data class OpenApiGapAnalysis(
@@ -42,7 +42,7 @@ data class OpenApiRawDocument(val root: JsonMap) {
     /** Expose root map directly for resolver use. */
     val raw: JsonMap get() = root
 
-    val version: String? get() = root["openapi"].asString()
+    val version: CharSequence? get() = root["openapi"].asString()
     val info: JsonMap? get() = root["info"].asMap()
     val paths: JsonMap get() = root["paths"].asMap() ?: emptyMap()
     val components: JsonMap? get() = root["components"].asMap()
@@ -52,12 +52,12 @@ data class OpenApiRawDocument(val root: JsonMap) {
             val pathObject = pathNode.asMap() ?: return@flatMap emptyList()
             pathObject.mapNotNull { (method, operationNode) ->
                 val operation = operationNode.asMap() ?: return@mapNotNull null
-                OpenApiRawOperation(path = path, method = method.lowercase(), operation = operation)
+                OpenApiRawOperation(path = path, method = method.toString().lowercase(), operation = operation)
             }
         }
 
-    fun refs(): List<String> {
-        val refs = mutableListOf<String>()
+    fun refs(): List<CharSequence> {
+        val refs = mutableListOf<CharSequence>()
         fun walk(node: Any?) {
             when (node) {
                 is Map<*, *> -> {
@@ -88,7 +88,7 @@ data class OpenApiRawDocument(val root: JsonMap) {
         operations().forEach { op ->
             add(OpenApiToken(
                 kind = "operation",
-                value = "${op.method.uppercase()} ${op.path}",
+                value = "${op.method.toString().uppercase()} ${op.path}",
                 location = "paths.${op.path}.${op.method}",
             ))
             op.operationId?.let {
@@ -158,7 +158,7 @@ data class OpenApiRawDocument(val root: JsonMap) {
         return OpenApiGapAnalysis(tokens = tokens, gaps = gaps)
     }
 
-    fun resolveRef(ref: String): Any? {
+    fun resolveRef(ref: CharSequence): Any? {
         if (!ref.startsWith("#/")) return null
         var current: Any? = root
         for (segment in ref.removePrefix("#/").split('/')) {
@@ -170,24 +170,24 @@ data class OpenApiRawDocument(val root: JsonMap) {
 }
 
 data class OpenApiRawOperation(
-    val path: String,
-    val method: String,
+    val path: CharSequence,
+    val method: CharSequence,
     val operation: JsonMap,
 ) {
-    val operationId: String? get() = operation["operationId"].asString()
+    val operationId: CharSequence? get() = operation["operationId"].asString()
 }
 
-class OpenApiParseException(message: String, cause: Throwable? = null) :
-    IllegalArgumentException(message, cause)
+class OpenApiParseException(message: CharSequence, cause: Throwable? = null) :
+    IllegalArgumentException(message.toString(), cause)
 
 object OpenApiRawParser {
-    fun parse(text: String): OpenApiRawDocument {
-        val root: Map<String, Any?> = when {
+    fun parse(text: CharSequence): OpenApiRawDocument {
+        val root: Map<CharSequence, Any?> = when {
             text.isBlank() -> throw OpenApiParseException("OpenAPI spec text is blank")
             text.trimStart().startsWith("{") -> {
                 try {
                     @Suppress("UNCHECKED_CAST")
-                    JsonParser.reify(text.trimStart().toSeries()) as? Map<String, Any?>
+                    JsonParser.reify(text.trimStart().toSeries()) as? Map<CharSequence, Any?>
                         ?: throw OpenApiParseException("Parsed JSON root is not a JSON object")
                 } catch (cause: Throwable) {
                     throw OpenApiParseException("Failed to parse OpenAPI JSON", cause)

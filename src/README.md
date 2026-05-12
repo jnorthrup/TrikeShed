@@ -19,7 +19,7 @@ Kernel algebra (`Join`, `Series<T>`, `Twin`, `α`, `j`) is defined in `lib/` and
 │  ConcreteElements      LiburingElement, FanoutDispatcherElement,     │
 │                        NioUserspaceElement                           │
 ├──────────────────────────────────────────────────────────────────────┤
-│  REACTOR  (userspace/ · ChannelRunner · FunctionalUringFacade)        │
+│  REACTOR  (userspace/ · ChannelRunner · FunctionalUringFacade)       │
 │                                                                      │
 │  Multiple concurrent Jobs sharing one io_uring ring. Each Job is     │
 │  a coroutine with its own File handle. IO steps chain as FSM         │
@@ -27,19 +27,19 @@ Kernel algebra (`Join`, `Series<T>`, `Twin`, `α`, `j`) is defined in `lib/` and
 │  translated to coroutine suspension.                                 │
 │                                                                      │
 │  Channel        operation queue (read/write/accept/connect/close,    │
-│                  submit/wait/peek)                                    │
+│                  submit/wait/peek)                                   │
 │  ChannelRunner  coroutine FSM: runOp → CompletableDeferred → resume  │
-│  File           handle lifecycle (open/close/isOpen/id)               │
+│  File           handle lifecycle (open/close/isOpen/id)              │
 │                                                                      │
 │      io_uring ring (one CQE loop — LiburingImpl.publish)             │
 │         │                                                            │
 │         ├─ Job 1: htx-general-client (QUIC, TCP, ngSCTP)             │
 │         │    File(fd) ─ Channel ─ submit ─ waitCqe ─ fanout          │
-│         │                                                             │
-│         ├─ Job 2: couch (HTX over transport)                        │
+│         │                                                            │
+│         ├─ Job 2: couch (HTX over transport)                         │
 │         │    File(fd) ─ Channel ─ submit ─ waitCqe ─ fanout          │
-│         │                                                             │
-│         └─ Job 3: ipfs (DHT UDP, content routing)                   │
+│         │                                                            │
+│         └─ Job 3: ipfs (DHT UDP, content routing)                    │
 │              File(fd) ─ Channel ─ submit ─ waitCqe ─ fanout          │
 ├──────────────────────────────────────────────────────────────────────┤
 │  HTX TOKENIZER  (tokenized in couch/htx/, wired through Channel)     │
@@ -60,24 +60,24 @@ Kernel algebra (`Join`, `Series<T>`, `Twin`, `α`, `j`) is defined in `lib/` and
 │    └─ FunctionalUringFacade  op batching + backend dispatch          │
 │         └─ UserspaceChannelBackend  expect → per-platform actual     │
 │              └─ Liburing → LiburingImpl  expect → actual             │
-│                   (linux: cinterop io_uring, posix: uring-or-pread,   │
-│                    jvm: ServiceLoader SPI, macos/js/wasm: fallback)   │
+│                   (linux: cinterop io_uring, posix: uring-or-pread,  │
+│                    jvm: ServiceLoader SPI, macos/js/wasm: fallback)  │
 │                                                                      │
 │  data types:                                                         │
-│    ByteBuffer  → ByteArray-backed NIO buffer                        │
-│    ByteRegion  → sub-range view of ByteBuffer                       │
-│    ByteSeries  → lazy Series<Byte> over ByteRegion (zero copy)      │
+│    ByteBuffer  → ByteArray-backed NIO buffer                         │
+│    ByteRegion  → sub-range view of ByteBuffer                        │
+│    ByteSeries  → lazy Series<Byte> over ByteRegion (zero copy)       │
 ├──────────────────────────────────────────────────────────────────────┤
 │  KERNEL SURFACES  (userspace/kernel/)                                │
 │                                                                      │
-│  SelectableChannelOps  pollReadable/pollWritable + tryRead/tryWrite │
+│  SelectableChannelOps  pollReadable/pollWritable + tryRead/tryWrite  │
 │  KernelUring           SQE/CQE abstraction (literbike port)          │
 │  PosixSocket           bind/listen/accept/connect/send/recv          │
 ├──────────────────────────────────────────────────────────────────────┤
 │  NIO COMPAT STUBS  (nio/channels/, nio/file/)                        │
 │                                                                      │
 │  UringSocketChannel, UringFileChannel, UringServerSocketChannel      │
-│  COMPATIBILITY SURFACE ONLY.  DO NOT ROUTE NEW IO THROUGH HERE.       │
+│  COMPATIBILITY SURFACE ONLY.  DO NOT ROUTE NEW IO THROUGH HERE.      │
 ├──────────────────────────────────────────────────────────────────────┤
 │  LIBRARY  (lib/)  ·  PRELOAD.md                                      │
 │                                                                      │

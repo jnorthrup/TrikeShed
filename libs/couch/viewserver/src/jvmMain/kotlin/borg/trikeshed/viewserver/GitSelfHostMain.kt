@@ -20,7 +20,7 @@ import kotlin.coroutines.EmptyCoroutineContext
  *   --port PORT         Server port (default: 5984)
  *   --sync-only         One-shot sync, then exit
  */
-fun main(args: Array<String>) {
+fun main(args: Array<CharSequence>) {
     val options = parseArgs(args)
 
     // Build CCEK context from JVM platform providers
@@ -87,8 +87,8 @@ fun main(args: Array<String>) {
     }
 }
 
-private fun parseArgs(args: Array<String>): Map<String, String> {
-    val options = mutableMapOf<String, String>()
+private fun parseArgs(args: Array<CharSequence>): Map<CharSequence, CharSequence> {
+    val options = mutableMapOf<CharSequence, CharSequence>()
     var i = 0
     while (i < args.size) {
         when (val arg = args[i]) {

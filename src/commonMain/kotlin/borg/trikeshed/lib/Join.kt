@@ -27,13 +27,13 @@ interface Join<A, B> {
         }
 
         // PairJoin: stores the two values directly (not a Pair, to avoid PairJoin(pair) recursion)
-        // Not @JvmInline since it has 2 fields (value class requires 1 param)
+        // Not   since it has 2 fields (value class requires 1 param)
         class PairJoin<A, B>(override val a: A, override val b: B) : Join<A, B> {
             override val pair: Pair<A, B> get() = a to b
         }
 
-        @JvmInline
-        value class EntryJoin<K, V  >( val entry: Map.Entry<K, V>) : Join<K, V> {
+
+                inline class EntryJoin<K, V  >( val entry: Map.Entry<K, V>) : Join<K, V> {
             override val a: K get() = entry.key
             override val b: V get() = entry.value
         }

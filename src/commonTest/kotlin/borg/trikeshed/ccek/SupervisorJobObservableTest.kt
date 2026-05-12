@@ -151,7 +151,7 @@ class SupervisorJobObservableTest {
     @Test
     fun observe_multipleObservers() {
         val obs = MutableObservable("initial")
-        val received = mutableListOf<String>()
+        val received = mutableListOf<CharSequence>()
         obs.observe { received.add("A:$it") }
         obs.observe { received.add("B:$it") }
         obs.update("updated")

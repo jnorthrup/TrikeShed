@@ -14,7 +14,7 @@ import kotlinx.coroutines.channels.Channel
  * The channelized atom fans out processing across its child atoms.
  */
 class ChannelizedAtom(
-    id: String,
+    id: CharSequence,
     knowledge: Series<NarsiveElement>,
     resources: Nars3Budget
 ) : Nars3Atom(id, knowledge, resources) {
@@ -40,7 +40,7 @@ class ChannelizedAtom(
  * Used by [Nars3PolyglotBridge] when a SourceFragment has no children.
  */
 class LocalAtom(
-    id: String,
+    id: CharSequence,
     knowledge: Series<NarsiveElement>,
     resources: Nars3Budget
 ) : Nars3Atom(id, knowledge, resources) {

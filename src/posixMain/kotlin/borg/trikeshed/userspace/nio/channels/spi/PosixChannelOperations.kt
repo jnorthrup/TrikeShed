@@ -22,12 +22,12 @@ class PosixChannelOperations : ChannelOperations {
     }
     override fun listen(fd: Int, backlog: Int): Int = platform.posix.listen(fd, backlog)
     override fun accept(fd: Int): Int = platform.posix.accept(fd, null, null)
-    override fun connect(fd: Int, host: String, port: Int): Int = memScoped {
+    override fun connect(fd: Int, host: CharSequence, port: Int): Int = memScoped {
         val addr = alloc<sockaddr_in> {
             sin_family = AF_INET.convert()
             sin_port = ((port ushr 8) or ((port and 0xFF) shl 8)).toUShort().convert()
         }
-        val he = gethostbyname(host) ?: return -1
+        val he = gethostbyname(host.toString()) ?: return -1
         val addrList = he.pointed.h_addr_list ?: return -1
         memcpy(addr.sin_addr.ptr, addrList[0]!!, 4u)
         platform.posix.connect(fd, addr.ptr.reinterpret(), sizeOf<sockaddr_in>().convert())

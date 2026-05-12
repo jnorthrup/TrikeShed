@@ -8,14 +8,16 @@ public abstract class CharsetDecoder protected constructor(
     protected val maxCharsPerByteValue: Float,
 ) {
     public open fun charset(): borg.trikeshed.userspace.nio.charset.Charset = charset
-    public abstract fun replacement():CharSequencepublic abstract fun replaceWith(p0: String): borg.trikeshed.userspace.nio.charset.CharsetDecoder
+    public abstract fun replacement(): CharSequence
+    public abstract fun replaceWith(p0: CharSequence): borg.trikeshed.userspace.nio.charset.CharsetDecoder
     public abstract fun malformedInputAction(): borg.trikeshed.userspace.nio.charset.CodingErrorAction
     public abstract fun onMalformedInput(p0: borg.trikeshed.userspace.nio.charset.CodingErrorAction): borg.trikeshed.userspace.nio.charset.CharsetDecoder
     public abstract fun unmappableCharacterAction(): borg.trikeshed.userspace.nio.charset.CodingErrorAction
     public abstract fun onUnmappableCharacter(p0: borg.trikeshed.userspace.nio.charset.CodingErrorAction): borg.trikeshed.userspace.nio.charset.CharsetDecoder
     public open fun averageCharsPerByte(): Float = averageCharsPerByteValue
     public open fun maxCharsPerByte(): Float = maxCharsPerByteValue
-    public abstract fun decode(p0: borg.trikeshed.userspace.nio.ByteBuffer):CharSequencepublic abstract fun flush(p0: borg.trikeshed.userspace.nio.ByteBuffer): borg.trikeshed.userspace.nio.charset.CoderResult
+    public abstract fun decode(p0: borg.trikeshed.userspace.nio.ByteBuffer): CharSequence
+    public abstract fun flush(p0: borg.trikeshed.userspace.nio.ByteBuffer): borg.trikeshed.userspace.nio.charset.CoderResult
     public abstract fun reset(): borg.trikeshed.userspace.nio.charset.CharsetDecoder
     public abstract fun isAutoDetecting(): Boolean
     public abstract fun isCharsetDetected(): Boolean

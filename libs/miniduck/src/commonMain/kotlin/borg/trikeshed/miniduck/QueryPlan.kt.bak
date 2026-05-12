@@ -4,7 +4,7 @@ import borg.trikeshed.lib.*
 
 /** Specification for ordering a column. */
 data class OrderSpec(
-    val column: String,
+    val column: CharSequence,
     val desc: Boolean = false
 )
 
@@ -18,8 +18,8 @@ data class OrderSpec(
  * Execute the full tree with [execute].
  */
 data class RelationRef(
-    val database: String,
-    val name: String,
+    val database: CharSequence,
+    val name: CharSequence,
     val kind: RelationKind,
 )
 
@@ -43,13 +43,13 @@ data class ScanPlan(
 
 data class ViewQueryPlan(
     override val source: RelationRef,
-    val designDocument: String,
-    val viewName: String,
-    val parameters: Map<String, String> = emptyMap(),
+    val designDocument: CharSequence,
+    val viewName: CharSequence,
+    val parameters: Map<CharSequence, CharSequence> = emptyMap(),
 ) : QueryPlan {
-    val database: String get() = source.database
+    val database: CharSequence get() = source.database
 
-    fun withParameter(name: String, value: Any?): ViewQueryPlan =
+    fun withParameter(name: CharSequence, value: Any?): ViewQueryPlan =
         copy(parameters = parameters + (name to value.toString()))
 }
 
@@ -64,7 +64,7 @@ data class FilterPlan(
 
 data class ProjectPlan(
     val upstream: QueryPlan,
-    val columns: List<String>,
+    val columns: List<CharSequence>,
 ) : QueryPlan {
     override val source: RelationRef get() = upstream.source
 }
@@ -87,7 +87,7 @@ data class LimitPlan(
 // ── Infix plan builders ───────────────────────────────────────────────────────
 
 infix fun QueryPlan.filter(pred: Predicate): FilterPlan = FilterPlan(this, pred)
-infix fun QueryPlan.project(columns: List<String>): ProjectPlan = ProjectPlan(this, columns)
+infix fun QueryPlan.project(columns: List<CharSequence>): ProjectPlan = ProjectPlan(this, columns)
 infix fun QueryPlan.orderBy(specs: List<OrderSpec>): OrderPlan = OrderPlan(this, specs)
 infix fun QueryPlan.limit(n: Int): LimitPlan = LimitPlan(this, n)
 infix fun QueryPlan.offset(n: Int): LimitPlan =
@@ -115,7 +115,7 @@ fun execute(plan: QueryPlan, base: MiniCursor): MiniCursor = when (plan) {
     is ProjectPlan -> execute(plan.upstream, base).get(*plan.columns.toTypedArray())
     is OrderPlan -> {
         val upstream = execute(plan.upstream, base)
-        val sortedList = upstream.toList().sortedWith(compareBy({ 
+        val sortedList = upstream.toList().sortedWith(compareBy({
             val colIdx = upstream.meta.view.indexOfFirst { it.name == it.column }
             { row: RowVec -> row[colIdx].a } as (RowVec) -> Comparable?
         }(it), it.desc))

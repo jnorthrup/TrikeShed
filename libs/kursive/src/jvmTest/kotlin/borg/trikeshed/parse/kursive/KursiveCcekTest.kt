@@ -152,7 +152,7 @@ class KursiveCcekTest {
     fun testWithParseScope() = runBlocking {
         val src = "hello".toSeries()
 
-        val (result, scope) = withParseScope<String>(src) { source, span ->
+        val (result, scope) = withParseScope<CharSequence>(src) { source, span ->
             val chars = CharArray(span.b - span.a)
             for (i in 0 until chars.size) chars[i] = source[span.a + i]
             chars.concatToString()

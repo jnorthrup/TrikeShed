@@ -100,14 +100,14 @@ data class YamlDocument(
 /* ─── thin parser layer backed by confix YamlScan + Reify ──────────────── */
 
 /** Parse YAML text to a plain Map — mirrors the old openapi/Yaml.kt API */
-fun parse(text: String): Map<String, Any?> {
+fun parse(text: CharSequence): Map<CharSequence, Any?> {
     val doc: YamlDocument = YamlParser.parse(text)
-    return (doc.root.reify() as? Map<String, Any?>) ?: emptyMap()
+    return (doc.root.reify() as? Map<CharSequence, Any?>) ?: emptyMap()
 }
 
 object YamlParser {
     /** Parse a YAML string into a YamlNode AST, then wrap as YamlDocument */
-    fun parse(text: String): YamlDocument {
+    fun parse(text: CharSequence): YamlDocument {
         val src = text.asSeries()
         val elems = YamlScan.scan(src)
         val lineStarts = buildLineStarts(src)
@@ -124,7 +124,7 @@ object YamlParser {
     ): Any? = parse(src.asString()).root.reify(nodeEvidence, rowVecCallback)
 
     fun reify(
-        text: String,
+        text: CharSequence,
         nodeEvidence: MutableList<TypeEvidence> = mutableListOf(),
         rowVecCallback: (RowVec) -> Unit = {},
     ): Any? = parse(text).root.reify(nodeEvidence, rowVecCallback)

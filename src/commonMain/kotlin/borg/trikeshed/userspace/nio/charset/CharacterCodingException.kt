@@ -6,5 +6,5 @@ package borg.trikeshed.userspace.nio.charset
 // Declarations intentionally mirror JDK taxonomy and contain no implementations.
 public open class CharacterCodingException : borg.trikeshed.userspace.nio.IOException {
     constructor() : super()
-    constructor(message: String) : super(message)
+    constructor(message: CharSequence) : super(message)
 }

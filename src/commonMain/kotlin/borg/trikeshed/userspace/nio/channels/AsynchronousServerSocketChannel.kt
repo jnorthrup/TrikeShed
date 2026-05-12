@@ -10,17 +10,18 @@ public abstract class AsynchronousServerSocketChannel {
     // TODO
     abstract fun provider(): AsynchronousChannelProvider
     // TODO
-    abstract fun bind(address: String): AsynchronousServerSocketChannel
+    abstract fun bind(address: CharSequence): AsynchronousServerSocketChannel
     // TODO
-    abstract fun bind(address: String, backlog: Int): AsynchronousServerSocketChannel
+    abstract fun bind(address: CharSequence, backlog: Int): AsynchronousServerSocketChannel
     // TODO
-    abstract fun <T> setOption(option: String, value: T): AsynchronousServerSocketChannel
+    abstract fun <T> setOption(option: CharSequence, value: T): AsynchronousServerSocketChannel
     // TODO
     abstract fun <A> accept(attachment: A, handler: CompletionHandler<AsynchronousSocketChannel, in A>): Unit
     // TODO
     abstract fun accept(): AsynchronousSocketChannel
     // TODO
-    abstract fun getLocalAddress():CharSequencecompanion object {
+    abstract fun getLocalAddress(): CharSequence
+    companion object {
         fun `open`(group: AsynchronousChannelGroup): AsynchronousServerSocketChannel = TODO("NIO common stub")
         fun `open`(): AsynchronousServerSocketChannel = TODO("NIO common stub")
     }

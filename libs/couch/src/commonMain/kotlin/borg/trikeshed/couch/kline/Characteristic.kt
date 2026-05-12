@@ -23,29 +23,29 @@ import borg.trikeshed.lib.j
  *   - BUFFER → klines accumulate for batch decision (e.g. volume spike detection)
  */
 interface KlineCharacteristic {
-    val name: String
+    val name: CharSequence
     val value: Any?
-    val unit: String
+    val unit: CharSequence
     val timestamp: Long  // openTime of the kline this char was derived from
-    val origin: String   // which funnel stage produced it
+    val origin: CharSequence   // which funnel stage produced it
 }
 
 /** A characteristic that computed from a single kline. */
 data class AtomicChar(
-    override val name: String,
+    override val name: CharSequence,
     override val value: Any?,
-    override val unit: String = "",
+    override val unit: CharSequence = "",
     override val timestamp: Long,
-    override val origin: String,
+    override val origin: CharSequence,
 ) : KlineCharacteristic
 
 /** A characteristic computed from a window of klines. */
 data class WindowChar(
-    override val name: String,
+    override val name: CharSequence,
     override val value: Any?,
-    override val unit: String = "",
+    override val unit: CharSequence = "",
     override val timestamp: Long,
-    override val origin: String,
+    override val origin: CharSequence,
     val windowSize: Int,
     val windowStart: Long,
     val windowEnd: Long,
@@ -53,11 +53,11 @@ data class WindowChar(
 
 /** A comparative characteristic — ratio or spread relative to something else. */
 data class RatioChar(
-    override val name: String,
+    override val name: CharSequence,
     override val value: Double,
-    override val unit: String = "ratio",
+    override val unit: CharSequence = "ratio",
     override val timestamp: Long,
-    override val origin: String,
+    override val origin: CharSequence,
     val numerator: KlineCharacteristic?,
     val denominator: KlineCharacteristic?,
 ) : KlineCharacteristic

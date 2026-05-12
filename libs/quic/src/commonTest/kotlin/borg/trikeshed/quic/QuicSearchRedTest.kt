@@ -16,7 +16,7 @@ import kotlin.test.assertTrue
  * RED phase: tests define desired algebra before full implementation exists.
  *
  * QUIC algebra (libs/quic commonMain):
- * - QuicConfig — alpn: List<String>, maxIdleTimeoutMs: Long, maxUdpPayloadSize: Int
+ * - QuicConfig — alpn: List<CharSequence>, maxIdleTimeoutMs: Long, maxUdpPayloadSize: Int
  * - QuicElement — AsyncContextElement + StreamTransport
  * - StreamHandle(id, send, recv) — per-stream channels
  *
@@ -33,7 +33,7 @@ import kotlin.test.assertTrue
  *
  * CONFIG ALGEBRA:
  * - QuicConfig defaults
- * - withAlpn(QuicConfig, List<String>) → QuicConfig
+ * - withAlpn(QuicConfig, List<CharSequence>) → QuicConfig
  * - withTimeout(QuicConfig, Long) → QuicConfig
  */
 class QuicSearchRedTest {
@@ -130,6 +130,6 @@ class QuicSearchRedTest {
 
 // === FREE FUNCTIONS ===
 
-fun QuicConfig.withAlpn(alpn: Series<String>): QuicConfig = copy(alpn = alpn)
+fun QuicConfig.withAlpn(alpn: Series<CharSequence>): QuicConfig = copy(alpn = alpn)
 
 fun QuicConfig.withTimeout(ms: Long): QuicConfig = copy(maxIdleTimeoutMs = ms)

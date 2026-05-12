@@ -8,7 +8,7 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 
 class BtrfsHarness {
-    suspend fun runDemo(sandbox: BtrfsSandboxElement): String {
+    suspend fun runDemo(sandbox: BtrfsSandboxElement): CharSequence {
         val completed = kotlinx.coroutines.CompletableDeferred<Unit>()
         val wal = BtrfsWal(sandbox)
         wal.open()

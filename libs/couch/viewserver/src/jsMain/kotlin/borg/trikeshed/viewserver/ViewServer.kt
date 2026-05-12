@@ -23,7 +23,7 @@ fun main() {
 
     rl.on("line", { line: dynamic ->
         try {
-            val text = line as String
+            val text = line as CharSequence
             val ctx = contextOf(Syntax.JSON, text.toSeries())
             val reified = Combinators.reify(ctx)
 
@@ -48,7 +48,7 @@ fun main() {
 
 // ── JS function compilation ────────────────────────────────────────────
 
-private fun compileJsFunction(source: String): CompiledFunction {
+private fun compileJsFunction(source: CharSequence): CompiledFunction {
     val fn: dynamic = try {
         js("eval")("($source)")
     } catch (e: dynamic) {
@@ -58,12 +58,12 @@ private fun compileJsFunction(source: String): CompiledFunction {
 }
 
 private class JsCompiledFunction(private val fn: dynamic) : CompiledFunction {
-    override fun map(doc: Map<String, Any?>, emit: (key: Any?, value: Any?) -> Unit) {
+    override fun map(doc: Map<CharSequence, Any?>, emit: (key: Any?, value: Any?) -> Unit) {
         val emitJs = { k: dynamic, v: dynamic -> emit(k, v) }
         fn(doc, emitJs)
     }
 
-    override fun reduce(sources: List<String>, values: List<Any?>, rereduce: Boolean): Any? {
+    override fun reduce(sources: List<CharSequence>, values: List<Any?>, rereduce: Boolean): Any? {
         // CouchDB reduce: fn(keys, values, rereduce)
         // For simplicity, use the first source and pass values + rereduce flag
         val reduceFn: dynamic = try {
@@ -79,7 +79,7 @@ private class JsCompiledFunction(private val fn: dynamic) : CompiledFunction {
 
 // ── Helpers ────────────────────────────────────────────────────────────
 
-private fun String.toSeries(): borg.trikeshed.lib.Series<Char> {
+private fun CharSequence.toSeries(): borg.trikeshed.lib.Series<Char> {
     val n = length
     return n j { i: Int -> this[i] }
 }

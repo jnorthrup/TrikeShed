@@ -6,8 +6,8 @@ import borg.trikeshed.couch.transport.htx.HtxRequestFactoryBridge
 
 data class RequestFactoryHtxExchange(
     val request: HtxRequest,
-    val contentType: String,
-    val body: String,
+    val contentType: CharSequence,
+    val body: CharSequence,
 )
 
 class RequestFactoryHtxClient {
@@ -29,7 +29,7 @@ class RequestFactoryHtxServer(
    val service: RequestFactoryTransportService,
    val bridge: HtxRequestFactoryBridge = HtxRequestFactoryBridge(),
 ) {
-    fun handle(rawRequest: String): String {
+    fun handle(rawRequest: CharSequence): CharSequence {
         val plan = bridge.decode(rawRequest)
         require(plan.dispatchMode.isRequestFactory) { "Unsupported request path: ${plan.requestPath}" }
         require(plan.contentType == RequestFactoryTransportContract.CONTENT_TYPE) { "Unsupported content type: ${plan.contentType}" }

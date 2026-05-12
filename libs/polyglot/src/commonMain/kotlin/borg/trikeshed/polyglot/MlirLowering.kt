@@ -17,7 +17,7 @@ class MlirLowering(val topology: CpuCacheTopology) {
     /**
      * Lower a cursor of regions into a complete MLIR module.
      */
-    fun lower(cursor: Cursor): String {
+    fun lower(cursor: Cursor): CharSequence {
         val sb = StringBuilder()
         sb.appendLine("module {")
 
@@ -64,5 +64,5 @@ class MlirLowering(val topology: CpuCacheTopology) {
     }
 }
 
-private fun String.prependIndent(indent: String): String =
+private fun CharSequence.prependIndent(indent: CharSequence): CharSequence =
     lineSequence().joinToString("\n") { if (it.isNotBlank()) indent + it else it }

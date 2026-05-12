@@ -50,7 +50,7 @@ public abstract class FileChannel protected constructor() : AbstractInterruptibl
     }
 
     public open class MapMode {
-        override fun toString():CharSequence= "MapMode"
+        override fun toString(): String= "MapMode"
         companion object {
             val READ_ONLY: FileChannel.MapMode = object : MapMode() {}
             val READ_WRITE: FileChannel.MapMode = object : MapMode() {}

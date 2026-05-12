@@ -13,18 +13,18 @@ import kotlin.test.assertTrue
 
 // ── Fake BlockStore used across tests ────────────────────────────────────
 
-private class FakeBlockStore(docs: Map<String, Map<String, Any?>>) {
+private class FakeBlockStore(docs: Map<CharSequence, Map<CharSequence, Any?>>) {
     private val data = docs.toMutableMap()
 
-    fun list(db: String): List<String> = data.keys.toList()
-    fun get(db: String, id: String): String? {
+    fun list(db: CharSequence): List<CharSequence> = data.keys.toList()
+    fun get(db: CharSequence, id: CharSequence): CharSequence? {
         val doc = data[id] ?: return null
         return doc.entries.joinToString(",", "{", "}") { (k, v) -> "\"$k\":${fakeJson(v)}" }
     }
 
-    private fun fakeJson(v: Any?): String = when (v) {
+    private fun fakeJson(v: Any?): CharSequence = when (v) {
         null -> "null"
-        is String -> "\"$v\""
+        is CharSequence -> "\"$v\""
         is Number -> v.toString()
         is Boolean -> v.toString()
         is List<*> -> v.joinToString(",", "[", "]") { fakeJson(it) }
@@ -35,14 +35,14 @@ private class FakeBlockStore(docs: Map<String, Map<String, Any?>>) {
 
 // ── CouchQueryServer stub that uses the Kotlin emit callback ─────────────
 
-private fun numericMapServer(fieldKey: String): CouchQueryServer = CouchQueryServer { _ ->
+private fun numericMapServer(fieldKey: CharSequence): CouchQueryServer = CouchQueryServer { _ ->
     object : CompiledFunction {
-        override fun map(doc: Map<String, Any?>, emit: (key: Any?, value: Any?) -> Unit) {
+        override fun map(doc: Map<CharSequence, Any?>, emit: (key: Any?, value: Any?) -> Unit) {
             val k = doc[fieldKey]
             val v = doc["value"]
             if (k != null) emit(k, v)
         }
-        override fun reduce(sources: List<String>, values: List<Any?>, rereduce: Boolean): Any? =
+        override fun reduce(sources: List<CharSequence>, values: List<Any?>, rereduce: Boolean): Any? =
             values.filterIsInstance<Number>().sumOf { it.toDouble() }
     }
 }
@@ -88,8 +88,8 @@ class ReactorCouchServerQueryTest {
     fun rereduce_combinesPartialResults() {
         val qs = CouchQueryServer { _ ->
             object : CompiledFunction {
-                override fun map(doc: Map<String, Any?>, emit: (key: Any?, value: Any?) -> Unit) {}
-                override fun reduce(sources: List<String>, values: List<Any?>, rereduce: Boolean): Any? {
+                override fun map(doc: Map<CharSequence, Any?>, emit: (key: Any?, value: Any?) -> Unit) {}
+                override fun reduce(sources: List<CharSequence>, values: List<Any?>, rereduce: Boolean): Any? {
                     val nums = values.filterIsInstance<Number>()
                     return nums.sumOf { it.toDouble() }
                 }
@@ -115,8 +115,8 @@ class ReactorCouchServerQueryTest {
     fun reduce_emptyValues_returnsNull() {
         val qs = CouchQueryServer { _ ->
             object : CompiledFunction {
-                override fun map(doc: Map<String, Any?>, emit: (key: Any?, value: Any?) -> Unit) {}
-                override fun reduce(sources: List<String>, values: List<Any?>, rereduce: Boolean): Any? =
+                override fun map(doc: Map<CharSequence, Any?>, emit: (key: Any?, value: Any?) -> Unit) {}
+                override fun reduce(sources: List<CharSequence>, values: List<Any?>, rereduce: Boolean): Any? =
                     if (values.isEmpty()) null else values.filterIsInstance<Number>().sumOf { it.toDouble() }
             }
         }

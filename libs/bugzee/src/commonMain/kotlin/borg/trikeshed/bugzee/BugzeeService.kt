@@ -9,30 +9,30 @@ import borg.trikeshed.miniduck.DocRowVec
 private val bugzeeRowKeys = listOf("product", "bugId", "commentId", "summary", "description", "assignee", "severity", "attachmentCount")
 
 data class BugzeeEnvelope(
-    val product: String,
-    val bugId: String,
-    val commentId: String? = null,
-    val summary: String,
-    val description: String,
-    val assignee: String? = null,
+    val product: CharSequence,
+    val bugId: CharSequence,
+    val commentId: CharSequence? = null,
+    val summary: CharSequence,
+    val description: CharSequence,
+    val assignee: CharSequence? = null,
     val severity: Int = 0,
-    val metadata: Map<String, String> = emptyMap(),
+    val metadata: Map<CharSequence, CharSequence> = emptyMap(),
     val attachments: Series<RowVec> = emptySeries(),
 )
 
 data class BugzeeQuery(
-    val product: String,
-    val listing: String = "open",
-    val after: String? = null,
+    val product: CharSequence,
+    val listing: CharSequence = "open",
+    val after: CharSequence? = null,
     val limit: Int = 25,
 )
 
 data class BugzeeWriteReceipt(
-    val product: String,
-    val bugId: String,
-    val commentId: String? = null,
+    val product: CharSequence,
+    val bugId: CharSequence,
+    val commentId: CharSequence? = null,
     val accepted: Boolean,
-    val revision: String? = null,
+    val revision: CharSequence? = null,
 )
 
 interface BugzeeClient {

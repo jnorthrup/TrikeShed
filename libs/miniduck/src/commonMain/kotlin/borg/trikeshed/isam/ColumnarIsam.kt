@@ -21,11 +21,11 @@ private const val ISAM3_LAYOUT_SUFFIX = ".isam3.yaml"
 class ColumnarIsam internal constructor(
     private val layout: Isam3Layout,
     private val stores: Series<Isam3StoreHandle>,
-    val datafileFilename: String,
-    private val viewName: String,
+    val datafileFilename: CharSequence,
+    private val viewName: CharSequence,
 ) : Usable, Cursor {
     private val resolvedColumns: Series<Isam3ResolvedColumn> = layout.resolvedColumns(viewName)
-    private val storeIndex: Map<String, Isam3StoreHandle> = stores.view.associateBy { it.file.name }
+    private val storeIndex: Map<CharSequence, Isam3StoreHandle> = stores.view.associateBy { it.file.name }
 
     // cache: one Series<() -> ColumnMeta> built once (metadata is immutable per schema)
     private val metaSeries: Series<() -> ColumnMeta> = resolvedColumns.size j { columnIndex: Int ->
@@ -58,9 +58,9 @@ class ColumnarIsam internal constructor(
     companion object {
         fun write(
             cursor: Cursor,
-            datafilename: String,
+            datafilename: CharSequence,
             indexModifier: IndexModifier = IndexModifier.None,
-            varChars: Map<String, Int> = emptyMap(),
+            varChars: Map<CharSequence, Int> = emptyMap(),
             transform: ((RowVec) -> RowVec)? = null,
         ) {
             require(cursor.size > 0) { "ColumnarIsam.write requires at least one row" }
@@ -113,7 +113,7 @@ class ColumnarIsam internal constructor(
 
         fun append(
             rows: Iterable<RowVec>,
-            datafilename: String,
+            datafilename: CharSequence,
             indexModifier: IndexModifier = IndexModifier.None,
             transform: ((RowVec) -> RowVec)? = null,
         ) {
@@ -131,7 +131,7 @@ class ColumnarCursor(
     override val b: (Int) -> RowVec get() = isam.b
 }
 
-fun openColumnarIsam(datafile: String): ColumnarIsam {
+fun openColumnarIsam(datafile: CharSequence): ColumnarIsam {
     val layoutPath = resolveLayoutPath(datafile)
     val layout = readLayout(layoutPath)
     val baseName = baseNameFor(layoutPath)
@@ -155,16 +155,16 @@ fun openColumnarIsam(datafile: String): ColumnarIsam {
 }
 
 fun openColumnarIsam(
-    datafile: String,
-    metafile: String,
+    datafile: CharSequence,
+    metafile: CharSequence,
 ): ColumnarIsam = openColumnarIsam(if (Files.exists(metafile)) metafile else datafile)
 
-fun columnarFrom(cursor: Cursor, datafile: String): ColumnarIsam {
+fun columnarFrom(cursor: Cursor, datafile: CharSequence): ColumnarIsam {
     ColumnarIsam.write(cursor, datafile)
     return openColumnarIsam(datafile)
 }
 
-fun columnarFrom(cursor: Cursor, datafile: String, modifier: IndexModifier): ColumnarIsam {
+fun columnarFrom(cursor: Cursor, datafile: CharSequence, modifier: IndexModifier): ColumnarIsam {
     ColumnarIsam.write(cursor, datafile, indexModifier = modifier)
     return openColumnarIsam(datafile)
 }
@@ -177,7 +177,7 @@ fun createIndexBlocks(
     indexModifier: IndexModifier,
 ): Pair<ByteArray, ByteArray> = Pair(ByteArray(0), ByteArray(0))
 
-private fun readLayout(layoutPath: String): Isam3Layout {
+private fun readLayout(layoutPath: CharSequence): Isam3Layout {
     val lines = Files.readAllLines(layoutPath)
     val first = lines.firstOrNull()?.trim() ?: error("Missing layout file: $layoutPath")
     return when {
@@ -187,23 +187,23 @@ private fun readLayout(layoutPath: String): Isam3Layout {
     }
 }
 
-private fun resolveLayoutPath(base: String): String = when {
+private fun resolveLayoutPath(base: CharSequence): CharSequence = when {
     base.endsWith(".yaml") || base.endsWith(".yml") -> base
     else -> "$base$ISAM3_LAYOUT_SUFFIX"
 }
 
-private fun baseNameFor(layoutPath: String): String = when {
+private fun baseNameFor(layoutPath: CharSequence): CharSequence = when {
     layoutPath.endsWith(ISAM3_LAYOUT_SUFFIX) -> layoutPath.removeSuffix(ISAM3_LAYOUT_SUFFIX)
     layoutPath.endsWith(".yaml") -> layoutPath.removeSuffix(".yaml")
     layoutPath.endsWith(".yml") -> layoutPath.removeSuffix(".yml")
     else -> layoutPath
 }
 
-private fun filePath(baseName: String, fileName: String): String = "$baseName.$fileName.col"
+private fun filePath(baseName: CharSequence, fileName: CharSequence): CharSequence = "$baseName.$fileName.col"
 
 internal data class Isam3StoreHandle(
     val file: Isam3File,
-    val path: String,
+    val path: CharSequence,
     val bytes: ByteArray,
     val rowCount: Int,
 ) {

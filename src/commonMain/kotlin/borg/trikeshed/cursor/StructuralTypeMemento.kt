@@ -10,7 +10,7 @@ object MapTypeMemento : TypeMemento {
     override fun toString(): String = "Map"
 }
 
-val TypeMemento.label: String
+val TypeMemento.label: CharSequence
     get() = when (this) {
         SeqTypeMemento -> "Seq"
         MapTypeMemento -> "Map"

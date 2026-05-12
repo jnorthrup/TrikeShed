@@ -32,7 +32,7 @@ class CouchViewManifestServiceTest {
 
     @Test
     fun dispatchKnownView_returnsRowSet() {
-        val capturedPath = mutableListOf<String>()
+        val capturedPath = mutableListOf<CharSequence>()
         val service = CouchViewManifestService(manifest) { path ->
             capturedPath += path
             fakeViewResponse
@@ -74,7 +74,7 @@ class CouchViewManifestServiceTest {
 
     @Test
     fun dispatchTwoArgView_buildsCorrectPath() {
-        val capturedPath = mutableListOf<String>()
+        val capturedPath = mutableListOf<CharSequence>()
         val service = CouchViewManifestService(manifest) { path ->
             capturedPath += path
             fakeViewResponse

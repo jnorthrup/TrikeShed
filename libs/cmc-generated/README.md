@@ -22,7 +22,7 @@ All sources live under `src/generated/kotlin/borg/trikeshed/cmc/`.
 
 | File | Role |
 |------|------|
-| `api/CoinMarketCapAPIApi.kt` | `interface CoinMarketCapAPIApi` with one method: `suspend fun cmcEndpointOverview(): String`. `DefaultCoinMarketCapAPIApi` takes a `suspend (GeneratedRequest) -> String` call function. `CoinMarketCapAPIApiContract` object holds per-operation `GeneratedRequest` constants. |
+| `api/CoinMarketCapAPIApi.kt` | `interface CoinMarketCapAPIApi` with one method: `suspend fun cmcEndpointOverview(): CharSequence`. `DefaultCoinMarketCapAPIApi` takes a `suspend (GeneratedRequest) -> CharSequence` call function. `CoinMarketCapAPIApiContract` object holds per-operation `GeneratedRequest` constants. |
 | `infrastructure/GeneratedRequest.kt` | `enum class HttpMethod { GET, POST, PUT, DELETE, PATCH }` + `data class GeneratedRequest(method, path, queryParams, body, operationId)`. |
 | `CoinMarketCapAPIServerAdapter.kt` | Server-side router: `CoinMarketCapAPIServerAdapter(context: CoroutineContext)` dispatches on `request.operationId`. Currently returns `501 Not Implemented` for the single operation (`cmcEndpointOverview`). Contains `Contract` object with operation constants. |
 | `ServerMessage.kt` | `data class ServerMessage(status, headers, body)` with `isSuccess` helper. |

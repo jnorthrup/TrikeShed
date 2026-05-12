@@ -1,7 +1,7 @@
 package borg.trikeshed.couch.relaxfactory
 
 @Target(AnnotationTarget.FUNCTION)
-annotation class View(val map: String, val reduce: String = "")
+annotation class View(val map: CharSequence, val reduce: CharSequence = "")
 
 @Target(AnnotationTarget.VALUE_PARAMETER)
 annotation class Key

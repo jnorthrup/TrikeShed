@@ -28,19 +28,19 @@ class CursorOpsCompositionTest {
 
     private fun sampleDocCursor(): Cursor = docs.size j { i -> parseDocRow(docs[i]) }
 
-    private fun parseJsonObject(json: String): Map<*, *> {
+    private fun parseJsonObject(json: CharSequence): Map<*, *> {
         val parsed = JsonSupport.parse(json) as? Map<*, *> ?: error("expected JSON object: $json")
         return parsed
     }
 
-    private fun parseDocCells(json: String): Series<Any> {
+    private fun parseDocCells(json: CharSequence): Series<Any> {
         val parsed = parseJsonObject(json)
         val name = parsed["name"] ?: error("missing name in $json")
         val age = parsed["age"] ?: error("missing age in $json")
         return listOf(name, age).map { it as Any }.toSeries()
     }
 
-    private fun parseDocRow(json: String): RowVec {
+    private fun parseDocRow(json: CharSequence): RowVec {
         val parsed = parseJsonObject(json)
         val entries = parsed.entries.toList()
         return DocRowVec(

@@ -19,11 +19,11 @@ import borg.trikeshed.userspace.nio.file.spi.FileOperations
  * Compaction rewrites the WAL, keeping only entries after a sequence number.
  */
 class NioBlockWal(
-    private val root: String,
+    private val root: CharSequence,
     private val fs: FileOperations,
 ) {
     private var nextSeq: Long = 0L
-    private val walPath: String get() = fs.resolvePath(root, "wal.ndjson")
+    private val walPath: CharSequence get() = fs.resolvePath(root, "wal.ndjson").toString()
 
     val headSequence: Long get() = nextSeq
 
@@ -31,7 +31,7 @@ class NioBlockWal(
      * Append a put operation. Returns the assigned sequence number.
      * The block payload is written as a second NDJSON line.
      */
-    fun appendPut(collection: String, id: String, block: BlockRowVec): Long {
+    fun appendPut(collection: CharSequence, id: CharSequence, block: BlockRowVec): Long {
         nextSeq++
         val encoded = MiniDuckBlockCodec.encode(block)
         val header = """{"seq":$nextSeq,"op":"put","collection":"$collection","id":"$id"}"""
@@ -42,7 +42,7 @@ class NioBlockWal(
     /**
      * Append a remove operation. Returns the assigned sequence number.
      */
-    fun appendRemove(collection: String, id: String): Long {
+    fun appendRemove(collection: CharSequence, id: CharSequence): Long {
         nextSeq++
         val entry = """{"seq":$nextSeq,"op":"remove","collection":"$collection","id":"$id"}"""
         appendText("$entry\n")
@@ -82,10 +82,10 @@ class NioBlockWal(
 
     private data class WalEntry(
         val seq: Long,
-        val op: String,
-        val collection: String,
-        val id: String,
-        val blockData: String? = null,
+        val op: CharSequence,
+        val collection: CharSequence,
+        val id: CharSequence,
+        val blockData: CharSequence? = null,
     )
 
     private fun readEntries(): List<WalEntry> {
@@ -105,7 +105,7 @@ class NioBlockWal(
                 continue
             }
             if (header.op == "put") {
-                val blockLines = mutableListOf<String>()
+                val blockLines = mutableListOf<CharSequence>()
                 var cursor = i + 1
                 while (cursor < lines.size) {
                     val candidate = lines[cursor]
@@ -126,14 +126,14 @@ class NioBlockWal(
         return entries
     }
 
-    private fun parseWalHeader(line: String): WalEntry? {
+    private fun parseWalHeader(line: CharSequence): WalEntry? {
         if (!line.startsWith("{")) return null
         return try {
             val m = JsonParser.parse(line)
             val seq = (m["seq"] as? Number)?.toLong() ?: return null
-            val op = m["op"] as? String ?: return null
-            val collection = m["collection"] as? String ?: ""
-            val id = m["id"] as? String ?: ""
+            val op = m["op"] as? CharSequence ?: return null
+            val collection = m["collection"] as? CharSequence ?: ""
+            val id = m["id"] as? CharSequence ?: ""
             WalEntry(seq, op, collection, id)
         } catch (_: Exception) {
             null
@@ -152,12 +152,12 @@ class NioBlockWal(
         }
     }
 
-    private fun appendText(text: String) {
+    private fun appendText(text: CharSequence) {
         val existing = if (fs.exists(walPath)) fs.readString(walPath) else ""
-        fs.write(walPath, existing + text)
+        fs.write(walPath, existing.toString() + text)
     }
 
-    private fun String.toSeries(): borg.trikeshed.lib.Series<Char> {
+    private fun CharSequence.toSeries(): borg.trikeshed.lib.Series<Char> {
         val n = length
         return n j { i: Int -> this[i] }
     }

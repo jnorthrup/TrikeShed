@@ -5,6 +5,6 @@ package borg.trikeshed.ipfs
  * networked (UDP/TCP) or no-op for in-process testing.
  */
 interface DhtTransport {
-    suspend fun announceProviderRemote(cid: CID, address: String)
-    suspend fun findProvidersRemote(cid: CID): List<String>
+    suspend fun announceProviderRemote(cid: CID, address: CharSequence)
+    suspend fun findProvidersRemote(cid: CID): List<CharSequence>
 }

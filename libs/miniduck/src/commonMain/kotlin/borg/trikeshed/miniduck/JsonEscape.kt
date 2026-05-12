@@ -3,7 +3,7 @@ package borg.trikeshed.miniduck
 /**
  * Escape a string for JSON output.
  */
-internal fun escapeJson(s: String): String {
+internal fun escapeJson(s: CharSequence): CharSequence {
     val sb = StringBuilder(s.length)
     for (c in s) {
         when (c) {

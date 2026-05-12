@@ -19,13 +19,13 @@ class GitOpenApiServerTest {
 
     // ── helpers ──────────────────────────────────────────────────────────────────
 
-    private fun makeGet(path: String): HtxMessage = HtxMessage().apply {
+    private fun makeGet(path: CharSequence): HtxMessage = HtxMessage().apply {
         addStartLine(HtxStartLine.request(borg.trikeshed.couch.htx.HttpMethod.Get, path.encodeToByteArray()))
         addEndHeaders()
         setEom()
     }
 
-    private fun makePost(path: String, body: String = ""): HtxMessage = HtxMessage().apply {
+    private fun makePost(path: CharSequence, body: CharSequence = ""): HtxMessage = HtxMessage().apply {
         addStartLine(HtxStartLine.request(HttpMethod.Post, path.encodeToByteArray()))
         addHeader("Content-Type".encodeToByteArray(), "application/x-www-form-urlencoded".encodeToByteArray())
         addEndHeaders()
@@ -33,7 +33,7 @@ class GitOpenApiServerTest {
         setEom()
     }
 
-    private fun makePut(path: String): HtxMessage = HtxMessage().apply {
+    private fun makePut(path: CharSequence): HtxMessage = HtxMessage().apply {
         addStartLine(HtxStartLine.request(HttpMethod.Put, path.encodeToByteArray()))
         addEndHeaders()
         setEom()
@@ -239,7 +239,7 @@ class GitOpenApiServerTest {
         return f
     }
 
-    private fun responseBody(msg: HtxMessage): String =
+    private fun responseBody(msg: HtxMessage): CharSequence =
         msg.blocks.filterIsInstance<HtxBlockData.Data>()
             .joinToString("") { it.bytes.decodeToString() }
 

@@ -8,7 +8,7 @@ typealias Predicate = (RowVec) -> Boolean
 
 data class ColumnRef(val name: String)
 
-fun col(name: String): ColumnRef = ColumnRef(name)
+fun col(name: CharSequence): ColumnRef = ColumnRef(name.toString())
 
 infix fun ColumnRef.eq(value: Any?): Predicate = { row -> row.getValue(name) == value }
 

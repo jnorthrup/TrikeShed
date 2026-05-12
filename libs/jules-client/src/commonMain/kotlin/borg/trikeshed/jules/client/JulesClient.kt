@@ -7,7 +7,7 @@ import borg.trikeshed.openapi.infrastructure.HttpMethod
 import borg.trikeshed.htx.client.HtxKey
 import kotlin.coroutines.CoroutineContext
 
-class JulesClient(val context: CoroutineContext, val apiKey: String) {
+class JulesClient(val context: CoroutineContext, val apiKey: CharSequence) {
     val api: JulesAPIApi = DefaultJulesAPIApi { request: GeneratedRequest ->
         val htx = requireNotNull(context[HtxKey]) { "Expected HtxKey in coroutine context" }
         // We use HTX client to execute the call against Jules API

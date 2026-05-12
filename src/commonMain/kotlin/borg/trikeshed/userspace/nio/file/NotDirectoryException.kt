@@ -5,5 +5,5 @@ package borg.trikeshed.userspace.nio.file
 // Generated from Amazon Corretto JDK 25 java.base NIO public/protected API via javap.
 // Declarations intentionally mirror JDK taxonomy and contain no implementations.
 public open class NotDirectoryException : FileSystemException {
-    constructor(p0: String) : super(p0)
+    constructor(p0: CharSequence) : super(p0)
 }

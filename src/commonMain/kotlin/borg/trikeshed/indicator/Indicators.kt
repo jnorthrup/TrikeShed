@@ -13,7 +13,7 @@ import kotlin.math.*
 // ── 1. Returns & Momentum ──────────────────────────────────────────────
 
 object ReturnsMomentum {
-    fun compute(close: Series<Double>): Map<String, Series<Double>> {
+    fun compute(close: Series<Double>): Map<CharSequence, Series<Double>> {
         val logRet = close.size j { i: Int ->
             if (i == 0) 0.0 else ln(close[i] / close[i - 1])
         }
@@ -27,7 +27,7 @@ object ReturnsMomentum {
 // ── 2. EMA & MACD ──────────────────────────────────────────────────────
 
 object EmaMacd {
-    fun compute(close: Series<Double>): Map<String, Series<Double>> {
+    fun compute(close: Series<Double>): Map<CharSequence, Series<Double>> {
         val ema5 = close.ema(5)
         val ema10 = close.ema(10)
         val ema12 = close.ema(12)

@@ -11,7 +11,7 @@ import kotlin.coroutines.CoroutineContext
  */
 interface SeekHandle {
     /** Open the file for reading. Returns handle ID or throws. */
-    fun open(filename: String, readOnly: Boolean = true): Long
+    fun open(filename: CharSequence, readOnly: Boolean = true): Long
 
     /** Close the handle. */
     fun close(handle: Long)

@@ -34,7 +34,7 @@ class ChannelRunner(
     private var running = false
 
     /** Open a TCP socket and register for read/write events. */
-    fun tcpConnect(host: String, port: Int): Int {
+    fun tcpConnect(host: CharSequence, port: Int): Int {
         val fd = channelOps.socket(2 /* AF_INET */, 1 /* SOCK_STREAM */, 0)
         reactorOps.register(fd, setOf(Interest.READ, Interest.WRITE))
         return fd

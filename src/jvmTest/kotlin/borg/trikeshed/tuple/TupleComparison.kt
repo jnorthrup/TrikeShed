@@ -12,26 +12,26 @@ object TupleComparison {
 
     /** capture.b.b.b.b.b.b.b — seven field reads */
     fun metadataFromJoin(
-        capture: Join<String, Join<String, Join<Long, Join<String?, Join<String?, Join<String?, Join<String?, Map<String, String>?>>>>>>>
-    ): Map<String, String>? {
+        capture: Join<CharSequence, Join<CharSequence, Join<Long, Join<CharSequence?, Join<CharSequence?, Join<CharSequence?, Join<CharSequence?, Map<CharSequence, CharSequence>?>>>>>>>
+    ): Map<CharSequence, CharSequence>? {
         return capture.b.b.b.b.b.b.b
     }
 
     // ── Approach 2: Typed tuple (1 field read) ──
 
-    @JvmInline
-    value class ObjStoreDirect(
-        val bucket: String,
-        val key: String,
+
+     inline class ObjStoreDirect(
+        val bucket: CharSequence,
+        val key: CharSequence,
         val byteSize: Long,
-        val contentType: String?,
-        val etag: String?,
-        val lastModified: String?,
-        val versionId: String?,
-        val metadata: Map<String, String>?
+        val contentType: CharSequence?,
+        val etag: CharSequence?,
+        val lastModified: CharSequence?,
+        val versionId: CharSequence?,
+        val metadata: Map<CharSequence, CharSequence>?
     )
 
-    fun metadataFromTuple(t: ObjStoreDirect): Map<String, String>? {
+    fun metadataFromTuple(t: ObjStoreDirect): Map<CharSequence, CharSequence>? {
         return t.metadata
     }
 }

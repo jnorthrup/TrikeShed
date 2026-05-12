@@ -6,6 +6,6 @@ package borg.trikeshed.userspace.nio.channels
 // Declarations intentionally mirror JDK taxonomy and contain no implementations.
 public interface MulticastChannel : NetworkChannel {
     override fun close(): Unit
-    fun join(group: String, networkInterface: String): MembershipKey
-    fun join(group: String, networkInterface: String, source: String): MembershipKey
+    fun join(group: CharSequence, networkInterface: CharSequence): MembershipKey
+    fun join(group: CharSequence, networkInterface: CharSequence, source: CharSequence): MembershipKey
 }

@@ -4,28 +4,28 @@ import borg.trikeshed.lib.*
 import org.slf4j.Logger
 
 class KLogger : Logger {
-    fun debug(debugTxt: () -> String) {
+    fun debug(debugTxt: () -> CharSequence) {
         logDebug(debugTxt)
     }
 
-    override fun debug(s: String) {
+    override fun debug(s: CharSequence) {
         logDebug { s }
     }
 
-    override fun trace(s: String) {
+    override fun trace(s: CharSequence) {
         logDebug { s }
     }
 
-    override fun info(s: String) = logDebug { s }
-    fun info(function: () -> String) {
+    override fun info(s: CharSequence) = logDebug { s }
+    fun info(function: () -> CharSequence) {
         debug(function)
     }
 
-    override fun warn(s: String) = logDebug { s }
-    fun warn(function: () -> String) = debug(function)
+    override fun warn(s: CharSequence) = logDebug { s }
+    fun warn(function: () -> CharSequence) = debug(function)
 
-    fun error(s: String) = logDebug { s }
-    fun error(function: () -> String) {
+    fun error(s: CharSequence) = logDebug { s }
+    fun error(function: () -> CharSequence) {
         debug(function)
     }
 }

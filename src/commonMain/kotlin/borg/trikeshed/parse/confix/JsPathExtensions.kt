@@ -2,8 +2,8 @@ package borg.trikeshed.parse.confix
 
 import borg.trikeshed.lib.*
 
-/** Convert a List of path segments (String or Int) into a JsPath Series.
- *  Accepts Int/Number or String; other values are stringified.
+/** Convert a List of path segments (CharSequence or Int) into a JsPath Series.
+ *  Accepts Int/Number or CharSequence; other values are stringified.
  */
 fun List<Any?>.toJsPath(): JsPath {
     val n = this.size

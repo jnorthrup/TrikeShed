@@ -11,14 +11,14 @@ import borg.trikeshed.cmc.infrastructure.HttpMethod
 
 /** Generated API interface for CoinMarketCapAPI. */
 interface CoinMarketCapAPIApi {
-    suspend fun cmcEndpointOverview(): String
+    suspend fun cmcEndpointOverview(): CharSequence
 }
 
 /** Default implementation — caller provides the low-level call. */
 class DefaultCoinMarketCapAPIApi(
-   val call: suspend (GeneratedRequest) -> String,
+   val call: suspend (GeneratedRequest) -> CharSequence,
 ) : CoinMarketCapAPIApi {
-    override suspend fun cmcEndpointOverview(): String = call(CoinMarketCapAPIApiContract.CmcEndpointOverview.request)
+    override suspend fun cmcEndpointOverview(): CharSequence = call(CoinMarketCapAPIApiContract.CmcEndpointOverview.request)
 }
 
 /** Contract constants for each CoinMarketCapAPI operation. */

@@ -1,9 +1,9 @@
 package borg.trikeshed.miniduck.schema
 
 interface SchemaManager {
-    fun getTable(name: String): TableSchema?
+    fun getTable(name: CharSequence): TableSchema?
 
-    suspend fun getTableSuspend(name: String): TableSchema? = getTable(name)
+    suspend fun getTableSuspend(name: CharSequence): TableSchema? = getTable(name)
 
     fun createTable(schema: TableSchema) {}
 
@@ -11,8 +11,8 @@ interface SchemaManager {
         createTable(schema)
     }
 
-    fun ensureColumns(table: String, cols: List<String>): TableSchema =
+    fun ensureColumns(table: CharSequence, cols: List<CharSequence>): TableSchema =
         TableSchema(table, cols.mapIndexed { index, name -> ColumnSchema(index, name) })
 
-    suspend fun ensureColumnsSuspend(table: String, cols: List<String>): TableSchema = ensureColumns(table, cols)
+    suspend fun ensureColumnsSuspend(table: CharSequence, cols: List<CharSequence>): TableSchema = ensureColumns(table, cols)
 }

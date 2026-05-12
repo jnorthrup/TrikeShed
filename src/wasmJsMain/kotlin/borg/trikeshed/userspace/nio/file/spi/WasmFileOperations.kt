@@ -9,56 +9,56 @@ import kotlin.random.Random
  */
 class WasmFileOperations : FileOperations {
 
-    override fun readAllLines(filename: String): List<String> =
+    override fun readAllLines(filename: CharSequence): List<String> =
         readString(filename).replaceChar('\r', '\n').split('\n').let { parts ->
             if (parts.isNotEmpty() && parts.last().isEmpty()) parts.dropLast(1) else parts
         }
 
-    override fun readAllBytes(filename: String): ByteArray =
+    override fun readAllBytes(filename: CharSequence): ByteArray =
         readBlob(filename)?.let(::decodeHex) ?: ByteArray(0)
 
-    override fun readString(filename: String): String = readAllBytes(filename).decodeToString()
+    override fun readString(filename: CharSequence): String = readAllBytes(filename).decodeToString()
 
-    override fun write(filename: String, bytes: ByteArray) {
+    override fun write(filename: CharSequence, bytes: ByteArray) {
         ensureParentDirectories(filename)
         writeBlob(filename, encodeHex(bytes))
     }
 
-    override fun write(filename: String, lines: List<String>) { write(filename, lines.joinToString("\n")) }
+    override fun write(filename: CharSequence, lines: List<CharSequence>) { write(filename, lines.joinToString("\n")) }
 
-    override fun write(filename: String, string: String) { write(filename, string.encodeToByteArray()) }
+    override fun write(filename: CharSequence, string: CharSequence) { write(filename, string.toString().encodeToByteArray()) }
 
     override fun cwd(): String = "/"
 
-    override fun exists(filename: String): Boolean =
+    override fun exists(filename: CharSequence): Boolean =
         readBlob(filename) != null || directoryExists(filename)
 
-    override fun streamLines(fileName: String, bufsize: Int): Sequence<Join<Long, ByteArray>> =
+    override fun streamLines(fileName: CharSequence, bufsize: Int): Sequence<Join<Long, ByteArray>> =
         streamByteLines(readAllBytes(fileName))
 
-    override fun iterateLines(fileName: String, bufsize: Int): Iterable<Join<Long, Series<Byte>>> =
+    override fun iterateLines(fileName: CharSequence, bufsize: Int): Iterable<Join<Long, Series<Byte>>> =
         streamLines(fileName, bufsize).map { (offset, bytes) -> offset j bytes.toSeries() }.asIterable()
 
-    override fun listDir(path: String): List<String> {
-        val normalized = normalizePath(path).trimEnd('/') + "/"
+    override fun listDir(path: CharSequence): List<String> {
+        val normalized = normalizePath(path).toString().trimEnd('/') + "/"
         val fileKeys = storageKeys(fileKey(normalized)) + blobFallback.keys.filter { it.startsWith(fileKey(normalized)) }
         val dirKeys = storageKeys(dirKey(normalized)) + dirFallback.map(::dirKey).filter { it.startsWith(dirKey(normalized)) }
         val entries = mutableListOf<String>()
-        for (key in fileKeys) entries.add(key.removePrefix(fileKey(normalized)).substringBefore('/'))
-        for (key in dirKeys) entries.add(key.removePrefix(dirKey(normalized)).substringBefore('/'))
+        for (key in fileKeys) entries.add(key.toString().removePrefix(fileKey(normalized).toString()).substringBefore('/'))
+        for (key in dirKeys) entries.add(key.toString().removePrefix(dirKey(normalized).toString()).substringBefore('/'))
         return entries.distinct()
     }
 
-    override fun isDir(path: String): Boolean = directoryExists(path)
-    override fun isFile(path: String): Boolean = readBlob(path) != null
-    override fun mkdirs(path: String) { ensureParentDirectories(path) }
-    override fun deleteRecursively(path: String) { rm(path) }
+    override fun isDir(path: CharSequence): Boolean = directoryExists(path)
+    override fun isFile(path: CharSequence): Boolean = readBlob(path) != null
+    override fun mkdirs(path: CharSequence) { ensureParentDirectories(path) }
+    override fun deleteRecursively(path: CharSequence) { rm(path) }
 
-    override fun resolvePath(vararg parts: String): String = normalizePath(parts.joinToString("/"))
+    override fun resolvePath(vararg parts: CharSequence): String = normalizePath(parts.joinToString("/")).toString()
 
-    override fun readZip(path: String): List<Pair<String, ByteArray>> = TODO("readZip WASM")
+    override fun readZip(path: CharSequence): List<Pair<String, ByteArray>> = TODO("readZip WASM")
 
-    override fun createTempDir(prefix: String): String =
+    override fun createTempDir(prefix: CharSequence): String =
         "/tmp/$prefix-${Random.nextLong().toString(16)}"
 }
 

@@ -1,27 +1,19 @@
 package borg.trikeshed.openapi
 
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.async
-import kotlinx.coroutines.cancel
+import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ReceiveChannel
-import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.selects.select
 import kotlin.coroutines.CoroutineContext
 import kotlin.math.max
 
 data class OpenApiCall<I>(
-    val callId: String,
+    val callId: CharSequence,
     val input: I,
 )
 
 data class OpenApiTruthAction<I, O>(
-    val callId: String,
+    val callId: CharSequence,
     val input: I,
     val document: OpenApiRawDocument,
     val tokens: List<OpenApiToken> = emptyList(),
@@ -32,32 +24,32 @@ data class OpenApiTruthAction<I, O>(
 data class OpenApiParsedCall<I>(
 
     val call: OpenApiCall<I>,
-    val rawJson: String,
+    val rawJson: CharSequence,
     val document: OpenApiRawDocument,
     val tokens: List<OpenApiToken>,
     val analysis: OpenApiGapAnalysis,
 ) : HasCallId {
-    override val callId: String get() = call.callId
+    override val callId: CharSequence get() = call.callId
     val input: I get() = call.input
 }
 
 data class OpenApiSignalCall<I>(
     val call: OpenApiCall<I>,
-    val rawText: String,
+    val rawText: CharSequence,
 ) : HasCallId {
-    override val callId: String get() = call.callId
+    override val callId: CharSequence get() = call.callId
     val input: I get() = call.input
 }
 
 data class OpenApiSignalAction<I, O>(
-    val callId: String,
+    val callId: CharSequence,
     val input: I,
-    val rawText: String,
+    val rawText: CharSequence,
     val output: O,
 )
 
 class OpenApiCallFailure(
-    val callId: String,
+    val callId: CharSequence,
     cause: Throwable,
 ) : RuntimeException("OpenAPI call '$callId' failed", cause)
 
@@ -89,7 +81,7 @@ suspend fun <I, O> speculativeParseBurndown(
     )
 
 interface HasCallId {
-    val callId: String
+    val callId: CharSequence
 }
 
 suspend fun <I, P : HasCallId, R> speculativePipelineBurndown(

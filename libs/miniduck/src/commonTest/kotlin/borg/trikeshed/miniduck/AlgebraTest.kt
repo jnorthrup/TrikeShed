@@ -42,7 +42,7 @@ class AlgebraTest {
     fun coTensorIsRieszPair() {
         // The covector's argument type equals its co-located tensor type — Riesz property
         val t = scalarTensor("hello")
-        val co: CoTensor<String> = t co { it.b(shapeOf()) }
+        val co: CoTensor<CharSequence> = t co { it.b(shapeOf()) }
         assertEquals("hello", co.contract())
     }
 

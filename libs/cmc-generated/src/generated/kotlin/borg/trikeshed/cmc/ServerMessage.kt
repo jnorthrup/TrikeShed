@@ -9,8 +9,8 @@ package borg.trikeshed.cmc
 /** Minimal HTTP response model used by the generated server adapter. */
 data class ServerMessage(
     val status: Int,
-    val headers: Map<String, String> = emptyMap(),
-    val body: String?,
+    val headers: Map<CharSequence, CharSequence> = emptyMap(),
+    val body: CharSequence?,
 ) {
     val isSuccess: Boolean get() = status in 200..299
 }

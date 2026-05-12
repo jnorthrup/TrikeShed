@@ -3,7 +3,7 @@
 package borg.trikeshed.userspace.nio.charset
 
 public open class UnsupportedCharsetException : IllegalArgumentException {
-    public constructor(p0: String) : super(p0)
+    public constructor(p0: CharSequence) : super(p0.toString())
 
-    public fun getCharsetName():CharSequence= message ?: ""
+    public fun getCharsetName(): CharSequence = message ?: ""
 }

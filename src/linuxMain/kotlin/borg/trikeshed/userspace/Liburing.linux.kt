@@ -184,5 +184,5 @@ internal actual object LiburingImpl : LiburingFacade {
         )
 }
 
-private fun <T> failure(message: String, rc: Int? = null): Result<T> =
+private fun <T> failure(message: CharSequence, rc: Int? = null): Result<T> =
     Result.failure(IllegalStateException(if (rc == null) message else "$message: $rc"))

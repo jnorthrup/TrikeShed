@@ -16,7 +16,7 @@ import simple.PosixOpenOpts
  * 64KB sliding window mirrors the JVM implementation.
  */
 class SeekFileBuffer(
-    val filename: String,
+    val filename: CharSequence,
     val initialOffset: Long = 0,
     val blkSize: Long = -1,
     val readOnly: Boolean = true,
@@ -58,7 +58,7 @@ class SeekFileBuffer(
         if (fd >= 0) return
         val flags = if (readOnly) PosixOpenOpts.withFlags(PosixOpenOpts.OpenReadOnly)
                     else PosixOpenOpts.withFlags(PosixOpenOpts.O_WrOnly)
-        fd = platform.posix.open(filename, flags.toInt())
+        fd = platform.posix.open(filename.toString(), flags.toInt())
         require(fd >= 0) { "open($filename) failed" }
         memScoped {
             val st = alloc<stat>()

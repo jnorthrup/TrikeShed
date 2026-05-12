@@ -5,7 +5,7 @@ import borg.trikeshed.lib.j
 import kotlin.test.*
 
 class BitCompTest {
-    private val stringBytes: (String) -> Series<Byte> = { s ->
+    private val stringBytes: (CharSequence) -> Series<Byte> = { s ->
         s.length j { i -> s[i].code.toByte() }
     }
 
@@ -47,7 +47,7 @@ class BitCompTest {
     @Test
     fun `mid-byte bit mismatch at bit 5`() {
         // 0x20 (00100000) vs 0x00 (00000000): xor 0x20, bit 5
-        val exA: (String) -> Series<Byte> = { s -> 1 j { i -> s[i].code.toByte() } }
+        val exA: (CharSequence) -> Series<Byte> = { s -> 1 j { i -> s[i].code.toByte() } }
         val bc = BitComp(exA)
         val a = charArrayOf(0x20.toChar()).concatToString()
         val b = charArrayOf(0x00.toChar()).concatToString()

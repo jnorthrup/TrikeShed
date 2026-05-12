@@ -20,7 +20,7 @@ data class Nars3Budget(
  * An item of knowledge, potentially incomplete, processed by atoms.
  */
 data class Nars3Message(
-    val content: String,
+    val content: CharSequence,
     val budget: Nars3Budget,
     val elements: Series<NarsiveElement> = Join.emptySeriesOf()
 )
@@ -31,14 +31,14 @@ data class Nars3Message(
  * exploring IKR (Incomplete Knowledge and Resources) via channels.
  */
 abstract class Nars3Atom(
-    val id: String,
+    val id: CharSequence,
     val knowledge: Series<NarsiveElement>,
     var resources: Nars3Budget
 ) {
     abstract suspend fun process(input: Channel<Nars3Message>, output: Channel<Nars3Message>)
 }
 
-class Nars3RefeedingAtom(id: String, knowledge: Series<NarsiveElement>, resources: Nars3Budget) : Nars3Atom(id, knowledge, resources) {
+class Nars3RefeedingAtom(id: CharSequence, knowledge: Series<NarsiveElement>, resources: Nars3Budget) : Nars3Atom(id, knowledge, resources) {
     override suspend fun process(input: Channel<Nars3Message>, output: Channel<Nars3Message>) {
         for (msg in input) {
             // Processing, deduct from budget

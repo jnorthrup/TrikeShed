@@ -7,20 +7,20 @@ import kotlin.collections.contains
  */
 class Trie(var root: Map<String, Node> = linkedMapOf()) {
    var freeze: Boolean = false
-    fun add(v: Int, vararg values: String) {
+    fun add(v: Int, vararg values: CharSequence) {
         if (freeze) throw IllegalStateException("Trie is frozen")
         var children: Map<String, Node> = root
 
-        values.forEachIndexed { i: Int, value: String ->
+        values.forEachIndexed { i: Int, value: CharSequence ->
             val isLeaf = i == values.size - 1
             // add new node
-            if (!children.contains(value)) {
+            if (!children.contains(value.toString())) {
                 val node = Node(pathSeg = value, leaf = isLeaf, payload = v)
-                (children as MutableMap)[value] = node
+                (children as MutableMap)[value.toString()] = node
                 children = node.children
             } else {
                 // exist, so traverse current path + set isLeaf if needed
-                val node: Node = children[value]!!
+                val node: Node = children[value.toString()]!!
 
                 if (isLeaf) {
                     // once a node becomes a leaf it should stay a leaf; do not clear a previous leaf when inserting deeper keys
@@ -33,7 +33,7 @@ class Trie(var root: Map<String, Node> = linkedMapOf()) {
         }
     }
 
-    fun contains(vararg values: String): Boolean = search(*values) != null
+    fun contains(vararg values: CharSequence): Boolean = search(*values.map { it.toString() }.toTypedArray()) != null
 
     operator fun get(vararg key: String): Int? = search(*key)?.payload
 
@@ -61,12 +61,12 @@ class Trie(var root: Map<String, Node> = linkedMapOf()) {
         // not at end, continue traversing
         // add new node
         if (children.isNotEmpty()) {
-            for ((i: Int, value: String) in segments.withIndex()) {
+            for ((i: Int, value: CharSequence) in segments.withIndex()) {
                 val atLeaf = i == segments.lastIndex
                 // add new node
                 if (children.contains(value)) {
                     // exist, so traverse current path, ending if is last value, and is leaf node
-                    val node: Node = children[value]!!
+                    val node: Node = children[value.toString()]!!
                     if (atLeaf) return if (node.leaf) {
                         node
                     } else {
@@ -85,7 +85,7 @@ class Trie(var root: Map<String, Node> = linkedMapOf()) {
          * Created by kenny on 6/6/16.
          */
         class Node(
-            val pathSeg: String,
+            val pathSeg: CharSequence,
             var leaf: Boolean,
             var payload: Int,
             var children: Map<String, Node> = linkedMapOf()

@@ -29,10 +29,10 @@ interface ProcessOperations : CoroutineContext.Element {
      * @return [ProcessResult] with exit code, stdout, stderr.
      */
     suspend fun exec(
-        command: String,
-        args: List<String> = emptyList(),
+        command: CharSequence,
+        args: List<CharSequence> = emptyList(),
         stdin: ByteArray? = null,
-        env: Map<String, String> = emptyMap(),
+        env: Map<CharSequence, CharSequence> = emptyMap(),
     ): ProcessResult
 }
 

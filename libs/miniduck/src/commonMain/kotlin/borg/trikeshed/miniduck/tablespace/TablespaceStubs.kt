@@ -8,18 +8,18 @@ import borg.trikeshed.lib.*
 // --- BlockStore SPI ---
 
 interface BlockStore {
-    fun put(collection: String, block: BlockRowVec): String?
-    fun putWithId(collection: String, id: String, block: BlockRowVec)
-    fun remove(collection: String, blockId: String)
-    fun get(collection: String, blockId: String): BlockRowVec?
-    fun list(collection: String): List<String>
+    fun put(collection: CharSequence, block: BlockRowVec): CharSequence?
+    fun putWithId(collection: CharSequence, id: CharSequence, block: BlockRowVec)
+    fun remove(collection: CharSequence, blockId: CharSequence)
+    fun get(collection: CharSequence, blockId: CharSequence): BlockRowVec?
+    fun list(collection: CharSequence): List<CharSequence>
 }
 
 class InMemoryBlockStore : BlockStore {
-    private val store: MutableMap<String, MutableMap<String, BlockRowVec>> = mutableMapOf()
-    private val idCounter = mutableMapOf<String, Int>()
+    private val store: MutableMap<CharSequence, MutableMap<CharSequence, BlockRowVec>> = mutableMapOf()
+    private val idCounter = mutableMapOf<CharSequence, Int>()
 
-    override fun put(collection: String, block: BlockRowVec): String? {
+    override fun put(collection: CharSequence, block: BlockRowVec): CharSequence? {
         val coll = store.getOrPut(collection) { mutableMapOf() }
         val id = (idCounter.getOrPut(collection) { 0 }).toString()
         idCounter[collection] = id.toInt() + 1
@@ -27,42 +27,42 @@ class InMemoryBlockStore : BlockStore {
         return id
     }
 
-    override fun putWithId(collection: String, id: String, block: BlockRowVec) {
+    override fun putWithId(collection: CharSequence, id: CharSequence, block: BlockRowVec) {
         store.getOrPut(collection) { mutableMapOf() }[id] = block
     }
 
-    override fun remove(collection: String, blockId: String) {
+    override fun remove(collection: CharSequence, blockId: CharSequence) {
         store[collection]?.remove(blockId)
     }
 
-    override fun get(collection: String, blockId: String): BlockRowVec? {
+    override fun get(collection: CharSequence, blockId: CharSequence): BlockRowVec? {
         return store[collection]?.get(blockId)
     }
 
-    override fun list(collection: String): List<String> {
+    override fun list(collection: CharSequence): List<CharSequence> {
         return store[collection]?.keys?.toList() ?: emptyList()
     }
 }
 
 // --- Region ---
 
-class Region(val name: String, val store: BlockStore)
+class Region(val name: CharSequence, val store: BlockStore)
 
 // --- Schema discovery ---
 
-data class ColumnSchema(val name: String)
-data class TableSchema(val name: String, val columns: List<ColumnSchema>)
+data class ColumnSchema(val name: CharSequence)
+data class TableSchema(val name: CharSequence, val columns: List<ColumnSchema>)
 
 // --- Tablespace ---
 
-class Tablespace(val name: String) {
+class Tablespace(val name: CharSequence) {
     private val regions: MutableList<Region> = mutableListOf()
 
     fun addRegion(region: Region) {
         regions.add(region)
     }
 
-    fun scan(collection: String): Series<RowVec> {
+    fun scan(collection: CharSequence): Series<RowVec> {
         val allRows = mutableListOf<RowVec>()
         for (region in regions) {
             val blockIds = region.store.list(collection)
@@ -77,13 +77,13 @@ class Tablespace(val name: String) {
         return allRows.size j { i -> allRows[i] }
     }
 
-    fun scanToJson(collection: String): String {
+    fun scanToJson(collection: CharSequence): CharSequence {
         val cursor = scan(collection)
         return cursor.toJson()
     }
 
-    fun discoverSchema(collection: String): TableSchema {
-        val allKeys = mutableSetOf<String>()
+    fun discoverSchema(collection: CharSequence): TableSchema {
+        val allKeys = mutableSetOf<CharSequence>()
         for (region in regions) {
             val blockIds = region.store.list(collection)
             for (blockId in blockIds) {
@@ -108,7 +108,7 @@ fun <T> Series(size: Int, f: (Int) -> T): Series<T> = size j f
 
 // --- Extension to convert Series<RowVec> to JSON ---
 
-fun Series<RowVec>?.toJson(): String {
+fun Series<RowVec>?.toJson(): CharSequence {
     val rows = this ?: return ""
     if (rows.isEmpty()) return ""
     val json = StringBuilder()
@@ -125,7 +125,7 @@ fun Series<RowVec>?.toJson(): String {
             val value = cell.a
             when (value) {
                 null -> json.append("null")
-                is String -> json.append("\"$value\"")
+                is CharSequence -> json.append("\"$value\"")
                 else -> json.append(value)
             }
         }

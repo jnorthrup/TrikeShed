@@ -10,8 +10,8 @@ class CouchViewServerProtocolTest {
     fun `reset command clears state and returns true`() {
         val server = CouchQueryServer { source ->
             object : CompiledFunction {
-                override fun map(doc: Map<String, Any?>, emit: (key: Any?, value: Any?) -> Unit) {}
-                override fun reduce(sources: List<String>, values: List<Any?>, rereduce: Boolean): Any? = null
+                override fun map(doc: Map<CharSequence, Any?>, emit: (key: Any?, value: Any?) -> Unit) {}
+                override fun reduce(sources: List<CharSequence>, values: List<Any?>, rereduce: Boolean): Any? = null
             }
         }
         val response = server.handle(CouchCommand.Reset)
@@ -23,10 +23,10 @@ class CouchViewServerProtocolTest {
     fun `add_fun and map_doc emits key-value pairs`() {
         val server = CouchQueryServer { source ->
             object : CompiledFunction {
-                override fun map(doc: Map<String, Any?>, emit: (key: Any?, value: Any?) -> Unit) {
+                override fun map(doc: Map<CharSequence, Any?>, emit: (key: Any?, value: Any?) -> Unit) {
                     emit(doc["_id"], 1)
                 }
-                override fun reduce(sources: List<String>, values: List<Any?>, rereduce: Boolean): Any? = null
+                override fun reduce(sources: List<CharSequence>, values: List<Any?>, rereduce: Boolean): Any? = null
             }
         }
         server.handle(CouchCommand.Reset)

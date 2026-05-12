@@ -33,7 +33,7 @@ class DescriptorFragmentInteropTest {
     fun ndjsonPreparedParserUsesSchemaCacheIdempotently() {
         val line1 = """{"id":1,"tags":["a"],"info":{"title":"A"}}"""
         val line2 = """{"id":2,"tags":["b"],"info":{"title":"B"}}"""
-        val schemaIndex = mutableMapOf<String, NdjsonPreparedParser>()
+        val schemaIndex = mutableMapOf<CharSequence, NdjsonPreparedParser>()
 
         val first = StructuredParserSupport.prepareNdjsonParser(line1, schemaIndex)
         val second = StructuredParserSupport.prepareNdjsonParser(line2, schemaIndex)

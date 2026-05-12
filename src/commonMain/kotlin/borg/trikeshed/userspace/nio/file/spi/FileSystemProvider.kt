@@ -15,11 +15,11 @@ import kotlin.reflect.KClass
 // Declarations intentionally mirror JDK taxonomy and contain no implementations.
 interface FileSystemProvider {
 
-    fun getScheme(): String// TODO("NIO common stub")
-    fun newFileSystem(p0: String, p1: Map<String, *>): FileSystem// TODO("NIO common stub")
-    fun getFileSystem(p0: String): FileSystem// TODO("NIO common stub")
-    fun getPath(p0: String): Path// TODO("NIO common stub")
-    fun newFileSystem(p0: Path, p1: Map<String, *>): FileSystem// TODO("NIO common stub")
+    fun getScheme(): CharSequence// TODO("NIO common stub")
+    fun newFileSystem(p0: CharSequence, p1: Map<CharSequence, *>): FileSystem// TODO("NIO common stub")
+    fun getFileSystem(p0: CharSequence): FileSystem// TODO("NIO common stub")
+    fun getPath(p0: CharSequence): Path// TODO("NIO common stub")
+    fun newFileSystem(p0: Path, p1: Map<CharSequence, *>): FileSystem// TODO("NIO common stub")
     fun newInputStream(p0: Path, vararg p1: OpenOption): Any// TODO("NIO common stub")
     fun newOutputStream(p0: Path, vararg p1: OpenOption): Any// TODO("NIO common stub")
     fun newFileChannel(p0: Path, p1: Set<OpenOption>, vararg p2: FileAttribute<*>): FileChannel// TODO("NIO common stub")
@@ -40,8 +40,8 @@ interface FileSystemProvider {
     fun checkAccess(p0: Path, vararg p1: AccessMode)// TODO("NIO common stub")
     fun <V : FileAttributeView> getFileAttributeView(p0: Path, p1: KClass<V>, vararg p2: LinkOption): V// TODO("NIO common stub")
     fun <A : BasicFileAttributes> readAttributes(p0: Path, p1: KClass<A>, vararg p2: LinkOption): A// TODO("NIO common stub")
-    fun readAttributes(p0: Path, p1: String, vararg p2: LinkOption): Map<String, Any>// TODO("NIO common stub")
-    fun setAttribute(p0: Path, p1: String, p2: Any, vararg p3: LinkOption)// TODO("NIO common stub")
+    fun readAttributes(p0: Path, p1: CharSequence, vararg p2: LinkOption): Map<CharSequence, Any>// TODO("NIO common stub")
+    fun setAttribute(p0: Path, p1: CharSequence, p2: Any, vararg p3: LinkOption)// TODO("NIO common stub")
     fun exists(p0: Path, vararg p1: LinkOption): Boolean// TODO("NIO common stub")
     fun <A : BasicFileAttributes> readAttributesIfExists(p0: Path, p1: KClass<A>, vararg p2: LinkOption): A// TODO("NIO common stub")
 //    companion object {

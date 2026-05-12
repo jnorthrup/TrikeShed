@@ -21,38 +21,38 @@ import kotlinx.coroutines.launch
  */
 class GitTreeIndexer(
     private val fileOps: FileOperations,
-    private val repoRoot: String,
+    private val repoRoot: CharSequence,
 ) {
     data class GitDoc(
-        val database: String,
-        val id: String,
-        val body: String,  // JSON
+        val database: CharSequence,
+        val id: CharSequence,
+        val body: CharSequence,  // JSON
     )
 
     data class FileEntry(
-        val path: String,
-        val sha1: String,
-        val mode: String,
-        val content: String,
+        val path: CharSequence,
+        val sha1: CharSequence,
+        val mode: CharSequence,
+        val content: CharSequence,
     )
 
     data class CommitInfo(
-        val sha1: String,
-        val message: String,
-        val author: String,
-        val tree: String,
-        val parents: List<String>,
+        val sha1: CharSequence,
+        val message: CharSequence,
+        val author: CharSequence,
+        val tree: CharSequence,
+        val parents: List<CharSequence>,
     )
 
     data class TreeInfo(
-        val sha1: String,
+        val sha1: CharSequence,
         val entries: List<TreeEntry>,
     )
 
     data class TreeEntry(
-        val path: String,
-        val sha1: String,
-        val mode: String,
+        val path: CharSequence,
+        val sha1: CharSequence,
+        val mode: CharSequence,
     )
 
     // ── Index the current HEAD ─────────────────────────────────────
@@ -66,7 +66,7 @@ class GitTreeIndexer(
 
     // ── Index a specific commit ────────────────────────────────────
 
-    fun indexCommit(sha: String): List<GitDoc> {
+    fun indexCommit(sha: CharSequence): List<GitDoc> {
         val docs = mutableListOf<GitDoc>()
         val gitDir = fileOps.resolvePath(repoRoot, ".git")
         val commit = readCommit(gitDir, sha) ?: return emptyList()
@@ -130,20 +130,20 @@ class GitTreeIndexer(
 
     // ── Git object readers ─────────────────────────────────────────
 
-    private fun readRef(gitDir: String, refName: String): String {
+    private fun readRef(gitDir: CharSequence, refName: CharSequence): CharSequence {
         val refPath = fileOps.resolvePath(gitDir, refName)
         if (!fileOps.exists(refPath)) return refName
         val content = fileOps.readString(refPath).trim()
         return if (content.startsWith("ref: ")) content.removePrefix("ref: ").trim() else content
     }
 
-    private fun resolveRef(gitDir: String, ref: String): String? {
+    private fun resolveRef(gitDir: CharSequence, ref: CharSequence): CharSequence? {
         val refPath = fileOps.resolvePath(gitDir, ref)
         if (fileOps.exists(refPath)) return fileOps.readString(refPath).trim()
         return ref.takeIf { it.length == 40 && it.all { c -> c in "0123456789abcdef" } }
     }
 
-    private fun readObject(gitDir: String, sha: String): String? {
+    private fun readObject(gitDir: CharSequence, sha: CharSequence): CharSequence? {
         val prefix = sha.substring(0, 2)
         val rest = sha.substring(2)
         val loosePath = fileOps.resolvePath(gitDir, "objects", prefix, rest)
@@ -169,14 +169,14 @@ class GitTreeIndexer(
         return null
     }
 
-    private fun readCommit(gitDir: String, sha: String): CommitInfo? {
+    private fun readCommit(gitDir: CharSequence, sha: CharSequence): CommitInfo? {
         val raw = readObject(gitDir, sha) ?: return null
         val headerEnd = raw.indexOf('\u0000')
         if (headerEnd < 0) return null
         val body = raw.substring(headerEnd + 1)
         val lines = body.lines()
         var tree = ""
-        val parents = mutableListOf<String>()
+        val parents = mutableListOf<CharSequence>()
         var author = ""
         val messageStart = body.indexOf("\n\n")
         val message = if (messageStart >= 0) body.substring(messageStart + 2).trim() else ""
@@ -191,7 +191,7 @@ class GitTreeIndexer(
         return CommitInfo(sha, message, author, tree, parents)
     }
 
-    private fun readTree(gitDir: String, sha: String): TreeInfo? {
+    private fun readTree(gitDir: CharSequence, sha: CharSequence): TreeInfo? {
         val raw = readObject(gitDir, sha) ?: return null
         val headerEnd = raw.indexOf('\u0000')
         if (headerEnd < 0) return null
@@ -211,7 +211,7 @@ class GitTreeIndexer(
         return TreeInfo(sha, entries)
     }
 
-    private fun readBlob(gitDir: String, sha: String): String? {
+    private fun readBlob(gitDir: CharSequence, sha: CharSequence): CharSequence? {
         val raw = readObject(gitDir, sha) ?: return null
         val headerEnd = raw.indexOf('\u0000')
         if (headerEnd < 0) return null
@@ -220,7 +220,7 @@ class GitTreeIndexer(
 
     // ── JSON serializers ───────────────────────────────────────────
 
-    private fun fileEntryToJson(e: FileEntry): String = buildString {
+    private fun fileEntryToJson(e: FileEntry): CharSequence = buildString {
         append("{\"_id\":\"path/${escape(e.path)}\",")
         append("\"path\":\"${escape(e.path)}\",")
         append("\"sha1\":\"${e.sha1}\",")
@@ -228,7 +228,7 @@ class GitTreeIndexer(
         append("\"content\":\"${escape(e.content)}\"}")
     }
 
-    private fun commitToJson(c: CommitInfo): String = buildString {
+    private fun commitToJson(c: CommitInfo): CharSequence = buildString {
         append("{\"_id\":\"commit/${c.sha1}\",")
         append("\"sha1\":\"${c.sha1}\",")
         append("\"message\":\"${escape(c.message)}\",")
@@ -237,7 +237,7 @@ class GitTreeIndexer(
         append("\"parents\":[${c.parents.joinToString(",") { "\"$it\"" }}]}")
     }
 
-    private fun treeToJson(t: TreeInfo): String = buildString {
+    private fun treeToJson(t: TreeInfo): CharSequence = buildString {
         append("{\"_id\":\"tree/${t.sha1}\",")
         append("\"sha1\":\"${t.sha1}\",")
         append("\"entries\":[")
@@ -248,7 +248,7 @@ class GitTreeIndexer(
         append("]}")
     }
 
-    private fun escape(s: String): String = s
+    private fun escape(s: CharSequence): CharSequence = s
         .replace("\\", "\\\\")
         .replace("\"", "\\\"")
         .replace("\n", "\\n")
@@ -257,7 +257,7 @@ class GitTreeIndexer(
 
     // ── Pack file support (minimal) ────────────────────────────────
 
-    private fun decompressZlib(data: ByteArray): String {
+    private fun decompressZlib(data: ByteArray): CharSequence {
         // Minimal zlib deflate decompressor — handles git's standard compression.
         // For production, delegate to platform zlib via expect/actual.
         // For now: git objects compressed with zlib deflate at level 6-9.
@@ -273,6 +273,6 @@ class GitTreeIndexer(
         }
     }
 
-    private fun findInPackIndex(idxBytes: ByteArray, sha: String): Long = -1L
-    private fun readFromPack(packBytes: ByteArray, offset: Long): String? = null
+    private fun findInPackIndex(idxBytes: ByteArray, sha: CharSequence): Long = -1L
+    private fun readFromPack(packBytes: ByteArray, offset: Long): CharSequence? = null
 }

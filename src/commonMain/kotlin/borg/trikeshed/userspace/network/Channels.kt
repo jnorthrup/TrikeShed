@@ -9,8 +9,8 @@ import kotlin.concurrent.Volatile
  */
 
 class ChannelMetadata(
-    val remoteAddr: String? = null,
-    val localAddr: String? = null,
+    val remoteAddr: CharSequence? = null,
+    val localAddr: CharSequence? = null,
     var protocol: Protocol? = null
 ) {
     @Volatile var bytesRead: Long = 0
@@ -18,15 +18,17 @@ class ChannelMetadata(
 }
 
 interface Channel {
-    fun channelType():CharSequencefun isConnected(): Boolean
+    fun channelType(): CharSequence
+    fun isConnected(): Boolean
     fun metadata(): ChannelMetadata?
     fun read(dst: ByteRegion): Int
     fun write(src: ByteSeries): Int
 }
 
 interface Channels {
-    fun open(addr: String): Channel
-    fun providerName():CharSequence}
+    fun open(addr: CharSequence): Channel
+    fun providerName(): CharSequence
+    }
 
 @Deprecated("Use Channels.", ReplaceWith("Channels"))
 typealias ChannelProvider = Channels

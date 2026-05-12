@@ -3,7 +3,9 @@
 package borg.trikeshed.htx.client
 
 import borg.trikeshed.userspace.nio.channels.spi.PosixChannelOperations
-import platform.posix.*
+import platform.posix.AF_INET
+import platform.posix.SOCK_DGRAM
+import platform.posix.close
 
 /**
  * macOS native SCTP transport via ring reactor raw IP + pure-Kotlin SCTP.
@@ -17,7 +19,7 @@ import platform.posix.*
 actual fun createSctpHandler(): HtxRequestHandler = NativeSctpHandler
 
 private val NativeSctpHandler: HtxRequestHandler = { request ->
-    val url = request.path
+    val url = ""+request.path
     val host = url.removePrefix("sctp://").substringBefore(':')
     val port = url.substringAfter(":").substringBefore('/').toIntOrNull() ?: 9899
 

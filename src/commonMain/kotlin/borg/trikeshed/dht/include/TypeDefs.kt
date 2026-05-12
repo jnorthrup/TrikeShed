@@ -13,7 +13,7 @@ import borg.trikeshed.dht.id.NUID
  * kicking the can down the road here
  */
 //typealias Address = URI
-typealias Address = String
+typealias Address = CharSequence
 /** routes */
 typealias Route<TNum> = Join<borg.trikeshed.dht.id.NUID<TNum>, borg.trikeshed.dht.include.Address>
 

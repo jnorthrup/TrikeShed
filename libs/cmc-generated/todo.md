@@ -45,7 +45,7 @@ not in this module.
       the adapter returns `ServerMessage(501, body = "cmcEndpointOverview not implemented")`.
       Once context bindings exist, this should route through the reactor context.
 - [ ] **`CoinMarketCapAPIApi` return types should be typed** — Currently returns
-      `String` for all operations. Once response schemas exist, the generator
+      `CharSequence` for all operations. Once response schemas exist, the generator
       should produce typed return types (e.g., `ListingsLatestResponse`).
 - [ ] **Contract objects should include query param templates** — Currently
       `CmcEndpointOverview.request` has empty `queryParams`. Once parameters

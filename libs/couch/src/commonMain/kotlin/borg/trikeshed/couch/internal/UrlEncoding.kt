@@ -3,7 +3,7 @@ val unreservedChars: Set<Char> = (
     ('A'..'Z') + ('a'..'z') + ('0'..'9') + listOf('-', '_', '.', '~')
 ).toSet()
 
-fun urlEncode(value: String): String {
+fun urlEncode(value: CharSequence): CharSequence {
     val out = StringBuilder()
     for (ch in value) {
         when {

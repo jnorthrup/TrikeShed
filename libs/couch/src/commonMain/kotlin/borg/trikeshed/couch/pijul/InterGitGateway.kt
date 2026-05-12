@@ -26,11 +26,11 @@ enum class GatewayMode {
 
 /** Represents a conversion between git and pijul. */
 data class ConversionResult(
-    val gitRef: String?,
+    val gitRef: CharSequence?,
     val pijulHash: PatchHash?,
     val isTag: Boolean,
     val success: Boolean,
-    val message: String,
+    val message: CharSequence,
 )
 
 /**
@@ -46,15 +46,15 @@ data class ConversionResult(
 class InterGitGateway(
     private val shell: ProcessShell,
     private val pijulRepo: Repository,
-    private val gitDir: String,
+    private val gitDir: CharSequence,
     private val mode: GatewayMode,
 ) {
     private val pendingConversions = mutableListOf<ConversionResult>()
-    private val branchMapping: Map<String, String> = emptyMap()  // git branch → pijul channel
-    private val channelMapping: Map<String, String> = emptyMap()  // pijul channel → git branch
+    private val branchMapping: Map<CharSequence, CharSequence> = emptyMap()  // git branch → pijul channel
+    private val channelMapping: Map<CharSequence, CharSequence> = emptyMap()  // pijul channel → git branch
 
     /** Export: convert a Pijul channel to a git branch. */
-    fun exportChannel(channelName: String, gitBranch: String): ConversionResult {
+    fun exportChannel(channelName: CharSequence, gitBranch: CharSequence): ConversionResult {
         val channel = pijulRepo.channel(channelName)
             ?: return ConversionResult(null, null, false, false, "Channel '$channelName' not found")
 
@@ -63,7 +63,7 @@ class InterGitGateway(
         }
 
         val sorted = topologicalSort(channel.patches.toList())
-        var lastCommitHash: String? = null
+        var lastCommitHash: CharSequence? = null
 
         for (patchHash in sorted) {
             val patch = resolvePatch(patchHash, channel)
@@ -85,7 +85,7 @@ class InterGitGateway(
     }
 
     /** Import: convert git commits to Pijul patches in a channel. */
-    fun importGitBranch(gitBranch: String, channelName: String): ConversionResult {
+    fun importGitBranch(gitBranch: CharSequence, channelName: CharSequence): ConversionResult {
         val revList = shell.exec("git", listOf("-C", gitDir, "rev-list", "--reverse", gitBranch))
         if (revList.exitCode != 0) {
             return ConversionResult(null, null, false, false, "Failed to list git commits: ${revList.stderr}")
@@ -129,7 +129,7 @@ class InterGitGateway(
     }
 
     /** Fanout push: send the same pijul patches to multiple git remotes. */
-    fun fanoutPush(channelName: String, remotes: List<String>): List<Pair<String, Boolean>> {
+    fun fanoutPush(channelName: CharSequence, remotes: List<CharSequence>): List<Pair<CharSequence, Boolean>> {
         val channel = pijulRepo.channel(channelName) ?: return remotes.map { it to false }
 
         val canonicalBranch = channelName
@@ -144,7 +144,7 @@ class InterGitGateway(
 
     // --- internals ---
 
-    private fun patchToGitCommit(patch: Patch, parentHash: String?, author: String): ConversionResult {
+    private fun patchToGitCommit(patch: Patch, parentHash: CharSequence?, author: CharSequence): ConversionResult {
         val applyResult = patch.apply(pijulRepo.pristine)
         val fileContent = when (applyResult) {
             is ApplyResult.Success -> applyResult.newState.values.firstOrNull()?.let { lines ->
@@ -158,7 +158,7 @@ class InterGitGateway(
         return ConversionResult(commitHash, patch.hash, false, true, "Commit created: $commitHash")
     }
 
-    private fun gitCommitToPatch(gitCommit: String, parentPatchHash: PatchHash?, channelName: String): ConversionResult {
+    private fun gitCommitToPatch(gitCommit: CharSequence, parentPatchHash: PatchHash?, channelName: CharSequence): ConversionResult {
         val msgResult = shell.exec("git", listOf("-C", gitDir, "log", "-1", "--format=%H%n%an%n%ae%n%at%n%s%n%b", gitCommit))
         if (msgResult.exitCode != 0) {
             return ConversionResult(null, null, false, false, "git log failed")
@@ -174,7 +174,7 @@ class InterGitGateway(
 
         val diffResult = shell.exec("git", listOf("-C", gitDir, "diff-tree", "--no-commit-id", "--name-only", "-r", gitCommit))
         val filePaths = diffResult.stdout.trim().split("\n").filter { it.isNotBlank() }
-        val fileContents = mutableMapOf<String, String>()
+        val fileContents = mutableMapOf<CharSequence, CharSequence>()
         for (path in filePaths) {
             val contentResult = shell.exec("git", listOf("-C", gitDir, "show", "$gitCommit:$path"))
             if (contentResult.exitCode == 0) fileContents[path] = contentResult.stdout
@@ -185,13 +185,13 @@ class InterGitGateway(
         return ConversionResult(gitCommit, patch.hash, false, true, "Patch recorded: ${patch.hash.display()}")
     }
 
-    private fun writeGitTree(content: String): String {
+    private fun writeGitTree(content: CharSequence): CharSequence {
         val blobResult = shell.exec("git", listOf("-C", gitDir, "hash-object", "-w", "--stdin"))
         val blobHash = blobResult.stdout.trim()
         return blobHash  // stub: real impl would build tree
     }
 
-    private fun createGitCommit(treeHash: String, parentHash: String?, message: String, timestamp: Long): String {
+    private fun createGitCommit(treeHash: CharSequence, parentHash: CharSequence?, message: CharSequence, timestamp: Long): CharSequence {
         val parentFlag = if (parentHash != null) listOf("-p", parentHash) else emptyList()
         val env = listOf("GIT_AUTHOR_NAME=TrikeShed", "GIT_AUTHOR_EMAIL=pijul@trikeshed", "GIT_AUTHOR_DATE=$timestamp")
         val result = shell.exec("git", listOf("-C", gitDir, "commit-tree", treeHash) + parentFlag + listOf("-m", message))
@@ -221,10 +221,10 @@ class InterGitGateway(
     // Note: real topological sort requires resolving Patch objects for dependency edges
 
     private fun buildPatchFromFiles(
-        name: String,
-        author: String,
+        name: CharSequence,
+        author: CharSequence,
         timestamp: Long,
-        files: Map<String, String>,
+        files: Map<CharSequence, CharSequence>,
         parentPatch: PatchHash?,
     ): Patch = object : Patch {
         override val name = "$name (by $author)"

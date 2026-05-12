@@ -19,26 +19,26 @@ object CpuCacheMlir {
     /**
      * MLIR attribute kinds for cache encoding.
      */
-    enum class CacheLevel(val mlirName: String) {
+    enum class CacheLevel(val mlirName: CharSequence) {
         L1("L1"),
         L2("L2"),
         L3("L3");
 
-        fun toMlirAttribute(): String = "#$CPU_CACHE_NAMESPACE.level<$mlirName>"
+        fun toMlirAttribute(): CharSequence = "#$CPU_CACHE_NAMESPACE.level<$mlirName>"
     }
 
-    enum class CacheType(val mlirName: String) {
+    enum class CacheType(val mlirName: CharSequence) {
         DATA("Data"),
         INSTRUCTION("Instruction"),
         UNIFIED("Unified");
 
-        fun toMlirAttribute(): String = "#$CPU_CACHE_NAMESPACE.type<$mlirName>"
+        fun toMlirAttribute(): CharSequence = "#$CPU_CACHE_NAMESPACE.type<$mlirName>"
     }
 
     /**
      * Encode CpuCacheTopology as MLIR assembly format.
      */
-    fun toMlirAssembly(topology: CpuCacheTopology): String {
+    fun toMlirAssembly(topology: CpuCacheTopology): CharSequence {
         val sb = StringBuilder()
         sb.appendLine("$CPU_CACHE_TOPOLOGY_OP {")
 
@@ -67,7 +67,7 @@ object CpuCacheMlir {
     }
 
     // Platform pattern types used by tests
-    sealed class PlatformPattern(val name: String) {
+    sealed class PlatformPattern(val name: CharSequence) {
         class LinuxSys : PlatformPattern("linux-sys")
         class MacOSSysctl : PlatformPattern("macos-sysctl")
         class GenericSysconf : PlatformPattern("posix-sysconf")
@@ -95,7 +95,7 @@ object CpuCacheMlir {
      * The generated module can be compiled with:
      *   mlir-translate --mlir-to-llvmir output.mlir | clang -x ir - -o cache_probe
      */
-    fun toLlvmDialrectModule(topology: CpuCacheTopology): String {
+    fun toLlvmDialrectModule(topology: CpuCacheTopology): CharSequence {
         return """
 module {
   // -----------------------------------------------------------------------
@@ -163,5 +163,5 @@ module {
 /**
  * Extension property: convert CpuCacheTopology to MLIR assembly format.
  */
-val CpuCacheTopology.asMlir: String
+val CpuCacheTopology.asMlir: CharSequence
     get() = CpuCacheMlir.toMlirAssembly(this)

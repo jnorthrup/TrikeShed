@@ -8,13 +8,13 @@ import borg.trikeshed.collections._s
 sealed interface SqlNode
 
 class Identifier(val name: Series<Char>) : SqlNode {
-    fun asString(): String = name.asString()
-    val s: String get() = asString()
+    fun asString(): CharSequence = name.asString()
+    val s: CharSequence get() = asString()
 }
 
 class StringLiteral(val value: Series<Char>) : SqlNode {
-    fun asString(): String = value.asString()
-    val s: String get() = asString()
+    fun asString(): CharSequence = value.asString()
+    val s: CharSequence get() = asString()
 }
 
 class NumericLiteral(val value: Number) : SqlNode
@@ -23,7 +23,7 @@ sealed interface Expr : SqlNode
 
 class ColumnRef(val id: Identifier) : Expr
 class LitExpr(val lit: SqlNode) : Expr
-data class BinaryExpr(val left: Expr, val op: String, val right: Expr) : Expr
+data class BinaryExpr(val left: Expr, val op: CharSequence, val right: Expr) : Expr
 data class Column(val expr: Expr, val alias: Identifier? = null) : SqlNode
 data class TableRef(val name: Identifier, val alias: Identifier? = null) : SqlNode
 data class SelectStmt(val columns: Series<Column>, val from: TableRef?, val where: Expr?) : SqlNode
@@ -35,18 +35,19 @@ data class SelectStmt(val columns: Series<Column>, val from: TableRef?, val wher
 class SqlParser(private val cs: CharSeries) {
     companion object {
         fun parse(src: Series<Char>): SelectStmt? = SqlParser(CharSeries(src).trim).parseSelect()
-        fun parse(text: String): SelectStmt? {
+        fun parse(text: CharSequence): SelectStmt? {
             // try the recursive-descent parser first
-            val parsed = parse(text.toSeries())
+            val textStr = text.toString()
+            val parsed = parse(textStr.toSeries())
             if (parsed != null) return parsed
 
-            // fallback: simple regex-based parser
-            val selUp = text.uppercase()
+            // fallback
+            val selUp = textStr.uppercase()
             val selIndex = selUp.indexOf("SELECT")
             val fromIndex = selUp.indexOf("FROM")
             if (selIndex < 0 || fromIndex < 0 || fromIndex <= selIndex) return null
-            val colsPart = text.substring(selIndex + "SELECT".length, fromIndex).trim()
-            val afterFrom = text.substring(fromIndex + "FROM".length).trim()
+            val colsPart = textStr.substring(selIndex + "SELECT".length, fromIndex).trim()
+            val afterFrom = textStr.substring(fromIndex + "FROM".length).trim()
             val parts = afterFrom.split(Regex("\\s+WHERE\\s+", RegexOption.IGNORE_CASE), 2)
             val tablePart = parts[0].trim().split(Regex("\\s+"))[0]
             val wherePart = if (parts.size > 1) parts[1].trim() else null
@@ -87,9 +88,9 @@ class SqlParser(private val cs: CharSeries) {
 
     fun peek(): Char = if (cs.pos < cs.limit) cs[cs.pos] else '\u0000'
 
-    fun matchKeyword(keyword: String): Boolean {
+    fun matchKeyword(keyword: CharSequence): Boolean {
         val save = cs.pos
-        val k = keyword.uppercase()
+        val k = keyword.toString().uppercase()
         for (i in k.indices) {
             if (cs.pos + i >= cs.limit) {
                 cs.pos = save; return false

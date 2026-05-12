@@ -14,7 +14,7 @@ enum class TransportMode {
     HTTPS, WEBSOCKET, QUIC, SCTP;
 
     companion object {
-        fun fromExtension(value: String?): TransportMode = when (value?.lowercase()) {
+        fun fromExtension(value: CharSequence?): TransportMode = when (value?.toString()?.lowercase()) {
             "ws", "websocket", "wss" -> WEBSOCKET
             "quic", "h3" -> QUIC
             "sctp" -> SCTP
@@ -28,7 +28,7 @@ enum class TransportMode {
 /** Parsed x-trikeshed-channel from a WebSocket operation. */
 data class WsChannelExtension(
     val type: WsChannelType,
-    val subscribeMessage: Map<String, Any?>? = null,
+    val subscribeMessage: Map<CharSequence, Any?>? = null,
 )
 
 enum class WsChannelType { SUBSCRIBE, READ, WRITE, CLOSE }
@@ -53,7 +53,7 @@ data class SctpExtension(
 
 data class SctpStreamMapping(
     val streamId: Int,
-    val operationId: String,
+    val operationId: CharSequence,
     val direction: SctpStreamDirection,
 )
 
@@ -98,7 +98,7 @@ fun ResolvedOpenApiDocument.parseTransportAnnotations(): List<TransportAnnotated
                     "close" -> WsChannelType.CLOSE
                     else -> WsChannelType.SUBSCRIBE
                 },
-                subscribeMessage = @Suppress("UNCHECKED_CAST") (ch["message"] as? Map<String, Any?>),
+                subscribeMessage = @Suppress("UNCHECKED_CAST") (ch["message"] as? Map<CharSequence, Any?>),
             )
         }
 
@@ -117,10 +117,10 @@ fun ResolvedOpenApiDocument.parseTransportAnnotations(): List<TransportAnnotated
 
         @Suppress("UNCHECKED_CAST")
         val sctp: SctpExtension? = opNode["x-trikeshed-sctp"]?.asMap()?.let { sc ->
-            val streams = (sc["streams"] as? List<Map<String, Any?>>)?.mapNotNull { s ->
+            val streams = (sc["streams"] as? List<Map<CharSequence, Any?>>)?.mapNotNull { s ->
                 SctpStreamMapping(
                     streamId = (s["streamId"] as? Number)?.toInt() ?: return@mapNotNull null,
-                    operationId = s["operationId"] as? String ?: return@mapNotNull null,
+                    operationId = s["operationId"] as? CharSequence ?: return@mapNotNull null,
                     direction = when (s["direction"]?.asStr()) {
                         "client_to_server" -> SctpStreamDirection.CLIENT_TO_SERVER
                         "server_to_client" -> SctpStreamDirection.SERVER_TO_CLIENT

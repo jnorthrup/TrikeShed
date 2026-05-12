@@ -10,25 +10,25 @@ import borg.trikeshed.lib.j
  * Item: the shared metamodel for JSON / YAML / CBOR.
  *
  * Every branch is either Join or Series -- no new abstract primitives.
- *   Map  = Series<Join<String, Item>>   (lazy key-value pairs)
+ *   Map  = Series<Join<CharSequence, Item>>   (lazy key-value pairs)
  *   Arr  = Series<Item>                  (lazy sequence)
  *   Scalars: Str, Bin, Num, Flt, Bool, Nil
  *   Tag: CBOR tag (ignored by JSON/YAML)
  */
 sealed interface Item {
 
-    data class Map(val entries: Series<Join<String, Item>>) : Item {
+    data class Map(val entries: Series<Join<CharSequence, Item>>) : Item {
         val size: Int get() = entries.a
-        operator fun get(key: String): Item? {
+        operator fun get(key: CharSequence): Item? {
             for (i in 0 until entries.a) {
                 val e = entries.b(i)
                 if (e.a == key) return e.b
             }
             return null
         }
-        fun keys(): List<String> = (0 until entries.a).map { entries.b(it).a }
+        fun keys(): List<CharSequence> = (0 until entries.a).map { entries.b(it).a }
         fun values(): List<Item> = (0 until entries.a).map { entries.b(it).b }
-        fun containsKey(key: String): Boolean = get(key) != null
+        fun containsKey(key: CharSequence): Boolean = get(key) != null
     }
 
     data class Arr(val items: Series<Item>) : Item {
@@ -36,7 +36,7 @@ sealed interface Item {
         operator fun get(index: Int): Item = items.b(index)
     }
 
-    data class Str(val value: String) : Item
+    data class Str(val value: CharSequence) : Item
     data class Bin(val value: ByteArray) : Item {
         override fun equals(other: Any?): Boolean = other is Bin && value.contentEquals(other.value)
         override fun hashCode(): Int = value.contentHashCode()
@@ -48,10 +48,10 @@ sealed interface Item {
     data class Tag(val tag: UInt, val item: Item) : Item
 }
 
-fun itemMapOf(vararg pairs: Pair<String, Item>): Item.Map =
+fun itemMapOf(vararg pairs: Pair<CharSequence, Item>): Item.Map =
     Item.Map(pairs.size j { pairs[it].first j pairs[it].second })
 
-fun itemMapOf(map: Map<String, Item>): Item.Map {
+fun itemMapOf(map: Map<CharSequence, Item>): Item.Map {
     val entries = map.entries.toList()
     return Item.Map(entries.size j { entries[it].key j entries[it].value })
 }
@@ -62,7 +62,7 @@ fun itemArrayOf(items: List<Item>): Item.Arr = Item.Arr(items.size j { items[it]
 fun Any?.toItem(): Item = when (this) {
     null -> Item.Nil
     is Item -> this
-    is String -> Item.Str(this)
+    is CharSequence -> Item.Str(this)
     is Long -> Item.Num(this)
     is Int -> Item.Num(this.toLong())
     is Short -> Item.Num(this.toLong())
@@ -91,7 +91,7 @@ fun Item.toAny(): Any? = when (this) {
     is Item.Bool -> value
     is Item.Bin -> value
     is Item.Map -> {
-        val m = LinkedHashMap<String, Any?>(size)
+        val m = LinkedHashMap<CharSequence, Any?>(size)
         for (i in 0 until entries.a) {
             m[entries.b(i).a] = entries.b(i).b.toAny()
         }
@@ -101,6 +101,6 @@ fun Item.toAny(): Any? = when (this) {
     is Item.Tag -> item.toAny()
 }
 
-val Item?.strValue: String? get() = (this as? Item.Str)?.value
+val Item?.strValue: CharSequence? get() = (this as? Item.Str)?.value
 val Item?.longValue: Long? get() = (this as? Item.Num)?.value
 val Item?.boolValue: Boolean? get() = (this as? Item.Bool)?.value

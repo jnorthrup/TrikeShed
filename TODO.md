@@ -273,7 +273,7 @@
 ▏ 
 ▏ ────────────────────────────────────────────────────────────
 ▏ 
-▏ 19-20. Asset model (was: gutted enum + @JvmInline removal)
+▏ 19-20. Asset model (was: gutted enum +   removal)
 ▏ 
     // 19a
     @Test fun `cachedAssetMutation returns all enum values`() {

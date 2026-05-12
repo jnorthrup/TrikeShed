@@ -12,15 +12,15 @@ import borg.trikeshed.lib.toSeries
 import borg.trikeshed.lib.view
 
 class Isam3FileReader private constructor(
-    val metafileFilename: String,
+    val metafileFilename: CharSequence,
     private val layout: Isam3Layout,
 ) : Usable {
-    constructor(metafileFilename: String) : this(metafileFilename, Isam3Layout.read(metafileFilename))
+    constructor(metafileFilename: CharSequence) : this(metafileFilename, Isam3Layout.read(metafileFilename))
 
     val version: Int get() = layout.version
     val partitions: Series<Isam3Partition> get() = layout.partitions
     val views: Series<Isam3View> get() = layout.views
-    val viewNames: Series<String> get() = layout.views.view.map { it.name }.toSeries()
+    val viewNames: Series<CharSequence> get() = layout.views.view.map { it.name }.toSeries()
     val recordMeta: Series<RecordMeta> get() = layout.recordMeta()
     val logicalMeta: Series<ColumnMeta> get() = layout.logicalMeta()
 
@@ -30,12 +30,12 @@ class Isam3FileReader private constructor(
 
     override fun close() = Unit
 
-    fun logicalNames(viewName: String? = null): Series<String> = layout.logicalNames(viewName)
-    fun recordMeta(viewName: String? = null): Series<RecordMeta> = layout.recordMeta(viewName)
-    fun logicalMeta(viewName: String? = null): Series<ColumnMeta> = layout.logicalMeta(viewName)
+    fun logicalNames(viewName: CharSequence? = null): Series<CharSequence> = layout.logicalNames(viewName)
+    fun recordMeta(viewName: CharSequence? = null): Series<RecordMeta> = layout.recordMeta(viewName)
+    fun logicalMeta(viewName: CharSequence? = null): Series<ColumnMeta> = layout.logicalMeta(viewName)
 
     companion object {
-        fun read(metafilename: String): Isam3FileReader = Isam3FileReader(metafilename)
-        fun parse(text: String): Isam3FileReader = Isam3FileReader("<text>", Isam3Layout.parse(text))
+        fun read(metafilename: CharSequence): Isam3FileReader = Isam3FileReader(metafilename)
+        fun parse(text: CharSequence): Isam3FileReader = Isam3FileReader("<text>", Isam3Layout.parse(text))
     }
 }

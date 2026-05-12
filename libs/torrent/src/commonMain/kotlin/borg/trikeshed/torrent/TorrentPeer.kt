@@ -5,9 +5,9 @@ package borg.trikeshed.torrent
  * Manages state machine per remote peer connection.
  */
 class TorrentPeer(
-    val ip: String,
+    val ip: CharSequence,
     val port: Int,
-    val peerId: String,
+    val peerId: CharSequence,
 ) {
     // Wire protocol message IDs
     enum class MessageId(val id: Int) {
@@ -25,7 +25,7 @@ class TorrentPeer(
      * Build a handshake message (BEP 3 §1).
      * <pstrlen><pstr><reserved><info_hash><peer_id>
      */
-    fun buildHandshake(infoHash: ByteArray, ourPeerId: String): ByteArray {
+    fun buildHandshake(infoHash: ByteArray, ourPeerId: CharSequence): ByteArray {
         val pstr = "BitTorrent protocol".encodeToByteArray()
         val reserved = ByteArray(8)
         return byteArrayOf(pstr.size.toByte()) + pstr + reserved + infoHash + ourPeerId.encodeToByteArray()

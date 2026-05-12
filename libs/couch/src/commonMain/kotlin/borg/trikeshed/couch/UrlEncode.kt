@@ -1,6 +1,6 @@
 package borg.trikeshed.couch
 
-internal fun urlencode(s: String): String {
+internal fun urlencode(s: CharSequence): CharSequence {
     val bytes = s.encodeToByteArray()
     val sb = StringBuilder()
     for (b in bytes) {

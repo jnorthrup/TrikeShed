@@ -65,7 +65,7 @@ class OpenApiCallPipelineTest {
         val results = speculativeGapBurndown(
             calls = inputs,
             parallelism = 1,
-            parser = { it },
+            parser = { it .toString()},
             truthAction = { parsed -> parsed.analysis.gaps.map(OpenApiGap::code).sorted() },
         )
 

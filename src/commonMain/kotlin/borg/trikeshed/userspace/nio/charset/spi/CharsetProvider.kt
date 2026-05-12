@@ -7,5 +7,5 @@ package borg.trikeshed.userspace.nio.charset.spi
 public abstract class CharsetProvider {
     protected constructor()
     fun charsets(): Iterator<borg.trikeshed.userspace.nio.charset.Charset> = TODO("NIO common stub")
-    fun charsetForName(p0: String): borg.trikeshed.userspace.nio.charset.Charset = TODO("NIO common stub")
+    fun charsetForName(p0: CharSequence): borg.trikeshed.userspace.nio.charset.Charset = TODO("NIO common stub")
 }

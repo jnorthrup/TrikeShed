@@ -6,8 +6,8 @@ package borg.trikeshed.userspace.nio.file.attribute
 // Declarations intentionally mirror JDK taxonomy and contain no implementations.
 public class PosixFilePermissions {
     companion object {
-        fun toString(p0: Set<PosixFilePermission>):CharSequence= TODO("NIO common stub")
-        fun fromString(p0: String): Set<PosixFilePermission> = TODO("NIO common stub")
+        fun toString(p0: Set<PosixFilePermission>): CharSequence= TODO("NIO common stub")
+        fun fromString(p0: CharSequence): Set<PosixFilePermission> = TODO("NIO common stub")
         fun asFileAttribute(p0: Set<PosixFilePermission>): FileAttribute<Set<PosixFilePermission>> = TODO("NIO common stub")
     }
 }

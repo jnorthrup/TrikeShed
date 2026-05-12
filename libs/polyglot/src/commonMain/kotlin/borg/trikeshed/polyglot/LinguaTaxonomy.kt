@@ -26,7 +26,7 @@ import kotlin.math.abs
  * ═══════════════════════════════════════════════════════════════════════════ */
 
 /** Stable identifier for a source language. */
-enum class LangId(val label: String) {
+enum class LangId(val label: CharSequence) {
     KOTLIN("kotlin"),
     JAVA("java"),
     PYTHON("python"),
@@ -43,7 +43,7 @@ enum class LangId(val label: String) {
     ;
 
     companion object {
-        fun of(label: String): LangId? = entries.find { it.label == label }
+        fun of(label: CharSequence): LangId? = entries.find { it.label == label }
     }
 }
 
@@ -218,9 +218,9 @@ data class LangEntry(
     val fingerprint: LangFingerprint,
     val classifier: LangClassifier,
     /** Canonical file extensions (e.g. [".kt", ".kts"]) — fallback, not primary. */
-    val extensions: Series<String>,
+    val extensions: Series<CharSequence>,
     /** Canonical shebang line prefix, or null. */
-    val shebang: String?,
+    val shebang: CharSequence?,
 ) {
     /**
      * Run classification on live source text.
@@ -238,14 +238,14 @@ interface LangRegistry {
         id: LangId,
         fingerprint: LangFingerprint,
         classifier: LangClassifier,
-        extensions: Series<String>,
-        shebang: String? = null,
+        extensions: Series<CharSequence>,
+        shebang: CharSequence? = null,
     ): LangEntry
 
     fun all(): Series<LangEntry>
     fun reset()
     fun series(): Series<LangEntry>
-    fun byExtension(ext: String): LangEntry?
+    fun byExtension(ext: CharSequence): LangEntry?
     fun byId(id: LangId): LangEntry?
     fun classifyAll(source: Series<Char>): Series<ClassificationResult>
     fun bestMatch(source: Series<Char>): ClassificationResult?
@@ -264,8 +264,8 @@ class ConcurrentLangRegistry : LangRegistry {
         id: LangId,
         fingerprint: LangFingerprint,
         classifier: LangClassifier,
-        extensions: Series<String>,
-        shebang: String?,
+        extensions: Series<CharSequence>,
+        shebang: CharSequence?,
     ): LangEntry {
         if (sealed) throw IllegalStateException("LangRegistry is sealed and cannot be modified")
         return LangEntry(id, fingerprint, classifier, extensions, shebang).also { entries.add(it) }
@@ -281,7 +281,7 @@ class ConcurrentLangRegistry : LangRegistry {
 
     override fun series(): Series<LangEntry> = entries.size j { i: Int -> entries[i] }
 
-    override fun byExtension(ext: String): LangEntry? = entries.find { entry ->
+    override fun byExtension(ext: CharSequence): LangEntry? = entries.find { entry ->
         entry.extensions.view.contains(ext)
     }
 

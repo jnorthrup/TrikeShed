@@ -28,7 +28,7 @@ enum class SignalType {
 data class SignalResult(
     val signal: SignalType,
     val confidence: Double = 1.0,
-    val conditions: Map<String, Boolean> = emptyMap()
+    val conditions: Map<CharSequence, Boolean> = emptyMap()
 )
 
 /**
@@ -157,7 +157,7 @@ object SampleStrategySignals {
      * Generate signal for current candle.
      */
     fun generateSignal(ctx: Context, ind: Indicators = computeIndicators(ctx)): SignalResult {
-        val conditions = mutableMapOf<String, Boolean>()
+        val conditions = mutableMapOf<CharSequence, Boolean>()
 
         // Check entry signals first
         val longEntry = checkLongEntry(ctx, ind)

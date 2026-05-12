@@ -18,7 +18,7 @@ fun Gt(column: CharSequence, value: Any?): (RowVec) -> Boolean = {
 private fun compareCursorValues(left: Any?, right: Any?): Int? = when {
     left == null || right == null -> null
     left is Number && right is Number -> left.toDouble().compareTo(right.toDouble())
-    left is String && right is String -> left.compareTo(right)
+    left is CharSequence && right is CharSequence -> left.cs.compareTo(right.cs)
     left is Boolean && right is Boolean -> left.compareTo(right)
     left is Comparable<*> && left::class == right::class -> compareComparableValues(left, right)
     else -> null
@@ -46,11 +46,11 @@ fun Cursor.where(predicate: (RowVec) -> Boolean): Cursor {
 }
 
 /** Project named columns — family-aware so DocRowVec/ViewRowVec rows keep their child. */
-fun Cursor.project(vararg columns: String): Cursor {
+fun Cursor.project(vararg columns: CharSequence): Cursor {
     val cursor = this
     return size j { y: Int ->
         val row = cursor.b(y)
-        val keys = columns.toList()
+        val keys = columns.map { it.toString() }
         val values = keys.map { col -> rowValue(row, col) }
         DocRowVec(keys, values, copiedChild(row))
     }
@@ -117,8 +117,8 @@ fun Cursor.drop(n: Int): Cursor {
 
 // Aggregation model
 interface Aggregation {
-    val targetColumn: String
-    val outputColumn: String
+    val targetColumn: CharSequence
+    val outputColumn: CharSequence
     fun createAccumulator(): Accumulator
 }
 
@@ -129,8 +129,8 @@ interface Accumulator {
 
 object Agg {
     fun count(column: CharSequence = "*"): Aggregation = object : Aggregation {
-        override val targetColumn: String = column
-        override val outputColumn: String = "count"
+        override val targetColumn: CharSequence = column.toString()
+        override val outputColumn: CharSequence = "count"
         override fun createAccumulator(): Accumulator = object : Accumulator {
             var count = 0L
             override fun add(value: Any?) { count++ }
@@ -139,8 +139,8 @@ object Agg {
     }
 
     fun sum(column: CharSequence): Aggregation = object : Aggregation {
-        override val targetColumn: String = column
-        override val outputColumn: String = "sum_$column"
+        override val targetColumn: CharSequence = column.toString()
+        override val outputColumn: CharSequence = "sum_$column"
         override fun createAccumulator(): Accumulator = object : Accumulator {
             var sum = 0.0
             override fun add(value: Any?) {
@@ -151,8 +151,8 @@ object Agg {
     }
 
     fun avg(column: CharSequence): Aggregation = object : Aggregation {
-        override val targetColumn: String = column
-        override val outputColumn: String = "avg_$column"
+        override val targetColumn: CharSequence = column.toString()
+        override val outputColumn: CharSequence = "avg_$column"
         override fun createAccumulator(): Accumulator = object : Accumulator {
             var sum = 0.0
             var count = 0L
@@ -167,8 +167,8 @@ object Agg {
     }
 
     fun min(column: CharSequence): Aggregation = object : Aggregation {
-        override val targetColumn: String = column
-        override val outputColumn: String = "min_$column"
+        override val targetColumn: CharSequence = column.toString()
+        override val outputColumn: CharSequence = "min_$column"
         override fun createAccumulator(): Accumulator = object : Accumulator {
             var min: Double? = null
             override fun add(value: Any?) {
@@ -182,8 +182,8 @@ object Agg {
     }
 
     fun max(column: CharSequence): Aggregation = object : Aggregation {
-        override val targetColumn: String = column
-        override val outputColumn: String = "max_$column"
+        override val targetColumn: CharSequence = column.toString()
+        override val outputColumn: CharSequence = "max_$column"
         override fun createAccumulator(): Accumulator = object : Accumulator {
             var max: Double? = null
             override fun add(value: Any?) {
@@ -246,10 +246,10 @@ fun Cursor.hashJoin(other: Cursor, leftKey: CharSequence, rightKey: CharSequence
         val key = leftRow.getValue(leftKey)
         val matches = rightIndex[key] ?: continue
         for (rightRow in matches) {
-            val keys = mutableListOf<String>()
+            val keys = mutableListOf<CharSequence>()
             val cells = mutableListOf<Any?>()
             appendRowData(keys, cells, leftRow)
-            appendJoinedRowData(keys, cells, rightRow, rightKey)
+            appendJoinedRowData(keys, cells, rightRow, rightKey.toString())
             resultRows.add(DocRowVec(keys, cells))
         }
     }
@@ -274,7 +274,7 @@ fun compareKeys(a: Any?, b: Any?): Int = when {
     else -> a.toString().compareTo(b.toString())
 }
 
-private fun rowName(row: RowVec, index: Int): String = when (row) {
+private fun rowName(row: RowVec, index: Int)  = when (row) {
     is DocRowVec -> row.keys[index]
     is ViewRowVec -> when (index) {
         0 -> "id"
@@ -351,7 +351,7 @@ private fun copiedChild(row: RowVec): Series<RowVec>? = when (row) {
     else -> null
 }
 
-private fun appendRowData(keys: MutableList<String>, cells: MutableList<Any?>, row: RowVec) {
+private fun appendRowData(keys: MutableList<  CharSequence>, cells: MutableList<Any?>, row: RowVec) {
     when (row) {
         is DocRowVec -> {
             for (i in 0 until row.size) {
@@ -368,7 +368,7 @@ private fun appendRowData(keys: MutableList<String>, cells: MutableList<Any?>, r
     }
 }
 
-private fun appendJoinedRowData(keys: MutableList<String>, cells: MutableList<Any?>, row: RowVec, joinKey: String) {
+private fun appendJoinedRowData(keys: MutableList<CharSequence>, cells: MutableList<Any?>, row: RowVec, joinKey: CharSequence) {
     when (row) {
         is DocRowVec -> {
             // Build a HashSet of already-emitted key names for O(1) dedup

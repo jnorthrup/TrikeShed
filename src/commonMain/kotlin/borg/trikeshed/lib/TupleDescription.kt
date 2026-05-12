@@ -3,7 +3,7 @@ package borg.trikeshed.lib
 
 /**names of tuples up to 22
  */
-enum class TupleDescription(vararg val description: String) {
+enum class TupleDescription(vararg val description: CharSequence) {
     tupleNounsUS("Nonce", "Mono", "Pair", "Triple", "Quad", "Quint", "Sext", "Sept", "Oct", "Non", "Dec", "Undec", "Duodec", "Tredec", "Quattuordec", "Quindec", "Sexdec", "Septendec", "Octodec", "Novemdec", "Vigint", "Unvigint", "Duovigint"),
  /**tuple nouns in RU*/ tupleNounsRU("Ноль", "Один", "Два", "Три", "Четыре", "Пять", "Шесть", "Семь", "Восемь", "Девять", "Десять", "Одиннадцать", "Двенадцать", "Тринадцать", "Четырнадцать", "Пятнадцать", "Шестнадцать", "Семнадцать", "Восемнадцать", "Девятнадцать", "Двадцать", "Двадцать один", "Двадцать два"),
  /**tuple nouns in DE*/ tupleNounsDE("Null", "Eins", "Zwei", "Drei", "Vier", "Fünf", "Sechs", "Sieben", "Acht", "Neun", "Zehn", "Elf", "Zwölf", "Dreizehn", "Vierzehn", "Fünfzehn", "Sechzehn", "Siebzehn", "Achtzehn", "Neunzehn", "Zwanzig", "Einundzwanzig", "Zweiundzwanzig"),

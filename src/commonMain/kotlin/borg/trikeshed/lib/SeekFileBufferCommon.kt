@@ -18,7 +18,7 @@ import borg.trikeshed.userspace.nio.ByteBuffer
  * For scattered ISAM reads, use [readv] with elevator batching.
  */
 class SeekFileBufferCommon(
-    val filename: String,
+    val filename: CharSequence,
     val initialOffset: Long = 0,
     val blkSize: Long = -1,
     val readOnly: Boolean = true,

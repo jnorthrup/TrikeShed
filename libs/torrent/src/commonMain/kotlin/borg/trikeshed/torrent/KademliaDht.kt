@@ -31,7 +31,7 @@ class KademliaDht(
             Node(hexToBytes("abcdef0123456789abcdef0123456789abcdef03"), "router.utorrent.com", 6881),
         )
 
-        private fun hexToBytes(hex: String): ByteArray {
+        private fun hexToBytes(hex: CharSequence): ByteArray {
             require(hex.length == 40)
             return ByteArray(20) { i ->
                 ((hex[i * 2].digitToInt(16) shl 4) or hex[i * 2 + 1].digitToInt(16)).toByte()
@@ -39,12 +39,12 @@ class KademliaDht(
         }
 
         fun randomNodeId(): ByteArray = Random.nextBytes(20)
-        fun nodeId(ip: String, port: Int, sha1: (ByteArray) -> ByteArray): ByteArray =
+        fun nodeId(ip: CharSequence, port: Int, sha1: (ByteArray) -> ByteArray): ByteArray =
             sha1("$ip:$port".encodeToByteArray())
     }
     override val key: AsyncContextKey<KademliaDht> get() = Key
 
-    data class Node(val id: ByteArray, val ip: String, val port: Int)
+    data class Node(val id: ByteArray, val ip: CharSequence, val port: Int)
 
     private val buckets = Array(160) { mutableListOf<Node>() }
 
@@ -118,7 +118,7 @@ class KademliaDht(
         sendQuery: suspend (ByteArray, Node) -> DhtProtocol.DhtMessage?,
     ): List<Node> = kotlinx.coroutines.withContext(supervisor) {
         val result = mutableListOf<Node>()
-        val visited = mutableSetOf<String>()
+        val visited = mutableSetOf<CharSequence>()
         val queue = ArrayDeque<Node>()
         queue.addAll(findClosest(infoHash, k))
 
@@ -154,7 +154,7 @@ class KademliaDht(
         return result
     }
 
-    private fun byteToKmpHex(b: Byte): String {
+    private fun byteToKmpHex(b: Byte): CharSequence {
         val i = b.toInt() and 0xFF
         val hexChars = "0123456789abcdef".toCharArray()
         return "${hexChars[i shr 4]}${hexChars[i and 0xF]}"

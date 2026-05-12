@@ -21,7 +21,7 @@ import kotlin.coroutines.CoroutineContext
  * ```kotlin
  * val buf = UserspaceMemoryBuffer(chunkSize = 4096)
  * buf.open()
- * val tree = BPlusTree<Long, String>(order = 32)
+ * val tree = BPlusTree<Long, CharSequence>(order = 32)
  * val nodeId = buf.allocateNode()
  * buf.writeNode(nodeId, serializeNode(rootNode))
  * val bytes = buf.readNode(nodeId)

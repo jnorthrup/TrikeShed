@@ -5,13 +5,13 @@ import java.io.ByteArrayOutputStream
 class JvmProcessOperations : ProcessOperations {
 
     override suspend fun exec(
-        command: String,
-        args: List<String>,
+        command: CharSequence,
+        args: List<CharSequence>,
         stdin: ByteArray?,
-        env: Map<String, String>,
+        env: Map<CharSequence, CharSequence>,
     ): ProcessResult {
-        val pb = ProcessBuilder(command, *args.toTypedArray())
-        env.forEach { (k, v) -> pb.environment()[k] = v }
+        val pb = ProcessBuilder(command.toString(), *args.map { it.toString() }.toTypedArray())
+        env.forEach { (k, v) -> pb.environment()[k.toString()] = v.toString() }
 
         val proc = pb.start()
 

@@ -1,11 +1,8 @@
 package borg.trikeshed.parse.kursive
 
-import borg.trikeshed.lib.CharSeries
-import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.*
 import borg.trikeshed.parse.kursive.legacy.KursiveParser
 import borg.trikeshed.parse.kursive.legacy.KursiveStep
-import borg.trikeshed.lib.SeriesBuffer
 import borg.trikeshed.parse.kursive.legacy.parser
 import borg.trikeshed.parse.kursive.legacy.s
 
@@ -34,19 +31,19 @@ object std {
         if (input.consume(expected)) input.slice(start) else null
     }
 
-    fun lit(text: String): KursiveParser<CharSeries> = parser("lit($text)") { input ->
+    fun lit(text: CharSequence): KursiveParser<CharSeries> = parser("lit($text)") { input ->
         val start = input.pos
         if (input.consume(text.toSeries())) input.slice(start) else null
     }
 
-    fun takeWhile(name: String, min: Int = 1, predicate: (Char) -> Boolean): KursiveParser<CharSeries> =
+    fun takeWhile(name: CharSequence, min: Int = 1, predicate: (Char) -> Boolean): KursiveParser<CharSeries> =
         parser(name) { input ->
             val start = input.pos
             while (input.peek()?.let(predicate) == true) input.advance()
             if (input.pos - start >= min) input.slice(start) else null
         }
 
-    fun takeUntil(name: String, min: Int = 1, stop: (Char) -> Boolean): KursiveParser<CharSeries> =
+    fun takeUntil(name: CharSequence, min: Int = 1, stop: (Char) -> Boolean): KursiveParser<CharSequence> =
         parser(name) { input ->
             val start = input.pos
             while (input.hasRemaining && input.peek()?.let(stop) != true) input.advance()
@@ -106,7 +103,7 @@ object std {
     }
 
     fun <T> separated(
-        name: String,
+        name: CharSequence,
         item: KursiveParser<T>,
         separator: KursiveParser<*>,
         allowEmpty: Boolean = true,
@@ -128,11 +125,11 @@ object std {
         items.snapshot()
     }
 
-    fun trimmed(name: String, delegate: KursiveParser<CharSeries>): KursiveParser<CharSeries> = parser(name) { input ->
+    fun trimmed(name: CharSequence, delegate: KursiveParser<CharSequence>): KursiveParser<CharSequence> = parser(name) { input ->
         delegate(input)?.let { CharSeries(it).trim.slice }
     }
 
-    fun restOfLine(name: String): KursiveParser<CharSeries> =
+    fun restOfLine(name: CharSequence): KursiveParser<CharSequence> =
         trimmed(name, takeUntil("${name}Raw", min = 1) { it == '\n' || it == '\r' })
 
     // step shorthands for infix grammar composition

@@ -16,13 +16,13 @@ import borg.trikeshed.test.TODOError
  */
 
 enum class ColumnType {
-    Long, Double, String, Bytes
+    Long, Double, CharSequence, Bytes
 }
 
 data class ColumnSchema(
-    val name: String,
+    val name: CharSequence,
     val type: ColumnType,
-    val indexPluginName: String? = null,
+    val indexPluginName: CharSequence? = null,
 ) {
     init {
         require(name.isNotEmpty()) { "ColumnSchema name must not be empty" }
@@ -30,11 +30,11 @@ data class ColumnSchema(
 }
 
 object IsamCursor {
-    fun open(path: String): IsamCursor = throw UnsupportedOperationException("IsamCursor.open not implemented")
+    fun open(path: CharSequence): IsamCursor = throw UnsupportedOperationException("IsamCursor.open not implemented")
 }
 
 object IsamVolume {
-    fun generateIsam(cursor: Cursor, schema: List<ColumnSchema>, tempDir: String): Unit =
+    fun generateIsam(cursor: Cursor, schema: List<ColumnSchema>, tempDir: CharSequence): Unit =
         throw UnsupportedOperationException("IsamVolume.generateIsam not implemented")
 }
 
@@ -200,7 +200,7 @@ interface IndexCursor {
 }
 
 object IndexPluginRegistry {
-    fun resolve(name: String): IndexPlugin = when (name) {
+    fun resolve(name: CharSequence): IndexPlugin = when (name) {
         "ZranIndex" -> ZranIndex()
         "Lz4Index" -> Lz4Index()
         else -> throw IllegalArgumentException("Unknown index plugin: $name")
@@ -210,11 +210,11 @@ object IndexPluginRegistry {
 interface IndexPlugin
 
 class ZranIndex : IndexPlugin {
-    fun openIndexCursor(fd: Int, path: String): IndexCursor =
+    fun openIndexCursor(fd: Int, path: CharSequence): IndexCursor =
         throw TODOError("ZranIndex.openIndexCursor not implemented")
 }
 
 class Lz4Index : IndexPlugin {
-    fun openIndexCursor(fd: Int, path: String): IndexCursor =
+    fun openIndexCursor(fd: Int, path: CharSequence): IndexCursor =
         throw TODOError("Lz4Index.openIndexCursor not implemented")
 }

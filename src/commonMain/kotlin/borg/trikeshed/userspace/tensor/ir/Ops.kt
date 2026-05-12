@@ -14,7 +14,7 @@ import borg.trikeshed.userspace.tensor.ir.IrAttribute.DenseAttr
 // ─── func dialect ─────────────────────────────────────────────────────────────
 
 object FuncOp {
-    fun create(name: String, inputs: List<IrType>, outputs: List<IrType>): Operation {
+    fun create(name: CharSequence, inputs: List<IrType>, outputs: List<IrType>): Operation {
         val entry = Region().block()
         inputs.forEachIndexed { ix, t -> entry.arguments[ix] = t }
         return Operation(
@@ -31,7 +31,7 @@ object ReturnOp {
 }
 
 object CallOp {
-    fun create(callee: String, args: List<SSAValue>, resultTypes: List<IrType>): Operation =
+    fun create(callee: CharSequence, args: List<SSAValue>, resultTypes: List<IrType>): Operation =
         Operation(
             name = "func.call",
             results = resultTypes,
@@ -416,7 +416,7 @@ object GenericOp {
         outputs: List<SSAValue>,
         region: Region.() -> Unit,
         indexingMaps: List<List<Int>>,
-        iteratorTypes: List<String>
+        iteratorTypes: List<CharSequence>
     ): Operation = Operation(
         name = "linalg.generic",
         regions = listOf(Region().apply(region)),
@@ -500,12 +500,12 @@ object MathFloorOp {
 // ─── LLVM dialect ─────────────────────────────────────────────────────────────
 
 object LLVMFuncOp {
-    fun create(name: String, inputs: List<IrType>, outputs: List<IrType>): Operation =
+    fun create(name: CharSequence, inputs: List<IrType>, outputs: List<IrType>): Operation =
         Operation(name = "llvm.func", results = outputs, attributes = mapOf("sym_name" to StringAttr(name)))
 }
 
 object LLVMCallOp {
-    fun create(callee: String, args: List<SSAValue>, resultTypes: List<IrType>): Operation =
+    fun create(callee: CharSequence, args: List<SSAValue>, resultTypes: List<IrType>): Operation =
         Operation(name = "llvm.call", results = resultTypes, attributes = mapOf("callee" to StringAttr(callee)))
 }
 
@@ -550,6 +550,6 @@ object LLVMAddOp {
 }
 
 object LLVMCmpOp {
-    fun create(predicate: String, lhs: SSAValue, rhs: SSAValue, resultType: IrType): Operation =
+    fun create(predicate: CharSequence, lhs: SSAValue, rhs: SSAValue, resultType: IrType): Operation =
         Operation(name = "llvm.icmp", results = listOf(resultType), attributes = mapOf("predicate" to StringAttr(predicate)))
 }

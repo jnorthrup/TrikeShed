@@ -6,15 +6,15 @@ enum class DispatchMode(val isRequestFactory: Boolean) {
 }
 
 data class InvocationPlan(
-    val requestPath: String,
-    val contentType: String,
+    val requestPath: CharSequence,
+    val contentType: CharSequence,
     val dispatchMode: DispatchMode,
     val allowsRelaxFactoryStyleCouchServices: Boolean,
-    val headers: Map<String, String> = emptyMap(),
+    val headers: Map<CharSequence, CharSequence> = emptyMap(),
 )
 
 class HtxRequestFactoryBridge {
-    fun decode(rawRequest: String): InvocationPlan {
+    fun decode(rawRequest: CharSequence): InvocationPlan {
         val lines = rawRequest.split("\r\n")
         val requestLine = lines.firstOrNull() ?: ""
         val parts = requestLine.split(" ")

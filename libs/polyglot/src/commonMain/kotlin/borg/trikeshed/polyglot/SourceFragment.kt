@@ -74,9 +74,9 @@ enum class NodeKind {
 
 /** Optional metadata annotations carried by a SourceFragment. */
 data class NodeMeta(
-    val visibility: String? = null,   // "public", "private", "pub(crate)", etc.
-    val mutability: String? = null,   // "val", "var", "let", "const", "mut"
-    val lifetime: String? = null,     // Rust lifetime annotations
+    val visibility: CharSequence? = null,   // "public", "private", "pub(crate)", etc.
+    val mutability: CharSequence? = null,   // "val", "var", "let", "const", "mut"
+    val lifetime: CharSequence? = null,     // Rust lifetime annotations
     val async: Boolean = false,
     val generic: Boolean = false,
     val extern: Boolean = false,
@@ -93,7 +93,7 @@ data class SourceFragment(
     val lang: LangId,
     val span: Twin<Int>,
     val kind: NodeKind,
-    val name: String?,
+    val name: CharSequence?,
     val evidence: TypeEvidence,
     val children: Series<SourceFragment> = Join.emptySeriesOf(),
     val meta: NodeMeta = NodeMeta(),
@@ -152,7 +152,7 @@ data class SourceFragment(
 data class UniversalAst(
     val lang: LangId,
     val root: SourceFragment,
-    val diagnostics: Series<String> = Join.emptySeriesOf(),
+    val diagnostics: Series<CharSequence> = Join.emptySeriesOf(),
 ) {
     fun toCursor(): borg.trikeshed.cursor.Cursor {
         val rows = root.flatten().toList()
@@ -173,5 +173,5 @@ interface LangParser {
     fun parse(source: Series<Char>): UniversalAst
 
     /** Parse a single file path. Platform-specific. */
-    fun parseFile(path: String): UniversalAst
+    fun parseFile(path: CharSequence): UniversalAst
 }

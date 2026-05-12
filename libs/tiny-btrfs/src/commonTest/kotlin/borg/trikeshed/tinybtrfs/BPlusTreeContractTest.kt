@@ -24,7 +24,7 @@ class BPlusTreeContractTest {
 
     @Test
     fun `BPlusTree insert produces new root copy-on-write`() {
-        val tree = BPlusTree<Int, String>(order = 3)
+        val tree = BPlusTree<Int, CharSequence>(order = 3)
         val r1 = tree.root
         tree.put(1, "one")
         val r2 = tree.root
@@ -33,7 +33,7 @@ class BPlusTreeContractTest {
 
     @Test
     fun `BPlusTree lookup retrieves value by key`() {
-        val tree = BPlusTree<Int, String>(order = 3)
+        val tree = BPlusTree<Int, CharSequence>(order = 3)
         tree.put(1, "one")
         assertEquals("one", tree.get(1))
         assertNull(tree.get(2))
@@ -41,7 +41,7 @@ class BPlusTreeContractTest {
 
     @Test
     fun `BPlusTree rangeQuery returns all keys in range`() {
-        val tree = BPlusTree<Int, String>(order = 3)
+        val tree = BPlusTree<Int, CharSequence>(order = 3)
         tree.put(1, "one")
         tree.put(2, "two")
         tree.put(3, "three")
@@ -53,7 +53,7 @@ class BPlusTreeContractTest {
 
     @Test
     fun `BPlusTree split occurs at overflow`() {
-        val tree = BPlusTree<Int, String>(order = 3)
+        val tree = BPlusTree<Int, CharSequence>(order = 3)
         tree.put(1, "one")
         tree.put(2, "two")
         tree.put(3, "three")
@@ -65,7 +65,7 @@ class BPlusTreeContractTest {
     @Test
     fun `BPlusTree merge occurs at underflow`() {
         // While proper merge isn't fully implemented in our tiny tree, basic remove is there
-        val tree = BPlusTree<Int, String>(order = 3)
+        val tree = BPlusTree<Int, CharSequence>(order = 3)
         tree.put(1, "one")
         tree.remove(1)
         assertNull(tree.get(1))
@@ -74,7 +74,7 @@ class BPlusTreeContractTest {
 
     @Test
     fun `BPlusTree is balanced after insert and delete`() {
-        val tree = BPlusTree<Int, String>(order = 3)
+        val tree = BPlusTree<Int, CharSequence>(order = 3)
         tree.put(1, "1")
         tree.put(2, "2")
         tree.put(3, "3")
@@ -84,7 +84,7 @@ class BPlusTreeContractTest {
     }
     @Test
     fun `snapshot preserves old root after modification`() {
-        val tree = BPlusTree<Int, String>(order = 3)
+        val tree = BPlusTree<Int, CharSequence>(order = 3)
         tree.put(1, "one")
         tree.put(2, "two")
         val snapshot = tree.root
@@ -92,7 +92,7 @@ class BPlusTreeContractTest {
         tree.put(4, "four")
 
         // old root should not have 3 or 4
-        val oldTree = BPlusTree<Int, String>(order = 3)
+        val oldTree = BPlusTree<Int, CharSequence>(order = 3)
         oldTree.root = snapshot
         assertEquals("one", oldTree.get(1))
         assertEquals("two", oldTree.get(2))
@@ -106,7 +106,7 @@ class BPlusTreeContractTest {
 
     @Test
     fun `fanout bounds are respected`() {
-        val tree = BPlusTree<Int, String>(order = 4)
+        val tree = BPlusTree<Int, CharSequence>(order = 4)
         for (i in 0 until 128) {
             tree.put(i, "v$i")
         }
@@ -122,10 +122,10 @@ class BPlusTreeContractTest {
     fun `bulkLoad produces same lookup results as individual inserts`() {
         val pairs = (0 until 200).map { it to "v$it" }
 
-        val sequential = BPlusTree<Int, String>(order = 8)
+        val sequential = BPlusTree<Int, CharSequence>(order = 8)
         pairs.forEach { (k, v) -> sequential.put(k, v) }
 
-        val bulk = BPlusTree<Int, String>(order = 8)
+        val bulk = BPlusTree<Int, CharSequence>(order = 8)
         bulk.bulkLoad(pairs)
 
         assertEquals(sequential.size(), bulk.size(), "size mismatch")
@@ -137,14 +137,14 @@ class BPlusTreeContractTest {
 
     @Test
     fun `bulkLoad on empty input leaves tree empty`() {
-        val tree = BPlusTree<Int, String>(order = 4)
+        val tree = BPlusTree<Int, CharSequence>(order = 4)
         tree.bulkLoad(emptyList())
         assertEquals(0, tree.size())
     }
 
     @Test
     fun `bulkLoad single element works`() {
-        val tree = BPlusTree<Int, String>(order = 4)
+        val tree = BPlusTree<Int, CharSequence>(order = 4)
         tree.bulkLoad(listOf(42 to "answer"))
         assertEquals(1, tree.size())
         assertEquals("answer", tree.get(42))

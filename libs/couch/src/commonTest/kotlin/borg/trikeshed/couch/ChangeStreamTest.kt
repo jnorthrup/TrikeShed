@@ -17,8 +17,8 @@ class ChangeStreamTest {
 
     @Test
     fun insertEmitsChangeEvent() {
-        val emitter = ChangeEmitter<String>()
-        val events = mutableListOf<Change<String>>()
+        val emitter = ChangeEmitter<CharSequence>()
+        val events = mutableListOf<Change<CharSequence>>()
         emitter.register { change -> events.add(change) }
 
         emitter.emit(Change.Insert("doc1"))
@@ -29,8 +29,8 @@ class ChangeStreamTest {
 
     @Test
     fun removeEmitsChangeEvent() {
-        val emitter = ChangeEmitter<String>()
-        val events = mutableListOf<Change<String>>()
+        val emitter = ChangeEmitter<CharSequence>()
+        val events = mutableListOf<Change<CharSequence>>()
         emitter.register { change -> events.add(change) }
 
         emitter.emit(Change.Remove("doc1"))
@@ -40,8 +40,8 @@ class ChangeStreamTest {
 
     @Test
     fun sealEmitsSealEvent() {
-        val emitter = ChangeEmitter<String>()
-        val events = mutableListOf<Change<String>>()
+        val emitter = ChangeEmitter<CharSequence>()
+        val events = mutableListOf<Change<CharSequence>>()
         emitter.register { change -> events.add(change) }
 
         emitter.emit(Change.Seal)
@@ -51,8 +51,8 @@ class ChangeStreamTest {
 
     @Test
     fun eventsAreDeliveredInOrder() {
-        val emitter = ChangeEmitter<String>()
-        val events = mutableListOf<Change<String>>()
+        val emitter = ChangeEmitter<CharSequence>()
+        val events = mutableListOf<Change<CharSequence>>()
         emitter.register { change -> events.add(change) }
 
         emitter.emit(Change.Insert("a"))
@@ -72,9 +72,9 @@ class ChangeStreamTest {
 
     @Test
     fun multipleListenersAllReceiveEvents() {
-        val emitter = ChangeEmitter<String>()
-        val events1 = mutableListOf<Change<String>>()
-        val events2 = mutableListOf<Change<String>>()
+        val emitter = ChangeEmitter<CharSequence>()
+        val events1 = mutableListOf<Change<CharSequence>>()
+        val events2 = mutableListOf<Change<CharSequence>>()
 
         emitter.register { change -> events1.add(change) }
         emitter.register { change -> events2.add(change) }
@@ -86,8 +86,8 @@ class ChangeStreamTest {
 
     @Test
     fun unregisteredListenerStopsReceiving() {
-        val emitter = ChangeEmitter<String>()
-        val events = mutableListOf<Change<String>>()
+        val emitter = ChangeEmitter<CharSequence>()
+        val events = mutableListOf<Change<CharSequence>>()
         val token = emitter.register { change -> events.add(change) }
 
         emitter.emit(Change.Insert("a"))
@@ -101,8 +101,8 @@ class ChangeStreamTest {
 
     @Test
     fun noEventsAfterSeal() {
-        val emitter = ChangeEmitter<String>()
-        val events = mutableListOf<Change<String>>()
+        val emitter = ChangeEmitter<CharSequence>()
+        val events = mutableListOf<Change<CharSequence>>()
         emitter.register { change -> events.add(change) }
 
         emitter.emit(Change.Seal)

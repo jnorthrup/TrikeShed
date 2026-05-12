@@ -32,7 +32,7 @@ object FeatureExtractor {
         high: Series<Double>,
         low: Series<Double>,
         volume: Series<Double>
-    ): Map<String, Series<Double>> = buildMap {
+    ): Map<CharSequence, Series<Double>> = buildMap {
 
         // 1. Returns & Momentum
         putAll(ReturnsMomentum.compute(close))

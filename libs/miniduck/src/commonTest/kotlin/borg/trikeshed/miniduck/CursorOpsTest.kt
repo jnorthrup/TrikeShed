@@ -6,7 +6,7 @@ import kotlin.test.*
 
 class CursorOpsTest {
 
-   fun cursor(vararg rows: Join<String, Any?>): Cursor =
+   fun cursor(vararg rows: Join<CharSequence, Any?>): Cursor =
         rows.size j { DocRowVec(listOf("key", "val"), listOf(rows[it].a, rows[it].b)) }
 
     // ── where ────────────────────────────────────────────────────────────────

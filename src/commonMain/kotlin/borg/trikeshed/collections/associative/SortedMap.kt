@@ -183,13 +183,13 @@ package borg.trikeshed.collections.associative
  * is a map whose keys are strings.  The following idiom obtains a view
  * containing all of the key-value mappings in `m` whose keys are
  * between `low` and `high`, inclusive:<pre>
- * SortedMap&lt;String, V&gt; sub = m.subMap(low, high+"\0");</pre>
+ * SortedMap&lt;CharSequence, V&gt; sub = m.subMap(low, high+"\0");</pre>
  *
  * A similar technique can be used to generate an *open range*
  * (which contains neither endpoint).  The following idiom obtains a
  * view containing all of the key-value mappings in `m` whose keys
  * are between `low` and `high`, exclusive:<pre>
- * SortedMap&lt;String, V&gt; sub = m.subMap(low+"\0", high);</pre>
+ * SortedMap&lt;CharSequence, V&gt; sub = m.subMap(low+"\0", high);</pre>
  *
  *
  * This interface is a member of the

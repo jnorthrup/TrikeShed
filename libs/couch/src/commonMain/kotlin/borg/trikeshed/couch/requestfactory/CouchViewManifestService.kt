@@ -14,7 +14,7 @@ import borg.trikeshed.couch.relaxfactory.CouchViewManifest
  */
 class CouchViewManifestService(
     private val manifest: CouchViewManifest,
-    private val httpGet: (path: String) -> String,
+    private val httpGet: (path: CharSequence) -> CharSequence,
 ) : RequestFactoryTransportService {
 
     override fun invoke(call: RequestFactoryCall): RequestFactoryResponse {

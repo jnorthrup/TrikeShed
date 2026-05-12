@@ -9,7 +9,7 @@ import kotlin.coroutines.AbstractCoroutineContextElement
  * Leveraging Kotlin's native coroutine infrastructure.
  */
 
-class CancellationError(message: String) : CancellationException(message)
+class CancellationError(message: CharSequence) : CancellationException(message.toString())
 
 /**
  * Job abstraction ported from literbike.

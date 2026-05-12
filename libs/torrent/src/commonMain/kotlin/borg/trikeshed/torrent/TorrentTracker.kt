@@ -4,20 +4,20 @@ package borg.trikeshed.torrent
  * HTTP BitTorrent tracker announce + scrape (BEP 3).
  */
 class TorrentTracker(
-    private val request: suspend (String) -> String,  // HTTP GET → response body
+    private val request: suspend (CharSequence) -> CharSequence,  // HTTP GET → response body
 ) {
     data class TrackerResponse(
-        val failureReason: String? = null,
-        val warningMessage: String? = null,
+        val failureReason: CharSequence? = null,
+        val warningMessage: CharSequence? = null,
         val interval: Int = 1800,
         val minInterval: Int? = null,
-        val trackerId: String? = null,
+        val trackerId: CharSequence? = null,
         val complete: Int = 0,
         val incomplete: Int = 0,
         val peers: List<PeerAddress> = emptyList(),
     )
 
-    data class PeerAddress(val ip: String, val port: Int)
+    data class PeerAddress(val ip: CharSequence, val port: Int)
 
     /**
      * Build announce URL and fetch peer list.
@@ -29,14 +29,14 @@ class TorrentTracker(
      * @param left bytes remaining
      */
     suspend fun announce(
-        trackerUrl: String,
-        infoHash: String,
-        peerId: String,
+        trackerUrl: CharSequence,
+        infoHash: CharSequence,
+        peerId: CharSequence,
         port: Int,
         uploaded: Long = 0,
         downloaded: Long = 0,
         left: Long = 0,
-        event: String = "started",  // started, stopped, completed, empty
+        event: CharSequence = "started",  // started, stopped, completed, empty
     ): TrackerResponse {
         val params = buildString {
             append("?info_hash=$infoHash")
@@ -52,7 +52,7 @@ class TorrentTracker(
         return parseTrackerResponse(body)
     }
 
-    private fun parseTrackerResponse(body: String): TrackerResponse {
+    private fun parseTrackerResponse(body: CharSequence): TrackerResponse {
         // Simplified bencode parser for tracker responses
         if (body.startsWith("d14:failure reason")) {
             val msg = body.substringAfter(":").substringBefore("e")

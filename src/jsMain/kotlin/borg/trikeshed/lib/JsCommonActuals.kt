@@ -9,16 +9,16 @@ import borg.trikeshed.userspace.nio.file.spi.JsFileOperations
 
 actual object System {
 
-    actual val homedir: String
+    actual val homedir: CharSequence
         get() = jsHomeDir()
 
-    actual fun getenv(name: String, defaultVal: String?): String? = (processObj.env[name] as? String) ?: defaultVal
+    actual fun getenv(name: CharSequence, defaultVal: CharSequence?): CharSequence? = (processObj.env[name] as? CharSequence) ?: defaultVal
 }
 
-fun readLinesSeq(path: String): Sequence<String> =
+fun readLinesSeq(path: CharSequence): Sequence<CharSequence> =
     Files.readAllLines(path).asSequence()
 
-fun readLines(path: String): List<String> = Files.readAllLines(path)
+fun readLines(path: CharSequence): List<CharSequence> = Files.readAllLines(path)
  data class JsHandleState(
     val fd: Int,
     var position: Long = 0,
@@ -28,7 +28,7 @@ class JsSeekHandle : SeekHandle {
    val handles = mutableMapOf<Long, JsHandleState>()
    var nextHandle = 1L
 
-    override fun open(filename: String, readOnly: Boolean): Long {
+    override fun open(filename: CharSequence, readOnly: Boolean): Long {
         require(jsExists(filename)) { "File does not exist: $filename" }
         val fd = jsOpen(filename, readOnly)
         val handle = nextHandle++
@@ -92,7 +92,7 @@ actual fun ioUringHandle(): SeekHandle? = null
 
 
 class SeekFileBuffer(
-    val filename: String,
+    val filename: CharSequence,
     val initialOffset: Long = 0,
     val blkSize: Long = -1,
     val readOnly: Boolean = true,

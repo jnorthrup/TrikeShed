@@ -7,7 +7,7 @@ import kotlin.test.assertNull
 class BPlusTreeTest {
     @Test
     fun `put and get simple`() {
-        val tree = BPlusTree<Int, String>(order = 3)
+        val tree = BPlusTree<Int, CharSequence>(order = 3)
         assertEquals(0, tree.size())
         assertNull(tree.get(1))
         tree.put(1, "one")

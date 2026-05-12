@@ -14,19 +14,19 @@ actual fun interrogateCpuCache(): CpuCacheTopology {
     val cores = sysconf(_SC_NPROCESSORS_ONLN).takeIf { it > 0 }?.toInt()
 
     return memScoped {
-        fun sysctlLong(name: String): Long? {
+        fun sysctlLong(name: CharSequence): Long? {
             val size = alloc<size_tVar>()
             val value = alloc<platform.posix.int64_tVar>()
             size.value = 8u
-            return if (sysctlbyname(name, value.ptr, size.ptr, null, 0u) == 0) {
+            return if (sysctlbyname(name.toString(), value.ptr, size.ptr, null, 0u) == 0) {
                 value.value.takeIf { it > 0 }
             } else null
         }
-        fun sysctlInt(name: String): Int? {
+        fun sysctlInt(name: CharSequence): Int? {
             val size = alloc<size_tVar>()
             val value = alloc<platform.posix.int32_tVar>()
             size.value = 4u
-            return if (sysctlbyname(name, value.ptr, size.ptr, null, 0u) == 0) {
+            return if (sysctlbyname(name.toString(), value.ptr, size.ptr, null, 0u) == 0) {
                 value.value.takeIf { it > 0 }
             } else null
         }

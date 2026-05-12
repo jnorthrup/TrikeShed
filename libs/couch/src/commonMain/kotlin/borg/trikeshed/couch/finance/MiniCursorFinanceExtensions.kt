@@ -22,7 +22,7 @@ import borg.trikeshed.lib.size
  *
  * @param closeColumn The column name for the price data (default: "close")
  */
-fun DoubleArray.toPriceCursor(closeColumn: String = "close"): Cursor =
+fun DoubleArray.toPriceCursor(closeColumn: CharSequence = "close"): Cursor =
     size j { index ->
         KeyedRowVec(
             keys = s_[closeColumn],
@@ -36,11 +36,11 @@ fun DoubleArray.toPriceCursor(closeColumn: String = "close"): Cursor =
  * @param column The column name to extract (default: "close")
  * @return A Series<Double> with the column values, or Double.NaN for missing/invalid values
  */
-fun Cursor.doubleSeries(column: String = "close"): Series<Double> =
+fun Cursor.doubleSeries(column: CharSequence = "close"): Series<Double> =
     size j { index ->
         when (val value = at(index).getValue(column)) {
             is Number -> value.toDouble()
-            is String -> value.toDoubleOrNull() ?: Double.NaN
+            is CharSequence -> value.toDoubleOrNull() ?: Double.NaN
             else -> Double.NaN
         }
     }

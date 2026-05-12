@@ -12,7 +12,7 @@ import borg.trikeshed.lib.*
 data class
 /** This is a dragnet for a given line to record the counters of character classes */
 TypeEvidence(
-    var confix: String = "",
+    var confix: CharSequence = "",
     var structuralMemento: TypeMemento? = null,
     var digits: UShort = 0U,
     var periods: UShort = 0U,
@@ -73,7 +73,7 @@ TypeEvidence(
                 recordColumnLength(src.size)
             }
 
-        fun detectConfix(src: Series<Char>): String {
+        fun detectConfix(src: Series<Char>): CharSequence {
             if (src.size < 2) return ""
             val first = src[0]
             val last = src[src.size - 1]
@@ -86,7 +86,7 @@ TypeEvidence(
             }
         }
 
-        fun detectStructuralMemento(confix: String): TypeMemento? =
+        fun detectStructuralMemento(confix: CharSequence): TypeMemento? =
             when (confix) {
                 "{}" -> MapTypeMemento
                 "[]" -> SeqTypeMemento

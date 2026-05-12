@@ -11,14 +11,14 @@ import borg.trikeshed.htx.client.generated.infrastructure.HttpMethod
 
 /** Generated API interface for HtxGeneral. */
 interface HtxGeneralApi {
-    suspend fun getHealth(): String
+    suspend fun getHealth(): CharSequence
 }
 
 /** Default implementation — caller provides the low-level call. */
 class DefaultHtxGeneralApi(
-   val call: suspend (GeneratedRequest) -> String,
+   val call: suspend (GeneratedRequest) -> CharSequence,
 ) : HtxGeneralApi {
-    override suspend fun getHealth(): String = call(HtxGeneralApiContract.GetHealth.request)
+    override suspend fun getHealth(): CharSequence = call(HtxGeneralApiContract.GetHealth.request)
 }
 
 /** Contract constants for each HtxGeneral operation. */

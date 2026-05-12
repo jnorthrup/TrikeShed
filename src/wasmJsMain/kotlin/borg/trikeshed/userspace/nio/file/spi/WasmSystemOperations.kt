@@ -4,6 +4,6 @@ import borg.trikeshed.lib.System
 
 class WasmSystemOperations : SystemOperations {
 
-    override fun getenv(name: String, defaultVal: String?) = System.getenv(name, defaultVal)
-    override val homedir: String get() = System.homedir
+    override fun getenv(name: CharSequence, defaultVal: CharSequence?) = System.getenv(name, defaultVal)
+    override val homedir: CharSequence get() = System.homedir
 }

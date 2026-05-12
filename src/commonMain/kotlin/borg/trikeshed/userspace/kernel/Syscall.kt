@@ -17,10 +17,10 @@ interface SyscallAdapter {
 
 /** fd-level socket syscalls — not a protocol adapter. */
 interface SocketSyscalls {
-    fun connect(host: String, port: Int): Int
-    fun bind(host: String, port: Int): Int
+    fun connect(host: CharSequence, port: Int): Int
+    fun bind(host: CharSequence, port: Int): Int
     fun listen(fd: Int, backlog: Int)
-    fun accept(fd: Int): Pair<Int, String>
+    fun accept(fd: Int): Pair<Int, CharSequence>
     fun send(fd: Int, src: ByteSeries, flags: Int): Int
     fun recv(fd: Int, dst: ByteRegion, flags: Int): Int
 }

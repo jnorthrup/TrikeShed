@@ -3,7 +3,9 @@
 package borg.trikeshed.htx.client
 
 import borg.trikeshed.userspace.nio.channels.spi.PosixChannelOperations
-import platform.posix.*
+import platform.posix.AF_INET
+import platform.posix.SOCK_DGRAM
+import platform.posix.close
 
 /**
  * macOS native QUIC transport via ring reactor UDP + pure-Kotlin QUIC.
@@ -16,8 +18,8 @@ actual fun createQuicHandler(): HtxRequestHandler = NativeQuicHandler
 
 private val NativeQuicHandler: HtxRequestHandler = { request ->
     val url = request.path
-    val host = url.removePrefix("quic://").substringBefore(':')
-    val port = url.substringAfter(":").substringBefore('/').toIntOrNull() ?: 4433
+    val host = (""+ url).removePrefix("quic://").substringBefore(':')
+    val port = (""+url).substringAfter(":").substringBefore('/').toIntOrNull() ?: 4433
 
     val ops = PosixChannelOperations()
     val fd = ops.socket(AF_INET, SOCK_DGRAM, 0)

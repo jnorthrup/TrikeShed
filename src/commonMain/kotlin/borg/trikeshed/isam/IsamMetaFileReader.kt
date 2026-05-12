@@ -37,7 +37,7 @@ IoType :=  IoInstant | IoDouble | IoString | IoInt
  * the binary file format follows this sample
  *
  */
- class IsamMetaFileReader(val metafileFilename: String, private val fileOps: FileOperations) :Usable{
+ class IsamMetaFileReader(val metafileFilename: CharSequence, private val fileOps: FileOperations) :Usable{
 
     val recordlen: Int by lazy {
         constraints.last().end
@@ -50,18 +50,18 @@ IoType :=  IoInstant | IoDouble | IoString | IoInt
    lateinit var constraints1: List<RecordMeta>
     override fun open() {
         //use readBytes and decodeString to read the lines into
-//        val lines = buf.readBytes(size).decodeToString().lines().filterNot { it.trim().startsWith("#") }.map(String::trim)
+//        val lines = buf.readBytes(size).decodeToString().lines().filterNot { it.trim().startsWith("#") }.map(CharSequence::trim)
         val lines = fileOps.readAllLines(metafileFilename).filterNot { it.trim().startsWith('#') }
         //split on \s+
-        val coords: Series<String> = CharSeries(lines[0]).trim.splitWs() α CharSeries::asString
-        val names: Series<String> = CharSeries(lines[1]).trim.splitWs() α CharSeries::asString
-        val types: Series<String> = CharSeries(lines[2]).trim.splitWs() α CharSeries::asString
+        val coords: Series<CharSequence> = CharSeries(lines[0]).trim.splitWs() α CharSeries::asString
+        val names: Series<CharSequence> = CharSeries(lines[1]).trim.splitWs() α CharSeries::asString
+        val types: Series<CharSequence> = CharSeries(lines[2]).trim.splitWs() α CharSeries::asString
 
 
         this@IsamMetaFileReader.constraints1 = names.toList().zip(types.toList()).mapIndexed { index, (name, type) ->
-            val begin = coords[2 * index].toInt()
-            val end = coords[2 * index + 1].toInt()
-            val ioMemento: IOMemento = IOMemento.valueOf(type)
+            val begin = coords[2 * index].toString().toInt()
+            val end = coords[2 * index + 1].toString().toInt()
+            val ioMemento: IOMemento = IOMemento.valueOf(type.toString())
             //use PlatformCodec to get the decoder and encoder
             val decoder: (ByteArray) -> Any? = ioMemento.createDecoder(end - begin)
             val encoder: (Any?) -> ByteArray = ioMemento.createEncoder(end - begin)
@@ -84,8 +84,8 @@ IoType :=  IoInstant | IoDouble | IoString | IoInt
      * 1. close the file descriptor
      */
     companion object {
-        fun write(metafilename: String, recordMetas: Series<ColumnMeta>, varchars: Map<String,Int>, fileOps: FileOperations): Series<RecordMeta> {
-            val lines: MutableList<String> = mutableListOf<String>()
+        fun write(metafilename: CharSequence, recordMetas: Series<ColumnMeta>, varchars: Map<CharSequence,Int>, fileOps: FileOperations): Series<RecordMeta> {
+            val lines: MutableList<CharSequence> = mutableListOf<CharSequence>()
 
             val result: Series<RecordMeta> = sanitize(recordMetas,varchars)
             lines.add("# format:  coords WS .. EOL names WS .. EOL TypeMememento WS .. [EOL]")
@@ -97,10 +97,10 @@ IoType :=  IoInstant | IoDouble | IoString | IoInt
             return result
         }
 
-        fun sanitize(recordMetas: Series<ColumnMeta>, varchars: Map<String, Int>): Series<RecordMeta> {
+        fun sanitize(recordMetas: Series<ColumnMeta>, varchars: Map<CharSequence, Int>): Series<RecordMeta> {
             val result: Series<RecordMeta> = if (recordMetas.view.any { it !is RecordMeta || (min(it.begin, it.end) < 0&&null==it.child) }) {
                 var offset = 0
-                recordMetas.view.map { (name: String,type: TypeMemento): ColumnMeta ->
+                recordMetas.view.map { (name: CharSequence,type: TypeMemento): ColumnMeta ->
                     val type: TypeMemento = type
                     val len: Int =  type.networkSize?: varchars[name]?: throw Exception("no network size for $name")
                     val recordMeta = RecordMeta(

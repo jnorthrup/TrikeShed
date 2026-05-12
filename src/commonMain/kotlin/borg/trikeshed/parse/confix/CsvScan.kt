@@ -88,7 +88,7 @@ object CsvScan {
 
     /** Return the text of field `fieldIdx` (0-based) from a CSV-line JsElement, trimmed.
      *  Returns null if fieldIdx is out of range or the field is blank. */
-    fun fieldText(e: JsElement, src: Series<Char>, fieldIdx: Int): String? {
+    fun fieldText(e: JsElement, src: Series<Char>, fieldIdx: Int): CharSequence? {
         val commas = e.b
         val n = commas.size
         if (fieldIdx < 0 || fieldIdx >= n) return null
@@ -110,12 +110,12 @@ object CsvScan {
     /** Parse field `fieldIdx` as Long. Returns null if absent/blank/non-numeric. */
     fun fieldLong(e: JsElement, src: Series<Char>, fieldIdx: Int): Long? {
         val t = fieldText(e, src, fieldIdx) ?: return null
-        return t.toLongOrNull()
+        return t.toString().toLongOrNull()
     }
 
     /** Parse field `fieldIdx` as Double. Returns null if absent/blank/non-numeric. */
     fun fieldDouble(e: JsElement, src: Series<Char>, fieldIdx: Int): Double? {
         val t = fieldText(e, src, fieldIdx) ?: return null
-        return t.toDoubleOrNull()
+        return t.toString().toDoubleOrNull()
     }
 }

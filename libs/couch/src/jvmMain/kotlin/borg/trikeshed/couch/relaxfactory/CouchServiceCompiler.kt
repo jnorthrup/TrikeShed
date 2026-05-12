@@ -11,11 +11,11 @@ import kotlin.reflect.full.*
 import kotlin.reflect.jvm.isAccessible
 import kotlin.reflect.jvm.jvmErasure
 
-inline fun <reified T : CouchService<*>> compile(namespace: String): CouchViewManifest =
+inline fun <reified T : CouchService<*>> compile(namespace: CharSequence): CouchViewManifest =
     CouchServiceCompiler.compile(T::class, namespace)
 
 object CouchServiceCompiler {
-    fun <T : CouchService<*>> compile(serviceClass: KClass<T>, namespace: String): CouchViewManifest {
+    fun <T : CouchService<*>> compile(serviceClass: KClass<T>, namespace: CharSequence): CouchViewManifest {
         val simpleName = serviceClass.simpleName!!
         // Strip ViewService or Service suffix, then lowercase
         val entityName = simpleName
@@ -26,8 +26,8 @@ object CouchServiceCompiler {
         val designDocId = "_design/${serviceClass.qualifiedName}"
         val language = "javascript"
 
-        val viewDefs = mutableMapOf<String, CouchViewDefinition>()
-        val invocations = mutableMapOf<String, CouchViewInvocation>()
+        val viewDefs = mutableMapOf<CharSequence, CouchViewDefinition>()
+        val invocations = mutableMapOf<CharSequence, CouchViewInvocation>()
 
         for (func in serviceClass.declaredMemberFunctions) {
             func.isAccessible = true
@@ -63,11 +63,11 @@ object CouchServiceCompiler {
         }
     }
 
-   fun buildTemplate(func: KFunction<*>, designDocId: String): String {
+   fun buildTemplate(func: KFunction<*>, designDocId: CharSequence): CharSequence {
         val params = func.valueParameters
         val methodAnnotations = func.annotations
 
-        val parts = mutableListOf<String>()
+        val parts = mutableListOf<CharSequence>()
 
         // Method-level annotations
         for (ann in methodAnnotations) {
@@ -108,9 +108,9 @@ object CouchServiceCompiler {
         return "$designDocId/_view/${func.name}$queryStr"
     }
 
-    internal fun jsonEncode(value: Any?): String = when (value) {
+    internal fun jsonEncode(value: Any?): CharSequence = when (value) {
         null -> "null"
-        is String -> "\"$value\""
+        is CharSequence -> "\"$value\""
         is Number -> value.toString()
         is Boolean -> value.toString()
         is Map<*, *> -> "{" + value.entries.joinToString(",") { (k, v) ->
@@ -121,7 +121,7 @@ object CouchServiceCompiler {
             // Use primary constructor parameters for declaration order (data classes)
             val ctor = value::class.primaryConstructor
             val props = value::class.memberProperties.associateBy { it.name }
-            val entries: List<Pair<String, Any?>> = if (ctor != null) {
+            val entries: List<Pair<CharSequence, Any?>> = if (ctor != null) {
                 ctor.parameters.mapNotNull { param ->
                     val prop = props[param.name] as? KProperty1<Any?, Any?>
                     prop?.let { p ->

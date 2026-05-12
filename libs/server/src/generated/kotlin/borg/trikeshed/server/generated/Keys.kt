@@ -12,5 +12,5 @@ object Keys {
     val htx: AsyncContextKey<HtxElementCompat> = HtxKey
     val quic: AsyncContextKey<QuicElement> = QuicKey
     val sctp: AsyncContextKey<SctpElement> = SctpKey
-    const val operationId: String = "getHealth"
+    const val operationId: CharSequence = "getHealth"
 }

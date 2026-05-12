@@ -72,8 +72,8 @@ interface FileOperations : CoroutineContext.Element {
     companion object Key : CoroutineContext.Key<FileOperations>
     override val key get() = Key
 
-    suspend fun write(path: String, data: ByteArray): Unit
-    suspend fun readAllLines(path: String): List<String>
+    suspend fun write(path: CharSequence, data: ByteArray): Unit
+    suspend fun readAllLines(path: CharSequence): List<CharSequence>
     // ...
 }
 ```

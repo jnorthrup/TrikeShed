@@ -57,7 +57,7 @@ class OpenApiSignalBurndownTest {
 }
 
 data class ContourSignal(
-    val title: String,
+    val title: CharSequence,
     val sectionCount: Int,
-    val signal: String,
+    val signal: CharSequence,
 )

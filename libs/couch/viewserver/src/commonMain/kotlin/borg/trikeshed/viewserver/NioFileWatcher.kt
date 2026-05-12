@@ -32,27 +32,27 @@ import kotlinx.coroutines.launch
  */
 class NioFileWatcher(
     private val fileOps: FileOperations,
-    private val root: String,
+    private val root: CharSequence,
     private val pollIntervalMs: Long = 2000L,
-    private val excludes: List<String> = listOf(".git/objects", "build/", ".gradle/", "node_modules/"),
+    private val excludes: List<CharSequence> = listOf(".git/objects", "build/", ".gradle/", "node_modules/"),
 ) : CoroutineContext.Element {
     companion object Key : CoroutineContext.Key<NioFileWatcher>
     override val key: CoroutineContext.Key<*> get() = Key
 
     /** Last-known state: path → content hash or last-modified info. */
-    private val knownFiles = mutableMapOf<String, SnapshotEntry>()
+    private val knownFiles = mutableMapOf<CharSequence, SnapshotEntry>()
 
     data class SnapshotEntry(
-        val path: String,
+        val path: CharSequence,
         val size: Long,
         val exists: Boolean,
     )
 
     sealed class FileChange {
-        abstract val path: String
-        data class Created(override val path: String, val content: String) : FileChange()
-        data class Modified(override val path: String, val content: String) : FileChange()
-        data class Deleted(override val path: String) : FileChange()
+        abstract val path: CharSequence
+        data class Created(override val path: CharSequence, val content: CharSequence) : FileChange()
+        data class Modified(override val path: CharSequence, val content: CharSequence) : FileChange()
+        data class Deleted(override val path: CharSequence) : FileChange()
     }
 
     /**
@@ -67,8 +67,8 @@ class NioFileWatcher(
 
         while (isActive) {
             delay(pollIntervalMs)
-            val currentSnapshot = mutableMapOf<String, SnapshotEntry>()
-            val seen = mutableSetOf<String>()
+            val currentSnapshot = mutableMapOf<CharSequence, SnapshotEntry>()
+            val seen = mutableSetOf<CharSequence>()
 
             fullScan { path, content ->
                 seen.add(path)
@@ -95,11 +95,11 @@ class NioFileWatcher(
     }
 
     /** Walk the directory tree and call [onFile] for every non-excluded file. */
-    private suspend fun fullScan(onFile: suspend (path: String, content: String) -> Unit) {
+    private suspend fun fullScan(onFile: suspend (path: CharSequence, content: CharSequence) -> Unit) {
         scanDir(root, onFile)
     }
 
-    private suspend fun scanDir(dir: String, onFile: suspend (path: String, content: String) -> Unit) {
+    private suspend fun scanDir(dir: CharSequence, onFile: suspend (path: CharSequence, content: CharSequence) -> Unit) {
         if (!fileOps.exists(dir) || !fileOps.isDir(dir)) return
         val entries = fileOps.listDir(dir)
         for (name in entries) {

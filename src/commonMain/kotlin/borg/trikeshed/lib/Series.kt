@@ -6,14 +6,12 @@ package borg.trikeshed.lib
 import borg.trikeshed.collections.binarySearch
 import borg.trikeshed.isam.meta.IOMemento
 import borg.trikeshed.parse.evidence.TypeEvidence
-import kotlin.jvm.JvmInline
 import kotlin.jvm.JvmName
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.pow
 
 typealias Series<T> = MetaSeries<Int, T>
-
 
 
 /** α
@@ -153,7 +151,7 @@ operator fun <T> Series<T>.get(index: IntRange): Series<T> = ((index.last + 1) -
 fun <T> Series<T>.getOrNull(i: Int): T? = if (i < size) this[i] else null
 
 
- /** Infixed element access. Equivalent to `get(index)`.
+/** Infixed element access. Equivalent to `get(index)`.
  */
 infix fun <T> Series<T>.at(index: Int): T = get(index)
 
@@ -257,7 +255,7 @@ fun <S> Join<Int, (Int) -> S>.toSet(opt: MutableSet<S>? = null): MutableSet<S> =
 
 // Series iterator for use in for loops
 operator fun <A> Series<A>.iterator(): Iterator<A> = object : Iterator<A> {
-   var current = 0
+    var current = 0
     override fun hasNext(): Boolean = current < size
     override fun next(): A {
         if (!hasNext()) throw NoSuchElementException()
@@ -268,8 +266,7 @@ operator fun <A> Series<A>.iterator(): Iterator<A> = object : Iterator<A> {
 }
 
 
-@JvmInline
-value class IterableSeries<A>(val s: Series<A>) : Iterable<A>, Series<A> by s {
+inline class IterableSeries<A>(val s: Series<A>) : Iterable<A>, Series<A> by s {
     override fun iterator(): Iterator<A> = s.iterator()
 }
 
@@ -287,9 +284,11 @@ infix operator fun <T> Series<T>.contains(it: Char): Boolean = this.view contain
  * IntHeap is a heap of integers
  */
 class IntHeap(series: Series<Int>) {
-   var heap: IntArray = IntArray(series.size)
-   var size = 0
-
+    var heap: IntArray = IntArray(series.size)
+    var size = 0
+    fun isEmpty(): Boolean = size == 0
+    fun isNotEmpty(): Boolean = size > 0
+    
     init {
         for (i in series) add(i)
     }
@@ -339,7 +338,6 @@ class IntHeap(series: Series<Int>) {
         return result
     }
 
-    fun isEmpty(): Boolean = size == 0
 }
 
 fun <T> List<T>.toSeries(): Series<T> = size j ::get
@@ -366,18 +364,23 @@ fun <T> Series<T>.last(): T {
     return this[size.dec()]
 }
 
-fun <B> Series<B>.isNotEmpty(): Boolean = size > 0
-fun <B> Series<B>.first(): B = this[0] //naming is _a little bit_ confusing with the pair overloads so it stays a function
+fun <B> Series<B>.isNotEmpty(): Boolean = !isEmpty()
+fun <B> Series<B>.first(): B =
+    this[0] //naming is _a little bit_ confusing with the pair overloads so it stays a function
 
 fun <B> Series<B>.drop(front: Int): Series<B> = get(min(front, size) until size)
 fun <B> Series<B>.dropLast(back: Int): Series<B> = get(0 until max(0, size - back))
 fun <B> Series<B>.take(exclusiveEnd: Int): Series<B> = get(0 until min(exclusiveEnd, size))
 
 //series foreachIndexed
-fun <T> Series<T>.forEachIndexed(action: (index: Int, T) -> Unit): Unit { var index = 0; for (item in this.view) action(index++, item) }
+fun <T> Series<T>.forEachIndexed(action: (index: Int, T) -> Unit): Unit {
+    var index = 0; for (item in this.view) action(index++, item)
+}
 
 //series foreach
-fun <T> Series<T>.forEach(action: (T) -> Unit): Unit { for (item in this.view) action(item) }
+fun <T> Series<T>.forEach(action: (T) -> Unit): Unit {
+    for (item in this.view) action(item)
+}
 
 fun <T> Series<T>.isEmpty(): Boolean = a == 0
 
@@ -388,14 +391,17 @@ fun <T> Series<T>.reversed(): Series<T> {
 
 object EmptySeries : Series<Nothing> by 0 j { _ -> throw NoSuchElementException("empty Series Access Violation") }
 
-inline fun<reified T>  emptySeries(): Series< T> = EmptySeries as Series<T>
+inline fun <reified T> emptySeries(): Series<T> = EmptySeries as Series<T>
 
 fun Series<Char>.parseLong(): Long {
 //handles +-
     var sign = 1L
     var x = 0
     when (this.first()) {
-        '-' -> { sign = -1L; x++ }
+        '-' -> {
+            sign = -1L; x++
+        }
+
         '+' -> x++
     }
     var r = 0L
@@ -480,7 +486,10 @@ fun Series<Char>.parseDouble(): Double {
     var digitsAfterDecimal = 0
 
     when (this[x]) {
-        '-' -> { isNegative = true; x++ }
+        '-' -> {
+            isNegative = true; x++
+        }
+
         '+' -> x++
     }
 
@@ -588,6 +597,7 @@ fun <T : Comparable<T>> Series<T>.compareTo(other: Series<T>): Int {
     }
     return this.size.compareTo(other.size)
 }
+
 fun <T : Comparable<T>> Series<T>.shortestLength(other: Series<T>): Int {
     val shortestLength = min(this.size, other.size)
     var i = 0
@@ -607,7 +617,7 @@ val <T : Comparable<T>> Series<T>.asComparable: ComparableSeries<T>
 fun <T : Comparable<T>> Series<T>.commonPrefixWith(other: Series<T>): Series<T> =
     if (size == 0) this else this[0 until shortestLength(other)]
 
-fun <T> Series<T>.firstOrNull(): T? = takeUnless({ a>0 } )?.b(0)
+fun <T> Series<T>.firstOrNull(): T? = takeUnless({ a > 0 })?.b(0)
 
 
 fun Series<Char>.parseLongOrNull(): Long? {
@@ -627,6 +637,7 @@ fun Series<Char>.parseLongOrNull(): Long? {
         } catch (e: Throwable) {
             null
         }
+
         else -> null
     }
 }

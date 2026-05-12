@@ -7,7 +7,7 @@ import borg.trikeshed.parse.kursive.JursiveCharSeries
  * Currently heuristically detects function-like sources and returns true if
  * the source looks like a JS function expression or arrow function.
  */
-fun isLikelyJsFn(src: String): Boolean {
+fun isLikelyJsFn(src: CharSequence): Boolean {
     val trimmed = src.trimStart()
     if (trimmed.isEmpty()) return false
     return when (trimmed.first()) {

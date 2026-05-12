@@ -19,7 +19,7 @@ import kotlin.test.assertTrue
 //   all children; Semaphore caps concurrent load. Not GlobalScope.
 // ================================================================================
 
-data class ClientConnection(val id: Long, val address: String)
+data class ClientConnection(val id: Long, val address: CharSequence)
 
 class ServerChannelStub(private val maxClients: Int = 10) {
    var nextId = 0L

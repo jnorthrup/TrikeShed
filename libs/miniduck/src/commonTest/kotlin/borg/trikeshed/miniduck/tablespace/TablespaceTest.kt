@@ -81,7 +81,7 @@ class TablespaceTest {
         assertEquals(2, cursor.size)
         val names = (0 until cursor.size).map { i ->
             val doc = cursor[i] as DocRowVec
-            doc["name"] as String
+            doc["name"] as CharSequence
         }.toSet()
         assertEquals(setOf("alice", "bob"), names)
     }

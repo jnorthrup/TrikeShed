@@ -13,7 +13,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 
 class LinuxCSVUtilTest {
-    val target: String = "src/commonTest/resources/hi.csv"
+    val target: CharSequence = "src/commonTest/resources/hi.csv"
 
     /** read in hi.csv and verify the contents */
     @Test
@@ -31,7 +31,7 @@ class LinuxCSVUtilTest {
         }
     }
 
-    fun fileBuffer(target: String): FileBuffer {
+    fun fileBuffer(target: CharSequence): FileBuffer {
         logDebug { "Cwd:" + Files.cwd() }
         val fname = Files.cwd() + '/' + target
         return openFileBuffer(fname)

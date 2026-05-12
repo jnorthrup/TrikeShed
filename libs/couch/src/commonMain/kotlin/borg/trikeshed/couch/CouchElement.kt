@@ -12,20 +12,20 @@ class CouchElement(
     companion object Key : AsyncContextKey<CouchElement>()
     override val key: AsyncContextKey<CouchElement> get() = Key
 
-    private val _collections = mutableMapOf<String, CollectionHandle>()
+    private val _collections = mutableMapOf<CharSequence, CollectionHandle>()
 
-    val collections: Map<String, CollectionHandle> get() = _collections
+    val collections: Map<CharSequence, CollectionHandle> get() = _collections
 
-    fun openCollection(name: String): CollectionHandle {
+    fun openCollection(name: CharSequence): CollectionHandle {
         require(state.isAtLeast(ElementState.OPEN)) { "CouchElement must be open to create collections" }
         val handle = CollectionHandle.open()
         _collections[name] = handle
         return handle
     }
 
-    fun collection(name: String): CollectionHandle? = _collections[name]
+    fun collection(name: CharSequence): CollectionHandle? = _collections[name]
 
-    fun activeCollections(): Sequence<Map.Entry<String, CollectionHandle>> =
+    fun activeCollections(): Sequence<Map.Entry<CharSequence, CollectionHandle>> =
         _collections.asSequence().filter { it.value.state != borg.trikeshed.couch.handle.HandleState.CLOSED }
 
     override suspend fun close() {

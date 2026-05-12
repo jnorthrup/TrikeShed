@@ -14,7 +14,7 @@ class MvccBlockStore {
 
     data class BlockEntry(var putSeq: Long, val block: Any?, var removed: Boolean = false, var removeSeq: Long? = null)
 
-    private val store: MutableMap<String, MutableList<BlockEntry>> = mutableMapOf()
+    private val store: MutableMap<CharSequence, MutableList<BlockEntry>> = mutableMapOf()
 
     // simple WAL stub
     data class WalEntry(val seq: Long)
@@ -31,7 +31,7 @@ class MvccBlockStore {
     /**
      * Put a block into the named collection. Returns a stable 1-based insertion id for the key.
      */
-    fun put(key: String, block: Any?): Int {
+    fun put(key: CharSequence, block: Any?): Int {
         seq += 1
         val list = store.getOrPut(key) { mutableListOf() }
         // Store the original block object so scans can inspect elements when needed
@@ -42,7 +42,7 @@ class MvccBlockStore {
         return list.size // id is index+1
     }
 
-    fun remove(key: String, id: Int) {
+    fun remove(key: CharSequence, id: Int) {
         // id is 1-based insertion index for the key
         val list = store[key] ?: return
         val idx = id - 1
@@ -68,7 +68,7 @@ class MvccBlockStore {
     /**
      * Return the list of insertion ids visible at the snapshot for the given key.
      */
-    fun listAt(snap: Snapshot, key: String): List<Int> = store[key]
+    fun listAt(snap: Snapshot, key: CharSequence): List<Int> = store[key]
         ?.mapIndexedNotNull { idx, entry ->
             if (entry.putSeq <= snap.seq && !(entry.removed && (entry.removeSeq ?: Long.MAX_VALUE) <= snap.seq)) idx + 1 else null
         }
@@ -77,7 +77,7 @@ class MvccBlockStore {
     /**
      * Get the block at a particular insertion id if visible at the snapshot.
      */
-    fun getAt(snap: Snapshot, key: String, id: Int): BlockLike? {
+    fun getAt(snap: Snapshot, key: CharSequence, id: Int): BlockLike? {
         val list = store[key] ?: return null
         val idx = id - 1
         if (idx !in list.indices) return null
@@ -93,7 +93,7 @@ class MvccBlockStore {
     }
 
     // Scan visible blocks at snapshot and produce a Cursor of RowVec rows used by tests.
-    fun scanAt(snap: Snapshot, key: String): borg.trikeshed.cursor.Cursor {
+    fun scanAt(snap: Snapshot, key: CharSequence): borg.trikeshed.cursor.Cursor {
         val list = store[key] ?: return borg.trikeshed.lib.Join.emptySeriesOf()
         val rowVecs: MutableList<borg.trikeshed.cursor.RowVec> = mutableListOf()
         for (entry in list) {

@@ -1,18 +1,18 @@
 package borg.trikeshed.process
 
 external interface ExecSyncOptions {
-    var encoding: String
+    var encoding: CharSequence
 }
 
 external interface ChildProcessModule {
-    fun execSync(command: String, options: ExecSyncOptions = definedExternally): String
+    fun execSync(command: CharSequence, options: ExecSyncOptions = definedExternally): CharSequence
 }
 
-external fun require(module: String): ChildProcessModule
+external fun require(module: CharSequence): ChildProcessModule
 val utf8Encoding: ExecSyncOptions = js("({encoding: 'utf8'})")
 
 actual class ProcessShell {
-    actual fun exec(command: String, args: List<String>): ProcessResult {
+    actual fun exec(command: CharSequence, args: List<CharSequence>): ProcessResult {
         val cmd = buildString {
             append(command)
             if (args.isNotEmpty()) append(" ")
@@ -21,12 +21,12 @@ actual class ProcessShell {
 
         return try {
             val childProcess = require("child_process")
-            val out: String = childProcess.execSync(cmd, utf8Encoding)
+            val out: CharSequence = childProcess.execSync(cmd, utf8Encoding)
             ProcessResult(0, out, "")
         } catch (e: Throwable) {
             ProcessResult(1, "", e.toString())
         }
     }
 
-    actual fun exec(command: String, vararg args: String): ProcessResult = exec(command, args.toList())
+    actual fun exec(command: CharSequence, vararg args: CharSequence): ProcessResult = exec(command, args.toList())
 }

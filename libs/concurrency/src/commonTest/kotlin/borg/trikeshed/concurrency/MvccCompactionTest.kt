@@ -32,7 +32,7 @@ class MvccCompactionTest {
         assertTrue(mvcc.wal.entries.all { it.seq >= snap.seq })
     }
 
-    fun sealedBlock(name: String): BlockRowVec {
+    fun sealedBlock(name: CharSequence): BlockRowVec {
         val block = BlockRowVec.mutable()
         block.append(KeyedRowVec(listOf("name"), listOf(name as Any?)))
         return block.seal()

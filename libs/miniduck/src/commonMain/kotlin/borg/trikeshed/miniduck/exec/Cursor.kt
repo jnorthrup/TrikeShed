@@ -46,7 +46,7 @@ private class RowVecRowAccessor(
     private val row: RowVec,
 ) : RowAccessor {
     override fun get(index: Int): Any? = row.values[index]
-    override fun get(name: String): Any? = row.getValue(name)
+    override fun get(name: CharSequence): Any? = row.getValue(name)
     override val size: Int get() = row.size
-    override fun columnName(index: Int): String? = if (index in 0 until row.keys.size) row.keys[index] else null
+    override fun columnName(index: Int): CharSequence? = if (index in 0 until row.keys.size) row.keys[index] else null
 }

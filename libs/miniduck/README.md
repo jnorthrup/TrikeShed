@@ -138,7 +138,7 @@ from reserved consideration, not from throwing resources at every feature simult
 | **Bloom filters** | Low — bit array + hash | Equality predicates on large datasets | Hash join build cost on negative lookups |
 | **Dictionary encoding (strings)** | Medium — map string→int at block write | High-cardinality string columns repeated | Storage shrinks, decode cost < scan savings |
 | **RLE / bitpacking** | Medium — encode/decode per type | Numeric columns with locality or small ranges | Working set exceeds L1/L2 cache |
-| **FSST (string compression)** | High — symbol table build + decode | String-heavy workloads (logs, JSON) | Only after RLE/dict prove the pattern |
+| **FSST (string compression)** | High — symbol table build + decode | CharSequence-heavy workloads (logs, JSON) | Only after RLE/dict prove the pattern |
 | **ART indexes** | Medium — radix tree over column values | Point lookups on string/numeric keys | Port from `../columnar/` as planned |
 | **Additional joins (Perfect, IEJoin, ASOF, Range)** | Medium-High — algorithm + cardinality estimator | Queries that blow up on hash join | Perfect join for PK/FK; ASOF for time-series |
 | **Cost model + optimizer** | High — needs cardinality stats | ≥2 indexes + ≥2 join strategies | Zone maps ARE the first stats. Cannot exist without them. |

@@ -17,7 +17,7 @@ import kotlinx.coroutines.coroutineScope
  * @param volatility      volatility threshold or measure from the trainer
  */
 data class StochasticPolicy(
-    val name: String,
+    val name: CharSequence,
     val expectedReturn: Double,
     val volatility: Double,
 )
@@ -29,7 +29,7 @@ data class StochasticPolicy(
  * the supplied parameter map.
  */
 interface KernelFeatureTransformer {
-    fun transform(cursor: Cursor, params: Map<String, Any>): Cursor
+    fun transform(cursor: Cursor, params: Map<CharSequence, Any>): Cursor
 }
 
 // ── Stochastic Trainer ───────────────────────────────────────────────────────
@@ -44,7 +44,7 @@ interface KernelStochasticTrainer {
     val lifecycleState: ElementState
 
     suspend fun open()
-    suspend fun train(cursor: Cursor, params: Map<String, Any>): StochasticPolicy
+    suspend fun train(cursor: Cursor, params: Map<CharSequence, Any>): StochasticPolicy
     suspend fun drain()
     suspend fun close()
 }
@@ -63,10 +63,10 @@ interface KernelStochasticTrainer {
  * The trainer is opened before and drained+closed after all work completes.
  */
 suspend fun executeKernelOptimizingHarness(
-    symbols: List<String>,
-    timeframes: List<String>,
-    searchSpace: List<Map<String, Any>>,
-    cacheProvider: (String, String) -> Cursor,
+    symbols: List<CharSequence>,
+    timeframes: List<CharSequence>,
+    searchSpace: List<Map<CharSequence, Any>>,
+    cacheProvider: (CharSequence, CharSequence) -> Cursor,
     transformer: KernelFeatureTransformer,
     trainer: KernelStochasticTrainer,
 ): List<StochasticPolicy> {
@@ -100,9 +100,9 @@ suspend fun executeKernelOptimizingHarness(
  * Falls back to the unmodified cursor if stochastic data is not yet cached.
  */
 class ExampleKernelTransformer : KernelFeatureTransformer {
-    override fun transform(cursor: Cursor, params: Map<String, Any>): Cursor {
-        val symbol = params["symbol"] as? String ?: return cursor
-        val timeframe = params["timeframe"] as? String ?: return cursor
+    override fun transform(cursor: Cursor, params: Map<CharSequence, Any>): Cursor {
+        val symbol = params["symbol"] as? CharSequence ?: return cursor
+        val timeframe = params["timeframe"] as? CharSequence ?: return cursor
         val kPeriod = (params["kPeriod"] as? Number)?.toInt() ?: 14
         val dPeriod = (params["dPeriod"] as? Number)?.toInt() ?: 3
 
@@ -125,7 +125,7 @@ class ExampleKernelTransformer : KernelFeatureTransformer {
 class NoOpTrainer : KernelStochasticTrainer {
     override val lifecycleState: ElementState = ElementState.OPEN
     override suspend fun open() {}
-    override suspend fun train(cursor: Cursor, params: Map<String, Any>): StochasticPolicy {
+    override suspend fun train(cursor: Cursor, params: Map<CharSequence, Any>): StochasticPolicy {
         val name = "${params["symbol"] ?: "unknown"}/${params["timeframe"] ?: "??"}"
         return StochasticPolicy(name = name, expectedReturn = 0.0, volatility = 0.0)
     }

@@ -23,7 +23,7 @@ class FunctionalUringFacadeTest {
             return 33
         }
 
-        override fun connect(file: FileImpl, address: String, port: Int): Int {
+        override fun connect(file: FileImpl, address: CharSequence, port: Int): Int {
             ops += "connect:${file.id}:$address:$port"
             return 44
         }
@@ -43,7 +43,7 @@ class FunctionalUringFacadeTest {
 
         override fun map(
             file: FileImpl,
-            mode: String,
+            mode: CharSequence,
             position: Long,
             size: Long
         ): Int {

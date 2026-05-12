@@ -21,8 +21,8 @@ import kotlin.jvm.JvmOverloads
 /**
  * a versatile range of two unsigned shorts stored as a 32 bit Int value as Inline class
  */
-@JvmInline
-value class DelimitRange(val value: Int) : Twin<UShort>, ClosedRange<UShort> {
+
+inline class DelimitRange(val value: Int) : Twin<UShort>, ClosedRange<UShort> {
     //emulates a pair of UShorts using 16 bits for two UShorts
     override val a: UShort get() = (value ushr 16).toUShort()
     override val b: UShort get() = (value and 0xFFFF).toUShort()

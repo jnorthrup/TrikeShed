@@ -14,7 +14,7 @@ enum class HttpMethod {
             return BY_NAME[s]
         }
 
-        fun fromString(s: String): HttpMethod? = BY_NAME[s]
+        fun fromString(s: CharSequence): HttpMethod? = BY_NAME[s]
     }
 
     fun toBytes(): ByteArray = when (this) {

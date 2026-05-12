@@ -7,7 +7,7 @@ import borg.trikeshed.parse.confix.path
 import kotlin.coroutines.CoroutineContext
 import borg.trikeshed.lib.toSeries
 
-suspend fun parseJulesSessionConfix(json: String, context: CoroutineContext): String {
+suspend fun parseJulesSessionConfix(json: CharSequence, context: CoroutineContext): CharSequence {
     val confix = ConfixElement(listOf(jsonSource(json)).toSeries(), context)
     confix.open()
     confix.activate()

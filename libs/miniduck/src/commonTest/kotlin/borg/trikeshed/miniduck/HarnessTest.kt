@@ -24,7 +24,7 @@ class HarnessTest {
         val policies = executeKernelOptimizingHarness(
                 symbols = listOf("SYM"),
                 timeframes = listOf("1d"),
-                searchSpace = listOf<Map<String, Any>>(mapOf("short_ma" to 2, "long_ma" to 3, "vol_window" to 3)),
+                searchSpace = listOf<Map<CharSequence, Any>>(mapOf("short_ma" to 2, "long_ma" to 3, "vol_window" to 3)),
                 cacheProvider = { _, _ -> cursor },
                 transformer = transformer,
                 trainer = trainer

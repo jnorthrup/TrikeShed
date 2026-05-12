@@ -12,16 +12,16 @@ import java.nio.file.Path
 
 data class CoinbaseAuthProof(
     val dotenvPath: Path,
-    val keyName: String,
-    val restUrl: String,
+    val keyName: CharSequence,
+    val restUrl: CharSequence,
     val balance: RobinhoodBalance?,
-    val quoteProduct: String,
+    val quoteProduct: CharSequence,
     val quote: Double?,
     val authSucceeded: Boolean,
-    val message: String,
+    val message: CharSequence,
 )
 
-suspend fun runCoinbaseAuthProof(dotenvPath: Path, quoteProduct: String = "BTC"): CoinbaseAuthProof {
+suspend fun runCoinbaseAuthProof(dotenvPath: Path, quoteProduct: CharSequence = "BTC"): CoinbaseAuthProof {
     val credentials = loadCredentials(dotenvPath)
     val apiConfig = loadCoinbaseApiConfig(dotenvPath.toString())
         ?: error("Coinbase API config missing in ${dotenvPath.toAbsolutePath().normalize()}")

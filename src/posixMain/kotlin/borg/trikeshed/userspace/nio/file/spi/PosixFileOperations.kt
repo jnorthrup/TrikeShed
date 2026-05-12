@@ -8,11 +8,11 @@ import platform.posix.*
 
 class PosixFileOperations : FileOperations {
 
-    override fun readAllLines(filename: String): List<String> =
+    override fun readAllLines(filename: CharSequence): List<String> =
         readString(filename).replace("\r\n", "\n").split('\n').let { if (it.isNotEmpty() && it.last().isEmpty()) it.dropLast(1) else it }
 
-    override fun readAllBytes(filename: String): ByteArray = memScoped {
-        val file = fopen(filename, "rb") ?: throw IllegalArgumentException("fopen($filename) failed")
+    override fun readAllBytes(filename: CharSequence): ByteArray = memScoped {
+        val file = fopen(filename.toString(), "rb") ?: throw IllegalArgumentException("fopen($filename) failed")
         try {
             require(fseek(file, 0, SEEK_END) == 0)
             val size = ftell(file); require(size >= 0)
@@ -24,10 +24,10 @@ class PosixFileOperations : FileOperations {
         } finally { fclose(file) }
     }
 
-    override fun readString(filename: String): String = readAllBytes(filename).decodeToString()
+    override fun readString(filename: CharSequence): String = readAllBytes(filename).decodeToString()
 
-    override fun write(filename: String, bytes: ByteArray) {
-        val file = fopen(filename, "wb") ?: throw IllegalArgumentException("fopen($filename) failed")
+    override fun write(filename: CharSequence, bytes: ByteArray) {
+        val file = fopen(filename.toString(), "wb") ?: throw IllegalArgumentException("fopen($filename) failed")
         try {
             if (bytes.isNotEmpty()) {
                 val written = bytes.usePinned { fwrite(it.addressOf(0), 1.convert(), bytes.size.toULong(), file) }
@@ -36,8 +36,8 @@ class PosixFileOperations : FileOperations {
         } finally { fclose(file) }
     }
 
-    override fun write(filename: String, lines: List<String>) { write(filename, lines.joinToString("\n")) }
-    override fun write(filename: String, string: String) { write(filename, string.encodeToByteArray()) }
+    override fun write(filename: CharSequence, lines: List<CharSequence>) { write(filename, lines.joinToString("\n")) }
+    override fun write(filename: CharSequence, string: CharSequence) { write(filename, string.toString().encodeToByteArray()) }
 
     override fun cwd(): String = memScoped {
         val pathmax = pathconf(".", _PC_PATH_MAX)
@@ -45,9 +45,9 @@ class PosixFileOperations : FileOperations {
         getcwd(buf, pathmax.toULong())?.toKString() ?: ""
     }
 
-    override fun exists(filename: String): Boolean = access(filename, F_OK) == 0
+    override fun exists(filename: CharSequence): Boolean = access(filename.toString(), F_OK) == 0
 
-    override fun streamLines(fileName: String, bufsize: Int): Sequence<Join<Long, ByteArray>> {
+    override fun streamLines(fileName: CharSequence, bufsize: Int): Sequence<Join<Long, ByteArray>> {
         val bytes = readAllBytes(fileName)
         return sequence {
             if (bytes.isEmpty()) return@sequence
@@ -63,11 +63,11 @@ class PosixFileOperations : FileOperations {
         }
     }
 
-    override fun iterateLines(fileName: String, bufsize: Int): Iterable<Join<Long, Series<Byte>>> =
+    override fun iterateLines(fileName: CharSequence, bufsize: Int): Iterable<Join<Long, Series<Byte>>> =
         streamLines(fileName, bufsize).map { (off, bytes) -> off j bytes.toSeries() }.asIterable()
 
-    override fun listDir(path: String): List<String> = memScoped {
-        val dp = opendir(path) ?: return@memScoped emptyList()
+    override fun listDir(path: CharSequence): List<String> = memScoped {
+        val dp = opendir(path.toString()) ?: return@memScoped emptyList()
         try {
             val result = mutableListOf<String>()
             val buf = alloc<dirent>()
@@ -77,17 +77,17 @@ class PosixFileOperations : FileOperations {
         } finally { closedir(dp) }
     }
 
-    override fun isDir(path: String): Boolean = memScoped {
-        val st = alloc<stat>(); stat(path, st.ptr) == 0 && (st.st_mode.toInt() and S_IFMT) == S_IFDIR
+    override fun isDir(path: CharSequence): Boolean = memScoped {
+        val st = alloc<stat>(); stat(path.toString(), st.ptr) == 0 && (st.st_mode.toInt() and S_IFMT) == S_IFDIR
     }
 
-    override fun isFile(path: String): Boolean = memScoped {
-        val st = alloc<stat>(); stat(path, st.ptr) == 0 && (st.st_mode.toInt() and S_IFMT) == S_IFREG
+    override fun isFile(path: CharSequence): Boolean = memScoped {
+        val st = alloc<stat>(); stat(path.toString(), st.ptr) == 0 && (st.st_mode.toInt() and S_IFMT) == S_IFREG
     }
 
-    override fun mkdirs(path: String) { mkdir(path, 0x1FFu.toUShort()) }
-    override fun deleteRecursively(path: String): Unit = TODO("deleteRecursively POSIX")
-    override fun resolvePath(vararg parts: String): String = parts.joinToString("/")
-    override fun readZip(path: String): List<Pair<String, ByteArray>> = TODO("readZip POSIX")
-    override fun createTempDir(prefix: String): String = "/tmp/$prefix-${generateSequence { ('a'..'z').random() }.take(8).joinToString("")}"
+    override fun mkdirs(path: CharSequence) { mkdir(path.toString(), 0x1FFu.toUShort()) }
+    override fun deleteRecursively(path: CharSequence): Unit = TODO("deleteRecursively POSIX")
+    override fun resolvePath(vararg parts: CharSequence): String = parts.joinToString("/")
+    override fun readZip(path: CharSequence): List<Pair<String, ByteArray>> = TODO("readZip POSIX")
+    override fun createTempDir(prefix: CharSequence): String = "/tmp/$prefix-${generateSequence { ('a'..'z').random() }.take(8).joinToString("")}"
 }

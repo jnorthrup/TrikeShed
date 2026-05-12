@@ -139,7 +139,7 @@ fun main() {
     arraySet.remove(20)
     println("ArraySet contains 20 after removal: ${arraySet.contains(20)}") // Output: false
 
-    val hashSet = borg.trikeshed.collections.HashSet<String>()
+    val hashSet = borg.trikeshed.collections.HashSet<CharSequence>()
     hashSet.add("apple")
     hashSet.add("banana")
     hashSet.add("cherry")

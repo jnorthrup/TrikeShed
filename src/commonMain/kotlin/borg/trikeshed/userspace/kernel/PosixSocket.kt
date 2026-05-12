@@ -9,10 +9,10 @@ import borg.trikeshed.userspace.ByteRegion
 
 interface PosixSocket {
     fun fd(): Int
-    fun bind(host: String, port: Int): Result<Unit>
+    fun bind(host: CharSequence, port: Int): Result<Unit>
     fun listen(backlog: Int): Result<Unit>
-    fun accept(): Result<Pair<Int, String>>
-    fun connect(host: String, port: Int): Result<Unit>
+    fun accept(): Result<Pair<Int, CharSequence>>
+    fun connect(host: CharSequence, port: Int): Result<Unit>
     fun send(src: ByteSeries, flags: Int): Result<Int>
     fun recv(dst: ByteRegion, flags: Int): Result<Int>
     fun setNonblocking(nonblocking: Boolean): Result<Unit>

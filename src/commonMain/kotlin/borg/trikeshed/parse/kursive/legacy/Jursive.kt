@@ -32,7 +32,7 @@ class JursiveCharSeries constructor(
 ) : Series<Char> by source {
 
     constructor(source: Series<Char>) : this(CharSeries(source), SeriesBuffer())
-    constructor(text: String) : this(text.toSeries())
+    constructor(text: CharSequence) : this(text.toSeries())
 
     val pos: Int get() = source.pos
     val hasRemaining: Boolean get() = source.hasRemaining
@@ -68,7 +68,7 @@ class JursiveCharSeries constructor(
     fun skipWhitespace(): JursiveCharSeries = apply { while (peek()?.isWhitespace() == true) source.pos++ }
 
     /** Try each string in order; return first successful match's CharSeries slice. Backtracks on failure. */
-    fun consumeAnyOf(vararg forms: String): CharSeries? {
+    fun consumeAnyOf(vararg forms: CharSequence): CharSeries? {
         for (form in forms) {
             val cp = checkpoint()
             val start = pos
@@ -107,7 +107,7 @@ fun <T> parser(name: Series<Char>, op: (JursiveCharSeries) -> T?): KursiveParser
     override val b: (JursiveCharSeries) -> T? = op
 }
 
-fun <T> parser(name: String, op: (JursiveCharSeries) -> T?): KursiveParser<T> = object : KursiveParser<T> {
+fun <T> parser(name: CharSequence, op: (JursiveCharSeries) -> T?): KursiveParser<T> = object : KursiveParser<T> {
     override val a: Series<Char> = name.toSeries()
     override val b: (JursiveCharSeries) -> T? = op
 }
@@ -147,7 +147,7 @@ fun peekIsNot(c: Char): KursiveStep = { input -> input.peek() != c }
 fun <T> KursiveParser<T>.named(name: Series<Char>): KursiveParser<T> =
     parser(name) { input -> this(input) }
 
-fun <T> KursiveParser<T>.named(name: String): KursiveParser<T> =
+fun <T> KursiveParser<T>.named(name: CharSequence): KursiveParser<T> =
     parser(name) { input -> this(input) }
 
 fun bb(name: Series<Char>, vararg steps: KursiveStep): KursiveParser<CharSeries> =
@@ -157,7 +157,7 @@ fun bb(name: Series<Char>, vararg steps: KursiveStep): KursiveParser<CharSeries>
         input.slice(start)
     }
 
-fun bb(name: String, vararg steps: KursiveStep): KursiveParser<CharSeries> = bb(name.toSeries(), *steps)
+fun bb(name: CharSequence, vararg steps: KursiveStep): KursiveParser<CharSeries> = bb(name.toSeries(), *steps)
 
 fun maybe(step: KursiveStep): KursiveStep = { input ->
     step(input)
@@ -176,7 +176,7 @@ fun <T> choice(name: Series<Char>, vararg options: KursiveParser<T>): KursivePar
         null
     }
 
-fun <T> choice(name: String, vararg options: KursiveParser<T>): KursiveParser<T> = choice(name.toSeries(), *options)
+fun <T> choice(name: CharSequence, vararg options: KursiveParser<T>): KursiveParser<T> = choice(name.toSeries(), *options)
 
 fun Series<Char>.joinName(separator: Char, other: Series<Char>): Series<Char> = this + s_[separator] + other
 
@@ -186,10 +186,10 @@ infix fun <T> KursiveParser<T>.or(other: KursiveParser<T>): KursiveParser<T> =
     }
 
 /** cppfront-style production declaration from parser: "task" colon budgetParser */
-infix fun <T> String.colon(body: KursiveParser<T>): KursiveParser<T> = body.named(this)
+infix fun <T> CharSequence.colon(body: KursiveParser<T>): KursiveParser<T> = body.named(this)
 
 /** cppfront-style production declaration from composed step: "budget" colon ('$'.s then ws then num.s) */
-infix fun String.colon(step: KursiveStep): KursiveParser<CharSeries> = bb(this, step)
+infix fun CharSequence.colon(step: KursiveStep): KursiveParser<CharSeries> = bb(this, step)
 
 /** Named-then composition: `(A colon B) then C` sequences B and C under A's name */
 infix fun <A, B> KursiveParser<A>.then(other: KursiveParser<B>): KursiveParser<Join<A, B>> =
@@ -200,7 +200,7 @@ infix fun <A, B> KursiveParser<A>.then(other: KursiveParser<B>): KursiveParser<J
     }
 
 /** Line-chunking: split input into lines, apply parser to each, return Series of results */
-fun <T> KursiveParser<T>.parseLines(text: String): Series<Join<T, NarsiveTrace>> {
+fun <T> KursiveParser<T>.parseLines(text: CharSequence): Series<Join<T, NarsiveTrace>> {
     val lines = text.lineSequence().filter { it.isNotBlank() }.toList()
     return lines.size j { index -> parse(lines[index])!! }
 }
@@ -208,7 +208,7 @@ fun <T> KursiveParser<T>.parseLines(text: String): Series<Join<T, NarsiveTrace>>
 fun <T> KursiveParser<T>.parseLines(text: Series<Char>): Series<Join<T, NarsiveTrace>> =
     parseLines(text.asString())
 
-fun <T> KursiveParser<T>.parse(input: String): Join<T, NarsiveTrace>? = parse(JursiveCharSeries(input))
+fun <T> KursiveParser<T>.parse(input: CharSequence): Join<T, NarsiveTrace>? = parse(JursiveCharSeries(input))
 
 fun <T> KursiveParser<T>.parse(input: Series<Char>): Join<T, NarsiveTrace>? = parse(JursiveCharSeries(input))
 
@@ -230,7 +230,7 @@ fun Series<Char>.toKursiveEvidence(): TypeEvidence = TypeEvidence().apply {
     recordColumnLength(this@toKursiveEvidence.size)
 }
 
-fun detectKursiveConfix(src: Series<Char>): String {
+fun detectKursiveConfix(src: Series<Char>): CharSequence {
     if (src.size < 2) return ""
     val first = src[0]
     val last = src[src.size - 1]
@@ -245,7 +245,7 @@ fun detectKursiveConfix(src: Series<Char>): String {
     }
 }
 
-fun detectKursiveStructuralMemento(confix: String): TypeMemento? =
+fun detectKursiveStructuralMemento(confix: CharSequence): TypeMemento? =
     when (confix) {
         "{}" -> MapTypeMemento
         "[]" -> SeqTypeMemento

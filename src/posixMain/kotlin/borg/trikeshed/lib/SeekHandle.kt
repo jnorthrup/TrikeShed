@@ -14,8 +14,8 @@ class PreadSeekHandle : SeekHandle {
     private val fds = mutableMapOf<Long, Int>()
     private var nextId: Long = 1
 
-    override fun open(filename: String, readOnly: Boolean): Long {
-        val fd = if (readOnly) open(filename, O_RDONLY) else open(filename, O_RDWR or O_CREAT, 438)
+    override fun open(filename: CharSequence, readOnly: Boolean): Long {
+        val fd = if (readOnly) open(filename.toString(), O_RDONLY) else open(filename.toString(), O_RDWR or O_CREAT, 438)
         if (fd < 0) {
             throw IllegalStateException("Failed to open $filename: $fd")
         }
@@ -78,8 +78,8 @@ class UringSeekHandle : SeekHandle {
 
     fun isAvailable(): Boolean = PosixUringIO.isAvailable()
 
-    override fun open(filename: String, readOnly: Boolean): Long {
-        val fd = if (readOnly) open(filename, O_RDONLY) else open(filename, O_RDWR or O_CREAT, 438)
+    override fun open(filename: CharSequence, readOnly: Boolean): Long {
+        val fd = if (readOnly) open(filename.toString(), O_RDONLY) else open(filename.toString(), O_RDWR or O_CREAT, 438)
         if (fd < 0) {
             throw IllegalStateException("Failed to open $filename: $fd")
         }

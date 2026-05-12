@@ -43,7 +43,7 @@ class TypedReducerTest {
 
     @Test
     fun `Reducer Count has correct zero and combine`() {
-        val r = Count<String>()
+        val r = Count<CharSequence>()
         assertEquals(0, r.zero)
         assertEquals(1, r.combine(0, "ignored"))
         assertEquals(3, r.combine(2, "also ignored"))
@@ -69,8 +69,8 @@ class TypedReducerTest {
 
     @Test
     fun `Series fold with Count reducer produces correct result`() {
-        val s: Series<String> = listOf("a", "b", "c", "d").toSeries()
-        val result = s.fold(Count<String>())
+        val s: Series<CharSequence> = listOf("a", "b", "c", "d").toSeries()
+        val result = s.fold(Count<CharSequence>())
         assertEquals(4, result)
     }
 

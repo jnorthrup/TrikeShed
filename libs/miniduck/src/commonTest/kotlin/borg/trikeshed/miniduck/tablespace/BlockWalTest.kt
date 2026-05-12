@@ -180,7 +180,7 @@ class BlockWalTest {
 
     // ── Helpers ──────────────────────────────────────────────────────────
 
-   fun buildBlock(name: String): BlockRowVec {
+   fun buildBlock(name: CharSequence): BlockRowVec {
         val block = BlockRowVec.mutable()
         block.append(DocRowVec(listOf("name"), listOf(name)))
         return block.seal()

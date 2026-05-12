@@ -60,7 +60,7 @@ class SqlToMiniDuckTest {
         assertEquals(listOf(listOf(35)), rows)
     }
 
-    private fun runQuery(sql: String, tableSource: InMemoryTableSource, width: Int): List<List<Any?>> {
+    private fun runQuery(sql: CharSequence, tableSource: InMemoryTableSource, width: Int): List<List<Any?>> {
         val stmt = SqlParser.parse(sql) ?: fail("parser did not produce a SelectStmt for $sql")
         val cursor = transformSelect(stmt, PlannerContext()).open(
             ExecutionContext(tableSource = tableSource),

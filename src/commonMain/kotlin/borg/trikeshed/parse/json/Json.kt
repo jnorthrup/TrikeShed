@@ -90,19 +90,19 @@ object JsonParser {
         }
     }
 
-    fun parse(text: String): Map<String, Any?> {
+    fun parse(text: CharSequence): Map<CharSequence, Any?> {
         val ctx = contextOf(Syntax.JSON, text.asSeries())
         @Suppress("UNCHECKED_CAST")
-        return materialize(Combinators.reify(ctx, Syntax.JSON), Combinators.tagOf(ctx.a, ctx.b)) as? Map<String, Any?> ?: emptyMap()
+        return materialize(Combinators.reify(ctx, Syntax.JSON), Combinators.tagOf(ctx.a, ctx.b)) as? Map<CharSequence, Any?> ?: emptyMap()
     }
 }
 
 /** Materialize a confix reified value into stdlib collections.
  *
  * Reify returns:
- *   - Series2<String,Any?>  (a Series of key-value Join pairs) → LinkedHashMap
+ *   - Series2<CharSequence,Any?>  (a Series of key-value Join pairs) → LinkedHashMap
  *   - Series<Any?>          (a Series of values)             → ArrayList
- *   - primitive             (String, Number, Boolean, null)   → identity
+ *   - primitive             (CharSequence, Number, Boolean, null)   → identity
  *
  * Series<A> = Join<Int, (Int)→A>
  * Series2<A,B> = Series<Join<A,B>> = Join<Int, (Int)→Join<A,B>>
@@ -124,19 +124,19 @@ fun materialize(node: Any?, tag: Tag? = null): Any? {
         is Function1<*, *> -> {
             if (size == 0) return when (tag) {
                 Tag.ARRAY -> ArrayList<Any?>(0)
-                Tag.OBJECT -> LinkedHashMap<String, Any?>(0)
-                else -> LinkedHashMap<String, Any?>(0)
+                Tag.OBJECT -> LinkedHashMap<CharSequence, Any?>(0)
+                else -> LinkedHashMap<CharSequence, Any?>(0)
             }
             val fn = second as (Int) -> Any?
             val at0 = fn(0)
-            if (at0 is Join<*, *> && (at0 as Join<*, *>).a is String) {
+            if (at0 is Join<*, *> && (at0 as Join<*, *>).a is CharSequence) {
                 // Series2: key-value pairs
                 @Suppress("UNCHECKED_CAST")
-                val mapFn = second as (Int) -> Join<String, Any?>
-                val map = LinkedHashMap<String, Any?>(size * 2)
+                val mapFn = second as (Int) -> Join<CharSequence, Any?>
+                val map = LinkedHashMap<CharSequence, Any?>(size * 2)
                 var i = 0
                 while (i < size) {
-                    val pair: Join<String, Any?> = mapFn(i)
+                    val pair: Join<CharSequence, Any?> = mapFn(i)
                     map[pair.first] = materialize(pair.second)
                     i++
                 }
@@ -157,8 +157,8 @@ fun materialize(node: Any?, tag: Tag? = null): Any? {
 fun queryPath(ctx: JsContext, path: JsPath): JsContext? = Path.resolve(ctx, path)
 
 /** Parse a JSON string to a stdlib Map (convenience, used by OpenApiRawParser) */
-fun parse(text: String): Map<String, Any?> {
+fun parse(text: CharSequence): Map<CharSequence, Any?> {
     val ctx = contextOf(Syntax.JSON, text.asSeries())
     @Suppress("UNCHECKED_CAST")
-    return materialize(Combinators.reify(ctx, Syntax.JSON)) as? Map<String, Any?> ?: emptyMap()
+    return materialize(Combinators.reify(ctx, Syntax.JSON)) as? Map<CharSequence, Any?> ?: emptyMap()
 }

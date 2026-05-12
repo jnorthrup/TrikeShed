@@ -7,12 +7,12 @@ import borg.trikeshed.cursor.*
 import borg.trikeshed.lib.*
 
 actual class IsamDataFile actual constructor(
-    datafileFilename: String,
-    metafileFilename: String,
+    datafileFilename: CharSequence,
+    metafileFilename: CharSequence,
     metafile: IsamMetaFileReader,
     private val fileOps: FileOperations,
 ) : Usable, Cursor {
-    actual val datafileFilename: String = datafileFilename
+    actual val datafileFilename: CharSequence = datafileFilename
     actual val metafile: IsamMetaFileReader = metafile
 
    val recordlen: Int get() = metafile.recordlen
@@ -47,7 +47,7 @@ actual class IsamDataFile actual constructor(
     }
 
     actual companion object {
-        actual fun write(cursor: Cursor, datafilename: String, varChars: Map<String, Int>, fileOps: FileOperations) {
+        actual fun write(cursor: Cursor, datafilename: CharSequence, varChars: Map<CharSequence, Int>, fileOps: FileOperations) {
             val metafilename = "$datafilename.meta"
 
             val meta0 = IsamMetaFileReader.write(metafilename, cursor.meta, varChars, fileOps)
@@ -72,8 +72,8 @@ actual class IsamDataFile actual constructor(
 
         actual fun append(
             msf: Iterable<RowVec>,
-            datafilename: String,
-            varChars: Map<String, Int>,
+            datafilename: CharSequence,
+            varChars: Map<CharSequence, Int>,
             transform: ((RowVec) -> RowVec)?,
             fileOps: FileOperations,
         ): Unit {

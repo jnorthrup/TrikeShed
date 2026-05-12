@@ -15,8 +15,8 @@ import java.nio.file.StandardOpenOption.*
 import java.util.concurrent.locks.ReentrantLock
 
 actual class IsamDataFile actual constructor(
-    datafileFilename: String,
-    metafileFilename: String,
+    datafileFilename: CharSequence,
+    metafileFilename: CharSequence,
     metafile: IsamMetaFileReader,
     @Suppress("UNUSED_PARAMETER") fileOps: FileOperations,
 ) : Usable, Cursor {
@@ -27,7 +27,7 @@ actual class IsamDataFile actual constructor(
     }
    val data: SeekableByteChannel by lazy {
         java.nio.file.Files.newByteChannel(
-            Paths.get(datafileFilename),
+            Paths.get(datafileFilename.toString()),
             READ
         )
     }
@@ -85,17 +85,17 @@ actual class IsamDataFile actual constructor(
 
 
     actual companion object {
-        actual fun write(cursor: Cursor, datafilename: String, varChars: Map<String, Int>, fileOps: FileOperations) {
+        actual fun write(cursor: Cursor, datafilename: CharSequence, varChars: Map<CharSequence, Int>, fileOps: FileOperations) {
             val metafilename = "$datafilename.meta"
 
             //turn off debug logging in here
-//            fun logDebug(f: (String) -> Unit): Unit = Unit
+//            fun logDebug(f: (CharSequence) -> Unit): Unit = Unit
 
             val meta0 = IsamMetaFileReader.write(metafilename, cursor.meta, varChars, fileOps)
 
             //open RandomAccessDataFile
 
-            val randomAccessFile = RandomAccessFile(datafilename, "rw")
+            val randomAccessFile = RandomAccessFile(datafilename.toString(), "rw")
             val data = randomAccessFile.channel
 
             //create row buffer
@@ -120,8 +120,8 @@ actual class IsamDataFile actual constructor(
 
         actual fun append(
             msf: Iterable<RowVec>,
-            datafilename: String,
-            varChars: Map<String, Int>,
+            datafilename: CharSequence,
+            varChars: Map<CharSequence, Int>,
             transform: ((RowVec) -> RowVec)?,
             fileOps: FileOperations,
         ): Unit {
@@ -139,7 +139,7 @@ actual class IsamDataFile actual constructor(
                 first = false
 
                 if (fileOps.exists(datafilename)) {
-                    val fileSize = java.nio.file.Files.size(Paths.get(datafilename))
+                    val fileSize = java.nio.file.Files.size(Paths.get(datafilename.toString()))
                     val alignment = fileSize % rowLen
                     if (alignment != 0L) {
                         println("WARN: file $datafilename is not aligned to recordlen $rowLen")
@@ -150,7 +150,7 @@ actual class IsamDataFile actual constructor(
             }
 
             // open RandomAccessDataFile
-            java.nio.file.Files.newOutputStream(Paths.get(datafilename), APPEND, WRITE, CREATE).use { data ->
+            java.nio.file.Files.newOutputStream(Paths.get(datafilename.toString()), APPEND, WRITE, CREATE).use { data ->
                 var fibLog: FibonacciReporter? = null
                 debug { fibLog = FibonacciReporter(size = null, noun = "appends") }
 

@@ -14,14 +14,14 @@ import borg.trikeshed.miniduck.withParameter
  */
 object CouchMiniDsl {
     data class DesignRef(
-        val database: String,
-        val designDocument: String,
+        val database: CharSequence,
+        val designDocument: CharSequence,
     )
 
     data class ViewRef(
-        val database: String,
-        val designDocument: String,
-        val viewName: String,
+        val database: CharSequence,
+        val designDocument: CharSequence,
+        val viewName: CharSequence,
     ) {
         val source: RelationRef
             get() = RelationRef(database = database, name = "$designDocument/$viewName", kind = RelationKind.VIEW)
@@ -29,10 +29,10 @@ object CouchMiniDsl {
 
     typealias QueryRef = ViewQueryPlan
 
-    infix fun String.design(designDocument: String): DesignRef =
+    infix fun CharSequence.design(designDocument: CharSequence): DesignRef =
         DesignRef(database = this, designDocument = designDocument)
 
-    infix fun DesignRef.view(viewName: String): ViewRef =
+    infix fun DesignRef.view(viewName: CharSequence): ViewRef =
         ViewRef(database = database, designDocument = designDocument, viewName = viewName)
 
     infix fun ViewRef.whereKey(value: Any?): QueryRef =

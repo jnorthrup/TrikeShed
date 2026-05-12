@@ -3,14 +3,14 @@ package borg.trikeshed.process
 import java.io.File
 
 actual class ProcessShell {
-    actual fun exec(command: String, args: List<String>): ProcessResult {
+    actual fun exec(command: CharSequence, args: List<CharSequence>): ProcessResult {
         return exec(cwd = null, command = command, args = args)
     }
 
-    actual fun exec(command: String, vararg args: String): ProcessResult =
+    actual fun exec(command: CharSequence, vararg args: CharSequence): ProcessResult =
         exec(null, command, args.toList())
 
-    private fun exec(cwd: String?, command: String, args: List<String>): ProcessResult {
+    private fun exec(cwd: CharSequence?, command: CharSequence, args: List<CharSequence>): ProcessResult {
         val builder = ProcessBuilder(listOf(command) + args)
         cwd?.let { builder.directory(File(it)) }
         builder.redirectErrorStream(false)

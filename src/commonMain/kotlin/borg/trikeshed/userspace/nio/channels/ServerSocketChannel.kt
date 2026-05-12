@@ -16,19 +16,20 @@ import borg.trikeshed.userspace.nio.channels.spi.SelectorProvider
 public abstract class ServerSocketChannel : AbstractSelectableChannel, NetworkChannel {
     constructor(provider: SelectorProvider) : super(provider)
     public abstract override fun validOps(): Int
-    public abstract override fun bind(address: String): ServerSocketChannel
-    fun bind(address: String, backlog: Int): ServerSocketChannel = bind(address)
-    public abstract override fun <T> setOption(option: String, value: T): ServerSocketChannel
+    public abstract override fun bind(address: CharSequence): ServerSocketChannel
+    fun bind(address: CharSequence, backlog: Int): ServerSocketChannel = bind(address)
+    public abstract override fun <T> setOption(option: CharSequence, value: T): ServerSocketChannel
     // TODO
     abstract fun accept(): SocketChannel
-    public abstract override fun getLocalAddress():CharSequencecompanion object {
+    public abstract override fun getLocalAddress(): CharSequence
+    companion object {
         fun open(): ServerSocketChannel {
             val file = Channels.socket(SocketDomain.AF_INET.posix, SocketType.SOCK_STREAM.mask, SocketProtocol.IPPROTO_TCP.posix)
             val channel = Channels.open()
             return UringServerSocketChannel(file, channel)
         }
 
-        fun open(protocolFamily: String): ServerSocketChannel = open()
+        fun open(protocolFamily: CharSequence): ServerSocketChannel = open()
     }
 }
 
@@ -56,17 +57,17 @@ internal class UringServerSocketChannel(
 
     override fun validOps(): Int = SelectionKey.OP_ACCEPT
 
-    override fun bind(address: String): ServerSocketChannel = this
+    override fun bind(address: CharSequence): ServerSocketChannel = this
 
-    override fun <T> setOption(option: String, value: T): ServerSocketChannel = this
+    override fun <T> setOption(option: CharSequence, value: T): ServerSocketChannel = this
 
-    override fun getLocalAddress():CharSequence= "0.0.0.0:0"
+    override fun getLocalAddress(): CharSequence = "0.0.0.0:0"
 
     // TODO
     override fun accept(): SocketChannel = TODO("accept — Channel.accept + submit+wait")
 
-    override fun <T> getOption(option: String): T = TODO("getOption")
-    override fun supportedOptions(): Set<String> = emptySet()
+    override fun <T> getOption(option: CharSequence): T = TODO("getOption")
+    override fun supportedOptions(): Set<CharSequence> = emptySet()
 
     override fun close() { open = false }
     override fun isOpen(): Boolean = open

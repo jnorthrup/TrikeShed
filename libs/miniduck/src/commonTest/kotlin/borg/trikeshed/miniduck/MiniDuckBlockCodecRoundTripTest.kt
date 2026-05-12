@@ -10,7 +10,7 @@ class MiniDuckBlockCodecRoundTripTest {
     // ── helpers ──────────────────────────────────────────────────────────
 
     /** Create a sealed block containing the given rows and return the NDJSON. */
-    private fun encodeBlock(vararg rows: RowVec): String {
+    private fun encodeBlock(vararg rows: RowVec): CharSequence {
         val block = BlockRowVec.mutable()
         rows.forEach(block::append)
         block.seal()
@@ -18,7 +18,7 @@ class MiniDuckBlockCodecRoundTripTest {
     }
 
     /** Decode NDJSON text back into a sealed BlockRowVec. */
-    private fun decodeBlock(text: String): BlockRowVec =
+    private fun decodeBlock(text: CharSequence): BlockRowVec =
         MiniDuckBlockCodec.decode(text)
 
     /** Round-trip helper: encode rows → decode → return decoded block. */

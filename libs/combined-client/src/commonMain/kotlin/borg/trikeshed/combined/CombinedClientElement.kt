@@ -29,7 +29,7 @@ open class CombinedClientElement(
         super.close()
     }
 
-    suspend fun executeRpc(target: String, args: List<String>): String {
+    suspend fun executeRpc(target: CharSequence, args: List<CharSequence>): CharSequence {
         return when (target) {
             "htx" -> {
                 val h = htx ?: error("HTX element not configured")

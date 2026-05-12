@@ -7,7 +7,7 @@ import borg.trikeshed.lib.j
 class BPlusTreeRangeTest {
     @Test
     fun `test range`() {
-        val tree = BPlusTree<Int, String>(order = 3)
+        val tree = BPlusTree<Int, CharSequence>(order = 3)
         tree.put(1, "one")
         tree.put(2, "two")
         tree.put(3, "three")
@@ -23,7 +23,7 @@ class BPlusTreeRangeTest {
 
     @Test
     fun `range includes entries with null values`() {
-        val tree = BPlusTree<Int, String?>(order = 3)
+        val tree = BPlusTree<Int, CharSequence?>(order = 3)
         tree.put(1, null)
         tree.put(2, "two")
         tree.put(3, null)

@@ -169,7 +169,7 @@ class MvccSnapshotTest {
         val names = (0 until cursor.size).map { i ->
             val row = cursor.at(i)
             // extract values properly
-            row.values.toList().firstOrNull() as? String
+            row.values.toList().firstOrNull() as? CharSequence
         }.toSet()
         assertEquals(setOf("alice", "bob"), names)
     }
@@ -190,7 +190,7 @@ class MvccSnapshotTest {
 
     // ── Helpers ──────────────────────────────────────────────────────────
 
-    fun sealedBlock(name: String): List<Any?> {
+    fun sealedBlock(name: CharSequence): List<Any?> {
         return listOf(name as Any?)
     }
 }

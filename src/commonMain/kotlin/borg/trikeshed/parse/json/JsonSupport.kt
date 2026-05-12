@@ -16,13 +16,13 @@ import borg.trikeshed.parse.confix.toJsPath
  */
 object JsonSupport {
     fun parse(
-        text: String,
+        text: CharSequence,
         nodeEvidence: MutableList<TypeEvidence>? = null,
         rowVecCallback: ((RowVec) -> Unit)? = null,
     ): Any? = JsonParser.reify(text.toSeries(), nodeEvidence, rowVecCallback)
 
     fun index(
-        text: String,
+        text: CharSequence,
         depths: MutableList<Int>? = null,
         takeFirst: Int? = null,
     ): JsElement = JsonParser.index(text.toSeries(), depths, takeFirst)
@@ -30,7 +30,7 @@ object JsonSupport {
     fun pathOf(vararg steps: Any?): JsPath = steps.asList().toJsPath()
 
     fun query(
-        text: String,
+        text: CharSequence,
         path: JsPath,
         reifyResult: Boolean = true,
         depths: MutableList<Int>? = null,
@@ -41,20 +41,20 @@ object JsonSupport {
     }
 
     fun query(
-        text: String,
+        text: CharSequence,
         path: List<*>,
         reifyResult: Boolean = true,
         depths: MutableList<Int>? = null,
      ): Any? = query(text, path.toJsPath(), reifyResult, depths)
 
     fun query(
-        text: String,
-        query: String,
+        text: CharSequence,
+        query: CharSequence,
         reifyResult: Boolean = true,
         depths: MutableList<Int>? = null,
     ): Any? = query(text, parseQueryPath(query), reifyResult, depths)
 
-    private fun parseQueryPath(query: String): JsPath {
+    private fun parseQueryPath(query: CharSequence): JsPath {
         val steps = mutableListOf<Any?>()
         val segment = StringBuilder()
 

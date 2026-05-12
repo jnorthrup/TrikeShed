@@ -16,14 +16,14 @@ import borg.trikeshed.couch.htx.*
 
 /** Result of an IPFS operation. */
 sealed class IpfsResult {
-    data class Stored(val cid: String, val sizeBytes: Long) : IpfsResult()
+    data class Stored(val cid: CharSequence, val sizeBytes: Long) : IpfsResult()
     data class PatchResult(val patch: Patch) : IpfsResult()
-    data class Error(val message: String) : IpfsResult()
+    data class Error(val message: CharSequence) : IpfsResult()
 }
 
 class PijulIpfsStore(
     private val shell: ProcessShell,
-    private val patchNamespace: String = "pijul/patches",
+    private val patchNamespace: CharSequence = "pijul/patches",
 ) {
     companion object {
         const val PATCH_CID_PREFIX = "/ipfs/"
@@ -55,7 +55,7 @@ class PijulIpfsStore(
     /**
      * Retrieve a patch from IPFS by CID.
      */
-    fun retrieve(cid: String): IpfsResult {
+    fun retrieve(cid: CharSequence): IpfsResult {
         val result = shell.exec("ipfs", listOf("cat", cid))
         if (result.exitCode != 0) {
             return IpfsResult.Error("ipfs cat failed: ${result.stderr}")
@@ -78,7 +78,7 @@ class PijulIpfsStore(
     /**
      * Pin a CID to prevent garbage collection.
      */
-    fun pin(cid: String): Boolean {
+    fun pin(cid: CharSequence): Boolean {
         val result = shell.exec("ipfs", listOf("pin", "add", cid))
         return result.exitCode == 0
     }
@@ -86,7 +86,7 @@ class PijulIpfsStore(
     /**
      * Check whether a CID is pinned.
      */
-    fun isPinned(cid: String): Boolean {
+    fun isPinned(cid: CharSequence): Boolean {
         val result = shell.exec("ipfs", listOf("pin", "ls", cid))
         return result.exitCode == 0 && result.stdout.contains(cid)
     }
@@ -94,7 +94,7 @@ class PijulIpfsStore(
     /**
      * List all patches stored in IPFS for a given namespace prefix.
      */
-    fun listStored(namespace: String): List<String> {
+    fun listStored(namespace: CharSequence): List<CharSequence> {
         val result = shell.exec("ipfs", listOf("pin", "ls", "--type=recursive"))
         if (result.exitCode != 0) return emptyList()
         return result.stdout.lines()
@@ -145,9 +145,9 @@ class PijulIpfsStore(
         sb.append(v.toChar())
     }
 
-    private fun isCompositeCid(cid: String): Boolean = cid.startsWith("Qm") && cid.contains("_")
+    private fun isCompositeCid(cid: CharSequence): Boolean = cid.startsWith("Qm") && cid.contains("_")
 
-    private fun parseCompositeCid(cid: String): List<String> = cid.split("_").filter { it.isNotBlank() }
+    private fun parseCompositeCid(cid: CharSequence): List<CharSequence> = cid.split("_").filter { it.isNotBlank() }
 
     private fun reassembleChunks(chunks: List<ByteArray>): ByteArray {
         val total = chunks.sumOf { it.size }
@@ -160,6 +160,6 @@ class PijulIpfsStore(
         return result
     }
 
-    private fun escapeShell(s: String): String =
+    private fun escapeShell(s: CharSequence): CharSequence =
         s.replace("'", "'\\''")
 }

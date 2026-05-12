@@ -5,11 +5,11 @@ import borg.trikeshed.couch.api.CouchViewDefinition
 
 /**
  * Minimal JSON encoder for CouchDB view query parameters.
- * Handles null, String, Boolean, Number, List, Map; falls back to toString() for anything else.
+ * Handles null, CharSequence, Boolean, Number, List, Map; falls back to toString() for anything else.
  */
-internal fun jsonEncode(value: Any?): String = when (value) {
+internal fun jsonEncode(value: Any?): CharSequence = when (value) {
     null -> "null"
-    is String -> buildString {
+    is CharSequence -> buildString {
         append('"')
         value.forEach { ch ->
             when (ch) {
@@ -44,8 +44,8 @@ internal fun jsonEncode(value: Any?): String = when (value) {
  * ```
  */
 fun couchViewManifest(
-    databaseName: String,
-    designDocId: String,
+    databaseName: CharSequence,
+    designDocId: CharSequence,
     block: CouchViewManifestBuilder.() -> Unit,
 ): CouchViewManifest {
     val builder = CouchViewManifestBuilder(databaseName, designDocId)
@@ -54,21 +54,21 @@ fun couchViewManifest(
 }
 
 class CouchViewManifestBuilder(
-    private val databaseName: String,
-    private val designDocId: String,
+    private val databaseName: CharSequence,
+    private val designDocId: CharSequence,
 ) {
-    private val viewDefs = mutableMapOf<String, CouchViewDefinition>()
-    private val invocations = mutableMapOf<String, CouchViewInvocation>()
+    private val viewDefs = mutableMapOf<CharSequence, CouchViewDefinition>()
+    private val invocations = mutableMapOf<CharSequence, CouchViewInvocation>()
 
     /**
      * Register a view with an explicit query [template].
      * Templates use `%N$s` placeholders for positional arguments (URL-encoded by [CouchViewInvocation.invoke]).
      */
     fun view(
-        name: String,
-        map: String,
-        reduce: String? = null,
-        template: String,
+        name: CharSequence,
+        map: CharSequence,
+        reduce: CharSequence? = null,
+        template: CharSequence,
         returnShape: CouchViewInvocation.ReturnShape = CouchViewInvocation.ReturnShape.ListValue,
     ) {
         viewDefs[name] = CouchViewDefinition(map = map, reduce = reduce)

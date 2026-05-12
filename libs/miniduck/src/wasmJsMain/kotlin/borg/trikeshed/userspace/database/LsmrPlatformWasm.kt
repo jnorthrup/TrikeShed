@@ -3,32 +3,32 @@ package borg.trikeshed.userspace.database
 import borg.trikeshed.userspace.nio.file.Files
 
 
-actual suspend fun persistSegmentToDisk(rootPath: String, fileName: String, entries: Map<String, ByteArray>) {
+actual suspend fun persistSegmentToDisk(rootPath: CharSequence, fileName: CharSequence, entries: Map<CharSequence, ByteArray>) {
     val path = segmentPath(rootPath, fileName)
     val bytes = encodeSegment(entries)
     Files.write(path, bytes)
 }
 
-actual suspend fun loadKeyFromSegment(rootPath: String, fileName: String, key: String): ByteArray? {
+actual suspend fun loadKeyFromSegment(rootPath: CharSequence, fileName: CharSequence, key: CharSequence): ByteArray? {
     val path = segmentPath(rootPath, fileName)
     if (!Files.exists(path)) return null
     val segment = Files.readAllBytes(path)
     return decodeSegment(segment, key)
 }
 
-actual fun deleteSegmentFile(rootPath: String, fileName: String) {
+actual fun deleteSegmentFile(rootPath: CharSequence, fileName: CharSequence) {
     Files.deleteRecursively(segmentPath(rootPath, fileName))
 }
-fun segmentPath(rootPath: String, fileName: String): String =
+fun segmentPath(rootPath: CharSequence, fileName: CharSequence): CharSequence =
     if (rootPath.isEmpty()) fileName
     else if (rootPath.endsWith('/')) "$rootPath$fileName"
     else "$rootPath/$fileName"
-fun encodeSegment(entries: Map<String, ByteArray>): ByteArray {
-    val totalSize = entries.entries.sumOf { (key, value) -> 4 + key.encodeToByteArray().size + 4 + value.size }
+fun encodeSegment(entries: Map<CharSequence, ByteArray>): ByteArray {
+    val totalSize = entries.entries.sumOf { (key, value) -> 4 + key.toString().encodeToByteArray().size + 4 + value.size }
     val bytes = ByteArray(totalSize)
     var pos = 0
     for ((key, value) in entries) {
-        val keyBytes = key.encodeToByteArray()
+        val keyBytes = key.toString().encodeToByteArray()
         pos = writeInt(bytes, pos, keyBytes.size)
         keyBytes.copyInto(bytes, pos)
         pos += keyBytes.size
@@ -38,7 +38,7 @@ fun encodeSegment(entries: Map<String, ByteArray>): ByteArray {
     }
     return bytes
 }
-fun decodeSegment(bytes: ByteArray, key: String): ByteArray? {
+fun decodeSegment(bytes: ByteArray, key: CharSequence): ByteArray? {
     var pos = 0
     while (pos + 8 <= bytes.size) {
         val keyLength = readInt(bytes, pos)

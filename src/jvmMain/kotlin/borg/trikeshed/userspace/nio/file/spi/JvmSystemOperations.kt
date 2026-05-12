@@ -2,9 +2,9 @@ package borg.trikeshed.userspace.nio.file.spi
 
 class JvmSystemOperations : SystemOperations {
 
-    override fun getenv(name: String, defaultVal: String?): String? =
-        java.lang.System.getenv(name) ?: defaultVal
+    override fun getenv(name: CharSequence, defaultVal: CharSequence?): CharSequence? =
+        java.lang.System.getenv(name.toString()) ?: defaultVal
 
-    override val homedir: String
+    override val homedir: CharSequence
         get() = java.lang.System.getProperty("user.home") ?: "/"
 }

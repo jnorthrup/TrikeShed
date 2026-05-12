@@ -10,13 +10,13 @@ data class DotenvResolution(
 )
 
 fun resolveDotenvPath(
-    explicitPath: String? = System.getProperty("cbadvanced.dotenv") ?: System.getenv("CBADVANCED_DOTENV"),
+    explicitPath: CharSequence? = System.getProperty("cbadvanced.dotenv") ?: System.getenv("CBADVANCED_DOTENV"),
     workingDir: Path = Paths.get("").toAbsolutePath().normalize(),
 ): Path = resolveDotenv(workingDir = workingDir, explicitPath = explicitPath).resolvedPath
 
 fun resolveDotenv(
     workingDir: Path = Paths.get("").toAbsolutePath().normalize(),
-    explicitPath: String? = System.getProperty("cbadvanced.dotenv") ?: System.getenv("CBADVANCED_DOTENV"),
+    explicitPath: CharSequence? = System.getProperty("cbadvanced.dotenv") ?: System.getenv("CBADVANCED_DOTENV"),
 ): DotenvResolution {
     val searched = mutableListOf<Path>()
     explicitPath?.takeUnless { it.isBlank() }?.let { raw ->

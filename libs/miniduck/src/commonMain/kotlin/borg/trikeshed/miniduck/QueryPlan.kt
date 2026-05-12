@@ -4,14 +4,14 @@ import borg.trikeshed.cursor.Cursor as MiniCursor
 
 /** Specification for ordering a column. */
 data class OrderSpec(
-    val column: String,
+    val column: CharSequence,
     val desc: Boolean = false,
 )
 
 /** Relation identity for plan trees and DSL surfaces. */
 data class RelationRef(
-    val database: String,
-    val name: String,
+    val database: CharSequence,
+    val name: CharSequence,
     val kind: RelationKind,
 )
 
@@ -35,13 +35,13 @@ data class ScanPlan(
 // ViewQueryPlan carries enough data for the DSL to attach parameters.
 data class ViewQueryPlan(
     override val source: RelationRef,
-    val designDocument: String,
-    val viewName: String,
-    val parameters: Map<String, String> = emptyMap(),
+    val designDocument: CharSequence,
+    val viewName: CharSequence,
+    val parameters: Map<CharSequence, CharSequence> = emptyMap(),
 ) : QueryPlan {
-    val database: String get() = source.database
+    val database: CharSequence get() = source.database
 
-    fun withParameter(name: String, value: Any?): ViewQueryPlan =
+    fun withParameter(name: CharSequence, value: Any?): ViewQueryPlan =
         copy(parameters = parameters + (name to (value?.toString() ?: "")))
 }
 
@@ -54,7 +54,7 @@ data class FilterPlan(
 
 data class ProjectPlan(
     val upstream: QueryPlan,
-    val columns: List<String>,
+    val columns: List<CharSequence>,
 ) : QueryPlan {
     override val source: RelationRef get() = upstream.source
 }
@@ -74,16 +74,16 @@ data class LimitPlan(
     override val source: RelationRef get() = upstream.source
 }
 
-fun QueryPlan.withParameter(key: String, value: Any?): QueryPlan = when (this) {
+fun QueryPlan.withParameter(key: CharSequence, value: Any?): QueryPlan = when (this) {
     is ViewQueryPlan -> this.copy(parameters = this.parameters + (key to (value?.toString() ?: "")))
     else -> this
 }
 
-fun ViewQueryPlan.withParameter(key: String, value: Any?): ViewQueryPlan =
+fun ViewQueryPlan.withParameter(key: CharSequence, value: Any?): ViewQueryPlan =
     this.copy(parameters = this.parameters + (key to (value?.toString() ?: "")))
 
 infix fun QueryPlan.filter(pred: Predicate): FilterPlan = FilterPlan(this, pred)
-infix fun QueryPlan.project(columns: List<String>): ProjectPlan = ProjectPlan(this, columns)
+infix fun QueryPlan.project(columns: List<CharSequence>): ProjectPlan = ProjectPlan(this, columns)
 infix fun QueryPlan.orderBy(specs: List<OrderSpec>): OrderPlan = OrderPlan(this, specs)
 infix fun QueryPlan.limit(n: Int): LimitPlan = LimitPlan(this, n)
 infix fun QueryPlan.offset(n: Int): LimitPlan =

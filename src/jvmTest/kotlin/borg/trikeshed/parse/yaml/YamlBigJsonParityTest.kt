@@ -31,7 +31,7 @@ class YamlBigJsonParityTest {
         }
     }
 
-   fun renderYaml(value: Any?, indent: Int = 0): String {
+   fun renderYaml(value: Any?, indent: Int = 0): CharSequence {
         val prefix = " ".repeat(indent)
         return when (value) {
             null -> "null"
@@ -43,13 +43,13 @@ class YamlBigJsonParityTest {
             is List<*> -> if (value.isEmpty()) "[]" else value.joinToString("\n") { child ->
                 renderListItem(child, indent)
             }
-            is String -> quoteYaml(value)
+            is CharSequence -> quoteYaml(value)
             is Boolean, is Int, is Long, is Double, is Float -> value.toString()
             else -> quoteYaml(value.toString())
         }
     }
 
-   fun renderListItem(value: Any?, indent: Int): String {
+   fun renderListItem(value: Any?, indent: Int): CharSequence {
         val prefix = " ".repeat(indent)
         return when {
             isInline(value) -> "$prefix- ${renderYaml(value, indent + 2)}"
@@ -79,7 +79,7 @@ class YamlBigJsonParityTest {
         }
     }
 
-   fun quoteYaml(value: String): String =
+   fun quoteYaml(value: CharSequence): CharSequence =
         buildString(value.length + 2) {
             append('"')
             value.forEach { ch ->
@@ -97,7 +97,7 @@ class YamlBigJsonParityTest {
 
    fun isInline(value: Any?): Boolean =
         value == null ||
-            value is String ||
+            value is CharSequence ||
             value is Number ||
             value is Boolean ||
             (value is Map<*, *> && value.isEmpty()) ||
@@ -115,7 +115,7 @@ class YamlBigJsonParityTest {
         var current = root
         for (segment in path) {
             current = when {
-                segment is String && current is Map<*, *> -> current[segment]
+                segment is CharSequence && current is Map<*, *> -> current[segment]
                 segment is Int && current is List<*> -> current[segment]
                 else -> error("Path $path is invalid at segment $segment for value $current")
             }

@@ -8,10 +8,10 @@ import platform.posix.*
 class PosixProcessOperations : ProcessOperations {
 
     override suspend fun exec(
-        command: String,
-        args: List<String>,
+        command: CharSequence,
+        args: List<CharSequence>,
         stdin: ByteArray?,
-        env: Map<String, String>,
+        env: Map<CharSequence, CharSequence>,
     ): ProcessResult {
         val cmd = buildString { append(command); for (a in args) { append(" "); append(a) } }
         val fp = popen("$cmd 2>&1", "r") ?: return ProcessResult(-1, byteArrayOf(), "popen() failed".encodeToByteArray())

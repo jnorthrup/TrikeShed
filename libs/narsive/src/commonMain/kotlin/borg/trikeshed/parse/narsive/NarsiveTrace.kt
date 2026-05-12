@@ -1,7 +1,7 @@
 package borg.trikeshed.parse.narsive
 
 data class NarsiveTrace(
-    val label: String,
-    val token: String? = null,
+    val label: CharSequence,
+    val token: CharSequence? = null,
     val parse: Any? = null,
 )

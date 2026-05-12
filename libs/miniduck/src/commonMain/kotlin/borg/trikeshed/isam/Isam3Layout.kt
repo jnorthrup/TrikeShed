@@ -22,14 +22,14 @@ class Isam3Layout(
     val partitions: Series<Isam3Partition>,
     val views: Series<Isam3View>,
 ) {
-    fun partition(name: String): Isam3Partition? {
+    fun partition(name: CharSequence): Isam3Partition? {
         for (partition in partitions.view) {
             if (partition.name == name) return partition
         }
         return null
     }
 
-    fun file(name: String): Isam3File? {
+    fun file(name: CharSequence): Isam3File? {
         for (partition in partitions.view) {
             for (file in partition.files.view) {
                 if (file.name == name) return file
@@ -38,11 +38,11 @@ class Isam3Layout(
         return null
     }
 
-    fun view(name: String): Isam3View? = views.view.firstOrNull { it.name == name }
+    fun view(name: CharSequence): Isam3View? = views.view.firstOrNull { it.name == name }
 
-    fun defaultViewName(): String = views.getOrNull(0)?.name ?: "default"
+    fun defaultViewName(): CharSequence = views.getOrNull(0)?.name ?: "default"
 
-    fun logicalNames(viewName: String? = null): Series<String> {
+    fun logicalNames(viewName: CharSequence? = null): Series<CharSequence> {
         val names = when (val resolvedView = when (viewName) {
             null -> views.getOrNull(0)
             else -> view(viewName) ?: error("Unknown ISAM3 view: $viewName")
@@ -53,17 +53,17 @@ class Isam3Layout(
         return names.toList().distinct().toSeries()
     }
 
-    fun logicalMeta(viewName: String? = null): Series<ColumnMeta> {
+    fun logicalMeta(viewName: CharSequence? = null): Series<ColumnMeta> {
         val resolved = resolvedColumns(viewName)
         return resolved.size j { index: Int -> resolved[index].meta }
     }
 
-    fun recordMeta(viewName: String? = null): Series<RecordMeta> {
+    fun recordMeta(viewName: CharSequence? = null): Series<RecordMeta> {
         val resolved = resolvedColumns(viewName)
         return resolved.size j { index: Int -> resolved[index].meta }
     }
 
-    fun resolvedColumns(viewName: String? = null): Series<Isam3ResolvedColumn> {
+    fun resolvedColumns(viewName: CharSequence? = null): Series<Isam3ResolvedColumn> {
         val names = logicalNames(viewName)
         if (names.size == 0) return emptySeries()
         return names.size j { index: Int ->
@@ -73,7 +73,7 @@ class Isam3Layout(
     }
 
     fun allPlacements(): Series<Isam3Placement> {
-        val seen = linkedSetOf<String>()
+        val seen = linkedSetOf<CharSequence>()
         val out = mutableListOf<Isam3Placement>()
         partitions.view.forEach { partition ->
             partition.files.view.forEach { file ->
@@ -87,7 +87,7 @@ class Isam3Layout(
         return out.toSeries()
     }
 
-    fun render(): String = buildString {
+    fun render(): CharSequence = buildString {
         appendLine("isam: 3")
         if (views.size > 0) {
             appendLine("views:")
@@ -120,7 +120,7 @@ class Isam3Layout(
         }
     }
 
-    private fun resolveColumn(columnName: String): Isam3ResolvedColumn {
+    private fun resolveColumn(columnName: CharSequence): Isam3ResolvedColumn {
         partitions.view.forEach { partition ->
             partition.files.view.forEach { file ->
                 file.groups.view.forEach { group ->
@@ -144,7 +144,7 @@ class Isam3Layout(
         error("Missing column $columnName in ISAM layout")
     }
 
-    private fun renderGroup(group: Isam3Group, indent: String): String {
+    private fun renderGroup(group: Isam3Group, indent: CharSequence): CharSequence {
         val placements = group.placements.toList()
         val packed = isPacked(group.type, placements)
         return if (packed) {
@@ -182,22 +182,22 @@ class Isam3Layout(
     }
 
     companion object {
-        fun parse(text: String): Isam3Layout = fromMap(parseYaml(text) as? Map<*, *> ?: error("ISAM layout root must be a map"))
+        fun parse(text: CharSequence): Isam3Layout = fromMap(parseYaml(text) as? Map<*, *> ?: error("ISAM layout root must be a map"))
 
-        fun read(file: String): Isam3Layout = parse(Files.readString(file))
+        fun read(file: CharSequence): Isam3Layout = parse(Files.readString(file).toString())
 
         fun fromConstraints(
-            partitionName: String,
+            partitionName: CharSequence,
             constraints: Series<RecordMeta>,
-            viewColumns: Series<String> = constraints.size j { index: Int -> constraints[index].name },
+            viewColumns: Series<CharSequence> = constraints.size j { index: Int -> constraints[index].name },
         ): Isam3Layout = fromCursor(partitionName, constraints, viewColumns)
 
         fun fromCursor(
-            partitionName: String,
+            partitionName: CharSequence,
             constraints: Series<RecordMeta>,
-            viewColumns: Series<String> = constraints.size j { index: Int -> constraints[index].name },
+            viewColumns: Series<CharSequence> = constraints.size j { index: Int -> constraints[index].name },
         ): Isam3Layout {
-            val groupsByCluster = linkedMapOf<String, MutableList<RecordMeta>>()
+            val groupsByCluster = linkedMapOf<CharSequence, MutableList<RecordMeta>>()
             constraints.view.forEach { meta ->
                 val cluster = clusterName(meta)
                 groupsByCluster.getOrPut(cluster) { mutableListOf() }.add(meta)
@@ -249,8 +249,8 @@ class Isam3Layout(
                 .toSeries()
 
             val resolvedViews = if (viewSeries.size > 0) viewSeries else 1 j { _: Int ->
-                val columns = mutableListOf<String>()
-                val seen = linkedSetOf<String>()
+                val columns = mutableListOf<CharSequence>()
+                val seen = linkedSetOf<CharSequence>()
                 for (partition in partitions.view) {
                     for (file in partition.files.view) {
                         for (group in file.groups.view) {
@@ -276,7 +276,7 @@ class Isam3Layout(
             }.toSeries()
         }
 
-        private fun parsePartition(name: String, raw: Any?): Isam3Partition {
+        private fun parsePartition(name: CharSequence, raw: Any?): Isam3Partition {
             val map = raw.asMap("partition $name")
             val flags = parseFlags(map["flags"] ?: map["coords"], "partition $name flags")
             val files = map.entries
@@ -286,7 +286,7 @@ class Isam3Layout(
             return Isam3Partition(name, flags, files)
         }
 
-        private fun parseFile(name: String, raw: Any?): Isam3File {
+        private fun parseFile(name: CharSequence, raw: Any?): Isam3File {
             val map = raw.asMap("file $name")
             val flags = parseFlags(map["flags"] ?: map["coords"], "file $name flags")
             var fileOffset = 0
@@ -306,8 +306,8 @@ class Isam3Layout(
             return Isam3File(name, flags, groups.toSeries(), rowWidth)
         }
 
-        private fun parseGroup(typeName: String, raw: Any?, context: String, fileOffset: Int): ParsedGroup {
-            val type = IOMemento.valueOf(typeName)
+        private fun parseGroup(typeName: CharSequence, raw: Any?, context: CharSequence, fileOffset: Int): ParsedGroup {
+            val type = IOMemento.valueOf(typeName.toString())
             val placements = when (raw) {
                 is List<*> -> parsePlacementList(type, raw, context, fileOffset)
                 is Map<*, *> -> parsePlacementMap(type, raw.entries.associate { it.key.toString() to it.value }, context)
@@ -317,15 +317,15 @@ class Isam3Layout(
             return ParsedGroup(Isam3Group(type, placements), spanEnd)
         }
 
-        private fun parsePlacementList(type: IOMemento, raw: List<*>, context: String, fileOffset: Int): Series<Isam3Placement> {
+        private fun parsePlacementList(type: IOMemento, raw: List<*>, context: CharSequence, fileOffset: Int): Series<Isam3Placement> {
             if (raw.isEmpty()) return emptySeries()
-            if (raw.size == 2 && raw[0] is Number && raw[1] is String) {
+            if (raw.size == 2 && raw[0] is Number && raw[1] is CharSequence) {
                 val width = (raw[0] as Number).toInt()
                 val name = raw[1].asString("$context ${type.name}")
                 requireWidth(type, width, name, context)
                 return 1 j { _: Int -> Isam3Placement(name, fileOffset, width) }
             }
-            if (raw.all { it is String }) {
+            if (raw.all { it is CharSequence }) {
                 var offset = fileOffset
                 return raw.map { value ->
                     val name = value.asString("$context ${type.name}")
@@ -339,7 +339,7 @@ class Isam3Layout(
                 var offset = fileOffset
                 return raw.map { spec ->
                     val list = spec as List<*>
-                    require(list.size == 2 && list[0] is Number && list[1] is String) {
+                    require(list.size == 2 && list[0] is Number && list[1] is CharSequence) {
                         "$context.${type.name} list entries must be [width, name]"
                     }
                     val width = (list[0] as Number).toInt()
@@ -353,7 +353,7 @@ class Isam3Layout(
             error("$context.${type.name} list form must be column names or [width, name] pairs")
         }
 
-        private fun parsePlacementMap(type: IOMemento, raw: Map<String, Any?>, context: String): Series<Isam3Placement> {
+        private fun parsePlacementMap(type: IOMemento, raw: Map<CharSequence, Any?>, context: CharSequence): Series<Isam3Placement> {
             return raw.entries.map { (name, beginRaw) ->
                 val begin = when (beginRaw) {
                     is List<*> -> {
@@ -374,20 +374,20 @@ class Isam3Layout(
             }.toSeries()
         }
 
-        private fun parseColumnNames(raw: Any?, context: String): Series<String> = when (raw) {
+        private fun parseColumnNames(raw: Any?, context: CharSequence): Series<CharSequence> = when (raw) {
             is List<*> -> raw.map { it.asString(context) }.toSeries()
-            is String -> 1 j { _: Int -> raw.asString(context) }
+            is CharSequence -> 1 j { _: Int -> raw.asString(context) }
             else -> error("$context must be a list of strings")
         }
 
-        private fun parseFlags(raw: Any?, context: String): Series<String> = when (raw) {
+        private fun parseFlags(raw: Any?, context: CharSequence): Series<CharSequence> = when (raw) {
             null -> emptySeries()
             is List<*> -> raw.map { it.asString(context) }.toSeries()
-            is String -> 1 j { _: Int -> raw.asString(context) }
+            is CharSequence -> 1 j { _: Int -> raw.asString(context) }
             else -> error("$context must be a list of strings")
         }
 
-        private fun widthFor(type: IOMemento, name: String, explicit: Int?, context: String): Int {
+        private fun widthFor(type: IOMemento, name: CharSequence, explicit: Int?, context: CharSequence): Int {
             val fixed = type.networkSize
             return when {
                 fixed != null -> {
@@ -403,7 +403,7 @@ class Isam3Layout(
             }
         }
 
-        private fun requireWidth(type: IOMemento, width: Int, name: String, context: String) {
+        private fun requireWidth(type: IOMemento, width: Int, name: CharSequence, context: CharSequence) {
             val fixed = type.networkSize
             if (fixed != null) {
                 require(width >= fixed) {
@@ -414,8 +414,8 @@ class Isam3Layout(
             }
         }
 
-        private fun clusterName(meta: RecordMeta): String {
-            val lower = meta.name.lowercase()
+        private fun clusterName(meta: RecordMeta): CharSequence {
+            val lower = meta.name.toString().lowercase()
             return when {
                 "time" in lower -> "time"
                 lower in PRICE_COLUMNS -> "price"
@@ -429,31 +429,31 @@ class Isam3Layout(
             }
         }
 
-        private val PRICE_COLUMNS: Set<String> = setOf("open", "high", "low", "close")
+        private val PRICE_COLUMNS: Set<CharSequence> = setOf("open", "high", "low", "close")
 
-        private fun typeNameOf(value: Any?): String = value?.let { it::class.simpleName ?: it::class.toString() } ?: "null"
+        private fun typeNameOf(value: Any?): CharSequence = value?.let { it::class.simpleName ?: it::class.toString() } ?: "null"
 
-        private fun Any?.asMap(context: String): Map<String, Any?> = asMapOrNull(context) ?: error("$context must be a map")
+        private fun Any?.asMap(context: CharSequence): Map<CharSequence, Any?> = asMapOrNull(context) ?: error("$context must be a map")
 
-        private fun Any?.asMapOrNull(context: String): Map<String, Any?>? = when (this) {
+        private fun Any?.asMapOrNull(context: CharSequence): Map<CharSequence, Any?>? = when (this) {
             null -> null
             is Map<*, *> -> entries.associate { it.key.toString() to it.value }
             else -> null
         }
 
-        private fun Any?.asString(context: String): String = when (this) {
-            is String -> this
+        private fun Any?.asString(context: CharSequence): CharSequence = when (this) {
+            is CharSequence -> this
             else -> error("$context must be a string, got ${typeNameOf(this)}")
         }
 
-        private fun Any?.asInt(context: String): Int = when (this) {
+        private fun Any?.asInt(context: CharSequence): Int = when (this) {
             is Int -> this
             is Long -> this.toInt()
             is Short -> this.toInt()
             is Byte -> this.toInt()
             is Double -> this.toInt()
             is Float -> this.toInt()
-            is String -> toIntOrNull() ?: error("$context must be an Int, got $this")
+            is CharSequence -> toString().toIntOrNull() ?: error("$context must be an Int, got $this")
             else -> error("$context must be an Int, got ${typeNameOf(this)}")
         }
     }
@@ -465,14 +465,14 @@ private data class ParsedGroup(
 )
 
 class Isam3Partition(
-    val name: String,
-    val flags: Series<String>,
+    val name: CharSequence,
+    val flags: Series<CharSequence>,
     val files: Series<Isam3File>,
 )
 
 class Isam3File(
-    val name: String,
-    val flags: Series<String>,
+    val name: CharSequence,
+    val flags: Series<CharSequence>,
     val groups: Series<Isam3Group>,
     val rowWidth: Int,
 )
@@ -483,7 +483,7 @@ class Isam3Group(
 )
 
 data class Isam3Placement(
-    val name: String,
+    val name: CharSequence,
     val begin: Int,
     val width: Int,
 ) {
@@ -491,21 +491,21 @@ data class Isam3Placement(
 }
 
 class Isam3View(
-    val name: String,
-    val columns: Series<String>,
+    val name: CharSequence,
+    val columns: Series<CharSequence>,
 )
 
 data class Isam3ResolvedColumn(
-    val partition: String,
-    val file: String,
+    val partition: CharSequence,
+    val file: CharSequence,
     val type: IOMemento,
     val meta: RecordMeta,
     val begin: Int,
     val end: Int,
 )
 
-private fun renderInlineList(values: List<String>): String =
+private fun renderInlineList(values: List<CharSequence>): CharSequence =
     values.joinToString(", ", prefix = "[", postfix = "]") { yamlScalar(it) }
 
-private fun yamlScalar(value: String): String =
-    if (value.matches(Regex("^[A-Za-z0-9_.:/+-]+$"))) value else "\"${value.replace("\\", "\\\\").replace("\"", "\\\"")}\""
+private fun yamlScalar(value: CharSequence): CharSequence =
+    if (value.toString().matches(Regex("^[A-Za-z0-9_.:/+-]+$"))) value else "\"${value.toString().replace("\\", "\\\\").replace("\"", "\\\"")}\""

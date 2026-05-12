@@ -17,18 +17,18 @@ external class Storage {
 }
 const val FILE_PREFIX = "trikeshed:browser:file:"
 const val DIR_PREFIX = "trikeshed:browser:dir:"
-val blobFallback = linkedMapOf<String, String>()
-val dirFallback = linkedSetOf<String>()
-val envFallback = linkedMapOf<String, String>()
+val blobFallback = linkedMapOf<CharSequence, CharSequence>()
+val dirFallback = linkedSetOf<CharSequence>()
+val envFallback = linkedMapOf<CharSequence, CharSequence>()
 fun storageOrNull(): Storage? =
     try {
         browserLocalStorage
     } catch (_: Throwable) {
         null
     }
-fun normalizePath(path: String): String {
+fun normalizePath(path: CharSequence): CharSequence {
     val normalized = path.replaceChar('\\', '/')
-    val parts: MutableList<String> = mutableListOf<String>()
+    val parts: MutableList<CharSequence> = mutableListOf<CharSequence>()
     for (part in normalized.split('/')) {
         when {
             part.isEmpty() || part == "." -> {}
@@ -38,43 +38,43 @@ fun normalizePath(path: String): String {
     }
     return "/" + parts.joinToString("/")
 }
-fun parentPath(path: String): String? {
-    val normalized: String = normalizePath(path)
+fun parentPath(path: CharSequence): CharSequence? {
+    val normalized: CharSequence = normalizePath(path)
     val cut: Int = normalized.lastIndexOf('/')
     return if (cut <= 0) "/"
     else normalized.substring(0, cut)
 }
-fun fileKey(path: String): String = FILE_PREFIX + normalizePath(path)
-fun dirKey(path: String): String = DIR_PREFIX + normalizePath(path)
-fun storageGet(key: String): String? =
+fun fileKey(path: CharSequence): CharSequence = FILE_PREFIX + normalizePath(path)
+fun dirKey(path: CharSequence): CharSequence = DIR_PREFIX + normalizePath(path)
+fun storageGet(key: CharSequence): CharSequence? =
     storageOrNull()?.let {
         try {
-            it.getItem(key)
+            it.getItem(key.toString())
         } catch (_: Throwable) {
             null
         }
     }
-fun storageSet(key: String, value: String): Boolean {
+fun storageSet(key: CharSequence, value: CharSequence): Boolean {
     val storage = storageOrNull() ?: return false
     return try {
-        storage.setItem(key, value)
+        storage.setItem(key.toString(), value.toString())
         true
     } catch (_: Throwable) {
         false
     }
 }
-fun storageRemove(key: String): Boolean {
+fun storageRemove(key: CharSequence): Boolean {
     val storage = storageOrNull() ?: return false
     return try {
-        storage.removeItem(key)
+        storage.removeItem(key.toString())
         true
     } catch (_: Throwable) {
         false
     }
 }
-fun storageKeys(prefix: String): List<String> {
+fun storageKeys(prefix: CharSequence): List<CharSequence> {
     val storage = storageOrNull() ?: return emptyList()
-    val keys = mutableListOf<String>()
+    val keys = mutableListOf<CharSequence>()
     for (index in 0 until storage.length) {
         val key = try {
             storage.key(index)
@@ -85,11 +85,11 @@ fun storageKeys(prefix: String): List<String> {
     }
     return keys
 }
-fun readBlob(path: String): String? {
+fun readBlob(path: CharSequence): CharSequence? {
     val key = fileKey(path)
     return storageGet(key) ?: blobFallback[key]
 }
-fun writeBlob(path: String, hex: String) {
+fun writeBlob(path: CharSequence, hex: CharSequence) {
     val key = fileKey(path)
     if (!storageSet(key, hex)) {
         blobFallback[key] = hex
@@ -97,13 +97,13 @@ fun writeBlob(path: String, hex: String) {
         blobFallback.remove(key)
     }
 }
-fun removeBlob(path: String): Boolean {
+fun removeBlob(path: CharSequence): Boolean {
     val key = fileKey(path)
     val removedStorage = storageRemove(key)
     val removedFallback = blobFallback.remove(key) != null
     return removedStorage || removedFallback
 }
-fun markDirectory(path: String) {
+fun markDirectory(path: CharSequence) {
     val normalized = normalizePath(path)
     if (!storageSet(dirKey(normalized), "1")) {
         dirFallback += normalized
@@ -111,17 +111,17 @@ fun markDirectory(path: String) {
         dirFallback.remove(normalized)
     }
 }
-fun unmarkDirectory(path: String): Boolean {
+fun unmarkDirectory(path: CharSequence): Boolean {
     val normalized = normalizePath(path)
     val removedStorage = storageRemove(dirKey(normalized))
     val removedFallback = dirFallback.remove(normalized)
     return removedStorage || removedFallback
 }
-fun directoryExists(path: String): Boolean {
+fun directoryExists(path: CharSequence): Boolean {
     val normalized = normalizePath(path)
     return storageGet(dirKey(normalized)) != null || normalized in dirFallback
 }
-fun ensureParentDirectories(path: String) {
+fun ensureParentDirectories(path: CharSequence) {
     var current = parentPath(path)
     while (current != null && current != "/") {
         markDirectory(current)
@@ -129,7 +129,7 @@ fun ensureParentDirectories(path: String) {
     }
     markDirectory("/")
 }
-fun encodeHex(bytes: ByteArray): String {
+fun encodeHex(bytes: ByteArray): CharSequence {
     val chars = CharArray(bytes.size * 2)
     val digits = "0123456789abcdef"
     var out = 0
@@ -140,7 +140,7 @@ fun encodeHex(bytes: ByteArray): String {
     }
     return chars.concatToString()
 }
-fun decodeHex(value: String): ByteArray {
+fun decodeHex(value: CharSequence): ByteArray {
     if (value.isEmpty()) return ByteArray(0)
     val size = value.length / 2
     return ByteArray(size) { index ->
@@ -151,14 +151,14 @@ fun decodeHex(value: String): ByteArray {
 }
 object WasmBrowserSeekHandle : SeekHandle {
    data class HandleState(
-        val filename: String,
+        val filename: CharSequence,
         var position: Long = 0,
     )
 
    val handles = mutableMapOf<Long, HandleState>()
    var nextHandle = 1L
 
-    override fun open(filename: String, readOnly: Boolean): Long {
+    override fun open(filename: CharSequence, readOnly: Boolean): Long {
         val handle = nextHandle++
         handles[handle] = HandleState(filename = normalizePath(filename))
         return handle
@@ -226,15 +226,15 @@ object WasmBrowserSeekHandle : SeekHandle {
 }
 
 actual object System {
-    actual fun getenv(name: String, defaultVal: String?): String? {
+    actual fun getenv(name: CharSequence, defaultVal: CharSequence?): CharSequence? {
         return envFallback[name] ?: defaultVal
     }
 
-    fun setEnv(name: String, value: String?) {
+    fun setEnv(name: CharSequence, value: CharSequence?) {
         if (value == null) envFallback.remove(name) else envFallback[name] = value
     }
 
-    fun setEnvMap(map: Map<String, String>?) {
+    fun setEnvMap(map: Map<CharSequence, CharSequence>?) {
         envFallback.clear()
         if (map != null) envFallback.putAll(map)
     }
@@ -243,22 +243,22 @@ actual object System {
         envFallback.clear()
     }
 
-    actual val homedir: String
+    actual val homedir: CharSequence
         get() = getenv("HOME", getenv("USERPROFILE", "/")) ?: "/"
 }
 
-fun mktemp(): String {
+fun mktemp(): CharSequence {
     val name = "/tmp/wasm-${Random.nextLong().toString(16)}.tmp"
     Files.write(name, ByteArray(0))
     return name
 }
 
-fun rm(path: String): Boolean {
+fun rm(path: CharSequence): Boolean {
     val normalized = normalizePath(path)
     val fileRemoved = removeBlob(normalized)
 
-    val nestedFilePrefix = fileKey(normalized).trimEnd('/') + "/"
-    val nestedDirPrefix = dirKey(normalized).trimEnd('/') + "/"
+    val nestedFilePrefix = fileKey(normalized).toString().trimEnd('/') + "/"
+    val nestedDirPrefix = dirKey(normalized).toString().trimEnd('/') + "/"
 
     val nestedFileKeys = storageKeys(nestedFilePrefix) + blobFallback.keys.filter { it.startsWith(nestedFilePrefix) }
     val nestedDirKeys =
@@ -277,23 +277,23 @@ fun rm(path: String): Boolean {
     return fileRemoved || dirRemoved || nestedFileKeys.isNotEmpty() || nestedDirKeys.isNotEmpty()
 }
 
-fun mkdir(path: String): Boolean {
+fun mkdir(path: CharSequence): Boolean {
     val normalized = normalizePath(path)
     ensureParentDirectories("$normalized/.dir")
     markDirectory(normalized)
     return true
 }
 
-fun readLinesSeq(path: String): Sequence<String> = Files.readAllLines(path).asSequence()
+fun readLinesSeq(path: CharSequence): Sequence<CharSequence> = Files.readAllLines(path).asSequence()
 
-fun readLines(path: String): List<String> = Files.readAllLines(path)
+fun readLines(path: CharSequence): List<CharSequence> = Files.readAllLines(path)
 actual fun platformSeekHandle(): SeekHandle = WasmBrowserSeekHandle
 
 actual fun ioUringHandle(): SeekHandle? = null
 
 
 class SeekFileBuffer(
-    val filename: String,
+    val filename: CharSequence,
     val initialOffset: Long = 0,
     val blkSize: Long = -1,
     val readOnly: Boolean = true,

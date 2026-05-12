@@ -12,20 +12,20 @@ package borg.trikeshed.torrent
  */
 data class MagnetLink(
     val infoHash: ByteArray,       // 20-byte SHA-1 info hash
-    val displayName: String? = null,
-    val trackers: List<String> = emptyList(),
+    val displayName: CharSequence? = null,
+    val trackers: List<CharSequence> = emptyList(),
     val exactLength: Long? = null,  // xl parameter
-    val peers: List<Pair<String, Int>> = emptyList(),  // x.pe: host:port
-    val manifest: String? = null,   // xs parameter (web seed / manifest URL)
+    val peers: List<Pair<CharSequence, Int>> = emptyList(),  // x.pe: host:port
+    val manifest: CharSequence? = null,   // xs parameter (web seed / manifest URL)
 ) {
     companion object {
         private val HEX_PATTERN = Regex("[0-9a-fA-F]{40}")
         private val BASE32_PATTERN = Regex("[A-Z2-7]{32}", RegexOption.IGNORE_CASE)
 
-        fun parse(uri: String): MagnetLink? {
+        fun parse(uri: CharSequence): MagnetLink? {
             if (!uri.startsWith("magnet:?", ignoreCase = true)) return null
             val qs = uri.substringAfter('?')
-            val params = mutableMapOf<String, MutableList<String>>()
+            val params = mutableMapOf<CharSequence, MutableList<CharSequence>>()
             for (pair in qs.split('&')) {
                 val eq = pair.indexOf('=')
                 if (eq < 0) continue
@@ -53,20 +53,20 @@ data class MagnetLink(
             return MagnetLink(infoHash, displayName, trackers, exactLength, peers, manifest)
         }
 
-        private fun hexToBytes(hex: String): ByteArray? {
+        private fun hexToBytes(hex: CharSequence): ByteArray? {
             if (hex.length != 40 || !hex.matches(HEX_PATTERN)) return null
             return ByteArray(20) { i ->
                 ((hex[i * 2].digitToInt(16) shl 4) or hex[i * 2 + 1].digitToInt(16)).toByte()
             }
         }
 
-        fun byteToHex(b: Byte): String {
+        fun byteToHex(b: Byte): CharSequence {
             val i = b.toInt() and 0xFF
             return "${HEX_CHARS[i shr 4]}${HEX_CHARS[i and 0xF]}"
         }
         private val HEX_CHARS = "0123456789abcdef".toCharArray()
 
-        private fun base32ToBytes(b32: String): ByteArray? {
+        private fun base32ToBytes(b32: CharSequence): ByteArray? {
             if (b32.length != 32) return null
             // RFC 4648 base32 hex alphabet
             val alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567"
@@ -89,7 +89,7 @@ data class MagnetLink(
     }
 
     /** Reconstruct magnet URI string. */
-    fun toUri(): String = buildString {
+    fun toUri(): CharSequence = buildString {
         append("magnet:?xt=urn:btih:")
         append(infoHash.joinToString("") { MagnetLink.byteToHex(it) })
         if (displayName != null) append("&dn=${displayName}")

@@ -5,20 +5,20 @@ import kotlin.js.JsName
 
 private object JsFileRegistry {
     private var nextId = 1
-    private val contentCache = mutableMapOf<String, ByteArray>()
+    private val contentCache = mutableMapOf<CharSequence, ByteArray>()
 
-    fun open(path: String, readOnly: Boolean): FileImpl {
+    fun open(path: CharSequence, readOnly: Boolean): FileImpl {
         val fi = FileImpl(nextId++)
         fi.path = path
         fi.knownSize = contentCache[path]?.size?.toLong() ?: -1L
         return fi
     }
 
-    fun cache(path: String, data: ByteArray) {
+    fun cache(path: CharSequence, data: ByteArray) {
         contentCache[path] = data
     }
 
-    fun getContent(path: String): ByteArray? = contentCache[path]
+    fun getContent(path: CharSequence): ByteArray? = contentCache[path]
 }
 
 private class JsUserspaceChannelBackend : UserspaceChannelBackend {
@@ -37,17 +37,17 @@ private class JsUserspaceChannelBackend : UserspaceChannelBackend {
 
     override fun write(file: FileImpl, buffer: ByteBuffer, offset: Long): Int = -1
     override fun accept(file: FileImpl): Int = -1
-    override fun connect(file: FileImpl, address: String, port: Int): Int = -1
+    override fun connect(file: FileImpl, address: CharSequence, port: Int): Int = -1
     override fun close(file: FileImpl): Int = 0
     override fun sync(file: FileImpl, metaData: Boolean): Int = 0
     override fun truncate(file: FileImpl, size: Long): Int = 0
-    override fun map(file: FileImpl, mode: String, position: Long, size: Long): Int = -1
+    override fun map(file: FileImpl, mode: CharSequence, position: Long, size: Long): Int = -1
 }
 
 internal actual fun openUserspaceChannelBackend(entries: Int): UserspaceChannelBackend = JsUserspaceChannelBackend()
 
 actual class FileImpl actual constructor(actual val id: Int) {
-    @PublishedApi internal var path: String = ""
+    @PublishedApi internal var path: CharSequence = ""
     @PublishedApi internal var knownSize: Long = -1L
     actual fun isOpen(): Boolean = id >= 0
     actual fun close() {}
@@ -55,7 +55,7 @@ actual class FileImpl actual constructor(actual val id: Int) {
 }
 
 internal actual object FilesImpl {
-    actual fun open(path: String, readOnly: Boolean): FileImpl =
+    actual fun open(path: CharSequence, readOnly: Boolean): FileImpl =
         JsFileRegistry.open(path, readOnly)
 }
 
@@ -64,7 +64,7 @@ internal actual object ChannelsImpl {
 }
 
 @PublishedApi
-internal suspend fun loadFile(path: String) {
+internal suspend fun loadFile(path: CharSequence) {
     val resp = jsFetch(path)
     val buf = resp.arrayBuffer()
     val int8Array = buf.unsafeCast<dynamic>()
@@ -74,12 +74,12 @@ internal suspend fun loadFile(path: String) {
 }
 
 @JsName("fetch")
-external fun jsFetch(input: String): JsResponse
+external fun jsFetch(input: CharSequence): JsResponse
 
 @JsName("Response")
 external class JsResponse {
     val ok: Boolean
     val status: Int
     fun arrayBuffer(): dynamic
-    fun text(): String
+    fun text(): CharSequence
 }

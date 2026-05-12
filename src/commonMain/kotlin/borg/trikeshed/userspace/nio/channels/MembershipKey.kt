@@ -11,12 +11,13 @@ public abstract class MembershipKey {
     // TODO
     abstract fun drop(): Unit
     // TODO
-    abstract fun block(sourceAddress: String): MembershipKey
+    abstract fun block(sourceAddress: CharSequence): MembershipKey
     // TODO
-    abstract fun unblock(sourceAddress: String): MembershipKey
+    abstract fun unblock(sourceAddress: CharSequence): MembershipKey
     // TODO
     abstract fun channel(): MulticastChannel
     // TODO
     abstract fun group():CharSequence// TODO
     abstract fun networkInterface():CharSequence// TODO
-    abstract fun sourceAddress():CharSequence}
+    abstract fun sourceAddress(): CharSequence
+    }

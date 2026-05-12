@@ -26,7 +26,7 @@ class Channel(
     fun accept(file: File, userData: Long) =
         facade.accept(file.impl, userData)
 
-    fun connect(file: File, address: String, port: Int, userData: Long) =
+    fun connect(file: File, address: CharSequence, port: Int, userData: Long) =
         facade.connect(file.impl, address, port, userData)
 
     fun close(file: File, userData: Long) =
@@ -38,12 +38,14 @@ class Channel(
     fun truncate(file: File, size: Long, userData: Long) =
         facade.truncate(file.impl, size, userData)
 
-    fun map(file: File, mode: String, position: Long, size: Long, userData: Long) =
+    fun map(file: File, mode: CharSequence, position: Long, size: Long, userData: Long) =
         facade.map(file.impl, mode, position, size, userData)
 
     fun submit(): Int = facade.submit()
 
     fun wait(minComplete: Int = 1): List<SelectionResult> = facade.wait(minComplete)
+
+    fun hasPending(fd: Int): Boolean = facade.hasPending(fd)
 
     fun peek(): List<SelectionResult> = facade.peek()
 }
@@ -56,7 +58,7 @@ class File internal constructor(internal val impl: FileImpl) {
 }
 
 object Files {
-    fun open(path: String, readOnly: Boolean = true): File = File(FilesImpl.open(path, readOnly))
+    fun open(path: CharSequence, readOnly: Boolean = true): File = File(FilesImpl.open(path, readOnly))
 }
 
 object Channels {
@@ -74,7 +76,7 @@ expect class FileImpl(id: Int) {
 }
 
 internal expect object FilesImpl {
-    fun open(path: String, readOnly: Boolean = true): FileImpl
+    fun open(path: CharSequence, readOnly: Boolean = true): FileImpl
 }
 
 internal expect object ChannelsImpl {

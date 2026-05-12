@@ -15,7 +15,7 @@ class JsonParserBigJsonJvmTest {
 
         assertTrue(result is Map<*, *>, "Result should be a Map")
 
-        val json = result as Map<String, Any?>
+        val json = result as Map<CharSequence, Any?>
 
         assertEquals(5532807773L, json["id64"])
         assertEquals("Jackson's Lighthouse", json["name"])
@@ -27,7 +27,7 @@ class JsonParserBigJsonJvmTest {
         assertEquals(0, json["population"])
         assertEquals(7, json["bodyCount"])
 
-        val coords = json["coords"] as Map<String, Any?>
+        val coords = json["coords"] as Map<CharSequence, Any?>
         assertEquals(157.0, coords["x"])
         assertEquals(-27.0, coords["y"])
         assertEquals(-70.0, coords["z"])
@@ -35,7 +35,7 @@ class JsonParserBigJsonJvmTest {
         val bodies = json["bodies"] as List<*>
         assertEquals(7, bodies.size)
 
-        val mainStar = bodies[0] as Map<String, Any?>
+        val mainStar = bodies[0] as Map<CharSequence, Any?>
         assertEquals(5532807773L, mainStar["id64"])
         assertEquals(0, mainStar["bodyId"])
         assertEquals("Jackson's Lighthouse", mainStar["name"])
@@ -55,21 +55,21 @@ class JsonParserBigJsonJvmTest {
         val rawPlanet = bodies[1]
         assertTrue(rawPlanet is Map<*, *>, "bodies[1] should be a Map but was $rawPlanet")
         @Suppress("UNCHECKED_CAST")
-        val planet = rawPlanet as Map<String, Any?>
+        val planet = rawPlanet as Map<CharSequence, Any?>
         assertEquals("Jackson's Lighthouse 1", planet["name"])
         assertEquals("Planet", planet["type"])
         assertEquals("Class V gas giant", planet["subType"])
         assertEquals(962.175568, planet["distanceToArrival"])
         assertFalse(planet["isLandable"] as Boolean)
 
-        val atmosphere: Map<String, *> = planet["atmosphereComposition"] as Map<String, *>
+        val atmosphere: Map<CharSequence, *> = planet["atmosphereComposition"] as Map<CharSequence, *>
         assertEquals(28.05669, atmosphere["Helium"])
         assertEquals(71.943306, atmosphere["Hydrogen"])
 
         val planetStations: List<*> = planet["stations"] as List<*>
         assertEquals(2, planetStations.size)
 
-        val firstStation = planetStations[0] as Map<String, Any?>
+        val firstStation = planetStations[0] as Map<CharSequence, Any?>
         assertEquals("T9Z-L7G", firstStation["name"])
         assertEquals(3708954368L, firstStation["id"])
         assertEquals("FleetCarrier", firstStation["controllingFaction"])
@@ -80,5 +80,5 @@ class JsonParserBigJsonJvmTest {
         assertTrue(services.contains("Universal Cartographics"))
     }
 
-   fun readBigJson(): String = Files.readAllLines("src/commonTest/resources/big.json").joinToString("\n")
+   fun readBigJson(): CharSequence = Files.readAllLines("src/commonTest/resources/big.json").joinToString("\n")
 }

@@ -18,7 +18,7 @@ package borg.trikeshed.parse.confix
  *     JsElement  = Join<Twin<Int>, Series<Int>>     // (open j close) j commas
  *     JsIndex    = Join<Twin<Int>, Series<Char>>    // (twin      j src)
  *     JsContext  = Join<JsElement, Series<Char>>    // element    j src
- *     JsPath     = Series<Either<String,Int>>
+ *     JsPath     = Series<Either<CharSequence,Int>>
  *
  *  One tokenizer per syntax emits Series<JsElement> over a shared Series<Char>.
  *  One reifier walks JsContext. One path-scanner walks JsPath over JsContext.
@@ -41,7 +41,7 @@ import kotlin.coroutines.CoroutineContext
 typealias JsElement = Join<Twin<Int>, Series<Int>>      // (open j close) j commas
 typealias JsIndex = Join<Twin<Int>, Series<Char>>       // (twin j src)
 typealias JsContext = Join<JsElement, Series<Char>>      // element j src
-typealias JsPathElement = Either<String, Int>
+typealias JsPathElement = Either<CharSequence, Int>
 typealias JsPath = Series<JsPathElement>
 
 
@@ -192,7 +192,7 @@ class ElemBuf(initial: Int = 16) {
  *  Reifier — JsContext → logical value, uniformly over JSON/CBOR/YAML.
  *
  *  Returns Any? only because the algebra is dynamic. No stdlib collections:
- *  arrays become Series<Any?>, objects become Series2<String,Any?>.
+ *  arrays become Series<Any?>, objects become Series2<CharSequence,Any?>.
  * ═══════════════════════════════════════════════════════════════════════════ */
 
 object Combinators {
@@ -321,8 +321,8 @@ object Combinators {
     private fun spanOf(e: JsElement, src: Series<Char>): Series<Char> =
         src.slice(e.a.a, e.a.b + 1)
 
-    /** materialize a text span into a String — reuses a pooled CharArray. */
-    fun textOf(e: JsElement, src: Series<Char>): String {
+    /** materialize a text span into a CharSequence — reuses a pooled CharArray. */
+    fun textOf(e: JsElement, src: Series<Char>): CharSequence {
         val a = e.a.a; val b = e.a.b
         val len = b - a + 1
         if (len <= 0) return ""
@@ -345,7 +345,7 @@ object Combinators {
         return when (tag.kind) {
             0 -> {  // OBJECT
                 val r = reifyObject(e, src, syntax)
-                if (r.first == 0) LinkedHashMap<String, Any?>(0) else r
+                if (r.first == 0) LinkedHashMap<CharSequence, Any?>(0) else r
             }
             1 -> {  // ARRAY
                 val r = reifyArray(e, src, syntax)
@@ -362,7 +362,7 @@ object Combinators {
         }
     }
 
-   private fun reifyString(e: JsElement, src: Series<Char>, syntax: Syntax): String {
+   private fun reifyString(e: JsElement, src: Series<Char>, syntax: Syntax): CharSequence {
         val a = e.a.a; val b = e.a.b
         // quoted JSON/YAML strings
         if (a <= b && (src[a] == '"' || src[a] == '\'')) {
@@ -421,7 +421,7 @@ object Combinators {
     }
 
     // helper: unescape JSON-style quotes (handles \n, \uXXXX, etc.)
-   private fun unescapeJsonString(s: String): String {
+   private fun unescapeJsonString(s: CharSequence): CharSequence {
         val out = StringBuilder(s.length)
         var i = 0
         while (i < s.length) {
@@ -460,7 +460,7 @@ object Combinators {
         return out.toString()
     }
 
-   private fun unescapeYamlSingleQuoted(s: String): String {
+   private fun unescapeYamlSingleQuoted(s: CharSequence): CharSequence {
         // YAML single-quoted scalar: replace doubled single-quotes with a single quote
         val out = StringBuilder(s.length)
         var index = 0
@@ -510,7 +510,7 @@ object Combinators {
             }
         }
         // Fallback: textual numeric span — try Int, then Long, then Double
-        val t = textOf(e, src).trim()
+        val t = textOf(e, src).trim().toString()
         t.toIntOrNull()?.let { return it }
         t.toLongOrNull()?.let { return it }
         return t.toDouble()
@@ -527,7 +527,7 @@ object Combinators {
     }
 
     /** object has keys at even child indices, values at odd indices */
-   private fun reifyObject(e: JsElement, src: Series<Char>, syntax: Syntax): Series2<String, Any?> {
+   private fun reifyObject(e: JsElement, src: Series<Char>, syntax: Syntax): Series2<CharSequence, Any?> {
         val all = realCommas(e, src)
         val keyCount = all.size / 2
         return keyCount j { i: Int ->
@@ -545,7 +545,7 @@ object Combinators {
 /* ═══════════════════════════════════════════════════════════════════════════
  *  Path scanning — JsPath over JsContext
  *
- *  A JsPath is a Series<Either<String,Int>>. Walking it descends into the
+ *  A JsPath is a Series<Either<CharSequence,Int>>. Walking it descends into the
  *  JsContext one segment at a time. Returns the resolved JsContext or null.
  * ═══════════════════════════════════════════════════════════════════════════ */
 
@@ -602,7 +602,7 @@ object Path {
         return null
     }
 
-   fun stepByName(e: JsElement, src: Series<Char>, name: String): JsContext? {
+   fun stepByName(e: JsElement, src: Series<Char>, name: CharSequence): JsContext? {
         if (Combinators.tagOf(e, src) != Tag.OBJECT) return null
 
         // Two-pass key lookup:
@@ -649,7 +649,7 @@ object Path {
         getPosition: (Int) -> Int,
         e: JsElement,
         src: Series<Char>,
-        name: String
+        name: CharSequence
     ): JsContext? {
         val parentOpen = e.a.a
         val parentClose = e.a.b
@@ -831,7 +831,7 @@ object Path {
         }
     }
 
-   fun stripQuotes(s: String): String {
+   fun stripQuotes(s: CharSequence): CharSequence {
         if (s.length >= 2 && (s[0] == '"' || s[0] == '\'') && s[s.length - 1] == s[0])
             return s.substring(1, s.length - 1)
         return s
@@ -976,9 +976,9 @@ fun path(vararg segs: Any): JsPath {
     val n = segs.size
     return n j { i ->
         when (val s = segs[i]) {
-            is String -> Either.Left(s)
+            is CharSequence -> Either.Left(s)
             is Int -> Either.Right(s)
-            else -> error("path segment must be String or Int, was ${s::class}")
+            else -> error("path segment must be CharSequence or Int, was ${s::class}")
         }
     }
 }

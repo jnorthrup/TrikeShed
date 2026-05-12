@@ -9,18 +9,18 @@ import borg.trikeshed.lib.j
  * Stays as a product of Join — named access via extension properties.
  * Sorting and merging operate only on .key and .seq; no reflection.
  */
-typealias LsmrEntry = Join<String, Join<String, Join<Long, Boolean>>>
+typealias LsmrEntry = Join<CharSequence, Join<CharSequence, Join<Long, Boolean>>>
 
-fun lsmrEntry(key: String, value: String, seq: Long, deleted: Boolean = false): LsmrEntry =
+fun lsmrEntry(key: CharSequence, value: CharSequence, seq: Long, deleted: Boolean = false): LsmrEntry =
     key j (value j (seq j deleted))
 
-val LsmrEntry.key: String get() = a
-val LsmrEntry.value: String get() = b.a
+val LsmrEntry.key: CharSequence get() = a
+val LsmrEntry.value: CharSequence get() = b.a
 val LsmrEntry.seq: Long get() = b.b.a
 val LsmrEntry.deleted: Boolean get() = b.b.b
 
 private val entryKeyOrder: Comparator<LsmrEntry> =
-    compareBy<LsmrEntry> { it.key }.thenByDescending { it.seq }
+    compareBy<LsmrEntry> { it.key.toString() }.thenByDescending { it.seq }
 
 /**
  * LSMR merge tree: L0 (memory) → L1 (sorted sealed runs) → L2 (merged runs).
@@ -36,11 +36,11 @@ class LsmrMergeTree {
     private val l1Runs: MutableList<List<LsmrEntry>> = mutableListOf()
     private val l2Runs: MutableList<List<LsmrEntry>> = mutableListOf()
 
-    fun put(key: String, value: String, seq: Long) {
+    fun put(key: CharSequence, value: CharSequence, seq: Long) {
         l0.add(lsmrEntry(key, value, seq))
     }
 
-    fun delete(key: String, seq: Long) {
+    fun delete(key: CharSequence, seq: Long) {
         l0.add(lsmrEntry(key, "", seq, deleted = true))
     }
 
@@ -84,7 +84,7 @@ class LsmrMergeTree {
     /** Merge a list of sorted runs: newest seq per key wins; tombstones suppressed. */
     private fun mergeRuns(runs: List<List<LsmrEntry>>): List<LsmrEntry> {
         // Collect all entries, pick highest seq per key, then filter tombstones.
-        val byKey = mutableMapOf<String, LsmrEntry>()
+        val byKey = mutableMapOf<CharSequence, LsmrEntry>()
         for (run in runs) {
             for (entry in run) {
                 val existing = byKey[entry.key]
@@ -95,6 +95,6 @@ class LsmrMergeTree {
         }
         return byKey.values
             .filter { !it.deleted }
-            .sortedBy { it.key }
+            .sortedBy { it.key.toString() }
     }
 }

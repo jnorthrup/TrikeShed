@@ -1,43 +1,83 @@
-@file:OptIn(ExperimentalForeignApi::class)
-
-package simple
+@file:OptIn(kotlinx.cinterop.ExperimentalForeignApi::class)
+package borg.trikeshed.userspace.nio.file
 
 import borg.trikeshed.lib.CZero.z
 import borg.trikeshed.native.HasDescriptor
 import borg.trikeshed.native.HasPosixErr
-import kotlinx.cinterop.*
+import kotlinx.cinterop.ByteVar
+import kotlinx.cinterop.ByteVarOf
+import kotlinx.cinterop.CArrayPointer
+import kotlinx.cinterop.CArrayPointerVar
+import kotlinx.cinterop.COpaquePointer
+import kotlinx.cinterop.CPointer
+import kotlinx.cinterop.CPointerVarOf
+import kotlinx.cinterop.CValuesRef
+import kotlinx.cinterop.ULongVarOf
+import kotlinx.cinterop.addressOf
+import kotlinx.cinterop.alloc
+import kotlinx.cinterop.allocArray
+import kotlinx.cinterop.convert
+import kotlinx.cinterop.cstr
+import kotlinx.cinterop.get
+import kotlinx.cinterop.memScoped
+import kotlinx.cinterop.nativeHeap
+import kotlinx.cinterop.pin
+import kotlinx.cinterop.ptr
+import kotlinx.cinterop.reinterpret
+import kotlinx.cinterop.toCPointer
+import kotlinx.cinterop.toKString
+import kotlinx.cinterop.toLong
+import kotlinx.cinterop.usePinned
+import kotlinx.cinterop.value
+import platform.posix.F_OK
+import platform.posix.MAP_ANONYMOUS
 import platform.posix.MAP_SHARED
 import platform.posix.PROT_READ
 import platform.posix.PROT_WRITE
 import platform.posix._SC_PAGE_SIZE
+import platform.posix.access
+import platform.posix.exit
+import platform.posix.fclose
+import platform.posix.fdopen
+import platform.posix.ferror
+import platform.posix.free
+import platform.posix.fstat
+import platform.posix.getline
+import platform.posix.lseek
+import platform.posix.memcpy
+import platform.posix.mmap
+import platform.posix.off_t
+import platform.posix.perror
+import platform.posix.read
+import platform.posix.size_t
+import platform.posix.ssize_t
+import platform.posix.stat
 import platform.posix.sysconf
-import platform.posix.uint32_t as __u32
-
-//import linux_uring.fstatat
-import platform.posix.off_t as __off_t
-import platform.posix.*
-
+import platform.posix.uint32_t
+import platform.posix.write
+import simple.HasSize
+import simple.PosixOpenOpts
 
 /**
 opens file for syncronous read  /write
  */
 class PosixFile(
-    val path: String?,
-    O_FLAGS: __u32 = PosixOpenOpts.withFlags(PosixOpenOpts.OpenReadOnly, PosixOpenOpts.OpenSync),
+    val path: CharSequence?,
+    O_FLAGS: uint32_t = PosixOpenOpts.withFlags(PosixOpenOpts.OpenReadOnly, PosixOpenOpts.OpenSync),
     override val fd: Int = run {
-        platform.posix.open(path, O_FLAGS.toInt())
+        platform.posix.open(path?.toString(), O_FLAGS.toInt())
     },
 ) : HasDescriptor, HasSize {
     override fun read64(buf: ByteArray): ULong {
         val addressOf = buf.pin().addressOf(0)
         val b: CArrayPointer<ByteVar> = addressOf.reinterpret()
-        val read = read(fd, b, buf.size.toULong())
+        val read = platform.posix.read(fd, b, buf.size.toULong())
         HasPosixErr.posixRequires(read >= 0) { "read failed with result ${HasPosixErr.reportErr(read.toInt())}" }
         return read.toULong()
     }
 
     override fun close(): Int {
-        val close = close(fd)
+        val close = platform.posix.close(fd)
         HasPosixErr.posixRequires(close >= 0) { "close failed with result ${HasPosixErr.reportErr(close)}" }
         st_?.let { nativeHeap.free(it.rawPtr) }
         return close
@@ -125,15 +165,15 @@ class PosixFile(
         //rewrite with very verbose debug{} blocks and logdebug{ progress}
         val addressOf = buf.pin().addressOf(0)
         val b: CArrayPointer<ByteVar> = addressOf.reinterpret()
-        val write = write(fd, b, buf.size.toULong())
+        val write = platform.posix.write(fd, b, buf.size.toULong())
         HasPosixErr.posixRequires(write >= 0) { "write failed with result ${HasPosixErr.reportErr(write.toInt())}" }
         return write.toULong()
 
     }
 
     /** *lseek [manpage](https://www.man7.org/linux/man-pages/man2/lseek.2.html) */
-    override fun seek(offset: __off_t, whence: Int): ULong {
-        val offr: __off_t = lseek(fd, offset, whence)
+    override fun seek(offset: off_t, whence: Int): ULong {
+        val offr: off_t = lseek(fd, offset, whence)
         HasPosixErr.posixRequires(offr >= 0) { "seek failed with result ${HasPosixErr.reportErr(res = offr.toInt())}" }
         return offr.toULong()
     }
@@ -143,7 +183,7 @@ class PosixFile(
         len: ULong,
         prot: Int = PROT_READ or PROT_WRITE,
         flags: Int = MAP_SHARED or MAP_ANONYMOUS,
-        offset: __off_t = 0L,
+        offset: off_t = 0L,
     ): COpaquePointer = mmap_base(fd = -1, __len = len, __prot = prot, __flags = flags, __offset = offset)
 
     /** * mmap [manpage](https://www.man7.org/linux/man-pages/man2/mmap.2.html) */
@@ -402,7 +442,7 @@ class PosixFile(
 
         /** offset must be a multiple
         of the page size as returned by sysconf(_SC_PAGE_SIZE).*/
-        offset: __off_t = 0L,
+        offset: off_t = 0L,
     ): CPointer<CArrayPointerVar<ByteVar>> {
 
         require(offset % sysconf(_SC_PAGE_SIZE) == 0L) { "offset must be a multiple of the page size as returned by sysconf(_SC_PAGE_SIZE)." }
@@ -417,21 +457,21 @@ class PosixFile(
     }
 
     /** * lseek [manpage](https://www.man7.org/linux/man-pages/man2/leek.2.html) */
-    fun at(offset: __off_t, whence: Int) {
-        lseek(fd, offset /* = kotlin.Long */,   whence)
+    fun at(offset: off_t, whence: Int) {
+        lseek(fd, offset /* = kotlin.Long */, whence)
     }
 
     companion object {
         /*** open [manpage](https://www.man7.org/linux/man-pages/man2/open.2.html) */
 
-        fun open(path: String?, O_FLAGS: Int): Int {
-            val fd = platform.posix.open(path, O_FLAGS)
+        fun open(path: CharSequence?, O_FLAGS: Int): Int {
+            val fd = platform.posix.open(path?.toString(), O_FLAGS)
             HasPosixErr.posixRequires(fd > 0) { "File::open $path returned ${HasPosixErr.reportErr(fd)}" }
             return fd
         }
 
-        fun statk(path: String?, stat1: stat = nativeHeap.alloc()): stat {
-            stat(path, stat1.ptr).also {
+        fun statk(path: CharSequence?, stat1: stat = nativeHeap.alloc()): stat {
+            stat(path?.toString(), stat1.ptr).also {
                 HasPosixErr.posixRequires(it.z) { "statx $path" }
                 return stat1
             }
@@ -469,7 +509,7 @@ class PosixFile(
              */
             __flags: Int,
             fd: Int,
-            __offset: __off_t,
+            __offset: off_t,
         ): COpaquePointer {
             HasPosixErr.warning(__offset % page_size == 0L) { "$__offset requires blocksize of $page_size" }
             val cPointer = mmap(__addr, __len, __prot, __flags, fd, __offset)
@@ -485,19 +525,19 @@ class PosixFile(
 
 
 
-        fun namedDirAndFile(file_path: String): List<String> = file_path.lastIndexOf('/').let { tail ->
+        fun namedDirAndFile(file_path: CharSequence): List<CharSequence> = file_path.lastIndexOf('/').let { tail ->
             if (tail == -1) listOf("", file_path) else listOf(
                 file_path.substring(0, tail),
                 file_path.substring(tail.inc())
             )
         }
 
-        fun exists(fname: String): Boolean = access(fname, F_OK).z
+        fun exists(fname: CharSequence): Boolean = access(fname.toString(), F_OK).z
 
         //todo: better FILE* handling
 
         /** lean on getline to read a file into a sequence of CharSeries */
-        fun readLinesSeq(path: String): Sequence<String> = memScoped {
+        fun readLinesSeq(path: CharSequence): Sequence<CharSequence> = memScoped {
 
             val file = PosixFile(path)
             val fp = fdopen(file.fd, "r")
@@ -505,7 +545,7 @@ class PosixFile(
             val len: ULongVarOf<size_t> = alloc()
             len.value = 0u
             var read: ssize_t
-            return sequence<String> {
+            return sequence<CharSequence> {
                 while (true) {
                     read = getline(line.ptr, len.ptr, fp)
                     if (read == -1L) break
@@ -520,14 +560,14 @@ class PosixFile(
 
         }
 
-        fun readLines(path: String): List<String> = memScoped {
+        fun readLines(path: CharSequence): List<CharSequence> = memScoped {
             val file = PosixFile(path)
             val fp = fdopen(file.fd, "r")
             val line: CPointerVarOf<CPointer<ByteVarOf<Byte>>> = alloc()
             val len: ULongVarOf<size_t> = alloc()
             len.value = 0u
             var read: ssize_t
-            val list: MutableList<String> = mutableListOf()
+            val list: MutableList<CharSequence> = mutableListOf()
 
             while (true) {
                 read = getline(line.ptr, len.ptr, fp)
@@ -542,7 +582,7 @@ class PosixFile(
             return list.also { file.close().also { fclose(fp) } }
         }
 
-        fun readAllBytes(filename: String): ByteArray = memScoped {
+        fun readAllBytes(filename: CharSequence): ByteArray = memScoped {
             val file = PosixFile(filename)
             val stat = statk(filename)
             val len = stat.st_size.convert<Int>()
@@ -552,8 +592,8 @@ class PosixFile(
             file.close()
             ByteArray(len) { buf[it] }
         }
-        fun readString(filename: String): String = readAllBytes(filename).decodeToString()
-        fun writeBytes(filename: String, bytes: ByteArray): Int = memScoped {
+        fun readString(filename: CharSequence): CharSequence = readAllBytes(filename).decodeToString()
+        fun writeBytes(filename: CharSequence, bytes: ByteArray): Int = memScoped {
             val flags = PosixOpenOpts.withFlags(
                 PosixOpenOpts.O_Creat,
                 PosixOpenOpts.O_Trunc,
@@ -572,19 +612,19 @@ class PosixFile(
         /**
          * writes \n terminated lines to a file
          */
-        fun writeLines(filename: String, lines: List<String>): Unit = memScoped {
+        fun writeLines(filename: CharSequence, lines: List<CharSequence>): Unit = memScoped {
             val O_FLAGS = PosixOpenOpts.withFlags(PosixOpenOpts.O_Creat, PosixOpenOpts.O_Trunc, PosixOpenOpts.O_WrOnly)
             val file = PosixFile(filename, O_FLAGS)
             lines.forEach { line ->
                 val len = line.length
-                val buf = line.plus('\n').cstr.getPointer(this)
+                val buf = line.toString().plus('\n').cstr.getPointer(this)
                 val written = write(file.fd, buf, len.inc().convert())
                 HasPosixErr.posixRequires(written == len.inc().toLong()) { "writeLines $filename" }
             }.also {
                 file.close()
             }
         }
-        fun writeString(filename: String, string: String): Int = writeBytes(filename, string.encodeToByteArray())
+        fun writeString(filename: CharSequence, string: CharSequence): Int = writeBytes(filename, string.toString().encodeToByteArray())
 
     }
 }

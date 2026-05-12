@@ -10,7 +10,7 @@ import borg.trikeshed.lib.view
  * These are the dialects relevant to multi-language lowering.
  * Each dialect is a namespace of operations and types.
  */
-enum class MlirDialect(val namespace: String) {
+enum class MlirDialect(val namespace: CharSequence) {
     BUILTIN("builtin"),     // module, unrealized_conversion_cast
     FUNC("func"),           // func.func, func.call, func.return
     ARITH("arith"),         // arith.addi, arith.addf, arith.constant, arith.cmpi
@@ -29,7 +29,7 @@ enum class MlirDialect(val namespace: String) {
     ;
 
     /** Fully qualified op name: "func.func", "arith.addf", etc. */
-    fun op(name: String): String = "$namespace.$name"
+    fun op(name: CharSequence): CharSequence = "$namespace.$name"
 }
 
 /**
@@ -40,12 +40,12 @@ enum class MlirDialect(val namespace: String) {
  */
 data class MlirOp(
     val dialect: MlirDialect,
-    val name: String,
-    val operandTypes: Series<String> = Join.emptySeriesOf(),
-    val resultTypes: Series<String> = Join.emptySeriesOf(),
+    val name: CharSequence,
+    val operandTypes: Series<CharSequence> = Join.emptySeriesOf(),
+    val resultTypes: Series<CharSequence> = Join.emptySeriesOf(),
 ) {
     /** Fully-qualified: "arith.addf" */
-    val qualifiedName: String get() = dialect.op(name)
+    val qualifiedName: CharSequence get() = dialect.op(name)
 
     override fun toString(): String =
         "\"$qualifiedName\"(${operandTypes.view.joinToString(", ")}) -> (${resultTypes.view.joinToString(", ")})"

@@ -21,7 +21,7 @@ That said, there are structural improvements worth tracking:
 - [ ] **`anyOf`/`oneOf` produce `Variant(Generic)`** — no actual variant
       resolution. Needs a strategy (sealed class? tagged union?) for generated code.
 - [ ] **`format` mapping is incomplete** — `toKotlinType()` ignores most string
-      formats (date-time, uuid, etc.) and maps everything to `String`. Should
+      formats (date-time, uuid, etc.) and maps everything to `CharSequence`. Should
       at least annotate or use value classes.
 
 ---

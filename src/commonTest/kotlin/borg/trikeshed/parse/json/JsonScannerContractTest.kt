@@ -143,12 +143,12 @@ class JsonScannerContractTest {
 
 data class JsonToken(
     val type: JsonTokenType,
-    val value: String,
+    val value: CharSequence,
 )
 
 enum class JsonTokenType { STRING, NUMBER, BOOLEAN, NULL }
 
-fun parseJsonToken(input: String): JsonToken? {
+fun parseJsonToken(input: CharSequence): JsonToken? {
     val text = input.trim()
     if (text.isEmpty()) return null
 

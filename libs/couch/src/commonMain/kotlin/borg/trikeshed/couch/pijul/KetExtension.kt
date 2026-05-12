@@ -31,12 +31,12 @@ object KetType {
 
 /** A single capability entry. */
 data class Capability(
-    val namespace: String,  // "pijul", "couch", "ipfs", "git", "ket"
-    val name: String,
+    val namespace: CharSequence,  // "pijul", "couch", "ipfs", "git", "ket"
+    val name: CharSequence,
     val version: Int,
-    val params: Map<String, String> = emptyMap(),
+    val params: Map<CharSequence, CharSequence> = emptyMap(),
 ) {
-    fun id(): String = "$namespace:$name@$version"
+    fun id(): CharSequence = "$namespace:$name@$version"
 }
 
 object StandardCapabilities {
@@ -52,7 +52,7 @@ private fun currentTimeMillis(): Long = 0L
 data class KetMessage(
     val type: UByte,
     val capabilities: List<Capability>,
-    val sessionId: String,
+    val sessionId: CharSequence,
     val timestamp: Long,
 ) {
 fun encode(): ByteArray {
@@ -94,7 +94,7 @@ fun encode(): ByteArray {
                 val name = data.copyOfRange(br.pos, (br.pos + nameLen).also { br.pos = it }).decodeToString()
                 val version = br.readU32().toInt()
                 val nParams = br.readU32().toInt()
-                val params = mutableMapOf<String, String>()
+                val params = mutableMapOf<CharSequence, CharSequence>()
                 repeat(nParams) {
                     val kLen = br.readU32().toInt()
                     val k = data.copyOfRange(br.pos, (br.pos + kLen).also { br.pos = it }).decodeToString()
@@ -146,7 +146,7 @@ private class SimpleByteArrayInputX(private val data: ByteArray) {
  * Manages capability negotiation between two peers.
  */
 class KetNegotiator(
-    private val sessionId: String,
+    private val sessionId: CharSequence,
     private val myCapabilities: List<Capability>,
 ) {
     private var negotiatedCaps: List<Capability>? = null

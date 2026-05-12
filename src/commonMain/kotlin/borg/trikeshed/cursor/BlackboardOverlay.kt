@@ -39,27 +39,27 @@ enum class OverlayRole {
  */
 data class Provenance(
     /** Source identifier (e.g., dataset name, file path, stream ID) */
-    val source: String,
+    val source: CharSequence,
 
     /** Timestamp of origin (epoch milliseconds) */
     val timestamp: Long,
 
     /** Transformation chain (ordered list of operation descriptions) */
-    val transformations: List<String> = emptyList(),
+    val transformations: List<CharSequence> = emptyList(),
 
     /** Optional creator/owner identifier */
-    val creator: String? = null
+    val creator: CharSequence? = null
 ) {
     /**
      * Append a transformation step to the provenance chain.
      */
-    fun withTransformation(step: String): Provenance =
+    fun withTransformation(step: CharSequence): Provenance =
         copy(transformations = transformations + step)
 
     /**
      * Create a derived provenance from this one with an additional transformation.
      */
-    fun derive(transformation: String): Provenance =
+    fun derive(transformation: CharSequence): Provenance =
         copy(transformations = transformations + transformation)
 }
 
@@ -78,7 +78,7 @@ data class Evidence(
     val supportCount: Int? = null,
 
     /** Optional evidence notes or annotations */
-    val notes: List<String> = emptyList()
+    val notes: List<CharSequence> = emptyList()
 ) {
     init {
         require(confidence in 0.0..1.0) {
@@ -114,10 +114,10 @@ sealed class DependencyHandle {
     data class ColumnRef(val column: Int) : DependencyHandle()
 
     /** Reference to a cell in another cursor */
-    data class ExternalCellRef(val cursorId: String, val row: Int, val column: Int) : DependencyHandle()
+    data class ExternalCellRef(val cursorId: CharSequence, val row: Int, val column: Int) : DependencyHandle()
 
     /** Reference to an external resource (e.g., file, database, stream) */
-    data class ExternalResource(val uri: String, val selector: String? = null) : DependencyHandle()
+    data class ExternalResource(val uri: CharSequence, val selector: CharSequence? = null) : DependencyHandle()
 
     /** Composite dependency (multiple handles) */
     data class Composite(val handles: List<DependencyHandle>) : DependencyHandle()
@@ -160,7 +160,7 @@ data class CellOverlay<T>(
      */
     fun derive(
         newRole: OverlayRole = OverlayRole.DERIVED,
-        transformation: String? = null
+        transformation: CharSequence? = null
     ): CellOverlay<T> {
         val newProvenance = provenance?.let {
             var p = it
@@ -194,7 +194,7 @@ data class CellOverlay<T>(
  */
 data class ColumnOverlay(
     /** Column name */
-    val name: String,
+    val name: CharSequence,
 
     /** Default role for cells in this column */
     val defaultRole: OverlayRole = OverlayRole.OBSERVATION,
@@ -206,10 +206,10 @@ data class ColumnOverlay(
     val evidence: Evidence? = null,
 
     /** Schema or type constraints */
-    val constraints: List<String> = emptyList(),
+    val constraints: List<CharSequence> = emptyList(),
 
     /** Semantic description or documentation */
-    val description: String? = null
+    val description: CharSequence? = null
 ) {
     /**
      * Create a cell overlay from this column overlay for a specific value.
@@ -225,13 +225,13 @@ data class ColumnOverlay(
     /**
      * Add a constraint to the column.
      */
-    fun withConstraint(constraint: String): ColumnOverlay =
+    fun withConstraint(constraint: CharSequence): ColumnOverlay =
         copy(constraints = constraints + constraint)
 
     /**
      * Update the description.
      */
-    fun withDescription(desc: String): ColumnOverlay =
+    fun withDescription(desc: CharSequence): ColumnOverlay =
         copy(description = desc)
 }
 
@@ -241,7 +241,7 @@ data class ColumnOverlay(
  */
 data class BlackboardContext(
     /** Unique identifier for this blackboard instance */
-    val id: String,
+    val id: CharSequence,
 
     /** Column overlays indexed by column index */
     val columnOverlays: Map<Int, ColumnOverlay> = emptyMap(),
@@ -250,7 +250,7 @@ data class BlackboardContext(
     val provenance: Provenance? = null,
 
     /** Cursor-level metadata tags */
-    val tags: Map<String, String> = emptyMap()
+    val tags: Map<CharSequence, CharSequence> = emptyMap()
 ) {
     /**
      * Get the overlay for a specific column.
@@ -278,7 +278,7 @@ data class BlackboardContext(
     /**
      * Add a tag to the cursor.
      */
-    fun withTag(key: String, value: String): BlackboardContext =
+    fun withTag(key: CharSequence, value: CharSequence): BlackboardContext =
         copy(tags = tags + (key to value))
 }
 
@@ -286,10 +286,10 @@ data class BlackboardContext(
  * Helper to create a provenance record.
  */
 fun provenance(
-    source: String,
+    source: CharSequence,
     timestamp: Long = currentTimeMillis(),
-    transformations: List<String> = emptyList(),
-    creator: String? = null,
+    transformations: List<CharSequence> = emptyList(),
+    creator: CharSequence? = null,
     block: ProvenanceBuilder.() -> Unit = {}
 ): Provenance {
     val builder = ProvenanceBuilder(source, timestamp, transformations.toMutableList(), creator)
@@ -301,15 +301,15 @@ fun provenance(
  * Builder for provenance records.
  */
 class ProvenanceBuilder(
-   var source: String,
+   var source: CharSequence,
    var timestamp: Long,
-   var transformations: MutableList<String>,
-   var creator: String?
+   var transformations: MutableList<CharSequence>,
+   var creator: CharSequence?
 ) {
-    fun source(source: String) { this.source = source }
+    fun source(source: CharSequence) { this.source = source }
     fun timestamp(timestamp: Long) { this.timestamp = timestamp }
-    fun transform(step: String) { transformations.add(step) }
-    fun creator(creator: String) { this.creator = creator }
+    fun transform(step: CharSequence) { transformations.add(step) }
+    fun creator(creator: CharSequence) { this.creator = creator }
 
     fun build(): Provenance = Provenance(source, timestamp, transformations, creator)
 }
@@ -321,7 +321,7 @@ fun evidence(
     confidence: Double = 1.0,
     errorMargin: Double? = null,
     supportCount: Int? = null,
-    notes: List<String> = emptyList()
+    notes: List<CharSequence> = emptyList()
 ): Evidence = Evidence(confidence, errorMargin, supportCount, notes)
 
 /**
@@ -344,22 +344,22 @@ fun <T> cellOverlay(
  * Create a column overlay with a simple DSL.
  */
 fun columnOverlay(
-    name: String,
+    name: CharSequence,
     defaultRole: OverlayRole = OverlayRole.OBSERVATION,
     provenance: Provenance? = null,
     evidence: Evidence? = null,
-    constraints: List<String> = emptyList(),
-    description: String? = null
+    constraints: List<CharSequence> = emptyList(),
+    description: CharSequence? = null
 ): ColumnOverlay = ColumnOverlay(name, defaultRole, provenance, evidence, constraints, description)
 
 /**
  * Create a blackboard context.
  */
 fun blackboardContext(
-    id: String,
+    id: CharSequence,
     columnOverlays: Map<Int, ColumnOverlay> = emptyMap(),
     provenance: Provenance? = null,
-    tags: Map<String, String> = emptyMap()
+    tags: Map<CharSequence, CharSequence> = emptyMap()
 ): BlackboardContext = BlackboardContext(id, columnOverlays, provenance, tags)
 
 // ==// Extension functions for Cursor and RowVec overlay access
@@ -401,7 +401,7 @@ fun columnRef(column: Int): DependencyHandle.ColumnRef =
 /**
  * Helper to create an external dependency handle.
  */
-fun externalResource(uri: String, selector: String? = null): DependencyHandle.ExternalResource =
+fun externalResource(uri: CharSequence, selector: CharSequence? = null): DependencyHandle.ExternalResource =
     DependencyHandle.ExternalResource(uri, selector)
 
 /**

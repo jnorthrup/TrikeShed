@@ -15,8 +15,8 @@ class CouchSyncEngine(
     private val fileOps: FileOperations,
     private val blockStore: BlockStore,
     private val wal: NioBlockWal,
-    private val couchUrl: String = "http://localhost:5984",
-    private val database: String = "trike_git",
+    private val couchUrl: CharSequence = "http://localhost:5984",
+    private val database: CharSequence = "trike_git",
 ) : CoroutineContext.Element {
     companion object Key : CoroutineContext.Key<CouchSyncEngine>
     override val key: CoroutineContext.Key<*> get() = Key
@@ -29,7 +29,7 @@ class CouchSyncEngine(
         for (doc in docs) upsertDocument(htx, doc)
     }
 
-    fun startContinuous(scope: CoroutineScope, htx: HtxElement, rootDir: String): Job {
+    fun startContinuous(scope: CoroutineScope, htx: HtxElement, rootDir: CharSequence): Job {
         htx.registerTransport(HtxTransport.HTTPS, createHttpsHandler())
         val watcher = NioFileWatcher(fileOps, root = rootDir)
         return watcher.start(scope) { change ->
@@ -50,7 +50,7 @@ class CouchSyncEngine(
         }
     }
 
-    private suspend fun deleteDocument(htx: HtxElement, path: String) {
+    private suspend fun deleteDocument(htx: HtxElement, path: CharSequence) {
         val docId = "path/$path"
         val response = htx.request("DELETE", "$couchUrl/$database/$docId", transport = HtxTransport.HTTPS)
         if (response.status in 200..299) {
@@ -59,7 +59,7 @@ class CouchSyncEngine(
         }
     }
 
-    private fun fileToDoc(path: String, content: String): GitTreeIndexer.GitDoc {
+    private fun fileToDoc(path: CharSequence, content: CharSequence): GitTreeIndexer.GitDoc {
         val hash = content.hashCode().toString(16).padStart(8, '0')
         val escaped = content.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r")
         return GitTreeIndexer.GitDoc(
@@ -76,7 +76,7 @@ class CouchSyncEngine(
     }
 
     /** Push the kline cascade design document to a CouchDB instance. */
-    suspend fun registerKlineViews(htx: HtxElement, klineDb: String = "klines") {
+    suspend fun registerKlineViews(htx: HtxElement, klineDb: CharSequence = "klines") {
         htx.registerTransport(HtxTransport.HTTPS, createHttpsHandler())
         htx.request(
             "PUT",

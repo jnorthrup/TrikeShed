@@ -37,7 +37,7 @@ class JvmHkdfSha256 : HkdfSha256 {
         return result
     }
 
-    override fun expandLabel(secret: ByteArray, label: String, context: ByteArray, length: Int): ByteArray {
+    override fun expandLabel(secret: ByteArray, label: CharSequence, context: ByteArray, length: Int): ByteArray {
         val labelBytes = "tls13 $label".encodeToByteArray()
         val hkdfLabel = ByteArray(2 + 1 + labelBytes.size + 1 + context.size + 2 + length)
         var p = 0

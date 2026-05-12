@@ -49,10 +49,10 @@ class BlockAggregateQueryTest {
         val grouped = cursor.groupBy("dept", Agg.count())
 
         // Find each dept's count
-        val counts = mutableMapOf<String, Long>()
+        val counts = mutableMapOf<CharSequence, Long>()
         for (i in 0 until grouped.size) {
             val row = grouped.at(i) as DocRowVec
-            val dept = row["dept"] as String
+            val dept = row["dept"] as CharSequence
             val cnt = (row["count"] as Number).toLong()
             counts[dept] = cnt
         }
@@ -68,10 +68,10 @@ class BlockAggregateQueryTest {
         val cursor = empCursor()
         val grouped = cursor.groupBy("dept", Agg.sum("salary"))
 
-        val sums = mutableMapOf<String, Double>()
+        val sums = mutableMapOf<CharSequence, Double>()
         for (i in 0 until grouped.size) {
             val row = grouped.at(i) as DocRowVec
-            sums[row["dept"] as String] = (row["sum_salary"] as Number).toDouble()
+            sums[row["dept"] as CharSequence] = (row["sum_salary"] as Number).toDouble()
         }
         assertEquals(360000.0, sums["eng"]!!, 1.0)  // 120k + 110k + 130k
         assertEquals(185000.0, sums["sales"]!!, 1.0) // 90k + 95k
@@ -85,10 +85,10 @@ class BlockAggregateQueryTest {
         val cursor = empCursor()
         val grouped = cursor.groupBy("dept", Agg.avg("salary"))
 
-        val avgs = mutableMapOf<String, Double>()
+        val avgs = mutableMapOf<CharSequence, Double>()
         for (i in 0 until grouped.size) {
             val row = grouped.at(i) as DocRowVec
-            avgs[row["dept"] as String] = (row["avg_salary"] as Number).toDouble()
+            avgs[row["dept"] as CharSequence] = (row["avg_salary"] as Number).toDouble()
         }
         assertEquals(120000.0, avgs["eng"]!!, 1.0)   // (120k+110k+130k)/3
         assertEquals(92500.0, avgs["sales"]!!, 1.0)   // (90k+95k)/2
@@ -102,12 +102,12 @@ class BlockAggregateQueryTest {
         val cursor = empCursor()
         val grouped = cursor.groupBy("dept", Agg.min("salary"), Agg.max("salary"))
 
-        val mins = mutableMapOf<String, Double>()
-        val maxs = mutableMapOf<String, Double>()
+        val mins = mutableMapOf<CharSequence, Double>()
+        val maxs = mutableMapOf<CharSequence, Double>()
         for (i in 0 until grouped.size) {
             val row = grouped.at(i) as DocRowVec
-            mins[row["dept"] as String] = (row["min_salary"] as Number).toDouble()
-            maxs[row["dept"] as String] = (row["max_salary"] as Number).toDouble()
+            mins[row["dept"] as CharSequence] = (row["min_salary"] as Number).toDouble()
+            maxs[row["dept"] as CharSequence] = (row["max_salary"] as Number).toDouble()
         }
         assertEquals(110000.0, mins["eng"]!!, 1.0)
         assertEquals(130000.0, maxs["eng"]!!, 1.0)

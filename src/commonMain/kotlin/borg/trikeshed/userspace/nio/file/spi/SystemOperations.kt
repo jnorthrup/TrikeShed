@@ -9,6 +9,6 @@ interface SystemOperations : CoroutineContext.Element {
     companion object Key : CoroutineContext.Key<SystemOperations>
     override val key: CoroutineContext.Key<*> get() = Key
 
-    fun getenv(name: String, defaultVal: String? = null): String?
+    fun getenv(name: CharSequence, defaultVal: CharSequence? = null): CharSequence?
     val homedir: CharSequence
 }

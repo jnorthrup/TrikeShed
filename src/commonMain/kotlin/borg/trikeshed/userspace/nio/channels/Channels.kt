@@ -17,10 +17,10 @@ public class Channels {
         fun newReadableChannel(input: Any): ReadableByteChannel = TODO("NIO common stub")
         fun newWritableChannel(output: Any): WritableByteChannel = TODO("NIO common stub")
         fun newReader(channel: ReadableByteChannel, decoder: CharsetDecoder, minBufferCap: Int): Any = TODO("NIO common stub")
-        fun newReaderForCharset(channel: ReadableByteChannel, charsetName: String): Any = TODO("NIO common stub")
+        fun newReaderForCharset(channel: ReadableByteChannel, charsetName: CharSequence): Any = TODO("NIO common stub")
         fun newReaderForDecoder(channel: ReadableByteChannel, charset: Charset): Any = TODO("NIO common stub")
         fun newWriter(channel: WritableByteChannel, encoder: CharsetEncoder, minBufferCap: Int): Any = TODO("NIO common stub")
-        fun newWriterForCharset(channel: WritableByteChannel, charsetName: String): Any = TODO("NIO common stub")
+        fun newWriterForCharset(channel: WritableByteChannel, charsetName: CharSequence): Any = TODO("NIO common stub")
         fun newWriterForEncoder(channel: WritableByteChannel, charset: Charset): Any = TODO("NIO common stub")
     }
 }

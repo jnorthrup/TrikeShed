@@ -16,7 +16,7 @@ class ContextEvictingMapTest {
 
     @Test
     fun nodeOwnerCompletionEvictsThatNode() = runTest {
-        val map = ContextEvictingMap<String, Int>(SupervisorJob())
+        val map = ContextEvictingMap<CharSequence, Int>(SupervisorJob())
         val owner = Job()
 
         map.bind("a", owner, 7)
@@ -32,7 +32,7 @@ class ContextEvictingMapTest {
     @Test
     fun mapOwnerCompletionClearsWholeMap() = runTest {
         val mapOwner = SupervisorJob()
-        val map = ContextEvictingMap<String, Int>(mapOwner)
+        val map = ContextEvictingMap<CharSequence, Int>(mapOwner)
 
         map.bind("a", Job(), 1)
         map.bind("b", Job(), 2)
@@ -48,7 +48,7 @@ class ContextEvictingMapTest {
 
     @Test
     fun explicitEvictHotKillsSingleNode() = runTest {
-        val map = ContextEvictingMap<String, Int>(SupervisorJob())
+        val map = ContextEvictingMap<CharSequence, Int>(SupervisorJob())
 
         map.bind("a", Job(), 9)
         map.bind("b", Job(), 11)
@@ -60,7 +60,7 @@ class ContextEvictingMapTest {
 
     @Test
     fun entriesOnlyExposeLiveNodes() = runTest {
-        val map = ContextEvictingMap<String, Int>(SupervisorJob())
+        val map = ContextEvictingMap<CharSequence, Int>(SupervisorJob())
         val live = Job()
         val dead = Job()
 

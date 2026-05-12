@@ -258,7 +258,7 @@ object YamlScan {
         return Tag.STRING
     }
 
-   fun lineIs(st: ScanState, kw: String): Boolean {
+   fun lineIs(st: ScanState, kw: CharSequence): Boolean {
         var i = 0; var p = st.pos
         while (i < kw.length && p < st.n) {
             if (st.s[p] != kw[i]) return false

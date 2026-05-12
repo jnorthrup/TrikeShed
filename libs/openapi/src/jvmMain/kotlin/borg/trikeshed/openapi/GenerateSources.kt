@@ -15,17 +15,17 @@ import java.io.File
  *   FORCE_HTX_CLIENT_GENERATED_PACKAGE — overrides the generated package root
  *   FORCE_HTX_CLIENT_DISPLAY_NAME — overrides the display name used in class names
  */
-fun main(args: Array<String>) {
+fun main(args: Array<CharSequence>) {
     val parsed = parseArgs(args)
     val specPath = parsed["--spec"] ?: error("--spec <path> required")
     val target = parsed["--target"] ?: "default"
     val outputDir = parsed["--output"] ?: error("--output <dir> required")
     val sides = parsed["--sides"]?.split(",") ?: listOf("client")
 
-    val specFile = File(specPath)
+    val specFile = File(specPath.toString())
     if (!specFile.exists()) error("Spec file not found: $specPath")
 
-    // 1. Parse YAML → Map<String, Any?>
+    // 1. Parse YAML → Map<CharSequence, Any?>
     val rawMap = parseYamlToMap(specFile.readText())
     val rawDoc = OpenApiRawDocument(rawMap)
 
@@ -37,7 +37,7 @@ fun main(args: Array<String>) {
     println("  Target: $target, Sides: $sides")
 
     // 3. Generate sources
-    val allSources = mutableMapOf<String, String>()
+    val allSources = mutableMapOf<CharSequence, CharSequence>()
 
     if (sides.contains("client")) {
         val clientSources = renderAllClientSources(
@@ -58,11 +58,11 @@ fun main(args: Array<String>) {
     }
 
     // 4. Write to output directory
-    val outRoot = File(outputDir)
+    val outRoot = File(outputDir.toString())
     for ((relPath, content) in allSources) {
-        val outFile = File(outRoot, relPath)
+        val outFile = File(outRoot, relPath.toString())
         outFile.parentFile.mkdirs()
-        outFile.writeText(content)
+        outFile.writeText(content.toString())
         println("  Written: $relPath (${content.length} chars)")
     }
 
@@ -71,8 +71,8 @@ fun main(args: Array<String>) {
 
 // ── Arg parser ──────────────────────────────────────────────────────────
 
-private fun parseArgs(args: Array<String>): Map<String, String> {
-    val result = mutableMapOf<String, String>()
+private fun parseArgs(args: Array<CharSequence>): Map<CharSequence, CharSequence> {
+    val result = mutableMapOf<CharSequence, CharSequence>()
     var i = 0
     while (i < args.size) {
         if (args[i].startsWith("--") && i + 1 < args.size) {
@@ -100,19 +100,19 @@ private fun parseArgs(args: Array<String>): Map<String, String> {
  *
  * NOT supported: anchors, aliases, tags, complex keys, explicit type indicators.
  */
-internal fun parseYamlToMap(yaml: String): Map<String, Any?> {
+internal fun parseYamlToMap(yaml: CharSequence): Map<CharSequence, Any?> {
     val lines = yaml.lines()
     return YamlParser(lines).parseDocument()
 }
 
-private class YamlParser(private val lines: List<String>) {
+private class YamlParser(private val lines: List<CharSequence>) {
     private var pos = 0
 
-    fun parseDocument(): Map<String, Any?> {
+    fun parseDocument(): Map<CharSequence, Any?> {
         skipEmptyAndComments()
         if (pos >= lines.size) return emptyMap()
         val indent = lineIndent(lines[pos])
-        return parseBlock(indent) as? Map<String, Any?> ?: emptyMap()
+        return parseBlock(indent) as? Map<CharSequence, Any?> ?: emptyMap()
     }
 
     private fun parseBlock(baseIndent: Int): Any? {
@@ -142,8 +142,8 @@ private class YamlParser(private val lines: List<String>) {
         }
     }
 
-    private fun parseMapping(baseIndent: Int): Map<String, Any?> {
-        val map = linkedMapOf<String, Any?>()
+    private fun parseMapping(baseIndent: Int): Map<CharSequence, Any?> {
+        val map = linkedMapOf<CharSequence, Any?>()
         while (pos < lines.size) {
             skipEmptyAndComments()
             if (pos >= lines.size) break
@@ -156,7 +156,7 @@ private class YamlParser(private val lines: List<String>) {
             if (!containsUnquotedColon(trimmed)) break
 
             val colonIdx = findUnquotedColon(trimmed)
-            val key = parseScalar(trimmed.substring(0, colonIdx).trim()) as String
+            val key = parseScalar(trimmed.substring(0, colonIdx).trim()) as CharSequence
             val afterColon = trimmed.substring(colonIdx + 1).trimStart()
 
             pos++
@@ -214,7 +214,7 @@ private class YamlParser(private val lines: List<String>) {
                     // The key is on this same line after "- "
                     val keyValuePart = afterDash
                     val colonIdx = findUnquotedColon(keyValuePart)
-                    val key = parseScalar(keyValuePart.substring(0, colonIdx).trim()) as String
+                    val key = parseScalar(keyValuePart.substring(0, colonIdx).trim()) as CharSequence
                     val afterColon = keyValuePart.substring(colonIdx + 1).trimStart()
                     pos++
 
@@ -228,7 +228,7 @@ private class YamlParser(private val lines: List<String>) {
                         }
                     }
                     // Continue reading siblings at itemIndent
-                    val siblings = mutableMapOf<String, Any?>(key to value)
+                    val siblings = mutableMapOf<CharSequence, Any?>(key to value)
                     while (pos < lines.size) {
                         skipEmptyAndComments()
                         if (pos >= lines.size) break
@@ -238,7 +238,7 @@ private class YamlParser(private val lines: List<String>) {
                         val nextTrimmed = nextLine.trim()
                         if (!containsUnquotedColon(nextTrimmed)) break
                         val ci = findUnquotedColon(nextTrimmed)
-                        val k = parseScalar(nextTrimmed.substring(0, ci).trim()) as String
+                        val k = parseScalar(nextTrimmed.substring(0, ci).trim()) as CharSequence
                         val ac = nextTrimmed.substring(ci + 1).trimStart()
                         pos++
                         val v: Any? = when {
@@ -263,7 +263,7 @@ private class YamlParser(private val lines: List<String>) {
         return list
     }
 
-    private fun parseInlineValue(s: String): Any? = when {
+    private fun parseInlineValue(s: CharSequence): Any? = when {
         s.startsWith("{") -> parseFlowMap(s)
         s.startsWith("[") -> parseFlowSequence(s)
         s == "null" || s == "~" -> null
@@ -272,10 +272,10 @@ private class YamlParser(private val lines: List<String>) {
         else -> parseScalar(s)
     }
 
-    private fun parseFlowMap(s: String): Map<String, Any?> {
+    private fun parseFlowMap(s: CharSequence): Map<CharSequence, Any?> {
         val content = s.trim().removeSurrounding("{", "}")
         if (content.isBlank()) return emptyMap()
-        val map = linkedMapOf<String, Any?>()
+        val map = linkedMapOf<CharSequence, Any?>()
         // Simple tokenizer for key:value pairs
         val items = splitFlowItems(content)
         for (item in items) {
@@ -288,14 +288,14 @@ private class YamlParser(private val lines: List<String>) {
         return map
     }
 
-    private fun parseFlowSequence(s: String): List<Any?> {
+    private fun parseFlowSequence(s: CharSequence): List<Any?> {
         val content = s.trim().removeSurrounding("[", "]")
         if (content.isBlank()) return emptyList()
         return splitFlowItems(content).map { parseInlineValue(it.trim()) }
     }
 
-    private fun splitFlowItems(s: String): List<String> {
-        val items = mutableListOf<String>()
+    private fun splitFlowItems(s: CharSequence): List<CharSequence> {
+        val items = mutableListOf<CharSequence>()
         var depth = 0
         val sb = StringBuilder()
         var inQuote: Char? = null
@@ -316,7 +316,7 @@ private class YamlParser(private val lines: List<String>) {
         return items
     }
 
-    private fun parseMultilineLiteral(indent: Int): String {
+    private fun parseMultilineLiteral(indent: Int): CharSequence {
         val sb = StringBuilder()
         while (pos < lines.size) {
             val line = lines[pos]
@@ -329,7 +329,7 @@ private class YamlParser(private val lines: List<String>) {
         return sb.toString().trimEnd('\n')
     }
 
-    private fun parseMultilineFolded(indent: Int): String {
+    private fun parseMultilineFolded(indent: Int): CharSequence {
         val sb = StringBuilder()
         while (pos < lines.size) {
             val line = lines[pos]
@@ -342,7 +342,7 @@ private class YamlParser(private val lines: List<String>) {
         return sb.toString().trim()
     }
 
-    private fun parseScalar(s: String): Any? {
+    private fun parseScalar(s: CharSequence): Any? {
         val trimmed = s.trim()
         return when {
             trimmed.isEmpty() -> null
@@ -351,17 +351,17 @@ private class YamlParser(private val lines: List<String>) {
             trimmed == "false" -> false
             trimmed.startsWith('"') && trimmed.endsWith('"') -> unquote(trimmed)
             trimmed.startsWith('\'') && trimmed.endsWith('\'') -> unquote(trimmed)
-            trimmed.toDoubleOrNull() != null -> {
+            trimmed.toString().toDoubleOrNull() != null -> {
                 // Keep as Int if no decimal point and fits
-                val asLong = trimmed.toLongOrNull()
-                if ('.' !in trimmed && 'e' !in trimmed.lowercase() && asLong != null) asLong
-                else trimmed.toDouble()
+                val asLong = trimmed.toString().toLongOrNull()
+                if ('.' !in trimmed.toString() && 'e' !in trimmed.toString().lowercase() && asLong != null) asLong
+                else trimmed.toString().toDouble()
             }
             else -> unquote(trimmed)
         }
     }
 
-    private fun unquote(s: String): String {
+    private fun unquote(s: CharSequence): CharSequence {
         if (s.length >= 2) {
             if ((s.startsWith('"') && s.endsWith('"')) || (s.startsWith('\'') && s.endsWith('\''))) {
                 return s.substring(1, s.length - 1)
@@ -378,13 +378,13 @@ private class YamlParser(private val lines: List<String>) {
         }
     }
 
-    private fun lineIndent(line: String): Int {
+    private fun lineIndent(line: CharSequence): Int {
         var i = 0
         while (i < line.length && line[i] == ' ') i++
         return i
     }
 
-    private fun containsUnquotedColon(s: String): Boolean {
+    private fun containsUnquotedColon(s: CharSequence): Boolean {
         var inQ: Char? = null
         for (i in s.indices) {
             val c = s[i]
@@ -397,7 +397,7 @@ private class YamlParser(private val lines: List<String>) {
         return false
     }
 
-    private fun findUnquotedColon(s: String): Int {
+    private fun findUnquotedColon(s: CharSequence): Int {
         var inQ: Char? = null
         for (i in s.indices) {
             val c = s[i]

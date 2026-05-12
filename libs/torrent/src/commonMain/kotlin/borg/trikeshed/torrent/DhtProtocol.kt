@@ -12,19 +12,19 @@ object DhtProtocol {
     // ── Query messages ───────────────────────────────────────────
 
     /** Ping a node to check if it's alive. {"t":"aa","y":"q","q":"ping","a":{"id":"<our_id>"}} */
-    fun ping(txId: String, ourId: ByteArray): ByteArray =
+    fun ping(txId: CharSequence, ourId: ByteArray): ByteArray =
         buildQuery(txId, "ping", mapOf("id" to ourId))
 
     /** Find nodes closest to target. {"t":"aa","y":"q","q":"find_node","a":{"id":"<our_id>","target":"<target>"}} */
-    fun findNode(txId: String, ourId: ByteArray, target: ByteArray): ByteArray =
+    fun findNode(txId: CharSequence, ourId: ByteArray, target: ByteArray): ByteArray =
         buildQuery(txId, "find_node", mapOf("id" to ourId, "target" to target))
 
     /** Get peers for an info hash. Returns peers or closest nodes. */
-    fun getPeers(txId: String, ourId: ByteArray, infoHash: ByteArray): ByteArray =
+    fun getPeers(txId: CharSequence, ourId: ByteArray, infoHash: ByteArray): ByteArray =
         buildQuery(txId, "get_peers", mapOf("id" to ourId, "info_hash" to infoHash))
 
     /** Announce that we have this torrent. {"t":"aa","y":"q","q":"announce_peer","a":{"id":"...","info_hash":"...","port":6881,"token":"..."}} */
-    fun announcePeer(txId: String, ourId: ByteArray, infoHash: ByteArray, port: Int, token: ByteArray): ByteArray =
+    fun announcePeer(txId: CharSequence, ourId: ByteArray, infoHash: ByteArray, port: Int, token: ByteArray): ByteArray =
         buildQuery(txId, "announce_peer", mapOf(
             "id" to ourId, "info_hash" to infoHash,
             "port" to port, "token" to token,
@@ -33,21 +33,21 @@ object DhtProtocol {
     // ── Response messages ────────────────────────────────────────
 
     /** Successful response. {"t":"aa","y":"r","r":{"id":"<remote_id>",...}} */
-    fun response(txId: String, values: Map<String, Any>): ByteArray =
+    fun response(txId: CharSequence, values: Map<CharSequence, Any>): ByteArray =
         bencode(mapOf("t" to txId, "y" to "r", "r" to values))
 
     /** Error response. {"t":"aa","y":"e","e":[201,"Generic Error"]} */
-    fun error(txId: String, code: Int, message: String): ByteArray =
+    fun error(txId: CharSequence, code: Int, message: CharSequence): ByteArray =
         bencode(mapOf("t" to txId, "y" to "e", "e" to listOf(code, message)))
 
     // ── Parsing ──────────────────────────────────────────────────
 
     data class DhtMessage(
-        val txId: String,
+        val txId: CharSequence,
         val type: Char,      // 'q', 'r', 'e'
-        val query: String?,
-        val args: Map<String, Any>?,
-        val response: Map<String, Any>?,
+        val query: CharSequence?,
+        val args: Map<CharSequence, Any>?,
+        val response: Map<CharSequence, Any>?,
         val error: List<Any>?,
     )
 
@@ -55,14 +55,14 @@ object DhtProtocol {
     fun parse(data: ByteArray): DhtMessage? {
         val dict = parseBencode(data) as? Map<*, *> ?: return null
         @Suppress("UNCHECKED_CAST")
-        val m = dict as Map<String, Any>
-        val t = m["t"] as? String ?: return null
-        val y = (m["y"] as? String)?.firstOrNull() ?: return null
+        val m = dict as Map<CharSequence, Any>
+        val t = m["t"] as? CharSequence ?: return null
+        val y = (m["y"] as? CharSequence)?.firstOrNull() ?: return null
         return DhtMessage(
             txId = t, type = y,
-            query = m["q"] as? String,
-            args = m["a"] as? Map<String, Any>,
-            response = m["r"] as? Map<String, Any>,
+            query = m["q"] as? CharSequence,
+            args = m["a"] as? Map<CharSequence, Any>,
+            response = m["r"] as? Map<CharSequence, Any>,
             error = (m["e"] as? List<*>)?.map { it!! },
         )
     }
@@ -70,11 +70,11 @@ object DhtProtocol {
     // ── Response interpretation ──────────────────────────────────
 
     /** Extract compact node info from a response (26 bytes per node: 20-byte ID + 4-byte IP + 2-byte port). */
-    fun nodes6(response: Map<String, Any>): List<KademliaDht.Node> {
-        val raw = response["nodes"] as? String ?: (response["nodes"] as? ByteArray)
+    fun nodes6(response: Map<CharSequence, Any>): List<KademliaDht.Node> {
+        val raw = response["nodes"] as? CharSequence ?: (response["nodes"] as? ByteArray)
             ?: return emptyList()
         val bytes = when (raw) {
-            is String -> raw.encodeToByteArray()
+            is CharSequence -> raw.encodeToByteArray()
             is ByteArray -> raw
             else -> return emptyList()
         }
@@ -91,11 +91,11 @@ object DhtProtocol {
     }
 
     /** Extract peer addresses from a response (6 bytes per peer: 4-byte IP + 2-byte port). */
-    fun peers6(response: Map<String, Any>): List<KademliaDht.Node> {
-        val raw = response["values"] as? String ?: (response["values"] as? ByteArray)
+    fun peers6(response: Map<CharSequence, Any>): List<KademliaDht.Node> {
+        val raw = response["values"] as? CharSequence ?: (response["values"] as? ByteArray)
             ?: return emptyList()
         val bytes = when (raw) {
-            is String -> raw.encodeToByteArray()
+            is CharSequence -> raw.encodeToByteArray()
             is ByteArray -> raw
             else -> return emptyList()
         }
@@ -112,13 +112,13 @@ object DhtProtocol {
 
     // ── Bencode helpers ───────────────────────────────────────────
 
-    private fun buildQuery(txId: String, query: String, args: Map<String, Any>): ByteArray =
+    private fun buildQuery(txId: CharSequence, query: CharSequence, args: Map<CharSequence, Any>): ByteArray =
         bencode(mapOf("t" to txId, "y" to "q", "q" to query, "a" to args))
 
     /** Minimal bencode encoder (strings, integers, lists, maps). */
     fun bencode(value: Any): ByteArray {
         return when (value) {
-            is String -> "${value.length}:$value".encodeToByteArray()
+            is CharSequence -> "${value.length}:$value".encodeToByteArray()
             is ByteArray -> "${value.size}:${value.decodeToString()}".encodeToByteArray()
             is Int -> "i${value}e".encodeToByteArray()
             is Long -> "i${value}e".encodeToByteArray()
@@ -145,7 +145,7 @@ object DhtProtocol {
         }
     }
 
-    /** Minimal bencode parser (returns Any? — String, Long, List<Any?>, Map<String, Any?>). */
+    /** Minimal bencode parser (returns Any? — CharSequence, Long, List<Any?>, Map<CharSequence, Any?>). */
     fun parseBencode(data: ByteArray): Any? {
         return parseBencodeAt(data, 0).first
     }
@@ -169,11 +169,11 @@ object DhtProtocol {
                 list to (p + 1)
             }
             'd' -> {
-                val map = mutableMapOf<String, Any?>()
+                val map = mutableMapOf<CharSequence, Any?>()
                 var p = pos + 1
                 while (p < data.size && data[p].toInt().toChar() != 'e') {
                     val (keyObj, kp) = parseBencodeAt(data, p)
-                    val key = keyObj as? String ?: keyObj.toString()
+                    val key = keyObj as? CharSequence ?: keyObj.toString()
                     val (valObj, vp) = parseBencodeAt(data, kp)
                     map[key] = valObj
                     p = vp

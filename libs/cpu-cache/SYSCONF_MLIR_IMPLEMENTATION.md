@@ -45,7 +45,7 @@ i32, i64 (Standard MLIR types)
 → C/POSIX: int, long
 ```
 
-### B. Global String Arrays
+### B. Global CharSequence Arrays
 ```
 !llvm.array<N x i8> (Fixed-width char arrays)
 → LLVM IR: [N x i8]

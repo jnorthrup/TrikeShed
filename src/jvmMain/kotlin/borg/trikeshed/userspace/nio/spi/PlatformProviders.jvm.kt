@@ -11,11 +11,13 @@ import kotlin.coroutines.CoroutineContext
 actual fun platformNioProviders(): List<CoroutineContext.Element> {
     val fs = JvmFileOperations()
     fileOperations = fs
+    val channels = JvmChannelOperations()
+    val reactor = JvmReactorOperations(channels)
     return listOf(
         fs,
         JvmSystemOperations(),
-        JvmChannelOperations(),
-        JvmReactorOperations(),
+        channels,
+        reactor,
         JvmProcessOperations(),
     )
 }

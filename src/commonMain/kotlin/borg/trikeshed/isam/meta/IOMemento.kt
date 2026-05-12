@@ -146,8 +146,8 @@ enum class IOMemento(override val networkSize: Int? = null, val fromChars: (Seri
         val readByteArray: (ByteArray) -> ByteArray = { value: ByteArray -> value }
         val writeByteArray: (Any?) -> ByteArray = { value: Any? -> value as ByteArray }
 
-        val readString: (ByteArray) -> String = { value: ByteArray -> value.decodeToString() }
-        val writeString: (Any?) -> ByteArray = { value: Any? -> (value as String).encodeToByteArray() }
+        val readString: (ByteArray) -> CharSequence = { value: ByteArray -> value.decodeToString() }
+        val writeString: (Any?) -> ByteArray = { value: Any? -> (value as CharSequence).toString().encodeToByteArray() }
 
         val readBool: (ByteArray) -> Boolean = { value: ByteArray -> value[0] == 1.toByte() }
         val writeBool: (Any?) -> ByteArray =

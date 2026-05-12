@@ -24,7 +24,7 @@ class Blackboard<T : Comparable<T>> {
     private var headTimestamp: T? = null
 
     /** Subscriptions by characteristic name → list of callbacks. */
-    private val subscriptions = mutableMapOf<String, MutableList<(KlineCharacteristic) -> Unit>>()
+    private val subscriptions = mutableMapOf<CharSequence, MutableList<(KlineCharacteristic) -> Unit>>()
 
     /**
      * Publish a characteristic to the board.
@@ -65,7 +65,7 @@ class Blackboard<T : Comparable<T>> {
     }
 
     /** Subscribe to a characteristic by name. Returns an unsubscribe handle. */
-    fun subscribe(name: String, callback: (KlineCharacteristic) -> Unit): () -> Unit {
+    fun subscribe(name: CharSequence, callback: (KlineCharacteristic) -> Unit): () -> Unit {
         subscriptions.getOrPut(name) { mutableListOf() }.add(callback)
         return { subscriptions[name]?.remove(callback) }
     }
@@ -77,11 +77,11 @@ class Blackboard<T : Comparable<T>> {
     }
 
     /** Observe all characteristics of a given name, newest first. */
-    fun observe(name: String): List<KlineCharacteristic> =
+    fun observe(name: CharSequence): List<KlineCharacteristic> =
         field.filter { it.name == name }.sortedByDescending { it.timestamp }
 
     /** Observe all characteristics with any of the given names. */
-    fun observe(vararg names: String): List<KlineCharacteristic> =
+    fun observe(vararg names: CharSequence): List<KlineCharacteristic> =
         field.filter { it.name in names }.sortedByDescending { it.timestamp }
 
     /** Snapshot of the entire board. */
@@ -127,9 +127,9 @@ class Funnel(
      * Each stage receives a kline and publishes computed characteristics to the blackboard.
      */
     interface Stage {
-        val name: String
-        val consumes: Set<String>  // characteristic names this stage reads from the blackboard
-        val produces: Set<String>  // characteristic names this stage publishes
+        val name: CharSequence
+        val consumes: Set<CharSequence>  // characteristic names this stage reads from the blackboard
+        val produces: Set<CharSequence>  // characteristic names this stage publishes
 
         /**
          * Process a kline and return characteristics.
@@ -197,9 +197,9 @@ class Funnel(
  * Use with `Funnel().register(computeStage("sma", listOf(CharName.SMA20, CharName.SMA50)) { kline, sma20, sma50 -> ... })`
  */
 class ComputeStage(
-    override val name: String,
-    override val consumes: Set<String>,
-    override val produces: Set<String>,
+    override val name: CharSequence,
+    override val consumes: Set<CharSequence>,
+    override val produces: Set<CharSequence>,
     private val fn: suspend (Kline) -> List<KlineCharacteristic>,
 ) : Funnel.Stage {
     override suspend fun process(kline: Kline): List<KlineCharacteristic> = fn(kline)
@@ -210,11 +210,11 @@ class ComputeStage(
  * Returns an empty list (kline dropped) or the same kline (passthrough, no new chars).
  */
 class FilterStage(
-    override val name: String,
-    override val consumes: Set<String>,
+    override val name: CharSequence,
+    override val consumes: Set<CharSequence>,
     private val predicate: (Kline) -> Boolean,
 ) : Funnel.Stage {
-    override val produces: Set<String> = emptySet()
+    override val produces: Set<CharSequence> = emptySet()
     override suspend fun process(kline: Kline): List<KlineCharacteristic> {
         return if (predicate(kline)) emptyList() else emptyList()  // empty = no new chars; filter is implied
     }
@@ -224,9 +224,9 @@ class FilterStage(
  * A funnel stage that branches klines to a side channel when a condition is met.
  */
 class BranchStage(
-    override val name: String,
-    override val consumes: Set<String>,
-    override val produces: Set<String> = emptySet(),
+    override val name: CharSequence,
+    override val consumes: Set<CharSequence>,
+    override val produces: Set<CharSequence> = emptySet(),
     private val condition: (Kline) -> Boolean,
     private val branchChannel: Channel<Kline>,
 ) : Funnel.Stage {
@@ -243,9 +243,9 @@ class BranchStage(
  * Flushes when buffer reaches capacity OR when age since first entry exceeds maxAgeMs.
  */
 class BufferStage(
-    override val name: String,
-    override val consumes: Set<String> = emptySet(),
-    override val produces: Set<String> = emptySet(),
+    override val name: CharSequence,
+    override val consumes: Set<CharSequence> = emptySet(),
+    override val produces: Set<CharSequence> = emptySet(),
     private val capacity: Int,
     private val maxAgeMs: Long,
     private val onFlush: (List<Kline>) -> Unit,
@@ -275,9 +275,9 @@ class BufferStage(
  * Example: computeStage("vol", setOf(CharName.VolumeRatio)) { kline -> ... }
  */
 fun computeStage(
-    name: String,
-    consumes: Set<String> = emptySet(),
-    produces: Set<String>,
+    name: CharSequence,
+    consumes: Set<CharSequence> = emptySet(),
+    produces: Set<CharSequence>,
     fn: suspend (Kline) -> List<KlineCharacteristic>,
 ) = ComputeStage(name, consumes, produces, fn)
 
@@ -285,8 +285,8 @@ fun computeStage(
  * Create a filter stage that drops klines where predicate returns false.
  */
 fun filterStage(
-    name: String,
-    consumes: Set<String> = emptySet(),
+    name: CharSequence,
+    consumes: Set<CharSequence> = emptySet(),
     predicate: (Kline) -> Boolean,
 ) = FilterStage(name, consumes, predicate)
 
@@ -294,8 +294,8 @@ fun filterStage(
  * Create a branch stage that sends matching klines to a side channel.
  */
 fun branchStage(
-    name: String,
-    consumes: Set<String> = emptySet(),
+    name: CharSequence,
+    consumes: Set<CharSequence> = emptySet(),
     condition: (Kline) -> Boolean,
     branch: Channel<Kline>,
 ) = BranchStage(name, consumes, emptySet(), condition, branch)
@@ -304,7 +304,7 @@ fun branchStage(
  * Create a buffer stage that batches klines and flushes on capacity or age.
  */
 fun bufferStage(
-    name: String,
+    name: CharSequence,
     capacity: Int,
     maxAgeMs: Long,
     onFlush: (List<Kline>) -> Unit,

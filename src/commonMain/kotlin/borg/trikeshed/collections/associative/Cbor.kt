@@ -1,5 +1,7 @@
 package borg.trikeshed.collections.associative
 
+import borg.trikeshed.lib.CharSeries
+import borg.trikeshed.lib.encodeToByteArray
 import borg.trikeshed.lib.j
 
 /**
@@ -28,7 +30,7 @@ object Cbor {
                 else encodeHead(buf, 1, -(value + 1))
             }
             is Item.Str -> {
-                val bytes = value.encodeToByteArray()
+                val bytes = CharSeries(value).encodeToByteArray()
                 encodeHead(buf, 3, bytes.size.toLong())
                 buf.write(bytes)
             }
@@ -119,7 +121,7 @@ object Cbor {
         }
 
        fun readMap(count: Int): Item.Map {
-            val keys = ArrayList<String>(count)
+            val keys = ArrayList<CharSequence>(count)
             val vals = ArrayList<Item>(count)
             for (i in 0 until count) {
                 val keyItem = readItem()
@@ -162,7 +164,7 @@ object Cbor {
         }
 
        fun readIndefMap(): Item.Map {
-            val keys = ArrayList<String>()
+            val keys = ArrayList<CharSequence>()
             val vals = ArrayList<Item>()
             while (true) {
                 if (u8() == 0xFF) break
@@ -196,7 +198,7 @@ object Cbor {
             return result
         }
 
-       fun readUtf8(n: Int): String {
+       fun readUtf8(n: Int): CharSequence {
             val result = data.decodeToString(pos, pos + n)
             pos += n
             return result

@@ -89,15 +89,15 @@ class RequestFactoryJsonCodecRedTest {
                     versionProperty = "version",
                     properties = listOf(
                         PropertySpec(name = "id", type = "Long", readOnly = true),
-                        PropertySpec(name = "displayName", type = "String"),
+                        PropertySpec(name = "displayName", type = "CharSequence"),
                     ),
                 ),
                 ValueProxySpec(
                     name = "AddressProxy",
                     serverType = "Address",
                     properties = listOf(
-                        PropertySpec(name = "street1", type = "String"),
-                        PropertySpec(name = "zip", type = "String"),
+                        PropertySpec(name = "street1", type = "CharSequence"),
+                        PropertySpec(name = "zip", type = "CharSequence"),
                     ),
                 ),
             ),

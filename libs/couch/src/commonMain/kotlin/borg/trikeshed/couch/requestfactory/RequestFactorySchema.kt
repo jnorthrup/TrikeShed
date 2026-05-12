@@ -8,15 +8,15 @@ data class RequestFactorySchema(
 )
 
 data class RequestFactorySpec(
-    val name: String,
-    val servletPath: String = "/gwtRequest",
-    val requestPath: String = "/gwtRequest",
-    val eventBusType: String? = null,
+    val name: CharSequence,
+    val servletPath: CharSequence = "/gwtRequest",
+    val requestPath: CharSequence = "/gwtRequest",
+    val eventBusType: CharSequence? = null,
 )
 
 data class RequestContextSpec(
-    val name: String,
-    val serviceType: String,
+    val name: CharSequence,
+    val serviceType: CharSequence,
     val serviceAnnotation: ServiceAnnotation? = null,
     val methods: List<RequestMethodSpec>,
 )
@@ -27,9 +27,9 @@ enum class ServiceAnnotation {
 }
 
 data class RequestMethodSpec(
-    val name: String,
+    val name: CharSequence,
     val kind: RequestMethodKind,
-    val returnType: String,
+    val returnType: CharSequence,
     val parameters: List<ParameterSpec>,
 )
 
@@ -39,42 +39,42 @@ enum class RequestMethodKind {
 }
 
 data class ParameterSpec(
-    val name: String,
-    val type: String,
-    val annotations: List<String> = emptyList(),
+    val name: CharSequence,
+    val type: CharSequence,
+    val annotations: List<CharSequence> = emptyList(),
 )
 
 sealed interface ProxySpec {
-    val name: String
-    val serverType: String
-    val extraTypes: List<String>
+    val name: CharSequence
+    val serverType: CharSequence
+    val extraTypes: List<CharSequence>
     val properties: List<PropertySpec>
 }
 
 data class EntityProxySpec(
-    override val name: String,
-    override val serverType: String,
-    val idProperty: String? = null,
-    val versionProperty: String? = null,
-    override val extraTypes: List<String> = emptyList(),
+    override val name: CharSequence,
+    override val serverType: CharSequence,
+    val idProperty: CharSequence? = null,
+    val versionProperty: CharSequence? = null,
+    override val extraTypes: List<CharSequence> = emptyList(),
     override val properties: List<PropertySpec>,
 ) : ProxySpec
 
 data class ValueProxySpec(
-    override val name: String,
-    override val serverType: String,
-    override val extraTypes: List<String> = emptyList(),
+    override val name: CharSequence,
+    override val serverType: CharSequence,
+    override val extraTypes: List<CharSequence> = emptyList(),
     override val properties: List<PropertySpec>,
 ) : ProxySpec
 
 data class PropertySpec(
-    val name: String,
-    val type: String,
+    val name: CharSequence,
+    val type: CharSequence,
     val readOnly: Boolean = false,
 )
 
 data class ValidationRuleSpec(
-    val targetType: String,
-    val constraint: String,
-    val message: String? = null,
+    val targetType: CharSequence,
+    val constraint: CharSequence,
+    val message: CharSequence? = null,
 )

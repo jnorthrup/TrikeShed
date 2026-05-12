@@ -16,6 +16,12 @@ import borg.trikeshed.userspace.nio.ByteBuffer
  * in the same order (userData preserved).
  */
 public interface UserspaceChannelBackend {
+    /**
+     * Poll: returns true if the fd has data available to read without blocking.
+     * Default: false (emulation targets override this).
+     */
+    fun hasPending(fd: Int): Boolean = false
+
     /** Legacy typed API — will be removed once all callers use [submitBatch]. */
     @Deprecated("Use submitBatch with UringSubmission")
     fun read(file: FileImpl, buffer: ByteBuffer, offset: Long): Int
@@ -24,7 +30,7 @@ public interface UserspaceChannelBackend {
     @Deprecated("Use submitBatch with UringSubmission")
     fun accept(file: FileImpl): Int
     @Deprecated("Use submitBatch with UringSubmission")
-    fun connect(file: FileImpl, address: String, port: Int): Int
+    fun connect(file: FileImpl, address: CharSequence, port: Int): Int
     @Deprecated("Use submitBatch with UringSubmission")
     fun close(file: FileImpl): Int
     @Deprecated("Use submitBatch with UringSubmission")
@@ -32,7 +38,7 @@ public interface UserspaceChannelBackend {
     @Deprecated("Use submitBatch with UringSubmission")
     fun truncate(file: FileImpl, size: Long): Int
     @Deprecated("Use submitBatch with UringSubmission")
-    fun map(file: FileImpl, mode: String, position: Long, size: Long): Int
+    fun map(file: FileImpl, mode: CharSequence, position: Long, size: Long): Int
 
     /**
      * Submit a batch of [UringSubmission] entries and return completions.
@@ -71,6 +77,8 @@ public class FunctionalUringFacade(
         require(entries > 0) { "entries must be positive" }
     }
 
+    fun hasPending(fd: Int): Boolean = backend.hasPending(fd)
+
     // -- Unified API --
 
     /** Enqueue a raw [UringSubmission]. */
@@ -103,7 +111,7 @@ public class FunctionalUringFacade(
         pushAny(PreparedChannelOp.Accept(file, userData))
     }
 
-    fun connect(file: FileImpl, address: String, port: Int, userData: Long) {
+    fun connect(file: FileImpl, address: CharSequence, port: Int, userData: Long) {
         pushAny(PreparedChannelOp.Connect(file, address, port, userData))
     }
 
@@ -119,7 +127,7 @@ public class FunctionalUringFacade(
         pushAny(PreparedChannelOp.Truncate(file, size, userData))
     }
 
-    fun map(file: FileImpl, mode: String, position: Long, size: Long, userData: Long) {
+    fun map(file: FileImpl, mode: CharSequence, position: Long, size: Long, userData: Long) {
         pushAny(PreparedChannelOp.Map(file, mode, position, size, userData))
     }
 
@@ -200,7 +208,7 @@ internal sealed interface PreparedChannelOp {
 
     data class Connect(
         val file: FileImpl,
-        val address: String,
+        val address: CharSequence,
         val port: Int,
         override val userData: Long,
     ) : PreparedChannelOp
@@ -224,7 +232,7 @@ internal sealed interface PreparedChannelOp {
 
     data class Map(
         val file: FileImpl,
-        val mode: String,
+        val mode: CharSequence,
         val position: Long,
         val size: Long,
         override val userData: Long,

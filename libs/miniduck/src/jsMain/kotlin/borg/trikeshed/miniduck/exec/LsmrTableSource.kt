@@ -10,15 +10,15 @@ import borg.trikeshed.miniduck.exec.InMemoryTableSource
 class LsmrTableSource(private val db: LsmrDatabase,val blockSizeThreshold: Int = 128) : TableSource {
    private val delegate = InMemoryTableSource()
 
-    override fun open(execCtx: ExecutionContext, tableName: String): Cursor = delegate.open(execCtx, tableName)
+    override fun open(execCtx: ExecutionContext, tableName: CharSequence): Cursor = delegate.open(execCtx, tableName)
 
-    override suspend fun openSuspend(execCtx: ExecutionContext, tableName: String): Cursor = delegate.openSuspend(execCtx, tableName)
+    override suspend fun openSuspend(execCtx: ExecutionContext, tableName: CharSequence): Cursor = delegate.openSuspend(execCtx, tableName)
 
-    override fun insert(execCtx: ExecutionContext, tableName: String, row: List<Any?>) = delegate.insert(execCtx, tableName, row)
+    override fun insert(execCtx: ExecutionContext, tableName: CharSequence, row: List<Any?>) = delegate.insert(execCtx, tableName, row)
 
-    override suspend fun insertSuspend(execCtx: ExecutionContext, tableName: String, row: List<Any?>) = delegate.insertSuspend(execCtx, tableName, row)
+    override suspend fun insertSuspend(execCtx: ExecutionContext, tableName: CharSequence, row: List<Any?>) = delegate.insertSuspend(execCtx, tableName, row)
 
-    override fun seedRows(tableName: String, rows: List<List<Any?>>) {
+    override fun seedRows(tableName: CharSequence, rows: List<List<Any?>>) {
         delegate.seedRows(tableName, rows)
     }
 }

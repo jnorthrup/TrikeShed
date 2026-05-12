@@ -37,7 +37,7 @@ object Rfc6455Handshake {
      * Uses a simple shift-xor PRNG since `kotlin.random.Random` is available
      * in commonMain.  For production, wire in a platform-secure RNG.
      */
-    fun generateKey(seed: Long = kotlinx.datetime.Clock.System.now().toEpochMilliseconds()): String {
+    fun generateKey(seed: Long = kotlinx.datetime.Clock.System.now().toEpochMilliseconds()): CharSequence {
         val bytes = ByteArray(16)
         var s = seed
         for (i in bytes.indices) {
@@ -56,8 +56,8 @@ object Rfc6455Handshake {
      *
      * The SHA-1 hashing is delegated to the platform via [sha1].
      */
-    fun computeAccept(key: String): String {
-        val input = (key + MAGIC_GUID).encodeToByteArray()
+    fun computeAccept(key: CharSequence): CharSequence {
+        val input = (key.toString() + MAGIC_GUID).encodeToByteArray()
         val hash = sha1(input)
         return hash.encodeBase64()
     }
@@ -81,12 +81,12 @@ object Rfc6455Handshake {
      * @return Full HTTP request text ready to send over TCP/TLS.
      */
     fun buildUpgradeRequest(
-        path: String,
-        host: String,
-        origin: String? = null,
-        protocols: String? = null,
-        key: String = generateKey(),
-    ): String {
+        path: CharSequence,
+        host: CharSequence,
+        origin: CharSequence? = null,
+        protocols: CharSequence? = null,
+        key: CharSequence = generateKey(),
+    ): CharSequence {
         val sb = StringBuilder()
         sb.append("GET $path HTTP/1.1\r\n")
         sb.append("Host: $host\r\n")
@@ -107,7 +107,7 @@ object Rfc6455Handshake {
      * @param expectedKey The `Sec-WebSocket-Key` sent in the client request.
      * @return true if the upgrade was accepted, false otherwise.
      */
-    fun validateUpgradeResponse(response: String, expectedKey: String): Boolean {
+    fun validateUpgradeResponse(response: CharSequence, expectedKey: CharSequence): Boolean {
         val lines = response.split("\r\n")
         if (lines.isEmpty()) return false
 
@@ -146,7 +146,7 @@ object Rfc6455Handshake {
      * @param request Raw HTTP request text from client.
      * @return A 101 upgrade response string, or null if the request is invalid.
      */
-    fun handleUpgradeRequest(request: String): String? {
+    fun handleUpgradeRequest(request: CharSequence): CharSequence? {
         val lines = request.split("\r\n")
         if (lines.isEmpty()) return null
 
@@ -156,7 +156,7 @@ object Rfc6455Handshake {
         if (!requestLine.contains("HTTP/1.1")) return null
 
         // Parse headers
-        val headers = mutableMapOf<String, String>()
+        val headers = mutableMapOf<CharSequence, CharSequence>()
         for (line in lines.drop(1)) {
             if (line.isBlank()) break
             val colon = line.indexOf(':')
@@ -191,7 +191,7 @@ object Rfc6455Handshake {
 
 private val B64_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
 
-private fun ByteArray.encodeBase64(): String {
+private fun ByteArray.encodeBase64(): CharSequence {
     val sb = StringBuilder((size + 2) / 3 * 4)
     var i = 0
     while (i < size) {
@@ -208,7 +208,7 @@ private fun ByteArray.encodeBase64(): String {
     return sb.toString()
 }
 
-private fun String.decodeBase64(): ByteArray? {
+private fun CharSequence.decodeBase64(): ByteArray? {
     val s = this.trimEnd('=')
     val result = mutableListOf<Byte>()
     var i = 0

@@ -43,8 +43,8 @@ import kotlinx.coroutines.launch
  */
 class GitTreeSelfHost(
     private val fileOps: FileOperations,
-    private val repoRoot: String,
-    private val couchUrl: String = "http://localhost:5984",
+    private val repoRoot: CharSequence,
+    private val couchUrl: CharSequence = "http://localhost:5984",
     private val port: Int = 5984,
 ) {
     private val store = NioBlockStore(fileOps.resolvePath(repoRoot, ".couch"), fileOps)
@@ -70,10 +70,10 @@ class GitTreeSelfHost(
             wal = wal,
             compileJs = { source ->
                 object : borg.trikeshed.viewserver.CompiledFunction {
-                    override fun map(doc: Map<String, Any?>, emit: (key: Any?, value: Any?) -> Unit) {
+                    override fun map(doc: Map<CharSequence, Any?>, emit: (key: Any?, value: Any?) -> Unit) {
                         // JVM: use default no-op compiler (view functions are JS, run via CouchDB's own view server)
                     }
-                    override fun reduce(sources: List<String>, values: List<Any?>, rereduce: Boolean): Any? = null
+                    override fun reduce(sources: List<CharSequence>, values: List<Any?>, rereduce: Boolean): Any? = null
                 }
             },
             port = port,

@@ -6,7 +6,7 @@ package borg.trikeshed.htx.client
  * Keeps the minimal set of options the codebase relies on (see HyperDLSwitches).
  */
 object HyperDLHelp {
-    fun helpText(): String = """
+    fun helpText(): CharSequence = """
 hyperdl — multi-protocol & multi-source download utility (TrikeShed native)
 
 Usage: hyperdl [OPTIONS] [URI]...

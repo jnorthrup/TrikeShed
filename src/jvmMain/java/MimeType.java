@@ -462,9 +462,9 @@ public enum MimeType {
   zip("application/zip"), //
   zmt("chemical/x-mopac-input"), //
   ;
-  public String contentType;
+  public CharSequence contentType;
 
-  MimeType(String contentType) {
+  MimeType(CharSequence contentType) {
 
     this.contentType = contentType;
   }

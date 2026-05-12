@@ -8,29 +8,29 @@ package borg.trikeshed.openapi
  * Walks the full document tree and resolves every $ref in place,
  * producing a new map with all references materialised.
  */
-fun OpenApiRawDocument.resolveAllRefs(): Map<String, Any?> {
-    val cache = mutableMapOf<String, Any?>()
-    fun doResolve(ref: String): Any? {
+fun OpenApiRawDocument.resolveAllRefs(): Map<CharSequence, Any?> {
+    val cache = mutableMapOf<CharSequence, Any?>()
+    fun doResolve(ref: CharSequence): Any? {
         cache[ref]?.let { return it }
         val result = this@resolveAllRefs.resolveRef(ref)
         cache[ref] = result
         return result
     }
     @Suppress("UNCHECKED_CAST")
-    return walkAndResolve(root, ::doResolve).let { it as? Map<String, Any?> }!!
+    return walkAndResolve(root, ::doResolve).let { it as? Map<CharSequence, Any?> }!!
 }
-fun walkAndResolve(node: Any?, resolveRef: (String) -> Any?): Any? {
+fun walkAndResolve(node: Any?, resolveRef: (CharSequence) -> Any?): Any? {
     return when (node) {
         null -> null
         is Map<*, *> -> {
             @Suppress("UNCHECKED_CAST")
-            val map = node as Map<String, Any?>
-            val ref: String? = map["\$ref"] as? String
+            val map = node as Map<CharSequence, Any?>
+            val ref: CharSequence? = map["\$ref"] as? CharSequence
             if (ref != null) {
                 val resolved: Any? = resolveRef(ref)
                 resolved ?: map
             } else {
-                map.mapValues { (_, v): Map.Entry<String, Any?> -> walkAndResolve(v, resolveRef) }
+                map.mapValues { (_, v): Map.Entry<CharSequence, Any?> -> walkAndResolve(v, resolveRef) }
             }
         }
         is List<*> -> {
@@ -41,7 +41,7 @@ fun walkAndResolve(node: Any?, resolveRef: (String) -> Any?): Any? {
 }
 
 // ── schema resolver ────────────────────────────────────────────────────────────
-fun resolveSchemaImpl(node: Any?, description: String?, resolveRef: (String) -> Any?): ResolvedSchema {
+fun resolveSchemaImpl(node: Any?, description: CharSequence?, resolveRef: (CharSequence) -> Any?): ResolvedSchema {
     if (node == null) return ResolvedSchema.Generic(description)
 
     val map = node.asMap() ?: return ResolvedSchema.Generic(description)
@@ -112,8 +112,8 @@ fun resolveSchemaImpl(node: Any?, description: String?, resolveRef: (String) -> 
 }
 fun resolveProperties(
     props: JsonMap?,
-    description: String?,
-    resolveRef: (String) -> Any?,
+    description: CharSequence?,
+    resolveRef: (CharSequence) -> Any?,
 ): List<ResolvedSchema.Prop> {
     if (props == null) return emptyList()
     return props.mapNotNull { (name, node) ->
@@ -127,7 +127,7 @@ fun resolveProperties(
     }
 }
 
-fun OpenApiRawDocument.resolveSchema(node: Any?, description: String? = null): ResolvedSchema =
+fun OpenApiRawDocument.resolveSchema(node: Any?, description: CharSequence? = null): ResolvedSchema =
     resolveSchemaImpl(node, description) { resolveRef(it) }
 
 // ── parameter resolver ────────────────────────────────────────────────────────
@@ -163,7 +163,7 @@ fun OpenApiRawDocument.resolveContent(content: Any?): List<ContentType> {
 
 fun OpenApiRawDocument.resolveResponse(
     responseNode: Any?,
-    description: String?,
+    description: CharSequence?,
     isDefault: Boolean = false,
 ): List<ResolvedResponse> {
     if (responseNode == null) return emptyList()
@@ -182,7 +182,7 @@ fun OpenApiRawDocument.resolveResponse(
 
     val results = mutableListOf<ResolvedResponse>()
     for ((statusKey, value) in map) {
-        val statusCode = statusKey.toIntOrNull() ?: continue
+        val statusCode = statusKey.toString().toIntOrNull() ?: continue
         val respMap = value.asMap() ?: continue
         results.add(
             ResolvedResponse(
@@ -212,7 +212,7 @@ fun resolveSecurity(security: Any?): List<SecurityRequirement> {
 
 fun parseTrikeshedContext(root: JsonMap): TrikeshedContext? {
     val ctx = root["x-trikeshed-context"]?.asMap()
-    val supervisorIds = mutableListOf<String>()
+    val supervisorIds = mutableListOf<CharSequence>()
 
     val paths = root["paths"]?.asMap()
     if (paths != null) {

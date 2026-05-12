@@ -37,7 +37,7 @@ fun <T> denseCoordinatesOf(vararg axes: T): DenseCoordinates<T> =
     DenseCoordinates(axes.toList())
 
 data class Chart<C, P>(
-    val name: String,
+    val name: CharSequence,
     val dimension: Int,
     val contains: (P) -> Boolean = { true },
     val project: (P) -> Coordinates<C>?,
@@ -70,7 +70,7 @@ class Atlas<C, P>(val charts: Series<Chart<C, P>>) {
         }
     }
 
-    fun chart(name: String): Chart<C, P>? {
+    fun chart(name: CharSequence): Chart<C, P>? {
         for (i in 0 until charts.size) {
             val chart = charts[i]
             if (chart.name == name) return chart
@@ -93,10 +93,10 @@ data class Manifold<C, P>(val atlas: Atlas<C, P>) {
 
     fun locate(point: P): ChartedPoint<C, P>? = atlas.locate(point)
 
-    fun point(chartName: String, coordinates: Coordinates<C>): P? =
+    fun point(chartName: CharSequence, coordinates: Coordinates<C>): P? =
         atlas.chart(chartName)?.point(coordinates)
 
-    fun transition(fromChartName: String, toChartName: String, coordinates: Coordinates<C>): Coordinates<C>? {
+    fun transition(fromChartName: CharSequence, toChartName: CharSequence, coordinates: Coordinates<C>): Coordinates<C>? {
         val from = atlas.chart(fromChartName) ?: return null
         val to = atlas.chart(toChartName) ?: return null
         return to.locate(from.point(coordinates))

@@ -9,11 +9,11 @@ import kotlin.jvm.JvmInline
  * - TwinPacked packs absolute (start,len) into a Long.
  * - Twin8 packs a small relative offset and a byte length into an Int.
  *
- * These are @JvmInline value classes that act as zero-cost facades over primitive storage.
+ * These are   value classes that act as zero-cost facades over primitive storage.
  */
 
-@JvmInline
-value class TwinPacked(val packed: Long) {
+
+inline class TwinPacked(val packed: Long) {
     companion object {
         fun of(start: Int, len: Int): TwinPacked = TwinPacked((start.toLong() shl 32) or (len.toLong() and 0xffffffffL))
     }
@@ -25,8 +25,8 @@ value class TwinPacked(val packed: Long) {
     override fun toString(): String = "TwinPacked(start=$start,len=$len)"
 }
 
-@JvmInline
-value class Twin8(val packed: Int) {
+
+inline class Twin8(val packed: Int) {
     companion object {
         fun of(offset: Int, len: Int): Twin8 {
             require(len in 0..0xFF) { "len must fit in 8 bits" }

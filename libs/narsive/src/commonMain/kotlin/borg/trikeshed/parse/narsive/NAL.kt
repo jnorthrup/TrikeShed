@@ -20,8 +20,8 @@ import borg.trikeshed.collections.s_
  * Each level enables new inference rules for deriving beliefs from existing ones.
  */
 enum class NALLevel(
-    val label: String,
-    val description: String,
+    val label: CharSequence,
+    val description: CharSequence,
     val primaryOperator: NarsiveOperator,
     val additionalOperators: Series<NarsiveOperator> = Join.emptySeriesOf(),
 ) {
@@ -101,10 +101,10 @@ enum class NALLevel(
         fun fromOperator(op: NarsiveOperator): NALLevel? = entries.firstOrNull { it.operators.view.contains(op) }
 
         /** Parse a NAL level string like "NAL1" or "nal1" */
-        fun fromString(label: String): NALLevel? {
-            val normalized = label.uppercase().trim()
+        fun fromString(label: CharSequence): NALLevel? {
+            val normalized = label.toString().uppercase().trim()
             return entries.find { it.name == normalized } ?: entries.find {
-                it.label == label.lowercase() || it.name.startsWith(normalized.replace("NAL", "NAL"))
+                it.label == label.toString().lowercase() || it.name.startsWith(normalized)
             }
         }
     }

@@ -91,7 +91,7 @@ class MiniRowVecRowAccessor(
     val row: RowVec,
 ) : RowAccessor {
     override fun get(index: Int): Any? = row[index]
-    override fun get(name: String): Any? {
+    override fun get(name: CharSequence): Any? {
         return row.getValue(name)
     }
 }

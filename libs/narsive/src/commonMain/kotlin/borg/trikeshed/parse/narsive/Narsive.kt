@@ -40,7 +40,7 @@ import kotlin.coroutines.CoroutineContext
  * - Exhaustive Fanout: Using `NarsiveElementKind.entries` allows systematic fanout across all possible parser types.
  */
 enum class NarsiveElementKind(
-    val parserName: String,
+    val parserName: CharSequence,
     val isRoot: Boolean = false,
    val operatorLexeme: (Series<Char>) -> Series<Char>? = { null },
    val operatorAccept: (NarsiveOperator) -> Boolean = { false },
@@ -136,9 +136,9 @@ enum class NarsiveRenderMode {
 // ── operator enum ───────────────────────────────────────────────
 
 enum class NarsiveOperator(
-    val asciiForm: String,
-    val unicodeForm: String? = null,
-    vararg val aliases: String,
+    val asciiForm: CharSequence,
+    val unicodeForm: CharSequence? = null,
+    vararg val aliases: CharSequence,
 ) : BitMaskedLong {
     INHERITANCE("-->", "→", "⟶"),
     SIMILARITY("<->", "↔", "⟷"),
@@ -161,8 +161,8 @@ enum class NarsiveOperator(
 
     override val mask: Long get() = 1L shl ordinal
 
-   val forms: Array<String> = (listOfNotNull(asciiForm, unicodeForm) + aliases.asList()).toTypedArray()
-   val orderedForms: Array<String> = forms.sortedByDescending(String::length).toTypedArray()
+   val forms: Array<CharSequence> = (listOfNotNull(asciiForm, unicodeForm) + aliases.asList()).toTypedArray()
+   val orderedForms: Array<CharSequence> = forms.sortedByDescending(CharSequence::length).toTypedArray()
 
     val isCopula: Boolean get() = ordinal <= CONCURRENT_IMPLICATION.ordinal
     val isConjunction: Boolean get() = ordinal in INTERSECTION.ordinal..PRODUCT.ordinal
@@ -311,15 +311,15 @@ object Narsive {
 
     // ── entry points ──
 
-    fun parseTask(text: String): Join<CharSeries, NarsiveTrace>? = task.parse(text)
+    fun parseTask(text: CharSequence): Join<CharSeries, NarsiveTrace>? = task.parse(text)
 
     fun parseTask(text: Series<Char>): Join<CharSeries, NarsiveTrace>? = task.parse(text)
 
-    fun parseSentence(text: String): Join<CharSeries, NarsiveTrace>? = sentence.parse(text)
+    fun parseSentence(text: CharSequence): Join<CharSeries, NarsiveTrace>? = sentence.parse(text)
 
     fun parseSentence(text: Series<Char>): Join<CharSeries, NarsiveTrace>? = sentence.parse(text)
 
-    fun parseTasks(text: String): Series<Join<CharSeries, NarsiveTrace>> = task.parseLines(text)
+    fun parseTasks(text: CharSequence): Series<Join<CharSeries, NarsiveTrace>> = task.parseLines(text)
 
     fun parseTasks(text: Series<Char>): Series<Join<CharSeries, NarsiveTrace>> = task.parseLines(text)
 }

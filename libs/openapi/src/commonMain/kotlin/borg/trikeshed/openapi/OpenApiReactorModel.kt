@@ -11,62 +11,62 @@ package borg.trikeshed.openapi
  */
 sealed interface ResolvedSchema {
     data class Str(
-        val format: String? = null,
-        val enum: List<String>? = null,
-        val default: String? = null,
-        val description: String? = null,
+        val format: CharSequence? = null,
+        val enum: List<CharSequence>? = null,
+        val default: CharSequence? = null,
+        val description: CharSequence? = null,
     ) : ResolvedSchema
 
     data class Num(
-        val format: String? = null,
+        val format: CharSequence? = null,
         val enum: List<Number>? = null,
         val default: Number? = null,
-        val description: String? = null,
+        val description: CharSequence? = null,
     ) : ResolvedSchema
 
     data class Int(
-        val format: String? = null,
+        val format: CharSequence? = null,
         val enum: List<Long>? = null,
         val default: Long? = null,
-        val description: String? = null,
+        val description: CharSequence? = null,
     ) : ResolvedSchema
 
     /** Named BoolSchema to avoid collision with kotlin.Boolean */
     data class BoolSchema(
         val default: Boolean? = null,
-        val description: String? = null,
+        val description: CharSequence? = null,
     ) : ResolvedSchema
 
     data class Obj(
         val properties: List<Prop> = emptyList(),
-        val required: Set<String> = emptySet(),
+        val required: Set<CharSequence> = emptySet(),
         val additionalProperties: Boolean = true,
-        val description: String? = null,
+        val description: CharSequence? = null,
     ) : ResolvedSchema
 
     data class Arr(
         val items: ResolvedSchema,
-        val description: String? = null,
+        val description: CharSequence? = null,
     ) : ResolvedSchema
 
     /** placeholders for unresolvable or polymorphic schemas */
-    data class Generic(val description: String? = null) : ResolvedSchema
+    data class Generic(val description: CharSequence? = null) : ResolvedSchema
 
     data class Ref(
-        val ref: String,
+        val ref: CharSequence,
         val target: ResolvedSchema?,
     ) : ResolvedSchema
 
     data class Variant(
         val schema: ResolvedSchema,
-        val description: String? = null,
+        val description: CharSequence? = null,
     ) : ResolvedSchema
 
     data class Prop(
-        val name: String,
+        val name: CharSequence,
         val schema: ResolvedSchema,
         val required: Boolean = false,
-        val description: String? = null,
+        val description: CharSequence? = null,
     )
 }
 
@@ -77,12 +77,12 @@ sealed interface ResolvedSchema {
  * security flattened.
  */
 data class ResolvedOperation(
-    val path: String,
-    val method: String,
-    val operationId: String,
-    val summary: String?,
-    val description: String?,
-    val tags: List<String>,
+    val path: CharSequence,
+    val method: CharSequence,
+    val operationId: CharSequence,
+    val summary: CharSequence?,
+    val description: CharSequence?,
+    val tags: List<CharSequence>,
     val parameters: List<ResolvedParameter>,
     val requestBody: ResolvedRequestBody?,
     val responses: List<ResolvedResponse>,
@@ -91,11 +91,11 @@ data class ResolvedOperation(
 )
 
 data class ResolvedParameter(
-    val name: String,
-    val location: String,   // path | query | header | cookie
+    val name: CharSequence,
+    val location: CharSequence,   // path | query | header | cookie
     val required: Boolean,
     val schema: ResolvedSchema,
-    val description: String? = null,
+    val description: CharSequence? = null,
     val example: Any? = null,
 )
 
@@ -105,33 +105,33 @@ data class ResolvedRequestBody(
 )
 
 data class ContentType(
-    val mediaType: String,
+    val mediaType: CharSequence,
     val schema: ResolvedSchema,
     val example: Any? = null,
 )
 
 data class ResolvedResponse(
     val statusCode: Int,
-    val description: String?,
+    val description: CharSequence?,
     val contentTypes: List<ContentType>,
     val isDefault: Boolean = false,
 )
 
 data class SecurityRequirement(
-    val schemeName: String,
-    val scopes: List<String> = emptyList(),
+    val schemeName: CharSequence,
+    val scopes: List<CharSequence> = emptyList(),
 )
 
 // ── context binding model ────────────────────────────────────────────────────
 
 data class ContextBinding(
-    val name: String,
-    val keyFqn: String,
-    val elementFqn: String,
-    val openFqn: String,
+    val name: CharSequence,
+    val keyFqn: CharSequence,
+    val elementFqn: CharSequence,
+    val openFqn: CharSequence,
 ) {
-    val keySimple get() = keyFqn.substringAfterLast('.')
-    val elementSimple get() = elementFqn.substringAfterLast('.')
+    val keySimple get() = keyFqn.toString().substringAfterLast('.')
+    val elementSimple get() = elementFqn.toString().substringAfterLast('.')
     val elementImport get() = elementFqn
     val openImport get() = openFqn
     val openAlias get() = "open_${name}"
@@ -146,22 +146,22 @@ data class ContextBinding(
 data class TrikeshedContext(
     val clientBindings: List<ContextBinding>,
     val serverBindings: List<ContextBinding>,
-    val supervisorOperationIds: List<String>,
+    val supervisorOperationIds: List<CharSequence>,
 )
 
 // ── resolved document ────────────────────────────────────────────────────────
 
 data class ResolvedOpenApiDocument(
-    val rawRoot: Map<String, Any?>,
-    val title: String,
-    val version: String,
-    val description: String?,
-    val servers: List<String>,
+    val rawRoot: Map<CharSequence, Any?>,
+    val title: CharSequence,
+    val version: CharSequence,
+    val description: CharSequence?,
+    val servers: List<CharSequence>,
     val operations: List<ResolvedOperation>,
     val trikeshedContext: TrikeshedContext?,
-    val trikeshedTitle: String?,
+    val trikeshedTitle: CharSequence?,
 ) {
-    val operationsById: Map<String, ResolvedOperation> by lazy {
+    val operationsById: Map<CharSequence, ResolvedOperation> by lazy {
         operations.associateBy { it.operationId }
     }
 

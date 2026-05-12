@@ -23,7 +23,7 @@ class FibonacciReporter(
     /** if we know the size beforehand we provide estimation */
     val size: Int? = null,
     /** what do we report? */
-    val noun: String = "rows",
+    val noun: CharSequence = "rows",
 ) : Usable {
 
     var trigger: Int = 0
@@ -38,7 +38,7 @@ class FibonacciReporter(
         count--;countdown = 1; "debug:FibonacciReporter closed ${report()} @ ${TimeSource.Monotonic.markNow()-begin} "
     }
 
-    fun report(): String? = (count++).run {
+    fun report(): CharSequence? = (count++).run {
         if (--countdown == 0) {
             //without -ea this benchmark only costs a unused variable decrement.
             countdown = fib(++trigger)

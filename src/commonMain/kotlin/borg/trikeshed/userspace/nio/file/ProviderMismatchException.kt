@@ -6,5 +6,5 @@ package borg.trikeshed.userspace.nio.file
 // Declarations intentionally mirror JDK taxonomy and contain no implementations.
 public open class ProviderMismatchException : IllegalArgumentException {
     constructor()
-    constructor(p0: String)
+    constructor(p0: CharSequence)
 }

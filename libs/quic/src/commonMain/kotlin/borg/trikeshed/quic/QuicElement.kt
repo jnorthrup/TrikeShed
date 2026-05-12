@@ -11,7 +11,7 @@ import kotlin.coroutines.CoroutineContext
 import kotlin.random.Random
 
 data class QuicConfig(
-    val alpn: Series<String> = Join.emptySeriesOf(),
+    val alpn: Series<CharSequence> = Join.emptySeriesOf(),
     val maxIdleTimeoutMs: Long = 30000,
     val maxUdpPayloadSize: Int = 1350,
     val initialVersion: QuicVersion = QuicVersions.VERSION_1,
@@ -76,7 +76,7 @@ data class QuicShortFrame(
 data class QuicChannelService(
     val _streams: MutableMap<Int, StreamHandle> = mutableMapOf(),
     val ioUringFd: Int = -1,          // -1 = epoll fallback
-    val xdpProg: String? = null,      // XDP prog name for hardware packet steering, null = software only
+    val xdpProg: CharSequence? = null,      // XDP prog name for hardware packet steering, null = software only
     val connectionId: QuicConnectionId = QuicConnectionId.generate(),
 ) : StreamTransport {
     companion object Key : CoroutineContext.Key<QuicChannelService>
@@ -151,12 +151,12 @@ data class QuicConfigV2(
  * Every error category from the Rust source is represented as a sealed sub-hierarchy
  * so that `when` exhaustiveness checking works in Kotlin.
  */
-sealed class QuicErrorException(override val message: String, override val cause: Throwable? = null) : Exception(message, cause) {
+sealed class QuicErrorException(val msg: CharSequence, override val cause: Throwable? = null) : Exception(msg.toString(), cause) {
 
     // -- Connection errors ---------------------------------------------------
 
     sealed class Connection(
-        msg: String,
+        msg: CharSequence,
         cause: Throwable? = null
     ) : QuicErrorException(msg, cause) {
 
@@ -173,14 +173,14 @@ sealed class QuicErrorException(override val message: String, override val cause
         ) : Connection("QUIC handshake failed", cause)
 
         class InvalidState(
-            val state: String
+            val state: CharSequence
         ) : Connection("Invalid state: $state")
     }
 
     // -- Stream errors -------------------------------------------------------
 
     sealed class Stream(
-        msg: String,
+        msg: CharSequence,
         cause: Throwable? = null
     ) : QuicErrorException(msg, cause) {
 
@@ -208,12 +208,12 @@ sealed class QuicErrorException(override val message: String, override val cause
     // -- Protocol errors -----------------------------------------------------
 
     sealed class Protocol(
-        msg: String,
+        msg: CharSequence,
         cause: Throwable? = null
     ) : QuicErrorException(msg, cause) {
 
         class InvalidPacket(
-            val detail: String
+            val detail: CharSequence
         ) : Protocol("Invalid packet: $detail")
 
         class VersionMismatch(
@@ -222,7 +222,7 @@ sealed class QuicErrorException(override val message: String, override val cause
         ) : Protocol("QUIC version mismatch: local=$local, remote=$remote")
 
         class Crypto(
-            val detail: String,
+            val detail: CharSequence,
             cause: Throwable? = null
         ) : Protocol("Crypto error: $detail", cause)
 
@@ -234,12 +234,12 @@ sealed class QuicErrorException(override val message: String, override val cause
     // -- Transport errors ----------------------------------------------------
 
     sealed class Transport(
-        msg: String,
+        msg: CharSequence,
         cause: Throwable? = null
     ) : QuicErrorException(msg, cause) {
 
         class Network(
-            val detail: String,
+            val detail: CharSequence,
             cause: Throwable? = null
         ) : Transport("Network error: $detail", cause)
 
@@ -252,7 +252,7 @@ sealed class QuicErrorException(override val message: String, override val cause
     // -- Flow-control errors -------------------------------------------------
 
     sealed class FlowControl(
-        msg: String
+        msg: CharSequence
     ) : QuicErrorException(msg) {
 
         data object ConnectionBlocked : FlowControl("Connection-level flow control blocked by peer")
@@ -265,7 +265,7 @@ sealed class QuicErrorException(override val message: String, override val cause
     // -- Congestion-control errors -------------------------------------------
 
     sealed class CongestionControl(
-        msg: String
+        msg: CharSequence
     ) : QuicErrorException(msg) {
 
         class CongestionWindowBlocked(
@@ -498,7 +498,7 @@ class QuicElement(
 
     override val activeStreams: Int get() = streams.size
 
-    suspend fun connect(host: String, port: Int): StreamHandle {
+    suspend fun connect(host: CharSequence, port: Int): StreamHandle {
         requireState(ElementState.OPEN)
         return openStream()
     }

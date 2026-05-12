@@ -84,9 +84,9 @@ public enum HttpStatus {
   $504("Gateway Timeout"), //
   $505("HTTP Version Not Supported"), //
   $507("Insufficient Storage"); //
-  public final String caption;
+  public final CharSequence caption;
 
-  HttpStatus(String caption) {
+  HttpStatus(CharSequence caption) {
     this.caption = caption;;
   }
 }

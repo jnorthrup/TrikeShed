@@ -1,7 +1,7 @@
 package borg.trikeshed.couch.transport.htx
 
 class HtxBackedCouchTransport {
-    fun view(database: String, path: String): HtxCouchExchange {
+    fun view(database: CharSequence, path: CharSequence): HtxCouchExchange {
         val request = HtxRequest(
             method = "GET",
             path = "/$database/$path",

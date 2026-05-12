@@ -19,7 +19,7 @@ persistence, networking, and domain logic:
 
 - **WAL + BPlusTree storage** — LSMRWal interface (append, read, snapshot,
   compact) backed by BtrfsWal which stores entries in a tiny-btrfs
-  BPlusTree<Long,String>. BtrfsSandboxElement wraps the tree as an
+  BPlusTree<Long,CharSequence>. BtrfsSandboxElement wraps the tree as an
   AsyncContextElement with SupervisorJob lifecycle.
 
 - **Reactor** — ReactorSupervisor is a CoroutineContext.Element that manages

@@ -54,7 +54,7 @@ class Nars3DeriverTest {
             }
         }
 
-        val derived = mutableListOf<String>()
+        val derived = mutableListOf<CharSequence>()
         machine.deriveAll(input, this) { derived += it.content }
 
         assertEquals(
@@ -65,12 +65,12 @@ class Nars3DeriverTest {
                 "similarity: bird --> animal | robin <-> bird",
                 "similarity: robin <-> bird | sparrow --> bird",
             ),
-            derived.sorted(),
+            derived.map { it.toString() }.sorted(),
         )
         machine.shutdown()
     }
 
-    private fun messageWithOperator(content: String, operator: NarsiveOperator): Nars3Message =
+    private fun messageWithOperator(content: CharSequence, operator: NarsiveOperator): Nars3Message =
         Nars3Message(
             content = content,
             budget = Nars3Budget(priority = 0.8f, durability = 0.7f, quality = 0.6f),

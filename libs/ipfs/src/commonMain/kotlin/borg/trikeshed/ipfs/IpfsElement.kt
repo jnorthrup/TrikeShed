@@ -13,7 +13,7 @@ open class IpfsElement(val blockStore: BlockStore, val dht: DhtService) : AsyncC
 
     suspend fun get(cid: CID): ByteArray? = blockStore.get(cid)
 
-    fun announceProvider(cid: CID, address: String) { dht.announceProvider(cid, address) }
+    fun announceProvider(cid: CID, address: CharSequence) { dht.announceProvider(cid, address) }
 
     suspend fun activePeers(): Int = 0
 }

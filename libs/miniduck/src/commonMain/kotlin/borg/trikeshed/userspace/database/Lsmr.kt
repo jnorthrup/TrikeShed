@@ -8,19 +8,19 @@ import kotlinx.coroutines.sync.withLock
  */
 
 data class LsmrConfig(
-    val path: String,
+    val path: CharSequence,
     val memtableThreshold: Int,
     val maxSegments: Int? = null
 )
 
 class LsmrDatabase(val config: LsmrConfig) {
-   val memtable = mutableMapOf<String, ByteArray>()
+   val memtable = mutableMapOf<CharSequence, ByteArray>()
    var memtableSize = 0
-   val segments = mutableListOf<MutableMap<String, ByteArray>>()
-   val segmentFiles = mutableListOf<String>()
+   val segments = mutableListOf<MutableMap<CharSequence, ByteArray>>()
+   val segmentFiles = mutableListOf<CharSequence>()
    val mutex = Mutex()
 
-    suspend fun put(id: String, value: ByteArray) {
+    suspend fun put(id: CharSequence, value: ByteArray) {
         mutex.withLock {
             val prev = memtable.put(id, value)
             if (prev != null) memtableSize -= prev.size
@@ -32,7 +32,7 @@ class LsmrDatabase(val config: LsmrConfig) {
         }
     }
 
-    suspend fun get(id: String): ByteArray? {
+    suspend fun get(id: CharSequence): ByteArray? {
         mutex.withLock {
             memtable[id]?.let { return it }
             // Search in-memory segments newest-first

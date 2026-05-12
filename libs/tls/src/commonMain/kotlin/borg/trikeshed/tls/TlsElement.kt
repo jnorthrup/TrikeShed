@@ -1,7 +1,9 @@
 package borg.trikeshed.tls
 
+import borg.trikeshed.collections.s_
 import borg.trikeshed.context.AsyncContextElement
 import borg.trikeshed.context.ElementState
+import borg.trikeshed.lib.Series
 import kotlin.coroutines.CoroutineContext
 
 /**
@@ -17,7 +19,7 @@ enum class TlsProtocolVersion {
 /**
  * Certificate hash for identity verification.
  */
-data class CertificateFingerprint(val sha256: String)
+data class CertificateFingerprint(val sha256: CharSequence)
 
 /**
  * TLS client configuration.
@@ -29,8 +31,8 @@ data class CertificateFingerprint(val sha256: String)
  */
 data class TlsSettings(
     val protocolVersion: TlsProtocolVersion = TlsProtocolVersion.V1_3,
-    val cipherSuites: List<String> = listOf("TLS_AES_256_GCM_SHA384", "TLS_CHACHA20_POLY1305_SHA256"),
-    val serverName: String? = null,
+    val cipherSuites: Series<CharSequence> = s_["TLS_AES_256_GCM_SHA384", "TLS_CHACHA20_POLY1305_SHA256"],
+    val serverName: CharSequence? = null,
     val pinnedCertificates: List<CertificateFingerprint> = emptyList(),
 ) {
     companion object {

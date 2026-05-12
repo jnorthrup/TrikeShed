@@ -3,17 +3,17 @@ package borg.trikeshed.openapi
 // ── server generation config ──────────────────────────────────────────────────
 
 data class ServerGenConfig(
-    val specPath: String,
-    val generatorTask: String,
-    val packageRoot: String,
-    val displayName: String,
-    val moduleSuffix: String = "",
+    val specPath: CharSequence,
+    val generatorTask: CharSequence,
+    val packageRoot: CharSequence,
+    val displayName: CharSequence,
+    val moduleSuffix: CharSequence = "",
     val trikeshedContext: TrikeshedContext?,
-    val messageTypeName: String = "ServerMessage",
+    val messageTypeName: CharSequence = "ServerMessage",
 ) {
     val adapterClassName get() = "${displayName}ServerAdapter"
-    val keysClassName get() = "Keys${moduleSuffix.replaceFirstChar { it.uppercase() }}"
-    val elementsClassName get() = "Elements${moduleSuffix.replaceFirstChar { it.uppercase() }}"
+    val keysClassName get() = "Keys${moduleSuffix.toString().replaceFirstChar { it.uppercase() }}"
+    val elementsClassName get() = "Elements${moduleSuffix.toString().replaceFirstChar { it.uppercase() }}"
     val adapterPackage get() = packageRoot
     val keysPackage get() = packageRoot
     val elementsPackage get() = packageRoot
@@ -21,7 +21,7 @@ data class ServerGenConfig(
 
 // ── ServerMessage ─────────────────────────────────────────────────────────────
 
-fun renderServerMessage(cfg: ServerGenConfig): String {
+fun renderServerMessage(cfg: ServerGenConfig): CharSequence {
     val banner = generatedBanner(cfg.specPath, cfg.generatorTask)
     return buildString {
         appendLine("package ${cfg.adapterPackage}")
@@ -31,8 +31,8 @@ fun renderServerMessage(cfg: ServerGenConfig): String {
         appendLine("/** Minimal HTTP response model used by the generated server adapter. */")
         appendLine("data class ${cfg.messageTypeName}(")
         appendLine("    val status: Int,")
-        appendLine("    val headers: Map<String, String> = emptyMap(),")
-        appendLine("    val body: String?,")
+        appendLine("    val headers: Map<CharSequence, CharSequence> = emptyMap(),")
+        appendLine("    val body: CharSequence?,")
         appendLine(") {")
         appendLine("    val isSuccess: Boolean get() = status in 200..299")
         appendLine("}")
@@ -44,7 +44,7 @@ fun renderServerMessage(cfg: ServerGenConfig): String {
 fun renderServerAdapter(
     ops: List<ResolvedOperation>,
     cfg: ServerGenConfig,
-): String {
+): CharSequence {
     val banner = generatedBanner(cfg.specPath, cfg.generatorTask)
     val bindings = cfg.trikeshedContext?.serverBindings ?: emptyList()
 
@@ -65,7 +65,7 @@ fun renderServerAdapter(
             if (binding != null) {
                 appendLine("                val ctx = requireNotNull(context[${binding.keySimple}]) { \"Expected ${binding.name} context\" }")
                 append("                val raw = ctx.request(")
-                append("method = \"${op.method.uppercase()}\", path = \"$pathEsc\"")
+                append("method = \"${op.method.toString().uppercase()}\", path = \"$pathEsc\"")
                 if (queryParams.isNotEmpty()) append(", queryParams = qps")
                 if (hasBody) append(", body = request.body")
                 appendLine(")")
@@ -101,9 +101,9 @@ fun renderServerAdapter(
         appendLine("    object Contract {")
         ops.forEach { op ->
             appendLine("        object ${op.contractClassName()} {")
-            appendLine("            const val operationId: String = \"${op.operationId.escapeKotlin()}\"")
-            appendLine("            const val path: String = \"${op.path.escapeKotlin()}\"")
-            appendLine("            const val method: String = \"${op.method.uppercase()}\"")
+            appendLine("            const val operationId: CharSequence = \"${op.operationId.escapeKotlin()}\"")
+            appendLine("            const val path: CharSequence = \"${op.path.escapeKotlin()}\"")
+            appendLine("            const val method: CharSequence = \"${op.method.toString().uppercase()}\"")
             appendLine("        }")
         }
         appendLine("    }")
@@ -113,7 +113,7 @@ fun renderServerAdapter(
 
 // ── ServerKeys ───────────────────────────────────────────────────────────────
 
-fun renderServerKeys(cfg: ServerGenConfig): String {
+fun renderServerKeys(cfg: ServerGenConfig): CharSequence {
     val banner = generatedBanner(cfg.specPath, cfg.generatorTask)
     val bindings = cfg.trikeshedContext?.serverBindings ?: emptyList()
 
@@ -139,7 +139,7 @@ fun renderServerKeys(cfg: ServerGenConfig): String {
 
 // ── ServerElements ────────────────────────────────────────────────────────────
 
-fun renderServerElements(cfg: ServerGenConfig): String {
+fun renderServerElements(cfg: ServerGenConfig): CharSequence {
     val banner = generatedBanner(cfg.specPath, cfg.generatorTask)
     val bindings = cfg.trikeshedContext?.serverBindings ?: emptyList()
 
@@ -170,11 +170,11 @@ fun renderServerElements(cfg: ServerGenConfig): String {
 
 fun renderAllServerSources(
     doc: ResolvedOpenApiDocument,
-    specPath: String,
-    generatorTask: String,
-    moduleSuffix: String = "",
-    messageTypeName: String = "ServerMessage",
-): Map<String, String> {
+    specPath: CharSequence,
+    generatorTask: CharSequence,
+    moduleSuffix: CharSequence = "",
+    messageTypeName: CharSequence = "ServerMessage",
+): Map<CharSequence, CharSequence> {
     val pkg = derivePackageRoot(doc.title)
     val display = deriveDisplayName(doc.title)
 
@@ -188,7 +188,7 @@ fun renderAllServerSources(
         messageTypeName = messageTypeName,
     )
 
-    val pkgPath = pkg.replace('.', '/')
+    val pkgPath = pkg.toString().replace('.', '/')
 
     return mapOf(
         "$pkgPath/${cfg.messageTypeName}.kt" to renderServerMessage(cfg),

@@ -13,8 +13,8 @@ class ChannelsNamingTest {
     fun channelsOpensChannel() {
         var lastWrite = ""
         val channels = object : Channels {
-            override fun open(addr: String): Channel = object : Channel {
-                override fun channelType(): String = "stub"
+            override fun open(addr: CharSequence): Channel = object : Channel {
+                override fun channelType(): CharSequence = "stub"
                 override fun isConnected(): Boolean = false
                 override fun metadata(): ChannelMetadata = ChannelMetadata(remoteAddr = addr)
                 override fun read(dst: ByteRegion): Int {
@@ -23,12 +23,12 @@ class ChannelsNamingTest {
                     return src.size
                 }
                 override fun write(src: ByteSeries): Int {
-                    lastWrite = src.asString()
+                    lastWrite = src.asString().toString()
                     return src.rem
                 }
             }
 
-            override fun providerName(): String = "stub"
+            override fun providerName(): CharSequence = "stub"
         }
 
         val channel = channels.open("127.0.0.1:80")

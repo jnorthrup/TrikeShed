@@ -23,7 +23,7 @@
 - Primitive encoding helpers (`putUShort`, `getUInt`, etc.) — pure functions. Correct.
 
 ### Missing from this module (present in root CCEK copy)
-- Root `ccek/NgSctpService` has: `paths: List<String>` (multi-homing), `congestionControl: String`
+- Root `ccek/NgSctpService` has: `paths: List<CharSequence>` (multi-homing), `congestionControl: CharSequence`
 - [ ] Migrate multi-homing path management into `SctpElement`
 - [ ] Migrate congestion control policy into `SctpElement` or `SctpConfig`
 

@@ -20,7 +20,7 @@ interface LSMRWal {
 }
 
 /* Minimal placeholder types - replace with full domain types later. */
-data class WalEntry(val seq: Long = 0L, val payload: String = "")
+data class WalEntry(val seq: Long = 0L, val payload: CharSequence = "")
 data class SnapshotRequest(val untilSequence: Long = 0L)
 data class WalSnapshot(val entries: List<WalEntry> = emptyList())
 data class CompactionPlan(val keepUntilSequence: Long = 0L)

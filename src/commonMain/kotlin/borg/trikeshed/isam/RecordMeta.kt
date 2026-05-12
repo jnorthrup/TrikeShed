@@ -20,7 +20,7 @@ import borg.trikeshed.lib.j
 
    class RecordMeta(
 //    /** column name*/
-    val name: String,
+    val name: CharSequence,
     /** enum-resident Type describing byte marshalling strategies - a specialization of TypeMemento */
     val type: IOMemento,
     /** context-specific byte offset beginning*/

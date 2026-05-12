@@ -1,5 +1,11 @@
+@file:Suppress("UNCHECKED_CAST")
+
 package borg.trikeshed.tls
 
+import borg.trikeshed.collections.s_
+import borg.trikeshed.lib.Series
+import borg.trikeshed.lib.view
+import borg.trikeshed.lib.α
 import kotlin.random.Random
 
 /**
@@ -8,11 +14,11 @@ import kotlin.random.Random
  */
 data class TlsFingerprint(
     val version: TlsVersionKind,
-    val cipherSuites: List<Int>,
-    val extensions: List<Int>,
-    val ellipticCurves: List<Int>,
-    val signatureAlgorithms: List<Int>,
-    val alpnProtocols: List<String>,
+    val cipherSuites: Series<Int>,
+    val extensions: Series<Int>,
+    val ellipticCurves: Series<Int>,
+    val signatureAlgorithms: Series<Int>,
+    val alpnProtocols: Series<CharSequence>,
     val compressCertificate: Boolean,
     val earlyData: Boolean,
     val sessionTicket: Boolean,
@@ -24,7 +30,7 @@ data class TlsFingerprint(
  *
  * Mirrors literbike/src/tls_fingerprint.rs:MobileBrowserProfile.
  */
-enum class BrowserProfile(val label: String, val marketSharePercent: Int) {
+enum class BrowserProfile(val label: CharSequence, val marketSharePercent: Int) {
     CHROME_120("Chrome Mobile 120", 65),
     SAFARI_17("Safari 17", 25),
     SAMSUNG_21("Samsung Browser 21", 5),
@@ -38,55 +44,55 @@ enum class BrowserProfile(val label: String, val marketSharePercent: Int) {
     val fingerprint: TlsFingerprint get() = when (this) {
         SAFARI_17 -> TlsFingerprint(
             version = TlsVersionKind.V1_3,
-            cipherSuites = listOf(0x1301, 0x1302, 0x1303, 0xC02F, 0xC030, 0xCCA9, 0xC02B, 0xC02C),
-            extensions = listOf(0x0000, 0x000B, 0x000A, 0x0023, 0x0010, 0x0005, 0x0033, 0x002B, 0x0029),
-            ellipticCurves = listOf(0x001D, 0x0017, 0x0018),
-            signatureAlgorithms = listOf(0x0403, 0x0503, 0x0603, 0x0804, 0x0805, 0x0806),
-            alpnProtocols = listOf("h2", "http/1.1"),
+            cipherSuites = s_[0x1301, 0x1302, 0x1303, 0xC02F, 0xC030, 0xCCA9, 0xC02B, 0xC02C,],
+            extensions = s_[0x0000, 0x000B, 0x000A, 0x0023, 0x0010, 0x0005, 0x0033, 0x002B, 0x0029,],
+            ellipticCurves = s_[0x001D, 0x0017, 0x0018,],
+            signatureAlgorithms = s_[0x0403, 0x0503, 0x0603, 0x0804, 0x0805, 0x0806,],
+            alpnProtocols = s_ ["h2", "http/1.1"],
             compressCertificate = true,
             earlyData = false,
             sessionTicket = true,
         )
         CHROME_120 -> TlsFingerprint(
             version = TlsVersionKind.V1_3,
-            cipherSuites = listOf(0x1301, 0x1302, 0x1303, 0xC02F, 0xC030, 0xCCA9, 0xC02B, 0xC02C, 0xCCA8),
-            extensions = listOf(0x0000, 0x000B, 0x000A, 0x0023, 0x0010, 0x0005, 0x0012, 0x0033, 0x002B, 0x002A, 0x001B, 0x0029),
-            ellipticCurves = listOf(0x001D, 0x0017, 0x0018, 0x0019),
-            signatureAlgorithms = listOf(0x0403, 0x0804, 0x0401, 0x0503, 0x0805, 0x0501),
-            alpnProtocols = listOf("h2", "http/1.1"),
+            cipherSuites = s_[0x1301, 0x1302, 0x1303, 0xC02F, 0xC030, 0xCCA9, 0xC02B, 0xC02C, 0xCCA8],
+            extensions = s_[0x0000, 0x000B, 0x000A, 0x0023, 0x0010, 0x0005, 0x0012, 0x0033, 0x002B, 0x002A, 0x001B, 0x0029],
+            ellipticCurves = s_[0x001D, 0x0017, 0x0018, 0x0019],
+            signatureAlgorithms = s_[0x0403, 0x0804, 0x0401, 0x0503, 0x0805, 0x0501],
+            alpnProtocols = s_["h2", "http/1.1"],
             compressCertificate = true,
             earlyData = true,
             sessionTicket = true,
         )
         FIREFOX_121 -> TlsFingerprint(
             version = TlsVersionKind.V1_3,
-            cipherSuites = listOf(0x1301, 0x1302, 0x1303, 0xC02B, 0xC02F, 0xC02C, 0xC030, 0xCCA9, 0xCCA8),
-            extensions = listOf(0x0000, 0x000B, 0x000A, 0x0023, 0x0010, 0x0033, 0x002B, 0x0029),
-            ellipticCurves = listOf(0x001D, 0x0017, 0x0018),
-            signatureAlgorithms = listOf(0x0403, 0x0503, 0x0603, 0x0804, 0x0805, 0x0806),
-            alpnProtocols = listOf("h2", "http/1.1"),
+            cipherSuites = s_[0x1301, 0x1302, 0x1303, 0xC02B, 0xC02F, 0xC02C, 0xC030, 0xCCA9, 0xCCA8],
+            extensions = s_[0x0000, 0x000B, 0x000A, 0x0023, 0x0010, 0x0033, 0x002B, 0x0029],
+            ellipticCurves = s_[0x001D, 0x0017, 0x0018],
+            signatureAlgorithms = s_[0x0403, 0x0503, 0x0603, 0x0804, 0x0805, 0x0806],
+            alpnProtocols = s_["h2", "http/1.1"],
             compressCertificate = false,
             earlyData = false,
             sessionTicket = true,
         )
         SAMSUNG_21 -> TlsFingerprint(
             version = TlsVersionKind.V1_3,
-            cipherSuites = listOf(0x1301, 0x1302, 0x1303, 0xC02F, 0xC030, 0xC02B, 0xC02C),
-            extensions = listOf(0x0000, 0x000B, 0x000A, 0x0023, 0x0010, 0x0033, 0x002B, 0x0029),
-            ellipticCurves = listOf(0x001D, 0x0017, 0x0018),
-            signatureAlgorithms = listOf(0x0403, 0x0503, 0x0804, 0x0805),
-            alpnProtocols = listOf("h2", "http/1.1"),
+            cipherSuites =s_[0x1301, 0x1302, 0x1303, 0xC02F, 0xC030, 0xC02B, 0xC02C],
+            extensions =s_[0x0000, 0x000B, 0x000A, 0x0023, 0x0010, 0x0033, 0x002B, 0x0029],
+            ellipticCurves =s_[0x001D, 0x0017, 0x0018],
+            signatureAlgorithms =s_[0x0403, 0x0503, 0x0804, 0x0805],
+            alpnProtocols =s_["h2", "http/1.1"],
             compressCertificate = false,
             earlyData = false,
             sessionTicket = true,
         )
         EDGE_120 -> TlsFingerprint(
             version = TlsVersionKind.V1_3,
-            cipherSuites = listOf(0x1301, 0x1302, 0x1303, 0xC02F, 0xC030, 0xCCA9, 0xC02B, 0xC02C, 0xCCA8),
-            extensions = listOf(0x0000, 0x000B, 0x000A, 0x0023, 0x0010, 0x0005, 0x0033, 0x002B, 0x002A, 0x0029),
-            ellipticCurves = listOf(0x001D, 0x0017, 0x0018, 0x0019),
-            signatureAlgorithms = listOf(0x0403, 0x0804, 0x0401, 0x0503, 0x0805, 0x0501),
-            alpnProtocols = listOf("h2", "http/1.1"),
+            cipherSuites =s_[0x1301, 0x1302, 0x1303, 0xC02F, 0xC030, 0xCCA9, 0xC02B, 0xC02C, 0xCCA8],
+            extensions =s_[0x0000, 0x000B, 0x000A, 0x0023, 0x0010, 0x0005, 0x0033, 0x002B, 0x002A, 0x0029],
+            ellipticCurves =s_[0x001D, 0x0017, 0x0018, 0x0019],
+            signatureAlgorithms =s_[0x0403, 0x0804, 0x0401, 0x0503, 0x0805, 0x0501],
+            alpnProtocols =s_["h2", "http/1.1"],
             compressCertificate = true,
             earlyData = true,
             sessionTicket = true,
@@ -125,7 +131,7 @@ class TlsFingerprintManager(
         private set
 
     private val profileHistory = mutableListOf<Pair<Long, BrowserProfile>>()
-    private val ja3Cache = mutableMapOf<String, String>()
+    private val ja3Cache = mutableMapOf<CharSequence, CharSequence>()
 
     private var lastRotationMs: Long = 0L
 
@@ -172,14 +178,14 @@ class TlsFingerprintManager(
      *
      * Mirrors literbike/src/tls_fingerprint.rs:generate_ja3_fingerprint().
      */
-    fun generateJa3(serverName: String): String {
+    fun generateJa3(serverName: CharSequence): CharSequence {
         ja3Cache[serverName]?.let { return it }
 
         val fp = currentProfile.fingerprint
         val version = when (fp.version) { TlsVersionKind.V1_2 -> "771"; TlsVersionKind.V1_3 -> "772" }
-        val ciphers = fp.cipherSuites.joinToString("-") { it.toInt().and(0xFFFF).toString() }
-        val extensions = fp.extensions.joinToString("-") { it.toInt().and(0xFFFF).toString() }
-        val curves = fp.ellipticCurves.joinToString("-") { it.toInt().and(0xFFFF).toString() }
+        val ciphers = fp.cipherSuites.view.joinToString("-") { it.toInt().and(0xFFFF).toString() }
+        val extensions = fp.extensions.view.joinToString("-") { it.toInt().and(0xFFFF).toString() }
+        val curves = fp.ellipticCurves.view.joinToString("-") { it.toInt().and(0xFFFF).toString() }
         val ecPointFormats = "0" // uncompressed only
 
         val ja3String = "$version,$ciphers,$extensions,$curves,$ecPointFormats"
@@ -192,11 +198,11 @@ class TlsFingerprintManager(
     /**
      * Build a TLS Settings object from the current fingerprint.
      */
-    fun toTlsSettings(serverName: String? = null): TlsSettings {
+    fun toTlsSettings(serverName: CharSequence? = null): TlsSettings {
         val fp = currentProfile.fingerprint
         return TlsSettings(
             protocolVersion = when (fp.version) { TlsVersionKind.V1_2 -> TlsProtocolVersion.V1_2; TlsVersionKind.V1_3 -> TlsProtocolVersion.V1_3 },
-            cipherSuites = fp.cipherSuites.map { suiteName(it) },
+            cipherSuites = (fp.cipherSuites α  { suiteName(it) }) as Series<CharSequence>,
             serverName = serverName,
             pinnedCertificates = emptyList(),
         )
@@ -204,13 +210,13 @@ class TlsFingerprintManager(
 
     // ── Internal ──────────────────────────────────────────────────────
 
-    private fun djb2(s: String): String {
+    private fun djb2(s: CharSequence): CharSequence {
         var hash = 5381L
         for (c in s) hash = (hash * 33) + c.code.toLong()
         return hash.toString(16)
     }
 
-    private fun suiteName(id: Int): String = when (id.and(0xFFFF)) {
+    private fun suiteName(id: Int): CharSequence = when (id.and(0xFFFF)) {
         0x1301 -> "TLS_AES_128_GCM_SHA256"
         0x1302 -> "TLS_AES_256_GCM_SHA384"
         0x1303 -> "TLS_CHACHA20_POLY1305_SHA256"

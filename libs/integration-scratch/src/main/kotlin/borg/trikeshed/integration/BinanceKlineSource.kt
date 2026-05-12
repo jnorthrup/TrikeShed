@@ -26,18 +26,18 @@ import java.time.format.DateTimeFormatter
 import java.util.zip.ZipInputStream
 
 class BinanceKlineFetchException(
-    message: String,
-    val symbol: String,
-    val interval: String,
+    message: CharSequence,
+    val symbol: CharSequence,
+    val interval: CharSequence,
     val startDate: LocalDate,
     val endDate: LocalDate,
-    val failedUrls: List<String>,
+    val failedUrls: List<CharSequence>,
     cause: Throwable? = null,
 ) : IllegalStateException(message, cause)
 
 private data class BinanceKlineFetchOutcome(
     val date: LocalDate,
-    val url: String,
+    val url: CharSequence,
     val rowCount: Int,
     val failure: Throwable? = null,
 )
@@ -56,13 +56,13 @@ private data class BinanceKlineFetchOutcome(
  * is a DocRowVec with keys: symbol, timespan, openTime, open, high, low, close, volume
  */
 class BinanceKlineSource(
-   val symbol: String,
-   val interval: String = "1h",
+   val symbol: CharSequence,
+   val interval: CharSequence = "1h",
    val startDate: LocalDate,
    val endDate: LocalDate,
    val blockCapacity: Int = 500,
    val maxConcurrentFetches: Int = 4,
-   private val csvFetcher: suspend (String) -> String = { url -> defaultFetchCsv(url) },
+   private val csvFetcher: suspend (CharSequence) -> CharSequence = { url -> defaultFetchCsv(url) },
 ) {
     init {
         require(symbol.isNotBlank()) { "symbol must not be blank" }
@@ -154,14 +154,14 @@ class BinanceKlineSource(
         }
     }
 
-   fun buildUrl(date: LocalDate): String {
+   fun buildUrl(date: LocalDate): CharSequence {
         val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd")
         return "https://data.binance.vision/data/spot/daily/klines/$symbol/$interval/$symbol-$interval-${date.format(formatter)}.zip"
     }
 
-   fun fetchCsv(urlStr: String): String = runBlocking { csvFetcher(urlStr) }
+   fun fetchCsv(urlStr: CharSequence): CharSequence = runBlocking { csvFetcher(urlStr) }
 
-   fun parseCsv(csv: String): List<Kline> {
+   fun parseCsv(csv: CharSequence): List<Kline> {
         val timespan = intervalToTimeSpan(interval)
         return csv.lineSequence()
             .filter { it.isNotBlank() }
@@ -186,7 +186,7 @@ class BinanceKlineSource(
             .toList()
     }
 
-   fun intervalToTimeSpan(interval: String): TimeSpan = when (interval) {
+   fun intervalToTimeSpan(interval: CharSequence): TimeSpan = when (interval) {
         "1m"  -> TimeSpan.Minutes1
         "3m"  -> TimeSpan.Minutes3
         "5m"  -> TimeSpan.Minutes5
@@ -230,7 +230,7 @@ class BinanceKlineSource(
         /** OHLCV schema keys for Binance klines (DocRowVec projection). */
         val OHLCV_KEYS = listOf("openTime", "open", "high", "low", "close", "volume")
 
-        suspend fun defaultFetchCsv(urlStr: String): String = withContext(Dispatchers.IO) {
+        suspend fun defaultFetchCsv(urlStr: CharSequence): CharSequence = withContext(Dispatchers.IO) {
             val conn = URI(urlStr).toURL().openConnection() as HttpURLConnection
             conn.connectTimeout = 10_000
             conn.readTimeout = 30_000

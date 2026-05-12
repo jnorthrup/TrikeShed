@@ -8,5 +8,5 @@ interface BlockStore {
 }
 
 interface NameResolver {
-    suspend fun resolve(name: String): CID?
+    suspend fun resolve(name: CharSequence): CID?
 }

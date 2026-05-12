@@ -3,7 +3,7 @@
 package borg.trikeshed.lib
 
 import borg.trikeshed.lib.CZero.nz
-import borg.trikeshed.collections.text.asSeries
+
 
 /**
  * char based spiritual successor to ByteBuffer for parsing
@@ -19,7 +19,8 @@ class CharSeries(
 
     /** the mark accessor */
     var mark: Int = -1,
-) : Series<Char> by buf { //delegate to the underlying series
+    override val length: Int  = buf.size,
+) : Series<Char> by buf ,CharSequence{ //delegate to the underlying series
 
     // Small char-window cache to improve locality. Uses buf.b(index) fallback when cache miss.
    var _charCache: CharArray? = null
@@ -46,7 +47,7 @@ class CharSeries(
         }
 
     //string ctor
-    constructor(s: String) : this(s.toSeries())
+    constructor(s: CharSequence) : this(s.toSeries())
 
     /**remaining chars*/
     val rem: Int get() = limit - pos
@@ -154,7 +155,7 @@ class CharSeries(
     }
 
 
-    fun asString(upto: Int = Int.MAX_VALUE): String =
+    fun asString(upto: Int = Int.MAX_VALUE): CharSequence =
         ((limit - pos) j { x: Int -> this[x + pos] }).toArray().concatToString()
 
     override fun toString(): String {
@@ -178,7 +179,7 @@ class CharSeries(
 
 
     //isEmpty override
-    val isEmpty: Boolean get() = pos == limit
+    fun isEmpty(): Boolean  = pos == limit
 
     /** success move position to the char after found and returns true.
      *  fail returns false and leaves position unchanged */
@@ -260,6 +261,12 @@ class CharSeries(
         return parts.toSeries()
     }
 
+    override operator fun get(index: Int): Char  = b(index)
+
+    override fun subSequence(startIndex: Int, endIndex: Int): CharSequence {
+        TODO("Not yet implemented")
+    }
+
     companion object {
 
         /**returns true and advances the position if the confix is {}*/
@@ -282,7 +289,7 @@ class CharSeries(
 
         }
 
-       fun confixFeature(client: CharSeries, chlit: String): Boolean {
+       fun confixFeature(client: CharSeries, chlit: CharSequence): Boolean {
             logNone { "confix $chlit before: ${client.asString()}" }
             var x = 0
             client.confixScope { test: Char ->
@@ -314,16 +321,14 @@ operator fun Series<Char>.div(delim: Char): Series<Series<Char>> { //lazy split
 
 
 
-val Series<Char>.cs: CharSequence
-    get() = object : CharSequence {
-        override val length: Int by ::a
-        override fun get(index: Int) = b(index)
-        override fun toString(): String = asString()
-        override fun subSequence(startIndex: Int, endIndex: Int): CharSequence = this@cs[startIndex until endIndex].cs
-    }
 
-val String.s: Series<Char> get() = this.asSeries()
-@get:kotlin.jvm.JvmName("sFromCharSeries")
-val Series<Char>.s: String get() = asString()
-@get:kotlin.jvm.JvmName("sFromByteSeries")
-val Series<Byte>.s: String get() = asString()
+//@get:kotlin.jvm.JvmName("sFromCharSeries")
+//val Series<Char>.s: CharSequence get() = asString()
+//@get:kotlin.jvm.JvmName("sFromByteSeries")
+//val Series<Byte>.s: CharSequence get() = asString()
+inline val CharSequence.s: Series<Char> get() = CharSeries(this)
+
+@get:kotlin.jvm.JvmName("sFromCharSeries2")
+inline val  CharSequence.cs get() =s
+
+ inline val Series<Char>.asCharSequence  get() = this as? CharSequence ?: CharSeries(this)

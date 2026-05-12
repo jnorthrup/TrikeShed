@@ -10,8 +10,8 @@ object ViewQueryEncoder {
      * URL-encodes query params. JSON values must be URL-encoded.
      * Uses the multiplatform couch internal encoder.
      */
-    fun encode(query: ViewQuery): String {
-        val parts = mutableListOf<String>()
+    fun encode(query: ViewQuery): CharSequence {
+        val parts = mutableListOf<CharSequence>()
 
         query.key?.let { parts += "key=${urlencode(toJson(it))}" }
         query.startKey?.let { parts += "startkey=${urlencode(toJson(it))}" }
@@ -30,14 +30,14 @@ object ViewQueryEncoder {
         return parts.joinToString("&")
     }
 
-   fun urlencode(s: String): String = urlEncode(s)
+   fun urlencode(s: CharSequence): CharSequence = urlEncode(s)
 
     /**
      * Convert a Kotlin value to its JSON representation for CouchDB query params.
      */
-   fun toJson(value: Any?): String = when (value) {
+   fun toJson(value: Any?): CharSequence = when (value) {
         null -> "null"
-        is String -> "\"$value\""
+        is CharSequence -> "\"$value\""
         is Number -> value.toString()
         is Boolean -> value.toString()
         is List<*> -> "[" + value.joinToString(",") { toJson(it) } + "]"

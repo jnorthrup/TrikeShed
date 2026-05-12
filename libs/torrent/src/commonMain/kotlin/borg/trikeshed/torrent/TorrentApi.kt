@@ -4,7 +4,7 @@ package borg.trikeshed.torrent
 interface TorrentHostAPI {
     suspend fun start()
     suspend fun stop()
-    suspend fun addTorrent(magnetUri: String): String
+    suspend fun addTorrent(magnetUri: CharSequence): CharSequence
     suspend fun removeTorrent(infoHash: ByteArray)
 }
 

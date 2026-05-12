@@ -24,7 +24,7 @@ import kotlinx.coroutines.sync.withPermit
  * Architecture:
  *
  *   PijulSyncEngine
- *   ├── peerChannels: Map<String, PeerChannel>       // one per remote peer
+ *   ├── peerChannels: Map<CharSequence, PeerChannel>       // one per remote peer
  *   ├── emitter: ChangeEmitter<SyncEvent>            // pub/sub for sync state
  *   ├── mergeCoordinator: PijulMerge                 // 3-way merge logic
  *   ├── ipfsStore: PijulIpfsStore                   // optional IPFS staging
@@ -41,8 +41,8 @@ import kotlinx.coroutines.sync.withPermit
 
 /** A remote peer with its own channel state. */
 class PeerChannel(
-    val peerId: String,
-    val peerUrl: String,
+    val peerId: CharSequence,
+    val peerUrl: CharSequence,
     var remoteHead: PatchHash?,
     var localHead: PatchHash?,
     val negotiatedCaps: List<Capability>,
@@ -53,14 +53,14 @@ class PeerChannel(
 
 /** Events emitted by the sync engine. */
 sealed class SyncEvent {
-    data class PatchPushed(val peerId: String, val patch: Patch) : SyncEvent()
-    data class PatchAcked(val peerId: String, val hash: PatchHash) : SyncEvent()
-    data class PatchNacked(val peerId: String, val hash: PatchHash, val reason: String) : SyncEvent()
+    data class PatchPushed(val peerId: CharSequence, val patch: Patch) : SyncEvent()
+    data class PatchAcked(val peerId: CharSequence, val hash: PatchHash) : SyncEvent()
+    data class PatchNacked(val peerId: CharSequence, val hash: PatchHash, val reason: CharSequence) : SyncEvent()
     data class ConflictDetected(val marker: ConflictMarker) : SyncEvent()
-    data class PeerConnected(val peerId: String) : SyncEvent()
-    data class PeerDisconnected(val peerId: String) : SyncEvent()
+    data class PeerConnected(val peerId: CharSequence) : SyncEvent()
+    data class PeerDisconnected(val peerId: CharSequence) : SyncEvent()
     object EpochSealed : SyncEvent()
-    data class Error(val peerId: String?, val message: String) : SyncEvent()
+    data class Error(val peerId: CharSequence?, val message: CharSequence) : SyncEvent()
 }
 
 /** Sync engine configuration. */
@@ -80,7 +80,7 @@ class PijulSyncEngine(
     private val ipfsStore: PijulIpfsStore?,
     private var config: SyncConfig = SyncConfig(),
 ) {
-    private val peers = mutableMapOf<String, PeerChannel>()
+    private val peers = mutableMapOf<CharSequence, PeerChannel>()
     private val emitter = ChangeEmitter<SyncEvent>()
     private val scope = CoroutineScope(kotlinx.coroutines.CoroutineName("PijulSync"))
     private val pushSemaphore = Semaphore(config.maxConcurrentPushes)
@@ -88,7 +88,7 @@ class PijulSyncEngine(
     /**
      * Register a remote peer for syncing.
      */
-    fun addPeer(peerId: String, peerUrl: String, remoteHead: PatchHash?): PeerChannel {
+    fun addPeer(peerId: CharSequence, peerUrl: CharSequence, remoteHead: PatchHash?): PeerChannel {
         val caps = StandardCapabilities.defaults()
         val peer = PeerChannel(peerId, peerUrl, remoteHead, null, caps)
         peers[peerId] = peer
@@ -99,7 +99,7 @@ class PijulSyncEngine(
     /**
      * Remove a peer.
      */
-    fun removePeer(peerId: String) {
+    fun removePeer(peerId: CharSequence) {
         peers.remove(peerId)
         emitter.emit(Change.Insert(SyncEvent.PeerDisconnected(peerId)))
     }
@@ -233,7 +233,7 @@ class PijulSyncEngine(
      * Merge local and remote patches for a peer.
      * Uses PijulMerge.threeWayMerge when there are conflicts.
      */
-    fun mergeWithPeer(peerId: String, ours: Channel, theirs: Channel): MergeResult {
+    fun mergeWithPeer(peerId: CharSequence, ours: Channel, theirs: Channel): MergeResult {
         val peer = peers[peerId] ?: return MergeResult.Incompatible("Unknown peer: $peerId")
         val result = PijulMerge.mergeChannels(ours, theirs, localRepo.pristine)
         when (result) {
@@ -250,7 +250,7 @@ class PijulSyncEngine(
         return result
     }
 
-    private fun parsePullOutput(stdout: String): List<PatchHash> {
+    private fun parsePullOutput(stdout: CharSequence): List<PatchHash> {
         // Parse pijul pull output for patch hashes
         return stdout.lines()
             .filter { it.startsWith("patch ") }

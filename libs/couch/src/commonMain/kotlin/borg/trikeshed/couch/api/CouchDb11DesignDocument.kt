@@ -4,15 +4,15 @@ package borg.trikeshed.couch.api
  * CouchDB 1.1 design document with manual JSON serialization.
  */
 data class CouchDb11DesignDocument(
-    val id: String,
-    val language: String,
-    val views: Map<String, CouchViewDefinition>,
+    val id: CharSequence,
+    val language: CharSequence,
+    val views: Map<CharSequence, CouchViewDefinition>,
 ) {
     /**
      * Build JSON manually (no kotlinx.serialization).
      * Produces e.g. {"_id":"_design/example","language":"javascript","views":{"by_brand":{"map":"...","reduce":"_count"}}}
      */
-    fun toJson(): String {
+    fun toJson(): CharSequence {
         val sb = StringBuilder()
         sb.append("{\"_id\":\"").append(escape(id)).append("\"")
         sb.append(",\"language\":\"").append(escape(language)).append("\"")
@@ -33,7 +33,7 @@ data class CouchDb11DesignDocument(
         return sb.toString()
     }
 
-   fun escape(s: String): String = s
+   fun escape(s: CharSequence): CharSequence = s
         .replace("\\", "\\\\")
         .replace("\"", "\\\"")
         .replace("\n", "\\n")

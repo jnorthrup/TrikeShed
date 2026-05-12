@@ -37,7 +37,7 @@ object MiniDuckBlockFiles {
         return normalized.seal()
     }
 
-    private fun normalizeRow(row: RowVec, parentKind: String? = null): RowVec = when (row) {
+    private fun normalizeRow(row: RowVec, parentKind: CharSequence? = null): RowVec = when (row) {
         is JsonRowVec -> {
             val normalizedChild = row.child?.let { ch -> ch.size j { i: Int -> normalizeRow(ch[i], "doc") } }
             if (parentKind == "blob") row else DocRowVec(listOf(row.nodeType), listOf(row.rawValue), normalizedChild)

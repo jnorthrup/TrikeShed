@@ -4,7 +4,7 @@ package borg.trikeshed.couch.api
  * CouchDB 1.1 endpoint specification.
  */
 data class CouchDb11Spec(
-    val paths: Map<String, String>,
+    val paths: Map<CharSequence, CharSequence>,
 ) {
     companion object {
         /**

@@ -69,14 +69,14 @@ class RelaxFactoryParityRedTest {
 
    interface VehicleViewService : CouchService<VehicleDoc> {
         @View(map = "function(doc){emit(doc.brand, doc);}")
-        fun getItemsWithBrand(@Key brand: String): List<VehicleDoc>
+        fun getItemsWithBrand(@Key brand: CharSequence): List<VehicleDoc>
 
         @View(map = "function(doc){emit(doc.model.slice(0,4), doc);}")
         @Descending(false)
         fun pagedPrefixSearch(
-            @Key key: String,
-            @StartKey startKey: String,
-            @EndKey endKey: String,
+            @Key key: CharSequence,
+            @StartKey startKey: CharSequence,
+            @EndKey endKey: CharSequence,
             @Limit limit: Int,
             @Skip skip: Int,
         ): List<VehicleDoc>
@@ -85,27 +85,27 @@ class RelaxFactoryParityRedTest {
         fun matchingTuple(@Key tuple: VehicleDoc): List<VehicleDoc>
 
         @View(map = "function(doc){emit(doc.brand, doc.model);}")
-        fun brandToModel(): Map<String, String>
+        fun brandToModel(): Map<CharSequence, CharSequence>
 
         @View(map = "function(doc){emit(doc.brand, 1);}", reduce = "_count")
         @Group(true)
         @GroupLevel(2)
         fun brandCountByPrefix(
-            @StartKey startKey: String,
-            @EndKey endKey: String,
-            @StartKeyDocId startKeyDocId: String,
-            @EndKeyDocId endKeyDocId: String,
-        ): Map<String, Int>
+            @StartKey startKey: CharSequence,
+            @EndKey endKey: CharSequence,
+            @StartKeyDocId startKeyDocId: CharSequence,
+            @EndKeyDocId endKeyDocId: CharSequence,
+        ): Map<CharSequence, Int>
 
         @View(map = "function(doc){emit(doc.brand, 1);}", reduce = "_count")
-        fun countMatchingBrand(@Key brand: String): Int
+        fun countMatchingBrand(@Key brand: CharSequence): Int
 
         @View(map = "function(doc){emit(doc.model, doc);}")
-        fun anyMatching(@Keys vararg keys: String): List<VehicleDoc>
+        fun anyMatching(@Keys vararg keys: CharSequence): List<VehicleDoc>
     }
 
    data class VehicleDoc(
-        val model: String,
-        val brand: String,
+        val model: CharSequence,
+        val brand: CharSequence,
     )
 }

@@ -2,52 +2,75 @@ package borg.trikeshed.userspace
 
 import borg.trikeshed.userspace.UringOp.Companion.UringSubmission
 import borg.trikeshed.userspace.nio.ByteBuffer
+import java.net.InetSocketAddress
+import java.net.Socket
 import java.nio.channels.FileChannel
 
+// ---- fd registry ----
+
+private var nextFd = 1
+private val fileSockets = mutableMapOf<Int, Socket>()      // network fds
+private val fileChannels = mutableMapOf<Int, FileChannel>()// file fds
+
+private fun allocFd(): Int = nextFd++
+
+// ---- UserspaceChannelBackend ----
+
 private class JvmUserspaceChannelBackend : UserspaceChannelBackend {
-    private val channels = mutableMapOf<Int, FileChannel>()
 
+    // Legacy typed shims — delegate to submitBatch where possible
+
+    @Deprecated("Use submitBatch")
     override fun read(file: FileImpl, buffer: ByteBuffer, offset: Long): Int {
-        val ch = channels[file.id] ?: return -1
+        val ch = fileChannels[file.id] ?: return -1
         return try {
-            ch.read(buffer.toNioByteBuffer(), offset).also { if (it > 0) buffer.position(buffer.position() + it) }
+            ch.read(buffer.toNioByteBuffer(), offset)
+                .also { if (it > 0) buffer.position(buffer.position() + it) }
         } catch (_: Exception) { -1 }
     }
 
+    @Deprecated("Use submitBatch")
     override fun write(file: FileImpl, buffer: ByteBuffer, offset: Long): Int {
-        val ch = channels[file.id] ?: return -1
+        val ch = fileChannels[file.id] ?: return -1
         return try {
-            ch.write(buffer.toNioByteBuffer(), offset).also { if (it > 0) buffer.position(buffer.position() + it) }
+            ch.write(buffer.toNioByteBuffer(), offset)
+                .also { if (it > 0) buffer.position(buffer.position() + it) }
         } catch (_: Exception) { -1 }
     }
 
-    override fun accept(file: FileImpl): Int = -1
-    override fun connect(file: FileImpl, address: String, port: Int): Int = -1
-    override fun close(file: FileImpl): Int = channels.remove(file.id)?.use { 0 } ?: 0
+    @Deprecated("Use submitBatch")
+    override fun accept(file: FileImpl): Int = -1 // use submitBatch ACCEPT
 
+    @Deprecated("Use submitBatch")
+    override fun connect(file: FileImpl, address: CharSequence, port: Int): Int = -1 // use submitBatch CONNECT
+
+    @Deprecated("Use submitBatch")
+    override fun close(file: FileImpl): Int {
+        fileSockets.remove(file.id)?.runCatching { close() }
+        fileChannels.remove(file.id)?.runCatching { close() }
+        return 0
+    }
+
+    @Deprecated("Use submitBatch")
     override fun sync(file: FileImpl, metaData: Boolean): Int {
-        val ch = channels[file.id] ?: return -1
-        return try {
-            if (metaData) ch.force(true) else ch.force(false)
-            0
-        } catch (_: Exception) { -1 }
+        val ch = fileChannels[file.id] ?: return -1
+        return try { ch.force(metaData); 0 } catch (_: Exception) { -1 }
     }
 
+    @Deprecated("Use submitBatch")
     override fun truncate(file: FileImpl, size: Long): Int {
-        val ch = channels[file.id] ?: return -1
-        return try {
-            ch.truncate(size)
-            0
-        } catch (_: Exception) { -1 }
+        val ch = fileChannels[file.id] ?: return -1
+        return try { ch.truncate(size); 0 } catch (_: Exception) { -1 }
     }
 
-    override fun map(file: FileImpl, mode: String, position: Long, size: Long): Int {
-        val ch = channels[file.id] ?: return -1
+    @Deprecated("Use submitBatch")
+    override fun map(file: FileImpl, mode: CharSequence, position: Long, size: Long): Int {
+        val ch = fileChannels[file.id] ?: return -1
         return try {
-            val mapMode = when (mode) {
-                "r" -> java.nio.channels.FileChannel.MapMode.READ_ONLY
-                "rw" -> java.nio.channels.FileChannel.MapMode.READ_WRITE
-                "p" -> java.nio.channels.FileChannel.MapMode.PRIVATE
+            val mapMode = when (mode.toString()) {
+                "r" -> FileChannel.MapMode.READ_ONLY
+                "rw" -> FileChannel.MapMode.READ_WRITE
+                "p" -> FileChannel.MapMode.PRIVATE
                 else -> return -1
             }
             ch.map(mapMode, position, size)
@@ -55,63 +78,165 @@ private class JvmUserspaceChannelBackend : UserspaceChannelBackend {
         } catch (_: Exception) { -1 }
     }
 
+    // ---- poll readiness ----
+
+    override fun hasPending(fd: Int): Boolean =
+        fileSockets[fd]?.runCatching { getInputStream().available() > 0 }?.getOrDefault(false) ?: false
+
+    // ---- unified batch path — uring emulation on JVM ----
+
     override fun submitBatch(submissions: List<UringSubmission>): List<SelectionResult> {
         if (submissions.isEmpty()) return emptyList()
-        val results = mutableListOf<SelectionResult>()
-        submissions.forEach { sub ->
-            val ch = channels[sub.fd]
-            if (ch == null) {
-                results.add(SelectionResult(-1, sub.userData))
-                return@forEach
-            }
-            val nioBuf = sub.buffer?.toNioByteBuffer()
-            val res = when (sub.opcode) {
-                UringOp.READV -> try { ch.read(nioBuf, sub.offset).also { if (it > 0 && nioBuf != null) sub.buffer.position(sub.buffer.position() + it) } } catch (_: Exception) { -1 }
-                UringOp.WRITEV -> try { ch.write(nioBuf, sub.offset).also { if (it > 0 && nioBuf != null) sub.buffer.position(sub.buffer.position() + it) } } catch (_: Exception) { -1 }
-                UringOp.FSYNC -> try { ch.force(false); 0 } catch (_: Exception) { -1 }
-                UringOp.FTRUNCATE -> try { ch.truncate(sub.offset); 0 } catch (_: Exception) { -1 }
-                UringOp.CLOSE -> try { channels.remove(sub.fd)?.close(); 0 } catch (_: Exception) { -1 }
+        return submissions.map { sub -> SelectionResult(dispatchOp(sub), sub.userData) }
+    }
+
+    private fun dispatchOp(sub: UringSubmission): Int = when (sub.opcode) {
+
+        UringOp.READ, UringOp.READV -> {
+            val ch = fileChannels[sub.fd]
+            val sock = fileSockets[sub.fd]
+            val buf = sub.buffer ?: return@dispatchOp -1
+            when {
+                ch != null -> try {
+                    ch.read(buf.toNioByteBuffer(), sub.offset)
+                        .also { if (it > 0) buf.position(buf.position() + it) }
+                } catch (_: Exception) { -1 }
+                sock != null -> try {
+                    val arr = buf.array()
+                    val n = sock.getInputStream().read(arr, buf.position(), buf.remaining())
+                    if (n > 0) buf.position(buf.position() + n)
+                    n
+                } catch (_: Exception) { -1 }
                 else -> -1
             }
-            results.add(SelectionResult(res, sub.userData))
         }
-        return results
+
+        UringOp.WRITE, UringOp.WRITEV -> {
+            val ch = fileChannels[sub.fd]
+            val sock = fileSockets[sub.fd]
+            val buf = sub.buffer ?: return@dispatchOp -1
+            when {
+                ch != null -> try {
+                    ch.write(buf.toNioByteBuffer(), sub.offset)
+                        .also { if (it > 0) buf.position(buf.position() + it) }
+                } catch (_: Exception) { -1 }
+                sock != null -> try {
+                    val arr = buf.array()
+                    val n = buf.remaining()
+                    sock.getOutputStream().write(arr, buf.position(), n)
+                    buf.position(buf.position() + n)
+                    n
+                } catch (_: Exception) { -1 }
+                else -> -1
+            }
+        }
+
+        UringOp.CONNECT -> {
+            val sock = fileSockets[sub.fd] ?: return@dispatchOp -1
+            // addr encoded as host string in buffer bytes, port in offset
+            val buf = sub.buffer ?: return@dispatchOp -1
+            val host = String(buf.array(), buf.position(), buf.remaining(), Charsets.UTF_8)
+            val port = sub.offset.toInt()
+            try { sock.connect(InetSocketAddress(host, port)); 0 } catch (_: Exception) { -1 }
+        }
+
+        UringOp.SEND -> {
+            val sock = fileSockets[sub.fd] ?: return@dispatchOp -1
+            val buf = sub.buffer ?: return@dispatchOp -1
+            try {
+                val n = buf.remaining()
+                sock.getOutputStream().write(buf.array(), buf.position(), n)
+                buf.position(buf.position() + n)
+                n
+            } catch (_: Exception) { -1 }
+        }
+
+        UringOp.RECV -> {
+            val sock = fileSockets[sub.fd] ?: return@dispatchOp -1
+            val buf = sub.buffer ?: return@dispatchOp -1
+            try {
+                val n = sock.getInputStream().read(buf.array(), buf.position(), buf.remaining())
+                if (n > 0) buf.position(buf.position() + n)
+                n
+            } catch (_: Exception) { -1 }
+        }
+
+        UringOp.ACCEPT -> {
+            // server-side accept: not wired yet — return -1
+            -1
+        }
+
+        UringOp.FSYNC -> {
+            val ch = fileChannels[sub.fd] ?: return@dispatchOp -1
+            try { ch.force(false); 0 } catch (_: Exception) { -1 }
+        }
+
+        UringOp.FTRUNCATE -> {
+            val ch = fileChannels[sub.fd] ?: return@dispatchOp -1
+            try { ch.truncate(sub.offset); 0 } catch (_: Exception) { -1 }
+        }
+
+        UringOp.CLOSE -> {
+            fileSockets.remove(sub.fd)?.runCatching { close() }
+            fileChannels.remove(sub.fd)?.runCatching { close() }
+            0
+        }
+
+        else -> -1
     }
 }
 
-internal actual fun openUserspaceChannelBackend(entries: Int): UserspaceChannelBackend = JvmUserspaceChannelBackend()
+internal actual fun openUserspaceChannelBackend(entries: Int): UserspaceChannelBackend =
+    JvmUserspaceChannelBackend()
+
+// ---- FileImpl ----
+
+actual class FileImpl actual constructor(actual val id: Int) {
+    @PublishedApi internal var path: CharSequence = ""
+    actual fun isOpen(): Boolean = id >= 0
+    actual fun close() {
+        fileSockets.remove(id)?.runCatching { close() }
+        fileChannels.remove(id)?.runCatching { close() }
+    }
+    actual fun size(): Long =
+        fileChannels[id]?.size()
+            ?: path.toString().let { java.io.File(it).let { f -> if (f.exists()) f.length() else -1L } }
+}
+
+// ---- FilesImpl ----
+
+internal actual object FilesImpl {
+    actual fun open(path: CharSequence, readOnly: Boolean): FileImpl {
+        val fd = allocFd()
+        fileChannels[fd] = FileChannel.open(
+            java.nio.file.Paths.get(path.toString()),
+            if (readOnly)
+                java.util.EnumSet.of(java.nio.file.StandardOpenOption.READ)
+            else
+                java.util.EnumSet.of(
+                    java.nio.file.StandardOpenOption.READ,
+                    java.nio.file.StandardOpenOption.WRITE
+                )
+        )
+        return FileImpl(fd).also { it.path = path }
+    }
+}
+
+// ---- ChannelsImpl — real JVM socket, keyed by synthetic fd ----
+
+internal actual object ChannelsImpl {
+    actual fun socket(domain: Int, type: Int, protocol: Int): FileImpl {
+        val fd = allocFd()
+        fileSockets[fd] = Socket()   // unconnected; CONNECT op wires it up
+        return FileImpl(fd)
+    }
+}
+
+// ---- helpers ----
 
 private fun ByteBuffer.toNioByteBuffer(): java.nio.ByteBuffer {
     val nio = java.nio.ByteBuffer.wrap(array(), arrayOffset(), capacity())
     nio.position(position())
     nio.limit(limit())
     return nio
-}
-
-actual class FileImpl actual constructor(actual val id: Int) {
-    @PublishedApi internal var path: String = ""
-    @PublishedApi internal var jvmChannel: java.nio.channels.FileChannel? = null
-    actual fun isOpen(): Boolean = id >= 0
-    actual fun close() {
-        jvmChannel?.close()
-        jvmChannel = null
-    }
-    actual fun size(): Long = jvmChannel?.size() ?: java.io.File(path).let { if (it.exists()) it.length() else -1L }
-}
-
-internal actual object FilesImpl {
-    private var nextId = 1
-    actual fun open(path: String, readOnly: Boolean): FileImpl =
-        FileImpl(nextId++).also { fi ->
-            fi.path = path
-            fi.jvmChannel = java.nio.channels.FileChannel.open(
-                java.nio.file.Paths.get(path),
-                if (readOnly) java.util.EnumSet.of(java.nio.file.StandardOpenOption.READ)
-                else java.util.EnumSet.of(java.nio.file.StandardOpenOption.READ, java.nio.file.StandardOpenOption.WRITE)
-            )
-        }
-}
-
-internal actual object ChannelsImpl {
-    actual fun socket(domain: Int, type: Int, protocol: Int): FileImpl = FileImpl(-1)
 }

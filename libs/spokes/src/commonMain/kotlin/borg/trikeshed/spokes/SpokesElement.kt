@@ -30,7 +30,7 @@ class SpokesElement(
     companion object Key : AsyncContextKey<SpokesElement>() {
         @Suppress("FunctionName")
         fun Standalone(
-            m2CacheDir: String,
+            m2CacheDir: CharSequence,
             parentJob: Job? = null,
         ): SpokesElement {
             val bs = FileSystemBlockStore(m2CacheDir)
@@ -68,8 +68,8 @@ class SpokesElement(
 
     /** Queue on-the-fly git build. */
     suspend fun buildFromGit(
-        repoUrl: String,
-        commitSha: String,
+        repoUrl: CharSequence,
+        commitSha: CharSequence,
     ): GitBuildJob = registry.queueGitBuild(repoUrl, commitSha)
 
     data class ArtifactSnapshot(
@@ -79,9 +79,9 @@ class SpokesElement(
     )
 
     data class GitBuildJob(
-        val id: String,
-        val repoUrl: String,
-        val commitSha: String,
+        val id: CharSequence,
+        val repoUrl: CharSequence,
+        val commitSha: CharSequence,
         val status: BuildStatus,
         val builtCoord: Coordinate? = null,
     )
@@ -93,18 +93,18 @@ class SpokesElement(
  * ArtifactRegistry — searchable index turning the CDN into a hub.
  */
 interface ArtifactRegistry {
-    val localNodeAddress: String
+    val localNodeAddress: CharSequence
     fun register(coord: Coordinate, source: Source)
     fun search(query: CoordQuery): List<Coordinate>
     operator fun get(coord: Coordinate): Source?
-    fun queueGitBuild(repoUrl: String, commitSha: String): SpokesElement.GitBuildJob
+    fun queueGitBuild(repoUrl: CharSequence, commitSha: CharSequence): SpokesElement.GitBuildJob
     fun all(): List<Coordinate>
 }
 
 data class CoordQuery(
-    val group: String? = null,
-    val artifact: String? = null,
-    val version: String? = null,
+    val group: CharSequence? = null,
+    val artifact: CharSequence? = null,
+    val version: CharSequence? = null,
     val packaging: Packaging? = null,
     val source: Source? = null,
     val maxResults: Int = 50,
@@ -117,21 +117,21 @@ enum class BuildSystem {
     ;
 
     /** CLI command to build a project of this type from its root directory. */
-    fun buildCommand(): String = when (this) {
+    fun buildCommand(): CharSequence = when (this) {
         GRADLE -> "./gradlew assemble --no-daemon"
         CARGO -> "cargo package --no-verify"
         OPAM -> "dune build @install && opam pin add . --with-doc --with-test -y"
     }
 
     /** Output directory relative to project root where the artifact appears after build. */
-    fun outputDir(): String = when (this) {
+    fun outputDir(): CharSequence = when (this) {
         GRADLE -> "build/libs/"
         CARGO -> "target/package/"
         OPAM -> "_build/default/"
     }
 
     /** File extension of the built artifact. */
-    fun artifactExt(): String = when (this) {
+    fun artifactExt(): CharSequence = when (this) {
         GRADLE -> "jar"
         CARGO -> "crate"
         OPAM -> "opam"
@@ -147,8 +147,8 @@ enum class Source {
 }
 
 class InMemoryArtifactRegistry: ArtifactRegistry {
-    override val localNodeAddress: String = "/ip4/127.0.0.1/tcp/4001"
-    private val index = mutableMapOf<String, Source>()
+    override val localNodeAddress: CharSequence = "/ip4/127.0.0.1/tcp/4001"
+    private val index = mutableMapOf<CharSequence, Source>()
     private val builds = mutableListOf<SpokesElement.GitBuildJob>()
 
     override fun register(coord: Coordinate, source: Source) {
@@ -168,7 +168,7 @@ class InMemoryArtifactRegistry: ArtifactRegistry {
         }.take(query.maxResults)
     }
     override operator fun get(coord: Coordinate): Source? = index[coord.mavenCoord]
-    override fun queueGitBuild(repoUrl: String, commitSha: String): SpokesElement.GitBuildJob {
+    override fun queueGitBuild(repoUrl: CharSequence, commitSha: CharSequence): SpokesElement.GitBuildJob {
         val job = SpokesElement.GitBuildJob(
             id = "build-${builds.size}", repoUrl = repoUrl, commitSha = commitSha,
             status = SpokesElement.BuildStatus.QUEUED,
@@ -186,8 +186,8 @@ class InMemoryArtifactRegistry: ArtifactRegistry {
 /**
  * FileSystemBlockStore — disk-backed ipfs BlockStore.
  */
-class FileSystemBlockStore(private val rootDir: String) : BlockStore {
-    private fun pathFor(cid: CID): String {
+class FileSystemBlockStore(private val rootDir: CharSequence) : BlockStore {
+    private fun pathFor(cid: CID): CharSequence {
         val hex = cid.bytes.joinToString("") { b -> (b.toInt() and 0xFF).toString(16).padStart(2, '0') }
         return "$rootDir/blocks/${hex.substring(0, 2)}/${hex.substring(2)}"
     }
@@ -223,7 +223,7 @@ class SpokesServer(
         return snap?.let { ArtifactForServe(coord, it.data, coord.packaging.contentType) }
     }
 
-    suspend fun onGitHook(repoUrl: String, commitSha: String): SpokesElement.GitBuildJob =
+    suspend fun onGitHook(repoUrl: CharSequence, commitSha: CharSequence): SpokesElement.GitBuildJob =
         spokes.buildFromGit(repoUrl, commitSha)
 
     fun searchIndex(query: CoordQuery): List<Coordinate> = spokes.search(query)
@@ -231,6 +231,6 @@ class SpokesServer(
     data class ArtifactForServe(
         val coord: Coordinate,
         val data: ByteArray,
-        val contentType: String,
+        val contentType: CharSequence,
     )
 }

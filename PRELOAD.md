@@ -94,7 +94,7 @@ Cursor rules:
 typealias JsElement = Join<Twin<Int>, Series<Int>>
 typealias JsIndex = Join<Twin<Int>, Series<Char>>
 typealias JsContext = Join<JsElement, Series<Char>>
-typealias JsPathElement = Either<String, Int>
+typealias JsPathElement = Either<CharSequence, Int>
 typealias JsPath = Series<JsPathElement>
 ```
 

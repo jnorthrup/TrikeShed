@@ -15,14 +15,14 @@ import borg.trikeshed.lib.j
  * @property transport  Transport selection
  */
 data class HtxClientRequest(
-    val method: String = "GET",
-    val path: String,
-    val body: String = "",
-    val headers: Map<String, String> = emptyMap(),
+    val method: CharSequence = "GET",
+    val path: CharSequence,
+    val body: CharSequence = "",
+    val headers: Map<CharSequence, CharSequence> = emptyMap(),
     val transport: HtxTransport = HtxTransport.HTTPS,
 )
 
-data class HtxClientMessage(val status: Int, val body: String, val headers: Map<String, String> = emptyMap())
+data class HtxClientMessage(val status: Int, val body: CharSequence, val headers: Map<CharSequence, CharSequence> = emptyMap())
 
 /**
  * Transport backends available for [HtxElement].
@@ -44,7 +44,7 @@ private val schemeToTransport = mapOf(
     "sctp://" to HtxTransport.SCTP,
 )
 
-fun selectTransport(uri: String): HtxTransport {
+fun selectTransport(uri: CharSequence): HtxTransport {
     for ((scheme, transport) in schemeToTransport) {
         if (uri.startsWith(scheme)) return transport
     }
@@ -70,7 +70,7 @@ class HtxElementCompat(private val handler: HtxRequestHandler? = null) : AsyncCo
  override val key: AsyncContextKey<HtxElementCompat> get() = Key
 
  /** Delegate to the registered handler, or return stub if none provided */
- suspend fun request(method: String = "GET", path: String = "/", body: String = ""): HtxClientMessage {
+ suspend fun request(method: CharSequence = "GET", path: CharSequence = "/", body: CharSequence = ""): HtxClientMessage {
  val req = HtxClientRequest(method = method, path = path, body = body)
  return handler?.invoke(req) ?: HtxClientMessage(status = 200, body = "ok")
  }
@@ -87,10 +87,10 @@ class HtxElement {
     }
 
     suspend fun request(
-        method: String = "GET",
-        path: String,
-        body: String = "",
-        headers: Map<String, String> = emptyMap(),
+        method: CharSequence = "GET",
+        path: CharSequence,
+        body: CharSequence = "",
+        headers: Map<CharSequence, CharSequence> = emptyMap(),
         transport: HtxTransport? = null,
     ): HtxClientMessage {
         val req = HtxClientRequest(

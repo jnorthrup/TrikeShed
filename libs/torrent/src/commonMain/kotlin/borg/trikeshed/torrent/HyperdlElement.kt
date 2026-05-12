@@ -41,13 +41,13 @@ class HyperdlElement(
 
     // ── Download state ────────────────────────────────────────────
 
-    private val activeDownloads = mutableMapOf<String, DownloadTask>()
+    private val activeDownloads = mutableMapOf<CharSequence, DownloadTask>()
     private val gidCounter = AtomicLong(1)
 
     data class DownloadTask(
-        val gid: String,
-        val uri: String,
-        val status: String = "active",
+        val gid: CharSequence,
+        val uri: CharSequence,
+        val status: CharSequence = "active",
         val totalLength: Long = 0,
         val completedLength: Long = 0,
         val downloadSpeed: Long = 0,
@@ -56,7 +56,7 @@ class HyperdlElement(
     )
 
     data class DownloadFile(
-        val path: String,
+        val path: CharSequence,
         val length: Long,
         val completedLength: Long = 0,
         val selected: Boolean = true,
@@ -115,35 +115,35 @@ class HyperdlElement(
 
     // ── HyperDL download API ──────────────────────────────────────
 
-    fun addUri(uri: String, options: Map<String, String> = emptyMap()): String {
+    fun addUri(uri: CharSequence, options: Map<CharSequence, CharSequence> = emptyMap()): CharSequence {
         val gid = gidCounter.getAndIncrement().toString(16)
         val task = DownloadTask(gid = gid, uri = uri, status = "active")
         activeDownloads[gid] = task
         return gid
     }
 
-    fun addTorrent(torrent: TorrentMetainfo, uris: List<String> = emptyList()): String {
+    fun addTorrent(torrent: TorrentMetainfo, uris: List<CharSequence> = emptyList()): CharSequence {
         val gid = gidCounter.getAndIncrement().toString(16)
         val task = DownloadTask(gid = gid, uri = torrent.announce, status = "active")
         activeDownloads[gid] = task
         return gid
     }
 
-    fun tellStatus(gid: String): DownloadTask? = activeDownloads[gid]
-    fun pause(gid: String): DownloadTask? =
+    fun tellStatus(gid: CharSequence): DownloadTask? = activeDownloads[gid]
+    fun pause(gid: CharSequence): DownloadTask? =
         activeDownloads[gid]?.copy(status = "paused")?.also { activeDownloads[gid] = it }
-    fun unpause(gid: String): DownloadTask? {
+    fun unpause(gid: CharSequence): DownloadTask? {
         val task = activeDownloads[gid] ?: return null
         if (task.status == "paused") activeDownloads[gid] = task.copy(status = "active")
         return activeDownloads[gid]
     }
-    fun remove(gid: String): Boolean = activeDownloads.remove(gid) != null
+    fun remove(gid: CharSequence): Boolean = activeDownloads.remove(gid) != null
     fun tellActive(): List<DownloadTask> = activeDownloads.values.filter { it.status == "active" }
     fun tellWaiting(offset: Int = 0, num: Int = 100): List<DownloadTask> =
         activeDownloads.values.filter { it.status == "waiting" }.drop(offset).take(num)
     fun tellStopped(offset: Int = 0, num: Int = 100): List<DownloadTask> =
         activeDownloads.values.filter { it.status in listOf("complete", "error") }.drop(offset).take(num)
-    fun getGlobalStat(): Map<String, Long> = mapOf(
+    fun getGlobalStat(): Map<CharSequence, Long> = mapOf(
         "downloadSpeed" to activeDownloads.values.sumOf { it.downloadSpeed },
         "uploadSpeed" to activeDownloads.values.sumOf { it.uploadSpeed },
         "numActive" to activeDownloads.values.count { it.status == "active" }.toLong(),

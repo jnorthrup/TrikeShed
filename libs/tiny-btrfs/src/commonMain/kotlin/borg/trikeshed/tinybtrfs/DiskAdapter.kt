@@ -8,7 +8,7 @@ import borg.trikeshed.lib.*
  * CommonMain-only protocol: implementations live in platform modules (jvmMain/posixMain).
  *
  * Node identifiers are Series<Char>-backed values so VFS-facing code stays on the
- * project char-series algebra instead of intern-prone String surfaces.
+ * project char-series algebra instead of intern-prone CharSequence surfaces.
  */
 class NodeId(val chars: Series<Char>) : Comparable<NodeId> {
     override fun compareTo(other: NodeId): Int {
@@ -47,7 +47,7 @@ class NodeId(val chars: Series<Char>) : Comparable<NodeId> {
     }
 }
 
-fun String.toNodeId(): NodeId = NodeId(toSeries())
+fun CharSequence.toNodeId(): NodeId = NodeId(toSeries())
 fun Series<Char>.toNodeId(): NodeId = NodeId(this)
 
 interface DiskAdapter {
@@ -126,7 +126,7 @@ fun readStableImage(
 ): ByteArray? = read()?.copyOf()?.also(verify)
 
 fun readVolatileImage(
-    label: String,
+    label: CharSequence,
     maxAttempts: Int,
     read: () -> ByteArray?,
     verify: (ByteArray) -> Unit,

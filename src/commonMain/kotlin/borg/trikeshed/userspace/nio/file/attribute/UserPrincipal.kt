@@ -5,5 +5,5 @@ package borg.trikeshed.userspace.nio.file.attribute
 // Generated from Amazon Corretto JDK 25 java.base NIO public/protected API via javap.
 // Declarations intentionally mirror JDK taxonomy and contain no implementations.
 public interface UserPrincipal {
-    fun getName():CharSequence= TODO("NIO common stub")
+    fun getName(): CharSequence = TODO("NIO common stub")
 }

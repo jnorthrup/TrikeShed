@@ -8,7 +8,7 @@ import java.io.ObjectInputStream
 import java.io.ObjectOutputStream
 
 
-typealias ReifiedMessage = Pair<List<Pair<String, String>>, String>
+typealias ReifiedMessage = Pair<List<Pair<CharSequence, CharSequence>>, CharSequence>
 
 val debug = { }
 

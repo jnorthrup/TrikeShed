@@ -92,7 +92,7 @@ class MvccBlockStoreContractTest {
 
     // ── Helpers ──────────────────────────────────────────────────────────
 
-    fun sealedBlock(name: String): List<Any?> {
+    fun sealedBlock(name: CharSequence): List<Any?> {
         return listOf(name as Any?)
     }
 }

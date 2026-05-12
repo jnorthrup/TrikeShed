@@ -6,7 +6,7 @@ import borg.trikeshed.lib.SeekHandle
 
 /** JVM stub. Route through NIO FileChannel. */
 actual fun platformSeekHandle(): SeekHandle = object : SeekHandle {
-    override fun open(filename: String, readOnly: Boolean): Long = -1
+    override fun open(filename: CharSequence, readOnly: Boolean): Long = -1
     override fun close(handle: Long) {}
     override fun pread(handle: Long, dst: ByteRegion, fileOffset: Long): Int = -1
     override fun pwrite(handle: Long, src: ByteSeries, fileOffset: Long): Int = -1

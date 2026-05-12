@@ -14,7 +14,7 @@ aria2c-style argument parsing.
 
 - **CombinedClientApp** — an `AsyncContextElement` that parses aria2c-style CLI
   args into `Aria2Switches`, opens a `CombinedClientElement`, and runs an RPC
-  session loop via `supervisorScope` + `Channel<String>`.  Commands are
+  session loop via `supervisorScope` + `Channel<CharSequence>`.  Commands are
   space-split and forwarded to `combinedClient.executeRpc()`.
 
 - **ReactorElement** — a placeholder `AsyncContextElement` with an empty

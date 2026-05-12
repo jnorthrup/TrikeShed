@@ -46,7 +46,7 @@ class BigInt constructor(val sign: Boolean?, val magnitude: Series<UInt>) : Numb
         /**This parameter is not used within the constructor but
          *  ensures that the method signatures for ULong and Long
          *  constructors do not clash when compiled in Java.*/
-        javaCannotCompileULongAndLongMethodsThatConflict: String = ""
+        javaCannotCompileULongAndLongMethodsThatConflict: CharSequence = ""
     ) : this(
         sign = if (value.z) null else true,
         magnitude = if (value.z) emptySeries() else value.let { absValue ->
@@ -56,7 +56,7 @@ class BigInt constructor(val sign: Boolean?, val magnitude: Series<UInt>) : Numb
         }
     )
 
-    constructor(value: String) : this(
+    constructor(value: CharSequence) : this(
         sign = if (value.isEmpty()) null else value[0] != '-',
         magnitude = if (value.isEmpty()) emptySeries() else {
             val magnitude = mutableListOf<UInt>()
@@ -321,7 +321,7 @@ class BigInt constructor(val sign: Boolean?, val magnitude: Series<UInt>) : Numb
             is UByte -> invoke(primitive.toULong())
             is UShort -> invoke(primitive.toULong())
             is UInt -> invoke(primitive.toULong())
-//            is String -> invoke(primitive.toLong())
+//            is CharSequence -> invoke(primitive.toLong())
             else -> throw IllegalArgumentException("Unsupported type ${primitive::class}")
         }
     }

@@ -1,14 +1,14 @@
 package borg.trikeshed.couch.requestfactory
 
 data class RequestFactoryOpenApiDocument(
-    val openapi: String,
-    val path: String,
-    val operationId: String,
-    val contentType: String,
+    val openapi: CharSequence,
+    val path: CharSequence,
+    val operationId: CharSequence,
+    val contentType: CharSequence,
 )
 
 object RequestFactoryOpenApiYamlCodec {
-    fun toYaml(): String = """
+    fun toYaml(): CharSequence = """
         |openapi: 3.1.0
         |info:
         |  title: GWT RequestFactory Transport
@@ -45,7 +45,7 @@ object RequestFactoryOpenApiYamlCodec {
         |              ${'$'}ref: '#/components/schemas/RequestFactoryCall'
         |""".trimMargin()
 
-    fun fromYaml(yaml: String): RequestFactoryOpenApiDocument {
+    fun fromYaml(yaml: CharSequence): RequestFactoryOpenApiDocument {
         val lines = yaml.lines()
         val openapi = lines.first { it.startsWith("openapi:") }.substringAfter(':').trim()
         val path = lines.first { it.startsWith("  /") }.substringBefore(':').trim()

@@ -45,7 +45,7 @@ class HyperDownloader(
      * Failed segments are scavenged — retried up to [maxRetries] times.
      */
     suspend fun download(
-        url: String,
+        url: CharSequence,
         split: Int = switches.split,
         maxConcurrent: Int = switches.maxConcurrent,
         maxRetries: Int = 3,
@@ -57,7 +57,7 @@ class HyperDownloader(
 
         // HEAD → Content-Length
         val head = el.request("HEAD", url, transport = transport)
-        val contentLength = head.headers["content-length"]?.toLongOrNull()
+        val contentLength = head.headers["content-length"]?.toString()?.toLongOrNull()
             ?: error("Server did not provide Content-Length")
 
         // Split rule: only parallel-segment if file_size ≥ 2 × minSplitSize
@@ -67,7 +67,7 @@ class HyperDownloader(
         if (effectiveSplit <= 1) {
             val response = el.request("GET", url, transport = transport)
             check(response.status in 200..299) { "Download failed: HTTP ${response.status}" }
-            return@withContext response.body.encodeToByteArray()
+            return@withContext response.body.toString().encodeToByteArray()
         }
 
         // Split points at multiples of pieceLength
@@ -101,7 +101,7 @@ class HyperDownloader(
                                 check(response.status in 200..299 || response.status == 206) {
                                     "Segment $index failed: HTTP ${response.status}"
                                 }
-                                segments[index] = response.body.encodeToByteArray()
+                                segments[index] = response.body.toString().encodeToByteArray()
                                 return@withPermit
                             } catch (e: Exception) {
                                 attempt++

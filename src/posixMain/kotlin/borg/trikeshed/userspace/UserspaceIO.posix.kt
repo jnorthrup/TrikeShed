@@ -34,11 +34,11 @@ private class PosixUserspaceChannelBackend(
     }
 
     override fun accept(file: FileImpl): Int = -1
-    override fun connect(file: FileImpl, address: String, port: Int): Int = -1
+    override fun connect(file: FileImpl, address: CharSequence, port: Int): Int = -1
     override fun close(file: FileImpl): Int = PosixUringIO.closeFd(file.id, entries)
     override fun sync(file: FileImpl, metaData: Boolean): Int = if (metaData) PosixUringIO.fsync(file.id, entries) else PosixUringIO.fdatasync(file.id, entries)
     override fun truncate(file: FileImpl, size: Long): Int = PosixUringIO.ftruncate(file.id, size, entries)
-    override fun map(file: FileImpl, mode: String, position: Long, size: Long): Int {
+    override fun map(file: FileImpl, mode: CharSequence, position: Long, size: Long): Int {
         if (file.id < 0) return -1
         val prot = when (mode) {
             "r" -> 1 // PROT_READ
@@ -94,9 +94,9 @@ actual class FileImpl actual constructor(actual val id: Int) {
 }
 
 internal actual object FilesImpl {
-    actual fun open(path: String, readOnly: Boolean): FileImpl {
+    actual fun open(path: CharSequence, readOnly: Boolean): FileImpl {
         val flags = if (readOnly) O_RDONLY else (O_RDWR or O_CREAT)
-        return FileImpl(open(path, flags, 438u))
+        return FileImpl(open(path.toString(), flags, 438u))
     }
 }
 

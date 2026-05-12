@@ -37,8 +37,8 @@ import java.util.zip.ZipInputStream
  *   → BinanceCursor
  */
 class BinanceTableSource(
-    val symbol: String,
-    val interval: String = "1h",
+    val symbol: CharSequence,
+    val interval: CharSequence = "1h",
     val startDate: LocalDate,
     val endDate: LocalDate,
     val blockCapacity: Int = 500,
@@ -59,15 +59,15 @@ class BinanceTableSource(
     )
 
     private val schemaManager: SchemaManager = object : SchemaManager {
-        override suspend fun getTableSuspend(name: String): TableSchema? =
+        override suspend fun getTableSuspend(name: CharSequence): TableSchema? =
             if (name == symbol) ohlcvSchema else null
 
-        override fun getTable(name: String): TableSchema? =
+        override fun getTable(name: CharSequence): TableSchema? =
             if (name == symbol) ohlcvSchema else null
 
         override suspend fun createTableSuspend(schema: TableSchema) {}
-        override suspend fun ensureColumnsSuspend(table: String, cols: List<String>): TableSchema = ohlcvSchema
-        override fun ensureColumns(table: String, cols: List<String>): TableSchema = ohlcvSchema
+        override suspend fun ensureColumnsSuspend(table: CharSequence, cols: List<CharSequence>): TableSchema = ohlcvSchema
+        override fun ensureColumns(table: CharSequence, cols: List<CharSequence>): TableSchema = ohlcvSchema
     }
 
     // Lazily fetched, populated by the first open() / openSuspend() call.
@@ -85,23 +85,23 @@ class BinanceTableSource(
      * Synchronous open: delegates to [openSuspend] via the default bridge
      * ([runBlockingCommon]), which fetches on first call and caches blocks.
      */
-    override fun open(execCtx: ExecutionContext, tableName: String): Cursor {
+    override fun open(execCtx: ExecutionContext, tableName: CharSequence): Cursor {
         require(tableName == symbol) { "Unknown table: $tableName (expected $symbol)" }
         // First call triggers the fetch via openSuspend bridging.
         // Subsequent calls reuse cached blocks.
         return BinanceCursor(resolvedBlocks(execCtx))
     }
 
-    override suspend fun openSuspend(execCtx: ExecutionContext, tableName: String): Cursor {
+    override suspend fun openSuspend(execCtx: ExecutionContext, tableName: CharSequence): Cursor {
         require(tableName == symbol) { "Unknown table: $tableName (expected $symbol)" }
         return BinanceCursor(resolvedBlocksSuspend())
     }
 
-    override fun insert(execCtx: ExecutionContext, tableName: String, row: List<Any?>) {
+    override fun insert(execCtx: ExecutionContext, tableName: CharSequence, row: List<Any?>) {
         error("BinanceTableSource is read-only")
     }
 
-    override suspend fun insertSuspend(execCtx: ExecutionContext, tableName: String, row: List<Any?>) {
+    override suspend fun insertSuspend(execCtx: ExecutionContext, tableName: CharSequence, row: List<Any?>) {
         error("BinanceTableSource is read-only")
     }
 
@@ -184,7 +184,7 @@ class BinanceTableSource(
         }
     }
 
-    fun buildUrl(date: LocalDate): String {
+    fun buildUrl(date: LocalDate): CharSequence {
         val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd")
         return "https://data.binance.vision/data/spot/daily/klines/$symbol/$interval/" +
             "$symbol-$interval-${date.format(formatter)}.csv"
@@ -194,7 +194,7 @@ class BinanceTableSource(
      * Fetch CSV from URL. Uses [withContext(Dispatchers.IO)] to avoid blocking
      * the coroutine dispatcher. Handles plain CSV and gzipped CSV.
      */
-    private suspend fun fetchCsv(urlStr: String): String = withContext(Dispatchers.IO) {
+    private suspend fun fetchCsv(urlStr: CharSequence): CharSequence = withContext(Dispatchers.IO) {
         val conn = URI(urlStr).toURL().openConnection() as HttpURLConnection
         conn.connectTimeout = 10_000
         conn.readTimeout = 30_000
@@ -219,7 +219,7 @@ class BinanceTableSource(
         }
     }
 
-    fun parseCsv(csv: String, timespan: TimeSpan = intervalToTimeSpan(interval)): List<Kline> {
+    fun parseCsv(csv: CharSequence, timespan: TimeSpan = intervalToTimeSpan(interval)): List<Kline> {
         return csv.lineSequence()
             .filter { it.isNotBlank() }
             .mapNotNull { line ->
@@ -243,7 +243,7 @@ class BinanceTableSource(
             .toList()
     }
 
-    fun intervalToTimeSpan(interval: String): TimeSpan = when (interval) {
+    fun intervalToTimeSpan(interval: CharSequence): TimeSpan = when (interval) {
         "1m" -> TimeSpan.Minutes1
         "3m" -> TimeSpan.Minutes3
         "5m" -> TimeSpan.Minutes5

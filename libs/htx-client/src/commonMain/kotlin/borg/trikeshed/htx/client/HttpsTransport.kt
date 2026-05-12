@@ -29,22 +29,22 @@ fun ringHttpsHandler(
     channels: ChannelOperations,
     reactor: ReactorOperations,
 ): HtxRequestHandler = { request: HtxClientRequest ->
-    val host = request.path
+    val host = request.path.toString()
         .removePrefix("https://")
         .removePrefix("http://")
         .substringBefore(':')
-    val port = request.path
+    val port = request.path.toString()
         .substringAfter(":")
         .substringBefore('/')
         .toIntOrNull() ?: 443
-    val pathPart = request.path
+    val pathPart = request.path.toString()
         .substringAfter(host)
         .substringAfter(port.toString())
         .ifEmpty { "/" }
-    val fullPath = if (request.path.contains("?")) {
-        request.path.substringAfter(host).substringAfter(port.toString())
+    val fullPath = if (request.path.toString().contains("?")) {
+        request.path.toString().substringAfter(host).substringAfter(port.toString())
     } else {
-        val qp = request.headers["X-Query-Params"].orEmpty()
+        val qp = request.headers["X-Query-Params"]?.toString().orEmpty()
         if (qp.isNotEmpty()) "$pathPart?$qp" else pathPart
     }
 

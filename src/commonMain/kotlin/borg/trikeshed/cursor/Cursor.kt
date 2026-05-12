@@ -83,23 +83,23 @@ val Cursor.meta: Series<ColumnMeta>
     }
 
 /** create an Intarray of cursor meta by Strings of column names */
-fun Cursor.meta(vararg s: String): Series<Int> {
+fun Cursor.meta(vararg s: CharSequence): Series<Int> {
     val meta: Series<ColumnMeta> = meta
     return s.size j { i ->
-        meta.view.indexOfFirst { columnMeta: ColumnMeta -> columnMeta.name == s[i] }
+        meta.view.indexOfFirst { columnMeta: ColumnMeta -> columnMeta.name == s[i].toString() }
     }
 }
 
 /** cursor get by String vararg -- return a Cursor with the columns specified by the vararg */
-operator fun Cursor.get(vararg s: String): Cursor = this[meta(*s)]
+operator fun Cursor.get(vararg s: CharSequence): Cursor = this[meta(*s)]
 
 /** ColumnExclusion value class
  *
  * used to exclude columns from a cursor by name
  *
  * @param name the name of the column to exclude */
-@JvmInline
-value class ColumnExclusion(val name: String) {
+
+inline class ColumnExclusion(val name: String) {
     override fun toString(): String = "ColumnExclusion($name)"
 }
 
@@ -125,7 +125,7 @@ operator fun Cursor.get(s: Series<ColumnExclusion>): Cursor {
 }
 
 //in columnar project this is meta.right
-val Series<ColumnMeta>.names: Series<String> get() = this α ColumnMeta::name
+val Series<ColumnMeta>.names: Series<String> get() = this α { it.name.toString() }
 
 /** head default 5 rows
  * just like unix head - print default 5 lines from cursor contents to stdout */
@@ -192,7 +192,7 @@ private fun Cursor.selectColumns(indices: IntArray): Cursor {
  *
  */
 val Cursor.isNumerical: Boolean
-    get() = meta.view.all { (_: String, b: TypeMemento): ColumnMeta ->
+    get() = meta.view.all { (_: CharSequence, b: TypeMemento): ColumnMeta ->
         when (b) {
             IoByte, IoShort, IoInt, IoFloat, IoDouble, IoLong -> true
             else -> false

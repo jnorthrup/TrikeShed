@@ -17,8 +17,8 @@ data class CouchDb11RowSet(
     val rows: BlockRowVec,
 ) {
     companion object {
-        fun fromJson(json: String): CouchDb11RowSet {
-            val root = JsonParser.reify(json.toSeries()) as? Map<String, Any?>
+        fun fromJson(json: CharSequence): CouchDb11RowSet {
+            val root = JsonParser.reify(json.toSeries()) as? Map<CharSequence, Any?>
                 ?: error("CouchDB row set must be a JSON object")
 
             val totalRows = root.int("total_rows")
@@ -26,7 +26,7 @@ data class CouchDb11RowSet(
             val block = BlockRowVec.mutable()
 
             root.list("rows").forEach { rawRow ->
-                val row = rawRow as? Map<String, Any?>
+                val row = rawRow as? Map<CharSequence, Any?>
                     ?: error("CouchDB row entry must be a JSON object")
                 val docMap = row.mapValueOrNull("doc")
                 val docLoader: (() -> RowVec)? = docMap?.let { map -> { parseDocRowVec(map) } }
@@ -48,27 +48,27 @@ data class CouchDb11RowSet(
             )
         }
 
-        fun parseDocRowVec(map: Map<String, Any?>): borg.trikeshed.cursor.RowVec {
+        fun parseDocRowVec(map: Map<CharSequence, Any?>): borg.trikeshed.cursor.RowVec {
             val entries = map.entries.toList()
             val keys = entries.size j { index: Int -> entries[index].key }
             val cells = entries.size j { index: Int -> entries[index].value }
             return KeyedRowVec(keys, cells).toRowVec()
         }
 
-       fun Map<String, Any?>.string(name: String): String =
-            this[name] as? String ?: error("Missing string field '$name'")
+       fun Map<CharSequence, Any?>.string(name: CharSequence): CharSequence =
+            this[name] as? CharSequence ?: error("Missing string field '$name'")
 
-       fun Map<String, Any?>.int(name: String): Int = when (val value = this[name]) {
+       fun Map<CharSequence, Any?>.int(name: CharSequence): Int = when (val value = this[name]) {
             is Int -> value
             is Long -> value.toInt()
             is Double -> value.toInt()
             else -> error("Missing numeric field '$name'")
         }
 
-       fun Map<String, Any?>.list(name: String): List<Any?> =
+       fun Map<CharSequence, Any?>.list(name: CharSequence): List<Any?> =
             this[name] as? List<Any?> ?: emptyList()
 
-       fun Map<String, Any?>.mapValueOrNull(name: String): Map<String, Any?>? =
-            this[name] as? Map<String, Any?>
+       fun Map<CharSequence, Any?>.mapValueOrNull(name: CharSequence): Map<CharSequence, Any?>? =
+            this[name] as? Map<CharSequence, Any?>
     }
 }

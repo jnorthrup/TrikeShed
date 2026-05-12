@@ -33,7 +33,7 @@ expect fun interrogateCpuCache(): CpuCacheTopology
  * Format a [CpuCacheTopology] as Confix JSON —
  * a parseable medium consumable by TrikeShed's Confix parser.
  */
-fun CpuCacheTopology.toConfix(): String = buildString {
+fun CpuCacheTopology.toConfix(): CharSequence = buildString {
     appendLine("{")
     appendLine("  \"l1DataBytes\": ${l1DataBytes ?: "null"},")
     appendLine("  \"l1InstructionBytes\": ${l1InstructionBytes ?: "null"},")

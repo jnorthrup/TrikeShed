@@ -13,26 +13,27 @@ public abstract class DatagramChannel : AbstractSelectableChannel, ByteChannel, 
     protected constructor(provider: SelectorProvider) : super(provider)
     public abstract override fun close()
     public abstract override fun validOps(): Int
-    public abstract override fun bind(address: String): DatagramChannel
-    public abstract override fun <T> setOption(option: String, value: T): DatagramChannel
+    public abstract override fun bind(address: CharSequence): DatagramChannel
+    public abstract override fun <T> setOption(option: CharSequence, value: T): DatagramChannel
     // TODO
     abstract fun isConnected(): Boolean
     // TODO
-    abstract fun connect(address: String): DatagramChannel
+    abstract fun connect(address: CharSequence): DatagramChannel
     // TODO
     abstract fun disconnect(): DatagramChannel
     // TODO
     abstract fun getRemoteAddress():CharSequence// TODO
     abstract fun receive(dst: ByteRegion):CharSequence// TODO
-    abstract fun send(src: ByteBuffer, address: String): Int
+    abstract fun send(src: ByteBuffer, address: CharSequence): Int
     public abstract override fun read(dst: ByteBuffer): Int
     public abstract override fun read(dsts: Array<out ByteBuffer>, offset: Int, length: Int): Long
     public abstract override fun read(dsts: Array<out ByteBuffer>): Long
     public abstract override fun write(src: ByteBuffer): Int
     public abstract override fun write(srcs: Array<out ByteBuffer>, offset: Int, length: Int): Long
     public abstract override fun write(srcs: Array<out ByteBuffer>): Long
-    public abstract override fun getLocalAddress():CharSequencecompanion object {
+    public abstract override fun getLocalAddress(): CharSequence
+    companion object {
         fun `open`(): DatagramChannel = TODO("NIO common stub")
-        fun `open`(protocolFamily: String): DatagramChannel = TODO("NIO common stub")
+        fun `open`(protocolFamily: CharSequence): DatagramChannel = TODO("NIO common stub")
     }
 }

@@ -12,8 +12,8 @@ import borg.trikeshed.miniduck.*
 typealias WalEntry= Join< /*seek*/Long,/*op*/  WalOp>
 
 sealed class WalOp {
-    data class Put(val collection: String, val id: String, val block: BlockRowVec) : WalOp()
-    data class Remove(val collection: String, val id: String) : WalOp()
+    data class Put(val collection: CharSequence, val id: CharSequence, val block: BlockRowVec) : WalOp()
+    data class Remove(val collection: CharSequence, val id: CharSequence) : WalOp()
 }
 
 class InMemoryBlockWal {

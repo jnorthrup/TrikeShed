@@ -27,7 +27,7 @@ class MLIRContext {
  */
 class MLIRTensor(
     val shape: List<Int>,
-    val dtype: String,
+    val dtype: CharSequence,
     val strides: List<Int>
 ) {
     companion object {

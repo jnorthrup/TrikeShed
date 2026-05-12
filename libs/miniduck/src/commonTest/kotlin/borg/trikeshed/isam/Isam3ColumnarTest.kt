@@ -22,7 +22,7 @@ import kotlin.test.assertTrue
 import kotlin.time.Instant
 
 private data class CellSpec(
-    val name: String,
+    val name: CharSequence,
     val value: Any?,
     val type: IOMemento,
 )

@@ -14,7 +14,7 @@ import borg.trikeshed.userspace.nio.ByteBuffer
  *
  * [code] = ordinal = the kernel IORING_OP_* integer value.
  */
-enum class UringOp(val desc: String) : BitMasked<Long> {
+enum class UringOp(val desc: CharSequence) : BitMasked<Long> {
     NOP("no-op"),
     READV("vectored read — iovec"),
     WRITEV("vectored write — iovec"),

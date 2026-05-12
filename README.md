@@ -192,7 +192,7 @@ Protocol-agnostic session layer. Auto-detects protocol from first bytes:
 
 ```kotlin
 interface Channel {
-    fun channelType(): String
+    fun channelType(): CharSequence
     fun isConnected(): Boolean
     fun metadata(): ChannelMetadata?
     fun read(dst: ByteRegion): Int

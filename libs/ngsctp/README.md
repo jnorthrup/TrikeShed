@@ -18,7 +18,7 @@ TrikeShed's adaptation remaps the architecture to:
 | Upstream (KMPngSCTP) | TrikeShed adaptation |
 |---|---|
 | `dev.jnorthrup.ngsctp` | `borg.trikeshed.sctp` |
-| `java.net.InetSocketAddress` | `(host: String, port: Int)` |
+| `java.net.InetSocketAddress` | `(host: CharSequence, port: Int)` |
 | `NgSctpAssociation` as `CoroutineScope` | `SctpElement` as `AsyncContextElement` |
 | `SctpTransport` interface | `ChannelOperations` SPI |
 | `CongestionControl` / `SendBuffer` | Pending ring reactor integration |

@@ -35,12 +35,12 @@ interface BitMasked<P : Comparable<P>> {
             }
 
         /** Binary search for name. Returns ordinal or -1. */
-        fun findOrdinal(nameIndex: Series<String>, ordinals: Series<Int>, name: String): Int {
+        fun findOrdinal(nameIndex: Series<String>, ordinals: Series<Int>, name: CharSequence): Int {
             var lo = 0
             var hi = nameIndex.a - 1
             while (lo <= hi) {
                 val mid = (lo + hi) / 2
-                val cmp = nameIndex.b(mid).compareTo(name)
+                val cmp = nameIndex.b(mid).compareTo(name.toString())
                 when {
                     cmp == 0 -> return ordinals.b(mid)
                     cmp < 0 -> lo = mid + 1

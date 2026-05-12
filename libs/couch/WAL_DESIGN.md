@@ -49,50 +49,50 @@ Need a closed entry taxonomy.
 ```kotlin
 sealed interface WalEntry {
     val sequence: Long
-    val database: String
-    val txId: String?
+    val database: CharSequence
+    val txId: CharSequence?
     val timestampMicros: Long
 }
 
 data class PutDoc(
     override val sequence: Long,
-    override val database: String,
-    val docId: String,
-    val revision: String,
-    val bodyJson: String,
+    override val database: CharSequence,
+    val docId: CharSequence,
+    val revision: CharSequence,
+    val bodyJson: CharSequence,
     val deleted: Boolean = false,
-    override val txId: String? = null,
+    override val txId: CharSequence? = null,
     override val timestampMicros: Long,
 ) : WalEntry
 
 data class DeleteDoc(
     override val sequence: Long,
-    override val database: String,
-    val docId: String,
-    val revision: String,
-    override val txId: String? = null,
+    override val database: CharSequence,
+    val docId: CharSequence,
+    val revision: CharSequence,
+    override val txId: CharSequence? = null,
     override val timestampMicros: Long,
 ) : WalEntry
 
 data class PutDesignDoc(
     override val sequence: Long,
-    override val database: String,
-    val designDocId: String,
-    val bodyJson: String,
-    override val txId: String? = null,
+    override val database: CharSequence,
+    val designDocId: CharSequence,
+    val bodyJson: CharSequence,
+    override val txId: CharSequence? = null,
     override val timestampMicros: Long,
 ) : WalEntry
 
 data class PutAttachmentMeta(
     override val sequence: Long,
-    override val database: String,
-    val docId: String,
-    val revision: String,
-    val attachmentName: String,
-    val contentType: String,
-    val blobRef: String,
+    override val database: CharSequence,
+    val docId: CharSequence,
+    val revision: CharSequence,
+    val attachmentName: CharSequence,
+    val contentType: CharSequence,
+    val blobRef: CharSequence,
     val length: Long,
-    override val txId: String? = null,
+    override val txId: CharSequence? = null,
     override val timestampMicros: Long,
 ) : WalEntry
 ```
@@ -189,19 +189,19 @@ typealias Shape = Series<Int>
 typealias Tensor<T> = Join<Shape, (Shape) -> T>
 
 data class SnapshotRequest(
-    val database: String,
+    val database: CharSequence,
     val upToSequence: Long = Long.MAX_VALUE,
     val includeDesignDocs: Boolean = true,
 )
 
 data class WalSnapshot(
-    val database: String,
+    val database: CharSequence,
     val baseSequence: Long,
     val docs: Cursor,
     val designDocs: Cursor,
     val attachments: Cursor,
-    val tensorCharts: Series<Join<String, Manifold<Int, RowVec>>>,
-    val segmentRefs: List<String>,
+    val tensorCharts: Series<Join<CharSequence, Manifold<Int, RowVec>>>,
+    val segmentRefs: List<CharSequence>,
 )
 ```
 
@@ -247,15 +247,15 @@ Suggested types:
 
 ```kotlin
 data class CompactionPlan(
-    val database: String,
+    val database: CharSequence,
     val throughSequence: Long,
 )
 
 data class CompactionResult(
-    val database: String,
+    val database: CharSequence,
     val compactedThrough: Long,
-    val reclaimedSegments: List<String>,
-    val emittedSnapshotRef: String,
+    val reclaimedSegments: List<CharSequence>,
+    val emittedSnapshotRef: CharSequence,
 )
 ```
 

@@ -41,7 +41,7 @@ class GitOpenApiServer(private val shell: ProcessShell) {
         }
     }
 
-    private fun HtxStartLine.operationId(req: HtxMessage): String {
+    private fun HtxStartLine.operationId(req: HtxMessage): CharSequence {
         val uri = this.uri.decodeToString()
         // operationId from x-trikeshed-operationId header if present
         findHeader(req, "x-trikeshed-operationId".encodeToByteArray())?.decodeToString()?.let { return it }
@@ -63,7 +63,7 @@ class GitOpenApiServer(private val shell: ProcessShell) {
         }
     }
 
-    private fun parseQueryParams(msg: HtxMessage): Map<String, String> {
+    private fun parseQueryParams(msg: HtxMessage): Map<CharSequence, CharSequence> {
         val sl = msg.startLine() ?: return emptyMap()
         val uri = sl.uri.decodeToString()
         val query = uri.substringAfter('?', "")
@@ -74,7 +74,7 @@ class GitOpenApiServer(private val shell: ProcessShell) {
         }.toMap()
     }
 
-    private fun String.decodeURL(): String =
+    private fun CharSequence.decodeURL(): CharSequence =
         buildString(length) {
             var index = 0
             while (index < this@decodeURL.length) {
@@ -114,14 +114,14 @@ class GitOpenApiServer(private val shell: ProcessShell) {
         else -> null
     }
 
-    private fun gitPorcelain(vararg args: String): HtxMessage {
+    private fun gitPorcelain(vararg args: CharSequence): HtxMessage {
         val result = shell.exec("git", args.toList())
         val exitCode = result.exitCode
         val output = if (exitCode == 0) result.stdout else result.stderr
         return textResponse(output, if (exitCode == 0) 200 else 400)
     }
 
-    private fun gitCommit(repo: String, message: String): HtxMessage {
+    private fun gitCommit(repo: CharSequence, message: CharSequence): HtxMessage {
         // Stage all, then commit with message
         val stageResult = shell.exec("git", "-C", repo, "add", "-A")
         if (stageResult.exitCode != 0) return textResponse(stageResult.stderr, 500)
@@ -131,36 +131,36 @@ class GitOpenApiServer(private val shell: ProcessShell) {
         return textResponse(output, if (commitResult.exitCode == 0) 200 else 400)
     }
 
-    private fun gitAdd(repo: String, files: String): HtxMessage {
+    private fun gitAdd(repo: CharSequence, files: CharSequence): HtxMessage {
         val fileList = files.split(" ").filter { it.isNotEmpty() }
         val result = shell.exec("git", "-C", repo, "add", *fileList.toTypedArray())
         return textResponse(result.stdout.ifEmpty { result.stderr }, if (result.exitCode == 0) 200 else 400)
     }
 
-    private fun gitReset(repo: String, ref: String): HtxMessage =
+    private fun gitReset(repo: CharSequence, ref: CharSequence): HtxMessage =
         gitPorcelain("-C", repo, "reset", ref)
 
-    private fun gitDiff(repo: String, cached: Boolean): HtxMessage {
-        val args = mutableListOf<String>("-C", repo, "diff")
+    private fun gitDiff(repo: CharSequence, cached: Boolean): HtxMessage {
+        val args = mutableListOf<CharSequence>("-C", repo, "diff")
         if (cached) args.add("--cached")
         val result = shell.exec("git", args.toList())
         return textResponse(result.stdout, if (result.exitCode == 0) 200 else 400)
     }
 
-    private fun gitCheckout(repo: String, ref: String): HtxMessage =
+    private fun gitCheckout(repo: CharSequence, ref: CharSequence): HtxMessage =
         gitPorcelain("-C", repo, "checkout", ref)
 
-    private fun gitInit(repo: String): HtxMessage {
+    private fun gitInit(repo: CharSequence): HtxMessage {
         val result = shell.exec("git", "init", "--quiet", repo)
         return textResponse(result.stdout.ifEmpty { "Initialized: $repo" }, if (result.exitCode == 0) 200 else 400)
     }
 
-    private fun gitRevParse(repo: String, ref: String): HtxMessage {
+    private fun gitRevParse(repo: CharSequence, ref: CharSequence): HtxMessage {
         val result = shell.exec("git", "-C", repo, "rev-parse", ref)
         return textResponse(result.stdout.trimEnd(), if (result.exitCode == 0) 200 else 400)
     }
 
-    private fun gitInfoRefs(repo: String, service: String): HtxMessage {
+    private fun gitInfoRefs(repo: CharSequence, service: CharSequence): HtxMessage {
         // git-upload-pack or git-receive-pack advertised refs
         val result = shell.exec(
             "git", "-C", repo,
@@ -185,7 +185,7 @@ class GitOpenApiServer(private val shell: ProcessShell) {
         }
     }
 
-    private fun gitUploadPack(request: HtxMessage, repo: String): HtxMessage {
+    private fun gitUploadPack(request: HtxMessage, repo: CharSequence): HtxMessage {
         val body = request.blocks.filterIsInstance<HtxBlockData.Data>().joinToString("") {
             it.bytes.decodeToString()
         }
@@ -207,7 +207,7 @@ class GitOpenApiServer(private val shell: ProcessShell) {
         }
     }
 
-    private fun gitReceivePack(request: HtxMessage, repo: String): HtxMessage {
+    private fun gitReceivePack(request: HtxMessage, repo: CharSequence): HtxMessage {
         return HtxMessage().apply {
             addStartLine(HtxStartLine.response(200, "OK".encodeToByteArray()))
             addHeader("Content-Type".encodeToByteArray(), "application/x-git-receive-pack-result".encodeToByteArray())
@@ -224,7 +224,7 @@ class GitOpenApiServer(private val shell: ProcessShell) {
         setEom()
     }
 
-    private fun textResponse(body: String, status: Int): HtxMessage = HtxMessage().apply {
+    private fun textResponse(body: CharSequence, status: Int): HtxMessage = HtxMessage().apply {
         addStartLine(HtxStartLine.response(status, if (status < 400) "OK".encodeToByteArray() else "Error".encodeToByteArray()))
         addHeader("Content-Type".encodeToByteArray(), "text/plain; charset=utf-8".encodeToByteArray())
         addData(body.encodeToByteArray())
@@ -232,5 +232,5 @@ class GitOpenApiServer(private val shell: ProcessShell) {
         setEom()
     }
 
-    private fun errorResponse(status: Int, message: String): HtxMessage = textResponse(message, status)
+    private fun errorResponse(status: Int, message: CharSequence): HtxMessage = textResponse(message, status)
 }

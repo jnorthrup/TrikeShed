@@ -39,7 +39,7 @@ sealed class MergeResult {
         val partialResult: Patch?,  // patch that could be applied before conflict hit
     ) : MergeResult()
 
-    data class Incompatible(val reason: String) : MergeResult()
+    data class Incompatible(val reason: CharSequence) : MergeResult()
 }
 
 /**
@@ -244,7 +244,7 @@ object PijulMerge {
         override infix fun commute(other: Patch) = null
     }
 
-    private fun createNullPatch(id: String): Patch = object : Patch {
+    private fun createNullPatch(id: CharSequence): Patch = object : Patch {
         override val name = id
         override val hash = PatchHash.of()
         override val timestamp = 0L

@@ -29,15 +29,15 @@ class YamlParserTest {
            |    get:
            |      operationId: listPets
            |""".trimMargin( ),
-        ) as Map<String, Any?>
+        ) as Map<CharSequence, Any?>
 
         assertEquals("3.1.0", result["openapi"])
-        val info = result["info"] as Map<String, Any?>
+        val info = result["info"] as Map<CharSequence, Any?>
         assertEquals("Example API", info["title"])
         assertEquals(listOf("pets", "orders"), result["tags"])
-        val paths = result["paths"] as Map<String, Any?>
-        val pets = paths["/pets"] as Map<String, Any?>
-        val get = pets["get"] as Map<String, Any?>
+        val paths = result["paths"] as Map<CharSequence, Any?>
+        val pets = paths["/pets"] as Map<CharSequence, Any?>
+        val get = pets["get"] as Map<CharSequence, Any?>
         assertEquals("listPets", get["operationId"])
     }
 
@@ -51,9 +51,9 @@ class YamlParserTest {
             |  - url: https://sandbox.example.com
             |    description: sandbox
             |""".trimMargin(    ),
-        ) as Map<String, Any?>
+        ) as Map<CharSequence, Any?>
 
-        val servers = result["servers"] as List<Map<String, Any?>>
+        val servers = result["servers"] as List<Map<CharSequence, Any?>>
         assertEquals(2, servers.size)
         assertEquals("https://api.example.com", servers[0]["url"])
         assertEquals("sandbox", servers[1]["description"])

@@ -29,7 +29,7 @@ data class DeltaLineEdit(
     val op: LineOperation,
     val lineStart: Int,
     val lineEnd: Int,
-    val newText: String,
+    val newText: CharSequence,
 )
 
 /** Encode a patch as a sequence of HtxBlockData.Data blocks (no HtxMessage overhead). */
@@ -156,7 +156,7 @@ object CouchDeltaCodec {
     }
 
     private data class DecodedPatchHeader(
-        val name: String,
+        val name: CharSequence,
         val hash: PatchHash,
         val timestamp: Long,
         val dependsOn: Set<PatchHash>,

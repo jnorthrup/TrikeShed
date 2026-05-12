@@ -11,16 +11,16 @@ sealed class CouchCommand {
     data object Reset : CouchCommand()
 
     /** `["add_fun", "function(doc) { ... }"]` — register a new view function. */
-    data class AddFun(val source: String) : CouchCommand()
+    data class AddFun(val source: CharSequence) : CouchCommand()
 
     /** `["map_doc", {...doc...}]` — map a single document through all active functions. */
-    data class MapDoc(val doc: Map<String, Any?>) : CouchCommand()
+    data class MapDoc(val doc: Map<CharSequence, Any?>) : CouchCommand()
 
     /** `["reduce", [source, ...], ...]` — reduce values. */
-    data class Reduce(val sources: List<String>, val values: List<Any?>) : CouchCommand()
+    data class Reduce(val sources: List<CharSequence>, val values: List<Any?>) : CouchCommand()
 
     /** `["rereduce", [source, ...], ...]` — re-reduce values. */
-    data class Rereduce(val sources: List<String>, val values: List<Any?>) : CouchCommand()
+    data class Rereduce(val sources: List<CharSequence>, val values: List<Any?>) : CouchCommand()
 
     companion object {
         /**
@@ -29,27 +29,27 @@ sealed class CouchCommand {
          */
         fun parse(json: List<*>): CouchCommand? {
             if (json.isEmpty()) return null
-            val op = json[0] as? String ?: return null
+            val op = json[0] as? CharSequence ?: return null
             return when (op) {
                 "reset" -> Reset
                 "add_fun" -> {
-                    val source = json.getOrNull(1) as? String ?: return null
+                    val source = json.getOrNull(1) as? CharSequence ?: return null
                     AddFun(source)
                 }
                 "map_doc" -> {
                     @Suppress("UNCHECKED_CAST")
-                    val doc = json.getOrNull(1) as? Map<String, Any?> ?: return null
+                    val doc = json.getOrNull(1) as? Map<CharSequence, Any?> ?: return null
                     MapDoc(doc)
                 }
                 "reduce" -> {
                     @Suppress("UNCHECKED_CAST")
-                    val fns = (json.getOrNull(1) as? List<*>)?.mapNotNull { it as? String } ?: return null
+                    val fns = (json.getOrNull(1) as? List<*>)?.mapNotNull { it as? CharSequence } ?: return null
                     val values = json.getOrNull(2) as? List<*> ?: emptyList<Any?>()
                     Reduce(fns, values as List<Any?>)
                 }
                 "rereduce" -> {
                     @Suppress("UNCHECKED_CAST")
-                    val fns = (json.getOrNull(1) as? List<*>)?.mapNotNull { it as? String } ?: return null
+                    val fns = (json.getOrNull(1) as? List<*>)?.mapNotNull { it as? CharSequence } ?: return null
                     val values = json.getOrNull(2) as? List<*> ?: emptyList<Any?>()
                     Rereduce(fns, values as List<Any?>)
                 }
@@ -75,5 +75,5 @@ sealed class CouchResponse {
     data class ReduceResult(val value: Any?) : CouchResponse()
 
     /** `"error"` or structured error. */
-    data class Error(val message: String) : CouchResponse()
+    data class Error(val message: CharSequence) : CouchResponse()
 }

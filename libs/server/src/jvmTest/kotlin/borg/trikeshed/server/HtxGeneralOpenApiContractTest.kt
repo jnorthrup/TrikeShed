@@ -313,7 +313,7 @@ class HtxGeneralOpenApiContractTest {
         assertTrue(apiText.contains("Generated from ../server/openapi/htx-general.openapi.yaml by ./gradlew -p libs/htx-client openApiGenerateHtxGeneralClient."))
         assertTrue(apiText.contains("Repository policy: this checked-in file must be regenerated, not edited by hand."))
         assertTrue(apiText.contains("suspend fun getHealth(): HealthStatus"))
-        assertTrue(apiText.contains("const val operationId: String = \"getHealth\""))
+        assertTrue(apiText.contains("const val operationId: CharSequence = \"getHealth\""))
         assertTrue(apiText.contains("path = \"/health\""))
 
         val infrastructureText = generatedInfrastructureFile.readText()
@@ -363,7 +363,7 @@ class HtxGeneralOpenApiContractTest {
         }
     }
 
-   fun snapshotGeneratedContents(): Map<String, String> =
+   fun snapshotGeneratedContents(): Map<CharSequence, CharSequence> =
         expectedGeneratedFiles.associateWith { relativePath ->
             File(generatedSourceRoot, relativePath).readText()
         }
@@ -375,7 +375,7 @@ class HtxGeneralOpenApiContractTest {
         }
     }
 
-   fun runGradle(vararg arguments: String): GradleRun {
+   fun runGradle(vararg arguments: CharSequence): GradleRun {
         val process = ProcessBuilder(
             listOf(File(repoRoot, "gradlew").absolutePath, "--no-daemon") + arguments,
         )
@@ -393,7 +393,7 @@ class HtxGeneralOpenApiContractTest {
         )
     }
 
-   fun runCommand(vararg arguments: String): CommandRun {
+   fun runCommand(vararg arguments: CharSequence): CommandRun {
         val process = ProcessBuilder(arguments.toList())
             .directory(repoRoot)
             .redirectErrorStream(true)
@@ -411,11 +411,11 @@ class HtxGeneralOpenApiContractTest {
 
    data class GradleRun(
         val exitCode: Int,
-        val output: String,
+        val output: CharSequence,
     )
 
    data class CommandRun(
         val exitCode: Int,
-        val output: String,
+        val output: CharSequence,
     )
 }

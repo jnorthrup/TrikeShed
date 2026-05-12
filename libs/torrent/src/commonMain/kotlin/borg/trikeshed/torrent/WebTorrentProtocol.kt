@@ -29,11 +29,11 @@ object WebTorrentProtocol {
      * @param port our listening port
      */
     fun buildHandshakeRequest(
-        trackerHost: String,
-        infoHashHex: String,
-        peerIdHex: String,
+        trackerHost: CharSequence,
+        infoHashHex: CharSequence,
+        peerIdHex: CharSequence,
         port: Int = DEFAULT_PORT,
-    ): String = buildString {
+    ): CharSequence = buildString {
         append("GET /announce?info_hash=$infoHashHex&peer_id=$peerIdHex&port=$port HTTP/1.1\r\n")
         append("Host: $trackerHost\r\n")
         append("Upgrade: websocket\r\n")
@@ -47,7 +47,7 @@ object WebTorrentProtocol {
     /**
      * Verify a WebSocket upgrade response. Returns true if the server accepted.
      */
-    fun verifyHandshakeResponse(response: String): Boolean {
+    fun verifyHandshakeResponse(response: CharSequence): Boolean {
         val lines = response.split("\r\n")
         val status = lines.firstOrNull() ?: return false
         return status.contains("101") &&

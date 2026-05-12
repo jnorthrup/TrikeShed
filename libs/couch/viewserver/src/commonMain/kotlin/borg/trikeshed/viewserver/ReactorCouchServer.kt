@@ -27,7 +27,7 @@ import kotlinx.coroutines.launch
 // ── HTTP/1.1 request parser ──────────────────────────────────────────────
 
 /** Percent-decode a URL query parameter value (handles multi-byte UTF-8). */
-private fun urlDecode(value: String): String {
+private fun urlDecode(value: CharSequence): CharSequence {
     val bytes = mutableListOf<Byte>()
     var i = 0
     while (i < value.length) {
@@ -45,13 +45,13 @@ private fun urlDecode(value: String): String {
 }
 
 data class HttpRequest(
-    val method: String,
-    val path: String,
-    val headers: Map<String, String>,
-    val body: String,
+    val method: CharSequence,
+    val path: CharSequence,
+    val headers: Map<CharSequence, CharSequence>,
+    val body: CharSequence,
 )
 
-private fun parseHttpRequest(raw: String): HttpRequest? {
+private fun parseHttpRequest(raw: CharSequence): HttpRequest? {
     val parts = raw.split("\r\n\r\n", limit = 2)
     val headerSection = parts[0]
     val body = parts.getOrElse(1) { "" }
@@ -61,7 +61,7 @@ private fun parseHttpRequest(raw: String): HttpRequest? {
     if (requestLine.size < 2) return null
     val method = requestLine[0]
     val path = requestLine[1]
-    val headers = mutableMapOf<String, String>()
+    val headers = mutableMapOf<CharSequence, CharSequence>()
     for (i in 1 until lines.size) {
         val colon = lines[i].indexOf(':')
         if (colon > 0) headers[lines[i].substring(0, colon).trim().lowercase()] =
@@ -101,7 +101,7 @@ class ReactorCouchServer(
     private val couch: CouchElement,
     private val store: BlockStore,
     private val wal: NioBlockWal,
-    private val compileJs: (String) -> CompiledFunction,
+    private val compileJs: (CharSequence) -> CompiledFunction,
     private val port: Int = 5984,
 ) : AsyncContextElement() {
     companion object Key : AsyncContextKey<ReactorCouchServer>()
@@ -121,7 +121,7 @@ class ReactorCouchServer(
 
     private val viewServer = CouchQueryServer(compileJs)
     /** db → viewName → (mapSource, reduceSource?) */
-    private val viewSources = mutableMapOf<String, MutableMap<String, Pair<String, String?>>>()
+    private val viewSources = mutableMapOf<CharSequence, MutableMap<CharSequence, Pair<CharSequence, CharSequence?>>>()
     private var serverFd: Int = -1
 
     /**
@@ -232,7 +232,7 @@ class ReactorCouchServer(
 
     // ── HTTP routing ───────────────────────────────────────────────
 
-    private fun route(request: HttpRequest): String {
+    private fun route(request: HttpRequest): CharSequence {
         val (pathPart, queryPart) = request.path.split("?", limit = 2).let { it[0] to it.getOrElse(1) { "" } }
         val path = pathPart.trim('/')
         val segments = path.split('/')
@@ -259,12 +259,12 @@ class ReactorCouchServer(
 
     // ── Document CRUD ──────────────────────────────────────────────
 
-    private fun handleGetDoc(db: String, docId: String): String {
+    private fun handleGetDoc(db: CharSequence, docId: CharSequence): CharSequence {
         val block = store.get(db, docId) ?: return """{"error":"not_found","reason":"missing"}"""
         return blockToJson(block)
     }
 
-    private fun handlePutDoc(db: String, docId: String, body: String): String {
+    private fun handlePutDoc(db: CharSequence, docId: CharSequence, body: CharSequence): CharSequence {
         val doc = parseJsonToMap(body)
         val block = docToBlock(doc)
         store.putWithId(db, docId, block)
@@ -272,24 +272,24 @@ class ReactorCouchServer(
         return """{"ok":true,"id":"$docId","rev":"1-abc"}"""
     }
 
-    private fun handleDeleteDoc(db: String, docId: String): String {
+    private fun handleDeleteDoc(db: CharSequence, docId: CharSequence): CharSequence {
         store.remove(db, docId)
         wal.appendRemove(db, docId)
         return """{"ok":true,"id":"$docId"}"""
     }
 
-    private fun handleListDb(db: String): String {
+    private fun handleListDb(db: CharSequence): CharSequence {
         val ids = store.list(db)
         val rows = ids.joinToString(",") { """{"id":"$it","key":"$it","value":{"rev":"1-abc"}}""" }
         return """{"total_rows":${ids.size},"offset":0,"rows":[$rows]}"""
     }
 
-    private fun handleBulkDocs(db: String, body: String): String {
+    private fun handleBulkDocs(db: CharSequence, body: CharSequence): CharSequence {
         val parsed = parseJsonToMap(body)
         @Suppress("UNCHECKED_CAST")
-        val docs = parsed["docs"] as? List<Map<String, Any?>> ?: return """{"error":"bad_request","reason":"missing docs"}"""
+        val docs = parsed["docs"] as? List<Map<CharSequence, Any?>> ?: return """{"error":"bad_request","reason":"missing docs"}"""
         for (doc in docs) {
-            val id = doc["_id"] as? String ?: continue
+            val id = doc["_id"] as? CharSequence ?: continue
             val block = docToBlock(doc)
             store.putWithId(db, id, block)
             wal.appendPut(db, id, block)
@@ -299,16 +299,16 @@ class ReactorCouchServer(
 
     // ── View query ─────────────────────────────────────────────────
 
-    fun registerView(db: String, ddoc: String, viewName: String, mapSource: String, reduceSource: String? = null) {
+    fun registerView(db: CharSequence, ddoc: CharSequence, viewName: CharSequence, mapSource: CharSequence, reduceSource: CharSequence? = null) {
         viewSources.getOrPut(db) { mutableMapOf() }[viewName] = mapSource to reduceSource
     }
 
     /** Register all cascade kline views for in-process query via [KlineDesignDoc]. */
-    fun registerKlineViews(db: String = KlineDesignDoc.DEFAULT_DB) {
+    fun registerKlineViews(db: CharSequence = KlineDesignDoc.DEFAULT_DB) {
         KlineDesignDoc.registerWith(this, db)
     }
 
-    private fun handleViewQuery(db: String, ddoc: String, viewName: String, queryParams: Map<String, String> = emptyMap()): String {
+    private fun handleViewQuery(db: CharSequence, ddoc: CharSequence, viewName: CharSequence, queryParams: Map<CharSequence, CharSequence> = emptyMap()): CharSequence {
         val entry = viewSources[db]?.get(viewName)
             ?: return """{"error":"not_found","reason":"view $viewName not found in $db"}"""
         val (mapSource, reduceSource) = entry
@@ -328,7 +328,7 @@ class ReactorCouchServer(
         viewServer.handle(CouchCommand.Reset)
         viewServer.handle(CouchCommand.AddFun(mapSource))
 
-        data class Row(val id: String, val key: Any?, val value: Any?)
+        data class Row(val id: CharSequence, val key: Any?, val value: Any?)
         val rows = mutableListOf<Row>()
         for (id in store.list(db)) {
             val block = store.get(db, id) ?: continue
@@ -403,20 +403,20 @@ class ReactorCouchServer(
 
     // ── JSON helpers ───────────────────────────────────────────────
 
-    private fun parseJsonToMap(json: String): Map<String, Any?> {
+    private fun parseJsonToMap(json: CharSequence): Map<CharSequence, Any?> {
         val ctx = contextOf(Syntax.JSON, json.toSeries())
         @Suppress("UNCHECKED_CAST")
-        return Combinators.reify(ctx) as? Map<String, Any?> ?: emptyMap()
+        return Combinators.reify(ctx) as? Map<CharSequence, Any?> ?: emptyMap()
     }
 
-    private fun parseJsonValue(json: String): Any? {
+    private fun parseJsonValue(json: CharSequence): Any? {
         val ctx = contextOf(Syntax.JSON, json.toSeries())
         return Combinators.reify(ctx)
     }
 
     // ── Query param helpers ────────────────────────────────────────
 
-    private fun parseQueryParams(query: String): Map<String, String> {
+    private fun parseQueryParams(query: CharSequence): Map<CharSequence, CharSequence> {
         if (query.isBlank()) return emptyMap()
         return query.split('&').mapNotNull { pair ->
             val eq = pair.indexOf('=')
@@ -426,12 +426,12 @@ class ReactorCouchServer(
         }.toMap()
     }
 
-    /** CouchDB collation rank: null=0 false=1 true=2 Number=3 String=4 Array=5 Object=6 */
+    /** CouchDB collation rank: null=0 false=1 true=2 Number=3 CharSequence=4 Array=5 Object=6 */
     private fun collationRank(v: Any?): Int = when (v) {
         null -> 0
         is Boolean -> if (v) 2 else 1
         is Number -> 3
-        is String -> 4
+        is CharSequence -> 4
         is List<*> -> 5
         is Map<*, *> -> 6
         else -> 4
@@ -444,7 +444,7 @@ class ReactorCouchServer(
             a == null -> 0
             a is Boolean && b is Boolean -> a.compareTo(b)
             a is Number && b is Number -> a.toDouble().compareTo(b.toDouble())
-            a is String && b is String -> a.compareTo(b)
+            a is CharSequence && b is CharSequence -> a.compareTo(b)
             a is List<*> && b is List<*> -> {
                 val minLen = minOf(a.size, b.size)
                 for (i in 0 until minLen) {
@@ -463,22 +463,22 @@ class ReactorCouchServer(
 
     // ── Document ↔ JSON ↔ BlockStore helpers ──────────────────────
 
-    private fun docToBlock(doc: Map<String, Any?>): BlockRowVec {
+    private fun docToBlock(doc: Map<CharSequence, Any?>): BlockRowVec {
         // Use MiniDuckBlockCodec round-trip: Map → JSON → BlockRowVec
         val json = mapToJson(doc)
         return borg.trikeshed.miniduck.MiniDuckBlockCodec.decode(json)
     }
 
-    private fun blockToDoc(block: BlockRowVec): Map<String, Any?> {
+    private fun blockToDoc(block: BlockRowVec): Map<CharSequence, Any?> {
         val json = borg.trikeshed.miniduck.MiniDuckBlockCodec.encode(block)
         return parseJsonToMap(json)
     }
 
-    private fun blockToJson(block: BlockRowVec): String {
+    private fun blockToJson(block: BlockRowVec): CharSequence {
         return borg.trikeshed.miniduck.MiniDuckBlockCodec.encode(block)
     }
 
-    private fun mapToJson(map: Map<String, Any?>): String {
+    private fun mapToJson(map: Map<CharSequence, Any?>): CharSequence {
         val sb = StringBuilder("{")
         map.entries.forEachIndexed { i, (k, v) ->
             if (i > 0) sb.append(",")
@@ -488,9 +488,9 @@ class ReactorCouchServer(
         return sb.toString()
     }
 
-    private fun jsonValue(v: Any?): String = JsonSerializer.serializeValue(v)
+    private fun jsonValue(v: Any?): CharSequence = JsonSerializer.serializeValue(v)
 
-    private fun String.toSeries(): Series<Char> {
+    private fun CharSequence.toSeries(): Series<Char> {
         val n = length
         return n j { i: Int -> this[i] }
     }

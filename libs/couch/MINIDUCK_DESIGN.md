@@ -30,7 +30,7 @@ Three layers:
 ## 2. Canonical data types
 
 Use existing TrikeShed primitives wherever possible, but tighten Tensor around the algebra the user asked for:
-- `ColumnMeta = Join<String, TypeMemento>`
+- `ColumnMeta = Join<CharSequence, TypeMemento>`
 - `RowVec = Series2<Any?, ()`ColumnMeta↻`>` as the parent row abstraction
 - `Cursor = Series<RowVec>`
 - `Series<T> = Join<Int, (Int) -> T>`
@@ -52,8 +52,8 @@ interface MiniDuck {
 }
 
 data class RelationRef(
-    val database: String,
-    val name: String,
+    val database: CharSequence,
+    val name: CharSequence,
     val kind: RelationKind,
 )
 
@@ -224,15 +224,15 @@ This keeps the query layer:
 ```kotlin
 sealed interface Predicate
 
-data class Eq(val column: String, val value: Any?) : Predicate
+data class Eq(val column: CharSequence, val value: Any?) : Predicate
 
-data class Gt(val column: String, val value: Comparable<*>) : Predicate
+data class Gt(val column: CharSequence, val value: Comparable<*>) : Predicate
 
-data class Lt(val column: String, val value: Comparable<*>) : Predicate
+data class Lt(val column: CharSequence, val value: Comparable<*>) : Predicate
 
-data class Between(val column: String, val lower: Any?, val upper: Any?) : Predicate
+data class Between(val column: CharSequence, val lower: Any?, val upper: Any?) : Predicate
 
-data class InList(val column: String, val values: List<Any?>) : Predicate
+data class InList(val column: CharSequence, val values: List<Any?>) : Predicate
 
 data class And(val left: Predicate, val right: Predicate) : Predicate
 
@@ -245,7 +245,7 @@ Projection should be structural rather than stringly-typed SQL snippets:
 
 ```kotlin
 data class Projection(
-    val columns: List<String>,
+    val columns: List<CharSequence>,
 )
 ```
 

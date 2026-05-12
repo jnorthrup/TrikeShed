@@ -11,20 +11,20 @@ class ReddishStoreTest {
     fun getDelegatesToClientAndReturnsValue() {
         val store = ReddishStore(
             client = object : ReddishClient {
-                override fun get(key: String): String? = if (key == "cache:token") "abc123" else null
-                override fun set(key: String, value: String, ttl: Long?): Boolean = true
-                override fun del(key: String): Boolean = false
-                override fun lpush(key: String, vararg elements: String): Int = 0
-                override fun rpush(key: String, vararg elements: String): Int = 0
-                override fun lpop(key: String): String? = null
-                override fun rpop(key: String): String? = null
-                override fun ll(key: String): List<String> = emptyList()
-                override fun hset(key: String, field: String, value: String): Int = 0
-                override fun hget(key: String, field: String): String? = null
-                override fun hgetall(key: String): Map<String, String> = emptyMap()
-                override fun hdel(key: String, vararg fields: String): Int = 0
-                override fun keys(pattern: String): List<String> = emptyList()
-                override fun expire(key: String, ttl: Long): Boolean = false
+                override fun get(key: CharSequence): CharSequence? = if (key == "cache:token") "abc123" else null
+                override fun set(key: CharSequence, value: CharSequence, ttl: Long?): Boolean = true
+                override fun del(key: CharSequence): Boolean = false
+                override fun lpush(key: CharSequence, vararg elements: CharSequence): Int = 0
+                override fun rpush(key: CharSequence, vararg elements: CharSequence): Int = 0
+                override fun lpop(key: CharSequence): CharSequence? = null
+                override fun rpop(key: CharSequence): CharSequence? = null
+                override fun ll(key: CharSequence): List<CharSequence> = emptyList()
+                override fun hset(key: CharSequence, field: CharSequence, value: CharSequence): Int = 0
+                override fun hget(key: CharSequence, field: CharSequence): CharSequence? = null
+                override fun hgetall(key: CharSequence): Map<CharSequence, CharSequence> = emptyMap()
+                override fun hdel(key: CharSequence, vararg fields: CharSequence): Int = 0
+                override fun keys(pattern: CharSequence): List<CharSequence> = emptyList()
+                override fun expire(key: CharSequence, ttl: Long): Boolean = false
                 override fun query(query: ReddishQuery) = 0 j { _: Int -> ReddishKey(query.pattern, "") }
             },
         )
@@ -38,24 +38,24 @@ class ReddishStoreTest {
     fun setDelegatesToClientAndReturnsAccepted() {
         val store = ReddishStore(
             client = object : ReddishClient {
-                override fun get(key: String): String? = null
-                override fun set(key: String, value: String, ttl: Long?): Boolean {
+                override fun get(key: CharSequence): CharSequence? = null
+                override fun set(key: CharSequence, value: CharSequence, ttl: Long?): Boolean {
                     assertEquals("cmc:tickers", key)
                     assertEquals("[1,2,3]", value)
                     return true
                 }
-                override fun del(key: String): Boolean = false
-                override fun lpush(key: String, vararg elements: String): Int = 0
-                override fun rpush(key: String, vararg elements: String): Int = 0
-                override fun lpop(key: String): String? = null
-                override fun rpop(key: String): String? = null
-                override fun ll(key: String): List<String> = emptyList()
-                override fun hset(key: String, field: String, value: String): Int = 0
-                override fun hget(key: String, field: String): String? = null
-                override fun hgetall(key: String): Map<String, String> = emptyMap()
-                override fun hdel(key: String, vararg fields: String): Int = 0
-                override fun keys(pattern: String): List<String> = emptyList()
-                override fun expire(key: String, ttl: Long): Boolean = false
+                override fun del(key: CharSequence): Boolean = false
+                override fun lpush(key: CharSequence, vararg elements: CharSequence): Int = 0
+                override fun rpush(key: CharSequence, vararg elements: CharSequence): Int = 0
+                override fun lpop(key: CharSequence): CharSequence? = null
+                override fun rpop(key: CharSequence): CharSequence? = null
+                override fun ll(key: CharSequence): List<CharSequence> = emptyList()
+                override fun hset(key: CharSequence, field: CharSequence, value: CharSequence): Int = 0
+                override fun hget(key: CharSequence, field: CharSequence): CharSequence? = null
+                override fun hgetall(key: CharSequence): Map<CharSequence, CharSequence> = emptyMap()
+                override fun hdel(key: CharSequence, vararg fields: CharSequence): Int = 0
+                override fun keys(pattern: CharSequence): List<CharSequence> = emptyList()
+                override fun expire(key: CharSequence, ttl: Long): Boolean = false
                 override fun query(query: ReddishQuery) = 0 j { _: Int -> ReddishKey(query.pattern, "") }
             },
         )
@@ -70,23 +70,23 @@ class ReddishStoreTest {
         val elements = mutableListOf("a", "b", "c")
         val store = ReddishStore(
             client = object : ReddishClient {
-                override fun get(key: String): String? = null
-                override fun set(key: String, value: String, ttl: Long?): Boolean = false
-                override fun del(key: String): Boolean = false
-                override fun lpush(key: String, vararg els: String): Int {
+                override fun get(key: CharSequence): CharSequence? = null
+                override fun set(key: CharSequence, value: CharSequence, ttl: Long?): Boolean = false
+                override fun del(key: CharSequence): Boolean = false
+                override fun lpush(key: CharSequence, vararg els: CharSequence): Int {
                     els.toList().reversed().forEach { elements.add(0, it) }
                     return elements.size
                 }
-                override fun rpush(key: String, vararg elements: String): Int = 0
-                override fun lpop(key: String): String? = if (elements.isNotEmpty()) elements.removeAt(0) else null
-                override fun rpop(key: String): String? = null
-                override fun ll(key: String): List<String> = elements.toList()
-                override fun hset(key: String, field: String, value: String): Int = 0
-                override fun hget(key: String, field: String): String? = null
-                override fun hgetall(key: String): Map<String, String> = emptyMap()
-                override fun hdel(key: String, vararg fields: String): Int = 0
-                override fun keys(pattern: String): List<String> = emptyList()
-                override fun expire(key: String, ttl: Long): Boolean = false
+                override fun rpush(key: CharSequence, vararg elements: CharSequence): Int = 0
+                override fun lpop(key: CharSequence): CharSequence? = if (elements.isNotEmpty()) elements.removeAt(0) else null
+                override fun rpop(key: CharSequence): CharSequence? = null
+                override fun ll(key: CharSequence): List<CharSequence> = elements.toList()
+                override fun hset(key: CharSequence, field: CharSequence, value: CharSequence): Int = 0
+                override fun hget(key: CharSequence, field: CharSequence): CharSequence? = null
+                override fun hgetall(key: CharSequence): Map<CharSequence, CharSequence> = emptyMap()
+                override fun hdel(key: CharSequence, vararg fields: CharSequence): Int = 0
+                override fun keys(pattern: CharSequence): List<CharSequence> = emptyList()
+                override fun expire(key: CharSequence, ttl: Long): Boolean = false
                 override fun query(query: ReddishQuery) = 0 j { _: Int -> ReddishKey(query.pattern, "") }
             },
         )
@@ -99,26 +99,26 @@ class ReddishStoreTest {
 
     @Test
     fun hsetAndHgetAllWork() {
-        val hash = mutableMapOf<String, String>()
+        val hash = mutableMapOf<CharSequence, CharSequence>()
         val store = ReddishStore(
             client = object : ReddishClient {
-                override fun get(key: String): String? = null
-                override fun set(key: String, value: String, ttl: Long?): Boolean = false
-                override fun del(key: String): Boolean = false
-                override fun lpush(key: String, vararg elements: String): Int = 0
-                override fun rpush(key: String, vararg elements: String): Int = 0
-                override fun lpop(key: String): String? = null
-                override fun rpop(key: String): String? = null
-                override fun ll(key: String): List<String> = emptyList()
-                override fun hset(key: String, field: String, value: String): Int {
+                override fun get(key: CharSequence): CharSequence? = null
+                override fun set(key: CharSequence, value: CharSequence, ttl: Long?): Boolean = false
+                override fun del(key: CharSequence): Boolean = false
+                override fun lpush(key: CharSequence, vararg elements: CharSequence): Int = 0
+                override fun rpush(key: CharSequence, vararg elements: CharSequence): Int = 0
+                override fun lpop(key: CharSequence): CharSequence? = null
+                override fun rpop(key: CharSequence): CharSequence? = null
+                override fun ll(key: CharSequence): List<CharSequence> = emptyList()
+                override fun hset(key: CharSequence, field: CharSequence, value: CharSequence): Int {
                     hash[field] = value
                     return 1
                 }
-                override fun hget(key: String, field: String): String? = null
-                override fun hgetall(key: String): Map<String, String> = hash.toMap()
-                override fun hdel(key: String, vararg fields: String): Int = 0
-                override fun keys(pattern: String): List<String> = emptyList()
-                override fun expire(key: String, ttl: Long): Boolean = false
+                override fun hget(key: CharSequence, field: CharSequence): CharSequence? = null
+                override fun hgetall(key: CharSequence): Map<CharSequence, CharSequence> = hash.toMap()
+                override fun hdel(key: CharSequence, vararg fields: CharSequence): Int = 0
+                override fun keys(pattern: CharSequence): List<CharSequence> = emptyList()
+                override fun expire(key: CharSequence, ttl: Long): Boolean = false
                 override fun query(query: ReddishQuery) = 0 j { _: Int -> ReddishKey(query.pattern, "") }
             },
         )
@@ -136,20 +136,20 @@ class ReddishStoreTest {
     fun projectBuildsDocRowVec() {
         val store = ReddishStore(
             client = object : ReddishClient {
-                override fun get(key: String): String? = null
-                override fun set(key: String, value: String, ttl: Long?): Boolean = false
-                override fun del(key: String): Boolean = false
-                override fun lpush(key: String, vararg elements: String): Int = 0
-                override fun rpush(key: String, vararg elements: String): Int = 0
-                override fun lpop(key: String): String? = null
-                override fun rpop(key: String): String? = null
-                override fun ll(key: String): List<String> = emptyList()
-                override fun hset(key: String, field: String, value: String): Int = 0
-                override fun hget(key: String, field: String): String? = null
-                override fun hgetall(key: String): Map<String, String> = emptyMap()
-                override fun hdel(key: String, vararg fields: String): Int = 0
-                override fun keys(pattern: String): List<String> = emptyList()
-                override fun expire(key: String, ttl: Long): Boolean = false
+                override fun get(key: CharSequence): CharSequence? = null
+                override fun set(key: CharSequence, value: CharSequence, ttl: Long?): Boolean = false
+                override fun del(key: CharSequence): Boolean = false
+                override fun lpush(key: CharSequence, vararg elements: CharSequence): Int = 0
+                override fun rpush(key: CharSequence, vararg elements: CharSequence): Int = 0
+                override fun lpop(key: CharSequence): CharSequence? = null
+                override fun rpop(key: CharSequence): CharSequence? = null
+                override fun ll(key: CharSequence): List<CharSequence> = emptyList()
+                override fun hset(key: CharSequence, field: CharSequence, value: CharSequence): Int = 0
+                override fun hget(key: CharSequence, field: CharSequence): CharSequence? = null
+                override fun hgetall(key: CharSequence): Map<CharSequence, CharSequence> = emptyMap()
+                override fun hdel(key: CharSequence, vararg fields: CharSequence): Int = 0
+                override fun keys(pattern: CharSequence): List<CharSequence> = emptyList()
+                override fun expire(key: CharSequence, ttl: Long): Boolean = false
                 override fun query(query: ReddishQuery) = 0 j { _: Int -> ReddishKey(query.pattern, "") }
             },
         )

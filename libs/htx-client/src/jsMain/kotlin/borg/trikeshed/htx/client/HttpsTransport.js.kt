@@ -15,6 +15,6 @@ actual fun createHttpsHandler(): HtxRequestHandler = { request ->
         options["body"] = request.body
     }
     val response: dynamic = (js("fetch(request.path, options)") as Promise<dynamic>).await()
-    val body: String = (response.text() as Promise<String>).await<String>()
+    val body: CharSequence = (response.text() as Promise<CharSequence>).await<CharSequence>()
     HtxClientMessage(status = response.status as Int, body = body)
 }

@@ -9,7 +9,7 @@ actual fun createWsHandler(): HtxRequestHandler = JsWsHandler()
 class JsWsHandler : HtxRequestHandler {
 
     private var ws: dynamic = null
-    private var lastMessage: String = ""
+    private var lastMessage: CharSequence = ""
 
     override suspend fun invoke(request: HtxClientRequest): HtxClientMessage {
         if (ws == null || js("ws.readyState") as Int != 1 /* OPEN */) {
@@ -35,7 +35,7 @@ class JsWsHandler : HtxRequestHandler {
     private suspend fun readMessage(): HtxClientMessage {
         return suspendCancellableCoroutine { cont ->
             ws.onmessage = { event: dynamic ->
-                lastMessage = event.data as String
+                lastMessage = event.data as CharSequence
                 cont.resume(HtxClientMessage(status = 200, body = lastMessage))
             }
             ws.onerror = { event: dynamic ->
@@ -47,7 +47,7 @@ class JsWsHandler : HtxRequestHandler {
         }
     }
 
-    fun send(text: String) {
+    fun send(text: CharSequence) {
         ws.send(text)
     }
 

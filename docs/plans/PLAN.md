@@ -401,7 +401,7 @@ same uring ring as application data. No separate SSL BIO.
 | Key/Element linter | Detect Pattern B/D → flag for Pattern A. Detect manual `ElementState` outside `AsyncContextElement`. | After refactor #1-8 completed |
 | Uring wiring check | Verify every IO-capable `AsyncContextElement` calls through `FunctionalUringFacade`, not raw `Channel`. | After Step 2 |
 | Generated client template | OpenAPI generator already produces Pattern A. Extend to produce `FanoutDispatcher` registration boilerplate. | After Step 3 |
-| Confix + HTX unification | HTX blocks are `ByteRegion` slices. Confix reifier operates on `ByteRegion` → `ByteSeries` → `Series<Char>`. Avoid intermediate `String`/`ByteArray` allocations between protocol layer and parser. | After HTX wired through uring |
+| Confix + HTX unification | HTX blocks are `ByteRegion` slices. Confix reifier operates on `ByteRegion` → `ByteSeries` → `Series<Char>`. Avoid intermediate `CharSequence`/`ByteArray` allocations between protocol layer and parser. | After HTX wired through uring |
 | CCEK visualizer | Given coroutine context, show the full element→key→supervisor→fanout graph. Helps verify no isolated elements, no orphan supervisors. | After Step 1 |
 
 ---

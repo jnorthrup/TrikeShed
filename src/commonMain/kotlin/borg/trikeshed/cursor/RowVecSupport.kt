@@ -15,37 +15,37 @@ fun RowVec.getValue(key: CharSequence): Any? {
         }
         when (meta) {
             is RecordMeta -> if (meta.name.contentEquals(key)) return cell.a
-            is Join<*, *> -> if ((meta.a as? String)?.contentEquals(key) == true) return cell.a
+            is Join<*, *> -> if ((meta.a as? CharSequence)?.contentEquals(key) == true) return cell.a
         }
     }
     return null
 }
 
-fun RowVec.stringValue(name: CharSequence, default: String): String =
-    getValue(name) as? String ?: default
+fun RowVec.stringValue(name: CharSequence, default: CharSequence): CharSequence =
+    getValue(name) as? CharSequence ?: default
 
 fun RowVec.longValue(name: CharSequence): Long = when (val value = getValue(name)) {
     is Long -> value
     is Number -> value.toLong()
-    is String -> value.toLongOrNull() ?: 0L
+    is CharSequence -> value.toString().toLongOrNull() ?: 0L
     else -> 0L
 }
 
 fun RowVec.doubleValue(name: CharSequence): Double = when (val value = getValue(name)) {
     is Double -> value
     is Number -> value.toDouble()
-    is String -> value.toDoubleOrNull() ?: 0.0
+    is CharSequence -> value.toString().toDoubleOrNull() ?: 0.0
     else -> 0.0
 }
 
 fun RowVec.intValue(name: CharSequence): Int = when (val value = getValue(name)) {
     is Int -> value
     is Number -> value.toInt()
-    is String -> value.toIntOrNull() ?: 0
+    is CharSequence -> value.toString().toIntOrNull() ?: 0
     else -> 0
 }
 
-fun cellsToRowVec(cells: Series<Any?>, keys: Series<String>): RowVec {
+fun cellsToRowVec(cells: Series<Any?>, keys: Series<CharSequence>): RowVec {
     require(cells.size == keys.size) { "cells and keys must have the same length" }
     val values: Series<Any?> = cells
     val meta: Series<`ColumnMeta↻`> = cells.size j { index: Int ->
@@ -65,7 +65,7 @@ fun cellsToRowVec(cells: Series<Any?>, keys: Series<String>): RowVec {
 }
 
 /** Column names extracted from the RowVec metadata. */
-val RowVec.keys: Series<String> get() = right α `ColumnMeta↻`::invoke α ColumnMeta::a
+val RowVec.keys: Series<CharSequence> get() = right α `ColumnMeta↻`::invoke α ColumnMeta::a
 
 /** Cell values as a flat List. Semantically identical to [values] but returns List<Any?>. */
 val RowVec.cells get() = values

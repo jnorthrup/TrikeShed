@@ -60,13 +60,13 @@ package borg.trikeshed.collections
  * is a sorted set of strings.  The following idiom obtains a view
  * containing all of the strings in `s` from `low` to
  * `high`, inclusive:<pre>
- * SortedSet&lt;String&gt; sub = s.subSet(low, high+"\0");</pre>
+ * SortedSet&lt;CharSequence&gt; sub = s.subSet(low, high+"\0");</pre>
  *
  * A similar technique can be used to generate an *open range* (which
  * contains neither endpoint).  The following idiom obtains a view
  * containing all of the Strings in `s` from `low` to
  * `high`, exclusive:<pre>
- * SortedSet&lt;String&gt; sub = s.subSet(low+"\0", high);</pre>
+ * SortedSet&lt;CharSequence&gt; sub = s.subSet(low+"\0", high);</pre>
  *
  *
  * This interface is a member of the

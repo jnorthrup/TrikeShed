@@ -30,7 +30,7 @@ data class CursorTensorSnapshot(
     val rowCount: Int,
     val columnCount: Int,
     val values: DoubleArray,
-    val columnNames: Series<String>,
+    val columnNames: Series<CharSequence>,
     val sourceColumnIndices: IntArray,
     val columnTypeCodes: IntArray,
 ) {
@@ -215,7 +215,7 @@ object CursorTensorReifier {
         else -> false
     }
 
-   fun Any?.toTensorDouble(columnName: String, row: Int, column: Int): Double = when (this) {
+   fun Any?.toTensorDouble(columnName: CharSequence, row: Int, column: Int): Double = when (this) {
         null -> Double.NaN
         is Double -> this
         is Float -> toDouble()
@@ -257,7 +257,7 @@ object CursorTensorReifier {
         val rowCount = cursor.size
         val columnCount = selectedColumns.size
         val values = DoubleArray(rowCount * columnCount)
-        val columnNames :Series<String> = (columnCount) j { index:Int ->
+        val columnNames :Series<CharSequence> = (columnCount) j { index:Int ->
             val i: Int = selectedColumns[index]
             val value: ColumnMeta = meta[i]
             value.a

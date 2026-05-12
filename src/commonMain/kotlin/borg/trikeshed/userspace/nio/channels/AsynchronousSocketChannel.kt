@@ -13,18 +13,18 @@ public abstract class AsynchronousSocketChannel {
     // TODO
     abstract fun provider(): AsynchronousChannelProvider
     // TODO
-    abstract fun bind(address: String): AsynchronousSocketChannel
+    abstract fun bind(address: CharSequence): AsynchronousSocketChannel
     // TODO
-    abstract fun <T> setOption(option: String, value: T): AsynchronousSocketChannel
+    abstract fun <T> setOption(option: CharSequence, value: T): AsynchronousSocketChannel
     // TODO
     abstract fun shutdownInput(): AsynchronousSocketChannel
     // TODO
     abstract fun shutdownOutput(): AsynchronousSocketChannel
     // TODO
     abstract fun getRemoteAddress():CharSequence// TODO
-    abstract fun <A> connect(address: String, attachment: A, handler: CompletionHandler<Unit?, in A>): Unit
+    abstract fun <A> connect(address: CharSequence, attachment: A, handler: CompletionHandler<Unit?, in A>): Unit
     // TODO
-    abstract fun connect(address: String): Unit?
+    abstract fun connect(address: CharSequence): Unit?
     // TODO
     abstract fun <A> read(dst: ByteBuffer, timeout: Long, attachment: A, handler: CompletionHandler<Int, in A>): Unit
     // TODO
@@ -42,7 +42,8 @@ public abstract class AsynchronousSocketChannel {
     // TODO
     abstract fun <A> write(srcs: Array<out ByteSeries>, offset: Int, length: Int, timeout: Long, attachment: A, handler: CompletionHandler<Long, in A>): Unit
     // TODO
-    abstract fun getLocalAddress():CharSequencecompanion object {
+    abstract fun getLocalAddress(): CharSequence
+    companion object {
         fun `open`(group: AsynchronousChannelGroup): AsynchronousSocketChannel = TODO("NIO common stub")
         fun `open`(): AsynchronousSocketChannel = TODO("NIO common stub")
     }

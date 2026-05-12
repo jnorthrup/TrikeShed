@@ -10,10 +10,10 @@ import borg.trikeshed.miniduck.schema.TableSchema
 
 /** Simple in-memory table source used for tests and JS platform stub delegation. */
 class InMemoryTableSource : TableSource {
-    private val tables: MutableMap<String, MutableSeries<RowVec>> = linkedMapOf()
-    private val schemas: MutableMap<String, TableSchema> = linkedMapOf()
+    private val tables: MutableMap<CharSequence, MutableSeries<RowVec>> = linkedMapOf()
+    private val schemas: MutableMap<CharSequence, TableSchema> = linkedMapOf()
 
-    override fun open(execCtx: ExecutionContext, tableName: String): Cursor {
+    override fun open(execCtx: ExecutionContext, tableName: CharSequence): Cursor {
         val rows: Series<RowVec> = tables[tableName] ?: emptySeries()
         val schema = (execCtx.schemaManager as? SchemaManager)?.getTable(tableName) ?: schemas[tableName]
         // For schema-based rows with column names, transform to the schema columns.
@@ -23,7 +23,7 @@ class InMemoryTableSource : TableSource {
             if (schema != null && row.keys.size > 0) {
                 // Transform to schema's column keys
                 val currentCells = row.cells
-                val keys = schema.columns.size j { i: Int -> schema.columns[i].name }
+                val keys = schema.columns.size j { i: Int -> schema.columns[i].name.toString() }
                 DocRowVec(keys, currentCells)
             } else {
                 row
@@ -32,22 +32,22 @@ class InMemoryTableSource : TableSource {
         return SeriesCursor(rowVecs)
     }
 
-    override suspend fun openSuspend(execCtx: ExecutionContext, tableName: String): Cursor = open(execCtx, tableName)
+    override suspend fun openSuspend(execCtx: ExecutionContext, tableName: CharSequence): Cursor = open(execCtx, tableName)
 
-    override fun insert(execCtx: ExecutionContext, tableName: String, row: List<Any?>) {
+    override fun insert(execCtx: ExecutionContext, tableName: CharSequence, row: List<Any?>) {
         val list = tables.getOrPut(tableName) { emptySeries<RowVec>().cow }
         val schema = schemas[tableName]
         val keys = if (schema != null) {
-            schema.columns.size j { i: Int -> schema.columns[i].name }
+            schema.columns.size j { i: Int -> schema.columns[i].name.toString() }
         } else {
             row.size j { i: Int -> "col$i" }
         }
         list.add(DocRowVec(keys, seriesOf(row)))
     }
 
-    override suspend fun insertSuspend(execCtx: ExecutionContext, tableName: String, row: List<Any?>) = insert(execCtx, tableName, row)
+    override suspend fun insertSuspend(execCtx: ExecutionContext, tableName: CharSequence, row: List<Any?>) = insert(execCtx, tableName, row)
 
-    override fun seedRows(tableName: String, rows: List<List<Any?>>) {
+    override fun seedRows(tableName: CharSequence, rows: List<List<Any?>>) {
         if (rows.isEmpty()) return
         // Infer column names from first row if present
         val firstRow = rows[0]
@@ -62,7 +62,7 @@ class InMemoryTableSource : TableSource {
     fun addTable(schema: TableSchema, rows: List<List<Any?>>) {
         schemas[schema.name] = schema
         val list = tables.getOrPut(schema.name) { emptySeries<RowVec>().cow }
-        val keys = schema.columns.size j { i: Int -> schema.columns[i].name }
+        val keys = schema.columns.size j { i: Int -> schema.columns[i].name.toString() }
         rows.forEach { row ->
             list.add(DocRowVec(keys, seriesOf(row)))
         }

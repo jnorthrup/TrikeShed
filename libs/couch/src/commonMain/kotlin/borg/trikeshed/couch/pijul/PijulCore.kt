@@ -19,7 +19,7 @@ import borg.trikeshed.lib.j
 enum class LineOperation { Add, Delete, Move }
 
 /** A single line in a file. */
-data class Line(val text: String)
+data class Line(val text: CharSequence)
 
 /** A hash identifier for a patch (32 bytes). */
 data class PatchHash(
@@ -28,25 +28,25 @@ data class PatchHash(
     override fun equals(other: Any?): Boolean = other is PatchHash && bytes.contentEquals(other.bytes)
     override fun hashCode(): Int = bytes.contentHashCode()
 
-    fun display(): String = base58Encode(bytes)
+    fun display(): CharSequence = base58Encode(bytes)
 
     companion object {
         fun of(vararg bytes: Byte) = PatchHash(byteArrayOf(*bytes))
-        fun parse(text: String) = PatchHash(text.encodeToByteArray())
+        fun parse(text: CharSequence) = PatchHash(text.encodeToByteArray())
     }
 }
 
 /** A tag — a named, immutable pointer to a patch hash. */
 data class Tag(
-    val name: String,
+    val name: CharSequence,
     val hash: PatchHash,
     val timestamp: Long,
-    val message: String,
+    val message: CharSequence,
 )
 
 /** A named, ordered sequence of patches. Channels are branch-equivalent in pijul. */
 data class Channel(
-    val name: String,
+    val name: CharSequence,
     val head: PatchHash,
     val patches: Set<PatchHash>,
     val graph: DependencyGraph,
@@ -59,7 +59,7 @@ data class Channel(
  * compose(other) and commute(other) are partial — they return null on conflict.
  */
 interface Patch {
-    val name: String
+    val name: CharSequence
     val hash: PatchHash
     val timestamp: Long
     val dependsOn: Set<PatchHash>
@@ -81,8 +81,8 @@ interface Patch {
 /** Result of applying a patch. */
 sealed class ApplyResult {
     data class Success(val newState: Pristine, val changedLines: List<DeltaLineEdit>) : ApplyResult()
-    data class Conflict(val message: String, val conflictedEdges: List<GraphEdge>) : ApplyResult()
-    data class Failure(val message: String) : ApplyResult()
+    data class Conflict(val message: CharSequence, val conflictedEdges: List<GraphEdge>) : ApplyResult()
+    data class Failure(val message: CharSequence) : ApplyResult()
 }
 
 /** File → list of lines mapping. Pristine is the known-good state before a patch. */
@@ -138,16 +138,16 @@ class DependencyGraph(
  */
 class Repository(
     val pristine: Pristine,
-    val channels: Map<String, Channel>,
+    val channels: Map<CharSequence, Channel>,
     val localPatches: Set<Patch>,
-    val tags: Map<String, Tag>,
+    val tags: Map<CharSequence, Tag>,
     val nextInode: Int,
 ) {
-    fun channel(name: String): Channel? = channels[name]
+    fun channel(name: CharSequence): Channel? = channels[name]
     fun localPatch(hash: PatchHash): Patch? = localPatches.find { it.hash == hash }
 
     /** Create a new channel with the given name, starting from `from` channel. */
-    fun createChannel(name: String, from: Channel): Repository {
+    fun createChannel(name: CharSequence, from: Channel): Repository {
         val newChannel = from.copy(name = name)
         return Repository(pristine, channels = channels + (name to newChannel), localPatches, tags, nextInode)
     }
@@ -176,7 +176,7 @@ class Repository(
 
 private val BASE58_ALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
 
-private fun base58Encode(data: ByteArray): String {
+private fun base58Encode(data: ByteArray): CharSequence {
     if (data.isEmpty()) return ""
     var carry = 0
     val digitCount = (data.size * 8 + 5) / 6

@@ -9,7 +9,7 @@ package borg.trikeshed.viewserver
  * The `compile` function is platform-specific (JS `eval`, JVM Nashorn/Graal, etc.).
  */
 class CouchQueryServer(
-    private val compile: (String) -> CompiledFunction,
+    private val compile: (CharSequence) -> CompiledFunction,
 ) {
     private val functions = mutableListOf<CompiledFunction>()
 
@@ -73,7 +73,7 @@ class CouchQueryServer(
  */
 interface CompiledFunction {
     /** Map a single document, calling [emit] for each key-value pair. */
-    fun map(doc: Map<String, Any?>, emit: (key: Any?, value: Any?) -> Unit)
+    fun map(doc: Map<CharSequence, Any?>, emit: (key: Any?, value: Any?) -> Unit)
 
     /**
      * Reduce (or rereduce) values.
@@ -81,7 +81,7 @@ interface CompiledFunction {
      * @param values   the values to reduce
      * @param rereduce  true if this is a rereduce call
      */
-    fun reduce(sources: List<String>, values: List<Any?>, rereduce: Boolean): Any?
+    fun reduce(sources: List<CharSequence>, values: List<Any?>, rereduce: Boolean): Any?
 }
 
 // ── JSON response serializer ─────────────────────────────────────────────
@@ -93,7 +93,7 @@ interface CompiledFunction {
  * No external dependencies — suitable for commonMain.
  */
 object JsonSerializer {
-    fun serialize(response: CouchResponse): String = when (response) {
+    fun serialize(response: CouchResponse): CharSequence = when (response) {
         is CouchResponse.True -> "true"
         is CouchResponse.Error -> serializeString(response.message)
         is CouchResponse.ReduceResult -> "[true,[${serializeValue(response.value)}]]"
@@ -107,11 +107,11 @@ object JsonSerializer {
         }
     }
 
-    fun serializeValue(value: Any?): String = when (value) {
+    fun serializeValue(value: Any?): CharSequence = when (value) {
         null -> "null"
         is Boolean -> value.toString()
         is Number -> value.toString()
-        is String -> serializeString(value)
+        is CharSequence -> serializeString(value)
         is List<*> -> "[${value.joinToString(",") { serializeValue(it) }}]"
         is Map<*, *> -> {
             val entries = value.entries.joinToString(",") { (k, v) ->
@@ -122,7 +122,7 @@ object JsonSerializer {
         else -> serializeString(value.toString())
     }
 
-    private fun serializeString(s: String): String {
+    private fun serializeString(s: CharSequence): CharSequence {
         val sb = StringBuilder("\"")
         for (ch in s) {
             when (ch) {

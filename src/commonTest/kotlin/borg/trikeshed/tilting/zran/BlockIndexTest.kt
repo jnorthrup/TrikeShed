@@ -30,12 +30,12 @@ data class Point(
 }
 
 interface PointRowVec {
-    val keys: List<String>
+    val keys: List<CharSequence>
     val cells: List<Any?>
     val size: Int
     val winsize: Int
     operator fun get(index: Int): Any?
-    operator fun get(key: String): Any?
+    operator fun get(key: CharSequence): Any?
 }
 
 internal class PointRowVecImpl(
@@ -51,7 +51,7 @@ internal class PointRowVecImpl(
     )
     override val size: Int get() = 4
     override fun get(index: Int): Any? = cells.getOrNull(index)
-    override fun get(key: String): Any? {
+    override fun get(key: CharSequence): Any? {
         val idx = keys.indexOf(key)
         return if (idx >= 0) cells.getOrNull(idx) else null
     }
@@ -318,9 +318,9 @@ class BlockIndexTest {
         // When lz4 is wired, Lz4BlockIndex should:
         // - implement BlockIndex
         // - have provider = CompressionProvider.LZ4
-        // - build(fileName: String?, span: ULong): Int
-        // - readIndex(indexFname: String?): Boolean
-        // - writeIndex(indexFname: String): Int
+        // - build(fileName: CharSequence?, span: ULong): Int
+        // - readIndex(indexFname: CharSequence?): Boolean
+        // - writeIndex(indexFname: CharSequence): Int
         // - getWindow(index: Int): UByteArray
         // - seekLine(lineIndex: Int): PointRowVec?
         // - seekByte(decompressedOffset: ULong): PointRowVec?

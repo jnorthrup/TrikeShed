@@ -28,7 +28,7 @@ fun Series<Byte>.decodeDirtyUtf8(charArray: CharArray = CharArray(size)): Series
     return w j charArray::get
 }
 
-fun Series<Byte>.asString(): String = toArray().decodeToString()
+fun Series<Byte>.asString(): CharSequence = toArray().decodeToString()
 
 class ByteSeries(
     buf: Series<Byte>,
@@ -59,7 +59,7 @@ class ByteSeries(
             val c = raw(pos); pos++; return c
         }
 
-    constructor(s: String) : this(s.toSeries().encodeToByteArray().toSeries())
+    constructor(s: CharSequence) : this(s.toSeries().encodeToByteArray().toSeries())
 
     constructor(buf: ByteArray, pos: Int = 0, limit: Int = buf.size) : this(
         buf α { it },
@@ -131,7 +131,7 @@ class ByteSeries(
         return result
     }
 
-    fun asString(upto: Int = Int.MAX_VALUE): String =
+    fun asString(upto: Int = Int.MAX_VALUE): CharSequence =
         ((limit - pos) j { x: Int -> raw(x + pos) }).toArray().decodeToString().take(upto)
 
     override fun toString(): String {
@@ -261,13 +261,13 @@ fun Series<Byte>.isDirtyUTF8(): Boolean {
 
 fun ByteSeries.decodeToString() = decodeUtf8().asString()
 
-fun Series<Byte>.startsWith(s: String): Boolean {
-    val join = s.encodeToByteArray() α { it }
+fun Series<Byte>.startsWith(s: CharSequence): Boolean {
+    val join = s.toString().encodeToByteArray() α { it }
     return join.size <= size && join.zip(this).view.all { it.first == it.second }
 }
 
-fun Series<Byte>.endsWith(s: String): Boolean {
-    val join = s.encodeToByteArray() α { it }
+fun Series<Byte>.endsWith(s: CharSequence): Boolean {
+    val join = s.toString().encodeToByteArray() α { it }
     return join.size <= size && join.zip(this.reversed()).view.all { it.first == it.second }
 }
 

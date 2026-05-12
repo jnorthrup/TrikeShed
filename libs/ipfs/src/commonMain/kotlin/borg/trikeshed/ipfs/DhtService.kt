@@ -9,9 +9,9 @@ import kotlin.collections.mutableSetOf
  * Provides a simple provider registry keyed by CID bytes hex.
  */
 class DhtService(private val transport: DhtTransport? = null) {
-    private val providers: MutableMap<String, MutableSet<String>> = mutableMapOf()
+    private val providers: MutableMap<CharSequence, MutableSet<CharSequence>> = mutableMapOf()
 
-    fun announceProvider(cid: CID, address: String) {
+    fun announceProvider(cid: CID, address: CharSequence) {
         val key = hex(cid.bytes)
         providers.getOrPut(key) { mutableSetOf() }.add(address)
 
@@ -26,12 +26,12 @@ class DhtService(private val transport: DhtTransport? = null) {
         }
     }
 
-    suspend fun findProviders(cid: CID): List<String> {
+    suspend fun findProviders(cid: CID): List<CharSequence> {
         val key = hex(cid.bytes)
         val local = providers[key]?.toList() ?: emptyList()
         if (local.isNotEmpty()) return local
         return transport?.findProvidersRemote(cid) ?: emptyList()
     }
 
-    private fun hex(bytes: ByteArray): String = bytes.joinToString("") { (it.toInt() and 0xFF).toString(16).padStart(2, '0') }
+    private fun hex(bytes: ByteArray): CharSequence = bytes.joinToString("") { (it.toInt() and 0xFF).toString(16).padStart(2, '0') }
 }

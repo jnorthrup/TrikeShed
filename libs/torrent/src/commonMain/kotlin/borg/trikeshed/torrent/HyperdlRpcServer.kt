@@ -98,11 +98,11 @@ class HyperdlRpcServer(
      * Process a raw JSON-RPC request string. Returns JSON response string.
      * The caller is responsible for HTTP framing (POST /jsonrpc).
      */
-    fun handleRequest(jsonRequest: String): String {
+    fun handleRequest(jsonRequest: CharSequence): CharSequence {
         val params = parseJsonRpc(jsonRequest) ?: return errorResponse(null, -32700, "Parse error")
         val id = params["id"]
         val method = params["method"] ?: return errorResponse(id, -32600, "Invalid Request")
-        val args = params["params"] as? Map<String, Any?> ?: emptyMap()
+        val args = params["params"] as? Map<CharSequence, Any?> ?: emptyMap()
 
         return when (method) {
             "aria2.addUri" -> rpcAddUri(id, args)
@@ -122,70 +122,70 @@ class HyperdlRpcServer(
 
     // ── RPC method handlers ───────────────────────────────────────
 
-    private fun rpcAddUri(id: Any?, args: Map<String, Any?>): String {
+    private fun rpcAddUri(id: Any?, args: Map<CharSequence, Any?>): CharSequence {
         @Suppress("UNCHECKED_CAST")
-        val uris = (args["uris"] as? List<String>) ?: return errorResponse(id, -32602, "Missing 'uris'")
+        val uris = (args["uris"] as? List<CharSequence>) ?: return errorResponse(id, -32602, "Missing 'uris'")
         val gid = hyperdl.addUri(uris.first())
         return successResponse(id, gid)
     }
 
-    private fun rpcAddTorrent(id: Any?, args: Map<String, Any?>): String {
+    private fun rpcAddTorrent(id: Any?, args: Map<CharSequence, Any?>): CharSequence {
         // Torrent data is base64-encoded in the 'torrent' field
         return errorResponse(id, -32000, "addTorrent: bencode parsing pending")
     }
 
-    private fun rpcTellStatus(id: Any?, args: Map<String, Any?>): String {
-        val gid = args["gid"] as? String ?: return errorResponse(id, -32602, "Missing 'gid'")
+    private fun rpcTellStatus(id: Any?, args: Map<CharSequence, Any?>): CharSequence {
+        val gid = args["gid"] as? CharSequence ?: return errorResponse(id, -32602, "Missing 'gid'")
         val task = hyperdl.tellStatus(gid)
             ?: return errorResponse(id, 1, "GID $gid not found")
         return successResponse(id, taskToJson(task))
     }
 
-    private fun rpcPause(id: Any?, args: Map<String, Any?>): String {
-        val gid = args["gid"] as? String ?: return errorResponse(id, -32602, "Missing 'gid'")
+    private fun rpcPause(id: Any?, args: Map<CharSequence, Any?>): CharSequence {
+        val gid = args["gid"] as? CharSequence ?: return errorResponse(id, -32602, "Missing 'gid'")
         val task = hyperdl.pause(gid) ?: return errorResponse(id, 1, "GID $gid not found")
         return successResponse(id, gid)
     }
 
-    private fun rpcUnpause(id: Any?, args: Map<String, Any?>): String {
-        val gid = args["gid"] as? String ?: return errorResponse(id, -32602, "Missing 'gid'")
+    private fun rpcUnpause(id: Any?, args: Map<CharSequence, Any?>): CharSequence {
+        val gid = args["gid"] as? CharSequence ?: return errorResponse(id, -32602, "Missing 'gid'")
         val task = hyperdl.unpause(gid) ?: return errorResponse(id, 1, "GID $gid not found")
         return successResponse(id, gid)
     }
 
-    private fun rpcRemove(id: Any?, args: Map<String, Any?>): String {
-        val gid = args["gid"] as? String ?: return errorResponse(id, -32602, "Missing 'gid'")
+    private fun rpcRemove(id: Any?, args: Map<CharSequence, Any?>): CharSequence {
+        val gid = args["gid"] as? CharSequence ?: return errorResponse(id, -32602, "Missing 'gid'")
         hyperdl.remove(gid)
         return successResponse(id, gid)
     }
 
-    private fun rpcTellActive(id: Any?, args: Map<String, Any?>): String {
-        val keys = (args["keys"] as? List<String>) ?: emptyList()
+    private fun rpcTellActive(id: Any?, args: Map<CharSequence, Any?>): CharSequence {
+        val keys = (args["keys"] as? List<CharSequence>) ?: emptyList()
         val tasks = hyperdl.tellActive().map { taskToJson(it, keys) }
         return successResponse(id, tasks)
     }
 
-    private fun rpcTellWaiting(id: Any?, args: Map<String, Any?>): String {
+    private fun rpcTellWaiting(id: Any?, args: Map<CharSequence, Any?>): CharSequence {
         val offset = (args["offset"] as? Number)?.toInt() ?: 0
         val num = (args["num"] as? Number)?.toInt() ?: 100
-        val keys = (args["keys"] as? List<String>) ?: emptyList()
+        val keys = (args["keys"] as? List<CharSequence>) ?: emptyList()
         val tasks = hyperdl.tellWaiting(offset, num).map { taskToJson(it, keys) }
         return successResponse(id, tasks)
     }
 
-    private fun rpcTellStopped(id: Any?, args: Map<String, Any?>): String {
+    private fun rpcTellStopped(id: Any?, args: Map<CharSequence, Any?>): CharSequence {
         val offset = (args["offset"] as? Number)?.toInt() ?: 0
         val num = (args["num"] as? Number)?.toInt() ?: 100
-        val keys = (args["keys"] as? List<String>) ?: emptyList()
+        val keys = (args["keys"] as? List<CharSequence>) ?: emptyList()
         val tasks = hyperdl.tellStopped(offset, num).map { taskToJson(it, keys) }
         return successResponse(id, tasks)
     }
 
-    private fun rpcGetGlobalStat(id: Any?): String {
+    private fun rpcGetGlobalStat(id: Any?): CharSequence {
         return successResponse(id, hyperdl.getGlobalStat())
     }
 
-    private fun rpcGetVersion(id: Any?): String {
+    private fun rpcGetVersion(id: Any?): CharSequence {
         return successResponse(id, mapOf(
             "version" to "1.0.0",
             "enabledFeatures" to listOf("Async DNS", "BitTorrent", "HTX-TLS")
@@ -194,8 +194,8 @@ class HyperdlRpcServer(
 
     // ── JSON helpers ──────────────────────────────────────────────
 
-    private fun taskToJson(task: HyperdlElement.DownloadTask, keys: List<String> = emptyList()): Map<String, Any?> {
-        val map = mutableMapOf<String, Any?>(
+    private fun taskToJson(task: HyperdlElement.DownloadTask, keys: List<CharSequence> = emptyList()): Map<CharSequence, Any?> {
+        val map = mutableMapOf<CharSequence, Any?>(
             "gid" to task.gid,
             "status" to task.status,
             "totalLength" to task.totalLength.toString(),
@@ -207,12 +207,12 @@ class HyperdlRpcServer(
         return if (keys.isEmpty()) map else map.filterKeys { it in keys }
     }
 
-    private fun parseJsonRpc(json: String): Map<String, Any?>? {
+    private fun parseJsonRpc(json: CharSequence): Map<CharSequence, Any?>? {
         try {
             // Minimal JSON parser — just enough for RPC params
             val trimmed = json.trim()
             if (!trimmed.startsWith("{")) return null
-            val result = mutableMapOf<String, Any?>()
+            val result = mutableMapOf<CharSequence, Any?>()
             var pos = 1
             while (pos < trimmed.length && trimmed[pos] != '}') {
                 pos = skipWhitespace(trimmed, pos)
@@ -239,20 +239,20 @@ class HyperdlRpcServer(
         } catch (_: Exception) { return null }
     }
 
-    private fun successResponse(id: Any?, result: Any?): String {
-        val idStr = when (id) { null -> "null"; is String -> "\"$id\""; else -> id.toString() }
+    private fun successResponse(id: Any?, result: Any?): CharSequence {
+        val idStr = when (id) { null -> "null"; is CharSequence -> "\"$id\""; else -> id.toString() }
         val resultStr = jsonValue(result)
         return """{"jsonrpc":"2.0","id":$idStr,"result":$resultStr}"""
     }
 
-    private fun errorResponse(id: Any?, code: Int, message: String): String {
-        val idStr = when (id) { null -> "null"; is String -> "\"$id\""; else -> id.toString() }
+    private fun errorResponse(id: Any?, code: Int, message: CharSequence): CharSequence {
+        val idStr = when (id) { null -> "null"; is CharSequence -> "\"$id\""; else -> id.toString() }
         return """{"jsonrpc":"2.0","id":$idStr,"error":{"code":$code,"message":"$message"}}"""
     }
 
-    private fun jsonValue(v: Any?): String = when (v) {
+    private fun jsonValue(v: Any?): CharSequence = when (v) {
         null -> "null"
-        is String -> "\"$v\""
+        is CharSequence -> "\"$v\""
         is Number -> v.toString()
         is Boolean -> v.toString()
         is Map<*, *> -> "{" + v.entries.joinToString(",") { (k, vv) -> "\"$k\":${jsonValue(vv)}" } + "}"
@@ -260,19 +260,19 @@ class HyperdlRpcServer(
         else -> "\"${v}\""
     }
 
-    private fun skipWhitespace(s: String, pos: Int): Int {
+    private fun skipWhitespace(s: CharSequence, pos: Int): Int {
         var p = pos
         while (p < s.length && s[p].isWhitespace()) p++
         return p
     }
 
-    private fun skipArray(s: String, pos: Int): Int {
+    private fun skipArray(s: CharSequence, pos: Int): Int {
         var depth = 1; var p = pos + 1
         while (p < s.length && depth > 0) { when (s[p]) { '[' -> depth++; ']' -> depth-- }; p++ }
         return p
     }
 
-    private fun skipObject(s: String, pos: Int): Int {
+    private fun skipObject(s: CharSequence, pos: Int): Int {
         var depth = 1; var p = pos + 1
         while (p < s.length && depth > 0) { when (s[p]) { '{' -> depth++; '}' -> depth-- }; p++ }
         return p

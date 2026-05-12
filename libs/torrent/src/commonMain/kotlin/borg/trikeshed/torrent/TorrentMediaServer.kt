@@ -17,7 +17,7 @@ import kotlinx.coroutines.*
  */
 class TorrentMediaServer(
     private val streaming: StreamingTorrent,
-    private val fileName: String = "stream",
+    private val fileName: CharSequence = "stream",
     private val port: Int = 6800,
     parentJob: kotlinx.coroutines.Job? = null,
 ) : AsyncContextElement(parentJob = parentJob) {
@@ -158,7 +158,7 @@ class TorrentMediaServer(
         clientBuffers.remove(fd)
     }
 
-    private fun writeResponse(fd: Int, ring: borg.trikeshed.userspace.nio.channels.spi.ChannelOperations.ChannelHandle, status: Int, message: String, body: String?) {
+    private fun writeResponse(fd: Int, ring: borg.trikeshed.userspace.nio.channels.spi.ChannelOperations.ChannelHandle, status: Int, message: CharSequence, body: CharSequence?) {
         val statusLine = "HTTP/1.1 $status $message"
         val bodyStr = body ?: ""
         val headers = buildString {
@@ -170,7 +170,7 @@ class TorrentMediaServer(
         ring.submit()
     }
 
-    private fun parseRange(header: String?): Pair<Long, Long>? {
+    private fun parseRange(header: CharSequence?): Pair<Long, Long>? {
         if (header == null) return null
         val eq = header.indexOf('=')
         if (eq < 0) return null
@@ -184,7 +184,7 @@ class TorrentMediaServer(
 
     // ── MIME detection ────────────────────────────────────────────
 
-    private fun detectContentType(name: String): String {
+    private fun detectContentType(name: CharSequence): CharSequence {
         val ext = name.substringAfterLast('.', "").lowercase()
         return when (ext) {
             "mp4", "m4v" -> "video/mp4"

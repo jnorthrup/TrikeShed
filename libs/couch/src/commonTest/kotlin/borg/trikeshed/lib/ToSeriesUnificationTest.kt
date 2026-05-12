@@ -9,7 +9,7 @@ import kotlin.test.assertEquals
  * Only these overloads are used anywhere in the codebase:
  *   - List<T>.toSeries()
  *   - ByteArray.toSeries()     (WASM/JS file streaming)
- *   - String.toSeries()        (JSON text parsing)
+ *   - CharSequence.toSeries()        (JSON text parsing)
  *   - Sequence<T>.toSeries()
  *
  * These are dead and should be removed:
@@ -22,7 +22,7 @@ class ToSeriesUnificationTest {
     @Test
     fun `List toSeries produces correct size and values`() {
         val list = listOf("a", "b", "c")
-        val s: Series<String> = list.toSeries()
+        val s: Series<CharSequence> = list.toSeries()
         assertEquals(3, s.size)
         assertEquals("a", s[0])
         assertEquals("b", s[1])
@@ -40,7 +40,7 @@ class ToSeriesUnificationTest {
     }
 
     @Test
-    fun `String toSeries splits into chars`() {
+    fun `CharSequence toSeries splits into chars`() {
         val s: Series<Char> = "abc".toSeries()
         assertEquals(3, s.size)
         assertEquals('a', s[0])

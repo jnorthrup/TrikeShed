@@ -5,19 +5,19 @@ import java.time.LocalDate
 import kotlinx.coroutines.runBlocking
 
 data class BinanceStochasticMainArgs(
-    val symbol: String = "BTCUSDT",
-    val interval: String = "1h",
+    val symbol: CharSequence = "BTCUSDT",
+    val interval: CharSequence = "1h",
     val startDate: LocalDate = LocalDate.parse("2024-01-01"),
     val endDate: LocalDate = LocalDate.parse("2024-01-01"),
     val maxConcurrentFetches: Int = 4,
 )
 
-fun parseBinanceStochasticMainArgs(args: Array<String>): BinanceStochasticMainArgs {
+fun parseBinanceStochasticMainArgs(args: Array<CharSequence>): BinanceStochasticMainArgs {
     var parsed = BinanceStochasticMainArgs()
     var i = 0
     while (i < args.size) {
         val name = args[i]
-        fun value(): String {
+        fun value(): CharSequence {
             require(i + 1 < args.size) { "missing value for $name" }
             return args[++i]
         }
@@ -51,7 +51,7 @@ suspend fun runBinanceStochasticKlineCache(
     provider = provider,
 )
 
-fun main(rawArgs: Array<String>) = runBlocking {
+fun main(rawArgs: Array<CharSequence>) = runBlocking {
     val args = parseBinanceStochasticMainArgs(rawArgs)
     val loaded = runBinanceStochasticKlineCache(args)
     println("Loaded ${loaded.cursor.size} Binance klines for ${loaded.key.kline.symbol} ${loaded.key.kline.interval}")

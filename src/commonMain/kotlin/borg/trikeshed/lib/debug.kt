@@ -29,7 +29,7 @@ fun <T> T.debug(block: (T) -> Unit): T {
     return this
 }
 
-fun <T> T.log(block: (T) -> String): T {
+fun <T> T.log(block: (T) -> CharSequence): T {
     println(block(this))
     return this
 }
@@ -40,12 +40,12 @@ infix fun <T> T.d(other: T): T {
 }
 
 /** iff debugging is enabled, print the result of the block */
-fun logDebug(block: () -> String) {
+fun logDebug(block: () -> CharSequence) {
     if (debugging) println("debug: " + block())
 }
 
-fun logNone(block: () -> String) {}
+fun logNone(block: () -> CharSequence) {}
 
-fun logAlways(block: () -> String) {//import as logDebug
+fun logAlways(block: () -> CharSequence) {//import as logDebug
     println("info: " + block())
 }

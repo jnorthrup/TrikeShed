@@ -4,16 +4,16 @@ package borg.trikeshed.spokes
  * Coordinate - uniquely identifies an artifact across .m2/npm/p2p.
  */
 data class Coordinate(
-    val group: String,
-    val artifact: String,
-    val version: String,
+    val group: CharSequence,
+    val artifact: CharSequence,
+    val version: CharSequence,
     val packaging: Packaging = Packaging.JAR,
 ) {
-    val mavenCoord: String
+    val mavenCoord: CharSequence
         get() = "$group:$artifact:$version:${packaging.ext}"
 
     /** Maven layout path used by the VPS server. */
-    val mavenPath: String
+    val mavenPath: CharSequence
         get() {
             val gp = group.replace('.', '/')
             return "/$gp/$artifact/$version/$artifact-$version.${packaging.ext}"
@@ -35,7 +35,7 @@ data class Coordinate(
     override fun toString() = mavenCoord
 }
 
-enum class Packaging(val ext: String, val contentType: String) {
+enum class Packaging(val ext: CharSequence, val contentType: CharSequence) {
     JAR("jar", "application/java-archive"),
     POM("pom", "application/xml"),
     AAR("aar", "application/octet-stream"),

@@ -119,7 +119,7 @@ class ChannelBackedByRingTest {
 
     /** Ring has no kotlinx Channel dependency — pure array + head/tail. */
     @Test fun ring_pureArray_noChannelDependency() {
-        val r = Ring<String>(8)
+        val r = Ring<CharSequence>(8)
         assertTrue(r.push("a"))
         assertEquals("a", r.pop())
         // Ring is self-contained, no kotlinx, no locks

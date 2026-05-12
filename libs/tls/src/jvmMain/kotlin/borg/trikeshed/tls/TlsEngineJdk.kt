@@ -1,8 +1,9 @@
 package borg.trikeshed.tls
 
+import borg.trikeshed.lib.*
+import java.nio.ByteBuffer
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import java.nio.ByteBuffer
 import javax.net.ssl.SSLContext
 import javax.net.ssl.SSLEngine
 import javax.net.ssl.SSLEngineResult
@@ -25,10 +26,10 @@ class TlsEngineJdk(private val settings: TlsSettings) : TlsEngine {
     private val sslEngine: SSLEngine = sslContext.createSSLEngine().apply {
         useClientMode = true
         settings.serverName?.let { sni ->
-            sslParameters = sslParameters.also { it.serverNames = listOf(javax.net.ssl.SNIHostName(sni)) }
+            sslParameters = sslParameters.also { it.serverNames = listOf(javax.net.ssl.SNIHostName(sni.cs.encodeToByteArray())) }
         }
         if (settings.cipherSuites.isNotEmpty()) {
-            enabledCipherSuites = settings.cipherSuites.toTypedArray()
+            enabledCipherSuites =( settings.cipherSuites α { it.toString() }).toArray()
         }
     }
 

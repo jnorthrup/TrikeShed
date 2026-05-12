@@ -15,7 +15,7 @@ public abstract class SelectorProvider {
     // TODO
     abstract open fun openDatagramChannel(): DatagramChannel
     // TODO
-    abstract open fun openDatagramChannel(protocolFamily: String): DatagramChannel
+    abstract open fun openDatagramChannel(protocolFamily: CharSequence): DatagramChannel
     // TODO
     abstract open fun openPipe(): Pipe
     // TODO
@@ -27,9 +27,9 @@ public abstract class SelectorProvider {
     // TODO
     abstract open fun inheritedChannel(): Channel
     // TODO
-    abstract open fun openSocketChannel(protocolFamily: String): SocketChannel
+    abstract open fun openSocketChannel(protocolFamily: CharSequence): SocketChannel
     // TODO
-    abstract open fun openServerSocketChannel(protocolFamily: String): ServerSocketChannel
+    abstract open fun openServerSocketChannel(protocolFamily: CharSequence): ServerSocketChannel
     companion object {
         fun provider(): SelectorProvider = UringSelectorProvider
     }
@@ -37,7 +37,7 @@ public abstract class SelectorProvider {
 
 internal object UringSelectorProvider : SelectorProvider() {
     override fun openDatagramChannel(): DatagramChannel = DatagramChannel.open()
-    override fun openDatagramChannel(protocolFamily: String): DatagramChannel = DatagramChannel.open(protocolFamily)
+    override fun openDatagramChannel(protocolFamily: CharSequence): DatagramChannel = DatagramChannel.open(protocolFamily)
     // TODO
     override fun openPipe(): Pipe = TODO("pipe")
     // TODO
@@ -46,6 +46,6 @@ internal object UringSelectorProvider : SelectorProvider() {
     override fun openSocketChannel(): SocketChannel = SocketChannel.open()
     // TODO
     override fun inheritedChannel(): Channel = TODO("inheritedChannel")
-    override fun openSocketChannel(protocolFamily: String): SocketChannel = SocketChannel.open()
-    override fun openServerSocketChannel(protocolFamily: String): ServerSocketChannel = ServerSocketChannel.open()
+    override fun openSocketChannel(protocolFamily: CharSequence): SocketChannel = SocketChannel.open()
+    override fun openServerSocketChannel(protocolFamily: CharSequence): ServerSocketChannel = ServerSocketChannel.open()
 }

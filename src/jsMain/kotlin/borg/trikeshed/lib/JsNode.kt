@@ -9,37 +9,37 @@ val path: dynamic = js("require('path')")
 val processObj: dynamic = js("process")
 val Buffer: dynamic = js("globalThis.Buffer")
 
-internal fun jsCwd(): String = processObj.cwd() as String
+internal fun jsCwd(): CharSequence = processObj.cwd() as CharSequence
 
-internal fun jsHomeDir(): String =
-    (processObj.env.HOME as? String)
-        ?: (processObj.env.USERPROFILE as? String)
+internal fun jsHomeDir(): CharSequence =
+    (processObj.env.HOME as? CharSequence)
+        ?: (processObj.env.USERPROFILE as? CharSequence)
         ?: jsCwd()
 
-internal fun jsExists(filename: String): Boolean = fs.existsSync(filename) as Boolean
+internal fun jsExists(filename: CharSequence): Boolean = fs.existsSync(filename) as Boolean
 
-internal fun jsReadString(filename: String): String = fs.readFileSync(filename, "utf8") as String
+internal fun jsReadString(filename: CharSequence): CharSequence = fs.readFileSync(filename, "utf8") as CharSequence
 
-internal fun jsReadBytes(filename: String): ByteArray {
+internal fun jsReadBytes(filename: CharSequence): ByteArray {
     val buffer: dynamic = fs.readFileSync(filename)
     val size = (buffer.length as Number).toInt()
     return ByteArray(size) { index -> (buffer[index] as Number).toByte() }
 }
 
-internal fun jsWriteString(filename: String, string: String) {
+internal fun jsWriteString(filename: CharSequence, string: CharSequence) {
     fs.writeFileSync(filename, string, "utf8")
 }
 
-internal fun jsWriteBytes(filename: String, bytes: ByteArray) {
+internal fun jsWriteBytes(filename: CharSequence, bytes: ByteArray) {
     fs.writeFileSync(filename, bytes)
 }
 
-internal fun jsMkdir(pathName: String): Boolean {
+internal fun jsMkdir(pathName: CharSequence): Boolean {
     fs.mkdirSync(pathName, js("({ recursive: true })"))
     return true
 }
 
-internal fun jsRm(pathName: String): Boolean {
+internal fun jsRm(pathName: CharSequence): Boolean {
     try {
         fs.rmSync(pathName, js("({ recursive: true, force: true })"))
         return true
@@ -53,15 +53,15 @@ internal fun jsRm(pathName: String): Boolean {
     }
 }
 
-internal fun jsMktemp(): String {
+internal fun jsMktemp(): CharSequence {
     val tempName = "tmp-${Date.now().toLong()}-${Random.nextInt(1_000_000)}.tmp"
-    val fileName = path.join(os.tmpdir(), tempName) as String
+    val fileName = path.join(os.tmpdir(), tempName) as CharSequence
     fs.writeFileSync(fileName, "")
     return fileName
 }
 
 /** Open a file and return a numeric file descriptor. */
-internal fun jsOpen(filename: String, readOnly: Boolean): Int {
+internal fun jsOpen(filename: CharSequence, readOnly: Boolean): Int {
     val fd: dynamic = fs.openSync(filename, if (readOnly) "r" else "r+")
     return fd as Int
 }

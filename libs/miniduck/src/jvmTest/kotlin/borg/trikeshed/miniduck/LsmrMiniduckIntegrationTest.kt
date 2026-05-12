@@ -23,13 +23,13 @@ class LsmrMiniduckIntegrationTest {
         val rows = listOf(listOf(1, "Alice"), listOf(2, "Bob"))
         tableSource.seedRows("users", rows)
 
-        val read = mutableListOf<Pair<Int, String>>()
+        val read = mutableListOf<Pair<Int, CharSequence>>()
         val cursor = tableSource.open(execCtx, "users")
         while (cursor.next()) {
             val idAny = cursor.row.get(0)
             val nameAny = cursor.row.get(1)
-            val id = (idAny as? Number)?.toInt() ?: (idAny as? String)?.toIntOrNull() ?: error("unexpected id type: $idAny")
-            val name = nameAny as? String ?: nameAny?.toString() ?: error("unexpected name type: $nameAny")
+            val id = (idAny as? Number)?.toInt() ?: (idAny as? CharSequence)?.toIntOrNull() ?: error("unexpected id type: $idAny")
+            val name = nameAny as? CharSequence ?: nameAny?.toString() ?: error("unexpected name type: $nameAny")
             read.add(id to name)
         }
         cursor.close()

@@ -51,7 +51,7 @@ data class YamlOpaqueExtent(
 }
 
 data class DescriptorFragment(
-    val key: String?,
+    val key: CharSequence?,
     val depth: Int,
     val memento: TypeMemento,
     val evidence: TypeEvidence,
@@ -59,14 +59,14 @@ data class DescriptorFragment(
     val children: List<DescriptorFragment> = emptyList(),
 )
 
-fun DescriptorFragment.signature(): String =
+fun DescriptorFragment.signature(): CharSequence =
     buildString {
         append(key ?: "$")
         append(':')
         append(memento.label)
         if (children.isNotEmpty()) {
             append('{')
-            append(children.sortedBy { it.key ?: "" }.joinToString(",") { it.signature() })
+            append(children.sortedBy { it.key?.toString() ?: "" }.joinToString(",") { it.signature() })
             append('}')
         }
     }
@@ -74,21 +74,21 @@ fun DescriptorFragment.signature(): String =
 data class NdjsonPreparedParser(
     val descriptor: DescriptorFragment,
 ) {
-    fun parse(line: String): Any? = JsonParser.reify(line.toSeries())
-    fun describeRowTree(line: String): TreeCursor = StructuredParserSupport.describeJsonRowTree(line)
+    fun parse(line: CharSequence): Any? = JsonParser.reify(line.toSeries())
+    fun describeRowTree(line: CharSequence): TreeCursor = StructuredParserSupport.describeJsonRowTree(line)
 }
 
 object StructuredParserSupport {
     fun describeRootEntry(value: Any?): DescriptorFragment = describeValueFragment(key = null, value = value, depth = 0)
 
-    fun describeJsonText(text: String): DescriptorFragment =
+    fun describeJsonText(text: CharSequence): DescriptorFragment =
         describeJsonFragment(CharSeries(text), 0, text.length, 0, null, ExtentTermination.EndOfInput)
 
-    fun describeJsonRowTree(text: String): TreeCursor = describeJsonText(text).toTreeCursor()
+    fun describeJsonRowTree(text: CharSequence): TreeCursor = describeJsonText(text).toTreeCursor()
 
     fun prepareNdjsonParser(
-        sampleLine: String,
-        schemaIndex: MutableMap<String, NdjsonPreparedParser>? = null,
+        sampleLine: CharSequence,
+        schemaIndex: MutableMap<CharSequence, NdjsonPreparedParser>? = null,
     ): NdjsonPreparedParser {
         val descriptor = describeJsonText(sampleLine)
         val signature = descriptor.signature()
@@ -96,8 +96,8 @@ object StructuredParserSupport {
     }
 
     fun parseNdjson(
-        lines: Sequence<String>,
-        schemaIndex: MutableMap<String, NdjsonPreparedParser>? = null,
+        lines: Sequence<CharSequence>,
+        schemaIndex: MutableMap<CharSequence, NdjsonPreparedParser>? = null,
     ): Sequence<Any?> = sequence {
         for (line in lines) {
             if (line.isBlank()) continue
@@ -106,16 +106,16 @@ object StructuredParserSupport {
         }
     }
 
-    fun describeYamlText(text: String): DescriptorFragment {
+    fun describeYamlText(text: CharSequence): DescriptorFragment {
         val document = YamlParser.parse(text)
         val totalLines = text.normalizeCrLf().lines().size
         return describeYamlNode(null, document.root, 0, totalLines)
     }
 
-    fun describeYamlRowTree(text: String): TreeCursor = describeYamlText(text).toTreeCursor()
+    fun describeYamlRowTree(text: CharSequence): TreeCursor = describeYamlText(text).toTreeCursor()
 
     fun describeValueFragment(
-        key: String?,
+        key: CharSequence?,
         value: Any?,
         depth: Int,
     ): DescriptorFragment {
@@ -140,7 +140,7 @@ object StructuredParserSupport {
     }
 
     fun describeYamlNode(
-        key: String?,
+        key: CharSequence?,
         node: YamlNode,
         depth: Int,
         totalLines: Int,
@@ -174,7 +174,7 @@ object StructuredParserSupport {
         startInclusive: Int,
         endExclusive: Int,
         depth: Int,
-        key: String?,
+        key: CharSequence?,
         termination: ExtentTermination,
     ): DescriptorFragment {
         val (start, end) = trimBounds(text, startInclusive, endExclusive)
@@ -213,7 +213,7 @@ object StructuredParserSupport {
         when (value) {
             is Map<*, *> -> TypeEvidence.sample("{}".toSeries())
             is List<*> -> TypeEvidence.sample("[]".toSeries())
-            is String -> TypeEvidence.sample("\"${escape(value)}\"".toSeries())
+            is CharSequence -> TypeEvidence.sample("\"${escape(value)}\"".toSeries())
             is Boolean, is Int, is Long, is Double, is Float -> TypeEvidence.sample(value.toString().toSeries())
             null -> TypeEvidence().apply {
                 empty = 1U
@@ -223,7 +223,7 @@ object StructuredParserSupport {
         }
 }
 
-private fun String.normalizeCrLf(): String {
+private fun CharSequence.normalizeCrLf(): CharSequence {
     val out = StringBuilder(length)
     var index = 0
     while (index < length) {
@@ -238,7 +238,7 @@ private fun String.normalizeCrLf(): String {
     return out.toString()
 }
 
-fun DescriptorFragment.toTreeCursor(path: String = "$"): TreeCursor =
+fun DescriptorFragment.toTreeCursor(path: CharSequence = "$"): TreeCursor =
     TreeCursor(
         row = toRowVec(path),
         children =
@@ -247,9 +247,9 @@ fun DescriptorFragment.toTreeCursor(path: String = "$"): TreeCursor =
             },
     )
 
-fun DescriptorFragment.rowVecTree(path: String = "$"): Sequence<RowVec> = toTreeCursor(path).flatten()
+fun DescriptorFragment.rowVecTree(path: CharSequence = "$"): Sequence<RowVec> = toTreeCursor(path).flatten()
 
-fun DescriptorFragment.toRowVec(path: String): RowVec {
+fun DescriptorFragment.toRowVec(path: CharSequence): RowVec {
     val extentFlavor = extent?.flavor?.name ?: ReificationFlavor.Generic.name
     val (extentStart, extentEnd, indentDepth) =
         when (val value = extent) {
@@ -290,7 +290,7 @@ fun DescriptorFragment.toRowVec(path: String): RowVec {
     return values.size j { index: Int -> values[index] } j meta
 }
 
-fun childPath(parent: String, key: String?): String =
+fun childPath(parent: CharSequence, key: CharSequence?): CharSequence =
     when {
         key == null -> parent
         key.all(Char::isDigit) -> "$parent[$key]"
@@ -328,7 +328,7 @@ val DESCRIPTOR_ROW_COLUMNS = arrayOf(
     "minColumnLength" j IOMemento.IoInt,
 )
 
-fun escape(value: String): String =
+fun escape(value: CharSequence): CharSequence =
     buildString(value.length) {
         value.forEach { ch ->
             when (ch) {
@@ -343,7 +343,7 @@ fun escape(value: String): String =
     }
 
 data class JsonMember(
-    val key: String,
+    val key: CharSequence,
     val valueStart: Int,
     val valueEndExclusive: Int,
     val termination: ExtentTermination,

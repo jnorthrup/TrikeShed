@@ -19,7 +19,7 @@ spec text (YAML|JSON)
   -> renderAllServerSources()         // ServerAdapter, ServerMessage, Keys, Elements
 ```
 
-All rendering functions are top-level pure functions that return `Map<String, String>`
+All rendering functions are top-level pure functions that return `Map<CharSequence, CharSequence>`
 (relative path -> file content).
 
 ## Source Layout

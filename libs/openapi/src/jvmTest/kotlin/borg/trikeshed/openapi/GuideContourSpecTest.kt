@@ -91,11 +91,11 @@ class GuideContourSpecTest {
 
    fun assertGuideSpec(
         file: File,
-        expectedTitle: String,
-        expectedServer: String,
-        expectedPaths: List<String>,
-        expectedSections: List<String>,
-        extraFragments: List<String>,
+        expectedTitle: CharSequence,
+        expectedServer: CharSequence,
+        expectedPaths: List<CharSequence>,
+        expectedSections: List<CharSequence>,
+        extraFragments: List<CharSequence>,
     ) {
         assertTrue(file.exists(), "Expected ${file.path} to exist")
         val text = file.readText()

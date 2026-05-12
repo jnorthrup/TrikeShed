@@ -39,7 +39,7 @@ val Long.fromBinary: Int get() {
     return r
 }
 
-fun String.replaceChar(old: Char, new: Char): String {
+fun CharSequence.replaceChar(old: Char, new: Char): CharSequence {
     val sb = StringBuilder(length)
     for (i in 0 until length) {
         sb.append(if (this[i] == old) new else this[i])

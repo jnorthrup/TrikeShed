@@ -22,7 +22,7 @@ interface ChannelOperations : CoroutineContext.Element {
     /** Accept an incoming connection. Returns new fd, or -1 if none pending. */
     fun accept(fd: Int): Int
     /** Connect to remote host:port. Returns 0 on success, negative on error. */
-    fun connect(fd: Int, host: String, port: Int): Int
+    fun connect(fd: Int, host: CharSequence, port: Int): Int
 
     interface ChannelHandle {
         val id: Int

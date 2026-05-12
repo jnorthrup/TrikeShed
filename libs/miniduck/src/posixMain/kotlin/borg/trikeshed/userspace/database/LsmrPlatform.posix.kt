@@ -1,19 +1,19 @@
 package borg.trikeshed.userspace.database
 
 actual suspend fun persistSegmentToDisk(
-    rootPath: String,
-    fileName: String,
-    entries: Map<String, ByteArray>
+    rootPath: CharSequence,
+    fileName: CharSequence,
+    entries: Map<CharSequence, ByteArray>
 ) {
 }
 
 actual suspend fun loadKeyFromSegment(
-    rootPath: String,
-    fileName: String,
-    key: String
+    rootPath: CharSequence,
+    fileName: CharSequence,
+    key: CharSequence
 ): ByteArray? {
     throw NotImplementedError("loadKeyFromSegment not implemented on POSIX")
 }
 
-actual fun deleteSegmentFile(rootPath: String, fileName: String) {
+actual fun deleteSegmentFile(rootPath: CharSequence, fileName: CharSequence) {
 }

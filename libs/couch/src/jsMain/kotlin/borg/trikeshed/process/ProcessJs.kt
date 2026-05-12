@@ -1,7 +1,7 @@
 package borg.trikeshed.process
 
 actual class ProcessShell {
-    actual fun exec(command: String, args: List<String>): ProcessResult {
+    actual fun exec(command: CharSequence, args: List<CharSequence>): ProcessResult {
         val cmd = buildString {
             append(command)
             if (args.isNotEmpty()) append(" ")
@@ -9,12 +9,12 @@ actual class ProcessShell {
         }
 
         return try {
-            val out: String = js("require('child_process').execSync(cmd, {encoding: 'utf8'})") as String
+            val out: CharSequence = js("require('child_process').execSync(cmd, {encoding: 'utf8'})") as CharSequence
             ProcessResult(0, out, "")
         } catch (e: Throwable) {
             ProcessResult(1, "", e.toString())
         }
     }
 
-    actual fun exec(command: String, vararg args: String): ProcessResult = exec(command, args.toList())
+    actual fun exec(command: CharSequence, vararg args: CharSequence): ProcessResult = exec(command, args.toList())
 }

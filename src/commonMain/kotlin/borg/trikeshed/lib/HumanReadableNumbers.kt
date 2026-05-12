@@ -6,8 +6,8 @@ import kotlin.math.pow
 /***
  * translate human readable numbers to Number values, converting to lowercase first, using 1024 by default unless specified otherwise
  */
-fun String.readableUnitsToNumber(decimal: Boolean = false): Number {
-    val value = this.trim().lowercase()
+fun CharSequence.readableUnitsToNumber(decimal: Boolean = false): Number {
+    val value = this.toString().trim().lowercase()
     val multiplier = if (decimal) 1000 else 1024
     val suffix = when {
         value.endsWith("b") -> 1
@@ -27,7 +27,7 @@ fun String.readableUnitsToNumber(decimal: Boolean = false): Number {
 /**
  * human readable bytecounts using 1.xx format
  */
-val Long.humanReadableByteCountIEC: String
+val Long.humanReadableByteCountIEC: CharSequence
     get() {
         val seriesConstant = 1024
         val seriesDoubleConstant = seriesConstant.toDouble()
@@ -38,14 +38,14 @@ val Long.humanReadableByteCountIEC: String
 /**
  * human readable bytecounts using 1.xx format
  */
-val Long.humanReadableByteCountSI: String
+val Long.humanReadableByteCountSI: CharSequence
     get() {
 
         val seriesConstant = 1000
         val seriesDoubleConstant = seriesConstant.toDouble()
         return unitizer(seriesConstant, seriesDoubleConstant)
     }
-fun Long.unitizer(seriesConstant: Int, seriesDoubleConstant: Double): String {
+fun Long.unitizer(seriesConstant: Int, seriesDoubleConstant: Double): CharSequence {
     if (this == Long.MIN_VALUE) return (Long.MIN_VALUE + 1).humanReadableByteCountIEC
     if (this < 0) return "-" + (-this).humanReadableByteCountIEC
     if (this < seriesConstant) return this.toString() + " B"

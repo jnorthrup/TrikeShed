@@ -22,7 +22,7 @@ fun main() {
     // JVM: no-op compile function — map/reduce do nothing by default.
     // Override by registering a real JS engine (Nashorn/Graal) via system property.
     val engine = System.getProperty("viewserver.js.engine", "none")
-    val compile: (String) -> CompiledFunction = when (engine) {
+    val compile: (CharSequence) -> CompiledFunction = when (engine) {
         "none" -> { _ -> NoopFunction }
         else -> error("JS engine '$engine' not supported. Use GraalJS or Nashorn.")
     }
@@ -58,11 +58,11 @@ fun main() {
 }
 
 private object NoopFunction : CompiledFunction {
-    override fun map(doc: Map<String, Any?>, emit: (key: Any?, value: Any?) -> Unit) {}
-    override fun reduce(sources: List<String>, values: List<Any?>, rereduce: Boolean): Any? = null
+    override fun map(doc: Map<CharSequence, Any?>, emit: (key: Any?, value: Any?) -> Unit) {}
+    override fun reduce(sources: List<CharSequence>, values: List<Any?>, rereduce: Boolean): Any? = null
 }
 
-private fun String.toSeries(): borg.trikeshed.lib.Series<Char> {
+private fun CharSequence.toSeries(): borg.trikeshed.lib.Series<Char> {
     val n = length
     return n j { i: Int -> this[i] }
 }

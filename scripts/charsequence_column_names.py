@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
 """
 charsequence_column_names.py
-Widens column-name lookup parameters from String to CharSequence across
+Widens column-name lookup parameters from CharSequence to CharSequence across
 miniduck and the cursor layer so CharSeries can be passed without toString().
 
 Discretion rules applied:
-  - Structural/storage keys (DocRowVec Series<String> backing, cellsToRowVec,
+  - Structural/storage keys (DocRowVec Series<CharSequence> backing, cellsToRowVec,
     RowVec.keys property, WAL/collection/filesystem Strings) are NOT touched.
   - Only lookup-time parameters (getValue, column predicates, CursorOps funs) widen.
   - when(name) blocks in families become when(name.toString()) — Kotlin won't
-    match CharSequence against String literals in a when expression.
-  - String comparisons in getValue become contentEquals().
-  - Aggregation targetColumn/outputColumn stay String; factory fun params widen
+    match CharSequence against CharSequence literals in a when expression.
+  - CharSequence comparisons in getValue become contentEquals().
+  - Aggregation targetColumn/outputColumn stay CharSequence; factory fun params widen
     and call .toString() at assignment (interpolation already handles this).
 
 Dry-run by default. Pass --apply to write.
@@ -35,7 +35,7 @@ def reg(path: Path, label: str, old: str, new: str):
 rvs = ROOT / "src/commonMain/kotlin/borg/trikeshed/cursor/RowVecSupport.kt"
 
 reg(rvs, "getValue key param",
-    "fun RowVec.getValue(key: String): Any? {",
+    "fun RowVec.getValue(key: CharSequence): Any? {",
     "fun RowVec.getValue(key: CharSequence): Any? {")
 
 reg(rvs, "getValue meta.name comparison (RecordMeta)",
@@ -44,22 +44,22 @@ reg(rvs, "getValue meta.name comparison (RecordMeta)",
 
 reg(rvs, "getValue meta.a comparison (Join)",
     "is Join<*, *> -> if (meta.a == key) return cell.a",
-    'is Join<*, *> -> if ((meta.a as? String)?.contentEquals(key) == true) return cell.a')
+    'is Join<*, *> -> if ((meta.a as? CharSequence)?.contentEquals(key) == true) return cell.a')
 
 reg(rvs, "stringValue name param",
-    "fun RowVec.stringValue(name: String, default: String): String =",
-    "fun RowVec.stringValue(name: CharSequence, default: String): String =")
+    "fun RowVec.stringValue(name: CharSequence, default: CharSequence): CharSequence =",
+    "fun RowVec.stringValue(name: CharSequence, default: CharSequence): CharSequence =")
 
 reg(rvs, "longValue name param",
-    "fun RowVec.longValue(name: String): Long",
+    "fun RowVec.longValue(name: CharSequence): Long",
     "fun RowVec.longValue(name: CharSequence): Long")
 
 reg(rvs, "doubleValue name param",
-    "fun RowVec.doubleValue(name: String): Double",
+    "fun RowVec.doubleValue(name: CharSequence): Double",
     "fun RowVec.doubleValue(name: CharSequence): Double")
 
 reg(rvs, "intValue name param",
-    "fun RowVec.intValue(name: String): Int",
+    "fun RowVec.intValue(name: CharSequence): Int",
     "fun RowVec.intValue(name: CharSequence): Int")
 
 # ─── RowVecFamilies.kt ────────────────────────────────────────────────────────
@@ -67,17 +67,17 @@ rvf = ROOT / "libs/miniduck/src/commonMain/kotlin/borg/trikeshed/miniduck/RowVec
 
 # JsonRowVec
 reg(rvf, "JsonRowVec getValue param + when",
-    '    fun getValue(name: String): Any? = when (name) {\n        "nodeType" -> nodeType\n        "rawValue" -> rawValue\n        else -> null\n    }\n}',
+    '    fun getValue(name: CharSequence): Any? = when (name) {\n        "nodeType" -> nodeType\n        "rawValue" -> rawValue\n        else -> null\n    }\n}',
     '    fun getValue(name: CharSequence): Any? = when (name.toString()) {\n        "nodeType" -> nodeType\n        "rawValue" -> rawValue\n        else -> null\n    }\n}')
 
 # ViewRowVec
 reg(rvf, "ViewRowVec getValue param + when",
-    '    fun getValue(name: String): Any? = when (name) {\n        "id", "_id" -> id\n        "key" -> key\n        "value" -> value\n        else -> null\n    }\n}',
+    '    fun getValue(name: CharSequence): Any? = when (name) {\n        "id", "_id" -> id\n        "key" -> key\n        "value" -> value\n        else -> null\n    }\n}',
     '    fun getValue(name: CharSequence): Any? = when (name.toString()) {\n        "id", "_id" -> id\n        "key" -> key\n        "value" -> value\n        else -> null\n    }\n}')
 
-# DocRowVec — getValue(name: String): complex body with cached scan
+# DocRowVec — getValue(name: CharSequence): complex body with cached scan
 reg(rvf, "DocRowVec getValue param",
-    "    fun getValue(name: String): Any? {",
+    "    fun getValue(name: CharSequence): Any? {",
     "    fun getValue(name: CharSequence): Any? {")
 
 reg(rvf, "DocRowVec getValue cached comparison",
@@ -89,81 +89,81 @@ reg(rvf, "DocRowVec getValue linear comparison",
     "            if (keys[i].contentEquals(name)) return cells[i]")
 
 reg(rvf, "DocRowVec get(name) operator",
-    "    operator fun get(name: String): Any? = getValue(name)",
+    "    operator fun get(name: CharSequence): Any? = getValue(name)",
     "    operator fun get(name: CharSequence): Any? = getValue(name)")
 
 # ─── RowVecCompat.kt ─────────────────────────────────────────────────────────
 rvc = ROOT / "libs/miniduck/src/commonMain/kotlin/borg/trikeshed/miniduck/RowVecCompat.kt"
 
 reg(rvc, "RowVecCompat getValue param",
-    "fun RowVec.getValue(name: String): Any? = rootGetValue(name)",
+    "fun RowVec.getValue(name: CharSequence): Any? = rootGetValue(name)",
     "fun RowVec.getValue(name: CharSequence): Any? = rootGetValue(name)")
 
 reg(rvc, "RowVecCompat get[] operator",
-    'operator fun RowVec.get(name: String): Any? = getValue(name)',
+    'operator fun RowVec.get(name: CharSequence): Any? = getValue(name)',
     'operator fun RowVec.get(name: CharSequence): Any? = getValue(name)')
 
 # ─── CursorOps.kt ─────────────────────────────────────────────────────────────
 co = ROOT / "libs/miniduck/src/commonMain/kotlin/borg/trikeshed/miniduck/CursorOps.kt"
 
 reg(co, "Eq column param",
-    "fun Eq(column: String, value: Any?): (RowVec) -> Boolean",
+    "fun Eq(column: CharSequence, value: Any?): (RowVec) -> Boolean",
     "fun Eq(column: CharSequence, value: Any?): (RowVec) -> Boolean")
 
 reg(co, "Ge column param",
-    "fun Ge(column: String, value: Any?): (RowVec) -> Boolean",
+    "fun Ge(column: CharSequence, value: Any?): (RowVec) -> Boolean",
     "fun Ge(column: CharSequence, value: Any?): (RowVec) -> Boolean")
 
 reg(co, "Gt column param",
-    "fun Gt(column: String, value: Any?): (RowVec) -> Boolean",
+    "fun Gt(column: CharSequence, value: Any?): (RowVec) -> Boolean",
     "fun Gt(column: CharSequence, value: Any?): (RowVec) -> Boolean")
 
-reg(co, "orderBy(column: String) single-arg",
-    "fun Cursor.orderBy(column: String): Cursor = orderBy(OrderSpec(column))",
+reg(co, "orderBy(column: CharSequence) single-arg",
+    "fun Cursor.orderBy(column: CharSequence): Cursor = orderBy(OrderSpec(column))",
     "fun Cursor.orderBy(column: CharSequence): Cursor = orderBy(OrderSpec(column.toString()))")
 
-reg(co, "orderBy(column: String, desc) two-arg",
-    "fun Cursor.orderBy(column: String, desc: Boolean): Cursor = orderBy(OrderSpec(column, desc = desc))",
+reg(co, "orderBy(column: CharSequence, desc) two-arg",
+    "fun Cursor.orderBy(column: CharSequence, desc: Boolean): Cursor = orderBy(OrderSpec(column, desc = desc))",
     "fun Cursor.orderBy(column: CharSequence, desc: Boolean): Cursor = orderBy(OrderSpec(column.toString(), desc = desc))")
 
 reg(co, "Cursor.minus columnName param",
-    "operator fun Cursor.minus(columnName: String): Cursor {",
+    "operator fun Cursor.minus(columnName: CharSequence): Cursor {",
     "operator fun Cursor.minus(columnName: CharSequence): Cursor {")
 
 reg(co, "Cursor.groupBy keyColumn param",
-    "fun Cursor.groupBy(keyColumn: String, vararg aggregations: Aggregation): Cursor {",
+    "fun Cursor.groupBy(keyColumn: CharSequence, vararg aggregations: Aggregation): Cursor {",
     "fun Cursor.groupBy(keyColumn: CharSequence, vararg aggregations: Aggregation): Cursor {")
 
 reg(co, "Cursor.hashJoin leftKey rightKey params",
-    "fun Cursor.hashJoin(other: Cursor, leftKey: String, rightKey: String): Cursor {",
+    "fun Cursor.hashJoin(other: Cursor, leftKey: CharSequence, rightKey: CharSequence): Cursor {",
     "fun Cursor.hashJoin(other: Cursor, leftKey: CharSequence, rightKey: CharSequence): Cursor {")
 
 reg(co, "Cursor.join leftKey rightKey params",
-    "fun Cursor.join(other: Cursor, leftKey: String, rightKey: String): Cursor = hashJoin(other, leftKey, rightKey)",
+    "fun Cursor.join(other: Cursor, leftKey: CharSequence, rightKey: CharSequence): Cursor = hashJoin(other, leftKey, rightKey)",
     "fun Cursor.join(other: Cursor, leftKey: CharSequence, rightKey: CharSequence): Cursor = hashJoin(other, leftKey, rightKey)")
 
 reg(co, "Aggregation.count column param",
-    '    fun count(column: String = "*"): Aggregation = object : Aggregation {',
+    '    fun count(column: CharSequence = "*"): Aggregation = object : Aggregation {',
     '    fun count(column: CharSequence = "*"): Aggregation = object : Aggregation {')
 
 reg(co, "Aggregation.sum column param",
-    '    fun sum(column: String): Aggregation = object : Aggregation {',
+    '    fun sum(column: CharSequence): Aggregation = object : Aggregation {',
     '    fun sum(column: CharSequence): Aggregation = object : Aggregation {')
 
 reg(co, "Aggregation.avg column param",
-    '    fun avg(column: String): Aggregation = object : Aggregation {',
+    '    fun avg(column: CharSequence): Aggregation = object : Aggregation {',
     '    fun avg(column: CharSequence): Aggregation = object : Aggregation {')
 
 reg(co, "Aggregation.min column param",
-    '    fun min(column: String): Aggregation = object : Aggregation {',
+    '    fun min(column: CharSequence): Aggregation = object : Aggregation {',
     '    fun min(column: CharSequence): Aggregation = object : Aggregation {')
 
 reg(co, "Aggregation.max column param",
-    '    fun max(column: String): Aggregation = object : Aggregation {',
+    '    fun max(column: CharSequence): Aggregation = object : Aggregation {',
     '    fun max(column: CharSequence): Aggregation = object : Aggregation {')
 
 reg(co, "private rowValue column param",
-    "private fun rowValue(row: RowVec, column: String): Any?",
+    "private fun rowValue(row: RowVec, column: CharSequence): Any?",
     "private fun rowValue(row: RowVec, column: CharSequence): Any?")
 
 # ─── Apply or report ─────────────────────────────────────────────────────────

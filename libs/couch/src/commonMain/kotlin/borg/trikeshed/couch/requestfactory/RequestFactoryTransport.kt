@@ -7,10 +7,10 @@ object RequestFactoryTransportContract {
 }
 
 data class RequestFactoryCall(
-    val context: String,
-    val method: String,
+    val context: CharSequence,
+    val method: CharSequence,
     val arguments: List<TransportValue>,
-    val ccekKey: String? = null,
+    val ccekKey: CharSequence? = null,
 )
 
 data class RequestFactoryResponse(
@@ -21,15 +21,15 @@ data class RequestFactoryResponse(
 )
 
 data class EntityDelta(
-    val type: String,
+    val type: CharSequence,
     val id: TransportValue? = null,
     val version: TransportValue? = null,
-    val properties: Map<String, TransportValue> = emptyMap(),
+    val properties: Map<CharSequence, TransportValue> = emptyMap(),
 )
 
 data class ConstraintViolation(
-    val path: String,
-    val message: String,
+    val path: CharSequence,
+    val message: CharSequence,
     val invalidValue: TransportValue? = null,
 )
 
@@ -38,8 +38,8 @@ data class ConstraintViolationResponse(
 )
 
 data class ErrorResponse(
-    val message: String,
-    val details: String? = null,
+    val message: CharSequence,
+    val details: CharSequence? = null,
 )
 
 interface RequestFactoryTransportService {

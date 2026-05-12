@@ -11,8 +11,8 @@ class JulesClientIntegrationTest {
 
     @Test
     fun generatedClientMatchesOpenApiContract() = runTest {
-        var requestedMethod: String? = null
-        var requestedPath: String? = null
+        var requestedMethod: CharSequence? = null
+        var requestedPath: CharSequence? = null
 
         val htxElement = openHtxElement { request ->
             requestedMethod = request.method

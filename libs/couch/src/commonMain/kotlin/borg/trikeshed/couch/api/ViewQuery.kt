@@ -15,6 +15,6 @@ data class ViewQuery(
     val groupLevel: Int? = null,
     val includeDocs: Boolean? = null,
     val reduce: Boolean? = null,
-    val startKeyDocId: String? = null,
-    val endKeyDocId: String? = null,
+    val startKeyDocId: CharSequence? = null,
+    val endKeyDocId: CharSequence? = null,
 )

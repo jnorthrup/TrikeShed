@@ -12,8 +12,8 @@ import kotlinx.coroutines.sync.withLock
 import java.time.LocalDate
 
 data class BinanceKlineKey(
-    val symbol: String,
-    val interval: String,
+    val symbol: CharSequence,
+    val interval: CharSequence,
     val startDate: LocalDate,
     val endDate: LocalDate,
 )
@@ -89,14 +89,14 @@ fun computeStochastic(
     return Stochastic.compute(highs, lows, closes, kPeriod, dPeriod)
 }
 
-private fun Cursor.ohlcSeries(column: String): Series<Double> {
+private fun Cursor.ohlcSeries(column: CharSequence): Series<Double> {
     val n = size
     return n j { index: Int ->
         val row = at(index)
         val value = row.getValue(column)
         when (value) {
             is Number -> value.toDouble()
-            is String -> value.toDouble()
+            is CharSequence -> value.toDouble()
             else -> throw IllegalArgumentException("row $index column $column is not numeric: $value")
         }
     }

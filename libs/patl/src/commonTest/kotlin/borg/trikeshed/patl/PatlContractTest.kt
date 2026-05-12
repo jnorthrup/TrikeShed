@@ -10,8 +10,8 @@ import borg.trikeshed.lib.Series
 
 class PatlContractTest {
 
-    private fun stringBitComp() = BitComp<String> { s ->
-        val bytes = s.encodeToByteArray()
+    private fun stringBitComp() = BitComp<CharSequence> { s ->
+        val bytes = s.toString().encodeToByteArray()
         bytes.size j { i -> bytes[i] }
     }
 
@@ -24,7 +24,7 @@ class PatlContractTest {
 
     @Test
     fun `PatriciaTrieMap insert returns new map persistent`() {
-        val map1 = PatriciaTrieMap<String, Int>(stringBitComp())
+        val map1 = PatriciaTrieMap<CharSequence, Int>(stringBitComp())
         val map2 = map1.insert("foo", 1)
         assertNotSame(map1, map2)
         assertEquals(1, map2.size)
@@ -33,7 +33,7 @@ class PatlContractTest {
 
     @Test
     fun `PatriciaTrieMap delete returns new map persistent`() {
-        val map1 = PatriciaTrieMap<String, Int>(stringBitComp()).insert("foo", 1)
+        val map1 = PatriciaTrieMap<CharSequence, Int>(stringBitComp()).insert("foo", 1)
         val map2 = map1.delete("foo")
         assertNotSame(map1, map2)
         assertEquals(0, map2.size)
@@ -42,20 +42,20 @@ class PatlContractTest {
 
     @Test
     fun `lookup returns value for exact key`() {
-        val map = PatriciaTrieMap<String, Int>(stringBitComp()).insert("foo", 1).insert("bar", 2)
+        val map = PatriciaTrieMap<CharSequence, Int>(stringBitComp()).insert("foo", 1).insert("bar", 2)
         assertEquals(1, map.lookup("foo"))
         assertEquals(2, map.lookup("bar"))
     }
 
     @Test
     fun `lookup returns null for missing key`() {
-        val map = PatriciaTrieMap<String, Int>(stringBitComp()).insert("foo", 1)
+        val map = PatriciaTrieMap<CharSequence, Int>(stringBitComp()).insert("foo", 1)
         assertNull(map.lookup("bar"))
     }
 
     @Test
     fun `node count reflects shared-prefix compression`() {
-        val map = PatriciaTrieMap<String, Int>(stringBitComp())
+        val map = PatriciaTrieMap<CharSequence, Int>(stringBitComp())
             .insert("foo", 1)
             .insert("food", 2)
             .insert("bar", 3)
@@ -77,7 +77,7 @@ class PatlContractTest {
 
     @Test
     fun `AutoIntNodeStore auto-allocates node ids`() {
-        val map = PatriciaTrieMap<String, Int>(stringBitComp()).insert("foo", 1).insert("bar", 2)
+        val map = PatriciaTrieMap<CharSequence, Int>(stringBitComp()).insert("foo", 1).insert("bar", 2)
         assertTrue(map.store.size >= 0)
     }
 }

@@ -18,7 +18,7 @@ public abstract class CharsetEncoder protected constructor(
     public abstract fun onUnmappableCharacter(p0: borg.trikeshed.userspace.nio.charset.CodingErrorAction): borg.trikeshed.userspace.nio.charset.CharsetEncoder
     public open fun averageBytesPerChar(): Float = averageBytesPerCharValue
     public open fun maxBytesPerChar(): Float = maxBytesPerCharValue
-    public abstract fun encode(p0: String): borg.trikeshed.userspace.nio.ByteBuffer
+    public abstract fun encode(p0: CharSequence): borg.trikeshed.userspace.nio.ByteBuffer
     public abstract fun flush(p0: borg.trikeshed.userspace.nio.ByteBuffer): borg.trikeshed.userspace.nio.charset.CoderResult
     public abstract fun reset(): borg.trikeshed.userspace.nio.charset.CharsetEncoder
     public abstract fun canEncode(p0: Char): Boolean

@@ -5,7 +5,7 @@ package borg.trikeshed.userspace.nio.charset
 // Generated from Amazon Corretto JDK 25 java.base NIO public/protected API via javap.
 // Declarations intentionally mirror JDK taxonomy and contain no implementations.
 public class CodingErrorAction {
-    override fun toString():CharSequence= TODO("NIO common stub")
+    override fun toString(): String= TODO("NIO common stub")
     companion object {
         val IGNORE: borg.trikeshed.userspace.nio.charset.CodingErrorAction = TODO("NIO common stub")
         val REPLACE: borg.trikeshed.userspace.nio.charset.CodingErrorAction = TODO("NIO common stub")

@@ -32,7 +32,7 @@ class DefaultHkdfSha256(
         return result
     }
 
-    override fun expandLabel(secret: ByteArray, label: String, context: ByteArray, length: Int): ByteArray {
+    override fun expandLabel(secret: ByteArray, label: CharSequence, context: ByteArray, length: Int): ByteArray {
         val labelBytes = "tls13 $label".encodeToByteArray()
         // struct HkdfLabel { uint16 length; opaque label<7..255>; opaque context<0..255>; }
         val hkdfLabel = ByteArray(2 + 1 + labelBytes.size + 1 + context.size)

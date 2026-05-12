@@ -18,38 +18,38 @@ typealias JitSymbol = Long
  */
 data class JitResult(
     val symbol: JitSymbol,
-    val entryName:CharSequence)
+    val entryName: CharSequence)
 
 /**
  * ORC JIT compiler state
  */
 class OrcJit {
-   val contexts = mutableMapOf<String, JitSession>()
+   val contexts = mutableMapOf<CharSequence, JitSession>()
 
     companion object {
         fun create(): OrcJit = OrcJit()
     }
 
-    fun createSession(name: String): JitSession {
+    fun createSession(name: CharSequence): JitSession {
         val session = JitSession(name)
         contexts[name] = session
         return session
     }
 
-    fun getSession(name: String): JitSession? = contexts[name]
+    fun getSession(name: CharSequence): JitSession? = contexts[name]
 }
 
 /**
  * JIT session
  */
-class JitSession(val name: String) {
-   val compiledSymbols = mutableMapOf<String, JitSymbol>()
+class JitSession(val name: CharSequence) {
+   val compiledSymbols = mutableMapOf<CharSequence, JitSymbol>()
 
-    fun registerSymbol(name: String, symbol: JitSymbol) {
+    fun registerSymbol(name: CharSequence, symbol: JitSymbol) {
         compiledSymbols[name] = symbol
     }
 
-    fun lookupSymbol(name: String): JitSymbol? = compiledSymbols[name]
+    fun lookupSymbol(name: CharSequence): JitSymbol? = compiledSymbols[name]
 }
 
 /**
@@ -77,9 +77,9 @@ sealed class TensorOp {
 class CompileRequest(
     val operation: TensorOp,
     val inputShapes: List<List<Int>>,
-    val dtype:CharSequence) {
+    val dtype: CharSequence) {
     companion object {
-        fun create(operation: TensorOp, inputShapes: List<List<Int>>, dtype: String): CompileRequest {
+        fun create(operation: TensorOp, inputShapes: List<List<Int>>, dtype: CharSequence): CompileRequest {
             return CompileRequest(operation, inputShapes, dtype)
         }
     }
@@ -107,7 +107,7 @@ class MlirOrcBuilder(
     /**
      * Generate MLIR IR for pending operations
      */
-    fun emitMlir():CharSequence{
+    fun emitMlir(): CharSequence {
         val ir = StringBuilder()
         ir.appendLine("module {")
 
@@ -143,11 +143,11 @@ class MlirOrcBuilder(
 /**
  * JIT compilation errors
  */
-sealed class JitError(message: String) : Throwable(message) {
+sealed class JitError(message: CharSequence) : Throwable(message.toString()) {
     object MlirNotEnabled : JitError("MLIR feature not enabled")
-    class CompilationFailed(msg: String) : JitError("Compilation failed: $msg")
-    class SymbolNotFound(sym: String) : JitError("Symbol not found: $sym")
-    class InvalidDtype(dtype: String) : JitError("Invalid dtype: $dtype")
+    class CompilationFailed(msg: CharSequence) : JitError("Compilation failed: $msg")
+    class SymbolNotFound(sym: CharSequence) : JitError("Symbol not found: $sym")
+    class InvalidDtype(dtype: CharSequence) : JitError("Invalid dtype: $dtype")
 }
 
 /**
@@ -177,14 +177,14 @@ class JitExecutor {
  */
 class TensorGraph {
    val operations = mutableListOf<TensorOp>()
-   val inputs = mutableListOf<Triple<String, List<Int>, String>>()
+   val inputs = mutableListOf<Triple<CharSequence, List<Int>, CharSequence>>()
    var outputShape: List<Int> = emptyList()
 
     companion object {
         fun create(): TensorGraph = TensorGraph()
     }
 
-    fun addInput(name: String, shape: List<Int>, dtype: String): Int {
+    fun addInput(name: CharSequence, shape: List<Int>, dtype: CharSequence): Int {
         val id = inputs.size
         inputs.add(Triple(name, shape, dtype))
         return id
@@ -210,7 +210,7 @@ class TensorGraph {
         return optimized
     }
 
-    fun toMlir():CharSequence{
+    fun toMlir(): CharSequence {
         val ir = StringBuilder()
         ir.appendLine("// Tensor computation graph compiled to MLIR")
         ir.appendLine("module {")

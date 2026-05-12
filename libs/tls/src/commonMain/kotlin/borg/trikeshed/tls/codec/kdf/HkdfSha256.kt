@@ -45,5 +45,5 @@ interface HkdfSha256 : CoroutineContext.Element {
      *   opaque context<0..255> = Context;
      * }
      */
-    fun expandLabel(secret: ByteArray, label: String, context: ByteArray, length: Int): ByteArray
+    fun expandLabel(secret: ByteArray, label: CharSequence, context: ByteArray, length: Int): ByteArray
 }

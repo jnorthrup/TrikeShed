@@ -3,11 +3,11 @@ package borg.trikeshed.openapi
 // ── client generation config ──────────────────────────────────────────────────
 
 data class ClientGenConfig(
-    val specPath: String,
-    val generatorTask: String,
-    val packageRoot: String,
-    val displayName: String,
-    val moduleSuffix: String = "",
+    val specPath: CharSequence,
+    val generatorTask: CharSequence,
+    val packageRoot: CharSequence,
+    val displayName: CharSequence,
+    val moduleSuffix: CharSequence = "",
     val trikeshedContext: TrikeshedContext?,
 ) {
     val apiPackage get() = "$packageRoot.api"
@@ -23,7 +23,7 @@ data class ClientGenConfig(
     val requestClassName get() = "GeneratedRequest"
     val httpMethodName get() = "HttpMethod"
 
-   val apiSuffix get() = moduleSuffix.replaceFirstChar { it.uppercase() }
+   val apiSuffix get() = moduleSuffix.toString().replaceFirstChar { it.uppercase() }
 }
 
 // ── operation contract rendering ─────────────────────────────────────────────
@@ -31,14 +31,14 @@ data class ClientGenConfig(
 /**
  * Renders a contract object for a single operation inside the ApiContract object.
  */
-fun renderOperationContract(op: ResolvedOperation, cfg: ClientGenConfig): String {
+fun renderOperationContract(op: ResolvedOperation, cfg: ClientGenConfig): CharSequence {
     val path = op.path.escapeKotlin()
     val method = op.method.toHttpMethodEnum()
     val hasBody = op.requestBody != null
 
     return buildString {
         appendLine("        object ${op.contractClassName()} {")
-        appendLine("            const val operationId: String = \"${op.operationId.escapeKotlin()}\"")
+        appendLine("            const val operationId: CharSequence = \"${op.operationId.escapeKotlin()}\"")
         append("            val request: ${cfg.requestClassName} = ${cfg.requestClassName}(")
         append("method = ${cfg.httpMethodName}.$method")
         append(", path = \"$path\"")
@@ -50,7 +50,7 @@ fun renderOperationContract(op: ResolvedOperation, cfg: ClientGenConfig): String
 
 // ── Keys.kt ─────────────────────────────────────────────────────────────────
 
-fun renderClientKeys(cfg: ClientGenConfig): String {
+fun renderClientKeys(cfg: ClientGenConfig): CharSequence {
     val banner = generatedBanner(cfg.specPath, cfg.generatorTask)
     val ctx = cfg.trikeshedContext
     val bindings = ctx?.clientBindings ?: emptyList()
@@ -84,7 +84,7 @@ fun renderClientKeys(cfg: ClientGenConfig): String {
 
 // ── Elements.kt ─────────────────────────────────────────────────────────────
 
-fun renderClientElements(cfg: ClientGenConfig): String {
+fun renderClientElements(cfg: ClientGenConfig): CharSequence {
     val banner = generatedBanner(cfg.specPath, cfg.generatorTask)
     val ctx = cfg.trikeshedContext
     val bindings = ctx?.clientBindings ?: emptyList()
@@ -123,7 +123,7 @@ fun renderClientElements(cfg: ClientGenConfig): String {
 fun renderClientSupervisorJobs(
     ops: List<ResolvedOperation>,
     cfg: ClientGenConfig,
-): String {
+): CharSequence {
     val banner = generatedBanner(cfg.specPath, cfg.generatorTask)
     val superOps = ops.filter { it.isSupervisor }
 
@@ -150,7 +150,7 @@ fun renderClientSupervisorJobs(
 
 // ── HttpMethod + GeneratedRequest infrastructure ─────────────────────────────
 
-fun renderClientRequest(cfg: ClientGenConfig): String {
+fun renderClientRequest(cfg: ClientGenConfig): CharSequence {
     val banner = generatedBanner(cfg.specPath, cfg.generatorTask)
 
     return buildString {
@@ -169,12 +169,12 @@ fun renderClientRequest(cfg: ClientGenConfig): String {
         appendLine(" */")
         appendLine("data class ${cfg.requestClassName}(")
         appendLine("    val method: ${cfg.httpMethodName},")
-        appendLine("    val path: String,")
-        appendLine("    val queryParams: Map<String, String> = emptyMap(),")
-        appendLine("    val body: String? = null,")
-        appendLine("    val operationId: String? = null,")
-        appendLine("    val transport: String? = null,")
-        appendLine("    val headers: Map<String, String> = emptyMap(),")
+        appendLine("    val path: CharSequence,")
+        appendLine("    val queryParams: Map<CharSequence, CharSequence> = emptyMap(),")
+        appendLine("    val body: CharSequence? = null,")
+        appendLine("    val operationId: CharSequence? = null,")
+        appendLine("    val transport: CharSequence? = null,")
+        appendLine("    val headers: Map<CharSequence, CharSequence> = emptyMap(),")
         appendLine(")")
     }
 }
@@ -184,7 +184,7 @@ fun renderClientRequest(cfg: ClientGenConfig): String {
 fun renderClientApi(
     ops: List<ResolvedOperation>,
     cfg: ClientGenConfig,
-): String {
+): CharSequence {
     val banner = generatedBanner(cfg.specPath, cfg.generatorTask)
     val contracts = ops.joinToString("\n\n") { renderOperationContract(it, cfg) }
 
@@ -200,17 +200,17 @@ fun renderClientApi(
         appendLine("interface ${cfg.apiInterfaceName} {")
         ops.forEach { op ->
             val params = op.toKotlinParams()
-            appendLine("    suspend fun ${op.apiMethodName()}($params): String")
+            appendLine("    suspend fun ${op.apiMethodName()}($params): CharSequence")
         }
         appendLine("}")
         appendLine()
         appendLine("/** Default implementation — caller provides the low-level call. */")
         appendLine("class ${cfg.defaultImplName}(")
-        appendLine("   val call: suspend (${cfg.requestClassName}) -> String,")
+        appendLine("   val call: suspend (${cfg.requestClassName}) -> CharSequence,")
         appendLine(") : ${cfg.apiInterfaceName} {")
         ops.forEach { op ->
             val params = op.toKotlinParams()
-            val retType = "String"
+            val retType = "CharSequence"
             val pathParams = op.parameters.filter { it.location == "path" }
             val queryParams = op.parameters.filter { it.location == "query" }
             if (pathParams.isNotEmpty() || queryParams.isNotEmpty()) {
@@ -241,7 +241,7 @@ fun successSchema(op: ResolvedOperation): ResolvedSchema? =
 fun renderClientModels(
     ops: List<ResolvedOperation>,
     cfg: ClientGenConfig,
-): String {
+): CharSequence {
     val banner = generatedBanner(cfg.specPath, cfg.generatorTask)
     val schemas = ops.mapNotNull { op ->
         successSchema(op)?.let { op.responseModelName() to it }
@@ -257,7 +257,7 @@ fun renderClientModels(
         appendLine("import kotlin.Double")
         appendLine("import kotlin.Int")
         appendLine("import kotlin.Long")
-        appendLine("import kotlin.String")
+        appendLine("import kotlin.CharSequence")
         appendLine("import kotlin.collections.List")
         appendLine("import kotlin.collections.Map")
         appendLine()
@@ -272,7 +272,7 @@ fun renderClientModels(
         }
     }
 }
-fun renderSchemaAsDataClass(name: String, schema: ResolvedSchema): String {
+fun renderSchemaAsDataClass(name: CharSequence, schema: ResolvedSchema): CharSequence {
     val props: List<ResolvedSchema.Prop> = when (schema) {
         is ResolvedSchema.Obj -> schema.properties
         is ResolvedSchema.Ref -> emptyList()
@@ -280,7 +280,7 @@ fun renderSchemaAsDataClass(name: String, schema: ResolvedSchema): String {
     }
 
     if (props.isEmpty()) {
-        return "data class $name(val raw: String)"
+        return "data class $name(val raw: CharSequence)"
     }
 
     val fields = props.joinToString(",\n") { prop ->
@@ -298,10 +298,10 @@ fun renderSchemaAsDataClass(name: String, schema: ResolvedSchema): String {
  */
 fun renderAllClientSources(
     doc: ResolvedOpenApiDocument,
-    specPath: String,
-    generatorTask: String,
-    moduleSuffix: String = "",
-): Map<String, String> {
+    specPath: CharSequence,
+    generatorTask: CharSequence,
+    moduleSuffix: CharSequence = "",
+): Map<out CharSequence, CharSequence> {
     val pkg = derivePackageRoot(doc.title)
     val display = deriveDisplayName(doc.title)
 
@@ -314,7 +314,7 @@ fun renderAllClientSources(
         trikeshedContext = doc.trikeshedContext,
     )
 
-    val rootPath = pkg.replace('.', '/')
+    val rootPath = pkg.toString().replace('.', '/')
     val infraPath = "$pkg/infrastructure".replace('.', '/')
     val modelPath = "$pkg/model".replace('.', '/')
     val apiPath = "$pkg/api".replace('.', '/')

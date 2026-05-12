@@ -3,11 +3,11 @@ package borg.trikeshed.couch.relaxfactory
 import borg.trikeshed.couch.internal.urlEncode
 
 class CouchViewInvocation(
-    val path: String,
-    val template: String,
+    val path: CharSequence,
+    val template: CharSequence,
     val returnShape: CouchViewInvocation.ReturnShape,
-   val encodeValue: (Any?) -> String,
-   val databaseName: String = "",
+   val encodeValue: (Any?) -> CharSequence,
+   val databaseName: CharSequence = "",
 ) {
     enum class ReturnShape {
         ListValue,

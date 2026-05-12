@@ -97,7 +97,7 @@ class UserspaceMemoryBufferTest {
 
         // Simulate B+Tree using the buffer as backing store.
         // The tree itself is in-memory; the buffer stores serialized node blobs.
-        val tree = BPlusTree<Long, String>(order = 4)
+        val tree = BPlusTree<Long, CharSequence>(order = 4)
 
         // Insert some entries
         for (i in 1L..20L) {
@@ -120,8 +120,8 @@ class UserspaceMemoryBufferTest {
         assertEquals(1, buf.chunkCount()) // only rootId is active
     }
 
-    // Minimal serialization for the BPlusTree<Long, String> smoke test.
-    private fun serializeTree(tree: BPlusTree<Long, String>): ByteArray {
+    // Minimal serialization for the BPlusTree<Long, CharSequence> smoke test.
+    private fun serializeTree(tree: BPlusTree<Long, CharSequence>): ByteArray {
         val sb = StringBuilder()
         sb.append("${tree.size()}\n")
         // Walk in-order and serialize each entry

@@ -14,7 +14,7 @@ import kotlin.test.*
  */
 class CollectionHandleTest {
 
-   fun doc(vararg pairs: Pair<String, Any?>) =
+   fun doc(vararg pairs: Pair<CharSequence, Any?>) =
         borg.trikeshed.miniduck.DocRowVec(
             pairs.map { it.first },
             pairs.map { it.second },
@@ -49,7 +49,7 @@ class CollectionHandleTest {
         h.append(doc("name" to "alice", "age" to 30))
         h.append(doc("name" to "bob", "age" to 25))
 
-        val snap = h.metaSnapshot { row -> row["name"] as String }
+        val snap = h.metaSnapshot { row -> row["name"] as CharSequence }
 
         assertEquals(2, snap.size)
         assertEquals(30, snap["alice"]["age"])

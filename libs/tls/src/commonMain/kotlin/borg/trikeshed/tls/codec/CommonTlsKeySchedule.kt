@@ -13,7 +13,7 @@ class CommonTlsKeySchedule(
 ) : TlsKeySchedule {
     override val key: kotlin.coroutines.CoroutineContext.Key<*> get() = TlsKeySchedule.Key
 
-    private fun deriveSecret(secret: ByteArray, label: String, messagesHash: ByteArray): ByteArray =
+    private fun deriveSecret(secret: ByteArray, label: CharSequence, messagesHash: ByteArray): ByteArray =
         hkdf.expandLabel(secret, label, messagesHash, 32)
 
     private fun trafficKey(secret: ByteArray): ByteArray =

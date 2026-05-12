@@ -50,7 +50,7 @@ class ReactorWebSocketHandler(
 
     private suspend fun connect(request: HtxClientRequest) {
         // Parse wss://host:port/path
-        val uri = request.path.removePrefix("wss://").removePrefix("ws://")
+        val uri = request.path.toString().removePrefix("wss://").removePrefix("ws://")
         val slash = uri.indexOf('/')
         val hostPort = if (slash >= 0) uri.substring(0, slash) else uri
         val path = if (slash >= 0) uri.substring(slash) else "/"
@@ -74,7 +74,7 @@ class ReactorWebSocketHandler(
         )
 
         // Send handshake via raw or TLS socket
-        val handshakeBytes = handshake.encodeToByteArray()
+        val handshakeBytes = handshake.toString().encodeToByteArray()
         if (tls != null) {
             val encrypted = tls!!.wrap(handshakeBytes)
             writeToSocket(encrypted)
@@ -116,13 +116,13 @@ class ReactorWebSocketHandler(
         return HtxClientMessage(status = 200, body = text)
     }
 
-    fun send(text: String): ByteArray {
+    fun send(text: CharSequence): ByteArray {
         val frame = WebSocketFrame.buildFrame(
             opcode = WebSocketFrame.OpCode.TEXT,
             fin = true,
             masked = true,
             maskingKey = ByteArray(4) { (kotlin.random.Random.nextInt() and 0xFF).toByte() },
-            payload = text.encodeToByteArray(),
+            payload = text.toString().encodeToByteArray(),
         )
         return frame
     }

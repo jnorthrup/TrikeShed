@@ -18,17 +18,17 @@ import borg.trikeshed.parse.json.JsonParser
  *
  * Scalar values use type tagging:
  *   `{"_k":"n"}` = null
- *   `{"_k":"s","v":"..."}` = String
+ *   `{"_k":"s","v":"..."}` = CharSequence
  *   `{"_k":"i","v":30}` = Int
  *   `{"_k":"l","v":9876543210}` = Long
  *   `{"_k":"d","v":3.14}` = Double
  *   `{"_k":"b","v":true}` = Boolean
- *   `{"_k":"m","v":{...}}` = Map<String,Any?>
+ *   `{"_k":"m","v":{...}}` = Map<CharSequence,Any?>
  *   `{"_k":"a","v":[...]}` = List<Any?>
  */
 object MiniDuckBlockCodec {
 
-    fun encode(block: BlockRowVec): String {
+    fun encode(block: BlockRowVec): CharSequence {
         val sb = StringBuilder()
         sb.append("""{"_type":"_block"}""")
         val rows = block.child
@@ -39,7 +39,7 @@ object MiniDuckBlockCodec {
         return sb.toString()
     }
 
-    fun decode(text: String): BlockRowVec {
+    fun decode(text: CharSequence): BlockRowVec {
         val lines = text.split('\n').filter { it.isNotBlank() }
         val block = BlockRowVec.mutable()
         for (idx in 1 until lines.size) {
@@ -147,7 +147,7 @@ object MiniDuckBlockCodec {
     private fun appendObjStore(
         sb: StringBuilder,
         row: RowVec,
-        typeTag: String,
+        typeTag: CharSequence,
         @Suppress("UNUSED_PARAMETER") provider: ObjectStoreProvider,
     ) {
         when (row) {
@@ -159,10 +159,10 @@ object MiniDuckBlockCodec {
     }
 
     private fun appendObjStoreFields(
-        sb: StringBuilder, typeTag: String,
-        bucket: String, key: String, byteSize: Long,
-        contentType: String?, etag: String?, lastModified: String?,
-        versionId: String?, metadata: Map<String, String>?,
+        sb: StringBuilder, typeTag: CharSequence,
+        bucket: CharSequence, key: CharSequence, byteSize: Long,
+        contentType: CharSequence?, etag: CharSequence?, lastModified: CharSequence?,
+        versionId: CharSequence?, metadata: Map<CharSequence, CharSequence>?,
     ) {
         sb.append("{\"_type\":")
         appendJsonString(sb, typeTag)
@@ -214,7 +214,7 @@ object MiniDuckBlockCodec {
         sb.append(']')
     }
 
-    private fun appendStrArray(sb: StringBuilder, list: List<String>) {
+    private fun appendStrArray(sb: StringBuilder, list: List<CharSequence>) {
         sb.append('[')
         list.forEachIndexed { i, s -> if (i > 0) sb.append(','); appendJsonString(sb, s) }
         sb.append(']')
@@ -229,7 +229,7 @@ object MiniDuckBlockCodec {
     private fun appendTaggedValue(sb: StringBuilder, v: Any?) {
         when (v) {
             null -> sb.append("""{"_k":"n"}""")
-            is String -> {
+            is CharSequence -> {
                 sb.append("{\"_k\":\"s\",\"v\":")
                 appendJsonString(sb, v)
                 sb.append('}')
@@ -264,7 +264,7 @@ object MiniDuckBlockCodec {
         }
     }
 
-    private fun appendJsonString(sb: StringBuilder, value: String) {
+    private fun appendJsonString(sb: StringBuilder, value: CharSequence) {
         sb.append('"')
         for (ch in value) when (ch) {
             '\\' -> sb.append("\\\\")
@@ -280,7 +280,7 @@ object MiniDuckBlockCodec {
     // ── Decoding ─────────────────────────────────────────────────────────────
 
     @Suppress("UNCHECKED_CAST")
-    private fun decodeRow(line: String): RowVec? {
+    private fun decodeRow(line: CharSequence): RowVec? {
         val m = JsonParser.parse(line)
         return when (m["_type"]) {
             "doc" -> decodeJsonRow(m, docMode = true)
@@ -304,72 +304,72 @@ object MiniDuckBlockCodec {
      * Json mode: direct nodeType/rawValue mapping.
      */
     @Suppress("UNCHECKED_CAST")
-    private fun decodeJsonRow(m: Map<String, Any?>, docMode: Boolean): JsonRowVec {
-        val nodeType: String
-        val rawValue: String?
+    private fun decodeJsonRow(m: Map<CharSequence, Any?>, docMode: Boolean): JsonRowVec {
+        val nodeType: CharSequence
+        val rawValue: CharSequence?
         if (docMode) {
             // Doc format: store keys+cells as a compact JSON string in rawValue
-            val keys = (m["keys"] as? List<*>)?.map { it as String } ?: emptyList()
+            val keys = (m["keys"] as? List<*>)?.map { it as CharSequence } ?: emptyList()
             val rawCells = (m["cells"] as? List<*>) ?: emptyList<Any?>()
             val cells: List<Any?> = rawCells.map { decodeTagged(it) }
             nodeType = "doc"
             rawValue = if (keys.isEmpty() && cells.isEmpty()) null
                 else keys.zip(cells).joinToString(",", "{", "}") { (k, v) -> "$k:$v" }
         } else {
-            nodeType = m["nodeType"] as? String ?: ""
-            rawValue = m["rawValue"] as? String
+            nodeType = m["nodeType"] as? CharSequence ?: ""
+            rawValue = m["rawValue"] as? CharSequence
         }
         val chRaw = m["_ch"] as? List<*>
         val childFactory: (() -> Series<RowVec>)? = chRaw?.let { list ->
             { list.size j { i: Int -> decodeRow(encodeRowToString(list[i]!!)) ?: JsonRowVec("empty", null) } }
         }
-        return JsonRowVec(nodeType, rawValue, childFactory)
+        return JsonRowVec(nodeType?.toString() ?: "", rawValue?.toString(), childFactory)
     }
 
     @Suppress("UNCHECKED_CAST")
-    private fun decodeView(m: Map<String, Any?>): ViewRowVec {
-        val id = decodeTagged(m["id"]) as? String
+    private fun decodeView(m: Map<CharSequence, Any?>): ViewRowVec {
+        val id = decodeTagged(m["id"]) as? CharSequence
         val key = decodeTagged(m["key"])
         val value = decodeTagged(m["value"])
         val chRaw = m["_ch"] as? List<*>
         val docLoader: (() -> RowVec)? = if (chRaw != null && chRaw.isNotEmpty()) {
             { decodeRow(encodeRowToString(chRaw[0]!!)) ?: JsonRowVec("empty", null) }
         } else null
-        return ViewRowVec(id, key, value, docLoader)
+        return ViewRowVec(id?.toString(), key, value, docLoader)
     }
 
-    private fun decodeManifold(m: Map<String, Any?>): ManifoldConcept<Nothing?> {
+    private fun decodeManifold(m: Map<CharSequence, Any?>): ManifoldConcept<Nothing?> {
         val angular = (m["angular"] as? Long) ?: (m["angular"] as? Number)?.toLong() ?: 0L
         val budget = (m["budget"] as? Long) ?: (m["budget"] as? Number)?.toLong() ?: 0L
         return ManifoldConcept(angular, BudgetCoord.unpack(budget), null)
     }
 
     @Suppress("UNCHECKED_CAST")
-    private fun decodeYamlNode(m: Map<String, Any?>): YamlRowVec {
-        val nodeKind = m["nodeKind"] as? String ?: ""
-        val scalarValue = m["scalarValue"] as? String
+    private fun decodeYamlNode(m: Map<CharSequence, Any?>): YamlRowVec {
+        val nodeKind = m["nodeKind"] as? CharSequence ?: ""
+        val scalarValue = m["scalarValue"] as? CharSequence
         val chRaw = m["_ch"] as? List<*>
         val childFactory: (() -> Series<RowVec>)? = chRaw?.let { list ->
             { list.size j { i: Int -> decodeRow(encodeRowToString(list[i]!!)) ?: JsonRowVec("empty", null) } }
         }
-        return YamlRowVec(nodeKind, scalarValue, childFactory)
+        return YamlRowVec(nodeKind.toString(), scalarValue?.toString(), childFactory)
     }
 
-    private fun decodeBlob(m: Map<String, Any?>): BlobRowVec {
-        val mime = m["mime"] as? String ?: ""
-        val hex = m["bytes"] as? String ?: ""
+    private fun decodeBlob(m: Map<CharSequence, Any?>): BlobRowVec {
+        val mime = m["mime"] as? CharSequence ?: ""
+        val hex = m["bytes"] as? CharSequence ?: ""
         val chRaw = m["_ch"] as? List<*>
         val childFactory: ((ByteArray) -> Series<RowVec>)? = chRaw?.let { list ->
             { _ -> list.size j { i: Int -> decodeRow(encodeRowToString(list[i]!!)) ?: JsonRowVec("empty", null) } }
         }
-        return BlobRowVec(hex.fromHex(), mime, childFactory)
+        return BlobRowVec(hex.fromHex(),   childFactory)
     }
 
     @Suppress("UNCHECKED_CAST")
-    private fun decodeKeyed(m: Map<String, Any?>): DocRowVec {
+    private fun decodeKeyed(m: Map<CharSequence, Any?>): DocRowVec {
         val rawKeys = m["keys"] as? List<*> ?: emptyList<Any?>()
         val rawCells = m["cells"] as? List<*> ?: emptyList<Any?>()
-        val keys: Series<String> = rawKeys.size j { i -> rawKeys[i] as? String ?: "" }
+        val keys  = rawKeys.size.j { i:Int -> rawKeys[i]?.toString() ?: "" as CharSequence}
         val cells: Series<Any?> = rawCells.size j { i -> decodeTagged(rawCells[i]) }
         val chRaw = m["_ch"] as? List<*>
         val childFactory: (() -> Series<RowVec>)? = chRaw?.let { list ->
@@ -379,43 +379,43 @@ object MiniDuckBlockCodec {
     }
 
     @Suppress("UNCHECKED_CAST")
-    private fun decodeGcs(m: Map<String, Any?>): GcsRowVec = GcsRowVec(
-        bucket = m["bucket"] as? String ?: "",
-        key = m["key"] as? String ?: "",
+    private fun decodeGcs(m: Map<CharSequence, Any?>): GcsRowVec = GcsRowVec(
+        bucket = (m["bucket"] as? CharSequence)?.toString() ?: "",
+        key = (m["key"] as? CharSequence)?.toString() ?: "",
         byteSize = (m["byteSize"] as? Long) ?: (m["byteSize"] as? Number)?.toLong() ?: 0L,
-        contentType = m["contentType"] as? String,
-        etag = m["etag"] as? String,
-        lastModified = m["lastModified"] as? String,
-        versionId = m["versionId"] as? String,
-        metadata = (m["metadata"] as? Map<String, Any?>)?.mapValues { it.value as? String ?: it.value.toString() },
+        contentType = (m["contentType"] as? CharSequence)?.toString(),
+        etag = (m["etag"] as? CharSequence)?.toString(),
+        lastModified = (m["lastModified"] as? CharSequence)?.toString(),
+        versionId = (m["versionId"] as? CharSequence)?.toString(),
+        metadata = (m["metadata"] as? Map<*, *>)?.entries?.associate { (k, v) -> k.toString() to (v?.toString() ?: "") },
     )
 
     @Suppress("UNCHECKED_CAST")
-    private fun decodeS3(m: Map<String, Any?>): S3RowVec = S3RowVec(
-        bucket = m["bucket"] as? String ?: "",
-        key = m["key"] as? String ?: "",
+    private fun decodeS3(m: Map<CharSequence, Any?>): S3RowVec = S3RowVec(
+        bucket = (m["bucket"] as? CharSequence)?.toString() ?: "",
+        key = (m["key"] as? CharSequence)?.toString() ?: "",
         byteSize = (m["byteSize"] as? Long) ?: (m["byteSize"] as? Number)?.toLong() ?: 0L,
-        contentType = m["contentType"] as? String,
-        etag = m["etag"] as? String,
-        lastModified = m["lastModified"] as? String,
-        versionId = m["versionId"] as? String,
-        metadata = (m["metadata"] as? Map<String, Any?>)?.let { if (it.isEmpty()) null else it.mapValues { e -> e.value as? String ?: e.value.toString() } },
+        contentType = (m["contentType"] as? CharSequence)?.toString(),
+        etag = (m["etag"] as? CharSequence)?.toString(),
+        lastModified = (m["lastModified"] as? CharSequence)?.toString(),
+        versionId = (m["versionId"] as? CharSequence)?.toString(),
+        metadata = (m["metadata"] as? Map<*, *>)?.entries?.associate { (k, v) -> k.toString() to (v?.toString() ?: "") }?.ifEmpty { null } as Map<CharSequence, CharSequence>?,
     )
 
     @Suppress("UNCHECKED_CAST")
-    private fun decodeAlibaba(m: Map<String, Any?>): AlibabaRowVec = AlibabaRowVec(
-        bucket = m["bucket"] as? String ?: "",
-        key = m["key"] as? String ?: "",
+    private fun decodeAlibaba(m: Map<CharSequence, Any?>): AlibabaRowVec = AlibabaRowVec(
+        bucket = (m["bucket"] as? CharSequence)?.toString() ?: "",
+        key = (m["key"] as? CharSequence)?.toString() ?: "",
         byteSize = (m["byteSize"] as? Long) ?: (m["byteSize"] as? Number)?.toLong() ?: 0L,
-        contentType = m["contentType"] as? String,
-        etag = m["etag"] as? String,
-        lastModified = m["lastModified"] as? String,
-        versionId = m["versionId"] as? String,
-        metadata = (m["metadata"] as? Map<String, Any?>)?.let { if (it.isEmpty()) null else it.mapValues { e -> e.value as? String ?: e.value.toString() } },
+        contentType = (m["contentType"] as? CharSequence)?.toString(),
+        etag = (m["etag"] as? CharSequence)?.toString(),
+        lastModified = (m["lastModified"] as? CharSequence)?.toString(),
+        versionId = (m["versionId"] as? CharSequence)?.toString(),
+        metadata = (m["metadata"] as? Map<*, *>)?.entries?.associate { (k, v) -> k.toString() to (v?.toString() ?: "") }?.ifEmpty { null } as Map<CharSequence, CharSequence>?,
     )
 
     @Suppress("UNCHECKED_CAST")
-    private fun decodeNestedBlock(m: Map<String, Any?>): BlockRowVec {
+    private fun decodeNestedBlock(m: Map<CharSequence, Any?>): BlockRowVec {
         val chRaw = m["_ch"] as? List<*> ?: emptyList<Any?>()
         val block = BlockRowVec.mutable()
         for (item in chRaw) {
@@ -426,7 +426,7 @@ object MiniDuckBlockCodec {
     }
 
     /** Re-encode a decoded JSON Map/value back to a JSON string for recursive row parsing. */
-    private fun encodeRowToString(value: Any): String {
+    private fun encodeRowToString(value: Any): CharSequence {
         val sb = StringBuilder()
         appendAnyJson(sb, value)
         return sb.toString()
@@ -436,7 +436,7 @@ object MiniDuckBlockCodec {
     private fun appendAnyJson(sb: StringBuilder, value: Any?) {
         when (value) {
             null -> sb.append("null")
-            is String -> appendJsonString(sb, value)
+            is CharSequence -> appendJsonString(sb, value)
             is Number -> sb.append(value.toString())
             is Boolean -> sb.append(value.toString())
             is Map<*, *> -> {
@@ -462,16 +462,16 @@ object MiniDuckBlockCodec {
 
     @Suppress("UNCHECKED_CAST")
     private fun decodeTagged(raw: Any?): Any? {
-        val m = raw as? Map<String, Any?> ?: return raw
+        val m = raw as? Map<CharSequence, Any?> ?: return raw
         return when (m["_k"]) {
             "n" -> null
-            "s" -> m["v"] as? String
+            "s" -> m["v"] as? CharSequence
             "i" -> (m["v"] as? Long)?.toInt() ?: (m["v"] as? Number)?.toInt()
             "l" -> (m["v"] as? Long) ?: (m["v"] as? Number)?.toLong()
             "d" -> (m["v"] as? Double) ?: (m["v"] as? Number)?.toDouble()
             "f" -> ((m["v"] as? Double) ?: (m["v"] as? Number)?.toDouble())?.toFloat()
             "b" -> m["v"] as? Boolean
-            "m" -> (m["v"] as? Map<String, Any?>)?.mapValues { decodeTagged(it.value) }
+            "m" -> (m["v"] as? Map<CharSequence, Any?>)?.mapValues { decodeTagged(it.value) }
             "a" -> (m["v"] as? List<*>)?.map { decodeTagged(it) }
             else -> raw
         }
@@ -481,7 +481,7 @@ object MiniDuckBlockCodec {
 
     private val HEX_DIGITS = "0123456789abcdef".toCharArray()
 
-    private fun ByteArray.toHex(): String {
+    private fun ByteArray.toHex(): CharSequence {
         val len = size
         val chars = CharArray(len * 2)
         var ci = 0
@@ -493,7 +493,7 @@ object MiniDuckBlockCodec {
  return chars.concatToString()
     }
 
-    private fun String.fromHex(): ByteArray {
+    private fun CharSequence.fromHex(): ByteArray {
         val len = length ushr 1
         val out = ByteArray(len)
         for (i in 0 until len) {

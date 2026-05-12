@@ -42,7 +42,7 @@ class LinuxChannelOperations : ChannelOperations {
 
     override fun accept(fd: Int): Int = platform.posix.accept(fd, null, null)
 
-    override fun connect(fd: Int, host: String, port: Int): Int = memScoped {
+    override fun connect(fd: Int, host: CharSequence, port: Int): Int = memScoped {
         val addr = alloc<sockaddr_in> {
             sin_family = AF_INET.convert()
             sin_port = ((port ushr 8) or ((port and 0xFF) shl 8)).toUShort().convert()

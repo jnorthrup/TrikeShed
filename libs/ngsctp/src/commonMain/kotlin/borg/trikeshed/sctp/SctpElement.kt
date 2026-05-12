@@ -28,7 +28,7 @@ enum class PathState {
  * @param failures Consecutive heartbeat failures on this path.
  */
 data class PathStatus(
-    val address: String,
+    val address: CharSequence,
     val state: PathState = PathState.UNKNOWN,
     val failures: Int = 0,
 )
@@ -44,9 +44,9 @@ enum class SctpState {
     SHUTDOWN_ACK_SENT,
 }
 
-sealed class SctpError(message: String) : RuntimeException(message) {
-    class BindFailed(details: String) : SctpError(details)
-    class ConnectFailed(details: String) : SctpError(details)
+sealed class SctpError(message: CharSequence) : RuntimeException(message.toString()) {
+    class BindFailed(details: CharSequence) : SctpError(details)
+    class ConnectFailed(details: CharSequence) : SctpError(details)
     class Closed : SctpError("SCTP element is closed")
 }
 
@@ -339,8 +339,8 @@ suspend fun openSctpElement(): SctpElement =
 class SctpElement(
    val streams: MutableMap<Int, StreamHandle> = mutableMapOf(),
    val associations: MutableMap<Long, SctpState> = mutableMapOf(),
-   val paths: List<String> = emptyList(),          // multi-homing: active path addresses
-   val congestionControl: String = "cubic"          // cubic | hstcp | rack — deterministic only
+   val paths: List<CharSequence> = emptyList(),          // multi-homing: active path addresses
+   val congestionControl: CharSequence = "cubic"          // cubic | hstcp | rack — deterministic only
 ) : AsyncContextElement(), StreamTransport {
     companion object Key : AsyncContextKey<SctpElement>()
 
@@ -348,7 +348,7 @@ class SctpElement(
         get() = Key
 
     /** Per-path failover tracking — lazy-initialized from [paths] on first access. */
-    val _pathStatuses: MutableMap<String, PathStatus> by lazy {
+    val _pathStatuses: MutableMap<CharSequence, PathStatus> by lazy {
         paths.associateTo(mutableMapOf()) { it to PathStatus(address = it) }
     }
 
@@ -361,7 +361,7 @@ class SctpElement(
      * Mark [failedPath] as INACTIVE and return the next available ACTIVE path
      * for failover. Returns null if no paths remain.
      */
-    fun failover(failedPath: String): PathStatus? {
+    fun failover(failedPath: CharSequence): PathStatus? {
         val current = _pathStatuses[failedPath] ?: return primaryPath
         _pathStatuses[failedPath] = current.copy(
             state = PathState.INACTIVE,
@@ -371,7 +371,7 @@ class SctpElement(
     }
 
     /** Mark [path] as ACTIVE (recovery after successful heartbeat probe). */
-    fun recoverPath(path: String): PathStatus {
+    fun recoverPath(path: CharSequence): PathStatus {
         val current = _pathStatuses[path] ?: PathStatus(address = path)
         val recovered = current.copy(
             state = PathState.ACTIVE,
@@ -382,7 +382,7 @@ class SctpElement(
     }
 
     /** All path statuses, indexed by address. */
-    val pathStatuses: Map<String, PathStatus> get() = _pathStatuses
+    val pathStatuses: Map<CharSequence, PathStatus> get() = _pathStatuses
 
     override suspend fun openStream(): StreamHandle {
         requireState(ElementState.OPEN)
@@ -398,7 +398,7 @@ class SctpElement(
 
     override val activeStreams: Int get() = streams.size
 
-   fun assocId(host: String, port: Int): Long =
+   fun assocId(host: CharSequence, port: Int): Long =
         (host.hashCode().toLong() shl 32) xor port.toLong()
 
     // ── Server side ──────────────────────────────────────────────────────
@@ -429,7 +429,7 @@ class SctpElement(
      * Initiate connection — sends INIT, enters COOKIE_WAIT (RFC 4960 §5.2.1 step 2).
      * Caller must progress through [handleInitAck] → [handleCookieAck].
      */
-    suspend fun connect(host: String, port: Int): SctpAssociation {
+    suspend fun connect(host: CharSequence, port: Int): SctpAssociation {
         requireState(ElementState.OPEN)
         val id = assocId(host, port)
         associations[id] = SctpState.COOKIE_WAIT

@@ -20,22 +20,22 @@ interface FileOperations : CoroutineContext.Element {
     companion object Key : CoroutineContext.Key<FileOperations>
     override val key: CoroutineContext.Key<*> get() = Key
 
-    fun readAllLines(filename: String): List<String>
-    fun readAllBytes(filename: String): ByteArray
-    fun readString(filename: String): CharSequence
-    fun write(filename: String, bytes: ByteArray)
-    fun write(filename: String, lines: List<String>)
-    fun write(filename: String, string: String)
+    fun readAllLines(filename: CharSequence): List<String>
+    fun readAllBytes(filename: CharSequence): ByteArray
+    fun readString(filename: CharSequence): CharSequence
+    fun write(filename: CharSequence, bytes: ByteArray)
+    fun write(filename: CharSequence, lines: List<CharSequence>)
+    fun write(filename: CharSequence, string: CharSequence)
     fun cwd(): CharSequence
-    fun exists(filename: String): Boolean
-    fun streamLines(fileName: String, bufsize: Int = 64): Sequence<Join<Long, ByteArray>>
-    fun iterateLines(fileName: String, bufsize: Int = 12): Iterable<Join<Long, Series<Byte>>>
-    fun listDir(path: String): List<String>
-    fun isDir(path: String): Boolean
-    fun isFile(path: String): Boolean
-    fun mkdirs(path: String)
-    fun deleteRecursively(path: String)
-    fun resolvePath(vararg parts: String): CharSequence
-    fun readZip(path: String): List<Pair<String, ByteArray>>
-    fun createTempDir(prefix: String): CharSequence
+    fun exists(filename: CharSequence): Boolean
+    fun streamLines(fileName: CharSequence, bufsize: Int = 64): Sequence<Join<Long, ByteArray>>
+    fun iterateLines(fileName: CharSequence, bufsize: Int = 12): Iterable<Join<Long, Series<Byte>>>
+    fun listDir(path: CharSequence): List<String>
+    fun isDir(path: CharSequence): Boolean
+    fun isFile(path: CharSequence): Boolean
+    fun mkdirs(path: CharSequence)
+    fun deleteRecursively(path: CharSequence)
+    fun resolvePath(vararg parts: CharSequence): CharSequence
+    fun readZip(path: CharSequence): List<Pair<String, ByteArray>>
+    fun createTempDir(prefix: CharSequence): CharSequence
 }

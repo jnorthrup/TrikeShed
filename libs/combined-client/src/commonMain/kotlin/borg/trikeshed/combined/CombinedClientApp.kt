@@ -7,10 +7,10 @@ import kotlinx.coroutines.channels.Channel
 data class CombinedSwitches(
     val continueDownload: Boolean = false,
     val saveNotFound: Boolean = false,
-    val dir: String = ".",
+    val dir: CharSequence = ".",
 ) {
     companion object {
-        fun parse(args: List<String>): CombinedSwitches {
+        fun parse(args: List<CharSequence>): CombinedSwitches {
             var continueDownload = false
             var saveNotFound = false
             var dir = "."
@@ -21,19 +21,16 @@ data class CombinedSwitches(
                     arg == "-c" -> continueDownload = true
                     arg == "--save-not-found" -> {
                         val next = args.getOrNull(i + 1)
-                        if (next != null && !next.startsWith("-")) {
+                        if (next != null && !next.toString().startsWith("-")) {
                             i++
-                            saveNotFound = next.toBooleanStrictOrNull() ?: false
+                            saveNotFound = next.toString().toBooleanStrictOrNull() ?: false
                         } else {
                             saveNotFound = true
                         }
                     }
-                    arg.startsWith("--save-not-found=") -> {
-                        saveNotFound = arg.substringAfter("=").toBooleanStrictOrNull() ?: true
-                    }
-                    arg == "-d" -> {
+                    arg.startsWith("--save-not-found=") -> saveNotFound = (""+arg).substringAfter("=").toBooleanStrictOrNull() ?: true; arg == "-d" -> {
                         i++
-                        dir = args.getOrNull(i) ?: "."
+                        dir = args.getOrNull(i)?.toString() ?: "."
                     }
                 }
                 i++
@@ -44,7 +41,7 @@ data class CombinedSwitches(
 }
 
 class CombinedClientApp(
-    private val args: List<String> = emptyList(),
+    private val args: List<CharSequence> = emptyList(),
     private val combinedClient: CombinedClientElement = CombinedClientElement(),
 ) : AsyncContextElement() {
     companion object Key : AsyncContextKey<CombinedClientApp>()

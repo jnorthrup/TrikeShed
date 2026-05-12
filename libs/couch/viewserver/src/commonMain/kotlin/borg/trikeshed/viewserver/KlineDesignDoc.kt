@@ -87,21 +87,21 @@ function(doc) {
 }""".trim()
 
     /** All view definitions: name → (mapSrc, reduceSrc?). */
-    val views: Map<String, Pair<String, String?>> = mapOf(
+    val views: Map<CharSequence, Pair<CharSequence, CharSequence?>> = mapOf(
         "bySymbol"   to (MAP_BY_SYMBOL   to OHLCV_REDUCE),
         "byTimespan" to (MAP_BY_TIMESPAN to OHLCV_REDUCE),
         "byDate"     to (MAP_BY_DATE     to null),
     )
 
     /** Register all cascade kline map+reduce views with [server] under [db]. */
-    fun registerWith(server: ReactorCouchServer, db: String = DEFAULT_DB) {
+    fun registerWith(server: ReactorCouchServer, db: CharSequence = DEFAULT_DB) {
         for ((name, pair) in views) {
             server.registerView(db, "klines", name, pair.first, pair.second)
         }
     }
 
     /** Emit the design document as a CouchDB-compatible JSON string. */
-    fun toJson(): String = buildString {
+    fun toJson(): CharSequence = buildString {
         append("""{"_id":"$DESIGN_ID","language":"javascript","views":{""")
         views.entries.forEachIndexed { i, (name, pair) ->
             if (i > 0) append(',')
