@@ -21,9 +21,7 @@ public abstract class ServerSocketChannel : AbstractSelectableChannel, NetworkCh
     public abstract override fun <T> setOption(option: String, value: T): ServerSocketChannel
     // TODO
     abstract fun accept(): SocketChannel
-    public abstract override fun getLocalAddress(): String
-
-    companion object {
+    public abstract override fun getLocalAddress():CharSequencecompanion object {
         fun open(): ServerSocketChannel {
             val file = Channels.socket(SocketDomain.AF_INET.posix, SocketType.SOCK_STREAM.mask, SocketProtocol.IPPROTO_TCP.posix)
             val channel = Channels.open()
@@ -62,7 +60,7 @@ internal class UringServerSocketChannel(
 
     override fun <T> setOption(option: String, value: T): ServerSocketChannel = this
 
-    override fun getLocalAddress(): String = "0.0.0.0:0"
+    override fun getLocalAddress():CharSequence= "0.0.0.0:0"
 
     // TODO
     override fun accept(): SocketChannel = TODO("accept — Channel.accept + submit+wait")

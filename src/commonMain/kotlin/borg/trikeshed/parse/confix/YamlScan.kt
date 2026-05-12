@@ -1,10 +1,14 @@
 package borg.trikeshed.parse.confix
 
+import borg.trikeshed.lib.Series
+import borg.trikeshed.lib.get
+import borg.trikeshed.lib.size
+import borg.trikeshed.lib.slice
+
 /* ═══════════════════════════════════════════════════════════════════════════════
  *
  *  YAML tokenizer → Series<JsElement>
- * ═══════════════════════════════════════════════════════════════════════════ */
-
+ * ═══════════════════════════════════════════════════════════════════════════
  *  YAML tokenizer (indentation-as-confix flow subset) → Series<JsElement>
  *
  *  Supports the project-sized subset: block mappings ("key: value"), block

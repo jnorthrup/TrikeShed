@@ -6,14 +6,14 @@ import borg.trikeshed.userspace.tensor.DType
 
 /** SSA values: either an operation result or a block argument. */
 sealed class SSAValue {
-    abstract fun name(): String
+    abstract fun name(): CharSequence
 
     data class OpResult(val op: Operation, val index: Int) : SSAValue() {
-        override fun name(): String = "%v${op.uid}.$index"
+        override fun name(): CharSequence = "%v${op.uid}.$index"
     }
 
     data class BlockArgument(val block: Block, val index: Int) : SSAValue() {
-        override fun name(): String = "%arg${block.uid}.$index"
+        override fun name(): CharSequence = "%arg${block.uid}.$index"
     }
 }
 
@@ -69,7 +69,7 @@ class Operation(
     fun result(i: Int): SSAValue = SSAValue.OpResult(this, i)
     fun result(): SSAValue = result(0)
 
-    fun toString(full: Boolean = false): String = buildString {
+    fun toString(full: Boolean = false): String= buildCharSequence{
         if (results.isNotEmpty()) {
             append(results.indices.joinToString(", ") { "${result(it)}" })
             append(" = ")
@@ -122,38 +122,38 @@ sealed class IrType {
     }
 
     class F32(val width: Int = 32) : IrType() {
-        override fun toString(): String = "f$width"
+        override fun toString(): String= "f$width"
     }
 
     class F64(val width: Int = 64) : IrType() {
-        override fun toString(): String = "f$width"
+        override fun toString(): String= "f$width"
     }
 
     class Integer(val width: Int, val signed: Boolean = true) : IrType() {
-        override fun toString(): String = if (signed) "i$width" else "i$width"
+        override fun toString(): String= if (signed) "i$width" else "i$width"
     }
 
     class Index : IrType() {
-        override fun toString(): String = "index"
+        override fun toString(): String= "index"
     }
 
     class MemRef(val elementType: IrType, val shape: List<Int>) : IrType() {
-        override fun toString(): String = "memref<${shape.joinToString("x")}x$elementType>"
+        override fun toString(): String= "memref<${shape.joinToString("x")}x$elementType>"
     }
 
     class Tensor(val elementType: IrType, val shape: List<Int>) : IrType() {
-        override fun toString(): String = when (shape) {
+        override fun toString(): String= when (shape) {
             emptyList<Int>() -> elementType.toString()
             else -> "tensor<${shape.joinToString("x")}x$elementType>"
         }
     }
 
     class Vector(val elementType: IrType, val shape: List<Int>) : IrType() {
-        override fun toString(): String = "vector<${shape.joinToString("x")}x$elementType>"
+        override fun toString(): String= "vector<${shape.joinToString("x")}x$elementType>"
     }
 
     class Function(val inputs: List<IrType>, val outputs: List<IrType>) : IrType() {
-        override fun toString(): String = "(() -> ())"
+        override fun toString(): String= "(() -> ())"
     }
 }
 
@@ -174,19 +174,19 @@ fun DType.toMLIR(): IrType = when (this) {
 /** Compile-time constant values. */
 sealed class IrAttribute {
     class IntAttr(val value: Int, val type: IrType) : IrAttribute() {
-        override fun toString(): String = "$value : $type"
+        override fun toString(): String= "$value : $type"
     }
 
     class FloatAttr(val value: Double, val type: IrType) : IrAttribute() {
-        override fun toString(): String = "$value : $type"
+        override fun toString(): String= "$value : $type"
     }
 
     class StringAttr(val value: String) : IrAttribute() {
-        override fun toString(): String = "\"$value\""
+        override fun toString(): String= "\"$value\""
     }
 
     class DenseAttr(val values: List<Number>, val type: IrType) : IrAttribute() {
-        override fun toString(): String = "dense<${values.joinToString(",")}> : $type"
+        override fun toString(): String= "dense<${values.joinToString(",")}> : $type"
     }
 }
 

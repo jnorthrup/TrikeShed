@@ -22,10 +22,8 @@ public abstract class DatagramChannel : AbstractSelectableChannel, ByteChannel, 
     // TODO
     abstract fun disconnect(): DatagramChannel
     // TODO
-    abstract fun getRemoteAddress(): String
-    // TODO
-    abstract fun receive(dst: ByteRegion): String
-    // TODO
+    abstract fun getRemoteAddress():CharSequence// TODO
+    abstract fun receive(dst: ByteRegion):CharSequence// TODO
     abstract fun send(src: ByteBuffer, address: String): Int
     public abstract override fun read(dst: ByteBuffer): Int
     public abstract override fun read(dsts: Array<out ByteBuffer>, offset: Int, length: Int): Long
@@ -33,9 +31,7 @@ public abstract class DatagramChannel : AbstractSelectableChannel, ByteChannel, 
     public abstract override fun write(src: ByteBuffer): Int
     public abstract override fun write(srcs: Array<out ByteBuffer>, offset: Int, length: Int): Long
     public abstract override fun write(srcs: Array<out ByteBuffer>): Long
-    public abstract override fun getLocalAddress(): String
-
-    companion object {
+    public abstract override fun getLocalAddress():CharSequencecompanion object {
         fun `open`(): DatagramChannel = TODO("NIO common stub")
         fun `open`(protocolFamily: String): DatagramChannel = TODO("NIO common stub")
     }

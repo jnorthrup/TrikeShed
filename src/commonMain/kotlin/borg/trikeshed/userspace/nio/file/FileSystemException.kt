@@ -7,7 +7,7 @@ package borg.trikeshed.userspace.nio.file
 public open class FileSystemException : borg.trikeshed.userspace.nio.IOException {
     constructor(p0: String) : super(p0)
     constructor(p0: String, p1: String, p2: String) : super(listOfNotNull(p0, p1, p2).joinToString(" -> "))
-    fun getFile(): String = TODO("NIO common stub")
-    fun getOtherFile(): String = TODO("NIO common stub")
-    fun getReason(): String = TODO("NIO common stub")
+    fun getFile():CharSequence= TODO("NIO common stub")
+    fun getOtherFile():CharSequence= TODO("NIO common stub")
+    fun getReason():CharSequence= TODO("NIO common stub")
 }

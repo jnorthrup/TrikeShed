@@ -20,7 +20,7 @@ public class Files {
             FileChannel.open(Paths.get(path), *options)
 
         fun readAllBytes(path: String): ByteArray = fileOperations.readAllBytes(path)
-        fun readString(path: String, charset: Charset = StandardCharsets.UTF_8): String = fileOperations.readString(path)
+        fun readString(path: String, charset: Charset = StandardCharsets.UTF_8):CharSequence= fileOperations.readString(path)
         fun readAllLines(path: String, charset: Charset = StandardCharsets.UTF_8): List<String> = fileOperations.readAllLines(path)
         fun readAllLines(path: String): List<String> = readAllLines(path, StandardCharsets.UTF_8)
 
@@ -122,8 +122,8 @@ public class Files {
         fun copy(`in`: Any, path: String, vararg options: CopyOption): Long = TODO("copy stream->file")
         fun copy(path: String, out: Any): Long = TODO("copy file->stream")
         fun getFileStore(path: String): FileStore = TODO("statfs")
-        fun probeContentType(path: String): String = TODO("content type")
- fun cwd(): String = fileOperations.cwd()
+        fun probeContentType(path: String):CharSequence= TODO("content type")
+ fun cwd():CharSequence= fileOperations.cwd()
 
         // --- Path-based overloads (delegate to String-path versions) ---
 
@@ -132,7 +132,7 @@ public class Files {
         fun newByteChannel(path: Path, vararg options: OpenOption): SeekableByteChannel =
             newByteChannel(path.toString(), *options)
         fun readAllBytes(path: Path): ByteArray = readAllBytes(path.toString())
-        fun readString(path: Path, charset: Charset = StandardCharsets.UTF_8): String = readString(path.toString(), charset)
+        fun readString(path: Path, charset: Charset = StandardCharsets.UTF_8):CharSequence= readString(path.toString(), charset)
         fun readAllLines(path: Path, charset: Charset = StandardCharsets.UTF_8): List<String> = readAllLines(path.toString(), charset)
         fun readAllLines(path: Path): List<String> = readAllLines(path.toString())
         fun write(path: Path, bytes: ByteArray, vararg options: OpenOption): Path = write(path.toString(), bytes, *options)
@@ -193,7 +193,7 @@ public class Files {
         fun copy(`in`: Any, path: Path, vararg options: CopyOption): Long = copy(`in`, path.toString(), *options)
         fun copy(path: Path, out: Any): Long = copy(path.toString(), out)
         fun getFileStore(path: Path): FileStore = getFileStore(path.toString())
-        fun probeContentType(path: Path): String = probeContentType(path.toString())
+        fun probeContentType(path: Path):CharSequence= probeContentType(path.toString())
     }
 }
 

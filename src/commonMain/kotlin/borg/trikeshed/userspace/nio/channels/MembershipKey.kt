@@ -17,9 +17,6 @@ public abstract class MembershipKey {
     // TODO
     abstract fun channel(): MulticastChannel
     // TODO
-    abstract fun group(): String
-    // TODO
-    abstract fun networkInterface(): String
-    // TODO
-    abstract fun sourceAddress(): String
-}
+    abstract fun group():CharSequence// TODO
+    abstract fun networkInterface():CharSequence// TODO
+    abstract fun sourceAddress():CharSequence}

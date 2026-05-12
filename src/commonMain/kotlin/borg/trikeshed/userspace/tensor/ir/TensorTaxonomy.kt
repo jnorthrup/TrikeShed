@@ -42,7 +42,7 @@ enum class DialectLevel {
     ;
 
     /** Canonical MLIR dialect name */
-    val mlirName: String get() = when (this) {
+    val mlirName: Stringget() = when (this) {
         Linalg -> "linalg"
         Tensor -> "tensor"
         Vector -> "vector"

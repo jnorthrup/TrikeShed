@@ -31,5 +31,5 @@ public open class FileLock {
     open fun release() {}
     // TODO
     open fun close() { release() }
-    override fun toString(): String = "FileLock($_channel, $_position, $_size, $_shared)"
+    override fun toString():CharSequence= "FileLock($_channel, $_position, $_size, $_shared)"
 }

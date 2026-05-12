@@ -189,7 +189,7 @@ public open class ByteBuffer protected constructor(
 
     public override fun isDirect(): Boolean = false
 
-    public override fun toString(): String = "ByteBuffer(position=${position0}, limit=${limit0}, capacity=${capacity}, order=${order0})"
+    public override fun toString():CharSequence= "ByteBuffer(position=${position0}, limit=${limit0}, capacity=${capacity}, order=${order0})"
 
     public override fun hashCode(): Int {
         var result = 1

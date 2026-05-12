@@ -10,11 +10,11 @@ public interface WatchEvent<T : Any> {
     fun context(): T = TODO("NIO common stub")
 
     public interface Kind<T : Any> {
-        fun name(): String = TODO("NIO common stub")
+        fun name():CharSequence= TODO("NIO common stub")
         fun type(): kotlin.reflect.KClass<T> = TODO("NIO common stub")
     }
 
     public interface Modifier {
-        fun name(): String = TODO("NIO common stub")
+        fun name():CharSequence= TODO("NIO common stub")
     }
 }

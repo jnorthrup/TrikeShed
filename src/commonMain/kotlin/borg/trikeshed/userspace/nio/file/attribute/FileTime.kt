@@ -29,7 +29,7 @@ public class FileTime private constructor(private val millis: Long) : Comparable
 
     override fun compareTo(other: FileTime): Int = millis.compareTo(other.millis)
 
-    override fun toString(): String = toInstant().toString()
+    override fun toString():CharSequence= toInstant().toString()
 
     companion object {
         fun from(value: Long, unit: DurationUnit): FileTime = when (unit) {

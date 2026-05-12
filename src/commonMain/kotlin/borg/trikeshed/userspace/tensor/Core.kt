@@ -101,7 +101,7 @@ class Tensor constructor(
     fun asBytes(): ByteArray = data.copyOf()
     fun asBytesMut(): ByteArray = data
 
-    override fun toString(): String {
+    override fun toString():CharSequence{
         return "Tensor(shape=${shape.dims()}, dtype=$dtype, sizeBytes=${data.size})"
     }
 }

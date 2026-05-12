@@ -23,16 +23,14 @@ public abstract class SocketChannel : AbstractSelectableChannel, ByteChannel, Sc
     // TODO
     abstract fun connect(address: String): Boolean
     fun finishConnect(): Boolean = false
-    fun getRemoteAddress(): String = "0.0.0.0:0"
+    fun getRemoteAddress():CharSequence= "0.0.0.0:0"
     public abstract override fun read(dst: ByteBuffer): Int
     public abstract override fun read(dsts: Array<out ByteBuffer>, offset: Int, length: Int): Long
     public abstract override fun read(dsts: Array<out ByteBuffer>): Long
     public abstract override fun write(src: ByteBuffer): Int
     public abstract override fun write(srcs: Array<out ByteBuffer>, offset: Int, length: Int): Long
     public abstract override fun write(srcs: Array<out ByteBuffer>): Long
-    public abstract override fun getLocalAddress(): String
-
-    companion object {
+    public abstract override fun getLocalAddress():CharSequencecompanion object {
         fun open(): SocketChannel {
             val file = Channels.socket(SocketDomain.AF_INET.posix, SocketType.SOCK_STREAM.mask, SocketProtocol.IPPROTO_TCP.posix)
             val channel = Channels.open()
@@ -96,7 +94,7 @@ internal class UringSocketChannel(
     }
 
     override fun write(srcs: Array<out ByteBuffer>): Long = write(srcs, 0, srcs.size)
-    override fun getLocalAddress(): String = "0.0.0.0:0"
+    override fun getLocalAddress():CharSequence= "0.0.0.0:0"
 
     // TODO
     override fun shutdownInput(): SocketChannel = TODO("shutdown")

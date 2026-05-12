@@ -5,5 +5,5 @@ package borg.trikeshed.userspace.nio.charset
 public open class UnsupportedCharsetException : IllegalArgumentException {
     public constructor(p0: String) : super(p0)
 
-    public fun getCharsetName(): String = message ?: ""
+    public fun getCharsetName():CharSequence= message ?: ""
 }

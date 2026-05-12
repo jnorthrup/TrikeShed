@@ -1,10 +1,10 @@
 package borg.trikeshed.parse.confix
 
+import borg.trikeshed.lib.*
+
 /* ═══════════════════════════════════════════════════════════════════════════════
  *
- *  CBOR tokenizer → Series<JsElement>
- * ═══════════════════════════════════════════════════════════════════════════ */
-
+ *
  *  CBOR tokenizer → Series<JsElement> over a Series<Byte>
  *
  *  CBOR is binary; the scanner operates directly on bytes via ByteSeries

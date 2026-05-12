@@ -237,7 +237,7 @@ fun lowerFuncToLLVM(): LoweringPass = { region ->
 
 data class Pipeline(
     val stages: List<LoweringPass>,
-    val entryName: String = "main"
+    val entryName: String= "main"
 ) {
     /** Run all stages in sequence, returning the final lowered region */
     fun lower(region: Region): Region = stages.fold(region) { r, stage -> stage(r) }

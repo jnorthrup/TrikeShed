@@ -11,7 +11,7 @@ import kotlin.coroutines.CoroutineContext
  * No disk IO. Deterministic. Suitable for test fixtures.
  */
 class InMemoryFileOperations(
-    private val cwd: String = "/mem",
+    private val cwd:CharSequence= "/mem",
 ) : FileOperations {
 
     private val files = mutableMapOf<String, ByteArray>()
@@ -23,7 +23,7 @@ class InMemoryFileOperations(
     override fun readAllBytes(filename: String): ByteArray =
         files[filename] ?: throw NoSuchFileException(filename)
 
-    override fun readString(filename: String): String =
+    override fun readString(filename: String):CharSequence=
         readAllBytes(filename).decodeToString()
 
     override fun exists(filename: String): Boolean =
@@ -63,12 +63,12 @@ class InMemoryFileOperations(
         dirs.removeAll { it == path || it.startsWith(prefix) }
     }
 
-    override fun cwd(): String = cwd
+    override fun cwd():CharSequence= cwd
 
-    override fun resolvePath(vararg parts: String): String =
+    override fun resolvePath(vararg parts: String):CharSequence=
         parts.fold(cwd) { acc, seg -> "$acc/$seg" }.replace("//", "/")
 
-    override fun createTempDir(prefix: String): String {
+    override fun createTempDir(prefix: String):CharSequence{
         val path = "/tmp/$prefix-${files.size}"
         mkdirs(path)
         return path

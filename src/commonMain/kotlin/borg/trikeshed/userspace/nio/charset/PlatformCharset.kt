@@ -7,14 +7,14 @@ internal class PlatformCharset private constructor(
 ) {
     fun canEncode(): Boolean = true
 
-    fun decode(bytes: ByteArray, offset: Int, length: Int): String = codec.decode(bytes, offset, length)
+    fun decode(bytes: ByteArray, offset: Int, length: Int):CharSequence= codec.decode(bytes, offset, length)
 
     fun encode(value: String): ByteArray = codec.encode(value)
 
     fun contains(other: PlatformCharset): Boolean = this === other
 
     private interface Codec {
-        fun decode(bytes: ByteArray, offset: Int, length: Int): String = TODO("NIO common stub")
+        fun decode(bytes: ByteArray, offset: Int, length: Int):CharSequence= TODO("NIO common stub")
         fun encode(value: String): ByteArray = TODO("NIO common stub")
     }
 
@@ -23,7 +23,7 @@ internal class PlatformCharset private constructor(
             name = "UTF-8",
             aliases = setOf("UTF8", "unicode-1-1-utf-8"),
             codec = object : Codec {
-                override fun decode(bytes: ByteArray, offset: Int, length: Int): String =
+                override fun decode(bytes: ByteArray, offset: Int, length: Int):CharSequence=
                     bytes.decodeToString(offset, offset + length)
 
                 override fun encode(value: String): ByteArray = value.encodeToByteArray()
@@ -34,7 +34,7 @@ internal class PlatformCharset private constructor(
             name = "ISO-8859-1",
             aliases = setOf("ISO8859-1", "ISO_8859-1", "latin1", "latin-1"),
             codec = object : Codec {
-                override fun decode(bytes: ByteArray, offset: Int, length: Int): String = buildString(length) {
+                override fun decode(bytes: ByteArray, offset: Int, length: Int):CharSequence= buildString(length) {
                     for (i in offset until offset + length) {
                         append(bytes[i].toInt().and(0xff).toChar())
                     }
@@ -75,4 +75,4 @@ internal class PlatformCharset private constructor(
     }
 }
 
-private fun String.normalizedCharsetName(): String = trim().uppercase()
+private fun String.normalizedCharsetName():CharSequence= trim().uppercase()

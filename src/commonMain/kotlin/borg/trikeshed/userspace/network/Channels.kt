@@ -18,8 +18,7 @@ class ChannelMetadata(
 }
 
 interface Channel {
-    fun channelType(): String
-    fun isConnected(): Boolean
+    fun channelType():CharSequencefun isConnected(): Boolean
     fun metadata(): ChannelMetadata?
     fun read(dst: ByteRegion): Int
     fun write(src: ByteSeries): Int
@@ -27,8 +26,7 @@ interface Channel {
 
 interface Channels {
     fun open(addr: String): Channel
-    fun providerName(): String
-}
+    fun providerName():CharSequence}
 
 @Deprecated("Use Channels.", ReplaceWith("Channels"))
 typealias ChannelProvider = Channels

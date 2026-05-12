@@ -1,10 +1,11 @@
 package borg.trikeshed.parse.confix
 
+import borg.trikeshed.lib.CharSeries
+import borg.trikeshed.lib.Series
+import borg.trikeshed.lib.get
+
 /* ═══════════════════════════════════════════════════════════════════════════════
  *
- *  JSON tokenizer → Series<JsElement>
- * ═══════════════════════════════════════════════════════════════════════════ */
-
  *  JSON tokenizer → Series<JsElement> over the input Series<Char>
  * ═══════════════════════════════════════════════════════════════════════════ */
 

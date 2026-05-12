@@ -15,8 +15,7 @@ enum class AdapterType {
 
 interface SessionChannel {
     fun adapterType(): AdapterType
-    fun remoteAddr(): String
-    fun isConnected(): Boolean
+    fun remoteAddr():CharSequencefun isConnected(): Boolean
     fun close(): Result<Unit>
     fun read(dst: ByteRegion): Int
     fun write(src: ByteSeries): Int

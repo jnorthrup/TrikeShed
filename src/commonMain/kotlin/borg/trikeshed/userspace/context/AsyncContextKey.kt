@@ -21,7 +21,7 @@ sealed class AsyncContextKey {
     /**
      * Key for TrikeShed Userspace NIO context elements.
      * Singleton object: always compare by identity (===).
-     * Type-parameterized as Key<NioUserspaceElement> for safe context lookup.
+     * Type-parameterized as Ke y<NioUserspaceElement> for safe context lookup.
      */
     object NioUserspaceKey : AsyncContextKey(), CoroutineContext.Key<NioUserspaceElement>
 

@@ -3,6 +3,7 @@
 package borg.trikeshed.tinybtrfs
 
 import borg.trikeshed.lib.*
+import kotlin.jvm.JvmName
 
 interface Codec<K : Comparable<K>, V> {
     fun encode(node: BPlusTree.Node<K, V>): ByteArray
@@ -424,7 +425,7 @@ class BPlusTree<K : Comparable<K>, V>(
 
     @JvmName("bulkLoadFromList")
     fun bulkLoad(sortedPairs: List<Pair<K, V>>) {
-        bulkLoad(sortedPairs.toSeries().let { list -> list.size j { i -> list[i].a j list[i].b } })
+        bulkLoad(sortedPairs.size j { i -> sortedPairs[i].first j sortedPairs[i].second })
     }
 
     fun validateFanoutBounds(): Boolean {

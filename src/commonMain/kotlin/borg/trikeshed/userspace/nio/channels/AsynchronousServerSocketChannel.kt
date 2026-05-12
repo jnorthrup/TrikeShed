@@ -20,9 +20,7 @@ public abstract class AsynchronousServerSocketChannel {
     // TODO
     abstract fun accept(): AsynchronousSocketChannel
     // TODO
-    abstract fun getLocalAddress(): String
-
-    companion object {
+    abstract fun getLocalAddress():CharSequencecompanion object {
         fun `open`(group: AsynchronousChannelGroup): AsynchronousServerSocketChannel = TODO("NIO common stub")
         fun `open`(): AsynchronousServerSocketChannel = TODO("NIO common stub")
     }

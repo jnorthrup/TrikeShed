@@ -1,10 +1,14 @@
 package borg.trikeshed.parse.confix
 
+import borg.trikeshed.lib.*
+import borg.trikeshed.lib.Series
+
 /* ═══════════════════════════════════════════════════════════════════════════════
  *
  *  CSV tokenizer → Series<JsElement>
  * ═══════════════════════════════════════════════════════════════════════════ */
-
+/* ═══════════════════════════════════════════════════════════════════════════
+ *
  *  CSV tokenizer → Series<JsElement> over Series<Char>.
  *
  *  Algebraically identical to JSON: a CSV is treated as a virtual array of

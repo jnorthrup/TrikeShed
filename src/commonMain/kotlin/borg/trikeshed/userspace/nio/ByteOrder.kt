@@ -3,7 +3,7 @@
 package borg.trikeshed.userspace.nio
 
 public open class ByteOrder(private val orderName: String) {
-    override fun toString(): String = orderName
+    override fun toString():CharSequence= orderName
 
     public companion object {
         val BIG_ENDIAN: borg.trikeshed.userspace.nio.ByteOrder = object : ByteOrder("BIG_ENDIAN") {}

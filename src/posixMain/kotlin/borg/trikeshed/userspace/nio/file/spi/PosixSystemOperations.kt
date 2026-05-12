@@ -11,6 +11,6 @@ class PosixSystemOperations : SystemOperations {
         val ptr = posix_getenv(name); return ptr?.toKString() ?: defaultVal
     }
 
-    override val homedir: String
+    override val homedir: CharSequence
         get() { val ptr = posix_getenv("HOME"); return ptr?.toKString() ?: "/tmp" }
 }

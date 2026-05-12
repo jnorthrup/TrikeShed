@@ -3,15 +3,15 @@ package borg.trikeshed.miniduck
 import borg.trikeshed.cursor.*
 import borg.trikeshed.lib.*
 /** Equality predicate for Cursor.where. */
-fun Eq(column: String, value: Any?): (RowVec) -> Boolean = { it.getValue(column) == value }
+fun Eq(column: CharSequence, value: Any?): (RowVec) -> Boolean = { it.getValue(column) == value }
 
 /** Greater-than-or-equal predicate for Cursor.where. */
-fun Ge(column: String, value: Any?): (RowVec) -> Boolean = {
+fun Ge(column: CharSequence, value: Any?): (RowVec) -> Boolean = {
     compareCursorValues(it.getValue(column), value)?.let { result -> result >= 0 } ?: false
 }
 
 /** Greater-than predicate for Cursor.where. */
-fun Gt(column: String, value: Any?): (RowVec) -> Boolean = {
+fun Gt(column: CharSequence, value: Any?): (RowVec) -> Boolean = {
     compareCursorValues(it.getValue(column), value)?.let { result -> result > 0 } ?: false
 }
 
@@ -81,10 +81,10 @@ fun Cursor.orderBy(vararg specs: OrderSpec): Cursor {
 }
 
 /** Order by a single column (ascending). */
-fun Cursor.orderBy(column: String): Cursor = orderBy(OrderSpec(column))
+fun Cursor.orderBy(column: CharSequence): Cursor = orderBy(OrderSpec(column.toString()))
 
 /** Order by a single column with explicit direction. */
-fun Cursor.orderBy(column: String, desc: Boolean): Cursor = orderBy(OrderSpec(column, desc = desc))
+fun Cursor.orderBy(column: CharSequence, desc: Boolean): Cursor = orderBy(OrderSpec(column.toString(), desc = desc))
 
 /** Chain transforms. */
 infix fun <T> Cursor.then(transform: (Cursor) -> T): T = transform(this)
@@ -93,7 +93,7 @@ infix fun <T> Cursor.then(transform: (Cursor) -> T): T = transform(this)
 fun emptyCursor(): Cursor = emptySeries()
 
 /** Minus operator to exclude a column. */
-operator fun Cursor.minus(columnName: String): Cursor {
+operator fun Cursor.minus(columnName: CharSequence): Cursor {
     val meta = this.meta
     val colIdx = meta.view.indexOfFirst { it.name == columnName }
     if (colIdx < 0) return this
@@ -128,7 +128,7 @@ interface Accumulator {
 }
 
 object Agg {
-    fun count(column: String = "*"): Aggregation = object : Aggregation {
+    fun count(column: CharSequence = "*"): Aggregation = object : Aggregation {
         override val targetColumn: String = column
         override val outputColumn: String = "count"
         override fun createAccumulator(): Accumulator = object : Accumulator {
@@ -138,7 +138,7 @@ object Agg {
         }
     }
 
-    fun sum(column: String): Aggregation = object : Aggregation {
+    fun sum(column: CharSequence): Aggregation = object : Aggregation {
         override val targetColumn: String = column
         override val outputColumn: String = "sum_$column"
         override fun createAccumulator(): Accumulator = object : Accumulator {
@@ -150,7 +150,7 @@ object Agg {
         }
     }
 
-    fun avg(column: String): Aggregation = object : Aggregation {
+    fun avg(column: CharSequence): Aggregation = object : Aggregation {
         override val targetColumn: String = column
         override val outputColumn: String = "avg_$column"
         override fun createAccumulator(): Accumulator = object : Accumulator {
@@ -166,7 +166,7 @@ object Agg {
         }
     }
 
-    fun min(column: String): Aggregation = object : Aggregation {
+    fun min(column: CharSequence): Aggregation = object : Aggregation {
         override val targetColumn: String = column
         override val outputColumn: String = "min_$column"
         override fun createAccumulator(): Accumulator = object : Accumulator {
@@ -181,7 +181,7 @@ object Agg {
         }
     }
 
-    fun max(column: String): Aggregation = object : Aggregation {
+    fun max(column: CharSequence): Aggregation = object : Aggregation {
         override val targetColumn: String = column
         override val outputColumn: String = "max_$column"
         override fun createAccumulator(): Accumulator = object : Accumulator {
@@ -198,7 +198,7 @@ object Agg {
 }
 
 /** Group by a column with aggregations. */
-fun Cursor.groupBy(keyColumn: String, vararg aggregations: Aggregation): Cursor {
+fun Cursor.groupBy(keyColumn: CharSequence, vararg aggregations: Aggregation): Cursor {
     if (size == 0) return this
 
     val groups = mutableMapOf<Any?, MutableList<Accumulator>>()
@@ -226,7 +226,7 @@ fun Cursor.groupBy(keyColumn: String, vararg aggregations: Aggregation): Cursor 
 }
 
 /** Hash join with another cursor. */
-fun Cursor.hashJoin(other: Cursor, leftKey: String, rightKey: String): Cursor {
+fun Cursor.hashJoin(other: Cursor, leftKey: CharSequence, rightKey: CharSequence): Cursor {
     if (this.size == 0 || other.size == 0) return emptyCursor()
 
     val rightIndex = mutableMapOf<Any?, MutableList<RowVec>>()
@@ -258,7 +258,7 @@ fun Cursor.hashJoin(other: Cursor, leftKey: String, rightKey: String): Cursor {
 }
 
 /** Join alias. */
-fun Cursor.join(other: Cursor, leftKey: String, rightKey: String): Cursor = hashJoin(other, leftKey, rightKey)
+fun Cursor.join(other: Cursor, leftKey: CharSequence, rightKey: CharSequence): Cursor = hashJoin(other, leftKey, rightKey)
 
 /**
  * Compare two nullable key values for ordering.
@@ -326,7 +326,7 @@ private fun rowCell(row: RowVec, index: Int): Any? = when (row) {
     else -> row[index].a
 }
 
-private fun rowValue(row: RowVec, column: String): Any? = when (row) {
+private fun rowValue(row: RowVec, column: CharSequence): Any? = when (row) {
     is DocRowVec -> row.getValue(column)
     is ViewRowVec -> row.getValue(column)
     is JsonRowVec -> when (column) {

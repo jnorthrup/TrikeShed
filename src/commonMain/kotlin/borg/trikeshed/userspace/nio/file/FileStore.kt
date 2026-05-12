@@ -6,8 +6,8 @@ package borg.trikeshed.userspace.nio.file
 // Declarations intentionally mirror JDK taxonomy and contain no implementations.
 public abstract class FileStore {
     protected constructor()
-    fun name(): String = TODO("NIO common stub")
-    fun type(): String = TODO("NIO common stub")
+    fun name():CharSequence= TODO("NIO common stub")
+    fun type():CharSequence= TODO("NIO common stub")
     fun isReadOnly(): Boolean = TODO("NIO common stub")
     fun getTotalSpace(): Long = TODO("NIO common stub")
     fun getUsableSpace(): Long = TODO("NIO common stub")

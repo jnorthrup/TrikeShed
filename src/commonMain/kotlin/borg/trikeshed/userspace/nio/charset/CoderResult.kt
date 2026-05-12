@@ -5,7 +5,7 @@ package borg.trikeshed.userspace.nio.charset
 // Generated from Amazon Corretto JDK 25 java.base NIO public/protected API via javap.
 // Declarations intentionally mirror JDK taxonomy and contain no implementations.
 public class CoderResult {
-    override fun toString(): String = TODO("NIO common stub")
+    override fun toString():CharSequence= TODO("NIO common stub")
     fun isUnderflow(): Boolean = TODO("NIO common stub")
     fun isOverflow(): Boolean = TODO("NIO common stub")
     fun isError(): Boolean = TODO("NIO common stub")

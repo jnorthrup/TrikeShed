@@ -6,8 +6,7 @@ package borg.trikeshed.userspace.nio.channels
 // Declarations intentionally mirror JDK taxonomy and contain no implementations.
 public interface NetworkChannel : Channel {
     fun bind(address: String): NetworkChannel
-    fun getLocalAddress(): String
-    fun <T> setOption(option: String, value: T): NetworkChannel
+    fun getLocalAddress():CharSequencefun <T> setOption(option: String, value: T): NetworkChannel
     fun <T> getOption(option: String): T
     fun supportedOptions(): Set<String>
 }

@@ -18,8 +18,7 @@ typealias JitSymbol = Long
  */
 data class JitResult(
     val symbol: JitSymbol,
-    val entryName: String
-)
+    val entryName:CharSequence)
 
 /**
  * ORC JIT compiler state
@@ -78,8 +77,7 @@ sealed class TensorOp {
 class CompileRequest(
     val operation: TensorOp,
     val inputShapes: List<List<Int>>,
-    val dtype: String
-) {
+    val dtype:CharSequence) {
     companion object {
         fun create(operation: TensorOp, inputShapes: List<List<Int>>, dtype: String): CompileRequest {
             return CompileRequest(operation, inputShapes, dtype)
@@ -109,7 +107,7 @@ class MlirOrcBuilder(
     /**
      * Generate MLIR IR for pending operations
      */
-    fun emitMlir(): String {
+    fun emitMlir():CharSequence{
         val ir = StringBuilder()
         ir.appendLine("module {")
 
@@ -212,7 +210,7 @@ class TensorGraph {
         return optimized
     }
 
-    fun toMlir(): String {
+    fun toMlir():CharSequence{
         val ir = StringBuilder()
         ir.appendLine("// Tensor computation graph compiled to MLIR")
         ir.appendLine("module {")

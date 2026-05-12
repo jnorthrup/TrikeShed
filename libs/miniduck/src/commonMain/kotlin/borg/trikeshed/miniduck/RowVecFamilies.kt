@@ -47,7 +47,7 @@ value class JsonRowVec(
 
     operator fun get(index: Int): Any? = when (index) { 0 -> nodeType; else -> rawValue }
 
-    fun getValue(name: String): Any? = when (name) {
+    fun getValue(name: CharSequence): Any? = when (name.toString()) {
         "nodeType" -> nodeType
         "rawValue" -> rawValue
         else -> null
@@ -89,18 +89,18 @@ class DocRowVec private constructor(
 
     operator fun get(index: Int): Any? = if (index in 0 until keys.size) cells[index] else null
 
-    operator fun get(name: String): Any? = getValue(name)
+    operator fun get(name: CharSequence): Any? = getValue(name)
 
-    fun getValue(name: String): Any? {
+    fun getValue(name: CharSequence): Any? {
         val cached = keysList
         if (cached != null) {
             for (i in cached.indices) {
-                if (cached[i] == name) return cells[i]
+                if (cached[i].contentEquals(name)) return cells[i]
             }
             return null
         }
         for (i in 0 until keys.size) {
-            if (keys[i] == name) return cells[i]
+            if (keys[i].contentEquals(name)) return cells[i]
         }
         return null
     }
@@ -142,7 +142,7 @@ value class ViewRowVec(
         0 -> id; 1 -> key; 2 -> value; else -> null
     }
 
-    fun getValue(name: String): Any? = when (name) {
+    fun getValue(name: CharSequence): Any? = when (name.toString()) {
         "id", "_id" -> id
         "key" -> key
         "value" -> value
@@ -351,38 +351,36 @@ private fun appendJsonString(json: StringBuilder, value: String) {
 }
 
 // ── Object store row types ───────────────────────────────────────────────────
-// Three value classes sharing the same capture shape, distinguished by
-// ObjectStoreProvider.  Each is a value class — ByteArray in capture is fine
-// because value class fields can be arrays (they just don't get elided to
-// primitives at JVM level).
+// Three distinct value classes — GCS, S3, Alibaba have different provider
+// semantics and are not interchangeable.  Named intermediates cut the .b chain.
 
 enum class ObjectStoreProvider { GCS, S3, ALIBABA }
 
-typealias ObjStoreCapture = Join<ObjectStoreProvider, Join<String, Join<String, Join<Long, Join<String?, Join<String?, Join<String?, Map<String, String>?>?>?>?>>>>
+// Shared capture shape — each class holds (bucket j (key j (byteSize j (contentType j (etag j (lastModified j (versionId j metadata)))))))
+typealias ObjStorePayload = Join<String, Join<String, Join<Long, Join<String?, Join<String?, Join<String?, Join<String?, Map<String, String>?>>>>>>>
 
-value class GcsRowVec(
-    private val capture: ObjStoreCapture,
-) : RowVec {
+value class GcsRowVec(private val capture: ObjStorePayload) : RowVec {
     constructor(
-        bucket: String,
-        key: String,
-        byteSize: Long,
-        contentType: String? = null,
-        etag: String? = null,
-        lastModified: String? = null,
-        versionId: String? = null,
-        metadata: Map<String, String>? = null,
-    ) : this(ObjectStoreProvider.GCS j (bucket j (key j (byteSize j (contentType j (etag j (lastModified j (versionId j metadata))))))))
+        bucket: String, key: String, byteSize: Long,
+        contentType: String? = null, etag: String? = null, lastModified: String? = null,
+        versionId: String? = null, metadata: Map<String, String>? = null,
+    ) : this(bucket j (key j (byteSize j (contentType j (etag j (lastModified j (versionId j metadata)))))))
 
-    val provider: ObjectStoreProvider get() = ObjectStoreProvider.GCS
-    val bucket: String get() = capture.b.a
-    val key: String get() = capture.b.b.a
-    val byteSize: Long get() = capture.b.b.b.a
-    val contentType: String? get() = capture.b.b.b.b.a
-    val etag: String? get() = capture.b.b.b.b.b.a
-    val lastModified: String? get() = capture.b.b.b.b.b.b.a
-    val versionId: String? get() = capture.b.b.b.b.b.b.b.a
-    val metadata: Map<String, String>? get() = capture.b.b.b.b.b.b.b.b
+    val provider: ObjectStoreProvider  get() = ObjectStoreProvider.GCS
+    private val fromKey                get() = capture.b
+    private val fromSize               get() = fromKey.b
+    private val fromCT                 get() = fromSize.b
+    private val fromEtag               get() = fromCT.b
+    private val fromLM                 get() = fromEtag.b
+    private val fromVer                get() = fromLM.b
+    val bucket: String                 get() = capture.a
+    val key: String                    get() = fromKey.a
+    val byteSize: Long                 get() = fromSize.a
+    val contentType: String?           get() = fromCT.a
+    val etag: String?                  get() = fromEtag.a
+    val lastModified: String?          get() = fromLM.a
+    val versionId: String?             get() = fromVer.a
+    val metadata: Map<String, String>? get() = fromVer.b
 
     override val a: Int get() = 8
     override val b: (Int) -> Join<Any?, `ColumnMeta↻`>
@@ -399,29 +397,28 @@ value class GcsRowVec(
 
 fun GcsRowVec.toRowVec(): RowVec = this
 
-value class S3RowVec(
-    private val capture: ObjStoreCapture,
-) : RowVec {
+value class S3RowVec(private val capture: ObjStorePayload) : RowVec {
     constructor(
-        bucket: String,
-        key: String,
-        byteSize: Long,
-        contentType: String? = null,
-        etag: String? = null,
-        lastModified: String? = null,
-        versionId: String? = null,
-        metadata: Map<String, String>? = null,
-    ) : this(ObjectStoreProvider.S3 j (bucket j (key j (byteSize j (contentType j (etag j (lastModified j (versionId j metadata))))))))
+        bucket: String, key: String, byteSize: Long,
+        contentType: String? = null, etag: String? = null, lastModified: String? = null,
+        versionId: String? = null, metadata: Map<String, String>? = null,
+    ) : this(bucket j (key j (byteSize j (contentType j (etag j (lastModified j (versionId j metadata)))))))
 
-    val provider: ObjectStoreProvider get() = ObjectStoreProvider.S3
-    val bucket: String get() = capture.b.a
-    val key: String get() = capture.b.b.a
-    val byteSize: Long get() = capture.b.b.b.a
-    val contentType: String? get() = capture.b.b.b.b.a
-    val etag: String? get() = capture.b.b.b.b.b.a
-    val lastModified: String? get() = capture.b.b.b.b.b.b.a
-    val versionId: String? get() = capture.b.b.b.b.b.b.b.a
-    val metadata: Map<String, String>? get() = capture.b.b.b.b.b.b.b.b
+    val provider: ObjectStoreProvider  get() = ObjectStoreProvider.S3
+    private val fromKey                get() = capture.b
+    private val fromSize               get() = fromKey.b
+    private val fromCT                 get() = fromSize.b
+    private val fromEtag               get() = fromCT.b
+    private val fromLM                 get() = fromEtag.b
+    private val fromVer                get() = fromLM.b
+    val bucket: String                 get() = capture.a
+    val key: String                    get() = fromKey.a
+    val byteSize: Long                 get() = fromSize.a
+    val contentType: String?           get() = fromCT.a
+    val etag: String?                  get() = fromEtag.a
+    val lastModified: String?          get() = fromLM.a
+    val versionId: String?             get() = fromVer.a
+    val metadata: Map<String, String>? get() = fromVer.b
 
     override val a: Int get() = 8
     override val b: (Int) -> Join<Any?, `ColumnMeta↻`>
@@ -438,29 +435,28 @@ value class S3RowVec(
 
 fun S3RowVec.toRowVec(): RowVec = this
 
-value class AlibabaRowVec(
-    private val capture: ObjStoreCapture,
-) : RowVec {
+value class AlibabaRowVec(private val capture: ObjStorePayload) : RowVec {
     constructor(
-        bucket: String,
-        key: String,
-        byteSize: Long,
-        contentType: String? = null,
-        etag: String? = null,
-        lastModified: String? = null,
-        versionId: String? = null,
-        metadata: Map<String, String>? = null,
-    ) : this(ObjectStoreProvider.ALIBABA j (bucket j (key j (byteSize j (contentType j (etag j (lastModified j (versionId j metadata))))))))
+        bucket: String, key: String, byteSize: Long,
+        contentType: String? = null, etag: String? = null, lastModified: String? = null,
+        versionId: String? = null, metadata: Map<String, String>? = null,
+    ) : this(bucket j (key j (byteSize j (contentType j (etag j (lastModified j (versionId j metadata)))))))
 
-    val provider: ObjectStoreProvider get() = ObjectStoreProvider.ALIBABA
-    val bucket: String get() = capture.b.a
-    val key: String get() = capture.b.b.a
-    val byteSize: Long get() = capture.b.b.b.a
-    val contentType: String? get() = capture.b.b.b.b.a
-    val etag: String? get() = capture.b.b.b.b.b.a
-    val lastModified: String? get() = capture.b.b.b.b.b.b.a
-    val versionId: String? get() = capture.b.b.b.b.b.b.b.a
-    val metadata: Map<String, String>? get() = capture.b.b.b.b.b.b.b.b
+    val provider: ObjectStoreProvider  get() = ObjectStoreProvider.ALIBABA
+    private val fromKey                get() = capture.b
+    private val fromSize               get() = fromKey.b
+    private val fromCT                 get() = fromSize.b
+    private val fromEtag               get() = fromCT.b
+    private val fromLM                 get() = fromEtag.b
+    private val fromVer                get() = fromLM.b
+    val bucket: String                 get() = capture.a
+    val key: String                    get() = fromKey.a
+    val byteSize: Long                 get() = fromSize.a
+    val contentType: String?           get() = fromCT.a
+    val etag: String?                  get() = fromEtag.a
+    val lastModified: String?          get() = fromLM.a
+    val versionId: String?             get() = fromVer.a
+    val metadata: Map<String, String>? get() = fromVer.b
 
     override val a: Int get() = 8
     override val b: (Int) -> Join<Any?, `ColumnMeta↻`>

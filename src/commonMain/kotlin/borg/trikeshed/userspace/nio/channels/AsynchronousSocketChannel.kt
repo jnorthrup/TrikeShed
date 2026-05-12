@@ -21,8 +21,7 @@ public abstract class AsynchronousSocketChannel {
     // TODO
     abstract fun shutdownOutput(): AsynchronousSocketChannel
     // TODO
-    abstract fun getRemoteAddress(): String
-    // TODO
+    abstract fun getRemoteAddress():CharSequence// TODO
     abstract fun <A> connect(address: String, attachment: A, handler: CompletionHandler<Unit?, in A>): Unit
     // TODO
     abstract fun connect(address: String): Unit?
@@ -43,9 +42,7 @@ public abstract class AsynchronousSocketChannel {
     // TODO
     abstract fun <A> write(srcs: Array<out ByteSeries>, offset: Int, length: Int, timeout: Long, attachment: A, handler: CompletionHandler<Long, in A>): Unit
     // TODO
-    abstract fun getLocalAddress(): String
-
-    companion object {
+    abstract fun getLocalAddress():CharSequencecompanion object {
         fun `open`(group: AsynchronousChannelGroup): AsynchronousSocketChannel = TODO("NIO common stub")
         fun `open`(): AsynchronousSocketChannel = TODO("NIO common stub")
     }

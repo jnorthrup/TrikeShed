@@ -11,7 +11,7 @@ public class AclEntry {
     fun flags(): Set<borg.trikeshed.userspace.nio.file.attribute.AclEntryFlag> = TODO("NIO common stub")
     override fun equals(p0: Any?): Boolean = TODO("NIO common stub")
     override fun hashCode(): Int = TODO("NIO common stub")
-    override fun toString(): String = TODO("NIO common stub")
+    override fun toString():CharSequence= TODO("NIO common stub")
     companion object {
         fun newBuilder(): borg.trikeshed.userspace.nio.file.attribute.AclEntry.Builder = TODO("NIO common stub")
         fun newBuilder(p0: borg.trikeshed.userspace.nio.file.attribute.AclEntry): borg.trikeshed.userspace.nio.file.attribute.AclEntry.Builder = TODO("NIO common stub")
