@@ -14,11 +14,14 @@ public abstract class SocketChannel : AbstractSelectableChannel, ByteChannel, Sc
     public abstract override fun validOps(): Int
     public abstract override fun bind(address: String): SocketChannel
     public abstract override fun <T> setOption(option: String, value: T): SocketChannel
-    fun shutdownInput(): SocketChannel = TODO("shutdown")
-    fun shutdownOutput(): SocketChannel = TODO("shutdown")
+    // TODO
+    abstract fun shutdownInput(): SocketChannel
+    // TODO
+    abstract fun shutdownOutput(): SocketChannel
     fun isConnected(): Boolean = false
     fun isConnectionPending(): Boolean = false
-    fun connect(address: String): Boolean = TODO("connect")
+    // TODO
+    abstract fun connect(address: String): Boolean
     fun finishConnect(): Boolean = false
     fun getRemoteAddress(): String = "0.0.0.0:0"
     public abstract override fun read(dst: ByteBuffer): Int
@@ -48,7 +51,9 @@ internal class UringSocketChannel(
     private var open: Boolean = true
     private val lock = Any()
 
+    // TODO
     override fun begin() {}
+    // TODO
     override fun end(completed: Boolean) {}
     override fun provider(): SelectorProvider = SelectorProvider.provider()
     override fun isRegistered(): Boolean = false
@@ -92,8 +97,20 @@ internal class UringSocketChannel(
 
     override fun write(srcs: Array<out ByteBuffer>): Long = write(srcs, 0, srcs.size)
     override fun getLocalAddress(): String = "0.0.0.0:0"
+
+    // TODO
+    override fun shutdownInput(): SocketChannel = TODO("shutdown")
+    // TODO
+    override fun shutdownOutput(): SocketChannel = TODO("shutdown")
+    // TODO
+    override fun connect(address: String): Boolean = TODO("connect")
+
+    override fun <T> getOption(option: String): T = TODO("getOption")
+    override fun supportedOptions(): Set<String> = emptySet()
+
     override fun close() { open = false }
     override fun isOpen(): Boolean = open
     override fun implCloseSelectableChannel() { open = false }
+    // TODO
     override fun implConfigureBlocking(block: Boolean) {}
 }

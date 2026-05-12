@@ -6,21 +6,36 @@ package borg.trikeshed.userspace.nio.channels
 // Declarations intentionally mirror JDK taxonomy and contain no implementations.
 public abstract class SelectionKey {
     protected constructor()
-    open fun channel(): SelectableChannel = TODO("NIO common stub")
-    open fun selector(): Selector = TODO("NIO common stub")
-    open fun isValid(): Boolean = TODO("NIO common stub")
-    open fun cancel(): Unit = TODO("NIO common stub")
-    open fun interestOps(): Int = TODO("NIO common stub")
-    open fun interestOps(ops: Int): SelectionKey = TODO("NIO common stub")
-    open fun interestOpsOr(ops: Int): Int = TODO("NIO common stub")
-    open fun interestOpsAnd(ops: Int): Int = TODO("NIO common stub")
-    open fun readyOps(): Int = TODO("NIO common stub")
-    open fun isReadable(): Boolean = TODO("NIO common stub")
-    open fun isWritable(): Boolean = TODO("NIO common stub")
-    open fun isConnectable(): Boolean = TODO("NIO common stub")
-    open fun isAcceptable(): Boolean = TODO("NIO common stub")
-    open fun attach(ob: Any): Any = TODO("NIO common stub")
-    open fun attachment(): Any = TODO("NIO common stub")
+    // TODO
+    abstract open fun channel(): SelectableChannel
+    // TODO
+    abstract open fun selector(): Selector
+    // TODO
+    abstract open fun isValid(): Boolean
+    // TODO
+    abstract open fun cancel(): Unit
+    // TODO
+    abstract open fun interestOps(): Int
+    // TODO
+    abstract open fun interestOps(ops: Int): SelectionKey
+    // TODO
+    abstract open fun interestOpsOr(ops: Int): Int
+    // TODO
+    abstract open fun interestOpsAnd(ops: Int): Int
+    // TODO
+    abstract open fun readyOps(): Int
+    // TODO
+    abstract open fun isReadable(): Boolean
+    // TODO
+    abstract open fun isWritable(): Boolean
+    // TODO
+    abstract open fun isConnectable(): Boolean
+    // TODO
+    abstract open fun isAcceptable(): Boolean
+    // TODO
+    abstract open fun attach(ob: Any): Any
+    // TODO
+    abstract open fun attachment(): Any
 
     companion object {
         val OP_READ: Int = TODO("NIO common stub")

@@ -23,12 +23,6 @@ typealias Cursor = Series<RowVec>
 infix fun Series<Any?>.j(meta: Series<`ColumnMeta↻`>): RowVec =
     this.zip(meta).debug { if (a != meta.a) logDebug("RowVec size mismatch detected".leftIdentity) }
 
-/**
- * Joins a Series of scalar values with a Series of column metadata providers into a RowVec.
- * This is a convenience alias used across the codebase where the name 'joins' is preferred.
- */
-infix fun Series<Any?>.joins(meta: Series<`ColumnMeta↻`>): RowVec = this j meta
-
 /** Cursors combine: combine a series of RowVec into a Cursor. */
 val Series<RowVec>.cursor: Cursor get() = this
 

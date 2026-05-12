@@ -1,6 +1,6 @@
 package borg.trikeshed.polyglot
 
-import borg.trikeshed.lib.TypeEvidence
+import borg.trikeshed.parse.evidence.TypeEvidence
 import borg.trikeshed.cursor.Cursor
 import borg.trikeshed.lib.*
 import borg.trikeshed.parse.interop.DescriptorFragment

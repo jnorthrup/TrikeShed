@@ -7,18 +7,30 @@ import borg.trikeshed.userspace.nio.channels.spi.SelectorProvider
 // Declarations intentionally mirror JDK taxonomy and contain no implementations.
 public abstract class Selector {
     protected constructor()
-    open fun isOpen(): Boolean = TODO("NIO common stub")
-    open fun provider(): SelectorProvider = TODO("NIO common stub")
-    open fun keys(): Set<SelectionKey> = TODO("NIO common stub")
-    open fun selectedKeys(): Set<SelectionKey> = TODO("NIO common stub")
-    open fun selectNow(): Int = TODO("NIO common stub")
-    open fun select(timeout: Long): Int = TODO("NIO common stub")
-    open fun select(): Int = TODO("NIO common stub")
-    open fun select(action: (SelectionKey) -> Unit, timeout: Long): Int = TODO("NIO common stub")
-    open fun select(action: (SelectionKey) -> Unit): Int = TODO("NIO common stub")
-    open fun selectNow(action: (SelectionKey) -> Unit): Int = TODO("NIO common stub")
-    open fun wakeup(): Selector = TODO("NIO common stub")
-    open fun close(): Unit = TODO("NIO common stub")
+    // TODO
+    abstract open fun isOpen(): Boolean
+    // TODO
+    abstract open fun provider(): SelectorProvider
+    // TODO
+    abstract open fun keys(): Set<SelectionKey>
+    // TODO
+    abstract open fun selectedKeys(): Set<SelectionKey>
+    // TODO
+    abstract open fun selectNow(): Int
+    // TODO
+    abstract open fun select(timeout: Long): Int
+    // TODO
+    abstract open fun select(): Int
+    // TODO
+    abstract open fun select(action: (SelectionKey) -> Unit, timeout: Long): Int
+    // TODO
+    abstract open fun select(action: (SelectionKey) -> Unit): Int
+    // TODO
+    abstract open fun selectNow(action: (SelectionKey) -> Unit): Int
+    // TODO
+    abstract open fun wakeup(): Selector
+    // TODO
+    abstract open fun close(): Unit
 
     companion object {
         fun `open`(): Selector = TODO("NIO common stub")

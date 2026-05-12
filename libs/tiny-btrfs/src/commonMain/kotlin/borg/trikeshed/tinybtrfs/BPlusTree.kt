@@ -341,26 +341,27 @@ class BPlusTree<K : Comparable<K>, V>(
     }
 
     /**
-     * Bulk-load the tree from a pre-sorted list of key/value pairs in O(n) time.
+     * Bulk-load the tree from a pre-sorted Series2 of key/value pairs in O(n) time.
      * The tree must be empty; call on a freshly-constructed instance.
      *
      * The algorithm builds leaf nodes left-to-right filling each to [order] keys,
      * then builds internal levels bottom-up until a single root remains.
      */
-    fun bulkLoad(sortedPairs: List<Pair<K, V>>) {
+    fun bulkLoad(sortedPairs: Series2<K, V>) {
         require(size() == 0) { "bulkLoad requires an empty tree" }
         if (sortedPairs.isEmpty()) return
 
         // --- pass 1: build leaf nodes ---
         val leaves = mutableListOf<LeafNode>()
         var cur = LeafNode()
-        for ((k, v) in sortedPairs) {
+        for (i in 0 until sortedPairs.a) {
+            val pair = sortedPairs[i]
             if (cur.keysCount == order) {
                 leaves.add(cur)
                 cur = LeafNode()
             }
-            cur._keys[cur.keysCount] = k
-            cur._values[cur.keysCount] = v
+            cur._keys[cur.keysCount] = pair.a
+            cur._values[cur.keysCount] = pair.b
             cur.keysCount++
         }
         if (cur.keysCount > 0) leaves.add(cur)
@@ -419,6 +420,11 @@ class BPlusTree<K : Comparable<K>, V>(
         }
 
         root = currentLevel[0]
+    }
+
+    @JvmName("bulkLoadFromList")
+    fun bulkLoad(sortedPairs: List<Pair<K, V>>) {
+        bulkLoad(sortedPairs.toSeries().let { list -> list.size j { i -> list[i].a j list[i].b } })
     }
 
     fun validateFanoutBounds(): Boolean {

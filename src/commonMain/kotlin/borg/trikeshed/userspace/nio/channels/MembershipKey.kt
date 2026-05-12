@@ -6,12 +6,20 @@ package borg.trikeshed.userspace.nio.channels
 // Declarations intentionally mirror JDK taxonomy and contain no implementations.
 public abstract class MembershipKey {
     protected constructor()
-    fun isValid(): Boolean = TODO("NIO common stub")
-    fun drop(): Unit = TODO("NIO common stub")
-    fun block(sourceAddress: String): MembershipKey = TODO("NIO common stub")
-    fun unblock(sourceAddress: String): MembershipKey = TODO("NIO common stub")
-    fun channel(): MulticastChannel = TODO("NIO common stub")
-    fun group(): String = TODO("NIO common stub")
-    fun networkInterface(): String = TODO("NIO common stub")
-    fun sourceAddress(): String = TODO("NIO common stub")
+    // TODO
+    abstract fun isValid(): Boolean
+    // TODO
+    abstract fun drop(): Unit
+    // TODO
+    abstract fun block(sourceAddress: String): MembershipKey
+    // TODO
+    abstract fun unblock(sourceAddress: String): MembershipKey
+    // TODO
+    abstract fun channel(): MulticastChannel
+    // TODO
+    abstract fun group(): String
+    // TODO
+    abstract fun networkInterface(): String
+    // TODO
+    abstract fun sourceAddress(): String
 }

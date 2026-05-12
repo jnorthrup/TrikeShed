@@ -58,17 +58,22 @@ typealias HtxRequestHandler = suspend (HtxClientRequest) -> HtxClientMessage
 
 val HtxKey: AsyncContextKey<HtxElementCompat> = HtxElementCompat.Key
 
-suspend fun openHtxElement(): HtxElementCompat =
-    HtxElementCompat().also { it.open() }
+/**
+ * Open an HtxElementCompat with a request handler.
+ * The handler is registered for the HTTPS transport.
+ */
+suspend fun openHtxElement(handler: HtxRequestHandler? = null): HtxElementCompat =
+ HtxElementCompat(handler)
 
-class HtxElementCompat : AsyncContextElement() {
-    companion object Key : AsyncContextKey<HtxElementCompat>()
-    override val key: AsyncContextKey<HtxElementCompat> get() = Key
+class HtxElementCompat(private val handler: HtxRequestHandler? = null) : AsyncContextElement() {
+ companion object Key : AsyncContextKey<HtxElementCompat>()
+ override val key: AsyncContextKey<HtxElementCompat> get() = Key
 
-    suspend fun request(method: String = "GET", path: String = "/", body: String = ""): HtxClientMessage {
-        // Stub for server compat — real transport goes through new API
-        return HtxClientMessage(status = 200, body = "ok")
-    }
+ /** Delegate to the registered handler, or return stub if none provided */
+ suspend fun request(method: String = "GET", path: String = "/", body: String = ""): HtxClientMessage {
+ val req = HtxClientRequest(method = method, path = path, body = body)
+ return handler?.invoke(req) ?: HtxClientMessage(status = 200, body = "ok")
+ }
 }
 
 // ── New (simplified) API ──────────────────────────────────────────

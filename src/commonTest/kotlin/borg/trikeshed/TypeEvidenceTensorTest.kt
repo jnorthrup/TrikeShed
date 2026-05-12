@@ -1,6 +1,6 @@
 package borg.trikeshed
 
-import borg.trikeshed.lib.TypeEvidence
+import borg.trikeshed.parse.evidence.TypeEvidence
 import borg.trikeshed.cursor.MapTypeMemento
 import borg.trikeshed.cursor.SeqTypeMemento
 import borg.trikeshed.isam.meta.IOMemento

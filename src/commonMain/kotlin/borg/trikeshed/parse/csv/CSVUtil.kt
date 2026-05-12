@@ -8,12 +8,13 @@ import borg.trikeshed.isam.meta.IOMemento
 import borg.trikeshed.isam.meta.IOMemento.IoCharSeries
 import borg.trikeshed.isam.meta.IOMemento.IoString
 import borg.trikeshed.lib.*
-import borg.trikeshed.lib.TypeEvidence.Companion.deduce
-import borg.trikeshed.lib.TypeEvidence.Companion.update
+import borg.trikeshed.parse.evidence.TypeEvidence.Companion.deduce
+import borg.trikeshed.parse.evidence.TypeEvidence.Companion.update
 import borg.trikeshed.lib.long.LongSeries
 import borg.trikeshed.lib.long.drop
 import borg.trikeshed.lib.long.get
 import borg.trikeshed.parse.csv.CSVUtil.streamSpec
+import borg.trikeshed.parse.evidence.TypeEvidence
 import kotlin.jvm.JvmInline
 import kotlin.jvm.JvmOverloads
 

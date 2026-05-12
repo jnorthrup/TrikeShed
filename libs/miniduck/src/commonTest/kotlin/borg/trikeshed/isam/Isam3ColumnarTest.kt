@@ -1,6 +1,6 @@
 package borg.trikeshed.isam
 
-import borg.trikeshed.lib.Files
+import borg.trikeshed.userspace.nio.file.Files
 
 
 import borg.trikeshed.cursor.ColumnMeta

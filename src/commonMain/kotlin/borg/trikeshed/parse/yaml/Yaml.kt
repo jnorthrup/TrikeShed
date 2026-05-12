@@ -2,11 +2,12 @@
 
 package borg.trikeshed.parse.yaml
 
-import borg.trikeshed.lib.TypeEvidence
+import borg.trikeshed.collections.text.asSeries
+import borg.trikeshed.parse.evidence.TypeEvidence
 import borg.trikeshed.cursor.RowVec
 import borg.trikeshed.lib.*
 import borg.trikeshed.parse.confix.*
-import borg.trikeshed.lib.toRowVec
+import borg.trikeshed.parse.evidence.toRowVec
 
 /* ─── public API surface — preserved for DescriptorFragments.kt ─────────── */
 

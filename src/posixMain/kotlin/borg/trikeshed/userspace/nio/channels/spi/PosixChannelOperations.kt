@@ -35,20 +35,24 @@ class PosixChannelOperations : ChannelOperations {
     override fun close(fd: Int): Int = platform.posix.close(fd)
 
     fun handleFor(fd: Int): ChannelOperations.ChannelHandle = RingHandle(fd)
+    fun markConnected(fd: Int) { (handleFor(fd) as? RingHandle)?.markConnected() }
 
-    private class RingHandle(private val fd: Int) : ChannelOperations.ChannelHandle {
-        override val id: Int get() = fd
-        private data class PendingOp(val f: Int, val buf: ByteBuffer, val read: Boolean, val user: Long)
+    private class RingHandle(private val targetFd: Int) : ChannelOperations.ChannelHandle {
+        override val id: Int get() = targetFd
+        private data class PendingOp(val fd: Int, val buf: ByteBuffer, val read: Boolean, val user: Long)
         private val pending = mutableListOf<PendingOp>()
         private var lastResults: List<ChannelResult> = emptyList()
+        private var connected = false
+
+        fun markConnected() { connected = true }
 
         override fun read(buffer: ByteBuffer, offset: Long): Int {
             val off = buffer.arrayOffset() + buffer.position()
-            return buffer.array().usePinned { pread(fd, it.addressOf(off), buffer.remaining().convert(), offset) }.toInt()
+            return buffer.array().usePinned { pread(targetFd, it.addressOf(off), buffer.remaining().convert(), offset) }.toInt()
         }
         override fun write(buffer: ByteBuffer, offset: Long): Int {
             val off = buffer.arrayOffset() + buffer.position()
-            return buffer.array().usePinned { pwrite(fd, it.addressOf(off), buffer.remaining().convert(), offset) }.toInt()
+            return buffer.array().usePinned { pwrite(targetFd, it.addressOf(off), buffer.remaining().convert(), offset) }.toInt()
         }
         override fun readv(fd: Int, buffer: ByteBuffer, userData: Long): Int {
             pending.add(PendingOp(fd, buffer, read = true, user = userData))
@@ -59,12 +63,13 @@ class PosixChannelOperations : ChannelOperations {
             return 0
         }
         override fun submit(): Int {
+            if (pending.isEmpty()) return 0
             val completions = mutableListOf<ChannelResult>()
             for (op in pending) {
                 val off = op.buf.arrayOffset() + op.buf.position()
                 val remaining = op.buf.remaining()
                 val backing = op.buf.array()
-                val f = op.f; val rd = op.read; val u = op.user
+                val f = op.fd; val rd = op.read; val u = op.user
                 val res = backing.usePinned { pinned ->
                     (if (rd) recv(f, pinned.addressOf(off), remaining.convert(), 0)
                      else send(f, pinned.addressOf(off), remaining.convert(), 0)).toInt()

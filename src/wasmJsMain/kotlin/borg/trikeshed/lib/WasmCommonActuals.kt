@@ -2,6 +2,7 @@ package borg.trikeshed.lib
 
 import borg.trikeshed.userspace.ByteRegion
 import borg.trikeshed.lib.long.LongSeries
+import borg.trikeshed.userspace.nio.file.Files
 import borg.trikeshed.userspace.nio.file.spi.FileOperations
 import borg.trikeshed.userspace.nio.file.spi.WasmFileOperations
 import kotlin.random.Random
@@ -148,25 +149,6 @@ fun decodeHex(value: String): ByteArray {
         ((hi shl 4) or lo).toByte()
     }
 }
-fun streamByteLines(bytes: ByteArray): Sequence<Join<Long, ByteArray>> = sequence {
-    var offset = 0L
-    var lineStart = 0L
-    val line = ArrayList<Byte>()
-
-    for (byte in bytes) {
-        line += byte
-        offset++
-        if (byte == '\n'.code.toByte()) {
-            yield(lineStart j line.toByteArray())
-            line.clear()
-            lineStart = offset
-        }
-    }
-
-    if (line.isNotEmpty()) {
-        yield(lineStart j line.toByteArray())
-    }
-}
 object WasmBrowserSeekHandle : SeekHandle {
    data class HandleState(
         val filename: String,
@@ -264,8 +246,6 @@ actual object System {
     actual val homedir: String
         get() = getenv("HOME", getenv("USERPROFILE", "/")) ?: "/"
 }
-
-internal actual fun defaultFileOperations(): FileOperations = WasmFileOperations()
 
 fun mktemp(): String {
     val name = "/tmp/wasm-${Random.nextLong().toString(16)}.tmp"

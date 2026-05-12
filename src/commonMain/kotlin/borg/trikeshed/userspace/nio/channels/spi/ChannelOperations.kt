@@ -41,7 +41,8 @@ interface ChannelOperations : CoroutineContext.Element {
     }
 
     /** Close a file/socket descriptor. Returns 0 on success, negative on error. */
-    fun close(fd: Int): Int
+    // TODO
+    abstract fun close(fd: Int): Int
 }
 
 data class ChannelResult(val fd: Int, val res: Int, val userData: Long)

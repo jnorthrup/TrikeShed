@@ -7,39 +7,32 @@ import borg.trikeshed.isam.meta.IOMemento
 import borg.trikeshed.lib.*
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// RowVec families — inline value classes over pure Joins
+// RowVec families — value classes over pure Joins (Kotlin 2).
 //
-// Design: every family with ≤3 components is a @JvmInline value class whose
-// single field is a Join (or nested Join).  This gives zero-allocation
-// construction while preserving RowVec interface dispatch.
+// Every family with a single-capture backing stores its state in one Join field.
+// Kotlin 2 value class elides the wrapper at callsites where the exact type is
+// known, falling back to the interface row view when cast to RowVec.
 //
-// DocRowVec is a typealias for JsonRowVec (Confix synonym).
+// RowVec = Series2 = MetaSeries<Int,Join> = interface with a: Int, b: (Int)->Join.
+// Value classes implement RowVec by overriding a/b and delegating where possible.
 // ═══════════════════════════════════════════════════════════════════════════════
 
-// ── Series shorthand ───────────────────────────────────────────────────────────
-/** Inline Series constructor — s_["a", "b", "c"] creates Series<String>. */
-fun <T> s_(vararg elements: T): Series<T> = seriesOf(elements.toList())
-
-// ── JsonRowVec / DocRowVec ────────────────────────────────────────────────────
+// ── JsonRowVec ─────────────────────────────────────────────────────────────────
 // Two-component family: nodeType + rawValue, with optional lazy child.
-// DocRowVec is a synonym (Confix naming).
 
-class JsonRowVec private constructor(
+value class JsonRowVec(
     private val capture: Join<String, Join<String?, (() -> Series<RowVec>)?>>,
 ) : RowVec {
-    // ── primary constructor ──
     constructor(
         nodeType: String,
         rawValue: String? = null,
         childFactory: (() -> Series<RowVec>)? = null,
     ) : this(nodeType j (rawValue j childFactory))
 
-    // ── accessors ──
     val nodeType: String get() = capture.a
     val rawValue: String? get() = capture.b.a
     private val childFactory: (() -> Series<RowVec>)? get() = capture.b.b
 
-    // ── RowVec ──
     override val a: Int get() = 2
     override val b: (Int) -> Join<Any?, `ColumnMeta↻`>
         get() = { i: Int ->
@@ -63,7 +56,8 @@ class JsonRowVec private constructor(
 
 // ── DocRowVec ──────────────────────────────────────────────────────────────────
 // Three-component family: keys + cells + optional child, dynamic column access.
-// Inline value class over nested Joins — zero-allocation construction.
+// Stays as class — secondary keysList field for cached linear-scan getValue.
+// (Value class requires exactly one property.)
 
 class DocRowVec private constructor(
     private val capture: Join<Series<String>, Join<Series<Any?>, Series<RowVec>?>>,
@@ -117,7 +111,7 @@ fun DocRowVec.toRowVec(): RowVec = this
 // ── ViewRowVec ─────────────────────────────────────────────────────────────────
 // Three-component family: id + key + value, with optional lazy doc child.
 
-class ViewRowVec private constructor(
+value class ViewRowVec(
     private val capture: Join<String?, Join<Any?, Join<Any?, (() -> RowVec)?>>>,
 ) : RowVec {
     constructor(
@@ -160,8 +154,9 @@ fun ViewRowVec.toRowVec(): RowVec = this
 
 // ── YamlRowVec ─────────────────────────────────────────────────────────────────
 // Two-component family: nodeKind + scalarValue, with optional lazy child.
+// Identical capture shape to JsonRowVec, different accessor names.
 
-class YamlRowVec private constructor(
+value class YamlRowVec(
     private val capture: Join<String, Join<String?, (() -> Series<RowVec>)?>>,
 ) : RowVec {
     constructor(
@@ -194,7 +189,7 @@ fun YamlRowVec.toRowVec(): RowVec = this
 // ── BlobRowVec ─────────────────────────────────────────────────────────────────
 // Two-component family: bytes + mimeType, with optional child factory.
 
-class BlobRowVec private constructor(
+value class BlobRowVec(
     private val capture: Join<ByteArray, Join<String, ((ByteArray) -> Series<RowVec>)?>>,
 ) : RowVec {
     constructor(
@@ -286,7 +281,6 @@ fun Any?.blockRowCount(): Int? = blockRows()?.size
 fun Series<RowVec>?.toJson(): String {
     val rows = this ?: return ""
     if (rows.isEmpty()) return ""
-    // Pre-size StringBuilder based on estimated row bytes (128 chars/row)
     val json = StringBuilder(rows.size * 128)
     for (rowIndex in 0 until rows.size) {
         if (json.isNotEmpty()) json.append('\n')
@@ -356,21 +350,40 @@ private fun appendJsonString(json: StringBuilder, value: String) {
     json.append('"')
 }
 
-// ── Object store row types ────────────────────────────────────────────────────
+// ── Object store row types ───────────────────────────────────────────────────
+// Three value classes sharing the same capture shape, distinguished by
+// ObjectStoreProvider.  Each is a value class — ByteArray in capture is fine
+// because value class fields can be arrays (they just don't get elided to
+// primitives at JVM level).
 
 enum class ObjectStoreProvider { GCS, S3, ALIBABA }
 
-class GcsRowVec(
-    val bucket: String,
-    val key: String,
-    val byteSize: Long,
-    val contentType: String? = null,
-    val etag: String? = null,
-    val lastModified: String? = null,
-    val versionId: String? = null,
-    val metadata: Map<String, String>? = null,
+typealias ObjStoreCapture = Join<ObjectStoreProvider, Join<String, Join<String, Join<Long, Join<String?, Join<String?, Join<String?, Map<String, String>?>?>?>?>>>>
+
+value class GcsRowVec(
+    private val capture: ObjStoreCapture,
 ) : RowVec {
+    constructor(
+        bucket: String,
+        key: String,
+        byteSize: Long,
+        contentType: String? = null,
+        etag: String? = null,
+        lastModified: String? = null,
+        versionId: String? = null,
+        metadata: Map<String, String>? = null,
+    ) : this(ObjectStoreProvider.GCS j (bucket j (key j (byteSize j (contentType j (etag j (lastModified j (versionId j metadata))))))))
+
     val provider: ObjectStoreProvider get() = ObjectStoreProvider.GCS
+    val bucket: String get() = capture.b.a
+    val key: String get() = capture.b.b.a
+    val byteSize: Long get() = capture.b.b.b.a
+    val contentType: String? get() = capture.b.b.b.b.a
+    val etag: String? get() = capture.b.b.b.b.b.a
+    val lastModified: String? get() = capture.b.b.b.b.b.b.a
+    val versionId: String? get() = capture.b.b.b.b.b.b.b.a
+    val metadata: Map<String, String>? get() = capture.b.b.b.b.b.b.b.b
+
     override val a: Int get() = 8
     override val b: (Int) -> Join<Any?, `ColumnMeta↻`>
         get() = { i: Int -> colValue(i) j { ColumnMeta(colName(i), IOMemento.IoString) } }
@@ -386,17 +399,30 @@ class GcsRowVec(
 
 fun GcsRowVec.toRowVec(): RowVec = this
 
-class S3RowVec(
-    val bucket: String,
-    val key: String,
-    val byteSize: Long,
-    val contentType: String? = null,
-    val etag: String? = null,
-    val lastModified: String? = null,
-    val versionId: String? = null,
-    val metadata: Map<String, String>? = null,
+value class S3RowVec(
+    private val capture: ObjStoreCapture,
 ) : RowVec {
+    constructor(
+        bucket: String,
+        key: String,
+        byteSize: Long,
+        contentType: String? = null,
+        etag: String? = null,
+        lastModified: String? = null,
+        versionId: String? = null,
+        metadata: Map<String, String>? = null,
+    ) : this(ObjectStoreProvider.S3 j (bucket j (key j (byteSize j (contentType j (etag j (lastModified j (versionId j metadata))))))))
+
     val provider: ObjectStoreProvider get() = ObjectStoreProvider.S3
+    val bucket: String get() = capture.b.a
+    val key: String get() = capture.b.b.a
+    val byteSize: Long get() = capture.b.b.b.a
+    val contentType: String? get() = capture.b.b.b.b.a
+    val etag: String? get() = capture.b.b.b.b.b.a
+    val lastModified: String? get() = capture.b.b.b.b.b.b.a
+    val versionId: String? get() = capture.b.b.b.b.b.b.b.a
+    val metadata: Map<String, String>? get() = capture.b.b.b.b.b.b.b.b
+
     override val a: Int get() = 8
     override val b: (Int) -> Join<Any?, `ColumnMeta↻`>
         get() = { i: Int -> colValue(i) j { ColumnMeta(colName(i), IOMemento.IoString) } }
@@ -412,17 +438,30 @@ class S3RowVec(
 
 fun S3RowVec.toRowVec(): RowVec = this
 
-class AlibabaRowVec(
-    val bucket: String,
-    val key: String,
-    val byteSize: Long,
-    val contentType: String? = null,
-    val etag: String? = null,
-    val lastModified: String? = null,
-    val versionId: String? = null,
-    val metadata: Map<String, String>? = null,
+value class AlibabaRowVec(
+    private val capture: ObjStoreCapture,
 ) : RowVec {
+    constructor(
+        bucket: String,
+        key: String,
+        byteSize: Long,
+        contentType: String? = null,
+        etag: String? = null,
+        lastModified: String? = null,
+        versionId: String? = null,
+        metadata: Map<String, String>? = null,
+    ) : this(ObjectStoreProvider.ALIBABA j (bucket j (key j (byteSize j (contentType j (etag j (lastModified j (versionId j metadata))))))))
+
     val provider: ObjectStoreProvider get() = ObjectStoreProvider.ALIBABA
+    val bucket: String get() = capture.b.a
+    val key: String get() = capture.b.b.a
+    val byteSize: Long get() = capture.b.b.b.a
+    val contentType: String? get() = capture.b.b.b.b.a
+    val etag: String? get() = capture.b.b.b.b.b.a
+    val lastModified: String? get() = capture.b.b.b.b.b.b.a
+    val versionId: String? get() = capture.b.b.b.b.b.b.b.a
+    val metadata: Map<String, String>? get() = capture.b.b.b.b.b.b.b.b
+
     override val a: Int get() = 8
     override val b: (Int) -> Join<Any?, `ColumnMeta↻`>
         get() = { i: Int -> colValue(i) j { ColumnMeta(colName(i), IOMemento.IoString) } }
@@ -437,16 +476,3 @@ class AlibabaRowVec(
 }
 
 fun AlibabaRowVec.toRowVec(): RowVec = this
-
-object ObjectStoreRowVec {
-    fun gcs(bucket: String, key: String, byteSize: Long, contentType: String? = null): GcsRowVec =
-        GcsRowVec(bucket, key, byteSize, contentType)
-    fun s3(bucket: String, key: String, byteSize: Long, contentType: String? = null): S3RowVec =
-        S3RowVec(bucket, key, byteSize, contentType)
-    fun alibaba(bucket: String, key: String, byteSize: Long, contentType: String? = null): AlibabaRowVec =
-        AlibabaRowVec(bucket, key, byteSize, contentType)
-}
-
-// ── asSeries extension for DocRowVec ─────────────────────────────────────────
-/** Returns the cells of a DocRowVec as a Series<Any?>. */
-fun DocRowVec.asSeries(): Series<Any?> = cells

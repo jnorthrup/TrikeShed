@@ -1,11 +1,11 @@
 package borg.trikeshed.parse.interop
 
-import borg.trikeshed.lib.TypeEvidence
+import borg.trikeshed.parse.evidence.TypeEvidence
 import borg.trikeshed.cursor.ColumnMeta
 import borg.trikeshed.cursor.RowVec
 import borg.trikeshed.cursor.TreeCursor
 import borg.trikeshed.cursor.TypeMemento
-import borg.trikeshed.cursor.joins
+import borg.trikeshed.cursor.j
 import borg.trikeshed.cursor.label
 import borg.trikeshed.isam.meta.IOMemento
 import borg.trikeshed.lib.*
@@ -287,7 +287,7 @@ fun DescriptorFragment.toRowVec(path: String): RowVec {
         if (evidence.minColumnLength == UShort.MAX_VALUE) 0 else evidence.minColumnLength.toInt(),
     )
     val meta = DESCRIPTOR_ROW_COLUMNS.size j { index: Int -> { @Suppress("UNCHECKED_CAST") (DESCRIPTOR_ROW_COLUMNS[index] as ColumnMeta) } }
-    return values.size j { index: Int -> values[index] } joins meta
+    return values.size j { index: Int -> values[index] } j meta
 }
 
 fun childPath(parent: String, key: String?): String =

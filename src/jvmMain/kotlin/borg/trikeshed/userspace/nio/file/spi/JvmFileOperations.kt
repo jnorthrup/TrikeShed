@@ -17,15 +17,21 @@ class JvmFileOperations : FileOperations {
         java.nio.file.Files.readString(java.nio.file.Path.of(filename))
 
     override fun write(filename: String, bytes: ByteArray) {
-        java.nio.file.Files.write(java.nio.file.Path.of(filename), bytes)
+        val f = java.io.File(filename)
+        f.parentFile?.mkdirs()
+        java.nio.file.Files.write(f.toPath(), bytes)
     }
 
     override fun write(filename: String, lines: List<String>) {
-        java.nio.file.Files.write(java.nio.file.Path.of(filename), lines)
+        val f = java.io.File(filename)
+        f.parentFile?.mkdirs()
+        java.nio.file.Files.write(f.toPath(), lines)
     }
 
     override fun write(filename: String, string: String) {
-        java.nio.file.Files.writeString(java.nio.file.Path.of(filename), string)
+        val f = java.io.File(filename)
+        f.parentFile?.mkdirs()
+        java.nio.file.Files.writeString(f.toPath(), string)
     }
 
     override fun cwd(): String = java.nio.file.Path.of("").toAbsolutePath().toString()

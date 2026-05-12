@@ -5,6 +5,7 @@ package borg.trikeshed.lib
 
 import borg.trikeshed.collections.binarySearch
 import borg.trikeshed.isam.meta.IOMemento
+import borg.trikeshed.parse.evidence.TypeEvidence
 import kotlin.jvm.JvmInline
 import kotlin.jvm.JvmName
 import kotlin.math.max
@@ -595,11 +596,11 @@ fun <T : Comparable<T>> Series<T>.shortestLength(other: Series<T>): Int {
 }
 
 //comparable series
-interface CSeries<T : Comparable<T>> : Series<T>, Comparable<Series<T>>
+interface ComparableSeries<T : Comparable<T>> : Series<T>, Comparable<Series<T>>
 
 /** Comparable Series */
-val <T : Comparable<T>> Series<T>.cpb: CSeries<T>
-    get() = object : CSeries<T>, Series<T> by this, Comparable<Series<T>> {
+val <T : Comparable<T>> Series<T>.asComparable: ComparableSeries<T>
+    get() = object : ComparableSeries<T>, Series<T> by this, Comparable<Series<T>> {
         override fun compareTo(other: Series<T>): Int = compareTo(other, naturalOrder())
     }
 

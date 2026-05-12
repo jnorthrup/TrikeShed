@@ -3,8 +3,9 @@
 package borg.trikeshed.polyglot
 
 import borg.trikeshed.collections.s_
-import borg.trikeshed.lib.TypeEvidence
+import borg.trikeshed.parse.evidence.TypeEvidence
 import borg.trikeshed.cursor.*
+import borg.trikeshed.cursor.j
 import borg.trikeshed.isam.meta.IOMemento
 import borg.trikeshed.lib.*
 import borg.trikeshed.lib.j
@@ -128,7 +129,7 @@ data class SourceFragment(
                 "meta_generic" j IOMemento.IoBoolean,
                 "meta_extern" j IOMemento.IoBoolean,
             ] as Series<ColumnMeta>) α { it.leftIdentity }
-        return values joins metas
+        return values j metas
     }
 
     /** Flatten to a depth-first RowVec sequence. */

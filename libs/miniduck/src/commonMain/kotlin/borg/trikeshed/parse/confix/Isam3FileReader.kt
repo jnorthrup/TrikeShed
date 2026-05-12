@@ -1,6 +1,6 @@
 package borg.trikeshed.parse.confix
 
-import borg.trikeshed.lib.Files
+import borg.trikeshed.userspace.nio.file.Files
 import borg.trikeshed.lib.Usable
 import borg.trikeshed.cursor.ColumnMeta
 import borg.trikeshed.isam.Isam3Layout

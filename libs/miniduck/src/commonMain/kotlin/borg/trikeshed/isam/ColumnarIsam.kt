@@ -1,6 +1,6 @@
 package borg.trikeshed.isam
 
-import borg.trikeshed.lib.Files
+import borg.trikeshed.userspace.nio.file.Files
 import borg.trikeshed.lib.Usable
 import borg.trikeshed.cursor.ColumnMeta
 import borg.trikeshed.cursor.Cursor
@@ -12,7 +12,6 @@ import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.getOrNull
 import borg.trikeshed.lib.j
-import borg.trikeshed.lib.toList
 import borg.trikeshed.lib.toSeries
 import borg.trikeshed.lib.view
 import borg.trikeshed.lib.size

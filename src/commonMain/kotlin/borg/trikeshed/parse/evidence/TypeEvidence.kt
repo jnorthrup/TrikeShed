@@ -1,8 +1,13 @@
-package borg.trikeshed.lib
+@file:Suppress("UNCHECKED_CAST")
 
+package borg.trikeshed.parse.evidence
+
+import borg.trikeshed.collections._a
 import borg.trikeshed.context.BitMasked
 import borg.trikeshed.cursor.*
 import borg.trikeshed.isam.meta.IOMemento
+import borg.trikeshed.isam.meta.IOMemento.*
+import borg.trikeshed.lib.*
 
 data class
 /** This is a dragnet for a given line to record the counters of character classes */
@@ -110,21 +115,22 @@ TypeEvidence(
             val maxColumnLength = typeEvidence.maxColumnLength.toUInt()
 
             return when {
-                typeEvidence.dquotes > 0U || typeEvidence.quotes > 0U -> IOMemento.IoString
-                typeEvidence.empty > 0U || typeEvidence.alpha > 0U -> IOMemento.IoString
-                typeEvidence.truefalse > 0U -> IOMemento.IoBoolean
-                digits == 0U -> IOMemento.IoString
-                periods == 0U && exponent == 0U && signs <= 1U && special == 0U && maxColumnLength <= 3U + signs -> IOMemento.IoByte
-                periods == 0U && exponent == 0U && signs <= 1U && special == 0U && maxColumnLength <= 5U + signs -> IOMemento.IoShort
-                periods == 0U && exponent == 0U && signs <= 1U && special == 0U && maxColumnLength <= 10U + signs -> IOMemento.IoInt
-                periods == 0U && exponent == 0U && signs <= 1U && special == 0U && maxColumnLength <= 19U + signs -> IOMemento.IoLong
-                periods == 1U && exponent == 0U && signs <= 1U && special == 0U && maxColumnLength <= 34U + signs + exponent -> IOMemento.IoFloat
-                periods == 1U && exponent <= 1U && signs <= 1U && special == 0U && maxColumnLength <= 66U + signs + exponent -> IOMemento.IoDouble
-                else -> IOMemento.IoString
+                typeEvidence.dquotes > 0U || typeEvidence.quotes > 0U -> IoString
+                typeEvidence.empty > 0U || typeEvidence.alpha > 0U -> IoString
+                typeEvidence.truefalse > 0U -> IoBoolean
+                digits == 0U -> IoString
+                periods == 0U && exponent == 0U && signs <= 1U && special == 0U && maxColumnLength <= 3U + signs -> IoByte
+                periods == 0U && exponent == 0U && signs <= 1U && special == 0U && maxColumnLength <= 5U + signs -> IoShort
+                periods == 0U && exponent == 0U && signs <= 1U && special == 0U && maxColumnLength <= 10U + signs -> IoInt
+                periods == 0U && exponent == 0U && signs <= 1U && special == 0U && maxColumnLength <= 19U + signs -> IoLong
+                periods == 1U && exponent == 0U && signs <= 1U && special == 0U && maxColumnLength <= 34U + signs + exponent -> IoFloat
+                periods == 1U && exponent <= 1U && signs <= 1U && special == 0U && maxColumnLength <= 66U + signs + exponent -> IoDouble
+                else -> IoString
             }
         }
 
-        fun deduceMemento(typeEvidence: TypeEvidence): TypeMemento = typeEvidence.structuralMemento ?: deduce(typeEvidence)
+        fun deduceMemento(typeEvidence: TypeEvidence): TypeMemento =
+            typeEvidence.structuralMemento ?: deduce(typeEvidence)
 
         fun MutableList<TypeEvidence>.update(
             lineEvidence: MutableList<TypeEvidence>,
@@ -147,9 +153,12 @@ TypeEvidence(
                         if (whitespaces < typeDeduction.whitespaces) whitespaces = typeDeduction.whitespaces
                         if (backslashes < typeDeduction.backslashes) backslashes = typeDeduction.backslashes
                         if (linefeed < typeDeduction.linefeed) linefeed = typeDeduction.linefeed
-                        if (maxColumnLength < typeDeduction.maxColumnLength) maxColumnLength = typeDeduction.maxColumnLength
-            if (maxColumnLength < typeDeduction.maxColumnLength) maxColumnLength = typeDeduction.maxColumnLength
-            if (minColumnLength > typeDeduction.minColumnLength) minColumnLength = typeDeduction.minColumnLength
+                        if (maxColumnLength < typeDeduction.maxColumnLength) maxColumnLength =
+                            typeDeduction.maxColumnLength
+                        if (maxColumnLength < typeDeduction.maxColumnLength) maxColumnLength =
+                            typeDeduction.maxColumnLength
+                        if (minColumnLength > typeDeduction.minColumnLength) minColumnLength =
+                            typeDeduction.minColumnLength
                     }
                 }
             }
@@ -197,9 +206,8 @@ val CHAR_CATEGORY: IntArray = IntArray(128) { c ->
 
 /** Pre-computed lookup table: each ASCII char maps to exactly one single-bit category. */
 
-fun TypeEvidence.toRowVec(): RowVec {
-    val values = arrayOf<Any?>(
-        confix,
+fun TypeEvidence.toRowVec(): RowVec  =    _a[
+        confix as Any?,
         digits.toInt(),
         periods.toInt(),
         exponent.toInt(),
@@ -216,27 +224,29 @@ fun TypeEvidence.toRowVec(): RowVec {
         maxColumnLength.toInt(),
         if (minColumnLength == UShort.MAX_VALUE) 0 else minColumnLength.toInt(),
         TypeEvidence.deduceMemento(this).label,
-    )
-    val meta: Series<`ColumnMeta↻`> = TYPE_EVIDENCE_COLUMNS.size j { index: Int -> { @Suppress("UNCHECKED_CAST") (TYPE_EVIDENCE_COLUMNS[index] as ColumnMeta) } }
-    return values.size j { index: Int -> values[index] } joins meta
-}
+    ].run {
+        val meta: Series<`ColumnMeta↻`> =
+            TYPE_EVIDENCE_COLUMNS.size j { index: Int -> {   (TYPE_EVIDENCE_COLUMNS[index] as ColumnMeta) } }
+        join((size j (::get)) , meta)
+    }
+
 
 val TYPE_EVIDENCE_COLUMNS = arrayOf(
-    "confix" j IOMemento.IoString,
-    "digits" j IOMemento.IoInt,
-    "periods" j IOMemento.IoInt,
-    "exponent" j IOMemento.IoInt,
-    "signs" j IOMemento.IoInt,
-    "special" j IOMemento.IoInt,
-    "alpha" j IOMemento.IoInt,
-    "truefalse" j IOMemento.IoInt,
-    "empty" j IOMemento.IoInt,
-    "quotes" j IOMemento.IoInt,
-    "dquotes" j IOMemento.IoInt,
-    "whitespaces" j IOMemento.IoInt,
-    "backslashes" j IOMemento.IoInt,
-    "linefeed" j IOMemento.IoInt,
-    "maxColumnLength" j IOMemento.IoInt,
-    "minColumnLength" j IOMemento.IoInt,
-    "deducedType" j IOMemento.IoString,
+    "confix" j IoString,
+    "digits" j IoInt,
+    "periods" j IoInt,
+    "exponent" j IoInt,
+    "signs" j IoInt,
+    "special" j IoInt,
+    "alpha" j IoInt,
+    "truefalse" j IoInt,
+    "empty" j IoInt,
+    "quotes" j IoInt,
+    "dquotes" j IoInt,
+    "whitespaces" j IoInt,
+    "backslashes" j IoInt,
+    "linefeed" j IoInt,
+    "maxColumnLength" j IoInt,
+    "minColumnLength" j IoInt,
+    "deducedType" j IoString,
 )

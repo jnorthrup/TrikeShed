@@ -2,15 +2,7 @@ package borg.trikeshed.lib
 
 import borg.trikeshed.lib.long.LongSeries
 import borg.trikeshed.userspace.ByteRegion
-import kotlin.random.Random
-import borg.trikeshed.lib.ByteSeries
-import borg.trikeshed.lib.Join
-import borg.trikeshed.lib.SeekFileBufferCommon
-import borg.trikeshed.lib.SeekHandle
-import borg.trikeshed.lib.Series
-import borg.trikeshed.lib.Series2
-import borg.trikeshed.lib.j
-import borg.trikeshed.lib.toSeries
+import borg.trikeshed.userspace.nio.file.Files
 import borg.trikeshed.userspace.nio.file.spi.FileOperations
 import borg.trikeshed.userspace.nio.file.spi.JsFileOperations
 
@@ -22,8 +14,6 @@ actual object System {
 
     actual fun getenv(name: String, defaultVal: String?): String? = (processObj.env[name] as? String) ?: defaultVal
 }
-
-internal actual fun defaultFileOperations(): FileOperations = JsFileOperations()
 
 fun readLinesSeq(path: String): Sequence<String> =
     Files.readAllLines(path).asSequence()

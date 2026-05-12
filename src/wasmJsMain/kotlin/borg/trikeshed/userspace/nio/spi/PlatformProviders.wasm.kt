@@ -1,6 +1,6 @@
 package borg.trikeshed.userspace.nio.spi
 
-import borg.trikeshed.lib.fileOperations
+import borg.trikeshed.userspace.nio.file.fileOperations
 import borg.trikeshed.userspace.nio.channels.spi.WasmChannelOperations
 import borg.trikeshed.userspace.nio.channels.spi.WasmProcessOperations
 import borg.trikeshed.userspace.nio.channels.spi.WasmReactorOperations

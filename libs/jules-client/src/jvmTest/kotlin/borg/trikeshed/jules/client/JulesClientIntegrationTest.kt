@@ -1,9 +1,7 @@
 package borg.trikeshed.jules.client
 
 import borg.trikeshed.htx.client.HtxClientMessage
-import borg.trikeshed.htx.client.HtxElement
 import borg.trikeshed.htx.client.openHtxElement
-import borg.trikeshed.openapi.infrastructure.HttpMethod
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -33,6 +31,5 @@ class JulesClientIntegrationTest {
         assertEquals("POST", requestedMethod)
         assertEquals("https://jules.googleapis.com/v1alpha/sessions?key=my-test-key", requestedPath)
         assertTrue(response.contains("\"id\": \"123\""))
-        htxElement.close()
     }
 }

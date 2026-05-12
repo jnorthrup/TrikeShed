@@ -1,14 +1,8 @@
 package borg.trikeshed.parse.confix
 
-import borg.trikeshed.parse.confix.Path
-import borg.trikeshed.parse.confix.Combinators
-import borg.trikeshed.parse.confix.Syntax
-import borg.trikeshed.parse.confix.asSeries
-import borg.trikeshed.parse.confix.contextOf
-import borg.trikeshed.parse.confix.path
+import borg.trikeshed.collections.text.asSeries
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
 
 /**
  * Exhaustive escape-sequence decoding test battery.

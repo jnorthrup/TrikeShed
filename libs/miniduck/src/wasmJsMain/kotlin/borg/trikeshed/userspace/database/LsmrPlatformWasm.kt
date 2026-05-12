@@ -1,6 +1,6 @@
 package borg.trikeshed.userspace.database
 
-import borg.trikeshed.lib.Files
+import borg.trikeshed.userspace.nio.file.Files
 
 
 actual suspend fun persistSegmentToDisk(rootPath: String, fileName: String, entries: Map<String, ByteArray>) {

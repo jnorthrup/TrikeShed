@@ -17,6 +17,8 @@ import borg.trikeshed.lib.Closeable
 //
 // Do not route new IO through these stubs. Implement UserspaceChannelBackend instead.
 public interface Channel : Closeable {
-    fun isOpen(): Boolean = TODO("NIO common stub")
-    override fun close(): Unit = TODO("NIO common stub")
+    // TODO
+    abstract fun isOpen(): Boolean
+    // TODO
+    abstract override fun close(): Unit
 }

@@ -1,7 +1,7 @@
-package borg.trikeshed
+package borg.trikeshed.userspace.nio.file
 
-import borg.trikeshed.lib.Files
-import borg.trikeshed.lib.second
+import borg.trikeshed.userspace.nio.channels.FileChannel
+
 import kotlin.io.path.createTempDirectory
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
@@ -14,17 +14,17 @@ class FilesTest {
         //stream the file and check the line contents
         val lines = (0 until 20).map { (0 until (2..75).random()).map { ('a'..'z').random() }.joinToString("") }
         assert(lines.size == 20)
-        val tdir = createTempDirectory()
-        assert(java.nio.file.Files.exists(tdir))
-        val resolve = tdir.resolve("test.txt")
-        java.nio.file.Files.write(resolve, lines)
-        val stream = Files.streamLines(resolve.toString())
+        val tdir: borg.trikeshed.userspace.nio.file.Path = Files.createTempDirectory(Paths.get("/tmp"), "test")
+        assert(Files.exists(tdir))
+        val resolve  = tdir.resolve("test.txt")
+        Files.write(resolve, lines)
+        val stream = Files.lines(resolve.toString())
         val streamLines = stream.toList()
         assert(streamLines.size == 20)
-        assertContentEquals(streamLines.map { it.second.decodeToString().trim() }, lines.map { it.trim() })
+        assertContentEquals(streamLines.map { it.trim() }, lines.map { it.trim() })
 
         //test the seek with RandomAccess file on all strings
-        val raf = java.io.RandomAccessFile(resolve.toString(), "r")
+        val raf = FileChannel.open(resolve  )
         for (i in 0 until 20) {
             val (pos, bytes) = streamLines[i]
             raf.seek(pos)

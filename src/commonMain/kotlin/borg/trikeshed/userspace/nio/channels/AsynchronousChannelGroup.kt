@@ -7,12 +7,18 @@ import borg.trikeshed.userspace.nio.channels.spi.AsynchronousChannelProvider
 // Declarations intentionally mirror JDK taxonomy and contain no implementations.
 public abstract class AsynchronousChannelGroup {
     protected constructor(provider: AsynchronousChannelProvider)
-    fun provider(): AsynchronousChannelProvider = TODO("NIO common stub")
-    fun isShutdown(): Boolean = TODO("NIO common stub")
-    fun isTerminated(): Boolean = TODO("NIO common stub")
-    fun shutdown(): Unit = TODO("NIO common stub")
-    fun shutdownNow(): Unit = TODO("NIO common stub")
-    fun awaitTermination(timeout: Long): Boolean = TODO("NIO common stub")
+    // TODO
+    abstract fun provider(): AsynchronousChannelProvider
+    // TODO
+    abstract fun isShutdown(): Boolean
+    // TODO
+    abstract fun isTerminated(): Boolean
+    // TODO
+    abstract fun shutdown(): Unit
+    // TODO
+    abstract fun shutdownNow(): Unit
+    // TODO
+    abstract fun awaitTermination(timeout: Long): Boolean
     companion object {
         fun withFixedThreadPool(threadCount: Int): AsynchronousChannelGroup = TODO("NIO common stub")
         fun withCachedThreadPool(initialSize: Int): AsynchronousChannelGroup = TODO("NIO common stub")

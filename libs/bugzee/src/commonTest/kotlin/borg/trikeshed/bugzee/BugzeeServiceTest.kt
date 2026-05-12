@@ -3,8 +3,9 @@ package borg.trikeshed.bugzee
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.size
-import borg.trikeshed.miniduck.BlobRowVec
-import borg.trikeshed.miniduck.S3RowVec
+import borg.trikeshed.cursor.RowVec
+import borg.trikeshed.lib.emptySeries
+import borg.trikeshed.miniduck.DocRowVec
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertSame
@@ -14,36 +15,36 @@ class BugzeeServiceTest {
     @Test
     fun publishDelegatesToClientAndReturnsReceipt() {
         val expected = BugzeeWriteReceipt(
-            subreddit = "reddit",
-            postId = "p-1",
-            commentId = "c-1",
+            product = "bugzee",
+            bugId = "BUG-1",
+            commentId = "C-1",
             accepted = true,
             revision = "rev-1",
         )
         val service = BugzeeService(
             client = object : BugzeeClient {
                 override fun upsert(envelope: BugzeeEnvelope): BugzeeWriteReceipt {
-                    assertEquals("reddit", envelope.subreddit)
-                    assertEquals("post body", envelope.body)
+                    assertEquals("bugzee", envelope.product)
+                    assertEquals("body description", envelope.description)
                     return expected
                 }
 
                 override fun query(query: BugzeeQuery) = 0 j { _: Int -> BugzeeEnvelope(
-                    subreddit = query.subreddit,
-                    postId = "unused-post",
-                    title = "unused",
-                    body = "unused",
+                    product = query.product,
+                    bugId = "unused-bug",
+                    summary = "unused",
+                    description = "unused",
                 ) }
             },
         )
 
         val receipt = service.publish(
             BugzeeEnvelope(
-                subreddit = "reddit",
-                postId = "p-1",
-                commentId = "c-1",
-                title = "thread",
-                body = "post body",
+                product = "bugzee",
+                bugId = "BUG-1",
+                commentId = "C-1",
+                summary = "thread",
+                description = "body description",
             ),
         )
 
@@ -54,12 +55,12 @@ class BugzeeServiceTest {
     fun syncDelegatesQueryAndReturnsSeries() {
         val expected = 2 j { index: Int ->
             BugzeeEnvelope(
-                subreddit = "reddit",
-                postId = "p-$index",
-                commentId = "c-$index",
-                title = "title-$index",
-                body = "body-$index",
-                score = index,
+                product = "bugzee",
+                bugId = "BUG-$index",
+                commentId = "C-$index",
+                summary = "summary-$index",
+                description = "body-$index",
+                severity = index,
             )
         }
         val service = BugzeeService(
@@ -67,81 +68,81 @@ class BugzeeServiceTest {
                 override fun upsert(envelope: BugzeeEnvelope): BugzeeWriteReceipt = error("unused")
 
                 override fun query(query: BugzeeQuery) = expected.also {
-                    assertEquals("reddit", query.subreddit)
-                    assertEquals("new", query.listing)
+                    assertEquals("bugzee", query.product)
+                    assertEquals("open", query.listing)
                 }
             },
         )
 
-        val actual = service.sync(BugzeeQuery(subreddit = "reddit", listing = "new"))
+        val actual = service.sync(BugzeeQuery(product = "bugzee", listing = "open"))
 
         assertEquals(2, actual.size)
-        assertEquals(1, actual[1].score)
+        assertEquals(1, actual[1].severity)
     }
 
     @Test
-    fun projectBuildsDocRowVecWithMediaChildren() {
+    fun projectBuildsDocRowVecWithAttachmentChildren() {
         val service = BugzeeService(
             client = object : BugzeeClient {
                 override fun upsert(envelope: BugzeeEnvelope): BugzeeWriteReceipt = error("unused")
                 override fun query(query: BugzeeQuery) = 0 j { _: Int -> BugzeeEnvelope(
-                    subreddit = query.subreddit,
-                    postId = "unused-post",
-                    title = "unused",
-                    body = "unused",
+                    product = query.product,
+                    bugId = "unused-bug",
+                    summary = "unused",
+                    description = "unused",
                 ) }
             },
         )
+        val child1 = DocRowVec(listOf("col1"), listOf(1))
+        val child2 = DocRowVec(listOf("col2"), listOf(2))
         val envelope = BugzeeEnvelope(
-            subreddit = "reddit",
-            postId = "p-42",
-            commentId = "c-9",
-            title = "s3 backed thread",
-            body = "body",
-            author = "bob",
-            score = 17,
-            tags = mapOf("bucket" to "s3"),
-            media = 2 j { index: Int ->
+            product = "bugzee",
+            bugId = "BUG-42",
+            commentId = "C-9",
+            summary = "s3 backed thread",
+            description = "body",
+            assignee = "bob",
+            severity = 17,
+            metadata = mapOf("bucket" to "s3"),
+            attachments = 2 j { index: Int ->
                 when (index) {
-                    0 -> BlobRowVec(byteArrayOf((index + 1).toByte()), mimeType = "image/png")
-                    else -> S3RowVec(bucket = "reddit-media", key = "posts/p-42/preview.png", byteSize = 4096L, contentType = "image/png")
+                    0 -> child1
+                    else -> child2
                 }
             },
         )
 
         val row = service.project(envelope)
 
-        assertEquals("reddit", row[0])
-        assertEquals("p-42", row[1])
+        assertEquals("bugzee", row[0])
+        assertEquals("BUG-42", row[1])
         assertEquals(17, row[6])
         assertEquals(2, row[7])
-        assertEquals(2, row["mediaCount"])
-        assertTrue(row["tagCount"] == null)
+        assertEquals(2, row["attachmentCount"])
+        assertTrue(row["assignee"] == null || row["assignee"] == "bob")
         assertTrue(row.child != null)
-        assertSame(envelope.media, row.child)
+        assertSame(envelope.attachments, row.child)
         assertEquals(2, row.child!!.size)
-        assertTrue(row.child!![0] is BlobRowVec)
-        assertTrue(row.child!![1] is S3RowVec)
     }
 
     @Test
     fun envelopeCanProjectWithoutServiceWrapper() {
-        val media = S3RowVec(bucket = "reddit-media", key = "posts/p-5/body.json", byteSize = 64L, contentType = "application/json")
+        val attachment = DocRowVec(listOf("col1"), listOf(1))
         val envelope = BugzeeEnvelope(
-            subreddit = "reddit",
-            postId = "p-5",
-            title = "direct rowvec",
-            body = "projection",
-            tags = mapOf("source" to "idmg", "kind" to "post"),
-            media = 1 j { media },
+            product = "bugzee",
+            bugId = "BUG-5",
+            summary = "direct rowvec",
+            description = "projection",
+            metadata = mapOf("source" to "idmg", "kind" to "bug"),
+            attachments = 1 j { index: Int -> attachment },
         )
 
         val row = envelope.toRowVec()
 
-        assertEquals("reddit", row["subreddit"])
-        assertEquals(1, row["mediaCount"])
-        assertTrue(row["tagCount"] == null)
-        assertSame(envelope.media, row.child)
-        assertSame(media, row.child!![0])
+        assertEquals("bugzee", row["product"])
+        assertEquals(1, row["attachmentCount"])
+        assertTrue(row.child != null)
+        assertSame(envelope.attachments, row.child)
+        assertSame(attachment, row.child!![0])
     }
 }

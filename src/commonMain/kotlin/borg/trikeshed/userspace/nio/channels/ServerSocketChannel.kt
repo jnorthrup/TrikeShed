@@ -19,7 +19,8 @@ public abstract class ServerSocketChannel : AbstractSelectableChannel, NetworkCh
     public abstract override fun bind(address: String): ServerSocketChannel
     fun bind(address: String, backlog: Int): ServerSocketChannel = bind(address)
     public abstract override fun <T> setOption(option: String, value: T): ServerSocketChannel
-    fun accept(): SocketChannel = TODO("accept — Channel.accept + submit+wait")
+    // TODO
+    abstract fun accept(): SocketChannel
     public abstract override fun getLocalAddress(): String
 
     companion object {
@@ -41,7 +42,9 @@ internal class UringServerSocketChannel(
     private var open: Boolean = true
     private val lock = Any()
 
+    // TODO
     override fun begin() {}
+    // TODO
     override fun end(completed: Boolean) {}
 
     override fun provider(): SelectorProvider = SelectorProvider.provider()
@@ -61,9 +64,16 @@ internal class UringServerSocketChannel(
 
     override fun getLocalAddress(): String = "0.0.0.0:0"
 
+    // TODO
+    override fun accept(): SocketChannel = TODO("accept — Channel.accept + submit+wait")
+
+    override fun <T> getOption(option: String): T = TODO("getOption")
+    override fun supportedOptions(): Set<String> = emptySet()
+
     override fun close() { open = false }
     override fun isOpen(): Boolean = open
 
     override fun implCloseSelectableChannel() { open = false }
+    // TODO
     override fun implConfigureBlocking(block: Boolean) {}
 }

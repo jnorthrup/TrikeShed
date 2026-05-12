@@ -10,10 +10,14 @@ import borg.trikeshed.userspace.nio.channels.AsynchronousSocketChannel
 // Declarations intentionally mirror JDK taxonomy and contain no implementations.
 public abstract class AsynchronousChannelProvider {
     protected constructor()
-    fun openAsynchronousChannelGroupWithThreadCount(threadCount: Int): AsynchronousChannelGroup = TODO("NIO common stub")
-    fun openAsynchronousChannelGroupWithInitialSize(initialSize: Int): AsynchronousChannelGroup = TODO("NIO common stub")
-    fun openAsynchronousServerSocketChannel(group: AsynchronousChannelGroup): AsynchronousServerSocketChannel = TODO("NIO common stub")
-    fun openAsynchronousSocketChannel(group: AsynchronousChannelGroup): AsynchronousSocketChannel = TODO("NIO common stub")
+    // TODO
+    abstract fun openAsynchronousChannelGroupWithThreadCount(threadCount: Int): AsynchronousChannelGroup
+    // TODO
+    abstract fun openAsynchronousChannelGroupWithInitialSize(initialSize: Int): AsynchronousChannelGroup
+    // TODO
+    abstract fun openAsynchronousServerSocketChannel(group: AsynchronousChannelGroup): AsynchronousServerSocketChannel
+    // TODO
+    abstract fun openAsynchronousSocketChannel(group: AsynchronousChannelGroup): AsynchronousSocketChannel
     companion object {
         fun provider(): AsynchronousChannelProvider = TODO("NIO common stub")
     }

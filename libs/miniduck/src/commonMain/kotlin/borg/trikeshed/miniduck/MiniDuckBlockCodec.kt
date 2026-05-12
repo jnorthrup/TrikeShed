@@ -487,10 +487,10 @@ object MiniDuckBlockCodec {
         var ci = 0
         for (i in 0 until len) {
             val v = this[i].toInt() and 0xFF
-            chars[ci++] = HEX_DIGITS[v ushr 4]
-            chars[ci++] = HEX_DIGITS[v and 0xF]
-        }
-        return String(chars)
+ chars[ci++] = HEX_DIGITS[v ushr 4]
+ chars[ci++] = HEX_DIGITS[v and 0xF]
+ }
+ return chars.concatToString()
     }
 
     private fun String.fromHex(): ByteArray {

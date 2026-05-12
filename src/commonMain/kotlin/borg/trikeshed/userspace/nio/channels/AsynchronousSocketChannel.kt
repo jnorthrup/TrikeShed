@@ -10,23 +10,40 @@ import borg.trikeshed.userspace.nio.channels.spi.AsynchronousChannelProvider
 // Declarations intentionally mirror JDK taxonomy and contain no implementations.
 public abstract class AsynchronousSocketChannel {
     protected constructor(provider: AsynchronousChannelProvider)
-    fun provider(): AsynchronousChannelProvider = TODO("NIO common stub")
-    fun bind(address: String): AsynchronousSocketChannel = TODO("NIO common stub")
-    fun <T> setOption(option: String, value: T): AsynchronousSocketChannel = TODO("NIO common stub")
-    fun shutdownInput(): AsynchronousSocketChannel = TODO("NIO common stub")
-    fun shutdownOutput(): AsynchronousSocketChannel = TODO("NIO common stub")
-    fun getRemoteAddress(): String = TODO("NIO common stub")
-    fun <A> connect(address: String, attachment: A, handler: CompletionHandler<Unit?, in A>): Unit = TODO("NIO common stub")
-    fun connect(address: String): Unit? = TODO("NIO common stub")
-    fun <A> read(dst: ByteBuffer, timeout: Long, attachment: A, handler: CompletionHandler<Int, in A>): Unit = TODO("NIO common stub")
-    fun <A> read(dst: ByteBuffer, attachment: A, handler: CompletionHandler<Int, in A>): Unit = TODO("NIO common stub")
-    fun read(dst: ByteBuffer): Int = TODO("NIO common stub")
-    fun <A> read(dsts: Array<out ByteBuffer>, offset: Int, length: Int, timeout: Long, attachment: A, handler: CompletionHandler<Long, in A>): Unit = TODO("NIO common stub")
-    fun <A> write(src: ByteSeries, timeout: Long, attachment: A, handler: CompletionHandler<Int, in A>): Unit = TODO("NIO common stub")
-    fun <A> write(src: ByteSeries, attachment: A, handler: CompletionHandler<Int, in A>): Unit = TODO("NIO common stub")
-    fun write(src: ByteSeries): Int = TODO("NIO common stub")
-    fun <A> write(srcs: Array<out ByteSeries>, offset: Int, length: Int, timeout: Long, attachment: A, handler: CompletionHandler<Long, in A>): Unit = TODO("NIO common stub")
-    fun getLocalAddress(): String = TODO("NIO common stub")
+    // TODO
+    abstract fun provider(): AsynchronousChannelProvider
+    // TODO
+    abstract fun bind(address: String): AsynchronousSocketChannel
+    // TODO
+    abstract fun <T> setOption(option: String, value: T): AsynchronousSocketChannel
+    // TODO
+    abstract fun shutdownInput(): AsynchronousSocketChannel
+    // TODO
+    abstract fun shutdownOutput(): AsynchronousSocketChannel
+    // TODO
+    abstract fun getRemoteAddress(): String
+    // TODO
+    abstract fun <A> connect(address: String, attachment: A, handler: CompletionHandler<Unit?, in A>): Unit
+    // TODO
+    abstract fun connect(address: String): Unit?
+    // TODO
+    abstract fun <A> read(dst: ByteBuffer, timeout: Long, attachment: A, handler: CompletionHandler<Int, in A>): Unit
+    // TODO
+    abstract fun <A> read(dst: ByteBuffer, attachment: A, handler: CompletionHandler<Int, in A>): Unit
+    // TODO
+    abstract fun read(dst: ByteBuffer): Int
+    // TODO
+    abstract fun <A> read(dsts: Array<out ByteBuffer>, offset: Int, length: Int, timeout: Long, attachment: A, handler: CompletionHandler<Long, in A>): Unit
+    // TODO
+    abstract fun <A> write(src: ByteSeries, timeout: Long, attachment: A, handler: CompletionHandler<Int, in A>): Unit
+    // TODO
+    abstract fun <A> write(src: ByteSeries, attachment: A, handler: CompletionHandler<Int, in A>): Unit
+    // TODO
+    abstract fun write(src: ByteSeries): Int
+    // TODO
+    abstract fun <A> write(srcs: Array<out ByteSeries>, offset: Int, length: Int, timeout: Long, attachment: A, handler: CompletionHandler<Long, in A>): Unit
+    // TODO
+    abstract fun getLocalAddress(): String
 
     companion object {
         fun `open`(group: AsynchronousChannelGroup): AsynchronousSocketChannel = TODO("NIO common stub")

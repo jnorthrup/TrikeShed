@@ -1,6 +1,6 @@
 package borg.trikeshed.parse.confix
 
-import borg.trikeshed.lib.*
+import borg.trikeshed.collections.text.asSeries
 import kotlin.test.Test
 import kotlin.test.assertNotNull
 import kotlin.test.fail

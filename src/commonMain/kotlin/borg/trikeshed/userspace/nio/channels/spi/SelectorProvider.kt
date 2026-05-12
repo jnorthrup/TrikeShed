@@ -12,15 +12,24 @@ import borg.trikeshed.userspace.nio.channels.Channel
 // Declarations intentionally mirror JDK taxonomy and contain no implementations.
 public abstract class SelectorProvider {
     constructor()
-    open fun openDatagramChannel(): DatagramChannel = TODO("NIO common stub")
-    open fun openDatagramChannel(protocolFamily: String): DatagramChannel = TODO("NIO common stub")
-    open fun openPipe(): Pipe = TODO("NIO common stub")
-    open fun openSelector(): AbstractSelector = TODO("NIO common stub")
-    open fun openServerSocketChannel(): ServerSocketChannel = TODO("NIO common stub")
-    open fun openSocketChannel(): SocketChannel = TODO("NIO common stub")
-    open fun inheritedChannel(): Channel = TODO("NIO common stub")
-    open fun openSocketChannel(protocolFamily: String): SocketChannel = TODO("NIO common stub")
-    open fun openServerSocketChannel(protocolFamily: String): ServerSocketChannel = TODO("NIO common stub")
+    // TODO
+    abstract open fun openDatagramChannel(): DatagramChannel
+    // TODO
+    abstract open fun openDatagramChannel(protocolFamily: String): DatagramChannel
+    // TODO
+    abstract open fun openPipe(): Pipe
+    // TODO
+    abstract open fun openSelector(): AbstractSelector
+    // TODO
+    abstract open fun openServerSocketChannel(): ServerSocketChannel
+    // TODO
+    abstract open fun openSocketChannel(): SocketChannel
+    // TODO
+    abstract open fun inheritedChannel(): Channel
+    // TODO
+    abstract open fun openSocketChannel(protocolFamily: String): SocketChannel
+    // TODO
+    abstract open fun openServerSocketChannel(protocolFamily: String): ServerSocketChannel
     companion object {
         fun provider(): SelectorProvider = UringSelectorProvider
     }
@@ -29,10 +38,13 @@ public abstract class SelectorProvider {
 internal object UringSelectorProvider : SelectorProvider() {
     override fun openDatagramChannel(): DatagramChannel = DatagramChannel.open()
     override fun openDatagramChannel(protocolFamily: String): DatagramChannel = DatagramChannel.open(protocolFamily)
+    // TODO
     override fun openPipe(): Pipe = TODO("pipe")
+    // TODO
     override fun openSelector(): AbstractSelector = TODO("selector")
     override fun openServerSocketChannel(): ServerSocketChannel = ServerSocketChannel.open()
     override fun openSocketChannel(): SocketChannel = SocketChannel.open()
+    // TODO
     override fun inheritedChannel(): Channel = TODO("inheritedChannel")
     override fun openSocketChannel(protocolFamily: String): SocketChannel = SocketChannel.open()
     override fun openServerSocketChannel(protocolFamily: String): ServerSocketChannel = ServerSocketChannel.open()

@@ -1,9 +1,7 @@
 package borg.trikeshed.concurrency
 
+import borg.trikeshed.cursor.j
 import borg.trikeshed.lib.j
-import borg.trikeshed.lib.size
-import borg.trikeshed.cursor.joins
-import borg.trikeshed.lib.Join
 
 /**
  * Minimal MVCC Block store stub used by tests. Not a full implementation — provides only
@@ -111,18 +109,18 @@ class MvccBlockStore {
                     }
                     val values: borg.trikeshed.lib.Series<Any?> = cells.size j { idx -> cells[idx] }
                     val meta: borg.trikeshed.lib.Series<() -> borg.trikeshed.cursor.ColumnMeta> = cells.size j { idx -> { borg.trikeshed.cursor.ColumnMeta("col$idx", borg.trikeshed.isam.meta.IOMemento.IoString) } }
-                    rowVecs.add(values.joins(meta))
+                    rowVecs.add(values j meta)
                 }
             } else if (block is Array<*>) {
                 val cells: List<Any?> = block.toList()
                 val values: borg.trikeshed.lib.Series<Any?> = cells.size j { idx -> cells[idx] }
                 val meta: borg.trikeshed.lib.Series<() -> borg.trikeshed.cursor.ColumnMeta> = cells.size j { idx -> { borg.trikeshed.cursor.ColumnMeta("col$idx", borg.trikeshed.isam.meta.IOMemento.IoString) } }
-                rowVecs.add(values.joins(meta))
+                rowVecs.add(values j meta)
             } else {
                 val cells = listOf(block)
                 val values: borg.trikeshed.lib.Series<Any?> = cells.size j { idx -> cells[idx] }
                 val meta: borg.trikeshed.lib.Series<() -> borg.trikeshed.cursor.ColumnMeta> = cells.size j { idx -> { borg.trikeshed.cursor.ColumnMeta("col$idx", borg.trikeshed.isam.meta.IOMemento.IoString) } }
-                rowVecs.add(values.joins(meta))
+                rowVecs.add(values j meta)
             }
         }
         return rowVecs.size j { r -> rowVecs[r] }

@@ -3,7 +3,7 @@
 package borg.trikeshed.lib
 
 import borg.trikeshed.lib.CZero.nz
-import borg.trikeshed.parse.confix.asSeries
+import borg.trikeshed.collections.text.asSeries
 
 /**
  * char based spiritual successor to ByteBuffer for parsing

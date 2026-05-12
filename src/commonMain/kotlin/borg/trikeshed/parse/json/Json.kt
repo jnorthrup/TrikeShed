@@ -1,10 +1,11 @@
 package borg.trikeshed.parse.json
 
-import borg.trikeshed.lib.TypeEvidence
-import borg.trikeshed.lib.toRowVec
+import borg.trikeshed.collections.text.asSeries
 import borg.trikeshed.cursor.RowVec
 import borg.trikeshed.lib.*
 import borg.trikeshed.parse.confix.*
+import borg.trikeshed.parse.evidence.TypeEvidence
+import borg.trikeshed.parse.evidence.toRowVec
 
 /**
  * Thin re-export layer over the confix JSON stack.

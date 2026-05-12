@@ -1,6 +1,7 @@
 @file:Suppress("unused")
 package borg.trikeshed.parse.yaml
 
+import borg.trikeshed.collections.text.asSeries
 import borg.trikeshed.lib.*
 import borg.trikeshed.parse.confix.*
 import kotlin.test.Test

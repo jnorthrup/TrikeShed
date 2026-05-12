@@ -1,12 +1,11 @@
 package borg.trikeshed.parse.kursive.legacy
 
-import borg.trikeshed.lib.TypeEvidence
+import borg.trikeshed.parse.evidence.TypeEvidence
 import borg.trikeshed.cursor.ColumnMeta
 import borg.trikeshed.cursor.MapTypeMemento
 import borg.trikeshed.cursor.RowVec
 import borg.trikeshed.cursor.SeqTypeMemento
 import borg.trikeshed.cursor.TypeMemento
-import borg.trikeshed.cursor.joins
 import borg.trikeshed.cursor.label
 import borg.trikeshed.lib.SeriesBuffer
 import borg.trikeshed.lib.CharSeries
@@ -21,6 +20,7 @@ import borg.trikeshed.lib.plus
 import borg.trikeshed.lib.toSeries
 import borg.trikeshed.lib.size
 import borg.trikeshed.collections.s_
+import borg.trikeshed.cursor.j
 import borg.trikeshed.isam.meta.IOMemento
 
 typealias NarsiveEvent = Join<Series<Char>, Twin<Int>>
@@ -273,7 +273,7 @@ fun TypeEvidence.toKursiveRowVec(): RowVec {
         TypeEvidence.deduceMemento(this).label,
     )
     val meta = KURSIVE_EVIDENCE_COLUMNS.size j { index: Int -> { @Suppress("UNCHECKED_CAST") (KURSIVE_EVIDENCE_COLUMNS[index] as ColumnMeta) } }
-    return values.size j { index: Int -> values[index] } joins meta
+    return values.size j { index: Int -> values[index] } j meta
 }
 
 val KURSIVE_EVIDENCE_COLUMNS = arrayOf(

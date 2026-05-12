@@ -10,7 +10,6 @@ import borg.trikeshed.lib.*
 import java.io.RandomAccessFile
 import java.nio.ByteBuffer
 import java.nio.channels.SeekableByteChannel
-import java.nio.file.Files
 import java.nio.file.Paths
 import java.nio.file.StandardOpenOption.*
 import java.util.concurrent.locks.ReentrantLock
@@ -140,7 +139,7 @@ actual class IsamDataFile actual constructor(
                 first = false
 
                 if (fileOps.exists(datafilename)) {
-                    val fileSize = Files.size(Paths.get(datafilename))
+                    val fileSize = java.nio.file.Files.size(Paths.get(datafilename))
                     val alignment = fileSize % rowLen
                     if (alignment != 0L) {
                         println("WARN: file $datafilename is not aligned to recordlen $rowLen")
@@ -151,7 +150,7 @@ actual class IsamDataFile actual constructor(
             }
 
             // open RandomAccessDataFile
-            Files.newOutputStream(Paths.get(datafilename), APPEND, WRITE, CREATE).use { data ->
+            java.nio.file.Files.newOutputStream(Paths.get(datafilename), APPEND, WRITE, CREATE).use { data ->
                 var fibLog: FibonacciReporter? = null
                 debug { fibLog = FibonacciReporter(size = null, noun = "appends") }
 

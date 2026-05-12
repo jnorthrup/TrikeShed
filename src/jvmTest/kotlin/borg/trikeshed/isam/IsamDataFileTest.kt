@@ -1,13 +1,15 @@
 package borg.trikeshed.isam
 
+import borg.trikeshed.collections._l
+import borg.trikeshed.collections.s_
 import borg.trikeshed.cursor.*
 import borg.trikeshed.isam.meta.IOMemento
 import borg.trikeshed.lib.*
+import borg.trikeshed.miniduck.s_
 import borg.trikeshed.userspace.nio.file.spi.JvmFileOperations
 import org.junit.Assert.assertEquals
 import org.junit.Test
 import java.io.File
-import java.nio.file.Files
 import java.nio.file.Paths
 
 class IsamDataFileTest {
@@ -27,19 +29,20 @@ class IsamDataFileTest {
             val row1 = s_[10, 20.0] j s_[ { ColumnMeta("int_col", IOMemento.IoInt) }, { ColumnMeta("double_col", IOMemento.IoDouble) } ]
             val row2 = s_[30, 40.0] j s_[ { ColumnMeta("int_col", IOMemento.IoInt) }, { ColumnMeta("double_col", IOMemento.IoDouble) } ]
 
-            IsamDataFile.append(listOf(row1, row2), datafilename, emptyMap(), null, fileOps)
+            IsamDataFile.append(_l
+                [row1, row2], datafilename, emptyMap(), null, fileOps)
 
             assertEquals(true, fileOps.exists(datafilename))
             assertEquals(true, fileOps.exists(metafilename))
 
-            val initialSize = Files.size(Paths.get(datafilename))
+            val initialSize = borg.trikeshed.userspace.nio.file.Files.size(Paths.get(datafilename))
             assertEquals(24, initialSize.toInt()) // 2 rows * (4 for int + 8 for double)
 
             // 2. Append more records
             val row3 = s_[50, 60.0] j s_[ { ColumnMeta("int_col", IOMemento.IoInt) }, { ColumnMeta("double_col", IOMemento.IoDouble) } ]
             IsamDataFile.append(listOf(row3), datafilename, emptyMap(), null, fileOps)
 
-            val finalSize = Files.size(Paths.get(datafilename))
+            val finalSize = borg.trikeshed.userspace.nio.file.Files.size(Paths.get(datafilename))
             assertEquals(36, finalSize.toInt()) // 3 rows * 12 bytes
 
             // 3. Verify reading

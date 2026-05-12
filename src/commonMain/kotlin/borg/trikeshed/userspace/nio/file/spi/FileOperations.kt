@@ -14,7 +14,7 @@ import kotlin.coroutines.CoroutineContext
  *   val fs = coroutineContext[FileOperations.Key]
  *   fs?.readString("config.yaml")
  *
- * Or use the top-level [borg.trikeshed.lib.Files] accessor property.
+ * Or use the top-level [borg.trikeshed.userspace.nio.file.Files] accessor property.
  */
 interface FileOperations : CoroutineContext.Element {
     companion object Key : CoroutineContext.Key<FileOperations>

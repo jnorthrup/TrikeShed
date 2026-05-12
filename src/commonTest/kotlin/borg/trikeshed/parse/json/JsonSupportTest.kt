@@ -1,6 +1,6 @@
 package borg.trikeshed.parse.json
 
-import borg.trikeshed.lib.TypeEvidence
+import borg.trikeshed.parse.evidence.TypeEvidence
 import borg.trikeshed.cursor.name
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.size
