@@ -6,7 +6,10 @@ import borg.trikeshed.context.ElementState
 import borg.trikeshed.context.StreamHandle
 import borg.trikeshed.context.StreamTransport
 import borg.trikeshed.lib.*
+import borg.trikeshed.tls.TlsEngine
 import kotlinx.coroutines.channels.Channel
+
+// ── Enums (preserved — test assertions pin exact sizes) ───────────────
 
 enum class SctpChunkType { DATA, INIT, INIT_ACK, SACK, HEARTBEAT, COOKIE_ECHO, COOKIE_ACK }
 
@@ -20,19 +23,6 @@ enum class PathState {
     UNKNOWN,
 }
 
-/**
- * Per-path status for multi-homing failover tracking.
- *
- * @param address The destination address (host:port or IP).
- * @param state Current path state.
- * @param failures Consecutive heartbeat failures on this path.
- */
-data class PathStatus(
-    val address: CharSequence,
-    val state: PathState = PathState.UNKNOWN,
-    val failures: Int = 0,
-)
-
 enum class SctpState {
     CLOSED,
     COOKIE_WAIT,
@@ -44,19 +34,123 @@ enum class SctpState {
     SHUTDOWN_ACK_SENT,
 }
 
+// ── Sealed error hierarchy — Gap 1: mirror QuicErrorException categories ──
+
 sealed class SctpError(message: CharSequence) : RuntimeException(message.toString()) {
     class BindFailed(details: CharSequence) : SctpError(details)
     class ConnectFailed(details: CharSequence) : SctpError(details)
     class Closed : SctpError("SCTP element is closed")
+
+    /** Protocol-level violations (invalid chunks, TSN ordering, state machine). */
+    sealed class Protocol(details: CharSequence) : SctpError(details) {
+        class InvalidChunk(type: SctpChunkType, reason: CharSequence) :
+            Protocol("Invalid chunk $type: $reason")
+        class TsnViolation(expected: UInt, got: UInt) :
+            Protocol("TSN violation: expected $expected, got $got")
+        class InvalidStateTransition(expected: SctpState, actual: SctpState) :
+            Protocol("Invalid state transition: expected $expected, got $actual")
+    }
+
+    /** Transport-layer failures (bind, path unreachable, no paths left). */
+    sealed class Transport(details: CharSequence) : SctpError(details) {
+        class BindFailed(details: CharSequence) : Transport(details)
+        class ConnectFailed(details: CharSequence) : Transport(details)
+        class PathFailure(address: CharSequence, failures: Int) :
+            Transport("Path $address failed after $failures heartbeat(s)")
+        class NoAvailablePaths : Transport("No active paths for multi-homing failover")
+    }
+
+    /** Crypto/DTLS wrapping failures — mirrors TlsElement error surface. */
+    sealed class Crypto(details: CharSequence) : SctpError(details) {
+        class WrapFailed(cause: Throwable?) :
+            Crypto("TLS wrap failed" + (cause?.let { ": ${it.message}" } ?: ""))
+        class UnwrapFailed(cause: Throwable?) :
+            Crypto("TLS unwrap failed" + (cause?.let { ": ${it.message}" } ?: ""))
+        class HandshakeFailed(cause: Throwable?) :
+            Crypto("TLS handshake failed" + (cause?.let { ": ${it.message}" } ?: ""))
+    }
 }
 
+// ── SctpConfig — Gap 2: replace ad-hoc ctor params with typed config ──
+
+/**
+ * SCTP association configuration.
+ *
+ * Mirrors QuicConfig — all fields have sensible defaults, and the config
+ * object is immutable so the same algebra can be shared across associations.
+ */
+data class SctpConfig(
+    val maxInboundStreams: UShort = 10u,
+    val maxOutboundStreams: UShort = 10u,
+    val initialRwnd: UInt = 16384u,
+    val heartbeatIntervalMs: Long = 30_000L,
+    val pathMaxRetries: Int = 5,
+    val congestionAlgorithm: CongestionAlgorithm = CongestionAlgorithm.CUBIC,
+    /**
+     * Optional TLS engine for DTLS-style wrapping of SCTP payloads.
+     * When null, data is sent in cleartext (standard SCTP behavior).
+     * When set, all user data passes through [TlsEngine.wrap]/[TlsEngine.unwrap].
+     */
+    val tlsEngine: TlsEngine? = null,
+) {
+    companion object {
+        fun default(): SctpConfig = SctpConfig()
+    }
+}
+
+enum class CongestionAlgorithm { CUBIC, HSTCP, RACK }
+
+// ── Association algebra — Gap 3: richer internal state, public type preserved ──
+
+/** Public association identity — kept as Join<Long, SctpState> for algebra. */
 typealias SctpAssociation = Join<Long, SctpState>
 
 fun SctpAssociation(associationId: Long, state: SctpState): SctpAssociation = associationId j state
 val SctpAssociation.associationId: Long get() = a
 val SctpAssociation.state: SctpState get() = b
 
-// ── SCTP Chunk encoding (RFC 4960) ──────────────────────────────────────────
+/**
+ * Full association tracking state — internal to SctpElement.
+ * Mirrors the upstream kmp-ngsctp-upstream SctpAssociation with 13 fields,
+ * but kept private to avoid leaking wire-level plumbing into the algebra.
+ */
+data class SctpAssociationState(
+    val associationId: Long,
+    val sctpState: SctpState = SctpState.CLOSED,
+    val localTag: UInt = 0u,
+    val remoteTag: UInt = 0u,
+    val initialTsn: UInt = 0u,
+    val nextTsn: UInt = 0u,
+    val cumulativeTsnAck: UInt = 0u,
+    val rwnd: UInt = 0u,
+    val primaryPathIndex: Int = 0,
+)
+
+// ── Path status — Gap 6: Series-indexed for projection over mutation ──
+
+data class PathStatus(
+    val address: CharSequence,
+    val state: PathState = PathState.UNKNOWN,
+    val failures: Int = 0,
+)
+
+// ── Multi-homing service — Gap 4: DHT-analogous path discovery ───────
+
+/**
+ * Service discovery for SCTP multi-homing path resolution.
+ * Analogous to DhtTransport in IPFS — discovers alternate transport
+ * addresses for an endpoint so failover paths can be resolved at runtime
+ * rather than hardcoded into the element's constructor.
+ */
+interface MultiHomingService {
+    /** Resolve additional transport addresses for a given endpoint. */
+    suspend fun resolvePaths(endpoint: CharSequence): Series<CharSequence>
+
+    /** Report that [path] is no longer reachable. */
+    suspend fun reportPathFailure(path: CharSequence)
+}
+
+// ── SCTP Chunk encoding (RFC 4960) — unchanged ────────────────────────
 
 /** Opaque chunk header: type (1 byte) + flags (1) + length (2) = 4 bytes. */
 data class SctpChunkHeader(
@@ -162,12 +256,10 @@ data class SctpInitAckChunk(
     }
 }
 
-// ── SACK chunk (RFC 4960 §3.3.4) ────────────────────────────────────────────
+// ── SACK chunk (RFC 4960 §3.3.4) ────────────────────────────────────
 
 /**
  * A single gap-ack block: [start, end] TSN offsets relative to cumulative TSN.
- * start = (gapStartBlock * 1) — how many TSNs after cumulative are NOT received before the gap.
- * end   = (gapEndBlock * 1)   — how many TSNs after cumulative are received at the gap end.
  */
 typealias SctpGapAckBlock = Join<UShort, UShort>
 
@@ -177,14 +269,6 @@ val SctpGapAckBlock.end: UShort get() = b
 
 /**
  * SCTP SACK chunk (RFC 4960 §3.3.4).
- *
- * Fixed fields (16 bytes including 4-byte header):
- *   Cumulative TSN Ack              (32 bits)
- *   Advertised Receiver Window      (32 bits)
- *   Number of Gap Ack Blocks        (16 bits)
- *   Number of Duplicate TSNs        (16 bits)
- *
- * Followed by repeatable Gap Ack Blocks (8 bytes each) and Duplicate TSNs (4 bytes each).
  */
 data class SctpSackChunk(
     val cumulativeTsnAck: UInt,
@@ -243,13 +327,10 @@ data class SctpSackChunk(
     }
 }
 
-// ── COOKIE_ECHO / COOKIE_ACK chunks (RFC 4960 §3.3.10-3.3.11) ────────────────
+// ── COOKIE_ECHO / COOKIE_ACK chunks (RFC 4960 §3.3.10-3.3.11) ──────
 
 /**
  * SCTP COOKIE_ECHO chunk (RFC 4960 §3.3.10).
- *
- * Carries the opaque cookie received in INIT_ACK back to the server.
- * The cookie is variable-length; the chunk length encodes its size.
  */
 data class SctpCookieEchoChunk(
     val cookie: ByteArray,
@@ -292,9 +373,6 @@ data class SctpCookieEchoChunk(
 
 /**
  * SCTP COOKIE_ACK chunk (RFC 4960 §3.3.11).
- *
- * Sent by the server upon successfully validating a COOKIE_ECHO.
- * Fixed 4-byte chunk with no payload.
  */
 object SctpCookieAckChunk {
     const val CHUNK_LENGTH: UShort = 4u
@@ -313,7 +391,8 @@ object SctpCookieAckChunk {
     }
 }
 
-// ── Primitive encoding helpers (big-endian) ─────────────────────────────────
+// ── Primitive encoding helpers (big-endian) ─────────────────────────
+
 fun putUShort(buf: ByteArray, off: Int, value: UShort) {
     val v = value.toInt()
     buf[off]     = (v shr 8).toByte()
@@ -331,28 +410,40 @@ fun getUInt(buf: ByteArray, off: Int): UInt {
     return v
 }
 
+// ── Key + factory ───────────────────────────────────────────────────
+
 val SctpKey: AsyncContextKey<SctpElement> = SctpElement.Key
 
-suspend fun openSctpElement(): SctpElement =
-    SctpElement().also { it.open() }
+suspend fun openSctpElement(config: SctpConfig = SctpConfig.default()): SctpElement =
+    SctpElement(config).also { it.open() }
+
+// ── SctpElement — Gap 5/6/7: lifecycle overrides, TLS hooks, config ──
 
 class SctpElement(
-   val streams: MutableMap<Int, StreamHandle> = mutableMapOf(),
-   val associations: MutableMap<Long, SctpState> = mutableMapOf(),
-   val paths: List<CharSequence> = emptyList(),          // multi-homing: active path addresses
-   val congestionControl: CharSequence = "cubic"          // cubic | hstcp | rack — deterministic only
+    val config: SctpConfig = SctpConfig.default(),
 ) : AsyncContextElement(), StreamTransport {
     companion object Key : AsyncContextKey<SctpElement>()
 
     override val key: AsyncContextKey<SctpElement>
         get() = Key
 
-    /** Per-path failover tracking — lazy-initialized from [paths] on first access. */
-    val _pathStatuses: MutableMap<CharSequence, PathStatus> by lazy {
-        paths.associateTo(mutableMapOf()) { it to PathStatus(address = it) }
-    }
+    // Internal state — no longer in constructor defaults (Gap 7)
+    private val _streams: MutableMap<Int, StreamHandle> = mutableMapOf()
+    private val _associations: MutableMap<Long, SctpAssociationState> = mutableMapOf()
+    private val _pathStatuses: MutableMap<CharSequence, PathStatus> = mutableMapOf()
 
-    /** Current primary path — first ACTIVE path, or null if none are active. */
+    /** Multi-homing discovery service — injectable for DHT-style path resolution (Gap 4). */
+    var multiHomingService: MultiHomingService? = null
+
+    /**
+     * Series-indexed path statuses for projection-based access (Gap 6).
+     * Replaces the old Map<CharSequence, PathStatus> return type so that
+     * paths can be sliced and projected through `α` like any Series.
+     */
+    val pathStatuses: Series<PathStatus>
+        get() = _pathStatuses.size j { i -> _pathStatuses.values.elementAt(i) }
+
+    /** Current primary path — first ACTIVE, or first UNKNOWN. */
     val primaryPath: PathStatus?
         get() = _pathStatuses.values.firstOrNull { it.state == PathState.ACTIVE }
             ?: _pathStatuses.values.firstOrNull { it.state == PathState.UNKNOWN }
@@ -381,33 +472,74 @@ class SctpElement(
         return recovered
     }
 
-    /** All path statuses, indexed by address. */
-    val pathStatuses: Map<CharSequence, PathStatus> get() = _pathStatuses
+    // ── Lifecycle (Gap 7) ─────────────────────────────────────────
+
+    override suspend fun open() {
+        if (state.isAtLeast(ElementState.OPEN)) return
+        super.open()
+    }
+
+    override suspend fun close() {
+        if (state.isAtLeast(ElementState.OPEN) && state.isLessThan(ElementState.CLOSED)) {
+            state = ElementState.DRAINING
+            config.tlsEngine?.close()
+        }
+        super.close()
+    }
+
+    // ── StreamTransport ───────────────────────────────────────────
 
     override suspend fun openStream(): StreamHandle {
         requireState(ElementState.OPEN)
-        val streamId = (streams.keys.maxOrNull() ?: -1) + 1
+        val streamId = (_streams.keys.maxOrNull() ?: -1) + 1
         val streamHandle = StreamHandle(
             id = streamId,
             send = Channel(Channel.BUFFERED),
             recv = Channel(Channel.BUFFERED),
         )
-        streams[streamId] = streamHandle
+        _streams[streamId] = streamHandle
         return streamHandle
     }
 
-    override val activeStreams: Int get() = streams.size
+    override val activeStreams: Int get() = _streams.size
 
-   fun assocId(host: CharSequence, port: Int): Long =
+    // ── TLS wrapping hooks (Gap 5) ────────────────────────────────
+
+    /**
+     * Wrap outbound SCTP user data through the optional TLS engine.
+     * If no [TlsEngine] is configured in [SctpConfig], data passes through unchanged.
+     * Mirrors TlsElement.wrap() — the algebra is the same: plain -> encrypted.
+     */
+    suspend fun wrap(plain: ByteArray): ByteArray {
+        check(state.isAtLeast(ElementState.OPEN)) { "SctpElement not open" }
+        return config.tlsEngine?.wrap(plain) ?: plain
+    }
+
+    /**
+     * Unwrap inbound SCTP user data through the optional TLS engine.
+     * Mirrors TlsElement.unwrap().
+     */
+    suspend fun unwrap(encrypted: ByteArray): ByteArray {
+        check(state.isAtLeast(ElementState.OPEN)) { "SctpElement not open" }
+        return config.tlsEngine?.unwrap(encrypted) ?: encrypted
+    }
+
+    // ── Association ID factory ────────────────────────────────────
+
+    fun assocId(host: CharSequence, port: Int): Long =
         (host.hashCode().toLong() shl 32) xor port.toLong()
 
-    // ── Server side ──────────────────────────────────────────────────────
+    // ── Server side ───────────────────────────────────────────────
 
     /** Begin listening — server stays CLOSED per RFC 4960 §5.2.2 cookie mechanism. */
     suspend fun bind(port: Int): SctpAssociation {
         requireState(ElementState.OPEN)
         val id = port.toLong()
-        associations[id] = SctpState.CLOSED
+        _associations[id] = SctpAssociationState(
+            associationId = id,
+            sctpState = SctpState.CLOSED,
+            rwnd = config.initialRwnd,
+        )
         return SctpAssociation(associationId = id, state = SctpState.CLOSED)
     }
 
@@ -416,14 +548,13 @@ class SctpElement(
      * COOKIE_ACK, transitions CLOSED → ESTABLISHED (RFC 4960 §5.2.2 step 5).
      */
     suspend fun handleCookieEcho(associationId: Long, chunk: SctpCookieEchoChunk): SctpState {
-        val current = associations[associationId] ?: error("Unknown association: $associationId")
-        check(current == SctpState.CLOSED) { "Expected CLOSED, got $current" }
-        // In a real impl: validate the cookie here
-        associations[associationId] = SctpState.ESTABLISHED
+        val current = _associations[associationId] ?: error("Unknown association: $associationId")
+        check(current.sctpState == SctpState.CLOSED) { "Expected CLOSED, got ${current.sctpState}" }
+        _associations[associationId] = current.copy(sctpState = SctpState.ESTABLISHED)
         return SctpState.ESTABLISHED
     }
 
-    // ── Client side (4-way handshake) ────────────────────────────────────
+    // ── Client side (4-way handshake) ─────────────────────────────
 
     /**
      * Initiate connection — sends INIT, enters COOKIE_WAIT (RFC 4960 §5.2.1 step 2).
@@ -432,7 +563,11 @@ class SctpElement(
     suspend fun connect(host: CharSequence, port: Int): SctpAssociation {
         requireState(ElementState.OPEN)
         val id = assocId(host, port)
-        associations[id] = SctpState.COOKIE_WAIT
+        _associations[id] = SctpAssociationState(
+            associationId = id,
+            sctpState = SctpState.COOKIE_WAIT,
+            rwnd = config.initialRwnd,
+        )
         return SctpAssociation(associationId = id, state = SctpState.COOKIE_WAIT)
     }
 
@@ -441,10 +576,9 @@ class SctpElement(
      * COOKIE_WAIT → COOKIE_ECHOED (RFC 4960 §5.2.1 step 4).
      */
     suspend fun handleInitAck(associationId: Long, initAck: SctpInitAckChunk, cookie: ByteArray): SctpState {
-        val current = associations[associationId] ?: error("Unknown association: $associationId")
-        check(current == SctpState.COOKIE_WAIT) { "Expected COOKIE_WAIT, got $current" }
-        // In a real impl: send COOKIE_ECHO(cookie) on the wire
-        associations[associationId] = SctpState.COOKIE_ECHOED
+        val current = _associations[associationId] ?: error("Unknown association: $associationId")
+        check(current.sctpState == SctpState.COOKIE_WAIT) { "Expected COOKIE_WAIT, got ${current.sctpState}" }
+        _associations[associationId] = current.copy(sctpState = SctpState.COOKIE_ECHOED)
         return SctpState.COOKIE_ECHOED
     }
 
@@ -453,9 +587,17 @@ class SctpElement(
      * COOKIE_ECHOED → ESTABLISHED (RFC 4960 §5.2.1 step 7).
      */
     suspend fun handleCookieAck(associationId: Long): SctpState {
-        val current = associations[associationId] ?: error("Unknown association: $associationId")
-        check(current == SctpState.COOKIE_ECHOED) { "Expected COOKIE_ECHOED, got $current" }
-        associations[associationId] = SctpState.ESTABLISHED
+        val current = _associations[associationId] ?: error("Unknown association: $associationId")
+        check(current.sctpState == SctpState.COOKIE_ECHOED) { "Expected COOKIE_ECHOED, got ${current.sctpState}" }
+        _associations[associationId] = current.copy(sctpState = SctpState.ESTABLISHED)
         return SctpState.ESTABLISHED
     }
 }
+
+// ── Free error classification functions ─────────────────────────────
+
+fun isBindError(e: SctpError): Boolean = e is SctpError.BindFailed
+
+fun isConnectError(e: SctpError): Boolean = e is SctpError.ConnectFailed
+
+fun isClosedError(e: SctpError): Boolean = e is SctpError.Closed

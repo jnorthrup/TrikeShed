@@ -1,0 +1,54 @@
+# Dispatch Prompt Optimization — RLM-GEPA
+#
+# Optimizes subagent dispatch prompts (context + goal) for multi-agent
+# coding tasks. The agent_spec tells GEPA what kind of behavioral
+# improvements are in-scope for prompt engineering.
+
+use_cases:
+  - "Dispatch parallel subagents to implement features across a KMP monorepo"
+  - "Dispatch subagents to create new library modules with cross-dependencies"
+  - "Dispatch subagents to fix compilation errors across multiple files"
+  - "Dispatch subagents for exploratory analysis of a codebase"
+  - "Dispatch subagents for test generation across modules"
+
+runtime_grounding_examples:
+  file_isolation:
+    - "Two parallel agents modifying the same file causes merge conflicts"
+    - "Agent A's write_file overwrites Agent B's changes to BugzeeService.kt"
+    - "Subagents must have exclusive write targets; no shared files"
+  token_budgets:
+    - "A 36 api_calls subagent used 1.5M input tokens for a single task"
+    - "Context field was 782 chars of file paths — redundant reads inflated tokens"
+    - "Over-specifying existing code in context causes token explosion"
+  dependency_ordering:
+    - "bugzee build failed because hazelnut dependency wasn't declared"
+    - "Agent modified build.gradle.kts but parent module didn't compile"
+    - "Transport layer depends on cluster, which depends on service — sequential order needed"
+
+tool_signatures: |
+  delegate_task(tasks=[{toolsets, goal, context}]) — batch spawn up to 3 parallel
+  subagents with isolated contexts. Each subagent gets file, terminal toolsets.
+  Results returned as array of {task_index, status, summary, tokens, duration}.
+  Subagents cannot share state or read each other's work in progress.
+  Max context length ~8000 chars before token explosion.
+
+target_signature: |
+  Given a multi-agent coding task, produce optimal dispatch prompts for 3-5
+  subagents. Each prompt has: (1) tool field (codex|copilot|qwen|opencode),
+  (2) goal field (self-contained task description), (3) context field
+  (file paths, existing code references, constraints). The dispatch must
+  minimize token waste, avoid file conflicts, and maximize output quality.
+
+scoring_description: >
+  Score from 0-1. 1.0 = all subagents complete with zero conflicts, minimal
+  token usage (<200K input per agent), clean compilation, and no shared file
+  modifications. Deductions: -0.1 per shared-file conflict, -0.05 per 100K
+  excess tokens above 300K, -0.1 per compilation error introduced, -0.05 per
+  60s above 120s average duration. Bonus +0.05 if sequential dependency
+  ordering is explicit for dependent tasks.
+
+counterfactual_axis_name: "failure modes"
+domain_conventions_note: >
+  TrikeShed is a KMP monorepo. CharSequence not String in commonMain. No type
+  conversion wrappers. UringFacade is the platform. Tests verify algebraic
+  purity. Subagents cannot use clarify, memory, or execute_code.

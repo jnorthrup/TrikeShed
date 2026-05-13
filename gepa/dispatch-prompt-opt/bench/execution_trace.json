@@ -1,0 +1,94 @@
+{
+  "round_1_batch_1": {
+    "agents": [
+      {
+        "tool": "codex",
+        "task": "service",
+        "goal_len": 873,
+        "context_len": 686,
+        "duration_seconds": 97.26,
+        "api_calls": 7,
+        "status": "completed",
+        "tokens": {
+          "input": 54994,
+          "output": 4207
+        },
+        "outcome": "success - enhanced BugzeeService.kt with voting, comments, feeds, subscriptions",
+        "quality": 0.85
+      },
+      {
+        "tool": "copilot",
+        "task": "cluster",
+        "goal_len": 745,
+        "context_len": 548,
+        "duration_seconds": 377.43,
+        "api_calls": 16,
+        "status": "completed",
+        "tokens": {
+          "input": 494935,
+          "output": 17828
+        },
+        "outcome": "success - created BugzeeCluster.kt with 25000+ lines",
+        "quality": 0.9
+      },
+      {
+        "tool": "qwen",
+        "task": "couch_grounding",
+        "goal_len": 819,
+        "context_len": 720,
+        "duration_seconds": 337.28,
+        "api_calls": 13,
+        "status": "completed",
+        "tokens": {
+          "input": 350598,
+          "output": 15678
+        },
+        "outcome": "success - created BugzeeCouchGrounding.kt with maps/reduces, 839 lines",
+        "quality": 0.88
+      }
+    ],
+    "issues": "subagent modified shared file (BugzeeService.kt) - caused conflicts between parallel agents"
+  },
+  "round_1_task_4": {
+    "agents": [
+      {
+        "tool": "qwen",
+        "task": "transports",
+        "goal_len": 1340,
+        "context_len": 782,
+        "duration_seconds": 409.06,
+        "api_calls": 36,
+        "status": "completed",
+        "tokens": {
+          "input": 1512979,
+          "output": 15471
+        },
+        "outcome": "success - created BugzeeTransports.kt 1121 lines, plus build.gradle.kts edit",
+        "quality": 0.82,
+        "files_modified": [
+          "BugzeeTransports.kt",
+          "build.gradle.kts"
+        ]
+      }
+    ]
+  },
+  "round_1_task_5": {
+    "agents": [
+      {
+        "tool": "qwen",
+        "task": "spokes",
+        "goal_len": 1494,
+        "context_len": 1098,
+        "duration_seconds": 336.29,
+        "api_calls": 10,
+        "status": "completed",
+        "tokens": {
+          "input": 563838,
+          "output": 15800
+        },
+        "outcome": "success - created BugzeeSpokes.kt 1691 lines",
+        "quality": 0.9
+      }
+    ]
+  }
+}

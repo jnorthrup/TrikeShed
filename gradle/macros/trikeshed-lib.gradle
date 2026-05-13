@@ -179,6 +179,11 @@ switch (project.path) {
     case ":libs:patl":
     case ":libs:tiny-btrfs":
     case ":libs:ngsctp":
+        kmpHost()
+        extensions.getByName("kotlin").sourceSets.getByName("commonMain").dependencies {
+            implementation project(":libs:tls")
+        }
+        break
     case ":libs:quic":
     case ":libs:ipfs":
     case ":libs:tls":
@@ -186,6 +191,14 @@ switch (project.path) {
         break
     case ":libs:uring":
         kmpJvm()
+        break
+    case ":libs:ebpf":
+        kmpHost(rootMode: "none", coroutinesMain: false)
+        def ebpfKotlin = extensions.getByName("kotlin")
+        def ebpfSets = ebpfKotlin.sourceSets
+        ebpfSets.getByName("commonMain").dependencies {
+            implementation project(":libs:uring")
+        }
         break
     case ":libs:polyglot":
         kmpJvm()

@@ -48,17 +48,10 @@ fun ringHttpsHandler(
 
     val fd = channels.socket(2, 1, 0)
     check(fd >= 0) { "socket failed" }
-        val connResult = channels.connect(fd, host, port)
-        if (connResult < 0) {
-            // EINPROGRESS on non-blocking socket — wait for writable
-            reactor.register(fd, setOf(Interest.WRITE), 1L)
-            val w = reactor.poll(Duration.INFINITE)
-            if (w.isEmpty()) error("connect timed out to $host:$port")
-            reactor.deregister(fd)
-        }
+    val connResult = channels.connect(fd, host, port)
     check(connResult >= 0) { "connect failed: $connResult" }
     val ring = channels.openChannel()
-    val handle = object : ChannelOperations.ChannelHandle {
+    val handle: ChannelOperations.ChannelHandle = object : ChannelOperations.ChannelHandle {
         override val id get() = fd
         override fun read(b: ByteBuffer, o: Long) = ring.read(b, o)
         override fun write(b: ByteBuffer, o: Long) = ring.write(b, o)
