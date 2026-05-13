@@ -122,3 +122,13 @@ fun CharSequence.removeSuffix(suffix: CharSequence): CharSequence =
 fun Iterable<CharSequence>.sorted(): List<CharSequence> = this.toList().sortedBy { it.toString() }
 fun Sequence<CharSequence>.sorted(): List<CharSequence> = this.toList().sortedBy { it.toString() }
 fun Array<out CharSequence>.sorted(): List<CharSequence> = this.asList().sortedBy { it.toString() }
+
+// Numeric parsing helpers for CharSequence -> delegate to String parsing
+fun CharSequence.toIntOrNull(radix: Int = 10): Int? = this.toString().toIntOrNull(radix)
+fun CharSequence.toInt(radix: Int = 10): Int = this.toString().toInt(radix)
+fun CharSequence.toLongOrNull(radix: Int = 10): Long? = this.toString().toLongOrNull(radix)
+fun CharSequence.toLong(radix: Int = 10): Long = this.toString().toLong(radix)
+fun CharSequence.toDoubleOrNull(): Double? = this.toString().toDoubleOrNull()
+fun CharSequence.toDouble(): Double = this.toString().toDouble()
+fun CharSequence.toFloatOrNull(): Float? = this.toString().toFloatOrNull()
+fun CharSequence.toFloat(): Float = this.toString().toFloat()
