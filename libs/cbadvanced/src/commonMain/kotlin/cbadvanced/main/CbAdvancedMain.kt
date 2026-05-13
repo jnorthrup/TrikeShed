@@ -2,11 +2,12 @@ package cbadvanced.main
 
 import cbadvanced.resolveDotenv
 import cbadvanced.runCoinbaseAuthProof
+import kotlinx.coroutines.*
 
-suspend fun main(args: Array<CharSequence>) {
+fun main(args: Array<String>) {
     val requestedProduct = args.firstOrNull()?.ifBlank { null }?.substringBefore("-USD") ?: "BTC"
     val resolution = resolveDotenv()
-    val proof = runCoinbaseAuthProof(resolution.resolvedPath, requestedProduct)
+    val proof = runBlocking { runCoinbaseAuthProof(resolution.resolvedPath, requestedProduct) }
 
     println(proof.message)
     println("cbadvanced auth proof")

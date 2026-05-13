@@ -16,7 +16,7 @@ import kotlin.test.assertTrue
 class MacosHtxDebugTest {
 
     private val channels = PosixChannelOperations()
-    private val reactor = PosixReactorOperations()
+    private val reactor = PosixReactorOperations(channels)
     private val ring = channels.openChannel()
 
     private fun channelHandle(fd: Int) = object : borg.trikeshed.userspace.nio.channels.spi.ChannelOperations.ChannelHandle {

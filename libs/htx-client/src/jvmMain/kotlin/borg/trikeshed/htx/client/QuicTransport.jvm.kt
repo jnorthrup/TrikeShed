@@ -117,12 +117,11 @@ private fun buildQuicInitial(dcid: ByteArray, serverName: String): ByteArray {
     // Derive initial secret
     val initialSecret = hkdf.extract(initialSalt, dcid)
 
-    // Derive client initial secret (RFC 9001 uses "tls13 " prefix for HKDF-Expand-Label)
+    // QUIC Initial key derivation: RFC 9001 §5.1 with HKDF-Expand-Label (RFC 8446 §7.1)
+    // The "tls13 " prefix is included by expandLabel per RFC 8446 convention.
     val clientInitialSecret = hkdf.expandLabel(initialSecret, "client in", ByteArray(0), 32)
-
-    // Derive key material
-    val key = hkdf.expandLabel(clientInitialSecret, "quic key", ByteArray(0), 16)
-    val iv = hkdf.expandLabel(clientInitialSecret, "quic iv", ByteArray(0), 12)
+    val key  = hkdf.expandLabel(clientInitialSecret, "quic key", ByteArray(0), 16)
+    val iv   = hkdf.expandLabel(clientInitialSecret, "quic iv",  ByteArray(0), 12)
     val hpKey = hkdf.expandLabel(clientInitialSecret, "quic hp", ByteArray(0), 16)
 
     // Build TLS ClientHello for QUIC (ALPN: h3)
@@ -144,22 +143,22 @@ private fun buildQuicInitial(dcid: ByteArray, serverName: String): ByteArray {
         put(clientHello)
     }.toByteArray()
 
-    // Pad to fill 1200-byte minimum datagram (RFC 9000 §14.1)
-    // Account for: header(~28) + pn(4) + tag(16) = ~48 overhead
-    val paddingNeeded = (1152 - cryptoFrame.size).coerceAtLeast(0)
-    val payload = if (cryptoFrame.size < 1152) {
-        // PADDING frame (type=0x00) fills remaining space
-        cryptoFrame + ByteArray(paddingNeeded)
-    } else {
-        cryptoFrame
-    }
+    // Build the AEAD payload: CRYPTO frame + optional PADDING.
+    // Header overhead: 1(flags) + 4(ver) + 1(dcid_len) + 8(dcid) + 1(scid_len) + 8(scid)
+    //                 + 1(token_len) + 2(length_varint) = 26, plus pn(2) + tag(16) = 44.
+    // To reach 1200 bytes total: payload should be ~1200 - 44 = ~1156 bytes.
+    // But we can also pad OUTSIDE the AEAD payload (aioquic does this).
+    // aioquic sends: ~460 bytes payload + 16 tag + 2 pn = ~478 in-Length, + 700 zero-pad outside Length.
+    val targetPayloadSize = 460  // match aioquic's working payload size
+    val paddingNeeded = (targetPayloadSize - cryptoFrame.size).coerceAtLeast(0)
+    val payload = cryptoFrame + ByteArray(paddingNeeded)
 
-    // Packet number: 0 (4-byte encoding, matching aioquic reference)
-    val pn = byteArrayOf(0x00, 0x00, 0x00, 0x00)
-    val pnLen = pn.size // 4
+    // Packet number: 0 (2-byte encoding, matching aioquic reference)
+    val pn = byteArrayOf(0x00, 0x00)
+    val pnLen = pn.size // 2
 
     // Build unprotected header (used as AAD)
-    // Long header: 0xC0 | (pnLen - 1) = 0xC3
+    // Long header: 0xC0 | (pnLen - 1) = 0xC1
     val firstByte = (0xC0 or (pnLen - 1)).toByte()
     val scid = Random.nextBytes(8) // 8-byte SCID (servers may require non-empty SCID)
     val unprotectedHeader = ByteArrayBuilder().apply {
@@ -196,7 +195,10 @@ private fun buildQuicInitial(dcid: ByteArray, serverName: String): ByteArray {
         protectedHeader[pnOffset + i] = (protectedHeader[pnOffset + i].toInt() xor mask[1 + i].toInt()).toByte()
     }
 
-    return protectedHeader + ciphertext
+    // Pad to 1200-byte minimum (RFC 9000 §14.1) — zero-fill outside the Length field
+    val core = protectedHeader + ciphertext
+    val padNeeded = (1200 - core.size).coerceAtLeast(0)
+    return core + ByteArray(padNeeded)
 }
 
 /**
@@ -204,20 +206,36 @@ private fun buildQuicInitial(dcid: ByteArray, serverName: String): ByteArray {
  * Uses the AES-128 key schedule from DefaultAes128Gcm internally.
  */
 private fun aesEcbEncrypt(key: ByteArray, block: ByteArray): ByteArray {
-    // The DefaultAes128Gcm has the AES S-box and key expansion internally.
-    // We need raw AES block encrypt. Access via seal with zero nonce and empty AAD
-    // won't work — we need direct block encrypt.
-    // For QUIC header protection, we just need AES-ECB on a 16-byte block.
-    val aes = DefaultAes128Gcm()
-    // Use seal with a 16-byte plaintext and extract the first 16 bytes of output
-    // Actually, AES-GCM seal does: AES-CTR(key, nonce, plaintext) + GHASH + tag
-    // That's not AES-ECB. We need direct AES block encryption.
-    //
-    // Workaround: the AES key expansion is private. We need to implement AES-ECB
-    // or use Java's javax.crypto.Cipher. Since this is JVM-only, use JCA:
     val cipher = javax.crypto.Cipher.getInstance("AES/ECB/NoPadding")
     cipher.init(javax.crypto.Cipher.ENCRYPT_MODE, javax.crypto.spec.SecretKeySpec(key, "AES"))
     return cipher.doFinal(block)
+}
+
+/**
+ * QUIC HKDF-Expand-Label: builds HKDF info WITHOUT the "tls13 " prefix.
+ *
+ * RFC 9001 §5.1 uses HKDF-Expand-Label (RFC 8446 §7.1) for QUIC Initial keys,
+ * but the QUIC-specific labels ("client in", "quic key", etc.) are passed raw.
+ * The "tls13 " prefix convention applies only to TLS cipher suite labels.
+ */
+private fun quicExpandLabel(
+    hkdf: DefaultHkdfSha256,
+    secret: ByteArray,
+    label: String,
+    context: ByteArray,
+    length: Int
+): ByteArray {
+    val labelBytes = label.encodeToByteArray()
+    // struct { uint16 length; opaque label<0..255>; opaque context<0..255>; }
+    val info = ByteArray(2 + 1 + labelBytes.size + 1 + context.size)
+    var p = 0
+    info[p++] = ((length ushr 8) and 0xFF).toByte()
+    info[p++] = (length and 0xFF).toByte()
+    info[p++] = labelBytes.size.toByte()
+    labelBytes.copyInto(info, p); p += labelBytes.size
+    info[p++] = context.size.toByte()
+    context.copyInto(info, p)
+    return hkdf.expand(secret, info, length)
 }
 
 /** QUIC varint encoding (RFC 9000 §16). */

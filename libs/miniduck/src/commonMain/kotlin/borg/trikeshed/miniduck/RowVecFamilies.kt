@@ -190,9 +190,8 @@ class DocRowVec private constructor(
 // ── BlobRowVec ─────────────────────────────────────────────────────────────────
 // Two-component family: bytes + mimeType, with optional child factory.
 
-@JvmInline
-value class BlobRowVec(
-      val capture: Join<ByteArray, Join<CharSequence, ((ByteArray) -> Series<RowVec>)?>>,
+inline class BlobRowVec(
+    val capture: Join<ByteArray, Join<CharSequence, ((ByteArray) -> Series<RowVec>)?>>,
 ) : RowVec {
     constructor(
         bytes: ByteArray,

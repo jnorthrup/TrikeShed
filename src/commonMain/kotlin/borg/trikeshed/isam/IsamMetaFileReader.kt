@@ -51,7 +51,7 @@ IoType :=  IoInstant | IoDouble | IoString | IoInt
     override fun open() {
         //use readBytes and decodeString to read the lines into
 //        val lines = buf.readBytes(size).decodeToString().lines().filterNot { it.trim().startsWith("#") }.map(CharSequence::trim)
-        val lines = fileOps.readAllLines(metafileFilename).filterNot { it.trim().startsWith('#') }
+        val lines: List<CharSequence> = fileOps.readAllLines(metafileFilename).view.filterNot { it.trim().startsWith('#') }
         //split on \s+
         val coords: Series<CharSequence> = CharSeries(lines[0]).trim.splitWs() α CharSeries::asString
         val names: Series<CharSequence> = CharSeries(lines[1]).trim.splitWs() α CharSeries::asString
@@ -93,7 +93,7 @@ IoType :=  IoInstant | IoDouble | IoString | IoInt
             lines.add(result.view.joinToString(" ") { it.begin.toString() + " " + it.end })
             lines.add(result.view.joinToString(" ") { it.name })
             lines.add(result.view.joinToString(" ") { it.type.name })
-            fileOps.write(metafilename, lines)
+            fileOps.write(metafilename, lines.toSeries())
             return result
         }
 

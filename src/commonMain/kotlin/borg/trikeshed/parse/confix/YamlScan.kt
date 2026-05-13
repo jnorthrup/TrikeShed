@@ -1,6 +1,8 @@
 package borg.trikeshed.parse.confix
 
+import borg.trikeshed.lib.CharSeries
 import borg.trikeshed.lib.Series
+import borg.trikeshed.lib.cs
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.size
 import borg.trikeshed.lib.slice

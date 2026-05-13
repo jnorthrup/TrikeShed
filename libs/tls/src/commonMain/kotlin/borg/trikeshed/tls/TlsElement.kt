@@ -34,6 +34,8 @@ data class TlsSettings(
     val cipherSuites: Series<CharSequence> = s_["TLS_AES_256_GCM_SHA384", "TLS_CHACHA20_POLY1305_SHA256"],
     val serverName: CharSequence? = null,
     val pinnedCertificates: List<CertificateFingerprint> = emptyList(),
+    /** Optional PEM-encoded CA bundle bytes. When null, CaBundleLocator is consulted at handshake time. */
+    val caBundle: ByteArray? = null,
 ) {
     companion object {
         /** Accept all versions (least secure — for legacy). */

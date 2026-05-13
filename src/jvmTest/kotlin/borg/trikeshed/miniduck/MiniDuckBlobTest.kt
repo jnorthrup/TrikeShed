@@ -1,15 +1,15 @@
 package borg.trikeshed.miniduck
 
-import borg.trikeshed.lib.*
+import borg.trikeshed.lib.get
 import kotlin.test.Test
-import kotlin.test.assertTrue
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 class MiniDuckBlobTest {
     @Test
     fun blobRoundTrip() {
         val bytes = byteArrayOf(1, 2, 3, 4, 5)
-        val blob = BlobRowVec(bytes, mimeType = "application/octet-stream")
+        val blob = BlobRowVec(bytes )
         val block = BlockRowVec.mutable()
         block.append(blob)
         val sealed = block.seal()

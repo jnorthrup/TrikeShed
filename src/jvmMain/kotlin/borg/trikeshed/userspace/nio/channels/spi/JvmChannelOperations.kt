@@ -66,8 +66,8 @@ class JvmChannelOperations : ChannelOperations {
         override val id: Int = 0
         override fun read(buffer: ByteBuffer, offset: Long): Int = -1
         override fun write(buffer: ByteBuffer, offset: Long): Int = -1
-        override fun readv(fd: Int, buffer: ByteBuffer, userData: Long): Int = -1
-        override fun writev(fd: Int, buffer: ByteBuffer, userData: Long): Int = -1
+        override fun readv(fd: Int, buffer: ByteBuffer, userData: Long): Int = recv(fd, buffer, userData)
+        override fun writev(fd: Int, buffer: ByteBuffer, userData: Long): Int = send(fd, buffer, userData)
         override fun submit(): Int = ch.submit()
         override fun wait(minComplete: Int): List<ChannelResult> =
             ch.wait(minComplete).map { ChannelResult(it.res, it.res, it.userData) }

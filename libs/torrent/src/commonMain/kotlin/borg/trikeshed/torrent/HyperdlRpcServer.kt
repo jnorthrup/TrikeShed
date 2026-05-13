@@ -3,8 +3,10 @@ package borg.trikeshed.torrent
 import borg.trikeshed.context.AsyncContextElement
 import borg.trikeshed.context.AsyncContextKey
 import borg.trikeshed.context.ElementState
-import borg.trikeshed.htx.client.HtxElement
-import borg.trikeshed.htx.client.HtxTransport
+import borg.trikeshed.userspace.nio.ByteBuffer
+import borg.trikeshed.userspace.reactor.Interest
+import borg.trikeshed.userspace.nio.channels.spi.ChannelOperations
+import borg.trikeshed.userspace.nio.channels.spi.ReactorOperations
 import kotlinx.coroutines.*
 
 /**
@@ -23,7 +25,7 @@ import kotlinx.coroutines.*
  */
 class HyperdlRpcServer(
     private val hyperdl: HyperdlElement,
-    private val htx: HtxElement,
+    private val htx: borg.trikeshed.htx.client.HtxElement,
     parentJob: kotlinx.coroutines.Job? = null,
 ) : AsyncContextElement(parentJob = parentJob) {
     companion object Key : AsyncContextKey<HyperdlRpcServer>() {
@@ -48,50 +50,139 @@ class HyperdlRpcServer(
     }
 
     /**
-     * Start RPC server loop on [port] using the ring reactor model.
-     *
-     * Wire protocol: HTTP POST /jsonrpc → JSON-RPC 2.0 response.
-     * The caller must provide [channels] and [reactor] as context elements.
-     * Runs under SupervisorJob until [close] is called.
+     * Start RPC server loop. Uses [channels] for socket+ring I/O and
+     * [reactor] for fd registration.
      */
     suspend fun serve(
         port: Int = 6800,
-        channels: borg.trikeshed.userspace.nio.channels.spi.ChannelOperations,
-        reactor: borg.trikeshed.userspace.nio.channels.spi.ReactorOperations,
+        channels: ChannelOperations,
+        reactor: ReactorOperations,
     ) = withContext(supervisor) {
         requireState(ElementState.ACTIVE)
-        val serverFd = channels.socket(2, 1, 0) // AF_INET=2, SOCK_STREAM=1
-        check(serverFd >= 0) { "socket failed" }
-        channels.bind(serverFd, port)
+
+        // Listening socket
+        val serverFd = channels.socket(2, 1, 0)
+        check(serverFd >= 0) { "socket() failed" }
+        val bindRes = channels.bind(serverFd, port)
+        check(bindRes == 0) { "bind(port=$port) failed" }
         channels.listen(serverFd, 128)
-        reactor.register(serverFd, setOf(borg.trikeshed.userspace.reactor.Interest.READ), ACCEPT_KEY)
 
         val ring = channels.openChannel()
-        ring.readv(serverFd, borg.trikeshed.userspace.nio.ByteBuffer.allocate(64))
+        ring.prepAccept(serverFd, ACCEPT_KEY)
         ring.submit()
 
         while (isActive) {
-            val results = ring.wait()
+            val results = ring.wait(minComplete = 1)
             for (r in results) {
-                when (r.userData) {
+                val fd = r.fd
+                when (r.userData and 0xFFFF_FFFFL) {
                     ACCEPT_KEY -> {
-                        ring.readv(serverFd, borg.trikeshed.userspace.nio.ByteBuffer.allocate(64)) // re-enqueue
                         val clientFd = r.res
                         if (clientFd >= 0) {
-                            reactor.register(clientFd, setOf(borg.trikeshed.userspace.reactor.Interest.READ), READ_KEY)
+                            clientBuffers[clientFd] = StringBuilder()
+                            reactor.register(clientFd, setOf(Interest.READ), READ_KEY_BASE + clientFd.toLong())
                         }
+                        ring.prepAccept(serverFd, ACCEPT_KEY)
                     }
-                    READ_KEY -> {
-                        if (r.res <= 0) { reactor.deregister(r.fd); continue }
-                        // Read HTTP request from client buffer
-                        // For now, handle as raw JSON-RPC via handleRequest
-                        // Full HTTP parsing pending reactor integration
+                    else -> {
+                        if (r.res <= 0) {
+                            clientBuffers.remove(fd)
+                            reactor.deregister(fd)
+                        } else {
+                            handleClientData(fd, ring, reactor)
+                        }
+                        ring.submit()
                     }
                 }
             }
             ring.submit()
         }
         reactor.deregister(serverFd)
+        channels.close(serverFd)
+    }
+
+    /** Per-client request accumulators. */
+    private val clientBuffers = mutableMapOf<Int, StringBuilder>()
+
+    /**
+     * Read HTTP data from client fd, parse request, respond.
+     */
+    /**
+     * Read HTTP data from client fd, parse request, respond.
+     * Re-enqueues a readv for the next reactor cycle.
+     */
+    private suspend fun handleClientData(
+        clientFd: Int, ring: ChannelOperations.ChannelHandle, reactor: ReactorOperations,
+    ) {
+        val buf = clientBuffers.getOrPut(clientFd) { StringBuilder() }
+        val rb = ByteBuffer.allocate(8192)
+        val bytesRead = ring.read(rb, 0L)
+        if (bytesRead <= 0) {
+            clientBuffers.remove(clientFd)
+            reactor.deregister(clientFd)
+            channels.close(clientFd)
+            return
+        }
+        rb.position(0); rb.limit(bytesRead)
+        val chunk = ByteArray(bytesRead)
+        rb.get(chunk, 0, bytesRead)
+        buf.append(chunk.decodeToString())
+
+        val text = buf.toString()
+        val headerEnd = text.indexOf("\r\n\r\n")
+        if (headerEnd < 0) return // incomplete headers, wait for more data
+
+        val header = text.substring(0, headerEnd)
+        val contentLength = parseContentLength(header)
+        val bodyStart = headerEnd + 4
+        val bodyLength = text.length - bodyStart
+        if (bodyLength < contentLength) return // incomplete body, wait for more data
+
+        val body = text.substring(bodyStart, bodyStart + contentLength)
+        buf.clear()
+        if (bodyStart + contentLength < text.length) buf.append(text.substring(bodyStart + contentLength))
+
+        val firstLine = header.substringBefore("\r\n")
+        val parts = firstLine.split(" ")
+        if (parts.size < 2 || parts[1] != "/jsonrpc") {
+            writeResponse(clientFd, ring, 404, "Not Found")
+            clientBuffers.remove(clientFd)
+            reactor.deregister(clientFd)
+            channels.close(clientFd)
+            return
+        }
+
+        val response = handleRequest(body)
+        write200(clientFd, ring, response)
+        // Close connection after response (HTTP/1.0 style for simplicity)
+        clientBuffers.remove(clientFd)
+        reactor.deregister(clientFd)
+        channels.close(clientFd)
+    }
+
+    private fun writeResponse(clientFd: Int, ring: ChannelOperations.ChannelHandle, status: Int, body: String) {
+        val statusText = when (status) { 200 -> "OK"; else -> "Error" }
+        val http = "HTTP/1.1 $status $statusText\r\nContent-Type: application/json\r\nContent-Length: ${body.length}\r\nConnection: close\r\n\r\n$body"
+        ring.write(ByteBuffer.wrap(http.encodeToByteArray()), 0L)
+    }
+
+    private fun write200(clientFd: Int, ring: ChannelOperations.ChannelHandle, response: CharSequence) {
+        val body = response.toString()
+        val http = "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: ${body.length}\r\nConnection: close\r\n\r\n$body"
+        ring.write(ByteBuffer.wrap(http.encodeToByteArray()), 0L)
+    }
+
+    private fun parseContentLength(header: String): Int {
+        val idx = header.indexOf("Content-Length:", ignoreCase = true)
+        if (idx < 0) return 0
+        val lineEnd = header.indexOf("\r\n", idx)
+        if (lineEnd < 0) return 0
+        val line = header.substring(idx, lineEnd)
+        val valEnd = line.indexOf('\n')
+        if (valEnd < 0) return 0
+        val colon = line.indexOf(':')
+        if (colon < 0) return 0
+        return line.substring(colon + 1).trim().toIntOrNull() ?: 0
     }
 
     /**

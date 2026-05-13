@@ -39,11 +39,14 @@ class PosixChannelOperations : ChannelOperations {
 
     private class RingHandle(private val targetFd: Int) : ChannelOperations.ChannelHandle {
         override val id: Int get() = targetFd
-        private data class PendingOp(val fd: Int, val buf: ByteBuffer, val read: Boolean, val user: Long)
+        private data class PendingOp(val fd: Int, val buf: ByteBuffer, val read: Boolean, val accept: Boolean, val user: Long)
         private val pending = mutableListOf<PendingOp>()
         private var lastResults: List<ChannelResult> = emptyList()
         private var connected = false
-
+        override fun prepAccept(serverFd: Int, userData: Long): Int {
+            pending.add(PendingOp(fd = serverFd, buf = ByteBuffer.allocate(0), read = false, accept = true, user = userData))
+            return 0
+        }
         fun markConnected() { connected = true }
 
         override fun read(buffer: ByteBuffer, offset: Long): Int {
@@ -54,12 +57,12 @@ class PosixChannelOperations : ChannelOperations {
             val off = buffer.arrayOffset() + buffer.position()
             return buffer.array().usePinned { pwrite(targetFd, it.addressOf(off), buffer.remaining().convert(), offset) }.toInt()
         }
-        override fun readv(fd: Int, buffer: ByteBuffer, userData: Long): Int {
-            pending.add(PendingOp(fd, buffer, read = true, user = userData))
+        override fun readv(fd: Int, buf: ByteBuffer, userData: Long): Int {
+            pending.add(PendingOp(fd, buf, read = true, accept = false, user = userData))
             return 0
         }
-        override fun writev(fd: Int, buffer: ByteBuffer, userData: Long): Int {
-            pending.add(PendingOp(fd, buffer, read = false, user = userData))
+        override fun writev(fd: Int, buf: ByteBuffer, userData: Long): Int {
+            pending.add(PendingOp(fd, buf, read = false, accept = false, user = userData))
             return 0
         }
         override fun submit(): Int {
@@ -68,11 +71,15 @@ class PosixChannelOperations : ChannelOperations {
             for (op in pending) {
                 val off = op.buf.arrayOffset() + op.buf.position()
                 val remaining = op.buf.remaining()
-                val backing = op.buf.array()
-                val f = op.fd; val rd = op.read; val u = op.user
-                val res = backing.usePinned { pinned ->
-                    (if (rd) recv(f, pinned.addressOf(off), remaining.convert(), 0)
-                     else send(f, pinned.addressOf(off), remaining.convert(), 0)).toInt()
+                val f = op.fd; val u = op.user
+                val res = if (op.accept) {
+                    platform.posix.accept(op.fd, null, null).toInt()
+                } else {
+                    val backing = op.buf.array()
+                    backing.usePinned { pinned ->
+                        (if (op.read) recv(f, pinned.addressOf(off), remaining.convert(), 0)
+                         else send(f, pinned.addressOf(off), remaining.convert(), 0)).toInt()
+                    }
                 }
                 completions.add(ChannelResult(f, res, u))
             }

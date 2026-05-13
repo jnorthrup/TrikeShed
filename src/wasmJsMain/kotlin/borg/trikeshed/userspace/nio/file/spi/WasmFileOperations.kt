@@ -8,11 +8,9 @@ import kotlin.random.Random
  * Uses OPFS / IndexedDB blob storage for the Wasm browser environment.
  */
 class WasmFileOperations : FileOperations {
-
-    override fun readAllLines(filename: CharSequence): List<String> =
-        readString(filename).replaceChar('\r', '\n').split('\n').let { parts ->
-            if (parts.isNotEmpty() && parts.last().isEmpty()) parts.dropLast(1) else parts
-        }
+    override fun readAllLines(filename: CharSequence): Series<CharSequence> {
+        TODO("Not yet implemented")
+    }
 
     override fun readAllBytes(filename: CharSequence): ByteArray =
         readBlob(filename)?.let(::decodeHex) ?: ByteArray(0)
@@ -24,7 +22,10 @@ class WasmFileOperations : FileOperations {
         writeBlob(filename, encodeHex(bytes))
     }
 
-    override fun write(filename: CharSequence, lines: List<CharSequence>) { write(filename, lines.joinToString("\n")) }
+    override fun write(filename: CharSequence, lines: Series<CharSequence>) {
+        TODO("Not yet implemented")
+    }
+
 
     override fun write(filename: CharSequence, string: CharSequence) { write(filename, string.toString().encodeToByteArray()) }
 
@@ -36,17 +37,22 @@ class WasmFileOperations : FileOperations {
     override fun streamLines(fileName: CharSequence, bufsize: Int): Sequence<Join<Long, ByteArray>> =
         streamByteLines(readAllBytes(fileName))
 
-    override fun iterateLines(fileName: CharSequence, bufsize: Int): Iterable<Join<Long, Series<Byte>>> =
-        streamLines(fileName, bufsize).map { (offset, bytes) -> offset j bytes.toSeries() }.asIterable()
+    override fun iterateLines(
+        fileName: CharSequence,
+        bufsize: Int
+    ): Iterable<Join<Long, ByteArray>> {
+        TODO("Not yet implemented")
+    }
+//
 
-    override fun listDir(path: CharSequence): List<String> {
+    override fun listDir(path: CharSequence): List<CharSeries> {
         val normalized = normalizePath(path).toString().trimEnd('/') + "/"
         val fileKeys = storageKeys(fileKey(normalized)) + blobFallback.keys.filter { it.startsWith(fileKey(normalized)) }
         val dirKeys = storageKeys(dirKey(normalized)) + dirFallback.map(::dirKey).filter { it.startsWith(dirKey(normalized)) }
-        val entries = mutableListOf<String>()
-        for (key in fileKeys) entries.add(key.toString().removePrefix(fileKey(normalized).toString()).substringBefore('/'))
-        for (key in dirKeys) entries.add(key.toString().removePrefix(dirKey(normalized).toString()).substringBefore('/'))
-        return entries.distinct()
+        val entries: MutableSeries<CharSequence> = emptySeries<CharSequence>() as MutableSeries<CharSequence>
+        for (key in fileKeys) entries.add(key.removePrefix(fileKey(normalized).toString()).substringBefore('/'))
+        for (key in dirKeys) entries.add(key.removePrefix(dirKey(normalized).toString()).substringBefore('/'))
+        return (entries α {it.cs }).view.distinct()
     }
 
     override fun isDir(path: CharSequence): Boolean = directoryExists(path)
@@ -55,8 +61,10 @@ class WasmFileOperations : FileOperations {
     override fun deleteRecursively(path: CharSequence) { rm(path) }
 
     override fun resolvePath(vararg parts: CharSequence): String = normalizePath(parts.joinToString("/")).toString()
+    override fun readZip(path: CharSequence): Series2<CharSequence, ByteArray> {
+        TODO("Not yet implemented")
+    }
 
-    override fun readZip(path: CharSequence): List<Pair<String, ByteArray>> = TODO("readZip WASM")
 
     override fun createTempDir(prefix: CharSequence): String =
         "/tmp/$prefix-${Random.nextLong().toString(16)}"

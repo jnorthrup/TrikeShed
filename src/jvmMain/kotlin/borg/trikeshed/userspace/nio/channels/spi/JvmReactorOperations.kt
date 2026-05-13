@@ -14,7 +14,8 @@ import kotlin.time.Duration
 class JvmReactorOperations(
     private val channels: JvmChannelOperations,
 ) : ReactorOperations {
-    override val key get() = ReactorOperations.Key
+    override val key: ReactorOperations.Key
+        get() = ReactorOperations.Key
 
     private data class Registration(val interests: Set<Interest>, val userData: Long)
 
@@ -30,11 +31,14 @@ class JvmReactorOperations(
 
     override suspend fun poll(timeout: Duration): List<ReactorSignal> {
         val deadline = if (timeout.isInfinite()) Long.MAX_VALUE
-                       else System.currentTimeMillis() + timeout.inWholeMilliseconds
+        else System.currentTimeMillis() + timeout.inWholeMilliseconds
         while (true) {
             val ready = registered.entries.mapNotNull { (fd, reg) ->
-                if (Interest.READ in reg.interests && channels.hasPending(fd))
-                    ReactorSignal(fd, setOf(Interest.READ), reg.userData)
+                if (Interest.READ in reg.interests && channels.hasPending(fd)) ReactorSignal(
+                    fd,
+                    setOf(Interest.READ),
+                    reg.userData,
+                )
                 else null
             }
             if (ready.isNotEmpty()) return ready

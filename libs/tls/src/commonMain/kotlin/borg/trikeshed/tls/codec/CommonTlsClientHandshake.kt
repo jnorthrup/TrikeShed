@@ -43,6 +43,7 @@ class CommonTlsClientHandshake(
     private val clientKeyPair = x25519.generateKeyPair()
     private var serverPublicKey: ByteArray? = null
     private var sharedSecret: ByteArray? = null
+    private var handshakeKeysInstalled: Boolean = false
     private val clientRandom: ByteArray = ByteArray(32).also { Random.nextBytes(it) }
     private val transcript = mutableListOf<ByteArray>()
 
@@ -91,14 +92,41 @@ class CommonTlsClientHandshake(
         p += 2; p += 1
         val el = ((body[p].toInt() and 0xFF) shl 8) or (body[p+1].toInt() and 0xFF); p += 2
         val ee = p + el
-        while (p < ee) {
-            val et = ((body[p].toInt() and 0xFF) shl 8) or (body[p+1].toInt() and 0xFF); p += 2
-            val dl = ((body[p].toInt() and 0xFF) shl 8) or (body[p+1].toInt() and 0xFF); p += 2
-            if (et == 51) { p += 2; val kl = ((body[p].toInt() and 0xFF) shl 8) or (body[p+1].toInt() and 0xFF); p += 2
-                serverPublicKey = body.copyOfRange(p, p + kl) }
-            p += dl
+        while (p + 4 <= ee) {
+            val et = ((body[p].toInt() and 0xFF) shl 8) or (body[p + 1].toInt() and 0xFF)
+            p += 2
+            val dl = ((body[p].toInt() and 0xFF) shl 8) or (body[p + 1].toInt() and 0xFF)
+            p += 2
+            val dataStart = p
+            val dataEnd = dataStart + dl
+            if (dataEnd > ee) break
+            if (et == 51 && dl >= 4) {
+                var kp = dataStart
+                kp += 2 // group
+                if (kp + 2 <= dataEnd) {
+                    val kl = ((body[kp].toInt() and 0xFF) shl 8) or (body[kp + 1].toInt() and 0xFF)
+                    kp += 2
+                    if (kp + kl <= dataEnd) {
+                        serverPublicKey = body.copyOfRange(kp, kp + kl)
+                    }
+                }
+            }
+            p = dataEnd
         }
-        sharedSecret = x25519.sharedSecret(clientKeyPair.privateKey, serverPublicKey!!)
+        val spk = serverPublicKey ?: error("server key_share extension missing")
+        sharedSecret = x25519.sharedSecret(clientKeyPair.privateKey, spk)
+        if (!handshakeKeysInstalled) {
+            val helloH = sha256.hash((transcript[0].toList() + transcript[1].toList()).toByteArray())
+            val schedule = CommonTlsKeySchedule(hkdf)
+            val keys = schedule.compute(sharedSecret!!, helloH, helloH)
+            recordCodec.installKeys(
+                keys.clientHandshakeKey,
+                keys.clientHandshakeIv,
+                keys.serverHandshakeKey,
+                keys.serverHandshakeIv,
+            )
+            handshakeKeysInstalled = true
+        }
         state = TlsClientHandshake.State.WAITING_EE
     }
 
@@ -125,6 +153,21 @@ class CommonTlsClientHandshake(
         recordCodec.installKeys(keys.clientHandshakeKey, keys.clientHandshakeIv,
             keys.serverHandshakeKey, keys.serverHandshakeIv)
         state = TlsClientHandshake.State.CONNECTED
+    }
+
+    /** Install application traffic keys after the handshake reaches CONNECTED. */
+    fun installApplicationKeys() {
+        check(state == TlsClientHandshake.State.CONNECTED)
+        val transcript = transcriptHash()
+        val helloH = ByteArray(32) // dummy — app keys use master secret derived from sharedSecret + zero salt
+        val schedule = CommonTlsKeySchedule(hkdf)
+        val keys = schedule.compute(sharedSecret!!, helloH, transcript)
+        recordCodec.installKeys(
+            keys.clientApplicationKey,
+            keys.clientApplicationIv,
+            keys.serverApplicationKey,
+            keys.serverApplicationIv,
+        )
     }
 
     override fun buildClientFinished(): ByteArray {

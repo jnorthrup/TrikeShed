@@ -179,7 +179,7 @@ fun createIndexBlocks(
 
 private fun readLayout(layoutPath: CharSequence): Isam3Layout {
     val lines = Files.readAllLines(layoutPath)
-    val first = lines.firstOrNull()?.trim() ?: error("Missing layout file: $layoutPath")
+    val first = lines.view.firstOrNull()?.toString()?.trim() ?: error("Missing layout file: $layoutPath")
     return when {
         first == "isam: 3" -> Isam3Layout.read(layoutPath)
         first.startsWith("# trikeshed-columnar-isam-v1") -> error("Legacy columnar layout is not supported by the new isam:3 writer")

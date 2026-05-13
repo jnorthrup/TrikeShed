@@ -1,5 +1,6 @@
 package cbadvanced
 
+import borg.trikeshed.userspace.nio.file.Path
 import dreamer.exchange.CoinbaseClient
 import dreamer.exchange.CoinbaseCredentials
 import dreamer.exchange.JvmHmacSigner
@@ -8,7 +9,6 @@ import dreamer.exchange.JwtSigner
 import dreamer.exchange.RobinhoodBalance
 import dreamer.exchange.loadCoinbaseApiConfig
 import dreamer.exchange.loadCoinbaseCredentials
-import java.nio.file.Path
 
 data class CoinbaseAuthProof(
     val dotenvPath: Path,
@@ -24,7 +24,7 @@ data class CoinbaseAuthProof(
 suspend fun runCoinbaseAuthProof(dotenvPath: Path, quoteProduct: CharSequence = "BTC"): CoinbaseAuthProof {
     val credentials = loadCredentials(dotenvPath)
     val apiConfig = loadCoinbaseApiConfig(dotenvPath.toString())
-        ?: error("Coinbase API config missing in ${dotenvPath.toAbsolutePath().normalize()}")
+        ?: error("Coinbase API config missing in $dotenvPath")
 
     val client = CoinbaseClient(
         config = apiConfig,
@@ -38,7 +38,7 @@ suspend fun runCoinbaseAuthProof(dotenvPath: Path, quoteProduct: CharSequence = 
     val quote = if (balance != null) client.getQuotes(listOf(quoteProduct))?.get(quoteProduct) else null
 
     return CoinbaseAuthProof(
-        dotenvPath = dotenvPath.toAbsolutePath().normalize(),
+        dotenvPath = dotenvPath,
         keyName = credentials.apiKeyId ?: credentials.apiKey,
         restUrl = credentials.restUrl,
         balance = balance,
@@ -55,4 +55,4 @@ suspend fun runCoinbaseAuthProof(dotenvPath: Path, quoteProduct: CharSequence = 
 
 private fun loadCredentials(dotenvPath: Path): CoinbaseCredentials =
     loadCoinbaseCredentials(dotenvPath.toString())
-        ?: error("Coinbase credentials missing in ${dotenvPath.toAbsolutePath().normalize()}")
+        ?: error("Coinbase credentials missing in $dotenvPath")

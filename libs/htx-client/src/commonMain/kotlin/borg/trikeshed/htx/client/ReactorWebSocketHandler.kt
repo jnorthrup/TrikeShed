@@ -54,8 +54,8 @@ class ReactorWebSocketHandler(
         val slash = uri.indexOf('/')
         val hostPort = if (slash >= 0) uri.substring(0, slash) else uri
         val path = if (slash >= 0) uri.substring(slash) else "/"
-        val host = hostPort.substringBefore(':')
-        val port = hostPort.substringAfter(':', "443").toIntOrNull() ?: 443
+        val host = hostPort.toString().substringBefore(':')
+        val port = hostPort.toString().substringAfter(':', "443").toIntOrNull() ?: 443
 
         // Open TCP socket
         val domain = 2  // AF_INET

@@ -2,6 +2,7 @@ package borg.trikeshed.userspace.nio.file.spi
 
 import borg.trikeshed.lib.Join
 import borg.trikeshed.lib.Series
+import borg.trikeshed.lib.Series2
 import kotlin.coroutines.CoroutineContext
 
 /**
@@ -20,22 +21,22 @@ interface FileOperations : CoroutineContext.Element {
     companion object Key : CoroutineContext.Key<FileOperations>
     override val key: CoroutineContext.Key<*> get() = Key
 
-    fun readAllLines(filename: CharSequence): List<String>
+    fun readAllLines(filename: CharSequence): Series<CharSequence>
     fun readAllBytes(filename: CharSequence): ByteArray
     fun readString(filename: CharSequence): CharSequence
     fun write(filename: CharSequence, bytes: ByteArray)
-    fun write(filename: CharSequence, lines: List<CharSequence>)
+    fun write(filename: CharSequence, lines: Series<CharSequence>)
     fun write(filename: CharSequence, string: CharSequence)
     fun cwd(): CharSequence
     fun exists(filename: CharSequence): Boolean
     fun streamLines(fileName: CharSequence, bufsize: Int = 64): Sequence<Join<Long, ByteArray>>
-    fun iterateLines(fileName: CharSequence, bufsize: Int = 12): Iterable<Join<Long, Series<Byte>>>
-    fun listDir(path: CharSequence): List<String>
+    fun iterateLines(fileName: CharSequence, bufsize: Int = 12): Iterable<Join<Long, ByteArray>>
+    fun listDir(path: CharSequence): List<CharSequence>
     fun isDir(path: CharSequence): Boolean
     fun isFile(path: CharSequence): Boolean
     fun mkdirs(path: CharSequence)
     fun deleteRecursively(path: CharSequence)
     fun resolvePath(vararg parts: CharSequence): CharSequence
-    fun readZip(path: CharSequence): List<Pair<String, ByteArray>>
+    fun readZip(path: CharSequence): Series2<CharSequence, ByteArray>
     fun createTempDir(prefix: CharSequence): CharSequence
 }

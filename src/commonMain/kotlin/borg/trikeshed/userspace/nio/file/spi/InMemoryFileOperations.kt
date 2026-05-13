@@ -2,8 +2,10 @@ package borg.trikeshed.userspace.nio.file.spi
 
 import borg.trikeshed.lib.Join
 import borg.trikeshed.lib.Series
+import borg.trikeshed.lib.Series2
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.toSeries
+import borg.trikeshed.lib.view
 import kotlin.coroutines.CoroutineContext
 
 /**
@@ -17,8 +19,8 @@ class InMemoryFileOperations(
     private val files = mutableMapOf<String, ByteArray>()
     private val dirs = mutableSetOf<String>()
 
-    override fun readAllLines(filename: CharSequence): List<String> =
-        readString(filename).lines()
+    override fun readAllLines(filename: CharSequence): Series<CharSequence> =
+        readString(filename).lines().toSeries()
 
     override fun readAllBytes(filename: CharSequence): ByteArray =
         files[filename.toString()] ?: throw NoSuchFileException(filename.toString())
@@ -32,10 +34,10 @@ class InMemoryFileOperations(
     override fun isFile(path: CharSequence): Boolean = path.toString() in files
     override fun isDir(path: CharSequence): Boolean = path.toString() in dirs
 
-    override fun listDir(path: CharSequence): List<String> {
+    override fun listDir(path: CharSequence): List<CharSequence> {
         val prefix = path.toString().trimEnd('/') + "/"
         return files.keys.filter { it.startsWith(prefix) }
-            .map { it.removePrefix(prefix).substringBefore('/') }
+            .map { it.removePrefix(prefix).substringBefore('/') as CharSequence }
             .distinct()
     }
 
@@ -44,8 +46,8 @@ class InMemoryFileOperations(
         files[filename.toString()] = bytes
     }
 
-    override fun write(filename: CharSequence, lines: List<CharSequence>) {
-        write(filename, lines.joinToString("\n").encodeToByteArray())
+    override fun write(filename: CharSequence, lines: Series<CharSequence>) {
+        write(filename, lines.view.joinToString("\n").encodeToByteArray())
     }
 
     override fun write(filename: CharSequence, string: CharSequence) {
@@ -93,10 +95,10 @@ class InMemoryFileOperations(
         }
     }
 
-    override fun iterateLines(fileName: CharSequence, bufsize: Int): Iterable<Join<Long, Series<Byte>>> =
-        streamLines(fileName, bufsize).map { (off, arr) -> off j arr.toSeries() }.asIterable()
+    override fun iterateLines(fileName: CharSequence, bufsize: Int): Iterable<Join<Long, ByteArray>> =
+        streamLines(fileName, bufsize).asIterable()
 
-    override fun readZip(path: CharSequence): List<Pair<String, ByteArray>> =
+    override fun readZip(path: CharSequence): Series2<CharSequence, ByteArray> =
         error("readZip unsupported in InMemoryFileOperations")
 
     override val key: CoroutineContext.Key<*> get() = FileOperations.Key

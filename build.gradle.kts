@@ -40,6 +40,9 @@ kotlin {
             "-Xexpect-actual-classes",
             // Kotlin 2.4 blocks user code in kotlin.* package — allow our non-JVM JvmInline stubs
             "-Xallow-kotlin-package",
+            // Silence kotlin annotation noise: inline class, deprecation, redundant inline
+            "-Xwarning-level=NOTHING_TO_INLINE:disabled",
+            "-Xwarning-level=DEPRECATION:disabled",
         )
     }
 

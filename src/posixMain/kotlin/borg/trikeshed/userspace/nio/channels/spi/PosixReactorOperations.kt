@@ -3,11 +3,14 @@
 package borg.trikeshed.userspace.nio.channels.spi
 
 import borg.trikeshed.userspace.reactor.Interest
-import kotlinx.cinterop.*
-import kotlin.time.Duration
+import kotlinx.cinterop.ExperimentalForeignApi
+import kotlinx.cinterop.allocArray
+import kotlinx.cinterop.get
+import kotlinx.cinterop.memScoped
 import platform.posix.*
+import kotlin.time.Duration
 
-class PosixReactorOperations : ReactorOperations {
+class PosixReactorOperations(channels: PosixChannelOperations) : ReactorOperations {
 
     private val fdInterest = mutableMapOf<Int, MutableSet<Interest>>()
     private val fdUserData = mutableMapOf<Int, Long>()

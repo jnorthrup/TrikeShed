@@ -38,6 +38,7 @@ class HyperdlElement(
     private var torrentElement: TorrentElement? = null
     private var streaming: StreamingTorrent? = null
     private var mediaServer: TorrentMediaServer? = null
+    private var rpcServer: HyperdlRpcServer? = null
 
     // ── Download state ────────────────────────────────────────────
 
@@ -72,12 +73,32 @@ class HyperdlElement(
         state = ElementState.ACTIVE
     }
 
+    /** Open the aria2-compatible RPC server on [port]. */
+    suspend fun openRpcServer(port: Int = 6800) {
+        requireState(ElementState.ACTIVE)
+        val rpc = HyperdlRpcServer(
+            hyperdl = hyperdl,
+            htx = htxElement,
+            parentJob = supervisor,
+        )
+        rpcServer = rpc
+        rpc.open()
+        supervisor.launch {
+            try {
+                // RPC server runs until rpcServer.close() or supervisor cancellation
+            } finally {
+                rpc.close()
+            }
+        }
+    }
+
     override suspend fun close() {
         if (state.isAtLeast(ElementState.OPEN) && state.isLessThan(ElementState.CLOSED)) {
             state = ElementState.DRAINING
             torrentElement?.close()
             streaming?.close()
             mediaServer?.close()
+            rpcServer?.close()
             activeDownloads.clear()
             hyperdl.close()
             dht.close()

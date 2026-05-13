@@ -14,7 +14,7 @@ import kotlin.test.assertTrue
 class MacosHtxIntegrationTest {
 
     private val channels = PosixChannelOperations()
-    private val reactor = PosixReactorOperations()
+    private val reactor = PosixReactorOperations(channels)
     private val handler = ringHttpsHandler(channels, reactor)
 
     private fun makeClient(): HtxElement {

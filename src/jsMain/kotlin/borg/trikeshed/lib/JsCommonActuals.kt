@@ -16,9 +16,9 @@ actual object System {
 }
 
 fun readLinesSeq(path: CharSequence): Sequence<CharSequence> =
-    Files.readAllLines(path).asSequence()
+    Files.readAllLines(path).view.asSequence()
 
-fun readLines(path: CharSequence): List<CharSequence> = Files.readAllLines(path)
+fun readLines(path: CharSequence): List<CharSequence> = Files.readAllLines(path).view.toList()
  data class JsHandleState(
     val fd: Int,
     var position: Long = 0,

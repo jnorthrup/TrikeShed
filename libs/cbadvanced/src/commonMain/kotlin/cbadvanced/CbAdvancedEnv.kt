@@ -1,8 +1,7 @@
 package cbadvanced
 
-import java.nio.file.Files
-import java.nio.file.Path
-import java.nio.file.Paths
+import borg.trikeshed.userspace.nio.file.Files
+import borg.trikeshed.userspace.nio.file.Path
 
 data class DotenvResolution(
     val resolvedPath: Path,
@@ -11,16 +10,16 @@ data class DotenvResolution(
 
 fun resolveDotenvPath(
     explicitPath: CharSequence? = System.getProperty("cbadvanced.dotenv") ?: System.getenv("CBADVANCED_DOTENV"),
-    workingDir: Path = Paths.get("").toAbsolutePath().normalize(),
+    workingDir: Path = Files.cwd(),
 ): Path = resolveDotenv(workingDir = workingDir, explicitPath = explicitPath).resolvedPath
 
 fun resolveDotenv(
-    workingDir: Path = Paths.get("").toAbsolutePath().normalize(),
+    workingDir: Path = Files.cwd(),
     explicitPath: CharSequence? = System.getProperty("cbadvanced.dotenv") ?: System.getenv("CBADVANCED_DOTENV"),
 ): DotenvResolution {
     val searched = mutableListOf<Path>()
     explicitPath?.takeUnless { it.isBlank() }?.let { raw ->
-        val candidate = Path.of(raw).toAbsolutePath().normalize()
+        val candidate = Path(raw)
         searched.add(candidate)
         require(Files.exists(candidate)) { "Explicit dotenv path does not exist: $candidate" }
         return DotenvResolution(candidate, searched)
@@ -35,11 +34,11 @@ fun resolveDotenv(
                 searched.forEach { append("\n - ").append(it) }
             },
         )
-    return DotenvResolution(resolved.toAbsolutePath().normalize(), searched)
+    return DotenvResolution(resolved, searched)
 }
 
 fun dotenvCandidates(workingDir: Path): List<Path> {
-    val normalized = workingDir.toAbsolutePath().normalize()
+    val normalized = workingDir
     val parent = normalized.parent
     return listOfNotNull(
         normalized.resolve(".env"),
@@ -48,5 +47,5 @@ fun dotenvCandidates(workingDir: Path): List<Path> {
         normalized.resolveSibling("libs").resolve("dreamer-kmm").resolve(".env"),
         parent?.resolve("dreamer-kmm")?.resolve(".env"),
         parent?.resolve("libs")?.resolve("dreamer-kmm")?.resolve(".env"),
-    ).map { it.toAbsolutePath().normalize() }.distinct()
+    ).distinct()
 }

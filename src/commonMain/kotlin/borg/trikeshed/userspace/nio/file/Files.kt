@@ -3,6 +3,8 @@
 package borg.trikeshed.userspace.nio.file
 
 import borg.trikeshed.lib.Join
+import borg.trikeshed.lib.Series
+import borg.trikeshed.lib.toSeries
 import borg.trikeshed.userspace.nio.channels.FileChannel
 import borg.trikeshed.userspace.nio.channels.SeekableByteChannel
 import borg.trikeshed.userspace.nio.charset.Charset
@@ -21,15 +23,17 @@ public class Files {
 
         fun readAllBytes(path: CharSequence): ByteArray = fileOperations.readAllBytes(path)
         fun readString(path: CharSequence, charset: Charset = StandardCharsets.UTF_8): CharSequence = fileOperations.readString(path)
-        fun readAllLines(path: CharSequence, charset: Charset = StandardCharsets.UTF_8): List<CharSequence> = fileOperations.readAllLines(path)
-        fun readAllLines(path: CharSequence): List<CharSequence> = readAllLines(path, StandardCharsets.UTF_8)
+        fun readAllLines(path: CharSequence, charset: Charset = StandardCharsets.UTF_8): Series<CharSequence> = fileOperations.readAllLines(path)
+        fun readAllLines(path: CharSequence): Series<CharSequence> = readAllLines(path, StandardCharsets.UTF_8)
 
         fun write(path: CharSequence, bytes: ByteArray, vararg options: OpenOption): Path {
             fileOperations.write( path, bytes)
             return Paths[path]
         }
-        fun write(path: CharSequence, lines: Iterable<CharSequence>, charset: Charset = StandardCharsets.UTF_8, vararg options: OpenOption): Path =
-            write(path, lines.joinToString("\n").encodeToByteArray(), *options)
+        fun write(path: CharSequence, lines: Iterable<CharSequence>, charset: Charset = StandardCharsets.UTF_8, vararg options: OpenOption): Path {
+            fileOperations.write(path, lines.toList().toSeries())
+            return Paths[path]
+        }
         fun write(path: CharSequence, lines: Iterable<CharSequence>, vararg options: OpenOption): Path =
             write(path, lines, StandardCharsets.UTF_8, *options)
         fun writeString(path: CharSequence, csq: CharSequence, vararg options: OpenOption): Path =
@@ -133,8 +137,8 @@ public class Files {
             newByteChannel(path.toString(), *options)
         fun readAllBytes(path: Path): ByteArray = readAllBytes(path.toString())
         fun readString(path: Path, charset: Charset = StandardCharsets.UTF_8): CharSequence = readString(path.toString(), charset)
-        fun readAllLines(path: Path, charset: Charset = StandardCharsets.UTF_8): List<CharSequence> = readAllLines(path.toString(), charset)
-        fun readAllLines(path: Path): List<CharSequence> = readAllLines(path.toString())
+        fun readAllLines(path: Path, charset: Charset = StandardCharsets.UTF_8): Series<CharSequence> = readAllLines(path.toString(), charset)
+        fun readAllLines(path: Path): Series<CharSequence> = readAllLines(path.toString())
         fun write(path: Path, bytes: ByteArray, vararg options: OpenOption): Path = write(path.toString(), bytes, *options)
         fun write(path: Path, lines: Iterable<CharSequence>, charset: Charset = StandardCharsets.UTF_8, vararg options: OpenOption): Path = write(path.toString(), lines, charset, *options)
         fun write(path: Path, lines: Iterable<CharSequence>, vararg options: OpenOption): Path = write(path.toString(), lines, *options)
@@ -222,7 +226,7 @@ private object UninitializedFileOperations : FileOperations {
     override fun readAllBytes(filename: CharSequence): Nothing = error("FileOperations not initialized — call PlatformProviders.init() first")
     override fun readString(filename: CharSequence): Nothing = error("FileOperations not initialized — call PlatformProviders.init() first")
     override fun write(filename: CharSequence, bytes: ByteArray): Nothing = error("FileOperations not initialized")
-    override fun write(filename: CharSequence, lines: List<CharSequence>): Nothing = error("FileOperations not initialized")
+    override fun write(filename: CharSequence, lines: Series<CharSequence>): Nothing = error("FileOperations not initialized")
     override fun write(filename: CharSequence, CharSequence: CharSequence): Nothing = error("FileOperations not initialized")
     override fun cwd(): Nothing = error("FileOperations not initialized")
     override fun exists(filename: CharSequence): Nothing = error("FileOperations not initialized")

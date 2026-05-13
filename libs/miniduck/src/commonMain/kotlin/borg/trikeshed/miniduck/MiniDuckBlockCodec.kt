@@ -40,7 +40,7 @@ object MiniDuckBlockCodec {
     }
 
     fun decode(text: CharSequence): BlockRowVec {
-        val lines = text.split('\n').filter { it.isNotBlank() }
+        val lines = text.toString().split('\n').filter { it.isNotBlank() }
         val block = BlockRowVec.mutable()
         for (idx in 1 until lines.size) {
             val row = decodeRow(lines[idx]) ?: continue

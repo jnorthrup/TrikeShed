@@ -32,6 +32,22 @@ class JvmQuicHeadToHeadTest {
         return cipher.doFinal(block)
     }
 
+    /** QUIC HKDF-Expand-Label without "tls13 " prefix */
+    private fun quicExpandLabel(
+        hkdf: DefaultHkdfSha256, secret: ByteArray, label: String, context: ByteArray, length: Int
+    ): ByteArray {
+        val labelBytes = label.encodeToByteArray()
+        val info = ByteArray(2 + 1 + labelBytes.size + 1 + context.size)
+        var p = 0
+        info[p++] = ((length ushr 8) and 0xFF).toByte()
+        info[p++] = (length and 0xFF).toByte()
+        info[p++] = labelBytes.size.toByte()
+        labelBytes.copyInto(info, p); p += labelBytes.size
+        info[p++] = context.size.toByte()
+        context.copyInto(info, p)
+        return hkdf.expand(secret, info, length)
+    }
+
     private fun quicVarint(v: Long): ByteArray = when {
         v < 0x40 -> byteArrayOf(v.toByte())
         v < 0x4000 -> byteArrayOf((0x40L or ((v ushr 8) and 0x3FL)).toByte(), (v and 0xFFL).toByte())
@@ -109,13 +125,14 @@ class JvmQuicHeadToHeadTest {
         // CRYPTO frame
         val cryptoFrame = byteArrayOf(0x06) + quicVarint(0L) + quicVarint(clientHello.size.toLong()) + clientHello
 
-        // Pad payload to reach ~1152 bytes (leaving room for header(~28) + pn(4) + tag(16) = ~48)
-        val paddingNeeded = (1152 - cryptoFrame.size).coerceAtLeast(0)
+        // Match aioquic: ~460 bytes payload, pad to 1200 outside AEAD
+        val targetPayloadSize = 460
+        val paddingNeeded = (targetPayloadSize - cryptoFrame.size).coerceAtLeast(0)
         val payload = cryptoFrame + ByteArray(paddingNeeded)
 
-        val pn = byteArrayOf(0x00, 0x00, 0x00, 0x00)
-        val pnLen = 4
-        val firstByte = (0xC0 or (pnLen - 1)).toByte()
+        val pn = byteArrayOf(0x00, 0x00)
+        val pnLen = 2
+        val firstByte = (0xC0 or (pnLen - 1)).toByte()  // 0xC1
         val scid = kotlin.random.Random.nextBytes(8)
         val header = mutableListOf<Byte>()
         header.add(firstByte)
@@ -149,7 +166,10 @@ class JvmQuicHeadToHeadTest {
             protectedHeader[pnOffset + i] = (protectedHeader[pnOffset + i].toInt() xor mask[1 + i].toInt()).toByte()
         }
 
-        return protectedHeader + ciphertext
+        // Pad to 1200 minimum
+        val core = protectedHeader + ciphertext
+        val padNeeded = (1200 - core.size).coerceAtLeast(0)
+        return core + ByteArray(padNeeded)
     }
 
     @Test

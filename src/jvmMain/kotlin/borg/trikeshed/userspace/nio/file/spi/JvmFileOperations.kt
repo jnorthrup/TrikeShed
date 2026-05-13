@@ -7,13 +7,13 @@ import java.util.zip.ZipInputStream
 
 class JvmFileOperations : FileOperations {
 
-    override fun readAllLines(filename: CharSequence): List<String> =
-        java.nio.file.Files.readAllLines(java.nio.file.Path.of(filename.toString()))
+    override fun readAllLines(filename: CharSequence): Series<CharSequence> =
+        java.nio.file.Files.readAllLines(java.nio.file.Path.of(filename.toString())).toSeries()
 
     override fun readAllBytes(filename: CharSequence): ByteArray =
         java.nio.file.Files.readAllBytes(java.nio.file.Path.of(filename.toString()))
 
-    override fun readString(filename: CharSequence): String =
+    override fun readString(filename: CharSequence): CharSequence =
         java.nio.file.Files.readString(java.nio.file.Path.of(filename.toString()))
 
     override fun write(filename: CharSequence, bytes: ByteArray) {
@@ -22,10 +22,10 @@ class JvmFileOperations : FileOperations {
         java.nio.file.Files.write(f.toPath(), bytes)
     }
 
-    override fun write(filename: CharSequence, lines: List<CharSequence>) {
+    override fun write(filename: CharSequence, lines: Series<CharSequence>) {
         val f = java.io.File(filename.toString())
         f.parentFile?.mkdirs()
-        java.nio.file.Files.write(f.toPath(), lines)
+        java.nio.file.Files.write(f.toPath(), lines.view.map { it.toString() })
     }
 
     override fun write(filename: CharSequence, string: CharSequence) {
@@ -66,10 +66,10 @@ class JvmFileOperations : FileOperations {
         }
     }
 
-    override fun iterateLines(fileName: CharSequence, bufsize: Int): Iterable<Join<Long, Series<Byte>>> =
-        streamLines(fileName, bufsize).map { (off, arr) -> off j arr.toSeries() }.asIterable()
+    override fun iterateLines(fileName: CharSequence, bufsize: Int): Iterable<Join<Long, ByteArray>> =
+        streamLines(fileName, bufsize).asIterable()
 
-    override fun listDir(path: CharSequence): List<String> =
+    override fun listDir(path: CharSequence): List<CharSequence> =
         File(path.toString()).listFiles()?.map { it.name } ?: emptyList()
 
     override fun isDir(path: CharSequence): Boolean = File(path.toString()).isDirectory
@@ -82,19 +82,19 @@ class JvmFileOperations : FileOperations {
 
     override fun resolvePath(vararg parts: CharSequence): String = parts.joinToString(File.separator)
 
-    override fun readZip(path: CharSequence): List<Pair<String, ByteArray>> {
-        val result = mutableListOf<Pair<String, ByteArray>>()
+    override fun readZip(path: CharSequence): Series2<CharSequence, ByteArray> {
+        val result = mutableListOf<Join<CharSequence, ByteArray>>()
         ZipInputStream(File(path.toString()).inputStream()).use { zis ->
             var entry = zis.nextEntry
             while (entry != null) {
                 if (!entry.isDirectory) {
                     val bytes = zis.readBytes()
-                    result.add(entry.name to bytes)
+                    result.add(entry.name j bytes)
                 }
                 entry = zis.nextEntry
             }
         }
-        return result
+        return result.toSeries()
     }
 
     override fun createTempDir(prefix: CharSequence): String =

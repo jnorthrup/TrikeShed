@@ -3,6 +3,7 @@
 package borg.trikeshed.lib
 
 import borg.trikeshed.lib.CZero.nz
+import kotlin.jvm.JvmName
 
 
 /**
@@ -20,7 +21,7 @@ class CharSeries(
     /** the mark accessor */
     var mark: Int = -1,
     override val length: Int  = buf.size,
-) : Series<Char> by buf ,CharSequence{ //delegate to the underlying series
+) : Series<Char> by buf ,CharSequence, Comparable<CharSequence>{ //delegate to the underlying series
 
     // Small char-window cache to improve locality. Uses buf.b(index) fallback when cache miss.
    var _charCache: CharArray? = null
@@ -269,6 +270,8 @@ class CharSeries(
         return CharSeries(buf)
     }
 
+    override fun compareTo(other: CharSequence): Int  = naturalOrder<CharSeries>().compare(this, other.cs)
+
     companion object {
 
         /**returns true and advances the position if the confix is {}*/
@@ -320,17 +323,14 @@ operator fun Series<Char>.div(delim: Char): Series<Series<Char>> { //lazy split
     }
 }
 
-
-
-
-
 //@get:kotlin.jvm.JvmName("sFromCharSeries")
 //val Series<Char>.s: CharSequence get() = asString()
 //@get:kotlin.jvm.JvmName("sFromByteSeries")
 //val Series<Byte>.s: CharSequence get() = asString()
 inline val CharSequence.s: Series<Char> get() = CharSeries(this)
 
-@get:kotlin.jvm.JvmName("sFromCharSeries2")
-inline val  CharSequence.cs get() =s
+@get:JvmName("sFromCharSeries2")
+inline val  CharSequence.cs:CharSeries get() =CharSeries(this)
 
- inline val Series<Char>.asCharSequence  get() = this as? CharSequence ?: CharSeries(this)
+ inline val Series<Char>.asCharSequence: CharSequence get() = this as? CharSequence ?: CharSeries(this)
+ inline val Series<Char>.cs: CharSequence get() = this as? CharSequence ?: CharSeries(this)

@@ -109,7 +109,7 @@ class NioBlockWal(
                 var cursor = i + 1
                 while (cursor < lines.size) {
                     val candidate = lines[cursor]
-                    if (candidate.isNotBlank() && parseWalHeader(candidate.trim()) != null) break
+                    if (candidate.isNotBlank() && parseWalHeader(candidate.toString().trim()) != null) break
                     if (candidate.isNotBlank()) blockLines += candidate
                     cursor++
                 }

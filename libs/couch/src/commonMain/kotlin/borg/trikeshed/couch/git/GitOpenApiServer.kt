@@ -51,14 +51,14 @@ class GitOpenApiServer(private val shell: ProcessShell) {
         return when {
             uri == "/health" -> "getHealth"
             uri.startsWith("/git porcelain/") -> {
-                val op = uri.removePrefix("/git porcelain/")
+                val op = uri.toString().removePrefix("/git porcelain/")
                 "git${op.replaceFirstChar { it.uppercase() }}"
             }
             uri.startsWith("/git smart/") -> {
-                val op = uri.removePrefix("/git smart/")
+                val op = uri.toString().removePrefix("/git smart/")
                 "git${op.replaceFirstChar { it.uppercase() }}"
             }
-            else -> uri.trimStart('/').replace("/", " ").replace("-", "")
+            else -> uri.toString().trimStart('/').replace("/", " ").replace("-", "")
                 .split(" ").take(3).joinToString("")
         }
     }
@@ -157,7 +157,7 @@ class GitOpenApiServer(private val shell: ProcessShell) {
 
     private fun gitRevParse(repo: CharSequence, ref: CharSequence): HtxMessage {
         val result = shell.exec("git", "-C", repo, "rev-parse", ref)
-        return textResponse(result.stdout.trimEnd(), if (result.exitCode == 0) 200 else 400)
+        return textResponse(result.stdout.toString().trimEnd(), if (result.exitCode == 0) 200 else 400)
     }
 
     private fun gitInfoRefs(repo: CharSequence, service: CharSequence): HtxMessage {
@@ -201,7 +201,7 @@ class GitOpenApiServer(private val shell: ProcessShell) {
         return HtxMessage().apply {
             addStartLine(HtxStartLine.response(200, "OK".encodeToByteArray()))
             addHeader("Content-Type".encodeToByteArray(), "application/x-git-upload-pack-result".encodeToByteArray())
-            addData(result.stdout.encodeToByteArray())
+            addData(result.stdout.toString().encodeToByteArray())
             addEndHeaders()
             setEom()
         }

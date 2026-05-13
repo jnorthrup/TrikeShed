@@ -29,20 +29,18 @@ fun ringHttpsHandler(
     channels: ChannelOperations,
     reactor: ReactorOperations,
 ): HtxRequestHandler = { request: HtxClientRequest ->
-    val host = request.path.toString()
+    val rawUrl = request.path.toString()
+    val noScheme = rawUrl
         .removePrefix("https://")
         .removePrefix("http://")
-        .substringBefore(':')
-    val port = request.path.toString()
-        .substringAfter(":")
-        .substringBefore('/')
-        .toIntOrNull() ?: 443
-    val pathPart = request.path.toString()
-        .substringAfter(host)
-        .substringAfter(port.toString())
-        .ifEmpty { "/" }
-    val fullPath = if (request.path.toString().contains("?")) {
-        request.path.toString().substringAfter(host).substringAfter(port.toString())
+    val authority = noScheme.substringBefore('/')
+    val host = authority.substringBefore(':')
+    check(host.isNotEmpty()) { "invalid url host: $rawUrl" }
+    val port = authority.substringAfter(':', "443").toIntOrNull() ?: 443
+    val urlPathAndQuery = noScheme.substringAfter('/', "")
+    val pathPart = if (urlPathAndQuery.isEmpty()) "/" else "/$urlPathAndQuery"
+    val fullPath = if ('?' in pathPart) {
+        pathPart
     } else {
         val qp = request.headers["X-Query-Params"]?.toString().orEmpty()
         if (qp.isNotEmpty()) "$pathPart?$qp" else pathPart
@@ -73,7 +71,7 @@ fun ringHttpsHandler(
         val hs = CommonTlsClientHandshake(sha256, x25519, hkdf, codec, host)
 
         val ch = hs.buildClientHello()
-        handle.writev(
+        val sentHello = handle.writev(
             fd, ByteBuffer.wrap(
                 byteArrayOf(0x16, 0x03, 0x03,
                     ((ch.size ushr 8) and 0xFF).toByte(),
@@ -81,6 +79,7 @@ fun ringHttpsHandler(
                 ) + ch
             )
         )
+        check(sentHello > 0) { "client hello send failed: $sentHello" }
 
         var done = false
         val buf = ByteArray(16384)

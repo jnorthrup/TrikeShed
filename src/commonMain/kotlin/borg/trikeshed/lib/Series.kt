@@ -288,7 +288,7 @@ class IntHeap(series: Series<Int>) {
     var size = 0
     fun isEmpty(): Boolean = size == 0
     fun isNotEmpty(): Boolean = size > 0
-    
+
     init {
         for (i in series) add(i)
     }
