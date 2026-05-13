@@ -31,7 +31,7 @@ fun CharSequence.removeSurroundingCs(delimiter: CharSequence): CharSequence =
 
 fun CharSequence.removeSurroundingCs(prefix: CharSequence, suffix: CharSequence): CharSequence =
     if (this.startsWith(prefix) && this.endsWith(suffix))
-        combine(this.cs.take(prefix.length until 0), this.cs.drop(prefix.length).dropLast(suffix.length)).asCharSequence
+        this.cs.drop(prefix.length).dropLast(suffix.length).asCharSequence
     else this
 
 /**
