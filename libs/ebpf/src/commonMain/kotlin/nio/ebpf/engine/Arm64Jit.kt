@@ -1,12 +1,10 @@
-package nio.ebpf.jit
+package nio.ebpf.engine
 
-import nio.ebpf.algebra.*
+import nio.ebpf.types.*
 
 /** Userspace eBPF → ARM64 (AArch64) native code JIT compiler. */
 object Arm64Jit {
     private val ARM64_X = intArrayOf(0, 1, 2, 3, 4, 5, 19, 21, 22, 23, 24, 31)
-
-    /** Force a long hex literal to an Int (handles values > Int.MAX_VALUE). */
     private fun wi(v: Long): Int = v.toInt()
 
     fun compile(program: EbpfProgram): JitCode {
@@ -25,11 +23,11 @@ object Arm64Jit {
     }
 
     private fun epilogue(b: ByteBuf) {
-        b.pushWord(wi(0xa9417b93L))    // ldp x19, x20, [sp, #16]
-        b.pushWord(wi(0xa9427b95L))    // ldp x21, x22, [sp, #32]
-        b.pushWord(wi(0x912003ffL))    // add sp, sp, #512
-        b.pushWord(wi(0xa8c17bfdL))    // ldp fp, lr, [sp], #16
-        b.pushWord(wi(0xd65f03c0L))    // ret
+        b.pushWord(wi(0xa9417b93L))
+        b.pushWord(wi(0xa9427b95L))
+        b.pushWord(wi(0x912003ffL))
+        b.pushWord(wi(0xa8c17bfdL))
+        b.pushWord(wi(0xd65f03c0L))
     }
 
     private fun emitOne(inst: EbpfInstruction, b: ByteBuf) {
@@ -40,18 +38,16 @@ object Arm64Jit {
             is EbpfInstruction.And -> armRR(b, wi(0x8a000000L), inst)
             is EbpfInstruction.Or -> armRR(b, wi(0xaa000000L), inst)
             is EbpfInstruction.Xor -> armRR(b, wi(0xca000000L), inst)
-            is EbpfInstruction.MovImm -> mov64(b, ARM64_X[inst.dst.index], inst.imm.toLong())
-            is EbpfInstruction.AddImm -> armRI(b, wi(0x91000000L), inst.dst.index, inst.imm)
-            is EbpfInstruction.SubImm -> armRI(b, wi(0xd1000000L), inst.dst.index, inst.imm)
+            is EbpfInstruction.MovImm -> mov64(b, ARM64_X[inst.dst.index], inst.immVal!!.toLong())
+            is EbpfInstruction.AddImm -> armRI(b, wi(0x91000000L), inst.dst.index, inst.immVal!!)
+            is EbpfInstruction.SubImm -> armRI(b, wi(0xd1000000L), inst.dst.index, inst.immVal!!)
             is EbpfInstruction.LdX -> {
-                val rt = ARM64_X[inst.dst.index]
-                val rn = ARM64_X[inst.src.index]
+                val rt = ARM64_X[inst.dst.index]; val rn = ARM64_X[inst.src.index]
                 val off = (inst.offset.toInt() / inst.size.bytes) and 0xfff
                 ldr64(b, rt, rn, off)
             }
             is EbpfInstruction.StX -> {
-                val rt = ARM64_X[inst.src.index]
-                val rn = ARM64_X[inst.dst.index]
+                val rt = ARM64_X[inst.src.index]; val rn = ARM64_X[inst.dst.index]
                 val off = (inst.offset.toInt() / inst.size.bytes) and 0xfff
                 str64(b, rt, rn, off)
             }
@@ -62,14 +58,12 @@ object Arm64Jit {
     }
 
     private fun armRR(b: ByteBuf, base: Int, inst: EbpfInstruction) {
-        val dst = ARM64_X[inst.dst?.index ?: 0]
-        val src = ARM64_X[inst.src?.index ?: 0]
+        val dst = ARM64_X[inst.dst?.index ?: 0]; val src = ARM64_X[inst.src?.index ?: 0]
         b.pushWord(base or src or (dst shl 16) or (dst shl 24))
     }
 
     private fun armRI(b: ByteBuf, base: Int, ebpfIdx: Int, imm: Int) {
-        val rd = ARM64_X[ebpfIdx]
-        val i = imm and 0xfff
+        val rd = ARM64_X[ebpfIdx]; val i = imm and 0xfff
         b.pushWord(base or rd or (rd shl 8) or (i shl 10))
     }
 

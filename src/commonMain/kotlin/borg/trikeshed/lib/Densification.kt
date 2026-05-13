@@ -1,8 +1,7 @@
-@file:Suppress("NonAsciiCharacters", "FunctionName")
+@file:Suppress("NonAsciiCharacters", "FunctionName", "INLINE_CLASS_DEPRECATED")
 
 package borg.trikeshed.lib
 
-import kotlin.jvm.JvmInline
 import kotlin.math.ln
 
 /**
@@ -31,9 +30,7 @@ inline class DensifiedJoin(private val payload: Long) : Twin<Int> {
  * Represents the character range of a single value in a densified JSON
  * structure, bounded by structural events (open/close confix tokens).
  */
-data class ValueInterval(
-    val chars: CharSequence,
-)
+inline class ValueInterval(val chars: CharSequence)
 
 /**
  * Architectural projection — describes how a layer specializes Join.
@@ -52,6 +49,7 @@ data class Projection<T>(
         fun lib(): Projection<Join<*, *>> = Projection("lib", "Join<A,B>", 1.0)
         fun cursor(): Projection<Join<*, *>> = Projection("cursor", "Join<Any?,()`ColumnMeta↻`>", 4.0)
         fun wam(): Projection<Join<*, *>> = Projection("wam", "Join<Map<String,String>,Boolean>", 16.0)
+
         // CCEK uses CoroutineContext.Key and Element — referenced as string only
         fun ccek(): Projection<Join<*, *>> = Projection("ccek", "Join<Key<*>,Element>", 8.0)
     }
@@ -85,4 +83,6 @@ data class Projection<T>(
  * access, register-packed, linear).
  */
 fun densificationFactor(sparseSize: Int, denseSize: Int): Double =
-    if (denseSize == 0) 0.0 else ln(sparseSize.toDouble().coerceAtLeast(1.0) / denseSize.toDouble().coerceAtLeast(1.0)) + 1.0
+    if (denseSize == 0) 0.0 else ln(
+        sparseSize.toDouble().coerceAtLeast(1.0) / denseSize.toDouble().coerceAtLeast(1.0),
+    ) + 1.0
