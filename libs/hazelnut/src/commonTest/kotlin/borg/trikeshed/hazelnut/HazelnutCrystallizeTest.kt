@@ -217,9 +217,12 @@ class HazelTopologyTest {
 
     @Test fun replicatorsFor() {
         val topo = HazelTopology()
-        topo.addNode(ProductionGraphNode("a", GraphNodeType.DATA_NODE, Transport.SCTP, objectIds = setOf("o1")).addObject("x"))
-        topo.addNode(ProductionGraphNode("b", GraphNodeType.OBSERVER, Transport.QUIC, objectIds = setOf("o1")).addObject("x"))
-        topo.addNode(ProductionGraphNode("c", GraphNodeType.DATA_NODE, Transport.HTX).addObject("y"))
+        val sa = ProductionGraphNode("a", GraphNodeType.DATA_NODE, Transport.SCTP, objectIds = setOf("o1")).addObject("x")
+        val sb = ProductionGraphNode("b", GraphNodeType.OBSERVER, Transport.QUIC, objectIds = setOf("o1")).addObject("x")
+        val sc = ProductionGraphNode("c", GraphNodeType.DATA_NODE, Transport.HTX).addObject("y")
+        topo.addNode(sa)
+        topo.addNode(sb)
+        topo.addNode(sc)
         val reps = topo.replicatorsFor("x")
         assertEquals(2, reps.size)
     }
