@@ -60,3 +60,65 @@ fun CharSequence.replaceRangeCs(range: IntRange, replacement: CharSequence): Cha
 fun CharSequence.replaceRangeCs(startIndex: Int, endIndex: Int, replacement: CharSequence): CharSequence =
     replaceRangeCs(startIndex until endIndex, replacement)
 
+// Compatibility: CharSequence-friendly overloads (return CharSequence) for common String APIs
+fun CharSequence.substringAfter(delimiter: CharSequence, missingDelimiterValue: CharSequence = this): CharSequence {
+    val d = delimiter.toString()
+    if (d.length == 1) {
+        val ch = d[0]
+        val s = this.cs
+        var i = 0
+        while (i < s.size) {
+            if (s[i] == ch) return s[(i + 1) until s.size].asCharSequence
+            i++
+        }
+        return missingDelimiterValue
+    }
+    val s = this.toString()
+    val idx = s.indexOf(d)
+    return if (idx < 0) missingDelimiterValue else s.substring(idx + d.length)
+}
+
+fun CharSequence.substringAfterLast(delimiter: CharSequence, missingDelimiterValue: CharSequence = this): CharSequence {
+    val d = delimiter.toString()
+    if (d.length == 1) {
+        val ch = d[0]
+        val s = this.cs
+        var i = s.size - 1
+        while (i >= 0) {
+            if (s[i] == ch) return s[(i + 1) until s.size].asCharSequence
+            i--
+        }
+        return missingDelimiterValue
+    }
+    val s = this.toString()
+    val idx = s.lastIndexOf(d)
+    return if (idx < 0) missingDelimiterValue else s.substring(idx + d.length)
+}
+
+fun CharSequence.substringBefore(delimiter: CharSequence, missingDelimiterValue: CharSequence = this): CharSequence {
+    val d = delimiter.toString()
+    if (d.length == 1) {
+        val ch = d[0]
+        val s = this.cs
+        var i = 0
+        while (i < s.size) {
+            if (s[i] == ch) return s[0 until i].asCharSequence
+            i++
+        }
+        return missingDelimiterValue
+    }
+    val s = this.toString()
+    val idx = s.indexOf(d)
+    return if (idx < 0) missingDelimiterValue else s.substring(0, idx)
+}
+
+fun CharSequence.removePrefix(prefix: CharSequence): CharSequence =
+    if (this.startsWith(prefix)) this.cs.drop(prefix.length).asCharSequence else this
+
+fun CharSequence.removeSuffix(suffix: CharSequence): CharSequence =
+    if (this.endsWith(suffix)) this.cs.dropLast(suffix.length).asCharSequence else this
+
+// Sorting helpers for collections of CharSequence
+fun Iterable<CharSequence>.sorted(): List<CharSequence> = this.toList().sortedBy { it.toString() }
+fun Sequence<CharSequence>.sorted(): List<CharSequence> = this.toList().sortedBy { it.toString() }
+fun Array<out CharSequence>.sorted(): List<CharSequence> = this.asList().sortedBy { it.toString() }
