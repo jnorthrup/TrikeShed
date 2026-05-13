@@ -39,7 +39,7 @@ private class NativeTlsEngine(
      * [reader] returns one TLS record at a time (5-byte header stripped).
      * [writer] sends a raw TLS record (including the 5-byte TLS record header).
      */
-    suspend fun handshake(
+    override suspend fun handshake(
         reader: suspend () -> ByteArray,
         writer: suspend (ByteArray) -> Unit,
     ) {

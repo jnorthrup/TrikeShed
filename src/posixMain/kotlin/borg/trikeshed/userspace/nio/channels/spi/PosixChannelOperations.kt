@@ -20,7 +20,11 @@ class PosixChannelOperations : ChannelOperations {
         }
         platform.posix.bind(fd, addr.ptr.reinterpret(), sizeOf<sockaddr_in>().convert()).toInt()
     }
-    override fun listen(fd: Int, backlog: Int): Int = platform.posix.listen(fd, backlog)
+    override fun listen(fd: Int, backlog: Int): Int {
+        // Mark socket as non-blocking
+        platform.posix.fcntl(fd, platform.posix.F_SETFL, platform.posix.fcntl(fd, platform.posix.F_GETFL) or platform.posix.O_NONBLOCK)
+        return platform.posix.listen(fd, backlog)
+    }
     override fun accept(fd: Int): Int = platform.posix.accept(fd, null, null)
     override fun connect(fd: Int, host: CharSequence, port: Int): Int = memScoped {
         val addr = alloc<sockaddr_in> {
@@ -62,8 +66,15 @@ class PosixChannelOperations : ChannelOperations {
             return 0
         }
         override fun writev(fd: Int, buf: ByteBuffer, userData: Long): Int {
-            pending.add(PendingOp(fd, buf, read = false, accept = false, user = userData))
-            return 0
+            // Synchronous send — caller expects bytes sent immediately (no queue)
+            val off = buf.arrayOffset() + buf.position()
+            val remaining = buf.remaining()
+            val backing = buf.array()
+            val res = backing.usePinned { pinned ->
+                platform.posix.send(fd, pinned.addressOf(off), remaining.convert(), 0)
+            }.toInt()
+            if (res > 0) buf.position(buf.position() + res)
+            return res
         }
         override fun submit(): Int {
             if (pending.isEmpty()) return 0

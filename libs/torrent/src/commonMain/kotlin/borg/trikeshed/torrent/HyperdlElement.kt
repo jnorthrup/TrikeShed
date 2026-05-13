@@ -84,11 +84,8 @@ class HyperdlElement(
         rpcServer = rpc
         rpc.open()
         supervisor.launch {
-            try {
-                // RPC server runs until rpcServer.close() or supervisor cancellation
-            } finally {
-                rpc.close()
-            }
+            // RPC server runs until rpcServer.close() or supervisor cancellation
+            rpc.serve(port)
         }
     }
 

@@ -49,9 +49,15 @@ class HyperdlRpcServer(
         }
     }
 
+    /** Per-client request accumulators. */
+    private val clientBuffers = mutableMapOf<Int, StringBuilder>()
+
     /**
      * Start RPC server loop. Uses [channels] for socket+ring I/O and
      * [reactor] for fd registration.
+     *
+     * Accept path: ring.prepAccept → submit → wait → read clientFd
+     * Read path: ring.readv → submit → wait → parse → respond
      */
     suspend fun serve(
         port: Int = 6800,
@@ -60,63 +66,49 @@ class HyperdlRpcServer(
     ) = withContext(supervisor) {
         requireState(ElementState.ACTIVE)
 
-        // Listening socket
-        val serverFd = channels.socket(2, 1, 0)
+        val serverFd = channels.socket(2, 1, 0) // AF_INET=2, SOCK_STREAM=1
         check(serverFd >= 0) { "socket() failed" }
         val bindRes = channels.bind(serverFd, port)
         check(bindRes == 0) { "bind(port=$port) failed" }
         channels.listen(serverFd, 128)
 
         val ring = channels.openChannel()
-        ring.prepAccept(serverFd, ACCEPT_KEY)
-        ring.submit()
+        reactor.register(serverFd, setOf(Interest.READ), ACCEPT_KEY)
 
         while (isActive) {
-            val results = ring.wait(minComplete = 1)
-            for (r in results) {
-                val fd = r.fd
-                when (r.userData and 0xFFFF_FFFFL) {
-                    ACCEPT_KEY -> {
-                        val clientFd = r.res
-                        if (clientFd >= 0) {
-                            clientBuffers[clientFd] = StringBuilder()
-                            reactor.register(clientFd, setOf(Interest.READ), READ_KEY_BASE + clientFd.toLong())
-                        }
-                        ring.prepAccept(serverFd, ACCEPT_KEY)
+            val signals = reactor.poll(kotlin.time.Duration.INFINITE)
+            for (signal in signals) {
+                val fd = signal.fd
+                if (fd == serverFd && signal.interests.contains(Interest.READ)) {
+                    // Accept a new client connection
+                    val clientFd = channels.accept(serverFd)
+                    if (clientFd >= 0) {
+                        clientBuffers[clientFd] = StringBuilder()
+                        reactor.register(clientFd, setOf(Interest.READ), READ_KEY_BASE + clientFd.toLong())
                     }
-                    else -> {
-                        if (r.res <= 0) {
-                            clientBuffers.remove(fd)
-                            reactor.deregister(fd)
-                        } else {
-                            handleClientData(fd, ring, reactor)
-                        }
-                        ring.submit()
-                    }
+                } else if (signal.interests.contains(Interest.READ)) {
+                    handleClientData(fd, ring, reactor, channels)
                 }
             }
-            ring.submit()
         }
         reactor.deregister(serverFd)
         channels.close(serverFd)
     }
 
-    /** Per-client request accumulators. */
-    private val clientBuffers = mutableMapOf<Int, StringBuilder>()
-
     /**
      * Read HTTP data from client fd, parse request, respond.
-     */
-    /**
-     * Read HTTP data from client fd, parse request, respond.
-     * Re-enqueues a readv for the next reactor cycle.
      */
     private suspend fun handleClientData(
-        clientFd: Int, ring: ChannelOperations.ChannelHandle, reactor: ReactorOperations,
+        clientFd: Int, ring: ChannelOperations.ChannelHandle, reactor: ReactorOperations, channels: ChannelOperations,
     ) {
         val buf = clientBuffers.getOrPut(clientFd) { StringBuilder() }
         val rb = ByteBuffer.allocate(8192)
-        val bytesRead = ring.read(rb, 0L)
+        ring.readv(clientFd, rb, 0L)
+        val submitResults = ring.submit()
+        val completions = ring.wait(minComplete = submitResults)
+        val received = completions.find { it.fd == clientFd }
+
+        val bytesRead = received?.res ?: -1
         if (bytesRead <= 0) {
             clientBuffers.remove(clientFd)
             reactor.deregister(clientFd)
@@ -127,17 +119,22 @@ class HyperdlRpcServer(
         val chunk = ByteArray(bytesRead)
         rb.get(chunk, 0, bytesRead)
         buf.append(chunk.decodeToString())
-
         val text = buf.toString()
         val headerEnd = text.indexOf("\r\n\r\n")
-        if (headerEnd < 0) return // incomplete headers, wait for more data
-
+        if (headerEnd < 0) {
+            // Incomplete headers — wait for more data
+            ring.readv(clientFd, ByteBuffer.allocate(8192), READ_KEY_BASE + clientFd.toLong())
+            return
+        }
         val header = text.substring(0, headerEnd)
         val contentLength = parseContentLength(header)
         val bodyStart = headerEnd + 4
         val bodyLength = text.length - bodyStart
-        if (bodyLength < contentLength) return // incomplete body, wait for more data
-
+        if (bodyLength < contentLength) {
+            // Incomplete body — wait for more data
+            ring.readv(clientFd, ByteBuffer.allocate(8192), READ_KEY_BASE + clientFd.toLong())
+            return
+        }
         val body = text.substring(bodyStart, bodyStart + contentLength)
         buf.clear()
         if (bodyStart + contentLength < text.length) buf.append(text.substring(bodyStart + contentLength))
@@ -154,10 +151,10 @@ class HyperdlRpcServer(
 
         val response = handleRequest(body)
         write200(clientFd, ring, response)
-        // Close connection after response (HTTP/1.0 style for simplicity)
         clientBuffers.remove(clientFd)
         reactor.deregister(clientFd)
         channels.close(clientFd)
+
     }
 
     private fun writeResponse(clientFd: Int, ring: ChannelOperations.ChannelHandle, status: Int, body: String) {
