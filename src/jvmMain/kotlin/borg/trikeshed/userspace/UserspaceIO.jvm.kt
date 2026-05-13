@@ -2,6 +2,8 @@ package borg.trikeshed.userspace
 
 import borg.trikeshed.userspace.UringOp.Companion.UringSubmission
 import borg.trikeshed.userspace.nio.ByteBuffer
+import java.net.DatagramPacket
+import java.net.DatagramSocket
 import java.net.InetSocketAddress
 import java.net.Socket
 import java.nio.channels.FileChannel
@@ -9,8 +11,9 @@ import java.nio.channels.FileChannel
 // ---- fd registry ----
 
 private var nextFd = 1
-private val fileSockets = mutableMapOf<Int, Socket>()      // network fds
-private val fileChannels = mutableMapOf<Int, FileChannel>()// file fds
+private val fileSockets = mutableMapOf<Int, Socket>()          // TCP fds
+private val fileDatagrams = mutableMapOf<Int, DatagramSocket>() // UDP fds
+private val fileChannels = mutableMapOf<Int, FileChannel>()    // file fds
 
 private fun allocFd(): Int = nextFd++
 
@@ -46,6 +49,7 @@ private class JvmUserspaceChannelBackend : UserspaceChannelBackend {
 
     @Deprecated("Use submitBatch")
     override fun close(file: FileImpl): Int {
+        fileDatagrams.remove(file.id)?.runCatching { close() }
         fileSockets.remove(file.id)?.runCatching { close() }
         fileChannels.remove(file.id)?.runCatching { close() }
         return 0
@@ -81,7 +85,9 @@ private class JvmUserspaceChannelBackend : UserspaceChannelBackend {
     // ---- poll readiness ----
 
     override fun hasPending(fd: Int): Boolean =
-        fileSockets[fd]?.runCatching { getInputStream().available() > 0 }?.getOrDefault(false) ?: false
+        fileDatagrams[fd]?.let { false }  // UDP: no non-blocking poll on JVM DatagramSocket
+        ?: fileSockets[fd]?.runCatching { getInputStream().available() > 0 }?.getOrDefault(false)
+        ?: false
 
     // ---- unified batch path — uring emulation on JVM ----
 
@@ -132,33 +138,58 @@ private class JvmUserspaceChannelBackend : UserspaceChannelBackend {
         }
 
         UringOp.CONNECT -> {
-            val sock = fileSockets[sub.fd] ?: return@dispatchOp -1
-            // addr encoded as host string in buffer bytes, port in offset
             val buf = sub.buffer ?: return@dispatchOp -1
             val host = String(buf.array(), buf.position(), buf.remaining(), Charsets.UTF_8)
             val port = sub.offset.toInt()
-            try { sock.connect(InetSocketAddress(host, port)); 0 } catch (_: Exception) { -1 }
+            val sock = fileSockets[sub.fd]
+            val dg = fileDatagrams[sub.fd]
+            when {
+                sock != null -> try { sock.connect(InetSocketAddress(host, port)); 0 } catch (_: Exception) { -1 }
+                dg != null -> try { dg.connect(InetSocketAddress(host, port)); 0 } catch (_: Exception) { -1 }
+                else -> -1
+            }
         }
 
         UringOp.SEND -> {
-            val sock = fileSockets[sub.fd] ?: return@dispatchOp -1
             val buf = sub.buffer ?: return@dispatchOp -1
-            try {
-                val n = buf.remaining()
-                sock.getOutputStream().write(buf.array(), buf.position(), n)
-                buf.position(buf.position() + n)
-                n
-            } catch (_: Exception) { -1 }
+            val sock = fileSockets[sub.fd]
+            val dg = fileDatagrams[sub.fd]
+            when {
+                sock != null -> try {
+                    val n = buf.remaining()
+                    sock.getOutputStream().write(buf.array(), buf.position(), n)
+                    buf.position(buf.position() + n)
+                    n
+                } catch (_: Exception) { -1 }
+                dg != null -> try {
+                    val data = buf.array().copyOfRange(buf.position(), buf.position() + buf.remaining())
+                    dg.send(DatagramPacket(data, data.size))
+                    data.size
+                } catch (_: Exception) { -1 }
+                else -> -1
+            }
         }
 
         UringOp.RECV -> {
-            val sock = fileSockets[sub.fd] ?: return@dispatchOp -1
             val buf = sub.buffer ?: return@dispatchOp -1
-            try {
-                val n = sock.getInputStream().read(buf.array(), buf.position(), buf.remaining())
-                if (n > 0) buf.position(buf.position() + n)
-                n
-            } catch (_: Exception) { -1 }
+            val sock = fileSockets[sub.fd]
+            val dg = fileDatagrams[sub.fd]
+            when {
+                sock != null -> try {
+                    val n = sock.getInputStream().read(buf.array(), buf.position(), buf.remaining())
+                    if (n > 0) buf.position(buf.position() + n)
+                    n
+                } catch (_: Exception) { -1 }
+                dg != null -> try {
+                    val pkt = DatagramPacket(buf.array(), buf.position(), buf.remaining())
+                    dg.soTimeout = 10_000
+                    dg.receive(pkt)
+                    if (pkt.length > 0) buf.position(buf.position() + pkt.length)
+                    pkt.length
+                } catch (_: java.net.SocketTimeoutException) { 0 }
+                catch (_: Exception) { -1 }
+                else -> -1
+            }
         }
 
         UringOp.ACCEPT -> {
@@ -176,7 +207,39 @@ private class JvmUserspaceChannelBackend : UserspaceChannelBackend {
             try { ch.truncate(sub.offset); 0 } catch (_: Exception) { -1 }
         }
 
+        UringOp.SENDMSG -> {
+            val dg = fileDatagrams[sub.fd] ?: return@dispatchOp -1
+            val buf = sub.buffer ?: return@dispatchOp -1
+            val host = String(buf.array(), buf.position(), buf.remaining(), Charsets.UTF_8)
+            val port = sub.offset.toInt()
+            try {
+                val data = buf.array().let { arr ->
+                    // If addr field holds the actual data, use that instead
+                    if (sub.addr > 0 && sub.len > 0) {
+                        // data is at native addr — can't access on JVM, use buffer
+                        arr.copyOfRange(buf.position(), buf.position() + buf.remaining())
+                    } else arr.copyOfRange(buf.position(), buf.position() + buf.remaining())
+                }
+                dg.send(DatagramPacket(data, data.size, InetSocketAddress(host, port)))
+                data.size
+            } catch (_: Exception) { -1 }
+        }
+
+        UringOp.RECVMSG -> {
+            val dg = fileDatagrams[sub.fd] ?: return@dispatchOp -1
+            val buf = sub.buffer ?: return@dispatchOp -1
+            try {
+                val pkt = DatagramPacket(buf.array(), buf.position(), buf.remaining())
+                dg.soTimeout = (sub.offset.coerceIn(0, 30_000)).toInt()
+                dg.receive(pkt)
+                if (pkt.length > 0) buf.position(buf.position() + pkt.length)
+                pkt.length
+            } catch (_: java.net.SocketTimeoutException) { 0 }
+            catch (_: Exception) { -1 }
+        }
+
         UringOp.CLOSE -> {
+            fileDatagrams.remove(sub.fd)?.runCatching { close() }
             fileSockets.remove(sub.fd)?.runCatching { close() }
             fileChannels.remove(sub.fd)?.runCatching { close() }
             0
@@ -195,6 +258,7 @@ actual class FileImpl actual constructor(actual val id: Int) {
     @PublishedApi internal var path: CharSequence = ""
     actual fun isOpen(): Boolean = id >= 0
     actual fun close() {
+        fileDatagrams.remove(id)?.runCatching { close() }
         fileSockets.remove(id)?.runCatching { close() }
         fileChannels.remove(id)?.runCatching { close() }
     }
@@ -227,7 +291,12 @@ internal actual object FilesImpl {
 internal actual object ChannelsImpl {
     actual fun socket(domain: Int, type: Int, protocol: Int): FileImpl {
         val fd = allocFd()
-        fileSockets[fd] = Socket()   // unconnected; CONNECT op wires it up
+        // SOCK_DGRAM (type=2) → UDP DatagramSocket, else TCP Socket
+        if (type == 2) {
+            fileDatagrams[fd] = DatagramSocket()
+        } else {
+            fileSockets[fd] = Socket()   // unconnected; CONNECT op wires it up
+        }
         return FileImpl(fd)
     }
 }

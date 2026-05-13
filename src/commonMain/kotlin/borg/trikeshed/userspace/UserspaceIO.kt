@@ -1,5 +1,6 @@
 package borg.trikeshed.userspace
 
+import borg.trikeshed.userspace.UringOp.Companion.UringSubmission
 import borg.trikeshed.userspace.nio.ByteBuffer
 
 data class SelectionResult(val res: Int, val userData: Long)
@@ -40,6 +41,8 @@ class Channel(
 
     fun map(file: File, mode: CharSequence, position: Long, size: Long, userData: Long) =
         facade.map(file.impl, mode, position, size, userData)
+
+    fun enqueue(sub: UringSubmission) = facade.enqueue(sub)
 
     fun submit(): Int = facade.submit()
 

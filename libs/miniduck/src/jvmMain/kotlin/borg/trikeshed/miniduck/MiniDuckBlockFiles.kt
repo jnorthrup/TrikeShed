@@ -23,7 +23,7 @@ object MiniDuckBlockFiles {
             "Cannot write a mutable block — call seal() first"
         }
         val text = MiniDuckBlockCodec.encode(block)
-        path.toFile().writeText(text)
+        path.toFile().writeText(text.toString())
     }
 
     /** Read a block from an NDJSON file. */

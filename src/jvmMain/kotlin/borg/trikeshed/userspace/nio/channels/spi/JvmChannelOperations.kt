@@ -2,6 +2,8 @@ package borg.trikeshed.userspace.nio.channels.spi
 
 import borg.trikeshed.userspace.Channels
 import borg.trikeshed.userspace.File
+import borg.trikeshed.userspace.UringOp
+import borg.trikeshed.userspace.UringOp.Companion.UringSubmission
 import borg.trikeshed.userspace.nio.ByteBuffer
 
 /**
@@ -31,7 +33,8 @@ class JvmChannelOperations : ChannelOperations {
 
     override fun connect(fd: Int, host: CharSequence, port: Int): Int {
         val file = files[fd] ?: return -1
-        ring.connect(file, host, port, userData = fd.toLong())
+        val hostBuf = ByteBuffer.wrap(host.toString().encodeToByteArray())
+        ring.enqueue(UringSubmission(UringOp.CONNECT, file.id, 0L, hostBuf.remaining(), port.toLong(), 0, fd.toLong(), hostBuf))
         ring.submit()
         return ring.wait(1).firstOrNull()?.res ?: -1
     }
@@ -41,16 +44,18 @@ class JvmChannelOperations : ChannelOperations {
         return 0
     }
 
+    fun hasPending(fd: Int): Boolean = ring.hasPending(fd)
+
     fun send(fd: Int, buffer: ByteBuffer, userData: Long): Int {
         val file = files[fd] ?: return -1
-        ring.write(file, buffer, offset = 0L, userData = userData)
+        ring.enqueue(UringSubmission(UringOp.SEND, file.id, 0L, buffer.remaining(), 0L, 0, userData, buffer))
         ring.submit()
         return ring.wait(1).firstOrNull()?.res ?: -1
     }
 
     fun recv(fd: Int, buffer: ByteBuffer, userData: Long): Int {
         val file = files[fd] ?: return -1
-        ring.read(file, buffer, offset = 0L, userData = userData)
+        ring.enqueue(UringSubmission(UringOp.RECV, file.id, 0L, buffer.remaining(), 0L, 0, userData, buffer))
         ring.submit()
         return ring.wait(1).firstOrNull()?.res ?: -1
     }
@@ -61,6 +66,8 @@ class JvmChannelOperations : ChannelOperations {
         override val id: Int = 0
         override fun read(buffer: ByteBuffer, offset: Long): Int = -1
         override fun write(buffer: ByteBuffer, offset: Long): Int = -1
+        override fun readv(fd: Int, buffer: ByteBuffer, userData: Long): Int = -1
+        override fun writev(fd: Int, buffer: ByteBuffer, userData: Long): Int = -1
         override fun submit(): Int = ch.submit()
         override fun wait(minComplete: Int): List<ChannelResult> =
             ch.wait(minComplete).map { ChannelResult(it.res, it.res, it.userData) }

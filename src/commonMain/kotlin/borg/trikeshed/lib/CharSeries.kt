@@ -264,7 +264,9 @@ class CharSeries(
     override operator fun get(index: Int): Char  = b(index)
 
     override fun subSequence(startIndex: Int, endIndex: Int): CharSequence {
-        TODO("Not yet implemented")
+        // Return a zero-copy CharSeries view of the requested range
+        val buf = this[startIndex until endIndex]
+        return CharSeries(buf)
     }
 
     companion object {

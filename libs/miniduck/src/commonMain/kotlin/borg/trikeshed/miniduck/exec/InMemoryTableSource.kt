@@ -23,7 +23,7 @@ class InMemoryTableSource : TableSource {
             if (schema != null && row.keys.size > 0) {
                 // Transform to schema's column keys
                 val currentCells = row.cells
-                val keys = schema.columns.size j { i: Int -> schema.columns[i].name.toString() }
+                val keys = schema.columns.size j { i: Int -> schema.columns[i].name.toString() as CharSequence }
                 DocRowVec(keys, currentCells)
             } else {
                 row
@@ -38,9 +38,9 @@ class InMemoryTableSource : TableSource {
         val list = tables.getOrPut(tableName) { emptySeries<RowVec>().cow }
         val schema = schemas[tableName]
         val keys = if (schema != null) {
-            schema.columns.size j { i: Int -> schema.columns[i].name.toString() }
+            schema.columns.size j { i: Int -> schema.columns[i].name.toString() as CharSequence }
         } else {
-            row.size j { i: Int -> "col$i" }
+            row.size j { i: Int -> "col$i" as CharSequence }
         }
         list.add(DocRowVec(keys, seriesOf(row)))
     }
@@ -52,7 +52,7 @@ class InMemoryTableSource : TableSource {
         // Infer column names from first row if present
         val firstRow = rows[0]
         val colCount = firstRow.size
-        val keys = colCount j { i: Int -> "col$i" }
+        val keys = colCount j { i: Int -> "col$i" as CharSequence }
         val list = tables.getOrPut(tableName) { emptySeries<RowVec>().cow }
         rows.forEach { r ->
             list.add(DocRowVec(keys, seriesOf(r)))
@@ -62,7 +62,7 @@ class InMemoryTableSource : TableSource {
     fun addTable(schema: TableSchema, rows: List<List<Any?>>) {
         schemas[schema.name] = schema
         val list = tables.getOrPut(schema.name) { emptySeries<RowVec>().cow }
-        val keys = schema.columns.size j { i: Int -> schema.columns[i].name.toString() }
+        val keys = schema.columns.size j { i: Int -> schema.columns[i].name.toString() as CharSequence }
         rows.forEach { row ->
             list.add(DocRowVec(keys, seriesOf(row)))
         }
