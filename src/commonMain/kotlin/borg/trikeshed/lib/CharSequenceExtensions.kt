@@ -7,15 +7,6 @@ package borg.trikeshed.lib
  * Names use the "Cs" suffix so they don't shadow kotlin stdlib functions.
  */
 
-/** CharSequence overload for stdlib String.substringBefore — converts to String. */
-fun CharSequence.substringBefore(delim: CharSequence): CharSequence = this.toString().substringBefore(delim.toString())
-fun CharSequence.substringBefore(delim: CharSequence, missingDelimiterValue: CharSequence): CharSequence =
-    this.toString().substringBefore(delim.toString(), missingDelimiterValue.toString())
-fun CharSequence.substringAfter(delim: CharSequence): CharSequence = this.toString().substringAfter(delim.toString())
-fun CharSequence.substringAfter(delim: CharSequence, missingDelimiterValue: CharSequence): CharSequence =
-    this.toString().substringAfter(delim.toString(), missingDelimiterValue.toString())
-fun CharSequence.substringBeforeLast(delim: CharSequence): CharSequence = this.toString().substringBeforeLast(delim.toString())
-fun CharSequence.substringAfterLast(delim: CharSequence): CharSequence = this.toString().substringAfterLast(delim.toString())
 
 inline fun CharSequence.substringCs(startIndex: Int): CharSequence = substringCs(startIndex, this.length)
 inline fun CharSequence.substringCs(startIndex: Int, endIndex: Int): CharSequence = this.cs.get(startIndex until endIndex).asCharSequence
@@ -69,54 +60,3 @@ fun CharSequence.replaceRangeCs(range: IntRange, replacement: CharSequence): Cha
 fun CharSequence.replaceRangeCs(startIndex: Int, endIndex: Int, replacement: CharSequence): CharSequence =
     replaceRangeCs(startIndex until endIndex, replacement)
 
-// --- Compatibility extensions (same names as String API) -------------------
-
-fun CharSequence.substringAfterLast(delimiter: Char, missingDelimiterValue: CharSequence = this): CharSequence {
-    val s = this.cs
-    var i = s.size - 1
-    while (i >= 0) {
-        if (s[i] == delimiter) return s[(i + 1) until s.size].asCharSequence
-        i--
-    }
-    return missingDelimiterValue
-}
-
-fun CharSequence.substringAfterLast(delimiter: CharSequence, missingDelimiterValue: CharSequence = this): CharSequence {
-    val str = delimiter.toString()
-    // simple fallback using toString when delimiter is longer than 1
-    if (str.length == 1) return substringAfterLast(str[0], missingDelimiterValue)
-    val s = this.toString()
-    val idx = s.lastIndexOf(str)
-    return if (idx < 0) missingDelimiterValue else s.substring(idx + str.length)
-}
-
-fun CharSequence.substringAfter(delimiter: Char, missingDelimiterValue: CharSequence = this): CharSequence {
-    val s = this.cs
-    var i = 0
-    val n = s.size
-    while (i < n) {
-        if (s[i] == delimiter) return s[(i + 1) until n].asCharSequence
-        i++
-    }
-    return missingDelimiterValue
-}
-
-fun CharSequence.substringBefore(delimiter: Char, missingDelimiterValue: CharSequence = this): CharSequence {
-    val s = this.cs
-    var i = 0
-    val n = s.size
-    while (i < n) {
-        if (s[i] == delimiter) return s[0 until i].asCharSequence
-        i++
-    }
-    return missingDelimiterValue
-}
-
-// Provide isEmpty/isNotEmpty on CharSequence for convenience
-fun CharSequence.isEmpty(): Boolean = this.length == 0
-fun CharSequence.isNotEmpty(): Boolean = this.length != 0
-
-// Sorting helpers for sequences of CharSequence (sort by string value)
-fun Sequence<CharSequence>.sorted(): List<CharSequence> = this.toList().sortedBy { it.toString() }
-fun Iterable<CharSequence>.sorted(): List<CharSequence> = this.toList().sortedBy { it.toString() }
-fun Array<out CharSequence>.sorted(): List<CharSequence> = this.asList().sortedBy { it.toString() }
