@@ -384,6 +384,9 @@ class BugzeeSocketManager(
 
     private var socketCounter: Int = 0
 
+    /** Global userData counter for generating unique operation tokens. */
+    private var userDataCounter: Long = 0L
+
     /**
      * A socket entry tracking the FileImpl and its state.
      */
@@ -532,7 +535,7 @@ class BugzeeSocketManager(
     private fun nextFd(): Int = ++socketCounter
 
     private fun nextUserData(entry: SocketEntry): Long =
-        entry.file.id.toLong() shl 48 or (++entry.userDataCounter)
+        entry.file.id.toLong() shl 48 or (++userDataCounter)
 
     /**
      * Enqueue a recv operation on the given binding.
