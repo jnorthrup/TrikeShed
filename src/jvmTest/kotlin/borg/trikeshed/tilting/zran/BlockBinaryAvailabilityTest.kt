@@ -43,7 +43,7 @@ class BlockBinaryAvailabilityTest {
     /** Run a command and return its stdout, or null if the command fails. */
    fun runCmd(vararg args: CharSequence): CharSequence? {
         return try {
-            val pb = java.lang.ProcessBuilder(args.toList())
+            val pb = java.lang.ProcessBuilder(args.map { it.toString() })
             pb.redirectErrorStream(true)
             val proc = pb.start()
             val output = proc.inputStream.bufferedReader().readText().trim()
