@@ -2,6 +2,7 @@ package borg.trikeshed.miniduck
 
 import borg.trikeshed.cursor.*
 import borg.trikeshed.lib.*
+import java.util.LinkedList
 /** Equality predicate for Cursor.where. */
 fun Eq(column: CharSequence, value: Any?): (RowVec) -> Boolean = { it.getValue(column) == value }
 
@@ -201,8 +202,8 @@ object Agg {
 fun Cursor.groupBy(keyColumn: CharSequence, vararg aggregations: Aggregation): Cursor {
     if (size == 0) return this
 
-    val groups = mutableMapOf<Any?, MutableList<Accumulator>>()
-    val groupOrder = mutableListOf<Any?>()
+    val groups = LinkedHashMap<Any?, LinkedList<Accumulator>>()
+    val groupOrder = LinkedList<Any?>()
 
     for (i in 0 until size) {
         val row = at(i)
@@ -229,25 +230,25 @@ fun Cursor.groupBy(keyColumn: CharSequence, vararg aggregations: Aggregation): C
 fun Cursor.hashJoin(other: Cursor, leftKey: CharSequence, rightKey: CharSequence): Cursor {
     if (this.size == 0 || other.size == 0) return emptyCursor()
 
-    val rightIndex = mutableMapOf<Any?, MutableList<RowVec>>()
+    val rightIndex = LinkedHashMap<Any?, LinkedList<RowVec>>()
     for (i in 0 until other.size) {
         val row = other.at(i)
         val key = row.getValue(rightKey)
         if (key != null) {
-            rightIndex.getOrPut(key) { mutableListOf() }.add(row)
+            rightIndex.getOrPut(key) { LinkedList() }.add(row)
         }
     }
 
     // Pre-allocate result list to avoid resizing
-    val resultRows = ArrayList<RowVec>(this.size * 2)
-    // HashSet for O(1) join-key dedup across left columns
+    val resultRows = LinkedList<RowVec>(this.size * 2)
+    // LinkedHashSet for O(1) join-key dedup across left columns
     for (i in 0 until this.size) {
         val leftRow = this.at(i)
         val key = leftRow.getValue(leftKey)
         val matches = rightIndex[key] ?: continue
         for (rightRow in matches) {
-            val keys = mutableListOf<CharSequence>()
-            val cells = mutableListOf<Any?>()
+            val keys = LinkedList<CharSequence>()
+            val cells = LinkedList<Any?>()
             appendRowData(keys, cells, leftRow)
             appendJoinedRowData(keys, cells, rightRow, rightKey.toString())
             resultRows.add(DocRowVec(keys, cells))
@@ -351,7 +352,7 @@ private fun copiedChild(row: RowVec): Series<RowVec>? = when (row) {
     else -> null
 }
 
-private fun appendRowData(keys: MutableList<  CharSequence>, cells: MutableList<Any?>, row: RowVec) {
+private fun appendRowData(keys: LinkedList<  CharSequence>, cells: LinkedList<Any?>, row: RowVec) {
     when (row) {
         is DocRowVec -> {
             for (i in 0 until row.size) {
@@ -368,10 +369,10 @@ private fun appendRowData(keys: MutableList<  CharSequence>, cells: MutableList<
     }
 }
 
-private fun appendJoinedRowData(keys: MutableList<CharSequence>, cells: MutableList<Any?>, row: RowVec, joinKey: CharSequence) {
+private fun appendJoinedRowData(keys: LinkedList<CharSequence>, cells: LinkedList<Any?>, row: RowVec, joinKey: CharSequence) {
     when (row) {
         is DocRowVec -> {
-            // Build a HashSet of already-emitted key names for O(1) dedup
+            // Build a LinkedHashSet of already-emitted key names for O(1) dedup
             val existingKeys = keys.toHashSet()
             for (i in 0 until row.keys.size) {
                 val key = row.keys[i]

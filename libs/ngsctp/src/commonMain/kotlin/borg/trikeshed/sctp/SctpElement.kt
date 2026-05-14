@@ -428,9 +428,9 @@ class SctpElement(
         get() = Key
 
     // Internal state — no longer in constructor defaults (Gap 7)
-    private val _streams: MutableMap<Int, StreamHandle> = mutableMapOf()
-    private val _associations: MutableMap<Long, SctpAssociationState> = mutableMapOf()
-    private val _pathStatuses: MutableMap<CharSequence, PathStatus> = mutableMapOf()
+    private val _streams: LinkedHashMap<Int, StreamHandle> = LinkedHashMap()
+    private val _associations: LinkedHashMap<Long, SctpAssociationState> = LinkedHashMap()
+    private val _pathStatuses: LinkedHashMap<CharSequence, PathStatus> = LinkedHashMap()
 
     /** Multi-homing discovery service — injectable for DHT-style path resolution (Gap 4). */
     var multiHomingService: MultiHomingService? = null

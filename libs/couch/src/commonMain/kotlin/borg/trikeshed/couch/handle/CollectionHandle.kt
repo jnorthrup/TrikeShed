@@ -4,6 +4,7 @@ import borg.trikeshed.lib.MetaSeries
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.j
 import borg.trikeshed.miniduck.DocRowVec
+import java.util.LinkedList
 
 /**
  * In-memory collection handle for appending rows and producing immutable snapshots.
@@ -23,7 +24,7 @@ operator fun DocMetaSeries.get(key: Comparable<*>): DocRowVec = b(key)
 
 class CollectionHandle constructor() {
     var _state: HandleState = HandleState.OPEN
-    val rows: MutableList<DocRowVec> = mutableListOf()
+    val rows: LinkedList<DocRowVec> = LinkedList()
 
     val state: HandleState get() = _state
     val rowCount: Int get() = rows.size

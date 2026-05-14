@@ -1,5 +1,6 @@
 package borg.trikeshed.torrent
 
+import java.util.LinkedList
 /**
  * DHT wire protocol messages (BEP 5).
  *
@@ -78,7 +79,7 @@ object DhtProtocol {
             is ByteArray -> raw
             else -> return emptyList()
         }
-        val nodes = mutableListOf<KademliaDht.Node>()
+        val nodes = LinkedList<KademliaDht.Node>()
         var i = 0
         while (i + 26 <= bytes.size) {
             val id = bytes.copyOfRange(i, i + 20)
@@ -99,7 +100,7 @@ object DhtProtocol {
             is ByteArray -> raw
             else -> return emptyList()
         }
-        val peers = mutableListOf<KademliaDht.Node>()
+        val peers = LinkedList<KademliaDht.Node>()
         var i = 0
         while (i + 6 <= bytes.size) {
             val ip = "${bytes[i].toInt() and 0xFF}.${bytes[i+1].toInt() and 0xFF}.${bytes[i+2].toInt() and 0xFF}.${bytes[i+3].toInt() and 0xFF}"
@@ -123,14 +124,14 @@ object DhtProtocol {
             is Int -> "i${value}e".encodeToByteArray()
             is Long -> "i${value}e".encodeToByteArray()
             is List<*> -> {
-                val parts = mutableListOf<ByteArray>()
+                val parts = LinkedList<ByteArray>()
                 parts.add("l".encodeToByteArray())
                 for (item in value) { if (item != null) parts.add(bencode(item)) }
                 parts.add("e".encodeToByteArray())
                 parts.fold(ByteArray(0)) { a, b -> a + b }
             }
             is Map<*, *> -> {
-                val parts = mutableListOf<ByteArray>()
+                val parts = LinkedList<ByteArray>()
                 parts.add("d".encodeToByteArray())
                 val sorted = value.entries.sortedBy { it.key.toString() }
                 for ((k, v) in sorted) {
@@ -159,7 +160,7 @@ object DhtProtocol {
                 num to (end + 1)
             }
             'l' -> {
-                val list = mutableListOf<Any?>()
+                val list = LinkedList<Any?>()
                 var p = pos + 1
                 while (p < data.size && data[p].toInt().toChar() != 'e') {
                     val (item, next) = parseBencodeAt(data, p)
@@ -169,7 +170,7 @@ object DhtProtocol {
                 list to (p + 1)
             }
             'd' -> {
-                val map = mutableMapOf<CharSequence, Any?>()
+                val map = LinkedHashMap<CharSequence, Any?>()
                 var p = pos + 1
                 while (p < data.size && data[p].toInt().toChar() != 'e') {
                     val (keyObj, kp) = parseBencodeAt(data, p)

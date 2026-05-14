@@ -88,7 +88,7 @@ class TorrentMediaServer(
 
     // ── HTTP handling ─────────────────────────────────────────────
 
-    private val clientBuffers = mutableMapOf<Int, StringBuilder>()
+    private val clientBuffers = LinkedHashMap<Int, StringBuilder>()
 
     private suspend fun handleClientRead(fd: Int, ring: borg.trikeshed.userspace.nio.channels.spi.ChannelOperations.ChannelHandle) {
         // Simplified HTTP parsing — extract method, path, and Range header

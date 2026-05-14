@@ -1,6 +1,7 @@
 package borg.trikeshed.couch.pijul
 
 import borg.trikeshed.couch.htx.*
+import java.util.LinkedList
 
 /**
  * Encode patches as compact couch deltas for transmission over HTX.
@@ -40,7 +41,7 @@ object CouchDeltaCodec {
      * Returns a list of blocks batched at `batchSize` edits each.
      */
     fun encodePatch(patch: Patch, batchSize: Int = 64): List<HtxBlockData.Data> {
-        val blocks = mutableListOf<HtxBlockData.Data>()
+        val blocks = LinkedList<HtxBlockData.Data>()
 
         // Header block
         blocks.add(HtxBlockData.Data(buildPatchHeader(patch)))
@@ -68,7 +69,7 @@ object CouchDeltaCodec {
 
         // First block is header
         val header = decodePatchHeader(blocks.first().bytes)
-        val allEdits = mutableListOf<DeltaLineEdit>()
+        val allEdits = LinkedList<DeltaLineEdit>()
 
         for (block in blocks.drop(1)) {
             if (block.bytes.isEmpty()) continue
@@ -101,7 +102,7 @@ object CouchDeltaCodec {
     private fun decodeDeltaBatch(data: ByteArray): List<DeltaLineEdit> {
         val br = SimpleByteArrayInput(data)
         val n = br.readU32().toInt()
-        val edits = mutableListOf<DeltaLineEdit>()
+        val edits = LinkedList<DeltaLineEdit>()
         repeat(n) {
             val op = LineOperation.entries[br.readU8().toInt()]
             val start = br.readU32().toInt()
@@ -145,7 +146,7 @@ object CouchDeltaCodec {
         val hash = PatchHash(data.copyOfRange(hashStart, br.pos))
         val timestamp = br.readU64()
         val nDeps = br.readU32().toInt()
-        val deps = mutableSetOf<PatchHash>()
+        val deps = LinkedHashSet<PatchHash>()
         repeat(nDeps) {
             val dLen = br.readU8().toInt()
             val dStart = br.pos
@@ -196,7 +197,7 @@ object CouchDeltaCodec {
 // --- Minimal binary I/O helpers (no BigInteger, no external deps) ---
 
 private class SimpleByteArrayOutput {
-    private val parts = mutableListOf<ByteArray>()
+    private val parts = LinkedList<ByteArray>()
     private var size = 0
 
     fun write(b: ByteArray) { parts.add(b); size += b.size }

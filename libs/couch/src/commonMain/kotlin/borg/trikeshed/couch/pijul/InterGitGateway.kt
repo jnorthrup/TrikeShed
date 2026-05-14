@@ -2,6 +2,7 @@ package borg.trikeshed.couch.pijul
 
 import borg.trikeshed.couch.htx.*
 import borg.trikeshed.process.ProcessShell
+import java.util.LinkedList
 
 /**
  * InterGitGateway — bidirectional choreography between git and pijul repositories.
@@ -49,7 +50,7 @@ class InterGitGateway(
     private val gitDir: CharSequence,
     private val mode: GatewayMode,
 ) {
-    private val pendingConversions = mutableListOf<ConversionResult>()
+    private val pendingConversions = LinkedList<ConversionResult>()
     private val branchMapping: Map<CharSequence, CharSequence> = emptyMap()  // git branch → pijul channel
     private val channelMapping: Map<CharSequence, CharSequence> = emptyMap()  // pijul channel → git branch
 
@@ -104,7 +105,7 @@ class InterGitGateway(
 
     /** Sync: bidirectionally reconcile git and pijul. */
     fun sync(): List<ConversionResult> {
-        val results = mutableListOf<ConversionResult>()
+        val results = LinkedList<ConversionResult>()
         when (mode) {
             GatewayMode.PUSH_TO_GIT -> {
                 for ((chnName) in pijulRepo.channels) {
@@ -174,7 +175,7 @@ class InterGitGateway(
 
         val diffResult = shell.exec("git", listOf("-C", gitDir, "diff-tree", "--no-commit-id", "--name-only", "-r", gitCommit))
         val filePaths = diffResult.stdout.trim().split("\n").filter { it.isNotBlank() }
-        val fileContents = mutableMapOf<CharSequence, CharSequence>()
+        val fileContents = LinkedHashMap<CharSequence, CharSequence>()
         for (path in filePaths) {
             val contentResult = shell.exec("git", listOf("-C", gitDir, "show", "$gitCommit:$path"))
             if (contentResult.exitCode == 0) fileContents[path] = contentResult.stdout

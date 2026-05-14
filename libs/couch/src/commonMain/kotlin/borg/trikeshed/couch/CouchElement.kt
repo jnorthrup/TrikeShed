@@ -12,7 +12,7 @@ class CouchElement(
     companion object Key : AsyncContextKey<CouchElement>()
     override val key: AsyncContextKey<CouchElement> get() = Key
 
-    private val _collections = mutableMapOf<CharSequence, CollectionHandle>()
+    private val _collections = LinkedHashMap<CharSequence, CollectionHandle>()
 
     val collections: Map<CharSequence, CollectionHandle> get() = _collections
 

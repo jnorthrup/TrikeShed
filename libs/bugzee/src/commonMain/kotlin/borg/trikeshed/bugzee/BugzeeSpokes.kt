@@ -10,6 +10,7 @@ import borg.trikeshed.userspace.nio.spi.UringOp.Companion.UringSubmission
 import borg.trikeshed.userspace.nio.ByteBuffer
 import kotlin.math.min
 import kotlin.math.max
+import java.util.LinkedList
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // BugzeeSpokes.kt — Background processing build pipeline and repository
@@ -228,10 +229,10 @@ class JobQueue(
     )
 
     // Underlying storage — sorted by (priority desc, createdAt asc)
-    private val queued: MutableList<SpokeJob> = mutableListOf()
+    private val queued: LinkedList<SpokeJob> = LinkedList()
 
     // Jobs claimed by workers (jobId -> job)
-    private val claimed: MutableMap<CharSequence, SpokeJob> = mutableMapOf()
+    private val claimed: LinkedHashMap<CharSequence, SpokeJob> = linkedMapOf()
 
     // Backpressure flag
     private var _backpressureActive = false
@@ -357,7 +358,7 @@ class SpokeRepository(
     private val historyTtlMs: Long = 3_600_000L, // 1 hour default
 ) {
     // All known jobs indexed by jobId
-    private val records: MutableMap<CharSequence, SpokeJob> = mutableMapOf()
+    private val records: LinkedHashMap<CharSequence, SpokeJob> = linkedMapOf()
 
     /** Store or update a job record. */
     fun save(job: SpokeJob) {
@@ -522,8 +523,8 @@ data class PipelineCheckpoint(
 class BuildPipeline(
     val name: CharSequence = "default",
 ) {
-    private val stages: MutableList<PipelineStage> = mutableListOf()
-    private val checkpoints: MutableList<PipelineCheckpoint> = mutableListOf()
+    private val stages: LinkedList<PipelineStage> = LinkedList()
+    private val checkpoints: LinkedList<PipelineCheckpoint> = LinkedList()
 
     /** Register a stage. */
     fun addStage(stage: PipelineStage) {
@@ -542,7 +543,7 @@ class BuildPipeline(
      * on success, or the failing stage ID on failure.
      */
     fun execute(job: SpokeJob): PipelineExecutionResult {
-        val completedOrder = mutableListOf<Int>()
+        val completedOrder = LinkedList<Int>()
         val success = mapOf<Int, PipelineStage>()
 
         for ((idx, stage) in stages.withIndex()) {
@@ -766,11 +767,11 @@ class ArtifactStore(
 ) {
 
     // In-memory index: hash -> ArtifactEntry
-    private val index: MutableMap<CharSequence, ArtifactEntry> = mutableMapOf()
+    private val index: LinkedHashMap<CharSequence, ArtifactEntry> = linkedMapOf()
 
     // In-memory blob cache: hash hex -> ByteArray
     // In production, this would be backed by uring file I/O.
-    private val blobCache: MutableMap<CharSequence, ByteArray> = mutableMapOf()
+    private val blobCache: LinkedHashMap<CharSequence, ByteArray> = linkedMapOf()
 
     private var blobCounter: Long = 0L
 
@@ -1373,10 +1374,10 @@ class SpokeService(
 ) {
 
     // Registered workers
-    private val workers: MutableList<SpokeWorker> = mutableListOf()
+    private val workers: LinkedList<SpokeWorker> = LinkedList()
 
     // Completed jobs ready for draining
-    private val completedJobs: MutableList<SpokeResult> = mutableListOf()
+    private val completedJobs: LinkedList<SpokeResult> = LinkedList()
 
     // Job counter for ID generation
     private var jobIdCounter: Long = 0L

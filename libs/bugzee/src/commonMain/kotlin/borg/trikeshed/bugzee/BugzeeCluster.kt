@@ -8,6 +8,7 @@ import borg.trikeshed.userspace.nio.spi.FileImpl
 import borg.trikeshed.userspace.nio.spi.FunctionalUringFacade
 import borg.trikeshed.userspace.nio.spi.UringOp.Companion.UringSubmission
 import borg.trikeshed.userspace.nio.ByteBuffer
+import java.util.LinkedList
 
 // - Bugzee Cluster: Hazelcast-inspired partitioned bug-tracking mesh -----------
 
@@ -197,10 +198,10 @@ class GossipProtocol(
     private val localNodeId: CharSequence,
 ) {
     /** Known node metadata, keyed by nodeId. */
-    val membershipMap: MutableMap<CharSequence, NodeMetadata> = mutableMapOf()
+    val membershipMap: LinkedHashMap<CharSequence, NodeMetadata> = LinkedHashMap()
 
     /** Recent failure-detection suspects. */
-    private val suspectTimers: MutableMap<CharSequence, Long> = mutableMapOf()
+    private val suspectTimers: LinkedHashMap<CharSequence, Long> = LinkedHashMap()
 
     private val suspectTimeoutMs: Long = 15000
     private val removedTimeoutMs: Long = 60000
@@ -225,7 +226,7 @@ class GossipProtocol(
      * Returns list of nodes whose state changed (delta).
      */
     fun receiveGossip(payload: List<NodeMetadata>): List<NodeMetadata> {
-        val deltas = mutableListOf<NodeMetadata>()
+        val deltas = LinkedList<NodeMetadata>()
         for (remote in payload) {
             val before = membershipMap[remote.nodeId]
             val merged = update(remote)
@@ -247,7 +248,7 @@ class GossipProtocol(
 
     /** Mark a node as removed after extended silence. */
     fun removeSilent(now: Long = System.currentTimeMillis()): List<CharSequence> {
-        val removed = mutableListOf<CharSequence>()
+        val removed = LinkedList<CharSequence>()
         for ((nid, ts) in suspectTimers.toList()) {
             if (now - ts > removedTimeoutMs) {
                 val meta = membershipMap[nid]
@@ -383,7 +384,7 @@ class BugzeeClusterRegistry(
 ) {
     val partition: Partition = Partition(config.partitionCount)
     val gossip: GossipProtocol = GossipProtocol(config.localNodeId)
-    val nodeBindings: MutableMap<CharSequence, BugzeeTransportBinding> = mutableMapOf()
+    val nodeBindings: LinkedHashMap<CharSequence, BugzeeTransportBinding> = LinkedHashMap()
     var selfNode: BugzeeClusterNode = BugzeeClusterNode(
         nodeId = config.localNodeId,
         transport = config.nodes.find { it.nodeId == config.localNodeId }?.transport
@@ -498,199 +499,3 @@ class BugzeeClusterService(
 
         // Seed membership from config
         for (node in config.nodes) {
-            if (node.nodeId != config.localNodeId) {
-                registry.gossip.update(NodeMetadata.forNode(node))
-
-                // Create transport binding if possible
-                if (facade != null && socketProvider != null) {
-                    val socket = socketProvider(node)
-                    val binding = BugzeeTransportBinding(
-                        createBugzeeBinding(node.transport, facade, socket),
-                    )
-                    registry.registerBinding(node.nodeId, binding)
-                }
-            }
-        }
-
-        return snapshot()
-    }
-
-    /**
-     * Leave the cluster: transition to LEAVING state, update gossip metadata.
-     * The node will eventually transition to REMOVED by peers' anti-entropy.
-     */
-    fun leave(): BugzeeClusterSnapshot {
-        val current = registry.gossip.membershipMap[config.localNodeId]
-        if (current != null) {
-            val updated = current.copy(
-                state = BugzeeClusterState.LEAVING,
-                version = current.version + 1,
-                lastSeen = System.currentTimeMillis(),
-            )
-            registry.gossip.update(updated)
-        }
-        registry.selfNode = registry.selfNode.copy(state = BugzeeClusterState.LEAVING)
-        return snapshot()
-    }
-
-    /**
-     * Full cluster removal: transition self to REMOVED.
-     */
-    fun remove(): BugzeeClusterSnapshot {
-        val current = registry.gossip.membershipMap[config.localNodeId]
-        if (current != null) {
-            registry.gossip.update(
-                current.copy(
-                    state = BugzeeClusterState.REMOVED,
-                    version = current.version + 1,
-                ),
-            )
-        }
-        registry.selfNode = registry.selfNode.copy(state = BugzeeClusterState.REMOVED)
-        return snapshot()
-    }
-
-    // - Discovery ---------------------------------------------------------------
-
-    /**
-     * Discover all known cluster members and their current state.
-     * Returns a snapshot for each node.
-     */
-    fun discover(): List<NodeMetadata> =
-        registry.gossip.membershipMap.values.toList()
-
-    /**
-     * Get a specific node by ID from the membership map.
-     */
-    fun discover(nodeId: CharSequence): NodeMetadata? =
-        registry.gossip.membershipMap[nodeId]
-
-    // - Broadcast ---------------------------------------------------------------
-
-    /**
-     * Broadcast a payload to all active nodes via their transport bindings.
-     * Returns the list of userData tokens for enqueued sends.
-     *
-     * If a node has no binding, it is skipped (disconnected).
-     */
-    fun broadcast(payload: ByteArray): Map<CharSequence, Long> {
-        val tokens = mutableMapOf<CharSequence, Long>()
-        for ((nodeId, binding) in registry.nodeBindings) {
-            val meta = registry.gossip.membershipMap[nodeId]
-            if (meta?.state == BugzeeClusterState.ACTIVE) {
-                val token = binding.enqueueGossip(payload)
-                tokens[nodeId] = token
-            }
-        }
-        // Submit all queued uring ops
-        val binding = registry.nodeBindings.values.firstOrNull()
-        binding?.facade?.submit()
-        return tokens
-    }
-
-    /**
-     * Broadcast a heartbeat signal (empty payload) to all peers.
-     */
-    fun heartbeat(): Map<CharSequence, Long> =
-        broadcast(byteArrayOf())
-
-    // - Partition lookup --------------------------------------------------------
-
-    /**
-     * Determine the node responsible for a given bugId via rendezvous hashing.
-     * Returns null if no active nodes are available.
-     */
-    fun getNodeForBugId(bugId: CharSequence): BugzeeClusterNode? =
-        registry.getNodeForBugId(bugId)
-
-    /**
-     * Get all partition IDs owned by a specific node.
-     * Used for debugging and visualisations.
-     */
-    fun getPartitionsForNode(nodeId: CharSequence): List<Int> =
-        (0 until config.partitionCount)
-            .filter { i ->
-                val assigned = registry.partition.getNodeForBugId(
-                    "partition-$i",
-                    registry.activeNodes(),
-                )
-                assigned?.nodeId == nodeId
-            }
-
-    // - State management --------------------------------------------------------
-
-    /** Set a node's state (for gossip propagation). */
-    fun setNodeState(nodeId: CharSequence, state: BugzeeClusterState) {
-        val meta = registry.gossip.membershipMap[nodeId]
-        if (meta != null) {
-            registry.gossip.update(
-                meta.copy(state = state, version = meta.version + 1, lastSeen = System.currentTimeMillis()),
-            )
-        }
-    }
-
-    /**
-     * Run anti-entropy: merge received gossip and expire silent suspects.
-     */
-    fun antiEntropy(received: List<NodeMetadata>): List<NodeMetadata> {
-        val deltas = registry.gossip.receiveGossip(received)
-        val removed = registry.gossip.removeSilent()
-        return deltas + removed.map { rid ->
-            registry.gossip.membershipMap[rid] ?: NodeMetadata(
-                nodeId = rid,
-                state = BugzeeClusterState.REMOVED,
-                address = "",
-                port = 0,
-                transport = Transport.HTX,
-                version = 0L,
-                lastSeen = System.currentTimeMillis(),
-            )
-        }
-    }
-
-    // - Snapshot ----------------------------------------------------------------
-
-    /** Capture a point-in-time snapshot of cluster state. */
-    fun snapshot(): BugzeeClusterSnapshot =
-        BugzeeClusterSnapshot(
-            clusterName = clusterName,
-            localNodeId = localNodeId,
-            membershipSize = registry.gossip.membershipSize,
-            activeNodeCount = registry.gossip.activeNodes().size,
-            partitionCount = config.partitionCount,
-            localState = registry.selfNode.state,
-            metadata = registry.gossip.membershipMap.values.toList(),
-        )
-}
-
-// - Couch grounding: cluster snapshot - DocRowVec-----------------------------------
-
-fun BugzeeClusterRegistry.toRowVec(): DocRowVec {
-    val self = selfNode
-    val meta = listOf(
-        "localNodeId",
-        "state",
-        "transport",
-        "address",
-        "port",
-        "membershipSize",
-        "activeNodes",
-        "partitionCount",
-        "boundRemotes",
-    )
-    val cells = listOf(
-        config.localNodeId,
-        self.state.name,
-        self.transport.scheme,
-        self.address,
-        self.port,
-        gossip.membershipSize,
-        gossip.activeNodes().size,
-        config.partitionCount,
-        nodeBindings.size,
-    )
-    return DocRowVec(
-        keys = meta,
-        cells = cells,
-    )
-}

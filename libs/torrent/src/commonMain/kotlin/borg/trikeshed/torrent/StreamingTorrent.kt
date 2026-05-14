@@ -45,7 +45,7 @@ class StreamingTorrent(
 
     private val piecePriority = Mutex()
     private val pendingReads = Mutex()
-    private val readWaiters = mutableMapOf<Long, CompletableDeferred<ByteArray>>()  // pieceIndex → waiter
+    private val readWaiters = LinkedHashMap<Long, CompletableDeferred<ByteArray>>()  // pieceIndex → waiter
 
     override suspend fun open() {
         if (state.isAtLeast(ElementState.OPEN)) return

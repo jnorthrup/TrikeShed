@@ -2,18 +2,18 @@ package borg.trikeshed.ipfs
 
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
-import kotlin.collections.mutableSetOf
+import kotlin.collections.LinkedHashSet
 
 /**
  * Minimal in-process DHT service for prototype/testing.
  * Provides a simple provider registry keyed by CID bytes hex.
  */
 class DhtService(private val transport: DhtTransport? = null) {
-    private val providers: MutableMap<CharSequence, MutableSet<CharSequence>> = mutableMapOf()
+    private val providers: LinkedHashMap<CharSequence, LinkedHashSet<CharSequence>> = LinkedHashMap()
 
     fun announceProvider(cid: CID, address: CharSequence) {
         val key = hex(cid.bytes)
-        providers.getOrPut(key) { mutableSetOf() }.add(address)
+        providers.getOrPut(key) { LinkedHashSet() }.add(address)
 
         transport?.let { t ->
             try {

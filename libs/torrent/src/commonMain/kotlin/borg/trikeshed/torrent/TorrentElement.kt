@@ -3,6 +3,7 @@ package borg.trikeshed.torrent
 import borg.trikeshed.context.AsyncContextElement
 import borg.trikeshed.context.AsyncContextKey
 import borg.trikeshed.context.ElementState
+import java.util.LinkedList
 
 /**
  * Torrent swarm supervisor (Pattern A CCEK).
@@ -28,7 +29,7 @@ class TorrentElement(
         )
     }
 
-    private val peers = mutableListOf<TorrentPeer>()
+    private val peers = LinkedList<TorrentPeer>()
 
     override suspend fun open() {
         if (state.isAtLeast(ElementState.OPEN)) return

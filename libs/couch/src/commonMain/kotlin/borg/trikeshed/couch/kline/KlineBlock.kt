@@ -1,5 +1,6 @@
 package borg.trikeshed.couch.kline
 
+import java.util.LinkedList
     import borg.trikeshed.cursor.Cursor
     import borg.trikeshed.miniduck.toRowVec
     import borg.trikeshed.lib.get
@@ -16,7 +17,7 @@ package borg.trikeshed.couch.kline
  * Seal() is the irreversible sync boundary — readers only see sealed blocks.
  *
  * Donor patterns:
- *   - TradePairEventMuxer: accumulates CandlestickEvents in ArrayList,
+ *   - TradePairEventMuxer: accumulates CandlestickEvents in LinkedList,
  *     then flushes to ISAM on episode cutoff
  *   - BlockRowVec: the MUTABLE→SEALED state machine already established
  *     in TrikeShed miniduck
@@ -27,7 +28,7 @@ package borg.trikeshed.couch.kline
  * carried per-row as in the donor).
  */
 class KlineBlock constructor(
-    val rows: MutableList<Kline>,
+    val rows: LinkedList<Kline>,
     var _state: State,
     val timespan: TimeSpan?,
 ) {
@@ -40,7 +41,7 @@ class KlineBlock constructor(
     companion object {
         /** Create a new mutable block. Optionally enforce a single timespan. */
         fun mutable(timespan: TimeSpan? = null): KlineBlock =
-            KlineBlock(mutableListOf(), State.MUTABLE, timespan)
+            KlineBlock(LinkedList(), State.MUTABLE, timespan)
     }
 
     /**

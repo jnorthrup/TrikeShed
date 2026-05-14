@@ -7,6 +7,9 @@ import borg.trikeshed.lib.j
 import borg.trikeshed.miniduck.BlockRowVec
 import borg.trikeshed.miniduck.DocRowVec
 import borg.trikeshed.userspace.nio.file.spi.FileOperations
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.test.runTest
+import kotlin.coroutines.CoroutineContext
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -15,9 +18,8 @@ import kotlin.test.assertTrue
 
 class NioBlockWalTest {
     @Test
-    fun appendPutKeepsPriorEntriesAndReplayRestoresBlocks() {
-        val fs = TestFileOperations()
-        val wal = NioBlockWal("/wal-root", fs)
+    fun appendPutKeepsPriorEntriesAndReplayRestoresBlocks() = runTest(context = setupContext()) {
+        val wal = NioBlockWal("/wal-root")
 
         wal.appendPut("docs", "blk-0", blockOf("alice"))
         wal.appendPut("docs", "blk-1", blockOf("bob"))
@@ -32,14 +34,14 @@ class NioBlockWalTest {
         val row = surviving.child!![0] as DocRowVec
         assertEquals("bob", row.cells[0])
 
+        val fs = currentCoroutineContext()[FileOperations.Key]!!
         val walLines = fs.readString("/wal-root/wal.ndjson").lines()
         assertEquals(3, walLines.count { it.startsWith("{\"seq\":") })
     }
 
     @Test
-    fun compactPreservesMultilineBlockPayloads() {
-        val fs = TestFileOperations()
-        val wal = NioBlockWal("/wal-root", fs)
+    fun compactPreservesMultilineBlockPayloads() = runTest(context = setupContext()) {
+        val wal = NioBlockWal("/wal-root")
 
         wal.appendPut("docs", "blk-0", blockOf("alice"))
         wal.appendPut("docs", "blk-1", blockOf("bob"))
@@ -53,7 +55,14 @@ class NioBlockWalTest {
         assertEquals(1, surviving.rowCount)
         val row = surviving.child!![0] as DocRowVec
         assertEquals("bob", row.cells[0])
+
+        val fs = currentCoroutineContext()[FileOperations.Key]!!
         assertTrue(fs.readString("/wal-root/wal.ndjson").contains("\"id\":\"blk-1\""))
+    }
+
+    private fun setupContext(): CoroutineContext {
+        val fs = TestFileOperations()
+        return fs
     }
 
     private fun blockOf(name: CharSequence): BlockRowVec {
@@ -65,6 +74,8 @@ class NioBlockWalTest {
     private class TestFileOperations : FileOperations {
         private val files = linkedMapOf<CharSequence, CharSequence>()
         private val directories = linkedSetOf<CharSequence>()
+
+        override val key get() = FileOperations.Key
 
         override fun readAllLines(filename: CharSequence): List<CharSequence> = readString(filename).lines()
 

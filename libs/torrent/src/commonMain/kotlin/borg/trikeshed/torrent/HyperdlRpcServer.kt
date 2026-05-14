@@ -8,6 +8,7 @@ import borg.trikeshed.userspace.reactor.Interest
 import borg.trikeshed.userspace.nio.channels.spi.ChannelOperations
 import borg.trikeshed.userspace.nio.channels.spi.ReactorOperations
 import kotlinx.coroutines.*
+import kotlinx.coroutines.currentCoroutineContext
 
 /**
  * JSON-RPC server over HTTP (wire-compatible with aria2 RPC protocol).
@@ -50,7 +51,7 @@ class HyperdlRpcServer(
     }
 
     /** Per-client request accumulators. */
-    private val clientBuffers = mutableMapOf<Int, StringBuilder>()
+    private val clientBuffers = LinkedHashMap<Int, StringBuilder>()
 
     /**
      * Start RPC server loop. Uses [channels] for socket+ring I/O and
@@ -62,9 +63,10 @@ class HyperdlRpcServer(
     suspend fun serve(
         port: Int = 6800,
         channels: ChannelOperations,
-        reactor: ReactorOperations,
     ) = withContext(supervisor) {
         requireState(ElementState.ACTIVE)
+        val reactor = currentCoroutineContext()[ReactorOperations.Key]
+            ?: error("ReactorOperations not found in coroutine context")
 
         val serverFd = channels.socket(2, 1, 0) // AF_INET=2, SOCK_STREAM=1
         check(serverFd >= 0) { "socket() failed" }
@@ -87,7 +89,7 @@ class HyperdlRpcServer(
                         reactor.register(clientFd, setOf(Interest.READ), READ_KEY_BASE + clientFd.toLong())
                     }
                 } else if (signal.interests.contains(Interest.READ)) {
-                    handleClientData(fd, ring, reactor, channels)
+                    handleClientData(fd, ring, channels)
                 }
             }
         }
@@ -99,8 +101,10 @@ class HyperdlRpcServer(
      * Read HTTP data from client fd, parse request, respond.
      */
     private suspend fun handleClientData(
-        clientFd: Int, ring: ChannelOperations.ChannelHandle, reactor: ReactorOperations, channels: ChannelOperations,
+        clientFd: Int, ring: ChannelOperations.ChannelHandle, channels: ChannelOperations,
     ) {
+        val reactor = currentCoroutineContext()[ReactorOperations.Key]
+            ?: error("ReactorOperations not found in coroutine context")
         val buf = clientBuffers.getOrPut(clientFd) { StringBuilder() }
         val rb = ByteBuffer.allocate(8192)
         ring.readv(clientFd, rb, 0L)
@@ -283,7 +287,7 @@ class HyperdlRpcServer(
     // ── JSON helpers ──────────────────────────────────────────────
 
     private fun taskToJson(task: HyperdlElement.DownloadTask, keys: List<CharSequence> = emptyList()): Map<CharSequence, Any?> {
-        val map = mutableMapOf<CharSequence, Any?>(
+        val map = LinkedHashMap<CharSequence, Any?>(
             "gid" to task.gid,
             "status" to task.status,
             "totalLength" to task.totalLength.toString(),
@@ -300,7 +304,7 @@ class HyperdlRpcServer(
             // Minimal JSON parser — just enough for RPC params
             val trimmed = json.trim()
             if (!trimmed.startsWith("{")) return null
-            val result = mutableMapOf<CharSequence, Any?>()
+            val result = LinkedHashMap<CharSequence, Any?>()
             var pos = 1
             while (pos < trimmed.length && trimmed[pos] != '}') {
                 pos = skipWhitespace(trimmed, pos)

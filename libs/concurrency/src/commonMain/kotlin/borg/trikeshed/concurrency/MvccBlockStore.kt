@@ -14,11 +14,11 @@ class MvccBlockStore {
 
     data class BlockEntry(var putSeq: Long, val block: Any?, var removed: Boolean = false, var removeSeq: Long? = null)
 
-    private val store: MutableMap<CharSequence, MutableList<BlockEntry>> = mutableMapOf()
+    private val store: LinkedHashMap<CharSequence, LinkedList<BlockEntry>> = linkedMapOf()
 
     // simple WAL stub
     data class WalEntry(val seq: Long)
-    class Wal { val entries: MutableList<WalEntry> = mutableListOf() }
+    class Wal { val entries: LinkedList<WalEntry> = LinkedList() }
     val wal: Wal = Wal()
 
     // exposed block meta for tests (removeSeq is normalized to a non-nullable long for tests)
@@ -59,7 +59,7 @@ class MvccBlockStore {
         // remove entries that are removed and have removeSeq < upToSeq
         for ((k, list) in store) {
             val retained = list.filter { !it.removed || (it.removeSeq != null && it.removeSeq!! >= upToSeq) || it.putSeq >= upToSeq }
-            store[k] = retained.toMutableList()
+            store[k] = retained.toCollection(LinkedList())
         }
         // compact WAL as well
         wal.entries.removeAll { it.seq < upToSeq }
@@ -95,7 +95,7 @@ class MvccBlockStore {
     // Scan visible blocks at snapshot and produce a Cursor of RowVec rows used by tests.
     fun scanAt(snap: Snapshot, key: CharSequence): borg.trikeshed.cursor.Cursor {
         val list = store[key] ?: return borg.trikeshed.lib.Join.emptySeriesOf()
-        val rowVecs: MutableList<borg.trikeshed.cursor.RowVec> = mutableListOf()
+        val rowVecs: LinkedList<borg.trikeshed.cursor.RowVec> = LinkedList()
         for (entry in list) {
             if (entry.putSeq > snap.seq) continue
             if (entry.removed && (entry.removeSeq ?: Long.MAX_VALUE) <= snap.seq) continue

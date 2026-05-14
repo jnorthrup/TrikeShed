@@ -26,6 +26,7 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
+import java.util.LinkedList
 
 /** A spawnable unit of work — ephemeral, single-use. */
 data class SpawnSpec(
@@ -79,8 +80,8 @@ class EphemeralSpawner(
         SupervisorJob() + CoroutineName("EphemeralSpawner-${localMember.id}") + Dispatchers.Default
     )
     private val spawnSemaphore = Semaphore(32)
-    private val pendingSpawns = mutableMapOf<CharSequence, Deferred<WorkerStatus>>()
-    private val activeWorkers = mutableMapOf<CharSequence, Job>()
+    private val pendingSpawns = LinkedHashMap<CharSequence, Deferred<WorkerStatus>>()
+    private val activeWorkers = LinkedHashMap<CharSequence, Job>()
     private val workQueue = Channel<SpawnSpec>(capacity = Channel.UNLIMITED)
 
     /**
@@ -174,8 +175,8 @@ class EphemeralSpawner(
      * triggers the next, with results flowing through the blackboard.
      */
     suspend fun executeWorkflow(workflow: CascadingWorkflow): Map<CharSequence, WorkerStatus> {
-        val results = mutableMapOf<CharSequence, WorkerStatus>()
-        val completedStages = mutableSetOf<CharSequence>()
+        val results = LinkedHashMap<CharSequence, WorkerStatus>()
+        val completedStages = LinkedHashSet<CharSequence>()
 
         // Build dependency graph
         val stageMap = workflow.stages.associateBy { it.stageId }
@@ -318,7 +319,7 @@ class GossipMicroserviceFacade(
         shardSize: Int = 4,
     ): Map<CharSequence, WorkerStatus> {
         val chunks = workItems.chunked(maxOf(1, workItems.size / shardSize))
-        val results = mutableMapOf<CharSequence, WorkerStatus>()
+        val results = LinkedHashMap<CharSequence, WorkerStatus>()
 
         val shardJobs = chunks.mapIndexed { index, chunk ->
             scope.async {
@@ -337,7 +338,7 @@ class GossipMicroserviceFacade(
      */
     suspend fun consult(query: String, targetRing: ConcentricRing = ConcentricRing.Local): List<String> {
         val peers = gossipEngine.membersInRing(targetRing)
-        val responses = mutableListOf<String>()
+        val responses = LinkedList<String>()
 
         for (peer in peers) {
             // Send consult request via gossip

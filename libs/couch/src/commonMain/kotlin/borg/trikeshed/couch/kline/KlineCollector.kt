@@ -1,11 +1,12 @@
 package borg.trikeshed.couch.kline
 
 import borg.trikeshed.userspace.concurrency.Channel
+import java.util.LinkedList
 
 /**
  * KlineCollector: drains a Channel<Kline> into sealed KlineBlocks of fixed capacity.
  *
- * Donor pattern: TradePairEventMuxer accumulates CandlestickEvents in an ArrayList
+ * Donor pattern: TradePairEventMuxer accumulates CandlestickEvents in an LinkedList
  * and flushes to ISAM when episodeCutoff is reached. Here we seal blocks at a
  * configurable capacity and hand them off via callback — no ISAM dependency.
  *

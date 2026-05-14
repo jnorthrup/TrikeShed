@@ -2,6 +2,7 @@ package borg.trikeshed.couch.pijul
 
 import borg.trikeshed.process.ProcessShell
 import borg.trikeshed.couch.htx.*
+import java.util.LinkedList
 
 /**
  * PijulIpfsStore — store and retrieve patches via IPFS.
@@ -63,7 +64,7 @@ class PijulIpfsStore(
         val data = result.stdout
         if (isCompositeCid(cid)) {
             val chunkCids = parseCompositeCid(cid)
-            val chunks = mutableListOf<ByteArray>()
+            val chunks = LinkedList<ByteArray>()
             for (chunkCid in chunkCids) {
                 val catResult = shell.exec("ipfs", listOf("cat", chunkCid))
                 if (catResult.exitCode != 0) return IpfsResult.Error("Failed to retrieve chunk $chunkCid")

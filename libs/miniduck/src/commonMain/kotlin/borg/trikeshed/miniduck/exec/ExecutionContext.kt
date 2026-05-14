@@ -1,8 +1,9 @@
 package borg.trikeshed.miniduck.exec
 
-/** Stub for compile */
+import borg.trikeshed.miniduck.schema.SchemaManager
+
+/** Execution context for SQL query execution. */
 class ExecutionContext(
-    val schemaManager: Any? = null,
-    val config: Any? = null,
-    val tableSource: Any? = null,
+    val schemaManager: SchemaManager? = null,
+    val tableSource: TableSource? = null,
 )

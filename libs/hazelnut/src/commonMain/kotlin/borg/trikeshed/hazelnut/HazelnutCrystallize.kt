@@ -1,6 +1,7 @@
 package borg.trikeshed.hazelnut
 
 import borg.trikeshed.lib.*
+import java.util.LinkedList
 
 // ── Split-brain resolution: git-gated CRDT + pijul patch logic ─────────────
 
@@ -74,8 +75,8 @@ enum class ChangeType {
  */
 class GitGatedCrystore(
     val localNodeId: CharSequence,
-    private val patches: MutableList<ChangePatch> = mutableListOf(),
-    private val heads: MutableSet<CharSequence> = mutableSetOf(),
+    private val patches: LinkedList<ChangePatch> = LinkedList(),
+    private val heads: LinkedHashSet<CharSequence> = LinkedHashSet(),
     var patchCounter: Long = 0,
 ) {
     /** Record a new change with auto-incremented vector clock. */
@@ -118,7 +119,7 @@ class GitGatedCrystore(
 
     /** Merge remote patches: resolve concurrent patches via strategy. */
     fun mergeRemote(remote: List<ChangePatch>, strategy: CrdtStrategy): List<CharSequence> {
-        val merged = mutableListOf<CharSequence>()
+        val merged = LinkedList<CharSequence>()
         for (remotePatch in remote) {
             // Incorporate remote clock
             val existing = patches.find { it.patchId == remotePatch.patchId }
@@ -325,7 +326,7 @@ data class NarsNodeProfile(
  * for conflict resolution and object ownership.
  */
 class NarsAdaptiveCluster(
-    val profiles: MutableMap<CharSequence, NarsNodeProfile> = mutableMapOf(),
+    val profiles: LinkedHashMap<CharSequence, NarsNodeProfile> = LinkedHashMap(),
 ) {
     fun upsert(nodeId: CharSequence, transport: Transport): NarsNodeProfile {
         val existing = profiles[nodeId]
@@ -418,8 +419,8 @@ data class ProductionGraphNode(
  * Cluster topology graph — tracks node connections and partition assignments.
  */
 class HazelTopology(
-    val nodes: MutableMap<CharSequence, ProductionGraphNode> = mutableMapOf(),
-    val edges: MutableList<GraphEdge> = mutableListOf(),
+    val nodes: LinkedHashMap<CharSequence, ProductionGraphNode> = LinkedHashMap(),
+    val edges: LinkedList<GraphEdge> = LinkedList(),
 ) {
     fun addNode(node: ProductionGraphNode) {
         nodes[node.nodeId] = node
@@ -462,7 +463,7 @@ data class TimeseriesSample(
 )
 
 class ConflictAnalytics(
-    val samples: MutableList<TimeseriesSample> = mutableListOf(),
+    val samples: LinkedList<TimeseriesSample> = LinkedList(),
     val windowMinutes: Int = 60,
 ) {
     fun record(nodeId: CharSequence, metric: CharSequence, value: Double, vararg labels: Pair<CharSequence, CharSequence>) {

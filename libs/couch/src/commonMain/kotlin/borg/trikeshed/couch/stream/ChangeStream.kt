@@ -29,7 +29,7 @@ sealed class Change<out T> {
  * Very small synchronous emitter for test use.
  */
 class ChangeEmitter<T> {
-   val listeners: MutableMap<Int, (Change<T>) -> Unit> = linkedMapOf()
+   val listeners: LinkedHashMap<Int, (Change<T>) -> Unit> = linkedMapOf()
    var nextToken = 0
    var sealed: Boolean = false
 

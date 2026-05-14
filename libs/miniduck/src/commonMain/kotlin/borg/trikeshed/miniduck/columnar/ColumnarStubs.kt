@@ -9,6 +9,7 @@ import borg.trikeshed.lib.size
 import borg.trikeshed.miniduck.DocRowVec
 import borg.trikeshed.miniduck.toRowVec
 import borg.trikeshed.test.TODOError
+import java.util.LinkedList
 
 /**
  * Columnar type stubs — RED test scaffolding for unimplemented columnar features.
@@ -42,7 +43,7 @@ object SpanMatcher {
     fun find(cursorA: Cursor, cursorB: Cursor): Cursor {
         if (cursorA.size == 0 || cursorB.size == 0) return 0 j { _: Int -> throw IndexOutOfBoundsException("empty") }
 
-        val spans = mutableListOf<RowVec>()
+        val spans = LinkedList<RowVec>()
         var ia = 0
         var ib = 0
 
@@ -113,7 +114,7 @@ object SpanMatcher {
         // Phase 2: pair remaining gap-free regions from both cursors
         if (ia < cursorA.size && ib < cursorB.size) {
             // collect remaining gap-free regions from A
-            val aRegions = mutableListOf<IntRange>()
+            val aRegions = LinkedList<IntRange>()
             var start = ia
             for (i in ia until cursorA.size - 1) {
                 val delta = openTime(cursorA, i + 1) - openTime(cursorA, i)
@@ -125,7 +126,7 @@ object SpanMatcher {
             aRegions.add(start until cursorA.size)
 
             // collect remaining gap-free regions from B
-            val bRegions = mutableListOf<IntRange>()
+            val bRegions = LinkedList<IntRange>()
             start = ib
             for (i in ib until cursorB.size - 1) {
                 val delta = openTime(cursorB, i + 1) - openTime(cursorB, i)

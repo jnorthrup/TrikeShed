@@ -1,5 +1,6 @@
 package borg.trikeshed.torrent
 
+import java.util.LinkedList
 /**
  * PriorityQueue — weighted priority heap for dynamic block scheduling.
  *
@@ -14,8 +15,8 @@ package borg.trikeshed.torrent
  */
 class PriorityQueue {
 
-    private val heap = mutableListOf<PriorityBlock>()
-    private val pendingKeys = mutableSetOf<ByteArray>()
+    private val heap = LinkedList<PriorityBlock>()
+    private val pendingKeys = LinkedHashSet<ByteArray>()
 
     val size: Int get() = heap.size
     val isEmpty: Boolean get() = heap.isEmpty()

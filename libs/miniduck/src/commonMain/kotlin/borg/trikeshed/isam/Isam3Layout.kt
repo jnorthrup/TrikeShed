@@ -13,6 +13,7 @@ import borg.trikeshed.lib.toSeries
 import borg.trikeshed.lib.view
 import borg.trikeshed.lib.size
 import borg.trikeshed.parse.yaml.parse as parseYaml
+import java.util.LinkedList
 
 private val ISAM3_RESERVED_TOP_LEVEL = setOf("isam", "views", "defaults")
 private val ISAM3_RESERVED_GROUP_KEYS = setOf("flags", "coords")
@@ -74,7 +75,7 @@ class Isam3Layout(
 
     fun allPlacements(): Series<Isam3Placement> {
         val seen = linkedSetOf<CharSequence>()
-        val out = mutableListOf<Isam3Placement>()
+        val out = LinkedList<Isam3Placement>()
         partitions.view.forEach { partition ->
             partition.files.view.forEach { file ->
                 file.groups.view.forEach { group ->
@@ -197,16 +198,16 @@ class Isam3Layout(
             constraints: Series<RecordMeta>,
             viewColumns: Series<CharSequence> = constraints.size j { index: Int -> constraints[index].name },
         ): Isam3Layout {
-            val groupsByCluster = linkedMapOf<CharSequence, MutableList<RecordMeta>>()
+            val groupsByCluster = linkedMapOf<CharSequence, LinkedList<RecordMeta>>()
             constraints.view.forEach { meta ->
                 val cluster = clusterName(meta)
-                groupsByCluster.getOrPut(cluster) { mutableListOf() }.add(meta)
+                groupsByCluster.getOrPut(cluster) { LinkedList() }.add(meta)
             }
 
             val files = groupsByCluster.entries.map { (clusterName, metas) ->
-                val groupByType = linkedMapOf<IOMemento, MutableList<RecordMeta>>()
+                val groupByType = linkedMapOf<IOMemento, LinkedList<RecordMeta>>()
                 metas.forEach { meta ->
-                    groupByType.getOrPut(meta.type) { mutableListOf() }.add(meta)
+                    groupByType.getOrPut(meta.type) { LinkedList() }.add(meta)
                 }
 
                 var offset = 0
@@ -249,7 +250,7 @@ class Isam3Layout(
                 .toSeries()
 
             val resolvedViews = if (viewSeries.size > 0) viewSeries else 1 j { _: Int ->
-                val columns = mutableListOf<CharSequence>()
+                val columns = LinkedList<CharSequence>()
                 val seen = linkedSetOf<CharSequence>()
                 for (partition in partitions.view) {
                     for (file in partition.files.view) {
@@ -290,7 +291,7 @@ class Isam3Layout(
             val map = raw.asMap("file $name")
             val flags = parseFlags(map["flags"] ?: map["coords"], "file $name flags")
             var fileOffset = 0
-            val groups = mutableListOf<Isam3Group>()
+            val groups = LinkedList<Isam3Group>()
             for ((groupKey, groupRaw) in map.entries) {
                 if (groupKey in ISAM3_RESERVED_GROUP_KEYS) continue
                 val parsed = parseGroup(groupKey, groupRaw, "file $name", fileOffset)
@@ -498,14 +499,3 @@ class Isam3View(
 data class Isam3ResolvedColumn(
     val partition: CharSequence,
     val file: CharSequence,
-    val type: IOMemento,
-    val meta: RecordMeta,
-    val begin: Int,
-    val end: Int,
-)
-
-private fun renderInlineList(values: List<CharSequence>): CharSequence =
-    values.joinToString(", ", prefix = "[", postfix = "]") { yamlScalar(it) }
-
-private fun yamlScalar(value: CharSequence): CharSequence =
-    if (value.toString().matches(Regex("^[A-Za-z0-9_.:/+-]+$"))) value else "\"${value.toString().replace("\\", "\\\\").replace("\"", "\\\"")}\""

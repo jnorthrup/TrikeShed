@@ -2,6 +2,7 @@ package borg.trikeshed.userspace.database
 
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import java.util.LinkedList
 
 /**
  * Log-Structured Merge-Tree (LSMR) database ported from literbike.
@@ -14,10 +15,10 @@ data class LsmrConfig(
 )
 
 class LsmrDatabase(val config: LsmrConfig) {
-   val memtable = mutableMapOf<CharSequence, ByteArray>()
+   val memtable = LinkedHashMap<CharSequence, ByteArray>()
    var memtableSize = 0
-   val segments = mutableListOf<MutableMap<CharSequence, ByteArray>>()
-   val segmentFiles = mutableListOf<CharSequence>()
+   val segments = LinkedList<LinkedHashMap<CharSequence, ByteArray>>()
+   val segmentFiles = LinkedList<CharSequence>()
    val mutex = Mutex()
 
     suspend fun put(id: CharSequence, value: ByteArray) {

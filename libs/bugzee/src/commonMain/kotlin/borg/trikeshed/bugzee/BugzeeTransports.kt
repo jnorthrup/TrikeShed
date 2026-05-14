@@ -8,6 +8,7 @@ import borg.trikeshed.userspace.nio.spi.SelectionResult
 import borg.trikeshed.userspace.nio.spi.UringOp
 import borg.trikeshed.userspace.nio.spi.UringOp.Companion.UringSubmission
 import borg.trikeshed.userspace.nio.ByteBuffer
+import java.util.LinkedList
 
 // ── 1. BugzeeMessageType ─────────────────────────────────────────────────────
 
@@ -377,10 +378,10 @@ class BugzeeSocketManager(
     private val maxConnectionsPerPeer: Int = 4,
 ) {
     /** Peer identifier to transport to list of socket FileImpls. */
-    private val peerSockets = mutableMapOf<CharSequence, MutableMap<Transport, MutableList<SocketEntry>>>()
+    private val peerSockets = LinkedHashMap<CharSequence, LinkedHashMap<Transport, LinkedList<SocketEntry>>>()
 
     /** Active transport bindings. */
-    private val bindings = mutableMapOf<Int, TransportBinding>() // fd -> binding
+    private val bindings = LinkedHashMap<Int, TransportBinding>() // fd -> binding
 
     private var socketCounter: Int = 0
 
@@ -403,8 +404,8 @@ class BugzeeSocketManager(
      * Reuses an existing socket if available and the pool limit isn't exceeded.
      */
     fun getOrCreateSocket(peerId: CharSequence, transport: Transport): SocketEntry? {
-        val peerMap = peerSockets.getOrPut(peerId) { mutableMapOf() }
-        val socketList = peerMap.getOrPut(transport) { mutableListOf() }
+        val peerMap = peerSockets.getOrPut(peerId) { LinkedHashMap() }
+        val socketList = peerMap.getOrPut(transport) { LinkedList() }
 
         // Return existing if pool not full
         if (socketList.isNotEmpty() && socketList.size < maxConnectionsPerPeer) {
@@ -561,13 +562,13 @@ class TransportSelector {
      * Tracks which transports are available for each peer.
      * Key: peer nodeId, Value: set of available transports ordered by preference.
      */
-    private val peerAvailability = mutableMapOf<CharSequence, MutableSet<Transport>>()
+    private val peerAvailability = LinkedHashMap<CharSequence, LinkedHashSet<Transport>>()
 
     /**
      * Register that a peer supports the given transport.
      */
     fun registerTransport(peerId: CharSequence, transport: Transport) {
-        val available = peerAvailability.getOrPut(peerId) { mutableSetOf() }
+        val available = peerAvailability.getOrPut(peerId) { LinkedHashSet() }
         available.add(transport)
     }
 
@@ -629,16 +630,16 @@ class BugzeeNetworkLayer(
     private val defaultConfig: TransportDefaults = TransportDefaults(),
 ) {
     /** Pending receive buffers keyed by peer+transport. */
-    private val rxBuffers = mutableMapOf<CharSequence, MutableList<ByteBuffer>>()
+    private val rxBuffers = LinkedHashMap<CharSequence, LinkedList<ByteBuffer>>()
 
     /** Callback invoked on each received message. */
     private var onDataCallback: ((CharSequence, BugzeeNetworkMessage) -> Unit)? = null
 
     /** In-flight send tokens keyed by userData. */
-    private val pendingSends = mutableMapOf<Long, BugzeeNetworkMessage>()
+    private val pendingSends = LinkedHashMap<Long, BugzeeNetworkMessage>()
 
     /** Pending receive tokens keyed by userData. */
-    private val pendingReceives = mutableMapOf<Long, Pair<CharSequence, TransportBinding>>()
+    private val pendingReceives = LinkedHashMap<Long, Pair<CharSequence, TransportBinding>>()
 
     /**
      * Default transport configuration wrapper.
@@ -655,7 +656,7 @@ class BugzeeNetworkLayer(
      * Establishes socket FDs and registers them with the selector.
      */
     fun connect(peerId: CharSequence, address: CharSequence, transports: Set<Transport>) {
-        val bindings = mutableListOf<TransportBinding>()
+        val bindings = LinkedList<TransportBinding>()
 
         for (transport in transports) {
             val socket = socketManager.getOrCreateSocket(peerId, transport)
@@ -745,7 +746,7 @@ class BugzeeNetworkLayer(
         val buf = ByteBuffer.allocate(65536)
         val token = socketManager.enqueueRecv(binding, buf)
         pendingReceives[token] = peerId to binding
-        rxBuffers.getOrPut(peerId) { mutableListOf() }.add(buf)
+        rxBuffers.getOrPut(peerId) { LinkedList() }.add(buf)
     }
 
     /**
@@ -845,10 +846,10 @@ class BugzeeRelay(
     )
 
     /** Routing table keyed by nodeId, value is list of route entries. */
-    private val routingTable = mutableMapOf<CharSequence, MutableList<RouteEntry>>()
+    private val routingTable = LinkedHashMap<CharSequence, LinkedList<RouteEntry>>()
 
     /** Messages forwarded but not yet acknowledged, keyed by correlationId. */
-    private val pendingForwards = mutableMapOf<CharSequence, PendingForward>()
+    private val pendingForwards = LinkedHashMap<CharSequence, PendingForward>()
 
     /** Callback to invoke when a forwarded message is acknowledged. */
     private var onAckCallback: ((CharSequence) -> Unit)? = null
@@ -858,7 +859,7 @@ class BugzeeRelay(
      * should be forwarded via the optionally specified transport.
      */
     fun addRoute(targetNodeId: CharSequence, msgType: BugzeeMessageType, via: Transport? = null) {
-        val entries = routingTable.getOrPut(targetNodeId) { mutableListOf() }
+        val entries = routingTable.getOrPut(targetNodeId) { LinkedList() }
         // Replace existing route for same msgType
         entries.removeAll { it.msgType == msgType }
         entries.add(RouteEntry(targetNodeId, msgType, via))

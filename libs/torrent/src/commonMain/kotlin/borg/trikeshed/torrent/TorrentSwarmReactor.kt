@@ -9,6 +9,7 @@ import borg.trikeshed.userspace.nio.channels.spi.ReactorOperations
 import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
+import java.util.LinkedList
 
 /**
  * TorrentSwarmReactor — io_uring/epoll-based reactor for swarm peer I/O.
@@ -42,7 +43,7 @@ class TorrentSwarmReactor(
     override val key: AsyncContextKey<TorrentSwarmReactor> get() = Key
 
     // Per-peer state tracking
-    private val peerStates = mutableMapOf<Int, PeerState>()
+    private val peerStates = LinkedHashMap<Int, PeerState>()
     private val acceptKeyBase = 1000L
     private val readKeyBase = 2000L
     private val writeKeyBase = 3000L
@@ -53,7 +54,7 @@ class TorrentSwarmReactor(
         val peer: TorrentPeer,
         val readBuffer: ByteArray = ByteArray(65536),
         val writeBuffer: ByteArray = ByteArray(65536),
-        val pendingRequests = mutableMapOf<Int, PendingBlockRequest>(),
+        val pendingRequests = LinkedHashMap<Int, PendingBlockRequest>(),
         val chokeState: ChokeState = ChokeState.Choked,
     )
 
@@ -87,16 +88,17 @@ class TorrentSwarmReactor(
     /**
      * Start the swarm reactor event loop.
      *
-     * Takes ChannelOperations for socket/ring I/O and ReactorOperations
-     * for fd interest management. The reactor accepts on the listen socket,
-     * connects to discovered peers, and handles read/write via ring.
+     * Fetches ChannelOperations and ReactorOperations from coroutine context.
+     * The reactor accepts on the listen socket, connects to discovered peers,
+     * and handles read/write via ring.
      */
     suspend fun run(
         listenPort: Int = 6881,
-        channels: ChannelOperations,
-        reactor: ReactorOperations,
     ) = withContext(supervisor) {
         requireState(ElementState.ACTIVE)
+
+        val channels = currentCoroutineContext()[ChannelOperations.Key]!!
+        val reactor = currentCoroutineContext()[ReactorOperations.Key]!!
 
         // Create listen socket
         val listenFd = channels.socket(2, 1, 0) // AF_INET=2, SOCK_STREAM=1
@@ -121,7 +123,7 @@ class TorrentSwarmReactor(
                             peerStates[peerFd] = PeerState(peerFd, newPeer)
                         }
                     } else if (peerStates.containsKey(signal.fd)) {
-                        handlePeerEvent(signal.fd, reactor, channels)
+                        handlePeerEvent(signal.fd)
                     }
                 }
             }
@@ -137,9 +139,10 @@ class TorrentSwarmReactor(
     suspend fun connectToPeer(
         ip: CharSequence,
         port: Int,
-        channels: ChannelOperations,
-        reactor: ReactorOperations,
     ) {
+        val channels = currentCoroutineContext()[ChannelOperations.Key]!!
+        val reactor = currentCoroutineContext()[ReactorOperations.Key]!!
+
         val peerFd = channels.socket(2, 1, 0)
         if (peerFd < 0) return
 
@@ -159,9 +162,10 @@ class TorrentSwarmReactor(
      */
     private suspend fun handlePeerEvent(
         fd: Int,
-        reactor: ReactorOperations,
-        channels: ChannelOperations,
     ) {
+        val reactor = currentCoroutineContext()[ReactorOperations.Key]!!
+        val channels = currentCoroutineContext()[ChannelOperations.Key]!!
+
         val peerState = peerStates[fd] ?: return
         val buf = ByteBuffer.wrap(peerState.readBuffer)
         // Ring read path — read available data from peer
@@ -179,7 +183,7 @@ class TorrentSwarmReactor(
         // Parse wire protocol messages from buffer
         val messages = parseWireProtocol(buf, bytesRead)
         for (msg in messages) {
-            dispatchMessage(peerState, msg, fd, channels)
+            dispatchMessage(peerState, msg, fd)
         }
 
         // Schedule next read
@@ -190,7 +194,7 @@ class TorrentSwarmReactor(
      * Parse BitTorrent wire protocol from raw bytes.
      */
     private fun parseWireProtocol(buf: ByteBuffer, length: Int): List<PeerMessage> {
-        val messages = mutableListOf<PeerMessage>()
+        val messages = LinkedList<PeerMessage>()
         buf.position(0)
         buf.limit(length)
 
@@ -220,12 +224,14 @@ class TorrentSwarmReactor(
     /**
      * Dispatch a parsed message to the appropriate handler.
      */
-    private fun dispatchMessage(
+    private suspend fun dispatchMessage(
         peerState: PeerState,
         msg: PeerMessage,
         fd: Int,
-        channels: ChannelOperations,
     ) {
+        // Fetch ChannelOperations from coroutine context
+        val channels = currentCoroutineContext()[ChannelOperations.Key]!!
+
         when (msg) {
             is PeerMessage.Handshake -> {
                 // Verify info hash, send our handshake back

@@ -1,5 +1,6 @@
 package borg.trikeshed.couch.htx
 
+import java.util.LinkedList
 /**
  * RED-phase stubs for HTX search & transformation algebra.
  *
@@ -73,7 +74,7 @@ fun HtxMessage.Companion.deserialize(bytes: ByteArray): HtxMessage? {
 fun HtxMessage.buildPayload(): ByteArray {
     val blocks = this.blocks
     // flags(4) + blockCount(2) + blocks...
-    val parts = mutableListOf<ByteArray>()
+    val parts = LinkedList<ByteArray>()
     // flags (big-endian uint32)
     val flagBuf = ByteArray(4)
     writeInt32BE(flagBuf, 0, flags.toInt())
@@ -117,7 +118,7 @@ fun encodeBlock(bd: HtxBlockData): ByteArray {
 }
 fun encodeStartLine(sl: HtxBlockData.StartLine): ByteArray {
     val s = sl.sl
-    val parts = mutableListOf<ByteArray>()
+    val parts = LinkedList<ByteArray>()
     parts.add(byteArrayOf(if (s.isRequest) 1.toByte() else 0.toByte()))
     if (s.isRequest) {
         // method(1) + uriLen(2) + uri + verMajor(1) + verMinor(1)
@@ -302,7 +303,7 @@ fun normalizeToHtx(bytes: ByteArray): HtxMessage = HtxMessage.normalizeToHtx(byt
 // ── Transformation algebra ──────────────────────────────────────
 
 fun HtxMessage.mergeTrailers(): HtxMessage {
-    val newBlocks = mutableListOf<HtxBlockData>()
+    val newBlocks = LinkedList<HtxBlockData>()
     for (b in this.blocks) {
         when (b) {
             is HtxBlockData.Trailer -> newBlocks.add(HtxBlockData.Header(b.name, b.value))
@@ -329,7 +330,7 @@ fun HtxMessage.withFlag(flag: HtxFlags): HtxMessage {
 // ── Construction algebra (DSL factories) ────────────────────────
 
 class HtxMessageBuilder {
-    val headers = mutableListOf<Pair<ByteArray, ByteArray>>()
+    val headers = LinkedList<Pair<ByteArray, ByteArray>>()
     fun header(name: ByteArray, value: ByteArray) { headers.add(name to value) }
 }
 

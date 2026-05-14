@@ -5,6 +5,7 @@ import borg.trikeshed.context.AsyncContextKey
 import borg.trikeshed.context.ElementState
 import kotlinx.coroutines.Job
 import kotlin.random.Random
+import java.util.LinkedList
 
 /**
  * Kademlia DHT (BEP 5) — distributed hash table for peer discovery.
@@ -46,7 +47,7 @@ class KademliaDht(
 
     data class Node(val id: ByteArray, val ip: CharSequence, val port: Int)
 
-    private val buckets = Array(160) { mutableListOf<Node>() }
+    private val buckets = Array(160) { LinkedList<Node>() }
 
     // ── Lifecycle ─────────────────────────────────────────────────
 
@@ -101,7 +102,7 @@ class KademliaDht(
     }
 
     fun findClosest(target: ByteArray, count: Int = k): List<Node> {
-        val all = mutableListOf<Node>()
+        val all = LinkedList<Node>()
         for (bucket in buckets) { all.addAll(bucket) }
         all.sortBy { xorDistance(it.id, target) }
         return all.take(count)
@@ -117,8 +118,8 @@ class KademliaDht(
         infoHash: ByteArray,
         sendQuery: suspend (ByteArray, Node) -> DhtProtocol.DhtMessage?,
     ): List<Node> = kotlinx.coroutines.withContext(supervisor) {
-        val result = mutableListOf<Node>()
-        val visited = mutableSetOf<CharSequence>()
+        val result = LinkedList<Node>()
+        val visited = LinkedHashSet<CharSequence>()
         val queue = ArrayDeque<Node>()
         queue.addAll(findClosest(infoHash, k))
 

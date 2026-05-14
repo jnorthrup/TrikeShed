@@ -5,6 +5,8 @@ import borg.trikeshed.miniduck.MiniDuckBlockCodec
 import borg.trikeshed.parse.json.JsonParser
 import borg.trikeshed.lib.j
 import borg.trikeshed.userspace.nio.file.spi.FileOperations
+import java.util.LinkedList
+import kotlinx.coroutines.currentCoroutineContext
 
 /**
  * Persistent write-ahead log backed by [FileOperations] NIO SPI.
@@ -20,10 +22,13 @@ import borg.trikeshed.userspace.nio.file.spi.FileOperations
  */
 class NioBlockWal(
     private val root: CharSequence,
-    private val fs: FileOperations,
 ) {
     private var nextSeq: Long = 0L
-    private val walPath: CharSequence get() = fs.resolvePath(root, "wal.ndjson").toString()
+    private val walPath: CharSequence get() = fs().resolvePath(root, "wal.ndjson").toString()
+
+    private suspend fun fs(): FileOperations =
+        currentCoroutineContext()[FileOperations.Key]
+            ?: throw IllegalStateException("FileOperations not in coroutine context")
 
     val headSequence: Long get() = nextSeq
 
@@ -31,7 +36,7 @@ class NioBlockWal(
      * Append a put operation. Returns the assigned sequence number.
      * The block payload is written as a second NDJSON line.
      */
-    fun appendPut(collection: CharSequence, id: CharSequence, block: BlockRowVec): Long {
+    suspend fun appendPut(collection: CharSequence, id: CharSequence, block: BlockRowVec): Long {
         nextSeq++
         val encoded = MiniDuckBlockCodec.encode(block)
         val header = """{"seq":$nextSeq,"op":"put","collection":"$collection","id":"$id"}"""
@@ -42,7 +47,7 @@ class NioBlockWal(
     /**
      * Append a remove operation. Returns the assigned sequence number.
      */
-    fun appendRemove(collection: CharSequence, id: CharSequence): Long {
+    suspend fun appendRemove(collection: CharSequence, id: CharSequence): Long {
         nextSeq++
         val entry = """{"seq":$nextSeq,"op":"remove","collection":"$collection","id":"$id"}"""
         appendText("$entry\n")
@@ -52,7 +57,7 @@ class NioBlockWal(
     /**
      * Replay all WAL entries from [startSeq] onto [store].
      */
-    fun replay(startSeq: Long, store: BlockStore) {
+    suspend fun replay(startSeq: Long, store: BlockStore) {
         val entries = readEntries()
         for (entry in entries) {
             if (entry.seq < startSeq) continue
@@ -64,7 +69,7 @@ class NioBlockWal(
      * Compact the WAL, keeping only entries with seq >= [keepFromSeq].
      * Rewrites the WAL file.
      */
-    fun compact(keepFromSeq: Long) {
+    suspend fun compact(keepFromSeq: Long) {
         val entries = readEntries().filter { it.seq >= keepFromSeq }
         val newContent = StringBuilder()
         for (entry in entries) {
@@ -75,7 +80,7 @@ class NioBlockWal(
                 newContent.append('\n')
             }
         }
-        fs.write(walPath, newContent.toString())
+        fs().write(walPath, newContent.toString())
     }
 
     // ── Internal entry parsing ─────────────────────────────────────
@@ -88,11 +93,11 @@ class NioBlockWal(
         val blockData: CharSequence? = null,
     )
 
-    private fun readEntries(): List<WalEntry> {
-        if (!fs.exists(walPath)) return emptyList()
-        val text = fs.readString(walPath)
+    private suspend fun readEntries(): List<WalEntry> {
+        if (!fs().exists(walPath)) return emptyList()
+        val text = fs().readString(walPath)
         val lines = text.lines()
-        val entries = mutableListOf<WalEntry>()
+        val entries = LinkedList<WalEntry>()
         var i = 0
         while (i < lines.size) {
             val headerLine = lines[i].trim()
@@ -105,7 +110,7 @@ class NioBlockWal(
                 continue
             }
             if (header.op == "put") {
-                val blockLines = mutableListOf<CharSequence>()
+                val blockLines = LinkedList<CharSequence>()
                 var cursor = i + 1
                 while (cursor < lines.size) {
                     val candidate = lines[cursor]
@@ -140,7 +145,7 @@ class NioBlockWal(
         }
     }
 
-    private fun applyEntry(entry: WalEntry, store: BlockStore) {
+    private suspend fun applyEntry(entry: WalEntry, store: BlockStore) {
         when (entry.op) {
             "put" -> {
                 if (entry.blockData != null) {
@@ -152,9 +157,9 @@ class NioBlockWal(
         }
     }
 
-    private fun appendText(text: CharSequence) {
-        val existing = if (fs.exists(walPath)) fs.readString(walPath) else ""
-        fs.write(walPath, existing.toString() + text)
+    private suspend fun appendText(text: CharSequence) {
+        val existing = if (fs().exists(walPath)) fs().readString(walPath) else ""
+        fs().write(walPath, existing.toString() + text)
     }
 
     private fun CharSequence.toSeries(): borg.trikeshed.lib.Series<Char> {

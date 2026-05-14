@@ -10,6 +10,7 @@ import borg.trikeshed.miniduck.exec.*
 import borg.trikeshed.miniduck.schema.SchemaManager
 import borg.trikeshed.miniduck.schema.TableSchema
 import borg.trikeshed.parse.kursive.sql.*
+import java.util.LinkedList
 
 data class PlannerContext(
     val schemaManager: SchemaManager? = null,
@@ -34,7 +35,7 @@ data class SelectPlan(
             return base
         }
 
-        val rows = mutableListOf<DocRowVec>()
+        val rows = LinkedList<DocRowVec>()
         while (base.next()) {
             val current = base.row
             if (!matchesWhere(current, stmt.where)) continue
@@ -98,8 +99,8 @@ data class SelectPlan(
         columns: borg.trikeshed.lib.Series<Column>,
         schema: TableSchema?,
     ): DocRowVec {
-        val names = mutableListOf<String>()
-        val values = mutableListOf<Any?>()
+        val names = LinkedList<String>()
+        val values = LinkedList<Any?>()
 
         if (isSelectAll(columns)) {
             val schemaColumns = schema?.columns

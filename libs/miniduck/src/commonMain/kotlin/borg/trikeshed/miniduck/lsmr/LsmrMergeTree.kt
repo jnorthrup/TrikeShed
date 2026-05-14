@@ -2,6 +2,7 @@ package borg.trikeshed.miniduck.lsmr
 
 import borg.trikeshed.lib.Join
 import borg.trikeshed.lib.j
+import java.util.LinkedList
 
 /**
  * LSMR entry: key j (value j (seq j deleted))
@@ -32,9 +33,9 @@ private val entryKeyOrder: Comparator<LsmrEntry> =
  *  - scan() merges across all levels lazily, newest seq per key wins.
  */
 class LsmrMergeTree {
-    private val l0: MutableList<LsmrEntry> = mutableListOf()
-    private val l1Runs: MutableList<List<LsmrEntry>> = mutableListOf()
-    private val l2Runs: MutableList<List<LsmrEntry>> = mutableListOf()
+    private val l0: LinkedList<LsmrEntry> = LinkedList()
+    private val l1Runs: LinkedList<List<LsmrEntry>> = LinkedList()
+    private val l2Runs: LinkedList<List<LsmrEntry>> = LinkedList()
 
     fun put(key: CharSequence, value: CharSequence, seq: Long) {
         l0.add(lsmrEntry(key, value, seq))
@@ -84,7 +85,7 @@ class LsmrMergeTree {
     /** Merge a list of sorted runs: newest seq per key wins; tombstones suppressed. */
     private fun mergeRuns(runs: List<List<LsmrEntry>>): List<LsmrEntry> {
         // Collect all entries, pick highest seq per key, then filter tombstones.
-        val byKey = mutableMapOf<CharSequence, LsmrEntry>()
+        val byKey = LinkedHashMap<CharSequence, LsmrEntry>()
         for (run in runs) {
             for (entry in run) {
                 val existing = byKey[entry.key]

@@ -42,7 +42,7 @@ class HyperdlElement(
 
     // ── Download state ────────────────────────────────────────────
 
-    private val activeDownloads = mutableMapOf<CharSequence, DownloadTask>()
+    private val activeDownloads = LinkedHashMap<CharSequence, DownloadTask>()
     private val gidCounter = AtomicLong(1)
 
     data class DownloadTask(

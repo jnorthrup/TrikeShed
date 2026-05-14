@@ -35,7 +35,7 @@ class UserspaceBtrfsBuffer(
     companion object Key : CoroutineContext.Key<UserspaceBtrfsBuffer>
 
     /** In-memory block store: nodeId → ByteArray (size = chunkSize). */
-    private val store = mutableMapOf<NodeId, ByteArray>()
+    private val store = LinkedHashMap<NodeId, ByteArray>()
 
     /** Monotonic ID counter for allocation. */
     private var nextId = 1L

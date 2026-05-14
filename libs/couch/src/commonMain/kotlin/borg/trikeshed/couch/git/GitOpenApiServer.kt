@@ -2,6 +2,7 @@ package borg.trikeshed.couch.git
 
 import borg.trikeshed.couch.htx.*
 import borg.trikeshed.process.ProcessShell
+import java.util.LinkedList
 
 /**
  * Git OpenAPI server — routes HTX messages to git subprocesses via ProcessShell.
@@ -141,7 +142,7 @@ class GitOpenApiServer(private val shell: ProcessShell) {
         gitPorcelain("-C", repo, "reset", ref)
 
     private fun gitDiff(repo: CharSequence, cached: Boolean): HtxMessage {
-        val args = mutableListOf<CharSequence>("-C", repo, "diff")
+        val args = LinkedList<CharSequence>("-C", repo, "diff")
         if (cached) args.add("--cached")
         val result = shell.exec("git", args.toList())
         return textResponse(result.stdout, if (result.exitCode == 0) 200 else 400)

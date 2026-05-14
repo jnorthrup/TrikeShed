@@ -4,6 +4,7 @@ import borg.trikeshed.lib.*
 import borg.trikeshed.parse.narsive.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
+import java.util.LinkedList
 
 // NARS3 Machine and Context
 
@@ -114,7 +115,7 @@ class Nars3Machine(private val scope: CoroutineScope) {
         withContext(scope.coroutineContext.minusKey(Job)) {
             supervisorScope {
                 val pairCount = scan.count * (scan.count - 1) / 2
-                val tasks = ArrayList<Deferred<Series<Nars3Message>>>(pairCount)
+                val tasks = LinkedList<Deferred<Series<Nars3Message>>>(pairCount)
                 var leftOrdinal = 0
                 while (leftOrdinal < scan.count) {
                     val leftIndex = scan.indices[leftOrdinal]

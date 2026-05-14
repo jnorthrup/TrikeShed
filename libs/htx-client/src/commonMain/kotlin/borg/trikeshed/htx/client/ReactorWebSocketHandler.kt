@@ -8,7 +8,8 @@ import borg.trikeshed.ws.Rfc6455Handshake
 import borg.trikeshed.ws.WebSocketFrame
 import borg.trikeshed.userspace.nio.ByteBuffer
 import borg.trikeshed.userspace.nio.channels.spi.ChannelOperations
-
+import kotlinx.coroutines.currentCoroutineContext
+import borg.trikeshed.userspace.nio.reactor.NioSupervisor
 /**
  * Reactor-integrated WebSocket transport handler for the HTX client.
  *
@@ -26,15 +27,12 @@ import borg.trikeshed.userspace.nio.channels.spi.ChannelOperations
  *
  * ```
  * val element = openHtxElement()
- * val nio = coroutineContext[NioSupervisor.Key]!!
- * val channelOps = nio.service<ChannelOperations>()!!
  * val tlsSettings = TlsSettings(serverName = "ws-feed.pro.coinbase.com")
- * val handler = ReactorWebSocketHandler(channelOps, tlsSettings)
+ * val handler = ReactorWebSocketHandler(tlsSettings)
  * element.registerTransport(HtxTransport.WEBSOCKET, handler)
  * ```
  */
 class ReactorWebSocketHandler(
-    private val channelOps: ChannelOperations,
     private val tlsSettings: borg.trikeshed.userspace.nio.tls.TlsSettings? = null,
 ) : HtxRequestHandler {
 
@@ -49,6 +47,10 @@ class ReactorWebSocketHandler(
     }
 
     private suspend fun connect(request: HtxClientRequest) {
+        // Fetch ChannelOperations from coroutine context (miniduck pattern)
+        val nio = currentCoroutineContext()[NioSupervisor.Key]!!
+        val channelOps = nio.service<ChannelOperations>()!!
+
         // Parse wss://host:port/path
         val uri = request.path.toString().removePrefix("wss://").removePrefix("ws://")
         val slash = uri.indexOf('/')

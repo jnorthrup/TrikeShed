@@ -12,6 +12,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.withContext
 import kotlin.coroutines.CoroutineContext
+import java.util.LinkedList
 
 /**
  * ManifoldElement — CCEK element that is the seating foundation for the NARS3 deriver.
@@ -32,11 +33,11 @@ import kotlin.coroutines.CoroutineContext
  * For full NAL-level fanout, pass a Series<DeriverStep> to deriveAll() which
  * fans out across NAL levels as concurrent children of timeBranch.
  */
-object ManifoldSupervisorKey : CoroutineContext.Key<ManifoldElement>
-
 class ManifoldElement(parentJob: Job? = null) : AsyncContextElement(parentJob = parentJob) {
 
-    override val key: CoroutineContext.Key<*> get() = ManifoldSupervisorKey
+    companion object Key : CoroutineContext.Key<ManifoldElement>
+
+    override val key: CoroutineContext.Key<*> get() = Key
 
     /** Shape branch: RowVec family / block dispatch */
     val shapeBranch: CompletableJob = SupervisorJob(supervisor)
@@ -106,7 +107,7 @@ class ManifoldElement(parentJob: Job? = null) : AsyncContextElement(parentJob = 
     ) {
         supervisorScope {
             val branch = branchContext(scope, timeBranch)
-            val children = ArrayList<kotlinx.coroutines.Deferred<Unit>>(steps.a)
+            val children = LinkedList<kotlinx.coroutines.Deferred<Unit>>(steps.a)
             for (i in 0 until steps.a) {
                 val step = steps.b(i)
                 children += async(branch) {

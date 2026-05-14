@@ -16,7 +16,7 @@ data class HarnessStochasticKey(val symbol: CharSequence, val timeframe: CharSeq
 
 object HarnessStochasticCache {
     private val mutex = Mutex()
-    private val values = mutableMapOf<HarnessStochasticKey, Stochastic.Result>()
+    private val values = LinkedHashMap<HarnessStochasticKey, Stochastic.Result>()
 
     suspend fun ensureCached(
         symbol: CharSequence,

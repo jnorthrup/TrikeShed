@@ -80,7 +80,7 @@ class HtxElementCompat(private val handler: HtxRequestHandler? = null) : AsyncCo
 
 @Suppress("unused")
 class HtxElement {
-    val transports = mutableMapOf<HtxTransport, HtxRequestHandler>()
+    val transports = LinkedHashMap<HtxTransport, HtxRequestHandler>()
 
     fun registerTransport(transport: HtxTransport, handler: HtxRequestHandler) {
         transports[transport] = handler

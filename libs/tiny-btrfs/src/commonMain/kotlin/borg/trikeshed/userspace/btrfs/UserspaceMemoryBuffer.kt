@@ -39,7 +39,7 @@ class UserspaceMemoryBuffer(
     companion object Key : CoroutineContext.Key<UserspaceMemoryBuffer>
 
     /** In-memory chunk store: nodeId → ByteArray. */
-    private val store = mutableMapOf<NodeId, ByteArray>()
+    private val store = LinkedHashMap<NodeId, ByteArray>()
 
     /** Monotonic ID counter for allocation. */
     private var nextId = 1L

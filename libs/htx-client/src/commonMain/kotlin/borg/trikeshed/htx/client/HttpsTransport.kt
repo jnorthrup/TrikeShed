@@ -6,6 +6,7 @@ import borg.trikeshed.userspace.nio.spi.NioSupervisor
 import borg.trikeshed.userspace.nio.tls.TlsElement
 import borg.trikeshed.userspace.nio.tls.TlsSettings
 import borg.trikeshed.userspace.reactor.UringReactor
+import java.util.LinkedList
 
 /**
  * Platform actual calls ringHttpsHandler(UringReactor()).
@@ -91,8 +92,8 @@ fun ringHttpsHandler(reactor: UringReactor): HtxRequestHandler = { request: HtxC
 
         // Read and decrypt response records
         val headerBuf = StringBuilder()
-        val bodyBytes = mutableListOf<Byte>()
-        val respHeaders = mutableMapOf<CharSequence, CharSequence>()
+        val bodyBytes = LinkedList<Byte>()
+        val respHeaders = LinkedHashMap<CharSequence, CharSequence>()
         var status = 0
         var headersDone = false
 
@@ -133,7 +134,7 @@ fun ringHttpsHandler(reactor: UringReactor): HtxRequestHandler = { request: HtxC
 
 private fun parseResponse(
     headerText: String,
-    out: MutableMap<CharSequence, CharSequence>,
+    out: LinkedHashMap<CharSequence, CharSequence>,
     onStatus: (Int) -> Unit,
 ) {
     val lines = headerText.split("\r\n")

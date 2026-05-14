@@ -10,8 +10,8 @@ import borg.trikeshed.miniduck.schema.TableSchema
 
 /** Simple in-memory table source used for tests and JS platform stub delegation. */
 class InMemoryTableSource : TableSource {
-    private val tables: MutableMap<CharSequence, MutableSeries<RowVec>> = linkedMapOf()
-    private val schemas: MutableMap<CharSequence, TableSchema> = linkedMapOf()
+    private val tables: LinkedHashMap<CharSequence, MutableSeries<RowVec>> = linkedMapOf()
+    private val schemas: LinkedHashMap<CharSequence, TableSchema> = linkedMapOf()
 
     override fun open(execCtx: ExecutionContext, tableName: CharSequence): Cursor {
         val rows: Series<RowVec> = tables[tableName] ?: emptySeries()

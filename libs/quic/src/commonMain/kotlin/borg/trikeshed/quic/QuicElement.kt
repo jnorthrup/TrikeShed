@@ -74,7 +74,7 @@ data class QuicShortFrame(
  * - ioUringFd = -1 means epoll fallback mode
  */
 data class QuicChannelService(
-    val _streams: MutableMap<Int, StreamHandle> = mutableMapOf(),
+    val _streams: LinkedHashMap<Int, StreamHandle> = LinkedHashMap(),
     val ioUringFd: Int = -1,          // -1 = epoll fallback
     val xdpProg: CharSequence? = null,      // XDP prog name for hardware packet steering, null = software only
     val connectionId: QuicConnectionId = QuicConnectionId.generate(),
@@ -477,7 +477,7 @@ suspend fun openQuicElement(config: QuicConfig = QuicConfig()): QuicElement =
 
 class QuicElement(
     val config: QuicConfig = QuicConfig(),
-    val streams: MutableMap<Int, StreamHandle> = mutableMapOf(),
+    val streams: LinkedHashMap<Int, StreamHandle> = LinkedHashMap(),
 ) : AsyncContextElement(), StreamTransport {
     companion object Key : AsyncContextKey<QuicElement>()
 

@@ -1,5 +1,6 @@
 package borg.trikeshed.hazelnut
 
+import java.util.LinkedList
 // ── NARS-3 Semantic Taxonomy: Garden Collection (gk) + Spokes ─────────────
 
 /**
@@ -165,7 +166,7 @@ data class Nars3FeatureVector(
  */
 class Nars3Corpus(
     val windowMs: Long = 3600000,
-    private val _entries: MutableList<Nars3FeatureVector> = mutableListOf(),
+    private val _entries: LinkedList<Nars3FeatureVector> = LinkedList(),
 ) {
     val size: Int get() = _entries.size
 
@@ -206,7 +207,7 @@ class Nars3Corpus(
  * Refreshes the corpus from NARS node profiles and cluster topology state.
  */
 class Nars3Runtime(
-    private val profiles: MutableMap<CharSequence, NarsNodeProfile>,
+    private val profiles: LinkedHashMap<CharSequence, NarsNodeProfile>,
     private val topology: HazelTopology,
     private val analytics: ConflictAnalytics,
     val corpus: Nars3Corpus = Nars3Corpus(),

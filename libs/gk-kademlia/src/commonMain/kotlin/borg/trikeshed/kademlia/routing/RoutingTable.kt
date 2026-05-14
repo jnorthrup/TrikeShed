@@ -28,5 +28,5 @@ open class RoutingTable<TNum : Comparable<TNum>, Sz : NetMask<TNum>>(
         min(agentNUID.netmask.distance(agentNUID.id!!, g.id!!), bucketCount).dec()
     open val bucketCount: Int = agentNUID.netmask.bits.let { if (optimal) it else it / 2 + 1 }
     open val bucketSize: Int = agentNUID.netmask.bits.let { if (optimal) it else it / 2 + 1 }
-    val buckets: Array<MutableMap<TNum, Route<TNum>>> = Array(bucketCount) { linkedMapOf() }
+    val buckets: Array<LinkedHashMap<TNum, Route<TNum>>> = Array(bucketCount) { linkedMapOf() }
 }

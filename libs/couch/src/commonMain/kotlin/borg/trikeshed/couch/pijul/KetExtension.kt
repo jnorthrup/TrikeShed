@@ -1,6 +1,7 @@
 package borg.trikeshed.couch.pijul
 
 import borg.trikeshed.couch.htx.*
+import java.util.LinkedList
 
 /**
  * KET — Key Exchange & Extension Negotiation.
@@ -86,7 +87,7 @@ fun encode(): ByteArray {
             val sessionId = data.copyOfRange(br.pos, (br.pos + sidLen).also { br.pos = it }).decodeToString()
             val timestamp = br.readU64()
             val nCaps = br.readU32().toInt()
-            val caps = mutableListOf<Capability>()
+            val caps = LinkedList<Capability>()
             repeat(nCaps) {
                 val nsLen = br.readU32().toInt()
                 val ns = data.copyOfRange(br.pos, (br.pos + nsLen).also { br.pos = it }).decodeToString()
@@ -94,7 +95,7 @@ fun encode(): ByteArray {
                 val name = data.copyOfRange(br.pos, (br.pos + nameLen).also { br.pos = it }).decodeToString()
                 val version = br.readU32().toInt()
                 val nParams = br.readU32().toInt()
-                val params = mutableMapOf<CharSequence, CharSequence>()
+                val params = LinkedHashMap<CharSequence, CharSequence>()
                 repeat(nParams) {
                     val kLen = br.readU32().toInt()
                     val k = data.copyOfRange(br.pos, (br.pos + kLen).also { br.pos = it }).decodeToString()
@@ -110,7 +111,7 @@ fun encode(): ByteArray {
 }
 
 private class SimpleByteArrayOutputX {
-    private val parts = mutableListOf<ByteArray>()
+    private val parts = LinkedList<ByteArray>()
     private var size = 0
     fun write(b: ByteArray) { parts.add(b); size += b.size }
     fun writeU32(v: Int) {

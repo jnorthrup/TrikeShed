@@ -1,5 +1,6 @@
 package borg.trikeshed.torrent
 
+import java.util.LinkedList
 /**
  * Magnet link parser (BEP 9).
  *
@@ -25,13 +26,13 @@ data class MagnetLink(
         fun parse(uri: CharSequence): MagnetLink? {
             if (!uri.startsWith("magnet:?", ignoreCase = true)) return null
             val qs = uri.substringAfter('?')
-            val params = mutableMapOf<CharSequence, MutableList<CharSequence>>()
+            val params = LinkedHashMap<CharSequence, LinkedList<CharSequence>>()
             for (pair in qs.split('&')) {
                 val eq = pair.indexOf('=')
                 if (eq < 0) continue
                 val key = pair.substring(0, eq).lowercase()
                 val value = pair.substring(eq + 1)
-                params.getOrPut(key) { mutableListOf() }.add(value)
+                params.getOrPut(key) { LinkedList() }.add(value)
             }
 
             // Extract info hash from xt=urn:btih:<hash>

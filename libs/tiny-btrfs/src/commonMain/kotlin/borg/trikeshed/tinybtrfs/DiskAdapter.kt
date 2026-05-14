@@ -152,7 +152,7 @@ fun readVolatileImage(
  * want a trivial memory-backed store.
  */
 class InMemoryDiskAdapter : DiskAdapter {
-   val store = mutableMapOf<NodeId, ByteArray>()
+   val store = LinkedHashMap<NodeId, ByteArray>()
    var nextId = 1L
     override fun readNode(nodeId: NodeId): ByteArray? = store[nodeId]?.copyOf()
     override fun writeNode(nodeId: NodeId, bytes: ByteArray) { store[nodeId] = bytes.copyOf() }

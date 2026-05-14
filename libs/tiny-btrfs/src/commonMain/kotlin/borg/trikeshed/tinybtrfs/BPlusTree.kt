@@ -4,6 +4,7 @@ package borg.trikeshed.tinybtrfs
 
 import borg.trikeshed.lib.*
 import kotlin.jvm.JvmName
+import java.util.LinkedList
 
 interface Codec<K : Comparable<K>, V> {
     fun encode(node: BPlusTree.Node<K, V>): ByteArray
@@ -353,7 +354,7 @@ class BPlusTree<K : Comparable<K>, V>(
         if (sortedPairs.isEmpty()) return
 
         // --- pass 1: build leaf nodes ---
-        val leaves = mutableListOf<LeafNode>()
+        val leaves = LinkedList<LeafNode>()
         var cur = LeafNode()
         for (i in 0 until sortedPairs.a) {
             val pair = sortedPairs[i]
@@ -375,7 +376,7 @@ class BPlusTree<K : Comparable<K>, V>(
         // --- pass 2+: build internal levels bottom-up until one root ---
         var currentLevel: List<Node<K, V>> = leaves
         while (currentLevel.size > 1) {
-            val nextLevel = mutableListOf<InternalNode>()
+            val nextLevel = LinkedList<InternalNode>()
             var parent = InternalNode()
             parent._children[0] = currentLevel[0]
             parent.childrenCount = 1
@@ -460,7 +461,7 @@ class BPlusTree<K : Comparable<K>, V>(
                 if (internal.keyAt(i - 1).compareTo(internal.keyAt(i)) >= 0) return invalid(depth)
             }
 
-            val children = ArrayList<Validation<K>>(internal.childrenCount)
+            val children = LinkedList<Validation<K>>(internal.childrenCount)
             for (i in 0 until internal.childrenCount) {
                 val childValidation = walk(internal.childAt(i), depth + 1, false)
                 if (!childValidation.ok) return invalid(depth)
@@ -492,7 +493,7 @@ class BPlusTree<K : Comparable<K>, V>(
     }
 
     fun range(start: K, end: K): Sequence<Join<K, V>> = sequence {
-        val stack = mutableListOf<Join<Node<K, V>, Int>>()
+        val stack = LinkedList<Join<Node<K, V>, Int>>()
         var cur = root
 
         while (!cur.isLeaf()) {

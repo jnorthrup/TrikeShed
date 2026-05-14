@@ -1,5 +1,6 @@
 package borg.trikeshed.torrent
 
+import java.util.LinkedList
 /**
  * BlockQueue — a priority queue for PriorityBlock transfers.
  *
@@ -12,7 +13,7 @@ package borg.trikeshed.torrent
  * same PriorityQueue through the PriorityBlock bridge interface.
  */
 class BlockQueue {
-    private val heap = mutableListOf<PriorityBlock>()
+    private val heap = LinkedList<PriorityBlock>()
 
     val size: Int get() = heap.size
 

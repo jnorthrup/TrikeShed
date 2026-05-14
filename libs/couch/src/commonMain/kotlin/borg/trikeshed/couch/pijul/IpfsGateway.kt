@@ -188,7 +188,7 @@ data class PeerInfo(
 )
 
 class ReplicationTopology {
-    private val peers = mutableMapOf<CharSequence, PeerInfo>()
+    private val peers = LinkedHashMap<CharSequence, PeerInfo>()
 
     fun addPeer(peerId: CharSequence, role: PeerRole, peerUrl: CharSequence) {
         peers[peerId] = PeerInfo(peerId, role, peerUrl)

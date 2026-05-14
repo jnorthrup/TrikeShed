@@ -1,6 +1,7 @@
 package borg.trikeshed.couch.htx
 
 import borg.trikeshed.collections.associative.trie.Trie
+import java.util.LinkedList
 
 /**
  * Internal state machine for HTTP/1.x parsing.
@@ -12,7 +13,7 @@ enum class HttpParseState { RequestLine, Headers, Body }
  * Blocks metadata at END; payloads at BEGINNING (ring buffer layout).
  */
 class HtxMessage(
-    val blocks: MutableList<HtxBlockData> = mutableListOf(),
+    val blocks: LinkedList<HtxBlockData> = LinkedList(),
     var flags: UInt = HtxFlags.NONE.mask,
 ) {
     fun isEmpty(): Boolean = blocks.isEmpty()

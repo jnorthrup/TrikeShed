@@ -47,15 +47,15 @@ class ConcentricGossipEngine(
     private val membershipEvents = Channel<MembershipEvent>(capacity = Channel.UNLIMITED)
 
     // Membership table: MemberId → GossipMember
-    private val members = mutableMapOf<MemberId, GossipMemberState>()
-    private val ringMembers = mutableMapOf<ConcentricRing, MutableSet<MemberId>>()
-    private val suspectCount = mutableMapOf<MemberId, Int>()
+    private val members = LinkedHashMap<MemberId, GossipMemberState>()
+    private val ringMembers = LinkedHashMap<ConcentricRing, LinkedHashSet<MemberId>>()
+    private val suspectCount = LinkedHashMap<MemberId, Int>()
 
     // GK Kademlia routing table for wide-area discovery
     private val routingTable: RoutingTable<ULong, NetMaskCoolSz>? = buildRoutingTable()
 
     // Work queue: pending work offers awaiting acceptance
-    private val pendingWork = mutableMapOf<CharSequence, GossipMessage.WorkOffer>()
+    private val pendingWork = LinkedHashMap<CharSequence, GossipMessage.WorkOffer>()
 
     private var gossipSeq = 0L
     private val ringSemaphore = Semaphore(config.maxConcurrentRingOps)
@@ -74,10 +74,10 @@ class ConcentricGossipEngine(
         // Seed the cluster
         for (seed in seedNodes) {
             members[seed.id] = GossipMemberState(seed)
-            ringMembers.getOrPut(seed.ring) { mutableSetOf() }.add(seed.id)
+            ringMembers.getOrPut(seed.ring) { LinkedHashSet() }.add(seed.id)
             scope.launch { sendMessage(seed, GossipMessage.Join(localMember, seedNodes.map { it.id })) }
         }
-        ringMembers.getOrPut(localMember.ring) { mutableSetOf() }.add(localMember.id)
+        ringMembers.getOrPut(localMember.ring) { LinkedHashSet() }.add(localMember.id)
         members[localMember.id] = GossipMemberState(localMember)
     }
 
@@ -221,7 +221,7 @@ class ConcentricGossipEngine(
                 val ring = ringForNewMember(from)
                 val promoted = from.copy(ring = ring, lastSeen = System.currentTimeMillis())
                 members[promoted.id] = GossipMemberState(promoted)
-                ringMembers.getOrPut(ring) { mutableSetOf() }.add(promoted.id)
+                ringMembers.getOrPut(ring) { LinkedHashSet() }.add(promoted.id)
                 membershipEvents.send(MembershipEvent.Joined(promoted))
                 messageChannel.send(msg)
                 // Gossip join to peers in same ring
