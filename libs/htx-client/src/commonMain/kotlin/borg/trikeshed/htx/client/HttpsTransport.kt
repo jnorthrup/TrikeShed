@@ -2,169 +2,144 @@ package borg.trikeshed.htx.client
 
 import borg.trikeshed.userspace.nio.ByteBuffer
 import borg.trikeshed.userspace.nio.channels.spi.ChannelOperations
-import borg.trikeshed.userspace.nio.channels.spi.ChannelResult
-import borg.trikeshed.userspace.nio.channels.spi.ReactorOperations
-import borg.trikeshed.userspace.reactor.Interest
-import borg.trikeshed.userspace.nio.tls.codec.CommonTlsClientHandshake
-import borg.trikeshed.userspace.nio.tls.codec.CommonTlsRecordCodec
-import borg.trikeshed.userspace.nio.tls.codec.RecordDirection
-import borg.trikeshed.userspace.nio.tls.codec.aead.DefaultAes128Gcm
-import borg.trikeshed.userspace.nio.tls.codec.ecdh.DefaultX25519
-import borg.trikeshed.userspace.nio.tls.codec.hash.DefaultSha256
-import borg.trikeshed.userspace.nio.tls.codec.kdf.DefaultHkdfSha256
-import borg.trikeshed.userspace.nio.tls.record.ContentType
-import kotlin.time.Duration
+import borg.trikeshed.userspace.nio.spi.NioSupervisor
+import borg.trikeshed.userspace.nio.tls.TlsElement
+import borg.trikeshed.userspace.nio.tls.TlsSettings
+import borg.trikeshed.userspace.reactor.UringReactor
 
+/**
+ * Platform actual calls ringHttpsHandler(UringReactor()).
+ */
 expect fun createHttpsHandler(): HtxRequestHandler
 
 /**
- * commonMain HTTPS transport via the unified ring.
- * Uses ChannelHandle.{readv,writev} + ReactorOperations.poll().
+ * commonMain HTTPS handler.
  *
- * Note: ReactorOperations.poll() is a suspend function, so this handler
- * is only usable from a coroutine context. HtxRequestHandler is already
- * a suspend function type, so this works correctly.
+ * Hierarchy — all under reactor.supervisor (the root SupervisorJob):
+ *   reactor  (UringReactor)
+ *     nioSup (NioSupervisor — provides ChannelOperations via platformNioProviders SPI)
+ *     tls    (TlsElement   — the only platform boundary is createTlsEngine inside open())
+ *
+ * All socket IO goes through reactor.submitWithThrottle { channel.readv / writev }.
+ * No JVM types, no platform conditionals.
  */
-fun ringHttpsHandler(
-    channels: ChannelOperations,
-    reactor: ReactorOperations,
-): HtxRequestHandler = { request: HtxClientRequest ->
+fun ringHttpsHandler(reactor: UringReactor): HtxRequestHandler = { request: HtxClientRequest ->
     val rawUrl = request.path.toString()
-    val noScheme = rawUrl
-        .removePrefix("https://")
-        .removePrefix("http://")
-    val authority = noScheme.substringBefore('/')
-    val host = authority.substringBefore(':')
-    check(host.isNotEmpty()) { "invalid url host: $rawUrl" }
-    val port = authority.substringAfter(':', "443").toIntOrNull() ?: 443
-    val urlPathAndQuery = noScheme.substringAfter('/', "")
-    val pathPart = if (urlPathAndQuery.isEmpty()) "/" else "/$urlPathAndQuery"
-    val fullPath = if ('?' in pathPart) {
-        pathPart
-    } else {
-        val qp = request.headers["X-Query-Params"]?.toString().orEmpty()
-        if (qp.isNotEmpty()) "$pathPart?$qp" else pathPart
-    }
+    val noScheme = rawUrl.removePrefix("https://").removePrefix("http://")
+    val host = noScheme.substringBefore('/').substringBefore(':')
+    check(host.isNotEmpty()) { "empty host in url: $rawUrl" }
+    val port = noScheme.substringBefore('/').substringAfter(':', "443").toIntOrNull() ?: 443
+    val path = "/" + noScheme.substringAfter('/', "")
 
-    val fd = channels.socket(2, 1, 0)
-    check(fd >= 0) { "socket failed" }
-    val connResult = channels.connect(fd, host, port)
-    check(connResult >= 0) { "connect failed: $connResult" }
-    val ring = channels.openChannel()
-    val handle: ChannelOperations.ChannelHandle = object : ChannelOperations.ChannelHandle {
-        override val id get() = fd
-        override fun read(b: ByteBuffer, o: Long) = ring.read(b, o)
-        override fun write(b: ByteBuffer, o: Long) = ring.write(b, o)
-        override fun readv(fd: Int, b: ByteBuffer, userData: Long) = ring.readv(fd, b, userData)
-        override fun writev(fd: Int, b: ByteBuffer, userData: Long) = ring.writev(fd, b, userData)
-        override fun submit() = ring.submit()
-        override fun wait(min: Int) = ring.wait(min)
-    }
-    reactor.register(fd, setOf(Interest.READ), 1L)
+    reactor.open()
+
+    // NioSupervisor and TlsElement are children of reactor.supervisor
+    val nioSup = NioSupervisor(parentJob = reactor.supervisor)
+    nioSup.open()
+
+    val ch: ChannelOperations = nioSup.service<ChannelOperations>()
+        ?: error("no ChannelOperations — platformNioProviders() not wired")
+
+    val tls = TlsElement(TlsSettings(serverName = host), parentJob = reactor.supervisor)
+    tls.open()
+
+    val handle = ch.openChannel()
 
     try {
-        val sha256 = _root_ide_package_.borg.trikeshed.userspace.nio.tls.codec.hash.DefaultSha256()
-        val x25519 = _root_ide_package_.borg.trikeshed.userspace.nio.tls.codec.ecdh.DefaultX25519()
-        val hkdf = _root_ide_package_.borg.trikeshed.userspace.nio.tls.codec.kdf.DefaultHkdfSha256(sha256)
-        val aes = _root_ide_package_.borg.trikeshed.userspace.nio.tls.codec.aead.DefaultAes128Gcm()
-        val codec = _root_ide_package_.borg.trikeshed.userspace.nio.tls.codec.CommonTlsRecordCodec(aes)
-        val hs = _root_ide_package_.borg.trikeshed.userspace.nio.tls.codec.CommonTlsClientHandshake(
-            sha256,
-            x25519,
-            hkdf,
-            codec,
-            host
-        )
+        val fd = reactor.submitWithThrottle { ch.socket(2, 1, 0) }
+        check(fd >= 0) { "socket() returned $fd" }
 
-        val ch = hs.buildClientHello()
-        val sentHello = handle.writev(
-            fd, ByteBuffer.wrap(
-                byteArrayOf(0x16, 0x03, 0x03,
-                    ((ch.size ushr 8) and 0xFF).toByte(),
-                    (ch.size and 0xFF).toByte()
-                ) + ch
-            )
-        )
-        check(sentHello > 0) { "client hello send failed: $sentHello" }
+        val cr = reactor.submitWithThrottle { ch.connect(fd, host, port) }
+        check(cr >= 0) { "connect($host:$port) returned $cr" }
 
-        var done = false
-        val buf = ByteArray(16384)
-        while (!done) {
-            reactor.poll(Duration.INFINITE)
-            val bb = ByteBuffer.wrap(buf)
-            val n = handle.readv(fd, bb)
-            if (n <= 0) error("recv failed")
+        // Helpers: raw socket read/write — use ch.recv/send directly (not the file-handle)
+        suspend fun rawRead(): ByteArray {
+            val buf = ByteBuffer(16384)
+            return reactor.submitWithThrottle {
+                val n = handle.readv(fd, buf)
+                if (n <= 0) error("socket recv failed: $n")
+                buf.array().copyOf(n)
+            }
+        }
+
+        suspend fun rawWrite(data: ByteArray) {
+            reactor.submitWithThrottle {
+                handle.writev(fd, ByteBuffer.wrap(data))
+            }
+        }
+
+        // TLS handshake — entirely through TlsElement; no platform types
+        tls.handshake(reader = { rawRead() }, writer = { rawWrite(it) })
+
+        // HTTP/1.1 request
+        val extraHeaders = request.headers.entries.joinToString("") { "${it.key}: ${it.value}\r\n" }
+        val reqBody = request.body.toString()
+        val reqBodyBytes = reqBody.encodeToByteArray()
+        val httpReq = buildString {
+            append("${request.method} $path HTTP/1.1\r\n")
+            append("Host: $host\r\n")
+            append("User-Agent: TrikeShed/1.0\r\n")
+            append("Accept: */*\r\n")
+            append("Connection: close\r\n")
+            if (extraHeaders.isNotEmpty()) append(extraHeaders)
+            if (reqBody.isNotEmpty()) append("Content-Length: ${reqBodyBytes.size}\r\n")
+            append("\r\n")
+            append(reqBody)
+        }
+
+        rawWrite(tls.wrap(httpReq.encodeToByteArray()))
+
+        // Read and decrypt response records
+        val headerBuf = StringBuilder()
+        val bodyBytes = mutableListOf<Byte>()
+        val respHeaders = mutableMapOf<CharSequence, CharSequence>()
+        var status = 0
+        var headersDone = false
+
+        while (true) {
+            val raw = try { rawRead() } catch (_: Exception) { break }
             var p = 0
-            while (p + 5 <= n) {
-                val rl = ((buf[p + 3].toInt() and 0xFF) shl 8) or (buf[p + 4].toInt() and 0xFF)
-                if (p + 5 + rl > n) break
-                val payload = buf.copyOfRange(p + 5, p + 5 + rl)
-                val rec = buf.copyOfRange(p, p + 5 + rl)
+            while (p + 5 <= raw.size) {
+                val ct = raw[p].toInt() and 0xFF
+                val rl = ((raw[p + 3].toInt() and 0xFF) shl 8) or (raw[p + 4].toInt() and 0xFF)
+                if (p + 5 + rl > raw.size) break
+                val record = raw.copyOfRange(p, p + 5 + rl)
                 p += 5 + rl
-                when (buf[p - 5 - rl].toInt()) {
-                    0x16 -> if (hs.state.name == "CLIENT_HELLO_SENT") hs.processServerHello(payload)
-                    0x17 -> codec.decrypt(_root_ide_package_.borg.trikeshed.userspace.nio.tls.codec.RecordDirection.SERVER_WRITE, rec)?.let { d ->
-                        processHs(d, hs, codec, handle, fd)
-                        if (hs.state.name == "CONNECTED") done = true
+                if (ct != 0x17) continue  // skip alerts / ChangeCipherSpec
+
+                val plain = tls.unwrap(record)
+
+                if (!headersDone) {
+                    headerBuf.append(plain.decodeToString())
+                    val he = headerBuf.indexOf("\r\n\r\n")
+                    if (he >= 0) {
+                        headersDone = true
+                        parseResponse(headerBuf.substring(0, he), respHeaders) { status = it }
+                        headerBuf.substring(he + 4).encodeToByteArray().forEach { bodyBytes.add(it) }
                     }
+                } else {
+                    plain.forEach { bodyBytes.add(it) }
                 }
             }
         }
 
-        // Build HTTP request with headers
-        val headerLines = request.headers
-            .filterKeys { it != "X-Query-Params" }
-            .map { "${it.key}: ${it.value}" }
-            .joinToString("\r\n")
-        val httpReq = "${request.method} $fullPath HTTP/1.1\r\n" +
-            "Host: $host\r\n" +
-            "User-Agent: TrikeShed/1.0\r\n" +
-            (if (headerLines.isNotEmpty()) "$headerLines\r\n" else "") +
-            "Accept: */*\r\nConnection: close\r\n\r\n" +
-            request.body
-        handle.writev(fd, ByteBuffer.wrap(
-            codec.encrypt(_root_ide_package_.borg.trikeshed.userspace.nio.tls.codec.RecordDirection.CLIENT_WRITE, _root_ide_package_.borg.trikeshed.userspace.nio.tls.record.ContentType.APPLICATION_DATA, httpReq.encodeToByteArray())
-        ))
-
-        val resp = mutableListOf<Byte>()
-        while (true) {
-            reactor.poll(Duration.INFINITE)
-            val rb = ByteBuffer.wrap(ByteArray(16384))
-            val n = handle.readv(fd, rb)
-            if (n <= 0) break
-            for (i in 0 until n) resp.add(rb.get(i))
-        }
-        val d = codec.decrypt(_root_ide_package_.borg.trikeshed.userspace.nio.tls.codec.RecordDirection.SERVER_WRITE, resp.toByteArray())
-            ?: error("decrypt failed")
-        val t = d.decodeToString()
-        val status = t.substringAfter(' ').substringBefore(' ').toInt()
-        val bodyStart = t.indexOf("\r\n\r\n")
-        HtxClientMessage(status = status, body = t.substring(bodyStart + 4))
+        HtxClientMessage(status = status, headers = respHeaders, body = bodyBytes.toByteArray().decodeToString())
     } finally {
-        reactor.deregister(fd)
+        tls.close()
+        nioSup.close()
+        ch.close(0)
     }
 }
 
-private suspend fun processHs(
-    data: ByteArray,
-    hs: borg.trikeshed.userspace.nio.tls.codec.CommonTlsClientHandshake,
-    codec: borg.trikeshed.userspace.nio.tls.codec.CommonTlsRecordCodec,
-    handle: ChannelOperations.ChannelHandle,
-    fd: Int,
+private fun parseResponse(
+    headerText: String,
+    out: MutableMap<CharSequence, CharSequence>,
+    onStatus: (Int) -> Unit,
 ) {
-    when ((data[0].toInt() and 0xFF)) {
-        0x08 -> hs.processEncryptedExtensions(data)
-        0x0B -> hs.processCertificate(data)
-        0x0F -> hs.processCertificateVerify(data)
-        0x14 -> {
-            hs.processServerFinished(data)
-            handle.writev(fd, ByteBuffer.wrap(
-                codec.encrypt(
-                    _root_ide_package_.borg.trikeshed.userspace.nio.tls.codec.RecordDirection.CLIENT_WRITE,
-                    _root_ide_package_.borg.trikeshed.userspace.nio.tls.record.ContentType.HANDSHAKE,
-                    hs.buildClientFinished()
-                )
-            ))
-        }
+    val lines = headerText.split("\r\n")
+    lines.firstOrNull()?.split(" ", limit = 3)?.getOrNull(1)?.toIntOrNull()?.let(onStatus)
+    for (line in lines.drop(1)) {
+        val c = line.indexOf(':')
+        if (c > 0) out[line.substring(0, c).trim()] = line.substring(c + 1).trim()
     }
 }

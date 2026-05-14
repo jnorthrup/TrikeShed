@@ -8,7 +8,7 @@ package borg.trikeshed.userspace.nio.tls.codec.aead
  * No platform dependencies. ~1.5 MB/s on JVM, ~0.3 MB/s on JS — adequate for TLS handshake.
  */
 class DefaultAes128Gcm : borg.trikeshed.userspace.nio.tls.codec.aead.Aes128Gcm {
-    override val key: kotlin.coroutines.CoroutineContext.Key<*> get() = _root_ide_package_.borg.trikeshed.userspace.nio.tls.codec.aead.Aes128Gcm.Key
+    override val key: kotlin.coroutines.CoroutineContext.Key<*> get() = borg.trikeshed.userspace.nio.tls.codec.aead.Aes128Gcm.Key
 
     // ── S-box ──────────────────────────────────────────────────────
 

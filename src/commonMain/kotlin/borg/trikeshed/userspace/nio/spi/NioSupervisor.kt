@@ -3,6 +3,7 @@ package borg.trikeshed.userspace.nio.spi
 import borg.trikeshed.context.AsyncContextElement
 import borg.trikeshed.context.AsyncContextKey
 import borg.trikeshed.context.ElementState
+import kotlinx.coroutines.Job
 import kotlin.coroutines.CoroutineContext
 
 /**
@@ -11,7 +12,7 @@ import kotlin.coroutines.CoroutineContext
  * Owns the lifecycle FSM ([AsyncContextElement]) and a service registry.
  * Platform providers are registered at [open] time and resolved via [service].
  */
-open class NioSupervisor : AsyncContextElement() {
+open class NioSupervisor(parentJob: Job? = null) : AsyncContextElement(parentJob = parentJob) {
     companion object Key : AsyncContextKey<NioSupervisor>()
     override val key: CoroutineContext.Key<*> get() = Key
 

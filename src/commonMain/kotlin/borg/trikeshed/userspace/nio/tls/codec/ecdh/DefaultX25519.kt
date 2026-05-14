@@ -10,14 +10,14 @@ import kotlin.random.Random
  * Constant-time scalar multiplication.
  */
 class DefaultX25519 : borg.trikeshed.userspace.nio.tls.codec.ecdh.X25519 {
-    override val key: kotlin.coroutines.CoroutineContext.Key<*> get() = _root_ide_package_.borg.trikeshed.userspace.nio.tls.codec.ecdh.X25519.Key
+    override val key: kotlin.coroutines.CoroutineContext.Key<*> get() = borg.trikeshed.userspace.nio.tls.codec.ecdh.X25519.Key
 
     override fun generateKeyPair(): borg.trikeshed.userspace.nio.tls.codec.ecdh.X25519.KeyPair {
         val private = Random.nextBytes(ByteArray(32))
         private[0] = (private[0].toInt() and 0xF8).toByte()
         private[31] = ((private[31].toInt() and 0x7F) or 0x40).toByte()
         val public = scalarMult(private, BASE_POINT)
-        return _root_ide_package_.borg.trikeshed.userspace.nio.tls.codec.ecdh.X25519.KeyPair(public, private)
+        return borg.trikeshed.userspace.nio.tls.codec.ecdh.X25519.KeyPair(public, private)
     }
 
     override fun sharedSecret(privateKey: ByteArray, peerPublicKey: ByteArray): ByteArray =

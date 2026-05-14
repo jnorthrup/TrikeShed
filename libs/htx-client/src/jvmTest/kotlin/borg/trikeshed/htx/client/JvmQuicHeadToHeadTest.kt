@@ -1,11 +1,11 @@
 package borg.trikeshed.htx.client
 
-import borg.trikeshed.tls.codec.aead.DefaultAes128Gcm
-import borg.trikeshed.tls.codec.ecdh.DefaultX25519
-import borg.trikeshed.tls.codec.hash.DefaultSha256
-import borg.trikeshed.tls.codec.kdf.DefaultHkdfSha256
-import borg.trikeshed.tls.codec.CommonTlsClientHandshake
-import borg.trikeshed.tls.codec.CommonTlsRecordCodec
+import borg.trikeshed.userspace.nio.tls.codec.aead.DefaultAes128Gcm
+import borg.trikeshed.userspace.nio.tls.codec.ecdh.DefaultX25519
+import borg.trikeshed.userspace.nio.tls.codec.hash.DefaultSha256
+import borg.trikeshed.userspace.nio.tls.codec.kdf.DefaultHkdfSha256
+import borg.trikeshed.userspace.nio.tls.codec.CommonTlsClientHandshake
+import borg.trikeshed.userspace.nio.tls.codec.CommonTlsRecordCodec
 import borg.trikeshed.userspace.nio.ByteBuffer
 import borg.trikeshed.userspace.nio.channels.spi.JvmChannelOperations
 import kotlinx.coroutines.test.runTest

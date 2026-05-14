@@ -1,20 +1,44 @@
 package borg.trikeshed.userspace.nio.channels.spi
 
+import borg.trikeshed.context.AsyncContextElement
+import borg.trikeshed.context.AsyncContextKey
+import borg.trikeshed.context.ElementState
 import borg.trikeshed.userspace.Channels
 import borg.trikeshed.userspace.File
 import borg.trikeshed.userspace.UringOp
 import borg.trikeshed.userspace.UringOp.Companion.UringSubmission
 import borg.trikeshed.userspace.nio.ByteBuffer
+import kotlinx.coroutines.Job
 
 /**
  * JVM ChannelOperations — all IO through FunctionalUringFacade / UserspaceChannelBackend.
  * Zero JDK imports. JDK is isolated in UserspaceIO.jvm.kt only.
+ *
+ * CCEK-compliant: AsyncContextElement with CREATED → OPEN → DRAINING → CLOSED lifecycle.
  */
-class JvmChannelOperations : ChannelOperations {
-    override val key get() = ChannelOperations.Key
+class JvmChannelOperations(
+    parentJob: Job? = null,
+) : AsyncContextElement(parentJob = parentJob), ChannelOperations {
+
+    companion object Key : AsyncContextKey<JvmChannelOperations>()
+    override val key get() = Key
 
     private val files = mutableMapOf<Int, File>()
     private val ring = Channels.open(entries = 256)
+
+    override suspend fun open() {
+        if (state.isAtLeast(ElementState.OPEN)) return
+        super.open()
+        state = ElementState.ACTIVE
+    }
+
+    override suspend fun close() {
+        if (state == ElementState.ACTIVE) {
+            state = ElementState.DRAINING
+            files.clear()
+        }
+        super.close()
+    }
 
     override fun openChannel(entries: Int): ChannelOperations.ChannelHandle =
         JvmChannelHandle(Channels.open(entries))
@@ -25,10 +49,8 @@ class JvmChannelOperations : ChannelOperations {
         return file.id
     }
 
-    override fun bind(fd: Int, port: Int): Int = -1   // server-side: not yet
-
+    override fun bind(fd: Int, port: Int): Int = -1
     override fun listen(fd: Int, backlog: Int): Int = -1
-
     override fun accept(fd: Int): Int = -1
 
     override fun connect(fd: Int, host: CharSequence, port: Int): Int {
@@ -68,6 +90,7 @@ class JvmChannelOperations : ChannelOperations {
         override fun write(buffer: ByteBuffer, offset: Long): Int = -1
         override fun readv(fd: Int, buffer: ByteBuffer, userData: Long): Int = recv(fd, buffer, userData)
         override fun writev(fd: Int, buffer: ByteBuffer, userData: Long): Int = send(fd, buffer, userData)
+        override fun prepAccept(serverFd: Int, userData: Long): Int = -1
         override fun submit(): Int = ch.submit()
         override fun wait(minComplete: Int): List<ChannelResult> =
             ch.wait(minComplete).map { ChannelResult(it.res, it.res, it.userData) }

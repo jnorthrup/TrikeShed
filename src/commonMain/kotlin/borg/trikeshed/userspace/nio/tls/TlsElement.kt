@@ -4,6 +4,7 @@ import borg.trikeshed.collections.s_
 import borg.trikeshed.context.AsyncContextElement
 import borg.trikeshed.context.ElementState
 import borg.trikeshed.lib.Series
+import kotlinx.coroutines.Job
 import kotlin.coroutines.CoroutineContext
 
 /**
@@ -30,7 +31,7 @@ data class CertificateFingerprint(val sha256: CharSequence)
  * @param pinnedCertificates optional certificate pinning (public key hashes)
  */
 data class TlsSettings(
-    val protocolVersion: borg.trikeshed.userspace.nio.tls.TlsProtocolVersion = _root_ide_package_.borg.trikeshed.userspace.nio.tls.TlsProtocolVersion.V1_3,
+    val protocolVersion: borg.trikeshed.userspace.nio.tls.TlsProtocolVersion = borg.trikeshed.userspace.nio.tls.TlsProtocolVersion.V1_3,
     val cipherSuites: Series<CharSequence> = s_["TLS_AES_256_GCM_SHA384", "TLS_CHACHA20_POLY1305_SHA256"],
     val serverName: CharSequence? = null,
     val pinnedCertificates: List<borg.trikeshed.userspace.nio.tls.CertificateFingerprint> = emptyList(),
@@ -39,7 +40,7 @@ data class TlsSettings(
 ) {
     companion object {
         /** Accept all versions (least secure — for legacy). */
-        val acceptAllVersions = TlsSettings(protocolVersion = _root_ide_package_.borg.trikeshed.userspace.nio.tls.TlsProtocolVersion.V1_2)
+        val acceptAllVersions = TlsSettings(protocolVersion = borg.trikeshed.userspace.nio.tls.TlsProtocolVersion.V1_2)
 
         /** Modern default: TLS 1.3 with strong cipher suites. */
         val default = TlsSettings()
@@ -56,8 +57,9 @@ expect fun createTlsEngine(settings: borg.trikeshed.userspace.nio.tls.TlsSetting
  * TlsElement wraps a real TLS engine with async lifecycle management.
  */
 class TlsElement(
-    val settings: borg.trikeshed.userspace.nio.tls.TlsSettings = _root_ide_package_.borg.trikeshed.userspace.nio.tls.TlsSettings.default,
-) : AsyncContextElement() {
+    val settings: borg.trikeshed.userspace.nio.tls.TlsSettings = borg.trikeshed.userspace.nio.tls.TlsSettings.default,
+    parentJob: Job? = null,
+) : AsyncContextElement(parentJob = parentJob) {
     override val key: CoroutineContext.Key<*> = Key
     companion object Key : CoroutineContext.Key<TlsElement>
 
@@ -67,7 +69,7 @@ class TlsElement(
     override suspend fun open() {
         if (state.isAtLeast(ElementState.OPEN)) return
         super.open()
-        engine = _root_ide_package_.borg.trikeshed.userspace.nio.tls.createTlsEngine(settings)
+        engine = borg.trikeshed.userspace.nio.tls.createTlsEngine(settings)
     }
 
     override suspend fun close() {
@@ -76,6 +78,11 @@ class TlsElement(
             engine?.close()
         }
         super.close()
+    }
+
+    suspend fun handshake(reader: suspend () -> ByteArray, writer: suspend (ByteArray) -> Unit) {
+        check(state.isAtLeast(ElementState.OPEN)) { "TlsElement not open" }
+        engine!!.handshake(reader, writer)
     }
 
     suspend fun wrap(plain: ByteArray): ByteArray {

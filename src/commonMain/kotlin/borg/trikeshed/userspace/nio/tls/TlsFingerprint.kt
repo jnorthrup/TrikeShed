@@ -43,8 +43,8 @@ enum class BrowserProfile(val label: CharSequence, val marketSharePercent: Int) 
      */
     val fingerprint: borg.trikeshed.userspace.nio.tls.TlsFingerprint
         get() = when (this) {
-        SAFARI_17 -> _root_ide_package_.borg.trikeshed.userspace.nio.tls.TlsFingerprint(
-            version = _root_ide_package_.borg.trikeshed.userspace.nio.tls.TlsVersionKind.V1_3,
+        SAFARI_17 -> borg.trikeshed.userspace.nio.tls.TlsFingerprint(
+            version = borg.trikeshed.userspace.nio.tls.TlsVersionKind.V1_3,
             cipherSuites = s_[0x1301, 0x1302, 0x1303, 0xC02F, 0xC030, 0xCCA9, 0xC02B, 0xC02C, ],
             extensions = s_[0x0000, 0x000B, 0x000A, 0x0023, 0x0010, 0x0005, 0x0033, 0x002B, 0x0029, ],
             ellipticCurves = s_[0x001D, 0x0017, 0x0018, ],
@@ -54,8 +54,8 @@ enum class BrowserProfile(val label: CharSequence, val marketSharePercent: Int) 
             earlyData = false,
             sessionTicket = true,
         )
-        CHROME_120 -> _root_ide_package_.borg.trikeshed.userspace.nio.tls.TlsFingerprint(
-            version = _root_ide_package_.borg.trikeshed.userspace.nio.tls.TlsVersionKind.V1_3,
+        CHROME_120 -> borg.trikeshed.userspace.nio.tls.TlsFingerprint(
+            version = borg.trikeshed.userspace.nio.tls.TlsVersionKind.V1_3,
             cipherSuites = s_[0x1301, 0x1302, 0x1303, 0xC02F, 0xC030, 0xCCA9, 0xC02B, 0xC02C, 0xCCA8],
             extensions = s_[0x0000, 0x000B, 0x000A, 0x0023, 0x0010, 0x0005, 0x0012, 0x0033, 0x002B, 0x002A, 0x001B, 0x0029],
             ellipticCurves = s_[0x001D, 0x0017, 0x0018, 0x0019],
@@ -65,8 +65,8 @@ enum class BrowserProfile(val label: CharSequence, val marketSharePercent: Int) 
             earlyData = true,
             sessionTicket = true,
         )
-        FIREFOX_121 -> _root_ide_package_.borg.trikeshed.userspace.nio.tls.TlsFingerprint(
-            version = _root_ide_package_.borg.trikeshed.userspace.nio.tls.TlsVersionKind.V1_3,
+        FIREFOX_121 -> borg.trikeshed.userspace.nio.tls.TlsFingerprint(
+            version = borg.trikeshed.userspace.nio.tls.TlsVersionKind.V1_3,
             cipherSuites = s_[0x1301, 0x1302, 0x1303, 0xC02B, 0xC02F, 0xC02C, 0xC030, 0xCCA9, 0xCCA8],
             extensions = s_[0x0000, 0x000B, 0x000A, 0x0023, 0x0010, 0x0033, 0x002B, 0x0029],
             ellipticCurves = s_[0x001D, 0x0017, 0x0018],
@@ -76,8 +76,8 @@ enum class BrowserProfile(val label: CharSequence, val marketSharePercent: Int) 
             earlyData = false,
             sessionTicket = true,
         )
-        SAMSUNG_21 -> _root_ide_package_.borg.trikeshed.userspace.nio.tls.TlsFingerprint(
-            version = _root_ide_package_.borg.trikeshed.userspace.nio.tls.TlsVersionKind.V1_3,
+        SAMSUNG_21 -> borg.trikeshed.userspace.nio.tls.TlsFingerprint(
+            version = borg.trikeshed.userspace.nio.tls.TlsVersionKind.V1_3,
             cipherSuites = s_[0x1301, 0x1302, 0x1303, 0xC02F, 0xC030, 0xC02B, 0xC02C],
             extensions = s_[0x0000, 0x000B, 0x000A, 0x0023, 0x0010, 0x0033, 0x002B, 0x0029],
             ellipticCurves = s_[0x001D, 0x0017, 0x0018],
@@ -87,8 +87,8 @@ enum class BrowserProfile(val label: CharSequence, val marketSharePercent: Int) 
             earlyData = false,
             sessionTicket = true,
         )
-        EDGE_120 -> _root_ide_package_.borg.trikeshed.userspace.nio.tls.TlsFingerprint(
-            version = _root_ide_package_.borg.trikeshed.userspace.nio.tls.TlsVersionKind.V1_3,
+        EDGE_120 -> borg.trikeshed.userspace.nio.tls.TlsFingerprint(
+            version = borg.trikeshed.userspace.nio.tls.TlsVersionKind.V1_3,
             cipherSuites = s_[0x1301, 0x1302, 0x1303, 0xC02F, 0xC030, 0xCCA9, 0xC02B, 0xC02C, 0xCCA8],
             extensions = s_[0x0000, 0x000B, 0x000A, 0x0023, 0x0010, 0x0005, 0x0033, 0x002B, 0x002A, 0x0029],
             ellipticCurves = s_[0x001D, 0x0017, 0x0018, 0x0019],
@@ -124,7 +124,7 @@ enum class BrowserProfile(val label: CharSequence, val marketSharePercent: Int) 
  * Mirrors literbike/src/tls_fingerprint.rs:TlsFingerprintManager.
  */
 class TlsFingerprintManager(
-    initialProfile: borg.trikeshed.userspace.nio.tls.BrowserProfile = _root_ide_package_.borg.trikeshed.userspace.nio.tls.BrowserProfile.random(),
+    initialProfile: borg.trikeshed.userspace.nio.tls.BrowserProfile = borg.trikeshed.userspace.nio.tls.BrowserProfile.random(),
     /** Rotate fingerprint every N seconds (0 = disabled). */
     val rotationIntervalSec: Int = 1200,  // 20 minutes default
 ) {
@@ -150,7 +150,7 @@ class TlsFingerprintManager(
         val elapsed = nowMs - lastRotationMs
         val thresholdMs = (rotationIntervalSec * 1000L) + Random.nextInt(0, 900_000) // add ±15min jitter
         if (elapsed >= thresholdMs) {
-            val newProfile = _root_ide_package_.borg.trikeshed.userspace.nio.tls.BrowserProfile.random()
+            val newProfile = borg.trikeshed.userspace.nio.tls.BrowserProfile.random()
             profileHistory.add(nowMs to newProfile)
             if (profileHistory.size > 5) profileHistory.removeAt(0)
             currentProfile = newProfile
@@ -163,7 +163,7 @@ class TlsFingerprintManager(
      * Force immediate profile rotation.
      */
     fun forceRotate(nowMs: Long) {
-        val newProfile = _root_ide_package_.borg.trikeshed.userspace.nio.tls.BrowserProfile.random()
+        val newProfile = borg.trikeshed.userspace.nio.tls.BrowserProfile.random()
         profileHistory.add(nowMs to newProfile)
         if (profileHistory.size > 5) profileHistory.removeAt(0)
         currentProfile = newProfile
@@ -183,7 +183,7 @@ class TlsFingerprintManager(
         ja3Cache[serverName]?.let { return it }
 
         val fp = currentProfile.fingerprint
-        val version = when (fp.version) { _root_ide_package_.borg.trikeshed.userspace.nio.tls.TlsVersionKind.V1_2 -> "771"; _root_ide_package_.borg.trikeshed.userspace.nio.tls.TlsVersionKind.V1_3 -> "772" }
+        val version = when (fp.version) { borg.trikeshed.userspace.nio.tls.TlsVersionKind.V1_2 -> "771"; borg.trikeshed.userspace.nio.tls.TlsVersionKind.V1_3 -> "772" }
         val ciphers = fp.cipherSuites.view.joinToString("-") { it.toInt().and(0xFFFF).toString() }
         val extensions = fp.extensions.view.joinToString("-") { it.toInt().and(0xFFFF).toString() }
         val curves = fp.ellipticCurves.view.joinToString("-") { it.toInt().and(0xFFFF).toString() }
@@ -201,9 +201,9 @@ class TlsFingerprintManager(
      */
     fun toTlsSettings(serverName: CharSequence? = null): borg.trikeshed.userspace.nio.tls.TlsSettings {
         val fp = currentProfile.fingerprint
-        return _root_ide_package_.borg.trikeshed.userspace.nio.tls.TlsSettings(
+        return borg.trikeshed.userspace.nio.tls.TlsSettings(
             protocolVersion = when (fp.version) {
-                _root_ide_package_.borg.trikeshed.userspace.nio.tls.TlsVersionKind.V1_2 -> _root_ide_package_.borg.trikeshed.userspace.nio.tls.TlsProtocolVersion.V1_2; _root_ide_package_.borg.trikeshed.userspace.nio.tls.TlsVersionKind.V1_3 -> _root_ide_package_.borg.trikeshed.userspace.nio.tls.TlsProtocolVersion.V1_3
+                borg.trikeshed.userspace.nio.tls.TlsVersionKind.V1_2 -> borg.trikeshed.userspace.nio.tls.TlsProtocolVersion.V1_2; borg.trikeshed.userspace.nio.tls.TlsVersionKind.V1_3 -> borg.trikeshed.userspace.nio.tls.TlsProtocolVersion.V1_3
             },
             cipherSuites = (fp.cipherSuites α { suiteName(it) }) as Series<CharSequence>,
             serverName = serverName,

@@ -181,7 +181,7 @@ switch (project.path) {
     case ":libs:ngsctp":
         kmpHost()
         extensions.getByName("kotlin").sourceSets.getByName("commonMain").dependencies {
-            implementation project(":libs:tls")
+            implementation project(":") // TLS lives in the root project commonMain
         }
         break
     case ":libs:quic":
@@ -501,7 +501,7 @@ switch (project.path) {
         extensions.getByName("kotlin").sourceSets.getByName("commonMain").dependencies {
             implementation project(":libs:htx-client")
             implementation project(":libs:ipfs")
-            implementation project(":libs:tls")
+            implementation project(":libs:ipfs") // ipfs and htx-client live in the root project commonMain
             implementation project(":libs:miniduck")
             implementation project(":libs:couch")
         }
@@ -521,9 +521,7 @@ switch (project.path) {
     case ":libs:htx-client":
         kmpHost()
         extensions.getByName("kotlin").sourceSets.getByName("commonMain").dependencies {
-            implementation project(":libs:tls")
-            implementation project(":libs:quic")
-            implementation project(":libs:ngsctp")
+            // TLS, quic, ngsctp live in the root project commonMain
         }
         extensions.getByName("kotlin").sourceSets.getByName("commonMain").kotlin.srcDir("src/generated/kotlin")
 
@@ -558,7 +556,7 @@ switch (project.path) {
     case ":libs:jules-client":
         kmpHost()
         extensions.getByName("kotlin").sourceSets.getByName("commonMain").dependencies {
-            implementation project(":libs:tls")
+            implementation project(":") // TLS lives in the root project commonMain
         }
         break
     default:

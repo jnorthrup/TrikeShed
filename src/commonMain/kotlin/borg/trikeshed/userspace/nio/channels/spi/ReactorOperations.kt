@@ -1,8 +1,12 @@
 package borg.trikeshed.userspace.nio.channels.spi
 
+import borg.trikeshed.context.AsyncContextElement
+import borg.trikeshed.context.AsyncContextKey
+import borg.trikeshed.userspace.reactor.Interest
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlin.coroutines.CoroutineContext
 import kotlin.time.Duration
-import borg.trikeshed.userspace.reactor.Interest
 
 /**
  * Platform poll/reactor abstraction — fills the NIO async-file-signal gap.
@@ -25,3 +29,14 @@ data class ReactorSignal(
     val ready: Set<Interest>,
     val userData: Long,
 )
+
+/**
+ * Abstract base enforcing CCEK: all ReactorOperations implementations
+ * must be AsyncContextElements with proper lifecycle.
+ */
+abstract class AsyncReactorOperations(
+    parentJob: Job? = null,
+) : AsyncContextElement(parentJob = parentJob), ReactorOperations {
+    companion object Key : AsyncContextKey<AsyncReactorOperations>()
+    override val key: CoroutineContext.Key<*> get() = Key
+}

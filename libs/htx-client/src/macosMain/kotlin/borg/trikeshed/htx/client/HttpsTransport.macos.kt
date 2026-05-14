@@ -1,10 +1,7 @@
 package borg.trikeshed.htx.client
 
-import borg.trikeshed.userspace.nio.channels.spi.PosixChannelOperations
-import borg.trikeshed.userspace.nio.channels.spi.PosixReactorOperations
+import borg.trikeshed.userspace.reactor.UringReactor
 
-private val platformChannels = PosixChannelOperations()
-private val platformReactor = PosixReactorOperations(platformChannels)
+private val reactor = UringReactor()
 
-actual fun createHttpsHandler(): HtxRequestHandler =
-    ringHttpsHandler(platformChannels, platformReactor)
+actual fun createHttpsHandler(): HtxRequestHandler = ringHttpsHandler(reactor)

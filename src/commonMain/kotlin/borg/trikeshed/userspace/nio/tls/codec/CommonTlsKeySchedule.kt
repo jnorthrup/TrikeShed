@@ -11,7 +11,7 @@ import borg.trikeshed.userspace.nio.tls.codec.kdf.HkdfSha256
 class CommonTlsKeySchedule(
     private val hkdf: borg.trikeshed.userspace.nio.tls.codec.kdf.HkdfSha256,
 ) : borg.trikeshed.userspace.nio.tls.codec.TlsKeySchedule {
-    override val key: kotlin.coroutines.CoroutineContext.Key<*> get() = _root_ide_package_.borg.trikeshed.userspace.nio.tls.codec.TlsKeySchedule.Key
+    override val key: kotlin.coroutines.CoroutineContext.Key<*> get() = borg.trikeshed.userspace.nio.tls.codec.TlsKeySchedule.Key
 
     private fun deriveSecret(secret: ByteArray, label: CharSequence, messagesHash: ByteArray): ByteArray =
         hkdf.expandLabel(secret, label, messagesHash, 32)
@@ -35,7 +35,7 @@ class CommonTlsKeySchedule(
         // Application traffic secrets
         val cats = deriveSecret(ms, "c ap traffic", handshakeHash)
         val sats = deriveSecret(ms, "s ap traffic", handshakeHash)
-        return _root_ide_package_.borg.trikeshed.userspace.nio.tls.codec.TrafficKeyMaterial(
+        return borg.trikeshed.userspace.nio.tls.codec.TrafficKeyMaterial(
             clientHandshakeKey = trafficKey(chts), clientHandshakeIv = trafficIv(chts),
             serverHandshakeKey = trafficKey(shts), serverHandshakeIv = trafficIv(shts),
             clientApplicationKey = trafficKey(cats), clientApplicationIv = trafficIv(cats),

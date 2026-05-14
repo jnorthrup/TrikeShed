@@ -64,7 +64,7 @@ class ReactorWebSocketHandler(
 
         // TLS wrapping if wss://
         if (request.path.startsWith("wss://") && tlsSettings != null) {
-            tls = _root_ide_package_.borg.trikeshed.userspace.nio.tls.TlsElement(tlsSettings).also { it.open() }
+            tls = borg.trikeshed.userspace.nio.tls.TlsElement(tlsSettings).also { it.open() }
         }
 
         // WebSocket handshake

@@ -1,8 +1,5 @@
 package borg.trikeshed.userspace.nio.tls.codec
 
-import borg.trikeshed.userspace.nio.tls.codec.ecdh.X25519
-import borg.trikeshed.userspace.nio.tls.codec.hash.Sha256
-import borg.trikeshed.userspace.nio.tls.codec.kdf.HkdfSha256
 import kotlin.random.Random
 
 /**
@@ -32,13 +29,13 @@ class CommonTlsClientHandshake(
     private val sha256: borg.trikeshed.userspace.nio.tls.codec.hash.Sha256,
     private val x25519: borg.trikeshed.userspace.nio.tls.codec.ecdh.X25519,
     private val hkdf: borg.trikeshed.userspace.nio.tls.codec.kdf.HkdfSha256,
-    private val recordCodec: borg.trikeshed.userspace.nio.tls.codec.TlsRecordCodec,
+    private val recordCodec: TlsRecordCodec,
     private val serverName: CharSequence,
     private val alpnProtocols: List<CharSequence> = listOf("h2", "http/1.1"),
-) : borg.trikeshed.userspace.nio.tls.codec.TlsClientHandshake {
-    override val key: kotlin.coroutines.CoroutineContext.Key<*> get() = _root_ide_package_.borg.trikeshed.userspace.nio.tls.codec.TlsClientHandshake.Key
+) : TlsClientHandshake {
+    override val key: kotlin.coroutines.CoroutineContext.Key<*> get() = TlsClientHandshake.Key
 
-    override var state: borg.trikeshed.userspace.nio.tls.codec.TlsClientHandshake.State = _root_ide_package_.borg.trikeshed.userspace.nio.tls.codec.TlsClientHandshake.State.IDLE; private set
+    override var state: TlsClientHandshake.State = TlsClientHandshake.State.IDLE; private set
 
     private val clientKeyPair = x25519.generateKeyPair()
     private var serverPublicKey: ByteArray? = null
@@ -53,14 +50,14 @@ class CommonTlsClientHandshake(
     }
 
     override fun buildClientHello(): ByteArray {
-        check(state == _root_ide_package_.borg.trikeshed.userspace.nio.tls.codec.TlsClientHandshake.State.IDLE)
+        check(state == TlsClientHandshake.State.IDLE)
         val body = buildClientHelloBody()
         val msg = frameHandshake(0x01, body)
-        transcript.add(msg); state = _root_ide_package_.borg.trikeshed.userspace.nio.tls.codec.TlsClientHandshake.State.CLIENT_HELLO_SENT
+        transcript.add(msg); state = TlsClientHandshake.State.CLIENT_HELLO_SENT
         return msg
     }
 
-    private fun buildClientHelloBody(): ByteArray = _root_ide_package_.borg.trikeshed.userspace.nio.tls.codec.ByteArrayBuilder()
+    private fun buildClientHelloBody(): ByteArray = ByteArrayBuilder()
         .run {
         put16(0x0303); put(clientRandom); put8(0)
         put16(2); put16(0x1301); put8(1); put8(0)
@@ -68,7 +65,7 @@ class CommonTlsClientHandshake(
         toByteArray()
     }
 
-    private fun buildExtensions(): ByteArray = _root_ide_package_.borg.trikeshed.userspace.nio.tls.codec.ByteArrayBuilder()
+    private fun buildExtensions(): ByteArray = ByteArrayBuilder()
         .run {
         putExtension(43) { put8(2); put16(0x0304) }
         putExtension(10) { put16(2); put16(0x001D) }
@@ -87,7 +84,7 @@ class CommonTlsClientHandshake(
     }
 
     override fun processServerHello(message: ByteArray) {
-        check(state == _root_ide_package_.borg.trikeshed.userspace.nio.tls.codec.TlsClientHandshake.State.CLIENT_HELLO_SENT); transcript.add(message)
+        check(state == TlsClientHandshake.State.CLIENT_HELLO_SENT); transcript.add(message)
         val body = message.copyOfRange(4, message.size)
         var p = 2; p += 32
         p += 1 + (body[p].toInt() and 0xFF)
@@ -119,7 +116,7 @@ class CommonTlsClientHandshake(
         sharedSecret = x25519.sharedSecret(clientKeyPair.privateKey, spk)
         if (!handshakeKeysInstalled) {
             val helloH = sha256.hash((transcript[0].toList() + transcript[1].toList()).toByteArray())
-            val schedule = _root_ide_package_.borg.trikeshed.userspace.nio.tls.codec.CommonTlsKeySchedule(hkdf)
+            val schedule = CommonTlsKeySchedule(hkdf)
             val keys = schedule.compute(sharedSecret!!, helloH, helloH)
             recordCodec.installKeys(
                 keys.clientHandshakeKey,
@@ -129,40 +126,43 @@ class CommonTlsClientHandshake(
             )
             handshakeKeysInstalled = true
         }
-        state = _root_ide_package_.borg.trikeshed.userspace.nio.tls.codec.TlsClientHandshake.State.WAITING_EE
+        state = TlsClientHandshake.State.WAITING_EE
     }
 
     override fun processEncryptedExtensions(message: ByteArray) {
-        check(state == _root_ide_package_.borg.trikeshed.userspace.nio.tls.codec.TlsClientHandshake.State.WAITING_EE); transcript.add(message)
-        state = _root_ide_package_.borg.trikeshed.userspace.nio.tls.codec.TlsClientHandshake.State.WAITING_CERT
+        check(state == TlsClientHandshake.State.WAITING_EE); transcript.add(message)
+        state = TlsClientHandshake.State.WAITING_CERT
     }
 
     override fun processCertificate(message: ByteArray) {
-        check(state == _root_ide_package_.borg.trikeshed.userspace.nio.tls.codec.TlsClientHandshake.State.WAITING_CERT); transcript.add(message)
-        state = _root_ide_package_.borg.trikeshed.userspace.nio.tls.codec.TlsClientHandshake.State.WAITING_CV
+        check(state == TlsClientHandshake.State.WAITING_CERT); transcript.add(message)
+        state = TlsClientHandshake.State.WAITING_CV
     }
 
     override fun processCertificateVerify(message: ByteArray) {
-        check(state == _root_ide_package_.borg.trikeshed.userspace.nio.tls.codec.TlsClientHandshake.State.WAITING_CV); transcript.add(message)
-        state = _root_ide_package_.borg.trikeshed.userspace.nio.tls.codec.TlsClientHandshake.State.WAITING_FINISHED
+        check(state == TlsClientHandshake.State.WAITING_CV); transcript.add(message)
+        state = TlsClientHandshake.State.WAITING_FINISHED
     }
 
     override fun processServerFinished(message: ByteArray) {
-        check(state == _root_ide_package_.borg.trikeshed.userspace.nio.tls.codec.TlsClientHandshake.State.WAITING_FINISHED); transcript.add(message)
-        val helloH = sha256.hash((transcript[0].toList() + transcript[1].toList()).toByteArray())
-        val schedule = _root_ide_package_.borg.trikeshed.userspace.nio.tls.codec.CommonTlsKeySchedule(hkdf)
-        val keys = schedule.compute(sharedSecret!!, helloH, transcriptHash())
+        check(state == TlsClientHandshake.State.WAITING_FINISHED)
+        val preFinishHash = transcriptHash()
+        transcript.add(message)
+        val schedule = CommonTlsKeySchedule(hkdf)
+        val keys = schedule.compute(sharedSecret!!, preFinishHash, preFinishHash)
         recordCodec.installKeys(keys.clientHandshakeKey, keys.clientHandshakeIv,
             keys.serverHandshakeKey, keys.serverHandshakeIv)
-        state = _root_ide_package_.borg.trikeshed.userspace.nio.tls.codec.TlsClientHandshake.State.CONNECTED
+        // Install application traffic keys after handshake keys
+        installApplicationKeys()
+        state = TlsClientHandshake.State.CONNECTED
     }
 
     /** Install application traffic keys after the handshake reaches CONNECTED. */
     fun installApplicationKeys() {
-        check(state == _root_ide_package_.borg.trikeshed.userspace.nio.tls.codec.TlsClientHandshake.State.CONNECTED)
+        check(state == TlsClientHandshake.State.CONNECTED)
         val transcript = transcriptHash()
         val helloH = ByteArray(32) // dummy — app keys use master secret derived from sharedSecret + zero salt
-        val schedule = _root_ide_package_.borg.trikeshed.userspace.nio.tls.codec.CommonTlsKeySchedule(hkdf)
+        val schedule = CommonTlsKeySchedule(hkdf)
         val keys = schedule.compute(sharedSecret!!, helloH, transcript)
         recordCodec.installKeys(
             keys.clientApplicationKey,
@@ -173,10 +173,10 @@ class CommonTlsClientHandshake(
     }
 
     override fun buildClientFinished(): ByteArray {
-        check(state == _root_ide_package_.borg.trikeshed.userspace.nio.tls.codec.TlsClientHandshake.State.CONNECTED)
-        val helloH = sha256.hash((transcript[0].toList() + transcript[1].toList()).toByteArray())
-        val schedule = _root_ide_package_.borg.trikeshed.userspace.nio.tls.codec.CommonTlsKeySchedule(hkdf)
-        val keys = schedule.compute(sharedSecret!!, helloH, transcriptHash())
+        check(state == TlsClientHandshake.State.CONNECTED)
+        val transcriptHash = transcriptHash()
+        val schedule = CommonTlsKeySchedule(hkdf)
+        val keys = schedule.compute(sharedSecret!!, transcriptHash, transcriptHash)
         val fk = hkdf.expandLabel(keys.clientHandshakeKey, "finished", ByteArray(0), 32)
         val vd = sha256.hmac(fk, transcriptHash())
         return frameHandshake(0x14, vd).also { transcript.add(it) }
@@ -189,8 +189,8 @@ class CommonTlsClientHandshake(
         body.copyInto(m, 4); return m
     }
 
-    private fun borg.trikeshed.userspace.nio.tls.codec.ByteArrayBuilder.putExtension(type: Int, f: borg.trikeshed.userspace.nio.tls.codec.ByteArrayBuilder.() -> Unit) {
-        val inner = _root_ide_package_.borg.trikeshed.userspace.nio.tls.codec.ByteArrayBuilder(); f(inner)
+    private fun ByteArrayBuilder.putExtension(type: Int, f: ByteArrayBuilder.() -> Unit) {
+        val inner = ByteArrayBuilder(); f(inner)
         put16(type); putVar16(inner.toByteArray())
     }
 }

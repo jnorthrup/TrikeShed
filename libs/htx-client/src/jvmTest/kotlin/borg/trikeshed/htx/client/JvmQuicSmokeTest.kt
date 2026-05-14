@@ -1,7 +1,7 @@
 package borg.trikeshed.htx.client
 
-import borg.trikeshed.tls.codec.hash.DefaultSha256
-import borg.trikeshed.tls.codec.kdf.DefaultHkdfSha256
+import borg.trikeshed.userspace.nio.tls.codec.hash.DefaultSha256
+import borg.trikeshed.userspace.nio.tls.codec.kdf.DefaultHkdfSha256
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals

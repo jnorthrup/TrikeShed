@@ -13,7 +13,7 @@ import borg.trikeshed.userspace.nio.tls.record.ContentType
 class CommonTlsRecordCodec(
     private val aes128: borg.trikeshed.userspace.nio.tls.codec.aead.Aes128Gcm,
 ) : borg.trikeshed.userspace.nio.tls.codec.TlsRecordCodec {
-    override val key: kotlin.coroutines.CoroutineContext.Key<*> get() = _root_ide_package_.borg.trikeshed.userspace.nio.tls.codec.TlsRecordCodec.Key
+    override val key: kotlin.coroutines.CoroutineContext.Key<*> get() = borg.trikeshed.userspace.nio.tls.codec.TlsRecordCodec.Key
 
     private var clientKey: ByteArray? = null
     private var clientIv: ByteArray? = null
@@ -24,8 +24,8 @@ class CommonTlsRecordCodec(
 
     override suspend fun encrypt(direction: borg.trikeshed.userspace.nio.tls.codec.RecordDirection, innerType: borg.trikeshed.userspace.nio.tls.record.ContentType, plaintext: ByteArray): ByteArray {
         val (key, iv, seq) = when (direction) {
-            _root_ide_package_.borg.trikeshed.userspace.nio.tls.codec.RecordDirection.CLIENT_WRITE -> Triple(clientKey!!, clientIv!!, clientSeq++)
-            _root_ide_package_.borg.trikeshed.userspace.nio.tls.codec.RecordDirection.SERVER_WRITE -> Triple(serverKey!!, serverIv!!, serverSeq++)
+            borg.trikeshed.userspace.nio.tls.codec.RecordDirection.CLIENT_WRITE -> Triple(clientKey!!, clientIv!!, clientSeq++)
+            borg.trikeshed.userspace.nio.tls.codec.RecordDirection.SERVER_WRITE -> Triple(serverKey!!, serverIv!!, serverSeq++)
         }
         val nonce = xorNonce(seq, iv)
         val recordLen = plaintext.size + 1 + aes128.tagLength
@@ -39,8 +39,8 @@ class CommonTlsRecordCodec(
 
     override suspend fun decrypt(direction: borg.trikeshed.userspace.nio.tls.codec.RecordDirection, wire: ByteArray): ByteArray? {
         val (key, iv, seq) = when (direction) {
-            _root_ide_package_.borg.trikeshed.userspace.nio.tls.codec.RecordDirection.CLIENT_WRITE -> Triple(clientKey!!, clientIv!!, clientSeq++)
-            _root_ide_package_.borg.trikeshed.userspace.nio.tls.codec.RecordDirection.SERVER_WRITE -> Triple(serverKey!!, serverIv!!, serverSeq++)
+            borg.trikeshed.userspace.nio.tls.codec.RecordDirection.CLIENT_WRITE -> Triple(clientKey!!, clientIv!!, clientSeq++)
+            borg.trikeshed.userspace.nio.tls.codec.RecordDirection.SERVER_WRITE -> Triple(serverKey!!, serverIv!!, serverSeq++)
         }
         val nonce = xorNonce(seq, iv)
         val aad = wire.copyOfRange(0, 5)

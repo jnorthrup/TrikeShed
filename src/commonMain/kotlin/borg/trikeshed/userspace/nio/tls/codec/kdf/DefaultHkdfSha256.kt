@@ -11,7 +11,7 @@ import borg.trikeshed.userspace.nio.tls.codec.hash.Sha256
 class DefaultHkdfSha256(
     private val sha256: borg.trikeshed.userspace.nio.tls.codec.hash.Sha256,
 ) : borg.trikeshed.userspace.nio.tls.codec.kdf.HkdfSha256 {
-    override val key: kotlin.coroutines.CoroutineContext.Key<*> get() = _root_ide_package_.borg.trikeshed.userspace.nio.tls.codec.kdf.HkdfSha256.Key
+    override val key: kotlin.coroutines.CoroutineContext.Key<*> get() = borg.trikeshed.userspace.nio.tls.codec.kdf.HkdfSha256.Key
 
     override fun extract(salt: ByteArray?, ikm: ByteArray): ByteArray {
         val s = salt ?: ByteArray(hashLen)
