@@ -1,8 +1,8 @@
 package borg.trikeshed.htx.client
 
 import borg.trikeshed.lib.*
-import borg.trikeshed.tls.TlsElement
-import borg.trikeshed.tls.TlsSettings
+import borg.trikeshed.userspace.nio.tls.TlsElement
+import borg.trikeshed.userspace.nio.tls.TlsSettings
 import borg.trikeshed.ws.FrameHeader
 import borg.trikeshed.ws.Rfc6455Handshake
 import borg.trikeshed.ws.WebSocketFrame
@@ -13,7 +13,7 @@ import borg.trikeshed.userspace.nio.channels.spi.ChannelOperations
  * Reactor-integrated WebSocket transport handler for the HTX client.
  *
  * This is the [HtxRequestHandler] registered for [borg.trikeshed.htx.client.HtxTransport.WEBSOCKET].
- * It opens a raw TCP socket via [ChannelOperations], optionally wraps it with TLS ([TlsElement]),
+ * It opens a raw TCP socket via [ChannelOperations], optionally wraps it with TLS ([borg.trikeshed.userspace.nio.tls.TlsElement]),
  * performs the RFC 6455 WebSocket handshake, and then reads/writes WS frames.
  *
  * ## Design
@@ -35,12 +35,12 @@ import borg.trikeshed.userspace.nio.channels.spi.ChannelOperations
  */
 class ReactorWebSocketHandler(
     private val channelOps: ChannelOperations,
-    private val tlsSettings: TlsSettings? = null,
+    private val tlsSettings: borg.trikeshed.userspace.nio.tls.TlsSettings? = null,
 ) : HtxRequestHandler {
 
     private var connected = false
     private var sockFd: Int = -1
-    private var tls: TlsElement? = null
+    private var tls: borg.trikeshed.userspace.nio.tls.TlsElement? = null
     private var readBuffer = ByteArray(65536)
 
     override suspend fun invoke(request: HtxClientRequest): HtxClientMessage {
@@ -64,7 +64,7 @@ class ReactorWebSocketHandler(
 
         // TLS wrapping if wss://
         if (request.path.startsWith("wss://") && tlsSettings != null) {
-            tls = TlsElement(tlsSettings).also { it.open() }
+            tls = _root_ide_package_.borg.trikeshed.userspace.nio.tls.TlsElement(tlsSettings).also { it.open() }
         }
 
         // WebSocket handshake

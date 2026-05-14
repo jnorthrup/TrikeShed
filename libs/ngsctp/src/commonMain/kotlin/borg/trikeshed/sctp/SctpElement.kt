@@ -6,7 +6,7 @@ import borg.trikeshed.context.ElementState
 import borg.trikeshed.context.StreamHandle
 import borg.trikeshed.context.StreamTransport
 import borg.trikeshed.lib.*
-import borg.trikeshed.tls.TlsEngine
+import borg.trikeshed.userspace.nio.tls.TlsEngine
 import kotlinx.coroutines.channels.Channel
 
 // ── Enums (preserved — test assertions pin exact sizes) ───────────────
@@ -89,9 +89,9 @@ data class SctpConfig(
     /**
      * Optional TLS engine for DTLS-style wrapping of SCTP payloads.
      * When null, data is sent in cleartext (standard SCTP behavior).
-     * When set, all user data passes through [TlsEngine.wrap]/[TlsEngine.unwrap].
+     * When set, all user data passes through [borg.trikeshed.userspace.nio.tls.TlsEngine.wrap]/[borg.trikeshed.userspace.nio.tls.TlsEngine.unwrap].
      */
-    val tlsEngine: TlsEngine? = null,
+    val tlsEngine: borg.trikeshed.userspace.nio.tls.TlsEngine? = null,
 ) {
     companion object {
         fun default(): SctpConfig = SctpConfig()
@@ -507,7 +507,7 @@ class SctpElement(
 
     /**
      * Wrap outbound SCTP user data through the optional TLS engine.
-     * If no [TlsEngine] is configured in [SctpConfig], data passes through unchanged.
+     * If no [borg.trikeshed.userspace.nio.tls.TlsEngine] is configured in [SctpConfig], data passes through unchanged.
      * Mirrors TlsElement.wrap() — the algebra is the same: plain -> encrypted.
      */
     suspend fun wrap(plain: ByteArray): ByteArray {

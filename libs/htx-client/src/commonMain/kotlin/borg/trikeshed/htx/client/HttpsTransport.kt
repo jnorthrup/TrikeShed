@@ -5,14 +5,14 @@ import borg.trikeshed.userspace.nio.channels.spi.ChannelOperations
 import borg.trikeshed.userspace.nio.channels.spi.ChannelResult
 import borg.trikeshed.userspace.nio.channels.spi.ReactorOperations
 import borg.trikeshed.userspace.reactor.Interest
-import borg.trikeshed.tls.codec.CommonTlsClientHandshake
-import borg.trikeshed.tls.codec.CommonTlsRecordCodec
-import borg.trikeshed.tls.codec.RecordDirection
-import borg.trikeshed.tls.codec.aead.DefaultAes128Gcm
-import borg.trikeshed.tls.codec.ecdh.DefaultX25519
-import borg.trikeshed.tls.codec.hash.DefaultSha256
-import borg.trikeshed.tls.codec.kdf.DefaultHkdfSha256
-import borg.trikeshed.tls.record.ContentType
+import borg.trikeshed.userspace.nio.tls.codec.CommonTlsClientHandshake
+import borg.trikeshed.userspace.nio.tls.codec.CommonTlsRecordCodec
+import borg.trikeshed.userspace.nio.tls.codec.RecordDirection
+import borg.trikeshed.userspace.nio.tls.codec.aead.DefaultAes128Gcm
+import borg.trikeshed.userspace.nio.tls.codec.ecdh.DefaultX25519
+import borg.trikeshed.userspace.nio.tls.codec.hash.DefaultSha256
+import borg.trikeshed.userspace.nio.tls.codec.kdf.DefaultHkdfSha256
+import borg.trikeshed.userspace.nio.tls.record.ContentType
 import kotlin.time.Duration
 
 expect fun createHttpsHandler(): HtxRequestHandler
@@ -20,7 +20,7 @@ expect fun createHttpsHandler(): HtxRequestHandler
 /**
  * commonMain HTTPS transport via the unified ring.
  * Uses ChannelHandle.{readv,writev} + ReactorOperations.poll().
- * 
+ *
  * Note: ReactorOperations.poll() is a suspend function, so this handler
  * is only usable from a coroutine context. HtxRequestHandler is already
  * a suspend function type, so this works correctly.
@@ -63,12 +63,18 @@ fun ringHttpsHandler(
     reactor.register(fd, setOf(Interest.READ), 1L)
 
     try {
-        val sha256 = DefaultSha256()
-        val x25519 = DefaultX25519()
-        val hkdf = DefaultHkdfSha256(sha256)
-        val aes = DefaultAes128Gcm()
-        val codec = CommonTlsRecordCodec(aes)
-        val hs = CommonTlsClientHandshake(sha256, x25519, hkdf, codec, host)
+        val sha256 = _root_ide_package_.borg.trikeshed.userspace.nio.tls.codec.hash.DefaultSha256()
+        val x25519 = _root_ide_package_.borg.trikeshed.userspace.nio.tls.codec.ecdh.DefaultX25519()
+        val hkdf = _root_ide_package_.borg.trikeshed.userspace.nio.tls.codec.kdf.DefaultHkdfSha256(sha256)
+        val aes = _root_ide_package_.borg.trikeshed.userspace.nio.tls.codec.aead.DefaultAes128Gcm()
+        val codec = _root_ide_package_.borg.trikeshed.userspace.nio.tls.codec.CommonTlsRecordCodec(aes)
+        val hs = _root_ide_package_.borg.trikeshed.userspace.nio.tls.codec.CommonTlsClientHandshake(
+            sha256,
+            x25519,
+            hkdf,
+            codec,
+            host
+        )
 
         val ch = hs.buildClientHello()
         val sentHello = handle.writev(
@@ -97,7 +103,7 @@ fun ringHttpsHandler(
                 p += 5 + rl
                 when (buf[p - 5 - rl].toInt()) {
                     0x16 -> if (hs.state.name == "CLIENT_HELLO_SENT") hs.processServerHello(payload)
-                    0x17 -> codec.decrypt(RecordDirection.SERVER_WRITE, rec)?.let { d ->
+                    0x17 -> codec.decrypt(_root_ide_package_.borg.trikeshed.userspace.nio.tls.codec.RecordDirection.SERVER_WRITE, rec)?.let { d ->
                         processHs(d, hs, codec, handle, fd)
                         if (hs.state.name == "CONNECTED") done = true
                     }
@@ -117,7 +123,7 @@ fun ringHttpsHandler(
             "Accept: */*\r\nConnection: close\r\n\r\n" +
             request.body
         handle.writev(fd, ByteBuffer.wrap(
-            codec.encrypt(RecordDirection.CLIENT_WRITE, ContentType.APPLICATION_DATA, httpReq.encodeToByteArray())
+            codec.encrypt(_root_ide_package_.borg.trikeshed.userspace.nio.tls.codec.RecordDirection.CLIENT_WRITE, _root_ide_package_.borg.trikeshed.userspace.nio.tls.record.ContentType.APPLICATION_DATA, httpReq.encodeToByteArray())
         ))
 
         val resp = mutableListOf<Byte>()
@@ -128,7 +134,7 @@ fun ringHttpsHandler(
             if (n <= 0) break
             for (i in 0 until n) resp.add(rb.get(i))
         }
-        val d = codec.decrypt(RecordDirection.SERVER_WRITE, resp.toByteArray())
+        val d = codec.decrypt(_root_ide_package_.borg.trikeshed.userspace.nio.tls.codec.RecordDirection.SERVER_WRITE, resp.toByteArray())
             ?: error("decrypt failed")
         val t = d.decodeToString()
         val status = t.substringAfter(' ').substringBefore(' ').toInt()
@@ -141,8 +147,8 @@ fun ringHttpsHandler(
 
 private suspend fun processHs(
     data: ByteArray,
-    hs: CommonTlsClientHandshake,
-    codec: CommonTlsRecordCodec,
+    hs: borg.trikeshed.userspace.nio.tls.codec.CommonTlsClientHandshake,
+    codec: borg.trikeshed.userspace.nio.tls.codec.CommonTlsRecordCodec,
     handle: ChannelOperations.ChannelHandle,
     fd: Int,
 ) {
@@ -154,8 +160,8 @@ private suspend fun processHs(
             hs.processServerFinished(data)
             handle.writev(fd, ByteBuffer.wrap(
                 codec.encrypt(
-                    RecordDirection.CLIENT_WRITE,
-                    ContentType.HANDSHAKE,
+                    _root_ide_package_.borg.trikeshed.userspace.nio.tls.codec.RecordDirection.CLIENT_WRITE,
+                    _root_ide_package_.borg.trikeshed.userspace.nio.tls.record.ContentType.HANDSHAKE,
                     hs.buildClientFinished()
                 )
             ))
