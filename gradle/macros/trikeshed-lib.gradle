@@ -36,6 +36,26 @@ def nestedLibPeer = { String path, String artifact ->
     rootProject.findProject(path) ?: "borg.trikeshed:${artifact}:${libVersion}"
 }
 
+def trikeshedRlmPython = {
+    rootProject.providers.gradleProperty("trikeshed.rlm.python").orNull ?: "python3"
+}
+
+def trikeshedRlmHermesCommand = {
+    rootProject.providers.gradleProperty("trikeshed.rlm.hermesCommand").orNull
+}
+
+def trikeshedRlmScript = {
+    rootProject.file("scripts/trikeshed_rlm_gradle.py")
+}
+
+def trikeshedRlmModuleKey = {
+    project.path.substring(1).replace(':', '__').replaceFirst(/^__/, '')
+}
+
+def trikeshedRlmRulesFile = {
+    rootProject.file("gradle/trikeshed-rlm/libs/${trikeshedRlmModuleKey()}.json")
+}
+
 repositories {
     mavenCentral()
     mavenLocal()
@@ -562,4 +582,130 @@ switch (project.path) {
     default:
         kmpHost()
         break
+}
+
+def trikeshedRlmReportsDir = layout.buildDirectory.dir("trikeshed-rlm")
+def trikeshedRlmBriefFile = trikeshedRlmReportsDir.map { it.file("module-brief.json") }
+def trikeshedRlmLintFile = trikeshedRlmReportsDir.map { it.file("violations.json") }
+def trikeshedRlmDelegateFile = trikeshedRlmReportsDir.map { it.file("delegate-packet.json") }
+def trikeshedRlmRefineFile = trikeshedRlmReportsDir.map { it.file("refinement-proposal.json") }
+
+tasks.register("trikeshedModuleBrief", Exec) {
+    group = "verification"
+    description = "Manually build a TrikeShed RLM module brief for this lib."
+    inputs.dir(project.projectDir)
+    inputs.file(trikeshedRlmScript())
+    outputs.file(trikeshedRlmBriefFile)
+    doFirst {
+        trikeshedRlmReportsDir.get().asFile.mkdirs()
+        commandLine(
+            trikeshedRlmPython(),
+            trikeshedRlmScript().absolutePath,
+            "brief",
+            "--module-path", project.projectDir.absolutePath,
+            "--output", trikeshedRlmBriefFile.get().asFile.absolutePath,
+        )
+    }
+}
+
+tasks.register("trikeshedLint", Exec) {
+    group = "verification"
+    description = "Manually lint this lib against TrikeShed RLM rules."
+    dependsOn("trikeshedModuleBrief")
+    inputs.file(trikeshedRlmBriefFile)
+    inputs.file(trikeshedRlmScript())
+    if (trikeshedRlmRulesFile().exists()) {
+        inputs.file(trikeshedRlmRulesFile())
+    }
+    outputs.file(trikeshedRlmLintFile)
+    doFirst {
+        trikeshedRlmReportsDir.get().asFile.mkdirs()
+        def args = [
+            trikeshedRlmPython(),
+            trikeshedRlmScript().absolutePath,
+            "lint",
+            "--report", trikeshedRlmBriefFile.get().asFile.absolutePath,
+            "--output", trikeshedRlmLintFile.get().asFile.absolutePath,
+        ]
+        if (trikeshedRlmRulesFile().exists()) {
+            args.addAll(["--rules", trikeshedRlmRulesFile().absolutePath])
+        }
+        commandLine(args)
+    }
+}
+
+tasks.register("trikeshedDelegatePacket", Exec) {
+    group = "verification"
+    description = "Manually emit the delegate packet for this lib."
+    dependsOn("trikeshedLint")
+    inputs.file(trikeshedRlmBriefFile)
+    inputs.file(trikeshedRlmLintFile)
+    inputs.file(trikeshedRlmScript())
+    outputs.file(trikeshedRlmDelegateFile)
+    doFirst {
+        trikeshedRlmReportsDir.get().asFile.mkdirs()
+        commandLine(
+            trikeshedRlmPython(),
+            trikeshedRlmScript().absolutePath,
+            "delegate-packet",
+            "--report", trikeshedRlmBriefFile.get().asFile.absolutePath,
+            "--lint", trikeshedRlmLintFile.get().asFile.absolutePath,
+            "--output", trikeshedRlmDelegateFile.get().asFile.absolutePath,
+        )
+    }
+}
+
+tasks.register("trikeshedRefineRules", Exec) {
+    group = "verification"
+    description = "Manually propose narrower TrikeShed RLM rules for this lib."
+    dependsOn("trikeshedLint")
+    inputs.file(trikeshedRlmBriefFile)
+    inputs.file(trikeshedRlmLintFile)
+    inputs.file(trikeshedRlmScript())
+    if (trikeshedRlmRulesFile().exists()) {
+        inputs.file(trikeshedRlmRulesFile())
+    }
+    outputs.file(trikeshedRlmRefineFile)
+    doFirst {
+        trikeshedRlmReportsDir.get().asFile.mkdirs()
+        def args = [
+            trikeshedRlmPython(),
+            trikeshedRlmScript().absolutePath,
+            "refine-rules",
+            "--report", trikeshedRlmBriefFile.get().asFile.absolutePath,
+            "--lint", trikeshedRlmLintFile.get().asFile.absolutePath,
+            "--output", trikeshedRlmRefineFile.get().asFile.absolutePath,
+        ]
+        if (trikeshedRlmRulesFile().exists()) {
+            args.addAll(["--rules", trikeshedRlmRulesFile().absolutePath])
+        }
+        if (trikeshedRlmHermesCommand() != null) {
+            args.addAll(["--hermes-command", trikeshedRlmHermesCommand()])
+        }
+        commandLine(args)
+    }
+}
+
+tasks.register("trikeshedApplyRules") {
+    group = "verification"
+    description = "Manually apply refined TrikeShed RLM rules for this lib."
+    dependsOn("trikeshedRefineRules")
+    doLast {
+        def proposalFile = trikeshedRlmRefineFile.get().asFile
+        if (!proposalFile.exists()) {
+            throw new GradleException("No refinement proposal found at ${proposalFile}")
+        }
+        def rulesDir = rootProject.file("gradle/trikeshed-rlm/libs")
+        rulesDir.mkdirs()
+        exec {
+            commandLine(
+                trikeshedRlmPython(),
+                trikeshedRlmScript().absolutePath,
+                "apply-rules",
+                "--proposal", proposalFile.absolutePath,
+                "--rules-dir", rulesDir.absolutePath,
+                "--module-name", project.path,
+            )
+        }
+    }
 }

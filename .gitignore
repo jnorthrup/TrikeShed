@@ -28,6 +28,12 @@ tmp/
 # which SHOULD be tracked by git
 
 measurements.txt
+
+# TrikeShed RLM artifacts
+trikeshed-rlm-traces/
+gepa/
+scripts/__pycache__/
+hermes-predict-rlm/
 measurements_*.txt
 logs/
 

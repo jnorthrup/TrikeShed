@@ -276,3 +276,60 @@ afterEvaluate {
     }
 }
 
+val trikeshedLibProjects = provider {
+    subprojects.filter { it.path.startsWith(":libs:") }
+}
+
+fun Project.manualTrikeshedLibTask(taskName: String): String? =
+    if (tasks.findByName(taskName) != null) "$path:$taskName" else null
+
+tasks.register("trikeshedBriefLibs") {
+    group = "verification"
+    description = "Manually build TrikeShed RLM module briefs for all libs modules."
+    dependsOn(trikeshedLibProjects.get().mapNotNull { it.manualTrikeshedLibTask("trikeshedModuleBrief") })
+}
+
+tasks.register("trikeshedLintLibs") {
+    group = "verification"
+    description = "Manually lint all libs modules with TrikeShed RLM rules."
+    dependsOn(trikeshedLibProjects.get().mapNotNull { it.manualTrikeshedLibTask("trikeshedLint") })
+}
+
+tasks.register("trikeshedDelegatePacketsLibs") {
+    group = "verification"
+    description = "Manually emit delegate packets for all libs modules."
+    dependsOn(trikeshedLibProjects.get().mapNotNull { it.manualTrikeshedLibTask("trikeshedDelegatePacket") })
+}
+
+tasks.register("trikeshedRefineLibRules") {
+    group = "verification"
+    description = "Manually propose narrower TrikeShed RLM rules for all libs modules."
+    dependsOn(trikeshedLibProjects.get().mapNotNull { it.manualTrikeshedLibTask("trikeshedRefineRules") })
+}
+
+tasks.register("trikeshedApplyLibRules") {
+    group = "verification"
+    description = "Manually apply refined TrikeShed RLM rules for all libs modules."
+    dependsOn(trikeshedLibProjects.get().mapNotNull { it.manualTrikeshedLibTask("trikeshedApplyRules") })
+}
+
+tasks.register("trikeshedGepaBuild") {
+    group = "verification"
+    description = "Manually build GEPA project from accumulated lint traces."
+    doLast {
+        val gepaOutput = layout.buildDirectory.file("trikeshed-rlm-gepa/gepa-project-info.json").get().asFile
+        gepaOutput.parentFile.mkdirs()
+        val python = providers.gradleProperty("trikeshed.rlm.python").orNull ?: "python3"
+        val script = rootProject.file("scripts/trikeshed_rlm_gradle.py").absolutePath
+        val proc = ProcessBuilder(
+            python, script, "gepa-build",
+            "--root-dir", rootProject.projectDir.absolutePath,
+            "--output", gepaOutput.absolutePath,
+        ).inheritIO().start()
+        val exitCode = proc.waitFor()
+        if (exitCode != 0) {
+            throw GradleException("trikeshedGepaBuild failed with exit code $exitCode")
+        }
+    }
+}
+
