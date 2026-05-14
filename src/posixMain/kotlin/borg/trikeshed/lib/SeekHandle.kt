@@ -3,7 +3,7 @@
 package borg.trikeshed.lib
 
 import borg.trikeshed.PosixUringIO
-import borg.trikeshed.userspace.ByteRegion
+import borg.trikeshed.userspace.nio.spi.ByteRegion
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.alloc
 import kotlinx.cinterop.memScoped

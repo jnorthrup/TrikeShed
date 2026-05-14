@@ -2,7 +2,6 @@
 
 package borg.trikeshed.userspace.nio.channels
 
-import borg.trikeshed.userspace.ByteRegion
 import borg.trikeshed.userspace.nio.ByteBuffer
 
 // Generated from Amazon Corretto JDK 25 java.base NIO public/protected API via javap.

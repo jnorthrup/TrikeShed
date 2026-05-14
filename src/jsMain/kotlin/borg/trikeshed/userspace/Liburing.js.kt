@@ -1,5 +1,8 @@
 package borg.trikeshed.userspace
 
+import borg.trikeshed.userspace.nio.spi.LiburingFacade
+import borg.trikeshed.userspace.nio.spi.UringCompletion
+
 internal actual object LiburingImpl : LiburingFacade {
     actual override fun open(entries: Int, flags: Int): Result<Unit> = unsupported()
     actual override fun prepRead(fd: Int, bufAddress: Long, len: Int, offset: Long, userData: Long): Result<Unit> = unsupported()

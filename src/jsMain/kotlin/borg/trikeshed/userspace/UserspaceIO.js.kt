@@ -1,6 +1,8 @@
 package borg.trikeshed.userspace
 
 import borg.trikeshed.userspace.nio.ByteBuffer
+import borg.trikeshed.userspace.nio.spi.FileImpl
+import borg.trikeshed.userspace.nio.spi.UserspaceChannelBackend
 import kotlin.js.JsName
 
 private object JsFileRegistry {

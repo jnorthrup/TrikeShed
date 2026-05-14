@@ -1,4 +1,4 @@
-package borg.trikeshed.userspace
+package borg.trikeshed.userspace.nio.spi
 
 /**
  * Result of a single io_uring submission queue entry completion.

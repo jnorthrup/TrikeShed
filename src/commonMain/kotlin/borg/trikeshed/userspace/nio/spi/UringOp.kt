@@ -1,6 +1,6 @@
 @file:Suppress("unused")
 
-package borg.trikeshed.userspace
+package borg.trikeshed.userspace.nio.spi
 
 import borg.trikeshed.context.BitMasked
 import borg.trikeshed.context.or

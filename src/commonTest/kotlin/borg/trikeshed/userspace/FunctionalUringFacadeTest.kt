@@ -1,6 +1,10 @@
 package borg.trikeshed.userspace
 
 import borg.trikeshed.userspace.nio.ByteBuffer
+import borg.trikeshed.userspace.nio.spi.FileImpl
+import borg.trikeshed.userspace.nio.spi.FunctionalUringFacade
+import borg.trikeshed.userspace.nio.spi.SelectionResult
+import borg.trikeshed.userspace.nio.spi.UserspaceChannelBackend
 import kotlin.test.Test
 import kotlin.test.assertEquals
 

@@ -1,9 +1,6 @@
-package borg.trikeshed.userspace
+package borg.trikeshed.userspace.nio.spi
 
-import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.*
 
 /**
  * Coroutine integration around the userspace Channel.
@@ -20,7 +17,7 @@ class ChannelRunner(
             for (result in channel.wait(minComplete = 0)) {
                 pendingOps.remove(result.userData)?.complete(result)
             }
-            kotlinx.coroutines.yield()
+            yield()
         }
     }
 

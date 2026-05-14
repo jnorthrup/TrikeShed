@@ -1,7 +1,7 @@
 package borg.trikeshed.userspace.kernel
 
 import borg.trikeshed.lib.ByteSeries
-import borg.trikeshed.userspace.ByteRegion
+import borg.trikeshed.userspace.nio.spi.ByteRegion
 
 /**
  * Unified Kernel Syscall Interface

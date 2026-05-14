@@ -4,7 +4,7 @@ package borg.trikeshed
 
 import borg.trikeshed.lib.long.LongSeries
 import borg.trikeshed.lib.Series2
-import borg.trikeshed.userspace.ByteRegion
+import borg.trikeshed.userspace.nio.spi.ByteRegion
 import kotlinx.cinterop.*
 import platform.posix.*
 import simple.PosixOpenOpts

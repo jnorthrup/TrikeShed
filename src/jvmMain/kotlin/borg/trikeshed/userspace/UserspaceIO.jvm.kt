@@ -1,7 +1,11 @@
 package borg.trikeshed.userspace
 
-import borg.trikeshed.userspace.UringOp.Companion.UringSubmission
+import borg.trikeshed.userspace.nio.spi.UringOp.Companion.UringSubmission
 import borg.trikeshed.userspace.nio.ByteBuffer
+import borg.trikeshed.userspace.nio.spi.FileImpl
+import borg.trikeshed.userspace.nio.spi.SelectionResult
+import borg.trikeshed.userspace.nio.spi.UringOp
+import borg.trikeshed.userspace.nio.spi.UserspaceChannelBackend
 import java.net.DatagramPacket
 import java.net.DatagramSocket
 import java.net.InetSocketAddress

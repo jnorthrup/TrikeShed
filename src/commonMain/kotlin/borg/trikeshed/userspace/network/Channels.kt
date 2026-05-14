@@ -1,7 +1,7 @@
 package borg.trikeshed.userspace.network
 
 import borg.trikeshed.lib.ByteSeries
-import borg.trikeshed.userspace.ByteRegion
+import borg.trikeshed.userspace.nio.spi.ByteRegion
 import kotlin.concurrent.Volatile
 
 /**

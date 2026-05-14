@@ -1,10 +1,8 @@
 package borg.trikeshed.lib
 
-import borg.trikeshed.userspace.ByteRegion
+import borg.trikeshed.userspace.nio.spi.ByteRegion
 import borg.trikeshed.lib.long.LongSeries
 import borg.trikeshed.userspace.nio.file.Files
-import borg.trikeshed.userspace.nio.file.spi.FileOperations
-import borg.trikeshed.userspace.nio.file.spi.WasmFileOperations
 import kotlin.random.Random
 
 @JsName("localStorage")external val browserLocalStorage: Storage?

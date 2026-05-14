@@ -1,12 +1,11 @@
-package borg.trikeshed.userspace
+package borg.trikeshed.userspace.nio.spi
 
-import borg.trikeshed.userspace.UringOp.Companion.UringSubmission
 import borg.trikeshed.userspace.nio.ByteBuffer
 
 /**
  * Platform backend for the unified submission queue.
  *
- * Implementations translate [UringSubmission] instances to platform-native I/O:
+ * Implementations translate [UringOp.Companion.UringSubmission] instances to platform-native I/O:
  *   Linux → liburing SQEs (or pread/pwrite fallback)
  *   JVM   → java.nio.channels.FileChannel / AsynchronousFileChannel
  *   JS    → fetch / Blob / ArrayBuffer
@@ -41,16 +40,16 @@ public interface UserspaceChannelBackend {
     fun map(file: FileImpl, mode: CharSequence, position: Long, size: Long): Int
 
     /**
-     * Submit a batch of [UringSubmission] entries and return completions.
+     * Submit a batch of [UringOp.Companion.UringSubmission] entries and return completions.
      *
-     * Each [UringSubmission.userData] is echoed back in the matching
+     * Each [UringOp.Companion.UringSubmission.userData] is echoed back in the matching
      * [SelectionResult.userData].  [SelectionResult.res] holds the
      * syscall return value (bytes read/written, fd for accept, 0 for close, etc.)
      *
      * Default implementation dispatches to the legacy typed methods.
      * Platform backends SHOULD override this for native batching.
      */
-    fun submitBatch(submissions: List<UringSubmission>): List<SelectionResult> {
+    fun submitBatch(submissions: List<UringOp.Companion.UringSubmission>): List<SelectionResult> {
         // Default: no batch support — callers must use legacy path
         return emptyList()
     }
@@ -61,9 +60,9 @@ public interface UserspaceChannelBackend {
  *
  * Two APIs coexist:
  * 1. **Typed** — [read], [write], [accept], [connect], [close] + [submit]/[wait]/[peek]
- * 2. **Unified** — [enqueue] any [UringSubmission], then [submit]/[wait]/[peek]
+ * 2. **Unified** — [enqueue] any [UringOp.Companion.UringSubmission], then [submit]/[wait]/[peek]
  *
- * The typed API is sugar that creates [UringSubmission] internally.
+ * The typed API is sugar that creates [UringOp.Companion.UringSubmission] internally.
  * New code should use the unified path exclusively.
  */
 public class FunctionalUringFacade(
@@ -81,14 +80,14 @@ public class FunctionalUringFacade(
 
     // -- Unified API --
 
-    /** Enqueue a raw [UringSubmission]. */
-    fun enqueue(sub: UringSubmission) {
+    /** Enqueue a raw [UringOp.Companion.UringSubmission]. */
+    fun enqueue(sub: UringOp.Companion.UringSubmission) {
         require(pending.size < entries) { "submission queue full" }
         pending.addLast(sub)
     }
 
     /** Convenience: enqueue multiple submissions. */
-    fun enqueueAll(subs: List<UringSubmission>) {
+    fun enqueueAll(subs: List<UringOp.Companion.UringSubmission>) {
         subs.forEach { enqueue(it) }
     }
 
@@ -138,11 +137,11 @@ public class FunctionalUringFacade(
         if (submitted == 0) return 0
 
         // Partition into unified vs legacy
-        val unified = mutableListOf<UringSubmission>()
+        val unified = mutableListOf<UringOp.Companion.UringSubmission>()
         val legacy = mutableListOf<PreparedChannelOp>()
         while (pending.isNotEmpty()) {
             when (val op = pending.removeFirst()) {
-                is UringSubmission -> unified.add(op)
+                is UringOp.Companion.UringSubmission -> unified.add(op)
                 is PreparedChannelOp -> legacy.add(op)
                 else -> error("unexpected op type: $op")
             }

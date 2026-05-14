@@ -1,14 +1,12 @@
 package borg.trikeshed.hazelnut
 
-import borg.trikeshed.context.AsyncContextElement
-import borg.trikeshed.context.AsyncContextKey
 import borg.trikeshed.cursor.RowVec
 import borg.trikeshed.lib.*
 import borg.trikeshed.miniduck.DocRowVec
-import borg.trikeshed.userspace.FileImpl
-import borg.trikeshed.userspace.FunctionalUringFacade
-import borg.trikeshed.userspace.UringOp
-import borg.trikeshed.userspace.UringOp.Companion.UringSubmission
+import borg.trikeshed.userspace.nio.spi.FileImpl
+import borg.trikeshed.userspace.nio.spi.FunctionalUringFacade
+import borg.trikeshed.userspace.nio.spi.UringOp
+import borg.trikeshed.userspace.nio.spi.UringOp.Companion.UringSubmission
 import borg.trikeshed.userspace.nio.ByteBuffer
 
 // ── Hazelnut: forum/thread layer (original) ──────────────────────────────────

@@ -1,6 +1,5 @@
-package borg.trikeshed.userspace
+package borg.trikeshed.userspace.nio.spi
 
-import borg.trikeshed.userspace.UringOp.Companion.UringSubmission
 import borg.trikeshed.userspace.nio.ByteBuffer
 
 data class SelectionResult(val res: Int, val userData: Long)
@@ -10,9 +9,9 @@ data class SelectionResult(val res: Int, val userData: Long)
  *
  * Two APIs coexist:
  * 1. **Typed** — [read], [write], [accept], [connect], [close], [sync], [truncate], [map] + [submit]/[wait]/[peek]
- * 2. **Unified** — [enqueue] any [UringSubmission], then [submit]/[wait]/[peek]
+ * 2. **Unified** — [enqueue] any [UringOp.Companion.UringSubmission], then [submit]/[wait]/[peek]
  *
- * The typed API is sugar that creates [UringSubmission] internally.
+ * The typed API is sugar that creates [UringOp.Companion.UringSubmission] internally.
  * New code should use the unified path exclusively.
  */
 class Channel(
@@ -42,7 +41,7 @@ class Channel(
     fun map(file: File, mode: CharSequence, position: Long, size: Long, userData: Long) =
         facade.map(file.impl, mode, position, size, userData)
 
-    fun enqueue(sub: UringSubmission) = facade.enqueue(sub)
+    fun enqueue(sub: UringOp.Companion.UringSubmission) = facade.enqueue(sub)
 
     fun submit(): Int = facade.submit()
 

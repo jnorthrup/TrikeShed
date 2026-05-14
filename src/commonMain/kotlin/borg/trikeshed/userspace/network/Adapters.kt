@@ -1,7 +1,7 @@
 package borg.trikeshed.userspace.network
 
 import borg.trikeshed.lib.ByteSeries
-import borg.trikeshed.userspace.ByteRegion
+import borg.trikeshed.userspace.nio.spi.ByteRegion
 
 /**
  * Protocol session surface — sits above the transport/handle layer.

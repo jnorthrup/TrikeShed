@@ -3,12 +3,10 @@ package borg.trikeshed.bugzee
 import borg.trikeshed.hazelnut.HazelnutClusterNode
 import borg.trikeshed.hazelnut.Transport
 import borg.trikeshed.hazelnut.TransportBinding
-import borg.trikeshed.lib.emptyMap
-import borg.trikeshed.lib.emptyList
 import borg.trikeshed.miniduck.DocRowVec
-import borg.trikeshed.userspace.FileImpl
-import borg.trikeshed.userspace.FunctionalUringFacade
-import borg.trikeshed.userspace.UringOp.Companion.UringSubmission
+import borg.trikeshed.userspace.nio.spi.FileImpl
+import borg.trikeshed.userspace.nio.spi.FunctionalUringFacade
+import borg.trikeshed.userspace.nio.spi.UringOp.Companion.UringSubmission
 import borg.trikeshed.userspace.nio.ByteBuffer
 
 // - Bugzee Cluster: Hazelcast-inspired partitioned bug-tracking mesh -----------

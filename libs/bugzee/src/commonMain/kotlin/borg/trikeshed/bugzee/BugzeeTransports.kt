@@ -2,11 +2,11 @@ package borg.trikeshed.bugzee
 
 import borg.trikeshed.hazelnut.Transport
 import borg.trikeshed.hazelnut.TransportBinding
-import borg.trikeshed.userspace.FileImpl
-import borg.trikeshed.userspace.FunctionalUringFacade
-import borg.trikeshed.userspace.SelectionResult
-import borg.trikeshed.userspace.UringOp
-import borg.trikeshed.userspace.UringOp.Companion.UringSubmission
+import borg.trikeshed.userspace.nio.spi.FileImpl
+import borg.trikeshed.userspace.nio.spi.FunctionalUringFacade
+import borg.trikeshed.userspace.nio.spi.SelectionResult
+import borg.trikeshed.userspace.nio.spi.UringOp
+import borg.trikeshed.userspace.nio.spi.UringOp.Companion.UringSubmission
 import borg.trikeshed.userspace.nio.ByteBuffer
 
 // ── 1. BugzeeMessageType ─────────────────────────────────────────────────────

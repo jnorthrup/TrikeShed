@@ -1,7 +1,7 @@
 package borg.trikeshed.userspace
 
-import borg.trikeshed.lib.asString
 import borg.trikeshed.userspace.nio.ByteBuffer
+import borg.trikeshed.userspace.nio.spi.ByteRegion
 import kotlin.test.Test
 import kotlin.test.assertEquals
 

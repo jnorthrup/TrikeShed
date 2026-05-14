@@ -4,7 +4,7 @@ import borg.trikeshed.userspace.nio.ByteBuffer
 import kotlin.coroutines.CoroutineContext
 
 /**
- * Platform channel/socket factory — replaces borg.trikeshed.userspace.Channels + ChannelImpl expect.
+ * Platform channel/socket factory — replaces borg.trikeshed.userspace.nio.spi.Channels + ChannelImpl expect.
  *
  * io_uring submission/completion ring abstraction: prepare operations, submit batch, wait for completions.
  */

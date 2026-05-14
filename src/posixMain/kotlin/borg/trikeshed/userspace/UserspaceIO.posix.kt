@@ -3,8 +3,12 @@
 package borg.trikeshed.userspace
 
 import borg.trikeshed.PosixUringIO
-import borg.trikeshed.userspace.UringOp.Companion.UringSubmission
+import borg.trikeshed.userspace.nio.spi.UringOp.Companion.UringSubmission
 import borg.trikeshed.userspace.nio.ByteBuffer
+import borg.trikeshed.userspace.nio.spi.FileImpl
+import borg.trikeshed.userspace.nio.spi.SelectionResult
+import borg.trikeshed.userspace.nio.spi.UringOp
+import borg.trikeshed.userspace.nio.spi.UserspaceChannelBackend
 import platform.posix.O_CREAT
 import platform.posix.O_RDONLY
 import platform.posix.O_RDWR
@@ -101,5 +105,6 @@ internal actual object FilesImpl {
 }
 
 internal actual object ChannelsImpl {
-    actual fun socket(domain: Int, type: Int, protocol: Int): FileImpl = FileImpl(platform.posix.socket(domain, type, protocol))
+    actual fun socket(domain: Int, type: Int, protocol: Int): FileImpl =
+        FileImpl(platform.posix.socket(domain, type, protocol))
 }

@@ -1,8 +1,6 @@
 package borg.trikeshed.lib
 
-import borg.trikeshed.userspace.ByteRegion
-import borg.trikeshed.lib.ByteSeries
-import borg.trikeshed.lib.SeekHandle
+import borg.trikeshed.userspace.nio.spi.ByteRegion
 
 /** JVM stub. Route through NIO FileChannel. */
 actual fun platformSeekHandle(): SeekHandle = object : SeekHandle {

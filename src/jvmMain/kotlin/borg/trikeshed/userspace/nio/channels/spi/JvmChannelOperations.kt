@@ -3,11 +3,12 @@ package borg.trikeshed.userspace.nio.channels.spi
 import borg.trikeshed.context.AsyncContextElement
 import borg.trikeshed.context.AsyncContextKey
 import borg.trikeshed.context.ElementState
-import borg.trikeshed.userspace.Channels
-import borg.trikeshed.userspace.File
-import borg.trikeshed.userspace.UringOp
-import borg.trikeshed.userspace.UringOp.Companion.UringSubmission
+import borg.trikeshed.userspace.nio.spi.Channels
+import borg.trikeshed.userspace.nio.spi.File
+import borg.trikeshed.userspace.nio.spi.UringOp
+import borg.trikeshed.userspace.nio.spi.UringOp.Companion.UringSubmission
 import borg.trikeshed.userspace.nio.ByteBuffer
+import borg.trikeshed.userspace.nio.spi.Channel
 import kotlinx.coroutines.Job
 
 /**
@@ -83,7 +84,7 @@ class JvmChannelOperations(
     }
 
     private inner class JvmChannelHandle(
-        private val ch: borg.trikeshed.userspace.Channel
+        private val ch: Channel
     ) : ChannelOperations.ChannelHandle {
         override val id: Int = 0
         override fun read(buffer: ByteBuffer, offset: Long): Int = -1

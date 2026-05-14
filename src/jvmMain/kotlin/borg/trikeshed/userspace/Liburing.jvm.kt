@@ -1,6 +1,8 @@
 package borg.trikeshed.userspace
 
 import borg.trikeshed.context.loadLiburingFacadeSpi
+import borg.trikeshed.userspace.nio.spi.LiburingFacade
+import borg.trikeshed.userspace.nio.spi.UringCompletion
 
 internal actual object LiburingImpl : LiburingFacade {
     private val delegate: LiburingFacade? by lazy {

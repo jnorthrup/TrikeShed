@@ -1,4 +1,4 @@
-package borg.trikeshed.userspace
+package borg.trikeshed.userspace.nio.spi
 
 import borg.trikeshed.lib.ByteSeries
 import borg.trikeshed.lib.j

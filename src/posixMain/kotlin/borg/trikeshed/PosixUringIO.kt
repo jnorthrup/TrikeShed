@@ -2,7 +2,7 @@
 
 package borg.trikeshed
 
-import borg.trikeshed.userspace.Liburing
+import borg.trikeshed.userspace.nio.spi.Liburing
 import kotlinx.cinterop.*
 import platform.posix.*
 

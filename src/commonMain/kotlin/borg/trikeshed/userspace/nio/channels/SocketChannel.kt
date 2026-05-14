@@ -2,9 +2,9 @@
 
 package borg.trikeshed.userspace.nio.channels
 
-import borg.trikeshed.userspace.Channel
-import borg.trikeshed.userspace.Channels
-import borg.trikeshed.userspace.File
+import borg.trikeshed.userspace.nio.spi.Channel
+import borg.trikeshed.userspace.nio.spi.Channels
+import borg.trikeshed.userspace.nio.spi.File
 import borg.trikeshed.userspace.nio.ByteBuffer
 import borg.trikeshed.userspace.nio.channels.spi.AbstractSelectableChannel
 import borg.trikeshed.userspace.nio.channels.spi.SelectorProvider

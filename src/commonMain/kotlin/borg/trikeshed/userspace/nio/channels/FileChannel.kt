@@ -2,13 +2,14 @@
 
 package borg.trikeshed.userspace.nio.channels
 
-import borg.trikeshed.lib.ByteSeries
 import borg.trikeshed.userspace.nio.ByteBuffer
 import borg.trikeshed.userspace.nio.file.Path
 import borg.trikeshed.userspace.nio.file.OpenOption
 import borg.trikeshed.userspace.nio.file.StandardOpenOption
 import borg.trikeshed.userspace.nio.file.attribute.FileAttribute
 import borg.trikeshed.userspace.nio.channels.spi.AbstractInterruptibleChannel
+import borg.trikeshed.userspace.nio.spi.Channels
+import borg.trikeshed.userspace.nio.spi.Files
 
 /**
  * FileChannel wired behind UringFacade.
@@ -42,8 +43,8 @@ public abstract class FileChannel protected constructor() : AbstractInterruptibl
     companion object {
         fun open(path: Path, options: Set<OpenOption>, vararg attrs: FileAttribute<*>): FileChannel {
             val readOnly = !options.any { it is StandardOpenOption && it == StandardOpenOption.WRITE }
-            val file = borg.trikeshed.userspace.Files.open(path.toString(), readOnly)
-            val channel = borg.trikeshed.userspace.Channels.open()
+            val file = Files.open(path.toString(), readOnly)
+            val channel = Channels.open()
             return UringFileChannel(file, channel)
         }
         fun open(path: Path, vararg options: OpenOption): FileChannel = open(path, options.toSet())

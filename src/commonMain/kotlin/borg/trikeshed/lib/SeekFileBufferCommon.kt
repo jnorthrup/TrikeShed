@@ -1,11 +1,11 @@
 package borg.trikeshed.lib
 
 import borg.trikeshed.lib.long.LongSeries
-import borg.trikeshed.userspace.ByteRegion
-import borg.trikeshed.userspace.Channel
-import borg.trikeshed.userspace.Channels
-import borg.trikeshed.userspace.File
-import borg.trikeshed.userspace.Files
+import borg.trikeshed.userspace.nio.spi.ByteRegion
+import borg.trikeshed.userspace.nio.spi.Channel
+import borg.trikeshed.userspace.nio.spi.Channels
+import borg.trikeshed.userspace.nio.spi.File
+import borg.trikeshed.userspace.nio.spi.Files
 import borg.trikeshed.userspace.nio.ByteBuffer
 
 /**

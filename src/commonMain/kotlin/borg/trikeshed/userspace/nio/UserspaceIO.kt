@@ -1,8 +1,8 @@
 package borg.trikeshed.userspace.nio
 
-import borg.trikeshed.userspace.Channel
-import borg.trikeshed.userspace.File
-import borg.trikeshed.userspace.SelectionResult
+import borg.trikeshed.userspace.nio.spi.Channel
+import borg.trikeshed.userspace.nio.spi.File
+import borg.trikeshed.userspace.nio.spi.SelectionResult
 
 /**
  * Compatibility names for the old userspace IO facade.
@@ -12,11 +12,11 @@ import borg.trikeshed.userspace.SelectionResult
 @Deprecated("Use borg.trikeshed.userspace.nio.ByteBuffer.", ReplaceWith("ByteBuffer"))
 typealias UserspaceBuffer = ByteBuffer
 
-@Deprecated("Use borg.trikeshed.userspace.File.", ReplaceWith("File"))
+@Deprecated("Use borg.trikeshed.userspace.nio.spi.File.", ReplaceWith("File"))
 typealias UserspaceFD = File
 
 @Deprecated("Use SelectionResult.", ReplaceWith("SelectionResult"))
 typealias UserspaceIOResult = SelectionResult
 
-@Deprecated("Use borg.trikeshed.userspace.Channel.", ReplaceWith("Channel"))
+@Deprecated("Use borg.trikeshed.userspace.nio.spi.Channel.", ReplaceWith("Channel"))
 typealias UserspaceRing = Channel
