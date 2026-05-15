@@ -6,6 +6,8 @@ package borg.trikeshed.lib
 import borg.trikeshed.collections.binarySearch
 import borg.trikeshed.isam.meta.IOMemento
 import borg.trikeshed.parse.evidence.TypeEvidence
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.LocalDateTime
 import kotlin.jvm.JvmName
 import kotlin.math.max
 import kotlin.math.min
@@ -14,21 +16,8 @@ import kotlin.math.pow
 typealias Series<T> = MetaSeries<Int, T>
 
 
-/** α
- * (λx.M[x]) → (λy.M[y])	α-conversion
- * https://en.wikipedia.org/wiki/Lambda_calculus
- *
- * in kotlin terms, λ above is a lambda expression and M is a function and the '.' is the body of the lambda
- * therefore the function M is the receiver of the extension function and the lambda expression is the argument
- *
- *  the simplest possible kotlin example of λx.M[x] is
- *  ` { x -> M(x) } ` making the delta symbol into lambda braces and the x into a parameter and the M(x) into the body
- */
-
-inline infix fun <X, C, V : Series<X>> V.α(crossinline xform: (X) -> C): Series<C> = size j { i -> xform(this[i]) }
-
 /*iterable conversion*/
-infix fun <X, C, Subject : Iterable<X>> Subject.α(xform: (X) -> C) = object : Iterable<C> {
+infix fun < X, C, Subject : Iterable<X>> Subject.α(xform: (X) -> C) = object : Iterable<C> {
     override fun iterator(): Iterator<C> = object : Iterator<C> {
         val iter: Iterator<X> = this@α.iterator()
         override fun hasNext(): Boolean = iter.hasNext()
@@ -86,6 +75,8 @@ fun Series<Short>.toArray(): ShortArray = ShortArray(size, ::get)
 inline fun <reified T> Series<T>.toArray(): Array<T> = Array(size, ::get)
 
 fun <T> Array<T>.toSeries(): Join<Int, (Int) -> T> = size j ::get
+
+fun  CharArray .toSeries(): Join<Int, (Int) -> Char> = size j ::get
 
 
 //clockwise circle arrow unicode character is ↻ (U+21BB)
@@ -276,6 +267,9 @@ inline class IterableSeries<A>(val s: Series<A>) : Iterable<A>, Series<A> by s {
  */
 val <T> Series<T>.view: IterableSeries<T> get() = this as? IterableSeries ?: IterableSeries(this)
 
+/** MutableSeries.view — enables SeriesBuffer and other mutable series to be viewed as IterableSeries for use with standard library extensions */
+val <T> MutableSeries<T>.view: IterableSeries<T> get() = IterableSeries(this as Series<T>)
+
 infix operator fun <T> IterableSeries<T>.contains(x: Char): Boolean = this.any { x == it }
 infix operator fun <T> Series<T>.contains(it: Char): Boolean = this.view contains it
 
@@ -413,7 +407,7 @@ fun Series<Char>.parseLong(): Long {
 }
 
 
-fun Series<Char>.parseIsoDateTime(): kotlinx.datetime.LocalDateTime {
+fun Series<Char>.parseIsoDateTime(): LocalDateTime {
     val year = this[0..3].parseLong().toInt()
     val month = this[5..6].parseLong().toInt()
     val day = this[8..9].parseLong().toInt()
@@ -421,7 +415,7 @@ fun Series<Char>.parseIsoDateTime(): kotlinx.datetime.LocalDateTime {
     val minute = this[14..15].parseLong().toInt()
     val second = this[17..18].parseLong().toInt()
     val nanosecond = this[20..26].parseLong().toInt()
-    return kotlinx.datetime.LocalDateTime(year, month, day, hour, minute, second, nanosecond)
+    return LocalDateTime(year, month, day, hour, minute, second, nanosecond)
 }
 
 fun Series<Char>.encodeToByteArray(): ByteArray {
@@ -455,11 +449,11 @@ fun Series<Char>.encodeToByteArray(): ByteArray {
 fun ByteArray.decodeToChars(): Series<Char> = toSeries().decodeUtf8(/*CharArray(size)*/)
 
 
-fun Series<Char>.parseIsoDate(): kotlinx.datetime.LocalDate {
+fun Series<Char>.parseIsoDate(): LocalDate {
     val year = this[0..3].parseLong().toInt()
     val month = this[5..6].parseLong().toInt()
     val day = this[8..9].parseLong().toInt()
-    return kotlinx.datetime.LocalDate(year, month, day)
+    return LocalDate(year, month, day)
 }
 
 fun Series<Char>.asString(upto: Int = Int.MAX_VALUE): String {
