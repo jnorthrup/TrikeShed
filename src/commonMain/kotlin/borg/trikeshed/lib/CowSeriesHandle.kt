@@ -2,8 +2,6 @@
 
 package borg.trikeshed.lib
 
-import kotlin.properties.Delegates
-
 
 // inline factory value for CopyOnWriteSeries
 inline val <reified T> Series<T>.cow: CowSeriesHandle<T> get() = CowSeriesHandle(COWSeriesBody(this))
@@ -13,134 +11,166 @@ fun <T> Series<T>.materialize(): CowSeriesHandle<T> = CowSeriesHandle(COWSeriesB
 
 
 /**
- * CopyOnWriteSeries which creates a new copy of the backing Series on all mutation methods.
+ * CopyOnWriteSeries which swaps a flat-array body on all mutation methods.
  *
- * this the envelope of a letter+envelope abstraction using COWSeriesBody as the letter
+ * Letter-envelope abstraction: the handle is the mutable envelope,
+ * [COWSeriesBody] is the immutable letter backed by a contiguous [Array].
  *
- * this contains a Long? immutable version attribute which is incremented during cloning, or stays null
- *
+ * JIT profile:
+ *   - reads are O(1) aaload + checkcast (Graal inlines the lambda, BCEs the bounds, eliminates the cast)
+ *   - mutations are O(n) arraycopy intrinsic (compiled to memcpy / vectorized copy)
+ *   - single monomorphic receiver type at Function1.invoke (the body's b-lambda is one class, ever)
+ *   - no closure nesting, no megamorphic dispatch, no staircase depth growth
+ *   - trimToSize is automatic: every body carries an exact-sized array with zero spare capacity
  */
 class CowSeriesHandle<T>(
     letter1: COWSeriesBody<T>,
     var observer: ((Twin<Series<T>>) -> Unit)? = null,
-    var versionObserver: ((Twin<Long?>) -> Unit)? = null,
+    var versionObserver: ((Twin<Long>) -> Unit)? = null,
 
     ) : MutableSeries<T> {
 
-    var letter: COWSeriesBody<T> by Delegates.observable(letter1) { _, old, new ->
+    var letter: COWSeriesBody<T> = letter1
+        private set
+
+    private fun swap(old: COWSeriesBody<T>, new: COWSeriesBody<T>) {
+        letter = new
         observer?.invoke(old j new)
+        versionObserver?.invoke(old.version j new.version)
     }
 
     override val a: Int get() = letter.a
     override val b: (Int) -> T get() = letter.b
     override fun set(index: Int, item: T) {
-        letter = letter.set(index, item)
+        swap(letter, letter.set(index, item))
     }
 
     override fun add(item: T) {
-        letter = letter.append(item)
+        swap(letter, letter.append(item))
     }
 
     override fun add(index: Int, item: T) {
-        letter = letter.insert(index, item)
+        swap(letter, letter.insert(index, item))
     }
 
     override fun removeAt(index: Int): T {
-        val item = letter.b(index)
-        letter = letter.removeAt(index)
+        val item = letter[index]
+        swap(letter, letter.removeAt(index))
         return item
     }
 
     override fun remove(item: T): Boolean {
-        val i = letter.backing.view.indexOf(item)
+        val i = letter.indexOf(item)
         if (i != -1) {
-            letter = letter.removeAt(i)
+            swap(letter, letter.removeAt(i))
             return true
         }
         return false
     }
 
     override fun clear() {
-        letter = letter.clear()
+        swap(letter, letter.clear())
     }
 
     override fun plus(item: T): MutableSeries<T> {
-        letter = letter.append(item); return this
+        add(item); return this
     }
 
     override fun minus(item: T): MutableSeries<T> {
-        letter = letter.remove(item); return this
+        remove(item); return this
     }
 
     override fun plusAssign(item: T) {
-        letter = letter.append(item)
+        add(item)
     }
 
     override fun minusAssign(item: T) {
-        letter = letter.remove(item)
+        remove(item)
     }
 
-    operator fun get(range: IntRange): COWSeriesBody<T> = letter.get(range)
+    operator fun get(range: IntRange): COWSeriesBody<T> = letter[range]
 
-    //version from backing
-    val version: Any get() = letter.version ?: letter.toString()
+    val version: Long get() = letter.version
 }
 
 
 /**
- * an immutable CopyOnWriteSwappingSeries (letter) which returns a new copy of itself on all add,set,append,remove,clear methods.
+ * Immutable COW letter backed by a flat Array.
  *
- * this is the letter-and-envelope pattern for a mutable series.
+ * Every mutation returns a new body with a copied, exact-sized array.
+ * No spare capacity — trimToSize is automatic.
  *
- * this contains a Long? immutable version attribute which is incremented during cloning, or stays null if the
- * object-identity is good enough for unordered version discriminator
+ * The [b] lambda is a stored val (one allocation at construction, captures the array reference).
+ * Graal sees a single monomorphic receiver type at the invoke site → inlines → sees aaload → BCE.
  */
 class COWSeriesBody<T>(
-    val backing: Series<T> = EmptySeries as Series<T>,
-    override val version: Long? = null,
-) : Series<T> by backing, VersionedSeries<T> {
+    private val buf: Array<Any?> = emptyArray(),
+    override val a: Int = 0,
+    override val version: Long = 0L,
+) : Series<T>, VersionedSeries<T> {
 
-    /** create a new copy of this, with the given item inserted at the given index */
+    /** Materialize a lazy Series into a flat array. */
+    constructor(backing: Series<T>) : this(
+        Array(backing.size) { backing[it] },
+        backing.size,
+        0L
+    )
+
+    /** Single stored lambda — monomorphic at every invoke site. */
+    override val b: (Int) -> T = { i: Int -> buf[i] as T }
+
+    fun indexOf(item: T): Int {
+        var i = 0
+        while (i < a) {
+            if (buf[i] == item) return i
+            i++
+        }
+        return -1
+    }
+
+    /** O(n) arraycopy + single element replace. */
     fun set(index: Int, item: T): COWSeriesBody<T> {
-        //use List(size){x} ctor here to avoid copying the backing list
-        return copy((a) j { i: Int -> if (i == index) item else backing[i] }, version?.inc())
+        val newBuf = buf.copyOf()
+        newBuf[index] = item
+        return COWSeriesBody(newBuf, a, version + 1L)
     }
 
-    /** create a new copy of this, with the given item appended */
-    fun append(item: T): COWSeriesBody<T> = copy(backing + borg.trikeshed.collections.s_[item])
+    /** O(n) arraycopy into a new array of size+1. */
+    fun append(item: T): COWSeriesBody<T> {
+        val newBuf = arrayOfNulls<Any?>(a + 1)
+        buf.copyInto(newBuf, 0, 0, a)
+        newBuf[a] = item
+        return COWSeriesBody(newBuf, a + 1, version + 1L)
+    }
 
-    /** create a new copy of this, with the given item removed */
     fun remove(item: T): COWSeriesBody<T> {
-
-        val i = backing.view.indexOf(item)
+        val i = indexOf(item)
         return if (i != -1) removeAt(i) else this
-
     }
 
-    fun insert(index: Int, item: T): COWSeriesBody<T> = copy(backing = (backing.size.inc()) j {
-        when {
-            it < index -> backing[it]
-            it > index -> backing[it.dec()]
-            else -> item
-        }
-    })
+    /** O(n) arraycopy into a new array of size+1, shifting tail right. */
+    fun insert(index: Int, item: T): COWSeriesBody<T> {
+        val newBuf = arrayOfNulls<Any?>(a + 1)
+        buf.copyInto(newBuf, 0, 0, index)
+        newBuf[index] = item
+        buf.copyInto(newBuf, index + 1, index, a)
+        return COWSeriesBody(newBuf, a + 1, version + 1L)
+    }
 
+    /** O(n) arraycopy into a new array of size-1, shifting tail left. */
+    fun removeAt(index: Int): COWSeriesBody<T> {
+        val newBuf = arrayOfNulls<Any?>(a - 1)
+        buf.copyInto(newBuf, 0, 0, index)
+        buf.copyInto(newBuf, index, index + 1, a)
+        return COWSeriesBody(newBuf, a - 1, version + 1L)
+    }
 
-    /** create a new copy of this, with the given item removed at the given index */
-    fun removeAt(index: Int): COWSeriesBody<T> = copy(backing = (backing.size.dec()) j {
-        when {
-            it < index -> backing[it]
-            else -> backing[it.inc()]
-        }
-    })
+    fun clear(): COWSeriesBody<T> = COWSeriesBody(version = version + 1L)
 
-
-    fun clear(): COWSeriesBody<T> = /*create a new slice of 0*/ copy( EmptySeries as Series<T>)
-
-    operator fun get(range: IntRange): COWSeriesBody<T> = copy(backing = backing[range])
-
-    /** create a new copy of this, with the given item inserted at the given index */
-   fun copy(backing: Join<Int, (Int) -> T> = this.backing, version: Long? = this.version?.inc()): COWSeriesBody<T> =
-        COWSeriesBody(backing, version)
+    operator fun get(range: IntRange): COWSeriesBody<T> {
+        val len = range.last - range.first + 1
+        val newBuf = arrayOfNulls<Any?>(len)
+        buf.copyInto(newBuf, 0, range.first, range.last + 1)
+        return COWSeriesBody(newBuf, len, version + 1L)
+    }
 }
-
