@@ -589,106 +589,40 @@ fun from(topology: CacheTopology): ReificationContext {
 
 ## The Cursor Assembly: From Columnar `Pai2`/`Vect0r` to TrikeShed `Join`/`Series`
 
-> *The Cursor is the point where all four shape families intersect. Its lineage from [github.com/jnorthrup/columnar](https://github.com/jnorthrup/columnar/blob/2f144c52e50aa0958bec0f7ee37cf2d72a015339/README.md) — a JVM dataframe project that was a "deliberate departure from the JDK as kotlin-MPP" — is the evolutionary proof that the CRMS pattern works.*
+> *Source: [github.com/jnorthrup/columnar](https://github.com/jnorthrup/columnar/blob/2f144c52e50aa0958bec0f7ee37cf2d72a015339/README.md) — TrikeShed is the "second draft from scratch keeping what works well, making a deliberate departure from the JDK as kotlin-MPP."*
 
-### The Columnar Ancestor (Actual Types)
-
-Columnar was a pandas-analog for the JVM that succeeded at data wrangling at scales exceeding Python VM overhead. The core insight, from the Columnar README: *"the idea of an idempotent, immutable series of values not afforded by primitive arrays alone appeared cheapest by pairing a boundary count with a lambda function that accepts an index."*
-
-The actual types from `~/work/Columnar/`:
+The Columnar types and their TrikeShed renames — the structure is identical:
 
 ```kotlin
-// ── Columnar (JVM, github.com/jnorthrup/columnar) ──────────────
-// The monotype foundation:
-interface Pai2<A, B> { val a: A; val b: B }  // later renamed → Join<A, B>
-
-// The "invented" pure interface:
-typealias Vect0r<T> = Pai2<Int, (Int) -> T>  // later renamed → Series<T>
-typealias Vect02<F, S> = Vect0r<Pai2<F, S>>  // later renamed → Series2<A, B>
-
-// The Cursor — already a typealias chain, not a class:
-typealias CellMeta = () -> CoroutineContext   // later → `ColumnMeta↻` = () -> ColumnMeta
-typealias RecordMeta = Pai2<String, TypeMemento>  // later → ColumnMeta = Join<CharSequence, TypeMemento>
-typealias RowVec = Vect02<Any?, CellMeta>     // later → Series2<Any?, `ColumnMeta↻`>
-typealias Cursor = Vect0r<RowVec>             // later → Series<RowVec>
-
-// Blackboard: CoroutineContext.Element for access behaviors
-// — the CCEK ancestor! CellMeta returned CoroutineContext, which held
-//   sealed class hierarchies describing IO, encoding, and access patterns.
-//   These are the "hierarchical threadlocals" the README describes.
+// ── Columnar (JVM) ──────────────────── ── TrikeShed (KMP) ──────
+interface Pai2<A, B> { val a: A; val b: B }  // → Join<A, B>
+typealias Vect0r<T> = Pai2<Int, (Int) -> T>  // → Series<T>
+typealias Vect02<F, S> = Vect0r<Pai2<F, S>>  // → Series2<A, B>
+typealias RecordMeta = Pai2<String, TypeMemento>  // → ColumnMeta = Join<CharSequence, TypeMemento>
+typealias CellMeta = () -> CoroutineContext   // → `ColumnMeta↻` = () -> ColumnMeta  (narrowed)
+typealias RowVec = Vect02<Any?, CellMeta>     // → Series2<Any?, `ColumnMeta↻`>
+typealias Cursor = Vect0r<RowVec>             // → Series<RowVec>
 ```
 
-The Columnar README describes these sealed class hierarchies as *"orthogonal context elements... different aspects of accessing data and projecting cursors and matrix transformations... easy to think of as hierarchical threadlocals to achieve IOBound storage access to large datasets."* This is the direct ancestor of TrikeShed's CCEK pattern.
+**The Cursor was never a class hierarchy.** Even in Columnar, it was a typealias chain. The sealed class hierarchies lived in the Blackboard — `CoroutineContext.Element` subclasses that Columnar's README describes as *"orthogonal context elements... easy to think of as hierarchical threadlocals to achieve IOBound storage access."* TrikeShed's CCEK formalized this into a lifecycle FSM.
 
-### The Rename Chain: Columnar → TrikeShed
-
-TrikeShed is explicitly the *"second draft from scratch keeping what works well"* — the types were renamed but the structure is identical:
-
-| Columnar (JVM) | TrikeShed (KMP) | What changed |
-|----------------|-----------------|-------------|
-| `Pai2<A, B>` (interface) | `Join<A, B>` (interface) | Name only — same `val a: A; val b: B` |
-| `Vect0r<T> = Pai2<Int, (Int)->T>` | `Series<T> = Join<Int, (Int)->T>` | Name only — same typealias shape |
-| `Vect02<F,S> = Vect0r<Pai2<F,S>>` | `Series2<A,B> = Series<Join<A,B>>` | Name only — same typealias shape |
-| `CellMeta = () -> CoroutineContext` | `ColumnMeta↻ = () -> ColumnMeta` | Narrowed: full CoroutineContext → Join<name, type> |
-| `RecordMeta = Pai2<String, TypeMemento>` | `ColumnMeta = Join<CharSequence, TypeMemento>` | String → CharSequence (KMP compatible) |
-| `RowVec = Vect02<Any?, CellMeta>` | `RowVec = Series2<Any?, ColumnMeta↻>` | Follows from above renames |
-| `Cursor = Vect0r<RowVec>` | `Cursor = Series<RowVec>` | Follows from above renames |
-| `CoroutineContext.Element` sealed hierarchies | CCEK `AsyncContextElement` with lifecycle FSM | Formalized: informal threadlocal-like → structured lifecycle |
-| JVM NIO mmap + lock-on-seek | Platform-split: JVM NIO / posix mmap / io_uring | KMP platform targets |
-| `combine(seriesn...)` binary-search index regions | `combine(a, b)` staircase index regions | Same algorithm, same name |
-| `mySeries.▶` → Kotlin Iterable | `mySeries.view` → Kotlin List | Same promotion, different name |
-
-The key structural preservation: **the Cursor was never a class hierarchy.** Even in Columnar, it was a typealias chain `Cursor = Vect0r<Vect02<Any?, ()->CoroutineContext>>`. The "sealed class hierarchies" lived in the CoroutineContext elements (the Blackboard), not in Cursor itself. TrikeShed's CCEK simply formalized what Columnar already had informally.
-
-### What Changed Between Columnar and TrikeShed
-
-From the Columnar README: *"Trikeshed above moves the impl into a more posix IO friendly implementation supporting effortless 64-bit off-heap maps without obligating to maintain paging hacks of 32 bit volumes to utilize mmap access methods."*
-
-| Columnar limitation | TrikeShed resolution |
-|--------------------|--------------------|
-| JVM-only NIO with lock-on-seek | KMP platform split: JVM NIO / posix mmap / io_uring |
-| 32-bit mmap paging hacks for large files | 64-bit off-heap maps, no paging workaround |
-| `Pai2` / `Vect0r` — obtuse naming | `Join` / `Series` — reads as algebra |
-| `CellMeta = () -> CoroutineContext` — the entire context | `ColumnMeta↻ = () -> ColumnMeta` — just the (name, type) pair |
-| Sealed class Blackboard elements — informal lifecycle | CCEK `AsyncContextElement` — formal forward-only FSM |
-| `combine` binary-search over arbitrary partition count | `combine` staircase with `ReificationContext` depth budget |
-| No primitive specialization for Twin packing | `TwInt(Long)`, `DensifiedJoin(Long)` — inline class packing |
+The only structural change: `CellMeta = () -> CoroutineContext` (returning the entire context) was narrowed to `ColumnMeta↻ = () -> ColumnMeta` (returning just the name+type pair). The Blackboard's `CoroutineContext.Element` sealed hierarchies were extracted into the CCEK layer above the Cursor, where they belong.
 
 ```mermaid
-graph TD
-    subgraph "Columnar (github.com/jnorthrup/columnar)"
-        P2["Pai2«A, B» — the monotype"]
-        V0["Vect0r«T» = Pai2«Int, (Int)->T»"]
-        V02["Vect02«F,S» = Vect0r«Pai2«F,S»»"]
-        CM_old["CellMeta = () -> CoroutineContext"]
-        RM["RecordMeta = Pai2«String, TypeMemento»"]
-        RV_old["RowVec = Vect02«Any?, CellMeta»"]
-        CUR_old["Cursor = Vect0r«RowVec»"]
-        BB["Blackboard: CoroutineContext.Element sealed hierarchies"]
+graph LR
+    subgraph "Columnar"
+        P2["Pai2 / Vect0r / CellMeta"]
+        BB["Blackboard: CoroutineContext.Element"]
     end
-
-    subgraph "TrikeShed (KMP second draft)"
-        J["Join«A, B» — same monotype"]
-        S["Series«T» = Join«Int, (Int)->T»"]
-        S2["Series2«A,B» = Series«Join«A,B»»"]
-        CM_new["ColumnMeta↻ = () -> Join«name, type»"]
-        RV_new["RowVec = Series2«Any?, ColumnMeta↻»"]
-        CUR_new["Cursor = Series«RowVec»"]
-        CCEK_new["CCEK: AsyncContextElement + lifecycle FSM"]
+    subgraph "TrikeShed"
+        JS["Join / Series / ColumnMeta↻"]
+        CCEK["CCEK: AsyncContextElement + FSM"]
     end
-
-    P2 -->|"renamed"| J
-    V0 -->|"renamed"| S
-    V02 -->|"renamed"| S2
-    CM_old -->|"narrowed"| CM_new
-    RV_old -->|"follows"| RV_new
-    CUR_old -->|"follows"| CUR_new
-    BB -->|"formalized"| CCEK_new
-
+    P2 -->|"renamed"| JS
+    BB -->|"formalized"| CCEK
     style P2 fill:#8b0000,color:#ffd4d4
-    style J fill:#2d1b69,color:#e0d4ff
-    style CUR_new fill:#2d1b69,color:#e0d4ff
-    style CCEK_new fill:#4a1942,color:#f0e6ff
+    style JS fill:#2d1b69,color:#e0d4ff
+    style CCEK fill:#4a1942,color:#f0e6ff
 ```
 
 ### The Columnar Optimization: ReifiedSplitSeries2
