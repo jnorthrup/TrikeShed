@@ -100,7 +100,7 @@ class SeriesBuffer<T>(
 }
 
 /**
- * LinkedList-backed [MutableSeries] that IS-A [List].
+ * ArrayList-backed [MutableSeries] that IS-A [List].
  * Penalized by RLM like all mutables.
  *
  * Dual-implements MutableSeries + List so both `series[i]` and `list[i]` work
@@ -108,7 +108,7 @@ class SeriesBuffer<T>(
  * zero type friction.
  */
 class SeriesArrayList<T>(
-    private val backing: LinkedList<T> = LinkedList(),
+    private val backing: ArrayList<T> = ArrayList(8),
 ) : MutableSeries<T>, List<T> {
     // MutableSeries: a is the size
     override val a: Int get() = backing.size
@@ -147,6 +147,6 @@ class SeriesArrayList<T>(
     /** Snapshot to pure [Series]. */
     fun snapshot(): Series<T> = a j { index -> backing[index] }
 
-    /** toList — LinkedList IS-A List. */
-    fun toList(): List<T> = backing.toList()
+    /** toList — ArrayList IS-A List. */
+    fun toList(): List<T> = ArrayList(backing)
 }
