@@ -56,14 +56,19 @@ class CollectionHandle constructor() {
     fun metaSnapshot(keyOf: (DocRowVec) -> Comparable<*>): DocMetaSeries {
         check(_state != HandleState.CLOSED) { "Cannot snapshot a CLOSED handle" }
         val snapshot = rows.toList()
-        val byKey = LinkedHashMap<Comparable<*>, DocRowVec>(snapshot.size)
-        snapshot.forEach { row ->
+        val byKey: Map<Comparable<*>, DocRowVec> = snapshot.associate { row ->
             val key = keyOf(row)
-            check(key !in byKey) { "Duplicate doc key in snapshot: $key" }
-            byKey[key] = row
+            check(snapshot.count { keyOf(it) == key } == 1) { "Duplicate doc key in snapshot: $key" }
+            key to row
         }
         return DocMetaCount(snapshot.size) j { key: Comparable<*> ->
             byKey[key] ?: error("Missing doc for key $key")
         }
+    }
+
+    fun snapshot(): Series<DocRowVec> {
+        check(_state != HandleState.CLOSED) { "Cannot snapshot a CLOSED handle" }
+        val snapshot = rows.toList()
+        return snapshot.size j { snapshot[it] }
     }
 }

@@ -26,8 +26,8 @@ package borg.trikeshed.couch.kline
  * The block may also enforce a single symbol (currently not enforced; symbol is
  * carried per-row as in the donor).
  */
-class KlineBlock constructor(
-    val rows: MutableList<Kline>,
+class KlineBlock private constructor(
+    var rows: List<Kline>,
     var _state: State,
     val timespan: TimeSpan?,
 ) {
@@ -40,7 +40,7 @@ class KlineBlock constructor(
     companion object {
         /** Create a new mutable block. Optionally enforce a single timespan. */
         fun mutable(timespan: TimeSpan? = null): KlineBlock =
-            KlineBlock(ArrayList(), State.MUTABLE, timespan)
+            KlineBlock(listOf(), State.MUTABLE, timespan)
     }
 
     /**
@@ -56,7 +56,7 @@ class KlineBlock constructor(
                 "Mixed timespan: block expects $timespan but got ${kline.timespan}"
             )
         }
-        rows.add(kline)
+        rows = rows + listOf(kline)
     }
 
     /**

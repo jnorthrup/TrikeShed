@@ -165,7 +165,7 @@ data class Nars3FeatureVector(
  */
 class Nars3Corpus(
     val windowMs: Long = 3600000,
-    private val _entries: MutableList<Nars3FeatureVector> = buildList {},
+    private val _entries: List<Nars3FeatureVector> = buildList {},
 ) {
     val size: Int get() = _entries.size
 

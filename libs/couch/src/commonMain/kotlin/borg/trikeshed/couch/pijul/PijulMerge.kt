@@ -93,8 +93,8 @@ object PijulMerge {
 
         var result = pristine
         val graph = base.graph.let { it as? DependencyGraph ?: DependencyGraph.empty() }
-        val applied = ArrayList<Patch>()
-        val conflicts = ArrayList<ConflictMarker>()
+        val applied = listOf<Patch>
+        val conflicts = listOf<ConflictMarker>
 
         for (patch in sorted) {
             val patchObj = resolvePatch(patch) ?: continue // unknown patch, skip

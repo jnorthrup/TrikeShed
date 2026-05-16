@@ -63,11 +63,10 @@ class PijulIpfsStore(
         val data = result.stdout
         if (isCompositeCid(cid)) {
             val chunkCids = parseCompositeCid(cid)
-            val chunks = ArrayList<ByteArray>()
-            for (chunkCid in chunkCids) {
+            val chunks: List<ByteArray> = chunkCids.map { chunkCid ->
                 val catResult = shell.exec("ipfs", listOf("cat", chunkCid))
                 if (catResult.exitCode != 0) return IpfsResult.Error("Failed to retrieve chunk $chunkCid")
-                chunks.add(catResult.stdout.encodeToByteArray())
+                catResult.stdout.encodeToByteArray()
             }
             val reassembled = reassembleChunks(chunks)
             return IpfsResult.PatchResult(deserializePatch(reassembled))

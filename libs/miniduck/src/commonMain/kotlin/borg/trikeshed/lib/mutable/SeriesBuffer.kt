@@ -12,8 +12,8 @@ import borg.trikeshed.lib.j
  * at IO edge boundaries. Since this IS-A List, toList() returns List with
  * zero type friction.
  */
-class SeriesArrayList<T>(
-    private val backing: ArrayList<T> = ArrayList(8),
+class SeriesList<T>(
+    private val backing: List<T> = ArrayList(),
 ) : MutableSeries<T>, List<T> {
     // MutableSeries: a is the size
     override val a: Int get() = backing.size

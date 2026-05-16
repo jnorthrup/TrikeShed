@@ -49,7 +49,7 @@ class InterGitGateway(
     private val gitDir: CharSequence,
     private val mode: GatewayMode,
 ) {
-    private val pendingConversions = ArrayList<ConversionResult>()
+    private var pendingConversions = listOf<ConversionResult>()
     private val branchMapping: Map<CharSequence, CharSequence> = emptyMap()  // git branch → pijul channel
     private val channelMapping: Map<CharSequence, CharSequence> = emptyMap()  // pijul channel → git branch
 
@@ -104,25 +104,25 @@ class InterGitGateway(
 
     /** Sync: bidirectionally reconcile git and pijul. */
     fun sync(): List<ConversionResult> {
-        val results = ArrayList<ConversionResult>()
-        when (mode) {
+        val results = when (mode) {
             GatewayMode.PUSH_TO_GIT -> {
-                for ((chnName) in pijulRepo.channels) {
-                    results.add(exportChannel(chnName, chnName))
+                pijulRepo.channels.map { (chnName) ->
+                    exportChannel(chnName, chnName)
                 }
             }
             GatewayMode.PULL_FROM_GIT -> {
-                for ((gitBranch, chnName) in branchMapping) {
-                    results.add(importGitBranch(gitBranch, chnName))
+                branchMapping.map { (gitBranch, chnName) ->
+                    importGitBranch(gitBranch, chnName)
                 }
             }
             GatewayMode.SYNC_BIDIRECTIONAL -> {
-                for ((gitBranch, chnName) in branchMapping) {
-                    results.add(importGitBranch(gitBranch, chnName))
+                val imports = branchMapping.map { (gitBranch, chnName) ->
+                    importGitBranch(gitBranch, chnName)
                 }
-                for ((chnName, gitBranch) in channelMapping) {
-                    results.add(exportChannel(chnName, gitBranch))
+                val exports = channelMapping.map { (chnName, gitBranch) ->
+                    exportChannel(chnName, gitBranch)
                 }
+                imports + exports
             }
         }
         return results
@@ -174,10 +174,9 @@ class InterGitGateway(
 
         val diffResult = shell.exec("git", listOf("-C", gitDir, "diff-tree", "--no-commit-id", "--name-only", "-r", gitCommit))
         val filePaths = diffResult.stdout.trim().split("\n").filter { it.isNotBlank() }
-        val fileContents = LinkedHashMap<CharSequence, CharSequence>()
-        for (path in filePaths) {
+        val fileContents: Map<CharSequence, CharSequence> = filePaths.associate { path ->
             val contentResult = shell.exec("git", listOf("-C", gitDir, "show", "$gitCommit:$path"))
-            if (contentResult.exitCode == 0) fileContents[path] = contentResult.stdout
+            path to (if (contentResult.exitCode == 0) contentResult.stdout else "")
         }
 
         val patch = buildPatchFromFiles(subject, author, timestamp, fileContents, parentPatchHash)

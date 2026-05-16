@@ -141,9 +141,9 @@ class GitOpenApiServer(private val shell: ProcessShell) {
         gitPorcelain("-C", repo, "reset", ref)
 
     private fun gitDiff(repo: CharSequence, cached: Boolean): HtxMessage {
-        val args = ArrayList("-C", repo, "diff")
+        val args = listOf("-C", repo, "diff")
         if (cached) args.add("--cached")
-        val result = shell.exec("git", args.toList())
+        val result = shell.exec("git", args)
         return textResponse(result.stdout, if (result.exitCode == 0) 200 else 400)
     }
 

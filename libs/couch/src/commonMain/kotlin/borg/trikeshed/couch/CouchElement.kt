@@ -12,14 +12,14 @@ class CouchElement(
     companion object Key : AsyncContextKey<CouchElement>()
     override val key: AsyncContextKey<CouchElement> get() = Key
 
-    private val _collections = LinkedHashMap<CharSequence, CollectionHandle>()
+    private var _collections: Map<CharSequence, CollectionHandle> = mapOf()
 
     val collections: Map<CharSequence, CollectionHandle> get() = _collections
 
     fun openCollection(name: CharSequence): CollectionHandle {
         require(state.isAtLeast(ElementState.OPEN)) { "CouchElement must be open to create collections" }
         val handle = CollectionHandle.open()
-        _collections[name] = handle
+        _collections = _collections + (name to handle)
         return handle
     }
 
@@ -30,7 +30,7 @@ class CouchElement(
 
     override suspend fun close() {
         _collections.values.forEach { it.close() }
-        _collections.clear()
+        _collections = mapOf()
         super.close()
     }
 }

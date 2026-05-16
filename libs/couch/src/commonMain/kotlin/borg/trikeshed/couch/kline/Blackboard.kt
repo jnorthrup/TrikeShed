@@ -18,13 +18,13 @@ import borg.trikeshed.lib.j
  */
 class Blackboard<T : Comparable<T>> {
     /** Published characteristics, sorted by (timestamp, origin, name). */
-    private val field = ArrayList<KlineCharacteristic>()
+    private var field = listOf<KlineCharacteristic>()
 
     /** Current head timestamp — the board's cursor into time. */
     private var headTimestamp: T? = null
 
     /** Subscriptions by characteristic name → list of callbacks. */
-    private val subscriptions = LinkedHashMap<CharSequence, LinkedList<(KlineCharacteristic) -> Unit>>()
+    private var subscriptions = mapOf<CharSequence, List<(KlineCharacteristic) -> Unit>>()
 
     /**
      * Publish a characteristic to the board.
@@ -38,7 +38,7 @@ class Blackboard<T : Comparable<T>> {
             val ct = char.timestamp as T
             if (ct < t) return  // stale, discard
         }
-        field.add(char)
+        field = field + listOf(char)
         // Notify subscribers for this characteristic's name
         subscriptions[char.name]?.forEach { it(char) }
     }
@@ -50,7 +50,7 @@ class Blackboard<T : Comparable<T>> {
     fun publishAll(chars: List<KlineCharacteristic>) {
         // Collect subs before publishing so notifications happen in batch order
         for (char in chars) {
-            field.add(char)
+            field = field + listOf(char)
             subscriptions[char.name]?.forEach { it(char) }
         }
     }
@@ -58,17 +58,17 @@ class Blackboard<T : Comparable<T>> {
     /** Advance the head timestamp — discards everything older. */
     fun advanceHead(t: T) {
         headTimestamp = t
-        field.removeAll { c ->
+        field = field.filter { c ->
             @Suppress("UNCHECKED_CAST")
-            (c.timestamp as T) < t
+            (c.timestamp as T) >= t
         }
     }
 
     /** Subscribe to a characteristic by name. Returns an unsubscribe handle. */
     fun subscribe(name: CharSequence, callback: (KlineCharacteristic) -> Unit): () -> Unit {
-        val list = subscriptions.getOrPut(name) { ArrayList() }
-        list.add(callback)
-        return { subscriptions[name]?.remove(callback) }
+        val existing = subscriptions[name] ?: emptyList()
+        subscriptions = subscriptions + (name to existing + listOf(callback))
+        return { subscriptions[name]?.let { subscriptions = subscriptions + (name to it.filter { it != callback }) } }
     }
 
     /** Observe all characteristics at or after a given timestamp. */
@@ -118,7 +118,7 @@ class Funnel(
     private val blackboard: Blackboard<Long>,
 ) {
     /** Registered stages, in order. */
-    private val stages = ArrayList<Stage>()
+    private var stages = listOf<Stage>()
 
     /** Whether the funnel is running. */
     private var running = false
@@ -142,7 +142,7 @@ class Funnel(
 
     /** Register a stage. Stages execute in registration order. */
     fun register(stage: Stage): Funnel {
-        stages.add(stage)
+        stages = stages + listOf(stage)
         return this
     }
 
@@ -251,17 +251,17 @@ class BufferStage(
     private val maxAgeMs: Long,
     private val onFlush: (List<Kline>) -> Unit,
 ) : Funnel.Stage {
-    private val buffer = ArrayList<Kline>()
+    private var buffer = listOf<Kline>()
     private var firstTimestamp: Long? = null
 
     override suspend fun process(kline: Kline): List<KlineCharacteristic> {
         if (firstTimestamp == null) firstTimestamp = kline.openTime
-        buffer.add(kline)
+        buffer = buffer + listOf(kline)
 
         val age = kline.openTime - (firstTimestamp ?: kline.openTime)
         if (buffer.size >= capacity || age > maxAgeMs) {
-            val flush = buffer.toList()
-            buffer.clear()
+            val flush = buffer
+            buffer = emptyList()
             firstTimestamp = null
             onFlush(flush)
         }

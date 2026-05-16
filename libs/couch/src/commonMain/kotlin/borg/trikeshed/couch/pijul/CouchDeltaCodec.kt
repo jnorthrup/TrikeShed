@@ -40,24 +40,19 @@ object CouchDeltaCodec {
      * Returns a list of blocks batched at `batchSize` edits each.
      */
     fun encodePatch(patch: Patch, batchSize: Int = 64): List<HtxBlockData.Data> {
-        val blocks = ArrayList<HtxBlockData.Data>()
-
-        // Header block
-        blocks.add(HtxBlockData.Data(buildPatchHeader(patch)))
+        val headerBlock = HtxBlockData.Data(buildPatchHeader(patch))
 
         // Edit batches
         val edits = extractEdits(patch)
-        var offset = 0
-        while (offset < edits.size) {
-            val batch = edits.subList(offset, minOf(offset + batchSize, edits.size))
-            blocks.add(HtxBlockData.Data(encodeDeltaBatch(batch)))
-            offset += batch.size
+        val batches = edits.chunked(batchSize).map { batch ->
+            HtxBlockData.Data(encodeDeltaBatch(batch))
         }
 
         // EOF marker
         val eofBytes = byteArrayOf(PijulHtx.PATCH_EOF) + patch.hash.bytes.copyOf()
-        blocks.add(HtxBlockData.Data(eofBytes))
-        return blocks
+        val eofBlock = HtxBlockData.Data(eofBytes)
+
+        return listOf(headerBlock) + batches + listOf(eofBlock)
     }
 
     /**
@@ -68,12 +63,10 @@ object CouchDeltaCodec {
 
         // First block is header
         val header = decodePatchHeader(blocks.first().bytes)
-        val allEdits = ArrayList<DeltaLineEdit>()
-
-        for (block in blocks.drop(1)) {
-            if (block.bytes.isEmpty()) continue
-            if (block.bytes.first() == PijulHtx.PATCH_EOF) break
-            allEdits.addAll(decodeDeltaBatch(block.bytes))
+        val allEdits = blocks.drop(1).flatMap { block ->
+            if (block.bytes.isEmpty()) return@flatMap emptyList()
+            if (block.bytes.first() == PijulHtx.PATCH_EOF) return@flatMap emptyList()
+            decodeDeltaBatch(block.bytes)
         }
         return buildPatch(header, allEdits)
     }
@@ -101,8 +94,7 @@ object CouchDeltaCodec {
     private fun decodeDeltaBatch(data: ByteArray): List<DeltaLineEdit> {
         val br = SimpleByteArrayInput(data)
         val n = br.readU32().toInt()
-        val edits = ArrayList<DeltaLineEdit>()
-        repeat(n) {
+        val edits = List(n) {
             val op = LineOperation.entries[br.readU8().toInt()]
             val start = br.readU32().toInt()
             val end = br.readU32().toInt()
@@ -111,7 +103,7 @@ object CouchDeltaCodec {
             val textEnd = textStart + len
             br.pos = textEnd
             val text = data.copyOfRange(textStart, textEnd).decodeToString()
-            edits.add(DeltaLineEdit(op, start, end, text))
+            DeltaLineEdit(op, start, end, text)
         }
         return edits
     }
@@ -145,13 +137,12 @@ object CouchDeltaCodec {
         val hash = PatchHash(data.copyOfRange(hashStart, br.pos))
         val timestamp = br.readU64()
         val nDeps = br.readU32().toInt()
-        val deps = LinkedHashSet<PatchHash>()
-        repeat(nDeps) {
+        val deps: Set<PatchHash> = (0 until nDeps).map {
             val dLen = br.readU8().toInt()
             val dStart = br.pos
             br.pos = dStart + dLen
-            deps.add(PatchHash(data.copyOfRange(dStart, br.pos)))
-        }
+            PatchHash(data.copyOfRange(dStart, br.pos))
+        }.toSet()
         return DecodedPatchHeader(name, hash, timestamp, deps)
     }
 
@@ -196,7 +187,7 @@ object CouchDeltaCodec {
 // --- Minimal binary I/O helpers (no BigInteger, no external deps) ---
 
 private class SimpleByteArrayOutput {
-    private val parts = ArrayList<ByteArray>()
+    private val parts = listOf<ByteArray>
     private var size = 0
 
     fun write(b: ByteArray) { parts.add(b); size += b.size }

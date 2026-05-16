@@ -86,23 +86,21 @@ fun encode(): ByteArray {
             val sessionId = data.copyOfRange(br.pos, (br.pos + sidLen).also { br.pos = it }).decodeToString()
             val timestamp = br.readU64()
             val nCaps = br.readU32().toInt()
-            val caps = ArrayList<Capability>()
-            repeat(nCaps) {
+            val caps: List<Capability> = (0 until nCaps).map {
                 val nsLen = br.readU32().toInt()
                 val ns = data.copyOfRange(br.pos, (br.pos + nsLen).also { br.pos = it }).decodeToString()
                 val nameLen = br.readU32().toInt()
                 val name = data.copyOfRange(br.pos, (br.pos + nameLen).also { br.pos = it }).decodeToString()
                 val version = br.readU32().toInt()
                 val nParams = br.readU32().toInt()
-                val params = LinkedHashMap<CharSequence, CharSequence>()
-                repeat(nParams) {
+                val params: Map<CharSequence, CharSequence> = (0 until nParams).associate {
                     val kLen = br.readU32().toInt()
                     val k = data.copyOfRange(br.pos, (br.pos + kLen).also { br.pos = it }).decodeToString()
                     val vLen = br.readU32().toInt()
                     val v = data.copyOfRange(br.pos, (br.pos + vLen).also { br.pos = it }).decodeToString()
-                    params[k] = v
+                    k to v
                 }
-                caps.add(Capability(ns, name, version, params))
+                Capability(ns, name, version, params)
             }
             return KetMessage(type, caps, sessionId, timestamp)
         }
@@ -110,7 +108,7 @@ fun encode(): ByteArray {
 }
 
 private class SimpleByteArrayOutputX {
-    private val parts = ArrayList<ByteArray>()
+    private val parts = listOf<ByteArray>
     private var size = 0
     fun write(b: ByteArray) { parts.add(b); size += b.size }
     fun writeU32(v: Int) {

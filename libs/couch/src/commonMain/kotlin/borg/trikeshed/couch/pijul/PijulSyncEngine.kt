@@ -47,8 +47,8 @@ class PeerChannel(
     var localHead: PatchHash?,
     val negotiatedCaps: List<Capability>,
 ) {
-    val pendingPatches = ArrayList<Patch>()
-    val ackedPatches = ArrayList<PatchHash>()
+    val pendingPatches = listOf<Patch>
+    val ackedPatches = listOf<PatchHash>
 }
 
 /** Events emitted by the sync engine. */
@@ -80,7 +80,7 @@ class PijulSyncEngine(
     private val ipfsStore: PijulIpfsStore?,
     private var config: SyncConfig = SyncConfig(),
 ) {
-    private val peers = LinkedHashMap<CharSequence, PeerChannel>()
+    private val peers = mapOf<CharSequence, PeerChannel>
     private val emitter = ChangeEmitter<SyncEvent>()
     private val scope = CoroutineScope(kotlinx.coroutines.CoroutineName("PijulSync"))
     private val pushSemaphore = Semaphore(config.maxConcurrentPushes)

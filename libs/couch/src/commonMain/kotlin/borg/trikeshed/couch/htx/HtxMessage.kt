@@ -15,24 +15,24 @@ class HtxMessage(
     val blocks: List<HtxBlockData> = emptyList(),
     var flags: UInt = HtxFlags.NONE.mask,
 ) {
-    private val _blocks: MutableList<HtxBlockData> = ArrayList(blocks)
+    private var _blocks: List<HtxBlockData> = this.blocks.toList()
     fun isEmpty(): Boolean = _blocks.isEmpty()
     fun size(): Int = _blocks.size
 
-    fun addStartLine(sl: HtxStartLine) { _blocks.add(HtxBlockData.StartLine(sl)) }
+    fun addStartLine(sl: HtxStartLine) { _blocks = _blocks + listOf(HtxBlockData.StartLine(sl)) }
     fun addHeader(name: ByteArray, value: ByteArray) {
-        _blocks.add(HtxBlockData.Header(name, value))
+        _blocks = _blocks + listOf(HtxBlockData.Header(name, value))
     }
-    fun addData(data: ByteArray) { _blocks.add(HtxBlockData.Data(data)) }
+    fun addData(data: ByteArray) { _blocks = _blocks + listOf(HtxBlockData.Data(data)) }
     fun addTrailer(name: ByteArray, value: ByteArray) {
-        _blocks.add(HtxBlockData.Trailer(name, value))
+        _blocks = _blocks + listOf(HtxBlockData.Trailer(name, value))
     }
-    fun addEndHeaders() { _blocks.add(HtxBlockData.EndHeaders) }
-    fun addEndTrailers() { _blocks.add(HtxBlockData.EndTrailers) }
+    fun addEndHeaders() { _blocks = _blocks + listOf(HtxBlockData.EndHeaders) }
+    fun addEndTrailers() { _blocks = _blocks + listOf(HtxBlockData.EndTrailers) }
     fun setEom() { flags = HtxFlags.EOM.mask }
 
     /** Internal: add a decoded block during parsing. */
-    internal fun addBlock(bd: HtxBlockData) { _blocks.add(bd) }
+    internal fun addBlock(bd: HtxBlockData) { _blocks = _blocks + listOf(bd) }
 
     fun startLine(): HtxStartLine? = _blocks
         .filterIsInstance<HtxBlockData.StartLine>()

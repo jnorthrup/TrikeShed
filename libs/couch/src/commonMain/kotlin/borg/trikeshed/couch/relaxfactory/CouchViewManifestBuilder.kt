@@ -57,8 +57,8 @@ class CouchViewManifestBuilder(
     private val databaseName: CharSequence,
     private val designDocId: CharSequence,
 ) {
-    private val viewDefs = LinkedHashMap<CharSequence, CouchViewDefinition>()
-    private val invocations = LinkedHashMap<CharSequence, CouchViewInvocation>()
+    private val viewDefs = mapOf<CharSequence, CouchViewDefinition>
+    private val invocations = mapOf<CharSequence, CouchViewInvocation>
 
     /**
      * Register a view with an explicit query [template].

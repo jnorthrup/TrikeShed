@@ -188,13 +188,13 @@ data class PeerInfo(
 )
 
 class ReplicationTopology {
-    private val peers = LinkedHashMap<CharSequence, PeerInfo>()
+    private var peers = mapOf<CharSequence, PeerInfo>()
 
     fun addPeer(peerId: CharSequence, role: PeerRole, peerUrl: CharSequence) {
-        peers[peerId] = PeerInfo(peerId, role, peerUrl)
+        peers = peers + (peerId to PeerInfo(peerId, role, peerUrl))
     }
 
-    fun removePeer(peerId: CharSequence) { peers.remove(peerId) }
+    fun removePeer(peerId: CharSequence) { peers = peers - peerId }
 
     fun getPeers(role: PeerRole?) = peers.values.filter { role == null || it.role == role }
 

@@ -72,26 +72,21 @@ fun HtxMessage.Companion.deserialize(bytes: ByteArray): HtxMessage? {
 // ── Internal payload encoding helpers ────────────────────────────
 fun HtxMessage.buildPayload(): ByteArray {
     val blocks = this.blocks
-    // flags(4) + blockCount(2) + blocks...
-    val parts = ArrayList<ByteArray>()
     // flags (big-endian uint32)
     val flagBuf = ByteArray(4)
     writeInt32BE(flagBuf, 0, flags.toInt())
-    parts.add(flagBuf)
     // blockCount (big-endian uint16)
     val countBuf = ByteArray(2)
     countBuf[0] = ((blocks.size shr 8) and 0xFF).toByte()
     countBuf[1] = (blocks.size and 0xFF).toByte()
-    parts.add(countBuf)
-    // Each block
-    for (b in blocks) {
-        parts.add(encodeBlock(b))
-    }
-    // Flatten
-    val total = parts.sumOf { it.size }
+    // Each block encoded
+    val encodedBlocks = blocks.map { encodeBlock(it) }
+    // Flatten: flagBuf + countBuf + encodedBlocks
+    val allParts = listOf(flagBuf, countBuf) + encodedBlocks
+    val total = allParts.sumOf { it.size }
     val result = ByteArray(total)
     var pos = 0
-    for (p in parts) {
+    for (p in allParts) {
         p.copyInto(result, pos)
         pos += p.size
     }
@@ -117,7 +112,7 @@ fun encodeBlock(bd: HtxBlockData): ByteArray {
 }
 fun encodeStartLine(sl: HtxBlockData.StartLine): ByteArray {
     val s = sl.sl
-    val parts = ArrayList<ByteArray>()
+    val parts = listOf<ByteArray>
     parts.add(byteArrayOf(if (s.isRequest) 1.toByte() else 0.toByte()))
     if (s.isRequest) {
         // method(1) + uriLen(2) + uri + verMajor(1) + verMinor(1)
@@ -145,14 +140,7 @@ fun encodeStartLine(sl: HtxBlockData.StartLine): ByteArray {
         parts.add(reason)
         parts.add(byteArrayOf(s.version.first.toByte(), s.version.second.toByte()))
     }
-    val total = parts.sumOf { it.size }
-    val result = ByteArray(total)
-    var pos = 0
-    for (p in parts) {
-        p.copyInto(result, pos)
-        pos += p.size
-    }
-    return result
+    return parts.fold(ByteArray(0)) { acc, ba -> acc + ba }
 }
 fun encodeHeader(hdr: HtxBlockData.Header): ByteArray {
     val total = 2 + hdr.name.size + 2 + hdr.value.size
@@ -302,38 +290,33 @@ fun normalizeToHtx(bytes: ByteArray): HtxMessage = HtxMessage.normalizeToHtx(byt
 // ── Transformation algebra ──────────────────────────────────────
 
 fun HtxMessage.mergeTrailers(): HtxMessage {
-    val newBlocks = ArrayList<HtxBlockData>()
-    for (b in this.blocks) {
+    val newBlocks = this.blocks.flatMap { b ->
         when (b) {
-            is HtxBlockData.Trailer -> newBlocks.add(HtxBlockData.Header(b.name, b.value))
-            is HtxBlockData.EndTrailers -> {
-                // drop
-            }
-            else -> newBlocks.add(b)
+            is HtxBlockData.Trailer -> listOf(HtxBlockData.Header(b.name, b.value))
+            is HtxBlockData.EndTrailers -> emptyList()
+            else -> listOf(b)
         }
     }
-    return HtxMessage(blocks = ArrayList(newBlocks), flags = this.flags)
+    return HtxMessage(blocks = newBlocks, flags = this.flags)
 }
 
 fun HtxMessage.stripBody(): HtxMessage {
-    val newBlocks = ArrayList<HtxBlockData>()
-    for (b in this.blocks) {
-        if (b !is HtxBlockData.Data) newBlocks.add(b)
-    }
-    val newMsg = HtxMessage(blocks = ArrayList(newBlocks), flags = this.flags)
+    val newBlocks = this.blocks.filter { it !is HtxBlockData.Data }
+    val newMsg = HtxMessage(blocks = newBlocks, flags = this.flags)
     newMsg.setEom()
     return newMsg
 }
 
 fun HtxMessage.withFlag(flag: HtxFlags): HtxMessage {
-    return HtxMessage(blocks = ArrayList(this.blocks), flags = (this.flags or flag.mask))
+    return HtxMessage(blocks = this.blocks, flags = (this.flags or flag.mask))
 }
 
 // ── Construction algebra (DSL factories) ────────────────────────
 
 class HtxMessageBuilder {
-    val headers = ArrayList<Pair<ByteArray, ByteArray>>()
-    fun header(name: ByteArray, value: ByteArray) { headers.add(name to value) }
+    private val _headers = listOf<Pair<ByteArray, ByteArray>>()
+    val headers: List<Pair<ByteArray, ByteArray>> get() = _headers
+    fun header(name: ByteArray, value: ByteArray) { _headers.add(name to value) }
 }
 
 fun request(method: HttpMethod, uri: ByteArray, block: HtxMessageBuilder.() -> Unit = {}): HtxMessage {

@@ -74,8 +74,8 @@ enum class ChangeType {
  */
 class GitGatedCrystore(
     val localNodeId: CharSequence,
-    private val patches: MutableList<ChangePatch> = buildList {},
-    private val heads: LinkedHashSet<CharSequence> = LinkedHashSet(),
+    private val patches: List<ChangePatch> = buildList {},
+    private val heads: Set<CharSequence> = linkedSetOf(),
     var patchCounter: Long = 0,
 ) {
     /** Record a new change with auto-incremented vector clock. */
@@ -325,7 +325,7 @@ data class NarsNodeProfile(
  * for conflict resolution and object ownership.
  */
 class NarsAdaptiveCluster(
-    val profiles: HashMap<CharSequence, NarsNodeProfile> = LinkedHashMap(),
+    val profiles: Map<CharSequence, NarsNodeProfile> = linkedMapOf(),
 ) {
     fun upsert(nodeId: CharSequence, transport: Transport): NarsNodeProfile {
         val existing = profiles[nodeId]
@@ -418,8 +418,8 @@ data class ProductionGraphNode(
  * Cluster topology graph — tracks node connections and partition assignments.
  */
 class HazelTopology(
-    val nodes: HashMap<CharSequence, ProductionGraphNode> = LinkedHashMap(),
-    val edges: MutableList<GraphEdge> = buildList {},
+    val nodes: Map<CharSequence, ProductionGraphNode> = linkedMapOf(),
+    val edges: List<GraphEdge> = buildList {},
 ) {
     fun addNode(node: ProductionGraphNode) {
         nodes[node.nodeId] = node
@@ -462,7 +462,7 @@ data class TimeseriesSample(
 )
 
 class ConflictAnalytics(
-    val samples: MutableList<TimeseriesSample> = buildList {},
+    val samples: List<TimeseriesSample> = buildList {},
     val windowMinutes: Int = 60,
 ) {
     fun record(nodeId: CharSequence, metric: CharSequence, value: Double, vararg labels: Pair<CharSequence, CharSequence>) {
