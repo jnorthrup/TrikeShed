@@ -41,8 +41,8 @@ inline class ValueInterval(val chars: CharSequence)
  * at that layer relative to the raw lib baseline.
  */
 data class Projection<T>(
-    val layer: String,
-    val signature: String,
+    val layer: CharSequence,
+    val signature: CharSequence,
     val densificationFactor: Double,
 ) {
     companion object {

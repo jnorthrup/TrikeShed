@@ -11,14 +11,14 @@ class DefaultSm3 : Sm3 {
 
     override fun hash(data: ByteArray): ByteArray {
         val padded = pad(data)
-        var h0 = 0x7380166fL
-        var h1 = 0x4914b2b9L
-        var h2 = 0x172442d7L
-        var h3 = 0xda8a0600L
-        var h4 = 0xa96f30bcL
-        var h5 = 0x163138aaL
-        var h6 = 0xe38dee4dL
-        var h7 = 0xb0fb0e4eL
+        var h0 = 0x7380166f
+        var h1 = 0x4914b2b9
+        var h2 = 0x172442d7
+        var h3 = 0xda8a0600.toInt()
+        var h4 = 0xa96f30bc.toInt()
+        var h5 = 0x163138aa
+        var h6 = 0xe38dee4d.toInt()
+        var h7 = 0xb0fb0e4e.toInt()
         var a = h0; var b = h1; var c = h2; var d = h3
         var e = h4; var f = h5; var g = h6; var hv = h7
 

@@ -1,4 +1,7 @@
-     Dissertation: CharStr as Join<TextOp, (TextOp) -> CharSequence>                                   
+ 
+
+#  Dissertation:
+  CharStr as Join<TextOp, (TextOp) -> CharSequence>                                   
      
 # What is actually being  proposed                     
                                                         

@@ -379,13 +379,12 @@ val Array<Char>.cs: CharSeries
 public val CharSequence.path: Path get() = Path(this)
 
 /** Create a Path from a String. (FFI boundary entry.) */
-public fun String.toPath(): Path = Path(this)
+public fun CharSequence.toPath(): Path = Path(this)
 
 /** Convert this Path to a filesystem-safe String. (FFI boundary exit.) */
-public fun Path.toFileString(): String = toString()
+public fun Path.toFileString(): CharSequence = this
 
 /** Resolve a child string relative to this Path. */
-public fun Path.resolve(child: String): Path = resolve(child as CharSequence)
 
 /** Create a [Path] from [this] Series<Char>. */
 public fun Series<Char>.toPath(): Path = Path(this)

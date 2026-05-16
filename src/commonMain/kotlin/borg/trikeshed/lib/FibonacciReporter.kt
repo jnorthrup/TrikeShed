@@ -1,13 +1,11 @@
 package borg.trikeshed.lib
 
 import kotlin.time.Clock
-import kotlin.jvm.JvmOverloads
 import kotlin.math.max
 import kotlin.time.Duration
 import kotlin.time.ExperimentalTime
 import kotlin.time.TimeSource
 
-@JvmOverloads
 tailrec fun fib(n: Int, a: Int = 0, b: Int = 1): Int = when (n) {
     0 -> a
     1 -> b

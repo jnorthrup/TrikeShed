@@ -3,7 +3,6 @@
 package borg.trikeshed.lib
 
 import borg.trikeshed.lib.CZero.nz
-import kotlin.jvm.JvmName
 
 
 /**
@@ -167,7 +166,7 @@ class CharSeries(
     }
 
     /** Pure joinToString — joins this CharSeries's characters with a separator, returns String. */
-    fun joinToString(separator: CharSequence = ""): String {
+    fun joinToString(separator: CharSequence = ""): CharSequence {
         if (isEmpty()) return ""
         val sb = StringBuilder()
         sb.append(raw(pos))
@@ -345,7 +344,6 @@ operator fun Series<Char>.div(delim: Char): Series<Series<Char>> { //lazy split
 //val Series<Byte>.s: CharSequence get() = asString()
 inline val CharSequence.s: Series<Char> get() = CharSeries(this)
 
-@get:JvmName("sFromCharSeries2")
 inline val  CharSequence.cs:CharSeries get() =CharSeries(this)
 
  inline val Series<Char>.asCharSequence: CharSequence get() = this as? CharSequence ?: CharSeries(this)

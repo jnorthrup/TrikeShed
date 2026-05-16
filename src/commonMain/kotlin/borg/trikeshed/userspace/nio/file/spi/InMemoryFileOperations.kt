@@ -3,47 +3,53 @@ package borg.trikeshed.userspace.nio.file.spi
 import borg.trikeshed.lib.Join
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.Series2
+import borg.trikeshed.lib.SeriesBuffer
 import borg.trikeshed.lib.j
+import borg.trikeshed.lib.size
+import borg.trikeshed.lib.substringBefore
 import borg.trikeshed.lib.toSeries
 import borg.trikeshed.lib.view
 import kotlin.coroutines.CoroutineContext
 
 /**
- * In-memory [FileOperations] — filesystem as a mutable map.
+ * In-memory [FileOperations] — filesystem as a map keyed by CharSequence.
  * No disk IO. Deterministic. Suitable for test fixtures.
  */
 class InMemoryFileOperations(
     private val cwd: CharSequence = "/mem",
 ) : FileOperations {
 
-    private val files = mutableMapOf<String, ByteArray>()
-    private val dirs = mutableSetOf<String>()
+    // LinkedHashMap keyed by CharSequence — no String in the pure zone
+    private val files = linkedMapOf<CharSequence, ByteArray>()
+    private val dirs = linkedMapOf<CharSequence, Unit>()
 
     override fun readAllLines(filename: CharSequence): Series<CharSequence> =
         readString(filename).lines().toSeries()
 
     override fun readAllBytes(filename: CharSequence): ByteArray =
-        files[filename.toString()] ?: throw NoSuchFileException(filename.toString())
+        files[filename] ?: files.entries.firstOrNull { it.key.contentEquals(filename) }?.value
+            ?: throw NoSuchFileException(filename)
 
     override fun readString(filename: CharSequence): CharSequence =
         readAllBytes(filename).decodeToString()
 
     override fun exists(filename: CharSequence): Boolean =
-        filename.toString() in files || filename.toString() in dirs
+        files.keys.any { it.contentEquals(filename) } || dirs.keys.any { it.contentEquals(filename) }
 
-    override fun isFile(path: CharSequence): Boolean = path.toString() in files
-    override fun isDir(path: CharSequence): Boolean = path.toString() in dirs
+    override fun isFile(path: CharSequence): Boolean = files.keys.any { it.contentEquals(path) }
+    override fun isDir(path: CharSequence): Boolean = dirs.keys.any { it.contentEquals(path) }
 
     override fun listDir(path: CharSequence): List<CharSequence> {
-        val prefix = path.toString().trimEnd('/') + "/"
-        return files.keys.filter { it.startsWith(prefix) }
+        val prefix = path.trimEnd('/').toString() + "/"
+        return files.keys
+            .filter { it.startsWith(prefix) }
             .map { it.removePrefix(prefix).substringBefore('/') as CharSequence }
             .distinct()
     }
 
     override fun write(filename: CharSequence, bytes: ByteArray) {
         ensureParentDirs(filename)
-        files[filename.toString()] = bytes
+        files[filename] = bytes
     }
 
     override fun write(filename: CharSequence, lines: Series<CharSequence>) {
@@ -56,13 +62,14 @@ class InMemoryFileOperations(
 
     override fun mkdirs(path: CharSequence) {
         ensureParentDirs("$path/.dir")
-        dirs += path.toString()
+        dirs[path] = Unit
     }
 
     override fun deleteRecursively(path: CharSequence) {
-        val prefix = path.toString().trimEnd('/') + "/"
-        files.keys.removeAll { it == path.toString() || it.startsWith(prefix) }
-        dirs.removeAll { it == path.toString() || it.startsWith(prefix) }
+        val prefix = path.trimEnd('/').toString() + "/"
+        val pathStr = path.toString()
+        files.keys.removeAll { it.toString() == pathStr || it.startsWith(prefix) }
+        dirs.keys.removeAll { it.toString() == pathStr || it.startsWith(prefix) }
     }
 
     override fun cwd(): CharSequence = cwd
@@ -81,17 +88,17 @@ class InMemoryFileOperations(
         return sequence {
             var offset = 0L
             var start = 0L
-            val line = mutableListOf<Byte>()
+            val line = SeriesBuffer<Byte>()
             for (b in bytes) {
                 line += b
                 offset++
                 if (b == '\n'.code.toByte()) {
-                    yield(start j line.toByteArray())
+                    yield(start j line.snapshot().view.toList().toByteArray())
                     line.clear()
                     start = offset
                 }
             }
-            if (line.isNotEmpty()) yield(start j line.toByteArray())
+            if (line.size > 0) yield(start j line.snapshot().view.toList().toByteArray())
         }
     }
 
@@ -108,7 +115,7 @@ class InMemoryFileOperations(
         var current = ""
         for (i in 0 until parts.lastIndex) {
             current += "/" + parts[i]
-            dirs += current
+            dirs[current] = Unit
         }
     }
 }

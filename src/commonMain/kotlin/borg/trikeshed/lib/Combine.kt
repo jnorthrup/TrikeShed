@@ -1,6 +1,5 @@
 package borg.trikeshed.lib
 
-import kotlin.jvm.JvmInline
 import kotlin.math.log2
 import kotlin.math.roundToInt
 

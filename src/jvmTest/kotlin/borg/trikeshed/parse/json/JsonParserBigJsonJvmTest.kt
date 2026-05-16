@@ -80,5 +80,5 @@ class JsonParserBigJsonJvmTest {
         assertTrue(services.contains("Universal Cartographics"))
     }
 
-   fun readBigJson(): CharSequence = Files.readAllLines("src/commonTest/resources/big.json").joinToString("\n")
+   fun readBigJson(): CharSequence = Files.readString("src/commonTest/resources/big.json")
 }

@@ -3,9 +3,8 @@ package borg.trikeshed.cursor
 import borg.trikeshed.isam.RecordMeta
 import borg.trikeshed.isam.meta.IOMemento
 import borg.trikeshed.lib.*
-import kotlin.jvm.JvmOverloads
 
-class SimpleCursor @JvmOverloads constructor(
+class SimpleCursor constructor(
     val scalars: Series<ColumnMeta>,
     val data: Series<Series<Any>>,
     val o: Series<RecordMeta> = scalars α { it: ColumnMeta ->

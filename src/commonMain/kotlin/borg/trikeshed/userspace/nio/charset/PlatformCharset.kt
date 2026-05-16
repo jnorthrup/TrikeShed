@@ -75,4 +75,4 @@ internal class PlatformCharset private constructor(
     }
 }
 
-private fun CharSequence.normalizedCharsetName(): String = toString().trim().uppercase()
+private fun CharSequence.normalizedCharsetName(): CharSequence = toString().trim().uppercase()

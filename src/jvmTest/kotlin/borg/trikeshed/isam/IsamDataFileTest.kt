@@ -1,18 +1,26 @@
 package borg.trikeshed.isam
 
-import borg.trikeshed.collections._l
-import borg.trikeshed.collections.s_
 import borg.trikeshed.cursor.*
 import borg.trikeshed.isam.meta.IOMemento
 import borg.trikeshed.lib.*
-import borg.trikeshed.miniduck.s_
+import borg.trikeshed.userspace.nio.file.Files
+import borg.trikeshed.userspace.nio.file.Paths
 import borg.trikeshed.userspace.nio.file.spi.JvmFileOperations
-import org.junit.Assert.assertEquals
-import org.junit.Test
 import java.io.File
-import java.nio.file.Paths
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 
 class IsamDataFileTest {
+
+    private fun rowOf(vararg pairs: Pair<Any?, IOMemento>): RowVec {
+        val count = pairs.size
+        val values: Series<Any?> = count j { ix: Int -> pairs[ix].first }
+        val metas: Series<`ColumnMeta↻`> = count j { ix: Int ->
+            { RecordMeta("col$ix", pairs[ix].second) }
+        }
+        return values j metas
+    }
 
     @Test
     fun testAppendExisting() {
@@ -26,23 +34,22 @@ class IsamDataFileTest {
 
         try {
             // 1. Initial write (via append)
-            val row1 = s_[10, 20.0] j s_[ { ColumnMeta("int_col", IOMemento.IoInt) }, { ColumnMeta("double_col", IOMemento.IoDouble) } ]
-            val row2 = s_[30, 40.0] j s_[ { ColumnMeta("int_col", IOMemento.IoInt) }, { ColumnMeta("double_col", IOMemento.IoDouble) } ]
+            val row1 = rowOf(10 to IOMemento.IoInt, 20.0 to IOMemento.IoDouble)
+            val row2 = rowOf(30 to IOMemento.IoInt, 40.0 to IOMemento.IoDouble)
 
-            IsamDataFile.append(_l
-                [row1, row2], datafilename, emptyMap(), null, fileOps)
+            IsamDataFile.append(listOf(row1, row2), datafilename, emptyMap(), null, fileOps)
 
             assertEquals(true, fileOps.exists(datafilename))
             assertEquals(true, fileOps.exists(metafilename))
 
-            val initialSize = borg.trikeshed.userspace.nio.file.Files.size(Paths.get(datafilename))
+            val initialSize = Files.size(Paths.get(datafilename))
             assertEquals(24, initialSize.toInt()) // 2 rows * (4 for int + 8 for double)
 
             // 2. Append more records
-            val row3 = s_[50, 60.0] j s_[ { ColumnMeta("int_col", IOMemento.IoInt) }, { ColumnMeta("double_col", IOMemento.IoDouble) } ]
+            val row3 = rowOf(50 to IOMemento.IoInt, 60.0 to IOMemento.IoDouble)
             IsamDataFile.append(listOf(row3), datafilename, emptyMap(), null, fileOps)
 
-            val finalSize = borg.trikeshed.userspace.nio.file.Files.size(Paths.get(datafilename))
+            val finalSize = Files.size(Paths.get(datafilename))
             assertEquals(36, finalSize.toInt()) // 3 rows * 12 bytes
 
             // 3. Verify reading
@@ -68,23 +75,24 @@ class IsamDataFileTest {
         }
     }
 
-    @Test(expected = IllegalArgumentException::class)
+    @Test
     fun testSchemaMismatch() {
         val datafilename = "test_mismatch.isam"
         val metafilename = "$datafilename.meta"
         val fileOps = JvmFileOperations()
 
-        // Cleanup
         File(datafilename).delete()
         File(metafilename).delete()
 
         try {
-            val row1 = s_[10] j s_[ { ColumnMeta("int_col", IOMemento.IoInt) } ]
-            IsamDataFile.append(listOf(row1), datafilename, emptyMap(), null, fileOps)
+            assertFailsWith<IllegalArgumentException> {
+                val row1 = rowOf(10 to IOMemento.IoInt)
+                IsamDataFile.append(listOf(row1), datafilename, emptyMap(), null, fileOps)
 
-            // Append with different schema
-            val row2 = s_[20.0] j s_[ { ColumnMeta("double_col", IOMemento.IoDouble) } ]
-            IsamDataFile.append(listOf(row2), datafilename, emptyMap(), null, fileOps)
+                // Append with different schema
+                val row2 = rowOf(20.0 to IOMemento.IoDouble)
+                IsamDataFile.append(listOf(row2), datafilename, emptyMap(), null, fileOps)
+            }
         } finally {
             File(datafilename).delete()
             File(metafilename).delete()

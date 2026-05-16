@@ -2,8 +2,6 @@
 
 package borg.trikeshed.lib
 
-import kotlin.jvm.JvmInline
-import kotlin.jvm.JvmStatic
 
 // ============================================================================
 // Pack helpers — reusable bit-shuffle primitives

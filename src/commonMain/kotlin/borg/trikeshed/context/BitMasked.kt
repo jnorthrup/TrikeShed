@@ -1,6 +1,7 @@
 package borg.trikeshed.context
 
 import borg.trikeshed.lib.Series
+import borg.trikeshed.lib.cs
 import borg.trikeshed.lib.j
 import kotlin.enums.EnumEntries
 import kotlin.jvm.JvmName
@@ -27,20 +28,24 @@ interface BitMasked<P : Comparable<P>> {
             lazy { entries.size j { i: Int -> i } }
 
         /** Lazy name index: Pair of (sorted names Series, ordinals Series). */
-        fun <E> nameIndex(entries: EnumEntries<E>): Lazy<Pair<Series<String>, Series<Int>>> where E : Enum<E>, E : BitMasked<*> =
+        fun <E> nameIndex(entries: EnumEntries<E>): Lazy<Pair<Series<CharSequence>, Series<Int>>> where E : Enum<E>, E : BitMasked<*> =
             lazy {
                 val sorted = entries.sortedBy { it.name }
                 val n = sorted.size
-                (n j { i: Int -> sorted[i].name }) to (n j { i: Int -> sorted[i].ordinal })
+                (n j { i: Int -> sorted[i].name as CharSequence }) to (n j { i: Int -> sorted[i].ordinal })
             }
 
         /** Binary search for name. Returns ordinal or -1. */
-        fun findOrdinal(nameIndex: Series<String>, ordinals: Series<Int>, name: CharSequence): Int {
+        fun findOrdinal(nameIndex: Series<CharSequence>, ordinals: Series<Int>, name: CharSequence): Int {
             var lo = 0
             var hi = nameIndex.a - 1
             while (lo <= hi) {
                 val mid = (lo + hi) / 2
-                val cmp = nameIndex.b(mid).compareTo(name.toString())
+                val left = nameIndex.b(mid)
+                val cmp = when {
+                    left.contentEquals(name) -> 0
+                    else -> left.cs.compareTo(name.cs)
+                }
                 when {
                     cmp == 0 -> return ordinals.b(mid)
                     cmp < 0 -> lo = mid + 1
@@ -156,14 +161,14 @@ fun BitMasked<UInt>.rotateRight(bits: Int): UInt = (this.mask shr bits) or (this
 // BitMasked<UInt> boolean logic
 infix fun BitMasked<UInt>.andAlso(mask: UInt): Boolean = (this.mask and mask) != 0u
 infix fun BitMasked<UInt>.orElse(mask: UInt): Boolean = (this.mask or mask) != 0u
-@JvmName("logicalNotUInt")
+@JvmName("bitMaskedUIntLogicalNot")
 fun BitMasked<UInt>.logicalNot(): Boolean = this.mask == 0u
 
 // BitMasked<UInt> conversion
 fun BitMasked<UInt>.toUInt(): UInt = this.mask
-@JvmName("toIntUInt")
+@JvmName("bitMaskedUIntToInt")
 fun BitMasked<UInt>.toInt(): Int = this.mask.toInt()
-@JvmName("toLongUInt")
+@JvmName("bitMaskedUIntToLong")
 fun BitMasked<UInt>.toLong(): Long = this.mask.toLong()
 
 // ========== Long operators: BitMasked<Long> ==========
@@ -205,13 +210,13 @@ infix fun BitMasked<Long>.ge(mask: Long): Boolean = this.mask >= mask
 // BitMasked<Long> boolean logic
 infix fun BitMasked<Long>.andAlso(mask: Long): Boolean = (this.mask and mask) != 0L
 infix fun BitMasked<Long>.orElse(mask: Long): Boolean = (this.mask or mask) != 0L
-@JvmName("logicalNotLong")
+@JvmName("bitMaskedLongLogicalNot")
 fun BitMasked<Long>.logicalNot(): Boolean = this.mask == 0L
 
 // BitMasked<Long> conversion
-@JvmName("toLongLong")
+@JvmName("bitMaskedLongToLong")
 fun BitMasked<Long>.toLong(): Long = this.mask
-@JvmName("toIntLong")
+@JvmName("bitMaskedLongToInt")
 fun BitMasked<Long>.toInt(): Int = this.mask.toInt()
 fun BitMasked<Long>.toULong(): ULong = this.mask.toULong()
 

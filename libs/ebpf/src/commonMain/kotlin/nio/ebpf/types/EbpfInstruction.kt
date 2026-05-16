@@ -18,8 +18,7 @@ import nio.ebpf.raw.BEBPF_ORDER
  * Network-endian: the RowVec backing store uses LE (native on x86/amd64, ARM64).
  * JVM translation layer handles ByteBuffer order switching at the last mile.
  */
-@JvmInline
-value class EbpfInstruction(val raw: Long) {
+inline class EbpfInstruction(val raw: Long) {
 
     companion object {
         // ── Field extractors (LE decoding from raw) ──

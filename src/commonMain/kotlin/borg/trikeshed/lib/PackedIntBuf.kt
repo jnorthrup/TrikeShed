@@ -2,7 +2,6 @@
 
 package borg.trikeshed.lib
 
-import kotlin.jvm.JvmInline
 
 // ============================================================================
 // PackedIntBuf — growable accumulator that packs small unsigned values into

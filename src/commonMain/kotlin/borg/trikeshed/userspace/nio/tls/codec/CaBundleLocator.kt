@@ -1,6 +1,9 @@
 package borg.trikeshed.userspace.nio.tls.codec
 
 import borg.trikeshed.userspace.nio.file.Files
+import borg.trikeshed.lib.SeriesBuffer
+import borg.trikeshed.lib.size
+import borg.trikeshed.lib.view
 
 /**
  * CommonMain CA certificate bundle discovery — mirrors curl's CA path probing
@@ -38,8 +41,8 @@ object CaBundleLocator {
      * On success, read the file via
      * `Files.readAllBytes(result)` to get PEM bytes.
      */
-    fun locate(): String? {
-        for (path: String in KNOWN_BUNDLES) {
+    fun locate(): CharSequence? {
+        for (path in KNOWN_BUNDLES) {
             if (Files.exists(path)) {
                 return path
             }
@@ -52,7 +55,7 @@ object CaBundleLocator {
      * no bundle is found on this system.
      */
     fun load(): ByteArray? {
-        val path: String = locate() ?: return null
+        val path = locate() ?: return null
         return Files.readAllBytes(path)
     }
 
@@ -60,14 +63,14 @@ object CaBundleLocator {
      * When no bundle is found, produce a diagnostic message listing
      * curl's expected paths and whether any exist on this system.
      */
-    fun diagnostic(): String {
-        val found: MutableList<String> = mutableListOf()
+    fun diagnostic(): CharSequence {
+        val found = SeriesBuffer<CharSequence>()
         for (path in KNOWN_BUNDLES) {
-            if (Files.exists(path)) found.add(path)
+            if (Files.exists(path)) found += path
         }
         return buildString {
             append("CA bundle discovery: ")
-            if (found.isEmpty()) {
+            if (found.size == 0) {
                 append("NONE found.")
                 append(" Probe these curl-default paths:")
                 for (p in KNOWN_BUNDLES) {
@@ -77,7 +80,7 @@ object CaBundleLocator {
                 append(" or curl --version for backend info.")
             } else {
                 append("found ").append(found.size).append(" bundle(s):")
-                for (f in found) {
+                for (f in found.view) {
                     append("\n  ").append(f)
                 }
             }

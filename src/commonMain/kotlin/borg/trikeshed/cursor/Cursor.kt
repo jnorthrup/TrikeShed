@@ -6,8 +6,7 @@ package borg.trikeshed.cursor
 import borg.trikeshed.isam.meta.IOMemento.*
 import borg.trikeshed.isam.RecordMeta
 import borg.trikeshed.lib.*
-import kotlin.jvm.JvmInline
-import kotlin.jvm.JvmOverloads
+
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.random.Random
@@ -99,12 +98,10 @@ operator fun Cursor.get(vararg s: CharSequence): Cursor = this[meta(*s)]
  *
  * @param name the name of the column to exclude */
 
-inline class ColumnExclusion(val name: String) {
-    override fun toString(): String = "ColumnExclusion($name)"
-}
+inline class ColumnExclusion(val name: CharSequence)
 
 /** create operator unary minus for ColumnExclusion on string */
-operator fun String.unaryMinus(): ColumnExclusion = ColumnExclusion(this)
+operator fun CharSequence.unaryMinus(): ColumnExclusion = ColumnExclusion(this)
 
 /** Return cursor with columns excluded by indexes */
 operator fun Cursor.minus(killbag: Series<Int>): Cursor {
@@ -123,11 +120,10 @@ operator fun Cursor.get(s: Series<ColumnExclusion>): Cursor {
 }
 
 //in columnar project this is meta.right
-val Series<ColumnMeta>.names: Series<String> get() = this α { it.name.toString() }
+val Series<ColumnMeta>.names: Series<CharSequence> get() = this α { it.name }
 
 /** head default 5 rows
  * just like unix head - print default 5 lines from cursor contents to stdout */
-@JvmOverloads
 fun Cursor.head(last: Int = 5): Unit = show(0 until (max(0, min(last, size))))
 
 /** run head starting at random index */

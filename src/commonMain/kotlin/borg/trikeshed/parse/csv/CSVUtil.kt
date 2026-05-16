@@ -15,8 +15,6 @@ import borg.trikeshed.lib.long.drop
 import borg.trikeshed.lib.long.get
 import borg.trikeshed.parse.csv.CSVUtil.streamSpec
 import borg.trikeshed.parse.evidence.TypeEvidence
-import kotlin.jvm.JvmInline
-import kotlin.jvm.JvmOverloads
 
 /**
  * a versatile range of two unsigned shorts stored as a 32 bit Int value as Inline class
@@ -52,7 +50,6 @@ object CSVUtil {
      * read a csv file into a series of segments
      */
 //    @JvmStatic
-    @JvmOverloads
     fun parseLine(
         /**the source media*/
         file: LongSeries<Byte>,
@@ -278,10 +275,10 @@ object CSVUtil {
      */
     data class StreamSpec(
         val rows: Sequence<RowVec>,
-        val colNames: List<String>,
+        val colNames: Series<CharSequence>,
         val colTypes: List<IOMemento>,
         /** column name → max observed field length (only for IoString columns) */
-        val varChars: Map<String, Int>,
+        val varChars: Map<CharSequence, Int>,
     )
 
     /**
@@ -317,7 +314,7 @@ object CSVUtil {
         val fileSize = file.a
 
         // ── Phase 1: column names + data-start position ──────────────────────
-        val colNames = mutableListOf<String>()
+        val colNames = SeriesBuffer<CharSequence>()
         var dataStart = 0L
         val hdrBuf = ByteArray(1024)
         var hdrLen = 0
@@ -327,9 +324,9 @@ object CSVUtil {
                 val b = file[dataStart]
                 val c = b.toInt().toChar()
                 when {
-                    c == delim -> { colNames.add(hdrBuf.decodeToString(0, hdrLen)); hdrLen = 0 }
+                    c == delim -> { colNames += hdrBuf.decodeToString(0, hdrLen); hdrLen = 0 }
                     c == '\r' || c == '\n' -> {
-                        colNames.add(hdrBuf.decodeToString(0, hdrLen))
+                        colNames += hdrBuf.decodeToString(0, hdrLen)
                         if (c == '\r' && dataStart + 1 < fileSize && file[dataStart + 1].toInt().toChar() == '\n')
                             dataStart++
                         dataStart++; break
@@ -344,7 +341,7 @@ object CSVUtil {
                 val c = file[p++].toInt().toChar()
                 if (c == delim) count++ else if (c == '\r' || c == '\n') break
             }
-            repeat(count) { i -> colNames.add("col$i") }
+            repeat(count) { i -> colNames += "col$i" }
         }
         val colCount = colNames.size
 
@@ -384,7 +381,7 @@ object CSVUtil {
         val metaArr = Array(colCount) { i -> RecordMeta(colNames[i], colTypesList[i]) }
 
         // varChars: max observed length for each IoString column
-        val varChars: Map<String, Int> = buildMap {
+        val varChars: Map<CharSequence, Int> = buildMap {
             colNames.forEachIndexed { i, name ->
                 if (colTypesList[i] == IoString && i < fileEvidence.size)
                     put(name, fileEvidence[i].maxColumnLength.toInt().coerceAtLeast(1))
@@ -436,7 +433,7 @@ object CSVUtil {
 /** list<String>  -> CSV Cursor of strings
  * */
 @OptIn(ExperimentalUnsignedTypes::class)
-fun simpelCsvCursor(lineList: List<String>): Cursor {
+fun simpelCsvCursor(lineList: List<CharSequence>): Cursor {
     //take line11 as headers.  the split by ','
     val headerNames = lineList[0].split(",").map { it.trim() }
     val hdrMeta = headerNames.map { RecordMeta(it, IoString) }

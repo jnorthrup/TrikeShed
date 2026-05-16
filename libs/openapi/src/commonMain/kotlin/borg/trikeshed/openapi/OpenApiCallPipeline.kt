@@ -6,7 +6,7 @@ import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.selects.select
 import kotlin.coroutines.CoroutineContext
 import kotlin.math.max
-import borg.trikeshed.lib.SeriesArrayList
+import borg.trikeshed.lib.SeriesBuffer
 
 data class OpenApiCall<I>(
     val callId: CharSequence,
@@ -156,7 +156,7 @@ suspend fun <I, P : HasCallId, R> speculativePipelineBurndown(
         success.close()
     }
 
-    val results = SeriesArrayList<R>()
+    val results = SeriesBuffer<R>()
     try {
         while (results.size < work.size) {
             select<Unit> {
@@ -226,7 +226,7 @@ suspend fun <I, O> speculativeParseBurndown(
     parser: suspend (I) -> String,
     truthAction: suspend (OpenApiCall<I>, OpenApiRawDocument) -> O,
 ): List<OpenApiTruthAction<I, O>> {
-    val buffered = SeriesArrayList<OpenApiCall<I>>()
+    val buffered = SeriesBuffer<OpenApiCall<I>>()
     for (call in calls) buffered += call
     return speculativeParseBurndown(buffered.toList(), parallelism, parser, truthAction)
 }
@@ -237,7 +237,7 @@ suspend fun <I, O> speculativeGapBurndown(
     parser: suspend (I) -> String,
     truthAction: suspend (OpenApiParsedCall<I>) -> O,
 ): List<OpenApiTruthAction<I, O>> {
-    val buffered = SeriesArrayList<OpenApiCall<I>>()
+    val buffered = SeriesBuffer<OpenApiCall<I>>()
     for (call in calls) buffered += call
     return speculativeGapBurndown(buffered.toList(), parallelism, parser, truthAction)
 }
@@ -270,7 +270,7 @@ suspend fun <I, O> speculativeSignalBurndown(
     parser: suspend (I) -> String,
     signalAction: suspend (OpenApiSignalCall<I>) -> O,
 ): List<OpenApiSignalAction<I, O>> {
-    val buffered = SeriesArrayList<OpenApiCall<I>>()
+    val buffered = SeriesBuffer<OpenApiCall<I>>()
     for (call in calls) buffered += call
     return speculativeSignalBurndown(buffered.toList(), parallelism, parser, signalAction)
 }

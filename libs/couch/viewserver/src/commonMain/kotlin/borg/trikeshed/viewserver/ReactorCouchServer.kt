@@ -21,6 +21,7 @@ import borg.trikeshed.userspace.nio.channels.spi.ReactorOperations
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
 import kotlin.coroutines.CoroutineContext
+import kotlin.coroutines.coroutineContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
@@ -119,19 +120,32 @@ class ReactorCouchServer(
         fun fd(ud: Long): Int = (ud and 0xFFFFFFFFL).toInt()
     }
 
+    // CCEK: Reactor service context keys — retrieve via currentCoroutineContext()[Key]
+    private object ViewSourcesKey : CoroutineContext.Key<*>
+    private object ReadAccumKey : CoroutineContext.Key<*>
+    private object PendingReadBuffersKey : CoroutineContext.Key<*>
+
+    // Accessors — delegate to coroutine context, lazily initialized per-serving scope
+    @Suppress("UNCHECKED_CAST")
+    private val viewSources: MutableMap<CharSequence, MutableMap<CharSequence, Pair<CharSequence, CharSequence?>>>
+        get() = coroutineContext[ViewSourcesKey] as? MutableMap<CharSequence, MutableMap<CharSequence, Pair<CharSequence, CharSequence?>>>
+            ?: error("ViewSources not in coroutine context")
+
+    @Suppress("UNCHECKED_CAST")
+    private val readAccum: MutableMap<Int, MutableList<Byte>>
+        get() = coroutineContext[ReadAccumKey] as? MutableMap<Int, MutableList<Byte>>
+            ?: error("ReadAccum not in coroutine context")
+
+    @Suppress("UNCHECKED_CAST")
+    private val pendingReadBuffers: MutableMap<Int, ByteBuffer>
+        get() = coroutineContext[PendingReadBuffersKey] as? MutableMap<Int, ByteBuffer>
+            ?: error("PendingReadBuffers not in coroutine context")
+
+    // viewServer is constructed once and shared across all serve calls (server-scoped, not per-connection)
     private val viewServer = CouchQueryServer(compileJs)
-    /** db → viewName → (mapSource, reduceSource?) */
-    private val viewSources = mutableMapOf<CharSequence, MutableMap<CharSequence, Pair<CharSequence, CharSequence?>>>()
+
+    // Per-serverFd state (not per-connection, so lives on the class)
     private var serverFd: Int = -1
-
-    /**
-     * Per-connection read accumulation: clientFd → bytes received so far.
-     * HTTP requests may arrive in fragments; we buffer until we see the full header block.
-     */
-    private val readAccum = mutableMapOf<Int, MutableList<Byte>>()
-
-    /** Read buffers currently in-flight (one per client fd). */
-    private val pendingReadBuffers = mutableMapOf<Int, ByteBuffer>()
 
     // ── Pattern A lifecycle ────────────────────────────────────────
 
@@ -159,22 +173,29 @@ class ReactorCouchServer(
      * Start the accept-dispatch loop.
      * Runs until [close] is called or parent scope cancels.
      */
-    suspend fun serve(killSignal: kotlinx.coroutines.Job? = null) = withContext(supervisor) {
-        requireState(ElementState.ACTIVE)
-        val ring = channelOps.openChannel()
-        // Arm the first accept SQE.
-        ring.prepAccept(serverFd, EventKey.encode(EventKey.ACCEPT, serverFd))
-        ring.submit()
-        while (isActive) {
-            val results = ring.wait()
-            for (r in results) {
-                when (EventKey.type(r.userData)) {
-                    EventKey.ACCEPT -> handleAccept(ring, r)
-                    EventKey.READ   -> handleRead(ring, r)
-                    EventKey.WRITE  -> handleWrite(r)
-                }
-            }
+    suspend fun serve(killSignal: kotlinx.coroutines.Job? = null) {
+        // Inject per-serve-call mutable state into coroutine context (GEPA CCEK pattern)
+        val serveContext = supervisor +
+            (PendingReadBuffersKey to mutableMapOf<Int, ByteBuffer>()) +
+            (ReadAccumKey to mutableMapOf<Int, List<Byte>>()) +
+            (ViewSourcesKey to mutableMapOf<CharSequence, MutableMap<CharSequence, Pair<CharSequence, CharSequence?>>>>())
+        withContext(serveContext) {
+            requireState(ElementState.ACTIVE)
+            val ring = channelOps.openChannel()
+            // Arm the first accept SQE.
+            ring.prepAccept(serverFd, EventKey.encode(EventKey.ACCEPT, serverFd))
             ring.submit()
+            while (isActive) {
+                val results = ring.wait()
+                for (r in results) {
+                    when (EventKey.type(r.userData)) {
+                        EventKey.ACCEPT -> handleAccept(ring, r)
+                        EventKey.READ   -> handleRead(ring, r)
+                        EventKey.WRITE  -> handleWrite(r)
+                    }
+                }
+                ring.submit()
+            }
         }
     }
 
@@ -378,16 +399,14 @@ class ReactorCouchServer(
 
         if (group || groupLevel != null) {
             val level = groupLevel ?: Int.MAX_VALUE
-            val grouped = LinkedHashMap<Any?, MutableList<Any?>>()
-            for (row in paged) {
-                val gk = keyPrefix(row.key, level)
-                grouped.getOrPut(gk) { mutableListOf() }.add(row.value)
-            }
-            var groupedEntries = grouped.entries.toList()
-            if (descending) groupedEntries = groupedEntries.reversed()
-            val limitedGroups = if (limit != null) groupedEntries.take(limit) else groupedEntries
+            // Group by composite key, collect values per group, then serialize
+            val groups = paged.groupBy { keyPrefix(it.key, level) }
+            val sortedKeys = groups.keys.sortedWith { a, b -> compareKeys(a, b) }
+            val limitedKeys = if (descending) sortedKeys.reversed() else sortedKeys
+            val keySeq = if (limit != null) limitedKeys.take(limit) else limitedKeys
 
-            val rowJson = limitedGroups.joinToString(",") { (gk, values) ->
+            val rowJson = keySeq.joinToString(",") { gk ->
+                val values = groups[gk]!!.map { it.value }
                 val r = viewServer.handle(CouchCommand.Reduce(listOf(reduceFn), values))
                 val result = if (r is CouchResponse.ReduceResult) r.value else null
                 """{"key":${jsonValue(gk)},"value":${jsonValue(result)}}"""

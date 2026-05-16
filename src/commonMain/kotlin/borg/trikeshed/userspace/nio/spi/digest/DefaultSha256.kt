@@ -7,8 +7,8 @@ package borg.trikeshed.userspace.nio.spi.digest
  * Register this in the coroutine context via `DefaultSha256()`.
  * Platforms can swap in hardware-accelerated impls at composition time.
  */
-class DefaultSha256 : borg.trikeshed.userspace.nio.tls.codec.hash.Sha256 {
-    override val key: kotlin.coroutines.CoroutineContext.Key<*> get() = borg.trikeshed.userspace.nio.tls.codec.hash.Sha256.Key
+class DefaultSha256 : Sha256 {
+    override val key: kotlin.coroutines.CoroutineContext.Key<*> get() = Sha256.Key
 
     override fun hash(data: ByteArray): ByteArray {
         val padded = pad(data)

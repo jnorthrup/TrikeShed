@@ -6,7 +6,7 @@ import borg.trikeshed.userspace.nio.channels.spi.JvmChannelOperations
 import borg.trikeshed.userspace.nio.tls.codec.aead.Aes128Gcm
 import borg.trikeshed.userspace.nio.tls.codec.aead.DefaultAes128Gcm
 import borg.trikeshed.userspace.nio.tls.codec.ecdh.DefaultX25519
-import borg.trikeshed.userspace.nio.tls.codec.hash.DefaultSha256
+import borg.trikeshed.userspace.nio.spi.digest.DefaultSha256
 import borg.trikeshed.userspace.nio.tls.codec.kdf.DefaultHkdfSha256
 import borg.trikeshed.userspace.nio.tls.codec.CommonTlsClientHandshake
 import borg.trikeshed.userspace.nio.tls.codec.CommonTlsRecordCodec

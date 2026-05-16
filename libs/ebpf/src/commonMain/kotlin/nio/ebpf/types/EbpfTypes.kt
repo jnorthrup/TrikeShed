@@ -1,8 +1,7 @@
 package nio.ebpf.types
 
 /** eBPF register — zero overhead wrapper around index. */
-@JvmInline
-value class Reg(val index: Int) {
+inline class Reg(val index: Int) {
     init { require(index in 0..15) { "eBPF register index must be 0..15, got $index" } }
     companion object {
         val R0 = Reg(0); val R1 = Reg(1); val R2 = Reg(2); val R3 = Reg(3); val R4 = Reg(4)

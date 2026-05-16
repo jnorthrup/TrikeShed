@@ -8,7 +8,6 @@ import borg.trikeshed.lib.Join
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.Tensor
 import borg.trikeshed.lib.j
-import kotlin.jvm.JvmInline
 import kotlin.math.pow
 
 /**

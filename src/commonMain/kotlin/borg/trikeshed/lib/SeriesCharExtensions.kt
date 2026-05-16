@@ -135,9 +135,9 @@ fun CharSeries.replaceRangeCs(range: IntRange, replacement: CharSequence): CharS
     val cs: CharSeries = this
     val r: Int = range.first.coerceAtLeast(0).coerceAtMost(cs.length)
     val l: Int = (range.last + 1).coerceAtLeast(r).coerceAtMost(cs.length)
-    val pre: String = cs.subSequence(0, r).toString()
-    val suf: String = cs.subSequence(l, cs.length).toString()
-    return pre + replacement.toString() + suf
+    val pre: CharSequence = cs.subSequence(0, r)
+    val suf: CharSequence = cs.subSequence(l, cs.length)
+    return pre.toString() + replacement.toString() + suf.toString()
 }
 
 
@@ -174,7 +174,7 @@ fun CharSequence.replaceRangeCs(range: IntRange, replacement: CharSequence): Cha
     val cs: CharSeries = CharSeries(this)
     val r: Int = range.first.coerceAtLeast(0).coerceAtMost(cs.length)
     val l: Int = (range.last + 1).coerceAtLeast(r).coerceAtMost(cs.length)
-    val pre: String = cs.subSequence(0, r).toString()
-    val suf: String = cs.subSequence(l, cs.length).toString()
-    return pre + replacement.toString() + suf
+    val pre: CharSequence = cs.subSequence(0, r)
+    val suf: CharSequence = cs.subSequence(l, cs.length)
+    return pre.toString() + replacement.toString() + suf.toString()
 }

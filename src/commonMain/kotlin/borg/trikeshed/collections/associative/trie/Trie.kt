@@ -6,7 +6,7 @@ import kotlin.collections.contains
  * Created by kenny on 6/6/16.
  */
 class Trie(var root: Map<String, Node> = linkedMapOf()) {
-   var freeze: Boolean = false
+  var freeze: Boolean = false
     fun add(v: Int, vararg values: CharSequence) {
         if (freeze) throw IllegalStateException("Trie is frozen")
         var children: Map<String, Node> = root
@@ -35,13 +35,13 @@ class Trie(var root: Map<String, Node> = linkedMapOf()) {
 
     fun contains(vararg values: CharSequence): Boolean = search(*values.map { it.toString() }.toTypedArray()) != null
 
-    operator fun get(vararg key: String): Int? = search(*key)?.payload
+    operator fun get(vararg key: CharSequence): Int? = search(*key)?.payload
 
     fun frez(n: Node) {
 
         n.children.entries.let { cnodes: Set<Map.Entry<String, Node>> ->
             n.children = ArrayMap.sorting(n.children)
-            for ((_: String, v: Node) in cnodes) frez(v)
+            for ((_, v) in cnodes) frez(v)
         }
     }
 
@@ -53,7 +53,7 @@ class Trie(var root: Map<String, Node> = linkedMapOf()) {
         }
     }
 
-    fun search(vararg segments: String): Node? {
+    fun search(vararg segments: CharSequence): Node? {
         // empty lookup should simply return null (no payload)
         if (segments.isEmpty()) return null
 
@@ -64,7 +64,7 @@ class Trie(var root: Map<String, Node> = linkedMapOf()) {
             for ((i: Int, value: CharSequence) in segments.withIndex()) {
                 val atLeaf = i == segments.lastIndex
                 // add new node
-                if (children.contains(value)) {
+                if (children.contains(value.toString())) {
                     // exist, so traverse current path, ending if is last value, and is leaf node
                     val node: Node = children[value.toString()]!!
                     if (atLeaf) return if (node.leaf) {

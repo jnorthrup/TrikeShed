@@ -8,7 +8,6 @@ import borg.trikeshed.isam.meta.IOMemento
 import borg.trikeshed.parse.evidence.TypeEvidence
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.LocalDateTime
-import kotlin.jvm.JvmName
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.pow
@@ -548,7 +547,6 @@ fun Series<Char>.parseDoubleOrNull(): Double? = try {
 infix fun <T, R> List<T>.zip(other: Series<R>): List<Join<T, R>> =
     zip(other.view) { a: T, b: R -> a j b }
 
-@JvmName("vvzip2")
 @Suppress("UNCHECKED_CAST")
 infix fun <T, O, R : Series2<T, O>> Series<T>.zip(o: Series<O>): R =
     ReifiedSplitSeries2(this, o) as R

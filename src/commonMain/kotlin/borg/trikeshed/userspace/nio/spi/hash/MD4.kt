@@ -81,8 +81,8 @@ object MD4 {
 
         // Initialize hash values
         var a = 0x67452301
-        var b = 0xefcdab89
-        var c = 0x98badcfe
+        var b = 0xefcdab89.toInt()
+        var c = 0x98badcfe.toInt()
         var d = 0x10325476
 
         var offset = 0
@@ -176,21 +176,21 @@ object MD4 {
         (b[o + 3].toInt() and 0xFF)
 }
 
-/** MD4 of a string, returned as hex string */
-fun String.md4(): String = MD4.hash(this.toByteArray()).hex()
+/** MD4 of a CharSequence (encodes to UTF-8), returned as hex CharSeries */
+fun CharSequence.md4(): CharSequence = MD4.hash(toString().encodeToByteArray()).hex
 
-/** MD4 of a ByteArray, returned as hex string */
-fun ByteArray.md4Hex(): String = MD4.hash(this).hex()
+/** MD4 of a ByteArray, returned as hex CharSequence */
+val ByteArray.md4Hex: CharSequence get() = MD4.hash(this).hex
 
-/** Convert ByteArray to lowercase hex string */
-val ByteArray.hex: String
+/** Convert ByteArray to lowercase hex CharSeries */
+val ByteArray.hex: CharSequence
     get() {
         val res = CharArray(size shl 1)
         for (ix in indices) get(ix).toInt().also {
             res[ix shl 1] = hexChar((it shr 4) and 0xf)
             res[(ix shl 1) + 1] = hexChar(it and 0xf)
         }
-        return String(res)
+        return CharSeries(res)
     }
 
 private fun hexChar(v: Int): Char = if (v < 10) ('0'.code + v).toChar() else ('a'.code + v - 10).toChar()

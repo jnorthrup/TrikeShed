@@ -4,7 +4,6 @@ package borg.trikeshed.collections.associative
 
 
 import borg.trikeshed.lib.Join
-import kotlin.jvm.JvmInline
 
 
 inline class JoinEntry<A, B>(val join: Join<A, B>) : Map.Entry<A, B> {

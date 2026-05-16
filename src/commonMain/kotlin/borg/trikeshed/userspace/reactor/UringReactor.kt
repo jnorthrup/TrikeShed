@@ -43,7 +43,7 @@ class UringReactor(
 
     // Open event handlers
     private val acceptHandlers = mutableListOf<(Int) -> Unit>()
-    private val readHandlers = mutableMapOf<Int, (String) -> Unit>()
+    private val readHandlers = linkedMapOf<Int, (ByteArray) -> Unit>()
     private val errorHandlers = mutableMapOf<Int, (Throwable) -> Unit>()
 
     // TLS settings — created at open() time, not at construction
@@ -94,7 +94,7 @@ class UringReactor(
     /**
      * Create a new TLS engine for a connection using the reactor's settings.
      */
-    fun createTlsEngine(serverName: String? = null): borg.trikeshed.userspace.nio.tls.TlsEngine {
+    fun createTlsEngine(serverName: CharSequence? = null): borg.trikeshed.userspace.nio.tls.TlsEngine {
         val settings = tlsSettings.copy(serverName = serverName)
         return borg.trikeshed.userspace.nio.tls.createTlsEngine(settings)
     }
@@ -109,7 +109,7 @@ class UringReactor(
         acceptHandlers.add(handler)
     }
 
-    fun onRead(fd: Int, handler: (String) -> Unit) {
+    fun onRead(fd: Int, handler: (ByteArray) -> Unit) {
         readHandlers[fd] = handler
     }
 
