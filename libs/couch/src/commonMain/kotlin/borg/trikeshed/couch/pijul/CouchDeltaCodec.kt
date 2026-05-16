@@ -1,7 +1,6 @@
 package borg.trikeshed.couch.pijul
 
 import borg.trikeshed.couch.htx.*
-import java.util.LinkedList
 
 /**
  * Encode patches as compact couch deltas for transmission over HTX.
@@ -41,7 +40,7 @@ object CouchDeltaCodec {
      * Returns a list of blocks batched at `batchSize` edits each.
      */
     fun encodePatch(patch: Patch, batchSize: Int = 64): List<HtxBlockData.Data> {
-        val blocks = LinkedList<HtxBlockData.Data>()
+        val blocks = ArrayList<HtxBlockData.Data>()
 
         // Header block
         blocks.add(HtxBlockData.Data(buildPatchHeader(patch)))
@@ -69,7 +68,7 @@ object CouchDeltaCodec {
 
         // First block is header
         val header = decodePatchHeader(blocks.first().bytes)
-        val allEdits = LinkedList<DeltaLineEdit>()
+        val allEdits = ArrayList<DeltaLineEdit>()
 
         for (block in blocks.drop(1)) {
             if (block.bytes.isEmpty()) continue
@@ -102,7 +101,7 @@ object CouchDeltaCodec {
     private fun decodeDeltaBatch(data: ByteArray): List<DeltaLineEdit> {
         val br = SimpleByteArrayInput(data)
         val n = br.readU32().toInt()
-        val edits = LinkedList<DeltaLineEdit>()
+        val edits = ArrayList<DeltaLineEdit>()
         repeat(n) {
             val op = LineOperation.entries[br.readU8().toInt()]
             val start = br.readU32().toInt()
@@ -197,7 +196,7 @@ object CouchDeltaCodec {
 // --- Minimal binary I/O helpers (no BigInteger, no external deps) ---
 
 private class SimpleByteArrayOutput {
-    private val parts = LinkedList<ByteArray>()
+    private val parts = ArrayList<ByteArray>()
     private var size = 0
 
     fun write(b: ByteArray) { parts.add(b); size += b.size }

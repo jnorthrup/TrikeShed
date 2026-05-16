@@ -37,7 +37,7 @@ fun Cursor.hashJoin(other: Cursor, leftKey: CharSequence, rightKey: CharSequence
         val existing = rightIndex.view.find { it.first == key } ?: continue
         val matches = existing.second
         for (matchIdx in 0 until matches.size) {
-            val rightRow = matches[matchIdx]
+            val rightRow = matches[matchIdx] as RowVec
             val keys: SeriesBuffer<CharSequence> = SeriesBuffer()
             val cells: SeriesBuffer<Any?> = SeriesBuffer()
             appendRowData(keys, cells, leftRow)

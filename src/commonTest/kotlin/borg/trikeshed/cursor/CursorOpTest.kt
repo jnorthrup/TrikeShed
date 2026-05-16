@@ -1,12 +1,5 @@
 package borg.trikeshed.cursor
 
-import borg.trikeshed.cursor.BloomFilter
-import borg.trikeshed.cursor.Cursor
-import borg.trikeshed.cursor.RowVec
-import borg.trikeshed.cursor.at
-import borg.trikeshed.cursor.groupBy
-import borg.trikeshed.cursor.head
-import borg.trikeshed.cursor.show
 import borg.trikeshed.isam.RecordMeta
 import borg.trikeshed.isam.meta.IOMemento
 import borg.trikeshed.isam.meta.IOMemento.*
@@ -15,9 +8,6 @@ import borg.trikeshed.parse.csv.simpelCsvCursor
 import borg.trikeshed.userspace.nio.spi.digest.DefaultSm3
 import borg.trikeshed.userspace.nio.spi.digest.Sm3
 import kotlin.math.exp
-import kotlin.math.ln
-import kotlin.math.max
-import kotlin.math.min
 import kotlin.random.Random
 import kotlin.test.*
 
@@ -219,9 +209,9 @@ class CursorOpTest {
             rowOf("third" to IoString),
         )
         val last = cursor.row(-1)
-        assertEquals("third", last[0]?.a)
+        assertEquals("third", last[0].a)
         val secondLast = cursor.row(-2)
-        assertEquals("second", secondLast[0]?.a)
+        assertEquals("second", secondLast[0].a)
     }
 
     @Test
@@ -231,7 +221,7 @@ class CursorOpTest {
             rowOf("second" to IoString),
         )
         val row = cursor at 0
-        assertEquals("first", row[0]?.a)
+        assertEquals("first", row[0].a)
     }
 
     @Test
@@ -242,7 +232,7 @@ class CursorOpTest {
             rowOf("third" to IoString),
         )
         val row = cursor at -1
-        assertEquals("third", row[0]?.a)
+        assertEquals("third", row[0].a)
     }
 
     @Test
@@ -267,9 +257,9 @@ class CursorOpTest {
         )
         val cursor = simpelCsvCursor(lines)
         assertEquals(2, cursor.size)
-        assertEquals("Alice", cursor.row(0)[0]?.a)
-        assertEquals("30", cursor.row(0)[1]?.a)
-        assertEquals("NYC", cursor.row(0)[2]?.a)
+        assertEquals("Alice", cursor.row(0)[0].a)
+        assertEquals("30", cursor.row(0)[1].a)
+        assertEquals("NYC", cursor.row(0)[2].a)
     }
 
     @Test
@@ -359,15 +349,15 @@ class CursorOpTest {
     @Test
     fun sm3DefaultExists() {
         val hasher = DefaultSm3()
-        val result = hasher.hash("test".toByteArray())
+        val result = hasher.hash("test".encodeToByteArray())
         assertEquals(32, result.size, "SM3 output must be 32 bytes")
     }
 
     @Test
     fun sm3Hmac() {
         val hasher = DefaultSm3()
-        val key = "key".toByteArray()
-        val data = "data".toByteArray()
+        val key = "key".encodeToByteArray()
+        val data = "data".encodeToByteArray()
         val mac = hasher.hmac(key, data)
         assertEquals(32, mac.size)
     }
@@ -375,7 +365,7 @@ class CursorOpTest {
     @Test
     fun sm3Consistent() {
         val hasher = DefaultSm3()
-        val data = "hello".toByteArray()
+        val data = "hello".encodeToByteArray()
         val h1 = hasher.hash(data)
         val h2 = hasher.hash(data)
         assertTrue(h1.contentEquals(h2), "Same input must produce same output")
@@ -384,8 +374,8 @@ class CursorOpTest {
     @Test
     fun sm3DifferentOutputs() {
         val hasher = DefaultSm3()
-        val h1 = hasher.hash("a".toByteArray())
-        val h2 = hasher.hash("b".toByteArray())
+        val h1 = hasher.hash("a".encodeToByteArray())
+        val h2 = hasher.hash("b".encodeToByteArray())
         assertFalse(h1.contentEquals(h2), "Different inputs must produce different outputs")
     }
 
@@ -398,7 +388,6 @@ class CursorOpTest {
 
     @Test
     fun sm3KeyInterface() {
-        val hasher = DefaultSm3()
         val key: kotlin.coroutines.CoroutineContext.Key<*> = Sm3.Key
         assertNotNull(key)
     }

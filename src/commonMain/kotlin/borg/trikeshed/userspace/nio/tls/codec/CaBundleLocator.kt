@@ -1,9 +1,9 @@
 package borg.trikeshed.userspace.nio.tls.codec
 
-import borg.trikeshed.userspace.nio.file.Files
-import borg.trikeshed.lib.SeriesBuffer
+import borg.trikeshed.lib.mutable.SeriesBuffer
 import borg.trikeshed.lib.size
 import borg.trikeshed.lib.view
+import borg.trikeshed.userspace.nio.file.Files
 
 /**
  * CommonMain CA certificate bundle discovery — mirrors curl's CA path probing

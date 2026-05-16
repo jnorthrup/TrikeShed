@@ -1,7 +1,6 @@
 package borg.trikeshed.hazelnut
 
 import borg.trikeshed.lib.*
-import java.util.LinkedList
 
 // ── Split-brain resolution: git-gated CRDT + pijul patch logic ─────────────
 
@@ -75,7 +74,7 @@ enum class ChangeType {
  */
 class GitGatedCrystore(
     val localNodeId: CharSequence,
-    private val patches: LinkedList<ChangePatch> = LinkedList(),
+    private val patches: MutableList<ChangePatch> = buildList {},
     private val heads: LinkedHashSet<CharSequence> = LinkedHashSet(),
     var patchCounter: Long = 0,
 ) {
@@ -95,7 +94,7 @@ class GitGatedCrystore(
             parentHashes = parents,
             nodeOrigin = localNodeId,
             clock = clock,
-            timestamp = System.currentTimeMillis(),
+            timestamp = kotlin.js.Date.now().toLong(),
             changeType = type,
             objectId = objectId,
             targetValue = value,
@@ -119,7 +118,7 @@ class GitGatedCrystore(
 
     /** Merge remote patches: resolve concurrent patches via strategy. */
     fun mergeRemote(remote: List<ChangePatch>, strategy: CrdtStrategy): List<CharSequence> {
-        val merged = LinkedList<CharSequence>()
+        val merged = buildList<CharSequence>()
         for (remotePatch in remote) {
             // Incorporate remote clock
             val existing = patches.find { it.patchId == remotePatch.patchId }
@@ -172,7 +171,7 @@ class GitGatedCrystore(
                     parentHashes = heads.toList(),
                     nodeOrigin = localNodeId,
                     clock = mergedClock,
-                    timestamp = System.currentTimeMillis(),
+                    timestamp = kotlin.js.Date.now().toLong(),
                     changeType = ChangeType.UPDATE,
                     objectId = headPatches[0].objectId,
                     targetValue = headPatches.maxByOrNull { it.targetValue.length }?.targetValue ?: "",
@@ -191,7 +190,7 @@ class GitGatedCrystore(
                     parentHashes = heads.toList(),
                     nodeOrigin = localNodeId,
                     clock = mergedClock,
-                    timestamp = System.currentTimeMillis(),
+                    timestamp = kotlin.js.Date.now().toLong(),
                     changeType = ChangeType.UPDATE,
                     objectId = headPatches[0].objectId,
                     targetValue = headPatches.joinToString(",") { it.targetValue },
@@ -250,7 +249,7 @@ class GitGatedCrystore(
                     parentHashes = heads.toList(),
                     nodeOrigin = localNodeId,
                     clock = mergedClock,
-                    timestamp = System.currentTimeMillis(),
+                    timestamp = kotlin.js.Date.now().toLong(),
                     changeType = ChangeType.UPDATE,
                     objectId = headPatches[0].objectId,
                     targetValue = headPatches.joinToString("|") { p -> "node=${p.nodeOrigin}:$p.targetValue" },
@@ -326,17 +325,17 @@ data class NarsNodeProfile(
  * for conflict resolution and object ownership.
  */
 class NarsAdaptiveCluster(
-    val profiles: LinkedHashMap<CharSequence, NarsNodeProfile> = LinkedHashMap(),
+    val profiles: HashMap<CharSequence, NarsNodeProfile> = LinkedHashMap(),
 ) {
     fun upsert(nodeId: CharSequence, transport: Transport): NarsNodeProfile {
         val existing = profiles[nodeId]
         val updated = if (existing != null) {
             existing.copy(
                 residenceTimeMs = existing.residenceTimeMs + 60000,
-                lastHeartbeat = System.currentTimeMillis(),
+                lastHeartbeat = kotlin.js.Date.now().toLong(),
             )
         } else {
-            NarsNodeProfile(nodeId, transport, lastHeartbeat = System.currentTimeMillis())
+            NarsNodeProfile(nodeId, transport, lastHeartbeat = kotlin.js.Date.now().toLong())
         }
         profiles[nodeId] = updated
         return updated
@@ -345,7 +344,7 @@ class NarsAdaptiveCluster(
     /** Find the most influential node for a given object type. */
     fun leaderFor(type: DistributedObjectType?): NarsNodeProfile? {
         val active = profiles.values.filter {
-            System.currentTimeMillis() - it.lastHeartbeat < 300000 // 5min staleness
+            kotlin.js.Date.now().toLong() - it.lastHeartbeat < 300000 // 5min staleness
         }
         if (active.isEmpty()) return null
         return if (type != null) {
@@ -356,19 +355,19 @@ class NarsAdaptiveCluster(
     }
 
     fun recordConflict(nodeId: CharSequence, resolved: Boolean) {
-        profiles.computeIfPresent(nodeId) { _, p -> p.recordConflict(resolved) }
+        profiles[nodeId]?.let { profiles[nodeId] = it.recordConflict(resolved) }
     }
 
     fun heartbeat(nodeId: CharSequence, ok: Boolean) {
-        profiles.computeIfPresent(nodeId) { _, p -> p.tickReliability(ok) }
+        profiles[nodeId]?.let { profiles[nodeId] = it.tickReliability(ok) }
     }
 
     fun specialize(nodeId: CharSequence, type: DistributedObjectType, weight: Double) {
-        profiles.computeIfPresent(nodeId) { _, p -> p.specialize(type, weight) }
+        profiles[nodeId]?.let { profiles[nodeId] = it.specialize(type, weight) }
     }
 
     val liveCount: Int get() = profiles.count {
-        System.currentTimeMillis() - it.value.lastHeartbeat < 300000
+        kotlin.js.Date.now().toLong() - it.value.lastHeartbeat < 300000
     }
 }
 
@@ -404,8 +403,8 @@ data class ProductionGraphNode(
 ) {
     fun touch(): ProductionGraphNode =
         copy(
-            uptimeMs = uptimeMs + (System.currentTimeMillis() - lastActivity).coerceAtLeast(0),
-            lastActivity = System.currentTimeMillis(),
+            uptimeMs = uptimeMs + (kotlin.js.Date.now().toLong() - lastActivity).coerceAtLeast(0),
+            lastActivity = kotlin.js.Date.now().toLong(),
         )
 
     fun addPartition(p: CharSequence): ProductionGraphNode =
@@ -419,8 +418,8 @@ data class ProductionGraphNode(
  * Cluster topology graph — tracks node connections and partition assignments.
  */
 class HazelTopology(
-    val nodes: LinkedHashMap<CharSequence, ProductionGraphNode> = LinkedHashMap(),
-    val edges: LinkedList<GraphEdge> = LinkedList(),
+    val nodes: HashMap<CharSequence, ProductionGraphNode> = LinkedHashMap(),
+    val edges: MutableList<GraphEdge> = buildList {},
 ) {
     fun addNode(node: ProductionGraphNode) {
         nodes[node.nodeId] = node
@@ -463,13 +462,13 @@ data class TimeseriesSample(
 )
 
 class ConflictAnalytics(
-    val samples: LinkedList<TimeseriesSample> = LinkedList(),
+    val samples: MutableList<TimeseriesSample> = buildList {},
     val windowMinutes: Int = 60,
 ) {
     fun record(nodeId: CharSequence, metric: CharSequence, value: Double, vararg labels: Pair<CharSequence, CharSequence>) {
         samples.add(
             TimeseriesSample(
-                timestamp = System.currentTimeMillis(),
+                timestamp = kotlin.js.Date.now().toLong(),
                 metricName = metric,
                 value = value,
                 nodeId = nodeId,
@@ -480,7 +479,7 @@ class ConflictAnalytics(
 
     /** Conflict rate per minute over the window. */
     fun conflictRate(nodeId: CharSequence? = null): Double {
-        val cutoff = System.currentTimeMillis() - windowMinutes * 60000
+        val cutoff = kotlin.js.Date.now().toLong() - windowMinutes * 60000
         val filtered = if (nodeId != null) {
             samples.filter { it.timestamp >= cutoff && it.nodeId == nodeId }
         } else {
@@ -492,7 +491,7 @@ class ConflictAnalytics(
 
     /** Most conflicted node in the time window. */
     fun mostContestedNodeId(): CharSequence? {
-        val cutoff = System.currentTimeMillis() - windowMinutes * 60000
+        val cutoff = kotlin.js.Date.now().toLong() - windowMinutes * 60000
         val contested = samples
             .filter { it.timestamp >= cutoff && it.metricName.toString().contains("conflict") }
             .groupBy { it.nodeId }
@@ -502,7 +501,7 @@ class ConflictAnalytics(
 
     /** Average merge latency in the window. */
     fun avgMergeLatencyMs(): Double {
-        val cutoff = System.currentTimeMillis() - windowMinutes * 60000
+        val cutoff = kotlin.js.Date.now().toLong() - windowMinutes * 60000
         val mergeSamples = samples.filter {
             it.timestamp >= cutoff && it.metricName.toString() == "merge_latency"
         }
@@ -511,7 +510,7 @@ class ConflictAnalytics(
 
     /** Split-brain event count by object type */
     fun splitBrainByObjectType(): Map<CharSequence, Int> {
-        val cutoff = System.currentTimeMillis() - windowMinutes * 60000
+        val cutoff = kotlin.js.Date.now().toLong() - windowMinutes * 60000
         return samples
             .filter {
                 it.timestamp >= cutoff &&
@@ -524,7 +523,7 @@ class ConflictAnalytics(
 
     fun sampleCount(): Int = samples.size
     fun prune(windowMinutes: Int) {
-        val cutoff = System.currentTimeMillis() - windowMinutes * 60000L
+        val cutoff = kotlin.js.Date.now().toLong() - windowMinutes * 60000L
         samples.removeAll { it.timestamp < cutoff }
     }
 }
@@ -564,7 +563,7 @@ class SplitBrainOrchestrator(
         analytics.record(
             crystore.localNodeId,
             "merge_latency",
-            System.currentTimeMillis().toDouble(),
+            kotlin.js.Date.now().toLong().toDouble(),
         )
 
         if (leader != null) {

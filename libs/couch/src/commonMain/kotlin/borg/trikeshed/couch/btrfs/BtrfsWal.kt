@@ -11,7 +11,6 @@ import borg.trikeshed.couch.wal.WalEntry
 import borg.trikeshed.couch.wal.WalSnapshot
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.j
-import java.util.LinkedList
 
 class BtrfsWal(private val element: BtrfsSandboxElement) : AsyncContextElement(), LSMRWal {
     companion object Key : AsyncContextKey<BtrfsWal>()
@@ -31,11 +30,12 @@ class BtrfsWal(private val element: BtrfsSandboxElement) : AsyncContextElement()
 
     override suspend fun read(fromInclusive: Long, toExclusive: Long): Series<WalEntry> {
         requireState(ElementState.OPEN)
-        val entries = LinkedList<WalEntry>()
-        for (i in fromInclusive until toExclusive) {
-            val v = element.btree.get(i)
-            if (v != null) {
-                entries.add(WalEntry(i, v))
+        val entries = buildList {
+            for (i in fromInclusive until toExclusive) {
+                val v = element.btree.get(i)
+                if (v != null) {
+                    add(WalEntry(i, v))
+                }
             }
         }
         return entries.size j { i -> entries[i] }
@@ -47,9 +47,10 @@ class BtrfsWal(private val element: BtrfsSandboxElement) : AsyncContextElement()
 
     override suspend fun snapshot(request: SnapshotRequest): WalSnapshot {
         val series = read(1L, request.untilSequence + 1)
-        val list = LinkedList<WalEntry>()
-        for (i in 0 until series.a) {
-            list.add(series.b(i))
+        val list = buildList<WalEntry> {
+            for (i in 0 until series.a) {
+                add(series.b(i))
+            }
         }
         return WalSnapshot(list)
     }

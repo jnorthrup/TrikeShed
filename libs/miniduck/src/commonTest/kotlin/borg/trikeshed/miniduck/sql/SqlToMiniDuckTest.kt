@@ -65,7 +65,7 @@ class SqlToMiniDuckTest {
         val cursor = transformSelect(stmt, PlannerContext()).open(
             ExecutionContext(tableSource = tableSource),
         )
-        val rows = mutableListOf<List<Any?>>()
+        val rows = buildList<List<Any?>>()
         while (cursor.next()) {
             rows += List(width) { index -> cursor.row[index] }
         }

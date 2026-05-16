@@ -1,12 +1,12 @@
 package borg.trikeshed.userspace.nio.tls
 
+import borg.trikeshed.userspace.nio.spi.digest.DefaultSha256
 import borg.trikeshed.userspace.nio.tls.codec.CommonTlsClientHandshake
 import borg.trikeshed.userspace.nio.tls.codec.CommonTlsRecordCodec
 import borg.trikeshed.userspace.nio.tls.codec.RecordDirection
 import borg.trikeshed.userspace.nio.tls.codec.TlsClientHandshake
 import borg.trikeshed.userspace.nio.tls.codec.aead.DefaultAes128Gcm
 import borg.trikeshed.userspace.nio.tls.codec.ecdh.DefaultX25519
-import borg.trikeshed.userspace.nio.tls.codec.hash.DefaultSha256
 import borg.trikeshed.userspace.nio.tls.codec.kdf.DefaultHkdfSha256
 import borg.trikeshed.userspace.nio.tls.record.ContentType
 

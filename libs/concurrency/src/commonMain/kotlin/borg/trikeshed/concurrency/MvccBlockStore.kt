@@ -2,6 +2,7 @@ package borg.trikeshed.concurrency
 
 import borg.trikeshed.cursor.RowVec
 import borg.trikeshed.cursor.j
+import borg.trikeshed.cursor.values
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.mutable.SeriesBuffer
 

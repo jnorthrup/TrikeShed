@@ -2,7 +2,6 @@ package borg.trikeshed.couch.pijul
 
 import borg.trikeshed.couch.htx.*
 import borg.trikeshed.process.ProcessShell
-import java.util.LinkedList
 
 /**
  * InterGitGateway — bidirectional choreography between git and pijul repositories.
@@ -50,7 +49,7 @@ class InterGitGateway(
     private val gitDir: CharSequence,
     private val mode: GatewayMode,
 ) {
-    private val pendingConversions = LinkedList<ConversionResult>()
+    private val pendingConversions = ArrayList<ConversionResult>()
     private val branchMapping: Map<CharSequence, CharSequence> = emptyMap()  // git branch → pijul channel
     private val channelMapping: Map<CharSequence, CharSequence> = emptyMap()  // pijul channel → git branch
 
@@ -105,7 +104,7 @@ class InterGitGateway(
 
     /** Sync: bidirectionally reconcile git and pijul. */
     fun sync(): List<ConversionResult> {
-        val results = LinkedList<ConversionResult>()
+        val results = ArrayList<ConversionResult>()
         when (mode) {
             GatewayMode.PUSH_TO_GIT -> {
                 for ((chnName) in pijulRepo.channels) {

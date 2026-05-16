@@ -1,8 +1,5 @@
 package borg.trikeshed.openapi
 
-import borg.trikeshed.lib.SeriesBuffer
-import borg.trikeshed.lib.SeriesArrayList
-
 // ── helpers ──────────────────────────────────────────────────────────────────
 
 // ── reference resolution ──────────────────────────────────────────────────────
@@ -12,11 +9,11 @@ import borg.trikeshed.lib.SeriesArrayList
  * producing a new map with all references materialised.
  */
 fun OpenApiRawDocument.resolveAllRefs(): Map<CharSequence, Any?> {
-    // RLM: SeriesBuffer used as cache for ref resolution
-    val cache = SeriesArrayList<Pair<CharSequence, Any?>>()
+    // RLM: buildList used as cache for ref resolution
+    val cache = buildList<Pair<CharSequence, Any?>>()
     fun doResolve(ref: CharSequence): Any? {
         // Linear search through cache (acceptable for small docs)
-        for (i in 0 until cache.size) {
+        for (i in cache.indices) {
             if (cache[i].first == ref) return cache[i].second
         }
         val result = this@resolveAllRefs.resolveRef(ref)
@@ -61,14 +58,14 @@ fun resolveSchemaImpl(node: Any?, description: CharSequence?, resolveRef: (CharS
 
     // allOf / anyOf / oneOf
     map["allOf"]?.asList()?.let { items ->
-        val props = LongSeries.build { it += <ResolvedSchema.Prop>() })
+        val props = buildList<ResolvedSchema.Prop>()
         for (item in items) {
             val resolved = resolveSchemaImpl(item, null, resolveRef)
             if (resolved is ResolvedSchema.Obj) {
                 props.addAll(resolved.properties)
             }
         }
-        return ResolvedSchema.Obj(properties = props.toList(), description = description)
+        return ResolvedSchema.Obj(properties = props, description = description)
     }
     if (map.containsKey("anyOf") || map.containsKey("oneOf")) {
         return ResolvedSchema.Variant(
@@ -135,7 +132,7 @@ fun resolveProperties(
 }
 
 fun OpenApiRawDocument.resolveSchema(node: Any?, description: CharSequence? = null): ResolvedSchema =
-    resolveSchemaImpl(node, description) { resolveRef(it) }
+    resolveSchemaImpl(node, description) { ref -> resolveRef(ref) }
 
 // ── parameter resolver ────────────────────────────────────────────────────────
 
@@ -187,7 +184,7 @@ fun OpenApiRawDocument.resolveResponse(
         )
     }
 
-    val results = SeriesBuffer<ResolvedResponse>()
+    val results = buildList<ResolvedResponse>()
     for ((statusKey, value) in map) {
         val statusCode = statusKey.toString().toIntOrNull() ?: continue
         val respMap = value.asMap() ?: continue
@@ -219,7 +216,7 @@ fun resolveSecurity(security: Any?): List<SecurityRequirement> {
 
 fun parseTrikeshedContext(root: JsonMap): TrikeshedContext? {
     val ctx = root["x-trikeshed-context"]?.asMap()
-    val supervisorIds = SeriesBuffer<CharSequence>()
+    val supervisorIds = buildList<CharSequence>()
 
     val paths = root["paths"]?.asMap()
     if (paths != null) {
@@ -231,14 +228,14 @@ fun parseTrikeshedContext(root: JsonMap): TrikeshedContext? {
                 if (operation["x-trikeshed-supervisor"]?.asBool() == true) {
                     val opId = operation["operationId"]?.asStr()
                     if (opId != null) {
-                        supervisorIds.add(opId)
+                        supervisorIds += opId
                     }
                 }
             }
         }
     }
 
-    if (ctx == null && supervisorIds.count == 0) return null
+    if (ctx == null && supervisorIds.isEmpty()) return null
 
     val clientBindings = parseBindingsFromSectionMap(ctx?.get("client")?.asList())
     val serverBindings = parseBindingsFromSectionMap(ctx?.get("server")?.asList())

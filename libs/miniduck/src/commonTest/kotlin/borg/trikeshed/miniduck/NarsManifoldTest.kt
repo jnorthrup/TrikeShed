@@ -251,7 +251,7 @@ class NarsManifoldTest {
             angular = 0x1111L,
             budget = BudgetCoord(p = 0.9f, d = 0.8f, q = 0.7f),
         )
-        val derived = mutableListOf<ManifoldConcept<Unit>>()
+        val derived = buildList<ManifoldConcept<Unit>>()
 
         element.derive(concept, this, energyFloor = 0.05f, decayFactor = 0.5f) {
             derived.add(it)
@@ -269,7 +269,7 @@ class NarsManifoldTest {
             angular = 0xAAAAAAAAL,
             budget = BudgetCoord(p = 0.8f, d = 0.7f, q = 0.6f),
         )
-        val emitted = mutableListOf<Long>()
+        val emitted = buildList<Long>()
         val steps: Series<DeriverStep<Unit>> = 3 j { i: Int ->
             when (i) {
                 0 -> decayStep(factor = 0.5f, floor = 0f)

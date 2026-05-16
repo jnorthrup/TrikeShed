@@ -5,6 +5,9 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 
+/** expect/actual for current time in milliseconds */
+expect fun currentTimeMillis(): Long
+
 /** Ring level for replication scope (0=local, 1=rack, 2=region, 3=wide-area, 4=federation). */
 typealias RingLevel = Int
 
@@ -12,7 +15,7 @@ typealias RingLevel = Int
 data class AgentId(val bytes: ByteArray) {
     override fun equals(other: Any?) = other is AgentId && bytes.contentEquals(other.bytes)
     override fun hashCode() = bytes.contentHashCode()
-    override fun toString() = bytes.joinToString("") { "%02x".format(it) }
+    override fun toString() = bytes.joinToString("") { it.toString(16).padStart(2, '0') }
     companion object {
         fun random() = kotlin.random.Random.Default.nextBytes(20)
     }
@@ -40,7 +43,7 @@ data class Fact(
     val ttlMs: Long = Long.MAX_VALUE,
     val room: String,
     val tags: Set<String> = emptySet(),
-    val createdAt: Long = System.currentTimeMillis(),
+    val createdAt: Long = currentTimeMillis(),
 ) {
     override fun equals(other: Any?) = other is Fact && key == other.key && room == other.room && version == other.version
     override fun hashCode() = 31 * (31 * key.hashCode() + room.hashCode()) + version.hashCode()
@@ -140,7 +143,9 @@ class Room(
     fun addTrigger(trigger: Trigger) { triggers.add(trigger) }
 
     /** Remove a trigger. */
-    fun removeTrigger(pattern: FactPattern) { triggers.removeIf { it.pattern == pattern } }
+    fun removeTrigger(pattern: FactPattern) {
+        triggers.removeAll { it.pattern == pattern }
+    }
 
     /** Room stats. */
     fun stats() = Triple(facts.size, subscriptions.size, triggers.size)
@@ -177,7 +182,11 @@ class Blackboard(
 
     /** Join (or create) a room on the blackboard. */
     fun joinRoom(name: String, replicationRing: RingLevel = 2): Room {
-        return rooms.getOrPut(name) { Room(name, replicationRing).also { roomChannels.putIfAbsent(name, Channel(Channel.UNLIMITED)) } }
+        return rooms.getOrPut(name) {
+            val room = Room(name, replicationRing)
+            if (name !in roomChannels) roomChannels[name] = Channel(Channel.UNLIMITED)
+            room
+        }
     }
 
     /** Write a fact to a room. */

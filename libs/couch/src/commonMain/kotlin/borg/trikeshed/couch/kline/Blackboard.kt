@@ -3,7 +3,6 @@ package borg.trikeshed.couch.kline
 import borg.trikeshed.userspace.concurrency.Channel
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.j
-import java.util.LinkedList
 
 /**
  * Blackboard — a shared, pub/sub observation field for KlineCharacteristics.
@@ -19,7 +18,7 @@ import java.util.LinkedList
  */
 class Blackboard<T : Comparable<T>> {
     /** Published characteristics, sorted by (timestamp, origin, name). */
-    private val field = LinkedList<KlineCharacteristic>()
+    private val field = ArrayList<KlineCharacteristic>()
 
     /** Current head timestamp — the board's cursor into time. */
     private var headTimestamp: T? = null
@@ -67,7 +66,8 @@ class Blackboard<T : Comparable<T>> {
 
     /** Subscribe to a characteristic by name. Returns an unsubscribe handle. */
     fun subscribe(name: CharSequence, callback: (KlineCharacteristic) -> Unit): () -> Unit {
-        subscriptions.getOrPut(name) { LinkedList() }.add(callback)
+        val list = subscriptions.getOrPut(name) { ArrayList() }
+        list.add(callback)
         return { subscriptions[name]?.remove(callback) }
     }
 
@@ -118,7 +118,7 @@ class Funnel(
     private val blackboard: Blackboard<Long>,
 ) {
     /** Registered stages, in order. */
-    private val stages = LinkedList<Stage>()
+    private val stages = ArrayList<Stage>()
 
     /** Whether the funnel is running. */
     private var running = false
@@ -251,7 +251,7 @@ class BufferStage(
     private val maxAgeMs: Long,
     private val onFlush: (List<Kline>) -> Unit,
 ) : Funnel.Stage {
-    private val buffer = LinkedList<Kline>()
+    private val buffer = ArrayList<Kline>()
     private var firstTimestamp: Long? = null
 
     override suspend fun process(kline: Kline): List<KlineCharacteristic> {

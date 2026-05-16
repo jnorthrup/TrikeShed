@@ -1,7 +1,6 @@
 package borg.trikeshed.couch.api
 
 import borg.trikeshed.couch.internal.urlencode
-import java.util.LinkedList
 
 /**
  * Encodes [ViewQuery] into a URL query string using CouchDB 1.1 parameter names.
@@ -12,21 +11,21 @@ object ViewQueryEncoder {
      * Uses the multiplatform couch internal encoder.
      */
     fun encode(query: ViewQuery): CharSequence {
-        val parts = LinkedList<CharSequence>()
-
-        query.key?.let { parts += "key=${urlencode(toJson(it))}" }
-        query.startKey?.let { parts += "startkey=${urlencode(toJson(it))}" }
-        query.endKey?.let { parts += "endkey=${urlencode(toJson(it))}" }
-        query.keys?.let { parts += "keys=${urlencode(toJson(it))}" }
-        query.limit?.let { parts += "limit=$it" }
-        query.skip?.let { parts += "skip=$it" }
-        query.descending?.let { parts += "descending=$it" }
-        query.group?.let { parts += "group=$it" }
-        query.groupLevel?.let { parts += "group_level=$it" }
-        query.includeDocs?.let { parts += "include_docs=$it" }
-        query.reduce?.let { parts += "reduce=$it" }
-        query.startKeyDocId?.let { parts += "startkey_docid=${urlencode(it)}" }
-        query.endKeyDocId?.let { parts += "endkey_docid=${urlencode(it)}" }
+        val parts = buildList {
+            query.key?.let { add("key=${urlencode(toJson(it))}") }
+            query.startKey?.let { add("startkey=${urlencode(toJson(it))}") }
+            query.endKey?.let { add("endkey=${urlencode(toJson(it))}") }
+            query.keys?.let { add("keys=${urlencode(toJson(it))}") }
+            query.limit?.let { add("limit=$it") }
+            query.skip?.let { add("skip=$it") }
+            query.descending?.let { add("descending=$it") }
+            query.group?.let { add("group=$it") }
+            query.groupLevel?.let { add("group_level=$it") }
+            query.includeDocs?.let { add("include_docs=$it") }
+            query.reduce?.let { add("reduce=$it") }
+            query.startKeyDocId?.let { add("startkey_docid=${urlencode(it)}") }
+            query.endKeyDocId?.let { add("endkey_docid=${urlencode(it)}") }
+        }
 
         return parts.joinToString("&")
     }

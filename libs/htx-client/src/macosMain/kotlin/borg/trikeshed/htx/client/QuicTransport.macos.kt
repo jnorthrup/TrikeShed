@@ -29,7 +29,7 @@ private val NativeQuicHandler: HtxRequestHandler = { request ->
         val handle = ops.openChannel()
 
         // Build QUIC Initial packet with TLS 1.3 ClientHello in CRYPTO frame
-        val quicElement = borg.trikeshed.quic.QuicElement()
+        val quicElement =  QuicElement()
         quicElement.open()
         val stream = quicElement.connect(host, port)
 

@@ -3,12 +3,13 @@ package borg.trikeshed.userspace.nio.file.spi
 import borg.trikeshed.lib.Join
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.Series2
-import borg.trikeshed.lib.SeriesBuffer
 import borg.trikeshed.lib.j
+import borg.trikeshed.lib.mutable.SeriesBuffer
 import borg.trikeshed.lib.size
 import borg.trikeshed.lib.substringBefore
 import borg.trikeshed.lib.toSeries
 import borg.trikeshed.lib.view
+import kotlin.collections.toList
 import kotlin.coroutines.CoroutineContext
 
 /**

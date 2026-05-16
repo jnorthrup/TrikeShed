@@ -1,6 +1,5 @@
 package borg.trikeshed.couch.kline
 
-import java.util.LinkedList
     import borg.trikeshed.cursor.Cursor
     import borg.trikeshed.miniduck.toRowVec
     import borg.trikeshed.lib.get
@@ -28,7 +27,7 @@ import java.util.LinkedList
  * carried per-row as in the donor).
  */
 class KlineBlock constructor(
-    val rows: LinkedList<Kline>,
+    val rows: MutableList<Kline>,
     var _state: State,
     val timespan: TimeSpan?,
 ) {
@@ -41,7 +40,7 @@ class KlineBlock constructor(
     companion object {
         /** Create a new mutable block. Optionally enforce a single timespan. */
         fun mutable(timespan: TimeSpan? = null): KlineBlock =
-            KlineBlock(LinkedList(), State.MUTABLE, timespan)
+            KlineBlock(ArrayList(), State.MUTABLE, timespan)
     }
 
     /**

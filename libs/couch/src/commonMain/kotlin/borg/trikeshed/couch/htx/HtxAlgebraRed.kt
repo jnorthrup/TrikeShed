@@ -1,6 +1,5 @@
 package borg.trikeshed.couch.htx
 
-import java.util.LinkedList
 /**
  * RED-phase stubs for HTX search & transformation algebra.
  *
@@ -74,7 +73,7 @@ fun HtxMessage.Companion.deserialize(bytes: ByteArray): HtxMessage? {
 fun HtxMessage.buildPayload(): ByteArray {
     val blocks = this.blocks
     // flags(4) + blockCount(2) + blocks...
-    val parts = LinkedList<ByteArray>()
+    val parts = ArrayList<ByteArray>()
     // flags (big-endian uint32)
     val flagBuf = ByteArray(4)
     writeInt32BE(flagBuf, 0, flags.toInt())
@@ -118,7 +117,7 @@ fun encodeBlock(bd: HtxBlockData): ByteArray {
 }
 fun encodeStartLine(sl: HtxBlockData.StartLine): ByteArray {
     val s = sl.sl
-    val parts = LinkedList<ByteArray>()
+    val parts = ArrayList<ByteArray>()
     parts.add(byteArrayOf(if (s.isRequest) 1.toByte() else 0.toByte()))
     if (s.isRequest) {
         // method(1) + uriLen(2) + uri + verMajor(1) + verMinor(1)
@@ -184,7 +183,7 @@ fun HtxMessage.Companion.parsePayload(payload: ByteArray): HtxMessage? {
         if (pos + dataLen > payload.size) return null
         val data = payload.copyOfRange(pos, pos + dataLen); pos += dataLen
         val bd = decodeBlock(typeCode, data) ?: return null
-        msg.blocks.add(bd)
+        msg.addBlock(bd)
     }
     return msg
 }
@@ -303,7 +302,7 @@ fun normalizeToHtx(bytes: ByteArray): HtxMessage = HtxMessage.normalizeToHtx(byt
 // ── Transformation algebra ──────────────────────────────────────
 
 fun HtxMessage.mergeTrailers(): HtxMessage {
-    val newBlocks = LinkedList<HtxBlockData>()
+    val newBlocks = ArrayList<HtxBlockData>()
     for (b in this.blocks) {
         when (b) {
             is HtxBlockData.Trailer -> newBlocks.add(HtxBlockData.Header(b.name, b.value))
@@ -313,24 +312,27 @@ fun HtxMessage.mergeTrailers(): HtxMessage {
             else -> newBlocks.add(b)
         }
     }
-    return HtxMessage(blocks = newBlocks.toMutableList(), flags = this.flags)
+    return HtxMessage(blocks = ArrayList(newBlocks), flags = this.flags)
 }
 
 fun HtxMessage.stripBody(): HtxMessage {
-    val newBlocks = this.blocks.filter { it !is HtxBlockData.Data }.toMutableList()
-    val newMsg = HtxMessage(blocks = newBlocks, flags = this.flags)
+    val newBlocks = ArrayList<HtxBlockData>()
+    for (b in this.blocks) {
+        if (b !is HtxBlockData.Data) newBlocks.add(b)
+    }
+    val newMsg = HtxMessage(blocks = ArrayList(newBlocks), flags = this.flags)
     newMsg.setEom()
     return newMsg
 }
 
 fun HtxMessage.withFlag(flag: HtxFlags): HtxMessage {
-    return HtxMessage(blocks = this.blocks.toMutableList(), flags = (this.flags or flag.mask))
+    return HtxMessage(blocks = ArrayList(this.blocks), flags = (this.flags or flag.mask))
 }
 
 // ── Construction algebra (DSL factories) ────────────────────────
 
 class HtxMessageBuilder {
-    val headers = LinkedList<Pair<ByteArray, ByteArray>>()
+    val headers = ArrayList<Pair<ByteArray, ByteArray>>()
     fun header(name: ByteArray, value: ByteArray) { headers.add(name to value) }
 }
 

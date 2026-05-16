@@ -1,7 +1,6 @@
 package borg.trikeshed.couch.kline
 
 import borg.trikeshed.userspace.concurrency.Channel
-import java.util.LinkedList
 
 /**
  * KlineCollector: drains a Channel<Kline> into sealed KlineBlocks of fixed capacity.

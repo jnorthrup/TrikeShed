@@ -1,7 +1,6 @@
 package borg.trikeshed.kademlia.id
 import borg.trikeshed.lib.assert
 import borg.trikeshed.num.BigInt
-import java.math.BigInteger
 import borg.trikeshed.kademlia.bitops.BitOps
 import borg.trikeshed.kademlia.bitops.BitOps.Companion.minOps
 import borg.trikeshed.kademlia.id.impl.*

@@ -4,6 +4,7 @@ import borg.trikeshed.kademlia.bitops.BitOps
 import borg.trikeshed.kademlia.id.NUID
 import borg.trikeshed.kademlia.net.NetMask
 import borg.trikeshed.kademlia.routing.RoutingTable
+import borg.trikeshed.kademlia.id.impl.ULongNUID
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.sync.Semaphore
@@ -111,8 +112,11 @@ class ConcentricGossipEngine(
                 for (peerId in selected) {
                     val state = members[peerId] ?: continue
                     if (state.isSuspected) continue
-                    ringSemaphore.withPermit {
+                    ringSemaphore.acquire()
+                    try {
                         sendMessage(state.member, GossipMessage.Ping(localMember.id, gossipSeq))
+                    } finally {
+                        ringSemaphore.release()
                     }
                 }
             }
@@ -174,7 +178,8 @@ class ConcentricGossipEngine(
                         // Steal work from outer ring
                         val work = pendingWork.values.firstOrNull { it.ring == outerRing }
                         if (work != null) {
-                            ringSemaphore.withPermit {
+                            ringSemaphore.acquire()
+                            try {
                                 // Send steal request to outer ring
                                 val targetPeerId = outerPeers.randomOrNull()
                                 targetPeerId?.let {
@@ -183,6 +188,8 @@ class ConcentricGossipEngine(
                                         sendMessage(peer, GossipMessage.WorkSteal(outerRing, localMember.id, 1))
                                     }
                                 }
+                            } finally {
+                                ringSemaphore.release()
                             }
                         }
                     }
@@ -338,7 +345,7 @@ class ConcentricGossipEngine(
         // Build from GK Kademlia routing table if available
         // Uses the CoolSz (64-bit) netmask for wide-area peer discovery
         return try {
-            val nuid = object : borg.trikeshed.kademlia.id.ULongNUID(
+            val nuid = object : ULongNUID(
                 kotlin.random.Random.nextLong().toULong()
             ) {
                 override val netmask = NetMaskCoolSz
@@ -355,9 +362,9 @@ object NetMaskCoolSz : borg.trikeshed.kademlia.net.NetMask<ULong> {
 }
 
 data class GossipConfig(
-    val gossipIntervalMs: Long = DEFAULT_GOSSIP_INTERVAL_MS,
-    val heartbeatTimeoutMs: Long = DEFAULT_HEARTBEAT_TIMEOUT_MS,
-    val suspectThreshold: Int = DEFAULT_SUSPECT_THRESHOLD,
+    val gossipIntervalMs: Long = ConcentricGossipEngine.DEFAULT_GOSSIP_INTERVAL_MS,
+    val heartbeatTimeoutMs: Long = ConcentricGossipEngine.DEFAULT_HEARTBEAT_TIMEOUT_MS,
+    val suspectThreshold: Int = ConcentricGossipEngine.DEFAULT_SUSPECT_THRESHOLD,
     val gossipFanout: Int = 3,
     val maxConcurrentRingOps: Int = 16,
     val messageBufferSize: Int = 256,

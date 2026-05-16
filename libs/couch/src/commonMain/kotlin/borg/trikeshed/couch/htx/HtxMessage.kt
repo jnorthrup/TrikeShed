@@ -1,7 +1,6 @@
 package borg.trikeshed.couch.htx
 
 import borg.trikeshed.collections.associative.trie.Trie
-import java.util.LinkedList
 
 /**
  * Internal state machine for HTTP/1.x parsing.
@@ -13,30 +12,34 @@ enum class HttpParseState { RequestLine, Headers, Body }
  * Blocks metadata at END; payloads at BEGINNING (ring buffer layout).
  */
 class HtxMessage(
-    val blocks: LinkedList<HtxBlockData> = LinkedList(),
+    val blocks: List<HtxBlockData> = emptyList(),
     var flags: UInt = HtxFlags.NONE.mask,
 ) {
-    fun isEmpty(): Boolean = blocks.isEmpty()
-    fun size(): Int = blocks.size
+    private val _blocks: MutableList<HtxBlockData> = ArrayList(blocks)
+    fun isEmpty(): Boolean = _blocks.isEmpty()
+    fun size(): Int = _blocks.size
 
-    fun addStartLine(sl: HtxStartLine) { blocks.add(HtxBlockData.StartLine(sl)) }
+    fun addStartLine(sl: HtxStartLine) { _blocks.add(HtxBlockData.StartLine(sl)) }
     fun addHeader(name: ByteArray, value: ByteArray) {
-        blocks.add(HtxBlockData.Header(name, value))
+        _blocks.add(HtxBlockData.Header(name, value))
     }
-    fun addData(data: ByteArray) { blocks.add(HtxBlockData.Data(data)) }
+    fun addData(data: ByteArray) { _blocks.add(HtxBlockData.Data(data)) }
     fun addTrailer(name: ByteArray, value: ByteArray) {
-        blocks.add(HtxBlockData.Trailer(name, value))
+        _blocks.add(HtxBlockData.Trailer(name, value))
     }
-    fun addEndHeaders() { blocks.add(HtxBlockData.EndHeaders) }
-    fun addEndTrailers() { blocks.add(HtxBlockData.EndTrailers) }
+    fun addEndHeaders() { _blocks.add(HtxBlockData.EndHeaders) }
+    fun addEndTrailers() { _blocks.add(HtxBlockData.EndTrailers) }
     fun setEom() { flags = HtxFlags.EOM.mask }
 
-    fun startLine(): HtxStartLine? = blocks
+    /** Internal: add a decoded block during parsing. */
+    internal fun addBlock(bd: HtxBlockData) { _blocks.add(bd) }
+
+    fun startLine(): HtxStartLine? = _blocks
         .filterIsInstance<HtxBlockData.StartLine>()
         .firstOrNull()?.sl
 
     fun headers(): Sequence<Pair<ByteArray, ByteArray>> = sequence {
-        for (b in blocks) {
+        for (b in _blocks) {
             if (b is HtxBlockData.Header) yield(b.name to b.value)
         }
     }

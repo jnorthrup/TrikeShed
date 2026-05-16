@@ -88,8 +88,8 @@ class EphemeralSpawner(
      * capabilities.  Returns the best candidate or null if no quorum reached.
      */
     private fun queryTarget(spec: SpawnSpec): GossipMember? {
-        val candidates = membersInRing(spec.targetRing)
-            .filter { m -> spec.requiresCapabilities.all { it in m.capabilities } }
+        val candidates = gossipEngine.membersInRing(spec.targetRing)
+            .filter { m -> spec.requiresCapabilities.all { cap -> cap in m.capabilities } }
         if (candidates.isEmpty()) {
             val fallback = ConcentricRing.entries.getOrNull(spec.targetRing.id + 1)
             if (fallback != null) return queryTarget(spec.copy(targetRing = fallback))
@@ -337,7 +337,7 @@ class GossipMicroserviceFacade(
      */
     suspend fun consult(query: String, targetRing: ConcentricRing = ConcentricRing.Local): List<String> {
         val peers = gossipEngine.membersInRing(targetRing)
-        val responses = LinkedList<String>()
+        val responses = buildList<String> { }
 
         for (peer in peers) {
             // Send consult request via gossip

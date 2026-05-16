@@ -1,6 +1,5 @@
 package borg.trikeshed.hazelnut
 
-import java.util.LinkedList
 // ── NARS-3 Semantic Taxonomy: Garden Collection (gk) + Spokes ─────────────
 
 /**
@@ -104,7 +103,7 @@ data class Nars3SemanticTerm(
     val dimension: Nars3ConfidenceDimension,
     val observation: CharSequence,
     val value: Double,
-    val timestamp: Long = System.currentTimeMillis(),
+    val timestamp: Long = kotlin.js.Date.now().toLong(),
     val context: Map<CharSequence, CharSequence> = emptyMap(),
     val severity: Nars3Severity = Nars3Severity.INFO,
 )
@@ -131,7 +130,7 @@ fun Nars3SemanticTerm.computeConfidence(): Double {
 data class Nars3FeatureVector(
     val nodeId: CharSequence,
     val terms: List<Nars3SemanticTerm>,
-    val vectorTimestamp: Long = System.currentTimeMillis(),
+    val vectorTimestamp: Long = kotlin.js.Date.now().toLong(),
 ) {
     val compositeConfidence: Double
         get() = if (terms.isEmpty()) 0.0 else terms.map { it.computeConfidence() }.average()
@@ -166,7 +165,7 @@ data class Nars3FeatureVector(
  */
 class Nars3Corpus(
     val windowMs: Long = 3600000,
-    private val _entries: LinkedList<Nars3FeatureVector> = LinkedList(),
+    private val _entries: MutableList<Nars3FeatureVector> = buildList {},
 ) {
     val size: Int get() = _entries.size
 
@@ -175,19 +174,19 @@ class Nars3Corpus(
         prune()
     }
 
-    fun confidenceFor(domain: Nars3GardenDomain, cutoff: Long = System.currentTimeMillis() - windowMs): Double {
+    fun confidenceFor(domain: Nars3GardenDomain, cutoff: Long = kotlin.js.Date.now().toLong() - windowMs): Double {
         val terms = _entries.filter { it.vectorTimestamp >= cutoff }
             .flatMap { it.byDomain(domain) }
         return if (terms.isEmpty()) 0.0 else terms.map { it.computeConfidence() }.average()
     }
 
-    fun confidenceForSpoke(spoke: Nars3Spoke, cutoff: Long = System.currentTimeMillis() - windowMs): Double {
+    fun confidenceForSpoke(spoke: Nars3Spoke, cutoff: Long = kotlin.js.Date.now().toLong() - windowMs): Double {
         val terms = _entries.filter { it.vectorTimestamp >= cutoff }
             .flatMap { it.bySpoke(spoke) }
         return if (terms.isEmpty()) 0.0 else terms.map { it.computeConfidence() }.average()
     }
 
-    fun systemConfidence(cutoff: Long = System.currentTimeMillis() - windowMs): Double {
+    fun systemConfidence(cutoff: Long = kotlin.js.Date.now().toLong() - windowMs): Double {
         val recent = _entries.filter { it.vectorTimestamp >= cutoff }
         return if (recent.isEmpty()) 0.0 else recent.map { it.compositeConfidence }.average()
     }
@@ -197,7 +196,7 @@ class Nars3Corpus(
     fun allRecommendations(): List<CharSequence> = _entries.flatMap { it.recommendations() }
 
     private fun prune() {
-        val cutoff = System.currentTimeMillis() - windowMs
+        val cutoff = kotlin.js.Date.now().toLong() - windowMs
         _entries.removeAll { it.vectorTimestamp < cutoff }
     }
 }
@@ -214,7 +213,7 @@ class Nars3Runtime(
 ) {
     fun refreshConfidence() {
         for ((nodeId, profile) in profiles) {
-            fun t(domain: Nars3GardenDomain, dim: Nars3ConfidenceDimension, value: Double, observation: CharSequence) {
+            fun t(domain: Nars3GardenDomain, dim: Nars3ConfidenceDimension, value: Double, observation: CharSequence): Nars3SemanticTerm =
                 Nars3SemanticTerm(
                     gardenDomain = domain,
                     dimension = dim,
@@ -222,7 +221,6 @@ class Nars3Runtime(
                     value = value,
                     context = mapOf("nodeId" to nodeId),
                 )
-            }
 
             val nodeTerms = listOf(
                 t(Nars3GardenDomain.NODE, Nars3Dimensions.all[12], // heartbeat

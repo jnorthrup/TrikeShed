@@ -196,8 +196,8 @@ switch (project.path) {
         // dreamer-kmm has its own exceptional build.gradle.kts — standalone, root TrikeShed only
         break
     case ":libs:agent":
-        kmpHost()
-        extensions.getByName("kotlin").sourceSets.getByName("commonMain").dependencies {
+        kmpJvm(coroutinesMain: true)
+        extensions.getByName("kotlin").sourceSets.getByName("jvmMain").dependencies {
             implementation project(":libs:blackboard")
             implementation project(":libs:gossip")
         }
@@ -206,7 +206,7 @@ switch (project.path) {
         kmpHost()
         break
     case ":libs:gossip":
-        kmpHost()
+        kmpJvm(coroutinesMain: true)
         extensions.getByName("kotlin").sourceSets.getByName("commonMain").dependencies {
             implementation project(":libs:blackboard")
             implementation project(":libs:gk-kademlia")
@@ -243,7 +243,7 @@ switch (project.path) {
         }
         break
     case ":libs:concurrency":
-        kmpHost()
+        kmpJvm()
         break
     case ":libs:cmc-generated":
         plainJvm()
@@ -364,6 +364,8 @@ switch (project.path) {
     case ":libs:cpu-cache":
         kmpHost(rootMode: "none", coroutinesMain: false)
         def cpuKotlin = extensions.getByName("kotlin")
+        // RLM: main() commented out in Main.kt - disable executable linking
+        /*
         if (System.getProperty("os.name") == "Mac OS X" && cpuKotlin.targets.findByName("macos") == null) {
             cpuKotlin.macosX64("macos") {
                 binaries.executable("interrogateCpuNative") {
@@ -395,6 +397,8 @@ switch (project.path) {
                 entryPoint = "borg.trikeshed.cpucache.main"
             }
         }
+        */
+        /*
         tasks.register("interrogateCpuNative", Exec) {
             group = "cpu-cache"
             description = "Interrogate CPU cache topology using Native binary and print Confix JSON"
@@ -412,6 +416,7 @@ switch (project.path) {
             def buildDir = layout.buildDirectory.get().asFile
             commandLine("${buildDir}/bin/${targetName}/interrogateCpuNativeReleaseExecutable/interrogateCpuNative.kexe")
         }
+        */
         tasks.register("interrogateCpu", JavaExec) {
             group = "cpu-cache"
             description = "Interrogate CPU cache topology and print Confix JSON"
@@ -448,7 +453,7 @@ switch (project.path) {
         miniduckSets.findByName("linuxMain")?.dependsOn(miniduckPosix)
         break
     case ":libs:couch":
-        kmpHost(datetimeMain: true)
+        kmpJvm()
         def couchKotlin = extensions.getByName("kotlin")
         def couchSets = couchKotlin.sourceSets
         couchSets.getByName("commonMain").dependencies {
@@ -464,18 +469,6 @@ switch (project.path) {
         couchSets.getByName("jvmTest").dependencies {
             implementation nestedLibPeer(":libs:couch:viewserver", "couch-viewserver")
         }
-        couchSets.getByName("jsTest").dependencies {
-            implementation "org.jetbrains.kotlinx:kotlinx-coroutines-core:${prop("versions.kotlinx-coroutines-core")}"
-            implementation "org.jetbrains.kotlinx:kotlinx-coroutines-test:${prop("versions.kotlinx-coroutines-test")}"
-        }
-        couchSets.getByName("wasmJsTest").dependencies {
-            implementation "org.jetbrains.kotlinx:kotlinx-coroutines-core:${prop("versions.kotlinx-coroutines-core")}"
-            implementation "org.jetbrains.kotlinx:kotlinx-coroutines-test:${prop("versions.kotlinx-coroutines-test")}"
-        }
-        def couchPosix = couchSets.create("posixMain")
-        couchPosix.dependsOn(couchSets.getByName("commonMain"))
-        couchSets.findByName("macosMain")?.dependsOn(couchPosix)
-        couchSets.findByName("linuxMain")?.dependsOn(couchPosix)
         tasks.register("quickValidate", JavaExec) {
             group = "verification"
             description = "Run a quick jvmMain validation of MiniDuck encode/decode"
@@ -528,6 +521,10 @@ switch (project.path) {
         break
     case ":libs:openapi":
         kmpHost()
+        def openapiKotlin = extensions.getByName("kotlin")
+        openapiKotlin.sourceSets.getByName("commonMain").dependencies {
+            implementation project(":") // root project provides SeriesBuffer, etc.
+        }
         group = "org.bereft"
         version = trikeshedVersion
         break

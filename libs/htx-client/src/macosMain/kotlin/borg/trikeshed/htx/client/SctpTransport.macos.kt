@@ -32,14 +32,14 @@ private val NativeSctpHandler: HtxRequestHandler = { request ->
         val handle = ops.openChannel()
 
         // Build SCTP INIT chunk over UDP encapsulation
-        val sctpElement = borg.trikeshed.sctp.SctpElement()
+        val sctpElement =  SctpElement()
         sctpElement.open()
         val assoc = sctpElement.connect(host, port)
 
         // Generate random initiate tag and TSN (RFC 4960 §5.2.1)
         val randomTag = kotlin.random.Random.nextInt().toUInt()
         val randomTsn = kotlin.random.Random.nextInt().toUInt()
-        val initChunk = borg.trikeshed.sctp.SctpInitChunk(
+        val initChunk =  SctpInitChunk(
             initiateTag = randomTag,
             aRwnd = 131072u,
             outboundStreams = 10u,

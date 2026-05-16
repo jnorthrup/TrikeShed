@@ -1,7 +1,5 @@
 package borg.trikeshed.openapi
 
-import borg.trikeshed.lib.SeriesBuffer
-
 /**
  * Transport extensions parsed from x-trikeshed-* annotations in an OpenAPI spec.
  *
@@ -80,7 +78,7 @@ data class TransportAnnotatedOperation(
  */
 fun ResolvedOpenApiDocument.parseTransportAnnotations(): List<TransportAnnotatedOperation> {
     val paths = rawRoot["paths"]?.asMap() ?: emptyMap()
-    val results = SeriesBuffer<TransportAnnotatedOperation>()
+    val results = buildList<TransportAnnotatedOperation>()
 
     for (op in operations) {
         // Walk raw paths to find this operation's annotations

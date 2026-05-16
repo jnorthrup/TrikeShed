@@ -3,7 +3,7 @@ package borg.trikeshed
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.toList as flowToList
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.runTest
 import kotlinx.datetime.Clock
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -12,7 +12,7 @@ import kotlin.test.assertTrue
 class ThinSliceTest {
 
     @Test
-    fun `flow should emit items correctly`() = runBlocking {
+    fun `flow should emit items correctly`() = runTest {
         val testFlow: Flow<Int> = flowOf(1, 2, 33)
         val collectedItems = testFlow.flowToList()
 

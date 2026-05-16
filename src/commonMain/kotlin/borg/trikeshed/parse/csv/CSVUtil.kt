@@ -8,13 +8,14 @@ import borg.trikeshed.isam.meta.IOMemento
 import borg.trikeshed.isam.meta.IOMemento.IoCharSeries
 import borg.trikeshed.isam.meta.IOMemento.IoString
 import borg.trikeshed.lib.*
-import borg.trikeshed.parse.evidence.TypeEvidence.Companion.deduce
-import borg.trikeshed.parse.evidence.TypeEvidence.Companion.update
 import borg.trikeshed.lib.long.LongSeries
 import borg.trikeshed.lib.long.drop
 import borg.trikeshed.lib.long.get
+import borg.trikeshed.lib.mutable.SeriesBuffer
 import borg.trikeshed.parse.csv.CSVUtil.streamSpec
 import borg.trikeshed.parse.evidence.TypeEvidence
+import borg.trikeshed.parse.evidence.TypeEvidence.Companion.deduce
+import borg.trikeshed.parse.evidence.TypeEvidence.Companion.update
 
 /**
  * a versatile range of two unsigned shorts stored as a 32 bit Int value as Inline class

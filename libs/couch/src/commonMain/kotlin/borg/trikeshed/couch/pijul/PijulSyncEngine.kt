@@ -7,7 +7,6 @@ import borg.trikeshed.process.ProcessShell
 import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
-import java.util.LinkedList
 
 /**
  * PijulSyncEngine — realtime fanout/fanin merge coordinator.
@@ -48,8 +47,8 @@ class PeerChannel(
     var localHead: PatchHash?,
     val negotiatedCaps: List<Capability>,
 ) {
-    val pendingPatches = LinkedList<Patch>()
-    val ackedPatches = LinkedList<PatchHash>()
+    val pendingPatches = ArrayList<Patch>()
+    val ackedPatches = ArrayList<PatchHash>()
 }
 
 /** Events emitted by the sync engine. */

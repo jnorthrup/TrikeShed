@@ -5,11 +5,11 @@ import borg.trikeshed.cursor.RowVec
 import borg.trikeshed.cursor.at
 import borg.trikeshed.cursor.getValue
 import borg.trikeshed.lib.j
+import borg.trikeshed.lib.mutable.SeriesArrayList
 import borg.trikeshed.lib.size
 import borg.trikeshed.miniduck.DocRowVec
 import borg.trikeshed.miniduck.toRowVec
 import borg.trikeshed.test.TODOError
-import java.util.LinkedList
 
 /**
  * Columnar type stubs — RED test scaffolding for unimplemented columnar features.
@@ -43,7 +43,7 @@ object SpanMatcher {
     fun find(cursorA: Cursor, cursorB: Cursor): Cursor {
         if (cursorA.size == 0 || cursorB.size == 0) return 0 j { _: Int -> throw IndexOutOfBoundsException("empty") }
 
-        val spans = LinkedList<RowVec>()
+        val spans = SeriesArrayList<RowVec>()
         var ia = 0
         var ib = 0
 
@@ -114,7 +114,7 @@ object SpanMatcher {
         // Phase 2: pair remaining gap-free regions from both cursors
         if (ia < cursorA.size && ib < cursorB.size) {
             // collect remaining gap-free regions from A
-            val aRegions = LinkedList<IntRange>()
+            val aRegions = SeriesArrayList<IntRange>()
             var start = ia
             for (i in ia until cursorA.size - 1) {
                 val delta = openTime(cursorA, i + 1) - openTime(cursorA, i)
@@ -126,7 +126,7 @@ object SpanMatcher {
             aRegions.add(start until cursorA.size)
 
             // collect remaining gap-free regions from B
-            val bRegions = LinkedList<IntRange>()
+            val bRegions = SeriesArrayList<IntRange>()
             start = ib
             for (i in ib until cursorB.size - 1) {
                 val delta = openTime(cursorB, i + 1) - openTime(cursorB, i)
@@ -142,10 +142,10 @@ object SpanMatcher {
             for (aReg in aRegions) {
                 while (bi < bRegions.size) {
                     val bReg = bRegions[bi]
-                    val aRegStart = openTime(cursorA, aReg.first)
-                    val aRegEnd = openTime(cursorA, aReg.last)
-                    val bRegStart = openTime(cursorB, bReg.first)
-                    val bRegEnd = openTime(cursorB, bReg.last)
+                    val aRegStart = openTime(cursorA, aReg.start)
+                    val aRegEnd = openTime(cursorA, aReg.endInclusive)
+                    val bRegStart = openTime(cursorB, bReg.start)
+                    val bRegEnd = openTime(cursorB, bReg.endInclusive)
                     // check temporal proximity: regions overlap or are within 1 interval
                     if (bRegEnd + 60_000L >= aRegStart && aRegEnd + 60_000L >= bRegStart) {
                         val spanStart = minOf(aRegStart, bRegStart)
@@ -154,7 +154,7 @@ object SpanMatcher {
                             keys = listOf("aStart", "aEnd", "bStart", "bEnd", "aRows", "bRows"),
                             cells = listOf(
                                 spanStart, spanEnd, spanStart, spanEnd,
-                                aReg.last - aReg.first + 1, bReg.last - bReg.first + 1,
+                                aReg.endInclusive - aReg.start + 1, bReg.endInclusive - bReg.start + 1,
                             ),
                         ).toRowVec())
                         bi++

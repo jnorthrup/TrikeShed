@@ -2,7 +2,6 @@ package borg.trikeshed.miniduck.lsmr
 
 import borg.trikeshed.lib.Join
 import borg.trikeshed.lib.j
-import java.util.LinkedList
 
 /**
  * LSMR entry: key j (value j (seq j deleted))
@@ -33,9 +32,9 @@ private val entryKeyOrder: Comparator<LsmrEntry> =
  *  - scan() merges across all levels lazily, newest seq per key wins.
  */
 class LsmrMergeTree {
-    private val l0: LinkedList<LsmrEntry> = LinkedList()
-    private val l1Runs: LinkedList<List<LsmrEntry>> = LinkedList()
-    private val l2Runs: LinkedList<List<LsmrEntry>> = LinkedList()
+    private val l0: ArrayDeque<LsmrEntry> = ArrayDeque()
+    private val l1Runs: ArrayDeque<List<LsmrEntry>> = ArrayDeque()
+    private val l2Runs: ArrayDeque<List<LsmrEntry>> = ArrayDeque()
 
     fun put(key: CharSequence, value: CharSequence, seq: Long) {
         l0.add(lsmrEntry(key, value, seq))

@@ -331,7 +331,7 @@ private fun copiedChild(row: RowVec): Series<RowVec>? = when (row) {
     else -> null
 }
 
-private fun appendRowData(keys: SeriesBuffer<CharSequence>, cells: SeriesBuffer<Any?>, row: RowVec) {
+internal fun appendRowData(keys: SeriesBuffer<CharSequence>, cells: SeriesBuffer<Any?>, row: RowVec) {
     when (row) {
         is DocRowVec -> {
             for (i in 0 until row.size) {
@@ -348,7 +348,7 @@ private fun appendRowData(keys: SeriesBuffer<CharSequence>, cells: SeriesBuffer<
     }
 }
 
-private fun appendJoinedRowData(keys: SeriesBuffer<CharSequence>, cells: SeriesBuffer<Any?>, row: RowVec, joinKey: CharSequence) {
+internal fun appendJoinedRowData(keys: SeriesBuffer<CharSequence>, cells: SeriesBuffer<Any?>, row: RowVec, joinKey: CharSequence) {
     when (row) {
         is DocRowVec -> {
             val existingKeys: SeriesBuffer<String> = SeriesBuffer()

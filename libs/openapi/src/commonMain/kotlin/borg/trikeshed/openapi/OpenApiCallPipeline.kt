@@ -6,7 +6,7 @@ import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.selects.select
 import kotlin.coroutines.CoroutineContext
 import kotlin.math.max
-import borg.trikeshed.lib.SeriesBuffer
+import borg.trikeshed.lib.mutable.SeriesBuffer
 
 data class OpenApiCall<I>(
     val callId: CharSequence,
@@ -158,7 +158,7 @@ suspend fun <I, P : HasCallId, R> speculativePipelineBurndown(
 
     val results = SeriesBuffer<R>()
     try {
-        while (results.size < work.size) {
+        while (results.count < work.size) {
             select<Unit> {
                 failure.onReceive { callFailure ->
                     parseWorkers.forEach { it.cancel() }

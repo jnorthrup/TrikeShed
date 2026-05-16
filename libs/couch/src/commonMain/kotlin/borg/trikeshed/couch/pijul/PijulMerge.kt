@@ -1,6 +1,5 @@
 package borg.trikeshed.couch.pijul
 
-import java.util.LinkedList
 /**
  * Pijul's 3-way merge algorithm — patch composition with conflict detection.
  *
@@ -94,8 +93,8 @@ object PijulMerge {
 
         var result = pristine
         val graph = base.graph.let { it as? DependencyGraph ?: DependencyGraph.empty() }
-        val applied = LinkedList<Patch>()
-        val conflicts = LinkedList<ConflictMarker>()
+        val applied = ArrayList<Patch>()
+        val conflicts = ArrayList<ConflictMarker>()
 
         for (patch in sorted) {
             val patchObj = resolvePatch(patch) ?: continue // unknown patch, skip

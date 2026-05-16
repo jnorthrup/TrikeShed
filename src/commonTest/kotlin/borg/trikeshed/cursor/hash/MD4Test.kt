@@ -21,7 +21,7 @@ class MD4Test {
 
     @Test
     fun testMD4Length() {
-        val result = MD4.hash("test".toByteArray())
+        val result = MD4.hash("test".encodeToByteArray())
         assertEquals(16, result.size, "MD4 output must be 16 bytes")
     }
 

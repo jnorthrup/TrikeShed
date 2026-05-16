@@ -23,7 +23,7 @@ class LsmrMiniduckIntegrationTest {
         val rows = listOf(listOf(1, "Alice"), listOf(2, "Bob"))
         tableSource.seedRows("users", rows)
 
-        val read = mutableListOf<Pair<Int, CharSequence>>()
+        val read = buildList<Pair<Int, CharSequence>>()
         val cursor = tableSource.open(execCtx, "users")
         while (cursor.next()) {
             val idAny = cursor.row.get(0)
