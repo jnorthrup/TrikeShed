@@ -1,7 +1,7 @@
 package dev.jnorthrup.ngsctp.parser
 
 import dev.jnorthrup.ngsctp.NgChunk
-import java.nio.ByteBuffer
+import borg.trikeshed.userspace.nio.ByteBuffer
 
 /**
  * Spirit-based TLV Parser for ngSCTP
@@ -32,7 +32,7 @@ object NgSctpParser {
         val verificationTag = buffer.getInt().toUInt()
         val checksum = buffer.getInt().toUInt()
 
-        val chunks = mutableListOf<NgChunk>()
+        val chunks = LongSeries.build { it += <NgChunk>() })
         while (buffer.hasRemaining()) {
             val chunk = parseChunk(buffer) ?: break
             chunks.add(chunk)

@@ -12,8 +12,8 @@ import borg.trikeshed.miniduck.sql.PlannerContext
 import borg.trikeshed.miniduck.sql.PlannerConfig
 import borg.trikeshed.miniduck.sql.transformSelect
 
-fun main() {
-    val db = LsmrDatabase(LsmrConfig(path = "", memtableThreshold = 1024))
+// RLM: library entrypoint commented out - fun main() {
+// RLM: library entrypoint commented out -     val db = LsmrDatabase(LsmrConfig(path = "", memtableThreshold = 1024))
     val schemaManager = LsmrSchemaManager(db)
     val tableSource = LsmrTableSource(db)
 
@@ -30,7 +30,7 @@ fun main() {
     val plan = transformSelect(stmt, PlannerContext(schemaManager))
 
     val cur = plan.open(execCtx)
-    val rows = mutableListOf<Pair<Any?, Any?>>()
+    val rows = LongSeries.build { it += <Pair<Long?, Long?>>() })
     while (cur.next()) {
         val id = cur.row.get("id")
         val name = cur.row.get("name")

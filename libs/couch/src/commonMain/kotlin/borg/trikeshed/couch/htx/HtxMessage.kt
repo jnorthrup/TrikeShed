@@ -130,7 +130,7 @@ class HtxMessage(
        fun parseRequestLine(line: CharSequence): Triple<HttpMethod, CharSequence, Pair<Int, Int>>? {
             val parts = line.split(' ', limit = 3)
             if (parts.size < 3) return null
-            val method = HttpMethod.fromString(parts[0]) ?: return null
+            val method = HttpMethod.BY_NAME[parts[0]] ?: return null
             val uri = parts[1]
             val version = parseVersion(parts[2]) ?: return null
             return Triple(method, uri, version)

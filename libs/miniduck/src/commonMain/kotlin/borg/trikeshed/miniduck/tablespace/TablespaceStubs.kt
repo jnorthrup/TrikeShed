@@ -4,7 +4,7 @@ import borg.trikeshed.miniduck.BlockRowVec
 import borg.trikeshed.miniduck.DocRowVec
 import borg.trikeshed.cursor.RowVec
 import borg.trikeshed.lib.*
-import java.util.LinkedList
+import borg.trikeshed.lib.mutable.SeriesBuffer
 
 // --- BlockStore SPI ---
 
@@ -17,31 +17,60 @@ interface BlockStore {
 }
 
 class InMemoryBlockStore : BlockStore {
-    private val store: LinkedHashMap<CharSequence, LinkedHashMap<CharSequence, BlockRowVec>> = LinkedHashMap()
-    private val idCounter = LinkedHashMap<CharSequence, Int>()
+    private val store: SeriesBuffer<Pair<CharSequence, SeriesBuffer<Pair<CharSequence, BlockRowVec>>>> = SeriesBuffer()
+    private val idCounter: SeriesBuffer<Pair<CharSequence, Int>> = SeriesBuffer()
+
+    private fun getOrCreateCollection(collection: CharSequence): SeriesBuffer<Pair<CharSequence, BlockRowVec>> {
+        return store.view.find { it.first == collection }?.second ?: run {
+            val buf: SeriesBuffer<Pair<CharSequence, BlockRowVec>> = SeriesBuffer()
+            store.add(collection to buf)
+            buf
+        }
+    }
+
+    private fun getCollection(collection: CharSequence): SeriesBuffer<Pair<CharSequence, BlockRowVec>>? =
+        store.view.find { it.first == collection }?.second
+
+    private fun getIdCounter(collection: CharSequence): Int =
+        idCounter.view.find { it.first == collection }?.second ?: 0
+
+    private fun setIdCounter(collection: CharSequence, value: Int) {
+        val existing = idCounter.view.find { it.first == collection }
+        if (existing != null) {
+            // replace in place isn't easy; remove and add
+            idCounter.view.filter { it.first != collection }
+            idCounter.add(collection to value)
+        } else {
+            idCounter.add(collection to value)
+        }
+    }
 
     override suspend fun put(collection: CharSequence, block: BlockRowVec): CharSequence? {
-        val coll = store.getOrPut(collection) { LinkedHashMap() }
-        val id = (idCounter.getOrPut(collection) { 0 }).toString()
-        idCounter[collection] = id.toInt() + 1
-        coll[id] = block
-        return id
+        val coll = getOrCreateCollection(collection)
+        val nextId = getIdCounter(collection)
+        setIdCounter(collection, nextId + 1)
+        coll.add(nextId.toString() to block)
+        return nextId.toString()
     }
 
     override suspend fun putWithId(collection: CharSequence, id: CharSequence, block: BlockRowVec) {
-        store.getOrPut(collection) { LinkedHashMap() }[id] = block
+        getOrCreateCollection(collection).add(id to block)
     }
 
     override suspend fun remove(collection: CharSequence, blockId: CharSequence) {
-        store[collection]?.remove(blockId)
+        getCollection(collection)?.let { coll ->
+            val filtered = coll.view.filter { it.first != blockId }
+            coll.clear()
+            filtered.forEach { coll.add(it) }
+        }
     }
 
     override suspend fun get(collection: CharSequence, blockId: CharSequence): BlockRowVec? {
-        return store[collection]?.get(blockId)
+        return getCollection(collection)?.view?.find { it.first == blockId }?.second
     }
 
     override suspend fun list(collection: CharSequence): List<CharSequence> {
-        return store[collection]?.keys?.toList() ?: emptyList()
+        return getCollection(collection)?.view?.map { it.first }?.toList() ?: emptyList()
     }
 }
 
@@ -57,15 +86,15 @@ data class TableSchema(val name: CharSequence, val columns: List<ColumnSchema>)
 // --- Tablespace ---
 
 class Tablespace(val name: CharSequence) {
-    private val regions: LinkedList<Region> = LinkedList()
+    private val regions: SeriesBuffer<Region> = SeriesBuffer()
 
-    fun addRegion(region: Region) {
+    suspend fun addRegion(region: Region) {
         regions.add(region)
     }
 
-    fun scan(collection: CharSequence): Series<RowVec> {
-        val allRows = LinkedList<RowVec>()
-        for (region in regions) {
+    suspend fun scan(collection: CharSequence): Series<RowVec> {
+        val allRows: SeriesBuffer<RowVec> = SeriesBuffer()
+        for (region in regions.view) {
             val blockIds = region.store.list(collection)
             for (blockId in blockIds) {
                 val block = region.store.get(collection, blockId) ?: continue
@@ -75,17 +104,17 @@ class Tablespace(val name: CharSequence) {
                 }
             }
         }
-        return allRows.size j { i -> allRows[i] }
+        return allRows.size j { allRows[it] }
     }
 
-    fun scanToJson(collection: CharSequence): CharSequence {
+    suspend fun scanToJson(collection: CharSequence): CharSequence {
         val cursor = scan(collection)
         return cursor.toJson()
     }
 
-    fun discoverSchema(collection: CharSequence): TableSchema {
-        val allKeys = LinkedHashSet<CharSequence>()
-        for (region in regions) {
+    suspend fun discoverSchema(collection: CharSequence): TableSchema {
+        val allKeys: SeriesBuffer<CharSequence> = SeriesBuffer()
+        for (region in regions.view) {
             val blockIds = region.store.list(collection)
             for (blockId in blockIds) {
                 val block = region.store.get(collection, blockId) ?: continue
@@ -99,7 +128,7 @@ class Tablespace(val name: CharSequence) {
                 }
             }
         }
-        return TableSchema(collection, allKeys.map { ColumnSchema(it) })
+        return TableSchema(collection, allKeys.view.map { ColumnSchema(it) })
     }
 }
 

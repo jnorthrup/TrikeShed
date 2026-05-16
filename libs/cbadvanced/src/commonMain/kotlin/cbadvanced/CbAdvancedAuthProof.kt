@@ -3,12 +3,10 @@ package cbadvanced
 import borg.trikeshed.userspace.nio.file.Path
 import dreamer.exchange.CoinbaseClient
 import dreamer.exchange.CoinbaseCredentials
-import dreamer.exchange.JvmHmacSigner
-import dreamer.exchange.JvmHttpTransport
-import dreamer.exchange.JwtSigner
-import dreamer.exchange.RobinhoodBalance
+import dreamer.exchange.*
 import dreamer.exchange.loadCoinbaseApiConfig
 import dreamer.exchange.loadCoinbaseCredentials
+import kotlin.time.Clock
 
 data class CoinbaseAuthProof(
     val dotenvPath: Path,
@@ -28,11 +26,11 @@ suspend fun runCoinbaseAuthProof(dotenvPath: Path, quoteProduct: CharSequence = 
 
     val client = CoinbaseClient(
         config = apiConfig,
-        http = JvmHttpTransport(),
-        signer = JvmHmacSigner(),
-        jwtAuth = JwtSigner(),
+        http =  HttpTransport(),
+        signer = HmacSigner(),
+        jwtAuth = Signer(),
     )
-    client.initClock(System.currentTimeMillis(), 0L)
+    client.initClock(Clock.System.now().toEpochMilliseconds(), 0L)
 
     val balance = client.getBalance()
     val quote = if (balance != null) client.getQuotes(listOf(quoteProduct))?.get(quoteProduct) else null

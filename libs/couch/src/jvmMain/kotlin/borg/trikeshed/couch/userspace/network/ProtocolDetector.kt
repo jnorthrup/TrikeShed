@@ -35,7 +35,7 @@ class ProtocolDetector {
             tlsDetected = true
             return
         }
-        buf.append(CharSequence(bytes))
+        buf.append(String(bytes, Charsets.UTF_8))
     }
 
     /**

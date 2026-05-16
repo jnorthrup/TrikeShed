@@ -75,7 +75,7 @@ class BinanceKlineSource(
      * Each row is a DocRowVec with keys: symbol, timespan, openTime, open, high, low, close, volume
      */
     fun fetchCursor(): Cursor {
-        val blocks = mutableListOf<KlineBlock>()
+        val blocks = LongSeries.build { it += <KlineBlock>() })
         runBlocking {
             fetchAll { block -> blocks.add(block) }
         }
@@ -90,7 +90,7 @@ class BinanceKlineSource(
    suspend fun fetchAll(onBlock: (KlineBlock) -> Unit) = coroutineScope {
         val channel: Channel<Kline> = Channel(ChannelCapacity.Unbounded)
         val collector = KlineCollector(blockCapacity)
-        val collected = mutableListOf<KlineBlock>()
+        val collected = LongSeries.build { it += <KlineBlock>() })
 
         val collectorJob = launch {
             collector.collect(channel) { block ->

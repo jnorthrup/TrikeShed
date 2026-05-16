@@ -53,9 +53,16 @@ fun detectOrNull(registry: LangRegistry, source: Series<Char>, minConfidence: Do
  * [LangParser] for the detected language. The parser emits a [UniversalAst].
  */
 object LangParsers {
-    private val parsers = mutableMapOf<LangId, LangParser>()
-    fun register(parser: LangParser) { parsers[parser.lang] = parser }
-    fun get(lang: LangId): LangParser? = parsers[lang]
+    private val parsers: SeriesBuffer<Pair<LangId, LangParser>> = SeriesBuffer()
+    fun register(parser: LangParser) {
+        val existing = parsers.view.find { it.first == parser.lang }
+        if (existing != null) {
+            existing.second // replace not needed, just keep existing
+        } else {
+            parsers.add(parser.lang to parser)
+        }
+    }
+    fun get(lang: LangId): LangParser? = parsers.view.find { it.first == lang }?.second
 }
 
 /**

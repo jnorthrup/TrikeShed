@@ -9,6 +9,7 @@ interface BitOps<Primitive : Comparable<Primitive>> {
     val and: (Primitive, Primitive) -> Primitive
     val plus: (Primitive, Primitive) -> Primitive
     val minus: (Primitive, Primitive) -> Primitive
+    fun nextInt(bits: Int): Int
     fun toNumber(x: Primitive): Number = x.let {
         when (one) {
             is Number -> it as Number

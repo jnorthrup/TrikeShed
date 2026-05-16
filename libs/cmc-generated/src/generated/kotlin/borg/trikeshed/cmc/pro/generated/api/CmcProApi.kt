@@ -30,7 +30,7 @@ class DefaultCmcProApi(
    val call: suspend (GeneratedRequest) -> CharSequence,
 ) : CmcProApi {
     override suspend fun cryptocurrencyMap(symbol: CharSequence?, slug: CharSequence?, start: Int?, limit: CharSequence?): CharSequence = run {
-        val queryParams = mutableMapOf<CharSequence, CharSequence>()
+        val queryParams = LongLongSeries.build { putAll(mapOf(<CharSequence, CharSequence>()) })
         if (symbol != null) queryParams["symbol"] = symbol.toString()
         if (slug != null) queryParams["slug"] = slug.toString()
         if (start != null) queryParams["start"] = start.toString()
@@ -39,7 +39,7 @@ class DefaultCmcProApi(
         call(CmcProApiContract.CryptocurrencyMap.request.copy(queryParams = queryParams)) }
 
     override suspend fun cryptocurrencyListingsLatest(start: Int?, limit: CharSequence?, sort: CharSequence?, sort_dir: CharSequence?, convert: CharSequence?): CharSequence = run {
-        val queryParams = mutableMapOf<CharSequence, CharSequence>()
+        val queryParams = LongLongSeries.build { putAll(mapOf(<CharSequence, CharSequence>()) })
         if (start != null) queryParams["start"] = start.toString()
         if (limit != null) queryParams["limit"] = limit.toString()
         if (sort != null) queryParams["sort"] = sort.toString()
@@ -49,7 +49,7 @@ class DefaultCmcProApi(
         call(CmcProApiContract.CryptocurrencyListingsLatest.request.copy(queryParams = queryParams)) }
 
     override suspend fun cryptocurrencyQuotesLatestV2(id: CharSequence?, symbol: CharSequence?, slug: CharSequence?, convert: CharSequence?): CharSequence = run {
-        val queryParams = mutableMapOf<CharSequence, CharSequence>()
+        val queryParams = LongLongSeries.build { putAll(mapOf(<CharSequence, CharSequence>()) })
         if (id != null) queryParams["id"] = id.toString()
         if (symbol != null) queryParams["symbol"] = symbol.toString()
         if (slug != null) queryParams["slug"] = slug.toString()
@@ -58,7 +58,7 @@ class DefaultCmcProApi(
         call(CmcProApiContract.CryptocurrencyQuotesLatestV2.request.copy(queryParams = queryParams)) }
 
     override suspend fun cryptocurrencyQuotesHistoricalV3(id: CharSequence?, symbol: CharSequence?, time_start: CharSequence?, time_end: CharSequence?, count: Int?, interval: CharSequence?, convert: CharSequence?): CharSequence = run {
-        val queryParams = mutableMapOf<CharSequence, CharSequence>()
+        val queryParams = LongLongSeries.build { putAll(mapOf(<CharSequence, CharSequence>()) })
         if (id != null) queryParams["id"] = id.toString()
         if (symbol != null) queryParams["symbol"] = symbol.toString()
         if (time_start != null) queryParams["time_start"] = time_start.toString()
@@ -70,7 +70,7 @@ class DefaultCmcProApi(
         call(CmcProApiContract.CryptocurrencyQuotesHistoricalV3.request.copy(queryParams = queryParams)) }
 
     override suspend fun cryptocurrencyOhlcvHistoricalV2(id: CharSequence?, symbol: CharSequence?, time_start: CharSequence?, time_end: CharSequence?, count: Int?, interval: CharSequence?, convert: CharSequence?): CharSequence = run {
-        val queryParams = mutableMapOf<CharSequence, CharSequence>()
+        val queryParams = LongLongSeries.build { putAll(mapOf(<CharSequence, CharSequence>()) })
         if (id != null) queryParams["id"] = id.toString()
         if (symbol != null) queryParams["symbol"] = symbol.toString()
         if (time_start != null) queryParams["time_start"] = time_start.toString()
@@ -82,7 +82,7 @@ class DefaultCmcProApi(
         call(CmcProApiContract.CryptocurrencyOhlcvHistoricalV2.request.copy(queryParams = queryParams)) }
 
     override suspend fun cryptocurrencyInfoV2(id: CharSequence?, symbol: CharSequence?, slug: CharSequence?): CharSequence = run {
-        val queryParams = mutableMapOf<CharSequence, CharSequence>()
+        val queryParams = LongLongSeries.build { putAll(mapOf(<CharSequence, CharSequence>()) })
         if (id != null) queryParams["id"] = id.toString()
         if (symbol != null) queryParams["symbol"] = symbol.toString()
         if (slug != null) queryParams["slug"] = slug.toString()
@@ -90,7 +90,7 @@ class DefaultCmcProApi(
         call(CmcProApiContract.CryptocurrencyInfoV2.request.copy(queryParams = queryParams)) }
 
     override suspend fun exchangeMap(slug: CharSequence?, start: Int?, limit: CharSequence?): CharSequence = run {
-        val queryParams = mutableMapOf<CharSequence, CharSequence>()
+        val queryParams = LongLongSeries.build { putAll(mapOf(<CharSequence, CharSequence>()) })
         if (slug != null) queryParams["slug"] = slug.toString()
         if (start != null) queryParams["start"] = start.toString()
         if (limit != null) queryParams["limit"] = limit.toString()
@@ -98,7 +98,7 @@ class DefaultCmcProApi(
         call(CmcProApiContract.ExchangeMap.request.copy(queryParams = queryParams)) }
 
     override suspend fun exchangeListingsLatest(start: Int?, limit: CharSequence?, sort: CharSequence?, sort_dir: CharSequence?, convert: CharSequence?): CharSequence = run {
-        val queryParams = mutableMapOf<CharSequence, CharSequence>()
+        val queryParams = LongLongSeries.build { putAll(mapOf(<CharSequence, CharSequence>()) })
         if (start != null) queryParams["start"] = start.toString()
         if (limit != null) queryParams["limit"] = limit.toString()
         if (sort != null) queryParams["sort"] = sort.toString()
@@ -108,7 +108,7 @@ class DefaultCmcProApi(
         call(CmcProApiContract.ExchangeListingsLatest.request.copy(queryParams = queryParams)) }
 
     override suspend fun globalMetricsQuotesLatest(convert: CharSequence?): CharSequence = run {
-        val queryParams = mutableMapOf<CharSequence, CharSequence>()
+        val queryParams = LongLongSeries.build { putAll(mapOf(<CharSequence, CharSequence>()) })
         if (convert != null) queryParams["convert"] = convert.toString()
 
         call(CmcProApiContract.GlobalMetricsQuotesLatest.request.copy(queryParams = queryParams)) }
@@ -117,7 +117,7 @@ class DefaultCmcProApi(
         call(CmcProApiContract.FearAndGreedLatest.request)
 
     override suspend fun klineCandles(symbol: CharSequence?, interval: CharSequence?, time_start: CharSequence?, time_end: CharSequence?, count: Int?, convert: CharSequence?): CharSequence = run {
-        val queryParams = mutableMapOf<CharSequence, CharSequence>()
+        val queryParams = LongLongSeries.build { putAll(mapOf(<CharSequence, CharSequence>()) })
         if (symbol != null) queryParams["symbol"] = symbol.toString()
         if (interval != null) queryParams["interval"] = interval.toString()
         if (time_start != null) queryParams["time_start"] = time_start.toString()
@@ -128,7 +128,7 @@ class DefaultCmcProApi(
         call(CmcProApiContract.KlineCandles.request.copy(queryParams = queryParams)) }
 
     override suspend fun priceConversionV2(amount: CharSequence, id: CharSequence?, symbol: CharSequence?, time_start: CharSequence?, convert: CharSequence?): CharSequence = run {
-        val queryParams = mutableMapOf<CharSequence, CharSequence>()
+        val queryParams = LongLongSeries.build { putAll(mapOf(<CharSequence, CharSequence>()) })
         if (amount != null) queryParams["amount"] = amount.toString()
         if (id != null) queryParams["id"] = id.toString()
         if (symbol != null) queryParams["symbol"] = symbol.toString()

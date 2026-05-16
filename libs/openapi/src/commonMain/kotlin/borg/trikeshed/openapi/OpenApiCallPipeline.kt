@@ -6,6 +6,7 @@ import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.selects.select
 import kotlin.coroutines.CoroutineContext
 import kotlin.math.max
+import borg.trikeshed.lib.SeriesArrayList
 
 data class OpenApiCall<I>(
     val callId: CharSequence,
@@ -155,7 +156,7 @@ suspend fun <I, P : HasCallId, R> speculativePipelineBurndown(
         success.close()
     }
 
-    val results = mutableListOf<R>()
+    val results = SeriesArrayList<R>()
     try {
         while (results.size < work.size) {
             select<Unit> {
@@ -184,7 +185,7 @@ suspend fun <I, P : HasCallId, R> speculativePipelineBurndown(
         actionWorkers.forEach { it.cancel() }
     }
 
-    results
+    results.toList()
 }
 
 suspend fun <I, O> speculativeGapBurndown(
@@ -225,9 +226,9 @@ suspend fun <I, O> speculativeParseBurndown(
     parser: suspend (I) -> String,
     truthAction: suspend (OpenApiCall<I>, OpenApiRawDocument) -> O,
 ): List<OpenApiTruthAction<I, O>> {
-    val buffered = mutableListOf<OpenApiCall<I>>()
+    val buffered = SeriesArrayList<OpenApiCall<I>>()
     for (call in calls) buffered += call
-    return speculativeParseBurndown(buffered, parallelism, parser, truthAction)
+    return speculativeParseBurndown(buffered.toList(), parallelism, parser, truthAction)
 }
 
 suspend fun <I, O> speculativeGapBurndown(
@@ -236,9 +237,9 @@ suspend fun <I, O> speculativeGapBurndown(
     parser: suspend (I) -> String,
     truthAction: suspend (OpenApiParsedCall<I>) -> O,
 ): List<OpenApiTruthAction<I, O>> {
-    val buffered = mutableListOf<OpenApiCall<I>>()
+    val buffered = SeriesArrayList<OpenApiCall<I>>()
     for (call in calls) buffered += call
-    return speculativeGapBurndown(buffered, parallelism, parser, truthAction)
+    return speculativeGapBurndown(buffered.toList(), parallelism, parser, truthAction)
 }
 
 suspend fun <I, O> speculativeSignalBurndown(
@@ -269,7 +270,7 @@ suspend fun <I, O> speculativeSignalBurndown(
     parser: suspend (I) -> String,
     signalAction: suspend (OpenApiSignalCall<I>) -> O,
 ): List<OpenApiSignalAction<I, O>> {
-    val buffered = mutableListOf<OpenApiCall<I>>()
+    val buffered = SeriesArrayList<OpenApiCall<I>>()
     for (call in calls) buffered += call
-    return speculativeSignalBurndown(buffered, parallelism, parser, signalAction)
+    return speculativeSignalBurndown(buffered.toList(), parallelism, parser, signalAction)
 }

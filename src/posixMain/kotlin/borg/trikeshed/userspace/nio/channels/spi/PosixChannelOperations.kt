@@ -41,7 +41,7 @@ class PosixChannelOperations : ChannelOperations {
         memcpy(addr.sin_addr.ptr, addrList[0]!!, 4u)
         val res = platform.posix.connect(fd, addr.ptr.reinterpret(), sizeOf<sockaddr_in>().convert()).toInt()
         if (res < 0 && platform.posix.errno == platform.posix.EINPROGRESS) {
-            val pfds = platform.posix.alloc<pollfd>()
+            val pfds = alloc<pollfd>()
             pfds.fd = fd
             pfds.events = POLLOUT.toShort()
             val pr = platform.posix.poll(pfds.ptr, 1u, 15000)
@@ -90,6 +90,7 @@ class PosixChannelOperations : ChannelOperations {
             return n
         }
         override fun submit(): Int = 0
+        override fun prepAccept(serverFd: Int, userData: Long): Int = -1
         override fun wait(minComplete: Int): List<ChannelResult> = emptyList()
     }
 }

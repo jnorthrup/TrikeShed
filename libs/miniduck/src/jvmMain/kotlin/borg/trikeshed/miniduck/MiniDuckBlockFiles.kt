@@ -5,7 +5,7 @@ import borg.trikeshed.lib.get
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.toList
 import borg.trikeshed.lib.size
-import java.nio.file.Path
+import java.io.File
 
 /**
  * JVM-only file I/O for BlockRowVec.
@@ -18,17 +18,22 @@ import java.nio.file.Path
 object MiniDuckBlockFiles {
 
     /** Write a sealed block to an NDJSON file. */
-    fun write(path: Path, block: BlockRowVec) {
+    fun write(path: String, block: BlockRowVec) {
         check(block.state == BlockRowVec.State.SEALED) {
             "Cannot write a mutable block — call seal() first"
         }
         val text = MiniDuckBlockCodec.encode(block)
-        path.toFile().writeText(text.toString())
+        File(path).writeText(text.toString())
+    }
+
+    /** Write a sealed block to an NDJSON file (CharSequence path). */
+    fun write(path: CharSequence, block: BlockRowVec) {
+        write(path.toString(), block)
     }
 
     /** Read a block from an NDJSON file. */
-    fun read(path: Path): BlockRowVec {
-        val text = path.toFile().readText()
+    fun read(path: String): BlockRowVec {
+        val text = File(path).readText()
         val decoded = MiniDuckBlockCodec.decode(text)
         val normalized = BlockRowVec.mutable()
         for (i in 0 until decoded.child.size) {
@@ -36,6 +41,9 @@ object MiniDuckBlockFiles {
         }
         return normalized.seal()
     }
+
+    /** Read a block from an NDJSON file (CharSequence path). */
+    fun read(path: CharSequence): BlockRowVec = read(path.toString())
 
     private fun normalizeRow(row: RowVec, parentKind: CharSequence? = null): RowVec = when (row) {
         is JsonRowVec -> {

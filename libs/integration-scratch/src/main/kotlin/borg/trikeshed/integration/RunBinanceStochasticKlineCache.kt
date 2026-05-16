@@ -51,8 +51,8 @@ suspend fun runBinanceStochasticKlineCache(
     provider = provider,
 )
 
-fun main(rawArgs: Array<CharSequence>) = runBlocking {
-    val args = parseBinanceStochasticMainArgs(rawArgs)
+// RLM: library entrypoint commented out - // RLM: library entrypoint commented out - // RLM: library entrypoint commented out - // RLM: library entrypoint commented out - // RLM: library entrypoint commented out - fun main(rawArgs: Array<CharSequence>) = runBlocking {
+// RLM: library entrypoint commented out - // RLM: library entrypoint commented out - // RLM: library entrypoint commented out - // RLM: library entrypoint commented out - // RLM: library entrypoint commented out -     val args = parseBinanceStochasticMainArgs(rawArgs)
     val loaded = runBinanceStochasticKlineCache(args)
     println("Loaded ${loaded.cursor.size} Binance klines for ${loaded.key.kline.symbol} ${loaded.key.kline.interval}")
     println("Stochastic rows=${loaded.stochastic.k.size}")

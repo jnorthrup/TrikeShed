@@ -12,7 +12,7 @@ class EbpfJitEngine(
     val programType: EbpfProgramType = EbpfProgramType.Unspec,
     val license: String = "GPL",
 ) {
-    private val instructions = mutableListOf<Long>()
+    private val instructions = LongSeries.build { it += <Long>() })
     private var compiled: JitCode? = null
     private var verified: VerifierResult? = null
 

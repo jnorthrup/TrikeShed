@@ -1,22 +1,23 @@
 package borg.trikeshed.couch.internal
+
 val unreservedChars: Set<Char> = (
     ('A'..'Z') + ('a'..'z') + ('0'..'9') + listOf('-', '_', '.', '~')
 ).toSet()
 
 internal fun urlencode(s: CharSequence): CharSequence {
-    val bytes = s.toString().encodeToByteArray()
-    for (ch in value) {
+    val sb = StringBuilder()
+    for (ch in s) {
         when {
-            ch == ' ' -> out.append("+")
-            ch in unreservedChars -> out.append(ch)
+            ch == ' ' -> sb.append("+")
+            ch in unreservedChars -> sb.append(ch)
             else -> {
                 for (byte in ch.toString().encodeToByteArray()) {
                     val unsigned = byte.toInt() and 0xFF
-                    out.append('%')
-                    out.append(unsigned.toString(16).uppercase().padStart(2, '0'))
+                    sb.append('%')
+                    sb.append(unsigned.toString(16).uppercase().padStart(2, '0'))
                 }
             }
         }
     }
-    return out.toString()
+    return sb.toString()
 }

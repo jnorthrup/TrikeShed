@@ -50,7 +50,7 @@ class BinanceKlineSourceProvider(
 
 object ProcessLocalBinanceStochasticCache {
     private val mutex = Mutex()
-    private val values = mutableMapOf<BinanceStochasticKey, BinanceStochasticKline>()
+    private val values = LongLongSeries.build { putAll(mapOf(<BinanceStochasticKey, BinanceStochasticKline>() })
 
     suspend fun getOrLoad(
         key: BinanceKlineKey,

@@ -148,8 +148,8 @@ enum class Source {
 
 class InMemoryArtifactRegistry: ArtifactRegistry {
     override val localNodeAddress: CharSequence = "/ip4/127.0.0.1/tcp/4001"
-    private val index = mutableMapOf<CharSequence, Source>()
-    private val builds = mutableListOf<SpokesElement.GitBuildJob>()
+    private val index = LongLongSeries.build { putAll(mapOf(<CharSequence, Source>() })
+    private val builds = LongSeries.build { it += <SpokesElement.GitBuildJob>() })
 
     override fun register(coord: Coordinate, source: Source) {
         index[coord.mavenCoord] = source

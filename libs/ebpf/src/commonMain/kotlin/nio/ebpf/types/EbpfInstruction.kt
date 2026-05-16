@@ -180,4 +180,4 @@ private const val BPF_MODE_MASK: Int = 0xe0
 private const val BPF_OP_MASK: Int = 0xf0
 
 /** Network-endian conversion marker. */
-expect val BEBPF_ORDER: Boolean
+// NOTE: BEBPF_ORDER is declared once in EbpfTypes.kt:67

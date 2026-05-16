@@ -20,13 +20,19 @@ import borg.trikeshed.parse.kursive.parseLines
 import borg.trikeshed.parse.kursive.std
 import borg.trikeshed.parse.kursive.then
 import borg.trikeshed.lib.Join
+import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.*
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.j
-import borg.trikeshed.lib.toSeries
 import borg.trikeshed.lib.size
 import kotlinx.coroutines.SupervisorJob
 import kotlin.coroutines.CoroutineContext
+
+/** Convert CharSequence to Series<Char>. */
+private fun CharSequence.toSeries(): Series<Char> {
+    val n = length
+    return n j { i: Int -> this[i] }
+}
 
 // ── element kinds ──────────────────────────────────────────────
 
@@ -109,14 +115,17 @@ class NarsiveSupervisorJob(
     val elements: Series<NarsiveElement>,
 ) {
    val supervisor = SupervisorJob()
-   private val fanoutCache = mutableMapOf<CoroutineContext.Key<*>, Series<NarsiveElement>>()
+   private val fanoutCache: SeriesBuffer<Pair<CoroutineContext.Key<*>, Series<NarsiveElement>>> = SeriesBuffer()
 
     fun fanout(key: CoroutineContext.Key<*>): Series<NarsiveElement> {
-        return fanoutCache.getOrPut(key) {
-            val matches = SeriesBuffer<NarsiveElement>()
-            elements.view.forEach { if (it.key === key) matches.add(it) }
-            matches.snapshot()
-        }
+        val existing = fanoutCache.view.find { it.first == key }
+        if (existing != null) return existing.second
+        val matches: SeriesBuffer<NarsiveElement> = SeriesBuffer()
+        elements.view.forEach { if (it.key === key) matches.add(it) }
+        val n = matches.size
+        val result: Series<NarsiveElement> = n j { matches[it] }
+        fanoutCache.add(key to result)
+        return result
     }
 
     fun fanout(kind: NarsiveElementKind): Series<NarsiveElement> = fanout(kind as CoroutineContext.Key<*>)
@@ -153,7 +162,7 @@ enum class NarsiveOperator(
     PRODUCT("*", "×", "⋅"),
     FUTURE(":/:", "◷"),
     PAST(":\\:", "◶"),
-    PRESENT(":|:", "◴"),
+    PRESENT(":/:", "◴"),
     QUERY_VARIABLE("?"),
     DEPENDENT_VARIABLE("#"),
     INDEPENDENT_VARIABLE("$"),

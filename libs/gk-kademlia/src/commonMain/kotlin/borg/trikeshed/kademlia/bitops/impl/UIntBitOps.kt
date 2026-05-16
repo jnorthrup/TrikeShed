@@ -2,6 +2,7 @@ package borg.trikeshed.kademlia.bitops.impl
 import borg.trikeshed.kademlia.bitops.BitOps
 object UIntBitOps : BitOps<UInt> {
     override val one: UInt = 1u
+    override fun nextInt(bits: Int): Int = kotlin.random.Random.nextInt(bits)
     override val xor: (UInt, UInt) -> UInt = UInt::xor
     override val and: (UInt, UInt) -> UInt = UInt::and
     override val shl: (UInt, Int) -> UInt = UInt::shl

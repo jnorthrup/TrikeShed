@@ -3,13 +3,13 @@ package borg.trikeshed.miniduck.tablespace
 import borg.trikeshed.miniduck.BlockRowVec
 import borg.trikeshed.miniduck.MiniDuckBlockCodec
 import borg.trikeshed.parse.json.JsonParser
-import borg.trikeshed.lib.j
+import borg.trikeshed.lib.mutable.SeriesBuffer
+import borg.trikeshed.lib.view
 import borg.trikeshed.userspace.nio.file.spi.FileOperations
-import java.util.LinkedList
 import kotlinx.coroutines.currentCoroutineContext
 
 /**
- * Persistent write-ahead log backed by [FileOperations] NIO SPI.
+ * Persistent write-ahead log using [FileOperations] NIO SPI.
  *
  * Format: JSON-lines (one entry per line).
  *   {"seq":1,"op":"put","collection":"docs","id":"doc1"}
@@ -24,7 +24,6 @@ class NioBlockWal(
     private val root: CharSequence,
 ) {
     private var nextSeq: Long = 0L
-    private val walPath: CharSequence get() = fs().resolvePath(root, "wal.ndjson").toString()
 
     private suspend fun fs(): FileOperations =
         currentCoroutineContext()[FileOperations.Key]
@@ -80,7 +79,7 @@ class NioBlockWal(
                 newContent.append('\n')
             }
         }
-        fs().write(walPath, newContent.toString())
+        fs().write(fs().resolvePath(root, "wal.ndjson").toString(), newContent.toString())
     }
 
     // ── Internal entry parsing ─────────────────────────────────────
@@ -94,10 +93,11 @@ class NioBlockWal(
     )
 
     private suspend fun readEntries(): List<WalEntry> {
-        if (!fs().exists(walPath)) return emptyList()
-        val text = fs().readString(walPath)
+        val path = fs().resolvePath(root, "wal.ndjson").toString()
+        if (!fs().exists(path)) return emptyList()
+        val text = fs().readString(path)
         val lines = text.lines()
-        val entries = LinkedList<WalEntry>()
+        val entries: SeriesBuffer<WalEntry> = SeriesBuffer()
         var i = 0
         while (i < lines.size) {
             val headerLine = lines[i].trim()
@@ -110,25 +110,24 @@ class NioBlockWal(
                 continue
             }
             if (header.op == "put") {
-                val blockLines = LinkedList<CharSequence>()
+                val blockLines: SeriesBuffer<CharSequence> = SeriesBuffer()
                 var cursor = i + 1
                 while (cursor < lines.size) {
                     val candidate = lines[cursor]
                     if (candidate.isNotBlank() && parseWalHeader(candidate.toString().trim()) != null) break
-                    if (candidate.isNotBlank()) blockLines += candidate
+                    if (candidate.isNotBlank()) blockLines.add(candidate)
                     cursor++
                 }
-                entries += header.copy(blockData = blockLines.joinToString("\n").ifEmpty { null })
+                val joined = blockLines.view.joinToString("\n")
+                entries.add(header.copy(blockData = if (joined.isEmpty()) null else joined))
                 i = cursor
             } else {
-                entries += header
+                entries.add(header)
                 i++
             }
         }
-        if (entries.isNotEmpty()) {
-            nextSeq = entries.last().seq
-        }
-        return entries
+        val allEntries = entries.toList()
+        return allEntries
     }
 
     private fun parseWalHeader(line: CharSequence): WalEntry? {
@@ -158,12 +157,8 @@ class NioBlockWal(
     }
 
     private suspend fun appendText(text: CharSequence) {
-        val existing = if (fs().exists(walPath)) fs().readString(walPath) else ""
-        fs().write(walPath, existing.toString() + text)
-    }
-
-    private fun CharSequence.toSeries(): borg.trikeshed.lib.Series<Char> {
-        val n = length
-        return n j { i: Int -> this[i] }
+        val path = fs().resolvePath(root, "wal.ndjson").toString()
+        val existing = if (fs().exists(path)) fs().readString(path) else ""
+        fs().write(path, existing.toString() + text)
     }
 }

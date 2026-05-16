@@ -117,7 +117,7 @@ data class SctpCommonHeader(
         const val SIZE = 12
 
         /** Parse from ByteBuffer */
-        fun parse(buffer: java.nio.ByteBuffer): SctpCommonHeader {
+        fun parse(buffer: borg.trikeshed.userspace.nio.ByteBuffer): SctpCommonHeader {
             return SctpCommonHeader(
                 sourcePort = buffer.getShort().toUShort(),
                 destinationPort = buffer.getShort().toUShort(),
@@ -128,7 +128,7 @@ data class SctpCommonHeader(
     }
 
     /** Serialize to ByteBuffer */
-    fun serialize(buffer: java.nio.ByteBuffer) {
+    fun serialize(buffer: borg.trikeshed.userspace.nio.ByteBuffer) {
         buffer.putShort(sourcePort.toShort())
         buffer.putShort(destinationPort.toShort())
         buffer.putInt(verificationTag.toInt())
@@ -137,7 +137,7 @@ data class SctpCommonHeader(
 
     /** Serialize to ByteArray */
     fun serialize(): ByteArray {
-        val buffer = java.nio.ByteBuffer.allocate(SIZE)
+        val buffer = borg.trikeshed.userspace.nio.ByteBuffer.allocate(SIZE)
         serialize(buffer)
         return buffer.array()
     }

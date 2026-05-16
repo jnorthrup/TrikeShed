@@ -1,0 +1,22 @@
+{
+  "critic_checks": [
+    "Mutable state must terminate at explicit edges.",
+    "Library modules must not expose executable entrypoints.",
+    "Namespace keys should remain stable and collision-resistant.",
+    "Recurring library_entrypoint violations must show declining trend.",
+    "Recurring mutable_stdlib_leak violations must show declining trend."
+  ],
+  "expected_intent": "library",
+  "forbidden_patterns": [
+    "\\bMutableList\\b",
+    "\\bMutableMap\\b",
+    "\\bMutableSet\\b",
+    "\\bArrayList\\b",
+    "\\bHashMap\\b",
+    "\\bHashSet\\b",
+    "\\bjava\\.util\\.(List|Map|Set)\\b",
+    "library_entrypoint",
+    "mutable_stdlib_leak"
+  ],
+  "required_terms": []
+}

@@ -26,8 +26,8 @@ object CouchServiceCompiler {
         val designDocId = "_design/${serviceClass.qualifiedName}"
         val language = "javascript"
 
-        val viewDefs = mutableMapOf<CharSequence, CouchViewDefinition>()
-        val invocations = mutableMapOf<CharSequence, CouchViewInvocation>()
+        val viewDefs = LongLongSeries.build { putAll(mapOf<CharSequence, CouchViewDefinition>()) }
+        val invocations = LongLongSeries.build { putAll(mapOf<CharSequence, CouchViewInvocation>()) })
 
         for (func in serviceClass.declaredMemberFunctions) {
             func.isAccessible = true
@@ -67,7 +67,7 @@ object CouchServiceCompiler {
         val params = func.valueParameters
         val methodAnnotations = func.annotations
 
-        val parts = mutableListOf<CharSequence>()
+        val parts = SeriesBuffer<CharSequence>()
 
         // Method-level annotations
         for (ann in methodAnnotations) {

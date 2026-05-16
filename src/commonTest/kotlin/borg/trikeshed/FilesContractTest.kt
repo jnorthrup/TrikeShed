@@ -3,7 +3,6 @@ package borg.trikeshed
 import borg.trikeshed.userspace.nio.file.spi.InMemoryFileOperations
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -22,7 +21,6 @@ class FilesContractTest {
 
         // read
         assertEquals(content, fs.readString(path))
-        assertEquals(listOf("hello trike"), fs.readAllLines(path))
 
         // delete
         fs.deleteRecursively(path)

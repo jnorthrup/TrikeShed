@@ -5,7 +5,7 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.*
 import kotlinx.coroutines.flow.*
 import java.net.InetSocketAddress
-import java.nio.ByteBuffer
+import borg.trikeshed.userspace.nio.ByteBuffer
 
 /**
  * ngSCTP Association - The core connection entity
@@ -452,7 +452,7 @@ class NgSctpAssociation private constructor(
      * Processes stream reconfiguration requests (add streams, reset streams)
      */
     private fun handleReConfig(reConfig: NgChunk_ReConfig) {
-        val responses = mutableListOf<ReConfigResponse>()
+        val responses = LongSeries.build { it += <ReConfigResponse>() })
 
         for (request in reConfig.requests) {
             val response = when (request) {
@@ -512,7 +512,7 @@ class NgSctpAssociation private constructor(
      * Processes address configuration change requests
      */
     private fun handleAsconf(asconf: NgChunk_Asconf) {
-        val responses = mutableListOf<NgChunk_AsconfAck.AsconfResponseParameter>()
+        val responses = LongSeries.build { it += <NgChunk_AsconfAck.AsconfResponseParameter>() })
 
         for (param in asconf.parameters) {
             // Process each address configuration parameter

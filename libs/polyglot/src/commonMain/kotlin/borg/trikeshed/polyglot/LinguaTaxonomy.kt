@@ -253,7 +253,7 @@ interface LangRegistry {
 
 /** Thread-safe append-only language registry implementation. */
 class ConcurrentLangRegistry : LangRegistry {
-    private val entries = mutableListOf<LangEntry>()
+    private val entries: SeriesBuffer<LangEntry> = SeriesBuffer()
     private var sealed = false
 
     fun seal() {
@@ -268,10 +268,12 @@ class ConcurrentLangRegistry : LangRegistry {
         shebang: CharSequence?,
     ): LangEntry {
         if (sealed) throw IllegalStateException("LangRegistry is sealed and cannot be modified")
-        return LangEntry(id, fingerprint, classifier, extensions, shebang).also { entries.add(it) }
+        val entry = LangEntry(id, fingerprint, classifier, extensions, shebang)
+        entries.add(entry)
+        return entry
     }
 
-    override fun all(): Series<LangEntry> = entries.toSeries()
+    override fun all(): Series<LangEntry> = entries.size j { i: Int -> entries[i] }
 
     /** Reset for test isolation. */
     override fun reset() {
@@ -281,11 +283,11 @@ class ConcurrentLangRegistry : LangRegistry {
 
     override fun series(): Series<LangEntry> = entries.size j { i: Int -> entries[i] }
 
-    override fun byExtension(ext: CharSequence): LangEntry? = entries.find { entry ->
+    override fun byExtension(ext: CharSequence): LangEntry? = entries.view.find { entry ->
         entry.extensions.view.contains(ext)
     }
 
-    override fun byId(id: LangId): LangEntry? = entries.find { it.id == id }
+    override fun byId(id: LangId): LangEntry? = entries.view.find { it.id == id }
 
     /**
      * Speculative classification: run all registered classifiers sequentially.
@@ -295,11 +297,11 @@ class ConcurrentLangRegistry : LangRegistry {
      * Returns ClassificationResults sorted by confidence descending.
      */
     override fun classifyAll(source: Series<Char>): Series<ClassificationResult> {
-        val results = entries.map { it.classify(source) }.sortedByDescending { it.confidence }
+        val results = entries.view.map { it.classify(source) }.sortedByDescending { it.confidence }
         return results.toSeries()
     }
 
     /** Top-ranked classification, or null if registry is empty. */
     override fun bestMatch(source: Series<Char>): ClassificationResult? =
-        classifyAll(source).firstOrNull()
+        classifyAll(source).let { if (it.isEmpty()) null else it[0] }
 }

@@ -1,15 +1,15 @@
 package borg.trikeshed.userspace.nio.tls.codec.kdf
 
-import borg.trikeshed.userspace.nio.tls.codec.hash.Sha256
+import borg.trikeshed.userspace.nio.spi.digest.Sha256
 
 /**
  * Pure-Kotlin HKDF-SHA-256 (RFC 5869) — commonMain default.
  *
- * Builds on a [borg.trikeshed.userspace.nio.tls.codec.hash.Sha256] instance (injected, not expect/actual).
+ * Builds on a [borg.trikeshed.userspace.nio.spi.digest.Sha256] instance (injected, not expect/actual).
  * Use `DefaultHkdfSha256(DefaultSha256())` for a self-contained default.
  */
 class DefaultHkdfSha256(
-    private val sha256: borg.trikeshed.userspace.nio.tls.codec.hash.Sha256,
+    private val sha256: borg.trikeshed.userspace.nio.spi.digest.Sha256,
 ) : borg.trikeshed.userspace.nio.tls.codec.kdf.HkdfSha256 {
     override val key: kotlin.coroutines.CoroutineContext.Key<*> get() = borg.trikeshed.userspace.nio.tls.codec.kdf.HkdfSha256.Key
 

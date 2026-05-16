@@ -1,0 +1,8 @@
+#!/bin/bash
+# TrikeShed RLM scanner - convenience wrapper
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PLUGIN_DIR="$SCRIPT_DIR/.hermes/plugins/trikeshed-rlm"
+
+python3 "$PLUGIN_DIR/trikeshed_rlm_scan.py" "$@"

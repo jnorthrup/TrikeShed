@@ -1,20 +1,8 @@
 package borg.trikeshed.isam
 
+import borg.trikeshed.cursor.*
+import borg.trikeshed.lib.*
 import borg.trikeshed.userspace.nio.file.Files
-import borg.trikeshed.lib.Usable
-import borg.trikeshed.cursor.ColumnMeta
-import borg.trikeshed.cursor.Cursor
-import borg.trikeshed.cursor.RowVec
-import borg.trikeshed.cursor.at
-import borg.trikeshed.cursor.name
-import borg.trikeshed.cursor.j
-import borg.trikeshed.lib.Series
-import borg.trikeshed.lib.get
-import borg.trikeshed.lib.getOrNull
-import borg.trikeshed.lib.j
-import borg.trikeshed.lib.toSeries
-import borg.trikeshed.lib.view
-import borg.trikeshed.lib.size
 
 private const val ISAM3_LAYOUT_SUFFIX = ".isam3.yaml"
 
@@ -39,8 +27,9 @@ class ColumnarIsam internal constructor(
         val values: Series<Any?> = resolvedColumns.size j { columnIndex: Int ->
             val resolved = resolvedColumns[columnIndex]
             val store = storeIndex[resolved.file] ?: error("Missing store ${resolved.file}")
-            val begin = rowIndex * store.rowWidth + resolved.begin
-            val slice = store.bytes.copyOfRange(begin, begin + resolved.meta.end - resolved.meta.begin)
+            val begin = (rowIndex.toLong() * store.rowWidth + resolved.begin).toInt()
+            val end = begin + resolved.meta.end - resolved.meta.begin
+            val slice = store.bytes.copyOfRange(begin, end)
             resolved.type.createDecoder(resolved.meta.end - resolved.meta.begin)(slice)
         }
         values.j(metaSeries)

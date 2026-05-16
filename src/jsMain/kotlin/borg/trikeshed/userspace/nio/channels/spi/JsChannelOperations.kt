@@ -15,6 +15,9 @@ class JsChannelOperations : ChannelOperations {
         override val id: Int get() = 0
         override fun read(buffer: ByteBuffer, offset: Long): Int = -1
         override fun write(buffer: ByteBuffer, offset: Long): Int = -1
+        override fun readv(fd: Int, buffer: ByteBuffer, userData: Long): Int = -1
+        override fun writev(fd: Int, buffer: ByteBuffer, userData: Long): Int = -1
+        override fun prepAccept(serverFd: Int, userData: Long): Int = -1
         override fun submit(): Int = 0
         override fun wait(minComplete: Int): List<ChannelResult> = emptyList()
     }

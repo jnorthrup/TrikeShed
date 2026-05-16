@@ -57,7 +57,7 @@ data class OpenApiRawDocument(val root: JsonMap) {
         }
 
     fun refs(): List<CharSequence> {
-        val refs = mutableListOf<CharSequence>()
+        val refs = LongSeries.build { it += <CharSequence>() })
         fun walk(node: Any?) {
             when (node) {
                 is Map<*, *> -> {

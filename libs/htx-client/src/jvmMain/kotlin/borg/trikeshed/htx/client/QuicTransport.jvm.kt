@@ -297,9 +297,9 @@ private fun ByteArrayBuilder.put32(v: Int) { put(byteArrayOf(((v ushr 24) and 0x
 
 /** Simple byte array builder. */
 private class ByteArrayBuilder {
-    private val buf = mutableListOf<Byte>()
-    fun put8(v: Int) { buf.add((v and 0xFF).toByte()) }
-    fun put(data: ByteArray) { data.forEach { buf.add(it) } }
+    private val buf = java.io.ByteArrayOutputStream()
+    fun put8(v: Int) { buf.write(v and 0xFF) }
+    fun put(data: ByteArray) { buf.write(data, 0, data.size) }
     fun toByteArray(): ByteArray = buf.toByteArray()
 }
 

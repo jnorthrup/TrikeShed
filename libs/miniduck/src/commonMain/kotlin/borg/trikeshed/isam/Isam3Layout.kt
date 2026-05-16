@@ -1,19 +1,11 @@
 package borg.trikeshed.isam
 
-import borg.trikeshed.userspace.nio.file.Files
 import borg.trikeshed.cursor.ColumnMeta
 import borg.trikeshed.isam.meta.IOMemento
-import borg.trikeshed.lib.Series
-import borg.trikeshed.lib.emptySeries
-import borg.trikeshed.lib.get
-import borg.trikeshed.lib.getOrNull
-import borg.trikeshed.lib.j
-import borg.trikeshed.lib.toList
-import borg.trikeshed.lib.toSeries
-import borg.trikeshed.lib.view
-import borg.trikeshed.lib.size
+import borg.trikeshed.lib.*
+import borg.trikeshed.lib.mutable.SeriesBuffer
 import borg.trikeshed.parse.yaml.parse as parseYaml
-import java.util.LinkedList
+import borg.trikeshed.userspace.nio.file.Files
 
 private val ISAM3_RESERVED_TOP_LEVEL = setOf("isam", "views", "defaults")
 private val ISAM3_RESERVED_GROUP_KEYS = setOf("flags", "coords")
@@ -48,10 +40,10 @@ class Isam3Layout(
             null -> views.getOrNull(0)
             else -> view(viewName) ?: error("Unknown ISAM3 view: $viewName")
         }) {
-            null -> allPlacements().toList().map { it.name }.distinct()
-            else -> resolvedView.columns.toList()
+            null -> allPlacements().view.map { it.name }.distinct()
+            else -> resolvedView.columns.view
         }
-        return names.toList().distinct().toSeries()
+        return names.distinct().toSeries()
     }
 
     fun logicalMeta(viewName: CharSequence? = null): Series<ColumnMeta> {
@@ -75,7 +67,7 @@ class Isam3Layout(
 
     fun allPlacements(): Series<Isam3Placement> {
         val seen = linkedSetOf<CharSequence>()
-        val out = LinkedList<Isam3Placement>()
+        val out = SeriesBuffer<Isam3Placement>()
         partitions.view.forEach { partition ->
             partition.files.view.forEach { file ->
                 file.groups.view.forEach { group ->
@@ -85,7 +77,7 @@ class Isam3Layout(
                 }
             }
         }
-        return out.toSeries()
+        return out
     }
 
     fun render(): CharSequence = buildString {
@@ -102,11 +94,11 @@ class Isam3Layout(
         }
         for (partition in partitions.view) {
             appendLine("${partition.name}:")
-                if (partition.flags.size > 0) {
-                    append("  flags: ")
-                    append(renderInlineList(partition.flags.toList()))
-                    appendLine()
-                }
+            if (partition.flags.size > 0) {
+                append("  flags: ")
+                append(renderInlineList(partition.flags.toList()))
+                appendLine()
+            }
             for (file in partition.files.view) {
                 appendLine("  ${file.name}:")
                 if (file.flags.size > 0) {
@@ -198,37 +190,38 @@ class Isam3Layout(
             constraints: Series<RecordMeta>,
             viewColumns: Series<CharSequence> = constraints.size j { index: Int -> constraints[index].name },
         ): Isam3Layout {
-            val groupsByCluster = linkedMapOf<CharSequence, LinkedList<RecordMeta>>()
+            val groupsByCluster = linkedMapOf<CharSequence, SeriesBuffer<RecordMeta>>()
             constraints.view.forEach { meta ->
                 val cluster = clusterName(meta)
-                groupsByCluster.getOrPut(cluster) { LinkedList() }.add(meta)
+                groupsByCluster.getOrPut(cluster) { SeriesBuffer() }.add(meta)
             }
 
-            val files = groupsByCluster.entries.map { (clusterName, metas) ->
-                val groupByType = linkedMapOf<IOMemento, LinkedList<RecordMeta>>()
-                metas.forEach { meta ->
-                    groupByType.getOrPut(meta.type) { LinkedList() }.add(meta)
-                }
+            val filesList: List<Isam3File> = groupsByCluster.entries.map { (clusterName, metas) ->
+                val groupByType = linkedMapOf<IOMemento, SeriesBuffer<RecordMeta>>()
+                metas.forEach { meta -> groupByType.getOrPut(meta.type) { SeriesBuffer() }.add(meta) }
 
                 var offset = 0
-                val groups = groupByType.entries.map { (type, typedMetas) ->
-                    val placements = typedMetas.map { meta ->
+                val groupsList: List<Isam3Group> = groupByType.entries.map { (type, typedMetas) ->
+                    val sb = SeriesBuffer<Isam3Placement>()
+                    for (i in 0 until typedMetas.a) {
+                        val meta: RecordMeta = typedMetas.b(i)
                         val width = meta.end - meta.begin
                         val placement = Isam3Placement(meta.name, offset, width)
                         offset += width
-                        placement
-                    }.toSeries()
-                    Isam3Group(type, placements)
-                }.toSeries()
+                        sb.add(placement)
+                    }
+                    Isam3Group(type, sb)
+                }
 
                 var rowWidth = 0
-                for (group in groups.view) {
+                for (group in groupsList) {
                     for (placement in group.placements.view) {
                         rowWidth += placement.width
                     }
                 }
-                Isam3File(clusterName, emptySeries(), groups, rowWidth)
-            }.toSeries()
+                Isam3File(clusterName, emptySeries(), groupsList.size j { groupsList[it] }, rowWidth)
+            }
+            val files: Series<Isam3File> = filesList.size j { filesList[it] }
 
             return Isam3Layout(
                 version = 3,
@@ -250,7 +243,7 @@ class Isam3Layout(
                 .toSeries()
 
             val resolvedViews = if (viewSeries.size > 0) viewSeries else 1 j { _: Int ->
-                val columns = LinkedList<CharSequence>()
+                val columns = SeriesBuffer<CharSequence>()
                 val seen = linkedSetOf<CharSequence>()
                 for (partition in partitions.view) {
                     for (file in partition.files.view) {
@@ -263,27 +256,28 @@ class Isam3Layout(
                 }
                 Isam3View(
                     name = partitions.getOrNull(0)?.name ?: "default",
-                    columns = columns.toSeries(),
+                    columns = columns,
                 )
             }
 
             return Isam3Layout(version, partitions, resolvedViews)
         }
 
-        private fun parseViews(value: Any?): Series<Isam3View> {
-            val map = value.asMapOrNull("views") ?: return emptySeries()
-            return map.entries.map { (viewName, cols) ->
+        private fun parseViews(raw: Any?): Series<Isam3View> {
+            val map = raw.asMapOrNull("views") ?: return emptySeries()
+            val list: List<Isam3View> = map.entries.map { (viewName, cols) ->
                 Isam3View(viewName, parseColumnNames(cols, "views.$viewName"))
-            }.toSeries()
+            }
+            return list.size j { list[it] }
         }
 
         private fun parsePartition(name: CharSequence, raw: Any?): Isam3Partition {
             val map = raw.asMap("partition $name")
             val flags = parseFlags(map["flags"] ?: map["coords"], "partition $name flags")
-            val files = map.entries
+            val filesList: List<Isam3File> = map.entries
                 .filter { (key, _) -> key !in ISAM3_RESERVED_GROUP_KEYS }
                 .map { (fileName, fileRaw) -> parseFile(fileName, fileRaw) }
-                .toSeries()
+            val files: Series<Isam3File> = filesList.size j { filesList[it] }
             return Isam3Partition(name, flags, files)
         }
 
@@ -291,7 +285,7 @@ class Isam3Layout(
             val map = raw.asMap("file $name")
             val flags = parseFlags(map["flags"] ?: map["coords"], "file $name flags")
             var fileOffset = 0
-            val groups = LinkedList<Isam3Group>()
+            val groups = SeriesBuffer<Isam3Group>()
             for ((groupKey, groupRaw) in map.entries) {
                 if (groupKey in ISAM3_RESERVED_GROUP_KEYS) continue
                 val parsed = parseGroup(groupKey, groupRaw, "file $name", fileOffset)
@@ -299,12 +293,12 @@ class Isam3Layout(
                 fileOffset = maxOf(fileOffset, parsed.spanEnd)
             }
             var rowWidth = 0
-            for (group in groups) {
+            for (group in groups.view) {
                 for (placement in group.placements.view) {
                     rowWidth = maxOf(rowWidth, placement.end)
                 }
             }
-            return Isam3File(name, flags, groups.toSeries(), rowWidth)
+            return Isam3File(name, flags, groups, rowWidth)
         }
 
         private fun parseGroup(typeName: CharSequence, raw: Any?, context: CharSequence, fileOffset: Int): ParsedGroup {
@@ -328,17 +322,18 @@ class Isam3Layout(
             }
             if (raw.all { it is CharSequence }) {
                 var offset = fileOffset
-                return raw.map { value ->
+                val list: List<Isam3Placement> = raw.map { value ->
                     val name = value.asString("$context ${type.name}")
                     val width = widthFor(type, name, null, context)
                     val placement = Isam3Placement(name, offset, width)
                     offset += width
                     placement
-                }.toSeries()
+                }
+                return list.size j { list[it] }
             }
             if (raw.all { it is List<*> }) {
                 var offset = fileOffset
-                return raw.map { spec ->
+                val placementsList: List<Isam3Placement> = raw.map { spec ->
                     val list = spec as List<*>
                     require(list.size == 2 && list[0] is Number && list[1] is CharSequence) {
                         "$context.${type.name} list entries must be [width, name]"
@@ -349,13 +344,14 @@ class Isam3Layout(
                     val placement = Isam3Placement(name, offset, width)
                     offset += width
                     placement
-                }.toSeries()
+                }
+                return placementsList.size j { placementsList[it] }
             }
             error("$context.${type.name} list form must be column names or [width, name] pairs")
         }
 
         private fun parsePlacementMap(type: IOMemento, raw: Map<CharSequence, Any?>, context: CharSequence): Series<Isam3Placement> {
-            return raw.entries.map { (name, beginRaw) ->
+            val placementsList: List<Isam3Placement> = raw.entries.map { (name, beginRaw) ->
                 val begin = when (beginRaw) {
                     is List<*> -> {
                         require(beginRaw.size in 1..2 && beginRaw[0] is Number) {
@@ -372,18 +368,25 @@ class Isam3Layout(
                 }
                 requireWidth(type, width, name, context)
                 Isam3Placement(name, begin, width)
-            }.toSeries()
+            }
+            return placementsList.size j { placementsList[it] }
         }
 
         private fun parseColumnNames(raw: Any?, context: CharSequence): Series<CharSequence> = when (raw) {
-            is List<*> -> raw.map { it.asString(context) }.toSeries()
+            is List<*> -> {
+                val list: List<CharSequence> = raw.map { it.asString(context) }
+                list.size j { list[it] }
+            }
             is CharSequence -> 1 j { _: Int -> raw.asString(context) }
             else -> error("$context must be a list of strings")
         }
 
         private fun parseFlags(raw: Any?, context: CharSequence): Series<CharSequence> = when (raw) {
             null -> emptySeries()
-            is List<*> -> raw.map { it.asString(context) }.toSeries()
+            is List<*> -> {
+                val list: List<CharSequence> = raw.map { it.asString(context) }
+                list.size j { list[it] }
+            }
             is CharSequence -> 1 j { _: Int -> raw.asString(context) }
             else -> error("$context must be a list of strings")
         }
@@ -499,3 +502,24 @@ class Isam3View(
 data class Isam3ResolvedColumn(
     val partition: CharSequence,
     val file: CharSequence,
+    val type: IOMemento,
+    val meta: RecordMeta,
+    val begin: Int,
+    val end: Int,
+)
+
+private fun renderInlineList(values: List<CharSequence>): CharSequence =
+    values.joinToString(", ", prefix = "[", postfix = "]") { yamlScalar(it) }
+
+private fun yamlScalar(value: CharSequence): CharSequence {
+    val s = value.toString()
+    return when {
+        s.isEmpty() -> "\"\""
+        s.contains(':') || s.contains('#') || s.contains('[') || s.contains(']') ||
+                s.contains('{') || s.contains('}') || s.contains(',') || s.startsWith(' ') ||
+                s.endsWith(' ') || s.contains("\"") || s.contains('\n') ||
+                s == "true" || s == "false" || s == "null" ||
+                s.matches(Regex("^-?[0-9]+\\.[0-9]+$")) -> "\"${s.replace("\"", "\\\"")}\""
+        else -> s
+    }
+}

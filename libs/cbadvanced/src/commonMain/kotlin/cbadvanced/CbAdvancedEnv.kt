@@ -17,7 +17,7 @@ fun resolveDotenv(
     workingDir: Path = Files.cwd(),
     explicitPath: CharSequence? = System.getProperty("cbadvanced.dotenv") ?: System.getenv("CBADVANCED_DOTENV"),
 ): DotenvResolution {
-    val searched = mutableListOf<Path>()
+    val searched = LongSeries.build { it += <Path>() })
     explicitPath?.takeUnless { it.isBlank() }?.let { raw ->
         val candidate = Path(raw)
         searched.add(candidate)

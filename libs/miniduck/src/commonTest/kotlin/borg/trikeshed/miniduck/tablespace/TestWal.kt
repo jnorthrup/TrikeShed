@@ -17,7 +17,7 @@ sealed class WalOp {
 }
 
 class InMemoryBlockWal {
-    private val entries = mutableListOf<WalEntry>()
+    private val entries = LongSeries.build { it += <WalEntry>() })
     private var seqCounter = 0L
 
     val headSequence: Long

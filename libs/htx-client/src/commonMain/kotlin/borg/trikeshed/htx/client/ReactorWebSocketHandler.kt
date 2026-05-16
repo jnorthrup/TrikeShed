@@ -9,7 +9,7 @@ import borg.trikeshed.ws.WebSocketFrame
 import borg.trikeshed.userspace.nio.ByteBuffer
 import borg.trikeshed.userspace.nio.channels.spi.ChannelOperations
 import kotlinx.coroutines.currentCoroutineContext
-import borg.trikeshed.userspace.nio.reactor.NioSupervisor
+import borg.trikeshed.userspace.nio.spi.NioSupervisor
 /**
  * Reactor-integrated WebSocket transport handler for the HTX client.
  *
@@ -48,7 +48,7 @@ class ReactorWebSocketHandler(
 
     private suspend fun connect(request: HtxClientRequest) {
         // Fetch ChannelOperations from coroutine context (miniduck pattern)
-        val nio = currentCoroutineContext()[NioSupervisor.Key]!!
+        val nio = currentCoroutineContext()[NioSupervisor]!!
         val channelOps = nio.service<ChannelOperations>()!!
 
         // Parse wss://host:port/path

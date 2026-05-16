@@ -11,8 +11,8 @@ actual class ProcessShell {
         exec(null, command, args.toList())
 
     private fun exec(cwd: CharSequence?, command: CharSequence, args: List<CharSequence>): ProcessResult {
-        val builder = ProcessBuilder(listOf(command) + args)
-        cwd?.let { builder.directory(File(it)) }
+        val builder = ProcessBuilder(listOf(command.toString()) + args.map { it.toString() })
+        cwd?.let { builder.directory(File(it.toString())) }
         builder.redirectErrorStream(false)
         val process = builder.start()
         val stdout = process.inputStream.bufferedReader().use { it.readText() }

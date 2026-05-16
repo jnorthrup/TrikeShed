@@ -195,6 +195,23 @@ switch (project.path) {
     case ":libs:dreamer-kmm":
         // dreamer-kmm has its own exceptional build.gradle.kts — standalone, root TrikeShed only
         break
+    case ":libs:agent":
+        kmpHost()
+        extensions.getByName("kotlin").sourceSets.getByName("commonMain").dependencies {
+            implementation project(":libs:blackboard")
+            implementation project(":libs:gossip")
+        }
+        break
+    case ":libs:blackboard":
+        kmpHost()
+        break
+    case ":libs:gossip":
+        kmpHost()
+        extensions.getByName("kotlin").sourceSets.getByName("commonMain").dependencies {
+            implementation project(":libs:blackboard")
+            implementation project(":libs:gk-kademlia")
+        }
+        break
     case ":libs:kursive":
     case ":libs:patl":
     case ":libs:tiny-btrfs":
@@ -213,10 +230,8 @@ switch (project.path) {
         kmpJvm()
         break
     case ":libs:ebpf":
-        kmpHost(rootMode: "none", coroutinesMain: false)
-        def ebpfKotlin = extensions.getByName("kotlin")
-        def ebpfSets = ebpfKotlin.sourceSets
-        ebpfSets.getByName("commonMain").dependencies {
+        kmpJvm()
+        extensions.getByName("kotlin").sourceSets.getByName("commonMain").dependencies {
             implementation project(":libs:uring")
         }
         break

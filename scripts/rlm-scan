@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# Convenience wrapper for RLM scanner
+cd "$(dirname "$0")/.."
+python3 .hermes/plugins/trikeshed-rlm/trikeshed_rlm_scan.py "$@"

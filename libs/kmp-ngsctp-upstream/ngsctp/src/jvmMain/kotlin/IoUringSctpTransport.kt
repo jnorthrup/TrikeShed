@@ -6,7 +6,7 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.*
 import kotlinx.coroutines.flow.*
 import java.net.*
-import java.nio.*
+import borg.trikeshed.userspace.nio.*
 import io.netty.buffer.*
 import io.netty.buffer.*
 
@@ -96,7 +96,7 @@ class IoUringSctpTransport(
         val header = SctpCommonHeader.parse(buffer)
         
         // Parse chunks
-        val chunks = mutableListOf<NgChunk>()
+        val chunks = LongSeries.build { it += <NgChunk>() })
         while (buffer.hasRemaining()) {
             val chunk = NgChunk.parse(buffer)
             if (chunk != null) {

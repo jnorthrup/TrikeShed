@@ -50,6 +50,7 @@ kotlin {
         val commonMain by getting {
             dependencies {
                 implementation(project(":"))
+                implementation(project(":libs:dreamer-kmm"))
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:${property("versions.kotlinx-coroutines-core")}")
             }
         }

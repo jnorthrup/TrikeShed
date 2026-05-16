@@ -1,7 +1,9 @@
 package borg.trikeshed.concurrency
 
+import borg.trikeshed.cursor.RowVec
 import borg.trikeshed.cursor.j
 import borg.trikeshed.lib.j
+import borg.trikeshed.lib.mutable.SeriesBuffer
 
 /**
  * Minimal MVCC Block store stub used by tests. Not a full implementation — provides only
@@ -14,11 +16,11 @@ class MvccBlockStore {
 
     data class BlockEntry(var putSeq: Long, val block: Any?, var removed: Boolean = false, var removeSeq: Long? = null)
 
-    private val store: LinkedHashMap<CharSequence, LinkedList<BlockEntry>> = linkedMapOf()
+private val store: SeriesBuffer<Pair<CharSequence, SeriesBuffer<BlockEntry>>> = SeriesBuffer()
 
     // simple WAL stub
     data class WalEntry(val seq: Long)
-    class Wal { val entries: LinkedList<WalEntry> = LinkedList() }
+    class Wal { val entries: SeriesBuffer<WalEntry> = SeriesBuffer() }
     val wal: Wal = Wal()
 
     // exposed block meta for tests (removeSeq is normalized to a non-nullable long for tests)
@@ -33,20 +35,23 @@ class MvccBlockStore {
      */
     fun put(key: CharSequence, block: Any?): Int {
         seq += 1
-        val list = store.getOrPut(key) { mutableListOf() }
-        // Store the original block object so scans can inspect elements when needed
+        // Find or create the block-entry list for this key
+        val existing = store.view.find { it.first == key }
+        val entries = existing?.second ?: SeriesBuffer<BlockEntry>()
         val storedBlock: Any? = block
         val entry = BlockEntry(seq, storedBlock)
-        list.add(entry)
-        wal.entries.add(WalEntry(seq))
-        return list.size // id is index+1
+        entries.add(entry)
+        if (existing == null) store.add(key to entries)
+        wal.entries.add(entry)
+        return entries.size // id is index+1
     }
 
     fun remove(key: CharSequence, id: Int) {
         // id is 1-based insertion index for the key
-        val list = store[key] ?: return
+        val existing = store.view.find { it.first == key } ?: return
+        val list = existing.second
         val idx = id - 1
-        if (idx in list.indices) {
+        if (idx in 0 until list.size) {
             val e = list[idx]
             seq += 1
             e.removed = true
@@ -57,10 +62,18 @@ class MvccBlockStore {
 
     fun compact(upToSeq: Long) {
         // remove entries that are removed and have removeSeq < upToSeq
-        for ((k, list) in store) {
-            val retained = list.filter { !it.removed || (it.removeSeq != null && it.removeSeq!! >= upToSeq) || it.putSeq >= upToSeq }
-            store[k] = retained.toCollection(LinkedList())
+        val filtered = store.view.filter { (_, entries) ->
+            val kept = entries.view.filter { e ->
+                !e.removed || (e.removeSeq != null && e.removeSeq!! >= upToSeq) || e.putSeq >= upToSeq
+            }
+            if (kept.size != entries.size) {
+                entries.clear()
+                kept.forEach { entries.add(it) }
+            }
+            kept.isNotEmpty()
         }
+        store.clear()
+        filtered.forEach { store.add(it.first to it.second) }
         // compact WAL as well
         wal.entries.removeAll { it.seq < upToSeq }
     }
@@ -68,7 +81,9 @@ class MvccBlockStore {
     /**
      * Return the list of insertion ids visible at the snapshot for the given key.
      */
-    fun listAt(snap: Snapshot, key: CharSequence): List<Int> = store[key]
+    fun listAt(snap: Snapshot, key: CharSequence): List<Int> = store.view.find { it.first == key }
+        ?.second
+        ?.view
         ?.mapIndexedNotNull { idx, entry ->
             if (entry.putSeq <= snap.seq && !(entry.removed && (entry.removeSeq ?: Long.MAX_VALUE) <= snap.seq)) idx + 1 else null
         }
@@ -78,9 +93,10 @@ class MvccBlockStore {
      * Get the block at a particular insertion id if visible at the snapshot.
      */
     fun getAt(snap: Snapshot, key: CharSequence, id: Int): BlockLike? {
-        val list = store[key] ?: return null
+        val existing = store.view.find { it.first == key } ?: return null
+        val list = existing.second
         val idx = id - 1
-        if (idx !in list.indices) return null
+        if (idx !in 0 until list.size) return null
         val entry = list[idx]
         if (entry.putSeq > snap.seq) return null
         if (entry.removed && (entry.removeSeq ?: Long.MAX_VALUE) <= snap.seq) return null
@@ -94,9 +110,11 @@ class MvccBlockStore {
 
     // Scan visible blocks at snapshot and produce a Cursor of RowVec rows used by tests.
     fun scanAt(snap: Snapshot, key: CharSequence): borg.trikeshed.cursor.Cursor {
-        val list = store[key] ?: return borg.trikeshed.lib.Join.emptySeriesOf()
-        val rowVecs: LinkedList<borg.trikeshed.cursor.RowVec> = LinkedList()
-        for (entry in list) {
+        val existing = store.view.find { it.first == key } ?: return borg.trikeshed.lib.Join.emptySeriesOf()
+        val list = existing.second
+        val rowVecs: SeriesBuffer<RowVec> = SeriesBuffer()
+        for (idx in 0 until list.size) {
+            val entry = list[idx]
             if (entry.putSeq > snap.seq) continue
             if (entry.removed && (entry.removeSeq ?: Long.MAX_VALUE) <= snap.seq) continue
             val block = entry.block
@@ -107,23 +125,23 @@ class MvccBlockStore {
                         is Array<*> -> elem.toList()
                         else -> listOf(elem)
                     }
-                    val values: borg.trikeshed.lib.Series<Any?> = cells.size j { idx -> cells[idx] }
-                    val meta: borg.trikeshed.lib.Series<() -> borg.trikeshed.cursor.ColumnMeta> = cells.size j { idx -> { borg.trikeshed.cursor.ColumnMeta("col$idx", borg.trikeshed.isam.meta.IOMemento.IoString) } }
+                    val values: borg.trikeshed.lib.Series<Any?> = cells.size j { idx2 -> cells[idx2] }
+                    val meta: borg.trikeshed.lib.Series<() -> borg.trikeshed.cursor.ColumnMeta> = cells.size j { idx2 -> { borg.trikeshed.cursor.ColumnMeta("col$idx2", borg.trikeshed.isam.meta.IOMemento.IoString) } }
                     rowVecs.add(values j meta)
                 }
             } else if (block is Array<*>) {
                 val cells: List<Any?> = block.toList()
-                val values: borg.trikeshed.lib.Series<Any?> = cells.size j { idx -> cells[idx] }
-                val meta: borg.trikeshed.lib.Series<() -> borg.trikeshed.cursor.ColumnMeta> = cells.size j { idx -> { borg.trikeshed.cursor.ColumnMeta("col$idx", borg.trikeshed.isam.meta.IOMemento.IoString) } }
+                val values: borg.trikeshed.lib.Series<Any?> = cells.size j { idx2 -> cells[idx2] }
+                val meta: borg.trikeshed.lib.Series<() -> borg.trikeshed.cursor.ColumnMeta> = cells.size j { idx2 -> { borg.trikeshed.cursor.ColumnMeta("col$idx2", borg.trikeshed.isam.meta.IOMemento.IoString) } }
                 rowVecs.add(values j meta)
             } else {
                 val cells = listOf(block)
-                val values: borg.trikeshed.lib.Series<Any?> = cells.size j { idx -> cells[idx] }
-                val meta: borg.trikeshed.lib.Series<() -> borg.trikeshed.cursor.ColumnMeta> = cells.size j { idx -> { borg.trikeshed.cursor.ColumnMeta("col$idx", borg.trikeshed.isam.meta.IOMemento.IoString) } }
+                val values: borg.trikeshed.lib.Series<Any?> = cells.size j { idx2 -> cells[idx2] }
+                val meta: borg.trikeshed.lib.Series<() -> borg.trikeshed.cursor.ColumnMeta> = cells.size j { idx2 -> { borg.trikeshed.cursor.ColumnMeta("col$idx2", borg.trikeshed.isam.meta.IOMemento.IoString) } }
                 rowVecs.add(values j meta)
             }
         }
-        return rowVecs.size j { r -> rowVecs[r] }
+        return rowVecs.size j { rowVecs[it] }
     }
 
     private class StoredBlockLike(private val rowCountValue: Int) : BlockLike {

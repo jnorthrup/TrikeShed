@@ -107,18 +107,16 @@ inline class ColumnExclusion(val name: String) {
 operator fun String.unaryMinus(): ColumnExclusion = ColumnExclusion(this)
 
 /** Return cursor with columns excluded by indexes */
-operator fun Cursor.minus(killbag: Series<Int>) {
+operator fun Cursor.minus(killbag: Series<Int>): Cursor {
     val toSet = (0 until meta.size).toSet()
     val ints = (toSet - killbag.toSet()).toIntArray()
-    this.get(*ints)
+    return this.get(ints)
 }
 
 /** cursor get by ColumnExclusion vararg -- return a Cursor with the columns excluded by the vararg */
 operator fun Cursor.get(s: Series<ColumnExclusion>): Cursor {
-
-    val exclusionBag: MutableSet<Int> = mutableSetOf<Int>()
-    s.view.forEachIndexed { i: Int, it: ColumnExclusion ->
-        exclusionBag.add(meta.view.indexOfFirst { it.name == it.name })
+    val exclusionBag: Set<Int> = s.view.fold(setOf()) { acc, exc ->
+        acc + meta.view.indexOfFirst { col -> col.name == exc.name }
     }
     val retained: IntArray = ((0 until meta.size).toSet() - exclusionBag).toIntArray()
     return this.get(*retained)

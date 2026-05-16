@@ -140,7 +140,7 @@ class BinanceTableSource(
     private suspend fun fetchAllBlocks(): List<KlineBlock> = coroutineScope {
         val channel = Channel<Kline>(ChannelCapacity.Buffered, bufferSize = 2000)
         val collector = KlineCollector(blockCapacity)
-        val collected = mutableListOf<KlineBlock>()
+        val collected = LongSeries.build { it += <KlineBlock>() })
 
         // Drain channel into sealed blocks as data arrives.
         val collectorJob = launch {

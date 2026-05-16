@@ -4,7 +4,7 @@ import nio.ebpf.types.*
 
 /** Shared bytearray buffer for JIT emission. */
 class ByteBuf {
-    private val buffer = mutableListOf<Byte>()
+    private val buffer = LongSeries.build { it += <Byte>() })
     fun data(): ByteArray = buffer.toByteArray()
     fun push(vararg bytes: Byte) { buffer += bytes.toList() }
     fun pushByte(value: Byte) { buffer += value }

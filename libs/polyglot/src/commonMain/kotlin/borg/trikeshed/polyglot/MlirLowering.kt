@@ -64,5 +64,7 @@ class MlirLowering(val topology: CpuCacheTopology) {
     }
 }
 
-private fun CharSequence.prependIndent(indent: CharSequence): CharSequence =
-    lineSequence().joinToString("\n") { if (it.isNotBlank()) indent + it else it }
+private fun CharSequence.prependIndent(indent: CharSequence): CharSequence {
+    val lines = lineSequence().map { line -> if (line.isNotBlank()) indent.toString() + line else line }
+    return lines.joinToString("\n")
+}

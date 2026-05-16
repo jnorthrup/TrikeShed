@@ -1,6 +1,5 @@
 package borg.trikeshed.miniduck.manifold
 
-import borg.trikeshed.context.AsyncContextElement
 import borg.trikeshed.lib.Series
 import borg.trikeshed.manifold.ManifoldConcept
 import kotlinx.coroutines.CompletableJob
@@ -8,143 +7,78 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.withContext
 import kotlin.coroutines.CoroutineContext
-import java.util.LinkedList
 
 /**
  * ManifoldElement — CCEK element that is the seating foundation for the NARS3 deriver.
  *
  * Three independent SupervisorJob branches, one per axis:
- *   shapeBranch  — RowVec family routing, block-level I/O dispatch
- *   timeBranch   — WAL seq / lifecycle sealing / NARS3 belief revision
- *   accessBranch — cache-aligned span seeks, index topology
+ *   - timeBranch: temporal reasoning cycles
+ *   - shapeBranch: spatial/conceptual clustering
+ *   - accessBranch: attention/priority filtering
  *
- * Invariant: no axis owns another.
- *   - Sibling branch failure is isolated (SupervisorJob semantics).
- *   - Shared parent lifecycle (open → drain → close) governs all three together.
- *
- * NARS3 deriver: derive() fires inference coroutines under timeBranch.
- * Each NAL operation becomes a child coroutine; failures don't cascade.
- * Results flow back via [onDerived] — the caller decides what to do with them.
- *
- * For full NAL-level fanout, pass a Series<DeriverStep> to deriveAll() which
- * fans out across NAL levels as concurrent children of timeBranch.
+ * Each branch operates with its own CoroutineContext derived from the
+ * element's base context and the axis-specific seed.
  */
-class ManifoldElement(parentJob: Job? = null) : AsyncContextElement(parentJob = parentJob) {
+class ManifoldElement<P>(
+    private val elementContext: CoroutineContext,
+    private val elementConcept: ManifoldConcept<P>,
+) {
 
-    companion object Key : CoroutineContext.Key<ManifoldElement>
+    private val timeBranchJob: CompletableJob = SupervisorJob()
+    private val shapeBranchJob: CompletableJob = SupervisorJob()
+    private val accessBranchJob: CompletableJob = SupervisorJob()
 
-    override val key: CoroutineContext.Key<*> get() = Key
-
-    /** Shape branch: RowVec family / block dispatch */
-    val shapeBranch: CompletableJob = SupervisorJob(supervisor)
-
-    /** Time branch: WAL sealing + NARS3 belief deriver */
-    val timeBranch: CompletableJob = SupervisorJob(supervisor)
-
-    /** Access branch: topology, cache spans, index seeks */
-    val accessBranch: CompletableJob = SupervisorJob(supervisor)
-
-    private fun branchScope(scope: CoroutineScope, branch: Job): CoroutineScope =
-        CoroutineScope(scope.coroutineContext.minusKey(Job) + branch)
-
-    private fun branchContext(scope: CoroutineScope, branch: Job): CoroutineContext =
-        scope.coroutineContext.minusKey(Job) + branch
+    val timeBranchContext: CoroutineContext = elementContext + timeBranchJob
+    val shapeBranchContext: CoroutineContext = elementContext + shapeBranchJob
+    val accessBranchContext: CoroutineContext = elementContext + accessBranchJob
 
     /**
-     * Dispatch a MiniDuckPoint to its branches.
-     * Each handler runs as an independent child coroutine of its branch.
-     * A null handler means that axis is not participating for this point.
-     */
-    suspend fun dispatch(
-        point: MiniDuckPoint,
-        scope: CoroutineScope,
-        onShape: (suspend (MiniDuckPoint) -> Unit)? = null,
-        onTime: (suspend (MiniDuckPoint) -> Unit)? = null,
-        onAccess: (suspend (MiniDuckPoint) -> Unit)? = null,
-    ) {
-        if (onShape != null) branchScope(scope, shapeBranch).launch { onShape(point) }
-        if (onTime  != null) branchScope(scope, timeBranch).launch { onTime(point) }
-        if (onAccess != null) branchScope(scope, accessBranch).launch { onAccess(point) }
-    }
-
-    /**
-     * NARS3 single-step deriver: apply one decay+reinforce cycle under timeBranch.
-     * Concepts that drop below energy threshold are not forwarded.
-     *
-     * This is the minimal deriver atom — deriveAll() fans across NAL steps.
-     */
-    suspend fun <P> derive(
-        concept: ManifoldConcept<P>,
-        scope: CoroutineScope,
-        energyFloor: Float = 0.05f,
-        decayFactor: Float = 0.9f,
-        onDerived: (ManifoldConcept<P>) -> Unit,
-    ) {
-        withContext(branchContext(scope, timeBranch)) {
-            val derived = concept.decay(decayFactor)
-            if (derived.budget.energy() >= energyFloor) {
-                onDerived(derived)
-            }
-        }
-    }
-
-    /**
-     * NARS3 multi-step deriver: fan out across a Series of deriver steps,
-     * each running as an independent child of timeBranch.
-     *
-     * A DeriverStep transforms a concept and calls back with results.
      * NAL levels, revision, choice, deduction etc. each become one step.
      */
-    suspend fun <P> deriveAll(
-        concept: ManifoldConcept<P>,
+    suspend fun deriveAll(
         steps: Series<DeriverStep<P>>,
         scope: CoroutineScope,
         onDerived: (ManifoldConcept<P>) -> Unit,
     ) {
         supervisorScope {
-            val branch = branchContext(scope, timeBranch)
-            val children = LinkedList<kotlinx.coroutines.Deferred<Unit>>(steps.a)
-            for (i in 0 until steps.a) {
-                val step = steps.b(i)
-                children += async(branch) {
-                    step.apply(concept, onDerived)
-                }
+            val branch = branchContext(scope, timeBranchJob)
+            val n = steps.a
+            val stepList: List<DeriverStep<P>> = buildList {
+                for (i in 0 until n) add(steps.b(i))
             }
-            for (child in children) {
-                runCatching { child.await() }
+            for (i in 0 until n) {
+                val step: DeriverStep<P> = stepList[i]
+                val deferred = async(branch) {
+                    step.apply(elementConcept, onDerived)
+                }
+                runCatching { deferred.await() }
             }
         }
     }
 
-    override suspend fun close() {
-        shapeBranch.complete()
-        timeBranch.complete()
-        accessBranch.complete()
-        super.close()
+    fun close() {
+        shapeBranchJob.cancel()
+        timeBranchJob.cancel()
+        accessBranchJob.cancel()
     }
+
+    private fun branchContext(scope: CoroutineScope, branch: Job): CoroutineContext =
+        scope.coroutineContext + branch
+
+    suspend fun <T> withTimeBranch(block: suspend CoroutineScope.() -> T): T =
+        withContext(timeBranchContext, block)
+
+    suspend fun <T> withShapeBranch(block: suspend CoroutineScope.() -> T): T =
+        withContext(shapeBranchContext, block)
+
+    suspend fun <T> withAccessBranch(block: suspend CoroutineScope.() -> T): T =
+        withContext(accessBranchContext, block)
 }
 
-/**
- * A single NARS3 inference step: transforms a concept and emits derived concepts.
- * Kept as a functional interface so NAL levels compose without coupling to ManifoldElement.
- */
-fun interface DeriverStep<P> {
-    suspend fun apply(concept: ManifoldConcept<P>, emit: (ManifoldConcept<P>) -> Unit)
+/** Deriver step — one inference cycle. */
+interface DeriverStep<P> {
+    fun apply(concept: ManifoldConcept<P>, onDerived: (ManifoldConcept<P>) -> Unit)
 }
-
-/** Built-in step: temporal decay — models belief aging over time. */
-fun <P> decayStep(factor: Float = 0.9f, floor: Float = 0.05f): DeriverStep<P> =
-    DeriverStep { concept, emit ->
-        val next = concept.decay(factor)
-        if (next.budget.energy() >= floor) emit(next)
-    }
-
-/** Built-in step: angular projection — remaps concept to a different identity region. */
-fun <P> angularShiftStep(shift: Long): DeriverStep<P> =
-    DeriverStep { concept, emit ->
-        emit(ManifoldConcept(concept.angular xor shift, concept.budget, concept.payload))
-    }

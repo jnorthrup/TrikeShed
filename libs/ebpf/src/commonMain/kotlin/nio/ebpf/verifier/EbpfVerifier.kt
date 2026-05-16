@@ -36,7 +36,7 @@ fun verifyProgram(program: EbpfProgram): VerifierResult {
     if (program.size() == 0) return VerifierResult.Failure(0, "empty program", emptyList())
     if (program.size() > 0xFFFF) return VerifierResult.Failure(0, "program too large", emptyList())
 
-    val traces = mutableListOf<VerifierTrace>()
+    val traces = LongSeries.build { it += <VerifierTrace>() })
     val reachable = BooleanArray(program.size())
     reachable[0] = true
     val queue = ArrayDeque<Int>().apply { add(0) }
@@ -86,7 +86,7 @@ private fun successors(pc: Int, opcode: Byte, inst: EbpfInstruction, size: Int):
 }
 
 private fun checkInst(inst: EbpfInstruction, state: VerifierState): List<String> {
-    val errors = mutableListOf<String>()
+    val errors = LongSeries.build { it += <String>() })
     val dr = inst.dstReg(); val sr = inst.srcReg()
     if (state.registers[dr].type is RegType.NotInitialized) errors += "R$dr used uninitialized"
     if (sr != 0 && state.registers[sr].type is RegType.NotInitialized) errors += "R$sr used uninitialized"

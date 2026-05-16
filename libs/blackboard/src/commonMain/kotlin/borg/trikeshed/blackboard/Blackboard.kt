@@ -22,7 +22,10 @@ data class AgentId(val bytes: ByteArray) {
 data class VectorClock(val clocks: Map<AgentId, Long> = emptyMap()) {
     fun increment(author: AgentId) = VectorClock(clocks + (author to (clocks[author] ?: 0) + 1))
     fun merge(other: VectorClock) = VectorClock(
-        clocks.toMutableMap().apply { other.clocks.forEach { (k, v) -> this[k] = maxOf(this[k] ?: 0, v) } }
+        buildMap(clocks.size + other.clocks.size) {
+            putAll(clocks)
+            other.clocks.forEach { (k, v) -> this[k] = maxOf(this[k] ?: 0, v) }
+        }
     )
     fun isAfter(other: VectorClock) = clocks.all { (k, v) -> v >= (other.clocks[k] ?: 0) } && clocks != other.clocks
 }
@@ -94,9 +97,9 @@ class Room(
     val name: String,
     val replicationRing: RingLevel = 2,
 ) {
-    private val facts = mutableMapOf<String, Fact>()
-    private val subscriptions = mutableListOf<Subscription>()
-    private val triggers = mutableListOf<Trigger>()
+    private val facts = linkedMapOf<String, Fact>()
+    private val subscriptions = arrayListOf<Subscription>()
+    private val triggers = arrayListOf<Trigger>()
     private val writeLock = Semaphore(1)
     private val roomScope = CoroutineScope(SupervisorJob() + CoroutineName("BlackboardRoom-$name"))
 
@@ -167,8 +170,8 @@ class Room(
 class Blackboard(
     val agent: Agent,
 ) {
-    private val rooms = mutableMapOf<String, Room>()
-    private val roomChannels = mutableMapOf<String, Channel<Fact>>()
+    private val rooms = linkedMapOf<String, Room>()
+    private val roomChannels = linkedMapOf<String, Channel<Fact>>()
 
     init { Room.blackboardRef = this }
 

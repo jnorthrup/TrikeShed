@@ -26,7 +26,6 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
-import java.util.LinkedList
 
 /** A spawnable unit of work — ephemeral, single-use. */
 data class SpawnSpec(

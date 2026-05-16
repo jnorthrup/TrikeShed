@@ -72,7 +72,7 @@ object Nars3PolyglotBridge {
     }
 
     fun astToArenaChain(ast: UniversalAst): Series<Nars3Atom> {
-        val atoms = mutableListOf<Nars3Atom>()
+        val atoms: SeriesBuffer<Nars3Atom> = SeriesBuffer()
         val defaultBudget = Nars3Budget(0.5f, 0.5f, 0.5f)
 
         fun walk(node: SourceFragment) {
@@ -81,6 +81,6 @@ object Nars3PolyglotBridge {
         }
 
         walk(ast.root)
-        return atoms.toSeries()
+        return atoms.size j { atoms[it] }
     }
 }

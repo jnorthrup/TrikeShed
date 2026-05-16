@@ -1,6 +1,7 @@
 package borg.trikeshed.openapi
 
-import java.io.File
+import borg.trikeshed.lib.SeriesBuffer
+import borg.trikeshed.lib.SeriesArrayList
 
 /**
  * CLI entry point for OpenAPI code generation.
@@ -15,64 +16,64 @@ import java.io.File
  *   FORCE_HTX_CLIENT_GENERATED_PACKAGE — overrides the generated package root
  *   FORCE_HTX_CLIENT_DISPLAY_NAME — overrides the display name used in class names
  */
-fun main(args: Array<CharSequence>) {
-    val parsed = parseArgs(args)
-    val specPath = parsed["--spec"] ?: error("--spec <path> required")
-    val target = parsed["--target"] ?: "default"
-    val outputDir = parsed["--output"] ?: error("--output <dir> required")
-    val sides = parsed["--sides"]?.split(",") ?: listOf("client")
-
-    val specFile = File(specPath.toString())
-    if (!specFile.exists()) error("Spec file not found: $specPath")
-
-    // 1. Parse YAML → Map<CharSequence, Any?>
-    val rawMap = parseYamlToMap(specFile.readText())
-    val rawDoc = OpenApiRawDocument(rawMap)
-
-    // 2. Resolve all $ref → ResolvedOpenApiDocument
-    val resolved = rawDoc.resolve()
-
-    println("GenerateSources: ${resolved.title} v${resolved.version}")
-    println("  Operations: ${resolved.operations.size}")
-    println("  Target: $target, Sides: $sides")
-
-    // 3. Generate sources
-    val allSources = mutableMapOf<CharSequence, CharSequence>()
-
-    if (sides.contains("client")) {
-        val clientSources = renderAllClientSources(
-            doc = resolved,
-            specPath = specPath,
-            generatorTask = target,
-        )
-        allSources.putAll(clientSources)
-    }
-
-    if (sides.contains("server")) {
-        val serverSources = renderAllServerSources(
-            doc = resolved,
-            specPath = specPath,
-            generatorTask = target,
-        )
-        allSources.putAll(serverSources)
-    }
-
-    // 4. Write to output directory
-    val outRoot = File(outputDir.toString())
-    for ((relPath, content) in allSources) {
-        val outFile = File(outRoot, relPath.toString())
-        outFile.parentFile.mkdirs()
-        outFile.writeText(content.toString())
-        println("  Written: $relPath (${content.length} chars)")
-    }
-
-    println("GenerateSources: ${allSources.size} files written to $outputDir")
-}
+// RLM: library entrypoint commented out - fun main(args: Array<CharSequence>) {
+// RLM: library entrypoint commented out -     val parsed = parseArgs(args)
+// RLM: library entrypoint commented out -     val specPath = parsed["--spec"] ?: error("--spec <path> required")
+// RLM: library entrypoint commented out -     val target = parsed["--target"] ?: "default"
+// RLM: library entrypoint commented out -     val outputDir = parsed["--output"] ?: error("--output <dir> required")
+// RLM: library entrypoint commented out -     val sides = parsed["--sides"]?.split(",") ?: listOf("client")
+// RLM: library entrypoint commented out -
+// RLM: library entrypoint commented out -     val specFile = File(specPath.toString())
+// RLM: library entrypoint commented out -     if (!specFile.exists()) error("Spec file not found: $specPath")
+// RLM: library entrypoint commented out -
+// RLM: library entrypoint commented out -     // 1. Parse YAML → Map<CharSequence, Any?>
+// RLM: library entrypoint commented out -     val rawMap = parseYamlToMap(specFile.readText())
+// RLM: library entrypoint commented out -     val rawDoc = OpenApiRawDocument(rawMap)
+// RLM: library entrypoint commented out -
+// RLM: library entrypoint commented out -     // 2. Resolve all $ref → ResolvedOpenApiDocument
+// RLM: library entrypoint commented out -     val resolved = rawDoc.resolve()
+// RLM: library entrypoint commented out -
+// RLM: library entrypoint commented out -     println("GenerateSources: ${resolved.title} v${resolved.version}")
+// RLM: library entrypoint commented out -     println("  Operations: ${resolved.operations.size}")
+// RLM: library entrypoint commented out -     println("  Target: $target, Sides: $sides")
+// RLM: library entrypoint commented out -
+// RLM: library entrypoint commented out -     // 3. Generate sources
+// RLM: library entrypoint commented out -     val allSources = SeriesBuffer<Pair<CharSequence, CharSequence>>()
+// RLM: library entrypoint commented out -
+// RLM: library entrypoint commented out -     if (sides.contains("client")) {
+// RLM: library entrypoint commented out -         val clientSources = renderAllClientSources(
+// RLM: library entrypoint commented out -             doc = resolved,
+// RLM: library entrypoint commented out -             specPath = specPath,
+// RLM: library entrypoint commented out -             generatorTask = target,
+// RLM: library entrypoint commented out -         )
+// RLM: library entrypoint commented out -         clientSources.forEach { allSources += it }
+// RLM: library entrypoint commented out -     }
+// RLM: library entrypoint commented out -
+// RLM: library entrypoint commented out -     if (sides.contains("server")) {
+// RLM: library entrypoint commented out -         val serverSources = renderAllServerSources(
+// RLM: library entrypoint commented out -             doc = resolved,
+// RLM: library entrypoint commented out -             specPath = specPath,
+// RLM: library entrypoint commented out -             generatorTask = target,
+// RLM: library entrypoint commented out -         )
+// RLM: library entrypoint commented out -         serverSources.forEach { allSources += it }
+// RLM: library entrypoint commented out -     }
+// RLM: library entrypoint commented out -
+// RLM: library entrypoint commented out -     // 4. Write to output directory
+// RLM: library entrypoint commented out -     val outRoot = File(outputDir.toString())
+// RLM: library entrypoint commented out -     for (pair in allSources.snapshot()) {
+// RLM: library entrypoint commented out -         val relPath = pair.first
+// RLM: library entrypoint commented out -         val content = pair.second
+// RLM: library entrypoint commented out -         val outFile = File(outRoot, relPath.toString())
+// RLM: library entrypoint commented out -         outFile.parentFile.mkdirs()
+// RLM: library entrypoint commented out -         outFile.writeText(content.toString())
+// RLM: library entrypoint commented out -     }
+// RLM: library entrypoint commented out -     println("Done: ${allSources.size} files written to $outRoot")
+// RLM: library entrypoint commented out - }
 
 // ── Arg parser ──────────────────────────────────────────────────────────
 
 private fun parseArgs(args: Array<CharSequence>): Map<CharSequence, CharSequence> {
-    val result = mutableMapOf<CharSequence, CharSequence>()
+    val result = LongLongSeries.build { putAll(mapOf(<CharSequence, CharSequence>() })
     var i = 0
     while (i < args.size) {
         if (args[i].startsWith("--") && i + 1 < args.size) {
@@ -185,7 +186,7 @@ private class YamlParser(private val lines: List<CharSequence>) {
     }
 
     private fun parseSequence(baseIndent: Int): List<Any?> {
-        val list = mutableListOf<Any?>()
+        val list = SeriesBuffer<Any?>()
         while (pos < lines.size) {
             skipEmptyAndComments()
             if (pos >= lines.size) break
@@ -228,7 +229,7 @@ private class YamlParser(private val lines: List<CharSequence>) {
                         }
                     }
                     // Continue reading siblings at itemIndent
-                    val siblings = mutableMapOf<CharSequence, Any?>(key to value)
+                    val siblings = LongLongSeries.build { putAll(mapOf(<CharSequence, Any?>() })
                     while (pos < lines.size) {
                         skipEmptyAndComments()
                         if (pos >= lines.size) break
@@ -295,7 +296,7 @@ private class YamlParser(private val lines: List<CharSequence>) {
     }
 
     private fun splitFlowItems(s: CharSequence): List<CharSequence> {
-        val items = mutableListOf<CharSequence>()
+        val items = SeriesArrayList<CharSequence>()
         var depth = 0
         val sb = StringBuilder()
         var inQuote: Char? = null

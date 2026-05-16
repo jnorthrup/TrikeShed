@@ -9,14 +9,14 @@ package borg.trikeshed.cpucache
  *   - --mlir: MLIR assembly format (cpu_cache dialect)
  *   - --llvm: LLVM dialect MLIR module (sysconf calls)
  */
-fun main(args: Array<String>) {
-    val topology = interrogateCpuCache()
+// RLM: library entrypoint commented out - fun main(args: Array<String>) {
+// RLM: library entrypoint commented out -     val topology = interrogateCpuCache()
 
-    val output = when {
-        args.isNotEmpty() && args[0] == "--mlir" -> topology.asMlir
-        args.isNotEmpty() && args[0] == "--llvm" -> CpuCacheMlir.toLlvmDialrectModule(topology)
-        else -> topology.toConfix()
-    }
-
-    println(output)
-}
+    // RLM: library entrypoint commented out - val topology = interrogateCpuCache()
+// RLM: library entrypoint commented out -     val output = when {
+// RLM: library entrypoint commented out -         args.isNotEmpty() && args[0] == "--mlir" -> topology.asMlir
+// RLM: library entrypoint commented out -         args.isNotEmpty() && args[0] == "--llvm" -> CpuCacheMlir.toLlvmDialrectModule(topology)
+// RLM: library entrypoint commented out -         else -> topology.toConfix()
+// RLM: library entrypoint commented out -     }
+// RLM: library entrypoint commented out -     println(output)
+//}

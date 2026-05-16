@@ -1,6 +1,6 @@
 package borg.trikeshed.couch.api
 
-import borg.trikeshed.couch.internal.urlEncode
+import borg.trikeshed.couch.internal.urlencode
 import java.util.LinkedList
 
 /**
@@ -31,7 +31,7 @@ object ViewQueryEncoder {
         return parts.joinToString("&")
     }
 
-   fun urlencode(s: CharSequence): CharSequence = urlEncode(s)
+   fun urlEncode(s: CharSequence): CharSequence = urlencode(s)
 
     /**
      * Convert a Kotlin value to its JSON representation for CouchDB query params.

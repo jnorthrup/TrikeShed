@@ -26,7 +26,7 @@ import kotlin.random.Random
  * ```
  */
 class CommonTlsClientHandshake(
-    private val sha256: borg.trikeshed.userspace.nio.tls.codec.hash.Sha256,
+    private val sha256: borg.trikeshed.userspace.nio.spi.digest.Sha256,
     private val x25519: borg.trikeshed.userspace.nio.tls.codec.ecdh.X25519,
     private val hkdf: borg.trikeshed.userspace.nio.tls.codec.kdf.HkdfSha256,
     private val recordCodec: TlsRecordCodec,

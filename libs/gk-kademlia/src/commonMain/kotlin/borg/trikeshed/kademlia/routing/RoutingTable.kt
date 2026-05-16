@@ -1,23 +1,29 @@
 package borg.trikeshed.kademlia.routing
 import borg.trikeshed.lib.Join
-import borg.trikeshed.lib.`↺`
 import borg.trikeshed.kademlia.id.NUID
 import borg.trikeshed.kademlia.include.Address
 import borg.trikeshed.kademlia.include.Route
 import borg.trikeshed.kademlia.net.NetMask
 import kotlin.math.min
+
+// Left identity function — returns the key unchanged.
+@Suppress("UNUSED")
+private fun <T> identityLeft(t: T): T = t
+
 open class RoutingTable<TNum : Comparable<TNum>, Sz : NetMask<TNum>>(
     val agentNUID: NUID<TNum>, val optimal: Boolean = false,
 ) {
     private val bitOps = agentNUID.ops
-    fun addRoute(other: Route<TNum>): Join<NUID<TNum>, Address>? = other.let { (g: NUID<TNum>) ->
+    fun addRoute(other: Route<TNum>): Join<NUID<TNum>, Address>? = other.let { route ->
+        val g: NUID<TNum> = route.a as NUID<TNum>
         min(agentNUID.netmask.distance(agentNUID.id!!, g.id!!), bucketCount).let {
             if (it > 0)
-                buckets[it.dec()].getOrPut(g.id!!, other.`↺`)
+                buckets[it.dec()].getOrPut(g.id!!) { route }
             else null
         }
     }
-    fun rmRoute(other: Route<TNum>): Join<NUID<TNum>, Address>? = other.let { (g: NUID<TNum>) ->
+    fun rmRoute(other: Route<TNum>): Join<NUID<TNum>, Address>? = other.let { route ->
+        val g: NUID<TNum> = route.a as NUID<TNum>
         agentNUID.netmask.distance(agentNUID.id!!, g.id!!).let { origDistance ->
             if (origDistance > 0)
                 buckets.takeIf { it.isNotEmpty() }?.get(min(bucketCount, origDistance.dec()))?.remove(g.id!!)

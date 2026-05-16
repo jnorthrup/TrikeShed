@@ -2,7 +2,7 @@ package dev.jnorthrup.ngsctp
 
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.*
-import java.nio.ByteBuffer
+import borg.trikeshed.userspace.nio.ByteBuffer
 
 /**
  * ngSCTP Stream - Structured concurrency channel for ordered message delivery

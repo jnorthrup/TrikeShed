@@ -1,6 +1,6 @@
 package dev.jnorthrup.ngsctp
 
-import java.nio.ByteBuffer
+import borg.trikeshed.userspace.nio.ByteBuffer
 
 /**
  * ngSCTP Chunk definitions using TLV (Type-Length-Value) format
@@ -160,7 +160,7 @@ sealed interface NgChunk {
             val fixedParam = buffer.getInt().toUInt()
 
             // Parse variable parameters (TLV)
-            val params = mutableListOf<SctpParameter>()
+            val params = LongSeries.build { it += <SctpParameter>() })
             var offset = 16
             while (offset < length.toInt()) {
                 val paramType = buffer.getShort().toUShort()
@@ -218,7 +218,7 @@ sealed interface NgChunk {
             val numDupTsns = buffer.getShort().toUShort()
 
             // Parse gap ack blocks
-            val gapBlocks = mutableListOf<Pair<UShort, UShort>>()
+            val gapBlocks = LongSeries.build { it += <Pair<UShort, UShort>>() })
             repeat(numGapBlocks.toInt()) {
                 val start = buffer.getShort().toUShort()
                 val end = buffer.getShort().toUShort()
@@ -226,7 +226,7 @@ sealed interface NgChunk {
             }
 
             // Parse duplicate TSNs
-            val dupTsns = mutableListOf<UInt>()
+            val dupTsns = LongSeries.build { it += <UInt>() })
             repeat(numDupTsns.toInt()) {
                 dupTsns.add(buffer.getInt().toUInt())
             }
@@ -589,7 +589,7 @@ data class NgChunk_ForwardTsn(
             buffer.get() // length high byte already handled
             val cumulativeTSN = buffer.getUInt()
 
-            val streamMappings = mutableListOf<StreamMapping>()
+            val streamMappings = LongSeries.build { it += <StreamMapping>() })
             var remaining = length.toInt() - 8
             while (remaining >= 4) {
                 val streamId = buffer.getUShort()
@@ -998,8 +998,8 @@ data data class NgChunk_ReConfig(
 
     companion object {
         fun parse(buffer: ByteBuffer, length: UShort): NgChunk_ReConfig {
-            val requests = mutableListOf<ReConfigRequest>()
-            val responses = mutableListOf<ReConfigResponse>()
+            val requests = LongSeries.build { it += <ReConfigRequest>() })
+            val responses = LongSeries.build { it += <ReConfigResponse>() })
             var remaining = length.toInt() - 4
 
             while (remaining >= 8) {
@@ -1020,7 +1020,7 @@ data data class NgChunk_ReConfig(
                     responses.add(ReConfigResponse(configType, 0u, result, seqNum))
                 } else {
                     val numStreams = (reqLen.toInt() - 8) / 2
-                    val streamIds = mutableListOf<UShort>()
+                    val streamIds = LongSeries.build { it += <UShort>() })
                     repeat(numStreams) {
                         streamIds.add(buffer.getShort().toUShort())
                     }
@@ -1117,7 +1117,7 @@ data class NgChunk_Asconf(
     companion object {
         fun parse(buffer: ByteBuffer, length: UShort): NgChunk_Asconf {
             val serial = buffer.getInt().toUInt()
-            val params = mutableListOf<AsconfParameter>()
+            val params = LongSeries.build { it += <AsconfParameter>() })
             var remaining = length.toInt() - 8
 
             while (remaining >= 8) {
@@ -1198,7 +1198,7 @@ data class NgChunk_AsconfAck(
     companion object {
         fun parse(buffer: ByteBuffer, length: UShort): NgChunk_AsconfAck {
             val serial = buffer.getInt().toUInt()
-            val params = mutableListOf<AsconfResponseParameter>()
+            val params = LongSeries.build { it += <AsconfResponseParameter>() })
             var remaining = length.toInt() - 8
 
             while (remaining >= 8) {

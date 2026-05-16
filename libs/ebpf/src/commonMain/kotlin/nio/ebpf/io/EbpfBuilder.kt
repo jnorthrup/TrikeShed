@@ -3,7 +3,7 @@ package nio.ebpf.io
 import nio.ebpf.types.*
 
 class EbpfBuilder {
-    internal val instructions = mutableListOf<Long>()
+    internal val instructions = LongSeries.build { it += <Long>() })
 
     fun add(src: Reg, dst: Reg) =
         alu(0x0f, dst.index, src.index)

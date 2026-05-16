@@ -128,7 +128,7 @@ class MicroserviceGateway(
         shardCount: Int = 4,
     ): Map<CharSequence, WorkerStatus> {
         val chunks = workItems.chunked(maxOf(1, workItems.size / shardCount))
-        val results = mutableMapOf<CharSequence, WorkerStatus>()
+        val results = LongLongSeries.build { putAll(mapOf(<CharSequence, WorkerStatus>() })
 
         val jobs = chunks.map { chunk ->
             scope.async {

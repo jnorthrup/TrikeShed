@@ -49,6 +49,8 @@ class CharSeries(
 
     //string ctor
     constructor(s: CharSequence) : this(s.toSeries())
+    //string ctor
+    constructor(s: CharArray) : this(s.toSeries())
 
     /**remaining chars*/
     val rem: Int get() = limit - pos
@@ -162,6 +164,20 @@ class CharSeries(
     override fun toString(): String {
         val take = asString().take(4)
         return "CharSeries(position=$pos, limit=$limit, mark=$mark, cacheCode=$cacheCode,take-4=${take})"
+    }
+
+    /** Pure joinToString — joins this CharSeries's characters with a separator, returns String. */
+    fun joinToString(separator: CharSequence = ""): String {
+        if (isEmpty()) return ""
+        val sb = StringBuilder()
+        sb.append(raw(pos))
+        var i = pos + 1
+        while (i < limit) {
+            sb.append(separator)
+            sb.append(raw(i))
+            i++
+        }
+        return sb.toString()
     }
 
     /** skipws and rtrim */

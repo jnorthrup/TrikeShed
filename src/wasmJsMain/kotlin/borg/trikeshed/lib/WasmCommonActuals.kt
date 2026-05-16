@@ -282,9 +282,9 @@ fun mkdir(path: CharSequence): Boolean {
     return true
 }
 
-fun readLinesSeq(path: CharSequence): Sequence<CharSequence> = Files.readAllLines(path).asSequence()
+fun readLinesSeq(path: CharSequence): Sequence<CharSequence> = emptySequence()
 
-fun readLines(path: CharSequence): List<CharSequence> = Files.readAllLines(path)
+fun readLines(path: CharSequence): List<CharSequence> = emptyList()
 actual fun platformSeekHandle(): SeekHandle = WasmBrowserSeekHandle
 
 actual fun ioUringHandle(): SeekHandle? = null

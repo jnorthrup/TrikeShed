@@ -356,11 +356,11 @@ class SendBuffer(
      * Mark chunks as acknowledged (cumulative and gap acks)
      */
     fun ackChunks(cumulativeAck: UInt, gapAcks: List<Pair<UInt, UInt>>): List<PendingChunk> {
-        val acked = mutableListOf<PendingChunk>()
+        val acked = LongSeries.build { it += <PendingChunk>() })
         val cumAckInt = cumulativeAck.toInt()
 
         // First, check if cumulative ACK advances
-        val toRemove = mutableListOf<Int>()
+        val toRemove = LongSeries.build { it += <Int>() })
 
         for ((tsn, chunk) in outstanding) {
             if (tsn <= cumAckInt) {

@@ -1,8 +1,11 @@
+@file:Suppress("UNCHECKED_CAST")
+
 package borg.trikeshed.miniduck
 
 import borg.trikeshed.cursor.*
 import borg.trikeshed.lib.*
-import java.util.LinkedList
+import borg.trikeshed.lib.mutable.SeriesBuffer
+
 /** Equality predicate for Cursor.where. */
 fun Eq(column: CharSequence, value: Any?): (RowVec) -> Boolean = { it.getValue(column) == value }
 
@@ -31,8 +34,6 @@ private fun compareComparableValues(left: Comparable<*>, right: Any): Int =
 
 /** Filter rows by predicate. */
 fun Cursor.where(predicate: (RowVec) -> Boolean): Cursor {
-    // Two-pass: count matches, then compact into IntArray for O(1) random access.
-    // This avoids List<RowVec> allocation (only stores int indices, not references + object headers).
     var count = 0
     val bitmap = BooleanArray(size)
     for (i in 0 until size) {
@@ -202,60 +203,38 @@ object Agg {
 fun Cursor.groupBy(keyColumn: CharSequence, vararg aggregations: Aggregation): Cursor {
     if (size == 0) return this
 
-    val groups = LinkedHashMap<Any?, LinkedList<Accumulator>>()
-    val groupOrder = LinkedList<Any?>()
+    val groups: SeriesBuffer<Pair<Any?, SeriesBuffer<Accumulator>>> = SeriesBuffer()
+    val groupOrder: SeriesBuffer<Any?> = SeriesBuffer()
 
     for (i in 0 until size) {
         val row = at(i)
         val key = row.getValue(keyColumn)
-        if (key !in groups) groupOrder.add(key)
-        val accumulators = groups.getOrPut(key) { aggregations.map { it.createAccumulator() }.toMutableList() }
+        val existingGroup = groups.view.find { it.first == key }
+        val accumulators: SeriesBuffer<Accumulator>
+        if (existingGroup != null) {
+            accumulators = existingGroup.second
+        } else {
+            groupOrder.add(key)
+            accumulators = SeriesBuffer()
+            groups.add(key to accumulators)
+        }
+        if (accumulators.size == 0) aggregations.forEach { accumulators.add(it.createAccumulator()) }
         aggregations.forEachIndexed { index, agg ->
             val value = if (agg.targetColumn == "*") null else row.getValue(agg.targetColumn)
             accumulators[index].add(value)
         }
     }
 
-    val resultRows = groupOrder.map { key ->
-        val accs = groups[key]!!
+    val resultRows: SeriesBuffer<RowVec> = SeriesBuffer()
+    for (idx in 0 until groupOrder.size) {
+        val key = groupOrder[idx]
+        val accs = groups.view.find { it.first == key }!!.second
         val keys = (aggregations.size + 1) j { i: Int -> if (i == 0) keyColumn else aggregations[i - 1].outputColumn }
         val cells = (aggregations.size + 1) j { i: Int -> if (i == 0) key else accs[i - 1].getResult() }
-        DocRowVec(keys, cells)
+        resultRows.add(DocRowVec(keys, cells))
     }
 
-    return resultRows.size j { resultRows[it].toRowVec() }
-}
-
-/** Hash join with another cursor. */
-fun Cursor.hashJoin(other: Cursor, leftKey: CharSequence, rightKey: CharSequence): Cursor {
-    if (this.size == 0 || other.size == 0) return emptyCursor()
-
-    val rightIndex = LinkedHashMap<Any?, LinkedList<RowVec>>()
-    for (i in 0 until other.size) {
-        val row = other.at(i)
-        val key = row.getValue(rightKey)
-        if (key != null) {
-            rightIndex.getOrPut(key) { LinkedList() }.add(row)
-        }
-    }
-
-    // Pre-allocate result list to avoid resizing
-    val resultRows = LinkedList<RowVec>(this.size * 2)
-    // LinkedHashSet for O(1) join-key dedup across left columns
-    for (i in 0 until this.size) {
-        val leftRow = this.at(i)
-        val key = leftRow.getValue(leftKey)
-        val matches = rightIndex[key] ?: continue
-        for (rightRow in matches) {
-            val keys = LinkedList<CharSequence>()
-            val cells = LinkedList<Any?>()
-            appendRowData(keys, cells, leftRow)
-            appendJoinedRowData(keys, cells, rightRow, rightKey.toString())
-            resultRows.add(DocRowVec(keys, cells))
-        }
-    }
-
-    return resultRows.size j { resultRows[it] }
+    return resultRows.size j { i: Int -> resultRows[i] as RowVec }
 }
 
 /** Join alias. */
@@ -352,7 +331,7 @@ private fun copiedChild(row: RowVec): Series<RowVec>? = when (row) {
     else -> null
 }
 
-private fun appendRowData(keys: LinkedList<  CharSequence>, cells: LinkedList<Any?>, row: RowVec) {
+private fun appendRowData(keys: SeriesBuffer<CharSequence>, cells: SeriesBuffer<Any?>, row: RowVec) {
     when (row) {
         is DocRowVec -> {
             for (i in 0 until row.size) {
@@ -369,19 +348,18 @@ private fun appendRowData(keys: LinkedList<  CharSequence>, cells: LinkedList<An
     }
 }
 
-private fun appendJoinedRowData(keys: LinkedList<CharSequence>, cells: LinkedList<Any?>, row: RowVec, joinKey: CharSequence) {
+private fun appendJoinedRowData(keys: SeriesBuffer<CharSequence>, cells: SeriesBuffer<Any?>, row: RowVec, joinKey: CharSequence) {
     when (row) {
         is DocRowVec -> {
-            // Build a LinkedHashSet of already-emitted key names for O(1) dedup
-            val existingKeys = keys.toHashSet()
+            val existingKeys: SeriesBuffer<String> = SeriesBuffer()
             for (i in 0 until row.keys.size) {
                 val key = row.keys[i]
-                if (key == joinKey || key in existingKeys) continue
-                existingKeys.add(key)
+                val keyStr = key.toString()
+                if (key == joinKey || existingKeys.view.find { it == keyStr } != null) continue
+                existingKeys.add(keyStr)
                 keys.add(key)
                 cells.add(row.cells[i])
             }
         }
-        else -> appendRowData(keys, cells, row)
     }
 }
