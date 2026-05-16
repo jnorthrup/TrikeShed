@@ -37,7 +37,7 @@ The four shape families below are **specific instantiations** of this nesting at
 
 ---
 
-## Shape Family 0: IO⁺-Reactor⁺-Protocol⁺-Parser Shapes (CCEK)
+## Shape Family 0: IO (+-) Reactor (+-) Protocol (+-) Parser Shapes (CCEK)
 
 > *The scope tree IS the parse tree. The reactor tree IS the IO tree. Both are MetaSeries-of-MetaSeries with forward-only lifecycle and structured fanout — and they subsume Families 1–3 as context-carried algebra.*
 
@@ -68,35 +68,6 @@ typealias ContextShape<K, E> = MetaSeries<K, E?>
 //   and   E = CoroutineContext.Element
 //   .a = Key (the discriminant)
 //   .b = ctx[key] (the lookup oracle — returns E? by identity)
-```
-
-### CCEK as Dependency Injection Isomorphism
-
-CCEK is strongly **Dependency Injection isomorphic**. The `Key→Element` relationship is the nexus of all statics, consts, enums, factories, and utilities — and it is mobile throughout accessibility and visibility within coroutine scope bounds:
-
-| DI Concept | CCEK Equivalent | Why isomorphic |
-|-----------|----------------|---------------|
-| **Service registry** | `CoroutineContext` (fold of Elements) | Both are key→value maps resolved at lookup time |
-| **Binding key** | `companion object Key : CoroutineContext.Key<E>` | Both are singleton identity objects (`===`) that parameterize the service type |
-| **Scoped singleton** | `AsyncContextElement` with lifecycle FSM | Both provide one instance per scope, created lazily, destroyed at scope exit |
-| **Scope hierarchy** | `coroutineScope { launch(parentContext + childElement) }` | Both compose scopes by overlaying child bindings on parent bindings |
-| **Factory method** | `inline fun <reified T> NioSupervisor.service(): T?` | Both resolve by type, with the Key serving as the reified discriminant |
-
-```kotlin
-// DI-style service resolution in CCEK:
-//   val reactor: UringReactor = coroutineContext[UringReactor.Key]
-//   val tls: TlsEngine = coroutineContext[TlsEngine.Key]
-//
-// The Key IS the binding:
-//   - It holds the companion statics (factory methods, defaults)
-//   - It routes lookup to the correct Element type
-//   - It scopes visibility: only code within the coroutineScope can resolve it
-//   - It is mobile: passing the context passes the entire service graph
-//
-// Unlike traditional DI (Dagger/Guice/Spring):
-//   - No annotation processing, no codegen, no reflection
-//   - The Key is a compile-time constant, not a runtime descriptor
-//   - Scope lifecycle is the coroutine's structured concurrency, not a container
 ```
 
 ### The Lifecycle FSM as BitMasked Ordinal
@@ -268,7 +239,7 @@ graph TD
 
         subgraph "Protocol Layer"
             TLS_E["TlsEngine — crypto boundary"]
-            DET["detectProtocol — CharStr⁺ combinator"]
+            DET["detectProtocol — CharStr (+-) combinator"]
         end
 
         subgraph "Parser Layer"
@@ -277,9 +248,9 @@ graph TD
         end
 
         subgraph "Carried Algebra"
-            F1["Family 1: CharStr⁺ — TextOp over packet bytes"]
-            F2["Family 2: Collection⁺ — ByteSeries, COW buffers"]
-            F3["Family 3: MLIR⁺-EBPF — JIT hash, packet filter"]
+            F1["Family 1: CharStr (+-) — TextOp over packet bytes"]
+            F2["Family 2: Collection (+-) — ByteSeries, COW buffers"]
+            F3["Family 3: MLIR (+-) EBPF — JIT hash, packet filter"]
         end
     end
 
@@ -334,9 +305,9 @@ The key insight: **CCEK is the algebra that binds Families 1–3 to execution sc
 
 | Lower Family | What it provides | How CCEK carries it |
 |-------------|-----------------|-------------------|
-| **Family 1: CharStr⁺** | TextOp algebra over text | Protocol detection applies TextOp to packet `ByteSeries`. Narsive operators are `BitMaskedLong` combinators routed through `CoroutineContext.Key`. |
-| **Family 2: Collection⁺** | COW / Chunked / Ring buffers | `ChannelOps` speaks `ByteSeries`. `ParseScope.source` is `Series<Char>`. `ReactorSignal` is a Join. `Interest` is `BitMasked<UInt>`. |
-| **Family 3: MLIR⁺-EBPF** | IR lowering + native encoding | `UringReactor` attaches eBPF to `io_uring` SQEs. Verifier DAG validates packet filters. JIT code executes within the reactor's lifecycle FSM. |
+| **Family 1: CharStr (+-)** | TextOp algebra over text | Protocol detection applies TextOp to packet `ByteSeries`. Narsive operators are `BitMaskedLong` combinators routed through `CoroutineContext.Key`. |
+| **Family 2: Collection (+-)** | COW / Chunked / Ring buffers | `ChannelOps` speaks `ByteSeries`. `ParseScope.source` is `Series<Char>`. `ReactorSignal` is a Join. `Interest` is `BitMasked<UInt>`. |
+| **Family 3: MLIR (+-) EBPF** | IR lowering + native encoding | `UringReactor` attaches eBPF to `io_uring` SQEs. Verifier DAG validates packet filters. JIT code executes within the reactor's lifecycle FSM. |
 
 The subsumption is not metaphorical — it is **structural**:
 
@@ -360,7 +331,7 @@ coroutineScope {
     handle.readv(fd, buffer)                          // ByteSeries IO
 
     // Family 1 carried by protocol detection:
-    val proto = reactor.detectProtocol(firstPacket)   // CharStr⁺ combinator
+    val proto = reactor.detectProtocol(firstPacket)   // CharStr (+-) combinator
 
     // Family 1+2 carried by parser:
     withParseScope(source) { src, span ->             // ParseScope element
@@ -379,7 +350,7 @@ coroutineScope {
 
 ---
 
-## Shape Family 1: CharStr⁺-Combinators
+## Shape Family 1: CharStr (+-) Combinators
 
 > *A string is a point in TextOp-space, and TextOp-space is itself a Join algebra.*
 
@@ -461,7 +432,7 @@ typealias Corpus = MetaSeries<CharStr, MetaSeries<TextOp<*>, Any?>>
 
 The nesting prevents sealed-hierarchy explosion: new families don't widen the inner sealed class — they nest as a new outer Join layer.
 
-### GADT-Flavored Dispatch
+### GADT (Generalized Algebraic Data Type) Flavored Dispatch
 
 ```kotlin
 sealed class TextOp<R> {
@@ -503,7 +474,7 @@ sealed class TextOp<R> {
 
 ---
 
-## Shape Family 2: Associative⁺-Mutable Collections
+## Shape Family 2: Associative (+-) Mutable Collections
 
 > *Mutation is a swap of the immutable letter inside a mutable envelope — and the envelope itself is a MetaSeries.*
 
@@ -764,9 +735,9 @@ The Cursor is where all four CRMS families meet:
 | Family | How Cursor Uses It |
 |--------|-------------------|
 | **Family 0 (CCEK)** | `ParseScope.source` is `Series<Char>` — a 1-column Cursor. `ParseScope.fanoutParsers` produces `Series<Join<Twin<Int>, Int>>` — a RowVec of (span, tag) pairs. |
-| **Family 1 (CharStr⁺)** | `Cursor.meta` accesses column names as `Series<CharSequence>` — each name is a CharStr candidate. `IOMemento` enum dispatch is the TypeMemento sealed hierarchy. |
-| **Family 2 (Collection⁺)** | `SimpleCursor` delegates `by c: Join<Int, (Int) -> RowVec>` — the cursor IS a Series, using COW for mutation. `CursorTensorReifier.fromCursor()` materializes into `DoubleArray` via the ReificationContext pattern. |
-| **Family 3 (MLIR⁺-eBPF)** | `CursorTensorSnapshot.values: DoubleArray` is the terminal dense-packed form — analogous to `EbpfInstruction(Long)`. `WasmDoubleTensor` targets Wasm SIMD, paralleling the eBPF JIT target. |
+| **Family 1 (CharStr (+-))** | `Cursor.meta` accesses column names as `Series<CharSequence>` — each name is a CharStr candidate. `IOMemento` enum dispatch is the TypeMemento sealed hierarchy. |
+| **Family 2 (Collection (+-))** | `SimpleCursor` delegates `by c: Join<Int, (Int) -> RowVec>` — the cursor IS a Series, using COW for mutation. `CursorTensorReifier.fromCursor()` materializes into `DoubleArray` via the ReificationContext pattern. |
+| **Family 3 (MLIR (+-) eBPF)** | `CursorTensorSnapshot.values: DoubleArray` is the terminal dense-packed form — analogous to `EbpfInstruction(Long)`. `WasmDoubleTensor` targets Wasm SIMD, paralleling the eBPF JIT target. |
 
 ### ManifoldConcept: Cursor-as-NARS3-Concept
 
@@ -801,7 +772,7 @@ class ManifoldConcept<out P>(
 
 ---
 
-## Shape Family 3: MLIR⁺-EBPF Shapes
+## Shape Family 3: MLIR (+-) EBPF Shapes
 
 > *The algebra lowers through MLIR dialects into native instruction encodings — and each layer is still a MetaSeries.*
 
@@ -954,7 +925,7 @@ typealias DagShape<K> = MetaSeries<K, Set<K>>
 
 ## The Unifying Table
 
-| Concept | CCEK Shape (Family 0) | CharStr⁺ Shape | Collection⁺ Shape | MLIR⁺-EBPF Shape |
+| Concept | CCEK Shape (Family 0) | CharStr (+-) Shape | Collection (+-) Shape | MLIR (+-) EBPF Shape |
 |---------|----------------------|----------------|-------------------|-------------------|
 | **Base type** | `MetaSeries<Key, Element?>` | `MetaSeries<TextOp<*>, Any?>` | `MetaSeries<Int, T>` | `MetaSeries<Int, Operation>` |
 | **Recursive nesting** | `ParseScope(Series<Char>, children: Series<ParseScope>)` | `MetaSeries<HashOp, MetaSeries<NgramOp, Int>>` | `Series<Series<T>>` (ChunkedMutable) | `Region = Series<Block> = Series<Series<Op>>` |
@@ -1097,8 +1068,6 @@ The answer may be less a `TextOp.EbpfHash` and more a Prolog/Datalog/WAM-style d
 2. **Phase 2 — CRMS lowering language**: Define a `LoweringOp<From, To>` sealed hierarchy that describes how to lower a MetaSeries at one layer into a MetaSeries at the next. `LoweringOp.TextOpToMlir : LoweringOp<TextOp, MlirOp>`, `LoweringOp.MlirToEbpf : LoweringOp<MlirOp, EbpfInstruction>`. The lowering IS a MetaSeries — each key is a source op, each value is the target op sequence. The WAM unification engine is the natural executor for this lowering: given a `LoweringOp`, the WAM resolves the target sequence by deterministic backtracking over the available instruction patterns.
 
 3. **Phase 3 — TextOp.EbpfHash**: With the lowering language in place, `TextOp.EbpfHash` becomes a `LoweringOp.TextOpToEbpf` that short-circuits the MLIR layer — direct text-algebra-to-native when the operation is simple enough (hash = shift + xor + mix, no control flow needed).
-
-**Architectural assumption**: eBPF is not a standalone facility — it augments the uring rigid syscall facade. Both `io_uring` and eBPF in userspace are assumed for all `commonMain` platform targets, fused into the NIO layer which also fuses mem, net, and file descriptor concepts into a common channelization pipeline. This fusion blurs the reactor's buffer handler with a language's parser — the eBPF program that classifies a packet IS a parser, and the parser that identifies a protocol IS a buffer handler. The uring completion queue IS a `Series<Join<fd, result, userData>>`, and the eBPF program that filters it IS a `TextOp` applied to the completion events.
 
 eBPF and MLIR are waiting for the language of CRMS itself to mature — to move from the idempotent algebra to tblgen and assembly DNA while not looking like an EJB descriptor.
 
