@@ -627,7 +627,7 @@ graph LR
 
 ### The Columnar Optimization: ReifiedSplitSeries2
 
-The hot-path optimization recaptures Columnar's `Vect02` column-oriented access pattern — without losing the row-major RowVec abstraction:
+The hot-path optimization recovers column-major access inside the row-major RowVec abstraction:
 
 ```kotlin
 // The naive RowVec is row-major: accessing cell i constructs a Join per call
@@ -647,8 +647,6 @@ val RowVec.values: Series<Any?>
 // This recovers the column-major access pattern inside the RowVec algebra
 // without breaking the typealias chain.
 // Zero Join allocation when the concrete type is ReifiedSplitSeries2.
-// The typealias IS the new vtable — scoped extension functions provide
-// the same trait-resemblant mix-ins as Columnar's index operator overloads.
 ```
 
 ### The Projection Densification Ladder
@@ -706,7 +704,7 @@ class ManifoldConcept<out P>(
 ```
 
 > [!NOTE]
-> The `ManifoldConcept : RowVec` implementation closes the loop: a cognitive concept is a database row is a MetaSeries cell. The Columnar `Vect02` ancestor couldn't express this — it required a separate concept abstraction outside the typealias chain. TrikeShed's chain makes the relationship structural, not nominal — with all of the same pitfalls that productive immutable designs create: overwhelming mutability accounting requirements and budget tradeoffs that rarely have a heuristic simpler than a Graal JIT.
+> The `ManifoldConcept : RowVec` implementation closes the loop: a cognitive concept is a database row is a MetaSeries cell. TrikeShed's typealias chain makes the relationship structural, not nominal — with all of the same pitfalls that productive immutable designs create: overwhelming mutability accounting requirements and budget tradeoffs that rarely have a heuristic simpler than a Graal JIT.
 
 > [!NOTE]
 > The Manifold and Tensor shapes emerged alongside each other out of contemporary scientific all-things-endpoint review, which needed to be conducted to arrive at the type-erasure / type-hoisting of isomorphic type-safe permutation consolidation and normalization with mechanical sympathy. The Cursor, Manifold, and Series are still in their first iteration — the CRMS pattern identifies the monomorphic vehicle of sane composition, but the shapes themselves need further maturation.
