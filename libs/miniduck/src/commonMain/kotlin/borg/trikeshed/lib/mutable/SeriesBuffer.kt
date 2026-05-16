@@ -13,7 +13,7 @@ import borg.trikeshed.lib.j
  * zero type friction.
  */
 class SeriesList<T>(
-    private val backing: List<T> = ArrayList(),
+    private val backing: MutableList<T> = arrayListOf(),
 ) : MutableSeries<T>, List<T> {
     // MutableSeries: a is the size
     override val a: Int get() = backing.size

@@ -706,8 +706,7 @@ class ManifoldConcept<out P>(
 > [!NOTE]
 > The `ManifoldConcept : RowVec` implementation closes the loop: a cognitive concept is a database row is a MetaSeries cell. TrikeShed's typealias chain makes the relationship structural, not nominal — with all of the same pitfalls that productive immutable designs create: overwhelming mutability accounting requirements and budget tradeoffs that rarely have a heuristic simpler than a Graal JIT.
 
-> [!NOTE]
-> The Manifold and Tensor shapes emerged alongside each other out of contemporary scientific all-things-endpoint review, which needed to be conducted to arrive at the type-erasure / type-hoisting of isomorphic type-safe permutation consolidation and normalization with mechanical sympathy. The Cursor, Manifold, and Series are still in their first iteration — the CRMS pattern identifies the monomorphic vehicle of sane composition, but the shapes themselves need further maturation.
+
 
 ---
 
@@ -908,16 +907,16 @@ The recursive nesting is what makes all five additions **non-breaking**. Each la
 
 ---
 
-## Open Questions — Design Tensions
+## Strategic Design Implementations
 
-The CRMS pattern sits at the intersection of two antithetical desires: the **productivity** of mutable, effectful, megamorphic composition and the **purity** of immutable, idempotent, monomorphic construction. Each question below is a specific instance of this tension.
+The CRMS pattern sits at the intersection of two antithetical desires: the **productivity** of mutable, effectful, megamorphic composition and the **purity** of immutable, idempotent, monomorphic construction. The following sections outline concrete strategies to achieve these goals and resolve the associated tensions in the current design.
 
 ---
 
-### Q1: Canonical Equality and the TextOp Dispatch Lever
+### 1: Canonical Equality and the TextOp Dispatch Lever
 
 > [!IMPORTANT]
-> **The surface question**: The DAG dissertation says "pick NormOp.NFC + HashOp.XXH3 and document it." Is this the right default, or should the canonical be configurable per-Corpus?
+> **Goal**: Establish canonical equality handling. The DAG dissertation initially suggested picking NormOp.NFC + HashOp.XXH3 as a global standard. The objective is to manage the canonical behavior optimally, ensuring it is efficient while allowing necessary per-Corpus configurability.
 
 **The deeper tension**: `TextOp<V>` wants a type dispatch lever — the `V` parameter carries the return type guarantee (`SizeOp : TextOp<Int>`, `HashOp : TextOp<Long>`, `NormOp : TextOp<CharStr>`). In Kotlin, this comes across crudely: generics emulating templates were never meant to spawn free vtable hoisting in typealiases. But this is precisely the X-coordinate fanout mechanism — the thing that lets a `MetaSeries<TextOp<*>, Any?>` dispatch to the right result type without a `when` on every access.
 
@@ -942,14 +941,18 @@ fun <R> CharStr.get(op: TextOp<R>): R = when (op) {
 // bimorphic JIT boundary.
 ```
 
-**Resolution path**: Stay flexible until the wave function compels a collapse on such deep layering. The current working assumption is NFC + XXH3 for `equals()/hashCode()`, but the hot set (which ops get explicit fields) should remain configurable per-Corpus via a `HotTextOpSet` inline class that the JIT can specialize on. The iteration counter does the right thing: ≤3 hot ops = bimorphic inline, >3 = vtable fallback. Type erasure is the feature, not the bug — it's what keeps the MetaSeries key space open-ended. Don't lock in the canonical until real corpus workloads demonstrate which ops are genuinely hot.
+**Actionable Implementation Strategy**: 
+1. **Configurable Hot Sets**: Introduce an inline class `HotTextOpSet(val mask: Int)` to define up to 3 `TextOp` implementations designated as the "hot path" for a specific `Corpus`.
+2. **JIT-Friendly Dispatch**: Implement the dispatcher to perform a bitwise check against `HotTextOpSet`. If the op is hot, dispatch via a monomorphic/bimorphic `when` block to direct field access.
+3. **Type-Safe Fallback**: For cache misses, fallback to an `IdentityHashMap<TextOp<*>, Any>`. This costs 1 volatile read + 1 probe but preserves type-erased flexibility.
+4. **Corpus Instantiation**: Parameterize `Corpus` creation with its `HotTextOpSet` instead of hardcoding global defaults. This delays the canonical choice until the workload characteristics are known, avoiding premature optimization.
 
 ---
 
-### Q2: ParseScope ↔ CharStr Isomorphism
+### 2: ParseScope ↔ CharStr Isomorphism
 
 > [!IMPORTANT]
-> **The surface question**: Should `ParseScope` carry a `CharStr`-typed source instead of raw `Series<Char>`, making the `fanoutParsers` → `Series<Join<Twin<Int>, Int>>` shape explicitly isomorphic to `CharStr = MetaSeries<TextOp, Any?>`?
+> **Goal**: Unify `ParseScope` and `CharStr` shapes algebraically without sacrificing performance. Determine how `ParseScope` can expose its parse results via the `CharStr` `MetaSeries` algebra (`fanoutParsers` → `Series<Join<Twin<Int>, Int>>` mapping to `MetaSeries<TextOp, Any?>`) without incurring runtime indirection penalties.
 
 **The deeper tension**: Composability is sought — the ability to treat parse spans and text operations as the same algebraic structure. But this composability must coexist with three antithetical requirements:
 
@@ -977,16 +980,20 @@ fun <R> CharStr.get(op: TextOp<R>): R = when (op) {
 //   the CharStr layer adds a MetaSeries indirection to every source access.
 ```
 
-**Resolution path**: Don't replace `Series<Char>` with `CharStr` in ParseScope. Instead, provide a **lifting function** that promotes a completed ParseScope into a CharStr — the parse tree becomes a TextOp family where each grammar rule is a TextOp and each parse result is the memoized answer. The isomorphism is made explicit at the **boundary** (sealed scope → CharStr), not at the **core** (live scope stays Series<Char>). This preserves the async lockless construction path while gaining the composed TextOp algebra after sealing.
+**Actionable Implementation Strategy**:
+1. **Maintain Raw Input Performance**: Keep `Series<Char>` as the explicit source parameter in `ParseScope` (`src/commonMain/kotlin/borg/trikeshed/userspace/concurrency/ParseScope.kt`) to maintain lockless, append-only performance during concurrent parse tree construction.
+2. **Explicit Lifting Function**: Implement `fun ParseScope.sealToCharStr(): CharStr` that finalizes the scope and transitions it into an immutable state.
+3. **Grammar to TextOp Mapping**: Inside `sealToCharStr()`, map the specific Narsive grammar tags to a dynamically constructed `TextOp` family. Each parse outcome becomes a memoized answer for its corresponding `TextOp`.
+4. **Boundary Isolation**: The isomorphism is formalized strictly at the boundary. The live scope remains a raw `Series<Char>`, but the output artifact is a fully algebraic `CharStr` with `O(1)` queryable memoized results.
 
 The broader observation: the author is exhausted chasing string refinements while negatively benefitting from the churn caused to parse-combinator grammar definitions which lose relevance at scale. String tokenizers/parsers and collection iterators in OO programming bear little resemblance to each other — but relationally the joinders are inevitable. The function of the Key to provide e.g. a "trim projection" IS a combinator, and the definition of CCEK (Coroutine → Context → Element → Key) touches down at the macroscopic level to highlight that `Key→Element` IS literally the shape of MetaSeries with mathematical products. The parse combinator's irrelevance at scale is precisely because it tries to be a micro-MetaSeries without the macro-MetaSeries lifecycle to scope it.
 
 ---
 
-### Q3: eBPF as CharStr Target — Elevating Manifold to CRMS
+### 3: eBPF as CharStr Target — Elevating Manifold to CRMS
 
 > [!IMPORTANT]
-> **The surface question**: Could a `TextOp.EbpfHash` exist that JIT-compiles a hash function via the eBPF engine, runs it in-kernel for packet classification, and memoizes the result in the CharStr cell?
+> **Goal**: Direct compilation of text operations to native kernel filters. Enable `TextOp.EbpfHash` to JIT-compile hash functions via the eBPF engine for in-kernel packet classification, and memoize results back into the `CharStr` cell seamlessly.
 
 **The deeper tension**: The existing `Cursor`, `Manifold`, and `Series` are in their first iteration. `ManifoldConcept<P> : RowVec` demonstrates that a NARS3 concept can be a Cursor row — but the `ManifoldConcept` is still a hackish inference of delta, not a first-class CRMS participant. What's needed is to elevate Manifold from "concept that happens to implement RowVec" to "concept that IS a MetaSeries of budget/angular/payload operations, where the budget algebra is as composable as the TextOp algebra."
 
@@ -1000,22 +1007,22 @@ Meanwhile, MLIR and eBPF are waiting. They define the lowering stack and the nat
 
 The answer may be less a `TextOp.EbpfHash` and more a Prolog/Datalog/WAM-style deterministic idempotent infinite Plan9-venté server abstraction — the architectural ancestor from which the Blackboard design was built even earlier than the Cursor abstractions. The WAM (Warren Abstract Machine) provides the declarative unification engine that the CRMS lowering needs: given a source op and a target instruction set, unify the lowering path without closing the window on interoperable rows-with-custom-metadata, children (DAG), and the simple loss-leader: CSV/ISAM row-0 meta-singleton exemplar plus random access mmap wire-proto-codec.
 
-**Resolution path**: Three phases:
+**Actionable Implementation Strategy**:
 
-1. **Phase 1 — Manifold as CRMS**: Replace `ManifoldConcept.angular/budget` with `MetaSeries<ManifoldOp<*>, Any?>` where `ManifoldOp` is a sealed hierarchy like TextOp. `ManifoldOp.Angular : ManifoldOp<Long>`, `ManifoldOp.Budget : ManifoldOp<BudgetCoord>`, `ManifoldOp.Payload : ManifoldOp<P>`. The concept becomes a point in ManifoldOp-space, just as CharStr is a point in TextOp-space.
+1. **Phase 1: Elevate Manifold to CRMS**: Implement a `ManifoldOp` sealed class. Refactor `ManifoldConcept` (`src/commonMain/kotlin/borg/trikeshed/manifold/ManifoldConcept.kt`) to use `MetaSeries<ManifoldOp<*>, Any?>` instead of ad-hoc fields. `ManifoldOp.Angular : ManifoldOp<Long>`, `ManifoldOp.Budget : ManifoldOp<BudgetCoord>`, `ManifoldOp.Payload : ManifoldOp<P>`. This turns concepts into algebraically queryable points in ManifoldOp-space.
 
-2. **Phase 2 — CRMS lowering language**: Define a `LoweringOp<From, To>` sealed hierarchy that describes how to lower a MetaSeries at one layer into a MetaSeries at the next. `LoweringOp.TextOpToMlir : LoweringOp<TextOp, MlirOp>`, `LoweringOp.MlirToEbpf : LoweringOp<MlirOp, EbpfInstruction>`. The lowering IS a MetaSeries — each key is a source op, each value is the target op sequence. The WAM unification engine is the natural executor for this lowering: given a `LoweringOp`, the WAM resolves the target sequence by deterministic backtracking over the available instruction patterns.
+2. **Phase 2: Introduce the WAM Lowering Engine**: Build the WAM-based unification engine. Create the `LoweringOp<From, To>` sealed hierarchy that functions as the rule set for the WAM. For example, define `LoweringOp.TextOpToMlir` and `LoweringOp.MlirToEbpf`. The WAM will lazily unify source algebra operations with native instruction sequences via deterministic backtracking.
 
-3. **Phase 3 — TextOp.EbpfHash**: With the lowering language in place, `TextOp.EbpfHash` becomes a `LoweringOp.TextOpToEbpf` that short-circuits the MLIR layer — direct text-algebra-to-native when the operation is simple enough (hash = shift + xor + mix, no control flow needed).
+3. **Phase 3: Direct eBPF Compilation Shortcuts**: Introduce `TextOp.EbpfHash`. Map this specific operator directly to native bytecode using `LoweringOp.TextOpToEbpf`. When invoked, the WAM bypasses the MLIR lowering completely, directly instantiating the `EbpfInstruction` stream into a `LongArray` formatted as a `Series<Long>`.
 
 eBPF and MLIR are waiting for the language of CRMS itself to mature — to move from the idempotent algebra to tblgen and assembly DNA while not looking like an EJB descriptor.
 
 ---
 
-### Q4: CCEK (Coroutine → Context → Element → Key) Lifecycle as Typed State Machine
+### 4: CCEK (Coroutine → Context → Element → Key) Lifecycle as Typed State Machine
 
 > [!WARNING]
-> **The surface question**: Could the `ElementState` lifecycle FSM be a sealed MetaSeries where each state is a key and the valid next-states are the values — making invalid transitions a compile error rather than a runtime `check()`? These patterns, hosted on Kotlin, are searching for their supporting genre and language placement.
+> **Goal**: Formalize the lifecycle state machine. Evolve the `ElementState` lifecycle FSM into a verifiable construct where state transitions are enforced, removing fragile runtime checks (`check()`) without degrading execution performance.
 
 **The historical context**: This question has roots in `~/work/RelaxFactory`, where the evolution was:
 
@@ -1057,7 +1064,11 @@ val validTransitions: LifecycleFSM = CREATED j { setOf(OPEN) }
 // ... and verify at element construction time, not at transition time.
 ```
 
-**Resolution path**: Don't parameterize `AsyncContextElement` by state type — that would infect `CoroutineContext.Key<E>` and break the CCEK identity routing. Instead, define `LifecycleFSM = MetaSeries<ElementState, Set<ElementState>>` as a compile-time constant that the `AsyncContextElement` constructor validates against. The FSM IS a MetaSeries — each state is a key, the valid next-states are the values. Invalid transitions are caught at **element creation time** (cold path), not at **state change time** (hot path). This preserves the RelaxFactory lesson: the hot-path state machine must be a simple ordinal comparison, but the cold-path validation can be as rich as needed.
+**Actionable Implementation Strategy**:
+1. **Preserve Hot-Path Performance**: Maintain `ElementState` (`src/commonMain/kotlin/borg/trikeshed/context/ElementState.kt`) as a `BitMasked<UInt>`. The state transitions during normal reactor execution must remain simple bitwise ordinal comparisons (`isAtLeast`, `isLessThan`) to avoid overhead. Note that classes like `ParseScope` use `ParseLifecycle`, which follows the identical state progression pattern.
+2. **Define Lifecycle Rules via MetaSeries**: Formulate the transition rules exactly as a MetaSeries: `val validTransitions: LifecycleFSM = CREATED j { setOf(OPEN) }`. This explicitly models the permitted edge transitions for the lifecycle DAG.
+3. **Cold-Path Transition Enforcer**: Replace bare `state = NEW_STATE` assignments with an inline DSL transition function, e.g., `fun transitionTo(newState: ElementState)`.
+4. **Compile-Time or Initialization Validation**: Use KSP (or reflection during testing) to validate the transitions defined in the elements against the `LifecycleFSM`. Ensure that `transitionTo` calls conform to the DAG, treating any illegal state changes as cold-path structural errors.
 
 ---
 
