@@ -70,6 +70,35 @@ typealias ContextShape<K, E> = MetaSeries<K, E?>
 //   .b = ctx[key] (the lookup oracle — returns E? by identity)
 ```
 
+### CCEK as Dependency Injection Isomorphism
+
+CCEK is strongly **Dependency Injection isomorphic**. The `Key→Element` relationship is the nexus of all statics, consts, enums, factories, and utilities — and it is mobile throughout accessibility and visibility within coroutine scope bounds:
+
+| DI Concept | CCEK Equivalent | Why isomorphic |
+|-----------|----------------|---------------|
+| **Service registry** | `CoroutineContext` (fold of Elements) | Both are key→value maps resolved at lookup time |
+| **Binding key** | `companion object Key : CoroutineContext.Key<E>` | Both are singleton identity objects (`===`) that parameterize the service type |
+| **Scoped singleton** | `AsyncContextElement` with lifecycle FSM | Both provide one instance per scope, created lazily, destroyed at scope exit |
+| **Scope hierarchy** | `coroutineScope { launch(parentContext + childElement) }` | Both compose scopes by overlaying child bindings on parent bindings |
+| **Factory method** | `inline fun <reified T> NioSupervisor.service(): T?` | Both resolve by type, with the Key serving as the reified discriminant |
+
+```kotlin
+// DI-style service resolution in CCEK:
+//   val reactor: UringReactor = coroutineContext[UringReactor.Key]
+//   val tls: TlsEngine = coroutineContext[TlsEngine.Key]
+//
+// The Key IS the binding:
+//   - It holds the companion statics (factory methods, defaults)
+//   - It routes lookup to the correct Element type
+//   - It scopes visibility: only code within the coroutineScope can resolve it
+//   - It is mobile: passing the context passes the entire service graph
+//
+// Unlike traditional DI (Dagger/Guice/Spring):
+//   - No annotation processing, no codegen, no reflection
+//   - The Key is a compile-time constant, not a runtime descriptor
+//   - Scope lifecycle is the coroutine's structured concurrency, not a container
+```
+
 ### The Lifecycle FSM as BitMasked Ordinal
 
 Every CCEK element traverses the same forward-only lifecycle — encoded as `BitMasked<UInt>`:
@@ -1068,6 +1097,8 @@ The answer may be less a `TextOp.EbpfHash` and more a Prolog/Datalog/WAM-style d
 2. **Phase 2 — CRMS lowering language**: Define a `LoweringOp<From, To>` sealed hierarchy that describes how to lower a MetaSeries at one layer into a MetaSeries at the next. `LoweringOp.TextOpToMlir : LoweringOp<TextOp, MlirOp>`, `LoweringOp.MlirToEbpf : LoweringOp<MlirOp, EbpfInstruction>`. The lowering IS a MetaSeries — each key is a source op, each value is the target op sequence. The WAM unification engine is the natural executor for this lowering: given a `LoweringOp`, the WAM resolves the target sequence by deterministic backtracking over the available instruction patterns.
 
 3. **Phase 3 — TextOp.EbpfHash**: With the lowering language in place, `TextOp.EbpfHash` becomes a `LoweringOp.TextOpToEbpf` that short-circuits the MLIR layer — direct text-algebra-to-native when the operation is simple enough (hash = shift + xor + mix, no control flow needed).
+
+**Architectural assumption**: eBPF is not a standalone facility — it augments the uring rigid syscall facade. Both `io_uring` and eBPF in userspace are assumed for all `commonMain` platform targets, fused into the NIO layer which also fuses mem, net, and file descriptor concepts into a common channelization pipeline. This fusion blurs the reactor's buffer handler with a language's parser — the eBPF program that classifies a packet IS a parser, and the parser that identifies a protocol IS a buffer handler. The uring completion queue IS a `Series<Join<fd, result, userData>>`, and the eBPF program that filters it IS a `TextOp` applied to the completion events.
 
 eBPF and MLIR are waiting for the language of CRMS itself to mature — to move from the idempotent algebra to tblgen and assembly DNA while not looking like an EJB descriptor.
 
