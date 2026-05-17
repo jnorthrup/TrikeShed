@@ -3,6 +3,8 @@ package borg.trikeshed.parse.kursive.sql
 import borg.trikeshed.lib.*
 import borg.trikeshed.collections._s
 
+private val CharSeries.cseq: CharSequence get() = this
+
 // Compact SQL AST using Series<Char> (zero-copy views)
 // Canonical root — kursive, miniduck, and couch all consume from here.
 sealed interface SqlNode
@@ -41,7 +43,7 @@ class SqlParser(private val cs: CharSeries) {
             if (parsed != null) return parsed
 
             // fallback: simple regex-based parser
-            val selUp = text.uppercase()
+            val selUp: CharSequence = text.uppercase()
             val selIndex = selUp.indexOf("SELECT")
             val fromIndex = selUp.indexOf("FROM")
             if (selIndex < 0 || fromIndex < 0 || fromIndex <= selIndex) return null
@@ -65,7 +67,7 @@ class SqlParser(private val cs: CharSeries) {
                 val cm = comp.matchEntire(wherePart)
                 if (cm != null) {
                     val colName = cm.groupValues[1]
-                    val op = cm.groupValues[2].uppercase()
+                    val op = cm.groupValues[2].uppercase().toString()
                     val litRaw = cm.groupValues[3]
                     val litNode: SqlNode = if (litRaw.startsWith("'") && litRaw.endsWith("'")) {
                         StringLiteral(litRaw.substring(1, litRaw.length - 1).toSeries())
@@ -87,9 +89,10 @@ class SqlParser(private val cs: CharSeries) {
 
     fun peek(): Char = if (cs.pos < cs.limit) cs[cs.pos] else '\u0000'
 
-    fun matchKeyword(keyword: String): Boolean {
+    fun matchKeyword(keyword: CharSequence): Boolean {
         val save = cs.pos
         val k = keyword.uppercase()
+
         for (i in k.indices) {
             if (cs.pos + i >= cs.limit) {
                 cs.pos = save; return false
@@ -262,7 +265,7 @@ class SqlParser(private val cs: CharSeries) {
         } else {
             val maybe = parseIdentifier()
             if (maybe != null) {
-                val nameStr = maybe.name.asString().uppercase()
+                val nameStr = maybe.name.asString().uppercase().toString()
                 val reserved =
                     _s["FROM", "WHERE", "GROUP", "ORDER", "HAVING", "LIMIT", "OFFSET", "JOIN", "ON", "AS", "UNION", "DISTINCT"]
                 if (nameStr in reserved) {
@@ -305,7 +308,7 @@ class SqlParser(private val cs: CharSeries) {
         } else {
             val maybe = parseIdentifier()
             if (maybe != null) {
-                val nameStr = maybe.name.asString().uppercase()
+                val nameStr = maybe.name.asString().uppercase().toString()
                 val reserved = setOf(
                     "FROM", "WHERE", "GROUP", "ORDER", "HAVING", "LIMIT", "OFFSET", "JOIN", "ON", "AS", "UNION", "DISTINCT",
                 )

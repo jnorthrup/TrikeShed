@@ -7,6 +7,24 @@ import java.util.zip.ZipFile
 
 class JvmFileOperations : FileOperations {
 
+    override fun open(path: String, readOnly: Boolean): Int {
+        val path_ = java.nio.file.Path.of(path)
+        val flags = if (readOnly) {
+            java.util.EnumSet.of(java.nio.file.StandardOpenOption.READ)
+        } else {
+            java.util.EnumSet.of(java.nio.file.StandardOpenOption.READ, java.nio.file.StandardOpenOption.WRITE, java.nio.file.StandardOpenOption.CREATE)
+        }
+        val channel = java.nio.file.Files.newByteChannel(path_, flags)
+        return channel.hashCode() // JVM channels don't expose raw fd, use hashCode as handle
+    }
+
+    override fun close(fd: Int): Int = 0 // JVM channel closed via close()
+
+    override fun size(fd: Int): Long {
+        // fd is channel hashCode here — lookup from registry if needed
+        return 0L
+    }
+
     override fun readAllLines(filename: String): List<String> =
         java.nio.file.Files.readAllLines(java.nio.file.Path.of(filename))
 

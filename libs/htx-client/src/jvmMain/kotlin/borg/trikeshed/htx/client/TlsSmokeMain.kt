@@ -1,7 +1,5 @@
 package borg.trikeshed.htx.client
 
-import kotlinx.coroutines.runBlocking
-
 suspend fun main() {
     val element = HtxElement()
     element.registerTransport(HtxTransport.HTTPS, createHttpsHandler())

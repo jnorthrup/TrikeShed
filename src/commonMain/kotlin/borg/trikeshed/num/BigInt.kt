@@ -3,7 +3,7 @@
 package borg.trikeshed.num
 
 import borg.trikeshed.collections.s_
-import borg.trikeshed.platform.PlatformCodec.Companion.readUInt
+import borg.trikeshed.userspace.nio.platform.spi.PlatformCodec.Companion.readUInt
 import borg.trikeshed.lib.CZero.nz
 import borg.trikeshed.lib.CZero.z
 import borg.trikeshed.lib.Series
@@ -11,7 +11,6 @@ import borg.trikeshed.lib.emptySeries
 import borg.trikeshed.lib.forEach
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.getOrNull
-import borg.trikeshed.lib.*
 import borg.trikeshed.lib.iterator
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.reversed

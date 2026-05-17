@@ -1,7 +1,6 @@
 package borg.trikeshed.ws
 
 import borg.trikeshed.lib.*
-import borg.trikeshed.parse.confix.asSeries
 
 /**
  * RFC 6455 WebSocket opening handshake — commonMain.

@@ -102,7 +102,7 @@ enum class NALLevel(
 
         /** Parse a NAL level string like "NAL1" or "nal1" */
         fun fromString(label: String): NALLevel? {
-            val normalized = label.uppercase().trim()
+            val normalized = label.uppercase().trim().toString()
             return entries.find { it.name == normalized } ?: entries.find {
                 it.label == label.lowercase() || it.name.startsWith(normalized.replace("NAL", "NAL"))
             }

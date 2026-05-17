@@ -96,8 +96,11 @@ fun Cursor.meta(vararg s: String): Series<Int> {
     }
 }
 
-/** cursor get by String vararg -- return a Cursor with the columns specified by the vararg */
-operator fun Cursor.get(vararg s: String): Cursor = this[meta(*s)]
+/** cursor get by String vararg — select columns by name, bypassing Series<Int> row-selection. */
+operator fun Cursor.get(vararg s: String): Cursor {
+    val indices = meta(*s)
+    return selectColumns(IntArray(indices.size) { indices[it] })
+}
 
 /** ColumnExclusion value class
  *
@@ -206,3 +209,76 @@ val Cursor.isNumerical: Boolean
     }
 
 val Cursor.isHomoMorphic: Boolean get() = !meta.view.any { it.type != meta[0].type }
+
+/** Filter rows by predicate. Preserves row count semantics. */
+fun Cursor.where(predicate: (RowVec) -> Boolean): Cursor {
+    if (size == 0) return this
+    val cursor = this
+    val filtered = (0 until size).filter { predicate(cursor.row(it)) }
+    return if (filtered.isEmpty()) emptySeries()
+    else Series(filtered.size) { cursor.row(filtered[it]) }
+}
+
+/** Order by a single column ascending (default) or descending. */
+fun Cursor.orderBy(column: String, desc: Boolean = false): Cursor {
+    if (size == 0) return this
+    val cursor = this
+    val colIdx = meta.view.indexOfFirst { it.name == column }.takeIf { it >= 0 }
+        ?: return this
+    val sorted = (0 until size).sortedWith { a, b ->
+        val va = (cursor.row(a) as ReifiedSplitSeries2<*, *>).valueAt(colIdx)
+        val vb = (cursor.row(b) as ReifiedSplitSeries2<*, *>).valueAt(colIdx)
+        val cmp = compareCursorValues(va, vb)
+        if (desc) -cmp else cmp
+    }
+    return Series(sorted.size) { cursor.row(sorted[it]) }
+}
+
+/** Take first n rows. */
+fun Cursor.take(n: Int): Cursor {
+    require(n >= 0) { "take count must be non-negative" }
+    if (n == 0) return emptySeries()
+    val cursor = this
+    val end = minOf(n, size)
+    return Series(end) { cursor.row(it) }
+}
+
+/** Drop first n rows. */
+fun Cursor.drop(n: Int): Cursor {
+    require(n >= 0) { "drop count must be non-negative" }
+    if (n == 0) return this
+    val cursor = this
+    val start = minOf(n, size)
+    val remaining = size - start
+    if (remaining <= 0) return emptySeries()
+    return Series(remaining) { cursor.row(start + it) }
+}
+
+/** Project named columns — returns new cursor with only those columns. */
+fun Cursor.project(vararg columns: String): Cursor {
+    if (size == 0) return this
+    val cursor = this
+    val indices = columns.mapNotNull { col ->
+        cursor.meta.view.indexOfFirst { it.name == col }.takeIf { it >= 0 }
+    }
+    if (indices.isEmpty()) {
+        return Series(size) { cellsToRowVec(emptySeries(), emptySeries()) }
+    }
+    return Series(size) { y ->
+        val row = cursor.row(y)
+        val selectedValues = indices.map { (row as ReifiedSplitSeries2<*, *>).valueAt(it) }
+        val selectedNames = indices.map { cursor.meta[it].name }
+        cellsToRowVec(selectedValues.toSeries(), selectedNames.toSeries())
+    }
+}
+
+// Compare two nullable values for ordering: nulls first, then numeric, then comparable, then string
+@Suppress("UNCHECKED_CAST")
+internal fun compareCursorValues(a: Any?, b: Any?): Int = when {
+    a == null && b == null -> 0
+    a == null -> -1
+    b == null -> 1
+    a is Number && b is Number -> a.toDouble().compareTo(b.toDouble()).toInt()
+    a is Comparable<*> -> (a as Comparable<Any?>).compareTo(b)
+    else -> a.toString().compareTo(b.toString())
+}

@@ -1,15 +1,15 @@
-@file:Suppress("SpellCheckingInspection", "ControlFlowWithEmptyBody")
+@file:Suppress("SpellCheckingInspection", "ControlFlowWithEmptyBody", "UNCHECKED_CAST", "CAST_NEVER_SUCCEEDS")
 
 package borg.trikeshed.lib
 
 import borg.trikeshed.lib.CZero.nz
-import borg.trikeshed.parse.confix.asSeries
+import kotlin.jvm.JvmName
 
 /**
  * char based spiritual successor to ByteBuffer for parsing
  */
 class CharSeries(
-    buf: Series<Char>,
+    private val buf: Series<Char>,
 
     /** the mutable position accessor */
     var pos: Int = 0,
@@ -19,20 +19,31 @@ class CharSeries(
 
     /** the mark accessor */
     var mark: Int = -1,
-) : Series<Char> by buf { //delegate to the underlying series
+     override val length: Int=buf.size,
+) : Series<Char> by buf, CharSequence { //delegate to the underlying series
+
+    /** CharSequence requires get(index: Int): Char */
+    override fun get(index: Int): Char = buf[index]
+
+    /** CharSequence requires subSequence(startIndex: Int, endIndex: Int): CharSequence */
+    override fun subSequence(startIndex: Int, endIndex: Int): CharSequence =
+        CharSeries((this)[startIndex until endIndex])
+    //string ctor
+    constructor(s: CharSequence) : this(s as? Series<Char> ?: s.toSeries())
 
     // Small char-window cache to improve locality. Uses buf.b(index) fallback when cache miss.
-   var _charCache: CharArray? = null
-   var _cacheBase: Int = 0
-   var _cacheLen: Int = 0
-   val CHAR_CACHE_WINDOW: Int = 4096
+    var _charCache: CharArray? = null
+    var _cacheBase: Int = 0
+    var _cacheLen: Int = 0
+    val CHAR_CACHE_WINDOW: Int = 4096
 
-   fun raw(i: Int): Char {
-        val c = _charCache
+    fun raw(i: Int): Char {
+        val c: CharArray? = _charCache
         if (c != null) {
-            val b = _cacheBase
-            val l = _cacheLen
-            if (i >= b && i < b + l) return c[i - b]
+            val b:Int = _cacheBase
+            val l:Int = _cacheLen
+            if (i >= b && i < b + l)
+                return c[i - b]
         }
         return b(i)
     }
@@ -45,8 +56,6 @@ class CharSeries(
             val c = raw(pos); pos++; return c
         }
 
-    //string ctor
-    constructor(s: String) : this(s.toSeries())
 
     /**remaining chars*/
     val rem: Int get() = limit - pos
@@ -177,8 +186,8 @@ class CharSeries(
     }
 
 
-    //isEmpty override
-    val isEmpty: Boolean get() = pos == limit
+    //isExhausted - true when no remaining chars (pos == limit)
+    val isExhausted: Boolean get() = pos == limit
 
     /** success move position to the char after found and returns true.
      *  fail returns false and leaves position unchanged */
@@ -260,6 +269,7 @@ class CharSeries(
         return parts.toSeries()
     }
 
+
     companion object {
 
         /**returns true and advances the position if the confix is {}*/
@@ -282,7 +292,7 @@ class CharSeries(
 
         }
 
-       fun confixFeature(client: CharSeries, chlit: String): Boolean {
+        fun confixFeature(client: CharSeries, chlit: String): Boolean {
             logNone { "confix $chlit before: ${client.asString()}" }
             var x = 0
             client.confixScope { test: Char ->
@@ -312,18 +322,23 @@ operator fun Series<Char>.div(delim: Char): Series<Series<Char>> { //lazy split
 }
 
 
+fun CharSequence.toSeries(): Series<Char> = (this as? Series<Char>) ?: cs
+val CharSequence.s: Series<Char> get() = (this as? CharSeries) ?: CharSeries(this)
+val CharSequence.cs: CharSeries get() = (this as? CharSeries) ?: CharSeries(this)
+val Series<Char>.cs: CharSeries get() = (this as? CharSeries) ?: CharSeries(this)
+fun CharSequence.uppercase(): CharSeries = (CharSeries(this) as Series<Char>).uppercaseSeries() as CharSeries
+fun CharSequence.uppercaseSeries(): CharSeries = (this.cs as Series<Char>).uppercaseSeries() as CharSeries
+fun Series<Char>.uppercaseSeries(): Series<Char> = (this α Char::uppercaseChar).cs
 
 
-val Series<Char>.cs: CharSequence
-    get() = object : CharSequence {
-        override val length: Int by ::a
-        override fun get(index: Int) = b(index)
-        override fun toString(): String = asString()
-        override fun subSequence(startIndex: Int, endIndex: Int): CharSequence = this@cs[startIndex until endIndex].cs
-    }
-
-val String.s: Series<Char> get() = this.asSeries()
-@get:kotlin.jvm.JvmName("sFromCharSeries")
+@get:JvmName("sFromCharSeries")
 val Series<Char>.s: String get() = asString()
-@get:kotlin.jvm.JvmName("sFromByteSeries")
+
+@get:JvmName("sFromByteSeries")
 val Series<Byte>.s: String get() = asString()
+
+/** Extension to convert CharSequence to Series<Char> */
+fun CharSequence.asSeries(): Series<Char> = this.cs
+
+/** Extension to convert CharSequence to CharSeries */
+fun CharSequence.toCharSeries(): CharSeries = this.cs

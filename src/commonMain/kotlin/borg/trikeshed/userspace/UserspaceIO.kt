@@ -55,17 +55,6 @@ class File internal constructor(internal val impl: FileImpl) {
     fun size(): Long = impl.size()
 }
 
-object Files {
-    fun open(path: String, readOnly: Boolean = true): File = File(FilesImpl.open(path, readOnly))
-}
-
-object Channels {
-    fun open(entries: Int = 256): Channel = Channel(FunctionalUringFacade(entries, openUserspaceChannelBackend(entries)))
-
-    fun socket(domain: Int, type: Int, protocol: Int): File =
-        File(ChannelsImpl.socket(domain, type, protocol))
-}
-
 expect class FileImpl(id: Int) {
     val id: Int
     fun isOpen(): Boolean

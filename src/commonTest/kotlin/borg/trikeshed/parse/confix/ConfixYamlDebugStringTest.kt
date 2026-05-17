@@ -1,5 +1,6 @@
 package borg.trikeshed.parse.confix
 
+import borg.trikeshed.lib.asSeries
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.size
 import kotlin.test.Test

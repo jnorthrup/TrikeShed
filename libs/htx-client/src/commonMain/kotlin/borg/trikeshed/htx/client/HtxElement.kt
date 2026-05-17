@@ -2,8 +2,6 @@ package borg.trikeshed.htx.client
 
 import borg.trikeshed.context.AsyncContextElement
 import borg.trikeshed.context.AsyncContextKey
-import borg.trikeshed.lib.Series
-import borg.trikeshed.lib.j
 
 /**
  * Options for HTTP/HTTPS/WebSocket requests through the HTX transport layer.
@@ -84,14 +82,14 @@ class HtxElement {
     suspend fun request(
         method: String = "GET",
         path: String,
-        body: String = "",
+        body: CharSequence = "",
         headers: Map<String, String> = emptyMap(),
         transport: HtxTransport? = null,
     ): HtxClientMessage {
         val req = HtxClientRequest(
             method = method,
             path = path,
-            body = body,
+            body = body.toString(),
             headers = headers,
             transport = transport ?: selectTransport(path),
         )

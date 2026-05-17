@@ -3,22 +3,19 @@
 package borg.trikeshed.isam.meta
 
 import borg.trikeshed.cursor.TypeMemento
-import borg.trikeshed.platform.PlatformCodec.Companion.currentPlatformCodec
-import borg.trikeshed.platform.PlatformCodec.Companion.readInt
-import borg.trikeshed.platform.PlatformCodec.Companion.readLong
-import borg.trikeshed.platform.PlatformCodec.Companion.readShort
-import borg.trikeshed.platform.PlatformCodec.Companion.readUInt
-import borg.trikeshed.platform.PlatformCodec.Companion.readULong
-import borg.trikeshed.platform.PlatformCodec.Companion.writeInt
-import borg.trikeshed.platform.PlatformCodec.Companion.writeLong
-import borg.trikeshed.platform.PlatformCodec.Companion.writeShort
-import borg.trikeshed.platform.PlatformCodec.Companion.writeUInt
-import borg.trikeshed.platform.PlatformCodec.Companion.writeULong
+import borg.trikeshed.userspace.nio.platform.spi.PlatformCodec.Companion.currentPlatformCodec
+import borg.trikeshed.userspace.nio.platform.spi.PlatformCodec.Companion.readInt
+import borg.trikeshed.userspace.nio.platform.spi.PlatformCodec.Companion.readLong
+import borg.trikeshed.userspace.nio.platform.spi.PlatformCodec.Companion.readUInt
+import borg.trikeshed.userspace.nio.platform.spi.PlatformCodec.Companion.readULong
+import borg.trikeshed.userspace.nio.platform.spi.PlatformCodec.Companion.writeInt
+import borg.trikeshed.userspace.nio.platform.spi.PlatformCodec.Companion.writeLong
+import borg.trikeshed.userspace.nio.platform.spi.PlatformCodec.Companion.writeUInt
+import borg.trikeshed.userspace.nio.platform.spi.PlatformCodec.Companion.writeULong
 import borg.trikeshed.lib.*
 import borg.trikeshed.lib.CharSeries
 import kotlin.time.Instant
 import kotlinx.datetime.LocalDate
-import kotlinx.datetime.LocalDateTime
 
 enum class IOMemento(override val networkSize: Int? = null, val fromChars: (Series<Char>) -> Any) : TypeMemento {
     IoBoolean(1, {

@@ -2,8 +2,8 @@ package borg.trikeshed.parse.yaml
 
 import borg.trikeshed.parse.confix.Combinators
 import borg.trikeshed.parse.confix.YamlScan
-import borg.trikeshed.parse.confix.asSeries
 import borg.trikeshed.lib.*
+import borg.trikeshed.lib.toSeries
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -62,7 +62,7 @@ items:
     sellPrice: 0
 """.trimIndent()
         // Dump elements
-        val src = yaml.asSeries()
+        val src = yaml.toSeries()
         val elems = YamlScan.scan(src)
         val n = elems.a
         println("Total elements: $n")

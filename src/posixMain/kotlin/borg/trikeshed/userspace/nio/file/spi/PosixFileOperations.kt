@@ -89,5 +89,17 @@ class PosixFileOperations : FileOperations {
     override fun deleteRecursively(path: String): Unit = TODO("deleteRecursively POSIX")
     override fun resolvePath(vararg parts: String): String = parts.joinToString("/")
     override fun readZip(path: String): List<Pair<String, ByteArray>> = TODO("readZip POSIX")
+    override fun open(path: String, readOnly: Boolean): Int {
+        val flags = if (readOnly) O_RDONLY else (O_RDWR or O_CREAT)
+        return platform.posix.open(path, flags, 0o644).toInt()
+    }
+
+    override fun close(fd: Int): Int = platform.posix.close(fd)
+
+    override fun size(fd: Int): Long = memScoped {
+        val st = alloc<stat>()
+        if (fstat(fd, st.ptr) == 0) st.st_size.toLong() else 0L
+    }
+
     override fun createTempDir(prefix: String): String = "/tmp/$prefix-${generateSequence { ('a'..'z').random() }.take(8).joinToString("")}"
 }

@@ -7,6 +7,7 @@ import borg.trikeshed.cursor.RowVec
 import borg.trikeshed.lib.*
 import borg.trikeshed.parse.confix.*
 import borg.trikeshed.lib.toRowVec
+import borg.trikeshed.lib.toSeries
 
 /* ─── public API surface — preserved for DescriptorFragments.kt ─────────── */
 
@@ -107,7 +108,7 @@ fun parse(text: String): Map<String, Any?> {
 object YamlParser {
     /** Parse a YAML string into a YamlNode AST, then wrap as YamlDocument */
     fun parse(text: String): YamlDocument {
-        val src = text.asSeries()
+        val src = text.toSeries()
         val elems = YamlScan.scan(src)
         val lineStarts = buildLineStarts(src)
         val root = buildYamlNode(elems, src, 0, lineStarts)
@@ -183,7 +184,7 @@ object YamlParser {
             }
             else -> {
                 val text = Combinators.textOf(elem, src)
-                YamlScalarNode(text.asSeries(), span)
+                YamlScalarNode(text.toSeries(), span)
             }
         }
     }
@@ -232,7 +233,7 @@ object YamlParser {
             val valNode = buildYamlNode(elems, src, valIdx, lineStarts)
             val entryStart = lineOf(lineStarts, keyElem.a.a)
             val entryEnd = lineOf(lineStarts, valElem.a.b)
-            list.add(YamlMappingEntry(keyText.asSeries(), valNode, entryStart j entryEnd))
+            list.add(YamlMappingEntry(keyText.toSeries(), valNode, entryStart j entryEnd))
             i += 2
         }
         return list.toSeries()

@@ -3,6 +3,7 @@ package borg.trikeshed.parse.confix
 import kotlin.test.Test
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.*
+import borg.trikeshed.lib.toSeries
 
 class ConfixYamlDebug2Test {
     @Test
@@ -12,7 +13,7 @@ class ConfixYamlDebug2Test {
     - a
     - b
 """
-        val src = yaml.asSeries()
+        val src = yaml.toSeries()
         val ctx = contextOf(Syntax.YAML, src)
         println("--- SOURCE CHARS ---")
         var i = 0

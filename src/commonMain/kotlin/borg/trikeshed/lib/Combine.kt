@@ -1,5 +1,6 @@
 package borg.trikeshed.lib
 
+import borg.trikeshed.userspace.nio.platform.spi.CacheTopology
 import kotlin.jvm.JvmInline
 import kotlin.math.log2
 import kotlin.math.roundToInt

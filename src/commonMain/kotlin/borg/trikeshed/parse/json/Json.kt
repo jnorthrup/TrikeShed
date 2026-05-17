@@ -4,6 +4,7 @@ import borg.trikeshed.lib.TypeEvidence
 import borg.trikeshed.lib.toRowVec
 import borg.trikeshed.cursor.RowVec
 import borg.trikeshed.lib.*
+import borg.trikeshed.lib.toSeries
 import borg.trikeshed.parse.confix.*
 
 /**
@@ -90,7 +91,7 @@ object JsonParser {
     }
 
     fun parse(text: String): Map<String, Any?> {
-        val ctx = contextOf(Syntax.JSON, text.asSeries())
+        val ctx = contextOf(Syntax.JSON, text.toSeries())
         @Suppress("UNCHECKED_CAST")
         return materialize(Combinators.reify(ctx, Syntax.JSON), Combinators.tagOf(ctx.a, ctx.b)) as? Map<String, Any?> ?: emptyMap()
     }
@@ -157,7 +158,7 @@ fun queryPath(ctx: JsContext, path: JsPath): JsContext? = Path.resolve(ctx, path
 
 /** Parse a JSON string to a stdlib Map (convenience, used by OpenApiRawParser) */
 fun parse(text: String): Map<String, Any?> {
-    val ctx = contextOf(Syntax.JSON, text.asSeries())
+    val ctx = contextOf(Syntax.JSON, text.toSeries())
     @Suppress("UNCHECKED_CAST")
     return materialize(Combinators.reify(ctx, Syntax.JSON)) as? Map<String, Any?> ?: emptyMap()
 }

@@ -1,5 +1,6 @@
 package borg.trikeshed.parse.confix
 
+import borg.trikeshed.lib.asSeries
 import kotlin.test.Test
 
 class ConfixYamlCheckTest {

@@ -46,10 +46,8 @@ enum class IoPlatform {
     ;
 
     companion object {
-        fun default(): IoPlatform = when {
-            System.getProperty("os.name")?.contains("Linux") == true -> POSIX_PREAD
-            else -> JVM_FILE_CHANNEL
-        }
+        /** Note: os.name check requires SystemOperations via CCEK. Using JVM_FILE_CHANNEL as safe default. */
+        fun default(): IoPlatform = JVM_FILE_CHANNEL
     }
 }
 

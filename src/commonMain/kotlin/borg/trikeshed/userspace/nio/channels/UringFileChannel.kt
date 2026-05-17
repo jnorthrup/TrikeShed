@@ -1,7 +1,7 @@
 package borg.trikeshed.userspace.nio.channels
 
-import borg.trikeshed.userspace.Channel
-import borg.trikeshed.userspace.File
+import borg.trikeshed.userspace.nio.channel.Channel
+import borg.trikeshed.userspace.nio.file.File
 import borg.trikeshed.userspace.nio.ByteBuffer
 
 internal class UringFileChannel(

@@ -4,10 +4,6 @@ package borg.trikeshed.lib
 
 import kotlinx.cinterop.*
 import platform.posix.*
-import borg.trikeshed.lib.Join
-import borg.trikeshed.lib.Series
-import borg.trikeshed.lib.j
-import borg.trikeshed.lib.toSeries
 
 actual object Files {
     actual fun readAllLines(filename: String): List<String> =

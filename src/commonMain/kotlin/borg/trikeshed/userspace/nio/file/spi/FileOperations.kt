@@ -14,6 +14,9 @@ interface FileOperations : CoroutineContext.Element {
     companion object Key : CoroutineContext.Key<FileOperations>
     override val key: CoroutineContext.Key<*> get() = Key
 
+    /** Open a file and return a raw file descriptor (fd integer). */
+    fun open(path: String, readOnly: Boolean = true): Int
+
     fun readAllLines(filename: String): List<String>
     fun readAllBytes(filename: String): ByteArray
     fun readString(filename: String): String
@@ -32,4 +35,9 @@ interface FileOperations : CoroutineContext.Element {
     fun resolvePath(vararg parts: String): String
     fun readZip(path: String): List<Pair<String, ByteArray>>
     fun createTempDir(prefix: String): String
+
+    /** Close a file descriptor. Returns 0 on success. */
+    fun close(fd: Int): Int
+    /** Return file size in bytes. */
+    fun size(fd: Int): Long
 }

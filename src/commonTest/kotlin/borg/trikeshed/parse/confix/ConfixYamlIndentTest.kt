@@ -1,6 +1,6 @@
 package borg.trikeshed.parse.confix
 
-import borg.trikeshed.lib.*
+import borg.trikeshed.lib.toSeries
 import kotlin.test.Test
 import kotlin.test.assertNotNull
 import kotlin.test.fail
@@ -17,7 +17,7 @@ class ConfixYamlIndentTest {
             |- url: https://example.com
             |""".trimMargin()
 
-        val ctx = contextOf(Syntax.YAML, yaml.asSeries())
+        val ctx = contextOf(Syntax.YAML, yaml.toSeries())
         val vTitleTop = Path.resolve(ctx, path("title"))
         if (vTitleTop != null) fail("title should NOT be at top level")
 
@@ -41,7 +41,7 @@ class ConfixYamlIndentTest {
             |      operationId: testOp
             |""".trimMargin()
 
-        val ctx = contextOf(Syntax.YAML, yaml.asSeries())
+        val ctx = contextOf(Syntax.YAML, yaml.toSeries())
 
         // securitySchemes should NOT be at top level
         val vTop = Path.resolve(ctx, path("securitySchemes"))
@@ -70,7 +70,7 @@ class ConfixYamlIndentTest {
             |      operationId: testOp
             |""".trimMargin()
 
-        val ctx = contextOf(Syntax.YAML, yaml.asSeries())
+        val ctx = contextOf(Syntax.YAML, yaml.toSeries())
 
         val vPaths = Path.resolve(ctx, path("paths"))
         assertNotNull(vPaths, "paths should be at top level")

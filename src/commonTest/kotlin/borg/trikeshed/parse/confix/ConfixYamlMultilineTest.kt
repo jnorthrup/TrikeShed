@@ -1,6 +1,6 @@
 package borg.trikeshed.parse.confix
 
-import borg.trikeshed.lib.*
+import borg.trikeshed.lib.toSeries
 import kotlin.test.Test
 import kotlin.test.assertNotNull
 import kotlin.test.fail
@@ -16,7 +16,7 @@ class ConfixYamlMultilineTest {
             |  title: Test
             |""".trimMargin()
 
-        val ctx = contextOf(Syntax.YAML, yaml.asSeries())
+        val ctx = contextOf(Syntax.YAML, yaml.toSeries())
 
         // info should have title (not broken by multiline description)
         val vInfo = Path.resolve(ctx, path("info"))
@@ -38,7 +38,7 @@ class ConfixYamlMultilineTest {
             |      operationId: testOp
             |""".trimMargin()
 
-        val ctx = contextOf(Syntax.YAML, yaml.asSeries())
+        val ctx = contextOf(Syntax.YAML, yaml.toSeries())
 
         // multiline continuation should NOT break subsequent keys
         val vPaths = Path.resolve(ctx, path("paths"))

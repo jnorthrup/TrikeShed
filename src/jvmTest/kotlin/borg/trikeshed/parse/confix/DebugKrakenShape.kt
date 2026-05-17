@@ -2,6 +2,7 @@
 package borg.trikeshed.parse.confix
 
 import borg.trikeshed.lib.*
+import borg.trikeshed.lib.toSeries
 import kotlin.test.Test
 
 class DebugKrakenShape {
@@ -23,7 +24,7 @@ class DebugKrakenShape {
             |      operationId: testOp
             |""".trimMargin()
 
-        val src = yaml.asSeries()
+        val src = yaml.toSeries()
         val elems = YamlScan.scan(src)
         val sb = StringBuilder()
         sb.appendLine("yaml length=${yaml.length}, elems=${elems.size}")

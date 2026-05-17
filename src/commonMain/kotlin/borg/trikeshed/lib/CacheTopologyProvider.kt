@@ -1,10 +1,11 @@
 @file:Suppress("NonAsciiCharacters")
 package borg.trikeshed.lib
 
+import borg.trikeshed.userspace.nio.platform.spi.CacheTopology
 import kotlin.coroutines.CoroutineContext
 
 /**
- * CCEK: provides [CacheTopology] from the platform.
+ * CCEK: provides [borg.trikeshed.userspace.nio.platform.spi.CacheTopology] from the platform.
  *
  * Replaces `expect val platformCacheTopology: CacheTopology`.
  * Register via NioSupervisor or direct context composition.

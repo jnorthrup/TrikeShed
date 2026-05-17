@@ -16,6 +16,24 @@ class InMemoryFileOperations(
 
     private val files = mutableMapOf<String, ByteArray>()
     private val dirs = mutableSetOf<String>()
+    private val openFiles = mutableMapOf<Int, String>()
+
+    override fun open(path: String, readOnly: Boolean): Int {
+        if (!exists(path)) throw NoSuchFileException(path)
+        val fd = openFiles.size + 1
+        openFiles[fd] = path
+        return fd
+    }
+
+    override fun close(fd: Int): Int {
+        openFiles.remove(fd)
+        return 0
+    }
+
+    override fun size(fd: Int): Long {
+        val path = openFiles[fd] ?: return 0L
+        return files[path]?.size?.toLong() ?: 0L
+    }
 
     override fun readAllLines(filename: String): List<String> =
         readString(filename).lines()

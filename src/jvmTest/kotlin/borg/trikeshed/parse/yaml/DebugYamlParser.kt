@@ -2,6 +2,7 @@
 package borg.trikeshed.parse.yaml
 
 import borg.trikeshed.lib.*
+import borg.trikeshed.lib.toSeries
 import borg.trikeshed.parse.confix.*
 import kotlin.test.Test
 import java.io.File
@@ -23,7 +24,7 @@ class DebugYamlParser {
            |      operationId: listPets
            |""".trimMargin( )
 
-        val src = yaml.asSeries()
+        val src = yaml.toSeries()
         val elems = YamlScan.scan(src)
         val sb = StringBuilder()
         sb.appendLine("yaml length=${yaml.length}")

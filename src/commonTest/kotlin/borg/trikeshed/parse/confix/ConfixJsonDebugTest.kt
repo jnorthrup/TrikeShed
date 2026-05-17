@@ -3,12 +3,13 @@ package borg.trikeshed.parse.confix
 import borg.trikeshed.lib.get
 import kotlin.test.Test
 import borg.trikeshed.lib.*
+import borg.trikeshed.lib.toSeries
 
 class ConfixJsonDebugTest {
     @Test
     fun debugJson() {
         val json = """{"s":"line1\\nline2","u":"\\u0041"}"""
-        val src = json.asSeries()
+        val src = json.toSeries()
         println("src.size=${src.size}")
         var i = 0
         while (i < src.size) { println("src[$i]=${src[i]}"); i++ }

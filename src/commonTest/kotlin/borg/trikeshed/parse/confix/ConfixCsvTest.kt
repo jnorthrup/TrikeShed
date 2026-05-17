@@ -5,6 +5,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import borg.trikeshed.lib.*
+import borg.trikeshed.lib.toSeries
 
 class ConfixCsvTest {
 
@@ -12,7 +13,7 @@ class ConfixCsvTest {
     @Test
     fun debugOutput() {
         val csv = "1700000000000,1.2345,1.2350,1.2340,1.2348,100.5,1700000059999,200.0,50,30.0,25.0,0\n"
-        val src = csv.asSeries()
+        val src = csv.toSeries()
         val elems = CsvScan.scan(src)
         assertEquals(1, elems.size, "should have 1 element")
         val e = elems[0]
@@ -27,7 +28,7 @@ class ConfixCsvTest {
     @Test
     fun singleKlineRow() {
         val csv = "1700000000000,1.2345,1.2350,1.2340,1.2348,100.5,1700000059999,200.0,50,30.0,25.0,0\n"
-        val src = csv.asSeries()
+        val src = csv.toSeries()
         val elems = CsvScan.scan(src)
         assertEquals(1, elems.size)
         val e = elems[0]
@@ -56,7 +57,7 @@ class ConfixCsvTest {
     @Test
     fun headerRow() {
         val header = "Open_time,Open,High,Low,Close,Volume,Close_time,Quote_asset_volume,Number_of_trades,Taker_buy_base_asset_volume,Taker_buy_quote_asset_volume,Ignore\n"
-        val src = header.asSeries()
+        val src = header.toSeries()
         val elems = CsvScan.scan(src)
         assertEquals(1, elems.size)
         val e = elems[0]
@@ -75,7 +76,7 @@ class ConfixCsvTest {
 
             1700000060000,1.2348,1.2360,1.2345,1.2355,80.0,1700000119999,160.0,40,20.0,15.0,0
         """.trimIndent()
-        val src = csv.asSeries()
+        val src = csv.toSeries()
         val elems = CsvScan.scan(src)
         // 3 non-blank lines + 1 blank (NULL-tagged) = 4 elements
         assertEquals(4, elems.size)
@@ -93,7 +94,7 @@ class ConfixCsvTest {
     @Test
     fun fieldTrim() {
         val csv = "  1700000000000  ,  1.2345  ,  1.2350  \n"
-        val src = csv.asSeries()
+        val src = csv.toSeries()
         val elems = CsvScan.scan(src)
         assertEquals(1, elems.size)
         assertEquals(1700000000000L, CsvScan.fieldLong(elems[0], src, 0))
@@ -105,7 +106,7 @@ class ConfixCsvTest {
     @Test
     fun noTrailingComma() {
         val csv = "1700000000000,1.2345,1.2350\n"
-        val src = csv.asSeries()
+        val src = csv.toSeries()
         val elems = CsvScan.scan(src)
         assertEquals(1, elems.size)
         assertEquals(3, elems[0].b.size)
@@ -117,7 +118,7 @@ class ConfixCsvTest {
     @Test
     fun crlfLineEndings() {
         val csv = "1700000000000,1.2345\r\n1700000060000,1.2348\r\n"
-        val src = csv.asSeries()
+        val src = csv.toSeries()
         val elems = CsvScan.scan(src)
         assertEquals(2, elems.size)
         assertEquals(1700000000000L, CsvScan.fieldLong(elems[0], src, 0))
@@ -127,7 +128,7 @@ class ConfixCsvTest {
     /** Omitted: blank input returns empty series. */
     @Test
     fun emptyInput() {
-        val src = "".asSeries()
+        val src = "".toSeries()
         val elems = CsvScan.scan(src)
         assertEquals(0, elems.size)
     }

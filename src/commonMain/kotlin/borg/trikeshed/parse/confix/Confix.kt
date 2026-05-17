@@ -46,9 +46,6 @@ typealias JsPath = Series<JsPathElement>
 
 
 
-/** Series of Chars from a CharSequence — use root's CharSequence.toSeries() */
-@Suppress("unused")
-fun CharSequence.asSeries(): Series<Char> = toSeries()
 
 
 /** tag byte encoded into commas[0] when the producer wants to signal kind.
