@@ -137,6 +137,35 @@ operator fun <T> Series<T>.get(index: Series<Int>): Series<T> = this[IntArray(in
 operator fun <T> Series<T>.get(index: IntArray): Series<T> = Series(index.size) { this[index[it]] }
 
 /**
+ * Return Series with elements excluded by indexes (killbag)
+ */
+operator fun <T> Series<T>.minus(killbag: Series<Int>): Series<T> {
+    val n = size
+    if (n == 0) return this
+    val kSize = killbag.size
+    if (kSize == 0) return this
+
+    // Allocation-free linear scan over primitive integers
+    val temp = IntArray(n)
+    var count = 0
+    for (i in 0 until n) {
+        var excluded = false
+        for (j in 0 until kSize) {
+            if (killbag[j] == i) {
+                excluded = true
+                break
+            }
+        }
+        if (!excluded) {
+            temp[count++] = i
+        }
+    }
+
+    val ints = if (count == n) temp else temp.copyOf(count)
+    return this[ints]
+}
+
+/**
  * series get by intRange
  */
 operator fun <T> Series<T>.get(index: IntRange): Series<T> = ((index.last + 1) - index.first) j { i ->

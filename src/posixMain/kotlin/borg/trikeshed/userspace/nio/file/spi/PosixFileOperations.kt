@@ -71,7 +71,7 @@ class PosixFileOperations : FileOperations {
         try {
             val result = mutableListOf<String>()
             val buf = alloc<dirent>()
-            var entry = allocPointerTo<dirent>()
+            val entry = allocPointerTo<dirent>()
             while (true) { if (readdir_r(dp, buf.ptr, entry.ptr) != 0) break; entry.value?.let { result.add(it.pointed.d_name.toKString()) } ?: break }
             result.filter { it != "." && it != ".." }
         } finally { closedir(dp) }
@@ -91,14 +91,14 @@ class PosixFileOperations : FileOperations {
     override fun readZip(path: String): List<Pair<String, ByteArray>> = TODO("readZip POSIX")
     override fun open(path: String, readOnly: Boolean): Int {
         val flags = if (readOnly) O_RDONLY else (O_RDWR or O_CREAT)
-        return platform.posix.open(path, flags, 0o644).toInt()
+        return platform.posix.open(path, flags,  644.fromOctal())
     }
 
     override fun close(fd: Int): Int = platform.posix.close(fd)
 
     override fun size(fd: Int): Long = memScoped {
         val st = alloc<stat>()
-        if (fstat(fd, st.ptr) == 0) st.st_size.toLong() else 0L
+        if (fstat(fd, st.ptr) == 0) st.st_size else 0L
     }
 
     override fun createTempDir(prefix: String): String = "/tmp/$prefix-${generateSequence { ('a'..'z').random() }.take(8).joinToString("")}"

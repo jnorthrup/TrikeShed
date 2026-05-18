@@ -56,16 +56,18 @@ IoType :=  IoInstant | IoDouble | IoString | IoInt
         val coords: Series<String> = CharSeries(lines[0]).trim.splitWs() α CharSeries::asString
         val names: Series<String> = CharSeries(lines[1]).trim.splitWs() α CharSeries::asString
         val types: Series<String> = CharSeries(lines[2]).trim.splitWs() α CharSeries::asString
+        val groups: Series<String>? = if (lines.size > 3) CharSeries(lines[3]).trim.splitWs() α CharSeries::asString else null
 
 
         this@IsamMetaFileReader.constraints1 = names.toList().zip(types.toList()).mapIndexed { index, (name, type) ->
             val begin = coords[2 * index].toInt()
             val end = coords[2 * index + 1].toInt()
+            val groupId = groups?.get(index)?.toInt() ?: 0
             val ioMemento: IOMemento = IOMemento.valueOf(type)
             //use PlatformCodec to get the decoder and encoder
             val decoder: (ByteArray) -> Any? = ioMemento.createDecoder(end - begin)
             val encoder: (Any?) -> ByteArray = ioMemento.createEncoder(end - begin)
-            RecordMeta(name, ioMemento, begin, end, decoder, encoder)
+            RecordMeta(name, ioMemento, begin, end, decoder, encoder, groupId = groupId)
         }
     }
 
@@ -93,6 +95,11 @@ IoType :=  IoInstant | IoDouble | IoString | IoInt
             lines.add(result.view.joinToString(" ") { it.begin.toString() + " " + it.end })
             lines.add(result.view.joinToString(" ") { it.name })
             lines.add(result.view.joinToString(" ") { it.type.name })
+            
+            if (result.view.any { it.groupId != 0 }) {
+                lines.add(result.view.joinToString(" ") { it.groupId.toString() })
+            }
+            
             fileOps.write(metafilename, lines)
             return result
         }
@@ -103,13 +110,15 @@ IoType :=  IoInstant | IoDouble | IoString | IoInt
                 recordMetas.view.map { (name: String,type: TypeMemento): ColumnMeta ->
                     val type: TypeMemento = type
                     val len: Int =  type.networkSize?: varchars[name]?: throw Exception("no network size for $name")
+                    val groupId = (type as? RecordMeta)?.groupId ?: 0
                     val recordMeta = RecordMeta(
                         name,
                         type as IOMemento,
                         offset,
                         offset + len,
                         type.createDecoder(len),
-                        type.createEncoder(len)
+                        type.createEncoder(len),
+                        groupId = groupId
                     )
                     offset += len
                     recordMeta

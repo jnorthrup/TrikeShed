@@ -33,6 +33,7 @@ import borg.trikeshed.lib.j
     val encoder: (Any?) -> ByteArray = type.createEncoder(end - begin),
     /** open to interpretation, for instance, CSV conversion to ISAM might define two RecordMetas for two steps*/
     var child: RecordMeta? = null,
+    val groupId: Int = 0,
     ) : ColumnMeta by (name j (type as TypeMemento)){
-       override fun toString(): String = "RecordMeta(name='$name', type=$type, begin=$begin, end=$end, decoder=$decoder, encoder=$encoder, child=$child)"
+       override fun toString(): String = "RecordMeta(name='$name', type=$type, begin=$begin, end=$end, decoder=$decoder, encoder=$encoder, child=$child, groupId=$groupId)"
     }

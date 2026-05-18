@@ -1,7 +1,7 @@
 @file:OptIn(ExperimentalForeignApi::class)
 @file:Suppress("NonAsciiCharacters")
 package borg.trikeshed.userspace.nio.platform.spi
-import borg.trikeshed.userspace.nio.platform.spi.CacheTopology
+import borg.trikeshed.lib.readableUnitsToNumber
 import kotlinx.cinterop.*
 import platform.posix.fclose
 import platform.posix.fgets
