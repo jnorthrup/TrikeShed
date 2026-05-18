@@ -1,0 +1,1074 @@
+openapi: 3.1.0
+info:
+  title: Robinhood Crypto Trading API
+  version: 1.0.0
+  description: OpenAPI document reconstructed from Robinhood Crypto Trading docs.
+externalDocs:
+  description: Robinhood Crypto Trading docs
+  url: https://docs.robinhood.com/crypto/trading/
+servers:
+- url: https://trading.robinhood.com
+tags:
+- name: Account
+- name: Market Data
+- name: Trading
+security:
+- x-api-key: []
+  x-signature: []
+  x-timestamp: []
+components:
+  securitySchemes:
+    x-api-key:
+      type: apiKey
+      in: header
+      name: x-api-key
+      description: Robinhood Crypto API key from the crypto account settings page.
+    x-signature:
+      type: apiKey
+      in: header
+      name: x-signature
+      description: Ed25519 request signature computed from api key, timestamp, path, method, and body.
+    x-timestamp:
+      type: apiKey
+      in: header
+      name: x-timestamp
+      description: Unix timestamp used when generating the signature.
+  schemas:
+    Error:
+      type: object
+      additionalProperties: true
+      properties:
+        detail:
+          type: string
+        code:
+          type: string
+        errors:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+    TradingAccount:
+      type: object
+      additionalProperties: true
+      properties:
+        account_number:
+          type: string
+        status:
+          type: string
+        buying_power:
+          type: string
+        buying_power_currency:
+          type: string
+        fee_tier:
+          type: string
+    TradingAccountPage:
+      type: object
+      additionalProperties: true
+      properties:
+        next:
+          type: string
+        previous:
+          type: string
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/TradingAccount'
+      required:
+      - results
+    TradingPair:
+      type: object
+      additionalProperties: true
+      properties:
+        symbol:
+          type: string
+        is_api_tradable:
+          type: boolean
+        min_order_size:
+          type: number
+        max_order_size:
+          type: number
+        price_increment:
+          type: number
+        quantity_increment:
+          type: number
+    TradingPairPage:
+      type: object
+      additionalProperties: true
+      properties:
+        next:
+          type: string
+        previous:
+          type: string
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/TradingPair'
+      required:
+      - results
+    Holding:
+      type: object
+      additionalProperties: true
+      properties:
+        asset_code:
+          type: string
+        total_quantity:
+          type: number
+        available_quantity:
+          type: number
+    HoldingPage:
+      type: object
+      additionalProperties: true
+      properties:
+        next:
+          type: string
+        previous:
+          type: string
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Holding'
+      required:
+      - results
+    MarketQuote:
+      type: object
+      additionalProperties: true
+      properties:
+        symbol:
+          type: string
+        bid:
+          type: number
+        ask:
+          type: number
+    BestBidAskPage:
+      type: object
+      additionalProperties: true
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/MarketQuote'
+      required:
+      - results
+    EstimatedPrice:
+      type: object
+      additionalProperties: true
+      properties:
+        symbol:
+          type: string
+        side:
+          type: string
+        quantity:
+          type: string
+        estimated_price:
+          type: number
+    EstimatedPricePage:
+      type: object
+      additionalProperties: true
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/EstimatedPrice'
+      required:
+      - results
+    OrderExecution:
+      type: object
+      additionalProperties: true
+    MarketOrderConfig:
+      type: object
+      additionalProperties: true
+      properties:
+        asset_quantity:
+          type: number
+    LimitOrderConfig:
+      type: object
+      additionalProperties: true
+      properties:
+        asset_quantity:
+          type: number
+        quote_amount:
+          type: number
+        limit_price:
+          type: number
+        time_in_force:
+          type: string
+    StopLossOrderConfig:
+      type: object
+      additionalProperties: true
+      properties:
+        asset_quantity:
+          type: number
+        quote_amount:
+          type: number
+        stop_price:
+          type: number
+        time_in_force:
+          type: string
+    StopLimitOrderConfig:
+      type: object
+      additionalProperties: true
+      properties:
+        asset_quantity:
+          type: number
+        quote_amount:
+          type: number
+        limit_price:
+          type: number
+        stop_price:
+          type: number
+        time_in_force:
+          type: string
+    CryptoOrderRequest:
+      type: object
+      additionalProperties: true
+      required:
+      - symbol
+      - client_order_id
+      - side
+      - type
+      properties:
+        symbol:
+          type: string
+          example: BTC-USD
+        client_order_id:
+          type: string
+          format: uuid
+        side:
+          type: string
+          enum:
+          - buy
+          - sell
+        type:
+          type: string
+          enum:
+          - market
+          - limit
+          - stop_limit
+          - stop_loss
+        market_order_config:
+          $ref: '#/components/schemas/MarketOrderConfig'
+        limit_order_config:
+          $ref: '#/components/schemas/LimitOrderConfig'
+        stop_loss_order_config:
+          $ref: '#/components/schemas/StopLossOrderConfig'
+        stop_limit_order_config:
+          $ref: '#/components/schemas/StopLimitOrderConfig'
+    CryptoOrder:
+      type: object
+      additionalProperties: true
+      properties:
+        id:
+          type: string
+          format: uuid
+        account_number:
+          type: string
+        symbol:
+          type: string
+        client_order_id:
+          type: string
+          format: uuid
+        side:
+          type: string
+          enum:
+          - buy
+          - sell
+        executions:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderExecution'
+        type:
+          type: string
+          enum:
+          - market
+          - limit
+          - stop_limit
+          - stop_loss
+        state:
+          type: string
+        average_price:
+          type: number
+        filled_asset_quantity:
+          type: number
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        market_order_config:
+          $ref: '#/components/schemas/MarketOrderConfig'
+        limit_order_config:
+          $ref: '#/components/schemas/LimitOrderConfig'
+        stop_loss_order_config:
+          $ref: '#/components/schemas/StopLossOrderConfig'
+        stop_limit_order_config:
+          $ref: '#/components/schemas/StopLimitOrderConfig'
+        fee_charged:
+          type: number
+        estimated_fee_remaining:
+          type: number
+    CryptoOrderPage:
+      type: object
+      additionalProperties: true
+      properties:
+        next:
+          type: string
+        previous:
+          type: string
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/CryptoOrder'
+      required:
+      - results
+paths:
+  /api/v2/crypto/trading/accounts/:
+    get:
+      tags:
+      - Account
+      operationId: v2GetAccounts
+      summary: Get Accounts
+      description: Retrieve a paginated list of crypto trading accounts for the authenticated user. Returns account details
+        including buying power, status, and fee tier information.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TradingAccountPage'
+        '400': &id001
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401': &id002
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403': &id003
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v2/crypto/marketdata/best_bid_ask/:
+    get:
+      tags:
+      - Market Data
+      operationId: v2GetBestBidAsk
+      summary: Get Best Price
+      description: Fetch a single bid and ask price per symbol, representing the best available price across our partner market
+        makers. This price does not take into account order size, and may not be the final execution price.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BestBidAskPage'
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      parameters:
+      - name: symbol
+        in: query
+        required: true
+        schema:
+          type: string
+          example: BTC-USD
+        description: List of trading pair symbol(s) to retrieve data for. Repeat the symbol parameter to request multiple
+          symbols.
+  /api/v2/crypto/trading/estimated_price/:
+    get:
+      tags:
+      - Market Data
+      operationId: v2GetEstimatedPrice
+      summary: Get Estimated Price
+      description: Return the estimated total cost or credit for a symbol, book side, and quantity. Request ask quotes to
+        estimate buy cost and bid quotes to estimate sell proceeds.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EstimatedPricePage'
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      parameters:
+      - name: symbol
+        in: query
+        required: true
+        schema:
+          type: string
+          example: BTC-USD
+        description: A valid currency pair symbol such as BTC-USD.
+      - name: side
+        in: query
+        required: true
+        schema:
+          type: string
+          enum:
+          - bid
+          - ask
+          - both
+          example: bid
+        description: Order side.
+      - name: quantity
+        in: query
+        required: true
+        schema:
+          type: string
+          example: 0.1,1,1.999
+        description: Comma-separated quantity list, up to 10 items.
+  /api/v2/crypto/trading/trading_pairs/:
+    get:
+      tags:
+      - Trading
+      operationId: v2GetTradingPairs
+      summary: Get Trading Pairs
+      description: Fetch a paginated list of available trading pairs for crypto trading. Returns trading pair details including
+        price increments, order size limits, and tradability status. Trading pairs can be filtered by symbol.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TradingPairPage'
+        '401': &id004
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403': &id005
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404': &id006
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      parameters:
+      - name: symbol
+        in: query
+        required: false
+        schema:
+          type: string
+          example: BTC-USD
+        description: Optional trading pair filter. Repeat the parameter to request multiple pairs.
+      - name: cursor
+        in: query
+        required: false
+        schema:
+          type: string
+        description: Pagination cursor from a previous response.
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+        description: Maximum number of results to return.
+  /api/v2/crypto/trading/holdings/:
+    get:
+      tags:
+      - Trading
+      operationId: v2GetHoldings
+      summary: Get Holdings
+      description: Retrieve a paginated list of crypto holdings for a specific account. Returns the total quantity and available
+        quantity for each asset held in the account.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HoldingPage'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+      parameters:
+      - name: account_number
+        in: query
+        required: true
+        schema:
+          type: string
+        description: The account number to retrieve holdings for.
+      - name: asset_code
+        in: query
+        required: false
+        schema:
+          type: string
+          example: BTC
+        description: Optional asset-code filter such as BTC.
+      - name: cursor
+        in: query
+        required: false
+        schema:
+          type: string
+        description: Pagination cursor from a previous response.
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+        description: Maximum number of results to return.
+  /api/v2/crypto/trading/orders/:
+    get:
+      tags:
+      - Trading
+      operationId: v2GetOrders
+      summary: Get Orders
+      description: Fetch a list of orders for the current user in a specific account.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CryptoOrderPage'
+        '401': *id004
+        '403': *id005
+        '404': *id006
+      parameters:
+      - name: account_number
+        in: query
+        required: true
+        schema:
+          type: string
+        description: The crypto account number to retrieve orders from.
+      - name: cursor
+        in: query
+        required: false
+        schema:
+          type: string
+        description: Pagination cursor from a previous response.
+      - name: created_at_start
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date-time
+        description: Filter orders created on or after this timestamp.
+      - name: created_at_end
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date-time
+        description: Filter orders created on or before this timestamp.
+      - name: updated_at_start
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date-time
+        description: Filter orders updated on or after this timestamp.
+      - name: updated_at_end
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date-time
+        description: Filter orders updated on or before this timestamp.
+      - name: symbol
+        in: query
+        required: false
+        schema:
+          type: string
+          example: BTC-USD
+        description: Filter orders by trading pair symbol.
+      - name: side
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - buy
+          - sell
+        description: Filter orders by side.
+      - name: type
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - market
+          - limit
+          - stop_limit
+          - stop_loss
+        description: Filter orders by type.
+      - name: state
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - open
+          - canceled
+          - filled
+          - failed
+          - pending
+        description: Filter orders by state.
+    post:
+      tags:
+      - Trading
+      operationId: v2PlaceOrder
+      summary: Place New Crypto Order
+      description: Place a new crypto trading order with an order type. This endpoint only supports placing orders on USD
+        symbols that have is_api_tradable=true.
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CryptoOrder'
+        '401': *id004
+        '403': *id005
+        '404': *id006
+      parameters:
+      - name: account_number
+        in: query
+        required: true
+        schema:
+          type: string
+        description: The number of the crypto account to place orders from.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CryptoOrderRequest'
+  /api/v2/crypto/trading/orders/{order_id}/:
+    get:
+      tags:
+      - Trading
+      operationId: v2GetOrder
+      summary: Get Order
+      description: Fetch a single order by order_id for the requested account.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CryptoOrder'
+        '401': *id004
+        '403': *id005
+        '404': *id006
+      parameters:
+      - name: order_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+        description: The ID of the order to fetch.
+      - name: account_number
+        in: query
+        required: true
+        schema:
+          type: string
+        description: The crypto account number that owns the order.
+  /api/v2/crypto/trading/orders/{id}/cancel/:
+    post:
+      tags:
+      - Trading
+      operationId: v2CancelOrder
+      summary: Cancel Open Crypto Order
+      description: Cancels an open crypto trading order.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CryptoOrder'
+        '401': &id007
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403': &id008
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+        description: The ID of the order to cancel.
+  /api/v1/crypto/trading/accounts/:
+    get:
+      tags:
+      - Account
+      operationId: v1GetAccountDetails
+      summary: Get Crypto Trading Account Details
+      description: Fetches the Robinhood Crypto account details for the current user.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TradingAccount'
+        '401': *id007
+        '403': *id008
+  /api/v1/crypto/marketdata/best_bid_ask/:
+    get:
+      tags:
+      - Market Data
+      operationId: v1GetBestBidAsk
+      summary: Get Best Price
+      description: Fetch the best bid and ask for one or more trading pair symbols.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BestBidAskPage'
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      parameters:
+      - name: symbol
+        in: query
+        required: true
+        schema:
+          type: string
+          example: BTC-USD
+        description: List of trading pair symbol(s) to retrieve data for. Repeat the parameter to request multiple symbols.
+  /api/v1/crypto/marketdata/estimated_price/:
+    get:
+      tags:
+      - Market Data
+      operationId: v1GetEstimatedPrice
+      summary: Get Estimated Price
+      description: Return the estimated total cost or credit for a symbol, side, and quantity list.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EstimatedPricePage'
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      parameters:
+      - name: symbol
+        in: query
+        required: true
+        schema:
+          type: string
+          example: BTC-USD
+        description: A valid currency pair such as BTC-USD.
+      - name: side
+        in: query
+        required: true
+        schema:
+          type: string
+          enum:
+          - bid
+          - ask
+          - both
+          example: ask
+        description: Order side.
+      - name: quantity
+        in: query
+        required: true
+        schema:
+          type: string
+          example: 0.1,1,1.999
+        description: Comma-separated quantity list, up to 10 items.
+  /api/v1/crypto/trading/trading_pairs/:
+    get:
+      tags:
+      - Trading
+      operationId: v1GetTradingPairs
+      summary: Get Crypto Trading Pairs
+      description: Fetch a list of available crypto trading pairs.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TradingPairPage'
+        '400': &id009
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404': &id010
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      parameters:
+      - name: symbol
+        in: query
+        required: false
+        schema:
+          type: string
+          example: BTC-USD
+        description: Optional trading pair filter. Repeat the parameter to request multiple pairs.
+      - name: cursor
+        in: query
+        required: false
+        schema:
+          type: string
+        description: Pagination cursor from a previous response.
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+        description: Maximum number of results to return.
+  /api/v1/crypto/trading/holdings/:
+    get:
+      tags:
+      - Trading
+      operationId: v1GetHoldings
+      summary: Get Crypto Holdings
+      description: Fetch a list of holdings for the current user.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HoldingPage'
+        '400': *id009
+        '404': *id010
+      parameters:
+      - name: asset_code
+        in: query
+        required: false
+        schema:
+          type: string
+          example: BTC
+        description: Optional asset-code filter such as BTC.
+      - name: cursor
+        in: query
+        required: false
+        schema:
+          type: string
+        description: Pagination cursor from a previous response.
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+        description: Maximum number of results to return.
+  /api/v1/crypto/trading/orders/:
+    get:
+      tags:
+      - Trading
+      operationId: v1GetOrders
+      summary: Get Crypto Orders
+      description: Fetch a list of orders for the current user.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CryptoOrderPage'
+        '400': *id009
+        '404': *id010
+      parameters:
+      - name: created_at_start
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date-time
+        description: Filter by created at start time range.
+      - name: created_at_end
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date-time
+        description: Filter by created at end time range.
+      - name: symbol
+        in: query
+        required: false
+        schema:
+          type: string
+          example: BTC-USD
+        description: Currency pair symbol such as BTC-USD.
+      - name: id
+        in: query
+        required: false
+        schema:
+          type: string
+          format: uuid
+        description: Order ID, unique per order.
+      - name: side
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - buy
+          - sell
+        description: Filter orders by side.
+      - name: state
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - open
+          - canceled
+          - partially_filled
+          - filled
+          - failed
+        description: Filter orders by state.
+      - name: type
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - limit
+          - market
+          - stop_limit
+          - stop_loss
+        description: Filter orders by type.
+      - name: updated_at_start
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date-time
+        description: Filter by updated at start time range.
+      - name: updated_at_end
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date-time
+        description: Filter by updated at end time range.
+      - name: cursor
+        in: query
+        required: false
+        schema:
+          type: string
+        description: Pagination cursor from a previous response.
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+        description: Maximum number of results to return.
+    post:
+      tags:
+      - Trading
+      operationId: v1PlaceOrder
+      summary: Place New Crypto Order
+      description: Place a new crypto trading order with an order type.
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CryptoOrder'
+        '400': *id009
+        '404': *id010
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CryptoOrderRequest'
+  /api/v1/crypto/trading/orders/{order_id}/:
+    get:
+      tags:
+      - Trading
+      operationId: v1GetOrder
+      summary: Get Crypto Order
+      description: Fetch a single crypto order by order ID.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CryptoOrder'
+        '400': *id009
+        '404': *id010
+      parameters:
+      - name: order_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+        description: The ID of the order to fetch.
+  /api/v1/crypto/trading/orders/{order_id}/cancel/:
+    post:
+      tags:
+      - Trading
+      operationId: v1CancelOrder
+      summary: Cancel Open Crypto Order
+      description: Cancels an open crypto trading order.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CryptoOrder'
+        '401': *id007
+        '403': *id008
+      parameters:
+      - name: order_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+        description: The ID of the order to cancel.
+
+x-trikeshed-context:
+  client:
+    - name: default
+      key: borg.trikeshed.test.DefaultKey
+      element: borg.trikeshed.test.DefaultElement
+      open: borg.trikeshed.test.openDefaultElement

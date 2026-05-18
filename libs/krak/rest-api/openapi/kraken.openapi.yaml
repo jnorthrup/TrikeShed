@@ -1,0 +1,1510 @@
+openapi: 3.1.0
+info:
+  title: Kraken Spot REST API
+  version: current
+  description: Conservative OpenAPI 3.1 spec built from Kraken API Center Spot REST endpoint pages. This captures documented
+    endpoint surfaces, summaries, and response descriptions from the live docs, not the guide-page hierarchy.
+servers:
+- url: https://api.kraken.com
+  description: Kraken API host
+tags:
+- name: Market Data
+  description: Public market data endpoints.
+- name: Account Data
+  description: account, balance, history, and reporting endpoints.
+- name: Trading
+  description: Order lifecycle and trading endpoints.
+- name: Funding
+  description: Deposit, withdrawal, and transfer endpoints.
+- name: Subaccounts
+  description: Subaccount management and allocation endpoints.
+- name: Strategies
+  description: Allocation and strategy management endpoints.
+- name: Earn
+  description: Earn strategy endpoints.
+components:
+  securitySchemes:
+    apiKeyAuth:
+      type: apiKey
+      in: header
+      name: API-Key
+    apiSignAuth:
+      type: apiKey
+      in: header
+      name: API-Sign
+  schemas:
+    GenericObject:
+      type: object
+      additionalProperties: true
+    GenericArray:
+      type: array
+      items: {}
+paths:
+  /0/private/AccountTransfer:
+    post:
+      tags:
+      - Subaccounts
+      operationId: accountTransfer
+      summary: Account Transfer
+      description: 'Transfer funds to and from master and subaccounts. Note: AccountTransfer must be called using an API key
+        from the master account. API Key Permissions Required: Funds permissions - Withdraw'
+      responses:
+        '200':
+          description: Funds transferred between accounts.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericObject'
+      x-kraken-source: https://docs.kraken.com/api/docs/rest-api/account-transfer
+      security:
+      - apiKeyAuth: []
+        apiSignAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenericObject'
+  /0/private/AddExport:
+    post:
+      tags:
+      - Account Data
+      operationId: addExport
+      summary: Request Export Report
+      description: 'Request export of trades or ledgers. API Key Permissions Required: Data - Export data'
+      responses:
+        '200':
+          description: Export request made
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericObject'
+      x-kraken-source: https://docs.kraken.com/api/docs/rest-api/add-export
+      security:
+      - apiKeyAuth: []
+        apiSignAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenericObject'
+  /0/private/AddOrder:
+    post:
+      tags:
+      - Trading
+      operationId: addOrder
+      summary: Add Order
+      description: 'Place a new order. Note: See the AssetPairs endpoint for details on the available trading pairs, their
+        price and quantity precisions, order minimums, available leverage, etc. API Key Permissions Required: Orders and trades
+        - Create & modify orders'
+      responses:
+        '200':
+          description: Order added.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericObject'
+      x-kraken-source: https://docs.kraken.com/api/docs/rest-api/add-order
+      security:
+      - apiKeyAuth: []
+        apiSignAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenericObject'
+  /0/private/AddOrderBatch:
+    post:
+      tags:
+      - Trading
+      operationId: addOrderBatch
+      summary: Add Order Batch
+      description: 'Sends a collection of orders (minimum of 2 and maximum 15): Validation is performed on the whole batch
+        prior to submission to the engine. If an order fails validation, the whole batch will be rejected. On submission to
+        the engine, if an order fails pre-match checks (i.e. funding), then the individual order will be rejected and remainder
+        of the batch will be processed. All orders in batch are limited to a single pair. Note: See the AssetPairs endpoint
+        for details on the available trading pairs, their price and quantity precisions, order minimums, available leverage,
+        etc. API Key Permissions Required: Orders and trades - Create & modify orders and Orders and trades - Cancel & close
+        orders'
+      responses:
+        '200':
+          description: The order of returned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericObject'
+      x-kraken-source: https://docs.kraken.com/api/docs/rest-api/add-order-batch
+      security:
+      - apiKeyAuth: []
+        apiSignAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenericObject'
+  /0/private/Earn/Allocate:
+    post:
+      tags:
+      - Earn
+      operationId: allocateStrategy
+      summary: Allocate Earn Funds
+      description: 'Allocate funds to the Strategy. Requires the Earn Funds API key permission. The amount must always be
+        defined. This method is asynchronous. A couple of preflight checks are performed synchronously on behalf of the method
+        before it is dispatched further. The client is required to poll the result using the /0/private/Earn/AllocateStatus
+        endpoint. There can be only one (de)allocation request in progress for given user and strategy at any time. While
+        the operation is in progress: pending attribute in /Earn/Allocations response for the strategy indicates that funds
+        are being allocated, pending attribute in /Earn/AllocateStatus response will be true. Following specific errors within
+        Earnings class can be returned by this method: Minimum allocation: EEarnings:Below min:(De)allocation operation amount
+        less than minimum Allocation in progress: EEarnings:Busy:Another (de)allocation for the same strategy is in progress
+        Service temporarily unavailable: EEarnings:Busy . Try again in a few minutes. User tier verification: EEarnings:Permission
+        denied:The user''s tier is not high enough Strategy not found: EGeneral:Invalid arguments:Invalid strategy ID'
+      responses:
+        '200':
+          description: Earn
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericObject'
+      x-kraken-source: https://docs.kraken.com/api/docs/rest-api/allocate-strategy
+      security:
+      - apiKeyAuth: []
+        apiSignAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenericObject'
+  /0/private/AmendOrder:
+    post:
+      tags:
+      - Trading
+      operationId: amendOrder
+      summary: Amend Order
+      description: 'The amend request enables clients to modify the order parameters in-place without the need to cancel the
+        existing order and create a new one. The order identifiers assigned by Kraken and/or client will stay the same. Queue
+        priority in the order book will be maintained where possible. If an amend request will reduce the order quantity below
+        the existing filled quantity, the remaining quantity will be cancelled. For more detail, see amend transaction guide
+        . API Key Permissions Required: Orders and trades - Create & modify orders or Orders and trades - Cancel & close orders'
+      responses:
+        '200':
+          description: A successful amend request will return the unique Kraken amend identifier.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericObject'
+      x-kraken-source: https://docs.kraken.com/api/docs/rest-api/amend-order
+      security:
+      - apiKeyAuth: []
+        apiSignAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenericObject'
+  /0/private/CancelAll:
+    post:
+      tags:
+      - Trading
+      operationId: cancelAllOrders
+      summary: Cancel All Orders
+      description: 'Cancel all open orders API Key Permissions Required: Orders and trades - Create & modify orders or Orders
+        and trades - Cancel & close orders'
+      responses:
+        '200':
+          description: Open orders cancelled.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericObject'
+      x-kraken-source: https://docs.kraken.com/api/docs/rest-api/cancel-all-orders
+      security:
+      - apiKeyAuth: []
+        apiSignAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenericObject'
+  /0/private/CancelAllOrdersAfter:
+    post:
+      tags:
+      - Trading
+      operationId: cancelAllOrdersAfter
+      summary: Cancel All Orders After X
+      description: 'CancelAllOrdersAfter provides a "Dead Man''s Switch" mechanism to protect the client from network malfunction,
+        extreme latency or unexpected matching engine downtime. The client can send a request with a timeout (in seconds),
+        that will start a countdown timer which will cancel all client orders when the timer expires. The client has to keep
+        sending new requests to push back the trigger time, or deactivate the mechanism by specifying a timeout of 0. If the
+        timer expires, all orders are cancelled and then the timer remains disabled until the client provides a new (non-zero)
+        timeout. The recommended use is to make a call every 15 to 30 seconds, providing a timeout of 60 seconds. This allows
+        the client to keep the orders in place in case of a brief disconnection or transient delay, while keeping them safe
+        in case of a network breakdown. It is also recommended to disable the timer ahead of regularly scheduled trading engine
+        maintenance (if the timer is enabled, all orders will be cancelled when the trading engine comes back from downtime
+        - planned or otherwise). API Key Permissions Required: Orders and trades - Create & modify orders or Orders and trades
+        - Cancel & close orders'
+      responses:
+        '200':
+          description: Dead man's switch timer reset or disabled.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericObject'
+      x-kraken-source: https://docs.kraken.com/api/docs/rest-api/cancel-all-orders-after
+      security:
+      - apiKeyAuth: []
+        apiSignAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenericObject'
+  /0/private/CancelOrder:
+    post:
+      tags:
+      - Trading
+      operationId: cancelOrder
+      summary: Cancel Order
+      description: 'Cancel a particular open order (or set of open orders) by txid , userref or cl_ord_id API Key Permissions
+        Required: Orders and trades - Create & modify orders or Orders and trades - Cancel & close orders'
+      responses:
+        '200':
+          description: Open order cancelled.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericObject'
+      x-kraken-source: https://docs.kraken.com/api/docs/rest-api/cancel-order
+      security:
+      - apiKeyAuth: []
+        apiSignAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenericObject'
+  /0/private/CancelOrderBatch:
+    post:
+      tags:
+      - Trading
+      operationId: cancelOrderBatch
+      summary: Cancel Order Batch
+      description: 'Cancel multiple open orders by txid , userref or cl_ord_id (maximum 50 total unique IDs/references) API
+        Key Permissions Required: Orders and trades - Create & modify orders or Orders and trades - Cancel & close orders'
+      responses:
+        '200':
+          description: Open order cancelled.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericObject'
+      x-kraken-source: https://docs.kraken.com/api/docs/rest-api/cancel-order-batch
+      security:
+      - apiKeyAuth: []
+        apiSignAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenericObject'
+  /0/private/WithdrawCancel:
+    post:
+      tags:
+      - Funding
+      operationId: cancelWithdrawal
+      summary: Request Withdrawal Cancellation
+      description: 'Cancel a recently requested withdrawal, if it has not already been successfully processed. API Key Permissions
+        Required: Funds permissions - Withdraw , unless withdrawal is a WalletTransfer , then no permissions are required.'
+      responses:
+        '200':
+          description: Withdrawal cancellation requested.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericObject'
+      x-kraken-source: https://docs.kraken.com/api/docs/rest-api/cancel-withdrawal
+      security:
+      - apiKeyAuth: []
+        apiSignAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenericObject'
+  /0/private/CreateSubaccount:
+    post:
+      tags:
+      - Subaccounts
+      operationId: createSubaccount
+      summary: Create Subaccount
+      description: 'Create a trading subaccount. Note: CreateSubaccount must be called using an API key from the master account.
+        API Key Permissions Required: Funds permissions - Withdraw'
+      responses:
+        '200':
+          description: Subaccount created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericObject'
+      x-kraken-source: https://docs.kraken.com/api/docs/rest-api/create-subaccount
+      security:
+      - apiKeyAuth: []
+        apiSignAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenericObject'
+  /0/private/Earn/Deallocate:
+    post:
+      tags:
+      - Earn
+      operationId: deallocateStrategy
+      summary: Deallocate Earn Funds
+      description: 'Deallocate funds from a strategy. Requires the Earn Funds API key permission. The amount must always be
+        defined. This method is asynchronous. A couple of preflight checks are performed synchronously on behalf of the method
+        before it is dispatched further. If the method returns HTTP 202 code, the client is required to poll the result using
+        the /Earn/DeallocateStatus endpoint. There can be only one (de)allocation request in progress for given user and strategy.
+        While the operation is in progress: pending attribute in Allocations response for the strategy will hold the amount
+        that is being deallocated (negative amount) pending attribute in DeallocateStatus response will be true. Following
+        specific errors within Earnings class can be returned by this method: Minimum allocation: EEarnings:Below min:(De)allocation
+        operation amount less than minimum allowed Allocation in progress: EEarnings:Busy:Another (de)allocation for the same
+        strategy is in progress Strategy not found: EGeneral:Invalid arguments:Invalid strategy ID'
+      responses:
+        '200':
+          description: Allocate Earn Funds
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericObject'
+      x-kraken-source: https://docs.kraken.com/api/docs/rest-api/deallocate-strategy
+      security:
+      - apiKeyAuth: []
+        apiSignAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenericObject'
+  /0/private/EditOrder:
+    post:
+      tags:
+      - Trading
+      operationId: editOrder
+      summary: Edit Order
+      description: 'Sends a request to edit the order parameters of a live order. When an order has been successfully modified,
+        the original order will be cancelled and a new order will be created with the adjusted parameters a new txid will
+        be returned in the response. note The new AmendOrder endpoint resolves the caveats listed below and has additional
+        performance gains. There are a number of caveats for EditOrder : triggered stop loss or profit take profit orders
+        are not supported. orders with conditional close terms attached are not supported. orders where the executed volume
+        is greater than the newly supplied volume will be rejected. cl_ord_id is not supported. existing executions will are
+        associated with the original order and not copied to the amended order. queue position will not be maintained. API
+        Key Permissions Required: Orders and trades - Create & modify orders and Orders and trades - Cancel & close orders'
+      responses:
+        '200':
+          description: Order edited.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericObject'
+      x-kraken-source: https://docs.kraken.com/api/docs/rest-api/edit-order
+      security:
+      - apiKeyAuth: []
+        apiSignAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenericObject'
+  /0/private/ExportStatus:
+    post:
+      tags:
+      - Account Data
+      operationId: exportStatus
+      summary: Get Export Report Status
+      description: 'Get status of requested data exports. API Key Permissions Required: Data - Export data'
+      responses:
+        '200':
+          description: Export status retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericObject'
+      x-kraken-source: https://docs.kraken.com/api/docs/rest-api/export-status
+      security:
+      - apiKeyAuth: []
+        apiSignAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenericObject'
+  /0/private/Balance:
+    post:
+      tags:
+      - Account Data
+      operationId: getAccountBalance
+      summary: Get Account Balance
+      description: 'Retrieve all cash balances, net of pending withdrawals. Note on Staking/Earn assets: We have begun to
+        migrate assets from our legacy Staking system over to a new Earn system. As such, the following assets may appear
+        in your balances and ledger. Please see our Support article for more details. Note that these assets are "read-only",
+        to interact with your balances in them please use the base asset (e.g. USDT to transact with your USDT and USDT.F
+        balances). Symbol Extensions : .B : balances in new yield-bearing products, similar to .S (staked) and .M (opt-in
+        rewards) balances .F : balances earning automatically in Kraken Rewards .T : tokenized assets. API Key Permissions
+        Required: Funds permissions - Query'
+      responses:
+        '200':
+          description: Account balances retrieved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericObject'
+      x-kraken-source: https://docs.kraken.com/api/docs/rest-api/get-account-balance
+      security:
+      - apiKeyAuth: []
+        apiSignAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenericObject'
+  /0/private/Earn/AllocateStatus:
+    post:
+      tags:
+      - Earn
+      operationId: getAllocateStrategyStatus
+      summary: Get Allocation Status
+      description: 'Get the status of the last allocation request. Requires either the Earn Funds or Query Funds API key permission.
+        (De)allocation operations are asynchronous and this endpoint allows client to retrieve the status of the last dispatched
+        operation. There can be only one (de)allocation request in progress for given user and strategy. The pending attribute
+        in the response indicates if the previously dispatched operation is still in progress (true) or has successfully completed
+        (false). If the dispatched request failed with an error, then HTTP error is returned to the client as if it belonged
+        to the original request. Following specific errors within Earnings class can be returned by this method: Insufficient
+        funds: EEarnings:Insufficient funds:Insufficient funds to complete the (de)allocation request User cap exceeded: EEarnings:Above
+        max:The allocation exceeds user limit for the strategy Total cap exceeded: EEarnings:Above max:The allocation exceeds
+        the total strategy limit Minimum allocation: EEarnings:Below min:(De)allocation operation amount less than minimum'
+      responses:
+        '200':
+          description: Deallocate Earn Funds
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericObject'
+      x-kraken-source: https://docs.kraken.com/api/docs/rest-api/get-allocate-strategy-status
+      security:
+      - apiKeyAuth: []
+        apiSignAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenericObject'
+  /0/private/GetApiKeyInfo:
+    post:
+      tags:
+      - Account Data
+      operationId: getApiKeyInfo
+      summary: Get API Key Info
+      description: 'Retrieve information about the API key that is used to make the request, including its name, permissions,
+        restrictions, and usage timestamps. API Key Permissions Required: None'
+      responses:
+        '200':
+          description: API key information retrieved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericObject'
+      x-kraken-source: https://docs.kraken.com/api/docs/rest-api/get-api-key-info
+      security:
+      - apiKeyAuth: []
+        apiSignAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenericObject'
+  /0/public/Assets:
+    get:
+      tags:
+      - Market Data
+      operationId: getAssetInfo
+      summary: Get Asset Info
+      description: Get information about the assets that are available for deposit, withdrawal, trading and earn.
+      responses:
+        '200':
+          description: Asset info retrieved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericObject'
+      x-kraken-source: https://docs.kraken.com/api/docs/rest-api/get-asset-info
+  /0/private/ClosedOrders:
+    post:
+      tags:
+      - Account Data
+      operationId: getClosedOrders
+      summary: Get Closed Orders
+      description: 'Retrieve information about orders that have been closed (filled or cancelled). 50 results are returned
+        at a time, the most recent by default. Note: If an order''s tx ID is given for start or end time, the order''s opening
+        time ( opentm ) is used API Key Permissions Required: Orders and trades - Query closed orders & trades'
+      responses:
+        '200':
+          description: Closed orders info retrieved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericObject'
+      x-kraken-source: https://docs.kraken.com/api/docs/rest-api/get-closed-orders
+      security:
+      - apiKeyAuth: []
+        apiSignAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenericObject'
+  /0/private/CreditLines:
+    post:
+      tags:
+      - Account Data
+      operationId: getCreditLines
+      summary: Get Credit Lines
+      description: 'Retrieve all credit line details for VIPs with this functionality. API Key Permissions Required: Funds
+        permissions - Query'
+      responses:
+        '200':
+          description: Credit line details retrieved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericObject'
+      x-kraken-source: https://docs.kraken.com/api/docs/rest-api/get-credit-lines
+      security:
+      - apiKeyAuth: []
+        apiSignAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenericObject'
+  /0/private/Earn/DeallocateStatus:
+    post:
+      tags:
+      - Earn
+      operationId: getDeallocateStrategyStatus
+      summary: Get Deallocation Status
+      description: 'Get the status of the last deallocation request. Requires either the Earn Funds or Query Funds API key
+        permission. (De)allocation operations are asynchronous and this endpoint allows client to retrieve the status of the
+        last dispatched operation. There can be only one (de)allocation request in progress for given user and strategy. The
+        pending attribute in the response indicates if the previously dispatched operation is still in progress (true) or
+        has successfully completed (false). If the dispatched request failed with an error, then HTTP error is returned to
+        the client as if it belonged to the original request. Following specific errors within Earnings class can be returned
+        by this method: Insufficient funds: EEarnings:Insufficient funds:Insufficient funds to complete the (de)allocation
+        request Minimum allocation: EEarnings:Below min:(De)allocation operation amount less than minimum'
+      responses:
+        '200':
+          description: Get Allocation Status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericObject'
+      x-kraken-source: https://docs.kraken.com/api/docs/rest-api/get-deallocate-strategy-status
+      security:
+      - apiKeyAuth: []
+        apiSignAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenericObject'
+  /0/private/DepositAddresses:
+    post:
+      tags:
+      - Funding
+      operationId: getDepositAddresses
+      summary: Get Deposit Addresses
+      description: 'Retrieve (or generate a new) deposit addresses for a particular asset and method. API Key Permissions
+        Required: Funds permissions - Query'
+      responses:
+        '200':
+          description: Deposit addresses retrieved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericObject'
+      x-kraken-source: https://docs.kraken.com/api/docs/rest-api/get-deposit-addresses
+      security:
+      - apiKeyAuth: []
+        apiSignAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenericObject'
+  /0/private/DepositMethods:
+    post:
+      tags:
+      - Funding
+      operationId: getDepositMethods
+      summary: Get Deposit Methods
+      description: 'Retrieve methods available for depositing a particular asset. API Key Permissions Required: Funds permissions
+        - Query and Funds permissions - Deposit'
+      responses:
+        '200':
+          description: Deposit methods retrieved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericObject'
+      x-kraken-source: https://docs.kraken.com/api/docs/rest-api/get-deposit-methods
+      security:
+      - apiKeyAuth: []
+        apiSignAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenericObject'
+  /0/private/BalanceEx:
+    post:
+      tags:
+      - Account Data
+      operationId: getExtendedBalance
+      summary: Get Extended Balance
+      description: 'Retrieve all extended account balances, including credits and held amounts. Balance available for trading
+        is calculated as: available balance = balance + credit - credit_used - hold_trade Note on Staking/Earn assets: We
+        have begun to migrate assets from our legacy Staking system over to a new Earn system. As such, the following assets
+        may appear in your balances and ledger. Please see our Support article for more details. Note that these assets are
+        "read-only", to interact with your balances in them please use the base asset (e.g. USDT to transact with your USDT
+        and USDT.F balances). Symbol Extensions : .B : balances in new yield-bearing products, similar to .S (staked) and
+        .M (opt-in rewards) balances .F : balances earning automatically in Kraken Rewards .T : tokenized assets. API Key
+        Permissions Required: Funds permissions - Query'
+      responses:
+        '200':
+          description: Extended account balances retrieved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericObject'
+      x-kraken-source: https://docs.kraken.com/api/docs/rest-api/get-extended-balance
+      security:
+      - apiKeyAuth: []
+        apiSignAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenericObject'
+  /0/public/GroupedBook:
+    get:
+      tags:
+      - Market Data
+      operationId: getGroupedOrderBook
+      summary: Get Grouped Order Book
+      description: The GroupedBook endpoint aggregates the volume in the order book over a specified tick range. It provides
+        a summary of liquidity deep into the book, useful for user interface display. Bids and asks between grouped price
+        levels are accumulated to the nearest passive level (asks rounded up, bids down).
+      responses:
+        '200':
+          description: Grouped order book data retrieved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericObject'
+      x-kraken-source: https://docs.kraken.com/api/docs/rest-api/get-grouped-order-book
+  /0/private/Ledgers:
+    post:
+      tags:
+      - Account Data
+      operationId: getLedgers
+      summary: Get Ledgers Info
+      description: 'Retrieve information about ledger entries. 50 results are returned at a time, the most recent by default.
+        Note on Staking/Earn assets: We have begun to migrate assets from our legacy Staking system over to a new Earn system.
+        As such, the following assets may appear in your balances and ledger. Please see our Support article for more details.
+        Note that these assets are "read-only", to interact with your balances in them please use the base asset (e.g. USDT
+        to transact with your USDT and USDT.F balances). .B , which represents balances in new yield-bearing products, similar
+        to .S (staked) and .M (opt-in rewards) balances .F , which represents balances earning automatically in Kraken Rewards
+        API Key Permissions Required: Data - Query ledger entries'
+      responses:
+        '200':
+          description: Ledgers info retrieved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericObject'
+      x-kraken-source: https://docs.kraken.com/api/docs/rest-api/get-ledgers
+      security:
+      - apiKeyAuth: []
+        apiSignAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenericObject'
+  /0/private/QueryLedgers:
+    post:
+      tags:
+      - Account Data
+      operationId: getLedgersInfo
+      summary: Query Ledgers
+      description: 'Retrieve information about specific ledger entries. Note on Staking/Earn assets: We have begun to migrate
+        assets from our legacy Staking system over to a new Earn system. As such, the following assets may appear in your
+        balances and ledger. Please see our Support article for more details. Note that these assets are "read-only", to interact
+        with your balances in them please use the base asset (e.g. USDT to transact with your USDT and USDT.F balances). .B
+        , which represents balances in new yield-bearing products, similar to .S (staked) and .M (opt-in rewards) balances
+        .F , which represents balances earning automatically in Kraken Rewards API Key Permissions Required: Data - Query
+        ledger entries'
+      responses:
+        '200':
+          description: Ledgers info retrieved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericObject'
+      x-kraken-source: https://docs.kraken.com/api/docs/rest-api/get-ledgers-info
+      security:
+      - apiKeyAuth: []
+        apiSignAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenericObject'
+  /0/private/Level3:
+    post:
+      tags:
+      - Market Data
+      operationId: getLevel3OrderBook
+      summary: Query L3 Order Book
+      description: 'Retrieve Level3 order book data, which provides individual order information at each price level. This
+        includes order IDs and timestamps for each order in the book. The Level3 endpoint requires authentication. API Key
+        Permissions Required: Orders and trades - Query open orders & trades'
+      responses:
+        '200':
+          description: Level 3 order book data retrieved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericObject'
+      x-kraken-source: https://docs.kraken.com/api/docs/rest-api/get-level-3-order-book
+      security:
+      - apiKeyAuth: []
+        apiSignAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenericObject'
+  /0/public/OHLC:
+    get:
+      tags:
+      - Market Data
+      operationId: getOhlcData
+      summary: Get OHLC Data
+      description: Retrieve OHLC market data. The last entry in the OHLC array is for the current, not-yet-committed timeframe,
+        and will always be present, regardless of the value of since . Returns up to 720 of the most recent entries (older
+        data cannot be retrieved, regardless of the value of since ).
+      responses:
+        '200':
+          description: OHLC data retrieved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericObject'
+      x-kraken-source: https://docs.kraken.com/api/docs/rest-api/get-ohlc-data
+  /0/private/OpenOrders:
+    post:
+      tags:
+      - Account Data
+      operationId: getOpenOrders
+      summary: Get Open Orders
+      description: 'Retrieve information about currently open orders. API Key Permissions Required: Orders and trades - Query
+        open orders & trades'
+      responses:
+        '200':
+          description: Open orders info retrieved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericObject'
+      x-kraken-source: https://docs.kraken.com/api/docs/rest-api/get-open-orders
+      security:
+      - apiKeyAuth: []
+        apiSignAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenericObject'
+  /0/private/OpenPositions:
+    post:
+      tags:
+      - Account Data
+      operationId: getOpenPositions
+      summary: Get Open Positions
+      description: 'Get information about open margin positions. API Key Permissions Required: Orders and trades - Query open
+        orders & trades'
+      responses:
+        '200':
+          description: Open positions info retrieved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericObject'
+      x-kraken-source: https://docs.kraken.com/api/docs/rest-api/get-open-positions
+      security:
+      - apiKeyAuth: []
+        apiSignAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenericObject'
+  /0/private/OrderAmends:
+    post:
+      tags:
+      - Account Data
+      operationId: getOrderAmends
+      summary: Get Order Amends
+      description: 'Retrieves an audit trail of amend transactions on the specified order. The list is ordered by ascending
+        amend timestamp. API Key Permissions Required: Orders and trades - Query open orders & trades or Orders and trades
+        - Query closed orders & trades , depending on status of order.'
+      responses:
+        '200':
+          description: The first entry contains the original order parameters and has amend_type of
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericObject'
+      x-kraken-source: https://docs.kraken.com/api/docs/rest-api/get-order-amends
+      security:
+      - apiKeyAuth: []
+        apiSignAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenericObject'
+  /0/public/Depth:
+    get:
+      tags:
+      - Market Data
+      operationId: getOrderBook
+      summary: Get Order Book
+      description: Returns level 2 (L2) order book, which describes the individual price levels in the book with aggregated
+        order quantities at each level.
+      responses:
+        '200':
+          description: Order book entries retrieved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericObject'
+      x-kraken-source: https://docs.kraken.com/api/docs/rest-api/get-order-book
+  /0/private/QueryOrders:
+    post:
+      tags:
+      - Account Data
+      operationId: getOrdersInfo
+      summary: Query Orders Info
+      description: 'Retrieve information about specific orders. API Key Permissions Required: Orders and trades - Query open
+        orders & trades or Orders and trades - Query closed orders & trades , depending on status of order'
+      responses:
+        '200':
+          description: Orders info retrieved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericObject'
+      x-kraken-source: https://docs.kraken.com/api/docs/rest-api/get-orders-info
+      security:
+      - apiKeyAuth: []
+        apiSignAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenericObject'
+  /0/public/PostTrade:
+    get:
+      tags:
+      - Transparency
+      operationId: getPostTrade
+      summary: Post-Trade Data
+      description: Returns a list of trades on the spot exchange. If no filter parameters are specified, the last 1000 trades
+        for all pairs are received.
+      responses:
+        '200':
+          description: Pre-Trade Data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericObject'
+      x-kraken-source: https://docs.kraken.com/api/docs/rest-api/get-post-trade
+  /0/public/PreTrade:
+    get:
+      tags:
+      - Transparency
+      operationId: getPreTrade
+      summary: Pre-Trade Data
+      description: Returns the price levels in the order book with aggregated order quantities at each price level. The top
+        10 levels are returned for each trading pair.
+      responses:
+        '200':
+          description: The top price levels of the aggregated order book.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericObject'
+      x-kraken-source: https://docs.kraken.com/api/docs/rest-api/get-pre-trade
+  /0/public/Spread:
+    get:
+      tags:
+      - Market Data
+      operationId: getRecentSpreads
+      summary: Get Recent Spreads
+      description: Returns the last ~200 top-of-book spreads for a given pair
+      responses:
+        '200':
+          description: Spread data retrieved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericObject'
+      x-kraken-source: https://docs.kraken.com/api/docs/rest-api/get-recent-spreads
+  /0/public/Trades:
+    get:
+      tags:
+      - Market Data
+      operationId: getRecentTrades
+      summary: Get Recent Trades
+      description: Returns the last 1000 trades by default
+      responses:
+        '200':
+          description: Trade data retrieved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericObject'
+      x-kraken-source: https://docs.kraken.com/api/docs/rest-api/get-recent-trades
+  /0/public/Time:
+    get:
+      tags:
+      - Market Data
+      operationId: getServerTime
+      summary: Get Server Time
+      description: Get the server's time.
+      responses:
+        '200':
+          description: Success response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericObject'
+      x-kraken-source: https://docs.kraken.com/api/docs/rest-api/get-server-time
+  /0/private/DepositStatus:
+    post:
+      tags:
+      - Funding
+      operationId: getStatusRecentDeposits
+      summary: Get Status of Recent Deposits
+      description: 'Retrieve information about recent deposits. Results are sorted by recency, use the cursor parameter to
+        iterate through list of deposits (page size equal to value of limit ) from newest to oldest. API Key Permissions Required:
+        Funds permissions - Query'
+      responses:
+        '200':
+          description: Recent deposits retrieved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericObject'
+      x-kraken-source: https://docs.kraken.com/api/docs/rest-api/get-status-recent-deposits
+      security:
+      - apiKeyAuth: []
+        apiSignAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenericObject'
+  /0/private/WithdrawStatus:
+    post:
+      tags:
+      - Funding
+      operationId: getStatusRecentWithdrawals
+      summary: Get Status of Recent Withdrawals
+      description: 'Retrieve information about recent withdrawals. Results are sorted by recency, use the cursor parameter
+        to iterate through list of withdrawals (page size equal to value of limit ) from newest to oldest. API Key Permissions
+        Required: Funds permissions - Withdraw or Data - Query ledger entries'
+      responses:
+        '200':
+          description: Recent withdrawals retrieved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericObject'
+      x-kraken-source: https://docs.kraken.com/api/docs/rest-api/get-status-recent-withdrawals
+      security:
+      - apiKeyAuth: []
+        apiSignAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenericObject'
+  /0/public/SystemStatus:
+    get:
+      tags:
+      - Market Data
+      operationId: getSystemStatus
+      summary: Get System Status
+      description: Get the current system status or trading mode.
+      responses:
+        '200':
+          description: Success response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericObject'
+      x-kraken-source: https://docs.kraken.com/api/docs/rest-api/get-system-status
+  /0/public/Ticker:
+    get:
+      tags:
+      - Market Data
+      operationId: getTickerInformation
+      summary: Get Ticker Information
+      description: Get ticker information for all or requested markets. To clarify usage, note that Today's prices start at
+        midnight UTC Leaving the pair parameter blank will return tickers for all tradeable assets on Kraken
+      responses:
+        '200':
+          description: Ticker info retrieved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericObject'
+      x-kraken-source: https://docs.kraken.com/api/docs/rest-api/get-ticker-information
+  /0/public/AssetPairs:
+    get:
+      tags:
+      - Market Data
+      operationId: getTradableAssetPairs
+      summary: Get Tradable Asset Pairs
+      description: Get tradable asset pairs
+      responses:
+        '200':
+          description: Tradable asset pairs retrieved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericObject'
+      x-kraken-source: https://docs.kraken.com/api/docs/rest-api/get-tradable-asset-pairs
+  /0/private/TradeBalance:
+    post:
+      tags:
+      - Account Data
+      operationId: getTradeBalance
+      summary: Get Trade Balance
+      description: 'Retrieve a summary of collateral balances, margin position valuations, equity and margin level. API Key
+        Permissions Required: Orders and trades - Query open orders & trades'
+      responses:
+        '200':
+          description: Trade balances retrieved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericObject'
+      x-kraken-source: https://docs.kraken.com/api/docs/rest-api/get-trade-balance
+      security:
+      - apiKeyAuth: []
+        apiSignAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenericObject'
+  /0/private/TradesHistory:
+    post:
+      tags:
+      - Account Data
+      operationId: getTradeHistory
+      summary: Get Trades History
+      description: 'Retrieve information about trades/fills. 50 results are returned at a time, the most recent by default.
+        Unless otherwise stated, costs, fees, prices, and volumes are specified with the precision for the asset pair ( pair_decimals
+        and lot_decimals ), not the individual assets'' precision ( decimals ). API Key Permissions Required: Orders and trades
+        - Query closed orders & trades'
+      responses:
+        '200':
+          description: Trade history retrieved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericObject'
+      x-kraken-source: https://docs.kraken.com/api/docs/rest-api/get-trade-history
+      security:
+      - apiKeyAuth: []
+        apiSignAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenericObject'
+  /0/private/TradeVolume:
+    post:
+      tags:
+      - Account Data
+      operationId: getTradeVolume
+      summary: Get Trade Volume
+      description: 'Returns 30 day USD trading volume and resulting fee schedule for any asset pair(s) provided. Fees will
+        not be included if pair is not specified as Kraken fees differ by asset pair. Note: If an asset pair is on a maker/taker
+        fee schedule, the taker side is given in fees and maker side in fees_maker . For pairs not on maker/taker, they will
+        only be given in fees . API Key Permissions Required: Funds permissions - Query'
+      responses:
+        '200':
+          description: Trade Volume retrieved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericObject'
+      x-kraken-source: https://docs.kraken.com/api/docs/rest-api/get-trade-volume
+      security:
+      - apiKeyAuth: []
+        apiSignAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenericObject'
+  /0/private/QueryTrades:
+    post:
+      tags:
+      - Account Data
+      operationId: getTradesInfo
+      summary: Query Trades Info
+      description: 'Retrieve information about specific trades/fills. API Key Permissions Required: Orders and trades - Query
+        closed orders & trades'
+      responses:
+        '200':
+          description: Trades info retrieved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericObject'
+      x-kraken-source: https://docs.kraken.com/api/docs/rest-api/get-trades-info
+      security:
+      - apiKeyAuth: []
+        apiSignAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenericObject'
+  /0/private/GetWebSocketsToken:
+    post:
+      tags:
+      - Trading
+      operationId: getWebsocketsToken
+      summary: Get Websockets Token
+      description: 'An authentication token must be requested via this REST API endpoint in order to connect to and authenticate
+        with our Websockets API . The token should be used within 15 minutes of creation, but it does not expire once a successful
+        Websockets connection andsubscription has been made and is maintained. API Key Permissions Required: WebSocket
+        interface - On'
+      responses:
+        '200':
+          description: Websockets token retrieved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericObject'
+      x-kraken-source: https://docs.kraken.com/api/docs/rest-api/get-websockets-token
+      security:
+      - apiKeyAuth: []
+        apiSignAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenericObject'
+  /0/private/WithdrawAddresses:
+    post:
+      tags:
+      - Funding
+      operationId: getWithdrawalAddresses
+      summary: Get Withdrawal Addresses
+      description: 'Retrieve a list of withdrawal addresses available for the user. API Key Permissions Required: Funds permissions
+        - Query and Funds permissions - Withdraw'
+      responses:
+        '200':
+          description: Withdrawal addresses retrieved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericObject'
+      x-kraken-source: https://docs.kraken.com/api/docs/rest-api/get-withdrawal-addresses
+      security:
+      - apiKeyAuth: []
+        apiSignAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenericObject'
+  /0/private/WithdrawInfo:
+    post:
+      tags:
+      - Funding
+      operationId: getWithdrawalInformation
+      summary: Get Withdrawal Information
+      description: 'Retrieve fee information about potential withdrawals for a particular asset, key and amount. API Key Permissions
+        Required: Funds permissions - Query and Funds permissions - Withdraw'
+      responses:
+        '200':
+          description: Withdrawal information retrieved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericObject'
+      x-kraken-source: https://docs.kraken.com/api/docs/rest-api/get-withdrawal-information
+      security:
+      - apiKeyAuth: []
+        apiSignAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenericObject'
+  /0/private/WithdrawMethods:
+    post:
+      tags:
+      - Funding
+      operationId: getWithdrawalMethods
+      summary: Get Withdrawal Methods
+      description: 'Retrieve a list of withdrawal methods available for the user. API Key Permissions Required: Funds permissions
+        - Query and Funds permissions - Withdraw'
+      responses:
+        '200':
+          description: Withdrawal methods retrieved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericObject'
+      x-kraken-source: https://docs.kraken.com/api/docs/rest-api/get-withdrawal-methods
+      security:
+      - apiKeyAuth: []
+        apiSignAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenericObject'
+  /0/private/Earn/Allocations:
+    post:
+      tags:
+      - Earn
+      operationId: listAllocations
+      summary: List Earn Allocations
+      description: 'List all allocations for the user. Requires the Query Funds API key permission. By default all allocations
+        are returned, even for strategies that have been used in the past and have zero balance now. That is so that the user
+        can see how much was earned with given strategy in the past. hide_zero_allocations parameter can be used to remove
+        zero balance entries from the output. Paging hasn''t been implemented for this method as we don''t expect the result
+        for a particular user to be overwhelmingly large. All amounts in the output can be denominated in a currency of user''s
+        choice (the converted_asset parameter). Information about when the next reward will be paid to the client is also
+        provided in the output. Allocated funds can be in up to 4 states: bonding allocated exit_queue (ETH only) unbonding
+        Any funds in total not in bonding / unbonding are simply allocated and earning rewards. Depending on the strategy
+        funds in the other 3 states can also be earning rewards. Consult the output of /Earn/Strategies to know whether bonding
+        / unbonding earn rewards. ETH in exit_queue still earns rewards. Note that for ETH , when the funds are in the exit_queue
+        state, the expires time given is the time when the funds will have finished unbonding, not when they go from exit
+        queue to unbonding. (Un)bonding time estimate can be inaccurate right after having (de)allocated the funds. Wait 1-2
+        minutes after (de)allocating to get an accurate result.'
+      responses:
+        '200':
+          description: List Earn Strategies
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericObject'
+      x-kraken-source: https://docs.kraken.com/api/docs/rest-api/list-allocations
+      security:
+      - apiKeyAuth: []
+        apiSignAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenericObject'
+  /0/private/Earn/Strategies:
+    post:
+      tags:
+      - Earn
+      operationId: listStrategies
+      summary: List Earn Strategies
+      description: 'List earn strategies along with their parameters. Requires a valid API key but not specific permission
+        is required. Returns only strategies that are available to the user based on geographic region. When the user does
+        not meet the tier restriction, can_allocate will be false and allocation_restriction_info indicates Tier as the restriction
+        reason. Earn products generally require Intermediate tier. Get your account verified to access earn. A note about
+        lock_type : instant : can be deallocated without an unbonding period. This is called flexible in the UI. bonded :
+        has an unbonding period. Deallocation will not happen until this period has passed. flex : "Kraken rewards". This
+        is earning on your spot balances where eligible. It''s turned on account wide from the UI and you cannot manually
+        allocate to these strategies. Paging isn''t yet implemented, so the endpoint always returns all data in the first
+        page.'
+      responses:
+        '200':
+          description: Get Deallocation Status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericObject'
+      x-kraken-source: https://docs.kraken.com/api/docs/rest-api/list-strategies
+      security:
+      - apiKeyAuth: []
+        apiSignAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenericObject'
+  /0/private/RemoveExport:
+    post:
+      tags:
+      - Account Data
+      operationId: removeExport
+      summary: Delete Export Report
+      description: 'Delete exported trades/ledgers report API Key Permissions Required: Data - Export data'
+      responses:
+        '200':
+          description: Export report deleted or cancelled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericObject'
+      x-kraken-source: https://docs.kraken.com/api/docs/rest-api/remove-export
+      security:
+      - apiKeyAuth: []
+        apiSignAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenericObject'
+  /0/private/RetrieveExport:
+    post:
+      tags:
+      - Account Data
+      operationId: retrieveExport
+      summary: Retrieve Data Export
+      description: 'Retrieve a processed data export API Key Permissions Required: Data - Export data'
+      responses:
+        '200':
+          description: Data export report retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericObject'
+      x-kraken-source: https://docs.kraken.com/api/docs/rest-api/retrieve-export
+      security:
+      - apiKeyAuth: []
+        apiSignAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenericObject'
+  /0/private/WalletTransfer:
+    post:
+      tags:
+      - Funding
+      operationId: walletTransfer
+      summary: Request Wallet Transfer
+      description: 'Transfer from a Kraken spot wallet to a Kraken Futures wallet. Note that a transfer in the other direction
+        must be requested via the Kraken Futures API endpoint for withdrawals to Spot wallets . API Key Permissions Required:
+        Funds permissions - Query'
+      responses:
+        '200':
+          description: Transfer created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericObject'
+      x-kraken-source: https://docs.kraken.com/api/docs/rest-api/wallet-transfer
+      security:
+      - apiKeyAuth: []
+        apiSignAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenericObject'
+  /0/private/Withdraw:
+    post:
+      tags:
+      - Funding
+      operationId: withdrawFunds
+      summary: Withdraw Funds
+      description: 'Make a withdrawal request. API Key Permissions Required: Funds permissions - Withdraw'
+      responses:
+        '200':
+          description: Withdrawal created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericObject'
+      x-kraken-source: https://docs.kraken.com/api/docs/rest-api/withdraw-funds
+      security:
+      - apiKeyAuth: []
+        apiSignAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenericObject'
+
+x-trikeshed-context:
+  client:
+    - name: default
+      key: borg.trikeshed.test.DefaultKey
+      element: borg.trikeshed.test.DefaultElement
+      open: borg.trikeshed.test.openDefaultElement

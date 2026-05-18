@@ -1,0 +1,266 @@
+openapi: 3.1.0
+info:
+  title: Kraken Custody REST API
+  version: current
+  description: "Conservative OpenAPI 3.1 spec built from Kraken API Center Custody REST endpoint pages. This captures documented endpoint surfaces, summaries, and response descriptions from the live docs."
+paths:
+  /0/private/DepositAddresses:
+    post:
+      operationId: depositAddresses
+      summary: Get deposit addresses
+      description: "Retrieve (or generate a new) deposit addresses for a particular asset and funding method. Use the Get Deposit Methods API to identify the appropriate deposit method."
+      responses:
+        '200':
+          description: See Kraken docs.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+  /0/private/DepositMethods:
+    post:
+      operationId: depositMethods
+      summary: Get deposit methods
+      description: "Retrieve the available deposit funding methods for depositing a specific asset. The deposit method is required to retrieve deposit addresses using the Get Deposit Addresses API ."
+      responses:
+        '200':
+          description: See Kraken docs.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+  /0/private/GetCustodyActivity:
+    post:
+      operationId: getCustodyActivity
+      summary: Get activity by id
+      description: Retrieve details for a specific task activity.
+      responses:
+        '200':
+          description: See Kraken docs.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+  /0/private/GetCustodyBalance:
+    post:
+      operationId: getCustodyBalance
+      summary: Get custody balance
+      description: Retrieve the balance for each asset held in the specified vault.
+      responses:
+        '200':
+          description: See Kraken docs.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+  /0/private/GetCustodyTask:
+    post:
+      operationId: getCustodyTask
+      summary: Get task by id
+      description: Retrieve details for a specific task.
+      responses:
+        '200':
+          description: See Kraken docs.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+  /0/private/GetCustodyTransaction:
+    post:
+      operationId: getCustodyTransaction
+      summary: Get transaction by id
+      description: Get transaction by id
+      responses:
+        '200':
+          description: See Kraken docs.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+  /0/private/GetCustodyVault:
+    post:
+      operationId: getCustodyVault
+      summary: Get vault information by id
+      description: Retrieve information and balances for a specific vault.
+      responses:
+        '200':
+          description: See Kraken docs.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+  /0/private/ListCustodyTasks:
+    post:
+      operationId: listCustodyTasks
+      summary: List tasks
+      description: Retrieve review tasks that match the specified filter criteria.
+      responses:
+        '200':
+          description: See Kraken docs.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+  /0/private/ListCustodyActivities:
+    post:
+      operationId: listCustodyTasksActivities
+      summary: List activities
+      description: Retrieve all activities that match the specified filter criteria.
+      responses:
+        '200':
+          description: See Kraken docs.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+  /0/private/ListCustodyTransactions:
+    post:
+      operationId: listCustodyTransactions
+      summary: List custody transactions
+      description: Retrieve the transaction history for a specified vault.
+      responses:
+        '200':
+          description: See Kraken docs.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+  /0/private/ListCustodyVaults:
+    post:
+      operationId: listCustodyVaults
+      summary: List vaults
+      description: Retrieve all vaults within the custody domain.
+      responses:
+        '200':
+          description: See Kraken docs.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+  /0/private/WithdrawAddresses:
+    post:
+      operationId: withdrawAddresses
+      summary: Get withdraw addresses
+      description: Retrieve a list of withdrawal addresses for a specified vault.
+      responses:
+        '200':
+          description: See Kraken docs.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+  /0/private/WithdrawMethods:
+    post:
+      operationId: withdrawMethods
+      summary: Get withdraw methods
+      description: Retrieve a list of withdrawal methods available for a specified vault.
+      responses:
+        '200':
+          description: See Kraken docs.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
