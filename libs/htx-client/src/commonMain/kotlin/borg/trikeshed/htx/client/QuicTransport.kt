@@ -7,4 +7,6 @@ package borg.trikeshed.htx.client
  * Platform actuals wire the QUIC UDP socket + TLS 1.3 + stream multiplexer
  * through the ring reactor.
  */
-expect fun createQuicHandler(): HtxRequestHandler
+fun createQuicHandler(): HtxRequestHandler = { _ ->
+    HtxClientMessage(status = 501, body = "QUIC transport not implemented")
+}

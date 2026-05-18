@@ -9,10 +9,20 @@ import java.nio.channels.spi.SelectorProvider as JdkSelectorProvider
 class JvmReactorOperations : ReactorOperations {
 
     private val selector: Selector = JdkSelectorProvider.provider().openSelector()
-    private val channelToFd = mutableMapOf<java.nio.channels.SelectableChannel, Int>()
-    private val fdUserData = mutableMapOf<Int, Long>()
-    private val fdInterests = mutableMapOf<Int, Set<Interest>>()
-    private var nextFd = 0
+
+    companion object {
+        internal val channelToFd = mutableMapOf<java.nio.channels.SelectableChannel, Int>()
+        internal val fdUserData = mutableMapOf<Int, Long>()
+        internal val fdInterests = mutableMapOf<Int, Set<Interest>>()
+        private var nextFd = 100
+
+        fun bindChannel(ch: java.nio.channels.SelectableChannel, interests: Set<Interest>): Int {
+            val fd = nextFd++
+            channelToFd[ch] = fd
+            fdInterests[fd] = interests
+            return fd
+        }
+    }
 
     override fun register(fd: Int, interests: Set<Interest>, userData: Long) {
         fdInterests[fd] = interests
@@ -28,7 +38,9 @@ class JvmReactorOperations : ReactorOperations {
 
     override fun deregister(fd: Int) {
         val ch = channelToFd.entries.firstOrNull { it.value == fd }?.key
-        selector.keys().find { it.channel() == ch }?.cancel()
+        if (ch != null) {
+            selector.keys().find { it.channel() == ch }?.cancel()
+        }
         fdUserData.remove(fd)
         fdInterests.remove(fd)
     }
@@ -51,9 +63,6 @@ class JvmReactorOperations : ReactorOperations {
     }
 
     fun bindChannel(ch: java.nio.channels.SelectableChannel, interests: Set<Interest>): Int {
-        val fd = nextFd++
-        channelToFd[ch] = fd
-        fdInterests[fd] = interests
-        return fd
+        return Companion.bindChannel(ch, interests)
     }
 }

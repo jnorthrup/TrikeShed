@@ -14,13 +14,8 @@ import borg.trikeshed.lib.j
 import borg.trikeshed.lib.toSeries
 
 
-actual object System {
-
-    actual val homedir: String
-        get() = jsHomeDir()
-
-    actual fun getenv(name: String, defaultVal: String?): String? = (processObj.env[name] as? String) ?: defaultVal
-}
+actual fun loadPlatformSystemOperations(): borg.trikeshed.userspace.nio.platform.spi.SystemOperations =
+    borg.trikeshed.userspace.nio.file.spi.JsSystemOperations()
 
 actual object Files {
     actual fun readAllLines(filename: String): List<String> =

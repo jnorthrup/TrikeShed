@@ -14,16 +14,25 @@ import borg.trikeshed.tls.codec.kdf.DefaultHkdfSha256
 import borg.trikeshed.tls.record.ContentType
 import kotlin.time.Duration
 
-expect fun createHttpsHandler(): HtxRequestHandler
+fun createHttpsHandler(): HtxRequestHandler {
+    val providers = borg.trikeshed.userspace.nio.spi.platformNioProviders()
+    val channels = providers.filterIsInstance<ChannelOperations>().firstOrNull()
+        ?: error("ChannelOperations not available on this platform")
+    val reactor = providers.filterIsInstance<ReactorOperations>().firstOrNull()
+        ?: error("ReactorOperations not available on this platform")
+    return ringHttpsHandler(channels, reactor)
+}
 
 /**
  * commonMain HTTPS transport via the unified ring.
  * Uses ChannelHandle.{readv,writev} + ReactorOperations.poll().
  */
 fun ringHttpsHandler(channels: ChannelOperations, reactor: ReactorOperations): HtxRequestHandler = { request ->
-    val host = request.path.removePrefix("https://").removePrefix("http://").substringBefore(':')
-    val port = request.path.substringAfter(":").substringBefore('/').toIntOrNull() ?: 443
-    val path = request.path.substringAfter(host).substringAfter(port.toString()).ifEmpty { "/" }
+    val hostPortPath = request.path.removePrefix("https://").removePrefix("http://")
+    val hostPort = hostPortPath.substringBefore('/')
+    val host = hostPort.substringBefore(':')
+    val port = hostPort.substringAfter(":", "").toIntOrNull() ?: 443
+    val path = "/" + hostPortPath.substringAfter('/', "")
 
     val fd = channels.socket(2, 1, 0)
     check(fd >= 0) { "socket failed" }
@@ -49,12 +58,19 @@ fun ringHttpsHandler(channels: ChannelOperations, reactor: ReactorOperations): H
         val ch = hs.buildClientHello()
         handle.writev(fd, ByteBuffer.wrap(byteArrayOf(0x16, 0x03, 0x03,
             ((ch.size ushr 8) and 0xFF).toByte(), (ch.size and 0xFF).toByte()) + ch))
+        handle.submit()
 
         var done = false; val buf = ByteArray(16384)
         while (!done) {
             reactor.poll(Duration.INFINITE)
-            val bb = ByteBuffer.wrap(buf); val n = handle.readv(fd, bb)
+            val bb = ByteBuffer.wrap(buf)
+            handle.readv(fd, bb)
+            handle.submit()
+            val results = handle.wait(1)
+            val n = results.firstOrNull { it.fd == fd }?.res ?: -1
             if (n <= 0) error("recv failed")
+            println("DEBUG: n = $n")
+            println("DEBUG: hex = " + buf.take(n).map { (it.toInt() and 0xFF).toString(16).padStart(2, '0') }.joinToString(""))
             var p = 0
             while (p + 5 <= n) {
                 val rl = ((buf[p+3].toInt() and 0xFF) shl 8) or (buf[p+4].toInt() and 0xFF)
@@ -74,18 +90,36 @@ fun ringHttpsHandler(channels: ChannelOperations, reactor: ReactorOperations): H
             "User-Agent: TrikeShed/1.0\r\nAccept: */*\r\nConnection: close\r\n\r\n" + request.body
         handle.writev(fd, ByteBuffer.wrap(
             codec.encrypt(RecordDirection.CLIENT_WRITE, ContentType.APPLICATION_DATA, httpReq.encodeToByteArray())))
+        handle.submit()
 
         val resp = mutableListOf<Byte>()
         while (true) {
             reactor.poll(Duration.INFINITE)
-            val rb = ByteBuffer.wrap(ByteArray(16384)); val n = handle.readv(fd, rb)
+            val rb = ByteBuffer.wrap(ByteArray(16384))
+            handle.readv(fd, rb)
+            handle.submit()
+            val results = handle.wait(1)
+            val n = results.firstOrNull { it.fd == fd }?.res ?: -1
             if (n <= 0) break
             for (i in 0 until n) resp.add(rb.get(i))
         }
         val d = codec.decrypt(RecordDirection.SERVER_WRITE, resp.toByteArray()) ?: error("decrypt failed")
         val t = d.decodeToString()
-        HtxClientMessage(status = t.substringAfter(' ').substringBefore(' ').toInt(),
-            body = t.substring(t.indexOf("\r\n\r\n") + 4))
+
+        var bodyIndex = -1
+        for (i in 0 until d.size - 3) {
+            if (d[i] == 13.toByte() && d[i+1] == 10.toByte() && d[i+2] == 13.toByte() && d[i+3] == 10.toByte()) {
+                bodyIndex = i + 4
+                break
+            }
+        }
+        val bodyBytes = if (bodyIndex != -1) d.copyOfRange(bodyIndex, d.size) else byteArrayOf()
+
+        HtxClientMessage(
+            status = t.substringAfter(' ').substringBefore(' ').toInt(),
+            body = t.substring(t.indexOf("\r\n\r\n") + 4),
+            binaryBody = bodyBytes
+        )
     } finally {
         reactor.deregister(fd)
     }
@@ -101,6 +135,7 @@ private suspend fun processHs(data: ByteArray, hs: CommonTlsClientHandshake,
             hs.processServerFinished(data)
             handle.writev(fd, ByteBuffer.wrap(codec.encrypt(RecordDirection.CLIENT_WRITE,
                 ContentType.HANDSHAKE, hs.buildClientFinished())))
+            handle.submit()
         }
     }
 }

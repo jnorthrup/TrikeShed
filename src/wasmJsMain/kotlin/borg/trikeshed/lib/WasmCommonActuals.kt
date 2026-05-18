@@ -241,27 +241,8 @@ object WasmBrowserSeekHandle : SeekHandle {
     }
 }
 
-actual object System {
-    actual fun getenv(name: String, defaultVal: String?): String? {
-        return envFallback[name] ?: defaultVal
-    }
-
-    fun setEnv(name: String, value: String?) {
-        if (value == null) envFallback.remove(name) else envFallback[name] = value
-    }
-
-    fun setEnvMap(map: Map<String, String>?) {
-        envFallback.clear()
-        if (map != null) envFallback.putAll(map)
-    }
-
-    fun clearEnv() {
-        envFallback.clear()
-    }
-
-    actual val homedir: String
-        get() = getenv("HOME", getenv("USERPROFILE", "/")) ?: "/"
-}
+actual fun loadPlatformSystemOperations(): borg.trikeshed.userspace.nio.platform.spi.SystemOperations =
+    borg.trikeshed.userspace.nio.file.spi.WasmSystemOperations()
 
 actual object Files {
     actual fun readAllLines(filename: String): List<String> =

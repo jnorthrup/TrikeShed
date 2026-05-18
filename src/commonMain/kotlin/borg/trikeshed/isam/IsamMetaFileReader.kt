@@ -14,11 +14,12 @@ import kotlin.math.min
  * the isam metafile format follows this sample
  *
 ```
-# format:  coords WS .. EOL names WS .. EOL TypeMememento WS ..
+# format:  coords WS .. EOL names WS .. EOL TypeMememento WS .. [EOL groups]
 # last coord is the recordlen
 0 12 12 24 24 32 32 40 40 48 48 56 56 64 64 72 72 76 76 84 84 92
 Open_time Close_time Open High Low Close Volume Quote_asset_volume Number_of_trades Taker_buy_base_asset_volume Taker_buy_quote_asset_volume
 IoInstant IoInstant IoDouble IoDouble IoDouble IoDouble IoDouble IoDouble IoInt IoDouble IoDouble
+<colIdx>[:<logicalIdx|suffixName>] ... [EOL]
 ```
 
 the ebnf we can use is:
@@ -31,6 +32,10 @@ names :=  (name WS)* name
 name :=  string
 TypeMemento :=  (IoType WS)* IoType
 IoType :=  IoInstant | IoDouble | IoString | IoInt
+colIdxList := (colIdx[:<logicalIdx|suffixName>]WS)* 
+logicalIdx := number
+suffixName := [A-z][A-z0-9_-]*
+groups := (colIdx[:<logicalIdx|suffixName>] WS)* colIdx 
 ```
  * 2. create a class that can create the binary file
  *

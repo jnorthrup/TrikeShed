@@ -7,4 +7,6 @@ package borg.trikeshed.htx.client
  * Platform actuals wire the SCTP association + 4-way handshake + multi-stream
  * through the ring reactor.
  */
-expect fun createSctpHandler(): HtxRequestHandler
+fun createSctpHandler(): HtxRequestHandler = { _ ->
+    HtxClientMessage(status = 501, body = "SCTP transport not implemented")
+}

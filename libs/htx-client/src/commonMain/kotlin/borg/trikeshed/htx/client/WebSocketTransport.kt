@@ -12,4 +12,6 @@ package borg.trikeshed.htx.client
  *   - WASM: node:ws or similar
  *   - POSIX: 501 stub
  */
-expect fun createWsHandler(): HtxRequestHandler
+fun createWsHandler(): HtxRequestHandler = { _ ->
+    HtxClientMessage(status = 501, body = "WebSocket transport not implemented")
+}
