@@ -27,7 +27,9 @@ actual fun createHttpsHandler(): HtxRequestHandler = { request ->
     )
 
     val httpReq = builder.build()
-    val resp = client.send(httpReq, HttpResponse.BodyHandlers.ofString())
+    val resp = client.send(httpReq, HttpResponse.BodyHandlers.ofByteArray())
+    val bytes = resp.body()
+    val bodyStr = String(bytes, java.nio.charset.StandardCharsets.UTF_8)
 
-    HtxClientMessage(status = resp.statusCode(), body = resp.body())
+    HtxClientMessage(status = resp.statusCode(), body = bodyStr, binaryBody = bytes)
 }

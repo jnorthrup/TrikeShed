@@ -20,7 +20,12 @@ data class HtxClientRequest(
     val transport: HtxTransport = HtxTransport.HTTPS,
 )
 
-data class HtxClientMessage(val status: Int, val body: String, val headers: Map<String, String> = emptyMap())
+data class HtxClientMessage(
+    val status: Int,
+    val body: String,
+    val headers: Map<String, String> = emptyMap(),
+    val binaryBody: ByteArray? = null
+)
 
 /**
  * Transport backends available for [HtxElement].
