@@ -91,18 +91,12 @@ class JvmChannelOperations : ChannelOperations {
                 val res = try {
                     if (op.read) {
                         val n = ch.read(jdkBuf)
-                        if (n <= 0) {
-                            throw IllegalStateException("DEBUG: read returned $n on fd ${op.fd}, isConnected=${ch.isConnected}, isBlocking=${ch.isBlocking}, remaining=${jdkBuf.remaining()}")
-                        }
                         if (n > 0) {
                             op.buf.position(op.buf.position() + n)
                         }
                         n
                     } else {
                         val n = ch.write(jdkBuf)
-                        if (n <= 0) {
-                            throw IllegalStateException("DEBUG: write returned $n on fd ${op.fd}, isConnected=${ch.isConnected}, isBlocking=${ch.isBlocking}, remaining=${jdkBuf.remaining()}")
-                        }
                         if (n > 0) {
                             op.buf.position(op.buf.position() + n)
                         }

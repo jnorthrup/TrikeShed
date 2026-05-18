@@ -45,6 +45,8 @@ class CommonTlsClientHandshake(
     private var sharedSecret: ByteArray? = null
     private val clientRandom: ByteArray = ByteArray(32).also { Random.nextBytes(it) }
     private val transcript = mutableListOf<ByteArray>()
+    private var clientApplicationKey: ByteArray? = null
+    private var clientApplicationIv: ByteArray? = null
 
     private fun transcriptHash(): ByteArray {
         val total = transcript.flatMap { it.toList() }.toByteArray()
@@ -85,21 +87,50 @@ class CommonTlsClientHandshake(
 
     override fun processServerHello(message: ByteArray) {
         check(state == TlsClientHandshake.State.CLIENT_HELLO_SENT); transcript.add(message)
+        println("DEBUG processServerHello: message.size = ${message.size}")
+        println("DEBUG processServerHello: message hex = " + message.map { (it.toInt() and 0xFF).toString(16).padStart(2, '0') }.joinToString(""))
         val body = message.copyOfRange(4, message.size)
-        var p = 2; p += 32
-        p += 1 + (body[p].toInt() and 0xFF)
-        p += 2; p += 1
-        val el = ((body[p].toInt() and 0xFF) shl 8) or (body[p+1].toInt() and 0xFF); p += 2
-        val ee = p + el
-        while (p < ee) {
-            val et = ((body[p].toInt() and 0xFF) shl 8) or (body[p+1].toInt() and 0xFF); p += 2
-            val dl = ((body[p].toInt() and 0xFF) shl 8) or (body[p+1].toInt() and 0xFF); p += 2
-            if (et == 51) { p += 2; val kl = ((body[p].toInt() and 0xFF) shl 8) or (body[p+1].toInt() and 0xFF); p += 2
-                serverPublicKey = body.copyOfRange(p, p + kl) }
-            p += dl
+        var p = 2
+        try {
+            p += 32
+            val sessionIdLen = body[p].toInt() and 0xFF
+            println("DEBUG processServerHello: sessionIdLen = $sessionIdLen")
+            p += 1 + sessionIdLen
+            val cipherSuite = ((body[p].toInt() and 0xFF) shl 8) or (body[p+1].toInt() and 0xFF); p += 2
+            val compression = body[p].toInt() and 0xFF; p += 1
+            println("DEBUG processServerHello: cipherSuite = $cipherSuite, compression = $compression, body.size = ${body.size}, p = $p")
+            val el = ((body[p].toInt() and 0xFF) shl 8) or (body[p+1].toInt() and 0xFF); p += 2
+            println("DEBUG processServerHello: el = $el")
+            val ee = p + el
+            while (p < ee) {
+                val et = ((body[p].toInt() and 0xFF) shl 8) or (body[p+1].toInt() and 0xFF); p += 2
+                val dl = ((body[p].toInt() and 0xFF) shl 8) or (body[p+1].toInt() and 0xFF); p += 2
+                val nextP = p + dl
+                println("DEBUG processServerHello: extension type = $et, len = $dl, p = $p")
+                if (et == 51) {
+                    var kp = p
+                    kp += 2
+                    val kl = ((body[kp].toInt() and 0xFF) shl 8) or (body[kp+1].toInt() and 0xFF); kp += 2
+                    serverPublicKey = body.copyOfRange(kp, kp + kl)
+                }
+                p = nextP
+            }
+            println("DEBUG client public:  " + clientKeyPair.publicKey.joinToString("") { (it.toInt() and 0xFF).toString(16).padStart(2, '0') })
+            println("DEBUG client private: " + clientKeyPair.privateKey.joinToString("") { (it.toInt() and 0xFF).toString(16).padStart(2, '0') })
+            println("DEBUG server public:  " + serverPublicKey?.joinToString("") { (it.toInt() and 0xFF).toString(16).padStart(2, '0') })
+            sharedSecret = x25519.sharedSecret(clientKeyPair.privateKey, serverPublicKey!!)
+            println("DEBUG shared secret:  " + sharedSecret?.joinToString("") { (it.toInt() and 0xFF).toString(16).padStart(2, '0') })
+            val helloH = sha256.hash((transcript[0].toList() + transcript[1].toList()).toByteArray())
+            println("DEBUG hello hash:     " + helloH.joinToString("") { (it.toInt() and 0xFF).toString(16).padStart(2, '0') })
+            val schedule = CommonTlsKeySchedule(hkdf)
+            val keys = schedule.compute(sharedSecret!!, helloH, helloH)
+            recordCodec.installKeys(keys.clientHandshakeKey, keys.clientHandshakeIv,
+                keys.serverHandshakeKey, keys.serverHandshakeIv)
+            state = TlsClientHandshake.State.WAITING_EE
+        } catch (e: Exception) {
+            println("DEBUG processServerHello: caught exception at p=$p, body.size=${body.size}")
+            throw e
         }
-        sharedSecret = x25519.sharedSecret(clientKeyPair.privateKey, serverPublicKey!!)
-        state = TlsClientHandshake.State.WAITING_EE
     }
 
     override fun processEncryptedExtensions(message: ByteArray) {
@@ -122,9 +153,14 @@ class CommonTlsClientHandshake(
         val helloH = sha256.hash((transcript[0].toList() + transcript[1].toList()).toByteArray())
         val schedule = CommonTlsKeySchedule(hkdf)
         val keys = schedule.compute(sharedSecret!!, helloH, transcriptHash())
-        recordCodec.installKeys(keys.clientHandshakeKey, keys.clientHandshakeIv,
-            keys.serverHandshakeKey, keys.serverHandshakeIv)
+        recordCodec.installReadKeys(keys.serverApplicationKey, keys.serverApplicationIv)
+        clientApplicationKey = keys.clientApplicationKey
+        clientApplicationIv = keys.clientApplicationIv
         state = TlsClientHandshake.State.CONNECTED
+    }
+
+    override fun installClientApplicationWriteKey() {
+        recordCodec.installWriteKeys(clientApplicationKey!!, clientApplicationIv!!)
     }
 
     override fun buildClientFinished(): ByteArray {
@@ -132,7 +168,7 @@ class CommonTlsClientHandshake(
         val helloH = sha256.hash((transcript[0].toList() + transcript[1].toList()).toByteArray())
         val schedule = CommonTlsKeySchedule(hkdf)
         val keys = schedule.compute(sharedSecret!!, helloH, transcriptHash())
-        val fk = hkdf.expandLabel(keys.clientHandshakeKey, "finished", ByteArray(0), 32)
+        val fk = hkdf.expandLabel(keys.clientHandshakeSecret, "finished", ByteArray(0), 32)
         val vd = sha256.hmac(fk, transcriptHash())
         return frameHandshake(0x14, vd).also { transcript.add(it) }
     }

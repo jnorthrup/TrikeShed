@@ -2,6 +2,8 @@ package borg.trikeshed.tls.codec.ecdh
 
 import kotlin.random.Random
 
+import borg.trikeshed.tls.codec.loadPlatformX25519
+
 /**
  * Pure-Kotlin X25519 (RFC 7748) — commonMain default.
  *
@@ -12,7 +14,10 @@ import kotlin.random.Random
 class DefaultX25519 : X25519 {
     override val key: kotlin.coroutines.CoroutineContext.Key<*> get() = X25519.Key
 
+    private val jvmDelegate: X25519? = loadPlatformX25519()
+
     override fun generateKeyPair(): X25519.KeyPair {
+        jvmDelegate?.let { return it.generateKeyPair() }
         val private = Random.nextBytes(ByteArray(32))
         private[0] = (private[0].toInt() and 0xF8).toByte()
         private[31] = ((private[31].toInt() and 0x7F) or 0x40).toByte()
@@ -20,8 +25,10 @@ class DefaultX25519 : X25519 {
         return X25519.KeyPair(public, private)
     }
 
-    override fun sharedSecret(privateKey: ByteArray, peerPublicKey: ByteArray): ByteArray =
-        scalarMult(privateKey, peerPublicKey)
+    override fun sharedSecret(privateKey: ByteArray, peerPublicKey: ByteArray): ByteArray {
+        jvmDelegate?.let { return it.sharedSecret(privateKey, peerPublicKey) }
+        return scalarMult(privateKey, peerPublicKey)
+    }
 
     // ── Field element (10 limbs × 25.5 bits) ───────────────────────
 

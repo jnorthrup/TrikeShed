@@ -1,5 +1,7 @@
 package borg.trikeshed.tls.codec.aead
 
+import borg.trikeshed.tls.codec.loadPlatformAes128Gcm
+
 /**
  * Pure-Kotlin AES-128-GCM (FIPS 197 + NIST SP 800-38D) — commonMain default.
  *
@@ -9,6 +11,8 @@ package borg.trikeshed.tls.codec.aead
  */
 class DefaultAes128Gcm : Aes128Gcm {
     override val key: kotlin.coroutines.CoroutineContext.Key<*> get() = Aes128Gcm.Key
+
+    private val jvmDelegate: Aes128Gcm? = loadPlatformAes128Gcm()
 
     // ── S-box ──────────────────────────────────────────────────────
 
@@ -118,8 +122,12 @@ class DefaultAes128Gcm : Aes128Gcm {
 
     private fun shr(v: ByteArray): ByteArray {
         val r = ByteArray(16)
-        for (i in 0..15) r[i] = ((v[i].toInt() and 0xFF) ushr 1).toByte()
-        for (i in 0..14) r[i] = (r[i].toInt() or ((v[i + 1].toInt() and 1) shl 7)).toByte()
+        var carry = 0
+        for (i in 0..15) {
+            val byte = v[i].toInt() and 0xFF
+            r[i] = ((byte ushr 1) or carry).toByte()
+            carry = (byte and 1) shl 7
+        }
         return r
     }
 
@@ -151,6 +159,7 @@ class DefaultAes128Gcm : Aes128Gcm {
     // ── Public API ─────────────────────────────────────────────────
 
     override fun seal(key: ByteArray, nonce: ByteArray, aad: ByteArray, plaintext: ByteArray): ByteArray {
+        jvmDelegate?.let { return it.seal(key, nonce, aad, plaintext) }
         val rk = expandKey(key)
         // H = AES_encrypt(K, 0^128)
         val zeroState = intArrayOf(0, 0, 0, 0)
@@ -168,6 +177,7 @@ class DefaultAes128Gcm : Aes128Gcm {
     }
 
     override fun open(key: ByteArray, nonce: ByteArray, aad: ByteArray, ciphertext: ByteArray): ByteArray? {
+        jvmDelegate?.let { return it.open(key, nonce, aad, ciphertext) }
         if (ciphertext.size < tagLength) return null
         val ct = ciphertext.copyOfRange(0, ciphertext.size - tagLength)
         val expectedTag = ciphertext.copyOfRange(ciphertext.size - tagLength, ciphertext.size)

@@ -1,5 +1,7 @@
 package borg.trikeshed.tls.codec.hash
 
+import borg.trikeshed.tls.codec.loadPlatformSha256
+
 /**
  * Pure-Kotlin SHA-256 (FIPS 180-4) — commonMain default.
  *
@@ -10,7 +12,10 @@ package borg.trikeshed.tls.codec.hash
 class DefaultSha256 : Sha256 {
     override val key: kotlin.coroutines.CoroutineContext.Key<*> get() = Sha256.Key
 
+    private val jvmDelegate: Sha256? = loadPlatformSha256()
+
     override fun hash(data: ByteArray): ByteArray {
+        jvmDelegate?.let { return it.hash(data) }
         val padded = pad(data)
         val h = intArrayOf(0x6a09e667.toInt(), 0xbb67ae85.toInt(), 0x3c6ef372.toInt(), 0xa54ff53a.toInt(), 0x510e527f.toInt(), 0x9b05688c.toInt(), 0x1f83d9ab.toInt(), 0x5be0cd19.toInt())
         for (chunk in 0 until padded.size step 64) compress(padded, chunk, h)
@@ -20,6 +25,7 @@ class DefaultSha256 : Sha256 {
     }
 
     override fun hmac(key: ByteArray, data: ByteArray): ByteArray {
+        jvmDelegate?.let { return it.hmac(key, data) }
         val blockSize = 64
         val key1 = if (key.size > blockSize) hash(key) else key
         val iKeyPad = ByteArray(blockSize) { if (it < key1.size) (key1[it].toInt() xor 0x36).toByte() else 0x36.toByte() }

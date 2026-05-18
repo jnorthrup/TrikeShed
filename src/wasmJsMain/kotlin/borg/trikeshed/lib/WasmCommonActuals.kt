@@ -241,8 +241,6 @@ object WasmBrowserSeekHandle : SeekHandle {
     }
 }
 
-actual fun loadPlatformSystemOperations(): borg.trikeshed.userspace.nio.platform.spi.SystemOperations =
-    borg.trikeshed.userspace.nio.file.spi.WasmSystemOperations()
 
 actual object Files {
     actual fun readAllLines(filename: String): List<String> =

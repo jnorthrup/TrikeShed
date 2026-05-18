@@ -14,8 +14,6 @@ import borg.trikeshed.lib.j
 import borg.trikeshed.lib.toSeries
 
 
-actual fun loadPlatformSystemOperations(): borg.trikeshed.userspace.nio.platform.spi.SystemOperations =
-    borg.trikeshed.userspace.nio.file.spi.JsSystemOperations()
 
 actual object Files {
     actual fun readAllLines(filename: String): List<String> =

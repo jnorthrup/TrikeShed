@@ -8,7 +8,7 @@ import platform.posix.fgets
 import platform.posix.fopen
 
 @OptIn(ExperimentalForeignApi::class)
-  val platformCacheTopology: CacheTopology by lazy {
+actual val platformCacheTopology: CacheTopology by lazy {
     val fromSys = readFromSysFs()
     if (fromSys != null) return@lazy fromSys
     CacheTopology.UNKNOWN

@@ -22,6 +22,8 @@ class CommonTlsRecordCodec(
     private var clientSeq: Long = 0L
     private var serverSeq: Long = 0L
 
+    var lastDecryptedContentType: ContentType? = null
+
     override suspend fun encrypt(direction: RecordDirection, innerType: ContentType, plaintext: ByteArray): ByteArray {
         val (key, iv, seq) = when (direction) {
             RecordDirection.CLIENT_WRITE -> Triple(clientKey!!, clientIv!!, clientSeq++)
@@ -37,6 +39,12 @@ class CommonTlsRecordCodec(
         return aad + ct
     }
 
+    private fun ByteArray.toHex(): String = joinToString("") {
+        val i = it.toInt() and 0xFF
+        val h = i.toString(16)
+        if (h.length < 2) "0$h" else h
+    }
+
     override suspend fun decrypt(direction: RecordDirection, wire: ByteArray): ByteArray? {
         val (key, iv, seq) = when (direction) {
             RecordDirection.CLIENT_WRITE -> Triple(clientKey!!, clientIv!!, clientSeq++)
@@ -45,14 +53,30 @@ class CommonTlsRecordCodec(
         val nonce = xorNonce(seq, iv)
         val aad = wire.copyOfRange(0, 5)
         val ct = wire.copyOfRange(5, wire.size)
-        val inner = aes128.open(key, nonce, aad, ct) ?: return null
+        println("DEBUG decrypt: key = ${key.toHex()}, iv = ${iv.toHex()}, seq = $seq")
+        println("DEBUG decrypt: aad = ${aad.toHex()}, ct.size = ${ct.size}")
+        val inner = aes128.open(key, nonce, aad, ct)
+        if (inner == null) {
+            println("DEBUG decrypt: aes128.open returned null!")
+            return null
+        }
+        lastDecryptedContentType = ContentType.fromCode(inner[inner.size - 1])
         return inner.copyOfRange(0, inner.size - 1)  // strip trailing content type
     }
 
     override fun installKeys(clientKey: ByteArray, clientIv: ByteArray, serverKey: ByteArray, serverIv: ByteArray) {
+        installWriteKeys(clientKey, clientIv)
+        installReadKeys(serverKey, serverIv)
+    }
+
+    override fun installWriteKeys(clientKey: ByteArray, clientIv: ByteArray) {
         this.clientKey = clientKey; this.clientIv = clientIv
+        clientSeq = 0L
+    }
+
+    override fun installReadKeys(serverKey: ByteArray, serverIv: ByteArray) {
         this.serverKey = serverKey; this.serverIv = serverIv
-        clientSeq = 0L; serverSeq = 0L
+        serverSeq = 0L
     }
 
     private fun xorNonce(seq: Long, iv: ByteArray): ByteArray {

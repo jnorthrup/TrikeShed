@@ -40,6 +40,8 @@ data class TrafficKeyMaterial(
     val serverHandshakeKey: ByteArray,   val serverHandshakeIv: ByteArray,
     val clientApplicationKey: ByteArray, val clientApplicationIv: ByteArray,
     val serverApplicationKey: ByteArray, val serverApplicationIv: ByteArray,
+    val clientHandshakeSecret: ByteArray = ByteArray(0),
+    val serverHandshakeSecret: ByteArray = ByteArray(0),
 ) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true

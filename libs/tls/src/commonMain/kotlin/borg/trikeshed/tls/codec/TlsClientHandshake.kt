@@ -42,4 +42,7 @@ interface TlsClientHandshake : CoroutineContext.Element {
 
     /** Build client Finished message. Must be called after server Finished. */
     fun buildClientFinished(): ByteArray
+
+    /** Install client-write application traffic keys. */
+    fun installClientApplicationWriteKey() {}
 }

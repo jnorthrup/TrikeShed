@@ -44,6 +44,16 @@ interface TlsRecordCodec : CoroutineContext.Element {
      * @param serverIv  server_write initialization vector (12 bytes)
      */
     fun installKeys(clientKey: ByteArray, clientIv: ByteArray, serverKey: ByteArray, serverIv: ByteArray)
+
+    /**
+     * Install traffic keys only for the write (sending) direction.
+     */
+    fun installWriteKeys(clientKey: ByteArray, clientIv: ByteArray) {}
+
+    /**
+     * Install traffic keys only for the read (receiving) direction.
+     */
+    fun installReadKeys(serverKey: ByteArray, serverIv: ByteArray) {}
 }
 
 /**

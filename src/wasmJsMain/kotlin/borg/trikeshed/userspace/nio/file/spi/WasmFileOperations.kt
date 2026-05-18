@@ -4,6 +4,10 @@ import borg.trikeshed.lib.Files
 
 class WasmFileOperations : FileOperations {
 
+    override fun open(path: String, readOnly: Boolean): Int = path.hashCode()
+    override fun close(fd: Int): Int = 0
+    override fun size(fd: Int): Long = 0L
+
     override fun readAllLines(f: String) = Files.readAllLines(f)
     override fun readAllBytes(f: String) = Files.readAllBytes(f)
     override fun readString(f: String) = Files.readString(f)

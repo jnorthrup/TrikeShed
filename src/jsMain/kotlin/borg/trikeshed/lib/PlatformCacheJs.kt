@@ -1,6 +1,4 @@
-@file:Suppress("NonAsciiCharacters")
-
-package borg.trikeshed.lib
+package borg.trikeshed.userspace.nio.platform.spi
 
 import borg.trikeshed.userspace.nio.platform.spi.CacheTopology
 

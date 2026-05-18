@@ -398,6 +398,11 @@ switch (project.path) {
         miniduckPosix.dependsOn(miniduckSets.getByName("commonMain"))
         miniduckSets.findByName("macosMain")?.dependsOn(miniduckPosix)
         miniduckSets.findByName("linuxMain")?.dependsOn(miniduckPosix)
+        tasks.configureEach { task ->
+            if (task.name == "compileTestKotlinMacos") {
+                task.dependsOn("exportCrossCompilationMetadataForMacosApiElements")
+            }
+        }
         break
     case ":libs:couch":
         kmpHost(datetimeMain: true)
