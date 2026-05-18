@@ -49,22 +49,24 @@ IoType :=  IoInstant | IoDouble | IoString | IoInt
 
    lateinit var constraints1: List<RecordMeta>
     override fun open() {
-        //use readBytes and decodeString to read the lines into
-//        val lines = buf.readBytes(size).decodeToString().lines().filterNot { it.trim().startsWith("#") }.map(String::trim)
         val lines = fileOps.readAllLines(metafileFilename).filterNot { it.trim().startsWith('#') }
-        //split on \s+
         val coords: Series<String> = CharSeries(lines[0]).trim.splitWs() α CharSeries::asString
         val names: Series<String> = CharSeries(lines[1]).trim.splitWs() α CharSeries::asString
         val types: Series<String> = CharSeries(lines[2]).trim.splitWs() α CharSeries::asString
-        val groups: Series<String>? = if (lines.size > 3) CharSeries(lines[3]).trim.splitWs() α CharSeries::asString else null
+        
+        val namesList = names.toList()
+        val groupsLine = if (lines.size > 3) lines[3].trim() else ""
+        val groupIds = if (groupsLine.isNotEmpty()) {
+            parseGroupsLine(groupsLine, namesList)
+        } else {
+            IntArray(namesList.size) { 0 }
+        }
 
-
-        this@IsamMetaFileReader.constraints1 = names.toList().zip(types.toList()).mapIndexed { index, (name, type) ->
+        this@IsamMetaFileReader.constraints1 = namesList.zip(types.toList()).mapIndexed { index, (name, type) ->
             val begin = coords[2 * index].toInt()
             val end = coords[2 * index + 1].toInt()
-            val groupId = groups?.get(index)?.toInt() ?: 0
+            val groupId = groupIds[index]
             val ioMemento: IOMemento = IOMemento.valueOf(type)
-            //use PlatformCodec to get the decoder and encoder
             val decoder: (ByteArray) -> Any? = ioMemento.createDecoder(end - begin)
             val encoder: (Any?) -> ByteArray = ioMemento.createEncoder(end - begin)
             RecordMeta(name, ioMemento, begin, end, decoder, encoder, groupId = groupId)
@@ -86,6 +88,36 @@ IoType :=  IoInstant | IoDouble | IoString | IoInt
      * 1. close the file descriptor
      */
     companion object {
+        fun parseGroupsLine(line: String, colNames: List<String>): IntArray {
+            val tokens = line.trim().split(Regex("\\s+")).filter { it.isNotEmpty() }
+            val colToGroupStr = mutableMapOf<String, String>()
+            val mentionedGroups = mutableListOf<String>()
+            
+            for (token in tokens) {
+                val parts = token.split(':')
+                val colKey = parts[0]
+                val groupVal = if (parts.size > 1) parts[1] else "0"
+                colToGroupStr[colKey] = groupVal
+                if (groupVal !in mentionedGroups) {
+                    mentionedGroups.add(groupVal)
+                }
+            }
+            
+            val groupToId = mentionedGroups.mapIndexed { index, name -> name to index }.toMap().toMutableMap()
+            val implicitGroupId = mentionedGroups.size
+            
+            return IntArray(colNames.size) { colIdx ->
+                val name = colNames[colIdx]
+                val strIdx = colIdx.toString()
+                val groupName = colToGroupStr[name] ?: colToGroupStr[strIdx]
+                if (groupName != null) {
+                    groupToId[groupName]!!
+                } else {
+                    implicitGroupId
+                }
+            }
+        }
+
         fun write(metafilename: String, recordMetas: Series<ColumnMeta>, varchars: Map<String,Int>, fileOps: FileOperations): Series<RecordMeta> {
             val lines: MutableList<String> = mutableListOf<String>()
 
@@ -97,7 +129,15 @@ IoType :=  IoInstant | IoDouble | IoString | IoInt
             lines.add(result.view.joinToString(" ") { it.type.name })
             
             if (result.view.any { it.groupId != 0 }) {
-                lines.add(result.view.joinToString(" ") { it.groupId.toString() })
+                val maxGroupId = result.view.maxOf { it.groupId }
+                val groupTokens = result.view.mapIndexedNotNull { index, recordMeta ->
+                    if (recordMeta.groupId != maxGroupId) {
+                        "$index:${recordMeta.groupId}"
+                    } else null
+                }
+                if (groupTokens.isNotEmpty()) {
+                    lines.add(groupTokens.joinToString(" "))
+                }
             }
             
             fileOps.write(metafilename, lines)

@@ -322,7 +322,7 @@ operator fun Series<Char>.div(delim: Char): Series<Series<Char>> { //lazy split
 }
 
 
-fun CharSequence.toSeries(): Series<Char> = (this as? Series<Char>) ?: cs
+fun CharSequence.toSeries(): Series<Char> = (this as? Series<Char>) ?: (this.length j { this[it] })
 val CharSequence.s: Series<Char> get() = (this as? CharSeries) ?: CharSeries(this)
 val CharSequence.cs: CharSeries get() = (this as? CharSeries) ?: CharSeries(this)
 val Series<Char>.cs: CharSeries get() = (this as? CharSeries) ?: CharSeries(this)
