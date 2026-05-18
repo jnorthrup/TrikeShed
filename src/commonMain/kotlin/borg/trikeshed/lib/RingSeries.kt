@@ -2,6 +2,11 @@
 
 package borg.trikeshed.lib
 
+/** Eviction listener invoked when elements are displaced by RingSeries. */
+fun interface EvictionListener<T> {
+    fun onEvict(item: T)
+}
+
 /**
  * Fixed-capacity MutableSeries backed by a ring buffer.
  *
@@ -11,7 +16,7 @@ package borg.trikeshed.lib
  *
  * O(1) append, O(1) get, O(1) set, O(1) removeAt, O(n) contains.
  */
-class RingSeries<T>(capacity: Int) : MutableSeries<T> {
+class RingSeries<T>(capacity: Int, val evict: EvictionListener<T>? = null) : MutableSeries<T> {
 
     init {
         require(capacity > 0) { "capacity must be positive" }
@@ -35,8 +40,14 @@ class RingSeries<T>(capacity: Int) : MutableSeries<T> {
     }
 
     override fun add(item: T) {
-        buf[(head + count) and mask] = item
-        if (count < mask + 1) count++ else head = (head + 1) and mask
+        if (count < mask + 1) {
+            buf[(head + count) and mask] = item
+            count++
+        } else {
+            evict?.onEvict(buf[head and mask] as T)
+            buf[head and mask] = item
+            head = (head + 1) and mask
+        }
     }
 
     override fun add(index: Int, item: T) {
