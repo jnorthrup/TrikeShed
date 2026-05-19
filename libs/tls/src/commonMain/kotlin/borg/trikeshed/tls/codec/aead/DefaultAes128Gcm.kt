@@ -75,7 +75,17 @@ class DefaultAes128Gcm : Aes128Gcm {
 
     private fun addRoundKey(state: IntArray, rk: IntArray) { for (i in 0..3) state[i] = state[i] xor rk[i] }
     private fun subBytes(state: IntArray) { for (i in 0..3) state[i] = subWord(state[i]) }
-    private fun shiftRows(state: IntArray) { state[0] = state[0]; state[1] = (state[1] shl 8) or (state[1] ushr 24); state[2] = (state[2] shl 16) or (state[2] ushr 16); state[3] = (state[3] shl 24) or (state[3] ushr 8) }
+    private fun shiftRows(state: IntArray) {
+        val r00 = state[0] ushr 24; val r01 = state[1] ushr 24; val r02 = state[2] ushr 24; val r03 = state[3] ushr 24
+        val r10 = (state[0] ushr 16) and 0xFF; val r11 = (state[1] ushr 16) and 0xFF; val r12 = (state[2] ushr 16) and 0xFF; val r13 = (state[3] ushr 16) and 0xFF
+        val r20 = (state[0] ushr 8) and 0xFF; val r21 = (state[1] ushr 8) and 0xFF; val r22 = (state[2] ushr 8) and 0xFF; val r23 = (state[3] ushr 8) and 0xFF
+        val r30 = state[0] and 0xFF; val r31 = state[1] and 0xFF; val r32 = state[2] and 0xFF; val r33 = state[3] and 0xFF
+
+        state[0] = (r00 shl 24) or (r11 shl 16) or (r22 shl 8) or r33
+        state[1] = (r01 shl 24) or (r12 shl 16) or (r23 shl 8) or r30
+        state[2] = (r02 shl 24) or (r13 shl 16) or (r20 shl 8) or r31
+        state[3] = (r03 shl 24) or (r10 shl 16) or (r21 shl 8) or r32
+    }
 
     private fun mixColumns(state: IntArray) {
         val s = IntArray(4) { state[it] }

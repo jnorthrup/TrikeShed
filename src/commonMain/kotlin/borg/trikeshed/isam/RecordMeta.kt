@@ -19,21 +19,16 @@ import borg.trikeshed.lib.j
  */
 
    class RecordMeta(
-//    /** column name*/
     val name: String,
-    /** enum-resident Type describing byte marshalling strategies - a specialization of TypeMemento */
     val type: IOMemento,
-    /** context-specific byte offset beginning*/
     val begin: Int = -1,
-    /** context-specific byte offset ending*/
     val end: Int = -1,
-    /** a lambda that converts a byte[]  to downstream, often but not necessarily the IoMemento utility */
     val decoder: (ByteArray) -> Any? = type.createDecoder(end - begin),
-    /** a lambda that produces a byte[] for marshalling to disk or elsewhere */
     val encoder: (Any?) -> ByteArray = type.createEncoder(end - begin),
-    /** open to interpretation, for instance, CSV conversion to ISAM might define two RecordMetas for two steps*/
     var child: RecordMeta? = null,
     val groupId: Int = 0,
+    /** Human-readable group label. Defaults to groupId.toString() — "0" stays visible as "0". Implicit (max) group → <stem>.bin; named groups → <stem>.<groupName>.bin. */
+    val groupName: String = groupId.toString(),
     ) : ColumnMeta by (name j (type as TypeMemento)){
-       override fun toString(): String = "RecordMeta(name='$name', type=$type, begin=$begin, end=$end, decoder=$decoder, encoder=$encoder, child=$child, groupId=$groupId)"
+       override fun toString(): String = "RecordMeta(name='$name', type=$type, begin=$begin, end=$end, groupId=$groupId, groupName='$groupName')"
     }

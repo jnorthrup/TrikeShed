@@ -321,6 +321,18 @@ operator fun Series<Char>.div(delim: Char): Series<Series<Char>> { //lazy split
     }
 }
 
+operator fun CharSeries.div(delim: Char): Series<CharSeries> {
+    val intList = mutableListOf<Int>()
+    for (x in 0 until rem) if (raw(pos + x) == delim) intList.add(x)
+    val iarr = intList.toIntArray()
+    val n = iarr.size
+    return (n + 1) j { x: Int ->
+        val p = if (x == 0) 0 else iarr[x - 1] + 1
+        val l = if (x == n) rem else iarr[x]
+        clone().pos(pos + p).lim(pos + l)
+    }
+}
+
 
 fun CharSequence.toSeries(): Series<Char> = (this as? Series<Char>) ?: (this.length j { this[it] })
 val CharSequence.s: Series<Char> get() = (this as? CharSeries) ?: CharSeries(this)

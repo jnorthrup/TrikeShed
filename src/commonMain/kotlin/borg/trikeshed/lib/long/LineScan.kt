@@ -84,7 +84,7 @@ fun LongSeries<Byte>.charLines(): Series<CharSeries> {
 /**
  * CSV field splitter on charLines.
  */
-fun LongSeries<Byte>.csvSplit(delim: Char = ','): Series<Series<Series<Char>>> {
+fun LongSeries<Byte>.csvSplit(delim: Char = ','): Series<Series<CharSeries>> {
     val cl = charLines()
     return cl.a j { rowIdx: Int ->
         cl.b(rowIdx) / delim

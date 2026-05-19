@@ -10,7 +10,7 @@ import kotlin.math.min
 /**
  * 1. create a class that can read the metadata file and create a collection of record constraints
  *
- * the isam metafile format follows this sample
+ * the isam metafile format follows this _sample_
  *
 ```
 # format:  coords WS .. EOL names WS .. EOL TypeMememento WS .. [EOL groups]
@@ -18,14 +18,15 @@ import kotlin.math.min
 0 12 12 24 24 32 32 40 40 48 48 56 56 64 64 72 72 76 76 84 84 92
 Open_time Close_time Open High Low Close Volume Quote_asset_volume Number_of_trades Taker_buy_base_asset_volume Taker_buy_quote_asset_volume
 IoInstant IoInstant IoDouble IoDouble IoDouble IoDouble IoDouble IoDouble IoInt IoDouble IoDouble
-# groups: sparse mixed grouping with ranges and comma-separated lists
-# examples: "0:0 1-4:2 5:0 7-12:reserved" or "0,5:0 1-4,6:2 7-12:reserved"
-0:0 1-4:2 5:0 7-12:reserved
+0:0 1-4,6-7:2 15,16:varchars
 ```
 
 the ebnf we can use is:
 
+
+the ebnf  is:
 ```
+
 metafile :=  (coords WS names WS .. EOL)*
 coords :=  (coord WS)* coord
 coord :=  number
@@ -37,13 +38,14 @@ groups := (groupSpec WS)* groupSpec
 groupSpec := colList ':' groupName
 colList := (colSpec ',')* colSpec
 colSpec := colIdx | colIdx '-' colIdx
-groupName := number | 'reserved'
+groupName := number | [A-z]+[A-z0-9_-@]*
 ```
+
  * 2. create a class that can create the binary file
  *
  * the binary file format follows this sample
  *
- */
+*/
  class IsamMetaFileReader(val metafileFilename: String, private val fileOps: FileOperations) :Usable{
 
     val recordlen: Int by lazy {
@@ -63,20 +65,20 @@ groupName := number | 'reserved'
 
         val namesList = names.toList()
         val groupsLine = if (lines.size > 3) lines[3].trim() else ""
-        val groupIds = if (groupsLine.isNotEmpty()) {
-            parseGroupsLine(groupsLine, namesList)
+        val groupSeries: Series<Join<Int, String>> = if (groupsLine.isNotEmpty()) {
+            parseGroupsLine(groupsLine, namesList.size)
         } else {
-            IntArray(namesList.size) { 0 }
+            Series(namesList.size) { idx -> idx j "0" }
         }
 
         this@IsamMetaFileReader.constraints1 = namesList.zip(types.toList()).mapIndexed { index, (name, type) ->
             val begin = coords[2 * index].toInt()
             val end = coords[2 * index + 1].toInt()
-            val groupId = groupIds[index]
+            val (groupId, groupName) = groupSeries[index]
             val ioMemento: IOMemento = IOMemento.valueOf(type)
             val decoder: (ByteArray) -> Any? = ioMemento.createDecoder(end - begin)
             val encoder: (Any?) -> ByteArray = ioMemento.createEncoder(end - begin)
-            RecordMeta(name, ioMemento, begin, end, decoder, encoder, groupId = groupId)
+            RecordMeta(name, ioMemento, begin, end, decoder, encoder, groupId = groupId, groupName = groupName)
         }
     }
 
@@ -95,48 +97,48 @@ groupName := number | 'reserved'
      * 1. close the file descriptor
      */
     companion object {
-        fun parseGroupsLine(line: String, colNames: List<String>): IntArray {
-            val tokens = line.trim().split(Regex("\\s+")).filter { it.isNotEmpty() }
-            val colToGroupStr = mutableMapOf<String, String>()
+        /**
+         * Parse the groups line per EBNF:
+         *   groups    := (groupSpec WS)* groupSpec
+         *   groupSpec := colList ':' groupName
+         *   colList   := (colSpec ',')* colSpec
+         *   colSpec   := colIdx | colIdx '-' colIdx
+         *   groupName := number | [A-Za-z][A-Za-z0-9_\-@]*
+         *
+         * Returns Series<Join<Int,String>> indexed by column position: colIdx j groupName.
+         * Columns not mentioned in the groups line are assigned the implicit group name
+         * (implicitId.toString()), which maps to the default <stem>.bin file.
+         */
+        fun parseGroupsLine(line: String, colCount: Int): Series<Join<Int, String>> {
+            val colToGroupName = mutableMapOf<Int, String>()
             val mentionedGroups = mutableListOf<String>()
 
-            for (token in tokens) {
-                val parts = token.split(':')
-                val groupVal = if (parts.size > 1) parts[1] else "0"
-
-                // Parse column specs: "0,5" or "0-5" or "0" or single token
-                val colSpecs = parts[0].split(',')
-                for (spec in colSpecs) {
-                    if (spec.contains('-')) {
-                        // Range: "0-5" means columns 0,1,2,3,4,5
-                        val (start, end) = spec.split('-').let { it[0].toInt() to it[1].toInt() }
-                        for (colIdx in start..end) {
-                            colToGroupStr[colIdx.toString()] = groupVal
-                        }
+            val cs = CharSeries(line).trim
+            val tokens: Series<CharSeries> = cs.splitWs()
+            for (i in 0 until tokens.size) {
+                val token = tokens[i]
+                val colonIdx = token.lastIndexOf(':')
+                if (colonIdx < 0) continue
+                val colListCs  = token.clone().lim(token.pos + colonIdx)
+                val groupName  = token.clone().pos(token.pos + colonIdx + 1).asString()
+                if (groupName !in mentionedGroups) mentionedGroups.add(groupName)
+                // expand colList: comma-separated colSpecs
+                val colSpecs: Series<CharSeries> = colListCs / ','
+                for (j in 0 until colSpecs.size) {
+                    val spec = colSpecs[j].trim
+                    val dashIdx = spec.indexOf('-')
+                    if (dashIdx > 0) {
+                        val lo = spec.clone().lim(spec.pos + dashIdx).asString().toInt()
+                        val hi = spec.clone().pos(spec.pos + dashIdx + 1).asString().toInt()
+                        for (k in lo..hi) colToGroupName[k] = groupName
                     } else {
-                        // Single column
-                        colToGroupStr[spec] = groupVal
+                        colToGroupName[spec.asString().toInt()] = groupName
                     }
                 }
-
-                if (groupVal !in mentionedGroups) {
-                    mentionedGroups.add(groupVal)
-                }
             }
 
-            val groupToId = mentionedGroups.mapIndexed { index, name -> name to index }.toMap().toMutableMap()
-            val implicitGroupId = mentionedGroups.size
-
-            return IntArray(colNames.size) { colIdx ->
-                val name = colNames[colIdx]
-                val strIdx = colIdx.toString()
-                val groupName = colToGroupStr[name] ?: colToGroupStr[strIdx]
-                if (groupName != null) {
-                    groupToId[groupName]!!
-                } else {
-                    implicitGroupId
-                }
-            }
+            val implicitName = mentionedGroups.size.toString()
+            return Series(colCount) { idx -> idx j (colToGroupName[idx] ?: implicitName) }
         }
 
         fun write(metafilename: String, recordMetas: Series<ColumnMeta>, varchars: Map<String,Int>, fileOps: FileOperations): Series<RecordMeta> {
@@ -149,55 +151,50 @@ groupName := number | 'reserved'
             lines.add(result.view.joinToString(" ") { it.name })
             lines.add(result.view.joinToString(" ") { it.type.name })
 
-            if (result.view.any { it.groupId != 0 }) {
-                val maxGroupId = result.view.maxOf { it.groupId }
+            // Emit groups line whenever more than one distinct groupId is present.
+            // 0 is no more special than any other groupId — the implicit group is simply maxGroupId.
+            val distinctGroups = result.view.map { it.groupId }.toSet()
+            if (distinctGroups.size > 1) {
+                val maxGroupId = distinctGroups.max()
 
-                // Group column indices by their groupId (excluding LAST/maxGroupId)
-                val groupsById = mutableMapOf<Int, MutableList<Int>>()
-                result.view.forEachIndexed { index, recordMeta ->
-                    if (recordMeta.groupId != maxGroupId) {
-                        groupsById.getOrPut(recordMeta.groupId) { mutableListOf() }.add(index)
-                    }
+                // Build groupName -> sorted list of column indices (excluding implicit/max group).
+                // Preserve first-appearance order — groups have no inherent sort value.
+                val byGroup = linkedMapOf<String, MutableList<Int>>()
+                result.view.forEachIndexed { idx, rm ->
+                    if (rm.groupId != maxGroupId)
+                        byGroup.getOrPut(rm.groupName) { mutableListOf() }.add(idx)
                 }
 
-                // Convert column indices to compact range format
-                val groupTokens = mutableListOf<String>()
-                groupsById.forEach { (groupId, colIndices) ->
-                    val groupName = when (groupId) {
-                        1 -> "reserved"
-                        else -> groupId.toString()
-                    }
-
-                    // Convert list of indices to ranges: [0,1,2,5,6] → "0-2 5-6"
-                    val ranges = mutableListOf<String>()
-                    var start = colIndices[0]
-                    var prev = colIndices[0]
-
-                    for (idx in colIndices.drop(1)) {
-                        if (idx == prev + 1) {
-                            // Consecutive
-                            prev = idx
-                        } else {
-                            // Gap - emit range
-                            ranges.add(if (start == prev) "$start" else "$start-$prev")
-                            start = idx
-                            prev = idx
-                        }
-                    }
-                    // Emit final range
-                    ranges.add(if (start == prev) "$start" else "$start-$prev")
-
-                    // Join ranges with commas, append group suffix
-                    groupTokens.add("${ranges.joinToString(",")}:$groupName")
+                val groupTokens = byGroup.entries.map { (gname, cols) ->
+                    "${buildColList(cols)}:$gname"
                 }
-
-                if (groupTokens.isNotEmpty()) {
-                    lines.add(groupTokens.joinToString(" "))
-                }
+                if (groupTokens.isNotEmpty()) lines.add(groupTokens.joinToString(" "))
             }
 
             fileOps.write(metafilename, lines)
             return result
+        }
+
+        /**
+         * Convert a sorted list of column indices into compact colList notation.
+         * e.g. [0,1,2,5,7,8] -> "0-2,5,7-8"
+         * This is the inverse of the range-expansion in parseGroupsLine.
+         */
+        private fun buildColList(cols: List<Int>): String {
+            if (cols.isEmpty()) return ""
+            val sorted = cols.sorted()
+            val sb = StringBuilder()
+            var start = sorted[0]; var prev = sorted[0]
+            fun flush() {
+                if (sb.isNotEmpty()) sb.append(',')
+                if (start == prev) sb.append(start) else sb.append("$start-$prev")
+            }
+            for (i in 1 until sorted.size) {
+                if (sorted[i] == prev + 1) { prev = sorted[i] }
+                else { flush(); start = sorted[i]; prev = sorted[i] }
+            }
+            flush()
+            return sb.toString()
         }
 
         fun sanitize(recordMetas: Series<ColumnMeta>, varchars: Map<String, Int>): Series<RecordMeta> {
@@ -206,12 +203,8 @@ groupName := number | 'reserved'
                 recordMetas.view.map { (name: String,type: TypeMemento): ColumnMeta ->
                     val type: TypeMemento = type
                     val len: Int =  type.networkSize?: varchars[name]?: throw Exception("no network size for $name")
-                    // Assign groupId based on field name: volume fields -> 1 (reserved), others -> 0 (default)
-                    val lowerName = name.lowercase()
-                    val groupId = when {
-                        "volume" in lowerName || "quote_asset" in lowerName -> 1
-                        else -> (type as? RecordMeta)?.groupId ?: 0
-                    }
+                    val groupId   = (type as? RecordMeta)?.groupId   ?: 0
+                    val groupName = (type as? RecordMeta)?.groupName ?: groupId.toString()
                     val recordMeta = RecordMeta(
                         name,
                         type as IOMemento,
@@ -219,7 +212,8 @@ groupName := number | 'reserved'
                         offset + len,
                         type.createDecoder(len),
                         type.createEncoder(len),
-                        groupId = groupId
+                        groupId = groupId,
+                        groupName = groupName,
                     )
                     offset += len
                     recordMeta
@@ -227,5 +221,6 @@ groupName := number | 'reserved'
             } else recordMetas as Series<RecordMeta>
             return result
         }
+
     }
 }

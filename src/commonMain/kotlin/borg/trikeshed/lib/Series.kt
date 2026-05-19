@@ -26,7 +26,7 @@ typealias Series<T> = MetaSeries<Int, T>
  *  ` { x -> M(x) } ` making the delta symbol into lambda braces and the x into a parameter and the M(x) into the body
  */
 
-inline infix fun <X, C, V : Series<X>> V.α(crossinline xform: (X) -> C): Series<C> = size j { i -> xform(this[i]) }
+inline infix fun <X, C, Domain >    MetaSeries<Domain,X>.α(crossinline xform: (X) -> C): MetaSeries<Domain,C> = a j { i -> xform(this[i]) }
 
 /*iterable conversion*/
 infix fun <X, C, Subject : Iterable<X>> Subject.α(xform: (X) -> C) = object : Iterable<C> {
