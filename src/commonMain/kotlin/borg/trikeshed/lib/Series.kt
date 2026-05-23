@@ -13,8 +13,6 @@ import kotlin.math.pow
 
 typealias Series<T> = MetaSeries<Int, T>
 
-
-
 /** α
  * (λx.M[x]) → (λy.M[y])	α-conversion
  * https://en.wikipedia.org/wiki/Lambda_calculus
