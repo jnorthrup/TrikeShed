@@ -166,7 +166,7 @@ kotlin {
                 implementation(project(":libs:quic"))
                 implementation(project(":libs:ngsctp"))
                 implementation(project(":libs:htx-client"))
-                implementation(project(":libs:miniduck"))
+                // miniduck excluded - requires deleted confix types
             }
         }
 

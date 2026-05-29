@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body { font-family: Arial, sans-serif; }
+        pre { background-color: #f5f5f5; padding: 8px; }
+        h2 { color: #333; }
+    </style>
+</head>
+<body>
+<h1>RFC: Byte-Based Encoding for JSON State Transition Tracking</h1>
+<p>
+    This document proposes an efficient byte-based encoding scheme for tracking state transitions and relative offsets in JSON parsing. The encoding should support 8-bit relative offsets, with no more than 2 bits for encoding state ordinals.
+</p>
+
+<h2>1. Introduction</h2>
+<p>
+    The purpose of this encoding is to improve the performance of JSON parsing by enabling autovectorization and parallelization. This will be achieved by implementing a simple and efficient encoding scheme that can handle arbitrary chunk sizes and support the tracking of state transitions in JSON parsing.
+</p>
+
+<h2>2. Encoding Scheme</h2>
+<p>
+    The encoding scheme should support the following state transitions:
+</p>
+<pre>
+- Unchanged: no change in state
+- ScopeOpen: open brackets '{' or '['
+- ScopeClose: close brackets '}' or ']'
+- ValueDelim: value delimiter ','
+</pre>
+<p>
+    The encoding should use 8-bit relative offsets with 2 bits dedicated to state ordinal encoding. The remaining 6 bits will be used to represent the distance between state transitions. An extension signal will be used to accommodate UShort or ULong64 for boundary escapes.
+</p>
+
+<h2>3. Enum</h2>
+<p>
+    The required enum for this encoding scheme will be as follows:
+</p>
+<pre>
+enum class JsStateEvent(val predicate: (UByte) -> Boolean) {
+Unchanged({ false }),
+ScopeOpen({ it.toUInt() == 0x7bU || it.toUInt() == 0x5bU }),
+ScopeClose({ it.toUInt() == 0x7dU || it.toUInt() == 0x5dU }),
+ValueDelim({ it.toUInt() == 0x2cU }),
+}
+</pre>
+
+<h2>4. Offset and Numbering</h2>
+<p>
+    Offsets and numbering should be explicitly documented in the encoding scheme. The '0' offsets need not be accommodated by this length encoding.
+</p>
+
+<h2>5. Conclusion</h2>
+<p>
+    By implementing this byte-based encoding scheme, we aim to improve the performance of JSON parsing by enabling autovectorization and parallelization while providing a simple and efficient solution for handling arbitrary chunk sizes and tracking state transitions.
+</p>
+</body>
+</html>

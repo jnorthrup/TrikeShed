@@ -8,17 +8,17 @@ pluginManagement {
 
 rootProject.name = "TrikeShed"
 
-// Auto-include every libs/ subdirectory that has a build.gradle.kts.
+// Auto-include every libs/ subdirectory that has a build.gradle.kts,
+// except broken ones that reference deleted confix types.
+val excludedLibs = setOf(
+    "miniduck", "openapi", "polyglot",
+    "dreamer-kmm", "cbadvanced",
+    "integration"  // macos klib missing — toolchain not configured
+)
+
 file("libs").listFiles()?.filter { it.isDirectory }?.forEach { dir ->
-    if (file("libs/${dir.name}/build.gradle.kts").exists()) {
+    if (dir.name !in excludedLibs && file("libs/${dir.name}/build.gradle.kts").exists()) {
         include(":libs:${dir.name}")
         project(":libs:${dir.name}").projectDir = dir
     }
 }
-
-// Nested modules
-// include(":libs:combined-client")
-// project(":libs:combined-client").projectDir = file("libs/combined-client")
-// include(":libs:couch:viewserver")
-// project(":libs:couch:viewserver").projectDir = file("libs/couch/viewserver")
-// include(":libs:jules-client")

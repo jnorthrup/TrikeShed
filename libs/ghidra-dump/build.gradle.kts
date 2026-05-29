@@ -7,7 +7,7 @@ group = "borg.trikeshed"
 version = "0.1.0-SNAPSHOT"
 
 val ghidraHome: String = providers.gradleProperty("ghidraHome")
-    .orElse(System.getenv("GHIDRA_HOME"))
+    .orElse(providers.provider { System.getenv("GHIDRA_HOME") ?: "" })
     .orElse("/opt/homebrew/var/homebrew/tmp/.cellar/ghidra/12.1")
     .get()
 
@@ -43,7 +43,7 @@ val ghidraDump by tasks.registering(Exec::class) {
     )
 
     doFirst {
-        workingDir.asFile.mkdirs()
+        file(workingDir).mkdirs()
     }
 }
 
@@ -61,6 +61,6 @@ tasks.named("assemble") {
     dependsOn(copyScript)
 }
 
-tasks.registering<PublishToMavenRepository> {
+tasks.registering(PublishToMavenRepository::class) {
     // placeholder — publish is no-op for this utility module
 }
