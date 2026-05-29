@@ -129,6 +129,14 @@ enum class IOMemento(override val networkSize: Int? = null, val fromChars: (Seri
     IoNothing(null, { "" }) {
         override fun createEncoder(i: Int): (Any?) -> ByteArray = { ByteArray(0) }
         override fun createDecoder(size: Int): (ByteArray) -> Any? = { ByteArray(0) }
+    },
+    IoArray(null, { throw UnsupportedOperationException("IoArray fromChars") }) {
+        override fun createEncoder(i: Int): (Any?) -> ByteArray = { throw UnsupportedOperationException("IoArray encoder") }
+        override fun createDecoder(size: Int): (ByteArray) -> Any? = { throw UnsupportedOperationException("IoArray decoder") }
+    },
+    IoObject(null, { throw UnsupportedOperationException("IoObject fromChars") }) {
+        override fun createEncoder(i: Int): (Any?) -> ByteArray = { throw UnsupportedOperationException("IoObject encoder") }
+        override fun createDecoder(size: Int): (ByteArray) -> Any? = { throw UnsupportedOperationException("IoObject decoder") }
     }
     ;
 

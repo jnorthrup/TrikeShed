@@ -2,6 +2,8 @@
 
 package borg.trikeshed.doubledispatch
 
+import kotlin.reflect.KClass
+
 /** Inline class packing start/end offsets — no allocation at runtime. */
 inline class Region(val packed: Long) {
     val start: Int get() = (packed ushr 32).toInt()
@@ -16,8 +18,8 @@ inline class Region(val packed: Long) {
 
 /** Inline class wrapping the force lambda — avoids vtable shim pointer.
  *  The phantom Type parameter carries monomorphic type witness at compile time.
- *  Dispatch is by static argument type: each factory function (reifyString, reifyNumber, etc.)
- *  hard-codes the argument type passed to Factory.reify(), selecting the correct overload
+ *  Dispatch is by static argument type: each factory function hard-codes the
+ *  argument type passed to Factory.reify(), selecting the correct overload
  *  at compile time. The phantom Type is never accessed at runtime. */
 @Suppress("INLINE_CLASS_DEPRECATED")
 inline class Reifier<R, out Type>(val _force: (Factory<R>) -> R) {
@@ -121,46 +123,187 @@ fun <R, Type> produce(
     factory: Factory<R>, payload: Reifier<R, Type>
 ): R = payload.force(factory)
 
-/** Factory functions — each creates a Reifier with phantom Type witness.
- *  Dispatch is by static argument type: each function hard-codes which value type
- *  it passes to Factory.reify(), so the compiler selects the correct overload.
- *  The phantom Type parameter carries monomorphic witness at compile time only.
- *  All lazy lambdas return non-nullable values — the parser guarantees non-null. */
-fun <R, Type> reifyString(
-    at: Region, lazy: (Region) -> String
-): Reifier<R, Type> = Reifier { factory -> factory.reify(lazy(at), at) }
+// === Forwarder / Recognizer — compile-time type witness pattern ===
 
-fun <R, Type> reifyNumber(
-    at: Region, lazy: (Region) -> Number
-): Reifier<R, Type> = Reifier { factory -> factory.reify(lazy(at), at) }
+/** Forwarder: the simple parse result function — takes Region, returns typed value.
+ *  Each JSON value type (String, Number, Boolean, Obj, Arr, Null) has its own
+ *  Forwarder that captures the parsed value and returns it on demand. */
+typealias Forwarder<R> = (Region) -> R
 
-fun <R, Type> reifyBoolean(
-    at: Region, lazy: (Region) -> Boolean
-): Reifier<R, Type> = Reifier { factory -> factory.reify(lazy(at), at) }
+/** Recognizer: KClass-phantom wrapper around Forwarder.
+ *  (KClass<R>, Region) -> R  forwards to  (Region) -> R
+ *  The KClass parameter is a compile-time type witness — it is never used at runtime.
+ *  It enables overload resolution by making the parameter types distinct.
+ *  R must be non-nullable (KClass bounds require Any). */
+typealias Recognizer<R> = (KClass<R>, Region) -> R
 
-fun <R, Type> reifyObject(
-    at: Region, lazy: (Region) -> Obj<R>
-): Reifier<R, Type> = Reifier { factory -> factory.reify(lazy(at), at) }
+/** Lift a Forwarder into a Recognizer — strips phantom KClass, forwards Region.
+ *  The KClass is the compile-time dispatch token; the Region is the runtime data.
+ *  This is the "forwarder" pattern: (KClass<R>, Region) -> R forwards to (Region) -> R. */
+fun <R : Any> recognize(forwarder: Forwarder<R>): Recognizer<R> = { _, region -> forwarder(region) }
 
-fun <R, Type> reifyArray(
-    at: Region, lazy: (Region) -> Arr<R>
-): Reifier<R, Type> = Reifier { factory -> factory.reify(lazy(at), at) }
-
-fun <R, Type> reifyNull(
-    at: Region
-): Reifier<R, Type> = Reifier { factory -> factory.reify(null, at) }
+/** Sentinel type for JSON null — avoids using Nothing as a reified type parameter.
+ *  Nothing has no instances and cannot be reified. JsonNull is a concrete token
+ *  that the handle function dispatches on at compile time. */
+object JsonNull
 
 /** JSON parser that produces a lazy Reifier tree.
- *  Optionally threads a collector to capture Region→Reifier mappings during parse,
- *  eliminating the need for a second tree walk (no walk-factory shim pointer).
- *  Dispatch is by static argument type — each factory function hard-codes the value type
- *  passed to Factory.reify(), so the compiler selects the correct overload.
- *  All parse methods return Reifiers with non-nullable phantom types — the parser
- *  guarantees non-null values for strings, numbers, booleans, objects, and arrays. */
+ *  Dispatch is via handle<R, reified T> — a single inline function with reified type
+ *  parameter that resolves the correct parse + reify branch at compile time.
+ *  No separate reifyString/reifyNumber/etc. factory functions needed.
+ *  No separate parseStringValue/parseNumber/etc. methods needed.
+ *  The handle function IS the unified dispatch point. */
 class Parser(val src: String) {
+
     var i: Int = 0
 
-    /** Parse top-level value. Optionally collect Region→Reifier mappings via collector. */
+    /** THE compile-time dispatched forwarder.
+     *  Uses reified T for type-driven dispatch — the compiler resolves the correct
+     *  branch when T is known at the call site. Each branch:
+     *    1. Parses the value for its type using Parser primitives
+     *    2. Creates a Forwarder that captures the parsed value
+     *    3. Wraps it in a Recognizer (KClass phantom + Region forward)
+     *    4. Creates a Reifier that calls Factory.reify() with the correct overload
+     *    5. Reports to the collector
+     *
+     *  The when(T::class) is resolved at compile time because T is reified and
+     *  the function is inline — the compiler sees the concrete T at each call site
+     *  and eliminates all branches except the correct one.
+     *
+     *  @param R the Factory result type (e.g., String for JsonFactory)
+     *  @param T the JSON value type — compile-time dispatch token */
+    @Suppress("UNCHECKED_CAST")
+    inline fun <R, reified T> handle(
+        noinline collector: ((Region, Reifier<R, *>) -> Unit)?
+    ): Reifier<R, *> {
+        return when (T::class) {
+            String::class -> {
+                val (value, at) = readString()
+                val forwarder: Forwarder<String> = { value }
+                val recognizer: Recognizer<String> = recognize(forwarder)
+                val r: Reifier<R, String> = Reifier { factory ->
+                    factory.reify(recognizer(String::class, at), at)
+                }
+                collector?.invoke(at, r)
+                r
+            }
+            Boolean::class -> {
+                val start = i
+                val value: Boolean = if (src.startsWith("true", i)) {
+                    i += 4; true
+                } else if (src.startsWith("false", i)) {
+                    i += 5; false
+                } else {
+                    fail("expected boolean")
+                }
+                val at = Region.of(start, i)
+                val forwarder: Forwarder<Boolean> = { value }
+                val recognizer: Recognizer<Boolean> = recognize(forwarder)
+                val r: Reifier<R, Boolean> = Reifier { factory ->
+                    factory.reify(recognizer(Boolean::class, at), at)
+                }
+                collector?.invoke(at, r)
+                r
+            }
+            Double::class -> {
+                val start = i
+                if (peek('-')) i++
+                digits("number")
+                if (peek('.')) {
+                    i++
+                    digits("fraction")
+                }
+                if (peek('e') || peek('E')) {
+                    i++
+                    if (peek('+') || peek('-')) i++
+                    digits("exponent")
+                }
+                val end = i
+                val raw = src.substring(start, end)
+                val at = Region.of(start, end)
+                val num: Number = if (raw.any { it == '.' || it == 'e' || it == 'E' }) raw.toDouble() else raw.toLong()
+                val r: Reifier<R, Number> = Reifier { factory ->
+                    factory.reify(num, at)
+                }
+                collector?.invoke(at, r)
+                r
+            }
+            Map::class -> {
+                val start = i
+                expect('{')
+                val fields = LinkedHashMap<String, Reifier<R, *>>()
+                skipWs()
+                if (tryChar('}')) {
+                    val at = Region.of(start, i)
+                    val r: Reifier<R, Obj<R>> = Reifier { factory ->
+                        factory.reify(fields, at)
+                    }
+                    collector?.invoke(at, r)
+                    return r
+                }
+                while (true) {
+                    skipWs()
+                    val (key, _) = readString()
+                    skipWs()
+                    expect(':')
+                    fields[key] = parseValue<R>(collector)
+                    skipWs()
+                    if (tryChar(',')) continue
+                    expect('}')
+                    break
+                }
+                val at = Region.of(start, i)
+                val r: Reifier<R, Obj<R>> = Reifier { factory ->
+                    factory.reify(fields, at)
+                }
+                collector?.invoke(at, r)
+                r
+            }
+            List::class -> {
+                val start = i
+                expect('[')
+                val items = ArrayList<Reifier<R, *>>()
+                skipWs()
+                if (tryChar(']')) {
+                    val at = Region.of(start, i)
+                    val r: Reifier<R, Arr<R>> = Reifier { factory ->
+                        factory.reify(items, at)
+                    }
+                    collector?.invoke(at, r)
+                    return r
+                }
+                while (true) {
+                    items += parseValue<R>(collector)
+                    skipWs()
+                    if (tryChar(',')) continue
+                    expect(']')
+                    break
+                }
+                val at = Region.of(start, i)
+                val r: Reifier<R, Arr<R>> = Reifier { factory ->
+                    factory.reify(items, at)
+                }
+                collector?.invoke(at, r)
+                r
+            }
+            JsonNull::class -> {
+                val start = i
+                expectWord("null")
+                val at = Region.of(start, i)
+                val r: Reifier<R, Nothing?> = Reifier { factory ->
+                    factory.reify(null, at)
+                }
+                collector?.invoke(at, r)
+                r
+            }
+            else -> fail("unrecognized type ${T::class}")
+        }
+    }
+
+    /** Parse top-level value. Routes through handle<R, T> for compile-time dispatch.
+     *  The when block on src[i] is the runtime entry point (unavoidable — we read
+     *  characters at runtime). Each branch calls handle<R, SpecificType>(collector)
+     *  where the compiler resolves the correct handle branch via reified T. */
     fun <R> parseDepth0(collector: ((Region, Reifier<R, *>) -> Unit)? = null): Reifier<R, *> {
         val payload: Reifier<R, *> = parseValue(collector)
         skipWs()
@@ -168,155 +311,25 @@ class Parser(val src: String) {
         return payload
     }
 
-    /** THE ONE TRUE UNINLINABLE PART */
+    /** Parse a single JSON value. The when block routes characters to handle<R, T>
+     *  overloads — each T is a reified type parameter that selects the correct
+     *  parse + reify branch at compile time. No manual name-to-name routing. */
     fun <R> parseValue(collector: ((Region, Reifier<R, *>) -> Unit)? = null): Reifier<R, *> {
         skipWs()
         if (i >= src.length) fail("expected value")
 
         return when (src[i]) {
-            '"' -> parseStringValue<R>(collector)
-            '{' -> parseObject<R>(collector)
-            '[' -> parseArray<R>(collector)
-            't', 'f' -> parseBoolean<R>(collector)
-            'n' -> parseNull<R>(collector)
-            '-', in '0'..'9' -> parseNumber<R>(collector)
-            else -> fail("expected value")
+            '"'              -> handle<R, String>(collector)
+            '{'              -> handle<R, Map<String, Reifier<R, *>>>(collector)
+            '['              -> handle<R, List<Reifier<R, *>>>(collector)
+            't', 'f'         -> handle<R, Boolean>(collector)
+            'n'              -> handle<R, JsonNull>(collector)
+            '-', in '0'..'9' -> handle<R, Double>(collector)
+            else             -> fail("expected value")
         }
     }
 
-    fun <R> parseStringValue(collector: ((Region, Reifier<R, *>) -> Unit)? = null): Reifier<R, String> {
-        val (value, at) = readString()
-        val r: Reifier<R, String> = reifyString<R, String>(at) { value }
-        collector?.invoke(at, r)
-        return r
-    }
-
-    fun <R> parseNumber(collector: ((Region, Reifier<R, *>) -> Unit)? = null): Reifier<R, Number> {
-        val start = i
-
-        if (peek('-')) i++
-
-        digits("number")
-
-        if (peek('.')) {
-            i++
-            digits("fraction")
-        }
-
-        if (peek('e') || peek('E')) {
-            i++
-            if (peek('+') || peek('-')) i++
-            digits("exponent")
-        }
-
-        val end = i
-        val raw = src.substring(start, end)
-        val at = Region.of(start, end)
-
-        val r: Reifier<R, Number> = reifyNumber<R, Number>(at) {
-            if (raw.any { it == '.' || it == 'e' || it == 'E' }) {
-                raw.toDouble()
-            } else {
-                raw.toLong()
-            }
-        }
-        collector?.invoke(at, r)
-        return r
-    }
-
-    fun <R> parseBoolean(collector: ((Region, Reifier<R, *>) -> Unit)? = null): Reifier<R, Boolean> {
-        val start = i
-
-        val value: Boolean = if (src.startsWith("true", i)) {
-            i += 4
-            true
-        } else if (src.startsWith("false", i)) {
-            i += 5
-            false
-        } else {
-            fail("expected boolean")
-        }
-
-        val at = Region.of(start, i)
-        val r: Reifier<R, Boolean> = reifyBoolean<R, Boolean>(at) { value }
-        collector?.invoke(at, r)
-        return r
-    }
-
-    fun <R> parseNull(collector: ((Region, Reifier<R, *>) -> Unit)? = null): Reifier<R, Nothing?> {
-        val start = i
-        expectWord("null")
-        val at = Region.of(start, i)
-        val r: Reifier<R, Nothing?> = reifyNull<R, Nothing?>(at)
-        collector?.invoke(at, r)
-        return r
-    }
-
-    fun <R> parseArray(collector: ((Region, Reifier<R, *>) -> Unit)? = null): Reifier<R, Arr<R>> {
-        val start = i
-        expect('[')
-
-        val items = ArrayList<Reifier<R, *>>()
-
-        skipWs()
-        if (tryChar(']')) {
-            val at = Region.of(start, i)
-            val r: Reifier<R, Arr<R>> = reifyArray<R, Arr<R>>(at) { items }
-            collector?.invoke(at, r)
-            return r
-        }
-
-        while (true) {
-            items += parseValue<R>(collector)
-            skipWs()
-
-            if (tryChar(',')) continue
-
-            expect(']')
-            break
-        }
-
-        val at = Region.of(start, i)
-        val r: Reifier<R, Arr<R>> = reifyArray<R, Arr<R>>(at) { items }
-        collector?.invoke(at, r)
-        return r
-    }
-
-    fun <R> parseObject(collector: ((Region, Reifier<R, *>) -> Unit)? = null): Reifier<R, Obj<R>> {
-        val start = i
-        expect('{')
-
-        val fields = LinkedHashMap<String, Reifier<R, *>>()
-
-        skipWs()
-        if (tryChar('}')) {
-            val at = Region.of(start, i)
-            val r: Reifier<R, Obj<R>> = reifyObject<R, Obj<R>>(at) { fields }
-            collector?.invoke(at, r)
-            return r
-        }
-
-        while (true) {
-            skipWs()
-            val (key, _) = readString()
-
-            skipWs()
-            expect(':')
-
-            fields[key] = parseValue<R>(collector)
-
-            skipWs()
-            if (tryChar(',')) continue
-
-            expect('}')
-            break
-        }
-
-        val at = Region.of(start, i)
-        val r: Reifier<R, Obj<R>> = reifyObject<R, Obj<R>>(at) { fields }
-        collector?.invoke(at, r)
-        return r
-    }
+    // === Low-level parse primitives ===
 
     fun readString(): Pair<String, Region> {
         val start = i
