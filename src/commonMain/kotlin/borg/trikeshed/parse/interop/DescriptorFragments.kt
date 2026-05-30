@@ -5,7 +5,7 @@ import borg.trikeshed.cursor.ColumnMeta
 import borg.trikeshed.cursor.RowVec
 import borg.trikeshed.cursor.TreeCursor
 import borg.trikeshed.cursor.TypeMemento
-import borg.trikeshed.cursor.joins
+import borg.trikeshed.lib.joins
 import borg.trikeshed.cursor.label
 import borg.trikeshed.isam.meta.IOMemento
 import borg.trikeshed.lib.*
@@ -74,7 +74,7 @@ fun DescriptorFragment.signature(): String =
 data class NdjsonPreparedParser(
     val descriptor: DescriptorFragment,
 ) {
-    fun parse(line: String): Any? = JsonParser.reify(line.toSeries())
+    fun parse(line: String): Any? = JsonParser.parse(line)
     fun describeRowTree(line: String): TreeCursor = StructuredParserSupport.describeJsonRowTree(line)
 }
 

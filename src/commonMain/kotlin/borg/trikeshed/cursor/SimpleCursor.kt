@@ -10,10 +10,10 @@ class SimpleCursor @JvmOverloads constructor(
     val data: Series<Series<Any>>,
     val o: Series<RecordMeta> = scalars α { it: ColumnMeta ->
         it as? RecordMeta ?: RecordMeta(
-            it.name,
-            it.first as? IOMemento ?: IOMemento.IoString
+            it.name.toString(),
+            it.type as? IOMemento ?: IOMemento.IoString
         )
     },
     val metaProviders: Series<`ColumnMeta↻`> = o.size j { index: Int -> { o[index] } },
-    val c: Join<Int, (Int) -> RowVec> = data α { row -> (row α { it as Any? }) j metaProviders },
+    val c: Join<Int, (Int) -> RowVec> = data α { row -> (row α { it as Any? }).joins(metaProviders) },
 ) : Cursor by c

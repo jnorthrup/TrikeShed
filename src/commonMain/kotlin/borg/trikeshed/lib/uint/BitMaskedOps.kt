@@ -1,4 +1,3 @@
-@file:JvmName("BitMaskedOpsUInt")
 package borg.trikeshed.lib.uint
 
 import borg.trikeshed.lib.BitMasked
@@ -26,28 +25,19 @@ infix fun BitMasked<UInt>.rangeTo(other: BitMasked<UInt>): UIntRange = this.mask
 infix fun Int.rangeTo(bm: BitMasked<UInt>): IntRange = this..bm.mask.toInt()
 
 // Bitwise helpers
-@JvmName("getBit")
 fun BitMasked<UInt>.getBit(bit: Int): Boolean = (this.mask and (1u shl bit)) != 0u
-@JvmName("setBit")
 fun BitMasked<UInt>.setBit(bit: Int): UInt = this.mask or (1u shl bit)
-@JvmName("clearBit")
 fun BitMasked<UInt>.clearBit(bit: Int): UInt = this.mask and (1u shl bit).inv()
-@JvmName("toggleBit")
 fun BitMasked<UInt>.toggleBit(bit: Int): UInt = this.mask xor (1u shl bit)
-@JvmName("rotateLeft")
 fun BitMasked<UInt>.rotateLeft(bits: Int): UInt = (this.mask shl bits) or (this.mask shr (32 - bits))
-@JvmName("rotateRight")
 fun BitMasked<UInt>.rotateRight(bits: Int): UInt = (this.mask shr bits) or (this.mask shl (32 - bits))
 
 // Boolean logic
 infix fun BitMasked<UInt>.andAlso(mask: UInt): Boolean = (this.mask and mask) != 0u
 infix fun BitMasked<UInt>.orElse(mask: UInt): Boolean = (this.mask or mask) != 0u
-@JvmName("logicalNot")
 fun BitMasked<UInt>.logicalNot(): Boolean = this.mask == 0u
 
 // Conversion
 fun BitMasked<UInt>.toUInt(): UInt = this.mask
-@JvmName("toInt")
 fun BitMasked<UInt>.toInt(): Int = this.mask.toInt()
-@JvmName("toLong")
 fun BitMasked<UInt>.toLong(): Long = this.mask.toLong()

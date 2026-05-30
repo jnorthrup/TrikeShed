@@ -2,7 +2,7 @@ package borg.trikeshed.concurrency
 
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.size
-import borg.trikeshed.cursor.joins
+import borg.trikeshed.lib.joins
 import borg.trikeshed.lib.Join
 
 /**

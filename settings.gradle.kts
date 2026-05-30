@@ -13,7 +13,7 @@ rootProject.name = "TrikeShed"
 val excludedLibs = setOf(
     "miniduck", "openapi", "polyglot",
     "dreamer-kmm", "cbadvanced",
-    "integration"  // macos klib missing — toolchain not configured
+    "integration",  // macos klib missing — toolchain not configured
 )
 
 file("libs").listFiles()?.filter { it.isDirectory }?.forEach { dir ->

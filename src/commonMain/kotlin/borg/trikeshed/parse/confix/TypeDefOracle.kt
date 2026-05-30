@@ -169,7 +169,7 @@ class TypeDefOracle {
             when (kind) {
                 "ngram", "factory_step" -> ngram.split(" -> ").map { it.trim() }.zipWithNext().forEach { (s, p) -> if (s.isNotBlank() && p.isNotBlank()) addLinkCheck(s, p) }
                 "isA_edge"             -> ngram.split(" -> ").takeIf { it.size >= 2 }?.let { (c, p) -> addLinkCheck(c, p) }
-                "topic"                -> Regex("""^topic:(\w+)\s+as\s+(\w+)""").find(ngram)?.let { (_, a, b) -> addEntry(b, a, null, "lda-topic") }
+                "topic"                -> Regex("""^topic:(\w+)\s+as\s+(\w+)""").find(ngram)?.let { mr -> addEntry(mr.groupValues[2], mr.groupValues[1], null, "lda-topic") }
             }
         }
     }

@@ -68,7 +68,7 @@ groupName := number | [A-z]+[A-z0-9_-@]*
         val groupSeries: Series<Join<Int, String>> = if (groupsLine.isNotEmpty()) {
             parseGroupsLine(groupsLine, namesList.size)
         } else {
-            Series(namesList.size) { idx -> idx j "0" }
+            namesList.size j { idx: Int -> idx j "0" }
         }
 
         this@IsamMetaFileReader.constraints1 = namesList.zip(types.toList()).mapIndexed { index, (name, type) ->
@@ -138,7 +138,7 @@ groupName := number | [A-z]+[A-z0-9_-@]*
             }
 
             val implicitName = mentionedGroups.size.toString()
-            return Series(colCount) { idx -> idx j (colToGroupName[idx] ?: implicitName) }
+            return colCount j { idx: Int -> idx j (colToGroupName[idx] ?: implicitName) }
         }
 
         fun write(metafilename: String, recordMetas: Series<ColumnMeta>, varchars: Map<String,Int>, fileOps: FileOperations): Series<RecordMeta> {
@@ -200,8 +200,9 @@ groupName := number | [A-z]+[A-z0-9_-@]*
         fun sanitize(recordMetas: Series<ColumnMeta>, varchars: Map<String, Int>): Series<RecordMeta> {
             val result: Series<RecordMeta> = if (recordMetas.view.any { it !is RecordMeta || (min(it.begin, it.end) < 0&&null==it.child) }) {
                 var offset = 0
-                recordMetas.view.map { (name: String,type: TypeMemento): ColumnMeta ->
-                    val type: TypeMemento = type
+                recordMetas.view.map { col: ColumnMeta ->
+                    val name: String = col.name.toString()
+                    val type: TypeMemento = col.type
                     val len: Int =  type.networkSize?: varchars[name]?: throw Exception("no network size for $name")
                     val groupId   = (type as? RecordMeta)?.groupId   ?: 0
                     val groupName = (type as? RecordMeta)?.groupName ?: groupId.toString()

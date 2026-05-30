@@ -43,7 +43,7 @@ interface ConfixOracleFacade {
      * @param parentPoolIdx pool index of the less-specific type
      * @return 2 = YES, 1 = NO, 0 = UNKNOWN
      */
-    fun isA(childPoolIdx: Int, parentPoolIdx: Int): Integer?
+    fun isA(childPoolIdx: Int, parentPoolIdx: Int): Int?
 
     fun setListener(listener: TypeDefListener?)
     fun edgeCount(): Int

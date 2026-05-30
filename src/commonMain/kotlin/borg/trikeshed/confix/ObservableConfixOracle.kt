@@ -1,6 +1,7 @@
 package borg.trikeshed.confix
 
 import borg.trikeshed.cursor.*
+import borg.trikeshed.cursor.CowSeriesHandle
 import borg.trikeshed.lib.*
 
 // ── ObservableConfixOracle ─────────────────────────────────────────
@@ -34,12 +35,11 @@ class ObservableConfixOracle(
     override fun getTypedefChain(modulePath: String, typeName: String): IntArray =
         service.getTypedefChain(modulePath, typeName)
 
-    override fun isA(childPoolIdx: Int, parentPoolIdx: Int): Integer? {
-        val known = service.isA(childPoolIdx, parentPoolIdx)
-        if (known == 2) return 2           // oracle says YES
-        if (known == 1) return 1           // oracle says NO
-        // Oracle has no opinion. Apply class-biased default if enabled.
-        return if (defaultUnknownToClass && !service.contains(childPoolIdx) && !service.contains(parentPoolIdx)) 2 else 0
+    override fun isA(childPoolIdx: Int, parentPoolIdx: Int): Int? {
+        val known = service.isA(childPoolIdx, parentPoolIdx) ?: return null
+        if (known == 2) return 2 as Int?           // oracle says YES
+        if (known == 1) return 1 as Int?           // oracle says NO
+        return if (defaultUnknownToClass) 2 as Int? else 0 as Int?
     }
 
     override fun setListener(listener: TypeDefListener?) {
@@ -75,9 +75,9 @@ class ObservableConfixOracle(
 class ObservableEdgesView(private val handle: CowSeriesHandle<IsAEdge>) {
     fun subscribe(callback: (oldSnapshot: IntArray, newSnapshot: IntArray) -> Unit): Subscription {
         return handle.subscribe { twin ->
-            callback(intArrayOf(twin.a.size), intArrayOf(twin.b.size))
+            callback(intArrayOf(twin.a.a), intArrayOf(twin.b.a))
         }
     }
 
-    fun size(): Int = handle.size
+    fun size(): Int = handle.a
 }

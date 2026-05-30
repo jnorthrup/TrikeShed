@@ -12,6 +12,8 @@ interface Join<A, B> {
     operator fun component1(): A = a
     operator fun component2(): B = b
     val pair: Pair<A, B> get() = Pair(a, b)
+
+    companion object
 }
 
 /** Infix constructor grammar — exactly like `to` for Pair, but for Join. */
@@ -26,6 +28,15 @@ typealias Twin<T> = Join<T, T>
 /** Construct a Twin. Routes to densest representation available. */
 fun <T> Twin(a: T, b: T): Twin<T> = a j b
 
+// ── Companion helpers ──────────────────────────────────────────
+
+/** Empty Series<T> — zero elements, never accessed. */
+fun <T> emptySeriesOf(): Series<T> = 0 j { _: Int -> throw IllegalStateException("empty series") }
+
+/** Zip two same-sized Series into a Series2 (Series<Join<A,B>>). */
+infix fun <A, B> Series<A>.joins(other: Series<B>): Series2<A, B> =
+    size j { i -> this[i] j other[i] }
+
 // ── MetaSeries / Series ─────────────────────────────────────────
 
 /** The universal indexed abstraction: a bound/key paired with an index oracle. */
@@ -38,6 +49,12 @@ typealias Series<T> = MetaSeries<Int, T>
 
 /** Series of Joins — the split-storage specialization. */
 typealias Series2<A, B> = Series<Join<A, B>>
+
+/** Project the A-side of a Series2. */
+val <A, B> Series2<A, B>.left: Series<A> get() = size j { this[it].a }
+
+/** Project the B-side of a Series2. */
+val <A, B> Series2<A, B>.right: Series<B> get() = size j { this[it].b }
 
 val <T>  Series<T>.size: Int get() = a
 

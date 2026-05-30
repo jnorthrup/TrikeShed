@@ -112,7 +112,7 @@ object std {
         allowEmpty: Boolean = true,
     ): KursiveParser<Series<T>> = parser(name) { input ->
         val items = SeriesBuffer<T>()
-        val first = item(input) ?: return@parser if (allowEmpty) Join.emptySeriesOf<T>() else null
+        val first = item(input) ?: return@parser if (allowEmpty) emptySeriesOf<T>() else null
         items.add(first)
 
         while (true) {

@@ -2,6 +2,7 @@ package borg.trikeshed.mlir
 
 import borg.trikeshed.lib.Join
 import borg.trikeshed.lib.Series
+import borg.trikeshed.lib.emptySeriesOf
 import borg.trikeshed.lib.view
 
 /**
@@ -41,8 +42,8 @@ enum class MlirDialect(val namespace: String) {
 data class MlirOp(
     val dialect: MlirDialect,
     val name: String,
-    val operandTypes: Series<String> = Join.emptySeriesOf(),
-    val resultTypes: Series<String> = Join.emptySeriesOf(),
+    val operandTypes: Series<String> = emptySeriesOf<String>(),
+    val resultTypes: Series<String> = emptySeriesOf<String>(),
 ) {
     /** Fully-qualified: "arith.addf" */
     val qualifiedName: String get() = dialect.op(name)

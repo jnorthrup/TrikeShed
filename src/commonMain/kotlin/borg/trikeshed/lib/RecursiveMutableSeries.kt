@@ -47,7 +47,7 @@ class RecursiveMutableSeries<T>(var data: Series<T>) : MutableSeries<T>, Series<
         this.view.withIndex().firstOrNull { it.value == item }?.index?.let { removeAt(it) } != null
 
     override fun clear() {
-        data = Join.emptySeriesOf<T>()
+        data = emptySeriesOf<T>()
     }
 
     override fun plus(item: T): MutableSeries<T> = RecursiveMutableSeries(data + borg.trikeshed.collections.s_[item])

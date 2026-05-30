@@ -2,6 +2,9 @@ package borg.trikeshed.parse.confix
 
 import borg.trikeshed.lib.*
 
+typealias JsPathElement = Either<String, Int>
+typealias JsPath = Series<JsPathElement>
+
 /** Convert a List of path segments (String or Int) into a JsPath Series.
  *  Accepts Int/Number or String; other values are stringified.
  */

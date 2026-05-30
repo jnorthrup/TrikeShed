@@ -15,12 +15,12 @@ import borg.trikeshed.lib.*
     val clusters = linkedMapOf<List<Any?>, IntAccumulator>()
     for (r in 0 until size) {
         val row = this[r] as ReifiedSplitSeries2<*, *>
-        val key = axis.map { row.valueAt(it) }
+        val key = axis.map { row.leftSeries[it] }
         clusters.getOrPut(key) { IntAccumulator() }.add(r)
     }
     val keys = clusters.keys.toList()
     val slabs = clusters.values.map { acc -> acc.toIntArray().also { acc.close() } }
-    val colCount = row(0).size
+    val colCount = this[0].size
     val axisPos = IntArray(colCount) { -1 }.also { a -> axis.forEachIndexed { pos, col -> a[col] = pos } }
     return GroupState(keys, slabs, colCount, axisPos, axisSet)
 }
@@ -50,7 +50,7 @@ inline fun Cursor.groupBy(axis: IntArray, crossinline reducer: RowReducer): Curs
         val acc = arrayOfNulls<Any?>(colCount)
         for (ri in rowIndices) for (cx in valueIndices) {
             val row = this[ri] as ReifiedSplitSeries2<*, *>
-            acc[cx] = reducer(acc[cx], row.valueAt(cx))
+            acc[cx] = reducer(acc[cx], row.leftSeries[cx])
         }
         colCount j { cx ->
             if (cx in axisSet) key[axisPos[cx]] j { cm[cx] }

@@ -140,19 +140,17 @@ object CSVUtil {
             logDebug { "parseConformantmeta: ${it.toList()}" }
         }
         return segments.a j { y: Int ->
-            segments.row(y).let { rv: RowVec ->
-                rv.a j { x: Int ->
-                    val recordMeta = meta[x]
-                    val type = recordMeta.type
-                    val any = rv[x].a
-                    try {
-                        val fromChars = type.fromChars(any as CharSeries)
-                        val function = recordMeta.leftIdentity
-                        fromChars j function
-                    } catch (e: Exception) {
-                        log { "parseConformant: $e col $x row $y " }
-                        throw e
-                    }
+            val rv: RowVec = segments[y]
+            rv.a j { x: Int ->
+                val recordMeta = meta[x]
+                val type = recordMeta.type
+                val any = rv[x].a
+                try {
+                    val fromChars = type.fromChars(any as CharSeries)
+                    fromChars j { recordMeta as ColumnMeta }
+                } catch (e: Exception) {
+                    log { "parseConformant: $e col $x row $y " }
+                    throw e
                 }
             }
         }
@@ -212,11 +210,11 @@ object CSVUtil {
                 lines.add(dstart j toArray)
             } while (datazero1 < file.a)
 
-            val conversionSegments = (fileEvidence?.α { evidence ->
+            val conversionSegments: Series<Join<IOMemento, Int>>? = (fileEvidence?.α { evidence ->
                 val deduce: IOMemento = deduce(evidence)
                 deduce j (deduce.networkSize ?: evidence.maxColumnLength.toInt())
             })?.toList()?.toSeries()
-            val convertedSegmentLengths = conversionSegments?.right?.toArray()
+            val convertedSegmentLengths: IntArray? = conversionSegments?.let { (it α { join: Join<IOMemento, Int> -> join.b }).toArray() }
 
             //perform the length additions of the segment lengths to arrive at DelimitRanges
             val convertedSegments = convertedSegmentLengths?.fold(mutableListOf<DelimitRange>()) { acc, length ->
@@ -226,11 +224,12 @@ object CSVUtil {
             }
 
             /**this meta will be the child layout for an ISAM promotion of the Cursor*/
+            val conversionTypes: Series<IOMemento>? = conversionSegments?.let { it α { join: Join<IOMemento, Int> -> join.a } }
             val successorMeta: List<RecordMeta>? = convertedSegmentLengths?.let {
                 it.indices.map { x ->
                     RecordMeta(
                         name = headerNames[x],
-                        type = conversionSegments.left[x],
+                        type = conversionTypes!![x],
                         //begin,end from convertedSegments
                         begin = convertedSegments?.get(x)?.a?.toInt() ?: -1,
                         end = convertedSegments?.get(x)?.b?.toInt() ?: -1,
@@ -251,7 +250,7 @@ object CSVUtil {
 
                     val delimitRange = DelimitRange(b)
                     CharSeries(
-                        lserr[delimitRange.first.toInt() until delimitRange.endInclusive.inc().toInt()].decodeUtf8()
+                        lserr[delimitRange.start.toInt() until delimitRange.endInclusive.inc().toInt()].decodeUtf8()
                     ) j {
                         val air: IntRange = delimitRange.asIntRange
 

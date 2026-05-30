@@ -9,7 +9,7 @@
  *   - /Users/jim/work/TrikeShed/libs/dreamer-kmm/src/commonMain/kotlin/org/bereft/strategy/jslogic/JsBotStateModels.kt
  *   - /Users/jim/work/TrikeShed/libs/dreamer-kmm/src/commonMain/kotlin/org/bereft/strategy/jslogic/JsBotConfig.kt
  *   - /Users/jim/work/TrikeShed/libs/dreamer-kmm/src/commonMain/kotlin/org/bereft/strategy/jslogic/SimulatedTradeAction.kt
- *   - /Users/jim/work/TrikeShed/src/commonMain/kotlin/borg/trikeshed/signal/SignalGenerator.kt  (TrikeShed donor — SampleStrategySignals)
+ *   - /Users/jim/work/TrikeShed/src/commonMain/kotlin/borg/trikeshed/signal/SignalGenerator.kt  (SampleStrategySignals)
  *   - /Users/jim/work/TrikeShed/src/commonMain/kotlin/borg/trikeshed/indicator/Indicators.kt
  *
  * Trikeshed conventions used:
@@ -215,7 +215,7 @@ object BotConfig {
 }
 
 // ══════════════════════════════════════════════════════════════
-// 6.  SIGNAL GENERATION  (from TrikeShed donor — SampleStrategySignals)
+// 6.  SIGNAL GENERATION  (SampleStrategySignals)
 // ══════════════════════════════════════════════════════════════
 
 enum class TradeSignalType {
@@ -233,7 +233,7 @@ data class SignalResult(
 )
 
 /**
- * SampleStrategy signal generator — ported from SignalGenerator.kt (TrikeShed donor).
+ * SampleStrategy signal generator — ported from SignalGenerator.kt.
  * All entry/exit signal logic is preserved exactly, no changes.
  */
 object SampleStrategySignals {
@@ -406,7 +406,7 @@ data class TradingAdapters(
 
 /**
  * Harvest simulator — manages token baselines, trailing state, and surplus harvest logic.
- * Faithfully reproduces all conditional branches and edge cases from the Columnar donor.
+ * Faithfully reproduces all conditional branches and edge cases from the Columnar implementation.
  *
  * Changes: Map-based holdings/prices replaced with Trikeshed Series where applicable;
  * SimulatedTradeAction sealed class used for output instead of raw maps.

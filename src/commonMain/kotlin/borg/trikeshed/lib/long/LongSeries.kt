@@ -21,7 +21,7 @@ operator fun <T> LongSeries<T>.get(r: LongRange): LongSeries<T> {
     return (r.last - r.first) j { x -> this[(r.first + x)] }
 }
 
-fun <T> LongSeries<T>.slice(start: Long, end: Long = size): LongSeries<T> =
+fun <T> LongSeries<T>.slice(start: Long, end: Long = a): LongSeries<T> =
     (end - start) j { x -> this[start + x] }
 
 fun <T> LongSeries<T>.drop(removeInitial: Long): LongSeries<T> = slice(removeInitial)

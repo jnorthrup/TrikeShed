@@ -48,10 +48,11 @@ class CollectorReducer<T> : Reducer<T, Series<T>> {
  *   items.state                  // lazily reified Series<Event>
  *   items.eventJournal.toList()  // raw event log
  */
-fun <T> reduxSeriesOf(chunkSize: Int = 4096): ReduxMutableSeries<T, Series<T>> =
+fun <T> reduxSeriesOf(chunkSize: Int = 4096, capture: T? = null): ReduxMutableSeries<T, Series<T>> =
     ReduxMutableSeries(
         eventJournal = ChunkedMutableSeries<T>(chunkSize),
-        reducer = CollectorReducer<T>()
+        reducer = CollectorReducer<T>(),
+        capture = capture as? T ?: throw IllegalArgumentException("capture required for domain schema"),
     )
 
 /**
@@ -63,8 +64,9 @@ fun <T> reduxSeriesOf(chunkSize: Int = 4096): ReduxMutableSeries<T, Series<T>> =
  *   val backing = ChunkedMutableSeries<String>()
  *   val journaled = reduxSeriesFrom(backing)
  */
-fun <T> reduxSeriesFrom(delegate: MutableSeries<T>): ReduxMutableSeries<T, Series<T>> =
+fun <T> reduxSeriesFrom(delegate: MutableSeries<T>, capture: T? = null): ReduxMutableSeries<T, Series<T>> =
     ReduxMutableSeries(
         eventJournal = delegate,
-        reducer = CollectorReducer<T>()
+        reducer = CollectorReducer<T>(),
+        capture = capture as? T ?: throw IllegalArgumentException("capture required for domain schema"),
     )

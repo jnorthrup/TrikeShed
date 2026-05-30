@@ -1,6 +1,8 @@
 package borg.trikeshed.confix
 
 import borg.trikeshed.cursor.*
+import borg.trikeshed.cursor.CowSeriesHandle
+import borg.trikeshed.cursor.CowSeriesBody
 import borg.trikeshed.lib.*
 import borg.trikeshed.parse.confix.*
 
@@ -86,7 +88,7 @@ class ConfixOracleService : ConfixOracleFacade {
                 break
             }
 
-            val entry = row.entries.find { it.name == currentName } ?: break
+            val entry = (0 until row.entries.a).map { row.entries.b(it) }.find { it.name == currentName } ?: break
 
             // Extract the base name from referredToType (strip params, unions, etc.)
             val baseName = extractBaseName(entry.referredToType)
@@ -108,17 +110,21 @@ class ConfixOracleService : ConfixOracleFacade {
         return chain.toIntArray()
     }
 
-    override fun isA(childPoolIdx: Int, parentPoolIdx: Int): Integer? {
-        val row = cachedRow ?: return 0  // nothing built yet — UNKNOWN
+    override fun isA(childPoolIdx: Int, parentPoolIdx: Int): Int? {
+        val row = cachedRow ?: return 0 as Int?  // nothing built yet — UNKNOWN
         val result = row.lattice.isA(TypeToken(childPoolIdx), TypeToken(parentPoolIdx))
-        return if (result == true) 2 else if (result == false) 1 else 0
+        return when {
+            result == true  -> 2 as Int?
+            result == false -> 1 as Int?
+            else            -> 0 as Int?
+        }
     }
 
     override fun setListener(listener: TypeDefListener?) {
         this.listener = listener
     }
 
-    override fun edgeCount(): Int = _edges.size
+    override fun edgeCount(): Int = _edges.a
 
     // ── observable access ──────────────────────────────────────────
 

@@ -59,13 +59,13 @@ fun cellsToRowVec(cells: Series<Any?>, keys: Series<String>): RowVec {
             null -> IoNothing
             else -> IoString
         }
-        ColumnMeta(keys[index], type).`↻`
+        ColumnMeta(keys[index], type).leftIdentity
     }
     return ReifiedSplitSeries2(values, meta)
 }
 
 /** Column names extracted from the RowVec metadata. */
-val RowVec.keys: Series<String> get() = right α `ColumnMeta↻`::invoke α ColumnMeta::a
+val RowVec.keys: Series<String> get() = right α `ColumnMeta↻`::invoke α { cm: ColumnMeta -> cm.name.toString() }
 
 /** Cell values as a flat List. Semantically identical to [values] but returns List<Any?>. */
 val RowVec.cells get() = values

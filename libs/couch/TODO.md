@@ -13,7 +13,7 @@ primitives, Series/Join/RingSeries only, CharSeries over String, SPI/Impl over e
 ```
 couch (KMP lib)
 ├── src/commonMain/kotlin/borg/trikeshed/couch/
-│   ├── ConfigParser/        ← INI → JSON/YAML/CBOR via Confix donor
+│   ├── ConfigParser/        ← INI → JSON/YAML/CBOR via Confix
 │   ├── ViewServer/         ← map/reduce view engine
 │   ├── CouchDB/            ← HTTP API, replication, database ops
 │   └── drivers/             ← couch_icu_driver, couch_ejson_compare (NATIVE)

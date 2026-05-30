@@ -87,7 +87,7 @@ fun <T> autoTwin(a: T, b: T): Twin<T> {
         a is Byte   && b is Byte   -> Twyte(packBytes(a, b))    as Twin<T>
         a is Char   && b is Char   -> Twhar(packChars(a, b))    as Twin<T>
         a is Float  && b is Float  -> TwInt(packFloats(a, b))   as Twin<T>
-        else                       -> Join.Companion.PairJoin(a, b) as Twin<T>
+        else                       -> a j b
     }
 }
 

@@ -237,7 +237,7 @@ object CursorTensorReifier {
         val selected = mutableListOf<Int>()
         (0 until meta.size).forEach { column ->
             val value: ColumnMeta = meta[column]
-            if (isNumeric(value.b)) {
+            if (isNumeric(value.type)) {
                 selected.add(column)
             }
         }
@@ -260,19 +260,19 @@ object CursorTensorReifier {
         val columnNames :Series<String> = (columnCount) j { index:Int ->
             val i: Int = selectedColumns[index]
             val value: ColumnMeta = meta[i]
-            value.a
+            value.name.toString()
         }
         val sourceColumnIndices = selectedColumns.copyOf()
-        val columnTypeCodes = IntArray(columnCount) { index -> tensorTypeCode(meta[selectedColumns[index]].b) }
+        val columnTypeCodes = IntArray(columnCount) { index -> tensorTypeCode(meta[selectedColumns[index]].type) }
 
         for (row in 0..<rowCount) {
-            val rowVec: RowVec = cursor.row(row)
+            val rowVec: RowVec = cursor[row]
             val rowValues: Series<Any?> = (rowVec as ReifiedSplitSeries2<*, *>).leftSeries as Series<Any?>
             for (denseColumn in 0 until columnCount) {
                 val sourceColumn = selectedColumns[denseColumn]
                 val columnMeta: ColumnMeta = meta[sourceColumn]
                 val cell = rowValues[sourceColumn]
-                values[row * columnCount + denseColumn] = cell.toTensorDouble(columnMeta.a, row, sourceColumn)
+                values[row * columnCount + denseColumn] = cell.toTensorDouble(columnMeta.name.toString(), row, sourceColumn)
             }
         }
 

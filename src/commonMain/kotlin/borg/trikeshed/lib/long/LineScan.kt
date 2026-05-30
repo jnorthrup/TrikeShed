@@ -21,7 +21,7 @@ import borg.trikeshed.lib.*
  */
 fun LongSeries<Byte>.lineOffsets(): LongArray {
     val offsets = mutableListOf<Long>()
-    val sz: Long = size
+    val sz: Long = a.toLong()
     var i = 0L
     // skip UTF-8 BOM if present
     if (sz >= 3 && this[0L] == 0xEF.toByte() && this[1L] == 0xBB.toByte() && this[2L] == 0xBF.toByte()) {
@@ -57,7 +57,7 @@ fun LongSeries<Byte>.lineOffsets(): LongArray {
  */
 fun LongSeries<Byte>.lines(): Series<ByteSeries> {
     val offsets = lineOffsets()
-    val sz: Long = size
+    val sz: Long = a.toLong()
     return offsets.size j { idx: Int ->
         val start = offsets[idx]
         val nextStart = if (idx + 1 < offsets.size) offsets[idx + 1] else sz

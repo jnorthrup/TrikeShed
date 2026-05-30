@@ -263,12 +263,12 @@ fun ByteSeries.decodeToString() = decodeUtf8().asString()
 
 fun Series<Byte>.startsWith(s: String): Boolean {
     val join = s.encodeToByteArray() α { it }
-    return join.size <= size && join.zip(this).view.all { it.first == it.second }
+    return join.size <= size && join.zip(this).view.all { it.a == it.b }
 }
 
 fun Series<Byte>.endsWith(s: String): Boolean {
     val join = s.encodeToByteArray() α { it }
-    return join.size <= size && join.zip(this.reversed()).view.all { it.first == it.second }
+    return join.size <= size && join.zip(this.reversed()).view.all { it.a == it.b }
 }
 
 operator fun Series<Byte>.div(delim: Byte): Series<Series<Byte>> { //lazy split

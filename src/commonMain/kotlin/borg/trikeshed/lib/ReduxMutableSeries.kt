@@ -14,7 +14,9 @@ import kotlin.jvm.JvmStatic
 class ReduxMutableSeries<A, S>(
     val eventJournal: MutableSeries<A>,
     val reducer: Reducer<A, S>,
-    initialState: S = reducer.zero
+    initialState: S = reducer.zero,
+    /** Capture column reflecting the domain. A RowVec/FacetedRow IS the schema. */
+    val capture: A,
 ) : MutableSeries<A> by eventJournal {
 
     private var _state: S = initialState
@@ -58,9 +60,9 @@ class ReduxMutableSeries<A, S>(
          * using a CollectorReducer.
          */
         @JvmStatic
-        fun <T> of(delegate: MutableSeries<T>): ReduxMutableSeries<T, Series<T>> {
-            return ReduxMutableSeries(delegate, CollectorReducer())
-        }
+            fun <T> of(delegate: MutableSeries<T>, capture: T): ReduxMutableSeries<T, Series<T>> {
+                return ReduxMutableSeries(delegate, CollectorReducer(), capture = capture)
+            }
     }
 }
 

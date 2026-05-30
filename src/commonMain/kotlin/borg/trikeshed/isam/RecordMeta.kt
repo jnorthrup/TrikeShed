@@ -19,16 +19,16 @@ import borg.trikeshed.lib.j
  */
 
    class RecordMeta(
-    val name: String,
-    val type: IOMemento,
+    override val name: String,
+    override val type: IOMemento,
     val begin: Int = -1,
     val end: Int = -1,
     val decoder: (ByteArray) -> Any? = type.createDecoder(end - begin),
     val encoder: (Any?) -> ByteArray = type.createEncoder(end - begin),
-    var child: RecordMeta? = null,
+    override var child: RecordMeta? = null,
     val groupId: Int = 0,
     /** Human-readable group label. Defaults to groupId.toString() — "0" stays visible as "0". Implicit (max) group → <stem>.bin; named groups → <stem>.<groupName>.bin. */
     val groupName: String = groupId.toString(),
-    ) : ColumnMeta by (name j (type as TypeMemento)){
+    ) : ColumnMeta by ColumnMeta(name, type, child as ColumnMeta?){
        override fun toString(): String = "RecordMeta(name='$name', type=$type, begin=$begin, end=$end, groupId=$groupId, groupName='$groupName')"
     }

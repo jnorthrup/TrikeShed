@@ -107,7 +107,7 @@ operator fun <T> Series<T>.get(index: Series<Int>): Series<T> = this[IntArray(in
 /**
  * series get by array
  */
-operator fun <T> Series<T>.get(index: IntArray): Series<T> = Series(index.size) { this[index[it]] }
+operator fun <T> Series<T>.get(index: IntArray): Series<T> = index.size j { i: Int -> this[index[i]] }
 
 /**
  * Return Series with elements excluded by indexes (killbag)
