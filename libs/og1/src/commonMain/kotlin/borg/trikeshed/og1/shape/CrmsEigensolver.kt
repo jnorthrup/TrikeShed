@@ -21,8 +21,7 @@ data class CrmsEigenResult(
 ) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
-        if (javaClass != other?.javaClass) return false
-        other as CrmsEigenResult
+        if (other !is CrmsEigenResult) return false
         return eigenvalue == other.eigenvalue &&
                 gap == other.gap &&
                 rank == other.rank &&
@@ -80,7 +79,8 @@ class CrmsEigensolver {
     }
 
     private fun correlationEigen(cursor: Series<RowVec>, shape: Shape): CrmsEigenResult {
-        val metricCols = shape.dropLast(5)  // last 5 = date axes
+        // Metric columns: everything after the 2 date axes (reading_date, interval)
+        val metricCols = shape.drop(shape.size - 2.coerceAtMost(shape.size))
         val n = cursor.a
         val k = metricCols.size
         if (k < 1) return emptyResult()
@@ -97,14 +97,16 @@ class CrmsEigensolver {
     }
 
     private fun gapEigen(cursor: Series<RowVec>, shape: Shape): CrmsEigenResult {
+        val k = maxOf(2, minOf(sqrt(cursor.a.toDouble()), 8.0).toInt())
+        val clusters = kMeansAssign(cursor, shape, k)
         val corr = correlationEigen(cursor, shape)
         val sorted = corr.components.sortedDescending()
         val gap = if (sorted.size >= 2) sorted[0] - sorted[1] else sorted.firstOrNull() ?: 0f
-        return corr.copy(gap = gap)
+        return corr.copy(gap = gap, clusterOf = clusters)
     }
 
     private fun kMeansEigen(cursor: Series<RowVec>, shape: Shape): CrmsEigenResult {
-        val k = maxOf(2, minOf(sqrt(cursor.a.toDouble()).toInt(), 8))
+        val k = maxOf(2, minOf(sqrt(cursor.a.toDouble()), 8.0).toInt())
         val clusters = kMeansAssign(cursor, shape, k)
         return dominantClusterEigen(cursor, clusters)
     }
@@ -191,11 +193,19 @@ class CrmsEigensolver {
         return assignments
     }
 
-    /** Sum of metric columns for a row (all except key and date axes). */
+    /** Sum of metric columns for a row (all except key and date axes).
+     *  Shape layout: [key cols..., date cols (reading_date, interval), metric cols].
+     *  dateOffset = total columns - date_axe_count - metric_count = shape.size - 2 - metric_count.
+     *  For byGroup0 (11 cols, 2 keys, 2 date, 7 metrics): dateOffset = 11 - 2 = 9 → metrics start at shape[9]..shape[10].
+     */
     private fun metricSum(row: RowVec, shape: Shape): Float {
-        val dateOffset = shape.size - 5.coerceAtMost(shape.size)
+        val n = shape.size
+        // date axes are the last 2 elements of shape (reading_date, interval)
+        val dateAxisCount = 2.coerceAtMost(n)
+        val keyAxisCount = n - dateAxisCount - 7  // metrics are always last 7 (metric_0..metric_6)
+        val metricStart = keyAxisCount + dateAxisCount
         var sum = 0f
-        for (i in 0 until dateOffset.coerceAtLeast(0)) {
+        for (i in metricStart until n) {
             sum += colValue(row, shape[i])
         }
         return sum
