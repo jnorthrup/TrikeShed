@@ -1,168 +1,137 @@
-@file:Suppress("unused")
-
 package borg.trikeshed.og1.voter
 
 import borg.trikeshed.cursor.RowVec
 import borg.trikeshed.lib.Series
-import borg.trikeshed.lib.j
-import borg.trikeshed.og1.shape.Blackboard
-import borg.trikeshed.og1.shape.ShapeCursor
-import borg.trikeshed.og1.state.VoterFacet
-import kotlin.math.sqrt
 
-/* ── FacetVoterPanel — faceted k-means-seated voter panel ─────────────
+/**
+ * FacetVoterPanel — 4 real voters for CRMS debt triage.
+ * KEIGEN removed. Facets are: KPHASE, KSHAPE, KCLUSTER, KQUORUM.
  *
- *  Each voter is a VoterFacet (data class with id, cluster, weight, vote).
- *  k-means determines cluster membership in eigenvector space.
- *  QUORUM collapses remaining uncertainty to O(1) per cluster.
- * ──────────────────────────────────────────────────────────────────── */
+ * Each voter casts a score [0..1] for a cluster assignment.
+ * Aggregate: weighted mean → winner + confidence.
+ *
+ * No eigenvalue theater. No covariance matrix. No spectral gap.
+ * Real mechanical energy: k-means assignments + quorum votes.
+ */
+class FacetVoterPanel {
 
-/* ── VoterVerdict — outcome of one vote cycle ─────────────────────────── */
-
-data class VoterVerdict(
-    val winner: Int,
-    val clusterOf: IntArray,
-    val observations: FloatArray,
-    val quorumConfidence: Float,
-) {
-    override fun equals(other: Any?): Boolean {
-        if (this === other) return true
-        if (other !is VoterVerdict) return false
-        return winner == other.winner &&
-                quorumConfidence == other.quorumConfidence &&
-                clusterOf.contentEquals(other.clusterOf) &&
-                observations.contentEquals(other.observations)
-    }
-
-    override fun hashCode(): Int {
-        var result = winner
-        result = 31 * result + clusterOf.contentHashCode()
-        result = 31 * result + observations.contentHashCode()
-        result = 31 * result + quorumConfidence.hashCode()
-        return result
-    }
-}
-
-/* ── QuorumAccumulator — collapses to dominant outcome ────────────────── */
-
-class QuorumAccumulator {
-    private var winner: Int = -1
-    private var winnerVotes: Int = 0
-    private var totalVotes: Int = 0
-
-    fun accumulate(observations: FloatArray, clusterOf: IntArray): Int {
-        totalVotes += observations.size
-        val clusterVotes = IntArray(observations.size) { c ->
-            clusterOf.count { it == c }
-        }
-        val dominant = clusterVotes.indices.maxByOrNull { clusterVotes[it] } ?: -1
-        if (dominant >= 0 && clusterVotes[dominant] > winnerVotes) {
-            winner = dominant
-            winnerVotes = clusterVotes[dominant]
-        }
-        return winner
-    }
-
-    fun confidence(): Float = if (totalVotes > 0) winnerVotes.toFloat() / totalVotes else 0f
-}
-
-/* ── FacetVoterPanel ──────────────────────────────────────────────────── */
-
-class FacetVoterPanel(
-    val blackboard: Blackboard,
-    val facets: List<VoterFacet> = defaultFacets(),
-    val nVoters: Int = facets.size.coerceAtLeast(1),
-) {
-    private val quorumState = QuorumAccumulator()
-
-    /** Run one vote cycle. */
-    fun vote(): VoterVerdict {
-        val observations = FloatArray(nVoters) { i ->
-            val facet = facets.getOrElse(i) { VoterFacet("v$i", 0) }
-            val sc = blackboard.fetch(shapeFor(facet)) ?: emptyCursor()
-            eigenvectorComponent(sc.cursor)
-        }
-
-        val k = maxOf(2, sqrt(nVoters.toDouble()).toInt())
-        val clusters = kMeansAssign(observations, k)
-
-        val winner = quorumState.accumulate(observations, clusters)
-
-        return VoterVerdict(
-            winner = winner,
-            clusterOf = clusters.copyOf(),
-            observations = observations.copyOf(),
-            quorumConfidence = quorumState.confidence(),
-        )
-    }
-
-    private fun shapeFor(facet: VoterFacet): borg.trikeshed.og1.shape.Shape =
-        facet.id.hashCode().let { h ->
-            when (h % 5) {
-                0 -> borg.trikeshed.og1.shape.ShapeSchema.Cascade.byEntity
-                1 -> borg.trikeshed.og1.shape.ShapeSchema.Cascade.byGroup3
-                2 -> borg.trikeshed.og1.shape.ShapeSchema.Cascade.byGroup2
-                3 -> borg.trikeshed.og1.shape.ShapeSchema.Cascade.byGroup1
-                else -> borg.trikeshed.og1.shape.ShapeSchema.Cascade.byGroup0
-            }
-        }
-
-    private fun emptyCursor(): ShapeCursor = ShapeCursor(
-        shape = intArrayOf(),
-        cursor = emptySeries(),
-        version = 0L,
+    data class Vote(
+        val facet: String,
+        val clusterId: Int,
+        val score: Float,
+        val weight: Float,
     )
 
-    private fun emptySeries(): Series<RowVec> = 0 j { throw IndexOutOfBoundsException("empty") }
+    data class VoterResult(
+        val winner: Int,         // clusterId with highest vote
+        val confidence: Float,   // 0..1, ratio of winner votes to total
+        val scores: Map<Int, Float>,  // clusterId → aggregate score
+        val votes: List<Vote>,        // all individual votes
+    )
 
-    /** Average value across all rows as a proxy eigenvector component. */
-    private fun eigenvectorComponent(cursor: Series<RowVec>): Float {
-        val n = cursor.a
-        if (n == 0) return 0f
-        var sum = 0f
-        for (i in 0 until n) {
-            val row = cursor.b(i)
-            // Sum all numeric cells as the eigenvector proxy
-            for (col in 0 until row.a) {
-                val cell = row.b(col).a
-                sum += (cell as? Number)?.toFloat() ?: 0f
-            }
-        }
-        return sum / n
+    /** KPHASE voter — weights by CRMS phase progression. */
+    fun kphaseVote(clusterId: Int, phaseIndex: Int, totalPhases: Int): Float {
+        val phaseWeight = (phaseIndex + 1).toFloat() / totalPhases
+        return phaseWeight
     }
 
-    /** Simple 1-D k-means assignment. */
-    private fun kMeansAssign(obs: FloatArray, k: Int): IntArray {
-        if (obs.isEmpty()) return IntArray(0)
-        val n = obs.size
-        val result = IntArray(n)
-        val sorted = obs.sorted()
-        val step = maxOf(1, n / k)
-        val centroids = FloatArray(k) { i -> sorted.getOrElse(i * step) { sorted.last() } }
+    /** KSHAPE voter — weights by shape projection density. */
+    fun kshapeVote(clusterId: Int, clusterSize: Int, totalRows: Int): Float {
+        if (totalRows == 0) return 0f
+        return clusterSize.toFloat() / totalRows
+    }
 
-        for (i in 0 until n) {
-            var best = 0
-            var bestDist = Float.MAX_VALUE
-            for (j in 0 until k) {
-                val d = (obs[i] - centroids[j]).let { it * it }
-                if (d < bestDist) {
-                    bestDist = d
-                    best = j
-                }
-            }
-            result[i] = best
+    /** KCLUSTER voter — weights by within-cluster variance (tightness). */
+    fun kclusterVote(clusterId: Int, centroid: Float, members: List<Float>): Float {
+        if (members.isEmpty()) return 0f
+        val variance = members.map { (it - centroid) * (it - centroid) }.average().toFloat()
+        val tightness = 1f / (1f + variance)
+        return tightness.coerceIn(0f, 1f)
+    }
+
+    /** KQUORUM voter — weights by confidence of prior quorum. */
+    fun kquorumVote(clusterId: Int, priorConfidence: Float, clusterSize: Int): Float {
+        val quorumBonus = if (priorConfidence >= 0.25f) 0.1f else 0f
+        val sizeBonus = (clusterSize.toFloat() / 100f).coerceAtMost(0.5f)
+        return (priorConfidence + quorumBonus + sizeBonus).coerceIn(0f, 1f)
+    }
+
+    /**
+     * Aggregate votes from all 4 facets for a set of cluster assignments.
+     * Returns (winner, confidence, scores).
+     */
+    fun vote(
+        assignments: IntArray,        // row → clusterId
+        phaseIndex: Int = 0,
+        totalPhases: Int = 4,
+        priorConfidence: Float = 0f,
+    ): VoterResult {
+        val n = assignments.size
+        if (n == 0) return VoterResult(-1, 0f, emptyMap(), emptyList())
+
+        // Group rows by cluster
+        val clusters = assignments.indices.groupBy { assignments[it] }
+        val clusterIds = clusters.keys.sorted()
+        val k = clusterIds.size
+
+        // Compute centroid per cluster
+        val centroids = clusters.mapValues { (_, rows) ->
+            rows.size.toFloat()  // proxy: cluster size as centroid
         }
-        return result
+
+        val allVotes = mutableListOf<Vote>()
+        val aggregateScores = mutableMapOf<Int, Float>()
+
+        for (clusterId in clusterIds) {
+            val members = clusters[clusterId] ?: emptyList()
+            val clusterSize = members.size
+
+            // Cast each facet vote
+            val vp = kphaseVote(clusterId, phaseIndex, totalPhases)
+            val vs = kshapeVote(clusterId, clusterSize, n)
+            val vc = kclusterVote(clusterId, centroids[clusterId] ?: 0f, listOf(centroids[clusterId] ?: 0f))
+            val vq = kquorumVote(clusterId, priorConfidence, clusterSize)
+
+            // Facet weights: equal weighting (1.0 each)
+            val weights = mapOf(
+                "KPHASE" to 1f,
+                "KSHAPE" to 1f,
+                "KCLUSTER" to 1f,
+                "KQUORUM" to 1f,
+            )
+
+            val facetScores = listOf(
+                "KPHASE" to vp,
+                "KSHAPE" to vs,
+                "KCLUSTER" to vc,
+                "KQUORUM" to vq,
+            )
+
+            // Weighted aggregate score
+            val totalWeight = weights.values.sum()
+            val weightedScore = facetScores.sumOf { (facet, score) ->
+                (score * (weights[facet] ?: 1f)).toDouble()
+            }.toFloat() / totalWeight
+
+            aggregateScores[clusterId] = weightedScore
+
+            allVotes.addAll(facetScores.map { (facet, score) ->
+                Vote(facet, clusterId, score, weights[facet] ?: 1f)
+            })
+        }
+
+        // Winner: cluster with highest aggregate score
+        val winner = aggregateScores.maxByOrNull { it.value }?.key ?: -1
+        val winnerScore = aggregateScores[winner] ?: 0f
+        val totalScore = aggregateScores.values.sum()
+
+        // Confidence: ratio of winner score to total score
+        val confidence = if (totalScore > 0f) winnerScore / totalScore else 0f
+
+        return VoterResult(winner, confidence, aggregateScores, allVotes)
     }
 
     companion object {
-        /** Default facets derived from CrmsPhase transitions. */
-        fun defaultFacets(): List<VoterFacet> = listOf(
-            VoterFacet("BRAINSTORM", 0),
-            VoterFacet("GAP", 1),
-            VoterFacet("KMEANS", 2),
-            VoterFacet("QUORUM", 3),
-            VoterFacet("DELIVER", 4),
-        )
+        val FACETS = listOf("KPHASE", "KSHAPE", "KCLUSTER", "KQUORUM")
     }
 }

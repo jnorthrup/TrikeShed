@@ -11,8 +11,8 @@ import borg.trikeshed.og1.fanout.poolInit
  *
  * Shape encodes the lens over a readings tensor:
  *   Shape[0..k)       = key columns (groupBy axis)
- *   Shape[k..k+5)     = date axes (year, month, day, hour, minute)
- *   Shape[k+5..n)     = metric columns (reduce targets)
+ *   Shape[k..k+2)     = date axes (reading_date, interval) — always LAST 2
+ *   Shape[k+2..n)     = metric columns (reduce targets) — always before date
  *
  * Shape is the STABLE HANDLE. Cursor is the VOLATILE BODY.
  * Watermark tracks version for Confix re-join.
@@ -58,16 +58,17 @@ object ShapeSchema {
     fun validate(shape: Shape): Boolean =
         shape.distinct().size == shape.size && shape.size >= 2
 
-    /** Key column count (excluding date axes and metrics). */
-    fun keyCount(shape: Shape): Int = shape.size - 5
+    /** Key column count (excluding date axes and metrics).
+     *  Date axes are always last 2 elements; metrics are the remaining columns.
+     */
+    fun keyCount(shape: Shape): Int = shape.size - 9  // 7 metrics + 2 date = 9 non-key cols
 
-    /** Date axis ordinals given key column count. */
+    /** Date axis ordinals given shape.
+     *  Date axes are [reading_date, interval] — always the LAST 2 elements.
+     */
     fun dateAxes(shape: Shape): IntArray = intArrayOf(
-        shape.size - 5,  // year
-        shape.size - 4,  // month
-        shape.size - 3,  // day
-        shape.size - 2,  // hour
-        shape.size - 1,  // minute
+        shape[shape.size - 2],  // reading_date (COL 6)
+        shape[shape.size - 1],  // interval (COL 7)
     )
 
     /** Canonical cascade shapes — one per eigenspace level.
@@ -75,16 +76,16 @@ object ShapeSchema {
      *  Ordinals from Readings.kt column layout.
      */
     object Cascade {
-        // Level 1: byEntity   — [entity, year, month, day, hour, minute]   ordinal [4,15,16,17,18,19]
-        val byEntity   = intArrayOf(4, 15, 16, 17, 18, 19)
-        // Level 2: byGroup3   — [group_3, entity, year, month, day, hour, minute]  ordinal [3,4,15,16,17,18,19]
-        val byGroup3   = intArrayOf(3, 4, 15, 16, 17, 18, 19)
-        // Level 3: byGroup2   — [group_2, entity, year, month, day, hour, minute]  ordinal [2,4,15,16,17,18,19]
-        val byGroup2   = intArrayOf(2, 4, 15, 16, 17, 18, 19)
-        // Level 4: byGroup1   — [group_1, entity, year, month, day, hour, minute]  ordinal [1,4,15,16,17,18,19]
-        val byGroup1   = intArrayOf(1, 4, 15, 16, 17, 18, 19)
-        // Level 5: byGroup0   — [group_0, entity, year, month, day, hour, minute]  ordinal [0,4,15,16,17,18,19]
-        val byGroup0   = intArrayOf(0, 4, 15, 16, 17, 18, 19)
+        // Level 1: byEntity   — [entity, metric_0..metric_6]   ordinal [4,8,9,10,11,12,13,14]
+        val byEntity   = intArrayOf(4, 8, 9, 10, 11, 12, 13, 14)
+        // Level 2: byGroup3   — [group_3, entity, metric_0..metric_6]  ordinal [3,4,8,9,10,11,12,13,14]
+        val byGroup3   = intArrayOf(3, 4, 8, 9, 10, 11, 12, 13, 14)
+        // Level 3: byGroup2   — [group_2, entity, metric_0..metric_6]  ordinal [2,4,8,9,10,11,12,13,14]
+        val byGroup2   = intArrayOf(2, 4, 8, 9, 10, 11, 12, 13, 14)
+        // Level 4: byGroup1   — [group_1, entity, metric_0..metric_6]  ordinal [1,4,8,9,10,11,12,13,14]
+        val byGroup1   = intArrayOf(1, 4, 8, 9, 10, 11, 12, 13, 14)
+        // Level 5: byGroup0   — [group_0, entity, metric_0..metric_6]  ordinal [0,4,8,9,10,11,12,13,14]
+        val byGroup0   = intArrayOf(0, 4, 8, 9, 10, 11, 12, 13, 14)
 
         val all = listOf(byGroup0, byGroup1, byGroup2, byGroup3, byEntity)
     }
@@ -115,14 +116,17 @@ open class Blackboard {
     /** Eigensolve across all registered shapes for a given CRMS phase.
      *  Uses wireproto Payloads for Python-based eigenvector computations.
      */
-    fun eigensolve(phase: CrmsPhase): Map<String, EigenResult> {
+    fun eigensolve(phase: CrmsPhase): Map<String, CrmsEigenResult> {
         poolInit
+        // System.err.println("[blackboard.eigensolve] phase=$phase boxes=${boxes.size}")
         return boxes.entries.associate { (key, box) ->
             val sc = box.reify()
+            // System.err.println("[blackboard.eigensolve] key=$key shape=${sc.shape.contentToString()} cursor.a=${sc.cursor.a}")
+            val eigensolver = CrmsEigensolver()
             val result = when (phase) {
-                CrmsPhase.GAP     -> eigenvectorCorrelation(sc.cursor)
-                CrmsPhase.KMEANS  -> kMeansCluster(sc.cursor, sc.shape)
-                CrmsPhase.QUORUM  -> dominantEigenvector(sc.cursor)
+                CrmsPhase.GAP     -> eigensolver.eigensolve(sc, CrmsPhase.GAP)
+                CrmsPhase.KMEANS  -> eigensolver.eigensolve(sc, CrmsPhase.KMEANS)
+                CrmsPhase.QUORUM  -> eigensolver.eigensolve(sc, CrmsPhase.QUORUM)
                 else              -> emptyResult()
             }
             key to result
@@ -144,7 +148,8 @@ data class EigenResult(
 )
 
 /* ── Stub eigensolvers — wired to PyEngine via Payloads ────────────── */
-fun eigenvectorCorrelation(cursor: Series<RowVec>): EigenResult = emptyResult()
-fun kMeansCluster(cursor: Series<RowVec>, shape: Shape): EigenResult = emptyResult()
-fun dominantEigenvector(cursor: Series<RowVec>): EigenResult = emptyResult()
-private fun emptyResult() = EigenResult()
+fun eigenvectorCorrelation(cursor: Series<RowVec>): CrmsEigenResult = CrmsEigenResult(0f, 0f, floatArrayOf(), -1)
+fun kMeansCluster(cursor: Series<RowVec>, shape: Shape): CrmsEigenResult = CrmsEigenResult(0f, 0f, floatArrayOf(), -1)
+fun dominantEigenvector(cursor: Series<RowVec>): CrmsEigenResult = CrmsEigenResult(0f, 0f, floatArrayOf(), -1)
+fun gapEigen(cursor: Series<RowVec>, shape: Shape): CrmsEigenResult = CrmsEigenResult(0f, 0f, floatArrayOf(), -1)
+private fun emptyResult(): CrmsEigenResult = CrmsEigenResult(0f, 0f, floatArrayOf(), -1)

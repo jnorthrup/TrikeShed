@@ -62,25 +62,25 @@ class CrmsCron {
         }
     }
 
-    private fun gapsFromResults(r: Map<String, EigenResult>) =
+    private fun gapsFromResults(r: Map<String, CrmsEigenResult>) =
         r.entries.flatMap { (k, v) ->
-            v.eigenvalues.mapIndexed { i, ev -> mapOf("shape" to k, "idx" to i, "eigenvalue" to ev) }
+            v.components.mapIndexed { i, ev -> mapOf("shape" to k, "idx" to i, "eigenvalue" to ev) }
         }
 
-    private fun facetsFromResults(r: Map<String, EigenResult>) =
+    private fun facetsFromResults(r: Map<String, CrmsEigenResult>) =
         r.entries.map { (k, v) ->
-            VoterFacet(id = k, cluster = v.dominant, weight = v.gap, vote = mapOf(k to v.gap))
+            VoterFacet(id = k, cluster = v.rank, weight = v.gap.toDouble(), vote = mapOf(k to v.gap.toDouble()))
         }
 
-    private fun winnerFromResults(r: Map<String, EigenResult>) =
+    private fun winnerFromResults(r: Map<String, CrmsEigenResult>) =
         r.entries.maxByOrNull { it.value.gap }?.key ?: ""
 
-    private fun confidenceFromResults(r: Map<String, EigenResult>): Double {
-        val max = r.values.maxOfOrNull { it.gap } ?: 0.0
+    private fun confidenceFromResults(r: Map<String, CrmsEigenResult>): Double {
+        val max = r.values.maxOfOrNull { it.gap } ?: 0f
         return if (max > 0) 1.0 else 0.0
     }
 
-    private fun buildPlanFromResults(r: Map<String, EigenResult>): FanoutPlan =
+    private fun buildPlanFromResults(r: Map<String, CrmsEigenResult>): FanoutPlan =
         state.plan  // real impl: build FanoutPlan from cluster assignments
 
     fun currentState(): CrmsState = state

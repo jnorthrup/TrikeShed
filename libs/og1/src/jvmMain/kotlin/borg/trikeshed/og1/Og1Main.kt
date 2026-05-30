@@ -27,8 +27,6 @@ private class DataMeta(private val col: Int) : () -> ColumnMeta {
 @Suppress("UNCHECKED_CAST")
 private fun rowVecOf(data: LongArray): RowVec =
     object : Series<Join<Any?, () -> ColumnMeta>> {
-        // Series<T> = MetaSeries<Int, T> = Join<Int, (Int) -> T>
-        // a = size (Int), b = index oracle (Int) -> T
         override val a: Int get() = data.size
         override val b: (Int) -> Join<Any?, () -> ColumnMeta>
             get() = { col ->
@@ -49,8 +47,8 @@ fun main(args: Array<String>) {
 
     // ── Pipeline bootstrap ────────────────────────────────────────────────
 
-    val cron = CrmsCron()
-    val eig  = CrmsEigensolver()
+    val cron  = CrmsCron()
+    val eig   = CrmsEigensolver()
     val board = Blackboard()
 
     ShapeSchema.Cascade.all.forEach { shape -> board.register(shape) }
@@ -68,6 +66,7 @@ fun main(args: Array<String>) {
 
     // ── Tick loop ────────────────────────────────────────────────────────
 
+    val voterPanel = FacetVoterPanel()
     println("""{"og1":"start","tenant":"$tenant","phase":"${cron.currentPhase()}","iterations":$iterations}""")
 
     repeat(iterations) { i ->
@@ -80,8 +79,18 @@ fun main(args: Array<String>) {
             r.clusterOf ?: intArrayOf()
         }
 
-        val voterPanel = FacetVoterPanel(board)
-        val verdict = voterPanel.vote()
+        // Flatten all cluster assignments across shapes
+        val allAssignments = clusterMap.values
+            .toList()
+            .flatMap { it.toList() }
+            .toIntArray()
+
+        val verdict = voterPanel.vote(
+            assignments   = allAssignments,
+            phaseIndex    = CrmsPhase.entries.indexOf(state.phase),
+            totalPhases   = CrmsPhase.entries.size,
+            priorConfidence = 0.5f,
+        )
 
         val bestEntry = eigenResults.maxByOrNull { it.value.eigenvalue }
         val bestShape  = bestEntry?.key
@@ -91,18 +100,16 @@ fun main(args: Array<String>) {
         val elapsed = System.currentTimeMillis() - tickMs
 
         println(buildString {
-            append("""{"tick":$i,""")
-            append(""""phase":"${state.phase}",""")
-            append(""""ringSize":${ring.size},""")
-            append(""""bestShape":${bestShape?.contentToString() ?: "null"},""")
-            append(""""eigenvalue":${bestEigen?.eigenvalue ?: 0f},""")
-            append(""""gap":${bestEigen?.gap ?: 0f},""")
-            append(""""nClusters":${clusterMap.size},""")
-            append(""""quorumWinner":${verdict.winner},""")
-            append(""""quorumConfidence":${verdict.quorumConfidence},""")
-            append(""""elapsedMs":$elapsed,""")
-            append(""""clusterCards":$clusterCardsJson}""")
-        })
+                    append("""{"tick":$i,"phase":"${state.phase}","ringSize":${ring.size},""")
+                    append("""bestShape":${bestShape?.contentToString() ?: "null"},""")
+                    append("""eigenvalue":${bestEigen?.eigenvalue ?: 0f},""")
+                    append("""gap":${bestEigen?.gap ?: 0f},""")
+                    append("""nClusters":${clusterMap.size},""")
+                    append("""quorumWinner":${verdict.winner},""")
+                    append("""quorumConfidence":${verdict.confidence},""")
+                    append("""elapsedMs":$elapsed,""")
+                    append("""clusterCards":$clusterCardsJson}""")
+                })
 
         seedMock(ring, count = 3)
     }
@@ -161,12 +168,12 @@ private fun buildClusterCards(
     return cards.joinToString(",", "[", "]") { c ->
         buildString {
             append("""{"clusterId":${c.clusterId},""")
-            append(""""eigenvalue":${c.eigenvalue},""")
-            append(""""gap":${c.gap},""")
-            append(""""memberCount":${c.memberCount},""")
-            append(""""shapeKey":${c.shapeKey},""")
-            append(""""title":${jsonStr(c.title())},""")
-            append(""""body":${jsonStr(c.body())}}""")
+            append("""{"eigenvalue":${c.eigenvalue},""")
+            append("""{"gap":${c.gap},""")
+            append("""{"memberCount":${c.memberCount},""")
+            append("""{"shapeKey":${c.shapeKey},""")
+            append("""{"title":${jsonStr(c.title())},""")
+            append("""{"body":${jsonStr(c.body())}}""")
         }
     }
 }
@@ -177,14 +184,14 @@ private fun seedMock(ring: RingSeries<RowVec>, count: Int) {
     val tick = (System.currentTimeMillis() / 1000).toInt()
     repeat(count) { sub ->
         val data = longArrayOf(
-            (tick * 100 + sub).toLong(),
-            1L, 2L, 3L, 4L,
-            2026L, 5L, 30L, 12L, 0L,
-            (tick * 10 + sub).toLong(),
-            (tick * 5  + sub).toLong(),
-            (tick * 3  + sub).toLong(),
-            (tick * 2  + sub).toLong(),
-            (sub * 7).toLong(),
+            (tick * 100 + sub).toLong(),  // col 0: group_0 (time-varying key)
+            1L, 2L, 3L, 4L,               // cols 1-4: group_1, group_2, group_3, entity
+            2026L, 5L, 30L, 12L, 0L,      // cols 5-9: year, month, day, hour, minute
+            0L, 0L,                       // cols 10-11: reading_date, interval (date axes)
+            (tick * 3  + sub).toLong(),   // col 12: metric_0
+            (tick * 2  + sub).toLong(),   // col 13: metric_1
+            (sub * 7).toLong(),           // col 14: metric_2
+            0L, 0L, 0L, 0L, 0L,           // cols 15-19: metric_3..metric_6 (padding)
         )
         ring.append(rowVecOf(data))
     }

@@ -1,24 +1,14 @@
 plugins {
     kotlin("multiplatform")
-    application
     `maven-publish`
 }
 
 group = "borg.trikeshed"
 version = "0.1.0-SNAPSHOT"
 
-application {
-    mainClass = "borg.trikeshed.og1.Og1Kt"
-}
-
 kotlin {
     jvmToolchain(21)
     jvm {
-        jvmToolchain(21)
-        withJava()
-        testTask("jvmTest") {
-            jvmArgs("--add-opens=java.base/java.lang=ALL-UNNAMED")
-        }
     }
     js { nodejs() }
     @OptIn(org.jetbrains.kotlin.gradle.ExperimentalWasmDsl::class)
