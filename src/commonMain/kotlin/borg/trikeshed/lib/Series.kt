@@ -378,12 +378,24 @@ fun <T> seriesOf(list: List<T>): Series<T> = list.toSeries()
 fun seriesOfAny(list: List<Any?>): Series<Any?> = list.toSeries()
 
 fun ByteArray.toSeries(): Series<Byte> = size j ::get
+fun ShortArray.toSeries(): Series<Short> = size j ::get
 fun IntArray.toSeries(): Series<Int> = size j ::get
-fun UIntArray.toSeries(): Series<UInt> = size j ::get
+fun LongArray.toSeries(): Series<Long> = size j ::get
+fun FloatArray.toSeries(): Series<Float> = size j ::get
 fun DoubleArray.toSeries(): Series<Double> = size j ::get
+fun CharArray.toSeries(): Series<Char> = size j ::get
+fun BooleanArray.toSeries(): Series<Boolean> = size j ::get
+fun UIntArray.toSeries(): Series<UInt> = size j ::get
 
 fun ClosedRange<Int>.toSeries(): Series<Int> = (endInclusive - start + 1) j { i: Int -> i + start }
 fun <T> Sequence<T>.toSeries(): Series<T> = toList().toSeries()
+fun <T> Series<T>.toSequence(): Sequence<T> = Sequence { iterator() }
+
+/** Materialize any Collection into a Series by copying into a List first. */
+fun <T> Collection<T>.toSeries(): Series<T> = toList().let { list -> list.size j list::get }
+
+/** Materialize a Set into a Series. Order preserved for LinkedHashSet; arbitrary for HashSet. */
+fun <T> Set<T>.toSeries(): Series<T> = toList().let { list -> list.size j list::get }
 
 fun <T> Series<T>.last(): T {
     require(size > 0) { "last() on empty Series" }
