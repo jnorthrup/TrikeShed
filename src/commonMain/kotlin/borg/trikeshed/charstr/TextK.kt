@@ -1,7 +1,7 @@
 package borg.trikeshed.charstr
 
 import borg.trikeshed.lib.*
-import borg.trikeshed.isam.meta.IOMemento
+import borg.trikeshed.cursor.IOMemento
 
 /**
  * TextK — GADT-style sealed hierarchy for text facets.

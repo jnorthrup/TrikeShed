@@ -1,164 +1,91 @@
+@file:Suppress("UNCHECKED_CAST")
 package borg.trikeshed.parse.json
 
-import borg.trikeshed.lib.TypeEvidence
-import borg.trikeshed.lib.toRowVec
-import borg.trikeshed.cursor.RowVec
 import borg.trikeshed.lib.*
-import borg.trikeshed.lib.toSeries
+import borg.trikeshed.cursor.*
 import borg.trikeshed.parse.confix.*
 
 /**
  * Thin re-export layer over the confix JSON stack.
- * All actual parsing is delegated to JsonScan + Reify from borg.trikeshed.parse.confix.
  *
- * Backward-compatible API: callers still use JsonParser.reify(text.toSeries())
- * or parse(text) — behaviour unchanged, engine now backed by confix.
+ * Backward-compatible API: callers use JsonParser.parse(text) — engine now backed by confix.
  */
-
-/* ─── type aliases (formerly in this package) ──────────────────────────── */
-typealias JsElement = borg.trikeshed.parse.confix.JsElement
-typealias JsIndex = borg.trikeshed.parse.confix.JsIndex
-typealias JsContext = borg.trikeshed.parse.confix.JsContext
-typealias JsPathElement = borg.trikeshed.parse.confix.JsPathElement
-typealias JsPath = borg.trikeshed.parse.confix.JsPath
-
-/* ─── public API ─────────────────────────────────────────────────────────── */
 
 object JsonParser {
-    fun reify(src: Series<Char>): Any? {
-        val ctx = contextOf(Syntax.JSON, src)
-        val tag = Combinators.tagOf(ctx.a, ctx.b)
-        return materialize(Combinators.reify(ctx, Syntax.JSON), tag)
+    /** Parse JSON text into a Cursor (tree of RowVec). */
+    fun scan(text: String): Cursor = scan(text.toSeries())
+
+    /** Parse JSON Series<Char> into a Cursor. */
+    fun scan(src: Series<Char>): Cursor {
+        val bytes = src.encodeToByteArray()
+        return Syntax.JSON.scan(bytes.size j { i -> bytes[i] })
     }
 
-    /** Scan JSON and return the top-level JsElement (index 0). */
-    fun index(src: Series<Char>, data: MutableList<Int>? = null, top: Int? = null): JsElement {
-        val elems = JsonScan.scan(src)
-        val idx = top ?: 0
-        return elems[idx]
-    }
+    /** Parse JSON text into a stdlib Map. */
+    fun parse(text: String): Map<String, Any?> = parse(text.toSeries())
 
-    /** Reify with optional TypeEvidence collector and RowVec callback. */
-    fun reify(src: Series<Char>, evidence: MutableList<TypeEvidence>?, callback: ((RowVec) -> Unit)?): Any? {
-        val ctx = contextOf(Syntax.JSON, src)
-        if (evidence != null || callback != null) {
-            collectJsonEvidence(ctx.a, src, isKey = false, evidence, callback)
-        }
-        val result = Combinators.reify(ctx, Syntax.JSON)
-        val tag = Combinators.tagOf(ctx.a, ctx.b)
-        return materialize(result, tag)
-    }
-
-    private fun collectJsonEvidence(
-        e: JsElement,
-        src: Series<Char>,
-        isKey: Boolean,
-        evidence: MutableList<TypeEvidence>?,
-        callback: ((RowVec) -> Unit)?,
-    ) {
-        if (isKey) return
-        val ev = TypeEvidence.sample(src.slice(e.a.a, e.a.b + 1))
-        evidence?.add(ev)
-        callback?.invoke(ev.toRowVec())
-        val tag = Combinators.tagOf(e, src)
-        when (tag.kind) {
-            0 -> { // OBJECT: children alternate key/value
-                val all = Combinators.realCommas(e, src)
-                for (i in 0 until all.size) {
-                    val childElem = JsonScan.parseOne(src, all[i])
-                    collectJsonEvidence(childElem, src, isKey = (i % 2 == 0), evidence, callback)
-                }
-            }
-            1 -> { // ARRAY: all children are values
-                val all = Combinators.realCommas(e, src)
-                for (i in 0 until all.size) {
-                    val childElem = JsonScan.parseOne(src, all[i])
-                    collectJsonEvidence(childElem, src, isKey = false, evidence, callback)
-                }
-            }
-        }
-    }
-
-    /** Path traversal over JSON context. */
-    fun jsPath(ctx: JsContext, path: JsPath, flat: Boolean = false, data: List<Int>? = null): Any? {
-        val resolved = Path.resolve(ctx, path)
-        return if (resolved != null) {
-            val reified = Combinators.reify(resolved, Syntax.JSON)
-            materialize(reified, Combinators.tagOf(resolved.a, resolved.b))
-        } else {
-            null
-        }
-    }
-
-    fun parse(text: String): Map<String, Any?> {
-        val ctx = contextOf(Syntax.JSON, text.toSeries())
-        @Suppress("UNCHECKED_CAST")
-        return materialize(Combinators.reify(ctx, Syntax.JSON), Combinators.tagOf(ctx.a, ctx.b)) as? Map<String, Any?> ?: emptyMap()
+    /** Parse JSON Series<Char> into a stdlib Map. */
+    fun parse(src: Series<Char>): Map<String, Any?> {
+        val bytes = src.encodeToByteArray()
+        val series: Series<Byte> = bytes.size j { i -> bytes[i] }
+        val cursor = Syntax.JSON.scan(series)
+        return cursorToMap(cursor, src)
     }
 }
 
-/** Materialize a confix reified value into stdlib collections.
- *
- * Reify returns:
- *   - Series2<String,Any?>  (a Series of key-value Join pairs) → LinkedHashMap
- *   - Series<Any?>          (a Series of values)             → ArrayList
- *   - primitive             (String, Number, Boolean, null)   → identity
- *
- * Series<A> = Join<Int, (Int)→A>
- * Series2<A,B> = Series<Join<A,B>> = Join<Int, (Int)→Join<A,B>>
- *
- * We detect which by observing the second field of the outer Join:
- *   if it's an (Int)→Join<A,B>  → Series2 (map)
- *   if it's an (Int)→A          → Series  (list)
- */
-@Suppress("UNCHECKED_CAST")
-fun materialize(node: Any?, tag: Tag? = null): Any? {
-    if (node == null) return null
+/** Convert a 1-row Cursor (object) into a LinkedHashMap using the source chars for keys. */
+private fun cursorToMap(cursor: Cursor, src: Series<Char>): LinkedHashMap<String, Any?> {
+    val map = LinkedHashMap<String, Any?>()
+    if (cursor.size == 0) return map
+    val row = cursor[0]
+    // row is RowVec = Series2<Any?, ColumnMeta↻>
+    // columns: 0=open, 1=close, 2=tag, 3=children
+    val open = row[0].a as? Int ?: return map
+    val close = row[0].b as? Int ?: return map
+    val children = row[3].a as? Cursor ?: return map
+    // Object children alternate key/value
+    var i = 0
+    while (i < children.size - 1) {
+        val keyRow = children[i]
+        val valRow = children[i + 1]
+        val kOpen = keyRow[0].a as? Int ?: break
+        val kClose = keyRow[0].b as? Int ?: break
+        val key = src[kOpen..kClose].asString()
+        val value = materializeRow(valRow, src)
+        map[key] = value
+        i += 2
+    }
+    return map
+}
 
-    // node = Join<Int, F> where F is either (Int)->Join<A,B> (map) or (Int)->A (list)
-    val join = node as? Join<Int, *> ?: return node
-    val second = join.second ?: return node
-    val size = join.first
-
-    return when (second) {
-        is Function1<*, *> -> {
-            if (size == 0) return when (tag) {
-                Tag.ARRAY -> ArrayList<Any?>(0)
-                Tag.OBJECT -> LinkedHashMap<String, Any?>(0)
-                else -> LinkedHashMap<String, Any?>(0)
-            }
-            val fn = second as (Int) -> Any?
-            val at0 = fn(0)
-            if (at0 is Join<*, *> && (at0 as Join<*, *>).a is String) {
-                // Series2: key-value pairs
-                @Suppress("UNCHECKED_CAST")
-                val mapFn = second as (Int) -> Join<String, Any?>
-                val map = LinkedHashMap<String, Any?>(size * 2)
-                var i = 0
-                while (i < size) {
-                    val pair: Join<String, Any?> = mapFn(i)
-                    map[pair.first] = materialize(pair.second)
-                    i++
-                }
-                map
-            } else {
-                // Series: list
-                val list = ArrayList<Any?>(size)
-                var i = 0
-                while (i < size) { list.add(materialize(fn(i))); i++ }
-                list
-            }
+private fun materializeRow(row: RowVec, src: Series<Char>): Any? {
+    val tag = row[2].a as? IOMemento ?: return null
+    val open = row[0].a as? Int ?: return null
+    val close = row[0].b as? Int ?: return null
+    return when (tag) {
+        IOMemento.IoString -> src[open..close].asString()
+        IOMemento.IoBoolean -> src[open] == 't'
+        IOMemento.IoDouble -> src[open..close].asString().toDouble()
+        IOMemento.IoNothing -> null
+        IOMemento.IoObject -> {
+            val children = row[3].a as? Cursor ?: return null
+            cursorToMap(children.size j { children[it] }, src)
         }
-        else -> node
+        IOMemento.IoArray -> {
+            val children = row[3].a as? Cursor ?: return emptyList<Any?>()
+            val list = ArrayList<Any?>(children.size)
+            for (i in 0 until children.size) list.add(materializeRow(children[i], src))
+            list
+        }
+        else -> src[open..close].asString()
     }
 }
 
-/** Path query over JSON using confix Path */
-fun queryPath(ctx: JsContext, path: JsPath): JsContext? = Path.resolve(ctx, path)
+/** Parse a JSON string to a stdlib Map (convenience) */
+fun parse(text: String): Map<String, Any?> = JsonParser.parse(text)
 
-/** Parse a JSON string to a stdlib Map (convenience, used by OpenApiRawParser) */
-fun parse(text: String): Map<String, Any?> {
-    val ctx = contextOf(Syntax.JSON, text.toSeries())
-    @Suppress("UNCHECKED_CAST")
-    return materialize(Combinators.reify(ctx, Syntax.JSON)) as? Map<String, Any?> ?: emptyMap()
+private fun Series<Char>.asString(): String {
+    val sb = StringBuilder(size)
+    for (i in 0 until size) sb.append(this[i])
+    return sb.toString()
 }

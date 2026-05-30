@@ -1,104 +1,48 @@
 package borg.trikeshed.manifold
 
-import borg.trikeshed.lib.Join
-import borg.trikeshed.lib.Series
-import borg.trikeshed.lib.get
-import borg.trikeshed.lib.j
-import borg.trikeshed.lib.size
+import borg.trikeshed.lib.*
+import borg.trikeshed.cursor.*
 
-/**
- * Semantic coordinates stay indexed and lazy.
- * Dense lowered views materialize separately so one type does not pretend to do both jobs.
- */
-data class Coordinates<T>(val axes: Series<T>) {
-    val dimension: Int get() = axes.size
+// ── ManifoldK — NARS3 concept facet keys ────────────────────────
+//
+// Elevated from ad-hoc ManifoldConcept<P> : RowVec to
+// first-class CRMS participant via OpK.
 
-    operator fun get(axis: Int): T = axes[axis]
-
-    fun lowered(): DenseCoordinates<T> = DenseCoordinates(List(dimension) { axis: Int -> axes[axis] })
+sealed class ManifoldK<out R> : OpK<R>() {
+    data object Angular : ManifoldK<Long>()
+    data object Budget  : ManifoldK<BudgetCoord>()
+    data object Payload : ManifoldK<Any?>()
 }
 
-/**
- * Lowered/materialized coordinate storage.
- * This is intentionally not a Series so semantic and dense layers remain distinct.
- */
-data class DenseCoordinates<T>(val axes: List<T>) {
-    val dimension: Int get() = axes.size
+/** ManifoldRow = FacetedRow<ManifoldK<*>> — a concept is a point in ManifoldK-space. */
+typealias ManifoldRow = FacetedRow<ManifoldK<*>>
 
-    operator fun get(axis: Int): T = axes[axis]
-
-    fun semantic(): Coordinates<T> = Coordinates(dimension j { axis: Int -> axes[axis] })
-}
-
-fun <T> coordinatesOf(vararg axes: T): Coordinates<T> =
-    Coordinates(axes.size j { axis: Int -> axes[axis] })
-
-fun <T> denseCoordinatesOf(vararg axes: T): DenseCoordinates<T> =
-    DenseCoordinates(axes.toList())
-
-data class Chart<C, P>(
-    val name: String,
-    val dimension: Int,
-    val contains: (P) -> Boolean = { true },
-    val project: (P) -> Coordinates<C>?,
-    val embed: (Coordinates<C>) -> P,
-) {
-    fun locate(point: P): Coordinates<C>? = if (contains(point)) project(point) else null
-
-    fun point(coordinates: Coordinates<C>): P {
-        require(coordinates.dimension == dimension) {
-            "chart '$name' expects $dimension coordinates but got ${coordinates.dimension}"
-        }
-        return embed(coordinates)
-    }
-
-    fun lowered(point: P): DenseCoordinates<C>? = locate(point)?.lowered()
-}
-
-typealias ChartedPoint<C, P> = Join<Chart<C, P>, Coordinates<C>>
-
-class Atlas<C, P>(val charts: Series<Chart<C, P>>) {
-    val size: Int get() = charts.size
-
-    val dimension: Int = if (charts.size == 0) 0 else charts[0].dimension
-
-    init {
-        for (i in 0 until charts.size) {
-            require(charts[i].dimension == dimension) {
-                "atlas chart '${charts[i].name}' dimension ${charts[i].dimension} disagrees with $dimension"
-            }
+/** Construct a manifold concept as a FacetedRow. */
+fun <P> manifold(angular: Long, budget: BudgetCoord, payload: P): ManifoldRow =
+    ManifoldK.Angular j { op: ManifoldK<*> ->
+        when (op) {
+            ManifoldK.Angular -> angular
+            ManifoldK.Budget  -> budget
+            ManifoldK.Payload -> payload
         }
     }
 
-    fun chart(name: String): Chart<C, P>? {
-        for (i in 0 until charts.size) {
-            val chart = charts[i]
-            if (chart.name == name) return chart
-        }
-        return null
-    }
+// ── ManifoldRow → RowVec ────────────────────────────────────────
 
-    fun locate(point: P): ChartedPoint<C, P>? {
-        for (i in 0 until charts.size) {
-            val chart = charts[i]
-            val coordinates = chart.locate(point) ?: continue
-            return chart j coordinates
-        }
-        return null
+/** ManifoldRow participates in Cursor algebra via RowVec projection. */
+fun ManifoldRow.asRowVec(): RowVec = 2 j { i ->
+    @Suppress("UNCHECKED_CAST")
+    when (i) {
+        0    -> (b(ManifoldK.Angular) as Long) as Any? j { ColumnMeta("angular", IOMemento.IoLong) }
+        else -> (b(ManifoldK.Budget) as BudgetCoord).packed as Any? j { ColumnMeta("budget", IOMemento.IoLong) }
     }
 }
 
-data class Manifold<C, P>(val atlas: Atlas<C, P>) {
-    val dimension: Int get() = atlas.dimension
-
-    fun locate(point: P): ChartedPoint<C, P>? = atlas.locate(point)
-
-    fun point(chartName: String, coordinates: Coordinates<C>): P? =
-        atlas.chart(chartName)?.point(coordinates)
-
-    fun transition(fromChartName: String, toChartName: String, coordinates: Coordinates<C>): Coordinates<C>? {
-        val from = atlas.chart(fromChartName) ?: return null
-        val to = atlas.chart(toChartName) ?: return null
-        return to.locate(from.point(coordinates))
-    }
+/** Hamming distance between two manifold angular coordinates. */
+fun hammingDistance(a: ManifoldRow, b: ManifoldRow): Int {
+    @Suppress("UNCHECKED_CAST")
+    val xa = a.b(ManifoldK.Angular) as Long
+    @Suppress("UNCHECKED_CAST")
+    val xb = b.b(ManifoldK.Angular) as Long
+    return (xa xor xb).countOneBits()
 }

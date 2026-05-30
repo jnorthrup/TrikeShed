@@ -3,37 +3,15 @@
 
 package borg.trikeshed.lib
 
-import borg.trikeshed.collections.binarySearch
-import borg.trikeshed.isam.meta.IOMemento
+import borg.trikeshed.collections.*
+import borg.trikeshed.isam.meta.*
 import kotlin.jvm.JvmInline
 import kotlin.jvm.JvmName
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.pow
 
-typealias Series<T> = MetaSeries<Int, T>
 
-/** α
- * (λx.M[x]) → (λy.M[y])	α-conversion
- * https://en.wikipedia.org/wiki/Lambda_calculus
- *
- * in kotlin terms, λ above is a lambda expression and M is a function and the '.' is the body of the lambda
- * therefore the function M is the receiver of the extension function and the lambda expression is the argument
- *
- *  the simplest possible kotlin example of λx.M[x] is
- *  ` { x -> M(x) } ` making the delta symbol into lambda braces and the x into a parameter and the M(x) into the body
- */
-
-inline infix fun <X, C, Domain >    MetaSeries<Domain,X>.α(crossinline xform: (X) -> C): MetaSeries<Domain,C> = a j { i -> xform(this[i]) }
-
-/*iterable conversion*/
-infix fun <X, C, Subject : Iterable<X>> Subject.α(xform: (X) -> C) = object : Iterable<C> {
-    override fun iterator(): Iterator<C> = object : Iterator<C> {
-        val iter: Iterator<X> = this@α.iterator()
-        override fun hasNext(): Boolean = iter.hasNext()
-        override fun next(): C = xform(iter.next())
-    }
-}
 
 
 /** this is an alpha conversion however the type erasure forces inlining here for Arrays as a holdover from java
@@ -98,10 +76,7 @@ fun <T> Array<T>.toSeries(): Join<Int, (Int) -> T> = size j ::get
 //according to openai Codex:
 // in kotlin, val a: ()->B  wraps a B.  in lambda calculus which is left identity ?  in kotlin, a: ()->B  is right identity.  left identity is: val a: ()->B = { b }  right identity is:  val a: ()->B = b
 
-inline val <T> T.leftIdentity: () -> T get() = { this }
-inline val <T> T.`↻`: () -> T get() = this.leftIdentity
-
-fun <T> T.rightIdentity(t: T): T = t
+// leftIdentity / ↻ / rightIdentity defined in Join.kt (zTrike canonical)
 
 inline infix fun <C> IntArray.α(crossinline m: (Int) -> C): Series<C> = this.size j { m(this[it]) }
 
@@ -163,13 +138,7 @@ operator fun <T> Series<T>.minus(killbag: Series<Int>): Series<T> {
     return this[ints]
 }
 
-/**
- * series get by intRange
- */
-operator fun <T> Series<T>.get(index: IntRange): Series<T> = ((index.last + 1) - index.first) j { i ->
-    require(index.step == 1)
-    this[index.first + i]
-}
+// Series.get(IntRange) defined in Join.kt (zTrike canonical)
 
 /** series get by int
  *
@@ -294,20 +263,7 @@ operator fun <A> Series<A>.iterator(): Iterator<A> = object : Iterator<A> {
 }
 
 
-@JvmInline
-value class IterableSeries<A>(val s: Series<A>) : Iterable<A>, Series<A> by s {
-    override fun iterator(): Iterator<A> = s.iterator()
-}
-
-/**
- * a macro to wrap as Iterable
- *
- */
-val <T> Series<T>.view: IterableSeries<T> get() = this as? IterableSeries ?: IterableSeries(this)
-
-infix operator fun <T> IterableSeries<T>.contains(x: Char): Boolean = this.any { x == it }
-infix operator fun <T> Series<T>.contains(it: Char): Boolean = this.view contains it
-
+// IterableSeries + view defined in Join.kt (zTrike canonical)
 
 /***
  * IntHeap is a heap of integers
@@ -631,14 +587,7 @@ fun <T : Comparable<T>> Series<T>.shortestLength(other: Series<T>): Int {
     return i
 }
 
-//comparable series
-interface CSeries<T : Comparable<T>> : Series<T>, Comparable<Series<T>>
-
-/** Comparable Series */
-val <T : Comparable<T>> Series<T>.cpb: CSeries<T>
-    get() = object : CSeries<T>, Series<T> by this, Comparable<Series<T>> {
-        override fun compareTo(other: Series<T>): Int = compareTo(other, naturalOrder())
-    }
+//comparable series - CSeries + cpb defined in Join.kt (zTrike canonical)
 
 fun <T : Comparable<T>> Series<T>.commonPrefixWith(other: Series<T>): Series<T> =
     if (size == 0) this else this[0 until shortestLength(other)]

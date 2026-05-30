@@ -3,8 +3,7 @@
 package borg.trikeshed.charstr
 
 import borg.trikeshed.lib.*
-import borg.trikeshed.isam.meta.IOMemento
-import borg.trikeshed.context.BitMasked
+import borg.trikeshed.cursor.IOMemento
 import kotlin.concurrent.Volatile
 
 /**

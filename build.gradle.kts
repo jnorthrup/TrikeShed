@@ -4,7 +4,7 @@ import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
 
 plugins {
-    kotlin("multiplatform") version "2.4.0-Beta2"
+    kotlin("multiplatform") version "2.4.0-RC2"
     id("com.github.ben-manes.versions") version "0.54.0"
     `maven-publish`
 }

@@ -46,7 +46,7 @@ class ChunkedMutableSeries<T>(
         val ci = stairs.indexOfFirst { it > index }
         if (ci < 0) throw IndexOutOfBoundsException("index $index, total $totalSize")
         val offset = if (ci == 0) index else index - stairs[ci - 1]
-        return autoTwin(ci, offset)
+        return ci j offset
     }
 
     // ── Series interface ─────────────────────────────────────────────────

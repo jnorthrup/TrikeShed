@@ -1,64 +1,121 @@
-@file:Suppress("NonAsciiCharacters", "FunctionName", "ObjectPropertyName", "OVERRIDE_BY_INLINE", "UNCHECKED_CAST")
+@file:Suppress("NOTHING_TO_INLINE", "NonAsciiCharacters", "INLINE_CLASS_DEPRECATED", "FunctionName")
 
 package borg.trikeshed.lib
 
-import kotlin.jvm.JvmInline
-
-
 /**
- * Joins two things.  Pair semantics but distinct in the symbol naming
+ * The base binary composition — a product type with two properties and nothing else.
+ * Lower memory footprint and better cache working set than any JVM data class.
  */
 interface Join<A, B> {
     val a: A
     val b: B
     operator fun component1(): A = a
     operator fun component2(): B = b
+    val pair: Pair<A, B> get() = Pair(a, b)
+}
 
-    val pair: Pair<A, B> get() = a to b
+/** Infix constructor grammar — exactly like `to` for Pair, but for Join. */
+inline infix fun <A, B> A.j(b: B): Join<A, B> = object : Join<A, B> {
+    override val a: A get() = this@j
+    override val b: B get() = b
+}
 
-    /** debugger hack only, violates all common sense */
-    val list: List<Any?> get() = (this as? Series<Any?>)?.toList() ?: emptyList()
+/** Same-typed Join. */
+typealias Twin<T> = Join<T, T>
 
-    companion object {
-        //the Join factory method
-        operator fun <A, B> invoke(_a: A, _b: B): Join<A, B> = object : Join<A, B> {
-            override inline val a: A get() = _a
-            override inline val b: B get() = _b
-        }
+/** Construct a Twin. Routes to densest representation available. */
+fun <T> Twin(a: T, b: T): Twin<T> = a j b
 
-        // PairJoin: stores the two values directly (not a Pair, to avoid PairJoin(pair) recursion)
-        // Not @JvmInline since it has 2 fields (value class requires 1 param)
-        class PairJoin<A, B>(override val a: A, override val b: B) : Join<A, B> {
-            override val pair: Pair<A, B> get() = a to b
-        }
+// ── MetaSeries / Series ─────────────────────────────────────────
 
-        @JvmInline
-        value class EntryJoin<K, V  >( val entry: Map.Entry<K, V>) : Join<K, V> {
-            override val a: K get() = entry.key
-            override val b: V get() = entry.value
-        }
+/** The universal indexed abstraction: a bound/key paired with an index oracle. */
+typealias MetaSeries<I, T> = Join<I, (I) -> T>
 
-        operator fun <A, B> invoke(pair:Pair<A,B> ) : Join<A, B>  = PairJoin(pair.first, pair.second)
-        operator fun <A, B> invoke(pair:Map.Entry<A,B> ) : Join<A, B>  = EntryJoin(pair)
+val <I>  MetaSeries<I, *>.domain get() = a
 
-        fun <B> emptySeriesOf(): Series<B> = EmptySeries as Series<B>
+/** Integer-indexed MetaSeries — the default Series. */
+typealias Series<T> = MetaSeries<Int, T>
+
+/** Series of Joins — the split-storage specialization. */
+typealias Series2<A, B> = Series<Join<A, B>>
+
+val <T>  Series<T>.size: Int get() = a
+
+operator fun <I, T> MetaSeries<I, T>.get(key: I): T = b(key)
+
+// ── Iterable view ───────────────────────────────────────────────
+
+inline
+class IterableSeries<T>(val series: Series<T>) : Iterable<T>, Series<T> by series {
+    override fun iterator(): Iterator<T> = object : Iterator<T> {
+        private var i = 0
+        override fun hasNext(): Boolean = i < series.size
+        override fun next(): T = series[i++]
     }
 }
 
-typealias Twin<T> = Join<T, T>
+val <T> Series<T>.view: IterableSeries<T>
+    get() = this as? IterableSeries ?: IterableSeries(this)
 
-//Twin factory method — routes through autoTwin for densest representation
-fun <T> Twin(a: T, b: T): Twin<T> = autoTwin(a, b)
+// ── Comparable Series ───────────────────────────────────────────
 
-/** Twin factory with an [AutoTwinContext] — use when building many Twins of the same runtime type. */
-fun <T> Twin(a: T, b: T, ctx: AutoTwinContext<T>): Twin<T> = ctx.pack(a, b)
+interface CSeries<T : Comparable<T>> : Series<T>, Comparable<Series<T>> {
+    override fun compareTo(other: Series<T>): Int {
+        val n = minOf(size, other.size)
+        for (i in 0 until n) {
+            val c = this[i].compareTo(other[i])
+            if (c != 0) return c
+        }
+        return size.compareTo(other.size)
+    }
+}
+
+val <T : Comparable<T>> Series<T>.cpb: CSeries<T>
+    get() = object : CSeries<T>, Series<T> by this {}
+
+// ── Projection (α) ─────────────────────────────────────────────
+
+/** Lazy map / projection over a Series. */
+/*inline*/  infix fun <X, C, Domain >    MetaSeries<Domain,X>.α(/*crossinline*/ xform: (X) -> C): MetaSeries<Domain,C> = a j { i -> xform(this[i]) }
+
+/** Iterable projection. */
+inline infix fun <X, C, Subject : Iterable<X>> Subject.α(crossinline xform: (X) -> C): Iterable<C> =
+    map { xform(it) }
+
+// ── Left identity / constant anchor ────────────────────────────
+
+/** Returns a constant supplier of this value. */
+inline val <T> T.`↺`: () -> T get() = leftIdentity
+
+/** Left identity — a supplier that always returns this value. */
+val <T> T.leftIdentity: () -> T get() = { this }
+
+// ── Collection literals ─────────────────────────────────────────
+
+/** List literal: _l[a, b, c] */
+object _l {
+    operator fun <T> get(vararg t: T): List<T> = listOf(*t)
+}
+
+/** Array literal: _a[a, b, c] */
+object _a {
+    inline operator fun <reified T> get(vararg t: T): Array<T> = arrayOf(*t)
+}
+
+/** Set literal: _s[a, b, c] */
+object _s {
+    operator fun <T> get(vararg t: T): Set<T> = setOf(*t)
+}
+
+/** Series literal: s_[a, b, c] */
+object s_ {
+    operator fun <T> get(vararg t: T): Series<T> = t.size j { i -> t[i] }
+}
+
+// ── Range view ──────────────────────────────────────────────────
+
+/** Range selection as composition, not control flow. */
+operator fun <T> Series<T>.get(range: IntRange): Series<T> =
+    range.count() j { i -> this[range.first + i] }
 
 
-val <A> Join<A, *>.first: A get() = this.a
-val <B> Join<*, B>.second: B get() = this.b
-
-/**
- * exactly like "to" for "Join" but with a different (and shorter!) name.
- * Uses [Join.Companion.PairJoin] for zero allocation beyond the Pair itself.
- */
-infix fun <A, B> A.j(b: B): Join<A, B> = Join(this to b)
