@@ -182,6 +182,9 @@ kotlin {
         val wasmJsMain by getting { dependsOn(commonMain) }
         val wasmJsTest by getting { dependsOn(commonTest) }
     }
+    sourceSets.commonTest.dependencies {
+        implementation(kotlin("test"))
+    }
 }
 
 subprojects {

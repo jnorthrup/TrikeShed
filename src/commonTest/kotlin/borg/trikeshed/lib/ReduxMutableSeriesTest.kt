@@ -25,8 +25,8 @@ class ReduxMutableSeriesTest {
 
     @Test
     fun testDelayedReification() {
-        val journal = ChunkedMutableSeries<Action>(capacity = 100)
-        val redux = ReduxMutableSeries(journal, CounterReducer())
+        val journal = ChunkedMutableSeries<Action>()
+        val redux = ReduxMutableSeries(journal, CounterReducer(), capture = Action.Increment(0))
 
         assertEquals(0, redux.state.counter)
 
