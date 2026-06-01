@@ -2,12 +2,14 @@
 
 package borg.trikeshed.userspace.nio
 
+import borg.trikeshed.userspace.nio.platform.spi.PlatformCodec
+
 public open class ByteOrder(private val orderName: String) {
     override fun toString(): String = orderName
 
     public companion object {
         val BIG_ENDIAN: borg.trikeshed.userspace.nio.ByteOrder = object : ByteOrder("BIG_ENDIAN") {}
         val LITTLE_ENDIAN: borg.trikeshed.userspace.nio.ByteOrder = object : ByteOrder("LITTLE_ENDIAN") {}
-        fun nativeOrder(): borg.trikeshed.userspace.nio.ByteOrder = BIG_ENDIAN
+        fun nativeOrder(): borg.trikeshed.userspace.nio.ByteOrder = PlatformCodec.nativeByteOrder
     }
 }

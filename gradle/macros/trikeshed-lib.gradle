@@ -7,13 +7,13 @@ buildscript {
         maven { url = uri("https://www.jitpack.io") }
     }
     dependencies {
-        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:2.4.0-Beta2"
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:2.4.0-RC2"
     }
 }
 
 def trikeshedVersion = "1.0"
 def libVersion = "0.1.0-SNAPSHOT"
-def kotlinVersion = "2.4.0-Beta2"
+def kotlinVersion = "2.4.0-RC2"
 
 def prop = { String name ->
     def value = rootProject.providers.gradleProperty(name).orNull
@@ -61,7 +61,7 @@ def configureCompiler = { kotlinExt, boolean expectActual ->
 }
 
 def standardKmpHostTargets = { kotlinExt, boolean executables ->
-    kotlinExt.jvmToolchain(21)
+    kotlinExt.jvmToolchain(25)
     kotlinExt.jvm()
     kotlinExt.js {
         nodejs()
@@ -81,7 +81,7 @@ def standardKmpHostTargets = { kotlinExt, boolean executables ->
 }
 
 def jvmOnlyTarget = { kotlinExt ->
-    kotlinExt.jvmToolchain(21)
+    kotlinExt.jvmToolchain(25)
     kotlinExt.jvm()
 }
 
@@ -150,7 +150,7 @@ def plainJvm = { boolean applyApplication = false ->
     group = "borg.trikeshed"
     version = libVersion
     def kotlinExt = extensions.getByName("kotlin")
-    kotlinExt.jvmToolchain(21)
+    kotlinExt.jvmToolchain(25)
     tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompilationTask.class).configureEach {
         compilerOptions {
             apiVersion.set(org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_4)

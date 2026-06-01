@@ -1,5 +1,7 @@
 package borg.trikeshed.userspace.nio.platform.spi
 
+import borg.trikeshed.userspace.nio.ByteOrder
+
 interface PlatformCodec {
     val readLong: (ByteArray) -> Long
     val readInt: (ByteArray) -> Int
@@ -20,13 +22,16 @@ interface PlatformCodec {
     val writeULong: (ULong) -> ByteArray
 
     companion object {
-        // Use Long constant - works on both JVM and Native
-       const val TEST_INT = 0x01020304
-        val isLittleEndian: Boolean = (TEST_INT.toByte().toInt() and 0xFF) == 0x04
-        val isNetworkEndian: Boolean = !isLittleEndian
+        val nativeByteOrder: ByteOrder by lazy(::platformNativeByteOrder)
+        val networkByteOrder: ByteOrder = ByteOrder.BIG_ENDIAN
+        val isLittleEndian: Boolean get() = nativeByteOrder == ByteOrder.LITTLE_ENDIAN
+        val isNetworkEndian: Boolean get() = nativeByteOrder == networkByteOrder
 
         val currentPlatformCodec: PlatformCodec by lazy {
             CommonPlatformCodec(isLittleEndian)
+        }
+        val networkEndianCodec: PlatformCodec by lazy {
+            CommonPlatformCodec(false)
         }
 
         // Top-level convenience references

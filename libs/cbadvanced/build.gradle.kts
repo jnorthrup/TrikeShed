@@ -7,7 +7,7 @@ plugins {
 group = "borg.trikeshed"
 version = "0.1.0-SNAPSHOT"
 
-val kotlinVersion = "2.4.0-Beta2"
+val kotlinVersion = "2.4.0-RC2"
 
 kotlin {
     jvmToolchain(21)
