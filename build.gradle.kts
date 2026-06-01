@@ -148,25 +148,20 @@ kotlin {
 
                 implementation("org.bouncycastle:bcprov-jdk15on:1.70")
 
-                // Depend on libs/common JVM artifact for userspace/context implementations
+                // Depend on userspace/context implementations via classpath (no libs/ subprojects)
             }
 
             // Include JMH benchmark sources in jvmMain for compilation
             kotlin.srcDir("src/jmhMain/kotlin")
             resources.srcDir("src/jmhMain/resources")
 
-            // Include local DuckDB JVM sources when available so tests can compile
-            kotlin.srcDir("libs/duckdb/src/jvmMain/kotlin")
+            // Local DuckDB JVM sources unavailable (libs/ removed)
         }
         val jvmTest by getting {
             dependencies {
                 implementation(kotlin("test-junit"))
                 implementation("org.junit.jupiter:junit-jupiter:6.1.0")
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
-                implementation(project(":libs:quic"))
-                implementation(project(":libs:ngsctp"))
-                implementation(project(":libs:htx-client"))
-                // miniduck excluded - requires deleted confix types
             }
         }
 
