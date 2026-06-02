@@ -2,14 +2,60 @@ package borg.trikeshed.charstr
 
 import borg.trikeshed.lib.*
 
-// ── CharStr ─────────────────────────────────────────────────────
-//
-// A string is a point in TextK-space, and TextK-space is itself a Join algebra.
-// The payload (CharSequence) is the witness; TextK is the question space;
-// the lambda is the answer oracle.
-//
-// CharStr participates in Join algebra as a 1-row, infinitely-wide row
-// keyed by computed properties, not by ordinal columns.
+/**
+── CharStr ─────────────────────────────────────────────────────
+
+A string is a point in TextK-space, and TextK-space is itself a Join algebra.
+The payload (CharSequence) is the witness; TextK is the question space;
+the lambda is the answer oracle.
+
+CharStr participates in Join algebra as a 1-row, infinitely-wide row
+keyed by computed properties, not by ordinal columns.
+
+```text
+┌─────────────────────────────────────────────────────────────────────┐
+│                           CharStr                                   │
+│                  MetaSeries<TextK<*>, Any?>                         │
+│                = Join<TextK<*>, (TextK<*>) → Any?>                  │
+└─────────────────────────────────────────────────────────────────────┘
+                            │
+    ┌───────────────────────┼───────────────────────┐
+    ▼                       ▼                       ▼
+    ┌─────────────┐        ┌─────────────┐        ┌─────────────┐
+    │ TextK.Raw   │        │ TextK.SizeK │        │ TextK.HashK │
+    │ CharSequence│        │ bytes       │        │ xxh3        │
+    │ (witness)   │        │ codepoints  │        │ fnv1a       │
+    │             │        │ graphemes   │        │ siphash13   │
+    │             │        │ utf16       │        │ crc32c      │
+    └─────────────┘        └─────────────┘        └─────────────┘
+         ▲                       ▲                       ▲
+         │                       │                       │
+         │                       ▼                       │
+         │               ┌─────────────┐                 │
+         │               │ TextK.NormK │                 │
+         │               │ nfc         │                 │
+         │               │ nfd         │                 │
+         │               │ nfkc        │                 │
+         │               │ nfkd        │                 │
+         │               └─────────────┘                 │
+         │                       ▲                       │
+         │                       │                       │
+         │                       ▼                       │
+         │               ┌─────────────┐                 │
+         │               │TextK.CaseFold│                │
+         │               │ caseFolded  │                 │
+         │               └─────────────┘                 │
+         │                       ▲                       │
+─ ─ ─ ─ ─┴───────────────────────┴───────────────────────┴─ ─ ─ ─ ─ ─
+DEPENDENCY EDGES:
+SizeK → Raw         NormK → Codepoints     CaseFold → NFC
+HashK → Raw
+NormK → Codepoints
+
+Corpus = Series<CharStr>   ← matrix: rows=CharStr, columns=TextK
+Adding a TextK = adding a column with no downstream code change.
+```
+*/
 
 /** CharStr = MetaSeries<TextK<*>, Any?> = Join<TextK<*>, (TextK<*>) -> Any?> */
 typealias CharStr = MetaSeries<TextK<*>, Any?>
@@ -66,19 +112,19 @@ typealias TextKDag = MetaSeries<TextK<*>, Set<TextK<*>>>
 /** The dependency DAG. Every TextK declares what must be computed first. */
 val TEXT_K_DEPS: Map<TextK<*>, Set<TextK<*>>> = mapOf(
     TextK.SizeK.Bytes      to setOf(TextK.Raw),
-    TextK.SizeK.Codepoints to setOf(TextK.Raw),
-    TextK.SizeK.Graphemes  to setOf(TextK.SizeK.Codepoints),
-    TextK.SizeK.UTF16Units to setOf(TextK.Raw),
-    TextK.HashK.XXH3       to setOf(TextK.Raw),
-    TextK.HashK.FNV1a      to setOf(TextK.Raw),
-    TextK.HashK.SipHash13  to setOf(TextK.Raw),
-    TextK.HashK.CRC32C     to setOf(TextK.Raw),
-    TextK.NormK.NFC        to setOf(TextK.SizeK.Codepoints),
-    TextK.NormK.NFD        to setOf(TextK.SizeK.Codepoints),
-    TextK.NormK.NFKC       to setOf(TextK.SizeK.Codepoints),
-    TextK.NormK.NFKD       to setOf(TextK.SizeK.Codepoints),
-    TextK.CaseFold         to setOf(TextK.NormK.NFC),
-    TextK.Raw              to emptySet(),
+            TextK.SizeK.Codepoints to setOf(TextK.Raw),
+            TextK.SizeK.Graphemes  to setOf(TextK.SizeK.Codepoints),
+            TextK.SizeK.UTF16Units to setOf(TextK.Raw),
+            TextK.HashK.XXH3       to setOf(TextK.Raw),
+            TextK.HashK.FNV1a      to setOf(TextK.Raw),
+            TextK.HashK.SipHash13  to setOf(TextK.Raw),
+            TextK.HashK.CRC32C     to setOf(TextK.Raw),
+            TextK.NormK.NFC        to setOf(TextK.SizeK.Codepoints),
+            TextK.NormK.NFD        to setOf(TextK.SizeK.Codepoints),
+            TextK.NormK.NFKC       to setOf(TextK.SizeK.Codepoints),
+            TextK.NormK.NFKD       to setOf(TextK.SizeK.Codepoints),
+            TextK.CaseFold         to setOf(TextK.NormK.NFC),
+            TextK.Raw              to emptySet(),
 )
 
 /** DAG as a lookup function — the dependency graph is itself a Join. */

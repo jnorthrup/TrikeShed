@@ -152,6 +152,7 @@ kotlin {
             }
 
             // Include JMH benchmark sources in jvmMain for compilation
+            kotlin.srcDir("src/jvmMain/kotlin")
             kotlin.srcDir("src/jmhMain/kotlin")
             resources.srcDir("src/jmhMain/resources")
 
