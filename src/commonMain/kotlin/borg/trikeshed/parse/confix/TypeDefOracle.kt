@@ -29,6 +29,17 @@ data class TypeDefEntry(
     val source: String,
 )
 
+// ── TypeDefOracleK — facet keys for TypeDefOracleRow ───────────────
+
+sealed class TypeDefOracleK<out R> : OpK<R>() {
+    data object Entries   : TypeDefOracleK<Series<TypeDefEntry>>()
+    data object Tokens    : TypeDefOracleK<Series<TypeToken>>()
+    data object Names     : TypeDefOracleK<(TypeToken) -> String>()
+    data object ByName    : TypeDefOracleK<(String) -> TypeToken?>()
+    data object Lattice   : TypeDefOracleK<IsALattice>()
+    data object EdgeCount : TypeDefOracleK<Int>()
+}
+
 // ── TypeDefOracle ──────────────────────────────────────────────────────────────
 
 class TypeDefOracle {
@@ -143,8 +154,8 @@ class TypeDefOracle {
         return capturedEntries.size j { op: Any? ->
             @Suppress("UNCHECKED_CAST")
             when (op) {
-                TypeDefOracleK.Entries   -> (capturedEntries.size j { capturedEntries[it] })
-                TypeDefOracleK.Tokens     -> (capturedNames.size j { TypeToken(it) })
+                TypeDefOracleK.Entries   -> (capturedEntries.size j { i: Int -> capturedEntries[i] })
+                TypeDefOracleK.Tokens     -> (capturedNames.size j { i: Int -> TypeToken(i) })
                 TypeDefOracleK.Names      -> ({ token: TypeToken ->
                     if (token.poolIdx in capturedNames.indices) capturedNames[token.poolIdx] else "?$token"
                 })
@@ -203,3 +214,33 @@ class TypeDefOracle {
 
     val size: Int get() = entries.size
 }
+
+// ── TypeDefOracleRow — the faceted row returned by build() ─────────
+
+typealias TypeDefOracleRow = FacetedRow<Any>
+
+// ── Faceted accessors for TypeDefOracleRow ────────────────────────────
+
+@Suppress("UNCHECKED_CAST")
+val TypeDefOracleRow.entries: Series<TypeDefEntry>
+    get() = b(TypeDefOracleK.Entries) as Series<TypeDefEntry>
+
+@Suppress("UNCHECKED_CAST")
+val TypeDefOracleRow.tokens: Series<TypeToken>
+    get() = b(TypeDefOracleK.Tokens) as Series<TypeToken>
+
+@Suppress("UNCHECKED_CAST")
+val TypeDefOracleRow.tdNames: (TypeToken) -> String
+    get() = b(TypeDefOracleK.Names) as (TypeToken) -> String
+
+@Suppress("UNCHECKED_CAST")
+val TypeDefOracleRow.byName: (String) -> TypeToken?
+    get() = b(TypeDefOracleK.ByName) as (String) -> TypeToken?
+
+@Suppress("UNCHECKED_CAST")
+val TypeDefOracleRow.lattice: IsALattice
+    get() = b(TypeDefOracleK.Lattice) as IsALattice
+
+@Suppress("UNCHECKED_CAST")
+val TypeDefOracleRow.edgeCount: Int
+    get() = b(TypeDefOracleK.EdgeCount) as Int

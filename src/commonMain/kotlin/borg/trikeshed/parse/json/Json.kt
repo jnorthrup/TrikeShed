@@ -40,16 +40,16 @@ private fun cursorToMap(cursor: Cursor, src: Series<Char>): LinkedHashMap<String
     val row = cursor[0]
     // row is RowVec = Series2<Any?, ColumnMeta↻>
     // columns: 0=open, 1=close, 2=tag, 3=children
-    val open = row[0].a as? Int ?: return map
-    val close = row[0].b as? Int ?: return map
-    val children = row[3].a as? Cursor ?: return map
+    val open = row.open
+    val close = row.close
+    val children = row.kids
     // Object children alternate key/value
     var i = 0
     while (i < children.size - 1) {
         val keyRow = children[i]
         val valRow = children[i + 1]
-        val kOpen = keyRow[0].a as? Int ?: break
-        val kClose = keyRow[0].b as? Int ?: break
+        val kOpen = keyRow.open
+        val kClose = keyRow.close
         val key = src[kOpen..kClose].asString()
         val value = materializeRow(valRow, src)
         map[key] = value
@@ -59,20 +59,20 @@ private fun cursorToMap(cursor: Cursor, src: Series<Char>): LinkedHashMap<String
 }
 
 private fun materializeRow(row: RowVec, src: Series<Char>): Any? {
-    val tag = row[2].a as? IOMemento ?: return null
-    val open = row[0].a as? Int ?: return null
-    val close = row[0].b as? Int ?: return null
+    val tag = row.tag
+    val open = row.open
+    val close = row.close
     return when (tag) {
         IOMemento.IoString -> src[open..close].asString()
         IOMemento.IoBoolean -> src[open] == 't'
         IOMemento.IoDouble -> src[open..close].asString().toDouble()
         IOMemento.IoNothing -> null
         IOMemento.IoObject -> {
-            val children = row[3].a as? Cursor ?: return null
+            val children = row.kids
             cursorToMap(children.size j { children[it] }, src)
         }
         IOMemento.IoArray -> {
-            val children = row[3].a as? Cursor ?: return emptyList<Any?>()
+            val children = row.kids
             val list = ArrayList<Any?>(children.size)
             for (i in 0 until children.size) list.add(materializeRow(children[i], src))
             list

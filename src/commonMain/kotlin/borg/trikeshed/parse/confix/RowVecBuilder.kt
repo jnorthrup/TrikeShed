@@ -89,7 +89,7 @@ class RowVecBuilder {
         facet(name, IOMemento.IoBoolean, value, doc)
 
     /** Add an object facet (becomes a branch node). */
-    fun object(name: String, doc: String = ""): RowVecBuilder =
+    fun `object`(name: String, doc: String = ""): RowVecBuilder =
         facet(name, IOMemento.IoObject, null, doc)
 
     /** Add an array facet (becomes a branch node). */
@@ -125,10 +125,10 @@ class RowVecBuilder {
 
         val metaSeries: Series<`ColumnMeta↻`> = width j { col: Int ->
             when (col) {
-                0    -> { ColumnMeta("open",  IOMemento.IoInt) }
-                1    -> { ColumnMeta("close", IOMemento.IoInt) }
-                2    -> { ColumnMeta("tag",   IOMemento.IoObject) }
-                3    -> { ColumnMeta("kids",  IOMemento.IoObject) }
+                0    -> { -> ColumnMeta("open",  IOMemento.IoInt) }
+                1    -> { -> ColumnMeta("close", IOMemento.IoInt) }
+                2    -> { -> ColumnMeta("tag",   IOMemento.IoObject) }
+                3    -> { -> ColumnMeta("kids",  IOMemento.IoObject) }
                 else -> facets[col - 4].supplier()
             }
         }
@@ -136,9 +136,9 @@ class RowVecBuilder {
         @Suppress("UNCHECKED_CAST")
         return width j { col: Int -> values[col] } joins metaSeries
     }
-
-    private fun emptyCursor(): Cursor = 0 j { error("empty cursor") }
 }
+
+fun emptyCursor(): Cursor = 0 j { error("empty cursor") }
 
 // ── Sensible defaults ──────────────────────────────────────────────────────────
 
@@ -225,8 +225,8 @@ fun RowVec.setAt(col: Int, value: Any?): RowVec {
     val newVals = arrayOfNulls<Any?>(w)
     for (i in 0 until w) newVals[i] = b(i).a
     newVals[col] = value
-    val meta = (0 until w).j { i -> b(i).b() }
-    return w j { i -> newVals[i] } joins meta
+    val meta = w j { i: Int -> b(i).b }
+    return w j { i: Int -> newVals[i] } joins meta
 }
 
 /** Get column value by name. */
@@ -239,9 +239,7 @@ fun RowVec.get(name: String): Any? {
 }
 
 /** Get column value by index. */
-fun RowVec[col: Int]: Any? = b(col).a
-
-private fun RowVec.setAt(idx: Int, value: Any?) { /* no-op for now — immutable algebra */ }
+operator fun RowVec.get(col: Int): Any? = b(col).a
 
 // ─────────────────────────────────────────────────────────────────────────────
 // BLACKBOARD ALIGNMENT
@@ -252,29 +250,3 @@ private fun RowVec.setAt(idx: Int, value: Any?) { /* no-op for now — immutable
 //   body   = Series<Byte> (swappable, zero-copy reloadable)
 //
 // BlackBoard role tags via OverlayRole enum (from cursor.BlackboardOverlay).
-
-enum class ConfixRole {
-    /** Raw parsed geometry — unprocessed. */
-    OBSERVATION,
-    /** Derived scalars — reified values. */
-    DERIVED,
-    /** Aggregated rollups — cascade results. */
-    AGGREGATE,
-    /** Typedef chain results. */
-    TYPEDEF_CHAIN,
-    /** Pointcut statistics. */
-    POINTCUT_STATS,
-}
-
-/** Tag a ConfixDoc with a role for BlackBoard indexing. */
-data class BlackBoardEntry(
-    val doc:       ConfixDoc,
-    val role:      ConfixRole = ConfixRole.OBSERVATION,
-    val timestamp: Long       = System.nanoTime(),
-    val provenance: String    = "",
-)
-
-val BlackBoardEntry.index:   ConfixIndex get() = doc.index
-val BlackBoardEntry.src:     Series<Byte> get() = doc.src
-val BlackBoardEntry.facade:  ConfixIndex get() = doc.index
-val BlackBoardEntry.body:    Series<Byte> get() = doc.src

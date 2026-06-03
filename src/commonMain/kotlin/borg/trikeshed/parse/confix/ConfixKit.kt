@@ -28,16 +28,31 @@ import borg.trikeshed.lib.*
 //   JsPath / JsPathElement
 //   BlackBoard alignment helpers
 
+// ── Core Type Aliases (ConfixCell / ConfixDoc) ──────────────────────────────────
+
+typealias ConfixCell = Join<RowVec, Series<Byte>>
+val ConfixCell.row: RowVec       get() = a
+val ConfixCell.src: Series<Byte> @kotlin.jvm.JvmName("getConfixCellSrc") get() = b
+
+fun ConfixCell.reify(): Any? = row.reify(src)
+
+typealias ConfixDoc = Join<ConfixIndex, Series<Byte>>
+val ConfixDoc.index: ConfixIndex get() = a
+val ConfixDoc.src: Series<Byte>  @kotlin.jvm.JvmName("getConfixDocSrc") get() = b
+@Suppress("UNCHECKED_CAST")
+val ConfixDoc.roots: Cursor get() = index.b(ConfixIndexK.TreeCursor) as Cursor
+val ConfixDoc.root: RowVec? get() = if (roots.size > 0) roots[0] else null
+
 // ── Parse entry points ─────────────────────────────────────────────────────────
 
 fun confixDoc(bytes: ByteArray, syntax: Syntax): ConfixDoc {
-    val src = bytes.size j { bytes[it] }
+    val src = bytes.size j { i: Int -> bytes[i] }
     return syntax.scanIndex(src) j src
 }
 
 fun confixDoc(text: String): ConfixDoc {
     val bytes = text.encodeToByteArray()
-    val src   = bytes.size j { bytes[it] }
+    val src   = bytes.size j { i: Int -> bytes[i] }
     val syntax = if (text.trimStart().firstOrNull() in setOf('{', '[', '"'))
         Syntax.JSON else Syntax.YAML
     return syntax.scanIndex(src) j src
@@ -92,21 +107,84 @@ fun ConfixDoc.docAt(vararg path: Any): ConfixCell?  = rootCell?.cellGetAt(*path)
 fun ConfixDoc.value(vararg path: Any): Any?         = docAt(*path)?.reify()
 
 // ── Reification (re-exported from Confix.kt, no duplicate here) ───────────────
-//
-// RowVec.reify(src: Series<Byte>) lives in Confix.kt
-// ConfixCell.reify() lives in Confix.kt
+
+fun RowVec.reify(src: Series<Byte>): Any? = when (tag) {
+    borg.trikeshed.cursor.IOMemento.IoNothing             -> null
+    borg.trikeshed.cursor.IOMemento.IoBoolean             -> src[open].toInt().toChar() == 't'
+    borg.trikeshed.cursor.IOMemento.IoDouble              -> src.spanStr(open, close).toDoubleOrNull()
+    borg.trikeshed.cursor.IOMemento.IoInt                 -> src.spanLong(open, close).toInt()
+    borg.trikeshed.cursor.IOMemento.IoLong                -> src.spanLong(open, close)
+    borg.trikeshed.cursor.IOMemento.IoString              -> src.spanStr(open + 1, close - 1) // strip quotes
+    borg.trikeshed.cursor.IOMemento.IoBytes               -> ByteArray(close - open + 1) { src[open + it] }
+    borg.trikeshed.cursor.IOMemento.IoObject,
+    borg.trikeshed.cursor.IOMemento.IoArray               -> kids
+    else                            -> src.spanStr(open, close)
+}
+
+@Suppress("UNCHECKED_CAST")
+fun ConfixDoc.reify(tokenIdx: Int): Any? =
+    (index.b(ConfixIndexK.TreeCursor) as Cursor)[tokenIdx].reify(src)
 
 // ── Flat index navigation (re-exported from Confix.kt) ───────────────────────
-//
-// ConfixIndex.valueIndexFor(keyIdx: Int) lives in Confix.kt
-// ConfixIndex.resolve(key: CharSequence) lives in Confix.kt
-// ConfixIndex.resolve(parent: Int, at: Int) lives in Confix.kt
+
+@Suppress("UNCHECKED_CAST")
+fun ConfixIndex.valueIndexFor(keyTokenIdx: Int): Int? {
+    val depths = b(ConfixIndexK.Depths) as Series<Int>
+    val d = depths[keyTokenIdx]
+    val total = depths.size
+    for (i in keyTokenIdx + 1 until total)
+        if (depths[i] == d) return i
+    return null
+}
+
+@Suppress("UNCHECKED_CAST")
+fun ConfixIndex.resolve(key: CharSequence): Int? =
+    (b(ConfixIndexK.KeyToChild) as (CharSequence) -> Int?)(key)?.let { valueIndexFor(it) }
+
+@Suppress("UNCHECKED_CAST")
+fun ConfixIndex.resolve(parentTokenIdx: Int, arrayIdx: Int): Int? {
+    val ch = (b(ConfixIndexK.DirectChildren) as (Int) -> Series<Int>)(parentTokenIdx)
+    return if (arrayIdx < ch.size) ch[arrayIdx] else null
+}
 
 // ── Tree navigation (re-exported from Confix.kt) ───────────────────────────────
-//
-// RowVec.step(key: CharSequence, src: Series<Byte>) lives in Confix.kt
-// RowVec.step(at: Int) lives in Confix.kt
-// RowVec.getAt(vararg path: Any, src: Series<Byte>) lives in Confix.kt
+
+fun RowVec.step(key: CharSequence, src: Series<Byte>): RowVec? {
+    val ch = kids
+    var i = 0
+    while (i + 1 < ch.size) {
+        val k = ch[i]
+        if (k.tag == borg.trikeshed.cursor.IOMemento.IoString) {
+            val kOpen  = k.open  + 1
+            val kClose = k.close - 1
+            val kLen   = kClose - kOpen + 1
+            if (kLen == key.length) {
+                var match = true
+                for (d in 0 until kLen)
+                    if (src[kOpen + d].toInt().toChar() != key[d]) { match = false; break }
+                if (match) return ch[i + 1]
+            }
+        }
+        i += 2
+    }
+    return null
+}
+
+fun RowVec.step(arrayIdx: Int): RowVec? =
+    kids.let { if (arrayIdx < it.size) it[arrayIdx] else null }
+
+fun RowVec.getAt(vararg path: Any, src: Series<Byte>): RowVec? {
+    var cur: RowVec? = this
+    for (step in path) {
+        cur = when (step) {
+            is CharSequence -> cur?.step(step, src)
+            is Int          -> cur?.step(step)
+            else            -> error("path step must be CharSequence or Int")
+        }
+        if (cur == null) return null
+    }
+    return cur
+}
 
 // ── JsonElement alias (backward compat) ───────────────────────────────────────
 
@@ -166,10 +244,30 @@ enum class ConfixRole {
 data class BlackBoardEntry(
     val doc:       ConfixDoc,
     val role:      ConfixRole = ConfixRole.OBSERVATION,
-    val timestamp: Long       = System.nanoTime(),
+    val timestamp: Long       = 0L,
     val provenance: String    = "",
 )
 
 val BlackBoardEntry.index:  ConfixIndex    get() = doc.index
 val BlackBoardEntry.src:    Series<Byte>   get() = doc.src
 val BlackBoardEntry.facade: ConfixIndex   get() = doc.index
+
+// ── RowVec properties ──────────────────────────────────────────────────────────
+
+val RowVec.open:  Int                                 get() = this[0] as Int
+val RowVec.close: Int                                 get() = this[1] as Int
+val RowVec.tag:   borg.trikeshed.cursor.IOMemento get() = this[2] as borg.trikeshed.cursor.IOMemento
+val RowVec.kids:  Cursor                              get() = this[3] as Cursor
+
+private fun Series<Byte>.spanStr(open: Int, close: Int): String {
+    if (close < open) return ""
+    val len = close - open + 1
+    return CharArray(len) { this[open + it].toInt().toChar() }.concatToString()
+}
+
+private fun Series<Byte>.spanLong(open: Int, close: Int): Long {
+    var v = 0L; var neg = false; var i = open
+    if (i <= close && this[i].toInt().toChar() == '-') { neg = true; i++ }
+    while (i <= close) { v = v * 10 + (this[i++].toInt().toChar() - '0') }
+    return if (neg) -v else v
+}
