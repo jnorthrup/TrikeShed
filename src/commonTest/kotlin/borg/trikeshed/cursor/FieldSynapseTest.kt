@@ -27,29 +27,18 @@ import kotlin.test.*
  */
 class FieldSynapseTest {
 
-    // ── Opcode → wire value ────────────────────────────────────────
-
-    private fun opcodeFor(op: FieldOpcode): Byte = when (op) {
-        FieldOpcode.L_GET -> 0xA5
-        FieldOpcode.L_SET -> 0xA6
-        FieldOpcode.P_GET -> 0xA7
-        FieldOpcode.P_SET -> 0xA8
-    }
-
-    // ── isSet truth table ──────────────────────────────────────────
-
-    private fun expectedIsSet(op: FieldOpcode): Boolean = when (op) {
-        FieldOpcode.L_GET -> false
-        FieldOpcode.L_SET -> true
-        FieldOpcode.P_GET -> false
-        FieldOpcode.P_SET -> true
-    }
-
     // ── Phase ─────────────────────────────────────────────────────
 
-    private fun phaseOf(ph: Phase): Byte = when (ph) {
-        Phase.BEFORE -> 0
-        Phase.AFTER  -> 1
+    private object Phase {
+        const val BEFORE: Byte = 0
+        const val AFTER: Byte = 1
+    }
+
+    private object FieldOpcode {
+        const val L_GET: Byte = 0xA5.toByte()
+        const val L_SET: Byte = 0xA6.toByte()
+        const val P_GET: Byte = 0xA7.toByte()
+        const val P_SET: Byte = 0xA8.toByte()
     }
 
     // ── Table-driven: all 4 opcodes × both phases ─────────────────
@@ -219,7 +208,7 @@ class FieldSynapseTest {
 
     // ── Helper ──────────────────────────────────────────────────────
 
-    private fun make(op: FieldOpcode, ph: Phase): FieldSynapse = FieldSynapse(
+    private fun make(op: Byte, ph: Byte): FieldSynapse = FieldSynapse(
         phase = ph,
         opcode = op,
         methodIdx = 0,

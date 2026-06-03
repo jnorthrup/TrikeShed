@@ -28,7 +28,7 @@ class ConfixSaxJaxTest {
         val doc = confixDoc("""{"a": [1, 2]}""")
         
         // Act
-        val node = JaxElement.inflate(doc.index, parentTokenIdx = 0, src = doc.docSrc)
+        val node = JaxElement.inflate(doc.index, parentTokenIdx = 0, src = doc.src)
         
         // Assert
         kotlin.test.assertTrue(node.children.size > 0, "Root node should have children")
@@ -37,7 +37,7 @@ class ConfixSaxJaxTest {
     @Test
     fun `JAX Element should lazy-load raw byte slices`() {
         val doc = confixDoc("""{"a": [1, 2]}""")
-        val node = JaxElement.inflate(doc.index, parentTokenIdx = 0, src = doc.docSrc)
+        val node = JaxElement.inflate(doc.index, parentTokenIdx = 0, src = doc.src)
         val bytes = node.bytes()
         kotlin.test.assertTrue(bytes.isNotEmpty(), "Should load raw byte slices")
     }

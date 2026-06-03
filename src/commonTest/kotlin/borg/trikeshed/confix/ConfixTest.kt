@@ -134,7 +134,7 @@ class ConfixTest {
             0x65.toByte(), 0x68, 0x65, 0x6C, 0x6C, 0x6F,
             0x01
         )
-        val doc = confixDoc(b)
+        val doc = confixDoc(b, Syntax.CBOR)
         // CBOR tree navigation is WIP — just confirm parse doesn't crash
         assertNotNull(doc.index)
     }
