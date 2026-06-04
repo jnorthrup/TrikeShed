@@ -204,8 +204,8 @@ groupName := number | [A-z]+[A-z0-9_-@]*
                     val name: String = col.name.toString()
                     val type: TypeMemento = col.type
                     val len: Int =  type.networkSize?: varchars[name]?: throw Exception("no network size for $name")
-                    val groupId   = (type as? RecordMeta)?.groupId   ?: 0
-                    val groupName = (type as? RecordMeta)?.groupName ?: groupId.toString()
+                    val groupId   = (col as? RecordMeta)?.groupId   ?: 0
+                    val groupName = (col as? RecordMeta)?.groupName ?: groupId.toString()
                     val recordMeta = RecordMeta(
                         name,
                         type as IOMemento,
