@@ -6,10 +6,10 @@ import borg.trikeshed.cursor.*
 import kotlin.test.*
 
 class ConfixTest {
-    fun bytes(s: String): ByteArray = s.toByteArray()
+    fun bytes(s: String): ByteArray = s.encodeToByteArray()
 
     fun src(s: String): Series<Byte> {
-        val b = s.toByteArray()
+        val b = s.encodeToByteArray()
         val n = b.size
         return n j { i: Int -> b[i] }
     }

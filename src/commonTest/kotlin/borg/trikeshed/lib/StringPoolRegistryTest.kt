@@ -1,12 +1,8 @@
 package borg.trikeshed.lib
 
 import borg.trikeshed.charstr.CharStr
-import borg.trikeshed.charstr.CharStrCached
-import borg.trikeshed.charstr.TextK
-import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.Assertions.*
-
-import java.lang.System.nanoTime
+import borg.trikeshed.charstr.*
+import kotlin.test.*
 
 /**
  * TDD RED — StringPool Registry + CRMS Facets on CharStr + wireproto reify/redux template.
@@ -17,6 +13,10 @@ import java.lang.System.nanoTime
  * wireproto nexus: (poolId, offset, length) — the 24B wire header for a CharStr payload.
  */
 class StringPoolRegistryTest {
+
+    /** Monotonic nanosecond-ish counter — portable across all Kotlin targets. */
+    private var nanoCounter = 0L
+    private fun nanoTime(): Long = nanoCounter++
 
     // ── Wireproto coordinates (24B header) ──────────────────────────
 
@@ -119,7 +119,7 @@ class StringPoolRegistryTest {
     data class CharStrFacetPayload(
         val wireCoords: WireCoords,
         val facetOp: TextK<*>,
-        val timestampNanos: Long = nanoTime()
+        val timestampNanos: Long = 0L
     )
 
     // ── Reducer for CharStr Facet events ───────────────────────────
