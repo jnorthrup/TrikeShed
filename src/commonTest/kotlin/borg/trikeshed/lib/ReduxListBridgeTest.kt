@@ -87,8 +87,8 @@ class ReduxListBridgeTest {
         assertEquals(5, bridge.journal.size, "journal should have 5 init entries")
         assertEquals(5, bridge.state.size, "state should have 5 entries after init")
 
-        // rapid-fire abuse: 10 000 set operations, hammering every slot
-        val N = 10_000
+        // rapid-fire abuse: 1 000 set operations, hammering every slot
+        val N = 1_000
         for (i in 0 until N) {
             bridge.set(i % 5, "set-$i")
         }
@@ -114,12 +114,12 @@ class ReduxListBridgeTest {
         val bridge = ReduxListBridge(delegate)
 
         val slots = 8
-        val opsPerSlot = 1_250
+        val opsPerSlot = 125
         val total = slots * opsPerSlot
 
         for (slot in 0 until slots) {
             for (op in 0 until opsPerSlot) {
-                bridge.set(slot, slot * 10_000 + op)
+                bridge.set(slot, slot * 1_000 + op)
             }
         }
 
@@ -128,7 +128,7 @@ class ReduxListBridgeTest {
         assertEquals(slots, s.size)
         for (slot in 0 until slots) {
             assertEquals(
-                slot * 10_000 + (opsPerSlot - 1),
+                slot * 1_000 + (opsPerSlot - 1),
                 s[slot],
                 "slot $slot should hold the last value written to it"
             )

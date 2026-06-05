@@ -147,7 +147,7 @@ enum class Syntax {
     }
 
     val COL_META: Series<`ColumnMeta↻`> = 4 j { c: Int ->
-        when (c) { 0->ColumnMeta("open",IOMemento.IoInt);1->ColumnMeta("close",IOMemento.IoInt);2->ColumnMeta("tag",IOMemento.IoObject);3->ColumnMeta("children",IOMemento.IoObject);else->error("4") } as `ColumnMeta↻`
+        when (c) { 0->ColumnMeta("open",IOMemento.IoInt);1->ColumnMeta("close",IOMemento.IoInt);2->ColumnMeta("tag",IOMemento.IoObject);3->ColumnMeta("children",IOMemento.IoObject);else->error("4") }.let { { it } }
     }
 
     data class FlatIndex(

@@ -1,7 +1,5 @@
 
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
-import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
-import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
 
 plugins {
     kotlin("multiplatform") version "2.4.0-RC2"
@@ -11,10 +9,6 @@ plugins {
 
 group = "org.bereft"
 version = "1.0"
-val enableNativeSharedLib = providers.gradleProperty("native.sharedLib").orNull == "true"
-
-val focusedTransportSlice = providers.gradleProperty("focusedTransportSlice").orNull == "true"
-
 // Centralized dependency versions available to all subprojects via project.extra
 extra["versions.kotlinx-coroutines-core"] = "1.11.0"
 extra["versions.kotlinx-coroutines-test"] = "1.11.0"
@@ -47,72 +41,6 @@ kotlin {
 
     jvm {}
 
-    js { nodejs() }
-
-    @OptIn(ExperimentalWasmDsl::class) wasmJs {
-        browser {
-            testTask {
-                val firefoxBin = project.file("/Applications/Firefox.app/Contents/MacOS/firefox")
-                if (firefoxBin.exists()) {
-                    useKarma {
-                        useFirefox()
-                    }
-                } else {
-                    useKarma {
-                        useChromeHeadless()
-                    }
-                }
-            }
-        }
-    }
-
-    val hostOs: String  = System.getProperty("os.name")
-    val hostArch: String = System.getProperty("os.arch")
-
-    if (hostOs == "Mac OS X") {
-        if (hostArch == "aarch64") {
-            macosArm64("macos") {
-                if (enableNativeSharedLib) {
-                    binaries.sharedLib {
-                        baseName = "trikeshed"
-                    }
-                }
-                // Local DuckDB cinterop removed from root build; if a local libs/duckdb is available,
-                // include it via settings.gradle.kts as a composite build and add a proper cinterop there.
-            }
-        } else {
-            // Intel mac
-            macosX64("macos") {
-                if (enableNativeSharedLib) {
-                    binaries.sharedLib {
-                        baseName = "trikeshed"
-                    }
-                }
-            }
-        }
-    }
-    if (hostOs == "Linux") {
-        linuxX64("linux") {
-            compilations.getByName("main") {
-                val zlinux_uring by cinterops.creating {
-                    defFile(project.file("io_uring_interop/zlinux_uring.def"))
-                }
-            }
-            if (enableNativeSharedLib) {
-                binaries.sharedLib {
-                    baseName = "trikeshed"
-                }
-            }
-        }
-        linuxArm64("linuxArm64") {
-            if (enableNativeSharedLib) {
-                binaries.sharedLib {
-                    baseName = "trikeshed"
-                }
-            }
-        }
-    }
-
     sourceSets {
         val commonMain by getting {
             dependencies {
@@ -126,19 +54,6 @@ kotlin {
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
             }
         }
-        val nativeMain by creating { dependsOn(commonMain) }
-        val nativeTest by creating { dependsOn(commonTest) }
-        val posixMain by creating {
-            dependsOn(nativeMain)
-        }
-        val posixTest by creating {
-            dependsOn(nativeTest)
-        }
-        if (hostOs == "Linux") {
-            val linuxMain by getting { dependsOn(posixMain) }
-            val linuxTest by getting { dependsOn(posixTest) }
-        }
-
         val jvmMain by getting {
             resources.srcDir("src/jvmMain/resources")
             dependencies {
@@ -165,18 +80,6 @@ kotlin {
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
             }
         }
-
-        val macosMain = sourceSets.findByName("macosMain"); macosMain?.dependsOn(sourceSets.getByName("posixMain"))
-        val macosTest = sourceSets.findByName("macosTest"); macosTest?.run {
-            dependsOn(posixTest)
-        }
-
-        val jsMain by getting {
-            dependsOn(commonMain)
-        }
-        val jsTest by getting { dependsOn(commonTest) }
-        val wasmJsMain by getting { dependsOn(commonMain) }
-        val wasmJsTest by getting { dependsOn(commonTest) }
     }
     sourceSets.commonTest.dependencies {
         implementation(kotlin("test"))
@@ -203,13 +106,6 @@ afterEvaluate {
             gradlePluginPortal()
             google()
             maven("https://www.jitpack.io")
-        }
-    }
-
-    if (System.getProperty("os.name") == "Mac OS X") {
-        val macosTarget = kotlin.targets.getByName("macos") as KotlinNativeTarget
-        macosTarget.binaries.all {
-            linkerOpts.addAll(listOf("-L/opt/homebrew/lib"))
         }
     }
 
@@ -254,20 +150,6 @@ afterEvaluate {
         group = "verification"
         dependsOn("test")
         dependsOn(jmhTask)
-    }
-
-    // Set CHROME_BIN to wrapper that launches Chrome with required flags for headless runs
-    val chromeWrapper = project.file("scripts/chrome-headless-wrapper.sh")
-    val firefoxBin = project.file("/Applications/Firefox.app/Contents/MacOS/firefox")
-    tasks.matching { it.name == "wasmJsBrowserTest" || it.name.endsWith("BrowserTest") }.configureEach {
-        (this as? org.gradle.api.tasks.testing.Test)?.let {
-            // Make CHROME_BIN available to the test process so Karma uses the wrapper
-            it.environment("CHROME_BIN", chromeWrapper.absolutePath)
-            // If a local Firefox binary exists, make FIREFOX_BIN available so Karma can use it
-            if (firefoxBin.exists()) {
-                it.environment("FIREFOX_BIN", firefoxBin.absolutePath)
-            }
-        }
     }
 }
 

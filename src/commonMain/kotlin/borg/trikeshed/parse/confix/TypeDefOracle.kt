@@ -52,7 +52,8 @@ class TypeDefOracle {
 
     fun parseTypeDefs(text: String, source: String = "<unknown>") {
         val typedefPattern = Regex(
-            """(?m)^\s*typedef\s+(.+?)\s+as\s+([A-Za-z_]\w*)(?:<([^>]+)>)?\s*;"""
+            """^\s*typedef\s+(.+?)\s+as\s+([A-Za-z_]\w*)(?:<([^>]+)>)?\s*;""",
+            setOf(RegexOption.MULTILINE)
         )
         for (m in typedefPattern.findAll(text)) {
             val referredTo = m.groupValues[1].trim()
@@ -62,7 +63,8 @@ class TypeDefOracle {
         }
 
         val typealiasPattern = Regex(
-            """(?m)^\s*typealias\s+([A-Za-z_]\w*)(?:<([^>]+)>)?\s*=\s*(.+?)$"""
+            """^\s*typealias\s+([A-Za-z_]\w*)(?:<([^>]+)>)?\s*=\s*(.+?)$""",
+            setOf(RegexOption.MULTILINE)
         )
         for (m in typealiasPattern.findAll(text)) {
             val name = m.groupValues[1].trim()
