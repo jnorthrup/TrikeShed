@@ -8,4 +8,8 @@ pluginManagement {
 
 rootProject.name = "TrikeShed"
 
-include(":libs:motion-estimation")
+// Dynamically include every library under libs/ so each subproject can be built autonomously
+val libsDir = rootDir.resolve("libs")
+if (libsDir.exists() && libsDir.isDirectory) {
+    libsDir.listFiles()!!.filter { it.isDirectory }.forEach { include(":libs:${it.name}") }
+}
