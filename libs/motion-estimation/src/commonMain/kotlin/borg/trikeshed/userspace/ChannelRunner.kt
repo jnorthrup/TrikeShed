@@ -19,6 +19,28 @@ interface Channel {
     suspend fun wait(minComplete: Int)
 }
 
+abstract class NamedSplatAsyncContextElement(val explicitName: String) : SplatAsyncContextElement() {
+    override val key: CoroutineContext.Key<*> = object : CoroutineContext.Key<SplatAsyncContextElement> {}
+
+    suspend fun transitionWithExplicitSplat(to: ElementState) {
+        val from = lifecycleState
+        val splat = stateSplatModel?.predict(from)
+
+        Chronicle.emit(
+            TransitionSplat(
+                elementKey = explicitName,
+                from = from,
+                splat = splat,
+                actual = to,
+                composition = captureComposition()
+            )
+        )
+
+        @Suppress("INVISIBLE_MEMBER", "INVISIBLE_REFERENCE")
+        state = to
+    }
+}
+
 class SplatChannelRunner(
     private val channel: Channel,
     private val scope: CoroutineScope,
@@ -27,8 +49,7 @@ class SplatChannelRunner(
     enum class ChannelOutcome { SUBMIT_MORE, WAIT_COMPLETE, DRAIN, ERROR }
 
     suspend fun start() {
-        val element = object : SplatAsyncContextElement() {
-            override val key: CoroutineContext.Key<*> = object : CoroutineContext.Key<SplatAsyncContextElement> {}
+        val element = object : NamedSplatAsyncContextElement("ChannelRunner") {
             override val stateSplatModel = motionModel.asStateAdapter()
             override fun captureComposition(): Join<String, Series<String>> =
                 "ChannelRunner".j(channel.pendingOps.j { i: Int -> "op_$i" })
@@ -38,8 +59,6 @@ class SplatChannelRunner(
 
         while (element.lifecycleState != ElementState.CLOSED) {
             val context = "ChannelRunner".j(channel.pendingCount)
-            val splat = motionModel.predict(context)
-
             val outcome = when {
                 channel.pendingCount > 0 -> ChannelOutcome.SUBMIT_MORE
                 channel.waiters > 0 -> ChannelOutcome.WAIT_COMPLETE
@@ -51,7 +70,7 @@ class SplatChannelRunner(
                 else -> ElementState.ACTIVE
             }
 
-            element.transitionWithSplat(actualState)
+            element.transitionWithExplicitSplat(actualState)
 
             when (outcome) {
                 ChannelOutcome.SUBMIT_MORE -> channel.submit()

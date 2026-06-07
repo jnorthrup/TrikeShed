@@ -11,18 +11,28 @@ import borg.trikeshed.splat.Splat
 import borg.trikeshed.splat.toChronology
 
 class CircularQueue<T>(private val capacity: Int) {
-    private val buffer = mutableListOf<T>()
+    private var head = 0
+    private var tail = 0
+    private var count = 0
+    private val buffer = arrayOfNulls<Any?>(capacity)
 
     fun enqueue(item: T) {
-        if (buffer.size >= capacity) {
-            buffer.removeAt(0)
+        if (count == capacity) {
+            head = (head + 1) % capacity
+        } else {
+            count++
         }
-        buffer.add(item)
+        buffer[tail] = item
+        tail = (tail + 1) % capacity
     }
 
-    val size: Int get() = buffer.size
+    val size: Int get() = count
 
-    operator fun get(index: Int): T = buffer[index]
+    @Suppress("UNCHECKED_CAST")
+    operator fun get(index: Int): T {
+        if (index >= count) throw IndexOutOfBoundsException("Index $index out of bounds for size $count")
+        return buffer[(head + index) % capacity] as T
+    }
 }
 
 object Chronicle {

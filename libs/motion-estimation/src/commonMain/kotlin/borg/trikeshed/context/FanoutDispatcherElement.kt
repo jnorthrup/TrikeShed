@@ -9,6 +9,7 @@ import borg.trikeshed.lib.toSeries
 import borg.trikeshed.splat.Splat
 import borg.trikeshed.splat.SplatModel
 import borg.trikeshed.splat.toChronology
+import borg.trikeshed.splat.EmpiricalMotionModel
 
 class FanoutDispatcherElement : SplatAsyncContextElement() {
     companion object Key : AsyncContextKey<FanoutDispatcherElement>()
@@ -38,7 +39,9 @@ class FanoutDispatcherElement : SplatAsyncContextElement() {
 
             actuals.add(subscriberType.j(outcome))
 
-            // fanoutSplatModel?.observe(context, outcome) // EmpircalMotionModel handles this natively
+            if (fanoutSplatModel is EmpiricalMotionModel<Join<String, String>, DeliveryOutcome>) {
+                (fanoutSplatModel as EmpiricalMotionModel<Join<String, String>, DeliveryOutcome>).observe(context, outcome)
+            }
         }
 
         Chronicle.emit(
