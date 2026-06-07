@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>XVM Type Production System</title>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'JetBrains Mono', monospace; background: #020617; min-height: 100vh; padding: 2rem; color: white; }
+    .container { max-width: 1200px; margin: 0 auto; }
+    .header { margin-bottom: 2rem; }
+    .header-row { display: flex; align-items: center; gap: 1rem; margin-bottom: 0.5rem; }
+    .pulse-dot { width: 12px; height: 12px; background: #22d3ee; border-radius: 50%; animation: pulse 2s infinite; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    h1 { font-size: 1.5rem; font-weight: 700; letter-spacing: -0.025em; }
+    .subtitle { color: #94a3b8; font-size: 0.875rem; margin-left: 1.75rem; }
+    .diagram-container { background: rgba(15,23,42,0.5); border-radius: 1rem; border: 1px solid #1e293b; padding: 1.5rem; overflow-x: auto; }
+    svg { width: 100%; min-width: 1020px; display: block; }
+    .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; margin-top: 2rem; }
+    .card { background: rgba(15,23,42,0.5); border-radius: 0.75rem; border: 1px solid #1e293b; padding: 1.25rem; }
+    .card-header { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem; }
+    .card-dot { width: 8px; height: 8px; border-radius: 50%; }
+    .card-dot.cyan   { background: #22d3ee; }
+    .card-dot.violet { background: #a78bfa; }
+    .card-dot.orange { background: #fb923c; }
+    .card-dot.emerald{ background: #34d399; }
+    .card h3 { font-size: 0.875rem; font-weight: 600; }
+    .card ul { list-style: none; color: #94a3b8; font-size: 0.75rem; }
+    .card li { margin-bottom: 0.375rem; }
+    .footer { text-align: center; margin-top: 1.5rem; color: #475569; font-size: 0.75rem; }
+  </style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <div class="header-row">
+      <div class="pulse-dot"></div>
+      <h1>XVM Type Production System</h1>
+    </div>
+    <p class="subtitle">Five erasure cutpoints · Observability bus · Tabular rule tables · Runtime composition pipeline</p>
+  </div>
+
+  <div class="diagram-container">
+    <svg viewBox="0 0 1060 710">
+      <defs>
+        <marker id="arr"        markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0,10 3.5,0 7" fill="#64748b"/></marker>
+        <marker id="arr-cyan"   markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0,10 3.5,0 7" fill="#22d3ee"/></marker>
+        <marker id="arr-orange" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0,10 3.5,0 7" fill="#fb923c"/></marker>
+        <marker id="arr-violet" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0,10 3.5,0 7" fill="#a78bfa"/></marker>
+        <marker id="arr-green"  markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0,10 3.5,0 7" fill="#34d399"/></marker>
+        <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+          <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#1e293b" stroke-width="0.5"/>
+        </pattern>
+      </defs>
+
+      <rect width="100%" height="100%" fill="url(#grid)"/>
+
+      <!-- ── ARROWS (drawn first, behind boxes) ───────────────────────────── -->
+
+      <!-- E1→E2→E3→E4→E5 horizontal pipeline -->
+      <line x1="203" y1="98" x2="241" y2="98" stroke="#22d3ee" stroke-width="1.5" marker-end="url(#arr-cyan)"/>
+      <line x1="393" y1="98" x2="431" y2="98" stroke="#22d3ee" stroke-width="1.5" marker-end="url(#arr-cyan)"/>
+      <line x1="583" y1="98" x2="621" y2="98" stroke="#22d3ee" stroke-width="1.5" marker-end="url(#arr-cyan)"/>
+      <line x1="793" y1="98" x2="831" y2="98" stroke="#22d3ee" stroke-width="1.5" marker-end="url(#arr-cyan)"/>
+
+      <!-- capture lines: erasure nodes → publisher bus -->
+      <line x1="128" y1="143" x2="128" y2="193" stroke="#fb923c" stroke-width="1" stroke-dasharray="3,3" marker-end="url(#arr-orange)"/>
+      <line x1="318" y1="143" x2="318" y2="193" stroke="#fb923c" stroke-width="1" stroke-dasharray="3,3" marker-end="url(#arr-orange)"/>
+      <line x1="508" y1="143" x2="508" y2="193" stroke="#fb923c" stroke-width="1" stroke-dasharray="3,3" marker-end="url(#arr-orange)"/>
+      <line x1="708" y1="143" x2="708" y2="193" stroke="#fb923c" stroke-width="1" stroke-dasharray="3,3" marker-end="url(#arr-orange)"/>
+      <line x1="920" y1="143" x2="920" y2="193" stroke="#fb923c" stroke-width="1" stroke-dasharray="3,3" marker-end="url(#arr-orange)"/>
+
+      <!-- publisher bus → rule tables -->
+      <line x1="530" y1="272" x2="530" y2="299" stroke="#fb923c" stroke-width="1.5" marker-end="url(#arr-orange)"/>
+
+      <!-- rule tables → runtime (TypeInfo output feeds runtime) -->
+      <line x1="643" y1="448" x2="490" y2="476" stroke="#a78bfa" stroke-width="1.5" marker-end="url(#arr-violet)"/>
+
+      <!-- ObjectHandle → ClassComposition → Frame.resolveType -->
+      <line x1="198" y1="553" x2="216" y2="553" stroke="#34d399" stroke-width="1.5" marker-end="url(#arr-green)"/>
+      <line x1="388" y1="553" x2="406" y2="553" stroke="#34d399" stroke-width="1.5" marker-end="url(#arr-green)"/>
+
+      <!-- ── COMPILE-TIME BOUNDARY ─────────────────────────────────────────── -->
+      <rect x="48" y="28" width="965" height="132" rx="8"
+            fill="rgba(8,51,68,0.12)" stroke="#22d3ee" stroke-width="1" stroke-dasharray="6,3"/>
+      <text x="58" y="42" fill="#22d3ee" font-size="9" font-weight="600">COMPILE-TIME ERASURE PIPELINE</text>
+
+      <!-- E1 -->
+      <rect x="53"  y="50" width="150" height="93" rx="6" fill="#0f172a"/>
+      <rect x="53"  y="50" width="150" height="93" rx="6" fill="rgba(8,51,68,0.4)" stroke="#22d3ee" stroke-width="1.5"/>
+      <text x="128" y="68"  fill="white"   font-size="10" font-weight="700" text-anchor="middle">E1</text>
+      <text x="128" y="82"  fill="#22d3ee" font-size="9"  font-weight="600" text-anchor="middle">ConstantPool</text>
+      <text x="128" y="95"  fill="#94a3b8" font-size="8"  text-anchor="middle">.register()</text>
+      <text x="128" y="108" fill="#94a3b8" font-size="7"  text-anchor="middle">CP.java:177</text>
+      <text x="128" y="120" fill="#22d3ee" font-size="7"  text-anchor="middle">capture parameterized id</text>
+      <text x="128" y="132" fill="#22d3ee" font-size="7"  text-anchor="middle">before resolveTypedefs()</text>
+
+      <!-- E2 -->
+      <rect x="243" y="50" width="150" height="93" rx="6" fill="#0f172a"/>
+      <rect x="243" y="50" width="150" height="93" rx="6" fill="rgba(8,51,68,0.4)" stroke="#22d3ee" stroke-width="1.5"/>
+      <text x="318" y="68"  fill="white"   font-size="10" font-weight="700" text-anchor="middle">E2</text>
+      <text x="318" y="82"  fill="#22d3ee" font-size="9"  font-weight="600" text-anchor="middle">Register</text>
+      <text x="318" y="95"  fill="#94a3b8" font-size="8"  text-anchor="middle">ctor(type,name,method)</text>
+      <text x="318" y="108" fill="#94a3b8" font-size="7"  text-anchor="middle">Register.java:31</text>
+      <text x="318" y="120" fill="#22d3ee" font-size="7"  text-anchor="middle">unknown-index slot</text>
+      <text x="318" y="132" fill="#94a3b8" font-size="7"  text-anchor="middle">null → IllegalArgumentException</text>
+
+      <!-- E3 -->
+      <rect x="433" y="50" width="150" height="93" rx="6" fill="#0f172a"/>
+      <rect x="433" y="50" width="150" height="93" rx="6" fill="rgba(8,51,68,0.4)" stroke="#22d3ee" stroke-width="1.5"/>
+      <text x="508" y="68"  fill="white"   font-size="10" font-weight="700" text-anchor="middle">E3</text>
+      <text x="508" y="82"  fill="#22d3ee" font-size="9"  font-weight="600" text-anchor="middle">Register</text>
+      <text x="508" y="95"  fill="#94a3b8" font-size="8"  text-anchor="middle">ctor(type,name,int)</text>
+      <text x="508" y="108" fill="#94a3b8" font-size="7"  text-anchor="middle">Register.java:60</text>
+      <text x="508" y="120" fill="#22d3ee" font-size="7"  text-anchor="middle">indexed slot</text>
+      <text x="508" y="132" fill="#94a3b8" font-size="7"  text-anchor="middle">null ok: DEFAULT/IGNORE only</text>
+
+      <!-- E4 -->
+      <rect x="623" y="50" width="170" height="93" rx="6" fill="#0f172a"/>
+      <rect x="623" y="50" width="170" height="93" rx="6" fill="rgba(8,51,68,0.4)" stroke="#22d3ee" stroke-width="1.5"/>
+      <text x="708" y="68"  fill="white"   font-size="10" font-weight="700" text-anchor="middle">E4</text>
+      <text x="708" y="82"  fill="#22d3ee" font-size="9"  font-weight="600" text-anchor="middle">TypedefConstant</text>
+      <text x="708" y="95"  fill="#94a3b8" font-size="8"  text-anchor="middle">.getReferredToType()</text>
+      <text x="708" y="108" fill="#94a3b8" font-size="7"  text-anchor="middle">TypedefConstant.java:62</text>
+      <text x="708" y="120" fill="#22d3ee" font-size="7"  text-anchor="middle">cycle → RecursiveTypeConstant</text>
+      <text x="708" y="132" fill="#94a3b8" font-size="7"  text-anchor="middle">visitor · m_fInitialized gate</text>
+
+      <!-- E5 -->
+      <rect x="833" y="50" width="175" height="93" rx="6" fill="#0f172a"/>
+      <rect x="833" y="50" width="175" height="93" rx="6" fill="rgba(8,51,68,0.4)" stroke="#22d3ee" stroke-width="1.5"/>
+      <text x="920" y="68"  fill="white"   font-size="10" font-weight="700" text-anchor="middle">E5</text>
+      <text x="920" y="82"  fill="#22d3ee" font-size="9"  font-weight="600" text-anchor="middle">TerminalTypeConstant</text>
+      <text x="920" y="95"  fill="#94a3b8" font-size="8"  text-anchor="middle">.resolveTypedefs()</text>
+      <text x="920" y="108" fill="#94a3b8" font-size="7"  text-anchor="middle">TTC.java:522</text>
+      <text x="920" y="120" fill="#22d3ee" font-size="7"  text-anchor="middle">leaf chain-chase terminus</text>
+      <text x="920" y="132" fill="#94a3b8" font-size="7"  text-anchor="middle">Format.Typedef → recurse</text>
+
+      <!-- ── OBSERVABILITY BUS ──────────────────────────────────────────────── -->
+      <rect x="48"  y="195" width="965" height="75" rx="6" fill="#0f172a"/>
+      <rect x="48"  y="195" width="965" height="75" rx="6" fill="rgba(251,146,60,0.3)" stroke="#fb923c" stroke-width="1.5"/>
+      <text x="530" y="213" fill="white"   font-size="11" font-weight="700" text-anchor="middle">TypedefResolutionPublisher</text>
+      <text x="530" y="228" fill="#fb923c" font-size="8"  text-anchor="middle">73 TypedefCallsite ordinals  ·  volatile boolean active (zero-overhead gate)  ·  record(pool, site, resolved, success) → [factId, nano, poolId, siteOrd, clsName, format, success, isReverted]</text>
+      <text x="530" y="243" fill="#94a3b8" font-size="7"  text-anchor="middle">revert(factId) / revertSite(pool,site) / revertPool(pool)  ·  metaAsRowVec() → Confix "keys|cells"  ·  Kotlin JournalSeries + ReduxMutableSeries via reflection</text>
+      <text x="530" y="258" fill="#94a3b8" font-size="7"  text-anchor="middle">KOTLIN_CLASS = "borg.trikeshed.cursor.TypedefResolutionSeries"  ·  StringPool lazy intern  ·  kotlinAvailable=false → all calls short-circuit</text>
+
+      <!-- ── RULE TABLES HEADER ─────────────────────────────────────────────── -->
+      <text x="48" y="293" fill="#a78bfa" font-size="9" font-weight="600">TABULAR TYPE PRODUCTION RULES  (TypeConstant.java · TypeInfo.java · TerminalTypeConstant.java)</text>
+
+      <!-- 3A: Format-keyed dispatch -->
+      <rect x="48"  y="300" width="155" height="145" rx="6" fill="#0f172a"/>
+      <rect x="48"  y="300" width="155" height="145" rx="6" fill="rgba(76,29,149,0.4)" stroke="#a78bfa" stroke-width="1.5"/>
+      <text x="125" y="316" fill="white"   font-size="9"  font-weight="600" text-anchor="middle">3A · Format Dispatch</text>
+      <text x="125" y="329" fill="#a78bfa" font-size="7"  text-anchor="middle">calculateRelationToContribution()</text>
+      <text x="57"  y="345" fill="#94a3b8" font-size="7">Module/Class → nominal inherit</text>
+      <text x="57"  y="357" fill="#94a3b8" font-size="7">Property → same-name IS_A</text>
+      <text x="57"  y="369" fill="#94a3b8" font-size="7">TypeParameter → identity IS_A</text>
+      <text x="57"  y="381" fill="#94a3b8" font-size="7">FormalTypeChild → same-name</text>
+      <text x="57"  y="393" fill="#94a3b8" font-size="7">ThisClass → congruent bidir</text>
+      <text x="57"  y="405" fill="#94a3b8" font-size="7">Typedef → expand + retry</text>
+      <text x="57"  y="417" fill="#94a3b8" font-size="7">IsConst/IsEnum/… → base del.</text>
+      <text x="57"  y="429" fill="#94a3b8" font-size="7">Unresolved → INCOMPATIBLE</text>
+      <text x="57"  y="438" fill="#a78bfa" font-size="7">default → IllegalStateException</text>
+
+      <!-- 3B: Sealing table -->
+      <rect x="218" y="300" width="150" height="145" rx="6" fill="#0f172a"/>
+      <rect x="218" y="300" width="150" height="145" rx="6" fill="rgba(76,29,149,0.4)" stroke="#a78bfa" stroke-width="1.5"/>
+      <text x="293" y="316" fill="white"   font-size="9"  font-weight="600" text-anchor="middle">3B · Sealing Table</text>
+      <text x="293" y="329" fill="#a78bfa" font-size="7"  text-anchor="middle">isIncompatibleComboImpl()</text>
+      <text x="227" y="345" fill="#94a3b8" font-size="7">ENUMVALUE → always sealed</text>
+      <text x="227" y="357" fill="#94a3b8" font-size="7">PACKAGE → always sealed</text>
+      <text x="227" y="369" fill="#94a3b8" font-size="7">MODULE → always sealed</text>
+      <text x="227" y="381" fill="#94a3b8" font-size="7">ENUM → sealed unless child isA</text>
+      <text x="227" y="393" fill="#94a3b8" font-size="7">CLASS/CONST/SERVICE →</text>
+      <text x="227" y="405" fill="#94a3b8" font-size="7">  incompatible w/ another</text>
+      <text x="227" y="417" fill="#94a3b8" font-size="7">  class/const/svc/enum/pkg</text>
+
+      <!-- 3C: Contribution list -->
+      <rect x="383" y="300" width="155" height="145" rx="6" fill="#0f172a"/>
+      <rect x="383" y="300" width="155" height="145" rx="6" fill="rgba(76,29,149,0.4)" stroke="#a78bfa" stroke-width="1.5"/>
+      <text x="460" y="316" fill="white"   font-size="9"  font-weight="600" text-anchor="middle">3C · Contribution List</text>
+      <text x="460" y="329" fill="#a78bfa" font-size="7"  text-anchor="middle">createContributionList()</text>
+      <text x="392" y="345" fill="#94a3b8" font-size="7">CLASS/CONST/SERVICE →</text>
+      <text x="392" y="357" fill="#94a3b8" font-size="7">  validate Extends clause</text>
+      <text x="392" y="369" fill="#94a3b8" font-size="7">  isExtendsLegal(format)</text>
+      <text x="392" y="381" fill="#94a3b8" font-size="7">  detect cyclical extends</text>
+      <text x="392" y="393" fill="#94a3b8" font-size="7">  implicit Object if no Extends</text>
+      <text x="392" y="405" fill="#94a3b8" font-size="7">MIXIN/ANNOTATION →</text>
+      <text x="392" y="417" fill="#94a3b8" font-size="7">  Into clause first</text>
+      <text x="392" y="429" fill="#94a3b8" font-size="7">  Extends (must match fmt)</text>
+      <text x="392" y="441" fill="#94a3b8" font-size="7">  implicit into Object</text>
+
+      <!-- 3D: TypeInfo pipeline -->
+      <rect x="553" y="300" width="180" height="145" rx="6" fill="#0f172a"/>
+      <rect x="553" y="300" width="180" height="145" rx="6" fill="rgba(76,29,149,0.4)" stroke="#a78bfa" stroke-width="1.5"/>
+      <text x="643" y="316" fill="white"   font-size="9"  font-weight="600" text-anchor="middle">3D · TypeInfo Pipeline</text>
+      <text x="643" y="329" fill="#a78bfa" font-size="7"  text-anchor="middle">buildTypeInfoImpl()</text>
+      <text x="562" y="345" fill="#94a3b8" font-size="7">1. access: STRUCT/PUB/PRIV</text>
+      <text x="562" y="357" fill="#94a3b8" font-size="7">2. annotation dispatch</text>
+      <text x="562" y="369" fill="#94a3b8" font-size="7">3. PropertyClassType dispatch</text>
+      <text x="562" y="381" fill="#94a3b8" font-size="7">4. resolveContributionTypes()</text>
+      <text x="562" y="393" fill="#94a3b8" font-size="7">5. createContributionList() →3C</text>
+      <text x="562" y="405" fill="#94a3b8" font-size="7">6. collectTypeParameters()</text>
+      <text x="562" y="417" fill="#94a3b8" font-size="7">7. createCallChains()</text>
+      <text x="562" y="429" fill="#94a3b8" font-size="7">8. collectMemberInfo()</text>
+      <text x="562" y="441" fill="#a78bfa" font-size="7">→ TypeInfo(Complete|Incomplete)</text>
+
+      <!-- 3E: Formal dispatch -->
+      <rect x="748" y="300" width="155" height="145" rx="6" fill="#0f172a"/>
+      <rect x="748" y="300" width="155" height="145" rx="6" fill="rgba(76,29,149,0.4)" stroke="#a78bfa" stroke-width="1.5"/>
+      <text x="825" y="316" fill="white"   font-size="9"  font-weight="600" text-anchor="middle">3E · Formal Dispatch</text>
+      <text x="825" y="329" fill="#a78bfa" font-size="7"  text-anchor="middle">TTC.buildTypeInfo()</text>
+      <text x="757" y="345" fill="#94a3b8" font-size="7">Class/Module → super pipeline</text>
+      <text x="757" y="357" fill="#94a3b8" font-size="7">IsClass/IsEnum/… →</text>
+      <text x="757" y="369" fill="#94a3b8" font-size="7">  keyword base delegation</text>
+      <text x="757" y="381" fill="#94a3b8" font-size="7">Property/TypeParam/</text>
+      <text x="757" y="393" fill="#94a3b8" font-size="7">FormalTypeChild →</text>
+      <text x="757" y="405" fill="#94a3b8" font-size="7">  resolve constraint type</text>
+      <text x="757" y="417" fill="#94a3b8" font-size="7">  strip autoNarrowing</text>
+      <text x="757" y="429" fill="#94a3b8" font-size="7">  wrap in constraint TypeInfo</text>
+      <text x="757" y="441" fill="#94a3b8" font-size="7">  null if incomplete (deferred)</text>
+
+      <!-- 3F: Overload -->
+      <rect x="918" y="300" width="95" height="145" rx="6" fill="#0f172a"/>
+      <rect x="918" y="300" width="95" height="145" rx="6" fill="rgba(76,29,149,0.4)" stroke="#a78bfa" stroke-width="1.5"/>
+      <text x="965" y="316" fill="white"   font-size="9"  font-weight="600" text-anchor="middle">3F · Overload</text>
+      <text x="965" y="329" fill="#a78bfa" font-size="7"  text-anchor="middle">findMethods()</text>
+      <text x="926" y="348" fill="#94a3b8" font-size="7">isTopLevel()</text>
+      <text x="926" y="360" fill="#94a3b8" font-size="7">kind.matches()</text>
+      <text x="926" y="372" fill="#94a3b8" font-size="7">!isCapped()</text>
+      <text x="926" y="387" fill="#94a3b8" font-size="7">arity window:</text>
+      <text x="926" y="399" fill="#94a3b8" font-size="7">cRequired</text>
+      <text x="926" y="411" fill="#94a3b8" font-size="7">..cAllParams</text>
+      <text x="926" y="425" fill="#94a3b8" font-size="7">lazy 2nd-idx</text>
+      <text x="926" y="437" fill="#94a3b8" font-size="7">"name;N"+kind</text>
+
+      <!-- ── RUNTIME COMPOSITION BOUNDARY ─────────────────────────────────── -->
+      <rect x="48" y="472" width="600" height="178" rx="8"
+            fill="rgba(6,78,59,0.12)" stroke="#34d399" stroke-width="1" stroke-dasharray="5,3"/>
+      <text x="58" y="486" fill="#34d399" font-size="9" font-weight="600">RUNTIME COMPOSITION PIPELINE</text>
+
+      <!-- ObjectHandle -->
+      <rect x="58"  y="494" width="140" height="118" rx="6" fill="#0f172a"/>
+      <rect x="58"  y="494" width="140" height="118" rx="6" fill="rgba(6,78,59,0.4)" stroke="#34d399" stroke-width="1.5"/>
+      <text x="128" y="510" fill="white"   font-size="9"  font-weight="600" text-anchor="middle">ObjectHandle</text>
+      <text x="128" y="523" fill="#34d399" font-size="8"  text-anchor="middle">m_clazz: TypeComposition</text>
+      <text x="67"  y="540" fill="#94a3b8" font-size="7">cloneAs(clazz):</text>
+      <text x="67"  y="552" fill="#94a3b8" font-size="7">  swap m_clazz only</text>
+      <text x="67"  y="564" fill="#94a3b8" font-size="7">  zero field copy</text>
+      <text x="67"  y="576" fill="#94a3b8" font-size="7">revealOrigin():</text>
+      <text x="67"  y="588" fill="#94a3b8" font-size="7">  ensureOrigin(this)</text>
+      <text x="67"  y="600" fill="#94a3b8" font-size="7">GenericHandle copies fields</text>
+
+      <!-- ClassComposition -->
+      <rect x="218" y="494" width="170" height="118" rx="6" fill="#0f172a"/>
+      <rect x="218" y="494" width="170" height="118" rx="6" fill="rgba(6,78,59,0.4)" stroke="#34d399" stroke-width="1.5"/>
+      <text x="303" y="510" fill="white"   font-size="9"  font-weight="600" text-anchor="middle">ClassComposition</text>
+      <text x="227" y="526" fill="#94a3b8" font-size="7">f_typeInception (PRIVATE)</text>
+      <text x="227" y="538" fill="#94a3b8" font-size="7">f_typeStructure (STRUCT)</text>
+      <text x="227" y="550" fill="#94a3b8" font-size="7">f_typeRevealed (public view)</text>
+      <text x="227" y="562" fill="#34d399" font-size="7">6 shared ConcurrentHashMaps</text>
+      <text x="227" y="577" fill="#94a3b8" font-size="7">maskAs() → isA() check</text>
+      <text x="227" y="589" fill="#94a3b8" font-size="7">revealAs() → STRUCT→PRIV</text>
+      <text x="227" y="601" fill="#94a3b8" font-size="7">derivative shares all caches</text>
+
+      <!-- Frame.resolveType -->
+      <rect x="408" y="494" width="230" height="118" rx="6" fill="#0f172a"/>
+      <rect x="408" y="494" width="230" height="118" rx="6" fill="rgba(6,78,59,0.4)" stroke="#34d399" stroke-width="1.5"/>
+      <text x="523" y="510" fill="white"   font-size="9"  font-weight="600" text-anchor="middle">Frame.resolveType()</text>
+      <text x="523" y="523" fill="#34d399" font-size="7"  text-anchor="middle">Frame.java:1471  ·  central hub</text>
+      <text x="417" y="540" fill="#94a3b8" font-size="7">1. containsFormalType →</text>
+      <text x="417" y="552" fill="#94a3b8" font-size="7">   resolveGenerics(pool, resolver)</text>
+      <text x="417" y="564" fill="#94a3b8" font-size="7">2. containsAutoNarrowing →</text>
+      <text x="417" y="576" fill="#94a3b8" font-size="7">   resolveAutoNarrowing(pool,false,</text>
+      <text x="417" y="588" fill="#94a3b8" font-size="7">   f_hThis.getType(), null)</text>
+      <text x="417" y="601" fill="#34d399" font-size="7">called at: NEW / CAST / assign / reg</text>
+
+      <!-- Frame.checkType bar -->
+      <rect x="58" y="624" width="580" height="20" rx="3" fill="rgba(6,78,59,0.25)" stroke="#34d399" stroke-width="1"/>
+      <text x="150" y="637" fill="#34d399" font-size="8" font-weight="600">Frame.checkType()  :861</text>
+      <text x="310" y="637" fill="#94a3b8" font-size="7">pos==typeId → skip  ·  IS_A → ok  ·  IS_A_WEAK → proxy wrap  ·  default → revealOrigin() retry</text>
+
+      <!-- ── INTEGRATION TESTS ──────────────────────────────────────────────── -->
+      <rect x="663" y="472" width="350" height="178" rx="6" fill="#0f172a"/>
+      <rect x="663" y="472" width="350" height="178" rx="6" fill="rgba(30,41,59,0.5)" stroke="#94a3b8" stroke-width="1.5"/>
+      <text x="838" y="489" fill="white"   font-size="9"  font-weight="600" text-anchor="middle">TypedefCascadeDagReificationTest</text>
+      <text x="838" y="502" fill="#94a3b8" font-size="7"  text-anchor="middle">javatools/src/test/java/org/xvm/runtime/</text>
+      <text x="672" y="519" fill="#94a3b8" font-size="7">① liveDag_allCallsiteOrdinalsFiring</text>
+      <text x="682" y="531" fill="#64748b" font-size="7">compile minimal module → drain → table.ruleCount()==73</text>
+      <text x="672" y="545" fill="#94a3b8" font-size="7">② liveDag_cascadeTableFromLiveFacts</text>
+      <text x="682" y="557" fill="#64748b" font-size="7">5-hop A→B→C→D→E→Int · reduce() · ruleCount>0</text>
+      <text x="672" y="571" fill="#94a3b8" font-size="7">③ noCycles_resolveTypedefsTerminates</text>
+      <text x="682" y="583" fill="#64748b" font-size="7">self-ref typedef · parser catches before E4 fires</text>
+      <text x="672" y="597" fill="#94a3b8" font-size="7">④ simdReady_allKindBucketsNonEmpty</text>
+      <text x="682" y="609" fill="#64748b" font-size="7">KIND_RETURN=2 TYPE=1 FIELD=1 ALLOC=1 · dh[0]=2 dh[1]=3</text>
+      <text x="672" y="623" fill="#94a3b8" font-size="7">⑤ adjacentRuleSoA_coversAll73CallsiteOrdinals</text>
+      <text x="682" y="635" fill="#64748b" font-size="7">0x65≥0 · 0x66≥0 · 0x00==-1 · pure unit</text>
+
+      <!-- ── LEGEND ──────────────────────────────────────────────────────────── -->
+      <text x="50" y="665" fill="white" font-size="9" font-weight="600">Legend</text>
+      <rect x="50"  y="671" width="14" height="9" rx="2" fill="rgba(8,51,68,0.4)"    stroke="#22d3ee" stroke-width="1"/>
+      <text x="69"  y="679" fill="#94a3b8" font-size="8">Erasure Cutpoint</text>
+      <rect x="188" y="671" width="14" height="9" rx="2" fill="rgba(251,146,60,0.3)" stroke="#fb923c" stroke-width="1"/>
+      <text x="207" y="679" fill="#94a3b8" font-size="8">Observability Bus</text>
+      <rect x="330" y="671" width="14" height="9" rx="2" fill="rgba(76,29,149,0.4)"  stroke="#a78bfa" stroke-width="1"/>
+      <text x="349" y="679" fill="#94a3b8" font-size="8">Rule Table</text>
+      <rect x="432" y="671" width="14" height="9" rx="2" fill="rgba(6,78,59,0.4)"    stroke="#34d399" stroke-width="1"/>
+      <text x="451" y="679" fill="#94a3b8" font-size="8">Runtime Pipeline</text>
+      <rect x="555" y="671" width="14" height="9" rx="2" fill="rgba(30,41,59,0.5)"   stroke="#94a3b8" stroke-width="1"/>
+      <text x="574" y="679" fill="#94a3b8" font-size="8">Integration Tests</text>
+    </svg>
+  </div>
+
+  <div class="cards">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-dot cyan"></div>
+        <h3>Erasure Cutpoints (E1–E5)</h3>
+      </div>
+      <ul>
+        <li>• E1 ConstantPool.register():177 — last observable point for parameterized typedef identity</li>
+        <li>• E2/E3 Register ctors :31/:60 — every runtime register stores erased type; null only allowed for DEFAULT/IGNORE</li>
+        <li>• E4 TypedefConstant.getReferredToType():62 — cycle detection via visitor; cycle → RecursiveTypeConstant</li>
+        <li>• E5 TerminalTypeConstant.resolveTypedefs():522 — leaf of the chain-chase; if Format.Typedef recurse else return this</li>
+      </ul>
+    </div>
+    <div class="card">
+      <div class="card-header">
+        <div class="card-dot violet"></div>
+        <h3>Rule Tables (3A–3F)</h3>
+      </div>
+      <ul>
+        <li>• 3A: Format-keyed subtype dispatch — 9 cases on Format enum, duck-type fallback</li>
+        <li>• 3B: Intersection sealing — ENUMVALUE/MODULE/PACKAGE always INCOMPATIBLE</li>
+        <li>• 3C: Contribution list ordering — Class validates Extends; Mixin validates Into first</li>
+        <li>• 3D: TypeInfo 8-step pipeline — access→annotation→contribution→params→chains→members→TypeInfo</li>
+        <li>• 3E: Formal type dispatch — formals wrap constraint TypeInfo; null if deferred</li>
+        <li>• 3F: Overload resolution — arity window [cRequired..cAllParams], !isCapped()</li>
+      </ul>
+    </div>
+    <div class="card">
+      <div class="card-header">
+        <div class="card-dot orange"></div>
+        <h3>Observability (TypedefResolutionPublisher)</h3>
+      </div>
+      <ul>
+        <li>• 73 TypedefCallsite enum values — one per resolveTypedefs() call site in ASM/compiler</li>
+        <li>• volatile boolean active — single read; zero overhead when false</li>
+        <li>• 8-field WAL fact: factId, nano, poolId, siteOrd, clsName, format, success, isReverted</li>
+        <li>• Redux compensating facts: revert / revertSite / revertPool</li>
+        <li>• Kotlin bridge via reflection only — zero compile-time javatools→Kotlin dependency</li>
+      </ul>
+    </div>
+  </div>
+
+  <p class="footer">XVM · Type Production System · javatools/asm/constants + runtime · lib_cursor observability bridge</p>
+</div>
+</body>
+</html>

@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MutableSeries Variants · O-Notation · CoW · WireProto</title>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'JetBrains Mono', monospace; background: #020617; min-height: 100vh; padding: 2rem; color: white; }
+    .container { max-width: 1300px; margin: 0 auto; }
+    .header { margin-bottom: 2rem; }
+    .header-row { display: flex; align-items: center; gap: 1rem; margin-bottom: 0.5rem; }
+    .pulse-dot { width: 12px; height: 12px; background: #a78bfa; border-radius: 50%; animation: pulse 2s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+    h1 { font-size: 1.5rem; font-weight: 700; letter-spacing: -0.025em; }
+    .subtitle { color: #94a3b8; font-size: 0.875rem; margin-left: 1.75rem; }
+    .diagram-container { background: rgba(15,23,42,0.5); border-radius: 1rem; border: 1px solid #1e293b; padding: 1.5rem; overflow-x: auto; }
+    svg { width: 100%; min-width: 1200px; display: block; }
+    .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; margin-top: 2rem; }
+    .card { background: rgba(15,23,42,0.5); border-radius: 0.75rem; border: 1px solid #1e293b; padding: 1.25rem; }
+    .card-header { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem; }
+    .card-dot { width: 8px; height: 8px; border-radius: 50%; }
+    .card-dot.violet  { background: #a78bfa; }
+    .card-dot.orange  { background: #fb923c; }
+    .card-dot.emerald { background: #34d399; }
+    .card-dot.cyan    { background: #22d3ee; }
+    .card-dot.rose    { background: #fb7185; }
+    .card h3 { font-size: 0.875rem; font-weight: 600; }
+    .card ul { list-style: none; color: #94a3b8; font-size: 0.75rem; }
+    .card li { margin-bottom: 0.375rem; }
+    .footer { text-align: center; margin-top: 1.5rem; color: #475569; font-size: 0.75rem; }
+  </style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <div class="header-row">
+      <div class="pulse-dot"></div>
+      <h1>MutableSeries Variants · O-Notation · CoW · WireProto · Delegates</h1>
+    </div>
+    <p class="subtitle">Interface hierarchy → concrete implementations → application-level composites in lib_cursor</p>
+  </div>
+
+  <div class="diagram-container">
+    <svg viewBox="0 0 1240 780">
+      <defs>
+        <marker id="a"   markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0,10 3.5,0 7" fill="#64748b"/></marker>
+        <marker id="av"  markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0,10 3.5,0 7" fill="#a78bfa"/></marker>
+        <marker id="ao"  markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0,10 3.5,0 7" fill="#fb923c"/></marker>
+        <marker id="ag"  markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0,10 3.5,0 7" fill="#34d399"/></marker>
+        <marker id="ac"  markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0,10 3.5,0 7" fill="#22d3ee"/></marker>
+        <marker id="ar"  markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0,10 3.5,0 7" fill="#fb7185"/></marker>
+        <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+          <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#1e293b" stroke-width="0.5"/>
+        </pattern>
+      </defs>
+      <rect width="100%" height="100%" fill="url(#grid)"/>
+
+      <!-- ═══════════════════════════════════════════════════════════════════
+           ARROWS
+           ═══════════════════════════════════════════════════════════════════ -->
+
+      <!-- Interface → implementations (implements) -->
+      <line x1="265" y1="75"  x2="380" y2="75"  stroke="#a78bfa" stroke-width="1" stroke-dasharray="4,2" marker-end="url(#av)"/>
+      <line x1="265" y1="100" x2="380" y2="102" stroke="#a78bfa" stroke-width="1" stroke-dasharray="4,2" marker-end="url(#av)"/>
+      <line x1="265" y1="125" x2="380" y2="130" stroke="#a78bfa" stroke-width="1" stroke-dasharray="4,2" marker-end="url(#av)"/>
+
+      <!-- CowSeriesHandle → COWSeriesBody (has-a) -->
+      <line x1="400" y1="158" x2="400" y2="195" stroke="#34d399" stroke-width="1.5" marker-end="url(#ag)"/>
+
+      <!-- JournalSeries → CowSeriesHandle (wraps) -->
+      <line x1="738" y1="130" x2="648" y2="130" stroke="#fb7185" stroke-width="1" stroke-dasharray="3,2" marker-end="url(#ar)"/>
+
+      <!-- ReduxMutableSeries → MutableSeries (wraps) -->
+      <line x1="738" y1="210" x2="648" y2="210" stroke="#fb7185" stroke-width="1" stroke-dasharray="3,2" marker-end="url(#ar)"/>
+
+      <!-- EventSeries / BatchingSeries / WireSeries composite arrows -->
+      <line x1="738" y1="398" x2="738" y2="355" stroke="#22d3ee" stroke-width="1" stroke-dasharray="3,2" marker-end="url(#ac)"/>
+
+      <!-- WireSeries → ByteBuffer encoding -->
+      <line x1="738" y1="398" x2="738" y2="445" stroke="#22d3ee" stroke-width="1.5" marker-end="url(#ac)"/>
+
+      <!-- ═══════════════════════════════════════════════════════════════════
+           INTERFACE  (top)
+           ═══════════════════════════════════════════════════════════════════ -->
+      <rect x="30" y="38" width="470" height="100" rx="8"
+            fill="rgba(76,29,149,0.12)" stroke="#a78bfa" stroke-width="1" stroke-dasharray="6,3"/>
+      <text x="40" y="52" fill="#a78bfa" font-size="9" font-weight="600">INTERFACE</text>
+
+      <rect x="50" y="55" width="215" height="75" rx="6" fill="#0f172a"/>
+      <rect x="50" y="55" width="215" height="75" rx="6" fill="rgba(76,29,149,0.4)" stroke="#a78bfa" stroke-width="2"/>
+      <text x="157" y="72"  fill="white"   font-size="10" font-weight="700" text-anchor="middle">MutableSeries&lt;T&gt;</text>
+      <text x="157" y="86"  fill="#a78bfa" font-size="8"  text-anchor="middle">extends Series&lt;T&gt;</text>
+      <text x="157" y="98"  fill="#94a3b8" font-size="7"  text-anchor="middle">(= Join&lt;Int, (Int)→T&gt;)</text>
+      <text x="59"  y="114" fill="#94a3b8" font-size="7">set(i,T)  add(T)  add(i,T)  removeAt</text>
+      <text x="59"  y="124" fill="#94a3b8" font-size="7">remove(T)  clear()  plus/minus/+=/-=</text>
+
+      <!-- ═══════════════════════════════════════════════════════════════════
+           CONCRETE IMPLEMENTATIONS  (middle-left)
+           ═══════════════════════════════════════════════════════════════════ -->
+
+      <!-- CowSeriesHandle -->
+      <rect x="382" y="48"  width="254" height="110" rx="6" fill="#0f172a"/>
+      <rect x="382" y="48"  width="254" height="110" rx="6" fill="rgba(6,78,59,0.4)" stroke="#34d399" stroke-width="2"/>
+      <text x="509" y="66"  fill="white"   font-size="10" font-weight="700" text-anchor="middle">CowSeriesHandle&lt;T&gt;</text>
+      <text x="509" y="80"  fill="#34d399" font-size="8"  text-anchor="middle">Copy-on-Write · envelope + letter</text>
+      <text x="391" y="93"  fill="#94a3b8" font-size="7">Delegates.observable on letter swap</text>
+      <text x="391" y="105" fill="#94a3b8" font-size="7">observer: (Twin&lt;Series&lt;T&gt;&gt;)→Unit</text>
+      <text x="391" y="117" fill="#94a3b8" font-size="7">versionObserver: (Twin&lt;Long&gt;)→Unit</text>
+      <text x="391" y="129" fill="#34d399" font-size="7">subscribe(f) → ()→Unit (cancelable)</text>
+      <text x="391" y="141" fill="#94a3b8" font-size="7">O(1) read · O(n) write (arraycopy)</text>
+
+      <!-- COWSeriesBody -->
+      <rect x="382" y="197" width="254" height="100" rx="6" fill="#0f172a"/>
+      <rect x="382" y="197" width="254" height="100" rx="6" fill="rgba(6,78,59,0.3)" stroke="#34d399" stroke-width="1"/>
+      <text x="509" y="215" fill="white"   font-size="9"  font-weight="700" text-anchor="middle">COWSeriesBody&lt;T&gt;</text>
+      <text x="509" y="229" fill="#34d399" font-size="8"  text-anchor="middle">immutable letter · VersionedSeries</text>
+      <text x="391" y="242" fill="#94a3b8" font-size="7">backing: Series&lt;T&gt; · version: Long?</text>
+      <text x="391" y="253" fill="#94a3b8" font-size="7">set/append/insert/removeAt → copy()</text>
+      <text x="391" y="264" fill="#94a3b8" font-size="7">copy() incs version · new COWSeriesBody</text>
+      <text x="391" y="275" fill="#94a3b8" font-size="7">cow = Series&lt;T&gt;.cow extension prop</text>
+      <text x="391" y="286" fill="#94a3b8" font-size="7">materialize() = generic factory</text>
+
+      <!-- RingSeries -->
+      <rect x="382" y="310" width="254" height="122" rx="6" fill="#0f172a"/>
+      <rect x="382" y="310" width="254" height="122" rx="6" fill="rgba(251,146,60,0.4)" stroke="#fb923c" stroke-width="2"/>
+      <text x="509" y="328" fill="white"   font-size="10" font-weight="700" text-anchor="middle">RingSeries&lt;T&gt;</text>
+      <text x="509" y="342" fill="#fb923c" font-size="8"  text-anchor="middle">power-of-2 capacity · mask indexing</text>
+      <text x="391" y="355" fill="#94a3b8" font-size="7">EvictionListener&lt;T&gt;? on evict</text>
+      <text x="391" y="367" fill="#94a3b8" font-size="7">O(1) put · O(1) get · O(1) set</text>
+      <text x="391" y="379" fill="#94a3b8" font-size="7">O(1) removeAt · O(n) contains</text>
+      <text x="391" y="391" fill="#94a3b8" font-size="7">full → overwrite oldest + evict cb</text>
+      <text x="391" y="403" fill="#94a3b8" font-size="7">head incremented on overflow</text>
+      <text x="391" y="415" fill="#fb923c" font-size="7">only MutableSeries surviving &gt;1K evt/s</text>
+      <text x="391" y="427" fill="#94a3b8" font-size="7">shims: head/tail/epoch (zero-GC)</text>
+
+      <!-- ChunkedMutableSeries -->
+      <rect x="382" y="445" width="254" height="122" rx="6" fill="#0f172a"/>
+      <rect x="382" y="445" width="254" height="122" rx="6" fill="rgba(251,146,60,0.3)" stroke="#fb923c" stroke-width="1.5"/>
+      <text x="509" y="463" fill="white"   font-size="10" font-weight="700" text-anchor="middle">ChunkedMutableSeries&lt;T&gt;</text>
+      <text x="509" y="477" fill="#fb923c" font-size="8"  text-anchor="middle">tree of fixed-size chunks (4096)</text>
+      <text x="391" y="490" fill="#94a3b8" font-size="7">chunks: Series&lt;Series&lt;T&gt;&gt;</text>
+      <text x="391" y="502" fill="#94a3b8" font-size="7">O(1) amortized append · no copy</text>
+      <text x="391" y="514" fill="#94a3b8" font-size="7">O(log n) get (stairs-indexed)</text>
+      <text x="391" y="526" fill="#94a3b8" font-size="7">O(n) set/removeAt: copy chunk only</text>
+      <text x="391" y="538" fill="#94a3b8" font-size="7">last chunk ← fill until full → new</text>
+      <text x="391" y="550" fill="#94a3b8" font-size="7">avoids O(n) copy of Cow/Recursive</text>
+      <text x="391" y="562" fill="#fb923c" font-size="7">front-line: event buffering</text>
+
+      <!-- ═══════════════════════════════════════════════════════════════════
+           COMPOSITE WRAPPERS  (middle-right)
+           ═══════════════════════════════════════════════════════════════════ -->
+
+      <rect x="680" y="38"  width="280" height="355" rx="8"
+            fill="rgba(136,19,55,0.12)" stroke="#fb7185" stroke-width="1" stroke-dasharray="4,3"/>
+      <text x="690" y="52" fill="#fb7185" font-size="9" font-weight="600">COMPOSITE WRAPPERS</text>
+
+      <!-- JournalSeries -->
+      <rect x="690" y="58"  width="260" height="118" rx="6" fill="#0f172a"/>
+      <rect x="690" y="58"  width="260" height="118" rx="6" fill="rgba(136,19,55,0.4)" stroke="#fb7185" stroke-width="1.5"/>
+      <text x="820" y="76"  fill="white"   font-size="10" font-weight="700" text-anchor="middle">JournalSeries&lt;T&gt;</text>
+      <text x="820" y="90"  fill="#fb7185" font-size="8"  text-anchor="middle">wraps CowSeriesHandle · delta journal</text>
+      <text x="699" y="103" fill="#94a3b8" font-size="7">Delta: Set(idx,old,new) | Add(i,item)</text>
+      <text x="699" y="115" fill="#94a3b8" font-size="7">       | Remove(idx,old)</text>
+      <text x="699" y="127" fill="#94a3b8" font-size="7">commit() → clear journal (irreversible)</text>
+      <text x="699" y="139" fill="#94a3b8" font-size="7">rollback() → replay in reverse</text>
+      <text x="699" y="151" fill="#94a3b8" font-size="7">pendingCount / hasPending</text>
+      <text x="699" y="163" fill="#fb7185" font-size="7">backing mutated immediately</text>
+      <text x="699" y="175" fill="#94a3b8" font-size="7">journal provides undo capability</text>
+
+      <!-- ReduxMutableSeries -->
+      <rect x="690" y="185" width="260" height="118" rx="6" fill="#0f172a"/>
+      <rect x="690" y="185" width="260" height="118" rx="6" fill="rgba(136,19,55,0.4)" stroke="#fb7185" stroke-width="1.5"/>
+      <text x="820" y="203" fill="white"   font-size="10" font-weight="700" text-anchor="middle">ReduxMutableSeries&lt;A,S&gt;</text>
+      <text x="820" y="217" fill="#fb7185" font-size="8"  text-anchor="middle">eventJournal + Reducer + capture</text>
+      <text x="699" y="230" fill="#94a3b8" font-size="7">MutableSeries&lt;A&gt; by eventJournal</text>
+      <text x="699" y="242" fill="#94a3b8" font-size="7">Reducer&lt;A,S&gt;: combine(acc,ele)→acc</text>
+      <text x="699" y="254" fill="#94a3b8" font-size="7">reify() → lazy fold new events</text>
+      <text x="699" y="266" fill="#94a3b8" font-size="7">state: S = reified materialized view</text>
+      <text x="699" y="278" fill="#94a3b8" font-size="7">dispatch(action) = eventJournal.add</text>
+      <text x="699" y="290" fill="#94a3b8" font-size="7">capture A = schema row (RowVec)</text>
+      <text x="699" y="302" fill="#fb7185" font-size="7">of(delegate) → CollectorReducer&lt;T&gt;</text>
+
+      <!-- ═══════════════════════════════════════════════════════════════════
+           APPLICATION COMPOSITES  (bottom)
+           ═══════════════════════════════════════════════════════════════════ -->
+
+      <rect x="30" y="588" width="1180" height="185" rx="8"
+            fill="rgba(8,51,68,0.12)" stroke="#22d3ee" stroke-width="1" stroke-dasharray="5,3"/>
+      <text x="40" y="602" fill="#22d3ee" font-size="9" font-weight="600">APPLICATION COMPOSITES  (lib_cursor/src/main/kotlin/org/xvm/cursor/PointcutWireSpine.kt)</text>
+
+      <!-- EventSeries -->
+      <rect x="50"  y="613" width="260" height="118" rx="6" fill="#0f172a"/>
+      <rect x="50"  y="613" width="260" height="118" rx="6" fill="rgba(8,51,68,0.4)" stroke="#22d3ee" stroke-width="1.5"/>
+      <text x="180" y="631" fill="white"   font-size="10" font-weight="700" text-anchor="middle">EventSeries&lt;T&gt;</text>
+      <text x="180" y="645" fill="#22d3ee" font-size="8"  text-anchor="middle">Delegates.observable + listeners</text>
+      <text x="59"  y="660" fill="#94a3b8" font-size="7">var series: Series&lt;T&gt; by</text>
+      <text x="59"  y="672" fill="#94a3b8" font-size="7">  Delegates.observable(initial)</text>
+      <text x="59"  y="684" fill="#94a3b8" font-size="7">  { _, _, next →</text>
+      <text x="59"  y="696" fill="#94a3b8" font-size="7">    listeners.forEach { it(sig) }</text>
+      <text x="59"  y="708" fill="#94a3b8" font-size="7">  }</text>
+      <text x="59"  y="720" fill="#94a3b8" font-size="7">subscribe(listener) → attach</text>
+      <text x="59"  y="732" fill="#22d3ee" font-size="7">signature = JoinRef(series, meta)</text>
+
+      <!-- BatchingSeries -->
+      <rect x="330" y="613" width="260" height="118" rx="6" fill="#0f172a"/>
+      <rect x="330" y="613" width="260" height="118" rx="6" fill="rgba(8,51,68,0.4)" stroke="#22d3ee" stroke-width="1.5"/>
+      <text x="460" y="631" fill="white"   font-size="10" font-weight="700" text-anchor="middle">BatchingSeries&lt;T&gt;</text>
+      <text x="460" y="645" fill="#22d3ee" font-size="8"  text-anchor="middle">Chunked + Ring + Redux + Wire</text>
+      <text x="339" y="660" fill="#94a3b8" font-size="7">signatures: ChunkedMutableSeries</text>
+      <text x="339" y="672" fill="#94a3b8" font-size="7">deliveries: ChunkedMutableSeries</text>
+      <text x="339" y="684" fill="#94a3b8" font-size="7">evicted: ChunkedMutableSeries</text>
+      <text x="339" y="696" fill="#94a3b8" font-size="7">hot: RingSeries(capacity, evict)</text>
+      <text x="339" y="708" fill="#94a3b8" font-size="7">journal: ReduxMutableSeries</text>
+      <text x="339" y="720" fill="#94a3b8" font-size="7">wireSeries: WireSeries&lt;String&gt;</text>
+      <text x="339" y="732" fill="#22d3ee" font-size="7">accept(signature) → all sinks</text>
+
+      <!-- WireSeries -->
+      <rect x="610" y="613" width="260" height="118" rx="6" fill="#0f172a"/>
+      <rect x="610" y="613" width="260" height="118" rx="6" fill="rgba(8,51,68,0.4)" stroke="#22d3ee" stroke-width="1.5"/>
+      <text x="740" y="631" fill="white"   font-size="10" font-weight="700" text-anchor="middle">WireSeries&lt;T&gt;</text>
+      <text x="740" y="645" fill="#22d3ee" font-size="8"  text-anchor="middle">CodecPlatform&lt;T&gt; + ByteBuffer</text>
+      <text x="619" y="660" fill="#94a3b8" font-size="7">encodeRecord: ByteBuffer, signature</text>
+      <text x="619" y="672" fill="#94a3b8" font-size="7">decodeRecord: ByteBuffer → Join&lt;Series,Col&gt;</text>
+      <text x="619" y="684" fill="#94a3b8" font-size="7">singleWireproto: 4B count + 4B len + data</text>
+      <text x="619" y="696" fill="#94a3b8" font-size="7">drain: N records → packed ByteArray</text>
+      <text x="619" y="708" fill="#94a3b8" font-size="7">decode: ByteArray → Series&lt;Join&lt;..&gt;&gt;</text>
+      <text x="619" y="720" fill="#94a3b8" font-size="7">StringCodecPlatform: UTF-8 intern</text>
+      <text x="619" y="732" fill="#22d3ee" font-size="7">WireSeries.strings() factory</text>
+
+      <!-- BatchMutableSeries -->
+      <rect x="890" y="640" width="250" height="90" rx="6" fill="#0f172a"/>
+      <rect x="890" y="640" width="250" height="90" rx="6" fill="rgba(8,51,68,0.3)" stroke="#22d3ee" stroke-width="1"/>
+      <text x="1015" y="658" fill="white"   font-size="9"  font-weight="700" text-anchor="middle">BatchMutableSeries&lt;T&gt;</text>
+      <text x="1015" y="672" fill="#22d3ee" font-size="7"  text-anchor="middle">wraps BatchingSeries(256)</text>
+      <text x="899"  y="688" fill="#94a3b8" font-size="7">attach(EventSeries) → subscribe</text>
+      <text x="899"  y="700" fill="#94a3b8" font-size="7">deliveries() / cursor() / drain()</text>
+      <text x="899"  y="712" fill="#94a3b8" font-size="7">singleWireproto(signature) → bytes</text>
+      <text x="899"  y="724" fill="#22d3ee" font-size="7">Join&lt;Int,(Int)→Join&lt;Series,Col&gt;&gt;</text>
+
+      <!-- ═══════════════════════════════════════════════════════════════════
+           O-NOTATION TABLE  (right column)
+           ═══════════════════════════════════════════════════════════════════ -->
+      <rect x="1000" y="38"  width="210" height="355" rx="6" fill="#0f172a"/>
+      <rect x="1000" y="38"  width="210" height="355" rx="6" fill="rgba(30,41,59,0.5)" stroke="#94a3b8" stroke-width="1.5"/>
+      <text x="1105" y="56"  fill="white"   font-size="9"  font-weight="700" text-anchor="middle">O-Notation</text>
+      <text x="1010" y="72"  fill="#94a3b8" font-size="7" font-weight="600">CowSeriesHandle</text>
+      <text x="1010" y="85"  fill="#64748b" font-size="7">get: O(1)  aaload</text>
+      <text x="1010" y="97"  fill="#64748b" font-size="7">set: O(n)  copyOf</text>
+      <text x="1010" y="109" fill="#64748b" font-size="7">add: O(n)  arraycopy</text>
+      <text x="1010" y="121" fill="#64748b" font-size="7">remove: O(n)  shift</text>
+      <text x="1010" y="137" fill="#94a3b8" font-size="7" font-weight="600">RingSeries</text>
+      <text x="1010" y="150" fill="#64748b" font-size="7">get: O(1)  mask</text>
+      <text x="1010" y="162" fill="#64748b" font-size="7">set: O(1)  mask</text>
+      <text x="1010" y="174" fill="#64748b" font-size="7">add: O(1)  mask</text>
+      <text x="1010" y="186" fill="#64748b" font-size="7">removeAt: O(n)  shift</text>
+      <text x="1010" y="202" fill="#94a3b8" font-size="7" font-weight="600">ChunkedMutableSeries</text>
+      <text x="1010" y="215" fill="#64748b" font-size="7">get: O(log n)  stairs</text>
+      <text x="1010" y="227" fill="#64748b" font-size="7">add: O(1)  amortized</text>
+      <text x="1010" y="239" fill="#64748b" font-size="7">set: O(n)  copy chunk</text>
+      <text x="1010" y="251" fill="#64748b" font-size="7">removeAt: O(n)  copy chunk</text>
+      <text x="1010" y="267" fill="#94a3b8" font-size="7" font-weight="600">JournalSeries</text>
+      <text x="1010" y="280" fill="#64748b" font-size="7">same as Cow + journal</text>
+      <text x="1010" y="292" fill="#64748b" font-size="7">commit: O(1)  clear</text>
+      <text x="1010" y="304" fill="#64748b" font-size="7">rollback: O(m)  undo</text>
+      <text x="1010" y="320" fill="#94a3b8" font-size="7" font-weight="600">ReduxMutableSeries</text>
+      <text x="1010" y="333" fill="#64748b" font-size="7">dispatch: O(1)  add</text>
+      <text x="1010" y="345" fill="#64748b" font-size="7">reify: O(n-m)  fold</text>
+
+      <!-- ═══════════════════════════════════════════════════════════════════
+           LEGEND
+           ═══════════════════════════════════════════════════════════════════ -->
+      <text x="38"  y="750" fill="white"  font-size="9" font-weight="600">Legend</text>
+      <rect  x="38"  y="757" width="14" height="9" rx="2" fill="rgba(76,29,149,0.4)"  stroke="#a78bfa" stroke-width="1"/>
+      <text  x="58"  y="765" fill="#94a3b8" font-size="8">Interface</text>
+      <rect  x="140" y="757" width="14" height="9" rx="2" fill="rgba(6,78,59,0.4)"    stroke="#34d399" stroke-width="1"/>
+      <text  x="160" y="765" fill="#94a3b8" font-size="8">CoW / Observable</text>
+      <rect  x="300" y="757" width="14" height="9" rx="2" fill="rgba(251,146,60,0.4)" stroke="#fb923c" stroke-width="1"/>
+      <text  x="320" y="765" fill="#94a3b8" font-size="8">Ring / Chunk (firehose)</text>
+      <rect  x="500" y="757" width="14" height="9" rx="2" fill="rgba(136,19,55,0.4)"  stroke="#fb7185" stroke-width="1"/>
+      <text  x="520" y="765" fill="#94a3b8" font-size="8">Journal / Redux</text>
+      <rect  x="660" y="757" width="14" height="9" rx="2" fill="rgba(8,51,68,0.4)"    stroke="#22d3ee" stroke-width="1"/>
+      <text  x="680" y="765" fill="#94a3b8" font-size="8">Application composite</text>
+      <line  x1="830" y1="761" x2="850" y2="761" stroke="#a78bfa" stroke-width="1" stroke-dasharray="3,2"/>
+      <text  x="855" y="765" fill="#94a3b8" font-size="8">implements</text>
+      <line  x1="950" y1="761" x2="970" y2="761" stroke="#fb7185" stroke-width="1" stroke-dasharray="3,2"/>
+      <text  x="975" y="765" fill="#94a3b8" font-size="8">wraps</text>
+    </svg>
+  </div>
+
+  <div class="cards">
+    <div class="card">
+      <div class="card-header"><div class="card-dot emerald"></div><h3>CoW + Observable Delegates</h3></div>
+      <ul>
+        <li>• CowSeriesHandle uses Delegates.observable on letter swap</li>
+        <li>• observer fires old j new (Twin&lt;Series&lt;T&gt;&gt;) on every mutation</li>
+        <li>• versionObserver fires Twin&lt;Long&gt; version transitions</li>
+        <li>• subscribe(f) returns cancelable ()→Unit</li>
+        <li>• COWSeriesBody is immutable — mutation returns a new body</li>
+        <li>• version: Long? incs on every copy — object identity fallback</li>
+      </ul>
+    </div>
+    <div class="card">
+      <div class="card-header"><div class="card-dot orange"></div><h3>Ring &amp; Chunk (Firehose)</h3></div>
+      <ul>
+        <li>• RingSeries: power-of-2, mask indexing, O(1) all ops</li>
+        <li>• EvictionListener callback on overflow — feeds evicted sink</li>
+        <li>• ChunkedMutableSeries: 4096-elem chunks, stairs-indexed</li>
+        <li>• O(1) amortized append — no copy until chunk is full</li>
+        <li>• set/removeAt copy only the target chunk, not the whole series</li>
+        <li>• Chunked = front-line event buffer; Ring = hot sink</li>
+      </ul>
+    </div>
+    <div class="card">
+      <div class="card-header"><div class="card-dot cyan"></div><h3>Wire Proto + Application Composites</h3></div>
+      <ul>
+        <li>• WireSeries&lt;T&gt;: CodecPlatform + ByteBuffer codec</li>
+        <li>• singleWireproto: 4B count + 4B len + record bytes</li>
+        <li>• drain: packed N-record ByteArray with count header</li>
+        <li>• EventSeries: Delegates.observable on Series&lt;T&gt; → notifies listeners on change</li>
+        <li>• BatchingSeries: orchestrates Chunked + Ring + Redux + WireSeries</li>
+        <li>• BatchMutableSeries: Join&lt;Int,(Int)→Join&lt;Series,Col&gt;&gt; facade</li>
+      </ul>
+    </div>
+  </div>
+
+  <p class="footer">TrikeShed · CowSeriesHandle · RingSeries · ChunkedMutableSeries · JournalSeries · ReduxMutableSeries · WireSeries · EventSeries</p>
+</div>
+</body>
+</html>
