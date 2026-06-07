@@ -8,4 +8,4 @@ pluginManagement {
 
 rootProject.name = "TrikeShed"
 
-// libs/ removed — no subproject auto-inclusion
+include(":libs:motion-estimation")
