@@ -73,6 +73,15 @@ kotlin {
 
             // Local DuckDB JVM sources unavailable (libs/ removed)
         }
+
+        tasks.withType<JavaCompile>().configureEach {
+            options.compilerArgs.addAll(
+                listOf(
+                    "--add-exports=java.base/jdk.internal.classfile=ALL-UNNAMED",
+                    "--add-exports=java.base/jdk.internal.classfile.constantpool=ALL-UNNAMED"
+                )
+            )
+        }
         val jvmTest by getting {
             dependencies {
                 implementation(kotlin("test-junit"))
