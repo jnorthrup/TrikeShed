@@ -105,13 +105,13 @@ actual object Files {
             val dp = opendir(path) ?: return@memScoped emptyList<String>()
             try {
                 val result = mutableListOf<String>()
-                val buf = alloc<dirent>()
-                var entry = allocPointerTo<dirent>()
+
+
                 while (true) {
-                    val err = readdir_r(dp, buf.ptr, entry.ptr)
-                    if (err != 0) break
-                    val ent = entry.value
-                    if (ent == null) break
+                    val ent = readdir(dp) ?: break
+
+
+
                     val name = ent.pointed.d_name.toKString()
                     if (name != "." && name != "..") result.add(name)
                 }
@@ -136,11 +136,34 @@ actual object Files {
         mkdir(path, 0x1FFu.toUShort())
     }
 
-    actual fun deleteRecursively(path: String): Unit = TODO("deleteRecursively POSIX")
+    actual fun deleteRecursively(path: String): Unit = memScoped {
+        val st = alloc<stat>()
+        if (stat(path, st.ptr) != 0) return // Does not exist
+        if ((st.st_mode.toInt() and S_IFMT) == S_IFDIR) {
+            val dp = opendir(path) ?: return
+            try {
+
+
+                while (true) {
+                    val ent = readdir(dp) ?: break
+
+                    val name = ent.pointed.d_name.toKString()
+                    if (name != "." && name != "..") {
+                        deleteRecursively("$path/$name")
+                    }
+                }
+            } finally {
+                closedir(dp)
+            }
+            rmdir(path)
+        } else {
+            remove(path)
+        }
+    }
 
     actual fun resolvePath(vararg parts: String): String = parts.joinToString("/")
 
-    actual fun readZip(path: String): List<Pair<String, ByteArray>> = TODO("readZip POSIX")
+    actual fun readZip(path: String): List<Pair<String, ByteArray>> = throw UnsupportedOperationException("readZip unsupported")
 
     actual fun createTempDir(prefix: String): String =
         "/tmp/$prefix-${generateSequence { ('a'..'z').random() }.take(8).joinToString("")}"
