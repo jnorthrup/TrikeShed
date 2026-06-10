@@ -70,9 +70,9 @@ class PosixFileOperations : FileOperations {
         val dp = opendir(path) ?: return@memScoped emptyList()
         try {
             val result = mutableListOf<String>()
-            val buf = alloc<dirent>()
-            val entry = allocPointerTo<dirent>()
-            while (true) { if (readdir_r(dp, buf.ptr, entry.ptr) != 0) break; entry.value?.let { result.add(it.pointed.d_name.toKString()) } ?: break }
+
+
+            while (true) { val ent = readdir(dp) ?: break; result.add(ent.pointed.d_name.toKString()) }
             result.filter { it != "." && it != ".." }
         } finally { closedir(dp) }
     }
@@ -86,9 +86,32 @@ class PosixFileOperations : FileOperations {
     }
 
     override fun mkdirs(path: String) { mkdir(path, 0x1FFu.toUShort()) }
-    override fun deleteRecursively(path: String): Unit = TODO("deleteRecursively POSIX")
+    override fun deleteRecursively(path: String): Unit = memScoped {
+        val st = alloc<stat>()
+        if (stat(path, st.ptr) != 0) return // Does not exist
+        if ((st.st_mode.toInt() and S_IFMT) == S_IFDIR) {
+            val dp = opendir(path) ?: return
+            try {
+
+
+                while (true) {
+                    val ent = readdir(dp) ?: break
+
+                    val name = ent.pointed.d_name.toKString()
+                    if (name != "." && name != "..") {
+                        deleteRecursively("$path/$name")
+                    }
+                }
+            } finally {
+                closedir(dp)
+            }
+            rmdir(path)
+        } else {
+            remove(path)
+        }
+    }
     override fun resolvePath(vararg parts: String): String = parts.joinToString("/")
-    override fun readZip(path: String): List<Pair<String, ByteArray>> = TODO("readZip POSIX")
+    override fun readZip(path: String): List<Pair<String, ByteArray>> = throw UnsupportedOperationException("readZip unsupported")
     override fun open(path: String, readOnly: Boolean): Int {
         val flags = if (readOnly) O_RDONLY else (O_RDWR or O_CREAT)
         return platform.posix.open(path, flags,  644.fromOctal())

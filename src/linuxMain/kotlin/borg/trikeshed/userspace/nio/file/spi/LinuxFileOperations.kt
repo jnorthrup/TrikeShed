@@ -89,11 +89,11 @@ class LinuxFileOperations : FileOperations {
         val dp = opendir(path) ?: return@memScoped emptyList()
         try {
             val result = mutableListOf<String>()
-            val buf = alloc<dirent>()
-            val entry = allocPointerTo<dirent>()
+
+
             while (true) {
-                if (readdir_r(dp, buf.ptr, entry.ptr) != 0) break
-                entry.value?.let { result.add(it.pointed.d_name.toKString()) } ?: break
+                val ent = readdir(dp) ?: break
+                result.add(ent.pointed.d_name.toKString())
             }
             result.filter { it != "." && it != ".." }
         } finally {
@@ -112,9 +112,34 @@ class LinuxFileOperations : FileOperations {
     }
 
     override fun mkdirs(path: String) { mkdir(path, 0x1FFu.toUShort()) }
-    override fun deleteRecursively(path: String) { TODO("deleteRecursively Linux") }
+    override fun deleteRecursively(path: String) {
+        memScoped {
+            val st = alloc<stat>()
+            if (stat(path, st.ptr) != 0) return // Does not exist
+            if ((st.st_mode.toInt() and S_IFMT) == S_IFDIR) {
+                val dp = opendir(path) ?: return
+                try {
+
+
+                    while (true) {
+                        val ent = readdir(dp) ?: break
+
+                        val name = ent.pointed.d_name.toKString()
+                        if (name != "." && name != "..") {
+                            deleteRecursively("$path/$name")
+                        }
+                    }
+                } finally {
+                    closedir(dp)
+                }
+                rmdir(path)
+            } else {
+                remove(path)
+            }
+        }
+    }
     override fun resolvePath(vararg parts: String): String = parts.joinToString("/")
-    override fun readZip(path: String): List<Pair<String, ByteArray>> = TODO("readZip Linux")
+    override fun readZip(path: String): List<Pair<String, ByteArray>> = throw UnsupportedOperationException("readZip unsupported")
     override fun createTempDir(prefix: String): String =
         "/tmp/$prefix-${generateSequence { ('a'..'z').random() }.take(8).joinToString("")}"
 }
