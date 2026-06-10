@@ -1,9 +1,12 @@
 import org.gradle.api.provider.Provider
 import org.gradle.api.tasks.Input
 import org.gradle.process.CommandLineArgumentProvider
+import org.gradle.api.JavaVersion
+import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
-    kotlin("jvm") version "2.3.21"
+    kotlin("jvm")
     id("application")
     id("me.champeau.jmh") version "0.7.2"
     id("java-library")
@@ -17,8 +20,41 @@ repositories {
     mavenCentral()
 }
 
+// JVM Toolchain for consistent JVM target
+java {
+    toolchain {
+        languageVersion.set(JavaLanguageVersion.of(21))
+    }
+}
+
+// Explicitly configure JavaCompile to use JVM 21
+tasks.withType<JavaCompile>().configureEach {
+    options.release.set(21)
+}
+
 // javatools on classpath so KSP resolver can see org.xvm.asm.* types
+java {
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
+}
+
+// Kotlin compiler args for JEP 484 ClassFile API access
+tasks.withType<KotlinCompile>().configureEach {
+    compilerOptions {
+        jvmTarget.set(JvmTarget.JVM_21)
+        freeCompilerArgs.set(listOf(
+            "--add-exports=java.base/jdk.internal.classfile=ALL-UNNAMED",
+            "--add-exports=java.base/jdk.internal.classfile.constantpool=ALL-UNNAMED",
+            "--add-exports=java.base/jdk.internal.classfile.attribute=ALL-UNNAMED",
+            "--add-exports=java.base/jdk.internal.classfile.instruction=ALL-UNNAMED"
+        ))
+    }
+}
+
+// javatools on classpath so KSP resolver can see org.xvm.asm.* types
+// Optional: only add if the JAR exists
 val javatoolsJar = layout.projectDirectory.file("../javatools/build/libs/javatools-0.4.4-SNAPSHOT.jar")
+val hasJavatools = javatoolsJar.asFile.exists()
 
 private class PointcutVmXdkLibDirProvider(
     private val xdkLibDir: Provider<String>
@@ -54,7 +90,7 @@ dependencies {
 
 val pointcutVmJavatoolsDir = layout.buildDirectory.dir("pointcut-vm/javatools")
 
-val unpackPointcutVmJavatools by tasks.registering(Sync::class) {
+val unpackPointcutVmJavatools = tasks.register("unpackPointcutVmJavatools", Sync::class) {
     from({ zipTree(javatoolsJar.asFile) })
     into(pointcutVmJavatoolsDir)
 }
@@ -78,28 +114,28 @@ tasks.test {
     classpath = files(pointcutVmJavatoolsDir) + classpath
 }
 
-val runMacro by tasks.registering(JavaExec::class) {
+val runMacro = tasks.register("runMacro", JavaExec::class) {
     val mainSourceSet = project.extensions.getByType<SourceSetContainer>().getByName("main")
     classpath = mainSourceSet.runtimeClasspath
     mainClass.set("org.xvm.cursor.ToSeriesMacroKt")
     if (project.hasProperty("macroArgs")) {
-        args = (project.property("macroArgs") as String).split(" ")
+        args((project.property("macroArgs") as String).split(" "))
     }
 }
 
-val runPointcutCmdline by tasks.registering(JavaExec::class) {
+val runPointcutCmdline = tasks.register("runPointcutCmdline", JavaExec::class) {
     val mainSourceSet = project.extensions.getByType<SourceSetContainer>().getByName("main")
     dependsOn(unpackPointcutVmJavatools, tasks.named("classes"))
     classpath = files(pointcutVmJavatoolsDir) + mainSourceSet.runtimeClasspath
     mainClass.set("org.xvm.cursor.PointcutCmdlineKt")
     if (project.hasProperty("pointcutMode")) {
-        args = (project.property("pointcutMode") as String).split(" ")
+        args((project.property("pointcutMode") as String).split(" "))
     } else {
         args("xvm")
     }
 }
 
-val generateJep483Dump by tasks.registering(JavaExec::class) {
+val generateJep483Dump = tasks.register("generateJep483Dump", JavaExec::class) {
     val mainSourceSet = project.extensions.getByType<SourceSetContainer>().getByName("main")
     dependsOn(unpackPointcutVmJavatools, tasks.named("classes"))
     classpath = files(pointcutVmJavatoolsDir) + mainSourceSet.runtimeClasspath
@@ -119,9 +155,22 @@ application {
     mainClass.set("org.xvm.cursor.BlackboardTimeseriesKt")
 }
 
+// ── JEP 484 Typedef Classfile Scanner ───────────────────────────────────────
+// val runTypedefScan = tasks.register("runTypedefScan", JavaExec::class) {
+//     val mainSourceSet = project.extensions.getByType<SourceSetContainer>().getByName("main")
+//     dependsOn(tasks.named("classes"))
+//     classpath = mainSourceSet.runtimeClasspath
+//     mainClass.set("org.xvm.cursor.TypedefClassfileScannerKt")
+//     if (project.hasProperty("scanPath")) {
+//         args(project.property("scanPath") as String)
+//     } else if (project.hasProperty("scanJar")) {
+//         args("--jar", project.property("scanJar") as String)
+//     }
+// }
+
 // ── JMH opt-out via -Pjmh=false ─────────────────────────────────────────────
-val jmhDisabled = providers.gradleProperty("jmh").orNull == "false"
-if (jmhDisabled) {
-    tasks.matching { it.name.startsWith("jmh") }.configureEach { enabled = false }
-    tasks.named("compileJmhKotlin") { enabled = false }
-}
+// val jmhDisabled = providers.gradleProperty("jmh").orNull == "false"
+// if (jmhDisabled) {
+//     tasks.matching { it.name.startsWith("jmh") }.configureEach { enabled = false }
+//     tasks.named("compileJmhKotlin") { enabled = false }
+// }

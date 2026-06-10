@@ -1,0 +1,30 @@
+name: miniduck-memory
+version: 0.1.0-SNAPSHOT
+description: Miniduck-based memory storage for Hermes/TrikeShed integration
+main: borg.trikeshed.miniduck.memory.MiniduckMemoryModule
+
+dependencies:
+  - miniduck
+  - lib_cursor
+  - kurative
+
+targets:
+  - jvm
+  - js
+  - wasmJs
+  - linuxX64
+  - macosArm64
+
+exports:
+  - MiniduckMemoryStore
+  - MiniduckMemoryOps
+  - MiniduckMemoryModule
+  - MemoryEntry
+  - JvmBlockStores
+  - FileBlockStore
+
+tags:
+  - memory
+  - miniduck
+  - trikeshed
+  - hermes

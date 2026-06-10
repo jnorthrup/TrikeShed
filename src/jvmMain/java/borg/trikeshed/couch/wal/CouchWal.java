@@ -77,12 +77,8 @@ public class CouchWal {
                 paths.filter(Files::isRegularFile)
                      .filter(p -> p.toString().endsWith(".class"))
                      .forEach(p -> {
-                         try {
-                             String id = classesDir.relativize(p).toString();
-                             adapter.parseAndRegister(p, id);
-                         } catch (IOException e) {
-                             System.err.println("Failed to parse " + p + ": " + e.getMessage());
-                         }
+                         String id = classesDir.relativize(p).toString();
+                         adapter.parseAndRegister(p, id);
                      });
             }
         }
