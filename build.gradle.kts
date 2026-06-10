@@ -2,7 +2,7 @@
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 
 plugins {
-    kotlin("multiplatform") version "2.4.0-RC2"
+    kotlin("multiplatform") version "2.4.0"
     id("com.github.ben-manes.versions") version "0.54.0"
     `maven-publish`
 }
@@ -34,6 +34,12 @@ kotlin {
             "-Xexpect-actual-classes",
             // Kotlin 2.4 blocks user code in kotlin.* package — allow our non-JVM JvmInline stubs
             "-Xallow-kotlin-package",
+            // JEP 484 ClassFile API (jdk.internal.classfile)
+            "--add-exports=java.base/jdk.internal.classfile=ALL-UNNAMED",
+            "--add-exports=java.base/jdk.internal.classfile.attribute=ALL-UNNAMED",
+            "--add-exports=java.base/jdk.internal.classfile.constantpool=ALL-UNNAMED",
+            "--add-exports=java.base/jdk.internal.classfile.instruction=ALL-UNNAMED",
+            "--add-exports=java.base/jdk.internal.classfile.models=ALL-UNNAMED",
         )
     }
 
@@ -62,6 +68,9 @@ kotlin {
                 implementation("org.openjdk.jmh:jmh-generator-annprocess:1.37")
 
                 implementation("org.bouncycastle:bcprov-jdk15on:1.70")
+
+                // GraalJS polyglot for JS eval (Bun alternate core)
+                implementation("org.graalvm.polyglot:js:24.1.1")
 
                 // Depend on userspace/context implementations via classpath (no libs/ subprojects)
             }

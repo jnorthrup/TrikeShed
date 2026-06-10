@@ -1,0 +1,119 @@
+openapi: 3.1.0
+info:
+  title: GWT RequestFactory Transport
+  version: latest
+  description: RequestFactory servlet contract centered on /gwtRequest.
+servers:
+  - url: https://www.gwtproject.org
+paths:
+  /gwtRequest:
+    post:
+      operationId: invokeRequestFactory
+      summary: Invoke a RequestFactory context method
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RequestFactoryCall'
+      responses:
+        '200':
+          description: Successful invocation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RequestFactoryResponse'
+        '400':
+          description: Malformed request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Constraint violation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConstraintViolationResponse'
+components:
+  schemas:
+    RequestFactoryCall:
+      type: object
+      required: [context, method, arguments]
+      properties:
+        context:
+          type: string
+        method:
+          type: string
+        arguments:
+          type: array
+          items:
+            $ref: '#/components/schemas/TransportValue'
+    RequestFactoryResponse:
+      type: object
+      required: [success]
+      properties:
+        success:
+          type: boolean
+        value:
+          $ref: '#/components/schemas/TransportValue'
+        updatedEntities:
+          type: array
+          items:
+            $ref: '#/components/schemas/EntityDelta'
+        validationErrors:
+          type: array
+          items:
+            $ref: '#/components/schemas/ConstraintViolation'
+    EntityDelta:
+      type: object
+      required: [type]
+      properties:
+        type:
+          type: string
+        id:
+          $ref: '#/components/schemas/TransportValue'
+        version:
+          $ref: '#/components/schemas/TransportValue'
+        properties:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/TransportValue'
+    ConstraintViolation:
+      type: object
+      required: [path, message]
+      properties:
+        path:
+          type: string
+        message:
+          type: string
+        invalidValue:
+          $ref: '#/components/schemas/TransportValue'
+    ConstraintViolationResponse:
+      type: object
+      required: [errors]
+      properties:
+        errors:
+          type: array
+          items:
+            $ref: '#/components/schemas/ConstraintViolation'
+    ErrorResponse:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: string
+        details:
+          type: string
+    TransportValue:
+      oneOf:
+        - type: 'null'
+        - type: string
+        - type: integer
+        - type: number
+        - type: boolean
+        - type: array
+          items:
+            $ref: '#/components/schemas/TransportValue'
+        - type: object
+          additionalProperties: true

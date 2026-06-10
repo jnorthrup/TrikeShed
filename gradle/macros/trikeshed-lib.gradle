@@ -7,13 +7,13 @@ buildscript {
         maven { url = uri("https://www.jitpack.io") }
     }
     dependencies {
-        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:2.4.0-RC2"
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:2.4.0"
     }
 }
 
 def trikeshedVersion = "1.0"
 def libVersion = "0.1.0-SNAPSHOT"
-def kotlinVersion = "2.4.0-RC2"
+def kotlinVersion = "2.4.0"
 
 def prop = { String name ->
     def value = rootProject.providers.gradleProperty(name).orNull
@@ -403,6 +403,25 @@ switch (project.path) {
                 task.dependsOn("exportCrossCompilationMetadataForMacosApiElements")
             }
         }
+        break
+    case ":libs:miniduck-memory":
+        kmpHost(datetimeMain: true)
+        def miniduckMemKotlin = extensions.getByName("kotlin")
+        def miniduckMemSets = miniduckMemKotlin.sourceSets
+        miniduckMemSets.getByName("commonMain").dependencies {
+            api libPeer("miniduck")
+            api libPeer("kursive")
+        }
+        miniduckMemSets.getByName("jvmMain").dependencies {
+            implementation "org.jetbrains.kotlin:kotlin-reflect:${kotlinVersion}"
+        }
+        miniduckMemSets.getByName("commonTest").dependencies {
+            implementation libPeer("couch")
+        }
+        def miniduckMemPosix = miniduckMemSets.create("posixMain")
+        miniduckMemPosix.dependsOn(miniduckMemSets.getByName("commonMain"))
+        miniduckMemSets.findByName("macosMain")?.dependsOn(miniduckMemPosix)
+        miniduckMemSets.findByName("linuxMain")?.dependsOn(miniduckMemPosix)
         break
     case ":libs:couch":
         kmpHost(datetimeMain: true)
