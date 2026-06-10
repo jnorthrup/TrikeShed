@@ -1,0 +1,121 @@
+openapi: 3.1.0
+info:
+  title: Kraken APIs
+  version: global-intro
+  description: Contour of https://docs.kraken.com/api/docs/guides/global-intro
+servers:
+  - url: https://docs.kraken.com
+x-page-contour:
+  source: https://docs.kraken.com/api/docs/guides/global-intro
+  sections:
+    - heading: Introduction
+      summary: We offer a range of Application Programming Interfaces (APIs) to send order transactions, stream market data, manage accounts, and integrate crypto services into your applications.
+    - heading: Direct Trading APIs
+      summary: For direct access to Kraken's spot and futures trading platforms.
+      links:
+        - label: REST API
+          href: /api/docs/guides/spot-rest-intro
+        - label: Websocket API
+          href: /api/docs/guides/spot-ws-intro
+        - label: FIX API
+          href: /api/docs/guides/fix-intro
+    - heading: Embed API (B2B / B2B2C)
+      summary: For businesses looking to integrate crypto services into their own products.
+      links:
+        - label: Embed Authentication Guide
+          href: /api/docs/guides/embed-rest-auth
+        - label: Your First Trade
+          href: /api/docs/guides/embed-first-trade
+      bullets:
+        - Create and manage users on behalf of their customers
+        - Execute trades using a quote-based model
+        - Access portfolio and earn features
+        - Receive real-time updates via webhooks
+    - heading: Choosing an API
+      summary: Our APIs offer a versatile ecosystem. Each API has distinct characteristics, and clients can choose a single protocol or combination of protocols that best fit their requirements.
+    - heading: Summary of product versus exchange / API
+      table:
+        - [Spot REST, Spot Websocket, Spot FIX, Futures REST, Futures Websocket, Futures FIX]
+        - [Market Data, Yes, Yes, Yes, Yes, Yes, Yes]
+        - [Order Transactions, Yes, Yes, Yes, Yes, -, Yes]
+        - [Account Data, Yes, Yes, -, Yes, Yes, -]
+        - [Funding, Yes, -, -, Yes, -, -]
+        - [Earn, Yes, -, -, -, -, -]
+        - [Subaccounts, Yes, -, -, Yes, -, -]
+        - [Charts, -, -, -, Yes, -, -]
+    - heading: Futures and Spot Trading
+      bullets:
+        - API protocols and endpoints.
+        - Onboarding process and testing.
+        - Authentication.
+        - Rate limits.
+        - Error messages.
+    - heading: IP Whitelisting
+      summary: API/programmatic traders can connect directly to Kraken AWS point of presence to improve latency and performance by whitelisting IPs.
+    - heading: Colocation Access
+      summary: We offer colocation services through our partnership with Beeks Group, enabling you to host your trading infrastructure in close proximity to Kraken's API endpoints for enhanced performance and reduced latency.
+      note: Dedicated URLs are required to access colocation services.
+    - heading: Endpoint URLs
+      endpoints:
+        - label: Spot WebSocket (WS)
+          value: colo-london.vip-ws.kraken.com
+        - label: Spot WebSocket Auth
+          value: colo-london.vip-ws-auth.kraken.com
+        - label: FIX API
+          value: colo-london.vip-fix.kraken.com
+        - label: Futures REST API
+          value: colo-london.vip.futures.kraken.com
+        - label: Futures WS API
+          value: wss://colo-london.vip.futures.kraken.com/ws/v1
+    - heading: FAQ and Support
+      summary: Further information can be found on the API section of our support pages.
+    - heading: Notices
+      bullets:
+        - Use of the Kraken APIs is subject to the Kraken Terms & Conditions and Privacy Notice, as well as all other applicable terms and disclosures made available on www.kraken.com.
+        - You must seek our prior permission for certain uses of the Kraken API’s.
+        - This includes, but is not limited to, any non-personal commercial use of data from publicly accessible endpoints, such as market data, exchange status, and any other data.
+        - You may seek such permission by contacting marketdata@kraken.com.
+paths:
+  /api/docs/guides/global-intro:
+    get:
+      operationId: krakenGlobalIntro
+      summary: Kraken APIs
+      description: Entry point for the Kraken API guide.
+      responses:
+        "200":
+          description: Guide page
+  /api/docs/guides/spot-rest-intro:
+    get:
+      operationId: krakenSpotRestIntro
+      summary: REST API
+      responses:
+        "200":
+          description: Direct Trading API guide
+  /api/docs/guides/spot-ws-intro:
+    get:
+      operationId: krakenSpotWsIntro
+      summary: Websocket API
+      responses:
+        "200":
+          description: Direct Trading API guide
+  /api/docs/guides/fix-intro:
+    get:
+      operationId: krakenFixIntro
+      summary: FIX API
+      responses:
+        "200":
+          description: Direct Trading API guide
+  /api/docs/guides/embed-rest-auth:
+    get:
+      operationId: krakenEmbedAuthGuide
+      summary: Embed Authentication Guide
+      responses:
+        "200":
+          description: Embed guide
+  /api/docs/guides/embed-first-trade:
+    get:
+      operationId: krakenEmbedFirstTrade
+      summary: Your First Trade
+      responses:
+        "200":
+          description: Embed guide

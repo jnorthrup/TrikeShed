@@ -1,12 +1,8 @@
 package borg.trikeshed.chronicle
 
-import borg.trikeshed.context.FanoutDispatcherElement.DeliveryOutcome
 import borg.trikeshed.context.ElementState
-import borg.trikeshed.lib.Join
-import borg.trikeshed.lib.Series
-import borg.trikeshed.lib.j
-import borg.trikeshed.lib.size
-import borg.trikeshed.lib.view
+import borg.trikeshed.context.FanoutDispatcherElement.DeliveryOutcome
+import borg.trikeshed.lib.*
 import borg.trikeshed.splat.Splat
 import borg.trikeshed.splat.toChronology
 
@@ -25,7 +21,7 @@ class CircularQueue<T>(private val capacity: Int) {
     operator fun get(index: Int): T = buffer[index]
 }
 
-object Chronicle {
+object  Chronicle {
     private val buffer = CircularQueue<ChronicleEvent>(capacity = 1_000_000)
 
     fun emit(event: ChronicleEvent) {

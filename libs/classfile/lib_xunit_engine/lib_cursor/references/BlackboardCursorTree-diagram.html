@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Blackboard Cursor-Tree · Lazy ColumnMeta Joins</title>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'JetBrains Mono', monospace; background: #020617; min-height: 100vh; padding: 2rem; color: white; }
+    .container { max-width: 1280px; margin: 0 auto; }
+    .header { margin-bottom: 2rem; }
+    .header-row { display: flex; align-items: center; gap: 1rem; margin-bottom: 0.5rem; }
+    .pulse-dot { width: 12px; height: 12px; background: #fb923c; border-radius: 50%; animation: pulse 2s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+    h1 { font-size: 1.5rem; font-weight: 700; letter-spacing: -0.025em; }
+    .subtitle { color: #94a3b8; font-size: 0.875rem; margin-left: 1.75rem; }
+    .diagram-container { background: rgba(15,23,42,0.5); border-radius: 1rem; border: 1px solid #1e293b; padding: 1.5rem; overflow-x: auto; }
+    svg { width: 100%; min-width: 1100px; display: block; }
+    .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1rem; margin-top: 2rem; }
+    .card { background: rgba(15,23,42,0.5); border-radius: 0.75rem; border: 1px solid #1e293b; padding: 1.25rem; }
+    .card-header { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem; }
+    .card-dot { width: 8px; height: 8px; border-radius: 50%; }
+    .card-dot.orange  { background: #fb923c; }
+    .card-dot.cyan    { background: #22d3ee; }
+    .card-dot.violet  { background: #a78bfa; }
+    .card-dot.emerald { background: #34d399; }
+    .card-dot.rose    { background: #fb7185; }
+    .card h3 { font-size: 0.875rem; font-weight: 600; }
+    .card ul { list-style: none; color: #94a3b8; font-size: 0.75rem; }
+    .card li { margin-bottom: 0.375rem; }
+    .footer { text-align: center; margin-top: 1.5rem; color: #475569; font-size: 0.75rem; }
+  </style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <div class="header-row">
+      <div class="pulse-dot"></div>
+      <h1>Blackboard Cursor-Tree · Lazy ColumnMeta Joins</h1>
+    </div>
+    <p class="subtitle">()-&gt;ColumnMeta closure facade · overlay roles (OBSERVATION / AGGREGATE / ROOT) · ConfixCursor lazy row · facet dispatch</p>
+  </div>
+
+  <div class="diagram-container">
+    <svg viewBox="0 0 1160 800">
+      <defs>
+        <marker id="a"   markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0,10 3.5,0 7" fill="#64748b"/></marker>
+        <marker id="ao"  markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0,10 3.5,0 7" fill="#fb923c"/></marker>
+        <marker id="av"  markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0,10 3.5,0 7" fill="#a78bfa"/></marker>
+        <marker id="ac"  markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0,10 3.5,0 7" fill="#22d3ee"/></marker>
+        <marker id="ag"  markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0,10 3.5,0 7" fill="#34d399"/></marker>
+        <marker id="ar"  markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0,10 3.5,0 7" fill="#fb7185"/></marker>
+        <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+          <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#1e293b" stroke-width="0.5"/>
+        </pattern>
+      </defs>
+      <rect width="100%" height="100%" fill="url(#grid)"/>
+
+      <!-- ═══════════════════════════════════════════════════════════════════
+           ARROWS
+           ═══════════════════════════════════════════════════════════════════ -->
+
+      <!-- top: Cursor → RowVec → RowVecCell → value+ColumnMeta -->
+      <line x1="220" y1="128" x2="220" y2="173" stroke="#22d3ee" stroke-width="1.5" marker-end="url(#ac)"/>
+      <line x1="220" y1="285" x2="220" y2="322" stroke="#22d3ee" stroke-width="1.5" marker-end="url(#ac)"/>
+      <line x1="220" y1="408" x2="220" y2="453" stroke="#22d3ee" stroke-width="1.5" marker-end="url(#ac)"/>
+
+      <!-- ColumnMeta → ColumnMeta (recursive child) -->
+      <line x1="380" y1="500" x2="380" y2="532" stroke="#22d3ee" stroke-width="1" stroke-dasharray="3,2" marker-end="url(#ac)"/>
+
+      <!-- Cursor tree: top → ClassfileTaxonomy (child) -->
+      <line x1="500" y1="290" x2="540" y2="290" stroke="#fb923c" stroke-width="1.5" marker-end="url(#ao)"/>
+      <!-- Cursor tree: top → EdgeTaxonomy (child) -->
+      <line x1="500" y1="330" x2="540" y2="330" stroke="#fb923c" stroke-width="1.5" marker-end="url(#ao)"/>
+      <!-- Cursor tree: top → SynapsePhilum (child) -->
+      <line x1="500" y1="370" x2="540" y2="370" stroke="#fb923c" stroke-width="1.5" marker-end="url(#ao)"/>
+
+      <!-- ConfixCursor → ConfixRow (lazy) -->
+      <line x1="640" y1="310" x2="640" y2="368" stroke="#a78bfa" stroke-width="1.5" marker-end="url(#av)"/>
+      <!-- ConfixRow → RowVec via facet() -->
+      <line x1="800" y1="310" x2="800" y2="368" stroke="#a78bfa" stroke-width="1.5" marker-end="url(#av)"/>
+
+      <!-- ConfixFacade → RowVec (walk/reify) -->
+      <line x1="870" y1="230" x2="870" y2="195" stroke="#34d399" stroke-width="1" stroke-dasharray="3,2" marker-end="url(#ag)"/>
+
+      <!-- BlackboardTimeseries → ConfixCursor (parses P-code JSON) -->
+      <line x1="640" y1="228" x2="640" y2="262" stroke="#fbbf24" stroke-width="1.5" marker-end="url(#a)"/>
+
+      <!-- CrmsDomainCursor → Cursor (from beans) -->
+      <line x1="870" y1="400" x2="870" y2="448" stroke="#fb7185" stroke-width="1.5" marker-end="url(#ar)"/>
+
+      <!-- EventRing → Cursor (asCursor) -->
+      <line x1="640" y1="410" x2="640" y2="448" stroke="#fb923c" stroke-width="1.5" marker-end="url(#ao)"/>
+
+      <!-- MetaSeries → Cursor (filter+codec projection) -->
+      <line x1="1065" y1="310" x2="1065" y2="368" stroke="#a78bfa" stroke-width="1.5" marker-end="url(#av)"/>
+
+      <!-- Overlay roles bottom arrow -->
+      <line x1="220" y1="640" x2="220" y2="672" stroke="#fbbf24" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#a)"/>
+
+      <!-- StringHashFacetCursor → Cursor (hashBlackboard) -->
+      <line x1="500" y1="490" x2="540" y2="490" stroke="#fb923c" stroke-width="1.5" marker-end="url(#ao)"/>
+
+      <!-- ═══════════════════════════════════════════════════════════════════
+           ROW 1: CORE TYPE HIERARCHY
+           ═══════════════════════════════════════════════════════════════════ -->
+
+      <!-- Cursor -->
+      <rect x="30"  y="55"  width="190" height="72" rx="6" fill="#0f172a"/>
+      <rect x="30"  y="55"  width="190" height="72" rx="6" fill="rgba(8,51,68,0.4)" stroke="#22d3ee" stroke-width="2"/>
+      <text x="125" y="73"  fill="white"   font-size="10" font-weight="700" text-anchor="middle">Cursor</text>
+      <text x="125" y="87"  fill="#22d3ee" font-size="8"  text-anchor="middle">Join&lt;Int, (Int)→RowVec&gt;</text>
+      <text x="39"  y="101" fill="#94a3b8" font-size="7">size j { idx → RowVec }</text>
+      <text x="39"  y="113" fill="#94a3b8" font-size="7">b(idx) → lazy RowVec</text>
+
+      <!-- RowVec -->
+      <rect x="30"  y="175" width="190" height="110" rx="6" fill="#0f172a"/>
+      <rect x="30"  y="175" width="190" height="110" rx="6" fill="rgba(8,51,68,0.4)" stroke="#22d3ee" stroke-width="2"/>
+      <text x="125" y="193" fill="white"   font-size="10" font-weight="700" text-anchor="middle">RowVec</text>
+      <text x="125" y="207" fill="#22d3ee" font-size="8"  text-anchor="middle">Join&lt;Int, (Int)→RowVecCell&gt;</text>
+      <text x="39"  y="221" fill="#94a3b8" font-size="7">size j { col → RowVecCell }</text>
+      <text x="39"  y="233" fill="#94a3b8" font-size="7">b(col) → lazy cell</text>
+      <text x="39"  y="245" fill="#94a3b8" font-size="7">Lazy evaluation: col accessor</text>
+      <text x="39"  y="257" fill="#94a3b8" font-size="7">is a Series of cells</text>
+      <text x="39"  y="269" fill="#22d3ee" font-size="7">column = metadata axis</text>
+
+      <!-- RowVecCell -->
+      <rect x="30"  y="325" width="190" height="83" rx="6" fill="#0f172a"/>
+      <rect x="30"  y="325" width="190" height="83" rx="6" fill="rgba(8,51,68,0.4)" stroke="#22d3ee" stroke-width="1.5"/>
+      <text x="125" y="343" fill="white"   font-size="10" font-weight="700" text-anchor="middle">RowVecCell</text>
+      <text x="125" y="357" fill="#22d3ee" font-size="8"  text-anchor="middle">Join&lt;Any?, ColumnMeta&gt;</text>
+      <text x="39"  y="371" fill="#94a3b8" font-size="7">cell.a = value (Any?)</text>
+      <text x="39"  y="383" fill="#94a3b8" font-size="7">cell.b() = ColumnMeta accessor</text>
+      <text x="39"  y="395" fill="#22d3ee" font-size="7">child rows stay lazy</text>
+
+      <!-- ColumnMeta -->
+      <rect x="30"  y="455" width="190" height="120" rx="6" fill="#0f172a"/>
+      <rect x="30"  y="455" width="190" height="120" rx="6" fill="rgba(8,51,68,0.4)" stroke="#22d3ee" stroke-width="1.5"/>
+      <text x="125" y="473" fill="white"   font-size="10" font-weight="700" text-anchor="middle">ColumnMeta</text>
+      <text x="125" y="487" fill="#22d3ee" font-size="8"  text-anchor="middle">Join&lt;Char, Join&lt;TypeM, ColMeta?gt;&gt;</text>
+      <text x="39"  y="501" fill="#94a3b8" font-size="7">.a = name (CharSequence)</text>
+      <text x="39"  y="513" fill="#94a3b8" font-size="7">.b = TypeMemento</text>
+      <text x="39"  y="525" fill="#94a3b8" font-size="7">.b.b = child ColumnMeta? (recursive)</text>
+      <text x="39"  y="537" fill="#94a3b8" font-size="7">recursive: left-chained column tree</text>
+      <text x="39"  y="549" fill="#94a3b8" font-size="7">IOMemento.IoString/IoInt/IoLong/</text>
+      <text x="39"  y="561" fill="#94a3b8" font-size="7">  IoBytes/IoArray/IoObject</text>
+
+      <!-- ColumnMetaRef -->
+      <rect x="30"  y="590" width="190" height="85" rx="6" fill="#0f172a"/>
+      <rect x="30"  y="590" width="190" height="85" rx="6" fill="rgba(251,146,60,0.4)" stroke="#fb923c" stroke-width="2"/>
+      <text x="125" y="608" fill="white"   font-size="10" font-weight="700" text-anchor="middle">ColumnMetaRef</text>
+      <text x="125" y="622" fill="#fb923c" font-size="8"  text-anchor="middle">extends ColumnMeta + PointcutFacet</text>
+      <text x="39"  y="637" fill="#94a3b8" font-size="7">val facet: PointcutFacet enum</text>
+      <text x="39"  y="649" fill="#94a3b8" font-size="7">ordinal, name, typeName, facet</text>
+      <text x="39"  y="661" fill="#94a3b8" font-size="7">facet = runtime intent tag</text>
+      <text x="39"  y="673" fill="#22d3ee" font-size="7">SymbolName / ClassfileTaxonomy / …</text>
+
+      <!-- ═══════════════════════════════════════════════════════════════════
+           ROW 2: BLACKBOARD CURSOR TREE
+           ═══════════════════════════════════════════════════════════════════ -->
+
+      <rect x="240" y="55" width="910" height="405" rx="8"
+            fill="rgba(251,146,60,0.08)" stroke="#fb923c" stroke-width="1" stroke-dasharray="6,3"/>
+      <text x="250" y="70" fill="#fb923c" font-size="9" font-weight="600">BLACKBOARD CURSOR TREE  (OverlayRole: OBSERVATION)</text>
+
+      <!-- top-level Cursor root -->
+      <rect x="252" y="80" width="248" height="90" rx="6" fill="#0f172a"/>
+      <rect x="252" y="80" width="248" height="90" rx="6" fill="rgba(251,146,60,0.3)" stroke="#fb923c" stroke-width="1.5"/>
+      <text x="376" y="98"  fill="white"   font-size="9"  font-weight="700" text-anchor="middle">CRMS Blackboard Cursor</text>
+      <text x="376" y="112" fill="#fb923c" font-size="7"  text-anchor="middle">top-level Cursor = Join&lt;Int,(Int)→RowVec&gt;</text>
+      <text x="261" y="127" fill="#94a3b8" font-size="7">children: constants / methods / fields /</text>
+      <text x="261" y="139" fill="#94a3b8" font-size="7">edges / events / source / ...</text>
+      <text x="261" y="151" fill="#fb923c" font-size="7">each child = lazy ()-&gt;Cursor facade</text>
+      <text x="261" y="163" fill="#94a3b8" font-size="7">lazy until accessed</text>
+
+      <!-- ClassfileTaxonomy -->
+      <rect x="542" y="250" width="218" height="80" rx="6" fill="#0f172a"/>
+      <rect x="542" y="250" width="218" height="80" rx="6" fill="rgba(76,29,149,0.4)" stroke="#a78bfa" stroke-width="1.5"/>
+      <text x="651" y="268" fill="white"   font-size="9"  font-weight="700" text-anchor="middle">ClassfileTaxonomy</text>
+      <text x="651" y="282" fill="#a78bfa" font-size="7"  text-anchor="middle">PointcutFacet enum value</text>
+      <text x="551" y="297" fill="#94a3b8" font-size="7">child of: constants / methods / fields</text>
+      <text x="551" y="309" fill="#94a3b8" font-size="7">columns: SymbolName, TypeInfo,</text>
+      <text x="551" y="321" fill="#94a3b8" font-size="7">ClassfileCoordinate, XvmCoordinate</text>
+
+      <!-- EdgeTaxonomy -->
+      <rect x="542" y="295" width="218" height="70" rx="6" fill="#0f172a"/>
+      <rect x="542" y="295" width="218" height="70" rx="6" fill="rgba(76,29,149,0.4)" stroke="#a78bfa" stroke-width="1.5"/>
+      <text x="651" y="313" fill="white"   font-size="9"  font-weight="700" text-anchor="middle">EdgeTaxonomy</text>
+      <text x="651" y="327" fill="#a78bfa" font-size="7"  text-anchor="middle">PointcutFacet enum value</text>
+      <text x="551" y="342" fill="#94a3b8" font-size="7">child of: edges column</text>
+      <text x="551" y="354" fill="#94a3b8" font-size="7">columns: poolId, codecHash, sourceIndex</text>
+
+      <!-- SynapsePhilum -->
+      <rect x="542" y="335" width="218" height="70" rx="6" fill="#0f172a"/>
+      <rect x="542" y="335" width="218" height="70" rx="6" fill="rgba(76,29,149,0.4)" stroke="#a78bfa" stroke-width="1.5"/>
+      <text x="651" y="353" fill="white"   font-size="9"  font-weight="700" text-anchor="middle">SynapsePhilum</text>
+      <text x="651" y="367" fill="#a78bfa" font-size="7"  text-anchor="middle">PointcutFacet enum value</text>
+      <text x="551" y="382" fill="#94a3b8" font-size="7">child of: events column</text>
+      <text x="551" y="394" fill="#94a3b8" font-size="7">threshold spike → fire event</text>
+
+      <!-- ConfixCursor -->
+      <rect x="542" y="80" width="198" height="220" rx="6" fill="#0f172a"/>
+      <rect x="542" y="80" width="198" height="220" rx="6" fill="rgba(76,29,149,0.3)" stroke="#a78bfa" stroke-width="1.5"/>
+      <text x="641" y="98"  fill="white"   font-size="9"  font-weight="700" text-anchor="middle">ConfixCursor</text>
+      <text x="641" y="112" fill="#a78bfa" font-size="7"  text-anchor="middle">Confix facade: JSON/YAML/CBOR/CSV</text>
+      <text x="551" y="127" fill="#94a3b8" font-size="7">rows() → lazy ConfixRow sequence</text>
+      <text x="551" y="139" fill="#94a3b8" font-size="7">RowVecCell via metaChain()</text>
+      <text x="551" y="151" fill="#94a3b8" font-size="7">  metaChain(cols) builds ColumnMeta</text>
+      <text x="551" y="163" fill="#94a3b8" font-size="7">  chain recursively (tail = child)</text>
+      <text x="551" y="178" fill="#94a3b8" font-size="7">facet(name): ConfixCursor projection</text>
+      <text x="551" y="190" fill="#94a3b8" font-size="7">join(other, on): faceted join</text>
+      <text x="551" y="205" fill="#94a3b8" font-size="7">column values parsed on first</text>
+      <text x="551" y="217" fill="#94a3b8" font-size="7">access, then cached</text>
+      <text x="551" y="232" fill="#94a3b8" font-size="7">raw nested JSON stays as string</text>
+      <text x="551" y="244" fill="#94a3b8" font-size="7">until 2nd ConfixCursor pass</text>
+      <text x="551" y="259" fill="#94a3b8" font-size="7">ConfixFormat.JSON / YAML / CBOR / CSV</text>
+      <text x="551" y="271" fill="#94a3b8" font-size="7">LazyRow: get(idx) → parse+cache</text>
+      <text x="551" y="283" fill="#a78bfa" font-size="7">ConfixRow interface: get(idx)</text>
+
+      <!-- ConfixFacade -->
+      <rect x="770" y="80" width="198" height="215" rx="6" fill="#0f172a"/>
+      <rect x="770" y="80" width="198" height="215" rx="6" fill="rgba(6,78,59,0.3)" stroke="#34d399" stroke-width="1.5"/>
+      <text x="869" y="98"  fill="white"   font-size="9"  font-weight="700" text-anchor="middle">ConfixFacade</text>
+      <text x="869" y="112" fill="#34d399" font-size="7"  text-anchor="middle">RowVec walker · facet reifier</text>
+      <text x="779" y="127" fill="#94a3b8" font-size="7">walk(row) → WalkResult</text>
+      <text x="779" y="139" fill="#94a3b8" font-size="7">  reifiedCells()</text>
+      <text x="779" y="151" fill="#94a3b8" font-size="7">  forcedAnyChild()</text>
+      <text x="779" y="163" fill="#94a3b8" font-size="7">reifyRow(row) → ReifiedRow</text>
+      <text x="779" y="175" fill="#94a3b8" font-size="7">  scalar cells → reified</text>
+      <text x="779" y="187" fill="#94a3b8" font-size="7">  ChildRows facet → NOT forced</text>
+      <text x="779" y="202" fill="#94a3b8" font-size="7">FacetReifier.reify(facet, value)</text>
+      <text x="779" y="214" fill="#94a3b8" font-size="7">  SymbolRef → .value</text>
+      <text x="779" y="226" fill="#94a3b8" font-size="7">  Int → StringPool.resolve()</text>
+      <text x="779" y="238" fill="#94a3b8" font-size="7">  Lazy → .value</text>
+      <text x="779" y="250" fill="#94a3b8" font-size="7">  MemSegment → raw segment</text>
+      <text x="779" y="265" fill="#34d399" font-size="7">lazy cells never forced prematurely</text>
+
+      <!-- CrmsDomainCursor -->
+      <rect x="770" y="395" width="198" height="75" rx="6" fill="#0f172a"/>
+      <rect x="770" y="395" width="198" height="75" rx="6" fill="rgba(136,19,55,0.3)" stroke="#fb7185" stroke-width="1.5"/>
+      <text x="869" y="413" fill="white"   font-size="9"  font-weight="700" text-anchor="middle">CrmsDomainCursor</text>
+      <text x="869" y="427" fill="#fb7185" font-size="7"  text-anchor="middle">bean Series → Cursor via reflection</text>
+      <text x="779" y="442" fill="#94a3b8" font-size="7">ReflectiveFacet.toRowVec(bean)</text>
+      <text x="779" y="454" fill="#94a3b8" font-size="7">childFacet(name) → PointcutFacet</text>
+      <text x="779" y="466" fill="#94a3b8" font-size="7">eventRing(capacity) → EventRing</text>
+
+      <!-- MetaSeries -->
+      <rect x="982" y="80" width="160" height="220" rx="6" fill="#0f172a"/>
+      <rect x="982" y="80" width="160" height="220" rx="6" fill="rgba(76,29,149,0.3)" stroke="#a78bfa" stroke-width="1.5"/>
+      <text x="1062" y="98" fill="white"   font-size="9"  font-weight="700" text-anchor="middle">MetaSeries</text>
+      <text x="1062" y="112" fill="#a78bfa" font-size="7"  text-anchor="middle">lazy codec / filter / projection</text>
+      <text x="991" y="127" fill="#94a3b8" font-size="7">filter: (Input)→Boolean</text>
+      <text x="991" y="139" fill="#94a3b8" font-size="7">codec: (Input)→Output (→RowVec)</text>
+      <text x="991" y="154" fill="#94a3b8" font-size="7">cursor(source): Cursor</text>
+      <text x="991" y="166" fill="#94a3b8" font-size="7">only matching rows pass filter</text>
+      <text x="991" y="181" fill="#a78bfa" font-size="7">ClassfileMetaSeries</text>
+      <text x="991" y="193" fill="#94a3b8" font-size="7">  package prefix filter</text>
+      <text x="991" y="205" fill="#94a3b8" font-size="7">EventMetaSeries</text>
+      <text x="991" y="217" fill="#94a3b8" font-size="7">  opcode range filter</text>
+      <text x="991" y="229" fill="#a78bfa" font-size="7">ConfixMetaSeries</text>
+      <text x="991" y="241" fill="#94a3b8" font-size="7">  path glob filter</text>
+      <text x="991" y="253" fill="#94a3b8" font-size="7">KBoundary</text>
+      <text x="991" y="265" fill="#94a3b8" font-size="7">  Series&lt;key&gt; → Series&lt;RowVec&gt;</text>
+      <text x="991" y="277" fill="#94a3b8" font-size="7">KRowVecFactory</text>
+      <text x="991" y="289" fill="#94a3b8" font-size="7">  facet SymbolId in col 2</text>
+      <text x="991" y="301" fill="#a78bfa" font-size="7">MetaSeriesCollector</text>
+      <text x="991" y="313" fill="#94a3b8" font-size="7">  Series&lt;RowVec&gt; →</text>
+      <text x="991" y="325" fill="#94a3b8" font-size="7">  Series&lt;Series&lt;RowVec&gt;&gt; (grouped)</text>
+
+      <!-- ═══════════════════════════════════════════════════════════════════
+           ROW 3: CONCRETE BLACKBOARD IMPLEMENTATIONS
+           ═══════════════════════════════════════════════════════════════════ -->
+
+      <rect x="240" y="480" width="910" height="145" rx="8"
+            fill="rgba(6,78,59,0.08)" stroke="#34d399" stroke-width="1" stroke-dasharray="5,3"/>
+      <text x="250" y="496" fill="#34d399" font-size="9" font-weight="600">BLACKBOARD IMPLEMENTATIONS</text>
+
+      <!-- EventRing -->
+      <rect x="252" y="510" width="280" height="108" rx="6" fill="#0f172a"/>
+      <rect x="252" y="510" width="280" height="108" rx="6" fill="rgba(251,146,60,0.3)" stroke="#fb923c" stroke-width="1.5"/>
+      <text x="392" y="528" fill="white"   font-size="9"  font-weight="700" text-anchor="middle">EventRing</text>
+      <text x="392" y="542" fill="#fb923c" font-size="7"  text-anchor="middle">packed ArrayDeque ring · capacity-gated</text>
+      <text x="261" y="557" fill="#94a3b8" font-size="7">append(opcode, nanoTime, coord, symbolId, bytes)</text>
+      <text x="261" y="569" fill="#94a3b8" font-size="7">EventRecord: (nanoTime, opcode, coord,</text>
+      <text x="261" y="581" fill="#94a3b8" font-size="7">  symbolId, wireproto: MemSegment)</text>
+      <text x="261" y="593" fill="#94a3b8" font-size="7">asCursor(): Cursor = snapshot j eventRowVec</text>
+      <text x="261" y="605" fill="#94a3b8" font-size="7">eventRowVec: 5-column RowVec (nano/opcode/</text>
+      <text x="261" y="617" fill="#94a3b8" font-size="7">  coord/symbol/wire) — PointcutFacet per col</text>
+
+      <!-- StringHashFacetCursor -->
+      <rect x="542" y="510" width="288" height="108" rx="6" fill="#0f172a"/>
+      <rect x="542" y="510" width="288" height="108" rx="6" fill="rgba(251,146,60,0.3)" stroke="#fb923c" stroke-width="1.5"/>
+      <text x="686" y="528" fill="white"   font-size="9"  font-weight="700" text-anchor="middle">StringHashFacetCursor</text>
+      <text x="686" y="542" fill="#fb923c" font-size="7"  text-anchor="middle">Series&lt;String&gt; → hash-collapsed blackboard Cursor</text>
+      <text x="551" y="557" fill="#94a3b8" font-size="7">facets() = blackboardCursor: grouped by poolId</text>
+      <text x="551" y="569" fill="#94a3b8" font-size="7">HashFacet: {poolId, codecHash, value, positions[]}</text>
+      <text x="551" y="581" fill="#94a3b8" font-size="7">blackboardSchema: codecHash/poolId/value/</text>
+      <text x="551" y="593" fill="#94a3b8" font-size="7">  count/wireproto/rows(occurrenceCursor)</text>
+      <text x="551" y="605" fill="#94a3b8" font-size="7">hashBlackboard(): Cursor = blackboardCursor</text>
+      <text x="551" y="617" fill="#94a3b8" font-size="7">encodeFacetWireproto: ByteBuffer (hash/poolId/</text>
+      <text x="551" y="629" fill="#94a3b8" font-size="7">  len/value/positions) — packed 24B wireproto</text>
+
+      <!-- BlackboardTimeseries -->
+      <rect x="842" y="510" width="300" height="108" rx="6" fill="#0f172a"/>
+      <rect x="842" y="510" width="300" height="108" rx="6" fill="rgba(120,53,15,0.3)" stroke="#fbbf24" stroke-width="1.5"/>
+      <text x="992" y="528" fill="white"   font-size="9"  font-weight="700" text-anchor="middle">BlackboardTimeseries</text>
+      <text x="992" y="542" fill="#fbbf24" font-size="7"  text-anchor="middle">OverlayRole: OBSERVATION · nanoTime capture</text>
+      <text x="851" y="557" fill="#94a3b8" font-size="7">runBlackboardTimeseries(pcodePath: String)</text>
+      <text x="851" y="569" fill="#94a3b8" font-size="7">parsePcodeJson: ConfixCursor(json) →</text>
+      <text x="851" y="581" fill="#94a3b8" font-size="7">  List&lt;PcodeFunction&gt; (2-pass: fn + ops)</text>
+      <text x="851" y="593" fill="#94a3b8" font-size="7">op histogram: op → count (Confix taxonomy)</text>
+      <text x="851" y="605" fill="#94a3b8" font-size="7">hot-function density: by invocation count</text>
+      <text x="851" y="617" fill="#94a3b8" font-size="7">varnode space distribution per layer</text>
+      <text x="851" y="629" fill="#fbbf24" font-size="7">one per-event nano timestamp only</text>
+
+      <!-- ═══════════════════════════════════════════════════════════════════
+           OVERLAY ROLES
+           ═══════════════════════════════════════════════════════════════════ -->
+
+      <rect x="30"  y="645" width="910" height="75" rx="6" fill="#0f172a"/>
+      <rect x="30"  y="645" width="910" height="75" rx="6" fill="rgba(120,53,15,0.3)" stroke="#fbbf24" stroke-width="1.5"/>
+      <text x="485" y="664" fill="white"   font-size="9"  font-weight="700" text-anchor="middle">OverlayRole  ·  same Cursor/RowVec shape, different runtime semantics</text>
+      <text x="40"   y="683" fill="#fbbf24" font-size="8">OBSERVATION</text>
+      <text x="130"  y="683" fill="#94a3b8" font-size="7">one nanoTime per event · timestamp capture</text>
+      <text x="380"  y="683" fill="#34d399" font-size="8">AGGREGATE</text>
+      <text x="460"  y="683" fill="#94a3b8" font-size="7">op histogram / hot-fn tracking / layer coverage</text>
+      <text x="720"  y="683" fill="#a78bfa" font-size="8">ROOT</text>
+      <text x="768"  y="683" fill="#94a3b8" font-size="7">ConfixCursor parse + top-level facade walk</text>
+
+      <!-- PointcutFacet enum -->
+      <rect x="970" y="470" width="170" height="200" rx="6" fill="#0f172a"/>
+      <rect x="970" y="470" width="170" height="200" rx="6" fill="rgba(76,29,149,0.3)" stroke="#a78bfa" stroke-width="1"/>
+      <text x="1055" y="488" fill="white"   font-size="8"  font-weight="700" text-anchor="middle">PointcutFacet</text>
+      <text x="1055" y="502" fill="#a78bfa" font-size="7"  text-anchor="middle">18 enum values</text>
+      <text x="979"  y="518" fill="#94a3b8" font-size="7">Unfaceted</text>
+      <text x="979"  y="530" fill="#94a3b8" font-size="7">SymbolName</text>
+      <text x="979"  y="542" fill="#94a3b8" font-size="7">TypeInfo</text>
+      <text x="979"  y="554" fill="#94a3b8" font-size="7">ClassfileCoordinate</text>
+      <text x="979"  y="566" fill="#94a3b8" font-size="7">XvmCoordinate</text>
+      <text x="979"  y="578" fill="#94a3b8" font-size="7">PointcutKind</text>
+      <text x="979"  y="590" fill="#94a3b8" font-size="7">StringPool</text>
+      <text x="979"  y="602" fill="#94a3b8" font-size="7">Wireproto</text>
+      <text x="979"  y="614" fill="#94a3b8" font-size="7">ChildRows</text>
+      <text x="979"  y="626" fill="#94a3b8" font-size="7">ConfixMeta</text>
+      <text x="979"  y="638" fill="#94a3b8" font-size="7">VmStats</text>
+      <text x="979"  y="650" fill="#94a3b8" font-size="7">ReduxPhilum</text>
+      <text x="979"  y="662" fill="#94a3b8" font-size="7">SynapsePhilum</text>
+      <text x="979"  y="674" fill="#94a3b8" font-size="7">ClassfileTaxonomy</text>
+      <text x="979"  y="686" fill="#94a3b8" font-size="7">EdgeTaxonomy</text>
+      <text x="979"  y="698" fill="#94a3b8" font-size="7">CrmsDomain / XSrcFile / …</text>
+
+      <!-- ═══════════════════════════════════════════════════════════════════
+           LEGEND
+           ═══════════════════════════════════════════════════════════════════ -->
+      <text x="38"  y="748" fill="white"  font-size="9" font-weight="600">Legend</text>
+      <rect  x="38"  y="755" width="14" height="9" rx="2" fill="rgba(8,51,68,0.4)"    stroke="#22d3ee" stroke-width="1"/>
+      <text  x="58"  y="763" fill="#94a3b8" font-size="8">Core types (Cursor/RowVec/Cell/Meta)</text>
+      <rect  x="290" y="755" width="14" height="9" rx="2" fill="rgba(251,146,60,0.4)" stroke="#fb923c" stroke-width="1"/>
+      <text  x="310" y="763" fill="#94a3b8" font-size="8">Blackboard / EventRing / HashFacet</text>
+      <rect  x="530" y="755" width="14" height="9" rx="2" fill="rgba(76,29,149,0.4)"  stroke="#a78bfa" stroke-width="1"/>
+      <text  x="550" y="763" fill="#94a3b8" font-size="8">Confix / MetaSeries / Taxonomy facet</text>
+      <rect  x="730" y="755" width="14" height="9" rx="2" fill="rgba(6,78,59,0.4)"    stroke="#34d399" stroke-width="1"/>
+      <text  x="750" y="763" fill="#94a3b8" font-size="8">ConfixFacade / walker</text>
+      <rect  x="900" y="755" width="14" height="9" rx="2" fill="rgba(120,53,15,0.3)"  stroke="#fbbf24" stroke-width="1"/>
+      <text  x="920" y="763" fill="#94a3b8" font-size="8">Overlay roles / timeseries</text>
+      <rect  x="1080" y="755" width="14" height="9" rx="2" fill="rgba(136,19,55,0.4)" stroke="#fb7185" stroke-width="1"/>
+      <text  x="1100" y="763" fill="#94a3b8" font-size="8">CrmsDomainCursor</text>
+    </svg>
+  </div>
+
+  <div class="cards">
+    <div class="card">
+      <div class="card-header"><div class="card-dot cyan"></div><h3>Core Type Hierarchy (Lazy Joins)</h3></div>
+      <ul>
+        <li>• Cursor = Join&lt;Int,(Int)→RowVec&gt; — series of RowVec, indexed by row ordinal</li>
+        <li>• RowVec = Join&lt;Int,(Int)→RowVecCell&gt; — series of cells, indexed by column ordinal</li>
+        <li>• RowVecCell = Join&lt;Any?, ColumnMeta&gt; — value + ()→ColumnMeta accessor (lazy)</li>
+        <li>• ColumnMeta = recursive chain: name + TypeMemento + child ColumnMeta?</li>
+        <li>• ColumnMetaRef adds PointcutFacet enum — runtime intent tag on each column</li>
+        <li>• Child rows stay lazy: facet == ChildRows → do NOT force</li>
+      </ul>
+    </div>
+    <div class="card">
+      <div class="card-header"><div class="card-dot orange"></div><h3>Blackboard Cursor-Tree + ConfixCursor</h3></div>
+      <ul>
+        <li>• top-level CRMS Blackboard Cursor — children: constants/methods/fields/edges/events/source</li>
+        <li>• each child = lazy ()→Cursor facade — only evaluated on access</li>
+        <li>• ConfixCursor: ConfixFormat (JSON/YAML/CBOR/CSV) → lazy ConfixRow sequence</li>
+        <li>• ConfixRow.get(idx) parses+ caches on first access; nested JSON stays raw until 2nd pass</li>
+        <li>• metaChain(cols): builds ColumnMeta recursively with tail=child (left-chained tree)</li>
+        <li>• facet(name) / join(other,on): ConfixCursor projections for column selection and faceted join</li>
+      </ul>
+    </div>
+    <div class="card">
+      <div class="card-header"><div class="card-dot violet"></div><h3>ConfixFacade · FacetReifier · Overlay Roles</h3></div>
+      <ul>
+        <li>• FacetReifier dispatch: SymbolRef→.value, Int→StringPool.resolve, Lazy→.value, MemSegment→raw</li>
+        <li>• walk(row) returns reified scalars + forcedAnyChild flag — does NOT force ChildRows</li>
+        <li>• reifyRow(row) → ReifiedRow: scalars reified, lazyForcedFlags per column</li>
+        <li>• EventRing: packed ring (nano/opcode/coord/symbol/wireproto), asCursor() = snapshot</li>
+        <li>• StringHashFacetCursor: Series&lt;String&gt; → hash-collapsed blackboard Cursor via poolId grouping</li>
+        <li>• OverlayRole: OBSERVATION (nanoTime), AGGREGATE (histogram), ROOT (parse+walk)</li>
+      </ul>
+    </div>
+  </div>
+
+  <p class="footer">TrikeShed Cursor · ColumnMetaRef · ConfixCursor · ConfixFacade · CrmsDomainCursor · EventRing · StringHashFacetCursor · BlackboardTimeseries</p>
+</div>
+</body>
+</html>
