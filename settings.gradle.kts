@@ -17,3 +17,8 @@ if (libsDir.exists() && libsDir.isDirectory) {
         .filter { it.name != "ng-sctp" }
         .forEach { include(":libs:${it.name}") }
 }
+
+// Support hybrid kotlin xvm build if ../xvm exists
+if (java.io.File("../xvm").exists()) {
+    includeBuild("../xvm")
+}
