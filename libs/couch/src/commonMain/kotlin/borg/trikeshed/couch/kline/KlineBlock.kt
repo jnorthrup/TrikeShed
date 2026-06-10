@@ -1,19 +1,16 @@
 package borg.trikeshed.couch.kline
 
-    import borg.trikeshed.miniduck.DocRowVec
-    import borg.trikeshed.miniduck.MiniCursor
-    import borg.trikeshed.miniduck.MiniRowVec
-    import borg.trikeshed.miniduck.toRowVec
-    import borg.trikeshed.lib.Series
-    import borg.trikeshed.lib.j
-    import borg.trikeshed.lib.size
-    import borg.trikeshed.lib.toSeries
-    import borg.trikeshed.cursor.Cursor
-    import borg.trikeshed.cursor.ColumnMeta
-    import borg.trikeshed.isam.meta.IOMemento
+import borg.trikeshed.parse.confix.*
+import borg.trikeshed.lib.Series
+import borg.trikeshed.lib.j
+import borg.trikeshed.lib.size
+import borg.trikeshed.lib.toSeries
+import borg.trikeshed.cursor.Cursor
+import borg.trikeshed.cursor.ColumnMeta
+import borg.trikeshed.isam.meta.IOMemento
 
 /**
- * KlineBlock: DuckDB-style mutable→sealed chunk of klines.
+ * KlineBlock: Confix-style mutable→sealed chunk of klines.
  *
  * One writer appends klines during MUTABLE phase.
  * Seal() is the irreversible sync boundary — readers only see sealed blocks.
@@ -21,8 +18,7 @@ package borg.trikeshed.couch.kline
  * Donor patterns:
  *   - TradePairEventMuxer: accumulates CandlestickEvents in ArrayList,
  *     then flushes to ISAM on episode cutoff
- *   - BlockRowVec: the MUTABLE→SEALED state machine already established
- *     in TrikeShed miniduck
+ *   - ConfixBlock: the MUTABLE→SEALED state machine using Confix facets
  *   - DataBinanceVision.klines: the schema (Open_time, Open, High, Low, Close, Volume)
  *
  * Single-timespan invariant: all klines in a block must share the same TimeSpan.
@@ -39,6 +35,9 @@ class KlineBlock constructor(
 
     val state: State get() = _state
     val rowCount: Int get() = rows.size
+
+    // Internal ConfixBlock for storage
+    private val confixBlock = ConfixBlock.mutable()
 
     companion object {
         /** Create a new mutable block. Optionally enforce a single timespan. */
@@ -60,6 +59,8 @@ class KlineBlock constructor(
             )
         }
         rows.add(kline)
+        // Also append to ConfixBlock
+        confixBlock.append(kline.toConfixDocCell().cell)
     }
 
     /**
@@ -71,24 +72,21 @@ class KlineBlock constructor(
     fun seal(): KlineBlock {
         check(_state == State.MUTABLE) { "Already sealed" }
         _state = State.SEALED
+        confixBlock.seal()
         return this
     }
 
     /**
-     * Present the sealed block as a MiniCursor of DocRowVec.
+     * Present the sealed block as a Confix cursor of DocCells.
      *
-     * Each row is a Kline.toDocRowVec() — the standard OHLCV keys.
+     * Each row is a Kline.toConfixDocCell() — the standard OHLCV keys.
      * The cursor is a lazy Series: rows are projected on access.
      *
      * @throws IllegalStateException if the block is not sealed.
      */
-    fun asCursor(): MiniCursor {
+    fun asCursor(): Cursor {
         check(_state == State.SEALED) { "Block must be sealed before presenting as cursor" }
-        // Snapshot the rows list to avoid concurrent modification
-        val snapshot = rows.toList()
-        return snapshot.size j { i: Int ->
-            snapshot[i].toDocRowVec().toRowVec()
-        }
+        return confixBlock.seal().cellsSeries
     }
 
     /**
@@ -96,7 +94,7 @@ class KlineBlock constructor(
      *
      * Each row is projected as a RowVec of values joined with ColumnMeta
      * inferred from the cell values. This allows feeding blocks into
-     * Columnar/ISAM paths without going through MiniCursor.
+     * Columnar/ISAM paths without going through Confix cursor.
      */
     fun asColumnarCursor(): borg.trikeshed.cursor.Cursor {
         check(_state == State.SEALED) { "Block must be sealed before presenting as cursor" }

@@ -124,6 +124,16 @@ class LinuxChannelOperations : ChannelOperations {
 
         override fun submit(): Int = Liburing.submit().getOrElse { -1 }
 
+        /** Async UDP sendmsg — queues a SENDMSG SQE with msghdr. */
+        override fun sendmsg(fd: Int, msgHdrPtr: Long, userData: Long = 0L): Int {
+            return Liburing.prepSendmsg(fd, msgHdrPtr, 0, userData).fold({ 0 }, { -1 })
+        }
+
+        /** Async UDP recvmsg — queues a RECVMSG SQE with msghdr. */
+        override fun recvmsg(fd: Int, msgHdrPtr: Long, userData: Long = 0L): Int {
+            return Liburing.prepRecvmsg(fd, msgHdrPtr, 0, userData).fold({ 0 }, { -1 })
+        }
+
         override fun wait(minComplete: Int): List<ChannelResult> {
             val results = mutableListOf<ChannelResult>()
             repeat(minComplete) {

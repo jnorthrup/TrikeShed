@@ -1,9 +1,6 @@
 package borg.trikeshed.couch.api
 
-import borg.trikeshed.miniduck.BlockRowVec
-import borg.trikeshed.miniduck.DocRowVec
-import borg.trikeshed.miniduck.MiniRowVec
-import borg.trikeshed.miniduck.ViewRowVec
+import borg.trikeshed.parse.confix.*
 import borg.trikeshed.lib.toSeries
 import borg.trikeshed.parse.json.JsonParser
 
@@ -13,7 +10,7 @@ import borg.trikeshed.parse.json.JsonParser
 data class CouchDb11RowSet(
     val totalRows: Int,
     val offset: Int,
-    val rows: BlockRowVec,
+    val rows: ConfixBlock,
 ) {
     companion object {
         fun fromJson(json: String): CouchDb11RowSet {
@@ -22,20 +19,22 @@ data class CouchDb11RowSet(
 
             val totalRows = root.int("total_rows")
             val offset = root.int("offset")
-            val block = BlockRowVec.mutable()
+            val block = ConfixBlock.mutable()
 
             root.list("rows").forEach { rawRow ->
                 val row = rawRow as? Map<String, Any?>
                     ?: error("CouchDB row entry must be a JSON object")
                 val docMap = row.mapValueOrNull("doc")
-                val docLoader: (() -> MiniRowVec)? = docMap?.let { map -> { parseDocRowVec(map) } }
+                val docLoader: (() -> ConfixCell)? = docMap?.let { map ->
+                    { parseDocCell(map) }
+                }
 
                 block.append(
-                    ViewRowVec(
+                    confixViewCell(
                         id = row.string("id"),
                         key = row["key"],
                         value = row["value"],
-                        docLoader = docLoader,
+                        doc = docLoader?.invoke(),
                     ),
                 )
             }
@@ -47,10 +46,10 @@ data class CouchDb11RowSet(
             )
         }
 
-       fun parseDocRowVec(map: Map<String, Any?>): DocRowVec {
+       fun parseDocCell(map: Map<String, Any?>): ConfixCell {
             val keys = map.keys.toList()
             val cells = keys.map { key -> map[key] }
-            return DocRowVec(keys = keys, cells = cells)
+            return confixDocCell(keys = keys, cells = cells).cell
         }
 
        fun Map<String, Any?>.string(name: String): String =

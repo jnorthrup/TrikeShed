@@ -21,4 +21,6 @@ class LoopbackDhtTransport : DhtTransport {
         val key = hex(cid.bytes)
         return mutex.withLock { registry[key]?.toList() ?: emptyList() }
     }
+
+    override fun close() {}
 }

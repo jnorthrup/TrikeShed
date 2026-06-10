@@ -1,17 +1,14 @@
 package borg.trikeshed.couch.minidsl
 
-import borg.trikeshed.miniduck.QueryPlan
-import borg.trikeshed.miniduck.RelationKind
-import borg.trikeshed.miniduck.RelationRef
-import borg.trikeshed.miniduck.ViewQueryPlan
+import borg.trikeshed.parse.confix.*
 
 /**
- * Infix-only MiniDuck surface.
+ * Infix-only Confix surface.
  *
  * The object is used as an extension scope so the DSL remains explicit and does not
  * leak builder-style globals.
  */
-object CouchMiniDsl {
+object CouchConfixDsl {
     data class DesignRef(
         val database: String,
         val designDocument: String,
@@ -22,11 +19,11 @@ object CouchMiniDsl {
         val designDocument: String,
         val viewName: String,
     ) {
-        val source: RelationRef
-            get() = RelationRef(database = database, name = "$designDocument/$viewName", kind = RelationKind.VIEW)
+        val source: ConfixRelationRef
+            get() = ConfixRelationRef(database = database, name = "$designDocument/$viewName", kind = ConfixRelationKind.VIEW)
     }
 
-    typealias QueryRef = ViewQueryPlan
+    typealias QueryRef = ConfixViewQueryPlan
 
     infix fun String.design(designDocument: String): DesignRef =
         DesignRef(database = this, designDocument = designDocument)
@@ -35,7 +32,7 @@ object CouchMiniDsl {
         ViewRef(database = database, designDocument = designDocument, viewName = viewName)
 
     infix fun ViewRef.whereKey(value: Any?): QueryRef =
-        ViewQueryPlan(
+        ConfixViewQueryPlan(
             source = source,
             designDocument = designDocument,
             viewName = viewName,
@@ -53,7 +50,7 @@ object CouchMiniDsl {
 
     val ViewRef.group: GroupRef
         get() = GroupRef(
-            ViewQueryPlan(
+            ConfixViewQueryPlan(
                 source = source,
                 designDocument = designDocument,
                 viewName = viewName,
@@ -67,5 +64,5 @@ object CouchMiniDsl {
         query.withParameter("group_level", level)
 }
 
-typealias DesignRef = CouchMiniDsl.DesignRef
-typealias ViewRef = CouchMiniDsl.ViewRef
+typealias DesignRef = CouchConfixDsl.DesignRef
+typealias ViewRef = CouchConfixDsl.ViewRef

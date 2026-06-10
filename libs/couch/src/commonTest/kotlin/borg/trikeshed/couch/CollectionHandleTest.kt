@@ -2,6 +2,7 @@ package borg.trikeshed.couch
 
 import borg.trikeshed.couch.handle.*
 import borg.trikeshed.lib.*
+import borg.trikeshed.parse.confix.confixDocCell
 import kotlin.test.*
 
 /**
@@ -14,11 +15,11 @@ import kotlin.test.*
  */
 class CollectionHandleTest {
 
-   fun doc(vararg pairs: Pair<String, Any?>) =
-        borg.trikeshed.miniduck.DocRowVec(
-            pairs.map { it.first },
-            pairs.map { it.second },
-        )
+  fun doc(vararg pairs: Pair<String, Any?>): ConfixCell =
+        confixDocCell(
+            keys = pairs.map { it.first },
+            cells = pairs.map { it.second },
+        ).cell
 
     @Test
     fun handleStartsOpen() {
@@ -40,7 +41,7 @@ class CollectionHandleTest {
         h.append(doc("b" to 20))
         val snap = h.snapshot()
         assertEquals(2, snap.size)
-        assertEquals(10, (snap[0] as borg.trikeshed.miniduck.DocRowVec)["a"])
+        assertEquals(10, snap[0].get("a")?.reify())
     }
 
     @Test

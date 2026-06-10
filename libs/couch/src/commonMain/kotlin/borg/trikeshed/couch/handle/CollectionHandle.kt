@@ -1,6 +1,6 @@
 package borg.trikeshed.couch.handle
 
-import borg.trikeshed.miniduck.MiniRowVec
+import borg.trikeshed.parse.confix.ConfixCell
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.j
 
@@ -10,7 +10,7 @@ import borg.trikeshed.lib.j
  */
 class CollectionHandle constructor() {
     var _state: HandleState = HandleState.OPEN
-    val rows: MutableList<MiniRowVec> = mutableListOf()
+    val rows: MutableList<ConfixCell> = mutableListOf()
 
     val state: HandleState get() = _state
     val rowCount: Int get() = rows.size
@@ -19,7 +19,7 @@ class CollectionHandle constructor() {
         fun open(): CollectionHandle = CollectionHandle()
     }
 
-    fun append(row: MiniRowVec) {
+    fun append(row: ConfixCell) {
         check(_state == HandleState.OPEN) { "Cannot append unless OPEN" }
         rows.add(row)
     }
@@ -34,7 +34,7 @@ class CollectionHandle constructor() {
         _state = HandleState.CLOSED
     }
 
-    fun snapshot(): Series<MiniRowVec> {
+    fun snapshot(): Series<ConfixCell> {
         check(_state != HandleState.CLOSED) { "Cannot snapshot a CLOSED handle" }
         return rows.size j { rows[it] }
     }
