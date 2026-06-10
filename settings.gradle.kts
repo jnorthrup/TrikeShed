@@ -14,3 +14,4 @@ include(":libs:motion-estimation")
 if (java.io.File("../xvm").exists()) {
     includeBuild("../xvm")
 }
+include(":libs:lcnc")
