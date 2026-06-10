@@ -9,3 +9,4 @@ pluginManagement {
 rootProject.name = "TrikeShed"
 
 include(":libs:motion-estimation")
+include(":libs:htx-client")
