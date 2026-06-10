@@ -1,6 +1,6 @@
 package borg.trikeshed.couch.kline
 
-import borg.trikeshed.miniduck.DocRowVec
+import borg.trikeshed.parse.confix.confixDocCell
 
 /**
  * Standard kline (OHLCV candle) timespans.
@@ -47,14 +47,14 @@ data class Kline(
     val volume: Double,
 ) {
     companion object {
-        /** Standard OHLCV column names for DocRowVec projection. */
+        /** Standard OHLCV column names for ConfixDocCell projection. */
         val schemaKeys = listOf(
             "symbol", "timespan", "openTime", "open", "high", "low", "close", "volume"
         )
     }
 
-    /** Project this kline as a DocRowVec with standard OHLCV keys. */
-    fun toDocRowVec(): DocRowVec = DocRowVec(
+    /** Project this kline as a ConfixDocCell with standard OHLCV keys. */
+    fun toConfixDocCell(): ConfixDocCell = confixDocCell(
         keys = schemaKeys,
         cells = listOf(symbol, timespan, openTime, open, high, low, close, volume),
     )
@@ -88,7 +88,7 @@ data class ExtendedKline(
     val takerBuyQuoteVolume: Double,
 ) {
     companion object {
-        /** Full 12-field schema keys for DocRowVec projection. */
+        /** Full 12-field schema keys for ConfixDocCell projection. */
         val schemaKeys = listOf(
             "symbol", "timespan", "openTime",
             "open", "high", "low", "close", "volume",
@@ -100,8 +100,8 @@ data class ExtendedKline(
     /** Downcast to the base [Kline] (OHLCV subset). */
     fun toKline(): Kline = Kline(symbol, timespan, openTime, open, high, low, close, volume)
 
-    /** Project as a DocRowVec with all 12 Binance fields. */
-    fun toDocRowVec(): DocRowVec = DocRowVec(
+    /** Project as a ConfixDocCell with all 12 Binance fields. */
+    fun toConfixDocCell(): ConfixDocCell = confixDocCell(
         keys = schemaKeys,
         cells = listOf(
             symbol, timespan, openTime,

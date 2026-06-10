@@ -2,6 +2,7 @@ package borg.trikeshed.couch
 
 import borg.trikeshed.couch.handle.*
 import borg.trikeshed.lib.*
+import borg.trikeshed.parse.confix.confixDocCell
 import kotlinx.coroutines.*
 import kotlinx.coroutines.test.runTest
 import kotlin.test.*
@@ -19,9 +20,9 @@ import kotlin.test.*
  */
 class ConcurrentWriteSealTest {
 
-   fun doc(v: Int) = borg.trikeshed.miniduck.DocRowVec(
+  fun doc(v: Int): ConfixCell = confixDocCell(
         listOf("v"), listOf(v)
-    )
+    ).cell
 
     @Test
     fun concurrentAppendsAllLand() {
@@ -116,7 +117,7 @@ class ConcurrentWriteSealTest {
         // write 50 rows
         repeat(50) { h.append(doc(it)) }
 
-        val snapshots = mutableListOf<borg.trikeshed.lib.Series<borg.trikeshed.miniduck.MiniRowVec>>()
+        val snapshots = mutableListOf<Series<ConfixCell>>()
         // take 5 snapshots concurrently
         coroutineScope {
             repeat(5) {

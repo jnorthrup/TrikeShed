@@ -24,6 +24,8 @@ interface LiburingFacade {
     fun prepFtruncate(fd: Int, size: Long, userData: Long): Result<Unit>
     fun prepMmap(fd: Int, addr: Long, len: Int, prot: Int, flags: Int, offset: Long, userData: Long): Result<Unit>
     fun prepMunmap(addr: Long, len: Int, userData: Long): Result<Unit>
+    fun prepSendmsg(fd: Int, msgHdrPtr: Long, flags: Int, userData: Long): Result<Unit>
+    fun prepRecvmsg(fd: Int, msgHdrPtr: Long, flags: Int, userData: Long): Result<Unit>
     fun submit(): Result<Int>
     fun waitCqe(): Result<UringCompletion>
     fun peekCqe(): Result<UringCompletion?>
@@ -67,6 +69,8 @@ internal expect object LiburingImpl : LiburingFacade {
     override fun prepFtruncate(fd: Int, size: Long, userData: Long): Result<Unit>
     override fun prepMmap(fd: Int, addr: Long, len: Int, prot: Int, flags: Int, offset: Long, userData: Long): Result<Unit>
     override fun prepMunmap(addr: Long, len: Int, userData: Long): Result<Unit>
+    override fun prepSendmsg(fd: Int, msgHdrPtr: Long, flags: Int, userData: Long): Result<Unit>
+    override fun prepRecvmsg(fd: Int, msgHdrPtr: Long, flags: Int, userData: Long): Result<Unit>
     override fun submit(): Result<Int>
     override fun waitCqe(): Result<UringCompletion>
     override fun peekCqe(): Result<UringCompletion?>

@@ -1,5 +1,7 @@
 package borg.trikeshed.miniduck.tablespace
 
+import borg.trikeshed.ipfs.BlockStore as IpfsBlockStoreApi
+import borg.trikeshed.ipfs.IpfsElement
 import borg.trikeshed.miniduck.BlockRowVec
 import borg.trikeshed.miniduck.objectstore.ObjectStoreAdapter
 import borg.trikeshed.lib.Series
@@ -49,7 +51,12 @@ interface BlockStore {
 
         @JvmStatic
         fun inMemory(): InMemoryBlockStore = InMemoryBlockStore()
-    }
+
+        /** Create an IpfsBlockStore backed by IPFS content-addressed storage. */
+        @JvmStatic
+        fun ipfs(ipfsElement: IpfsElement): IpfsBlockStore =
+            IpfsBlockStore.create(ipfsElement)
+}
 }
 
 /**

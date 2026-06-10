@@ -102,6 +102,18 @@ internal actual object LiburingImpl : LiburingFacade {
             io_uring_prep_munmap(sqe, addr, len)
         }
 
+    actual override fun prepSendmsg(fd: Int, msgHdrPtr: Long, flags: Int, userData: Long): Result<Unit> =
+        prepare(userData) { sqe ->
+            sqe.pointed.user_data = userData.toULong()
+            io_uring_prep_sendmsg(sqe, fd, msgHdrPtr.toCPointer<msghdr>(), flags.toUInt())
+        }
+
+    actual override fun prepRecvmsg(fd: Int, msgHdrPtr: Long, flags: Int, userData: Long): Result<Unit> =
+        prepare(userData) { sqe ->
+            sqe.pointed.user_data = userData.toULong()
+            io_uring_prep_recvmsg(sqe, fd, msgHdrPtr.toCPointer<msghdr>(), flags.toUInt())
+        }
+
     actual override fun submit(): Result<Int> {
         val currentRing = ring ?: return failure("liburing ring is not open")
         val rc = io_uring_submit(currentRing)

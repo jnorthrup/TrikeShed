@@ -36,6 +36,10 @@ interface ChannelOperations : CoroutineContext.Element {
         fun writev(fd: Int, buffer: ByteBuffer, userData: Long = 0L): Int = -1
         /** Async accept on a listening fd — queues an accept SQE. */
         fun prepAccept(serverFd: Int, userData: Long = 0L): Int = -1
+        /** Async UDP sendmsg — queues a SENDMSG SQE with msghdr. */
+        fun sendmsg(fd: Int, msgHdrPtr: Long, userData: Long = 0L): Int = -1
+        /** Async UDP recvmsg — queues a RECVMSG SQE with msghdr. */
+        fun recvmsg(fd: Int, msgHdrPtr: Long, userData: Long = 0L): Int = -1
         fun submit(): Int
         fun wait(minComplete: Int = 1): List<ChannelResult>
     }

@@ -7,4 +7,5 @@ package borg.trikeshed.ipfs
 interface DhtTransport {
     suspend fun announceProviderRemote(cid: CID, address: String)
     suspend fun findProvidersRemote(cid: CID): List<String>
+    fun close()
 }
