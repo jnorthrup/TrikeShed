@@ -21,69 +21,120 @@ C = TypeVar("C")
 T = TypeVar("T")
 
 
-# --- Type alias: Series<T> = Join<int, Callable[[int], T]> ---
-# We use a protocol for structural typing
-
-class SeriesProtocol(Protocol[X]):
-    """Structural protocol for Series."""
-    a: int  # size
-    b: Callable[[int], X]  # index function
-    
-    @property
-    def size(self) -> int: ...
-    
-    def __getitem__(self, i: int) -> X: ...
-    
-    @property
-    def view(self) -> Iterable[X]: ...
-
-
-# The actual Series type is Join<int, Callable[[int], X]>
+# --- Type alias for type hinting ---
+# Series<T> = Join<int, Callable[[int], T]>
 Series = Join[int, Callable[[int], X]]
 
 
-# --- Attach extension methods to Series (Join) objects ---
-# These are added dynamically to instances created via series_of, etc.
+# --- Proper Series class with all methods ---
 
-def _series_size(self: Series[X]) -> int:
-    """Series.size — the length of the series."""
-    return self.a
+class SeriesMixin:
+    """Mixin providing Series methods for Join objects."""
+    
+    @property
+    def size(self) -> int:
+        return self.a
+    
+    def __getitem__(self, i: int) -> X:
+        return self.b(i)
+    
+    @property
+    def view(self) -> Iterable[X]:
+        return IterableSeries(self)
+    
+    def __matmul__(self, xform: Callable[[X], C]) -> Series[C]:
+        """series @ xform — lazy map/projection (α operator)."""
+        return j(self.a, lambda i: xform(self[i]))
+    
+    def __mul__(self, xform: Callable[[X], C]) -> Series[C]:
+        """series * xform — alternative lazy map/projection."""
+        return j(self.a, lambda i: xform(self[i]))
+    
+    @property
+    def cpb(self):
+        """series.cpb — comparable series view."""
+        # Import here to avoid circular import
+        from .series import CSeries
+        return CSeries(self.a, self.b)
 
 
-def _series_getitem(self: Series[X], i: int) -> X:
-    """Series[i] — index access."""
-    return self.b(i)
+# We can't easily mix this into Join objects created by j()
+# So we create a factory that returns objects with the mixin
 
 
-def _series_view(self: Series[X]) -> Iterable[X]:
-    """Series.view — materialized iterable view."""
-    return IterableSeries(self)
+def _make_series(size: int, index_fn: Callable[[int], X]) -> Series[X]:
+    """Create a Series (Join with Series methods attached)."""
+    series_obj = Join(size, index_fn)
+    # Attach mixin methods
+    series_obj.size = property(lambda self: self.a).__get__(series_obj, Series)
+    series_obj.__getitem__ = lambda self, i: self.b(i).__get__(series_obj, Series)
+    series_obj.view = property(lambda self: IterableSeries(self)).__get__(series_obj, Series)
+    series_obj.__matmul__ = lambda self, xform: j(self.a, lambda i: xform(self[i])).__get__(series_obj, Series)
+    series_obj.__mul__ = lambda self, xform: j(self.a, lambda i: xform(self[i])).__get__(series_obj, Series)
+    return series_obj
 
 
-def _series_matmul(self: Series[X], xform: Callable[[X], C]) -> Series[C]:
-    """series @ xform — lazy map/projection (α operator)."""
-    return j(self.a, lambda i: xform(self[i]))
+# Simpler approach: just use a class
 
 
-def _series_mul(self: Series[X], xform: Callable[[X], C]) -> Series[C]:
-    """series * xform — alternative lazy map/projection."""
-    return j(self.a, lambda i: xform(self[i]))
+class SeriesClass(Generic[X]):
+    """Series class implementing the full algebra."""
+    
+    def __init__(self, size: int, index_fn: Callable[[int], X]):
+        self._size = size
+        self._index_fn = index_fn
+    
+    @property
+    def size(self) -> int:
+        return self._size
+    
+    @property
+    def a(self) -> int:
+        return self._size
+    
+    @property
+    def b(self) -> Callable[[int], X]:
+        return self._index_fn
+    
+    def __getitem__(self, i: int) -> X:
+        return self._index_fn(i)
+    
+    @property
+    def view(self) -> Iterable[X]:
+        return IterableSeries(self)
+    
+    def __matmul__(self, xform: Callable[[X], C]) -> Series[C]:
+        """series @ xform — lazy map/projection (α operator)."""
+        return SeriesClass(self._size, lambda i: xform(self._index_fn(i)))
+    
+    def __mul__(self, xform: Callable[[X], C]) -> Series[C]:
+        return self.__matmul__(xform)
+    
+    def __iter__(self) -> Iterator[X]:
+        for i in range(self._size):
+            yield self._index_fn(i)
+    
+    def __repr__(self) -> str:
+        return f"Series({self._size}, {self._index_fn})"
+    
+    @property
+    def cpb(self):
+        from .series import CSeries
+        return CSeries(self._size, self._index_fn)
 
 
-# Attach as properties/methods to the Join class (used as Series)
-# We do this at module load time
-Series.size = property(_series_size)  # type: ignore[attr-defined]
-Series.__getitem__ = _series_getitem  # type: ignore[attr-defined]
-Series.view = property(_series_view)  # type: ignore[attr-defined]
-Series.__matmul__ = _series_matmul  # type: ignore[attr-defined]
-Series.__mul__ = _series_mul  # type: ignore[attr-defined]
+# Update Series type alias to use our class for construction
+# But keep the type hint as Join for compatibility
+def _series_from_join(join: Join[int, Callable[[int], X]]) -> SeriesClass[X]:
+    """Convert a Join to SeriesClass."""
+    return SeriesClass(join.a, join.b)
 
 
 # --- Lazy projection α (alpha) ---
 
-def alpha_projection(series: SeriesProtocol[X], xform: Callable[[X], C]) -> Series[C]:
+def alpha_projection(series: SeriesClass[X], xform: Callable[[X], C]) -> SeriesClass[C]:
     """series α xform — lazy map/projection. Mirrors Kotlin `series α { ... }`."""
-    return j(series.size, lambda i: xform(series[i]))
+    return series @ xform
 
 
 # --- Iterable materialization ---
@@ -91,7 +142,7 @@ def alpha_projection(series: SeriesProtocol[X], xform: Callable[[X], C]) -> Seri
 @dataclass(frozen=True, repr=False)
 class IterableSeries(Generic[X]):
     """Materialized iterable view of a Series."""
-    source: SeriesProtocol[X]
+    source: SeriesClass[X]
 
     def __iter__(self) -> Iterator[X]:
         for i in range(self.source.size):
@@ -104,8 +155,7 @@ class IterableSeries(Generic[X]):
         return self.source[i]
 
     def map(self, fn: Callable[[X], C]) -> "IterableSeries[C]":
-        # Return a new IterableSeries wrapping the projected Series
-        return IterableSeries(alpha_projection(self.source, fn))
+        return IterableSeries(self.source @ fn)
 
     def filter(self, pred: Callable[[X], bool]) -> list[X]:
         return [x for x in self if pred(x)]
@@ -132,7 +182,6 @@ class CSeries(Generic[T]):
         return self._index_fn(i)
 
     def __lt__(self, other: "CSeries[T]") -> bool:
-        # Lexicographic comparison
         n = min(self.size, other.size)
         for i in range(n):
             if self[i] < other[i]:
@@ -151,35 +200,30 @@ class CSeries(Generic[T]):
         return not (self < other)
 
 
-def cpb(series: Series[T]) -> CSeries[T]:
-    """series.cpb — comparable series view."""
-    return CSeries(series.a, series.b)
-
-
-# Attach cpb property
-Series.cpb = property(cpb)  # type: ignore[attr-defined]
-
-
 # --- Construction helpers ---
 
-def series_of(*items: X) -> Series[X]:
+def series_of(*items: X) -> SeriesClass[X]:
     """Create a Series from items: s_(1, 2, 3)."""
     lst = list(items)
-    return j(len(lst), lambda i: lst[i])
+    return SeriesClass(len(lst), lambda i: lst[i])
 
 
-def series_from_iterable(it: Iterable[X]) -> Series[X]:
+def series_from_iterable(it: Iterable[X]) -> SeriesClass[X]:
     """Create a Series from any iterable."""
     lst = list(it)
-    return j(len(lst), lambda i: lst[i])
+    return SeriesClass(len(lst), lambda i: lst[i])
 
 
-def series_range(start: int, stop: int, step: int = 1) -> Series[int]:
+def series_range(start: int, stop: int, step: int = 1) -> SeriesClass[int]:
     """Create a Series from range."""
     rng = range(start, stop, step)
-    return j(len(rng), lambda i: rng[i])
+    return SeriesClass(len(rng), lambda i: rng[i])
 
 
-def series_repeat(value: X, count: int) -> Series[X]:
+def series_repeat(value: X, count: int) -> SeriesClass[X]:
     """Create a Series repeating a value."""
-    return j(count, lambda _: value)
+    return SeriesClass(count, lambda _: value)
+
+
+# For backward compatibility with type hints
+# Series = Join[int, Callable[[int], X]]  # type alias
