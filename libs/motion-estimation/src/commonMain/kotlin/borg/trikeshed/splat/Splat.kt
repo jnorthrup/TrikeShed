@@ -4,7 +4,7 @@ import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.size
 import borg.trikeshed.lib.α
-import borg.trikeshed.lib.view.toIterable
+import borg.trikeshed.lib.view
 
 // ── Splat core ────────────────────────────────────────────────────
 data class Splat(
@@ -14,7 +14,7 @@ data class Splat(
     val dim: Int get() = position.size
     init {
         require(covariance.size == dim) { "Covariance rows (${covariance.size}) must match position dim ($dim)" }
-        for (row in covariance.toIterable()) {
+        for (row in covariance.view) {
             require(row.size == dim) { "Covariance columns (${row.size}) must match position dim ($dim)" }
         }
         require(opacity in 0.0..1.0) { "Opacity must be in [0,1], got $opacity" }
