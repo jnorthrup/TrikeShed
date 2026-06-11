@@ -1,5 +1,7 @@
 package org.xvm.cursor
 
+import borg.trikeshed.lib.α
+import borg.trikeshed.lib.toList
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.Assertions.*
 import org.xvm.List as ShadowList
@@ -16,7 +18,7 @@ class ListDetourTest {
     fun `test list creation detour with custom codec`() {
         // Setup codec that reverses strings in the list
         ShadowList.codec = { original ->
-            original.map { (it as String).reversed() }
+            (original α { (it as String).reversed() }).view.toList()
         }
 
         try {

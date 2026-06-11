@@ -1,5 +1,7 @@
 package org.xvm.cursor
 import borg.trikeshed.parse.confix.Syntax
+import borg.trikeshed.lib.α
+import borg.trikeshed.lib.toList
 
 /**
  * ConfixCursor — Confix facade for JSON/YAML/CBOR/CSV with lazy row/column values
@@ -62,7 +64,7 @@ interface ConfixRow {
     fun columnNames(): List<String>
 
     /** Materialize all values as a list (forces parsing of every column) */
-    fun toList(): List<Any?> = (0 until size).map { get(it) }
+    fun toList(): List<Any?> = ((0 until size) α { get(it) }).view.toList()
 
     /** Materialize all values as a name→value map */
     fun toMap(): Map<String, Any?> = columnNames().withIndex().associate { it.value to get(it.index) }
@@ -163,10 +165,10 @@ class ConfixCursor private constructor(
         val projectedIndices = parentSchema.mapIndexedNotNull { idx, col ->
             if (col.name in nameSet) idx else null
         }
-        val projectedNames = projectedSchema.map { it.name }
+        val projectedNames = (projectedSchema α { it.name }).view.toList()
 
         return ConfixCursor(source, format, projectedSchema) { _ ->
-            this.rows().map { parentRow ->
+            this.rows() α { parentRow ->
                 LazyConfixRow(
                     _columnNames = projectedNames,
                     rawExtractor = { i -> parentRow[projectedIndices[i]] },
@@ -190,7 +192,7 @@ class ConfixCursor private constructor(
         val rightCols = other.columns()
         val rightWithoutKey = rightCols.filter { it.name != on }
         val joinedSchema = leftCols + rightWithoutKey
-        val joinedNames = joinedSchema.map { it.name }
+        val joinedNames = (joinedSchema α { it.name }).view.toList()
 
         return ConfixCursor(source, format, joinedSchema) { _ ->
             // materialize right side indexed by join key
@@ -200,7 +202,7 @@ class ConfixCursor private constructor(
             this.rows().flatMap { leftRow ->
                 val key = leftRow[on]
                 val matchingRights = rightIndex[key] ?: emptyList()
-                matchingRights.map { rightRow ->
+                matchingRights α { rightRow ->
                     LazyConfixRow(
                         _columnNames = joinedNames,
                         rawExtractor = { i ->
@@ -248,15 +250,16 @@ class ConfixCursor private constructor(
 
             // find the first object { ... } and extract its keys+types
             val obj = extractFirstObject(trimmed) ?: return emptyList()
-            return obj.entries.map { (k, v) ->
+            return (obj.entries α { (k, v) ->
                 ConfixColumn(k, inferType(v))
+            }).view.toList()
             }
         }
 
         fun parseRows(src: String, cols: List<ConfixColumn>): Sequence<ConfixRow> {
             val trimmed = src.trim()
-            val colNames = cols.map { it.name }
-            val colTypes = cols.map { it.type }
+            val colNames = (cols α { it.name }).view.toList()
+            val colTypes = (cols α { it.type }).view.toList()
             return object : Sequence<ConfixRow> {
                 override fun iterator(): Iterator<ConfixRow> = ObjectIterator(trimmed, colNames, colTypes)
             }
@@ -280,7 +283,7 @@ class ConfixCursor private constructor(
                 if (pos >= data.length || data[pos] == ']') throw NoSuchElementException()
                 val fields = mutableMapOf<String, Any?>()
                 parseObject(fields)
-                val rawValues = colNames.map { fields[it] }.toTypedArray()
+                val rawValues = (colNames α { fields[it] }).view.toList().toTypedArray()
                 return LazyConfixRow(
                     _columnNames = colNames,
                     rawExtractor = { i -> rawValues[i] },
@@ -521,8 +524,8 @@ class ConfixCursor private constructor(
         }
 
         fun parseRows(src: String, cols: List<ConfixColumn>): Sequence<ConfixRow> {
-            val colNames = cols.map { it.name }
-            val colTypes = cols.map { it.type }
+            val colNames = (cols α { it.name }).view.toList()
+            val colTypes = (cols α { it.type }).view.toList()
             // skip header line
             val headerEnd = firstLineEnd(src)
             if (headerEnd >= src.length) return emptySequence()
