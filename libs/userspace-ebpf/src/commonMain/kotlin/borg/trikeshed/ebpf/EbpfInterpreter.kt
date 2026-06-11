@@ -7,9 +7,6 @@ class EbpfInterpreter(val program: EbpfProgram) {
         var pc = 0
         registers.fill(0)
 
-        // R1 points to context
-        // Context pointer simulation is limited in this basic interpreter
-
         while (pc < program.instructions.size) {
             val inst = EbpfInstruction(program.instructions[pc])
             pc++
@@ -26,7 +23,6 @@ class EbpfInterpreter(val program: EbpfProgram) {
                 }
                 EbpfOpcode.BPF_LDX -> executeLdx(opcode, inst, context)
                 EbpfOpcode.BPF_STX -> executeStx(opcode, inst, context)
-                // Implement other classes...
             }
 
             if (classOp == EbpfOpcode.BPF_JMP && (opcode and 0xF0) == EbpfOpcode.BPF_EXIT) {
@@ -127,16 +123,69 @@ class EbpfInterpreter(val program: EbpfProgram) {
         val size = opcode and 0x18
 
         val addr = registers[src] + inst.offset
-        // Simplified memory access, only from context array
-        if (addr >= 0 && addr < context.size) {
+
+        if (addr >= 0) {
             when (size) {
-                EbpfOpcode.BPF_B -> registers[dst] = (context[addr.toInt()].toLong() and 0xFF)
-                // H, W, DW requires larger array bounds checking
+                // Use Little-Endian decoding for compatibility with x86-64 target
+                EbpfOpcode.BPF_B -> if (addr < context.size) registers[dst] = (context[addr.toInt()].toLong() and 0xFF)
+                EbpfOpcode.BPF_H -> if (addr + 1 < context.size) registers[dst] = (
+                    (context[addr.toInt()].toLong() and 0xFF) or
+                    ((context[(addr + 1).toInt()].toLong() and 0xFF) shl 8)
+                )
+                EbpfOpcode.BPF_W -> if (addr + 3 < context.size) registers[dst] = (
+                    (context[addr.toInt()].toLong() and 0xFF) or
+                    ((context[(addr + 1).toInt()].toLong() and 0xFF) shl 8) or
+                    ((context[(addr + 2).toInt()].toLong() and 0xFF) shl 16) or
+                    ((context[(addr + 3).toInt()].toLong() and 0xFF) shl 24)
+                )
+                EbpfOpcode.BPF_DW -> if (addr + 7 < context.size) registers[dst] = (
+                    (context[addr.toInt()].toLong() and 0xFF) or
+                    ((context[(addr + 1).toInt()].toLong() and 0xFF) shl 8) or
+                    ((context[(addr + 2).toInt()].toLong() and 0xFF) shl 16) or
+                    ((context[(addr + 3).toInt()].toLong() and 0xFF) shl 24) or
+                    ((context[(addr + 4).toInt()].toLong() and 0xFF) shl 32) or
+                    ((context[(addr + 5).toInt()].toLong() and 0xFF) shl 40) or
+                    ((context[(addr + 6).toInt()].toLong() and 0xFF) shl 48) or
+                    ((context[(addr + 7).toInt()].toLong() and 0xFF) shl 56)
+                )
             }
         }
     }
 
     private fun executeStx(opcode: Int, inst: EbpfInstruction, context: ByteArray) {
-        // Implementation for store instructions
+        val dst = inst.dstReg
+        val src = inst.srcReg
+        val size = opcode and 0x18
+
+        val addr = registers[dst] + inst.offset
+
+        if (addr >= 0) {
+            val v = registers[src]
+            when (size) {
+                EbpfOpcode.BPF_B -> if (addr < context.size) {
+                    context[addr.toInt()] = (v and 0xFF).toByte()
+                }
+                EbpfOpcode.BPF_H -> if (addr + 1 < context.size) {
+                    context[addr.toInt()] = (v and 0xFF).toByte()
+                    context[(addr + 1).toInt()] = ((v ushr 8) and 0xFF).toByte()
+                }
+                EbpfOpcode.BPF_W -> if (addr + 3 < context.size) {
+                    context[addr.toInt()] = (v and 0xFF).toByte()
+                    context[(addr + 1).toInt()] = ((v ushr 8) and 0xFF).toByte()
+                    context[(addr + 2).toInt()] = ((v ushr 16) and 0xFF).toByte()
+                    context[(addr + 3).toInt()] = ((v ushr 24) and 0xFF).toByte()
+                }
+                EbpfOpcode.BPF_DW -> if (addr + 7 < context.size) {
+                    context[addr.toInt()] = (v and 0xFF).toByte()
+                    context[(addr + 1).toInt()] = ((v ushr 8) and 0xFF).toByte()
+                    context[(addr + 2).toInt()] = ((v ushr 16) and 0xFF).toByte()
+                    context[(addr + 3).toInt()] = ((v ushr 24) and 0xFF).toByte()
+                    context[(addr + 4).toInt()] = ((v ushr 32) and 0xFF).toByte()
+                    context[(addr + 5).toInt()] = ((v ushr 40) and 0xFF).toByte()
+                    context[(addr + 6).toInt()] = ((v ushr 48) and 0xFF).toByte()
+                    context[(addr + 7).toInt()] = ((v ushr 56) and 0xFF).toByte()
+                }
+            }
+        }
     }
 }
