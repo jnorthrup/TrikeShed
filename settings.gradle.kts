@@ -22,9 +22,7 @@ if (libsDir.exists() && libsDir.isDirectory) {
 include(":libs:classfile:lib_cursor")
 
 // Support hybrid kotlin xvm build if ../xvm exists
- feature/lcnc-grid-algebra-13076933959051589929
 if (java.io.File("../xvm").exists()) {
     includeBuild("../xvm")
 }
 include(":libs:lcnc")
-   
