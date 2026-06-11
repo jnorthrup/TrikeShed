@@ -29,7 +29,7 @@ kotlin.sourceSets["commonMain"].dependencies {
 kotlin.sourceSets["jvmMain"].dependencies {
     implementation(kotlin("stdlib-jdk8"))
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:1.11.0")
-    implementation("org.bereft:TrikeShed-jvm:1.0") // from mavenLocal
+    // implementation("org.bereft:TrikeShed-jvm:1.0") // from mavenLocal
     implementation(project(":libs:classfile:lib_cursor"))
 }
 
