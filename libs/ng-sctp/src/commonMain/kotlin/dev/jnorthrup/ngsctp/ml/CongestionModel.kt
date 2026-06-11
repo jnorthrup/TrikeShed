@@ -232,7 +232,7 @@ class CubicCongestionPredictor : CongestionPredictor {
         // On loss, reduce to (1-beta) * cwnd
         wMax = features.cwnd
         lastLossTime = System.currentTimeMillis()
-        return (features.cwnd * (1 - BETA).toUInt()).coerceAtLeast(4380u)
+        return (features.cwnd.toDouble() * (1 - BETA)).toUInt()).coerceAtLeast(4380u)
     }
 }
 
