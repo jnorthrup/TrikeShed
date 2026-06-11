@@ -1,6 +1,6 @@
 package borg.trikeshed.ebpf
 
-class EbpfInterpreter(val program: EbpfProgram) {
+class EbpfInterpreter(val program: EbpfProgram, val registry: EbpfHelperRegistry = EbpfHelperRegistry()) {
     val registers = LongArray(11) // R0-R10
 
     fun execute(context: ByteArray): Long {
@@ -18,9 +18,10 @@ class EbpfInterpreter(val program: EbpfProgram) {
                 EbpfOpcode.BPF_ALU64 -> executeAlu64(opcode, inst)
                 EbpfOpcode.BPF_ALU -> executeAlu32(opcode, inst)
                 EbpfOpcode.BPF_JMP -> {
-                    val jmpOffset = executeJmp(opcode, inst)
+                    val jmpOffset = executeJmp(opcode, inst, context)
                     pc += jmpOffset
                 }
+                EbpfOpcode.BPF_LD -> pc += executeLd(opcode, inst, program, pc)
                 EbpfOpcode.BPF_LDX -> executeLdx(opcode, inst, context)
                 EbpfOpcode.BPF_STX -> executeStx(opcode, inst, context)
             }
@@ -31,6 +32,24 @@ class EbpfInterpreter(val program: EbpfProgram) {
         }
 
         return registers[0]
+    }
+
+
+    private fun executeLd(opcode: Int, inst: EbpfInstruction, program: EbpfProgram, pc: Int): Int {
+        val size = opcode and 0x18
+        val mode = opcode and 0xE0
+
+        if (size == EbpfOpcode.BPF_DW && mode == EbpfOpcode.BPF_IMM) {
+            // 64-bit immediate load. The second half of the immediate is in the next instruction's imm field.
+            if (pc < program.instructions.size) {
+                val nextInst = EbpfInstruction(program.instructions[pc])
+                val lower32 = inst.imm.toLong() and 0xFFFFFFFFL
+                val upper32 = nextInst.imm.toLong() and 0xFFFFFFFFL
+                registers[inst.dstReg] = lower32 or (upper32 shl 32)
+                return 1 // Skip next instruction
+            }
+        }
+        return 0
     }
 
     private fun executeAlu64(opcode: Int, inst: EbpfInstruction) {
@@ -87,7 +106,7 @@ class EbpfInterpreter(val program: EbpfProgram) {
         registers[dst] = dstVal.toLong() and 0xFFFFFFFFL
     }
 
-    private fun executeJmp(opcode: Int, inst: EbpfInstruction): Int {
+    private fun executeJmp(opcode: Int, inst: EbpfInstruction, context: ByteArray): Int {
         val dst = inst.dstReg
         val src = inst.srcReg
         val isK = (opcode and EbpfOpcode.BPF_X) == 0
@@ -109,7 +128,10 @@ class EbpfInterpreter(val program: EbpfProgram) {
             EbpfOpcode.BPF_JLE -> dstVal.toULong() <= operand.toULong()
             EbpfOpcode.BPF_JSLT -> dstVal < operand
             EbpfOpcode.BPF_JSLE -> dstVal <= operand
-            EbpfOpcode.BPF_CALL -> false // Calls not fully implemented
+            EbpfOpcode.BPF_CALL -> {
+                registers[0] = registry.callHelper(inst.imm, registers, context)
+                false // Does not jump
+            }
             EbpfOpcode.BPF_EXIT -> false
             else -> false
         }

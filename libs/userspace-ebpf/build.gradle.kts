@@ -10,6 +10,11 @@ kotlin {
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
             }
         }
+        val jvmMain by getting {
+            dependencies {
+                implementation("net.java.dev.jna:jna:5.13.0")
+            }
+        }
         val jvmTest by getting {
             dependencies {
                 implementation(kotlin("test"))
