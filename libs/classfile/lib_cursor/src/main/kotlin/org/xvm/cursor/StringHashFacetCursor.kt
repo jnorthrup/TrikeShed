@@ -1,5 +1,7 @@
 package org.xvm.cursor
 
+import borg.trikeshed.lib.α
+import borg.trikeshed.lib.toList
 import borg.trikeshed.lib.Join
 import borg.trikeshed.lib.Series
 import java.nio.ByteBuffer
@@ -136,14 +138,14 @@ class StringHashFacetCursor(
             valueByPool.putIfAbsent(poolId, value)
             codecHashByPool.putIfAbsent(poolId, codec.hash(value))
         }
-        return positionsByPool.entries.map { entry ->
+        return (positionsByPool.entries α { entry ->
             HashFacet(
                 poolId = entry.key,
                 codecHash = codecHashByPool.getValue(entry.key),
                 value = valueByPool.getValue(entry.key),
                 positions = entry.value.toIntArray(),
             )
-        }
+        }).view.toList()
     }
 
     private fun facetRow(facet: HashFacet): RowVec = rowOf(
