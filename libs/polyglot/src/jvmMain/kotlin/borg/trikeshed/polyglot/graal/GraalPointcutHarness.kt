@@ -51,7 +51,8 @@ class GraalPointcutHarness(
     /** Install Python-side automatic pointcut instrumentation module from inline string. */
     private fun installPythonInstrumentation() {
         try {
-            context.eval("python", PYTHON_INSTRUMENTATION_MODULE)
+            val ctx: org.graalvm.polyglot.Context = this.context
+            ctx.eval("python", PYTHON_INSTRUMENTATION_MODULE)
         } catch (e: Exception) {
             // Python not available, skip
         }
@@ -62,22 +63,23 @@ class GraalPointcutHarness(
         context.bindPointcutEmitter(this, producer)
     }
 
-    /** 
+    /**
      * Evaluate code in a Graal language.
      * Language IDs: "js", "ruby", "python", "wasm", "llvm"
      * Returns the result converted to a Kotlin/JVM type.
      */
     fun eval(languageId: String, source: String): Any? {
-        val value = context.eval(languageId, source)
+        val ctx: org.graalvm.polyglot.Context = this.context
+        val value = ctx.eval(languageId, source)
         if (value == null || value.isNull) return null
-        
+
         // Try numeric conversions in order of preference
         if (value.isNumber) {
             try { return value.asInt() } catch (e: Exception) {}
             try { return value.asLong() } catch (e: Exception) {}
             try { return value.asDouble() } catch (e: Exception) {}
         }
-        
+
         return when {
             value.isString -> value.asString()
             value.isBoolean -> value.asBoolean()
@@ -115,7 +117,15 @@ class GraalPointcutHarness(
         const val OP_P_GET = 0xA7.toByte()
         const val OP_P_SET = 0xA8.toByte()
 
-        /** Python instrumentation module - loaded inline to avoid resource issues. */
+        /** Python instrumentation module - loaded inline to avoid resource issues.
+         * 
+         * NOTE: Python's `__getattribute__` does NOT intercept reads of instance 
+         * attributes that are stored in `__dict__`. Only `__setattr__` and 
+         * `__getattr__` (for missing attributes) are reliably intercepted.
+         * 
+         * For full JVM bytecode pointcuts on GraalPy Python objects, 
+         * GraalVM Truffle instrumentation API would be needed.
+         */
         const val PYTHON_INSTRUMENTATION_MODULE = """
 import sys
 import types
@@ -136,37 +146,6 @@ def _emit(phase, is_static, is_write, class_name, field_name, location, seq):
     '''Emit a pointcut via the host-bound emitter.'''
     if _emitter is not None:
         _emitter.emitFieldAccess(phase, is_static, is_write, class_name, field_name, location, seq)
-
-def _make_getattribute(class_name, original_getattribute=None):
-    '''Create a __getattribute__ that emits L_GET/P_GET pointcuts for ALL attribute access.'''
-    def instrumented_getattribute(self, name):
-        # Skip private/dunder attributes to avoid recursion
-        if name.startswith('_'):
-            if original_getattribute:
-                return original_getattribute(self, name)
-            return object.__getattribute__(self, name)
-        
-        # Determine if static (class attribute) or instance
-        is_static = isinstance(self, type)
-        
-        # BEFORE phase
-        seq = _get_next_seq()
-        _emit(0, is_static, False, class_name, name, class_name + '.__getattribute__', seq)
-        
-        try:
-            if original_getattribute:
-                result = original_getattribute(self, name)
-            else:
-                result = object.__getattribute__(self, name)
-        except AttributeError:
-            # Still emit AFTER on exception
-            _emit(1, is_static, False, class_name, name, class_name + '.__getattribute__', seq)
-            raise
-        
-        # AFTER phase
-        _emit(1, is_static, False, class_name, name, class_name + '.__getattribute__', seq)
-        return result
-    return instrumented_getattribute
 
 def _make_setattr(class_name, original_setattr=None):
     '''Create a __setattr__ that emits L_SET/P_SET pointcuts.'''
@@ -197,6 +176,41 @@ def _make_setattr(class_name, original_setattr=None):
         _emit(1, is_static, True, class_name, name, class_name + '.__setattr__', seq)
     return instrumented_setattr
 
+def _make_getattr(class_name, original_getattr=None):
+    '''Create a __getattr__ that emits L_GET/P_GET pointcuts for missing attributes.
+    
+    NOTE: Python's __getattr__ is ONLY called for missing attributes.
+    For attributes in __dict__, __getattr__ is NOT called.
+    '''
+    def instrumented_getattr(self, name):
+        # Skip private/dunder attributes
+        if name.startswith('_'):
+            if original_getattr:
+                return original_getattr(self, name)
+            raise AttributeError(name)
+        
+        # Determine if static (class attribute) or instance
+        is_static = isinstance(self, type)
+        
+        # BEFORE phase
+        seq = _get_next_seq()
+        _emit(0, is_static, False, class_name, name, class_name + '.__getattr__', seq)
+        
+        try:
+            if original_getattr:
+                result = original_getattr(self, name)
+            else:
+                raise AttributeError(name)
+        except AttributeError:
+            # Still emit AFTER on exception
+            _emit(1, is_static, False, class_name, name, class_name + '.__getattr__', seq)
+            raise
+        
+        # AFTER phase
+        _emit(1, is_static, False, class_name, name, class_name + '.__getattr__', seq)
+        return result
+    return instrumented_getattr
+
 _seq_counter = 0
 def _get_next_seq():
     global _seq_counter
@@ -218,12 +232,12 @@ def instrument_class(cls, class_name=None):
     sys.stderr.flush()
     
     # Save original methods if they exist
-    original_getattribute = getattr(cls, '__getattribute__', None)
     original_setattr = getattr(cls, '__setattr__', None)
+    original_getattr = getattr(cls, '__getattr__', None)
     
     # Install instrumented versions
-    cls.__getattribute__ = _make_getattribute(class_name, original_getattribute)
     cls.__setattr__ = _make_setattr(class_name, original_setattr)
+    cls.__getattr__ = _make_getattr(class_name, original_getattr)
     
     # Also instrument __delattr__ if present
     original_delattr = getattr(cls, '__delattr__', None)
@@ -278,14 +292,16 @@ pointcut_instrument.set_emitter = set_emitter
 sys.modules['pointcut_instrument'] = pointcut_instrument
 """
         }
+    }
 
     /** Bind the emitter to Python's pointcut_instrument module. */
     fun bindPythonInstrumentation(producer: PointcutEventProducer) {
         try {
+            val ctx = context
             // First ensure the module is loaded
-            context.eval("python", "import pointcut_instrument")
+            ctx.eval("python", "import pointcut_instrument")
             // Then bind the emitter
-            context.eval("python", "pointcut_instrument.set_emitter(pointcutEmitter)")
+            ctx.eval("python", "pointcut_instrument.set_emitter(pointcutEmitter)")
         } catch (e: Exception) {
             // Python not available
             println("Python instrumentation bind failed: ${e.message}")
@@ -378,3 +394,21 @@ fun Context.bindPointcutEmitter(harness: GraalPointcutHarness, producer: Pointcu
         }
     }
 }
+
+/**
+ * Python instrumentation module - loaded inline to avoid resource issues.
+ * 
+ * NOTE: Python's `__getattr__` is ONLY called for missing attributes.
+ * For attributes in `__dict__`, `__getattr__` is NOT called.
+ * 
+ * For full JVM bytecode pointcuts on GraalPy Python objects, 
+ * GraalVM Truffle instrumentation API would be needed.
+ * 
+ * The current implementation captures:
+ * - L_SET/P_SET via `__setattr__` (all writes)
+ * - L_GET/P_GET via `__getattr__` (only missing attributes)
+ * - `__delattr__` for deletions
+ * 
+ * For full JVM bytecode pointcuts on GraalPy Python objects, 
+ * GraalVM Truffle instrumentation API would be needed.
+ */

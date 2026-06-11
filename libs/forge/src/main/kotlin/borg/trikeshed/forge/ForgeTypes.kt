@@ -1,9 +1,8 @@
 package borg.trikeshed.forge
 
-import borg.trikeshed.lib.Series
-import borg.trikeshed.lib.Join
 import kotlinx.serialization.Serializable
 import kotlinx.coroutines.channels.ReceiveChannel
+import kotlinx.coroutines.flow.Flow
 
 /**
  * A single input file or context item in the forge workspace.
@@ -24,6 +23,7 @@ data class ForgeFile(
  * Unique identifier for a forge file.
  */
 @Serializable
+@JvmInline
 value class ForgeFileId(val value: String) {
     companion object {
         fun generate(): ForgeFileId = ForgeFileId(java.util.UUID.randomUUID().toString())
@@ -47,6 +47,7 @@ data class ForgeSnapshot(
 )
 
 @Serializable
+@JvmInline
 value class ForgeSnapshotId(val value: String) {
     companion object {
         fun generate(): ForgeSnapshotId = ForgeSnapshotId(java.util.UUID.randomUUID().toString())
@@ -69,6 +70,7 @@ data class ForgePrompt(
 )
 
 @Serializable
+@JvmInline
 value class ForgePromptId(val value: String) {
     companion object {
         fun generate(): ForgePromptId = ForgePromptId(java.util.UUID.randomUUID().toString())
@@ -100,6 +102,7 @@ data class ForgeWorkflow(
 )
 
 @Serializable
+@JvmInline
 value class ForgeWorkflowId(val value: String) {
     companion object {
         fun generate(): ForgeWorkflowId = ForgeWorkflowId(java.util.UUID.randomUUID().toString())
@@ -160,13 +163,7 @@ sealed interface WorkflowStep {
 
 @Serializable
 enum class AgentType {
-    CODEX("Codex CLI - autonomous coding agent"),
-    CLAUDE_CODE("Claude Code - autonomous coding agent"),
-    OPENCODE("OpenCode - autonomous coding agent"),
-    GENERIC("Generic agent via API"),
-    CUSTOM("Custom agent implementation");
-
-    val description: String
+    CODEX, CLAUDE_CODE, OPENCODE, GENERIC, CUSTOM
 }
 
 @Serializable
@@ -212,6 +209,7 @@ sealed interface StepResult {
  */
 @Serializable
 data class ForgeExecutionResult(
+    val executionId: ForgeExecutionId,
     val workflowId: ForgeWorkflowId,
     val snapshotId: ForgeSnapshotId,
     val stepResults: List<StepResult>,
@@ -221,6 +219,14 @@ data class ForgeExecutionResult(
     val completedAt: Long,
     val status: ExecutionStatus,
 )
+
+@Serializable
+@JvmInline
+value class ForgeExecutionId(val value: String) {
+    companion object {
+        fun generate(): ForgeExecutionId = ForgeExecutionId(java.util.UUID.randomUUID().toString())
+    }
+}
 
 @Serializable
 enum class ExecutionStatus {
@@ -233,22 +239,38 @@ enum class ExecutionStatus {
 @Serializable
 sealed interface CollaborationEvent {
     @Serializable
-    data class FileCreated(val file: ForgeFile, val userId: String) : CollaborationEvent
+    data class FileCreated(val file: ForgeFile, val userId: ForgeUserId) : CollaborationEvent
     @Serializable
-    data class FileUpdated(val fileId: ForgeFileId, val patch: String, val userId: String) : CollaborationEvent
+    data class FileUpdated(val fileId: ForgeFileId, val patch: String, val userId: ForgeUserId) : CollaborationEvent
     @Serializable
-    data class FileDeleted(val fileId: ForgeFileId, val userId: String) : CollaborationEvent
+    data class FileDeleted(val fileId: ForgeFileId, val userId: ForgeUserId) : CollaborationEvent
     @Serializable
-    data class SnapshotCreated(val snapshot: ForgeSnapshot, val userId: String) : CollaborationEvent
+    data class SnapshotCreated(val snapshot: ForgeSnapshot, val userId: ForgeUserId) : CollaborationEvent
     @Serializable
-    data class WorkflowExecuted(val execution: ForgeExecutionResult, val userId: String) : CollaborationEvent
+    data class WorkflowExecuted(val execution: ForgeExecutionResult, val userId: ForgeUserId) : CollaborationEvent
     @Serializable
-    data class UserJoined(val userId: String, val userName: String) : CollaborationEvent
+    data class UserJoined(val userId: ForgeUserId, val userName: String) : CollaborationEvent
     @Serializable
-    data class UserLeft(val userId: String) : CollaborationEvent
+    data class UserLeft(val userId: ForgeUserId) : CollaborationEvent
     @Serializable
-    data class CursorPosition(val userId: String, val fileId: ForgeFileId, val position: Int) : CollaborationEvent
+    data class CursorPosition(val userId: ForgeUserId, val fileId: ForgeFileId, val position: Int) : CollaborationEvent
 }
+
+@Serializable
+@JvmInline
+value class ForgeUserId(val value: String) {
+    companion object {
+        fun generate(): ForgeUserId = ForgeUserId(java.util.UUID.randomUUID().toString())
+    }
+}
+
+@Serializable
+data class ForgeUser(
+    val id: ForgeUserId,
+    val name: String,
+    val color: String,
+    val connectedAt: Long = System.currentTimeMillis(),
+)
 
 /**
  * Exported/sharable inference result.
@@ -260,15 +282,60 @@ data class ForgeArtifact(
     val description: String,
     val files: List<ForgeFile>,
     val workflowId: ForgeWorkflowId?,
-    val executionId: String?,
+    val executionId: ForgeExecutionId?,
     val metadata: Map<String, String> = emptyMap(),
     val createdAt: Long = System.currentTimeMillis(),
     val isPublic: Boolean = false,
 )
 
 @Serializable
+@JvmInline
 value class ForgeArtifactId(val value: String) {
     companion object {
         fun generate(): ForgeArtifactId = ForgeArtifactId(java.util.UUID.randomUUID().toString())
     }
+}
+
+@Serializable
+enum class ExportFormat {
+    ZIP, TAR_GZ, TAR, DIRECTORY, JSON
+}
+
+@Serializable
+data class ForgeExportManifest(
+    val artifactId: ForgeArtifactId,
+    val artifactName: String,
+    val exportedAt: Long,
+    val fileCount: Int,
+    val totalSize: Long,
+    val workflowId: ForgeWorkflowId?,
+    val executionId: ForgeExecutionId?,
+)
+
+data class ForgeExportBundle(
+    val format: ExportFormat,
+    val data: ByteArray,
+    val manifest: ForgeExportManifest,
+)
+
+/**
+ * Diff between two snapshots.
+ */
+data class ForgeDiff(
+    val addedFiles: List<ForgeFile>,
+    val removedFiles: List<ForgeFileId>,
+    val modifiedFiles: List<ForgeFile>,  // new version
+    val unchangedFiles: List<ForgeFileId>,
+)
+
+/**
+ * Progress update during workflow execution.
+ */
+sealed interface StepProgress {
+    data class StepStarted(val stepId: String, val stepName: String) : StepProgress
+    data class StepMessage(val stepId: String, val message: String) : StepProgress
+    data class StepCompleted(val stepId: String, val result: StepResult) : StepProgress
+    data class StepFailed(val stepId: String, val error: String) : StepProgress
+    data class WorkflowCompleted(val result: ForgeExecutionResult) : StepProgress
+    data class WorkflowFailed(val error: String, val partialResults: List<StepResult>) : StepProgress
 }

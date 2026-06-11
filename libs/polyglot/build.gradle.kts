@@ -27,4 +27,9 @@ configurations {
 
 tasks.named<org.gradle.api.tasks.testing.Test>("jvmTest") {
     useJUnitPlatform()
+    // Configure javaagent for tests - use the jvm-agent jar
+    val agentJar = File("../jvm-agent/build/libs/jvm-agent-0.1.0-SNAPSHOT.jar")
+    if (agentJar.exists()) {
+        jvmArgs = listOf("-javaagent:${agentJar.absolutePath}")
+    }
 }

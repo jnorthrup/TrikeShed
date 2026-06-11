@@ -45,6 +45,15 @@ repositories {
     maven { url = uri("https://www.jitpack.io") }
 }
 
+project.repositories {
+    mavenCentral()
+    mavenLocal()
+    google()
+    gradlePluginPortal()
+    maven { url = uri("https://oss.sonatype.org/content/repositories/snapshots/") }
+    maven { url = uri("https://www.jitpack.io") }
+}
+
 def configureCompiler = { kotlinExt, boolean expectActual ->
     def args = [
         "-opt-in=kotlin.RequiresOptIn",
@@ -193,6 +202,16 @@ switch (project.path) {
             implementation rootPeer()
             implementation "org.jetbrains.kotlinx:kotlinx-coroutines-core:${prop("versions.kotlinx-coroutines-core")}"
         }
+        break
+    case ":libs:forge":
+        kmpJvm()
+        extensions.getByName("kotlin").sourceSets.getByName("commonTest").dependencies {
+            implementation rootPeer()
+            implementation "org.jetbrains.kotlinx:kotlinx-coroutines-core:${prop("versions.kotlinx-coroutines-core")}"
+        }
+        break
+    case ":libs:jvm-agent":
+        plainJvm()
         break
     case ":libs:concurrency":
         kmpHost()

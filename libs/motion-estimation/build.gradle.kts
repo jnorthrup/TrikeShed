@@ -2,6 +2,15 @@ plugins {
     kotlin("multiplatform")
 }
 
+repositories {
+    mavenCentral()
+    mavenLocal()
+    google()
+    gradlePluginPortal()
+    maven { url = uri("https://oss.sonatype.org/content/repositories/snapshots/") }
+    maven { url = uri("https://www.jitpack.io") }
+}
+
 kotlin {
     jvm {}
 

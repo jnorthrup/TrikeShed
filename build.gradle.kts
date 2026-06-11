@@ -1,4 +1,3 @@
-
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 
 plugins {
@@ -94,9 +93,7 @@ kotlin {
                 implementation("org.junit.jupiter:junit-jupiter:6.1.0")
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
             }
-            }
-    sourceSets.commonTest.dependencies {
-        implementation(kotlin("test"))
+        }
     }
 }
 
@@ -166,4 +163,3 @@ afterEvaluate {
         dependsOn(jmhTask)
     }
 }
-

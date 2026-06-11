@@ -12,7 +12,7 @@ interface ForgeStepRunner {
      * Execute an LLM call step.
      */
     suspend fun runLlmCall(
-        step: ForgeWorkflow.LlmCallStep,
+        step: WorkflowStep.LlmCall,
         resolvedInputs: Map<String, String>,
         modelConfig: Map<String, String>,
     ): StepResult
@@ -21,7 +21,7 @@ interface ForgeStepRunner {
      * Execute a code execution step.
      */
     suspend fun runCodeExecution(
-        step: ForgeWorkflow.CodeExecutionStep,
+        step: WorkflowStep.CodeExecution,
         resolvedInputs: Map<String, String>,
         workingDir: String,
     ): StepResult
@@ -30,7 +30,7 @@ interface ForgeStepRunner {
      * Execute an agent invocation step.
      */
     suspend fun runAgentInvocation(
-        step: ForgeWorkflow.AgentInvocationStep,
+        step: WorkflowStep.AgentInvocation,
         resolvedInputs: Map<String, String>,
         agentConfig: AgentConfig,
         workingDir: String,
@@ -40,7 +40,7 @@ interface ForgeStepRunner {
      * Execute a file transform step.
      */
     suspend fun runFileTransform(
-        step: ForgeWorkflow.FileTransformStep,
+        step: WorkflowStep.FileTransform,
         workspace: ForgeWorkspace,
     ): StepResult
 
@@ -48,7 +48,7 @@ interface ForgeStepRunner {
      * Evaluate a conditional step.
      */
     suspend fun runConditional(
-        step: ForgeWorkflow.ConditionalStep,
+        step: WorkflowStep.Conditional,
         resolvedInputs: Map<String, String>,
     ): Boolean
 
@@ -56,9 +56,9 @@ interface ForgeStepRunner {
      * Execute parallel branches.
      */
     suspend fun runParallel(
-        step: ForgeWorkflow.ParallelStep,
+        step: WorkflowStep.Parallel,
         resolvedInputs: Map<String, String>,
-        runBranch: (List<WorkflowStep>, Map<String, String>) -> List<StepResult>,
+        runBranch: suspend (List<WorkflowStep>, Map<String, String>) -> List<StepResult>,
     ): List<StepResult>
 }
 
