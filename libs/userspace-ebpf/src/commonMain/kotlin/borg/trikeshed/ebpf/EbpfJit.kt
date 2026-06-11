@@ -271,6 +271,15 @@ class EbpfJit {
         if (jmpOp == EbpfOpcode.BPF_EXIT) {
             out.append(0x5D) // pop rbp
             out.append(0xC3) // ret
+        } else if (jmpOp == EbpfOpcode.BPF_CALL) {
+            // For x86-64 calling convention:
+            // R1(RDI), R2(RSI), R3(RDX), R4(RCX), R5(R8)
+            // Helpers are assumed to be raw function pointers or handled via an external dispatcher.
+            // In a fully integrated JIT, inst.imm is the helper ID, which we map to a function pointer.
+            // For now, we emit a call to a mock placeholder (offset 0) to be patched.
+            out.append(0xE8)
+            patches.add(JumpPatch(index, 0, out.currentSize)) // 0 offset, would point to helper stub
+            out.appendInt32(0)
         } else if (jmpOp == EbpfOpcode.BPF_JA) {
             // Unconditional jump: jmp rel32
             out.append(0xE9)
