@@ -1002,10 +1002,10 @@ sys.path.insert(0, "$tspyPath")
 
 # Test tspy imports
 import tspy
-from tspy import Join, Series, j, s_, alpha
+from tspy import Join, Series, j, s_, twin
 from tspy import FieldSynapse
 from tspy import ColumnMeta, IoInt, IoString, RowVec, row_cell, cursor as make_cursor, select
-from tspy import PyenvEmitter
+from tspy import PyenvEmitter, install_pointcut_hooks
 from tspy import CHRONICLE, TransitionSplat, emit
 
 print("tspy imported successfully on " + sys.implementation.name)
@@ -1021,7 +1021,9 @@ doubled = series.alpha(lambda x: x * 2)
 assert doubled[0] == 2
 assert doubled[2] == 6
 
-c = alpha(lambda: 42)
+# Left identity anchor (constant)
+from tspy import constant
+c = constant(42)
 assert c() == 42
 
 # Test wire protocol

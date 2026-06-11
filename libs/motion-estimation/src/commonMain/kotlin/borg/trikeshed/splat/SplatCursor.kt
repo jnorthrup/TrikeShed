@@ -13,13 +13,39 @@ import borg.trikeshed.parse.confix.ConfixIndex
 import borg.trikeshed.parse.confix.Syntax
 import borg.trikeshed.parse.confix.reify
 
-// ── Minimal stubs to avoid type inference issues ──────────────────
-// These are needed by other modules but cause type inference issues when fully implemented
-// Full implementation requires fixing the j/α type inference in the library
+// ── Cursor integration ───────────────────────────────────────────
+// Convert a Series<RowVec> to Series<Splat> by mapping each RowVec to Splat
+fun Series<RowVec>.toSplatSeries(): Series<Splat> {
+    val size = this.size
+    val items = Array<Splat>(size)
+    for (i in 0 until size) {
+        val row = this[i]
+        val arr = Array<Any?>(2)
+        arr[0] = this[i]
+        arr[1] = { borg.trikeshed.cursor.ColumnMeta("splat", borg.trikeshed.cursor.IOMemento.IoObject, null) }
+        items[i] = (2 j { i: Int -> arr[i] }) as Splat
+    }
+    return size j { idx: Int -> items[idx] }
+}
 
-fun Series<RowVec>.toSplatSeries(): Series<Splat> = this as Series<Splat>
-fun Series<Splat>.toSplatSet(): Cursor = this as Cursor
-fun Splat.toRowVec(): RowVec = this as RowVec
-fun splatSetOf(vararg splats: Splat): Cursor = splats[0] as Cursor
-fun Series<Splat>.toSplatSeries(): Series<Splat> = this
-fun RowVec.toSplat(): Splat = this as Splat
+fun Series<Splat>.toSplatSet(): Cursor {
+    val size = this.size
+    val arr = Array<RowVec>(size)
+    for (i in 0 until size) arr[i] = this[i].toRowVec()
+    return size j { idx: Int -> arr[idx] }
+}
+
+fun Splat.toRowVec(): RowVec {
+    val arr = Array<Any?>(2)
+    arr[0] = this
+    arr[1] = { borg.trikeshed.cursor.ColumnMeta("splat", borg.trikeshed.cursor.IOMemento.IoObject, null) }
+    return (2 j { i: Int -> arr[i] }) as RowVec
+}
+
+fun splatSetOf(vararg splats: Splat): Cursor {
+    val rowsArray = splats.map { it.toRowVec() }.toTypedArray()
+    val size = rowsArray.size
+    return size j { idx: Int -> rowsArray[idx] }
+}
+
+fun RowVec.toSplat(): Splat = this.get(0) as Splat

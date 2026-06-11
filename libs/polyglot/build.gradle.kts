@@ -4,6 +4,7 @@ dependencies {
     "jvmMainImplementation"("org.graalvm.polyglot:polyglot:24.1.1")
     "jvmMainImplementation"("org.graalvm.sdk:graal-sdk:24.1.1")
     "jvmTestRuntimeOnly"("org.graalvm.polyglot:python:24.1.1")
+    "jvmTestRuntimeOnly"("org.graalvm.polyglot:js:24.1.1")
 
     // JUnit Jupiter for TDD tests (JUnit 5)
     "jvmTestImplementation"("org.junit.jupiter:junit-jupiter:5.10.2")
