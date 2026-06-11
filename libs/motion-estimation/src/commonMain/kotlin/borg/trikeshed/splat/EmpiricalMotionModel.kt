@@ -21,7 +21,7 @@ class EmpiricalMotionModel<Context, T> : SplatModel<Context, T> {
         val entries = outcomes.keys.toList()
         val size = entries.size
 
-        return size.j { i ->
+        return size.j { i: Int ->
             val outcome = entries[i]
             val count = outcomes[outcome] ?: 0
             val prob = (count + laplaceSmoothing) / (total + laplaceSmoothing * size)
@@ -29,7 +29,7 @@ class EmpiricalMotionModel<Context, T> : SplatModel<Context, T> {
         }
     }
 
-    fun emptySplat(): Splat<T> = 0.j { _ -> error("empty") }
+    fun emptySplat(): Splat<T> = 0.j { _ : Int -> error("empty") }
 
     fun asStateAdapter(): SplatModel<borg.trikeshed.context.ElementState, borg.trikeshed.context.ElementState> {
         val self = this
@@ -37,7 +37,7 @@ class EmpiricalMotionModel<Context, T> : SplatModel<Context, T> {
             override fun predict(context: borg.trikeshed.context.ElementState): Splat<borg.trikeshed.context.ElementState> {
                 // Return an empty splat since the types don't necessarily match the generic context
                 // This is a bridge for the ChannelRunner to supply a model
-                return 0.j { _ -> error("empty") }
+                return 0.j { _ : Int -> error("empty") }
             }
         }
     }

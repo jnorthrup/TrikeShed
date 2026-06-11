@@ -5,6 +5,8 @@ import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.size
 import borg.trikeshed.lib.view
+import borg.trikeshed.lib.a
+import borg.trikeshed.lib.b
 
 typealias OutcomeVec<T> = Join<T, Double>
 typealias Splat<T> = Series<OutcomeVec<T>>
