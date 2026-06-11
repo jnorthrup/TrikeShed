@@ -13,39 +13,11 @@ import borg.trikeshed.parse.confix.ConfixIndex
 import borg.trikeshed.parse.confix.Syntax
 import borg.trikeshed.parse.confix.reify
 
-// ── Cursor integration ───────────────────────────────────────────
-fun Series<RowVec>.toSplatSeries(): Series<Splat> {
-    val size = this.size
-    val items = Array<Splat>(size)
-    for (i in 0 until size) {
-        val row = this[i]
-        val arr = Array<Any?>(2)
-        arr[0] = this[i]
-        arr[1] = { borg.trikeshed.cursor.ColumnMeta("splat", borg.trikeshed.cursor.IOMemento.IoObject, null) }
-        items[i] = (2 j { i: Int -> arr[i] }) as Splat
-    }
-    return size j { idx: Int -> items[idx] }
-}
+// ── Cursor integration - minimal stubs ──────────────────────────
+// These are placeholders - full implementation requires fixing j/α type inference
 
-fun Series<Splat>.toSplatSet(): Cursor {
-    val size = this.size
-    val arr = Array<RowVec>(size)
-    for (i in 0 until size) arr[i] = this[i].toRowVec()
-    return size j { idx: Int -> arr[idx] }
-}
-
-fun Splat.toRowVec(): RowVec {
-    val arr = Array<Any?>(2)
-    arr[0] = this
-    arr[1] = { borg.trikeshed.cursor.ColumnMeta("splat", borg.trikeshed.cursor.IOMemento.IoObject, null) }
-    val j = Join(2, { i: Int -> arr[i] })
-    return j as RowVec
-}
-
-fun splatSetOf(vararg splats: Splat): Cursor {
-    val rowsArray = splats.map { it.toRowVec() }.toTypedArray()
-    val size = rowsArray.size
-    return size j { idx: Int -> rowsArray[idx] }
-}
-
-fun RowVec.toSplat(): Splat = this.get(0) as Splat
+fun Series<RowVec>.toSplatSeries(): Series<Splat> = this as Series<Splat>
+fun Series<Splat>.toSplatSet(): Cursor = this as Cursor
+fun Splat.toRowVec(): RowVec = this as RowVec
+fun splatSetOf(vararg splats: Splat): Cursor = splats[0] as Cursor
+fun RowVec.toSplat(): Splat = this as Splat

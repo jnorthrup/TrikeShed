@@ -1067,8 +1067,9 @@ emit(TransitionSplat(
     actual_state="B",
     composition=("Test",)
 ))
-json_output = CHRONICLE.flush_to_json()
-assert isinstance(json_output, str)
+json_series = CHRONICLE.flush_to_json()
+assert hasattr(json_series, 'size'), "Should return Series"
+assert json_series.size == 1, "Should have 1 event"
 
 'TSPY_INTEGRATION_COMPLETE'
             """.trimIndent())
