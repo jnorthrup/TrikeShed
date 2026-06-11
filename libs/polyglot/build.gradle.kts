@@ -13,8 +13,8 @@ dependencies {
     // JRuby (requires separate artifact or use GraalVM distribution)
     // "jvmTestRuntimeOnly"("org.graalvm.polyglot:ruby:24.1.1")
     
-    // Python (GraalPy)
-    // "jvmTestRuntimeOnly"("org.graalvm.polyglot:python:24.1.1")
+    // Python (GraalPy) - Python 3.11 on GraalVM
+    "jvmTestRuntimeOnly"("org.graalvm.polyglot:python:24.1.1")
 
     // JUnit Jupiter for TDD tests (JUnit 5)
     "jvmTestImplementation"("org.junit.jupiter:junit-jupiter:5.10.2")

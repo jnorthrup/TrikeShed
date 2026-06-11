@@ -1,13 +1,13 @@
 package borg.trikeshed.userspace
 
-/**
- * Result of a single io_uring submission queue entry completion.
- */
+/** Result of a single io_uring submission queue entry completion. */
 data class UringCompletion(
     val userData: Long,
     val res: Int,
     val flags: Int,
-)
+) : FanoutEvent {
+    override val eventType: Int = 0
+}
 
 /**
  * Canonical userspace liburing facade.

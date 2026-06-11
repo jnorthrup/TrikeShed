@@ -2,7 +2,6 @@ package borg.trikeshed.userspace
 
 import borg.trikeshed.context.AsyncContextElement
 import borg.trikeshed.context.ElementState
-import kotlinx.coroutines.CompletableJob
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.withContext
@@ -59,16 +58,24 @@ class LiburingElement(
 }
 
 /**
- * FanoutDispatcherElement — Pattern A CCEK element for channelized completion dispatch.
+ * FanoutEvent — generic event type for fanout dispatcher.
+ * Subsystems can define their own event type codes (offset + 100).
+ */
+interface FanoutEvent {
+    val eventType: Int
+}
+
+/**
+ * FanoutDispatcherElement — Pattern A CCEK element for generic event dispatch.
  *
- * Central dispatch point for all io_uring completions. Elements register
- * handlers by userData token; completions are fanned out to all subscribers
- * for that token.
+ * Central dispatch point for all events (io_uring completions, splat updates, etc.).
+ * Elements register handlers by event type token; events are fanned out to all
+ * subscribers for that type.
  *
  * PRELOAD.md contract:
  * - Single-threaded dispatch via reactor CQE loop
  * - Structured concurrency: handlers run in parent SupervisorJob scope
- * - Cold Series α-projection: handlers receive cold completion Series
+ * - Cold Series α-projection: handlers receive cold event Series
  */
 class FanoutDispatcherElement(
     parentJob: kotlinx.coroutines.Job? = null,
@@ -76,25 +83,28 @@ class FanoutDispatcherElement(
 
     override val key: CoroutineContext.Key<*> get() = borg.trikeshed.userspace.context.AsyncContextKey.FanoutDispatcherKey
 
-    private val handlers = mutableMapOf<Long, MutableList<(UringCompletion) -> Unit>>()
+    private val handlers = mutableMapOf<Int, MutableList<(FanoutEvent) -> Unit>>()
 
-    /** Register a handler for completions with the given userData token. */
-    fun registerHandler(userData: Long, handler: (UringCompletion) -> Unit) {
-        handlers.getOrPut(userData) { mutableListOf() }.add(handler)
-        // Also register with liburing facade
-        Liburing.registerFanoutHandler(userData, handler)
+    /** Register a handler for events of the given type code. */
+    fun registerHandler(eventType: Int, handler: (FanoutEvent) -> Unit) {
+        handlers.getOrPut(eventType) { mutableListOf() }.add(handler)
     }
 
     /** Remove a handler. */
-    fun removeHandler(userData: Long, handler: (UringCompletion) -> Unit) {
-        handlers[userData]?.remove(handler)
-        if (handlers[userData].isNullOrEmpty()) handlers.remove(userData)
-        Liburing.removeFanoutHandler(userData, handler)
+    fun removeHandler(eventType: Int, handler: (FanoutEvent) -> Unit) {
+        handlers[eventType]?.remove(handler)
+        if (handlers[eventType].isNullOrEmpty()) handlers.remove(eventType)
     }
 
-    /** Dispatch a completion to all handlers for its userData. */
-    internal fun dispatch(completion: UringCompletion) {
-        handlers[completion.userData]?.toList()?.forEach { it(completion) }
+    /** Dispatch an event to all handlers for its type. */
+    fun dispatch(event: FanoutEvent) {
+        handlers[event.eventType]?.toList()?.forEach { it(event) }
+    }
+
+    /** Dispatch a UringCompletion (eventType = 0). */
+    fun dispatchUring(completion: UringCompletion) {
+        // UringCompletion doesn't implement FanoutEvent, use type code 0
+        handlers[0]?.toList()?.forEach { it(completion) }
     }
 
     override suspend fun close() {

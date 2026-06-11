@@ -39,6 +39,18 @@ class GraalPointcutHarness(
     private val methodIndexCache = ConcurrentHashMap<String, Int>()
     private val templateIndexCache = ConcurrentHashMap<String, Int>()
 
+    init {
+        // Auto-bind pointcut emitter if producer provided
+        if (pointcutProducer != null) {
+            context.bindPointcutEmitter(this, pointcutProducer)
+        }
+    }
+
+    /** Bind pointcut emitter to context manually (for custom setup). */
+    fun bindPointcutEmitter(producer: PointcutEventProducer) {
+        context.bindPointcutEmitter(this, producer)
+    }
+
     /** 
      * Evaluate code in a Graal language.
      * Language IDs: "js", "ruby", "python", "wasm", "llvm"
