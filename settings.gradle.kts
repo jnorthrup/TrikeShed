@@ -21,8 +21,4 @@ if (libsDir.exists() && libsDir.isDirectory) {
 // Include lib_cursor explicitly (skip classfile root and its problematic subprojects)
 include(":libs:classfile:lib_cursor")
 
-// Support hybrid kotlin xvm build if ../xvm exists
-if (java.io.File("../xvm").exists()) {
-    includeBuild("../xvm")
-}
 include(":libs:lcnc")

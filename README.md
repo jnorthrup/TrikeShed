@@ -19,10 +19,9 @@ Kernel algebra (`Join`, `Series<T>`, `Twin`, `α`, `j`) is defined in `lib/` and
 │  File          handle lifecycle (open/close/isOpen/id)               │
 │  Channel       operation queue (read/write/accept/connect/close)     │
 │    │            submit/wait/peek                                     │
-│    └─ ChannelImpl  (expect → actual per platform)                    │
-│         └─ FunctionalUringFacade  (op batching + backend dispatch)   │
-│              └─ UserspaceChannelBackend  (expect → actual)           │
-│                   └─ Liburing  →  LiburingImpl  (expect → actual)    │
+│    └─ FunctionalUringFacade  (op batching + backend dispatch)       │
+│         └─ UserspaceChannelBackend  (platform impl per backend)       │
+│              └─ Liburing  →  LiburingImpl  (expect → actual)    │
 │                                                                      │
 │  data types:                                                         │
 │    ByteBuffer  → NIO buffer backed by ByteArray                     │
@@ -91,12 +90,12 @@ suspend fun doRead(buf: ByteBuffer): SelectionResult = runner.runOp { token ->
 | Symbol | commonMain | posixMain | linuxMain | jvmMain | js/wasm |
 |--------|-----------|-----------|-----------|---------|---------|
 | `FileImpl` | expect class | POSIX fd wrapper | inherits posix | JDK Path | — |
-| `ChannelImpl` | expect class | `FunctionalUringFacade` | inherits posix | SPI delegate | — |
 | `LiburingImpl` | expect object | — | cinterop `io_uring_*` | ServiceLoader | `UnsupportedOperationException` |
 | `FilesImpl` | expect object | POSIX `open()` | inherits posix | `java.nio.file` | — |
 | `ChannelsImpl` | expect object | POSIX `socket()` | inherits posix | fd emulation | — |
+| `openUserspaceChannelBackend()` | expect fun | `PosixUserspaceChannelBackend` | inherits posix | `JvmUserspaceChannelBackend` | — |
 
-`openUserspaceChannelBackend()` — expect function, POSIX actual returns `PosixUserspaceChannelBackend`.
+`FunctionalUringFacade` is a regular class (not expect/actual) that wraps a `UserspaceChannelBackend` interface implementation per platform.
 
 ---
 
@@ -105,8 +104,7 @@ suspend fun doRead(buf: ByteBuffer): SelectionResult = runner.runOp { token ->
 ```
 ByteBuffer.read(src)                     UringSocketChannel / UringFileChannel
   → channel.read(file, buf, offset, tok) userspace.Channel
-    → ChannelImpl.read()                 expect → actual
-      → FunctionalUringFacade.read()     enqueue PreparedChannelOp.Read
+    → FunctionalUringFacade.read()       enqueue PreparedChannelOp.Read
   → channel.submit()
     → FunctionalUringFacade.submit()     drain pending → backend.read()
       → PosixUserspaceChannelBackend.read()
