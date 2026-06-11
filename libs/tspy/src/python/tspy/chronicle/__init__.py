@@ -8,14 +8,21 @@ Pure Python implementation of TrikeShed Chronicle:
 """
 
 from __future__ import annotations
-from typing import Any, Callable, Generic, Iterator, TypeVar
-from dataclasses import dataclass
+from typing import Any, Callable, ClassVar, Generic, Iterator, TypeVar
+from dataclasses import dataclass, field
 from collections.abc import Sequence
 
 from ..algebra import Series, RingSeries, FieldSynapse
 from ..cursor import Cursor
 
 T = TypeVar('T')
+
+# Python 3.9 compat: slots=True only in 3.10+
+import sys
+if sys.version_info >= (3, 10):
+    _DC_SLOTS = {'frozen': True, 'slots': True}
+else:
+    _DC_SLOTS = {'frozen': True}
 
 
 # =============================================================================
@@ -76,10 +83,9 @@ class CircularQueue(Generic[T]):
 # ChronicleEvent — sealed hierarchy using type discriminant
 # =============================================================================
 
-@dataclass(frozen=True, slots=True)
 class ChronicleEvent:
     """Base chronicle event — includes type discriminant for reification"""
-    event_type: str
+    # event_type derived from class name
     
     def to_json(self) -> str:
         raise NotImplementedError
@@ -97,15 +103,15 @@ class ChronicleEvent:
         raise NotImplementedError
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(**_DC_SLOTS)
 class TransitionSplat(ChronicleEvent):
     """CCEK element state transition with splat prediction"""
+    event_type: ClassVar[str] = 'TransitionSplat'
     element_key: str
     from_state: str
     splat: Any | None  # Splat<ElementState>
     actual_state: str
     composition: tuple[str, Series[str]]  # Join<String, Series<String>>
-    event_type: str = 'TransitionSplat'
     
     def to_json(self) -> str:
         import json
@@ -144,15 +150,15 @@ class TransitionSplat(ChronicleEvent):
         }
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(**_DC_SLOTS)
 class FanoutSplat(ChronicleEvent):
     """CCEK fanout dispatcher event with per-subscriber splats"""
+    event_type: ClassVar[str] = 'FanoutSplat'
     dispatcher_id: int
     event_type_name: str
     splats: Series[tuple[str, Any]]  # Series<Join<String, Splat<DeliveryOutcome>>>
     actuals: Series[tuple[str, Any]]  # Series<Join<String, DeliveryOutcome>>
     subscriber_count: int
-    event_type: str = 'FanoutSplat'
     
     def to_json(self) -> str:
         import json
@@ -196,7 +202,7 @@ class Chronicle:
     Mirrors JVM `org.xvm.cursor.Chronicle` with Python conventions.
     """
     
-    def __init__(self, capacity: int = 1_000_000):
+    def __init__(self, capacity: int = 1_048_576):  # 2^20
         self._buffer = CircularQueue[ChronicleEvent](capacity)
         self._subscribers: list[Callable[[ChronicleEvent], None]] = []
     

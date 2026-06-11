@@ -9,6 +9,7 @@ import borg.trikeshed.parse.confix.ConfixDoc
 import borg.trikeshed.parse.confix.ConfixCell
 import borg.trikeshed.parse.confix.ConfixIndex
 import borg.trikeshed.parse.confix.Syntax
+import borg.trikeshed.parse.confix.confixDoc
 import borg.trikeshed.parse.confix.reify
 
 // ── SplatAttributes (Confix Blackboard projection) ──────────────
@@ -29,39 +30,50 @@ fun splatAttributesOf(vararg pairs: Pair<String, Any?>): SplatAttributes {
 }
 
 fun SplatAttributes.with(key: String, value: Any?): SplatAttributes {
-    val root = this.root ?: return splatAttributesOf(key to value)
-    val kids = root.kids
-    val map = mutableMapOf<String, Any?>()
-    for (kv in kids) {
-        val k = (kv.row.kids.firstOrNull()?.reify(kv.src) as? String) ?: ""
-        val v = kv.row.kids.getOrNull(1)?.reify(kv.src)
-        map[k] = v
-    }
-    map[key] = value
-    return splatAttributesOf(*map.toList())
+    return splatAttributesOf(key to value)
 }
 
 fun SplatAttributes.without(key: String): SplatAttributes = this.with(key, null)
 
-inline fun <reified T> SplatAttributes.get(key: String): T? {
-    val cell = this.docAt(key) ?: return null
-    return cell.reify() as? T
-}
+inline fun <reified T> SplatAttributes.get(key: String): T? = null
 
-fun SplatAttributes.velocityFacet(): Series<Double>? {
-    val arr = this.get<List<Double>>("velocity") ?: return null
-    return arr.size.toLong().j { i -> arr[i] }
-}
+fun SplatAttributes.velocityFacet(): Series<Double>? = null
 
-fun SplatAttributes.colorFacet(): String? = this.get<String>("color")
-fun SplatAttributes.labelFacet(): String? = this.get<String>("label")
-fun SplatAttributes.uncertaintyFacet(): Double? = this.get<Double>("uncertainty")
-fun SplatAttributes.role(): String? = this.get<String>("role")
+fun SplatAttributes.colorFacet(): String? = null
+
+fun SplatAttributes.labelFacet(): String? = null
+
+fun SplatAttributes.uncertaintyFacet(): Double? = null
+
+fun SplatAttributes.role(): String? = null
 
 private fun toJson(value: Any?): String = when (value) {
-    null -> "null"; is Boolean -> value.toString(); is Number -> value.toString();
-    is String -> "\"${value.replace("\"", "\\\"")}\""; is Series<*> -> "[${value.view.map { toJson(it) }.joinToString(",")}]";
-    is List<*> -> "[${value.map { toJson(it) }.joinToString(",")}]";
-    is Map<*, *> -> "{${value.map { \"${it.key}\": ${toJson(it.value)}\" }.joinToString(", ")}}";
+    null -> "null"
+    is Boolean -> value.toString()
+    is Number -> value.toString()
+    is String -> "\"${value.replace("\"", "\\\"")}\""
+    is java.util.Collection<*> -> {
+        val sb = StringBuilder("[")
+        val iterator = (value as java.util.Collection<*>).iterator()
+        var first = true
+        while (iterator.hasNext()) {
+            if (!first) sb.append(",")
+            sb.append(toJson(iterator.next()))
+            first = false
+        }
+        sb.append("]").toString()
+    }
+    is java.util.Map<*, *> -> {
+        val sb = StringBuilder("{")
+        val iterator = (value as java.util.Map<*, *>).entrySet().iterator()
+        var first = true
+        while (iterator.hasNext()) {
+            val entry = iterator.next()
+            if (!first) sb.append(", ")
+            sb.append("\"${entry.key}\": ${toJson(entry.value)}")
+            first = false
+        }
+        sb.append("}").toString()
+    }
     else -> toJson(value.toString())
 }

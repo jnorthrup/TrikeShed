@@ -12,6 +12,13 @@ from typing import Any, Callable, Generic, Iterable, Iterator, TypeVar, Tuple, P
 from dataclasses import dataclass
 from ..algebra import Series, Join, j as _j, twin as _twin, s_ as _s_
 
+# Python 3.9 compat: slots=True only in 3.10+
+import sys
+if sys.version_info >= (3, 10):
+    _DC_SLOTS = {'frozen': True, 'slots': True}
+else:
+    _DC_SLOTS = {'frozen': True}
+
 T = TypeVar('T')
 K = TypeVar('K')
 
@@ -28,7 +35,7 @@ class TypeMemento(Protocol):
     """Type evidence carried by column metadata"""
     network_size: int | None
 
-@dataclass(frozen=True, slots=True)
+@dataclass(**_DC_SLOTS)
 class IOMemento:
     """Standard IO mementos — fixed-width types enable O(1) random access"""
     network_size: int | None
@@ -56,7 +63,7 @@ IoArray = IOMemento(None)
 IoBytes = IOMemento(None)
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(**_DC_SLOTS)
 class ColumnMeta:
     """ColumnMeta = Join<CharSequence, Join<TypeMemento, ColumnMeta?>> — name × type × child"""
     name: str
@@ -77,7 +84,31 @@ ColumnMetaThunk = Callable[[], ColumnMeta]
 # RowVec = Series2<Any, ColumnMeta↻> = Series<Join<Any, () -> ColumnMeta>>
 # =============================================================================
 
-RowVec = Series[Join[Any, ColumnMetaThunk]]
+# RowVec as a dataclass wrapper around Series
+@dataclass(**_DC_SLOTS)
+class RowVec:
+    """RowVec = Series<Join<Any, ColumnMetaThunk>>"""
+    cells: Series[Join[Any, ColumnMetaThunk]]
+    
+    def __init__(self, *cells: Join[Any, ColumnMetaThunk]):
+        from ..algebra import s_ as _s_
+        # Handle both RowVec(cell1, cell2, ...) and RowVec((cell1, cell2, ...))
+        if len(cells) == 1 and isinstance(cells[0], (tuple, list)):
+            cells = tuple(cells[0])
+        object.__setattr__(self, 'cells', _s_(*cells))
+    
+    @property
+    def size(self) -> int:
+        return self.cells.size
+    
+    def __getitem__(self, i: int) -> Join[Any, ColumnMetaThunk]:
+        return self.cells[i]
+    
+    def __iter__(self):
+        return iter(self.cells)
+    
+    def __len__(self) -> int:
+        return self.size
 
 
 def row_cell(value: Any, meta: ColumnMeta) -> Join[Any, ColumnMetaThunk]:
@@ -87,19 +118,50 @@ def row_cell(value: Any, meta: ColumnMeta) -> Join[Any, ColumnMetaThunk]:
 
 def row_vec(*cells: Join[Any, ColumnMetaThunk]) -> RowVec:
     """Construct RowVec from cells"""
-    return s_(*cells)
+    return RowVec(*cells)
 
 
 # =============================================================================
 # Cursor = Series<RowVec>
 # =============================================================================
 
-Cursor = Series[RowVec]
+# =============================================================================
+# Cursor = Series<RowVec>
+# =============================================================================
+
+@dataclass(**_DC_SLOTS)
+class Cursor:
+    """Cursor = Series<RowVec>"""
+    rows: Series[RowVec]
+    
+    def __init__(self, *rows: RowVec):
+        from ..algebra import s_ as _s_
+        object.__setattr__(self, 'rows', _s_(*rows))
+    
+    @property
+    def size(self) -> int:
+        return self.rows.size
+    
+    def __getitem__(self, i: int) -> RowVec:
+        return self.rows[i]
+    
+    def range(self, start: int, end: int) -> 'Cursor':
+        count = max(0, min(end, self.size) - start)
+        return Cursor(*(self.rows[start + i] for i in range(count)))
+    
+    def __iter__(self):
+        return iter(self.rows)
+    
+    def __len__(self) -> int:
+        return self.size
+    
+    def alpha(self, xform):
+        return self.rows.alpha(xform)
 
 
 def cursor(*rows: RowVec) -> Cursor:
     """Construct Cursor from rows"""
-    return s_(*rows)
+    return Cursor(*rows)
 
 
 # =============================================================================
@@ -108,10 +170,10 @@ def cursor(*rows: RowVec) -> Cursor:
 
 def select(cursor: Cursor, *cols: int) -> Cursor:
     """Column projection by ordinal indices — reorders / projects columns"""
-    return Series(
-        cursor.size,
-        lambda row: s_(*(cursor[row][c] for c in cols))
-    )
+    return Cursor(*(
+        RowVec(*(cursor[row][c] for c in cols))
+        for row in range(cursor.size)
+    ))
 
 
 def select_names(cursor: Cursor, *names: str) -> Cursor:
@@ -136,21 +198,21 @@ def exclude(cursor: Cursor, *names: str) -> Cursor:
 def join(left: Cursor, right: Cursor) -> Cursor:
     """Widen along columns — side-by-side join"""
     rows = min(left.size, right.size)
-    return Series(
-        rows,
-        lambda row: Series(
-            left[row].size + right[row].size,
-            lambda c: left[row][c] if c < left[row].size else right[row][c - left[row].size]
-        )
-    )
+    return Cursor(*(
+        RowVec(*(
+            left[row][c] if c < left[row].size else right[row][c - left[row].size]
+            for c in range(left[row].size + right[row].size)
+        ))
+        for row in range(rows)
+    ))
 
 
 def combine(top: Cursor, bottom: Cursor) -> Cursor:
     """Concatenate along rows — top-to-bottom"""
-    return Series(
-        top.size + bottom.size,
-        lambda row: top[row] if row < top.size else bottom[row - top.size]
-    )
+    return Cursor(*(
+        top[row] if row < top.size else bottom[row - top.size]
+        for row in range(top.size + bottom.size)
+    ))
 
 
 # Cursor α — lazy map over rows

@@ -15,6 +15,13 @@ import sys
 from ..algebra import FieldSynapse, PointcutEmitterPort
 from ..cursor import ColumnMeta, IoString
 
+# Python 3.9 compat: slots=True only in 3.10+
+import sys
+if sys.version_info >= (3, 10):
+    _DC_SLOTS = {'frozen': True, 'slots': True}
+else:
+    _DC_SLOTS = {'frozen': True}
+
 
 # =============================================================================
 # CPython Pointcut Emitter — monkey-patches object.__getattr__ etc.
@@ -30,7 +37,7 @@ def _next_seq() -> int:
     return _sequence_local.seq
 
 
-@dataclass(slots=True)
+@dataclass(**_DC_SLOTS)
 class _PointcutState:
     """Per-object pointcut tracking state"""
     emitter: PointcutEmitterPort

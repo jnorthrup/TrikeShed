@@ -162,7 +162,14 @@ def constant(t: T) -> Callable[[], T]:
 # Wire protocol: FieldSynapse (24 bytes) — exact match to JVM
 # =============================================================================
 
-@dataclass(frozen=True, slots=True)
+# Python 3.9 compat: slots=True only in 3.10+
+import sys
+if sys.version_info >= (3, 10):
+    _DC_SLOTS = {'frozen': True, 'slots': True}
+else:
+    _DC_SLOTS = {'frozen': True}
+
+@dataclass(**_DC_SLOTS)
 class FieldSynapse:
     """24-byte wire protocol frame — matches JVM FieldSynapse exactly"""
     phase: int         # 0=BEFORE, 1=AFTER  (1 byte)
@@ -186,10 +193,10 @@ class FieldSynapse:
     def encode(self) -> bytes:
         """Encode to 24-byte wire frame (big-endian)"""
         import struct
-        # phase(1) + opcode(1) + pad(2) + method_idx(4) + addr(4) + seq(4) + nano(8) + callsite_hash(4) + template_idx(4) = 32?
-        # JVM packs as 24 bytes: phase(1) + opcode(1) + method_idx(4) + addr(4) + seq(4) + nano(8) + callsite_hash(4) + template_idx(4) = 30, padded?
-        # Actual JVM: ByteBuffer.put(phase).put(opcode).putInt(methodIdx).putInt(addr).putInt(seq).putLong(nano).putInt(callsiteHash).putInt(templateIdx)
-        return struct.pack('>bbiiiqii',
+        # JVM: phase(1) + opcode(1) + methodIdx(4) + addr(4) + seq(4) + nano(8) + callsiteHash(4) + templateIdx(4) = 30 bytes
+        # Packed as: bbiiiqii (2 bytes + 30 bytes = 32 bytes with alignment)
+        # In Python: 'b' is signed char (-128 to 127), 'B' is unsigned (0 to 255)
+        return struct.pack('>BBiiiqii',
             self.phase & 0xFF,
             self.opcode & 0xFF,
             self.method_idx,
@@ -203,7 +210,7 @@ class FieldSynapse:
     @classmethod
     def decode(cls, buf: bytes) -> 'FieldSynapse':
         import struct
-        phase, opcode, method_idx, addr, seq, nano, callsite_hash, template_idx = struct.unpack('>bbiiiqii', buf[:32])
+        phase, opcode, method_idx, addr, seq, nano, callsite_hash, template_idx = struct.unpack('>BBiiiqii', buf[:32])
         return cls(phase, opcode, method_idx, addr, seq, nano, callsite_hash, template_idx)
 
 

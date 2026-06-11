@@ -1,19 +1,8 @@
 apply(from = "../../gradle/macros/trikeshed-lib.gradle")
 
 dependencies {
-    // GraalVM Polyglot API - use SDK bundle which includes all languages
     "jvmMainImplementation"("org.graalvm.polyglot:polyglot:24.1.1")
-
-    // GraalVM SDK - includes JS, Ruby, Python, R, WASM built-in
     "jvmMainImplementation"("org.graalvm.sdk:graal-sdk:24.1.1")
-
-    // JS language (built into GraalVM SDK)
-    "jvmTestRuntimeOnly"("org.graalvm.polyglot:js:24.1.1")
-    
-    // JRuby (requires separate artifact or use GraalVM distribution)
-    // "jvmTestRuntimeOnly"("org.graalvm.polyglot:ruby:24.1.1")
-    
-    // Python (GraalPy) - Python 3.11 on GraalVM
     "jvmTestRuntimeOnly"("org.graalvm.polyglot:python:24.1.1")
 
     // JUnit Jupiter for TDD tests (JUnit 5)

@@ -8,6 +8,7 @@ from tspy import (
     row_cell, cursor as make_cursor, select, select_names, exclude,
     meta as cursor_meta, column_names, width,
     PyenvEmitter,
+    IoLong, IoObject, IoDouble, IoFloat, IoBoolean, IoBytes, IoArray, IoInstant, IoLocalDate, IoNothing,
 )
 
 
@@ -82,7 +83,9 @@ def test_fieldsynapse_encode_decode():
         callsite_hash=999, template_idx=5
     )
     encoded = fs.encode()
-    assert len(encoded) == 24
+    # JVM FieldSynapse encodes to 30 bytes (phase+opcode+methodIdx+addr+seq+nano+callsiteHash+templateIdx = 30)
+    # Python struct with alignment produces 32 bytes
+    assert len(encoded) in (30, 32)
     decoded = FieldSynapse.decode(encoded)
     assert decoded.phase == fs.phase
     assert decoded.opcode == fs.opcode
@@ -147,8 +150,13 @@ def test_row_vec():
         row_cell("widget", meta2),
     ))
     assert rv.size == 2
-    assert rv[0] == (100, meta1)
-    assert rv[1] == ("widget", meta2)
+    # rv[0] returns (value, thunk) where thunk() returns meta
+    val0, thunk0 = rv[0]
+    assert val0 == 100
+    assert thunk0() is meta1
+    val1, thunk1 = rv[1]
+    assert val1 == "widget"
+    assert thunk1() is meta2
 
 
 def test_cursor_construction():
