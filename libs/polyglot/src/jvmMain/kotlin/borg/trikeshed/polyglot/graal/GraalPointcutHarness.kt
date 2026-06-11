@@ -10,16 +10,16 @@ import java.util.concurrent.atomic.AtomicLong
 
 /**
  * GraalPointcutHarness - extends pointcut capturing to any Graal polyglot language.
- * 
+ *
  * Uses manual pointcut emission via bound emitter (PolyglotPointcutEmitter).
  * Supports JS, Ruby, Python, WASM via GraalVM SDK.
- * 
+ *
  * Pointcut types:
  * - L_GET (0xA5): instance field / local variable read
  * - L_SET (0xA6): instance field / local variable write
  * - P_GET (0xA7): static field read
  * - P_SET (0xA8): static field write
- * 
+ *
  * Two modes supported:
  * - Same-VM: runs in current JVM (current implementation)
  * - Parent-process VM: communicates via external process (future)
@@ -43,6 +43,23 @@ class GraalPointcutHarness(
         // Auto-bind pointcut emitter if producer provided
         if (pointcutProducer != null) {
             context.bindPointcutEmitter(this, pointcutProducer)
+        }
+        // Install Python instrumentation module from resource
+        installPythonInstrumentation()
+    }
+
+    /** Install Python-side automatic pointcut instrumentation module from resource. */
+    private fun installPythonInstrumentation() {
+        try {
+            val resource = GraalPointcutHarness::class.java.getResource("/pointcut_instrument.py")
+            println("[POINT CUT] Resource URL: $resource")
+            val moduleCode = resource?.readText()
+                ?: throw IllegalStateException("pointcut_instrument.py resource not found")
+            println("[POINT CUT] Module loaded, length: ${moduleCode.length}")
+            context.eval("python", moduleCode)
+        } catch (e: Exception) {
+            println("[POINT CUT] Installation failed: ${e.message}")
+            // Python not available, skip
         }
     }
 
@@ -103,6 +120,19 @@ class GraalPointcutHarness(
         const val OP_L_SET = 0xA6.toByte()
         const val OP_P_GET = 0xA7.toByte()
         const val OP_P_SET = 0xA8.toByte()
+    }
+
+    /** Bind the emitter to Python's pointcut_instrument module. */
+    fun bindPythonInstrumentation(producer: PointcutEventProducer) {
+        try {
+            // First ensure the module is loaded
+            context.eval("python", "import pointcut_instrument")
+            // Then bind the emitter
+            context.eval("python", "pointcut_instrument.set_emitter(pointcutEmitter)")
+        } catch (e: Exception) {
+            // Python not available
+            println("Python instrumentation bind failed: ${e.message}")
+        }
     }
 }
 
@@ -191,3 +221,8 @@ fun Context.bindPointcutEmitter(harness: GraalPointcutHarness, producer: Pointcu
         }
     }
 }
+
+/**
+ * Python module for automatic pointcut instrumentation.
+ * Loaded from src/jvmMain/resources/pointcut_instrument.py
+ */

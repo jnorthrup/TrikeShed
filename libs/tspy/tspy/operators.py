@@ -9,21 +9,20 @@ from __future__ import annotations
 from typing import Callable, TypeVar, Generic, Any
 
 from .join import j
-from .series import Series
+from .series import Series, SeriesClass
 
 X = TypeVar("X")
 C = TypeVar("C")
 T = TypeVar("T")
 
 
-def alpha(series: Series[X], xform: Callable[[X], C]) -> Series[C]:
+def alpha(series: SeriesClass[X], xform: Callable[[X], C]) -> SeriesClass[C]:
     """
     Lazy projection: series α xform.
     Mirrors Kotlin `series α { it.transform() }`.
     Returns a new Series with size preserved, elements transformed lazily.
     """
-    # Use the j function directly instead of series.a.j(...)
-    return j(series.a, lambda i: xform(series[i]))
+    return SeriesClass(series.size, lambda i: xform(series[i]))
 
 
 # Unicode alias

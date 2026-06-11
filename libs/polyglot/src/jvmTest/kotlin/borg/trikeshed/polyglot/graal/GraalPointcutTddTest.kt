@@ -519,15 +519,19 @@ scene.animate_shift()
         val harness = GraalPointcutHarness()
         try {
             var capturedSynapses: MutableList<FieldSynapse> = mutableListOf()
-            harness.context.bindPointcutEmitter(harness, object : PointcutEventProducer {
+            // Use only Python instrumentation binding
+            harness.bindPythonInstrumentation(object : PointcutEventProducer {
                 override fun emit(synapse: FieldSynapse) {
                     capturedSynapses.add(synapse)
                 }
                 override fun emitBatch(synapses: Series<FieldSynapse>) {}
             })
 
-            // Python class with instance fields
+            // Python class with instance fields - instrumented automatically
             harness.eval("python", """
+import pointcut_instrument
+import sys
+
 class PythonTarget:
     def __init__(self):
         self.instance_int = 0
@@ -537,6 +541,13 @@ class PythonTarget:
 class Nested:
     def __init__(self):
         self.value = 42
+
+# Auto-instrument the classes
+print("[TEST] Before auto_instrument")
+pointcut_instrument.auto_instrument(PythonTarget)
+print("[TEST] Instrumented PythonTarget")
+pointcut_instrument.auto_instrument(Nested)
+print("[TEST] Instrumented Nested")
 
 target = PythonTarget()
 # Write instance fields (L_SET)
@@ -558,9 +569,11 @@ z = target.nested.value
             assertTrue(lGets.size >= 3, "Should capture L_GET for instance_int, instance_str, nested.value reads - got ${lGets.size}")
             
             println("Python class field access: L_SET=${lSets.size}, L_GET=${lGets.size}")
+            println("All synapses: ${capturedSynapses.size}")
 
         } catch (e: Exception) {
             println("Python class field access test: ${e.message}")
+            e.printStackTrace()
             throw e  // RED - fail to drive implementation
         } finally {
             harness.close()
@@ -572,7 +585,8 @@ z = target.nested.value
         val harness = GraalPointcutHarness()
         try {
             var capturedSynapses: MutableList<FieldSynapse> = mutableListOf()
-            harness.context.bindPointcutEmitter(harness, object : PointcutEventProducer {
+            // Use only Python instrumentation binding
+            harness.bindPythonInstrumentation(object : PointcutEventProducer {
                 override fun emit(synapse: FieldSynapse) {
                     capturedSynapses.add(synapse)
                 }
@@ -580,6 +594,8 @@ z = target.nested.value
             })
 
             harness.eval("python", """
+import pointcut_instrument
+
 class PythonStaticTarget:
     static_int = 10
     static_str = "static"
@@ -587,6 +603,9 @@ class PythonStaticTarget:
     @classmethod
     def get_static(cls):
         return cls.static_int
+
+# Auto-instrument the class
+pointcut_instrument.auto_instrument(PythonStaticTarget)
 
 # Static field read (P_GET)
 x = PythonStaticTarget.static_int
@@ -606,9 +625,11 @@ z = PythonStaticTarget.get_static()
             assertTrue(pSets.size >= 2, "Should capture P_SET for static_int, static_str writes - got ${pSets.size}")
             
             println("Python static field access: P_GET=${pGets.size}, P_SET=${pSets.size}")
+            println("All synapses: ${capturedSynapses.size}")
 
         } catch (e: Exception) {
             println("Python static field test: ${e.message}")
+            e.printStackTrace()
             throw e
         } finally {
             harness.close()

@@ -1,0 +1,13 @@
+README.md
+pyproject.toml
+src/python/tspy/__init__.py
+src/python/tspy.egg-info/PKG-INFO
+src/python/tspy.egg-info/SOURCES.txt
+src/python/tspy.egg-info/dependency_links.txt
+src/python/tspy.egg-info/requires.txt
+src/python/tspy.egg-info/top_level.txt
+src/python/tspy/algebra/__init__.py
+src/python/tspy/chronicle/__init__.py
+src/python/tspy/cursor/__init__.py
+src/python/tspy/polyglot/__init__.py
+tests/test_algebra.py

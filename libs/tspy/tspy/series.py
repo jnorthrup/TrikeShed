@@ -114,6 +114,9 @@ class SeriesClass(Generic[X]):
         for i in range(self._size):
             yield self._index_fn(i)
     
+    def __len__(self) -> int:
+        return self._size
+    
     def __repr__(self) -> str:
         return f"Series({self._size}, {self._index_fn})"
     
