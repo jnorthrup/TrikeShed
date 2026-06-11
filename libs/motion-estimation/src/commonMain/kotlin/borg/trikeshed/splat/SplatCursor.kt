@@ -14,7 +14,6 @@ import borg.trikeshed.parse.confix.Syntax
 import borg.trikeshed.parse.confix.reify
 
 // ── Cursor integration ───────────────────────────────────────────
-// Convert a Series<RowVec> to Series<Splat> by mapping each RowVec to Splat
 fun Series<RowVec>.toSplatSeries(): Series<Splat> {
     val size = this.size
     val items = Array<Splat>(size)
@@ -39,7 +38,8 @@ fun Splat.toRowVec(): RowVec {
     val arr = Array<Any?>(2)
     arr[0] = this
     arr[1] = { borg.trikeshed.cursor.ColumnMeta("splat", borg.trikeshed.cursor.IOMemento.IoObject, null) }
-    return (2 j { i: Int -> arr[i] }) as RowVec
+    val j = Join(2, { i: Int -> arr[i] })
+    return j as RowVec
 }
 
 fun splatSetOf(vararg splats: Splat): Cursor {
