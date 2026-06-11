@@ -23,14 +23,14 @@ interface PlatformCodec {
 
     companion object {
         val nativeByteOrder: ByteOrder by lazy(::platformNativeByteOrder)
-        val networkByteOrder: ByteOrder = ByteOrder.BIG_ENDIAN
+        val wireByteOrder: ByteOrder = ByteOrder.BIG_ENDIAN
         val isLittleEndian: Boolean get() = nativeByteOrder == ByteOrder.LITTLE_ENDIAN
-        val isNetworkEndian: Boolean get() = nativeByteOrder == networkByteOrder
+        val isWireEndian: Boolean get() = nativeByteOrder == wireByteOrder
 
         val currentPlatformCodec: PlatformCodec by lazy {
             CommonPlatformCodec(isLittleEndian)
         }
-        val networkEndianCodec: PlatformCodec by lazy {
+        val wireCodec: PlatformCodec by lazy {
             CommonPlatformCodec(false)
         }
 

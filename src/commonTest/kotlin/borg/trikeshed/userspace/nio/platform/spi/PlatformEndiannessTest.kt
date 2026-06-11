@@ -34,9 +34,9 @@ class PlatformEndiannessTest {
     }
 
     @Test
-    fun `network endian codec always writes big endian`() {
-        val wireInt = PlatformCodec.networkEndianCodec.writeInt(0x01020304)
-        val wireLong = PlatformCodec.networkEndianCodec.writeLong(0x0102030405060708L)
+    fun `wire codec always writes big endian`() {
+        val wireInt = PlatformCodec.wireCodec.writeInt(0x01020304)
+        val wireLong = PlatformCodec.wireCodec.writeLong(0x0102030405060708L)
 
         assertContentEquals(byteArrayOf(0x01, 0x02, 0x03, 0x04), wireInt)
         assertContentEquals(
@@ -60,10 +60,10 @@ class PlatformEndiannessTest {
     }
 
     @Test
-    fun `native and network codecs diverge on little endian hosts`() {
+    fun `native and wire codecs diverge on little endian hosts`() {
         if (PlatformCodec.isLittleEndian) {
             val native = PlatformCodec.currentPlatformCodec.writeInt(0x01020304)
-            val network = PlatformCodec.networkEndianCodec.writeInt(0x01020304)
+            val network = PlatformCodec.wireCodec.writeInt(0x01020304)
 
             assertTrue(
                 !native.contentEquals(network),
@@ -76,8 +76,8 @@ class PlatformEndiannessTest {
     }
 
     @Test
-    fun `network codec read and write are inverse`() {
-        val codec = PlatformCodec.networkEndianCodec
+    fun `wire codec read and write are inverse`() {
+        val codec = PlatformCodec.wireCodec
         for (value in listOf(0, 1, -1, Int.MAX_VALUE, Int.MIN_VALUE, 0x01020304)) {
             assertEquals(value, codec.readInt(codec.writeInt(value)))
         }
