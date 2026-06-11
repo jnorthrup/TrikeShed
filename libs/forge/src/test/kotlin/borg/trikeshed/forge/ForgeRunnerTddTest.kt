@@ -3,6 +3,7 @@ package borg.trikeshed.forge
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 
@@ -42,7 +43,7 @@ class ForgeStepRunnerTddTest {
             timeoutMs = 5000
         )
 
-        val result = runner.runCode(step, emptyMap(), "/tmp").await()
+        val result = runner.runCodeExecution(step, emptyMap(), "/tmp").await()
 
         assertTrue(result is StepResult.Success)
         val success = result as StepResult.Success
@@ -69,7 +70,7 @@ class ForgeStepRunnerTddTest {
             timeoutMs = 60000
         )
 
-        val result = runner.runAgent(step, mapOf("language" -> "kotlin"), config, "/workspace").await()
+        val result = runner.runAgentInvocation(step, mapOf("language" -> "kotlin"), config, "/workspace").await()
 
         assertTrue(result is StepResult.Success)
         val success = result as StepResult.Success
@@ -86,7 +87,7 @@ class ForgeStepRunnerTddTest {
             outputPath = "merged.md"
         )
 
-        val result = runner.runTransform(step, workspace).await()
+        val result = runner.runFileTransform(step, workspace).await()
 
         assertTrue(result is StepResult.Success)
         val success = result as StepResult.Success
@@ -103,10 +104,10 @@ class ForgeStepRunnerTddTest {
             elseBranch = listOf(WorkflowStep.CodeExecution("else", "python", "pass", emptyMap()))
         )
 
-        val result = runner.evalConditional(step, mapOf("input" -> "this is a long string")).await()
+        val result = runner.runConditional(step, mapOf("input" -> "this is a long string")).await()
         assertTrue(result)
 
-        val result2 = runner.evalConditional(step, mapOf("input" -> "short")).await()
+        val result2 = runner.runConditional(step, mapOf("input" -> "short")).await()
         assertFalse(result2)
     }
 
@@ -123,7 +124,7 @@ class ForgeStepRunnerTddTest {
 
         val results = runner.runParallel(step, emptyMap()) { branchSteps, inputs ->
             branchSteps.map { step ->
-                runner.runCode(step as WorkflowStep.CodeExecution, inputs, "/tmp").await()
+                runner.runCodeExecution(step as WorkflowStep.CodeExecution, inputs, "/tmp").await()
             }
         }.await()
 
@@ -150,7 +151,7 @@ class ForgeAgentRunnerTddTest {
             environment = emptyMap()
         )
 
-        val events = runner.run(config, "Create a test", mapOf(), "/workspace")
+        val events = runner.runAgent(config, "Create a test", mapOf(), "/workspace")
         assertNotNull(events)
 
         // Collect a few events
@@ -179,15 +180,15 @@ class ForgeAgentRunnerTddTest {
 
 private class ForgeStepRunnerStub : ForgeStepRunner {
     override suspend fun runLlmCall(step: WorkflowStep.LlmCall, inputs: Map<String, String>, modelConfig: Map<String, String>): StepResult = throw AssertionError("RED: runLlmCall not implemented")
-    override suspend fun runCode(step: WorkflowStep.CodeExecution, inputs: Map<String, String>, workingDir: String): StepResult = throw AssertionError("RED: runCode not implemented")
-    override suspend fun runAgent(step: WorkflowStep.AgentInvocation, inputs: Map<String, String>, config: AgentConfig, workingDir: String): StepResult = throw AssertionError("RED: runAgent not implemented")
-    override suspend fun runTransform(step: WorkflowStep.FileTransform, workspace: ForgeWorkspace): StepResult = throw AssertionError("RED: runTransform not implemented")
-    override suspend fun evalConditional(step: WorkflowStep.Conditional, inputs: Map<String, String>): Boolean = throw AssertionError("RED: evalConditional not implemented")
+    override suspend fun runCodeExecution(step: WorkflowStep.CodeExecution, inputs: Map<String, String>, workingDir: String): StepResult = throw AssertionError("RED: runCodeExecution not implemented")
+    override suspend fun runAgentInvocation(step: WorkflowStep.AgentInvocation, inputs: Map<String, String>, config: AgentConfig, workingDir: String): StepResult = throw AssertionError("RED: runAgentInvocation not implemented")
+    override suspend fun runFileTransform(step: WorkflowStep.FileTransform, workspace: ForgeWorkspace): StepResult = throw AssertionError("RED: runFileTransform not implemented")
+    override suspend fun runConditional(step: WorkflowStep.Conditional, inputs: Map<String, String>): Boolean = throw AssertionError("RED: runConditional not implemented")
     override suspend fun runParallel(step: WorkflowStep.Parallel, inputs: Map<String, String>, runBranch: (List<WorkflowStep>, Map<String, String>) -> List<StepResult>): List<StepResult> = throw AssertionError("RED: runParallel not implemented")
 }
 
 private class ForgeAgentRunnerStub : ForgeAgentRunner {
-    override fun run(config: AgentConfig, task: String, context: Map<String, String>, workingDir: String): kotlinx.coroutines.channels.ReceiveChannel<AgentEvent> = Channel(0)
+    override fun runAgent(config: AgentConfig, task: String, context: Map<String, String>, workingDir: String): kotlinx.coroutines.channels.ReceiveChannel<AgentEvent> = Channel(0)
     override suspend fun isAvailable(): Boolean = throw AssertionError("RED: isAvailable not implemented")
     override val agentType: AgentType = AgentType.CODEX
 }
@@ -196,38 +197,38 @@ private class ForgeWorkspaceStub : ForgeWorkspace {
     override suspend fun put(file: ForgeFile): ForgeFile = throw AssertionError()
     override suspend fun get(id: ForgeFileId): ForgeFile? = throw AssertionError()
     override suspend fun delete(id: ForgeFileId): Boolean = throw AssertionError()
-    override suspend fun list(): ForgeFileStore = throw AssertionError()
-    override suspend fun search(query: String): ForgeFileStore = throw AssertionError()
-    override fun stream(id: ForgeFileId): ReceiveChannel<String>? = throw AssertionError()
+    override suspend fun list(): Map<ForgeFileId, ForgeFile> = throw AssertionError()
+    override suspend fun search(query: String): List<ForgeFile> = throw AssertionError()
+    override fun stream(id: ForgeFileId): kotlinx.coroutines.channels.ReceiveChannel<String>? = throw AssertionError()
     override suspend fun snapshot(message: String, tags: Set<String>): ForgeSnapshot = throw AssertionError()
     override suspend fun getSnapshot(id: ForgeSnapshotId): ForgeSnapshot? = throw AssertionError()
-    override suspend fun history(): ForgeHistory = throw AssertionError()
+    override suspend fun history(): List<ForgeSnapshot> = throw AssertionError()
     override suspend fun restore(id: ForgeSnapshotId): ForgeSnapshot = throw AssertionError()
     override suspend fun diff(from: ForgeSnapshotId, to: ForgeSnapshotId): ForgeDiff = throw AssertionError()
     override suspend fun branch(base: ForgeSnapshotId, name: String): ForgeSnapshot = throw AssertionError()
     override suspend fun merge(source: ForgeSnapshotId, target: ForgeSnapshotId, message: String): ForgeSnapshot = throw AssertionError()
     override suspend fun putPrompt(prompt: ForgePrompt): ForgePrompt = throw AssertionError()
     override suspend fun getPrompt(id: ForgePromptId): ForgePrompt? = throw AssertionError()
-    override suspend fun listPrompts(): ForgePromptLibrary = throw AssertionError()
-    override suspend fun searchPrompts(query: String): ForgePromptLibrary = throw AssertionError()
+    override suspend fun listPrompts(): List<ForgePrompt> = throw AssertionError()
+    override suspend fun searchPrompts(query: String): List<ForgePrompt> = throw AssertionError()
     override suspend fun deletePrompt(id: ForgePromptId): Boolean = throw AssertionError()
     override suspend fun putWorkflow(workflow: ForgeWorkflow): ForgeWorkflow = throw AssertionError()
     override suspend fun getWorkflow(id: ForgeWorkflowId): ForgeWorkflow? = throw AssertionError()
-    override suspend fun listWorkflows(): ForgeWorkflowRegistry = throw AssertionError()
-    override suspend fun searchWorkflows(query: String): ForgeWorkflowRegistry = throw AssertionError()
+    override suspend fun listWorkflows(): List<ForgeWorkflow> = throw AssertionError()
+    override suspend fun searchWorkflows(query: String): List<ForgeWorkflow> = throw AssertionError()
     override suspend fun deleteWorkflow(id: ForgeWorkflowId): Boolean = throw AssertionError()
-    override fun execute(workflowId: ForgeWorkflowId, inputs: Map<String, String>, configs: Map<AgentType, AgentConfig>, snapshotId: ForgeSnapshotId?): Flow<StepProgress> = flowOf()
+    override fun execute(workflowId: ForgeWorkflowId, inputs: Map<String, String>, configs: Map<AgentType, AgentConfig>, snapshotId: ForgeSnapshotId?): kotlinx.coroutines.flow.Flow<StepProgress> = flowOf()
     override suspend fun executeSync(workflowId: ForgeWorkflowId, inputs: Map<String, String>, configs: Map<AgentType, AgentConfig>, snapshotId: ForgeSnapshotId?): ForgeExecutionResult = throw AssertionError()
     override suspend fun cancel(executionId: ForgeExecutionId): Boolean = throw AssertionError()
-    override suspend fun executions(workflowId: ForgeWorkflowId?): ForgeExecutionHistory = throw AssertionError()
-    override fun events(): Flow<CollaborationEvent> = flowOf()
+    override suspend fun executions(workflowId: ForgeWorkflowId?): List<ForgeExecutionResult> = throw AssertionError()
+    override fun events(): kotlinx.coroutines.flow.Flow<CollaborationEvent> = flowOf()
     override suspend fun emit(event: CollaborationEvent) = throw AssertionError()
-    override suspend fun users(): ForgeActiveUsers = throw AssertionError()
+    override suspend fun users(): List<ForgeUser> = throw AssertionError()
     override suspend fun join(user: ForgeUser) = throw AssertionError()
     override suspend fun leave(userId: ForgeUserId) = throw AssertionError()
     override suspend fun artifact(name: String, description: String, files: List<ForgeFile>, workflowId: ForgeWorkflowId?, executionId: ForgeExecutionId?, isPublic: Boolean): ForgeArtifact = throw AssertionError()
     override suspend fun getArtifact(id: ForgeArtifactId): ForgeArtifact? = throw AssertionError()
-    override suspend fun listArtifacts(publicOnly: Boolean): ForgeArtifactCollection = throw AssertionError()
+    override suspend fun listArtifacts(publicOnly: Boolean): List<ForgeArtifact> = throw AssertionError()
     override suspend fun export(id: ForgeArtifactId, format: ExportFormat): ForgeExportBundle = throw AssertionError()
     override suspend fun importArtifact(bundle: ForgeExportBundle): ForgeArtifact = throw AssertionError()
 }
