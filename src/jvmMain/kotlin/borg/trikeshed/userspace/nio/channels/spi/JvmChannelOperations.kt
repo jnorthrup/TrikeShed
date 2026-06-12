@@ -15,6 +15,16 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
+ * Extension to convert custom ByteBuffer to NIO ByteBuffer
+ */
+private fun ByteBuffer.toNioByteBuffer(): java.nio.ByteBuffer {
+    val nio = java.nio.ByteBuffer.wrap(array(), arrayOffset(), capacity())
+    nio.position(position())
+    nio.limit(limit())
+    return nio
+}
+
+/**
  * JVM stub implementation of [ChannelOperations].
  * 
  * This is a DEV/CI stub only. Production uses Linux io_uring (kernel-level).
@@ -26,10 +36,10 @@ class JvmChannelOperations(
 
     // fd -> Channel mapping (thread-safe)
     // Separate maps for file vs socket channels since FileChannel != SelectableChannel
-    private val fileChannels = ConcurrentHashMap<Int, FileChannel>()
-    private val socketChannels = ConcurrentHashMap<Int, SelectableChannel>()
-    private val socketInterests = ConcurrentHashMap<Int, Set<Interest>>()
-    private val fdCounter = AtomicInteger(100)
+    internal val fileChannels = ConcurrentHashMap<Int, FileChannel>()
+    internal val socketChannels = ConcurrentHashMap<Int, SelectableChannel>()
+    internal val socketInterests = ConcurrentHashMap<Int, Set<Interest>>()
+    internal val fdCounter = AtomicInteger(100)
 
     override fun openChannel(entries: Int): ChannelOperations.ChannelHandle =
         JvmChannelHandle(this, entries)
@@ -95,13 +105,6 @@ class JvmChannelOperations(
     // Public method to register a FileChannel (for file I/O)
     fun registerFile(fd: Int, fc: FileChannel) {
         fileChannels[fd] = fc
-    }
-
-    private fun ByteBuffer.toNioByteBuffer(): java.nio.ByteBuffer {
-        val nio = java.nio.ByteBuffer.wrap(array(), arrayOffset(), capacity())
-        nio.position(position())
-        nio.limit(limit())
-        return nio
     }
 }
 

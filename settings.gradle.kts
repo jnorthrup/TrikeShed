@@ -1,32 +1,42 @@
-pluginManagement {
-    repositories {
-        gradlePluginPortal()
-        mavenCentral()
-        google()
-    }
+import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
+
+tasks.register<Test>("focusedTransportTest") {
+    description = "Runs the focused JVM transport/routing slice."
+    group = "verification"
+    val jvmTestComp = kotlin.targets.getByName("jvm").compilations.getByName("test")
+    val jvmTestTask = tasks.named<Test>("jvmTest")
+    testClassesDirs = jvmTestTask.get().testClassesDirs
+    classpath = files(
+        jvmTestComp.runtimeDependencyFiles,
+        jvmTestComp.output.allOutputs,
+        jvmTestTask.get().outputs.files
+    )
+    include("**/ChannelizationSelectionTest.class")
+    include("**/ChannelizationProjectionTest.class")
+    include("**/ProtocolRouterTest.class")
+    include("**/SelectorTransportBackendTest.class")
+    include("**/LinuxNativeTransportBackendTest.class")
+    include("**/CcekTransportCapabilityTest.class")
+    shouldRunAfter(jvmTestTask)
 }
 
-rootProject.name = "TrikeShed"
+val jmhTask = tasks.register<JavaExec>("jmh") {
+    description = "Runs JMH benchmarks"
+    group = "benchmark"
+    dependsOn("compileKotlinJvm")
+    dependsOn("jvmJar")
 
-// Dynamically include every library under libs/ so each subproject can be built autonomously
-// Note: the following are excluded due to:
-// - classfile (nested gradle, multiplatform with JVM-only subprojects)
-// - miniduck-memory (depends on classfile/miniduck)
-// - jvm-agent (standalone java agent)
-// - activejs (expect/actual architecture issues - being migrated to SPI)
-// - og1 (multiplatform own build, compilation errors)
-// - ngsctp (JVM-specific ByteBuffer in commonMain)
-val libsDir = rootDir.resolve("libs")
-if (libsDir.exists() && libsDir.isDirectory) {
-    libsDir.listFiles()!!
-        .filter { it.isDirectory }
-        .filter { it.name !in setOf(
-                    "classfile", "miniduck-memory", "jvm-agent",
-                    "activejs", "og1", "ngsctp", "userspace"
-                ) }
-        .forEach { include(":libs:${it.name}") }
+    val jvmComp = kotlin.targets.getByName("jvm").compilations.getByName("main")
+    classpath = jvmComp.runtimeDependencyFiles ?: files()
+    classpath += files(jvmComp.output.classesDirs)
+    classpath += files(tasks.getByName("jvmJar").outputs.files)
+
+    mainClass.set("org.openjdk.jmh.Main")
 }
 
-// Include lcnc and couch viewserver
-include(":libs:lcnc")
-include(":libs:couch:viewserver")
+tasks.register("benchmark") {
+    description = "Runs all benchmarks (tests + JMH)"
+    group = "verification"
+    dependsOn("test")
+    dependsOn(jmhTask)
+}

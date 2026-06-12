@@ -1,6 +1,9 @@
 package borg.trikeshed.ebpf
 
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.ReceiveChannel
+import kotlinx.coroutines.channels.ProducerScope
 import kotlinx.coroutines.channels.produce
 import kotlinx.coroutines.channels.send
 import kotlinx.coroutines.flow.Flow
@@ -276,9 +279,9 @@ class EbpfStreamResults(
     fun executeFlow(contexts: Flow<ByteArray>): Flow<Long> = executor.executeFlow(contexts)
 
     /** Executes on a ReceiveChannel of contexts */
-    suspend fun executeChannel(
+    suspend fun <E> executeChannel(
         contexts: ReceiveChannel<ByteArray>
-    ): ReceiveChannel<Long> = produce {
+    ): ReceiveChannel<Long> = CoroutineScope(Job()).produce {
         for (context in contexts) {
             send(executor.executeStream(sequenceOf(context)).first())
         }

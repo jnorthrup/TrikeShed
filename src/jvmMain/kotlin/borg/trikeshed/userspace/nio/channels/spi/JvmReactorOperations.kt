@@ -2,6 +2,7 @@ package borg.trikeshed.userspace.nio.channels.spi
 
 import borg.trikeshed.userspace.reactor.Interest
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.time.Duration
