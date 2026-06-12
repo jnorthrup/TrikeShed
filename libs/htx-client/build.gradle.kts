@@ -2,7 +2,7 @@ apply(from = "../../gradle/macros/trikeshed-lib.gradle")
 
 plugins {
     kotlin("multiplatform")
-    kotlin("plugin.serialization")
+    id("org.jetbrains.kotlin.plugin.serialization") version "2.4.0"
 }
 
 kotlin {
@@ -10,7 +10,8 @@ kotlin {
     sourceSets {
         val commonMain by getting {
             dependencies {
-                api(kotlinx.serialization("core"))
+                api("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
+                api("org.jetbrains.kotlinx:kotlinx-serialization-core:1.7.3")
             }
         }
         val jvmMain by getting {}

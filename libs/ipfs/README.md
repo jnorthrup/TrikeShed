@@ -50,6 +50,7 @@ libs/ipfs/
    - Verifies SHA-256, size, segment structure
 
 ### Target Asset:
+
 ```
 CID: bafkreicysg23kiwv34eg2d7qweipxwosdo2py4ldv42nbauguluen5v6am
 Asset: Big Buck Bunny (1080p, ~147MB, 9:56 duration)
@@ -57,6 +58,7 @@ Format: Dag-CBOR wrapped video in CAR
 ```
 
 ### Run:
+
 ```bash
 ./gradlew :libs:ipfs:run -PmainClass=borg.trikeshed.ipfs.console.BigBuckBunnyVerifier
 ```
@@ -78,6 +80,7 @@ java -cp libs/ipfs/build/libs/ipfs-0.1.0-SNAPSHOT.jar \
 | `Agent<TNum>` | Composed NUID + RoutingTable |
 
 ### Distance Metric
+
 ```kotlin
 // XOR distance in BigInteger space
 distance(a, b) = (a xor b).bitLength()
@@ -97,6 +100,5 @@ bucket = min(distance, bucketCount).dec()
 ## Dependencies
 
 - `libs:miniduck` — BlockRowVec, MiniDuckBlockCodec
-- `libs:classfile:lib_cursor` — Series, Cursor, ColumnMeta
 - AWS SDK v2 (S3), Google Cloud Storage, Alibaba OSS (jvmMain)
 - kotlinx-coroutines (structured concurrency for CCEK fanout)

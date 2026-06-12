@@ -1,11 +1,42 @@
 package borg.trikeshed.sctp
 
+import kotlinx.serialization.Serializable
+import borg.trikeshed.context.AsyncContextElement
+import borg.trikeshed.context.ElementState
 import kotlin.coroutines.CoroutineContext
 
 /**
+ * SCTP Association information.
+ */
+@Serializable
+data class AssociationInfo(
+    val localPort: Int,
+    val remotePort: Int,
+    val state: AssociationState,
+    val streams: Int,
+    val nextTSN: UInt,
+    val cwnd: UInt,
+    val ssthresh: UInt,
+    val bytesInFlight: Long,
+    val outstandingChunks: Int
+)
+
+/**
+ * SCTP Association states
+ */
+enum class AssociationState {
+    CLOSED,
+    COOKIE_WAIT,
+    COOKIE_ECHOED,
+    ESTABLISHED,
+    SHUTDOWN_PENDING,
+    SHUTDOWN_SENT,
+    SHUTDOWN_RECEIVED
+}
+
+/**
  * SCTP Element for the HTX client - Stub implementation.
- * Wraps an SCTP association placeholder and provides the CoroutineContext.Element interface
- * for structured concurrency integration with the TrikeShed context system.
+ * Extends AsyncContextElement for proper lifecycle integration with TrikeShed context system.
  * 
  * TODO: Replace with actual ngsctp.NgSctpAssociation integration when ngsctp compiles.
  */
@@ -13,34 +44,27 @@ class SctpElement(
     val remoteHost: String = "127.0.0.1",
     val remotePort: Int = 9899,
     val localPort: Int = 0
-) : CoroutineContext.Element {
+) : AsyncContextElement(ElementState.CREATED) {
 
     override val key: CoroutineContext.Key<*> get() = SctpKey
-
-    /** Association state */
-    @Volatile
-    var state: AssociationState = AssociationState.CLOSED
-        private set
 
     /** Placeholder for underlying association (actual ngsctp implementation pending) */
     // private var association: NgSctpAssociation? = null
 
-    suspend fun open() {
-        state = AssociationState.COOKIE_WAIT
+    override suspend fun open() {
+        super.open()
         // TODO: Perform actual SCTP handshake
         // association = NgSctpAssociation.connect(...)
-        state = AssociationState.ESTABLISHED
     }
 
-    suspend fun drain() {
+    override suspend fun drain() {
+        super.drain()
         // Wait for all streams to complete
         // association?.coroutineContext?.ensureActive()
     }
 
-    suspend fun close() {
-        state = AssociationState.SHUTDOWN_PENDING
-        // association?.close()
-        state = AssociationState.CLOSED
+    override suspend fun close() {
+        super.close()
     }
 
     /** Get a stream by ID */
@@ -50,6 +74,42 @@ class SctpElement(
     suspend fun openStream(streamId: Int = 0): NgSctpStream {
         // return association?.openStream(streamId) ?: throw IllegalStateException("Association not established")
         throw NotImplementedError("ngsctp integration pending - SctpStream not available")
+    }
+
+    /** Get association info */
+    fun getInfo(): AssociationInfo = AssociationInfo(
+        localPort = localPort,
+        remotePort = remotePort,
+        state = mapElementStateToAssociationState(state),
+        streams = 0,
+        nextTSN = 0u,
+        cwnd = 0u,
+        ssthresh = 0u,
+        bytesInFlight = 0L,
+        outstandingChunks = 0
+    )
+
+    /** Map internal ElementState to SCTP AssociationState */
+    private fun mapElementStateToAssociationState(es: ElementState): AssociationState = when (es) {
+        ElementState.CREATED -> AssociationState.CLOSED
+        ElementState.OPEN -> AssociationState.ESTABLISHED
+        ElementState.ACTIVE -> AssociationState.ESTABLISHED
+        ElementState.DRAINING -> AssociationState.SHUTDOWN_PENDING
+        ElementState.CLOSED -> AssociationState.CLOSED
+    }
+
+    /** Send data on a stream (convenience method) */
+    suspend fun send(streamId: Int, data: ByteArray): Boolean {
+        val stream = getStream(streamId)
+        if (stream == null) return false
+        stream.write(data)
+        return true
+    }
+
+    /** Receive data from a stream (convenience method) */
+    suspend fun receive(streamId: Int): ByteArray? {
+        val stream = getStream(streamId)
+        return stream?.receive()
     }
 }
 
@@ -66,17 +126,6 @@ suspend fun openSctpElement(
     val element = SctpElement(remoteHost, remotePort, localPort)
     element.open()
     return element
-}
-
-/** SCTP Association states */
-enum class AssociationState {
-    CLOSED,
-    COOKIE_WAIT,
-    COOKIE_ECHOED,
-    ESTABLISHED,
-    SHUTDOWN_PENDING,
-    SHUTDOWN_SENT,
-    SHUTDOWN_RECEIVED
 }
 
 /** Placeholder for SCTP Stream - will be replaced by ngsctp.NgSctpStream */

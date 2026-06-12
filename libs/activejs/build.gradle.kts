@@ -28,19 +28,19 @@ kotlin.sourceSets["commonMain"].dependencies {
 // JVM target depends on lib_cursor (JVM-only) and TrikeShed-jvm
 kotlin.sourceSets["jvmMain"].dependencies {
     implementation(kotlin("stdlib-jdk8"))
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:1.11.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
     implementation("org.bereft:TrikeShed-jvm:1.0") // from mavenLocal
     implementation(project(":libs:classfile:lib_cursor"))
 }
 
 kotlin.sourceSets["jsMain"].dependencies {
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core-js:1.11.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
 }
 
 kotlin.sourceSets["wasmJsMain"].dependencies {
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core-wasm:1.11.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
 }
 
 kotlin.sourceSets["linuxX64Main"].dependencies {
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core-native:1.11.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
 }

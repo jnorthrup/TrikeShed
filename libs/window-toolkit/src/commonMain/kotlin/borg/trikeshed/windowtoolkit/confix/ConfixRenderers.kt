@@ -1,12 +1,8 @@
 package borg.trikeshed.windowtoolkit.confix
 
-// TODO: Pull in full org.xvm.activejs when KMP variant resolution fixes are applied
-// import org.xvm.activejs.BlackBoardEntry
-// import org.xvm.activejs.SaxEvent
-
 // The renderer engine abstraction
 interface ConfixRenderer {
-    fun render(entry: Any) // TODO: Swap to BlackBoardEntry
+    fun render(entry: Any)
     fun processInputToken(token: String)
 }
 
@@ -18,10 +14,6 @@ class ConfixBlackboardWidget : ConfixRenderer {
     // Renders the ConfixDoc by walking it as SAX events
     override fun render(entry: Any) {
         // abstract kernel parsing fallback
-        // val doc = entry.doc
-        // when (doc) {
-        //     is org.xvm.activejs.ConfixDoc -> doc.saxWalk { event -> ... }
-        // }
     }
 
     override fun processInputToken(token: String) {

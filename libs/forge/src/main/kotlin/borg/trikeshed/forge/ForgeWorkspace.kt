@@ -1,5 +1,6 @@
 package borg.trikeshed.forge
 
+import borg.trikeshed.forge.CascadeTypes.*
 import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.serialization.Serializable
@@ -71,6 +72,25 @@ interface ForgeWorkspace {
     suspend fun users(): List<ForgeUser>
     suspend fun join(user: ForgeUser)
     suspend fun leave(userId: ForgeUserId)
+
+    // =========================================================================
+    // Cascade Operations
+    // =========================================================================
+
+    suspend fun putCascade(cascade: OperationalCascade): OperationalCascade
+    suspend fun getCascade(id: CascadeId): OperationalCascade?
+    suspend fun listCascades(): List<OperationalCascade>
+    suspend fun deleteCascade(id: CascadeId): Boolean
+
+    /** Detect operational cascades from source data */
+    suspend fun detectCascades(request: CascadeDetectionRequest): CascadeDetectionResult
+
+    /** Execute a cascade and return results */
+    fun executeCascade(cascadeId: CascadeId, snapshotId: ForgeSnapshotId? = null): Flow<CascadeProgress>
+    suspend fun executeCascadeSync(cascadeId: CascadeId, snapshotId: ForgeSnapshotId? = null): CascadeExecutionResult
+
+    /** Get cascade graph for visualization */
+    suspend fun getCascadeGraph(cascadeId: CascadeId): CascadeGraph?
 
     // =========================================================================
     // Artifacts / Sharing

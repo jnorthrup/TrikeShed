@@ -7,28 +7,23 @@ kotlin {
     js { browser() }
     @OptIn(org.jetbrains.kotlin.gradle.ExperimentalWasmDsl::class)
     wasmJs { browser() }
-    linuxX64()
+    linuxX64 {}
 
     sourceSets {
         val commonMain by getting {
             dependencies {
-
-
                 api("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
+                api(project(":libs:user-signals"))
             }
         }
 
         val jvmMain by getting {
             dependencies {
-
-
-
             }
         }
 
         val linuxX64Main by getting {
             dependencies {
-
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
             }
         }

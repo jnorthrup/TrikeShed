@@ -38,7 +38,6 @@ def nestedLibPeer = { String path, String artifact ->
 
 repositories {
     mavenCentral()
-    mavenLocal()
     google()
     gradlePluginPortal()
     maven { url = uri("https://oss.sonatype.org/content/repositories/snapshots/") }
@@ -47,7 +46,6 @@ repositories {
 
 project.repositories {
     mavenCentral()
-    mavenLocal()
     google()
     gradlePluginPortal()
     maven { url = uri("https://oss.sonatype.org/content/repositories/snapshots/") }
@@ -179,29 +177,34 @@ def plainJvm = { boolean applyApplication = false ->
 
 switch (project.path) {
     case ":libs:common":
-        kmpHost()
+        kmpHost(rootMode: "none")
         break
     case ":libs:dreamer-kmm":
         // dreamer-kmm has its own exceptional build.gradle.kts — standalone, root TrikeShed only
         break
     case ":libs:kursive":
     case ":libs:patl":
-    case ":libs:tiny-btrfs":
     case ":libs:ngsctp":
     case ":libs:quic":
-    case ":libs:ipfs":
+    // case ":libs:ipfs":  // TODO: Fix compilation errors
     case ":libs:tls":
-        kmpHost()
-        break
+    case ":libs:concurrency":
     case ":libs:uring":
+    case ":libs:polyglot":
         kmpJvm()
         break
-    case ":libs:polyglot":
+    case ":libs:tiny-btrfs":
+        kmpHost(rootMode: "none")
+        break
+    case ":libs:forge":
         kmpJvm()
         extensions.getByName("kotlin").sourceSets.getByName("commonTest").dependencies {
             implementation rootPeer()
             implementation "org.jetbrains.kotlinx:kotlinx-coroutines-core:${prop("versions.kotlinx-coroutines-core")}"
         }
+        break
+    case ":libs:tiny-btrfs":
+        kmpHost()
         break
     case ":libs:forge":
         kmpJvm()
@@ -392,7 +395,7 @@ switch (project.path) {
         }
         break
     case ":libs:dreamer-dashboard":
-        kmpHost()
+        kmpHost(rootMode: "none")
         group = "com.vsiwest"
         extensions.getByName("kotlin").sourceSets.getByName("jsMain").dependencies {
             implementation libPeer("dreamer-kmm")
@@ -400,15 +403,15 @@ switch (project.path) {
         }
         break
     case ":libs:miniduck":
-        kmpHost(datetimeMain: true)
+        kmpHost(datetimeMain: true, rootMode: "none")
         def miniduckKotlin = extensions.getByName("kotlin")
         def miniduckSets = miniduckKotlin.sourceSets
         miniduckSets.getByName("commonMain").dependencies {
-            implementation libPeer("kursive")
             implementation "org.jetbrains.kotlin:kotlin-test:${kotlinVersion}"
         }
         miniduckSets.getByName("jvmMain").dependencies {
             implementation "org.jetbrains.kotlin:kotlin-reflect:${kotlinVersion}"
+            implementation libPeer("kursive")
         }
         miniduckSets.getByName("commonTest").dependencies {
             implementation libPeer("couch")
@@ -429,10 +432,10 @@ switch (project.path) {
         def miniduckMemSets = miniduckMemKotlin.sourceSets
         miniduckMemSets.getByName("commonMain").dependencies {
             api libPeer("miniduck")
-            api libPeer("kursive")
         }
         miniduckMemSets.getByName("jvmMain").dependencies {
             implementation "org.jetbrains.kotlin:kotlin-reflect:${kotlinVersion}"
+            api libPeer("kursive")
         }
         miniduckMemSets.getByName("commonTest").dependencies {
             implementation libPeer("couch")
@@ -443,18 +446,20 @@ switch (project.path) {
         miniduckMemSets.findByName("linuxMain")?.dependsOn(miniduckMemPosix)
         break
     case ":libs:couch":
-        kmpHost(datetimeMain: true)
+        kmpHost(datetimeMain: true, rootMode: "none")
         def couchKotlin = extensions.getByName("kotlin")
         def couchSets = couchKotlin.sourceSets
         couchSets.getByName("commonMain").dependencies {
             api libPeer("miniduck")
-            api libPeer("quic")
-            // api libPeer("ngsctp")  // TODO: Re-enable when ngsctp compiles
             implementation libPeer("tiny-btrfs")
-            implementation libPeer("kursive")
         }
         couchSets.getByName("jvmMain").dependencies {
             implementation "org.jetbrains.kotlin:kotlin-reflect:${kotlinVersion}"
+            api libPeer("quic")
+            // api libPeer("ngsctp")  // TODO: Re-enable when ngsctp compiles
+            implementation libPeer("kursive")
+            implementation libPeer("patl")
+            implementation libPeer("tls")
         }
         couchSets.getByName("jvmTest").dependencies {
             implementation nestedLibPeer(":libs:couch:viewserver", "couch-viewserver")
@@ -492,8 +497,10 @@ switch (project.path) {
         def viewSets = viewKotlin.sourceSets
         viewSets.getByName("commonMain").dependencies {
             implementation libPeer("couch")
-            implementation libPeer("kursive")
             implementation libPeer("htx-client")
+        }
+        viewSets.getByName("jvmMain").dependencies {
+            implementation libPeer("kursive")
         }
         viewSets.getByName("jsMain").kotlin.srcDir("${layout.buildDirectory.get().asFile}/dukat")
         tasks.register("generateDts", Exec) {
@@ -537,13 +544,13 @@ switch (project.path) {
         }
         break
     case ":libs:htx-client":
-        kmpHost()
-        extensions.getByName("kotlin").sourceSets.getByName("commonMain").dependencies {
+        kmpJvm()
+        extensions.getByName("kotlin").sourceSets.getByName("jvmMain").dependencies {
             implementation project(":libs:tls")
             implementation project(":libs:quic")
             // implementation project(":libs:ngsctp")  // TODO: Re-enable when ngsctp compiles
         }
-        extensions.getByName("kotlin").sourceSets.getByName("commonMain").kotlin.srcDir("src/generated/kotlin")
+        extensions.getByName("kotlin").sourceSets.getByName("jvmMain").kotlin.srcDir("src/generated/kotlin")
 
         tasks.register("openApiGenerateHtxGeneralClient", JavaExec) {
             group = "openapi"

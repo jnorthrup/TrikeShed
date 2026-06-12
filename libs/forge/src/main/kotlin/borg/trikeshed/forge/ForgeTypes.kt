@@ -1,5 +1,6 @@
 package borg.trikeshed.forge
 
+import borg.trikeshed.forge.CascadeTypes.CascadeId
 import kotlinx.serialization.Serializable
 import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.flow.Flow
@@ -158,6 +159,13 @@ sealed interface WorkflowStep {
     data class Parallel(
         val id: String,
         val branches: List<List<WorkflowStep>>,
+    ) : WorkflowStep
+
+    @Serializable
+    data class CascadeExecution(
+        val id: String,
+        val cascadeId: CascadeId,
+        val inputs: Map<String, String> = emptyMap(),
     ) : WorkflowStep
 }
 

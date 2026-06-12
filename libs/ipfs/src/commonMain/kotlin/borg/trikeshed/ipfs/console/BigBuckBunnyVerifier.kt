@@ -1,25 +1,23 @@
 package borg.trikeshed.ipfs.console
 
-import borg.trikeshed.dht.agent.Agent
 import borg.trikeshed.dht.agent.WorldAgent
-import borg.trikeshed.dht.agent.WorldNetwork
 import borg.trikeshed.dht.agent.WorldRouter
 import borg.trikeshed.dht.id.NUID
 import borg.trikeshed.dht.id.NUID.Companion.minNUID
-import borg.trikeshed.dht.id.BigIntegerNUID
+import borg.trikeshed.dht.id.impl.BigIntegerNUID
 import borg.trikeshed.dht.include.Address
 import borg.trikeshed.dht.include.Route
-import borg.trikeshed.dht.net.NetMask
 import borg.trikeshed.dht.routing.RoutingTable
 import borg.trikeshed.ipfs.CID
 import borg.trikeshed.ipfs.DhtService
-import borg.trikeshed.ipfs.LoopbackDhtTransport
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.delay
+import java.io.ByteArrayOutputStream
 import java.math.BigInteger
 import java.net.URL
 import java.nio.charset.StandardCharsets
 import java.security.MessageDigest
+import java.util.Random
 
 /**
  * Big Buck Bunny Verifier — IPFS DHT & Gateway Verification Console App
@@ -71,7 +69,7 @@ object BigBuckBunnyVerifier {
         // ─── 3. Announce Provider for Target CID ───
         println("▶ Step 3: Announcing Provider for Target CID")
         val cid = parseCid(TARGET_CID)
-        announceProvider(agent, cid)
+        announceProvider(cid)
         println("  ✓ Announced as provider for CID: $TARGET_CID")
         println()
 
@@ -93,14 +91,16 @@ object BigBuckBunnyVerifier {
         }
     }
 
-    // ═══════════════════════════════════════════════════════════════
+    // ════════════════════════════════════════════════════════════════
     // DHT Identity Manufacturing
-    // ═══════════════════════════════════════════════════════════════
+    // ════════════════════════════════════════════════════════════════
 
     private fun createAgent(): WorldAgent {
-        // Create 160-bit NUID (IPFS/Kademlia standard)
-        val nuid = minNUID(160) as BigIntegerNUID
+        // Create 160-bit NUID (IPFS/Kademlia standard) - uses BigInt internally
+        val nuid: NUID<BigInteger> = minNUID(160)
         val routingTable = WorldRouter(nuid)
+        // Assign random ID
+        nuid.assign(BigInteger(160, Random()))
         return WorldAgent(nuid, routingTable)
     }
 
@@ -109,24 +109,24 @@ object BigBuckBunnyVerifier {
         val bootstrapPeers = listOf(
             "/dnsaddr/bootstrap.libp2p.io/p2p/12D3KooWBmAwcd4PJNJvfV89HwE48nwkRmAgo8Vy3uQEyNNHBox2",
             "/dnsaddr/bootstrap.libp2p.io/p2p/12D3KooWQYV9dGMFoRzNStwpXztXaBU3F5h6AodBdM4NSJKVNLyz",
-            "/dnsaddr/bootstrap.libp2p.io/p2p/12D3KooWSX8UBLwJQE vorbeYNxwgQZ9kzvZRdLQ7Uj2JTD5YwcfQe",
+            "/dnsaddr/bootstrap.libp2p.io/p2p/12D3KooWSX8UBLwJQEvorbeYNxwgQZ9kzvZRdLQ7Uj2JTD5YwcfQe",
             "/dnsaddr/bootstrap.libp2p.io/p2p/12D3KooWQvnUbRVo6tNtLUS2TVZpM6aE3jvw5t1QYtsELHNMzq93",
             "/dnsaddr/bootstrap.libp2p.io/p2p/12D3KooW9hgvPHaNvPJnTFavVQQCGLGjm6U9apVw3X7aa3DvwZdF",
         )
 
         bootstrapPeers.forEach { peerAddr ->
             // Create a synthetic NUID for the bootstrap peer (in real impl, parse from peer ID)
-            val peerNuid = minNUID(160) as BigIntegerNUID
-            peerNuid.assign(BigInteger.probablePrime(160, java.util.Random()))
+            val peerNuid: NUID<BigInteger> = minNUID(160)
+            peerNuid.assign(BigInteger(160, Random()))
             val route = Route(peerNuid, peerAddr)
             agent.routingTable.addRoute(route)
         }
     }
 
-    private fun announceProvider(agent: WorldAgent, cid: CID) {
-        val transport = LoopbackDhtTransport()
-        val dht = DhtService(transport)
-        dht.announceProvider(cid, "trikeshed-verifier:${agent.NUID.id?.toString(16) ?: "unknown"}")
+    private fun announceProvider(cid: CID) {
+        // Simple in-process announcement using DhtService directly
+        val dht = DhtService()
+        dht.announceProvider(cid, "trikeshed-verifier")
     }
 
     private fun parseCid(cidStr: String): CID {
@@ -141,9 +141,9 @@ object BigBuckBunnyVerifier {
         return CID(raw)
     }
 
-    // ═══════════════════════════════════════════════════════════════
+    // ════════════════════════════════════════════════════════════════
     // Gateway Fetching & Verification
-    // ═══════════════════════════════════════════════════════════════
+    // ════════════════════════════════════════════════════════════════
 
     private data class VerificationResult(
         val verified: Boolean,
@@ -153,8 +153,9 @@ object BigBuckBunnyVerifier {
     )
 
     private fun fetchAndVerifyAllGateways(): Map<String, VerificationResult> {
-        return GATEWAYS.associateWith { gateway ->
-            try {
+        val results = mutableMapOf<String, VerificationResult>()
+        GATEWAYS.forEach { gateway ->
+            results[gateway] = try {
                 val url = URL("$gateway$TARGET_CID")
                 println("  → Fetching from $gateway...")
                 val connection = url.openConnection()
@@ -202,8 +203,6 @@ object BigBuckBunnyVerifier {
                 )
             }
         }
+        return results
     }
 }
-
-// Helper import
-import java.io.ByteArrayOutputStream

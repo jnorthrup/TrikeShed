@@ -5,8 +5,6 @@ main: borg.trikeshed.miniduck.memory.MiniduckMemoryModule
 
 dependencies:
   - miniduck
-  - lib_cursor
-  - kurative
 
 targets:
   - jvm
