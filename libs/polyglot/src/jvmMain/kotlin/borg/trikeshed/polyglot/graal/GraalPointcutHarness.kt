@@ -5,7 +5,6 @@ import org.graalvm.polyglot.HostAccess
 import org.graalvm.polyglot.Value
 import borg.trikeshed.polyglot.ccek.PointcutEventProducer
 import borg.trikeshed.polyglot.ccek.FieldSynapse
-import java.io.InputStream
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
 
@@ -200,74 +199,81 @@ class GraalPointcutHarness(
         const val OP_L_SET = 0xA6.toByte()
         const val OP_P_GET = 0xA7.toByte()
         const val OP_P_SET = 0xA8.toByte()
-    }
 
-    /** Python instrumentation module - loaded from resource file. */
-    val PYTHON_INSTRUMENTATION_MODULE: String
-        get() = loadPythonInstrumentationModule()
+        /** Python instrumentation module - loaded from resource file. */
+        fun loadPythonInstrumentationModule(): String {
+            val stream = GraalPointcutHarness::class.java.getResourceAsStream("/pointcut_instrument.py")
+                ?: throw IllegalStateException("Python instrumentation module not found")
+            return stream.readBytes().decodeToString()
+        }
 
-    /** Load Python instrumentation module from resource file. */
-    fun loadPythonInstrumentationModule(): String {
-        val stream = GraalPointcutHarness::class.java.getResourceAsStream("/pointcut_instrument.py")
-            ?: throw IllegalStateException("Python instrumentation module not found")
-        return stream.readBytes().decodeToString()
-    }
+        /** Python instrumentation module - loaded from resource file. */
+        val PYTHON_INSTRUMENTATION_MODULE: String
+            get() = loadPythonInstrumentationModule()
 
-    /** Install Python-side automatic pointcut instrumentation module from inline string. */
-    private fun installPythonInstrumentation() {
-        try {
+        /** Load Python instrumentation module from resource file. */
+        fun loadPythonInstrumentationModule(): String {
+            val stream = GraalPointcutHarness::class.java.getResourceAsStream("/pointcut_instrument.py")
+                ?: throw IllegalStateException("Python instrumentation module not found")
+            return stream.readBytes().decodeToString()
+        }
+
+        /** Install Python-side automatic pointcut instrumentation module from inline string. */
+        private fun installPythonInstrumentation() {
+            try {
+                val ctx: org.graalvm.polyglot.Context = GraalPointcutHarness().graalContext
+                ctx.eval("python", PYTHON_INSTRUMENTATION_MODULE)
+            } catch (e: Exception) {
+                // Python not available, skip
+            }
+        }
+
+        /** Bind pointcut emitter to context manually (for custom setup). */
+        fun bindPointcutEmitter(producer: PointcutEventProducer) {
+            GraalPointcutHarness().graalContext.bindPointcutEmitter(GraalPointcutHarness(), producer)
+        }
+
+        /**
+         * Evaluate code in a Graal language.
+         * Language IDs: "js", "ruby", "python", "wasm", "llvm"
+         * Returns the result converted to a Kotlin/JVM type.
+         */
+        fun eval(languageId: String, source: String): Any? {
             val ctx: org.graalvm.polyglot.Context = GraalPointcutHarness().graalContext
-            ctx.eval("python", PYTHON_INSTRUMENTATION_MODULE)
-        } catch (e: Exception) {
-            // Python not available, skip
-        }
-    }
+            val value = ctx.eval(languageId, source)
+            if (value == null || value.isNull) return null
 
-    /** Bind pointcut emitter to context manually (for custom setup). */
-    fun bindPointcutEmitter(producer: PointcutEventProducer) {
-        GraalPointcutHarness().graalContext.bindPointcutEmitter(GraalPointcutHarness(), producer)
-    }
+            // Try numeric conversions in order of preference
+            if (value.isNumber) {
+                try { return value.asInt() } catch (e: Exception) {}
+                try { return value.asLong() } catch (e: Exception) {}
+                try { return value.asDouble() } catch (e: Exception) {}
+            }
 
-    /**
-     * Evaluate code in a Graal language.
-     * Language IDs: "js", "ruby", "python", "wasm", "llvm"
-     * Returns the result converted to a Kotlin/JVM type.
-     */
-    fun eval(languageId: String, source: String): Any? {
-        val ctx: org.graalvm.polyglot.Context = GraalPointcutHarness().graalContext
-        val value = ctx.eval(languageId, source)
-        if (value == null || value.isNull) return null
-
-        // Try numeric conversions in order of preference
-        if (value.isNumber) {
-            try { return value.asInt() } catch (e: Exception) {}
-            try { return value.asLong() } catch (e: Exception) {}
-            try { return value.asDouble() } catch (e: Exception) {}
+            return when {
+                value.isString -> value.asString()
+                value.isBoolean -> value.asBoolean()
+                value.isHostObject -> value.asHostObject()
+                else -> value.toString()
+            }
         }
 
-        return when {
-            value.isString -> value.asString()
-            value.isBoolean -> value.asBoolean()
-            value.isHostObject -> value.asHostObject()
-            else -> value.toString()
+        /** Close the Graal context and clean up. */
+        fun close() {
+            GraalPointcutHarness().graalContext.close()
         }
-    }
 
-    /** Close the Graal context and clean up. */
-    fun close() {
-        GraalPointcutHarness().graalContext.close()
-    }
+        /** Get or assign a method index for a callsite. */
+        fun getMethodIndex(callsiteKey: String): Int {
+            return GraalPointcutHarness().methodIndexCache.computeIfAbsent(callsiteKey) { GraalPointcutHarness().methodIndexCache.size }
+        }
 
-    /** Get or assign a method index for a callsite. */
-    fun getMethodIndex(callsiteKey: String): Int {
-        return GraalPointcutHarness().methodIndexCache.computeIfAbsent(callsiteKey) { GraalPointcutHarness().methodIndexCache.size }
-    }
+        /** Get or assign a template index for a pattern. */
+        fun getTemplateIndex(patternKey: String): Int {
+            return GraalPointcutHarness().templateIndexCache.computeIfAbsent(patternKey) { GraalPointcutHarness().templateIndexCache.size }
+        }
 
-    /** Get or assign a template index for a pattern. */
-    fun getTemplateIndex(patternKey: String): Int {
-        return GraalPointcutHarness().templateIndexCache.computeIfAbsent(patternKey) { GraalPointcutHarness().templateIndexCache.size }
+        /** Get next sequence number. */
+        fun nextSeq(): Long = GraalPointcutHarness().sequenceCounter.incrementAndGet()
     }
-
-    /** Get next sequence number. */
-    fun nextSeq(): Long = GraalPointcutHarness().sequenceCounter.incrementAndGet()
 }

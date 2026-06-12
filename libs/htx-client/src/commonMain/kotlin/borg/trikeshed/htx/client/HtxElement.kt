@@ -3,7 +3,6 @@ package borg.trikeshed.htx.client
 import borg.trikeshed.context.AsyncContextElement
 import borg.trikeshed.context.ElementState
 import borg.trikeshed.htx.client.ipfs.CakManager
-import borg.trikeshed.htx.client.ipfs.CarIntegration
 import borg.trikeshed.htx.client.ipfs.CarParseResult
 import borg.trikeshed.htx.client.ipfs.HtxBitswapTransport
 import borg.trikeshed.htx.client.ipfs.HtxDhtTransport
@@ -14,11 +13,7 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import kotlin.coroutines.CoroutineContext
-import kotlin.coroutines.EmptyCoroutineContext
 
-/**
- * HTTP response from HTX client/server.
- */
 @Serializable
 data class HtxClientMessage(
     val status: Int,
@@ -29,9 +24,6 @@ data class HtxClientMessage(
     val isSuccess: Boolean get() = status in 200..299
 }
 
-/**
- * HTTP request for HTX client/server.
- */
 @Serializable
 data class HtxClientRequest(
     val method: String,
@@ -47,39 +39,17 @@ data class HtxClientRequest(
     }
 }
 
-/**
- * HTX Element for the HTX client — CCEK integrated with IPFS stack.
- * 
- * IPFS Integration:
- * - CakManager: Unified content-addressable keys (BlockStore, DHT, Bitswap, CAR)
- * - HtxDhtTransport: DHT via io_uring/FunctionalUringFacade
- * - HtxBitswapTransport: Bitswap via HTX Channels
- * - CarIntegration: CAR v1/v2 archives
- * 
- * PRELOAD.md contract:
- * - Gets installed in coroutine context via HtxKey
- * - Lifecycle: CREATED → OPEN → ACTIVE → DRAINING → CLOSED
- * - Zero-copy fanout via shared FanoutDispatcherElement
- * - Cold Series α-projection for HTTP/IPFS message encoding
- */
 class HtxElement(
     val baseUrl: String = "http://127.0.0.1",
-    /** Optional BlockStore for content-addressable storage. */
     private val blockStore: borg.trikeshed.htx.client.ipfs.BlockStore? = null,
-    /** Optional DHT transport for Kademlia routing. */
     private val htxDhtTransport: HtxDhtTransport? = null,
-    /** Optional Bitswap transport for block exchange. */
     private val htxBitswapTransport: HtxBitswapTransport? = null,
-    /** Optional CCEK fanout dispatcher for zero-copy event dispatch. */
-    private val fanoutDispatcher: borg.trikeshed.userspace.FanoutDispatcherElement? = null,
 ) : AsyncContextElement(ElementState.CREATED) {
 
     override val key: CoroutineContext.Key<*> get() = HtxKey
 
     private var _cakManager: CakManager? = null
-    private var _carIntegration: CarIntegration? = null
 
-    /** Get or create the CAK Manager (unified IPFS interface). */
     val cak: CakManager
         get() {
             if (_cakManager == null) {
@@ -87,27 +57,16 @@ class HtxElement(
                     blockStore = blockStore ?: MemoryBlockStore(),
                     dhtTransport = htxDhtTransport,
                     bitswapTransport = htxBitswapTransport,
-                    fanoutDispatcher = fanoutDispatcher,
                     parentJob = coroutineContext[Job],
                 )
             }
             return _cakManager!!
         }
 
-    /** Get or create the CAR integration. */
-    val car: CarIntegration
-        get() {
-            if (_carIntegration == null) {
-                _carIntegration = CarIntegration()
-            }
-            return _carIntegration!!
-        }
-
     override suspend fun open() {
         super.open()
-        // Initialize IPFS stack if configured
         if (blockStore != null || htxDhtTransport != null || htxBitswapTransport != null) {
-            _ = cak // Force initialization
+            _ = cak
         }
     }
 
@@ -116,79 +75,44 @@ class HtxElement(
         super.close()
     }
 
-    /**
-     * Execute an HTTP request.
-     * Main entry point used by the server adapter.
-     */
     suspend fun request(
         method: String,
         path: String,
         headers: Map<String, List<String>> = emptyMap(),
         body: String = ""
-    ): HtxClientMessage {
-        return HtxClientMessage(
-            status = 200,
-            body = "OK"
-        )
-    }
+    ): HtxClientMessage = HtxClientMessage(status = 200, body = "OK")
 
-    // ───── IPFS Convenience Methods ─────
-
-    /** PUT content to IPFS and return CID. */
     suspend fun ipfsPut(data: ByteArray): borg.trikeshed.htx.client.ipfs.CID = cak.put(data)
-
-    /** GET content from IPFS by CID. */
     suspend fun ipfsGet(cid: borg.trikeshed.htx.client.ipfs.CID): ByteArray? = cak.get(cid)
-
-    /** Pin a CID (store locally + announce to DHT). */
     suspend fun ipfsPin(cid: borg.trikeshed.htx.client.ipfs.CID, address: String = "local") = cak.pin(cid, address)
-
-    /** Import CAR archive. */
     suspend fun ipfsImportCar(data: ByteArray): CarParseResult = cak.importCar(data)
-
-    /** Export roots as CAR archive. */
     suspend fun ipfsExportCar(roots: List<borg.trikeshed.htx.client.ipfs.CID>, version: Int = 2): ByteArray = cak.exportCar(roots, version)
 }
 
-/** Factory for opening HtxElement with IPFS integration. */
 object HtxElementFactory {
 
-    /** Open HtxElement with default configuration. */
     suspend fun open(
         baseUrl: String = "http://127.0.0.1",
         blockStore: borg.trikeshed.htx.client.ipfs.BlockStore? = null,
         htxDhtTransport: HtxDhtTransport? = null,
         htxBitswapTransport: HtxBitswapTransport? = null,
-        fanoutDispatcher: borg.trikeshed.userspace.FanoutDispatcherElement? = null,
     ): HtxElement {
-        val element = HtxElement(
-            baseUrl,
-            blockStore,
-            htxDhtTransport,
-            htxBitswapTransport,
-            fanoutDispatcher,
-        )
+        val element = HtxElement(baseUrl, blockStore, htxDhtTransport, htxBitswapTransport)
         element.open()
         return element
     }
 
-    /** Open HtxElement fully wired with CCEK reactor. */
     suspend fun openCcekWired(
         baseUrl: String = "http://127.0.0.1",
         scope: CoroutineScope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob()),
     ): Triple<HtxElement, borg.trikeshed.userspace.LiburingElement, borg.trikeshed.userspace.FanoutDispatcherElement> {
         
-        // Install liburing + fanout
         val (liburing, fanout) = scope.installLiburingWithFanout()
+        val (_, _, dhtTransport) = HtxDhtTransportFactory.installHtxDhtTransport(256)
         
-        // Install DHT transport
-        val (_, _, dhtTransport) = HtxDhtTransportFactory.installHtxDhtTransport(256, fanout)
-        
-        // Create element with IPFS
         val element = HtxElement(
             baseUrl = baseUrl,
             htxDhtTransport = dhtTransport,
-            fanoutDispatcher = fanout,
         )
         element.open()
         
@@ -196,5 +120,4 @@ object HtxElementFactory {
     }
 }
 
-/** Context key for HtxElement in structured concurrency. */
 object HtxKey : CoroutineContext.Key<HtxElement>

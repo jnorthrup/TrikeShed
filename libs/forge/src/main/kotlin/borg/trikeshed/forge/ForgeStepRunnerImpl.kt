@@ -15,7 +15,6 @@ class ForgeStepRunnerImpl : ForgeStepRunner {
         resolvedInputs: Map<String, String>,
         modelConfig: Map<String, String>
     ): StepResult {
-        // Mock LLM response
         return StepResult.Success(
             stepId = step.id,
             output = "Mock LLM response for prompt ${step.promptId.value} with model ${step.model}",
@@ -28,7 +27,6 @@ class ForgeStepRunnerImpl : ForgeStepRunner {
         resolvedInputs: Map<String, String>,
         workingDir: String
     ): StepResult {
-        // Mock code execution - just return the code as output
         return StepResult.Success(
             stepId = step.id,
             output = "Executed in ${step.language}: ${step.code.take(100)}",
@@ -42,7 +40,6 @@ class ForgeStepRunnerImpl : ForgeStepRunner {
         agentConfig: AgentConfig,
         workingDir: String
     ): StepResult {
-        // Mock agent response
         return StepResult.Success(
             stepId = step.id,
             output = "Agent ${step.agentType} completed task: ${step.task}",
@@ -54,7 +51,6 @@ class ForgeStepRunnerImpl : ForgeStepRunner {
         step: WorkflowStep.FileTransform,
         workspace: ForgeWorkspace
     ): StepResult {
-        // Mock file transform - create a merged file artifact
         val inputFiles = step.inputFileIds.mapNotNull { workspace.get(it) }
         val mergedContent = inputFiles.joinToString("\n\n---\n\n") { it.content }
         val artifact = ForgeFile(
@@ -74,7 +70,6 @@ class ForgeStepRunnerImpl : ForgeStepRunner {
         step: WorkflowStep.Conditional,
         resolvedInputs: Map<String, String>
     ): Boolean {
-        // Simple condition evaluation - check if input.length > N
         return when {
             step.condition.contains(".length >") -> {
                 val parts = step.condition.split(">")
@@ -113,22 +108,24 @@ class ForgeStepRunnerImpl : ForgeStepRunner {
         workspace: ForgeWorkspace
     ): StepResult {
         val result = workspace.executeCascadeSync(step.cascadeId)
-        return if (result.status == CascadeExecutionStatus.SUCCESS) {
-            StepResult.Success(
-                stepId = step.id,
-                output = kotlinx.serialization.json.Json.encodeToString(result.output.map { it.value }),
-                artifacts = result.output.map { row ->
-                    ForgeFile(
-                        id = ForgeFileId.generate(),
-                        path = "cascade-output/${row.key.joinToString("_")}.json",
-                        content = row.value,
-                        mimeType = "application/json"
-                    )
-                },
-                metadata = mapOf("cascadeId" to step.cascadeId.value, "rowCount" to result.output.size.toString())
-            )
-        } else {
-            StepResult.Failure(stepId = step.id, error = "Cascade execution failed: ${result.status}")
+        if (result.status != CascadeExecutionStatus.SUCCESS) {
+            return StepResult.Failure(stepId = step.id, error = "Cascade execution failed: ${result.status}")
         }
+
+        val outputStrings = result.output.map { it.value }.joinToString(",")
+        val artifacts = result.output.map { row ->
+            ForgeFile(
+                id = ForgeFileId.generate(),
+                path = "cascade-output/${row.key.joinToString("_")}.json",
+                content = row.value,
+                mimeType = "application/json"
+            )
+        }
+        return StepResult.Success(
+            stepId = step.id,
+            output = "[$outputStrings]",
+            artifacts = artifacts,
+            metadata = mapOf("cascadeId" to step.cascadeId.value, "rowCount" to result.output.size.toString())
+        )
     }
 }

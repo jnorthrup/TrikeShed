@@ -7,18 +7,8 @@ import borg.trikeshed.windowtoolkit.ui.StyleCursor
 import borg.trikeshed.windowtoolkit.math.Series
 import borg.trikeshed.windowtoolkit.math.Vec2
 import borg.trikeshed.windowtoolkit.ui.skin
-import borg.trikeshed.usersignals.Signal
-import borg.trikeshed.usersignals.SignalComponent
-import borg.trikeshed.usersignals.SignalFactory
-import borg.trikeshed.usersignals.SignalTemplate
-import borg.trikeshed.usersignals.SignalSource
-import borg.trikeshed.usersignals.Algebra.VisualTemplate
-import borg.trikeshed.usersignals.Algebra.TemplateHole
-import borg.trikeshed.usersignals.Algebra.TemplateOutput
-import borg.trikeshed.usersignals.Algebra.template
-import borg.trikeshed.usersignals.Algebra.beside
-import borg.trikeshed.usersignals.Algebra.above
-import borg.trikeshed.usersignals.SignalContextElement
+import borg.trikeshed.usersignals.*
+import borg.trikeshed.usersignals.SignalAlgebra
 
 /**
  * Root builder for the Windowing toolkit DSL shell.
@@ -63,43 +53,8 @@ class WindowShell(val context: WindowContextElement) {
         return st
     }
 
-    /** DSL for building signal templates */
-    class SignalTemplateBuilder {
-        private val templateBuilder = borg.trikeshed.usersignals.Algebra.TemplateBuilder()
-        private val bindingBuilders = mutableListOf<() -> borg.trikeshed.usersignals.Algebra.TemplateBinding<*>>()
-
-        fun <T> hole(key: String): TemplateHole<T> = templateBuilder.hole(key)
-        fun toggleHole() = borg.trikeshed.usersignals.Algebra.StandardHoles.toggle
-        fun lightHole() = borg.trikeshed.usersignals.Algebra.StandardHoles.light
-        fun sliderHole() = borg.trikeshed.usersignals.Algebra.StandardHoles.slider
-        fun knobHole() = borg.trikeshed.usersignals.Algebra.StandardHoles.knob
-        fun levelHole() = borg.trikeshed.usersignals.Algebra.StandardHoles.level
-        fun labelHole() = borg.trikeshed.usersignals.Algebra.StandardHoles.label
-        fun iconHole() = borg.trikeshed.usersignals.Algebra.StandardHoles.icon
-
-        fun <T> bind(hole: TemplateHole<T>, signal: Signal<T>): SignalTemplateBuilder {
-            bindingBuilders.add { borg.trikeshed.usersignals.Algebra.TemplateBinding(hole, signal) }
-            return this
-        }
-
-        fun label(text: String): SignalTemplateBuilder {
-            bindingBuilders.add { borg.trikeshed.usersignals.Algebra.TemplateBinding(borg.trikeshed.usersignals.Algebra.StandardHoles.label, borg.trikeshed.usersignals.Rendering.ConstSignal(text)) }
-            return this
-        }
-
-        fun icon(name: String): SignalTemplateBuilder {
-            bindingBuilders.add { borg.trikeshed.usersignals.Algebra.TemplateBinding(borg.trikeshed.usersignals.Algebra.StandardHoles.icon, borg.trikeshed.usersignals.Rendering.ConstSignal(name)) }
-            return this
-        }
-
-        fun build(): SignalTemplate {
-            val tpl = templateBuilder.build { bindings ->
-                TemplateOutput(templateId = templateBuilder.id, boundValues = bindings, metadata = templateBuilder.metadata)
-            }
-            val bindings = bindingBuilders.map { it() }
-            return borg.trikeshed.usersignals.SignalTemplate(tpl, bindings)
-        }
-    }
+    /** DSL for building signal templates - uses user-signals SignalTemplateBuilder */
+    typealias SignalTemplateBuilder = borg.trikeshed.usersignals.SignalTemplateBuilder
 
     /**
      * Create a composed signal component using user-signals algebra.
@@ -108,7 +63,7 @@ class WindowShell(val context: WindowContextElement) {
         if (components.size == 1) return components[0]
         var composed = components[0]
         for (i in 1 until components.size) {
-            composed = borg.trikeshed.usersignals.Algebra.beside(composed, components[i])
+            composed = SignalAlgebra.beside(composed, components[i])
         }
         return composed
     }
@@ -118,7 +73,7 @@ class WindowShell(val context: WindowContextElement) {
         if (components.size == 1) return components[0]
         var composed = components[0]
         for (i in 1 until components.size) {
-            composed = borg.trikeshed.usersignals.Algebra.above(composed, components[i])
+            composed = SignalAlgebra.above(composed, components[i])
         }
         return composed
     }

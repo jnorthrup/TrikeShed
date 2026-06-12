@@ -113,6 +113,7 @@ fun WindowContextElement.resizeFlow(): Flow<WindowResizeEvent> {
                 is SignalEvent.SignalChanged<*> -> if (event.signalId == "window.resize" && event.value is WindowResizeEvent) {
                     channel.trySend(event.value as WindowResizeEvent)
                 }
+                else -> {}
             }
         }
     })
@@ -127,6 +128,7 @@ fun WindowContextElement.tokenFlow(): Flow<InputTokenEvent> {
                 is SignalEvent.SignalChanged<*> -> if (event.signalId == "window.token" && event.value is InputTokenEvent) {
                     channel.trySend(event.value as InputTokenEvent)
                 }
+                else -> {}
             }
         }
     })

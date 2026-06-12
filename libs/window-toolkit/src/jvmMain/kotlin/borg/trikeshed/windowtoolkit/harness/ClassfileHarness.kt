@@ -8,10 +8,8 @@ import borg.trikeshed.windowtoolkit.math.size
 import borg.trikeshed.windowtoolkit.math.j
 import borg.trikeshed.windowtoolkit.ui.applyUniformStyle
 import borg.trikeshed.windowtoolkit.confix.ConfixBlackboardWidget
-import borg.trikeshed.usersignals.Algebra.TemplateOutput
-import borg.trikeshed.usersignals.SignalTemplate
-import borg.trikeshed.usersignals.Algebra.beside
-import borg.trikeshed.usersignals.Algebra.above
+import borg.trikeshed.usersignals.*
+import borg.trikeshed.usersignals.SignalAlgebra
 import kotlinx.coroutines.runBlocking
 
 /**
@@ -44,7 +42,6 @@ fun buildClassfileDatagridHarness(jsonDump: String): WindowShell {
             bind(lightHole(), toggle) // toggle also acts as light
             bind(sliderHole(), slider)
             bind(levelHole(), level)
-            iconHole().also { bind(it, borg.trikeshed.usersignals.Rendering.ConstSignal("📊")) }
         }
 
         // 5. Compose multiple signal components
@@ -63,7 +60,7 @@ fun buildClassfileDatagridHarness(jsonDump: String): WindowShell {
 
         // Use signal algebra to compose
         val composed = stackComponents(
-            beside(harnessStatus, zoomControl),
+            composeComponents(harnessStatus, zoomControl),
             activityMeter
         )
         // Component is automatically tracked
@@ -92,19 +89,16 @@ fun main() = runBlocking {
     shell.mount()
 
     // Demonstrate signal-driven updates
-    val toggle = shell.signals.getSource<Boolean>("classfile.enabled")
-    val slider = shell.signals.getSource<Double>("classfile.zoom")
-    val level = shell.signals.getSource<Double>("classfile.activity")
+    val ctx = shell.signals.signalContext
+    val toggleSource = ctx.getSource<Boolean>("classfile.enabled")
+    val sliderSource = ctx.getSource<Double>("classfile.zoom")
+    val levelSource = ctx.getSource<Double>("classfile.activity")
 
-    toggle?.emit(false)
-    slider?.emit(2.0)
-    level?.emit(0.75)
+    toggleSource?.emit(false)
+    sliderSource?.emit(2.0)
+    levelSource?.emit(0.75)
 
     println("Successfully mounted Classfile Harness inside Window Toolkit Shell")
-
-    // Render via signal template output
-    println("Signal template outputs (text backend):")
-    // This would render via the user-signals rendering pipeline
 
     shell.unmount()
 }

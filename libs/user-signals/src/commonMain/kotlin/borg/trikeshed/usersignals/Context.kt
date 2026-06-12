@@ -95,6 +95,7 @@ class SignalContextElement : AsyncSignalElement {
 fun CoroutineContext.getSignalContextElement(): SignalContextElement? = this[SignalContextElement.Key]
 
 class SignalFactory(private val context: SignalContextElement) {
+    val signalContext: SignalContextElement = context
     // Explicit type parameters for registration
     fun toggle(signalId: String, initial: Boolean = false): Toggle {
         val t = toggle(initial)

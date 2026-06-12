@@ -69,10 +69,10 @@ class ForgeCascadeTddTest {
         val result = workspace.detectCascades(request)
 
         val cascade = result.detectedCascades[0]
-        assertEquals(3, cascade.stages.size)  // Map, Reduce, Rereduce
-        val mapStage = cascade.stages[0] as CascadeStage.Map
-        val reduceStage = cascade.stages[1] as CascadeStage.Reduce
-        val rereduceStage = cascade.stages[2] as CascadeStage.Rereduce
+        assertEquals(3, cascade.stages.size)  // MapStage, ReduceStage, RereduceStage
+        val mapStage = cascade.stages[0] as CascadeStage.MapStage
+        val reduceStage = cascade.stages[1] as CascadeStage.ReduceStage
+        val rereduceStage = cascade.stages[2] as CascadeStage.RereduceStage
 
         assertTrue(mapStage.transform is MapTransform.JsFunction)
         assertTrue(reduceStage.reduceFn is ReduceTransform.Builtin)
@@ -169,8 +169,8 @@ class ForgeCascadeTddTest {
         val graph = workspace.getCascadeGraph(cascade.id)
 
         assertNotNull(graph)
-        assertEquals(4, graph!!.nodes.size)  // SOURCE -> MAP -> REDUCE -> REREDUCE -> SINK
-        assertEquals(3, graph.edges.size)
+        assertEquals(5, graph!!.nodes.size)  // SOURCE -> MAP -> REDUCE -> REREDUCE -> SINK
+        assertEquals(4, graph.edges.size)
         val types = graph.nodes.map { it.type }.toSet()
         assertTrue(types.contains(CascadeStageType.SOURCE))
         assertTrue(types.contains(CascadeStageType.MAP))

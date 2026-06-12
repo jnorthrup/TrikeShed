@@ -205,19 +205,19 @@ class ConsoleRenderer(
 }
 
 class SignalTemplate(
-    private val template: VisualTemplate,
-    private val bindings: List<TemplateBinding<*>> = emptyList()
-) {
+    override val template: VisualTemplate,
+    override val bindings: List<TemplateBinding<*>> = emptyList()
+) : SignalComponent<TemplateOutput> {
     fun <T> bind(hole: TemplateHole<T>, signal: Signal<T>): SignalTemplate =
         SignalTemplate(template, bindings + TemplateBinding(hole, signal))
 
     fun label(text: String): SignalTemplate = bind(labelHole(), ConstSignal(text))
     fun icon(name: String): SignalTemplate = bind(iconHole(), ConstSignal(name))
 
-    val output: Signal<TemplateOutput> = object : Signal<TemplateOutput> {
+    override val output: Signal<TemplateOutput> = object : Signal<TemplateOutput> {
         private val _channel = Channel<TemplateOutput>(Channel.UNLIMITED)
         override val value: TemplateOutput
-            get() = template.render(bindings.associate { it.hole.key to (it.signal.value as Any) })
+            get() = this@SignalTemplate.template.render(this@SignalTemplate.bindings.associate { it.hole.key to (it.signal.value as Any) })
         override val changes: Flow<TemplateOutput> = _channel.receiveAsFlow()
         init { _channel.trySend(value) }
     }
