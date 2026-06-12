@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TrikeShed Forge — Full Demo</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --surface2: #1c2333;
+    --border: #30363d;
+    --text: #e6edf3;
+    --text2: #8b949e;
+    --accent: #58a6ff;
+    --accent2: #7ee787;
+    --accent3: #d2a8ff;
+    --accent4: #f0883e;
+    --red: #f85149;
+    --yellow: #e3b341;
+    --green: #3fb950;
+    --cyan: #39d2c0;
+    --pink: #f778ba;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; height: 100vh; overflow: hidden; display: grid; grid-template-columns: 220px 1fr 280px; grid-template-rows: 48px 1fr; }
+
+  /* ── Header ── */
+  header { grid-column: 1/-1; background: var(--surface); border-bottom: 1px solid var(--border); display: flex; align-items: center; padding: 0 16px; gap: 16px; }
+  header .logo { font-weight: 700; font-size: 15px; letter-spacing: -0.5px; }
+  header .logo span { color: var(--accent); }
+  header .breadcrumb { color: var(--text2); font-size: 12px; }
+  header .breadcrumb b { color: var(--text); }
+  header .metrics-bar { margin-left: auto; display: flex; gap: 12px; }
+  .metric-chip { background: var(--surface2); border: 1px solid var(--border); border-radius: 6px; padding: 2px 10px; font-size: 11px; color: var(--text2); }
+  .metric-chip b { color: var(--accent2); margin-right: 4px; }
+
+  /* ── Sidebar ── */
+  nav { background: var(--surface); border-right: 1px solid var(--border); padding: 12px 0; overflow-y: auto; }
+  nav .section { padding: 8px 16px; font-size: 10px; font-weight: 700; color: var(--text2); text-transform: uppercase; letter-spacing: 1px; }
+  nav .item { padding: 6px 16px 6px 28px; font-size: 13px; cursor: pointer; display: flex; align-items: center; gap: 8px; color: var(--text2); transition: all .15s; }
+  nav .item:hover, nav .item.active { background: rgba(88,166,255,.08); color: var(--text); }
+  nav .item.active { border-right: 2px solid var(--accent); }
+  nav .item .icon { width: 16px; text-align: center; font-size: 14px; }
+  nav .item .badge { margin-left: auto; background: var(--accent); color: var(--bg); font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 8px; }
+  nav .item .badge.green { background: var(--green); }
+  nav .item .badge.purple { background: var(--accent3); }
+  nav .item .badge.orange { background: var(--accent4); }
+  nav .collab-users { padding: 8px 16px; }
+  .collab-dot { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text2); margin-right: 10px; }
+  .collab-dot .dot { width: 8px; height: 8px; border-radius: 50%; }
+
+  /* ── Main ── */
+  main { overflow-y: auto; padding: 24px; }
+  .panel { display: none; }
+  .panel.active { display: block; }
+
+  /* ── Panel: Overview ── */
+  .hero { text-align: center; padding: 40px 0 32px; }
+  .hero h1 { font-size: 32px; font-weight: 300; letter-spacing: -1px; }
+  .hero h1 b { font-weight: 700; color: var(--accent); }
+  .hero p { color: var(--text2); margin-top: 8px; font-size: 14px; max-width: 600px; margin-inline: auto; }
+  .stats-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; margin-top: 24px; }
+  .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 16px; text-align: center; }
+  .stat-card .num { font-size: 28px; font-weight: 700; }
+  .stat-card .lbl { font-size: 11px; color: var(--text2); text-transform: uppercase; letter-spacing: .5px; margin-top: 4px; }
+  .pipeline-flow { margin-top: 28px; display: flex; align-items: center; justify-content: center; gap: 0; flex-wrap: wrap; }
+  .flow-node { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 10px 16px; font-size: 12px; font-weight: 600; text-align: center; }
+  .flow-arrow { color: var(--accent); font-size: 18px; padding: 0 6px; }
+
+  /* ── Panel: Files ── */
+  .file-list { display: flex; flex-direction: column; gap: 8px; }
+  .file-row { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 12px 16px; display: grid; grid-template-columns: 20px 1fr 120px 60px; gap: 12px; align-items: center; }
+  .file-row .mime-icon { font-size: 16px; }
+  .file-row .path { font-family: 'SF Mono', Menlo, monospace; font-size: 13px; }
+  .file-row .mime { font-size: 11px; color: var(--text2); }
+  .file-row .size { font-size: 11px; color: var(--text2); text-align: right; }
+
+  /* ── Panel: Workflow ── */
+  .wf-canvas { display: flex; flex-direction: column; gap: 0; position: relative; }
+  .wf-step { display: flex; align-items: stretch; gap: 0; }
+  .wf-rail { width: 48px; display: flex; flex-direction: column; align-items: center; position: relative; }
+  .wf-dot { width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--accent); background: var(--bg); z-index: 1; flex-shrink: 0; }
+  .wf-dot.done { background: var(--green); border-color: var(--green); }
+  .wf-dot.running { background: var(--yellow); border-color: var(--yellow); animation: pulse 1.5s infinite; }
+  @keyframes pulse { 0%,100%{ box-shadow: 0 0 0 0 rgba(227,179,65,.4); } 50%{ box-shadow: 0 0 0 8px rgba(227,179,65,0); } }
+  .wf-line { width: 2px; flex: 1; background: var(--border); }
+  .wf-card { flex: 1; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 12px 16px; margin: 4px 0; }
+  .wf-card .step-type { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; }
+  .wf-card .step-detail { font-size: 13px; margin-top: 4px; color: var(--text2); }
+  .type-llm { color: var(--accent); }
+  .type-code { color: var(--green); }
+  .type-agent { color: var(--accent3); }
+  .type-transform { color: var(--accent4); }
+  .type-cascade { color: var(--cyan); }
+
+  /* ── Panel: Database ── */
+  .db-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .db-table th { text-align: left; padding: 8px 12px; border-bottom: 2px solid var(--border); color: var(--text2); font-size: 11px; text-transform: uppercase; letter-spacing: .5px; font-weight: 600; }
+  .db-table td { padding: 8px 12px; border-bottom: 1px solid var(--border); }
+  .db-table tr:hover td { background: rgba(88,166,255,.04); }
+  .status-badge { display: inline-block; padding: 2px 10px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+  .status-backlog { background: rgba(139,148,158,.15); color: var(--text2); }
+  .status-todo { background: rgba(88,166,255,.15); color: var(--accent); }
+  .status-in-progress { background: rgba(227,179,65,.15); color: var(--yellow); }
+  .status-done { background: rgba(63,185,80,.15); color: var(--green); }
+  .effort-dots { display: flex; gap: 3px; }
+  .effort-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--border); }
+  .effort-dot.filled { background: var(--accent4); }
+
+  /* ── Panel: Notion ── */
+  .notion-page { max-width: 700px; }
+  .notion-page h1 { font-size: 28px; font-weight: 700; margin-bottom: 8px; }
+  .notion-page .block { padding: 4px 0; display: flex; align-items: flex-start; gap: 8px; }
+  .notion-page .block .check { color: var(--green); font-size: 14px; margin-top: 2px; flex-shrink: 0; }
+  .notion-page .block .check.empty { color: var(--border); }
+  .notion-page .block .bullet { color: var(--text2); margin-top: 2px; flex-shrink: 0; }
+  .notion-page .block .text { font-size: 14px; line-height: 1.5; }
+  .notion-page .block .text h2 { font-size: 18px; font-weight: 600; margin: 12px 0 4px; }
+  .notion-page .block .text.dim { color: var(--text2); }
+
+  /* ── Panel: Cascades ── */
+  .cascade-diagram { display: flex; align-items: center; gap: 12px; margin: 20px 0; flex-wrap: wrap; }
+  .cascade-node { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 12px 20px; text-align: center; }
+  .cascade-node .c-label { font-size: 11px; color: var(--text2); text-transform: uppercase; }
+  .cascade-node .c-value { font-size: 16px; font-weight: 700; margin-top: 4px; }
+  .cascade-arrow { color: var(--accent); font-size: 20px; }
+
+  /* ── Panel: Artifacts ── */
+  .artifact-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 20px; }
+  .artifact-card h3 { font-size: 16px; font-weight: 600; }
+  .artifact-card .meta { font-size: 12px; color: var(--text2); margin-top: 8px; }
+  .artifact-card .public-badge { display: inline-block; background: rgba(63,185,80,.15); color: var(--green); padding: 2px 10px; border-radius: 10px; font-size: 11px; font-weight: 600; margin-top: 8px; }
+
+  /* ── Inspector ── */
+  aside { background: var(--surface); border-left: 1px solid var(--border); padding: 16px; overflow-y: auto; }
+  aside h3 { font-size: 11px; text-transform: uppercase; letter-spacing: .5px; color: var(--text2); margin-bottom: 8px; }
+  .inspector-section { margin-bottom: 20px; }
+  .inspector-row { display: flex; justify-content: space-between; padding: 4px 0; font-size: 12px; border-bottom: 1px solid rgba(48,54,61,.5); }
+  .inspector-row .key { color: var(--text2); }
+  .inspector-row .val { color: var(--accent2); font-family: 'SF Mono', Menlo, monospace; }
+
+  .event-log { max-height: 300px; overflow-y: auto; }
+  .event-entry { padding: 3px 0; font-size: 11px; color: var(--text2); font-family: 'SF Mono', Menlo, monospace; border-bottom: 1px solid rgba(48,54,61,.3); }
+  .event-entry .ev-tag { display: inline-block; padding: 0 4px; border-radius: 3px; font-size: 10px; margin-right: 6px; }
+  .ev-tag.put { background: rgba(88,166,255,.15); color: var(--accent); }
+  .ev-tag.snap { background: rgba(63,185,80,.15); color: var(--green); }
+  .ev-tag.exec { background: rgba(210,168,255,.15); color: var(--accent3); }
+  .ev-tag.collab { background: rgba(240,136,62,.15); color: var(--accent4); }
+  .ev-tag.query { background: rgba(57,210,192,.15); color: var(--cyan); }
+
+  /* ── Snapshot timeline ── */
+  .snap-timeline { display: flex; flex-direction: column; gap: 12px; }
+  .snap-item { display: flex; gap: 12px; align-items: flex-start; }
+  .snap-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--accent); margin-top: 5px; flex-shrink: 0; }
+  .snap-line { width: 2px; background: var(--border); margin-left: 4px; flex: 1; min-height: 24px; }
+  .snap-body h4 { font-size: 13px; font-weight: 600; }
+  .snap-body .snap-meta { font-size: 11px; color: var(--text2); margin-top: 2px; }
+
+  /* ── Prompt cards ── */
+  .prompt-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px; margin-bottom: 12px; }
+  .prompt-card h4 { font-size: 14px; font-weight: 600; }
+  .prompt-card .tpl { font-family: 'SF Mono', Menlo, monospace; font-size: 12px; color: var(--text2); margin-top: 8px; background: var(--surface2); padding: 8px; border-radius: 6px; white-space: pre-wrap; line-height: 1.4; }
+  .prompt-card .params { margin-top: 8px; display: flex; gap: 6px; flex-wrap: wrap; }
+  .param-chip { background: rgba(210,168,255,.1); color: var(--accent3); padding: 2px 8px; border-radius: 4px; font-size: 11px; font-family: monospace; }
+
+  /* scrollbar */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo"><span>⬡</span> TrikeShed <b>Forge</b></div>
+  <div class="breadcrumb">Workspace › <b>Full Demo</b></div>
+  <div class="metrics-bar">
+    <span class="metric-chip"><b>3</b> files</span>
+    <span class="metric-chip"><b>37</b> tests ✓</span>
+    <span class="metric-chip"><b>22</b> cursor rows</span>
+    <span class="metric-chip"><b>3</b> machines</span>
+  </div>
+</header>
+
+<nav>
+  <div class="section">Workspace</div>
+  <div class="item active" data-panel="overview"><span class="icon">◈</span> Overview</div>
+  <div class="item" data-panel="files"><span class="icon">📄</span> Files <span class="badge">3</span></div>
+  <div class="item" data-panel="snapshots"><span class="icon">⧖</span> Snapshots <span class="badge green">2</span></div>
+  <div class="item" data-panel="prompts"><span class="icon">⚡</span> Prompts <span class="badge purple">2</span></div>
+
+  <div class="section">Process</div>
+  <div class="item" data-panel="workflow"><span class="icon">⤳</span> Workflow <span class="badge">5</span></div>
+  <div class="item" data-panel="cascades"><span class="icon">⟳</span> Cascades <span class="badge orange">1</span></div>
+  <div class="item" data-panel="artifacts"><span class="icon">📦</span> Artifacts <span class="badge green">1</span></div>
+
+  <div class="section">Notion</div>
+  <div class="item" data-panel="notion"><span class="icon">✎</span> Dashboard</div>
+  <div class="item" data-panel="database"><span class="icon">⊞</span> Forge Hinges <span class="badge">10</span></div>
+
+  <div class="section" style="margin-top:12px">Online</div>
+  <div class="collab-users">
+    <span class="collab-dot"><span class="dot" style="background:#4A90D9"></span> Alice</span>
+    <span class="collab-dot"><span class="dot" style="background:#D94A4A"></span> Bob</span>
+  </div>
+</nav>
+
+<main>
+  <!-- OVERVIEW -->
+  <div class="panel active" id="panel-overview">
+    <div class="hero">
+      <h1>TrikeShed <b>Forge</b></h1>
+      <p>Autonomous LLM Workflow Fabric — full demo exercising every surface: files, snapshots, prompts, DAG workflows, agent invocation, cascades, Notion model, artifacts, and real-time collaboration.</p>
+    </div>
+
+    <div class="stats-grid">
+      <div class="stat-card"><div class="num" style="color:var(--accent)">3</div><div class="lbl">Files</div></div>
+      <div class="stat-card"><div class="num" style="color:var(--green)">37</div><div class="lbl">Tests ✓</div></div>
+      <div class="stat-card"><div class="num" style="color:var(--accent3)">22</div><div class="lbl">Cursor Rows</div></div>
+      <div class="stat-card"><div class="num" style="color:var(--accent4)">25</div><div class="lbl">Collab Events</div></div>
+      <div class="stat-card"><div class="num" style="color:var(--cyan)">5</div><div class="lbl">WF Steps</div></div>
+      <div class="stat-card"><div class="num" style="color:var(--pink)">2</div><div class="lbl">Prompts</div></div>
+      <div class="stat-card"><div class="num" style="color:var(--yellow)">2</div><div class="lbl">Snapshots</div></div>
+      <div class="stat-card"><div class="num" style="color:var(--green)">3</div><div class="lbl">Machines</div></div>
+    </div>
+
+    <div style="margin-top:36px; text-align:center;">
+      <div style="font-size:11px; color:var(--text2); text-transform:uppercase; letter-spacing:1px; margin-bottom:12px;">PRELOAD Algebra Chain</div>
+      <div class="pipeline-flow">
+        <div class="flow-node" style="border-color:var(--accent)">Join&lt;A,B&gt;</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-node" style="border-color:var(--accent2)">Series&lt;T&gt;</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-node" style="border-color:var(--accent3)">Cursor</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-node" style="border-color:var(--accent4)">ConfixDoc</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-node" style="border-color:var(--pink)">Blackboard</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-node" style="border-color:var(--cyan)">CCEK</div>
+      </div>
+    </div>
+
+    <div style="margin-top:36px; text-align:center;">
+      <div style="font-size:11px; color:var(--text2); text-transform:uppercase; letter-spacing:1px; margin-bottom:12px;">Demo Pipeline: Telemetry Analysis</div>
+      <div class="pipeline-flow">
+        <div class="flow-node" style="border-color:var(--accent)">JSONL<br><small style="color:var(--text2)">readings</small></div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-node" style="border-color:var(--accent3)">LLM<br><small style="color:var(--text2)">gpt-5.5</small></div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-node" style="border-color:var(--green)">Code<br><small style="color:var(--text2)">kotlin</small></div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-node" style="border-color:var(--accent3)">Agent<br><small style="color:var(--text2)">CODEX</small></div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-node" style="border-color:var(--accent4)">Transform<br><small style="color:var(--text2)">md-table</small></div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-node" style="border-color:var(--cyan)">Cascade<br><small style="color:var(--text2)">rollup</small></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FILES -->
+  <div class="panel" id="panel-files">
+    <h2 style="font-size:20px; font-weight:600; margin-bottom:16px;">Files</h2>
+    <div class="file-list">
+      <div class="file-row">
+        <div class="mime-icon" style="color:var(--accent)">📄</div>
+        <div><div class="path">README.md</div><div style="font-size:11px;color:var(--text2);margin-top:2px"># TrikeShed Forge</div></div>
+        <div class="mime">text/markdown</div>
+        <div class="size">492 B</div>
+      </div>
+      <div class="file-row">
+        <div class="mime-icon" style="color:var(--accent4)">📊</div>
+        <div><div class="path">data/readings.jsonl</div><div style="font-size:11px;color:var(--text2);margin-top:2px">{"machine":"alpha","region":"us-east","cpu":85.2…</div></div>
+        <div class="mime">application/x-ndjson</div>
+        <div class="size">507 B</div>
+      </div>
+      <div class="file-row">
+        <div class="mime-icon" style="color:var(--green)">⌨</div>
+        <div><div class="path">src/analyzer.kt</div><div style="font-size:11px;color:var(--text2);margin-top:2px">package borg.trikeshed.forge.demo</div></div>
+        <div class="mime">text/x-kotlin</div>
+        <div class="size">265 B</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SNAPSHOTS -->
+  <div class="panel" id="panel-snapshots">
+    <h2 style="font-size:20px; font-weight:600; margin-bottom:16px;">Snapshot Timeline</h2>
+    <div class="snap-timeline">
+      <div class="snap-item">
+        <div><div class="snap-dot"></div><div class="snap-line"></div></div>
+        <div class="snap-body">
+          <h4>c575a685 — Initial workspace state</h4>
+          <div class="snap-meta">3 files · tags: init, baseline</div>
+        </div>
+      </div>
+      <div class="snap-item">
+        <div><div class="snap-dot"></div><div class="snap-line"></div></div>
+        <div class="snap-body">
+          <h4>8a967d7d — Post-modification checkpoint</h4>
+          <div class="snap-meta">3 files · 1 file modified · tags: checkpoint</div>
+        </div>
+      </div>
+    </div>
+    <div style="margin-top:24px; background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:16px;">
+      <div style="font-size:12px; color:var(--text2); margin-bottom:8px;">Diff: snap₁ → snap₂</div>
+      <div style="font-family:'SF Mono',Menlo,monospace; font-size:12px;">
+        <div style="color:var(--green)">+ ## Status</div>
+        <div style="color:var(--green)">+ All 37 tests GREEN. Standalone harness verified.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PROMPTS -->
+  <div class="panel" id="panel-prompts">
+    <h2 style="font-size:20px; font-weight:600; margin-bottom:16px;">Prompt Library</h2>
+    <div class="prompt-card">
+      <h4>summarize-readings <span style="color:var(--text2);font-weight:400;font-size:12px;">v1</span></h4>
+      <div class="tpl">Summarize these machine telemetry readings as a <span style="color:var(--accent3)">{{format}}</span> report:
+
+<span style="color:var(--accent3)">{{readings}}</span>
+
+Focus on: <span style="color:var(--accent3)">{{focus_areas}}</span></div>
+      <div class="params"><span class="param-chip">format</span><span class="param-chip">readings</span><span class="param-chip">focus_areas</span></div>
+    </div>
+    <div class="prompt-card">
+      <h4>critique-analysis <span style="color:var(--text2);font-weight:400;font-size:12px;">v1</span></h4>
+      <div class="tpl">Critique this analysis for completeness and accuracy:
+
+<span style="color:var(--accent3)">{{analysis}}</span>
+
+Consider: <span style="color:var(--accent3)">{{criteria}}</span></div>
+      <div class="params"><span class="param-chip">analysis</span><span class="param-chip">criteria</span></div>
+    </div>
+  </div>
+
+  <!-- WORKFLOW -->
+  <div class="panel" id="panel-workflow">
+    <h2 style="font-size:20px; font-weight:600; margin-bottom:4px;">telemetry-analysis-pipeline</h2>
+    <div style="font-size:12px; color:var(--text2); margin-bottom:20px;">5 steps · version 2 · execution: SUCCESS</div>
+    <div class="wf-canvas">
+      <div class="wf-step">
+        <div class="wf-rail"><div class="wf-dot done"></div><div class="wf-line"></div></div>
+        <div class="wf-card">
+          <div class="step-type type-llm">① LLM Call</div>
+          <div class="step-detail">gpt-5.5 · summarize-readings · inputs: format=table, focus_areas=cpu trends</div>
+        </div>
+      </div>
+      <div class="wf-step">
+        <div class="wf-rail"><div class="wf-dot done"></div><div class="wf-line"></div></div>
+        <div class="wf-card">
+          <div class="step-type type-code">② Code Execution</div>
+          <div class="step-detail">kotlin · analyzeCpu(readings) · timeout: 10s</div>
+        </div>
+      </div>
+      <div class="wf-step">
+        <div class="wf-rail"><div class="wf-dot done"></div><div class="wf-line"></div></div>
+        <div class="wf-card">
+          <div class="step-type type-agent">③ Agent Invocation</div>
+          <div class="step-detail">CODEX · "Critique telemetry analysis" · tools: read, search</div>
+        </div>
+      </div>
+      <div class="wf-step">
+        <div class="wf-rail"><div class="wf-dot done"></div><div class="wf-line"></div></div>
+        <div class="wf-card">
+          <div class="step-type type-transform">④ File Transform</div>
+          <div class="step-detail">markdown-table · output/report.md</div>
+        </div>
+      </div>
+      <div class="wf-step">
+        <div class="wf-rail"><div class="wf-dot done"></div></div>
+        <div class="wf-card">
+          <div class="step-type type-cascade">⑤ Cascade Execution</div>
+          <div class="step-detail">machine-cpu-rollup · group by [machine] · reduce AVG(cpu)</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CASCADES -->
+  <div class="panel" id="panel-cascades">
+    <h2 style="font-size:20px; font-weight:600; margin-bottom:4px;">Operational Cascades</h2>
+    <div style="font-size:12px; color:var(--text2); margin-bottom:20px;">CouchDB-style map/reduce/rereduce pipelines</div>
+
+    <div style="background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:20px; margin-bottom:20px;">
+      <h3 style="font-size:16px; font-weight:600;">machine-cpu-rollup</h3>
+      <div style="font-size:12px; color:var(--text2); margin-top:4px;">Source: data/readings.jsonl · Key: [machine] · Metric: cpu</div>
+
+      <div class="cascade-diagram">
+        <div class="cascade-node" style="border-color:var(--accent)">
+          <div class="c-label">Source</div>
+          <div class="c-value" style="color:var(--accent)">JSONL</div>
+        </div>
+        <div class="cascade-arrow">→</div>
+        <div class="cascade-node" style="border-color:var(--accent3)">
+          <div class="c-label">Map</div>
+          <div class="c-value" style="color:var(--accent3);font-size:13px">emit([machine], cpu)</div>
+        </div>
+        <div class="cascade-arrow">→</div>
+        <div class="cascade-node" style="border-color:var(--green)">
+          <div class="c-label">Reduce</div>
+          <div class="c-value" style="color:var(--green)">AVG</div>
+        </div>
+        <div class="cascade-arrow">→</div>
+        <div class="cascade-node" style="border-color:var(--accent4)">
+          <div class="c-label">Output</div>
+          <div class="c-value" style="color:var(--accent4)">3 rows</div>
+        </div>
+      </div>
+    </div>
+
+    <table class="db-table">
+      <tr><th>Machine</th><th>Avg CPU</th><th>Readings</th></tr>
+      <tr><td style="font-family:monospace">alpha</td><td style="color:var(--accent4)">88.65</td><td>2</td></tr>
+      <tr><td style="font-family:monospace">beta</td><td style="color:var(--accent2)">48.65</td><td>2</td></tr>
+      <tr><td style="font-family:monospace">gamma</td><td style="color:var(--yellow)">83.80</td><td>2</td></tr>
+    </table>
+  </div>
+
+  <!-- ARTIFACTS -->
+  <div class="panel" id="panel-artifacts">
+    <h2 style="font-size:20px; font-weight:600; margin-bottom:16px;">Artifacts</h2>
+    <div class="artifact-card">
+      <h3>📦 telemetry-report-v1</h3>
+      <div class="meta">Machine telemetry analysis report with cascade rollup</div>
+      <div class="meta" style="margin-top:8px;">
+        2 files · from workflow: telemetry-analysis-pipeline · execution: c3a4e026
+      </div>
+      <div class="public-badge">🌐 Public</div>
+      <div style="margin-top:16px; background:var(--surface2); border-radius:6px; padding:12px;">
+        <div style="font-size:11px; color:var(--text2); margin-bottom:8px;">Export: JSON · 999 bytes</div>
+        <div style="font-family:'SF Mono',Menlo,monospace; font-size:11px; color:var(--text2);">
+          { "artifactId": "667f0518", "artifactName": "telemetry-report-v1", "fileCount": 2, "totalSize": 999 }
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- NOTION -->
+  <div class="panel" id="panel-notion">
+    <h2 style="font-size:20px; font-weight:600; margin-bottom:16px;">Notion Dashboard</h2>
+    <div class="notion-page">
+      <h1>TrikeShed Forge Dashboard</h1>
+
+      <div class="block"><div class="text" style="padding:4px 0">Forge is an autonomous LLM workflow fabric built on cursor algebra.</div></div>
+
+      <div class="block"><div class="text"><h2>Pipeline Status</h2></div></div>
+
+      <div class="block"><div class="check">✓</div><div class="text" style="text-decoration:line-through;color:var(--text2)">Create workspace and load telemetry files</div></div>
+      <div class="block"><div class="check">✓</div><div class="text" style="text-decoration:line-through;color:var(--text2)">Build analysis workflow with 5 steps</div></div>
+      <div class="block"><div class="check">✓</div><div class="text" style="text-decoration:line-through;color:var(--text2)">Execute workflow end-to-end</div></div>
+      <div class="block"><div class="check">✓</div><div class="text" style="text-decoration:line-through;color:var(--text2)">Run cascade rollup on machine metrics</div></div>
+      <div class="block"><div class="bullet">•</div><div class="text dim">All 37 Forge tests passing in standalone harness</div></div>
+
+      <div class="block"><div class="text"><h2>Next Steps</h2></div></div>
+      <div class="block"><div class="check empty">○</div><div class="text">Wire PRELOAD lowering: Cursor → Confix → Blackboard → CCEK</div></div>
+      <div class="block"><div class="bullet">•</div><div class="text dim">10 missing hinges identified in gap analysis</div></div>
+    </div>
+  </div>
+
+  <!-- DATABASE -->
+  <div class="panel" id="panel-database">
+    <h2 style="font-size:20px; font-weight:600; margin-bottom:4px;">Forge Hinges</h2>
+    <div style="font-size:12px; color:var(--text2); margin-bottom:16px;">10 items · 3 fields · Query: In Progress sorted by Effort ↓</div>
+    <table class="db-table">
+      <thead>
+        <tr><th>Name</th><th>Status</th><th>Effort</th><th>Owner</th></tr>
+      </thead>
+      <tbody>
+        <tr><td style="font-family:monospace;font-weight:600">ForgeCorpusCursor</td><td><span class="status-badge status-in-progress">In Progress</span></td><td><div class="effort-dots"><span class="effort-dot filled"></span><span class="effort-dot filled"></span><span class="effort-dot filled"></span></div></td><td>Jim</td></tr>
+        <tr><td style="font-family:monospace;font-weight:600">ForgeAgentElement</td><td><span class="status-badge status-in-progress">In Progress</span></td><td><div class="effort-dots"><span class="effort-dot filled"></span><span class="effort-dot filled"></span><span class="effort-dot filled"></span><span class="effort-dot filled"></span><span class="effort-dot filled"></span></div></td><td>Jim</td></tr>
+        <tr><td style="font-family:monospace;font-weight:600">ForgeWorkspaceElement</td><td><span class="status-badge status-in-progress">In Progress</span></td><td><div class="effort-dots"><span class="effort-dot filled"></span><span class="effort-dot filled"></span><span class="effort-dot filled"></span><span class="effort-dot filled"></span><span class="effort-dot filled"></span></div></td><td>Jim</td></tr>
+        <tr><td style="font-family:monospace;font-weight:600">ForgePromptCursor</td><td><span class="status-badge status-todo">Todo</span></td><td><div class="effort-dots"><span class="effort-dot filled"></span><span class="effort-dot filled"></span></div></td><td>Jim</td></tr>
+        <tr><td style="font-family:monospace;font-weight:600">ForgeWorkflowGraphCursor</td><td><span class="status-badge status-todo">Todo</span></td><td><div class="effort-dots"><span class="effort-dot filled"></span><span class="effort-dot filled"></span><span class="effort-dot filled"></span></div></td><td>Jim</td></tr>
+        <tr><td style="font-family:monospace;font-weight:600">ForgeLcncAdapter</td><td><span class="status-badge status-todo">Todo</span></td><td><div class="effort-dots"><span class="effort-dot filled"></span><span class="effort-dot filled"></span><span class="effort-dot filled"></span><span class="effort-dot filled"></span></div></td><td>Cascade</td></tr>
+        <tr><td style="font-family:monospace;font-weight:600">ForgeConfixStore</td><td><span class="status-badge status-todo">Todo</span></td><td><div class="effort-dots"><span class="effort-dot filled"></span><span class="effort-dot filled"></span><span class="effort-dot filled"></span></div></td><td>Jim</td></tr>
+        <tr><td style="font-family:monospace;font-weight:600">ForgeExecutionCursor</td><td><span class="status-badge status-backlog">Backlog</span></td><td><div class="effort-dots"><span class="effort-dot filled"></span><span class="effort-dot filled"></span></div></td><td>Forge Agent</td></tr>
+        <tr><td style="font-family:monospace;font-weight:600">ForgeArtifactCursor</td><td><span class="status-badge status-backlog">Backlog</span></td><td><div class="effort-dots"><span class="effort-dot filled"></span><span class="effort-dot filled"></span></div></td><td>Forge Agent</td></tr>
+        <tr><td style="font-family:monospace;font-weight:600">ForgeMutationJournal</td><td><span class="status-badge status-backlog">Backlog</span></td><td><div class="effort-dots"><span class="effort-dot filled"></span><span class="effort-dot filled"></span><span class="effort-dot filled"></span></div></td><td>Jim</td></tr>
+      </tbody>
+    </table>
+  </div>
+</main>
+
+<aside>
+  <div class="inspector-section">
+    <h3>Workspace Metrics</h3>
+    <div class="inspector-row"><span class="key">Files</span><span class="val">3</span></div>
+    <div class="inspector-row"><span class="key">Snapshots</span><span class="val">2</span></div>
+    <div class="inspector-row"><span class="key">Prompts</span><span class="val">2</span></div>
+    <div class="inspector-row"><span class="key">Workflows</span><span class="val">1</span></div>
+    <div class="inspector-row"><span class="key">Executions</span><span class="val">1</span></div>
+    <div class="inspector-row"><span class="key">Cascades</span><span class="val">1</span></div>
+    <div class="inspector-row"><span class="key">Artifacts</span><span class="val">1</span></div>
+    <div class="inspector-row"><span class="key">Cursor Rows</span><span class="val">22</span></div>
+    <div class="inspector-row"><span class="key">DB Rows</span><span class="val">10</span></div>
+    <div class="inspector-row"><span class="key">Tests</span><span class="val" style="color:var(--green)">37 ✓</span></div>
+  </div>
+
+  <div class="inspector-section">
+    <h3>Execution</h3>
+    <div class="inspector-row"><span class="key">Status</span><span class="val" style="color:var(--green)">SUCCESS</span></div>
+    <div class="inspector-row"><span class="key">Workflow</span><span class="val">ec28c92c</span></div>
+    <div class="inspector-row"><span class="key">Snapshot</span><span class="val">8a967d7d</span></div>
+    <div class="inspector-row"><span class="key">Artifact</span><span class="val">667f0518</span></div>
+  </div>
+
+  <div class="inspector-section">
+    <h3>Cascade Output</h3>
+    <div class="inspector-row"><span class="key">alpha</span><span class="val" style="color:var(--accent4)">88.65</span></div>
+    <div class="inspector-row"><span class="key">beta</span><span class="val" style="color:var(--accent2)">48.65</span></div>
+    <div class="inspector-row"><span class="key">gamma</span><span class="val" style="color:var(--yellow)">83.80</span></div>
+  </div>
+
+  <div class="inspector-section">
+    <h3>Collaboration</h3>
+    <div class="inspector-row"><span class="key">Online</span><span class="val">2 users</span></div>
+    <div class="inspector-row"><span class="key">Alice</span><span class="val" style="color:#4A90D9">editing</span></div>
+    <div class="inspector-row"><span class="key">Bob</span><span class="val" style="color:#D94A4A">viewing</span></div>
+    <div class="inspector-row"><span class="key">Events</span><span class="val">25</span></div>
+  </div>
+
+  <div class="inspector-section">
+    <h3>Event Log</h3>
+    <div class="event-log">
+      <div class="event-entry"><span class="ev-tag put">put</span>README.md</div>
+      <div class="event-entry"><span class="ev-tag put">put</span>data/readings.jsonl</div>
+      <div class="event-entry"><span class="ev-tag put">put</span>src/analyzer.kt</div>
+      <div class="event-entry"><span class="ev-tag query">search</span>'cpu' → 2 hits</div>
+      <div class="event-entry"><span class="ev-tag snap">snap</span>Initial workspace (3 files)</div>
+      <div class="event-entry"><span class="ev-tag put">put</span>update README.md</div>
+      <div class="event-entry"><span class="ev-tag snap">snap</span>Post-modification checkpoint</div>
+      <div class="event-entry"><span class="ev-tag query">diff</span>1 modified, 0 added</div>
+      <div class="event-entry"><span class="ev-tag put">prompt</span>summarize-readings v1</div>
+      <div class="event-entry"><span class="ev-tag put">prompt</span>critique-analysis v1</div>
+      <div class="event-entry"><span class="ev-tag exec">wf</span>telemetry-analysis-pipeline (5 steps)</div>
+      <div class="event-entry"><span class="ev-tag exec">exec</span>SUCCESS</div>
+      <div class="event-entry"><span class="ev-tag exec">cascade</span>machine-cpu-rollup (2 stages)</div>
+      <div class="event-entry"><span class="ev-tag exec">cascade</span>SUCCESS (3 output rows)</div>
+      <div class="event-entry"><span class="ev-tag query">notion</span>22 cursor rows, 10 db rows</div>
+      <div class="event-entry"><span class="ev-tag query">query</span>3 items 'In Progress'</div>
+      <div class="event-entry"><span class="ev-tag exec">artifact</span>telemetry-report-v1</div>
+      <div class="event-entry"><span class="ev-tag exec">export</span>JSON 999B</div>
+      <div class="event-entry"><span class="ev-tag collab">join</span>Alice joined</div>
+      <div class="event-entry"><span class="ev-tag collab">join</span>Bob joined</div>
+      <div class="event-entry"><span class="ev-tag collab">edit</span>Alice edited README</div>
+      <div class="event-entry"><span class="ev-tag collab">view</span>Bob @ readings.jsonl:42</div>
+      <div class="event-entry"><span class="ev-tag collab">sync</span>2 users online</div>
+      <div class="event-entry"><span class="ev-tag snap">snap</span>history: 2 snapshots</div>
+    </div>
+  </div>
+</aside>
+
+<script>
+document.querySelectorAll('nav .item').forEach(item => {
+  item.addEventListener('click', () => {
+    document.querySelectorAll('nav .item').forEach(i => i.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    item.classList.add('active');
+    document.getElementById('panel-' + item.dataset.panel).classList.add('active');
+  });
+});
+</script>
+</body>
+</html>

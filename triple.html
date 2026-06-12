@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang='en'>
+<head>
+<meta charset='UTF-8' />
+<meta name='viewport' content='width=device-width, initial-scale=1.0' />
+<title>Real Cursor / Blackboard / Execution Triple</title>
+<style>
+  :root {
+    --bg:#0b1117; --pane:#101923; --pane2:#0d141c; --line:#1e2a36; --txt:#d8e0ea; --muted:#7f8ea3;
+    --blue:#7aa2f7; --green:#9ece6a; --amber:#e0af68; --red:#f7768e; --purple:#bb9af7; --cyan:#7dcfff;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--txt); font-family:Inter,system-ui,sans-serif; }
+  .mono { font-family:"SF Mono", ui-monospace, Menlo, monospace; }
+  .page { display:grid; grid-template-columns: 1.2fr 1.2fr .9fr; gap:18px; padding:24px; min-height:100vh; }
+  .hero { grid-column:1/-1; background:var(--pane2); border:1px solid var(--line); border-radius:14px; padding:20px 22px; }
+  .hero h1 { margin:0 0 8px; font-size:26px; }
+  .hero p { margin:0; color:var(--muted); max-width:90ch; line-height:1.55; }
+  .hero .meta { margin-top:14px; display:flex; flex-wrap:wrap; gap:8px; }
+  .pill { border:1px solid var(--line); background:var(--pane); border-radius:999px; padding:6px 10px; font-size:11px; color:var(--muted); }
+  .col { display:grid; gap:18px; align-content:start; }
+  .card { background:var(--pane); border:1px solid var(--line); border-radius:14px; overflow:hidden; }
+  .head { display:flex; justify-content:space-between; align-items:center; gap:10px; padding:13px 16px; border-bottom:1px solid var(--line); }
+  .head h2, .head h3 { margin:0; font-size:15px; }
+  .sub { color:var(--muted); font-size:11px; }
+  .body { padding:14px 16px; }
+  .flow { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-top:14px; }
+  .node { background:var(--pane); border:1px solid var(--line); border-radius:12px; padding:10px 12px; min-width:130px; }
+  .node .cap { color:var(--muted); font-size:10px; text-transform:uppercase; letter-spacing:.08em; }
+  .node .nm { font-size:12px; font-weight:650; margin-top:4px; }
+  .node.good { border-color:rgba(158,206,106,.4); }
+  .node.mid { border-color:rgba(224,175,104,.4); }
+  .node.hot { border-color:rgba(122,162,247,.55); box-shadow:0 0 0 1px rgba(122,162,247,.45) inset; }
+  .arrow { color:#516070; }
+  table.grid { width:100%; border-collapse:collapse; font-size:12px; }
+  table.grid th, table.grid td { border-bottom:1px solid var(--line); padding:8px 10px; vertical-align:top; text-align:left; }
+  table.grid th { color:var(--muted); font-size:11px; text-transform:uppercase; letter-spacing:.06em; font-weight:700; }
+  .idx, .type, .key { white-space:nowrap; }
+  .type { color:var(--blue); }
+  .key { color:var(--cyan); }
+  tr.target td { background:rgba(122,162,247,.08); }
+  tr.overlay td { background:rgba(187,154,247,.06); }
+  tr.trace td { background:rgba(224,175,104,.06); }
+  tr.hi td { box-shadow:0 0 0 9999px rgba(122,162,247,.07) inset; }
+  .controls { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px; }
+  button { background:#14202c; color:var(--txt); border:1px solid var(--line); border-radius:10px; padding:8px 11px; cursor:pointer; font:inherit; font-size:12px; }
+  button:hover { border-color:var(--blue); }
+  button.secondary { background:#0f1720; color:var(--muted); }
+  .json { background:#0a1118; border:1px solid var(--line); border-radius:10px; padding:12px; white-space:pre-wrap; font-size:12px; line-height:1.55; }
+  .json .k { color:var(--blue); } .json .s { color:var(--amber); } .json .n { color:var(--purple); } .json .b { color:var(--green); }
+  .tabs { display:flex; gap:8px; margin-bottom:12px; flex-wrap:wrap; }
+  .tabbtn.active { border-color:var(--blue); color:white; }
+  .tabpanel { display:none; } .tabpanel.active { display:block; }
+  .status { color:var(--muted); font-size:12px; margin-top:10px; min-height:18px; }
+  ul.tight { margin:0; padding-left:18px; }
+  ul.tight li { margin:6px 0; color:var(--muted); }
+  .goodtxt { color:var(--green); } .warntxt { color:var(--amber); } .badtxt { color:var(--red); }
+</style>
+</head>
+<body>
+<div class='page'>
+  <section class='hero'>
+    <h1>Real cursor / blackboard / execution triple</h1>
+    <p>
+      This page is generated from a runnable Kotlin harness at <span class='mono'>/tmp/trikeshed-triple</span> using copied real source for
+      <span class='mono'>Join.kt</span>, <span class='mono'>Cursor.kt</span>, and <span class='mono'>BlackboardOverlay.kt</span>.
+      The triple below is not illustrative fake state: it is actual runtime output from constructing a real <span class='mono'>RowVec</span>,
+      a real <span class='mono'>CellOverlay/BlackboardContext</span>, and a real execution event row that all point at the same target cell.
+    </p>
+    <div class='meta'>
+      <span class='pill'>workspace.summary → row-0:summary</span>
+      <span class='pill'>effectiveRole = GROUND_TRUTH</span>
+      <span class='pill'>confidence = 0.92</span>
+      <span class='pill'>runId = forge-run-telemetry-1</span>
+    </div>
+    <div class='flow'>
+      <div class='node good hot' id='node-workspace'><div class='cap'>cursor[0]</div><div class='nm mono'>workspace row</div></div>
+      <div class='arrow'>→</div>
+      <div class='node mid' id='node-overlay'><div class='cap'>overlay</div><div class='nm mono'>accepted summary cell</div></div>
+      <div class='arrow'>→</div>
+      <div class='node mid' id='node-blackboard'><div class='cap'>cursor[1]</div><div class='nm mono'>blackboard row</div></div>
+      <div class='arrow'>→</div>
+      <div class='node mid' id='node-execution'><div class='cap'>cursor[2]</div><div class='nm mono'>execution row</div></div>
+    </div>
+  </section>
+
+  <div class='col'>
+    <div class='card'>
+      <div class='head'><h2>Workspace row</h2><div class='sub mono'>workspaceRow</div></div>
+      <div class='body'>
+        <div class='controls'>
+          <button id='focus-summary'>focus summary cell</button>
+          <button id='focus-link'>follow linkage</button>
+          <button id='reset-view' class='secondary'>reset</button>
+        </div>
+        
+    <table id='workspace-table' class='grid'>
+      <thead><tr><th>#</th><th>key</th><th>type</th><th>value</th></tr></thead>
+      <tbody>
+        <tr><td class='mono idx'>0</td><td class='mono key'>rowId</td><td class='mono type'>IoString</td><td>row-0</td></tr><tr><td class='mono idx'>1</td><td class='mono key'>path</td><td class='mono type'>IoString</td><td>README.md</td></tr><tr class="target workspace-target"><td class='mono idx'>2</td><td class='mono key'>summary</td><td class='mono type'>IoString</td><td>CPU anomalies cluster around alpha/gamma; memory pressure rising.</td></tr><tr><td class='mono idx'>3</td><td class='mono key'>status</td><td class='mono type'>IoString</td><td>draft</td></tr>
+      </tbody>
+    </table>
+    
+        <div class='status' id='workspace-status'>summary is cell index 2 in a real RowVec with schema carried by ColumnMeta suppliers.</div>
+      </div>
+    </div>
+
+    <div class='card'>
+      <div class='head'><h2>Execution row</h2><div class='sub mono'>executionRow</div></div>
+      <div class='body'>
+        
+    <table id='execution-table' class='grid'>
+      <thead><tr><th>#</th><th>key</th><th>type</th><th>value</th></tr></thead>
+      <tbody>
+        <tr><td class='mono idx'>0</td><td class='mono key'>seq</td><td class='mono type'>IoInt</td><td>7</td></tr><tr><td class='mono idx'>1</td><td class='mono key'>runId</td><td class='mono type'>IoString</td><td>forge-run-telemetry-1</td></tr><tr><td class='mono idx'>2</td><td class='mono key'>stepId</td><td class='mono type'>IoString</td><td>step-human-accept</td></tr><tr class="trace execution-focus"><td class='mono idx'>3</td><td class='mono key'>eventKind</td><td class='mono type'>IoString</td><td>HUMAN_ACCEPT</td></tr><tr class="trace execution-focus"><td class='mono idx'>4</td><td class='mono key'>targetRowId</td><td class='mono type'>IoString</td><td>row-0</td></tr><tr class="trace execution-focus"><td class='mono idx'>5</td><td class='mono key'>targetColumn</td><td class='mono type'>IoInt</td><td>2</td></tr><tr class="trace execution-focus"><td class='mono idx'>6</td><td class='mono key'>detail</td><td class='mono type'>IoString</td><td>summary cell accepted: HYPOTHESIS -&gt; GROUND_TRUTH</td></tr>
+      </tbody>
+    </table>
+    
+        <div class='status'>This is the concrete lowering target for a future <span class='mono'>ForgeExecutionCursor</span> row: explicit target row + target column + event kind.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class='col'>
+    <div class='card'>
+      <div class='head'><h2>Blackboard row</h2><div class='sub mono'>blackboardRow</div></div>
+      <div class='body'>
+        
+    <table id='blackboard-table' class='grid'>
+      <thead><tr><th>#</th><th>key</th><th>type</th><th>value</th></tr></thead>
+      <tbody>
+        <tr><td class='mono idx'>0</td><td class='mono key'>rowId</td><td class='mono type'>IoString</td><td>row-0</td></tr><tr><td class='mono idx'>1</td><td class='mono key'>column</td><td class='mono type'>IoString</td><td>summary</td></tr><tr class="overlay blackboard-focus"><td class='mono idx'>2</td><td class='mono key'>role</td><td class='mono type'>IoString</td><td>GROUND_TRUTH</td></tr><tr class="overlay blackboard-focus"><td class='mono idx'>3</td><td class='mono key'>confidence</td><td class='mono type'>IoDouble</td><td>0.92</td></tr><tr><td class='mono idx'>4</td><td class='mono key'>source</td><td class='mono type'>IoString</td><td>agent:codex</td></tr><tr><td class='mono idx'>5</td><td class='mono key'>creator</td><td class='mono type'>IoString</td><td>codex</td></tr><tr class="overlay blackboard-focus"><td class='mono idx'>6</td><td class='mono key'>deps</td><td class='mono type'>IoString</td><td>ExternalResource(uri=file://README.md) | ExternalResource(uri=file://data/readings.jsonl, selector=rows[0..5]) | CellRef(row=0, col=2)</td></tr><tr class="overlay blackboard-focus"><td class='mono idx'>7</td><td class='mono key'>transformations</td><td class='mono type'>IoString</td><td>prompt:summarize-readings -&gt; input:file://README.md -&gt; input:file://data/readings.jsonl -&gt; role:HYPOTHESIS -&gt; accepted-by:human</td></tr>
+      </tbody>
+    </table>
+    
+        <div class='status'>Same target cell, but reified as a semantic row: role, confidence, provenance, dependencies, transformations.</div>
+      </div>
+    </div>
+
+    <div class='card'>
+      <div class='head'><h2>Triple cursor</h2><div class='sub'>three real rows in one Cursor</div></div>
+      <div class='body'>
+        <div class='tabs'>
+          <button class='tabbtn active' data-tab='tab0'>cursor[0]</button><button class='tabbtn' data-tab='tab1'>cursor[1]</button><button class='tabbtn' data-tab='tab2'>cursor[2]</button>
+        </div>
+        <div class='tabpanel active' id='tab0'>
+    <table id='cursor-0' class='grid'>
+      <thead><tr><th>#</th><th>key</th><th>type</th><th>value</th></tr></thead>
+      <tbody>
+        <tr><td class='mono idx'>0</td><td class='mono key'>rowId</td><td class='mono type'>IoString</td><td>row-0</td></tr><tr><td class='mono idx'>1</td><td class='mono key'>path</td><td class='mono type'>IoString</td><td>README.md</td></tr><tr><td class='mono idx'>2</td><td class='mono key'>summary</td><td class='mono type'>IoString</td><td>CPU anomalies cluster around alpha/gamma; memory pressure rising.</td></tr><tr><td class='mono idx'>3</td><td class='mono key'>status</td><td class='mono type'>IoString</td><td>draft</td></tr>
+      </tbody>
+    </table>
+    </div><div class='tabpanel' id='tab1'>
+    <table id='cursor-1' class='grid'>
+      <thead><tr><th>#</th><th>key</th><th>type</th><th>value</th></tr></thead>
+      <tbody>
+        <tr><td class='mono idx'>0</td><td class='mono key'>rowId</td><td class='mono type'>IoString</td><td>row-0</td></tr><tr><td class='mono idx'>1</td><td class='mono key'>column</td><td class='mono type'>IoString</td><td>summary</td></tr><tr><td class='mono idx'>2</td><td class='mono key'>role</td><td class='mono type'>IoString</td><td>GROUND_TRUTH</td></tr><tr><td class='mono idx'>3</td><td class='mono key'>confidence</td><td class='mono type'>IoDouble</td><td>0.92</td></tr><tr><td class='mono idx'>4</td><td class='mono key'>source</td><td class='mono type'>IoString</td><td>agent:codex</td></tr><tr><td class='mono idx'>5</td><td class='mono key'>creator</td><td class='mono type'>IoString</td><td>codex</td></tr><tr><td class='mono idx'>6</td><td class='mono key'>deps</td><td class='mono type'>IoString</td><td>ExternalResource(uri=file://README.md) | ExternalResource(uri=file://data/readings.jsonl, selector=rows[0..5]) | CellRef(row=0, col=2)</td></tr><tr><td class='mono idx'>7</td><td class='mono key'>transformations</td><td class='mono type'>IoString</td><td>prompt:summarize-readings -&gt; input:file://README.md -&gt; input:file://data/readings.jsonl -&gt; role:HYPOTHESIS -&gt; accepted-by:human</td></tr>
+      </tbody>
+    </table>
+    </div><div class='tabpanel' id='tab2'>
+    <table id='cursor-2' class='grid'>
+      <thead><tr><th>#</th><th>key</th><th>type</th><th>value</th></tr></thead>
+      <tbody>
+        <tr><td class='mono idx'>0</td><td class='mono key'>seq</td><td class='mono type'>IoInt</td><td>7</td></tr><tr><td class='mono idx'>1</td><td class='mono key'>runId</td><td class='mono type'>IoString</td><td>forge-run-telemetry-1</td></tr><tr><td class='mono idx'>2</td><td class='mono key'>stepId</td><td class='mono type'>IoString</td><td>step-human-accept</td></tr><tr><td class='mono idx'>3</td><td class='mono key'>eventKind</td><td class='mono type'>IoString</td><td>HUMAN_ACCEPT</td></tr><tr><td class='mono idx'>4</td><td class='mono key'>targetRowId</td><td class='mono type'>IoString</td><td>row-0</td></tr><tr><td class='mono idx'>5</td><td class='mono key'>targetColumn</td><td class='mono type'>IoInt</td><td>2</td></tr><tr><td class='mono idx'>6</td><td class='mono key'>detail</td><td class='mono type'>IoString</td><td>summary cell accepted: HYPOTHESIS -&gt; GROUND_TRUTH</td></tr>
+      </tbody>
+    </table>
+    </div>
+      </div>
+    </div>
+  </div>
+
+  <div class='col'>
+    <div class='card'>
+      <div class='head'><h3>Accepted overlay</h3><div class='sub'>real CellOverlay output</div></div>
+      <div class='body'>
+        <div class='json' id='overlay-json'></div>
+      </div>
+    </div>
+
+    <div class='card'>
+      <div class='head'><h3>Blackboard context</h3><div class='sub'>real BlackboardContext output</div></div>
+      <div class='body'>
+        <div class='json' id='context-json'></div>
+      </div>
+    </div>
+
+    <div class='card'>
+      <div class='head'><h3>What became concrete here</h3><div class='sub'>vs prior simulation</div></div>
+      <div class='body'>
+        <ul class='tight'>
+          <li><span class='goodtxt'>Real</span>: a workspace <span class='mono'>RowVec</span> with actual cell schema types.</li>
+          <li><span class='goodtxt'>Real</span>: a <span class='mono'>CellOverlay</span> promoted from <span class='mono'>HYPOTHESIS</span> to <span class='mono'>GROUND_TRUTH</span>.</li>
+          <li><span class='goodtxt'>Real</span>: a <span class='mono'>BlackboardContext</span> with column defaults and cursor provenance tags.</li>
+          <li><span class='goodtxt'>Real</span>: an execution event row that points to the same target cell.</li>
+          <li><span class='warntxt'>Still target shape</span>: Forge does not yet store this triple as a first-class runtime lane by default.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+  const data = {"workspaceRow": {"label": "workspaceRow", "width": 4, "cells": [{"index": 0, "key": "rowId", "type": "IoString", "value": "row-0"}, {"index": 1, "key": "path", "type": "IoString", "value": "README.md"}, {"index": 2, "key": "summary", "type": "IoString", "value": "CPU anomalies cluster around alpha/gamma; memory pressure rising."}, {"index": 3, "key": "status", "type": "IoString", "value": "draft"}]}, "blackboardRow": {"label": "blackboardRow", "width": 8, "cells": [{"index": 0, "key": "rowId", "type": "IoString", "value": "row-0"}, {"index": 1, "key": "column", "type": "IoString", "value": "summary"}, {"index": 2, "key": "role", "type": "IoString", "value": "GROUND_TRUTH"}, {"index": 3, "key": "confidence", "type": "IoDouble", "value": "0.92"}, {"index": 4, "key": "source", "type": "IoString", "value": "agent:codex"}, {"index": 5, "key": "creator", "type": "IoString", "value": "codex"}, {"index": 6, "key": "deps", "type": "IoString", "value": "ExternalResource(uri=file://README.md) | ExternalResource(uri=file://data/readings.jsonl, selector=rows[0..5]) | CellRef(row=0, col=2)"}, {"index": 7, "key": "transformations", "type": "IoString", "value": "prompt:summarize-readings -> input:file://README.md -> input:file://data/readings.jsonl -> role:HYPOTHESIS -> accepted-by:human"}]}, "executionRow": {"label": "executionRow", "width": 7, "cells": [{"index": 0, "key": "seq", "type": "IoInt", "value": "7"}, {"index": 1, "key": "runId", "type": "IoString", "value": "forge-run-telemetry-1"}, {"index": 2, "key": "stepId", "type": "IoString", "value": "step-human-accept"}, {"index": 3, "key": "eventKind", "type": "IoString", "value": "HUMAN_ACCEPT"}, {"index": 4, "key": "targetRowId", "type": "IoString", "value": "row-0"}, {"index": 5, "key": "targetColumn", "type": "IoInt", "value": "2"}, {"index": 6, "key": "detail", "type": "IoString", "value": "summary cell accepted: HYPOTHESIS -> GROUND_TRUTH"}]}, "tripleCursor": [{"label": "cursor[0]", "width": 4, "cells": [{"index": 0, "key": "rowId", "type": "IoString", "value": "row-0"}, {"index": 1, "key": "path", "type": "IoString", "value": "README.md"}, {"index": 2, "key": "summary", "type": "IoString", "value": "CPU anomalies cluster around alpha/gamma; memory pressure rising."}, {"index": 3, "key": "status", "type": "IoString", "value": "draft"}]}, {"label": "cursor[1]", "width": 8, "cells": [{"index": 0, "key": "rowId", "type": "IoString", "value": "row-0"}, {"index": 1, "key": "column", "type": "IoString", "value": "summary"}, {"index": 2, "key": "role", "type": "IoString", "value": "GROUND_TRUTH"}, {"index": 3, "key": "confidence", "type": "IoDouble", "value": "0.92"}, {"index": 4, "key": "source", "type": "IoString", "value": "agent:codex"}, {"index": 5, "key": "creator", "type": "IoString", "value": "codex"}, {"index": 6, "key": "deps", "type": "IoString", "value": "ExternalResource(uri=file://README.md) | ExternalResource(uri=file://data/readings.jsonl, selector=rows[0..5]) | CellRef(row=0, col=2)"}, {"index": 7, "key": "transformations", "type": "IoString", "value": "prompt:summarize-readings -> input:file://README.md -> input:file://data/readings.jsonl -> role:HYPOTHESIS -> accepted-by:human"}]}, {"label": "cursor[2]", "width": 7, "cells": [{"index": 0, "key": "seq", "type": "IoInt", "value": "7"}, {"index": 1, "key": "runId", "type": "IoString", "value": "forge-run-telemetry-1"}, {"index": 2, "key": "stepId", "type": "IoString", "value": "step-human-accept"}, {"index": 3, "key": "eventKind", "type": "IoString", "value": "HUMAN_ACCEPT"}, {"index": 4, "key": "targetRowId", "type": "IoString", "value": "row-0"}, {"index": 5, "key": "targetColumn", "type": "IoInt", "value": "2"}, {"index": 6, "key": "detail", "type": "IoString", "value": "summary cell accepted: HYPOTHESIS -> GROUND_TRUTH"}]}], "context": {"id": "forge-run-telemetry-1", "tags": {"workflowId": "wf-telemetry", "rowId": "row-0", "summaryColumn": "2"}, "columnDefaults": {"2": "HYPOTHESIS"}, "cursorProvenanceSource": "workflow:telemetry-analysis-pipeline", "cursorProvenanceCreator": "forge"}, "acceptedOverlay": {"role": "GROUND_TRUTH", "value": "CPU anomalies cluster around alpha/gamma; memory pressure rising.", "confidence": 0.92, "supportCount": 2, "source": "agent:codex", "creator": "codex", "transformations": ["prompt:summarize-readings", "input:file://README.md", "input:file://data/readings.jsonl", "role:HYPOTHESIS", "accepted-by:human"], "dependencies": ["ExternalResource(uri=file://README.md)", "ExternalResource(uri=file://data/readings.jsonl, selector=rows[0..5])", "CellRef(row=0, col=2)"]}, "effectiveRole": "GROUND_TRUTH", "linkage": {"workspace.summary": "row-0:summary", "blackboard.targets": "row-0:summary", "execution.targets": "row-0:summary", "context.column[2]": "summary"}};
+
+  function format(obj) {
+    return JSON.stringify(obj, null, 2)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"([^"]+)":/g, '<span class="k">"$1"</span>:')
+      .replace(/: "([^"]*)"/g, ': <span class="s">"$1"</span>')
+      .replace(/: (\d+\.?\d*)/g, ': <span class="n">$1</span>')
+      .replace(/: (true|false|null)/g, ': <span class="b">$1</span>');
+  }
+  document.getElementById('overlay-json').innerHTML = format(data.acceptedOverlay);
+  document.getElementById('context-json').innerHTML = format(data.context);
+
+  function clearHi() {
+    document.querySelectorAll('tr.hi').forEach(tr => tr.classList.remove('hi'));
+    document.querySelectorAll('.node').forEach(n => n.classList.remove('hot'));
+  }
+  function hot(id) { document.getElementById(id).classList.add('hot'); }
+
+  document.getElementById('focus-summary').onclick = () => {
+    clearHi();
+    document.querySelector('#workspace-table tbody tr:nth-child(3)').classList.add('hi');
+    hot('node-workspace');
+    document.getElementById('workspace-status').textContent = 'Focused workspace target cell: key=summary, index=2, type=IoString.';
+  };
+  document.getElementById('focus-link').onclick = () => {
+    clearHi();
+    document.querySelector('#workspace-table tbody tr:nth-child(3)').classList.add('hi');
+    document.querySelector('#blackboard-table tbody tr:nth-child(3)').classList.add('hi');
+    document.querySelector('#execution-table tbody tr:nth-child(5)').classList.add('hi');
+    document.querySelector('#execution-table tbody tr:nth-child(6)').classList.add('hi');
+    hot('node-workspace'); hot('node-overlay'); hot('node-blackboard'); hot('node-execution');
+    document.getElementById('workspace-status').textContent = 'Linkage followed: workspace summary cell → accepted overlay → blackboard row → execution target row/column.';
+  };
+  document.getElementById('reset-view').onclick = () => {
+    clearHi();
+    hot('node-workspace');
+    document.getElementById('workspace-status').textContent = 'summary is cell index 2 in a real RowVec with schema carried by ColumnMeta suppliers.';
+  };
+
+  document.querySelectorAll('.tabbtn').forEach(btn => btn.addEventListener('click', () => {
+    document.querySelectorAll('.tabbtn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tabpanel').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById(btn.dataset.tab).classList.add('active');
+  }));
+</script>
+</body>
+</html>
