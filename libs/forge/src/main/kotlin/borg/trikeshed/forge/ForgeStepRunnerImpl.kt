@@ -3,6 +3,7 @@ package borg.trikeshed.forge
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.serialization.json.Json
 
 /**
  * Basic implementation of ForgeStepRunner for testing.
@@ -104,5 +105,30 @@ class ForgeStepRunnerImpl : ForgeStepRunner {
             allResults.addAll(branchResults)
         }
         return allResults
+    }
+
+    override suspend fun runCascadeExecution(
+        step: WorkflowStep.CascadeExecution,
+        resolvedInputs: Map<String, String>,
+        workspace: ForgeWorkspace
+    ): StepResult {
+        val result = workspace.executeCascadeSync(step.cascadeId)
+        return if (result.status == CascadeExecutionStatus.SUCCESS) {
+            StepResult.Success(
+                stepId = step.id,
+                output = kotlinx.serialization.json.Json.encodeToString(result.output.map { it.value }),
+                artifacts = result.output.map { row ->
+                    ForgeFile(
+                        id = ForgeFileId.generate(),
+                        path = "cascade-output/${row.key.joinToString("_")}.json",
+                        content = row.value,
+                        mimeType = "application/json"
+                    )
+                },
+                metadata = mapOf("cascadeId" to step.cascadeId.value, "rowCount" to result.output.size.toString())
+            )
+        } else {
+            StepResult.Failure(stepId = step.id, error = "Cascade execution failed: ${result.status}")
+        }
     }
 }

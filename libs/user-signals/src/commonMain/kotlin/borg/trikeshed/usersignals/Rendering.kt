@@ -4,6 +4,7 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.launch
 
 interface RenderBackend {
     val id: String
@@ -45,21 +46,22 @@ class TextBackend : RenderBackend {
     private fun formatText(output: TemplateOutput): String {
         val sb = StringBuilder()
         sb.appendLine("┌─ ${output.templateId} ─")
-        output.boundValues.forEach { (key, value) ->
-            sb.appendLine("│ $key: ${formatValue(value)}")
+        output.boundValues.forEach { (_, value) ->
+            sb.appendLine("│ ${formatValue(value)}")
         }
-        output.metadata.forEach { (key, value) ->
-            sb.appendLine("│ # $key: $value")
+        output.metadata.forEach { (_, value) ->
+            sb.appendLine("│ # ${value}")
         }
         sb.appendLine("└${"─".repeat(output.templateId.length + 4)}")
         return sb.toString()
     }
 
-    private fun formatValue(value: Any): String = when (value) {
-        is Map<*, *> -> value.map { "${it.key}=${formatValue(it.value)}" }.joinToString(", ", "{", "}")
+    private fun formatValue(value: Any?): String = when (value) {
+        is Map<*, *> -> value.map { "${formatValue(it.key)}=${formatValue(it.value)}" }.joinToString(", ", "{", "}")
         is List<*> -> value.joinToString(", ", "[", "]") { formatValue(it) }
         is Double -> "%.3f".format(value)
         is Boolean -> if (value) "●" else "○"
+        null -> "null"
         else -> value.toString()
     }
 }
@@ -72,24 +74,20 @@ class JsonBackend : RenderBackend {
     )
 
     private fun formatJson(output: TemplateOutput): String {
-        val sb = StringBuilder()
-        sb.append("{")
-        sb.append("\"templateId\":\"${output.templateId}\",")
-        sb.append("\"values\":{")
-        sb.append(output.boundValues.map { (k, v) -> "\"$k\":${toJson(v)}" }.joinToString(","))
-        sb.append("},")
-        sb.append("\"metadata\":{")
-        sb.append(output.metadata.map { (k, v) -> "\"$k\":${toJson(v)}" }.joinToString(","))
-        sb.append("}}")
-        return sb.toString()
+        return "{\"templateId\":\"${output.templateId}\",\"values\":${mapToJson(output.boundValues)},\"metadata\":${mapToJson(output.metadata)}}"
     }
 
-    private fun toJson(value: Any): String = when (value) {
+    fun mapToJson(map: Map<String, Any>): String {
+        return "{${map.map { (k, v) -> "\"$k\":${toJson(v)}" }.joinToString(",")}}"
+    }
+
+    private fun toJson(value: Any?): String = when (value) {
         is String -> "\"$value\""
         is Number -> value.toString()
         is Boolean -> value.toString()
-        is Map<*, *> -> "{${value.map { (k, v) -> "\"$k\":${toJson(v)}" }.joinToString(",")}}"
+        is Map<*, *> -> mapToJson(value as Map<String, Any>)
         is List<*> -> "[${value.map { toJson(it) }.joinToString(",")}]"
+        null -> "null"
         else -> "\"$value\""
     }
 }
@@ -118,24 +116,25 @@ class AnsiBackend : RenderBackend {
     private fun formatAnsi(output: TemplateOutput): String {
         val sb = StringBuilder()
         sb.appendLine("${BOLD}${CYAN}╭─ ${output.templateId} ─╮${RESET}")
-        output.boundValues.forEach { (key, value) ->
+        output.boundValues.forEach { (_, value) ->
             val (color, symbol) = when (value) {
                 is Boolean -> if (value) Pair(GREEN, "●") else Pair(RED, "○")
                 is Double -> Pair(if (value > 0.5) YELLOW else BLUE, "▓")
                 else -> Pair(WHITE, "▸")
             }
-            sb.appendLine("${DIM}│${RESET} $key: ${color}$symbol${RESET} ${formatAnsiValue(value)}")
+            sb.appendLine("${DIM}│${RESET} ${color}$symbol${RESET} ${formatAnsiValue(value)}")
         }
-        output.metadata.forEach { (key, value) ->
-            sb.appendLine("${DIM}│${RESET} ${MAGENTA}# $key${RESET}: $value")
+        output.metadata.forEach { (_, value) ->
+            sb.appendLine("${DIM}│${RESET} ${MAGENTA}#${RESET}: $value")
         }
         sb.appendLine("${BOLD}${CYAN}╰${"─".repeat(output.templateId.length + 4)}╯${RESET}")
         return sb.toString()
     }
 
-    private fun formatAnsiValue(value: Any): String = when (value) {
+    private fun formatAnsiValue(value: Any?): String = when (value) {
         is Double -> "%.2f".format(value)
         is Boolean -> if (value) "ON" else "OFF"
+        null -> "null"
         else -> value.toString()
     }
 }
@@ -218,7 +217,7 @@ class SignalTemplate(
     val output: Signal<TemplateOutput> = object : Signal<TemplateOutput> {
         private val _channel = Channel<TemplateOutput>(Channel.UNLIMITED)
         override val value: TemplateOutput
-            get() = template.render(bindings.associate { it.hole.key to it.signal.value })
+            get() = template.render(bindings.associate { it.hole.key to (it.signal.value as Any) })
         override val changes: Flow<TemplateOutput> = _channel.receiveAsFlow()
         init { _channel.trySend(value) }
     }

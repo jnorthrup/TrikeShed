@@ -1,8 +1,8 @@
 package borg.trikeshed.forge
 
-import borg.trikeshed.forge.CascadeTypes.CascadeProgress
 import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.flow.Flow
+
 /**
  * Low-level runner for individual workflow steps.
  * Implementations provide execution for different step types.
@@ -11,20 +11,13 @@ interface ForgeStepRunner {
 
     /**
      * Execute an LLM call step.
-     /** Execute parallel branches. */
-     suspend fun runParallel(
-         step: WorkflowStep.Parallel,
-         resolvedInputs: Map<String, String>,
-         runBranch: suspend (List<WorkflowStep>, Map<String, String>) -> List<StepResult>,
-     ): List<StepResult>
+     */
+    suspend fun runLlmCall(
+        step: WorkflowStep.LlmCall,
+        resolvedInputs: Map<String, String>,
+        modelConfig: Map<String, String>,
+    ): StepResult
 
-     /** Execute a cascade stage. */
-     suspend fun runCascadeExecution(
-         step: WorkflowStep.CascadeExecution,
-         resolvedInputs: Map<String, String>,
-         workspace: ForgeWorkspace,
-     ): StepResult
-     }
     /**
      * Execute a code execution step.
      */
@@ -62,20 +55,22 @@ interface ForgeStepRunner {
 
     /**
      * Execute parallel branches.
-     /** Execute parallel branches. */
-     suspend fun runParallel(
-         step: WorkflowStep.Parallel,
-         resolvedInputs: Map<String, String>,
-         runBranch: suspend (List<WorkflowStep>, Map<String, String>) -> List<StepResult>,
-     ): List<StepResult>
+     */
+    suspend fun runParallel(
+        step: WorkflowStep.Parallel,
+        resolvedInputs: Map<String, String>,
+        runBranch: suspend (List<WorkflowStep>, Map<String, String>) -> List<StepResult>,
+    ): List<StepResult>
 
-     /** Execute a cascade stage. */
-     suspend fun runCascadeExecution(
-         step: WorkflowStep.CascadeExecution,
-         resolvedInputs: Map<String, String>,
-         workspace: ForgeWorkspace,
-     ): StepResult
-     }
+    /**
+     * Execute a cascade stage.
+     */
+    suspend fun runCascadeExecution(
+        step: WorkflowStep.CascadeExecution,
+        resolvedInputs: Map<String, String>,
+        workspace: ForgeWorkspace,
+    ): StepResult
+}
 
 /**
  * Agent runner for coding agents (Codex, Claude Code, etc.).

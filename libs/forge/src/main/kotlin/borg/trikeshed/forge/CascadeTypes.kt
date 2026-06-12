@@ -56,10 +56,12 @@ enum class DataFormat { AUTO, JSON, CSV, CONFIX, PARQUET, MARKDOWN_TABLE }
 /** A single stage in the cascade pipeline */
 @Serializable
 sealed interface CascadeStage {
+    val id: String
+
     /** Map stage: transforms each input row independently */
     @Serializable
-    data class Map(
-        val id: String,
+    data class MapStage(
+        override val id: String,
         /** JS map function (CouchDB style) or Kotlin lambda reference */
         val transform: MapTransform,
         /** Output schema hint */
@@ -68,8 +70,8 @@ sealed interface CascadeStage {
 
     /** Reduce stage: aggregates by key */
     @Serializable
-    data class Reduce(
-        val id: String,
+    data class ReduceStage(
+        override val id: String,
         val reduceFn: ReduceTransform,
         /** Initial value for fold */
         val initialValue: String? = null,
@@ -77,30 +79,30 @@ sealed interface CascadeStage {
 
     /** Rereduce stage: merges partial reductions (for distributed/sharded execution) */
     @Serializable
-    data class Rereduce(
-        val id: String,
+    data class RereduceStage(
+        override val id: String,
         val rereduceFn: ReduceTransform,
     ) : CascadeStage
 
     /** Filter stage: predicates on rows */
     @Serializable
-    data class Filter(
-        val id: String,
+    data class FilterStage(
+        override val id: String,
         val predicate: String,  // JS expression or Kotlin predicate ref
     ) : CascadeStage
 
     /** Project stage: select/rename columns */
     @Serializable
-    data class Project(
-        val id: String,
+    data class ProjectStage(
+        override val id: String,
         val columns: List<String>,  // output column names
         val expressions: Map<String, String>,  // column -> expression
     ) : CascadeStage
 
     /** Join stage: combine with another cascade/source */
     @Serializable
-    data class Join(
-        val id: String,
+    data class JoinStage(
+        override val id: String,
         val otherSource: CascadeSource,
         val onKeys: List<String>,
         val joinType: JoinType = JoinType.INNER,

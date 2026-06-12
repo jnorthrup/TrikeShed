@@ -5,6 +5,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeoutOrNull
 import java.math.BigInteger
 import java.net.InetSocketAddress
@@ -47,7 +48,6 @@ class DhtService(
             }
             fun fromBigInteger(bi: BigInteger): NodeId {
                 val bytes = bi.toByteArray()
-                // Ensure 20 bytes (160 bits)
                 return if (bytes.size == 20) NodeId(bytes)
                 else if (bytes.size > 20) NodeId(bytes.copyOfRange(bytes.size - 20, bytes.size))
                 else NodeId(ByteArray(20 - bytes.size) + bytes)
@@ -99,7 +99,6 @@ class DhtService(
     fun announceProvider(cid: CID, address: String) = providersMutex.withLock {
         providers.computeIfAbsent(cid.hex()) { mutableSetOf() }.add(address)
         transport?.let { t ->
-            // Fire and forget for remote announcement
             CoroutineScope(Job()).launch { t.announceProviderRemote(cid, address) }
         }
     }
@@ -116,7 +115,6 @@ class DhtService(
         val local = routingTable.findClosest(target)
         transport?.let { t ->
             // In real impl: iterative RPC to closest nodes
-            // For now, return local results
         }
         return@withLock local
     }

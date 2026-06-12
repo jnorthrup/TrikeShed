@@ -3,9 +3,8 @@ package borg.trikeshed.htx.client.ipfs
 import borg.trikeshed.userspace.FunctionalUringFacade
 import borg.trikeshed.userspace.UringCompletion
 import borg.trikeshed.userspace.UringOp
-import borg.trikeshed.userspace.concurrentMutex
-import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /**
  * DHT Transport interface — abstracts network I/O for DHT operations.
@@ -51,7 +50,7 @@ class HtxDhtTransport(
         facade.enqueue(UringOp.Companion.Submissions.nop(3L))
         facade.submit()
         facade.waitCqe()
-        return emptyList() // Stub - real impl would do iterative FIND_NODE
+        return emptyList()
     }
 
     fun registerFanoutHandler(handler: (UringCompletion) -> Unit) {
@@ -67,10 +66,7 @@ object HtxDhtTransportFactory {
         entries: Int = 256,
         fanoutDispatcher: borg.trikeshed.userspace.FanoutDispatcherElement? = null,
     ): HtxDhtTransport {
-        val facade = FunctionalUringFacade(
-            entries,
-            borg.trikeshed.userspace.openUserspaceChannelBackend(entries)
-        )
+        val facade = FunctionalUringFacade(entries)
         return HtxDhtTransport(facade, fanoutDispatcher)
     }
 
