@@ -42,37 +42,33 @@ kotlin {
     jvm {}
 
     sourceSets {
-        named("commonMain") {
+        val commonMain by getting {
             dependencies {
                 api("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
                 api("org.jetbrains.kotlinx:kotlinx-datetime:0.8.0-0.6.x-compat")
             }
         }
-        named("commonTest") {
+        val commonTest by getting {
             dependencies {
                 implementation(kotlin("test"))
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
             }
         }
-        named("jvmMain") {
+        val jvmMain by getting {
             resources.srcDir("src/jvmMain/resources")
             dependencies {
                 // JMH dependencies for benchmarking
                 implementation("org.openjdk.jmh:jmh-core:1.37")
                 implementation("org.openjdk.jmh:jmh-generator-annprocess:1.37")
-                implementation("org.bouncycastle:bcprov-jdk15on:1.70")
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
-            }
-            resources.srcDir("src/jmhMain/resources")
-        }
-    }
 
-    // Configure JVM source directories at the Kotlin extension level
-    // This is the correct API for Gradle 9.6+ with Kotlin Multiplatform plugin 2.4
-    sourceSets {
-        named("jvmMain").configure {
-            // Add source directories using the proper API
-            srcDirs("src/jvmMain/kotlin", "src/jmhMain/kotlin")
+                implementation("org.bouncycastle:bcprov-jdk15on:1.70")
+
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
+
+                // Depend on userspace/context implementations via classpath (no libs/ subprojects)
+            }
+
+            resources.srcDir("src/jmhMain/resources")
         }
     }
 
