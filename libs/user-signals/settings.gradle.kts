@@ -12,12 +12,10 @@ dependencyResolutionManagement {
         mavenCentral()
         google()
         gradlePluginPortal()
-        maven("https://oss.sonatype.org/content/repositories/snapshots/")
-        maven("https://www.jitpack.io")
     }
 }
 
-rootProject.name = "polyglot"
+rootProject.name = "user-signals"
 
 includeBuild("../..") {
     dependencySubstitution {

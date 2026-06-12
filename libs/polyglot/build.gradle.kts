@@ -1,3 +1,11 @@
+plugins {
+    kotlin("multiplatform") version "2.4.0"
+}
+
+extra["versions.kotlinx-coroutines-core"] = "1.11.0"
+extra["versions.kotlinx-coroutines-test"] = "1.11.0"
+extra["versions.kotlinx-datetime"] = "0.6.1"
+
 apply(from = "../../gradle/macros/trikeshed-lib.gradle")
 
 dependencies {

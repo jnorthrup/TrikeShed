@@ -1,10 +1,10 @@
 package borg.trikeshed.windowtoolkit.context
 
-import borg.trikeshed.usersignals.AsyncSignalElement
-import borg.trikeshed.usersignals.AsyncSignalKey
-import borg.trikeshed.usersignals.SignalContextElement
-import borg.trikeshed.usersignals.SignalEvent
-import borg.trikeshed.usersignals.SignalSubscriber
+import borg.trikeshed.windowtoolkit.internal.SignalContextElement
+import borg.trikeshed.windowtoolkit.internal.SignalEvent
+import borg.trikeshed.windowtoolkit.internal.SignalSubscriber
+import borg.trikeshed.windowtoolkit.internal.AsyncSignalElement
+import borg.trikeshed.windowtoolkit.internal.AsyncSignalKey
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.receiveAsFlow

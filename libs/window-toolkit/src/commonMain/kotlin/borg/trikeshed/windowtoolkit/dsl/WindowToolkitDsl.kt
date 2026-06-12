@@ -1,8 +1,8 @@
 package borg.trikeshed.windowtoolkit.dsl
 
 import borg.trikeshed.windowtoolkit.context.WindowContextElement
-import borg.trikeshed.usersignals.*
-import borg.trikeshed.usersignals.SignalAlgebra
+import borg.trikeshed.windowtoolkit.internal.*
+import borg.trikeshed.windowtoolkit.internal.SignalAlgebra
 import kotlinx.coroutines.Dispatchers
 
 /**

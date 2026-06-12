@@ -3,7 +3,7 @@ package borg.trikeshed.windowtoolkit.harness
 import borg.trikeshed.windowtoolkit.dsl.WindowShell
 import borg.trikeshed.windowtoolkit.dsl.windowContext
 import borg.trikeshed.windowtoolkit.dsl.panel
-import borg.trikeshed.usersignals.*
+import borg.trikeshed.windowtoolkit.internal.*
 import kotlinx.coroutines.runBlocking
 
 /**

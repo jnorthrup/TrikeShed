@@ -1,313 +1,286 @@
-# Classfile Peripheral Pointcut Trajectory Integration Plan
+# Classfile Pointcut Trajectory — Source Root Contract Plan
 
 > **For Hermes:** Use subagent-driven-development skill to implement this plan task-by-task.
 
-**Goal:** Move JVM/Graal/polyglot pointcut work into a peripheral `libs/classfile` package hierarchy with TDD RED contracts first, keeping the root TrikeShed build nearly unchanged.
+**Goal:** Put JVM/Graal/polyglot pointcut TDD under `libs/classfile` while using the **source root contract** — `PRELOAD.md` plus the existing root algebra in `src/commonMain/kotlin` — as the controlling API. Do **not** create a new dependency in root.
 
-**Architecture:** `libs/classfile` becomes the boundary library. `commonMain` defines pure SPI/data contracts for classfile scans, source mappings, faceted cursor endpoints, pointcut delegate activation, and observable sinks. A Java/JVM implementation layer uses JEP 484 `java.lang.classfile` to scan bytecode and launch JVM pointcut harnesses. Polyglot/Graal mappings consume the same SPI through explicit symbol/source mapping tables rather than Kotlin `expect/actual`.
+**Architecture:** Root source remains the kernel contract (`Join`, `Series`, `Cursor`, metadata, CCEK lifecycle/fanout). `libs/classfile` builds peripheral classfile/JEP-484/Graal pointcut surfaces against that contract and must not introduce root → classfile coupling. Direction is one-way: classfile consumes root algebra; root does not depend on classfile.
 
-**Tech Stack:** Kotlin common SPI, JVM/Java source for JEP 484 Class-File API, JUnit/TDD RED tests, TrikeShed `Series`/`MutableSeries`/`Cursor`/`ColumnMeta`, Confix blackboard projections, GraalVM Polyglot launch fixtures.
-
----
-
-## Non-negotiable shape
-
-1. **Root barely changes.** Do not expand root `settings.gradle.kts` or root `build.gradle.kts` as the main integration mechanism. Keep root changes to zero during RED/scaffold work; if a later green build needs root visibility, make it a one-line include/composite decision after the peripheral lib is green standalone.
-2. **`libs/classfile` owns the trajectory.** New contracts, RED tests, harnesses, and scaffolds live under `libs/classfile`, not `src/` root and not `libs/polyglot` first.
-3. **SPI, not `expect/actual`.** `commonMain` exposes interfaces and data records. JVM/JEP 484 and Graal/polyglot implementations register through explicit constructors, `ServiceLoader`, or a registry object injected into tests.
-4. **Tests first.** Add new RED test files; do not mutate existing tests unless Jim explicitly overrides the standing rule.
-5. **No fake integration claims.** Synthetic delegate/blackboard tests are labeled unit/scaffold tests until JVM/Graal launch tests actually run a classfile/polyglot program and observe emitted records.
+**Tech Stack:** Source-root TrikeShed kernel algebra from `PRELOAD.md`, `Series`/`Cursor`/metadata projections, peripheral `libs/classfile` SPI, JEP 484 `java.lang.classfile`, JVM launch harnesses, GraalVM polyglot mapping scaffolds, TDD RED tests.
 
 ---
 
-## Proposed package hierarchy under `libs/classfile`
+## Source root is the main contract
+
+Use `/Users/jim/work/TrikeShed/PRELOAD.md` and existing root source as normative:
+
+- `Join<A,B>` is the base composition shape.
+- `Series<T> = Join<Int, (Int) -> T>` is the indexed abstraction.
+- `Cursor = Series<RowVec>` is the dataframe-shaped specialization.
+- Metadata is part of the algebra, not an afterthought.
+- `List<T>.toSeries()` and `Array<T>.toSeries()` are first-class gateway priorities for peripheral scans that start from JVM/stdlib collections.
+- Use `α` lazy projections and `.view` only at stdlib/materialization boundaries.
+- Use `/` (`div`) for value-side cursor/coordinate reduction and `%` (`rem`) for index-side reduction so reduced pointcut cursors collapse back to `Series` before `α` transforms and `.view` materialization.
+- Side effects stay at explicit userspace/CCEK boundaries with lifecycle and fanout.
+
+`libs/classfile` must **not** define a parallel algebra. Its pointcut rows, blackboards, symbol maps, and activation cursors collapse back to source-root `Join`/`Series`/`Cursor` shapes.
+
+---
+
+## Hard dependency rule
+
+**DO NOT CREATE A NEW DEPENDENCY IN ROOT.**
+
+Allowed dependency direction:
 
 ```text
-libs/classfile/
-  build.gradle.kts                         # peripheral build only
-  settings.gradle.kts                      # optional standalone build, not root integration
-  src/commonMain/kotlin/borg/trikeshed/classfile/
-    spi/ClassfileScanSpi.kt                # SPI entry point, no expect/actual
-    spi/PointcutDelegateSpi.kt             # delegate registration and activation
-    spi/PointcutSink.kt                    # Observable/MutableSeries sink abstraction
-    model/ClassfilePattern.kt              # glob/pattern activation model
-    model/BytecodePointcutKind.kt          # field/local/array/const/invoke/value op kinds
-    model/SourceCoordinate.kt              # file, line, column?, language, symbol
-    model/SymbolCoordinate.kt              # symbol table key/name/fqn/owner/descriptor
-    model/PointcutCoordinate.kt            # bytecode + source + symbol mapped row
-    cursor/ClassfileFacets.kt              # ColumnMeta facets for endpoint/lambda/sink/etc.
-    cursor/ClassfileBlackboard.kt          # Confix projection and cursor rows
-    cursor/PointcutActivationCursor.kt     # spreadsheet-like late-bound activation rows
-    sink/MutableSeriesPointcutSink.kt      # lossless observable sink contract
-  src/javaMain/java/borg/trikeshed/classfile/jep484/
-    Jep484ClassfileScanner.java            # `java.lang.classfile` scan implementation
-    Jep484PointcutCommand.java             # JVM command/harness launch description
-  src/jvmMain/kotlin/borg/trikeshed/classfile/jvm/
-    JvmPointcutHarness.kt                  # JVM launch facade over Java scanner
-    AotJitDumpHarness.kt                   # dump scanner/harness fixture
-  src/jvmMain/kotlin/borg/trikeshed/classfile/graal/
-    GraalPointcutMappingBridge.kt          # maps polyglot source sections to SPI records
-    GraalEcmaPointcutLaunch.kt             # ECMA-specific launch fixture
-  src/commonTest/kotlin/borg/trikeshed/classfile/red/
-    ClassfileSpiRedTest.kt
-    ClassfileFacetedCursorRedTest.kt
-    ClassfileBlackboardRedTest.kt
-    PointcutDelegateActivationRedTest.kt
-    MutableSeriesObservableSinkRedTest.kt
-  src/jvmTest/kotlin/borg/trikeshed/classfile/red/
-    Jep484JvmPointcutCommandRedTest.kt
-    AotJitDumpHarnessRedTest.kt
-    GraalPolyglotPointcutLaunchRedTest.kt
-    GraalEcmaSymbolMappingRedTest.kt
+root source contract  ──consumed by──>  libs/classfile peripheral implementation
 ```
 
-If Gradle cannot support `javaMain` directly with the current classfile plugin, use `src/jvmMain/java` initially but keep package names `borg.trikeshed.classfile.jep484`. The contract remains: Java/JVM implementation below the SPI, no `expect/actual`.
+Forbidden direction:
 
----
-
-## TDD tranche 1: JVM pointcut command and value-bytecode scan RED
-
-### Task 1: Add RED SPI inventory test
-
-**Objective:** Define the common SPI surface before implementation.
-
-**Files:**
-- Create: `libs/classfile/src/commonTest/kotlin/borg/trikeshed/classfile/red/ClassfileSpiRedTest.kt`
-- Later create: `libs/classfile/src/commonMain/kotlin/borg/trikeshed/classfile/spi/ClassfileScanSpi.kt`
-
-**RED assertions:**
-- `ClassfileScanSpi.scan(bytes, request)` returns a `Series<PointcutCoordinate>`.
-- `PointcutCoordinate` includes:
-  - `bytecodeOpcode`: JVM opcode mnemonic or byte value.
-  - `pointcutKind`: field/local/array/constant/invoke/value category.
-  - `source`: `SourceCoordinate`.
-  - `symbol`: `SymbolCoordinate`.
-  - `delegateKey`: nullable activation key.
-- The RED compile inventory should show missing types only from `borg.trikeshed.classfile.*`.
-
-**Run:**
-```bash
-./gradlew :libs:classfile:compileTestKotlinJvm --rerun-tasks
+```text
+root build/source  ──depends on──>  libs/classfile
 ```
 
-**Expected RED:** compilation fails with missing classfile SPI/model types.
+Implementation implications:
 
-### Task 2: Add RED JVM command test for full pointcut command surface
-
-**Objective:** Show the complete command/harness contract for JVM pointcuts before implementation.
-
-**Files:**
-- Create: `libs/classfile/src/jvmTest/kotlin/borg/trikeshed/classfile/red/Jep484JvmPointcutCommandRedTest.kt`
-
-**RED assertions:**
-- A `JvmPointcutCommand` can be built with:
-  - classpath entries,
-  - main class or test class target,
-  - glob activation patterns,
-  - output sink key,
-  - bytecode categories: field, local load/store, array load/store, constants, invokes, numeric ops, conversions, compare/branch.
-- Running the command against a tiny fixture class yields pointcut coordinates for at least:
-  - `GETFIELD`, `PUTFIELD`, `GETSTATIC`, `PUTSTATIC`,
-  - `ILOAD`/`ISTORE` plus long/float/double/object variants where fixture allows,
-  - `IALOAD`/`IASTORE` plus representative array variants,
-  - `LDC`, intrinsic constants,
-  - `INVOKEVIRTUAL`, `INVOKESTATIC`, `INVOKESPECIAL`,
-  - numeric operator/conversion instructions.
-- Every coordinate has non-empty source and symbol names.
-
-**Expected RED:** missing `JvmPointcutCommand`, `Jep484ClassfileScanner`, and fixture mapping types.
-
-### Task 3: Add RED JEP 484 scanner test
-
-**Objective:** Force the implementation to use JEP 484 as the classfile scanner, not ASM as the primary scanner.
-
-**Files:**
-- Create: `libs/classfile/src/jvmTest/kotlin/borg/trikeshed/classfile/red/Jep484BytecodeScanRedTest.kt`
-
-**RED assertions:**
-- The scanner exposes a `scannerBackend == "java.lang.classfile/JEP-484"` marker.
-- It reads `SourceFile`, `LineNumberTable`, local variables, field refs, method refs, and constants from a compiled fixture.
-- It emits deterministic `PointcutCoordinate` rows sorted by bytecode offset.
-
-**Expected RED:** missing scanner implementation.
+1. No new root `implementation(project(":libs:classfile"))`.
+2. No new root source imports from `borg.trikeshed.classfile.*`.
+3. No root `src/` pointcut scaffolding.
+4. No root Gradle expansion as the integration mechanism.
+5. `libs/classfile` may reuse existing root algebra contracts exactly as already modeled by the project build, but root must remain ignorant of classfile internals.
 
 ---
 
-## TDD tranche 2: Polyglot/Graal source and symbol mapping scaffold RED
+## Peripheral package hierarchy in `libs/classfile`
 
-### Task 4: Add RED polyglot mapping table test
+Use source-root algebra names in every model. Do not create opaque wrappers where a `Join`, `Series`, cursor row, or metadata projection is the natural contract.
 
-**Objective:** Define how Graal/polyglot language mappings reroute pointcuts to source objects/symbols.
+```text
+libs/classfile/src/commonMain/kotlin/borg/trikeshed/classfile/
+  spi/
+    ClassfileScanSpi.kt              # scan(bytes, request): Series<PointcutCoordinate>
+    PointcutDelegateSpi.kt           # activation delegate, explicit lifecycle
+    PointcutSink.kt                  # sink boundary over MutableSeries/Series
+  model/
+    ClassfilePattern.kt              # glob/pattern scan request as algebraic data
+    BytecodePointcutKind.kt          # field/local/array/const/invoke/operator/conversion
+    SourceCoordinate.kt              # source file/line/column/language
+    SymbolCoordinate.kt              # symbol name/fqn/owner/descriptor/table key
+    PointcutCoordinate.kt            # bytecode + source + symbol + activation key
+  cursor/
+    ClassfileFacets.kt               # metadata facets for endpoint/lambda/sink/activation
+    ClassfileBlackboard.kt           # Series/ Cursor projection of scans and activations
+    PointcutActivationCursor.kt      # spreadsheet-like late-bound function rows
+  sink/
+    MutableSeriesPointcutSink.kt     # observable/lossless sink delegate
 
-**Files:**
-- Create: `libs/classfile/src/commonTest/kotlin/borg/trikeshed/classfile/red/PolyglotSymbolMappingRedTest.kt`
-- Later create: `libs/classfile/src/commonMain/kotlin/borg/trikeshed/classfile/model/PolyglotSourceMapping.kt`
+libs/classfile/src/jvmMain/java/borg/trikeshed/classfile/jep484/
+  Jep484ClassfileScanner.java        # JEP 484 java.lang.classfile scanner
+  Jep484PointcutCommand.java         # JVM command/harness contract
 
-**RED assertions:**
-- `PolyglotSourceMapping` maps from JVM/Graal callsite to:
-  - language id (`js`, `python`, etc.),
-  - source URI/name,
-  - line/column if known,
-  - symbol name,
-  - source object key or symbol table key.
-- Unknown mappings preserve JVM coordinate and mark source as unresolved instead of dropping the event.
+libs/classfile/src/jvmMain/kotlin/borg/trikeshed/classfile/
+  jvm/
+    JvmPointcutHarness.kt            # actual JVM launch facade
+    AotJitDumpHarness.kt             # AOT/JIT dump scanning harness
+  graal/
+    GraalPointcutMappingBridge.kt    # polyglot source/symbol mapping bridge
+    GraalEcmaPointcutLaunch.kt       # ECMA-specific fixture launch
+```
 
-### Task 5: Add RED Graal ECMA launch test
-
-**Objective:** Make ECMAScript the first real specialized language mapping.
-
-**Files:**
-- Create: `libs/classfile/src/jvmTest/kotlin/borg/trikeshed/classfile/red/GraalEcmaSymbolMappingRedTest.kt`
-
-**RED assertions:**
-- Launch a Graal JS snippet through the classfile SPI harness.
-- Capture pointcut coordinates whose symbols are JS-facing names where possible, not only JVM host names.
-- Assert mappings for object field get/set and function invocation.
-- Assert fallback to JVM coordinate when Graal source section is unavailable.
-
-**Expected RED:** missing Graal mapping bridge and launch fixture.
-
----
-
-## Faceted cursor and Confix blackboard tranche
-
-### Task 6: Add RED ColumnMeta facet contract
-
-**Objective:** Define delegation endpoint facets without making every Confix mapping executable.
-
-**Files:**
-- Create: `libs/classfile/src/commonTest/kotlin/borg/trikeshed/classfile/red/ClassfileFacetedCursorRedTest.kt`
-- Later create: `libs/classfile/src/commonMain/kotlin/borg/trikeshed/classfile/cursor/ClassfileFacets.kt`
-
-**RED assertions:**
-- Cursor columns can carry facets:
-  - `SourceMappedSymbol`,
-  - `PointcutDelegateEndpoint`,
-  - `LambdaMedium`,
-  - `ObservableSink`,
-  - `GlobActivation`,
-  - `LateBoundFunction`.
-- Only rows whose medium supports in-VM lambda passing expose `LambdaMedium` and `LateBoundFunction`.
-- Confix-only rows remain data-only and are filtered out of actuation cursors.
-
-### Task 7: Add RED Confix classfile blackboard test
-
-**Objective:** Strengthen the classfile blackboard into a pattern-based scan and activation surface.
-
-**Files:**
-- Create: `libs/classfile/src/commonTest/kotlin/borg/trikeshed/classfile/red/ClassfileBlackboardRedTest.kt`
-
-**RED assertions:**
-- A blackboard registers whole-pattern scans and glob activation rules.
-- It can project records as cursor rows for spreadsheet-like inspection.
-- It can filter rows by facet and activation state.
-- It preserves source/symbol/bytecode coordinates losslessly.
-
-### Task 8: Add RED MutableSeries observable sink delegate test
-
-**Objective:** Keep firehose/sink semantics explicit and lossless.
-
-**Files:**
-- Create: `libs/classfile/src/commonTest/kotlin/borg/trikeshed/classfile/red/MutableSeriesObservableSinkRedTest.kt`
-
-**RED assertions:**
-- `MutableSeriesPointcutSink` receives every activated pointcut delegate event.
-- Delegates can be attached/detached by activation row.
-- Sink records include activation pattern, delegate key, source, symbol, and bytecode pointcut kind.
-- The unit test is explicitly synthetic until JVM/Graal launch tests feed the same sink.
+If the current Gradle plugin has no `javaMain`, use `src/jvmMain/java` for Java files. The architectural contract remains SPI/common model first, Java/JVM implementation second, no `expect/actual`.
 
 ---
 
-## AOT/JIT dump and actual launch tranche
+## TDD RED tranche 1 — source-root algebra contract
 
-### Task 9: Add RED AOT/JIT dump harness test
+### Task 1: RED test for algebra-shaped classfile rows
 
-**Objective:** Ensure dump artifacts scan through the same classfile SPI.
+**Create:** `libs/classfile/src/commonTest/kotlin/borg/trikeshed/classfile/red/ClassfileSourceRootContractRedTest.kt`
 
-**Files:**
-- Create: `libs/classfile/src/jvmTest/kotlin/borg/trikeshed/classfile/red/AotJitDumpHarnessRedTest.kt`
+**The test should assert:**
 
-**RED assertions:**
-- Harness accepts an AOT/JIT dump directory or jar/classfile glob.
-- Scanner records each matched classfile with source/symbol coordinates where present.
-- Missing debug tables are represented as unresolved source coordinates, not failures.
+- `ClassfileScanSpi.scan(...)` returns `Series<PointcutCoordinate>`.
+- `PointcutCoordinate` is decomposable into source-root-like joined parts, not a sealed command object maze.
+- Row projections can be expressed as `Series.α { ... }`.
+- Materialized inspection uses `.view`, not eager lists in the core API.
+- Cursor projection preserves metadata/facets.
 
-### Task 10: Add RED real JVM launch test
+**Expected RED:** unresolved `ClassfileScanSpi`, `PointcutCoordinate`, `SourceCoordinate`, `SymbolCoordinate`, `ClassfileFacets`.
 
-**Objective:** Prove the JVM harness can execute a tiny fixture and drain pointcuts into the same sink.
+### Task 2: RED test for no root dependency direction
 
-**Files:**
-- Create: `libs/classfile/src/jvmTest/kotlin/borg/trikeshed/classfile/red/JvmActualPointcutLaunchRedTest.kt`
+**Create:** `libs/classfile/src/commonTest/kotlin/borg/trikeshed/classfile/red/RootDependencyDirectionRedTest.kt`
 
-**RED assertions:**
-- Launch a fixture with the command built in Task 2.
-- Drain `MutableSeriesPointcutSink`.
-- Assert observed events match the JEP 484 static scan at least by pointcut kind and symbol names.
+**The test should assert by convention/static inspection:**
 
-### Task 11: Add RED real GraalVM launch test
+- No root source file imports `borg.trikeshed.classfile`.
+- No root build file declares a dependency on `:libs:classfile`.
+- Classfile package names are peripheral-only.
 
-**Objective:** Prove Graal polyglot actual launches use the same SPI and sink.
-
-**Files:**
-- Create: `libs/classfile/src/jvmTest/kotlin/borg/trikeshed/classfile/red/GraalPolyglotPointcutLaunchRedTest.kt`
-
-**RED assertions:**
-- Launch JS via GraalVM.
-- Feed emitted/mapped events into `MutableSeriesPointcutSink`.
-- Assert language id, source coordinate, symbol name, and bytecode fallback coordinate are all present.
+This can be a test utility that scans files under the repo root and fails if root gains a classfile dependency. It protects Jim’s “DO NOT CREATE A NEW DEPENDENCY IN ROOT” rule.
 
 ---
 
-## Minimal implementation order after RED inventory
+## TDD RED tranche 2 — JVM/JEP-484 pointcut command
 
-1. Create only the common SPI/model records needed for compilation.
-2. Add the faceted cursor constants and filtering helpers.
-3. Add blackboard registration/projection as an in-memory `MutableSeries` model.
-4. Add synthetic observable sink/delegate activation.
-5. Implement the JEP 484 scanner over `java.lang.classfile` in Java/JVM source.
-6. Wire JVM command/harness to scanner output first, runtime launch second.
-7. Wire Graal ECMA mapping bridge using explicit `PolyglotSourceMapping` tables.
-8. Add AOT/JIT dump scanner harness.
+### Task 3: RED full JVM pointcut command test
 
-Each step must run a targeted RED→GREEN cycle before the next step.
+**Create:** `libs/classfile/src/jvmTest/kotlin/borg/trikeshed/classfile/red/Jep484JvmPointcutCommandRedTest.kt`
+
+**The test should assert:**
+
+- A command can describe classpath, target main/test class, glob activation patterns, sink key, and pointcut categories.
+- The command is data-first and can be projected into a cursor row.
+- A fixture scan asks for value-related bytecode categories:
+  - field get/set: `GETFIELD`, `PUTFIELD`, `GETSTATIC`, `PUTSTATIC`
+  - local load/store: `ILOAD`/`ISTORE` and representative L/F/D/A variants
+  - array load/store: representative typed load/store
+  - constants: intrinsic constants and `LDC`
+  - invokes: virtual/static/special/interface where available
+  - numeric operators/conversions/compare/branch
+- Every emitted `PointcutCoordinate` has bytecode, source coordinate, and symbol coordinate fields.
+
+### Task 4: RED JEP 484 static scan test
+
+**Create:** `libs/classfile/src/jvmTest/kotlin/borg/trikeshed/classfile/red/Jep484BytecodeScanRedTest.kt`
+
+**The test should assert:**
+
+- Scanner backend marker is `java.lang.classfile/JEP-484`.
+- It reads `SourceFile`, line numbers, local variable table if present, field refs, method refs, and loadable constants.
+- Results are a `Series<PointcutCoordinate>` sorted by bytecode offset.
+- Missing debug info becomes an unresolved `SourceCoordinate`, not a dropped event.
+
+---
+
+## TDD RED tranche 3 — Graal/polyglot source mapping scaffold
+
+### Task 5: RED polyglot symbol map contract
+
+**Create:** `libs/classfile/src/commonTest/kotlin/borg/trikeshed/classfile/red/PolyglotSymbolMappingRedTest.kt`
+
+**The test should assert:**
+
+- A polyglot mapping table maps JVM/Graal callsites to `SourceCoordinate` and `SymbolCoordinate`.
+- Language id (`js`, `python`, etc.) is part of the coordinate.
+- Unknown source sections preserve JVM fallback coordinates.
+- The mapping table projects as `Series<PointcutCoordinate>` and as a cursor for inspection.
+
+### Task 6: RED Graal ECMAScript launch scaffold
+
+**Create:** `libs/classfile/src/jvmTest/kotlin/borg/trikeshed/classfile/red/GraalEcmaPointcutLaunchRedTest.kt`
+
+**The test should assert:**
+
+- A Graal JS fixture can be launched through the classfile SPI/harness.
+- Object field get/set and function invocation are mapped to JS-facing symbol names where source sections allow it.
+- JVM fallback symbols are retained when JS source mapping is incomplete.
+- The sink records are the same `PointcutCoordinate` rows as the JEP-484 scanner uses.
+
+---
+
+## TDD RED tranche 4 — faceted cursor blackboard and delegate activation
+
+### Task 7: RED ColumnMeta facet contract
+
+**Create:** `libs/classfile/src/commonTest/kotlin/borg/trikeshed/classfile/red/ClassfileFacetedCursorRedTest.kt`
+
+**The test should assert facets for:**
+
+- `SourceMappedSymbol`
+- `PointcutDelegateEndpoint`
+- `LambdaMedium`
+- `ObservableSink`
+- `GlobActivation`
+- `LateBoundFunction`
+
+Only rows backed by in-VM lambda-capable media expose `LambdaMedium` / `LateBoundFunction`. Confix-only rows remain data rows.
+
+### Task 8: RED Confix classfile blackboard test
+
+**Create:** `libs/classfile/src/commonTest/kotlin/borg/trikeshed/classfile/red/ClassfileBlackboardRedTest.kt`
+
+**The test should assert:**
+
+- Whole-pattern scans register on a blackboard.
+- Glob activation rules project into cursor rows.
+- Facet filters select delegate-capable rows.
+- Source/symbol/bytecode coordinates survive projection.
+
+### Task 9: RED MutableSeries observable sink delegate test
+
+**Create:** `libs/classfile/src/commonTest/kotlin/borg/trikeshed/classfile/red/MutableSeriesObservableSinkRedTest.kt`
+
+**The test should assert:**
+
+- Activated delegates write every event into a lossless sink.
+- Attach/detach is represented as algebraic lifecycle state, not hidden callbacks.
+- Sink content can be viewed as `Series<PointcutCoordinate>` and cursor rows.
+
+---
+
+## TDD RED tranche 5 — actual launch and dump paths
+
+### Task 10: RED AOT/JIT dump harness test
+
+**Create:** `libs/classfile/src/jvmTest/kotlin/borg/trikeshed/classfile/red/AotJitDumpHarnessRedTest.kt`
+
+**The test should assert:**
+
+- Harness accepts a dump directory/jar/class glob.
+- Every matched classfile gets scanned through the same SPI.
+- Missing debug tables yield unresolved source coordinates.
+
+### Task 11: RED actual JVM pointcut launch test
+
+**Create:** `libs/classfile/src/jvmTest/kotlin/borg/trikeshed/classfile/red/JvmActualPointcutLaunchRedTest.kt`
+
+**The test should assert:**
+
+- A tiny JVM fixture launches.
+- The sink drains observed pointcut rows.
+- Runtime rows can be matched back to static JEP-484 scan rows by kind and symbol coordinate.
+
+### Task 12: RED actual GraalVM polyglot pointcut launch test
+
+**Create:** `libs/classfile/src/jvmTest/kotlin/borg/trikeshed/classfile/red/GraalPolyglotPointcutLaunchRedTest.kt`
+
+**The test should assert:**
+
+- Graal JS launches.
+- Emitted/mapped events enter the same sink.
+- Rows include language id, source coordinate, symbol name, and JVM fallback coordinate.
+
+---
+
+## Implementation sequence after RED
+
+1. Add minimal common model/SPI records so RED tests compile one layer at a time.
+2. Keep every model algebra-shaped: `Series`, `Join`, cursor projections, metadata facets.
+3. Implement blackboard + sink as in-memory peripheral structures under `libs/classfile`.
+4. Implement JEP 484 scanner using `java.lang.classfile`.
+5. Implement JVM command/harness over the scanner.
+6. Implement Graal/ECMA mapping bridge into the same `PointcutCoordinate` rows.
+7. Implement AOT/JIT dump harness.
+8. Only then consider build integration — without adding a root dependency.
 
 ---
 
 ## Verification commands
 
-Prefer peripheral verification first:
+Use the existing project path if `libs/classfile` is already included:
 
 ```bash
-# If libs/classfile remains wired as a root project:
 ./gradlew :libs:classfile:compileTestKotlinJvm --rerun-tasks
 ./gradlew :libs:classfile:jvmTest --rerun-tasks --tests "borg.trikeshed.classfile.red.*"
-
-# If classfile is isolated as a peripheral standalone build:
-/Users/jim/work/TrikeShed/gradlew -p libs/classfile compileTestKotlinJvm --rerun-tasks
-/Users/jim/work/TrikeShed/gradlew -p libs/classfile jvmTest --rerun-tasks
 ```
 
-If standalone Gradle complains the lib is not part of root settings, do **not** broaden root immediately. First add a local `libs/classfile/settings.gradle.kts` for peripheral verification. Root inclusion is a final integration step only after classfile is green standalone.
+If Gradle currently cannot see `libs/classfile`, do **not** solve that by adding a root dependency. Either use the existing root source contract as-is or create a temporary/peripheral-only verification route that does not make root depend on classfile.
 
 ---
 
-## Root-change budget
+## Final invariant
 
-Allowed before the peripheral lib is green:
-- Zero root code changes.
-- Zero root source changes.
-- Optional `.hermes/plans/*` only.
-
-Allowed after peripheral lib is green, if needed:
-- One small root `settings.gradle.kts` inclusion or composite-build line.
-- No root `src/` dependencies on classfile internals; root consumes SPI-facing artifact only.
-
----
-
-## Risks and guardrails
-
-- **Existing `libs/classfile` build may be stale.** Do not fix by pulling root into it. Fix the peripheral build locally or isolate with a standalone settings file.
-- **JEP 484 requires JDK 24+.** Current environment reports JDK 25, so scanner implementation can target `java.lang.classfile` directly.
-- **Graal source sections are not always available.** Mapping must preserve unresolved fallback records.
-- **MutableSeries firehose can overflow if backed by recursive series at high depth.** Use a flat sink journal for launch tests; keep cursor projection lazy.
-- **Confix actuation must be opt-in.** Only facets declaring lambda-capable in-VM media can expose late-bound function actuation.
+`PRELOAD.md` + root source algebra is the contract. `libs/classfile` is a peripheral consumer/implementation. Root does not depend on it.

@@ -17,7 +17,7 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "polyglot"
+rootProject.name = "window-toolkit"
 
 includeBuild("../..") {
     dependencySubstitution {
