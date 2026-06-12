@@ -8,6 +8,184 @@ import borg.trikeshed.polyglot.ccek.FieldSynapse
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
 
+// Opcode constants (matching xvm FieldSynapse wire protocol) - top-level for accessibility
+const val OP_L_GET = 0xA5.toByte()
+const val OP_L_SET = 0xA6.toByte()
+const val OP_P_GET = 0xA7.toByte()
+const val OP_P_SET = 0xA8.toByte()
+
+// Phase constants
+const val PHASE_BEFORE = 0.toByte()
+const val PHASE_AFTER = 1.toByte()
+
+/**
+ * Python instrumentation module - loaded inline to avoid resource issues.
+ */
+const val PYTHON_INSTRUMENTATION_MODULE = """
+import sys
+import types
+
+print("[POINT CUT] Module loaded", file=sys.stderr)
+sys.stderr.flush()
+
+# Global emitter reference (bound by host)
+_emitter = None
+_instrumented_classes = set()
+
+def _set_emitter(emitter):
+    '''Called by host to register the pointcut emitter.'''
+    global _emitter
+    _emitter = emitter
+
+def _emit(phase, is_static, is_write, class_name, field_name, location, seq):
+    '''Emit a pointcut via the host-bound emitter.'''
+    if _emitter is not None:
+        _emitter.emitFieldAccess(phase, is_static, is_write, class_name, field_name, location, seq)
+
+def _make_setattr(class_name, original_setattr=None):
+    '''Create a __setattr__ that emits L_SET/P_SET pointcuts.'''
+    def instrumented_setattr(self, name, value):
+        # Skip private/dunder attributes
+        if name.startswith('_'):
+            if original_setattr:
+                return original_setattr(self, name, value)
+            object.__setattr__(self, name, value)
+            return
+        
+        is_static = isinstance(self, type)
+        
+        # BEFORE phase
+        seq = _get_next_seq()
+        _emit(0, is_static, True, class_name, name, class_name + '.__setattr__', seq)
+        
+        try:
+            if original_setattr:
+                original_setattr(self, name, value)
+            else:
+                object.__setattr__(self, name, value)
+        except Exception:
+            _emit(1, is_static, True, class_name, name, class_name + '.__setattr__', seq)
+            raise
+        
+        # AFTER phase
+        _emit(1, is_static, True, class_name, name, class_name + '.__setattr__', seq)
+    return instrumented_setattr
+
+def _make_getattr(class_name, original_getattr=None):
+    '''Create a __getattr__ that emits L_GET/P_GET pointcuts for missing attributes.
+    
+    NOTE: Python's __getattr__ is ONLY called for missing attributes.
+    For attributes in __dict__, __getattr__ is NOT called.
+    '''
+    def instrumented_getattr(self, name):
+        # Skip private/dunder attributes
+        if name.startswith('_'):
+            if original_getattr:
+                return original_getattr(self, name)
+            raise AttributeError(name)
+        
+        # Determine if static (class attribute) or instance
+        is_static = isinstance(self, type)
+        
+        # BEFORE phase
+        seq = _get_next_seq()
+        _emit(0, is_static, False, class_name, name, class_name + '.__getattr__', seq)
+        
+        try:
+            if original_getattr:
+                result = original_getattr(self, name)
+            else:
+                raise AttributeError(name)
+        except AttributeError:
+            # Still emit AFTER on exception
+            _emit(1, is_static, False, class_name, name, class_name + '.__getattr__', seq)
+            raise
+        
+        # AFTER phase
+        _emit(1, is_static, False, class_name, name, class_name + '.__getattr__', seq)
+        return result
+    return instrumented_getattr
+
+_seq_counter = 0
+def _get_next_seq():
+    global _seq_counter
+    _seq_counter += 1
+    return _seq_counter
+
+def instrument_class(cls, class_name=None):
+    '''Instrument a class to emit pointcuts on attribute access.'''
+    global _instrumented_classes
+    
+    if class_name is None:
+        class_name = cls.__name__
+    
+    # Skip if already instrumented
+    if cls in _instrumented_classes:
+        return cls
+    
+    print("[POINT CUT] Instrumenting class: " + class_name, file=sys.stderr)
+    sys.stderr.flush()
+    
+    # Save original methods if they exist
+    original_setattr = getattr(cls, '__setattr__', None)
+    original_getattr = getattr(cls, '__getattr__', None)
+    
+    # Install instrumented versions
+    cls.__setattr__ = _make_setattr(class_name, original_setattr)
+    cls.__getattr__ = _make_getattr(class_name, original_getattr)
+    
+    # Also instrument __delattr__ if present
+    original_delattr = getattr(cls, '__delattr__', None)
+    if original_delattr:
+        def instrumented_delattr(self, name):
+            if name.startswith('_'):
+                return original_delattr(self, name)
+            is_static = isinstance(self, type)
+            seq = _get_next_seq()
+            _emit(0, is_static, True, class_name, name, class_name + '.__delattr__', seq)
+            try:
+                original_delattr(self, name)
+            except Exception:
+                _emit(1, is_static, True, class_name, name, class_name + '.__delattr__', seq)
+                raise
+            _emit(1, is_static, True, class_name, name, class_name + '.__delattr__', seq)
+        cls.__delattr__ = instrumented_delattr
+    
+    _instrumented_classes.add(cls)
+    return cls
+
+def instrument_module(mod):
+    '''Instrument all classes in a module.'''
+    for name in dir(mod):
+        obj = getattr(mod, name)
+        if isinstance(obj, type):
+            instrument_class(obj, name)
+    return mod
+
+def auto_instrument(target):
+    '''Automatically instrument a class or module.'''
+    if isinstance(target, type):
+        return instrument_class(target)
+    elif isinstance(target, types.ModuleType):
+        return instrument_module(target)
+    else:
+        raise TypeError('Cannot auto-instrument ' + str(type(target)))
+
+# Export functions
+def set_emitter(emitter):
+    '''Host calls this to bind the emitter.'''
+    _set_emitter(emitter)
+
+# Make auto_instrument available as 'pointcut_instrument' module
+pointcut_instrument = sys.modules[__name__]
+pointcut_instrument.instrument_class = instrument_class
+pointcut_instrument.instrument_module = instrument_module
+pointcut_instrument.auto_instrument = auto_instrument
+pointcut_instrument.set_emitter = set_emitter
+
+# Register as importable module
+sys.modules['pointcut_instrument'] = pointcut_instrument
+
 /**
  * GraalPointcutHarness - extends pointcut capturing to any Graal polyglot language.
  *
@@ -120,23 +298,8 @@ class GraalPointcutHarness(
         }
     }
 
-    companion object {
-        // Phase constants
-        const val PHASE_BEFORE = 0.toByte()
-        const val PHASE_AFTER = 1.toByte()
-
-        // Opcode constants (matching xvm FieldSynapse wire protocol)
-        @JvmStatic
-        const val OP_L_GET = 0xA5.toByte()
-        @JvmStatic
-        const val OP_L_SET = 0xA6.toByte()
-        @JvmStatic
-        const val OP_P_GET = 0xA7.toByte()
-        @JvmStatic
-        const val OP_P_SET = 0xA8.toByte()
-
-        /** Python instrumentation module - loaded inline to avoid resource issues. */
-        const val PYTHON_INSTRUMENTATION_MODULE = """
+    /** Python instrumentation module - loaded inline to avoid resource issues. */
+    const val PYTHON_INSTRUMENTATION_MODULE = """
 import sys
 import types
 
@@ -369,7 +532,7 @@ class PolyglotPointcutEmitter(
             else -> OP_L_SET
         }
 
-        val callsiteKey = "$className.$fieldName${if (isStatic) " static" else ""}${if (isWrite) " write" else " read"}"
+        val callsiteKey = "$className.$fieldName${if (isStatic) \" static\" else \"\"}${if (isWrite) \" write\" else \" read\"}"
         val synapse = FieldSynapse(
             phase = 0, // BEFORE
             opcode = opcode,
