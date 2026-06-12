@@ -188,20 +188,31 @@ class NgSctpAssociation private constructor(
     }
 
     /**
-     * Open a new stream on this association
+     * Open a new outbound stream
      */
     fun openStream(
+        streamId: Int? = null,
         priority: Int = 0,
         intent: String = "default"
     ): NgSctpStream {
         check(state == AssociationState.ESTABLISHED) { 
             "Cannot open stream in state: $state" 
         }
-        val streamId = nextStreamId++
-        val stream = NgSctpStream(streamId, this, priority, intent)
-        streams[streamId] = stream
+        val id = streamId ?: nextStreamId++
+        val stream = NgSctpStream(id, this, priority, intent)
+        streams[id] = stream
         return stream
     }
+
+    /**
+     * Get an existing stream by ID
+     */
+    fun getStream(streamId: Int): NgSctpStream? = streams[streamId]
+
+    /**
+     * Get the next available stream ID
+     */
+    fun nextStreamId(): Int = nextStreamId
 
     /**
      * Send a chunk on this association

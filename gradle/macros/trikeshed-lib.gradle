@@ -449,7 +449,7 @@ switch (project.path) {
         couchSets.getByName("commonMain").dependencies {
             api libPeer("miniduck")
             api libPeer("quic")
-            api libPeer("ngsctp")
+            // api libPeer("ngsctp")  // TODO: Re-enable when ngsctp compiles
             implementation libPeer("tiny-btrfs")
             implementation libPeer("kursive")
         }
@@ -515,7 +515,7 @@ switch (project.path) {
         def serverSets = extensions.getByName("kotlin").sourceSets
         serverSets.getByName("commonMain").dependencies {
             api libPeer("quic")
-            api libPeer("ngsctp")
+            // api libPeer("ngsctp")  // TODO: Re-enable when ngsctp compiles
             api libPeer("htx-client")
         }
         serverSets.getByName("commonTest").kotlin.srcDir("src/generated/kotlin")
@@ -541,7 +541,7 @@ switch (project.path) {
         extensions.getByName("kotlin").sourceSets.getByName("commonMain").dependencies {
             implementation project(":libs:tls")
             implementation project(":libs:quic")
-            implementation project(":libs:ngsctp")
+            // implementation project(":libs:ngsctp")  // TODO: Re-enable when ngsctp compiles
         }
         extensions.getByName("kotlin").sourceSets.getByName("commonMain").kotlin.srcDir("src/generated/kotlin")
 

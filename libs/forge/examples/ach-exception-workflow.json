@@ -1,0 +1,83 @@
+[
+  {
+    "id": "step1-fetch-transaction",
+    "type": "LlmCall",
+    "promptId": "fetch-transaction-prompt",
+    "inputs": {
+      "transaction_id": "{{input}}"
+    },
+    "model": "gpt-4o-mini",
+    "parameters": {
+      "temperature": "0.1"
+    }
+  },
+  {
+    "id": "step2-validate-nacha",
+    "type": "CodeExecution",
+    "language": "kotlin",
+    "code": "val transaction = input.transaction\nval errors = mutableListOf<String>()\nif (transaction.amount <= 0) errors.add(\"Amount must be positive\")\nif (transaction.routingNumber.length != 9) errors.add(\"Invalid routing number\")\nif (transaction.accountNumber.isBlank()) errors.add(\"Account number required\")\nif (transaction.companyName.isBlank()) errors.add(\"Company name required\")\nresult = mapOf(\"valid\" to errors.isEmpty(), \"errors\" to errors)",
+    "inputs": {
+      "transaction": "{{step1-fetch-transaction.output}}"
+    },
+    "timeoutMs": 5000
+  },
+  {
+    "id": "step3-check-compliance",
+    "type": "AgentInvocation",
+    "agentType": "LCNC",
+    "task": "Check transaction against OFAC sanctions list and NACHA rules",
+    "context": {
+      "transaction": "{{step1-fetch-transaction.output}}",
+      "validation": "{{step2-validate-nacha.output}}"
+    },
+    "allowedTools": ["read_file", "web_search", "run_command"]
+  },
+  {
+    "id": "step4-resolve-exception",
+    "type": "Conditional",
+    "condition": "{{step2-validate-nacha.output.valid}} == false or {{step3-check-compliance.output.flagged}} == true",
+    "thenBranch": [
+      {
+        "id": "step4a-create-case",
+        "type": "AgentInvocation",
+        "agentType": "LCNC",
+        "task": "Create exception case in compliance system with full audit trail",
+        "context": {
+          "transaction": "{{step1-fetch-transaction.output}}",
+          "validation": "{{step2-validate-nacha.output}}",
+          "compliance": "{{step3-check-compliance.output}}"
+        },
+        "allowedTools": ["write_file", "run_command"]
+      },
+      {
+        "id": "step4b-notify-team",
+        "type": "LlmCall",
+        "promptId": "exception-notification-prompt",
+        "inputs": {
+          "transaction": "{{step1-fetch-transaction.output}}",
+          "errors": "{{step2-validate-nacha.output.errors}}",
+          "complianceFlags": "{{step3-check-compliance.output.flags}}"
+        },
+        "model": "gpt-4o-mini"
+      }
+    ],
+    "elseBranch": [
+      {
+        "id": "step4c-auto-approve",
+        "type": "CodeExecution",
+        "language": "kotlin",
+        "code": "result = mapOf(\"status\" to \"APPROVED\", \"transactionId\" to input.id, \"approvedAt\" to java.time.Instant.now().toString())",
+        "inputs": {
+          "id": "{{step1-fetch-transaction.output.id}}"
+        }
+      }
+    ]
+  },
+  {
+    "id": "step5-log-audit",
+    "type": "FileTransform",
+    "inputFileIds": [],
+    "transform": "create-audit-log",
+    "outputPath": "audit/{{step1-fetch-transaction.output.id}}.json"
+  }
+]

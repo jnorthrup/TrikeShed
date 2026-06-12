@@ -29,7 +29,7 @@ class GraalPointcutHarness(
     private val enableInstrumentation: Boolean = true
 ) {
 
-    val context: Context = Context.newBuilder()
+    val graalContext: Context = Context.newBuilder()
         .allowAllAccess(true)
         .allowHostAccess(HostAccess.ALL)
         .allowHostClassLookup { className -> true }
@@ -42,7 +42,7 @@ class GraalPointcutHarness(
     init {
         // Auto-bind pointcut emitter if producer provided
         if (pointcutProducer != null) {
-            context.bindPointcutEmitter(this, pointcutProducer)
+            graalContext.bindPointcutEmitter(this, pointcutProducer)
         }
         // Install Python instrumentation module from inline string
         installPythonInstrumentation()
@@ -51,7 +51,7 @@ class GraalPointcutHarness(
     /** Install Python-side automatic pointcut instrumentation module from inline string. */
     private fun installPythonInstrumentation() {
         try {
-            val ctx: org.graalvm.polyglot.Context = this.context
+            val ctx: org.graalvm.polyglot.Context = graalContext
             ctx.eval("python", PYTHON_INSTRUMENTATION_MODULE)
         } catch (e: Exception) {
             // Python not available, skip
@@ -60,7 +60,7 @@ class GraalPointcutHarness(
 
     /** Bind pointcut emitter to context manually (for custom setup). */
     fun bindPointcutEmitter(producer: PointcutEventProducer) {
-        context.bindPointcutEmitter(this, producer)
+        graalContext.bindPointcutEmitter(this, producer)
     }
 
     /**
@@ -69,7 +69,7 @@ class GraalPointcutHarness(
      * Returns the result converted to a Kotlin/JVM type.
      */
     fun eval(languageId: String, source: String): Any? {
-        val ctx: org.graalvm.polyglot.Context = this.context
+        val ctx: org.graalvm.polyglot.Context = graalContext
         val value = ctx.eval(languageId, source)
         if (value == null || value.isNull) return null
 
@@ -90,7 +90,7 @@ class GraalPointcutHarness(
 
     /** Close the Graal context and clean up. */
     fun close() {
-        context.close()
+        graalContext.close()
     }
 
     /** Get or assign a method index for a callsite. */
@@ -290,14 +290,14 @@ pointcut_instrument.set_emitter = set_emitter
 
 # Register as importable module
 sys.modules['pointcut_instrument'] = pointcut_instrument
-"""
+\"\"\"
         }
     }
 
     /** Bind the emitter to Python's pointcut_instrument module. */
     fun bindPythonInstrumentation(producer: PointcutEventProducer) {
         try {
-            val ctx = context
+            val ctx = graalContext
             // First ensure the module is loaded
             ctx.eval("python", "import pointcut_instrument")
             // Then bind the emitter
@@ -353,62 +353,23 @@ class PolyglotPointcutEmitter(
         seq: Long
     ) {
         val opcode = when {
-            isStatic && !isWrite -> GraalPointcutHarness.OP_P_GET
-            isStatic && isWrite -> GraalPointcutHarness.OP_P_SET
-            !isStatic && !isWrite -> GraalPointcutHarness.OP_L_GET
-            else -> GraalPointcutHarness.OP_L_SET
+            isStatic && !isWrite -> 0xA7.toByte()
+            isStatic && isWrite -> 0xA8.toByte()
+            !isStatic && !isWrite -> 0xA5.toByte()
+            else -> 0xA6.toByte()
         }
 
         val callsiteKey = "$className.$fieldName${if (isStatic) " static" else ""}${if (isWrite) " write" else " read"}"
-        val methodIdx = harness.getMethodIndex(callsiteKey)
-        val templateIdx = harness.getTemplateIndex(callsiteKey)
-
         val synapse = FieldSynapse(
-            phase = phase.toByte(),
+            phase = 0, // BEFORE
             opcode = opcode,
-            methodIdx = methodIdx,
-            addr = className.hashCode() + fieldName.hashCode(),
+            methodIdx = harness.getMethodIndex(callsiteKey),
+            addr = sourceLocation.hashCode(),
             seq = seq.toInt(),
             nano = System.nanoTime(),
             callsiteHash = callsiteKey.hashCode(),
-            templateIdx = templateIdx
+            templateIdx = 0
         )
         producer.emit(synapse)
     }
 }
-
-/**
- * Extension function to bind pointcut emitter to Graal context.
- * Usage: context.bindPointcutEmitter(harness, producer)
- */
-fun Context.bindPointcutEmitter(harness: GraalPointcutHarness, producer: PointcutEventProducer) {
-    val emitter = PolyglotPointcutEmitter(producer, harness)
-    // Bind to all available languages - initialize each language first
-    listOf("js", "ruby", "python", "R").forEach { lang ->
-        try {
-            // Initialize the language first
-            initialize(lang)
-            getBindings(lang).putMember("pointcutEmitter", emitter)
-        } catch (e: Exception) {
-            // Language not available, skip
-        }
-    }
-}
-
-/**
- * Python instrumentation module - loaded inline to avoid resource issues.
- * 
- * NOTE: Python's `__getattr__` is ONLY called for missing attributes.
- * For attributes in `__dict__`, `__getattr__` is NOT called.
- * 
- * For full JVM bytecode pointcuts on GraalPy Python objects, 
- * GraalVM Truffle instrumentation API would be needed.
- * 
- * The current implementation captures:
- * - L_SET/P_SET via `__setattr__` (all writes)
- * - L_GET/P_GET via `__getattr__` (only missing attributes)
- * - `__delattr__` for deletions
- * 
- * For full JVM bytecode pointcuts on GraalPy Python objects, 
- * GraalVM Truffle instrumentation API would be needed.
- */

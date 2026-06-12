@@ -225,14 +225,14 @@ class CubicCongestionPredictor : CongestionPredictor {
     
     override fun predictPhase(features: CongestionFeatures): Boolean {
         // In CUBIC, we're in slow start if cwnd < wMax * beta
-        return features.cwnd < (wMax * 0.5u)
+        return features.cwnd.toDouble() < (wMax.toDouble() * BETA)
     }
     
     override fun predictSsthresh(features: CongestionFeatures): UInt {
         // On loss, reduce to (1-beta) * cwnd
         wMax = features.cwnd
         lastLossTime = System.currentTimeMillis()
-        return (features.cwnd * (1 - BETA).toUInt()).coerceAtLeast(4380u)
+        return (features.cwnd.toDouble() * (1 - BETA)).toUInt().coerceAtLeast(4380u)
     }
 }
 

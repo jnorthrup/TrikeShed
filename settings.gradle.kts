@@ -8,4 +8,20 @@ pluginManagement {
 
 rootProject.name = "TrikeShed"
 
-include(":libs:forge")
+// Dynamically include every library under libs/ so each subproject can be built autonomously
+// Note: classfile (nested gradle), miniduck-memory (depends on classfile), jvm-agent (standalone java agent), forge (has build issues) excluded
+val libsDir = rootDir.resolve("libs")
+if (libsDir.exists() && libsDir.isDirectory) {
+    libsDir.listFiles()!!
+        .filter { it.isDirectory }
+        .filter { it.name !in setOf("classfile", "miniduck-memory", "jvm-agent", "forge") }
+        .forEach { include(":libs:${it.name}") }
+}
+
+// Include jvm-agent explicitly (standalone Java agent, no macros)
+include(":libs:jvm-agent")
+
+// Include lib_cursor explicitly (skip classfile root and its problematic subprojects)
+include(":libs:classfile:lib_cursor")
+
+include(":libs:lcnc")

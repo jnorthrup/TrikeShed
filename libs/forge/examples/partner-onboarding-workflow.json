@@ -1,0 +1,121 @@
+{
+  "name": "Partner Onboarding Workflow",
+  "description": "Automated partner onboarding with compliance checks, contract generation, and system provisioning",
+  "steps": [
+    {
+      "id": "step1-collect-partner-data",
+      "type": "LlmCall",
+      "promptId": "partner-data-collection-prompt",
+      "inputs": {
+        "partner_name": "{{input.partner_name}}",
+        "contact_email": "{{input.contact_email}}",
+        "business_type": "{{input.business_type}}"
+      },
+      "model": "gpt-4o-mini",
+      "parameters": { "temperature": "0.2" }
+    },
+    {
+      "id": "step2-kyc-check",
+      "type": "AgentInvocation",
+      "agentType": "LCNC",
+      "task": "Run KYC/AML checks on partner entity",
+      "context": {
+        "partner": "{{step1-collect-partner-data.output}}"
+      },
+      "allowedTools": ["web_search", "read_file", "run_command"]
+    },
+    {
+      "id": "step3-credit-assessment",
+      "type": "AgentInvocation",
+      "agentType": "LCNC",
+      "task": "Assess partner creditworthiness using financial models",
+      "context": {
+        "partner": "{{step1-collect-partner-data.output}}",
+        "kyc": "{{step2-kyc-check.output}}"
+      },
+      "allowedTools": ["read_file", "run_command"]
+    },
+    {
+      "id": "step4-generate-contract",
+      "type": "FileTransform",
+      "inputFileIds": [],
+      "transform": "render-contract-template",
+      "outputPath": "contracts/{{step1-collect-partner-data.output.partner_name}}.pdf"
+    },
+    {
+      "id": "step5-provision-systems",
+      "type": "Parallel",
+      "branches": [
+        [
+          {
+            "id": "step5a-ach-setup",
+            "type": "AgentInvocation",
+            "agentType": "LCNC",
+            "task": "Provision ACH processing credentials and endpoints",
+            "context": { "partner": "{{step1-collect-partner-data.output}}" },
+            "allowedTools": ["run_command"]
+          }
+        ],
+        [
+          {
+            "id": "step5b-webhook-config",
+            "type": "AgentInvocation",
+            "agentType": "LCNC",
+            "task": "Configure webhook endpoints for real-time notifications",
+            "context": { "partner": "{{step1-collect-partner-data.output}}" },
+            "allowedTools": ["run_command"]
+          }
+        ],
+        [
+          {
+            "id": "step5c-monitoring",
+            "type": "AgentInvocation",
+            "agentType": "LCNC",
+            "task": "Set up transaction monitoring and alerting thresholds",
+            "context": { "partner": "{{step1-collect-partner-data.output}}" },
+            "allowedTools": ["run_command"]
+          }
+        ]
+      ]
+    },
+    {
+      "id": "step6-compliance-review",
+      "type": "Conditional",
+      "condition": "{{step2-kyc-check.output.flags}} != empty or {{step3-credit-assessment.output.risk}} == \"HIGH\"",
+      "thenBranch": [
+        {
+          "id": "step6a-escalate",
+          "type": "AgentInvocation",
+          "agentType": "LCNC",
+          "task": "Escalate to compliance team for manual review",
+          "context": {
+            "partner": "{{step1-collect-partner-data.output}}",
+            "kyc": "{{step2-kyc-check.output}}",
+            "credit": "{{step3-credit-assessment.output}}"
+          },
+          "allowedTools": ["write_file", "run_command"]
+        }
+      ],
+      "elseBranch": [
+        {
+          "id": "step6b-auto-approve",
+          "type": "CodeExecution",
+          "language": "kotlin",
+          "code": "result = mapOf(\"status\" to \"AUTO_APPROVED\", \"partnerId\" to input.partner_id, \"approvedAt\" to java.time.Instant.now().toString())",
+          "inputs": { "partner_id": "{{step1-collect-partner-data.output.id}}" }
+        }
+      ]
+    },
+    {
+      "id": "step7-welcome-package",
+      "type": "LlmCall",
+      "promptId": "partner-welcome-prompt",
+      "inputs": {
+        "partner_name": "{{step1-collect-partner-data.output.partner_name}}",
+        "credentials": "{{step5-provision-systems.output}}",
+        "contract_url": "{{step4-generate-contract.output.url}}"
+      },
+      "model": "gpt-4o-mini"
+    }
+  ]
+}
