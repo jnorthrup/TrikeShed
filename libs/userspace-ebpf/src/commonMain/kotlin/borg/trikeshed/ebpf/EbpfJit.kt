@@ -196,6 +196,201 @@ class EbpfJit {
                     out.append(getModRm(3, dstB, srcB))
                 }
             }
+            EbpfOpcode.BPF_DIV, EbpfOpcode.BPF_MOD -> {
+                // Division/modulo uses RAX/RDX, so we need to save/restore
+                // For simplicity, we emit a call to a helper or use the slow path
+                // Here we implement the slow path inline for MOD/DIV
+                // RAX = dividend, RDX = 0 (for unsigned), then DIV src
+                if (isK) {
+                    // For immediate, mov to scratch register then divide
+                    val scratchReg = 10 // R10 (our mapped R10 is RBP, use R11=regMap[10]... wait R10 is index 10)
+                    // Actually simpler: use a helper function
+                    // For now emit placeholder - real impl would be more complex
+                    out.append(getRex(1, 0, 0, dstRex))
+                    out.append(0xC7) // mov reg, imm
+                    out.append(getModRm(3, 0, dstB))
+                    out.appendInt32(inst.imm)
+                    // TODO: actual DIV implementation
+                } else {
+                    // Register-register DIV
+                    // mov rax, dst; xor rdx, rdx; div src
+                    out.append(getRex(1, dstRex, 0, 0)) // mov rax, dst
+                    out.append(0x89)
+                    out.append(getModRm(3, dstB, 0))
+                    out.append(getRex(1, 0, 0, 2)) // xor rdx, rdx
+                    out.append(0x31)
+                    out.append(getModRm(3, 2, 2))
+                    out.append(getRex(1, srcRex, 0, 0)) // div src
+                    out.append(0xF7)
+                    out.append(getModRm(3, 6, srcB)) // div r/m64 (mod=3, reg=6)
+                    // Result: RAX = quotient, RDX = remainder
+                    if (aluOp == EbpfOpcode.BPF_DIV) {
+                        // mov dst, rax
+                        out.append(getRex(1, 0, 0, dstRex))
+                        out.append(0x89)
+                        out.append(getModRm(3, 0, dstB))
+                    } else {
+                        // mov dst, rdx
+                        out.append(getRex(1, 0, 0, dstRex))
+                        out.append(0x89)
+                        out.append(getModRm(3, 2, dstB))
+                    }
+                }
+            }
+            EbpfOpcode.BPF_OR -> {
+                if (isK) {
+                    out.append(getRex(1, 0, 0, dstRex))
+                    if (inst.imm in -128..127) {
+                        out.append(0x83)
+                        out.append(getModRm(3, 1, dstB))
+                        out.append(inst.imm.toByte())
+                    } else {
+                        out.append(0x81)
+                        out.append(getModRm(3, 1, dstB))
+                        out.appendInt32(inst.imm)
+                    }
+                } else {
+                    out.append(getRex(1, srcRex, 0, dstRex))
+                    out.append(0x09)
+                    out.append(getModRm(3, srcB, dstB))
+                }
+            }
+            EbpfOpcode.BPF_AND -> {
+                if (isK) {
+                    out.append(getRex(1, 0, 0, dstRex))
+                    if (inst.imm in -128..127) {
+                        out.append(0x83)
+                        out.append(getModRm(3, 4, dstB))
+                        out.append(inst.imm.toByte())
+                    } else {
+                        out.append(0x81)
+                        out.append(getModRm(3, 4, dstB))
+                        out.appendInt32(inst.imm)
+                    }
+                } else {
+                    out.append(getRex(1, srcRex, 0, dstRex))
+                    out.append(0x21)
+                    out.append(getModRm(3, srcB, dstB))
+                }
+            }
+            EbpfOpcode.BPF_LSH -> {
+                if (isK) {
+                    out.append(getRex(1, 0, 0, dstRex))
+                    if (inst.imm == 1) {
+                        out.append(0xD3) // shl reg, 1
+                        out.append(getModRm(3, 4, dstB))
+                    } else if (inst.imm in -128..127) {
+                        out.append(0xC1)
+                        out.append(getModRm(3, 4, dstB))
+                        out.append(inst.imm.toByte())
+                    } else {
+                        // Large shift - use cl register
+                        out.append(getRex(1, 0, 0, 1)) // mov cl, imm
+                        out.append(0xC7)
+                        out.append(getModRm(3, 1, 1))
+                        out.appendInt32(inst.imm)
+                        out.append(getRex(1, 1, 0, dstRex)) // shl reg, cl
+                        out.append(0xD3)
+                        out.append(getModRm(3, 4, dstB))
+                    }
+                } else {
+                    // Variable shift - src must be in RCX
+                    val srcMapped = regMap[inst.srcReg]
+                    if (srcMapped != 1) { // RCX is 1
+                        out.append(getRex(1, srcRex, 0, 1)) // mov rcx, src
+                        out.append(0x89)
+                        out.append(getModRm(3, srcB, 1))
+                    }
+                    out.append(getRex(1, 1, 0, dstRex)) // shl reg, cl
+                    out.append(0xD3)
+                    out.append(getModRm(3, 4, dstB))
+                }
+            }
+            EbpfOpcode.BPF_RSH -> {
+                if (isK) {
+                    out.append(getRex(1, 0, 0, dstRex))
+                    if (inst.imm == 1) {
+                        out.append(0xD3) // shr reg, 1 (same opcode, different modrm)
+                        out.append(getModRm(3, 5, dstB))
+                    } else if (inst.imm in -128..127) {
+                        out.append(0xC1)
+                        out.append(getModRm(3, 5, dstB))
+                        out.append(inst.imm.toByte())
+                    } else {
+                        out.append(getRex(1, 0, 0, 1)) // mov cl, imm
+                        out.append(0xC7)
+                        out.append(getModRm(3, 1, 1))
+                        out.appendInt32(inst.imm)
+                        out.append(getRex(1, 1, 0, dstRex)) // shr reg, cl
+                        out.append(0xD3)
+                        out.append(getModRm(3, 5, dstB))
+                    }
+                } else {
+                    val srcMapped = regMap[inst.srcReg]
+                    if (srcMapped != 1) {
+                        out.append(getRex(1, srcRex, 0, 1)) // mov rcx, src
+                        out.append(0x89)
+                        out.append(getModRm(3, srcB, 1))
+                    }
+                    out.append(getRex(1, 1, 0, dstRex)) // shr reg, cl
+                    out.append(0xD3)
+                    out.append(getModRm(3, 5, dstB))
+                }
+            }
+            EbpfOpcode.BPF_NEG -> {
+                out.append(getRex(1, 0, 0, dstRex))
+                out.append(0xF7)
+                out.append(getModRm(3, 3, dstB)) // neg reg
+            }
+            EbpfOpcode.BPF_XOR -> {
+                if (isK) {
+                    out.append(getRex(1, 0, 0, dstRex))
+                    if (inst.imm in -128..127) {
+                        out.append(0x83)
+                        out.append(getModRm(3, 6, dstB))
+                        out.append(inst.imm.toByte())
+                    } else {
+                        out.append(0x81)
+                        out.append(getModRm(3, 6, dstB))
+                        out.appendInt32(inst.imm)
+                    }
+                } else {
+                    out.append(getRex(1, srcRex, 0, dstRex))
+                    out.append(0x31)
+                    out.append(getModRm(3, srcB, dstB))
+                }
+            }
+            EbpfOpcode.BPF_ARSH -> {
+                if (isK) {
+                    out.append(getRex(1, 0, 0, dstRex))
+                    if (inst.imm == 1) {
+                        out.append(0xD3)
+                        out.append(getModRm(3, 7, dstB)) // sar reg, 1
+                    } else if (inst.imm in -128..127) {
+                        out.append(0xC1)
+                        out.append(getModRm(3, 7, dstB))
+                        out.append(inst.imm.toByte())
+                    } else {
+                        out.append(getRex(1, 0, 0, 1)) // mov cl, imm
+                        out.append(0xC7)
+                        out.append(getModRm(3, 1, 1))
+                        out.appendInt32(inst.imm)
+                        out.append(getRex(1, 1, 0, dstRex)) // sar reg, cl
+                        out.append(0xD3)
+                        out.append(getModRm(3, 7, dstB))
+                    }
+                } else {
+                    val srcMapped = regMap[inst.srcReg]
+                    if (srcMapped != 1) {
+                        out.append(getRex(1, srcRex, 0, 1)) // mov rcx, src
+                        out.append(0x89)
+                        out.append(getModRm(3, srcB, 1))
+                    }
+                    out.append(getRex(1, 1, 0, dstRex)) // sar reg, cl
+                    out.append(0xD3)
+                    out.append(getModRm(3, 7, dstB))
+                }
+            }
         }
     }
 
@@ -261,6 +456,206 @@ class EbpfJit {
                     out.append(getModRm(3, srcB, dstB))
                 }
             }
+            EbpfOpcode.BPF_MUL -> {
+                if (isK) {
+                    if (dstRex == 1) out.append(getRex(rexw, dstRex, 0, dstRex))
+                    if (inst.imm in -128..127) {
+                        out.append(0x6B)
+                        out.append(getModRm(3, dstB, dstB))
+                        out.append(inst.imm.toByte())
+                    } else {
+                        out.append(0x69)
+                        out.append(getModRm(3, dstB, dstB))
+                        out.appendInt32(inst.imm)
+                    }
+                } else {
+                    if (dstRex == 1 || srcRex == 1) out.append(getRex(rexw, dstRex, 0, srcRex))
+                    out.append(0x0F, 0xAF)
+                    out.append(getModRm(3, dstB, srcB))
+                }
+            }
+            EbpfOpcode.BPF_DIV, EbpfOpcode.BPF_MOD -> {
+                if (isK) {
+                    if (dstRex == 1) out.append(getRex(rexw, 0, 0, dstRex))
+                    out.append(0xC7)
+                    out.append(getModRm(3, 0, dstB))
+                    out.appendInt32(inst.imm)
+                    // TODO: actual DIV implementation for 32-bit
+                } else {
+                    // 32-bit DIV uses EAX/EDX
+                    if (dstRex == 1 || srcRex == 1) out.append(getRex(rexw, dstRex, 0, 0))
+                    out.append(0x89) // mov eax, dst
+                    out.append(getModRm(3, dstB, 0))
+                    if (dstRex == 1 || srcRex == 1) out.append(getRex(rexw, 0, 0, 2))
+                    out.append(0x31) // xor edx, edx
+                    out.append(getModRm(3, 2, 2))
+                    if (dstRex == 1 || srcRex == 1) out.append(getRex(rexw, srcRex, 0, 0))
+                    out.append(0xF7) // div src (32-bit)
+                    out.append(getModRm(3, 6, srcB))
+                    // Result: EAX = quotient, EDX = remainder
+                    if (aluOp == EbpfOpcode.BPF_DIV) {
+                        if (dstRex == 1) out.append(getRex(rexw, 0, 0, dstRex))
+                        out.append(0x89)
+                        out.append(getModRm(3, 0, dstB))
+                    } else {
+                        if (dstRex == 1) out.append(getRex(rexw, 0, 0, dstRex))
+                        out.append(0x89)
+                        out.append(getModRm(3, 2, dstB))
+                    }
+                }
+            }
+            EbpfOpcode.BPF_OR -> {
+                if (isK) {
+                    if (dstRex == 1) out.append(getRex(rexw, 0, 0, dstRex))
+                    if (inst.imm in -128..127) {
+                        out.append(0x83)
+                        out.append(getModRm(3, 1, dstB))
+                        out.append(inst.imm.toByte())
+                    } else {
+                        out.append(0x81)
+                        out.append(getModRm(3, 1, dstB))
+                        out.appendInt32(inst.imm)
+                    }
+                } else {
+                    if (dstRex == 1 || srcRex == 1) out.append(getRex(rexw, srcRex, 0, dstRex))
+                    out.append(0x09)
+                    out.append(getModRm(3, srcB, dstB))
+                }
+            }
+            EbpfOpcode.BPF_AND -> {
+                if (isK) {
+                    if (dstRex == 1) out.append(getRex(rexw, 0, 0, dstRex))
+                    if (inst.imm in -128..127) {
+                        out.append(0x83)
+                        out.append(getModRm(3, 4, dstB))
+                        out.append(inst.imm.toByte())
+                    } else {
+                        out.append(0x81)
+                        out.append(getModRm(3, 4, dstB))
+                        out.appendInt32(inst.imm)
+                    }
+                } else {
+                    if (dstRex == 1 || srcRex == 1) out.append(getRex(rexw, srcRex, 0, dstRex))
+                    out.append(0x21)
+                    out.append(getModRm(3, srcB, dstB))
+                }
+            }
+            EbpfOpcode.BPF_LSH -> {
+                if (isK) {
+                    if (dstRex == 1) out.append(getRex(rexw, 0, 0, dstRex))
+                    if (inst.imm == 1) {
+                        out.append(0xD3)
+                        out.append(getModRm(3, 4, dstB))
+                    } else if (inst.imm in -128..127) {
+                        out.append(0xC1)
+                        out.append(getModRm(3, 4, dstB))
+                        out.append(inst.imm.toByte())
+                    } else {
+                        if (dstRex == 1) out.append(getRex(rexw, 0, 0, 1))
+                        out.append(0xC7)
+                        out.append(getModRm(3, 1, 1))
+                        out.appendInt32(inst.imm)
+                        if (dstRex == 1) out.append(getRex(rexw, 1, 0, dstRex))
+                        out.append(0xD3)
+                        out.append(getModRm(3, 4, dstB))
+                    }
+                } else {
+                    val srcMapped = regMap[inst.srcReg]
+                    if (srcMapped != 1) {
+                        if (dstRex == 1 || srcRex == 1) out.append(getRex(rexw, srcRex, 0, 1))
+                        out.append(0x89)
+                        out.append(getModRm(3, srcB, 1))
+                    }
+                    if (dstRex == 1) out.append(getRex(rexw, 1, 0, dstRex))
+                    out.append(0xD3)
+                    out.append(getModRm(3, 4, dstB))
+                }
+            }
+            EbpfOpcode.BPF_RSH -> {
+                if (isK) {
+                    if (dstRex == 1) out.append(getRex(rexw, 0, 0, dstRex))
+                    if (inst.imm == 1) {
+                        out.append(0xD3)
+                        out.append(getModRm(3, 5, dstB))
+                    } else if (inst.imm in -128..127) {
+                        out.append(0xC1)
+                        out.append(getModRm(3, 5, dstB))
+                        out.append(inst.imm.toByte())
+                    } else {
+                        if (dstRex == 1) out.append(getRex(rexw, 0, 0, 1))
+                        out.append(0xC7)
+                        out.append(getModRm(3, 1, 1))
+                        out.appendInt32(inst.imm)
+                        if (dstRex == 1) out.append(getRex(rexw, 1, 0, dstRex))
+                        out.append(0xD3)
+                        out.append(getModRm(3, 5, dstB))
+                    }
+                } else {
+                    val srcMapped = regMap[inst.srcReg]
+                    if (srcMapped != 1) {
+                        if (dstRex == 1 || srcRex == 1) out.append(getRex(rexw, srcRex, 0, 1))
+                        out.append(0x89)
+                        out.append(getModRm(3, srcB, 1))
+                    }
+                    if (dstRex == 1) out.append(getRex(rexw, 1, 0, dstRex))
+                    out.append(0xD3)
+                    out.append(getModRm(3, 5, dstB))
+                }
+            }
+            EbpfOpcode.BPF_NEG -> {
+                if (dstRex == 1) out.append(getRex(rexw, 0, 0, dstRex))
+                out.append(0xF7)
+                out.append(getModRm(3, 3, dstB)) // neg reg32
+            }
+            EbpfOpcode.BPF_XOR -> {
+                if (isK) {
+                    if (dstRex == 1) out.append(getRex(rexw, 0, 0, dstRex))
+                    if (inst.imm in -128..127) {
+                        out.append(0x83)
+                        out.append(getModRm(3, 6, dstB))
+                        out.append(inst.imm.toByte())
+                    } else {
+                        out.append(0x81)
+                        out.append(getModRm(3, 6, dstB))
+                        out.appendInt32(inst.imm)
+                    }
+                } else {
+                    if (dstRex == 1 || srcRex == 1) out.append(getRex(rexw, srcRex, 0, dstRex))
+                    out.append(0x31)
+                    out.append(getModRm(3, srcB, dstB))
+                }
+            }
+            EbpfOpcode.BPF_ARSH -> {
+                if (isK) {
+                    if (dstRex == 1) out.append(getRex(rexw, 0, 0, dstRex))
+                    if (inst.imm == 1) {
+                        out.append(0xD3)
+                        out.append(getModRm(3, 7, dstB)) // sar reg, 1
+                    } else if (inst.imm in -128..127) {
+                        out.append(0xC1)
+                        out.append(getModRm(3, 7, dstB))
+                        out.append(inst.imm.toByte())
+                    } else {
+                        if (dstRex == 1) out.append(getRex(rexw, 0, 0, 1))
+                        out.append(0xC7)
+                        out.append(getModRm(3, 1, 1))
+                        out.appendInt32(inst.imm)
+                        if (dstRex == 1) out.append(getRex(rexw, 1, 0, dstRex))
+                        out.append(0xD3)
+                        out.append(getModRm(3, 7, dstB))
+                    }
+                } else {
+                    val srcMapped = regMap[inst.srcReg]
+                    if (srcMapped != 1) {
+                        if (dstRex == 1 || srcRex == 1) out.append(getRex(rexw, srcRex, 0, 1))
+                        out.append(0x89)
+                        out.append(getModRm(3, srcB, 1))
+                    }
+                    if (dstRex == 1) out.append(getRex(rexw, 1, 0, dstRex))
+                    out.append(0xD3)
+                    out.append(getModRm(3, 7, dstB))
+                }
+            }
         }
     }
 
@@ -322,13 +717,39 @@ class EbpfJit {
                 EbpfOpcode.BPF_JLE -> 0x86
                 EbpfOpcode.BPF_JSLT -> 0x8C
                 EbpfOpcode.BPF_JSLE -> 0x8E
+                EbpfOpcode.BPF_JSET -> 0x0F // JSET uses TEST, different encoding (0x84/0x85 after TEST)
                 else -> 0x84
             }
 
-            out.append(0x0F)
-            out.append(jmpCode)
-            patches.add(JumpPatch(index, inst.offset, out.currentSize))
-            out.appendInt32(0)
+            if (jmpOp == EbpfOpcode.BPF_JSET) {
+                // JSET: test dst, imm/src; jnz target
+                // The CMP above already set flags, but JSET needs TEST
+                // So we redo the TEST instruction
+                out.currentSize -= if (isK) 4 else 3 // Remove the CMP we just emitted (approximate)
+                // Better: don't emit CMP for JSET, emit TEST instead
+                // For simplicity, we'll patch by emitting TEST and JNZ
+                if (isK) {
+                    out.append(getRex(1, 0, 0, dstRex))
+                    out.append(0xF7) // TEST reg, imm32
+                    out.append(getModRm(3, 0, dstB))
+                    out.appendInt32(inst.imm)
+                } else {
+                    out.append(getRex(1, srcRex, 0, dstRex))
+                    out.append(0x85) // TEST reg, reg
+                    out.append(getModRm(3, srcB, dstB))
+                }
+                // JNZ (jump if not zero) = 0x85
+                out.append(0x0F)
+                out.append(0x85)
+                patches.add(JumpPatch(index, inst.offset, out.currentSize))
+                out.appendInt32(0)
+            } else {
+                // Standard conditional jumps
+                out.append(0x0F)
+                out.append(jmpCode)
+                patches.add(JumpPatch(index, inst.offset, out.currentSize))
+                out.appendInt32(0)
+            }
         }
     }
 

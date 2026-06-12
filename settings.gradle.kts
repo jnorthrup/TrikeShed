@@ -20,7 +20,11 @@ val libsDir = rootDir.resolve("libs")
 if (libsDir.exists() && libsDir.isDirectory) {
     libsDir.listFiles()!!
         .filter { it.isDirectory }
-        .filter { it.name !in setOf("classfile", "miniduck-memory", "jvm-agent", "activejs", "og1", "ngsctp") }
+        .filter { it.name !in setOf(
+                    "classfile", "miniduck-memory", "jvm-agent",
+                    "activejs", "og1", "ngsctp", "userspace-ebpf",
+                    "userspace"
+                ) }
         .forEach { include(":libs:${it.name}") }
 }
 

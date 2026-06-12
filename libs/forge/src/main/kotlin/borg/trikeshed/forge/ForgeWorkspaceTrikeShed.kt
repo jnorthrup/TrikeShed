@@ -2,6 +2,7 @@ package borg.trikeshed.forge
 
 import borg.trikeshed.forge.CascadeTypes.*
 import borg.trikeshed.miniduck.BlockRowVec
+import borg.trikeshed.miniduck.DocRowVec
 import borg.trikeshed.miniduck.tablespace.BlockStore
 import borg.trikeshed.miniduck.tablespace.InMemoryBlockStore
 import borg.trikeshed.parse.confix.*
@@ -32,10 +33,7 @@ class ForgeWorkspaceTrikeShed(
     private val blockStore: BlockStore = InMemoryBlockStore()
 ) : ForgeWorkspace {
 
-    // ── Collections backed by BlockStore ──────────────────────────────────
-    // Each Forge concept gets its own BlockStore collection namespace
-    private val filesStore = blockStore
-    private val snapshotsStore = blockStore
+    // ── In-memory state (backed by BlockStore for persistence) ─────────────
     private val prompts = mutableMapOf<ForgePromptId, ForgePrompt>()
     private val workflows = mutableMapOf<ForgeWorkflowId, ForgeWorkflow>()
     private val executions = mutableListOf<ForgeExecutionResult>()
@@ -52,44 +50,37 @@ class ForgeWorkspaceTrikeShed(
     private const val ARTIFACTS_COL = "forge.artifacts"
     private const val CASCADES_COL = "forge.cascades"
     private const val PATH_INDEX_COL = "forge.path_index"
+    private const val HEAD_COL = "forge.head"
 
     // ── File Management (ConfixDoc as native format) ──────────────────────
 
     override suspend fun put(file: ForgeFile): ForgeFile {
         val updated = file.copy(updatedAt = System.currentTimeMillis())
         
-        // Serialize ForgeFile → ConfixDoc → CBOR bytes
         val bytes = serializeToConfix(updated)
         
-        // Store in BlockStore: wrap bytes in a BlockRowVec with single row
-        val block = BlockRowVec.mutable().apply {
-            append(miniRowVecOf("key" to updated.id.value, "value" to bytes, "meta" to mapOf("path" to updated.path)))
-            seal()
-        }
-        filesStore.put(FILES_COL, block)
-        
-        // Also index path for search
-        val pathBlock = BlockRowVec.mutable().apply {
-            append(miniRowVecOf("path" to updated.path, "fileId" to updated.id.value))
-            seal()
-        }
-        blockStore.put(PATH_INDEX_COL, pathBlock)
+        val row = DocRowVec(
+            keys = listOf("key", "value", "meta"),
+            cells = listOf(updated.id.value, bytes, mapOf("path" to updated.path))
+        )
+        val block = BlockRowVec(mutableListOf(row), false).apply { seal() }
+        blockStore.put(FILES_COL, block)
         
         return updated
     }
 
     override suspend fun get(id: ForgeFileId): ForgeFile? {
-        val blocks = filesStore.list(FILES_COL).mapNotNull { filesStore.get(FILES_COL, it) }
+        val blocks = blockStore.list(FILES_COL).mapNotNull { blockStore.get(FILES_COL, it) }
         return blocks.mapNotNull { deserializeFromConfix(it) }
             .firstOrNull { it.id == id }
     }
 
     override suspend fun delete(id: ForgeFileId): Boolean {
-        val blocks = filesStore.list(FILES_COL)
+        val blocks = blockStore.list(FILES_COL)
         for (blockId in blocks) {
-            val block = filesStore.get(FILES_COL, blockId)
+            val block = blockStore.get(FILES_COL, blockId)
             if (deserializeFromConfix(block!!)?.id == id) {
-                filesStore.remove(FILES_COL, blockId)
+                blockStore.remove(FILES_COL, blockId)
                 return true
             }
         }
@@ -97,15 +88,15 @@ class ForgeWorkspaceTrikeShed(
     }
 
     override suspend fun list(): Map<ForgeFileId, ForgeFile> {
-        return filesStore.list(FILES_COL)
-            .mapNotNull { filesStore.get(FILES_COL, it) }
+        return blockStore.list(FILES_COL)
+            .mapNotNull { blockStore.get(FILES_COL, it) }
             .mapNotNull { deserializeFromConfix(it) }
             .associateBy({ it.id }, { it })
     }
 
     override suspend fun search(query: String): List<ForgeFile> {
-        return filesStore.list(FILES_COL)
-            .mapNotNull { filesStore.get(FILES_COL, it) }
+        return blockStore.list(FILES_COL)
+            .mapNotNull { blockStore.get(FILES_COL, it) }
             .mapNotNull { deserializeFromConfix(it) }
             .filter { it.path.contains(query, ignoreCase = true) || it.content.contains(query, ignoreCase = true) }
     }
@@ -123,23 +114,22 @@ class ForgeWorkspaceTrikeShed(
         val currentFiles = list().toMap()
         val snapId = ForgeSnapshotId.generate()
         
-        // Build snapshot as ConfixDoc
         val snapDoc = buildSnapshotDoc(currentFiles, message, tags, snapId)
         val snapBytes = serializeToConfix(snapDoc)
         
-        // Store snapshot
-        val block = BlockRowVec.mutable().apply {
-            append(miniRowVecOf("id" to snapId.value, "data" to snapBytes))
-            seal()
-        }
-        snapshotsStore.put(SNAPSHOTS_COL, block)
+        val row = DocRowVec(
+            keys = listOf("id", "data"),
+            cells = listOf(snapId.value, snapBytes)
+        )
+        val block = BlockRowVec(mutableListOf(row), false).apply { seal() }
+        blockStore.put(SNAPSHOTS_COL, block)
         
-        // Update head pointer
-        val headBlock = BlockRowVec.mutable().apply {
-            append(miniRowVecOf("headId" to snapId.value, "headBlockId" to block.hashCode().toString()))
-            seal()
-        }
-        blockStore.put("forge.head", headBlock)
+        val headRow = DocRowVec(
+            keys = listOf("headId", "headBlockId"),
+            cells = listOf(snapId.value, block.hashCode().toString())
+        )
+        val headBlock = BlockRowVec(mutableListOf(headRow), false).apply { seal() }
+        blockStore.put(HEAD_COL, headBlock)
 
         val snap = ForgeSnapshot(
             id = snapId,
@@ -156,13 +146,13 @@ class ForgeWorkspaceTrikeShed(
     }
 
     override suspend fun getSnapshot(id: ForgeSnapshotId): ForgeSnapshot? {
-        val blocks = snapshotsStore.list(SNAPSHOTS_COL).mapNotNull { snapshotsStore.get(SNAPSHOTS_COL, it) }
+        val blocks = blockStore.list(SNAPSHOTS_COL).mapNotNull { blockStore.get(SNAPSHOTS_COL, it) }
         return blocks.mapNotNull { deserializeSnapshot(it) }
             .firstOrNull { it.id == id }
     }
 
     override suspend fun history(): List<ForgeSnapshot> {
-        return snapshotsStore.list(SNAPSHOTS_COL).mapNotNull { snapshotsStore.get(SNAPSHOTS_COL, it) }
+        return blockStore.list(SNAPSHOTS_COL).mapNotNull { blockStore.get(SNAPSHOTS_COL, it) }
             .mapNotNull { deserializeSnapshot(it) }
             .sortedByDescending { it.timestamp }
     }
@@ -170,10 +160,7 @@ class ForgeWorkspaceTrikeShed(
     override suspend fun restore(id: ForgeSnapshotId): ForgeSnapshot {
         val snap = getSnapshot(id) ?: throw IllegalArgumentException("Snapshot not found: $id")
         
-        // Clear current files
-        filesStore.list(FILES_COL).forEach { filesStore.remove(FILES_COL, it) }
-        
-        // Restore from snapshot
+        blockStore.list(FILES_COL).forEach { blockStore.remove(FILES_COL, it) }
         snap.files.forEach { (_, file) -> put(file) }
         
         return snap
@@ -212,11 +199,12 @@ class ForgeWorkspaceTrikeShed(
             author = "forge-user"
         ).also { newSnap ->
             val bytes = serializeToConfix(buildSnapshotDoc(newSnap.files, newSnap.message, newSnap.tags, newSnap.id))
-            val block = BlockRowVec.mutable().apply {
-                append(miniRowVecOf("id" to newSnap.id.value, "data" to bytes))
-                seal()
-            }
-            snapshotsStore.put(SNAPSHOTS_COL, block)
+            val row = DocRowVec(
+                keys = listOf("id", "data"),
+                cells = listOf(newSnap.id.value, bytes)
+            )
+            val block = BlockRowVec(mutableListOf(row), false).apply { seal() }
+            blockStore.put(SNAPSHOTS_COL, block)
         }
     }
 
@@ -236,11 +224,12 @@ class ForgeWorkspaceTrikeShed(
             author = "forge-user"
         ).also { merged ->
             val bytes = serializeToConfix(buildSnapshotDoc(merged.files, message, setOf("merge"), merged.id))
-            val block = BlockRowVec.mutable().apply {
-                append(miniRowVecOf("id" to merged.id.value, "data" to bytes))
-                seal()
-            }
-            snapshotsStore.put(SNAPSHOTS_COL, block)
+            val row = DocRowVec(
+                keys = listOf("id", "data"),
+                cells = listOf(merged.id.value, bytes)
+            )
+            val block = BlockRowVec(mutableListOf(row), false).apply { seal() }
+            blockStore.put(SNAPSHOTS_COL, block)
         }
     }
 
@@ -342,12 +331,12 @@ class ForgeWorkspaceTrikeShed(
         )
         artifacts[artifact.id] = artifact
         
-        // Persist to BlockStore
         val bytes = serializeToConfix(artifact)
-        val block = BlockRowVec.mutable().apply {
-            append(miniRowVecOf("id" to artifact.id.value, "data" to bytes))
-            seal()
-        }
+        val row = DocRowVec(
+            keys = listOf("id", "data"),
+            cells = listOf(artifact.id.value, bytes)
+        )
+        val block = BlockRowVec(mutableListOf(row), false).apply { seal() }
         blockStore.put(ARTIFACTS_COL, block)
         
         emit(CollaborationEvent.SnapshotCreated(
@@ -500,18 +489,6 @@ class ForgeWorkspaceTrikeShed(
 
     private fun getHeadSnapshotId(): ForgeSnapshotId? {
         return ForgeSnapshotId.ROOT // stub
-    }
-
-    // ── MiniRowVec factory for BlockStore rows ──────────────────────────
-
-    private fun miniRowVecOf(vararg pairs: Pair<String, Any?>): MiniRowVec {
-        // Create a MiniRowVec with the given key-value pairs
-        // This is a simplified factory - in reality would use MiniRowVec DSL
-        return object : MiniRowVec() {
-            override val size: Int = pairs.size
-            override fun get(index: Int): Any? = pairs[index].second
-            override val child: Series<MiniRowVec>? = null
-        }
     }
 
     // ── Cascade execution logic (from ForgeWorkspaceImpl) ───────────────

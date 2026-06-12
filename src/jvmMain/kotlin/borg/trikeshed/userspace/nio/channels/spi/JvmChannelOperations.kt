@@ -8,27 +8,27 @@ import borg.trikeshed.userspace.UringOp.Companion.UringSubmission
 import borg.trikeshed.userspace.SelectionResult
 import java.nio.channels.FileChannel
 import java.nio.channels.SelectionKey
-import java.nio.channels.Selector
+import java.nio.channels.SelectableChannel
 import java.nio.channels.ServerSocketChannel
 import java.nio.channels.SocketChannel
-import java.nio.channels.spi.SelectorProvider as JdkSelectorProvider
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
-import kotlin.time.Duration
 
 /**
- * JVM implementation of [ChannelOperations] using Java NIO.
- *
- * Maps uring-style [UringSubmission] to NIO Channel operations.
- * Uses a single-threaded Selector reactor for socket I/O and
- * direct FileChannel for file I/O.
+ * JVM stub implementation of [ChannelOperations].
+ * 
+ * This is a DEV/CI stub only. Production uses Linux io_uring (kernel-level).
+ * This stub just delegates to blocking NIO for local development.
  */
 class JvmChannelOperations(
     private val entries: Int = 256,
 ) : ChannelOperations {
 
     // fd -> Channel mapping (thread-safe)
-    private val fdToChannel = ConcurrentHashMap<Int, ChannelEntry>()
+    // Separate maps for file vs socket channels since FileChannel != SelectableChannel
+    private val fileChannels = ConcurrentHashMap<Int, FileChannel>()
+    private val socketChannels = ConcurrentHashMap<Int, SelectableChannel>()
+    private val socketInterests = ConcurrentHashMap<Int, Set<Interest>>()
     private val fdCounter = AtomicInteger(100)
 
     override fun openChannel(entries: Int): ChannelOperations.ChannelHandle =
@@ -44,25 +44,22 @@ class JvmChannelOperations(
     }
 
     override fun bind(fd: Int, port: Int): Int {
-        val entry = fdToChannel[fd] ?: return -1
-        (entry.channel as? ServerSocketChannel)
-            ?.bind(java.net.InetSocketAddress(port)) ?.let { return 0 }
+        val ch = socketChannels[fd] as? ServerSocketChannel ?: return -1
+        ch.bind(java.net.InetSocketAddress(port))?.let { return 0 }
         return -1
     }
 
     override fun listen(fd: Int, backlog: Int): Int = 0 // NIO ServerSocketChannel listens implicitly on bind
 
     override fun accept(fd: Int): Int {
-        val entry = fdToChannel[fd] ?: return -1
-        val server = entry.channel as? ServerSocketChannel ?: return -1
+        val server = socketChannels[fd] as? ServerSocketChannel ?: return -1
         val client = server.accept() ?: return -1
         client.configureBlocking(false)
         return registerChannelInternal(client, Interest.toMask(setOf(Interest.READ)))
     }
 
     override fun connect(fd: Int, host: String, port: Int): Int {
-        val entry = fdToChannel[fd] ?: return -1
-        val ch = entry.channel as? SocketChannel ?: return -1
+        val ch = socketChannels[fd] as? SocketChannel ?: return -1
         val address = java.net.InetSocketAddress(host, port)
         try {
             ch.configureBlocking(true)
@@ -78,25 +75,27 @@ class JvmChannelOperations(
     }
 
     override fun close(fd: Int): Int {
-        fdToChannel.remove(fd)?.channel?.close()
+        socketChannels.remove(fd)?.close()
+        fileChannels.remove(fd)?.close()
+        socketInterests.remove(fd)
         return 0
     }
 
     /**
      * Register a channel with fd and interests, return fd.
      */
-    private fun registerChannelInternal(ch: java.nio.channels.SelectableChannel, initialMask: UInt): Int {
+    private fun registerChannelInternal(ch: SelectableChannel, initialMask: UInt): Int {
         val fd = fdCounter.incrementAndGet()
-        // Convert UInt mask back to Set for internal storage
         val interests = initialMask.toInterests()
-        fdToChannel[fd] = ChannelEntry(ch, interests)
+        socketChannels[fd] = ch
+        socketInterests[fd] = interests
         return fd
     }
 
-    internal inner class ChannelEntry(
-        internal val channel: java.nio.channels.SelectableChannel,
-        internal var interests: Set<Interest>,
-    )
+    // Public method to register a FileChannel (for file I/O)
+    fun registerFile(fd: Int, fc: FileChannel) {
+        fileChannels[fd] = fc
+    }
 
     internal inner class JvmChannelHandle(
         private val ops: JvmChannelOperations,
@@ -128,26 +127,25 @@ class JvmChannelOperations(
         override fun submit(): Int {
             val completions = mutableListOf<ChannelResult>()
 
-            // Split into file I/O (direct) vs socket I/O (via Selector)
+            // Split into file I/O (direct) vs socket I/O
             val fileOps = mutableListOf<PendingOp>()
             val socketOps = mutableListOf<PendingOp>()
 
             while (pending.isNotEmpty()) {
                 val op = pending.removeFirst()
-                if (ops.fdToChannel[op.fd]?.channel is FileChannel) {
+                if (ops.fileChannels[op.fd] != null) {
                     fileOps.add(op)
                 } else {
                     socketOps.add(op)
                 }
             }
 
-            // Execute file I/O directly (blocking but on dedicated thread pool in real impl)
+            // Execute file I/O directly (blocking - DEV ONLY)
             for (op in fileOps) {
-                val entry = ops.fdToChannel[op.fd] ?: run {
+                val fc = ops.fileChannels[op.fd] ?: run {
                     completions.add(ChannelResult(op.fd, -1, op.user))
                     continue
                 }
-                val fc = entry.channel as FileChannel
                 val nioBuf = op.buf.toNioByteBuffer()
                 val res = try {
                     if (op.read) {
@@ -165,14 +163,9 @@ class JvmChannelOperations(
                 completions.add(ChannelResult(op.fd, res, op.user))
             }
 
-            // Socket I/O: register interests with reactor (handled via JvmReactorOperations)
-            // For now, execute directly on calling thread (simplified)
+            // Socket I/O - blocking for dev
             for (op in socketOps) {
-                val entry = ops.fdToChannel[op.fd] ?: run {
-                    completions.add(ChannelResult(op.fd, -1, op.user))
-                    continue
-                }
-                val sc = entry.channel as? SocketChannel ?: run {
+                val sc = ops.socketChannels[op.fd] as? SocketChannel ?: run {
                     completions.add(ChannelResult(op.fd, -1, op.user))
                     continue
                 }
@@ -198,15 +191,16 @@ class JvmChannelOperations(
         }
 
         override fun wait(minComplete: Int): List<ChannelResult> = lastResults
-
-        private data class PendingOp(
-            val fd: Int,
-            val buf: ByteBuffer,
-            val read: Boolean,
-            val user: Long,
-            val offset: Long = 0L,
-        )
     }
+
+    // Moved out of inner class to avoid 'Class is prohibited here' error
+    private data class PendingOp(
+        val fd: Int,
+        val buf: ByteBuffer,
+        val read: Boolean,
+        val user: Long,
+        val offset: Long = 0L,
+    )
 
     private fun ByteBuffer.toNioByteBuffer(): java.nio.ByteBuffer {
         val nio = java.nio.ByteBuffer.wrap(array(), arrayOffset(), capacity())

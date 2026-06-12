@@ -1,5 +1,6 @@
 package borg.trikeshed.windowtoolkit.harness
 
+import borg.trikeshed.windowtoolkit.dsl.WindowShell
 import borg.trikeshed.windowtoolkit.dsl.windowContext
 import borg.trikeshed.windowtoolkit.dsl.panel
 import borg.trikeshed.usersignals.*
@@ -55,11 +56,15 @@ fun main() = runBlocking {
     println("Signal UI Harness mounted and updated")
 
     // One-shot render to TUI
-    val (text, ansi) = shell.renderOnce().let { (t, a) -> t to a }
-    println("Text output:")
-    println(text.content)
-    println("\nANSI output:")
-    println(ansi.content)
+    val results = shell.renderOnce()
+    if (results.size >= 2) {
+        val textResult = results[0]
+        val ansiResult = results[1]
+        println("Text output:")
+        println(textResult.content)
+        println("\nANSI output:")
+        println(ansiResult.content)
+    }
 
     shell.unmount()
 }

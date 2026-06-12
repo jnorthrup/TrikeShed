@@ -8,8 +8,6 @@ import org.junit.jupiter.api.Assertions.*
 
 /**
  * HTX Client IPFS Integration Demo Test
- * 
- * Run with: ./gradlew :libs:htx-client:jvmTest --tests "borg.trikeshed.htx.client.ipfs.IpfsIntegrationDemo" --no-daemon
  */
 class IpfsIntegrationDemo {
 

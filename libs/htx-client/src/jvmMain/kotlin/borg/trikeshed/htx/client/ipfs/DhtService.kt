@@ -9,6 +9,9 @@ import java.math.BigInteger
 import java.net.InetSocketAddress
 import java.util.Random
 
+/**
+ * DHT Service — full Kademlia implementation with iterative routing.
+ */
 class DhtService(
     private val localNodeId: NodeId = NodeId.random(),
     private val transport: DhtTransport? = null,

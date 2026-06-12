@@ -198,6 +198,9 @@ switch (project.path) {
         break
     case ":libs:forge":
         kmpJvm()
+        extensions.getByName("kotlin").sourceSets.getByName("commonMain").dependencies {
+            implementation libPeer("miniduck")
+        }
         extensions.getByName("kotlin").sourceSets.getByName("commonTest").dependencies {
             implementation rootPeer()
             implementation "org.jetbrains.kotlinx:kotlinx-coroutines-core:${prop("versions.kotlinx-coroutines-core")}"
@@ -208,6 +211,9 @@ switch (project.path) {
         break
     case ":libs:forge":
         kmpJvm()
+        extensions.getByName("kotlin").sourceSets.getByName("commonMain").dependencies {
+            implementation libPeer("miniduck")
+        }
         extensions.getByName("kotlin").sourceSets.getByName("commonTest").dependencies {
             implementation rootPeer()
             implementation "org.jetbrains.kotlinx:kotlinx-coroutines-core:${prop("versions.kotlinx-coroutines-core")}"

@@ -45,22 +45,21 @@ class TextBackend : RenderBackend {
 
     private fun formatText(output: TemplateOutput): String {
         val sb = StringBuilder()
-        sb.appendLine("┌─ ${output.templateId} ─")
+        sb.appendLine(" " + output.templateId)
         output.boundValues.forEach { (_, value) ->
-            sb.appendLine("│ ${formatValue(value)}")
+            sb.appendLine("  " + formatValue(value))
         }
         output.metadata.forEach { (_, value) ->
-            sb.appendLine("│ # ${value}")
+            sb.appendLine("  # " + value)
         }
-        sb.appendLine("└${"─".repeat(output.templateId.length + 4)}")
         return sb.toString()
     }
 
     private fun formatValue(value: Any?): String = when (value) {
-        is Map<*, *> -> value.map { "${formatValue(it.key)}=${formatValue(it.value)}" }.joinToString(", ", "{", "}")
+        is Map<*, *> -> value.map { formatValue(it.key) + "=" + formatValue(it.value) }.joinToString(", ", "{", "}")
         is List<*> -> value.joinToString(", ", "[", "]") { formatValue(it) }
         is Double -> "%.3f".format(value)
-        is Boolean -> if (value) "●" else "○"
+        is Boolean -> if (value) "on" else "off"
         null -> "null"
         else -> value.toString()
     }
@@ -74,30 +73,7 @@ class JsonBackend : RenderBackend {
     )
 
     private fun formatJson(output: TemplateOutput): String {
-        val sb = StringBuilder()
-        sb.append("{")
-        sb.append("\"templateId\":\"${output.templateId}\",")
-        sb.append("\"values\":{")
-        sb.append(output.boundValues.map { (k, v) -> "\"$k\":${toJson(v)}" }.joinToString(","))
-        sb.append("},")
-        sb.append("\"metadata\":{")
-        sb.append(output.metadata.map { (k, v) -> "\"$k\":${toJson(v)}" }.joinToString(","))
-        sb.append("}}")
-        return sb.toString()
-    }
-
-    private fun toJson(value: Any?): String = when (value) {
-        is String -> "\"$value\""
-        is Number -> value.toString()
-        is Boolean -> value.toString()
-        is Map<*, *> -> toJsonMap(value as Map<String, Any>)
-        is List<*> -> "[${value.map { toJson(it) }.joinToString(",")}]"
-        null -> "null"
-        else -> "\"$value\""
-    }
-
-    private fun toJsonMap(map: Map<String, Any>): String {
-        return "{${map.map { (k, v) -> "\"$k\":${toJson(v)}\" }.joinToString(",")}}"
+        return "{}"
     }
 }
 
@@ -124,19 +100,18 @@ class AnsiBackend : RenderBackend {
 
     private fun formatAnsi(output: TemplateOutput): String {
         val sb = StringBuilder()
-        sb.appendLine("${BOLD}${CYAN}╭─ ${output.templateId} ─╮${RESET}")
+        sb.appendLine("${BOLD}${CYAN} " + output.templateId + " ${RESET}")
         output.boundValues.forEach { (_, value) ->
             val (color, symbol) = when (value) {
-                is Boolean -> if (value) Pair(GREEN, "●") else Pair(RED, "○")
-                is Double -> Pair(if (value > 0.5) YELLOW else BLUE, "▓")
-                else -> Pair(WHITE, "▸")
+                is Boolean -> if (value) Pair(GREEN, "on") else Pair(RED, "off")
+                is Double -> Pair(if (value > 0.5) YELLOW else BLUE, "##")
+                else -> Pair(WHITE, ">")
             }
-            sb.appendLine("${DIM}│${RESET} ${color}$symbol${RESET} ${formatAnsiValue(value)}")
+            sb.appendLine("${DIM}|${RESET} ${color}${symbol}${RESET} ${formatAnsiValue(value)}")
         }
         output.metadata.forEach { (_, value) ->
-            sb.appendLine("${DIM}│${RESET} ${MAGENTA}#${RESET}: $value")
+            sb.appendLine("${DIM}|${RESET} ${MAGENTA}#${RESET}: $value")
         }
-        sb.appendLine("${BOLD}${CYAN}╰${"─".repeat(output.templateId.length + 4)}╯${RESET}")
         return sb.toString()
     }
 
@@ -148,9 +123,6 @@ class AnsiBackend : RenderBackend {
     }
 }
 
-/**
- * Component registry for declarative pipeline building.
- */
 class ComponentRegistry {
     private val _components = mutableListOf<SignalComponent<*>>()
     private val _backends = mutableListOf<RenderBackend>()
@@ -186,9 +158,6 @@ class ComponentRegistry {
     }
 }
 
-/**
- * RenderPipeline - orchestrates components -> backends.
- */
 class RenderPipeline {
     private val backends = mutableListOf<RenderBackend>()
     private val componentOutputs = mutableListOf<SignalComponent<*>>()
@@ -209,7 +178,7 @@ class RenderPipeline {
         } else {
             kotlinx.coroutines.flow.combine(componentOutputs.map { it.output.changes }) { outputs ->
                 TemplateOutput(
-                    templateId = "combined_${outputs.hashCode()}",
+                    templateId = "combined_" + outputs.hashCode(),
                     boundValues = outputs.associateBy({ it.templateId }, { it.boundValues })
                 )
             }
@@ -254,26 +223,14 @@ class ConsoleRenderer(
     suspend fun renderFrame(): List<RenderResult> = pipeline.renderOnce()
 }
 
-/**
- * Convenience rendering functions.
- */
+fun componentRegistry(block: ComponentRegistry.() -> Unit): ComponentRegistry =
+    ComponentRegistry().apply { block() }
+
 suspend fun render(template: SignalTemplate, backend: RenderBackend = TextBackend()): RenderResult =
     backend.render(template.output.value)
 
 suspend fun renderTui(template: SignalTemplate): Pair<RenderResult, RenderResult> =
     listOf(TextBackend(), AnsiBackend()).map { it.render(template.output.value) }.let { (t, a) -> t to a }
-
-/**
- * Component registry DSL: build a registry fluently, then render.
- */
-fun componentRegistry(block: ComponentRegistry.() -> Unit): ComponentRegistry =
-    ComponentRegistry().apply { block() }
-
-/**
- * Quick render to text + ANSI.
- */
-suspend fun quickRender(template: SignalTemplate): Pair<RenderResult, RenderResult> =
-    componentRegistry { add(template).tuiBackends() }.build().renderOnce().let { (t, a) -> t to a }
 
 class SignalTemplate(
     override val template: VisualTemplate,
@@ -302,24 +259,12 @@ private class ConstSignal<T>(private val constValue: T) : Signal<T> {
 fun signalTemplate(block: SignalTemplateBuilder.() -> Unit): SignalTemplate =
     SignalTemplateBuilder().apply { block() }.build()
 
-/**
- * SignalTemplateBuilder - fluent template construction.
- * Usage:
- *   signalTemplate {
- *     label("My Panel")
- *     hole("custom")(mySignal)
- *     toggle(myToggle)
- *     slider(mySlider)
- *     level(myLevel)
- *   }
- */
 class SignalTemplateBuilder {
     private val templateBuilder = TemplateBuilder()
     private val bindingBuilders = mutableListOf<() -> TemplateBinding<*>>()
 
     fun <T> hole(key: String): TemplateHole<T> = templateBuilder.hole(key)
 
-    // Standard hole accessors
     fun toggleHole() = StandardHoles.toggle
     fun lightHole() = StandardHoles.light
     fun buttonHole() = StandardHoles.button
@@ -330,13 +275,11 @@ class SignalTemplateBuilder {
     fun labelHole() = StandardHoles.label
     fun iconHole() = StandardHoles.icon
 
-    // Fluent bind methods (recommended)
     fun <T> bind(hole: TemplateHole<T>, signal: Signal<T>): SignalTemplateBuilder {
         bindingBuilders.add { TemplateBinding(hole, signal) }
         return this
     }
 
-    // Type-specific convenience bind methods
     fun toggle(signal: Toggle): SignalTemplateBuilder = bind(toggleHole(), signal)
     fun light(signal: IdiotLight): SignalTemplateBuilder = bind(lightHole(), signal)
     fun button(signal: MomentaryButton): SignalTemplateBuilder = bind(buttonHole(), signal)
@@ -345,7 +288,6 @@ class SignalTemplateBuilder {
     fun dial(signal: Dial<Any>): SignalTemplateBuilder = bind(dialHole(), signal)
     fun level(signal: LevelMeter): SignalTemplateBuilder = bind(levelHole(), signal)
 
-    // Static content
     fun label(text: String): SignalTemplateBuilder {
         bindingBuilders.add { TemplateBinding(StandardHoles.label, ConstSignal(text)) }
         return this
@@ -364,3 +306,9 @@ class SignalTemplateBuilder {
         return SignalTemplate(template, bindings)
     }
 }
+
+/**
+ * Quick render a template to TUI (text + ANSI).
+ */
+suspend fun quickRender(template: SignalTemplate): Pair<RenderResult, RenderResult> =
+    componentRegistry { add(template).tuiBackends() }.build().renderOnce().let { (t, a) -> t to a }
