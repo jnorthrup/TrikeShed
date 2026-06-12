@@ -1,8 +1,10 @@
 package borg.trikeshed.userspace
 
-import borg.trikeshed.userspace.UringOp.Companion.UringSubmission
-import borg.trikeshed.userspace.nio.ByteBuffer
 import borg.trikeshed.userspace.nio.channels.spi.JvmReactorOperations
+import borg.trikeshed.userspace.nio.ByteBuffer
+import borg.trikeshed.userspace.UringOp.Companion.UringSubmission
+import borg.trikeshed.userspace.UringOp
+import borg.trikeshed.userspace.reactor.Interest
 import java.nio.channels.FileChannel
 import java.nio.channels.Selector
 import java.util.concurrent.ConcurrentHashMap
@@ -34,36 +36,25 @@ private class JvmUserspaceChannelBackend(
     override fun accept(file: FileImpl): Int = -1
     override fun connect(file: FileImpl, address: String, port: Int): Int = -1
 
-    override fun close(file: FileImpl): Int = channels.remove(file.id)?.close() ?: run { 0 }
+    override fun close(file: FileImpl): Int {
+        val wrapper = channels.remove(file.id)
+        wrapper?.close()
+        return 0
+    }
 
     override fun sync(file: FileImpl, metaData: Boolean): Int {
         val ch = channels[file.id] ?: return -1
-        return try {
-            ch.fc.force(metaData)
-            0
-        } catch (_: Exception) { -1 }
+        return ch.sync(metaData)
     }
 
     override fun truncate(file: FileImpl, size: Long): Int {
         val ch = channels[file.id] ?: return -1
-        return try {
-            ch.fc.truncate(size)
-            0
-        } catch (_: Exception) { -1 }
+        return ch.truncate(size)
     }
 
     override fun map(file: FileImpl, mode: String, position: Long, size: Long): Int {
         val ch = channels[file.id] ?: return -1
-        return try {
-            val mapMode = when (mode) {
-                "r" -> java.nio.channels.FileChannel.MapMode.READ_ONLY
-                "rw" -> java.nio.channels.FileChannel.MapMode.READ_WRITE
-                "p" -> java.nio.channels.FileChannel.MapMode.PRIVATE
-                else -> return -1
-            }
-            ch.fc.map(mapMode, position, size)
-            0
-        } catch (_: Exception) { -1 }
+        return ch.map(mode, position, size)
     }
 
     override fun submitBatch(submissions: List<UringSubmission>): List<SelectionResult> {
@@ -72,7 +63,7 @@ private class JvmUserspaceChannelBackend(
         val results = mutableListOf<SelectionResult>()
 
         for (sub in submissions) {
-            val wrapper = channels[sub.fd]
+            var wrapper = channels[sub.fd]
             if (wrapper == null) {
                 // Auto-register if not present (for files opened via FilesImpl)
                 if (sub.opcode in setOf(UringOp.READ, UringOp.WRITE, UringOp.FSYNC, UringOp.FTRUNCATE, UringOp.CLOSE)) {
@@ -81,81 +72,47 @@ private class JvmUserspaceChannelBackend(
                         java.nio.file.Paths.get(""),
                         java.util.EnumSet.noneOf(java.nio.file.StandardOpenOption::class.java)
                     )
-                    wrapper = registerChannel(fc, sub.fd)
-                    channels[sub.fd] = wrapper!!
+                    val newWrapper = registerChannel(fc, sub.fd)
+                    if (newWrapper != null) {
+                        wrapper = newWrapper
+                        channels[sub.fd] = wrapper
+                    }
                 } else {
                     results.add(SelectionResult(-1, sub.userData))
                     continue
                 }
             }
 
-            val res = when (sub.opcode) {
-                UringOp.READ, UringOp.READV -> executeRead(wrapper!!, sub)
-                UringOp.WRITE, UringOp.WRITEV -> executeWrite(wrapper!!, sub)
-                UringOp.FSYNC -> executeSync(wrapper!!)
-                UringOp.FTRUNCATE -> executeTruncate(wrapper!!, sub.offset)
-                UringOp.CLOSE -> executeClose(wrapper!!)
-                else -> {
-                    results.add(SelectionResult(-1, sub.userData))
-                    continue
+            val res = if (wrapper != null) {
+                when (sub.opcode) {
+                    UringOp.READ, UringOp.READV -> wrapper.executeRead(sub)
+                    UringOp.WRITE, UringOp.WRITEV -> wrapper.executeWrite(sub)
+                    UringOp.FSYNC -> wrapper.executeSync()
+                    UringOp.FTRUNCATE -> wrapper.executeTruncate(sub.offset)
+                    UringOp.CLOSE -> wrapper.executeClose()
+                    else -> {
+                        results.add(SelectionResult(-1, sub.userData))
+                        continue
+                    }
                 }
+            } else {
+                -1
             }
             results.add(SelectionResult(res, sub.userData))
         }
         return results
     }
 
-    private fun executeRead(w: ChannelWrapper, sub: UringSubmission): Int {
-        val nioBuf = sub.buffer?.toNioByteBuffer() ?: return -1
-        return try {
-            when (w) {
-                is FileWrapper -> w.fc.read(nioBuf, sub.offset).also { if (it > 0) sub.buffer?.position(sub.buffer.position() + it) }
-                is SocketWrapper -> w.sc.read(nioBuf).also { if (it > 0) sub.buffer?.position(sub.buffer.position() + it) }
-                else -> -1
-            }
-        } catch (_: Exception) { -1 }
-    }
-
-    private fun executeWrite(w: ChannelWrapper, sub: UringSubmission): Int {
-        val nioBuf = sub.buffer?.toNioByteBuffer() ?: return -1
-        return try {
-            when (w) {
-                is FileWrapper -> w.fc.write(nioBuf, sub.offset).also { if (it > 0) sub.buffer?.position(sub.buffer.position() + it) }
-                is SocketWrapper -> w.sc.write(nioBuf).also { if (it > 0) sub.buffer?.position(sub.buffer.position() + it) }
-                else -> -1
-            }
-        } catch (_: Exception) { -1 }
-    }
-
-    private fun executeSync(w: ChannelWrapper): Int = when (w) {
-        is FileWrapper -> try { w.fc.force(false); 0 } catch (_: Exception) { -1 }
-        else -> -1
-    }
-
-    private fun executeTruncate(w: ChannelWrapper, size: Long): Int = when (w) {
-        is FileWrapper -> try { w.fc.truncate(size); 0 } catch (_: Exception) { -1 }
-        else -> -1
-    }
-
-    private fun executeClose(w: ChannelWrapper): Int = when (w) {
-        is FileWrapper -> try { w.fc.close(); 0 } catch (_: Exception) { -1 }
-        is SocketWrapper -> try { w.sc.close(); 0 } catch (_: Exception) { -1 }
-    }
-
-    /**
-     * Register a channel backend.
-     * Returns wrapper or null if channel type unsupported.
-     */
     @Suppress("UNUSED_PARAMETER")
     private fun registerChannel(ch: java.nio.channels.Channel, desiredFd: Int): ChannelWrapper? =
         when (ch) {
-            is FileChannel -> FileWrapper(ch).also { channels[desiredFd] = it }
-            is java.nio.channels.SocketChannel -> SocketWrapper(ch).also {
+            is FileChannel -> FileWrapper(fc = ch, id = fdCounter.incrementAndGet()).also { channels[desiredFd] = it }
+            is java.nio.channels.SocketChannel -> SocketWrapper(sc = ch, id = fdCounter.incrementAndGet()).also {
                 channels[desiredFd] = it
                 // Register with reactor
                 reactor.bindChannel(ch, setOf(Interest.READ, Interest.WRITE))
             }
-            is java.nio.channels.ServerSocketChannel -> ServerWrapper(ch).also {
+            is java.nio.channels.ServerSocketChannel -> ServerWrapper(ssc = ch, id = fdCounter.incrementAndGet()).also {
                 channels[desiredFd] = it
                 reactor.bindChannel(ch, setOf(Interest.ACCEPT))
             }
@@ -164,22 +121,116 @@ private class JvmUserspaceChannelBackend(
 
     private sealed interface ChannelWrapper {
         val id: Int
+        fun close(): Int
+        fun sync(metaData: Boolean): Int
+        fun truncate(size: Long): Int
+        fun map(mode: String, position: Long, size: Long): Int
+        fun executeRead(sub: UringSubmission): Int
+        fun executeWrite(sub: UringSubmission): Int
+        fun executeSync(): Int
+        fun executeTruncate(size: Long): Int
+        fun executeClose(): Int
     }
 
     private data class FileWrapper(
         val fc: FileChannel,
-        override val id: Int = fdCounter.incrementAndGet(),
-    ) : ChannelWrapper
+        override val id: Int,
+    ) : ChannelWrapper {
+
+        override fun close(): Int = try { fc.close(); 0 } catch (_: Exception) { -1 }
+
+        override fun sync(metaData: Boolean): Int = try { fc.force(metaData); 0 } catch (_: Exception) { -1 }
+
+        override fun truncate(size: Long): Int = try { fc.truncate(size); 0 } catch (_: Exception) { -1 }
+
+        override fun map(mode: String, position: Long, size: Long): Int = try {
+            val mapMode = when (mode) {
+                "r" -> java.nio.channels.FileChannel.MapMode.READ_ONLY
+                "rw" -> java.nio.channels.FileChannel.MapMode.READ_WRITE
+                "p" -> java.nio.channels.FileChannel.MapMode.PRIVATE
+                else -> return -1
+            }
+            fc.map(mapMode, position, size)
+            0
+        } catch (_: Exception) { -1 }
+
+        override fun executeRead(sub: UringSubmission): Int {
+            val nioBuf = sub.buffer?.toNioByteBuffer() ?: return -1
+            return try {
+                val n = fc.read(nioBuf, sub.offset)
+                if (n > 0) sub.buffer?.position(sub.buffer?.position()?.plus(n) ?: n)
+                n
+            } catch (_: Exception) { -1 }
+        }
+
+        override fun executeWrite(sub: UringSubmission): Int {
+            val nioBuf = sub.buffer?.toNioByteBuffer() ?: return -1
+            return try {
+                val n = fc.write(nioBuf, sub.offset)
+                if (n > 0) sub.buffer?.position(sub.buffer?.position()?.plus(n) ?: n)
+                n
+            } catch (_: Exception) { -1 }
+        }
+
+        override fun executeSync(): Int = try { fc.force(false); 0 } catch (_: Exception) { -1 }
+
+        override fun executeTruncate(size: Long): Int = try { fc.truncate(size); 0 } catch (_: Exception) { -1 }
+
+        override fun executeClose(): Int = try { fc.close(); 0 } catch (_: Exception) { -1 }
+    }
 
     private data class SocketWrapper(
         val sc: java.nio.channels.SocketChannel,
-        override val id: Int = fdCounter.incrementAndGet(),
-    ) : ChannelWrapper
+        override val id: Int,
+    ) : ChannelWrapper {
+
+        override fun close(): Int = try { sc.close(); 0 } catch (_: Exception) { -1 }
+
+        override fun sync(metaData: Boolean): Int = -1
+
+        override fun truncate(size: Long): Int = -1
+
+        override fun map(mode: String, position: Long, size: Long): Int = -1
+
+        override fun executeRead(sub: UringSubmission): Int {
+            val nioBuf = sub.buffer?.toNioByteBuffer() ?: return -1
+            return try {
+                val n = sc.read(nioBuf)
+                if (n > 0) sub.buffer?.position(sub.buffer?.position()?.plus(n) ?: n)
+                n
+            } catch (_: Exception) { -1 }
+        }
+
+        override fun executeWrite(sub: UringSubmission): Int {
+            val nioBuf = sub.buffer?.toNioByteBuffer() ?: return -1
+            return try {
+                val n = sc.write(nioBuf)
+                if (n > 0) sub.buffer?.position(sub.buffer?.position()?.plus(n) ?: n)
+                n
+            } catch (_: Exception) { -1 }
+        }
+
+        override fun executeSync(): Int = -1
+        override fun executeTruncate(size: Long): Int = -1
+        override fun executeClose(): Int = try { sc.close(); 0 } catch (_: Exception) { -1 }
+    }
 
     private data class ServerWrapper(
         val ssc: java.nio.channels.ServerSocketChannel,
-        override val id: Int = fdCounter.incrementAndGet(),
-    ) : ChannelWrapper
+        override val id: Int,
+    ) : ChannelWrapper {
+
+        override fun close(): Int = try { ssc.close(); 0 } catch (_: Exception) { -1 }
+
+        override fun sync(metaData: Boolean): Int = -1
+        override fun truncate(size: Long): Int = -1
+        override fun map(mode: String, position: Long, size: Long): Int = -1
+        override fun executeRead(sub: UringSubmission): Int = -1
+        override fun executeWrite(sub: UringSubmission): Int = -1
+        override fun executeSync(): Int = -1
+        override fun executeTruncate(size: Long): Int = -1
+        override fun executeClose(): Int = try { ssc.close(); 0 } catch (_: Exception) { -1 }
+    }
 }
 
 internal actual fun openUserspaceChannelBackend(entries: Int): UserspaceChannelBackend =

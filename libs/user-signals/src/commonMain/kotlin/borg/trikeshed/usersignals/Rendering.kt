@@ -5,6 +5,11 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
+import kotlinx.serialization.Encoder
+import kotlinx.serialization.Serializer
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
 
 interface RenderBackend {
     val id: String
@@ -68,14 +73,12 @@ class TextBackend : RenderBackend {
 
 class JsonBackend : RenderBackend {
     override val id = "json"
+    private val json = Json { prettyPrint = true; ignoreUnknownKeys = true }
+
     override fun render(output: TemplateOutput): RenderResult = JsonRenderResult(
-        content = formatJson(output),
+        content = json.encodeToString(output),
         metadata = output.metadata
     )
-
-    private fun formatJson(output: TemplateOutput): String {
-        return "{}"
-    }
 }
 
 class AnsiBackend : RenderBackend {
@@ -125,6 +128,44 @@ class AnsiBackend : RenderBackend {
     }
 }
 
+/**
+ * Component registry for declarative pipeline building.
+ */
+class ComponentRegistry {
+    private val components = mutableListOf<SignalComponent<*>>()
+    private val backends = mutableListOf<RenderBackend>()
+
+    fun add(component: SignalComponent<*>): ComponentRegistry {
+        components.add(component)
+        return this
+    }
+
+    fun addAll(components: Iterable<SignalComponent<*>>): ComponentRegistry {
+        this.components.addAll(components)
+        return this
+    }
+
+    fun backend(backend: RenderBackend): ComponentRegistry {
+        backends.add(backend)
+        return this
+    }
+
+    fun textBackend(): ComponentRegistry = backend(TextBackend())
+    fun jsonBackend(): ComponentRegistry = backend(JsonBackend())
+    fun ansiBackend(): ComponentRegistry = backend(AnsiBackend())
+    fun tuiBackends(): ComponentRegistry = backend(TextBackend()).backend(AnsiBackend())
+
+    fun build(): RenderPipeline {
+        val pipeline = RenderPipeline()
+        backends.forEach { pipeline.addBackend(it) }
+        components.forEach { pipeline.addComponent(it) }
+        return pipeline
+    }
+}
+
+/**
+ * RenderPipeline - orchestrates components -> backends.
+ */
 class RenderPipeline {
     private val backends = mutableListOf<RenderBackend>()
     private val componentOutputs = mutableListOf<SignalComponent<*>>()
@@ -190,14 +231,37 @@ class ConsoleRenderer(
     suspend fun renderFrame(): List<RenderResult> = pipeline.renderOnce()
 }
 
+/**
+ * Convenience rendering functions.
+ */
 suspend fun render(template: SignalTemplate, backend: RenderBackend = TextBackend()): RenderResult =
     backend.render(template.output.value)
 
-suspend fun renderAll(template: SignalTemplate, backends: List<RenderBackend>): List<RenderResult> =
-    backends.map { it.render(template.output.value) }
-
 suspend fun renderTui(template: SignalTemplate): Pair<RenderResult, RenderResult> =
-    renderAll(template, listOf(TextBackend(), AnsiBackend())).let { (t, a) -> t to a }
+    listOf(TextBackend(), AnsiBackend()).map { it.render(template.output.value) }.let { (t, a) -> t to a }
+
+/**
+ * Component registry DSL: build a registry fluently, then render.
+ * Usage:
+ *   componentRegistry {
+ *     add(myTemplate)
+ *     textBackend()
+ *   }.renderOnce()
+ */
+fun componentRegistry(block: ComponentRegistry.() -> Unit): ComponentRegistry =
+    ComponentRegistry().apply { block() }
+
+/**
+ * One-shot render with fluent registry.
+ */
+suspend fun componentRegistry(block: ComponentRegistry.() -> Unit): RenderPipeline =
+    ComponentRegistry().apply { block() }.build()
+
+/**
+ * Quick render to text + ANSI.
+ */
+suspend fun quickRender(template: SignalTemplate): Pair<RenderResult, RenderResult> =
+    componentRegistry { add(template).tuiBackends() }.build().renderOnce().let { (t, a) -> t to a }
 
 class SignalTemplate(
     override val template: VisualTemplate,
@@ -226,24 +290,50 @@ private class ConstSignal<T>(private val constValue: T) : Signal<T> {
 fun signalTemplate(block: SignalTemplateBuilder.() -> Unit): SignalTemplate =
     SignalTemplateBuilder().apply { block() }.build()
 
+/**
+ * SignalTemplateBuilder - fluent template construction.
+ * Usage:
+ *   signalTemplate {
+ *     label("My Panel")
+ *     hole("custom")(mySignal)
+ *     toggle(myToggle)
+ *     slider(mySlider)
+ *     level(myLevel)
+ *   }
+ */
 class SignalTemplateBuilder {
     private val templateBuilder = TemplateBuilder()
     private val bindingBuilders = mutableListOf<() -> TemplateBinding<*>>()
 
     fun <T> hole(key: String): TemplateHole<T> = templateBuilder.hole(key)
+
+    // Standard hole accessors
     fun toggleHole() = StandardHoles.toggle
     fun lightHole() = StandardHoles.light
+    fun buttonHole() = StandardHoles.button
     fun sliderHole() = StandardHoles.slider
     fun knobHole() = StandardHoles.knob
+    fun dialHole() = StandardHoles.dial
     fun levelHole() = StandardHoles.level
     fun labelHole() = StandardHoles.label
     fun iconHole() = StandardHoles.icon
 
+    // Fluent bind methods (recommended)
     fun <T> bind(hole: TemplateHole<T>, signal: Signal<T>): SignalTemplateBuilder {
         bindingBuilders.add { TemplateBinding(hole, signal) }
         return this
     }
 
+    // Type-specific convenience bind methods
+    fun toggle(signal: Toggle): SignalTemplateBuilder = bind(toggleHole(), signal)
+    fun light(signal: IdiotLight): SignalTemplateBuilder = bind(lightHole(), signal)
+    fun button(signal: MomentaryButton): SignalTemplateBuilder = bind(buttonHole(), signal)
+    fun slider(signal: Slider): SignalTemplateBuilder = bind(sliderHole(), signal)
+    fun knob(signal: Knob): SignalTemplateBuilder = bind(knobHole(), signal)
+    fun dial(signal: Dial<*>): SignalTemplateBuilder = bind(dialHole(), signal)
+    fun level(signal: LevelMeter): SignalTemplateBuilder = bind(levelHole(), signal)
+
+    // Static content
     fun label(text: String): SignalTemplateBuilder {
         bindingBuilders.add { TemplateBinding(StandardHoles.label, ConstSignal(text)) }
         return this

@@ -1,7 +1,8 @@
 package borg.trikeshed.userspace.nio.channels.spi
 
 import borg.trikeshed.userspace.reactor.Interest
-import kafka.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.withContext
 import kotlin.time.Duration
 import java.nio.channels.SelectionKey
 import java.nio.channels.Selector
@@ -26,7 +27,7 @@ class JvmReactorOperations(
     private val fdRegistry = ConcurrentHashMap<Int, RegistryEntry>()
     private val fdCounter = AtomicInteger(1000)
 
-    override fun register(fd: Int, interests: Set<Interest>, userData: Long = 0L) {
+    override fun register(fd: Int, interests: Set<Interest>, userData: Long) {
         val entry = fdRegistry[fd] ?: return
         val mask = Interest.toMask(interests)
         fdRegistry[fd] = RegistryEntry(entry.channel, interests, userData)
@@ -40,7 +41,6 @@ class JvmReactorOperations(
         try {
             entry.channel.register(selector, ops)
         } catch (e: Exception) {
-            // Channel might already be registered; re-register
             selector.keys().firstOrNull { it.channel() == entry.channel }?.cancel()
             entry.channel.register(selector, ops)
         }
@@ -55,45 +55,44 @@ class JvmReactorOperations(
     override suspend fun poll(timeout: Duration): List<ReactorSignal> {
         val ms = if (timeout.isInfinite()) 0L else timeout.inWholeMilliseconds
 
-        // Run selector.select on a background thread (not carrier!)
-        return suspendCancellableCoroutine { cont ->
-            val msLocal = ms
-            val runnable = Runnable {
-                var n = 0
-                try {
-                    n = if (msLocal == 0L) selector.selectNow() else selector.select(msLocal)
-                } catch (e: Exception) {
-                    cont.resumeWith(kotlin.Result.failure(e))
-                    return@Runnable
-                }
-
-                if (n == 0) {
-                    cont.resume(emptyList())
-                    return@Runnable
-                }
-
-                val ready = selector.selectedKeys().mapNotNull { key ->
-                    val fd = fdRegistry.entries.firstOrNull { it.value.channel == key.channel() }?.key
-                        ?: return@mapNotNull null
-                    val sig = mutableSetOf<Interest>()
-                    if (key.isReadable) sig.add(Interest.READ)
-                    if (key.isWritable) sig.add(Interest.WRITE)
-                    if (key.isAcceptable) sig.add(Interest.ACCEPT)
-                    if (key.isConnectable) sig.add(Interest.CONNECT)
-                    val userData = fdRegistry[fd]?.userData ?: 0L
-                    ReactorSignal(fd, sig, userData)
-                }
-                selector.selectedKeys().clear()
-                cont.resume(ready)
+        val deferred = kotlinx.coroutines.CompletableDeferred<List<ReactorSignal>>()
+        
+        val runnable = Runnable {
+            var n = 0
+            try {
+                n = if (ms == 0L) selector.selectNow() else selector.select(ms)
+            } catch (e: Exception) {
+                deferred.completeExceptionally(e)
+                return@Runnable
             }
-            // Execute on IO dispatcher — DOES NOT BLOCK CARRIER THREAD
+
+            if (n == 0) {
+                deferred.complete(emptyList())
+                return@Runnable
+            }
+
+            val ready = selector.selectedKeys().mapNotNull { key ->
+                val fd = fdRegistry.entries.firstOrNull { it.value.channel == key.channel() }?.key
+                    ?: return@mapNotNull null
+                val sig = mutableSetOf<Interest>()
+                if (key.isReadable) sig.add(Interest.READ)
+                if (key.isWritable) sig.add(Interest.WRITE)
+                if (key.isAcceptable) sig.add(Interest.ACCEPT)
+                if (key.isConnectable) sig.add(Interest.CONNECT)
+                val userData = fdRegistry[fd]?.userData ?: 0L
+                ReactorSignal(fd, sig, userData)
+            }
+            selector.selectedKeys().clear()
+            deferred.complete(ready)
+        }
+
+        withContext(kotlinx.coroutines.Dispatchers.IO) {
             kotlinx.coroutines.Dispatchers.IO.runnable(runnable).run()
         }
+        
+        return deferred.await()
     }
 
-    /**
-     * Bind a raw channel to an fd for reactor tracking.
-     */
     fun bindChannel(ch: java.nio.channels.SelectableChannel, interests: Set<Interest>, userData: Long = 0L): Int {
         val fd = fdCounter.incrementAndGet()
         fdRegistry[fd] = RegistryEntry(ch, interests, userData)
@@ -107,3 +106,4 @@ class JvmReactorOperations(
         val userData: Long,
     )
 }
+EOF

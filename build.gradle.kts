@@ -62,6 +62,9 @@ kotlin {
 
                 implementation("org.bouncycastle:bcprov-jdk15on:1.70")
 
+                // kotlinx.coroutines for suspendCancellableCoroutine
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
+
                 // Depend on userspace/context implementations via classpath (no libs/ subprojects)
             }
 
@@ -172,4 +175,5 @@ afterEvaluate {
         dependsOn("test")
         dependsOn(jmhTask)
     }
+}
 }

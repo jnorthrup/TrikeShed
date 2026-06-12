@@ -14,7 +14,6 @@ import java.nio.channels.SocketChannel
 import java.nio.channels.spi.SelectorProvider as JdkSelectorProvider
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
-import kotlin.coroutines.suspendCancellableCoroutine
 import kotlin.time.Duration
 
 /**
