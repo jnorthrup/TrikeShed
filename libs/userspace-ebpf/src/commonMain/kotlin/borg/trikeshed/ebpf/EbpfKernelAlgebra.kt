@@ -1,6 +1,8 @@
 package borg.trikeshed.ebpf
 
 import kotlinx.coroutines.channels.ReceiveChannel
+import kotlinx.coroutines.channels.produce
+import kotlinx.coroutines.channels.send
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -14,8 +16,7 @@ object EbpfKernelAlgebra {
      * The index is the instruction offset (pc), the value is the raw instruction.
      */
     fun EbpfProgram.asInstructionSeries(): Series<Long> {
-        val size = program.instructions.size
-        return size j { index -> program.instructions[index] }
+        return this.instructions.size j { index -> this.instructions[index] }
     }
 
     /**
@@ -39,6 +40,7 @@ object EbpfKernelAlgebra {
 
     /**
      * Executes a program and captures the full execution trace.
+     * Uses the public interpreter API.
      */
     fun EbpfProgram.traceExecute(
         context: ByteArray,
@@ -46,9 +48,10 @@ object EbpfKernelAlgebra {
     ): ExecutionTrace {
         val interpreter = EbpfInterpreter(this, registry)
         val traces = mutableListOf<LongArray>()
+
+        // We need to trace by stepping through manually
         var pc = 0
-        val registers = LongArray(11)
-        registers.fill(0)
+        val registers = LongArray(11) { 0L }
 
         while (pc < program.instructions.size) {
             traces.add(registers.copyOf())
@@ -58,15 +61,167 @@ object EbpfKernelAlgebra {
             pc++
 
             when (classOp) {
-                EbpfOpcode.BPF_ALU64 -> interpreter.executeAlu64(opcode, inst)
-                EbpfOpcode.BPF_ALU -> interpreter.executeAlu32(opcode, inst)
-                EbpfOpcode.BPF_JMP -> {
-                    val jmpOffset = interpreter.executeJmp(opcode, inst, context)
-                    pc += jmpOffset
+                EbpfOpcode.BPF_ALU64 -> {
+                    val dst = inst.dstReg
+                    val src = inst.srcReg
+                    val isK = (opcode and EbpfOpcode.BPF_X) == 0
+                    val aluOp = opcode and 0xF0
+                    val operand = if (isK) inst.imm.toLong() else registers[src]
+
+                    when (aluOp) {
+                        EbpfOpcode.BPF_ADD -> registers[dst] += operand
+                        EbpfOpcode.BPF_SUB -> registers[dst] -= operand
+                        EbpfOpcode.BPF_MUL -> registers[dst] *= operand
+                        EbpfOpcode.BPF_DIV -> if (operand != 0L) registers[dst] /= operand else registers[dst] = 0
+                        EbpfOpcode.BPF_OR -> registers[dst] = registers[dst] or operand
+                        EbpfOpcode.BPF_AND -> registers[dst] = registers[dst] and operand
+                        EbpfOpcode.BPF_LSH -> registers[dst] = registers[dst] shl operand.toInt()
+                        EbpfOpcode.BPF_RSH -> registers[dst] = registers[dst] ushr operand.toInt()
+                        EbpfOpcode.BPF_NEG -> registers[dst] = -registers[dst]
+                        EbpfOpcode.BPF_MOD -> if (operand != 0L) registers[dst] %= operand else registers[dst] = registers[dst]
+                        EbpfOpcode.BPF_XOR -> registers[dst] = registers[dst] xor operand
+                        EbpfOpcode.BPF_MOV -> registers[dst] = operand
+                        EbpfOpcode.BPF_ARSH -> registers[dst] = registers[dst] shr operand.toInt()
+                    }
                 }
-                EbpfOpcode.BPF_LD -> pc += interpreter.executeLd(opcode, inst, this, pc)
-                EbpfOpcode.BPF_LDX -> interpreter.executeLdx(opcode, inst, context)
-                EbpfOpcode.BPF_STX -> interpreter.executeStx(opcode, inst, context)
+                EbpfOpcode.BPF_ALU -> {
+                    val dst = inst.dstReg
+                    val src = inst.srcReg
+                    val isK = (opcode and EbpfOpcode.BPF_X) == 0
+                    val aluOp = opcode and 0xF0
+                    val operand = if (isK) inst.imm else registers[src].toInt()
+                    var dstVal = registers[dst].toInt()
+
+                    when (aluOp) {
+                        EbpfOpcode.BPF_ADD -> dstVal += operand
+                        EbpfOpcode.BPF_SUB -> dstVal -= operand
+                        EbpfOpcode.BPF_MUL -> dstVal *= operand
+                        EbpfOpcode.BPF_DIV -> if (operand != 0) dstVal /= operand else dstVal = 0
+                        EbpfOpcode.BPF_OR -> dstVal = dstVal or operand
+                        EbpfOpcode.BPF_AND -> dstVal = dstVal and operand
+                        EbpfOpcode.BPF_LSH -> dstVal = dstVal shl operand
+                        EbpfOpcode.BPF_RSH -> dstVal = dstVal ushr operand
+                        EbpfOpcode.BPF_NEG -> dstVal = -dstVal
+                        EbpfOpcode.BPF_MOD -> if (operand != 0) dstVal %= operand else dstVal = dstVal
+                        EbpfOpcode.BPF_XOR -> dstVal = dstVal xor operand
+                        EbpfOpcode.BPF_MOV -> dstVal = operand
+                        EbpfOpcode.BPF_ARSH -> dstVal = dstVal shr operand
+                    }
+                    registers[dst] = dstVal.toLong() and 0xFFFFFFFFL
+                }
+                EbpfOpcode.BPF_JMP -> {
+                    val jmpOp = opcode and 0xF0
+                    val isK = (opcode and EbpfOpcode.BPF_X) == 0
+                    val dst = inst.dstReg
+                    val src = inst.srcReg
+                    val operand = if (isK) inst.imm.toLong() else registers[src]
+                    val dstVal = registers[dst]
+
+                    val jump = when (jmpOp) {
+                        EbpfOpcode.BPF_JA -> true
+                        EbpfOpcode.BPF_JEQ -> dstVal == operand
+                        EbpfOpcode.BPF_JGT -> dstVal.toULong() > operand.toULong()
+                        EbpfOpcode.BPF_JGE -> dstVal.toULong() >= operand.toULong()
+                        EbpfOpcode.BPF_JSET -> (dstVal and operand) != 0L
+                        EbpfOpcode.BPF_JNE -> dstVal != operand
+                        EbpfOpcode.BPF_JSGT -> dstVal > operand
+                        EbpfOpcode.BPF_JSGE -> dstVal >= operand
+                        EbpfOpcode.BPF_CALL -> {
+                            registers[0] = registry.callHelper(inst.imm, registers, context)
+                            false
+                        }
+                        EbpfOpcode.BPF_EXIT -> false
+                        EbpfOpcode.BPF_JLT -> dstVal.toULong() < operand.toULong()
+                        EbpfOpcode.BPF_JLE -> dstVal.toULong() <= operand.toULong()
+                        EbpfOpcode.BPF_JSLT -> dstVal < operand
+                        EbpfOpcode.BPF_JSLE -> dstVal <= operand
+                        else -> false
+                    }
+
+                    if (jump) pc += inst.offset.toInt()
+                }
+                EbpfOpcode.BPF_LD -> {
+                    val sizeLd = opcode and 0x18
+                    val mode = opcode and 0xE0
+
+                    if (sizeLd == EbpfOpcode.BPF_DW && mode == EbpfOpcode.BPF_IMM) {
+                        // 64-bit immediate load. The second half of the immediate is in the next instruction's imm field.
+                        if (pc < program.instructions.size) {
+                            val nextInst = EbpfInstruction(program.instructions[pc])
+                            val lower32 = inst.imm.toLong() and 0xFFFFFFFFL
+                            val upper32 = nextInst.imm.toLong() and 0xFFFFFFFFL
+                            registers[inst.dstReg] = lower32 or (upper32 shl 32)
+                            pc++
+                        }
+                    }
+                }
+                EbpfOpcode.BPF_LDX -> {
+                    val dst = inst.dstReg
+                    val src = inst.srcReg
+                    val sizeLdx = opcode and 0x18
+                    val addr = registers[src] + inst.offset
+
+                    if (addr >= 0) {
+                        when (sizeLdx) {
+                            EbpfOpcode.BPF_B -> if (addr < context.size) registers[dst] = (context[addr.toInt()].toLong() and 0xFF)
+                            EbpfOpcode.BPF_H -> if (addr + 1 < context.size) registers[dst] = (
+                                (context[addr.toInt()].toLong() and 0xFF) or
+                                ((context[(addr + 1).toInt()].toLong() and 0xFF) shl 8)
+                            )
+                            EbpfOpcode.BPF_W -> if (addr + 3 < context.size) registers[dst] = (
+                                (context[addr.toInt()].toLong() and 0xFF) or
+                                ((context[(addr + 1).toInt()].toLong() and 0xFF) shl 8) or
+                                ((context[(addr + 2).toInt()].toLong() and 0xFF) shl 16) or
+                                ((context[(addr + 3).toInt()].toLong() and 0xFF) shl 24)
+                            )
+                            EbpfOpcode.BPF_DW -> if (addr + 7 < context.size) registers[dst] = (
+                                (context[addr.toInt()].toLong() and 0xFF) or
+                                ((context[(addr + 1).toInt()].toLong() and 0xFF) shl 8) or
+                                ((context[(addr + 2).toInt()].toLong() and 0xFF) shl 16) or
+                                ((context[(addr + 3).toInt()].toLong() and 0xFF) shl 24) or
+                                ((context[(addr + 4).toInt()].toLong() and 0xFF) shl 32) or
+                                ((context[(addr + 5).toInt()].toLong() and 0xFF) shl 40) or
+                                ((context[(addr + 6).toInt()].toLong() and 0xFF) shl 48) or
+                                ((context[(addr + 7).toInt()].toLong() and 0xFF) shl 56)
+                            )
+                        }
+                    }
+                }
+                EbpfOpcode.BPF_STX -> {
+                    val dst = inst.dstReg
+                    val src = inst.srcReg
+                    val sizeStx = opcode and 0x18
+                    val addr = registers[dst] + inst.offset
+
+                    if (addr >= 0) {
+                        val v = registers[src]
+                        when (sizeStx) {
+                            EbpfOpcode.BPF_B -> if (addr < context.size) {
+                                context[addr.toInt()] = (v and 0xFF).toByte()
+                            }
+                            EbpfOpcode.BPF_H -> if (addr + 1 < context.size) {
+                                context[addr.toInt()] = (v and 0xFF).toByte()
+                                context[(addr + 1).toInt()] = ((v ushr 8) and 0xFF).toByte()
+                            }
+                            EbpfOpcode.BPF_W -> if (addr + 3 < context.size) {
+                                context[addr.toInt()] = (v and 0xFF).toByte()
+                                context[(addr + 1).toInt()] = ((v ushr 8) and 0xFF).toByte()
+                                context[(addr + 2).toInt()] = ((v ushr 16) and 0xFF).toByte()
+                                context[(addr + 3).toInt()] = ((v ushr 24) and 0xFF).toByte()
+                            }
+                            EbpfOpcode.BPF_DW -> if (addr + 7 < context.size) {
+                                context[addr.toInt()] = (v and 0xFF).toByte()
+                                context[(addr + 1).toInt()] = ((v ushr 8) and 0xFF).toByte()
+                                context[(addr + 2).toInt()] = ((v ushr 16) and 0xFF).toByte()
+                                context[(addr + 3).toInt()] = ((v ushr 24) and 0xFF).toByte()
+                                context[(addr + 4).toInt()] = ((v ushr 32) and 0xFF).toByte()
+                                context[(addr + 5).toInt()] = ((v ushr 40) and 0xFF).toByte()
+                                context[(addr + 6).toInt()] = ((v ushr 48) and 0xFF).toByte()
+                                context[(addr + 7).toInt()] = ((v ushr 56) and 0xFF).toByte()
+                            }
+                        }
+                    }
+                }
             }
 
             if (classOp == EbpfOpcode.BPF_JMP && (opcode and 0xF0) == EbpfOpcode.BPF_EXIT) {
@@ -123,7 +278,7 @@ class EbpfStreamResults(
     /** Executes on a ReceiveChannel of contexts */
     suspend fun executeChannel(
         contexts: ReceiveChannel<ByteArray>
-    ): ReceiveChannel<Long> = contexts.produce {
+    ): ReceiveChannel<Long> = produce {
         for (context in contexts) {
             send(executor.executeStream(sequenceOf(context)).first())
         }
@@ -136,7 +291,7 @@ class EbpfStreamResults(
 data class EbpfResultSeries(
     val results: List<Long>
 ) {
-    override val size: Int get() = results.size
+    val size: Int get() = results.size
     operator fun get(index: Int): Long = results[index]
 
     /** Converts to kernel algebra Series */
@@ -166,7 +321,7 @@ class EbpfPipeline private constructor(
     fun execute(context: ByteArray, registry: EbpfHelperRegistry = EbpfHelperRegistry()): Long {
         var currentContext = context.copyOf()
         var lastResult = 0L
-        for (program in programs) {
+        for (program in this.programs) {
             val interpreter = EbpfInterpreter(program, registry)
             lastResult = interpreter.execute(currentContext)
         }
