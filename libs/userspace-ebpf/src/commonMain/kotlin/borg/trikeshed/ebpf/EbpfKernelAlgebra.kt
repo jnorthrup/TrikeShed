@@ -3,9 +3,7 @@ package borg.trikeshed.ebpf
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.ReceiveChannel
-import kotlinx.coroutines.channels.ProducerScope
 import kotlinx.coroutines.channels.produce
-import kotlinx.coroutines.channels.send
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -52,13 +50,12 @@ object EbpfKernelAlgebra {
         val interpreter = EbpfInterpreter(this, registry)
         val traces = mutableListOf<LongArray>()
 
-        // We need to trace by stepping through manually
         var pc = 0
         val registers = LongArray(11) { 0L }
 
-        while (pc < program.instructions.size) {
+        while (pc < this.instructions.size) {
             traces.add(registers.copyOf())
-            val inst = EbpfInstruction(program.instructions[pc])
+            val inst = EbpfInstruction(this.instructions[pc])
             val opcode = inst.opcode
             val classOp = opcode and EbpfOpcode.BPF_CLASS_MASK
             pc++
@@ -148,9 +145,8 @@ object EbpfKernelAlgebra {
                     val mode = opcode and 0xE0
 
                     if (sizeLd == EbpfOpcode.BPF_DW && mode == EbpfOpcode.BPF_IMM) {
-                        // 64-bit immediate load. The second half of the immediate is in the next instruction's imm field.
-                        if (pc < program.instructions.size) {
-                            val nextInst = EbpfInstruction(program.instructions[pc])
+                        if (pc < this.instructions.size) {
+                            val nextInst = EbpfInstruction(this.instructions[pc])
                             val lower32 = inst.imm.toLong() and 0xFFFFFFFFL
                             val upper32 = nextInst.imm.toLong() and 0xFFFFFFFFL
                             registers[inst.dstReg] = lower32 or (upper32 shl 32)
@@ -279,11 +275,11 @@ class EbpfStreamResults(
     fun executeFlow(contexts: Flow<ByteArray>): Flow<Long> = executor.executeFlow(contexts)
 
     /** Executes on a ReceiveChannel of contexts */
-    suspend fun <E> executeChannel(
+    suspend fun executeChannel(
         contexts: ReceiveChannel<ByteArray>
-    ): ReceiveChannel<Long> = CoroutineScope(Job()).produce {
+    ): ReceiveChannel<Long> = CoroutineScope(Job()).produce<Long> {
         for (context in contexts) {
-            send(executor.executeStream(sequenceOf(context)).first())
+            this.send(executor.executeStream(sequenceOf(context)).first())
         }
     }
 }
@@ -324,7 +320,7 @@ class EbpfPipeline private constructor(
     fun execute(context: ByteArray, registry: EbpfHelperRegistry = EbpfHelperRegistry()): Long {
         var currentContext = context.copyOf()
         var lastResult = 0L
-        for (program in this.programs) {
+        for (program in programs) {
             val interpreter = EbpfInterpreter(program, registry)
             lastResult = interpreter.execute(currentContext)
         }
