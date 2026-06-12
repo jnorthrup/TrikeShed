@@ -3,7 +3,7 @@ package borg.trikeshed.ebpf
 import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.channels.consumeEach
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.map
 
 /**
  * Streaming eBPF program loader that can load programs from various stream sources.
@@ -51,23 +51,23 @@ class EbpfProgramLoader {
         flow: Flow<ByteArray>,
         chunkHandler: (ByteArray) -> Unit = { }
     ): List<EbpfProgram> {
-        val buffer = mutableListOf<Byte>()
+        val buffer = ByteArrayOutputStream()
         val programs = mutableListOf<EbpfProgram>()
 
         flow.collect { chunk ->
             chunkHandler(chunk)
-            buffer.addAll(chunk)
+            buffer.write(chunk)
 
             // Process complete 8-byte instructions
-            while (buffer.size >= 8) {
-                val instBytes = buffer.subList(0, 8).toByteArray()
-                buffer.removeRange(0, 8)
-                val program = loadFromBytes(ByteArray(8) { instBytes[it] })
+            while (buffer.size() >= 8) {
+                val instBytes = ByteArray(8)
+                buffer.read(instBytes, 0, 8)
+                val program = loadFromBytes(instBytes)
                 programs.add(program)
             }
         }
 
-        require(buffer.isEmpty()) { "Incomplete instruction at end of stream (${buffer.size} bytes remaining)" }
+        require(buffer.size() == 0) { "Incomplete instruction at end of stream (${buffer.size()} bytes remaining)" }
         return programs
     }
 
@@ -79,22 +79,22 @@ class EbpfProgramLoader {
         channel: ReceiveChannel<ByteArray>,
         chunkHandler: (ByteArray) -> Unit = { }
     ): List<EbpfProgram> {
-        val buffer = mutableListOf<Byte>()
+        val buffer = ByteArrayOutputStream()
         val programs = mutableListOf<EbpfProgram>()
 
         channel.consumeEach { chunk ->
             chunkHandler(chunk)
-            buffer.addAll(chunk)
+            buffer.write(chunk)
 
-            while (buffer.size >= 8) {
-                val instBytes = buffer.subList(0, 8).toByteArray()
-                buffer.removeRange(0, 8)
-                val program = loadFromBytes(ByteArray(8) { instBytes[it] })
+            while (buffer.size() >= 8) {
+                val instBytes = ByteArray(8)
+                buffer.read(instBytes, 0, 8)
+                val program = loadFromBytes(instBytes)
                 programs.add(program)
             }
         }
 
-        require(buffer.isEmpty()) { "Incomplete instruction at end of stream (${buffer.size} bytes remaining)" }
+        require(buffer.size() == 0) { "Incomplete instruction at end of stream (${buffer.size()} bytes remaining)" }
         return programs
     }
 
@@ -112,7 +112,7 @@ class EbpfProgramLoader {
             val parts = trimmed.split("\\s+".toRegex())
             require(parts.size == 5) { "Assembly line must have 5 parts: opcode dst src offset imm" }
 
-            val opcode = parseHexOrDec(parts[0])
+            val opcode = parseHexOrDec(parts[0]).toInt()
             val dstReg = parseHexOrDec(parts[1]).toInt()
             val srcReg = parseHexOrDec(parts[2]).toInt()
             val offset = parseHexOrDec(parts[3]).toShort()
@@ -130,6 +130,33 @@ class EbpfProgramLoader {
         } else {
             str.toLong()
         }
+    }
+}
+
+/** Simple byte array output stream for buffering. */
+class ByteArrayOutputStream {
+    private var buffer = ByteArray(64)
+    private var size = 0
+
+    fun size(): Int = size
+
+    fun write(data: ByteArray) {
+        if (size + data.size > buffer.size) {
+            val newBuffer = ByteArray(maxOf(buffer.size * 2, size + data.size))
+            buffer.copyInto(newBuffer, 0, size)
+            buffer = newBuffer
+        }
+        data.copyInto(buffer, size)
+        size += data.size
+    }
+
+    fun read(dest: ByteArray, offset: Int, length: Int) {
+        buffer.copyInto(dest, offset, 0, length)
+        // Shift remaining data
+        if (length < size) {
+            buffer.copyInto(buffer, 0, length, size)
+        }
+        size -= length
     }
 }
 
@@ -157,7 +184,7 @@ class EbpfStreamExecutor(
     /**
      * Executes the program on a Flow of contexts, producing a Flow of results.
      */
-    suspend fun executeFlow(contexts: Flow<ByteArray>): Flow<Long> = contexts.map { context ->
+    fun executeFlow(contexts: Flow<ByteArray>): Flow<Long> = contexts.map { context ->
         interpreter.execute(context)
     }
 }
@@ -184,6 +211,14 @@ class EbpfProgramManager {
     private var nextId = 1
     private val lock = Any()
 
+    /** Executes action under lock. */
+    @Suppress("UNUSED_PARAMETER")
+    private inline fun <T> locked(action: () -> T): T {
+        synchronized(lock) {
+            return action()
+        }
+    }
+
     /** Loads a new program and returns its assigned ID. */
     fun loadProgram(
         program: EbpfProgram,
@@ -193,7 +228,7 @@ class EbpfProgramManager {
         verify: Boolean = true,
         jitCompile: Boolean = false
     ): Int {
-        return lock.synchronized {
+        return locked {
             val id = nextId++
             var verified = false
             if (verify) {
@@ -234,14 +269,14 @@ class EbpfProgramManager {
 
     /** Unloads a program by ID. */
     fun unloadProgram(id: Int): Boolean {
-        return lock.synchronized {
+        return locked {
             programs.remove(id) != null
         }
     }
 
     /** Gets a loaded program by ID. */
     fun getProgram(id: Int): LoadedEbpfProgram? {
-        return lock.synchronized {
+        return locked {
             programs[id]
         }
     }
@@ -253,8 +288,8 @@ class EbpfProgramManager {
         verify: Boolean = true,
         jitCompile: Boolean = false
     ): Boolean {
-        return lock.synchronized {
-            val existing = programs[id] ?: return false
+        return locked {
+            val existing = programs[id] ?: return@locked false
             var verified = false
             if (verify) {
                 try {
@@ -275,21 +310,21 @@ class EbpfProgramManager {
 
     /** Lists all loaded program IDs. */
     fun listPrograms(): List<LoadedEbpfProgram> {
-        return lock.synchronized {
+        return locked {
             programs.values.toList()
         }
     }
 
     /** Gets the number of loaded programs. */
     fun size(): Int {
-        return lock.synchronized {
+        return locked {
             programs.size
         }
     }
 
     /** Clears all loaded programs. */
     fun clear() {
-        lock.synchronized {
+        locked {
             programs.clear()
         }
     }

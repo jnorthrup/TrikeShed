@@ -1,10 +1,17 @@
 apply(from = "../../gradle/macros/trikeshed-lib.gradle")
 
 dependencies {
+    // GraalVM Polyglot API - use SDK bundle which includes all languages
     "jvmMainImplementation"("org.graalvm.polyglot:polyglot:24.1.1")
+
+    // GraalVM SDK - includes JS, Ruby, Python, R, WASM built-in
     "jvmMainImplementation"("org.graalvm.sdk:graal-sdk:24.1.1")
-    "jvmTestRuntimeOnly"("org.graalvm.polyglot:python:24.1.1")
+
+    // JS language (built into GraalVM SDK)
     "jvmTestRuntimeOnly"("org.graalvm.polyglot:js:24.1.1")
+
+    // Python on GraalVM
+    "jvmTestRuntimeOnly"("org.graalvm.polyglot:python:24.1.1")
 
     // JUnit Jupiter for TDD tests (JUnit 5)
     "jvmTestImplementation"("org.junit.jupiter:junit-jupiter:5.10.2")
@@ -13,10 +20,14 @@ dependencies {
     // Kotlin test extensions - use JUnit 5 variant
     "jvmTestImplementation"("org.jetbrains.kotlin:kotlin-test:2.4.0")
     "jvmTestImplementation"("org.jetbrains.kotlin:kotlin-test-junit5:2.4.0")
+
+    // kotlinx.coroutines for suspendCancellableCoroutine etc.
+    "jvmMainImplementation"("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
+    "jvmTestImplementation"("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
 }
 
-// Exclude kotlin-test-junit (JUnit 4) from macro to avoid framework conflict with JUnit 5
 configurations {
+    // Exclude kotlin-test-junit (JUnit 4) from macro to avoid framework conflict with JUnit 5
     named("jvmTestCompileClasspath") {
         exclude(group = "org.jetbrains.kotlin", module = "kotlin-test-junit")
     }
@@ -27,9 +38,4 @@ configurations {
 
 tasks.named<org.gradle.api.tasks.testing.Test>("jvmTest") {
     useJUnitPlatform()
-    // Configure javaagent for tests - use the jvm-agent jar
-    val agentJar = File("../jvm-agent/build/libs/jvm-agent-0.1.0-SNAPSHOT.jar")
-    if (agentJar.exists()) {
-        jvmArgs = listOf("-javaagent:${agentJar.absolutePath}")
-    }
 }

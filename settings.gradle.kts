@@ -22,8 +22,7 @@ if (libsDir.exists() && libsDir.isDirectory) {
         .filter { it.isDirectory }
         .filter { it.name !in setOf(
                     "classfile", "miniduck-memory", "jvm-agent",
-                    "activejs", "og1", "ngsctp", "userspace-ebpf",
-                    "userspace"
+                    "activejs", "og1", "ngsctp", "userspace"
                 ) }
         .forEach { include(":libs:${it.name}") }
 }

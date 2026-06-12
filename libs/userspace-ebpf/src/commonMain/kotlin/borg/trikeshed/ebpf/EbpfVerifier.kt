@@ -177,7 +177,8 @@ class EbpfVerifier(val program: EbpfProgram) {
 
         // For now, we're conservative: require a clear counter and bound check
         // In a production verifier, this would be much more sophisticated
-        return hasCounter && hasBoundCheck && (boundValue?.absoluteValue ?: 0L) <= maxLoopIterations
+        val absBound = boundValue?.let { if (it < 0) -it else it } ?: 0L
+        return hasCounter && hasBoundCheck && absBound <= maxLoopIterations
     }
 
     private fun verifyInstructions(reachable: BooleanArray) {

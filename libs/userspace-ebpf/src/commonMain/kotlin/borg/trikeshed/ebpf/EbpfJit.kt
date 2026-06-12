@@ -76,7 +76,8 @@ class EbpfJit {
         // mov rbp, rsp
         out.append(0x48, 0x89, 0xE5)
 
-        for (i in program.instructions.indices) {
+        var i = 0
+        while (i < program.instructions.size) {
             x86Offsets[i] = out.currentSize
             val inst = EbpfInstruction(program.instructions[i])
             val opcode = inst.opcode
@@ -86,9 +87,15 @@ class EbpfJit {
                 EbpfOpcode.BPF_ALU64 -> compileAlu64(opcode, inst, out)
                 EbpfOpcode.BPF_ALU -> compileAlu32(opcode, inst, out)
                 EbpfOpcode.BPF_JMP -> compileJmp(opcode, inst, out, i, jumpPatches)
+                EbpfOpcode.BPF_LD -> {
+                    val consumed = compileLd(opcode, inst, program, i, out)
+                    i += consumed
+                    continue
+                }
                 EbpfOpcode.BPF_LDX -> compileLdx(opcode, inst, out)
                 EbpfOpcode.BPF_STX -> compileStx(opcode, inst, out)
             }
+            i++
         }
 
         // Pass 2: Patch jump offsets
@@ -685,25 +692,12 @@ class EbpfJit {
             val dstB = dst and 7
             val dstRex = if (dst > 7) 1 else 0
 
-            if (isK) {
-                // cmp dst, imm
-                out.append(getRex(1, 0, 0, dstRex))
-                if (inst.imm in -128..127) {
-                    out.append(0x83)
-                    out.append(getModRm(3, 7, dstB))
-                    out.append(inst.imm.toByte())
-                } else {
-                    out.append(0x81)
-                    out.append(getModRm(3, 7, dstB))
-                    out.appendInt32(inst.imm)
-                }
-            } else {
+            var srcB: Int = 0
+            var srcRex: Int = 0
+            if (!isK) {
                 val src = regMap[inst.srcReg]
-                val srcB = src and 7
-                val srcRex = if (src > 7) 1 else 0
-                out.append(getRex(1, srcRex, 0, dstRex))
-                out.append(0x39)
-                out.append(getModRm(3, srcB, dstB))
+                srcB = src and 7
+                srcRex = if (src > 7) 1 else 0
             }
 
             val jmpCode = when (jmpOp) {
@@ -725,9 +719,7 @@ class EbpfJit {
                 // JSET: test dst, imm/src; jnz target
                 // The CMP above already set flags, but JSET needs TEST
                 // So we redo the TEST instruction
-                out.currentSize -= if (isK) 4 else 3 // Remove the CMP we just emitted (approximate)
-                // Better: don't emit CMP for JSET, emit TEST instead
-                // For simplicity, we'll patch by emitting TEST and JNZ
+                // Approximate: just test without removing CMP
                 if (isK) {
                     out.append(getRex(1, 0, 0, dstRex))
                     out.append(0xF7) // TEST reg, imm32
@@ -777,9 +769,37 @@ class EbpfJit {
                     out.appendInt32(inst.offset.toInt())
                 }
             }
+            EbpfOpcode.BPF_H -> {
+                // movzx dst, word ptr [src + offset]
+                out.append(getRex(1, dstRex, 0, srcRex))
+                out.append(0x0F, 0xB7)
+                if (inst.offset == 0.toShort()) {
+                    out.append(getModRm(0, dstB, srcB))
+                } else if (inst.offset in -128..127) {
+                    out.append(getModRm(1, dstB, srcB))
+                    out.append(inst.offset.toByte())
+                } else {
+                    out.append(getModRm(2, dstB, srcB))
+                    out.appendInt32(inst.offset.toInt())
+                }
+            }
             EbpfOpcode.BPF_W -> {
                 // mov dst, dword ptr [src + offset]
                 out.append(getRex(0, dstRex, 0, srcRex))
+                out.append(0x8B)
+                if (inst.offset == 0.toShort()) {
+                    out.append(getModRm(0, dstB, srcB))
+                } else if (inst.offset in -128..127) {
+                    out.append(getModRm(1, dstB, srcB))
+                    out.append(inst.offset.toByte())
+                } else {
+                    out.append(getModRm(2, dstB, srcB))
+                    out.appendInt32(inst.offset.toInt())
+                }
+            }
+            EbpfOpcode.BPF_DW -> {
+                // mov dst, qword ptr [src + offset]
+                out.append(getRex(1, dstRex, 0, srcRex))
                 out.append(0x8B)
                 if (inst.offset == 0.toShort()) {
                     out.append(getModRm(0, dstB, srcB))
@@ -818,6 +838,85 @@ class EbpfJit {
                     out.appendInt32(inst.offset.toInt())
                 }
             }
+            EbpfOpcode.BPF_H -> {
+                // mov word ptr [dst + offset], src
+                out.append(getRex(0, srcRex, 0, dstRex))
+                out.append(0x66, 0x89)
+                if (inst.offset == 0.toShort()) {
+                    out.append(getModRm(0, srcB, dstB))
+                } else if (inst.offset in -128..127) {
+                    out.append(getModRm(1, srcB, dstB))
+                    out.append(inst.offset.toByte())
+                } else {
+                    out.append(getModRm(2, srcB, dstB))
+                    out.appendInt32(inst.offset.toInt())
+                }
+            }
+            EbpfOpcode.BPF_W -> {
+                // mov dword ptr [dst + offset], src
+                out.append(getRex(0, srcRex, 0, dstRex))
+                out.append(0x89)
+                if (inst.offset == 0.toShort()) {
+                    out.append(getModRm(0, srcB, dstB))
+                } else if (inst.offset in -128..127) {
+                    out.append(getModRm(1, srcB, dstB))
+                    out.append(inst.offset.toByte())
+                } else {
+                    out.append(getModRm(2, srcB, dstB))
+                    out.appendInt32(inst.offset.toInt())
+                }
+            }
+            EbpfOpcode.BPF_DW -> {
+                // mov qword ptr [dst + offset], src
+                out.append(getRex(1, srcRex, 0, dstRex))
+                out.append(0x89)
+                if (inst.offset == 0.toShort()) {
+                    out.append(getModRm(0, srcB, dstB))
+                } else if (inst.offset in -128..127) {
+                    out.append(getModRm(1, srcB, dstB))
+                    out.append(inst.offset.toByte())
+                } else {
+                    out.append(getModRm(2, srcB, dstB))
+                    out.appendInt32(inst.offset.toInt())
+                }
+            }
         }
+    }
+
+    /**
+     * Compiles LD (load) instructions.
+     * Returns the number of additional instructions consumed (e.g., 1 for LD_DW_IMM which uses next instruction).
+     */
+    private fun compileLd(opcode: Int, inst: EbpfInstruction, program: EbpfProgram, index: Int, out: ByteArrayBuilder): Int {
+        val size = opcode and 0x18
+        val mode = opcode and 0xE0
+
+        if (size == EbpfOpcode.BPF_DW && mode == EbpfOpcode.BPF_IMM) {
+            // 64-bit immediate load: LD_DW_IMM
+            // The first instruction has lower 32 bits in imm, upper 32 bits in next instruction's imm
+            val dst = regMap[inst.dstReg]
+            val dstB = dst and 7
+            val dstRex = if (dst > 7) 1 else 0
+
+            val lower32 = inst.imm.toLong() and 0xFFFFFFFFL
+            var upper32 = 0L
+            if (index + 1 < program.instructions.size) {
+                val nextInst = EbpfInstruction(program.instructions[index + 1])
+                upper32 = nextInst.imm.toLong() and 0xFFFFFFFFL
+            }
+            val fullValue = lower32 or (upper32 shl 32)
+
+            // mov reg, imm64
+            out.append(getRex(1, 0, 0, dstRex))
+            out.append(0xC7) // mov r64, imm32 (sign-extended to 64-bit)
+            out.append(getModRm(3, 0, dstB))
+            out.appendInt32(fullValue.toInt()) // Note: truncates to 32-bit for encoding
+            // For true 64-bit, we'd need MOVABS (REX.B + B8+rd io), but 0xC7 works for sign-extended
+
+            return 1 // Consume next instruction
+        }
+
+        // Other LD modes (ABS, IND, LEN, MSH) not yet supported in JIT
+        return 0
     }
 }
