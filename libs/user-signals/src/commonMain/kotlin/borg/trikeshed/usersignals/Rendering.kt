@@ -5,11 +5,6 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
-import kotlinx.serialization.Encoder
-import kotlinx.serialization.Serializer
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
 
 interface RenderBackend {
     val id: String
@@ -73,12 +68,37 @@ class TextBackend : RenderBackend {
 
 class JsonBackend : RenderBackend {
     override val id = "json"
-    private val json = Json { prettyPrint = true; ignoreUnknownKeys = true }
-
     override fun render(output: TemplateOutput): RenderResult = JsonRenderResult(
-        content = json.encodeToString(output),
+        content = formatJson(output),
         metadata = output.metadata
     )
+
+    private fun formatJson(output: TemplateOutput): String {
+        val sb = StringBuilder()
+        sb.append("{")
+        sb.append("\"templateId\":\"${output.templateId}\",")
+        sb.append("\"values\":{")
+        sb.append(output.boundValues.map { (k, v) -> "\"$k\":${toJson(v)}" }.joinToString(","))
+        sb.append("},")
+        sb.append("\"metadata\":{")
+        sb.append(output.metadata.map { (k, v) -> "\"$k\":${toJson(v)}" }.joinToString(","))
+        sb.append("}}")
+        return sb.toString()
+    }
+
+    private fun toJson(value: Any?): String = when (value) {
+        is String -> "\"$value\""
+        is Number -> value.toString()
+        is Boolean -> value.toString()
+        is Map<*, *> -> toJsonMap(value as Map<String, Any>)
+        is List<*> -> "[${value.map { toJson(it) }.joinToString(",")}]"
+        null -> "null"
+        else -> "\"$value\""
+    }
+
+    private fun toJsonMap(map: Map<String, Any>): String {
+        return "{${map.map { (k, v) -> "\"$k\":${toJson(v)}\" }.joinToString(",")}}"
+    }
 }
 
 class AnsiBackend : RenderBackend {
@@ -132,21 +152,24 @@ class AnsiBackend : RenderBackend {
  * Component registry for declarative pipeline building.
  */
 class ComponentRegistry {
-    private val components = mutableListOf<SignalComponent<*>>()
-    private val backends = mutableListOf<RenderBackend>()
+    private val _components = mutableListOf<SignalComponent<*>>()
+    private val _backends = mutableListOf<RenderBackend>()
+
+    val components: List<SignalComponent<*>> get() = _components
+    val backends: List<RenderBackend> get() = _backends
 
     fun add(component: SignalComponent<*>): ComponentRegistry {
-        components.add(component)
+        _components.add(component)
         return this
     }
 
     fun addAll(components: Iterable<SignalComponent<*>>): ComponentRegistry {
-        this.components.addAll(components)
+        _components.addAll(components)
         return this
     }
 
     fun backend(backend: RenderBackend): ComponentRegistry {
-        backends.add(backend)
+        _backends.add(backend)
         return this
     }
 
@@ -157,8 +180,8 @@ class ComponentRegistry {
 
     fun build(): RenderPipeline {
         val pipeline = RenderPipeline()
-        backends.forEach { pipeline.addBackend(it) }
-        components.forEach { pipeline.addComponent(it) }
+        _backends.forEach { pipeline.addBackend(it) }
+        _components.forEach { pipeline.addComponent(it) }
         return pipeline
     }
 }
@@ -242,20 +265,9 @@ suspend fun renderTui(template: SignalTemplate): Pair<RenderResult, RenderResult
 
 /**
  * Component registry DSL: build a registry fluently, then render.
- * Usage:
- *   componentRegistry {
- *     add(myTemplate)
- *     textBackend()
- *   }.renderOnce()
  */
 fun componentRegistry(block: ComponentRegistry.() -> Unit): ComponentRegistry =
     ComponentRegistry().apply { block() }
-
-/**
- * One-shot render with fluent registry.
- */
-suspend fun componentRegistry(block: ComponentRegistry.() -> Unit): RenderPipeline =
-    ComponentRegistry().apply { block() }.build()
 
 /**
  * Quick render to text + ANSI.
@@ -330,7 +342,7 @@ class SignalTemplateBuilder {
     fun button(signal: MomentaryButton): SignalTemplateBuilder = bind(buttonHole(), signal)
     fun slider(signal: Slider): SignalTemplateBuilder = bind(sliderHole(), signal)
     fun knob(signal: Knob): SignalTemplateBuilder = bind(knobHole(), signal)
-    fun dial(signal: Dial<*>): SignalTemplateBuilder = bind(dialHole(), signal)
+    fun dial(signal: Dial<Any>): SignalTemplateBuilder = bind(dialHole(), signal)
     fun level(signal: LevelMeter): SignalTemplateBuilder = bind(levelHole(), signal)
 
     // Static content

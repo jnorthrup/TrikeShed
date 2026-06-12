@@ -1,14 +1,16 @@
 package borg.trikeshed.userspace.nio.channels.spi
 
 import borg.trikeshed.userspace.reactor.Interest
-import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.withContext
+import kotlin.coroutines.suspendCancellableCoroutine
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWith
 import kotlin.time.Duration
 import java.nio.channels.SelectionKey
 import java.nio.channels.Selector
 import java.nio.channels.spi.SelectorProvider as JdkSelectorProvider
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
+import java.lang.Thread
 
 /**
  * JVM implementation of [ReactorOperations] using Java NIO Selector.
@@ -20,16 +22,15 @@ import java.util.concurrent.atomic.AtomicInteger
  * Thread-safe via ConcurrentHashMap; Selector runs on a dedicated thread.
  */
 class JvmReactorOperations(
-    private val selector: Selector = JdkSelectorProvider.provider().openSelector(),
+    private val selector: Selector = java.nio.channels.spi.SelectorProvider.provider().openSelector(),
 ) : ReactorOperations {
 
     // fd -> (Channel, interests, userData)
     private val fdRegistry = ConcurrentHashMap<Int, RegistryEntry>()
     private val fdCounter = AtomicInteger(1000)
 
-    override fun register(fd: Int, interests: Set<Interest>, userData: Long) {
+    override fun register(fd: Int, interests: Set<Interest>, userData: Long = 0L) {
         val entry = fdRegistry[fd] ?: return
-        val mask = Interest.toMask(interests)
         fdRegistry[fd] = RegistryEntry(entry.channel, interests, userData)
 
         var ops = 0
@@ -52,28 +53,26 @@ class JvmReactorOperations(
         }
     }
 
-    override suspend fun poll(timeout: Duration): List<ReactorSignal> {
+    override suspend fun poll(timeout: Duration): List<ReactorSignal> = suspendCancellableCoroutine { cont ->
         val ms = if (timeout.isInfinite()) 0L else timeout.inWholeMilliseconds
 
-        val deferred = kotlinx.coroutines.CompletableDeferred<List<ReactorSignal>>()
-        
-        val runnable = Runnable {
-            var n = 0
+        Thread(Runnable {
+            var n: Int = 0
             try {
                 n = if (ms == 0L) selector.selectNow() else selector.select(ms)
             } catch (e: Exception) {
-                deferred.completeExceptionally(e)
-                return@Runnable
+                cont.resumeWith(kotlin.Result.failure(e))
+                return
             }
 
             if (n == 0) {
-                deferred.complete(emptyList())
-                return@Runnable
+                cont.resume(emptyList())
+                return
             }
 
             val ready = selector.selectedKeys().mapNotNull { key ->
-                val fd = fdRegistry.entries.firstOrNull { it.value.channel == key.channel() }?.key
-                    ?: return@mapNotNull null
+                val fdEntry = fdRegistry.entries.firstOrNull { it.value.channel == key.channel() }
+                val fd = fdEntry?.key ?: return@mapNotNull null
                 val sig = mutableSetOf<Interest>()
                 if (key.isReadable) sig.add(Interest.READ)
                 if (key.isWritable) sig.add(Interest.WRITE)
@@ -81,18 +80,13 @@ class JvmReactorOperations(
                 if (key.isConnectable) sig.add(Interest.CONNECT)
                 val userData = fdRegistry[fd]?.userData ?: 0L
                 ReactorSignal(fd, sig, userData)
-            }
+            }.toList()
             selector.selectedKeys().clear()
-            deferred.complete(ready)
+            cont.resume(ready)
         }
-
-        withContext(kotlinx.coroutines.Dispatchers.IO) {
-            kotlinx.coroutines.Dispatchers.IO.runnable(runnable).run()
-        }
-        
-        return deferred.await()
     }
 
+    /** Bind a raw channel to an fd for reactor tracking. Returns allocated fd. */
     fun bindChannel(ch: java.nio.channels.SelectableChannel, interests: Set<Interest>, userData: Long = 0L): Int {
         val fd = fdCounter.incrementAndGet()
         fdRegistry[fd] = RegistryEntry(ch, interests, userData)
@@ -106,4 +100,3 @@ class JvmReactorOperations(
         val userData: Long,
     )
 }
-EOF

@@ -176,4 +176,3 @@ afterEvaluate {
         dependsOn(jmhTask)
     }
 }
-}

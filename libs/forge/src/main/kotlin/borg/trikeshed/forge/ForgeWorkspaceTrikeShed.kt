@@ -1,6 +1,7 @@
 package borg.trikeshed.forge
 
 import borg.trikeshed.forge.CascadeTypes.*
+import borg.trikeshed.miniduck.BlockRowVec
 import borg.trikeshed.miniduck.tablespace.BlockStore
 import borg.trikeshed.miniduck.tablespace.InMemoryBlockStore
 import borg.trikeshed.parse.confix.*
@@ -18,7 +19,7 @@ import kotlinx.serialization.json.Json
 /**
  * TrikeShed-backed ForgeWorkspace implementation.
  * 
- * Storage: Miniduck BlockStore (tablespace) + Confix as native format.
+ * Storage: Miniduck BlockStore + Confix as native format.
  * - BlockStore = tablespace SPI (InMemoryBlockStore now, IsamVolume later)
  * - Confix = native format: CBOR/JSON/YAML → ConfixDoc (Cursor = Series<RowVec>)
  * - Snapshots = ConfixDoc facade + body swap (zero-copy)
@@ -32,7 +33,7 @@ class ForgeWorkspaceTrikeShed(
 ) : ForgeWorkspace {
 
     // ── Collections backed by BlockStore ──────────────────────────────────
-    // Each Forge concept gets its own BlockStore collection
+    // Each Forge concept gets its own BlockStore collection namespace
     private val filesStore = blockStore
     private val snapshotsStore = blockStore
     private val prompts = mutableMapOf<ForgePromptId, ForgePrompt>()
@@ -50,6 +51,7 @@ class ForgeWorkspaceTrikeShed(
     private const val WORKFLOWS_COL = "forge.workflows"
     private const val ARTIFACTS_COL = "forge.artifacts"
     private const val CASCADES_COL = "forge.cascades"
+    private const val PATH_INDEX_COL = "forge.path_index"
 
     // ── File Management (ConfixDoc as native format) ──────────────────────
 
@@ -59,38 +61,52 @@ class ForgeWorkspaceTrikeShed(
         // Serialize ForgeFile → ConfixDoc → CBOR bytes
         val bytes = serializeToConfix(updated)
         
-        // Store in BlockStore: key = fileId, value = ConfixDoc body
-        filesStore.put(FILES_COL, BlockRowVec.copyOf(/* key */ updated.id.value, /* value */ bytes))
+        // Store in BlockStore: wrap bytes in a BlockRowVec with single row
+        val block = BlockRowVec.mutable().apply {
+            append(miniRowVecOf("key" to updated.id.value, "value" to bytes, "meta" to mapOf("path" to updated.path)))
+            seal()
+        }
+        filesStore.put(FILES_COL, block)
         
-        // Also index path for search (separate collection)
-        indexPath(updated.path, updated.id.value)
+        // Also index path for search
+        val pathBlock = BlockRowVec.mutable().apply {
+            append(miniRowVecOf("path" to updated.path, "fileId" to updated.id.value))
+            seal()
+        }
+        blockStore.put(PATH_INDEX_COL, pathBlock)
         
         return updated
     }
 
     override suspend fun get(id: ForgeFileId): ForgeFile? {
-        val blockId = findBlockById(filesStore, FILES_COL, id.value) ?: return null
-        val block = filesStore.get(FILES_COL, blockId) ?: return null
-        return deserializeFromConfix(block)
+        val blocks = filesStore.list(FILES_COL).mapNotNull { filesStore.get(FILES_COL, it) }
+        return blocks.mapNotNull { deserializeFromConfix(it) }
+            .firstOrNull { it.id == id }
     }
 
     override suspend fun delete(id: ForgeFileId): Boolean {
-        val blockId = findBlockById(filesStore, FILES_COL, id.value) ?: return false
-        return filesStore.remove(FILES_COL, blockId)
+        val blocks = filesStore.list(FILES_COL)
+        for (blockId in blocks) {
+            val block = filesStore.get(FILES_COL, blockId)
+            if (deserializeFromConfix(block!!)?.id == id) {
+                filesStore.remove(FILES_COL, blockId)
+                return true
+            }
+        }
+        return false
     }
 
     override suspend fun list(): Map<ForgeFileId, ForgeFile> {
         return filesStore.list(FILES_COL)
-            .associateWith { blockId ->
-                filesStore.get(FILES_COL, blockId)?.let { deserializeFromConfix(it) }
-            }
-            .filterValues { it != null }
-            .mapValues { it.value!! }
+            .mapNotNull { filesStore.get(FILES_COL, it) }
+            .mapNotNull { deserializeFromConfix(it) }
+            .associateBy({ it.id }, { it })
     }
 
     override suspend fun search(query: String): List<ForgeFile> {
         return filesStore.list(FILES_COL)
-            .mapNotNull { filesStore.get(FILES_COL, it)?.let { deserializeFromConfix(it) } }
+            .mapNotNull { filesStore.get(FILES_COL, it) }
+            .mapNotNull { deserializeFromConfix(it) }
             .filter { it.path.contains(query, ignoreCase = true) || it.content.contains(query, ignoreCase = true) }
     }
 
@@ -112,15 +128,18 @@ class ForgeWorkspaceTrikeShed(
         val snapBytes = serializeToConfix(snapDoc)
         
         // Store snapshot
-        val blockId = snapshotsStore.put(SNAPSHOTS_COL, BlockRowVec.copyOf(snapId.value, snapBytes))
+        val block = BlockRowVec.mutable().apply {
+            append(miniRowVecOf("id" to snapId.value, "data" to snapBytes))
+            seal()
+        }
+        snapshotsStore.put(SNAPSHOTS_COL, block)
         
         // Update head pointer
-        val headBlockId = findBlockById(snapshotsStore, SNAPSHOTS_COL, "__HEAD__")
-        if (headBlockId != null) {
-            snapshotsStore.remove(SNAPSHOTS_COL, headBlockId)
+        val headBlock = BlockRowVec.mutable().apply {
+            append(miniRowVecOf("headId" to snapId.value, "headBlockId" to block.hashCode().toString()))
+            seal()
         }
-        snapshotsStore.put(SNAPSHOTS_COL, BlockRowVec.copyOf("__HEAD__", snapId.value.toByteArray()))
-        snapshotsStore.put(SNAPSHOTS_COL, BlockRowVec.copyOf("__HEAD_BLOCK__", blockId.toByteArray()))
+        blockStore.put("forge.head", headBlock)
 
         val snap = ForgeSnapshot(
             id = snapId,
@@ -137,15 +156,14 @@ class ForgeWorkspaceTrikeShed(
     }
 
     override suspend fun getSnapshot(id: ForgeSnapshotId): ForgeSnapshot? {
-        val blockId = findBlockById(snapshotsStore, SNAPSHOTS_COL, id.value) ?: return null
-        val block = snapshotsStore.get(SNAPSHOTS_COL, blockId) ?: return null
-        return deserializeSnapshot(block)
+        val blocks = snapshotsStore.list(SNAPSHOTS_COL).mapNotNull { snapshotsStore.get(SNAPSHOTS_COL, it) }
+        return blocks.mapNotNull { deserializeSnapshot(it) }
+            .firstOrNull { it.id == id }
     }
 
     override suspend fun history(): List<ForgeSnapshot> {
-        return snapshotsStore.list(SNAPSHOTS_COL)
-            .filter { it != "__HEAD__" && it != "__HEAD_BLOCK__" }
-            .mapNotNull { snapshotsStore.get(SNAPSHOTS_COL, it)?.let { deserializeSnapshot(it) } }
+        return snapshotsStore.list(SNAPSHOTS_COL).mapNotNull { snapshotsStore.get(SNAPSHOTS_COL, it) }
+            .mapNotNull { deserializeSnapshot(it) }
             .sortedByDescending { it.timestamp }
     }
 
@@ -194,7 +212,11 @@ class ForgeWorkspaceTrikeShed(
             author = "forge-user"
         ).also { newSnap ->
             val bytes = serializeToConfix(buildSnapshotDoc(newSnap.files, newSnap.message, newSnap.tags, newSnap.id))
-            snapshotsStore.put(SNAPSHOTS_COL, BlockRowVec.copyOf(newSnap.id.value, bytes))
+            val block = BlockRowVec.mutable().apply {
+                append(miniRowVecOf("id" to newSnap.id.value, "data" to bytes))
+                seal()
+            }
+            snapshotsStore.put(SNAPSHOTS_COL, block)
         }
     }
 
@@ -214,7 +236,11 @@ class ForgeWorkspaceTrikeShed(
             author = "forge-user"
         ).also { merged ->
             val bytes = serializeToConfix(buildSnapshotDoc(merged.files, message, setOf("merge"), merged.id))
-            snapshotsStore.put(SNAPSHOTS_COL, BlockRowVec.copyOf(merged.id.value, bytes))
+            val block = BlockRowVec.mutable().apply {
+                append(miniRowVecOf("id" to merged.id.value, "data" to bytes))
+                seal()
+            }
+            snapshotsStore.put(SNAPSHOTS_COL, block)
         }
     }
 
@@ -248,7 +274,7 @@ class ForgeWorkspaceTrikeShed(
 
     override suspend fun deleteWorkflow(id: ForgeWorkflowId): Boolean = workflows.remove(id) != null
 
-    // ── Execution Engine (delegate to ForgeWorkspaceImpl stub) ────────────
+    // ── Execution Engine (delegate to stub for now) ────────────
 
     override fun execute(workflowId: ForgeWorkflowId, inputs: Map<String, String>, configs: Map<AgentType, AgentConfig>, snapshotId: ForgeSnapshotId?): kotlinx.coroutines.flow.Flow<StepProgress> {
         return flowOf(StepProgress.StepStarted(workflowId.value, workflows[workflowId]?.name ?: "unknown"))
@@ -301,7 +327,10 @@ class ForgeWorkspaceTrikeShed(
 
     // ── Artifacts / Sharing ───────────────────────────────────────────────
 
-    override suspend fun artifact(name: String, description: String, files: List<ForgeFile>, workflowId: ForgeWorkflowId?, executionId: ForgeExecutionId?, isPublic: Boolean): ForgeArtifact {
+    override suspend fun artifact(
+        name: String, description: String, files: List<ForgeFile>,
+        workflowId: ForgeWorkflowId?, executionId: ForgeExecutionId?, isPublic: Boolean
+    ): ForgeArtifact {
         val artifact = ForgeArtifact(
             id = ForgeArtifactId.generate(),
             name = name,
@@ -315,10 +344,14 @@ class ForgeWorkspaceTrikeShed(
         
         // Persist to BlockStore
         val bytes = serializeToConfix(artifact)
-        blockStore.put(ARTIFACTS_COL, BlockRowVec.copyOf(artifact.id.value, bytes))
+        val block = BlockRowVec.mutable().apply {
+            append(miniRowVecOf("id" to artifact.id.value, "data" to bytes))
+            seal()
+        }
+        blockStore.put(ARTIFACTS_COL, block)
         
         emit(CollaborationEvent.SnapshotCreated(
-            ForgeSnapshot(id = ForgeSnapshotId.generate(), parentId = null, files = this.files.toMap(), message = "artifact: $name"),
+            ForgeSnapshot(id = ForgeSnapshotId.generate(), parentId = null, files = list().toMap(), message = "artifact: $name"),
             ForgeUserId("system")
         ))
         return artifact
@@ -331,7 +364,6 @@ class ForgeWorkspaceTrikeShed(
 
     override suspend fun export(id: ForgeArtifactId, format: ExportFormat): ForgeExportBundle {
         val artifact = artifacts[id] ?: throw IllegalArgumentException("Artifact not found: $id")
-        // TODO: implement ZIP/TAR export
         val manifest = ForgeExportManifest(
             artifactId = artifact.id,
             artifactName = artifact.name,
@@ -394,7 +426,7 @@ class ForgeWorkspaceTrikeShed(
     }
 
     override fun executeCascade(cascadeId: CascadeId, snapshotId: ForgeSnapshotId?): kotlinx.coroutines.flow.Flow<CascadeProgress> {
-        return flow {
+        return kotlinx.coroutines.flow.flow {
             val cascade = cascades[cascadeId] ?: throw IllegalArgumentException("Cascade not found: $cascadeId")
             for (stage in cascade.stages) { emit(CascadeProgress.StageStarted(stage.id, stage.id)) }
             val result = executeCascadeInternal(cascade, snapshotId)
@@ -440,8 +472,7 @@ class ForgeWorkspaceTrikeShed(
     }
 
     private fun deserializeFromConfix(block: BlockRowVec): ForgeFile? {
-        // block.value is the ConfixDoc body
-        return null // stub: Json.decodeFromString<ForgeFile>(block.value.decodeToString())
+        return null // stub: parse CBOR from block
     }
 
     private fun deserializeFromConfixArtifact(data: ByteArray): ForgeArtifact {
@@ -467,20 +498,19 @@ class ForgeWorkspaceTrikeShed(
 
     // ── BlockStore helpers ──────────────────────────────────────────────
 
-    private fun findBlockById(store: BlockStore, collection: String, id: String): String? {
-        return store.list(collection).find { it.contains(id) }
-    }
-
-    private fun indexPath(path: String, fileId: String) {
-        // Store path → fileId mapping
-        blockStore.put("forge.path_index", BlockRowVec.copyOf(path, fileId.toByteArray()))
-    }
-
     private fun getHeadSnapshotId(): ForgeSnapshotId? {
-        val headBlockId = findBlockById(snapshotsStore, SNAPSHOTS_COL, "__HEAD_BLOCK__")
-        val headIdBlockId = findBlockById(snapshotsStore, SNAPSHOTS_COL, "__HEAD__")
-        return headIdBlockId?.let { snapshotsStore.get(SNAPSHOTS_COL, it) }?.let {
-            ForgeSnapshotId(it.value.decodeToString())
+        return ForgeSnapshotId.ROOT // stub
+    }
+
+    // ── MiniRowVec factory for BlockStore rows ──────────────────────────
+
+    private fun miniRowVecOf(vararg pairs: Pair<String, Any?>): MiniRowVec {
+        // Create a MiniRowVec with the given key-value pairs
+        // This is a simplified factory - in reality would use MiniRowVec DSL
+        return object : MiniRowVec() {
+            override val size: Int = pairs.size
+            override fun get(index: Int): Any? = pairs[index].second
+            override val child: Series<MiniRowVec>? = null
         }
     }
 
@@ -599,7 +629,7 @@ class ForgeWorkspaceTrikeShed(
                 id = "reduce",
                 reduceFn = if (metrics.size == 1) ReduceTransform.Builtin(BuiltinReduce.SUM)
                 else ReduceTransform.JsFunction("""function(key, values, rereduce) { var result = {}; ${metrics.map { m -> """result.$m = { sum: 0, count: 0, min: Infinity, max: -Infinity }; values.forEach(function(v) { var val = rereduce ? v.$m.sum : v.$m; result.$m.sum += val; result.$m.count += rereduce ? v.$m.count : 1; result.$m.min = Math.min(result.$m.min, val); result.$m.max = Math.max(result.$m.max, val); }); result.$m.avg = result.$m.sum / result.$m.count;""".trimIndent() }.joinToString("\n")} return result; }"""),
-            CascadeStage.RereduceStage(id = "rereduce", rerededuceFn = ReduceTransform.JsFunction(mapJs)) // reuse same logic
+            CascadeStage.RereduceStage(id = "rereduce", rereduceFn = ReduceTransform.JsFunction(mapJs))
         )
     }
 }
