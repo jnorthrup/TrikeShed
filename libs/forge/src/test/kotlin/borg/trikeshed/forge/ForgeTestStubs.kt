@@ -51,6 +51,16 @@ internal class ForgeWorkspaceStub : ForgeWorkspace {
     override suspend fun listArtifacts(publicOnly: Boolean): List<ForgeArtifact> = throw AssertionError("RED: listArtifacts not implemented")
     override suspend fun export(id: ForgeArtifactId, format: ExportFormat): ForgeExportBundle = throw AssertionError("RED: export not implemented")
     override suspend fun importArtifact(bundle: ForgeExportBundle): ForgeArtifact = throw AssertionError("RED: importArtifact not implemented")
+
+    // Cascade operations
+    override suspend fun putCascade(cascade: OperationalCascade): OperationalCascade = throw AssertionError("RED: putCascade not implemented")
+    override suspend fun getCascade(id: CascadeId): OperationalCascade? = throw AssertionError("RED: getCascade not implemented")
+    override suspend fun listCascades(): List<OperationalCascade> = throw AssertionError("RED: listCascades not implemented")
+    override suspend fun deleteCascade(id: CascadeId): Boolean = throw AssertionError("RED: deleteCascade not implemented")
+    override suspend fun detectCascades(request: CascadeDetectionRequest): CascadeDetectionResult = throw AssertionError("RED: detectCascades not implemented")
+    override fun executeCascade(cascadeId: CascadeId, snapshotId: ForgeSnapshotId?): kotlinx.coroutines.flow.Flow<CascadeProgress> = flowOf()
+    override suspend fun executeCascadeSync(cascadeId: CascadeId, snapshotId: ForgeSnapshotId?): CascadeExecutionResult = throw AssertionError("RED: executeCascadeSync not implemented")
+    override suspend fun getCascadeGraph(cascadeId: CascadeId): CascadeGraph? = throw AssertionError("RED: getCascadeGraph not implemented")
 }
 
 internal class ForgeStepRunnerStub : ForgeStepRunner {
@@ -60,6 +70,7 @@ internal class ForgeStepRunnerStub : ForgeStepRunner {
     override suspend fun runFileTransform(step: WorkflowStep.FileTransform, workspace: ForgeWorkspace): StepResult = throw AssertionError("RED: runFileTransform not implemented")
     override suspend fun runConditional(step: WorkflowStep.Conditional, inputs: Map<String, String>): Boolean = throw AssertionError("RED: runConditional not implemented")
     override suspend fun runParallel(step: WorkflowStep.Parallel, inputs: Map<String, String>, runBranch: suspend (List<WorkflowStep>, Map<String, String>) -> List<StepResult>): List<StepResult> = throw AssertionError("RED: runParallel not implemented")
+    override suspend fun runCascadeExecution(step: WorkflowStep.CascadeExecution, inputs: Map<String, String>, workspace: ForgeWorkspace): StepResult = throw AssertionError("RED: runCascadeExecution not implemented")
 }
 
 internal class ForgeAgentRunnerStub : ForgeAgentRunner {

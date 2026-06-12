@@ -331,9 +331,12 @@ class ForgeWorkspaceImpl : ForgeWorkspace {
 
         // Get sample data to infer structure
         val sampleData = parseSampleData(source)
-        val inferredKeys = request.candidateKeys.filter { key ->
+        val allCandidateKeys = request.candidateKeys.filter { key ->
             sampleData.any { it.containsKey(key) }
         }
+        // Key hierarchy = candidate keys that are NOT metrics (grouping keys only)
+        val metricSet = request.candidateMetrics.toSet()
+        val inferredKeys = allCandidateKeys.filterNot { it in metricSet }
         val inferredMetrics = request.candidateMetrics.filter { metric ->
             sampleData.any { it.containsKey(metric) }
         }
@@ -349,7 +352,10 @@ class ForgeWorkspaceImpl : ForgeWorkspace {
             sources = request.sources,
             stages = stages,
             keyHierarchy = keyHierarchy,
-            metadata = mapOf("confidence" to confidence.toString())
+            metadata = mapOf(
+                "confidence" to confidence.toString(),
+                "metrics" to inferredMetrics.joinToString(",")
+            )
         )
 
         val hierarchies = if (keyHierarchy.isNotEmpty()) listOf(keyHierarchy) else emptyList()
@@ -373,13 +379,91 @@ class ForgeWorkspaceImpl : ForgeWorkspace {
 
     private fun parseJsonLines(content: String): List<Map<String, Any>> {
         val lines = content.lines().filter { it.isNotBlank() }
-        return lines.map { line ->
+        val results = mutableListOf<Map<String, Any>>()
+        for (line in lines) {
             try {
-                Json.decodeFromString<Map<String, Any>>(line)
+                // Use kotlinx.serialization with MapSerializer for more flexible parsing
+                val map = Json.decodeFromString<Map<String, Any>>(line)
+                if (map.isNotEmpty()) results.add(map)
             } catch (e: Exception) {
-                emptyMap<String, Any>()
+                // Fallback: simple manual parsing for basic JSON
+                val manual = parseJsonManually(line)
+                if (manual.isNotEmpty()) results.add(manual)
             }
-        }.filter { it.isNotEmpty() }.take(10)  // Sample first 10
+            if (results.size >= 10) break
+        }
+        return results
+    }
+
+    // Simple manual JSON parser for basic key-value pairs (strings, numbers, booleans)
+    private fun parseJsonManually(json: String): Map<String, Any> {
+        val result = mutableMapOf<String, Any>()
+        var content = json.trim()
+        if (!content.startsWith("{") || !content.endsWith("}")) return emptyMap()
+        content = content.substring(1, content.length - 1).trim()
+        if (content.isEmpty()) return result
+
+        var pos = 0
+        while (pos < content.length) {
+            // Skip whitespace
+            while (pos < content.length && content[pos].isWhitespace()) pos++
+            if (pos >= content.length) break
+
+            // Parse key (expect quoted string)
+            if (content[pos] != '"') break
+            pos++
+            val keyStart = pos
+            while (pos < content.length && content[pos] != '"') pos++
+            if (pos >= content.length) break
+            val key = content.substring(keyStart, pos)
+            pos++ // skip closing quote
+
+            // Skip whitespace and colon
+            while (pos < content.length && content[pos].isWhitespace()) pos++
+            if (pos >= content.length || content[pos] != ':') break
+            pos++
+
+            // Skip whitespace
+            while (pos < content.length && content[pos].isWhitespace()) pos++
+
+            // Parse value
+            val value: Any
+            if (pos >= content.length) break
+            when (content[pos]) {
+                '"' -> {
+                    pos++
+                    val valStart = pos
+                    while (pos < content.length && content[pos] != '"') pos++
+                    value = content.substring(valStart, pos)
+                    pos++ // skip closing quote
+                }
+                't' -> { // true
+                    value = true
+                    pos += 4
+                }
+                'f' -> { // false
+                    value = false
+                    pos += 5
+                }
+                'n' -> { // null
+                    value = ""
+                    pos += 4
+                }
+                else -> { // number
+                    val valStart = pos
+                    while (pos < content.length && (content[pos].isDigit() || content[pos] == '.' || content[pos] == '-' || content[pos] == 'e' || content[pos] == 'E')) pos++
+                    val numStr = content.substring(valStart, pos)
+                    value = if (numStr.contains('.') || numStr.contains('e') || numStr.contains('E'))
+                        numStr.toDouble() else numStr.toLong()
+                }
+            }
+            result[key] = value
+
+            // Skip whitespace and comma
+            while (pos < content.length && content[pos].isWhitespace()) pos++
+            if (pos < content.length && content[pos] == ',') pos++
+        }
+        return result
     }
 
     private fun buildCascadeStages(keys: List<String>, metrics: List<String>): List<CascadeStage> {
@@ -470,8 +554,8 @@ class ForgeWorkspaceImpl : ForgeWorkspace {
         val source = cascade.sources.firstOrNull() ?: throw IllegalStateException("No source for cascade")
         val sampleData = parseSampleData(source)
 
-        // Execute map: emit (key, value) for each row
-        val mapStage = cascade.stages.first { it is CascadeStage.MapStage } as CascadeStage.MapStage
+        // Get metrics from cascade metadata
+        val metrics = cascade.metadata["metrics"]?.let { it.split(",").filter { it.isNotEmpty() } } ?: emptyList()
 
         // Simulate map: group by key hierarchy
         val grouped = mutableMapOf<List<String>, MutableList<Map<String, Any>>>()
@@ -483,25 +567,31 @@ class ForgeWorkspaceImpl : ForgeWorkspace {
         // Execute reduce: sum metrics per key
         val outputRows = mutableListOf<CascadeOutputRow>()
 
-            for ((key, rows) in grouped) {
-            val reduced = mutableMapOf<String, Any>()
-            for (metric in cascade.keyHierarchy) {  // Using keyHierarchy as metric proxy for now
+        for ((key, rows) in grouped) {
+            val reduced = mutableMapOf<String, String>()
+            for (metric in metrics) {
                 val values = rows.mapNotNull { it[metric] as? Number }.map { it.toDouble() }
                 if (values.isNotEmpty()) {
-                    reduced["${metric}_sum"] = values.sum()
-                    reduced["${metric}_avg"] = (values.average() ?: 0.0) as Any
-                    reduced["${metric}_min"] = (values.minOrNull() ?: 0.0) as Any
-                    reduced["${metric}_max"] = (values.maxOrNull() ?: 0.0) as Any
+                    reduced["${metric}_sum"] = values.sum().toString()
+                    reduced["${metric}_avg"] = (values.average() ?: 0.0).toString()
+                    reduced["${metric}_min"] = (values.minOrNull() ?: 0.0).toString()
+                    reduced["${metric}_max"] = (values.maxOrNull() ?: 0.0).toString()
                 }
             }
             outputRows.add(CascadeOutputRow(key, Json.encodeToString(reduced)))
         }
 
+        // Create a serializable stageOutputs without Any types
+        val serializableStageOutputs = mapOf<String, List<CascadeOutputRow>>(
+            "map" to outputRows,
+            "reduce" to outputRows
+        )
+
         return CascadeExecutionResult(
             executionId = CascadeExecutionId.generate(),
             cascadeId = cascade.id,
             output = outputRows,
-            stageOutputs = mapOf("map" to outputRows, "reduce" to outputRows),
+            stageOutputs = serializableStageOutputs,
             startedAt = System.currentTimeMillis(),
             completedAt = System.currentTimeMillis(),
             status = CascadeExecutionStatus.SUCCESS

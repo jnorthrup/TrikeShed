@@ -1,49 +1,28 @@
 package borg.trikeshed.windowtoolkit.dsl
 
 import borg.trikeshed.windowtoolkit.context.WindowContextElement
-import borg.trikeshed.windowtoolkit.confix.ConfixBlackboardWidget
-import borg.trikeshed.windowtoolkit.ui.SkinNode
-import borg.trikeshed.windowtoolkit.ui.StyleCursor
-import borg.trikeshed.windowtoolkit.math.Series
-import borg.trikeshed.windowtoolkit.math.Vec2
-import borg.trikeshed.windowtoolkit.ui.skin
 import borg.trikeshed.usersignals.*
 import borg.trikeshed.usersignals.SignalAlgebra
 
 /**
  * Root builder for the Windowing toolkit DSL shell.
- * Now integrated with user-signals for signal-driven UI composition.
+ * Signal-driven UI composition without graphical dimensions.
  */
-class WindowShell(val context: WindowContextElement) {
-
-    private val widgets = mutableListOf<ConfixBlackboardWidget>()
-    private val layers = mutableListOf<SkinNode>()
-
-    /** Signal factory for creating user signals within this shell */
-    val signals: SignalFactory = SignalFactory(context.signalContextInstance)
+class WindowShell(private val context: WindowContextElement) {
 
     /** Signal components for UI composition */
     private val components = mutableListOf<SignalComponent<*>>()
 
-    /**
-     * Declares a Confix Blackboard widget layer.
-     */
-    fun confixDatagrid(configure: ConfixBlackboardWidget.() -> Unit) {
-        val widget = ConfixBlackboardWidget()
-        widget.configure()
-        widgets.add(widget)
-    }
+    /** Signal factory for creating user signals within this shell */
+    val signals: SignalFactory = SignalFactory(context.signalContextInstance)
+
+    /** Access underlying signal context for advanced usage */
+    val signalContext: SignalContextElement = context.signalContextInstance
 
     /**
-     * Declares a geometric layout layer mapped with visual skins.
-     */
-    fun layoutLayer(geometry: Series<Vec2>, styles: StyleCursor) {
-        layers.add(skin(geometry, styles))
-    }
-
-    /**
-     * Create a signal template for UI composition without graphical dimensions.
+     * Create a signal template for UI composition.
      * Uses user-signals algebra for pure signal-driven templates.
+     * @return the created SignalTemplate (also auto-tracked as a component)
      */
     fun signalTemplate(block: SignalTemplateBuilder.() -> Unit): SignalTemplate {
         val builder = SignalTemplateBuilder()
@@ -57,59 +36,82 @@ class WindowShell(val context: WindowContextElement) {
     typealias SignalTemplateBuilder = borg.trikeshed.usersignals.SignalTemplateBuilder
 
     /**
-     * Create a composed signal component using user-signals algebra.
+     * Compose components horizontally (side by side).
      */
-    fun composeComponents(vararg components: SignalComponent<*>): SignalComponent<*> {
-        if (components.size == 1) return components[0]
-        var composed = components[0]
-        for (i in 1 until components.size) {
-            composed = SignalAlgebra.beside(composed, components[i])
-        }
-        return composed
-    }
+    fun beside(vararg components: SignalComponent<*>): SignalComponent<*> =
+        if (components.size == 1) components[0]
+        else components.reduce { acc, c -> SignalAlgebra.beside(acc, c) }
 
-    /** Stack components vertically */
-    fun stackComponents(vararg components: SignalComponent<*>): SignalComponent<*> {
-        if (components.size == 1) return components[0]
-        var composed = components[0]
-        for (i in 1 until components.size) {
-            composed = SignalAlgebra.above(composed, components[i])
-        }
-        return composed
-    }
+    /**
+     * Compose components vertically (stacked).
+     */
+    fun above(vararg components: SignalComponent<*>): SignalComponent<*> =
+        if (components.size == 1) components[0]
+        else components.reduce { acc, c -> SignalAlgebra.above(acc, c) }
 
-    /** Create a toggle signal bound to this shell */
-    fun createToggle(signalId: String, initial: Boolean = false) = signals.toggle(signalId, initial)
+    /**
+     * Compose components in z-stack (overlay).
+     */
+    fun overlay(vararg components: SignalComponent<*>): SignalComponent<*> =
+        if (components.size == 1) components[0]
+        else components.reduce { acc, c -> SignalAlgebra.overlay(acc, c) }
 
-    /** Create an idiot light signal bound to this shell */
-    fun createLight(signalId: String, initial: Boolean = false) = signals.idiotLight(signalId, initial)
+    /**
+     * Conditional visibility based on a boolean signal.
+     */
+    fun whenVisible(condition: Signal<Boolean>, component: SignalComponent<*>): SignalComponent<*> =
+        SignalAlgebra.whenVisible(condition, component)
 
-    /** Create a slider signal bound to this shell */
-    fun createSlider(signalId: String, min: Double, max: Double, initial: Double? = null, step: Double? = null) =
-        signals.slider(signalId, min, max, initial, step)
+    // ====================================================================
+    // Signal Creation - unified factory methods
+    // ====================================================================
 
-    /** Create a knob signal bound to this shell */
-    fun createKnob(signalId: String, min: Double = 0.0, max: Double = 1.0, initial: Double = 0.0, detents: Int? = null) =
-        signals.knob(signalId, min, max, initial, detents)
+    /** Create a toggle signal (0D on/off with intent) */
+    fun toggle(id: String, initial: Boolean = false): Toggle =
+        signals.toggle(id, initial)
 
-    /** Create a level meter signal bound to this shell */
-    fun createLevelMeter(signalId: String, peakHoldMillis: Long = 1000) =
-        signals.levelMeter(signalId, peakHoldMillis)
+    /** Create an idiot light (0D passive status indicator) */
+    fun light(id: String, initial: Boolean = false): IdiotLight =
+        signals.idiotLight(id, initial)
 
-    suspend fun mount() {
-        context.open()
-    }
+    /** Create a momentary button (0D press/release) */
+    fun button(id: String): MomentaryButton =
+        signals.momentaryButton(id)
+
+    /** Create a radio toggle group (0D multi-state) */
+    fun <T> radio(id: String, options: List<T>, initial: T? = null): RadioToggle<T> =
+        signals.radioToggle(id, options, initial)
+
+    /** Create a slider (1D continuous range) */
+    fun slider(id: String, min: Double, max: Double, initial: Double? = null, step: Double? = null): Slider =
+        signals.slider(id, min, max, initial, step)
+
+    /** Create a knob (1D rotary with optional detents) */
+    fun knob(id: String, min: Double = 0.0, max: Double = 1.0, initial: Double = 0.0, detents: Int? = null): Knob =
+        signals.knob(id, min, max, initial, detents)
+
+    /** Create a dial (1D discrete positions) */
+    fun <T> dial(id: String, positions: List<T>, initial: T? = null): Dial<T> =
+        signals.dial(id, positions, initial)
+
+    /** Create a level meter (1D read-only amplitude) */
+    fun level(id: String, peakHoldMillis: Long = 1000): LevelMeter =
+        signals.levelMeter(id, peakHoldMillis)
+
+    // ====================================================================
+    // Lifecycle
+    // ====================================================================
+
+    suspend fun mount() = context.open()
 
     suspend fun unmount() {
         context.close()
-        widgets.clear()
-        layers.clear()
         components.clear()
     }
 }
 
 /**
- * Entry point DSL function for the Window Toolkit.
+ * Main entry point - creates a window context with signal-driven UI.
  */
 fun windowContext(block: WindowShell.() -> Unit): WindowShell {
     val context = WindowContextElement()
@@ -117,8 +119,3 @@ fun windowContext(block: WindowShell.() -> Unit): WindowShell {
     shell.block()
     return shell
 }
-
-/**
- * Entry point with signal context factory.
- */
-fun windowContextWithSignals(block: WindowShell.() -> Unit): WindowShell = windowContext(block)

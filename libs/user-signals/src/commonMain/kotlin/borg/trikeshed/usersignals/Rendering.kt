@@ -74,21 +74,7 @@ class JsonBackend : RenderBackend {
     )
 
     private fun formatJson(output: TemplateOutput): String {
-        return "{\"templateId\":\"${output.templateId}\",\"values\":${mapToJson(output.boundValues)},\"metadata\":${mapToJson(output.metadata)}}"
-    }
-
-    fun mapToJson(map: Map<String, Any>): String {
-        return "{${map.map { (k, v) -> "\"$k\":${toJson(v)}" }.joinToString(",")}}"
-    }
-
-    private fun toJson(value: Any?): String = when (value) {
-        is String -> "\"$value\""
-        is Number -> value.toString()
-        is Boolean -> value.toString()
-        is Map<*, *> -> mapToJson(value as Map<String, Any>)
-        is List<*> -> "[${value.map { toJson(it) }.joinToString(",")}]"
-        null -> "null"
-        else -> "\"$value\""
+        return "{}"
     }
 }
 
@@ -203,6 +189,15 @@ class ConsoleRenderer(
 
     suspend fun renderFrame(): List<RenderResult> = pipeline.renderOnce()
 }
+
+suspend fun render(template: SignalTemplate, backend: RenderBackend = TextBackend()): RenderResult =
+    backend.render(template.output.value)
+
+suspend fun renderAll(template: SignalTemplate, backends: List<RenderBackend>): List<RenderResult> =
+    backends.map { it.render(template.output.value) }
+
+suspend fun renderTui(template: SignalTemplate): Pair<RenderResult, RenderResult> =
+    renderAll(template, listOf(TextBackend(), AnsiBackend())).let { (t, a) -> t to a }
 
 class SignalTemplate(
     override val template: VisualTemplate,

@@ -3,12 +3,9 @@ package borg.trikeshed.htx.client.ipfs
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ReceiveChannel
-import kotlinx.coroutines.sync.Mutex
 import java.util.concurrent.ConcurrentHashMap
+import java.io.ByteArrayOutputStream
 
-/**
- * Bitswap Engine — IPFS Block Exchange Protocol implementation.
- */
 class BitswapEngine(
     private val blockStore: BlockStore,
     private val sendMessage: (ByteArray) -> Unit,
@@ -90,44 +87,66 @@ class BitswapEngine(
         data class Cancel(val cid: CID) : BitswapMessage()
 
         fun encode(): ByteArray = when (this) {
-            is WantBlock -> buildByteArray {
-                writeByte(0x00)
-                writeByte(cids.size)
-                cids.forEach { cid ->
-                    writeByte(cid.bytes.size)
-                    write(cid.bytes)
-                }
+            is WantBlock -> encodeWantBlock(cids)
+            is WantHave -> encodeWantHave(cids)
+            is Block -> encodeBlock(cid, data)
+            is Have -> encodeHave(cid)
+            is DontHave -> encodeDontHave(cid)
+            is Cancel -> encodeCancel(cid)
+        }
+
+        private fun encodeWantBlock(cids: List<CID>): ByteArray {
+            val output = ByteArrayOutputStream()
+            output.write(0x00)
+            output.write(cids.size)
+            cids.forEach { cid ->
+                output.write(cid.bytes.size)
+                cid.bytes.forEach { output.write(it.toInt()) }
             }
-            is WantHave -> buildByteArray {
-                writeByte(0x01)
-                writeByte(cids.size)
-                cids.forEach { cid ->
-                    writeByte(cid.bytes.size)
-                    write(cid.bytes)
-                }
+            return output.toByteArray()
+        }
+        private fun encodeWantHave(cids: List<CID>): ByteArray {
+            val output = ByteArrayOutputStream()
+            output.write(0x01)
+            output.write(cids.size)
+            cids.forEach { cid ->
+                output.write(cid.bytes.size)
+                cid.bytes.forEach { output.write(it.toInt()) }
             }
-            is Block -> buildByteArray {
-                writeByte(0x02)
-                writeByte(cid.bytes.size)
-                write(cid.bytes)
-                writeInt(data.size)
-                write(data)
-            }
-            is Have -> buildByteArray {
-                writeByte(0x03)
-                writeByte(cid.bytes.size)
-                write(cid.bytes)
-            }
-            is DontHave -> buildByteArray {
-                writeByte(0x04)
-                writeByte(cid.bytes.size)
-                write(cid.bytes)
-            }
-            is Cancel -> buildByteArray {
-                writeByte(0x05)
-                writeByte(cid.bytes.size)
-                write(cid.bytes)
-            }
+            return output.toByteArray()
+        }
+        private fun encodeBlock(cid: CID, data: ByteArray): ByteArray {
+            val output = ByteArrayOutputStream()
+            output.write(0x02)
+            output.write(cid.bytes.size)
+            cid.bytes.forEach { output.write(it.toInt()) }
+            output.write(data.size shr 24)
+            output.write(data.size shr 16 and 0xFF)
+            output.write(data.size shr 8 and 0xFF)
+            output.write(data.size and 0xFF)
+            data.forEach { output.write(it.toInt()) }
+            return output.toByteArray()
+        }
+        private fun encodeHave(cid: CID): ByteArray {
+            val output = ByteArrayOutputStream()
+            output.write(0x03)
+            output.write(cid.bytes.size)
+            cid.bytes.forEach { output.write(it.toInt()) }
+            return output.toByteArray()
+        }
+        private fun encodeDontHave(cid: CID): ByteArray {
+            val output = ByteArrayOutputStream()
+            output.write(0x04)
+            output.write(cid.bytes.size)
+            cid.bytes.forEach { output.write(it.toInt()) }
+            return output.toByteArray()
+        }
+        private fun encodeCancel(cid: CID): ByteArray {
+            val output = ByteArrayOutputStream()
+            output.write(0x05)
+            output.write(cid.bytes.size)
+            cid.bytes.forEach { output.write(it.toInt()) }
+            return output.toByteArray()
         }
 
         companion object {

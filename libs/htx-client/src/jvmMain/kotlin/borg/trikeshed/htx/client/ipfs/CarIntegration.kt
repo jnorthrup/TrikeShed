@@ -1,13 +1,11 @@
 package borg.trikeshed.htx.client.ipfs
 
+import java.io.ByteArrayOutputStream
 import java.io.IOException
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.security.MessageDigest
 
-/**
- * CAR (Content Addressable aRchive) Format Parser/Writer — v1 and v2.
- */
 object CarParser {
 
     private const val CAR_MAGIC = 0xC5D1.toShort()
@@ -22,7 +20,7 @@ object CarParser {
         require(magic == CAR_MAGIC) { "Invalid CAR magic: ${magic.toString(16)}" }
 
         val version = readVarint(buffer)
-        require(version == CAR_VERSION_1 || version == CAR_VERSION_2) {
+        require(version == CAR_VERSION_1.toLong() || version == CAR_VERSION_2.toLong()) {
             "Unsupported CAR version: $version"
         }
 
@@ -33,7 +31,7 @@ object CarParser {
 
         val blocks = mutableListOf<CarBlock>()
         while (buffer.remaining() > 0) {
-            if (version == CAR_VERSION_2 && buffer.remaining() > 0) {
+            if (version == CAR_VERSION_2.toLong() && buffer.remaining() > 0) {
                 val pos = buffer.position
                 val marker = readVarint(buffer)
                 if (marker == 0xFFFFFFFFL) {
@@ -50,7 +48,7 @@ object CarParser {
             }
         }
 
-        val index = if (version == CAR_VERSION_2) parseIndex(buffer) else null
+        val index = if (version == CAR_VERSION_2.toLong()) parseIndex(buffer) else null
 
         return CarParseResult(
             roots = roots,
@@ -103,14 +101,16 @@ object CarParser {
     }
 
     fun writeVarint(value: Long): ByteArray {
-        return buildByteArray {
-            var v = value
-            while (v >= 0x80) {
-                writeByte((v and 0x7F | 0x80).toByte())
-                v = v ushr 7
-            }
-            writeByte(v.toByte())
+        val output = ByteArrayOutputStream()
+        var v = value
+        while (v >= 0x80) {
+            val b: Int = ((v and 0x7F | 0x80).toByte()).toInt()
+            output.write(b)
+            v = v ushr 7
         }
+        val b: Int = (v.toByte()).toInt()
+        output.write(b)
+        return output.toByteArray()
     }
 }
 
@@ -131,37 +131,45 @@ data class CarParseResult(
 
 object CarWriter {
     fun write(blocks: List<CarBlock>, roots: List<CID>, version: Int = 2): ByteArray {
-        return buildByteArray {
-            writeShort(0xC5D1.toShort())
-            write(CarParser.writeVarint(version.toLong()))
-            writeInt(0) // header length placeholder
-            write(buildHeader(roots, version))
-            blocks.forEach { block ->
-                write(CarParser.writeVarint(block.data.size.toLong()))
-                write(block.cid.bytes)
-                write(block.data)
-            }
-            if (version == 2) writeIndex()
+        val output = ByteArrayOutputStream()
+        output.write(0xC5D1 and 0xFF)
+        output.write(0xC5D1 ushr 8)
+        writeVarint(output, version.toLong())
+        output.write(0)
+        buildHeader(roots, version).forEach { output.write(it.toInt()) }
+        blocks.forEach { block ->
+            writeVarint(output, block.data.size.toLong())
+            block.cid.bytes.forEach { output.write(it.toInt()) }
+            block.data.forEach { output.write(it.toInt()) }
         }
+        if (version == 2) writeVarint(output, 0xFFFFFFFFL)
+        return output.toByteArray()
+    }
+
+    private fun writeVarint(output: ByteArrayOutputStream, value: Long) {
+        var v = value
+        while (v >= 0x80) {
+            val b: Int = ((v and 0x7F | 0x80).toByte()).toInt()
+            output.write(b)
+            v = v ushr 7
+        }
+        val b: Int = (v.toByte()).toInt()
+        output.write(b)
     }
 
     private fun buildHeader(roots: List<CID>, version: Int): ByteArray {
-        return buildByteArray {
-            writeByte(0xA2)
-            writeByte(0x65)
-            write("roots".toByteArray())
-            writeByte(0x80 + roots.size)
-            roots.forEach { cid ->
-                writeByte(0x40 + cid.bytes.size)
-                write(cid.bytes)
-            }
-            writeByte(0x67)
-            write("version".toByteArray())
-            writeByte(version.toByte())
+        val output = ByteArrayOutputStream()
+        output.write(0xA2.toInt())
+        output.write(0x65.toInt())
+        "roots".toByteArray().forEach { output.write(it.toInt()) }
+        output.write((0x80 + roots.size).toInt())
+        roots.forEach { cid ->
+            output.write((0x40 + cid.bytes.size).toInt())
+            cid.bytes.forEach { output.write(it.toInt()) }
         }
-    }
-
-    private fun writeIndex() {
-        write(CarParser.writeVarint(0xFFFFFFFFL))
+        output.write(0x67.toInt())
+        "version".toByteArray().forEach { output.write(it.toInt()) }
+        output.write(version.toInt())
+        return output.toByteArray()
     }
 }

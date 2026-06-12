@@ -15,7 +15,11 @@ class DhtService(
 ) {
     
     private val providers = mutableMapOf<String, MutableSet<String>>()
+    private val providersMutex = Mutex()
+    
     private val contacts = mutableMapOf<String, NodeInfo>()
+    private val contactsMutex = Mutex()
+    
     private val routingTable = RoutingTable(localNodeId)
 
     data class NodeId(val bytes: ByteArray) {
@@ -65,36 +69,39 @@ class DhtService(
         }
     }
 
-    fun announceProvider(cid: CID, address: String) {
-        providers.computeIfAbsent(cid.hex()) { mutableSetOf() }.add(address)
+    suspend fun announceProvider(cid: CID, address: String) {
+        providersMutex.withLock {
+            providers.computeIfAbsent(cid.hex()) { mutableSetOf() }.add(address)
+        }
         transport?.let { t ->
             CoroutineScope(Job()).launch { t.announceProviderRemote(cid, address) }
         }
     }
 
-    suspend fun findProviders(cid: CID): List<String> =
+    suspend fun findProviders(cid: CID): List<String> = providersMutex.withLock {
         providers[cid.hex()]?.toList() ?: transport?.findProvidersRemote(cid) ?: emptyList()
+    }
 
     suspend fun findNode(target: NodeId): List<NodeInfo> = routingTable.findClosest(target)
 
-    fun handleFindNode(requester: NodeId, target: NodeId): List<NodeInfo> {
-        contacts[requester.toString()] = NodeInfo(requester, InetSocketAddress("unknown", 0))
+    suspend fun handleFindNode(requester: NodeId, target: NodeId): List<NodeInfo> {
+        contactsMutex.withLock { contacts[requester.toString()] = NodeInfo(requester, InetSocketAddress("unknown", 0)) }
         return routingTable.findClosest(target)
     }
 
-    fun handleFindProviders(requester: NodeId, cid: CID): List<String> {
-        contacts[requester.toString()] = NodeInfo(requester, InetSocketAddress("unknown", 0))
-        return providers[cid.hex()]?.toList() ?: emptyList()
+    suspend fun handleFindProviders(requester: NodeId, cid: CID): List<String> {
+        contactsMutex.withLock { contacts[requester.toString()] = NodeInfo(requester, InetSocketAddress("unknown", 0)) }
+        return providersMutex.withLock { providers[cid.hex()]?.toList() ?: emptyList() }
     }
 
-    fun handlePing(requester: NodeId): Boolean {
-        contacts.getOrPut(requester.toString()) { NodeInfo(requester, InetSocketAddress("unknown", 0)) }
-            .lastSeen = System.currentTimeMillis()
+    suspend fun handlePing(requester: NodeId): Boolean {
+        contactsMutex.withLock { contacts.getOrPut(requester.toString()) { NodeInfo(requester, InetSocketAddress("unknown", 0)) }
+            .lastSeen = System.currentTimeMillis() }
         return true
     }
 
-    fun addContact(node: NodeInfo) {
-        contacts[node.id.toString()] = node
+    suspend fun addContact(node: NodeInfo) {
+        contactsMutex.withLock { contacts[node.id.toString()] = node }
         routingTable.addNode(node)
     }
 }

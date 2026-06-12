@@ -277,3 +277,86 @@ class GraalPointcutHarness(
         fun nextSeq(): Long = GraalPointcutHarness().sequenceCounter.incrementAndGet()
     }
 }
+
+/**
+ * Host-accessible emitter that Graal polyglot code can call to emit pointcuts.
+ * This is bound into the Graal context as "pointcutEmitter".
+ */
+class PolyglotPointcutEmitter(
+    private val producer: PointcutEventProducer,
+    private val harness: GraalPointcutHarness
+) {
+
+    @HostAccess.Export
+    fun emit(
+        phase: Byte,
+        opcode: Byte,
+        methodName: String,
+        sourceLocation: String,
+        seq: Long,
+        callsiteHash: Int,
+        templateIdx: Int
+    ) {
+        val methodIdx = harness.getMethodIndex(methodName)
+        val synapse = FieldSynapse(
+            phase = phase,
+            opcode = opcode,
+            methodIdx = methodIdx,
+            addr = sourceLocation.hashCode(),
+            seq = seq.toInt(),
+            nano = System.nanoTime(),
+            callsiteHash = callsiteHash,
+            templateIdx = templateIdx
+        )
+        producer.emit(synapse)
+    }
+
+    @HostAccess.Export
+    fun emitFieldAccess(
+        phase: Int,  // Use Int instead of Byte for JS compatibility
+        isStatic: Boolean,
+        isWrite: Boolean,
+        className: String,
+        fieldName: String,
+        sourceLocation: String,
+        seq: Long
+    ) {
+        val opcode = when {
+            isStatic && !isWrite -> GraalPointcutHarness.OP_P_GET
+            isStatic && isWrite -> GraalPointcutHarness.OP_P_SET
+            !isStatic && !isWrite -> GraalPointcutHarness.OP_L_GET
+            else -> GraalPointcutHarness.OP_L_SET
+        }
+
+        val callsiteKey = "$className.$fieldName${if (isStatic) " static" else ""}${if (isWrite) " write" else " read"}"
+        val synapse = FieldSynapse(
+            phase = 0, // BEFORE
+            opcode = opcode,
+            methodIdx = harness.getMethodIndex(callsiteKey),
+            addr = sourceLocation.hashCode(),
+            seq = seq.toInt(),
+            nano = System.nanoTime(),
+            callsiteHash = callsiteKey.hashCode(),
+            templateIdx = 0
+        )
+        producer.emit(synapse)
+    }
+}
+
+/**
+ * Extension function to bind pointcut emitter to Graal context.
+ * Usage: context.bindPointcutEmitter(harness, producer)
+ */
+fun Context.bindPointcutEmitter(harness: GraalPointcutHarness, producer: PointcutEventProducer) {
+    val emitter = PolyglotPointcutEmitter(producer, harness)
+    // Bind to all available languages - initialize each language first
+    listOf("js", "ruby", "python", "R").forEach { lang ->
+        try {
+            // Initialize the language first
+            initialize(lang)
+            getBindings(lang).putMember("pointcutEmitter", emitter)
+        } catch (e: Exception) {
+            // Language not available, skip
+        }
+    }
+}

@@ -6,9 +6,6 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.launch
 
-/**
- * Bitswap Transport for HTX Client — stub implementation.
- */
 class HtxBitswapTransport(
     private val scope: CoroutineScope = kotlinx.coroutines.CoroutineScope(Job()),
 ) : AutoCloseable {
@@ -18,9 +15,7 @@ class HtxBitswapTransport(
 
     val messages: ReceiveChannel<BitswapEngine.BitswapMessage> = messageChannel
 
-    suspend fun send(message: BitswapEngine.BitswapMessage) {
-        // Stub - would send over HTX Channel in real implementation
-    }
+    suspend fun send(message: BitswapEngine.BitswapMessage) { /* stub */ }
 
     suspend fun registerWant(cid: CID): kotlinx.coroutines.CompletableDeferred<ByteArray> {
         val deferred = kotlinx.coroutines.CompletableDeferred<ByteArray>()
@@ -32,7 +27,5 @@ class HtxBitswapTransport(
         pendingWants.remove(cid.hex())?.complete(data)
     }
 
-    override fun close() {
-        messageChannel.close()
-    }
+    override fun close() { messageChannel.close() }
 }

@@ -2,15 +2,12 @@ package borg.trikeshed.htx.client
 
 import borg.trikeshed.context.AsyncContextElement
 import borg.trikeshed.context.ElementState
-import borg.trikeshed.htx.client.ipfs.CakManager
+import borg.trikeshed.htx.client.ipfs.BlockStore
+import borg.trikeshed.htx.client.ipfs.CID
 import borg.trikeshed.htx.client.ipfs.CarParseResult
-import borg.trikeshed.htx.client.ipfs.HtxBitswapTransport
-import borg.trikeshed.htx.client.ipfs.HtxDhtTransport
 import borg.trikeshed.htx.client.ipfs.MemoryBlockStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import kotlin.coroutines.CoroutineContext
 
@@ -41,22 +38,19 @@ data class HtxClientRequest(
 
 class HtxElement(
     val baseUrl: String = "http://127.0.0.1",
-    private val blockStore: borg.trikeshed.htx.client.ipfs.BlockStore? = null,
-    private val htxDhtTransport: HtxDhtTransport? = null,
-    private val htxBitswapTransport: HtxBitswapTransport? = null,
+    private val blockStore: BlockStore? = null,
 ) : AsyncContextElement(ElementState.CREATED) {
 
     override val key: CoroutineContext.Key<*> get() = HtxKey
 
     private var _cakManager: CakManager? = null
 
+    /** IPFS CAK Manager - lazy init. */
     val cak: CakManager
         get() {
             if (_cakManager == null) {
-                _cakManager = CakManagerFactory.createHtxWired(
+                _cakManager = CakManagerFactory.create(
                     blockStore = blockStore ?: MemoryBlockStore(),
-                    dhtTransport = htxDhtTransport,
-                    bitswapTransport = htxBitswapTransport,
                     parentJob = coroutineContext[Job],
                 )
             }
@@ -65,9 +59,7 @@ class HtxElement(
 
     override suspend fun open() {
         super.open()
-        if (blockStore != null || htxDhtTransport != null || htxBitswapTransport != null) {
-            _ = cak
-        }
+        if (blockStore != null) _ = cak
     }
 
     override suspend fun close() {
@@ -82,41 +74,21 @@ class HtxElement(
         body: String = ""
     ): HtxClientMessage = HtxClientMessage(status = 200, body = "OK")
 
-    suspend fun ipfsPut(data: ByteArray): borg.trikeshed.htx.client.ipfs.CID = cak.put(data)
-    suspend fun ipfsGet(cid: borg.trikeshed.htx.client.ipfs.CID): ByteArray? = cak.get(cid)
-    suspend fun ipfsPin(cid: borg.trikeshed.htx.client.ipfs.CID, address: String = "local") = cak.pin(cid, address)
+    suspend fun ipfsPut(data: ByteArray): CID = cak.put(data)
+    suspend fun ipfsGet(cid: CID): ByteArray? = cak.get(cid)
+    suspend fun ipfsPin(cid: CID, address: String = "local") = cak.pin(cid, address)
     suspend fun ipfsImportCar(data: ByteArray): CarParseResult = cak.importCar(data)
-    suspend fun ipfsExportCar(roots: List<borg.trikeshed.htx.client.ipfs.CID>, version: Int = 2): ByteArray = cak.exportCar(roots, version)
+    suspend fun ipfsExportCar(roots: List<CID>, version: Int = 2): ByteArray = cak.exportCar(roots, version)
 }
 
 object HtxElementFactory {
-
     suspend fun open(
         baseUrl: String = "http://127.0.0.1",
-        blockStore: borg.trikeshed.htx.client.ipfs.BlockStore? = null,
-        htxDhtTransport: HtxDhtTransport? = null,
-        htxBitswapTransport: HtxBitswapTransport? = null,
+        blockStore: BlockStore? = null,
     ): HtxElement {
-        val element = HtxElement(baseUrl, blockStore, htxDhtTransport, htxBitswapTransport)
+        val element = HtxElement(baseUrl, blockStore)
         element.open()
         return element
-    }
-
-    suspend fun openCcekWired(
-        baseUrl: String = "http://127.0.0.1",
-        scope: CoroutineScope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob()),
-    ): Triple<HtxElement, borg.trikeshed.userspace.LiburingElement, borg.trikeshed.userspace.FanoutDispatcherElement> {
-        
-        val (liburing, fanout) = scope.installLiburingWithFanout()
-        val (_, _, dhtTransport) = HtxDhtTransportFactory.installHtxDhtTransport(256)
-        
-        val element = HtxElement(
-            baseUrl = baseUrl,
-            htxDhtTransport = dhtTransport,
-        )
-        element.open()
-        
-        return element to liburing to fanout
     }
 }
 

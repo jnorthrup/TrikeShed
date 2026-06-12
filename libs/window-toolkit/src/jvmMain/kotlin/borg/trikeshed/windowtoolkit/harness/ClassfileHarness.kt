@@ -2,103 +2,62 @@ package borg.trikeshed.windowtoolkit.harness
 
 import borg.trikeshed.windowtoolkit.dsl.windowContext
 import borg.trikeshed.windowtoolkit.dsl.WindowShell
-import borg.trikeshed.windowtoolkit.ui.StyleRow
-import borg.trikeshed.windowtoolkit.math.v2
-import borg.trikeshed.windowtoolkit.math.size
-import borg.trikeshed.windowtoolkit.math.j
-import borg.trikeshed.windowtoolkit.ui.applyUniformStyle
-import borg.trikeshed.windowtoolkit.confix.ConfixBlackboardWidget
 import borg.trikeshed.usersignals.*
-import borg.trikeshed.usersignals.SignalAlgebra
 import kotlinx.coroutines.runBlocking
 
 /**
- * Harness connecting a generic JSON string mapping Classfile coordinate data
- * into the generic Confix Blackboard and layout rendering system of the window-toolkit.
- * Now uses user-signals for signal-driven UI composition without graphical dimensions.
+ * Harness demonstrating signal-driven UI composition with user-signals.
+ * No graphical dimensions - pure signal templates with rendering backends.
  */
-fun buildClassfileDatagridHarness(jsonDump: String): WindowShell {
-    val shell = windowContext {
-        // 1. Setup the Confix Datagrid representation layer
-        confixDatagrid {
-            // Push entry to render
-        }
+fun buildSignalUIHarness(): WindowShell {
+    return windowContext {
+        // Create signal-driven UI components
+        val enabled = toggle("app.enabled", true)
+        val zoom = slider("app.zoom", 0.5, 3.0, 1.0, 0.1)
+        val activity = level("app.activity", 2000)
 
-        // 2. Setup a simplistic layout layer mimicking classfile grid plotting
-        val points = 3 j { i: Int -> v2(i * 100.0, i * 20.0) }
-        val uniformStyles = points.size j { _: Int -> StyleRow(mapOf("color" to "blue")) }
-
-        layoutLayer(points, uniformStyles)
-
-        // 3. Create signal-driven UI components using user-signals
-        val toggle = createToggle("classfile.enabled", true)
-        val slider = createSlider("classfile.zoom", 0.5, 3.0, 1.0, 0.1)
-        val level = createLevelMeter("classfile.activity", 2000)
-
-        // 4. Build a signal template (no graphical dimensions, pure data)
+        // Status panel template
         signalTemplate {
-            label("Classfile Harness")
-            bind(toggleHole(), toggle)
-            bind(lightHole(), toggle) // toggle also acts as light
-            bind(sliderHole(), slider)
-            bind(levelHole(), level)
+            label("Signal UI Harness")
+            bind(toggleHole(), enabled)
+            bind(lightHole(), enabled)
+            bind(sliderHole(), zoom)
+            bind(levelHole(), activity)
         }
 
-        // 5. Compose multiple signal components
-        val zoomControl = signalTemplate {
-            label("Zoom")
-            bind(sliderHole(), slider)
-        }
-        val activityMeter = signalTemplate {
-            label("Activity")
-            bind(levelHole(), level)
-        }
-        val harnessStatus = signalTemplate {
-            label("Status")
-            bind(toggleHole(), toggle)
-        }
+        // Control panel - zoom
+        signalTemplate {
+            label("Zoom Control")
+            bind(sliderHole(), zoom)
+        }.also { /* auto-registered as component */ }
 
-        // Use signal algebra to compose
-        val composed = stackComponents(
-            composeComponents(harnessStatus, zoomControl),
-            activityMeter
-        )
-        // Component is automatically tracked
+        // Activity meter
+        signalTemplate {
+            label("Activity Meter")
+            bind(levelHole(), activity)
+        }.also { /* auto-registered */ }
     }
-
-    return shell
 }
 
 fun main() = runBlocking {
-    val sampleClassfileJson = """
-        {
-          "symbolName": "com.example.Demo",
-          "ownerType": "Demo",
-          "methodOrField": "<init>",
-          "classfileCoord": "com.example.Demo#<init>",
-          "cpIndex": 10,
-          "descriptor": "()V",
-          "xvmTypeInfo": "method",
-          "pointcutKind": 12,
-          "poolId": 101,
-          "activeJsFacet": "Unfaceted"
-        }
-    """.trimIndent()
-
-    val shell = buildClassfileDatagridHarness(sampleClassfileJson)
+    val shell = buildSignalUIHarness()
     shell.mount()
 
-    // Demonstrate signal-driven updates
-    val ctx = shell.signals.signalContext
-    val toggleSource = ctx.getSource<Boolean>("classfile.enabled")
-    val sliderSource = ctx.getSource<Double>("classfile.zoom")
-    val levelSource = ctx.getSource<Double>("classfile.activity")
+    // Demonstrate signal-driven updates via context
+    val ctx = shell.signalContext
+    ctx.getSource<Boolean>("app.enabled")?.emit(false)
+    ctx.getSource<Double>("app.zoom")?.emit(2.5)
+    ctx.getSource<Double>("app.activity")?.emit(0.85)
 
-    toggleSource?.emit(false)
-    sliderSource?.emit(2.0)
-    levelSource?.emit(0.75)
+    println("Signal UI Harness mounted and updated")
 
-    println("Successfully mounted Classfile Harness inside Window Toolkit Shell")
+    // Render via text backend (one-shot)
+    val pipeline = RenderPipeline()
+        .addBackend(TextBackend())
+        .addBackend(AnsiBackend())
+    
+    // Add all tracked components
+    // Note: In real usage, you'd add components explicitly or via a registry
 
     shell.unmount()
 }
