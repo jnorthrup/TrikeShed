@@ -18,8 +18,11 @@ import borg.trikeshed.lib.j
  *
  * Dense-array backing: internal nodes use Array<Any?> for keys/values/children
  * with explicit counts.  Public surface exposes Series<K>, Series<V>, Join, Twin.
+ *
+ * COPY-ON-WRITE (COW): All modifications create new nodes. Old nodes are never
+ * mutated, enabling snapshot isolation (old roots remain valid).
  */
-class BPlusTree<K : Comparable<K>, V>(  val order: Int = 32) {
+class BPlusTree<K : Comparable<K>, V>(val order: Int = 32) {
     init { require(order >= 3) { "order must be >= 3" } }
 
     sealed class Node<K, V> {
@@ -28,19 +31,28 @@ class BPlusTree<K : Comparable<K>, V>(  val order: Int = 32) {
         abstract fun isLeaf(): Boolean
     }
 
-    inner class LeafNode : Node<K, V>() {
-        @Suppress("UNCHECKED_CAST")
-        private var _keys: Array<Any?> = arrayOfNulls(order + 1)
-        private var _values: Array<Any?> = arrayOfNulls(order + 1)
-        var keysCount: Int = 0
-            private set
-        var next: LeafNode? = null
+    /** Result of a COW insert operation. */
+    sealed class InsertResult<K, V> {
+        data class NoSplit<K, V>(val newNode: Node<K, V>) : InsertResult<K, V>()
+        data class Split<K, V>(
+            val pivot: K,
+            val left: Node<K, V>,
+            val right: Node<K, V>
+        ) : InsertResult<K, V>()
+    }
+
+    inner class LeafNode(
+        private val _keys: Array<Any?> = arrayOfNulls(order + 1),
+        private val _values: Array<Any?> = arrayOfNulls(order + 1),
+        val keysCount: Int = 0,
+        val next: LeafNode? = null
+    ) : Node<K, V>() {
 
         override val keySeries: Series<K>
             get() = keysCount j { i: Int -> _keys[i] as K }
 
         val valueSeries: Series<V?>
-            get() = keysCount j  { i: Int -> _values[i] as V? }
+            get() = keysCount j { i: Int -> _values[i] as V? }
 
         override fun isLeaf() = true
 
@@ -50,12 +62,9 @@ class BPlusTree<K : Comparable<K>, V>(  val order: Int = 32) {
         }
 
         fun valueAt(i: Int): V? {
+            if (i < 0 || i >= keysCount) return null
             @Suppress("UNCHECKED_CAST")
             return _values[i] as V?
-        }
-
-        fun setValueAt(i: Int, v: V) {
-            _values[i] = v
         }
 
         fun binarySearchKeys(key: K): Int {
@@ -75,41 +84,61 @@ class BPlusTree<K : Comparable<K>, V>(  val order: Int = 32) {
             return -(low + 1)
         }
 
-        fun insertAt(index: Int, key: K, value: V) {
-            for (i in keysCount downTo index + 1) {
-                _keys[i] = _keys[i - 1]
-                _values[i] = _values[i - 1]
+        /** COW: returns new LeafNode with key/value inserted (or updated). */
+        fun insertAt(index: Int, key: K, value: V): LeafNode {
+            // Check if key already exists at index
+            if (index < keysCount && keyAt(index) == key) {
+                val newValues = _values.copyOf()
+                newValues[index] = value
+                return LeafNode(_keys, newValues, keysCount, next)
             }
-            _keys[index] = key
-            _values[index] = value
-            keysCount++
+            val newKeys = _keys.copyOf()
+            val newValues = _values.copyOf()
+            for (i in keysCount downTo index + 1) {
+                newKeys[i] = newKeys[i - 1]
+                newValues[i] = newValues[i - 1]
+            }
+            newKeys[index] = key
+            newValues[index] = value
+            return LeafNode(newKeys, newValues, keysCount + 1, next)
         }
 
-        fun splitAt(mid: Int): LeafNode {
-            val right = LeafNode()
+        /** COW: splits this leaf at mid, returning (newLeft, newRight) without mutating this. */
+        fun splitAt(mid: Int): Twin<LeafNode> {
+            val leftKeys = arrayOfNulls<Any?>(order + 1)
+            val leftValues = arrayOfNulls<Any?>(order + 1)
+            val rightKeys = arrayOfNulls<Any?>(order + 1)
+            val rightValues = arrayOfNulls<Any?>(order + 1)
+
+            // Left: [0, mid)
+            for (i in 0 until mid) {
+                leftKeys[i] = _keys[i]
+                leftValues[i] = _values[i]
+            }
+            // Right: [mid, keysCount)
             val rightLen = keysCount - mid
             for (i in 0 until rightLen) {
-                right._keys[i] = _keys[mid + i]
-                right._values[i] = _values[mid + i]
+                rightKeys[i] = _keys[mid + i]
+                rightValues[i] = _values[mid + i]
             }
-            right.keysCount = rightLen
-            // clear tail of left
-            for (i in mid until keysCount) {
-                _keys[i] = null
-                _values[i] = null
-            }
-            keysCount = mid
-            return right
+
+            val newLeft = LeafNode(leftKeys, leftValues, mid, this.next)
+            val newRight = LeafNode(rightKeys, rightValues, rightLen, this.next)
+            return newLeft j newRight
+        }
+
+        /** COW: returns new LeafNode with updated next pointer. */
+        fun withNext(newNext: LeafNode?): LeafNode {
+            return LeafNode(_keys, _values, keysCount, newNext)
         }
     }
 
-    inner class InternalNode : Node<K, V>() {
-        private var _keys: Array<Any?> = arrayOfNulls(order + 1)
-        private var _children: Array<Any?> = arrayOfNulls(order + 2)
-        var keysCount: Int = 0
-            private set
-        var childrenCount: Int = 0
-            private set
+    inner class InternalNode(
+        private val _keys: Array<Any?> = arrayOfNulls(order + 1),
+        private val _children: Array<Any?> = arrayOfNulls(order + 2),
+        val keysCount: Int = 0,
+        val childrenCount: Int = 0
+    ) : Node<K, V>() {
 
         override val keySeries: Series<K>
             get() = keysCount j { i ->
@@ -152,83 +181,85 @@ class BPlusTree<K : Comparable<K>, V>(  val order: Int = 32) {
             return -(low + 1)
         }
 
-        fun insertKeyAt(index: Int, key: K) {
+        /** COW: returns new InternalNode with key inserted at index. */
+        fun insertKeyAt(index: Int, key: K): InternalNode {
+            val newKeys = _keys.copyOf()
             for (i in keysCount downTo index + 1) {
-                _keys[i] = _keys[i - 1]
+                newKeys[i] = newKeys[i - 1]
             }
-            _keys[index] = key
-            keysCount++
+            newKeys[index] = key
+            return InternalNode(newKeys, _children, keysCount + 1, childrenCount)
         }
 
-        fun setChildAt(index: Int, child: Node<K, V>) {
-            _children[index] = child
+        /** COW: returns new InternalNode with child set at index. */
+        fun setChildAt(index: Int, child: Node<K, V>): InternalNode {
+            val newChildren = _children.copyOf()
+            newChildren[index] = child
+            return InternalNode(_keys, newChildren, keysCount, childrenCount)
         }
 
-        fun insertChildAt(index: Int, child: Node<K, V>) {
+        /** COW: returns new InternalNode with child inserted at index. */
+        fun insertChildAt(index: Int, child: Node<K, V>): InternalNode {
+            val newChildren = _children.copyOf()
             for (i in childrenCount downTo index + 1) {
-                _children[i] = _children[i - 1]
+                newChildren[i] = newChildren[i - 1]
             }
-            _children[index] = child
-            childrenCount++
+            newChildren[index] = child
+            return InternalNode(_keys, newChildren, keysCount, childrenCount + 1)
         }
 
-        fun addChild(child: Node<K, V>) {
-            _children[childrenCount] = child
-            childrenCount++
+        /** COW: returns new InternalNode with child appended. */
+        fun addChild(child: Node<K, V>): InternalNode {
+            val newChildren = _children.copyOf()
+            newChildren[childrenCount] = child
+            return InternalNode(_keys, newChildren, keysCount, childrenCount + 1)
         }
 
         /**
-         * Split at mid. Returns Join<pivotKey, rightNode>.
-         * Left half stays in this node, right half goes to the new node.
+         * COW: Split at mid. Returns Join<pivotKey, Twin<leftNode, rightNode>>.
+         * Creates new left and right nodes without mutating this.
          * - pivot = keys[mid]
          * - right keys: keys[mid+1 .. end]
          * - right children: children[mid+1 .. end]
          * - left keys: keys[0 .. mid-1]
          * - left children: children[0 .. mid]
          */
-        fun splitAt(mid: Int): Join<K, InternalNode> {
+        fun splitAt(mid: Int): Join<K, Twin<InternalNode>> {
             @Suppress("UNCHECKED_CAST")
             val pivotKey = _keys[mid] as K
-            val right = InternalNode()
-            // keys: mid+1 .. keysCount-1
+            
+            val leftKeys = arrayOfNulls<Any?>(order + 1)
+            val leftChildren = arrayOfNulls<Any?>(order + 2)
+            val rightKeys = arrayOfNulls<Any?>(order + 1)
+            val rightChildren = arrayOfNulls<Any?>(order + 2)
+
+            // Left keys: [0, mid)
+            for (i in 0 until mid) {
+                leftKeys[i] = _keys[i]
+            }
+            // Left children: [0, mid]
+            for (i in 0 until mid + 1) {
+                leftChildren[i] = _children[i]
+            }
+            // Right keys: [mid+1, keysCount)
             val rightKeyLen = keysCount - mid - 1
             for (i in 0 until rightKeyLen) {
-                right._keys[i] = _keys[mid + 1 + i]
+                rightKeys[i] = _keys[mid + 1 + i]
             }
-            right.keysCount = rightKeyLen
-            // children: mid+1 .. childrenCount-1
+            // Right children: [mid+1, childrenCount)
             val rightChildLen = childrenCount - mid - 1
             for (i in 0 until rightChildLen) {
-                right._children[i] = _children[mid + 1 + i]
+                rightChildren[i] = _children[mid + 1 + i]
             }
-            right.childrenCount = rightChildLen
-            // shrink left: null out moved/cleared slots
-            for (i in mid until keysCount) _keys[i] = null
-            for (i in mid + 1 until childrenCount) _children[i] = null
-            keysCount = mid
-            childrenCount = mid + 1
-            return pivotKey j right
+
+            val newLeft = InternalNode(leftKeys, leftChildren, mid, mid + 1)
+            val newRight = InternalNode(rightKeys, rightChildren, rightKeyLen, rightChildLen)
+            return pivotKey j (newLeft j newRight)
         }
     }
 
     var root: Node<K, V> = LeafNode()
     var _size = 0
-
-    /** Insert or replace a key/value. */
-    fun put(key: K, value: V) {
-        val existed: Boolean = get(key) != null
-        val split: Join<K, Twin<Node<K, V>>>? = insert(root, key, value)
-        if (split != null) {
-            val (pivot: K, twins: Twin<Node<K, V>>) = split
-            val (left: Node<K, V>, right: Node<K, V>) = twins
-            val newRoot = InternalNode()
-            newRoot.insertKeyAt(0, pivot)
-            newRoot.addChild(left)
-            newRoot.addChild(right)
-            root = newRoot
-        }
-        if (!existed) _size++
-    }
 
     /** Lookup value by key. */
     fun get(key: K): V? {
@@ -240,52 +271,29 @@ class BPlusTree<K : Comparable<K>, V>(  val order: Int = 32) {
     fun size(): Int = _size
 
     /**
-     * Internal insert. Returns Join<K, Twin<Node<K,V>>>? when a split occurs.
-     * Structure: pivot j (left j right)
-     * Null means no split was needed.
+     * Returns all values for keys in [start, end) range.
+     * Uses leaf node next pointers for efficient range traversal.
      */
-    fun insert(node: Node<K, V>, key: K, value: V): Join<K, Twin<Node<K, V>>>? {
-        if (node.isLeaf()) {
-            val leaf: BPlusTree<K, V>.LeafNode = node as LeafNode
-            val idx = leaf.binarySearchKeys(key)
-            if (idx >= 0) {
-                leaf.setValueAt(idx, value)
-                return null
-            }
-            val insertAt = -idx - 1
-            leaf.insertAt(insertAt, key, value)
-            if (leaf.keysCount > order) {
-                val mid = leaf.keysCount / 2
-                val right: BPlusTree<K, V>.LeafNode = leaf.splitAt(mid)
-                right.next = leaf.next
-                leaf.next = right
-                val pivot = right.keyAt(0)
-                return pivot j Twin(leaf, right)
-            }
-            return null
-        } else {
-            val internal: BPlusTree<K, V>.InternalNode = node as InternalNode
-            val idx = internal.binarySearchKeys(key)
-            var childIndex = if (idx >= 0) idx + 1 else -idx - 1
-            if (childIndex < 0) childIndex = 0
-            if (childIndex >= internal.childrenCount) childIndex = internal.childrenCount - 1
-            val child = internal.childAt(childIndex)
-            val split = insert(child, key, value)
-            if (split != null) {
-                val (pivot, twins) = split
-                val (left, right) = twins
-                // replace child with left, insert right at childIndex+1, insert pivot at childIndex
-                internal.setChildAt(childIndex, left)
-                internal.insertChildAt(childIndex + 1, right)
-                internal.insertKeyAt(childIndex, pivot)
-                if (internal.childrenCount > order) {
-                    val mid = internal.keysCount / 2
-                    val (pivotKey, rightNode) = internal.splitAt(mid)
-                    return pivotKey j Twin(internal, rightNode)
+    fun rangeQuery(start: K, end: K): List<V> {
+        val result = mutableListOf<V>()
+        // Find the leaf containing start key
+        var current: LeafNode? = findLeaf(root, start) as LeafNode?
+        
+        while (current != null) {
+            for (i in 0 until current.keysCount) {
+                val key = current.keyAt(i)
+                // Check if key is in [start, end)
+                if (key.compareTo(start) >= 0 && key.compareTo(end) < 0) {
+                    result.add(current.valueAt(i)!!)
+                } else if (key.compareTo(end) >= 0) {
+                    // Past the end, stop
+                    return result
                 }
             }
-            return null
+            // Move to next leaf
+            current = current.next
         }
+        return result
     }
 
     fun findLeaf(node: Node<K, V>, key: K): Node<K, V> {
@@ -299,5 +307,82 @@ class BPlusTree<K : Comparable<K>, V>(  val order: Int = 32) {
             cur = internal.childAt(childIndex)
         }
         return cur
+    }
+
+    /**
+     * COW internal insert. Returns InsertResult.
+     * Never mutates the input node - always returns new nodes.
+     */
+    fun insert(node: Node<K, V>, key: K, value: V): InsertResult<K, V> {
+        if (node.isLeaf()) {
+            val leaf: BPlusTree<K, V>.LeafNode = node as LeafNode
+            val idx = leaf.binarySearchKeys(key)
+            if (idx >= 0) {
+                // Update existing key - return new leaf with updated value
+                return InsertResult.NoSplit(leaf.insertAt(idx, key, value))
+            }
+            val insertAt = -idx - 1
+            val newLeaf = leaf.insertAt(insertAt, key, value)
+            if (newLeaf.keysCount > order) {
+                val mid = newLeaf.keysCount / 2
+                val (newLeft, newRight) = newLeaf.splitAt(mid)
+                val pivot = newRight.keyAt(0)
+                // Link leaves for range queries
+                val linkedLeft = newLeft.withNext(newRight)
+                return InsertResult.Split(pivot, linkedLeft, newRight)
+            }
+            return InsertResult.NoSplit(newLeaf)
+        } else {
+            val internal: BPlusTree<K, V>.InternalNode = node as InternalNode
+            val idx = internal.binarySearchKeys(key)
+            var childIndex = if (idx >= 0) idx + 1 else -idx - 1
+            if (childIndex < 0) childIndex = 0
+            if (childIndex >= internal.childrenCount) childIndex = internal.childrenCount - 1
+            val child = internal.childAt(childIndex)
+            val childResult = insert(child, key, value)
+            return when (childResult) {
+                is InsertResult.NoSplit -> {
+                    val newInternal = internal.setChildAt(childIndex, childResult.newNode)
+                    InsertResult.NoSplit(newInternal)
+                }
+                is InsertResult.Split -> {
+                    val (pivot, left, right) = childResult
+                    val withLeft = internal.setChildAt(childIndex, left)
+                    val withRight = withLeft.insertChildAt(childIndex + 1, right)
+                    val withPivot = withRight.insertKeyAt(childIndex, pivot)
+                    if (withPivot.keysCount > order) {
+                        val mid = withPivot.keysCount / 2
+                        val splitResult = withPivot.splitAt(mid)
+                        val pivotKey = splitResult.a
+                        val (newLeft, newRight) = splitResult.b
+                        InsertResult.Split(pivotKey, newLeft, newRight)
+                    } else {
+                        InsertResult.NoSplit(withPivot)
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Public put with COW - returns new root on split.
+     */
+    fun put(key: K, value: V) {
+        val existed: Boolean = get(key) != null
+        val result = insert(root, key, value)
+        when (result) {
+            is InsertResult.NoSplit -> {
+                root = result.newNode
+            }
+            is InsertResult.Split -> {
+                val (pivot, left, right) = result
+                val newRoot = InternalNode()
+                    .insertKeyAt(0, pivot)
+                    .addChild(left)
+                    .addChild(right)
+                root = newRoot
+            }
+        }
+        if (!existed) _size++
     }
 }

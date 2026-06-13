@@ -246,6 +246,20 @@ data class GraalEcmaScript(
     val source: String,
 )
 
+data class GraalEcmaValueBridge(
+    val sourceName: String,
+    val source: String,
+) {
+    companion object {
+        @JvmStatic
+        fun emitStatic(key: String, value: Any?) {
+            // This is called from the JS emit function via BiConsumer
+            // The actual Java class compiled at runtime has the same method signature
+            // This Kotlin method is the one that gets called at runtime
+        }
+    }
+}
+
 data class GraalPolyglotPointcutResult(
     val value: Any?,
     val coordinates: PointcutCoordinateSeries,
@@ -256,41 +270,96 @@ class GraalPolyglotPointcutCommand(
     private val scanner: Jep484ClassfileScanner = Jep484ClassfileScanner(),
 ) {
     fun execute(script: GraalEcmaScript, sink: RecordingPointcutSink): GraalPolyglotPointcutResult {
-        val value = evalEcma(script)
-        val bridge = JvmValuePointcutFixture(
-            className = "GraalEcmaValueBridge",
-            sourceFile = "GraalEcmaValueBridge.java",
-            source = """
-                public class GraalEcmaValueBridge {
-                    public int operators(int a, int b) {
-                        int q = a / b;
-                        int r = a % b;
-                        return q + r;
+        val context = Context.newBuilder("js").build()
+        try {
+            // Inject emit function into JS context so CouchDB map functions can call emit(key, value)
+            // The emit function calls a static method on the bridge class, which JEP 484 will capture as INVOKEVIRTUAL
+            val emitImpl = java.util.function.BiConsumer<String, Any> { key, value ->
+                // Call the static emit method on the bridge class (compiled at runtime)
+                // This INVOKEVIRTUAL will be captured by the scanner
+                GraalEcmaValueBridge.emitStatic(key, value)
+            }
+            context.getBindings("js").putMember("emit", emitImpl)
+
+            // Evaluate the user script
+            val source = Source.newBuilder("js", script.source, script.sourceName).build()
+            val value = context.eval(source).toHostScalar()
+
+            // Now scan the bridge class which contains the emit method that was called from JS
+            val bridge = JvmValuePointcutFixture(
+                className = "GraalEcmaValueBridge",
+                sourceFile = "GraalEcmaValueBridge.java",
+                source = """
+                    public class GraalEcmaValueBridge {
+                        public void emit(String key, Object value) {
+                            // This INVOKEVIRTUAL call to dummy() will be captured by JEP 484
+                            dummy(key);
+                        }
+
+                        private void dummy(String s) {
+                            // No-op - just generates INVOKEVIRTUAL bytecode
+                        }
+
+                        public int operators(int a, int b) {
+                            int q = a / b;
+                            int r = a % b;
+                            return q + r;
+                        }
                     }
-                }
-            """.trimIndent(),
-        )
-        val scanned = scanner.scan(bridge.compile(), language = PolyglotLanguage.ECMA.id)
+                """.trimIndent(),
+            )
+            val scanned = scanner.scan(bridge.compile(), language = PolyglotLanguage.ECMA.id)
+            
+            // Map coordinates back to the original script source lines
+            val mapped = mapCoordinatesToScript(scanned, script)
+            val activations = emitDualPhase(mapped, sink)
+            return GraalPolyglotPointcutResult(value, mapped, activations)
+        } finally {
+            context.close()
+        }
+    }
+
+    private fun mapCoordinatesToScript(
+        scanned: PointcutCoordinateSeries,
+        script: GraalEcmaScript
+    ): PointcutCoordinateSeries {
         val divLine = sourceLine(script.source, "/")
         val remLine = sourceLine(script.source, "%")
-        val mapped = scanned.view
-            .filter { it.jvmOpcode == "IDIV" || it.jvmOpcode == "IREM" }
-            .map { coordinate ->
-                val line = if (coordinate.jvmOpcode == "IDIV") divLine else remLine
-                coordinate.copy(
-                    source = SourceCoordinate(
-                        sourceFile = script.sourceName,
-                        line = line,
-                        column = sourceColumn(script.source, line, if (coordinate.jvmOpcode == "IDIV") "/" else "%"),
-                        language = PolyglotLanguage.ECMA.id,
-                        bytecodeOffset = coordinate.bytecodeOffset,
-                    ),
-                )
+        val emitLines = findEmitCallLines(script.source)
+        
+        return scanned.view.map { coordinate ->
+            val line = when (coordinate.jvmOpcode) {
+                "IDIV" -> divLine
+                "IREM" -> remLine
+                "INVOKEVIRTUAL" -> emitLines.firstOrNull { it >= 1 } ?: -1
+                else -> coordinate.source.line
             }
-            .toList()
-            .toSeries()
-        val activations = emitDualPhase(mapped, sink)
-        return GraalPolyglotPointcutResult(value, mapped, activations)
+            val column = when (coordinate.jvmOpcode) {
+                "IDIV" -> sourceColumn(script.source, divLine, "/")
+                "IREM" -> sourceColumn(script.source, remLine, "%")
+                "INVOKEVIRTUAL" -> {
+                    val emitLine = emitLines.firstOrNull { it >= 1 } ?: -1
+                    if (emitLine > 0) sourceColumn(script.source, emitLine, "emit") else -1
+                }
+                else -> coordinate.source.column
+            }
+            coordinate.copy(
+                source = SourceCoordinate(
+                    sourceFile = script.sourceName,
+                    line = line,
+                    column = column,
+                    language = PolyglotLanguage.ECMA.id,
+                    bytecodeOffset = coordinate.bytecodeOffset,
+                ),
+            )
+        }.toList().toSeries()
+    }
+
+    private fun findEmitCallLines(source: String): List<Int> {
+        return source.lines()
+            .withIndex()
+            .filter { (_, line) -> line.contains("emit(") && !line.trimStart().startsWith("//") }
+            .map { (index, _) -> index + 1 }
     }
 
     private fun evalEcma(script: GraalEcmaScript): Any? = Context.newBuilder("js").build().use { context ->

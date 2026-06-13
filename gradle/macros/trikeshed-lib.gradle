@@ -138,7 +138,8 @@ def kmpHost = { Map options = [:] ->
 
 def kmpJvm = { Map options = [:] ->
     def rootMode = options.get("rootMode", "api")
-    def coroutinesMain = options.get("coroutinesMain", false)
+    def coroutinesMain = options.get("coroutinesMain", true)  // Default to true
+    def extraDeps = options.get("extraDeps", [])
     pluginManager.apply("org.jetbrains.kotlin.multiplatform")
     pluginManager.apply("maven-publish")
     group = "borg.trikeshed"
@@ -147,6 +148,14 @@ def kmpJvm = { Map options = [:] ->
     configureCompiler(kotlinExt, true)
     jvmOnlyTarget(kotlinExt)
     standardSourceSets(kotlinExt, rootMode, coroutinesMain, false)
+    // Add extra dependencies after source sets are configured
+    if (extraDeps.size > 0) {
+        kotlinExt.sourceSets.named("jvmMain").configure {
+            dependencies {
+                extraDeps.each { dep -> implementation(dep) }
+            }
+        }
+    }
 }
 
 def plainJvm = { boolean applyApplication = false ->
@@ -191,10 +200,55 @@ switch (project.path) {
     case ":libs:concurrency":
     case ":libs:uring":
     case ":libs:polyglot":
-        kmpJvm()
+    case ":libs:acpmcp":
+    case ":libs:tcpd":
+        kmpJvm(coroutinesMain: true, rootMode: "none", extraDeps: ["org.graalvm.polyglot:polyglot:24.1.1"])
+        extensions.getByName("kotlin").sourceSets.getByName("jvmMain").dependencies {
+            implementation "org.jetbrains.kotlinx:kotlinx-coroutines-core:${prop("versions.kotlinx-coroutines-core")}"
+        }
+        extensions.getByName("kotlin").sourceSets.getByName("jvmTest").dependencies {
+            implementation "org.graalvm.polyglot:js:24.1.1"
+        }
+        break
+    case ":libs:asclepius":
+        kmpJvm(coroutinesMain: true, rootMode: "none", extraDeps: [
+            "org.graalvm.polyglot:polyglot:24.1.1",
+            "org.xerial:sqlite-jdbc:3.49.1.0",
+            "org.apache.arrow:arrow-memory-core:19.0.0",
+            "org.apache.arrow:arrow-vector:19.0.0",
+            "io.netty:netty-buffer:4.1.118.Final",
+            "io.netty:netty-transport:4.1.118.Final",
+            "org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3",
+        ])
+        extensions.getByName("kotlin").sourceSets.getByName("jvmMain").dependencies {
+            implementation "org.jetbrains.kotlinx:kotlinx-coroutines-core:${prop("versions.kotlinx-coroutines-core")}"
+        }
+        break
+    case ":libs:classfile":
+        kmpJvm(extraDeps: [project(":libs:couch")])
+        extensions.getByName("kotlin").sourceSets.getByName("jvmTest").dependencies {
+            implementation "org.graalvm.polyglot:js:24.1.1"
+        }
         break
     case ":libs:tiny-btrfs":
-        kmpHost(rootMode: "none")
+        kmpHost(rootMode: "api")
+        // Exclude LoopbackDiskAdapter from JVM compilation (requires liburing)
+        extensions.getByName("kotlin").sourceSets.getByName("jvmMain").kotlin {
+            exclude("**/LoopbackDiskAdapter.kt")
+        }
+        extensions.getByName("kotlin").sourceSets.getByName("jvmTest").kotlin {
+            exclude("**/LoopbackDiskAdapter.kt")
+        }
+        // Exclude userspace/btrfs files (depend on context module not available)
+        extensions.getByName("kotlin").sourceSets.getByName("commonMain").kotlin {
+            exclude("**/userspace/btrfs/**")
+        }
+        extensions.getByName("kotlin").sourceSets.getByName("jvmMain").kotlin {
+            exclude("**/userspace/btrfs/**")
+        }
+        extensions.getByName("kotlin").sourceSets.getByName("jvmTest").kotlin {
+            exclude("**/userspace/btrfs/**")
+        }
         break
     case ":libs:forge":
         kmpJvm()
@@ -205,9 +259,6 @@ switch (project.path) {
             implementation rootPeer()
             implementation "org.jetbrains.kotlinx:kotlinx-coroutines-core:${prop("versions.kotlinx-coroutines-core")}"
         }
-        break
-    case ":libs:tiny-btrfs":
-        kmpHost()
         break
     case ":libs:forge":
         kmpJvm()
@@ -454,6 +505,11 @@ switch (project.path) {
     case ":libs:couch":
         kmpHost(datetimeMain: true, rootMode: "none")
         def couchKotlin = extensions.getByName("kotlin")
+        // Exclude broken jvmMain files pending fixes
+        couchKotlin.sourceSets.getByName("jvmMain").kotlin {
+            exclude("**/IpfsMeshStore.kt")
+            exclude("**/GraalVmViewServer.kt")
+        }
         def couchSets = couchKotlin.sourceSets
         couchSets.getByName("commonMain").dependencies {
             api libPeer("miniduck")
@@ -507,6 +563,7 @@ switch (project.path) {
         }
         viewSets.getByName("jvmMain").dependencies {
             implementation libPeer("kursive")
+            implementation libPeer("classfile")
         }
         viewSets.getByName("jsMain").kotlin.srcDir("${layout.buildDirectory.get().asFile}/dukat")
         tasks.register("generateDts", Exec) {
