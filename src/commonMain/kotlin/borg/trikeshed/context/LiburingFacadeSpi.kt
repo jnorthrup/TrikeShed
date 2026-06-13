@@ -33,7 +33,7 @@ interface LiburingFacadeSpi {
      * @param entries number of SQEs in the submission ring
      * @param flags io_uring_setup flags (e.g. IORING_SETUP_SQPOLL)
      */
-    fun open(entries: Int = 256, flags: Int = 0): Result<Unit>
+    fun open(entries: Int = 2, flags: Int = 0): Result<Unit>
 
     /**
      * Prepare a read SQE: read [len] bytes from [fd] into [bufAddress] at offset [offset].

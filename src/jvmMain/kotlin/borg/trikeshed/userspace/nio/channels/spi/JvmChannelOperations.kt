@@ -31,7 +31,7 @@ private fun ByteBuffer.toNioByteBuffer(): java.nio.ByteBuffer {
  * This stub just delegates to blocking NIO for local development.
  */
 class JvmChannelOperations(
-    private val entries: Int = 256,
+    private val entries: Int = 2,
 ) : ChannelOperations {
 
     // fd -> Channel mapping (thread-safe)

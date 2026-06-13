@@ -12,7 +12,17 @@ repositories {
     mavenCentral()
 }
 
+// Add plugin source set
+sourceSets {
+    getByName("main") {
+        java.srcDir("src/plugin/kotlin")
+    }
+}
+
 dependencies {
+    // TrikeShed core (when available via composite build)
+    // implementation(project(":src"))
+    
     // Serialization / wireproto
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-core:1.7.3")

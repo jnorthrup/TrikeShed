@@ -7,7 +7,7 @@ import borg.trikeshed.userspace.openUserspaceChannelBackend
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
-class NioUringDhtTransport(entries: Int = 256) : DhtTransport {
+class NioUringDhtTransport(entries: Int = 2) : DhtTransport {
     private val facade = FunctionalUringFacade(entries, openUserspaceChannelBackend(entries))
 
     companion object {

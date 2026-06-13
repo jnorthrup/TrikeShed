@@ -14,7 +14,7 @@ data class UringCompletion(
  * Platform bindings are hidden behind LiburingImpl actuals.
  */
 interface LiburingFacade {
-    fun open(entries: Int = 256, flags: Int = 0): Result<Unit>
+    fun open(entries: Int = 2, flags: Int = 0): Result<Unit>
     fun prepRead(fd: Int, bufAddress: Long, len: Int, offset: Long, userData: Long): Result<Unit>
     fun prepWrite(fd: Int, bufAddress: Long, len: Int, offset: Long, userData: Long): Result<Unit>
     fun prepAccept(fd: Int, userData: Long): Result<Unit>

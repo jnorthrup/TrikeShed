@@ -186,9 +186,9 @@ sequence is identical regardless of transport — only the *parser* that produce
 
 ```
 HTTP/1.1 text on wire   →  parseHttp1()  ─┐
-HTTP/2 binary frames    →  (H2 parser)    ─┼→  [ReqSl · Hdr · Hdr · EOH · Data · EOT · EOM]
-HTTP/3 QUIC stream      →  (H3 mapping)    ─┘
-DHTX internal           →  DHTX_REQ/RES   ─┘   (non-HTTP, same framing)
+HTTP/2 binary frames    →  (H2 parser)   ─┼→  [ReqSl · Hdr · Hdr · EOH · Data · EOT · EOM]
+HTTP/3 QUIC stream      →  (H3 mapping)  ─┘
+DHTX internal           →  DHTX_REQ/RES  ─┘   (non-HTTP, same framing)
 ```
 
 ### Block Model

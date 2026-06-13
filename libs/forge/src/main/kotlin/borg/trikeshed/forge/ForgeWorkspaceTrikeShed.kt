@@ -6,7 +6,7 @@ package borg.trikeshed.forge
  * This class intentionally keeps the public "TrikeShed-backed" name available
  * while the real PRELOAD-native backend is still being lowered into cursor /
  * Confix / blackboard storage. The current green implementation delegates to
- * the Forge workspace contract implementation so the Forge app, demo, and test
+ * the Forge workspace contract implementation so the Forge app, test,
  * harness stand up from the root Gradle build instead of carrying a broken
  * experimental dependency on Miniduck/Confix modules that are not wired into the
  * Forge JVM build yet.
@@ -20,7 +20,7 @@ class ForgeWorkspaceTrikeShed(
     private val delegate: ForgeWorkspace = ForgeWorkspaceImpl(),
 ) : ForgeWorkspace by delegate {
 
-    /** Human-readable lowering target for UI/demo diagnostics. */
+    /** Human-readable lowering target for UI diagnostics. */
     val storageContract: String =
         "ForgeWorkspace -> Cursor rows -> Confix body/facade -> Blackboard provenance -> CCEK lifecycle"
 }

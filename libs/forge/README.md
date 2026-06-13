@@ -42,10 +42,10 @@ Forge provides a **workflow algebra** on top of a pluggable storage/collaboratio
 ./gradlew :libs:forge:build --no-daemon
 ```
 
-### Run Demo
+### Run Tests
 ```bash
 cd libs/forge
-./demo.sh
+./run.sh
 ```
 
 ### CLI Usage
