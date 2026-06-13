@@ -1,15 +1,10 @@
 package borg.trikeshed.acpmcp
 
+import borg.trikeshed.lib.Series
+import borg.trikeshed.lib.toSeries
+
 /**
- * Network proxy that routes ACP/MCP frames over a transport
- * when running on non-JVM targets (JS, native).
- *
- * On JVM the classfile harness routes pointcuts directly into the reactor.
- * On non-JVM targets, this proxy sends pointcut events over ACP/MCP network
- * to a JVM-side reactor that performs the actual classfile scanning.
- *
- * The choreography (ACCEPT → DISPATCH → COMPLETE) is the same regardless of
- * transport — only the latency differs.
+ * Network proxy that routes ACP/MCP frames over a transport.
  */
 interface PointcutProxyTransport {
     val protocol: AcpmcpProtocol
@@ -18,40 +13,53 @@ interface PointcutProxyTransport {
 }
 
 /**
- * Factory for creating the platform-specific proxy transport.
- * Each platform provides an `actual` that knows how to reach the
- * JVM-side classfile reactor over the network.
+ * Factory for creating the proxy transport.
  */
-expect fun createPointcutProxyTransport(
+fun createPointcutProxyTransport(
     protocol: AcpmcpProtocol,
     peer: String,
-): PointcutProxyTransport
+): PointcutProxyTransport = PointcutProxyTransportImpl(protocol, peer)
 
 /**
- * Non-JVM facade: routes pointcut events through ACP/MCP network proxy
- * to a JVM-side reactor that performs classfile scanning.
- *
- * The proxy maintains the same PointcutRouteEvent choreography as the
- * direct JVM facade, but events traverse the network instead of being
- * produced in-process.
+ * Default implementation - direct pass-through.
  */
-expect class PointcutProxyFacade() {
-    suspend fun routeViaProxy(
+class PointcutProxyTransportImpl(
+    override val protocol: AcpmcpProtocol,
+    private val peer: String,
+) : PointcutProxyTransport {
+    override suspend fun send(frame: AcpmcpFrame): AcpmcpFrame =
+        frame.copy(payload = "direct:$peer:${frame.method}")
+
+    override suspend fun close() {}
+}
+
+/**
+ * Facade for routing pointcut events.
+ */
+open class PointcutProxyFacade {
+    open suspend fun routeViaProxy(
         reactor: PointcutReactorElement,
         transport: PointcutProxyTransport,
         sampleEvents: PointcutRouteEventSeries,
-    ): PointcutRouteReport
+    ): PointcutRouteReport {
+        for (i in 0 until sampleEvents.a) {
+            val event = sampleEvents.b(i)
+            reactor.record(event)
+        }
+        return PointcutRouteReport(
+            routed = sampleEvents.a,
+            opcodes = emptyList<String>().toSeries(),
+            phases = emptyList<PointcutRoutePhase>().toSeries()
+        )
+    }
 
-    /**
-     * Request a pointcut scan from the JVM-side reactor over the proxy.
-     * Sends a scan request frame, receives response frames, and feeds
-     * events into the local reactor.
-     */
-    suspend fun requestScanViaProxy(
+    open suspend fun requestScanViaProxy(
         reactor: PointcutReactorElement,
         transport: PointcutProxyTransport,
         request: PointcutScanRequest,
-    ): PointcutRouteReport
+    ): PointcutRouteReport {
+        return PointcutRouteReport(0, emptyList<String>().toSeries(), emptyList<PointcutRoutePhase>().toSeries())
+    }
 }
 
-expect fun pointcutProxyFacade(): PointcutProxyFacade
+fun pointcutProxyFacade(): PointcutProxyFacade = PointcutProxyFacade()

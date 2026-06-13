@@ -37,6 +37,7 @@ def nestedLibPeer = { String path, String artifact ->
 }
 
 repositories {
+    mavenLocal()
     mavenCentral()
     google()
     gradlePluginPortal()
@@ -45,6 +46,7 @@ repositories {
 }
 
 project.repositories {
+    mavenLocal()
     mavenCentral()
     google()
     gradlePluginPortal()
@@ -188,6 +190,13 @@ switch (project.path) {
     case ":libs:common":
         kmpHost(rootMode: "none")
         break
+    case ":libs:lsm":
+        // lsm needs common - add it via extraDeps after kmpHost runs
+        kmpHost(rootMode: "none")
+        extensions.getByName("kotlin").sourceSets.getByName("jvmMain").dependencies {
+            implementation project(":libs:common")
+        }
+        break
     case ":libs:dreamer-kmm":
         // dreamer-kmm has its own exceptional build.gradle.kts — standalone, root TrikeShed only
         break
@@ -199,10 +208,19 @@ switch (project.path) {
     case ":libs:tls":
     case ":libs:concurrency":
     case ":libs:uring":
-    case ":libs:polyglot":
     case ":libs:acpmcp":
+        // acpmcp uses custom build.gradle.kts with maven root
+        break
     case ":libs:tcpd":
-        kmpJvm(coroutinesMain: true, rootMode: "none", extraDeps: ["org.graalvm.polyglot:polyglot:24.1.1"])
+        // tcpd uses KMP with maven root dep in commonMain
+        kmpJvm(coroutinesMain: true, rootMode: "none", extraDeps: [
+            "org.bereft:TrikeShed-jvm:1.0",
+            "org.graalvm.polyglot:polyglot:24.1.1",
+        ])
+        // Add to commonMain so all targets get root types
+        extensions.getByName("kotlin").sourceSets.getByName("commonMain").dependencies {
+            implementation "org.bereft:TrikeShed-jvm:1.0"
+        }
         extensions.getByName("kotlin").sourceSets.getByName("jvmMain").dependencies {
             implementation "org.jetbrains.kotlinx:kotlinx-coroutines-core:${prop("versions.kotlinx-coroutines-core")}"
         }

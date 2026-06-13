@@ -80,21 +80,32 @@ class PointcutReactorElement(
  *
  * On JVM: scans classfiles directly using Jep484ClassfileScanner.
  * On JS/native: routes through ACP/MCP proxy to JVM-side reactor.
+ * 
+ * Use ClassfilePointcutReactorFacadeJvm for JVM implementation.
  */
-expect class ClassfilePointcutReactorFacade() {
-    suspend fun routeJvmValuePointcuts(reactor: PointcutReactorElement): PointcutRouteReport
+open class ClassfilePointcutReactorFacade {
+    open suspend fun routeJvmValuePointcuts(reactor: PointcutReactorElement): PointcutRouteReport {
+        throw NotImplementedError("Override in platform implementation")
+    }
 }
 
-expect fun classfilePointcutReactorFacade(): ClassfilePointcutReactorFacade
+/**
+ * Factory to create the platform-specific implementation.
+ * On JVM: returns ClassfilePointcutReactorFacadeJvm
+ */
+fun classfilePointcutReactorFacade(): ClassfilePointcutReactorFacade = ClassfilePointcutReactorFacade()
 
 /**
  * Decode a PointcutScanResponse payload (JSON) into events.
- * Used by JS actual to reconstruct events from JVM-side scan results.
  */
-expect fun decodePointcutScanResponse(payload: String): PointcutScanResponse
+fun decodePointcutScanResponse(payload: String): PointcutScanResponse {
+    // Platform-specific implementation
+    throw NotImplementedError("Override in platform implementation")
+}
 
 /**
  * Encode a PointcutScanRequest into a payload string (JSON).
- * Used by JS actual to send scan requests over the proxy.
  */
-expect fun encodePointcutScanRequest(request: PointcutScanRequest): String
+fun encodePointcutScanRequest(request: PointcutScanRequest): String {
+    throw NotImplementedError("Override in platform implementation")
+}

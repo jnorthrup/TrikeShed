@@ -8,6 +8,7 @@ pluginManagement {
 
 rootProject.name = "TrikeShed"
 
+include(":libs:common")
 include(":libs:forge")
 include(":libs:forge-ui")
 include(":libs:lcnc")
