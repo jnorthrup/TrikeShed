@@ -1,5 +1,8 @@
 package borg.trikeshed.mutable
 
+import borg.trikeshed.lib.Reducer
+import borg.trikeshed.lib.Series
+import borg.trikeshed.lib.getOrNull
 import kotlin.jvm.JvmStatic
 
 /**

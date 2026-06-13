@@ -1,6 +1,6 @@
 package borg.trikeshed.mutable
 
-import kotlin.text.get
+import borg.trikeshed.lib.get
 
 /**
  * A Decorator over an existing [MutableSeries] that acts as an Aspect-Oriented (AOP) pointcut harness.

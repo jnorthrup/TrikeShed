@@ -3,7 +3,12 @@
 package borg.trikeshed.lib
 
 import borg.trikeshed.collections.s_
+import borg.trikeshed.mutable.ChunkedMutableSeries
+import borg.trikeshed.mutable.DequeSeries
+import borg.trikeshed.mutable.GuardSeries
+import borg.trikeshed.mutable.JournalSeries
 import borg.trikeshed.mutable.RingSeries
+import borg.trikeshed.mutable.SortedSeries
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -469,90 +474,90 @@ class MutableSeriesStrategyTest {
     }
 
     // ═══════════════════════════════════════════════════════════════════
-    // MergeMutableSeries
+    // SortedSeries (merged with MergeMutableSeries)
     // ═══════════════════════════════════════════════════════════════════
 
-    @Test fun mergeSeriesBatchInsertBelowThreshold() {
-        val ms = MergeMutableSeries<Int>(
+    @Test fun sortedSeriesBatchInsertBelowThreshold() {
+        val ss = SortedSeries<Int>(
             mergeThreshold = 10,
             comparator = { a, b -> a.compareTo(b) },
         )
-        ms.add(5); ms.add(3); ms.add(1)  // below threshold — pending only
-        assertEquals(0, ms.size)          // not compacted yet
+        ss.add(5); ss.add(3); ss.add(1)  // below threshold — pending only
+        assertEquals(0, ss.size)          // not compacted yet
     }
 
-    @Test fun mergeSeriesCompactsAtThreshold() {
-        val ms = MergeMutableSeries<Int>(
+    @Test fun sortedSeriesCompactsAtThreshold() {
+        val ss = SortedSeries<Int>(
             mergeThreshold = 3,
             comparator = { a, b -> a.compareTo(b) },
         )
-        ms.add(30); ms.add(10); ms.add(20)  // hits threshold, compacts
-        assertEquals(3, ms.size)
-        assertEquals(10, ms[0])
-        assertEquals(20, ms[1])
-        assertEquals(30, ms[2])
+        ss.add(30); ss.add(10); ss.add(20)  // hits threshold, compacts
+        assertEquals(3, ss.size)
+        assertEquals(10, ss[0])
+        assertEquals(20, ss[1])
+        assertEquals(30, ss[2])
     }
 
-    @Test fun mergeSeriesFlushForcesCompact() {
-        val ms = MergeMutableSeries<Int>(
+    @Test fun sortedSeriesFlushForcesCompact() {
+        val ss = SortedSeries<Int>(
             mergeThreshold = 100,
             comparator = { a, b -> a.compareTo(b) },
         )
-        ms.add(5); ms.add(3); ms.add(1)
-        assertEquals(0, ms.size)
-        ms.flush()
-        assertEquals(3, ms.size)
-        assertEquals(1, ms[0])
-        assertEquals(3, ms[1])
-        assertEquals(5, ms[2])
+        ss.add(5); ss.add(3); ss.add(1)
+        assertEquals(0, ss.size)
+        ss.flush()
+        assertEquals(3, ss.size)
+        assertEquals(1, ss[0])
+        assertEquals(3, ss[1])
+        assertEquals(5, ss[2])
     }
 
-    @Test fun mergeSeriesMergeMaintainsSortAcrossBatches() {
-        val ms = MergeMutableSeries<Int>(
+    @Test fun sortedSeriesMergeMaintainsSortAcrossBatches() {
+        val ss = SortedSeries<Int>(
             mergeThreshold = 4,
             comparator = { a, b -> a.compareTo(b) },
         )
         // Batch 1: 30, 10, 20, 40 → compacts → 10, 20, 30, 40
-        ms.add(30); ms.add(10); ms.add(20); ms.add(40)
-        assertEquals(4, ms.size)
-        assertEquals(10, ms[0]); assertEquals(20, ms[1])
-        assertEquals(30, ms[2]); assertEquals(40, ms[3])
+        ss.add(30); ss.add(10); ss.add(20); ss.add(40)
+        assertEquals(4, ss.size)
+        assertEquals(10, ss[0]); assertEquals(20, ss[1])
+        assertEquals(30, ss[2]); assertEquals(40, ss[3])
 
         // Batch 2: 5, 15, 25, 35 → compacts, merges with [10,20,30,40]
-        ms.add(5); ms.add(15); ms.add(25); ms.add(35)
-        assertEquals(8, ms.size)
+        ss.add(5); ss.add(15); ss.add(25); ss.add(35)
+        assertEquals(8, ss.size)
         // Final sorted: 5, 10, 15, 20, 25, 30, 35, 40
-        assertEquals(5, ms[0])
-        assertEquals(10, ms[1])
-        assertEquals(15, ms[2])
-        assertEquals(20, ms[3])
-        assertEquals(25, ms[4])
-        assertEquals(30, ms[5])
-        assertEquals(35, ms[6])
-        assertEquals(40, ms[7])
+        assertEquals(5, ss[0])
+        assertEquals(10, ss[1])
+        assertEquals(15, ss[2])
+        assertEquals(20, ss[3])
+        assertEquals(25, ss[4])
+        assertEquals(30, ss[5])
+        assertEquals(35, ss[6])
+        assertEquals(40, ss[7])
     }
 
-    @Test fun mergeSeriesRemove() {
-        val ms = MergeMutableSeries<Int>(
+    @Test fun sortedSeriesRemove() {
+        val ss = SortedSeries<Int>(
             mergeThreshold = 3,
             comparator = { a, b -> a.compareTo(b) },
         )
-        ms.add(10); ms.add(20); ms.add(30)
-        assertTrue(ms.remove(20))
-        assertEquals(2, ms.size)
-        assertEquals(10, ms[0])
-        assertEquals(30, ms[1])
+        ss.add(10); ss.add(20); ss.add(30)
+        assertTrue(ss.remove(20))
+        assertEquals(2, ss.size)
+        assertEquals(10, ss[0])
+        assertEquals(30, ss[1])
     }
 
-    @Test fun mergeSeriesClear() {
-        val ms = MergeMutableSeries<Int>(
+    @Test fun sortedSeriesClear() {
+        val ss = SortedSeries<Int>(
             mergeThreshold = 2,
             comparator = { a, b -> a.compareTo(b) },
         )
-        ms.add(10); ms.add(20)
-        assertEquals(2, ms.size)
-        ms.clear()
-        assertEquals(0, ms.size)
+        ss.add(10); ss.add(20)
+        assertEquals(2, ss.size)
+        ss.clear()
+        assertEquals(0, ss.size)
     }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -569,7 +574,7 @@ class MutableSeriesStrategyTest {
             DequeSeries<Int>().also { it.addLast(1) },
             GuardSeries<Int>(guard = { true }).also { it.add(1) },
             JournalSeries<Int>().also { it.add(1) },
-            MergeMutableSeries<Int>(mergeThreshold = 1, comparator = { a, b -> a.compareTo(b) }).also { it.add(1); it.flush() },
+            SortedSeries(mergeThreshold = 1, comparator = { a, b -> a.compareTo(b) }).also { it.add(1); it.flush() },
         ]
 
         // All report size and first element correctly

@@ -1,67 +1,159 @@
-package borg.trikeshed.mutable
-
-import borg.trikeshed.lib.get
-
 @file:Suppress("UNCHECKED_CAST")
+
+package borg.trikeshed.mutable
 
 import borg.trikeshed.lib.*
 
 /**
- * A MutableSeries that maintains sort order on insertion.
+ * A [MutableSeries] that maintains sorted order using lazy merge-sort.
+ *
+ * Inserts are batched into a [pending] buffer (amortized O(1)). When [pending]
+ * reaches [mergeThreshold], it is sorted and merged into the [sorted] backing
+ * via a linear two-pointer merge (O(n)). Reads always come from the sorted
+ * backing, so iteration and indexed access are O(1).
+ *
+ * This combines the eager-sorted semantics of the old [SortedSeries] with the
+ * batched-merge performance of the old [MergeMutableSeries].
+ *
+ * @param mergeThreshold  compact when pending reaches this size (default 64)
+ * @param comparator      sort order for pending → sorted merge
  */
 class SortedSeries<T>(
-    private var data: Series<T> = 0 j { throw IndexOutOfBoundsException("empty SortedSeries") },
+    private val mergeThreshold: Int = 64,
     private val comparator: (T, T) -> Int,
 ) : MutableSeries<T> {
 
-    override val a: Int get() = data.size
-    override val b: (Int) -> T = { i -> data[i] }
-
-    private fun insertionIndex(item: T): Int {
-        var lo = 0; var hi = data.size
-        while (lo < hi) { val mid = (lo + hi) ushr 1; if (comparator(data[mid], item) < 0) lo = mid + 1 else hi = mid }
-        return lo
+    init {
+        require(mergeThreshold > 0) { "mergeThreshold must be positive" }
     }
 
-    private fun indexOf(item: T): Int {
-        var lo = 0; var hi = data.size - 1
-        while (lo <= hi) { val mid = (lo + hi) ushr 1; val cmp = comparator(data[mid], item); when { cmp < 0 -> lo = mid + 1; cmp > 0 -> hi = mid - 1; else -> return mid } }
-        return -1
+    private var sorted: Series<T> = 0 j { throw IndexOutOfBoundsException("empty SortedSeries") }
+    private val pending: RecursiveMutableSeries<T> = RecursiveMutableSeries.create()
+    private var totalSize: Int = 0
+
+    override val a: Int get() = totalSize
+    override val b: (Int) -> T = { i ->
+        require(i in 0 until sorted.size) { "index $i out of bounds [0, ${sorted.size})" }
+        sorted[i]
     }
 
     override fun add(item: T) {
-        val pos = insertionIndex(item)
-        val old = data
-        data = (old.size + 1) j { i -> when { i < pos -> old[i]; i == pos -> item; else -> old[i - 1] } }
+        pending.add(item)
+        if (pending.size >= mergeThreshold) compact()
     }
 
-    override fun add(index: Int, item: T) { add(item) }
+    override fun add(index: Int, item: T) {
+        add(item) // index ignored — sort order wins
+    }
 
     override fun set(index: Int, item: T) {
-        val n = data.size; val old = data
-        data = (n - 1) j { i -> if (i < index) old[i] else old[i + 1] }
-        add(item)
+        // Remove old element at index, then add new item (maintains sort)
+        val oldSorted = sorted
+        sorted = (oldSorted.size - 1) j { i ->
+            if (i < index) oldSorted[i] else oldSorted[i + 1]
+        }
+        pending.add(item)
     }
 
     override fun removeAt(index: Int): T {
-        val item = data[index]; val old = data
-        data = (old.size - 1) j { i -> if (i < index) old[i] else old[i + 1] }
+        val item = sorted[index]
+        val oldSorted = sorted
+        sorted = (oldSorted.size - 1) j { i ->
+            if (i < index) oldSorted[i] else oldSorted[i + 1]
+        }
+        totalSize--
         return item
     }
 
     override fun remove(item: T): Boolean {
-        val idx = indexOf(item)
-        if (idx >= 0) { val old = data; data = (old.size - 1) j { i -> if (i < idx) old[i] else old[i + 1] }; return true }
+        // Search sorted backing
+        for (i in 0 until sorted.size) {
+            if (comparator(sorted[i], item) == 0) {
+                removeAt(i)
+                return true
+            }
+        }
+        // Search pending buffer
+        for (i in 0 until pending.size) {
+            if (comparator(pending[i], item) == 0) {
+                pending.removeAt(i)
+                return true
+            }
+        }
         return false
     }
 
-    override fun clear() { data = 0 j { throw IndexOutOfBoundsException("empty SortedSeries") } }
+    override fun clear() {
+        sorted = 0 j { throw IndexOutOfBoundsException("empty SortedSeries") }
+        pending.clear()
+        totalSize = 0
+    }
+
     override fun plus(item: T): MutableSeries<T> { add(item); return this }
     override fun minus(item: T): MutableSeries<T> { remove(item); return this }
     override fun plusAssign(item: T) { add(item) }
     override fun minusAssign(item: T) { remove(item) }
 
+    // ── Compaction ───────────────────────────────────────────────────────
+
+    /**
+     * Sort pending, then merge into sorted.
+     *
+     * Uses a simple two-pointer merge: both sorted and pending are assumed
+     * to be individually sorted (pending via external sort, sorted by
+     * construction). The merged result replaces sorted.
+     */
+    fun compact() {
+        if (pending.size == 0) return
+
+        val sortedPending = sortPending()
+        val sSize = sorted.size
+        val pSize = sortedPending.size
+        val n = sSize + pSize
+        val arr = arrayOfNulls<Any?>(n)
+        var si = 0; var pi = 0
+        @Suppress("UNCHECKED_CAST")
+        for (di in 0 until n) {
+            arr[di] = when {
+                si >= sSize -> sortedPending[pi++]
+                pi >= pSize -> sorted[si++]
+                comparator(sorted[si] as T, sortedPending[pi]) <= 0 -> sorted[si++]
+                else -> sortedPending[pi++]
+            }
+        }
+        @Suppress("UNCHECKED_CAST")
+        sorted = n j { i -> arr[i] as T }
+        totalSize = n
+        pending.clear()
+    }
+
+    /** Simple insertion sort of the pending buffer. */
+    private fun sortPending(): Series<T> {
+        if (pending.size <= 1) return pending.data
+
+        val arr = arrayOfNulls<Any?>(pending.size)
+        for (i in 0 until pending.size) arr[i] = pending[i]
+
+        @Suppress("UNCHECKED_CAST")
+        for (i in 1 until arr.size) {
+            val key = arr[i] as T
+            var j = i - 1
+            while (j >= 0 && comparator(arr[j] as T, key) > 0) {
+                arr[j + 1] = arr[j]
+                j--
+            }
+            arr[j + 1] = key
+        }
+
+        return arr.size j { i -> arr[i] as T }
+    }
+
+    /** Force compaction even if threshold not reached. */
+    fun flush() = compact()
+
     companion object {
-        fun <T : Comparable<T>> natural(): SortedSeries<T> = SortedSeries { a, b -> a.compareTo(b) }
+        /** Create a SortedSeries with natural ordering for Comparable elements. */
+        fun <T : Comparable<T>> natural(): SortedSeries<T> =
+            SortedSeries { a, b -> a.compareTo(b) }
     }
 }
