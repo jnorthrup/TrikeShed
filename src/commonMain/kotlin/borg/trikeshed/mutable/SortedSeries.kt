@@ -5,27 +5,15 @@ package borg.trikeshed.mutable
 import borg.trikeshed.lib.*
 
 /**
- * A [MutableSeries] that maintains sorted order using lazy merge-sort.
- *
- * Inserts are batched into a [pending] buffer (amortized O(1)). When [pending]
- * reaches [mergeThreshold], it is sorted and merged into the [sorted] backing
- * via a linear two-pointer merge (O(n)). Reads always come from the sorted
- * backing, so iteration and indexed access are O(1).
- *
- * This combines the eager-sorted semantics of the old [SortedSeries] with the
- * batched-merge performance of the old [MergeMutableSeries].
- *
- * @param mergeThreshold  compact when pending reaches this size (default 64)
+ * A [MutableSeries] that maintains sorted order
+
+ 
  * @param comparator      sort order for pending → sorted merge
  */
 class SortedSeries<T>(
-    private val mergeThreshold: Int = 64,
     private val comparator: (T, T) -> Int,
 ) : MutableSeries<T> {
 
-    init {
-        require(mergeThreshold > 0) { "mergeThreshold must be positive" }
-    }
 
     private var sorted: Series<T> = 0 j { throw IndexOutOfBoundsException("empty SortedSeries") }
     private val pending: RecursiveMutableSeries<T> = RecursiveMutableSeries.create()
@@ -152,8 +140,9 @@ class SortedSeries<T>(
     fun flush() = compact()
 
     companion object {
-        /** Create a SortedSeries with natural ordering for Comparable elements. */
+        /** Create a SortedSeries with natural ordering for Comparable elements.
+         *  Uses mergeThreshold=1 for eager compaction (backward compatible with old SortedSeries). */
         fun <T : Comparable<T>> natural(): SortedSeries<T> =
-            SortedSeries { a, b -> a.compareTo(b) }
+            SortedSeries(mergeThreshold = 1) { a, b -> a.compareTo(b) }
     }
 }
