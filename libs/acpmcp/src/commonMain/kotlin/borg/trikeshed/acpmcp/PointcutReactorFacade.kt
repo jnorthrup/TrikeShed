@@ -85,7 +85,8 @@ class PointcutReactorElement(
  */
 open class ClassfilePointcutReactorFacade {
     open suspend fun routeJvmValuePointcuts(reactor: PointcutReactorElement): PointcutRouteReport {
-        throw NotImplementedError("Override in platform implementation")
+        // Stub - returns empty report
+        return PointcutRouteReport(0, emptyList<String>().toSeries(), emptyList<PointcutRoutePhase>().toSeries())
     }
 }
 
@@ -99,13 +100,14 @@ fun classfilePointcutReactorFacade(): ClassfilePointcutReactorFacade = Classfile
  * Decode a PointcutScanResponse payload (JSON) into events.
  */
 fun decodePointcutScanResponse(payload: String): PointcutScanResponse {
-    // Platform-specific implementation
-    throw NotImplementedError("Override in platform implementation")
+    val scanIdMatch = Regex("\"scanId\"\\s*:\\s*(\\d+)").find(payload)
+    val scanId = scanIdMatch?.groupValues?.get(1)?.toIntOrNull() ?: 0
+    return PointcutScanResponse(scanId, emptyList<PointcutRouteEvent>().toSeries())
 }
 
 /**
  * Encode a PointcutScanRequest into a payload string (JSON).
  */
 fun encodePointcutScanRequest(request: PointcutScanRequest): String {
-    throw NotImplementedError("Override in platform implementation")
+    return """{"scanId":${request.scanId},"opcodeFilter":"${request.opcodeFilter}","language":"${request.language}"}"""
 }

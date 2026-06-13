@@ -1,71 +1,140 @@
-import sys
-
-print("[HERMES INSTRUMENT] Module loaded", file=sys.stderr)
-sys.stderr.flush()
-
 # ──────────────────────────────────────────────────────────────────────
-# IOMementoSlabOp mirror (from IOMementoSlabWire.kt)
+# HermesPointcutEmitter mirror (from HermesGraalHarness.kt)
 # ──────────────────────────────────────────────────────────────────────
 
-class IOMementoSlabOp:
-    """Stable enum mirror for IOMemento slab operations.
+# Phase constants
+ASC_PHASE_BEFORE = 0
+ASC_PHASE_AFTER = 1
 
-    Ordinal and name must match JVM IOMementoSlabOp exactly.
+# Opcode constants (match HermesGraalHarness.kt exactly)
+OP_TOOL_CALL = 0xB0
+OP_TOOL_RESULT = 0xB1
+OP_AGENT_TURN_START = 0xB2
+OP_AGENT_TURN_END = 0xB3
+OP_SKILL_LOAD = 0xB4
+OP_SKILL_EXEC = 0xB5
+OP_CONTEXT_COMPRESS = 0xB6
+OP_MEMORY_READ = 0xB7
+OP_MEMORY_WRITE = 0xB8
+OP_CRON_TICK = 0xB9
+OP_GATEWAY_MSG = 0xBA
+
+
+class HermesPointcutEmitter:
+    """Python mirror of HermesPointcutEmitter bound as `hermesPointcuts` in Graal.
+
+    Host (JVM) calls methods on this object from Python/JS via Graal polyglot.
     """
-    IoBoolean = 0
-    IoByte = 1
-    IoUByte = 2
-    IoShort = 3
-    IoUShort = 4
-    IoInt = 5
-    IoUInt = 6
-    IoLong = 7
-    IoULong = 8
-    IoFloat = 9
-    IoDouble = 10
-    IoLocalDate = 11
-    IoInstant = 12
-    IoString = 13
-    IoByteArray = 14
-    IoNothing = 15
 
-    _NAMES = [
-        "IoBoolean", "IoByte", "IoUByte", "IoShort", "IoUShort",
-        "IoInt", "IoUInt", "IoLong", "IoULong", "IoFloat",
-        "IoDouble", "IoLocalDate", "IoInstant", "IoString",
-        "IoByteArray", "IoNothing",
-    ]
+    def __init__(self):
+        self._harness = None
+        self._seq_counter = 0
 
-    _FIXED_SIZES = {
-        IoBoolean: 1, IoByte: 1, IoUByte: 1,
-        IoShort: 2, IoUShort: 2,
-        IoInt: 4, IoUInt: 4,
-        IoLong: 8, IoULong: 8,
-        IoFloat: 4, IoDouble: 8,
-        IoLocalDate: 8, IoInstant: 12,
-        IoString: None, IoByteArray: None,
-        IoNothing: 0,
-    }
+    def _bind_harness(self, harness):
+        """Called by JVM to bind the HermesGraalHarness."""
+        self._harness = harness
 
-    @classmethod
-    def name(cls, ordinal: int) -> str:
-        return cls._NAMES[ordinal] if 0 <= ordinal < len(cls._NAMES) else "UNKNOWN"
+    def _next_seq(self) -> int:
+        self._seq_counter += 1
+        return self._seq_counter
 
-    @classmethod
-    def fixed_size(cls, ordinal: int):
-        return cls._FIXED_SIZES.get(ordinal)
+    # ──────────────────────────────────────────────────────────────
+    # Public API — matches HermesPointcutEmitter @HostAccess.Export methods
+    # ──────────────────────────────────────────────────────────────
 
-    @classmethod
-    def is_variable(cls, ordinal: int) -> bool:
-        return cls._FIXED_SIZES.get(ordinal) is None
+    def emitToolCall(self, phase: int, toolName: str, argsJson: str, seq: int = 0):
+        """Emit tool call/result pointcut."""
+        if self._harness:
+            args_hash = hash(argsJson)
+            self._harness.emitToolCall(phase.to_bytes(1, 'little')[0], toolName, args_hash, seq or self._next_seq())
 
-    @classmethod
-    def frame_size(cls, ordinal: int, value) -> int:
-        fs = cls.fixed_size(ordinal)
-        if fs is not None:
-            return fs
-        if ordinal == cls.IoString:
-            return 4 + len(value.encode('utf-8'))
-        if ordinal == cls.IoByteArray:
-            return 4 + len(value)
-        return 4
+    def emitAgentTurn(self, phase: int, turnId: str, seq: int = 0):
+        """Emit agent turn start/end pointcut."""
+        if self._harness:
+            self._harness.emitAgentTurn(phase.to_bytes(1, 'little')[0], turnId, seq or self._next_seq())
+
+    def emitSkillExec(self, phase: int, skillName: str, seq: int = 0):
+        """Emit skill load/exec pointcut."""
+        if self._harness:
+            self._harness.emitSkillExec(phase.to_bytes(1, 'little')[0], skillName, seq or self._next_seq())
+
+    def emitContextCompress(self, phase: int, compressionRatio: float, seq: int = 0):
+        """Emit context compression pointcut."""
+        if self._harness:
+            self._harness.emitContextCompress(phase.to_bytes(1, 'little')[0], compressionRatio, seq or self._next_seq())
+
+    def emitMemoryOp(self, phase: int, isWrite: bool, key: str, seq: int = 0):
+        """Emit memory read/write pointcut."""
+        if self._harness:
+            self._harness.emitMemoryOp(phase.to_bytes(1, 'little')[0], isWrite, hash(key), seq or self._next_seq())
+
+    def emitGatewayMessage(self, phase: int, channel: str, seq: int = 0):
+        """Emit gateway message pointcut."""
+        if self._harness:
+            self._harness.emitGatewayMessage(phase.to_bytes(1, 'little')[0], hash(channel), seq or self._next_seq())
+
+    # ──────────────────────────────────────────────────────────────
+    # Convenience helpers for Python callers
+    # ──────────────────────────────────────────────────────────────
+
+    def tool_call_before(self, toolName: str, argsJson: str) -> int:
+        seq = self._next_seq()
+        self.emitToolCall(ASC_PHASE_BEFORE, toolName, argsJson, seq)
+        return seq
+
+    def tool_call_after(self, toolName: str, argsJson: str, seq: int):
+        self.emitToolCall(ASC_PHASE_AFTER, toolName, argsJson, seq)
+
+    def agent_turn_before(self, turnId: str) -> int:
+        seq = self._next_seq()
+        self.emitAgentTurn(ASC_PHASE_BEFORE, turnId, seq)
+        return seq
+
+    def agent_turn_after(self, turnId: str, seq: int):
+        self.emitAgentTurn(ASC_PHASE_AFTER, turnId, seq)
+
+    def skill_load(self, skillName: str) -> int:
+        seq = self._next_seq()
+        self.emitSkillExec(ASC_PHASE_BEFORE, skillName, seq)
+        return seq
+
+    def skill_exec(self, skillName: str, seq: int):
+        self.emitSkillExec(ASC_PHASE_AFTER, skillName, seq)
+
+    def context_compress(self, compressionRatio: float) -> int:
+        seq = self._next_seq()
+        self.emitContextCompress(ASC_PHASE_BEFORE, compressionRatio, seq)
+        return seq
+
+    def memory_read(self, key: str) -> int:
+        seq = self._next_seq()
+        self.emitMemoryOp(ASC_PHASE_BEFORE, False, key, seq)
+        return seq
+
+    def memory_write(self, key: str) -> int:
+        seq = self._next_seq()
+        self.emitMemoryOp(ASC_PHASE_BEFORE, True, key, seq)
+        return seq
+
+    def gateway_message(self, channel: str) -> int:
+        seq = self._next_seq()
+        self.emitGatewayMessage(ASC_PHASE_BEFORE, channel, seq)
+        return seq
+
+
+# Module-level singleton (bound by host)
+_emitter = HermesPointcutEmitter()
+
+
+def set_emitter(emitter: HermesPointcutEmitter):
+    """Host calls this to replace the singleton."""
+    global _emitter
+    _emitter = emitter
+
+
+def get_emitter() -> HermesPointcutEmitter:
+    return _emitter
+
+
+# Make available as importable module
+sys.modules['hermes_instrument'] = sys.modules[__name__]
