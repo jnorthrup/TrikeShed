@@ -248,15 +248,15 @@ class BPlusTree<K : Comparable<K>, V>(
                 val newValues = _values.cowSet(index, value)
                 return LeafNode(_keys, newValues, keysCount, next)
             }
-            val newKeys = _keys.cowAdd(key)
-            val newValues = _values.cowAdd(value)
+            val newKeys: MutableSeries<K> = _keys.cowAdd(key)
+            val newValues: MutableSeries<V?> = _values.cowAdd(value)
             // Shift elements after index
             for (i in keysCount downTo index + 1) {
-                newKeys[i] = newKeys[i - 1]
-                newValues[i] = newValues[i - 1]
+                newKeys.set(i, newKeys.b(i - 1))
+                newValues.set(i, newValues.b(i - 1))
             }
-            newKeys[index] = key
-            newValues[index] = value
+            newKeys.set(index, key)
+            newValues.set(index, value)
             return LeafNode(newKeys, newValues, keysCount + 1, next)
         }
 
