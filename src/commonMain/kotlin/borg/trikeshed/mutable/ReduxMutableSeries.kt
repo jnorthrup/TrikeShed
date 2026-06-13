@@ -1,4 +1,4 @@
-package borg.trikeshed.lib
+package borg.trikeshed.mutable
 
 import kotlin.jvm.JvmStatic
 
@@ -60,9 +60,8 @@ class ReduxMutableSeries<A, S>(
          * using a CollectorReducer.
          */
         @JvmStatic
-            fun <T> of(delegate: MutableSeries<T>, capture: T): ReduxMutableSeries<T, Series<T>> {
-                return ReduxMutableSeries(delegate, CollectorReducer(), capture = capture)
-            }
+        fun <T> of(delegate: MutableSeries<T>, capture: T): ReduxMutableSeries<T, Series<T>> {
+            return ReduxMutableSeries(delegate, CollectorReducer(), capture = capture)
+        }
     }
 }
-

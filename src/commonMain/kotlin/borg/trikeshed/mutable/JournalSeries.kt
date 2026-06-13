@@ -1,5 +1,8 @@
-package borg.trikeshed.lib
+@file:Suppress("UNCHECKED_CAST")
 
+package borg.trikeshed.mutable
+
+import borg.trikeshed.lib.get
 
 /**
  * A MutableSeries that records every mutation in a journal, enabling rollback.

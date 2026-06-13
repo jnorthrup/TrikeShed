@@ -184,7 +184,24 @@ class ModelMuxReactor(
     parentJob: CompletableJob? = null
 ) : AsyncContextElement(ElementState.CREATED, parentJob), KeyedService {
 
-    companion object ReactorKey : AsyncContextKey<ModelMuxReactor>()
+    companion object ReactorKey : AsyncContextKey<ModelMuxReactor> {
+        fun create(
+            config: ModelMuxReactorConfig = ModelMuxReactorConfig(),
+            parentJob: CompletableJob? = null
+        ): ModelMuxReactor {
+            return ModelMuxReactor(config, parentJob)
+        }
+
+        /** Create with default config from current directory */
+        suspend fun createAndStart(
+            configDir: File = File("."),
+            parentJob: CompletableJob? = null
+        ): ModelMuxReactor {
+            val reactor = create(ModelMuxReactorConfig(configDir = configDir), parentJob)
+            reactor.initialize()
+            return reactor
+        }
+    }
 
     override val key: CoroutineContext.Key<*> get() = ReactorKey
 
@@ -244,7 +261,7 @@ class ModelMuxReactor(
 
         // 5. Initialize ModelProxy (ModelMux)
         println("  🌐 Initializing ModelProxy (ModelMux) on $effectiveBind:$effectivePort...")
-        modelProxy = ModelProxy.create(proxyConfig, keyStore, dselRouter, parentJob = this.supervisor).initialize()
+        modelProxy = ModelProxy.Factory.create(proxyConfig, keyStore, dselRouter, parentJob = this.supervisor).initialize()
 
         // 6. Start HTTP server
         println("  🚀 Starting HTTP server...")
@@ -321,7 +338,7 @@ class ModelMuxReactor(
                 "total_providers" to providerStatuses.size,
                 "provider_details" to providerStatuses.map { it.toMap() },
             ),
-            "modelmux" to modelProxy.health().await(),
+            "modelmux" to modelProxy.health(),
         )
     }
 
@@ -341,26 +358,6 @@ class ModelMuxReactor(
             serverJob = null
             
             close()
-        }
-    }
-
-    /** Factory method for easy creation */
-    companion object Factory {
-        fun create(
-            config: ModelMuxReactorConfig = ModelMuxReactorConfig(),
-            parentJob: CompletableJob? = null
-        ): ModelMuxReactor {
-            return ModelMuxReactor(config, parentJob)
-        }
-
-        /** Create with default config from current directory */
-        suspend fun createAndStart(
-            configDir: File = File("."),
-            parentJob: CompletableJob? = null
-        ): ModelMuxReactor {
-            val reactor = create(ModelMuxReactorConfig(configDir = configDir), parentJob)
-            reactor.initialize()
-            return reactor
         }
     }
 }

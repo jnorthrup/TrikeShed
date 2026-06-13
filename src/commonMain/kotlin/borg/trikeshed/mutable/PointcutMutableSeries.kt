@@ -1,11 +1,11 @@
-package borg.trikeshed.lib
+package borg.trikeshed.mutable
 
-import borg.trikeshed.cursor.Cursor
+import kotlin.text.get
 
 /**
  * A Decorator over an existing [MutableSeries] that acts as an Aspect-Oriented (AOP) pointcut harness.
- * Every mutating operation is intercepted, converted into a [MutationAction], 
- * and dispatched to the provided sink (e.g. a ReduxMutableSeries "firehose") 
+ * Every mutating operation is intercepted, converted into a [MutationAction],
+ * and dispatched to the provided sink (e.g. a ReduxMutableSeries "firehose")
  * BEFORE the mutation is applied to the underlying delegate.
  */
 class PointcutMutableSeries<T>(

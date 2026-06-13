@@ -1,7 +1,10 @@
+package borg.trikeshed.mutable
+
+import borg.trikeshed.lib.get
+
 @file:Suppress("UNCHECKED_CAST")
 
-package borg.trikeshed.lib
-
+import borg.trikeshed.lib.*
 
 /**
  * A MutableSeries that maintains sort order on insertion.

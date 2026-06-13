@@ -7,8 +7,8 @@ import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.Twin
 import borg.trikeshed.lib.j
 import borg.trikeshed.cursor.MutableSeries
-import borg.trikeshed.cursor.JournalSeries
-import borg.trikeshed.cursor.RingSeries
+import borg.trikeshed.lib.JournalSeries
+import borg.trikeshed.lib.RingSeries
 
 /** COW extension functions for MutableSeries */
 fun <T> MutableSeries<T>.cowAdd(item: T): MutableSeries<T> = when (this) {

@@ -1,5 +1,8 @@
-package borg.trikeshed.lib
+package borg.trikeshed.mutable
 
+import borg.trikeshed.collections.s_
+import borg.trikeshed.lib.*
+import borg.trikeshed.lib.get
 
 class RecursiveMutableSeries<T>(var data: Series<T>) : MutableSeries<T>, Series<T> {
 
@@ -50,7 +53,7 @@ class RecursiveMutableSeries<T>(var data: Series<T>) : MutableSeries<T>, Series<
         data = emptySeriesOf<T>()
     }
 
-    override fun plus(item: T): MutableSeries<T> = RecursiveMutableSeries(data + borg.trikeshed.collections.s_[item])
+    override fun plus(item: T): MutableSeries<T> = RecursiveMutableSeries(data + s_[item])
 
     override fun minus(item: T): MutableSeries<T> = RecursiveMutableSeries(
         size j { i ->
@@ -65,7 +68,6 @@ class RecursiveMutableSeries<T>(var data: Series<T>) : MutableSeries<T>, Series<
     override fun minusAssign(item: T) {
         remove(item)
     }
-
 
     tailrec fun indexOfFirst(predicate: (T) -> Boolean, index: Int = 0): Int = when {
         index >= size -> -1

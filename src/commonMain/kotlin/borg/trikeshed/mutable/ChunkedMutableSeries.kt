@@ -1,7 +1,9 @@
 @file:Suppress("UNCHECKED_CAST")
 
-package borg.trikeshed.lib
+package borg.trikeshed.mutable
 
+import borg.trikeshed.lib.*
+import borg.trikeshed.lib.get
 
 /**
  * A MutableSeries backed by a tree of fixed-size chunks.
@@ -61,7 +63,6 @@ class ChunkedMutableSeries<T>(
 
     override fun set(index: Int, item: T) {
         val (ci, offset) = chunkIndexAndOffset(index)
-        // Rebuild the target chunk with the new value
         val oldChunk = chunks[ci]
         val newChunk: Series<T> = oldChunk.size j { i ->
             if (i == offset) item else oldChunk[i]
@@ -74,7 +75,6 @@ class ChunkedMutableSeries<T>(
 
     override fun add(item: T) {
         if (totalSize == 0) {
-            // First chunk
             val firstChunk: Series<T> = 1 j { item }
             chunks = 1 j { firstChunk }
             totalSize = 1
@@ -83,7 +83,6 @@ class ChunkedMutableSeries<T>(
         val lastIdx = chunks.size - 1
         val lastChunk = chunks[lastIdx]
         if (lastChunk.size < chunkSize) {
-            // Append to existing last chunk
             val newLast: Series<T> = (lastChunk.size + 1) j { i ->
                 if (i < lastChunk.size) lastChunk[i] else item
             }
@@ -92,7 +91,6 @@ class ChunkedMutableSeries<T>(
                 if (i == lastIdx) newLast else oldChunks[i]
             }
         } else {
-            // Allocate new chunk
             val newChunk: Series<T> = 1 j { item }
             val oldChunks = chunks
             val oldLen = oldChunks.size
@@ -109,7 +107,6 @@ class ChunkedMutableSeries<T>(
             return
         }
         val (ci, offset) = chunkIndexAndOffset(index)
-        // Rebuild chunk: expand by 1, insert item at offset
         val oldChunk = chunks[ci]
         val newChunk: Series<T> = (oldChunk.size + 1) j { i ->
             when {
@@ -130,7 +127,6 @@ class ChunkedMutableSeries<T>(
         val oldChunk = chunks[ci]
         val item = oldChunk[offset]
         if (oldChunk.size == 1) {
-            // Remove the chunk entirely
             val nc = chunks.size - 1
             val oldChunks = chunks
             chunks = nc j { i ->

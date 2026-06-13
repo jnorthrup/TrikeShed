@@ -8,11 +8,9 @@ import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.j
 import borg.trikeshed.parse.confix.ConfixDoc
 import borg.trikeshed.parse.confix.confixDoc
-import borg.trikeshed.parse.confix.get
 import kotlinx.coroutines.CompletableJob
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
 import java.net.http.HttpClient
@@ -39,33 +37,35 @@ data class ModelProxyConfig(
 
 /**
  * Chat Completion Request parsed from ConfixDoc (OpenAI compatible)
- * Uses Facet projections for field access instead of data class properties
+ * Uses core ConfixDoc API (RowVec, step, reify) for field access
  */
 class ChatCompletionRequest(private val doc: ConfixDoc) {
     
-    /** Model ID (e.g., "gpt-4", "kilo_code/deepseek-chat") */
-    val model: String get() = doc.scalar("model") as? String ?: ""
+    private val src: borg.trikeshed.lib.Series<Byte> = doc.src
+    private val root: borg.trikeshed.cursor.RowVec? = doc.root
     
-    /** Messages array - each message is a ConfixCell */
-    val messages: List<ChatMessage> get() {
-        val cells = doc.docAt("messages")?.cellKids ?: 0 j { _ -> error("No messages") }
-        return cells.size j { i -> ChatMessage(cells[i]) }
-    }
+    /** Model ID (e.g., "gpt-4", "kilo_code/deepseek-chat") */
+    val model: String = root?.step("model", src)?.reify(src) as? String ?: ""
+    
+    /** Messages array */
+    val messages: List<ChatMessage> = root?.step("messages", src)?.kids?.let { kids ->
+        kids.size j { i -> ChatMessage(kids[i], src) }
+    } ?: emptyList()
     
     /** Temperature (optional) */
-    val temperature: Double? get() = doc.scalar("temperature") as? Double
+    val temperature: Double? = root?.step("temperature", src)?.reify(src) as? Double
     
     /** Max tokens (optional) */
-    val maxTokens: Int? get() = doc.scalar("max_tokens") as? Int
+    val maxTokens: Int? = root?.step("max_tokens", src)?.reify(src) as? Int
     
     /** Stream flag (optional) */
-    val stream: Boolean? get() = doc.scalar("stream") as? Boolean
+    val stream: Boolean? = root?.step("stream", src)?.reify(src) as? Boolean
     
     /** Tools (optional) */
-    val tools: List<Any>? get() = doc.scalar("tools") as? List<Any>
+    val tools: List<Any>? = root?.step("tools", src)?.reify(src) as? List<Any>
     
     /** Tool choice (optional) */
-    val toolChoice: Any? get() = doc.scalar("tool_choice")
+    val toolChoice: Any? = root?.step("tool_choice", src)?.reify(src)
     
     companion object Parse {
         /** Parse JSON string into ChatCompletionRequest */
@@ -76,18 +76,21 @@ class ChatCompletionRequest(private val doc: ConfixDoc) {
     }
 }
 
-/** Single chat message with facet-based access */
-class ChatMessage(private val cell: borg.trikeshed.parse.confix.ConfixCell) {
-    val role: String = cell.scalar("role") as? String ?: ""
-    val content: String? = cell.scalar("content") as? String
-    val name: String? = cell.scalar("name") as? String
-    val toolCalls: List<Any>? = cell.scalar("tool_calls") as? List<Any>
-    val toolCallId: String? = cell.scalar("tool_call_id") as? String
+/** Single chat message using core ConfixDoc API */
+class ChatMessage(
+    private val cell: borg.trikeshed.cursor.RowVec,
+    private val src: borg.trikeshed.lib.Series<Byte>
+) {
+    val role: String = cell.step("role", src)?.reify(src) as? String ?: ""
+    val content: String? = cell.step("content", src)?.reify(src) as? String
+    val name: String? = cell.step("name", src)?.reify(src) as? String
+    val toolCalls: List<Any>? = cell.step("tool_calls", src)?.reify(src) as? List<Any>
+    val toolCallId: String? = cell.step("tool_call_id", src)?.reify(src) as? String
 }
 
 /**
  * Chat Completion Response - built using kernel algebra (Join/Series)
- * No @Serializable - we construct JSON via ConfixDoc or string building
+ * No @Serializable - we construct JSON via string building
  */
 class ChatCompletionResponse(
     val id: String,
@@ -163,7 +166,7 @@ class ModelInfo(
     val object: String = "model",
     val created: Long = System.currentTimeMillis() / 1000,
 ) {
-    fun toJson(): String = """{"id": "$id", "object": "$object", "created": $created, "owned_by": "$ownedBy"}"""
+    fun toJson(): String = """{"id": "$id", "object": "$object", "created": $created, "owned_by": "$ownedBy"}"}
 }
 
 /**
@@ -309,7 +312,7 @@ class ModelProxy(
             throw RuntimeException("Provider ${route.provider} returned ${response.statusCode()}: ${response.body()}")
         }
 
-        // Parse response using ConfixDoc (Facet projections)
+        // Parse response using ConfixDoc (core API)
         return parseChatResponse(response.body(), route.provider)
     }
 
@@ -330,29 +333,31 @@ class ModelProxy(
         return """{"model": "${request.model}", "messages": [$messagesJson]$extraPrefix}"""
     }
 
-    /** Parse chat completion response using ConfixDoc */
+    /** Parse chat completion response using ConfixDoc core API */
     private fun parseChatResponse(body: String, provider: String): ChatCompletionResponse {
         val doc = confixDoc(body)
+        val src = doc.src
+        val root = doc.root ?: error("No root in response")
         
-        val id = doc.scalar("id") as? String ?: UUID.randomUUID().toString()
-        val model = doc.scalar("model") as? String ?: "unknown"
-        val created = (doc.scalar("created") as? Long) ?: (System.currentTimeMillis() / 1000)
+        val id = root.step("id", src)?.reify(src) as? String ?: UUID.randomUUID().toString()
+        val model = root.step("model", src)?.reify(src) as? String ?: "unknown"
+        val created = (root.step("created", src)?.reify(src) as? Long) ?: (System.currentTimeMillis() / 1000)
         
-        val choicesCells = doc.docAt("choices")?.cellKids ?: 0 j { _ -> emptyList() }
+        val choicesCells = root.step("choices", src)?.kids ?: 0 j { _ -> emptyList() }
         val choices = choicesCells.size j { i ->
             val choiceCell = choicesCells[i]
-            val index = choiceCell.scalar("index") as? Int ?: i
-            val messageCell = choiceCell.get("message") ?: error("No message in choice")
-            val message = ChatMessage(messageCell)
-            val finishReason = choiceCell.scalar("finish_reason") as? String
+            val index = choiceCell.step("index", src)?.reify(src) as? Int ?: i
+            val messageCell = choiceCell.step("message", src) ?: error("No message in choice")
+            val message = ChatMessage(messageCell, src)
+            val finishReason = choiceCell.step("finish_reason", src)?.reify(src) as? String
             Choice(index, message, finishReason)
         }
         
-        val usage = doc.docAt("usage")?.let { usageCell ->
+        val usage = root.step("usage", src)?.let { usageCell ->
             Usage(
-                promptTokens = usageCell.scalar("prompt_tokens") as? Int ?: 0,
-                completionTokens = usageCell.scalar("completion_tokens") as? Int ?: 0,
-                totalTokens = usageCell.scalar("total_tokens") as? Int ?: 0,
+                promptTokens = usageCell.step("prompt_tokens", src)?.reify(src) as? Int ?: 0,
+                completionTokens = usageCell.step("completion_tokens", src)?.reify(src) as? Int ?: 0,
+                totalTokens = usageCell.step("total_tokens", src)?.reify(src) as? Int ?: 0,
             )
         }
 
@@ -398,7 +403,7 @@ class ModelProxy(
     }
 
     /** Fetch models from a specific provider - uses ConfixDoc parsing */
-    private fun fetchModelsFromProvider(status: borg.trikeshed.modelmux.keymux.ProviderStatus): Deferred<List<ModelInfo>> = async {
+    private fun fetchModelsFromProvider(status: borg.trikeshed.modelmux.keymux.ProviderStatus): Deferred<List<ModelInfo>> = async(this.supervisor) {
         val key = keyStore.getKey(status.name) ?: return@async emptyList()
         val url = "${status.baseUrl}/models"
 
@@ -421,20 +426,22 @@ class ModelProxy(
         }
     }
 
-    /** Parse models response using ConfixDoc */
+    /** Parse models response using ConfixDoc core API */
     private fun parseModelsResponse(body: String, provider: String): List<ModelInfo> {
         return try {
             val doc = confixDoc(body)
+            val src = doc.src
+            val root = doc.root ?: error("No root in models response")
             
             // Try "data" field first (OpenAI format), then "models" (Gemini format)
-            val cells = doc.docAt("data")?.cellKids 
-                ?: doc.docAt("models")?.cellKids 
+            val cells = root.step("data", src)?.kids 
+                ?: root.step("models", src)?.kids 
                 ?: 0 j { _ -> emptyList() }
             
             cells.size j { i ->
                 val cell = cells[i]
-                val rawId = (cell.scalar("id") as? String) 
-                    ?: (cell.scalar("name") as? String) 
+                val rawId = cell.step("id", src)?.reify(src) as? String 
+                    ?: cell.step("name", src)?.reify(src) as? String 
                     ?: return@j ModelInfo("$provider/unknown", provider)
                 val cleanId = rawId.removePrefix("models/")
                 ModelInfo("$provider/$cleanId", provider)
@@ -449,8 +456,9 @@ class ModelProxy(
             throw IllegalStateException("ModelProxy not active. Current state: $state")
         }
     }
+}
 
-    companion object Factory {
+companion object Factory {
         fun create(
             config: ModelProxyConfig,
             keyStore: borg.trikeshed.modelmux.keymux.KeyStore,

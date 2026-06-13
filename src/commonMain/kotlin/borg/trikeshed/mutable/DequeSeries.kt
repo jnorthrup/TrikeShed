@@ -1,13 +1,16 @@
-@file:Suppress("UNCHECKED_CAST")
-
-package borg.trikeshed.lib
+package borg.trikeshed.mutable
 
 import borg.trikeshed.collections.s_
+import borg.trikeshed.lib.Series
+import borg.trikeshed.lib.get
+import borg.trikeshed.lib.j
+import borg.trikeshed.lib.plus
+import borg.trikeshed.lib.size
 
 /**
  * A MutableSeries supporting O(1) addFirst and addLast.
  *
- * Backed by two [Series]: `front` (stored in reverse order) and `back`
+ * Backed by two [borg.trikeshed.lib.Series]: `front` (stored in reverse order) and `back`
  * (stored forward). The read path stitches: front elements are accessed
  * in reverse, back elements are accessed forward.
  *
@@ -19,13 +22,12 @@ import borg.trikeshed.collections.s_
 class DequeSeries<T> : MutableSeries<T> {
 
    var front: Series<T> = 0 j { throw IndexOutOfBoundsException("empty Deque front") }
-   var back: Series<T>  = 0 j { throw IndexOutOfBoundsException("empty Deque back") }
+   var back: Series<T> = 0 j { throw IndexOutOfBoundsException("empty Deque back") }
 
     override val a: Int get() = front.size + back.size
 
     override val b: (Int) -> T = { i ->
         if (i < front.size) {
-            // Front is reversed — element at index i is front[size-1-i]
             front[front.size - 1 - i]
         } else {
             back[i - front.size]
@@ -33,7 +35,6 @@ class DequeSeries<T> : MutableSeries<T> {
     }
 
     fun addFirst(item: T) {
-        // Append to front so deque[0] = front[size-1] (most recently prepended)
         front = front + s_[item]
     }
 
@@ -43,17 +44,15 @@ class DequeSeries<T> : MutableSeries<T> {
 
     fun removeFirst(): T {
         if (front.size > 0) {
-            // deque[0] = front[size-1] (most recently addFirst'd is at end of front array)
             val item = front[front.size - 1]
             val oldFront = front
             front = if (oldFront.size == 1) {
                 0 j { throw IndexOutOfBoundsException("empty Deque front") }
             } else {
-                (oldFront.size - 1) j { i -> oldFront[i] }  // drop last element
+                (oldFront.size - 1) j { i -> oldFront[i] }
             }
             return item
         }
-        // Front empty, take from back
         val item = back[0]
         val oldBack = back
         back = if (oldBack.size == 1) {
@@ -75,13 +74,12 @@ class DequeSeries<T> : MutableSeries<T> {
             }
             return item
         }
-        // Back empty, take from front (last deque element = front[0])
         val item = front[0]
         val oldFront = front
         front = if (oldFront.size == 1) {
             0 j { throw IndexOutOfBoundsException("empty Deque front") }
         } else {
-            (oldFront.size - 1) j { i -> oldFront[i + 1] }  // drop first element
+            (oldFront.size - 1) j { i -> oldFront[i + 1] }
         }
         return item
     }
@@ -93,9 +91,7 @@ class DequeSeries<T> : MutableSeries<T> {
     override fun add(index: Int, item: T) {
         if (index == 0) { addFirst(item); return }
         if (index == a) { addLast(item); return }
-        // Insert in middle: rebuild the affected side
         if (index < front.size) {
-            // Insert into front
             val revIdx = front.size - 1 - index
             val oldFront = front
             front = (oldFront.size + 1) j { i ->

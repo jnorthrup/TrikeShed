@@ -72,15 +72,38 @@ class GraalPointcutHarness(
         }
     }
 
-    /** Install Python-side pointcut instrumentation module from resources. */
+    /** Install language-side pointcut instrumentation modules from resources. */
     private fun installPythonInstrumentation() {
+        // JS module — always available, registers pointcut_instrument global
         try {
-            val module = GraalPointcutHarness::class.java
+            val jsModule = GraalPointcutHarness::class.java
+                .getResource("/pointcut_instrument.js")
+                ?.readText()
+            if (jsModule != null) {
+                try {
+                    graalContext.eval("js", jsModule)
+                } catch (e: Exception) {
+                    System.err.println("[polyglot] pointcut_instrument.js eval failed: ${e.message}")
+                }
+            } else {
+                System.err.println("[polyglot] pointcut_instrument.js resource not found")
+            }
+        } catch (e: Exception) {
+            System.err.println("[polyglot] pointcut_instrument.js load failed: ${e.message}")
+        }
+        // Python module — optional, present iff GraalPy is on the classpath
+        try {
+            val pyModule = GraalPointcutHarness::class.java
                 .getResource("/pointcut_instrument.py")
                 ?.readText()
-                ?: return
-            graalContext.eval("python", module)
-        } catch (_: Exception) {
+            if (pyModule != null) {
+                try {
+                    graalContext.eval("python", pyModule)
+                } catch (e: Exception) {
+                    System.err.println("[polyglot] pointcut_instrument.py eval failed: ${e.message}")
+                }
+            }
+        } catch (e: Exception) {
             // Python runtime is optional in local Graal distributions.
         }
     }
@@ -212,12 +235,17 @@ class PolyglotPointcutEmitter(
         callsiteHash: Int,
         templateIdx: Int,
     ) {
+        // Host assigns its own monotonic seq — the polyglot-side seq is a hint,
+        // not a contract. Guaranteeing host monotonicity is part of the
+        // FieldSynapse wire protocol and is what TDD red test
+        // "sequence numbers are strictly increasing per emitter" relies on.
+        val hostSeq = harness.nextSeq()
         val synapse = FieldSynapse(
             phase = phase,
             opcode = opcode,
             methodIdx = harness.getMethodIndex(methodKey),
             addr = sourceLocation.hashCode(),
-            seq = seq.toInt(),
+            seq = hostSeq.toInt(),
             nano = System.nanoTime(),
             callsiteHash = callsiteHash,
             templateIdx = templateIdx,

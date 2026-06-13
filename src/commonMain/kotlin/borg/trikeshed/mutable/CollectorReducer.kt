@@ -1,4 +1,8 @@
-package borg.trikeshed.lib
+@file:Suppress("UNCHECKED_CAST")
+
+package borg.trikeshed.mutable
+
+import borg.trikeshed.lib.*
 
 /**
  * CollectorReducer — a generic [Reducer] that accumulates dispatched

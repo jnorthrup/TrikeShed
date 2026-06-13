@@ -1,22 +1,27 @@
-@file:Suppress("UNCHECKED_CAST")
+package borg.trikeshed.mutable
 
-package borg.trikeshed.lib
-
-/** Eviction listener invoked when elements are displaced by RingSeries. */
+/** Eviction listener invoked when elements are displaced by [RingSeries]. */
 fun interface EvictionListener<T> {
     fun onEvict(item: T)
 }
 
 /**
- * Fixed-capacity MutableSeries backed by a ring buffer.
+ * Fixed-capacity [MutableSeries] backed by a ring buffer.
  *
  * Capacity MUST be a power of 2 — mask-based indexing avoids modulo.
- * When full, [add] overwrites the oldest element and advances head.
- * [removeAt] slides the window by incrementing head.
+ * When full, [add] overwrites the oldest element and advances head, firing
+ * [evict] for the displaced element. [removeAt] slides the window left.
  *
- * O(1) append, O(1) get, O(1) set, O(1) removeAt, O(n) contains.
+ * O(1) append, O(1) get, O(1) set, O(n) removeAt/contains.
+ *
+ * This is the canonical ring: the single-arg constructor (`RingSeries(cap)`)
+ * resolves here with a `null` eviction listener, satisfying both the simple
+ * cursor-style call sites and the richer eviction-aware ones.
  */
-class RingSeries<T>(capacity: Int, val evict: EvictionListener<T>? = null) : MutableSeries<T> {
+class RingSeries<T>(
+    capacity: Int,
+    val evict: EvictionListener<T>? = null,
+) : MutableSeries<T> {
 
     init {
         require(capacity > 0) { "capacity must be positive" }
@@ -29,6 +34,7 @@ class RingSeries<T>(capacity: Int, val evict: EvictionListener<T>? = null) : Mut
     private var count = 0
 
     override val a: Int get() = count
+    @Suppress("UNCHECKED_CAST")
     override val b: (Int) -> T = { i ->
         require(i in 0 until count) { "index $i out of bounds [0, $count)" }
         buf[(head + i) and mask] as T
@@ -53,14 +59,12 @@ class RingSeries<T>(capacity: Int, val evict: EvictionListener<T>? = null) : Mut
     override fun add(index: Int, item: T) {
         require(index in 0..count)
         if (count < mask + 1) {
-            // Shift elements after index right by 1 (ring-aware)
             for (i in count downTo index + 1) {
                 buf[(head + i) and mask] = buf[(head + i - 1) and mask]
             }
             buf[(head + index) and mask] = item
             count++
         } else {
-            // Full buffer — drop oldest, insert at index (relative to new head)
             for (i in 0 until index) {
                 buf[(head + i) and mask] = buf[(head + i + 1) and mask]
             }
@@ -71,8 +75,8 @@ class RingSeries<T>(capacity: Int, val evict: EvictionListener<T>? = null) : Mut
 
     override fun removeAt(index: Int): T {
         require(index in 0 until count)
+        @Suppress("UNCHECKED_CAST")
         val item = buf[(head + index) and mask] as T
-        // Shift elements after index left by 1
         for (i in index until count - 1) {
             buf[(head + i) and mask] = buf[(head + i + 1) and mask]
         }
@@ -107,6 +111,11 @@ class RingSeries<T>(capacity: Int, val evict: EvictionListener<T>? = null) : Mut
         return this
     }
 
-    override fun plusAssign(item: T) { add(item) }
-    override fun minusAssign(item: T) { remove(item) }
+    override fun plusAssign(item: T) {
+        add(item)
+    }
+
+    override fun minusAssign(item: T) {
+        remove(item)
+    }
 }

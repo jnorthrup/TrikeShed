@@ -3,6 +3,7 @@
 package borg.trikeshed.lib
 
 import borg.trikeshed.collections.s_
+import borg.trikeshed.mutable.RingSeries
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue

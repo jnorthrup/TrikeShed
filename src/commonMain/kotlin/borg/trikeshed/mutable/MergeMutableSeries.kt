@@ -1,7 +1,9 @@
 @file:Suppress("UNCHECKED_CAST")
 
-package borg.trikeshed.lib
+package borg.trikeshed.mutable
 
+import borg.trikeshed.lib.*
+import borg.trikeshed.lib.get
 
 /**
  * A MutableSeries that batches inserts and lazily merge-sorts.
@@ -31,7 +33,6 @@ class MergeMutableSeries<T>(
 
     override val a: Int get() = totalSize
     override val b: (Int) -> T = { i ->
-        // Read from sorted — pending is invisible until compacted
         require(i in 0 until sorted.size) { "index $i out of bounds [0, ${sorted.size})" }
         sorted[i]
     }
@@ -42,12 +43,10 @@ class MergeMutableSeries<T>(
     }
 
     override fun add(index: Int, item: T) {
-        // Ignore index — goes into pending for batch merge
         add(item)
     }
 
     override fun set(index: Int, item: T) {
-        // Remove old from sorted, add new to pending
         val oldSorted = sorted
         sorted = (oldSorted.size - 1) j { i ->
             if (i < index) oldSorted[i] else oldSorted[i + 1]
@@ -72,7 +71,6 @@ class MergeMutableSeries<T>(
                 return true
             }
         }
-        // Also check pending
         for (i in 0 until pending.size) {
             if (comparator(pending[i], item) == 0) {
                 pending.removeAt(i)
@@ -105,11 +103,10 @@ class MergeMutableSeries<T>(
     fun compact() {
         if (pending.size == 0) return
 
-        val sortedPending = sortPending()  // pure array-backed series
+        val sortedPending = sortPending()
         val sSize = sorted.size
         val pSize = sortedPending.size
         val n = sSize + pSize
-        // Eagerly materialize to avoid double-access of mutable-counter lambda
         val arr = arrayOfNulls<Any?>(n)
         var si = 0; var pi = 0
         @Suppress("UNCHECKED_CAST")
@@ -131,7 +128,6 @@ class MergeMutableSeries<T>(
     private fun sortPending(): Series<T> {
         if (pending.size <= 1) return pending.data
 
-        // Collect into an Array for in-place insertion sort
         val arr = arrayOfNulls<Any?>(pending.size)
         for (i in 0 until pending.size) arr[i] = pending[i]
 
