@@ -32,6 +32,7 @@ class WindowShell(private val context: WindowContextElement) {
     fun knob(id: String, min: Double = 0.0, max: Double = 1.0, initial: Double = 0.0, detents: Int? = null): Knob = signals.knob(id, min, max, initial, detents)
     fun <T> dial(id: String, positions: List<T>, initial: T? = null): Dial<T> = signals.dial(id, positions, initial)
     fun level(id: String, peakHoldMillis: Long = 1000): LevelMeter = signals.levelMeter(id, peakHoldMillis)
+    fun textField(id: String, initial: String = "", placeholder: String? = null, masked: Boolean = false): TextField = signals.textField(id, initial, placeholder, masked)
 
     // ====================================================================
     // Template & Composition

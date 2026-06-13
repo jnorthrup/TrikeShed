@@ -1,6 +1,8 @@
 package borg.trikeshed.windowtoolkit.widgets
 
 import borg.trikeshed.windowtoolkit.internal.*
+import kotlin.math.max
+import kotlin.math.min
 
 /**
  * Widget - UI component bound to a Signal.
@@ -158,7 +160,7 @@ class SliderWidget(override val signal: Slider) : Widget<Double> {
  * Knob widget.
  */
 class KnobWidget(override val signal: Knob, val size: Double = 40.0) : Widget<Double> {
-    override fun render(value: Double, ctx: RenderContext): RenderContext {
+    override fun render(value: Double, ctx: RenderContext): Rendered {
         val normalized = (value - signal.min) / (signal.max - signal.min)
         val angle = normalized * 270.0 - 135.0 // -135 to 135 degrees
         return Rendered(listOf(
@@ -190,6 +192,37 @@ class MeterWidget(override val signal: LevelMeter, val width: Double = 20.0, val
             RenderCommand.FillRect(0.0, height - levelHeight, width, levelHeight, Color.Green),
             RenderCommand.DrawRect(0.0, 0.0, width, height, Color.Black, filled = false)
         ))
+    }
+}
+
+/**
+ * Text field widget.
+ */
+class TextFieldWidget(override val signal: TextField, val width: Double = 200.0, val height: Double = 24.0) : Widget<TextFieldState> {
+    override fun render(state: TextFieldState, ctx: RenderContext): Rendered {
+        val masked = if (signal is TextFieldImpl) signal.masked else false
+        val displayText = if (masked) "●".repeat(state.text.length) else state.text
+        val caretX = if (state.text.isEmpty()) 4.0 else 4.0 + (displayText.substring(0, min(state.caret, state.text.length)).length * 7.0)
+        
+        val commands = mutableListOf<RenderCommand>(
+            RenderCommand.FillRect(0.0, 0.0, width, height, if (state.focused) Color.White else Color.LightGray),
+            RenderCommand.DrawRect(0.0, 0.0, width, height, if (state.focused) Color.Blue else Color.Gray, filled = false),
+            RenderCommand.DrawText(displayText, 4.0, height - 4.0, Color.Black, 12.0)
+        )
+        
+        if (state.focused && state.hasSelection) {
+            val selStartX = 4.0 + (displayText.substring(0, min(state.selectionStart, state.text.length)).length * 7.0)
+            val selEndX = 4.0 + (displayText.substring(0, min(state.selectionEnd, state.text.length)).length * 7.0)
+            val left = min(selStartX, selEndX)
+            val right = max(selStartX, selEndX)
+            commands.add(RenderCommand.FillRect(left, 2.0, right - left, height - 4.0, Color(0, 120, 215, 100)))
+        }
+        
+        if (state.focused && !state.hasSelection) {
+            commands.add(RenderCommand.DrawLine(caretX, 4.0, caretX, height - 4.0, Color.Blue, 1.0))
+        }
+        
+        return Rendered(commands)
     }
 }
 
@@ -229,11 +262,12 @@ class PanelWidget(
                 }
             }
             is Layout.Grid -> {
+                val spacing = 0.0 // Grid doesn't have spacing property
                 var col = 0
                 var row = 0
                 children.forEach { child ->
-                    val cx = col * (layout.cellWidth + layout.spacing)
-                    val cy = row * (layout.cellHeight + layout.spacing)
+                    val cx = col * (layout.cellWidth + spacing)
+                    val cy = row * (layout.cellHeight + spacing)
                     val rendered = child.render(Unit, ctx)
                     commands.addAll(rendered.commands.map { shift(it, cx, cy) })
                     col++
@@ -254,7 +288,9 @@ class PanelWidget(
             }
             is Layout.Absolute -> {
                 layout.children.forEach { pos ->
-                    val rendered = pos.widget.render(Unit, ctx)
+                    @Suppress("UNCHECKED_CAST")
+                    val widget = pos.widget as Widget<Unit>
+                    val rendered = widget.render(Unit, ctx)
                     commands.addAll(rendered.commands.map { shift(it, pos.x, pos.y) })
                 }
             }

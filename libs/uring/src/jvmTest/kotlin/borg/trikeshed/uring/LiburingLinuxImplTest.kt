@@ -54,7 +54,7 @@ class LiburingLinuxImplTest {
         //   3. mmap SQ entries: sqes = mmap(0, sqes_size, ..., ring_fd, IORING_OFF_SQES)
         //   4. mmap CQ ring: cq_ptr = mmap(0, cq_size, ..., ring_fd, IORING_OFF_CQ_RING)
         // The stub has none of this — it returns 0 for submitRead.
-        assertTrue(true) // contract test
+        TODO("redefine test requirements")
     }
 
     /** SQE submission: prep → submit → reap CQE. */

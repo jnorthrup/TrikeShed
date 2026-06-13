@@ -1,6 +1,13 @@
 package borg.trikeshed.windowtoolkit.window
 
+import borg.trikeshed.windowtoolkit.dsl.windowContext
+import borg.trikeshed.windowtoolkit.internal.Toggle
+import borg.trikeshed.windowtoolkit.internal.Slider
+import borg.trikeshed.windowtoolkit.internal.Knob
+import borg.trikeshed.windowtoolkit.internal.RadioToggle
 import borg.trikeshed.windowtoolkit.widgets.*
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.delay
 
 /**
  * Window - platform-native container for widgets.
@@ -171,56 +178,56 @@ class SwingWidgetHandle<T>(override val widget: Widget<T>) : WidgetHandle<T> {
  * Example: Create audio mixer UI.
  */
 fun main() = runBlocking {
-    // Create signals
-    val power = toggle(false)
-    val volume = slider(0.0, 100.0, 50.0)
-    val bass = knob(-12.0, 12.0, 0.0, 24)
-    val treble = knob(-12.0, 12.0, 0.0, 24)
-    val inputSelect = radioToggle(listOf("Mic", "Line", "USB"), "Line")
-    
-    // Create widgets
-    val powerWidget = ToggleWidget(power)
-    val volumeWidget = SliderWidget(volume)
-    val bassWidget = KnobWidget(bass)
-    val trebleWidget = KnobWidget(treble)
-    val inputWidget = RadioWidget(inputSelect)
-    
-    // Create layout
-    val mixerPanel = PanelWidget(
-        children = listOf(
-            powerWidget,
-            inputWidget,
-            volumeWidget,
-            PanelWidget(
-                children = listOf(bassWidget, trebleWidget),
-                layout = Layout.Row(8.0)
-            )
-        ),
-        layout = Layout.Column(16.0),
-        padding = 16.0
-    )
-    
-    // Create window
-    val factory = SwingWindowFactory()
-    val window = factory.create("Audio Mixer", Size(300, 250), mixerPanel)
-    window.attach(mixerPanel)
-    
-    // Open and render
-    window.open()
-    window.render()
-    
-    // Simulate signal changes
-    delay(100)
-    volume.setValue(75.0)
-    window.render()
-    
-    delay(100)
-    bass.rotateBy(2.0)
-    window.render()
-    
-    delay(100)
-    window.close()
+    val shell = windowContext {
+        // Create signals
+        val power = toggle("power", false)
+        val volume = slider("volume", 0.0, 100.0, 50.0)
+        val bass = knob("bass", -12.0, 12.0, 0.0, 24)
+        val treble = knob("treble", -12.0, 12.0, 0.0, 24)
+        val inputSelect = radioToggle("input", listOf("Mic", "Line", "USB"), "Line")
+        
+        // Create widgets
+        val powerWidget = ToggleWidget(power)
+        val volumeWidget = SliderWidget(volume)
+        val bassWidget = KnobWidget(bass)
+        val trebleWidget = KnobWidget(treble)
+        val inputWidget = RadioWidget(inputSelect)
+        
+        // Create layout
+        val mixerPanel = PanelWidget(
+            children = listOf(
+                powerWidget,
+                inputWidget,
+                volumeWidget,
+                PanelWidget(
+                    children = listOf(bassWidget, trebleWidget),
+                    layout = Layout.Row(8.0)
+                )
+            ),
+            layout = Layout.Column(16.0),
+            padding = 16.0
+        )
+        
+        // Create window
+        val factory = SwingWindowFactory()
+        val window = factory.create("Audio Mixer", Size(300.0, 250.0), mixerPanel)
+        window.attach(mixerPanel)
+        
+        // Open and render
+        window.open()
+        window.render()
+        
+        // Simulate signal changes
+        delay(100)
+        volume.setValue(75.0)
+        window.render()
+        
+        delay(100)
+        bass.rotateBy(2.0)
+        window.render()
+        
+        delay(100)
+        window.close()
+    }
 }
-
-private fun <T> kotlinx.coroutines.runBlocking(block: suspend () -> T): T = 
     kotlinx.coroutines.runBlocking { block() }

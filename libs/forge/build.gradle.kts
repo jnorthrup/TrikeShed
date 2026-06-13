@@ -21,7 +21,7 @@ sourceSets {
 
 dependencies {
     // TrikeShed core (when available via composite build)
-    // implementation(project(":src"))
+    implementation(project(":"))
     
     // Serialization / wireproto
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")

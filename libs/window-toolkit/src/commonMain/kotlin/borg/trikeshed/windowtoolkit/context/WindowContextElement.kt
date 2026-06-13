@@ -5,9 +5,11 @@ import borg.trikeshed.windowtoolkit.internal.SignalEvent
 import borg.trikeshed.windowtoolkit.internal.SignalSubscriber
 import borg.trikeshed.windowtoolkit.internal.AsyncSignalElement
 import borg.trikeshed.windowtoolkit.internal.AsyncSignalKey
+import borg.trikeshed.windowtoolkit.internal.TextField
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.launch
 import kotlin.coroutines.CoroutineContext
 
 // -- Temporary Stubs for CCEK Reactor implementation until KMP JS issues in root project are resolved --
@@ -40,9 +42,56 @@ class WindowContextElement : AsyncContextElement {
     // Window-specific subscribers (for backward compatibility)
     private val subscribers = mutableListOf<WindowEventSubscriber>()
 
+    // Track if synthetic sources have been registered
+    private var syntheticSourcesRegistered = false
+
     override suspend fun open() {
         super.open()
         signalContext.open()
+        registerSyntheticSources()
+    }
+
+    private fun registerSyntheticSources() {
+        if (syntheticSourcesRegistered) return
+        syntheticSourcesRegistered = true
+        
+        // Register window.resize as a synthetic source so it can be used in templates
+        val resizeSource = object : SignalSource<WindowResizeEvent> {
+            override var value: WindowResizeEvent = WindowResizeEvent(0.0, 0.0)
+                private set
+            private val _channel = Channel<WindowResizeEvent>(Channel.UNLIMITED)
+            override val changes: Flow<WindowResizeEvent> = _channel.asFlow()
+            override fun emit(value: WindowResizeEvent): WindowResizeEvent {
+                this.value = value
+                _channel.trySend(value)
+                return value
+            }
+            override suspend fun emitSuspend(value: WindowResizeEvent): WindowResizeEvent {
+                this.value = value
+                _channel.send(value)
+                return value
+            }
+        }
+        signalContext.registerSource("window.resize", resizeSource)
+
+        // Register window.token as a synthetic source so it can be used in templates
+        val tokenSource = object : SignalSource<InputTokenEvent> {
+            override var value: InputTokenEvent = InputTokenEvent("")
+                private set
+            private val _channel = Channel<InputTokenEvent>(Channel.UNLIMITED)
+            override val changes: Flow<InputTokenEvent> = _channel.asFlow()
+            override fun emit(value: InputTokenEvent): InputTokenEvent {
+                this.value = value
+                _channel.trySend(value)
+                return value
+            }
+            override suspend fun emitSuspend(value: InputTokenEvent): InputTokenEvent {
+                this.value = value
+                _channel.send(value)
+                return value
+            }
+        }
+        signalContext.registerSource("window.token", tokenSource)
     }
 
     suspend fun publishResize(width: Double, height: Double) {
@@ -82,6 +131,15 @@ class WindowContextElement : AsyncContextElement {
 
     /** Get a registered signal */
     fun <T> getSignal(signalId: String) = signalContext.getSignal<T>(signalId)
+
+    /** Bind window.token flow to a TextField for automatic text insertion */
+    fun bindTokenToTextField(textField: TextField) {
+        tokenFlow().onEach { event ->
+            if (textField.value.focused) {
+                textField.insert(event.token)
+            }
+        }.launchIn(kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Default + signalContextInstance))
+    }
 
     override suspend fun close() {
         subscribers.clear()

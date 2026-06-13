@@ -1,202 +1,184 @@
 package borg.trikeshed.forge.cursor
 
-import borg.trikeshed.forge.*
+import borg.trikeshed.forge.CardPriority
+import borg.trikeshed.forge.KanbanBoard
+import borg.trikeshed.forge.KanbanBoardId
+import borg.trikeshed.forge.KanbanCard
+import borg.trikeshed.forge.KanbanCardId
+import borg.trikeshed.forge.KanbanColumn
+import borg.trikeshed.forge.KanbanColumnId
+import borg.trikeshed.forge.toCascadeGraph
+import borg.trikeshed.forge.toDot
+import borg.trikeshed.forge.toMermaid
+import borg.trikeshed.userspace.reactor.HermesKanbanCli
+import borg.trikeshed.userspace.reactor.HermesKanbanTask
+import borg.trikeshed.userspace.reactor.HermesKanbanTaskDetail
+import kotlinx.coroutines.runBlocking
 
 /**
- * Hermes Kanban SQLite-backed board.
- * 
- * Bridges Forge Kanban to `~/.hermes/kanban.db`:
- * - tasks → KanbanCard
- * - task_runs → Card history
- * - task_links → dependencies
- * - task_comments → card notes
- * 
- * Provides:
- * - loadBoard() → KanbanBoard
- * - toCascadeGraph() → graphviz rendering
- * - renderMermaid() / renderDot() → diagram output
+ * CLI-backed projection of a Hermes kanban board into Forge Kanban types.
+ *
+ * This keeps Hermes as the durable operational truth while Forge owns the typed,
+ * visual projection surface.
  */
 class HermesKanbanCursor(
-    private val dbPath: String = "~/.hermes/kanban.db",
+    private val cli: HermesKanbanCli = HermesKanbanCli(),
 ) {
-    
-    // In real impl: JDBC connection to SQLite
-    
-    /**
-     * Load board from Hermes kanban.
-     */
-    fun loadBoard(boardId: String = "tshed"): KanbanBoard {
-        // Query tasks table, map status → columns
-        val columns = listOf(
-            KanbanColumn(KanbanColumnId("todo"), "To Do", 0),
-            KanbanColumn(KanbanColumnId("ready"), "Ready", 1),
-            KanbanColumn(KanbanColumnId("running"), "Running", 2),
-            KanbanColumn(KanbanColumnId("done"), "Done", 3),
-            KanbanColumn(KanbanColumnId("blocked"), "Blocked", 4),
-        )
-        
-        // Cards loaded from SQLite tasks table
-        return KanbanBoard(
+
+    fun loadBoard(boardId: String = cli.board): KanbanBoard = runBlocking {
+        val client = clientFor(boardId)
+        val details = client.list().map { task -> client.show(task.id) }
+        val columnIds = standardColumns.associate { it.status to it.id }
+        KanbanBoard(
             id = KanbanBoardId(boardId),
-            name = "Hermes Kanban",
-            columns = columns,
-            cards = emptyList(),
+            name = "Hermes Kanban ($boardId)",
+            columns = standardColumns.mapIndexed { index, spec ->
+                KanbanColumn(
+                    id = spec.id,
+                    name = spec.name,
+                    order = index,
+                )
+            },
+            cards = details.map { detail -> detail.toKanbanCard(columnIds) },
+            metadata = mapOf(
+                "board" to boardId,
+                "source" to "hermes-cli",
+            ),
         )
     }
-    
-    /**
-     * Get all cards optionally filtered by status.
-     */
-    fun getCards(status: String? = null): List<KanbanCard> {
-        // SELECT * FROM tasks WHERE status = ?
-        return emptyList()
+
+    fun getCards(status: String? = null): List<KanbanCard> = runBlocking {
+        val columnIds = standardColumns.associate { it.status to it.id }
+        cli.list(status).map { task -> cli.show(task.id).toKanbanCard(columnIds) }
     }
-    
-    /**
-     * Get card dependencies from task_links.
-     */
-    fun getDependencies(cardId: KanbanCardId): List<KanbanCardId> {
-        // SELECT * FROM task_links WHERE parent_id = ? OR child_id = ?
-        return emptyList()
+
+    fun getDependencies(cardId: KanbanCardId): List<KanbanCardId> = runBlocking {
+        cli.show(cardId.value).parents.map(::KanbanCardId)
     }
-    
-    /**
-     * Get run history for card.
-     */
-    fun getRuns(cardId: KanbanCardId): List<CardRun> {
-        // SELECT * FROM task_runs WHERE task_id = ? ORDER BY started_at DESC
-        return emptyList()
-    }
-    
-    /**
-     * Get comments for card.
-     */
-    fun getComments(cardId: KanbanCardId): List<CardComment> {
-        // SELECT * FROM task_comments WHERE task_id = ?
-        return emptyList()
-    }
-    
-    /**
-     * Convert board to CascadeGraph for visualization.
-     */
-    fun toCascadeGraph(board: KanbanBoard): CascadeGraph {
-        val nodes = mutableListOf<CascadeNode>()
-        val edges = mutableListOf<CascadeEdge>()
-        
-        // Column nodes as SOURCE/SINK
-        board.columns.forEach { col ->
-            nodes.add(CascadeNode(
-                id = col.id.value,
-                type = CascadeStageType.SOURCE,
-                label = col.name,
-                config = mapOf("order" to col.order.toString()),
-            ))
+
+    fun getRuns(cardId: KanbanCardId): List<CardRun> = runBlocking {
+        cli.show(cardId.value).runs.map { run ->
+            CardRun(
+                id = run.id,
+                profile = run.profile,
+                status = run.status,
+                outcome = run.outcome,
+                summary = run.summary,
+                startedAt = toMillis(run.startedAt),
+                endedAt = run.endedAt?.let(::toMillis),
+            )
         }
-        
-        // Card nodes
-        board.cards.forEach { card ->
-            val stageType = when (card.priority) {
-                CardPriority.CRITICAL -> CascadeStageType.MAP
-                CardPriority.HIGH -> CascadeStageType.MAP
-                else -> CascadeStageType.FILTER
-            }
-            nodes.add(CascadeNode(
-                id = card.id.value,
-                type = stageType,
-                label = card.title,
-                config = mapOf(
-                    "column" to card.columnId.value,
-                    "priority" to card.priority.name,
-                    "assignee" to (card.assignee ?: ""),
-                ),
-            ))
-            
-            // Edge to column
-            edges.add(CascadeEdge(
-                from = card.columnId.value,
-                to = card.id.value,
-                dataFlow = "in-column",
-            ))
-            
-            // Dependency edges
-            card.dependencies.forEach { dep ->
-                edges.add(CascadeEdge(
-                    from = dep.value,
-                    to = card.id.value,
-                    dataFlow = "blocked-by",
-                ))
-            }
+    }
+
+    fun getComments(cardId: KanbanCardId): List<CardComment> = runBlocking {
+        cli.show(cardId.value).comments.map { comment ->
+            CardComment(
+                id = comment.id ?: -1,
+                taskId = cardId,
+                author = comment.author,
+                body = comment.body,
+                createdAt = comment.createdAt?.let(::toMillis) ?: 0L,
+            )
         }
-        
-        return CascadeGraph(
-            cascadeId = CascadeId(board.id.value),
-            nodes = nodes,
-            edges = edges,
+    }
+
+    fun toCascadeGraph(board: KanbanBoard) = board.toCascadeGraph()
+
+    fun renderMermaid(board: KanbanBoard): String = board.toMermaid()
+
+    fun renderDot(board: KanbanBoard): String = board.toDot()
+
+    private fun clientFor(boardId: String): HermesKanbanCli =
+        if (boardId == cli.board) cli else cli.withBoard(boardId)
+
+    private fun HermesKanbanTaskDetail.toKanbanCard(columnIds: Map<String, KanbanColumnId>): KanbanCard {
+        val task = task
+        val createdAtMs = toMillis(task.createdAt)
+        val updatedAtMs = lastTimestamp(task)
+        return KanbanCard(
+            id = KanbanCardId(task.id),
+            title = task.title,
+            description = task.body ?: latestSummary.orEmpty(),
+            columnId = columnIds[task.status] ?: KanbanColumnId(task.status),
+            assignee = task.assignee,
+            priority = mapPriority(task.priority),
+            dependencies = parents.map(::KanbanCardId),
+            tags = buildSet {
+                add(task.status)
+                task.assignee?.let { add("assignee:$it") }
+            },
+            metadata = metadataFor(task),
+            createdAt = createdAtMs,
+            updatedAt = updatedAtMs,
         )
     }
-    
-    /**
-     * Render as Mermaid diagram.
-     */
-    fun renderMermaid(board: KanbanBoard): String {
-        val graph = toCascadeGraph(board)
-        return buildString {
-            appendLine("graph LR")
-            graph.nodes.forEach { node ->
-                val shape = when (node.type) {
-                    CascadeStageType.SOURCE -> "[${node.label}]"
-                    else -> "(${node.label})"
-                }
-                appendLine("  ${node.id}$shape")
-            }
-            graph.edges.forEach { edge ->
-                val arrow = when (edge.dataFlow) {
-                    "blocked-by" -> "-->|blocked|"
-                    else -> "-->"
-                }
-                appendLine("  ${edge.from} $arrow ${edge.to}")
-            }
+
+    private fun HermesKanbanTaskDetail.metadataFor(task: HermesKanbanTask): Map<String, String> = buildMap {
+        task.createdBy?.let { put("createdBy", it) }
+        task.tenant?.let { put("tenant", it) }
+        task.workspaceKind?.let { put("workspaceKind", it) }
+        task.workspacePath?.let { put("workspacePath", it) }
+        task.branchName?.let { put("branchName", it) }
+        task.sessionId?.let { put("sessionId", it) }
+        task.workflowTemplateId?.let { put("workflowTemplateId", it) }
+        task.currentStepKey?.let { put("currentStepKey", it) }
+        latestSummary?.let { put("latestSummary", it) }
+        put("priority.raw", task.priority.toString())
+        put("comments.count", comments.size.toString())
+        put("events.count", events.size.toString())
+        put("runs.count", runs.size.toString())
+        put("children.count", children.size.toString())
+        if (task.skills.isNotEmpty()) {
+            put("skills", task.skills.joinToString(","))
         }
     }
-    
-    /**
-     * Render as Graphviz DOT.
-     */
-    fun renderDot(board: KanbanBoard): String {
-        val graph = toCascadeGraph(board)
-        return buildString {
-            appendLine("digraph ${board.id.value} {")
-            appendLine("  rankdir=LR;")
-            appendLine("  node [shape=box,style=rounded];")
-            
-            graph.nodes.forEach { node ->
-                val color = when (node.type) {
-                    CascadeStageType.SOURCE -> "lightgray"
-                    CascadeStageType.MAP -> "lightblue"
-                    else -> "white"
-                }
-                val style = when (node.type) {
-                    CascadeStageType.SOURCE -> "style=filled,"
-                    else -> ""
-                }
-                appendLine("  ${node.id} [label=\"${node.label}\",fillcolor=$color$style];")
-            }
-            
-            graph.edges.forEach { edge ->
-                val style = when (edge.dataFlow) {
-                    "blocked-by" -> "color=red,style=bold,"
-                    else -> ""
-                }
-                appendLine("  ${edge.from} -> ${edge.to} [label=\"${edge.dataFlow}\"$style];")
-            }
-            appendLine("}")
-        }
+
+    private fun mapPriority(priority: Int): CardPriority = when {
+        priority >= 100 -> CardPriority.CRITICAL
+        priority > 0 -> CardPriority.HIGH
+        priority < 0 -> CardPriority.LOW
+        else -> CardPriority.MEDIUM
+    }
+
+    private fun lastTimestamp(task: HermesKanbanTask): Long = when {
+        task.completedAt != null -> toMillis(task.completedAt)
+        task.startedAt != null -> toMillis(task.startedAt)
+        else -> toMillis(task.createdAt)
+    }
+
+    private fun toMillis(epochSeconds: Long?): Long = when {
+        epochSeconds == null -> 0L
+        epochSeconds >= 100_000_000_000L -> epochSeconds
+        else -> epochSeconds * 1000L
+    }
+
+    private data class ColumnSpec(
+        val status: String,
+        val id: KanbanColumnId,
+        val name: String,
+    )
+
+    private companion object {
+        val standardColumns = listOf(
+            ColumnSpec("triage", KanbanColumnId("triage"), "Triage"),
+            ColumnSpec("todo", KanbanColumnId("todo"), "To Do"),
+            ColumnSpec("ready", KanbanColumnId("ready"), "Ready"),
+            ColumnSpec("running", KanbanColumnId("running"), "Running"),
+            ColumnSpec("review", KanbanColumnId("review"), "Review"),
+            ColumnSpec("blocked", KanbanColumnId("blocked"), "Blocked"),
+            ColumnSpec("scheduled", KanbanColumnId("scheduled"), "Scheduled"),
+            ColumnSpec("done", KanbanColumnId("done"), "Done"),
+            ColumnSpec("archived", KanbanColumnId("archived"), "Archived"),
+        )
     }
 }
 
-/**
- * Card run history from task_runs table.
- */
+fun openHermesKanban(boardId: String = "tshed"): KanbanBoard = HermesKanbanCursor().loadBoard(boardId)
+
+fun hermesKanbanMermaid(board: KanbanBoard): String = HermesKanbanCursor().renderMermaid(board)
+
+fun hermesKanbanDot(board: KanbanBoard): String = HermesKanbanCursor().renderDot(board)
+
 data class CardRun(
     val id: Int,
     val profile: String,
@@ -207,9 +189,6 @@ data class CardRun(
     val endedAt: Long?,
 )
 
-/**
- * Card comment from task_comments table.
- */
 data class CardComment(
     val id: Int,
     val taskId: KanbanCardId,
@@ -217,21 +196,3 @@ data class CardComment(
     val body: String,
     val createdAt: Long,
 )
-
-/**
- * Open Hermes Kanban board.
- */
-fun openHermesKanban(dbPath: String = "~/.hermes/kanban.db"): KanbanBoard =
-    HermesKanbanCursor(dbPath).loadBoard()
-
-/**
- * Render Hermes kanban as Mermaid.
- */
-fun hermesKanbanMermaid(board: KanbanBoard): String =
-    HermesKanbanCursor().renderMermaid(board)
-
-/**
- * Render Hermes kanban as Graphviz DOT.
- */
-fun hermesKanbanDot(board: KanbanBoard): String =
-    HermesKanbanCursor().renderDot(board)

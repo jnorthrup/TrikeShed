@@ -24,47 +24,47 @@ class BPlusTreeContractTest {
     @Test
     fun `BPlusTree insert produces new root copy-on-write`() {
         // btrfs is a COW filesystem — insert never mutates existing nodes
-        assertTrue(true)
+        TODO("redefine test requirements")
     }
 
     @Test
     fun `BPlusTree lookup retrieves value by key`() {
-        assertTrue(true)
+        TODO("redefine test requirements")
     }
 
     @Test
     fun `BPlusTree rangeQuery returns all keys in range`() {
         // [start, end) inclusive lower bound, exclusive upper
-        assertTrue(true)
+        TODO("redefine test requirements")
     }
 
     @Test
     fun `BPlusTree split occurs at overflow`() {
         // When node exceeds maxFanout, split into two nodes
-        assertTrue(true)
+        TODO("redefine test requirements")
     }
 
     @Test
     fun `BPlusTree merge occurs at underflow`() {
         // When node falls below minFanout, merge with sibling
-        assertTrue(true)
+        TODO("redefine test requirements")
     }
 
     @Test
     fun `BPlusTree is balanced after insert and delete`() {
         // All leaves at same depth
-        assertTrue(true)
+        TODO("redefine test requirements")
     }
 
     @Test
     fun `snapshot preserves old root after modification`() {
         // snapshots point to old root — COW guarantees they remain valid
-        assertTrue(true)
+        TODO("redefine test requirements")
     }
 
     @Test
     fun `fanout bounds are respected`() {
         // minFanout <= fanout <= maxFanout after rebalance
-        assertTrue(true)
+        TODO("redefine test requirements")
     }
 }

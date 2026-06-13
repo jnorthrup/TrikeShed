@@ -3,6 +3,8 @@ package borg.trikeshed.windowtoolkit.internal
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
+import kotlin.math.max
+import kotlin.math.min
 
 /**
  * User-signalling abstractions for 0D and 1D features (idiot lights, toggles, sliders, knobs).
@@ -126,6 +128,34 @@ interface LevelMeter : Signal<Double> {
 }
 
 // ====================================================================
+// TEXT FIELD SIGNAL
+// ====================================================================
+
+data class TextFieldState(
+    val text: String,
+    val caret: Int,
+    val selectionStart: Int = -1,
+    val selectionEnd: Int = -1,
+    val focused: Boolean = false,
+    val committed: Boolean = false
+) {
+    val hasSelection: Boolean get() = selectionStart != selectionEnd && selectionStart >= 0 && selectionEnd >= 0
+    val selectedText: String get() = if (hasSelection) text.substring(min(selectionStart, selectionEnd), max(selectionStart, selectionEnd)) else ""
+}
+
+interface TextField : Signal<TextFieldState> {
+    fun focus(): TextFieldState
+    fun blur(): TextFieldState
+    fun insert(text: String): TextFieldState
+    fun backspace(): TextFieldState
+    fun deleteForward(): TextFieldState
+    fun moveCaret(delta: Int): TextFieldState
+    fun setSelection(start: Int, end: Int): TextFieldState
+    fun clear(): TextFieldState
+    fun commit(): TextFieldState
+}
+
+// ====================================================================
 // FACTORY FUNCTIONS
 // ====================================================================
 
@@ -137,6 +167,7 @@ fun slider(min: Double, max: Double, initial: Double? = null, step: Double? = nu
 fun knob(min: Double = 0.0, max: Double = 1.0, initial: Double = 0.0, detents: Int? = null): Knob = KnobImpl(min, max, initial, detents)
 fun <T> dial(positions: List<T>, initial: T? = null): Dial<T> = DialImpl(positions, initial ?: positions.first())
 fun levelMeter(peakHoldMillis: Long = 1000): LevelMeter = LevelMeterImpl(peakHoldMillis)
+fun textField(initial: String = "", placeholder: String? = null, masked: Boolean = false): TextField = TextFieldImpl(initial, placeholder, masked)
 
 // ====================================================================
 // DEFAULT IMPLEMENTATIONS
@@ -244,4 +275,100 @@ internal class LevelMeterImpl(override val peakHoldMillis: Long) : LevelMeter, S
     override fun setLevel(level: Double): Double { value = level.coerceIn(0.0, 1.0); if (value > peakValue) { peakValue = value; peakTimestamp = System.currentTimeMillis() }; _channel.trySend(value); return value }
     override fun emit(value: Double): Double { this.value = value.coerceIn(0.0, 1.0); if (this.value > peakValue) { peakValue = this.value; peakTimestamp = System.currentTimeMillis() }; _channel.trySend(this.value); return this.value }
     override suspend fun emitSuspend(value: Double): Double { this.value = value.coerceIn(0.0, 1.0); if (this.value > peakValue) { peakValue = this.value; peakTimestamp = System.currentTimeMillis() }; _channel.send(this.value); return this.value }
+}
+
+// ====================================================================
+// TEXT FIELD IMPLEMENTATION
+// ====================================================================
+
+internal class TextFieldImpl(
+    initial: String,
+    val placeholder: String? = null,
+    val masked: Boolean = false
+) : TextField, SignalSource<TextFieldState> {
+    override var value: TextFieldState = TextFieldState(text = initial, caret = initial.length)
+        private set
+
+    private val _channel = Channel<TextFieldState>(Channel.UNLIMITED)
+    override val changes: Flow<TextFieldState> = _channel.asFlow()
+
+    private fun update(newState: TextFieldState): TextFieldState {
+        value = newState
+        _channel.trySend(newState)
+        return newState
+    }
+
+    override fun focus(): TextFieldState = update(value.copy(focused = true, committed = false))
+
+    override fun blur(): TextFieldState = update(value.copy(focused = false))
+
+    override fun insert(text: String): TextFieldState {
+        if (!value.focused) return value
+        val newText = if (value.hasSelection) {
+            val start = min(value.selectionStart, value.selectionEnd)
+            val end = max(value.selectionStart, value.selectionEnd)
+            value.text.substring(0, start) + text + value.text.substring(end)
+        } else {
+            value.text.substring(0, value.caret) + text + value.text.substring(value.caret)
+        }
+        val newCaret = if (value.hasSelection) min(value.selectionStart, value.selectionEnd) + text.length else value.caret + text.length
+        return update(value.copy(text = newText, caret = newCaret, selectionStart = -1, selectionEnd = -1, committed = false))
+    }
+
+    override fun backspace(): TextFieldState {
+        if (!value.focused || value.text.isEmpty()) return value
+        val newText = if (value.hasSelection) {
+            val start = min(value.selectionStart, value.selectionEnd)
+            val end = max(value.selectionStart, value.selectionEnd)
+            value.text.substring(0, start) + value.text.substring(end)
+        } else if (value.caret > 0) {
+            value.text.substring(0, value.caret - 1) + value.text.substring(value.caret)
+        } else {
+            value.text
+        }
+        val newCaret = if (value.hasSelection) min(value.selectionStart, value.selectionEnd) else value.caret - 1
+        return update(value.copy(text = newText, caret = max(0, newCaret), selectionStart = -1, selectionEnd = -1, committed = false))
+    }
+
+    override fun deleteForward(): TextFieldState {
+        if (!value.focused || value.caret >= value.text.length) return value
+        val newText = if (value.hasSelection) {
+            val start = min(value.selectionStart, value.selectionEnd)
+            val end = max(value.selectionStart, value.selectionEnd)
+            value.text.substring(0, start) + value.text.substring(end)
+        } else {
+            value.text.substring(0, value.caret) + value.text.substring(value.caret + 1)
+        }
+        val newCaret = if (value.hasSelection) min(value.selectionStart, value.selectionEnd) else value.caret
+        return update(value.copy(text = newText, caret = newCaret, selectionStart = -1, selectionEnd = -1, committed = false))
+    }
+
+    override fun moveCaret(delta: Int): TextFieldState {
+        if (!value.focused) return value
+        val newCaret = (value.caret + delta).coerceIn(0, value.text.length)
+        return update(value.copy(caret = newCaret, selectionStart = -1, selectionEnd = -1))
+    }
+
+    override fun setSelection(start: Int, end: Int): TextFieldState {
+        if (!value.focused) return value
+        val s = start.coerceIn(0, value.text.length)
+        val e = end.coerceIn(0, value.text.length)
+        return update(value.copy(selectionStart = s, selectionEnd = e, caret = e))
+    }
+
+    override fun clear(): TextFieldState = update(value.copy(text = "", caret = 0, selectionStart = -1, selectionEnd = -1, committed = false))
+
+    override fun commit(): TextFieldState = update(value.copy(committed = true))
+
+    override fun emit(value: TextFieldState): TextFieldState {
+        this.value = value
+        _channel.trySend(value)
+        return value
+    }
+
+    override suspend fun emitSuspend(value: TextFieldState): TextFieldState {
+        this.value = value
+        _channel.send(value)
+        return value
+    }
 }

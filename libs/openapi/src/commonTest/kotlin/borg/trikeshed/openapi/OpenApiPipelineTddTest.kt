@@ -22,19 +22,19 @@ class OpenApiPipelineTddTest {
     @Test
     fun `pipeline has operationId resolution stage`() {
         // OperationId uniquely identifies an endpoint within an OpenAPI doc
-        assertTrue(true)
+        TODO("redefine test requirements")
     }
 
     @Test
     fun `pipeline has request construction stage`() {
         // Builds HtxClientRequest from OpenAPI operation definition
-        assertTrue(true)
+        TODO("redefine test requirements")
     }
 
     @Test
     fun `pipeline has response parsing stage`() {
         // Parses HtxClientMessage into typed result per response schema
-        assertTrue(true)
+        TODO("redefine test requirements")
     }
 
     // ── OpenApiClientGenerator contract ───────────────────────────────────────
@@ -42,19 +42,19 @@ class OpenApiPipelineTddTest {
     @Test
     fun `OpenApiClientGenerator generates Keys object`() {
         // Generated Keys object contains AsyncContextKey<HtxElement> per endpoint
-        assertTrue(true)
+        TODO("redefine test requirements")
     }
 
     @Test
     fun `OpenApiClientGenerator generates Elements factory`() {
         // Generated Elements object contains suspend fun htx(): HtxElement
-        assertTrue(true)
+        TODO("redefine test requirements")
     }
 
     @Test
     fun `OpenApiClientGenerator generates SupervisorJobs`() {
         // One SupervisorJob per operationId, supporting fan-out
-        assertTrue(true)
+        TODO("redefine test requirements")
     }
 
     // ── Raw parser ────────────────────────────────────────────────────────────
@@ -62,12 +62,12 @@ class OpenApiPipelineTddTest {
     @Test
     fun `rawParser handles YAML OpenAPI documents`() {
         // OpenApiRawParser reads the .yaml file and produces an OpenApiDoc
-        assertTrue(true)
+        TODO("redefine test requirements")
     }
 
     @Test
     fun `rawParser handles JSON OpenAPI documents`() {
         // OpenApiRawParser reads the .json variant
-        assertTrue(true)
+        TODO("redefine test requirements")
     }
 }

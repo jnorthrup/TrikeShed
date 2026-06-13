@@ -7,6 +7,6 @@ class CompareKeysTest {
     @Test
     fun placeholder() {
         // placeholder test to avoid adding cross-cutting compilation targets in commonTest
-        assertTrue(true)
+        TODO("redefine test requirements")
     }
 }

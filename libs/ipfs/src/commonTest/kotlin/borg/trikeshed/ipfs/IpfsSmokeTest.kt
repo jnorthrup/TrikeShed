@@ -6,6 +6,6 @@ class IpfsSmokeTest {
     @Test
     fun smoke() {
         // Placeholder - add blockstore integration tests when ported
-        assertTrue(true)
+        TODO("redefine test requirements")
     }
 }

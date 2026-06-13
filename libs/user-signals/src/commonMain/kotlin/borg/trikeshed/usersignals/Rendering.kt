@@ -274,6 +274,7 @@ class SignalTemplateBuilder {
     fun levelHole() = StandardHoles.level
     fun labelHole() = StandardHoles.label
     fun iconHole() = StandardHoles.icon
+    fun textFieldHole() = StandardHoles.textField
 
     fun <T> bind(hole: TemplateHole<T>, signal: Signal<T>): SignalTemplateBuilder {
         bindingBuilders.add { TemplateBinding(hole, signal) }
@@ -287,6 +288,7 @@ class SignalTemplateBuilder {
     fun knob(signal: Knob): SignalTemplateBuilder = bind(knobHole(), signal)
     fun dial(signal: Dial<Any>): SignalTemplateBuilder = bind(dialHole(), signal)
     fun level(signal: LevelMeter): SignalTemplateBuilder = bind(levelHole(), signal)
+    fun textField(signal: TextField): SignalTemplateBuilder = bind(textFieldHole(), signal)
 
     fun label(text: String): SignalTemplateBuilder {
         bindingBuilders.add { TemplateBinding(StandardHoles.label, ConstSignal(text)) }

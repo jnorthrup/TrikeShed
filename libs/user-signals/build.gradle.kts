@@ -1,5 +1,5 @@
 plugins {
-    kotlin("multiplatform")
+    kotlin("multiplatform") version "2.4.0"
 }
 
 kotlin {
@@ -16,8 +16,20 @@ kotlin {
             }
         }
 
+        val commonTest by getting {
+            dependencies {
+                implementation(kotlin("test"))
+            }
+        }
+
         val jvmMain by getting {
             dependencies {
+            }
+        }
+
+        val jvmTest by getting {
+            dependencies {
+                implementation(kotlin("test-junit"))
             }
         }
 
@@ -27,4 +39,8 @@ kotlin {
             }
         }
     }
+}
+
+tasks.named<org.gradle.api.tasks.testing.Test>("jvmTest") {
+    useJUnit()
 }

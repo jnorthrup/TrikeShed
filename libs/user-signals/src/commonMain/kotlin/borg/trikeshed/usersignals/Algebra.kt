@@ -138,6 +138,7 @@ object StandardHoles {
     val level = TemplateHole<Double>("level")
     val label = TemplateHole<String>("label")
     val icon = TemplateHole<String>("icon")
+    val textField = TemplateHole<TextFieldState>("textField")
 }
 
 fun toggleHole() = StandardHoles.toggle
@@ -149,3 +150,4 @@ fun dialHole() = StandardHoles.dial
 fun levelHole() = StandardHoles.level
 fun labelHole() = StandardHoles.label
 fun iconHole() = StandardHoles.icon
+fun textFieldHole() = StandardHoles.textField

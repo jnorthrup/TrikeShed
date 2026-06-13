@@ -137,6 +137,11 @@ class SignalFactory(private val context: SignalContextElement) {
         context.registerSource(signalId, rt as SignalSource<*>)
         return rt
     }
+    fun textField(signalId: String, initial: String = "", placeholder: String? = null, masked: Boolean = false): TextField {
+        val tf = textField(initial, placeholder, masked)
+        context.registerSource(signalId, tf as SignalSource<*>)
+        return tf
+    }
 }
 
 fun signalContext(block: SignalContextElement.() -> Unit): SignalContextElement {
