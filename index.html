@@ -1,866 +1,759 @@
 <!DOCTYPE html>
-<!--
-  TrikeShed Demo — Live at https://jnorthrup.github.io/TrikeShed/
-  Deploy: master/docs → GitHub Pages
--->
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Forge Runtime / Collaboration Introspection</title>
-<style>
-  :root {
-    --bg: #0b0f14;
-    --pane: #111821;
-    --pane2: #0f141b;
-    --ink: #d3dbe6;
-    --muted: #758395;
-    --line: #1d2a38;
-    --blue: #7aa2f7;
-    --green: #9ece6a;
-    --amber: #e0af68;
-    --red: #f7768e;
-    --purple: #bb9af7;
-    --cyan: #7dcfff;
-    --teal: #73daca;
-    --comment: #5b6b7a;
-  }
-  * { box-sizing: border-box; }
-  html, body { margin: 0; background: var(--bg); color: var(--ink); font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif; }
-  code, pre, .mono { font-family: "SF Mono", ui-monospace, Menlo, Consolas, monospace; }
-  .page { display: grid; grid-template-columns: 260px 1fr 340px; min-height: 100vh; }
-  .rail, .inspector { background: var(--pane2); }
-  .rail { border-right: 1px solid var(--line); padding: 18px 0; }
-  .inspector { border-left: 1px solid var(--line); padding: 20px 18px; overflow: auto; }
-  .main { padding: 24px 28px 40px; overflow: auto; }
-  .brand { padding: 0 18px 14px; border-bottom: 1px solid var(--line); margin-bottom: 12px; }
-  .brand h1 { font-size: 15px; margin: 0 0 6px; font-weight: 650; }
-  .brand p { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.45; }
-  .nav-group { padding: 8px 0 4px; }
-  .nav-label { color: var(--muted); font-size: 10px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; padding: 8px 18px; }
-  .nav-item { padding: 10px 18px; cursor: pointer; border-left: 2px solid transparent; }
-  .nav-item:hover { background: rgba(122,162,247,.07); }
-  .nav-item.active { background: rgba(122,162,247,.09); border-left-color: var(--blue); }
-  .nav-item .title { font-size: 13px; font-weight: 600; margin-bottom: 3px; }
-  .nav-item .sub { font-size: 11px; color: var(--muted); line-height: 1.35; }
-
-  .hero { margin-bottom: 20px; }
-  .hero h2 { margin: 0 0 8px; font-size: 24px; font-weight: 700; }
-  .hero p { margin: 0; color: var(--muted); max-width: 78ch; line-height: 1.55; }
-  .legend { display: flex; gap: 8px; flex-wrap: wrap; margin: 14px 0 0; }
-  .badge { display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; padding: 5px 10px; font-size: 11px; border: 1px solid var(--line); background: var(--pane); }
-  .dot { width: 8px; height: 8px; border-radius: 50%; }
-  .ok { background: rgba(158,206,106,.08); }
-  .warn { background: rgba(224,175,104,.08); }
-  .bad { background: rgba(247,118,142,.08); }
-
-  .section { display: none; }
-  .section.active { display: block; }
-  .grid { display: grid; grid-template-columns: 1.2fr .8fr; gap: 18px; margin-top: 18px; }
-  .stack { display: grid; gap: 18px; }
-  .card { background: var(--pane); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
-  .card-head { padding: 12px 14px; border-bottom: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-  .card-head h3 { margin: 0; font-size: 13px; font-weight: 700; letter-spacing: .01em; }
-  .card-head .hint { color: var(--muted); font-size: 11px; }
-  .card-body { padding: 14px; }
-  .small { font-size: 12px; color: var(--muted); line-height: 1.5; }
-  .split { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-
-  .code { background: #0a1118; border: 1px solid var(--line); border-radius: 8px; padding: 10px 0; overflow: auto; }
-  .line { display: grid; grid-template-columns: 44px 1fr; gap: 14px; padding: 0 12px; min-height: 22px; }
-  .line:hover { background: rgba(122,162,247,.045); }
-  .ln { color: var(--comment); text-align: right; user-select: none; }
-  .src { white-space: pre; }
-  .kw { color: var(--purple); }
-  .ty { color: var(--blue); }
-  .id { color: var(--ink); }
-  .cm { color: var(--comment); font-style: italic; }
-  .en { color: var(--green); }
-  .fn { color: var(--cyan); }
-  .st { color: var(--amber); }
-
-  .pills { display: flex; flex-wrap: wrap; gap: 8px; }
-  .pill { border-radius: 999px; padding: 6px 10px; font-size: 11px; border: 1px solid var(--line); background: #0d1520; }
-  .pill.role { cursor: pointer; }
-  .pill.role.active { border-color: var(--blue); color: var(--blue); }
-  .pill.muted { color: var(--muted); }
-
-  .kv { display: grid; grid-template-columns: 150px 1fr; gap: 6px 12px; font-size: 12px; }
-  .kv div:nth-child(odd) { color: var(--muted); }
-  .json { background: #0a1118; border: 1px solid var(--line); border-radius: 8px; padding: 12px; white-space: pre-wrap; font-size: 12px; line-height: 1.55; }
-  .json .k { color: var(--blue); }
-  .json .v { color: var(--green); }
-  .json .s { color: var(--amber); }
-  .json .n { color: var(--purple); }
-
-  .timeline { display: grid; gap: 10px; }
-  .event { display: grid; grid-template-columns: 76px 1fr; gap: 10px; align-items: start; font-size: 12px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: #0d1520; }
-  .event .tag { font-weight: 700; color: var(--blue); text-transform: uppercase; font-size: 10px; letter-spacing: .08em; }
-  .event .msg { color: var(--ink); }
-  .event .msg small { display: block; color: var(--muted); margin-top: 3px; }
-
-  .graph { display: grid; gap: 10px; }
-  .node-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-  .node { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; background: #0d1520; min-width: 120px; }
-  .node .cap { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: .08em; }
-  .node .name { font-size: 12px; font-weight: 650; margin-top: 3px; }
-  .arrow { color: var(--comment); }
-  .node.good { border-color: rgba(158,206,106,.35); }
-  .node.warn { border-color: rgba(224,175,104,.35); }
-  .node.bad { border-color: rgba(247,118,142,.35); }
-  .node.active { box-shadow: 0 0 0 1px var(--blue) inset; }
-
-  .matrix { display: grid; grid-template-columns: 90px repeat(4, 1fr); gap: 2px; }
-  .cell { padding: 8px 10px; border: 1px solid var(--line); background: #0d1520; font-size: 12px; }
-  .cell.h { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .06em; }
-  .presence { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 6px; }
-
-  .btns { display: flex; flex-wrap: wrap; gap: 8px; }
-  button {
-    background: #13202e; color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px;
-    font-size: 12px; font-family: inherit; cursor: pointer;
-  }
-  button:hover { border-color: var(--blue); color: white; }
-  button.secondary { background: #0d1520; }
-  .statusline { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; color: var(--muted); font-size: 12px; }
-  .sep { color: var(--comment); }
-  ul.tight { margin: 0; padding-left: 18px; }
-  ul.tight li { margin: 6px 0; color: var(--muted); }
-  .goodtxt { color: var(--green); }
-  .warntxt { color: var(--amber); }
-  .badtxt { color: var(--red); }
-</style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Forge Final Production · TrikeShed</title>
+  <style>
+    :root {
+      --bg: #0a0f14;
+      --pane: #101721;
+      --pane2: #0d141c;
+      --pane3: #131d29;
+      --line: #1d2936;
+      --line2: #223245;
+      --ink: #d7e0ea;
+      --muted: #7d8ea3;
+      --blue: #7aa2f7;
+      --cyan: #7dcfff;
+      --green: #9ece6a;
+      --amber: #e0af68;
+      --red: #f7768e;
+      --purple: #bb9af7;
+      --teal: #73daca;
+      --shadow: 0 20px 60px rgba(0,0,0,.28);
+      --radius: 18px;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; background: var(--bg); color: var(--ink); font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif; }
+    a { color: inherit; text-decoration: none; }
+    button, input { font: inherit; }
+    code, pre, .mono { font-family: "SF Mono", ui-monospace, Menlo, Consolas, monospace; }
+    .shell { display: grid; grid-template-columns: 280px minmax(0,1fr) 360px; min-height: 100vh; }
+    .rail, .inspector { background: var(--pane2); }
+    .rail { border-right: 1px solid var(--line); padding: 20px 0 16px; }
+    .inspector { border-left: 1px solid var(--line); padding: 20px 18px; overflow: auto; }
+    .main { padding: 26px 28px 40px; overflow: auto; }
+    .brand { padding: 0 18px 18px; border-bottom: 1px solid var(--line); margin-bottom: 16px; }
+    .brand .eyebrow { color: var(--cyan); font-size: 11px; text-transform: uppercase; letter-spacing: .14em; font-weight: 700; }
+    .brand h1 { margin: 9px 0 8px; font-size: 19px; line-height: 1.15; }
+    .brand p { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.55; }
+    .nav { padding: 6px 10px; display: grid; gap: 6px; }
+    .navbtn { width: 100%; background: transparent; border: 1px solid transparent; color: var(--muted); padding: 11px 12px; border-radius: 12px; text-align: left; cursor: pointer; }
+    .navbtn:hover { background: rgba(122,162,247,.06); color: var(--ink); }
+    .navbtn.active { background: rgba(122,162,247,.10); border-color: rgba(122,162,247,.28); color: var(--ink); }
+    .navbtn .top { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 3px; }
+    .navbtn .ttl { font-size: 13px; font-weight: 650; }
+    .navbtn .sub { font-size: 11px; line-height: 1.4; color: var(--muted); }
+    .chip { display: inline-flex; align-items: center; gap: 7px; border: 1px solid var(--line2); background: rgba(16,23,33,.9); border-radius: 999px; padding: 7px 11px; font-size: 11px; color: var(--muted); }
+    .chip b { color: var(--ink); font-weight: 650; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; }
+    .dot.blue { background: var(--blue); } .dot.green { background: var(--green); } .dot.amber { background: var(--amber); } .dot.red { background: var(--red); } .dot.cyan { background: var(--cyan); }
+    .hero { background: linear-gradient(180deg, rgba(19,29,41,.98), rgba(13,20,28,.98)); border: 1px solid var(--line2); border-radius: 24px; box-shadow: var(--shadow); padding: 24px 24px 20px; margin-bottom: 22px; }
+    .hero h2 { margin: 0 0 10px; font-size: 31px; line-height: 1.05; letter-spacing: -.03em; max-width: 12ch; }
+    .hero p { margin: 0; color: var(--muted); line-height: 1.65; max-width: 78ch; }
+    .hero-grid { display: grid; grid-template-columns: 1.2fr .8fr; gap: 20px; align-items: end; margin-top: 20px; }
+    .hero-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+    .btn, .linkbtn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 42px; padding: 0 14px; border-radius: 12px; border: 1px solid var(--line2); background: var(--pane3); color: var(--ink); cursor: pointer; }
+    .btn.primary, .linkbtn.primary { background: rgba(122,162,247,.13); border-color: rgba(122,162,247,.35); }
+    .btn:hover, .linkbtn:hover { border-color: var(--blue); }
+    .stack { display: grid; gap: 18px; }
+    .card { background: var(--pane); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; box-shadow: 0 14px 44px rgba(0,0,0,.18); }
+    .card-head { padding: 14px 16px; border-bottom: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+    .card-head h3 { margin: 0; font-size: 14px; }
+    .hint { color: var(--muted); font-size: 11px; }
+    .card-body { padding: 16px; }
+    .metrics { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 12px; }
+    .metric { background: var(--pane3); border: 1px solid var(--line2); border-radius: 16px; padding: 16px 14px; }
+    .metric .num { font-size: 28px; font-weight: 750; letter-spacing: -.03em; }
+    .metric .lbl { margin-top: 6px; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .08em; }
+    .metric .meta { margin-top: 5px; color: var(--cyan); font-size: 11px; }
+    .grid2 { display: grid; grid-template-columns: 1.15fr .85fr; gap: 18px; }
+    .signal-board { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; }
+    .signal { background: rgba(19,29,41,.9); border: 1px solid var(--line2); border-radius: 14px; padding: 13px 14px; }
+    .signal .k { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .08em; }
+    .signal .v { margin-top: 6px; font-size: 16px; font-weight: 650; }
+    .signal .s { margin-top: 4px; color: var(--cyan); font-size: 11px; }
+    .asset-tools { display: flex; gap: 10px; align-items: center; margin-bottom: 14px; flex-wrap: wrap; }
+    .search { flex: 1 1 240px; min-height: 44px; background: var(--pane3); border: 1px solid var(--line2); border-radius: 12px; color: var(--ink); padding: 0 13px; }
+    .asset-grid { display: grid; gap: 12px; }
+    .asset { border: 1px solid var(--line2); background: linear-gradient(180deg, rgba(18,27,38,.95), rgba(14,20,28,.95)); border-radius: 18px; padding: 16px; cursor: pointer; transition: transform .14s ease, border-color .14s ease, background .14s ease; }
+    .asset:hover { transform: translateY(-1px); border-color: rgba(122,162,247,.34); }
+    .asset.active { border-color: rgba(122,162,247,.44); box-shadow: 0 0 0 1px rgba(122,162,247,.24) inset; }
+    .asset-head { display: flex; align-items: start; justify-content: space-between; gap: 14px; }
+    .asset-title { font-size: 16px; font-weight: 680; line-height: 1.25; }
+    .asset-kind { color: var(--cyan); font-size: 11px; text-transform: uppercase; letter-spacing: .08em; }
+    .asset-summary { margin-top: 10px; color: var(--muted); line-height: 1.6; font-size: 13px; }
+    .asset-meta { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+    .asset-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 14px; color: var(--muted); font-size: 12px; }
+    .split { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .codeblock { background: #091018; border: 1px solid var(--line2); border-radius: 14px; padding: 12px; }
+    .line { display: grid; grid-template-columns: 50px 1fr; gap: 14px; padding: 2px 4px; min-height: 22px; }
+    .line:hover { background: rgba(122,162,247,.05); }
+    .ln { color: #506070; text-align: right; user-select: none; }
+    .src { white-space: pre-wrap; word-break: break-word; }
+    .list { display: grid; gap: 8px; }
+    .list-item { padding: 10px 12px; border: 1px solid var(--line2); border-radius: 12px; background: var(--pane3); }
+    .list-item small { display: block; color: var(--muted); margin-top: 4px; }
+    .muted { color: var(--muted); }
+    .tiny { font-size: 11px; }
+    .section-tabs { display: flex; flex-wrap: wrap; gap: 8px; }
+    .tabbtn { min-height: 36px; padding: 0 11px; border-radius: 10px; border: 1px solid var(--line2); background: var(--pane3); color: var(--muted); cursor: pointer; }
+    .tabbtn.active { color: var(--ink); border-color: rgba(122,162,247,.34); background: rgba(122,162,247,.12); }
+    .status-list { display: grid; gap: 8px; }
+    .status { padding: 11px 12px; border-radius: 12px; border: 1px solid var(--line2); background: var(--pane3); color: var(--ink); }
+    .status.untracked { border-color: rgba(224,175,104,.35); }
+    .status.modified { border-color: rgba(122,162,247,.35); }
+    .pillrow { display: flex; flex-wrap: wrap; gap: 8px; }
+    .kv { display: grid; grid-template-columns: 120px 1fr; gap: 7px 12px; font-size: 12px; }
+    .kv div:nth-child(odd) { color: var(--muted); }
+    .event-log { display: grid; gap: 8px; }
+    .event { border: 1px solid var(--line2); border-radius: 12px; background: var(--pane3); padding: 10px 12px; }
+    .event .tag { color: var(--cyan); font-size: 10px; text-transform: uppercase; letter-spacing: .08em; font-weight: 700; }
+    .event .msg { margin-top: 5px; font-size: 12px; line-height: 1.45; }
+    .event .ts { margin-top: 4px; color: var(--muted); font-size: 11px; }
+    .footer-note { margin-top: 16px; padding: 0 18px; color: var(--muted); font-size: 11px; line-height: 1.55; }
+    @media (max-width: 1320px) {
+      .shell { grid-template-columns: 250px minmax(0,1fr); }
+      .inspector { grid-column: 1 / -1; border-left: 0; border-top: 1px solid var(--line); }
+    }
+    @media (max-width: 920px) {
+      .shell { grid-template-columns: 1fr; }
+      .rail { border-right: 0; border-bottom: 1px solid var(--line); }
+      .main { padding: 18px; }
+      .metrics, .grid2, .hero-grid { grid-template-columns: 1fr; }
+      .signal-board { grid-template-columns: 1fr; }
+    }
+  </style>
 </head>
 <body>
-<div class="page">
-  <aside class="rail">
-    <div class="brand">
-      <h1>Forge runtime seams</h1>
-      <p>Real source-grounded view of collaboration, blackboard state, provenance, tracing, and extension points.</p>
-    </div>
-
-    <div class="nav-group">
-      <div class="nav-label">Semantics</div>
-      <div class="nav-item active" data-sec="blackboard">
-        <div class="title">Blackboard state</div>
-        <div class="sub">OverlayRole, Provenance, Evidence, DependencyHandle, BlackboardContext</div>
+  <div class="shell">
+    <aside class="rail">
+      <div class="brand">
+        <div class="eyebrow">TrikeShed · Forge</div>
+        <h1>Final production</h1>
+        <p>Signal-driven GitHub Pages home bootstrapped from the real repo manifest and the published introspection artifacts.</p>
       </div>
-      <div class="nav-item" data-sec="sync">
-        <div class="title">Cursor-driven sync</div>
-        <div class="sub">CollaborationEvent flow today, CCEK fanout target</div>
-      </div>
-      <div class="nav-item" data-sec="provenance">
-        <div class="title">Snapshot / artifact provenance</div>
-        <div class="sub">Current links vs missing PRELOAD lowering</div>
-      </div>
-      <div class="nav-item" data-sec="trace">
-        <div class="title">Live execution tracing</div>
-        <div class="sub">Declared trace surface vs stub implementation</div>
-      </div>
-      <div class="nav-item" data-sec="extensibility">
-        <div class="title">Extensibility points</div>
-        <div class="sub">ForgeWorkspace, ForgeStepRunner, ForgeAgentRunner, lifecycle seams</div>
-      </div>
-    </div>
-  </aside>
-
-  <main class="main">
-    <div class="hero">
-      <h2>Human + agent collaboration, but with honest edges</h2>
-      <p>
-        This page distinguishes three things: <span class="goodtxt">implemented structures</span>,
-        <span class="warntxt">declared APIs with stub behavior</span>, and
-        <span class="badtxt">missing lowering seams</span> between Forge nouns and PRELOAD-native cursor / blackboard / CCEK runtime.
-      </p>
-      <div class="legend">
-        <span class="badge ok"><span class="dot" style="background:var(--green)"></span>real type exists now</span>
-        <span class="badge warn"><span class="dot" style="background:var(--amber)"></span>API exists, behavior shallow/stubbed</span>
-        <span class="badge bad"><span class="dot" style="background:var(--red)"></span>target seam missing</span>
-      </div>
-    </div>
-
-    <!-- BLACKBOARD -->
-    <section class="section active" id="sec-blackboard">
-      <div class="grid">
-        <div class="stack">
-          <div class="card">
-            <div class="card-head"><h3>Blackboard overlay primitives (actual source)</h3><div class="hint">cursor/BlackboardOverlay.kt</div></div>
-            <div class="card-body">
-              <div class="code">
-                <div class="line"><div class="ln">10</div><div class="src"><span class="kw">enum class</span> <span class="ty">OverlayRole</span> { <span class="en">OBSERVATION</span>, <span class="en">DERIVED</span>, <span class="en">AGGREGATE</span>, <span class="en">HYPOTHESIS</span>, <span class="en">GROUND_TRUTH</span>, <span class="en">CONTROL</span>, <span class="en">METADATA</span>, <span class="en">PROVENANCE</span> }</div></div>
-                <div class="line"><div class="ln">40</div><div class="src"><span class="kw">data class</span> <span class="ty">Provenance</span>(<span class="id">source</span>: <span class="ty">String</span>, <span class="id">timestamp</span>: <span class="ty">Long</span>, <span class="id">transformations</span>: <span class="ty">List</span>&lt;<span class="ty">String</span>&gt;, <span class="id">creator</span>: <span class="ty">String</span>?)</div></div>
-                <div class="line"><div class="ln">70</div><div class="src"><span class="kw">data class</span> <span class="ty">Evidence</span>(<span class="id">confidence</span>: <span class="ty">Double</span>, <span class="id">errorMargin</span>: <span class="ty">Double</span>?, <span class="id">supportCount</span>: <span class="ty">Int</span>?, <span class="id">notes</span>: <span class="ty">List</span>&lt;<span class="ty">String</span>&gt;)</div></div>
-                <div class="line"><div class="ln">109</div><div class="src"><span class="kw">sealed class</span> <span class="ty">DependencyHandle</span> { <span class="ty">CellRef</span>, <span class="ty">ColumnRef</span>, <span class="ty">ExternalCellRef</span>, <span class="ty">ExternalResource</span>, <span class="ty">Composite</span> }</div></div>
-                <div class="line"><div class="ln">130</div><div class="src"><span class="kw">data class</span> <span class="ty">CellOverlay</span>&lt;<span class="ty">T</span>&gt;(<span class="id">value</span>, <span class="id">role</span>, <span class="id">provenance</span>, <span class="id">evidence</span>, <span class="id">dependencies</span>)</div></div>
-                <div class="line"><div class="ln">161</div><div class="src"><span class="kw">fun</span> <span class="fn">derive</span>(<span class="id">newRole</span>: <span class="ty">OverlayRole</span> = <span class="en">DERIVED</span>, <span class="id">transformation</span>: <span class="ty">String</span>? = <span class="kw">null</span>)</div></div>
-                <div class="line"><div class="ln">242</div><div class="src"><span class="kw">data class</span> <span class="ty">BlackboardContext</span>(<span class="id">id</span>, <span class="id">columnOverlays</span>, <span class="id">provenance</span>, <span class="id">tags</span>)</div></div>
-                <div class="line"><div class="ln">263</div><div class="src"><span class="kw">fun</span> <span class="fn">getEffectiveRole</span>(<span class="id">columnIndex</span>, <span class="id">cellRole</span>) = <span class="id">cellRole</span> ?: <span class="id">columnOverlays</span>[<span class="id">columnIndex</span>]?.<span class="id">defaultRole</span> ?: <span class="en">OBSERVATION</span></div></div>
-              </div>
-              <p class="small" style="margin-top:12px;">
-                The essential point: the collaboration substrate already has epistemic roles, provenance chains, confidence, and dependency handles.
-                It is not yet wired through Forge artifacts/executions by default.
-              </p>
-            </div>
+      <div id="nav" class="nav"></div>
+      <div class="footer-note mono">docs/data/forge-production-signals.json → activeSection, activeAsset, query, contractMode</div>
+    </aside>
+    <main class="main">
+      <section class="hero">
+        <div class="hero-grid">
+          <div>
+            <div class="pillrow" id="hero-chips"></div>
+            <h2>Forge final production in signals, not templates.</h2>
+            <p id="hero-statement"></p>
+            <div class="hero-actions" id="hero-actions"></div>
           </div>
-
-          <div class="card">
-            <div class="card-head"><h3>Agent + human blackboard handoff</h3><div class="hint">interactive overlay mutation</div></div>
-            <div class="card-body">
-              <div class="pills" id="role-pills">
-                <span class="pill role active" data-role="HYPOTHESIS">agent hypothesis</span>
-                <span class="pill role" data-role="GROUND_TRUTH">human accepted truth</span>
-                <span class="pill role" data-role="DERIVED">derived cell</span>
-                <span class="pill role" data-role="PROVENANCE">audit entry</span>
-              </div>
-              <div class="btns" style="margin-top:12px;">
-                <button id="btn-agent-propose">agent proposes patch</button>
-                <button id="btn-human-accept" class="secondary">human accepts</button>
-                <button id="btn-add-dep" class="secondary">add dependency</button>
-                <button id="btn-confidence" class="secondary">confidence 0.64 → 0.92</button>
-                <button id="btn-reset-bb" class="secondary">reset</button>
-              </div>
-              <div class="split" style="margin-top:14px;">
-                <div>
-                  <div class="small" style="margin-bottom:8px;">Column overlay defaults</div>
-                  <div class="kv">
-                    <div>column</div><div class="mono">summary</div>
-                    <div>defaultRole</div><div class="mono">HYPOTHESIS</div>
-                    <div>description</div><div>agent-generated summary draft</div>
-                    <div>constraint</div><div class="mono">must cite source file</div>
-                  </div>
-                </div>
-                <div>
-                  <div class="small" style="margin-bottom:8px;">Effective state</div>
-                  <div class="kv" id="bb-effective"></div>
-                </div>
-              </div>
-              <div class="json" id="bb-json" style="margin-top:14px;"></div>
-            </div>
+          <div class="card" style="margin:0;">
+            <div class="card-head"><h3>Selected production asset</h3><div class="hint mono" id="hero-selected-kind"></div></div>
+            <div class="card-body" id="hero-selected"></div>
           </div>
         </div>
-
-        <div class="stack">
-          <div class="card">
-            <div class="card-head"><h3>Why this matters</h3><div class="hint">collaboration semantics</div></div>
-            <div class="card-body">
-              <ul class="tight">
-                <li><span class="goodtxt">Exists now:</span> role taxonomy distinguishes <span class="mono">HYPOTHESIS</span> vs <span class="mono">GROUND_TRUTH</span>.</li>
-                <li><span class="goodtxt">Exists now:</span> provenance is a transformation chain, not just a source string.</li>
-                <li><span class="goodtxt">Exists now:</span> dependencies can point at cells, columns, external resources, or composites.</li>
-                <li><span class="badtxt">Missing in Forge today:</span> <span class="mono">ForgeArtifact</span>, <span class="mono">ForgeExecutionResult</span>, and <span class="mono">CollaborationEvent</span> do not carry <span class="mono">CellOverlay</span> / <span class="mono">BlackboardContext</span>.</li>
-                <li><span class="badtxt">Missing lowering:</span> no default projection from workflow outputs into cursor cells with overlay metadata.</li>
-              </ul>
-            </div>
-          </div>
-
-          <div class="card">
-            <div class="card-head"><h3>Current seam to use</h3><div class="hint">explicit extension</div></div>
-            <div class="card-body">
-              <div class="json">blackboardContext(
-  id = <span class="s">"forge-run-123"</span>,
-  columnOverlays = mapOf(
-    0 to columnOverlay(
-      name = <span class="s">"summary"</span>,
-      defaultRole = <span class="n">HYPOTHESIS</span>,
-      description = <span class="s">"agent draft"</span>
-    )
-  ),
-  tags = mapOf(<span class="s">"workflowId"</span> to <span class="s">"..."</span>)
-)</div>
-              <p class="small" style="margin-top:12px;">
-                Lowest-friction extension point right now: wrap Forge outputs in a companion BlackboardContext and keep the Cursor / RowVec as the transport shape.
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- SYNC -->
-    <section class="section" id="sec-sync">
-      <div class="grid">
-        <div class="stack">
-          <div class="card">
-            <div class="card-head"><h3>Collaboration surface today (actual Forge)</h3><div class="hint">ForgeTypes.kt + ForgeWorkspaceImpl.kt</div></div>
-            <div class="card-body">
-              <div class="code">
-                <div class="line"><div class="ln">247</div><div class="src"><span class="kw">sealed interface</span> <span class="ty">CollaborationEvent</span> {</div></div>
-                <div class="line"><div class="ln">249</div><div class="src">  <span class="kw">data class</span> <span class="ty">FileCreated</span>(<span class="id">file</span>, <span class="id">userId</span>)</div></div>
-                <div class="line"><div class="ln">251</div><div class="src">  <span class="kw">data class</span> <span class="ty">FileUpdated</span>(<span class="id">fileId</span>, <span class="id">patch</span>, <span class="id">userId</span>)</div></div>
-                <div class="line"><div class="ln">255</div><div class="src">  <span class="kw">data class</span> <span class="ty">SnapshotCreated</span>(<span class="id">snapshot</span>, <span class="id">userId</span>)</div></div>
-                <div class="line"><div class="ln">257</div><div class="src">  <span class="kw">data class</span> <span class="ty">WorkflowExecuted</span>(<span class="id">execution</span>, <span class="id">userId</span>)</div></div>
-                <div class="line"><div class="ln">259</div><div class="src">  <span class="kw">data class</span> <span class="ty">UserJoined</span>(<span class="id">userId</span>, <span class="id">userName</span>)</div></div>
-                <div class="line"><div class="ln">263</div><div class="src">  <span class="kw">data class</span> <span class="ty">CursorPosition</span>(<span class="id">userId</span>, <span class="id">fileId</span>, <span class="id">position</span>)</div></div>
-                <div class="line"><div class="ln">228</div><div class="src"><span class="kw">override fun</span> <span class="fn">events</span>(): <span class="ty">Flow</span>&lt;<span class="ty">CollaborationEvent</span>&gt; = <span class="id">eventsFlow</span></div></div>
-                <div class="line"><div class="ln">230</div><div class="src"><span class="kw">override suspend fun</span> <span class="fn">emit</span>(<span class="id">event</span>: <span class="ty">CollaborationEvent</span>) { <span class="id">eventsFlow</span>.<span class="fn">tryEmit</span>(<span class="id">event</span>) }</div></div>
-                <div class="line"><div class="ln">25</div><div class="src"><span class="kw">private val</span> <span class="id">eventsFlow</span> = <span class="ty">MutableSharedFlow</span>&lt;<span class="ty">CollaborationEvent</span>&gt;(<span class="id">extraBufferCapacity</span> = <span class="n">100</span>)</div></div>
-              </div>
-              <p class="small" style="margin-top:12px;">
-                Today’s sync surface is an in-process event stream. It has the right nouns for collaboration, but not yet cursor-native mutation rows or reactor fanout ownership.
-              </p>
-            </div>
-          </div>
-
-          <div class="card">
-            <div class="card-head"><h3>Cursor-driven sync simulation</h3><div class="hint">event flow + visible row changes</div></div>
-            <div class="card-body">
-              <div class="btns">
-                <button id="sync-join-a">Alice joins</button>
-                <button id="sync-join-b">Bob joins</button>
-                <button id="sync-cursor">Bob cursor@README:42</button>
-                <button id="sync-patch">Alice patches row 1</button>
-                <button id="sync-snapshot">snapshot created</button>
-                <button id="sync-reset" class="secondary">reset</button>
-              </div>
-              <div class="matrix" style="margin-top:14px;">
-                <div class="cell h">row</div><div class="cell h">path</div><div class="cell h">text</div><div class="cell h">presence</div><div class="cell h">status</div>
-                <div class="cell mono">0</div><div class="cell mono">README.md</div><div class="cell" id="sync-r0-text"># TrikeShed Forge</div><div class="cell" id="sync-r0-pres">—</div><div class="cell" id="sync-r0-status">clean</div>
-                <div class="cell mono">1</div><div class="cell mono">src/analyzer.kt</div><div class="cell" id="sync-r1-text">fun analyzeCpu(...)</div><div class="cell" id="sync-r1-pres">—</div><div class="cell" id="sync-r1-status">clean</div>
-                <div class="cell mono">2</div><div class="cell mono">data/readings.jsonl</div><div class="cell" id="sync-r2-text">{"machine":"alpha",...}</div><div class="cell" id="sync-r2-pres">—</div><div class="cell" id="sync-r2-status">clean</div>
-              </div>
-              <div class="timeline" id="sync-events" style="margin-top:14px;"></div>
-            </div>
-          </div>
-        </div>
-
-        <div class="stack">
-          <div class="card">
-            <div class="card-head"><h3>Target runtime shape</h3><div class="hint">AsyncContextElement + lifecycle</div></div>
-            <div class="card-body">
-              <div class="code">
-                <div class="line"><div class="ln">13</div><div class="src"><span class="cm">CREATED → OPEN → ACTIVE → DRAINING → CLOSED</span></div></div>
-                <div class="line"><div class="ln">27</div><div class="src"><span class="kw">sealed class</span> <span class="ty">LifeK</span>&lt;<span class="ty">R</span>&gt; : <span class="ty">OpK</span>&lt;<span class="ty">R</span>&gt; { <span class="ty">State</span>, <span class="ty">FanOut</span> }</div></div>
-                <div class="line"><div class="ln">37</div><div class="src"><span class="kw">val</span> <span class="id">LIFECYCLE_TRANSITIONS</span>: <span class="ty">LifecycleFSM</span> = <span class="ty">ElementState</span>.<span class="id">entries</span>.<span class="id">size</span> <span class="fn">j</span> { ... }</div></div>
-                <div class="line"><div class="ln">18</div><div class="src"><span class="kw">abstract class</span> <span class="ty">AsyncContextElement</span>(...) : <span class="ty">CoroutineContext.Element</span> {</div></div>
-                <div class="line"><div class="ln">39</div><div class="src">  <span class="kw">open val</span> <span class="id">fanoutSubscribers</span>: <span class="ty">List</span>&lt;<span class="ty">AsyncContextElement</span>&gt; = <span class="fn">emptyList</span>()</div></div>
-                <div class="line"><div class="ln">42</div><div class="src">  <span class="kw">open suspend fun</span> <span class="fn">open</span>()</div></div>
-                <div class="line"><div class="ln">52</div><div class="src">  <span class="kw">open suspend fun</span> <span class="fn">drain</span>()</div></div>
-                <div class="line"><div class="ln">61</div><div class="src">  <span class="kw">open suspend fun</span> <span class="fn">close</span>()</div></div>
-              </div>
-              <p class="small" style="margin-top:12px;">
-                Honest gap: Forge sync currently uses <span class="mono">MutableSharedFlow</span>. PRELOAD-native sync wants a workspace element that owns lifecycle and fanout, with cursor mutation rows as the event body.
-              </p>
-            </div>
-          </div>
-
-          <div class="card">
-            <div class="card-head"><h3>Current → target mapping</h3><div class="hint">what to lower next</div></div>
-            <div class="card-body">
-              <ul class="tight">
-                <li><span class="goodtxt">Current:</span> <span class="mono">CollaborationEvent.CursorPosition</span> already names the right presence primitive.</li>
-                <li><span class="warntxt">Current:</span> sync is row-agnostic patches, not cursor mutation batches.</li>
-                <li><span class="badtxt">Target:</span> <span class="mono">ForgeWorkspaceElement : AsyncContextElement</span></li>
-                <li><span class="badtxt">Target:</span> fanout subscribers = UI / audit / artifact indexer / remote sync</li>
-                <li><span class="badtxt">Target:</span> event payloads should be cursor rows or mutation rows, not only ad hoc event classes</li>
-              </ul>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- PROVENANCE -->
-    <section class="section" id="sec-provenance">
-      <div class="grid">
-        <div class="stack">
-          <div class="card">
-            <div class="card-head"><h3>Snapshot + artifact structures today</h3><div class="hint">ForgeTypes.kt + ForgeWorkspaceImpl.kt</div></div>
-            <div class="card-body">
-              <div class="code">
-                <div class="line"><div class="ln">39</div><div class="src"><span class="kw">data class</span> <span class="ty">ForgeSnapshot</span>(<span class="id">id</span>, <span class="id">parentId</span>, <span class="id">files</span>: <span class="ty">Map</span>&lt;<span class="ty">ForgeFileId</span>, <span class="ty">ForgeFile</span>&gt;, <span class="id">message</span>, <span class="id">timestamp</span>, <span class="id">author</span>, <span class="id">tags</span>)</div></div>
-                <div class="line"><div class="ln">63</div><div class="src"><span class="kw">override suspend fun</span> <span class="fn">snapshot</span>(<span class="id">message</span>, <span class="id">tags</span>) = <span class="ty">ForgeSnapshot</span>(<span class="id">parentId</span> = <span class="id">snapshots</span>.<span class="fn">lastOrNull</span>()?.<span class="id">id</span>, <span class="id">files</span> = <span class="id">files</span>.<span class="fn">toMap</span>())</div></div>
-                <div class="line"><div class="ln">286</div><div class="src"><span class="kw">data class</span> <span class="ty">ForgeArtifact</span>(<span class="id">id</span>, <span class="id">name</span>, <span class="id">description</span>, <span class="id">files</span>, <span class="id">workflowId</span>?, <span class="id">executionId</span>?, <span class="id">metadata</span>, <span class="id">createdAt</span>, <span class="id">isPublic</span>)</div></div>
-                <div class="line"><div class="ln">312</div><div class="src"><span class="kw">data class</span> <span class="ty">ForgeExportManifest</span>(<span class="id">artifactId</span>, <span class="id">artifactName</span>, <span class="id">exportedAt</span>, <span class="id">fileCount</span>, <span class="id">totalSize</span>, <span class="id">workflowId</span>?, <span class="id">executionId</span>?)</div></div>
-                <div class="line"><div class="ln">285</div><div class="src"><span class="kw">override suspend fun</span> <span class="fn">export</span>(<span class="id">id</span>, <span class="id">format</span>) = <span class="ty">ForgeExportBundle</span>(<span class="id">data</span> = <span class="id">Json</span>.<span class="fn">encodeToString</span>(<span class="id">artifact</span>).<span class="fn">toByteArray</span>(), <span class="id">manifest</span> = ...)</div></div>
-              </div>
-            </div>
-          </div>
-
-          <div class="card">
-            <div class="card-head"><h3>Interactive provenance chain</h3><div class="hint">current links vs missing handles</div></div>
-            <div class="card-body">
-              <div class="btns">
-                <button id="prov-snap">take snapshot</button>
-                <button id="prov-run">run workflow</button>
-                <button id="prov-artifact">create artifact</button>
-                <button id="prov-export">export manifest</button>
-                <button id="prov-reset" class="secondary">reset</button>
-              </div>
-              <div class="graph" style="margin-top:16px;">
-                <div class="node-row">
-                  <div class="node good active" id="n-file"><div class="cap">source</div><div class="name mono">README.md + readings.jsonl</div></div>
-                  <div class="arrow">→</div>
-                  <div class="node warn" id="n-snapshot"><div class="cap">snapshot</div><div class="name mono">ForgeSnapshot</div></div>
-                  <div class="arrow">→</div>
-                  <div class="node warn" id="n-exec"><div class="cap">execution</div><div class="name mono">ForgeExecutionResult</div></div>
-                  <div class="arrow">→</div>
-                  <div class="node warn" id="n-artifact"><div class="cap">artifact</div><div class="name mono">ForgeArtifact</div></div>
-                  <div class="arrow">→</div>
-                  <div class="node warn" id="n-export"><div class="cap">export</div><div class="name mono">ForgeExportManifest</div></div>
-                </div>
-              </div>
-              <div class="json" id="prov-json" style="margin-top:14px;"></div>
-            </div>
-          </div>
-        </div>
-
-        <div class="stack">
-          <div class="card">
-            <div class="card-head"><h3>What provenance is actually preserved now</h3><div class="hint">field-level reality</div></div>
-            <div class="card-body">
-              <div class="kv">
-                <div>snapshot parent</div><div class="mono goodtxt">yes — parentId</div>
-                <div>snapshot file content</div><div class="mono goodtxt">yes — full files map copy</div>
-                <div>artifact → workflow</div><div class="mono goodtxt">yes — workflowId?</div>
-                <div>artifact → execution</div><div class="mono goodtxt">yes — executionId?</div>
-                <div>export → workflow</div><div class="mono goodtxt">yes — workflowId?</div>
-                <div>export → execution</div><div class="mono goodtxt">yes — executionId?</div>
-                <div>artifact → source cell/file dependencies</div><div class="mono badtxt">no explicit handles</div>
-                <div>prompt version lineage</div><div class="mono badtxt">no</div>
-                <div>source hashes / body refs</div><div class="mono badtxt">no</div>
-                <div>blackboard evidence/provenance on artifact</div><div class="mono badtxt">no</div>
-              </div>
-            </div>
-          </div>
-
-          <div class="card">
-            <div class="card-head"><h3>Missing PRELOAD lowering for provenance</h3><div class="hint">from gap analysis</div></div>
-            <div class="card-body">
-              <ul class="tight">
-                <li><span class="badtxt">Need:</span> <span class="mono">ForgeArtifactCursor</span> rows with dependency handles back to source rows and run events.</li>
-                <li><span class="badtxt">Need:</span> content-addressed <span class="mono">bodyRef</span> / <span class="mono">ConfixDoc</span> split, not only embedded strings.</li>
-                <li><span class="badtxt">Need:</span> <span class="mono">OverlayRole.PROVENANCE</span> / <span class="mono">DERIVED</span> attached to cells or rows.</li>
-                <li><span class="badtxt">Need:</span> snapshot roots for corpus/workflow/prompt/artifact instead of full file-map copies.</li>
-              </ul>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- TRACE -->
-    <section class="section" id="sec-trace">
-      <div class="grid">
-        <div class="stack">
-          <div class="card">
-            <div class="card-head"><h3>Declared trace/event surface</h3><div class="hint">ForgeTypes.kt + ForgeRunner.kt</div></div>
-            <div class="card-body">
-              <div class="code">
-                <div class="line"><div class="ln">341</div><div class="src"><span class="kw">sealed interface</span> <span class="ty">StepProgress</span> { <span class="ty">StepStarted</span>, <span class="ty">StepMessage</span>, <span class="ty">StepCompleted</span>, <span class="ty">StepFailed</span>, <span class="ty">WorkflowCompleted</span>, <span class="ty">WorkflowFailed</span> }</div></div>
-                <div class="line"><div class="ln">105</div><div class="src"><span class="kw">sealed interface</span> <span class="ty">AgentEvent</span> { <span class="ty">Output</span>, <span class="ty">ToolCall</span>, <span class="ty">ToolResult</span>, <span class="ty">Error</span>, <span class="ty">Completed</span>, <span class="ty">Progress</span> }</div></div>
-                <div class="line"><div class="ln">84</div><div class="src"><span class="kw">fun</span> <span class="fn">runAgent</span>(<span class="id">config</span>, <span class="id">task</span>, <span class="id">context</span>, <span class="id">workingDir</span>): <span class="ty">ReceiveChannel</span>&lt;<span class="ty">AgentEvent</span>&gt;</div></div>
-              </div>
-            </div>
-          </div>
-
-          <div class="card">
-            <div class="card-head"><h3>Implementation reality today</h3><div class="hint">ForgeWorkspaceImpl.kt + ForgeStepRunnerImpl.kt</div></div>
-            <div class="card-body">
-              <div class="code">
-                <div class="line"><div class="ln">189</div><div class="src"><span class="kw">return</span> <span class="fn">flowOf</span>(<span class="ty">StepProgress.StepStarted</span>(<span class="id">workflowId</span>.<span class="id">value</span>, <span class="id">workflow</span>.<span class="id">name</span>))</div></div>
-                <div class="line"><div class="ln">203</div><div class="src"><span class="kw">val</span> <span class="id">result</span> = <span class="ty">ForgeExecutionResult</span>(..., <span class="id">stepResults</span> = <span class="fn">emptyList</span>(), <span class="id">finalOutputs</span> = <span class="id">inputs</span>, <span class="id">artifacts</span> = <span class="fn">emptyList</span>(), <span class="id">status</span> = <span class="ty">ExecutionStatus</span>.<span class="en">SUCCESS</span>)</div></div>
-                <div class="line"><div class="ln">18</div><div class="src"><span class="kw">return</span> <span class="ty">StepResult.Success</span>(<span class="id">output</span> = <span class="st">"Mock LLM response..."</span>)</div></div>
-                <div class="line"><div class="ln">43</div><div class="src"><span class="kw">return</span> <span class="ty">StepResult.Success</span>(<span class="id">output</span> = <span class="st">"Agent CODEX completed task..."</span>)</div></div>
-              </div>
-              <p class="small" style="margin-top:12px;">
-                So: the trace types are rich, but the current implementation does not emit a genuine step-by-step runtime trace yet.
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div class="stack">
-          <div class="card">
-            <div class="card-head"><h3>Interactive trace mock on the declared surface</h3><div class="hint">uses real event names, not fake claims about current impl</div></div>
-            <div class="card-body">
-              <div class="btns">
-                <button id="trace-play">play declared trace</button>
-                <button id="trace-stub" class="secondary">show current stub behavior</button>
-                <button id="trace-reset" class="secondary">reset</button>
-              </div>
-              <div class="timeline" id="trace-events" style="margin-top:14px;"></div>
-            </div>
-          </div>
-
-          <div class="card">
-            <div class="card-head"><h3>Why execution tracing wants cursors</h3><div class="hint">next lowering</div></div>
-            <div class="card-body">
-              <ul class="tight">
-                <li><span class="goodtxt">Current:</span> step/agent event enums already name the important states.</li>
-                <li><span class="warntxt">Current:</span> those events are not persisted as append-only execution rows.</li>
-                <li><span class="badtxt">Target:</span> <span class="mono">ForgeExecutionCursor</span> with rows like <span class="mono">seq | runId | stepId | phase | tool | resultRef | provenance</span>.</li>
-                <li><span class="badtxt">Target:</span> agent tool calls and tool results should become blackboard / cursor facts rather than transient channel chatter.</li>
-              </ul>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- EXTENSIBILITY -->
-    <section class="section" id="sec-extensibility">
-      <div class="grid">
-        <div class="stack">
-          <div class="card">
-            <div class="card-head"><h3>Primary seams (real interfaces)</h3><div class="hint">where to plug in</div></div>
-            <div class="card-body">
-              <div class="code">
-                <div class="line"><div class="ln">11</div><div class="src"><span class="kw">interface</span> <span class="ty">ForgeWorkspace</span> { ... <span class="fn">events</span>(), <span class="fn">emit</span>(), <span class="fn">execute</span>(), <span class="fn">executeSync</span>(), <span class="fn">artifact</span>(), <span class="fn">export</span>() ... }</div></div>
-                <div class="line"><div class="ln">10</div><div class="src"><span class="kw">interface</span> <span class="ty">ForgeStepRunner</span> { <span class="fn">runLlmCall</span>(), <span class="fn">runCodeExecution</span>(), <span class="fn">runAgentInvocation</span>(), <span class="fn">runFileTransform</span>(), <span class="fn">runCascadeExecution</span>() }</div></div>
-                <div class="line"><div class="ln">78</div><div class="src"><span class="kw">interface</span> <span class="ty">ForgeAgentRunner</span> { <span class="fn">runAgent</span>(), <span class="fn">isAvailable</span>(), <span class="kw">val</span> <span class="id">agentType</span> }</div></div>
-                <div class="line"><div class="ln">113</div><div class="src"><span class="kw">sealed interface</span> <span class="ty">WorkflowStep</span> { <span class="ty">LlmCall</span>, <span class="ty">CodeExecution</span>, <span class="ty">AgentInvocation</span>, <span class="ty">FileTransform</span>, <span class="ty">Conditional</span>, <span class="ty">Parallel</span>, <span class="ty">CascadeExecution</span> }</div></div>
-              </div>
-            </div>
-          </div>
-
-          <div class="card">
-            <div class="card-head"><h3>Clickable seam map</h3><div class="hint">what changes where</div></div>
-            <div class="card-body">
-              <div class="pills" id="ext-pills">
-                <span class="pill role active" data-ext="agent">new agent backend</span>
-                <span class="pill role" data-ext="step">new workflow step</span>
-                <span class="pill role" data-ext="sync">real-time sync backend</span>
-                <span class="pill role" data-ext="provenance">artifact provenance store</span>
-                <span class="pill role" data-ext="overlay">blackboard semantics</span>
-              </div>
-              <div class="json" id="ext-json" style="margin-top:14px;"></div>
-            </div>
-          </div>
-        </div>
-
-        <div class="stack">
-          <div class="card">
-            <div class="card-head"><h3>Good extension points vs structural surgery</h3><div class="hint">practical sequencing</div></div>
-            <div class="card-body">
-              <div class="kv">
-                <div>easy</div><div>implement <span class="mono">ForgeAgentRunner</span> for a new backend</div>
-                <div>easy</div><div>add overlay companions around existing rows/artifacts</div>
-                <div>medium</div><div>replace mock <span class="mono">ForgeStepRunnerImpl</span> with real code / LLM / agent execution</div>
-                <div>medium</div><div>turn <span class="mono">StepProgress</span> into a real streaming trace</div>
-                <div>hard</div><div>lower collaboration into <span class="mono">AsyncContextElement</span> fanout + cursor mutation journal</div>
-                <div>hard</div><div>replace file-map snapshots with cursor-root / Confix-backed stores</div>
-              </div>
-            </div>
-          </div>
-
-          <div class="card">
-            <div class="card-head"><h3>Concrete next seams</h3><div class="hint">non-sloppy path</div></div>
-            <div class="card-body">
-              <ol class="tight">
-                <li>Create <span class="mono">ForgeExecutionCursor</span> rows from <span class="mono">StepProgress</span> + <span class="mono">AgentEvent</span>.</li>
-                <li>Add companion <span class="mono">BlackboardContext</span> to workflow outputs and artifacts.</li>
-                <li>Refactor collaboration bus into <span class="mono">ForgeWorkspaceElement : AsyncContextElement</span>.</li>
-                <li>Replace ad hoc artifact provenance with dependency handles back to source rows and execution rows.</li>
-              </ol>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-  </main>
-
-  <aside class="inspector">
-    <div class="statusline" style="margin-bottom:14px;">
-      <span class="badge ok"><span class="dot" style="background:var(--green)"></span>types</span>
-      <span class="badge warn"><span class="dot" style="background:var(--amber)"></span>impl gaps</span>
-      <span class="badge bad"><span class="dot" style="background:var(--red)"></span>lowering gaps</span>
-    </div>
-    <div class="card" style="margin-bottom:14px;">
-      <div class="card-head"><h3>Inspector</h3><div class="hint">changes with section</div></div>
-      <div class="card-body">
-        <div id="inspector-body" class="small">Select a section to inspect the current seam.</div>
-      </div>
-    </div>
-    <div class="card">
-      <div class="card-head"><h3>Blunt read</h3><div class="hint">no slop</div></div>
-      <div class="card-body">
-        <ul class="tight">
-          <li>Blackboard overlay semantics are already richer than Forge’s current artifact / execution payloads.</li>
-          <li>Collaboration nouns exist, but sync is currently an in-memory event bus.</li>
-          <li>Execution tracing types exist, but the workspace impl is mostly stubbed.</li>
-          <li>The clean path is to lower Forge surfaces into cursor rows + blackboard contexts + CCEK ownership.</li>
-        </ul>
-      </div>
-    </div>
-  </aside>
-</div>
-
-<script>
-  // ---------- navigation ----------
-  const inspectorText = {
-    blackboard: 'Blackboard is the strongest existing semantic substrate: role, provenance, evidence, and dependency handles already model human/agent epistemic state.',
-    sync: 'Current collaboration is Flow<CollaborationEvent> over MutableSharedFlow. Target sync wants AsyncContextElement lifecycle + fanout with cursor mutation payloads.',
-    provenance: 'Snapshot and artifact provenance today is mostly ID linkage plus full file-map copies. Good enough for demos, not enough for PRELOAD-grade lineage.',
-    trace: 'Trace enums are expressive. Implementation is not. Use them as the declared surface, but don’t confuse that with a real execution journal yet.',
-    extensibility: 'The clean seams are the interfaces: ForgeWorkspace, ForgeStepRunner, ForgeAgentRunner, WorkflowStep. Lowering seams are separate and deeper.'
-  };
-  document.querySelectorAll('.nav-item').forEach(item => {
-    item.addEventListener('click', () => {
-      document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-      document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
-      item.classList.add('active');
-      const sec = item.dataset.sec;
-      document.getElementById('sec-' + sec).classList.add('active');
-      document.getElementById('inspector-body').textContent = inspectorText[sec];
-    });
-  });
-  document.getElementById('inspector-body').textContent = inspectorText.blackboard;
-
-  // ---------- blackboard interactive ----------
-  let bbState;
-  function resetBlackboard() {
-    bbState = {
-      value: 'Agent draft: summarize machine telemetry anomalies',
-      role: 'HYPOTHESIS',
-      provenance: {
-        source: 'agent:codex',
-        timestamp: 1781299000000,
-        transformations: ['prompt:summarize-readings'],
-        creator: 'codex'
+      </section>
+      <div id="section-host" class="stack"></div>
+    </main>
+    <aside class="inspector">
+      <div id="inspector-host" class="stack"></div>
+    </aside>
+  </div>
+  <script id="bootstrap-data" type="application/json">{
+  "generated_at_utc": "2026-06-12T22:12:49Z",
+  "repo": {
+    "name": "TrikeShed",
+    "cwd": "/Users/jim/work/TrikeShed",
+    "branch": "master",
+    "remote": "https://github.com/jnorthrup/TrikeShed.git",
+    "pages_url": "https://jnorthrup.github.io/TrikeShed/",
+    "pages_root": "docs/"
+  },
+  "production_statement": "Production Pages surface is built from actual repo signals and published introspection artifacts, not a template dashboard.",
+  "signals": {
+    "published_asset_count": 4,
+    "copied_asset_count": 3,
+    "working_tree_entries": 5,
+    "modified_entries": 1,
+    "untracked_entries": 4,
+    "preload_line_count": 142,
+    "published_bytes": 167222
+  },
+  "working_tree": [
+    "M README.md",
+    "?? docs/demos/runtime.html",
+    "?? docs/demos/series.html",
+    "?? docs/demos/triple.html",
+    "?? docs/plans/2026-06-12-forge-blackboard-confix-adjacency.md"
+  ],
+  "preload_contract": {
+    "kernel_excerpt": [
+      {
+        "line": 3,
+        "text": "## Kernel algebra"
       },
-      evidence: { confidence: 0.64, errorMargin: 0.18, supportCount: 2, notes: ['derived from README.md', 'readings sampled from JSONL'] },
-      dependencies: [
-        { kind: 'ExternalResource', uri: 'file://README.md' },
-        { kind: 'ExternalResource', uri: 'file://data/readings.jsonl', selector: 'rows[0..5]' }
-      ],
-      column: { name: 'summary', defaultRole: 'HYPOTHESIS', description: 'agent-generated summary draft', constraints: ['must cite source file'] }
-    };
-    renderBlackboard();
-  }
-  function renderBlackboard() {
-    document.querySelectorAll('#role-pills .role').forEach(p => p.classList.toggle('active', p.dataset.role === bbState.role));
-    document.getElementById('bb-effective').innerHTML = `
-      <div>effective role</div><div class="mono">${bbState.role || bbState.column.defaultRole}</div>
-      <div>confidence</div><div class="mono">${bbState.evidence.confidence.toFixed(2)}</div>
-      <div>dependencies</div><div class="mono">${bbState.dependencies.length}</div>
-      <div>creator</div><div class="mono">${bbState.provenance.creator}</div>
-    `;
-    document.getElementById('bb-json').innerHTML = formatJson({
-      value: bbState.value,
-      role: bbState.role,
-      provenance: bbState.provenance,
-      evidence: bbState.evidence,
-      dependencies: bbState.dependencies
-    });
-  }
-  document.querySelectorAll('#role-pills .role').forEach(p => p.addEventListener('click', () => { bbState.role = p.dataset.role; renderBlackboard(); }));
-  document.getElementById('btn-agent-propose').onclick = () => {
-    bbState.role = 'HYPOTHESIS';
-    bbState.value = 'Agent draft: CPU anomalies cluster around alpha/gamma; memory pressure rising.';
-    bbState.provenance.creator = 'codex';
-    bbState.provenance.transformations.push('agent-proposal');
-    renderBlackboard();
-  };
-  document.getElementById('btn-human-accept').onclick = () => {
-    bbState.role = 'GROUND_TRUTH';
-    bbState.provenance.transformations.push('role:HYPOTHESIS');
-    bbState.provenance.transformations.push('accepted-by:human');
-    bbState.provenance.creator = 'jim';
-    bbState.evidence.confidence = 0.92;
-    bbState.evidence.notes.push('human-reviewed');
-    renderBlackboard();
-  };
-  document.getElementById('btn-add-dep').onclick = () => {
-    bbState.dependencies.push({ kind: 'CellRef', row: 2, column: 1 });
-    renderBlackboard();
-  };
-  document.getElementById('btn-confidence').onclick = () => {
-    bbState.evidence.confidence = bbState.evidence.confidence < 0.9 ? 0.92 : 0.64;
-    renderBlackboard();
-  };
-  document.getElementById('btn-reset-bb').onclick = resetBlackboard;
-  resetBlackboard();
-
-  // ---------- sync interactive ----------
-  let syncEvents = [];
-  let syncState;
-  function resetSync() {
-    syncEvents = [];
-    syncState = {
-      users: {},
-      rows: [
-        { text: '# TrikeShed Forge', presence: '—', status: 'clean' },
-        { text: 'fun analyzeCpu(...)', presence: '—', status: 'clean' },
-        { text: '{"machine":"alpha",...}', presence: '—', status: 'clean' }
-      ]
-    };
-    renderSync();
-  }
-  function pushSync(tag, msg, sub='') {
-    syncEvents.unshift({ tag, msg, sub });
-    syncEvents = syncEvents.slice(0, 8);
-    renderSync();
-  }
-  function renderSync() {
-    document.getElementById('sync-r0-text').textContent = syncState.rows[0].text;
-    document.getElementById('sync-r1-text').textContent = syncState.rows[1].text;
-    document.getElementById('sync-r2-text').textContent = syncState.rows[2].text;
-    document.getElementById('sync-r0-pres').innerHTML = syncState.rows[0].presence;
-    document.getElementById('sync-r1-pres').innerHTML = syncState.rows[1].presence;
-    document.getElementById('sync-r2-pres').innerHTML = syncState.rows[2].presence;
-    document.getElementById('sync-r0-status').textContent = syncState.rows[0].status;
-    document.getElementById('sync-r1-status').textContent = syncState.rows[1].status;
-    document.getElementById('sync-r2-status').textContent = syncState.rows[2].status;
-    document.getElementById('sync-events').innerHTML = syncEvents.map(e => `
-      <div class="event"><div class="tag">${e.tag}</div><div class="msg">${e.msg}${e.sub ? `<small>${e.sub}</small>` : ''}</div></div>
-    `).join('');
-  }
-  document.getElementById('sync-join-a').onclick = () => { syncState.users.alice = true; pushSync('join', 'UserJoined(Alice)', 'eventsFlow.tryEmit(UserJoined)'); };
-  document.getElementById('sync-join-b').onclick = () => { syncState.users.bob = true; pushSync('join', 'UserJoined(Bob)', 'eventsFlow.tryEmit(UserJoined)'); };
-  document.getElementById('sync-cursor').onclick = () => {
-    syncState.rows[0].presence = '<span class="presence" style="background:#f7768e"></span>Bob@42';
-    pushSync('cursor', 'CursorPosition(Bob, README.md, 42)', 'presence updates row 0');
-  };
-  document.getElementById('sync-patch').onclick = () => {
-    syncState.rows[1].text = 'fun analyzeCpu(readings) = ... // Alice patched';
-    syncState.rows[1].presence = '<span class="presence" style="background:#7aa2f7"></span>Alice';
-    syncState.rows[1].status = 'patched';
-    pushSync('patch', 'FileUpdated(src/analyzer.kt, patch, Alice)', 'row 1 text changed; still not a first-class mutation cursor');
-  };
-  document.getElementById('sync-snapshot').onclick = () => {
-    syncState.rows[0].status = 'snapshotted';
-    syncState.rows[1].status = 'snapshotted';
-    pushSync('snap', 'SnapshotCreated(snapshot, system)', 'event class exists; snapshot is still a file-map copy');
-  };
-  document.getElementById('sync-reset').onclick = resetSync;
-  resetSync();
-
-  // ---------- provenance interactive ----------
-  let prov;
-  function resetProv() {
-    prov = {
-      snapshot: null,
-      execution: null,
-      artifact: null,
-      export: null
-    };
-    renderProv();
-  }
-  function renderProv() {
-    const setActive = (id, on) => document.getElementById(id).classList.toggle('active', !!on);
-    setActive('n-snapshot', prov.snapshot);
-    setActive('n-exec', prov.execution);
-    setActive('n-artifact', prov.artifact);
-    setActive('n-export', prov.export);
-    document.getElementById('prov-json').innerHTML = formatJson({
-      sourceFiles: ['README.md', 'data/readings.jsonl'],
-      snapshot: prov.snapshot,
-      execution: prov.execution,
-      artifact: prov.artifact,
-      exportManifest: prov.export,
-      missing: {
-        dependencyHandles: prov.artifact ? 'not stored on ForgeArtifact' : 'n/a',
-        promptVersions: prov.execution ? 'not stored on ForgeExecutionResult' : 'n/a',
-        sourceHashes: prov.snapshot ? 'not stored on ForgeSnapshot' : 'n/a'
+      {
+        "line": 4,
+        "text": ""
+      },
+      {
+        "line": 5,
+        "text": "```kotlin"
+      },
+      {
+        "line": 6,
+        "text": "interface Join<A, B> {"
+      },
+      {
+        "line": 7,
+        "text": "    val a: A"
+      },
+      {
+        "line": 8,
+        "text": "    val b: B"
+      },
+      {
+        "line": 9,
+        "text": "    operator fun component1(): A = a"
+      },
+      {
+        "line": 10,
+        "text": "    operator fun component2(): B = b"
+      },
+      {
+        "line": 11,
+        "text": "    val pair: Pair<A, B> get() = Pair(a, b)"
+      },
+      {
+        "line": 12,
+        "text": "    // ... many extensions and specializations hang off this shape"
+      },
+      {
+        "line": 13,
+        "text": "}"
+      },
+      {
+        "line": 14,
+        "text": ""
       }
-    });
-  }
-  document.getElementById('prov-snap').onclick = () => {
-    prov.snapshot = { id: 'snap-1', parentId: 'root', files: 2, message: 'checkpoint', tags: ['baseline'] };
-    renderProv();
-  };
-  document.getElementById('prov-run').onclick = () => {
-    prov.execution = { executionId: 'exec-1', workflowId: 'wf-telemetry', snapshotId: 'snap-1', status: 'SUCCESS', stepResults: 0 };
-    renderProv();
-  };
-  document.getElementById('prov-artifact').onclick = () => {
-    prov.artifact = { artifactId: 'art-1', name: 'telemetry-report-v1', workflowId: 'wf-telemetry', executionId: 'exec-1', fileCount: 2, explicitDependencies: false };
-    renderProv();
-  };
-  document.getElementById('prov-export').onclick = () => {
-    prov.export = { artifactId: 'art-1', artifactName: 'telemetry-report-v1', workflowId: 'wf-telemetry', executionId: 'exec-1', totalSize: 999 };
-    renderProv();
-  };
-  document.getElementById('prov-reset').onclick = resetProv;
-  resetProv();
-
-  // ---------- trace interactive ----------
-  let traceTimer = null;
-  function resetTrace() {
-    if (traceTimer) clearInterval(traceTimer);
-    traceTimer = null;
-    document.getElementById('trace-events').innerHTML = '';
-  }
-  function addTrace(tag, msg, sub='') {
-    const el = document.createElement('div');
-    el.className = 'event';
-    el.innerHTML = `<div class="tag">${tag}</div><div class="msg">${msg}${sub ? `<small>${sub}</small>` : ''}</div>`;
-    document.getElementById('trace-events').prepend(el);
-  }
-  document.getElementById('trace-play').onclick = () => {
-    resetTrace();
-    const seq = [
-      ['StepStarted', 'step-summarize', 'declared StepProgress surface'],
-      ['StepMessage', 'prompt resolved + inputs bound', 'could map to execution row'],
-      ['Progress', 'agent warming up', 'declared AgentEvent.Progress'],
-      ['ToolCall', 'read_file(README.md)', 'declared AgentEvent.ToolCall'],
-      ['ToolResult', 'README content loaded', 'declared AgentEvent.ToolResult'],
-      ['StepCompleted', 'StepResult.Success(step-summarize, ...)', 'declared StepProgress.StepCompleted'],
-      ['WorkflowCompleted', 'ForgeExecutionResult(...)', 'declared StepProgress.WorkflowCompleted']
-    ];
-    let i = 0;
-    traceTimer = setInterval(() => {
-      if (i >= seq.length) { clearInterval(traceTimer); traceTimer = null; return; }
-      addTrace(seq[i][0], seq[i][1], seq[i][2]);
-      i++;
-    }, 420);
-  };
-  document.getElementById('trace-stub').onclick = () => {
-    resetTrace();
-    addTrace('Current', 'flowOf(StepStarted(workflowId.value, workflow.name))', 'execute() currently emits one StepStarted');
-    addTrace('Current', 'ForgeExecutionResult(stepResults = emptyList(), finalOutputs = inputs, artifacts = emptyList())', 'executeSync() currently returns success shell');
-    addTrace('Current', 'Mock LLM / Agent StepResult.Success strings', 'ForgeStepRunnerImpl is a test stub');
-  };
-  document.getElementById('trace-reset').onclick = resetTrace;
-
-  // ---------- extensibility ----------
-  const extData = {
-    agent: {
-      seam: 'ForgeAgentRunner',
-      implement: ['val agentType', 'suspend fun isAvailable()', 'fun runAgent(config, task, context, workingDir): ReceiveChannel<AgentEvent>'],
-      notes: ['best seam for Codex / Claude Code / local runner integrations', 'does not by itself fix provenance or cursor lowering']
+    ],
+    "cursor_excerpt": [
+      {
+        "line": 64,
+        "text": "## Cursor algebra"
+      },
+      {
+        "line": 65,
+        "text": ""
+      },
+      {
+        "line": 66,
+        "text": "```kotlin"
+      },
+      {
+        "line": 67,
+        "text": "typealias RowVec = Series2<Any, () -> RecordMeta>"
+      },
+      {
+        "line": 68,
+        "text": "/** Cursors are a columnar abstraction composed of Series of joined value+meta pairs */"
+      },
+      {
+        "line": 69,
+        "text": "typealias Cursor = Series<RowVec>"
+      },
+      {
+        "line": 70,
+        "text": "```"
+      },
+      {
+        "line": 71,
+        "text": ""
+      },
+      {
+        "line": 72,
+        "text": "Read Cursor as:"
+      },
+      {
+        "line": 73,
+        "text": "- RowVec = row-shaped value view plus metadata supplier"
+      }
+    ],
+    "ccek_excerpt": [
+      {
+        "line": 108,
+        "text": "## Userspace async context algebra (aka CCEK meaning Coroutine, Context, Element, Key )"
+      },
+      {
+        "line": 109,
+        "text": ""
+      },
+      {
+        "line": 110,
+        "text": "The userspace side is modeled as explicit async context elements and fanout, not hidden ambient magic."
+      },
+      {
+        "line": 111,
+        "text": ""
+      },
+      {
+        "line": 112,
+        "text": "Ground truths from the code/tests:"
+      },
+      {
+        "line": 113,
+        "text": "- async context keys are singleton identity objects"
+      },
+      {
+        "line": 114,
+        "text": "- current keys include `NioUserspaceKey`, `LiburingKey`, `FanoutDispatcherKey`"
+      },
+      {
+        "line": 115,
+        "text": "- element lifecycle is forward-only:"
+      },
+      {
+        "line": 116,
+        "text": "  - `CREATED`"
+      },
+      {
+        "line": 117,
+        "text": "  - `OPEN`"
+      }
+    ]
+  },
+  "assets": [
+    {
+      "id": "series",
+      "title": "TrikeShed Series Introspection",
+      "published_path": "./demos/series.html",
+      "repo_path": "docs/demos/series.html",
+      "source_origin": "series.html",
+      "kind": "algebra-introspector",
+      "summary": "Interactive type introspector over Join, MetaSeries, Series, RowVec, Cursor, \u03b1, view, and j.",
+      "evidence": [
+        "Real source-grounded type tree and syntax-highlighted source blocks.",
+        "Interactive projections and cursor composition behaviors are demonstrated in-page.",
+        "Built from the actual TrikeShed algebra rather than a product shell."
+      ],
+      "source_files": [
+        "PRELOAD.md",
+        "src/commonMain/kotlin/borg/trikeshed/lib/Join.kt",
+        "src/commonMain/kotlin/borg/trikeshed/cursor/Cursor.kt"
+      ],
+      "size_bytes": 56961,
+      "size_kib": 55.6
     },
-    step: {
-      seam: 'WorkflowStep + ForgeStepRunner',
-      implement: ['add new WorkflowStep subtype', 'extend ForgeStepRunner interface', 'teach workspace/compiler to execute it'],
-      notes: ['good when capability is semantically a new step kind', 'harder than adding a new agent backend']
+    {
+      "id": "runtime",
+      "title": "Forge Runtime / Collaboration Introspection",
+      "published_path": "./demos/runtime.html",
+      "repo_path": "docs/demos/runtime.html",
+      "source_origin": "runtime.html",
+      "kind": "runtime-seams",
+      "summary": "Source-grounded runtime surface for blackboard state, collaboration flow, provenance, tracing, and extension seams.",
+      "evidence": [
+        "Distinguishes implemented structures, stubbed APIs, and missing PRELOAD-native lowering.",
+        "Anchors directly to BlackboardOverlay, ForgeWorkspaceImpl, Lifecycle, and AsyncContextElement seams.",
+        "Designed for honest runtime inspection rather than speculative UI."
+      ],
+      "source_files": [
+        "src/commonMain/kotlin/borg/trikeshed/cursor/BlackboardOverlay.kt",
+        "libs/forge/src/main/kotlin/borg/trikeshed/forge/ForgeWorkspaceImpl.kt",
+        "src/commonMain/kotlin/borg/trikeshed/context/Lifecycle.kt",
+        "src/commonMain/kotlin/borg/trikeshed/context/AsyncContextElement.kt"
+      ],
+      "size_bytes": 57767,
+      "size_kib": 56.4
     },
-    sync: {
-      seam: 'ForgeWorkspace.events()/emit() → ForgeWorkspaceElement : AsyncContextElement',
-      implement: ['replace MutableSharedFlow bus', 'introduce fanoutSubscribers', 'make event payloads cursor mutation rows'],
-      notes: ['structural surgery', 'this is where real-time cursor-native collaboration lives']
+    {
+      "id": "triple",
+      "title": "Real Cursor / Blackboard / Execution Triple",
+      "published_path": "./demos/triple.html",
+      "repo_path": "docs/demos/triple.html",
+      "source_origin": "triple.html",
+      "kind": "proof-slice",
+      "summary": "Runnable proof slice linking one real workspace cell across RowVec, BlackboardContext, and execution-event rows.",
+      "evidence": [
+        "Generated from a runnable Kotlin harness using copied real source in /tmp/trikeshed-triple.",
+        "Shows one concrete target cell: row-0:summary.",
+        "Connects workspaceRow, blackboardRow, and executionRow through the same addressing discipline."
+      ],
+      "source_files": [
+        "src/commonMain/kotlin/borg/trikeshed/lib/Join.kt",
+        "src/commonMain/kotlin/borg/trikeshed/cursor/Cursor.kt",
+        "src/commonMain/kotlin/borg/trikeshed/cursor/BlackboardOverlay.kt"
+      ],
+      "size_bytes": 23014,
+      "size_kib": 22.5
     },
-    provenance: {
-      seam: 'ForgeArtifact / ForgeSnapshot / ForgeExecutionResult companion lowering',
-      implement: ['attach BlackboardContext', 'store dependency handles', 'add bodyRef/source hash/prompt version lineage'],
-      notes: ['can start as companion objects before full Confix store']
-    },
-    overlay: {
-      seam: 'columnOverlay / cellOverlay / blackboardContext',
-      implement: ['define overlay defaults per workflow output column', 'upgrade human-reviewed cells from HYPOTHESIS to GROUND_TRUTH', 'attach dependencies to source rows'],
-      notes: ['lowest-risk semantic improvement', 'already exists in cursor package today']
+    {
+      "id": "confix",
+      "title": "TrikeShed \u00b7 Confix \u2194 Cursor Blackboard",
+      "published_path": "./demos/ConfixCursorBlackboard.svg.html",
+      "repo_path": "docs/demos/ConfixCursorBlackboard.svg.html",
+      "source_origin": "docs/demos/ConfixCursorBlackboard.svg.html",
+      "kind": "support-diagram",
+      "summary": "Support diagram for the Confix \u2194 Cursor \u2194 Blackboard adjacency and its production hinge vocabulary.",
+      "evidence": [
+        "Diagram artifact already present in docs/demos.",
+        "Complements the runtime and triple proof surfaces with structural adjacency."
+      ],
+      "source_files": [
+        "docs/demos/ConfixCursorBlackboard.svg.html",
+        "docs/plans/2026-06-12-forge-blackboard-confix-adjacency.md"
+      ],
+      "size_bytes": 29480,
+      "size_kib": 28.8
     }
-  };
-  function renderExt(key) {
-    document.querySelectorAll('#ext-pills .role').forEach(p => p.classList.toggle('active', p.dataset.ext === key));
-    const d = extData[key];
-    document.getElementById('ext-json').innerHTML = formatJson(d);
+  ],
+  "links": {
+    "home": "./index.html",
+    "runtime": "./demos/runtime.html",
+    "series": "./demos/series.html",
+    "triple": "./demos/triple.html",
+    "confix": "./demos/ConfixCursorBlackboard.svg.html"
   }
-  document.querySelectorAll('#ext-pills .role').forEach(p => p.addEventListener('click', () => renderExt(p.dataset.ext)));
-  renderExt('agent');
+}</script>
+  <script>
+    const DATA = JSON.parse(document.getElementById('bootstrap-data').textContent);
 
-  // ---------- helpers ----------
-  function formatJson(obj) {
-    const raw = JSON.stringify(obj, null, 2)
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;');
-    return raw
-      .replace(/"([^"]+)":/g, '<span class="k">"$1"</span>:')
-      .replace(/: "([^"]*)"/g, ': <span class="s">"$1"</span>')
-      .replace(/: (\d+\.?\d*)/g, ': <span class="n">$1</span>')
-      .replace(/: (true|false|null)/g, ': <span class="v">$1</span>');
-  }
-</script>
+    function createSignal(initial) {
+      let value = initial;
+      const subs = new Set();
+      return {
+        get: () => value,
+        set: (next) => {
+          value = next;
+          subs.forEach(fn => fn(value));
+        },
+        sub: (fn) => {
+          subs.add(fn);
+          fn(value);
+          return () => subs.delete(fn);
+        }
+      };
+    }
+
+    function computed(deps, calc) {
+      const out = createSignal(calc(...deps.map(d => d.get())));
+      const refresh = () => out.set(calc(...deps.map(d => d.get())));
+      deps.forEach(dep => dep.sub(refresh));
+      return out;
+    }
+
+    function el(tag, attrs = {}, ...children) {
+      const node = document.createElement(tag);
+      Object.entries(attrs).forEach(([k, v]) => {
+        if (v == null) return;
+        if (k === 'class') node.className = v;
+        else if (k === 'html') node.innerHTML = v;
+        else if (k === 'text') node.textContent = v;
+        else if (k.startsWith('on') && typeof v === 'function') node.addEventListener(k.slice(2), v);
+        else node.setAttribute(k, v);
+      });
+      children.flat().forEach(child => {
+        if (child == null) return;
+        if (typeof child === 'string') node.appendChild(document.createTextNode(child));
+        else node.appendChild(child);
+      });
+      return node;
+    }
+
+    function clear(node) { node.replaceChildren(); }
+    function fmtBytes(n) { return (n / 1024).toFixed(1) + ' KiB'; }
+    function humanSection(id) { return ({ ship:'Shipboard', assets:'Published assets', contract:'PRELOAD contract', ops:'Ops / working tree' })[id] || id; }
+    function statusClass(line) { return line.startsWith('??') ? 'untracked' : 'modified'; }
+
+    const sections = [
+      { id: 'ship', title: 'Shipboard', sub: 'Production statement, metrics, and the live signal graph.' },
+      { id: 'assets', title: 'Published assets', sub: 'Real introspection pages copied into docs/demos and selected via signals.' },
+      { id: 'contract', title: 'PRELOAD contract', sub: 'Kernel, cursor, and CCEK excerpts lifted from PRELOAD.md.' },
+      { id: 'ops', title: 'Ops / working tree', sub: 'Pages roots, manifest links, and current repo state.' },
+    ];
+
+    const activeSection = createSignal('ship');
+    const activeAssetId = createSignal((DATA.assets.find(a => a.id === 'runtime') || DATA.assets[0]).id);
+    const query = createSignal('');
+    const contractMode = createSignal('kernel');
+    const eventLog = createSignal([]);
+    const activeAsset = computed([activeAssetId], id => DATA.assets.find(a => a.id === id) || DATA.assets[0]);
+    const filteredAssets = computed([query], q => {
+      const s = q.trim().toLowerCase();
+      if (!s) return DATA.assets;
+      return DATA.assets.filter(asset =>
+        asset.title.toLowerCase().includes(s) ||
+        asset.kind.toLowerCase().includes(s) ||
+        asset.summary.toLowerCase().includes(s) ||
+        asset.source_files.join(' ').toLowerCase().includes(s)
+      );
+    });
+
+    function pushEvent(tag, msg) {
+      const ts = new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit', second:'2-digit'});
+      eventLog.set([{ tag, msg, ts }, ...eventLog.get()].slice(0, 10));
+    }
+
+    let booted = false;
+    activeSection.sub(v => { if (booted) pushEvent('section', 'Focus moved to ' + humanSection(v)); render(); });
+    activeAsset.sub(asset => { if (booted) pushEvent('asset', 'Selected ' + asset.title); renderHero(); renderInspector(); renderSection(); });
+    query.sub(v => { if (booted) pushEvent('query', v ? 'Filtered assets with “' + v + '”' : 'Cleared asset filter'); renderSection(); renderInspector(); });
+    contractMode.sub(v => { if (booted) pushEvent('contract', 'Viewing ' + v + ' excerpt'); renderSection(); });
+
+    function renderNav() {
+      const host = document.getElementById('nav');
+      clear(host);
+      sections.forEach(sec => {
+        host.appendChild(el('button', {
+          class: 'navbtn' + (activeSection.get() === sec.id ? ' active' : ''),
+          onclick: () => activeSection.set(sec.id)
+        },
+          el('div', { class:'top' },
+            el('div', { class:'ttl', text: sec.title }),
+            el('div', { class:'tiny mono muted', text: sec.id })
+          ),
+          el('div', { class:'sub', text: sec.sub })
+        ));
+      });
+    }
+
+    function renderHero() {
+      const asset = activeAsset.get();
+      const chips = document.getElementById('hero-chips');
+      clear(chips);
+      [
+        ['blue', DATA.repo.branch],
+        ['green', DATA.signals.published_asset_count + ' published assets'],
+        ['cyan', DATA.repo.pages_root + ' Pages root'],
+        ['amber', DATA.signals.working_tree_entries + ' working tree signals']
+      ].forEach(([color, label]) => chips.appendChild(el('span', { class:'chip' }, el('span', { class:'dot ' + color }), label)));
+
+      document.getElementById('hero-statement').textContent = DATA.production_statement;
+      document.getElementById('hero-selected-kind').textContent = asset.kind;
+      const selected = document.getElementById('hero-selected');
+      clear(selected);
+      selected.append(
+        el('div', { class:'asset-kind', text: asset.kind }),
+        el('div', { style:'font-size:18px;font-weight:700;line-height:1.3;margin-top:6px;', text: asset.title }),
+        el('p', { class:'muted', style:'margin:10px 0 0;line-height:1.6;font-size:13px;', text: asset.summary }),
+        el('div', { class:'asset-meta', style:'margin-top:12px;' },
+          el('span', { class:'chip mono' }, asset.published_path),
+          el('span', { class:'chip' }, asset.size_kib + ' KiB'),
+          el('span', { class:'chip' }, asset.evidence.length + ' evidence points')
+        )
+      );
+      const actions = document.getElementById('hero-actions');
+      clear(actions);
+      actions.append(
+        el('a', { class:'linkbtn primary', href: asset.published_path, target:'_blank', rel:'noreferrer' }, 'Open selected asset'),
+        el('a', { class:'linkbtn', href: './data/forge-production-signals.json', target:'_blank', rel:'noreferrer' }, 'Open production manifest'),
+        el('a', { class:'linkbtn', href: DATA.repo.pages_url, target:'_blank', rel:'noreferrer' }, 'Open live Pages root')
+      );
+    }
+
+    function metricCard(num, label, meta) {
+      return el('div', { class:'metric' },
+        el('div', { class:'num', text: String(num) }),
+        el('div', { class:'lbl', text: label }),
+        el('div', { class:'meta', text: meta })
+      );
+    }
+
+    function renderShipboard() {
+      return el('div', { class:'stack' },
+        el('div', { class:'card' },
+          el('div', { class:'card-head' }, el('h3', { text:'Production signal board' }), el('div', { class:'hint mono', text:'repo → manifest → signals → published demos' })),
+          el('div', { class:'card-body' },
+            el('div', { class:'metrics' },
+              metricCard(DATA.signals.published_asset_count, 'Published assets', 'docs/demos + support diagram'),
+              metricCard(DATA.signals.preload_line_count, 'PRELOAD lines', 'kernel / cursor / CCEK excerpts loaded'),
+              metricCard(DATA.signals.working_tree_entries, 'Working tree entries', DATA.signals.modified_entries + ' modified · ' + DATA.signals.untracked_entries + ' untracked'),
+              metricCard(fmtBytes(DATA.signals.published_bytes), 'Published bytes', DATA.repo.pages_root + ' static footprint')
+            )
+          )
+        ),
+        el('div', { class:'grid2' },
+          el('div', { class:'card' },
+            el('div', { class:'card-head' }, el('h3', { text:'Production signals, not templates' }), el('div', { class:'hint', text:'all values sourced from the manifest' })),
+            el('div', { class:'card-body' },
+              el('div', { class:'signal-board' },
+                signalCell('Pages URL', DATA.repo.pages_url, 'GitHub Pages root'),
+                signalCell('Branch', DATA.repo.branch, 'current publish branch'),
+                signalCell('Copied assets', DATA.signals.copied_asset_count, 'series/runtime/triple mirrored into docs/demos'),
+                signalCell('Manifest time', DATA.generated_at_utc, 'UTC build stamp'),
+                signalCell('Modified entries', DATA.signals.modified_entries, 'tracked repo changes'),
+                signalCell('Untracked entries', DATA.signals.untracked_entries, 'new docs/demo payloads'),
+              )
+            )
+          ),
+          el('div', { class:'card' },
+            el('div', { class:'card-head' }, el('h3', { text:'Selected asset evidence' }), el('div', { class:'hint mono', text:activeAsset.get().id })),
+            el('div', { class:'card-body' },
+              el('div', { class:'list' }, ...activeAsset.get().evidence.map(item => el('div', { class:'list-item', text:item })))
+            )
+          )
+        )
+      );
+    }
+
+    function signalCell(k, v, s) {
+      return el('div', { class:'signal' },
+        el('div', { class:'k', text:k }),
+        el('div', { class:'v mono', text:String(v) }),
+        el('div', { class:'s', text:s })
+      );
+    }
+
+    function renderAssets() {
+      const assets = filteredAssets.get();
+      return el('div', { class:'stack' },
+        el('div', { class:'card' },
+          el('div', { class:'card-head' }, el('h3', { text:'Published introspection assets' }), el('div', { class:'hint', text:'filterable signal set rendered from the manifest' })),
+          el('div', { class:'card-body' },
+            el('div', { class:'asset-tools' },
+              el('input', { class:'search', type:'search', placeholder:'Filter by title, kind, source file, or summary…', value: query.get(), oninput: (e) => query.set(e.target.value) }),
+              el('span', { class:'chip' }, el('span', { class:'dot green' }), el('b', { text: String(assets.length) }), ' visible')
+            ),
+            el('div', { class:'asset-grid' }, ...(assets.length ? assets.map(assetCard) : [el('div', { class:'status untracked', text:'No assets match the current filter.' })]))
+          )
+        )
+      );
+    }
+
+    function assetCard(asset) {
+      return el('div', { class:'asset' + (activeAssetId.get() === asset.id ? ' active' : ''), onclick: () => activeAssetId.set(asset.id) },
+        el('div', { class:'asset-head' },
+          el('div', {},
+            el('div', { class:'asset-kind', text: asset.kind }),
+            el('div', { class:'asset-title', text: asset.title })
+          ),
+          el('span', { class:'chip mono' }, asset.size_kib + ' KiB')
+        ),
+        el('div', { class:'asset-summary', text: asset.summary }),
+        el('div', { class:'asset-meta' },
+          el('span', { class:'chip mono' }, asset.published_path),
+          el('span', { class:'chip' }, asset.source_files.length + ' source anchors'),
+          el('span', { class:'chip' }, asset.evidence.length + ' proof bullets')
+        ),
+        el('div', { class:'asset-row' },
+          el('span', { class:'mono', text: asset.repo_path }),
+          el('a', { class:'linkbtn', href: asset.published_path, target:'_blank', rel:'noreferrer', onclick: (e) => e.stopPropagation() }, 'Open')
+        )
+      );
+    }
+
+    function renderContract() {
+      const mode = contractMode.get();
+      const mapping = {
+        kernel: DATA.preload_contract.kernel_excerpt,
+        cursor: DATA.preload_contract.cursor_excerpt,
+        ccek: DATA.preload_contract.ccek_excerpt,
+      };
+      const excerpt = mapping[mode] || [];
+      return el('div', { class:'stack' },
+        el('div', { class:'card' },
+          el('div', { class:'card-head' }, el('h3', { text:'PRELOAD contract excerpts' }), el('div', { class:'hint mono', text:'PRELOAD.md' })),
+          el('div', { class:'card-body' },
+            el('div', { class:'section-tabs' },
+              ...['kernel','cursor','ccek'].map(id => el('button', { class:'tabbtn' + (mode === id ? ' active' : ''), onclick: () => contractMode.set(id) }, id))
+            ),
+            el('div', { class:'codeblock', style:'margin-top:14px;' },
+              ...excerpt.map(row => el('div', { class:'line' }, el('div', { class:'ln mono', text:String(row.line) }), el('div', { class:'src mono', text: row.text || ' ' })))
+            )
+          )
+        )
+      );
+    }
+
+    function renderOps() {
+      return el('div', { class:'stack' },
+        el('div', { class:'grid2' },
+          el('div', { class:'card' },
+            el('div', { class:'card-head' }, el('h3', { text:'Links and roots' }), el('div', { class:'hint', text:'production publish paths' })),
+            el('div', { class:'card-body' },
+              el('div', { class:'kv' },
+                el('div', { text:'Pages root' }), el('div', { class:'mono', text: DATA.repo.pages_root }),
+                el('div', { text:'Pages URL' }), el('div', { class:'mono', text: DATA.repo.pages_url }),
+                el('div', { text:'Manifest' }), el('div', { class:'mono', text: './data/forge-production-signals.json' }),
+                el('div', { text:'Branch' }), el('div', { class:'mono', text: DATA.repo.branch }),
+                el('div', { text:'Remote' }), el('div', { class:'mono', text: DATA.repo.remote }),
+              ),
+              el('div', { class:'hero-actions', style:'margin-top:14px;' },
+                el('a', { class:'linkbtn primary', href:'./data/forge-production-signals.json', target:'_blank', rel:'noreferrer' }, 'Open manifest JSON'),
+                el('a', { class:'linkbtn', href: DATA.repo.pages_url, target:'_blank', rel:'noreferrer' }, 'Open Pages'),
+              )
+            )
+          ),
+          el('div', { class:'card' },
+            el('div', { class:'card-head' }, el('h3', { text:'Current working tree' }), el('div', { class:'hint mono', text:'git status --short' })),
+            el('div', { class:'card-body' },
+              el('div', { class:'status-list' }, ...DATA.working_tree.map(line => el('div', { class:'status ' + statusClass(line) }, el('span', { class:'mono', text: line }))))
+            )
+          )
+        )
+      );
+    }
+
+    function renderSection() {
+      const host = document.getElementById('section-host');
+      clear(host);
+      const section = activeSection.get();
+      if (section === 'ship') host.appendChild(renderShipboard());
+      if (section === 'assets') host.appendChild(renderAssets());
+      if (section === 'contract') host.appendChild(renderContract());
+      if (section === 'ops') host.appendChild(renderOps());
+      renderNav();
+    }
+
+    function renderInspector() {
+      const host = document.getElementById('inspector-host');
+      clear(host);
+      const asset = activeAsset.get();
+      host.append(
+        el('div', { class:'card' },
+          el('div', { class:'card-head' }, el('h3', { text:'Asset inspector' }), el('div', { class:'hint mono', text: asset.id })),
+          el('div', { class:'card-body' },
+            el('div', { class:'asset-kind', text: asset.kind }),
+            el('div', { style:'font-size:17px;font-weight:700;margin-top:6px;line-height:1.3;', text: asset.title }),
+            el('p', { class:'muted', style:'margin:10px 0 0;line-height:1.6;font-size:13px;', text: asset.summary }),
+            el('div', { class:'asset-meta', style:'margin-top:14px;' },
+              el('span', { class:'chip mono' }, asset.published_path),
+              el('span', { class:'chip' }, asset.size_kib + ' KiB')
+            ),
+            el('div', { class:'hero-actions', style:'margin-top:14px;' },
+              el('a', { class:'linkbtn primary', href: asset.published_path, target:'_blank', rel:'noreferrer' }, 'Open asset'),
+            )
+          )
+        ),
+        el('div', { class:'card' },
+          el('div', { class:'card-head' }, el('h3', { text:'Proof points' }), el('div', { class:'hint', text: asset.evidence.length + ' evidence bullets' })),
+          el('div', { class:'card-body' }, el('div', { class:'list' }, ...asset.evidence.map(text => el('div', { class:'list-item', text }))))
+        ),
+        el('div', { class:'card' },
+          el('div', { class:'card-head' }, el('h3', { text:'Source anchors' }), el('div', { class:'hint', text: asset.source_files.length + ' files' })),
+          el('div', { class:'card-body' }, el('div', { class:'list' }, ...asset.source_files.map(text => el('div', { class:'list-item mono' }, text)) ))
+        ),
+        el('div', { class:'card' },
+          el('div', { class:'card-head' }, el('h3', { text:'Signal event log' }), el('div', { class:'hint', text:'local UI events' })),
+          el('div', { class:'card-body' },
+            el('div', { class:'event-log' }, ...(eventLog.get().length ? eventLog.get().map(entry => el('div', { class:'event' }, el('div', { class:'tag', text: entry.tag }), el('div', { class:'msg', text: entry.msg }), el('div', { class:'ts mono', text: entry.ts }))) : [el('div', { class:'muted tiny', text:'No events yet.' })]))
+          )
+        )
+      );
+    }
+
+    function render() {
+      renderHero();
+      renderSection();
+      renderInspector();
+    }
+
+    renderNav();
+    render();
+    booted = true;
+    pushEvent('boot', 'Loaded production manifest ' + DATA.generated_at_utc);
+    pushEvent('asset', 'Selected ' + activeAsset.get().title);
+    pushEvent('section', 'Focus moved to ' + humanSection(activeSection.get()));
+    renderInspector();
+  </script>
 </body>
 </html>

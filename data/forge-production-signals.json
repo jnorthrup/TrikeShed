@@ -1,0 +1,256 @@
+{
+  "generated_at_utc": "2026-06-12T22:12:49Z",
+  "repo": {
+    "name": "TrikeShed",
+    "cwd": "/Users/jim/work/TrikeShed",
+    "branch": "master",
+    "remote": "https://github.com/jnorthrup/TrikeShed.git",
+    "pages_url": "https://jnorthrup.github.io/TrikeShed/",
+    "pages_root": "docs/"
+  },
+  "production_statement": "Production Pages surface is built from actual repo signals and published introspection artifacts, not a template dashboard.",
+  "signals": {
+    "published_asset_count": 4,
+    "copied_asset_count": 3,
+    "working_tree_entries": 5,
+    "modified_entries": 1,
+    "untracked_entries": 4,
+    "preload_line_count": 142,
+    "published_bytes": 167222
+  },
+  "working_tree": [
+    "M README.md",
+    "?? docs/demos/runtime.html",
+    "?? docs/demos/series.html",
+    "?? docs/demos/triple.html",
+    "?? docs/plans/2026-06-12-forge-blackboard-confix-adjacency.md"
+  ],
+  "preload_contract": {
+    "kernel_excerpt": [
+      {
+        "line": 3,
+        "text": "## Kernel algebra"
+      },
+      {
+        "line": 4,
+        "text": ""
+      },
+      {
+        "line": 5,
+        "text": "```kotlin"
+      },
+      {
+        "line": 6,
+        "text": "interface Join<A, B> {"
+      },
+      {
+        "line": 7,
+        "text": "    val a: A"
+      },
+      {
+        "line": 8,
+        "text": "    val b: B"
+      },
+      {
+        "line": 9,
+        "text": "    operator fun component1(): A = a"
+      },
+      {
+        "line": 10,
+        "text": "    operator fun component2(): B = b"
+      },
+      {
+        "line": 11,
+        "text": "    val pair: Pair<A, B> get() = Pair(a, b)"
+      },
+      {
+        "line": 12,
+        "text": "    // ... many extensions and specializations hang off this shape"
+      },
+      {
+        "line": 13,
+        "text": "}"
+      },
+      {
+        "line": 14,
+        "text": ""
+      }
+    ],
+    "cursor_excerpt": [
+      {
+        "line": 64,
+        "text": "## Cursor algebra"
+      },
+      {
+        "line": 65,
+        "text": ""
+      },
+      {
+        "line": 66,
+        "text": "```kotlin"
+      },
+      {
+        "line": 67,
+        "text": "typealias RowVec = Series2<Any, () -> RecordMeta>"
+      },
+      {
+        "line": 68,
+        "text": "/** Cursors are a columnar abstraction composed of Series of joined value+meta pairs */"
+      },
+      {
+        "line": 69,
+        "text": "typealias Cursor = Series<RowVec>"
+      },
+      {
+        "line": 70,
+        "text": "```"
+      },
+      {
+        "line": 71,
+        "text": ""
+      },
+      {
+        "line": 72,
+        "text": "Read Cursor as:"
+      },
+      {
+        "line": 73,
+        "text": "- RowVec = row-shaped value view plus metadata supplier"
+      }
+    ],
+    "ccek_excerpt": [
+      {
+        "line": 108,
+        "text": "## Userspace async context algebra (aka CCEK meaning Coroutine, Context, Element, Key )"
+      },
+      {
+        "line": 109,
+        "text": ""
+      },
+      {
+        "line": 110,
+        "text": "The userspace side is modeled as explicit async context elements and fanout, not hidden ambient magic."
+      },
+      {
+        "line": 111,
+        "text": ""
+      },
+      {
+        "line": 112,
+        "text": "Ground truths from the code/tests:"
+      },
+      {
+        "line": 113,
+        "text": "- async context keys are singleton identity objects"
+      },
+      {
+        "line": 114,
+        "text": "- current keys include `NioUserspaceKey`, `LiburingKey`, `FanoutDispatcherKey`"
+      },
+      {
+        "line": 115,
+        "text": "- element lifecycle is forward-only:"
+      },
+      {
+        "line": 116,
+        "text": "  - `CREATED`"
+      },
+      {
+        "line": 117,
+        "text": "  - `OPEN`"
+      }
+    ]
+  },
+  "assets": [
+    {
+      "id": "series",
+      "title": "TrikeShed Series Introspection",
+      "published_path": "./demos/series.html",
+      "repo_path": "docs/demos/series.html",
+      "source_origin": "series.html",
+      "kind": "algebra-introspector",
+      "summary": "Interactive type introspector over Join, MetaSeries, Series, RowVec, Cursor, \u03b1, view, and j.",
+      "evidence": [
+        "Real source-grounded type tree and syntax-highlighted source blocks.",
+        "Interactive projections and cursor composition behaviors are demonstrated in-page.",
+        "Built from the actual TrikeShed algebra rather than a product shell."
+      ],
+      "source_files": [
+        "PRELOAD.md",
+        "src/commonMain/kotlin/borg/trikeshed/lib/Join.kt",
+        "src/commonMain/kotlin/borg/trikeshed/cursor/Cursor.kt"
+      ],
+      "size_bytes": 56961,
+      "size_kib": 55.6
+    },
+    {
+      "id": "runtime",
+      "title": "Forge Runtime / Collaboration Introspection",
+      "published_path": "./demos/runtime.html",
+      "repo_path": "docs/demos/runtime.html",
+      "source_origin": "runtime.html",
+      "kind": "runtime-seams",
+      "summary": "Source-grounded runtime surface for blackboard state, collaboration flow, provenance, tracing, and extension seams.",
+      "evidence": [
+        "Distinguishes implemented structures, stubbed APIs, and missing PRELOAD-native lowering.",
+        "Anchors directly to BlackboardOverlay, ForgeWorkspaceImpl, Lifecycle, and AsyncContextElement seams.",
+        "Designed for honest runtime inspection rather than speculative UI."
+      ],
+      "source_files": [
+        "src/commonMain/kotlin/borg/trikeshed/cursor/BlackboardOverlay.kt",
+        "libs/forge/src/main/kotlin/borg/trikeshed/forge/ForgeWorkspaceImpl.kt",
+        "src/commonMain/kotlin/borg/trikeshed/context/Lifecycle.kt",
+        "src/commonMain/kotlin/borg/trikeshed/context/AsyncContextElement.kt"
+      ],
+      "size_bytes": 57767,
+      "size_kib": 56.4
+    },
+    {
+      "id": "triple",
+      "title": "Real Cursor / Blackboard / Execution Triple",
+      "published_path": "./demos/triple.html",
+      "repo_path": "docs/demos/triple.html",
+      "source_origin": "triple.html",
+      "kind": "proof-slice",
+      "summary": "Runnable proof slice linking one real workspace cell across RowVec, BlackboardContext, and execution-event rows.",
+      "evidence": [
+        "Generated from a runnable Kotlin harness using copied real source in /tmp/trikeshed-triple.",
+        "Shows one concrete target cell: row-0:summary.",
+        "Connects workspaceRow, blackboardRow, and executionRow through the same addressing discipline."
+      ],
+      "source_files": [
+        "src/commonMain/kotlin/borg/trikeshed/lib/Join.kt",
+        "src/commonMain/kotlin/borg/trikeshed/cursor/Cursor.kt",
+        "src/commonMain/kotlin/borg/trikeshed/cursor/BlackboardOverlay.kt"
+      ],
+      "size_bytes": 23014,
+      "size_kib": 22.5
+    },
+    {
+      "id": "confix",
+      "title": "TrikeShed \u00b7 Confix \u2194 Cursor Blackboard",
+      "published_path": "./demos/ConfixCursorBlackboard.svg.html",
+      "repo_path": "docs/demos/ConfixCursorBlackboard.svg.html",
+      "source_origin": "docs/demos/ConfixCursorBlackboard.svg.html",
+      "kind": "support-diagram",
+      "summary": "Support diagram for the Confix \u2194 Cursor \u2194 Blackboard adjacency and its production hinge vocabulary.",
+      "evidence": [
+        "Diagram artifact already present in docs/demos.",
+        "Complements the runtime and triple proof surfaces with structural adjacency."
+      ],
+      "source_files": [
+        "docs/demos/ConfixCursorBlackboard.svg.html",
+        "docs/plans/2026-06-12-forge-blackboard-confix-adjacency.md"
+      ],
+      "size_bytes": 29480,
+      "size_kib": 28.8
+    }
+  ],
+  "links": {
+    "home": "./index.html",
+    "runtime": "./demos/runtime.html",
+    "series": "./demos/series.html",
+    "triple": "./demos/triple.html",
+    "confix": "./demos/ConfixCursorBlackboard.svg.html"
+  }
+}
