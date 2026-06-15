@@ -11,7 +11,7 @@ import kotlin.coroutines.CoroutineContext
  */
 class CakManager(
     private val blockStore: BlockStore,
-    private val dhtTransport: DhtTransport? = null,
+    private val dht: DhtService? = null,
     parentJob: Job? = null,
 ) : AsyncContextElement(ElementState.CREATED, parentJob) {
 
@@ -31,22 +31,16 @@ class CakManager(
 
     suspend fun delete(cid: CID) = blockStore.put(cid, byteArrayOf())
 
-    /** Announce this node as a provider for the given CID via local DHT. */
+    /** Announce this node as a provider for the given CID via DHT. */
     suspend fun provide(cid: CID, address: String = "local") {
-        val dht = DhtService()
-        dht.announceProvider(cid, address)
+        dht?.announceProvider(cid, address)
     }
 
-    /** Uses the embedded DhtService for local provider lookups. */
-    suspend fun findProviders(cid: CID): List<String> {
-        val dht = DhtService()
-        return dht.findProviders(cid)
-    }
+    /** Uses the injected DhtService for provider lookups. */
+    suspend fun findProviders(cid: CID): List<String> = dht?.findProviders(cid) ?: emptyList()
 
-    suspend fun findClosestNodes(target: CID, k: Int = 20): List<NodeInfo> {
-        val dhtService = DhtService()
-        return dhtService.findNode(NodeId.fromCID(target)).take(k)
-    }
+    suspend fun findClosestNodes(target: CID, k: Int = 20): List<DhtService.NodeInfo> =
+        dht?.findNode(DhtService.NodeId.fromCID(target))?.take(k) ?: emptyList()
 
     suspend fun fetch(cid: CID): ByteArray = blockStore.get(cid) ?: byteArrayOf()
 
@@ -54,14 +48,23 @@ class CakManager(
 
     fun handleBitswapMessage(message: Any) {}
 
+    /**
+     * Import a CAR archive: parse it, store all blocks in the block store,
+     * and return the parse result with block count.
+     */
     suspend fun importCar(data: ByteArray): CarParseResult {
         return try {
-            CarParser.parse(data)
+            CarParser.parseWithBlocks(data) { block ->
+                blockStore.put(block.cid, block.data)
+            }
         } catch (e: Exception) {
             CarParseResult(emptyList(), emptyList(), 2, null, CID(byteArrayOf()))
         }
     }
 
+    /**
+     * Export blocks as a CAR archive (v2) for the given root CIDs.
+     */
     suspend fun exportCar(rootCids: List<CID>, version: Int = 2): ByteArray {
         val blocks = rootCids.mapNotNull { cid ->
             blockStore.get(cid)?.let { CarBlock(cid, it) }
@@ -106,16 +109,16 @@ object CakHtxKey : CoroutineContext.Key<CakManager>
 object CakManagerFactory {
     fun create(
         blockStore: BlockStore = MemoryBlockStore(),
-        dhtTransport: DhtTransport? = null,
+        dht: DhtService? = null,
         parentJob: Job? = null,
-    ): CakManager = CakManager(blockStore, dhtTransport, parentJob)
+    ): CakManager = CakManager(blockStore, dht, parentJob)
 
     /** Install a CAK manager as a coroutine-scoped context element. */
     suspend fun CoroutineScope.installCakManager(
         blockStore: BlockStore = MemoryBlockStore(),
-        dhtTransport: DhtTransport? = null,
+        dht: DhtService? = null,
     ): CakManager {
-        val manager = create(blockStore, dhtTransport, coroutineContext[Job])
+        val manager = create(blockStore, dht, coroutineContext[Job])
         manager.open()
         return manager
     }

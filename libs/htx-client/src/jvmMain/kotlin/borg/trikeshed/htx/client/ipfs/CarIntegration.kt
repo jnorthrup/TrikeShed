@@ -13,7 +13,14 @@ object CarParser {
     private const val CAR_VERSION_2 = 2
 
     @Throws(IOException::class)
-    fun parse(data: ByteArray): CarParseResult {
+    fun parse(data: ByteArray): CarParseResult = parseWithBlocks(data) { }
+
+    /**
+     * Parse a CAR archive, optionally processing each block via [blockHandler].
+     * Returns the parse result with block count.
+     */
+    @Throws(IOException::class)
+    fun parseWithBlocks(data: ByteArray, blockHandler: (CarBlock) -> Unit): CarParseResult {
         val buffer = ByteBuffer.wrap(data).order(ByteOrder.LITTLE_ENDIAN)
 
         val magic = buffer.short
@@ -29,7 +36,7 @@ object CarParser {
         buffer.get(headerData)
         val roots = parseRootsFromHeader(headerData)
 
-        val blocks = mutableListOf<CarBlock>()
+        var blockCount = 0
         while (buffer.remaining() > 0) {
             if (version == CAR_VERSION_2.toLong() && buffer.remaining() > 0) {
                 val pos = buffer.position()
@@ -42,20 +49,19 @@ object CarParser {
             }
 
             try {
-                blocks.add(readBlock(buffer))
+                val block = readBlock(buffer)
+                blockHandler(block)
+                blockCount++
             } catch (e: Exception) {
                 break
             }
         }
 
-        val index = if (version == CAR_VERSION_2.toLong()) parseIndex(buffer) else null
-
         return CarParseResult(
             roots = roots,
-            blocks = blocks,
+            blockCount = blockCount,
             version = version.toInt(),
-            index = index,
-            dataCid = computeDataCid(blocks),
+            dataCid = CID(byteArrayOf()),
         )
     }
 
@@ -84,50 +90,18 @@ object CarParser {
 
     private fun parseCidFromBlock(blockData: ByteArray): CID =
         CID(blockData.copyOfRange(0, kotlin.math.min(32, blockData.size)))
-
-    private fun parseIndex(buffer: ByteBuffer): CarIndex {
-        val marker = readVarint(buffer)
-        require(marker == 0xFFFFFFFFL) { "Expected index marker" }
-        val indexLength = readVarint(buffer).toInt()
-        val indexData = ByteArray(indexLength)
-        buffer.get(indexData)
-        return CarIndex(emptyMap())
-    }
-
-    private fun computeDataCid(blocks: List<CarBlock>): CID {
-        val digest = MessageDigest.getInstance("SHA-256")
-        blocks.forEach { digest.update(it.data) }
-        return CID(digest.digest())
-    }
-
-    fun writeVarint(value: Long): ByteArray {
-        val output = ByteArrayOutputStream()
-        var v = value
-        while (v >= 0x80) {
-            val b: Int = ((v and 0x7FL or 0x80L).toByte()).toInt()
-            output.write(b)
-            v = v ushr 7
-        }
-        val b: Int = (v.toByte()).toInt()
-        output.write(b)
-        return output.toByteArray()
-    }
 }
 
+/**
+ * CAR block with CID and raw data.
+ * Defined here in jvmMain; used by CarWriter.
+ */
 data class CarBlock(val cid: CID, val data: ByteArray)
+
+/**
+ * CAR index for fast random access (CARv2).
+ */
 data class CarIndex(val offsets: Map<String, Long>)
-data class CarParseResult(
-    val roots: List<CID>,
-    val blocks: List<CarBlock>,
-    val version: Int,
-    val index: CarIndex?,
-    val dataCid: CID,
-) {
-    fun verified(): Boolean = blocks.all { block ->
-        val digest = MessageDigest.getInstance("SHA-256")
-        CID(digest.digest(block.data)).bytes.contentEquals(block.cid.bytes)
-    }
-}
 
 object CarWriter {
     fun write(blocks: List<CarBlock>, roots: List<CID>, version: Int = 2): ByteArray {
