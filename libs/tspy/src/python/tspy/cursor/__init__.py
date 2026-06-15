@@ -2,14 +2,16 @@
 tspy.cursor — TrikeShed cursor algebra in Python (tuple-native)
 
 Cursor = Series<RowVec>
-RowVec = Series2<Any, ColumnMeta↻> = Series<Join<Any, () -> ColumnMeta>>
+RowVec = Series2<Any?, ColumnMeta↻> = Series<Join<Any?, () -> ColumnMeta>>
 
-All types use tuples for immutability.
+All types are tuples/type-aliases for immutability and wire-protocol compatibility.
 """
 
 from __future__ import annotations
-from typing import Any, Callable, Generic, Iterable, Iterator, TypeVar, Tuple, Protocol
+
+from typing import Any, Callable, Generic, Iterable, Iterator, TypeVar, Tuple, Protocol, TypeAlias
 from dataclasses import dataclass
+
 from ..algebra import Series, Join, j as _j, twin as _twin, s_ as _s_
 
 # Python 3.9 compat: slots=True only in 3.10+
@@ -75,108 +77,70 @@ class ColumnMeta:
 
 ColumnMetaRef = ColumnMeta  # Alias — the interface IS the implementation
 
-
-# Lazy column metadata supplier
+# Lazy column metadata supplier — exact match to Kotlin `ColumnMeta↻ = () -> ColumnMeta`
 ColumnMetaThunk = Callable[[], ColumnMeta]
 
+# =============================================================================
+# Type Aliases — exact match to Kotlin cursor typealiases
+# =============================================================================
+
+# RowVec = Series2<Any?, ColumnMeta↻> = Series<Join<Any?, () -> ColumnMeta>>
+_RowVec: TypeAlias = Series[Join[Any, ColumnMetaThunk]]
+
+# Cursor = Series<RowVec>
+_Cursor: TypeAlias = Series[_RowVec]
 
 # =============================================================================
-# RowVec = Series2<Any, ColumnMeta↻> = Series<Join<Any, () -> ColumnMeta>>
+# Constructors — callable functions matching the type alias names
 # =============================================================================
-
-# RowVec as a dataclass wrapper around Series
-@dataclass(**_DC_SLOTS)
-class RowVec:
-    """RowVec = Series<Join<Any, ColumnMetaThunk>>"""
-    cells: Series[Join[Any, ColumnMetaThunk]]
-    
-    def __init__(self, *cells: Join[Any, ColumnMetaThunk]):
-        from ..algebra import s_ as _s_
-        # Handle both RowVec(cell1, cell2, ...) and RowVec((cell1, cell2, ...))
-        if len(cells) == 1 and isinstance(cells[0], (tuple, list)):
-            cells = tuple(cells[0])
-        object.__setattr__(self, 'cells', _s_(*cells))
-    
-    @property
-    def size(self) -> int:
-        return self.cells.size
-    
-    def __getitem__(self, i: int) -> Join[Any, ColumnMetaThunk]:
-        return self.cells[i]
-    
-    def __iter__(self):
-        return iter(self.cells)
-    
-    def __len__(self) -> int:
-        return self.size
-
 
 def row_cell(value: Any, meta: ColumnMeta) -> Join[Any, ColumnMetaThunk]:
     """Construct a cell: Join<value, () -> meta>"""
     return (value, lambda: meta)
 
 
-def row_vec(*cells: Join[Any, ColumnMetaThunk]) -> RowVec:
-    """Construct RowVec from cells"""
-    return RowVec(*cells)
+def _row_vec(*cells: Join[Any, ColumnMetaThunk]) -> _RowVec:
+    """Internal: Construct RowVec from cells — returns Series<Join<Any, ColumnMetaThunk>>"""
+    # Handle both row_vec(cell1, cell2, ...) and row_vec((cell1, cell2, ...))
+    if len(cells) == 1 and isinstance(cells[0], (tuple, list)):
+        cells = tuple(cells[0])
+    return _s_(*cells)
+
+
+def _cursor(*rows: _RowVec) -> _Cursor:
+    """Internal: Construct Cursor from rows — returns Series<RowVec>"""
+    return _s_(*rows)
+
+
+# Public constructors with type alias names — callable for backward compatibility
+def RowVec(*cells: Join[Any, ColumnMetaThunk]) -> _RowVec:
+    """Construct RowVec = Series<Join<Any, ColumnMetaThunk>>"""
+    return _row_vec(*cells)
+
+
+def Cursor(*rows: _RowVec) -> _Cursor:
+    """Construct Cursor = Series<RowVec>"""
+    return _cursor(*rows)
+
+
+# Backward-compatible lowercase aliases
+row_vec = RowVec
+cursor = Cursor
 
 
 # =============================================================================
-# Cursor = Series<RowVec>
+# Cursor combinators (pure projections) — work on Series types directly
 # =============================================================================
 
-# =============================================================================
-# Cursor = Series<RowVec>
-# =============================================================================
-
-@dataclass(**_DC_SLOTS)
-class Cursor:
-    """Cursor = Series<RowVec>"""
-    rows: Series[RowVec]
-    
-    def __init__(self, *rows: RowVec):
-        from ..algebra import s_ as _s_
-        object.__setattr__(self, 'rows', _s_(*rows))
-    
-    @property
-    def size(self) -> int:
-        return self.rows.size
-    
-    def __getitem__(self, i: int) -> RowVec:
-        return self.rows[i]
-    
-    def range(self, start: int, end: int) -> 'Cursor':
-        count = max(0, min(end, self.size) - start)
-        return Cursor(*(self.rows[start + i] for i in range(count)))
-    
-    def __iter__(self):
-        return iter(self.rows)
-    
-    def __len__(self) -> int:
-        return self.size
-    
-    def alpha(self, xform):
-        return self.rows.alpha(xform)
-
-
-def cursor(*rows: RowVec) -> Cursor:
-    """Construct Cursor from rows"""
-    return Cursor(*rows)
-
-
-# =============================================================================
-# Cursor combinators (pure projections)
-# =============================================================================
-
-def select(cursor: Cursor, *cols: int) -> Cursor:
+def select(cursor: _Cursor, *cols: int) -> _Cursor:
     """Column projection by ordinal indices — reorders / projects columns"""
-    return Cursor(*(
-        RowVec(*(cursor[row][c] for c in cols))
+    return _s_(*(
+        _row_vec(*(cursor[row][c] for c in cols))
         for row in range(cursor.size)
     ))
 
 
-def select_names(cursor: Cursor, *names: str) -> Cursor:
+def select_names(cursor: _Cursor, *names: str) -> _Cursor:
     """Column projection by name"""
     first_row = cursor[0]
     name_to_idx = {}
@@ -187,7 +151,7 @@ def select_names(cursor: Cursor, *names: str) -> Cursor:
     return select(cursor, *indices)
 
 
-def exclude(cursor: Cursor, *names: str) -> Cursor:
+def exclude(cursor: _Cursor, *names: str) -> _Cursor:
     """Column exclusion by name"""
     first_row = cursor[0]
     indices = [c for c in range(first_row.size) 
@@ -195,52 +159,55 @@ def exclude(cursor: Cursor, *names: str) -> Cursor:
     return select(cursor, *indices)
 
 
-def join(left: Cursor, right: Cursor) -> Cursor:
+def cursor_join(left: _Cursor, right: _Cursor) -> _Cursor:
     """Widen along columns — side-by-side join"""
     rows = min(left.size, right.size)
-    return Cursor(*(
-        RowVec(*(
+    return _s_(*(
+        _row_vec(*(
             left[row][c] if c < left[row].size else right[row][c - left[row].size]
             for c in range(left[row].size + right[row].size)
         ))
         for row in range(rows)
     ))
 
+# Alias for backward compatibility
+join = cursor_join
 
-def combine(top: Cursor, bottom: Cursor) -> Cursor:
+
+def combine(top: _Cursor, bottom: _Cursor) -> _Cursor:
     """Concatenate along rows — top-to-bottom"""
-    return Cursor(*(
+    return _s_(*(
         top[row] if row < top.size else bottom[row - top.size]
         for row in range(top.size + bottom.size)
     ))
 
 
 # Cursor α — lazy map over rows
-def cursor_alpha(cursor: Cursor, xform: Callable[[RowVec], T]) -> Series[T]:
+def cursor_alpha(cursor: _Cursor, xform: Callable[[_RowVec], T]) -> Series[T]:
     return cursor.alpha(xform)
 
 
 # Head / Tail
-def head(cursor: Cursor) -> RowVec:
+def head(cursor: _Cursor) -> _RowVec:
     return cursor[0]
 
 
-def tail(cursor: Cursor) -> Cursor:
-    return cursor.range(1, cursor.size)
+def tail(cursor: _Cursor) -> _Cursor:
+    return _s_(*(cursor[i] for i in range(1, cursor.size)))
 
 
 # Meta access
-def meta(cursor: Cursor) -> Series[ColumnMeta]:
+def meta(cursor: _Cursor) -> Series[ColumnMeta]:
     """Column metadata series from first row"""
     row = cursor[0]
     return Series(row.size, lambda c: row[c][1]())
 
 
-def column_names(cursor: Cursor) -> Series[str]:
+def column_names(cursor: _Cursor) -> Series[str]:
     return meta(cursor).alpha(lambda m: m.name)
 
 
-def width(cursor: Cursor) -> int:
+def width(cursor: _Cursor) -> int:
     return cursor[0].size
 
 
@@ -258,7 +225,7 @@ class ColK(Protocol[T]):
     class Width(Protocol): pass
 
 
-def as_faceted(rv: RowVec):
+def as_faceted(rv: _RowVec):
     """Lift: RowVec → FacetedRow<ColK<*>>"""
     return FacetedRow(
         value_at=lambda op: _colk_get(rv, op),
@@ -288,7 +255,7 @@ class FacetedRow(Generic[K]):
         return self._meta_series
 
 
-def _colk_get(rv: RowVec, op: Any) -> Any:
+def _colk_get(rv: _RowVec, op: Any) -> Any:
     if isinstance(op, ColK.ByIndex):
         return rv[op.col][0]
     elif isinstance(op, ColK.ByName):
@@ -304,7 +271,7 @@ def _colk_get(rv: RowVec, op: Any) -> Any:
     raise TypeError(f"Unknown ColK: {op}")
 
 
-def as_rowvec(fr: Any) -> RowVec:
+def as_rowvec(fr: Any) -> _RowVec:
     """Lower: FacetedRow<ColK<*>> → RowVec"""
     # Simplified — requires full protocol implementation
     raise NotImplementedError("Full lowering requires FacetedRow protocol")

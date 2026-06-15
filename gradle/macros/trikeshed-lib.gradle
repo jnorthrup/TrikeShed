@@ -198,9 +198,7 @@ switch (project.path) {
             implementation project(":libs:common")
         }
         break
-    case ":libs:dreamer-kmm":
-        // dreamer-kmm has its own exceptional build.gradle.kts — standalone, root TrikeShed only
-        break
+
     case ":libs:kursive":
     case ":libs:patl":
     case ":libs:ngsctp":
@@ -443,19 +441,7 @@ switch (project.path) {
             ]
         }
         break
-    case ":libs:dreamer-test-runner":
-        plainJvm()
-        dependencies {
-            implementation libPeer("dreamer-kmm")
-            implementation libPeer("miniduck")
-            implementation libPeer("couch")
-            testImplementation "org.jetbrains.kotlin:kotlin-test-junit:${kotlinVersion}"
-            testImplementation "org.jetbrains.kotlinx:kotlinx-coroutines-core:${prop("versions.kotlinx-coroutines-core")}"
-        }
-        tasks.named("test") {
-            useJUnit()
-        }
-        break
+
     case ":libs:integration-scratch":
         plainJvm(true)
         dependencies {

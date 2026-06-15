@@ -1,0 +1,112 @@
+package borg.trikeshed.lcnc.reduction
+
+import borg.trikeshed.lib.*
+
+/**
+ * Result with intermediate stage outputs.
+ */
+data class ReductionResult<Out>(
+    val output: Out,
+    val stageOutputs: Map<ReductionPhase, Any>  // phase → intermediate carrier
+)
+
+/**
+ * Unified reduction pipeline parameterized by four algebras.
+ *
+ * @param K   Key type (composite for hierarchy, hash for CRMS)
+ * @param V   Input value type (raw row, byte, TraceEvent)
+ * @param Acc Accumulator type (reduced value, partial tree, ConflictCell)
+ * @param Out Final output type (CascadeOutputRow, Cursor, List<ConflictCell>)
+ */
+interface LcncReduction<K, V, Acc, Out> {
+
+    /** Key algebra — extraction, hierarchy, ordering. */
+    val keyAlg: KeyAlg<K>
+
+    /** Value algebra — fold, merge, builtin reducers. */
+    val valueAlg: ValueAlg<V, Acc>
+
+    /** Phase algebra — allowed stages and transitions. */
+    val phaseAlg: PhaseAlg
+
+    /** Carrier algebra — abstract over Series/Ring/Array/Cursor. */
+    val carrierAlg: CarrierAlg<V>
+
+    /** Execute reduction on a carrier. */
+    fun execute(input: ReductionCarrier<V>): Out
+
+    /** Execute with phase checkpoints for inspection/debugging. */
+    fun executeWithCheckpoints(input: ReductionCarrier<V>): ReductionResult<Out>
+}
+
+/**
+ * Default execution template using the four algebras.
+ * Implementations can override execute/executeWithCheckpoints for custom logic.
+ */
+abstract class AbstractLcncReduction<K, V, Acc, Out>(
+    override val keyAlg: KeyAlg<K>,
+    override val valueAlg: ValueAlg<V, Acc>,
+    override val phaseAlg: PhaseAlg,
+    override val carrierAlg: CarrierAlg<V>
+) : LcncReduction<K, V, Acc, Out> {
+
+    override fun execute(input: ReductionCarrier<V>): Out {
+        val result = executeWithCheckpoints(input)
+        return result.output
+    }
+
+    override fun executeWithCheckpoints(input: ReductionCarrier<V>): ReductionResult<Out> {
+        val stageOutputs = mutableMapOf<ReductionPhase, Any>()
+        var current: Any = input
+
+        // Phase 1: MAP — extract key + value
+        val mapped = mapPhase(input)
+        stageOutputs[ReductionPhase.MAP] = mapped
+
+        // Phase 2: REDUCE — groupBy key → fold values
+        val reduced = reducePhase(mapped)
+        stageOutputs[ReductionPhase.REDUCE] = reduced
+
+        // Phase 3: REREDUCE — merge partials if needed (Forge)
+        val rereduced = rereducePhase(reduced)
+        if (rereduced !== reduced) {
+            stageOutputs[ReductionPhase.REREDUCE] = rereduced
+            current = rereduced
+        } else {
+            current = reduced
+        }
+
+        // Final output formatting
+        val output = formatOutput(current)
+
+        return ReductionResult(output, stageOutputs)
+    }
+
+    /** Phase MAP: extract key and pair with value. Override for custom mapping. */
+    protected open fun mapPhase(input: ReductionCarrier<V>): ReductionCarrier<Join<K, V>> {
+        return input.map { v -> keyAlg.extractor.extract(v) j v }
+    }
+
+    /** Phase REDUCE: groupBy key and fold values. Override for custom reduction. */
+    protected open fun reducePhase(mapped: ReductionCarrier<Join<K, V>>): ReductionCarrier<Join<K, Acc>> {
+        val grouped = mapped.groupBy({ it.a }) { it.b }
+        return grouped.map { (key, carrier) ->
+            key j carrier.fold(valueAlg.initial, valueAlg.folder)
+        }.toSeriesCarrier()
+    }
+
+    /** Phase REREDUCE: merge partial accumulators. Override for custom rereduce. */
+    protected open fun rereducePhase(reduced: ReductionCarrier<Join<K, Acc>>): ReductionCarrier<Join<K, Acc>> = reduced
+
+    /** Format final output. Must be implemented by concrete reduction. */
+    protected abstract fun formatOutput(reduced: Any): Out
+
+    /** Helper to convert Map<K, Join<K, Acc>> to ReductionCarrier. */
+    private fun <K, Acc> Map<K, Join<K, Acc>>.toSeriesCarrier(): ReductionCarrier<Join<K, Acc>> =
+        values.toList().let { list -> SeriesCarrier(list.size j { i -> list[i] }) }
+}
+
+/**
+ * Empty series carrier helper.
+ */
+fun <T> emptySeriesCarrier(): ReductionCarrier<T> = SeriesCarrier(emptySeriesOf())
