@@ -34,12 +34,6 @@ object RingRegistry {
 
     fun names(): List<String> = rings.keys.toList()
     fun clear(name: String) {
-        val ring = rings[name]
-        if (ring != null) ring.clear()
-    }
-}
-++
-    fun clear(name: String) {
         rings.remove(name)
     }
 }

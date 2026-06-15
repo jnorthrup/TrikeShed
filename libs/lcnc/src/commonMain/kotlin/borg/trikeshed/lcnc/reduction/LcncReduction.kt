@@ -102,7 +102,7 @@ abstract class AbstractLcncReduction<K, V, Acc, Out>(
     protected abstract fun formatOutput(reduced: Any): Out
 
     /** Helper to convert Map<K, Join<K, Acc>> to ReductionCarrier. */
-    private fun <K, Acc> Map<K, Join<K, Acc>>.toSeriesCarrier(): ReductionCarrier<Join<K, Acc>> =
+    protected fun <K, Acc> Map<K, Join<K, Acc>>.toSeriesCarrier(): ReductionCarrier<Join<K, Acc>> =
         values.toList().let { list -> SeriesCarrier(list.size j { i -> list[i] }) }
 }
 

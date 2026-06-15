@@ -188,10 +188,11 @@ object LcncReductions {
             keyAlg, valueAlg, phaseAlg, carrierAlg
         ) {
             override protected fun reducePhase(mapped: ReductionCarrier<Join<Int, TraceEvent>>): ReductionCarrier<Join<Int, ConflictCell>> {
-                val grouped = mapped.groupBy({ it.a }) { it.b }
-                return grouped.map { (hash, carrier) ->
+                val grouped: Map<Int, ReductionCarrier<TraceEvent>> = mapped.groupBy({ it.a }, { it.b })
+                val reduced = grouped.map { (hash, carrier) ->
                     hash j carrier.fold(ConflictCell.init(), valueAlg.folder)
-                }.toSeriesCarrier()
+                }
+                return SeriesCarrier<Join<Int, ConflictCell>>(reduced.size j { i -> reduced[i] })
             }
 
             override protected fun rereducePhase(reduced: ReductionCarrier<Join<Int, ConflictCell>>): ReductionCarrier<Join<Int, ConflictCell>> {
@@ -206,11 +207,4 @@ object LcncReductions {
             }
         }
     }
-}
-
-/** Placeholder for RingSeries. */
-interface RingSeries<T> {
-    val head: Int
-    val count: Int
-    operator fun get(index: Int): T
 }

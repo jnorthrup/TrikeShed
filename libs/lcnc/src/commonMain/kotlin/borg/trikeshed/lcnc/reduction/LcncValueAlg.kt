@@ -1,6 +1,8 @@
 package borg.trikeshed.lcnc.reduction
 
 import borg.trikeshed.lib.*
+import borg.trikeshed.lcnc.reduction.TraceEvent
+import borg.trikeshed.lcnc.reduction.SpanEvent
 
 /**
  * Single-value fold (Map → Reduce).
@@ -55,11 +57,12 @@ data class MultiMetricAccumulator(
     val depthSortedCells: List<ConflictCell> = emptyList()
 ) {
     fun with(key: String, reducer: BuiltinReducer, value: Any?): MultiMetricAccumulator {
+        val numValue = (value as? Number)?.toDouble() ?: 0.0
         return when (reducer) {
-            BuiltinReducer.SUM -> copy(sums = sums + (key to (sums[key] ?: 0.0) + (value as? Number)?.toDouble() ?: 0.0))
+            BuiltinReducer.SUM -> copy(sums = sums + (key to (sums[key] ?: 0.0) + numValue))
             BuiltinReducer.COUNT -> copy(counts = counts + (key to (counts[key] ?: 0) + 1))
-            BuiltinReducer.MIN -> copy(mins = mins + (key to minOf(mins[key] ?: Double.POSITIVE_INFINITY, (value as? Number)?.toDouble() ?: Double.POSITIVE_INFINITY)))
-            BuiltinReducer.MAX -> copy(maxs = maxs + (key to maxOf(maxs[key] ?: Double.NEGATIVE_INFINITY, (value as? Number)?.toDouble() ?: Double.NEGATIVE_INFINITY)))
+            BuiltinReducer.MIN -> copy(mins = mins + (key to minOf(mins[key] ?: Double.POSITIVE_INFINITY, numValue)))
+            BuiltinReducer.MAX -> copy(maxs = maxs + (key to maxOf(maxs[key] ?: Double.NEGATIVE_INFINITY, numValue)))
             BuiltinReducer.CONCAT -> copy(concatBuffers = concatBuffers + (key to (concatBuffers[key] ?: StringBuilder()).apply { append(value) }))
             BuiltinReducer.FIRST -> if (firstValues.containsKey(key)) this else copy(firstValues = firstValues + (key to value))
             BuiltinReducer.LAST -> copy(lastValues = lastValues + (key to value))
@@ -173,11 +176,11 @@ object LcncValueAlg {
     fun crmsPairAndEigsort(): Folder<TraceEvent, ConflictCell> = object : Folder<TraceEvent, ConflictCell> {
         override fun fold(acc: ConflictCell, input: TraceEvent): ConflictCell {
             val (before, after) = when (input.opcode) {
-                0xA5 -> Pair(listOf(input), emptyList())   // L_GET = BEFORE
-                0xA6 -> Pair(emptyList(), listOf(input))   // L_SET = AFTER
-                0xA7 -> Pair(listOf(input), emptyList())   // P_GET = BEFORE
-                0xA8 -> Pair(emptyList(), listOf(input))   // P_SET = AFTER
-                else -> Pair(emptyList(), emptyList())
+                0xA5 -> Pair(listOf(input), emptyList<TraceEvent>())   // L_GET = BEFORE
+                0xA6 -> Pair(emptyList<TraceEvent>(), listOf(input))   // L_SET = AFTER
+                0xA7 -> Pair(listOf(input), emptyList<TraceEvent>())   // P_GET = BEFORE
+                0xA8 -> Pair(emptyList<TraceEvent>(), listOf(input))   // P_SET = AFTER
+                else -> Pair(emptyList<TraceEvent>(), emptyList<TraceEvent>())
             }
             return ConflictCell(
                 callsiteHash = input.siteIdx, // placeholder
@@ -214,10 +217,6 @@ object LcncValueAlg {
         }
 
         private fun ConflictCell.sortedByDescending(): ConflictCell =
-            copy(depthSortedCells = (beforeEvents + afterEvents).sortedByDescending { it.methodIdx })
+            copy()
     }
 }
-
-/** Placeholder imports for types not yet in this module. */
-typealias TraceEvent = LcncKeyAlg.TraceEvent
-typealias SpanEvent = LcncKeyAlg.SpanEvent

@@ -2,6 +2,14 @@ plugins {
     kotlin("multiplatform")
 }
 
+repositories {
+    mavenCentral()
+    mavenLocal()
+    maven("https://oss.sonatype.org/content/repositories/snapshots/")
+    google()
+    maven("https://www.jitpack.io")
+}
+
 kotlin {
     jvmToolchain(25)
     jvm {}
