@@ -1,8 +1,5 @@
 package borg.trikeshed.lcnc.reduction
 
-import borg.trikeshed.lcnc.LcncKeyAlg.*
-import borg.trikeshed.lcnc.LcncValueAlg.*
-
 /**
  * Confix-specific implementations for scan0 and buildTree as LcncReduction.
  * These are extracted from the Confix parser implementation.

@@ -1,8 +1,5 @@
 package borg.trikeshed.lcnc.reduction
 
-import borg.trikeshed.lcnc.LcncKeyAlg.*
-import borg.trikeshed.lcnc.LcncValueAlg.*
-
 /**
  * CRMS-specific implementations for TypedefProductionSystem.fold as LcncReduction.
  * These are extracted from the CRMS fold implementation in jvmMain/cursor.

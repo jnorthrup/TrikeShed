@@ -2,8 +2,6 @@ package borg.trikeshed.lcnc.reduction
 
 import borg.trikeshed.cursor.*
 import borg.trikeshed.lib.*
-import borg.trikeshed.lcnc.LcncKeyAlg.*
-import borg.trikeshed.lcnc.LcncValueAlg.*
 
 /**
  * Pre-configured LcncReduction instances for each system.
@@ -157,11 +155,12 @@ object LcncReductions {
      * Out: List<ConflictCell>
      */
     fun crmsFold(): LcncReduction<Int, TraceEvent, ConflictCell, List<ConflictCell>> {
+        val hashExtractor = LcncKeyAlg.crmsCallsiteHash()
         val keyAlg = object : KeyAlg<Int> {
-            override val extractor: KeyExtractor<TraceEvent, Int> = LcncKeyAlg.crmsCallsiteHash()
+            override val extractor: KeyExtractor<TraceEvent, Int> = hashExtractor
             override val hierarchy: KeyHierarchy<Int> = object : KeyHierarchy<Int> {
-                override val levels: List<KeyExtractor<*, Int>> = listOf(keyAlg.extractor)
-                override fun compositeKey(input: Any): List<Int> = listOf(keyAlg.extractor.extract(input as TraceEvent))
+                override val levels: List<KeyExtractor<*, Int>> = listOf(hashExtractor)
+                override fun compositeKey(input: Any): List<Int> = listOf(hashExtractor.extract(input as TraceEvent))
                 override fun prefix(key: List<Int>, depth: Int): List<Int> = key.take(minOf(depth, key.size))
             }
             override val order: KeyOrder<Int> = LcncKeyAlg.naturalKeyOrder()

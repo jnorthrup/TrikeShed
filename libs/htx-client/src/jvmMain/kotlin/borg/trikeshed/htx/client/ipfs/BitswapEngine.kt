@@ -45,7 +45,7 @@ class BitswapEngine(
         broadcastCancel(cid)
     }
 
-    fun handleMessage(message: BitswapMessage) {
+    suspend fun handleMessage(message: BitswapMessage) {
         when (message) {
             is BitswapMessage.WantBlock -> message.cids.forEach { cid ->
                 val data = blockStore.get(cid)

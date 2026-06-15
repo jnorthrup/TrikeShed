@@ -1,7 +1,5 @@
 package borg.trikeshed.lcnc.reduction
 
-import borg.trikeshed.lcnc.LcncValueAlg.*
-
 /**
  * Forge-specific Folder/Merger implementations extracted from ForgeWorkspaceImpl.
  * These are the concrete reducers that Forge cascades use.
