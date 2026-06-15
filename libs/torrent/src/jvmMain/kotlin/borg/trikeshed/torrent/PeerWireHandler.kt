@@ -34,7 +34,7 @@ class PeerWireHandler(
                 havePieces(address).set(msg.pieceIndex, true)
                 onHave(msg.pieceIndex)
             }
-            is PeerWireMessage.BitField -> {
+            is PeerWireMessage.PWPieceBitField -> {
                 peerBitfields[address] = msg.have
                 for (i in 0 until msg.have.size) {
                     if (msg.have[i]) piecePicker.setPeerHave(i)

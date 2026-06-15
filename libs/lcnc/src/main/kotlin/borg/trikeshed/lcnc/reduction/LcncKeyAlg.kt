@@ -3,10 +3,9 @@ package borg.trikeshed.lcnc.reduction
 import borg.trikeshed.lib.*
 
 /**
- * Key extraction from a carrier element.
+ * Key extraction from a carrier element. `fun interface` allows lambda construction.
  */
-@FunctionalInterface
-interface KeyExtractor<T, K> {
+fun interface KeyExtractor<T, K> {
     fun extract(input: T): K
 }
 
@@ -14,8 +13,8 @@ interface KeyExtractor<T, K> {
  * Key hierarchy for multi-level reduction (Forge keyHierarchy, Confix depth, CRMS callsiteHash).
  */
 interface KeyHierarchy<K> {
-    val levels: List<KeyExtractor<*, K>>  // ordered: outermost → innermost
-    fun compositeKey(input: Any): List<K>  // [level0(key), level1(key), ...]
+    val levels: List<KeyExtractor<Any, K>>  // ordered: outermost → innermost (accept Any, cast internally)
+    fun compositeKey(input: Any): List<K>   // [level0(key), level1(key), ...]
     fun prefix(key: List<K>, depth: Int): List<K>  // for rereduce grouping
 }
 
@@ -35,6 +34,12 @@ interface KeyAlg<K> {
     val hierarchy: KeyHierarchy<K>
     val order: KeyOrder<K>
 }
+
+/**
+ * Confix structural key = (depth, open, close). Top-level so [LcncReductions] and
+ * [ConfixReducers] can reference it unqualified.
+ */
+data class ConfixStructuralKey(val depth: Int, val open: Int, val close: Int)
 
 /**
  * Default implementations and factories.
@@ -58,9 +63,9 @@ object LcncKeyAlg {
     // ── Forge: composite string key from keyHierarchy columns ─────
 
     fun forgeKeyHierarchy(columns: List<String>): KeyHierarchy<String> = object : KeyHierarchy<String> {
-        override val levels: List<KeyExtractor<*, String>> = columns.map { col ->
-            object : KeyExtractor<Map<String, Any>, String> {
-                override fun extract(input: Map<String, Any>): String = (input[col] as? String) ?: ""
+        override val levels: List<KeyExtractor<Any, String>> = columns.map { col ->
+            KeyExtractor<Any, String> { input ->
+                (input as? Map<String, Any>)?.get(col) as? String ?: ""
             }
         }
 
@@ -75,13 +80,12 @@ object LcncKeyAlg {
 
     // ── Confix: structural key = (depth, span.open, span.close) ──
 
-    data class ConfixStructuralKey(val depth: Int, val open: Int, val close: Int)
-
     fun confixStructuralKey(): KeyHierarchy<ConfixStructuralKey> = object : KeyHierarchy<ConfixStructuralKey> {
-        override val levels: List<KeyExtractor<*, ConfixStructuralKey>> = listOf(
-            object : KeyExtractor<SpanEvent, ConfixStructuralKey> {
-                override fun extract(input: SpanEvent): ConfixStructuralKey =
-                    ConfixStructuralKey(input.depth, input.span.start, input.span.endInclusive)
+        override val levels: List<KeyExtractor<Any, ConfixStructuralKey>> = listOf(
+            KeyExtractor<Any, ConfixStructuralKey> { input ->
+                val event = input as? SpanEvent
+                    ?: return@KeyExtractor ConfixStructuralKey(0, 0, 0)
+                ConfixStructuralKey(event.depth, event.span.start, event.span.endInclusive)
             }
         )
 
@@ -96,16 +100,17 @@ object LcncKeyAlg {
 
     // ── CRMS: 32-bit FNV-1a hash of (opcode, methodIdx, siteIdx) ──
 
-    fun crmsCallsiteHash(): KeyExtractor<TraceEvent, Int> = object : KeyExtractor<TraceEvent, Int> {
-        override fun extract(input: TraceEvent): Int {
-            // FNV-1a 32-bit
-            var hash = 0x811c9dc5
-            hash = (hash xor input.opcode) * 0x01000193
-            hash = (hash xor input.methodIdx) * 0x01000193
-            hash = (hash xor input.siteIdx) * 0x01000193
-            return hash
-        }
+    fun crmsCallsiteHash(): KeyExtractor<TraceEvent, Int> = KeyExtractor { input ->
+        // FNV-1a 32-bit
+        var hash = FNV_OFFSET
+        hash = (hash xor input.opcode) * FNV_PRIME
+        hash = (hash xor input.methodIdx) * FNV_PRIME
+        hash = (hash xor input.siteIdx) * FNV_PRIME
+        hash
     }
+
+    private const val FNV_OFFSET: Int = -2128831035  // 0x811c9dc5 as signed Int
+    private const val FNV_PRIME: Int = 0x01000193
 
     /** Standard natural ordering for Comparable keys. */
     fun <K : Comparable<K>> naturalKeyOrder(): KeyOrder<K> = object : KeyOrder<K> {
@@ -123,5 +128,12 @@ data class SpanEvent(val depth: Int, val span: Span) {
     data class Span(val start: Int, val endInclusive: Int)
 }
 
-/** Placeholder for TraceEvent — actual type from CRMS. */
-data class TraceEvent(val opcode: Int, val methodIdx: Int, val siteIdx: Int)
+/** Placeholder for TraceEvent — actual type from CRMS. Defaults keep the 3-arg ctor
+ *  used by tests while allowing latency/timestamp access in CRMS reducers. */
+data class TraceEvent(
+    val opcode: Int,
+    val methodIdx: Int,
+    val siteIdx: Int,
+    val latencyNanos: Long = 0L,
+    val timestampNanos: Long = 0L
+)

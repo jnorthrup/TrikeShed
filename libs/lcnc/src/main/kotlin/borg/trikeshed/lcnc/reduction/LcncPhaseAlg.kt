@@ -30,6 +30,14 @@ interface PhaseAlg {
 }
 
 /**
+ * Additional Forge phases for pipeline composition — declared as [ReductionPhase] instances
+ * nested here so tests can reference them as [LcncPhaseAlg.FILTER].
+ */
+object FILTER : ReductionPhase
+object PROJECT : ReductionPhase
+object JOIN : ReductionPhase
+
+/**
  * Default implementations and factories.
  */
 object LcncPhaseAlg {
@@ -38,9 +46,9 @@ object LcncPhaseAlg {
     val forgeTransitions = object : PhaseTransition {
         override fun canFollow(current: ReductionPhase, next: ReductionPhase): Boolean {
             return when (current) {
-                is ReductionPhase.MAP -> next in setOf(ReductionPhase.REDUCE, ReductionPhase.REREDUCE, ReductionPhase.FILTER, ReductionPhase.PROJECT, ReductionPhase.JOIN)
-                is ReductionPhase.REDUCE -> next in setOf(ReductionPhase.REREDUCE, ReductionPhase.FILTER, ReductionPhase.PROJECT, ReductionPhase.JOIN)
-                is ReductionPhase.REREDUCE -> next in setOf(ReductionPhase.FILTER, ReductionPhase.PROJECT, ReductionPhase.JOIN)
+                is ReductionPhase.MAP -> next in setOf(ReductionPhase.REDUCE, ReductionPhase.REREDUCE, FILTER, PROJECT, JOIN)
+                is ReductionPhase.REDUCE -> next in setOf(ReductionPhase.REREDUCE, FILTER, PROJECT, JOIN)
+                is ReductionPhase.REREDUCE -> next in setOf(FILTER, PROJECT, JOIN)
                 else -> false
             }
         }
@@ -78,10 +86,11 @@ object LcncPhaseAlg {
         override fun toString(): String = "CrmsTransitions"
     }
 
-    /** Additional Forge phases for pipeline composition. */
-    object FILTER : ReductionPhase
-    object PROJECT : ReductionPhase
-    object JOIN : ReductionPhase
+    /** Exhaustive set of every concrete phase (sealed interfaces have no enumValues). */
+    private val ALL_PHASES: Set<ReductionPhase> = setOf(
+        ReductionPhase.MAP, ReductionPhase.REDUCE, ReductionPhase.REREDUCE,
+        ReductionPhase.BEFORE, ReductionPhase.AFTER, FILTER, PROJECT, JOIN
+    )
 
     /** Default phase algebra for a given transition table. */
     fun defaultPhaseAlg(transitions: PhaseTransition): PhaseAlg = object : PhaseAlg {
@@ -96,11 +105,8 @@ object LcncPhaseAlg {
             }
             return true
         }
-        override fun nextValidPhases(current: ReductionPhase): Set<ReductionPhase> {
-            // Return all phases that can follow current
-            return enumValues<ReductionPhase>().filter { transitions.canFollow(current, it) }.toSet()
-                + (FILTER + PROJECT + JOIN)  // always allow these after any valid phase
-        }
+        override fun nextValidPhases(current: ReductionPhase): Set<ReductionPhase> =
+            ALL_PHASES.filter { transitions.canFollow(current, it) }.toSet()
     }
 
     /** Pre-configured phase algebras. */

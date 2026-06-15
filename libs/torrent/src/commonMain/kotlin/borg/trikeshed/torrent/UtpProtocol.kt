@@ -112,7 +112,7 @@ fun decodeUtpHeader(b: ByteArray): UtpHeader? {
     val seqNr = (b[11].toInt() and 0xFF) or ((b[12].toInt() and 0xFF) shl 8)
     val ackNr = (b[13].toInt() and 0xFF) or ((b[14].toInt() and 0xFF) shl 8)
     val type = UtpType.entries.find { it.id == typeId } ?: return null
-    return UtpHeader(type, version, connId, timestamp, wndSize, seqNr, ackNr)
+    return UtpHeader(type, version, connId, timestamp.toLong(), wndSize, seqNr, ackNr)
 }
 
 /**
@@ -250,13 +250,13 @@ class UtpSocket(
             // Connection established
             state = UtpState.CONNECTED
         }
-        updateRtt(header.timestamp, recvTime)
+        updateRttVars(rtt.coerceAtLeast(1), recvTime - header.timestamp)
         applyAck(header.ackNr, recvTime)
     }
 
     private fun handleData(header: UtpHeader, payload: ByteArray, recvTime: Long) {
         ackNr = header.seqNr
-        updateRtt(header.timestamp, recvTime)
+        updateRttVars(rtt.coerceAtLeast(1), recvTime - header.timestamp)
         applySelectiveAck(header.ackNr)
         onReceive(payload)
 

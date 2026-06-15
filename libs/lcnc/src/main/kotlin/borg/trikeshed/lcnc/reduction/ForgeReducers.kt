@@ -53,8 +53,7 @@ object ForgeReducers {
         val extractor: (MultiMetricAccumulator) -> Double = { acc ->
             val sum = acc.sums[column] ?: 0.0
             val count = acc.counts[column] ?: 0
-            if (count == 0) return@extractor 0.0
-            sum / count
+            if (count == 0) 0.0 else sum / count
         }
         return folder to extractor
     }

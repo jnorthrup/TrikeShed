@@ -10,6 +10,8 @@ object LcncReductions {
 
     // ── Forge OperationalCascade as LcncReduction ─────────────────
 
+    data class CascadeOutputRow(val key: List<String>, val accumulator: MultiMetricAccumulator)
+
     /**
      * Forge OperationalCascade reduction.
      * Key: List<String> (composite from keyHierarchy columns)
@@ -22,9 +24,9 @@ object LcncReductions {
         metrics: List<Pair<String, BuiltinReducer>>
     ): LcncReduction<List<String>, Map<String, Any>, MultiMetricAccumulator, List<CascadeOutputRow>> {
         val keyAlg = object : KeyAlg<List<String>> {
-            override val extractor: KeyExtractor<Map<String, Any>, List<String>> = object : KeyExtractor<Map<String, Any>, List<String>> {
-                override fun extract(input: Map<String, Any>): List<String> =
-                    keyHierarchy.map { (input[it] as? String) ?: "" }
+            override val extractor: KeyExtractor<Any, List<String>> = KeyExtractor { input ->
+                val map = input as? Map<String, Any> ?: emptyMap()
+                keyHierarchy.map { (map[it] as? String) ?: "" }
             }
             override val hierarchy: KeyHierarchy<List<String>> = LcncKeyAlg.forgeKeyHierarchy(keyHierarchy)
             override val order: KeyOrder<List<String>> = object : KeyOrder<List<String>> {
@@ -52,41 +54,35 @@ object LcncReductions {
         return object : AbstractLcncReduction<List<String>, Map<String, Any>, MultiMetricAccumulator, List<CascadeOutputRow>>(
             keyAlg, valueAlg, phaseAlg, carrierAlg
         ) {
-            override protected fun rereducePhase(reduced: ReductionCarrier<Join<List<String>, MultiMetricAccumulator>>): ReductionCarrier<Join<List<String>, MultiMetricAccumulator>> {
-                // Merge all partials into single accumulator per key
+            override fun rereducePhase(reduced: ReductionCarrier<Join<List<String>, MultiMetricAccumulator>>): ReductionCarrier<Join<List<String>, MultiMetricAccumulator>> {
+                // Merge all partials into a single accumulator per key
                 val grouped = reduced.groupBy({ it.a }) { it.b }
-                val merged = grouped.mapValues { (_, carrier) ->
-                    carrier.fold(valueAlg.initial, valueAlg.merger::merge)
+                val merged = grouped.map { (key, carrier) ->
+                    val partials = carrier.size j { i -> carrier[i] }
+                    key j valueAlg.merger.merge(partials)
                 }
-                return merged.toSeriesCarrier()
+                return SeriesCarrier(merged.size j { i -> merged[i] })
             }
 
-            override protected fun formatOutput(reduced: Any): List<CascadeOutputRow> {
+            override fun formatOutput(reduced: Any): List<CascadeOutputRow> {
+                @Suppress("UNCHECKED_CAST")
                 val carrier = reduced as ReductionCarrier<Join<List<String>, MultiMetricAccumulator>>
                 return carrier.map { (key, acc) -> CascadeOutputRow(key, acc) }.toList()
             }
         }
     }
 
-    data class CascadeOutputRow(val key: List<String>, val accumulator: MultiMetricAccumulator)
-
     // ── Confix Parser as LcncReduction ────────────────────────────
 
     /**
-     * Confix parser reduction.
-     * Key: ConfixStructuralKey (depth, open, close)
-     * Value: Byte (raw input)
-     * Acc: TreeBuilderState
-     * Out: Cursor
+     * Confix parser reduction (placeholder pipeline — scan0/buildTree live in the Confix
+     * parser; here we expose the reduction shape so it composes with the lcnc axis).
      */
+    @Suppress("UNCHECKED_CAST")
     fun confixParse(): LcncReduction<ConfixStructuralKey, Byte, TreeBuilderState, Cursor> {
         val keyAlg = object : KeyAlg<ConfixStructuralKey> {
-            override val extractor: KeyExtractor<Byte, ConfixStructuralKey> = object : KeyExtractor<Byte, ConfixStructuralKey> {
-                override fun extract(input: Byte): ConfixStructuralKey {
-                    // This is a placeholder — actual scan0 produces SpanEvents
-                    return ConfixStructuralKey(0, 0, 0)
-                }
-            }
+            override val extractor: KeyExtractor<Any, ConfixStructuralKey> =
+                KeyExtractor { ConfixStructuralKey(0, 0, 0) }
             override val hierarchy: KeyHierarchy<ConfixStructuralKey> = LcncKeyAlg.confixStructuralKey()
             override val order: KeyOrder<ConfixStructuralKey> = object : KeyOrder<ConfixStructuralKey> {
                 override fun compare(a: ConfixStructuralKey, b: ConfixStructuralKey): Int =
@@ -95,18 +91,8 @@ object LcncReductions {
         }
 
         val valueAlg = object : ValueAlg<Byte, TreeBuilderState> {
-            override val folder: Folder<Byte, TreeBuilderState> = object : Folder<Byte, TreeBuilderState> {
-                override fun fold(acc: TreeBuilderState, input: Byte): TreeBuilderState {
-                    // Placeholder — actual scan0 produces SpanEvents
-                    return acc
-                }
-            }
-            override val merger: Merger<TreeBuilderState> = object : Merger<TreeBuilderState> {
-                override fun merge(partials: Series<TreeBuilderState>): TreeBuilderState {
-                    // Tree merging not needed for Confix (single-pass)
-                    return partials[0]
-                }
-            }
+            override val folder: Folder<Byte, TreeBuilderState> = Folder { acc, _ -> acc }
+            override val merger: Merger<TreeBuilderState> = Merger { partials -> partials[0] }
             override val initial: TreeBuilderState = TreeBuilderState()
         }
 
@@ -116,51 +102,45 @@ object LcncReductions {
         return object : AbstractLcncReduction<ConfixStructuralKey, Byte, TreeBuilderState, Cursor>(
             keyAlg, valueAlg, phaseAlg, carrierAlg
         ) {
-            override protected fun mapPhase(input: ReductionCarrier<Byte>): ReductionCarrier<Join<ConfixStructuralKey, Byte>> {
-                // scan0 phase: token recognition
-                val tokens = scan0(input)
-                return tokens.map { span -> span.j(span.span.start.toByte()) }  // placeholder
-            }
+            override fun mapPhase(input: ReductionCarrier<Byte>): ReductionCarrier<Join<ConfixStructuralKey, Byte>> =
+                input.map { b -> ConfixStructuralKey(0, 0, 0) j b }
 
-            override protected fun reducePhase(mapped: ReductionCarrier<Join<ConfixStructuralKey, Byte>>): ReductionCarrier<Join<ConfixStructuralKey, TreeBuilderState>> {
-                // buildTree phase: fold spans → TreeBuilderState
-                val treeState = mapped.fold(TreeBuilderState()) { acc, join ->
-                    // Convert join to SpanEvent and fold
-                    acc // placeholder
+            override fun reducePhase(mapped: ReductionCarrier<Join<ConfixStructuralKey, Byte>>): ReductionCarrier<Join<ConfixStructuralKey, TreeBuilderState>> {
+                val grouped = mapped.groupBy({ it.a }) { it.b }
+                val reduced = grouped.map { (k, carrier) ->
+                    k j carrier.fold(TreeBuilderState()) { acc, _ -> acc }
                 }
-                return SeriesCarrier(1 j { _ -> ConfixStructuralKey(0,0,0) j treeState })
+                return SeriesCarrier(reduced.size j { i -> reduced[i] })
             }
 
-            override protected fun formatOutput(reduced: Any): Cursor {
-                val state = (reduced as ReductionCarrier<Join<ConfixStructuralKey, TreeBuilderState>>)[0].b
-                return buildTree(state)
-            }
+            override fun formatOutput(reduced: Any): Cursor = emptySeriesOf()
         }
     }
-
-    /** Placeholder scan0 — actual implementation in Confix parser. */
-    private fun scan0(input: ReductionCarrier<Byte>): ReductionCarrier<SpanEvent> =
-        SeriesCarrier(emptySeriesOf())
-
-    /** Placeholder buildTree — actual implementation in Confix parser. */
-    private fun buildTree(state: TreeBuilderState): Cursor = emptySeriesOf()
 
     // ── CRMS Fold as LcncReduction ────────────────────────────────
 
     /**
      * CRMS fold reduction.
-     * Key: Int (callsiteHash)
+     * Key: Int (callsiteHash over methodIdx+siteIdx — opcode distinguishes BEFORE/AFTER within a callsite)
      * Value: TraceEvent
      * Acc: ConflictCell
      * Out: List<ConflictCell>
      */
+    @Suppress("UNCHECKED_CAST")
     fun crmsFold(): LcncReduction<Int, TraceEvent, ConflictCell, List<ConflictCell>> {
-        val hashExtractor = LcncKeyAlg.crmsCallsiteHash()
+        // Callsite key = FNV-1a over (methodIdx, siteIdx) — groups BEFORE+AFTER of the same callsite.
+        val callsiteExtractor: KeyExtractor<Any, Int> = KeyExtractor { input ->
+            val e = input as TraceEvent
+            var hash = -2128831035  // 0x811c9dc5
+            hash = (hash xor e.methodIdx) * 0x01000193
+            hash = (hash xor e.siteIdx) * 0x01000193
+            hash
+        }
         val keyAlg = object : KeyAlg<Int> {
-            override val extractor: KeyExtractor<TraceEvent, Int> = hashExtractor
+            override val extractor: KeyExtractor<Any, Int> = callsiteExtractor
             override val hierarchy: KeyHierarchy<Int> = object : KeyHierarchy<Int> {
-                override val levels: List<KeyExtractor<*, Int>> = listOf(hashExtractor)
-                override fun compositeKey(input: Any): List<Int> = listOf(hashExtractor.extract(input as TraceEvent))
+                override val levels: List<KeyExtractor<Any, Int>> = listOf(callsiteExtractor)
+                override fun compositeKey(input: Any): List<Int> = listOf(callsiteExtractor.extract(input))
                 override fun prefix(key: List<Int>, depth: Int): List<Int> = key.take(minOf(depth, key.size))
             }
             override val order: KeyOrder<Int> = LcncKeyAlg.naturalKeyOrder()
@@ -177,7 +157,7 @@ object LcncReductions {
             override val carrier: (Any) -> ReductionCarrier<TraceEvent> = { input ->
                 when (input) {
                     is Array<*> -> LcncCarrierAlg.arrayCarrier(input as Array<TraceEvent>)
-                    is RingSeries<*> -> LcncCarrierAlg.ringCarrier(input as RingSeries<TraceEvent>, 2048)
+                    is RingSeries<*> -> LcncCarrierAlg.ringCarrier(input as Series<TraceEvent>, 2048)
                     else -> throw IllegalArgumentException("CRMS expects Array or RingSeries carrier")
                 }
             }
@@ -186,21 +166,21 @@ object LcncReductions {
         return object : AbstractLcncReduction<Int, TraceEvent, ConflictCell, List<ConflictCell>>(
             keyAlg, valueAlg, phaseAlg, carrierAlg
         ) {
-            override protected fun reducePhase(mapped: ReductionCarrier<Join<Int, TraceEvent>>): ReductionCarrier<Join<Int, ConflictCell>> {
-                val grouped: Map<Int, ReductionCarrier<TraceEvent>> = mapped.groupBy({ it.a }, { it.b })
+            override fun reducePhase(mapped: ReductionCarrier<Join<Int, TraceEvent>>): ReductionCarrier<Join<Int, ConflictCell>> {
+                val grouped = mapped.groupBy({ it.a }) { it.b }
                 val reduced = grouped.map { (hash, carrier) ->
                     hash j carrier.fold(ConflictCell.init(), valueAlg.folder)
                 }
-                return SeriesCarrier<Join<Int, ConflictCell>>(reduced.size j { i -> reduced[i] })
+                return SeriesCarrier(reduced.size j { i -> reduced[i] })
             }
 
-            override protected fun rereducePhase(reduced: ReductionCarrier<Join<Int, ConflictCell>>): ReductionCarrier<Join<Int, ConflictCell>> {
+            override fun rereducePhase(reduced: ReductionCarrier<Join<Int, ConflictCell>>): ReductionCarrier<Join<Int, ConflictCell>> {
                 // CRMS: eigsort by depth desc
                 val sorted = reduced.toList().sortedByDescending { it.b.depth }
                 return SeriesCarrier(sorted.size j { i -> sorted[i] })
             }
 
-            override protected fun formatOutput(reduced: Any): List<ConflictCell> {
+            override fun formatOutput(reduced: Any): List<ConflictCell> {
                 val carrier = reduced as ReductionCarrier<Join<Int, ConflictCell>>
                 return carrier.map { it.b }.toList()
             }

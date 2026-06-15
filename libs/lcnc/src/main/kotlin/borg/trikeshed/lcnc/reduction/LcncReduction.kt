@@ -57,7 +57,6 @@ abstract class AbstractLcncReduction<K, V, Acc, Out>(
 
     override fun executeWithCheckpoints(input: ReductionCarrier<V>): ReductionResult<Out> {
         val stageOutputs = mutableMapOf<ReductionPhase, Any>()
-        var current: Any = input
 
         // Phase 1: MAP — extract key + value
         val mapped = mapPhase(input)
@@ -71,13 +70,10 @@ abstract class AbstractLcncReduction<K, V, Acc, Out>(
         val rereduced = rereducePhase(reduced)
         if (rereduced !== reduced) {
             stageOutputs[ReductionPhase.REREDUCE] = rereduced
-            current = rereduced
-        } else {
-            current = reduced
         }
 
         // Final output formatting
-        val output = formatOutput(current)
+        val output = formatOutput(rereduced)
 
         return ReductionResult(output, stageOutputs)
     }
@@ -90,9 +86,10 @@ abstract class AbstractLcncReduction<K, V, Acc, Out>(
     /** Phase REDUCE: groupBy key and fold values. Override for custom reduction. */
     protected open fun reducePhase(mapped: ReductionCarrier<Join<K, V>>): ReductionCarrier<Join<K, Acc>> {
         val grouped = mapped.groupBy({ it.a }) { it.b }
-        return grouped.map { (key, carrier) ->
+        val reduced = grouped.map { (key, carrier) ->
             key j carrier.fold(valueAlg.initial, valueAlg.folder)
-        }.toSeriesCarrier()
+        }
+        return SeriesCarrier(reduced.size j { i -> reduced[i] })
     }
 
     /** Phase REREDUCE: merge partial accumulators. Override for custom rereduce. */
@@ -100,13 +97,4 @@ abstract class AbstractLcncReduction<K, V, Acc, Out>(
 
     /** Format final output. Must be implemented by concrete reduction. */
     protected abstract fun formatOutput(reduced: Any): Out
-
-    /** Helper to convert Map<K, Join<K, Acc>> to ReductionCarrier. */
-    protected fun <K, Acc> Map<K, Join<K, Acc>>.toSeriesCarrier(): ReductionCarrier<Join<K, Acc>> =
-        values.toList().let { list -> SeriesCarrier(list.size j { i -> list[i] }) }
 }
-
-/**
- * Empty series carrier helper.
- */
-fun <T> emptySeriesCarrier(): ReductionCarrier<T> = SeriesCarrier(emptySeriesOf())

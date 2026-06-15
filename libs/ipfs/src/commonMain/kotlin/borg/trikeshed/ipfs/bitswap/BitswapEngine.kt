@@ -1,10 +1,17 @@
 package borg.trikeshed.ipfs.bitswap
 
 import borg.trikeshed.ipfs.CID
+import borg.trikeshed.ipfs.BlockStore
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.channels.SendChannel
 import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import java.io.ByteArrayOutputStream
+import kotlinx.coroutines.CancellationException
+import java.io.DataOutputStream
+import java.nio.ByteBuffer
 import java.util.concurrent.ConcurrentHashMap
 
 /**
@@ -77,7 +84,7 @@ class BitswapEngine(
     /**
      * Cancel a block request.
      */
-    fun cancelWant(cid: CID) {
+    suspend fun cancelWant(cid: CID) {
         val key = cidHex(cid)
         wantlistMutex.withLock {
             wantlist.remove(key)
@@ -91,7 +98,7 @@ class BitswapEngine(
     /**
      * Handle incoming Bitswap message.
      */
-    fun handleMessage(message: BitswapMessage) {
+    suspend fun handleMessage(message: BitswapMessage) {
         when (message) {
             is BitswapMessage.WantBlock -> {
                 handleWantBlock(message.cids)
@@ -114,7 +121,7 @@ class BitswapEngine(
         }
     }
 
-    private fun handleWantBlock(cids: List<CID>) {
+    private suspend fun handleWantBlock(cids: List<CID>) {
         cids.forEach { cid ->
             val data = blockStore.get(cid)
             if (data != null) {
@@ -127,14 +134,14 @@ class BitswapEngine(
         }
     }
 
-    private fun handleWantHave(cids: List<CID>) {
+    private suspend fun handleWantHave(cids: List<CID>) {
         cids.forEach { cid ->
             val has = blockStore.get(cid) != null
             if (has) sendHave(cid) else sendDontHave(cid)
         }
     }
 
-    private fun handleBlock(cid: CID, data: ByteArray) {
+    private suspend fun handleBlock(cid: CID, data: ByteArray) {
         val key = cidHex(cid)
         // Store locally
         blockStore.put(cid, data)
@@ -232,43 +239,55 @@ sealed class BitswapMessage {
         // Simple binary encoding
         // In real impl: use protobuf or CBOR
         return when (this) {
-            is WantBlock -> buildByteArray {
-                writeByte(0x00)
-                writeByte(cids.size)
+            is WantBlock -> {
+                val out = ByteArrayOutputStream()
+                out.write(0x00)
+                out.write(cids.size)
                 cids.forEach { cid ->
-                    writeByte(cid.bytes.size)
-                    write(cid.bytes)
+                    out.write(cid.bytes.size)
+                    out.write(cid.bytes)
                 }
+                out.toByteArray()
             }
-            is WantHave -> buildByteArray {
-                writeByte(0x01)
-                writeByte(cids.size)
+            is WantHave -> {
+                val out = ByteArrayOutputStream()
+                out.write(0x01)
+                out.write(cids.size)
                 cids.forEach { cid ->
-                    writeByte(cid.bytes.size)
-                    write(cid.bytes)
+                    out.write(cid.bytes.size)
+                    out.write(cid.bytes)
                 }
+                out.toByteArray()
             }
-            is Block -> buildByteArray {
-                writeByte(0x02)
-                writeByte(cid.bytes.size)
-                write(cid.bytes)
-                writeInt(data.size)
-                write(data)
+            is Block -> {
+                val out = ByteArrayOutputStream()
+                out.write(0x02)
+                out.write(cid.bytes.size)
+                out.write(cid.bytes)
+                ByteBuffer.allocate(4).putInt(data.size).array().forEach { out.write(it.toInt() and 0xFF) }
+                out.write(data)
+                out.toByteArray()
             }
-            is Have -> buildByteArray {
-                writeByte(0x03)
-                writeByte(cid.bytes.size)
-                write(cid.bytes)
+            is Have -> {
+                val out = ByteArrayOutputStream()
+                out.write(0x03)
+                out.write(cid.bytes.size)
+                out.write(cid.bytes)
+                out.toByteArray()
             }
-            is DontHave -> buildByteArray {
-                writeByte(0x04)
-                writeByte(cid.bytes.size)
-                write(cid.bytes)
+            is DontHave -> {
+                val out = ByteArrayOutputStream()
+                out.write(0x04)
+                out.write(cid.bytes.size)
+                out.write(cid.bytes)
+                out.toByteArray()
             }
-            is Cancel -> buildByteArray {
-                writeByte(0x05)
-                writeByte(cid.bytes.size)
-                write(cid.bytes)
+            is Cancel -> {
+                val out = ByteArrayOutputStream()
+                out.write(0x05)
+                out.write(cid.bytes.size)
+                out.write(cid.bytes)
+                out.toByteArray()
             }
         }
     }
@@ -276,7 +295,7 @@ sealed class BitswapMessage {
     companion object {
         fun decode(data: ByteArray): BitswapMessage {
             val cursor = 0
-            val type = data[cursor] and 0xFF
+            val type = data[cursor].toInt() and 0xFF
             return when (type) {
                 0x00 -> decodeWantBlock(data)
                 0x01 -> decodeWantHave(data)
@@ -290,10 +309,10 @@ sealed class BitswapMessage {
 
         private fun decodeWantBlock(data: ByteArray): WantBlock {
             var pos = 1
-            val count = data[pos++] and 0xFF
+            val count = data[pos++].toInt() and 0xFF
             val cids = mutableListOf<CID>()
             repeat(count) {
-                val cidLen = data[pos++] and 0xFF
+                val cidLen = data[pos++].toInt() and 0xFF
                 val cidBytes = data.copyOfRange(pos, pos + cidLen)
                 pos += cidLen
                 cids.add(CID(cidBytes))
@@ -303,10 +322,10 @@ sealed class BitswapMessage {
 
         private fun decodeWantHave(data: ByteArray): WantHave {
             var pos = 1
-            val count = data[pos++] and 0xFF
+            val count = data[pos++].toInt() and 0xFF
             val cids = mutableListOf<CID>()
             repeat(count) {
-                val cidLen = data[pos++] and 0xFF
+                val cidLen = data[pos++].toInt() and 0xFF
                 val cidBytes = data.copyOfRange(pos, pos + cidLen)
                 pos += cidLen
                 cids.add(CID(cidBytes))
@@ -316,10 +335,10 @@ sealed class BitswapMessage {
 
         private fun decodeBlock(data: ByteArray): Block {
             var pos = 1
-            val cidLen = data[pos++] and 0xFF
+            val cidLen = data[pos++].toInt() and 0xFF
             val cidBytes = data.copyOfRange(pos, pos + cidLen)
             pos += cidLen
-            val dataLen = data[pos..pos+3].let { it[0].toInt() shl 24 | it[1].toInt() shl 16 | it[2].toInt() shl 8 | it[3].toInt() }
+            val dataLen = ByteBuffer.wrap(data, pos, 4).int
             pos += 4
             val blockData = data.copyOfRange(pos, pos + dataLen)
             return Block(CID(cidBytes), blockData)
@@ -327,30 +346,23 @@ sealed class BitswapMessage {
 
         private fun decodeHave(data: ByteArray): Have {
             var pos = 1
-            val cidLen = data[pos++] and 0xFF
+            val cidLen = data[pos++].toInt() and 0xFF
             val cidBytes = data.copyOfRange(pos, pos + cidLen)
             return Have(CID(cidBytes))
         }
 
         private fun decodeDontHave(data: ByteArray): DontHave {
             var pos = 1
-            val cidLen = data[pos++] and 0xFF
+            val cidLen = data[pos++].toInt() and 0xFF
             val cidBytes = data.copyOfRange(pos, pos + cidLen)
             return DontHave(CID(cidBytes))
         }
 
         private fun decodeCancel(data: ByteArray): Cancel {
             var pos = 1
-            val cidLen = data[pos++] and 0xFF
+            val cidLen = data[pos++].toInt() and 0xFF
             val cidBytes = data.copyOfRange(pos, pos + cidLen)
             return Cancel(CID(cidBytes))
         }
     }
 }
-
-// Helper for ByteArray building
-import kotlin.io.buildByteArray
-import kotlin.io.writeByte
-import kotlin.io.writeInt
-import kotlin.io.write
-import java.util.concurrent.CancellationException

@@ -36,19 +36,20 @@ interface TorrentHandle {
 }
 
 /**
- * SHA-256 based 40-byte info-hash used in BitTorrent v2 (BEP 52).
+ * SHA-256 based 32-byte info-hash used in BitTorrent v2 (BEP 52).
  */
 data class InfoHash(val bytes: ByteArray) {
-    init { require(bytes.size == 40) { "InfoHash must be exactly 40 bytes" } }
+    init { require(bytes.size == 32) { "InfoHash must be exactly 32 bytes (SHA-256)" } }
     fun hex(): String = bytes.joinToString("") { "%02x".format(it) }
-    override fun toString(): String = "InfoHash($hex())"
+    override fun toString(): String = "InfoHash(" + hex() + ")"
 }
 
 /**
  * Bitfield of piece availability.
  * Bit i == 1 means at least one peer has piece i.
  */
-class BitField(private val bits: ByteArray) {
+class BitField(val bits: ByteArray) {
+    init { require(bits.isNotEmpty()) { "BitField requires at least 1 byte" } }
     val size: Int = bits.size * 8
 
     operator fun get(piece: Int): Boolean {

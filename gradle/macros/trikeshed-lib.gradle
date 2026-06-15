@@ -204,8 +204,9 @@ switch (project.path) {
     case ":libs:ngsctp":
     case ":libs:quic":
     case ":libs:ipfs":
-        // IPFS uses JVM-only to avoid platform gaps
-        kmpJvm(rootMode: "none")
+        // IPFS uses JVM-only; depends on root for DHT types (NUID, NetMask, RoutingTable)
+        kmpJvm(rootMode: "api")
+        break
     case ":libs:tls":
         kmpHost(rootMode: "none")
         break
@@ -588,7 +589,6 @@ switch (project.path) {
         }
         def couchSets = couchKotlin.sourceSets
         couchSets.getByName("commonMain").dependencies {
-            api libPeer("miniduck")
             implementation libPeer("tiny-btrfs")
         }
         couchSets.getByName("jvmMain").dependencies {
@@ -598,6 +598,7 @@ switch (project.path) {
             implementation libPeer("kursive")
             implementation libPeer("patl")
             implementation libPeer("tls")
+            implementation libPeer("miniduck")
         }
         couchSets.getByName("jvmTest").dependencies {
             implementation nestedLibPeer(":libs:couch:viewserver", "couch-viewserver")

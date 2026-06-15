@@ -93,11 +93,11 @@ class TorrentSession(
 ) : TorrentHandle {
 
     private val peers = ConcurrentHashMap<PeerAddress, PeerSession>()
-    private val numPieces = torrentFile.info.length?.let { len ->
+    private val peerCount = torrentFile.info.length?.let { len ->
         ((len + (torrentFile.info.pieceLength ?: 16384) - 1) / (torrentFile.info.pieceLength ?: 16384)).toInt()
     } ?: 0
 
-    private val piecePicker = PiecePicker(numPieces, PieceStrategy.RAREST_FIRST)
+    private val piecePicker = PiecePicker(peerCount, PieceStrategy.RAREST_FIRST)
     private val peerWireHandler = PeerWireHandler(
         infoHashBytes = torrentFile.infoHashV1(),
         piecePicker = piecePicker,
@@ -114,7 +114,7 @@ class TorrentSession(
     override val name: String get() = torrentFile.info.name
     override val totalSize: Long get() = torrentFile.info.length ?: 0L
     override val pieceSize: Int get() = (torrentFile.info.pieceLength ?: 16384).toInt()
-    override val numPieces: Int get() = numPieces
+    override val numPieces: Int get() = peerCount
 
     fun start() {
         scope.launch {
@@ -133,22 +133,14 @@ class TorrentSession(
         }
     }
 
-    override suspend fun haveBitfield(): BitField = piecePicker.let {
-        BitField.empty(numPieces)
-    }
+    override suspend fun haveBitfield(): BitField = BitField.empty(peerCount)
 
     override suspend fun downloadPiece(pieceIndex: Int): ByteArray {
         val pieceLen = min(pieceSize.toLong(), totalSize - pieceIndex * pieceSize).toInt()
         return withTimeout(300_000) {
-            while (true) {
-                val peer = peers.values.find { it.hasPiece(pieceIndex) }
-                if (peer != null) {
-                    try {
-                        return@withTimeout peer.requestPiece(pieceIndex, 0, pieceLen)
-                    } catch (_: Exception) { /* try another peer */ }
-                }
-                delay(500)
-            }
+            val peer = peers.values.firstOrNull { it.hasPiece(pieceIndex) }
+                ?: throw IllegalStateException("No peer has piece $pieceIndex")
+            peer.requestPiece(pieceIndex, 0, pieceLen)
         }
     }
 

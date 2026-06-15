@@ -10,7 +10,7 @@ import java.net.InetAddress
  *
  * Each (address, connId) pair maps to one UtpSocket.
  */
-class UtpManager(private val scope: CoroutineScope) {
+open class UtpManager(private val scope: CoroutineScope) {
 
     private val connections = mutableMapOf<ConnectionKey, UtpSocket>()
     private val socket: DatagramSocket? = null // Created lazily on first send

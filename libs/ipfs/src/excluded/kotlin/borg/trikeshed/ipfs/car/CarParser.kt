@@ -1,7 +1,6 @@
 package borg.trikeshed.ipfs.car
 
 import borg.trikeshed.ipfs.CID
-import kotlinx.coroutines.tasks.await
 import java.io.ByteArrayInputStream
 import java.io.DataInputStream
 import java.io.IOException
@@ -54,14 +53,14 @@ object CarParser {
             // Peek - if we're at index section (v2), break
             if (version == CAR_VERSION_2 && buffer.remaining() > 0) {
                 // Check if next is index marker
-                val pos = buffer.position
+                val pos = buffer.position()
                 val marker = readVarint(buffer)
                 if (marker == 0xFFFFFFFFL) {
                     // Index section marker
-                    buffer.position = pos
+                    buffer.position() = pos
                     break
                 }
-                buffer.position = pos
+                buffer.position() = pos
             }
 
             try {

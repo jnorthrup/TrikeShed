@@ -1,22 +1,19 @@
 package borg.trikeshed.lcnc.reduction
 
 import borg.trikeshed.lib.*
-import borg.trikeshed.lcnc.reduction.TraceEvent
-import borg.trikeshed.lcnc.reduction.SpanEvent
 
 /**
- * Single-value fold (Map → Reduce).
+ * Single-value fold (Map → Reduce). `fun interface` enables SAM conversion so callers
+ * may pass a trailing lambda `(acc, input) -> acc` directly to [ReductionCarrier.fold].
  */
-@FunctionalInterface
-interface Folder<In, Acc> {
+fun interface Folder<In, Acc> {
     fun fold(acc: Acc, input: In): Acc
 }
 
 /**
  * Partial merge for rereduce / distributed reduction.
  */
-@FunctionalInterface
-interface Merger<Acc> {
+fun interface Merger<Acc> {
     fun merge(partials: Series<Acc>): Acc
 }
 
@@ -73,6 +70,7 @@ data class MultiMetricAccumulator(
 
 /**
  * CRMS ConflictCell for paired BEFORE/AFTER with eigsort.
+ * Top-level so [LcncReductionCoreTest] can reference it unqualified.
  */
 data class ConflictCell(
     val callsiteHash: Int,
@@ -89,6 +87,21 @@ data class ConflictCell(
 }
 
 /**
+ * Confix tree-builder accumulator. Top-level so [LcncReductionCoreTest] and the
+ * ConfixReducers can reference it unqualified.
+ */
+data class TreeBuilderState(
+    val stack: List<TreeNode> = emptyList(),
+    val roots: List<TreeNode> = emptyList()
+) {
+    data class TreeNode(
+        val tag: String,
+        val children: List<TreeNode> = emptyList(),
+        val span: SpanEvent.Span? = null
+    )
+}
+
+/**
  * Default implementations and factories.
  */
 object LcncValueAlg {
@@ -98,125 +111,105 @@ object LcncValueAlg {
 
     /** Forge: multi-metric reduce with rereduce support. */
     fun forgeMultiMetricReducer(metrics: List<Pair<String, BuiltinReducer>>): Folder<Map<String, Any>, MultiMetricAccumulator> =
-        object : Folder<Map<String, Any>, MultiMetricAccumulator> {
-            override fun fold(acc: MultiMetricAccumulator, input: Map<String, Any>): MultiMetricAccumulator {
-                var result = acc
-                for ((key, reducer) in metrics) {
-                    val value = input[key]
-                    result = result.with(key, reducer, value)
-                }
-                return result
+        Folder { acc, input ->
+            var result = acc
+            for ((key, reducer) in metrics) {
+                val value = input[key]
+                result = result.with(key, reducer, value)
             }
+            result
         }
 
     /** Forge merger: combines partial accumulators. */
-    fun forgeMerger(): Merger<MultiMetricAccumulator> = object : Merger<MultiMetricAccumulator> {
-        override fun merge(partials: Series<MultiMetricAccumulator>): MultiMetricAccumulator {
-            if (partials.size == 0) return emptyMultiMetricAccumulator()
-            var result = partials[0]
-            for (i in 1 until partials.size) {
-                result = mergeTwo(result, partials[i])
+    fun forgeMerger(): Merger<MultiMetricAccumulator> = Merger { partials ->
+        if (partials.size == 0) return@Merger emptyMultiMetricAccumulator()
+        var result = partials[0]
+        for (i in 1 until partials.size) {
+            result = mergeTwo(result, partials[i])
+        }
+        result
+    }
+
+    private fun mergeTwo(a: MultiMetricAccumulator, b: MultiMetricAccumulator): MultiMetricAccumulator {
+        fun <K, V> mergeMaps(mapA: Map<K, V>, mapB: Map<K, V>, merge: (V, V) -> V): Map<K, V> {
+            val allKeys = (mapA.keys + mapB.keys).toSet()
+            return allKeys.associateWith { k ->
+                merge(mapA[k] as V, mapB[k] as V)
             }
-            return result
         }
 
-        private fun mergeTwo(a: MultiMetricAccumulator, b: MultiMetricAccumulator): MultiMetricAccumulator {
-            fun <K, V> mergeMaps(mapA: Map<K, V>, mapB: Map<K, V>, merge: (V, V) -> V): Map<K, V> {
-                val allKeys = (mapA.keys + mapB.keys).toSet()
-                return allKeys.associateWith { k ->
-                    merge(mapA[k] as V, mapB[k] as V)
-                }
-            }
-
-            return MultiMetricAccumulator(
-                sums = mergeMaps(a.sums, b.sums) { x, y -> x + y },
-                counts = mergeMaps(a.counts, b.counts) { x, y -> x + y },
-                mins = mergeMaps(a.mins, b.mins) { x, y -> minOf(x, y) },
-                maxs = mergeMaps(a.maxs, b.maxs) { x, y -> maxOf(x, y) },
-                concatBuffers = mergeMaps(a.concatBuffers, b.concatBuffers) { x, y -> x.append(y).also { } },
-                firstValues = a.firstValues + b.firstValues,  // first wins
-                lastValues = b.lastValues + a.lastValues,     // last wins
-                beforeAfterPairs = a.beforeAfterPairs + b.beforeAfterPairs,
-                depthSortedCells = (a.depthSortedCells + b.depthSortedCells).sortedByDescending { it.depth }
-            )
-        }
+        return MultiMetricAccumulator(
+            sums = mergeMaps(a.sums, b.sums) { x, y -> x + y },
+            counts = mergeMaps(a.counts, b.counts) { x, y -> x + y },
+            mins = mergeMaps(a.mins, b.mins) { x, y -> minOf(x, y) },
+            maxs = mergeMaps(a.maxs, b.maxs) { x, y -> maxOf(x, y) },
+            concatBuffers = mergeMaps(a.concatBuffers, b.concatBuffers) { x, y -> x.append(y) },
+            firstValues = a.firstValues + b.firstValues,  // first wins
+            lastValues = b.lastValues + a.lastValues,     // last wins
+            beforeAfterPairs = a.beforeAfterPairs + b.beforeAfterPairs,
+            depthSortedCells = (a.depthSortedCells + b.depthSortedCells).sortedByDescending { it.depth }
+        )
     }
 
     /** Confix: tree construction (buildTree) = fold over spans. */
-    data class TreeBuilderState(
-        val stack: List<TreeNode> = emptyList(),
-        val roots: List<TreeNode> = emptyList()
-    ) {
-        data class TreeNode(val tag: String, val children: List<TreeNode> = emptyList(), val span: SpanEvent.Span? = null)
-    }
+    fun confixTreeBuilder(): Folder<SpanEvent, TreeBuilderState> = Folder { acc, input ->
+        // Single-pass parent tracking using stack (O(n))
+        val node = TreeBuilderState.TreeNode(tag = "span", span = input.span)
+        val newStack = acc.stack.toMutableList()
+        val newRoots = acc.roots.toMutableList()
 
-    fun confixTreeBuilder(): Folder<SpanEvent, TreeBuilderState> = object : Folder<SpanEvent, TreeBuilderState> {
-        override fun fold(acc: TreeBuilderState, input: SpanEvent): TreeBuilderState {
-            // Single-pass parent tracking using stack (O(n))
-            val node = TreeBuilderState.TreeNode(tag = "span", span = input.span)
-            val newStack = acc.stack.toMutableList()
-            val newRoots = acc.roots.toMutableList()
-
-            while (newStack.isNotEmpty() && newStack.last().span!!.endInclusive <= input.span.start) {
-                val closed = newStack.removeAt(newStack.lastIndex)
-                if (newStack.isEmpty()) {
-                    newRoots.add(closed)
-                } else {
-                    val parent = newStack.last()
-                    newStack[newStack.lastIndex] = parent.copy(children = parent.children + closed)
-                }
+        while (newStack.isNotEmpty() && newStack.last().span!!.endInclusive <= input.span.start) {
+            val closed = newStack.removeAt(newStack.lastIndex)
+            if (newStack.isEmpty()) {
+                newRoots.add(closed)
+            } else {
+                val parent = newStack.last()
+                newStack[newStack.lastIndex] = parent.copy(children = parent.children + closed)
             }
-
-            newStack.add(node)
-            return TreeBuilderState(newStack, newRoots)
         }
+
+        newStack.add(node)
+        TreeBuilderState(newStack, newRoots)
     }
 
     /** CRMS: BEFORE/AFTER pairing + eigsort. */
-    fun crmsPairAndEigsort(): Folder<TraceEvent, ConflictCell> = object : Folder<TraceEvent, ConflictCell> {
-        override fun fold(acc: ConflictCell, input: TraceEvent): ConflictCell {
-            val (before, after) = when (input.opcode) {
-                0xA5 -> Pair(listOf(input), emptyList<TraceEvent>())   // L_GET = BEFORE
-                0xA6 -> Pair(emptyList<TraceEvent>(), listOf(input))   // L_SET = AFTER
-                0xA7 -> Pair(listOf(input), emptyList<TraceEvent>())   // P_GET = BEFORE
-                0xA8 -> Pair(emptyList<TraceEvent>(), listOf(input))   // P_SET = AFTER
-                else -> Pair(emptyList<TraceEvent>(), emptyList<TraceEvent>())
-            }
-            return ConflictCell(
-                callsiteHash = input.siteIdx, // placeholder
-                beforeEvents = acc.beforeEvents + before,
-                afterEvents = acc.afterEvents + after,
-                depth = maxOf(acc.depth, input.methodIdx), // placeholder
-                frequency = acc.frequency + 1
-            )
+    fun crmsPairAndEigsort(): Folder<TraceEvent, ConflictCell> = Folder { acc, input ->
+        val (before, after) = when (input.opcode) {
+            0xA5 -> listOf(input) to emptyList<TraceEvent>()   // L_GET = BEFORE
+            0xA6 -> emptyList<TraceEvent>() to listOf(input)   // L_SET = AFTER
+            0xA7 -> listOf(input) to emptyList<TraceEvent>()   // P_GET = BEFORE
+            0xA8 -> emptyList<TraceEvent>() to listOf(input)   // P_SET = AFTER
+            else -> emptyList<TraceEvent>() to emptyList<TraceEvent>()
         }
+        ConflictCell(
+            callsiteHash = input.siteIdx, // placeholder
+            beforeEvents = acc.beforeEvents + before,
+            afterEvents = acc.afterEvents + after,
+            depth = maxOf(acc.depth, input.methodIdx), // placeholder
+            frequency = acc.frequency + 1
+        )
     }
 
     /** CRMS merger: combines partial ConflictCells. */
-    fun crmsMerger(): Merger<ConflictCell> = object : Merger<ConflictCell> {
-        override fun merge(partials: Series<ConflictCell>): ConflictCell {
-            if (partials.size == 0) return ConflictCell.init()
-            var result = partials[0]
-            for (i in 1 until partials.size) {
-                result = mergeTwo(result, partials[i])
-            }
-            return result.sortedByDescending()
+    fun crmsMerger(): Merger<ConflictCell> = Merger { partials ->
+        if (partials.size == 0) return@Merger ConflictCell.init()
+        var result = partials[0]
+        for (i in 1 until partials.size) {
+            result = mergeTwo(result, partials[i])
         }
+        result
+    }
 
-        private fun mergeTwo(a: ConflictCell, b: ConflictCell): ConflictCell {
-            require(a.callsiteHash == b.callsiteHash) { "Cannot merge different callsite hashes" }
-            return ConflictCell(
-                callsiteHash = a.callsiteHash,
-                beforeEvents = a.beforeEvents + b.beforeEvents,
-                afterEvents = a.afterEvents + b.afterEvents,
-                depth = maxOf(a.depth, b.depth),
-                frequency = a.frequency + b.frequency,
-                latencyNanos = a.latencyNanos + b.latencyNanos,
-                severity = maxOf(a.severity, b.severity)
-            )
-        }
-
-        private fun ConflictCell.sortedByDescending(): ConflictCell =
-            copy()
+    private fun mergeTwo(a: ConflictCell, b: ConflictCell): ConflictCell {
+        require(a.callsiteHash == b.callsiteHash) { "Cannot merge different callsite hashes" }
+        return ConflictCell(
+            callsiteHash = a.callsiteHash,
+            beforeEvents = a.beforeEvents + b.beforeEvents,
+            afterEvents = a.afterEvents + b.afterEvents,
+            depth = maxOf(a.depth, b.depth),
+            frequency = a.frequency + b.frequency,
+            latencyNanos = a.latencyNanos + b.latencyNanos,
+            severity = maxOf(a.severity, b.severity)
+        )
     }
 }

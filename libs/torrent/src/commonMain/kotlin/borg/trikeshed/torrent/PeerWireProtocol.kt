@@ -44,7 +44,7 @@ sealed class PeerWireMessage {
     data object Interested : PeerWireMessage()
     data object NotInterested : PeerWireMessage()
     data class Have(val pieceIndex: Int) : PeerWireMessage()
-    data class BitField(val have: BitField) : PeerWireMessage()
+    data class PWPieceBitField(val have: BitField) : PeerWireMessage()
     data class Request(val pieceIndex: Int, val offset: Int, val length: Int) : PeerWireMessage()
     data class Piece(val pieceIndex: Int, val offset: Int, val data: ByteArray) : PeerWireMessage()
     data class Cancel(val pieceIndex: Int, val offset: Int, val length: Int) : PeerWireMessage()
@@ -54,40 +54,39 @@ sealed class PeerWireMessage {
     /**
      * Encode to wire format (big-endian length-prefixed).
      * Format: <length:4><id:1><payload...>
-     * length = payload size + 1 (for id byte)
      */
     fun encode(): ByteArray {
         val payload = when (this) {
-            is Choke         -> ByteArray(0)
-            is Unchoke       -> ByteArray(0)
-            is Interested    -> ByteArray(0)
-            is NotInterested -> ByteArray(0)
-            is Have          -> int32BE(pieceIndex)
-            is BitField      -> have.bits
-            is Request       -> int32BE(pieceIndex) + int32BE(offset) + int32BE(length)
-            is Piece         -> int32BE(pieceIndex) + int32BE(offset) + data
-            is Cancel        -> int32BE(pieceIndex) + int32BE(offset) + int32BE(length)
-            is Port          -> int16BE(port)
-            is Extension     -> byteOf(id) + payload
+            is Choke           -> ByteArray(0)
+            is Unchoke         -> ByteArray(0)
+            is Interested      -> ByteArray(0)
+            is NotInterested   -> ByteArray(0)
+            is Have            -> int32BE(pieceIndex)
+            is PWPieceBitField -> have.bits
+            is Request         -> int32BE(pieceIndex) + int32BE(offset) + int32BE(length)
+            is Piece           -> int32BE(pieceIndex) + int32BE(offset) + data
+            is Cancel          -> int32BE(pieceIndex) + int32BE(offset) + int32BE(length)
+            is Port            -> int16BE(port)
+            is Extension       -> byteOf(id) + payload
         }
         val msgId = typeId()
-        val length = (payload.size + if (msgId >= 0) 1 else 0).toLong()
-        return int32BE(length.toInt()) + (if (msgId >= 0) byteOf(msgId) else ByteArray(0)) + payload
+        val length = payload.size + (if (msgId >= 0) 1 else 0)
+        return int32BE(length) + (if (msgId >= 0) byteOf(msgId) else ByteArray(0)) + payload
     }
 
     private fun typeId(): Int = when (this) {
-        is Choke         -> 0
-        is Unchoke       -> 1
-        is Interested    -> 2
-        is NotInterested -> 3
-        is Have          -> 4
-        is BitField      -> 5
-        is Request       -> 6
-        is Piece         -> 7
-        is Cancel        -> 8
-        is Port          -> 9
-        is Extension     -> 20
-        else             -> -1
+        is Choke           -> 0
+        is Unchoke         -> 1
+        is Interested      -> 2
+        is NotInterested   -> 3
+        is Have            -> 4
+        is PWPieceBitField -> 5
+        is Request         -> 6
+        is Piece           -> 7
+        is Cancel          -> 8
+        is Port            -> 9
+        is Extension       -> 20
+        else               -> -1
     }
 
     companion object {
@@ -102,7 +101,7 @@ sealed class PeerWireMessage {
                 2  -> Interested
                 3  -> NotInterested
                 4  -> Have((payload[1].toInt() shl 24) or (payload[2].toInt() shl 16) or (payload[3].toInt() shl 8) or payload[4].toInt())
-                5  -> BitField(BitField(payload.copyOfRange(1, payload.size)))
+                5  -> PWPieceBitField(BitField(payload.copyOfRange(1, payload.size)))
                 6  -> Request(
                     (payload[1].toInt() shl 24) or (payload[2].toInt() shl 16) or (payload[3].toInt() shl 8) or payload[4].toInt(),
                     (payload[5].toInt() shl 24) or (payload[6].toInt() shl 16) or (payload[7].toInt() shl 8) or payload[8].toInt(),

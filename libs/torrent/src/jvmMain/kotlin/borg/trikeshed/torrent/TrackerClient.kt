@@ -15,12 +15,12 @@ import java.net.URLEncoder
  *   - Compact peer list (bencoded "peers" as 6-byte binary records)
  *   - Tracker scrape (BEP 15) — not implemented here
  */
-class TrackerClient(private val scope: CoroutineScope) {
+open class TrackerClient(private val scope: CoroutineScope) {
 
     /**
      * Announce to a tracker and return discovered peer list.
      */
-    suspend fun announce(
+    open suspend fun announce(
         torrentFile: TorrentFile,
         peerId: ByteArray,
         port: Int,
@@ -65,7 +65,7 @@ class TrackerClient(private val scope: CoroutineScope) {
             val colon = response.indexOf(':', peersStart + 6)
             val lengthStr = response.substring(peersStart + 6, colon)
             val length = lengthStr.toIntOrNull() ?: return emptyList()
-            val peersData = response.substring(colon + 1, colon + 1 + length)
+            val peersData = response.substring(colon + 1, colon + 1 + length).toByteArray(Charsets.ISO_8859_1)
             parseCompactPeers(peersData)
         } catch (e: Exception) {
             emptyList()

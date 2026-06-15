@@ -102,3 +102,30 @@ bucket = min(distance, bucketCount).dec()
 - `libs:miniduck` — BlockRowVec, MiniDuckBlockCodec
 - AWS SDK v2 (S3), Google Cloud Storage, Alibaba OSS (jvmMain)
 - kotlinx-coroutines (structured concurrency for CCEK fanout)
+## Build Configuration
+
+The `:libs:ipfs` project uses `kmpJvm(rootMode: "api")` in `gradle/macros/trikeshed-lib.gradle`.
+This means it depends on the root TrikeShed project for DHT types (NUID, NetMask, RoutingTable, Agent, BitOps).
+
+The root project is the canonical source for DHT primitives. The `:libs:ipfs` project adds:
+- IPFS-specific CID/BlockStore abstractions (`IpfsApi.kt`)
+- DHT service with provider announce/find (`DhtService.kt`)
+- Bitswap block exchange protocol engine (`bitswap/BitswapEngine.kt`)
+- Transport interfaces and loopback implementation (`DhtTransport.kt`, `NioUringDhtTransport.kt`)
+- Disk-backed block store (`jvmMain/DiskBlockStore.kt`)
+
+### Excluded WIP Files
+
+The following files were moved to `src/excluded/` because they reference APIs that don't exist yet:
+- `car/CarParser.kt` — CAR archive parser (uses buildByteArray DSL + Long/Int type mismatches)
+- `codec/DagCodecs.kt` — Dag-CBOR codec (uses java.math.BigInteger instead of borg.trikeshed.num.BigInt)
+- `console/BigBuckBunnyVerifier.kt` — Demo console app (depends on CarParser/DagCodecs)
+
+These will be re-enabled when the kotlinx-io buildByteArray DSL is added or the code is rewritten.
+
+### Build Commands
+
+```bash
+./gradlew :libs:ipfs:jvmTest --offline --no-configuration-cache
+# 8 tests, 0 failures, 0 errors
+```

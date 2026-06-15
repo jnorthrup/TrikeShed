@@ -38,9 +38,7 @@ data class TorrentFile(
     val isV2Only: Boolean get() = info.pieces.rootSha256 != null && info.sha1RootTree == null
 
     companion object {
-        /**
-         * Parse a .torrent file from raw bencode bytes.
-         */
+        /** Parse a .torrent file from raw bencode bytes. */
         fun parse(data: ByteArray): TorrentFile = BencodeParser.parse(data)
     }
 }
@@ -89,64 +87,94 @@ object BencodeParser {
         return parseTorrent(root)
     }
 
-    private fun parseTorrent(map: Map<String, BencodeNode>): TorrentFile {
+    private fun parseTorrent(map: Map<String, Node>): TorrentFile {
+        val announceNode = map["announce"] as? Node.Str
+        val announceListNode = map["announce-list"] as? Node.BList
+        val creationDateNode = map["creation date"] as? Node.Int
+        val commentNode = map["comment"] as? Node.Str
+        val createdByNode = map["created by"] as? Node.Str
+        val encodingNode = map["encoding"] as? Node.Str
+        val infoNode = map["info"] as? Node.Dict
+        val announceList: List<List<String>> = if (announceListNode != null) {
+            announceListNode.items?.mapNotNull { tier ->
+                (tier as? Node.BList)?.items?.mapNotNull { (it as? Node.Str)?.value }
+            } ?: emptyList()
+        } else emptyList()
         return TorrentFile(
-            announce = map["announce"]?.string,
-            announceList = map["announce-list"]?.list?.map { tier ->
-                tier.list.map { it.string }
-            } ?: emptyList(),
-            creationDate = map["creation date"]?.integer,
-            comment = map["comment"]?.string,
-            createdBy = map["created by"]?.string,
-            encoding = map["encoding"]?.string,
-            info = parseInfo(map["info"]!!.asDict()),
+            announce = announceNode?.value,
+            announceList = announceList,
+            creationDate = creationDateNode?.intValue,
+            comment = commentNode?.value,
+            createdBy = createdByNode?.value,
+            encoding = encodingNode?.value,
+            info = parseInfo(infoNode?.entries ?: emptyMap()),
         )
     }
 
-    private fun parseInfo(map: Map<String, BencodeNode>): TorrentInfo {
-        val name = map["name"]?.string ?: "unknown"
+    private fun parseInfo(map: Map<String, Node>): TorrentInfo {
+        val nameNode = map["name"] as? Node.Str
+        val pieceLengthNode = map["piece length"] as? Node.Int
+        val lengthNode = map["length"] as? Node.Int
+        val metaVersionNode = map["meta version"] as? Node.Int
+        val fileTreeNode = map["file tree"] as? Node.Dict
+        val filesNode = map["files"] as? Node.BList
+        val sha1RootTreeNode = map["sha1 root tree"] as? Node.Str
+        val sourceNode = map["source"] as? Node.Str
+        val privateNode = map["private"] as? Node.Int
         return TorrentInfo(
-            name = name,
-            pieceLength = map["piece length"]?.integer,
+            name = nameNode?.value ?: "unknown",
+            pieceLength = pieceLengthNode?.intValue,
             pieces = parsePieceLayer(map),
-            length = map["length"]?.integer,
-            metaVersion = map["meta version"]?.integer?.toInt(),
-            fileTree = map["file tree"]?.let { parseFileTree(it.asDict()) },
-            files = map["files"]?.list?.map { parseFileEntry(it.asDict()) },
-            sha1RootTree = map["sha1 root tree"]?.string,
-            source = map["source"]?.string,
-            private = map["private"]?.integer?.toInt(),
+            length = lengthNode?.intValue,
+            metaVersion = metaVersionNode?.intValue?.toInt(),
+            fileTree = fileTreeNode?.let { parseFileTree(it.entries ?: emptyMap()) },
+            files = filesNode?.items?.mapNotNull { parseFileEntry(it) },
+            sha1RootTree = sha1RootTreeNode?.value,
+            source = sourceNode?.value,
+            private = privateNode?.intValue?.toInt(),
         )
     }
 
-    private fun parsePieceLayer(map: Map<String, BencodeNode>): PieceLayer {
-        val hex = map["pieces"]?.bytes?.toString(Charsets.ISO_8859_1)
+    private fun parsePieceLayer(map: Map<String, Node>): PieceLayer {
+        val hex = (map["pieces"] as? Node.Str)?.value
         val v1Hashes = if (hex != null && hex.length % 40 == 0) {
             (0 until hex.length step 40).map { hex.substring(it, it + 40) }
         } else emptyList()
-        return PieceLayer(v1Hashes, map["sha256"]?.string)
+        return PieceLayer(v1Hashes, (map["sha256"] as? Node.Str)?.value)
     }
 
-    private fun parseFileTree(map: Map<String, BencodeNode>): FileTree {
-        return FileTree(map.mapValues { parseFileTreeNode(it.value) })
+    private fun parseFileTree(entries: Map<String, Node>): FileTree {
+        return FileTree(entries.mapValues { parseFileTreeNode(it.value) })
     }
 
-    private fun parseFileTreeNode(node: BencodeNode): FileTreeNode {
-        val m = node.asDict()
+    private fun parseFileTreeNode(node: Node): FileTreeNode {
+        val dictNode = node as? Node.Dict
+        val dict = dictNode?.entries ?: return FileTreeNode.Directory(emptyMap())
         return when {
-            m.containsKey("length") -> FileTreeNode.File(
-                length = m["length"]!!.integer,
-                piecesRoot = m["pieces (v2)"]?.string,
+            dict.containsKey("length") -> {
+                val lenNode = dict["length"] as? Node.Int
+                val piecesRootNode = dict["pieces (v2)"] as? Node.Str
+                FileTreeNode.File(
+                    length = lenNode?.intValue ?: 0L,
+                    piecesRoot = piecesRootNode?.value,
+                )
+            }
+            else -> FileTreeNode.Directory(
+                dict.filterKeys { it != "pieces (v2)" }.mapValues { parseFileTreeNode(it.value) }
             )
-            else -> FileTreeNode.Directory(m.mapValues { parseFileTreeNode(it.value) })
         }
     }
 
-    private fun parseFileEntry(map: Map<String, BencodeNode>): TorrentFileEntry {
+    private fun parseFileEntry(node: Node): TorrentFileEntry? {
+        val dictNode = node as? Node.Dict
+        val dict = dictNode?.entries ?: return null
+        val pathNode = dict["path"] as? Node.BList
+        val lenNode = dict["length"] as? Node.Int
+        val md5sumNode = dict["md5sum"] as? Node.Str
         return TorrentFileEntry(
-            length = map["length"]!!.integer,
-            path = map["path"]!!.list.map { it.string },
-            md5sum = map["md5sum"]?.string,
+            length = lenNode?.intValue ?: return null,
+            path = pathNode?.items?.mapNotNull { (it as? Node.Str)?.value } ?: emptyList(),
+            md5sum = md5sumNode?.value,
         )
     }
 }
@@ -166,9 +194,7 @@ private class Tokenizer(private val data: ByteArray) {
 
     fun tokenize(): List<Token> {
         val tokens = mutableListOf<Token>()
-        while (pos < data.size) {
-            tokens.add(nextToken())
-        }
+        while (pos < data.size) tokens.add(nextToken())
         return tokens
     }
 
@@ -182,8 +208,8 @@ private class Tokenizer(private val data: ByteArray) {
                 pos++ // skip 'e'
                 Token.BInt(num)
             }
-            'l' -> { pos--; pos++; Token.BListStart }
-            'd' -> { pos--; pos++; Token.BDictStart }
+            'l' -> Token.BListStart
+            'd' -> Token.BDictStart
             'e' -> Token.BEnd
             in '0'..'9' -> {
                 val start = pos - 1
@@ -199,76 +225,73 @@ private class Tokenizer(private val data: ByteArray) {
     }
 }
 
-// ─── Bencode Decoder ────────────────────────────────────────────────────────
+// ─── Bencode Decoder ──────────────────────────────────────────────────────────
 
-private class Decoder(private val it: Iterator<BencodeParser.Token>) {
-    fun decodeDict(): Map<String, BencodeNode> {
-        val map = LinkedHashMap<String, BencodeNode>()
+private class Decoder(private val it: Iterator<Tokenizer.Token>) {
+    fun decodeDict(): Map<String, Node> {
+        val map = LinkedHashMap<String, Node>()
         while (it.hasNext()) {
             val t = it.next()
-            if (t == BencodeParser.Token.BEnd) break
-            val key = (t as BencodeParser.Token.BStr).bytes.toString(Charsets.ISO_8859_1)
+            if (t == Tokenizer.Token.BEnd) break
+            val key = (t as Tokenizer.Token.BStr).bytes.toString(Charsets.ISO_8859_1)
             map[key] = decodeNext()
         }
         return map
     }
 
-    private fun decodeNext(): BencodeNode {
+    private fun decodeNext(): Node {
         return when (val t = it.next()) {
-            is BencodeParser.Token.BStr -> BencodeNode.Str(t.bytes)
-            is BencodeParser.Token.BInt -> BencodeNode.Int(t.value)
-            BencodeParser.Token.BListStart -> {
-                val list = mutableListOf<BencodeNode>()
+            is Tokenizer.Token.BStr -> Node.Str(t.bytes)
+            is Tokenizer.Token.BInt -> Node.Int(t.value)
+            Tokenizer.Token.BListStart -> {
+                val items = mutableListOf<Node>()
                 while (it.hasNext()) {
                     val next = it.next()
-                    if (next == BencodeParser.Token.BEnd) break
+                    if (next == Tokenizer.Token.BEnd) break
                     it.previous()
-                    list.add(decodeNext())
+                    items.add(decodeNext())
                 }
-                BencodeNode.List(list)
+                Node.BList(items)
             }
-            BencodeParser.Token.BDictStart -> BencodeNode.Dict(decodeDict())
-            BencodeParser.Token.BEnd -> BencodeNode.Dict(emptyMap())
+            Tokenizer.Token.BDictStart -> Node.Dict(decodeDict())
+            Tokenizer.Token.BEnd -> Node.Dict(emptyMap())
         }
     }
 }
 
-private fun <T> Iterator<T>.previous() {} // no-op put-back for end-of-list detection
+private fun <T> Iterator<T>.previous() {} // no-op put-back
 
-private sealed class BencodeNode {
-    abstract val string: String
-    abstract val integer: Long
-    abstract val bytes: ByteArray
-    abstract val list: List<BencodeNode>
-    abstract val asDict: Map<String, BencodeNode>
+// ─── Bencode Node Types ───────────────────────────────────────────────────────
 
-    class Str(val bytes_: ByteArray) : BencodeNode() {
-        override val bytes: ByteArray = bytes_
-        override val string: String = bytes_.toString(Charsets.ISO_8859_1)
-        override val integer: Long get() = string.toLong()
-        override val list: List<BencodeNode> get() = throw IllegalStateException("Not a list")
-        override val asDict: Map<String, BencodeNode> get() = throw IllegalStateException("Not a dict")
+private sealed class Node {
+    abstract val value: String?
+    abstract val intValue: Long?
+    abstract val items: List<Node>?
+    abstract val entries: Map<String, Node>?
+
+    class Str(val bytes: ByteArray) : Node() {
+        override val value: String? = bytes.toString(Charsets.ISO_8859_1)
+        override val intValue: Long? = value?.toLongOrNull()
+        override val items: List<Node>? get() = null
+        override val entries: Map<String, Node>? get() = null
     }
-    class Int(val value: Long) : BencodeNode() {
-        override val bytes: ByteArray get() = value.toString().toByteArray()
-        override val string: String get() = value.toString()
-        override val integer: Long get() = value
-        override val list: List<BencodeNode> get() = throw IllegalStateException("Not a list")
-        override val asDict: Map<String, BencodeNode> get() = throw IllegalStateException("Not a dict")
+    class Int(val intVal: Long) : Node() {
+        override val value: String? get() = intVal.toString()
+        override val intValue: Long? get() = intVal
+        override val items: List<Node>? get() = null
+        override val entries: Map<String, Node>? get() = null
     }
-    class List(val list_: List<BencodeNode>) : BencodeNode() {
-        override val bytes: ByteArray get() = throw IllegalStateException("Not bytes")
-        override val string: String get() = throw IllegalStateException("Not a string")
-        override val integer: Long get() = throw IllegalStateException("Not an int")
-        override val list: List<BencodeNode> get() = list_
-        override val asDict: Map<String, BencodeNode> get() = throw IllegalStateException("Not a dict")
+    class BList(val items_: List<Node>) : Node() {
+        override val value: String? get() = null
+        override val intValue: Long? get() = null
+        override val items: List<Node>? = items_
+        override val entries: Map<String, Node>? get() = null
     }
-    class Dict(val dict: Map<String, BencodeNode>) : BencodeNode() {
-        override val bytes: ByteArray get() = throw IllegalStateException("Not bytes")
-        override val string: String get() = throw IllegalStateException("Not a string")
-        override val integer: Long get() = throw IllegalStateException("Not an int")
-        override val list: List<BencodeNode> get() = throw IllegalStateException("Not a list")
-        override val asDict: Map<String, BencodeNode> get() = dict
+    class Dict(val entries_: Map<String, Node>) : Node() {
+        override val value: String? get() = null
+        override val intValue: Long? get() = null
+        override val items: List<Node>? get() = null
+        override val entries: Map<String, Node>? = entries_
     }
 }
 
@@ -277,7 +300,7 @@ private sealed class BencodeNode {
 object BencodeEncoder {
     /**
      * Encode the info dict to canonical bencode bytes for info-hash.
-     * The info dict must be encoded in deterministic (sorted) key order.
+     * Keys must be encoded in sorted order for determinism.
      */
     fun encodeInfo(info: TorrentInfo): ByteArray {
         val out = StringBuilder()
@@ -285,74 +308,36 @@ object BencodeEncoder {
         encodeStr(out, "name")
         encodeStrContent(out, info.name)
 
-        // Piece length
-        info.pieceLength?.let {
-            encodeStr(out, "piece length")
-            encodeInt(out, it)
-        }
+        info.pieceLength?.let { encodeInt(out, "piece length", it) }
+        info.metaVersion?.let { encodeInt(out, "meta version", it.toLong()) }
 
-        // Meta version (v2 indicator)
-        info.metaVersion?.let {
-            encodeStr(out, "meta version")
-            encodeInt(out, it.toLong())
-        }
-
-        // v1 piece hashes
         if (info.pieces.pieceHashes.isNotEmpty()) {
             encodeStr(out, "pieces")
-            val hex = info.pieces.pieceHashes.joinToString("")
-            encodeStrContent(out, hex)
+            encodeStrContent(out, info.pieces.pieceHashes.joinToString(""))
         }
-
-        // v2 piece hash tree root
-        info.pieces.rootSha256?.let {
-            encodeStr(out, "sha256")
-            encodeStrContent(out, it)
-        }
-
-        // v1 single file length
-        info.length?.let {
-            encodeStr(out, "length")
-            encodeInt(out, it)
-        }
-
-        // v2 file tree
+        info.pieces.rootSha256?.let { encodeStr(out, "sha256"); encodeStrContent(out, it) }
+        info.length?.let { encodeInt(out, "length", it) }
         info.fileTree?.let { ft ->
             encodeStr(out, "file tree")
             encodeFileTree(out, ft)
         }
-
-        // v1 multi-file file list
         info.files?.let { fl ->
             encodeStr(out, "files")
             out.append("l")
             fl.forEach { entry ->
                 out.append("d")
-                encodeStr(out, "length")
-                encodeInt(out, entry.length)
+                encodeStr(out, "length"); encodeInt(out, entry.length)
                 encodeStr(out, "path")
                 out.append("l")
-                entry.path.forEach { part -> encodeStrContent(out, part) }
+                entry.path.forEach { encodeStrContent(out, it) }
                 out.append("e")
-                entry.md5sum?.let {
-                    encodeStr(out, "md5sum")
-                    encodeStrContent(out, it)
-                }
+                entry.md5sum?.let { encodeStr(out, "md5sum"); encodeStrContent(out, it) }
                 out.append("e")
             }
             out.append("e")
         }
-
-        // v1 root tree (for hybrid)
-        info.sha1RootTree?.let {
-            encodeStr(out, "sha1 root tree")
-            encodeStrContent(out, it)
-        }
-
-        info.private?.let {
-            encodeStr(out, "private")
-            encodeInt(out, it.toLong())
-        }
+        info.sha1RootTree?.let { encodeStr(out, "sha1 root tree"); encodeStrContent(out, it) }
+        info.private?.let { encodeInt(out, "private", it.toLong()) }
 
         out.append("e")
         return out.toString().toByteArray(Charsets.UTF_8)
@@ -363,11 +348,15 @@ object BencodeEncoder {
     }
 
     private fun encodeStrContent(sb: StringBuilder, s: String) {
-        // Bencode strings are raw bytes in UTF-8
         sb.append(s.length).append(":").append(s)
     }
 
     private fun encodeInt(sb: StringBuilder, n: Long) {
+        sb.append("i").append(n).append("e")
+    }
+
+    private fun encodeInt(sb: StringBuilder, key: String, n: Long) {
+        encodeStr(sb, key)
         sb.append("i").append(n).append("e")
     }
 
@@ -377,14 +366,7 @@ object BencodeEncoder {
             encodeStr(sb, name)
             when (node) {
                 is FileTreeNode.File -> {
-                    sb.append("d")
-                    encodeStr(sb, "length")
-                    encodeInt(sb, node.length)
-                    node.piecesRoot?.let {
-                        encodeStr(sb, "pieces (v2)")
-                        encodeStrContent(sb, it)
-                    }
-                    sb.append("e")
+                    sb.append("d6:lengthi").append(node.length).append("ee")
                 }
                 is FileTreeNode.Directory -> {
                     val sub = StringBuilder()
@@ -392,14 +374,7 @@ object BencodeEncoder {
                         encodeStr(sub, nk)
                         when (nv) {
                             is FileTreeNode.File -> {
-                                sub.append("d")
-                                encodeStr(sub, "length")
-                                encodeInt(sub, nv.length)
-                                nv.piecesRoot?.let {
-                                    encodeStr(sub, "pieces (v2)")
-                                    encodeStrContent(sub, it)
-                                }
-                                sub.append("e")
+                                sub.append("d6:lengthi").append(nv.length).append("ee")
                             }
                             is FileTreeNode.Directory -> {
                                 val sub2 = StringBuilder()
@@ -407,18 +382,10 @@ object BencodeEncoder {
                                     encodeStr(sub2, nnk)
                                     when (nnv) {
                                         is FileTreeNode.File -> {
-                                            sub2.append("d")
-                                            encodeStr(sub2, "length")
-                                            encodeInt(sub2, nnv.length)
-                                            nnv.piecesRoot?.let {
-                                                encodeStr(sub2, "pieces (v2)")
-                                                encodeStrContent(sub2, it)
-                                            }
-                                            sub2.append("e")
+                                            sub2.append("d6:lengthi").append(nnv.length).append("ee")
                                         }
                                         is FileTreeNode.Directory -> {
-                                            // Depth limit — encode as empty dir
-                                            sub2.append("de")
+                                            sub2.append("de") // depth limit: empty dir
                                         }
                                     }
                                 }
