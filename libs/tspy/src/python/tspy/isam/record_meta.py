@@ -9,8 +9,8 @@ from __future__ import annotations
 from typing import Any, Callable, Optional
 from dataclasses import dataclass, field
 
-from ..cursor import ColumnMeta, TypeMemento, ColumnMetaThunk
-from .meta import IOMemento, iomemento_from_name
+from tspy.cursor import ColumnMeta, TypeMemento, ColumnMetaThunk
+from tspy.isam.meta import IOMemento, iomemento_from_name
 
 
 @dataclass(frozen=True)

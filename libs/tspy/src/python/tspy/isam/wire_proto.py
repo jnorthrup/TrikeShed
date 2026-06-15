@@ -8,9 +8,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from ..cursor import RowVec, _RowVec
-from .record_meta import RecordMeta
-from ..algebra import Series
+from tspy.algebra import Series
+from tspy.cursor import RowVec, _RowVec, ColumnMetaThunk, _row_vec
+from tspy.isam.record_meta import RecordMeta
 
 
 def write_to_buffer(
@@ -31,6 +31,9 @@ def write_to_buffer(
     """
     row_data = row_vec  # RowVec is Series<Join<value, thunk>>
     
+    # Clear buffer first
+    row_buf[:] = b'\x00' * len(row_buf)
+    
     for x in range(meta.size):
         col_meta: RecordMeta = meta[x]
         # row_vec[x] = Join<value, thunk>
@@ -41,13 +44,14 @@ def write_to_buffer(
         
         # Copy encoded bytes into buffer at column offset
         end_pos = pos + len(col_bytes)
+        field_size = col_meta.end - col_meta.begin
         if end_pos <= len(row_buf):
             row_buf[pos:end_pos] = col_bytes
         else:
             # Truncate if buffer too small
             row_buf[pos:] = col_bytes[:len(row_buf) - pos]
         
-        # Null-terminate variable-width fields if space permits
+        # For variable-width fields, ensure null-termination within field bounds
         if col_meta.type.network_size is None and end_pos < col_meta.end:
             if end_pos < len(row_buf):
                 row_buf[end_pos] = 0
@@ -78,9 +82,7 @@ def read_from_buffer(
         col_value = col_meta.decoder(col_bytes)
         
         # Create cell: Join<value, thunk>
-        from ..cursor import ColumnMetaThunk
         thunk: ColumnMetaThunk = lambda cm=col_meta: cm
         cells.append((col_value, thunk))
     
-    from ..cursor import _row_vec
     return _row_vec(*cells)

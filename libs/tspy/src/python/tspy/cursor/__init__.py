@@ -102,8 +102,12 @@ def row_cell(value: Any, meta: ColumnMeta) -> Join[Any, ColumnMetaThunk]:
 def _row_vec(*cells: Join[Any, ColumnMetaThunk]) -> _RowVec:
     """Internal: Construct RowVec from cells — returns Series<Join<Any, ColumnMetaThunk>>"""
     # Handle both row_vec(cell1, cell2, ...) and row_vec((cell1, cell2, ...))
+    # A cell is Join<value, thunk> = tuple of length 2
+    # A collection of cells would be tuple/list of length != 2
     if len(cells) == 1 and isinstance(cells[0], (tuple, list)):
-        cells = tuple(cells[0])
+        # If it's a tuple of length 2, it's a single cell, not a collection
+        if not (isinstance(cells[0], tuple) and len(cells[0]) == 2 and callable(cells[0][1])):
+            cells = tuple(cells[0])
     return _s_(*cells)
 
 

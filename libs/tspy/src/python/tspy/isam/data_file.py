@@ -9,12 +9,12 @@ from __future__ import annotations
 import os
 from typing import Any, Callable, Dict, Iterable, Optional
 
-from ..algebra import Series, s_
-from ..cursor import RowVec, _RowVec, Cursor, _Cursor, row_cell, ColumnMeta, row_vec, cursor
-from .meta import IOMemento
-from .record_meta import RecordMeta
-from .meta_file import IsamMetaFileReader
-from .wire_proto import write_to_buffer, read_from_buffer
+from tspy.algebra import Series, s_
+from tspy.cursor import RowVec, _RowVec, Cursor, _Cursor, row_cell, ColumnMeta, row_vec, cursor, meta as cursor_meta
+from tspy.isam.meta import IOMemento
+from tspy.isam.record_meta import RecordMeta
+from tspy.isam.meta_file import IsamMetaFileReader
+from tspy.isam.wire_proto import write_to_buffer, read_from_buffer
 
 
 class IsamDataFile:
@@ -105,7 +105,7 @@ class IsamDataFile:
         return self._size
     
     # Cursor range view
-    def range(self, start: int, end: int) -> '_Cursor':
+    def range(self, start: int, end: int) -> _Cursor:
         """Return range view as Cursor."""
         count = max(0, min(end, self._size) - start)
         rows = [self[start + i] for i in range(count)]
@@ -114,13 +114,12 @@ class IsamDataFile:
     # Lazy projection (alpha)
     def alpha(self, xform: Callable[[_RowVec], Any]) -> Series:
         """Lazy map over rows."""
-        from ..algebra import Series
         return Series(self._size, lambda i: xform(self[i]))
     
     @classmethod
     def write(
         cls,
-        cursor: _Cursor,
+        cursor_obj: _Cursor,
         datafilename: str,
         varchars: Dict[str, int] = {},
         metafile_filename: Optional[str] = None,
@@ -129,7 +128,7 @@ class IsamDataFile:
         Write cursor to ISAM data file and metafile.
         
         Args:
-            cursor: Cursor = Series<RowVec> to write
+            cursor_obj: Cursor = Series<RowVec> to write
             datafilename: Output data file path
             varchars: Variable-length column sizes {col_name: size}
             metafile_filename: Optional custom metafile path
@@ -139,20 +138,21 @@ class IsamDataFile:
         """
         metafile = metafile_filename or f"{datafilename}.meta"
         
-        # Sanitize and write metafile
-        meta = IsamMetaFileReader.write(metafile, cursor[0].meta() if hasattr(cursor[0], 'meta') else 
-                                        Series(cursor[0].size, lambda c: cursor[0][c][1]()), varchars)
+        # Sanitize and write metafile - extract column metadata from first row
+        first_row = cursor_obj[0]
+        col_metas = [first_row[c][1]() for c in range(first_row.size)]
+        meta = IsamMetaFileReader.write(metafile, s_(*col_metas), varchars)
         
-        recordlen = meta[-1].end
+        recordlen = meta[meta.size - 1].end
         
         # Write data file
         with open(datafilename, 'wb') as f:
             row_buf = bytearray(recordlen)
-            for row in cursor:
+            for row in cursor_obj:
                 write_to_buffer(row, row_buf, meta)
                 f.write(row_buf)
         
-        return meta
+        return IsamMetaFileReader(metafile)
     
     @classmethod
     def append(
@@ -192,7 +192,7 @@ class IsamDataFile:
             meta = IsamMetaFileReader.write(metafile, s_(*col_metas), varchars)
             rows = rows_list  # Use collected rows
         
-        recordlen = meta[-1].end
+        recordlen = meta[meta.size - 1].end
         
         # Append to data file
         with open(datafilename, 'ab') as f:

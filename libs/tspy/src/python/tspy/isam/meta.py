@@ -10,8 +10,32 @@ from enum import Enum
 from typing import Any, Callable, Optional
 import struct
 
-from ...algebra import Series
-from ...cursor import ColumnMeta, TypeMemento, ColumnMetaThunk
+from tspy.algebra import Series
+from tspy.cursor import ColumnMeta, TypeMemento, ColumnMetaThunk
+
+
+# Fixed network sizes (None = variable) - defined outside Enum to avoid becoming enum member
+_IOMemento_SIZES = {
+    "IoBoolean": 1,
+    "IoByte": 1,
+    "IoUByte": 1,
+    "IoShort": 2,
+    "IoUShort": 2,
+    "IoInt": 4,
+    "IoUInt": 4,
+    "IoLong": 8,
+    "IoULong": 8,
+    "IoFloat": 4,
+    "IoDouble": 8,
+    "IoLocalDate": 8,
+    "IoInstant": 12,
+    "IoString": None,
+    "IoCharSeries": None,
+    "IoByteArray": None,
+    "IoNothing": 0,
+    "IoArray": None,
+    "IoObject": None,
+}
 
 
 class IOMemento(Enum):
@@ -39,32 +63,9 @@ class IOMemento(Enum):
     IoArray = "array"
     IoObject = "object"
 
-    # Fixed network sizes (None = variable)
-    _SIZES = {
-        IoBoolean: 1,
-        IoByte: 1,
-        IoUByte: 1,
-        IoShort: 2,
-        IoUShort: 2,
-        IoInt: 4,
-        IoUInt: 4,
-        IoLong: 8,
-        IoULong: 8,
-        IoFloat: 4,
-        IoDouble: 8,
-        IoLocalDate: 8,
-        IoInstant: 12,
-        IoString: None,
-        IoCharSeries: None,
-        IoByteArray: None,
-        IoNothing: 0,
-        IoArray: None,
-        IoObject: None,
-    }
-
     @property
     def network_size(self) -> Optional[int]:
-        return self._SIZES[self]
+        return _IOMemento_SIZES[self.name]
 
     @property
     def kind(self) -> int:

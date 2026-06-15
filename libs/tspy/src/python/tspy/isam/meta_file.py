@@ -9,11 +9,11 @@ from __future__ import annotations
 import re
 from typing import Any, Dict, List, Optional, Tuple
 
-from ..algebra import Series, s_
-from ..cursor import ColumnMeta, ColumnMetaThunk
-from .meta import IOMemento, iomemento_from_name
-from .record_meta import RecordMeta
-from .wire_proto import read_from_buffer, write_to_buffer
+from tspy.algebra import Series, s_
+from tspy.cursor import ColumnMeta, ColumnMetaThunk
+from tspy.isam.meta import IOMemento, iomemento_from_name
+from tspy.isam.record_meta import RecordMeta
+from tspy.isam.wire_proto import read_from_buffer, write_to_buffer
 
 
 class IsamMetaFileReader:
@@ -40,7 +40,7 @@ class IsamMetaFileReader:
     def recordlen(self) -> int:
         if self._recordlen is None:
             self._load()
-        return self._recordlen
+        return self._recordlen or 0
     
     @property
     def constraints(self) -> Series[RecordMeta]:
@@ -101,7 +101,7 @@ class IsamMetaFileReader:
             record_metas.append(record_meta)
         
         self._constraints = s_(*record_metas)
-        self._recordlen = self._constraints[-1].end if self._constraints.size > 0 else 0
+        self._recordlen = self._constraints[self._constraints.size - 1].end if self._constraints.size > 0 else 0
     
     def _parse_groups_line(self, line: str, col_count: int) -> Series[Tuple[int, str]]:
         """
