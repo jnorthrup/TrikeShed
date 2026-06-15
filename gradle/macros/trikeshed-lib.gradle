@@ -322,7 +322,7 @@ switch (project.path) {
     case ":libs:forge-ui":
         // Common only needs Compose, not the TrikeShed root project. TrikeShed core
         // is JVM-only (multiplatform targets that don't exist in the root project).
-        kmpHost(datetimeMain: true, rootMode: "none")
+        kmpJvm(rootMode: "none", coroutinesMain: true, datetimeMain: true)
         def forgeUiKotlin = extensions.getByName("kotlin")
         def forgeUiSets = forgeUiKotlin.sourceSets
         forgeUiSets.getByName("commonMain").dependencies {
@@ -348,12 +348,7 @@ switch (project.path) {
             implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
             implementation("org.jetbrains.kotlin:kotlin-reflect:2.4.0")
         }
-        forgeUiSets.getByName("jsMain").dependencies {
-            // Compose web targets only — no DesktopApplication entry
-            implementation("org.jetbrains.compose.web:web-core:1.7.3")
-            // web-svg pulls html-svg (browser-only) — must stay in jsMain
-            implementation("org.jetbrains.compose.web:web-svg:1.7.3")
-        }
+        // Remove jsMain dependencies - forge-ui is JVM-only for TrikeShed core
         break
     case ":libs:concurrency":
         kmpHost()

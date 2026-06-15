@@ -1,4 +1,4 @@
-package org.xvm.activejs
+package borg.trikeshed.activejs
 
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ReceiveChannel
@@ -66,7 +66,7 @@ actual enum class PointcutFacet {
     SymbolName,
     TypeInfo,
     ClassfileCoordinate,
-    XvmCoordinate,
+    TypeCoordinate,
     PointcutKind,
     StringPool,
     Wireproto,
@@ -79,7 +79,7 @@ actual enum class PointcutFacet {
     ClassfileTaxonomy,
     EdgeTaxonomy,
     CrmsDomain,
-    XSrcFile,
+    SrcFile,
 }
 
 // ── TypedefResolutionSeries ─────────────────────────────────────────────────
@@ -132,7 +132,7 @@ actual class ClassFileTaxonomy {
               "classfileCoord": "${row.classfileCoord}",
               "cpIndex": ${row.cpIndex},
               "descriptor": "${row.descriptor}",
-              "xvmTypeInfo": "${row.xvmTypeInfo}",
+              "typeInfo": "${row.typeInfo}",
               "pointcutKind": ${row.pointcutKind},
               "poolId": ${row.poolId},
               "activeJsFacet": "${row.activeJsFacet}"
@@ -170,7 +170,7 @@ actual class RowVec(private val row: CoordinateRow) {
             3 -> row.classfileCoord
             4 -> row.cpIndex
             5 -> row.descriptor
-            6 -> row.xvmTypeInfo
+            6 -> row.typeInfo
             7 -> row.pointcutKind
             8 -> row.poolId
             9 -> row.activeJsFacet.name

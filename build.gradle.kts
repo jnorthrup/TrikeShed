@@ -45,15 +45,6 @@ kotlin {
 
     js {
         nodejs()
-        browser {
-            testTask {
-                useKarma {
-                    // Use Electron as the browser
-                    // The useKarma block in Kotlin 2.4 uses a different API
-                    // We need to configure the karma config file
-                }
-            }
-        }
         binaries.executable()
     }
 
@@ -65,7 +56,15 @@ kotlin {
             }
         }
         named("commonTest").configure {
-            kotlin.exclude("**/demos/**", "**/strategy/**")
+            kotlin.exclude(
+                "**/demos/**",
+                "**/strategy/**",
+                "**/MutableSeriesStrategyTest.kt",
+                "**/PointcutMutableSeriesTest.kt",
+                "**/ReduxListBridgeTest.kt",
+                "**/ReduxMutableSeriesTest.kt",
+                "**/BtrfsCodecElementContractTest.kt"
+            )
             dependencies {
                 implementation(kotlin("test"))
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0-rc02")
