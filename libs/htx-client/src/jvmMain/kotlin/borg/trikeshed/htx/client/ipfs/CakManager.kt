@@ -2,17 +2,20 @@ package borg.trikeshed.htx.client.ipfs
 
 import borg.trikeshed.context.AsyncContextElement
 import borg.trikeshed.context.ElementState
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlin.coroutines.CoroutineContext
 
 /**
  * Content-Addressable Keys (CAK) Manager — JVM Implementation.
  */
 class CakManager(
     private val blockStore: BlockStore,
+    private val dhtTransport: DhtTransport? = null,
     parentJob: Job? = null,
 ) : AsyncContextElement(ElementState.CREATED, parentJob) {
 
-    override val key: kotlinx.coroutines.CoroutineContext.Key<*> get() = CakHtxKey
+    override val key: CoroutineContext.Key<*> get() = CakHtxKey
 
     suspend fun put(data: ByteArray): CID {
         val cid = CID.sha256(data)
@@ -28,11 +31,22 @@ class CakManager(
 
     suspend fun delete(cid: CID) = blockStore.put(cid, byteArrayOf())
 
-    fun provide(cid: CID, address: String = "local") { /* DHT integration */ }
+    /** Announce this node as a provider for the given CID via local DHT. */
+    suspend fun provide(cid: CID, address: String = "local") {
+        val dht = DhtService()
+        dht.announceProvider(cid, address)
+    }
 
-    suspend fun findProviders(cid: CID): List<String> = emptyList()
+    /** Uses the embedded DhtService for local provider lookups. */
+    suspend fun findProviders(cid: CID): List<String> {
+        val dht = DhtService()
+        return dht.findProviders(cid)
+    }
 
-    suspend fun findClosestNodes(target: CID, k: Int = 20): List<Any> = emptyList()
+    suspend fun findClosestNodes(target: CID, k: Int = 20): List<NodeInfo> {
+        val dhtService = DhtService()
+        return dhtService.findNode(NodeId.fromCID(target)).take(k)
+    }
 
     suspend fun fetch(cid: CID): ByteArray = blockStore.get(cid) ?: byteArrayOf()
 
@@ -40,9 +54,20 @@ class CakManager(
 
     fun handleBitswapMessage(message: Any) {}
 
-    suspend fun importCar(data: ByteArray): CarParseResult = CarParseResult(emptyList(), 0, 2, CID(byteArrayOf()))
+    suspend fun importCar(data: ByteArray): CarParseResult {
+        return try {
+            CarParser.parse(data)
+        } catch (e: Exception) {
+            CarParseResult(emptyList(), emptyList(), 2, null, CID(byteArrayOf()))
+        }
+    }
 
-    suspend fun exportCar(rootCids: List<CID>, version: Int = 2): ByteArray = byteArrayOf()
+    suspend fun exportCar(rootCids: List<CID>, version: Int = 2): ByteArray {
+        val blocks = rootCids.mapNotNull { cid ->
+            blockStore.get(cid)?.let { CarBlock(cid, it) }
+        }
+        return CarWriter.write(blocks, rootCids, version)
+    }
 
     suspend fun pin(cid: CID, address: String = "local") {
         if (!has(cid)) fetch(cid)
@@ -76,19 +101,22 @@ class CakManager(
     val components: Components = Components(blockStore)
 }
 
-object CakHtxKey : kotlinx.coroutines.CoroutineContext.Key<CakManager>
+object CakHtxKey : CoroutineContext.Key<CakManager>
 
 object CakManagerFactory {
-    suspend fun create(
+    fun create(
         blockStore: BlockStore = MemoryBlockStore(),
+        dhtTransport: DhtTransport? = null,
         parentJob: Job? = null,
-    ): CakManager = CakManager(blockStore, parentJob)
+    ): CakManager = CakManager(blockStore, dhtTransport, parentJob)
 
+    /** Install a CAK manager as a coroutine-scoped context element. */
     suspend fun CoroutineScope.installCakManager(
         blockStore: BlockStore = MemoryBlockStore(),
+        dhtTransport: DhtTransport? = null,
     ): CakManager {
-        val manager = create(blockStore, coroutineContext[Job])
+        val manager = create(blockStore, dhtTransport, coroutineContext[Job])
         manager.open()
-        return withContext(manager) { manager }
+        return manager
     }
 }

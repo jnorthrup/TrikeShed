@@ -85,11 +85,3 @@ class IpfsIntegrationDemo {
         println("═══════════════════════════════════════════════════════════════")
     }
 }
-
-class MemoryBlockStore : BlockStore {
-    private val store = mutableMapOf<String, ByteArray>()
-    private val mutex = Mutex()
-    
-    override suspend fun put(cid: CID, data: ByteArray) = mutex.withLock { store[cid.hex()] = data }
-    override suspend fun get(cid: CID): ByteArray? = mutex.withLock { store[cid.hex()] }
-}

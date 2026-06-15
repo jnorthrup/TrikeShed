@@ -32,13 +32,13 @@ object CarParser {
         val blocks = mutableListOf<CarBlock>()
         while (buffer.remaining() > 0) {
             if (version == CAR_VERSION_2.toLong() && buffer.remaining() > 0) {
-                val pos = buffer.position
+                val pos = buffer.position()
                 val marker = readVarint(buffer)
                 if (marker == 0xFFFFFFFFL) {
-                    buffer.position = pos
+                    buffer.position(pos)
                     break
                 }
-                buffer.position = pos
+                buffer.position(pos)
             }
 
             try {
@@ -63,7 +63,7 @@ object CarParser {
         var result = 0L
         var shift = 0
         while (true) {
-            val b = (buffer.get() and 0xFF).toLong()
+            val b = (buffer.get().toInt() and 0xFF).toLong()
             result = result or ((b and 0x7F) shl shift)
             if ((b and 0x80) == 0L) break
             shift += 7
@@ -104,7 +104,7 @@ object CarParser {
         val output = ByteArrayOutputStream()
         var v = value
         while (v >= 0x80) {
-            val b: Int = ((v and 0x7F | 0x80).toByte()).toInt()
+            val b: Int = ((v and 0x7FL or 0x80L).toByte()).toInt()
             output.write(b)
             v = v ushr 7
         }
@@ -149,7 +149,7 @@ object CarWriter {
     private fun writeVarint(output: ByteArrayOutputStream, value: Long) {
         var v = value
         while (v >= 0x80) {
-            val b: Int = ((v and 0x7F | 0x80).toByte()).toInt()
+            val b: Int = ((v and 0x7FL or 0x80L).toByte()).toInt()
             output.write(b)
             v = v ushr 7
         }

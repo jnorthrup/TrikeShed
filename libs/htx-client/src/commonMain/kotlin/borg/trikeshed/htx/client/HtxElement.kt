@@ -42,7 +42,7 @@ data class HtxClientRequest(
 /**
  * HTTP/HTTPS client element with TLS support.
  */
-class HtxElement(
+open class HtxElement(
     val baseUrl: String = "http://127.0.0.1",
     private val blockStore: BlockStore? = null,
     val tlsConfig: TlsConfig? = null,

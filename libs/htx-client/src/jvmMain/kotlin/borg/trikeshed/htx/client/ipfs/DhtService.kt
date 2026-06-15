@@ -5,57 +5,29 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import java.math.BigInteger
 import java.net.InetSocketAddress
-import java.util.Random
 
 /**
  * DHT Service — full Kademlia implementation with iterative routing.
+ * NodeId and NodeInfo are in commonMain (CidAndStore.kt).
  */
 class DhtService(
     private val localNodeId: NodeId = NodeId.random(),
     private val transport: DhtTransport? = null,
 ) {
-    
+
     private val providers = mutableMapOf<String, MutableSet<String>>()
     private val providersMutex = Mutex()
-    
+
     private val contacts = mutableMapOf<String, NodeInfo>()
     private val contactsMutex = Mutex()
-    
+
     private val routingTable = RoutingTable(localNodeId)
-
-    data class NodeId(val bytes: ByteArray) {
-        companion object {
-            fun random(): NodeId = NodeId(ByteArray(20).also { Random().nextBytes(it) })
-            fun fromBigInteger(bi: BigInteger): NodeId {
-                val bytes = bi.toByteArray()
-                return if (bytes.size == 20) NodeId(bytes)
-                else if (bytes.size > 20) NodeId(bytes.copyOfRange(bytes.size - 20, bytes.size))
-                else NodeId(ByteArray(20 - bytes.size) + bytes)
-            }
-        }
-        
-        fun xorDistance(other: NodeId): BigInteger {
-            val thisBi = BigInteger(1, bytes)
-            val otherBi = BigInteger(1, other.bytes)
-            return (thisBi xor otherBi).abs()
-        }
-        
-        fun bucketIndex(other: NodeId): Int = xorDistance(other).bitLength() - 1
-        override fun toString(): String = bytes.joinToString("") { "%02x".format(it) }
-    }
-
-    data class NodeInfo(
-        val id: NodeId,
-        val address: InetSocketAddress,
-        var lastSeen: Long = System.currentTimeMillis(),
-    )
 
     inner class RoutingTable(private val localId: NodeId) {
         private val buckets = Array(160) { mutableListOf<NodeInfo>() }
         private val k = 20
-        
+
         fun addNode(node: NodeInfo) {
             val bucketIdx = localId.bucketIndex(node.id)
             val bucket = buckets[bucketIdx]
@@ -64,7 +36,7 @@ class DhtService(
                 bucket.add(node)
             }
         }
-        
+
         fun findClosest(target: NodeId, count: Int = 20): List<NodeInfo> {
             return buckets.flatMap { it }
                 .sortedBy { it.id.xorDistance(target) }
@@ -88,18 +60,20 @@ class DhtService(
     suspend fun findNode(target: NodeId): List<NodeInfo> = routingTable.findClosest(target)
 
     suspend fun handleFindNode(requester: NodeId, target: NodeId): List<NodeInfo> {
-        contactsMutex.withLock { contacts[requester.toString()] = NodeInfo(requester, InetSocketAddress("unknown", 0)) }
+        contactsMutex.withLock { contacts[requester.toString()] = NodeInfo(requester, InetSocketAddress.createUnresolved("unknown", 0)) }
         return routingTable.findClosest(target)
     }
 
     suspend fun handleFindProviders(requester: NodeId, cid: CID): List<String> {
-        contactsMutex.withLock { contacts[requester.toString()] = NodeInfo(requester, InetSocketAddress("unknown", 0)) }
+        contactsMutex.withLock { contacts[requester.toString()] = NodeInfo(requester, InetSocketAddress.createUnresolved("unknown", 0)) }
         return providersMutex.withLock { providers[cid.hex()]?.toList() ?: emptyList() }
     }
 
     suspend fun handlePing(requester: NodeId): Boolean {
-        contactsMutex.withLock { contacts.getOrPut(requester.toString()) { NodeInfo(requester, InetSocketAddress("unknown", 0)) }
-            .lastSeen = System.currentTimeMillis() }
+        contactsMutex.withLock {
+            contacts.getOrPut(requester.toString()) { NodeInfo(requester, InetSocketAddress.createUnresolved("unknown", 0)) }
+                .lastSeen = System.currentTimeMillis()
+        }
         return true
     }
 

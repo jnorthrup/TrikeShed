@@ -1,14 +1,12 @@
 package borg.trikeshed.htx.client.ipfs
 
-interface DhtTransport {
-    suspend fun announceProviderRemote(cid: CID, address: String)
-    suspend fun findProvidersRemote(cid: CID): List<String>
-    suspend fun findNodeRemote(target: DhtService.NodeId): List<DhtService.NodeInfo>
-}
-
+/**
+ * Stub DHT Transport — in-process registry for testing and local-only operation.
+ * DhtTransport interface is in commonMain (CidAndStore.kt).
+ */
 class StubDhtTransport : DhtTransport {
     private val registry = mutableMapOf<String, MutableSet<String>>()
-    
+
     override suspend fun announceProviderRemote(cid: CID, address: String) {
         registry.computeIfAbsent(cid.hex()) { mutableSetOf() }.add(address)
     }
@@ -16,7 +14,7 @@ class StubDhtTransport : DhtTransport {
     override suspend fun findProvidersRemote(cid: CID): List<String> =
         registry[cid.hex()]?.toList() ?: emptyList()
 
-    override suspend fun findNodeRemote(target: DhtService.NodeId): List<DhtService.NodeInfo> = emptyList()
+    override suspend fun findNodeRemote(target: NodeId): List<NodeInfo> = emptyList()
 }
 
 object DhtTransportFactory {

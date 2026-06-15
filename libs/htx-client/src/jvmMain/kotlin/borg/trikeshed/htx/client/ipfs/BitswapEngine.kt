@@ -152,7 +152,7 @@ class BitswapEngine(
         companion object {
             fun decode(data: ByteArray): BitswapMessage {
                 var pos = 0
-                val type = data[pos++] and 0xFF
+                val type = data[pos++].toInt() and 0xFF
                 return when (type) {
                     0x00 -> decodeWantBlock(data)
                     0x01 -> decodeWantHave(data)
@@ -165,10 +165,10 @@ class BitswapEngine(
             }
             private fun decodeWantBlock(data: ByteArray): WantBlock {
                 var pos = 1
-                val count = data[pos++] and 0xFF
+                val count = data[pos++].toInt() and 0xFF
                 val cids = mutableListOf<CID>()
                 repeat(count) {
-                    val cidLen = data[pos++] and 0xFF
+                    val cidLen = data[pos++].toInt() and 0xFF
                     cids.add(CID(data.copyOfRange(pos, pos + cidLen)))
                     pos += cidLen
                 }
@@ -176,10 +176,10 @@ class BitswapEngine(
             }
             private fun decodeWantHave(data: ByteArray): WantHave {
                 var pos = 1
-                val count = data[pos++] and 0xFF
+                val count = data[pos++].toInt() and 0xFF
                 val cids = mutableListOf<CID>()
                 repeat(count) {
-                    val cidLen = data[pos++] and 0xFF
+                    val cidLen = data[pos++].toInt() and 0xFF
                     cids.add(CID(data.copyOfRange(pos, pos + cidLen)))
                     pos += cidLen
                 }
@@ -187,26 +187,26 @@ class BitswapEngine(
             }
             private fun decodeBlock(data: ByteArray): Block {
                 var pos = 1
-                val cidLen = data[pos++] and 0xFF
+                val cidLen = data[pos++].toInt() and 0xFF
                 val cidBytes = data.copyOfRange(pos, pos + cidLen)
                 pos += cidLen
-                val dataLen = (data[pos] shl 24) | ((data[pos+1] and 0xFF) shl 16) | ((data[pos+2] and 0xFF) shl 8) | (data[pos+3] and 0xFF)
+                val dataLen = ((data[pos].toInt() and 0xFF) shl 24) or ((data[pos+1].toInt() and 0xFF) shl 16) or ((data[pos+2].toInt() and 0xFF) shl 8) or (data[pos+3].toInt() and 0xFF)
                 pos += 4
                 return Block(CID(cidBytes), data.copyOfRange(pos, pos + dataLen))
             }
             private fun decodeHave(data: ByteArray): Have {
                 var pos = 1
-                val cidLen = data[pos++] and 0xFF
+                val cidLen = data[pos++].toInt() and 0xFF
                 return Have(CID(data.copyOfRange(pos, pos + cidLen)))
             }
             private fun decodeDontHave(data: ByteArray): DontHave {
                 var pos = 1
-                val cidLen = data[pos++] and 0xFF
+                val cidLen = data[pos++].toInt() and 0xFF
                 return DontHave(CID(data.copyOfRange(pos, pos + cidLen)))
             }
             private fun decodeCancel(data: ByteArray): Cancel {
                 var pos = 1
-                val cidLen = data[pos++] and 0xFF
+                val cidLen = data[pos++].toInt() and 0xFF
                 return Cancel(CID(data.copyOfRange(pos, pos + cidLen)))
             }
         }

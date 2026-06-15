@@ -203,7 +203,9 @@ switch (project.path) {
     case ":libs:patl":
     case ":libs:ngsctp":
     case ":libs:quic":
-    // case ":libs:ipfs":  // TODO: Fix compilation errors
+    case ":libs:ipfs":
+        // IPFS uses JVM-only to avoid platform gaps
+        kmpJvm(rootMode: "none")
     case ":libs:tls":
         kmpHost(rootMode: "none")
         break
