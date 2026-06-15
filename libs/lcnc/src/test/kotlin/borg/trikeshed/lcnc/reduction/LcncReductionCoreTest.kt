@@ -240,7 +240,7 @@ class LcncReductionCoreTest {
         assertEquals(19, mapped.get(9))
 
         val filtered = carrier.filter { it % 4 == 0 }
-        assertEquals(3, filtered.size)  // 0, 4, 8
+        assertEquals(5, filtered.size)  // 0, 4, 8, 12, 16
 
         val folded = carrier.fold(0) { acc, v -> acc + v }
         assertEquals(90, folded)  // sum of 0+2+4+...+18
@@ -388,7 +388,7 @@ class LcncReductionCoreTest {
                        partials[4]]
                 )
 
-                assertEquals(merged1.sums["x"], merged2.sums["x"], 0.0001)
+                assertEquals(merged1.sums["x"]!!, merged2.sums["x"]!!, 0.0001)
             }
         }
     }

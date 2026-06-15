@@ -1,6 +1,6 @@
 package borg.trikeshed.lcnc.reduction
 
-import borg.trikeshed.cursor.*
+import borg.trikeshed.cursor.Cursor
 import borg.trikeshed.lib.*
 
 /**
@@ -28,7 +28,11 @@ object LcncReductions {
                 val map = input as? Map<String, Any> ?: emptyMap()
                 keyHierarchy.map { (map[it] as? String) ?: "" }
             }
-            override val hierarchy: KeyHierarchy<List<String>> = LcncKeyAlg.forgeKeyHierarchy(keyHierarchy)
+            override val hierarchy: KeyHierarchy<List<String>> = object : KeyHierarchy<List<String>> {
+                override val levels: List<KeyExtractor<Any, List<String>>> = emptyList()
+                override fun compositeKey(input: Any): List<List<String>> = listOf(extractor.extract(input))
+                override fun prefix(key: List<List<String>>, depth: Int): List<List<String>> = key.take(depth)
+            }
             override val order: KeyOrder<List<String>> = object : KeyOrder<List<String>> {
                 override fun compare(a: List<String>, b: List<String>): Int {
                     for (i in 0 until maxOf(a.size, b.size)) {
@@ -49,7 +53,7 @@ object LcncReductions {
         }
 
         val phaseAlg = LcncPhaseAlg.forgePhaseAlg
-        val carrierAlg = LcncCarrierAlg.seriesCarrierAlg()
+        val carrierAlg = LcncCarrierAlg.seriesCarrierAlg<Map<String, Any>>()
 
         return object : AbstractLcncReduction<List<String>, Map<String, Any>, MultiMetricAccumulator, List<CascadeOutputRow>>(
             keyAlg, valueAlg, phaseAlg, carrierAlg
@@ -58,10 +62,10 @@ object LcncReductions {
                 // Merge all partials into a single accumulator per key
                 val grouped = reduced.groupBy({ it.a }) { it.b }
                 val merged = grouped.map { (key, carrier) ->
-                    val partials = carrier.size j { i -> carrier[i] }
+                    val partials = (0 until carrier.size).map { carrier[it] }.toSeries()
                     key j valueAlg.merger.merge(partials)
                 }
-                return SeriesCarrier(merged.size j { i -> merged[i] })
+                return SeriesCarrier(merged.toSeries())
             }
 
             override fun formatOutput(reduced: Any): List<CascadeOutputRow> {
@@ -97,7 +101,7 @@ object LcncReductions {
         }
 
         val phaseAlg = LcncPhaseAlg.confixPhaseAlg
-        val carrierAlg = LcncCarrierAlg.seriesCarrierAlg()
+        val carrierAlg = LcncCarrierAlg.seriesCarrierAlg<Byte>()
 
         return object : AbstractLcncReduction<ConfixStructuralKey, Byte, TreeBuilderState, Cursor>(
             keyAlg, valueAlg, phaseAlg, carrierAlg
@@ -110,7 +114,7 @@ object LcncReductions {
                 val reduced = grouped.map { (k, carrier) ->
                     k j carrier.fold(TreeBuilderState()) { acc, _ -> acc }
                 }
-                return SeriesCarrier(reduced.size j { i -> reduced[i] })
+                return SeriesCarrier(reduced.toSeries())
             }
 
             override fun formatOutput(reduced: Any): Cursor = emptySeriesOf()
@@ -157,7 +161,7 @@ object LcncReductions {
             override val carrier: (Any) -> ReductionCarrier<TraceEvent> = { input ->
                 when (input) {
                     is Array<*> -> LcncCarrierAlg.arrayCarrier(input as Array<TraceEvent>)
-                    is RingSeries<*> -> LcncCarrierAlg.ringCarrier(input as Series<TraceEvent>, 2048)
+                    is RingSeries<*> -> LcncCarrierAlg.ringCarrier<TraceEvent>(input as Series<TraceEvent>, 2048)
                     else -> throw IllegalArgumentException("CRMS expects Array or RingSeries carrier")
                 }
             }
@@ -171,13 +175,13 @@ object LcncReductions {
                 val reduced = grouped.map { (hash, carrier) ->
                     hash j carrier.fold(ConflictCell.init(), valueAlg.folder)
                 }
-                return SeriesCarrier(reduced.size j { i -> reduced[i] })
+                return SeriesCarrier(reduced.toSeries())
             }
 
             override fun rereducePhase(reduced: ReductionCarrier<Join<Int, ConflictCell>>): ReductionCarrier<Join<Int, ConflictCell>> {
                 // CRMS: eigsort by depth desc
                 val sorted = reduced.toList().sortedByDescending { it.b.depth }
-                return SeriesCarrier(sorted.size j { i -> sorted[i] })
+                return SeriesCarrier(sorted.toSeries())
             }
 
             override fun formatOutput(reduced: Any): List<ConflictCell> {

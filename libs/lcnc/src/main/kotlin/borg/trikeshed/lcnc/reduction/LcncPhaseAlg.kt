@@ -30,17 +30,15 @@ interface PhaseAlg {
 }
 
 /**
- * Additional Forge phases for pipeline composition — declared as [ReductionPhase] instances
- * nested here so tests can reference them as [LcncPhaseAlg.FILTER].
- */
-object FILTER : ReductionPhase
-object PROJECT : ReductionPhase
-object JOIN : ReductionPhase
-
-/**
  * Default implementations and factories.
  */
 object LcncPhaseAlg {
+
+    /** Additional Forge phases for pipeline composition — nested here so callers
+     *  reference them as [LcncPhaseAlg.FILTER] (see LcncReductionCoreTest). */
+    object FILTER : ReductionPhase
+    object PROJECT : ReductionPhase
+    object JOIN : ReductionPhase
 
     /** Forge: MAP → REDUCE → REREDUCE (optional) → FILTER/PROJECT/JOIN. */
     val forgeTransitions = object : PhaseTransition {

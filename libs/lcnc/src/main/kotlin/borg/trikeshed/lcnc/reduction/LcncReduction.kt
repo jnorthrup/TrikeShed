@@ -18,7 +18,7 @@ data class ReductionResult<Out>(
  * @param Acc Accumulator type (reduced value, partial tree, ConflictCell)
  * @param Out Final output type (CascadeOutputRow, Cursor, List<ConflictCell>)
  */
-interface LcncReduction<K, V, Acc, Out> {
+interface LcncReduction<K : Any, V : Any, Acc : Any, Out : Any> {
 
     /** Key algebra — extraction, hierarchy, ordering. */
     val keyAlg: KeyAlg<K>
@@ -32,34 +32,37 @@ interface LcncReduction<K, V, Acc, Out> {
     /** Carrier algebra — abstract over Series/Ring/Array/Cursor. */
     val carrierAlg: CarrierAlg<V>
 
-    /** Execute reduction on a carrier. */
-    fun execute(input: ReductionCarrier<V>): Out
+    /** Execute reduction on a carrier. Accepts any carrier (cast internally to [V]). */
+    fun execute(input: ReductionCarrier<*>): Out
 
     /** Execute with phase checkpoints for inspection/debugging. */
-    fun executeWithCheckpoints(input: ReductionCarrier<V>): ReductionResult<Out>
+    fun executeWithCheckpoints(input: ReductionCarrier<*>): ReductionResult<Out>
 }
 
 /**
  * Default execution template using the four algebras.
  * Implementations can override execute/executeWithCheckpoints for custom logic.
  */
-abstract class AbstractLcncReduction<K, V, Acc, Out>(
+abstract class AbstractLcncReduction<K : Any, V : Any, Acc : Any, Out : Any>(
     override val keyAlg: KeyAlg<K>,
     override val valueAlg: ValueAlg<V, Acc>,
     override val phaseAlg: PhaseAlg,
     override val carrierAlg: CarrierAlg<V>
 ) : LcncReduction<K, V, Acc, Out> {
 
-    override fun execute(input: ReductionCarrier<V>): Out {
-        val result = executeWithCheckpoints(input)
-        return result.output
+    @Suppress("UNCHECKED_CAST")
+    override fun execute(input: ReductionCarrier<*>): Out {
+        val typed = input as ReductionCarrier<V>
+        return executeWithCheckpoints(typed).output
     }
 
-    override fun executeWithCheckpoints(input: ReductionCarrier<V>): ReductionResult<Out> {
+    @Suppress("UNCHECKED_CAST")
+    override fun executeWithCheckpoints(input: ReductionCarrier<*>): ReductionResult<Out> {
+        val typedInput = input as ReductionCarrier<V>
         val stageOutputs = mutableMapOf<ReductionPhase, Any>()
 
         // Phase 1: MAP — extract key + value
-        val mapped = mapPhase(input)
+        val mapped = mapPhase(typedInput)
         stageOutputs[ReductionPhase.MAP] = mapped
 
         // Phase 2: REDUCE — groupBy key → fold values

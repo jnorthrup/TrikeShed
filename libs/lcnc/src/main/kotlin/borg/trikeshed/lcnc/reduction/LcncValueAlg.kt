@@ -49,6 +49,8 @@ data class MultiMetricAccumulator(
     val concatBuffers: Map<String, StringBuilder> = emptyMap(),
     val firstValues: Map<String, Any?> = emptyMap(),
     val lastValues: Map<String, Any?> = emptyMap(),
+    /** Individual values accumulated for SUM — used to compute order-independent sums. */
+    val sumEntries: Map<String, List<Double>> = emptyMap(),
     // CRMS-specific
     val beforeAfterPairs: List<Pair<Any?, Any?>> = emptyList(),
     val depthSortedCells: List<ConflictCell> = emptyList()
@@ -56,7 +58,13 @@ data class MultiMetricAccumulator(
     fun with(key: String, reducer: BuiltinReducer, value: Any?): MultiMetricAccumulator {
         val numValue = (value as? Number)?.toDouble() ?: 0.0
         return when (reducer) {
-            BuiltinReducer.SUM -> copy(sums = sums + (key to (sums[key] ?: 0.0) + numValue))
+            BuiltinReducer.SUM -> {
+                // Track individual values and recompute from canonical (sorted) order
+                // so summation is independent of input ordering (IEEE-754 associativity fix).
+                val entries = (sumEntries[key] ?: emptyList()) + numValue
+                val canonicalSum = entries.sorted().reduce { a, b -> a + b }
+                copy(sums = sums + (key to canonicalSum), sumEntries = sumEntries + (key to entries))
+            }
             BuiltinReducer.COUNT -> copy(counts = counts + (key to (counts[key] ?: 0) + 1))
             BuiltinReducer.MIN -> copy(mins = mins + (key to minOf(mins[key] ?: Double.POSITIVE_INFINITY, numValue)))
             BuiltinReducer.MAX -> copy(maxs = maxs + (key to maxOf(maxs[key] ?: Double.NEGATIVE_INFINITY, numValue)))
@@ -88,16 +96,18 @@ data class ConflictCell(
 
 /**
  * Confix tree-builder accumulator. Top-level so [LcncReductionCoreTest] and the
- * ConfixReducers can reference it unqualified.
+ * ConfixReducers can reference it unqualified. [TreeNode] uses mutable children so a
+ * node referenced from `roots` (or a parent) sees children added after it was rooted.
  */
 data class TreeBuilderState(
     val stack: List<TreeNode> = emptyList(),
     val roots: List<TreeNode> = emptyList()
 ) {
-    data class TreeNode(
+    class TreeNode(
         val tag: String,
-        val children: List<TreeNode> = emptyList(),
-        val span: SpanEvent.Span? = null
+        val children: MutableList<TreeNode> = mutableListOf(),
+        val span: SpanEvent.Span? = null,
+        val depth: Int = 0
     )
 }
 
@@ -146,28 +156,30 @@ object LcncValueAlg {
             concatBuffers = mergeMaps(a.concatBuffers, b.concatBuffers) { x, y -> x.append(y) },
             firstValues = a.firstValues + b.firstValues,  // first wins
             lastValues = b.lastValues + a.lastValues,     // last wins
+            sumEntries = mergeMaps(a.sumEntries, b.sumEntries) { x, y -> x + y },
             beforeAfterPairs = a.beforeAfterPairs + b.beforeAfterPairs,
             depthSortedCells = (a.depthSortedCells + b.depthSortedCells).sortedByDescending { it.depth }
         )
     }
 
-    /** Confix: tree construction (buildTree) = fold over spans. */
+    /** Confix: tree construction (buildTree) = fold over spans. Depth-based rooting:
+     *  a span is a child of the most recent open span with strictly smaller depth; when
+     *  the stack empties (depth-0 sibling) the node becomes a root. Open spans remain
+     *  in `roots`/`children` via mutable nodes, so the final tree is complete even when
+     *  the last span is never "closed" by a successor. */
     fun confixTreeBuilder(): Folder<SpanEvent, TreeBuilderState> = Folder { acc, input ->
-        // Single-pass parent tracking using stack (O(n))
-        val node = TreeBuilderState.TreeNode(tag = "span", span = input.span)
+        val node = TreeBuilderState.TreeNode(tag = "span", span = input.span, depth = input.depth)
         val newStack = acc.stack.toMutableList()
         val newRoots = acc.roots.toMutableList()
-
-        while (newStack.isNotEmpty() && newStack.last().span!!.endInclusive <= input.span.start) {
-            val closed = newStack.removeAt(newStack.lastIndex)
-            if (newStack.isEmpty()) {
-                newRoots.add(closed)
-            } else {
-                val parent = newStack.last()
-                newStack[newStack.lastIndex] = parent.copy(children = parent.children + closed)
-            }
+        // pop closed siblings/descendants (depth >= input.depth)
+        while (newStack.isNotEmpty() && newStack.last().depth >= input.depth) {
+            newStack.removeAt(newStack.lastIndex)
         }
-
+        if (newStack.isEmpty()) {
+            newRoots.add(node)
+        } else {
+            newStack.last().children.add(node)
+        }
         newStack.add(node)
         TreeBuilderState(newStack, newRoots)
     }

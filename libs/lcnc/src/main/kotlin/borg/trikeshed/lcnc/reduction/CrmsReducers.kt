@@ -163,7 +163,7 @@ object CrmsReducers {
                 val arr = groups.getOrPut(key) { IntArray(16) }
                 if (count >= arr.size) {
                     val newArr = IntArray(arr.size * 2)
-                    System.arraycopy(arr, 0, newArr, 0, arr.size)
+                    java.lang.System.arraycopy(arr, 0, newArr, 0, arr.size)
                     groups[key] = newArr
                     newArr[count] = i
                 } else {
@@ -193,7 +193,7 @@ object CrmsReducers {
             windows.getOrPut(windowKey) { mutableListOf() }.add(event)
 
             // Emit completed windows
-            val now = System.nanoTime()
+            val now = java.lang.System.nanoTime()
             val completed = windows.keys.filter { it + windowDurationNanos <= now }.sorted()
             return completed.map { key ->
                 val events = windows.remove(key)!!

@@ -29,7 +29,7 @@ object ConfixReducers {
         private var escapeNext = false
 
         override fun fold(acc: List<ScanToken>, input: Byte): List<ScanToken> {
-            val char = input.toChar()
+            val char = input.toInt().toChar()
             // Simplified JSON-like scanning — actual impl handles full Confix syntax
             when {
                 char == '{' || char == '[' -> {
@@ -66,21 +66,26 @@ object ConfixReducers {
     /** BuildTree: folds ScanTokens into a TreeBuilderState (Cursor). */
     class BuildTreeFolder : Folder<ScanToken, TreeBuilderState> {
         override fun fold(acc: TreeBuilderState, input: ScanToken): TreeBuilderState {
-            val node = TreeBuilderState.TreeNode(input.tag, emptyList(), input.span)
+            val node = TreeBuilderState.TreeNode(input.tag)
             val newStack = acc.stack.toMutableList()
             val newRoots = acc.roots.toMutableList()
 
             // Single-pass parent tracking using stack (O(n))
-            while (newStack.isNotEmpty() && newStack.last().span!!.endInclusive <= input.span.start) {
+            while (newStack.isNotEmpty() && newStack.last().span != null &&
+                   newStack.last().span!!.endInclusive <= (input.span?.start ?: 0)) {
                 val closed = newStack.removeAt(newStack.lastIndex)
                 if (newStack.isEmpty()) {
                     newRoots.add(closed)
                 } else {
-                    val parent = newStack.last()
-                    newStack[newStack.lastIndex] = parent.copy(children = parent.children + closed)
+                    newStack.last().children.add(closed)
                 }
             }
 
+            if (newStack.isNotEmpty()) {
+                newStack.last().children.add(node)
+            } else {
+                newRoots.add(node)
+            }
             newStack.add(node)
             return TreeBuilderState(newStack, newRoots)
         }
@@ -146,9 +151,8 @@ object ConfixReducers {
     /** Expose scanIndex as LcncReduction phase MAP output for Forge CursorSource integration. */
     fun scanIndex(): LcncReduction<ConfixStructuralKey, Byte, List<ScanToken>, List<ScanToken>> {
         val keyAlg = object : KeyAlg<ConfixStructuralKey> {
-            override val extractor: KeyExtractor<Byte, ConfixStructuralKey> = object : KeyExtractor<Byte, ConfixStructuralKey> {
-                override fun extract(input: Byte): ConfixStructuralKey = ConfixStructuralKey(0, 0, 0)
-            }
+            override val extractor: KeyExtractor<Any, ConfixStructuralKey> =
+                KeyExtractor { ConfixStructuralKey(0, 0, 0) }
             override val hierarchy: KeyHierarchy<ConfixStructuralKey> = LcncKeyAlg.confixStructuralKey()
             override val order: KeyOrder<ConfixStructuralKey> = object : KeyOrder<ConfixStructuralKey> {
                 override fun compare(a: ConfixStructuralKey, b: ConfixStructuralKey): Int = a.depth.compareTo(b.depth)
@@ -157,15 +161,14 @@ object ConfixReducers {
 
         val valueAlg = object : ValueAlg<Byte, List<ScanToken>> {
             override val folder: Folder<Byte, List<ScanToken>> = Scan0Folder()
-            override val merger: Merger<List<ScanToken>> = object : Merger<List<ScanToken>> {
-                override fun merge(partials: Series<List<ScanToken>>): List<ScanToken> =
-                    partials.flatMap { it }
+            override val merger: Merger<List<ScanToken>> = Merger { partials ->
+                partials.toList().flatten()
             }
             override val initial: List<ScanToken> = emptyList()
         }
 
         val phaseAlg = LcncPhaseAlg.confixPhaseAlg
-        val carrierAlg = LcncCarrierAlg.seriesCarrierAlg()
+        val carrierAlg = LcncCarrierAlg.seriesCarrierAlg<Byte>()
 
         return object : AbstractLcncReduction<ConfixStructuralKey, Byte, List<ScanToken>, List<ScanToken>>(
             keyAlg, valueAlg, phaseAlg, carrierAlg

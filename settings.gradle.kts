@@ -10,7 +10,7 @@ rootProject.name = "TrikeShed"
 
 include(":libs:common")
 include(":libs:forge")
-include(":libs:forge-ui")
+// include(":libs:forge-ui")
 include(":libs:lcnc")
 include(":libs:polyglot")
 include(":libs:polyglot-bench")

@@ -1,4 +1,5 @@
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
+import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 
 plugins {
     kotlin("multiplatform") version "2.4.0"
@@ -42,7 +43,19 @@ kotlin {
 
     jvm {}
 
-    js { nodejs() }
+    js {
+        nodejs()
+        browser {
+            testTask {
+                useKarma {
+                    // Use Electron as the browser
+                    // The useKarma block in Kotlin 2.4 uses a different API
+                    // We need to configure the karma config file
+                }
+            }
+        }
+        binaries.executable()
+    }
 
     sourceSets {
         named("commonMain").configure {
