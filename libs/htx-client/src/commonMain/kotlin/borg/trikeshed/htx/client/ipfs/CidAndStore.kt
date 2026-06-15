@@ -10,6 +10,8 @@ import java.util.Random
 data class CID(val bytes: ByteArray) {
     override fun toString(): String = "CID(${bytes.joinToString("") { "%02x".format(it) }})"
     fun hex(): String = bytes.joinToString("") { "%02x".format(it) }
+    override fun equals(other: Any?): Boolean = other is CID && bytes.contentEquals(other.bytes)
+    override fun hashCode(): Int = bytes.contentHashCode()
     companion object {
         fun sha256(data: ByteArray): CID = CID(MessageDigest.getInstance("SHA-256").digest(data))
     }
