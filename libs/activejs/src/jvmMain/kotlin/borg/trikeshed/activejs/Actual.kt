@@ -1,238 +1,116 @@
 package borg.trikeshed.activejs
 
-import borg.trikeshed.cursor.PointcutFacet as JvmPointcutFacet
-import borg.trikeshed.cursor.TypedefResolutionSeries as JvmTypedefResolutionSeries
-import borg.trikeshed.cursor.ClassFileTaxonomy as JvmClassFileTaxonomy
-import borg.trikeshed.cursor.Cursor as JvmCursor
-import borg.trikeshed.cursor.RowVec as JvmRowVec
-import borg.trikeshed.cursor.ColumnMeta as JvmColumnMeta
-import borg.trikeshed.cursor.ColumnMetaRef as JvmColumnMetaRef
-import borg.trikeshed.cursor.IOMemento as JvmIOMemento
-import borg.trikeshed.cursor.TypeMemento as JvmTypeMemento
-import borg.trikeshed.parse.confix.BlackBoardEntry as JvmBlackBoardEntry
-import borg.trikeshed.parse.confix.ConfixRole as JvmConfixRole
-import borg.trikeshed.parse.confix.SaxEvent as JvmSaxEvent
-import borg.trikeshed.parse.confix.confixDoc as JvmConfixDoc
-import borg.trikeshed.parse.confix.saxWalk as JvmSaxWalk
-import borg.trikeshed.lib.MutableSeries as JvmMutableSeries
-import borg.trikeshed.lib.ChunkedMutableSeries as JvmChunkedMutableSeries
-import borg.trikeshed.lib.Series as JvmSeries
-import borg.trikeshed.lib.Join as JvmJoin
-import borg.trikeshed.lib.j as jvmJ
-import borg.trikeshed.lib.liveSeries as jvmLiveSeries
+import kotlinx.coroutines.CoroutineContext
+import org.graalvm.polyglot.Context
+import org.graalvm.polyglot.Value
 
-// ── MutableSeries / ChunkedMutableSeries ────────────────────────────────────
-
-actual class MutableSeries<T> private constructor(private val delegate: JvmMutableSeries<T>) {
-    actual fun add(element: T) = delegate.add(element)
-    actual val a: Int get() = delegate.a
-    actual val b: (Int) -> T get() = delegate.b
-
-    companion object {
-        operator fun invoke<T>(): MutableSeries<T> = MutableSeries(JvmChunkedMutableSeries<T>() as JvmMutableSeries<T>)
+/**
+ * JVM actual implementation of GraalEcmaLauncher.
+ * Launches GraalVM Polyglot Context with pointcut hooks.
+ */
+actual class GraalEcmaLauncher {
+    private var context: GraalEcmaContext? = null
+    
+    actual fun initialize(context: CoroutineContext = kotlinx.coroutines.currentCoroutineContext()): GraalEcmaContext {
+        val graalContext = GraalEcmaContextImpl()
+        this.context = graalContext
+        return graalContext
+    }
+    
+    actual fun shutdown() {
+        context?.close()
+        context = null
     }
 }
 
-actual class ChunkedMutableSeries<T> : MutableSeries<T>(JvmChunkedMutableSeries<T>())
-
-// ── ColumnMeta / TypeMemento ────────────────────────────────────────────────
-
-actual class ColumnMeta(
-    name: String,
-    memento: Any,
-) {
-    actual val a: CharSequence get() = name
-    actual val b: Join<TypeMemento, ColumnMeta?> get() = 0 j null
-}
-
-actual class TypeMemento {
-    companion object {
-        val IoInt: TypeMemento = JvmTypeMemento.IoInt as TypeMemento
-        val IoLong: TypeMemento = JvmTypeMemento.IoLong as TypeMemento
-        val IoString: TypeMemento = JvmTypeMemento.IoString as TypeMemento
-        val IoObject: TypeMemento = JvmTypeMemento.IoObject as TypeMemento
-        val IoArray: TypeMemento = JvmTypeMemento.IoArray as TypeMemento
+/** JVM implementation of GraalEcmaContext wrapping GraalVM Polyglot Context. */
+actual class GraalEcmaContextImpl : GraalEcmaContext {
+    private val polyglotContext = Context.newBuilder("js")
+        .allowAllAccess(true)
+        .allowHostAccess(HostAccess.ALL)
+        .allowHostClassLoading(HostClassLoading.ALLOW)
+        .build()
+    
+    actual override val polyglotContext: Any = polyglotContext
+    
+    actual override fun eval(script: String): Any = polyglotContext.eval("js", script)
+    
+    actual override fun getBinding(name: String): Any? {
+        val bindings = polyglotContext.getBindings("js")
+        return if (bindings.hasMember(name)) bindings.getMember(name).asHostObject() else null
     }
-}
-
-// ── Join factory / Join class ───────────────────────────────────────────────
-
-actual fun <A, B> j(a: A, b: B): Join<A, B> = jvmJ(a, b)
-
-actual fun <T> Join(count: Int, access: (Int) -> T): Series<T> {
-    return Series(JvmSeries(count, access))
-}
-
-actual class Join<A, B>(val a: A, val b: B)
-
-// ── ColumnMetaRef ───────────────────────────────────────────────────────────
-
-actual class ColumnMetaRef(
-    actual override val ordinal: Int,
-    actual override val name: String,
-    actual override val typeName: String,
-    actual override val facet: PointcutFacet,
-) {
-    var activeJsFacet: ActiveJsFacet = ActiveJsFacet.Unfaceted
-
-    companion object {
-        fun fromJvm(jvm: JvmColumnMetaRef): ColumnMetaRef {
-            val activeFacet = when (jvm.facet) {
-                JvmPointcutFacet.SymbolName -> ActiveJsFacet.JsFunction
-                JvmPointcutFacet.TypeInfo -> ActiveJsFacet.JsModule
-                JvmPointcutFacet.ClassfileCoordinate -> ActiveJsFacet.WasmModule
-                JvmPointcutFacet.TypeCoordinate -> ActiveJsFacet.JsObject
-                JvmPointcutFacet.PointcutKind -> ActiveJsFacet.JsPromise
-                JvmPointcutFacet.StringPool -> ActiveJsFacet.JsTypedArray
-                else -> ActiveJsFacet.Unfaceted
-            }
-            return ColumnMetaRef(jvm.ordinal, jvm.name, jvm.typeName, PointcutFacet.valueOf(jvm.facet.name)).also {
-                it.activeJsFacet = activeFacet
+    
+    actual override fun putBinding(name: String, value: Any) {
+        val bindings = polyglotContext.getBindings("js")
+        bindings.putMember(name, value)
+    }
+    
+    actual override fun installPointcutHooks(target: Any, eventHandler: (PointcutEvent) -> Unit) {
+        // Install JS-side pointcut hooks that call back to Kotlin handler
+        val handlerProxy = object : ValueProxy {
+            override fun invoke(args: Array<Any?>?): Any? {
+                if (args != null && args.size >= 6) {
+                    val event = PointcutEvent(
+                        seq = (args[0] as? Number)?.toLong() ?: 0,
+                        nano = (args[1] as? Number)?.toLong() ?: System.nanoTime(),
+                        opcode = (args[2] as? Number)?.toInt() ?: 0,
+                        phase = args[3] as? String ?: "UNKNOWN",
+                        target = args[4] as? String ?: "",
+                        value = args[5]
+                    )
+                    eventHandler(event)
+                }
+                return null
             }
         }
+        
+        putBinding("__trikeshedPointcutHandler", handlerProxy)
+        
+        // Install the hooking script
+        eval("""
+            (function() {
+                const handler = __trikeshedPointcutHandler;
+                const originalDefineProperty = Object.defineProperty;
+                Object.defineProperty = function(obj, prop, desc) {
+                    if (desc && (desc.get || desc.set)) {
+                        const origGet = desc.get;
+                        const origSet = desc.set;
+                        if (origGet) {
+                            desc.get = function() {
+                                const val = origGet.apply(this, arguments);
+                                handler.invoke([Date.now(), performance.now(), 0xA5, "BEFORE", this.constructor.name + "#" + prop, val]);
+                                return val;
+                            };
+                        }
+                        if (origSet) {
+                            desc.set = function(v) {
+                                handler.invoke([Date.now(), performance.now(), 0xA6, "AFTER", this.constructor.name + "#" + prop, v]);
+                                return origSet.apply(this, arguments);
+                            };
+                        }
+                    }
+                    return originalDefineProperty.apply(this, arguments);
+                };
+                
+                // Hook function calls
+                const originalApply = Function.prototype.apply;
+                Function.prototype.apply = function(thisArg, args) {
+                    const name = this.name || "anonymous";
+                    handler.invoke([Date.now(), performance.now(), 0x10, "BEFORE", name, args]);
+                    const result = originalApply.apply(this, arguments);
+                    handler.invoke([Date.now(), performance.now(), 0x10, "AFTER", name, result]);
+                    return result;
+                };
+            })();
+        """.trimIndent())
+    }
+    
+    fun close() {
+        polyglotContext.close()
     }
 }
 
-// ── PointcutFacet ───────────────────────────────────────────────────────────
-
-actual enum class PointcutFacet {
-    Unfaceted,
-    SymbolName,
-    TypeInfo,
-    ClassfileCoordinate,
-    TypeCoordinate,
-    PointcutKind,
-    StringPool,
-    Wireproto,
-    ChildRows,
-    ConfixMeta,
-    VmStats,
-    ObserverDelegateRegistration,
-    ReduxPhilum,
-    SynapsePhilum,
-    ClassfileTaxonomy,
-    EdgeTaxonomy,
-    CrmsDomain,
-    SrcFile,
-}
-
-// ── TypedefResolutionSeries ─────────────────────────────────────────────────
-
-actual object TypedefResolutionSeries {
-    actual fun record(poolId: Int, siteOrd: Int, className: String, coordination: String, success: Boolean): Long {
-        return JvmTypedefResolutionSeries.record(poolId, siteOrd, className, coordination, success)
-    }
-    actual fun size(): Int = JvmTypedefResolutionSeries.size()
-    actual fun reset() = JvmTypedefResolutionSeries.reset()
-}
-
-// ── ClassFileTaxonomy ───────────────────────────────────────────────────────
-
-actual class ClassFileTaxonomy {
-    private val delegate = JvmClassFileTaxonomy()
-
-    actual val size: Int get() = delegate.size
-
-    actual fun register(row: Any) {
-        delegate.register(row as JvmClassFileTaxonomy.CoordinateRow)
-    }
-
-    actual fun rowAt(index: Int): Any = delegate.rowAt(index)
-
-    actual fun lookupByPoolId(poolId: Int): Any? = delegate.lookupByPoolId(poolId)
-
-    actual fun filterByKind(kind: Int): ClassFileTaxonomy {
-        val wrapped = ClassFileTaxonomy()
-        wrapped.delegate = delegate.filterByKind(kind)
-        return wrapped
-    }
-
-    actual fun filterByOwner(owner: String): ClassFileTaxonomy {
-        val wrapped = ClassFileTaxonomy()
-        wrapped.delegate = delegate.filterByOwner(owner)
-        return wrapped
-    }
-
-    actual fun asCursor(): Cursor = Cursor(delegate.asCursor())
-
-    actual fun toBlackboardEntries(): List<BlackBoardEntry> =
-        delegate.toBlackboardEntries().map { BlackBoardEntry(it) }
-
-    actual fun emitSaxEvents(consumer: (SaxEvent) -> Unit) {
-        delegate.emitSaxEvents { sax -> consumer(SaxEvent.fromJvm(sax)) }
-    }
-}
-
-// ── Cursor ──────────────────────────────────────────────────────────────────
-
-actual class Cursor(private val delegate: JvmCursor) {
-    actual val size: Int get() = delegate.size
-    actual operator fun get(index: Int): RowVec = RowVec(delegate.b(index))
-    actual fun columnMeta(name: String): ColumnMetaRef = ColumnMetaRef.fromJvm(delegate.columnMeta(name))
-}
-
-// ── RowVec ──────────────────────────────────────────────────────────────────
-
-actual class RowVec(private val delegate: JvmRowVec) {
-    actual val a: Int get() = delegate.a
-    actual val b: (Int) -> Any? get() = { delegate.b(it).a }
-}
-
-// ── BlackBoardEntry ─────────────────────────────────────────────────────────
-
-actual class BlackBoardEntry(private val delegate: JvmBlackBoardEntry) {
-    actual val doc: Any get() = delegate.doc
-    actual val role: ConfixRole get() = ConfixRole.valueOf(delegate.role.name)
-}
-
-// ── ConfixRole ──────────────────────────────────────────────────────────────
-
-actual enum class ConfixRole {
-    OBSERVATION,
-    COMMAND,
-    QUERY,
-}
-
-// ── SaxEvent ────────────────────────────────────────────────────────────────
-
-actual sealed class SaxEvent {
-    data class Enter(actual val memento: Any, actual val offset: Int) : SaxEvent()
-    data class Leave(actual val memento: Any, actual val offset: Int) : SaxEvent()
-
-    companion object {
-        fun fromJvm(jvm: JvmSaxEvent): SaxEvent = when (jvm) {
-            is JvmSaxEvent.Enter -> Enter(jvm.a, jvm.b)
-            is JvmSaxEvent.Leave -> Leave(jvm.a, jvm.b)
-        }
-    }
-}
-
-// ── IOMemento ────────────────────────────────────────────────────────────────
-
-actual object IOMemento {
-    actual val IoInt: Any get() = JvmIOMemento.IoInt
-    actual val IoLong: Any get() = JvmIOMemento.IoLong
-    actual val IoString: Any get() = JvmIOMemento.IoString
-    actual val IoObject: Any get() = JvmIOMemento.IoObject
-    actual val IoArray: Any get() = JvmIOMemento.IoArray
-}
-
-// ── confixDoc / saxWalk / liveSeries / Series ───────────────────────────────
-
-actual fun confixDoc(json: String): Any = JvmConfixDoc(json)
-
-actual fun Any.saxWalk(action: (SaxEvent) -> Unit) {
-    (this as borg.trikeshed.parse.confix.ConfixDoc).a.saxWalk { jse ->
-        action(SaxEvent.fromJvm(jse))
-    }
-}
-
-actual fun <T> liveSeries(count: () -> Int, access: (Int) -> T): Series<T> {
-    return Series(jvmLiveSeries(count, access))
-}
-
-// Wrapper for JVM Series
-actual class Series<T>(private val delegate: JvmSeries<T>) {
-    actual val a: Int get() = delegate.a
-    actual val b: (Int) -> T get() = delegate.b
+/** Proxy interface for GraalVM host callbacks. */
+interface ValueProxy {
+    fun invoke(args: Array<Any?>?): Any?
 }

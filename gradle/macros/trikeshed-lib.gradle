@@ -669,7 +669,7 @@ switch (project.path) {
         version = trikeshedVersion
         break
     case ":libs:torrent":
-        kmpHost()
+        kmpJvm(rootMode: "api")
         extensions.getByName("kotlin").sourceSets.getByName("commonMain").dependencies {
             implementation project(":libs:htx-client")
             implementation project(":libs:ipfs")

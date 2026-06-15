@@ -8,7 +8,7 @@ import kotlinx.coroutines.CoroutineContext
  * Single responsibility: launch GraalVM Polyglot context (JS) and install
  * pointcut hooks that feed events into the local TrikeShed system.
  */
-expect class GraalEcmaLauncher {
+expect interface GraalEcmaLauncher {
     /**
      * Initialize and return a GraalVM Polyglot Context configured for pointcutting.
      * The context has pointcut hooks installed that emit to the local CCEK bus.
@@ -20,7 +20,7 @@ expect class GraalEcmaLauncher {
 }
 
 /** Wrapper around GraalVM Polyglot Context with pointcut hooks installed. */
-expect class GraalEcmaContext {
+expect interface GraalEcmaContext {
     /** The underlying GraalVM Polyglot Context. */
     val polyglotContext: Any
     
