@@ -98,6 +98,13 @@ object CarParser {
  */
 data class CarBlock(val cid: CID, val data: ByteArray)
 
+data class CarParseResult(
+    val roots: List<CID>,
+    val blockCount: Int,
+    val version: Int,
+    val dataCid: CID,
+)
+
 /**
  * CAR index for fast random access (CARv2).
  */

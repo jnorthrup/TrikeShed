@@ -61,7 +61,7 @@ class IpfsIntegrationDemo {
         println("  Version: ${carData[2]}")
         
         val parsed = cak.importCar(carData)
-        println("  Imported: ${parsed.blocks.size} blocks, version ${parsed.version}")
+        println("  Imported: ${parsed.blockCount} blocks, version ${parsed.version}")
         
         // ── 5. Content Verification ──
         println("\n▶ 5. Integrity Verification")

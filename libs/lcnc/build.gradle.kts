@@ -1,6 +1,10 @@
 plugins {
-    kotlin("multiplatform")
+    kotlin("jvm")
+    `maven-publish`
 }
+
+group = "borg.trikeshed"
+version = "0.1.0-SNAPSHOT"
 
 repositories {
     mavenCentral()
@@ -12,18 +16,26 @@ repositories {
 
 kotlin {
     jvmToolchain(25)
-    jvm {}
 
     sourceSets {
-        val commonMain by getting {
+        val main by getting {
             dependencies {
-                api(project(":"))
+                implementation("org.bereft:TrikeShed-jvm:1.0")
             }
         }
-        val jvmTest by getting {
+        val test by getting {
             dependencies {
                 implementation(kotlin("test-junit"))
             }
         }
+    }
+
+    compilerOptions {
+        jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_25
+        freeCompilerArgs.addAll(
+            "-opt-in=kotlin.RequiresOptIn",
+            "-opt-in=kotlin.ExperimentalUnsignedTypes",
+            "-Xsuppress-version-warnings",
+        )
     }
 }
