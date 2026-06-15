@@ -626,7 +626,7 @@ switch (project.path) {
         }
         break
     case ":libs:couch:viewserver":
-        kmpHost()
+        kmpJvm(rootMode: "api")
         def viewKotlin = extensions.getByName("kotlin")
         def viewSets = viewKotlin.sourceSets
         viewSets.getByName("commonMain").dependencies {
@@ -637,20 +637,7 @@ switch (project.path) {
             implementation libPeer("kursive")
             implementation libPeer("classfile")
         }
-        viewSets.getByName("jsMain").kotlin.srcDir("${layout.buildDirectory.get().asFile}/dukat")
-        tasks.register("generateDts", Exec) {
-            group = "build"
-            description = "Run TypeScript compiler (npx tsc) to emit declaration files for user JS"
-            commandLine("npx", "tsc", "-p", "tsconfig.json")
-            workingDir = projectDir
-        }
-        tasks.register("generateKotlinExterns", Exec) {
-            group = "build"
-            description = "Convert .d.ts outputs from tsc into Kotlin externs using dukat."
-            dependsOn("generateDts")
-            commandLine("npx", "dukat", "build/dts", "-o", "${layout.buildDirectory.get().asFile}/dukat")
-            workingDir = projectDir
-        }
+        // JS/dukat targets removed - htx-client is JVM-only
         break
     case ":libs:server":
         kmpJvm(coroutinesMain: true)

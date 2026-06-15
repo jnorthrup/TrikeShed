@@ -13,7 +13,7 @@ expect interface GraalEcmaLauncher {
      * Initialize and return a GraalVM Polyglot Context configured for pointcutting.
      * The context has pointcut hooks installed that emit to the local CCEK bus.
      */
-    fun initialize(context: CoroutineContext = kotlinx.coroutines.currentCoroutineContext()): GraalEcmaContext
+    fun initialize(context: CoroutineContext): GraalEcmaContext
     
     /** Shutdown the GraalVM context and clean up resources. */
     fun shutdown()
@@ -64,8 +64,9 @@ object PointcutOpcode {
 /**
  * CCEK SPI for Pointcut Event Transport (local to TrikeShed).
  * Replaces xvm Channel with zero-copy CCEK bus via NioSupervisor.
+ * Platform-specific implementations in jvmMain/jsMain/etc.
  */
-interface PointcutEventProducer : CoroutineContext.Element {
+expect interface PointcutEventProducer : CoroutineContext.Element {
     companion object Key : kotlinx.coroutines.AsyncContextKey<PointcutEventProducer>()
     override val key: CoroutineContext.Key<*> get() = Key
     fun emit(event: PointcutEvent)
@@ -73,59 +74,11 @@ interface PointcutEventProducer : CoroutineContext.Element {
     fun unregisterConsumer(consumer: PointcutEventConsumer)
 }
 
-interface PointcutEventConsumer : CoroutineContext.Element {
+expect interface PointcutEventConsumer : CoroutineContext.Element {
     companion object Key : kotlinx.coroutines.AsyncContextKey<PointcutEventConsumer>()
     override val key: CoroutineContext.Key<*> get() = Key
     fun onEvent(event: PointcutEvent)
 }
 
-fun CoroutineContext.getPointcutEventProducer(): PointcutEventProducer? = this[PointcutEventProducer.Key]
-fun CoroutineContext.getPointcutEventConsumer(): PointcutEventConsumer? = this[PointcutEventConsumer.Key]
-
-/**
- * Default PointcutEventProducer implementation.
- * Registered in NioSupervisor for CCEK SPI resolution.
- */
-class PointcutEventProducerImpl : kotlinx.coroutines.AsyncContextElement(), PointcutEventProducer {
-    private val consumers = mutableListOf<PointcutEventConsumer>()
-    
-    override suspend fun open() {
-        super.open()
-        state = kotlinx.coroutines.context.ElementState.ACTIVE
-    }
-    
-    override fun close() {
-        consumers.clear()
-        super.close()
-    }
-    
-    override fun emit(event: PointcutEvent) {
-        for (consumer in consumers) {
-            consumer.onEvent(event)
-        }
-    }
-    
-    override fun registerConsumer(consumer: PointcutEventConsumer) {
-        if (consumer !in consumers) consumers += consumer
-    }
-    
-    override fun unregisterConsumer(consumer: PointcutEventConsumer) {
-        consumers -= consumer
-    }
-}
-
-open class PointcutEventConsumerImpl(private val producer: PointcutEventProducer) : kotlinx.coroutines.AsyncContextElement(), PointcutEventConsumer {
-    override suspend fun open() {
-        super.open()
-        state = kotlinx.coroutines.context.ElementState.ACTIVE
-    }
-    
-    override fun close() {
-        producer.unregisterConsumer(this)
-        super.close()
-    }
-    
-    override fun onEvent(event: PointcutEvent) {
-        // Override in subclasses
-    }
-}
+expect fun CoroutineContext.getPointcutEventProducer(): PointcutEventProducer?
+expect fun CoroutineContext.getPointcutEventConsumer(): PointcutEventConsumer?

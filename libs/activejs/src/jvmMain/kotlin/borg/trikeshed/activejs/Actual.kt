@@ -2,22 +2,23 @@ package borg.trikeshed.activejs
 
 import kotlinx.coroutines.CoroutineContext
 import org.graalvm.polyglot.Context
-import org.graalvm.polyglot.Value
+import org.graalvm.polyglot.HostAccess
+import org.graalvm.polyglot.HostClassLoading
 
 /**
  * JVM actual implementation of GraalEcmaLauncher.
  * Launches GraalVM Polyglot Context with pointcut hooks.
  */
-actual class GraalEcmaLauncher {
+actual class GraalEcmaLauncherImpl : GraalEcmaLauncher {
     private var context: GraalEcmaContext? = null
     
-    actual fun initialize(context: CoroutineContext = kotlinx.coroutines.currentCoroutineContext()): GraalEcmaContext {
+    override fun initialize(context: CoroutineContext = kotlinx.coroutines.currentCoroutineContext()): GraalEcmaContext {
         val graalContext = GraalEcmaContextImpl()
         this.context = graalContext
         return graalContext
     }
     
-    actual fun shutdown() {
+    override fun shutdown() {
         context?.close()
         context = null
     }
@@ -31,21 +32,21 @@ actual class GraalEcmaContextImpl : GraalEcmaContext {
         .allowHostClassLoading(HostClassLoading.ALLOW)
         .build()
     
-    actual override val polyglotContext: Any = polyglotContext
+    override val polyglotContext: Any = polyglotContext
     
-    actual override fun eval(script: String): Any = polyglotContext.eval("js", script)
+    override fun eval(script: String): Any = polyglotContext.eval("js", script)
     
-    actual override fun getBinding(name: String): Any? {
+    override fun getBinding(name: String): Any? {
         val bindings = polyglotContext.getBindings("js")
         return if (bindings.hasMember(name)) bindings.getMember(name).asHostObject() else null
     }
     
-    actual override fun putBinding(name: String, value: Any) {
+    override fun putBinding(name: String, value: Any) {
         val bindings = polyglotContext.getBindings("js")
         bindings.putMember(name, value)
     }
     
-    actual override fun installPointcutHooks(target: Any, eventHandler: (PointcutEvent) -> Unit) {
+    override fun installPointcutHooks(target: Any, eventHandler: (PointcutEvent) -> Unit) {
         // Install JS-side pointcut hooks that call back to Kotlin handler
         val handlerProxy = object : ValueProxy {
             override fun invoke(args: Array<Any?>?): Any? {
