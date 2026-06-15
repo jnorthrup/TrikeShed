@@ -32,5 +32,6 @@ include(":libs:ngsctp")
 include(":libs:concurrency")
 include(":libs:uring")
 include(":libs:ipfs")
+//include(":libs:torrent")  // untracked, broken build
 include(":libs:tcpd")
 include(":libs:modelmux")
