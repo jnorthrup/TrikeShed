@@ -57,11 +57,11 @@ class IpfsIntegrationDemo {
         println("\n▶ 4. CAR Archive (v2)")
         val carData = cak.exportCar(cids)
         println("  Exported CAR: ${carData.size} bytes")
-        println("  Magic: 0x${"%04x".format(carData[0].toInt() and 0xFF | (carData[1].toInt() and 0xFF) shl 8)}")
+        println("  Magic: 0x${"%04x".format((carData[0].toInt() and 0xFF) or ((carData[1].toInt() and 0xFF) shl 8))}")
         println("  Version: ${carData[2]}")
         
         val parsed = cak.importCar(carData)
-        println("  Imported: ${parsed.blockCount} blocks, version ${parsed.version}")
+        println("  Imported: ${parsed.blocks.size} blocks, version ${parsed.version}")
         
         // ── 5. Content Verification ──
         println("\n▶ 5. Integrity Verification")
