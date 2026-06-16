@@ -277,7 +277,7 @@ class ForgeWorkspaceTddTest {
     @Test
     fun `artifact lifecycle create get list export import`() = runTest {
         val file = ForgeFile(ForgeFileId("art-1"), "out.md", "Result", "text/markdown")
-        val artifact = workspace.artifact("My Artifact", "Description", listOf(file), null, null)
+        val artifact = workspace.artifact("My Artifact", "Description", listOf(file), null, null, false)
         assertNotNull(artifact.id)
 
         val retrieved = workspace.getArtifact(artifact.id)

@@ -629,4 +629,196 @@ class ForgeWorkspaceImpl : ForgeWorkspace {
 
         return CascadeGraph(cascadeId, nodes, edges)
     }
+
+    // =========================================================================
+    // Patch Bay / Cable Operations (Real-time Signal Routing) - Stub implementations
+    // =========================================================================
+
+    private val patchBays = mutableMapOf<PatchBayId, PatchBay>()
+    private val patchBayModules = mutableMapOf<PatchBayId, MutableMap<String, ModuleSpec>>()
+    private val patchBayCables = mutableMapOf<PatchBayId, MutableList<PatchCable>>()
+
+    override suspend fun putPatchBay(patchBay: PatchBay): PatchBay {
+        patchBays[patchBay.id] = patchBay
+        patchBayModules[patchBay.id] = mutableMapOf()
+        patchBayCables[patchBay.id] = mutableListOf()
+        return patchBay
+    }
+
+    override suspend fun getPatchBay(id: PatchBayId): PatchBay? = patchBays[id]
+
+    override suspend fun listPatchBays(): List<PatchBay> = patchBays.values.toList()
+
+    override suspend fun deletePatchBay(id: PatchBayId): Boolean = patchBays.remove(id) != null
+
+    override suspend fun putModule(patchBayId: PatchBayId, module: ModuleSpec): ModuleSpec {
+        val modules = patchBayModules.getOrPut(patchBayId) { mutableMapOf() }
+        modules[module.id] = module
+        return module
+    }
+
+    override suspend fun getModule(patchBayId: PatchBayId, moduleId: String): ModuleSpec? =
+        patchBayModules[patchBayId]?.get(moduleId)
+
+    override suspend fun deleteModule(patchBayId: PatchBayId, moduleId: String): Boolean =
+        patchBayModules[patchBayId]?.remove(moduleId) != null
+
+    override suspend fun connectCable(patchBayId: PatchBayId, cable: PatchCable): PatchCable {
+        val cables = patchBayCables.getOrPut(patchBayId) { mutableListOf() }
+        cables.removeAll { it.id == cable.id }
+        cables.add(cable)
+        return cable
+    }
+
+    override suspend fun disconnectCable(patchBayId: PatchBayId, cableId: CableId): Boolean {
+        val cables = patchBayCables[patchBayId] ?: return false
+        return cables.removeIf { it.id == cableId }
+    }
+
+    override suspend fun setCableState(patchBayId: PatchBayId, cableId: CableId, state: CableState): PatchCable? {
+        val cables = patchBayCables[patchBayId] ?: return null
+        val index = cables.indexOfFirst { it.id == cableId }
+        if (index == -1) return null
+        val updated = cables[index].copy(state = state)
+        cables[index] = updated
+        return updated
+    }
+
+    override suspend fun setCableTransform(patchBayId: PatchBayId, cableId: CableId, transform: CableTransform?): PatchCable? {
+        val cables = patchBayCables[patchBayId] ?: return null
+        val index = cables.indexOfFirst { it.id == cableId }
+        if (index == -1) return null
+        val updated = cables[index].copy(transform = transform)
+        cables[index] = updated
+        return updated
+    }
+
+    override suspend fun processPatchBay(patchBayId: PatchBayId, inputs: Map<String, String>, frameCount: Int): Map<String, String> {
+        // Stub: pass through inputs as outputs
+        return inputs
+    }
+
+    override fun streamPatchBay(patchBayId: PatchBayId, outputPort: PortAddress): kotlinx.coroutines.flow.Flow<Map<String, String>> {
+        return kotlinx.coroutines.flow.flowOf(emptyMap())
+    }
+
+    override suspend fun getPatchBayGraph(patchBayId: PatchBayId): PatchBayGraph? {
+        val patchBay = patchBays[patchBayId] ?: return null
+        val modules = patchBayModules[patchBayId] ?: return null
+        val cables = patchBayCables[patchBayId] ?: return null
+
+        val nodes = modules.values.map { module ->
+            PatchBayNode(
+                id = module.id,
+                moduleType = module.moduleType,
+                label = module.id,
+                position = module.position,
+                inputPorts = module.inputPorts,
+                outputPorts = module.outputPorts,
+            )
+        }.toList()
+
+        val edges = cables.map { cable ->
+            PatchBayEdge(
+                id = cable.id,
+                source = cable.source,
+                destination = cable.destination,
+                state = cable.state,
+                transform = cable.transform,
+            )
+        }.toList()
+
+        return PatchBayGraph(patchBayId, nodes, edges)
+    }
+
+    override suspend fun autoLayout(patchBayId: PatchBayId, algorithm: LayoutAlgorithm): PatchBay {
+        // Stub: return patch bay unchanged
+        return patchBays[patchBayId] ?: PatchBay(patchBayId, "empty", emptyMap(), emptyList())
+    }
+
+    override suspend fun createModuleFromStep(patchBayId: PatchBayId, step: WorkflowStep, position: ModulePosition): ModuleSpec {
+        val inputPorts: List<PortSpec>
+        val outputPorts: List<PortSpec>
+        val moduleType: ModuleType
+        
+        when (step) {
+            is WorkflowStep.LlmCall -> {
+                inputPorts = step.inputs.keys.map { PortSpec(it, PortType.DATA, PortDirection.INPUT, "String") }
+                outputPorts = listOf(PortSpec("output", PortType.DATA, PortDirection.OUTPUT, "String"))
+                moduleType = ModuleType.LLM_CALL
+            }
+            is WorkflowStep.CodeExecution -> {
+                inputPorts = step.inputs.keys.map { PortSpec(it, PortType.DATA, PortDirection.INPUT, "String") }
+                outputPorts = listOf(PortSpec("output", PortType.DATA, PortDirection.OUTPUT, "String"))
+                moduleType = ModuleType.CODE_EXECUTION
+            }
+            is WorkflowStep.AgentInvocation -> {
+                inputPorts = step.context.keys.map { PortSpec(it, PortType.DATA, PortDirection.INPUT, "String") }
+                outputPorts = listOf(PortSpec("output", PortType.DATA, PortDirection.OUTPUT, "String"))
+                moduleType = ModuleType.AGENT_INVOCATION
+            }
+            is WorkflowStep.FileTransform -> {
+                inputPorts = step.inputFileIds.mapIndexed { idx, _ -> PortSpec("file$idx", PortType.DATA, PortDirection.INPUT, "ForgeFile") }
+                outputPorts = listOf(PortSpec("outputPath", PortType.DATA, PortDirection.OUTPUT, "String"))
+                moduleType = ModuleType.FILE_TRANSFORM
+            }
+            is WorkflowStep.Conditional -> {
+                inputPorts = step.condition.split(" ").filter { it.startsWith("{{") }.map { it.trim('{', '}') }
+                    .map { PortSpec(it, PortType.DATA, PortDirection.INPUT, "String") }
+                outputPorts = listOf(PortSpec("then", PortType.CONTROL, PortDirection.OUTPUT, "String"), PortSpec("else", PortType.CONTROL, PortDirection.OUTPUT, "String"))
+                moduleType = ModuleType.CONDITIONAL
+            }
+            is WorkflowStep.Parallel -> {
+                val allKeys = mutableSetOf<String>()
+                for (branch in step.branches) {
+                    for (s in branch) {
+                        val keys = when (s) {
+                            is WorkflowStep.LlmCall -> s.inputs.keys
+                            is WorkflowStep.CodeExecution -> s.inputs.keys
+                            is WorkflowStep.AgentInvocation -> s.context.keys
+                            is WorkflowStep.CascadeExecution -> s.inputs.keys
+                            else -> emptySet()
+                        }
+                        allKeys.addAll(keys)
+                    }
+                }
+                inputPorts = allKeys.map { PortSpec(it, PortType.DATA, PortDirection.INPUT, "String") }
+                outputPorts = listOf(PortSpec("branch1", PortType.DATA, PortDirection.OUTPUT, "String"), PortSpec("branch2", PortType.DATA, PortDirection.OUTPUT, "String"))
+                moduleType = ModuleType.PARALLEL
+            }
+            is WorkflowStep.CascadeExecution -> {
+                inputPorts = step.inputs.keys.map { PortSpec(it, PortType.DATA, PortDirection.INPUT, "String") }
+                outputPorts = listOf(PortSpec("output", PortType.DATA, PortDirection.OUTPUT, "CascadeOutputRow"))
+                moduleType = ModuleType.CASCADE_EXECUTION
+            }
+            else -> {
+                inputPorts = emptyList()
+                outputPorts = emptyList()
+                moduleType = ModuleType.CUSTOM
+            }
+        }
+
+        return ModuleSpec(
+            id = step.id,
+            moduleType = moduleType,
+            inputPorts = inputPorts,
+            outputPorts = outputPorts,
+            position = position,
+        )
+    }
+
+    override suspend fun createModuleFromCascade(patchBayId: PatchBayId, cascade: OperationalCascade, position: ModulePosition): ModuleSpec {
+        val inputPorts = cascade.keyHierarchy.map { PortSpec(it, PortType.DATA, PortDirection.INPUT, "String") }
+        val outputPorts = cascade.stages.filterIsInstance<CascadeStage.ReduceStage>().flatMap { it.reduceFn.toString().split(" ") }.distinct()
+            .map { PortSpec(it, PortType.DATA, PortDirection.OUTPUT, "String") }
+            .ifEmpty { listOf(PortSpec("output", PortType.DATA, PortDirection.OUTPUT, "CascadeOutputRow")) }
+
+        return ModuleSpec(
+            id = cascade.id.value,
+            moduleType = ModuleType.REDUCE,
+            inputPorts = inputPorts,
+            outputPorts = outputPorts,
+            position = position,
+        )
+    }
 }

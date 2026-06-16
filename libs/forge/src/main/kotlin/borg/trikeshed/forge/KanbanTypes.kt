@@ -142,7 +142,7 @@ fun KanbanBoard.toCascadeGraph(): CascadeGraph {
     }
     
     return CascadeGraph(
-        cascadeId = CascadeId(id.value),
+        cascadeId = CascadeId(this.id.value),
         nodes = nodes,
         edges = edges,
     )
@@ -179,9 +179,9 @@ fun KanbanBoard.toMermaid(): String {
 fun KanbanBoard.toDot(): String {
     val graph = toCascadeGraph()
     return buildString {
-        appendLine("digraph ${id.value} {")
+        appendLine("digraph ${this@toDot.id.value} {")
         appendLine("  rankdir=LR;")
-        appendLine("  node [shape=box];")
+        appendLine("  node [shape=box;]")
         
         graph.nodes.forEach { node ->
             val style = when (node.type) {
@@ -208,3 +208,341 @@ fun KanbanBoard.toDot(): String {
         appendLine("}")
     }
 }
+
+/**
+ * Shape dimension enum for patch-cable modules.
+ * Each dimension adds visual/semantic meaning to the module shape.
+ */
+enum class PatchCableShapeDimension(
+    val dimName: String,
+    val description: String,
+    val visualHint: String,
+) {
+    SIGNAL_FLOW("signal_flow", "Data flows through the module", "→"),
+    CONTROL_FLOW("control_flow", "Control/branching logic", "⚡"),
+    STATE_MUTATION("state_mutation", "Module mutates shared state", "💾"),
+    PARALLELISM("parallelism", "Module spawns parallel branches", "⏱"),
+    EXTERNAL_IO("external_io", "Module interacts with external systems", "🌐"),
+    TEMPORAL("temporal", "Module has time-based behavior", "⏳"),
+    STOCHASTIC("stochastic", "Module has non-deterministic output", "🎲"),
+    COMPOSITE("composite", "Module contains sub-modules", "📦"),
+}
+
+/**
+ * Get shape dimensions for a workflow step.
+ */
+fun WorkflowStep.getPatchCableShapeDimensions(): Set<PatchCableShapeDimension> = when (this) {
+    is WorkflowStep.LlmCall -> setOf(
+        PatchCableShapeDimension.SIGNAL_FLOW,
+        PatchCableShapeDimension.STOCHASTIC,
+        PatchCableShapeDimension.EXTERNAL_IO,
+    )
+    is WorkflowStep.CodeExecution -> setOf(
+        PatchCableShapeDimension.SIGNAL_FLOW,
+        PatchCableShapeDimension.STATE_MUTATION,
+    )
+    is WorkflowStep.AgentInvocation -> setOf(
+        PatchCableShapeDimension.SIGNAL_FLOW,
+        PatchCableShapeDimension.EXTERNAL_IO,
+        PatchCableShapeDimension.STATE_MUTATION,
+        PatchCableShapeDimension.TEMPORAL,
+    )
+    is WorkflowStep.FileTransform -> setOf(
+        PatchCableShapeDimension.SIGNAL_FLOW,
+        PatchCableShapeDimension.EXTERNAL_IO,
+    )
+    is WorkflowStep.Conditional -> setOf(
+        PatchCableShapeDimension.CONTROL_FLOW,
+    )
+    is WorkflowStep.Parallel -> setOf(
+        PatchCableShapeDimension.PARALLELISM,
+        PatchCableShapeDimension.CONTROL_FLOW,
+    )
+    is WorkflowStep.CascadeExecution -> setOf(
+        PatchCableShapeDimension.SIGNAL_FLOW,
+        PatchCableShapeDimension.COMPOSITE,
+        PatchCableShapeDimension.STATE_MUTATION,
+    )
+}
+
+/**
+ * Render workflow with shape dimensions annotated (Mermaid).
+ */
+fun ForgeWorkflow.toShapeDimensionDiagram(): String {
+    val wfId = this.id.value
+    val steps = this.steps
+    return buildString {
+        appendLine("graph TD")
+        appendLine("  subgraph Dimensions [\"Shape Dimensions\"]")
+        PatchCableShapeDimension.values().forEach { dim ->
+            appendLine("    dim_${dim.dimName}[\"${dim.visualHint} ${dim.dimName}\n${dim.description}\"]")
+            appendLine("    style dim_${dim.dimName} fill:#333,stroke:#${dim.ordinal.toString(16).padStart(6, '0')},stroke-width:2px,color:#fff")
+        }
+        appendLine("  end")
+        appendLine("")
+
+        steps.forEach { step ->
+            val dims = step.getPatchCableShapeDimensions()
+            val dimLabels = dims.map { it.visualHint }.joinToString(" ")
+            val stepId = step.id
+            appendLine("  $stepId[\"$stepId\n$dimLabels\"]")
+            val primaryDim = dims.firstOrNull() ?: PatchCableShapeDimension.SIGNAL_FLOW
+            val color = when (primaryDim) {
+                PatchCableShapeDimension.SIGNAL_FLOW -> "#4A90D9"
+                PatchCableShapeDimension.CONTROL_FLOW -> "#D94AD9"
+                PatchCableShapeDimension.STATE_MUTATION -> "#E8A838"
+                PatchCableShapeDimension.PARALLELISM -> "#4AD9D9"
+                PatchCableShapeDimension.EXTERNAL_IO -> "#D94A4A"
+                PatchCableShapeDimension.TEMPORAL -> "#D9A84A"
+                PatchCableShapeDimension.STOCHASTIC -> "#A02EA0"
+                PatchCableShapeDimension.COMPOSITE -> "#2E8A8A"
+            }
+            appendLine("  style $stepId fill:$color,stroke:#fff,stroke-width:2px,color:#fff")
+        }
+
+        // Patch cables
+        steps.forEach { step ->
+            val currentStepId = step.id
+            val inputs = when (step) {
+                is WorkflowStep.LlmCall -> step.inputs
+                is WorkflowStep.CodeExecution -> step.inputs
+                is WorkflowStep.AgentInvocation -> step.context
+                is WorkflowStep.FileTransform -> emptyMap<String, String>()
+                is WorkflowStep.Conditional -> emptyMap<String, String>()
+                is WorkflowStep.Parallel -> emptyMap<String, String>()
+                is WorkflowStep.CascadeExecution -> step.inputs
+                else -> emptyMap<String, String>()
+            }
+            inputs.forEach { entry ->
+                val inputName = entry.key
+                val inputValue = entry.value
+                val refPattern = """\$\{(.+?)\.(.+?)\}""".toRegex()
+                inputValue.replace(refPattern) { matchResult ->
+                    val sourceStepId = matchResult.groupValues[1]
+                    val sourceOutput = matchResult.groupValues[2]
+                    appendLine("  $sourceStepId -.->|$sourceOutput → $inputName| $currentStepId")
+                    ""
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Convert workflow to patch bay modules (for real-time signal routing).
+ */
+fun ForgeWorkflow.toPatchBayModules(patchBayId: PatchBayId): Map<String, ModuleSpec> {
+    val modules = mutableMapOf<String, ModuleSpec>()
+    var x = 0.0
+    val y = 0.0
+    val spacing = 200.0
+    val steps = this.steps
+
+    steps.forEach { step ->
+        val moduleSpec = step.toModuleSpec(ModulePosition(x, y))
+        val stepId = when (step) {
+            is WorkflowStep.LlmCall -> step.id
+            is WorkflowStep.CodeExecution -> step.id
+            is WorkflowStep.AgentInvocation -> step.id
+            is WorkflowStep.FileTransform -> step.id
+            is WorkflowStep.Conditional -> step.id
+            is WorkflowStep.Parallel -> step.id
+            is WorkflowStep.CascadeExecution -> step.id
+            else -> ""
+        }
+        modules[stepId] = moduleSpec
+        x += spacing
+    }
+    
+    return modules
+}
+
+/**
+ * Convert workflow to patch cables based on input references.
+ */
+fun ForgeWorkflow.toPatchCables(patchBayId: PatchBayId): List<PatchCable> {
+    val cables = mutableListOf<PatchCable>()
+    val steps = this.steps
+
+    steps.forEach { step ->
+        val currentStepId = step.id
+        val inputs = when (step) {
+            is WorkflowStep.LlmCall -> step.inputs
+            is WorkflowStep.CodeExecution -> step.inputs
+            is WorkflowStep.AgentInvocation -> step.context
+            is WorkflowStep.FileTransform -> emptyMap<String, String>()
+            is WorkflowStep.Conditional -> emptyMap<String, String>()
+            is WorkflowStep.Parallel -> emptyMap<String, String>()
+            is WorkflowStep.CascadeExecution -> step.inputs
+            else -> emptyMap<String, String>()
+        }
+
+        inputs.forEach { entry ->
+            val inputName = entry.key
+            val inputValue = entry.value
+            val refPattern = """\{\{(.+?)\.(.+?)\}\}""".toRegex()
+            inputValue.replace(refPattern) { matchResult ->
+                val sourceStepId = matchResult.groupValues[1]
+                val sourceOutput = matchResult.groupValues[2]
+                val cable = PatchCable(
+                    id = CableId.generate(),
+                    source = PortAddress(sourceStepId, sourceOutput),
+                    destination = PortAddress(currentStepId, inputName),
+                    state = CableState.ACTIVE,
+                    routing = CableRouting.DIRECT,
+                )
+                cables.add(cable)
+                ""
+            }
+        }
+    }
+
+    return cables
+}
+
+/**
+ * Convert a single workflow step to a ModuleSpec for patch bay.
+ */
+fun WorkflowStep.toModuleSpec(position: ModulePosition): ModuleSpec = when (this) {
+    is WorkflowStep.LlmCall -> {
+        val moduleType = ModuleType.LLM_CALL
+        val inputPorts = inputs.keys.map { name ->
+            PortSpec(name, PortType.DATA, PortDirection.INPUT, "String")
+        }
+        val outputPorts = listOf(PortSpec("output", PortType.DATA, PortDirection.OUTPUT, "String"))
+        val parameterPorts = listOf(
+            PortSpec("model", PortType.CV, PortDirection.INPUT, "String", model),
+            PortSpec("temperature", PortType.CV, PortDirection.INPUT, "Double", parameters["temperature"] ?: "0.7"),
+        )
+        ModuleSpec(
+            id = id,
+            moduleType = moduleType,
+            inputPorts = inputPorts,
+            outputPorts = outputPorts,
+            parameterPorts = parameterPorts,
+            parameters = inputs,
+            position = position,
+        )
+    }
+    is WorkflowStep.CodeExecution -> {
+        val moduleType = ModuleType.CODE_EXECUTION
+        val inputPorts = inputs.keys.map { name ->
+            PortSpec(name, PortType.DATA, PortDirection.INPUT, "String")
+        }
+        val outputPorts = listOf(PortSpec("output", PortType.DATA, PortDirection.OUTPUT, "String"))
+        val parameterPorts = listOf(
+            PortSpec("language", PortType.CV, PortDirection.INPUT, "String", language),
+            PortSpec("timeoutMs", PortType.CV, PortDirection.INPUT, "Long", timeoutMs.toString()),
+        )
+        ModuleSpec(
+            id = id,
+            moduleType = moduleType,
+            inputPorts = inputPorts,
+            outputPorts = outputPorts,
+            parameterPorts = parameterPorts,
+            parameters = inputs,
+            position = position,
+        )
+    }
+    is WorkflowStep.AgentInvocation -> {
+        val moduleType = ModuleType.AGENT_INVOCATION
+        val inputPorts = context.keys.map { name ->
+            PortSpec(name, PortType.DATA, PortDirection.INPUT, "String")
+        }
+        val outputPorts = listOf(PortSpec("output", PortType.DATA, PortDirection.OUTPUT, "String"))
+        val parameterPorts = listOf(
+            PortSpec("agentType", PortType.CV, PortDirection.INPUT, "String", agentType.name),
+            PortSpec("maxTurns", PortType.CV, PortDirection.INPUT, "Int", "10"),
+        )
+        ModuleSpec(
+            id = id,
+            moduleType = moduleType,
+            inputPorts = inputPorts,
+            outputPorts = outputPorts,
+            parameterPorts = parameterPorts,
+            parameters = context,
+            position = position,
+        )
+    }
+    is WorkflowStep.FileTransform -> {
+        val moduleType = ModuleType.FILE_TRANSFORM
+        val inputPorts = inputFileIds.mapIndexed { index, _ ->
+            PortSpec("input$index", PortType.DATA, PortDirection.INPUT, "ForgeFile")
+        }
+        val outputPorts = listOf(PortSpec("outputPath", PortType.DATA, PortDirection.OUTPUT, "String"))
+        val parameterPorts = listOf(
+            PortSpec("transform", PortType.CV, PortDirection.INPUT, "String", transform),
+        )
+        ModuleSpec(
+            id = id,
+            moduleType = moduleType,
+            inputPorts = inputPorts,
+            outputPorts = outputPorts,
+            parameterPorts = parameterPorts,
+            parameters = emptyMap(),
+            position = position,
+        )
+    }
+    is WorkflowStep.Conditional -> {
+        val moduleType = ModuleType.CONDITIONAL
+        val inputPorts = listOf(
+            PortSpec("condition", PortType.DATA, PortDirection.INPUT, "Boolean"),
+        )
+        val outputPorts = listOf(
+            PortSpec("then", PortType.DATA, PortDirection.OUTPUT, "Any"),
+            PortSpec("else", PortType.DATA, PortDirection.OUTPUT, "Any"),
+        )
+        val parameterPorts = listOf(
+            PortSpec("expression", PortType.CV, PortDirection.INPUT, "String", condition),
+        )
+        ModuleSpec(
+            id = id,
+            moduleType = moduleType,
+            inputPorts = inputPorts,
+            outputPorts = outputPorts,
+            parameterPorts = parameterPorts,
+            parameters = emptyMap(),
+            position = position,
+        )
+    }
+    is WorkflowStep.Parallel -> {
+        val moduleType = ModuleType.PARALLEL
+        val inputPorts = emptyList<PortSpec>()
+        val outputPorts = branches.mapIndexed { index, _ ->
+            PortSpec("branch$index", PortType.DATA, PortDirection.OUTPUT, "Any")
+        }
+        val parameterPorts = listOf(
+            PortSpec("branchCount", PortType.CV, PortDirection.INPUT, "Int", branches.size.toString()),
+        )
+        ModuleSpec(
+            id = id,
+            moduleType = moduleType,
+            inputPorts = inputPorts,
+            outputPorts = outputPorts,
+            parameterPorts = parameterPorts,
+            parameters = emptyMap(),
+            position = position,
+        )
+    }
+    is WorkflowStep.CascadeExecution -> {
+        val moduleType = ModuleType.CASCADE_EXECUTION
+        val inputPorts = inputs.keys.map { name ->
+            PortSpec(name, PortType.DATA, PortDirection.INPUT, "String")
+        }
+        val outputPorts = listOf(PortSpec("output", PortType.DATA, PortDirection.OUTPUT, "CascadeOutputRow"))
+        val parameterPorts = listOf(
+            PortSpec("cascadeId", PortType.CV, PortDirection.INPUT, "String", cascadeId.value),
+        )
+        ModuleSpec(
+            id = id,
+            moduleType = moduleType,
+            inputPorts = inputPorts,
+            outputPorts = outputPorts,
+            parameterPorts = parameterPorts,
+            parameters = inputs,
+            position = position,
+        )
+    }
+    else -> throw IllegalArgumentException("Unknown WorkflowStep type: ${this::class.simpleName}")
+}
+

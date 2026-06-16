@@ -92,12 +92,54 @@ interface ForgeWorkspace {
     suspend fun getCascadeGraph(cascadeId: CascadeId): CascadeGraph?
 
     // =========================================================================
-    // Artifacts / Sharing
+    // Patch Bay / Cable Operations (Real-time Signal Routing)
     // =========================================================================
 
-    suspend fun artifact(name: String, description: String, files: List<ForgeFile>, workflowId: ForgeWorkflowId?, executionId: ForgeExecutionId?, isPublic: Boolean = false): ForgeArtifact
+    suspend fun putPatchBay(patchBay: PatchBay): PatchBay
+    suspend fun getPatchBay(id: PatchBayId): PatchBay?
+    suspend fun listPatchBays(): List<PatchBay>
+    suspend fun deletePatchBay(id: PatchBayId): Boolean
+
+    /** Add or update a module in the patch bay */
+    suspend fun putModule(patchBayId: PatchBayId, module: ModuleSpec): ModuleSpec
+    suspend fun getModule(patchBayId: PatchBayId, moduleId: String): ModuleSpec?
+    suspend fun deleteModule(patchBayId: PatchBayId, moduleId: String): Boolean
+
+    /** Cable operations for real-time reconfiguration */
+    suspend fun connectCable(patchBayId: PatchBayId, cable: PatchCable): PatchCable
+    suspend fun disconnectCable(patchBayId: PatchBayId, cableId: CableId): Boolean
+    suspend fun setCableState(patchBayId: PatchBayId, cableId: CableId, state: CableState): PatchCable?
+    suspend fun setCableTransform(patchBayId: PatchBayId, cableId: CableId, transform: CableTransform?): PatchCable?
+
+    /** Real-time signal processing: process one frame/block through the patch bay */
+    suspend fun processPatchBay(patchBayId: PatchBayId, inputs: Map<String, String>, frameCount: Int): Map<String, String>
+
+    /** Stream real-time output from a patch bay (for audio/video/CV streams) */
+    fun streamPatchBay(patchBayId: PatchBayId, outputPort: PortAddress): Flow<Map<String, String>>
+
+    /** Visual/graph operations */
+    suspend fun getPatchBayGraph(patchBayId: PatchBayId): PatchBayGraph?
+    suspend fun autoLayout(patchBayId: PatchBayId, algorithm: LayoutAlgorithm): PatchBay
+
+    /** Module factory: create standard modules from workflow steps */
+    suspend fun createModuleFromStep(patchBayId: PatchBayId, step: WorkflowStep, position: ModulePosition): ModuleSpec
+    suspend fun createModuleFromCascade(patchBayId: PatchBayId, cascade: OperationalCascade, position: ModulePosition): ModuleSpec
+
+    // =========================================================================
+    // Artifact / Sharing Operations
+    // =========================================================================
+
+    suspend fun artifact(
+        name: String,
+        description: String,
+        files: List<ForgeFile>,
+        workflowId: ForgeWorkflowId?,
+        executionId: ForgeExecutionId?,
+        isPublic: Boolean
+    ): ForgeArtifact
+
     suspend fun getArtifact(id: ForgeArtifactId): ForgeArtifact?
-    suspend fun listArtifacts(publicOnly: Boolean = false): List<ForgeArtifact>
+    suspend fun listArtifacts(publicOnly: Boolean): List<ForgeArtifact>
     suspend fun export(id: ForgeArtifactId, format: ExportFormat): ForgeExportBundle
     suspend fun importArtifact(bundle: ForgeExportBundle): ForgeArtifact
 }

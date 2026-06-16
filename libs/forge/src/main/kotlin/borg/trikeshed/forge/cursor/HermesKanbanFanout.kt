@@ -23,6 +23,9 @@ class HermesKanbanFanout(
     private val _prompts = mutableMapOf<ForgePromptId, ForgePrompt>()
     private val _workflows = mutableMapOf<ForgeWorkflowId, ForgeWorkflow>()
     private val _cascades = mutableMapOf<CascadeId, OperationalCascade>()
+    private val _patchBays = mutableMapOf<PatchBayId, PatchBay>()
+    private val _patchBayModules = mutableMapOf<String, MutableMap<String, ModuleSpec>>()
+    private val _patchBayCables = mutableMapOf<String, MutableList<PatchCable>>()
     
     // Kanban events flow
     private val _events = MutableSharedFlow<KanbanEvent>(replay = 1, extraBufferCapacity = 64)
@@ -295,6 +298,125 @@ class HermesKanbanFanout(
      * Render board as Graphviz DOT.
      */
     fun dot(board: KanbanBoard): String = cursor.renderDot(board)
+    
+    // =========================================================================
+    // Patch Bay / Cable Operations (Real-time Signal Routing)
+    // =========================================================================
+    
+    override suspend fun putPatchBay(patchBay: PatchBay): PatchBay {
+        _patchBays[patchBay.id] = patchBay
+        _patchBayModules[patchBay.id.value] = mutableMapOf()
+        _patchBayCables[patchBay.id.value] = mutableListOf()
+        return patchBay
+    }
+    
+    override suspend fun getPatchBay(id: PatchBayId): PatchBay? = _patchBays[id]
+    
+    override suspend fun listPatchBays(): List<PatchBay> = _patchBays.values.toList()
+    
+    override suspend fun deletePatchBay(id: PatchBayId): Boolean {
+        _patchBayModules.remove(id.value)
+        _patchBayCables.remove(id.value)
+        return _patchBays.remove(id) != null
+    }
+    
+    override suspend fun putModule(patchBayId: PatchBayId, module: ModuleSpec): ModuleSpec {
+        val modules = _patchBayModules.getOrPut(patchBayId.value) { mutableMapOf() }
+        modules[module.id] = module
+        return module
+    }
+    
+    override suspend fun getModule(patchBayId: PatchBayId, moduleId: String): ModuleSpec? {
+        return _patchBayModules[patchBayId.value]?.get(moduleId)
+    }
+    
+    override suspend fun deleteModule(patchBayId: PatchBayId, moduleId: String): Boolean {
+        return _patchBayModules[patchBayId.value]?.remove(moduleId) != null
+    }
+    
+    override suspend fun connectCable(patchBayId: PatchBayId, cable: PatchCable): PatchCable {
+        val cables = _patchBayCables.getOrPut(patchBayId.value) { mutableListOf() }
+        cables.add(cable)
+        return cable
+    }
+    
+    override suspend fun disconnectCable(patchBayId: PatchBayId, cableId: CableId): Boolean {
+        return _patchBayCables[patchBayId.value]?.removeIf { it.id == cableId } ?: false
+    }
+    
+    override suspend fun setCableState(patchBayId: PatchBayId, cableId: CableId, state: CableState): PatchCable? {
+        val cables = _patchBayCables[patchBayId.value] ?: return null
+        val index = cables.indexOfFirst { it.id == cableId }
+        return if (index >= 0) {
+            val updated = cables[index].copy(state = state)
+            cables[index] = updated
+            updated
+        } else null
+    }
+    
+    override suspend fun setCableTransform(patchBayId: PatchBayId, cableId: CableId, transform: CableTransform?): PatchCable? {
+        val cables = _patchBayCables[patchBayId.value] ?: return null
+        val index = cables.indexOfFirst { it.id == cableId }
+        return if (index >= 0) {
+            val updated = cables[index].copy(transform = transform)
+            cables[index] = updated
+            updated
+        } else null
+    }
+    
+    override suspend fun processPatchBay(patchBayId: PatchBayId, inputs: Map<String, String>, frameCount: Int): Map<String, String> {
+        // Simplified: just pass through inputs
+        return inputs
+    }
+    
+    override fun streamPatchBay(patchBayId: PatchBayId, outputPort: PortAddress): Flow<Map<String, String>> = kotlinx.coroutines.flow.flowOf(emptyMap<String, String>())
+    
+    override suspend fun getPatchBayGraph(patchBayId: PatchBayId): PatchBayGraph? {
+        val modules = _patchBayModules[patchBayId.value] ?: return null
+        val cables = _patchBayCables[patchBayId.value] ?: return null
+        val nodes = modules.values.map { module ->
+            PatchBayNode(
+                id = module.id,
+                moduleType = module.moduleType,
+                label = module.id,
+                position = module.position,
+                inputPorts = module.inputPorts,
+                outputPorts = module.outputPorts,
+            )
+        }
+        val edges = cables.map { cable ->
+            PatchBayEdge(
+                id = cable.id,
+                source = cable.source,
+                destination = cable.destination,
+                state = cable.state,
+                transform = cable.transform,
+            )
+        }
+        return PatchBayGraph(patchBayId, nodes, edges)
+    }
+    
+    override suspend fun autoLayout(patchBayId: PatchBayId, algorithm: LayoutAlgorithm): PatchBay {
+        return _patchBays[patchBayId] ?: PatchBay(patchBayId, "", emptyMap(), emptyList())
+    }
+    
+    override suspend fun createModuleFromStep(patchBayId: PatchBayId, step: WorkflowStep, position: ModulePosition): ModuleSpec {
+        val module = step.toModuleSpec(position)
+        return putModule(patchBayId, module)
+    }
+    
+    override suspend fun createModuleFromCascade(patchBayId: PatchBayId, cascade: OperationalCascade, position: ModulePosition): ModuleSpec {
+        val module = ModuleSpec(
+            id = cascade.id.value,
+            moduleType = ModuleType.CASCADE_EXECUTION,
+            inputPorts = cascade.keyHierarchy.map { key ->
+                PortSpec(key, PortType.DATA, PortDirection.INPUT, "String")
+            },
+            outputPorts = listOf(PortSpec("output", PortType.DATA, PortDirection.OUTPUT, "CascadeOutputRow")),
+            position = position,
+        )
+        return putModule(patchBayId, module)
+    }
 }
 
 /**
