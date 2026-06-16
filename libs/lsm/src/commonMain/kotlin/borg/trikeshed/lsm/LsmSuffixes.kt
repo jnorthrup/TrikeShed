@@ -53,8 +53,8 @@ data class Entry(
 /** Sorted run = immutable SSTable */
 data class SortedRun(
     val entries: Series<Entry>,
-    val minKey: Any,
-    val maxKey: Any,
+    val minKey: Any = "",
+    val maxKey: Any = "",
     val level: Int = 0,
     val version: Long = System.nanoTime()
 )
@@ -177,41 +177,3 @@ val <T : MutableSeries<Entry>> T.columnar: ColumnarSuffixes<T>
 /** Universal WAL suffix */
 val <T : MutableSeries<Entry>> T.wal: LsmWal<T>
     get() = LsmWal(this, 1024)
-
-// ──────────────────────────────────────────────────────────────────────────────
-// HELPER EXTENSIONS (using kernel algebra)
-// ──────────────────────────────────────────────────────────────────────────────
-
-fun <T : MutableSeries<Entry>> T.toSortedRun(): SortedRun {
-    val sorted = this.sortedBy { it.key }
-    val entries = s_ * sorted
-    return SortedRun(entries, sorted.first().key, sorted.last().key)
-}
-
-fun <T : MutableSeries<Entry>> T.toColumns(): Series<Column> = 
-    this.groupBy { it.column ?: "default" }
-        .map { (name, entries) -> 
-            Column(name, entries.map { it.value }.toSeries(), ColumnType("auto")) 
-        }
-        .toSeries()
-
-fun <T : MutableSeries<Entry>> T.toCheckpoint(): ColumnarStage.Checkpoint =
-    ColumnarStage.Checkpoint(this.toRowGroups().toSeries())
-
-fun <T : MutableSeries<Entry>> T.toRowGroups(maxRows: Int = 122880): Series<ColumnarStage.RowGroup> =
-    this.chunked(maxRows).map { it.toRowGroup(maxRows) }.toSeries()
-
-fun <T : MutableSeries<Entry>> T.toRowGroup(maxRows: Int): ColumnarStage.RowGroup =
-    ColumnarStage.RowGroup(this.toColumns(), minOf(this.size, maxRows))
-
-fun <T : MutableSeries<Entry>> T.partitionBy(key: (Entry) -> Any): Series<T> =
-    this.groupBy(key).map { (_, entries) -> entries.toMutableSeries() }.toSeries()
-
-fun <T : MutableSeries<Entry>> T.chunked(size: Int): Series<T> =
-    (0 until this.size step size).map { i -> 
-        this.slice(i..minOf(i + size - 1, this.size - 1)).toMutableSeries() 
-    }.toSeries()
-
-/** Helper to get column from Entry */
-fun Entry.getColumn(name: String): Any? =
-    if (column == name) value else null

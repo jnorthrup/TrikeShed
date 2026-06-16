@@ -1,20 +1,26 @@
-apply(from = "../../gradle/macros/trikeshed-lib.gradle")
-
 plugins {
     kotlin("multiplatform")
-    id("org.jetbrains.kotlin.plugin.serialization") version "2.4.0"
 }
 
 kotlin {
-    jvm {}
+    jvmToolchain(21)
+    jvm()
+
     sourceSets {
         val commonMain by getting {
             dependencies {
-                api("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
-                api("org.jetbrains.kotlinx:kotlinx-serialization-core:1.7.3")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.0")
             }
+            kotlin.srcDir("src/generated/kotlin")
+            kotlin.srcDir("src/commonMain/kotlin")
         }
-        val jvmMain by getting {}
+        val commonTest by getting {
+            dependencies {
+                implementation(kotlin("test"))
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.0")
+            }
+            kotlin.srcDir("src/commonTest/kotlin")
+        }
         val jvmTest by getting {
             dependencies {
                 implementation(kotlin("test-junit"))

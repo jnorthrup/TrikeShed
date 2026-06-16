@@ -42,7 +42,7 @@ base64 = "0.22"
 
 # Metrics
 metrics = "0.21"
-metrics-exporter-prometheus = "0.13"
+metrics-exporter-prometheus = { version = "0.13", optional = true }
 
 [dev-dependencies]
 tokio-test = "0.4"
@@ -50,12 +50,12 @@ mockito = "1.2"
 wiremock = "0.5"
 
 [[bin]]
-name = "modelmux"
-path = "src/modelmux/main.rs"
-
-[[bin]]
 name = "keymux"
 path = "src/keymux/main.rs"
+
+[[bin]]
+name = "modelmux"
+path = "src/modelmux/main.rs"
 
 [[bin]]
 name = "modelmux-reactor"
@@ -63,4 +63,5 @@ path = "src/reactor/main.rs"
 
 [features]
 default = []
-full = ["metrics-exporter-prometheus"]
+full = ["metrics"]
+metrics = ["metrics-exporter-prometheus"]
