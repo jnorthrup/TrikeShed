@@ -63,8 +63,8 @@ def configureCompiler = { kotlinExt, boolean expectActual ->
     if (expectActual) args.add("-Xexpect-actual-classes")
     tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompilationTask.class).configureEach {
         compilerOptions {
-            apiVersion.set(org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_4)
-            languageVersion.set(org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_4)
+            apiVersion.set("2.4")
+            languageVersion.set("2.4")
             freeCompilerArgs.addAll(args)
         }
     }
@@ -172,8 +172,8 @@ def plainJvm = { boolean applyApplication = false ->
     kotlinExt.jvmToolchain(25)
     tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompilationTask.class).configureEach {
         compilerOptions {
-            apiVersion.set(org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_4)
-            languageVersion.set(org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_4)
+            apiVersion.set("2.4")
+            languageVersion.set("2.4")
             freeCompilerArgs.addAll(
                 "-opt-in=kotlin.RequiresOptIn",
                 "-Xsuppress-version-warnings",
@@ -192,10 +192,18 @@ switch (project.path) {
         kmpHost(rootMode: "none")
         break
     case ":libs:lsm":
-        // lsm needs common - add it via extraDeps after kmpHost runs
-        kmpHost(rootMode: "none")
-        extensions.getByName("kotlin").sourceSets.getByName("jvmMain").dependencies {
+        // lsm needs common AND root project for lib module (MutableSeries, Series, etc.)
+        // Use kmpJvm with root project's JVM artifact from mavenLocal
+        kmpJvm(coroutinesMain: true, rootMode: "none", extraDeps: [
+            "org.bereft:TrikeShed-jvm:1.0",
+        ])
+        // Add to commonMain so all targets get root types
+        extensions.getByName("kotlin").sourceSets.getByName("commonMain").dependencies {
+            implementation "org.bereft:TrikeShed-jvm:1.0"
             implementation project(":libs:common")
+        }
+        extensions.getByName("kotlin").sourceSets.getByName("jvmMain").dependencies {
+            implementation "org.jetbrains.kotlinx:kotlinx-coroutines-core:${prop("versions.kotlinx-coroutines-core")}"
         }
         break
 
@@ -270,7 +278,7 @@ switch (project.path) {
         }
         break
     case ":libs:asclepius":
-        kmpJvm(coroutinesMain: true, rootMode: "none", extraDeps: [
+        kmpJvm(coroutinesMain: true, rootMode: "api", extraDeps: [
             "org.graalvm.polyglot:polyglot:24.1.1",
             "org.xerial:sqlite-jdbc:3.49.1.0",
             "org.apache.arrow:arrow-memory-core:19.0.0",
@@ -278,19 +286,36 @@ switch (project.path) {
             "io.netty:netty-buffer:4.1.118.Final",
             "io.netty:netty-transport:4.1.118.Final",
             "org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3",
+            project(":libs:polyglot"),
         ])
         extensions.getByName("kotlin").sourceSets.getByName("jvmMain").dependencies {
             implementation "org.jetbrains.kotlinx:kotlinx-coroutines-core:${prop("versions.kotlinx-coroutines-core")}"
         }
         break
     case ":libs:classfile":
-        kmpJvm(extraDeps: [project(":libs:couch")])
+        // JVM-only KMP project - use root project's JVM artifact from mavenLocal
+        kmpJvm(coroutinesMain: true, rootMode: "none", extraDeps: [
+            "org.bereft:TrikeShed-jvm:1.0",
+            project(":libs:couch"),
+        ])
+        // Add root to commonMain so all targets get root types
+        extensions.getByName("kotlin").sourceSets.getByName("commonMain").dependencies {
+            implementation "org.bereft:TrikeShed-jvm:1.0"
+            implementation project(":libs:couch")
+        }
         extensions.getByName("kotlin").sourceSets.getByName("jvmTest").dependencies {
             implementation "org.graalvm.polyglot:js:24.1.1"
         }
         break
     case ":libs:tiny-btrfs":
-        kmpHost(rootMode: "api")
+        // JVM-only KMP project - use root project's JVM artifact from mavenLocal
+        kmpJvm(coroutinesMain: true, rootMode: "none", extraDeps: [
+            "org.bereft:TrikeShed-jvm:1.0",
+        ])
+        // Add root to commonMain so all targets get root types
+        extensions.getByName("kotlin").sourceSets.getByName("commonMain").dependencies {
+            implementation "org.bereft:TrikeShed-jvm:1.0"
+        }
         // Exclude LoopbackDiskAdapter from JVM compilation (requires liburing)
         extensions.getByName("kotlin").sourceSets.getByName("jvmMain").kotlin {
             exclude("**/LoopbackDiskAdapter.kt")
@@ -310,13 +335,32 @@ switch (project.path) {
         }
         break
     case ":libs:forge":
-        kmpJvm()
-        extensions.getByName("kotlin").sourceSets.getByName("commonMain").dependencies {
+        pluginManager.apply("org.jetbrains.kotlin.multiplatform")
+        pluginManager.apply("org.jetbrains.kotlin.plugin.serialization")
+        pluginManager.apply("maven-publish")
+        group = "borg.trikeshed"
+        version = libVersion
+        def kotlinExt = extensions.getByName("kotlin")
+        configureCompiler(kotlinExt, true)
+        jvmOnlyTarget(kotlinExt)
+        // Source sets - forge uses src/main/kotlin (JVM structure)
+        def forgeSourceSets = extensions.getByName("kotlin").sourceSets
+        forgeSourceSets.getByName("commonMain").dependencies {
             implementation libPeer("miniduck")
+            api "org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3"
         }
-        extensions.getByName("kotlin").sourceSets.getByName("commonTest").dependencies {
+        forgeSourceSets.getByName("commonTest").dependencies {
             implementation rootPeer()
             implementation "org.jetbrains.kotlinx:kotlinx-coroutines-core:${prop("versions.kotlinx-coroutines-core")}"
+        }
+        // Map main source set to commonMain for JVM target
+        forgeSourceSets.named("jvmMain").configure {
+            kotlin.srcDir("src/main/kotlin")
+            resources.srcDir("src/main/resources")
+        }
+        forgeSourceSets.named("jvmTest").configure {
+            kotlin.srcDir("src/test/kotlin")
+            resources.srcDir("src/test/resources")
         }
         break
     case ":libs:forge-ui":
@@ -326,11 +370,12 @@ switch (project.path) {
         def forgeUiKotlin = extensions.getByName("kotlin")
         def forgeUiSets = forgeUiKotlin.sourceSets
         forgeUiSets.getByName("commonMain").dependencies {
-            // Compose Multiplatform
-            api("org.jetbrains.compose.runtime:runtime:1.7.3")
-            api("org.jetbrains.compose.foundation:foundation:1.7.3")
-            api("org.jetbrains.compose.material3:material3:1.7.3")
-            api("org.jetbrains.compose.components:components-resources:1.7.3")
+            // Compose Multiplatform - use version compatible with Kotlin 2.4.0
+            def composeVersion = "1.7.3" // TODO: update when Kotlin 2.4 compatible Compose is available
+            api("org.jetbrains.compose.runtime:runtime:$composeVersion")
+            api("org.jetbrains.compose.foundation:foundation:$composeVersion")
+            api("org.jetbrains.compose.material3:material3:$composeVersion")
+            api("org.jetbrains.compose.components:components-resources:$composeVersion")
             // TrikeShed core types are JVM-only — see jvmMain.
             api("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
             api("org.jetbrains.kotlinx:kotlinx-datetime:0.8.0-0.6.x-compat")
@@ -525,12 +570,17 @@ switch (project.path) {
         }
         break
     case ":libs:miniduck":
-        kmpJvm(rootMode: "api")
+        kmpJvm(
+            rootMode: "api",
+            coroutinesMain: true,
+            extraDeps: [
+                "org.jetbrains.kotlin:kotlin-reflect:${kotlinVersion}",
+                libPeer("kursive"),
+            ]
+        )
+        // JVM exclusions for platform-specific modules
         def miniduckKotlin = extensions.getByName("kotlin")
         def miniduckSets = miniduckKotlin.sourceSets
-        miniduckSets.getByName("commonMain").dependencies {
-            implementation "org.jetbrains.kotlin:kotlin-test:${kotlinVersion}"
-        }
         miniduckSets.getByName("jvmMain").kotlin {
             exclude("**/exec/LsmrTableSource.kt")
             exclude("**/objectstore/GcsAdapter.kt")
@@ -538,13 +588,11 @@ switch (project.path) {
             exclude("**/objectstore/AlibabaAdapter.kt")
             exclude("**/objectstore/ObjectStorageBlockStoreImpl.kt")
         }
-        miniduckSets.getByName("jvmMain").dependencies {
-            implementation "org.jetbrains.kotlin:kotlin-reflect:${kotlinVersion}"
-            implementation libPeer("kursive")
-        }
+        // Add couch to commonTest
         miniduckSets.getByName("commonTest").dependencies {
             implementation libPeer("couch")
         }
+        // posixMain source set
         def miniduckPosix = miniduckSets.create("posixMain")
         miniduckPosix.dependsOn(miniduckSets.getByName("commonMain"))
         miniduckSets.findByName("macosMain")?.dependsOn(miniduckPosix)

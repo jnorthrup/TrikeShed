@@ -5,6 +5,8 @@ import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.Twin
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.s_
+import borg.trikeshed.mutable.MutableSeries
+import borg.trikeshed.mutable.SortedSeries
 
 // ──────────────────────────────────────────────────────────────────────────────
 // LSM + DuckDB Unified Suffixes
@@ -35,22 +37,24 @@ sealed class ColumnarStage {
 
 /** Single entry - works for both LSM and columnar */
 data class Entry(
-    val key: Comparable<*>,
-    val value: Any?,
-    val seq: Long,
+    val key: Any,
+    val value: Any? = null,
+    val seq: Long = 0,
     val deleted: Boolean = false,
     // Columnar extension
     val column: String? = null,
     val row: Int? = null
 ) : Comparable<Entry> {
-    override fun compareTo(other: Entry): Int = key.compareTo(other.key)
+    @Suppress("UNCHECKED_CAST")
+    override fun compareTo(other: Entry): Int =
+        (key as Comparable<Any>).compareTo(other.key)
 }
 
 /** Sorted run = immutable SSTable */
 data class SortedRun(
     val entries: Series<Entry>,
-    val minKey: Comparable<*>,
-    val maxKey: Comparable<*>,
+    val minKey: Any,
+    val maxKey: Any,
     val level: Int = 0,
     val version: Long = System.nanoTime()
 )
@@ -109,52 +113,52 @@ class ColumnarSuffixes<T : MutableSeries<Entry>>(val source: T) {
 }
 
 /** WAL buffer - shared by both LSM and DuckDB */
-class LsmWal<T>(val source: T, val capacity: Int) {
+class LsmWal<T : MutableSeries<Entry>>(val source: T, val capacity: Int) {
     fun drain(): SortedRun = source.toSortedRun()
     fun toMemTable(): LsmMemTable<T> = LsmMemTable(source, capacity)
 }
 
 /** DuckDB WAL buffer */
-class DuckWal<T>(val source: T, val capacity: Int) {
+class DuckWal<T : MutableSeries<Entry>>(val source: T, val capacity: Int) {
     fun drain(): Series<Entry> = source.toSortedRun().entries
     fun toRowGroup(maxRows: Int): RowGroupBuilder<T> = RowGroupBuilder(source, maxRows)
 }
 
 /** LSM MemTable (in-memory sorted) */
-class LsmMemTable<T>(val source: T, val capacity: Int) {
+class LsmMemTable<T : MutableSeries<Entry>>(val source: T, val capacity: Int) {
     fun flush(): SortedRun = source.toSortedRun()
     infix fun level(n: Int): LsmLevelTarget<T> = LsmLevelTarget(source, n)
 }
 
 /** Target LSM level for placement */
-class LsmLevelTarget<T>(val source: T, val level: Int) {
+class LsmLevelTarget<T : MutableSeries<Entry>>(val source: T, val level: Int) {
     fun place(): SortedRun = SortedRun(source.toSortedRun().entries, level = level)
 }
 
 /** Compaction trigger */
-class LsmCompact<T>(val source: T) {
+class LsmCompact<T : MutableSeries<Entry>>(val source: T) {
     fun merge(levels: Series<LsmLevel>): SortedRun = source.toSortedRun()
 }
 
 /** Row group builder - columnar */
-class RowGroupBuilder<T>(val source: T, val maxRows: Int) {
+class RowGroupBuilder<T : MutableSeries<Entry>>(val source: T, val maxRows: Int) {
     fun build(): ColumnarStage.RowGroup = 
         ColumnarStage.RowGroup(source.toColumns(), source.size)
     infix fun column(name: String): ColumnVector<T> = ColumnVector(source, name)
 }
 
 /** Column vector */
-class ColumnVector<T>(val source: T, val name: String) {
+class ColumnVector<T : MutableSeries<Entry>>(val source: T, val name: String) {
     val data: Series<Any?> = source.α { it.value }
 }
 
 /** Partitioned */
-class Partitioned<T>(val source: T, val by: String) {
+class Partitioned<T : MutableSeries<Entry>>(val source: T, val by: String) {
     fun build(): Series<SortedRun> = source.partitionBy { it.key }.map { it.toSortedRun() }.toSeries()
 }
 
 /** Partitioned columnar */
-class PartitionedColumnar<T>(val source: T, val by: String) {
+class PartitionedColumnar<T : MutableSeries<Entry>>(val source: T, val by: String) {
     fun build(): Series<ColumnarStage.RowGroup> = source.partitionBy { it.getColumn(by) }.map { it.toRowGroup() }.toSeries()
 }
 
@@ -207,3 +211,7 @@ fun <T : MutableSeries<Entry>> T.chunked(size: Int): Series<T> =
     (0 until this.size step size).map { i -> 
         this.slice(i..minOf(i + size - 1, this.size - 1)).toMutableSeries() 
     }.toSeries()
+
+/** Helper to get column from Entry */
+fun Entry.getColumn(name: String): Any? =
+    if (column == name) value else null
