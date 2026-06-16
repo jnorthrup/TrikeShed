@@ -226,6 +226,17 @@ enum class PatchCableShapeDimension(
     TEMPORAL("temporal", "Module has time-based behavior", "⏳"),
     STOCHASTIC("stochastic", "Module has non-deterministic output", "🎲"),
     COMPOSITE("composite", "Module contains sub-modules", "📦"),
+    // Modernized patch-cable dimensions — increased shape dimensionality
+    FEEDBACK("feedback", "Module has feedback/recursive loops", "🔄"),
+    MODULATION("modulation", "Module modulates other signals", "〰"),
+    QUANTIZATION("quantization", "Module quantizes/discretizes signals", "⎯⎯"),
+    SPATIAL("spatial", "Module has spatial/geometric properties", "📐"),
+    SPECTRAL("spectral", "Module operates in frequency domain", "📊"),
+    ENVELOPE("envelope", "Module shapes amplitude over time", "⋏"),
+    SEQUENCE("sequence", "Module generates/processes sequences", "⏭"),
+    POLYPHONIC("polyphonic", "Module handles multiple voices/channels", "🎹"),
+    GRANULAR("granular", "Module processes micro-sound grains", "⬤"),
+    HYBRID("hybrid", "Module combines multiple signal domains", "⚛"),
 }
 
 /**
@@ -236,32 +247,43 @@ fun WorkflowStep.getPatchCableShapeDimensions(): Set<PatchCableShapeDimension> =
         PatchCableShapeDimension.SIGNAL_FLOW,
         PatchCableShapeDimension.STOCHASTIC,
         PatchCableShapeDimension.EXTERNAL_IO,
+        PatchCableShapeDimension.MODULATION,  // LLMs modulate output based on prompts
+        PatchCableShapeDimension.HYBRID,      // LLMs blend reasoning + generation
     )
     is WorkflowStep.CodeExecution -> setOf(
         PatchCableShapeDimension.SIGNAL_FLOW,
         PatchCableShapeDimension.STATE_MUTATION,
+        PatchCableShapeDimension.SEQUENCE,    // Code executes sequentially
+        PatchCableShapeDimension.FEEDBACK,    // Loops/recursion
     )
     is WorkflowStep.AgentInvocation -> setOf(
         PatchCableShapeDimension.SIGNAL_FLOW,
         PatchCableShapeDimension.EXTERNAL_IO,
         PatchCableShapeDimension.STATE_MUTATION,
         PatchCableShapeDimension.TEMPORAL,
+        PatchCableShapeDimension.FEEDBACK,    // Agent loops
+        PatchCableShapeDimension.POLYPHONIC,  // Multi-turn conversations
     )
     is WorkflowStep.FileTransform -> setOf(
         PatchCableShapeDimension.SIGNAL_FLOW,
         PatchCableShapeDimension.EXTERNAL_IO,
+        PatchCableShapeDimension.GRANULAR,    // Chunked processing
     )
     is WorkflowStep.Conditional -> setOf(
         PatchCableShapeDimension.CONTROL_FLOW,
+        PatchCableShapeDimension.QUANTIZATION, // Discrete branching
     )
     is WorkflowStep.Parallel -> setOf(
         PatchCableShapeDimension.PARALLELISM,
         PatchCableShapeDimension.CONTROL_FLOW,
+        PatchCableShapeDimension.SPATIAL,     // Parallel = spatial distribution
     )
     is WorkflowStep.CascadeExecution -> setOf(
         PatchCableShapeDimension.SIGNAL_FLOW,
         PatchCableShapeDimension.COMPOSITE,
         PatchCableShapeDimension.STATE_MUTATION,
+        PatchCableShapeDimension.SPECTRAL,    // Map-reduce = spectral decomposition
+        PatchCableShapeDimension.ENVELOPE,    // Cascade has attack/sustain/release
     )
 }
 
@@ -296,6 +318,17 @@ fun ForgeWorkflow.toShapeDimensionDiagram(): String {
                 PatchCableShapeDimension.TEMPORAL -> "#D9A84A"
                 PatchCableShapeDimension.STOCHASTIC -> "#A02EA0"
                 PatchCableShapeDimension.COMPOSITE -> "#2E8A8A"
+                // Modernized patch-cable dimensions
+                PatchCableShapeDimension.FEEDBACK -> "#8A4AD9"
+                PatchCableShapeDimension.MODULATION -> "#D98A4A"
+                PatchCableShapeDimension.QUANTIZATION -> "#4AD98A"
+                PatchCableShapeDimension.SPATIAL -> "#D94AD9"
+                PatchCableShapeDimension.SPECTRAL -> "#8AD94A"
+                PatchCableShapeDimension.ENVELOPE -> "#D94A8A"
+                PatchCableShapeDimension.SEQUENCE -> "#4A4AD9"
+                PatchCableShapeDimension.POLYPHONIC -> "#D9D94A"
+                PatchCableShapeDimension.GRANULAR -> "#4AD9D9"
+                PatchCableShapeDimension.HYBRID -> "#D98AD9"
             }
             appendLine("  style $stepId fill:$color,stroke:#fff,stroke-width:2px,color:#fff")
         }

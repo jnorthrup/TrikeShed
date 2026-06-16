@@ -14,7 +14,7 @@ echo
 cd /Users/jim/work/TrikeShed
 
 # Run tests which serve as the complete demo
-./gradlew :libs:forge:test --rerun-tasks --no-daemon -q 2>&1
+./gradlew :libs:forge:jvmTest --rerun-tasks --no-daemon -q 2>&1
 
 echo
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"

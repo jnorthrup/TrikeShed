@@ -61,6 +61,25 @@ internal class ForgeWorkspaceStub : ForgeWorkspace {
     override fun executeCascade(cascadeId: CascadeId, snapshotId: ForgeSnapshotId?): kotlinx.coroutines.flow.Flow<CascadeProgress> = flowOf()
     override suspend fun executeCascadeSync(cascadeId: CascadeId, snapshotId: ForgeSnapshotId?): CascadeExecutionResult = throw AssertionError("RED: executeCascadeSync not implemented")
     override suspend fun getCascadeGraph(cascadeId: CascadeId): CascadeGraph? = throw AssertionError("RED: getCascadeGraph not implemented")
+
+    // Patch Bay / Cable Operations (Real-time Signal Routing)
+    override suspend fun putPatchBay(patchBay: PatchBay): PatchBay = throw AssertionError("RED: putPatchBay not implemented")
+    override suspend fun getPatchBay(id: PatchBayId): PatchBay? = throw AssertionError("RED: getPatchBay not implemented")
+    override suspend fun listPatchBays(): List<PatchBay> = throw AssertionError("RED: listPatchBays not implemented")
+    override suspend fun deletePatchBay(id: PatchBayId): Boolean = throw AssertionError("RED: deletePatchBay not implemented")
+    override suspend fun putModule(patchBayId: PatchBayId, module: ModuleSpec): ModuleSpec = throw AssertionError("RED: putModule not implemented")
+    override suspend fun getModule(patchBayId: PatchBayId, moduleId: String): ModuleSpec? = throw AssertionError("RED: getModule not implemented")
+    override suspend fun deleteModule(patchBayId: PatchBayId, moduleId: String): Boolean = throw AssertionError("RED: deleteModule not implemented")
+    override suspend fun connectCable(patchBayId: PatchBayId, cable: PatchCable): PatchCable = throw AssertionError("RED: connectCable not implemented")
+    override suspend fun disconnectCable(patchBayId: PatchBayId, cableId: CableId): Boolean = throw AssertionError("RED: disconnectCable not implemented")
+    override suspend fun setCableState(patchBayId: PatchBayId, cableId: CableId, state: CableState): PatchCable? = throw AssertionError("RED: setCableState not implemented")
+    override suspend fun setCableTransform(patchBayId: PatchBayId, cableId: CableId, transform: CableTransform?): PatchCable? = throw AssertionError("RED: setCableTransform not implemented")
+    override suspend fun processPatchBay(patchBayId: PatchBayId, inputs: Map<String, String>, frameCount: Int): Map<String, String> = throw AssertionError("RED: processPatchBay not implemented")
+    override fun streamPatchBay(patchBayId: PatchBayId, outputPort: PortAddress): kotlinx.coroutines.flow.Flow<Map<String, String>> = flowOf()
+    override suspend fun getPatchBayGraph(patchBayId: PatchBayId): PatchBayGraph? = throw AssertionError("RED: getPatchBayGraph not implemented")
+    override suspend fun autoLayout(patchBayId: PatchBayId, algorithm: LayoutAlgorithm): PatchBay = throw AssertionError("RED: autoLayout not implemented")
+    override suspend fun createModuleFromStep(patchBayId: PatchBayId, step: WorkflowStep, position: ModulePosition): ModuleSpec = throw AssertionError("RED: createModuleFromStep not implemented")
+    override suspend fun createModuleFromCascade(patchBayId: PatchBayId, cascade: OperationalCascade, position: ModulePosition): ModuleSpec = throw AssertionError("RED: createModuleFromCascade not implemented")
 }
 
 internal class ForgeStepRunnerStub : ForgeStepRunner {

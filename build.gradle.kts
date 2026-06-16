@@ -45,7 +45,30 @@ kotlin {
 
     js {
         nodejs()
+        browser {
+            testTask {
+                useKarma {
+                    useConfigDirectory(project.layout.projectDirectory.dir("karma.config.d").asFile)
+                    // The Kotlin/JS framework refuses to start the browser test task unless
+                    // it has a browser in its internal list. We register ChromeHeadless so
+                    // the "No browsers configured" check passes; the karma.config.d append
+                    // then overrides the runtime browsers list to use karma-electron.
+                    useChromeHeadless()
+                }
+            }
+        }
         binaries.executable()
+    }
+    // Electron host for jsBrowserTest (TDD: ElectronHostTest expects
+    // process.versions.electron + Electron/<ver> in userAgent).
+    // These devDeps live in the JS test source-set's npm scope so the
+    // karma package.json installs them alongside the test runtime.
+    sourceSets.named("jsTest").configure {
+        dependencies {
+            // devDependencies: karma-electron (launcher) + electron (browser binary)
+            npm("karma-electron", "7.2.0")
+            npm("electron", "31.7.7")
+        }
     }
 
     sourceSets {
