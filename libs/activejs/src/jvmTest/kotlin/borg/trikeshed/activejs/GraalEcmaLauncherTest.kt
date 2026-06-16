@@ -9,7 +9,7 @@ class GraalEcmaLauncherTest {
 
     @Test
     fun testLauncherCreation() = runBlocking {
-        val launcher = GraalEcmaLauncher()
+        val launcher = GraalEcmaLauncherImpl()
         assertNotNull(launcher)
     }
 

@@ -1,17 +1,15 @@
 package borg.trikeshed.activejs
 
-import kotlinx.coroutines.CoroutineContext
-
 /** Stub implementation for Linux native target - GraalVM not available. */
-actual class GraalEcmaLauncherImpl : GraalEcmaLauncher {
-    override fun initialize(context: CoroutineContext = kotlinx.coroutines.currentCoroutineContext()): GraalEcmaContext {
+class GraalEcmaLauncherImpl : GraalEcmaLauncher {
+    override fun initialize(): GraalEcmaContext {
         return GraalEcmaContextStub()
     }
     
     override fun shutdown() {}
 }
 
-actual class GraalEcmaContextStub : GraalEcmaContext {
+class GraalEcmaContextStub : GraalEcmaContext {
     override val polyglotContext: Any = "LINUX_STUB"
     
     override fun eval(script: String): Any = "LINUX_STUB: $script"
@@ -21,4 +19,6 @@ actual class GraalEcmaContextStub : GraalEcmaContext {
     override fun putBinding(name: String, value: Any) {}
     
     override fun installPointcutHooks(target: Any, eventHandler: (PointcutEvent) -> Unit) {}
+    
+    override fun close() {}
 }

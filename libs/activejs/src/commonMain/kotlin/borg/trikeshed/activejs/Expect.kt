@@ -1,6 +1,6 @@
 package borg.trikeshed.activejs
 
-import kotlinx.coroutines.CoroutineContext
+import kotlin.coroutines.CoroutineContext
 
 /**
  * ActiveJS — GraalVM ECMA launcher with pointcut integration.
@@ -8,19 +8,19 @@ import kotlinx.coroutines.CoroutineContext
  * Single responsibility: launch GraalVM Polyglot context (JS) and install
  * pointcut hooks that feed events into the local TrikeShed system.
  */
-expect interface GraalEcmaLauncher {
+interface GraalEcmaLauncher {
     /**
      * Initialize and return a GraalVM Polyglot Context configured for pointcutting.
      * The context has pointcut hooks installed that emit to the local CCEK bus.
      */
-    fun initialize(context: CoroutineContext): GraalEcmaContext
+    fun initialize(): GraalEcmaContext
     
     /** Shutdown the GraalVM context and clean up resources. */
     fun shutdown()
 }
 
 /** Wrapper around GraalVM Polyglot Context with pointcut hooks installed. */
-expect interface GraalEcmaContext {
+interface GraalEcmaContext {
     /** The underlying GraalVM Polyglot Context. */
     val polyglotContext: Any
     
@@ -64,21 +64,44 @@ object PointcutOpcode {
 /**
  * CCEK SPI for Pointcut Event Transport (local to TrikeShed).
  * Replaces xvm Channel with zero-copy CCEK bus via NioSupervisor.
- * Platform-specific implementations in jvmMain/jsMain/etc.
  */
-expect interface PointcutEventProducer : CoroutineContext.Element {
-    companion object Key : kotlinx.coroutines.AsyncContextKey<PointcutEventProducer>()
-    override val key: CoroutineContext.Key<*> get() = Key
+interface PointcutEventProducer : CoroutineContext.Element {
+    companion object Key : CoroutineContext.Key<PointcutEventProducer>
     fun emit(event: PointcutEvent)
     fun registerConsumer(consumer: PointcutEventConsumer)
     fun unregisterConsumer(consumer: PointcutEventConsumer)
 }
 
-expect interface PointcutEventConsumer : CoroutineContext.Element {
-    companion object Key : kotlinx.coroutines.AsyncContextKey<PointcutEventConsumer>()
-    override val key: CoroutineContext.Key<*> get() = Key
+interface PointcutEventConsumer : CoroutineContext.Element {
+    companion object Key : CoroutineContext.Key<PointcutEventConsumer>
     fun onEvent(event: PointcutEvent)
 }
 
-expect fun CoroutineContext.getPointcutEventProducer(): PointcutEventProducer?
-expect fun CoroutineContext.getPointcutEventConsumer(): PointcutEventConsumer?
+/**
+ * Factory for creating platform-specific PointcutEventProducer/Consumer implementations.
+ * On JVM, returns implementations that integrate with CoroutineContext.
+ * On other platforms, returns no-op implementations.
+ */
+expect object PointcutEventFactory {
+    fun createProducer(): PointcutEventProducer
+    fun createConsumer(producer: PointcutEventProducer): PointcutEventConsumer
+    fun getProducer(): PointcutEventProducer?
+    fun getConsumer(): PointcutEventConsumer?
+}
+
+/**
+ * Default no-op implementations for platforms without CoroutineContext support.
+ */
+class NoOpPointcutEventProducer : PointcutEventProducer {
+    override val key: CoroutineContext.Key<PointcutEventProducer> get() = Key
+    companion object Key : CoroutineContext.Key<PointcutEventProducer>
+    override fun emit(event: PointcutEvent) {}
+    override fun registerConsumer(consumer: PointcutEventConsumer) {}
+    override fun unregisterConsumer(consumer: PointcutEventConsumer) {}
+}
+
+class NoOpPointcutEventConsumer(private val producer: PointcutEventProducer) : PointcutEventConsumer {
+    override val key: CoroutineContext.Key<PointcutEventConsumer> get() = Key
+    companion object Key : CoroutineContext.Key<PointcutEventConsumer>
+    override fun onEvent(event: PointcutEvent) {}
+}

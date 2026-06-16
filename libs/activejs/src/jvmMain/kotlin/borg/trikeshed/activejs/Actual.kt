@@ -1,18 +1,17 @@
 package borg.trikeshed.activejs
 
-import kotlinx.coroutines.CoroutineContext
+import kotlin.coroutines.CoroutineContext
 import org.graalvm.polyglot.Context
 import org.graalvm.polyglot.HostAccess
-import org.graalvm.polyglot.HostClassLoading
 
 /**
- * JVM actual implementation of GraalEcmaLauncher.
+ * JVM implementation of GraalEcmaLauncher.
  * Launches GraalVM Polyglot Context with pointcut hooks.
  */
-actual class GraalEcmaLauncherImpl : GraalEcmaLauncher {
-    private var context: GraalEcmaContext? = null
+class GraalEcmaLauncherImpl : GraalEcmaLauncher {
+    private var context: GraalEcmaContextImpl? = null
     
-    override fun initialize(context: CoroutineContext = kotlinx.coroutines.currentCoroutineContext()): GraalEcmaContext {
+    override fun initialize(): GraalEcmaContext {
         val graalContext = GraalEcmaContextImpl()
         this.context = graalContext
         return graalContext
@@ -25,24 +24,23 @@ actual class GraalEcmaLauncherImpl : GraalEcmaLauncher {
 }
 
 /** JVM implementation of GraalEcmaContext wrapping GraalVM Polyglot Context. */
-actual class GraalEcmaContextImpl : GraalEcmaContext {
-    private val polyglotContext = Context.newBuilder("js")
+class GraalEcmaContextImpl : GraalEcmaContext {
+    private val graalContext = Context.newBuilder("js")
         .allowAllAccess(true)
         .allowHostAccess(HostAccess.ALL)
-        .allowHostClassLoading(HostClassLoading.ALLOW)
         .build()
     
-    override val polyglotContext: Any = polyglotContext
+    override val polyglotContext: Any = graalContext
     
-    override fun eval(script: String): Any = polyglotContext.eval("js", script)
+    override fun eval(script: String): Any = graalContext.eval("js", script)
     
     override fun getBinding(name: String): Any? {
-        val bindings = polyglotContext.getBindings("js")
+        val bindings = graalContext.getBindings("js")
         return if (bindings.hasMember(name)) bindings.getMember(name).asHostObject() else null
     }
     
     override fun putBinding(name: String, value: Any) {
-        val bindings = polyglotContext.getBindings("js")
+        val bindings = graalContext.getBindings("js")
         bindings.putMember(name, value)
     }
     
@@ -107,7 +105,7 @@ actual class GraalEcmaContextImpl : GraalEcmaContext {
     }
     
     fun close() {
-        polyglotContext.close()
+        graalContext.close()
     }
 }
 

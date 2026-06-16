@@ -11,7 +11,7 @@ public open class ByteBuffer protected constructor(
     mark: Int = -1,
     private val readOnly: Boolean = false,
     private var order0: ByteOrder = ByteOrder.BIG_ENDIAN,
-) : Buffer(capacity), Comparable<ByteBuffer> {
+) : Buffer<Int>(capacity), Comparable<ByteBuffer> {
 
     init {
         require(base >= 0) { "base must be non-negative" }
@@ -23,6 +23,9 @@ public open class ByteBuffer protected constructor(
         limit0 = limit
         mark0 = mark
     }
+
+    /** Capacity as Int for NIO buffer state. */
+    override val capacityInt: Int = capacity
 
     public constructor(capacity: Int) : this(ByteArray(capacity), 0, capacity)
 
@@ -54,11 +57,35 @@ public open class ByteBuffer protected constructor(
         require(position0 + count <= limit0) { "Not enough space remaining" }
     }
 
+    // ── MetaSeries / NIO index functions ───────────────────────────
+
+    /** MetaSeries get by Int index (same as NIO get for ByteBuffer). */
+    override protected fun metaGet(index: Int): Byte = backing[absoluteIndex(index)]
+
+    /** MetaSeries put by Int index (same as NIO put for ByteBuffer). */
+    override protected fun metaPut(index: Int, value: Byte) {
+        requireWritable()
+        backing[absoluteIndex(index)] = value
+    }
+
+    /** NIO get by int index. */
+    override protected fun nioGet(index: Int): Byte = backing[absoluteIndex(index)]
+
+    /** NIO put by int index. */
+    override protected fun nioPut(index: Int, value: Byte) {
+        requireWritable()
+        backing[absoluteIndex(index)] = value
+    }
+
+    // ── Array access ───────────────────────────────────────────────
+
     public override fun hasArray(): Boolean = true
 
     public override fun array(): ByteArray = backing
 
     public override fun arrayOffset(): Int = base
+
+    // ── Slicing & duplication ──────────────────────────────────────
 
     public override fun slice(): ByteBuffer = slice(position0, limit0)
 
@@ -73,72 +100,75 @@ public open class ByteBuffer protected constructor(
 
     public fun asReadOnlyBuffer(): ByteBuffer = ByteBuffer(backing, base, capacity, position0, limit0, mark0, true, order0)
 
-    public fun get(): Byte = get(position0++)
+    // ── Relative get/put (inherit from Buffer) ────────────────────
 
-    public fun put(p0: Byte): ByteBuffer {
-        requireWritable(1)
-        backing[absoluteIndex(position0++)] = p0
-        return this
-    }
+    // ── Absolute get/put (inherit from Buffer, delegate to nioGet/nioPut) ────────────────
 
-    public fun get(p0: Int): Byte = backing[absoluteIndex(p0)]
+    // ── Bulk get/put (backing-optimized overrides) ────────────────
 
-    public fun put(p0: Int, p1: Byte): ByteBuffer {
-        requireWritable()
-        backing[absoluteIndex(p0)] = p1
-        return this
-    }
-
-    public fun get(p0: ByteArray, p1: Int, p2: Int): ByteBuffer {
-        require(p1 >= 0 && p2 >= 0 && p1 + p2 <= p0.size) { "destination out of bounds" }
-        requireReadable(p2)
+    public override fun get(dst: ByteArray, offset: Int, length: Int): ByteBuffer {
+        require(offset >= 0 && length >= 0 && offset + length <= dst.size) { "destination out of bounds" }
+        requireReadable(length)
         val start = absoluteIndex(position0)
-        backing.copyInto(p0, destinationOffset = p1, startIndex = start, endIndex = start + p2)
-        position0 += p2
+        backing.copyInto(dst, destinationOffset = offset, startIndex = start, endIndex = start + length)
+        position0 += length
         return this
     }
 
-    public fun get(p0: ByteArray): ByteBuffer = get(p0, 0, p0.size)
+    public override fun get(dst: ByteArray): ByteBuffer = get(dst, 0, dst.size)
 
-    public fun get(p0: Int, p1: ByteArray, p2: Int, p3: Int): ByteBuffer {
-        require(p2 >= 0 && p3 >= 0 && p2 + p3 <= p1.size) { "destination out of bounds" }
-        requireIndex(p0, p3)
-        backing.copyInto(p1, destinationOffset = p2, startIndex = absoluteIndex(p0), endIndex = absoluteIndex(p0) + p3)
+    public fun get(index: Int, dst: ByteArray, offset: Int, length: Int): ByteBuffer {
+        require(offset >= 0 && length >= 0 && offset + length <= dst.size) { "destination out of bounds" }
+        requireIndex(index, length)
+        backing.copyInto(dst, destinationOffset = offset, startIndex = absoluteIndex(index), endIndex = absoluteIndex(index) + length)
         return this
     }
 
-    public fun put(p0: ByteBuffer): ByteBuffer {
-        while (p0.hasRemaining()) put(p0.get())
+    public override fun put(src: Buffer<*>): ByteBuffer {
+        while (src.hasRemaining()) put(src.get())
         return this
     }
 
-    public fun put(p0: Int, p1: ByteBuffer, p2: Int, p3: Int): ByteBuffer {
+    public fun put(src: ByteBuffer): ByteBuffer {
+        val srcRem = src.remaining()
+        requireWritable(srcRem)
+        val thisStart = absoluteIndex(position0)
+        val srcStart = src.absoluteIndex(src.position())
+        src.backing.copyInto(backing, destinationOffset = thisStart, startIndex = srcStart, endIndex = srcStart + srcRem)
+        position0 += srcRem
+        src.position(src.position() + srcRem)
+        return this
+    }
+
+    public fun put(index: Int, src: ByteBuffer, srcOffset: Int, length: Int): ByteBuffer {
         requireWritable()
-        require(p2 >= 0 && p3 >= 0 && p2 + p3 <= p1.capacity) { "source out of bounds" }
-        requireIndex(p0, p3)
-        p1.backing.copyInto(backing, destinationOffset = absoluteIndex(p0), startIndex = p1.base + p2, endIndex = p1.base + p2 + p3)
+        require(srcOffset >= 0 && length >= 0 && srcOffset + length <= src.capacity) { "source out of bounds" }
+        requireIndex(index, length)
+        src.backing.copyInto(backing, destinationOffset = absoluteIndex(index), startIndex = src.base + srcOffset, endIndex = src.base + srcOffset + length)
         return this
     }
 
-    public fun put(p0: ByteArray, p1: Int, p2: Int): ByteBuffer {
-        require(p1 >= 0 && p2 >= 0 && p1 + p2 <= p0.size) { "source out of bounds" }
-        requireWritable(p2)
-        p0.copyInto(backing, destinationOffset = absoluteIndex(position0), startIndex = p1, endIndex = p1 + p2)
-        position0 += p2
+    public override fun put(src: ByteArray, offset: Int, length: Int): ByteBuffer {
+        require(offset >= 0 && length >= 0 && offset + length <= src.size) { "source out of bounds" }
+        requireWritable(length)
+        src.copyInto(backing, destinationOffset = absoluteIndex(position0), startIndex = offset, endIndex = offset + length)
+        position0 += length
         return this
     }
 
-    public fun put(p0: ByteArray): ByteBuffer = put(p0, 0, p0.size)
+    public override fun put(src: ByteArray): ByteBuffer = put(src, 0, src.size)
 
-    public fun put(p0: Int, p1: ByteArray, p2: Int, p3: Int): ByteBuffer {
-        require(p2 >= 0 && p3 >= 0 && p2 + p3 <= p1.size) { "source out of bounds" }
+    public fun put(index: Int, src: ByteArray, offset: Int, length: Int): ByteBuffer {
+        require(offset >= 0 && length >= 0 && offset + length <= src.size) { "source out of bounds" }
         requireWritable()
-        requireIndex(p0, p3)
-        p1.copyInto(backing, destinationOffset = absoluteIndex(p0), startIndex = p2, endIndex = p2 + p3)
+        requireIndex(index, length)
+        src.copyInto(backing, destinationOffset = absoluteIndex(index), startIndex = offset, endIndex = offset + length)
         return this
     }
 
-    public fun put(p0: Int, p1: ByteArray): ByteBuffer = put(p0, p1, 0, p1.size)
+    public fun put(index: Int, src: ByteArray): ByteBuffer = put(index, src, 0, src.size)
+
+    // ── Position/limit/mark overrides (covariant returns) ──────────
 
     public override fun position(p0: Int): ByteBuffer {
         super.position(p0)
@@ -175,57 +205,16 @@ public open class ByteBuffer protected constructor(
         return this
     }
 
-    public fun compact(): ByteBuffer {
-        requireWritable()
-        val rem = remaining()
-        if (rem > 0) {
-            backing.copyInto(backing, destinationOffset = base, startIndex = absoluteIndex(position0), endIndex = absoluteIndex(limit0))
-        }
-        position0 = rem
-        limit0 = capacity
-        mark0 = -1
+    public override fun compact(): ByteBuffer {
+        super.compact()
         return this
     }
 
+    // ── Read-only & direct ─────────────────────────────────────────
+
     public override fun isDirect(): Boolean = false
 
-    public override fun toString(): String = "ByteBuffer(position=${position0}, limit=${limit0}, capacity=${capacity}, order=${order0})"
-
-    public override fun hashCode(): Int {
-        var result = 1
-        for (i in position0 until limit0) {
-            result = 31 * result + (backing[absoluteIndex(i)].toInt() and 0xFF)
-        }
-        return result
-    }
-
-    public override fun equals(other: Any?): Boolean {
-        if (this === other) return true
-        if (other !is ByteBuffer) return false
-        if (remaining() != other.remaining()) return false
-        for (i in 0 until remaining()) {
-            if (get(position0 + i) != other.get(other.position() + i)) return false
-        }
-        return true
-    }
-
-    public override fun compareTo(other: ByteBuffer): Int {
-        val length = minOf(remaining(), other.remaining())
-        for (i in 0 until length) {
-            val a = get(position0 + i).toInt() and 0xFF
-            val b = other.get(other.position() + i).toInt() and 0xFF
-            if (a != b) return a - b
-        }
-        return remaining() - other.remaining()
-    }
-
-    public fun mismatch(other: ByteBuffer): Int {
-        val length = minOf(remaining(), other.remaining())
-        for (i in 0 until length) {
-            if (get(position0 + i) != other.get(other.position() + i)) return i
-        }
-        return if (remaining() != other.remaining()) length else -1
-    }
+    // ── Byte order ─────────────────────────────────────────────────
 
     public fun order(): ByteOrder = order0
 
@@ -233,6 +222,8 @@ public open class ByteBuffer protected constructor(
         order0 = p0
         return this
     }
+
+    // ── Alignment ──────────────────────────────────────────────────
 
     public fun alignmentOffset(p0: Int, p1: Int): Int {
         require(p0 > 0) { "alignment must be positive" }
@@ -248,10 +239,12 @@ public open class ByteBuffer protected constructor(
         return if (start > limit0) slice(limit0, limit0) else slice(start, limit0)
     }
 
+    // ── Typed get/put (short, char, int, long, float, double) ──────
+
     private fun readShort(index: Int): Short {
         requireIndex(index, 2)
-        val first = get(index).toInt() and 0xFF
-        val second = get(index + 1).toInt() and 0xFF
+        val first = nioGet(index).toInt() and 0xFF
+        val second = nioGet(index + 1).toInt() and 0xFF
         return if (order0 == ByteOrder.BIG_ENDIAN) {
             ((first shl 8) or second).toShort()
         } else {
@@ -274,10 +267,10 @@ public open class ByteBuffer protected constructor(
 
     private fun readInt(index: Int): Int {
         requireIndex(index, 4)
-        val b0 = get(index).toInt() and 0xFF
-        val b1 = get(index + 1).toInt() and 0xFF
-        val b2 = get(index + 2).toInt() and 0xFF
-        val b3 = get(index + 3).toInt() and 0xFF
+        val b0 = nioGet(index).toInt() and 0xFF
+        val b1 = nioGet(index + 1).toInt() and 0xFF
+        val b2 = nioGet(index + 2).toInt() and 0xFF
+        val b3 = nioGet(index + 3).toInt() and 0xFF
         return if (order0 == ByteOrder.BIG_ENDIAN) {
             (b0 shl 24) or (b1 shl 16) or (b2 shl 8) or b3
         } else {
@@ -303,7 +296,7 @@ public open class ByteBuffer protected constructor(
 
     private fun readLong(index: Int): Long {
         requireIndex(index, 8)
-        val parts = LongArray(8) { get(index + it).toLong() and 0xFF }
+        val parts = LongArray(8) { nioGet(index + it).toLong() and 0xFF }
         return if (order0 == ByteOrder.BIG_ENDIAN) {
             parts[0] shl 56 or (parts[1] shl 48) or (parts[2] shl 40) or (parts[3] shl 32) or
                 (parts[4] shl 24) or (parts[5] shl 16) or (parts[6] shl 8) or parts[7]
@@ -417,10 +410,55 @@ public open class ByteBuffer protected constructor(
         return this
     }
 
+    // ── Object methods ─────────────────────────────────────────────
+
+    public override fun toString(): String = "ByteBuffer(position=${position0}, limit=${limit0}, capacity=${capacity}, order=${order0})"
+
+    public override fun hashCode(): Int {
+        var result = 1
+        for (i in position0 until limit0) {
+            result = 31 * result + (nioGet(i).toInt() and 0xFF)
+        }
+        return result
+    }
+
+    public override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is ByteBuffer) return false
+        if (remaining() != other.remaining()) return false
+        for (i in 0 until remaining()) {
+            if (nioGet(position0 + i) != other.nioGet(other.position() + i)) return false
+        }
+        return true
+    }
+
+    public override fun compareTo(other: ByteBuffer): Int {
+        val length = minOf(remaining(), other.remaining())
+        for (i in 0 until length) {
+            val a = nioGet(position0 + i).toInt() and 0xFF
+            val b = other.nioGet(other.position() + i).toInt() and 0xFF
+            if (a != b) return a - b
+        }
+        return remaining() - other.remaining()
+    }
+
+    public fun mismatch(other: ByteBuffer): Int {
+        val length = minOf(remaining(), other.remaining())
+        for (i in 0 until length) {
+            if (nioGet(position0 + i) != other.nioGet(other.position() + i)) return i
+        }
+        return if (remaining() != other.remaining()) length else -1
+    }
+
+    // ── Factory methods ────────────────────────────────────────────
+
     public companion object {
         public fun allocateDirect(p0: Int): ByteBuffer = allocate(p0)
+
         public fun allocate(p0: Int): ByteBuffer = ByteBuffer(p0)
+
         public fun wrap(p0: ByteArray, p1: Int, p2: Int): ByteBuffer = ByteBuffer(p0, p1, p2)
+
         public fun wrap(p0: ByteArray): ByteBuffer = ByteBuffer(p0)
     }
 }

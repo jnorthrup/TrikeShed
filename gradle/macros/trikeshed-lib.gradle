@@ -708,6 +708,20 @@ switch (project.path) {
             implementation project(":libs:tls")
         }
         break
+    case ":libs:activejs":
+        // GraalVM ECMA launcher with pointcut integration — KMP with GraalVM on JVM
+        kmpHost(coroutinesMain: true, rootMode: "none", extraDeps: [
+            "org.graalvm.polyglot:polyglot:25.0.2",
+            "org.graalvm.polyglot:js-community:25.0.2",
+            "org.graalvm.js:js:25.0.2",
+        ])
+        extensions.getByName("kotlin").sourceSets.getByName("commonMain").dependencies {
+            implementation "org.jetbrains.kotlinx:kotlinx-coroutines-core:${prop('versions.kotlinx-coroutines-core')}"
+        }
+        extensions.getByName("kotlin").sourceSets.getByName("jvmMain").dependencies {
+            implementation "org.jetbrains.kotlinx:kotlinx-coroutines-core:${prop('versions.kotlinx-coroutines-core')}"
+        }
+        break
     default:
         kmpHost()
         break
