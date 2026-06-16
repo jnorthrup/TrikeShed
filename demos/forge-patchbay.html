@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Forge Patch Bay — Modular Signal Routing</title>
+<style>
+  :root {
+    --bg: #0b0f14;
+    --pane: #111821;
+    --pane2: #0f141b;
+    --ink: #d3dbe6;
+    --muted: #758395;
+    --line: #1d2a38;
+    --blue: #7aa2f7;
+    --green: #9ece6a;
+    --amber: #e0af68;
+    --red: #f7768e;
+    --purple: #bb9af7;
+    --cyan: #7dcfff;
+    --teal: #73daca;
+    --comment: #5b6b7a;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: var(--bg); color: var(--ink); font-family: Inter, ui-sans-serif, system-ui, sans-serif; overflow: hidden; }
+  .mono { font-family: "SF Mono", ui-monospace, Menlo, monospace; }
+
+  .app { display: grid; grid-template-columns: 1fr 360px; height: 100vh; }
+
+  /* ── Canvas Area ── */
+  .canvas-wrap { position: relative; overflow: hidden; background: radial-gradient(ellipse at 50% 40%, #0f1620 0%, var(--bg) 100%); }
+  svg.patchbay { width: 100%; height: 100%; display: block; }
+
+  /* Grid background */
+  .grid-bg { fill: none; stroke: var(--line); stroke-width: 0.5; opacity: 0.4; }
+
+  /* Module styles */
+  .module-body { rx: 8; cursor: pointer; transition: filter 0.2s; }
+  .module-body:hover { filter: brightness(1.3); }
+  .module-body.selected { stroke: #fff; stroke-width: 2.5; }
+  .module-title { font-size: 12px; font-weight: 700; fill: #fff; pointer-events: none; }
+  .module-type { font-size: 9px; fill: var(--muted); pointer-events: none; }
+  .port-label { font-size: 8px; fill: var(--muted); pointer-events: none; }
+
+  /* Port circles */
+  .port { cursor: pointer; transition: r 0.15s; }
+  .port:hover { r: 6; }
+  .port-input { stroke-width: 1.5; }
+  .port-output { stroke-width: 1.5; }
+  .port-type-data { fill: var(--blue); stroke: var(--blue); }
+  .port-type-control { fill: var(--purple); stroke: var(--purple); }
+  .port-type-cv { fill: var(--amber); stroke: var(--amber); }
+  .port-type-gate { fill: var(--green); stroke: var(--green); }
+
+  /* Cables */
+  .cable { fill: none; stroke-width: 2; opacity: 0.7; transition: opacity 0.2s; }
+  .cable:hover { opacity: 1; stroke-width: 3; }
+  .cable-muted { opacity: 0.15; stroke-dasharray: 4 4; }
+  .cable-active { opacity: 0.85; }
+
+  /* Signal pulse animation */
+  .signal-dot { fill: var(--cyan); filter: drop-shadow(0 0 4px var(--cyan)); }
+
+  /* Shape dimension chips */
+  .dim-chip { font-size: 14px; pointer-events: none; }
+
+  /* ── Inspector Panel ── */
+  .inspector { background: var(--pane2); border-left: 1px solid var(--line); padding: 20px 18px; overflow-y: auto; }
+  .inspector h2 { font-size: 15px; font-weight: 700; margin-bottom: 4px; }
+  .inspector .sub { font-size: 11px; color: var(--muted); margin-bottom: 16px; }
+  .inspector-section { margin-bottom: 18px; }
+  .inspector-section h3 { font-size: 10px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; }
+
+  .port-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+  .port-table th { text-align: left; color: var(--muted); font-size: 9px; text-transform: uppercase; letter-spacing: 0.08em; padding: 4px 6px; border-bottom: 1px solid var(--line); }
+  .port-table td { padding: 4px 6px; border-bottom: 1px solid var(--line); }
+  .port-table .mono { font-size: 10px; }
+
+  .dim-grid { display: flex; flex-wrap: wrap; gap: 6px; }
+  .dim-badge { display: inline-flex; align-items: center; gap: 4px; font-size: 10px; padding: 4px 8px; border-radius: 6px; border: 1px solid var(--line); background: var(--pane); }
+
+  .toolbar { position: absolute; top: 16px; left: 16px; display: flex; gap: 8px; z-index: 10; }
+  .btn { background: var(--pane); border: 1px solid var(--line); color: var(--ink); padding: 8px 14px; border-radius: 8px; font-size: 12px; cursor: pointer; transition: all 0.15s; }
+  .btn:hover { background: rgba(122,162,247,0.1); border-color: var(--blue); }
+  .btn.active { background: rgba(122,162,247,0.15); border-color: var(--blue); }
+
+  .frame-counter { position: absolute; top: 16px; right: 16px; font-size: 11px; color: var(--muted); font-family: monospace; }
+
+  .legend { position: absolute; bottom: 16px; left: 16px; display: flex; gap: 12px; font-size: 10px; }
+  .legend-item { display: flex; align-items: center; gap: 4px; color: var(--muted); }
+  .legend-dot { width: 10px; height: 10px; border-radius: 50%; }
+
+  .cable-list-item { padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; margin-bottom: 6px; font-size: 11px; cursor: pointer; transition: background 0.15s; }
+  .cable-list-item:hover { background: rgba(122,162,247,0.06); }
+  .cable-list-item .route { color: var(--cyan); font-size: 10px; }
+  .cable-state-active { color: var(--green); }
+  .cable-state-muted { color: var(--red); }
+  .cable-state-bypassed { color: var(--amber); }
+
+  .empty-state { color: var(--muted); font-size: 12px; text-align: center; padding: 30px 10px; }
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- ── SVG Canvas ── -->
+  <div class="canvas-wrap">
+    <div class="toolbar">
+      <button class="btn active" id="btn-signal" onclick="toggleSignal()">▶ Signal Flow</button>
+      <button class="btn" id="btn-layout" onclick="cycleLayout()">⇄ Layout</button>
+      <button class="btn" id="btn-dims" onclick="toggleDimensions()">◆ Shape Dims</button>
+    </div>
+    <div class="frame-counter" id="frame-counter">frame 0 · 0 fps</div>
+    <div class="legend">
+      <div class="legend-item"><div class="legend-dot" style="background:var(--blue)"></div> DATA</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--purple)"></div> CONTROL</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--amber)"></div> CV</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--green)"></div> GATE</div>
+    </div>
+    <svg class="patchbay" id="svg" viewBox="0 0 1000 600" preserveAspectRatio="xMidYMid meet">
+      <defs>
+        <filter id="glow"><feGaussianBlur stdDeviation="2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+      </defs>
+      <g id="grid"></g>
+      <g id="cables"></g>
+      <g id="modules"></g>
+      <g id="signals"></g>
+    </svg>
+  </div>
+
+  <!-- ── Inspector ── -->
+  <div class="inspector" id="inspector">
+    <h2>Forge Patch Bay</h2>
+    <p class="sub">Modular synth-style signal routing for LLM workflows. Click a module to inspect.</p>
+    <div id="inspector-content">
+      <div class="empty-state">Select a module to view its ports, type signature, and shape dimensions.</div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ════════════════════════════════════════════════════════════════
+// FORGE PATCH BAY — Data Model (mirrors Kotlin ForgeTypes.kt)
+// ════════════════════════════════════════════════════════════════
+
+const PortType = { DATA: '#7aa2f7', CONTROL: '#bb9af7', AUDIO: '#73daca', CV: '#e0af68', GATE: '#9ece6a', POLY: '#7dcfff' };
+const PortDir = { INPUT: 'in', OUTPUT: 'out', BIDIR: 'bidir' };
+const CableState = { ACTIVE: 'active', MUTED: 'muted', SOLOED: 'soled', BYPASSED: 'bypassed' };
+
+// Shape dimensions (mirrors PatchCableShapeDimension enum)
+const ShapeDim = {
+  SIGNAL_FLOW:  { name: 'signal_flow',  hint: '→', desc: 'Data flows through',     color: '#4A90D9' },
+  CONTROL_FLOW: { name: 'control_flow', hint: '⚡', desc: 'Control/branching',     color: '#D94AD9' },
+  STATE_MUTATION:{ name: 'state_mut',   hint: '💾', desc: 'Mutates shared state',  color: '#E8A838' },
+  PARALLELISM:  { name: 'parallelism',  hint: '⏱', desc: 'Parallel branches',     color: '#4AD9D9' },
+  EXTERNAL_IO:  { name: 'external_io',  hint: '🌐', desc: 'External systems',      color: '#D94A4A' },
+  TEMPORAL:     { name: 'temporal',     hint: '⏳', desc: 'Time-based behavior',   color: '#D9A84A' },
+  STOCHASTIC:   { name: 'stochastic',   hint: '🎲', desc: 'Non-deterministic',     color: '#A02EA0' },
+  COMPOSITE:    { name: 'composite',    hint: '📦', desc: 'Contains sub-modules',  color: '#2E8A8A' },
+};
+
+const DimByType = {
+  LLM_CALL:         ['SIGNAL_FLOW','STOCHASTIC','EXTERNAL_IO'],
+  CODE_EXECUTION:   ['SIGNAL_FLOW','STATE_MUTATION'],
+  AGENT_INVOCATION: ['SIGNAL_FLOW','EXTERNAL_IO','STATE_MUTATION','TEMPORAL'],
+  FILE_TRANSFORM:   ['SIGNAL_FLOW','EXTERNAL_IO'],
+  CONDITIONAL:      ['CONTROL_FLOW'],
+  PARALLEL:         ['PARALLELISM','CONTROL_FLOW'],
+  CASCADE_EXECUTION:['SIGNAL_FLOW','COMPOSITE','STATE_MUTATION'],
+};
+
+const ModuleColors = {
+  LLM_CALL:         { fill: '#2E5C8A', stroke: '#4A90D9' },
+  CODE_EXECUTION:   { fill: '#B8860B', stroke: '#E8A838' },
+  AGENT_INVOCATION: { fill: '#A02E2E', stroke: '#D94A4A' },
+  FILE_TRANSFORM:   { fill: '#2E8A3B', stroke: '#4AD96B' },
+  CONDITIONAL:      { fill: '#A02EA0', stroke: '#D94AD9' },
+  PARALLEL:         { fill: '#2E8A8A', stroke: '#4AD9D9' },
+  CASCADE_EXECUTION:{ fill: '#A0782E', stroke: '#D9A84A' },
+};
+
+// ── Workflow definition (mirrors a ForgeWorkflow) ──
+const workflow = {
+  name: "Document Processing Pipeline",
+  id: "doc-pipeline-001",
+  steps: [
+    { id: "ingest",    type: "FILE_TRANSFORM",    label: "Ingest",     dims: DimByType.FILE_TRANSFORM },
+    { id: "summarize", type: "LLM_CALL",          label: "Summarize",  dims: DimByType.LLM_CALL },
+    { id: "extract",   type: "CODE_EXECUTION",    label: "Extract",    dims: DimByType.CODE_EXECUTION },
+    { id: "enhance",   type: "AGENT_INVOCATION",  label: "Enhance",    dims: DimByType.AGENT_INVOCATION },
+    { id: "gate",      type: "CONDITIONAL",       label: "Quality Gate", dims: DimByType.CONDITIONAL },
+    { id: "parallel",  type: "PARALLEL",          label: "Parallel",   dims: DimByType.PARALLEL },
+    { id: "cascade",   type: "CASCADE_EXECUTION", label: "Cascade Rollup", dims: DimByType.CASCADE_EXECUTION },
+  ],
+};
+
+// ── Port definitions per module ──
+function makePorts(stepId, type) {
+  switch (type) {
+    case 'LLM_CALL':
+      return {
+        inputs: [{ name: 'text', pt: 'DATA', ts: 'String' }],
+        outputs: [{ name: 'output', pt: 'DATA', ts: 'String' }],
+        params: [{ name: 'model', pt: 'CV', ts: 'String', val: 'gpt-4o' }, { name: 'temp', pt: 'CV', ts: 'Double', val: '0.2' }]
+      };
+    case 'CODE_EXECUTION':
+      return {
+        inputs: [{ name: 'code', pt: 'DATA', ts: 'String' }],
+        outputs: [{ name: 'output', pt: 'DATA', ts: 'String' }],
+        params: [{ name: 'lang', pt: 'CV', ts: 'String', val: 'python' }]
+      };
+    case 'AGENT_INVOCATION':
+      return {
+        inputs: [{ name: 'task', pt: 'DATA', ts: 'String' }, { name: 'context', pt: 'DATA', ts: 'Map' }],
+        outputs: [{ name: 'output', pt: 'DATA', ts: 'String' }],
+        params: [{ name: 'agent', pt: 'CV', ts: 'String', val: 'CODEX' }]
+      };
+    case 'FILE_TRANSFORM':
+      return {
+        inputs: [{ name: 'file0', pt: 'DATA', ts: 'ForgeFile' }],
+        outputs: [{ name: 'outputPath', pt: 'DATA', ts: 'String' }],
+        params: [{ name: 'transform', pt: 'CV', ts: 'String', val: 'parse-md' }]
+      };
+    case 'CONDITIONAL':
+      return {
+        inputs: [{ name: 'condition', pt: 'CONTROL', ts: 'Boolean' }],
+        outputs: [{ name: 'then', pt: 'CONTROL', ts: 'Any' }, { name: 'else', pt: 'CONTROL', ts: 'Any' }],
+        params: [{ name: 'expr', pt: 'CV', ts: 'String', val: 'word_count > 100' }]
+      };
+    case 'PARALLEL':
+      return {
+        inputs: [],
+        outputs: [{ name: 'branch1', pt: 'DATA', ts: 'Any' }, { name: 'branch2', pt: 'DATA', ts: 'Any' }],
+        params: [{ name: 'count', pt: 'CV', ts: 'Int', val: '2' }]
+      };
+    case 'CASCADE_EXECUTION':
+      return {
+        inputs: [{ name: 'data', pt: 'DATA', ts: 'String' }],
+        outputs: [{ name: 'output', pt: 'DATA', ts: 'CascadeRow' }],
+        params: [{ name: 'cascadeId', pt: 'CV', ts: 'String', val: 'detected-1' }]
+      };
+  }
+  return { inputs: [], outputs: [], params: [] };
+}
+
+// ── Cables (mirrors PatchCable connections) ──
+const cables = [
+  { id: 'c1', src: ['ingest','outputPath'],    dst: ['summarize','text'],     state: 'active', transform: null },
+  { id: 'c2', src: ['summarize','output'],     dst: ['extract','code'],       state: 'active', transform: 'Gain' },
+  { id: 'c3', src: ['extract','output'],       dst: ['enhance','task'],       state: 'active', transform: null },
+  { id: 'c4', src: ['enhance','output'],       dst: ['gate','condition'],     state: 'active', transform: null },
+  { id: 'c5', src: ['gate','then'],            dst: ['parallel',null],        state: 'active', transform: null },
+  { id: 'c6', src: ['parallel','branch1'],     dst: ['cascade','data'],       state: 'active', transform: null },
+  { id: 'c7', src: ['extract','output'],       dst: ['cascade','data'],       state: 'bypassed', transform: null },
+];
+
+// ════════════════════════════════════════════════════════════════
+// LAYOUT ENGINE
+// ════════════════════════════════════════════════════════════════
+
+const layouts = ['hierarchical', 'circular', 'grid'];
+let layoutIdx = 0;
+let showDims = false;
+let signalOn = true;
+let selectedModule = null;
+
+function computeLayout() {
+  const layout = layouts[layoutIdx];
+  const positions = {};
+  const n = workflow.steps.length;
+
+  if (layout === 'hierarchical') {
+    const cols = [
+      ['ingest'],
+      ['summarize'],
+      ['extract'],
+      ['enhance'],
+      ['gate'],
+      ['parallel'],
+      ['cascade'],
+    ];
+    const xStart = 80, xStep = 130, yCenter = 280;
+    cols.forEach((col, ci) => {
+      col.forEach((id, ri) => {
+        positions[id] = { x: xStart + ci * xStep, y: yCenter + (ri - (col.length-1)/2) * 150 };
+      });
+    });
+  } else if (layout === 'circular') {
+    const cx = 480, cy = 280, r = 220;
+    workflow.steps.forEach((step, i) => {
+      const angle = (i / n) * Math.PI * 2 - Math.PI / 2;
+      positions[step.id] = { x: cx + Math.cos(angle) * r, y: cy + Math.sin(angle) * r };
+    });
+  } else if (layout === 'grid') {
+    const cols = 4, xStart = 100, yStart = 120, xStep = 210, yStep = 200;
+    workflow.steps.forEach((step, i) => {
+      positions[step.id] = { x: xStart + (i % cols) * xStep, y: yStart + Math.floor(i / cols) * yStep };
+    });
+  }
+  return positions;
+}
+
+// ════════════════════════════════════════════════════════════════
+// SVG RENDERING
+// ════════════════════════════════════════════════════════════════
+
+const SVG_NS = 'http://www.w3.org/2000/svg';
+function el(tag, attrs = {}) {
+  const e = document.createElementNS(SVG_NS, tag);
+  for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
+  return e;
+}
+
+const MODULE_W = 100;
+const MODULE_H = 70;
+
+function renderGrid() {
+  const g = document.getElementById('grid');
+  g.innerHTML = '';
+  for (let x = 0; x <= 1000; x += 40) {
+    g.appendChild(el('line', { x1: x, y1: 0, x2: x, y2: 600, class: 'grid-bg' }));
+  }
+  for (let y = 0; y <= 600; y += 40) {
+    g.appendChild(el('line', { x1: 0, y1: y, x2: 1000, y2: y, class: 'grid-bg' }));
+  }
+}
+
+function getPortPos(modulePos, ports, portName, isInput) {
+  const idx = ports.findIndex(p => p.name === portName);
+  if (idx === -1) return { x: modulePos.x + (isInput ? 0 : MODULE_W), y: modulePos.y + 25 };
+  const spacing = 14;
+  const startY = 30;
+  return {
+    x: modulePos.x + (isInput ? 0 : MODULE_W),
+    y: modulePos.y + startY + idx * spacing,
+  };
+}
+
+function renderModules(positions) {
+  const g = document.getElementById('modules');
+  g.innerHTML = '';
+
+  for (const step of workflow.steps) {
+    const pos = positions[step.id];
+    const ports = makePorts(step.id, step.type);
+    const colors = ModuleColors[step.type] || { fill: '#555', stroke: '#888' };
+    const dims = step.dims.map(d => ShapeDim[d]);
+
+    // Module body
+    const body = el('rect', {
+      x: pos.x, y: pos.y, width: MODULE_W, height: MODULE_H,
+      class: 'module-body' + (selectedModule === step.id ? ' selected' : ''),
+      fill: colors.fill, stroke: colors.stroke, 'stroke-width': 1.5, rx: 8,
+    });
+    body.onclick = () => selectModule(step.id);
+    g.appendChild(body);
+
+    // Title
+    const title = el('text', { x: pos.x + MODULE_W/2, y: pos.y + 16, 'text-anchor': 'middle', class: 'module-title' });
+    title.textContent = step.label;
+    g.appendChild(title);
+
+    // Type label
+    const typeLabel = el('text', { x: pos.x + MODULE_W/2, y: pos.y + 28, 'text-anchor': 'middle', class: 'module-type' });
+    typeLabel.textContent = step.type.replace(/_/g, ' ');
+    g.appendChild(typeLabel);
+
+    // Input ports
+    ports.inputs.forEach((p, i) => {
+      const py = pos.y + 30 + i * 14;
+      const circle = el('circle', {
+        cx: pos.x, cy: py, r: 4,
+        class: 'port port-input port-type-' + p.pt.toLowerCase(),
+        fill: PortType[p.pt], stroke: PortType[p.pt],
+      });
+      circle.onclick = (e) => { e.stopPropagation(); selectModule(step.id); };
+      g.appendChild(circle);
+
+      const lbl = el('text', { x: pos.x + 8, y: py + 3, class: 'port-label' });
+      lbl.textContent = p.name;
+      g.appendChild(lbl);
+    });
+
+    // Output ports
+    ports.outputs.forEach((p, i) => {
+      const py = pos.y + 30 + i * 14;
+      const circle = el('circle', {
+        cx: pos.x + MODULE_W, cy: py, r: 4,
+        class: 'port port-output port-type-' + p.pt.toLowerCase(),
+        fill: PortType[p.pt], stroke: PortType[p.pt],
+      });
+      circle.onclick = (e) => { e.stopPropagation(); selectModule(step.id); };
+      g.appendChild(circle);
+
+      const lbl = el('text', { x: pos.x + MODULE_W - 8, y: py + 3, 'text-anchor': 'end', class: 'port-label' });
+      lbl.textContent = p.name;
+      g.appendChild(lbl);
+    });
+
+    // Shape dimension chips (toggleable)
+    if (showDims) {
+      dims.forEach((dim, i) => {
+        const chip = el('text', {
+          x: pos.x + 4 + i * 16, y: pos.y + MODULE_H - 4,
+          class: 'dim-chip', 'font-size': 12,
+        });
+        chip.textContent = dim.hint;
+        chip.setAttribute('title', dim.name + ': ' + dim.desc);
+        g.appendChild(chip);
+      });
+    }
+  }
+}
+
+function renderCables(positions) {
+  const g = document.getElementById('cables');
+  g.innerHTML = '';
+
+  for (const cable of cables) {
+    const [srcMod, srcPort] = cable.src;
+    const [dstMod, dstPort] = cable.dst;
+    const srcStep = workflow.steps.find(s => s.id === srcMod);
+    const dstStep = workflow.steps.find(s => s.id === dstMod);
+    if (!srcStep || !dstStep) continue;
+
+    const srcPos = positions[srcMod];
+    const dstPos = positions[dstMod];
+    const srcPorts = makePorts(srcMod, srcStep.type);
+    const dstPorts = makePorts(dstMod, dstStep.type);
+
+    let srcXY, dstXY;
+    if (srcPort) {
+      srcXY = getPortPos(srcPos, srcPorts.outputs, srcPort, false);
+    } else {
+      srcXY = { x: srcPos.x + MODULE_W, y: srcPos.y + MODULE_H/2 };
+    }
+    if (dstPort) {
+      dstXY = getPortPos(dstPos, dstPorts.inputs, dstPort, true);
+    } else {
+      dstXY = { x: dstPos.x, y: dstPos.y + MODULE_H/2 };
+    }
+
+    // Bezier curve
+    const dx = dstXY.x - srcXY.x;
+    const cp1x = srcXY.x + Math.max(30, Math.abs(dx) * 0.4);
+    const cp1y = srcXY.y;
+    const cp2x = dstXY.x - Math.max(30, Math.abs(dx) * 0.4);
+    const cp2y = dstXY.y;
+    const path = `M ${srcXY.x} ${srcXY.y} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${dstXY.x} ${dstXY.y}`;
+
+    const srcType = srcStep.type;
+    const color = ModuleColors[srcType]?.stroke || '#888';
+    const stateClass = cable.state === 'muted' ? 'cable-muted' :
+                       cable.state === 'bypassed' ? 'cable-muted' : 'cable-active';
+
+    const pathEl = el('path', {
+      d: path, class: `cable ${stateClass}`, stroke: color, id: `cable-${cable.id}`,
+    });
+    pathEl.onclick = () => selectCable(cable.id);
+    g.appendChild(pathEl);
+  }
+}
+
+// ════════════════════════════════════════════════════════════════
+// SIGNAL ANIMATION (real-time signal flow through cables)
+// ════════════════════════════════════════════════════════════════
+
+let frameCount = 0;
+let lastFpsTime = performance.now();
+let fpsCount = 0;
+let animPhase = 0;
+
+function animateSignals() {
+  const g = document.getElementById('signals');
+  g.innerHTML = '';
+  if (!signalOn) return;
+
+  animPhase = (animPhase + 0.012) % 1.0;
+
+  for (const cable of cables) {
+    if (cable.state === 'muted') continue;
+    const pathEl = document.getElementById(`cable-${cable.id}`);
+    if (!pathEl) continue;
+    const len = pathEl.getTotalLength();
+    if (len < 1) continue;
+
+    // Two dots per cable offset by 0.5
+    for (let offset = 0; offset < 1; offset += 0.5) {
+      const t = (animPhase + offset) % 1.0;
+      // Skip if cable is bypassed but still show faint
+      const pt = pathEl.getPointAtLength(t * len);
+      const dot = el('circle', {
+        cx: pt.x, cy: pt.y, r: 3,
+        class: 'signal-dot',
+        opacity: cable.state === 'bypassed' ? 0.3 : 0.9,
+      });
+      g.appendChild(dot);
+    }
+  }
+}
+
+// ════════════════════════════════════════════════════════════════
+// INSPECTOR
+// ════════════════════════════════════════════════════════════════
+
+function selectModule(stepId) {
+  selectedModule = stepId;
+  const step = workflow.steps.find(s => s.id === stepId);
+  if (!step) return;
+
+  const ports = makePorts(stepId, step.type);
+  const dims = step.dims.map(d => ShapeDim[d]);
+  const colors = ModuleColors[step.type];
+
+  const html = `
+    <div class="inspector-section">
+      <h2>${step.label}</h2>
+      <p class="sub mono">${step.type} · id=${step.id}</p>
+    </div>
+    <div class="inspector-section">
+      <h3>Input Ports</h3>
+      <table class="port-table">
+        <tr><th>Name</th><th>Type</th><th>Sig</th></tr>
+        ${ports.inputs.map(p => `<tr><td class="mono">${p.name}</td><td style="color:${PortType[p.pt]}">${p.pt}</td><td class="mono">${p.ts}</td></tr>`).join('') || '<tr><td colspan=3 style="color:var(--muted)">(none)</td></tr>'}
+      </table>
+    </div>
+    <div class="inspector-section">
+      <h3>Output Ports</h3>
+      <table class="port-table">
+        <tr><th>Name</th><th>Type</th><th>Sig</th></tr>
+        ${ports.outputs.map(p => `<tr><td class="mono">${p.name}</td><td style="color:${PortType[p.pt]}">${p.pt}</td><td class="mono">${p.ts}</td></tr>`).join('') || '<tr><td colspan=3 style="color:var(--muted)">(none)</td></tr>'}
+      </table>
+    </div>
+    <div class="inspector-section">
+      <h3>Parameter Ports (CV)</h3>
+      <table class="port-table">
+        <tr><th>Name</th><th>Value</th><th>Sig</th></tr>
+        ${ports.params.map(p => `<tr><td class="mono">${p.name}</td><td class="mono">${p.val}</td><td class="mono">${p.ts}</td></tr>`).join('') || '<tr><td colspan=3 style="color:var(--muted)">(none)</td></tr>'}
+      </table>
+    </div>
+    <div class="inspector-section">
+      <h3>Shape Dimensions (${dims.length})</h3>
+      <div class="dim-grid">
+        ${dims.map(d => `<span class="dim-badge" title="${d.desc}"><span style="color:${d.color}">${d.hint}</span> ${d.name}</span>`).join('')}
+      </div>
+    </div>
+    <div class="inspector-section">
+      <h3>Connected Cables</h3>
+      ${cables.filter(c => c.src[0] === stepId || c.dst[0] === stepId).map(c => `
+        <div class="cable-list-item" onclick="selectCable('${c.id}')">
+          <span class="route mono">${c.src[0]}.${c.src[1] || '?'} → ${c.dst[0]}.${c.dst[1] || '?'}</span>
+          <span class="cable-state-${c.state}" style="float:right">${c.state.toUpperCase()}</span>
+          ${c.transform ? `<br><span class="mono" style="color:var(--amber)">⚡ ${c.transform}</span>` : ''}
+        </div>
+      `).join('') || '<div class="empty-state">No cables connected</div>'}
+    </div>
+  `;
+  document.getElementById('inspector-content').innerHTML = html;
+  render();
+}
+
+function selectCable(cableId) {
+  const cable = cables.find(c => c.id === cableId);
+  if (!cable) return;
+  const html = `
+    <div class="inspector-section">
+      <h2>Cable ${cable.id}</h2>
+      <p class="sub mono">${cable.src[0]}.${cable.src[1] || '?'} → ${cable.dst[0]}.${cable.dst[1] || '?'}</p>
+    </div>
+    <div class="inspector-section">
+      <h3>State</h3>
+      <div class="dim-grid">
+        <span class="dim-badge cable-state-${cable.state}">${cable.state.toUpperCase()}</span>
+        ${cable.transform ? `<span class="dim-badge">⚡ ${cable.transform}</span>` : ''}
+      </div>
+    </div>
+    <div class="inspector-section">
+      <h3>Toggle State</h3>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        ${Object.values(CableState).map(s => `
+          <button class="btn ${cable.state === s.toLowerCase() ? 'active' : ''}" onclick="setCableState('${cableId}','${s.toLowerCase()}')">${s}</button>
+        `).join('')}
+      </div>
+    </div>
+  `;
+  document.getElementById('inspector-content').innerHTML = html;
+}
+
+function setCableState(cableId, state) {
+  const cable = cables.find(c => c.id === cableId);
+  if (cable) { cable.state = state; render(); selectCable(cableId); }
+}
+
+// ════════════════════════════════════════════════════════════════
+// CONTROLS
+// ════════════════════════════════════════════════════════════════
+
+function toggleSignal() {
+  signalOn = !signalOn;
+  document.getElementById('btn-signal').classList.toggle('active', signalOn);
+  document.getElementById('btn-signal').textContent = signalOn ? '▶ Signal Flow' : '⏸ Signal Flow';
+}
+
+function cycleLayout() {
+  layoutIdx = (layoutIdx + 1) % layouts.length;
+  render();
+}
+
+function toggleDimensions() {
+  showDims = !showDims;
+  document.getElementById('btn-dims').classList.toggle('active', showDims);
+  render();
+}
+
+// ════════════════════════════════════════════════════════════════
+// MAIN LOOP
+// ════════════════════════════════════════════════════════════════
+
+function render() {
+  const positions = computeLayout();
+  renderCables(positions);
+  renderModules(positions);
+  // Re-render cables on top of modules for correct port alignment
+  const cablesG = document.getElementById('cables');
+  const modsG = document.getElementById('modules');
+  cablesG.parentNode.insertBefore(cablesG, modsG);
+}
+
+function tick() {
+  frameCount++;
+  fpsCount++;
+  const now = performance.now();
+  if (now - lastFpsTime > 1000) {
+    document.getElementById('frame-counter').textContent = `frame ${frameCount} · ${fpsCount} fps`;
+    fpsCount = 0;
+    lastFpsTime = now;
+  }
+  animateSignals();
+  requestAnimationFrame(tick);
+}
+
+// Init
+renderGrid();
+render();
+tick();
+</script>
+</body>
+</html>
