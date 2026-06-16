@@ -47,7 +47,7 @@ class MutableSeriesStrategyTest {
     @Test fun ringSeriesSet() {
         val r = RingSeries<Int>(4)
         for (i in 0 until 4) r.add(i)
-        r.set(1, 99)
+        r[1] = 99
         assertEquals(99, r[1])
     }
 
@@ -178,7 +178,7 @@ class MutableSeriesStrategyTest {
     // ═══════════════════════════════════════════════════════════════════
 
     @Test fun sortedSeriesMaintainsOrderOnAdd() {
-        val ss = SortedSeries.natural<Int>()
+        val ss: SortedSeries<Int> = SortedSeries.natural()
         ss.add(30); ss.add(10); ss.add(20); ss.add(40)
         assertEquals(4, ss.size)
         assertEquals(10, ss[0])
@@ -188,7 +188,7 @@ class MutableSeriesStrategyTest {
     }
 
     @Test fun sortedSeriesAddAtIndexIsIgnored() {
-        val ss = SortedSeries.natural<Int>()
+        val ss: SortedSeries<Int> = SortedSeries.natural()
         ss.add(30); ss.add(10)
         ss.add(0, 99)  // index ignored — sort order wins
         assertEquals(3, ss.size)
