@@ -92,6 +92,8 @@ Cursor rules:
 
 ## JSON scan / path algebra
 
+now handles yaml and cbor, and cursors under the name Confix 
+
 ```kotlin
 typealias JsElement = Join<Twin<Int>, Series<Int>>
 typealias JsIndex = Join<Twin<Int>, Series<Char>>
