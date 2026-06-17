@@ -262,7 +262,7 @@ data class ModuleProcessorState(
 data class SignalValue(
     val value: String,  // JSON-serialized value
     val typeSignature: String,
-    val timestamp: Long = System.currentTimeMillis(),
+    val timestamp: Long = PlatformUtils.currentTimeMillis(),
     val metadata: Map<String, String> = emptyMap(),
 )
 
@@ -277,8 +277,8 @@ data class ForgeFile(
     val content: String,
     val mimeType: String,
     val metadata: Map<String, String> = emptyMap(),
-    val createdAt: Long = System.currentTimeMillis(),
-    val updatedAt: Long = System.currentTimeMillis(),
+    val createdAt: Long = PlatformUtils.currentTimeMillis(),
+    val updatedAt: Long = PlatformUtils.currentTimeMillis(),
 )
 
 /**
@@ -303,7 +303,7 @@ data class ForgeSnapshot(
     val parentId: ForgeSnapshotId?,
     val files: Map<ForgeFileId, ForgeFile>,
     val message: String,
-    val timestamp: Long = System.currentTimeMillis(),
+    val timestamp: Long = PlatformUtils.currentTimeMillis(),
     val author: String = "unknown",
     val tags: Set<String> = emptySet(),
 )
@@ -328,7 +328,7 @@ data class ForgePrompt(
     val parameters: Map<String, PromptParameter>,
     val version: Int = 1,
     val tags: Set<String> = emptySet(),
-    val createdAt: Long = System.currentTimeMillis(),
+    val createdAt: Long = PlatformUtils.currentTimeMillis(),
 )
 
 @Serializable
@@ -492,8 +492,7 @@ data class ForgeExecutionResult(
 )
 
 @Serializable
-@JvmInline
-value class ForgeExecutionId(val value: String) {
+data class ForgeExecutionId(val value: String) {
     companion object {
         fun generate(): ForgeExecutionId = ForgeExecutionId(PlatformUtils.randomUuid())
     }
@@ -528,8 +527,7 @@ sealed interface CollaborationEvent {
 }
 
 @Serializable
-@JvmInline
-value class ForgeUserId(val value: String) {
+data class ForgeUserId(val value: String) {
     companion object {
         fun generate(): ForgeUserId = ForgeUserId(PlatformUtils.randomUuid())
     }
@@ -540,7 +538,7 @@ data class ForgeUser(
     val id: ForgeUserId,
     val name: String,
     val color: String,
-    val connectedAt: Long = System.currentTimeMillis(),
+    val connectedAt: Long = PlatformUtils.currentTimeMillis(),
 )
 
 /**
@@ -555,13 +553,12 @@ data class ForgeArtifact(
     val workflowId: ForgeWorkflowId?,
     val executionId: ForgeExecutionId?,
     val metadata: Map<String, String> = emptyMap(),
-    val createdAt: Long = System.currentTimeMillis(),
+    val createdAt: Long = PlatformUtils.currentTimeMillis(),
     val isPublic: Boolean = false,
 )
 
 @Serializable
-@JvmInline
-value class ForgeArtifactId(val value: String) {
+data class ForgeArtifactId(val value: String) {
     companion object {
         fun generate(): ForgeArtifactId = ForgeArtifactId(PlatformUtils.randomUuid())
     }

@@ -1,5 +1,6 @@
 package borg.trikeshed.forge
 
+import borg.trikeshed.forge.platform.PlatformUtils
 import kotlinx.serialization.Serializable
 
 /**
@@ -22,10 +23,9 @@ data class KanbanBoard(
 )
 
 @Serializable
-@JvmInline
-value class KanbanBoardId(val value: String) {
+data class KanbanBoardId(val value: String) {
     companion object {
-        fun generate(): KanbanBoardId = KanbanBoardId(java.util.UUID.randomUUID().toString())
+        fun generate(): KanbanBoardId = KanbanBoardId(PlatformUtils.randomUuid())
     }
 }
 
@@ -39,10 +39,9 @@ data class KanbanColumn(
 )
 
 @Serializable
-@JvmInline
-value class KanbanColumnId(val value: String) {
+data class KanbanColumnId(val value: String) {
     companion object {
-        fun generate(): KanbanColumnId = KanbanColumnId(java.util.UUID.randomUUID().toString())
+        fun generate(): KanbanColumnId = KanbanColumnId(PlatformUtils.randomUuid())
     }
 }
 
@@ -58,15 +57,14 @@ data class KanbanCard(
     val dependencies: List<KanbanCardId> = emptyList(),  // blocks other cards
     val tags: Set<String> = emptySet(),
     val metadata: Map<String, String> = emptyMap(),
-    val createdAt: Long = System.currentTimeMillis(),
-    val updatedAt: Long = System.currentTimeMillis(),
+    val createdAt: Long = PlatformUtils.currentTimeMillis(),
+    val updatedAt: Long = PlatformUtils.currentTimeMillis(),
 )
 
 @Serializable
-@JvmInline
-value class KanbanCardId(val value: String) {
+data class KanbanCardId(val value: String) {
     companion object {
-        fun generate(): KanbanCardId = KanbanCardId(java.util.UUID.randomUUID().toString())
+        fun generate(): KanbanCardId = KanbanCardId(PlatformUtils.randomUuid())
     }
 }
 
@@ -82,10 +80,9 @@ data class Swimlane(
 )
 
 @Serializable
-@JvmInline
-value class SwimlaneId(val value: String) {
+data class SwimlaneId(val value: String) {
     companion object {
-        fun generate(): SwimlaneId = SwimlaneId(java.util.UUID.randomUUID().toString())
+        fun generate(): SwimlaneId = SwimlaneId(PlatformUtils.randomUuid())
     }
 }
 

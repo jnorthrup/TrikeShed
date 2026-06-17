@@ -1,5 +1,6 @@
 package borg.trikeshed.forge
 
+import borg.trikeshed.forge.platform.PlatformUtils
 import kotlinx.serialization.Serializable
 
 /**
@@ -27,10 +28,9 @@ data class OperationalCascade(
 )
 
 @Serializable
-@JvmInline
-value class CascadeId(val value: String) {
+data class CascadeId(val value: String) {
     companion object {
-        fun generate(): CascadeId = CascadeId(java.util.UUID.randomUUID().toString())
+        fun generate(): CascadeId = CascadeId(PlatformUtils.randomUuid())
     }
 }
 
@@ -153,7 +153,7 @@ data class CascadeExecutionResult(
 @JvmInline
 value class CascadeExecutionId(val value: String) {
     companion object {
-        fun generate(): CascadeExecutionId = CascadeExecutionId(java.util.UUID.randomUUID().toString())
+        fun generate(): CascadeExecutionId = CascadeExecutionId(PlatformUtils.randomUuid())
     }
 }
 

@@ -355,25 +355,19 @@ switch (project.path) {
         }
         break
     case ":libs:forge":
-        pluginManager.apply("org.jetbrains.kotlin.multiplatform")
-        pluginManager.apply("org.jetbrains.kotlin.plugin.serialization")
-        pluginManager.apply("maven-publish")
-        group = "borg.trikeshed"
-        version = libVersion
-        def kotlinExt = extensions.getByName("kotlin")
-        configureCompiler(kotlinExt, true)
-        jvmOnlyTarget(kotlinExt)
-        // Source sets - forge uses src/main/kotlin (JVM structure)
-        def forgeSourceSets = extensions.getByName("kotlin").sourceSets
-        forgeSourceSets.getByName("commonMain").dependencies {
-            implementation libPeer("miniduck")
-            api "org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3"
-        }
+        // forge is configured in its own build.gradle.kts with plugins block
+        break
         forgeSourceSets.getByName("commonTest").dependencies {
-            implementation rootPeer()
             implementation "org.jetbrains.kotlinx:kotlinx-coroutines-core:${prop("versions.kotlinx-coroutines-core")}"
             implementation "org.jetbrains.kotlin:kotlin-test:2.4.0"
             implementation "org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0"
+        }
+        // root project and miniduck are JVM-only, add to jvmMain/jvmTest
+        forgeSourceSets.named("jvmMain").configure {
+            dependencies {
+                implementation rootPeer()
+                implementation libPeer("miniduck")
+            }
         }
         forgeSourceSets.named("jvmTest").configure {
             kotlin.srcDir("src/test/kotlin")
@@ -395,11 +389,6 @@ switch (project.path) {
             tasks.matching { it.name == "jvmTest" }.configureEach {
                 useJUnitPlatform()
             }
-        }
-        // Map main source set to commonMain for JVM target
-        forgeSourceSets.named("jvmMain").configure {
-            kotlin.srcDir("src/main/kotlin")
-            resources.srcDir("src/main/resources")
         }
         break
     case ":libs:forge-ui":

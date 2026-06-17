@@ -1,7 +1,7 @@
 package borg.trikeshed.forge
 
+import borg.trikeshed.forge.platform.PlatformUtils
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -31,7 +31,7 @@ class ForgeWorkspaceImpl : ForgeWorkspace {
     // =========================================================================
 
     override suspend fun put(file: ForgeFile): ForgeFile {
-        val updated = file.copy(updatedAt = System.currentTimeMillis())
+        val updated = file.copy(updatedAt = PlatformUtils.currentTimeMillis())
         files[updated.id] = updated
         return updated
     }
@@ -49,7 +49,7 @@ class ForgeWorkspaceImpl : ForgeWorkspace {
         val file = files[id] ?: return null
         val channel = Channel<String>(1)
         // Use a scope to send content
-        CoroutineScope(Dispatchers.IO).launch {
+        CoroutineScope(PlatformUtils.ioDispatcher).launch {
             channel.send(file.content)
             channel.close()
         }
@@ -198,7 +198,7 @@ class ForgeWorkspaceImpl : ForgeWorkspace {
     ): ForgeExecutionResult {
         val workflow = workflows[workflowId] ?: throw IllegalArgumentException("Workflow not found: $workflowId")
         val snapId = snapshotId ?: snapshots.last()?.id ?: ForgeSnapshotId.ROOT
-        val now = System.currentTimeMillis()
+        val now = PlatformUtils.currentTimeMillis()
 
         val result = ForgeExecutionResult(
             executionId = ForgeExecutionId.generate(),
@@ -287,7 +287,7 @@ class ForgeWorkspaceImpl : ForgeWorkspace {
         val manifest = ForgeExportManifest(
             artifactId = artifact.id,
             artifactName = artifact.name,
-            exportedAt = System.currentTimeMillis(),
+            exportedAt = PlatformUtils.currentTimeMillis(),
             fileCount = artifact.files.size,
             totalSize = artifact.files.sumOf { it.content.length.toLong() },
             workflowId = artifact.workflowId,
@@ -592,8 +592,8 @@ class ForgeWorkspaceImpl : ForgeWorkspace {
             cascadeId = cascade.id,
             output = outputRows,
             stageOutputs = serializableStageOutputs,
-            startedAt = System.currentTimeMillis(),
-            completedAt = System.currentTimeMillis(),
+            startedAt = PlatformUtils.currentTimeMillis(),
+            completedAt = PlatformUtils.currentTimeMillis(),
             status = CascadeExecutionStatus.SUCCESS
         )
     }
@@ -672,7 +672,9 @@ class ForgeWorkspaceImpl : ForgeWorkspace {
 
     override suspend fun disconnectCable(patchBayId: PatchBayId, cableId: CableId): Boolean {
         val cables = patchBayCables[patchBayId] ?: return false
-        return cables.removeIf { it.id == cableId }
+        val originalSize = cables.size
+        cables.removeAll { it.id == cableId }
+        return cables.size < originalSize
     }
 
     override suspend fun setCableState(patchBayId: PatchBayId, cableId: CableId, state: CableState): PatchCable? {

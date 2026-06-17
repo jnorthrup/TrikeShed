@@ -2,8 +2,8 @@ package borg.trikeshed.forge.notion
 
 import borg.trikeshed.forge.ForgeFile
 import borg.trikeshed.forge.ForgeFileId
+import borg.trikeshed.forge.platform.PlatformUtils
 import kotlinx.serialization.Serializable
-import java.util.UUID
 
 /**
  * First cut of the CursorDriven Notion clone core.
@@ -352,14 +352,14 @@ object CursorDrivenNotion {
         .trim('-')
         .ifBlank { "untitled" }
 
-    private fun now(): Long = System.currentTimeMillis()
+    private fun now(): Long = PlatformUtils.currentTimeMillis()
 }
 
 @Serializable
-@JvmInline
-value class NotionBlockId(val value: String) {
+expect class NotionBlockId constructor(value: String) {
+    val value: String
     companion object {
-        fun generate(): NotionBlockId = NotionBlockId("notion-block-${UUID.randomUUID()}")
+        fun generate(): NotionBlockId = NotionBlockId("notion-block-${PlatformUtils.randomUuid()}")
     }
 }
 
@@ -391,8 +391,8 @@ data class NotionBlock(
     val parentId: NotionBlockId?,
     val children: List<NotionBlockId> = emptyList(),
     val properties: Map<String, String> = emptyMap(),
-    val createdAt: Long = System.currentTimeMillis(),
-    val updatedAt: Long = System.currentTimeMillis(),
+    val createdAt: Long = PlatformUtils.currentTimeMillis(),
+    val updatedAt: Long = PlatformUtils.currentTimeMillis(),
 )
 
 @Serializable
@@ -409,7 +409,7 @@ data class NotionMutation(
     val operation: String,
     val blockId: NotionBlockId?,
     val payload: Map<String, String> = emptyMap(),
-    val timestamp: Long = System.currentTimeMillis(),
+    val timestamp: Long = PlatformUtils.currentTimeMillis(),
 )
 
 @Serializable
@@ -482,7 +482,7 @@ class NotionCursorView internal constructor(private val rows: List<NotionCursorR
 }
 
 private fun CursorNotionState.replace(block: NotionBlock): CursorNotionState =
-    copy(blocks = blocks + (block.id.value to block.copy(updatedAt = System.currentTimeMillis())))
+    copy(blocks = blocks + (block.id.value to block.copy(updatedAt = PlatformUtils.currentTimeMillis())))
 
 private fun CursorNotionState.withCursor(actorId: String, cursor: NotionCursor): CursorNotionState =
     copy(cursors = cursors + (actorId to cursor))
