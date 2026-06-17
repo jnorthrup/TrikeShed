@@ -1,0 +1,105 @@
+Metadata-Version: 2.4
+Name: tspy
+Version: 0.1.0
+Summary: TrikeShed Python: native Python implementation of the PRELOAD.md kernel algebra
+Author-email: TrikeShed <dev@trikeshed.org>
+License: MIT
+Classifier: Development Status :: 3 - Alpha
+Classifier: Intended Audience :: Developers
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.9
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+Classifier: Programming Language :: Python :: 3.13
+Requires-Python: >=3.9
+Description-Content-Type: text/markdown
+Provides-Extra: dev
+Requires-Dist: pytest>=8.0; extra == "dev"
+Requires-Dist: pytest-cov>=4.0; extra == "dev"
+
+# tspy — TrikeShed Python
+
+Native Python implementation of the PRELOAD.md kernel algebra (Join, Twin, Series, Cursor, α-projection, ↺ left-identity, etc.).
+
+## Installation
+
+```bash
+pip install -e /path/to/TrikeShed/libs/tspy
+```
+
+## Quick Start
+
+```python
+from tspy import (
+    Join, Twin, Series, twin,
+    j, alpha, α, left_identity,
+    _l, _a, _s, s_,
+    series_of, series_range, series_repeat,
+    cursor_from_columns,
+)
+
+# Join algebra
+j = Join(1, "hello")
+t = twin(42)  # Twin(42, 42)
+
+# Series algebra
+s = series_of(1, 2, 3, 4, 5)
+assert s.size == 5
+assert s[0] == 1
+assert list(s.view) == [1, 2, 3, 4, 5]
+
+# α (alpha) lazy projection
+doubled = s @ (lambda x: x * 2)  # or alpha(s, lambda x: x * 2)
+assert list(doubled.view) == [2, 4, 6, 8, 10]
+
+# Unicode operators
+doubled = α(s, lambda x: x * 2)
+
+# ↺ (left_identity) constant anchor
+thunk = left_identity(42)
+assert thunk() == 42
+
+# Composition literals
+_l[1, 2, 3]  # [1, 2, 3]
+_s[1, 2, 2, 3]  # {1, 2, 3}
+s_[1, 2, 3]  # Series(3, ...)
+
+# Cursor algebra
+cursor = cursor_from_columns(
+    ["name", "age"],
+    series_of("Alice", "Bob", "Carol"),
+    series_of(30, 25, 35)
+)
+assert cursor.size == 3
+row0 = cursor[0]
+assert row0[0].a == "Alice"
+assert row0[0].b()["name"] == "name"
+assert row0[1].a == 30
+
+# Cursor operations
+sliced = cursor_range(cursor, 1, 3)  # cursor[1:3]
+joined = join_cursors(c1, c2)  # widen horizontally
+combined = combine_cursors(c1, c2)  # concatenate vertically
+```
+
+## Algebra Reference
+
+| Symbol | Name | Description |
+|--------|------|-------------|
+| `Join<A, B>` | Join | Base binary composition |
+| `Twin<T>` | Twin | Same-typed Join |
+| `Series<T>` | Series | `Join<int, (int) -> T>` |
+| `j(a, b)` | j | Infix Join constructor |
+| `s @ f` | α | Lazy projection (map) |
+| `x.↺` | ↺ | Left identity: `lambda: x` |
+| `_l[...]` | List | List literal |
+| `_s[...]` | Set | Set literal |
+| `s_[...]` | Series | Series literal |
+
+## Tests
+
+```bash
+pytest tests/
+```

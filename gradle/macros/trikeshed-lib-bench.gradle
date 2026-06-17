@@ -1,0 +1,101 @@
+// polyglot-bench macro — kept tiny and explicit (the bench target is JVM-only,
+// with the GraalVM polyglot deps for evaluating JS and emitting FieldSynapse).
+
+buildscript {
+    repositories {
+        gradlePluginPortal()
+        mavenCentral()
+        google()
+        maven { url = uri("https://oss.sonatype.org/content/repositories/snapshots/") }
+    }
+    dependencies {
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:2.4.0"
+    }
+}
+
+def trikeshedVersion = "1.0"
+def libVersion = "0.1.0-SNAPSHOT"
+def kotlinVersion = "2.4.0"
+
+def prop = { String name ->
+    def value = rootProject.providers.gradleProperty(name).orNull
+    if (value != null) return value
+    if (rootProject.ext.has(name)) return rootProject.ext.get(name).toString()
+    throw new GradleException("Missing Gradle property: ${name}")
+}
+
+def rootPeer = {
+    rootProject.name == "TrikeShed" && project.path != ":"
+        ? project(":")
+        : "org.bereft:TrikeShed-jvm:${trikeshedVersion}"
+}
+
+repositories {
+    mavenLocal()
+    mavenCentral()
+    google()
+    gradlePluginPortal()
+}
+
+project.repositories {
+    mavenLocal()
+    mavenCentral()
+    google()
+    gradlePluginPortal()
+}
+
+pluginManager.apply("org.jetbrains.kotlin.jvm")
+pluginManager.apply("application")
+pluginManager.apply("java-library")
+pluginManager.apply("maven-publish")
+
+group = "borg.trikeshed"
+version = libVersion
+
+java {
+    toolchain {
+        languageVersion.set(JavaLanguageVersion.of(25))
+    }
+}
+
+tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompilationTask.class).configureEach {
+    compilerOptions {
+        apiVersion.set("2.4")
+        languageVersion.set("2.4")
+        freeCompilerArgs.addAll(
+            "-opt-in=kotlin.RequiresOptIn",
+            "-Xsuppress-version-warnings",
+        )
+    }
+}
+
+dependencies {
+    implementation rootPeer()
+    // Reuse the polyglot lib we just made (composite build dep)
+    implementation project(":libs:polyglot")
+    implementation "org.graalvm.polyglot:polyglot:25.0.2"
+    implementation "org.graalvm.polyglot:js:25.0.2"
+    implementation "org.graalvm.polyglot:js-community:25.0.2"
+
+    testImplementation "org.jetbrains.kotlin:kotlin-test:${kotlinVersion}"
+}
+
+application {
+    mainClass.set("borg.trikeshed.polyglot.bench.PolyglotBenchMainKt")
+}
+
+// ── Fat-jar packaging for native-image input ──────────────────────────────
+tasks.register("fatJar", Jar) {
+    group = "build"
+    description = "Builds a fat JAR suitable for native-image compilation"
+    archiveClassifier.set("all")
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    manifest {
+        attributes["Main-Class"] = "borg.trikeshed.polyglot.bench.PolyglotBenchMainKt"
+    }
+    from(sourceSets.main.get().output)
+    dependsOn(configurations.runtimeClasspath)
+    from({
+        configurations.runtimeClasspath.get().findAll { it.name.endsWith("jar") }.collect { zipTree(it) }
+    })
+}

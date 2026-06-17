@@ -11,6 +11,24 @@ internal actual object LiburingImpl : LiburingFacade {
     actual override fun prepFtruncate(fd: Int, size: Long, userData: Long): Result<Unit> = unsupported()
     actual override fun prepMmap(fd: Int, addr: Long, len: Int, prot: Int, flags: Int, offset: Long, userData: Long): Result<Unit> = unsupported()
     actual override fun prepMunmap(addr: Long, len: Int, userData: Long): Result<Unit> = unsupported()
+    actual override fun prepSendmsg(
+        fd: Int,
+        msgHdrPtr: Long,
+        flags: Int,
+        userData: Long
+    ): Result<Unit> {
+        TODO("Not yet implemented")
+    }
+
+    actual override fun prepRecvmsg(
+        fd: Int,
+        msgHdrPtr: Long,
+        flags: Int,
+        userData: Long
+    ): Result<Unit> {
+        TODO("Not yet implemented")
+    }
+
     actual override fun submit(): Result<Int> = unsupported()
     actual override fun waitCqe(): Result<UringCompletion> = unsupported()
     actual override fun peekCqe(): Result<UringCompletion?> = unsupported()

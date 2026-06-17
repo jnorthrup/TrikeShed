@@ -1,7 +1,7 @@
 package borg.trikeshed.confix
 
 import borg.trikeshed.cursor.*
-import borg.trikeshed.cursor.CowSeriesHandle
+import borg.trikeshed.mutable.CowSeriesHandle
 import borg.trikeshed.lib.*
 
 // ── ObservableConfixOracle ─────────────────────────────────────────

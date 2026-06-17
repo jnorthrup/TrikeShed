@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Forge Final Production · TrikeShed</title>
+  <style>
+    :root {
+      --bg: #0a0f14;
+      --pane: #101721;
+      --pane2: #0d141c;
+      --pane3: #131d29;
+      --line: #1d2936;
+      --line2: #223245;
+      --ink: #d7e0ea;
+      --muted: #7d8ea3;
+      --blue: #7aa2f7;
+      --cyan: #7dcfff;
+      --green: #9ece6a;
+      --amber: #e0af68;
+      --red: #f7768e;
+      --purple: #bb9af7;
+      --teal: #73daca;
+      --shadow: 0 20px 60px rgba(0,0,0,.28);
+      --radius: 18px;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; background: var(--bg); color: var(--ink); font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif; }
+    a { color: inherit; text-decoration: none; }
+    button, input { font: inherit; }
+    code, pre, .mono { font-family: "SF Mono", ui-monospace, Menlo, Consolas, monospace; }
+    .shell { display: grid; grid-template-columns: 280px minmax(0,1fr) 360px; min-height: 100vh; }
+    .rail, .inspector { background: var(--pane2); }
+    .rail { border-right: 1px solid var(--line); padding: 20px 0 16px; }
+    .inspector { border-left: 1px solid var(--line); padding: 20px 18px; overflow: auto; }
+    .main { padding: 26px 28px 40px; overflow: auto; }
+    .brand { padding: 0 18px 18px; border-bottom: 1px solid var(--line); margin-bottom: 16px; }
+    .brand .eyebrow { color: var(--cyan); font-size: 11px; text-transform: uppercase; letter-spacing: .14em; font-weight: 700; }
+    .brand h1 { margin: 9px 0 8px; font-size: 19px; line-height: 1.15; }
+    .brand p { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.55; }
+    .nav { padding: 6px 10px; display: grid; gap: 6px; }
+    .navbtn { width: 100%; background: transparent; border: 1px solid transparent; color: var(--muted); padding: 11px 12px; border-radius: 12px; text-align: left; cursor: pointer; }
+    .navbtn:hover { background: rgba(122,162,247,.06); color: var(--ink); }
+    .navbtn.active { background: rgba(122,162,247,.10); border-color: rgba(122,162,247,.28); color: var(--ink); }
+    .navbtn .top { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 3px; }
+    .navbtn .ttl { font-size: 13px; font-weight: 650; }
+    .navbtn .sub { font-size: 11px; line-height: 1.4; color: var(--muted); }
+    .chip { display: inline-flex; align-items: center; gap: 7px; border: 1px solid var(--line2); background: rgba(16,23,33,.9); border-radius: 999px; padding: 7px 11px; font-size: 11px; color: var(--muted); }
+    .chip b { color: var(--ink); font-weight: 650; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; }
+    .dot.blue { background: var(--blue); } .dot.green { background: var(--green); } .dot.amber { background: var(--amber); } .dot.red { background: var(--red); } .dot.cyan { background: var(--cyan); }
+    .hero { background: linear-gradient(180deg, rgba(19,29,41,.98), rgba(13,20,28,.98)); border: 1px solid var(--line2); border-radius: 24px; box-shadow: var(--shadow); padding: 24px 24px 20px; margin-bottom: 22px; }
+    .hero h2 { margin: 0 0 10px; font-size: 31px; line-height: 1.05; letter-spacing: -.03em; max-width: 12ch; }
+    .hero p { margin: 0; color: var(--muted); line-height: 1.65; max-width: 78ch; }
+    .hero-grid { display: grid; grid-template-columns: 1.2fr .8fr; gap: 20px; align-items: end; margin-top: 20px; }
+    .hero-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+    .btn, .linkbtn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 42px; padding: 0 14px; border-radius: 12px; border: 1px solid var(--line2); background: var(--pane3); color: var(--ink); cursor: pointer; }
+    .btn.primary, .linkbtn.primary { background: rgba(122,162,247,.13); border-color: rgba(122,162,247,.35); }
+    .btn:hover, .linkbtn:hover { border-color: var(--blue); }
+    .stack { display: grid; gap: 18px; }
+    .card { background: var(--pane); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; box-shadow: 0 14px 44px rgba(0,0,0,.18); }
+    .card-head { padding: 14px 16px; border-bottom: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+    .card-head h3 { margin: 0; font-size: 14px; }
+    .hint { color: var(--muted); font-size: 11px; }
+    .card-body { padding: 16px; }
+    .metrics { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 12px; }
+    .metric { background: var(--pane3); border: 1px solid var(--line2); border-radius: 16px; padding: 16px 14px; }
+    .metric .num { font-size: 28px; font-weight: 750; letter-spacing: -.03em; }
+    .metric .lbl { margin-top: 6px; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .08em; }
+    .metric .meta { margin-top: 5px; color: var(--cyan); font-size: 11px; }
+    .grid2 { display: grid; grid-template-columns: 1.15fr .85fr; gap: 18px; }
+    .signal-board { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; }
+    .signal { background: rgba(19,29,41,.9); border: 1px solid var(--line2); border-radius: 14px; padding: 13px 14px; }
+    .signal .k { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .08em; }
+    .signal .v { margin-top: 6px; font-size: 16px; font-weight: 650; }
+    .signal .s { margin-top: 4px; color: var(--cyan); font-size: 11px; }
+    .asset-tools { display: flex; gap: 10px; align-items: center; margin-bottom: 14px; flex-wrap: wrap; }
+    .search { flex: 1 1 240px; min-height: 44px; background: var(--pane3); border: 1px solid var(--line2); border-radius: 12px; color: var(--ink); padding: 0 13px; }
+    .asset-grid { display: grid; gap: 12px; }
+    .asset { border: 1px solid var(--line2); background: linear-gradient(180deg, rgba(18,27,38,.95), rgba(14,20,28,.95)); border-radius: 18px; padding: 16px; cursor: pointer; transition: transform .14s ease, border-color .14s ease, background .14s ease; }
+    .asset:hover { transform: translateY(-1px); border-color: rgba(122,162,247,.34); }
+    .asset.active { border-color: rgba(122,162,247,.44); box-shadow: 0 0 0 1px rgba(122,162,247,.24) inset; }
+    .asset-head { display: flex; align-items: start; justify-content: space-between; gap: 14px; }
+    .asset-title { font-size: 16px; font-weight: 680; line-height: 1.25; }
+    .asset-kind { color: var(--cyan); font-size: 11px; text-transform: uppercase; letter-spacing: .08em; }
+    .asset-summary { margin-top: 10px; color: var(--muted); line-height: 1.6; font-size: 13px; }
+    .asset-meta { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+    .asset-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 14px; color: var(--muted); font-size: 12px; }
+    .split { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .codeblock { background: #091018; border: 1px solid var(--line2); border-radius: 14px; padding: 12px; }
+    .line { display: grid; grid-template-columns: 50px 1fr; gap: 14px; padding: 2px 4px; min-height: 22px; }
+    .line:hover { background: rgba(122,162,247,.05); }
+    .ln { color: #506070; text-align: right; user-select: none; }
+    .src { white-space: pre-wrap; word-break: break-word; }
+    .list { display: grid; gap: 8px; }
+    .list-item { padding: 10px 12px; border: 1px solid var(--line2); border-radius: 12px; background: var(--pane3); }
+    .list-item small { display: block; color: var(--muted); margin-top: 4px; }
+    .muted { color: var(--muted); }
+    .tiny { font-size: 11px; }
+    .section-tabs { display: flex; flex-wrap: wrap; gap: 8px; }
+    .tabbtn { min-height: 36px; padding: 0 11px; border-radius: 10px; border: 1px solid var(--line2); background: var(--pane3); color: var(--muted); cursor: pointer; }
+    .tabbtn.active { color: var(--ink); border-color: rgba(122,162,247,.34); background: rgba(122,162,247,.12); }
+    .status-list { display: grid; gap: 8px; }
+    .status { padding: 11px 12px; border-radius: 12px; border: 1px solid var(--line2); background: var(--pane3); color: var(--ink); }
+    .status.untracked { border-color: rgba(224,175,104,.35); }
+    .status.modified { border-color: rgba(122,162,247,.35); }
+    .pillrow { display: flex; flex-wrap: wrap; gap: 8px; }
+    .kv { display: grid; grid-template-columns: 120px 1fr; gap: 7px 12px; font-size: 12px; }
+    .kv div:nth-child(odd) { color: var(--muted); }
+    .event-log { display: grid; gap: 8px; }
+    .event { border: 1px solid var(--line2); border-radius: 12px; background: var(--pane3); padding: 10px 12px; }
+    .event .tag { color: var(--cyan); font-size: 10px; text-transform: uppercase; letter-spacing: .08em; font-weight: 700; }
+    .event .msg { margin-top: 5px; font-size: 12px; line-height: 1.45; }
+    .event .ts { margin-top: 4px; color: var(--muted); font-size: 11px; }
+    .footer-note { margin-top: 16px; padding: 0 18px; color: var(--muted); font-size: 11px; line-height: 1.55; }
+    @media (max-width: 1320px) {
+      .shell { grid-template-columns: 250px minmax(0,1fr); }
+      .inspector { grid-column: 1 / -1; border-left: 0; border-top: 1px solid var(--line); }
+    }
+    @media (max-width: 920px) {
+      .shell { grid-template-columns: 1fr; }
+      .rail { border-right: 0; border-bottom: 1px solid var(--line); }
+      .main { padding: 18px; }
+      .metrics, .grid2, .hero-grid { grid-template-columns: 1fr; }
+      .signal-board { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <aside class="rail">
+      <div class="brand">
+        <div class="eyebrow">TrikeShed · Forge</div>
+        <h1>Final production</h1>
+        <p>Signal-driven GitHub Pages home bootstrapped from the real repo manifest and the published introspection artifacts.</p>
+      </div>
+      <div id="nav" class="nav"></div>
+      <div class="footer-note mono">docs/data/forge-production-signals.json → activeSection, activeAsset, query, contractMode</div>
+    </aside>
+    <main class="main">
+      <section class="hero">
+        <div class="hero-grid">
+          <div>
+            <div class="pillrow" id="hero-chips"></div>
+            <h2>Forge final production in signals, not templates.</h2>
+            <p id="hero-statement"></p>
+            <div class="hero-actions" id="hero-actions"></div>
+          </div>
+          <div class="card" style="margin:0;">
+            <div class="card-head"><h3>Selected production asset</h3><div class="hint mono" id="hero-selected-kind"></div></div>
+            <div class="card-body" id="hero-selected"></div>
+          </div>
+        </div>
+      </section>
+      <div id="section-host" class="stack"></div>
+    </main>
+    <aside class="inspector">
+      <div id="inspector-host" class="stack"></div>
+    </aside>
+  </div>
+  <script id="bootstrap-data" type="application/json">{
+  "generated_at_utc": "2026-06-12T22:12:49Z",
+  "repo": {
+    "name": "TrikeShed",
+    "cwd": "/Users/jim/work/TrikeShed",
+    "branch": "master",
+    "remote": "https://github.com/jnorthrup/TrikeShed.git",
+    "pages_url": "https://jnorthrup.github.io/TrikeShed/",
+    "pages_root": "docs/"
+  },
+  "production_statement": "Production Pages surface is built from actual repo signals and published introspection artifacts, not a template dashboard.",
+  "signals": {
+    "published_asset_count": 4,
+    "copied_asset_count": 3,
+    "working_tree_entries": 5,
+    "modified_entries": 1,
+    "untracked_entries": 4,
+    "preload_line_count": 142,
+    "published_bytes": 167222
+  },
+  "working_tree": [
+    "M README.md",
+    "?? docs/demos/runtime.html",
+    "?? docs/demos/series.html",
+    "?? docs/demos/triple.html",
+    "?? docs/plans/2026-06-12-forge-blackboard-confix-adjacency.md"
+  ],
+  "preload_contract": {
+    "kernel_excerpt": [
+      {
+        "line": 3,
+        "text": "## Kernel algebra"
+      },
+      {
+        "line": 4,
+        "text": ""
+      },
+      {
+        "line": 5,
+        "text": "```kotlin"
+      },
+      {
+        "line": 6,
+        "text": "interface Join<A, B> {"
+      },
+      {
+        "line": 7,
+        "text": "    val a: A"
+      },
+      {
+        "line": 8,
+        "text": "    val b: B"
+      },
+      {
+        "line": 9,
+        "text": "    operator fun component1(): A = a"
+      },
+      {
+        "line": 10,
+        "text": "    operator fun component2(): B = b"
+      },
+      {
+        "line": 11,
+        "text": "    val pair: Pair<A, B> get() = Pair(a, b)"
+      },
+      {
+        "line": 12,
+        "text": "    // ... many extensions and specializations hang off this shape"
+      },
+      {
+        "line": 13,
+        "text": "}"
+      },
+      {
+        "line": 14,
+        "text": ""
+      }
+    ],
+    "cursor_excerpt": [
+      {
+        "line": 64,
+        "text": "## Cursor algebra"
+      },
+      {
+        "line": 65,
+        "text": ""
+      },
+      {
+        "line": 66,
+        "text": "```kotlin"
+      },
+      {
+        "line": 67,
+        "text": "typealias RowVec = Series2<Any, () -> RecordMeta>"
+      },
+      {
+        "line": 68,
+        "text": "/** Cursors are a columnar abstraction composed of Series of joined value+meta pairs */"
+      },
+      {
+        "line": 69,
+        "text": "typealias Cursor = Series<RowVec>"
+      },
+      {
+        "line": 70,
+        "text": "```"
+      },
+      {
+        "line": 71,
+        "text": ""
+      },
+      {
+        "line": 72,
+        "text": "Read Cursor as:"
+      },
+      {
+        "line": 73,
+        "text": "- RowVec = row-shaped value view plus metadata supplier"
+      }
+    ],
+    "ccek_excerpt": [
+      {
+        "line": 108,
+        "text": "## Userspace async context algebra (aka CCEK meaning Coroutine, Context, Element, Key )"
+      },
+      {
+        "line": 109,
+        "text": ""
+      },
+      {
+        "line": 110,
+        "text": "The userspace side is modeled as explicit async context elements and fanout, not hidden ambient magic."
+      },
+      {
+        "line": 111,
+        "text": ""
+      },
+      {
+        "line": 112,
+        "text": "Ground truths from the code/tests:"
+      },
+      {
+        "line": 113,
+        "text": "- async context keys are singleton identity objects"
+      },
+      {
+        "line": 114,
+        "text": "- current keys include `NioUserspaceKey`, `LiburingKey`, `FanoutDispatcherKey`"
+      },
+      {
+        "line": 115,
+        "text": "- element lifecycle is forward-only:"
+      },
+      {
+        "line": 116,
+        "text": "  - `CREATED`"
+      },
+      {
+        "line": 117,
+        "text": "  - `OPEN`"
+      }
+    ]
+  },
+  "assets": [
+    {
+      "id": "series",
+      "title": "TrikeShed Series Introspection",
+      "published_path": "./demos/series.html",
+      "repo_path": "docs/demos/series.html",
+      "source_origin": "series.html",
+      "kind": "algebra-introspector",
+      "summary": "Interactive type introspector over Join, MetaSeries, Series, RowVec, Cursor, \u03b1, view, and j.",
+      "evidence": [
+        "Real source-grounded type tree and syntax-highlighted source blocks.",
+        "Interactive projections and cursor composition behaviors are demonstrated in-page.",
+        "Built from the actual TrikeShed algebra rather than a product shell."
+      ],
+      "source_files": [
+        "PRELOAD.md",
+        "src/commonMain/kotlin/borg/trikeshed/lib/Join.kt",
+        "src/commonMain/kotlin/borg/trikeshed/cursor/Cursor.kt"
+      ],
+      "size_bytes": 56961,
+      "size_kib": 55.6
+    },
+    {
+      "id": "runtime",
+      "title": "Forge Runtime / Collaboration Introspection",
+      "published_path": "./demos/runtime.html",
+      "repo_path": "docs/demos/runtime.html",
+      "source_origin": "runtime.html",
+      "kind": "runtime-seams",
+      "summary": "Source-grounded runtime surface for blackboard state, collaboration flow, provenance, tracing, and extension seams.",
+      "evidence": [
+        "Distinguishes implemented structures, stubbed APIs, and missing PRELOAD-native lowering.",
+        "Anchors directly to BlackboardOverlay, ForgeWorkspaceImpl, Lifecycle, and AsyncContextElement seams.",
+        "Designed for honest runtime inspection rather than speculative UI."
+      ],
+      "source_files": [
+        "src/commonMain/kotlin/borg/trikeshed/cursor/BlackboardOverlay.kt",
+        "libs/forge/src/main/kotlin/borg/trikeshed/forge/ForgeWorkspaceImpl.kt",
+        "src/commonMain/kotlin/borg/trikeshed/context/Lifecycle.kt",
+        "src/commonMain/kotlin/borg/trikeshed/context/AsyncContextElement.kt"
+      ],
+      "size_bytes": 57767,
+      "size_kib": 56.4
+    },
+    {
+      "id": "triple",
+      "title": "Real Cursor / Blackboard / Execution Triple",
+      "published_path": "./demos/triple.html",
+      "repo_path": "docs/demos/triple.html",
+      "source_origin": "triple.html",
+      "kind": "proof-slice",
+      "summary": "Runnable proof slice linking one real workspace cell across RowVec, BlackboardContext, and execution-event rows.",
+      "evidence": [
+        "Generated from a runnable Kotlin harness using copied real source in /tmp/trikeshed-triple.",
+        "Shows one concrete target cell: row-0:summary.",
+        "Connects workspaceRow, blackboardRow, and executionRow through the same addressing discipline."
+      ],
+      "source_files": [
+        "src/commonMain/kotlin/borg/trikeshed/lib/Join.kt",
+        "src/commonMain/kotlin/borg/trikeshed/cursor/Cursor.kt",
+        "src/commonMain/kotlin/borg/trikeshed/cursor/BlackboardOverlay.kt"
+      ],
+      "size_bytes": 23014,
+      "size_kib": 22.5
+    },
+    {
+      "id": "confix",
+      "title": "TrikeShed \u00b7 Confix \u2194 Cursor Blackboard",
+      "published_path": "./demos/ConfixCursorBlackboard.svg.html",
+      "repo_path": "docs/demos/ConfixCursorBlackboard.svg.html",
+      "source_origin": "docs/demos/ConfixCursorBlackboard.svg.html",
+      "kind": "support-diagram",
+      "summary": "Support diagram for the Confix \u2194 Cursor \u2194 Blackboard adjacency and its production hinge vocabulary.",
+      "evidence": [
+        "Diagram artifact already present in docs/demos.",
+        "Complements the runtime and triple proof surfaces with structural adjacency."
+      ],
+      "source_files": [
+        "docs/demos/ConfixCursorBlackboard.svg.html",
+        "docs/plans/2026-06-12-forge-blackboard-confix-adjacency.md"
+      ],
+      "size_bytes": 29480,
+      "size_kib": 28.8
+    }
+  ],
+  "links": {
+    "home": "./index.html",
+    "runtime": "./demos/runtime.html",
+    "series": "./demos/series.html",
+    "triple": "./demos/triple.html",
+    "confix": "./demos/ConfixCursorBlackboard.svg.html"
+  }
+}</script>
+  <script>
+    const DATA = JSON.parse(document.getElementById('bootstrap-data').textContent);
+
+    function createSignal(initial) {
+      let value = initial;
+      const subs = new Set();
+      return {
+        get: () => value,
+        set: (next) => {
+          value = next;
+          subs.forEach(fn => fn(value));
+        },
+        sub: (fn) => {
+          subs.add(fn);
+          fn(value);
+          return () => subs.delete(fn);
+        }
+      };
+    }
+
+    function computed(deps, calc) {
+      const out = createSignal(calc(...deps.map(d => d.get())));
+      const refresh = () => out.set(calc(...deps.map(d => d.get())));
+      deps.forEach(dep => dep.sub(refresh));
+      return out;
+    }
+
+    function el(tag, attrs = {}, ...children) {
+      const node = document.createElement(tag);
+      Object.entries(attrs).forEach(([k, v]) => {
+        if (v == null) return;
+        if (k === 'class') node.className = v;
+        else if (k === 'html') node.innerHTML = v;
+        else if (k === 'text') node.textContent = v;
+        else if (k.startsWith('on') && typeof v === 'function') node.addEventListener(k.slice(2), v);
+        else node.setAttribute(k, v);
+      });
+      children.flat().forEach(child => {
+        if (child == null) return;
+        if (typeof child === 'string') node.appendChild(document.createTextNode(child));
+        else node.appendChild(child);
+      });
+      return node;
+    }
+
+    function clear(node) { node.replaceChildren(); }
+    function fmtBytes(n) { return (n / 1024).toFixed(1) + ' KiB'; }
+    function humanSection(id) { return ({ ship:'Shipboard', assets:'Published assets', contract:'PRELOAD contract', ops:'Ops / working tree' })[id] || id; }
+    function statusClass(line) { return line.startsWith('??') ? 'untracked' : 'modified'; }
+
+    const sections = [
+      { id: 'ship', title: 'Shipboard', sub: 'Production statement, metrics, and the live signal graph.' },
+      { id: 'assets', title: 'Published assets', sub: 'Real introspection pages copied into docs/demos and selected via signals.' },
+      { id: 'contract', title: 'PRELOAD contract', sub: 'Kernel, cursor, and CCEK excerpts lifted from PRELOAD.md.' },
+      { id: 'ops', title: 'Ops / working tree', sub: 'Pages roots, manifest links, and current repo state.' },
+    ];
+
+    const activeSection = createSignal('ship');
+    const activeAssetId = createSignal((DATA.assets.find(a => a.id === 'runtime') || DATA.assets[0]).id);
+    const query = createSignal('');
+    const contractMode = createSignal('kernel');
+    const eventLog = createSignal([]);
+    const activeAsset = computed([activeAssetId], id => DATA.assets.find(a => a.id === id) || DATA.assets[0]);
+    const filteredAssets = computed([query], q => {
+      const s = q.trim().toLowerCase();
+      if (!s) return DATA.assets;
+      return DATA.assets.filter(asset =>
+        asset.title.toLowerCase().includes(s) ||
+        asset.kind.toLowerCase().includes(s) ||
+        asset.summary.toLowerCase().includes(s) ||
+        asset.source_files.join(' ').toLowerCase().includes(s)
+      );
+    });
+
+    function pushEvent(tag, msg) {
+      const ts = new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit', second:'2-digit'});
+      eventLog.set([{ tag, msg, ts }, ...eventLog.get()].slice(0, 10));
+    }
+
+    let booted = false;
+    activeSection.sub(v => { if (booted) pushEvent('section', 'Focus moved to ' + humanSection(v)); render(); });
+    activeAsset.sub(asset => { if (booted) pushEvent('asset', 'Selected ' + asset.title); renderHero(); renderInspector(); renderSection(); });
+    query.sub(v => { if (booted) pushEvent('query', v ? 'Filtered assets with “' + v + '”' : 'Cleared asset filter'); renderSection(); renderInspector(); });
+    contractMode.sub(v => { if (booted) pushEvent('contract', 'Viewing ' + v + ' excerpt'); renderSection(); });
+
+    function renderNav() {
+      const host = document.getElementById('nav');
+      clear(host);
+      sections.forEach(sec => {
+        host.appendChild(el('button', {
+          class: 'navbtn' + (activeSection.get() === sec.id ? ' active' : ''),
+          onclick: () => activeSection.set(sec.id)
+        },
+          el('div', { class:'top' },
+            el('div', { class:'ttl', text: sec.title }),
+            el('div', { class:'tiny mono muted', text: sec.id })
+          ),
+          el('div', { class:'sub', text: sec.sub })
+        ));
+      });
+    }
+
+    function renderHero() {
+      const asset = activeAsset.get();
+      const chips = document.getElementById('hero-chips');
+      clear(chips);
+      [
+        ['blue', DATA.repo.branch],
+        ['green', DATA.signals.published_asset_count + ' published assets'],
+        ['cyan', DATA.repo.pages_root + ' Pages root'],
+        ['amber', DATA.signals.working_tree_entries + ' working tree signals']
+      ].forEach(([color, label]) => chips.appendChild(el('span', { class:'chip' }, el('span', { class:'dot ' + color }), label)));
+
+      document.getElementById('hero-statement').textContent = DATA.production_statement;
+      document.getElementById('hero-selected-kind').textContent = asset.kind;
+      const selected = document.getElementById('hero-selected');
+      clear(selected);
+      selected.append(
+        el('div', { class:'asset-kind', text: asset.kind }),
+        el('div', { style:'font-size:18px;font-weight:700;line-height:1.3;margin-top:6px;', text: asset.title }),
+        el('p', { class:'muted', style:'margin:10px 0 0;line-height:1.6;font-size:13px;', text: asset.summary }),
+        el('div', { class:'asset-meta', style:'margin-top:12px;' },
+          el('span', { class:'chip mono' }, asset.published_path),
+          el('span', { class:'chip' }, asset.size_kib + ' KiB'),
+          el('span', { class:'chip' }, asset.evidence.length + ' evidence points')
+        )
+      );
+      const actions = document.getElementById('hero-actions');
+      clear(actions);
+      actions.append(
+        el('a', { class:'linkbtn primary', href: asset.published_path, target:'_blank', rel:'noreferrer' }, 'Open selected asset'),
+        el('a', { class:'linkbtn', href: './data/forge-production-signals.json', target:'_blank', rel:'noreferrer' }, 'Open production manifest'),
+        el('a', { class:'linkbtn', href: DATA.repo.pages_url, target:'_blank', rel:'noreferrer' }, 'Open live Pages root')
+      );
+    }
+
+    function metricCard(num, label, meta) {
+      return el('div', { class:'metric' },
+        el('div', { class:'num', text: String(num) }),
+        el('div', { class:'lbl', text: label }),
+        el('div', { class:'meta', text: meta })
+      );
+    }
+
+    function renderShipboard() {
+      return el('div', { class:'stack' },
+        el('div', { class:'card' },
+          el('div', { class:'card-head' }, el('h3', { text:'Production signal board' }), el('div', { class:'hint mono', text:'repo → manifest → signals → published demos' })),
+          el('div', { class:'card-body' },
+            el('div', { class:'metrics' },
+              metricCard(DATA.signals.published_asset_count, 'Published assets', 'docs/demos + support diagram'),
+              metricCard(DATA.signals.preload_line_count, 'PRELOAD lines', 'kernel / cursor / CCEK excerpts loaded'),
+              metricCard(DATA.signals.working_tree_entries, 'Working tree entries', DATA.signals.modified_entries + ' modified · ' + DATA.signals.untracked_entries + ' untracked'),
+              metricCard(fmtBytes(DATA.signals.published_bytes), 'Published bytes', DATA.repo.pages_root + ' static footprint')
+            )
+          )
+        ),
+        el('div', { class:'grid2' },
+          el('div', { class:'card' },
+            el('div', { class:'card-head' }, el('h3', { text:'Production signals, not templates' }), el('div', { class:'hint', text:'all values sourced from the manifest' })),
+            el('div', { class:'card-body' },
+              el('div', { class:'signal-board' },
+                signalCell('Pages URL', DATA.repo.pages_url, 'GitHub Pages root'),
+                signalCell('Branch', DATA.repo.branch, 'current publish branch'),
+                signalCell('Copied assets', DATA.signals.copied_asset_count, 'series/runtime/triple mirrored into docs/demos'),
+                signalCell('Manifest time', DATA.generated_at_utc, 'UTC build stamp'),
+                signalCell('Modified entries', DATA.signals.modified_entries, 'tracked repo changes'),
+                signalCell('Untracked entries', DATA.signals.untracked_entries, 'new docs/demo payloads'),
+              )
+            )
+          ),
+          el('div', { class:'card' },
+            el('div', { class:'card-head' }, el('h3', { text:'Selected asset evidence' }), el('div', { class:'hint mono', text:activeAsset.get().id })),
+            el('div', { class:'card-body' },
+              el('div', { class:'list' }, ...activeAsset.get().evidence.map(item => el('div', { class:'list-item', text:item })))
+            )
+          )
+        )
+      );
+    }
+
+    function signalCell(k, v, s) {
+      return el('div', { class:'signal' },
+        el('div', { class:'k', text:k }),
+        el('div', { class:'v mono', text:String(v) }),
+        el('div', { class:'s', text:s })
+      );
+    }
+
+    function renderAssets() {
+      const assets = filteredAssets.get();
+      return el('div', { class:'stack' },
+        el('div', { class:'card' },
+          el('div', { class:'card-head' }, el('h3', { text:'Published introspection assets' }), el('div', { class:'hint', text:'filterable signal set rendered from the manifest' })),
+          el('div', { class:'card-body' },
+            el('div', { class:'asset-tools' },
+              el('input', { class:'search', type:'search', placeholder:'Filter by title, kind, source file, or summary…', value: query.get(), oninput: (e) => query.set(e.target.value) }),
+              el('span', { class:'chip' }, el('span', { class:'dot green' }), el('b', { text: String(assets.length) }), ' visible')
+            ),
+            el('div', { class:'asset-grid' }, ...(assets.length ? assets.map(assetCard) : [el('div', { class:'status untracked', text:'No assets match the current filter.' })]))
+          )
+        )
+      );
+    }
+
+    function assetCard(asset) {
+      return el('div', { class:'asset' + (activeAssetId.get() === asset.id ? ' active' : ''), onclick: () => activeAssetId.set(asset.id) },
+        el('div', { class:'asset-head' },
+          el('div', {},
+            el('div', { class:'asset-kind', text: asset.kind }),
+            el('div', { class:'asset-title', text: asset.title })
+          ),
+          el('span', { class:'chip mono' }, asset.size_kib + ' KiB')
+        ),
+        el('div', { class:'asset-summary', text: asset.summary }),
+        el('div', { class:'asset-meta' },
+          el('span', { class:'chip mono' }, asset.published_path),
+          el('span', { class:'chip' }, asset.source_files.length + ' source anchors'),
+          el('span', { class:'chip' }, asset.evidence.length + ' proof bullets')
+        ),
+        el('div', { class:'asset-row' },
+          el('span', { class:'mono', text: asset.repo_path }),
+          el('a', { class:'linkbtn', href: asset.published_path, target:'_blank', rel:'noreferrer', onclick: (e) => e.stopPropagation() }, 'Open')
+        )
+      );
+    }
+
+    function renderContract() {
+      const mode = contractMode.get();
+      const mapping = {
+        kernel: DATA.preload_contract.kernel_excerpt,
+        cursor: DATA.preload_contract.cursor_excerpt,
+        ccek: DATA.preload_contract.ccek_excerpt,
+      };
+      const excerpt = mapping[mode] || [];
+      return el('div', { class:'stack' },
+        el('div', { class:'card' },
+          el('div', { class:'card-head' }, el('h3', { text:'PRELOAD contract excerpts' }), el('div', { class:'hint mono', text:'PRELOAD.md' })),
+          el('div', { class:'card-body' },
+            el('div', { class:'section-tabs' },
+              ...['kernel','cursor','ccek'].map(id => el('button', { class:'tabbtn' + (mode === id ? ' active' : ''), onclick: () => contractMode.set(id) }, id))
+            ),
+            el('div', { class:'codeblock', style:'margin-top:14px;' },
+              ...excerpt.map(row => el('div', { class:'line' }, el('div', { class:'ln mono', text:String(row.line) }), el('div', { class:'src mono', text: row.text || ' ' })))
+            )
+          )
+        )
+      );
+    }
+
+    function renderOps() {
+      return el('div', { class:'stack' },
+        el('div', { class:'grid2' },
+          el('div', { class:'card' },
+            el('div', { class:'card-head' }, el('h3', { text:'Links and roots' }), el('div', { class:'hint', text:'production publish paths' })),
+            el('div', { class:'card-body' },
+              el('div', { class:'kv' },
+                el('div', { text:'Pages root' }), el('div', { class:'mono', text: DATA.repo.pages_root }),
+                el('div', { text:'Pages URL' }), el('div', { class:'mono', text: DATA.repo.pages_url }),
+                el('div', { text:'Manifest' }), el('div', { class:'mono', text: './data/forge-production-signals.json' }),
+                el('div', { text:'Branch' }), el('div', { class:'mono', text: DATA.repo.branch }),
+                el('div', { text:'Remote' }), el('div', { class:'mono', text: DATA.repo.remote }),
+              ),
+              el('div', { class:'hero-actions', style:'margin-top:14px;' },
+                el('a', { class:'linkbtn primary', href:'./data/forge-production-signals.json', target:'_blank', rel:'noreferrer' }, 'Open manifest JSON'),
+                el('a', { class:'linkbtn', href: DATA.repo.pages_url, target:'_blank', rel:'noreferrer' }, 'Open Pages'),
+              )
+            )
+          ),
+          el('div', { class:'card' },
+            el('div', { class:'card-head' }, el('h3', { text:'Current working tree' }), el('div', { class:'hint mono', text:'git status --short' })),
+            el('div', { class:'card-body' },
+              el('div', { class:'status-list' }, ...DATA.working_tree.map(line => el('div', { class:'status ' + statusClass(line) }, el('span', { class:'mono', text: line }))))
+            )
+          )
+        )
+      );
+    }
+
+    function renderSection() {
+      const host = document.getElementById('section-host');
+      clear(host);
+      const section = activeSection.get();
+      if (section === 'ship') host.appendChild(renderShipboard());
+      if (section === 'assets') host.appendChild(renderAssets());
+      if (section === 'contract') host.appendChild(renderContract());
+      if (section === 'ops') host.appendChild(renderOps());
+      renderNav();
+    }
+
+    function renderInspector() {
+      const host = document.getElementById('inspector-host');
+      clear(host);
+      const asset = activeAsset.get();
+      host.append(
+        el('div', { class:'card' },
+          el('div', { class:'card-head' }, el('h3', { text:'Asset inspector' }), el('div', { class:'hint mono', text: asset.id })),
+          el('div', { class:'card-body' },
+            el('div', { class:'asset-kind', text: asset.kind }),
+            el('div', { style:'font-size:17px;font-weight:700;margin-top:6px;line-height:1.3;', text: asset.title }),
+            el('p', { class:'muted', style:'margin:10px 0 0;line-height:1.6;font-size:13px;', text: asset.summary }),
+            el('div', { class:'asset-meta', style:'margin-top:14px;' },
+              el('span', { class:'chip mono' }, asset.published_path),
+              el('span', { class:'chip' }, asset.size_kib + ' KiB')
+            ),
+            el('div', { class:'hero-actions', style:'margin-top:14px;' },
+              el('a', { class:'linkbtn primary', href: asset.published_path, target:'_blank', rel:'noreferrer' }, 'Open asset'),
+            )
+          )
+        ),
+        el('div', { class:'card' },
+          el('div', { class:'card-head' }, el('h3', { text:'Proof points' }), el('div', { class:'hint', text: asset.evidence.length + ' evidence bullets' })),
+          el('div', { class:'card-body' }, el('div', { class:'list' }, ...asset.evidence.map(text => el('div', { class:'list-item', text }))))
+        ),
+        el('div', { class:'card' },
+          el('div', { class:'card-head' }, el('h3', { text:'Source anchors' }), el('div', { class:'hint', text: asset.source_files.length + ' files' })),
+          el('div', { class:'card-body' }, el('div', { class:'list' }, ...asset.source_files.map(text => el('div', { class:'list-item mono' }, text)) ))
+        ),
+        el('div', { class:'card' },
+          el('div', { class:'card-head' }, el('h3', { text:'Signal event log' }), el('div', { class:'hint', text:'local UI events' })),
+          el('div', { class:'card-body' },
+            el('div', { class:'event-log' }, ...(eventLog.get().length ? eventLog.get().map(entry => el('div', { class:'event' }, el('div', { class:'tag', text: entry.tag }), el('div', { class:'msg', text: entry.msg }), el('div', { class:'ts mono', text: entry.ts }))) : [el('div', { class:'muted tiny', text:'No events yet.' })]))
+          )
+        )
+      );
+    }
+
+    function render() {
+      renderHero();
+      renderSection();
+      renderInspector();
+    }
+
+    renderNav();
+    render();
+    booted = true;
+    pushEvent('boot', 'Loaded production manifest ' + DATA.generated_at_utc);
+    pushEvent('asset', 'Selected ' + activeAsset.get().title);
+    pushEvent('section', 'Focus moved to ' + humanSection(activeSection.get()));
+    renderInspector();
+  </script>
+</body>
+</html>

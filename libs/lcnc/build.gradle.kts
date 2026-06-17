@@ -1,17 +1,40 @@
+import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
+
 plugins {
-    kotlin("multiplatform")
+    kotlin("jvm")
+    `maven-publish`
+}
+
+group = "borg.trikeshed"
+version = "0.1.0-SNAPSHOT"
+
+repositories {
+    mavenCentral()
+    mavenLocal()
+    maven("https://oss.sonatype.org/content/repositories/snapshots/")
+    google()
+    maven("https://www.jitpack.io")
 }
 
 kotlin {
-    jvm {}
+    jvmToolchain(25)
+
+    compilerOptions {
+        jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_25
+        freeCompilerArgs.addAll(
+            "-opt-in=kotlin.RequiresOptIn",
+            "-opt-in=kotlin.ExperimentalUnsignedTypes",
+            "-Xsuppress-version-warnings",
+        )
+    }
 
     sourceSets {
-        val commonMain by getting {
+        val main by getting {
             dependencies {
-                api(project(":"))
+                implementation("org.bereft:TrikeShed-jvm:1.0")
             }
         }
-        val jvmTest by getting {
+        val test by getting {
             dependencies {
                 implementation(kotlin("test-junit"))
             }

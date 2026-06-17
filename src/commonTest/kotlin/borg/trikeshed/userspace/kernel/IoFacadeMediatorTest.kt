@@ -152,6 +152,6 @@ class IoFacadeMediatorTest {
         // expect fun activeBackend(): ActiveBackend
         // Linux actual: return LiburingFacadeSpi adapter
         // JVM actual:    return NioSpi adapter
-        assertTrue(true) // contract test — real dispatch is expect/actual
+        TODO("redefine test requirements")
     }
 }

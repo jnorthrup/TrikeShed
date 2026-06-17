@@ -34,6 +34,11 @@ enum class Interest : BitMasked<UInt> {
 }
 
 /**
+ * Extension to convert UInt mask back to Set<Interest>.
+ */
+fun UInt.toInterests(): Set<Interest> = Interest.fromMask(this)
+
+/**
  * Maps to a single interest flag.
  */
 enum class IOOperation {

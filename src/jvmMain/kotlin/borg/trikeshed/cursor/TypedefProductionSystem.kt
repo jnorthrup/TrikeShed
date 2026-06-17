@@ -1,6 +1,6 @@
 package borg.trikeshed.cursor
 
-import borg.trikeshed.lib.RingSeries
+import borg.trikeshed.mutable.RingSeries
 
 /**
  * TypedefProductionSystem — CRMS data plane for typedef-adjacent call sites.

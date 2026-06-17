@@ -56,12 +56,10 @@ Kernel algebra (`Join`, `Series<T>`, `Twin`, `α`, `j`) is defined in `lib/` and
 ├──────────────────────────────────────────────────────────────────────┤
 │  TRANSPORT SUBSTRATE  (userspace/)                                   │
 │                                                                      │
-│  ChannelImpl  expect → actual per platform                           │
-│    └─ FunctionalUringFacade  op batching + backend dispatch          │
-│         └─ UserspaceChannelBackend  expect → per-platform actual     │
-│              └─ Liburing → LiburingImpl  expect → actual             │
-│                   (linux: cinterop io_uring, posix: uring-or-pread,   │
-│                    jvm: ServiceLoader SPI, macos/js/wasm: fallback)   │
+│  FunctionalUringFacade  op batching + backend dispatch               │
+│    └─ UserspaceChannelBackend  platform impl per backend              │
+│         └─ Liburing → LiburingImpl  (linux: cinterop, jvm: SPI,       │
+│              macos/js/wasm: fallback)                                 │
 │                                                                      │
 │  data types:                                                         │
 │    ByteBuffer  → ByteArray-backed NIO buffer                        │
@@ -188,9 +186,9 @@ sequence is identical regardless of transport — only the *parser* that produce
 
 ```
 HTTP/1.1 text on wire   →  parseHttp1()  ─┐
-HTTP/2 binary frames    →  (H2 parser)    ─┼→  [ReqSl · Hdr · Hdr · EOH · Data · EOT · EOM]
-HTTP/3 QUIC stream      →  (H3 mapping)    ─┘
-DHTX internal           →  DHTX_REQ/RES   ─┘   (non-HTTP, same framing)
+HTTP/2 binary frames    →  (H2 parser)   ─┼→  [ReqSl · Hdr · Hdr · EOH · Data · EOT · EOM]
+HTTP/3 QUIC stream      →  (H3 mapping)  ─┘
+DHTX internal           →  DHTX_REQ/RES  ─┘   (non-HTTP, same framing)
 ```
 
 ### Block Model
@@ -262,20 +260,19 @@ val results = ch.wait(minComplete = 1)
 | Symbol | commonMain | posixMain | linuxMain | jvmMain | js/wasm |
 |--------|-----------|-----------|-----------|---------|---------|
 | `FileImpl` | expect class | POSIX fd wrapper | inherits posix | JDK Path | — |
-| `ChannelImpl` | expect class | `FunctionalUringFacade` | inherits posix | SPI delegate | — |
 | `LiburingImpl` | expect object | — | cinterop `io_uring_*` | ServiceLoader | `UnsupportedOperationException` |
 | `FilesImpl` | expect object | POSIX `open()` | inherits posix | `java.nio.file` | — |
 | `ChannelsImpl` | expect object | POSIX `socket()` | inherits posix | fd emulation | — |
+| `openUserspaceChannelBackend()` | expect fun | `PosixUserspaceChannelBackend` | inherits posix | `JvmUserspaceChannelBackend` | — |
 
-`openUserspaceChannelBackend()` — expect function, POSIX actual returns `PosixUserspaceChannelBackend`.
+`FunctionalUringFacade` is a regular class (not expect/actual) that wraps a `UserspaceChannelBackend` interface implementation per platform.
 
 ### Data Flow: ByteArray → io_uring
 
 ```
 ByteBuffer.read(dst)                     SocketChannel / FileChannel
   → channel.read(file, buf, offset, tok) userspace.Channel
-    → ChannelImpl.read()                 expect → actual
-      → FunctionalUringFacade.read()     enqueue PreparedChannelOp.Read
+    → FunctionalUringFacade.read()       enqueue PreparedChannelOp.Read
   → channel.submit()
     → FunctionalUringFacade.submit()     drain pending → backend.read()
       → PosixUserspaceChannelBackend.read()

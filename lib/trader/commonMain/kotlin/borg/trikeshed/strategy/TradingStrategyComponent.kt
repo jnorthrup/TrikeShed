@@ -5,10 +5,6 @@
  *
  * Donor sources consulted:
  *   - /Users/jim/.Trash/dreamer/strategy/StrategyRules.kt
- *   - /Users/jim/work/TrikeShed/libs/dreamer-kmm/src/commonMain/kotlin/org/bereft/strategy/jslogic/JsLogicSimulator.kt
- *   - /Users/jim/work/TrikeShed/libs/dreamer-kmm/src/commonMain/kotlin/org/bereft/strategy/jslogic/JsBotStateModels.kt
- *   - /Users/jim/work/TrikeShed/libs/dreamer-kmm/src/commonMain/kotlin/org/bereft/strategy/jslogic/JsBotConfig.kt
- *   - /Users/jim/work/TrikeShed/libs/dreamer-kmm/src/commonMain/kotlin/org/bereft/strategy/jslogic/SimulatedTradeAction.kt
  *   - /Users/jim/work/TrikeShed/src/commonMain/kotlin/borg/trikeshed/signal/SignalGenerator.kt  (SampleStrategySignals)
  *   - /Users/jim/work/TrikeShed/src/commonMain/kotlin/borg/trikeshed/indicator/Indicators.kt
  *

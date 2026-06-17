@@ -1,257 +1,218 @@
-# TrikeShed `src/` — Core Substrate
+# TrikeShed
 
-Shared IO and choreography substrate for all `libs/*` modules. Targets commonMain, nativeMain, posixMain, linuxMain, macosMain, jvmMain, jsMain, wasmJsMain.
+<p align="left">
+  <a href="https://jnorthrup.github.io/TrikeShed/"><img alt="GitHub Pages final production" src="https://img.shields.io/badge/GitHub%20Pages-Final%20Production-0b0f14?style=for-the-badge&logo=github&logoColor=white"></a>
+  <a href="https://jnorthrup.github.io/TrikeShed/"><img alt="Forge production signals" src="https://img.shields.io/badge/Forge-Production%20Signals-7aa2f7?style=for-the-badge"></a>
+</p>
 
-Kernel algebra (`Join`, `Series<T>`, `Twin`, `α`, `j`) is defined in `lib/` and documented in [`PRELOAD.md`](../PRELOAD.md). This README covers the IO transport and choreography layers only.
+> **Explore the live site:** [jnorthrup.github.io/TrikeShed](https://jnorthrup.github.io/TrikeShed/)  
+> Source-grounded GitHub Pages home for Forge production signals: published introspection assets, PRELOAD contract excerpts, working-tree signals, and direct links into runtime / series / triple proofs.
 
----
+**A compositional, blackboard-based fabric for autonomous LLM workflows with real-time human–agent collaboration.**
 
-## Layers
+TrikeShed is a systems substrate for building reliable, observable, multi-step workflows that combine LLMs, coding agents, and human collaborators on shared state.
 
-```
-┌──────────────────────────────────────────────────────────────────────┐
-│  NIO COMPATIBILITY SURFACE  (nio/channels/, nio/file/)               │
-│  UringSocketChannel  UringFileChannel  UringServerSocketChannel      │
-│  COMPATIBILITY SURFACE ONLY.  DO NOT ROUTE NEW IO THROUGH HERE.      │
-├──────────────────────────────────────────────────────────────────────┤
-│  REAL TRANSPORT SUBSTRATE  (userspace/)                              │
-│                                                                      │
-│  File          handle lifecycle (open/close/isOpen/id)               │
-│  Channel       operation queue (read/write/accept/connect/close)     │
-│    │            submit/wait/peek                                     │
-│    └─ ChannelImpl  (expect → actual per platform)                    │
-│         └─ FunctionalUringFacade  (op batching + backend dispatch)   │
-│              └─ UserspaceChannelBackend  (expect → actual)           │
-│                   └─ Liburing  →  LiburingImpl  (expect → actual)    │
-│                                                                      │
-│  data types:                                                         │
-│    ByteBuffer  → NIO buffer backed by ByteArray                     │
-│    ByteRegion  → sub-range view of ByteBuffer                       │
-│    ByteSeries  → lazy Series<Byte> over ByteRegion (zero copy)      │
-├──────────────────────────────────────────────────────────────────────┤
-│  CHOREOGRAPHY  (context/)                                            │
-│                                                                      │
-│  AsyncContextElement   SupervisorJob, lifecycle, fanout subscribers  │
-│  AsyncContextKey<E>    type-safe context lookup                      │
-│  ConcreteElements      NioUserspaceElement, LiburingElement,         │
-│                        FanoutDispatcherElement                       │
-│  LiburingFacadeSpi     SPI for pluggable uring backends              │
-│  UserspaceNioSpi       SPI for pluggable NIO backends                │
-├──────────────────────────────────────────────────────────────────────┤
-│  KERNEL INTERFACES  (userspace/kernel/)                              │
-│                                                                      │
-│  SelectableChannelOps  pollReadable/pollWritable + tryRead/tryWrite │
-│  KernelUring           SQE/CQE abstraction ported from literbike     │
-│  KernelSQE / KernelCQE kernel uring structs                          │
-│  OpCode / UringSetupFlags                                            │
-├──────────────────────────────────────────────────────────────────────┤
-│  NETWORK PROTOCOL SURFACE  (userspace/network/)                     │
-│                                                                      │
-│  Channel               protocol session surface                      │
-│  ChannelMetadata       remoteAddr, localAddr, protocol               │
-│  ProtocolDetector      auto-detect protocol from first bytes         │
-├──────────────────────────────────────────────────────────────────────┤
-│  LIBRARY  (lib/)                                                     │
-│                                                                      │
-│  Join<A,B>  Series<T>  Twin<T>  ByteSeries  Cursor  HashSeriesSet   │
-│  RadixTree  CircularQueue  etc.                                      │
-│  Documented in PRELOAD.md                                            │
-└──────────────────────────────────────────────────────────────────────┘
-```
+Workflows are expressed as **algebraic compositions** rather than ad-hoc chains or simple DAGs. State is managed through a **blackboard architecture** with cursor-based real-time synchronization, immutable snapshots, and strong artifact provenance. The design draws from classical AI blackboard systems, modern effectful composition, and collaborative knowledge tools — the spiritual successor to “GNU Autotools × Notion” for agentic work.
 
----
+## Forge: The Visual Front-End
 
-## Transport Substrate: the only IO path
+The included Forge interface renders the complete working surface in real time:
 
-All IO routes through one surface:
+- **Workspace metrics** (files, snapshots, prompts, workflows, executions, cursor rows, collab events, DB rows)
+- **Preload algebra chain** visualization: `Join<A,B>` → `Series<T>` → `Cursor` → `ConfixDoc` → `Blackboard` → `CCEK`
+- Live multi-user collaboration (cursor presence, simultaneous edits)
+- Execution provenance with stable IDs and full trace
+- Cascade outputs with quantitative scores (α / β / γ)
+- Telemetry analysis demo pipeline
+- Notion-backed model layer
+- Explicit extensibility surface (“Forge Hinges”)
+
+The interface is deliberately instrumented so every layer — from algebraic composition down to individual agent steps — remains visible and actionable.
+
+## Core Architectural Concepts
+
+### Compositional Algebra
+Workflows are constructed from a small, typed set of operators that compose cleanly:
 
 ```kotlin
-val file  = Files.open("/data/foo.db")
-val sock  = Channels.socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)
-val ch    = Channels.open(entries = 256)
+// Kernel algebra from PRELOAD.md
+interface Join<A, B> { val a: A; val b: B }
+infix fun <A, B> A.j(b: B): Join<A, B> = Join(this, b)
 
-ch.read(file, buffer, offset = 0L, userData = 1L)
-ch.submit()
-val results = ch.wait(minComplete = 1)
+typealias Twin<T> = Join<T, T>
+typealias Series<T> = Join<Int, (Int) -> T>
+
+// Lazy projection over a Series
+infix fun <X, C, V : Series<X>> V.α(xform: (X) -> C): Series<C>
 ```
 
-This is synchronous submit+wait for the compatibility surface. The coroutine path uses `ChannelRunner`:
+**Key operators:**
+- `Join<A,B>` — binary composition (the base pattern)
+- `j` — infix constructor: `a j b` creates `Join(a, b)`
+- `Twin<T>` — same-typed pair: `Join<T, T>`
+- `Series<T>` — size + index function: `Join<Int, (Int) -> T>`
+- `α` — lazy map/projection over a Series
+
+See [`PRELOAD.md`](PRELOAD.md) for full kernel algebra documentation.
+
+### Cursor — Columnar Data Abstraction
 
 ```kotlin
-val runner = ChannelRunner(channel, scope)
-runner.start()   // poll loop: channel.wait(0), resume deferreds, yield
-
-suspend fun doRead(buf: ByteBuffer): SelectionResult = runner.runOp { token ->
-    channel.read(file, buf, 0L, token)
-}
+typealias RowVec = Series2<Any, () -> RecordMeta>
+typealias Cursor = Series<RowVec>
 ```
 
-### Platform wiring (expect/actual)
+Cursors are the dataframe-shaped specialization of the kernel algebra:
+- `cursor[i]` — select row by index
+- `cursor[i0 until i1]` — range view
+- `cursor["name","age"]` — project by column name
+- `join(cursor1, cursor2)` — widen along columns
 
-| Symbol | commonMain | posixMain | linuxMain | jvmMain | js/wasm |
-|--------|-----------|-----------|-----------|---------|---------|
-| `FileImpl` | expect class | POSIX fd wrapper | inherits posix | JDK Path | — |
-| `ChannelImpl` | expect class | `FunctionalUringFacade` | inherits posix | SPI delegate | — |
-| `LiburingImpl` | expect object | — | cinterop `io_uring_*` | ServiceLoader | `UnsupportedOperationException` |
-| `FilesImpl` | expect object | POSIX `open()` | inherits posix | `java.nio.file` | — |
-| `ChannelsImpl` | expect object | POSIX `socket()` | inherits posix | fd emulation | — |
+### Blackboard Architecture
 
-`openUserspaceChannelBackend()` — expect function, POSIX actual returns `PosixUserspaceChannelBackend`.
+TrikeShed implements a classical AI blackboard pattern with modern enhancements:
 
----
+- **Shared state surface** — all agents operate on a common working memory
+- **Cursor-based synchronization** — real-time multi-user collaboration
+- **Immutable snapshots** — full provenance and rollback
+- **Algebraic composition** — workflows as compositions, not DAGs
 
-## Data Flow: ByteArray → Kernel
+### Reactor — io_uring-Based Async Engine
 
-```
-ByteBuffer.read(src)                     UringSocketChannel / UringFileChannel
-  → channel.read(file, buf, offset, tok) userspace.Channel
-    → ChannelImpl.read()                 expect → actual
-      → FunctionalUringFacade.read()     enqueue PreparedChannelOp.Read
-  → channel.submit()
-    → FunctionalUringFacade.submit()     drain pending → backend.read()
-      → PosixUserspaceChannelBackend.read()
-        → PosixUringIO.readAt(fd, bytes, start, len, offset)
-          → bytes.usePinned { pinned.addressOf(start) }
-            → Liburing.prepRead(fd, address, len, offset, userData)
-              → LiburingImpl.prepRead()  [linux: io_uring_prep_read via cinterop]
-            → Liburing.submit()          [linux: io_uring_submit]
-            → Liburing.waitCqe()         [linux: io_uring_wait_cqe]
-              → publish(completion)      channelized fanout to handlers
-  → channel.wait(minComplete = 1)        drain completions → SelectionResult list
-```
-
-Fallback on POSIX when uring unavailable: `pread`/`pwrite` (seekable) or `read`/`write` (streams).
-
----
-
-## Choreography: Element Lifecycle
-
-```
-CREATED → OPEN → ACTIVE → DRAINING → CLOSED
-```
-
-Every IO component that needs coroutine context and lifecycle extends `AsyncContextElement`:
+The reactor models RelaxFactory's single-threaded selector + attachment-chain pattern, translated to coroutines and io_uring:
 
 ```kotlin
-class MyElement : AsyncContextElement() {
-    companion object Key : AsyncContextKey<MyElement>()  // Pattern A (canonical)
-
-    override suspend fun open() {
-        super.open()          // CREATED → OPEN
-        state = ElementState.ACTIVE
-        // register uring fanout handlers here
-    }
-
-    override suspend fun drain() {
-        state = ElementState.DRAINING
-        // drain completion queue
-        super.close()         // → CLOSED, cancels SupervisorJob
-    }
-}
-```
-
-### Rules
-
-1. Use `AsyncContextKey<E>` (not raw `CoroutineContext.Key<E>`)
-2. Companion `Key` is the type-safe lookup: `coroutineContext[MyElement.Key]`
-3. `SupervisorJob(parentJob)` is inherited from `AsyncContextElement` — children survive sibling failures
-4. `fanoutSubscribers` is the ordered downstream delivery list
-5. Lifecycle is forward-only — no transitions backward
-
----
-
-## Kernel Surfaces
-
-### SelectableChannelOps
-
-Reactor-level readiness surface. Speaks `ByteRegion`/`ByteSeries` — no raw `ByteArray`:
-
-```kotlin
-interface SelectableChannelOps {
-    suspend fun pollReadable(timeout: Duration? = null): Boolean
-    suspend fun pollWritable(timeout: Duration? = null): Boolean
-    fun tryRead(dst: ByteRegion): Int
-    fun tryWrite(src: ByteSeries): Int
-}
-```
-
-Used by protocol transport implementations in `libs/` (e.g., `HtxTransport`).
-
-### KernelUring
-
-Low-level SQE/CQE abstraction ported from literbike. Separate from `LiburingFacade` — this is the kernel struct surface, the facade is the op-queue surface.
-
-```kotlin
-interface KernelUring {
-    fun fd(): Int
-    fun submitDirect(sqe: KernelSQE): Result<Unit>
-    fun submitBulk(sqes: List<KernelSQE>): Result<Int>
-    fun reapCompletions(): List<KernelCQE>
-}
-```
-
----
-
-## Network Protocol Surface
-
-Protocol-agnostic session layer. Auto-detects protocol from first bytes:
-
-```kotlin
-interface Channel {
-    fun channelType(): String
-    fun isConnected(): Boolean
-    fun metadata(): ChannelMetadata?
-    fun read(dst: ByteRegion): Int
-    fun write(src: ByteSeries): Int
-}
-```
-
-`ProtocolDetector` handles ALPN-like initial byte inspection for QUIC vs HTTP vs websocket routing.
-
----
-
-## What NOT to do
-
-- **Do not route new IO through `nio/channels/`.** The UringSocketChannel/UringFileChannel stubs are JDK compatibility only. Implement `UserspaceChannelBackend` or wire through `userspace.Channel` instead.
-- **Do not create a second IO path.** There is one ring, one facade, one channelized fanout. Epoll/kqueue wrappers would be a bifurcation.
-- **Do not use raw `CoroutineContext.Key<E>`.** Use `AsyncContextKey<E>`.
-- **Do not manage `ElementState` manually.** Extend `AsyncContextElement`.
-
----
-
-## Consuming from libs/
-
-A `libs/` module declares `api(project(":"))` and receives all of the above. Typical pattern:
-
-```kotlin
-class MyProtocolElement : AsyncContextElement() {
-    companion object Key : AsyncContextKey<MyProtocolElement>()
-
-    private lateinit var channel: Channel
-    private lateinit var file: File
-
-    override suspend fun open() {
-        super.open()
-        channel = Channels.open(256)
-        file = Channels.socket(AF_INET, SOCK_STREAM, 0)
-        state = ElementState.ACTIVE
-    }
-
-    suspend fun request(buf: ByteBuffer): SelectionResult {
+class HtxTransport(channel: Channel) : SelectableChannelOps {
+    suspend fun execute(request: HtxClientRequest): HtxClientMessage {
         val runner = ChannelRunner(channel, coroutineScope)
-        return runner.runOp { token ->
-            channel.write(file, buf, 0L, token)
-        }
+        // connect → write → read → deliver (coroutine suspension)
     }
 }
 ```
 
+- Multiple concurrent Jobs share one uring ring
+- Each Job runs its own FSM via `ChannelRunner.runOp()`
+- CQE completions fan out via `userData` token mapping
+
+See [`src/README.md`](src/README.md) for full reactor documentation.
+
+### HTX — Version-Agnostic HTTP Tokenizer
+
+HTX is the common tokenizer for HTTP/1.x, HTTP/2, and HTTP/3, following HAProxy's internal `htx_blk` format:
+
+```kotlin
+// Block sequence identical across all HTTP versions
+HtxMessage: [ReqSl · Hdr · Hdr · EOH · Data · EOT · EOM]
+```
+
+The block sequence is identical whether bytes arrived via HTTP/1.1 text, HTTP/2 frames, or HTTP/3 QUIC.
+
+### Platform Support
+
+| Target | IO Backend | Status |
+|--------|-----------|--------|
+| `jvmMain` | JDK NIO | ✅ |
+| `linuxMain` | io_uring (cinterop) | ✅ |
+| `posixMain` | POSIX fallback | ✅ |
+| `macosMain` | POSIX fallback | ✅ |
+| `jsMain` | POSIX fallback | ✅ |
+| `wasmJsMain` | Unsupported | ⚠️ |
+
 ---
 
-## Related
+## Project Structure
 
-- [`PRELOAD.md`](../PRELOAD.md) — kernel algebra: `Join`, `Series<T>`, `Twin`, `α`, `j`
-- [`docs/plans/PLAN.md`](../docs/plans/PLAN.md) — consolidation roadmap
-- [`io_uring_interop/`](../io_uring_interop/) — C interop headers for Linux io_uring
-- [`src/linuxMain/.../Liburing.linux.kt`](linuxMain/kotlin/borg/trikeshed/userspace/Liburing.linux.kt) — cinterop actual
-- [`src/posixMain/.../PosixUringIO.kt`](posixMain/kotlin/borg/trikeshed/PosixUringIO.kt) — uring-or-POSIX fallback
+```
+TrikeShed/
+├── src/                    # Core substrate (commonMain + platform targets)
+│   ├── commonMain/kotlin/   # Shared kernel + HTX + choreography
+│   ├── lib/              # Kernel algebra (Join, Series, Twin, α, j)
+│   ├── context/          # AsyncContextElement, lifecycle
+│   └── ...
+├── libs/                  # Functional modules
+│   ├── couch/           # HTX document store + WAL
+│   ├── ipfs/            # DHT + content routing
+│   ├── forge/          # Visual collaboration UI
+│   ├── activejs/       # JS interop
+│   └── ...
+├── docs/                 # Design documents + demos
+├── io_uring_interop/     # C headers for io_uring
+└── build.gradle.kts     # Gradle root config
+```
+
+---
+
+## Quick Start
+
+```bash
+# Build everything
+./gradlew build
+
+# Run the Forge demo
+./gradlew :libs:forge:jsRun
+
+# Run IPFS console demo
+./gradlew :libs:ipfs:run
+
+# Run Couch WAL demo
+./gradlew :libs:couch:runWal
+```
+
+---
+
+## Key Design Documents
+
+- [`PRELOAD.md`](PRELOAD.md) — Kernel algebra: `Join`, `Series<T>`, `Twin`, `α`, `j`
+- [`src/README.md`](src/README.md) — Core substrate: reactor, HTX, transport, choreography
+- [`BUILD_GUIDE.md`](BUILD_GUIDE.md) — Build instructions and tasks
+- [`BOUNDARY_CONTRACT_SUMMARY.md`](BOUNDARY_CONTRACT_SUMMARY.md) — Module contracts
+- [`IPFS_INTEGRATION_REFINED.md`](IPFS_INTEGRATION_REFINED.md) — IPFS integration details
+- [`libs/couch/WAL_DESIGN.md`](libs/couch/WAL_DESIGN.md) — Write-Ahead Log design
+- [`libs/couch/MINIDUCK_DESIGN.md`](libs/couch/MINIDUCK_DESIGN.md) — Query engine design
+
+---
+
+## Modules
+
+### Core Substrate (`src/`)
+
+| Module | Purpose |
+|--------|---------|
+| `lib/` | Kernel algebra: Join, Series, Twin, α, Cursor |
+| `context/` | AsyncContextElement, lifecycle, fanout |
+| `charstr/` | Text handling (CharStr, CharStrCached) |
+| `collections/` | Series, HashSeriesSet, NavigableSet, associative |
+| `dht/` | Distributed hash table primitives |
+| `indicator/` | Feature extraction, DoubleSeries |
+| `isam/` | Indexed sequential access method |
+| `manifold/` | Concept manifolds |
+| `mlir/` | MLIR core |
+| `num/` | BigInt, numeric operations |
+
+### Library Modules (`libs/`)
+
+| Module | Purpose |
+|--------|---------|
+| `couch/` | HTX document store, WAL, query engine |
+| `ipfs/` | DHT, content routing, Kadmelia |
+| `forge/` | Visual collaboration UI |
+| `activejs/` | JS platform interop |
+| `tspy/` | Cursor/pointcut tooling |
+| `classfile/` | JVM classfile parsing |
+| `cursor/` | Cursor abstractions |
+
+---
+
+## Technology Stack
+
+- **Language**: Kotlin Multiplatform (common, jvm, linux, posix, macos, js, wasmJs)
+- **Build**: Gradle 8.x with version catalogs
+- **IO**: io_uring (Linux), POSIX fallback (macOS/js/wasm)
+- **Async**: Kotlin Coroutines + Structured Concurrency
+- **Serialization**: CBOR, JSON, HTX wire format
+
+---
+
+## License
+
+See [`LICENSE`](LICENSE) file for details.

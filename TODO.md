@@ -1,4 +1,9 @@
- use the ghidra json dump as runtime vm blackboard state on which to pointcut codec event filters like synapse and redux 
- 
-write an example red test running xvm unit tests with full redux events on 
- 
+# TrikeShed Forge - TODO
+
+- [ ] Implement LCNC integration for ForgeWorkspace (Miniduck/ISAM + websocket sync)
+- [ ] Implement LCNC integration for ForgeStepRunner (LCNC runtime)
+- [ ] Add AgentType.LCNC to ForgeAgentRunner
+- [ ] Example: ACH exception workflow with LCNC backend
+- [ ] Example: Partner onboarding with LCNC compliance/credit checks
+- [ ] Real-time collaboration UI (React/Compose)
+- [ ] Artifact marketplace / sharing protocol

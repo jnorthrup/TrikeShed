@@ -1,8 +1,8 @@
 package borg.trikeshed.confix
 
 import borg.trikeshed.cursor.*
-import borg.trikeshed.cursor.CowSeriesHandle
-import borg.trikeshed.cursor.CowSeriesBody
+import borg.trikeshed.mutable.CowSeriesHandle
+import borg.trikeshed.mutable.CowSeriesBody
 import borg.trikeshed.lib.*
 import borg.trikeshed.parse.confix.*
 

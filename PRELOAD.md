@@ -35,6 +35,8 @@ infix fun <X, C, Subject : Iterable<X>> Subject.α(/* ... */)
 interface CSeries<T : Comparable<T>> : Series<T>, Comparable<Series<T>>
 val <T : Comparable<T>> Series<T>.cpb: CSeries<T>
 
+    series.view = IterableSeries for .map , .filter, .all, and so on stdlib collection iterators
+
 // collection literals / macros
 object _l { operator fun <T> get(vararg t: T): List<T> = listOf(*t) }
 _l[...]   // List<T>

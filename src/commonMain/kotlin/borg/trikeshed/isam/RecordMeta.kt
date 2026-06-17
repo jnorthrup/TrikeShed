@@ -1,10 +1,7 @@
 package borg.trikeshed.isam
 
 import borg.trikeshed.cursor.ColumnMeta
-import borg.trikeshed.cursor.TypeMemento
 import borg.trikeshed.isam.meta.IOMemento
-import borg.trikeshed.lib.j
-
 
 
 /** RecordMeta is a data class that describes a column of an Isam record
@@ -15,7 +12,7 @@ import borg.trikeshed.lib.j
  * @param end the byte offset of the end of the column
  * @param decoder a lambda that converts a byte[]  to downstream, often but not necessarily the IoMemento utility
  * @param encoder a lambda that produces a byte[] for marshalling to disk or elsewhere
- * @param child a child RecordMeta for a child record, for instance, CSV conversion to ISAM might define two RecordMetas for two steps
+ * @param child the basis for blackboard cursor-dags where a child type is a cursor or in a speciasl (evidence) loop treating rows before and after conversion to isam meta.
  */
 
    class RecordMeta(

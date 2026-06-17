@@ -38,4 +38,13 @@ sealed class AsyncContextKey {
      * Type-parameterized as Key<FanoutDispatcherElement> for safe context lookup.
      */
     object FanoutDispatcherKey : AsyncContextKey(), CoroutineContext.Key<FanoutDispatcherElement>
+
+    /**
+     * Key for Btrfs little-endian codec context elements.
+     * Btrfs on-disk format is little-endian; this codec is distinct from
+     * PlatformCodec.wireCodec (which is BIG_ENDIAN for network protocols).
+     * Singleton object: always compare by identity (===).
+     * Type-parameterized as Key<BtrfsCodecElement> for safe context lookup.
+     */
+    object BtrfsCodecKey : AsyncContextKey(), CoroutineContext.Key<borg.trikeshed.userspace.btrfs.BtrfsCodecElement>
 }

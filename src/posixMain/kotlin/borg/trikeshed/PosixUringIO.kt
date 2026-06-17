@@ -11,9 +11,9 @@ internal object PosixUringIO {
     private var uringAvailable: Boolean = false
     private var nextUserData: Long = 1
 
-    fun isAvailable(entries: Int = 256): Boolean = ensureOpen(entries)
+    fun isAvailable(entries: Int = 2): Boolean = ensureOpen(entries)
 
-    fun readAt(fd: Int, bytes: ByteArray, start: Int, length: Int, offset: Long, entries: Int = 256): Int {
+    fun readAt(fd: Int, bytes: ByteArray, start: Int, length: Int, offset: Long, entries: Int = 2): Int {
         if (length <= 0) return 0
         val uringResult = submit(entries) { address, userData ->
             Liburing.prepRead(fd, address, length, offset, userData)
@@ -30,7 +30,7 @@ internal object PosixUringIO {
         } else direct
     }
 
-    fun writeAt(fd: Int, bytes: ByteArray, start: Int, length: Int, offset: Long, entries: Int = 256): Int {
+    fun writeAt(fd: Int, bytes: ByteArray, start: Int, length: Int, offset: Long, entries: Int = 2): Int {
         if (length <= 0) return 0
         val uringResult = submit(entries) { address, userData ->
             Liburing.prepWrite(fd, address, length, offset, userData)
@@ -47,7 +47,7 @@ internal object PosixUringIO {
         } else direct
     }
 
-    fun closeFd(fd: Int, entries: Int = 256): Int {
+    fun closeFd(fd: Int, entries: Int = 2): Int {
         if (fd < 0) return -1
         val userData = nextUserData++
         if (ensureOpen(entries) && Liburing.prepClose(fd, userData).isSuccess) {
@@ -69,7 +69,7 @@ internal object PosixUringIO {
         return -1L
     }
 
-    fun fsync(fd: Int, entries: Int = 256): Int {
+    fun fsync(fd: Int, entries: Int = 2): Int {
         if (fd < 0) return -1
         val userData = nextUserData++
         if (ensureOpen(entries) && Liburing.prepFsync(fd, userData, datasync = false).isSuccess) {
@@ -81,7 +81,7 @@ internal object PosixUringIO {
         return platform.posix.fsync(fd)
     }
 
-    fun fdatasync(fd: Int, entries: Int = 256): Int {
+    fun fdatasync(fd: Int, entries: Int = 2): Int {
         if (fd < 0) return -1
         val userData = nextUserData++
         if (ensureOpen(entries) && Liburing.prepFsync(fd, userData, datasync = true).isSuccess) {

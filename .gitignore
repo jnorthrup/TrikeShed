@@ -48,3 +48,4 @@ default/
 .deepseek/
 .env
 .gradle-home/
+.hermes/

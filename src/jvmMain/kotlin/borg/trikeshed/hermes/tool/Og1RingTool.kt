@@ -2,6 +2,7 @@ package borg.trikeshed.hermes.tool
 
 import borg.trikeshed.lib.*
 import borg.trikeshed.lib.Series
+import borg.trikeshed.mutable.RingSeries
 
 /**
  * og1 RingTool — exposes RingSeries to hermes agent.
@@ -32,15 +33,10 @@ object RingRegistry {
         }
 
     fun names(): List<String> = rings.keys.toList()
-
     fun clear(name: String) {
-        rings[name]?.clear()
+        rings.remove(name)
     }
 }
-
-// ── Reducer implementations ────────────────────────────────────────────────
-
-/** Count reducer: returns { "count": N } */
 fun countReduce(series: Series<Map<String, Any?>>): Map<String, Any> =
     mapOf("count" to series.a)
 
@@ -195,29 +191,27 @@ object Og1RingTool {
 
     fun append(ringName: String, events: List<Map<String, Any?>>): Map<String, Any?> {
         val ring = RingRegistry.getOrCreate(ringName)
-        val before = ring.a
+        val before = ring.size
         events.forEach { ring.add(it) }
         return mapOf(
             "ringName" to ringName,
             "appended" to events.size,
             "sizeBefore" to before,
-            "sizeAfter" to ring.a,
+            "sizeAfter" to ring.size,
         )
     }
 
     fun capture(ringName: String): Map<String, Any?> {
         // Snapshot: read all events from ring and return them as a flat list
-        // The caller stores this as the "journal" — no JournalSeries needed
         val ring = RingRegistry.getOrCreate(ringName)
-        val events = (0 until ring.a).map { ring[it] }
+        val events = (0 until ring.size).map { ring[it] }
         return mapOf(
             "ringName" to ringName,
             "captured" to true,
-            "size" to ring.a,
+            "size" to ring.size,
             "events" to events,
         )
     }
-
     fun listRings(): Map<String, Any?> = mapOf("rings" to RingRegistry.names())
 
     fun clear(ringName: String): Map<String, Any?> {
