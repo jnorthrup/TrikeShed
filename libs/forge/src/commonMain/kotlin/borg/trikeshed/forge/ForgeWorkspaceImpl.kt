@@ -1,5 +1,5 @@
 package borg.trikeshed.forge
-
+import borg.trikeshed.forge.platform.platformUtils
 import borg.trikeshed.forge.platform.PlatformUtils
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.channels.Channel
@@ -31,7 +31,7 @@ class ForgeWorkspaceImpl : ForgeWorkspace {
     // =========================================================================
 
     override suspend fun put(file: ForgeFile): ForgeFile {
-        val updated = file.copy(updatedAt = PlatformUtils.currentTimeMillis())
+        val updated = file.copy(updatedAt = platformUtils.currentTimeMillis())
         files[updated.id] = updated
         return updated
     }
@@ -49,7 +49,7 @@ class ForgeWorkspaceImpl : ForgeWorkspace {
         val file = files[id] ?: return null
         val channel = Channel<String>(1)
         // Use a scope to send content
-        CoroutineScope(PlatformUtils.ioDispatcher).launch {
+        CoroutineScope(platformUtils.ioDispatcher).launch {
             channel.send(file.content)
             channel.close()
         }
@@ -198,7 +198,7 @@ class ForgeWorkspaceImpl : ForgeWorkspace {
     ): ForgeExecutionResult {
         val workflow = workflows[workflowId] ?: throw IllegalArgumentException("Workflow not found: $workflowId")
         val snapId = snapshotId ?: snapshots.last()?.id ?: ForgeSnapshotId.ROOT
-        val now = PlatformUtils.currentTimeMillis()
+        val now = platformUtils.currentTimeMillis()
 
         val result = ForgeExecutionResult(
             executionId = ForgeExecutionId.generate(),
@@ -287,7 +287,7 @@ class ForgeWorkspaceImpl : ForgeWorkspace {
         val manifest = ForgeExportManifest(
             artifactId = artifact.id,
             artifactName = artifact.name,
-            exportedAt = PlatformUtils.currentTimeMillis(),
+            exportedAt = platformUtils.currentTimeMillis(),
             fileCount = artifact.files.size,
             totalSize = artifact.files.sumOf { it.content.length.toLong() },
             workflowId = artifact.workflowId,
@@ -296,13 +296,13 @@ class ForgeWorkspaceImpl : ForgeWorkspace {
         val json = Json.encodeToString(artifact)
         return ForgeExportBundle(
             format = format,
-            data = json.toByteArray(),
+            data = platformUtils.toPlatformByteArray(json),
             manifest = manifest
         )
     }
 
     override suspend fun importArtifact(bundle: ForgeExportBundle): ForgeArtifact {
-        val artifact = Json.decodeFromString<ForgeArtifact>(String(bundle.data))
+        val artifact = Json.decodeFromString<ForgeArtifact>(platformUtils.toPlatformString(bundle.data))
         artifacts[artifact.id] = artifact
         return artifact
     }
@@ -592,8 +592,8 @@ class ForgeWorkspaceImpl : ForgeWorkspace {
             cascadeId = cascade.id,
             output = outputRows,
             stageOutputs = serializableStageOutputs,
-            startedAt = PlatformUtils.currentTimeMillis(),
-            completedAt = PlatformUtils.currentTimeMillis(),
+            startedAt = platformUtils.currentTimeMillis(),
+            completedAt = platformUtils.currentTimeMillis(),
             status = CascadeExecutionStatus.SUCCESS
         )
     }

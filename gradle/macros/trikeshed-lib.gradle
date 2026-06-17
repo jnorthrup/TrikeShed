@@ -357,34 +357,7 @@ switch (project.path) {
     case ":libs:forge":
         // forge is configured in its own build.gradle.kts with plugins block
         break
-        forgeSourceSets.getByName("commonTest").dependencies {
-            implementation "org.jetbrains.kotlinx:kotlinx-coroutines-core:${prop("versions.kotlinx-coroutines-core")}"
-            implementation "org.jetbrains.kotlin:kotlin-test:2.4.0"
-            implementation "org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0"
-        }
-        // root project and miniduck are JVM-only, add to jvmMain/jvmTest
-        forgeSourceSets.named("jvmMain").configure {
-            dependencies {
-                implementation rootPeer()
-                implementation libPeer("miniduck")
-            }
-        }
-        forgeSourceSets.named("jvmTest").configure {
-            kotlin.srcDir("src/test/kotlin")
-            resources.srcDir("src/test/resources")
-            dependencies {
-                implementation "org.jetbrains.kotlin:kotlin-test-junit5:2.4.0"
-                implementation "org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0"
-            }
-        }
-        // Exclude JUnit 4 to avoid capability conflict with JUnit 5
-        configurations.named("jvmTestCompileClasspath").configure {
-            exclude(group: "org.jetbrains.kotlin", module: "kotlin-test-junit")
-        }
-        configurations.named("jvmTestRuntimeClasspath").configure {
-            exclude(group: "org.jetbrains.kotlin", module: "kotlin-test-junit")
-        }
-        // Apply JUnit 5 platform to the JVM test task
+    case ":libs:forge-ui":
         afterEvaluate {
             tasks.matching { it.name == "jvmTest" }.configureEach {
                 useJUnitPlatform()

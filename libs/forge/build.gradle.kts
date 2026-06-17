@@ -33,22 +33,6 @@ kotlin {
 
     jvm()
 
-    js {
-        nodejs()
-    }
-
-    wasmJs {
-        nodejs()
-    }
-
-    val hostOs = System.getProperty("os.name")
-    val hostArch = System.getProperty("os.arch")
-    if (hostOs == "Mac OS X" && hostArch == "aarch64") {
-        macosArm64("macos")
-    } else if (hostOs == "Linux") {
-        linuxX64("linux")
-    }
-
     sourceSets {
         val commonMain by getting {
             dependencies {
@@ -75,6 +59,7 @@ kotlin {
                 implementation("org.jetbrains.kotlin:kotlin-test-junit5:2.4.0")
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
             }
+            kotlin.srcDir("src/test/kotlin")
         }
     }
 }

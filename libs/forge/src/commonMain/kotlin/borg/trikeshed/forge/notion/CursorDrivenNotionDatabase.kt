@@ -1,4 +1,5 @@
 package borg.trikeshed.forge.notion
+import borg.trikeshed.forge.platform.platformUtils
 
 import borg.trikeshed.forge.platform.PlatformUtils
 import kotlinx.serialization.Serializable
@@ -197,14 +198,13 @@ object CursorDrivenNotionDatabases {
     private fun fieldNameKey(id: NotionDatabaseFieldId): String = "field.${id.value}.name"
     private fun fieldTypeKey(id: NotionDatabaseFieldId): String = "field.${id.value}.type"
     private fun fieldOptionsKey(id: NotionDatabaseFieldId): String = "field.${id.value}.options"
-    private fun now(): Long = PlatformUtils.currentTimeMillis()
+    private fun now(): Long = platformUtils.currentTimeMillis()
 
     private const val FIELD_ORDER = "database.fieldOrder"
 }
 
 @Serializable
-expect class NotionDatabaseFieldId constructor(value: String) {
-    val value: String
+data class NotionDatabaseFieldId(val value: String) {
     companion object {
         fun fromName(name: String): NotionDatabaseFieldId = NotionDatabaseFieldId(
             name.lowercase().replace(Regex("[^a-z0-9]+"), "-").trim('-').ifBlank { "field" }

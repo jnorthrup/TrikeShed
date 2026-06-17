@@ -1,4 +1,5 @@
 package borg.trikeshed.forge
+import borg.trikeshed.forge.platform.platformUtils
 
 import borg.trikeshed.forge.platform.PlatformUtils
 import kotlinx.serialization.Serializable
@@ -25,7 +26,7 @@ data class KanbanBoard(
 @Serializable
 data class KanbanBoardId(val value: String) {
     companion object {
-        fun generate(): KanbanBoardId = KanbanBoardId(PlatformUtils.randomUuid())
+        fun generate(): KanbanBoardId = KanbanBoardId(platformUtils.randomUuid())
     }
 }
 
@@ -41,7 +42,7 @@ data class KanbanColumn(
 @Serializable
 data class KanbanColumnId(val value: String) {
     companion object {
-        fun generate(): KanbanColumnId = KanbanColumnId(PlatformUtils.randomUuid())
+        fun generate(): KanbanColumnId = KanbanColumnId(platformUtils.randomUuid())
     }
 }
 
@@ -57,14 +58,14 @@ data class KanbanCard(
     val dependencies: List<KanbanCardId> = emptyList(),  // blocks other cards
     val tags: Set<String> = emptySet(),
     val metadata: Map<String, String> = emptyMap(),
-    val createdAt: Long = PlatformUtils.currentTimeMillis(),
-    val updatedAt: Long = PlatformUtils.currentTimeMillis(),
+    val createdAt: Long = platformUtils.currentTimeMillis(),
+    val updatedAt: Long = platformUtils.currentTimeMillis(),
 )
 
 @Serializable
 data class KanbanCardId(val value: String) {
     companion object {
-        fun generate(): KanbanCardId = KanbanCardId(PlatformUtils.randomUuid())
+        fun generate(): KanbanCardId = KanbanCardId(platformUtils.randomUuid())
     }
 }
 
@@ -82,7 +83,7 @@ data class Swimlane(
 @Serializable
 data class SwimlaneId(val value: String) {
     companion object {
-        fun generate(): SwimlaneId = SwimlaneId(PlatformUtils.randomUuid())
+        fun generate(): SwimlaneId = SwimlaneId(platformUtils.randomUuid())
     }
 }
 

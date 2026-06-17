@@ -1,4 +1,5 @@
 package borg.trikeshed.forge.notion
+import borg.trikeshed.forge.platform.platformUtils
 
 import borg.trikeshed.forge.ForgeFile
 import borg.trikeshed.forge.ForgeFileId
@@ -352,14 +353,13 @@ object CursorDrivenNotion {
         .trim('-')
         .ifBlank { "untitled" }
 
-    private fun now(): Long = PlatformUtils.currentTimeMillis()
+    private fun now(): Long = platformUtils.currentTimeMillis()
 }
 
 @Serializable
-expect class NotionBlockId constructor(value: String) {
-    val value: String
+data class NotionBlockId(val value: String) {
     companion object {
-        fun generate(): NotionBlockId = NotionBlockId("notion-block-${PlatformUtils.randomUuid()}")
+        fun generate(): NotionBlockId = NotionBlockId("notion-block-${platformUtils.randomUuid()}")
     }
 }
 
@@ -391,8 +391,8 @@ data class NotionBlock(
     val parentId: NotionBlockId?,
     val children: List<NotionBlockId> = emptyList(),
     val properties: Map<String, String> = emptyMap(),
-    val createdAt: Long = PlatformUtils.currentTimeMillis(),
-    val updatedAt: Long = PlatformUtils.currentTimeMillis(),
+    val createdAt: Long = platformUtils.currentTimeMillis(),
+    val updatedAt: Long = platformUtils.currentTimeMillis(),
 )
 
 @Serializable
@@ -409,7 +409,7 @@ data class NotionMutation(
     val operation: String,
     val blockId: NotionBlockId?,
     val payload: Map<String, String> = emptyMap(),
-    val timestamp: Long = PlatformUtils.currentTimeMillis(),
+    val timestamp: Long = platformUtils.currentTimeMillis(),
 )
 
 @Serializable
@@ -482,7 +482,7 @@ class NotionCursorView internal constructor(private val rows: List<NotionCursorR
 }
 
 private fun CursorNotionState.replace(block: NotionBlock): CursorNotionState =
-    copy(blocks = blocks + (block.id.value to block.copy(updatedAt = PlatformUtils.currentTimeMillis())))
+    copy(blocks = blocks + (block.id.value to block.copy(updatedAt = platformUtils.currentTimeMillis())))
 
 private fun CursorNotionState.withCursor(actorId: String, cursor: NotionCursor): CursorNotionState =
     copy(cursors = cursors + (actorId to cursor))

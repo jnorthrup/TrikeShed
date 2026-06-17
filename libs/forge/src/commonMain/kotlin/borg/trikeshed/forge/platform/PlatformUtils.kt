@@ -1,27 +1,21 @@
 package borg.trikeshed.forge.platform
 
-import kotlin.random.Random
+import kotlinx.coroutines.CoroutineDispatcher
 
 /**
- * Multiplatform platform utilities.
+ * Multiplatform platform utilities interface.
  * Provides platform-agnostic APIs for time, UUID generation, and coroutine dispatchers.
  */
-expect object PlatformUtils {
-    /**
-     * Current time in milliseconds since epoch.
-     */
+interface PlatformUtils {
     fun currentTimeMillis(): Long
-
-    /**
-     * Generate a random UUID string.
-     * Uses platform-appropriate randomness (not cryptographically secure for simple IDs).
-     */
     fun randomUuid(): String
-
-    /**
-     * Default coroutine dispatcher for IO-bound work.
-     * On JVM: Dispatchers.IO
-     * On JS/WASM: Dispatchers.Default (single-threaded, but works for async)
-     */
-    val ioDispatcher: kotlinx.coroutines.CoroutineDispatcher
+    val ioDispatcher: CoroutineDispatcher
+    fun toPlatformByteArray(str: String): ByteArray
+    fun toPlatformString(bytes: ByteArray): String
 }
+
+/** Platform-specific implementation provider */
+expect fun providePlatformUtils(): PlatformUtils
+
+/** Platform-specific implementation provider */
+val platformUtils: PlatformUtils = providePlatformUtils()

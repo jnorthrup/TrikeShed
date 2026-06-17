@@ -1,4 +1,5 @@
 package borg.trikeshed.forge
+import borg.trikeshed.forge.platform.platformUtils
 
 import borg.trikeshed.forge.platform.PlatformUtils
 import kotlinx.serialization.Serializable
@@ -68,10 +69,9 @@ data class PatchCable(
 )
 
 @Serializable
-@JvmInline
-value class CableId(val value: String) {
+data class CableId(val value: String) {
     companion object {
-        fun generate(): CableId = CableId(PlatformUtils.randomUuid())
+        fun generate(): CableId = CableId(platformUtils.randomUuid())
     }
 }
 
@@ -124,10 +124,9 @@ data class PatchBay(
 )
 
 @Serializable
-@JvmInline
-value class PatchBayId(val value: String) {
+data class PatchBayId(val value: String) {
     companion object {
-        fun generate(): PatchBayId = PatchBayId(PlatformUtils.randomUuid())
+        fun generate(): PatchBayId = PatchBayId(platformUtils.randomUuid())
     }
 }
 
@@ -262,7 +261,7 @@ data class ModuleProcessorState(
 data class SignalValue(
     val value: String,  // JSON-serialized value
     val typeSignature: String,
-    val timestamp: Long = PlatformUtils.currentTimeMillis(),
+    val timestamp: Long = platformUtils.currentTimeMillis(),
     val metadata: Map<String, String> = emptyMap(),
 )
 
@@ -277,18 +276,17 @@ data class ForgeFile(
     val content: String,
     val mimeType: String,
     val metadata: Map<String, String> = emptyMap(),
-    val createdAt: Long = PlatformUtils.currentTimeMillis(),
-    val updatedAt: Long = PlatformUtils.currentTimeMillis(),
+    val createdAt: Long = platformUtils.currentTimeMillis(),
+    val updatedAt: Long = platformUtils.currentTimeMillis(),
 )
 
 /**
  * Unique identifier for a forge file.
  */
 @Serializable
-@JvmInline
-value class ForgeFileId(val value: String) {
+data class ForgeFileId(val value: String) {
     companion object {
-        fun generate(): ForgeFileId = ForgeFileId(PlatformUtils.randomUuid())
+        fun generate(): ForgeFileId = ForgeFileId(platformUtils.randomUuid())
         fun fromPath(path: String): ForgeFileId = ForgeFileId(path)
     }
 }
@@ -303,16 +301,15 @@ data class ForgeSnapshot(
     val parentId: ForgeSnapshotId?,
     val files: Map<ForgeFileId, ForgeFile>,
     val message: String,
-    val timestamp: Long = PlatformUtils.currentTimeMillis(),
+    val timestamp: Long = platformUtils.currentTimeMillis(),
     val author: String = "unknown",
     val tags: Set<String> = emptySet(),
 )
 
 @Serializable
-@JvmInline
-value class ForgeSnapshotId(val value: String) {
+data class ForgeSnapshotId(val value: String) {
     companion object {
-        fun generate(): ForgeSnapshotId = ForgeSnapshotId(PlatformUtils.randomUuid())
+        fun generate(): ForgeSnapshotId = ForgeSnapshotId(platformUtils.randomUuid())
         val ROOT = ForgeSnapshotId("root")
     }
 }
@@ -328,14 +325,13 @@ data class ForgePrompt(
     val parameters: Map<String, PromptParameter>,
     val version: Int = 1,
     val tags: Set<String> = emptySet(),
-    val createdAt: Long = PlatformUtils.currentTimeMillis(),
+    val createdAt: Long = platformUtils.currentTimeMillis(),
 )
 
 @Serializable
-@JvmInline
-value class ForgePromptId(val value: String) {
+data class ForgePromptId(val value: String) {
     companion object {
-        fun generate(): ForgePromptId = ForgePromptId(PlatformUtils.randomUuid())
+        fun generate(): ForgePromptId = ForgePromptId(platformUtils.randomUuid())
     }
 }
 
@@ -364,10 +360,9 @@ data class ForgeWorkflow(
 )
 
 @Serializable
-@JvmInline
-value class ForgeWorkflowId(val value: String) {
+data class ForgeWorkflowId(val value: String) {
     companion object {
-        fun generate(): ForgeWorkflowId = ForgeWorkflowId(PlatformUtils.randomUuid())
+        fun generate(): ForgeWorkflowId = ForgeWorkflowId(platformUtils.randomUuid())
     }
 }
 
@@ -494,7 +489,7 @@ data class ForgeExecutionResult(
 @Serializable
 data class ForgeExecutionId(val value: String) {
     companion object {
-        fun generate(): ForgeExecutionId = ForgeExecutionId(PlatformUtils.randomUuid())
+        fun generate(): ForgeExecutionId = ForgeExecutionId(platformUtils.randomUuid())
     }
 }
 
@@ -529,7 +524,7 @@ sealed interface CollaborationEvent {
 @Serializable
 data class ForgeUserId(val value: String) {
     companion object {
-        fun generate(): ForgeUserId = ForgeUserId(PlatformUtils.randomUuid())
+        fun generate(): ForgeUserId = ForgeUserId(platformUtils.randomUuid())
     }
 }
 
@@ -538,7 +533,7 @@ data class ForgeUser(
     val id: ForgeUserId,
     val name: String,
     val color: String,
-    val connectedAt: Long = PlatformUtils.currentTimeMillis(),
+    val connectedAt: Long = platformUtils.currentTimeMillis(),
 )
 
 /**
@@ -553,14 +548,14 @@ data class ForgeArtifact(
     val workflowId: ForgeWorkflowId?,
     val executionId: ForgeExecutionId?,
     val metadata: Map<String, String> = emptyMap(),
-    val createdAt: Long = PlatformUtils.currentTimeMillis(),
+    val createdAt: Long = platformUtils.currentTimeMillis(),
     val isPublic: Boolean = false,
 )
 
 @Serializable
 data class ForgeArtifactId(val value: String) {
     companion object {
-        fun generate(): ForgeArtifactId = ForgeArtifactId(PlatformUtils.randomUuid())
+        fun generate(): ForgeArtifactId = ForgeArtifactId(platformUtils.randomUuid())
     }
 }
 
