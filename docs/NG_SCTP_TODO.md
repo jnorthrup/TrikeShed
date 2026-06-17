@@ -1,9 +1,9 @@
-# ngsctp (Next-Generation SCTP) Testing and Development Plan
+# ng-sctp (Next-Generation SCTP) Testing and Development Plan
 
-This document details the necessary steps to make the `ngsctp` module testable and interoperable with standard implementations like Pion SCTP.
+This document details the necessary steps to make the `ng-sctp` module testable and interoperable with standard implementations like Pion SCTP.
 
 ## Context
-The `ngsctp` library represents a high-performance SCTP implementation utilizing Kotlin Coroutines and a zero-copy parser (Spirit parser). However, the implementation is currently incomplete and excluded from the main Gradle build.
+The `ng-sctp` library represents a high-performance SCTP implementation utilizing Kotlin Coroutines and a zero-copy parser (Spirit parser). However, the implementation is currently incomplete and excluded from the main Gradle build.
 
 ## Blocking Issues for Interop Testing
 
@@ -27,7 +27,7 @@ cd sctp/examples/ping-pong
 go run pong/*.go
 ```
 
-### 2. Implement a Client Integration Test in `ngsctp`
+### 2. Implement a Client Integration Test in `ng-sctp`
 Write a Kotlin test to attempt the standard 4-way SCTP handshake using raw UDP encapsulation against the Pion server.
 ```kotlin
 suspend fun testInteropWithPion() = coroutineScope {
@@ -48,4 +48,4 @@ suspend fun testInteropWithPion() = coroutineScope {
 ```
 
 ### 3. Verify Wireshark / PCAP Observability
-Ensure the `ngsctp` UDP payloads are decodable by standard network analysis tools (Wireshark decode as SCTP-over-UDP).
+Ensure the `ng-sctp` UDP payloads are decodable by standard network analysis tools (Wireshark decode as SCTP-over-UDP).

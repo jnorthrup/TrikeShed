@@ -36,6 +36,12 @@ kotlin {
             "-Xsuppress-version-warnings",
             "-Xexpect-actual-classes",
             "-Xallow-kotlin-package",
+            // JEP 484 ClassFile API (jdk.internal.classfile)
+            "--add-exports=java.base/jdk.internal.classfile=ALL-UNNAMED",
+            "--add-exports=java.base/jdk.internal.classfile.attribute=ALL-UNNAMED",
+            "--add-exports=java.base/jdk.internal.classfile.constantpool=ALL-UNNAMED",
+            "--add-exports=java.base/jdk.internal.classfile.instruction=ALL-UNNAMED",
+            "--add-exports=java.base/jdk.internal.classfile.models=ALL-UNNAMED",
         )
     }
 

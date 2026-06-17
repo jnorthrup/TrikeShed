@@ -2,7 +2,7 @@ package borg.trikeshed.userspace
 
 import borg.trikeshed.context.AsyncContextElement
 import borg.trikeshed.context.ElementState
-import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CompletableJob
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.withContext
 import kotlin.coroutines.CoroutineContext
@@ -45,7 +45,7 @@ class LiburingElement(
     suspend fun submit(): Int = Liburing.submit().getOrThrow()
 
     /** Wait for at least [minComplete] completions. */
-    suspend fun wait(minComplete: Int = 1): List<UringCompletion> = withContext(kotlinx.coroutines.Dispatchers.Default) {
+    suspend fun wait(minComplete: Int = 1): List<UringCompletion> = withContext(kotlinx.coroutines.Dispatchers.IO) {
         Liburing.waitCqe().getOrThrow()
         // In real impl, this would collect multiple completions
         emptyList()
@@ -58,24 +58,16 @@ class LiburingElement(
 }
 
 /**
- * FanoutEvent — generic event type for fanout dispatcher.
- * Subsystems can define their own event type codes (offset + 100).
- */
-interface FanoutEvent {
-    val eventType: Int
-}
-
-/**
- * FanoutDispatcherElement — Pattern A CCEK element for generic event dispatch.
+ * FanoutDispatcherElement — Pattern A CCEK element for channelized completion dispatch.
  *
- * Central dispatch point for all events (io_uring completions, splat updates, etc.).
- * Elements register handlers by event type token; events are fanned out to all
- * subscribers for that type.
+ * Central dispatch point for all io_uring completions. Elements register
+ * handlers by userData token; completions are fanned out to all subscribers
+ * for that token.
  *
  * PRELOAD.md contract:
  * - Single-threaded dispatch via reactor CQE loop
  * - Structured concurrency: handlers run in parent SupervisorJob scope
- * - Cold Series α-projection: handlers receive cold event Series
+ * - Cold Series α-projection: handlers receive cold completion Series
  */
 class FanoutDispatcherElement(
     parentJob: kotlinx.coroutines.Job? = null,
@@ -83,28 +75,25 @@ class FanoutDispatcherElement(
 
     override val key: CoroutineContext.Key<*> get() = borg.trikeshed.userspace.context.AsyncContextKey.FanoutDispatcherKey
 
-    private val handlers = mutableMapOf<Int, MutableList<(FanoutEvent) -> Unit>>()
+    private val handlers = mutableMapOf<Long, MutableList<(UringCompletion) -> Unit>>()
 
-    /** Register a handler for events of the given type code. */
-    fun registerHandler(eventType: Int, handler: (FanoutEvent) -> Unit) {
-        handlers.getOrPut(eventType) { mutableListOf() }.add(handler)
+    /** Register a handler for completions with the given userData token. */
+    fun registerHandler(userData: Long, handler: (UringCompletion) -> Unit) {
+        handlers.getOrPut(userData) { mutableListOf() }.add(handler)
+        // Also register with liburing facade
+        Liburing.registerFanoutHandler(userData, handler)
     }
 
     /** Remove a handler. */
-    fun removeHandler(eventType: Int, handler: (FanoutEvent) -> Unit) {
-        handlers[eventType]?.remove(handler)
-        if (handlers[eventType].isNullOrEmpty()) handlers.remove(eventType)
+    fun removeHandler(userData: Long, handler: (UringCompletion) -> Unit) {
+        handlers[userData]?.remove(handler)
+        if (handlers[userData].isNullOrEmpty()) handlers.remove(userData)
+        Liburing.removeFanoutHandler(userData, handler)
     }
 
-    /** Dispatch an event to all handlers for its type. */
-    fun dispatch(event: FanoutEvent) {
-        handlers[event.eventType]?.toList()?.forEach { it(event) }
-    }
-
-    /** Dispatch a UringCompletion (eventType = 0). */
-    fun dispatchUring(completion: UringCompletion) {
-        // UringCompletion doesn't implement FanoutEvent, use type code 0
-        handlers[0]?.toList()?.forEach { it(completion) }
+    /** Dispatch a completion to all handlers for its userData. */
+    internal fun dispatch(completion: UringCompletion) {
+        handlers[completion.userData]?.toList()?.forEach { it(completion) }
     }
 
     override suspend fun close() {
@@ -121,8 +110,8 @@ object FanoutDispatcherKey : CoroutineContext.Key<FanoutDispatcherElement>
 
 /** Install LiburingElement + FanoutDispatcherElement in the coroutine context. */
 suspend fun CoroutineScope.installLiburingWithFanout(): Pair<LiburingElement, FanoutDispatcherElement> {
-    val liburing = LiburingElement(SupervisorJob())
-    val fanout = FanoutDispatcherElement(SupervisorJob())
+    val liburing = LiburingElement(supervisor)
+    val fanout = FanoutDispatcherElement(supervisor)
     liburing.open()
     // Install both elements in this scope's context
     return withContext(liburing + fanout) { liburing to fanout }

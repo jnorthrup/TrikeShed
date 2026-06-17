@@ -1,21 +1,12 @@
 package borg.trikeshed.windowtoolkit.context
 
-import borg.trikeshed.windowtoolkit.internal.SignalContextElement
-import borg.trikeshed.windowtoolkit.internal.SignalEvent
-import borg.trikeshed.windowtoolkit.internal.SignalSubscriber
-import borg.trikeshed.windowtoolkit.internal.AsyncSignalElement
-import borg.trikeshed.windowtoolkit.internal.AsyncSignalKey
-import borg.trikeshed.windowtoolkit.internal.TextField
-import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.receiveAsFlow
-import kotlinx.coroutines.launch
 import kotlin.coroutines.CoroutineContext
 
-// -- Temporary Stubs for CCEK Reactor implementation until KMP JS issues in root project are resolved --
 // TODO: Resolve build limitations with root Trikeshed project and JS compilation.
 // Once Trikeshed root supports JS natively, we should import AsyncContextElement, AsyncContextKey, ElementState
 // directly from borg.trikeshed.context instead of maintaining local stubs.
+
+// -- Temporary Stubs for CCEK Reactor implementation until KMP JS issues in root project are resolved --
 
 interface AsyncContextElement : CoroutineContext.Element {
     suspend fun open() {}
@@ -23,6 +14,7 @@ interface AsyncContextElement : CoroutineContext.Element {
 }
 
 interface AsyncContextKey<E : CoroutineContext.Element> : CoroutineContext.Key<E>
+
 // -----------------------------------------------------------------------------------------------------
 
 data class WindowResizeEvent(val width: Double, val height: Double)
@@ -30,81 +22,32 @@ data class InputTokenEvent(val token: String)
 
 /**
  * Reactor-Driven UI Context Element modeling the loop for the Window Toolkit.
- * Now backed by user-signals SignalContextElement for signal fanout.
  */
 class WindowContextElement : AsyncContextElement {
     companion object Key : AsyncContextKey<WindowContextElement>
     override val key: CoroutineContext.Key<*> get() = Key
 
-    // Delegate to signal context for fanout
-    private val signalContext = SignalContextElement()
-
-    // Window-specific subscribers (for backward compatibility)
+    // Subscribers array, mimicking the CCEK fanout model seen in activejs PointcutCcekElements
     private val subscribers = mutableListOf<WindowEventSubscriber>()
 
-    // Track if synthetic sources have been registered
-    private var syntheticSourcesRegistered = false
+    // Optional fanout dispatcher hook for generic Splat metrics tracing
+    // var fanoutDispatcher: FanoutDispatcherElement? = null // TODO: Uncomment when motion-estimation works on JS
 
     override suspend fun open() {
         super.open()
-        signalContext.open()
-        registerSyntheticSources()
-    }
-
-    private fun registerSyntheticSources() {
-        if (syntheticSourcesRegistered) return
-        syntheticSourcesRegistered = true
-        
-        // Register window.resize as a synthetic source so it can be used in templates
-        val resizeSource = object : SignalSource<WindowResizeEvent> {
-            override var value: WindowResizeEvent = WindowResizeEvent(0.0, 0.0)
-                private set
-            private val _channel = Channel<WindowResizeEvent>(Channel.UNLIMITED)
-            override val changes: Flow<WindowResizeEvent> = _channel.asFlow()
-            override fun emit(value: WindowResizeEvent): WindowResizeEvent {
-                this.value = value
-                _channel.trySend(value)
-                return value
-            }
-            override suspend fun emitSuspend(value: WindowResizeEvent): WindowResizeEvent {
-                this.value = value
-                _channel.send(value)
-                return value
-            }
-        }
-        signalContext.registerSource("window.resize", resizeSource)
-
-        // Register window.token as a synthetic source so it can be used in templates
-        val tokenSource = object : SignalSource<InputTokenEvent> {
-            override var value: InputTokenEvent = InputTokenEvent("")
-                private set
-            private val _channel = Channel<InputTokenEvent>(Channel.UNLIMITED)
-            override val changes: Flow<InputTokenEvent> = _channel.asFlow()
-            override fun emit(value: InputTokenEvent): InputTokenEvent {
-                this.value = value
-                _channel.trySend(value)
-                return value
-            }
-            override suspend fun emitSuspend(value: InputTokenEvent): InputTokenEvent {
-                this.value = value
-                _channel.send(value)
-                return value
-            }
-        }
-        signalContext.registerSource("window.token", tokenSource)
+        // state = ElementState.ACTIVE // TODO
     }
 
     suspend fun publishResize(width: Double, height: Double) {
         val event = WindowResizeEvent(width, height)
         subscribers.forEach { it.onResize(event) }
-        // Emit to signal context for fanout
-        signalContext.emit("window.resize", event)
+        // fanoutDispatcher?.splatPublish(event) // TODO
     }
 
     suspend fun publishToken(token: String) {
         val event = InputTokenEvent(token)
         subscribers.forEach { it.onToken(event) }
-        signalContext.emit("window.token", event)
+        // fanoutDispatcher?.splatPublish(event) // TODO
     }
 
     fun registerSubscriber(subscriber: WindowEventSubscriber) {
@@ -117,33 +60,9 @@ class WindowContextElement : AsyncContextElement {
         subscribers.remove(subscriber)
     }
 
-    // Signal context integration
-    /** Subscribe to all signal events (including window events) */
-    fun subscribeSignals(subscriber: SignalSubscriber) = signalContext.subscribe(subscriber)
-
-    fun unsubscribeSignals(subscriber: SignalSubscriber) = signalContext.unsubscribe(subscriber)
-
-    /** Access underlying signal context for advanced usage */
-    val signalContextInstance: SignalContextElement = signalContext
-
-    /** Emit a custom signal through the context */
-    fun <T> emitSignal(signalId: String, value: T): Boolean = signalContext.emit(signalId, value)
-
-    /** Get a registered signal */
-    fun <T> getSignal(signalId: String) = signalContext.getSignal<T>(signalId)
-
-    /** Bind window.token flow to a TextField for automatic text insertion */
-    fun bindTokenToTextField(textField: TextField) {
-        tokenFlow().onEach { event ->
-            if (textField.value.focused) {
-                textField.insert(event.token)
-            }
-        }.launchIn(kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Default + signalContextInstance))
-    }
-
     override suspend fun close() {
         subscribers.clear()
-        signalContext.close()
+        super.close()
     }
 }
 
@@ -159,36 +78,3 @@ interface WindowEventSubscriber {
 // Helpers for Context Resolution
 fun CoroutineContext.getWindowContextElement(): WindowContextElement? =
     this[WindowContextElement.Key]
-
-/**
- * Flow-based access to window events via user-signals
- */
-fun WindowContextElement.resizeFlow(): Flow<WindowResizeEvent> {
-    val channel = Channel<WindowResizeEvent>(Channel.UNLIMITED)
-    subscribeSignals(object : SignalSubscriber {
-        override fun onEvent(event: SignalEvent) {
-            when (event) {
-                is SignalEvent.SignalChanged<*> -> if (event.signalId == "window.resize" && event.value is WindowResizeEvent) {
-                    channel.trySend(event.value as WindowResizeEvent)
-                }
-                else -> {}
-            }
-        }
-    })
-    return channel.receiveAsFlow()
-}
-
-fun WindowContextElement.tokenFlow(): Flow<InputTokenEvent> {
-    val channel = Channel<InputTokenEvent>(Channel.UNLIMITED)
-    subscribeSignals(object : SignalSubscriber {
-        override fun onEvent(event: SignalEvent) {
-            when (event) {
-                is SignalEvent.SignalChanged<*> -> if (event.signalId == "window.token" && event.value is InputTokenEvent) {
-                    channel.trySend(event.value as InputTokenEvent)
-                }
-                else -> {}
-            }
-        }
-    })
-    return channel.receiveAsFlow()
-}

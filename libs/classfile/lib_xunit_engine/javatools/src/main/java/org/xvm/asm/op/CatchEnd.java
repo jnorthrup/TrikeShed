@@ -1,0 +1,94 @@
+package org.xvm.asm.op;
+
+
+import java.io.DataInput;
+import java.io.IOException;
+
+import java.lang.classfile.CodeBuilder;
+
+import org.xvm.asm.Constant;
+import org.xvm.asm.Op;
+import org.xvm.asm.OpJump;
+import org.xvm.asm.Scope;
+
+import org.xvm.javajit.BuildContext;
+
+import org.xvm.runtime.Frame;
+
+
+/**
+ * CATCH_END rel_addr ; finish an exception handler with a jump
+ * <p/>
+ * Each CATCH_END op must match up with a previous CATCH op.
+ * <p/>
+ * The CATCH_END op exits the scope and proceeds to the instruction at the location specified by
+ * "rel_addr".
+ */
+public class CatchEnd
+        extends OpJump {
+    /**
+     * Construct a CATCH_END op based on the destination Op.
+     *
+     * @param op  the Op to jump to when the handler completes
+     */
+    public CatchEnd(Op op) {
+        super(op);
+    }
+
+    /**
+     * Deserialization constructor.
+     *
+     * @param in      the DataInput to read from
+     * @param aconst  an array of constants used within the method
+     */
+    public CatchEnd(DataInput in, Constant[] aconst)
+            throws IOException {
+        super(in, aconst);
+    }
+
+    @Override
+    public int getOpCode() {
+        return OP_CATCH_END;
+    }
+
+    @Override
+    public boolean isExit() {
+        return true;
+    }
+
+    @Override
+    public int process(Frame frame, int iPC) {
+        frame.exitScope();
+        return jump(frame, iPC + m_ofJmp, m_cExits);
+    }
+
+    @Override
+    public void simulate(Scope scope) {
+        scope.exit(this);
+    }
+
+    // ----- JIT support ---------------------------------------------------------------------------
+
+    @Override
+    public void computeTypes(BuildContext bctx) {
+        bctx.exitScope(null);
+
+        // we could be called for dead code to correctly compute the scopes, but should not
+        // compute types further
+        if (bctx.typeMatrix.isReached(getAddress())) {
+            bctx.typeMatrix.follow(getAddress(), getAddress() + m_ofJmp, -1);
+        }
+    }
+
+    @Override
+    public int build(BuildContext bctx, CodeBuilder code) {
+        bctx.exitScope(code);
+
+        if (m_ofJmp > 1) {
+            code.goto_(bctx.ensureLabel(code, getAddress() + m_ofJmp));
+        } else {
+            assert m_ofJmp == 1;
+        }
+        return -1;
+    }
+}

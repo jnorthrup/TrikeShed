@@ -1,70 +1,62 @@
 package borg.trikeshed.windowtoolkit.harness
 
-import borg.trikeshed.windowtoolkit.dsl.WindowShell
 import borg.trikeshed.windowtoolkit.dsl.windowContext
-import borg.trikeshed.windowtoolkit.dsl.panel
-import borg.trikeshed.windowtoolkit.internal.*
+import borg.trikeshed.windowtoolkit.dsl.WindowShell
+import borg.trikeshed.windowtoolkit.ui.StyleRow
+import borg.trikeshed.windowtoolkit.math.v2
+import borg.trikeshed.windowtoolkit.math.size
+import borg.trikeshed.windowtoolkit.math.j
+import borg.trikeshed.windowtoolkit.ui.applyUniformStyle
+import borg.trikeshed.windowtoolkit.confix.ConfixBlackboardWidget
 import kotlinx.coroutines.runBlocking
+// import org.xvm.activejs.BlackBoardEntry
+// import org.xvm.activejs.ConfixRole
+// import org.xvm.activejs.confixDoc
 
 /**
- * Signal-driven UI harness - demonstrates the coherent DSL API.
+ * Harness connecting a generic JSON string mapping Classfile coordinate data
+ * into the generic Confix Blackboard and layout rendering system of the window-toolkit.
  */
-fun buildSignalUIHarness(): WindowShell {
-    return windowContext {
-        // Create signals
-        val enabled = toggle("app.enabled", true)
-        val zoom = slider("app.zoom", 0.5, 3.0, 1.0, 0.1)
-        val activity = level("app.activity", 2000)
+fun buildClassfileDatagridHarness(jsonDump: String): WindowShell {
+    val shell = windowContext {
+        // 1. Setup the Confix Datagrid representation layer
+        confixDatagrid {
+            // val entry = BlackBoardEntry(
+            //     doc = confixDoc(jsonDump),
+            //     role = ConfixRole.OBSERVATION
+            // )
+            // Push entry to render
+            // render(entry)
+        }
 
-        // Compose templates fluently
-        components.add(
-            panel {
-                label("Signal UI Harness")
-                toggle(enabled)
-                slider(zoom)
-                level(activity)
-            }
-        )
+        // 2. Setup a simplistic layout layer mimicking classfile grid plotting
+        val points = 3 j { i: Int -> v2(i * 100.0, i * 20.0) }
+        val uniformStyles = points.size j { _: Int -> StyleRow(mapOf("color" to "blue")) }
 
-        // Individual control panels
-        components.add(
-            panel {
-                label("Zoom Control")
-                slider(zoom)
-            }
-        )
-
-        components.add(
-            panel {
-                label("Activity Meter")
-                level(activity)
-            }
-        )
+        layoutLayer(points, uniformStyles)
     }
+
+    return shell
 }
 
 fun main() = runBlocking {
-    val shell = buildSignalUIHarness()
+    val sampleClassfileJson = """
+        {
+          "symbolName": "com.example.Demo",
+          "ownerType": "Demo",
+          "methodOrField": "<init>",
+          "classfileCoord": "com.example.Demo#<init>",
+          "cpIndex": 10,
+          "descriptor": "()V",
+          "xvmTypeInfo": "method",
+          "pointcutKind": 12,
+          "poolId": 101,
+          "activeJsFacet": "Unfaceted"
+        }
+    """.trimIndent()
+
+    val shell = buildClassfileDatagridHarness(sampleClassfileJson)
     shell.mount()
-
-    // Update signals via context
-    val ctx = shell.signalContext
-    ctx.getSource<Boolean>("app.enabled")?.emit(false)
-    ctx.getSource<Double>("app.zoom")?.emit(2.5)
-    ctx.getSource<Double>("app.activity")?.emit(0.85)
-
-    println("Signal UI Harness mounted and updated")
-
-    // One-shot render to TUI
-    val results = shell.renderOnce()
-    if (results.size >= 2) {
-        val textResult = results[0]
-        val ansiResult = results[1]
-        println("Text output:")
-        println(textResult.content)
-        println("\nANSI output:")
-        println(ansiResult.content)
-    }
-
+    println("Successfully mounted Classfile Harness inside Window Toolkit Shell")
     shell.unmount()
 }
