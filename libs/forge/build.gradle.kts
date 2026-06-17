@@ -51,7 +51,6 @@ kotlin {
         val jvmMain by getting {
             dependencies {
                 implementation(project(":libs:miniduck"))
-                implementation(project(":"))
             }
         }
         val jvmTest by getting {

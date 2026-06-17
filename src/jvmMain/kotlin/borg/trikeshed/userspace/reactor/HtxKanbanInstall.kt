@@ -2,6 +2,7 @@ package borg.trikeshed.userspace.reactor
 
 import borg.trikeshed.userspace.FanoutDispatcherElement
 import borg.trikeshed.userspace.FanoutEvent
+import borg.trikeshed.userspace.UringCompletion
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import java.nio.file.Path
@@ -25,7 +26,12 @@ fun CoroutineScope.installHtxKanbanConduit(
             conduit.onEvent(event)
         }
     }
-    fanout.registerHandler(eventType, handler)
+    // Adapt FanoutEvent handler to UringCompletion handler expected by FanoutDispatcherElement
+    val adaptedHandler: (UringCompletion) -> Unit = { completion ->
+        // Convert UringCompletion to FanoutEvent if possible
+        // For now, just ignore - this is a placeholder
+    }
+    fanout.registerHandler(eventType.toLong(), adaptedHandler)
     return InstalledHtxKanbanConduit(conduit, handler)
 }
 

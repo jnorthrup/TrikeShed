@@ -107,6 +107,7 @@ kotlin {
                 implementation("org.bouncycastle:bcprov-jdk15on:1.70")
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
+                implementation("org.graalvm.polyglot:polyglot:25.0.2+10.1")
             }
             kotlin.srcDir("src/jmhMain/kotlin")
             resources.srcDir("src/jmhMain/resources")

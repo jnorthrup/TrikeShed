@@ -44,6 +44,7 @@ kotlin {
                 api("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
                 api("org.jetbrains.kotlinx:kotlinx-datetime:0.8.0-rc02-0.6.x-compat")
                 implementation("org.xerial:sqlite-jdbc:3.49.0.0")
+                implementation("com.zaxxer:HikariCP:6.3.0")
             }
         }
         val commonTest by getting {
