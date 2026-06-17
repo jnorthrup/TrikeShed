@@ -1,5 +1,6 @@
 package borg.trikeshed.forge
 
+import borg.trikeshed.forge.platform.PlatformUtils
 import kotlinx.serialization.Serializable
 import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.flow.Flow
@@ -70,7 +71,7 @@ data class PatchCable(
 @JvmInline
 value class CableId(val value: String) {
     companion object {
-        fun generate(): CableId = CableId(java.util.UUID.randomUUID().toString())
+        fun generate(): CableId = CableId(PlatformUtils.randomUuid())
     }
 }
 
@@ -126,7 +127,7 @@ data class PatchBay(
 @JvmInline
 value class PatchBayId(val value: String) {
     companion object {
-        fun generate(): PatchBayId = PatchBayId(java.util.UUID.randomUUID().toString())
+        fun generate(): PatchBayId = PatchBayId(PlatformUtils.randomUuid())
     }
 }
 
@@ -287,7 +288,7 @@ data class ForgeFile(
 @JvmInline
 value class ForgeFileId(val value: String) {
     companion object {
-        fun generate(): ForgeFileId = ForgeFileId(java.util.UUID.randomUUID().toString())
+        fun generate(): ForgeFileId = ForgeFileId(PlatformUtils.randomUuid())
         fun fromPath(path: String): ForgeFileId = ForgeFileId(path)
     }
 }
@@ -311,7 +312,7 @@ data class ForgeSnapshot(
 @JvmInline
 value class ForgeSnapshotId(val value: String) {
     companion object {
-        fun generate(): ForgeSnapshotId = ForgeSnapshotId(java.util.UUID.randomUUID().toString())
+        fun generate(): ForgeSnapshotId = ForgeSnapshotId(PlatformUtils.randomUuid())
         val ROOT = ForgeSnapshotId("root")
     }
 }
@@ -334,7 +335,7 @@ data class ForgePrompt(
 @JvmInline
 value class ForgePromptId(val value: String) {
     companion object {
-        fun generate(): ForgePromptId = ForgePromptId(java.util.UUID.randomUUID().toString())
+        fun generate(): ForgePromptId = ForgePromptId(PlatformUtils.randomUuid())
     }
 }
 
@@ -366,7 +367,7 @@ data class ForgeWorkflow(
 @JvmInline
 value class ForgeWorkflowId(val value: String) {
     companion object {
-        fun generate(): ForgeWorkflowId = ForgeWorkflowId(java.util.UUID.randomUUID().toString())
+        fun generate(): ForgeWorkflowId = ForgeWorkflowId(PlatformUtils.randomUuid())
     }
 }
 
@@ -494,7 +495,7 @@ data class ForgeExecutionResult(
 @JvmInline
 value class ForgeExecutionId(val value: String) {
     companion object {
-        fun generate(): ForgeExecutionId = ForgeExecutionId(java.util.UUID.randomUUID().toString())
+        fun generate(): ForgeExecutionId = ForgeExecutionId(PlatformUtils.randomUuid())
     }
 }
 
@@ -530,7 +531,7 @@ sealed interface CollaborationEvent {
 @JvmInline
 value class ForgeUserId(val value: String) {
     companion object {
-        fun generate(): ForgeUserId = ForgeUserId(java.util.UUID.randomUUID().toString())
+        fun generate(): ForgeUserId = ForgeUserId(PlatformUtils.randomUuid())
     }
 }
 
@@ -562,7 +563,7 @@ data class ForgeArtifact(
 @JvmInline
 value class ForgeArtifactId(val value: String) {
     companion object {
-        fun generate(): ForgeArtifactId = ForgeArtifactId(java.util.UUID.randomUUID().toString())
+        fun generate(): ForgeArtifactId = ForgeArtifactId(PlatformUtils.randomUuid())
     }
 }
 
