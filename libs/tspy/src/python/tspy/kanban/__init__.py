@@ -1,4 +1,5 @@
-"""tspy.kanban — GEPA-evolved kanban coordination for TrikeShed forge solvers.
+"""
+tspy.kanban — GEPA-evolved kanban coordination for TrikeShed forge solvers.
 
 The implementation is evolved by GEPA against operational metrics.
 The seed candidate below is the starting policy string; GEPA mutates it
@@ -7,13 +8,17 @@ toward Pareto-efficient dispatch.
 Uses tspy.keymux for credential keys (lazy env scan, quota tracking) and
 tspy.modelmux for lazy model listing cache. The board pulls real keys
 from keymux and routes models through modelmux.
+
+Card state is persisted to JSON files (Confix-style: cursor gateway for structured trees).
 """
 
 from __future__ import annotations
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, asdict
 from typing import Any, Callable
 import time
 import threading
+import json
+import os
 
 from tspy.keymux import KeyEntry as MuxKeyEntry, KeyStore, get_store
 from tspy.modelmux import ModelMux, get_mux, ModelEntry
@@ -79,6 +84,8 @@ class KanbanBoard:
     Uses tspy.keymux.KeyStore for credential keys and tspy.modelmux.ModelMux
     for lazy model listings. The board tracks real operational metrics from
     actual dispatch events.
+    
+    Card state is persisted to JSON (Confix-style: cursor gateway for structured trees).
     """
 
     def __init__(
@@ -87,9 +94,11 @@ class KanbanBoard:
         cards: list[Card] | None = None,
         store: KeyStore | None = None,
         mux: ModelMux | None = None,
+        state_dir: str = ".tspy/kanban",
     ):
         self._store = store or get_store()
         self._mux = mux or get_mux()
+        self._state_dir = state_dir
         if keys is None:
             keys = self._seed_from_store()
         self.keys: dict[str, KeyEntry] = {k.key_id: k for k in keys}
@@ -99,15 +108,22 @@ class KanbanBoard:
         self.metrics = Metrics()
         self._dispatch_history: list[dict[str, Any]] = []
         self._completed_tasks: list[dict[str, Any]] = []
+        
+        # Ensure state directory exists
+        os.makedirs(self._state_dir, exist_ok=True)
 
     def _seed_from_store(self) -> list[KeyEntry]:
-        """Lazily pull real keys from keymux store (env-scanned) and route
-        models through modelmux for the target solver model."""
+        """Pull real keys from keymux store. Each key represents one quota/instance.
+        
+        Uses modelmux to cache available models per provider via /models endpoint,
+        then assigns the most recent (first in list) model from that provider.
+        """
         entries: list[KeyEntry] = []
         for mk in self._store:
-            # route through modelmux to get the actual solver model
-            model_entry = self._mux.pick("nvidia/nemotron-3-ultra-550b-a55b")
-            model = str(model_entry) if model_entry else ""
+            # Get cached models for this provider (modelmux lazy-fetches via /models)
+            models = self._mux.models(mk.provider)
+            # Use the most recent model (first in list) from cached /models response
+            model = models[0] if models else ""
             entries.append(KeyEntry(
                 key_id=mk.key_id,
                 provider=mk.provider,
@@ -264,6 +280,32 @@ class KanbanBoard:
             "todo": sum(1 for c in self.cards if c.column == "todo"),
         }
 
+    def save(self, path: str | None = None) -> str:
+        """Persist board state to Confix JSON file. Returns the path."""
+        if path is None:
+            path = os.path.join(self._state_dir, "board.json")
+        data = board_to_confix(self)
+        with open(path, "w") as f:
+            json.dump(data, f, indent=2)
+        return path
+
+    def load(self, path: str | None = None) -> bool:
+        """Load board state from Confix JSON file. Returns True if loaded."""
+        if path is None:
+            path = os.path.join(self._state_dir, "board.json")
+        if not os.path.exists(path):
+            return False
+        with open(path) as f:
+            data = json.load(f)
+        restored = confix_to_board(data, self._store, self._mux)
+        self.keys = restored.keys
+        self.cards = restored.cards
+        self.tick_count = restored.tick_count
+        self.metrics = restored.metrics
+        self._dispatch_history = restored._dispatch_history
+        self._completed_tasks = restored._completed_tasks
+        return True
+
 
 def parse_policy(text: str) -> dict[str, Any]:
     """Parse a policy text block into a dict. Handles key=value lines and key: bool."""
@@ -287,3 +329,41 @@ def parse_policy(text: str) -> dict[str, Any]:
             except ValueError:
                 policy[k] = v
     return policy
+
+# ---------------------------------------------------------------------------
+# Confix-style JSON persistence (cursor gateway for structured trees)
+# ---------------------------------------------------------------------------
+
+def board_to_confix(board: KanbanBoard) -> dict:
+    """Serialize board to Confix JSON structure (cursor gateway for structured trees)."""
+    return {
+        "tick_count": board.tick_count,
+        "keys": {k_id: asdict(k) for k_id, k in board.keys.items()},
+        "cards": [asdict(c) for c in board.cards],
+        "metrics": asdict(board.metrics),
+        "dispatch_history": board._dispatch_history,
+        "completed_tasks": board._completed_tasks,
+    }
+
+
+def confix_to_board(data: dict, store=None, mux=None) -> KanbanBoard:
+    """Restore board from Confix JSON structure."""
+    board = KanbanBoard(store=store, mux=mux)
+    board.tick_count = data.get("tick_count", 0)
+    
+    # Restore keys
+    for k_id, k_data in data.get("keys", {}).items():
+        key = KeyEntry(**k_data)
+        board.keys[k_id] = key
+    
+    # Restore cards
+    board.cards = [Card(**c_data) for c_data in data.get("cards", [])]
+    
+    # Restore metrics
+    m_data = data.get("metrics", {})
+    board.metrics = Metrics(**m_data)
+    
+    board._dispatch_history = data.get("dispatch_history", [])
+    board._completed_tasks = data.get("completed_tasks", [])
+    
+    return board

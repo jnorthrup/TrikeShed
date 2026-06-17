@@ -132,7 +132,9 @@ class ModelMux:
         """Check if a model id (provider/model or plain) exists in cache."""
         if "/" in model:
             prov, mid = model.split("/", 1)
-            return mid in self.models(prov)
+            # Check both full string (provider/model) and plain model id
+            models = self.models(prov)
+            return mid in models or model in models
         # plain — check all providers
         for prov in self._store.providers():
             if model in self.models(prov):

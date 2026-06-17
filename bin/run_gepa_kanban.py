@@ -23,11 +23,14 @@ from tspy.modelmux import get_mux
 
 
 # ---------------------------------------------------------------------------
-# Nemotron LM wrapper — bypasses litellm, uses OpenAI client directly
+# Nemotron LM wrapper — uses keymux/modelmux for credentials and model listings
 # ---------------------------------------------------------------------------
 
 class NemotronLM:
-    """OpenAI-compatible LM wrapper for NVIDIA Nemotron via integrate.api.nvidia.com."""
+    """OpenAI-compatible LM wrapper for NVIDIA Nemotron via integrate.api.nvidia.com.
+    
+    Uses tspy.keymux for credential lookup and tspy.modelmux for model routing.
+    """
 
     def __init__(
         self,
@@ -45,12 +48,27 @@ class NemotronLM:
         self._total_tokens_out = 0
         self._cost_lock = threading.Lock()
 
-        api_key = os.environ.get("NVIDIA_API_KEY")
-        if not api_key:
-            raise RuntimeError("NVIDIA_API_KEY not set in environment")
+        # Use keymux to get the NVIDIA API key
+        from tspy.keymux import get_store
+        store = get_store()
+        nvidia_key = store.get("nvidia")
+        if not nvidia_key:
+            raise RuntimeError("No NVIDIA key found in keymux store")
+        self._api_key = nvidia_key.secret
+        self._base_url = nvidia_key.base_url
+
+        # Use modelmux to verify the model is available
+        from tspy.modelmux import get_mux
+        self._mux = get_mux()
+        # Refresh model listings first (lazy fetch from NVIDIA)
+        self._mux.refresh()
+        available = self._mux.has_model(model)
+        if not available:
+            print(f"WARNING: model {model} not found in NVIDIA listings, proceeding anyway")
+
         self._client = OpenAI(
-            base_url="https://integrate.api.nvidia.com/v1",
-            api_key=api_key,
+            base_url=self._base_url,
+            api_key=self._api_key,
         )
         self.completion_kwargs: dict[str, Any] = {
             **({"temperature": temperature} if temperature is not None else {}),
@@ -101,28 +119,34 @@ class NemotronLM:
 def make_board() -> KanbanBoard:
     """Build a board seeded from the real keymux store.
 
-    All keys are assigned nemotron-3-ultra-550b-a55b as the solver model.
-    Falls back to synthetic keys when no env keys are present.
+    Each key from keymux represents one quota/instance.
+    Uses modelmux to cache /models listings per provider, assigns most recent model.
     """
     store = get_store()
     mux = get_mux()
+    
+    # Ensure model listings are cached (lazy fetch via /models)
+    mux.refresh()
 
     real_keys = list(store)
     if real_keys:
-        keys = [
-            KeyEntry(
+        keys = []
+        for mk in real_keys:
+            # Get cached models for this provider (modelmux lazy-fetches via /models)
+            models = mux.models(mk.provider)
+            # Use the most recent model (first in list) from cached /models response
+            model = models[0] if models else ""
+            keys.append(KeyEntry(
                 key_id=mk.key_id,
                 provider=mk.provider,
                 label=mk.provider,
-                model="nvidia/nemotron-3-ultra-550b-a55b",
-            )
-            for mk in real_keys
-        ]
+                model=model,
+            ))
     else:
         # synthetic fallback when no env keys present
         keys = [
             KeyEntry(key_id=f"key-{i}", provider="modelmux",
-                     label=f"solver-{i}", model="nvidia/nemotron-3-ultra-550b-a55b")
+                     label=f"solver-{i}", model="")
             for i in range(8)
         ]
     cards = [
@@ -214,10 +238,14 @@ def main():
 
     # Show the keys and models the board will dispatch with
     store = get_store()
+    mux = get_mux()
+    mux.refresh()
     real_keys = list(store)
-    print(f"\nKeys: {len(real_keys)} providers loaded, all assigned nemotron-3-ultra-550b-a55b")
+    print(f"\nKeys: {len(real_keys)} providers loaded, each key = 1 quota/instance")
     for mk in real_keys:
-        print(f"  {mk.key_id:20s} | {mk.provider:12s} | priority={mk.priority:2d} | free={mk.is_free}")
+        models = mux.models(mk.provider)
+        model = models[0] if models else "(none)"
+        print(f"  {mk.key_id:20s} | {mk.provider:12s} | model: {model}")
     print("=" * 64)
 
     result = optimize_anything(
