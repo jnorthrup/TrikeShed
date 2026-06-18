@@ -8,10 +8,10 @@ pluginManagement {
 
 rootProject.name = "TrikeShed"
 
-// Only include the working modules - exclude broken ones
+// Only include the working modules
 val workingModules = setOf(
     "forge", "forge-api", "forge-ui", "kanban", "keymux", "modelmux", "user-signals",
-    "lcnc", "window-toolkit", "miniduck", "miniduck-memory", "common", "miniduck",
+    "lcnc", "window-toolkit", "miniduck", "miniduck-memory", "common",
     "couch", "couch:viewserver", "htx-client", "tls", "ipfs", "quic", "ngsctp",
     "tiny-btrfs", "kursive", "patl", "concurrency", "dreamer-kmm", "dreamer-dashboard",
     "openapi", "server", "htx-client", "jules-client", "uring", "polyglot", "cmc",
@@ -26,11 +26,9 @@ if (libsDir.exists() && libsDir.isDirectory) {
         .forEach { include(":libs:${it.name}") }
 }
 
-// Include lib_cursor explicitly (skip classfile root and its problematic subprojects)
-include(":libs:classfile:lib_cursor")
-
-// Support hybrid kotlin xvm build if ../xvm exists
-if (java.io.File("../xvm").exists()) {
-    includeBuild("../xvm")
+// Include classfile subprojects if they have proper structure
+if (file("libs/classfile/lib_cursor").exists()) {
+    include(":libs:classfile:lib_cursor")
 }
+
 include(":libs:lcnc")

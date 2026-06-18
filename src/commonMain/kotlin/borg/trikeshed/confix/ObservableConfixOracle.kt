@@ -7,7 +7,7 @@ import borg.trikeshed.lib.*
 // ── ObservableConfixOracle ─────────────────────────────────────────
 //
 // Wraps [ConfixOracleService] with a per-listener subscription chain.
-// Each xvm ConstantPool gets its own ConfixOracleFacade via getFacade(),
+// Each  ConstantPool gets its own ConfixOracleFacade via getFacade(),
 // which gets its own ObservableConfixOracle.
 //
 // Collapsed architecture:
@@ -17,7 +17,7 @@ import borg.trikeshed.lib.*
 //
 // Subscription chain:
 //   addSource() → oracle.build() → _edges bumps → listener fires →
-//   xvm JIT refetches lattice or calls getTypedefChain()
+//    JIT refetches lattice or calls getTypedefChain()
 
 class ObservableConfixOracle(
     /** When true, isA() returns true for completely unclaimed type pairs (both unknown → Class). */
@@ -57,7 +57,7 @@ class ObservableConfixOracle(
 
     // ── public accessors for Java ──────────────────────────────────
 
-    /** The facade to hand to xvm's ConstantPool. */
+    /** The facade to hand to 's ConstantPool. */
     fun getFacade(): ConfixOracleFacade = this
 
     /** Observable edges — subscribe to receive Twin snapshots on every mutation. */

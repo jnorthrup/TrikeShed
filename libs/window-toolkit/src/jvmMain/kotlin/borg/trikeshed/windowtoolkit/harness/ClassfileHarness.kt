@@ -9,9 +9,6 @@ import borg.trikeshed.windowtoolkit.math.j
 import borg.trikeshed.windowtoolkit.ui.applyUniformStyle
 import borg.trikeshed.windowtoolkit.confix.ConfixBlackboardWidget
 import kotlinx.coroutines.runBlocking
-// import org.xvm.activejs.BlackBoardEntry
-// import org.xvm.activejs.ConfixRole
-// import org.xvm.activejs.confixDoc
 
 /**
  * Harness connecting a generic JSON string mapping Classfile coordinate data
@@ -21,8 +18,8 @@ fun buildClassfileDatagridHarness(jsonDump: String): WindowShell {
     val shell = windowContext {
         // 1. Setup the Confix Datagrid representation layer
         confixDatagrid {
-            // val entry = BlackBoardEntry(
-            //     doc = confixDoc(jsonDump),
+            // val entry = ConfixBlackboardEntry(
+            //     doc = ConfixDoc.fromJson(jsonDump),
             //     role = ConfixRole.OBSERVATION
             // )
             // Push entry to render
@@ -48,7 +45,7 @@ fun main() = runBlocking {
           "classfileCoord": "com.example.Demo#<init>",
           "cpIndex": 10,
           "descriptor": "()V",
-          "xvmTypeInfo": "method",
+          "typeInfo": "method",
           "pointcutKind": 12,
           "poolId": 101,
           "activeJsFacet": "Unfaceted"

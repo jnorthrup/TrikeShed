@@ -123,7 +123,7 @@ object TypedefProductionSystem {
      * Drives which bytecode sites get instrumented.
      */
     data class AdjacentRule(
-        val ownerPattern: String,   // "org/xvm/foo/**"
+        val ownerPattern: String,   // "org//foo/**"
         val opcode: Byte,
         val phase: Byte,            // 0=BEFORE, 1=AFTER
         val typedefName: String,

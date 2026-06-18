@@ -57,16 +57,16 @@ data class CardEntity(
         title: String? = null,
         columnId: String? = null,
         order: Int? = null,
-        assignee: String? = null,
-        priority: Int? = null,
+        assigneeParam: String? = null,
+        priorityParam: Int? = null,
         dependencies: List<String>? = null,
         tags: Set<String>? = null,
     ): CardEntity = copy(
         title = title ?: this.title,
         columnId = columnId ?: this.columnId,
         order = order ?: this.order,
-        assignee = assignee ?? this.assignee,
-        priority = priority ?: this.priority,
+        assignee = assigneeParam ?: this.assignee,
+        priority = priorityParam ?: this.priority,
         dependencies = dependencies ?: this.dependencies,
         tags = tags ?: this.tags,
         version = version + 1,
@@ -337,10 +337,12 @@ class KanbanRequestFactory(
         }
 
         // Emit sync event
-        boardEngine.cards.collectOnce { updatedCards ->
+        boardEngine.cards.collectOnce { updatedCards: List<BoardCard> ->
             // Version bump for optimistic locking
             _version++
-            val newEntities = updatedCards.map { it to _cards[it.id]?.copy(version = _version) }
+            val newEntities = updatedCards.map<Pair<BoardCard, CardEntity?>> { card ->
+                card to _cards[card.id]?.copy(version = _version)
+            }
             // In real impl: emit to SharedFlow for UI subscribers
         }
     }

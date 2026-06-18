@@ -13,7 +13,7 @@ class KanbanKeyPool {
         val keyId: String,
         val provider: String,
         val label: String,
-        val modelUrl: String = "",
+        var modelUrl: String = "",
         var lastModel: String? = null,
         var lastUsedMs: Long = 0,
         var accessCount: Long = 0,

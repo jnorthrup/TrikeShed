@@ -33,7 +33,7 @@ class KanbanCoordinator(
     val state: StateFlow<CoordinatorState> = _state.asStateFlow()
 
     private val _events = MutableSharedFlow<KanbanDispatchEvent>(extraBufferCapacity = 128)
-    val events: SharedFlow<KanbanDispatchEvent> = _events.asStateFlow()
+    val events: SharedFlow<KanbanDispatchEvent> = _events.asSharedFlow()
 
     suspend fun tick(policy: DispatchPolicy = parsePolicy(SEED_POLICY)): DispatchResult = mutex.withLock {
         val now = platformUtils.currentTimeMillis()

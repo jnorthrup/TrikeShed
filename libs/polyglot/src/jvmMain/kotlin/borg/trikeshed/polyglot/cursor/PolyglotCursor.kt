@@ -2,7 +2,7 @@ package borg.trikeshed.polyglot.cursor
 
 /**
  * PointcutFacet — taxonomic classification for pointcut interception sites.
- * Replaces org.xvm.cursor.PointcutFacet
+ * Formerly org..cursor.PointcutFacet
  */
 sealed class PointcutFacet {
     object MethodEntry : PointcutFacet()

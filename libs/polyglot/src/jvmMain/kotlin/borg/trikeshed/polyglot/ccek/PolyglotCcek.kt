@@ -4,7 +4,7 @@ import borg.trikeshed.lib.Series
 
 /**
  * FieldSynapse — 24-byte wire protocol frame for pointcut events.
- * Replaces org.xvm.activejs.ccek.FieldSynapse
+ * Formerly org..activejs.ccek.FieldSynapse
  */
 data class FieldSynapse(
     val phase: Byte,         // BEFORE=0 / AFTER=1
@@ -27,7 +27,7 @@ data class FieldSynapse(
 
 /**
  * PointcutEventProducer — emits FieldSynapse to a ring buffer / fanout.
- * Replaces org.xvm.activejs.ccek.PointcutEventProducer
+ * Formerly org..activejs.ccek.PointcutEventProducer
  */
 interface PointcutEventProducer {
     fun emit(synapse: FieldSynapse)

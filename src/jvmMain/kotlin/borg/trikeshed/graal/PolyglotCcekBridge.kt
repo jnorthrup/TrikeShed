@@ -16,7 +16,7 @@ class PolyglotPointcutEmitter {
         callsiteHash: Int,
         templateIdx: Int
     ) {
-        // Stub - no-op without xvm
+        // Stub - no-op without 
     }
 }
 

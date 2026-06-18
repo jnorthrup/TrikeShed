@@ -141,3 +141,32 @@ Read this as:
 4. purity means transforms read like projections, selections, joins, and ranges
 5. side effects belong at the userspace boundary with explicit lifecycle and fanout
 6. the goal is dense readable composition, not ceremonial abstraction
+
+# REFACTOR RECIPES
+
+## alpha xform 
+
+```kotlin
+         val supers = o.lattice.supertypes(cursor)
+         // Cursor → Series → MetaSeries → Join (at minimum)
+-        val superNames = (0 until supers.size).map { o.tdNames(supers[it]) }
++        val superNames = supers .α { o.tdNames(it) }
+         assertTrue("Series" in superNames || "MetaSeries" in superNames || "Join" in superNames,
+            "Expected at least one transitive supertype, got: $superNames")
+```
+
+
+## looping with views
+
+```kotlin
+         // params preserved
+         var tupleEntry: TypeDefEntry? = null
+-        for (i in 0 until o.entries.size){
+-            val e = o.entries[i]
++        for (e in o.entries.view)
+             if (e.name == "Tuple") { tupleEntry = e; break }
+-            }      
+         assertNotNull(tupleEntry)
+         
+
+ ```

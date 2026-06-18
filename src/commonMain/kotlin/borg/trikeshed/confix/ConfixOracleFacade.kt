@@ -11,8 +11,8 @@ import borg.trikeshed.cursor.*
 // The old parallel path (getStepTarget → resolveTypedefs → getLattice → sentinel)
 // collapses to a single getTypedefChain() call. isA() is unchanged.
 //
-// Usage from xvm Java:
-//   int[] chain = facade.getTypedefChain("org/xvm/asm", "Join");
+// Usage from  Java:
+//   int[] chain = facade.getTypedefChain("org//asm", "Join");
 //   // chain[0] = poolIdx of "Join"
 //   // chain[1..n] = poolIdx of each typedef hop
 //   // chain[n+1] = poolIdx of terminal (no more hops)
@@ -26,7 +26,7 @@ interface ConfixOracleFacade {
      * Returns pool indices from the typedef alias to its terminal type,
      * in order. The caller uses these indices to reconstruct the staircase.
      *
-     * @param modulePath  e.g. "org/xvm/asm"
+     * @param modulePath  e.g. "org//asm"
      * @param typeName    e.g. "Join" or "Cursor"
      * @return pool indices: [alias, step1, step2, ..., terminal]
      *         Empty array if the type is not a typedef or not in the oracle.

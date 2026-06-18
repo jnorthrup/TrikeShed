@@ -225,7 +225,6 @@ class ChunkedImpl<T>(
     private var isFrozen: Boolean = false,
     private val chunkSize: Int = 1024,
 ) : MutableSeriesImpl<T> {
-    // TODO: implement chunked storage for large series
     override val size: Int get() = chunks.sumOf { it.size }
     override fun append(item: T): MutableSeries<T> = TODO()
     override fun get(index: Int): T = TODO()
@@ -241,3 +240,160 @@ class ChunkedImpl<T>(
     override fun concat(other: MutableSeries<T>): MutableSeries<T> = TODO()
     override fun sequence(): Sequence<T> = TODO()
 }
+
+/** ──────────────────────────────────────────────────────────────────────────
+ *  BACKWARDS COMPATIBILITY: CowSeriesHandle, CowSeriesBody
+ *  These are the old API names, delegating to the new MutableSeries API.
+ *  ────────────────────────────────────────────────────────────────────────── */
+
+/**
+ * CowSeriesBody — the immutable letter (old API name).
+ * 
+ * Backed by Array<Any?> — copy-on-write semantics: every mutator returns a fresh
+ * body with a copied array. Now delegating to FrozenArrayImpl.
+ */
+@Deprecated("Use FrozenSeriesImpl / FrozenArrayImpl instead", replaceWith = ReplaceWith("FrozenArrayImpl<T>"))
+class CowSeriesBody<T>(
+    private val arr: Array<Any?> = emptyArray(),
+) : Join<Int, (Int) -> T> {
+
+    override val a: Int get() = arr.size
+    @Suppress("UNCHECKED_CAST")
+    override val b: (Int) -> T = { i -> arr[i] as T }
+
+    fun set(index: Int, item: T): CowSeriesBody<T> {
+        val copy = arr.copyOf()
+        copy[index] = item
+        return CowSeriesBody(copy)
+    }
+
+    /** Append at the tail. */
+    fun add(item: T): CowSeriesBody<T> = insert(arr.size, item)
+
+    /** Insert at [index], shifting the tail right. */
+    fun insert(index: Int, item: T): CowSeriesBody<T> {
+        val copy = Array<Any?>(arr.size + 1) { i ->
+            when {
+                i < index -> arr[i]
+                i == index -> item
+                else -> arr[i - 1]
+            }
+        }
+        return CowSeriesBody(copy)
+    }
+
+    fun removeAt(index: Int): CowSeriesBody<T> {
+        val copy = Array<Any?>(arr.size - 1) { i ->
+            if (i < index) arr[i] else arr[i + 1]
+        }
+        return CowSeriesBody(copy)
+    }
+
+    /** Remove the first element equal to [item]; returns this unchanged if absent. */
+    fun remove(item: T): CowSeriesBody<T> {
+        val i = arr.indexOfFirst { it == item }
+        return if (i >= 0) removeAt(i) else this
+    }
+
+    fun clear(): CowSeriesBody<T> = CowSeriesBody(emptyArray())
+
+    companion object {
+        fun <T> of(vararg items: T): CowSeriesBody<T> =
+            CowSeriesBody(arrayOf(*items))
+    }
+}
+
+/**
+ * Canonical (all-caps) spelling retained for source compatibility with the `lib/` lineage.
+ * CowSeriesBody and COWSeriesBody denote the same type.
+ */
+@Deprecated("Use CowSeriesBody instead")
+typealias COWSeriesBody<T> = CowSeriesBody<T>
+
+/**
+ * CowSeriesHandle — Copy-on-write envelope with a flat [CowSeriesBody] letter.
+ * 
+ * Read: O(1), aaload + checkcast.
+ * Write: O(n) arraycopy — the body is swapped atomically.
+ * Observer fires `old j new` on every swap — the transition is a [Twin].
+ * 
+ * Deprecated: Use MutableSeries / MutableSeriesImpl instead.
+ */
+@Deprecated("Use MutableSeries / MutableSeriesImpl instead", replaceWith = ReplaceWith("MutableSeries<T>"))
+class CowSeriesHandle<T>(
+    private var letter: CowSeriesBody<T>,
+    private var observer: ((Twin<Series<T>>) -> Unit)? = null,
+    private var versionObserver: ((Twin<Long>) -> Unit)? = null,
+) : MutableSeries<T> {
+
+    private var version: Long = 0L
+
+    override val a: Int get() = letter.a
+    @Suppress("UNCHECKED_CAST")
+    override val b: (Int) -> T = { i -> letter.b(i) }
+
+    override fun set(index: Int, item: T) {
+        val old = letter
+        letter = old.set(index, item)
+        bumpVersion(old)
+    }
+
+    override fun add(item: T) {
+        val old = letter
+        letter = old.add(item)
+        bumpVersion(old)
+    }
+
+    override fun add(index: Int, item: T) {
+        val old = letter
+        letter = old.insert(index, item)
+        bumpVersion(old)
+    }
+
+    override fun removeAt(index: Int): T {
+        val old = letter
+        val removed = old.b(index)
+        letter = old.removeAt(index)
+        bumpVersion(old)
+        return removed
+    }
+
+    override fun remove(item: T): Boolean {
+        val old = letter
+        val i = (0 until old.a).firstOrNull { old.b(it) == item } ?: return false
+        letter = old.removeAt(i)
+        bumpVersion(old)
+        return true
+    }
+
+    override fun clear() {
+        val old = letter
+        letter = old.clear()
+        bumpVersion(old)
+    }
+
+    override fun plus(item: T): MutableSeries<T> { add(item); return this }
+    override fun minus(item: T): MutableSeries<T> { remove(item); return this }
+    override fun plusAssign(item: T) { add(item) }
+    override fun minusAssign(item: T) { remove(item) }
+
+    private fun bumpVersion(old: CowSeriesBody<T>) {
+        val oldVer = version
+        version = oldVer + 1
+        observer?.invoke(old j letter)
+        versionObserver?.invoke(Twin(oldVer, version))
+    }
+
+    /** Subscribe to copy-on-write snapshots. */
+    fun subscribe(f: (Twin<Series<T>>) -> Unit): () -> Unit {
+        val prior = observer
+        observer = f
+        return { observer = prior }
+    }
+
+    /** Current version number. Increments on every mutation. */
+    fun version(): Long = version
+}
+
+/** Backwards compatibility factory. */
+fun <T> cowSeriesHandle(): CowSeriesHandle<T> = CowSeriesHandle(CowSeriesBody())

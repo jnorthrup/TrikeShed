@@ -4,7 +4,7 @@ import borg.trikeshed.lib.Series
 
 /**
  * PointcutFacet — taxonomic classification for pointcut interception sites.
- * Local replacement for org.xvm.cursor.PointcutFacet
+ * Formerly org..cursor.PointcutFacet
  */
 sealed class PointcutFacet {
     object MethodEntry : PointcutFacet()

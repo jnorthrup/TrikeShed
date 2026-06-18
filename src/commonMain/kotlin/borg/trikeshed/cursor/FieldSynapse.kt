@@ -26,7 +26,7 @@ data class FieldSynapse(
     val isSet: Boolean get() = (opcode.toInt() and 0xFF) == 0xA6 || (opcode.toInt() and 0xFF) == 0xA8
 
     companion object {
-        // Template indices (set by InternPool in xvm's FieldSynapse)
+        // Template indices (set by InternPool)
         const val TPL_BEFORE_GET = 0
         const val TPL_AFTER_GET  = 1
         const val TPL_BEFORE_SET = 2

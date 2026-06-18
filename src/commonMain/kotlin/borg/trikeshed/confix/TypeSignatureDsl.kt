@@ -10,19 +10,19 @@ import borg.trikeshed.cursor.*
 // Example usage:
 // ```
 // val patches = typeSignature {
-//     module("org/xvm/asm/Constants") {
+//     module("org//asm/Constants") {
 //         typedef("Join") implies "Tuple"
 //         typedef("Cursor") implies "Series"
 //         typedef("Twin<T>") implies "Join<T,T>"
 //     }
-//     module("org/xvm/asm/Ops") {
+//     module("org//asm/Ops") {
 //         typedef("Add") implies "Op"
 //     }
 // }
 //
 // // Hand to background agent
 // delegate_task(
-//     goal = "Apply these typedef patches to the xvm ConstantPool",
+//     goal = "Apply these typedef patches to the  ConstantPool",
 //     context = patches.toJson()
 // )
 // ```
@@ -72,7 +72,7 @@ data class TypedefPatch(
  *
  * ```kotlin
  * typeSignature {
- *     module("org/xvm/asm/Constants") { ... }
+ *     module("org//asm/Constants") { ... }
  * }
  * ```
  */
@@ -82,7 +82,7 @@ class TypeSignatureBuilder {
 
     /**
      * Declare a module's typedefs.
-     * @param path e.g. "org/xvm/asm/Constants"
+     * @param path e.g. "org//asm/Constants"
      * @param block  typedef builder block
      */
     fun module(path: String, block: TypedefBuilder.() -> Unit) {
@@ -156,7 +156,7 @@ class TypedefBuilder(private val modulePath: String) {
  *
  * ```kotlin
  * val spec = typeSignature {
- *     module("org/xvm/asm/Constants") {
+ *     module("org//asm/Constants") {
  *         typedef("Join<T,T>") implies "Twin<T>"
  *         "Series<RowVec>" implies "Cursor"
  *     }

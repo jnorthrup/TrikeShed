@@ -2,210 +2,210 @@
 package borg.trikeshed.lib
 
 import borg.trikeshed.mutable.MutableSeries
+import borg.trikeshed.mutable.CowArrayImpl
 
 /**
  * Primitive-specialized MutableSeries for Double.
  * Avoids boxing by using DoubleArray internally.
  */
-class DoubleSeries(private var data: DoubleArray = DoubleArray(32)) : MutableSeries<Double> {
-    private var _size = 0
+class DoubleSeries : MutableSeries<Double> {
+    private val impl = CowArrayImpl<Double>()
 
-    override val a: Int get() = _size
-    override val b: (Int) -> Double = { i -> data[i] }
+    override val size: Int get() = impl.size
+    override val a: Int get() = impl.a
+    override val b: (Int) -> Double = impl.b
 
-    override fun set(index: Int, item: Double) {
-        require(index in 0 until _size)
-        data[index] = item
-    }
+    override fun append(item: Double): MutableSeries<Double> = impl.append(item)
+    override fun get(index: Int): Double = impl.get(index)
+    override fun set(index: Int, item: Double): MutableSeries<Double> = impl.set(index, item)
+    override fun add(item: Double): MutableSeries<Double> = impl.add(item)
+    override fun add(index: Int, item: Double): MutableSeries<Double> = impl.add(index, item)
+    override fun removeAt(index: Int): Double = impl.removeAt(index)
+    override fun remove(item: Double): Boolean = impl.remove(item)
+    override fun clear(): MutableSeries<Double> = impl.clear()
 
-    override fun add(item: Double) {
-        if (_size == data.size) data = data.copyOf(_size * 2)
-        data[_size++] = item
-    }
+    override fun plus(item: Double): MutableSeries<Double> = impl.plus(item)
+    override fun minus(item: Double): MutableSeries<Double> = impl.minus(item)
+    override fun plusAssign(item: Double) { impl.plusAssign(item) }
+    override fun minusAssign(item: Double) { impl.minusAssign(item) }
 
-    override fun add(index: Int, item: Double) {
-        require(index in 0.._size)
-        if (_size == data.size) data = data.copyOf(_size * 2)
-        for (i in _size downTo index + 1) data[i] = data[i - 1]
-        data[index] = item
-        _size++
-    }
+    override fun iterator(): Iterator<Double> = impl.iterator()
+    override fun sequence(): Sequence<Double> = impl.sequence()
+    override fun concat(other: MutableSeries<Double>): MutableSeries<Double> = impl.concat(other)
 
-    override fun removeAt(index: Int): Double {
-        require(index in 0 until _size)
-        val removed = data[index]
-        for (i in index until _size - 1) data[i] = data[i + 1]
-        data[--_size] = 0.0
-        return removed
-    }
+    operator fun get(index: Int): Double = impl.get(index)
+    override fun set(index: Int, item: Double) { impl.set(index, item) }
+    override fun add(item: Double) { impl.add(item) }
+    override fun add(index: Int, item: Double) { impl.add(index, item) }
+    override fun removeAt(index: Int): Double = impl.removeAt(index)
+    override fun remove(item: Double): Boolean = impl.remove(item)
+    override fun clear() { impl.clear() }
+    override fun plus(item: Double): MutableSeries<Double> { impl.add(item); return this }
+    override fun minus(item: Double): MutableSeries<Double> { impl.remove(item); return this }
+    override fun plusAssign(item: Double) { impl.plusAssign(item) }
+    override fun minusAssign(item: Double) { impl.minusAssign(item) }
 
-    override fun remove(item: Double): Boolean {
-        val i = (0 until _size).firstOrNull { data[it] == item } ?: return false
-        removeAt(i)
-        return true
-    }
+    override val size: Int get() = impl.size
+    override val a: Int get() = impl.a
+    override val b: (Int) -> Double = impl.b
 
-    override fun clear() { _size = 0 }
-
-    override fun plus(item: Double): MutableSeries<Double> { add(item); return this }
-    override fun minus(item: Double): MutableSeries<Double> { remove(item); return this }
-    override fun plusAssign(item: Double) { add(item) }
-    override fun minusAssign(item: Double) { remove(item) }
-
-    operator fun get(index: Int): Double = data[index]
+    override fun freeze(): MutableSeries<Double> = impl.freeze()
+    override fun cowUpdate(index: Int, item: Double): MutableSeries<Double> = impl.cowUpdate(index, item)
+    override fun cowSnapshot(): MutableSeries<Double> = impl.cowSnapshot()
+    override fun insert(index: Int, item: Double): MutableSeries<Double> = impl.insert(index, item)
+    override fun removeAt(index: Int): Pair<MutableSeries<Double>, Double> = impl.removeAt(index)
+    override fun remove(item: Double): Boolean = impl.remove(item)
+    override fun clear(): MutableSeries<Double> { impl.clear(); return this }
+    override fun iterator(): Iterator<Double> = impl.iterator()
+    override fun concat(other: MutableSeries<Double>): MutableSeries<Double> = impl.concat(other)
+    override fun sequence(): Sequence<Double> = impl.sequence()
+    override fun set(index: Int, item: Double): MutableSeries<Double> { this[index] = item; return this }
+    override fun get(index: Int): Double = impl.get(index)
 }
 
 /**
  * Primitive-specialized MutableSeries for Long.
  */
-class LongBackingSeries(private var data: LongArray = LongArray(32)) : MutableSeries<Long> {
-    private var _size = 0
+class LongBackingSeries : MutableSeries<Long> {
+    private val impl = CowArrayImpl<Long>()
 
-    override val a: Int get() = _size
-    override val b: (Int) -> Long = { i -> data[i] }
+    override val size: Int get() = impl.size
+    override val a: Int get() = impl.a
+    override val b: (Int) -> Long = impl.b
 
-    override fun set(index: Int, item: Long) {
-        require(index in 0 until _size)
-        data[index] = item
-    }
+    override fun append(item: Long): MutableSeries<Long> = impl.append(item)
+    override fun get(index: Int): Long = impl.get(index)
+    override fun set(index: Int, item: Long): MutableSeries<Long> = impl.set(index, item)
+    override fun add(item: Long): MutableSeries<Long> = impl.add(item)
+    override fun add(index: Int, item: Long): MutableSeries<Long> = impl.add(index, item)
+    override fun removeAt(index: Int): Long = impl.removeAt(index)
+    override fun remove(item: Long): Boolean = impl.remove(item)
+    override fun clear(): MutableSeries<Long> = impl.clear()
+    override fun plus(item: Long): MutableSeries<Long> = impl.plus(item)
+    override fun minus(item: Long): MutableSeries<Long> = impl.minus(item)
+    override fun plusAssign(item: Long) { impl.plusAssign(item) }
+    override fun minusAssign(item: Long) { impl.minusAssign(item) }
+    override fun iterator(): Iterator<Long> = impl.iterator()
+    override fun sequence(): Sequence<Long> = impl.sequence()
+    override fun concat(other: MutableSeries<Long>): MutableSeries<Long> = impl.concat(other)
 
-    override fun add(item: Long) {
-        if (_size == data.size) data = data.copyOf(_size * 2)
-        data[_size++] = item
-    }
+    override fun freeze(): MutableSeries<Long> = impl.freeze()
+    override fun cowUpdate(index: Int, item: Long): MutableSeries<Long> = impl.cowUpdate(index, item)
+    override fun cowSnapshot(): MutableSeries<Long> = impl.cowSnapshot()
+    override fun insert(index: Int, item: Long): MutableSeries<Long> = impl.insert(index, item)
+    override fun removeAt(index: Int): Pair<MutableSeries<Long>, Long> = impl.removeAt(index)
+    override fun remove(item: Long): Boolean = impl.remove(item)
+    override fun clear(): MutableSeries<Long> { impl.clear(); return this }
+    override fun concat(other: MutableSeries<Long>): MutableSeries<Long> = impl.concat(other)
+    override fun sequence(): Sequence<Long> = impl.sequence()
 
-    override fun add(index: Int, item: Long) {
-        require(index in 0.._size)
-        if (_size == data.size) data = data.copyOf(_size * 2)
-        for (i in _size downTo index + 1) data[i] = data[i - 1]
-        data[index] = item
-        _size++
-    }
+    override val size: Int get() = impl.size
+    override val a: Int get() = impl.a
+    override val b: (Int) -> Long = impl.b
 
-    override fun removeAt(index: Int): Long {
-        require(index in 0 until _size)
-        val removed = data[index]
-        for (i in index until _size - 1) data[i] = data[i + 1]
-        data[--_size] = 0L
-        return removed
-    }
-
-    override fun remove(item: Long): Boolean {
-        val i = (0 until _size).firstOrNull { data[it] == item } ?: return false
-        removeAt(i)
-        return true
-    }
-
-    override fun clear() { _size = 0 }
-
-    override fun plus(item: Long): MutableSeries<Long> { add(item); return this }
-    override fun minus(item: Long): MutableSeries<Long> { remove(item); return this }
-    override fun plusAssign(item: Long) { add(item) }
-    override fun minusAssign(item: Long) { remove(item) }
-
-    operator fun get(index: Int): Long = data[index]
+    operator fun get(index: Int): Long = impl.get(index)
+    override fun set(index: Int, item: Long): MutableSeries<Long> = impl.set(index, item)
+    override fun add(item: Long) { impl.add(item) }
+    override fun add(index: Int, item: Long) { impl.add(index, item) }
+    override fun removeAt(index: Int): Long = impl.removeAt(index)
+    override fun remove(item: Long): Boolean = impl.remove(item)
+    override fun clear() { impl.clear() }
 }
 
 /**
  * Primitive-specialized MutableSeries for Int.
  */
-class IntSeries(private var data: IntArray = IntArray(32)) : MutableSeries<Int> {
-    private var _size = 0
+class IntSeries : MutableSeries<Int> {
+    private val impl = CowArrayImpl<Int>()
 
-    override val a: Int get() = _size
-    override val b: (Int) -> Int = { i -> data[i] }
+    override val size: Int get() = impl.size
+    override val a: Int get() = impl.a
+    override val b: (Int) -> Int = impl.b
 
-    override fun set(index: Int, item: Int) {
-        require(index in 0 until _size)
-        data[index] = item
-    }
+    override fun append(item: Int): MutableSeries<Int> = impl.append(item)
+    override fun get(index: Int): Int = impl.get(index)
+    override fun set(index: Int, item: Int): MutableSeries<Int> = impl.set(index, item)
+    override fun add(item: Int): MutableSeries<Int> = impl.add(item)
+    override fun add(index: Int, item: Int): MutableSeries<Int> = impl.add(index, item)
+    override fun removeAt(index: Int): Int = impl.removeAt(index)
+    override fun remove(item: Int): Boolean = impl.remove(item)
+    override fun clear(): MutableSeries<Int> = impl.clear()
+    override fun plus(item: Int): MutableSeries<Int> = impl.plus(item)
+    override fun minus(item: Int): MutableSeries<Int> = impl.minus(item)
+    override fun plusAssign(item: Int) { impl.plusAssign(item) }
+    override fun minusAssign(item: Int) { impl.minusAssign(item) }
+    override fun iterator(): Iterator<Int> = impl.iterator()
+    override fun sequence(): Sequence<Int> = impl.sequence()
+    override fun concat(other: MutableSeries<Int>): MutableSeries<Int> = impl.concat(other)
+    override fun freeze(): MutableSeries<Int> = impl.freeze()
+    override fun cowUpdate(index: Int, item: Int): MutableSeries<Int> = impl.cowUpdate(index, item)
+    override fun cowSnapshot(): MutableSeries<Int> = impl.cowSnapshot()
+    override fun insert(index: Int, item: Int): MutableSeries<Int> = impl.insert(index, item)
+    override fun removeAt(index: Int): Pair<MutableSeries<Int>, Int> = impl.removeAt(index)
+    override fun remove(item: Int): Boolean = impl.remove(item)
+    override fun clear(): MutableSeries<Int> { impl.clear(); return this }
+    override fun concat(other: MutableSeries<Int>): MutableSeries<Int> = impl.concat(other)
+    override fun sequence(): Sequence<Int> = impl.sequence()
 
-    override fun add(item: Int) {
-        if (_size == data.size) data = data.copyOf(_size * 2)
-        data[_size++] = item
-    }
+    override val size: Int get() = impl.size
+    override val a: Int get() = impl.a
+    override val b: (Int) -> Int = impl.b
 
-    override fun add(index: Int, item: Int) {
-        require(index in 0.._size)
-        if (_size == data.size) data = data.copyOf(_size * 2)
-        for (i in _size downTo index + 1) data[i] = data[i - 1]
-        data[index] = item
-        _size++
-    }
-
-    override fun removeAt(index: Int): Int {
-        require(index in 0 until _size)
-        val removed = data[index]
-        for (i in index until _size - 1) data[i] = data[i + 1]
-        data[--_size] = 0
-        return removed
-    }
-
-    override fun remove(item: Int): Boolean {
-        val i = (0 until _size).firstOrNull { data[it] == item } ?: return false
-        removeAt(i)
-        return true
-    }
-
-    override fun clear() { _size = 0 }
-
-    override fun plus(item: Int): MutableSeries<Int> { add(item); return this }
-    override fun minus(item: Int): MutableSeries<Int> { remove(item); return this }
-    override fun plusAssign(item: Int) { add(item) }
-    override fun minusAssign(item: Int) { remove(item) }
-
-    operator fun get(index: Int): Int = data[index]
+    operator fun get(index: Int): Int = impl.get(index)
+    override fun set(index: Int, item: Int): MutableSeries<Int> = impl.set(index, item)
+    override fun add(item: Int) { impl.add(item) }
+    override fun add(index: Int, item: Int) { impl.add(index, item) }
+    override fun removeAt(index: Int): Int = impl.removeAt(index)
+    override fun remove(item: Int): Boolean = impl.remove(item)
+    override fun clear() { impl.clear() }
 }
 
 /**
  * Primitive-specialized MutableSeries for Float.
  */
-class FloatSeries(private var data: FloatArray = FloatArray(32)) : MutableSeries<Float> {
-    private var _size = 0
+class FloatSeries : MutableSeries<Float> {
+    private val impl = CowArrayImpl<Float>()
 
-    override val a: Int get() = _size
-    override val b: (Int) -> Float = { i -> data[i] }
+    override val size: Int get() = impl.size
+    override val a: Int get() = impl.a
+    override val b: (Int) -> Float = impl.b
 
-    override fun set(index: Int, item: Float) {
-        require(index in 0 until _size)
-        data[index] = item
-    }
+    override fun append(item: Float): MutableSeries<Float> = impl.append(item)
+    override fun get(index: Int): Float = impl.get(index)
+    override fun set(index: Int, item: Float): MutableSeries<Float> = impl.set(index, item)
+    override fun add(item: Float): MutableSeries<Float> = impl.add(item)
+    override fun add(index: Int, item: Float): MutableSeries<Float> = impl.add(index, item)
+    override fun removeAt(index: Int): Float = impl.removeAt(index)
+    override fun remove(item: Float): Boolean = impl.remove(item)
+    override fun clear(): MutableSeries<Float> = impl.clear()
+    override fun plus(item: Float): MutableSeries<Float> = impl.plus(item)
+    override fun minus(item: Float): MutableSeries<Float> = impl.minus(item)
+    override fun plusAssign(item: Float) { impl.plusAssign(item) }
+    override fun minusAssign(item: Float) { impl.minusAssign(item) }
+    override fun iterator(): Iterator<Float> = impl.iterator()
+    override fun sequence(): Sequence<Float> = impl.sequence()
+    override fun concat(other: MutableSeries<Float>): MutableSeries<Float> = impl.concat(other)
+    override fun freeze(): MutableSeries<Float> = impl.freeze()
+    override fun cowUpdate(index: Int, item: Float): MutableSeries<Float> = impl.cowUpdate(index, item)
+    override fun cowSnapshot(): MutableSeries<Float> = impl.cowSnapshot()
+    override fun insert(index: Int, item: Float): MutableSeries<Float> = impl.insert(index, item)
+    override fun removeAt(index: Int): Pair<MutableSeries<Float>, Float> = impl.removeAt(index)
+    override fun remove(item: Float): Boolean = impl.remove(item)
+    override fun clear(): MutableSeries<Float> { impl.clear(); return this }
+    override fun concat(other: MutableSeries<Float>): MutableSeries<Float> = impl.concat(other)
+    override fun sequence(): Sequence<Float> = impl.sequence()
 
-    override fun add(item: Float) {
-        if (_size == data.size) data = data.copyOf(_size * 2)
-        data[_size++] = item
-    }
+    override val size: Int get() = impl.size
+    override val a: Int get() = impl.a
+    override val b: (Int) -> Float = impl.b
 
-    override fun add(index: Int, item: Float) {
-        require(index in 0.._size)
-        if (_size == data.size) data = data.copyOf(_size * 2)
-        for (i in _size downTo index + 1) data[i] = data[i - 1]
-        data[index] = item
-        _size++
-    }
-
-    override fun removeAt(index: Int): Float {
-        require(index in 0 until _size)
-        val removed = data[index]
-        for (i in index until _size - 1) data[i] = data[i + 1]
-        data[--_size] = 0.0f
-        return removed
-    }
-
-    override fun remove(item: Float): Boolean {
-        val i = (0 until _size).firstOrNull { data[it] == item } ?: return false
-        removeAt(i)
-        return true
-    }
-
-    override fun clear() { _size = 0 }
-
-    override fun plus(item: Float): MutableSeries<Float> { add(item); return this }
-    override fun minus(item: Float): MutableSeries<Float> { remove(item); return this }
-    override fun plusAssign(item: Float) { add(item) }
-    override fun minusAssign(item: Float) { remove(item) }
-
-    operator fun get(index: Int): Float = data[index]
+    operator fun get(index: Int): Float = impl.get(index)
+    override fun set(index: Int, item: Float): MutableSeries<Float> = impl.set(index, item)
+    override fun add(item: Float) { impl.add(item) }
+    override fun add(index: Int, item: Float) { impl.add(index, item) }
+    override fun removeAt(index: Int): Float = impl.removeAt(index)
+    override fun remove(item: Float): Boolean = impl.remove(item)
+    override fun clear() { impl.clear() }
 }
 
 /** Type alias bridging from columnar naming to cursor/kernel naming. */

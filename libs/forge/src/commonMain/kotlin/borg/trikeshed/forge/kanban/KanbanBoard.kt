@@ -77,10 +77,15 @@ class KanbanBoardEngine(
     fun startLoop(): Job = coordinator.startLoop(scope)
 }
 
-enum class BoardColumn(val ordinalValue: Int) { TODO(0), DOING(1), DONE(2), BLOCKED(3) {
-    companion object { fun fromName(name: String) = entries.find { it.name.equals(name, ignoreCase = true) } ?: TODO }
+enum class BoardColumn(val ordinalValue: Int) {
+    TODO(0), DOING(1), DONE(2), BLOCKED(3);
+
+    companion object {
+        fun fromName(name: String) = entries.find { it.name.equals(name, ignoreCase = true) } ?: TODO
+    }
+
     fun logHandle() = "C$ordinalValue"
-} }
+}
 
 @Serializable
 data class BoardCard(

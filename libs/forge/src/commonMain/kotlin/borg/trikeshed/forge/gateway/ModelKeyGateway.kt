@@ -20,7 +20,12 @@ enum class GatewayProtocol { HTTP, WS, IPC, IPFS, GIT_CAS, ENV_FILE }
 
 @Serializable data class ModelEntry(val id: String, val provider: String, val name: String, val contextWindow: Int = 0, val available: Boolean = true)
 @Serializable data class KeyEntry(val keyId: String, val provider: String, val baseUrl: String = "", val label: String = "", val free: Boolean = false, val priority: Int = 0)
-@Serializable data class UsageMetrics(val requestsByProvider:Map<String,Long>=emptyMap(), val errorsByProvider:Map<String,Long>=emptyMap(), val avgLatencyByProvider:Map<String,Double>=emptyMap(), val timestampMs:Long=platformUtils.currentTimeMillis())
+@Serializable data class UsageMetrics(
+    val requestsByProvider: Map<String, Long> = emptyMap(),
+    val errorsByProvider: Map<String, Long> = emptyMap(),
+    val avgLatencyByProvider: Map<String, Double> = emptyMap(),
+    val timestampMs: Long = platformUtils.currentTimeMillis(),
+)
 @Serializable data class GatewayHealth(val alive:Boolean, val protocol:String, val latencyMs:Long, val message:String?=null)
 
 interface ContentAddressedStore {

@@ -9,7 +9,7 @@ import java.util.Collections
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
 
-// Opcode constants (matching xvm FieldSynapse wire protocol) - top-level for accessibility
+// Opcode constants (matching FieldSynapse wire protocol) - top-level for accessibility
 const val OP_L_GET = 0xA5.toByte()
 const val OP_L_SET = 0xA6.toByte()
 const val OP_P_GET = 0xA7.toByte()

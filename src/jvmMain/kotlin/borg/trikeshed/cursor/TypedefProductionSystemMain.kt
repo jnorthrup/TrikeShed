@@ -14,13 +14,13 @@ object TypedefProductionSystemMain {
 
         // ── 1. Register AdjacentRule algebra ──────────────────────────
 
-        // Rule: trace all CALL sites on org.xvm.types.* typedefs
+        // Rule: trace all CALL sites on org..types.* typedefs
         TypedefProductionSystem.addRule(
             TypedefProductionSystem.AdjacentRule(
-                ownerPattern = "org/xvm/types/**",
+                ownerPattern = "org//types/**",
                 opcode = TypedefProductionSystem.OP_CALL,
                 phase = 0,  // BEFORE
-                typedefName = "org.xvm.types.Chain",
+                typedefName = "org..types.Chain",
                 depth = 2,
                 methodFilter = "*"
             )
@@ -32,28 +32,28 @@ object TypedefProductionSystemMain {
                 ownerPattern = "**",
                 opcode = TypedefProductionSystem.OP_PROPERTY,
                 phase = 0,
-                typedefName = "org.xvm.types.Any",
+                typedefName = "org..types.Any",
                 depth = 1,
                 methodFilter = "get*"
             )
         )
 
-        // Rule: trace ALLOC sites on org.xvm.collections.*
+        // Rule: trace ALLOC sites on org..collections.*
         TypedefProductionSystem.addRule(
             TypedefProductionSystem.AdjacentRule(
-                ownerPattern = "org/xvm/collections/**",
+                ownerPattern = "org//collections/**",
                 opcode = TypedefProductionSystem.OP_ALLOC,
                 phase = 0,
-                typedefName = "org.xvm.collections.List",
+                typedefName = "org..collections.List",
                 depth = 3,
                 methodFilter = "*"
             )
         )
 
         println("Rules registered: 3")
-        println("  CALL   org/xvm/types/**        depth=2")
+        println("  CALL   org//types/**        depth=2")
         println("  PROP   **                       depth=1, method=get*")
-        println("  ALLOC  org/xvm/collections/**  depth=3")
+        println("  ALLOC  org//collections/**  depth=3")
         println()
 
         // ── 2. Wire SlabSubscriber ───────────────────────────────────
@@ -103,9 +103,9 @@ object TypedefProductionSystemMain {
 
         // Simulate CALL events (BEFORE + AFTER pairs)
         val callSites = listOf(
-            Triple("org.xvm.types.Chain", "org.xvm.types.Chain.push", 0x0001),
-            Triple("org.xvm.types.Chain", "org.xvm.types.Chain.pop",  0x0002),
-            Triple("org.xvm.types.Chain", "org.xvm.types.Chain.head", 0x0003),
+            Triple("org..types.Chain", "org..types.Chain.push", 0x0001),
+            Triple("org..types.Chain", "org..types.Chain.pop",  0x0002),
+            Triple("org..types.Chain", "org..types.Chain.head", 0x0003),
         )
 
         for ((typedef, method, site) in callSites) {
@@ -119,8 +119,8 @@ object TypedefProductionSystemMain {
 
         // Simulate PROPERTY events
         val propSites = listOf(
-            Triple("org.xvm.types.Any", "getValue", 0x0010),
-            Triple("org.xvm.types.Any", "getType",  0x0011),
+            Triple("org..types.Any", "getValue", 0x0010),
+            Triple("org..types.Any", "getType",  0x0011),
         )
 
         for ((typedef, method, site) in propSites) {
@@ -134,8 +134,8 @@ object TypedefProductionSystemMain {
 
         // Simulate ALLOC events
         val allocSites = listOf(
-            Triple("org.xvm.collections.List", "", 0x0100),
-            Triple("org.xvm.collections.List", "", 0x0101),
+            Triple("org..collections.List", "", 0x0100),
+            Triple("org..collections.List", "", 0x0101),
         )
 
         for ((typedef, _, site) in allocSites) {

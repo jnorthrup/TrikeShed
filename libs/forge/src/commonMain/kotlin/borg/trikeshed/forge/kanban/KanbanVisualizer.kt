@@ -2,8 +2,8 @@
 
 package borg.trikeshed.forge.kanban
 
-import borg.trikeshed.cursor.CellOverlay
-import borg.trikeshed.cursor.OverlayRole
+import borg.trikeshed.forge.kanban.BoardCard
+import borg.trikeshed.forge.kanban.BoardColumn
 import kotlinx.serialization.Serializable
 
 @Serializable

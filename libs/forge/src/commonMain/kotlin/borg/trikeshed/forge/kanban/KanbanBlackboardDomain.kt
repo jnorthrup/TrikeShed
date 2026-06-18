@@ -2,23 +2,168 @@
 
 package borg.trikeshed.forge.kanban
 
-import borg.trikeshed.cursor.*
-import borg.trikeshed.lib.Join
-import borg.trikeshed.lib.j
-import borg.trikeshed.lib.Series
-import borg.trikeshed.lib.s_
-import borg.trikeshed.cursor.BlackboardContext
-import borg.trikeshed.cursor.CellOverlay
-import borg.trikeshed.cursor.ColumnOverlay
-import borg.trikeshed.cursor.OverlayRole
-import borg.trikeshed.cursor.Provenance
-import borg.trikeshed.cursor.Evidence
-import borg.trikeshed.cursor.DependencyHandle
-import borg.trikeshed.cursor.blackboardContext
-import borg.trikeshed.cursor.columnOverlay
-import borg.trikeshed.cursor.evidence
-import borg.trikeshed.cursor.provenance
 import borg.trikeshed.forge.platform.platformUtils
+import kotlinx.serialization.Serializable
+
+/**
+ * Kanban as a Blackboard domain -- minimal self-contained version.
+ * Inlines the overlay types from trikeshed.cursor.BlackboardOverlay
+ * so forge doesn't need a dependency on the trikeshed core modules.
+ */
+
+// --- Overlay types (inlined from trikeshed.cursor.BlackboardOverlay) ---
+
+enum class OverlayRole {
+    OBSERVATION, DERIVED, AGGREGATE, HYPOTHESIS,
+    GROUND_TRUTH, CONTROL, METADATA, PROVENANCE
+}
+
+@Serializable
+data class Provenance(
+    val source: String,
+    val timestamp: Long,
+    val transformations: List<String> = emptyList(),
+    val creator: String? = null,
+) {
+    fun withTransformation(step: String): Provenance = copy(transformations = transformations + step)
+    fun derive(transformation: String): Provenance = copy(transformations = transformations + transformation)
+}
+
+@Serializable
+data class Evidence(
+    val confidence: Double = 1.0,
+    val errorMargin: Double? = null,
+    val supportCount: Int? = null,
+    val notes: List<String> = emptyList(),
+) {
+    init {
+        require(confidence in 0.0..1.0) { "confidence must be in [0.0, 1.0], got $confidence" }
+        errorMargin?.let { require(it >= 0) { "Error margin must be non-negative, got $it" } }
+        supportCount?.let { require(it >= 0) { "Support count must be non-negative, got $it" } }
+    }
+    fun combine(other: Evidence): Evidence {
+        return copy(
+            confidence = (confidence + other.confidence) / 2.0,
+            supportCount = (supportCount ?: 0) + (other.supportCount ?: 0),
+            notes = notes + other.notes,
+        )
+    }
+}
+
+sealed class DependencyHandle {
+    data class CellRef(val row: Int, val column: Int) : DependencyHandle()
+    data class ColumnRef(val column: Int) : DependencyHandle()
+    data class ExternalCellRef(val cursorId: String, val row: Int, val column: Int) : DependencyHandle()
+    data class ExternalResource(val uri: String, val selector: String? = null) : DependencyHandle()
+    data class Composite(val handles: List<DependencyHandle>) : DependencyHandle()
+}
+
+@Serializable
+data class CellOverlay<T>(
+    val value: T,
+    val role: OverlayRole = OverlayRole.OBSERVATION,
+    val provenance: Provenance? = null,
+    val evidence: Evidence? = null,
+    val dependencies: List<DependencyHandle> = emptyList(),
+) {
+    fun <R> map(transform: (T) -> R): CellOverlay<R> = CellOverlay(
+        value = transform(value), role = role, provenance = provenance,
+        evidence = evidence, dependencies = dependencies,
+    )
+    fun derive(newRole: OverlayRole = OverlayRole.DERIVED, transformation: String? = null): CellOverlay<T> {
+        val newProvenance = provenance?.let {
+            var p = it
+            transformation?.let { p = p.derive("role:${role.name}"); p = p.derive(it) }
+            p
+        }
+        return copy(role = newRole, provenance = newProvenance)
+    }
+    fun withConfidence(confidence: Double): CellOverlay<T> {
+        val newEvidence = evidence?.copy(confidence = confidence) ?: Evidence(confidence = confidence)
+        return copy(evidence = newEvidence)
+    }
+    fun withDependency(handle: DependencyHandle): CellOverlay<T> = copy(dependencies = dependencies + handle)
+}
+
+@Serializable
+data class ColumnOverlay(
+    val name: String,
+    val defaultRole: OverlayRole = OverlayRole.OBSERVATION,
+    val provenance: Provenance? = null,
+    val evidence: Evidence? = null,
+    val constraints: List<String> = emptyList(),
+    val description: String? = null,
+) {
+    fun <T> toCellOverlay(value: T, row: Int): CellOverlay<T> = CellOverlay(
+        value = value, role = defaultRole, provenance = provenance, evidence = evidence
+    )
+    fun withConstraint(constraint: String): ColumnOverlay = copy(constraints = constraints + constraint)
+    fun withDescription(desc: String): ColumnOverlay = copy(description = desc)
+}
+
+@Serializable
+data class BlackboardContext(
+    val id: String,
+    val columnOverlays: Map<Int, ColumnOverlay> = emptyMap(),
+    val provenance: Provenance? = null,
+    val tags: Map<String, String> = emptyMap(),
+) {
+    fun getColumnOverlay(columnIndex: Int): ColumnOverlay? = columnOverlays[columnIndex]
+    fun getEffectiveRole(columnIndex: Int, cellRole: OverlayRole?): OverlayRole =
+        cellRole ?: columnOverlays[columnIndex]?.defaultRole ?: OverlayRole.OBSERVATION
+    fun getEffectiveEvidence(columnIndex: Int, cellEvidence: Evidence?): Evidence? =
+        cellEvidence ?: columnOverlays[columnIndex]?.evidence
+    fun withColumnOverlay(index: Int, overlay: ColumnOverlay): BlackboardContext =
+        copy(columnOverlays = columnOverlays + (index to overlay))
+    fun withTag(key: String, value: String): BlackboardContext = copy(tags = tags + (key to value))
+}
+
+fun provenance(
+    source: String,
+    timestamp: Long = platformUtils.currentTimeMillis(),
+    transformations: List<String> = emptyList(),
+    creator: String? = null,
+): Provenance = Provenance(source, timestamp, transformations, creator)
+
+fun evidence(
+    confidence: Double = 1.0,
+    errorMargin: Double? = null,
+    supportCount: Int? = null,
+    notes: List<String> = emptyList(),
+): Evidence = Evidence(confidence, errorMargin, supportCount, notes)
+
+fun <T> cellOverlay(
+    value: T,
+    role: OverlayRole = OverlayRole.OBSERVATION,
+    provenance: Provenance? = null,
+    evidence: Evidence? = null,
+    dependencies: List<DependencyHandle> = emptyList(),
+): CellOverlay<T> = CellOverlay(value, role, provenance, evidence, dependencies)
+
+fun columnOverlay(
+    name: String,
+    defaultRole: OverlayRole = OverlayRole.OBSERVATION,
+    provenance: Provenance? = null,
+    evidence: Evidence? = null,
+    constraints: List<String> = emptyList(),
+    description: String? = null,
+): ColumnOverlay = ColumnOverlay(name, defaultRole, provenance, evidence, constraints, description)
+
+fun blackboardContext(
+    id: String,
+    columnOverlays: Map<Int, ColumnOverlay> = emptyMap(),
+    provenance: Provenance? = null,
+    tags: Map<String, String> = emptyMap(),
+): BlackboardContext = BlackboardContext(id, columnOverlays, provenance, tags)
+
+fun cellRef(row: Int, column: Int): DependencyHandle.CellRef = DependencyHandle.CellRef(row, column)
+fun columnRef(column: Int): DependencyHandle.ColumnRef = DependencyHandle.ColumnRef(column)
+fun externalResource(uri: String, selector: String? = null): DependencyHandle.ExternalResource =
+    DependencyHandle.ExternalResource(uri, selector)
+fun compositeDependency(vararg handles: DependencyHandle): DependencyHandle.Composite =
+    DependencyHandle.Composite(handles.toList())
+
+// --- Kanban domain taxonomy ---
 
 object KanbanBlackboardDomain {
     object Cols {
@@ -73,13 +218,17 @@ object KanbanBlackboardDomain {
         )
     }
 
-    fun boardToContexts(cards: List<BoardCard>) = cards.map { cardToContext(it) }
-    fun boardToRows(cards: List<BoardCard>) = cards.map { cardToRow(it) }
+    fun boardToContexts(cards: List<BoardCard>): List<BlackboardContext> = cards.map { cardToContext(it) }
+    fun boardToRows(cards: List<BoardCard>): List<List<CellOverlay<*>>> = cards.map { cardToRow(it) }
 
     fun dependencyHandles(cards: List<BoardCard>): List<Join<String, String>> {
         val handles = mutableListOf<Join<String, String>>()
         val idIndex = cards.mapIndexed { i, c -> c.id to i }.toMap()
-        for (card in cards) for (dep in card.dependencies) if (idIndex.contains(dep)) handles.add(dep j card.id)
+        for (card in cards) {
+            for (dep in card.dependencies) {
+                if (idIndex.contains(dep)) handles.add(dep j card.id)
+            }
+        }
         return handles
     }
 }
@@ -97,3 +246,10 @@ object KanbanDomain : BlackboardDomain {
     override fun toContext(card: BoardCard) = KanbanBlackboardDomain.cardToContext(card)
     override fun toRow(card: BoardCard) = KanbanBlackboardDomain.cardToRow(card)
 }
+
+// --- Minimal Join/Series types for dependencyHandles ---
+typealias Join<A, B> = Pair<A, B>
+infix fun <A, B> A.j(b: B): Join<A, B> = this to b
+
+typealias Series<T> = List<T>
+infix fun <T> Int.s_(vararg items: T): Series<T> = items.toList()
