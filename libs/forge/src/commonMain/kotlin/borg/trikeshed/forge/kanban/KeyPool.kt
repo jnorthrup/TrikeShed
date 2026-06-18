@@ -2,14 +2,18 @@
 
 package borg.trikeshed.forge.kanban
 
-import kotlinx.coroutines.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.channels.Channel
-import borg.trikeshed.forge.platform.platformUtils
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.Json
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
+import kotlin.time.Duration.Companion.milliseconds
+import borg.trikeshed.forge.platform.platformUtils
+import borg.trikeshed.forge.kanban.v2.*
 
 /**
  * In-memory pool of credential keys for kanban worker delegation.
@@ -20,7 +24,7 @@ import java.util.concurrent.atomic.AtomicLong
 class KeyPool {
     private val mutex = Mutex()
     private val accessCount = AtomicLong(0)
-    
+
     data class MutableEntry(
         var keyId: String,
         var provider: String,
@@ -35,9 +39,9 @@ class KeyPool {
         var leaseExpiresAt: Long = 0,
         val semaphore: Channel<Unit> = Channel(1),
     )
-    
+
     private val mutableKeys = ConcurrentHashMap<String, MutableEntry>()
-    
+
     /**
      * Record a key access. Creates entry if new, updates timestamp/count.
      */
@@ -59,18 +63,18 @@ class KeyPool {
                 status = KeyStatus.ACTIVE,
             )
         }
-        
+
         // Update existing
         entry.lastUsedMs = now
         entry.accessCount++
         if (modelUrl.isNotBlank()) entry.modelUrl = modelUrl
         entry.status = KeyStatus.ACTIVE
-        
+
         accessCount.incrementAndGet()
-        
+
         entry.toImmutable()
     }
-    
+
     /**
      * Record the model used by a key.
      */
@@ -80,15 +84,15 @@ class KeyPool {
         entry.lastUsedMs = platformUtils.currentTimeMillis()
         entry.toImmutable()
     }
-    
+
     suspend fun markBackoff(keyId: String): KeyEntry? = mutex.withLock {
         mutableKeys[keyId]?.apply { status = KeyStatus.BACKOFF }?.toImmutable()
     }
-    
+
     suspend fun markBenched(keyId: String): KeyEntry? = mutex.withLock {
         mutableKeys[keyId]?.apply { status = KeyStatus.BENCHED }?.toImmutable()
     }
-    
+
     /**
      * Return bijective mapping of active keys to their last known model.
      */
@@ -98,13 +102,13 @@ class KeyPool {
             .associate { it.key to it.value.lastModel!! }
         DraftMapping(mapping = mapping)
     }
-    
+
     suspend fun getAvailable(): List<KeyEntry> = mutex.withLock {
         mutableKeys.values
             .filter { it.status == KeyStatus.ACTIVE }
             .map { it.toImmutable() }
     }
-    
+
     suspend fun getAvailableForAgent(agentId: String): List<KeyEntry> = mutex.withLock {
         val now = platformUtils.currentTimeMillis()
         return mutableKeys.values
@@ -121,7 +125,7 @@ class KeyPool {
             }
             .map { it.toImmutable() }
     }
-    
+
     suspend fun acquireLease(
         keyId: String,
         agentId: String,
@@ -129,21 +133,21 @@ class KeyPool {
     ): Boolean = mutex.withLock {
         val entry = mutableKeys[keyId] ?: return false
         if (entry.status != KeyStatus.ACTIVE) return false
-        
+
         val now = platformUtils.currentTimeMillis()
-        
+
         // Try to acquire semaphore
         val acquired = try {
             entry.semaphore.receive().fold(
                 onSuccess = { true },
-                onFailure = { false },
+                onFailure = { false }
             )
         } catch (e: Exception) {
             false
         }
-        
+
         if (!acquired) return false
-        
+
         try {
             // Check lease again under semaphore
             if (entry.leasedTo != null && entry.leaseExpiresAt > 0 && now > entry.leaseExpiresAt) {
@@ -151,7 +155,7 @@ class KeyPool {
                 entry.leaseStartedAt = 0
                 entry.leaseExpiresAt = 0
             }
-            
+
             if (entry.leasedTo == null || entry.leasedTo == agentId) {
                 entry.leasedTo = agentId
                 entry.leaseStartedAt = now
@@ -163,19 +167,22 @@ class KeyPool {
             entry.semaphore.trySend(Unit)
         }
     }
-    
+
     suspend fun acquireLeaseBlocking(
         keyId: String,
         agentId: String,
         ttlMs: Long = 0,
         timeoutMs: Long = 30_000,
     ): Boolean {
-        return withTimeoutOrNull(timeoutMs) {
+        suspend fun attempt(): Boolean? {
             while (true) {
                 val acquired = acquireLease(keyId, agentId, ttlMs)
-                if (acquired) return@withTimeoutOrNull true
+                if (acquired) return true
                 delay(100)
             }
+        }
+        return withTimeoutOrNull(timeoutMs.milliseconds) {
+            attempt()
         } ?: false
     }
 
@@ -189,7 +196,7 @@ class KeyPool {
         }
         return false
     }
-    
+
     suspend fun getLeaseInfo(keyId: String): LeaseInfo? = mutex.withLock {
         val entry = mutableKeys[keyId] ?: return null
         val now = platformUtils.currentTimeMillis()
@@ -201,11 +208,11 @@ class KeyPool {
             isActiveLease = entry.leasedTo != null && (entry.leaseExpiresAt == 0L || entry.leaseExpiresAt > now)
         )
     }
-    
+
     suspend fun getEntry(keyId: String): KeyEntry? = mutex.withLock {
         mutableKeys[keyId]?.toImmutable()
     }
-    
+
     suspend fun loadFromCredentialPool(poolData: Map<String, List<Map<String, Any>>>): Int = mutex.withLock {
         var count = 0
         for ((provider, entries) in poolData) {
@@ -213,12 +220,12 @@ class KeyPool {
                 val keyId = entry["id"] as? String ?: continue
                 val status = entry["last_status"] as? String ?: "active"
                 if (status == "benched") continue
-                
+
                 val lastModel = (entry["last_model"] as? String) ?: (entry["last_success_model"] as? String)
                 val modelUrl = (entry["base_url"] as? String) ?: (entry["inference_base_url"] as? String) ?: ""
                 val lastUsedAt = (entry["last_used_at"] as? Long) ?: 0
                 val requestCount = (entry["request_count"] as? Long) ?: 0
-                
+
                 val mutableEntry = MutableEntry(
                     keyId = keyId,
                     provider = provider,
@@ -233,14 +240,14 @@ class KeyPool {
                         else -> KeyStatus.ACTIVE
                     },
                 )
-                
+
                 mutableKeys[keyId] = mutableEntry
                 count++
             }
         }
         return count
     }
-    
+
     suspend fun toList(): List<Map<String, Any>> = mutex.withLock {
         mutableKeys.values.map { entry ->
             mapOf<String, Any>(
@@ -257,7 +264,7 @@ class KeyPool {
             )
         }
     }
-    
+
     fun totalAccessCount(): Long = accessCount.get()
 }
 

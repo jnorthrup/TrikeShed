@@ -2,6 +2,7 @@ package borg.trikeshed.forge.kanban.v2
 
 import borg.trikeshed.context.AsyncContextElement
 import borg.trikeshed.context.ElementState
+import kotlinx.coroutines.CoroutineContext
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -13,6 +14,14 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.locks.ReentrantLock
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.EmptyCoroutineContext
+import kotlin.coroutines.EmptyCoroutineContext
+import kotlin.coroutines.CoroutineContext
 
 object KeyPoolKey : CoroutineContext.Key<KeyPoolElement>
 object OperationalDataPoolKey : CoroutineContext.Key<OperationalDataPoolElement>
@@ -213,11 +222,23 @@ class GepaOptimizerElement(parentJob: Job? = null, private val coordinatorElemen
 @Serializable data class GepaResult(val bestCandidate: String, val totalMetricCalls: Int, val numCandidates: Int, val runDir: String, val timestampMs: Long = Instant.now().toEpochMilli())
 
 suspend fun installKanban(config: CoordinatorConfig = CoordinatorConfig(), gepaConfig: GepaConfig = GepaConfig(), maxHistoryPerKey: Int = 1000): KanbanElements {
-    val kp = KeyPoolElement(); val op = OperationalDataPoolElement(maxHistoryPerKey)
+    val kp: KeyPoolElement = KeyPoolElement(); val op: OperationalDataPoolElement = OperationalDataPoolElement(maxHistoryPerKey)
     val coord = CoordinatorElement(keyPoolElement=kp, opsPoolElement=op, config=config)
     val gp = GepaOptimizerElement(coordinatorElement=coord, opsPoolElement=op, config=gepaConfig)
     kp.open(); op.open(); coord.open(); gp.open()
-    return withContext(kp + op + coord + gp) { KanbanElements(kp, op, coord, gp) }
+    return withContext(buildCoroutineContext(kp, op, coord, gp)) { KanbanElements(kp, op, coord, gp) }
+}
+private fun buildCoroutineContext(kp: KeyPoolElement, op: OperationalDataPoolElement, coord: CoordinatorElement, gp: GepaOptimizerElement): CoroutineContext {
+    return EmptyCoroutineContext
+        .plus(kp as CoroutineContext.Element)
+        .plus(op as CoroutineContext.Element)
+        .plus(coord as CoroutineContext.Element)
+        .plus(gp as CoroutineContext.Element)
 }
 
-data class KanbanElements(val keyPool: KeyPoolElement, val opsPool: OperationalDataPoolElement, val coordinator: CoordinatorElement, val gepa: GepaOptimizerElement) : CoroutineContext.Element by keyPool + opsPool + coordinator + gepa
+
+data class KanbanElements(val keyPool: KeyPoolElement, val opsPool: OperationalDataPoolElement, val coordinator: CoordinatorElement, val gepa: GepaOptimizerElement) : kotlinx.coroutines.CoroutineContext.Element by
+    EmptyCoroutineContext.plus(keyPool as kotlinx.coroutines.CoroutineContext.Element)
+        .plus(opsPool as kotlinx.coroutines.CoroutineContext.Element)
+        .plus(coordinator as kotlinx.coroutines.CoroutineContext.Element)
+        .plus(gepa as kotlinx.coroutines.CoroutineContext.Element)
