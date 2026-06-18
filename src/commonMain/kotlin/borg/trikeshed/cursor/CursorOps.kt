@@ -15,6 +15,7 @@ import borg.trikeshed.lib.*
  * 
  * No operator overloading on get() to avoid return-type ambiguity.
  * Uses .b(i) for index access on Series/Cursor (no operator get on Join).
+ * Uses explicit Join constructor to avoid lambda type inference issues.
  */
 object CursorOps {
 
@@ -22,14 +23,14 @@ object CursorOps {
 
     /** Range view — composition, not control flow. */
     fun Cursor.range(range: IntRange): Cursor =
-        range.count() j { i: Int -> this.b(range.first + i) }
+        Join(range.count(), { i: Int -> this.b(range.first + i) })
 
     /** Column projection by ordinal indices — reorders / projects columns. */
     fun Cursor.select(vararg cols: Int): Cursor =
-        size j { row: Int ->
+        Join(size, { row: Int ->
             val rv = this.b(row)
-            cols.size j { c: Int -> rv.b(cols[c]) }
-        }
+            Join(cols.size, { c: Int -> rv.b(cols[c]) })
+        })
 
     /** Single column selection — returns new Cursor with that column only. */
     fun Cursor.col(col: Int): Cursor = select(col)
@@ -70,26 +71,26 @@ object CursorOps {
 
     /** Join two cursors side-by-side — widens along columns. */
     fun join(left: Cursor, right: Cursor): Cursor =
-        minOf(left.size, right.size) j { row: Int ->
+        Join(minOf(left.size, right.size), { row: Int ->
             val lr = left.b(row); val rr = right.b(row)
-            (lr.size + rr.size) j { c: Int ->
+            Join(lr.size + rr.size, { c: Int ->
                 if (c < lr.size) lr.b(c) else rr.b(c - lr.size)
-            }
-        }
+            })
+        })
 
     // ── Concatenation (along rows) ──────────────────────────────────
 
     /** Combine two cursors top-to-bottom — concatenates along rows. */
     fun combine(top: Cursor, bottom: Cursor): Cursor =
-        (top.size + bottom.size) j { row: Int ->
+        Join(top.size + bottom.size, { row: Int ->
             if (row < top.size) top.b(row) else bottom.b(row - top.size)
-        }
+        })
 
     // ── Projection ──────────────────────────────────────────────────
 
     /** Cursor α — lazy map over rows. */
     inline infix fun <C> Cursor.α(crossinline xform: (RowVec) -> C): Series<C> =
-        size j { i: Int -> xform(this.b(i)) }
+        Join(size, { i: Int -> xform(this.b(i)) })
 
     // ── Head / Tail ─────────────────────────────────────────────────
 
@@ -103,7 +104,7 @@ object CursorOps {
     val Cursor.meta: Series<ColumnMeta>
         get(): Series<ColumnMeta> {
             val row = this.b(0)
-            return row.size j { c: Int -> row.b(c).b() }
+            return Join(row.size, { c: Int -> row.b(c).b() })
         }
 
     /** Column names. */
