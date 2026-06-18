@@ -1,8 +1,5 @@
 package borg.trikeshed.mutable
 
-import borg.trikeshed.indicator.add
-import borg.trikeshed.lib.plus
-
 /**
  * A MutableSeries that gates [add] and [set] operations behind a predicate.
  *
@@ -18,7 +15,7 @@ import borg.trikeshed.lib.plus
 class GuardSeries<T>(
     private val guard: (T) -> Boolean,
     private val inner: MutableSeries<T> = CowSeriesHandle<T>(COWSeriesBody()),
-) : Appendable<T>,  Insertable<T> by inner as Insertable<T> {
+) : MutableSeries<T> by inner {
 
     override fun add(item: T) {
         if (guard(item)) inner.add(item)
@@ -32,12 +29,12 @@ class GuardSeries<T>(
         if (guard(item)) inner.set(index, item)
     }
 
-    fun plus(item: T): GuardSeries<T> {
+    override fun plus(item: T): MutableSeries<T> {
         if (guard(item)) inner.plus(item)
         return this
     }
 
-    fun plusAssign(item: T) {
+    override fun plusAssign(item: T) {
         if (guard(item)) inner.plusAssign(item)
     }
 }

@@ -1,51 +1,21 @@
-# Build outputs
-build/
-.gradle/
-
-# IDE files
-.idea/
+gradle
+.idea
+.gradle
+build
+docs/
+tmp/
 .vscode/
 
-# Kotlin cache
+<<<<<<< HEAD
 .kotlin/
+=======
+.kotlin
+.idea
+.gradle
+gradle
+gradlew
+gradlew.bat
 
-# Project-specific
-tmp/
-
-# Environment files
-.env
+>>>>>>> posixish
 .aider*
-.aider.chat.history.md
-.aider.input.history
-
-# Gradle wrapper (optional - but gradle directory itself should be tracked for version catalogs)
-# Note: gradle wrapper is typically not tracked in some setups
-# gradlew
-# gradlew.bat
-# gradle/wrapper/
-
-# The gradle/ directory should contain version catalogs (libs.versions.toml)
-# which SHOULD be tracked by git
-
-measurements.txt
-measurements_*.txt
-logs/
-
-# Native build outputs
-*.kexe
-*.kexe.dSYM/
-*.dSYM/
-default/
-
-# JVM crash / heap dump garbage
-*.hprof*
-
-# Tool/AI working dirs
-.git.bfg-report/
-.qwen/
-/.claude/
-.DS_Store
-.deepseek/
 .env
-.gradle-home/
-.hermes/

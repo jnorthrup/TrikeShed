@@ -19,5 +19,5 @@ repositories {
 }
 
 kotlin.sourceSets["commonMain"].dependencies {
-    api(project(":libs:lib"))
+    api(project(":"))
 }

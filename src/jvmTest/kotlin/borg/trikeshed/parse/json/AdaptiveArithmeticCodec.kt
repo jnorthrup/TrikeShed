@@ -1,7 +1,7 @@
 @file:OptIn(ExperimentalUnsignedTypes::class)
 
 package borg.trikeshed.parse.json
-class ArithmeticCodec(val nStates: Int,var frequencies: UIntArray = UIntArray(nStates) { 1u }) {
+class ArithmeticCodec(val nStates: Int, private var frequencies: UIntArray = UIntArray(nStates) { 1u }) {
 
     fun updateFrequencies(state: Int) = frequencies[state]++
 
@@ -40,7 +40,7 @@ class ArithmeticCodec(val nStates: Int,var frequencies: UIntArray = UIntArray(nS
         }
     }
 
-   fun findState(targetProb: Double, frequencies: UIntArray): UInt {
+    private fun findState(targetProb: Double, frequencies: UIntArray): UInt {
         var accum = 0.0
         val totalFreq = frequencies.sum()
         for ((i, freq) in frequencies.withIndex()) {
@@ -53,7 +53,7 @@ class ArithmeticCodec(val nStates: Int,var frequencies: UIntArray = UIntArray(nS
         throw IllegalStateException("should never get here")
     }
 
-   fun updateFrequencies(state: Int, frequencies: UIntArray) = frequencies[state]++
+    private fun updateFrequencies(state: Int, frequencies: UIntArray) = frequencies[state]++
 }
 
 fun main() {

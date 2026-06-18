@@ -103,22 +103,23 @@ object JsonBitmap {
                     else
                         input[inputY][inputX / 2] and 0b0000_1111U
 
-                    val maskBits: UInt = b.toUInt() shr 2 and 0x3u
+                    val maskBits = b.toUInt() shr 2 and 0x3u
 
-                    if ((quoteCounter % 2).nz)
+                    if ((quoteCounter % 2).nz) {
                         when {
                             (escapeCounter % 2).nz -> escapeCounter = 0
                             (maskBits and EscapeIncrement.ordinal.toUInt()).nz -> escapeCounter = 1
                             (maskBits and UtfInitiatorOrContinuation.ordinal.toUInt()).nz -> {}//matters in super rare caase of initiator on top of quotes not yet impl
                             (maskBits and QuoteIncrement.ordinal.toUInt()).nz -> quoteCounter++
-                        } else
+                        }
+                    } else
                         if ((maskBits and QuoteIncrement.ordinal.toUInt()).nz) quoteCounter++
 
-                    val jsStateBits: UInt = if ((quoteCounter % 2).nz) 0u else b.toUInt() and 0x3u
+                    val jsStateBits = if ((quoteCounter % 2).nz) 0u else b.toUInt() and 0x3u
 //write the jsStateBits 2 bit result right-to-left in the input bits so we can reuse the input array
-                    val writePos: Int = (4 - (outputX % 4)) * 2 // outputX 0..5 0 -> 6 1 -> 4 2 -> 2 3 -> 0 4 -> 6
-                    val writeMask: UInt = 0x3u shl writePos
-                    val writeValue: UInt = jsStateBits shl writePos
+                    val writePos = (4 - (outputX % 4)) * 2 // outputX 0..5 0 -> 6 1 -> 4 2 -> 2 3 -> 0 4 -> 6
+                    val writeMask = 0x3u shl writePos
+                    val writeValue = jsStateBits shl writePos
                     input[outputY][outputX / 4] =
                         (input[outputY][outputX / 4].toUInt() and writeMask.inv()).toUByte() or writeValue.toUByte()
                     outputX++
@@ -130,7 +131,7 @@ object JsonBitmap {
             } while (inputX / 2 < input[inputY].size)
             inputX = 0
             inputY++
-        } while (maskedSoFar.toUInt() < inputSize)
+        } while (maskedSoFar.toUInt() < inputSize.toUInt())
         return input
     }
 }

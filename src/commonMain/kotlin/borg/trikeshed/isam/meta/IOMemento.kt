@@ -3,19 +3,18 @@
 package borg.trikeshed.isam.meta
 
 import borg.trikeshed.cursor.TypeMemento
-import borg.trikeshed.userspace.nio.platform.spi.PlatformCodec.Companion.currentPlatformCodec
-import borg.trikeshed.userspace.nio.platform.spi.PlatformCodec.Companion.readInt
-import borg.trikeshed.userspace.nio.platform.spi.PlatformCodec.Companion.readLong
-import borg.trikeshed.userspace.nio.platform.spi.PlatformCodec.Companion.readUInt
-import borg.trikeshed.userspace.nio.platform.spi.PlatformCodec.Companion.readULong
-import borg.trikeshed.userspace.nio.platform.spi.PlatformCodec.Companion.writeInt
-import borg.trikeshed.userspace.nio.platform.spi.PlatformCodec.Companion.writeLong
-import borg.trikeshed.userspace.nio.platform.spi.PlatformCodec.Companion.writeUInt
-import borg.trikeshed.userspace.nio.platform.spi.PlatformCodec.Companion.writeULong
+import borg.trikeshed.isam.meta.PlatformCodec.Companion.currentPlatformCodec
+import borg.trikeshed.isam.meta.PlatformCodec.Companion.currentPlatformCodec.readInt
+import borg.trikeshed.isam.meta.PlatformCodec.Companion.currentPlatformCodec.readLong
+import borg.trikeshed.isam.meta.PlatformCodec.Companion.currentPlatformCodec.readUInt
+import borg.trikeshed.isam.meta.PlatformCodec.Companion.currentPlatformCodec.readULong
+import borg.trikeshed.isam.meta.PlatformCodec.Companion.currentPlatformCodec.writeInt
+import borg.trikeshed.isam.meta.PlatformCodec.Companion.currentPlatformCodec.writeLong
+import borg.trikeshed.isam.meta.PlatformCodec.Companion.currentPlatformCodec.writeUInt
+import borg.trikeshed.isam.meta.PlatformCodec.Companion.currentPlatformCodec.writeULong
 import borg.trikeshed.lib.*
 import borg.trikeshed.lib.CharSeries
-import kotlin.time.Instant
-import kotlinx.datetime.LocalDate
+import kotlinx.datetime.*
 
 enum class IOMemento(override val networkSize: Int? = null, val fromChars: (Series<Char>) -> Any) : TypeMemento {
     IoBoolean(1, {
@@ -81,16 +80,19 @@ enum class IOMemento(override val networkSize: Int? = null, val fromChars: (Seri
     },
     IoLocalDate(8, { it.parseIsoDateTime() }) {
         override fun createEncoder(i: Int): (Any?) -> ByteArray = {
-            val date = when (val value = it) {
-                is Instant -> LocalDate.parse(value.toString().substringBefore('T'))
-                is LocalDate -> value
-                else -> value as LocalDate
-            }
+            //try a cast elvis first with Instant then with LocalDate
+            val date = (it as? Instant)?.toLocalDateTime(TimeZone.UTC)?.date ?: it as LocalDate
+//
+//            val toEpochDays = (it as LocalDate).toEpochDays()
+//            writeLong (toEpochDays.toLong())
             writeLong(date.toEpochDays().toLong())
+
+
         }
 
         override fun createDecoder(size: Int): (ByteArray) -> Any? = {
-            LocalDate.fromEpochDays(readLong(it).toInt())
+            val fromEpochDays = LocalDate.fromEpochDays(readLong(it).toInt())
+            fromEpochDays
         }
     },
 
@@ -130,13 +132,14 @@ enum class IOMemento(override val networkSize: Int? = null, val fromChars: (Seri
         override fun createEncoder(i: Int): (Any?) -> ByteArray = { ByteArray(0) }
         override fun createDecoder(size: Int): (ByteArray) -> Any? = { ByteArray(0) }
     },
-    IoArray(null, { throw UnsupportedOperationException("IoArray fromChars") }) {
-        override fun createEncoder(i: Int): (Any?) -> ByteArray = { throw UnsupportedOperationException("IoArray encoder") }
-        override fun createDecoder(size: Int): (ByteArray) -> Any? = { throw UnsupportedOperationException("IoArray decoder") }
+    // Container types for YAML/Confix parsing
+    IoArray(null, { it }) {
+        override fun createEncoder(i: Int): (Any?) -> ByteArray = writeByteArray
+        override fun createDecoder(size: Int): (ByteArray) -> Any? = readByteArray
     },
-    IoObject(null, { throw UnsupportedOperationException("IoObject fromChars") }) {
-        override fun createEncoder(i: Int): (Any?) -> ByteArray = { throw UnsupportedOperationException("IoObject encoder") }
-        override fun createDecoder(size: Int): (ByteArray) -> Any? = { throw UnsupportedOperationException("IoObject decoder") }
+    IoObject(null, { it }) {
+        override fun createEncoder(i: Int): (Any?) -> ByteArray = writeByteArray
+        override fun createDecoder(size: Int): (ByteArray) -> Any? = readByteArray
     }
     ;
 

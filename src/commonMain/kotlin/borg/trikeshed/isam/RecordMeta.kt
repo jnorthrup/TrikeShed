@@ -1,7 +1,10 @@
 package borg.trikeshed.isam
 
 import borg.trikeshed.cursor.ColumnMeta
+import borg.trikeshed.cursor.TypeMemento
 import borg.trikeshed.isam.meta.IOMemento
+import borg.trikeshed.lib.j
+
 
 
 /** RecordMeta is a data class that describes a column of an Isam record
@@ -12,20 +15,24 @@ import borg.trikeshed.isam.meta.IOMemento
  * @param end the byte offset of the end of the column
  * @param decoder a lambda that converts a byte[]  to downstream, often but not necessarily the IoMemento utility
  * @param encoder a lambda that produces a byte[] for marshalling to disk or elsewhere
- * @param child the basis for blackboard cursor-dags where a child type is a cursor or in a speciasl (evidence) loop treating rows before and after conversion to isam meta.
+ * @param child a child RecordMeta for a child record, for instance, CSV conversion to ISAM might define two RecordMetas for two steps
  */
 
    class RecordMeta(
-    override val name: String,
-    override val type: IOMemento,
+//    /** column name*/
+    val name: String,
+    /** enum-resident Type describing byte marshalling strategies - a specialization of TypeMemento */
+    val type: IOMemento,
+    /** context-specific byte offset beginning*/
     val begin: Int = -1,
+    /** context-specific byte offset ending*/
     val end: Int = -1,
+    /** a lambda that converts a byte[]  to downstream, often but not necessarily the IoMemento utility */
     val decoder: (ByteArray) -> Any? = type.createDecoder(end - begin),
+    /** a lambda that produces a byte[] for marshalling to disk or elsewhere */
     val encoder: (Any?) -> ByteArray = type.createEncoder(end - begin),
-    override var child: RecordMeta? = null,
-    val groupId: Int = 0,
-    /** Human-readable group label. Defaults to groupId.toString() — "0" stays visible as "0". Implicit (max) group → <stem>.bin; named groups → <stem>.<groupName>.bin. */
-    val groupName: String = groupId.toString(),
-    ) : ColumnMeta by ColumnMeta(name, type, child as ColumnMeta?){
-       override fun toString(): String = "RecordMeta(name='$name', type=$type, begin=$begin, end=$end, groupId=$groupId, groupName='$groupName')"
+    /** open to interpretation, for instance, CSV conversion to ISAM might define two RecordMetas for two steps*/
+    var child: RecordMeta? = null,
+    ) : ColumnMeta by (name j (type as TypeMemento)){
+       override fun toString(): String = "RecordMeta(name='$name', type=$type, begin=$begin, end=$end, decoder=$decoder, encoder=$encoder, child=$child)"
     }

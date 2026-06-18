@@ -193,7 +193,7 @@ class PosixFile(
         be able to use some mapping flags (e.g., MAP_SYNC).
 
         MAP_PRIVATE
-        Create acopy-on-write mapping.  Updates to the
+        Create a private copy-on-write mapping.  Updates to the
         mapping are not visible to other processes mapping the
         same file, and are not carried through to the underlying
         file.  It is unspecified whether changes made to the file
@@ -343,7 +343,7 @@ class PosixFile(
         reserved one might get SIGSEGV upon a write if no physical
         memory is available.  See also the discussion of the file
         /proc/sys/vm/overcommit_memory in proc(5).  In kernels
-        before 2.6, this flag had effect only forwritable
+        before 2.6, this flag had effect only for private writable
         mappings.
 
         MAP_POPULATE (since Linux 2.5.46)
@@ -353,7 +353,7 @@ class PosixFile(
         call doesn't fail if the mapping cannot be populated (for
         example, due to limitations on the number of mapped huge
         pages when using MAP_HUGETLB).  MAP_POPULATE is supported
-        formappings only since Linux 2.6.23.
+        for private mappings only since Linux 2.6.23.
 
         MAP_STACK (since Linux 2.6.27)
         Allocate the mapping at an address suitable for a process
@@ -554,17 +554,10 @@ class PosixFile(
         }
         fun readString(filename: String): String = readAllBytes(filename).decodeToString()
         fun writeBytes(filename: String, bytes: ByteArray): Int = memScoped {
-            val flags = PosixOpenOpts.withFlags(
-                PosixOpenOpts.O_Creat,
-                PosixOpenOpts.O_Trunc,
-                PosixOpenOpts.O_WrOnly,
-            )
-            val file = PosixFile(filename, flags)
+            val file = PosixFile(filename)
             val len = bytes.size
             val buf = allocArray<ByteVar>(len)
-            bytes.usePinned { pinned ->
-                memcpy(buf, pinned.addressOf(0), len.convert())
-            }
+            bytes.forEachIndexed { index, byte -> buf[index] = byte }
             val written = write(file.fd, buf, len.convert())
             HasPosixErr.posixRequires(written == len.toLong()) { "writeBytes $filename" }
             file.close()

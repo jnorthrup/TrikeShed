@@ -10,11 +10,11 @@ typealias FlatFileRow = RowVec
 typealias Pair<F,S> = Join<F, S>
 
 class FlatFileSortingStrategy(
-   val cursor: Cursor,
-   val freeHeapSpace: Long,
-   val L1CacheSize: Int,
-   val rowsCount: Int,
-   val bytesPerRow: Int
+    private val cursor: Cursor,
+    private val freeHeapSpace: Long,
+    private val L1CacheSize: Int,
+    private val rowsCount: Int,
+    private val bytesPerRow: Int
 ) {
     enum class SortingAlgorithm {
         Qsort,

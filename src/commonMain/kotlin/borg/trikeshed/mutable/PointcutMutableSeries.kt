@@ -11,7 +11,7 @@ import borg.trikeshed.lib.get
 class PointcutMutableSeries<T>(
     private val delegate: MutableSeries<T>,
     private val actionSink: (MutationAction<T>) -> Unit
-) : Appendable<T>, RandomAccess<T>, Insertable<T>, Removable<T> {
+) : MutableSeries<T> {
 
     override val a: Int get() = delegate.a
     override val b: (Int) -> T get() = { delegate[it] }
@@ -46,22 +46,22 @@ class PointcutMutableSeries<T>(
         delegate.clear()
     }
 
-    fun plus(item: T): PointcutMutableSeries<T> {
+    override fun plus(item: T): MutableSeries<T> {
         actionSink(MutationAction.Plus(item))
         return PointcutMutableSeries(delegate.plus(item), actionSink)
     }
 
-    fun minus(item: T): PointcutMutableSeries<T> {
+    override fun minus(item: T): MutableSeries<T> {
         actionSink(MutationAction.Minus(item))
         return PointcutMutableSeries(delegate.minus(item), actionSink)
     }
 
-    fun plusAssign(item: T) {
+    override fun plusAssign(item: T) {
         actionSink(MutationAction.Add(item)) // Logically equivalent
         delegate.plusAssign(item)
     }
 
-    fun minusAssign(item: T) {
+    override fun minusAssign(item: T) {
         actionSink(MutationAction.Remove(item)) // Logically equivalent
         delegate.minusAssign(item)
     }

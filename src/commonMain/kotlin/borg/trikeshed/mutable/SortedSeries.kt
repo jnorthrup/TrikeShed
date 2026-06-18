@@ -14,7 +14,7 @@ import borg.trikeshed.lib.*
  */
 class SortedSeries<T>(
     private val comparator: (T, T) -> Int,
-) : Appendable<T>, RandomAccess<T>, Insertable<T>, Removable<T> {
+) : MutableSeries<T> {
 
     private var data: Series<T> = 0 j { throw IndexOutOfBoundsException("empty SortedSeries") }
 
@@ -58,10 +58,10 @@ class SortedSeries<T>(
         data = 0 j { throw IndexOutOfBoundsException("empty SortedSeries") }
     }
 
-    fun plus(item: T): SortedSeries<T> { add(item); return this }
-    fun minus(item: T): SortedSeries<T> { remove(item); return this }
-    fun plusAssign(item: T) { add(item) }
-    fun minusAssign(item: T) { remove(item) }
+    override fun plus(item: T): MutableSeries<T> { add(item); return this }
+    override fun minus(item: T): MutableSeries<T> { remove(item); return this }
+    override fun plusAssign(item: T) { add(item) }
+    override fun minusAssign(item: T) { remove(item) }
 
     /** Binary search to find insertion index for [item] in sorted [data]. */
     private fun findInsertionIndex(item: T): Int {

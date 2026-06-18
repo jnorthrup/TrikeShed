@@ -1,6 +1,6 @@
-[submodule "libs/dreamer-kmm"]
-	path = libs/dreamer-kmm
-	url = https://github.com/jnorthrup/dreamer-kmm.git
-[submodule "libs/kmp-ngsctp-upstream"]
-	path = libs/kmp-ngsctp-upstream
-	url = https://github.com/jnorthrup/KMPngSCTP.git
+[submodule "liburing"]
+	path = liburing
+	url = https://github.com/axboe/liburing.git
+[submodule "kotlin_uring"]
+	path = kotlin_uring
+	url = git@github.com:jnorthrup/kotlin_uring.git

@@ -1,5 +1,6 @@
 package borg.trikeshed.parse.csv
 
+import borg.trikeshed.common.Files
 import borg.trikeshed.lib.CZero.nz
 import borg.trikeshed.lib.CZero.z
 import borg.trikeshed.parse.json.JsonBitmap.LexerEvents.*
@@ -115,7 +116,7 @@ object CsvBitmap {
             } while (inputX / 2 < input[inputY].size)
             inputX = 0
             inputY++
-        } while (maskedSoFar.toUInt() < inputSize)
+        } while (maskedSoFar.toUInt() < inputSize.toUInt())
         return input
     }
 }

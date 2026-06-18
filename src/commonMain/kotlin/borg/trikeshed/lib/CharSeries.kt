@@ -1,15 +1,14 @@
-@file:Suppress("SpellCheckingInspection", "ControlFlowWithEmptyBody", "UNCHECKED_CAST", "CAST_NEVER_SUCCEEDS")
+@file:Suppress("SpellCheckingInspection", "ControlFlowWithEmptyBody")
 
 package borg.trikeshed.lib
 
 import borg.trikeshed.lib.CZero.nz
-import kotlin.jvm.JvmName
 
 /**
  * char based spiritual successor to ByteBuffer for parsing
  */
 class CharSeries(
-    private val buf: Series<Char>,
+    buf: Series<Char>,
 
     /** the mutable position accessor */
     var pos: Int = 0,
@@ -19,43 +18,18 @@ class CharSeries(
 
     /** the mark accessor */
     var mark: Int = -1,
-     override val length: Int=buf.size,
-) : Series<Char> by buf, CharSequence { //delegate to the underlying series
-
-    /** CharSequence requires get(index: Int): Char */
-    override fun get(index: Int): Char = buf[index]
-
-    /** CharSequence requires subSequence(startIndex: Int, endIndex: Int): CharSequence */
-    override fun subSequence(startIndex: Int, endIndex: Int): CharSequence =
-        CharSeries((this)[startIndex until endIndex])
-    //string ctor
-    constructor(s: CharSequence) : this(s as? Series<Char> ?: s.toSeries())
-
-    // Small char-window cache to improve locality. Uses buf.b(index) fallback when cache miss.
-    var _charCache: CharArray? = null
-    var _cacheBase: Int = 0
-    var _cacheLen: Int = 0
-    val CHAR_CACHE_WINDOW: Int = 4096
-
-    fun raw(i: Int): Char {
-        val c: CharArray? = _charCache
-        if (c != null) {
-            val b:Int = _cacheBase
-            val l:Int = _cacheLen
-            if (i >= b && i < b + l)
-                return c[i - b]
-        }
-        return b(i)
-    }
+) : Series<Char> by buf { //delegate to the underlying series
 
 
     /** get, the verb - the char at the current position and increment position */
-    val get: Char
+    inline val get: Char
         get() {
             if (!hasRemaining) throw IndexOutOfBoundsException("pos: $pos, limit: $limit")
-            val c = raw(pos); pos++; return c
+            val c = get(pos); pos++; return c
         }
 
+    //string ctor
+    constructor(s: String) : this(s.toSeries())
 
     /**remaining chars*/
     val rem: Int get() = limit - pos
@@ -120,7 +94,7 @@ class CharSeries(
     /** skip whitespace */
     val skipWs: CharSeries get() = apply { while (hasRemaining && mk.get.isWhitespace()); res }
 
-    val rtrim: CharSeries get() = apply { while (rem > 0 && raw(limit - 1).isWhitespace()) limit-- }
+    val rtrim: CharSeries get() = apply { while (rem > 0 && b(limit - 1).isWhitespace()) limit-- }
 
 
     fun clone(): CharSeries = CharSeries(a j b).also { it.pos = pos; it.limit = limit; it.mark = mark }
@@ -131,7 +105,7 @@ class CharSeries(
         get() {
             var h = 1
             for (i in pos until limit) {
-                h = 31 * h + raw(i).hashCode()
+                h = 31 * h + b(i).hashCode()
             }
             return h
         }
@@ -145,7 +119,7 @@ class CharSeries(
             mark != other.mark -> return false
             size != other.size -> return false
             else -> {
-                for (i in 0 until size) if (raw(i) != other.b(i)) return false
+                for (i in 0 until size) if (b(i) != other.b(i)) return false
                 return true
             }
         }
@@ -179,15 +153,15 @@ class CharSeries(
     fun confixScope(pred: (Char) -> Boolean) {
         var p = pos
         var l = limit
-        while (p < l && pred(raw(p))) p++
-        while (l > p && pred(raw(l.dec()))) l--
+        while (p < l && pred(get(p))) p++
+        while (l > p && pred(get(l.dec()))) l--
         lim(l)
         pos(p)
     }
 
 
-    //isExhausted - true when no remaining chars (pos == limit)
-    val isExhausted: Boolean get() = pos == limit
+    //isEmpty override
+    val isEmpty: Boolean get() = pos == limit
 
     /** success move position to the char after found and returns true.
      *  fail returns false and leaves position unchanged */
@@ -245,30 +219,13 @@ class CharSeries(
     operator fun dec(): CharSeries = apply { require(pos > 0) { "Underflow" }; pos-- }
 
     /** advance 1*/
-    operator fun inc(): CharSeries = apply { require(hasRemaining) { "Overflow" }; pos++ }
+    operator fun inc(): CharSeries = apply { require(hasRemaining) { "Overflow" };pos++ }
 
     //toArray override
     fun toArray(): CharArray {
         require(rem > 0) { "heads up: using an empty stateful CharSeries toArray()" }
         return CharArray(rem, ::get)
     }
-
-    /** Split on whitespace into zero-copy CharSeries slices. */
-    fun splitWs(): Series<CharSeries> {
-        val parts = mutableListOf<CharSeries>()
-        var i = pos
-        // skip leading whitespace
-        while (i < limit && raw(i).isWhitespace()) i++
-        while (i < limit) {
-            val start = i
-            while (i < limit && !raw(i).isWhitespace()) i++
-            val buf = this[start until i]
-            parts.add(CharSeries(buf))
-            while (i < limit && raw(i).isWhitespace()) i++
-        }
-        return parts.toSeries()
-    }
-
 
     companion object {
 
@@ -292,7 +249,7 @@ class CharSeries(
 
         }
 
-        fun confixFeature(client: CharSeries, chlit: String): Boolean {
+        private fun confixFeature(client: CharSeries, chlit: String): Boolean {
             logNone { "confix $chlit before: ${client.asString()}" }
             var x = 0
             client.confixScope { test: Char ->
@@ -310,47 +267,48 @@ operator fun Series<Char>.div(delim: Char): Series<Series<Char>> { //lazy split
     val intList = mutableListOf<Int>()
     for (x in 0 until size) if (this[x] == delim) intList.add(x)
 
+    /**
+     * iarr is an index of delimitted endings of the CharSeries.
+     */
     val iarr: IntArray = intList.toIntArray()
-    val n = iarr.size
 
-    // N delimiters → N+1 segments
-    return (n + 1) j { x: Int ->
-        val p = if (x == 0) 0 else iarr[x - 1] + 1
-        val l = if (x == n) this.size else iarr[x]
+    return iarr α { x ->
+        val p = if (x == 0) 0 else iarr[x.dec()].inc() //start of next
+        val l = //is x last index?
+            if (x == iarr.lastIndex)
+                this.size
+            else
+                iarr[x].dec()
         this[p until l]
     }
 }
 
-operator fun CharSeries.div(delim: Char): Series<CharSeries> {
+operator fun Series<Byte>.div(delim: Byte): Series<Series<Byte>> { //lazy split
     val intList = mutableListOf<Int>()
-    for (x in 0 until rem) if (raw(pos + x) == delim) intList.add(x)
-    val iarr = intList.toIntArray()
-    val n = iarr.size
-    return (n + 1) j { x: Int ->
-        val p = if (x == 0) 0 else iarr[x - 1] + 1
-        val l = if (x == n) rem else iarr[x]
-        clone().pos(pos + p).lim(pos + l)
+    for (x in 0 until size) if (this[x] == delim) intList.add(x)
+
+    /**
+     * iarr is an index of delimitted endings of the ByteSeries.
+     */
+    val iarr: IntArray = intList.toIntArray()
+
+    return iarr α { x ->
+        val p = if (x == 0) 0 else iarr[x.dec()].inc() //start of next
+        val l = //is x last index?
+            if (x == iarr.lastIndex)
+                this.size
+            else
+                iarr[x].dec()
+        this[p until l]
     }
+
+
 }
 
-
-fun CharSequence.toSeries(): Series<Char> = (this as? Series<Char>) ?: (this.length j { this[it] })
-val CharSequence.s: Series<Char> get() = (this as? CharSeries) ?: CharSeries(this)
-val CharSequence.cs: CharSeries get() = (this as? CharSeries) ?: CharSeries(this)
-val Series<Char>.cs: CharSeries get() = (this as? CharSeries) ?: CharSeries(this)
-fun CharSequence.uppercase(): CharSeries = (CharSeries(this) as Series<Char>).uppercaseSeries() as CharSeries
-fun CharSequence.uppercaseSeries(): CharSeries = (this.cs as Series<Char>).uppercaseSeries() as CharSeries
-fun Series<Char>.uppercaseSeries(): Series<Char> = (this α Char::uppercaseChar).cs
-
-
-@get:JvmName("sFromCharSeries")
-val Series<Char>.s: String get() = asString()
-
-@get:JvmName("sFromByteSeries")
-val Series<Byte>.s: String get() = asString()
-
-/** Extension to convert CharSequence to Series<Char> */
-fun CharSequence.asSeries(): Series<Char> = this.cs
-
-/** Extension to convert CharSequence to CharSeries */
-fun CharSequence.toCharSeries(): CharSeries = this.cs
+val Series<Char>.cs: CharSequence
+    get() = object : CharSequence {
+        override val length: Int by ::a
+        override fun get(index: Int) = b(index)
+        override fun toString(): String = asString()
+        override fun subSequence(startIndex: Int, endIndex: Int): CharSequence = this@cs[startIndex until endIndex].cs
+    }

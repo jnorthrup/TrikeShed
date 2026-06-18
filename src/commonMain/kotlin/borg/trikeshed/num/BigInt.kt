@@ -2,8 +2,7 @@
 
 package borg.trikeshed.num
 
-import borg.trikeshed.collections.s_
-import borg.trikeshed.userspace.nio.platform.spi.PlatformCodec.Companion.readUInt
+import borg.trikeshed.isam.meta.PlatformCodec.Companion.currentPlatformCodec.readUInt
 import borg.trikeshed.lib.CZero.nz
 import borg.trikeshed.lib.CZero.z
 import borg.trikeshed.lib.Series
@@ -11,20 +10,20 @@ import borg.trikeshed.lib.emptySeries
 import borg.trikeshed.lib.forEach
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.getOrNull
+import borg.trikeshed.lib.isEmpty
 import borg.trikeshed.lib.iterator
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.reversed
+import borg.trikeshed.lib.size
 import borg.trikeshed.lib.toSeries
 import borg.trikeshed.lib.α
-import borg.trikeshed.lib.view
-import borg.trikeshed.lib.size
+import borg.trikeshed.lib.`▶`
 import kotlin.math.absoluteValue
 import kotlin.math.max
-import borg.trikeshed.lib.isEmpty
 
 
 /** made immutable by series. */
-class BigInt constructor(val sign: Boolean?, val magnitude: Series<UInt>) : Number(),
+class BigInt private constructor(private val sign: Boolean?, private val magnitude: Series<UInt>) : Number(),
     Comparable<BigInt> {
 
 
@@ -35,12 +34,12 @@ class BigInt constructor(val sign: Boolean?, val magnitude: Series<UInt>) : Numb
             value.absoluteValue.let { absValue ->
                 val low = (absValue and 0xFFFF_FFFFL).toUInt() // Lower 32 bits
                 val high = ((absValue ushr 32) and 0xFFFF_FFFFL).toUInt() // Upper 32 bits
-                if (high.nz) s_[high, low] else s_[low]
-            }
+                if (high.nz) arrayOf(high, low) else arrayOf(low)
+            }.toSeries()
         }
     )
 
-    constructor(
+    private constructor(
         value: ULong,
         /**This parameter is not used within the constructor but
          *  ensures that the method signatures for ULong and Long
@@ -51,8 +50,8 @@ class BigInt constructor(val sign: Boolean?, val magnitude: Series<UInt>) : Numb
         magnitude = if (value.z) emptySeries() else value.let { absValue ->
             val low = (absValue and 0xFFFF_FFFFUL).toUInt()
             val high = ((absValue shr 32) and 0xFFFF_FFFFUL).toUInt()
-            if (high.nz) s_[high, low] else s_[low]
-        }
+            if (high.nz) arrayOf(high, low) else arrayOf(low)
+        }.toSeries()
     )
 
     constructor(value: String) : this(
@@ -164,7 +163,7 @@ class BigInt constructor(val sign: Boolean?, val magnitude: Series<UInt>) : Numb
 
     override fun toString(): String {
         val signString = if (sign == null) "" else if (sign) "+" else "-"
-        return signString + magnitude.reversed().view.joinToString("") { it.toString().padStart(9, '0') }
+        return signString + magnitude.reversed().`▶`.joinToString("") { it.toString().padStart(9, '0') }
     }
 
     override fun toByte(): Byte = toInt().toByte()
@@ -243,7 +242,7 @@ class BigInt constructor(val sign: Boolean?, val magnitude: Series<UInt>) : Numb
         return plus(negatedSubtrahend)
     }
 
-    fun processMagnitudes(addend: BigInt, addition: Boolean): Series<UInt> {
+    private fun processMagnitudes(addend: BigInt, addition: Boolean): Series<UInt> {
         val m1 = magnitude.reversed()
         val m2 = addend.magnitude.reversed()
 
@@ -325,3 +324,5 @@ class BigInt constructor(val sign: Boolean?, val magnitude: Series<UInt>) : Numb
         }
     }
 }
+
+

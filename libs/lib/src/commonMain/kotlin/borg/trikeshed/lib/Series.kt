@@ -2,6 +2,9 @@ package borg.trikeshed.lib
 
 import kotlin.jvm.JvmName
 
+// --- MetaSeries: generic key-value series ---
+typealias MetaSeries<K, V> = Map<K, V>
+
 // --- Series type: simple List ---
 typealias Series<T> = List<T>
 
@@ -27,7 +30,4 @@ inline infix fun <X, C> Series<X>.α(crossinline xform: (X) -> C): Series<C> =
 
 // --- View extension ---
 class IterableSeries<T>(private val series: Series<T>) : Iterable<T> by series
-val <T> List<T>.view: Iterable<T> get() = IterableSeries(this)
-
-// --- s_ extensions for series ---
-val <T> Series<T>.s_: List<T> get() = this
+val <T> Series<T>.view: Iterable<T> get() = IterableSeries(this)

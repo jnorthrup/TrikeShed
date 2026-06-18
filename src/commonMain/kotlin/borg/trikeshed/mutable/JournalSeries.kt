@@ -24,7 +24,7 @@ sealed class Delta<out T> {
 
 class JournalSeries<T>(
     private val backing: CowSeriesHandle<T> = CowSeriesHandle<T>(COWSeriesBody()),
-) : Appendable<T>, RandomAccess<T>, Insertable<T>, Removable<T> {
+) : MutableSeries<T> {
 
     private val journal: RecursiveMutableSeries<Delta<T>> = RecursiveMutableSeries.create()
 
@@ -74,10 +74,10 @@ class JournalSeries<T>(
 
     // ── Operator aliases ─────────────────────────────────────────────────
 
-    fun plus(item: T): JournalSeries<T> { add(item); return this }
-    fun minus(item: T): JournalSeries<T> { remove(item); return this }
-    fun plusAssign(item: T) { add(item) }
-    fun minusAssign(item: T) { remove(item) }
+    override fun plus(item: T): MutableSeries<T> { add(item); return this }
+    override fun minus(item: T): MutableSeries<T> { remove(item); return this }
+    override fun plusAssign(item: T) { add(item) }
+    override fun minusAssign(item: T) { remove(item) }
 
     // ── Transaction control ──────────────────────────────────────────────
 

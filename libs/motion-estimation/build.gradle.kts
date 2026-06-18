@@ -17,7 +17,7 @@ kotlin {
     sourceSets {
         val commonMain by getting {
             dependencies {
-                api(project(":libs:lib"))
+                implementation(project(":"))
                 api("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
             }
         }

@@ -2,8 +2,7 @@
 
 package borg.trikeshed.isam
 
-import borg.trikeshed.lib.Usable
-import borg.trikeshed.userspace.nio.file.spi.FileOperations
+import borg.trikeshed.common.Usable
 import borg.trikeshed.cursor.Cursor
 import borg.trikeshed.cursor.RowVec
 import borg.trikeshed.cursor.meta
@@ -13,12 +12,14 @@ import kotlinx.cinterop.*
 import platform.posix.*
 import simple.PosixFile
 import simple.PosixOpenOpts
+import kotlin.collections.component1
+import kotlin.collections.component2
+import kotlin.collections.set
 
 actual class IsamDataFile actual constructor(
     datafileFilename: String,
     metafileFilename: String,
     metafile: IsamMetaFileReader,
-    @Suppress("UNUSED_PARAMETER") fileOps: FileOperations,
 ) : Usable, Cursor {
 
     actual val datafileFilename: String = datafileFilename
@@ -32,10 +33,10 @@ actual class IsamDataFile actual constructor(
 
     } // unfortunately due to seperatoin of ctor and open, this is not immutable
     val constraints: Series<RecordMeta> by lazy { metafile.constraints }
-   lateinit var data: COpaquePointer
+    private lateinit var data: COpaquePointer
     var fileSize: Long = -1
 
-   var first = true
+    private var first = true
     actual override fun open() {
         if (!first) return
         memScoped {
@@ -84,7 +85,7 @@ actual class IsamDataFile actual constructor(
                 return (fileSize / recordlen).toInt()
             }
         }
-    actual override val b:(Int)-> RowVec /*(Int) -> Join<Int, (Int) -> Join<Any?, ()`ColumnMeta↻`>>*/ = { row ->
+    actual override val b:(Int)-> RowVec /*(Int) -> Join<Int, (Int) -> Join<Any?, () -> ColumnMeta>>*/ = { row ->
         memScoped {
             val d2 = data.toLong() + (row * recordlen)
 
@@ -110,10 +111,10 @@ actual class IsamDataFile actual constructor(
 
     actual companion object {
 
-        actual fun write(cursor: Cursor, datafilename: String, varChars: Map<String, Int>, fileOps: FileOperations) {
+        actual fun write(cursor: Cursor, datafilename: String, varChars: Map<String, Int>) {
             val metafilename = "$datafilename.meta"
 
-            val meta0 = IsamMetaFileReader.write(metafilename, cursor.meta, varChars, fileOps)
+            val meta0 = IsamMetaFileReader.write(metafilename, cursor.meta, varChars)
 
             //open RandomAccessDataFile
 
@@ -154,35 +155,8 @@ actual class IsamDataFile actual constructor(
             datafilename: String,
             varChars: Map<String, Int>,
             transform: ((RowVec) -> RowVec)?,
-            fileOps: FileOperations,
         ): Unit {
-            val metafilename = "$datafilename.meta"
-            val meta0: Series<RecordMeta> = if (fileOps.exists(metafilename)) {
-                val reader = IsamMetaFileReader(metafilename, fileOps)
-                reader.open()
-                reader.constraints
-            } else {
-                val rows = msf.map { transform?.invoke(it) ?: it }.toList()
-                val cursor = rows.toSeries()
-                write(cursor, datafilename, varChars, fileOps)
-                return
-            }
-
-            val last = meta0.last()
-            val rowLen = last.end
-
-            val data = PosixFile(
-                datafilename,
-                PosixOpenOpts.withFlags(PosixOpenOpts.O_WrOnly, PosixOpenOpts.O_Append, PosixOpenOpts.O_Creat)
-            )
-
-            msf.forEach { rowVec ->
-                val rv = transform?.invoke(rowVec) ?: rowVec
-                val rowBuf = ByteArray(rowLen)
-                WireProto.writeToBuffer(rv, rowBuf, meta0)
-                data.write(rowBuf)
-            }
-            data.close()
+            TODO()
         }
     }
 }

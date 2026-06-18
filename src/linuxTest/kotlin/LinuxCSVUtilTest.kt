@@ -1,8 +1,6 @@
-
-
 package borg.trikeshed.isam
 
-import borg.trikeshed.*
+import borg.trikeshed.common.*
 import borg.trikeshed.lib.CharSeries
 import borg.trikeshed.cursor.*
 import borg.trikeshed.isam.meta.IOMemento
@@ -26,7 +24,7 @@ class LinuxCSVUtilTest {
             val lp = (csv α { delimR: DelimitRange ->
                 val chars = fileBuf.get(delimR.asIntRange) α { it.toUByte().toInt().toChar() }
                 (chars).asString()
-            }).view.withIndex().toList()
+            }).`▶`.withIndex().toList()
             println(lp)
         }
     }
@@ -91,4 +89,49 @@ class LinuxCSVUtilTest {
             assertEquals(IOMemento.IoFloat, meta[11].type)
         }
     }
+
+//    @Test
+//    fun testConformant2Isam() {
+//        val fileBuf = fileBuffer(target)
+//        fileBuf.use {
+//            val cursor = CSVUtil.parseConformant(fileBuf)
+//            val meta = cursor.meta.debug {
+//                logDebug { "meta: ${it.toList()}" }
+//            }
+//            meta.forEach { println(it) }
+//            UringIsamDataFile.write  (cursor, "/tmp/hi.isam")
+//            IsamDataFile("/tmp/hi.isam").use { isam:Cursor ->
+//
+//                isam.head()
+//                logDebug {
+//                    "meta: ${
+//                        isam.meta.map { isam ->
+//                            isam.name to isam.type
+//                        }
+//                    }"
+//                }
+//                //test row 16 against the contents
+//                // 1502943360000,4261.48000000,4261.48000000,4261.48000000,4261.48000000,0.00000000,1502943419999,0.00000000,0,0.00000000,0.00000000,7958.34896534
+//                val row16 = isam.row(16)
+//                val row16List = row16.left
+//                assertEquals(12, row16List.size)
+//                assertEquals(1502943360000, row16List[0])
+//
+//                assertEquals(1502943419999, row16List[6])
+//                assertEquals(
+//                    0.toByte(),
+//                    row16List[8]
+//                )//this test arrives at a Byte duck type, and needs a cast or fails.
+//                assertEquals(4261.48f, row16List[1])
+//                assertEquals(4261.48f, row16List[2])
+//                assertEquals(4261.48f, row16List[3])
+//                assertEquals(4261.48f, row16List[4])
+//                assertEquals(7958.34896534, row16List[11])
+//                assertEquals(0f, row16List[5])
+//                assertEquals(0f, row16List[7])
+//                assertEquals(0f, row16List[9])
+//                assertEquals(0f, row16List[10])
+//            }
+//        }
+//    }
 }
