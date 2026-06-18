@@ -1,9 +1,7 @@
 @file:Suppress("UNCHECKED_CAST")
-
 package borg.trikeshed.mutable
 
 import borg.trikeshed.lib.*
-import borg.trikeshed.lib.get
 
 /**
  * A MutableSeries backed by a tree of fixed-size chunks.
@@ -19,7 +17,7 @@ import borg.trikeshed.lib.get
  */
 class ChunkedMutableSeries<T>(
     private val chunkSize: Int = 4096,
-) : MutableSeries<T> {
+) : MutableSeriesImpl<T> {
 
     init {
         require(chunkSize > 0) { "chunkSize must be positive" }
@@ -28,7 +26,7 @@ class ChunkedMutableSeries<T>(
    var chunks: Series<Series<T>> = 0 j { throw IndexOutOfBoundsException("no chunks") }
    var totalSize: Int = 0
 
-    // ── Stairs index for combine view ────────────────────────────────────
+    // Stairs index for combine view
 
     private fun stairsArray(): IntArray {
         val sz = chunks.size
@@ -51,17 +49,18 @@ class ChunkedMutableSeries<T>(
         return ci j offset
     }
 
-    // ── Series interface ─────────────────────────────────────────────────
+    // Series interface
 
+    override val size: Int get() = totalSize
     override val a: Int get() = totalSize
     override val b: (Int) -> T = { i ->
         val (ci, offset) = chunkIndexAndOffset(i)
         chunks[ci][offset]
     }
 
-    // ── MutableSeries ────────────────────────────────────────────────────
+    // MutableSeriesImpl
 
-    override fun set(index: Int, item: T) {
+    override fun set(index: Int, item: T): MutableSeries<T> {
         val (ci, offset) = chunkIndexAndOffset(index)
         val oldChunk = chunks[ci]
         val newChunk: Series<T> = oldChunk.size j { i ->
@@ -71,14 +70,15 @@ class ChunkedMutableSeries<T>(
         chunks = oldChunks.size j { i ->
             if (i == ci) newChunk else oldChunks[i]
         }
+        return this
     }
 
-    override fun add(item: T) {
+    override fun append(item: T): MutableSeries<T> {
         if (totalSize == 0) {
             val firstChunk: Series<T> = 1 j { item }
             chunks = 1 j { firstChunk }
             totalSize = 1
-            return
+            return this
         }
         val lastIdx = chunks.size - 1
         val lastChunk = chunks[lastIdx]
@@ -99,12 +99,13 @@ class ChunkedMutableSeries<T>(
             }
         }
         totalSize++
+        return this
     }
 
-    override fun add(index: Int, item: T) {
+    override fun add(index: Int, item: T): MutableSeries<T> {
         if (index == totalSize) {
             add(item)
-            return
+            return this
         }
         val (ci, offset) = chunkIndexAndOffset(index)
         val oldChunk = chunks[ci]
@@ -120,9 +121,10 @@ class ChunkedMutableSeries<T>(
             if (i == ci) newChunk else oldChunks[i]
         }
         totalSize++
+        return this
     }
 
-    override fun removeAt(index: Int): T {
+    override fun removeAt(index: Int): Pair<MutableSeries<T>, T> {
         val (ci, offset) = chunkIndexAndOffset(index)
         val oldChunk = chunks[ci]
         val item = oldChunk[offset]
@@ -142,7 +144,7 @@ class ChunkedMutableSeries<T>(
             }
         }
         totalSize--
-        return item
+        return this to item
     }
 
     override fun remove(item: T): Boolean {
@@ -160,8 +162,67 @@ class ChunkedMutableSeries<T>(
         totalSize = 0
     }
 
-    override fun plus(item: T): MutableSeries<T> { add(item); return this }
-    override fun minus(item: T): MutableSeries<T> { remove(item); return this }
-    override fun plusAssign(item: T) { add(item) }
-    override fun minusAssign(item: T) { remove(item) }
+    override fun freeze(): MutableSeries<T> = this
+
+    override fun cowUpdate(index: Int, item: T): MutableSeries<T> = set(index, item)
+
+    override fun cowSnapshot(): MutableSeries<T> = this
+
+    override fun insert(index: Int, item: T): MutableSeries<T> = add(index, item)
+
+    override fun removeAt(index: Int): Pair<MutableSeries<T>, T> {
+        val (ci, offset) = chunkIndexAndOffset(index)
+        val oldChunk = chunks[ci]
+        val item = oldChunk[offset]
+        if (oldChunk.size == 1) {
+            val nc = chunks.size - 1
+            val oldChunks = chunks
+            chunks = nc j { i ->
+                if (i < ci) oldChunks[i] else oldChunks[i + 1]
+            }
+        } else {
+            val newChunk: Series<T> = (oldChunk.size - 1) j { i ->
+                if (i < offset) oldChunk[i] else oldChunk[i + 1]
+            }
+            val oldChunks = chunks
+            chunks = oldChunks.size j { i ->
+                if (i == ci) newChunk else oldChunks[i]
+            }
+        }
+        totalSize--
+        return this to item
+    }
+
+    override fun remove(item: T): Boolean {
+        for (i in 0 until totalSize) {
+            if (b(i) == item) {
+                removeAt(i)
+                return true
+            }
+        }
+        return false
+    }
+
+    override fun clear() {
+        chunks = 0 j { throw IndexOutOfBoundsException("no chunks") }
+        totalSize = 0
+    }
+
+    override fun concat(other: MutableSeries<T>): MutableSeries<T> {
+        val otherChunks = other.sequence().toList().windowed(chunkSize, chunkSize, false) { chunk ->
+            chunk.size j { i -> chunk[i] }
+        }
+        chunks = chunks.size j { i -> chunks[i] } + otherChunks.size j { i -> otherChunks[i] }
+        totalSize += other.size
+        return this
+    }
+
+    override fun sequence(): Sequence<T> = (0 until totalSize).asSequence().map { b(it) }
+
+    override val size: Int get() = totalSize
+    override val a: Int get() = totalSize
+    override val b: (Int) -> T = { i ->
+        val (ci, offset) = chunkIndexAndOffset(i)
+        chunks[ci][offset]
+    }
 }

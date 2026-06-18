@@ -218,14 +218,14 @@ object KanbanBlackboardDomain {
         )
     }
 
-    fun boardToContexts(cards: List<BoardCard>): List<BlackboardContext> = cards.map { cardToContext(it) }
-    fun boardToRows(cards: List<BoardCard>): List<List<CellOverlay<*>>> = cards.map { cardToRow(it) }
+    fun boardToContexts(cards: List<BoardCard>): List<BlackboardContext> = cards.α { cardToContext(it) }
+    fun boardToRows(cards: List<BoardCard>): List<List<CellOverlay<*>>> = cards.α { cardToRow(it) }
 
     fun dependencyHandles(cards: List<BoardCard>): List<Join<String, String>> {
+        val idIndex = cards.α { it.id }.mapIndexed { i, id -> id to i }.toMap()
         val handles = mutableListOf<Join<String, String>>()
-        val idIndex = cards.mapIndexed { i, c -> c.id to i }.toMap()
-        for (card in cards) {
-            for (dep in card.dependencies) {
+        cards.view.forEach { card ->
+            card.dependencies.view.forEach { dep ->
                 if (idIndex.contains(dep)) handles.add(dep j card.id)
             }
         }
@@ -253,3 +253,6 @@ infix fun <A, B> A.j(b: B): Join<A, B> = this to b
 
 typealias Series<T> = List<T>
 infix fun <T> Int.s_(vararg items: T): Series<T> = items.toList()
+
+// --- Alpha projection helpers ---
+inline fun <T, R> List<T>.α(crossinline xform: (T) -> R): List<R> = this.map(xform)

@@ -8,14 +8,16 @@ pluginManagement {
 
 rootProject.name = "TrikeShed"
 
-// Only include the working modules
+// Clean working modules - NO xvm, lib_cursor, polyglot, activejs, classfile
+// We want: pointcutting algebra SEPARATED from xvm/lib_cursor
 val workingModules = setOf(
     "forge", "forge-api", "forge-ui", "kanban", "keymux", "modelmux", "user-signals",
     "lcnc", "window-toolkit", "miniduck", "miniduck-memory", "common",
     "couch", "couch:viewserver", "htx-client", "tls", "ipfs", "quic", "ngsctp",
     "tiny-btrfs", "kursive", "patl", "concurrency", "dreamer-kmm", "dreamer-dashboard",
-    "openapi", "server", "htx-client", "jules-client", "uring", "polyglot", "cmc",
-    "cmc-generated", "krak", "krak-generated", "rhood-generated", "cpu-cache"
+    "openapi", "server", "htx-client", "jules-client", "uring", "cmc",
+    "cmc-generated", "krak", "krak-generated", "rhood-generated", "cpu-cache",
+    "ccek-dsl"
 )
 
 val libsDir = rootDir.resolve("libs")
@@ -24,11 +26,6 @@ if (libsDir.exists() && libsDir.isDirectory) {
         .filter { it.isDirectory }
         .filter { it.name in workingModules }
         .forEach { include(":libs:${it.name}") }
-}
-
-// Include classfile subprojects if they have proper structure
-if (file("libs/classfile/lib_cursor").exists()) {
-    include(":libs:classfile:lib_cursor")
 }
 
 include(":libs:lcnc")

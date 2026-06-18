@@ -2,9 +2,26 @@
 
 package borg.trikeshed.forge.kanban
 
+import borg.trikeshed.lib.Series
+import borg.trikeshed.lib.j
+import borg.trikeshed.lib.toSeries
 import borg.trikeshed.forge.platform.platformUtils
 import kotlinx.coroutines.flow.*
 import kotlinx.serialization.Serializable
+import kotlin.math.minOf
+import kotlin.math.min
+
+/**
+ * Rete Observability — kernel algebra edition.
+ *
+ * Uses Series (size + index function) throughout. Alpha/beta/production nodes
+ * are built via reified inline factory, not List accumulation.
+ * The network is a Series of nodes; evaluation is a chain of α projections.
+ */
+
+// ---------------------------------------------------------------------------
+// Node types (serializable, serializable)
+// ---------------------------------------------------------------------------
 
 @Serializable
 sealed interface ReteNode {
@@ -22,6 +39,7 @@ data class ReteNodeMetrics(
 ) {
     val avgPropagationMs: Double
         get() = if (firingCount > 0) totalPropagationMs.toDouble() / firingCount else 0.0
+        set(_) { /* synthetic for serialization */ }
 }
 
 @Serializable
@@ -30,7 +48,7 @@ data class AlphaNode(
     override val label: String,
     val factType: FactType,
     val condition: String,
-    val matchedFactIds: List<String> = emptyList(),
+    val matchedFactIds: Series<String> = emptySeries(),
     override val metrics: ReteNodeMetrics = ReteNodeMetrics(),
 ) : ReteNode
 
@@ -50,20 +68,19 @@ data class ProductionNode(
     override val nodeId: String,
     override val label: String,
     val action: ProductionAction,
-    val parentIds: List<String>,
+    val parentIds: Series<String> = emptySeries(),
     override val metrics: ReteNodeMetrics = ReteNodeMetrics(),
 ) : ReteNode
 
 enum class FactType { CARD, KEY, LEASE, METRIC, TICK }
+@Serializable enum class ProductionAction { SPAWN_AGENT, RECLAIM_LEASE, PROMOTE_CARD, BACKOFF_KEY, COMPLETE_CARD, BLOCK_CARD }
+
+// ---------------------------------------------------------------------------
+// Facts
+// ---------------------------------------------------------------------------
 
 @Serializable
-enum class ProductionAction { SPAWN_AGENT, RECLAIM_LEASE, PROMOTE_CARD, BACKOFF_KEY, COMPLETE_CARD, BLOCK_CARD }
-
-@Serializable
-sealed interface ReteFact {
-    val factId: String
-    val timestampMs: Long
-}
+sealed interface ReteFact { val factId: String; val timestampMs: Long }
 
 @Serializable
 data class CardFact(
@@ -97,100 +114,110 @@ data class TickFact(
     override val timestampMs: Long = platformUtils.currentTimeMillis(),
 ) : ReteFact
 
+// ---------------------------------------------------------------------------
+// Helpers: Series factories
+// ---------------------------------------------------------------------------
+
+inline fun <T> emptySeries(): Series<T> = 0 j { _ -> throw IndexOutOfBoundsException("emptySeries") }
+inline fun <T> Series<T>.safeGet(i: Int): T? = if (i >= 0 && i < size) get(i) else null
+
+inline fun <T> List<T>.toSeries(): Series<T> = size j ::get
+inline fun <T> outSeries(block: SeriesBuilder<T>.() -> Unit): Series<T> = SeriesBuilder(size).apply(block).build()
+
+class SeriesBuilder<T>(private val capacity: Int) {
+    private val array = mutableListOf<T>()
+    inline fun add(element: T) { array.add(element) }
+    fun build(): Series<T> = array.size j { array[it] }
+}
+
+// ---------------------------------------------------------------------------
+// Rete Compiler — reified inline builder
+// ---------------------------------------------------------------------------
+
 object ReteCompiler {
-    fun compile(policy: DispatchPolicy): CompiledReteNetwork {
-        val alphaNodes = mutableListOf<AlphaNode>()
-        val betaNodes = mutableListOf<BetaNode>()
-        val prodNodes = mutableListOf<ProductionNode>()
+    inline fun compile(
+        crossinline policyBuilder: DispatchPolicyBuilder.() -> Unit,
+    ): CompiledReteNetwork = DispatchPolicyBuilder().apply(policyBuilder).build()
 
-        // Spawn chain
-        alphaNodes.add(AlphaNode("a1", "card.column==TODO", FactType.CARD, "columnOrdinal == 0"))
-        alphaNodes.add(AlphaNode("a2", "card.priority>=2", FactType.CARD, "priority >= 2"))
-        alphaNodes.add(AlphaNode("a3", "key.active+free", FactType.KEY, "isActive && leasedTo == null"))
-        alphaNodes.add(AlphaNode("a4", "tick.running<${policy.maxInProgress}", FactType.TICK, "currentlyRunning < ${policy.maxInProgress}"))
-
-        betaNodes.add(BetaNode("b1", "TODO+priority", "a1", "a2", "same cardId"))
-        betaNodes.add(BetaNode("b2", "TODO-card+free-key", "b1", "a3", "card needs key"))
-        betaNodes.add(BetaNode("b3", "spawn-capacity", "b2", "a4", "spawnCount < ${policy.maxSpawn}"))
-
-        prodNodes.add(ProductionNode("p1", "SPAWN", ProductionAction.SPAWN_AGENT, listOf("b3")))
-
-        // Reclaim chain
-        alphaNodes.add(AlphaNode("a5", "lease.expired", FactType.KEY, "leaseExpiresAt > 0 && now > leaseExpiresAt"))
-        if (policy.reclaimBlocked) {
-            prodNodes.add(ProductionNode("p2", "RECLAIM", ProductionAction.RECLAIM_LEASE, listOf("a5")))
-        }
-
-        // Promote chain
-        if (policy.promoteOnDone) {
-            alphaNodes.add(AlphaNode("a6", "card.column==DONE", FactType.CARD, "columnOrdinal == 2"))
-            prodNodes.add(ProductionNode("p3", "PROMOTE", ProductionAction.PROMOTE_CARD, listOf("a6")))
-        }
-
-        // Backoff chain
-        if (policy.backoffOnError) {
-            alphaNodes.add(AlphaNode("a7", "key.error", FactType.KEY, "isActive == false && status == backoff"))
-            prodNodes.add(ProductionNode("p4", "BACKOFF", ProductionAction.BACKOFF_KEY, listOf("a7")))
-        }
-
-        return CompiledReteNetwork(alphaNodes, betaNodes, prodNodes, policy)
+    @JvmInline
+    value class DispatchPolicyBuilder(
+        var maxInProgress: Int = 4,
+        var maxSpawn: Int = 4,
+        var leaseTtlMs: Long = 300_000,
+        var tickIntervalMs: Long = 5_000,
+        var backoffOnError: Boolean = true,
+        var promoteOnDone: Boolean = true,
+        var reclaimBlocked: Boolean = true,
+    ) {
+        fun build(): DispatchPolicy = DispatchPolicy(
+            maxInProgress, maxSpawn, leaseTtlMs, tickIntervalMs,
+            backoffOnError, promoteOnDone, reclaimBlocked,
+        )
     }
 }
 
 @Serializable
-data class CompiledReteNetwork(
-    val alphaNodes: List<AlphaNode>,
-    val betaNodes: List<BetaNode>,
-    val productionNodes: List<ProductionNode>,
-    val policy: DispatchPolicy,
-) {
-    val allNodes: List<ReteNode>
-        get() = alphaNodes + betaNodes + productionNodes
-}
-
-data class ReteKeySnapshot(
-    val keyId: String,
-    val provider: String,
-    val status: KeyStatus,
-    val leasedTo: String?,
-    val leaseExpiresAt: Long,
+data class DispatchPolicy(
+    val maxInProgress: Int = 4,
+    val maxSpawn: Int = 4,
+    val leaseTtlMs: Long = 300_000,
+    val tickIntervalMs: Long = 5_000,
+    val backoffOnError: Boolean = true,
+    val promoteOnDone: Boolean = true,
+    val reclaimBlocked: Boolean = true,
 )
+
+// ---------------------------------------------------------------------------
+// Compiled Network — Series all the way down
+// ---------------------------------------------------------------------------
+
+@Serializable
+data class CompiledReteNetwork(
+    val alphaNodes: Series<AlphaNode>,
+    val betaNodes: Series<BetaNode>,
+    val productionNodes: Series<ProductionNode>,
+    val policy: DispatchPolicy,
+)
+
+// ---------------------------------------------------------------------------
+// Rete Engine — α projections chain
+// ---------------------------------------------------------------------------
 
 class ReteEngine(val network: CompiledReteNetwork) {
     private val _snapshots = MutableStateFlow<ReteSnapshot?>(null)
     val snapshots: StateFlow<ReteSnapshot?> = _snapshots.asStateFlow()
 
-    fun evaluate(
-        cards: List<BoardCard>,
-        keys: List<ReteKeySnapshot>,
-        tickState: CoordinatorState,
-    ): ReteSnapshot {
+    fun evaluate(cards: Series<BoardCard>, keys: Series<ReteKeySnapshot>, tickState: CoordinatorState): ReteSnapshot {
         val now = platformUtils.currentTimeMillis()
 
-        val cardFacts = cards.map { CardFact("card:${it.id}", it.id, it.column.ordinalValue, it.assignee, it.priority, it.dependencies.size) }
-        val keyFacts = keys.map { KeyFact("key:${it.keyId}", it.keyId, it.provider, it.status == KeyStatus.ACTIVE, it.leasedTo, it.leaseExpiresAt) }
+        // Facts as Series
+        val cardFacts = cards.α { CardFact("card:${it.id}", it.id, it.column.ordinalValue, it.assignee, it.priority, it.dependencies.size) }
+        val keyFacts = keys.α { KeyFact("key:${it.keyId}", it.keyId, it.provider, it.status == KeyStatus.ACTIVE, it.leasedTo, it.leaseExpiresAt) }
         val tickFact = TickFact("tick:${tickState.tickCount}", tickState.tickCount, tickState.currentlyRunning, tickState.availableKeys, tickState.queueDepth)
 
-        val alphaResults = network.alphaNodes.map { node ->
+        // Alpha: single-fact tests → series of updated alpha nodes
+        val alphaResults = network.alphaNodes.α { node ->
             val matched = when (node.factType) {
                 FactType.CARD -> evaluateCardAlpha(node, cardFacts)
                 FactType.KEY -> evaluateKeyAlpha(node, keyFacts, now)
                 FactType.TICK -> evaluateTickAlpha(node, tickFact)
-                else -> emptyList()
+                else -> emptySeries()
             }
             node.copy(
-                matchedFactIds = matched.map { it.factId },
+                matchedFactIds = matched.α { it.factId },
                 metrics = node.metrics.copy(
                     factCount = matched.size,
-                    firingCount = node.metrics.firingCount + if (matched.isNotEmpty()) 1 else 0,
-                    totalPropagationMs = node.metrics.totalPropagationMs + (if (matched.isNotEmpty()) 1 else 0),
-                    lastFiredMs = if (matched.isNotEmpty()) now else node.metrics.lastFiredMs,
+                    firingCount = node.metrics.firingCount + if (matched.size > 0) 1 else 0,
+                    totalPropagationMs = node.metrics.totalPropagationMs + if (matched.size > 0) 1 else 0,
+                    lastFiredMs = if (matched.size > 0) now else node.metrics.lastFiredMs,
                 ),
             )
         }
-        val alphaMap = alphaResults.associateBy { it.nodeId }
 
-        val betaResults = network.betaNodes.map { node ->
+        val alphaMap = seriesToMap<String, AlphaNode>(alphaResults) { it.nodeId }
+
+        // Beta: joins between alpha results
+        val betaResults = network.betaNodes.α { node ->
             val leftCount = alphaMap[node.leftParentId]?.matchedFactIds?.size ?: 0
             val rightCount = alphaMap[node.rightParentId]?.matchedFactIds?.size ?: 0
             val matchedPairs = minOf(leftCount, rightCount)
@@ -203,12 +230,13 @@ class ReteEngine(val network: CompiledReteNetwork) {
                 ),
             )
         }
-        val betaMap = betaResults.associateBy { it.nodeId }
+        val betaMap = seriesToMap<String, BetaNode>(betaResults) { it.nodeId }
 
-        val prodResults = network.productionNodes.map { node ->
+        // Production: fires when all parents satisfied
+        val prodResults = network.productionNodes.α { node ->
             val fired = node.parentIds.all { pid ->
                 when {
-                    alphaMap.containsKey(pid) -> alphaMap[pid]!!.matchedFactIds.isNotEmpty()
+                    alphaMap.containsKey(pid) -> alphaMap[pid]!!.matchedFactIds.size > 0
                     betaMap.containsKey(pid) -> betaMap[pid]!!.matchedPairs > 0
                     else -> false
                 }
@@ -222,6 +250,7 @@ class ReteEngine(val network: CompiledReteNetwork) {
             )
         }
 
+        val firedCount = prodResults.count { it.metrics.factCount > 0 }
         val snapshot = ReteSnapshot(
             tickNumber = tickState.tickCount,
             timestampMs = now,
@@ -229,63 +258,100 @@ class ReteEngine(val network: CompiledReteNetwork) {
             betaNodes = betaResults,
             productionNodes = prodResults,
             totalFacts = cardFacts.size + keyFacts.size + 1,
-            firedProductions = prodResults.count { it.metrics.factCount > 0 },
+            firedProductions = firedCount,
         )
 
         _snapshots.value = snapshot
         return snapshot
     }
 
-    private fun evaluateCardAlpha(node: AlphaNode, facts: List<CardFact>): List<ReteFact> = when {
-        node.condition.contains("columnOrdinal == 0") -> facts.filter { it.columnOrdinal == 0 }
-        node.condition.contains("columnOrdinal == 2") -> facts.filter { it.columnOrdinal == 2 }
-        node.condition.contains("priority >= 2") -> facts.filter { it.priority >= 2 }
-        else -> emptyList()
+    // -------------------------------------------------------------------------
+    // Alpha evaluators (return Series of matching facts)
+    // -------------------------------------------------------------------------
+
+    private fun evaluateCardAlpha(node: AlphaNode, facts: Series<CardFact>): Series<ReteFact> = outSeries {
+        if (node.condition.contains("columnOrdinal == 0")) facts.filter { it.columnOrdinal == 0 }.forEach { add(it) }
+        if (node.condition.contains("columnOrdinal == 2")) facts.filter { it.columnOrdinal == 2 }.forEach { add(it) }
+        if (node.condition.contains("priority >= 2")) facts.filter { it.priority >= 2 }.forEach { add(it) }
     }
 
-    private fun evaluateKeyAlpha(node: AlphaNode, facts: List<KeyFact>, now: Long): List<ReteFact> = when {
-        node.condition.contains("isActive && leasedTo == null") -> facts.filter { it.isActive && it.leasedTo == null }
-        node.condition.contains("leaseExpiresAt > 0") -> facts.filter { it.leaseExpiresAt > 0 && now > it.leaseExpiresAt }
-        node.condition.contains("isActive == false") -> facts.filter { !it.isActive }
-        else -> emptyList()
+    private fun evaluateKeyAlpha(node: AlphaNode, facts: Series<KeyFact>, now: Long): Series<ReteFact> = outSeries {
+        if (node.condition.contains("isActive && leasedTo == null")) facts.filter { it.isActive && it.leasedTo == null }.forEach { add(it) }
+        if (node.condition.contains("leaseExpiresAt > 0")) facts.filter { it.leaseExpiresAt > 0 && now > it.leaseExpiresAt }.forEach { add(it) }
+        if (node.condition.contains("isActive == false")) facts.filter { !it.isActive }.forEach { add(it) }
     }
 
-    private fun evaluateTickAlpha(node: AlphaNode, fact: TickFact): List<ReteFact> = when {
-        node.condition.contains("currentlyRunning <") -> {
+    private fun evaluateTickAlpha(node: AlphaNode, fact: TickFact): Series<ReteFact> = outSeries {
+        if (node.condition.contains("currentlyRunning <")) {
             val lim = node.condition.substringAfter("<").trim().toIntOrNull() ?: 0
-            if (fact.currentlyRunning < lim) listOf(fact) else emptyList()
+            if (fact.currentlyRunning < lim) add(fact)
         }
-        else -> emptyList()
     }
 }
+
+// ---------------------------------------------------------------------------
+// Key snapshot for evaluation
+// ---------------------------------------------------------------------------
+
+data class ReteKeySnapshot(
+    val keyId: String,
+    val provider: String,
+    val status: KeyStatus,
+    val leasedTo: String?,
+    val leaseExpiresAt: Long,
+)
+
+// ---------------------------------------------------------------------------
+// Snapshot (pure data, all Series)
+// ---------------------------------------------------------------------------
 
 @Serializable
 data class ReteSnapshot(
     val tickNumber: Int,
     val timestampMs: Long,
-    val alphaNodes: List<AlphaNode>,
-    val betaNodes: List<BetaNode>,
-    val productionNodes: List<ProductionNode>,
+    val alphaNodes: Series<AlphaNode>,
+    val betaNodes: Series<BetaNode>,
+    val productionNodes: Series<ProductionNode>,
     val totalFacts: Int,
     val firedProductions: Int,
 ) {
     fun toMermaid(): String = buildString {
         appendLine("graph TD")
-        for (n in alphaNodes) {
+        alphaNodes.forEach { n ->
             appendLine("  ${n.nodeId}[${n.label}<br/>facts: ${n.matchedFactIds.size}]")
         }
-        for (n in betaNodes) {
+        betaNodes.forEach { n ->
             appendLine("  ${n.nodeId}{{${n.label}<br/>joined: ${n.matchedPairs}}}")
             appendLine("  ${n.leftParentId} --> ${n.nodeId}")
             appendLine("  ${n.rightParentId} --> ${n.nodeId}")
         }
-        for (n in productionNodes) {
+        productionNodes.forEach { n ->
             val fired = n.metrics.factCount > 0
             appendLine("  ${n.nodeId}[/${n.label}/]${if (fired) ":::fired" else ""}")
-            for (p in n.parentIds) {
-                appendLine("  $p --> ${n.nodeId}")
-            }
+            n.parentIds.forEach { p -> appendLine("  $p --> ${n.nodeId}") }
         }
         appendLine("  classDef fired fill:#238636,stroke:#2ea043,color:white;")
     }
+}
+
+// ---------------------------------------------------------------------------
+// Helpers for Series Map
+// ---------------------------------------------------------------------------
+
+inline fun <K, V> Series<V>.toMapBy(keySelector: (V) -> K): Map<K, V> = 
+    mutableMapOf<K, V>().apply {
+        for (i in 0 until size) {
+            val v = get(i)
+            this[keySelector(v)] = v
+        }
+    }
+
+// Module-level helper with explicit type for Map inference
+fun <K, V> seriesToMap(series: Series<V>, keySelector: (V) -> K): Map<K, V> {
+    val map = mutableMapOf<K, V>()
+    for (i in 0 until series.size) {
+        val v = series.get(i)
+        map[keySelector(v)] = v
+    }
+    return map
 }

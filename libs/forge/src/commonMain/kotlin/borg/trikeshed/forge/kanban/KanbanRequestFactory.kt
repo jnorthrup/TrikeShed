@@ -254,7 +254,7 @@ class KanbanRequestFactory(
     fun init(cards: List<BoardCard>) {
         _version = 0
         _cards.clear()
-        for (card in cards) {
+        cards.view.forEach { card ->
             _cards[card.id] = CardEntity(
                 entityId = card.id,
                 version = 0,
@@ -284,7 +284,7 @@ class KanbanRequestFactory(
         val tick = coordinator.tick()
 
         // Apply card mutations
-        for ((cardId, updated) in request.cardMutations) {
+        request.cardMutations.entries.view.forEach { (cardId, updated) ->
             _cards[cardId] = updated
             boardEngine.assign(cardId, updated.assignee ?: "")
             if (updated.columnId != _cards[cardId]?.columnId) {
@@ -293,7 +293,7 @@ class KanbanRequestFactory(
         }
 
         // Apply assignments
-        for ((cardId, assignee) in request.cardAssignments) {
+        request.cardAssignments.view.forEach { (cardId, assignee) ->
             _cards[cardId]?.let { card ->
                 _cards[cardId] = card.copyWith(assignee = assignee)
                 boardEngine.assign(cardId, assignee)
@@ -301,19 +301,21 @@ class KanbanRequestFactory(
         }
 
         // Apply moves
-        for ((cardId, columnId, order) in request.cardMoves) {
+        request.cardMoves.view.forEach { (cardId, columnId, order) ->
             val column = BoardColumn.values().firstOrNull { it.name.lowercase() == columnId }
                 ?: BoardColumn.TODO
             _cards[cardId]?.let { card ->
                 _cards[cardId] = card.copyWith(columnId = columnId)
-                if (column == BoardColumn.DOING) boardEngine.assign(cardId, card.assignee ?: "")
-                if (column == BoardColumn.DONE) boardEngine.complete(cardId, "moved to done")
-                if (column == BoardColumn.BLOCKED) boardEngine.block(cardId, "moved to blocked")
+                when (column) {
+                    BoardColumn.DOING -> boardEngine.assign(cardId, card.assignee ?: "")
+                    BoardColumn.DONE -> boardEngine.complete(cardId, "moved to done")
+                    BoardColumn.BLOCKED -> boardEngine.block(cardId, "moved to blocked")
+                }
             }
         }
 
         // Apply completions
-        for (cardId in request.cardCompletes) {
+        request.cardCompletes.view.forEach { cardId ->
             _cards[cardId]?.let { card ->
                 _cards[cardId] = card.copyWith(columnId = BoardColumn.DONE.name.lowercase())
                 boardEngine.complete(cardId, "completed")
@@ -321,7 +323,7 @@ class KanbanRequestFactory(
         }
 
         // Apply blocks
-        for ((cardId, reason) in request.cardBlocks) {
+        request.cardBlocks.view.forEach { (cardId, reason) ->
             _cards[cardId]?.let { card ->
                 _cards[cardId] = card.copyWith(columnId = BoardColumn.BLOCKED.name.lowercase())
                 boardEngine.block(cardId, reason)
@@ -329,7 +331,7 @@ class KanbanRequestFactory(
         }
 
         // Apply unblocks
-        for (cardId in request.cardUnblocks) {
+        request.cardUnblocks.view.forEach { cardId ->
             _cards[cardId]?.let { card ->
                 _cards[cardId] = card.copyWith(columnId = BoardColumn.TODO.name.lowercase())
                 boardEngine.unblock(cardId)

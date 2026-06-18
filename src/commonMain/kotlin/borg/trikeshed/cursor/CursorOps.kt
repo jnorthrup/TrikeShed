@@ -6,11 +6,11 @@ import borg.trikeshed.lib.*
 //
 // Selection, projection, widening, concatenation.
 // All pure — transforms read like projections, selections, joins, and ranges.
+//
+// In Cursor, single-int indexing is ALWAYS column selection (creates new Cursor).
+// Row access is ONLY via .b(index) or .at(index). Series.get extensions NOT imported.
 
 // ── Selection ───────────────────────────────────────────────────
-
-/** Row by index. */
-operator fun Cursor.get(i: Int): RowVec = b(i)
 
 /** Range view — composition, not control flow. */
 operator fun Cursor.get(range: IntRange): Cursor =
@@ -23,9 +23,17 @@ fun Cursor.select(vararg cols: Int): Cursor =
         cols.size j { c -> rv[cols[c]] }
     }
 
+/** Column projection by vararg — cursor[1, 2, 3] returns new Cursor with those columns. */
+operator fun Cursor.get(vararg cols: Int): Cursor = select(*cols)
+
+/** Single column selection — cursor[1] returns new Cursor with column 1 only. */
+operator fun Cursor.get(col: Int): Cursor = select(col)
+
+/** Row access — explicit, NOT via indexing. Use .at(i) or .b(i). */
+infix fun Cursor.at(index: Int): RowVec = this.b(index)
+
 /** Column projection by name. */
 fun Cursor.select(vararg names: CharSequence): Cursor {
-    // Resolve name→index from first row's metadata
     val firstRow = this[0]
     val nameToIdx = mutableMapOf<CharSequence, Int>()
     for (c in 0 until firstRow.size) {
@@ -79,8 +87,6 @@ val Cursor.head: RowVec get() = this[0]
 
 /** All rows except the first. */
 val Cursor.tail: Cursor get() = this[1..< size]
-
-// ── Meta access ─────────────────────────────────────────────────
 
 /** Column metadata series from the first row. */
 val Cursor.meta: Series<ColumnMeta>

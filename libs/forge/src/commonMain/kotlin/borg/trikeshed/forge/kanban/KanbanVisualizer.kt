@@ -34,21 +34,30 @@ private val COLUMN_COLORS = mapOf(
 private fun priorityColor(p: Int) = when { p >= 3 -> "#f87171"; p >= 2 -> "#fbbf24"; else -> "#4ade80" }
 
 fun buildRenderModel(cards: List<BoardCard>): KanbanRenderModel {
-    val columns = BoardColumn.entries.map { col ->
+    val columns = BoardColumn.entries.α { col ->
         KanbanRenderModel.ColumnRender(
             id = col.name.lowercase(), name = col.name, ordinalValue = col.ordinalValue,
             color = COLUMN_COLORS[col] ?: "#888888", wipLimit = null,
-            cards = cards.filter { it.column == col }.map { c ->
+            cards = cards.view.filter { it.column == col }.α { c ->
                 KanbanRenderModel.CardRender(c.id, c.title, col.name.lowercase(), c.assignee,
                     c.priority, priorityColor(c.priority), c.logHandle(), c.tags.toList())
             },
         )
     }
-    val edges = cards.flatMap { card -> card.dependencies.map { dep -> KanbanRenderModel.CardEdge(dep, card.id, "blocks") } }
-    val stats = KanbanRenderModel.BoardStats(cards.size, cards.count { it.column == BoardColumn.TODO },
-        cards.count { it.column == BoardColumn.DOING }, cards.count { it.column == BoardColumn.DONE },
-        cards.count { it.column == BoardColumn.BLOCKED }, cards.count { it.assignee != null }, cards.count { it.assignee == null })
+    val edges = cards.view.flatMap { card ->
+        card.dependencies.α { dep -> KanbanRenderModel.CardEdge(dep, card.id, "blocks") }
+    }
+    val stats = KanbanRenderModel.BoardStats(
+        cards.size,
+        cards.view.count { it.column == BoardColumn.TODO },
+        cards.view.count { it.column == BoardColumn.DOING },
+        cards.view.count { it.column == BoardColumn.DONE },
+        cards.view.count { it.column == BoardColumn.BLOCKED },
+        cards.view.count { it.assignee != null },
+        cards.view.count { it.assignee == null },
+    )
     return KanbanRenderModel(columns, edges, stats)
+}
 }
 
 fun KanbanRenderModel.toMermaid(): String = buildString {

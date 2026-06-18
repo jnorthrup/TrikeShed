@@ -22,5 +22,4 @@ repositories {
 
 kotlin.sourceSets["commonMain"].dependencies {
     api(project(":"))
-    api(project(":libs:classfile:lib_cursor"))
-}
+ }
