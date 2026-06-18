@@ -2,7 +2,7 @@ import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 
 plugins {
-    kotlin("multiplatform") version "2.4.0"
+    kotlin("multiplatform") version "2.1.0"
     id("com.github.ben-manes.versions") version "0.54.0"
     `maven-publish`
 }
@@ -28,8 +28,8 @@ repositories {
 
 kotlin {
     @OptIn(ExperimentalKotlinGradlePluginApi::class) compilerOptions {
-        apiVersion.set(org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_4)
-        languageVersion.set(org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_4)
+        apiVersion.set(org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_1)
+        languageVersion.set(org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_1)
         freeCompilerArgs = listOf(
             "-opt-in=kotlin.RequiresOptIn",
             "-opt-in=kotlin.ExperimentalUnsignedTypes",
@@ -39,13 +39,13 @@ kotlin {
             // JEP 484 ClassFile API (jdk.internal.classfile)
             "--add-exports=java.base/jdk.internal.classfile=ALL-UNNAMED",
             "--add-exports=java.base/jdk.internal.classfile.attribute=ALL-UNNAMED",
-            "--add-exports=java.base/jdk.internal.classfile.constantpool=ALL-UNNAMED",
-            "--add-exports=java.base/jdk.internal.classfile.instruction=ALL-UNNAMED",
-            "--add-exports=java.base/jdk.internal.classfile.models=ALL-UNNAMED",
+            "--add-exports=java.base/jdk/internal.classfile.constantpool=ALL-UNNAMED",
+            "--add-exports=java.base/jdk/internal.classfile.instruction=ALL-UNNAMED",
+            "--add-exports=java.base/jdk/internal.classfile.models=ALL-UNNAMED",
         )
     }
 
-    jvmToolchain(25)
+    jvmToolchain(21)
 
     jvm {}
 

@@ -15,33 +15,42 @@ import java.nio.file.Paths
 import java.nio.file.StandardOpenOption.*
 import java.util.concurrent.locks.ReentrantLock
 
+/**
+ * ISAM Data File — actual JVM implementation of Cursor.
+ * Uses interface-implementation pattern: actual class with explicit interface members.
+ */
 actual class IsamDataFile actual constructor(
     datafileFilename: String,
     metafileFilename: String,
     metafile: IsamMetaFileReader,
     @Suppress("UNUSED_PARAMETER") fileOps: FileOperations,
 ) : Usable, Cursor {
+
     actual val datafileFilename = datafileFilename
     actual val metafile by lazy {
         metafile.open()
         metafile
     }
-   val data: SeekableByteChannel by lazy {
+
+    val data: SeekableByteChannel by lazy {
         Files.newByteChannel(
             Paths.get(datafileFilename),
             READ
         )
     }
 
-   val recordlen: Int by lazy { metafile.recordlen }
-   val fileSize: Long get() = data.size()
+    val recordlen: Int by lazy { metafile.recordlen }
+    val fileSize: Long get() = data.size()
     actual override val a: Int by lazy { fileSize.toInt() / recordlen }
 
-   val constraints: Series<RecordMeta> get() = metafile.constraints
+    val constraints: Series<RecordMeta> get() = metafile.constraints
+
     override fun toString(): String =
         "IsamDataFile(metafile=$metafile, recordlen=$recordlen, constraints=$constraints," +
                 " datafileFilename='$datafileFilename', fileSize=$fileSize)"
 
+    // Cursor interface: a = row count, b: (Int) -> RowVec
+    actual override val a: Int by lazy { fileSize.toInt() / recordlen }
 
     actual override val b: (Int) -> RowVec = { row ->
         lock.lock()
@@ -51,16 +60,20 @@ actual class IsamDataFile actual constructor(
         lock.unlock()
         val array = buffer.position(0).array()
 
-        constraints.size j { col ->
+        // RowVec = Series2<Any?, ColumnMeta↻>
+        // Join size (col count) with index -> RowVec
+        constraints.size j { col: Int ->
             val constraint = constraints[col]
             val s = array.sliceArray(constraint.begin until constraint.end)
+            // Return RowVec = Series2<Any?, ColumnMeta↻>
+            // Value: decoded cell, Meta: supplier of ColumnMeta
             constraint.decoder(s)!! j { constraint }
         }
     }
-   val lock: ReentrantLock = ReentrantLock()
+
+    val lock: ReentrantLock = ReentrantLock()
 
     actual override fun open() {
-
         // report on record alignment of the file
         val alignment = fileSize % recordlen
         if (alignment != 0L) {
@@ -78,88 +91,14 @@ actual class IsamDataFile actual constructor(
             val ocu2 = occupancy.toLong()
             val unitSize = ocu2.humanReadableByteCountIEC
             val collectiveSize = (ySize.toLong() * ocu2).humanReadableByteCountIEC
-            println("DEBUG: file $datafileFilename has $count fields of type $type occupying $unitSize or total of $collectiveSize   (${occupancy * 100 / recordlen}%)")
+            println("DEBUG: file $datafileFilename has $count fields of type $type occupying $ocu2 ($collectiveSize total)")
         }
     }
 
-    actual override fun close(): Unit = data.close()
+    val lock: ReentrantLock = ReentrantLock()
 
-
-    actual companion object {
-        actual fun write(cursor: Cursor, datafilename: String, varChars: Map<String, Int>, fileOps: FileOperations) {
-            val metafilename = "$datafilename.meta"
-
-            //turn off debug logging in here
-//            fun logDebug(f: (String) -> Unit): Unit = Unit
-
-            val meta0 = IsamMetaFileReader.write(metafilename, cursor.meta, varChars, fileOps)
-
-            //open RandomAccessDataFile
-
-            val randomAccessFile = RandomAccessFile(datafilename, "rw")
-            val data = randomAccessFile.channel
-
-            //create row buffer
-            meta0.debug { logDebug { "toIsam: " + it.view.map { it.toString() } } }
-
-
-            val last = meta0.last()
-
-            val rowLen = last.end
-            val rowBuffer1 = ByteBuffer.allocate(rowLen)
-            val rowBuffer = rowBuffer1.array()
-
-            //write rows
-            cursor.iterator().forEach { rowVec ->
-                WireProto.writeToBuffer(rowVec, rowBuffer, meta0)
-                rowBuffer1.position(0)
-                data.write(rowBuffer1)
-            }
-            randomAccessFile.close()
-            data.close()
-        }
-
-        actual fun append(
-            msf: Iterable<RowVec>,
-            datafilename: String,
-            varChars: Map<String, Int>,
-            transform: ((RowVec) -> RowVec)?,
-            fileOps: FileOperations,
-        ): Unit {
-            val metafilename = "$datafilename.meta"
-
-            // TODO("not assume we have to write this file for this call.  if it exists, verify it and use it")
-            lateinit var meta0: Series<RecordMeta>
-
-            // open RandomAccessDataFile
-            val data =
-                Files.newOutputStream(Paths.get(datafilename), APPEND, WRITE, CREATE)
-
-
-            var last: RecordMeta
-
-            var rowLen = 0
-
-            lateinit var rowBuffer: ByteArray
-            var fibLog: FibonacciReporter? = null
-            debug { fibLog = FibonacciReporter(size = null, noun = "appends") }
-            var first = true
-            // write rows
-            msf.forEach { rowVec1: RowVec ->
-                val rowVec = transform?.let { it(rowVec1) } ?: rowVec1
-                if (first) {
-                    meta0 = IsamMetaFileReader.write(metafilename, rowVec.right.α { it() }, varChars, fileOps)
-                    last = meta0.last()
-                    rowLen = last.end
-                    rowBuffer = ByteArray(rowLen) { 0 }
-                    debug { logDebug { "toIsam: " + meta0.toList() } }
-                    first = false
-                }
-
-                WireProto.writeToBuffer(rowVec, rowBuffer, meta0)
-                data.write(rowBuffer)
-                debug { fibLog?.report()?.let { println(it) } }
-            }
-        }
+    actual override fun close() {
+        lock.lock()
+        try { data.close() } finally { lock.unlock() }
     }
 }
