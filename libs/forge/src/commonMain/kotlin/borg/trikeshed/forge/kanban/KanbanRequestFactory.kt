@@ -132,7 +132,7 @@ class KanbanRequest(
 
     /** Queue a card move (column + order). */
     fun moveCard(cardId: String, columnId: String, order: Int) {
-        cardMoves.add(cardId to columnId to order)
+        cardMoves.add(Triple(cardId, columnId, order))
     }
 
     /** Queue a card completion. */

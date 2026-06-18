@@ -19,7 +19,7 @@ import borg.trikeshed.lib.size
  *
  * set/removeAt operate on the combined index.
  */
-class DequeSeries<T> : MutableSeries<T> {
+class DequeSeries<T> : Appendable<T>, RandomAccess<T>, Insertable<T>, Removable<T> {
 
    var front: Series<T> = 0 j { throw IndexOutOfBoundsException("empty Deque front") }
    var back: Series<T> = 0 j { throw IndexOutOfBoundsException("empty Deque back") }
@@ -163,8 +163,8 @@ class DequeSeries<T> : MutableSeries<T> {
         back  = 0 j { throw IndexOutOfBoundsException("empty Deque back") }
     }
 
-    override fun plus(item: T): MutableSeries<T> { addLast(item); return this }
-    override fun minus(item: T): MutableSeries<T> { remove(item); return this }
-    override fun plusAssign(item: T) { addLast(item) }
-    override fun minusAssign(item: T) { remove(item) }
+    fun plus(item: T): DequeSeries<T> { addLast(item); return this }
+    fun minus(item: T): DequeSeries<T> { remove(item); return this }
+    fun plusAssign(item: T) { addLast(item) }
+    fun minusAssign(item: T) { remove(item) }
 }

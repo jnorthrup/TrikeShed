@@ -21,7 +21,7 @@ fun interface EvictionListener<T> {
 class RingSeries<T>(
     capacity: Int,
     val evict: EvictionListener<T>? = null,
-) : MutableSeries<T> {
+) : Appendable<T>, RandomAccess<T>, Insertable<T>, Removable<T> {
 
     init {
         require(capacity > 0) { "capacity must be positive" }
@@ -101,21 +101,21 @@ class RingSeries<T>(
         count = 0
     }
 
-    override fun plus(item: T): MutableSeries<T> {
+    fun plus(item: T): RingSeries<T> {
         add(item)
         return this
     }
 
-    override fun minus(item: T): MutableSeries<T> {
+    fun minus(item: T): RingSeries<T> {
         remove(item)
         return this
     }
 
-    override fun plusAssign(item: T) {
+    fun plusAssign(item: T) {
         add(item)
     }
 
-    override fun minusAssign(item: T) {
+    fun minusAssign(item: T) {
         remove(item)
     }
 }

@@ -17,7 +17,7 @@ import borg.trikeshed.lib.*
  */
 class ChunkedMutableSeries<T>(
     private val chunkSize: Int = 4096,
-) : MutableSeriesImpl<T> {
+) : Appendable<T>, RandomAccess<T>, Insertable<T>, Removable<T> {
 
     init {
         require(chunkSize > 0) { "chunkSize must be positive" }

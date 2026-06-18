@@ -36,7 +36,7 @@ kotlin {
     sourceSets {
         val commonMain by getting {
             dependencies {
-                // api(project(":libs:lib"))  // disabled - use ccek-core for core types
+                api("org.jetbrains.kotlin:kotlin-stdlib:2.4.0")
                 api("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
                 api("org.jetbrains.kotlinx:kotlinx-serialization-core:1.7.3")
                 api("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
