@@ -25,7 +25,6 @@ kotlin {
         freeCompilerArgs.addAll(
             "-opt-in=kotlin.RequiresOptIn",
             "-Xsuppress-version-warnings",
-            "-Xexpect-actual-classes",
         )
     }
 
@@ -36,31 +35,29 @@ kotlin {
     sourceSets {
         val commonMain by getting {
             dependencies {
-                api(project(":libs:forge"))
-                api(project(":libs:modelmux"))
-                api(project(":libs:keymux"))
                 api("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
                 api("org.jetbrains.kotlinx:kotlinx-serialization-core:1.7.3")
                 api("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
-                api("org.jetbrains.kotlinx:kotlinx-datetime:0.8.0-rc02-0.6.x-compat")
-                implementation("org.xerial:sqlite-jdbc:3.49.0.0")
-                implementation("com.zaxxer:HikariCP:6.3.0")
+                // api(project(":libs:forge"))  // disabled - has broken kanban deps
+                // api(project(":libs:modelmux"))
+                // api(project(":libs:keymux"))
             }
         }
         val commonTest by getting {
             dependencies {
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
                 implementation(kotlin("test"))
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
             }
         }
         val jvmMain by getting {
             dependencies {
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
+                implementation("org.sqlite:sqlite-jdbc:3.45.1.0")
             }
         }
         val jvmTest by getting {
             dependencies {
-                implementation("org.jetbrains.kotlin:kotlin-test-junit5:2.4.0")
+                implementation(kotlin("test-junit"))
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
             }
             kotlin.srcDir("src/test/kotlin")

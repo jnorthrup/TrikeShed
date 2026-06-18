@@ -81,8 +81,7 @@ actual class ColumnMetaRef(
                 JvmPointcutFacet.SymbolName -> ActiveJsFacet.JsFunction
                 JvmPointcutFacet.TypeInfo -> ActiveJsFacet.JsModule
                 JvmPointcutFacet.ClassfileCoordinate -> ActiveJsFacet.WasmModule
-                JvmPointcutFacet.XvmCoordinate -> ActiveJsFacet.JsObject
-                JvmPointcutFacet.PointcutKind -> ActiveJsFacet.JsPromise
+                 JvmPointcutFacet.PointcutKind -> ActiveJsFacet.JsPromise
                 JvmPointcutFacet.StringPool -> ActiveJsFacet.JsTypedArray
                 else -> ActiveJsFacet.Unfaceted
             }
@@ -100,8 +99,7 @@ actual enum class PointcutFacet {
     SymbolName,
     TypeInfo,
     ClassfileCoordinate,
-    XvmCoordinate,
-    PointcutKind,
+     PointcutKind,
     StringPool,
     Wireproto,
     ChildRows,
@@ -113,7 +111,6 @@ actual enum class PointcutFacet {
     ClassfileTaxonomy,
     EdgeTaxonomy,
     CrmsDomain,
-    XSrcFile,
 }
 
 // ── TypedefResolutionSeries ─────────────────────────────────────────────────

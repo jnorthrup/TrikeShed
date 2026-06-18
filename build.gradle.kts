@@ -124,3 +124,17 @@ kotlin {
         implementation(kotlin("test"))
     }
 }
+
+apply(from = "publish_macro.gradle.kts")
+
+tasks.named("publishMavenLocalMacro") {
+    doFirst {
+        println("=== Publishing TrikeShed to mavenLocal ===")
+    }
+}
+
+tasks.named("cleanPublishMavenLocal") {
+    doFirst {
+        println("=== Clean build + publish to mavenLocal ===")
+    }
+}

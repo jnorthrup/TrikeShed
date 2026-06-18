@@ -254,8 +254,7 @@ data class CoordinateRow(
     val classfileCoord: String,   // "owner#method" or similar coordinate
     val cpIndex: Int,             // constant-pool index (-1 if unavailable)
     val descriptor: String,       // JVM descriptor or signature
-    val xvmTypeInfo: String,      // XVM type / org.xtc evidence, or ""
-    val pointcutKind: Int,        // opcode byte (0x10..0xA8)
+     val pointcutKind: Int,        // opcode byte (0x10..0xA8)
     val poolId: Int,              // stable intern-pool / hash id
     val activeJsFacet: ActiveJsFacet = ActiveJsFacet.Unfaceted, // JS/WASM runtime intent
 )
