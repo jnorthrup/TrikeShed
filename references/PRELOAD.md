@@ -35,12 +35,29 @@ infix fun <X, C, Subject : Iterable<X>> Subject.α(/* ... */)
 interface CSeries<T : Comparable<T>> : Series<T>, Comparable<Series<T>>
 val <T : Comparable<T>> Series<T>.cpb: CSeries<T>
 
+```kotlin
 // collection literals / macros
 object _l { operator fun <T> get(vararg t: T): List<T> = listOf(*t) }
 _l[...]   // List<T>
 _a[...]   // Array<T> and primitive arrays
 _s[...]   // Set<T>
 s_[...]   // Series<T>
+
+// Coordinated operators (Series / Cursor / ReifiedSplitSeries2):
+//   series / delim      → Series<Series<T>>   (lazy split on delimiter: Char/Byte)
+//   series / d          → Series<Series<T>>   (partition into d equal parts)
+//   range   / d         → Series<IntRange>    (range partitioning)
+//   series % predicate  → Iterator<Int>       (matching indices)
+//   series + elem       → Series<T>           (append single)
+//   series + series     → Series<T>           (concatenate via combine)
+//
+// ReifiedSplitSeries2 — concrete Series2 storing left/right Series directly:
+//   .select(vararg idx) → ReifiedSplitSeries2 (column selection, zero Join alloc)
+//   .mapLeft(f)         → ReifiedSplitSeries2 (transform left, preserve split)
+//   .mapRight(f)        → ReifiedSplitSeries2 (transform right, preserve split)
+//   .valueAt(col)       → A                   (direct left access)
+//   .rightAt(col)       → B                   (direct right access)
+//   .swap()             → ReifiedSplitSeries2 (swap halves)
 ```
 
 Read this algebra as:
@@ -73,13 +90,13 @@ Read Cursor as:
 - metadata is part of the algebra, not an afterthought
 
 Common cursor ideas from the project:
-- `cursor[i]` selects a row/view by index
+- `cursor[i]` selects a row/view by index — uses `Series.get(i)` = `b(i)`; explicit infix `cursor at i` also available
 - `cursor[i0 until i1]` is a range view
 - `cursor[1,3,2]` reorders / projects columns by index
 - `cursor["name","age"]` projects by column name
 - `cursor[-"debug"]` excludes columns
-- `join(cursor1, cursor2)` widens along columns
-- `combine(cursor1, cursor2)` concatenates along rows
+- `join(cursor1, cursor2)` widens by columns
+- `combine(cursor1, cursor2)` concatenates by rows
 
 Cursor rules:
 1. prefer projection over mutation
