@@ -560,6 +560,34 @@ switch (project.path) {
             implementation project(":libs:tls")
         }
         break
+    case ":libs:forge-ui":
+        // Apply Compose plugin first so it can configure the application plugin
+        pluginManager.apply("org.jetbrains.kotlin.plugin.compose")
+        pluginManager.apply("org.jetbrains.compose")
+        plainJvm(true)
+        def forgeUiKotlin = extensions.getByName("kotlin")
+        forgeUiKotlin.sourceSets.getByName("main").dependencies {
+            implementation "org.jetbrains.kotlinx:kotlinx-coroutines-core:${prop('versions.kotlinx-coroutines-core')}"
+            implementation "org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3"
+            implementation "org.jetbrains.kotlinx:kotlinx-serialization-core:1.7.3"
+            implementation "org.jetbrains.compose.desktop:desktop-jvm:1.7.3"
+            implementation "org.jetbrains.compose.material3:material3:1.7.3"
+            implementation "org.jetbrains.compose.material:material-icons-extended:1.7.3"
+            implementation project(":libs:forge")
+        }
+        // Configure compose desktop application
+        project.afterEvaluate {
+            project.application { mainClass = "borg.trikeshed.forge.ui.MainKt" }
+            def ext = project.extensions.findByName("compose")
+            if (ext) {
+                ext.desktop {
+                    application {
+                        mainClass = "borg.trikeshed.forge.ui.MainKt"
+                    }
+                }
+            }
+        }
+        break
     default:
         kmpHost()
         break

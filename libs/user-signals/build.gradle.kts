@@ -2,6 +2,14 @@ plugins {
     kotlin("multiplatform") version "2.4.0"
 }
 
+repositories {
+    mavenCentral()
+    mavenLocal()
+    google()
+    maven("https://oss.sonatype.org/content/repositories/snapshots/")
+    maven("https://www.jitpack.io")
+}
+
 kotlin {
     jvm {}
     js { browser() }
