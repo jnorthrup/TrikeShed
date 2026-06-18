@@ -9,12 +9,12 @@ pluginManagement {
 rootProject.name = "TrikeShed"
 
 // Dynamically include every library under libs/ so each subproject can be built autonomously
-// Note: ng-sctp, classfile (nested gradle), miniduck-memory (depends on classfile), ipfs (build errors) excluded
+// Note: miniduck, couch, miniduck-memory, ng-sctp, classfile, ipfs excluded due to build errors
 val libsDir = rootDir.resolve("libs")
 if (libsDir.exists() && libsDir.isDirectory) {
     libsDir.listFiles()!!
         .filter { it.isDirectory }
-        .filter { it.name != "ng-sctp" && it.name != "classfile" && it.name != "miniduck-memory" }
+        .filter { it.name !in setOf("ng-sctp", "classfile", "miniduck-memory", "miniduck", "couch", "ipfs") }
         .forEach { include(":libs:${it.name}") }
 }
 

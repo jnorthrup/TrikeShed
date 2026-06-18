@@ -5,8 +5,9 @@ import borg.trikeshed.lib.*
 
 /**
  * Alias to support JsElement terminology over JsonElement/ConfixCell.
+ * Distinct from PRELOAD.md's JsElement = Join<Twin<Int>, Series<Int>> (JSON indexer)
  */
-typealias JsElement = ConfixCell
+typealias ConfixJsElement = ConfixCell
 
 /**
  * Confix JsElement accessible blackboard.
@@ -26,7 +27,7 @@ class ConfixBlackboard {
     /**
      * Navigates to a specific JsElement within the specified entry.
      */
-    fun navigate(id: String, path: JsPath): JsElement? {
+    fun navigate(id: String, path: JsPath): ConfixJsElement? {
         val entry = records[id] ?: return null
         return entry.doc.navigate(path)
     }
@@ -34,7 +35,7 @@ class ConfixBlackboard {
     /**
      * Resolves an element using vararg path segments.
      */
-    fun getAt(id: String, vararg path: Any): JsElement? {
+    fun getAt(id: String, vararg path: Any): ConfixJsElement? {
         val entry = records[id] ?: return null
         return entry.doc.docAt(*path)
     }

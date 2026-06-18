@@ -5,6 +5,8 @@ import borg.trikeshed.context.ElementState
 import kotlinx.coroutines.CompletableJob
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.supervisorScope
 import kotlin.coroutines.CoroutineContext
 
 /**
@@ -110,8 +112,8 @@ object FanoutDispatcherKey : CoroutineContext.Key<FanoutDispatcherElement>
 
 /** Install LiburingElement + FanoutDispatcherElement in the coroutine context. */
 suspend fun CoroutineScope.installLiburingWithFanout(): Pair<LiburingElement, FanoutDispatcherElement> {
-    val liburing = LiburingElement(supervisor)
-    val fanout = FanoutDispatcherElement(supervisor)
+    val liburing = LiburingElement(supervisorScope { null })
+    val fanout = FanoutDispatcherElement(supervisorScope { null })
     liburing.open()
     // Install both elements in this scope's context
     return withContext(liburing + fanout) { liburing to fanout }

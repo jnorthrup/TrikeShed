@@ -131,7 +131,7 @@ class CowSeriesHandle<T>(
  * atomically on every mutation.
  */
 class CowSeriesBody<T>(
-    private val arr: Array<Any?> = emptyArray(),
+      val arr: Array<Any?> = emptyArray(),
 ) : Join<Int, (Int) -> T> {
     override val a: Int get() = arr.size
     @Suppress("UNCHECKED_CAST")
