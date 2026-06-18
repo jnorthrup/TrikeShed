@@ -27,8 +27,7 @@ import kotlinx.serialization.Serializable
 // Wire format spec
 // ---------------------------------------------------------------------------
 
-@JvmInline
-value class WireProtoSpec(
+inline  class WireProtoSpec(
     val phaseBits: Int = 4,
     val opcodeBits: Int = 8,
     val methodIdxBits: Int = 4,

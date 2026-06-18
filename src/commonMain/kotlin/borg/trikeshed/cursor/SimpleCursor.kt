@@ -12,8 +12,7 @@ import kotlin.jvm.JvmOverloads
  * This class wraps the Join directly without relying on Kotlin delegation
  * to avoid XVM-era parameter mismatches.
  */
-@JvmInline
-value class SimpleCursor(
+inline  class SimpleCursor(
     val join: Join<Int, (Int) -> RowVec>,
 ) : Series<RowVec> by join {
 

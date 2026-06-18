@@ -51,8 +51,7 @@ class WindowConfixBuilder(
 }
 
 /** Compose node — zero-overhead value class wrapper. */
-@JvmInline
-value class ComposeNode(
+inline  class ComposeNode(
     private val kind: String,
     private val props: Map<String, Any>,
     private val children: List<ComposeNode> = emptyList(),
@@ -75,8 +74,7 @@ value class ComposeNode(
 }
 
 /** Layout constraints from confix attributes. */
-@JvmInline
-value class LayoutConstraints(
+inline  class LayoutConstraints(
     private val encoded: Long,
 ) {
 
@@ -111,19 +109,16 @@ value class LayoutConstraints(
 }
 
 /** Density-independent pixels — Valhalla inline class. */
-@JvmInline
-value class Dp(val value: Int) {
+inline  class Dp(val value: Int) {
     infix fun toPx(density: Float = 1.0f): Int = (value * density).toInt()
     infix fun sp(): Sp = Sp(value)
 }
 
 /** Scale-independent pixels. */
-@JvmInline
-value class Sp(val value: Int)
+inline  class Sp(val value: Int)
 
 /** Style facet — extracted from confix theme attributes. */
-@JvmInline
-value class StyleFacet(
+inline  class StyleFacet(
     private val colors: Map<String, Color> = emptyMap(),
     private val spacing: Map<String, Dp> = emptyMap(),
     private val typography: Map<String, TextStyle> = emptyMap(),
@@ -151,8 +146,7 @@ value class StyleFacet(
 }
 
 /** Color — Valhalla packed ARGB. */
-@JvmInline
-value class Color(private val argb: Int) {
+inline  class Color(private val argb: Int) {
     val alpha: Float get() = ((argb shr 24) and 0xFF) / 255f
     val red: Float get() = ((argb shr 16) and 0xFF) / 255f
     val green: Float get() = ((argb shr 8) and 0xFF) / 255f
@@ -169,8 +163,7 @@ value class Color(private val argb: Int) {
 }
 
 /** Text style — packed typography attributes. */
-@JvmInline
-value class TextStyle(
+inline  class TextStyle(
     private val encoded: Long = 0,
 ) {
     val fontSize: Sp get() = Sp((encoded shr 48).toInt())
@@ -195,8 +188,7 @@ enum class FontWeight(val value: Int) {
 }
 
 /** Modifier chain — valhalla inline class. */
-@JvmInline
-value class Modifier(val chain: List<ModifierOp> = emptyList()) {
+inline  class Modifier(val chain: List<ModifierOp> = emptyList()) {
     infix fun then(other: Modifier): Modifier = Modifier(chain + other.chain)
 
     infix fun fillMaxWidth(): Modifier = copy(chain + ModifierOp.FillMaxWidth)

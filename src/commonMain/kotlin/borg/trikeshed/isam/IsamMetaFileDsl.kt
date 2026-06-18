@@ -22,8 +22,7 @@ import kotlin.math.min
 
 interface Usable { fun open(); fun close() }
 
-@JvmInline
-value class MetafileConfig(
+inline  class MetafileConfig(
     val metafileFilename: String,
     val fileOps: FileOperations,
 )
@@ -37,8 +36,7 @@ inline fun readMetafile(
     block: MetafileReader.() -> Unit,
 ): MetafileReader = MetafileReader(config).apply(block)
 
-@JvmInline
-value class MetafileReader(override val config: MetafileConfig) : Usable {
+inline  class MetafileReader(override val config: MetafileConfig) : Usable {
     override fun open() = readMetafileInternal()
     override fun close() = logDebug { "closing metafile ${config.metafileFilename}" }
 
@@ -123,8 +121,7 @@ inline fun writeMetafile(
     block: MetafileWriter.() -> Unit,
 ): MetafileResult = MetafileWriter(config).apply(block).build()
 
-@JvmInline
-value class MetafileWriteConfig(
+inline  class MetafileWriteConfig(
     val metafilename: String,
     val recordMetas: Series<ColumnMeta>,
     val varchars: Map<String, Int>,

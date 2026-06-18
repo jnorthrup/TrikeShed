@@ -21,8 +21,7 @@ annotation class FacetDsl
  *   - FacetFn as inline function wrapper (no boxing)
  *   - FacetedSignal as @JvmInline value class over MutableSeries<Bind>
  */
-@JvmInline
-value class FacetKey(private val interned: String) {
+inline  class FacetKey(private val interned: String) {
     companion object {
         private val cache = mutableMapOf<String, FacetKey>()
         inline fun <reified T> get(name: String): FacetKey = cache.getOrPut(name) { FacetKey(name) }
@@ -52,8 +51,7 @@ inline class FacetFn<I : Signal<*>, O : Signal<*>>(
  * Valhalla: value class wrapper over MutableSeries of facet bindings.
  * Facets are cached after first computation.
  */
-@JvmInline
-value class FacetedSignal<I : Signal<*>>(
+inline  class FacetedSignal<I : Signal<*>>(
     private val base: I,
     private val facets: MutableSeries<Pair<FacetKey, FacetSignal<*>>> = mutableSeriesOf(),
 ) : Signal<*> by base {
@@ -93,8 +91,7 @@ value class FacetedSignal<I : Signal<*>>(
  * 
  * Creates a facet that renders a visual template with signal bindings.
  */
-@JvmInline
-value class TemplateFacet(
+inline  class TemplateFacet(
     private val template: VisualTemplate,
     private val bindings: Map<String, Signal<*>>,
 ) {

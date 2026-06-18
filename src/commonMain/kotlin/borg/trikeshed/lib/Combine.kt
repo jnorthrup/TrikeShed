@@ -12,8 +12,7 @@ import kotlin.math.roundToInt
  * return.  When an entrant would push the merge beyond that bound, the entrant
  * is copied into local ArrayList backing and re-enters the merge as depth 0.
  */
-@JvmInline
-value class ReificationContext(val maxDepth: Int) {
+inline  class ReificationContext(val maxDepth: Int) {
     init { require(maxDepth >= 0) { "maxDepth must be non-negative" } }
 
     val isExhausted: Boolean get() = maxDepth == 0

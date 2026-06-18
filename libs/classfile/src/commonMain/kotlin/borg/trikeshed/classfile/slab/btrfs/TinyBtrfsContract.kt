@@ -35,13 +35,11 @@ object BtrfsIoctl {
 }
 
 // ==================== DATA STRUCTS (packed, 24B aligned) ====================
-@JvmInline
-value class BtrfsFd(private val value: Int) {
+inline  class BtrfsFd(private val value: Int) {
     companion object { operator fun invoke(fd: Int) = BtrfsFd(fd) }
 }
 
-@JvmInline
-value class SubvolId(private val value: Long) {
+inline  class SubvolId(private val value: Long) {
     companion object { operator fun invoke(id: Long) = SubvolId(id) }
 }
 
@@ -122,8 +120,7 @@ data class ReceiveArgs(
 )
 
 /** 24B wireproto alignment for FieldSynapse compatibility */
-@JvmInline
-value class Aligned24<T>(val value: T)
+inline  class Aligned24<T>(val value: T)
 
 // ==================== CURSOR TRANSFORMS (pure projections) ====================
 

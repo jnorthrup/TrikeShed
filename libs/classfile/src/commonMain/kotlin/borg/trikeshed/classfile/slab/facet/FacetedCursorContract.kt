@@ -28,8 +28,7 @@ object LCNCMode {
     const val COUPLING = 3
 }
 
-@JvmInline
-value class LCNCModeFacet(private val mode: Int) {
+inline  class LCNCModeFacet(private val mode: Int) {
     companion object {
         val LOGIC = LCNCModeFacet(LCNCMode.LOGIC)
         val COMPUTATION = LCNCModeFacet(LCNCMode.COMPUTATION)
@@ -47,8 +46,7 @@ value class LCNCModeFacet(private val mode: Int) {
  * FieldSynapse: wireproto 24B, Phase=BEFORE/AFTER, FieldOpcode=L_GET/L_SET/P_GET/P_SET
  * Pointcut into GraalJS column access: intercepts `cursor["column"]` → handler chain
  */
-@JvmInline
-value class FieldSynapse(val opcode: Int) {
+inline  class FieldSynapse(val opcode: Int) {
     companion object {
         /** Phase: before operation */
         const val PHASE_BEFORE = 0
@@ -75,8 +73,7 @@ value class FieldSynapse(val opcode: Int) {
 }
 
 /** 24B wireproto struct for FieldSynapse pointcut events */
-@JvmInline
-value class PointcutEvent(val bytes: ByteArray) {
+inline  class PointcutEvent(val bytes: ByteArray) {
     init { require(bytes.size == 24) { "wireproto must be 24B" } }
     val synapse: FieldSynapse get() = FieldSynapse(bytes[0].toInt())
     val columnId: Long get() = bytes.sliceArray(1..8).let { b -> b.fold(0L) { a, v -> (a shl 8) or (v.toLong() and 0xFF) } }
@@ -172,8 +169,7 @@ fun pointcutExtentSet(
 )
 
 // ==================== GRAAL CONTEXT (JS/PY INTEROP) ====================
-@JvmInline
-value class GraalContext(val ptr: Long) {
+inline  class GraalContext(val ptr: Long) {
     companion object {
         val INVALID = GraalContext(0L)
     }

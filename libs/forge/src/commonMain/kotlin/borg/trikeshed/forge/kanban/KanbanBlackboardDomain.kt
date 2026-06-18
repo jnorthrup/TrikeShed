@@ -248,17 +248,3 @@ object KanbanDomain : BlackboardDomain {
     override fun toContext(card: BoardCard) = KanbanBlackboardDomain.cardToContext(card)
     override fun toRow(card: BoardCard) = KanbanBlackboardDomain.cardToRow(card)
 }
-
-// --- Minimal Join/Series types for dependencyHandles ---
-typealias Join<A, B> = Pair<A, B>
-fun <A, B> A.j(b: B): Join<A, B> = this to b
-
-typealias Series<T> = List<T>
-fun <T> Int.s_(vararg items: T): Series<T> = items.toList()
-
-// --- Alpha projection helpers ---
-inline fun <T, R> List<T>.α(crossinline xform: (T) -> R): List<R> = this.map(xform)
-
-// --- View extension for Series (IterableSeries pattern) ---
-class IterableSeries<T>(private val series: Series<T>) : Iterable<T> by series
-val <T> Series<T>.view: Iterable<T> get() = IterableSeries(this)

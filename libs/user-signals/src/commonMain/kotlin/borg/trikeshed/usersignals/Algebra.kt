@@ -3,8 +3,7 @@ package borg.trikeshed.usersignals
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 
-@JvmInline
-value class TemplateHole<T>(val key: String) {
+inline  class TemplateHole<T>(val key: String) {
     operator fun invoke(signal: Signal<T>): TemplateBinding<T> = TemplateBinding(this, signal)
 }
 

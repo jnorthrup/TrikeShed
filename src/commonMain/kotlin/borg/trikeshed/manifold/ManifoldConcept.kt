@@ -23,8 +23,7 @@ import kotlin.math.pow
  *   bits 20..39 → d
  *   bits  0..19 → q
  */
-@JvmInline
-value class BudgetCoord(val packed: Long) {
+inline  class BudgetCoord(val packed: Long) {
 
     /** Priority — unpacked from bits 40..59. */
     val p: Float get() = ((packed ushr 40) and SCALE).toFloat() / SCALE

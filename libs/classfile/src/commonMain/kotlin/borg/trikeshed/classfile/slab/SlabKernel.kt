@@ -19,8 +19,7 @@ typealias SlabLength = Long
 typealias SlabExtent = Join<SlabOffset, Join<SlabLength, SlabFacet>>
 
 /** Facet = runtime intent tag (not domain) — e.g., HOT, COLD, IMMUTABLE, DEDUP_CANDIDATE */
-@JvmInline
-value class SlabFacet(override val mask: Long) : BitMasked<Long> {
+inline  class SlabFacet(override val mask: Long) : BitMasked<Long> {
     infix fun or(other: SlabFacet) = SlabFacet(mask or other.mask)
     infix fun and(other: SlabFacet) = SlabFacet(mask and other.mask)
     fun has(facet: SlabFacet): Boolean = (mask and facet.mask) != 0L

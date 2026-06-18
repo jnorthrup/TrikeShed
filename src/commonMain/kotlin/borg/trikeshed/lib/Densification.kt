@@ -14,8 +14,7 @@ import kotlin.math.ln
  *
  * @see TwInt — the canonical dense-packed Int twin (same layout, wider scope)
  */
-@JvmInline
-value class DensifiedJoin(private val payload: Long) : Twin<Int> {
+inline  class DensifiedJoin(private val payload: Long) : Twin<Int> {
     override val a: Int get() = (payload ushr 32).toInt()
     override val b: Int get() = payload.toInt()
 

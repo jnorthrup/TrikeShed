@@ -11,8 +11,7 @@ import kotlin.jvm.JvmInline
  * bytes 2-3: offset (16 bits, signed)
  * bytes 4-7: imm (32 bits, signed)
  */
-@JvmInline
-value class EbpfInstruction(val raw: Long) {
+inline  class EbpfInstruction(val raw: Long) {
     val opcode: Int get() = (raw and 0xFF).toInt()
     val dstReg: Int get() = ((raw ushr 8) and 0x0F).toInt()
     val srcReg: Int get() = ((raw ushr 12) and 0x0F).toInt()

@@ -41,8 +41,7 @@ interface FileOperations {
 }
 
 // Simple platform utilities
-@JvmInline
-value class PlatformUtilsImpl(
+inline  class PlatformUtilsImpl(
     val currentTimeMillis: () -> Long = { System.currentTimeMillis() },
     val randomUuid: () -> String = { java.util.UUID.randomUUID().toString() },
     val ioDispatcher: kotlinx.coroutines.CoroutineDispatcher = kotlinx.coroutines.Dispatchers.IO,
@@ -71,8 +70,7 @@ data class DataFileConfig(
     val fileOps: FileOperations,
 )
 
-@JvmInline
-value class DataFilePosition(val offset: Long = 0)
+inline  class DataFilePosition(val offset: Long = 0)
 
 // ---------------------------------------------------------------------------
 // Reified inline append
@@ -137,8 +135,7 @@ inline fun <T> getIsam(
 // Reified inline pointcut journal (append-only)
 // ---------------------------------------------------------------------------
 
-@JvmInline
-value class PointcutJournalConfig(
+inline  class PointcutJournalConfig(
     val filename: String,
     val recordlen: Int = 128,
     val fileOps: FileOperations,
@@ -192,8 +189,7 @@ inline fun restoreFromIsam<State>(
 // File layout spec (reified)
 // ---------------------------------------------------------------------------
 
-@JvmInline
-value class FileLayoutSpec(
+inline  class FileLayoutSpec(
     val recordlen: Int,
     val headerSize: Int = 0,
     val indexStride: Int = 0, // 0 = no index

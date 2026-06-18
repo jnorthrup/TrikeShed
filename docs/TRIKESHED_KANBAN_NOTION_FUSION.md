@@ -63,8 +63,7 @@
 /**
  * Unified entity ID - spans all three systems.
  */
-@JvmInline
-value class EntityId(val raw: String) {
+inline  class EntityId(val raw: String) {
     companion object {
         // Kanban IDs: t_<hex>
         fun kanban(taskId: String) = EntityId("kanban:$taskId")

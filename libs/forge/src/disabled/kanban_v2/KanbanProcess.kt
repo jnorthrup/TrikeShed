@@ -91,8 +91,7 @@ data class KanbanPointcut(
 // Reified inline builder DSL
 // ---------------------------------------------------------------------------
 
-@JvmInline
-value class KanbanProcessConfig private constructor(
+inline  class KanbanProcessConfig private constructor(
     val boardEngine: KanbanBoardEngine,
     val couch: CouchGateway?,
     val isam: IsamGateway?,
@@ -151,8 +150,7 @@ class KanbanProcessBuilder {
 // Subsystem config builders (reified inline, no reflection)
 // ---------------------------------------------------------------------------
 
-@JvmInline
-value class CouchConfigBuilder(
+inline  class CouchConfigBuilder(
     var url: String = "http://localhost:5984",
     var db: String = "kanban",
     var username: String? = null,
@@ -167,8 +165,7 @@ value class CouchConfigBuilder(
     }
 }
 
-@JvmInline
-value class IsamConfigBuilder(
+inline  class IsamConfigBuilder(
     var path: String = ".tspy/isam/kanban",
     var pageSize: Int = 4096,
 ) {
@@ -178,8 +175,7 @@ value class IsamConfigBuilder(
     }
 }
 
-@JvmInline
-value class MiniduckConfigBuilder(
+inline  class MiniduckConfigBuilder(
     var reducer: String = "kanban/cascade",
     var workers: Int = 4,
 ) {
@@ -188,8 +184,7 @@ value class MiniduckConfigBuilder(
     }
 }
 
-@JvmInline
-value class BtrfsConfigBuilder(
+inline  class BtrfsConfigBuilder(
     var mountPoint: String = "/",
     var subvolume: String = ".tspy/btrfs",
 ) {

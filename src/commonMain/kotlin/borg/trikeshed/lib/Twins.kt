@@ -32,26 +32,22 @@ inline fun packFloats(a: Float, b: Float): Long =
 // are created in bulk (cursor scans, tensor construction, α-chains).
 // ============================================================================
 
-@JvmInline
-value class TwInt(private val capture: Long) : Twin<Int> {
+inline  class TwInt(private val capture: Long) : Twin<Int> {
     override val a: Int get() = (capture shr 32).toInt()
     override val b: Int get() = (capture and 0xFFFF_FFFFL).toInt()
 }
 
-@JvmInline
-value class Twhort(private val capture: Int) : Twin<Short> {
+inline  class Twhort(private val capture: Int) : Twin<Short> {
     override val a: Short get() = (capture shr 16).toShort()
     override val b: Short get() = (capture and 0xFFFF).toShort()
 }
 
-@JvmInline
-value class Twhar(private val capture: Int) : Twin<Char> {
+inline  class Twhar(private val capture: Int) : Twin<Char> {
     override val a: Char get() = (capture shr 16).toChar()
     override val b: Char get() = (capture and 0xFFFF).toChar()
 }
 
-@JvmInline
-value class Twyte(private val capture: Short) : Twin<Byte> {
+inline  class Twyte(private val capture: Short) : Twin<Byte> {
     override val a: Byte get() = (capture.toInt() shr 8).toByte()
     override val b: Byte get() = (capture.toInt() and 0xFF).toByte()
 }

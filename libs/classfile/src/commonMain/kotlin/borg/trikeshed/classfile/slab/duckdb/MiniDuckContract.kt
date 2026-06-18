@@ -12,14 +12,10 @@ import borg.trikeshed.lib.j
  */
 
 // ==================== DUCKDB HANDLE TYPES ====================
-@JvmInline
-value class DuckDB(val ptr: Long)
-@JvmInline
-value class DuckDBConnection(val ptr: Long)
-@JvmInline
-value class DuckDBConfig(val ptr: Long)
-@JvmInline
-value class DuckDBResult(val ptr: Long)
+inline  class DuckDB(val ptr: Long)
+inline  class DuckDBConnection(val ptr: Long)
+inline  class DuckDBConfig(val ptr: Long)
+inline  class DuckDBResult(val ptr: Long)
 
 // ==================== DUCKDB C API CONSTANTS ====================
 object DuckDBApi {
@@ -63,10 +59,8 @@ object DuckDBPragma {
 }
 
 // ==================== DATA CHUNK TYPES (vectorized execution unit) ====================
-@JvmInline
-value class DataChunk(val ptr: Long)
-@JvmInline
-value class Vector(val ptr: Long)
+inline  class DataChunk(val ptr: Long)
+inline  class Vector(val ptr: Long)
 
 data class LogicalType(val id: Int, val info: Long)
 object DuckDBTypes {

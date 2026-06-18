@@ -56,8 +56,7 @@ class FacetedCursorAdapter {
 /**
  * ReductionCarrier for FacetedCursor — wraps lcnc's SeriesCarrier.
  */
-@JvmInline
-value class FacetedCursorCarrier(
+inline  class FacetedCursorCarrier(
     val cursor: FacetedCursor,
 ) : ReductionCarrier<FacetedCursor> {
 
