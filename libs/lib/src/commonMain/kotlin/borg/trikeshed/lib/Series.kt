@@ -25,9 +25,9 @@ fun <T> Iterable<T>.toSeries(): Series<T> = this.toList()
 inline infix fun <X, C> Series<X>.α(crossinline xform: (X) -> C): Series<C> =
     this.map(xform)
 
-inline infix fun <X, C> List<X>.α(crossinline xform: (X) -> C): List<C> =
-    this.map(xform)
-
 // --- View extension ---
 class IterableSeries<T>(private val series: Series<T>) : Iterable<T> by series
-val <T> Series<T>.view: Iterable<T> get() = IterableSeries(this)
+val <T> List<T>.view: Iterable<T> get() = IterableSeries(this)
+
+// --- s_ extensions for series ---
+val <T> Series<T>.s_: List<T> get() = this

@@ -4,11 +4,11 @@
 package borg.trikeshed.forge.kanban
 
 import borg.trikeshed.forge.platform.platformUtils
-import borg.trikeshed.lib as lib
 import borg.trikeshed.lib.Join
-import borg.trikeshed.lib.α
 import borg.trikeshed.lib.Series
+import borg.trikeshed.lib.α
 import borg.trikeshed.lib.s_
+import borg.trikeshed.lib.view
 import kotlinx.serialization.Serializable
 
 /**

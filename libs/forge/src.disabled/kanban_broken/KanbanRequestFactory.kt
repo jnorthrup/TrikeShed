@@ -68,7 +68,7 @@ data class CardEntity(
         title = title ?: this.title,
         columnId = columnId ?: this.columnId,
         order = order ?: this.order,
-        assignee = assignee ?? this.assignee,
+        assignee = assignee ?: this.assignee,
         priority = priority ?: this.priority,
         dependencies = dependencies ?: this.dependencies,
         tags = tags ?: this.tags,

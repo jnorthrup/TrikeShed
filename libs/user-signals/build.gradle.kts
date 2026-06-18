@@ -27,7 +27,7 @@ kotlin {
         val commonMain by getting {
             dependencies {
                 api("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
-                api(rootProject)  // root project has mutable package
+                api(project(":libs:lib"))  // root project has mutable package
             }
         }
 

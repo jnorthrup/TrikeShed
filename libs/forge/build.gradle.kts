@@ -2,8 +2,7 @@ import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.dsl.KotlinVersion
 
 plugins {
-    kotlin("multiplatform") version "2.1.0"
-    kotlin("plugin.serialization") version "2.1.0"
+    kotlin("multiplatform") version "2.4.0"
     `maven-publish`
 }
 
@@ -20,8 +19,8 @@ repositories {
 
 kotlin {
     @OptIn(ExperimentalKotlinGradlePluginApi::class) compilerOptions {
-        apiVersion.set(org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_1)
-        languageVersion.set(org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_1)
+        apiVersion.set(org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_4)
+        languageVersion.set(org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_4)
         freeCompilerArgs.addAll(
             "-opt-in=kotlin.RequiresOptIn",
             "-Xsuppress-version-warnings",
@@ -36,7 +35,8 @@ kotlin {
     sourceSets {
         val commonMain by getting {
             dependencies {
-                api("org.jetbrains.kotlin:kotlin-stdlib:2.1.0")
+                api(project(":libs:lib"))
+                api("org.jetbrains.kotlin:kotlin-stdlib:2.4.0")
                 api("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
                 api("org.jetbrains.kotlinx:kotlinx-serialization-core:1.7.3")
                 api("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.1")
@@ -66,8 +66,8 @@ kotlin {
 
 tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompilationTask<*>> {
     compilerOptions {
-        apiVersion.set(KotlinVersion.KOTLIN_2_1)
-        languageVersion.set(KotlinVersion.KOTLIN_2_1)
+        apiVersion.set(KotlinVersion.KOTLIN_2_4)
+        languageVersion.set(KotlinVersion.KOTLIN_2_4)
         freeCompilerArgs.addAll(
             "-opt-in=kotlin.RequiresOptIn",
             "-Xsuppress-version-warnings",

@@ -7,12 +7,12 @@ kotlin {
     sourceSets {
         val commonMain by getting {
             dependencies {
-                api(project(":"))
+                api(project(":libs:lib"))
             }
         }
         val jvmMain by getting {
             dependencies {
-                api(project(":"))
+                api(project(":libs:lib"))
             }
         }
     }

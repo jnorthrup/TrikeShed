@@ -1,7 +1,7 @@
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 
 plugins {
-    kotlin("multiplatform") version "2.1.0"
+    kotlin("multiplatform") version "2.4.0"
     `maven-publish`
 }
 
@@ -18,8 +18,8 @@ repositories {
 
 kotlin {
     @OptIn(ExperimentalKotlinGradlePluginApi::class) compilerOptions {
-        apiVersion.set(org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_1)
-        languageVersion.set(org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_1)
+        apiVersion.set(org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_4)
+        languageVersion.set(org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_4)
         freeCompilerArgs.addAll(
             "-opt-in=kotlin.RequiresOptIn",
             "-opt-in=kotlin.ExperimentalUnsignedTypes",
@@ -35,7 +35,7 @@ kotlin {
             dependencies {
                 api("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
                 api("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
-                api(project(":libs:miniduck"))
+                // api(project(":libs:miniduck"))  // disabled - no build.gradle.kts
                 api(project(":libs:user-signals"))
             }
         }

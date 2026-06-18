@@ -95,8 +95,6 @@ actual class IsamDataFile actual constructor(
         }
     }
 
-    val lock: ReentrantLock = ReentrantLock()
-
     actual override fun close() {
         lock.lock()
         try { data.close() } finally { lock.unlock() }

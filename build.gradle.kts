@@ -2,7 +2,7 @@ import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 
 plugins {
-    kotlin("multiplatform") version "2.1.0"
+    kotlin("multiplatform") version "2.4.0"
     id("com.github.ben-manes.versions") version "0.54.0"
     `maven-publish`
 }
@@ -13,9 +13,9 @@ val enableNativeSharedLib = providers.gradleProperty("native.sharedLib").orNull 
 
 val focusedTransportSlice = providers.gradleProperty("focusedTransportSlice").orNull == "true"
 
-extra["versions.kotlinx-coroutines-core"] = "1.11.0-rc02"
-extra["versions.kotlinx-coroutines-test"] = "1.11.0-rc02"
-extra["versions.kotlinx-datetime"] = "0.8.0-rc02-0.6.x-compat"
+extra["versions.kotlinx-coroutines-core"] = "1.10.1"
+extra["versions.kotlinx-coroutines-test"] = "1.10.1"
+extra["versions.kotlinx-datetime"] = "0.8.0-0.6.x-compat"
 
 repositories {
     maven("https://oss.sonatype.org/content/repositories/snapshots/")
@@ -28,8 +28,8 @@ repositories {
 
 kotlin {
     @OptIn(ExperimentalKotlinGradlePluginApi::class) compilerOptions {
-        apiVersion.set(org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_1)
-        languageVersion.set(org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_1)
+        apiVersion.set(org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_4)
+        languageVersion.set(org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_4)
         freeCompilerArgs = listOf(
             "-opt-in=kotlin.RequiresOptIn",
             "-opt-in=kotlin.ExperimentalUnsignedTypes",

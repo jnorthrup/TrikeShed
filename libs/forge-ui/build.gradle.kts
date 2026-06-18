@@ -1,5 +1,5 @@
 plugins {
-    id("org.jetbrains.kotlin.plugin.compose") version "2.4.0"
+    id("org.jetbrains.kotlin.plugin.compose") version "2.1.0"
     id("org.jetbrains.compose") version "1.7.3"
 }
 
