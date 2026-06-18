@@ -1,27 +1,38 @@
+@file:Suppress("unused")
+
 package borg.trikeshed.forge.kanban
 
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
+import borg.trikeshed.forge.platform.platformUtils
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.serialization.Contextual
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
-import java.time.Instant
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
-import java.util.concurrent.locks.ReentrantLock
 
 /**
  * In-memory pool for operational metrics with label-based grouping and history.
  * Provides reactive flows for dashboard visualization.
+ * commonMain-safe: uses kotlinx.coroutines.sync.Mutex instead of ReentrantLock.
  */
 class OperationalDataPool(
     private val maxHistoryPerKey: Int = 1000,
 ) {
+    // ... (same class implementation)
     private val pools = ConcurrentHashMap<String, ConcurrentHashMap<String, OperationalEntry>>()
     private val history = ConcurrentHashMap<String, MutableList<OperationalEntry>>()
-    private val lock = ReentrantLock()
+    private val mutex = Mutex()
     
     // Reactive flows for dashboard
     private val poolFlows = ConcurrentHashMap<String, MutableStateFlow<List<OperationalEntry>>>()
@@ -29,44 +40,39 @@ class OperationalDataPool(
     /**
      * Record an operational metric. Creates pool/key if new.
      */
-    fun record(
+    suspend fun record(
         poolName: String,
         key: String,
         labels: Map<String, String> = emptyMap(),
         value: Double = 0.0,
         metadata: Map<String, String> = emptyMap(),
-    ): OperationalEntry {
-        val now = Instant.now().toEpochMilli()
+    ): OperationalEntry = mutex.withLock {
         val entry = OperationalEntry(
             poolName = poolName,
             key = key,
             labels = labels,
             value = value,
-            timestampMs = now,
+            timestampMs = platformUtils.currentTimeMillis(),
             metadata = metadata,
         )
         
-        lock.lock()
-        try {
-            val pool = pools.computeIfAbsent(poolName) { ConcurrentHashMap() }
-            pool[key] = entry
-            
-            val hist = history.computeIfAbsent(poolName) { mutableListOf() }
-            hist.add(entry)
-            if (hist.size > maxHistoryPerKey) {
-                hist.removeRange(0, hist.size - maxHistoryPerKey)
-            }
-            
-            // Emit to flow
-            val flow = poolFlows.computeIfAbsent(poolName) { 
-                MutableStateFlow(emptyList()) 
-            }
-            flow.value = pool.values.toList()
-            
-            return entry
-        } finally {
-            lock.unlock()
+        val pool = pools.computeIfAbsent(poolName) { ConcurrentHashMap() }
+        pool[key] = entry
+        
+        val hist = history.computeIfAbsent(poolName) { mutableListOf() }
+        hist.add(entry)
+        if (hist.size > maxHistoryPerKey) {
+            val removeCount = hist.size - maxHistoryPerKey
+            repeat(removeCount) { hist.removeAt(0) }
         }
+        
+        // Emit to flow
+        val flow = poolFlows.computeIfAbsent(poolName) { 
+            MutableStateFlow(emptyList()) 
+        }
+        flow.value = pool.values.toList()
+        
+        entry
     }
     
     fun get(poolName: String, key: String): OperationalEntry? {
@@ -120,27 +126,19 @@ class OperationalDataPool(
         }
     }
     
-    fun snapshot(): Map<String, List<OperationalEntry>> {
-        lock.lock()
-        try {
-            return pools.entries.mapValues { (_, pool) -> pool.values.toList() }.toMap()
-        } finally {
-            lock.unlock()
-        }
+    suspend fun snapshot(): Map<String, List<OperationalEntry>> = mutex.withLock {
+        val result = mutableMapOf<String, List<OperationalEntry>>()
+        pools.forEach { (k, v) -> result[k] = v.values.toList() }
+        return result
     }
     
-    fun clearPool(poolName: String): Int {
-        lock.lock()
-        try {
-            val pool = pools.remove(poolName)
-            val count = pool?.size ?: 0
-            pool?.clear()
-            history.remove(poolName)?.clear()
-            poolFlows.remove(poolName)
-            return count
-        } finally {
-            lock.unlock()
-        }
+    suspend fun clearPool(poolName: String): Int = mutex.withLock {
+        val pool = pools.remove(poolName)
+        val count = pool?.size ?: 0
+        pool?.clear()
+        history.remove(poolName)?.clear()
+        poolFlows.remove(poolName)
+        count
     }
     
     fun poolNames(): List<String> {
@@ -161,7 +159,11 @@ class OperationalDataPool(
         val flows = poolNames.map { getFlow(it) }
         return combine(*flows.toTypedArray()) { values ->
             poolNames.zip(values).toMap()
-        }.asStateFlow()
+        }.stateIn(
+            scope = CoroutineScope(SupervisorJob()),
+            started = SharingStarted.WhileSubscribed(),
+            initialValue = emptyMap()
+        )
     }
 }
 
@@ -175,7 +177,7 @@ data class DashboardAssertion(
     val viewId: String,
     val assertionType: AssertionType,
     val path: String,  // JSONPath
-    val expected: Any,
+    @Contextual val expected: Any,
     val description: String = "",
 )
 
@@ -185,22 +187,23 @@ enum class AssertionType {
     REGEX, IS_TRUE, IS_FALSE, IS_NONE, IS_NOT_NONE
 }
 
-/**
- * Global singleton accessor.
- */
-object OperationalDataPool {
-    @Volatile private var INSTANCE: OperationalDataPool? = null
-    private val LOCK = Any()
-    
-    fun get(maxHistoryPerKey: Int = 1000): OperationalDataPool {
-        return INSTANCE ?: LOCK.synchronized {
-            INSTANCE ?: OperationalDataPool(maxHistoryPerKey).also { INSTANCE = it }
-        }
-    }
-    
-    fun reset() {
-        LOCK.synchronized {
-            INSTANCE = null
-        }
+// ---------------------------------------------------------------------------
+// Module-level singleton accessor (coroutines-safe)
+// ---------------------------------------------------------------------------
+
+private class OperationalDataPoolHolder {
+    var instance: OperationalDataPool? = null
+    val mutex = Mutex()
+}
+
+private val _operationalDataPoolHolder = OperationalDataPoolHolder()
+
+suspend fun getOperationalDataPool(maxHistoryPerKey: Int = 1000): OperationalDataPool = _operationalDataPoolHolder.mutex.withLock {
+    _operationalDataPoolHolder.instance ?: OperationalDataPool(maxHistoryPerKey).also { _operationalDataPoolHolder.instance = it }
+}
+
+suspend fun resetOperationalDataPool() {
+    _operationalDataPoolHolder.mutex.withLock {
+        _operationalDataPoolHolder.instance = null
     }
 }
