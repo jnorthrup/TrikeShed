@@ -50,7 +50,7 @@ kotlin {
         }
         val jvmMain by getting {
             dependencies {
-                implementation(project(":libs:miniduck"))
+                // implementation(project(":libs:miniduck"))  // disabled due to miniduck compilation errors
             }
         }
         val jvmTest by getting {

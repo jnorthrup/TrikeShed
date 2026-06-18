@@ -1,5 +1,5 @@
 """
-tspy.kanban — GEPA-evolved kanban coordination for TrikeShed forge solvers.
+tspy.kanban -- GEPA-evolved kanban coordination for TrikeShed forge solvers.
 
 The implementation is evolved by GEPA against operational metrics.
 The seed candidate below is the starting policy string; GEPA mutates it
@@ -10,11 +10,15 @@ tspy.modelmux for lazy model listing cache. The board pulls real keys
 from keymux and routes models through modelmux.
 
 Card state is persisted to JSON files (Confix-style: cursor gateway for structured trees).
+
+String tables are exported as enums (IntEnum) so handles in logs are integers,
+avoiding varchar overhead. String serialization happens at the persistence boundary.
 """
 
 from __future__ import annotations
 from dataclasses import dataclass, field, asdict
 from typing import Any, Callable
+from enum import IntEnum
 import time
 import threading
 import json
@@ -25,27 +29,95 @@ from tspy.modelmux import ModelMux, get_mux, ModelEntry
 from tspy.algebra import Join, j, Series, s_
 
 
+# ---------------------------------------------------------------------------
+# String-table enums (avoid varchar in logs, enable integer handles)
+# ---------------------------------------------------------------------------
+
+class Column(IntEnum):
+    """Board column -- stored as int, serialized to/from string at persistence boundary."""
+    TODO = 0
+    DOING = 1
+    DONE = 2
+    BLOCKED = 3
+
+    @classmethod
+    def from_str(cls, s: str) -> "Column":
+        return _COLUMN_FROM_STR.get(s.lower(), cls.TODO)
+
+    def __str__(self) -> str:
+        return _COLUMN_NAMES[self]
+
+    def __repr__(self) -> str:
+        return f"C{self.value}"  # compact log handle e.g. C0, C1
+
+
+_COLUMN_NAMES = {Column.TODO: "todo", Column.DOING: "doing", Column.DONE: "done", Column.BLOCKED: "blocked"}
+_COLUMN_FROM_STR = {v: k for k, v in _COLUMN_NAMES.items()}
+
+
+class KeyStatus(IntEnum):
+    """Key lease status -- stored as int, serialized to/from string at persistence boundary."""
+    ACTIVE = 0
+    BACKOFF = 1
+    BENCHED = 2
+
+    @classmethod
+    def from_str(cls, s: str) -> "KeyStatus":
+        return _KEYSTATUS_FROM_STR.get(s.lower(), cls.ACTIVE)
+
+    def __str__(self) -> str:
+        return _KEYSTATUS_NAMES[self]
+
+    def __repr__(self) -> str:
+        return f"S{self.value}"  # compact log handle e.g. S0, S1
+
+
+_KEYSTATUS_NAMES = {KeyStatus.ACTIVE: "active", KeyStatus.BACKOFF: "backoff", KeyStatus.BENCHED: "benched"}
+_KEYSTATUS_FROM_STR = {v: k for k, v in _KEYSTATUS_NAMES.items()}
+
+
+# ---------------------------------------------------------------------------
+# Data model
+# ---------------------------------------------------------------------------
+
 @dataclass
 class KeyEntry:
-    """Kanban-side key wrapper around keymux KeyEntry."""
+    """Kanban-side key wrapper around keymux KeyEntry.
+
+    Log handle: key_id + repr(status) + repr(leased_to) = K<key_id> S<status_val> L<lease_val>
+    """
     key_id: str
     provider: str = ""
     label: str = ""
     model: str = ""
-    status: str = "active"  # active|backoff|benched
+    status: KeyStatus = KeyStatus.ACTIVE  # stored as int enum
     leased_to: str | None = None
     access_count: int = 0
     last_used_ms: int = 0
 
+    def log_handle(self) -> str:
+        """Compact integer handle for logs: K<key_id> S<status> L<0|1>"""
+        lease_flag = 0 if self.leased_to is None else 1
+        return f"K{self.key_id.removeprefix('env-')} S{self.status.value} L{lease_flag}"
+
 
 @dataclass
 class Card:
+    """Board card -- column/status stored as int enum for compact log handles.
+
+    Log handle: C<column_val> P<priority> A<assignee_flag>
+    """
     id: str
     title: str
-    column: str = "todo"  # todo|doing|done|blocked
+    column: Column = Column.TODO  # stored as int enum
     assignee: str | None = None
     priority: int = 1
     deps: list[str] = field(default_factory=list)
+
+    def log_handle(self) -> str:
+        """Compact integer handle for logs: C<column> P<priority> A<assignee_flag>"""
+        assignee_flag = 0 if self.assignee is None else 1
+        return f"C{self.column.value} P{self.priority} A{assignee_flag}"
 
 
 @dataclass
@@ -142,15 +214,15 @@ class KanbanBoard:
 
     def available_keys(self) -> list[KeyEntry]:
         with self._lock:
-            return [k for k in self.keys.values() if k.status == "active" and k.leased_to is None]
+            return [k for k in self.keys.values() if k.status == KeyStatus.ACTIVE and k.leased_to is None]
 
     def doing_count(self) -> int:
         with self._lock:
-            return sum(1 for c in self.cards if c.column == "doing")
+            return sum(1 for c in self.cards if c.column == Column.DOING)
 
     def completed_count(self) -> int:
         with self._lock:
-            return sum(1 for c in self.cards if c.column == "done")
+            return sum(1 for c in self.cards if c.column == Column.DONE)
 
     def tick(self, policy: dict[str, Any]) -> DispatchResult:
         """Run one dispatch tick under the given policy. Returns real metrics."""
@@ -173,11 +245,11 @@ class KanbanBoard:
 
         with self._lock:
             # spawn cards from todo -> doing, ordered by priority
-            todo = sorted([c for c in self.cards if c.column == "todo"], key=lambda c: -c.priority)
+            todo = sorted([c for c in self.cards if c.column == Column.TODO], key=lambda c: -c.priority)
             for i in range(min(can_spawn, len(todo), len(avail))):
                 card = todo[i]
                 key = avail[i]
-                card.column = "doing"
+                card.column = Column.DOING
                 card.assignee = key.key_id
                 key.leased_to = f"agent-{card.id}"
                 key.access_count += 1
@@ -195,11 +267,11 @@ class KanbanBoard:
             # check lease TTL for reclaim
             if reclaim_blocked:
                 for c in self.cards:
-                    if c.column == "doing" and c.assignee:
+                    if c.column == Column.DOING and c.assignee:
                         key = self.keys.get(c.assignee)
                         if key and key.last_used_ms > 0:
                             if now_ms - key.last_used_ms > lease_ttl_ms:
-                                c.column = "blocked"
+                                c.column = Column.BLOCKED
                                 c.assignee = None
                                 key.leased_to = None
                                 reclaimed += 1
@@ -212,7 +284,7 @@ class KanbanBoard:
 
             # promote done, reclaim blocked
             for c in self.cards:
-                if c.column == "done" and promote_on_done:
+                if c.column == Column.DONE and promote_on_done:
                     promoted += 1
                     if c.assignee:
                         key = self.keys.get(c.assignee)
@@ -223,7 +295,7 @@ class KanbanBoard:
                         "card_id": c.id,
                         "key_id": c.assignee,
                     })
-                elif c.column == "blocked" and reclaim_blocked:
+                elif c.column == Column.BLOCKED and reclaim_blocked:
                     reclaimed += 1
                     if c.assignee:
                         key = self.keys.get(c.assignee)
@@ -256,14 +328,14 @@ class KanbanBoard:
         """Mark a card as done (or errored) and release its key. Returns True if found."""
         with self._lock:
             for c in self.cards:
-                if c.id == card_id and c.column == "doing":
-                    c.column = "done"
+                if c.id == card_id and c.column == Column.DOING:
+                    c.column = Column.DONE
                     if c.assignee:
                         key = self.keys.get(c.assignee)
                         if key:
                             key.leased_to = None
                             if error:
-                                key.status = "backoff"
+                                key.status = KeyStatus.BACKOFF
                     return True
         return False
 
@@ -277,7 +349,7 @@ class KanbanBoard:
             "total_keys": len(self.keys),
             "doing": self.doing_count(),
             "done": self.completed_count(),
-            "todo": sum(1 for c in self.cards if c.column == "todo"),
+            "todo": sum(1 for c in self.cards if c.column == Column.TODO),
         }
 
     def save(self, path: str | None = None) -> str:
@@ -335,11 +407,25 @@ def parse_policy(text: str) -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 def board_to_confix(board: KanbanBoard) -> dict:
-    """Serialize board to Confix JSON structure (cursor gateway for structured trees)."""
+    """Serialize board to Confix JSON structure (cursor gateway for structured trees).
+    
+    Column and KeyStatus enums are serialized to string for human-readability
+    at the persistence boundary. On load, they are restored as int enums.
+    """
+    def key_to_dict(k: KeyEntry) -> dict:
+        d = asdict(k)
+        d["status"] = str(d["status"])  # enum -> string e.g. "active"
+        return d
+    
+    def card_to_dict(c: Card) -> dict:
+        d = asdict(c)
+        d["column"] = str(d["column"])  # enum -> string e.g. "todo"
+        return d
+    
     return {
         "tick_count": board.tick_count,
-        "keys": {k_id: asdict(k) for k_id, k in board.keys.items()},
-        "cards": [asdict(c) for c in board.cards],
+        "keys": {k_id: key_to_dict(k) for k_id, k in board.keys.items()},
+        "cards": [card_to_dict(c) for c in board.cards],
         "metrics": asdict(board.metrics),
         "dispatch_history": board._dispatch_history,
         "completed_tasks": board._completed_tasks,
@@ -351,13 +437,19 @@ def confix_to_board(data: dict, store=None, mux=None) -> KanbanBoard:
     board = KanbanBoard(store=store, mux=mux)
     board.tick_count = data.get("tick_count", 0)
     
-    # Restore keys
+    # Restore keys -- string status -> KeyStatus enum
     for k_id, k_data in data.get("keys", {}).items():
+        k_data = dict(k_data)  # copy to avoid mutating source
+        k_data["status"] = KeyStatus.from_str(k_data.get("status", "active"))
         key = KeyEntry(**k_data)
         board.keys[k_id] = key
     
-    # Restore cards
-    board.cards = [Card(**c_data) for c_data in data.get("cards", [])]
+    # Restore cards -- string column -> Column enum
+    board.cards = []
+    for c_data in data.get("cards", []):
+        c_data = dict(c_data)  # copy
+        c_data["column"] = Column.from_str(c_data.get("column", "todo"))
+        board.cards.append(Card(**c_data))
     
     # Restore metrics
     m_data = data.get("metrics", {})

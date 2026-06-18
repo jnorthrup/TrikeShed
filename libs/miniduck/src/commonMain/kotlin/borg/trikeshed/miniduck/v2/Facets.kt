@@ -5,6 +5,9 @@ import borg.trikeshed.mutable.MutableSeries
 import borg.trikeshed.mutable.CowSeriesHandle
 import borg.trikeshed.mutable.CowSeriesBody
 
+@DslMarker
+annotation class MiniDuckDsl
+
 sealed class Facet {
     data class Project(val columns: List<String>) : Facet()
     data class Filter(val predicate: (MiniDuckSeries) -> Boolean) : Facet()
@@ -46,22 +49,23 @@ class FacetedCursor(
         is Facet.Chain -> applyFacet(applyFacet(source, facet.first), facet.second)
     }
 
-    inline fun <reified T> Project.columns(vararg cols: String): FacetedCursor {
+    infix fun Project.columns(vararg cols: String): FacetedCursor {
         addFacet("proj_${cols.joinToString("_")}", Facet.Project(cols.toList()))
         return this
     }
 
-    inline fun <reified T> Filter.where(predicate: (MiniDuckSeries) -> Boolean): FacetedCursor {
+    infix fun Filter.where(predicate: (MiniDuckSeries) -> Boolean): FacetedCursor {
         addFacet("filter_${facets.size}", Facet.Filter(predicate))
         return this
     }
 
-    inline fun <reified T> Aggregate.by(key: String, value: String, fn: (List<Any?>) -> Any?): FacetedCursor {
+    infix fun Aggregate.by(key: String, value: String, fn: (List<Any?>) -> Any?): FacetedCursor {
         addFacet("agg_${key}_$value", Facet.Aggregate(key, value, fn))
         return this
     }
 }
 
+@MiniDuckDsl
 class FacetDSL<T : MiniDuckSeries> {
     private val facets = mutableListOf<Pair<String, Facet>>()
 
