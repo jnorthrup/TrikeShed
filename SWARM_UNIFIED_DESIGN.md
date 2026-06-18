@@ -59,8 +59,7 @@
 
 ```kotlin
 // Unified Identity
-@JvmInline
-value class EntityId(val raw: String) {
+inline  class EntityId(val raw: String) {
     companion object {
         fun kanban(taskId: String) = EntityId("kanban:$taskId")
         fun notion(blockId: String) = EntityId("notion:$blockId")
