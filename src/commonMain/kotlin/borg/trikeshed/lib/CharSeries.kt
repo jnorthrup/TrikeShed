@@ -29,7 +29,7 @@ class CharSeries(
         }
 
     //string ctor
-    constructor(s: String) : this(s.toSeries())
+    constructor(s: String) : this(s.toCharArray().toSeries())
 
     /**remaining chars*/
     val rem: Int get() = limit - pos

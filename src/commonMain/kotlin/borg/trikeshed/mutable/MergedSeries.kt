@@ -21,16 +21,16 @@ class MergedSeries<T>(
 ) : MutableSeries<T> {
 
     override val a: Int get() = sorted.size
-    override val b: (Int) -> T = sorted.b
+    override val b: (Int) -> T get() = sorted.b
 
-    override fun add(item: T) {
-        input.add(item)
+    override fun append(item: T) {
+        input.append(item)
         if (input.size >= mergeThreshold) flush()
     }
 
-    override fun add(index: Int, item: T) {
+    override fun insert(index: Int, item: T) {
         // Index is ignored for the input buffer; sort order wins on flush
-        add(item)
+        append(item)
     }
 
     override fun set(index: Int, item: T) {
@@ -51,17 +51,42 @@ class MergedSeries<T>(
         sorted.clear()
     }
 
-    override fun plus(item: T): MutableSeries<T> { add(item); return this }
+    // ── COW / freeze ─────────────────────────────────────────────
+
+    override val isFrozen: Boolean get() = false
+
+    override fun freeze(): Series<T> = sorted.freeze()
+
+    override fun cowSnapshot(): MutableSeries<T> {
+        flush()
+        return sorted.cowSnapshot()
+    }
+
+    override fun subscribe(observer: (Twin<Series<T>>) -> Unit): () -> Unit = {}
+
+    override fun version(): Long = sorted.version()
+
+    // ── Iteration ────────────────────────────────────────────────
+
+    override fun iterator(): Iterator<T> = sorted.iterator()
+
+    override fun sequence(): Sequence<T> = sorted.sequence()
+
+    // ── Concatenation ────────────────────────────────────────────
+
+    override fun plus(other: MutableSeries<T>): MutableSeries<T> = sorted.plus(other)
+
+    override fun plus(item: T): MutableSeries<T> { append(item); return this }
     override fun minus(item: T): MutableSeries<T> { remove(item); return this }
-    override fun plusAssign(item: T) { add(item) }
+    override fun plusAssign(item: T) { append(item) }
     override fun minusAssign(item: T) { remove(item) }
 
     /** Force-drain the input buffer into the sorted series. */
     fun flush() {
         if (input.size == 0) return
-        // Drain input into sorted by adding each element (sorted.add maintains order)
+        // Drain input into sorted by appending each element (sorted.append maintains order)
         for (i in 0 until input.size) {
-            sorted.add(input[i])
+            sorted.append(input[i])
         }
         input.clear()
     }

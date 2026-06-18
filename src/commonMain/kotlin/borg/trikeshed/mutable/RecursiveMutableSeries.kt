@@ -16,7 +16,7 @@ class RecursiveMutableSeries<T>(var data: Series<T>) : MutableSeries<T>, Series<
         }
     }
 
-    override fun add(item: T) {
+    override fun append(item: T) {
         val old = data
         val n = old.a
         data = (n + 1) j { i: Int ->
@@ -24,7 +24,7 @@ class RecursiveMutableSeries<T>(var data: Series<T>) : MutableSeries<T>, Series<
         }
     }
 
-    override fun add(index: Int, item: T) {
+    override fun insert(index: Int, item: T) {
         val old = data
         val n = old.a
         data = (n + 1) j { i: Int ->
@@ -53,6 +53,37 @@ class RecursiveMutableSeries<T>(var data: Series<T>) : MutableSeries<T>, Series<
         data = emptySeriesOf<T>()
     }
 
+    // ── COW / freeze ─────────────────────────────────────────────
+
+    override val isFrozen: Boolean get() = false
+
+    override fun freeze(): Series<T> =
+        FrozenArray<T>(Array<Any?>(data.a) { i -> data[i] })
+
+    override fun cowSnapshot(): MutableSeries<T> = RecursiveMutableSeries(data)
+
+    override fun subscribe(observer: (Twin<Series<T>>) -> Unit): () -> Unit = {}
+
+    override fun version(): Long = 0L
+
+    // ── Iteration ────────────────────────────────────────────────
+
+    override fun iterator(): Iterator<T> = sequence().iterator()
+
+    override fun sequence(): Sequence<T> = Sequence { iterator() }
+
+    // ── Concatenation ────────────────────────────────────────────
+
+    override fun plus(other: MutableSeries<T>): MutableSeries<T> {
+        val n = data.a
+        val m = other.a
+        return RecursiveMutableSeries(
+            (n + m) j { i: Int ->
+                if (i < n) data[i] else other.b(i - n)
+            }
+        )
+    }
+
     override fun plus(item: T): MutableSeries<T> = RecursiveMutableSeries(data + s_[item])
 
     override fun minus(item: T): MutableSeries<T> = RecursiveMutableSeries(
@@ -62,7 +93,7 @@ class RecursiveMutableSeries<T>(var data: Series<T>) : MutableSeries<T>, Series<
     )
 
     override fun plusAssign(item: T) {
-        add(item)
+        append(item)
     }
 
     override fun minusAssign(item: T) {

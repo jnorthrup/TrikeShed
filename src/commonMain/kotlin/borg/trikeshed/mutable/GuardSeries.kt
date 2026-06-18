@@ -1,9 +1,9 @@
 package borg.trikeshed.mutable
 
 /**
- * A MutableSeries that gates [add] and [set] operations behind a predicate.
+ * A MutableSeries that gates [append] and [set] operations behind a predicate.
  *
- * Mutations that violate the guard are silently ignored (add returns without
+ * Mutations that violate the guard are silently ignored (append returns without
  * inserting, set leaves the element unchanged). [remove], [removeAt], and
  * [clear] always pass through.
  *
@@ -14,15 +14,15 @@ package borg.trikeshed.mutable
  */
 class GuardSeries<T>(
     private val guard: (T) -> Boolean,
-    private val inner: MutableSeries<T> = CowSeriesHandle<T>(COWSeriesBody()),
+    private val inner: MutableSeries<T> = CowSeriesHandle<T>(),
 ) : MutableSeries<T> by inner {
 
-    override fun add(item: T) {
-        if (guard(item)) inner.add(item)
+    override fun append(item: T) {
+        if (guard(item)) inner.append(item)
     }
 
-    override fun add(index: Int, item: T) {
-        if (guard(item)) inner.add(index, item)
+    override fun insert(index: Int, item: T) {
+        if (guard(item)) inner.insert(index, item)
     }
 
     override fun set(index: Int, item: T) {

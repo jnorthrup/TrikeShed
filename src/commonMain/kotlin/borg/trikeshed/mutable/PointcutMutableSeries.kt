@@ -1,5 +1,7 @@
 package borg.trikeshed.mutable
 
+import borg.trikeshed.lib.Series
+import borg.trikeshed.lib.Twin
 import borg.trikeshed.lib.get
 
 /**
@@ -21,14 +23,14 @@ class PointcutMutableSeries<T>(
         delegate[index] = item
     }
 
-    override fun add(item: T) {
+    override fun append(item: T) {
         actionSink(MutationAction.Add(item))
-        delegate.add(item)
+        delegate.append(item)
     }
 
-    override fun add(index: Int, item: T) {
+    override fun insert(index: Int, item: T) {
         actionSink(MutationAction.AddAtIndex(index, item))
-        delegate.add(index, item)
+        delegate.insert(index, item)
     }
 
     override fun removeAt(index: Int): T {
@@ -45,6 +47,31 @@ class PointcutMutableSeries<T>(
         actionSink(MutationAction.Clear())
         delegate.clear()
     }
+
+    // ── COW / freeze ─────────────────────────────────────────────
+
+    override val isFrozen: Boolean get() = delegate.isFrozen
+
+    override fun freeze(): Series<T> = delegate.freeze()
+
+    override fun cowSnapshot(): MutableSeries<T> =
+        PointcutMutableSeries(delegate.cowSnapshot(), actionSink)
+
+    override fun subscribe(observer: (Twin<Series<T>>) -> Unit): () -> Unit =
+        delegate.subscribe(observer)
+
+    override fun version(): Long = delegate.version()
+
+    // ── Iteration ────────────────────────────────────────────────
+
+    override fun iterator(): Iterator<T> = delegate.iterator()
+
+    override fun sequence(): Sequence<T> = delegate.sequence()
+
+    // ── Concatenation ────────────────────────────────────────────
+
+    override fun plus(other: MutableSeries<T>): MutableSeries<T> =
+        PointcutMutableSeries(delegate.plus(other), actionSink)
 
     override fun plus(item: T): MutableSeries<T> {
         actionSink(MutationAction.Plus(item))

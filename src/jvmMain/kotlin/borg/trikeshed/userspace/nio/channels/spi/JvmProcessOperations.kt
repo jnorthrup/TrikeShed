@@ -16,9 +16,11 @@ class JvmProcessOperations : ProcessOperations {
         val proc = pb.start()
 
         // Feed stdin if provided
-        if (stdin != null) {
-            proc.outputStream.use { it.write(stdin); it.flush() }
-            proc.outputStream.close()
+        proc.outputStream.use {
+            if (stdin != null) {
+                it.write(stdin)
+                it.flush()
+            }
         }
 
         // Read stdout

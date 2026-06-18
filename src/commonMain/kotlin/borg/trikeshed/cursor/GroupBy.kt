@@ -29,7 +29,8 @@ import borg.trikeshed.lib.*
 fun Cursor.groupBy(vararg axis: Int): Cursor {
     if (size == 0) return this
     val (keys, slabs, colCount, axisPos, axisSet) = buildGroups(axis)
-    val cm = meta
+    val row0 = this.b(0)
+    val cm: Series<ColumnMeta> = row0.a j { c: Int -> row0.b(c).b() }
     return keys.size j { cy ->
         val rowIndices = slabs[cy]; val key = keys[cy]
         colCount j { cx ->
@@ -43,7 +44,8 @@ fun Cursor.groupBy(vararg axis: Int): Cursor {
 inline fun Cursor.groupBy(axis: IntArray, crossinline reducer: RowReducer): Cursor {
     if (size == 0) return this
     val (keys, slabs, colCount, axisPos, axisSet) = buildGroups(axis)
-    val cm = meta
+    val row0 = this.b(0)
+    val cm: Series<ColumnMeta> = row0.a j { c: Int -> row0.b(c).b() }
     val valueIndices = (0 until colCount).filter { it !in axisSet }
     return keys.size j { cy ->
         val rowIndices = slabs[cy]; val key = keys[cy]

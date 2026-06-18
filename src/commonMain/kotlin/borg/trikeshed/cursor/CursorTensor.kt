@@ -247,7 +247,8 @@ object CursorTensorReifier {
     fun fromCursor(cursor: Cursor, columns: IntArray = intArrayOf()): CursorTensorSnapshot {
         require(cursor.size > 0) { "cursor must contain at least one row to infer tensor metadata" }
 
-        val meta: Series<ColumnMeta> = cursor.meta
+        val row0 = cursor.b(0)
+        val meta: Series<ColumnMeta> = row0.a j { c: Int -> row0.b(c).b() }
         val selectedColumns: IntArray = if (columns.isNotEmpty()) columns.copyOf() else selectNumericColumns(meta)
 
         require(selectedColumns.isNotEmpty()) {

@@ -30,7 +30,7 @@ class ReduxMutableSeries<A, S>(
      */
     fun reify(): S {
         var currentState = _state
-        val currentSize = eventJournal.size
+        val currentSize = eventJournal.a
         if (_reifiedSize < currentSize) {
             for (i in _reifiedSize until currentSize) {
                 val action = eventJournal.getOrNull(i)

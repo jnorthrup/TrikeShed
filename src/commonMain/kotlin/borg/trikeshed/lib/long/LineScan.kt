@@ -76,9 +76,11 @@ fun LongSeries<Byte>.lines(): Series<ByteSeries> {
  */
 fun LongSeries<Byte>.charLines(): Series<CharSeries> {
     val byteLines = lines()
-    return byteLines.a j { idx: Int ->
-        CharSeries(byteLines.b(idx).decodeUtf8())
+    val items: Array<CharSeries?> = arrayOfNulls(byteLines.a)
+    for (idx in 0 until byteLines.a) {
+        items[idx] = CharSeries(byteLines.b(idx).decodeUtf8())
     }
+    return byteLines.a j { idx: Int -> items[idx]!! }
 }
 
 /**

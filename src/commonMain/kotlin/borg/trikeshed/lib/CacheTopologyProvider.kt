@@ -1,7 +1,9 @@
 @file:Suppress("NonAsciiCharacters")
 package borg.trikeshed.lib
 
-import borg.trikeshed.userspace.nio.platform.spi.CacheTopology
+import borg.trikeshed.cursor.CacheTopology
+import borg.trikeshed.cursor.ReificationContext
+import borg.trikeshed.userspace.nio.platform.spi.CacheTopology as SpiCacheTopology
 import kotlin.coroutines.CoroutineContext
 
 /**
@@ -16,12 +18,12 @@ import kotlin.coroutines.CoroutineContext
 interface CacheTopologyProvider : CoroutineContext.Element {
     companion object Key : CoroutineContext.Key<CacheTopologyProvider> {
         val UNKNOWN: CacheTopologyProvider = object : CacheTopologyProvider {
-            override val topology: CacheTopology = CacheTopology.UNKNOWN
+            override val topology: SpiCacheTopology = SpiCacheTopology.UNKNOWN
         }
     }
     override val key: CoroutineContext.Key<*> get() = Key
 
-    val topology: CacheTopology
+    val topology: SpiCacheTopology
 }
 
 /**
@@ -29,6 +31,11 @@ interface CacheTopologyProvider : CoroutineContext.Element {
  * Falls back to unlimited depth when no [CacheTopologyProvider] is registered.
  */
 fun CoroutineContext.reificationContext(): ReificationContext {
-    val t = this[CacheTopologyProvider.Key]?.topology ?: CacheTopology.UNKNOWN
-    return ReificationContext.from(t)
+    val t = this[CacheTopologyProvider.Key]?.topology
+    val cursorTopology = CacheTopology(
+        l1DataBytes = t?.l1DataBytes,
+        l2Bytes = t?.l2Bytes,
+        l3Bytes = t?.l3Bytes,
+    )
+    return ReificationContext.from(cursorTopology)
 }

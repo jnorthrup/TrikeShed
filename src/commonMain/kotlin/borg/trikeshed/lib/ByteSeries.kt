@@ -60,7 +60,7 @@ class ByteSeries(
         }
 
     //string ctor
-    constructor(s: String) : this(s.toSeries().encodeToByteArray().toSeries())
+    constructor(s: String) : this(s.encodeToByteArray().toSeries())
 
     constructor(buf: ByteArray, pos: Int = 0, limit: Int = buf.size) : this(
         limit j buf::get,
@@ -286,10 +286,10 @@ fun ByteSeries.decodeToString() = decodeUtf8().asString()
 
 fun Series<Byte>.startsWith(s: String): Boolean {
     val join = s.encodeToByteArray() α { it }
-    return join.size <= size && join.zip(this).`▶`.all { it.first == it.second }
+    return join.size <= size && join.zip(this).`▶`.all { it.a == it.b }
 }
 
 fun Series<Byte>.endsWith(s: String): Boolean {
     val join = s.encodeToByteArray() α { it }
-    return join.size <= size && join.zip(this.reversed()).`▶`.all { it.first == it.second }
+    return join.size <= size && join.zip(this.reversed()).`▶`.all { it.a == it.b }
 }

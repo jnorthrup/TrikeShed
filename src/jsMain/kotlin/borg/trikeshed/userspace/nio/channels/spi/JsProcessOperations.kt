@@ -8,8 +8,23 @@ class JsProcessOperations : ProcessOperations {
         stdin: ByteArray?,
         env: Map<String, String>,
     ): ProcessResult {
-        val cmd = buildString { append(command); for (a in args) { append(" "); append(a) } }
-        val out: String = js("require('child_process').execSync(cmd, {encoding: 'utf8'})") as String
-        return ProcessResult(0, out.encodeToByteArray(), byteArrayOf())
+        val childProcess: dynamic = js("require('child_process')")
+        val options: dynamic = js("({})")
+        val jsEnv: dynamic = js("Object.assign({}, process.env)")
+
+        env.forEach { (key, value) ->
+            jsEnv[key] = value
+        }
+
+        options.env = jsEnv
+        options.encoding = "buffer"
+        stdin?.let { options.input = it.decodeToString() }
+
+        val result: dynamic = childProcess.spawnSync(command, args.toTypedArray(), options)
+        val status = (result.status as Int?) ?: -1
+        val stdout = ((result.stdout as String?) ?: "").encodeToByteArray()
+        val stderr = ((result.stderr as String?) ?: "").encodeToByteArray()
+
+        return ProcessResult(status, stdout, stderr)
     }
 }

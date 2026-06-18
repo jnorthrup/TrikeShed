@@ -2,6 +2,7 @@ package borg.trikeshed.mutable
 
 import borg.trikeshed.collections.s_
 import borg.trikeshed.lib.Series
+import borg.trikeshed.lib.Twin
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.plus
@@ -86,9 +87,9 @@ class DequeSeries<T> : MutableSeries<T> {
 
     // ── MutableSeries interface ──────────────────────────────────────────
 
-    override fun add(item: T) = addLast(item)
+    override fun append(item: T) = addLast(item)
 
-    override fun add(index: Int, item: T) {
+    override fun insert(index: Int, item: T) {
         if (index == 0) { addFirst(item); return }
         if (index == a) { addLast(item); return }
         if (index < front.size) {
@@ -167,4 +168,27 @@ class DequeSeries<T> : MutableSeries<T> {
     override fun minus(item: T): MutableSeries<T> { remove(item); return this }
     override fun plusAssign(item: T) { addLast(item) }
     override fun minusAssign(item: T) { remove(item) }
+
+    override fun freeze(): Series<T> = (0 until a).map { b(it) }.let { list ->
+        val arr = arrayOfNulls<Any?>(list.size).also { a -> list.forEachIndexed { i, v -> a[i] = v } }
+        FrozenArray(arr)
+    }
+    override fun cowSnapshot(): MutableSeries<T> {
+        val snap = DequeSeries<T>(); snap.front = front; snap.back = back; return snap
+    }
+    override fun subscribe(observer: (Twin<Series<T>>) -> Unit): () -> Unit = {}
+    override fun version(): Long = 0L
+    override val isFrozen: Boolean get() = false
+    override fun iterator(): Iterator<T> = object : Iterator<T> {
+        var i = 0
+        override fun hasNext() = i < a
+        override fun next() = b(i++)
+    }
+    override fun sequence(): Sequence<T> = Sequence { iterator() }
+    override fun plus(other: MutableSeries<T>): MutableSeries<T> {
+        val result = DequeSeries<T>()
+        for (i in 0 until a) result.addLast(b(i))
+        for (i in 0 until other.a) result.addLast(other.b(i))
+        return result
+    }
 }

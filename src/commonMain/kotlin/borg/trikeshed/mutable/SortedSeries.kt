@@ -7,7 +7,7 @@ import borg.trikeshed.lib.*
 /**
  * A [MutableSeries] that maintains elements in sorted order at all times.
  *
- * Every [add] inserts the element at the correct sorted position (O(n)).
+ * Every [append] inserts the element at the correct sorted position (O(n)).
  * No buffering, no thresholds, no flush — the series is always sorted.
  *
  * @param comparator  sort order for elements
@@ -19,23 +19,23 @@ class SortedSeries<T>(
     private var data: Series<T> = 0 j { throw IndexOutOfBoundsException("empty SortedSeries") }
 
     override val a: Int get() = data.size
-    override val b: (Int) -> T = data.b
+    override val b: (Int) -> T get() = data::get
 
-    override fun add(item: T) {
+    override fun append(item: T) {
         val idx = findInsertionIndex(item)
         data = insertAt(data, idx, item)
     }
 
-    override fun add(index: Int, item: T) {
+    override fun insert(index: Int, item: T) {
         // Index is ignored — sort order always wins
-        add(item)
+        append(item)
     }
 
     override fun set(index: Int, item: T) {
         // Remove old element at index, then add new item (maintains sort)
         val old = data[index]
         data = removeAt(data, index)
-        add(item)
+        append(item)
     }
 
     override fun removeAt(index: Int): T {
@@ -58,9 +58,40 @@ class SortedSeries<T>(
         data = 0 j { throw IndexOutOfBoundsException("empty SortedSeries") }
     }
 
-    override fun plus(item: T): MutableSeries<T> { add(item); return this }
+    // ── COW / freeze ─────────────────────────────────────────────
+
+    override val isFrozen: Boolean get() = false
+
+    override fun freeze(): Series<T> = FrozenArray(Array<Any?>(data.a) { i -> data[i] })
+
+    override fun cowSnapshot(): MutableSeries<T> {
+        val snap = SortedSeries(comparator)
+        for (i in 0 until data.a) snap.append(data[i])
+        return snap
+    }
+
+    override fun subscribe(observer: (Twin<Series<T>>) -> Unit): () -> Unit = {}
+
+    override fun version(): Long = 0L
+
+    // ── Iteration ────────────────────────────────────────────────
+
+    override fun iterator(): Iterator<T> = sequence().iterator()
+
+    override fun sequence(): Sequence<T> = (0 until a).asSequence().map { b(it) }
+
+    // ── Concatenation ────────────────────────────────────────────
+
+    override fun plus(other: MutableSeries<T>): MutableSeries<T> {
+        val result = SortedSeries(comparator)
+        for (i in 0 until data.a) result.append(data[i])
+        for (i in 0 until other.a) result.append(other.b(i))
+        return result
+    }
+
+    override fun plus(item: T): MutableSeries<T> { append(item); return this }
     override fun minus(item: T): MutableSeries<T> { remove(item); return this }
-    override fun plusAssign(item: T) { add(item) }
+    override fun plusAssign(item: T) { append(item) }
     override fun minusAssign(item: T) { remove(item) }
 
     /** Binary search to find insertion index for [item] in sorted [data]. */

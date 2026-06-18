@@ -5,14 +5,9 @@ package borg.trikeshed.common.collections
 import borg.trikeshed.lib.Join
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.size
-import kotlinx.coroutines.InternalCoroutinesApi
-import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 
 //package vec
 
-@InternalCoroutinesApi
 typealias CircularQueue<T> = CirQlar<T>
 
 /**
@@ -24,11 +19,9 @@ only mutability is offer(T)
 has cheap direct toVect0r with live properties
 has more expensive toList/iterator by copy/concat
  */
-@InternalCoroutinesApi
 open class CirQlar<T>(
     val maxSize: Int,
     val al: Array<Any?> = arrayOfNulls<Any?>(maxSize),
-    val lock: Mutex = Mutex(),
     val evict: ((T) -> Unit)? = null,
 ) /*: AbstractQueue<T>()*/ {
 
@@ -37,17 +30,13 @@ open class CirQlar<T>(
 
     val full: Boolean get() = tail >= maxSize
 
-    /*override */  fun offer(e: T): Boolean = runBlocking {
-        val tmp: Any?
-        lock.withLock {
-            val i = tail % maxSize
-            tmp = evict?.run { al.takeIf { it.size < i }?.get(i) }
-            al[i] = e
-
-            if (++tail == 2 * maxSize) tail = maxSize
-        }
+    /*override */  fun offer(e: T): Boolean {
+        val i = tail % maxSize
+        val tmp: Any? = evict?.run { al.takeIf { it.size < i }?.get(i) }
+        al[i] = e
+        if (++tail == 2 * maxSize) tail = maxSize
         tmp?.let { t -> evict?.invoke(t as T) }
-        true
+        return true
     }
 
     fun toList(): List<T> {

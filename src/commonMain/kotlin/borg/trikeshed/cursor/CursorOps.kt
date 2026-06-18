@@ -32,7 +32,7 @@ object CursorOps {
         val self = this
         return join(size, fun(row: Int): RowVec {
             val rv = self.b(row)
-            return join(cols.size, fun(c: Int): Any? = rv.b(cols[c]))
+            return join(cols.size, fun(c: Int): Join<Any?, `ColumnMeta↻`> = rv.b(cols[c]))
         })
     }
 
@@ -77,18 +77,17 @@ object CursorOps {
 
     /** Join two cursors side-by-side — widens along columns. */
     fun join(left: Cursor, right: Cursor): Cursor =
-        Join(minOf(left.size, right.size), fun(row: Int): RowVec = {
+        join(minOf(left.size, right.size), fun(row: Int): RowVec {
             val lr = left.b(row); val rr = right.b(row)
-            return join(lr.size + rr.size, fun(c: Int): Any? = 
-                if (c < lr.size) lr.b(c) else rr.b(c - lr.size)
-            )
+            return join(lr.size + rr.size, fun(c: Int): Join<Any?, `ColumnMeta↻`> =
+                if (c < lr.size) lr.b(c) else rr.b(c - lr.size))
         })
 
     // ── Concatenation (along rows) ──────────────────────────────────
 
     /** Combine two cursors top-to-bottom — concatenates along rows. */
     fun combine(top: Cursor, bottom: Cursor): Cursor =
-        Join(top.size + bottom.size, fun(row: Int): RowVec = 
+        join(top.size + bottom.size, fun(row: Int): RowVec =
             if (row < top.size) top.b(row) else bottom.b(row - top.size)
         )
 
@@ -96,27 +95,27 @@ object CursorOps {
 
     /** Cursor α — lazy map over rows. */
     inline infix fun <C> Cursor.α(crossinline xform: (RowVec) -> C): Series<C> =
-        Join(size, fun(i: Int): C = xform(this@Cursor.b(i)))
+        join(size, fun(i: Int): C = xform(this[i]))
 
     // ── Head / Tail ─────────────────────────────────────────────────
 
     /** First row. */
-    val Cursor.head: RowVec get() = this@Cursor.b(0)
+    val Cursor.head: RowVec get() = this.b(0)
 
     /** All rows except the first. */
-    val Cursor.tail: Cursor get() = this@Cursor = this@Cursor.range(1..<size)
+    val Cursor.tail: Cursor get() = this.range(1..<size)
 
     /** Column metadata series from the first row. */
     val Cursor.meta: Series<ColumnMeta>
         get(): Series<ColumnMeta> {
-            val row = this@Cursor.b(0)
-            return Join(row.size, fun(c: Int): ColumnMeta = row.b(c).b())
+            val row = this.b(0)
+            return join(row.size, fun(c: Int): ColumnMeta = row.b(c).b())
         }
 
     /** Column names. */
     val Cursor.columnNames: Series<CharSequence>
-        get() = meta α { it: ColumnMeta -> it.name }
+        get() = meta α { cm: ColumnMeta -> cm.name }
 
     /** Column count. */
-    val Cursor.width: Int get() = this@Cursor.b(0).size
+    val Cursor.width: Int get() = this.b(0).size
 }

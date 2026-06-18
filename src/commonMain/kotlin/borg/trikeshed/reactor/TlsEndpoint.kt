@@ -1,48 +1,53 @@
-@file:Suppress("NonAsciiCharacters", "UNCHECKED_CAST", "NAME_SHADOWING")
-
 package borg.trikeshed.reactor
 
-import borg.trikeshed.userspace.nio.channels.ChannelRunner
-import borg.trikeshed.userspace.nio.channels.spi.ChannelOperations
-import borg.trikeshed.userspace.nio.channels.spi.ReactorOperations
-import borg.trikeshed.userspace.reactor.Interest
-import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.suspendCancellableCoroutine
-import java.nio.ByteBuffer
-import java.security.KeyStore
-import java.security.cert.X509Certificate
-import javax.net.ssl.KeyManagerFactory
-import javax.net.ssl.SSLContext
-import javax.net.ssl.SSLEngine
-import javax.net.ssl.SSLEngineResult
-import javax.net.ssl.TrustManagerFactory
-import kotlin.coroutines.Continuation
-import kotlin.coroutines.resume
-import kotlin.coroutines.resumeWithException
-
-// ─────────────────────────────────────────────────────────────────────────────
-// TLS ENDPOINT — First-class TLS reactor endpoint
-// ─────────────────────────────────────────────────────────────────────────────
+import borg.trikeshed.context.AsyncContextElement
+import borg.trikeshed.context.AsyncContextKey
+import borg.trikeshed.context.ElementState
+import borg.trikeshed.userspace.nio.ByteBuffer
+import borg.trikeshed.userspace.nio.channels.spi.ProcessOperations
+import borg.trikeshed.userspace.nio.channels.spi.ProcessResult
+import borg.trikeshed.userspace.nio.spi.NioSupervisor
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.serialization.Serializable
+import kotlin.coroutines.CoroutineContext
 
 /**
- * TLS endpoint configuration.
+ * Root-level TLS CCEK element.
+ *
+ * This keeps the choreography in the reactor root and uses the platform
+ * [ProcessOperations] SPI as the lowest-common-denominator backend. The
+ * current fallback is a worst-case `openssl s_client` exchange: it is
+ * connection-oriented and sufficient for request/response flows, but it is
+ * not a replacement for a fully streaming in-process TLS stack.
  */
+@Serializable
 data class TlsConfig(
-    val keyStore: String? = null,
-    val keyStorePassword: String? = null,
-    val keyAlias: String? = null,
     val trustStore: String? = null,
-    val trustStorePassword: String? = null,
-    val protocols: List<String> = listOf("TLSv1.3", "TLSv1.2"),
-    val ciphers: List<String> = listOf(
+    val certificateFile: String? = null,
+    val privateKeyFile: String? = null,
+    val privateKeyPassword: String? = null,
+    val protocols: List<TlsProtocol> = listOf(TlsProtocol.TLS13, TlsProtocol.TLS12),
+    val cipherSuites: List<String> = listOf(
+        "TLS_AES_128_GCM_SHA256",
         "TLS_AES_256_GCM_SHA384",
         "TLS_CHACHA20_POLY1305_SHA256",
-        "TLS_AES_128_GCM_SHA256",
+        "ECDHE-RSA-AES128-GCM-SHA256",
+        "ECDHE-RSA-AES256-GCM-SHA384",
+        "ECDHE-ECDSA-CHACHA20-POLY1305",
+        "ECDHE-ECDSA-AES128-GCM-SHA256",
+        "ECDHE-ECDSA-AES256-GCM-SHA384",
     ),
+    val supportedGroups: List<String> = listOf("X25519", "P-256", "P-384", "P-521"),
+    val alpnProtocols: List<String> = listOf("h2", "http/1.1"),
     val clientAuth: ClientAuth = ClientAuth.NONE,
-    val hostnameVerification: Boolean = false,
+    val hostnameVerification: Boolean = true,
+    val opensslCommand: String = "openssl",
 )
+
+enum class TlsProtocol {
+    TLS13,
+    TLS12,
+}
 
 enum class ClientAuth {
     NONE,
@@ -50,344 +55,353 @@ enum class ClientAuth {
     REQUIRED,
 }
 
-/**
- * TLS endpoint — wraps SSLEngine for non-blocking reactor I/O.
- * 
- * Provides first-class TLS support in the reactor:
- * - TLS handshake via suspend/resume using ChannelRunner
- * - Encrypted read/write via reactor ops
- * - SNI support
- * - Client certificate authentication
- */
-class TlsEndpoint(
+enum class TlsRole {
+    CLIENT,
+    SERVER,
+}
+
+data class TlsPeerCertificate(
+    val subject: String? = null,
+    val issuer: String? = null,
+)
+
+data class TlsSession(
+    val protocol: String? = null,
+    val cipherSuite: String? = null,
+    val peerCertificate: TlsPeerCertificate? = null,
+    val verified: Boolean = false,
+    val stdout: ByteArray = byteArrayOf(),
+    val stderr: ByteArray = byteArrayOf(),
+)
+
+interface TlsEndpoint {
+    val role: TlsRole
+    val remoteHost: String
+    val remotePort: Int
+
+    suspend fun handshake()
+    suspend fun read(destination: ByteBuffer): Int
+    suspend fun write(source: ByteBuffer): Int
+    suspend fun close()
+
+    val isHandshakeComplete: Boolean
+    val peerCertificate: TlsPeerCertificate?
+    val protocol: String?
+    val cipherSuite: String?
+    val lastSession: TlsSession?
+}
+
+class TlsElement(
+    val config: TlsConfig,
+    private val processOperations: ProcessOperations,
+    parentJob: kotlinx.coroutines.Job? = null,
+    private val ownedSupervisor: NioSupervisor? = null,
+    override val fanoutSubscribers: List<AsyncContextElement> = emptyList(),
+) : AsyncContextElement(ElementState.CREATED, parentJob) {
+    companion object Key : AsyncContextKey<TlsElement>()
+
+    override val key: CoroutineContext.Key<*> get() = Key
+
+    private val endpoints = linkedSetOf<OpenSslTlsEndpoint>()
+
+    override suspend fun open() {
+        if (state == ElementState.CREATED) {
+            super.open()
+            state = ElementState.ACTIVE
+        }
+    }
+
+    fun clientEndpoint(hostname: String, port: Int = 443): TlsEndpoint =
+        OpenSslTlsEndpoint(
+            owner = this,
+            role = TlsRole.CLIENT,
+            remoteHost = hostname,
+            remotePort = port,
+            config = config,
+            processOperations = processOperations,
+        ).also { endpoints += it }
+
+    fun serverEndpoint(bindHost: String = "0.0.0.0", port: Int = 443): TlsEndpoint =
+        UnsupportedServerTlsEndpoint(bindHost, port)
+
+    internal fun release(endpoint: TlsEndpoint) {
+        if (endpoint is OpenSslTlsEndpoint) {
+            endpoints -= endpoint
+        }
+    }
+
+    override suspend fun drain() {
+        endpoints.toList().forEach { it.close() }
+        super.drain()
+    }
+
+    override suspend fun close() {
+        endpoints.toList().forEach { it.close() }
+        endpoints.clear()
+        if (ownedSupervisor != null && ownedSupervisor.state.isLessThan(ElementState.CLOSED)) {
+            ownedSupervisor.close()
+        }
+        super.close()
+    }
+}
+
+suspend fun openTlsElement(
+    config: TlsConfig = TlsConfig(),
+    processOperations: ProcessOperations,
+    parentJob: kotlinx.coroutines.Job? = null,
+    subscribers: List<AsyncContextElement> = emptyList(),
+): TlsElement =
+    TlsElement(
+        config = config,
+        processOperations = processOperations,
+        parentJob = parentJob,
+        fanoutSubscribers = subscribers,
+    ).also { it.open() }
+
+suspend fun openTlsElement(
+    config: TlsConfig = TlsConfig(),
+    nioSupervisor: NioSupervisor? = null,
+    parentJob: kotlinx.coroutines.Job? = null,
+    subscribers: List<AsyncContextElement> = emptyList(),
+): TlsElement {
+    val contextSupervisor = currentCoroutineContext()[NioSupervisor.Key]
+    val activeSupervisor = nioSupervisor ?: contextSupervisor ?: NioSupervisor()
+    val ownsSupervisor = nioSupervisor == null && contextSupervisor == null
+
+    if (activeSupervisor.state == ElementState.CREATED) {
+        activeSupervisor.open()
+    }
+
+    val processOperations = activeSupervisor.service<ProcessOperations>()
+        ?: error("TlsElement requires ProcessOperations in NioSupervisor. Open the supervisor before installing TLS.")
+
+    return TlsElement(
+        config = config,
+        processOperations = processOperations,
+        parentJob = parentJob,
+        ownedSupervisor = activeSupervisor.takeIf { ownsSupervisor },
+        fanoutSubscribers = subscribers,
+    ).also { it.open() }
+}
+
+private class OpenSslTlsEndpoint(
+    private val owner: TlsElement,
+    override val role: TlsRole,
+    override val remoteHost: String,
+    override val remotePort: Int,
     private val config: TlsConfig,
-    private val engine: SSLEngine,
-    private val channelRunner: ChannelRunner,
-    private val fd: Int,
-) {
-    // Buffer pools
-    private val appBufferSize = 16 * 1024 // 16KB application buffer
-    private val netBufferSize = 17 * 1024 // 17KB network buffer
-    
-    private var appReadBuffer: ByteBuffer? = null
-    private var appWriteBuffer: ByteBuffer? = null
-    
-    // Handshake state
-    sealed class HandshakeState {
-        data object NotStarted : HandshakeState()
-        data object InProgress : HandshakeState()
-        data object Completed : HandshakeState()
-        data class Failed(val error: Throwable) : HandshakeState()
-    }
-    
-    private var handshakeState: HandshakeState = HandshakeState.NotStarted
-    
-    // ── Factory ────────────────────────────────────────────────
-    
-    companion object {
-        /**
-         * Create a server-side TLS endpoint.
-         */
-        fun server(
-            config: TlsConfig,
-            channelRunner: ChannelRunner,
-            fd: Int,
-        ): TlsEndpoint {
-            val engine = createSSLEngine(config, isServer = true)
-            return TlsEndpoint(config, engine, channelRunner, fd)
-        }
-        
-        /**
-         * Create a client-side TLS endpoint.
-         */
-        fun client(
-            config: TlsConfig,
-            hostname: String,
-            channelRunner: ChannelRunner,
-            fd: Int,
-        ): TlsEndpoint {
-            val engine = createSSLEngine(config, isServer = false, hostname = hostname)
-            return TlsEndpoint(config, engine, channelRunner, fd)
-        }
-        
-        private fun createSSLEngine(config: TlsConfig, isServer: Boolean, hostname: String = "localhost"): SSLEngine {
-            val sslContext = createSSLContext(config)
-            return if (isServer) {
-                sslContext.createSSLEngine()
-            } else {
-                sslContext.createSSLEngine(hostname, 443)
-            }
-        }
-        
-        private fun createSSLContext(config: TlsConfig): SSLContext {
-            val context = SSLContext.getInstance("TLS")
-            
-            // Load key store
-            val keyStore = KeyStore.getInstance(KeyStore.getDefaultType())
-            if (config.keyStore != null) {
-                val password = config.keyStorePassword?.toCharArray() ?: CharArray(0)
-                java.io.FileInputStream(config.keyStore).use { fis ->
-                    keyStore.load(fis, password)
-                }
-            } else {
-                keyStore.load(null, null)
-            }
-            
-            // Key manager
-            val kmf = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm())
-            val keyPassword = config.keyStorePassword?.toCharArray() ?: CharArray(0)
-            kmf.init(keyStore, keyPassword)
-            
-            // Trust manager
-            val tmf = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm())
-            if (config.trustStore != null) {
-                val trustStore = KeyStore.getInstance(KeyStore.getDefaultType())
-                val trustPassword = config.trustStorePassword?.toCharArray() ?: CharArray(0)
-                java.io.FileInputStream(config.trustStore).use { fis ->
-                    trustStore.load(fis, trustPassword)
-                }
-                tmf.init(trustStore)
-            } else {
-                tmf.init(keyStore)
-            }
-            
-            context.init(kmf.keyManagers, tmf.trustManagers, null)
-            return context
-        }
-    }
-    
-    // ── Reactor Operations ──────────────────────────────────────
-    
-    /**
-     * Perform TLS handshake via reactor suspension.
-     * 
-     * Uses the reactor pattern from ChannelRunner:
-     * connect → runOp(token) → suspend → CQE → resume
-     */
-    suspend fun handshake() {
-        if (handshakeState != HandshakeState.NotStarted) {
+    private val processOperations: ProcessOperations,
+) : TlsEndpoint {
+    private var closed = false
+    private var requestBuffer = byteArrayOf()
+    private var responseBuffer = byteArrayOf()
+    private var responseOffset = 0
+    private var exchangePerformed = false
+
+    override var lastSession: TlsSession? = null
+        private set
+
+    override val isHandshakeComplete: Boolean
+        get() = lastSession != null
+
+    override val peerCertificate: TlsPeerCertificate?
+        get() = lastSession?.peerCertificate
+
+    override val protocol: String?
+        get() = lastSession?.protocol
+
+    override val cipherSuite: String?
+        get() = lastSession?.cipherSuite
+
+    override suspend fun handshake() {
+        ensureOpen()
+        if (lastSession != null) {
             return
         }
-        
-        handshakeState = HandshakeState.InProgress
-        
-        try {
-            // Begin handshake
-            engine.beginHandshake()
-            
-            // Loop until handshake completes or fails
-            var status = engine.handshakeStatus
-            while (status != SSLEngineResult.HandshakeStatus.NOT_HANDSHAKING) {
-                if (status == SSLEngineResult.HandshakeStatus.NEED_TASK) {
-                    engine.delegatedTask?.run()
-                }
-                if (status == SSLEngineResult.HandshakeStatus.NEED_WRAP) {
-                    // Need to write TLS data to the socket
-                    doWrap()
-                    // Suspend on write ready
-                    channelRunner.writeAsync(fd)
-                }
-                if (status == SSLEngineResult.HandshakeStatus.NEED_UNWRAP) {
-                    // Need to read TLS data from the socket
-                    // First ensure we have data to unwrap
-                    if (appReadBuffer == null || !appReadBuffer!!.hasRemaining()) {
-                        // Suspend on read ready
-                        channelRunner.readAsync(fd)
-                    }
-                    doUnwrap()
-                }
-                
-                status = engine.handshakeStatus
-            }
-            
-            handshakeState = HandshakeState.Completed
-        } catch (e: Exception) {
-            handshakeState = HandshakeState.Failed(e)
-            throw e
+        if (requestBuffer.isEmpty()) {
+            lastSession = executeOpenSsl(payload = byteArrayOf(), quiet = false)
+        } else {
+            ensureExchange()
         }
     }
-    
-    /**
-     * Read decrypted data from the TLS stream.
-     */
-    suspend fun read(destination: ByteBuffer): Int {
-        check(handshakeState == HandshakeState.Completed) {
-            "Handshake not completed"
-        }
-        
-        // First unwrap any pending data
-        while (engine.handshakeStatus == SSLEngineResult.HandshakeStatus.NOT_HANDSHAKING) {
-            // Check if we have pending unwrapped data
-            if (appReadBuffer != null && appReadBuffer!!.hasRemaining()) {
-                val appBuf = appReadBuffer!!
-                val pos = appBuf.position()
-                destination.put(appBuf)
-                return destination.position() - pos
-            }
-            
-            // Need more encrypted data from network
-            channelRunner.readAsync(fd)
-            val consumed = doUnwrap()
-            if (consumed <= 0) {
-                // No more data available
-                return -1
-            }
-        }
-        
-        return -1
-    }
-    
-    /**
-     * Write encrypted data to the TLS stream.
-     */
-    suspend fun write(source: ByteBuffer): Int {
-        check(handshakeState == HandshakeState.Completed) {
-            "Handshake not completed"
-        }
-        
-        doWrap(source)
-        
-        // Wait for socket to be ready for writing
-        channelRunner.writeAsync(fd)
-        
-        return source.remaining()
-    }
-    
-    /**
-     * Close the TLS connection.
-     */
-    suspend fun close() {
-        engine.closeOutbound()
-        
-        // Do final wrap to send close_notify
-        while (!engine.isOutboundDone) {
-            doWrap()
-            channelRunner.writeAsync(fd)
-        }
-    }
-    
-    // ── Internal ───────────────────────────────────────────────
-    
-    private fun doWrap(appData: ByteBuffer? = null): Int {
-        val source = appData ?: ByteBuffer.allocate(appBufferSize)
-        val dest = ByteBuffer.allocate(netBufferSize)
-        
-        val result = engine.wrap(source, dest)
-        dest.flip()
-        
-        // Save encrypted data for network write
-        if (dest.hasRemaining()) {
-            val encrypted = ByteArray(dest.remaining())
-            dest.get(encrypted)
-            // In real implementation, this would be queued for network write
-            appWriteBuffer = dest
-        }
-        
-        return result.bytesProduced()
-    }
-    
-    private fun doUnwrap(): Int {
-        // Read encrypted data from network would happen here
-        // For now, assume we have data in appReadBuffer
-        val source = ByteBuffer.allocate(netBufferSize)
-        val dest = ByteBuffer.allocate(appBufferSize)
-        
-        // In real implementation, read from socket into source
-        // For now, return 0 to indicate no data
-        source.flip()
-        
-        if (!source.hasRemaining()) {
-            return 0
-        }
-        
-        val result = engine.unwrap(source, dest)
-        dest.flip()
-        
-        // Save app buffer for read()
-        if (dest.hasRemaining()) {
-            appReadBuffer = dest
-        }
-        
-        return result.bytesConsumed()
-    }
-    
-    /**
-     * Check if handshake completed successfully.
-     */
-    val isHandshakeComplete: Boolean
-        get() = handshakeState == HandshakeState.Completed
-    
-    /**
-     * Get the peer certificate.
-     */
-    val peerCertificate: X509Certificate?
-        get() {
-            val session = engine.session
-            return session?.peerCertificateChain?.firstOrNull() as? X509Certificate
-        }
-    
-    /**
-     * Get the protocol negotiated.
-     */
-    val protocol: String?
-        get() = engine.session?.protocol
-    
-    /**
-     * Get the cipher suite negotiated.
-     */
-    val cipherSuite: String?
-        get() = engine.session?.cipherSuite
-}
 
-// ─────────────────────────────────────────────────────────────────────────────
-// TLS ACCEPTOR — Server-side TLS acceptance
-// ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * TLS acceptor — accepts TLS connections on a server socket.
- */
-class TlsAcceptor(
-    private val config: TlsConfig,
-    private val channelRunner: ChannelRunner,
-) {
-    private var serverFd: Int = -1
-    
-    /**
-     * Bind to a port and start accepting TLS connections.
-     */
-    fun bind(port: Int): Int {
-        serverFd = channelRunner.tcpConnect("0.0.0.0", port)
-        return serverFd
+    override suspend fun read(destination: ByteBuffer): Int {
+        ensureOpen()
+        ensureExchange()
+        if (responseOffset >= responseBuffer.size) {
+            return -1
+        }
+        val count = minOf(destination.remaining(), responseBuffer.size - responseOffset)
+        destination.put(responseBuffer, responseOffset, count)
+        responseOffset += count
+        return count
     }
-    
-    /**
-     * Accept a new TLS connection.
-     */
-    suspend fun accept(): TlsEndpoint {
-        // Accept incoming connection
-        channelRunner.readAsync(serverFd)
-        
-        // Create TLS endpoint for the connection
-        val endpoint = TlsEndpoint.client(
-            config,
-            "localhost",
-            channelRunner,
-            serverFd,
+
+    override suspend fun write(source: ByteBuffer): Int {
+        ensureOpen()
+        check(!exchangePerformed) { "OpenSSL exec fallback is one-shot per endpoint. Create a fresh endpoint for a new exchange." }
+        val bytes = ByteArray(source.remaining())
+        source.get(bytes)
+        requestBuffer = requestBuffer + bytes
+        return bytes.size
+    }
+
+    override suspend fun close() {
+        if (closed) {
+            return
+        }
+        closed = true
+        requestBuffer = byteArrayOf()
+        responseBuffer = byteArrayOf()
+        responseOffset = 0
+        owner.release(this)
+    }
+
+    private fun ensureOpen() {
+        check(!closed) { "TLS endpoint is closed" }
+    }
+
+    private suspend fun ensureExchange() {
+        if (exchangePerformed) {
+            return
+        }
+        val session = executeOpenSsl(payload = requestBuffer, quiet = true)
+        lastSession = session
+        responseBuffer = session.stdout
+        responseOffset = 0
+        exchangePerformed = true
+    }
+
+    private suspend fun executeOpenSsl(payload: ByteArray, quiet: Boolean): TlsSession {
+        val result = processOperations.exec(
+            command = config.opensslCommand,
+            args = buildClientArgs(quiet = quiet),
+            stdin = payload,
         )
-        
-        // Perform handshake
-        endpoint.handshake()
-        
-        return endpoint
-    }
-    
-    /**
-     * Close the acceptor.
-     */
-    fun close() {
-        if (serverFd >= 0) {
-            // Close fd
-            serverFd = -1
+        val session = result.toTlsSession()
+        check(session.verified || !config.hostnameVerification) {
+            "OpenSSL TLS verification failed for $remoteHost:$remotePort"
         }
+        check(result.exitCode == 0) {
+            val detailBytes = if (result.stderr.isEmpty()) result.stdout else result.stderr
+            val detail = decodeText(detailBytes)
+            "OpenSSL exited with ${result.exitCode} for $remoteHost:$remotePort: $detail"
+        }
+        return session
+    }
+
+    private fun buildClientArgs(quiet: Boolean): List<String> {
+        val args = mutableListOf(
+            "s_client",
+            "-connect", "$remoteHost:$remotePort",
+            "-servername", remoteHost,
+        )
+
+        if (quiet) {
+            args += "-quiet"
+        }
+
+        when (config.protocols.firstOrNull()) {
+            TlsProtocol.TLS13 -> args += "-tls1_3"
+            TlsProtocol.TLS12 -> args += "-tls1_2"
+            null -> {}
+        }
+
+        val tls13Suites = config.cipherSuites.filter { it.startsWith("TLS_") }
+        if (tls13Suites.isNotEmpty()) {
+            args += listOf("-ciphersuites", tls13Suites.joinToString(":"))
+        }
+
+        val legacySuites = config.cipherSuites.filterNot { it.startsWith("TLS_") }
+        if (legacySuites.isNotEmpty()) {
+            args += listOf("-cipher", legacySuites.joinToString(":"))
+        }
+
+        if (config.supportedGroups.isNotEmpty()) {
+            args += listOf("-groups", config.supportedGroups.joinToString(":"))
+        }
+
+        if (config.alpnProtocols.isNotEmpty()) {
+            args += listOf("-alpn", config.alpnProtocols.joinToString(","))
+        }
+
+        config.trustStore?.let { args += listOf("-CAfile", it) }
+        config.certificateFile?.let { args += listOf("-cert", it) }
+        config.privateKeyFile?.let { args += listOf("-key", it) }
+        config.privateKeyPassword?.let { args += listOf("-pass", "pass:$it") }
+
+        if (config.hostnameVerification) {
+            args += listOf("-verify_hostname", remoteHost)
+            args += "-verify_return_error"
+        }
+
+        return args
     }
 }
+
+private class UnsupportedServerTlsEndpoint(
+    override val remoteHost: String,
+    override val remotePort: Int,
+) : TlsEndpoint {
+    override val role: TlsRole = TlsRole.SERVER
+
+    override suspend fun handshake() {
+        error("OpenSSL exec fallback does not support server-side TLS endpoints.")
+    }
+
+    override suspend fun read(destination: ByteBuffer): Int =
+        error("OpenSSL exec fallback does not support server-side TLS endpoints.")
+
+    override suspend fun write(source: ByteBuffer): Int =
+        error("OpenSSL exec fallback does not support server-side TLS endpoints.")
+
+    override suspend fun close() {}
+
+    override val isHandshakeComplete: Boolean = false
+    override val peerCertificate: TlsPeerCertificate? = null
+    override val protocol: String? = null
+    override val cipherSuite: String? = null
+    override val lastSession: TlsSession? = null
+}
+
+private fun ProcessResult.toTlsSession(): TlsSession {
+    val merged = buildString {
+        append(decodeText(stderr))
+        if (stderr.isNotEmpty() && stdout.isNotEmpty()) {
+            append('\n')
+        }
+        append(decodeText(stdout))
+    }
+    return TlsSession(
+        protocol = merged.findField("Protocol"),
+        cipherSuite = merged.findField("Cipher"),
+        peerCertificate = TlsPeerCertificate(
+            subject = merged.findPrefixValue("subject="),
+            issuer = merged.findPrefixValue("issuer="),
+        ),
+        verified = merged.contains("Verify return code: 0", ignoreCase = true) ||
+            merged.contains("Verification: OK", ignoreCase = true) ||
+            exitCode == 0,
+        stdout = stdout,
+        stderr = stderr,
+    )
+}
+
+private fun String.findField(name: String): String? =
+    lineSequence()
+        .map { it.trim() }
+        .firstOrNull { it.startsWith("$name:", ignoreCase = true) }
+        ?.substringAfter(':')
+        ?.trim()
+        ?.takeIf { it.isNotEmpty() }
+
+private fun String.findPrefixValue(prefix: String): String? =
+    lineSequence()
+        .map { it.trim() }
+        .firstOrNull { it.startsWith(prefix, ignoreCase = true) }
+        ?.substringAfter(prefix)
+        ?.trim()
+        ?.takeIf { it.isNotEmpty() }
+
+private fun decodeText(bytes: ByteArray): String =
+    if (bytes.isEmpty()) "" else bytes.decodeToString()
