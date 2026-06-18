@@ -1,6 +1,6 @@
 plugins {
-    id("org.jetbrains.kotlin.multiplatform")
-    id("maven-publish")
+    id("org.jetbrains.kotlin.jvm")
+    `maven-publish`
 }
 
 group = "borg.trikeshed"
@@ -10,23 +10,20 @@ repositories {
     mavenCentral()
     mavenLocal()
     google()
-    maven("https://oss.sonatype.org/content/repositories/snapshots/")
-    maven("https://www.jitpack.io")
+    maven { url = uri("https://oss.sonatype.org/content/repositories/snapshots/") }
+    maven { url = uri("https://www.jitpack.io") }
 }
 
 kotlin {
     jvmToolchain(25)
 
-    jvm()
-
     sourceSets {
-        val commonMain by getting {
+        val main by getting {
             dependencies {
-                api(project(":libs:ccek-core"))
                 api("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
             }
         }
-        val commonTest by getting {
+        val test by getting {
             dependencies {
                 implementation(kotlin("test"))
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
@@ -46,6 +43,6 @@ tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompilationTask<*>> {
     }
 }
 
-tasks.named<org.gradle.api.tasks.testing.Test>("jvmTest") {
+tasks.named<org.gradle.api.tasks.testing.Test>("test") {
     useJUnitPlatform()
 }

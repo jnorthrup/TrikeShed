@@ -228,7 +228,7 @@ object KanbanBlackboardDomain {
         val handles = mutableListOf<Join<String, String>>()
         cards.view.forEach { card ->
             card.dependencies.view.forEach { dep ->
-                if (idIndex.contains(dep)) handles.add(dep to card.id)
+                if (idIndex.contains(dep)) handles.add(dep j card.id)
             }
         }
         return handles
