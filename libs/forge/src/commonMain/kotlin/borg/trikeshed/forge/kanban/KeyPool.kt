@@ -169,13 +169,15 @@ class KeyPool {
         agentId: String,
         ttlMs: Long = 0,
         timeoutMs: Long = 30_000,
-    ): Boolean = withTimeoutOrNull(timeoutMs) {
-        while (true) {
-            val result = acquireLease(keyId, agentId, ttlMs)
-            if (result) return@withTimeoutOrNull true
-            delay(100)
-        }
-    } ?: false
+    ): Boolean {
+        return withTimeoutOrNull(timeoutMs) {
+            while (true) {
+                val acquired = acquireLease(keyId, agentId, ttlMs)
+                if (acquired) return@withTimeoutOrNull true
+                delay(100)
+            }
+        } ?: false
+    }
 
     suspend fun releaseLease(keyId: String, agentId: String): Boolean = mutex.withLock {
         val entry = mutableKeys[keyId] ?: return false
@@ -196,7 +198,7 @@ class KeyPool {
             leasedTo = entry.leasedTo,
             leaseStartedAt = entry.leaseStartedAt,
             leaseExpiresAt = entry.leaseExpiresAt,
-            isActiveLease = entry.leasedTo != null && (entry.leaseExpiresAt == 0 || entry.leaseExpiresAt > now)
+            isActiveLease = entry.leasedTo != null && (entry.leaseExpiresAt == 0L || entry.leaseExpiresAt > now)
         )
     }
     
@@ -239,9 +241,9 @@ class KeyPool {
         return count
     }
     
-    fun toList(): List<Map<String, Any>> = mutex.withLock {
+    suspend fun toList(): List<Map<String, Any>> = mutex.withLock {
         mutableKeys.values.map { entry ->
-            mapOf(
+            mapOf<String, Any>(
                 "key_id" to entry.keyId,
                 "provider" to entry.provider,
                 "label" to entry.label,
@@ -249,8 +251,8 @@ class KeyPool {
                 "last_used_ms" to entry.lastUsedMs,
                 "access_count" to entry.accessCount,
                 "status" to entry.status.name,
-                "last_model" to entry.lastModel,
-                "leased_to" to entry.leasedTo,
+                "last_model" to (entry.lastModel as Any? ?: ""),
+                "leased_to" to (entry.leasedTo as Any? ?: ""),
                 "lease_expires_at" to entry.leaseExpiresAt,
             )
         }
