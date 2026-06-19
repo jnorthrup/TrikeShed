@@ -3,14 +3,15 @@ package borg.trikeshed.forge.ui
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -19,25 +20,29 @@ import androidx.compose.material3.TextField
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Surface
-import androidx.compose.material3.SurfaceDefaults
-import androidx.compose.material3.Divider
-import androidx.compose.material3.ProgressIndicator
-import androidx.compose.material3.icons.Icons
-import androidx.compose.material3.icons.filled.Add
-import androidx.compose.material3.icons.filled.Refresh
-import androidx.compose.material3.icons.filled.PlayArrow
-import androidx.compose.material3.icons.filled.Stop
-import androidx.compose.material3.icons.filled.Settings
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Error
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.collectAsStateWithLifecycle
+import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.singleWindowApplication
@@ -48,55 +53,57 @@ import borg.trikeshed.forge.kanban.v2.installKanban
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.flow.collectAsStateWithLifecycle
+import kotlinx.coroutines.delay
 
 @Composable
 fun ForgeApp() {
     // Install Kanban CCEK elements in background
     val kanbanScope = remember { CoroutineScope(Dispatchers.Default) }
-    val kanbanElements by remember { mutableStateOf<KanbanElements?>(null) }
-    val initError by remember { mutableStateOf<String?>(null) }
+    var kanbanElements by remember { mutableStateOf<KanbanElements?>(null) }
+    var initError by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(Unit) {
         try {
-            kanbanElements = installKanban(
+            val elements = installKanban(
                 config = CoordinatorConfig(maxInProgress = 5, maxSpawn = 3),
                 gepaConfig = GepaConfig(maxMetricCalls = 20, intervalSeconds = 30),
                 maxHistoryPerKey = 500
             )
+            kanbanElements = elements
             // Start coordinator and GEPA loops
-            kanbanScope.launch { kanbanElements.coordinator.startLoop(kanbanScope) }
-            kanbanScope.launch { kanbanElements.gepa.startLoop(kanbanScope, intervalSeconds = 60) }
+            kanbanScope.launch { elements.coordinator.startLoop(kanbanScope) }
+            kanbanScope.launch { elements.gepa.startLoop(kanbanScope, intervalSeconds = 60) }
         } catch (e: Exception) {
             initError = e.message
         }
     }
 
     // Collect reactive state
-    val coordinatorState by kanbanElements?.coordinator.state
-        ?.collectAsStateWithLifecycle(initialValue = null)
-    val gepaState by kanbanElements?.gepa.state
-        ?.collectAsStateWithLifecycle(initialValue = null)
-    val keyPoolStats by remember { mutableStateOf<String>("") }
+    val coordinatorState by (kanbanElements?.coordinator?.flowState
+        ?.collectAsState(initial = null) ?: remember { mutableStateOf(null) })
+    val gepaState by (kanbanElements?.gepa?.flowState
+        ?.collectAsState(initial = null) ?: remember { mutableStateOf(null) })
+    var keyPoolStats by remember { mutableStateOf<String>("") }
 
     // Load key pool stats periodically
     LaunchedEffect(kanbanElements) {
-        kanbanElements?.let { elements ->
+        val elements = kanbanElements
+        if (elements != null) {
             kanbanScope.launch {
                 while (true) {
                     val draft = elements.keyPool.getDraft()
                     val available = elements.keyPool.getAvailable().size
                     keyPoolStats = "Keys: ${draft.mapping.size} drafted, $available available"
-                    kotlinx.coroutines.delay(5000)
+                    delay(5000)
                 }
             }
         }
     }
 
     // UI State
-    val showConfig by remember { mutableStateOf(false) }
-    val maxInProgress by remember { mutableStateOf(5) }
-    val maxSpawn by remember { mutableStateOf(3) }
+    var showConfig by remember { mutableStateOf(false) }
+    var maxInProgress by remember { mutableStateOf(5) }
+    var maxSpawn by remember { mutableStateOf(3) }
 
     if (initError != null) {
         ErrorScreen(error = initError!!)
@@ -107,6 +114,8 @@ fun ForgeApp() {
         LoadingScreen()
         return
     }
+
+    val elements = kanbanElements!!
 
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -120,11 +129,14 @@ fun ForgeApp() {
             // Header
             Header(title = "Forge Kanban", subtitle = "CCEK-powered autonomous dispatch", showConfig = { showConfig = true })
 
-            Divider(color = Color(0xFF333355), thickness = 1.dp)
+            HorizontalDivider(color = Color(0xFF333355), thickness = 1.dp)
 
             // Main content
             Column(
-                modifier = Modifier.fillMaxSize().padding(16.dp),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(16.dp)
+                    .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
@@ -149,12 +161,12 @@ fun ForgeApp() {
                     onMaxInProgressChange = { maxInProgress = it },
                     onMaxSpawnChange = { maxSpawn = it },
                     onApply = {
-                        kanbanElements?.coordinator.updateConfig(
+                        elements.coordinator.updateConfig(
                             CoordinatorConfig(maxInProgress = maxInProgress, maxSpawn = maxSpawn)
                         )
                     },
-                    onRunTick = { kanbanElements?.coordinator.tick() },
-                    onRunGepaCycle = { kanbanElements?.gepa.runCycle() },
+                    onRunTick = { elements.coordinator.tick() },
+                    onRunGepaCycle = { elements.gepa.runCycle() },
                 )
 
                 if (showConfig) {
@@ -162,7 +174,7 @@ fun ForgeApp() {
                         maxInProgress = maxInProgress,
                         maxSpawn = maxSpawn,
                         onApply = {
-                            kanbanElements?.coordinator.updateConfig(
+                            elements.coordinator.updateConfig(
                                 CoordinatorConfig(maxInProgress = maxInProgress, maxSpawn = maxSpawn)
                             )
                             showConfig = false
@@ -195,7 +207,7 @@ fun Header(title: String, subtitle: String, showConfig: () -> Unit) {
 }
 
 @Composable
-fun StatusCard(title: String, value: String, icon: androidx.compose.material3.icons.filled.Add, color: Color) {
+fun StatusCard(title: String, value: String, icon: androidx.compose.ui.graphics.vector.ImageVector, color: Color) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -231,17 +243,19 @@ fun CoordinatorStateCard(state: borg.trikeshed.forge.kanban.v2.CoordinatorState?
         Column(modifier = Modifier.padding(16.dp)) {
             Text(text = "Coordinator Dispatch", fontSize = 18.sp, fontWeight = FontWeight.Bold)
             androidx.compose.foundation.layout.Spacer(modifier = Modifier.padding(0.dp, 8.dp, 0.dp, 0.dp))
-            state?.let { s ->
+            if (state != null) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    MetricBox("Running", "${s.currentlyRunning} / ${s.maxInProgress}", Colors.Green)
-                    MetricBox("Available Keys", s.availableKeys.toString(), Colors.Blue)
-                    MetricBox("Queue Depth", s.queueDepth.toString(), Colors.Orange)
-                    MetricBox("Max Spawn/Tick", s.maxSpawn.toString(), Colors.Purple)
+                    MetricBox("Running", "${state.currentlyRunning} / ${state.maxInProgress}", Colors.Green)
+                    MetricBox("Available Keys", state.availableKeys.toString(), Colors.Blue)
+                    MetricBox("Queue Depth", state.queueDepth.toString(), Colors.Orange)
+                    MetricBox("Max Spawn/Tick", state.maxSpawn.toString(), Colors.Purple)
                 }
-            } ?: Text(text = "Initializing...", color = Color(0xFF666688))
+            } else {
+                Text(text = "Initializing...", color = Color(0xFF666688))
+            }
         }
     }
 }
@@ -258,26 +272,34 @@ fun GepaStateCard(state: borg.trikeshed.forge.kanban.v2.GepaState?) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text(text = "GEPA Optimizer", fontSize = 18.sp, fontWeight = FontWeight.Bold)
             androidx.compose.foundation.layout.Spacer(modifier = Modifier.padding(0.dp, 8.dp, 0.dp, 0.dp))
-            state?.let { s ->
+            if (state != null) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    MetricBox("Status", if (s.running) "RUNNING" else "IDLE", if (s.running) Colors.Green else Colors.Gray)
-                    MetricBox("Cycles", s.cycleCount.toString(), Colors.Blue)
-                    MetricBox("Last Result", s.lastResult?.let { "Score: ${it.bestCandidate.take(40)}..." } ?: "None", Colors.Purple)
+                    MetricBox("Status", if (state.running) "RUNNING" else "IDLE", if (state.running) Colors.Green else Colors.Gray)
+                    MetricBox("Cycles", state.cycleCount.toString(), Colors.Blue)
+                    MetricBox("Last Result", state.lastResult?.let { "Score: ${it.bestCandidate.take(40)}..." } ?: "None", Colors.Purple)
                 }
-                if (s.lastResult != null) {
+                if (state.lastResult != null) {
                     androidx.compose.foundation.layout.Spacer(modifier = Modifier.padding(0.dp, 8.dp, 0.dp, 0.dp))
-                    Text(text = "Best: ${s.lastResult?.bestCandidate}", fontSize = 12.sp, color = Color(0xFF8888AA), maxLines = 2, overflow = androidx.compose.ui.text.TextOverflow.Ellipsis)
+                    Text(
+                        text = "Best: ${state.lastResult?.bestCandidate}",
+                        fontSize = 12.sp,
+                        color = Color(0xFF8888AA),
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
                 }
-            } ?: Text(text = "Ready", color = Color(0xFF666688))
+            } else {
+                Text(text = "Ready", color = Color(0xFF666688))
+            }
         }
     }
 }
 
 @Composable
-fun MetricBox(label: String, value: String, color: Color) {
+fun RowScope.MetricBox(label: String, value: String, color: Color) {
     Column(
         modifier = Modifier
             .weight(1f)
@@ -332,7 +354,7 @@ fun ControlsCard(
                         onValueChange = { v -> v.toIntOrNull()?.let(onMaxInProgressChange) },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
-                        keyboardOptions = androidx.compose.ui.text.input.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number)
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
                     )
                 }
                 Column(modifier = Modifier.weight(1f)) {
@@ -343,7 +365,7 @@ fun ControlsCard(
                         onValueChange = { v -> v.toIntOrNull()?.let(onMaxSpawnChange) },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
-                        keyboardOptions = androidx.compose.ui.text.input.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number)
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
                     )
                 }
             }
@@ -400,15 +422,13 @@ fun ConfigDialog(
             .height(300.dp),
         colors = CardDefaults.cardColors(
             containerColor = Color(0xFF1A1A2E),
-            contentColor = Color.White,
-            surfaceColor = Color(0xFF16213E)
+            contentColor = Color.White
         )
     ) {
         Column(modifier = Modifier.padding(24.dp)) {
             Text(text = "Coordinator Configuration", fontSize = 24.sp, fontWeight = FontWeight.Bold)
             androidx.compose.foundation.layout.Spacer(modifier = Modifier.padding(0.dp, 24.dp, 0.dp, 0.dp))
 
-            // This would be a proper dialog in a real app
             Column(modifier = Modifier.fillMaxWidth()) {
                 Text(text = "Max In Progress: $maxInProgress", fontSize = 16.sp)
                 Text(text = "Max Spawn/Tick: $maxSpawn", fontSize = 16.sp)
@@ -438,7 +458,7 @@ fun LoadingScreen() {
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        ProgressIndicator(color = Color(0xFF00D4FF), modifier = Modifier.size(48.dp))
+        CircularProgressIndicator(color = Color(0xFF00D4FF), modifier = Modifier.size(48.dp))
         androidx.compose.foundation.layout.Spacer(modifier = Modifier.padding(0.dp, 16.dp, 0.dp, 0.dp))
         Text(text = "Initializing Forge CCEK...", fontSize = 18.sp, color = Color(0xFFAAAACC))
     }
@@ -455,7 +475,7 @@ fun ErrorScreen(error: String) {
         androidx.compose.foundation.layout.Spacer(modifier = Modifier.padding(0.dp, 16.dp, 0.dp, 0.dp))
         Text(text = "Failed to initialize", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color.White)
         androidx.compose.foundation.layout.Spacer(modifier = Modifier.padding(0.dp, 8.dp, 0.dp, 0.dp))
-        Text(text = error, fontSize = 14.sp, color = Color(0xFF8888AA), textAlign = androidx.compose.ui.text.TextAlign.Center, modifier = Modifier.padding(32.dp))
+        Text(text = error, fontSize = 14.sp, color = Color(0xFF8888AA), textAlign = TextAlign.Center, modifier = Modifier.padding(32.dp))
     }
 }
 

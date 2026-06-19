@@ -21,6 +21,12 @@ import platform.posix.*
  */
 class LinuxChannelOperations : ChannelOperations {
 
+    private data class PendingOp(
+        val outerUserData: Long,
+        val fd: Int,
+        val pin: Pinned<ByteArray>?,
+    )
+
     override fun openChannel(entries: Int): ChannelOperations.ChannelHandle {
         Liburing.open(entries).getOrThrow()
         return UringChannelHandle()
@@ -66,12 +72,6 @@ class LinuxChannelOperations : ChannelOperations {
         /** In-flight operations: ioReqId → (outerUserData, fd, pinned buffer or null). */
         private val pendingOps = mutableMapOf<Long, PendingOp>()
 
-        private data class PendingOp(
-            val outerUserData: Long,
-            val fd: Int,
-            val pin: Pinned<ByteArray>?,
-        )
-
         // ── SQE preparation ───────────────────────────────────────────────
 
         override fun prepAccept(serverFd: Int, userData: Long): Int {
@@ -87,7 +87,7 @@ class LinuxChannelOperations : ChannelOperations {
             val off = buffer.arrayOffset() + buffer.position()
             val pin = buffer.array().pin()
             pendingOps[rid] = PendingOp(userData, fd, pin)
-            val addr = pin.addressOf(off).rawValue
+            val addr = pin.addressOf(off).rawValue.toLong()
             return Liburing.prepRead(fd, addr, buffer.remaining(), 0L, rid).fold({ 0 }, {
                 pendingOps.remove(rid)?.pin?.unpin(); -1
             })
@@ -98,7 +98,7 @@ class LinuxChannelOperations : ChannelOperations {
             val off = buffer.arrayOffset() + buffer.position()
             val pin = buffer.array().pin()
             pendingOps[rid] = PendingOp(userData, fd, pin)
-            val addr = pin.addressOf(off).rawValue
+            val addr = pin.addressOf(off).rawValue.toLong()
             return Liburing.prepWrite(fd, addr, buffer.remaining(), 0L, rid).fold({ 0 }, {
                 pendingOps.remove(rid)?.pin?.unpin(); -1
             })
@@ -125,12 +125,12 @@ class LinuxChannelOperations : ChannelOperations {
         override fun submit(): Int = Liburing.submit().getOrElse { -1 }
 
         /** Async UDP sendmsg — queues a SENDMSG SQE with msghdr. */
-        override fun sendmsg(fd: Int, msgHdrPtr: Long, userData: Long = 0L): Int {
+        override fun sendmsg(fd: Int, msgHdrPtr: Long, userData: Long): Int {
             return Liburing.prepSendmsg(fd, msgHdrPtr, 0, userData).fold({ 0 }, { -1 })
         }
-
+ 
         /** Async UDP recvmsg — queues a RECVMSG SQE with msghdr. */
-        override fun recvmsg(fd: Int, msgHdrPtr: Long, userData: Long = 0L): Int {
+        override fun recvmsg(fd: Int, msgHdrPtr: Long, userData: Long): Int {
             return Liburing.prepRecvmsg(fd, msgHdrPtr, 0, userData).fold({ 0 }, { -1 })
         }
 

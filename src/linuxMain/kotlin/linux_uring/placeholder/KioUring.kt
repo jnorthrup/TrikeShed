@@ -101,7 +101,7 @@ class KioUring {
         val flags: CPointer<__u32Var> get() = (sqptr + p.sq_off.flags.toLong()).toCPointer<__u32Var>()!!
         val head: CPointer<__u32Var> get() = (sqptr + p.sq_off.head.toLong()).toCPointer<__u32Var>()!!
         val resv1: CPointer<__u32Var> get() = (sqptr + p.sq_off.resv1.toLong()).toCPointer<__u32Var>()!!
-        val resv2: CPointer<__u64Var> get() = (sqptr + p.sq_off.resv2.toLong()).toCPointer<__u64Var>()!!
+        val user_addr: CPointer<__u64Var> get() = (sqptr + p.sq_off.user_addr.toLong()).toCPointer<__u64Var>()!!
         val ring_entries: CPointer<__u32Var> get() = (sqptr + p.sq_off.ring_entries.toLong()).toCPointer<__u32Var>()!!
         val ring_mask: CPointer<__u32Var> get() = (sqptr + p.sq_off.ring_mask.toLong()).toCPointer<__u32Var>()!!
         val tail: CPointer<__u32Var> get() = (sqptr + p.sq_off.tail.toLong()).toCPointer<__u32Var>()!!
@@ -113,7 +113,7 @@ class KioUring {
         val head: CPointer<__u32Var> get() = (cqptr + p.cq_off.head.toLong()).toCPointer<__u32Var>()!!
         val overflow: CPointer<__u32Var> get() = (cqptr + p.cq_off.overflow.toLong()).toCPointer<__u32Var>()!!
         val resv1: CPointer<__u32Var> get() = (cqptr + p.cq_off.resv1.toLong()).toCPointer<__u32Var>()!!
-        val resv2: CPointer<__u64Var> get() = (cqptr + p.cq_off.resv2.toLong()).toCPointer<__u64Var>()!!
+        val user_addr: CPointer<__u64Var> get() = (cqptr + p.cq_off.user_addr.toLong()).toCPointer<__u64Var>()!!
         val ring_entries: CPointer<__u32Var> get() = (cqptr + p.cq_off.ring_entries.toLong()).toCPointer<__u32Var>()!!
         val ring_mask: CPointer<__u32Var> get() = (cqptr + p.cq_off.ring_mask.toLong()).toCPointer<__u32Var>()!!
         val tail: CPointer<__u32Var> get() = (cqptr + p.cq_off.tail.toLong()).toCPointer<__u32Var>()!!
@@ -182,7 +182,7 @@ class KioUring {
         for ((chunk, remains) in (file_sz downTo 0L step tehBlockSize).withIndex())
             fi.iovecs[chunk].run {
                 iov_len = min(remains, tehBlockSize).toULong()
-                iov_base = memalign(BLOCK_SZ, BLOCK_SZ)
+                iov_base = memalign(BLOCK_SZ.toULong(), BLOCK_SZ.toULong())
             }
         opReadToFileinfo(sqe, file_fd, fi, blocks)
     }
@@ -240,7 +240,7 @@ fun get_file_size(fd: Int): posix_off_t = memScoped {
     return st.st_size
 }
 
-private fun MemScope.getBlockDeviceBlockSize(fd: Int): off_t {
+private fun MemScope.getBlockDeviceBlockSize(fd: Int): posix_off_t {
     val bytes: LongVar = alloc()
     posixRequires(posix_ioctl(fd, PlatformLinuxBLKGETSIZE64, bytes.ptr).z) { ("ioctl") }
     return bytes.value /* = kotlin.Long */
@@ -310,7 +310,7 @@ val pvtHandle: UInt = pvtHandleSpec.dec()
 fun createSubmission(file_path: String, s: KioUring): Int {
     val namedDirAndFile1: List<String> = namedDirAndFile(file_path)
     val dirfd = getDirFd(namedDirAndFile1) // never closed
-    val file_fd = openat(dirfd, file_path, O_RDONLY) // never closed
+    val file_fd = k_openat(dirfd, file_path, O_RDONLY) // never closed
     posixRequires(file_fd >= 0) { "fileopen $file_fd" }
     s.opReadWholeFile(file_fd)
 

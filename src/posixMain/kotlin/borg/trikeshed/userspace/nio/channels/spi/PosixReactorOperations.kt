@@ -31,7 +31,7 @@ class PosixReactorOperations : ReactorOperations {
             pfds[index].fd = fd; pfds[index].events = events
         }
         val timeoutMs = if (timeout.isInfinite()) -1 else timeout.inWholeMilliseconds.toInt()
-        val n = poll(pfds, fds.size.toUInt(), timeoutMs)
+        val n = poll(pfds, fds.size.convert(), timeoutMs)
         if (n <= 0) return@memScoped emptyList()
         (0 until fds.size).mapNotNull { i ->
             val pfd = pfds[i]

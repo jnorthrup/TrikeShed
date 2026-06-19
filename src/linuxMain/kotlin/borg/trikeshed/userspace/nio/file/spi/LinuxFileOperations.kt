@@ -7,6 +7,7 @@ import borg.trikeshed.lib.Join
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.toSeries
+import borg.trikeshed.lib.fromOctal
 import kotlinx.cinterop.*
 import platform.posix.*
 
@@ -111,7 +112,7 @@ class LinuxFileOperations : FileOperations {
         stat(path, st.ptr) == 0 && (st.st_mode.toInt() and S_IFMT) == S_IFREG
     }
 
-    override fun mkdirs(path: String) { mkdir(path, 0x1FFu.toUShort()) }
+    override fun mkdirs(path: String) { mkdir(path, 0x1FFu.convert()) }
     override fun deleteRecursively(path: String) {
         memScoped {
             val st = alloc<stat>()
@@ -142,4 +143,16 @@ class LinuxFileOperations : FileOperations {
     override fun readZip(path: String): List<Pair<String, ByteArray>> = throw UnsupportedOperationException("readZip unsupported")
     override fun createTempDir(prefix: String): String =
         "/tmp/$prefix-${generateSequence { ('a'..'z').random() }.take(8).joinToString("")}"
+
+    override fun open(path: String, readOnly: Boolean): Int {
+        val flags = if (readOnly) O_RDONLY else (O_RDWR or O_CREAT)
+        return platform.posix.open(path, flags, 644.fromOctal())
+    }
+
+    override fun close(fd: Int): Int = platform.posix.close(fd)
+
+    override fun size(fd: Int): Long = memScoped {
+        val st = alloc<stat>()
+        if (fstat(fd, st.ptr) == 0) st.st_size else 0L
+    }
 }

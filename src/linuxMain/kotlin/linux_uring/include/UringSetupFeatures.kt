@@ -5,6 +5,7 @@ package linux_uring.include
 import borg.trikeshed.lib.CZero.nz
 import linux_uring.*
 import zlinux_uring.*
+import platform.posix.uint32_t as __u32
 
 /**
 If no flags are specified, the io_uring instance is setup for interrupt driven I/O. I/O may be submitted using

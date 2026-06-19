@@ -3,6 +3,7 @@ package linux_uring.include
 
 import borg.trikeshed.lib.CZero.nz
 import zlinux_uring.*
+import platform.posix.uint32_t as __u32
 
 
 /**

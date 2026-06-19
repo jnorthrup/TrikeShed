@@ -2,15 +2,9 @@
 
 package borg.trikeshed.userspace
 
-import kotlinx.cinterop.ByteVar
-import kotlinx.cinterop.CPointer
-import kotlinx.cinterop.CPointerVar
-import kotlinx.cinterop.alloc
-import kotlinx.cinterop.memScoped
-import kotlinx.cinterop.nativeHeap
-import kotlinx.cinterop.ptr
-import kotlinx.cinterop.toCPointer
+import kotlinx.cinterop.*
 import platform.posix.sockaddr
+import platform.posix.msghdr
 import zlinux_uring.IORING_FSYNC_DATASYNC
 import zlinux_uring.io_uring
 import zlinux_uring.io_uring_cq_advance
@@ -23,8 +17,8 @@ import zlinux_uring.io_uring_prep_close
 import zlinux_uring.io_uring_prep_connect
 import zlinux_uring.io_uring_prep_fsync
 import zlinux_uring.io_uring_prep_ftruncate
-import zlinux_uring.io_uring_prep_mmap
-import zlinux_uring.io_uring_prep_munmap
+import zlinux_uring.k_io_uring_prep_sendmsg
+import zlinux_uring.k_io_uring_prep_recvmsg
 import zlinux_uring.io_uring_prep_read
 import zlinux_uring.io_uring_prep_write
 import zlinux_uring.io_uring_queue_exit
@@ -39,7 +33,7 @@ internal actual object LiburingImpl : LiburingFacade {
     actual override fun open(entries: Int, flags: Int): Result<Unit> {
         if (ring != null) return Result.success(Unit)
         val allocated = nativeHeap.alloc<io_uring>()
-        val rc = io_uring_queue_init(entries, allocated.ptr, flags.toUInt())
+        val rc = io_uring_queue_init(entries.toUInt(), allocated.ptr, flags.toUInt())
         if (rc < 0) {
             nativeHeap.free(allocated.ptr)
             return failure("io_uring_queue_init failed", rc)
@@ -51,13 +45,13 @@ internal actual object LiburingImpl : LiburingFacade {
     actual override fun prepRead(fd: Int, bufAddress: Long, len: Int, offset: Long, userData: Long): Result<Unit> =
         prepare(userData) { sqe ->
             sqe.pointed.user_data = userData.toULong()
-            io_uring_prep_read(sqe, fd, bufAddress.toCPointer<ByteVar>(), len.toUInt(), offset)
+            io_uring_prep_read(sqe, fd, bufAddress.toCPointer<ByteVar>(), len.toUInt(), offset.toULong())
         }
 
     actual override fun prepWrite(fd: Int, bufAddress: Long, len: Int, offset: Long, userData: Long): Result<Unit> =
         prepare(userData) { sqe ->
             sqe.pointed.user_data = userData.toULong()
-            io_uring_prep_write(sqe, fd, bufAddress.toCPointer<ByteVar>(), len.toUInt(), offset)
+            io_uring_prep_write(sqe, fd, bufAddress.toCPointer<ByteVar>(), len.toUInt(), offset.toULong())
         }
 
     actual override fun prepAccept(fd: Int, userData: Long): Result<Unit> =
@@ -91,27 +85,21 @@ internal actual object LiburingImpl : LiburingFacade {
         }
 
     actual override fun prepMmap(fd: Int, addr: Long, len: Int, prot: Int, flags: Int, offset: Long, userData: Long): Result<Unit> =
-        prepare(userData) { sqe ->
-            sqe.pointed.user_data = userData.toULong()
-            io_uring_prep_mmap(sqe, fd, addr, len, prot, flags, offset)
-        }
+        Result.failure(UnsupportedOperationException("mmap is not supported via io_uring directly"))
 
     actual override fun prepMunmap(addr: Long, len: Int, userData: Long): Result<Unit> =
-        prepare(userData) { sqe ->
-            sqe.pointed.user_data = userData.toULong()
-            io_uring_prep_munmap(sqe, addr, len)
-        }
+        Result.failure(UnsupportedOperationException("munmap is not supported via io_uring directly"))
 
     actual override fun prepSendmsg(fd: Int, msgHdrPtr: Long, flags: Int, userData: Long): Result<Unit> =
         prepare(userData) { sqe ->
             sqe.pointed.user_data = userData.toULong()
-            io_uring_prep_sendmsg(sqe, fd, msgHdrPtr.toCPointer<msghdr>(), flags.toUInt())
+            k_io_uring_prep_sendmsg(sqe, fd, msgHdrPtr.toCPointer<COpaque>(), flags.toUInt())
         }
 
     actual override fun prepRecvmsg(fd: Int, msgHdrPtr: Long, flags: Int, userData: Long): Result<Unit> =
         prepare(userData) { sqe ->
             sqe.pointed.user_data = userData.toULong()
-            io_uring_prep_recvmsg(sqe, fd, msgHdrPtr.toCPointer<msghdr>(), flags.toUInt())
+            k_io_uring_prep_recvmsg(sqe, fd, msgHdrPtr.toCPointer<COpaque>(), flags.toUInt())
         }
 
     actual override fun submit(): Result<Int> {
@@ -171,7 +159,7 @@ internal actual object LiburingImpl : LiburingFacade {
     actual override fun close(): Result<Unit> {
         val currentRing = ring ?: return Result.success(Unit)
         io_uring_queue_exit(currentRing)
-        nativeHeap.free(currentRing)
+        nativeHeap.free(currentRing.rawValue)
         ring = null
         handlers.clear()
         return Result.success(Unit)
@@ -192,7 +180,7 @@ internal actual object LiburingImpl : LiburingFacade {
         UringCompletion(
             userData = pointed.user_data.toLong(),
             res = pointed.res,
-            flags = pointed.flags,
+            flags = pointed.flags.toInt(),
         )
 }
 

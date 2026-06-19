@@ -7,7 +7,6 @@ import kotlinx.cinterop.*
 
 //import linux_uring.fstatat
 import platform.posix.*
-import zlinux_uring.AT_FDCWD
 
 /**
 opens file for syncronous read  /write
@@ -574,3 +573,5 @@ class LinuxPosixFile(
 
     }
 }
+
+const val AT_FDCWD = -100

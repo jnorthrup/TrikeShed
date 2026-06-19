@@ -212,7 +212,8 @@ switch (project.path) {
         break
     case ":libs:polyglot":
         kmpJvm()
-        extensions.getByName("kotlin").sourceSets.getByName("commonTest").dependencies {
+        def polyglotKotlin = extensions.getByName("kotlin")
+        polyglotKotlin.sourceSets.getByName("commonTest").dependencies {
             implementation rootPeer()
             implementation "org.jetbrains.kotlinx:kotlinx-coroutines-core:${prop("versions.kotlinx-coroutines-core")}"
         }

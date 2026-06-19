@@ -5,7 +5,11 @@ import borg.trikeshed.lib.CharSeries
 import borg.trikeshed.cursor.*
 import borg.trikeshed.isam.meta.IOMemento
 import borg.trikeshed.lib.*
-import borg.trikeshed.lib.DelimitRange
+import borg.trikeshed.common.TypeEvidence
+import borg.trikeshed.common.FileBuffer
+import borg.trikeshed.common.Files
+import borg.trikeshed.common.openFileBuffer
+import borg.trikeshed.common.DelimitRange
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals

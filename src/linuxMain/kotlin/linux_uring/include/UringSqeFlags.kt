@@ -4,6 +4,7 @@ package linux_uring.include
 
 import borg.trikeshed.lib.CZero.nz
 import zlinux_uring.*
+import platform.posix.uint32_t as __u32
 
 /**
 The flagsfield is a bit mask. The supported flags are:

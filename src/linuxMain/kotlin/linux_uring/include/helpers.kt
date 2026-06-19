@@ -1,3 +1,5 @@
+@file:OptIn(kotlin.experimental.ExperimentalNativeApi::class, kotlinx.cinterop.ExperimentalForeignApi::class)
+
 package linux_uring.include
 
 import borg.trikeshed.lib.CZero.nz
@@ -135,7 +137,7 @@ fun t_create_ring(depth: Int, ring: CPointer<io_uring>, flags: UInt): t_setup_re
     return t_create_ring_params(depth, ring, p.ptr)
 }
 
-fun t_register_buffers(ring: CPointer<io_uring>, p2: CValuesRef< zlinux_uring.iovec >, nr_iovecs: UInt): t_setup_ret {
+fun t_register_buffers(ring: CPointer<io_uring>, p2: CValuesRef<iovec>, nr_iovecs: UInt): t_setup_ret {
 
     val ret = io_uring_register_buffers(ring, p2, nr_iovecs)
     when {

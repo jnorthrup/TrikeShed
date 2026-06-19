@@ -7,7 +7,7 @@ pluginManagement {
 }
 
 dependencyResolutionManagement {
-    repositoriesMode.set(RepositoriesMode.PREFER_SETTINGS)
+    repositoriesMode.set(RepositoriesMode.PREFER_PROJECT)
     repositories {
         mavenCentral()
         google()
@@ -29,7 +29,7 @@ val workingModules = setOf(
     "tiny-btrfs", "kursive", "patl", "concurrency", "dreamer-kmm", "dreamer-dashboard",
     "openapi", "htx-client", "jules-client", "cmc",
     "cmc-generated", "krak", "krak-generated", "rhood-generated", "cpu-cache",
-    "ccek-core", "lib"
+    "ccek-core", "lib", "classfile"
 )
 
 val brokenModules = setOf(

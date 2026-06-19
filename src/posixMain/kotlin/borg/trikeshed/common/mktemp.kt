@@ -6,6 +6,7 @@ import borg.trikeshed.lib.fromOctal
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.cstr
 import kotlinx.cinterop.toKStringFromUtf8
+import kotlinx.cinterop.convert
 import platform.posix.mkdtemp
 import platform.posix.unlink
 
@@ -25,7 +26,7 @@ actual fun rm(path: String): Boolean {
 
 actual fun  mkdir(path: String): Boolean {
     //kotlin native posix make directory hierarchy
-    val res = platform.posix.mkdir(path, 777.fromOctal().toUShort())
+    val res = platform.posix.mkdir(path, 777.fromOctal().convert())
     return res == 0
 }
 

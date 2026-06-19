@@ -133,7 +133,7 @@ actual object Files {
     }
 
     actual fun mkdirs(path: String) {
-        mkdir(path, 0x1FFu.toUShort())
+        mkdir(path, 0x1FFu.convert())
     }
 
     actual fun deleteRecursively(path: String): Unit = memScoped {

@@ -3,6 +3,8 @@ package borg.trikeshed.userspace.nio.file.spi
 import kotlinx.cinterop.toKString
 import platform.posix.getenv as posix_getenv
 
+import borg.trikeshed.userspace.nio.platform.spi.SystemOperations
+
 class LinuxSystemOperations : SystemOperations {
     override fun getenv(name: String, defaultVal: String?): String? =
         posix_getenv(name)?.toKString() ?: defaultVal

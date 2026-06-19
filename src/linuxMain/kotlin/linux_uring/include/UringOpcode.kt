@@ -6,6 +6,7 @@ import borg.trikeshed.lib.CZero.nz
 import cnames.structs.statx
 import zlinux_uring.*
 import zlinux_uring.io_uring_op.*
+import platform.posix.uint32_t as __u32
 
 /**
 io_uring_enter() is used to initiate and complete I/O using the shared submission and completion queues setup by a cal

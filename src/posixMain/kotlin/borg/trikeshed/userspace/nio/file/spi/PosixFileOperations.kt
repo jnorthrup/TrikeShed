@@ -85,7 +85,7 @@ class PosixFileOperations : FileOperations {
         val st = alloc<stat>(); stat(path, st.ptr) == 0 && (st.st_mode.toInt() and S_IFMT) == S_IFREG
     }
 
-    override fun mkdirs(path: String) { mkdir(path, 0x1FFu.toUShort()) }
+    override fun mkdirs(path: String) { mkdir(path, 0x1FFu.convert()) }
     override fun deleteRecursively(path: String): Unit = memScoped {
         val st = alloc<stat>()
         if (stat(path, st.ptr) != 0) return // Does not exist

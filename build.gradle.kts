@@ -33,13 +33,15 @@ kotlin {
         freeCompilerArgs = listOf(
             "-opt-in=kotlin.RequiresOptIn",
             "-opt-in=kotlin.ExperimentalUnsignedTypes",
+            "-opt-in=kotlinx.cinterop.UnsafeNumber",
+            "-opt-in=kotlinx.cinterop.ExperimentalForeignApi",
             "-Xsuppress-version-warnings",
             "-Xexpect-actual-classes",
             "-Xallow-kotlin-package",
         )
     }
 
-    jvmToolchain(21)
+    jvmToolchain(25)
 
     jvm {}
 
@@ -71,10 +73,18 @@ kotlin {
         compilations.getByName("main") {
             val zlinux_uring by cinterops.creating {
                 defFile(project.file("io_uring_interop/zlinux_uring.def"))
+                compilerOpts("-I${project.rootDir}/liburing/src/include", "-I${project.rootDir}/io_uring_interop")
             }
         }
     }
-    linuxArm64("linuxArm64")
+    linuxArm64("linuxArm64") {
+        compilations.getByName("main") {
+            val zlinux_uring by cinterops.creating {
+                defFile(project.file("io_uring_interop/zlinux_uring.def"))
+                compilerOpts("-I${project.rootDir}/liburing/src/include", "-I${project.rootDir}/io_uring_interop")
+            }
+        }
+    }
 
     sourceSets {
         val commonMain by getting {
@@ -105,13 +115,13 @@ kotlin {
 
         val macosMain = sourceSets.findByName("macosMain"); macosMain?.dependsOn(posixMain)
         val macosTest = sourceSets.findByName("macosTest"); macosTest?.dependsOn(posixTest)
-        val macosX64Main = sourceSets.findByName("macosX64Main"); macosX64Main?.dependsOn(posixMain)
-        val macosX64Test = sourceSets.findByName("macosX64Test"); macosX64Test?.dependsOn(posixTest)
+        val macosX64Main = sourceSets.findByName("macosX64Main"); macosX64Main?.dependsOn(posixMain); macosX64Main?.kotlin?.srcDir("src/macosMain/kotlin")
+        val macosX64Test = sourceSets.findByName("macosX64Test"); macosX64Test?.dependsOn(posixTest); macosX64Test?.kotlin?.srcDir("src/macosTest/kotlin")
 
         val linuxMain = sourceSets.findByName("linuxMain"); linuxMain?.dependsOn(posixMain)
         val linuxTest = sourceSets.findByName("linuxTest"); linuxTest?.dependsOn(posixTest)
-        val linuxArm64Main = sourceSets.findByName("linuxArm64Main"); linuxArm64Main?.dependsOn(posixMain)
-        val linuxArm64Test = sourceSets.findByName("linuxArm64Test"); linuxArm64Test?.dependsOn(posixTest)
+        val linuxArm64Main = sourceSets.findByName("linuxArm64Main"); linuxArm64Main?.dependsOn(posixMain); linuxArm64Main?.kotlin?.srcDir("src/linuxMain/kotlin")
+        val linuxArm64Test = sourceSets.findByName("linuxArm64Test"); linuxArm64Test?.dependsOn(posixTest); linuxArm64Test?.kotlin?.srcDir("src/linuxTest/kotlin")
 
         val wasmJsMain by getting { dependsOn(commonMain) }
         val wasmJsTest by getting { dependsOn(commonTest) }
