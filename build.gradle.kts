@@ -59,26 +59,31 @@ kotlin {
         }
         binaries.executable()
     }
-    // Electron host for jsBrowserTest (TDD: ElectronHostTest expects
-    // process.versions.electron + Electron/<ver> in userAgent).
-    // These devDeps live in the JS test source-set's npm scope so the
-    // karma package.json installs them alongside the test runtime.
-    sourceSets.named("jsTest").configure {
-        dependencies {
-            // devDependencies: karma-electron (launcher) + electron (browser binary)
-            npm("karma-electron", "7.2.0")
-            npm("electron", "31.7.7")
-        }
+
+    @OptIn(ExperimentalWasmDsl::class)
+    wasmJs {
+        browser()
     }
 
+    macosArm64("macos")
+    macosX64("macosX64")
+    linuxX64("linux") {
+        compilations.getByName("main") {
+            val zlinux_uring by cinterops.creating {
+                defFile(project.file("io_uring_interop/zlinux_uring.def"))
+            }
+        }
+    }
+    linuxArm64("linuxArm64")
+
     sourceSets {
-        named("commonMain").configure {
+        val commonMain by getting {
             dependencies {
                 api("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0-rc02")
                 api("org.jetbrains.kotlinx:kotlinx-datetime:0.8.0-rc02-0.6.x-compat")
             }
         }
-        named("commonTest").configure {
+        val commonTest by getting {
             kotlin.exclude(
                 "**/demos/**",
                 "**/strategy/**",
@@ -93,7 +98,25 @@ kotlin {
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0-rc02")
             }
         }
-        named("jvmMain").configure {
+        val nativeMain by creating { dependsOn(commonMain) }
+        val nativeTest by creating { dependsOn(commonTest) }
+        val posixMain by creating { dependsOn(nativeMain) }
+        val posixTest by creating { dependsOn(nativeTest) }
+
+        val macosMain = sourceSets.findByName("macosMain"); macosMain?.dependsOn(posixMain)
+        val macosTest = sourceSets.findByName("macosTest"); macosTest?.dependsOn(posixTest)
+        val macosX64Main = sourceSets.findByName("macosX64Main"); macosX64Main?.dependsOn(posixMain)
+        val macosX64Test = sourceSets.findByName("macosX64Test"); macosX64Test?.dependsOn(posixTest)
+
+        val linuxMain = sourceSets.findByName("linuxMain"); linuxMain?.dependsOn(posixMain)
+        val linuxTest = sourceSets.findByName("linuxTest"); linuxTest?.dependsOn(posixTest)
+        val linuxArm64Main = sourceSets.findByName("linuxArm64Main"); linuxArm64Main?.dependsOn(posixMain)
+        val linuxArm64Test = sourceSets.findByName("linuxArm64Test"); linuxArm64Test?.dependsOn(posixTest)
+
+        val wasmJsMain by getting { dependsOn(commonMain) }
+        val wasmJsTest by getting { dependsOn(commonTest) }
+
+        val jvmMain by getting {
             resources.srcDir("src/jvmMain/resources")
             dependencies {
                 implementation("org.openjdk.jmh:jmh-core:1.37")
@@ -106,16 +129,19 @@ kotlin {
             kotlin.srcDir("src/jmhMain/kotlin")
             resources.srcDir("src/jmhMain/resources")
         }
-        named("jvmTest").configure {
+        val jvmTest by getting {
             dependencies {
                 implementation(kotlin("test-junit"))
                 implementation("org.junit.jupiter:junit-jupiter:6.1.0-RC1")
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0-rc02")
             }
         }
-    }
-    sourceSets.commonTest.dependencies {
-        implementation(kotlin("test"))
+        val jsTest by getting {
+            dependencies {
+                npm("karma-electron", "7.2.0")
+                npm("electron", "31.7.7")
+            }
+        }
     }
 }
 

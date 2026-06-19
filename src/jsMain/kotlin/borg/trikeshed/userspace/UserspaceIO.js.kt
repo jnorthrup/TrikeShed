@@ -44,7 +44,7 @@ private class JsUserspaceChannelBackend : UserspaceChannelBackend {
     override fun map(file: FileImpl, mode: String, position: Long, size: Long): Int = -1
 }
 
-internal actual fun openUserspaceChannelBackend(entries: Int): UserspaceChannelBackend = JsUserspaceChannelBackend()
+actual fun openUserspaceChannelBackend(entries: Int): UserspaceChannelBackend = JsUserspaceChannelBackend()
 
 actual class FileImpl actual constructor(actual val id: Int) {
     @PublishedApi internal var path: String = ""

@@ -22,13 +22,13 @@ class OpenApiGeneratorTddTest {
         val ctx = buildServerContext()
         assertNotNull(ctx[borg.trikeshed.quic.QuicKey])
         assertNotNull(ctx[borg.trikeshed.sctp.SctpKey])
-        assertNotNull(ctx[borg.trikeshed.htx.client.HtxKey])
+        assertNotNull(ctx[borg.trikeshed.htx.HtxKey])
     }
 
     @Test
     fun `buildServerContext elements are OPEN`() = runTest {
         val ctx = buildServerContext()
-        val htx = ctx[borg.trikeshed.htx.client.HtxKey]
+        val htx = ctx[borg.trikeshed.htx.HtxKey]
         assertEquals(ElementState.OPEN, (htx as AsyncContextElement).state)
     }
 
@@ -36,7 +36,7 @@ class OpenApiGeneratorTddTest {
     fun `closeServerContext closes open elements`() = runTest {
         val ctx = buildServerContext()
         closeServerContext(ctx)
-        val htx = ctx[borg.trikeshed.htx.client.HtxKey] as AsyncContextElement
+        val htx = ctx[borg.trikeshed.htx.HtxKey] as AsyncContextElement
         assertEquals(ElementState.CLOSED, htx.state)
     }
 
@@ -61,7 +61,7 @@ class OpenApiGeneratorTddTest {
     fun `generated Keys htx resolves from server context`() = runTest {
         val ctx = buildServerContext()
         val htxKey = borg.trikeshed.server.generated.Keys.htx
-        assertSame(ctx[borg.trikeshed.htx.client.HtxKey], ctx[htxKey])
+        assertSame(ctx[borg.trikeshed.htx.HtxKey], ctx[htxKey])
     }
 
     @Test
@@ -83,7 +83,7 @@ class OpenApiGeneratorTddTest {
     @Test
     fun `generated Elements htx creates HtxElement in OPEN state`() = runTest {
         val elem = borg.trikeshed.server.generated.Elements.htx()
-        assertTrue(elem is borg.trikeshed.htx.client.HtxElement)
+        assertTrue(elem is borg.trikeshed.htx.HtxElement)
         assertEquals(ElementState.OPEN, elem.state)
     }
 

@@ -1,8 +1,8 @@
 package borg.trikeshed.server
 
 import borg.trikeshed.context.ElementState
-import borg.trikeshed.htx.client.HtxKey
-import borg.trikeshed.htx.client.openHtxElement
+import borg.trikeshed.htx.HtxKey
+import borg.trikeshed.htx.openHtxElement
 import borg.trikeshed.quic.QuicKey
 import borg.trikeshed.quic.openQuicElement
 import borg.trikeshed.sctp.SctpKey

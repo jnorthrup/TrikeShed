@@ -16,7 +16,7 @@ class HtxClientAria2Test {
     @Test
     fun testParallelChunkFetching() = runTest {
         val transport = object : NetworkTransportSpi {
-            override suspend fun connect(host: String, port: Int): NetworkConnection {
+            override suspend fun connect(target: HtxTarget): NetworkConnection {
                 return object : NetworkConnection {
                     var rangeStart = 0L
                     var rangeEnd = 0L

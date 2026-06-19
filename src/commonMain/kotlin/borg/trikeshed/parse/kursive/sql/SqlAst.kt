@@ -3,7 +3,7 @@ package borg.trikeshed.parse.kursive.sql
 import borg.trikeshed.lib.*
 import borg.trikeshed.collections._s
 
-private val CharSeries.cseq: CharSequence get() = this
+private val CharSeries.cseq: CharSequence get() = cs
 
 // Compact SQL AST using Series<Char> (zero-copy views)
 // Canonical root — kursive, miniduck, and couch all consume from here.
@@ -89,7 +89,7 @@ class SqlParser(private val cs: CharSeries) {
 
     fun peek(): Char = if (cs.pos < cs.limit) cs[cs.pos] else '\u0000'
 
-    fun matchKeyword(keyword: CharSequence): Boolean {
+    fun matchKeyword(keyword: String): Boolean {
         val save = cs.pos
         val k = keyword.uppercase()
 

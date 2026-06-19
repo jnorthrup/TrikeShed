@@ -19,7 +19,7 @@ class RadixTree<C : Comparable<C>>(var root: RadixTreeNode<C>? = null) {
  * a node in a prefix tree (trie)
  */
 class RadixTreeNode<C : Comparable<C>>(
-    var key: Series<C> = emptySeries(),
+    var key: Series<C> = emptySeriesOf(),
     var term: Boolean = false,
     var children: Array<RadixTreeNode<C>>? = null
 ) {

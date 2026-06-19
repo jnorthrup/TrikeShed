@@ -35,7 +35,7 @@ kotlin {
             dependencies {
                 api("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
                 api("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
-                // api(project(":libs:miniduck"))  // disabled - no build.gradle.kts
+                api(project(":libs:miniduck"))
                 api(project(":libs:user-signals"))
             }
         }

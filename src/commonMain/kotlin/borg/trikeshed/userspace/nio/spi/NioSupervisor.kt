@@ -27,8 +27,29 @@ open class NioSupervisor : AsyncContextElement() {
         if (state == ElementState.CREATED) {
             super.open()
             platformNioProviders().forEach { register(it) }
+            services
+                .filterIsInstance<AsyncContextElement>()
+                .filter { it.state == ElementState.CREATED }
+                .forEach { it.open() }
             state = ElementState.ACTIVE
         }
+    }
+
+    override suspend fun drain() {
+        services
+            .filterIsInstance<AsyncContextElement>()
+            .filter { it.state.isAtLeast(ElementState.OPEN) && it.state.isLessThan(ElementState.DRAINING) }
+            .forEach { it.drain() }
+        super.drain()
+    }
+
+    override suspend fun close() {
+        services
+            .asReversed()
+            .filterIsInstance<AsyncContextElement>()
+            .filter { it.state.isLessThan(ElementState.CLOSED) }
+            .forEach { it.close() }
+        super.close()
     }
 }
 

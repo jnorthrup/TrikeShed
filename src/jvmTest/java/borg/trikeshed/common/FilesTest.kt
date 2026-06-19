@@ -1,6 +1,5 @@
 package borg.trikeshed.common
 
-import borg.trikeshed.lib.second
 import kotlin.io.path.createTempDirectory
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
@@ -20,7 +19,7 @@ class FilesTest {
         val stream = Files.streamLines(resolve.toString())
         val streamLines = stream.toList()
         assert(streamLines.size == 20)
-        assertContentEquals(streamLines.map { it.second.decodeToString().trim() }, lines.map { it.trim() })
+        assertContentEquals(streamLines.map { it.b.decodeToString().trim() }, lines.map { it.trim() })
 
         //test the seek with RandomAccess file on all strings
         val raf = java.io.RandomAccessFile(resolve.toString(), "r")

@@ -1,6 +1,6 @@
 package borg.trikeshed.parse.yaml
 
-import borg.trikeshed.parse.json.JsonParser
+import borg.trikeshed.parse.json.JsonSupport
 import java.nio.file.Path
 import kotlin.test.Test
 import kotlin.test.assertNotNull
@@ -9,7 +9,7 @@ class TestYamlRoundTrip {
     @Test
     fun debugDeepListNesting() {
         val jsonText = java.nio.file.Files.readString(Path.of("src/commonTest/resources/big.json"))
-        val original = JsonParser.parse(jsonText) as Map<*, *>
+        val original = JsonSupport.parse(jsonText) as Map<*, *>
         val stations = original["stations"] as List<*>
         val s17 = stations[17] as Map<*, *>
         val outfitting = s17["outfitting"] as Map<*, *>

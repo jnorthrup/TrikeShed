@@ -1,7 +1,7 @@
 package borg.trikeshed.server
 
 import borg.trikeshed.context.ElementState
-import borg.trikeshed.htx.client.HtxKey
+import borg.trikeshed.htx.HtxKey
 import borg.trikeshed.quic.QuicKey
 import borg.trikeshed.sctp.SctpKey
 import kotlinx.coroutines.test.runTest

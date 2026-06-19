@@ -83,7 +83,7 @@ private class PosixUserspaceChannelBackend(
     }
 }
 
-internal actual fun openUserspaceChannelBackend(entries: Int): UserspaceChannelBackend = PosixUserspaceChannelBackend(entries)
+actual fun openUserspaceChannelBackend(entries: Int): UserspaceChannelBackend = PosixUserspaceChannelBackend(entries)
 
 actual class FileImpl actual constructor(actual val id: Int) {
     actual fun isOpen(): Boolean = id >= 0

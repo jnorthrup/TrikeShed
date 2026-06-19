@@ -233,7 +233,7 @@ private class JvmUserspaceChannelBackend(
     }
 }
 
-internal actual fun openUserspaceChannelBackend(entries: Int): UserspaceChannelBackend =
+actual fun openUserspaceChannelBackend(entries: Int): UserspaceChannelBackend =
     JvmUserspaceChannelBackend()
 
 private fun ByteBuffer.arrayAddress(): Long = java.nio.ByteBuffer.wrap(array(), arrayOffset(), capacity())

@@ -23,6 +23,7 @@ kotlin {
         val commonMain by getting {
             dependencies {
                 api(project(":libs:ccek-core"))
+                api(project(":"))
                 api("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
             }
         }

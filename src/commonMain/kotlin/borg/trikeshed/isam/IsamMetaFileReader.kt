@@ -4,8 +4,6 @@ import borg.trikeshed.common.Files
 import borg.trikeshed.common.Usable
 import borg.trikeshed.cursor.ColumnMeta
 import borg.trikeshed.cursor.TypeMemento
-import borg.trikeshed.cursor.name
-import borg.trikeshed.cursor.type
 import borg.trikeshed.isam.meta.IOMemento
 import borg.trikeshed.lib.*
 import kotlin.math.min
@@ -102,11 +100,11 @@ class IsamMetaFileReader(val metafileFilename: String) :Usable{
         fun sanitize(recordMetas: Series<ColumnMeta>, varchars: Map<String, Int>): Series<RecordMeta> {
             val result = (if (recordMetas.`▶`.any { !(it is RecordMeta) || (min(it.begin, it.end) < 0&&null==it.child) }) {
                 var offset = 0
-                recordMetas .map { columnMeta: ColumnMeta ->
+                recordMetas.`▶`.map { columnMeta: ColumnMeta ->
                     val type: TypeMemento = columnMeta.type
-                    val len =  type.networkSize?: varchars[columnMeta.name]?: throw Exception("no network size for ${columnMeta.name}")
+                    val len =  type.networkSize?: varchars[columnMeta.name.toString()]?: throw Exception("no network size for ${columnMeta.name}")
                     val recordMeta = RecordMeta(
-                        columnMeta.name,
+                        columnMeta.name.toString(),
                         type as IOMemento,
                         offset,
                         offset + len,

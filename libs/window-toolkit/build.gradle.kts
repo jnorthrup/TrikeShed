@@ -12,7 +12,9 @@ kotlin {
     sourceSets {
         val commonMain by getting {
             dependencies {
-
+                api(project(":"))
+                api(project(":libs:miniduck"))
+                api(project(":libs:user-signals"))
 
                 api("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
             }

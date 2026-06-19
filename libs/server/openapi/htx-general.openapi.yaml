@@ -12,14 +12,14 @@ tags:
 x-trikeshed-context:
   client:
     - name: htx
-      key: borg.trikeshed.htx.client.HtxKey
-      element: borg.trikeshed.htx.client.HtxElement
-      open: borg.trikeshed.htx.client.openHtxElement
+      key: borg.trikeshed.htx.HtxKey
+      element: borg.trikeshed.htx.HtxElement
+      open: borg.trikeshed.htx.openHtxElement
   server:
     - name: htx
-      key: borg.trikeshed.htx.client.HtxKey
-      element: borg.trikeshed.htx.client.HtxElement
-      open: borg.trikeshed.htx.client.openHtxElement
+      key: borg.trikeshed.htx.HtxKey
+      element: borg.trikeshed.htx.HtxElement
+      open: borg.trikeshed.htx.openHtxElement
     - name: quic
       key: borg.trikeshed.quic.QuicKey
       element: borg.trikeshed.quic.QuicElement

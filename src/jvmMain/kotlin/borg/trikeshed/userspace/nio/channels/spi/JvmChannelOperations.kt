@@ -81,7 +81,8 @@ class JvmChannelOperations(
         } finally {
             ch.configureBlocking(false)
         }
-        return registerChannelInternal(ch, Interest.toMask(setOf(Interest.READ, Interest.WRITE, Interest.CONNECT)))
+        socketInterests[fd] = setOf(Interest.READ, Interest.WRITE, Interest.CONNECT)
+        return 0
     }
 
     override fun close(fd: Int): Int {

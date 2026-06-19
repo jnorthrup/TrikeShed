@@ -4,7 +4,8 @@ package borg.trikeshed.isam
 import borg.trikeshed.lib.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
-import kotlinx.serialization.Serializable
+import kotlin.math.min
+import kotlin.jvm.JvmInline
 
 /**
  * ISAM Data File DSL — reified inline factory builders.
@@ -17,15 +18,17 @@ import kotlinx.serialization.Serializable
 
 /**
  * File operations interface — platform-neutral, implemented per target.
+ * Note: distinct from borg.trikeshed.userspace.nio.file.spi.FileOperations (CCEK-based).
+ * This is a simpler synchronous interface for DSL use.
  */
-interface FileOperations {
+interface IsamFileOps {
     /**
      * Append bytes to file.
      */
     fun append(filename: String, bytes: ByteArray): Long
 
     /**
-     * Append multiple byte arrays.
+     * Append multiple byte arrays concatenated.
      */
     fun appendAll(filename: String, bytes: ByteArray): Long
 
@@ -40,15 +43,7 @@ interface FileOperations {
     fun size(filename: String): Long
 }
 
-// Simple platform utilities
-inline  class PlatformUtilsImpl(
-    val currentTimeMillis: () -> Long = { System.currentTimeMillis() },
-    val randomUuid: () -> String = { java.util.UUID.randomUUID().toString() },
-    val ioDispatcher: kotlinx.coroutines.CoroutineDispatcher = kotlinx.coroutines.Dispatchers.IO,
-    val toPlatformByteArray: (String) -> ByteArray = { it.toByteArray() },
-    val toPlatformString: (ByteArray) -> String = { String(it) },
-)
-val platformUtils = PlatformUtilsImpl()
+
 
 /**
  * ISAM Data File DSL — reified inline factory builders.
@@ -63,37 +58,43 @@ val platformUtils = PlatformUtilsImpl()
 // Types
 // ---------------------------------------------------------------------------
 
-@Serializable
 data class DataFileConfig(
     val filename: String,
     val recordlen: Int,
-    val fileOps: FileOperations,
+    val fileOps: IsamFileOps,
 )
 
-inline  class DataFilePosition(val offset: Long = 0)
+@JvmInline
+value class DataFilePosition(val offset: Long = 0)
 
 // ---------------------------------------------------------------------------
 // Reified inline append
 // ---------------------------------------------------------------------------
 
-inline fun appendToIsam(
-    crossinline config: DataFileConfig,
-    crossinline records: Series<ByteArray>,
-): Long = config.fileOps.appendAll(config.filename, records.toByteArray())
+fun appendToIsam(
+    config: DataFileConfig,
+    records: Series<ByteArray>,
+): Long {
+    val combined = ByteArray(records.size * records[0].size)
+    for (i in 0 until records.size) {
+        records[i].copyInto(combined, i * records[i].size)
+    }
+    return config.fileOps.appendAll(config.filename, combined)
+}
 
-inline fun appendToIsam(
-    crossinline config: DataFileConfig,
-    crossinline record: ByteArray,
+fun appendToIsam(
+    config: DataFileConfig,
+    record: ByteArray,
 ): Long = config.fileOps.append(config.filename, record)
 
 // ---------------------------------------------------------------------------
 // Reified inline scan with projection
 // ---------------------------------------------------------------------------
 
-inline fun <T> scanIsam(
-    crossinline config: DataFileConfig,
-    crossinline decoder: (ByteArray) -> T,
-    crossinline projection: (T) -> T,
+fun <T> scanIsam(
+    config: DataFileConfig,
+    decoder: (ByteArray) -> T,
+    projection: (T) -> T,
 ): Series<T> {
     val recordlen = config.recordlen
     val fileSize = config.fileOps.size(config.filename)
@@ -106,21 +107,21 @@ inline fun <T> scanIsam(
     }
 }
 
-inline fun <T> scanIsamRange(
-    crossinline config: DataFileConfig,
-    crossinline decoder: (ByteArray) -> T,
-    crossinline projection: (T) -> T,
+fun <T> scanIsamRange(
+    config: DataFileConfig,
+    decoder: (ByteArray) -> T,
+    projection: (T) -> T,
     start: Int,
     end: Int,
-): Series<T> = scanIsam(config, decoder, projection).slice(start until min(end, (config.fileOps.size(config.filename) / config.recordlen).toInt()))
+): Series<T> = scanIsam(config, decoder, projection)[start until min(end, (config.fileOps.size(config.filename) / config.recordlen).toInt())]
 
 // ---------------------------------------------------------------------------
 // Reified inline get by index
 // ---------------------------------------------------------------------------
 
-inline fun <T> getIsam(
-    crossinline config: DataFileConfig,
-    crossinline decoder: (ByteArray) -> T,
+fun <T> getIsam(
+    config: DataFileConfig,
+    decoder: (ByteArray) -> T,
     index: Int,
 ): T? {
     val recordlen = config.recordlen
@@ -135,19 +136,19 @@ inline fun <T> getIsam(
 // Reified inline pointcut journal (append-only)
 // ---------------------------------------------------------------------------
 
-inline  class PointcutJournalConfig(
+data class PointcutJournalConfig(
     val filename: String,
     val recordlen: Int = 128,
-    val fileOps: FileOperations,
+    val fileOps: IsamFileOps,
 )
 
-inline fun appendPointcut(
-    crossinline config: PointcutJournalConfig,
-    crossinline pointcut: ByteArray,
+fun appendPointcut(
+    config: PointcutJournalConfig,
+    pointcut: ByteArray,
 ): Long = config.fileOps.append(config.filename, pointcut)
 
-inline fun scanPointcuts(
-    crossinline config: PointcutJournalConfig,
+fun scanPointcuts(
+    config: PointcutJournalConfig,
 ): Series<ByteArray> {
     val fileSize = config.fileOps.size(config.filename)
     val recordCount = (fileSize / config.recordlen).toInt()
@@ -158,54 +159,26 @@ inline fun scanPointcuts(
 }
 
 // ---------------------------------------------------------------------------
-// ReduxMutableSeries checkpoint (for ISAM state)
+// File layout spec
 // ---------------------------------------------------------------------------
 
-/**
- * Checkpoint a ReduxMutableSeries to ISAM.
- * Uses the capture -> body flow for Confix-style persistence.
- */
-inline fun checkpointToIsam<State>(
-    crossinline series: ReduxMutableSeries<State>,
-    crossinline config: DataFileConfig,
-    crossinline encoder: (State) -> ByteArray,
-): Long {
-    val body = series.capture()
-    val bytes = encoder(body)
-    return config.fileOps.append(config.filename, bytes)
-}
-
-inline fun restoreFromIsam<State>(
-    crossinline config: DataFileConfig,
-    crossinline decoder: (ByteArray) -> State,
-): State? {
-    val fileSize = config.fileOps.size(config.filename)
-    if (fileSize == 0) return null
-    val lastRecord = fileSize / config.recordlen - 1
-    return getIsam(config, decoder, lastRecord)
-}
-
-// ---------------------------------------------------------------------------
-// File layout spec (reified)
-// ---------------------------------------------------------------------------
-
-inline  class FileLayoutSpec(
+data class FileLayoutSpec(
     val recordlen: Int,
     val headerSize: Int = 0,
     val indexStride: Int = 0, // 0 = no index
 ) {
-    inline fun calcOffset(index: Int): Long = (index.toLong() * recordlen) + headerSize
-    inline fun recordCount(fileSize: Long): Int = ((fileSize - headerSize) / recordlen).toInt()
+    fun calcOffset(index: Int): Long = (index.toLong() * recordlen) + headerSize
+    fun recordCount(fileSize: Long): Int = ((fileSize - headerSize) / recordlen).toInt()
 }
 
 // ---------------------------------------------------------------------------
 // ISAM operations as flow
 // ---------------------------------------------------------------------------
 
-inline fun <T> isamFlow(
-    crossinline config: DataFileConfig,
-    crossinline decoder: (ByteArray) -> T,
-    crossinline predicate: (T) -> Boolean = { true },
+fun <T> isamFlow(
+    config: DataFileConfig,
+    decoder: (ByteArray) -> T,
+    predicate: (T) -> Boolean = { true },
 ): Flow<T> = flow {
     val recordlen = config.recordlen
     val fileSize = config.fileOps.size(config.filename)
@@ -216,18 +189,31 @@ inline fun <T> isamFlow(
         val decoded = decoder(record)
         if (predicate(decoded)) emit(decoded)
     }
-}.flowOn(Dispatchers.IO)
+}.flowOn(Dispatchers.Default)
 
 // ---------------------------------------------------------------------------
 // Batch operations
 // ---------------------------------------------------------------------------
 
-inline fun batchAppend(
-    crossinline config: DataFileConfig,
-    crossinline records: List<ByteArray>,
-): Long = config.fileOps.appendAll(config.filename, records.toByteArray())
+fun batchAppend(
+    config: DataFileConfig,
+    records: List<ByteArray>,
+): Long {
+    val totalSize = records.sumOf { it.size }
+    val combined = ByteArray(totalSize)
+    var pos = 0
+    for (r in records) { r.copyInto(combined, pos); pos += r.size }
+    return config.fileOps.appendAll(config.filename, combined)
+}
 
-inline fun batchAppend(
-    crossinline config: DataFileConfig,
-    crossinline records: Series<ByteArray>,
-): Long = config.fileOps.appendAll(config.filename, records.toByteArray())
+fun batchAppend(
+    config: DataFileConfig,
+    records: Series<ByteArray>,
+): Long {
+    val n = records.size
+    if (n == 0) return 0L
+    val recSize = records[0].size
+    val combined = ByteArray(n * recSize)
+    for (i in 0 until n) records[i].copyInto(combined, i * recSize)
+    return config.fileOps.appendAll(config.filename, combined)
+}

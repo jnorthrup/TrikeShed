@@ -74,7 +74,7 @@ fun DescriptorFragment.signature(): String =
 data class NdjsonPreparedParser(
     val descriptor: DescriptorFragment,
 ) {
-    fun parse(line: String): Any? = JsonParser.parse(line)
+    fun parse(line: String): Any? = JsonParser.reify(CharSeries(line))
     fun describeRowTree(line: String): TreeCursor = StructuredParserSupport.describeJsonRowTree(line)
 }
 

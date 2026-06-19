@@ -135,7 +135,7 @@ object SpanMatcher {
     )
 
     private fun openTime(cursor: Cursor, index: Int): Long {
-        val t = cursor[index].getValue("openTime")
+        val t = cursor.b(index).getValue("openTime")
         return when (t) {
             is Long -> t
             is Number -> t.toLong()

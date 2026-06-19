@@ -129,7 +129,7 @@ object std {
     }
 
     fun trimmed(name: String, delegate: KursiveParser<CharSeries>): KursiveParser<CharSeries> = parser(name) { input ->
-        delegate(input)?.let { raw -> (raw as Series<Char>).cs.trim.slice }
+        delegate(input)?.let { raw: CharSeries -> CharSeries(raw).trim }
     }
 
     fun restOfLine(name: String): KursiveParser<CharSeries> =

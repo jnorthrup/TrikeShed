@@ -1,47 +1,57 @@
 package borg.trikeshed.reactor
 
+import borg.trikeshed.ccek.KeyedService
 import borg.trikeshed.context.AsyncContextElement
 import borg.trikeshed.context.AsyncContextKey
 import borg.trikeshed.context.ElementState
-import borg.trikeshed.userspace.nio.ByteBuffer
-import borg.trikeshed.userspace.nio.channels.spi.ProcessOperations
-import borg.trikeshed.userspace.nio.channels.spi.ProcessResult
+import borg.trikeshed.lib.ByteSeries
+import borg.trikeshed.lib.Join
+import borg.trikeshed.lib.Series
+import borg.trikeshed.lib.emptySeriesOf
+import borg.trikeshed.lib.j
+import borg.trikeshed.lib.toList
+import borg.trikeshed.lib.toSeries
+import borg.trikeshed.userspace.FanoutEvent
+import borg.trikeshed.userspace.FanoutEventSubscriber
 import borg.trikeshed.userspace.nio.spi.NioSupervisor
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.serialization.Serializable
 import kotlin.coroutines.CoroutineContext
 
-/**
- * Root-level TLS CCEK element.
- *
- * This keeps the choreography in the reactor root and uses the platform
- * [ProcessOperations] SPI as the lowest-common-denominator backend. The
- * current fallback is a worst-case `openssl s_client` exchange: it is
- * connection-oriented and sufficient for request/response flows, but it is
- * not a replacement for a fully streaming in-process TLS stack.
- */
+typealias TlsProtocols = Series<TlsProtocol>
+typealias TlsCipherSuites = Series<TlsCipherSuite>
+typealias TlsSupportedGroups = Series<TlsSupportedGroup>
+typealias TlsApplicationProtocols = Series<TlsApplicationProtocol>
+typealias TlsPayload = ByteSeries
+typealias TlsPeer = Join<String, Int>
+typealias TlsRoute = Join<TlsRole, TlsPeer>
+typealias TlsFrames = Series<TlsChannelFrame>
+typealias TlsCodecResult = Join<TlsFlowState, TlsFrames>
+
+fun emptyTlsFrames(): TlsFrames = emptySeriesOf()
+
+fun tlsFrames(vararg frames: TlsChannelFrame): TlsFrames = frames.asList().toSeries()
+
+fun TlsCodecResult(
+    state: TlsFlowState,
+    frames: TlsFrames = emptyTlsFrames(),
+): TlsCodecResult = state j frames
+
+val TlsCodecResult.state: TlsFlowState get() = a
+val TlsCodecResult.frames: TlsFrames get() = b
+
 @Serializable
 data class TlsConfig(
     val trustStore: String? = null,
     val certificateFile: String? = null,
     val privateKeyFile: String? = null,
     val privateKeyPassword: String? = null,
-    val protocols: List<TlsProtocol> = listOf(TlsProtocol.TLS13, TlsProtocol.TLS12),
-    val cipherSuites: List<String> = listOf(
-        "TLS_AES_128_GCM_SHA256",
-        "TLS_AES_256_GCM_SHA384",
-        "TLS_CHACHA20_POLY1305_SHA256",
-        "ECDHE-RSA-AES128-GCM-SHA256",
-        "ECDHE-RSA-AES256-GCM-SHA384",
-        "ECDHE-ECDSA-CHACHA20-POLY1305",
-        "ECDHE-ECDSA-AES128-GCM-SHA256",
-        "ECDHE-ECDSA-AES256-GCM-SHA384",
-    ),
-    val supportedGroups: List<String> = listOf("X25519", "P-256", "P-384", "P-521"),
-    val alpnProtocols: List<String> = listOf("h2", "http/1.1"),
+    val protocols: TlsProtocols = TlsProtocol.entries.toTypedArray().toSeries(),
+    val cipherSuites: TlsCipherSuites = TlsCipherSuite.entries.toTypedArray().toSeries(),
+    val supportedGroups: TlsSupportedGroups = TlsSupportedGroup.entries.toTypedArray().toSeries(),
+    val alpnProtocols: TlsApplicationProtocols = TlsApplicationProtocol.entries.toTypedArray().toSeries(),
     val clientAuth: ClientAuth = ClientAuth.NONE,
     val hostnameVerification: Boolean = true,
-    val opensslCommand: String = "openssl",
 )
 
 enum class TlsProtocol {
@@ -60,40 +70,137 @@ enum class TlsRole {
     SERVER,
 }
 
+enum class TlsCipherSuite {
+    TLS_AES_128_GCM_SHA256,
+    TLS_AES_256_GCM_SHA384,
+    TLS_CHACHA20_POLY1305_SHA256,
+    ECDHE_RSA_AES128_GCM_SHA256,
+    ECDHE_RSA_AES256_GCM_SHA384,
+    ECDHE_ECDSA_CHACHA20_POLY1305,
+    ECDHE_ECDSA_AES128_GCM_SHA256,
+    ECDHE_ECDSA_AES256_GCM_SHA384,
+}
+
+enum class TlsSupportedGroup {
+    X25519,
+    P256,
+    P384,
+    P521,
+}
+
+enum class TlsApplicationProtocol {
+    H2,
+    HTTP_1_1,
+}
+
 data class TlsPeerCertificate(
     val subject: String? = null,
     val issuer: String? = null,
 )
 
 data class TlsSession(
-    val protocol: String? = null,
-    val cipherSuite: String? = null,
+    val protocol: TlsProtocol? = null,
+    val cipherSuite: TlsCipherSuite? = null,
     val peerCertificate: TlsPeerCertificate? = null,
     val verified: Boolean = false,
-    val stdout: ByteArray = byteArrayOf(),
-    val stderr: ByteArray = byteArrayOf(),
 )
 
-interface TlsEndpoint {
-    val role: TlsRole
-    val remoteHost: String
-    val remotePort: Int
+enum class TlsFlowStage {
+    HANDSHAKE,
+    UPSTREAM_PLAINTEXT,
+    UPSTREAM_CIPHERTEXT,
+    DOWNSTREAM_CIPHERTEXT,
+    DOWNSTREAM_PLAINTEXT,
+    CLOSE_NOTIFY,
+}
 
-    suspend fun handshake()
-    suspend fun read(destination: ByteBuffer): Int
-    suspend fun write(source: ByteBuffer): Int
-    suspend fun close()
+enum class TlsConnectionState {
+    CREATED,
+    NEGOTIATING,
+    OPEN,
+    DRAINING,
+    CLOSED,
+    FAILED,
+}
+
+data class TlsFlowState(
+    val route: TlsRoute,
+    val connectionOrdinal: Long = 0,
+    val lifecycle: TlsConnectionState = TlsConnectionState.CREATED,
+    val session: TlsSession? = null,
+    val pendingUpstreamPlaintext: TlsPayload = ByteSeries(byteArrayOf()),
+    val pendingUpstreamCiphertext: TlsPayload = ByteSeries(byteArrayOf()),
+    val pendingDownstreamCiphertext: TlsPayload = ByteSeries(byteArrayOf()),
+    val pendingDownstreamPlaintext: TlsPayload = ByteSeries(byteArrayOf()),
+)
+
+data class TlsChannelFrame(
+    val route: TlsRoute,
+    val stage: TlsFlowStage,
+    val payload: TlsPayload = ByteSeries(byteArrayOf()),
+    val session: TlsSession? = null,
+) : FanoutEvent {
+    override val eventType: Int = 0x544c53
+
+    val role: TlsRole get() = route.a
+    val remoteHost: String get() = route.b.a
+    val remotePort: Int get() = route.b.b
+}
+
+interface TlsChannelSubscriber {
+    suspend fun onTlsFrames(frames: TlsFrames)
+}
+
+interface TlsCodecBackend : KeyedService {
+    companion object Key : CoroutineContext.Key<TlsCodecBackend>
+    override val key: CoroutineContext.Key<*> get() = Key
+
+    suspend fun handshake(
+        config: TlsConfig,
+        state: TlsFlowState,
+    ): TlsCodecResult
+
+    suspend fun upstream(
+        config: TlsConfig,
+        state: TlsFlowState,
+        payload: TlsPayload,
+    ): TlsCodecResult
+
+    suspend fun downstream(
+        config: TlsConfig,
+        state: TlsFlowState,
+        payload: TlsPayload,
+    ): TlsCodecResult
+
+    suspend fun close(
+        config: TlsConfig,
+        state: TlsFlowState,
+    ): TlsCodecResult
+}
+
+interface TlsFilterCodec {
+    val route: TlsRoute
+    val flowState: TlsFlowState
+    val session: TlsSession? get() = flowState.session
+
+    suspend fun handshake(): TlsFrames
+    suspend fun upstream(payload: TlsPayload): TlsFrames
+    suspend fun downstream(payload: TlsPayload): TlsFrames
+    suspend fun close(): TlsFrames
+}
+
+interface TlsEndpoint : TlsFilterCodec {
+    val role: TlsRole get() = route.a
+    val remoteHost: String get() = route.b.a
+    val remotePort: Int get() = route.b.b
 
     val isHandshakeComplete: Boolean
-    val peerCertificate: TlsPeerCertificate?
-    val protocol: String?
-    val cipherSuite: String?
-    val lastSession: TlsSession?
+        get() = flowState.lifecycle == TlsConnectionState.OPEN && session != null
 }
 
 class TlsElement(
     val config: TlsConfig,
-    private val processOperations: ProcessOperations,
+    private val backend: TlsCodecBackend,
     parentJob: kotlinx.coroutines.Job? = null,
     private val ownedSupervisor: NioSupervisor? = null,
     override val fanoutSubscribers: List<AsyncContextElement> = emptyList(),
@@ -102,7 +209,8 @@ class TlsElement(
 
     override val key: CoroutineContext.Key<*> get() = Key
 
-    private val endpoints = linkedSetOf<OpenSslTlsEndpoint>()
+    private val endpoints = linkedSetOf<BackendTlsEndpoint>()
+    private var nextConnectionOrdinal = 1L
 
     override suspend fun open() {
         if (state == ElementState.CREATED) {
@@ -112,21 +220,37 @@ class TlsElement(
     }
 
     fun clientEndpoint(hostname: String, port: Int = 443): TlsEndpoint =
-        OpenSslTlsEndpoint(
-            owner = this,
-            role = TlsRole.CLIENT,
-            remoteHost = hostname,
-            remotePort = port,
-            config = config,
-            processOperations = processOperations,
-        ).also { endpoints += it }
+        register(TlsRole.CLIENT j (hostname j port))
 
     fun serverEndpoint(bindHost: String = "0.0.0.0", port: Int = 443): TlsEndpoint =
-        UnsupportedServerTlsEndpoint(bindHost, port)
+        register(TlsRole.SERVER j (bindHost j port))
+
+    private fun register(route: TlsRoute): TlsEndpoint =
+        BackendTlsEndpoint(
+            owner = this,
+            config = config,
+            backend = backend,
+            initialState = TlsFlowState(
+                route = route,
+                connectionOrdinal = nextConnectionOrdinal++,
+            ),
+        ).also { endpoints += it }
 
     internal fun release(endpoint: TlsEndpoint) {
-        if (endpoint is OpenSslTlsEndpoint) {
+        if (endpoint is BackendTlsEndpoint) {
             endpoints -= endpoint
+        }
+    }
+
+    internal suspend fun channelize(frames: TlsFrames) {
+        fanoutSubscribers
+            .filterIsInstance<TlsChannelSubscriber>()
+            .forEach { it.onTlsFrames(frames) }
+        val subscribers = fanoutSubscribers.filterIsInstance<FanoutEventSubscriber>()
+        if (subscribers.isNotEmpty()) {
+            frames.toList().forEach { frame ->
+                subscribers.forEach { it.onFanoutEvent(frame) }
+            }
         }
     }
 
@@ -147,13 +271,13 @@ class TlsElement(
 
 suspend fun openTlsElement(
     config: TlsConfig = TlsConfig(),
-    processOperations: ProcessOperations,
+    backend: TlsCodecBackend,
     parentJob: kotlinx.coroutines.Job? = null,
     subscribers: List<AsyncContextElement> = emptyList(),
 ): TlsElement =
     TlsElement(
         config = config,
-        processOperations = processOperations,
+        backend = backend,
         parentJob = parentJob,
         fanoutSubscribers = subscribers,
     ).also { it.open() }
@@ -172,236 +296,64 @@ suspend fun openTlsElement(
         activeSupervisor.open()
     }
 
-    val processOperations = activeSupervisor.service<ProcessOperations>()
-        ?: error("TlsElement requires ProcessOperations in NioSupervisor. Open the supervisor before installing TLS.")
+    val backend = activeSupervisor.service<TlsCodecBackend>()
+        ?: error("TlsElement requires TlsCodecBackend in NioSupervisor. Open the supervisor before installing TLS.")
 
     return TlsElement(
         config = config,
-        processOperations = processOperations,
+        backend = backend,
         parentJob = parentJob,
         ownedSupervisor = activeSupervisor.takeIf { ownsSupervisor },
         fanoutSubscribers = subscribers,
     ).also { it.open() }
 }
 
-private class OpenSslTlsEndpoint(
+private class BackendTlsEndpoint(
     private val owner: TlsElement,
-    override val role: TlsRole,
-    override val remoteHost: String,
-    override val remotePort: Int,
     private val config: TlsConfig,
-    private val processOperations: ProcessOperations,
+    private val backend: TlsCodecBackend,
+    initialState: TlsFlowState,
 ) : TlsEndpoint {
     private var closed = false
-    private var requestBuffer = byteArrayOf()
-    private var responseBuffer = byteArrayOf()
-    private var responseOffset = 0
-    private var exchangePerformed = false
 
-    override var lastSession: TlsSession? = null
+    override var flowState: TlsFlowState = initialState
         private set
 
-    override val isHandshakeComplete: Boolean
-        get() = lastSession != null
+    override val route: TlsRoute
+        get() = flowState.route
 
-    override val peerCertificate: TlsPeerCertificate?
-        get() = lastSession?.peerCertificate
-
-    override val protocol: String?
-        get() = lastSession?.protocol
-
-    override val cipherSuite: String?
-        get() = lastSession?.cipherSuite
-
-    override suspend fun handshake() {
+    override suspend fun handshake(): TlsFrames {
         ensureOpen()
-        if (lastSession != null) {
-            return
-        }
-        if (requestBuffer.isEmpty()) {
-            lastSession = executeOpenSsl(payload = byteArrayOf(), quiet = false)
-        } else {
-            ensureExchange()
-        }
+        return apply(backend.handshake(config, flowState))
     }
 
-    override suspend fun read(destination: ByteBuffer): Int {
+    override suspend fun upstream(payload: TlsPayload): TlsFrames {
         ensureOpen()
-        ensureExchange()
-        if (responseOffset >= responseBuffer.size) {
-            return -1
-        }
-        val count = minOf(destination.remaining(), responseBuffer.size - responseOffset)
-        destination.put(responseBuffer, responseOffset, count)
-        responseOffset += count
-        return count
+        return apply(backend.upstream(config, flowState, payload))
     }
 
-    override suspend fun write(source: ByteBuffer): Int {
+    override suspend fun downstream(payload: TlsPayload): TlsFrames {
         ensureOpen()
-        check(!exchangePerformed) { "OpenSSL exec fallback is one-shot per endpoint. Create a fresh endpoint for a new exchange." }
-        val bytes = ByteArray(source.remaining())
-        source.get(bytes)
-        requestBuffer = requestBuffer + bytes
-        return bytes.size
+        return apply(backend.downstream(config, flowState, payload))
     }
 
-    override suspend fun close() {
+    override suspend fun close(): TlsFrames {
         if (closed) {
-            return
+            return emptyTlsFrames()
         }
         closed = true
-        requestBuffer = byteArrayOf()
-        responseBuffer = byteArrayOf()
-        responseOffset = 0
+        val frames = apply(backend.close(config, flowState))
         owner.release(this)
+        return frames
     }
 
     private fun ensureOpen() {
         check(!closed) { "TLS endpoint is closed" }
     }
 
-    private suspend fun ensureExchange() {
-        if (exchangePerformed) {
-            return
-        }
-        val session = executeOpenSsl(payload = requestBuffer, quiet = true)
-        lastSession = session
-        responseBuffer = session.stdout
-        responseOffset = 0
-        exchangePerformed = true
-    }
-
-    private suspend fun executeOpenSsl(payload: ByteArray, quiet: Boolean): TlsSession {
-        val result = processOperations.exec(
-            command = config.opensslCommand,
-            args = buildClientArgs(quiet = quiet),
-            stdin = payload,
-        )
-        val session = result.toTlsSession()
-        check(session.verified || !config.hostnameVerification) {
-            "OpenSSL TLS verification failed for $remoteHost:$remotePort"
-        }
-        check(result.exitCode == 0) {
-            val detailBytes = if (result.stderr.isEmpty()) result.stdout else result.stderr
-            val detail = decodeText(detailBytes)
-            "OpenSSL exited with ${result.exitCode} for $remoteHost:$remotePort: $detail"
-        }
-        return session
-    }
-
-    private fun buildClientArgs(quiet: Boolean): List<String> {
-        val args = mutableListOf(
-            "s_client",
-            "-connect", "$remoteHost:$remotePort",
-            "-servername", remoteHost,
-        )
-
-        if (quiet) {
-            args += "-quiet"
-        }
-
-        when (config.protocols.firstOrNull()) {
-            TlsProtocol.TLS13 -> args += "-tls1_3"
-            TlsProtocol.TLS12 -> args += "-tls1_2"
-            null -> {}
-        }
-
-        val tls13Suites = config.cipherSuites.filter { it.startsWith("TLS_") }
-        if (tls13Suites.isNotEmpty()) {
-            args += listOf("-ciphersuites", tls13Suites.joinToString(":"))
-        }
-
-        val legacySuites = config.cipherSuites.filterNot { it.startsWith("TLS_") }
-        if (legacySuites.isNotEmpty()) {
-            args += listOf("-cipher", legacySuites.joinToString(":"))
-        }
-
-        if (config.supportedGroups.isNotEmpty()) {
-            args += listOf("-groups", config.supportedGroups.joinToString(":"))
-        }
-
-        if (config.alpnProtocols.isNotEmpty()) {
-            args += listOf("-alpn", config.alpnProtocols.joinToString(","))
-        }
-
-        config.trustStore?.let { args += listOf("-CAfile", it) }
-        config.certificateFile?.let { args += listOf("-cert", it) }
-        config.privateKeyFile?.let { args += listOf("-key", it) }
-        config.privateKeyPassword?.let { args += listOf("-pass", "pass:$it") }
-
-        if (config.hostnameVerification) {
-            args += listOf("-verify_hostname", remoteHost)
-            args += "-verify_return_error"
-        }
-
-        return args
+    private suspend fun apply(result: TlsCodecResult): TlsFrames {
+        flowState = result.state
+        owner.channelize(result.frames)
+        return result.frames
     }
 }
-
-private class UnsupportedServerTlsEndpoint(
-    override val remoteHost: String,
-    override val remotePort: Int,
-) : TlsEndpoint {
-    override val role: TlsRole = TlsRole.SERVER
-
-    override suspend fun handshake() {
-        error("OpenSSL exec fallback does not support server-side TLS endpoints.")
-    }
-
-    override suspend fun read(destination: ByteBuffer): Int =
-        error("OpenSSL exec fallback does not support server-side TLS endpoints.")
-
-    override suspend fun write(source: ByteBuffer): Int =
-        error("OpenSSL exec fallback does not support server-side TLS endpoints.")
-
-    override suspend fun close() {}
-
-    override val isHandshakeComplete: Boolean = false
-    override val peerCertificate: TlsPeerCertificate? = null
-    override val protocol: String? = null
-    override val cipherSuite: String? = null
-    override val lastSession: TlsSession? = null
-}
-
-private fun ProcessResult.toTlsSession(): TlsSession {
-    val merged = buildString {
-        append(decodeText(stderr))
-        if (stderr.isNotEmpty() && stdout.isNotEmpty()) {
-            append('\n')
-        }
-        append(decodeText(stdout))
-    }
-    return TlsSession(
-        protocol = merged.findField("Protocol"),
-        cipherSuite = merged.findField("Cipher"),
-        peerCertificate = TlsPeerCertificate(
-            subject = merged.findPrefixValue("subject="),
-            issuer = merged.findPrefixValue("issuer="),
-        ),
-        verified = merged.contains("Verify return code: 0", ignoreCase = true) ||
-            merged.contains("Verification: OK", ignoreCase = true) ||
-            exitCode == 0,
-        stdout = stdout,
-        stderr = stderr,
-    )
-}
-
-private fun String.findField(name: String): String? =
-    lineSequence()
-        .map { it.trim() }
-        .firstOrNull { it.startsWith("$name:", ignoreCase = true) }
-        ?.substringAfter(':')
-        ?.trim()
-        ?.takeIf { it.isNotEmpty() }
-
-private fun String.findPrefixValue(prefix: String): String? =
-    lineSequence()
-        .map { it.trim() }
-        .firstOrNull { it.startsWith(prefix, ignoreCase = true) }
-        ?.substringAfter(prefix)
-        ?.trim()
-        ?.takeIf { it.isNotEmpty() }
-
-private fun decodeText(bytes: ByteArray): String =
-    if (bytes.isEmpty()) "" else bytes.decodeToString()

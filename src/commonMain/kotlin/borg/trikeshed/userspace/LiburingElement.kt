@@ -47,7 +47,7 @@ class LiburingElement(
     suspend fun submit(): Int = Liburing.submit().getOrThrow()
 
     /** Wait for at least [minComplete] completions. */
-    suspend fun wait(minComplete: Int = 1): List<UringCompletion> = withContext(kotlinx.coroutines.Dispatchers.IO) {
+    suspend fun wait(minComplete: Int = 1): List<UringCompletion> = withContext(kotlinx.coroutines.Dispatchers.Default) {
         Liburing.waitCqe().getOrThrow()
         // In real impl, this would collect multiple completions
         emptyList()

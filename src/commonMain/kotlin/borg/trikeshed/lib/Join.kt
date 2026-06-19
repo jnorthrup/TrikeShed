@@ -82,7 +82,7 @@ val <T : Comparable<T>> Series<T>.cpb: CSeries<T>
 /*inline*/  infix fun <X, C, Domain >    MetaSeries<Domain,X>.α(/*crossinline*/ xform: (X) -> C): MetaSeries<Domain,C> = a j { i -> xform(this[i]) }
 
 /** Iterable projection. */
-inline infix fun <X, C, Subject : Iterable<X>> Subject.α(crossinline xform: (X) -> C): Iterable<C> =
+inline infix fun <X, C> Iterable<X>.α(crossinline xform: (X) -> C): List<C> =
     map { xform(it) }
 
 // ── Left identity / constant anchor ────────────────────────────

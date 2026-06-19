@@ -114,7 +114,7 @@ close    → submit() (fire-and-forget)
 
 ```kotlin
 class HtxTransport(channel: Channel) : SelectableChannelOps {
-    suspend fun execute(request: HtxClientRequest): HtxClientMessage {
+    suspend fun execute(request: HtxRequest): HtxResponse {
         val runner = ChannelRunner(channel, coroutineScope)
         val file = Channels.socket(AF_INET, SOCK_STREAM, 0)
 
@@ -149,7 +149,7 @@ val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 // 1,000 concurrent HTTP requests, one uring ring
 val results = (1..1000).map { i ->
     scope.async {
-        HtxTransport(ch).execute(HtxClientRequest("GET", "https://host$i/api"))
+        HtxTransport(ch).execute(parseHtxRequest("https://host$i/api"))
     }
 }.awaitAll()
 ```

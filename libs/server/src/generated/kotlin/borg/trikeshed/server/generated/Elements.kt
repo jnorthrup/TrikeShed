@@ -1,7 +1,7 @@
 package borg.trikeshed.server.generated
 
-import borg.trikeshed.htx.client.HtxElement
-import borg.trikeshed.htx.client.openHtxElement as openHtxElementRuntime
+import borg.trikeshed.htx.HtxElement
+import borg.trikeshed.htx.openHtxElement as openHtxElementRuntime
 import borg.trikeshed.quic.QuicElement
 import borg.trikeshed.quic.openQuicElement as openQuicElementRuntime
 import borg.trikeshed.sctp.SctpElement

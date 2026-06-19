@@ -224,7 +224,7 @@ class CharSeries(
     //toArray override
     fun toArray(): CharArray {
         require(rem > 0) { "heads up: using an empty stateful CharSeries toArray()" }
-        return CharArray(rem, ::get)
+        return CharArray(rem) { i -> get(pos + i) }
     }
 
     companion object {
@@ -312,3 +312,17 @@ val Series<Char>.cs: CharSequence
         override fun toString(): String = asString()
         override fun subSequence(startIndex: Int, endIndex: Int): CharSequence = this@cs[startIndex until endIndex].cs
     }
+
+fun CharSeries.splitWs(): Series<CharSeries> {
+    val result = mutableListOf<CharSeries>()
+    var start = pos
+    while (start < limit) {
+        while (start < limit && b(start).isWhitespace()) start++
+        if (start >= limit) break
+        var end = start
+        while (end < limit && !b(end).isWhitespace()) end++
+        result.add(CharSeries(this[start until end]))
+        start = end
+    }
+    return result.toSeries()
+}

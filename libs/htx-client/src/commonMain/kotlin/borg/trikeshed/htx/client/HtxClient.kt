@@ -6,7 +6,10 @@ import kotlinx.coroutines.flow.flow
 
 class HttpResponse(val status: Int, val body: String)
 
-class HtxClient(private val transport: NetworkTransportSpi) {
+class HtxClient(
+    private val transport: NetworkTransportSpi,
+    private val config: HtxClientConfig = HtxClientConfig(),
+) {
     suspend fun get(url: String): HttpResponse {
         var status = 200
         var responseData = byteArrayOf()
@@ -46,19 +49,13 @@ class HtxClient(private val transport: NetworkTransportSpi) {
     }
 
     suspend fun streamConnection(url: String, start: Long?, end: Long?): borg.trikeshed.htx.client.spi.NetworkConnection {
-        val withoutProtocol = url.substringAfter("://")
-        val host = withoutProtocol.substringBefore("/")
-        val path = "/" + withoutProtocol.substringAfter("/", "")
-
-        val connection = transport.connect(host, 80)
-
-        var request = "GET $path HTTP/1.1\r\nHost: $host\r\nConnection: close\r\n"
-        if (start != null && end != null) {
-            request += "Range: bytes=$start-$end\r\n"
-        }
-        request += "\r\n"
-
-        connection.write(request.encodeToByteArray())
+        val request = parseRequest(
+            url = url,
+            config = config,
+            range = if (start != null && end != null) HtxRange(start, end) else null,
+        )
+        val connection = transport.connect(request.target)
+        connection.write(request.renderWireRequest().encodeToByteArray())
         return connection
     }
 

@@ -11,9 +11,7 @@ import borg.trikeshed.lib.Join
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.Twin
 import borg.trikeshed.lib.combine
-import borg.trikeshed.lib.first
 import borg.trikeshed.lib.get
-import borg.trikeshed.lib.second
 import borg.trikeshed.lib.toSeries
 import borg.trikeshed.lib.`▶`
 import borg.trikeshed.lib.α
@@ -24,18 +22,18 @@ typealias JsIndex = Join<Twin<Int>, Series<Char>> //(twin j src)
 typealias JsContext = Join<JsElement, Series<Char>>
 
 
-typealias JsPathElement = Either<String, Int>
-typealias JsPath = Series<JsPathElement>
+typealias JsonPathElement = Either<String, Int>
+typealias JsonPath = Series<JsonPathElement>
 
 //private fun logDebug(t: () -> String) {} //logging turned off for now
 
-fun JsIndex.toSeries(): Series<Char> = this.second [ a.a until a.b]
+fun JsIndex.toSeries(): Series<Char> = this.b[a.a until a.b]
 
-val List<*>.toJsPath: JsPath
+val List<*>.toJsonPath: JsonPath
     get() = this.toSeries() α  {
         when (it) {
-            is String -> JsPathElement.left(it)
-            is Int -> JsPathElement.right(it)
+            is String -> JsonPathElement.left(it)
+            is Int -> JsonPathElement.right(it)
             else -> throw IllegalArgumentException("expected String or Int, got $it")
         }
     }
@@ -49,10 +47,12 @@ val List<*>.toJsPath: JsPath
  */
 val JsContext.segments: Iterable<JsIndex>
     get() {
-        val (element, src) = this
-        val (openIdx, closeIdx) = element.first
-        val commaIdxs: Series<Int> = combine(s_[openIdx], element.second, s_[closeIdx])
-        return commaIdxs. `▶` .zipWithNext().map { (a: Int, b: Int) -> a.inc() j b }.toList() α { it j src }
+        val element = a
+        val src = b
+        val openIdx = element.a.a
+        val closeIdx = element.a.b
+        val commaIdxs: Series<Int> = combine(s_[openIdx], element.b, s_[closeIdx])
+        return (commaIdxs.`▶` as Iterable<Int>).zipWithNext().map { (before, after) -> before.inc() j after } α { it j src }
     }
 
 /** a json scanner that indexes and optionally reifies the json chars
@@ -130,8 +130,9 @@ object JsonParser {
         return when (val c: Char = src.mk.get) {
             '{', '[' -> {
                 val index: JsElement = index(src)
-                val (openIdx: Int, closeIdx: Int) = index.first
-                val commaIdxs: Series<Int> = index.second
+                val openIdx: Int = index.a.a
+                val closeIdx: Int = index.a.b
+                val commaIdxs: Series<Int> = index.b
 
                 val isObj = '{' == c
                 //if obj we create k-v pairs otherwise we create values
@@ -146,36 +147,36 @@ object JsonParser {
                         else emptyArray<Any?>()
                 }
 
-                combine.`▶`.zipWithNext().map { (before, after) ->
+                (combine.`▶` as Iterable<Int>).zipWithNext().map { (before, after) ->
                     if (isObj) {
                         val tmp = CharSeries(src[before.inc() until after]).trim
                         require(tmp.seekTo('"')) {
                             "malformed open quote in ${tmp.take(40).asString()}"
                         }
-                        tmp.pos.let { openQuote ->
-                            require(tmp.seekTo('"', '\\')) {
-                                "malformed close-quote in ${tmp.take(40).asString()}"
-                            }
-                            (tmp.pos - 1).let { closeQuote ->
-                                require(tmp.seekTo(':')) {
-                                    "expected colon in ${tmp.take(40).asString()}"
-                                }
-                                tmp.slice.let { valueContext ->
-                                    tmp.lim(closeQuote).pos(openQuote).asString() j reify(valueContext)
-                                }
-                            }
+                        val openQuote = tmp.pos
+                        require(tmp.seekTo('"', '\\')) {
+                            "malformed close-quote in ${tmp.take(40).asString()}"
                         }
+                        val closeQuote = tmp.pos - 1
+                        require(tmp.seekTo(':')) {
+                            "expected colon in ${tmp.take(40).asString()}"
+                        }
+                        val valueContext = tmp.slice
+                        tmp.lim(closeQuote).pos(openQuote).asString() j reify(valueContext)
                     } else reify(CharSeries(src[before.inc() until after]).trim)
-                }.let {
-                    if (isObj) it.associate {
-                        val join = it as Join<*, *>
-                        val (key, value) = join
-                        key.let {
-                            it as? String ?: (it as? Series<Char>)?.asString() ?: (it as? CharSeries)?.asString()
-                            ?: it
+                }.let { mapped ->
+                    if (isObj) mapped.associate { item ->
+                        val join = item as Join<*, *>
+                        val key = join.a
+                        val value = join.b
+                        key.let { k ->
+                            k as? String ?: (k as? Series<*>)?.let { s ->
+                                (s as? Series<Char>)?.asString()
+                            } ?: (k as? CharSeries)?.asString() ?: k
                         } to value
-                    } else it as? String ?: (it as? Series<Char>)?.asString() ?: (it as? CharSeries)?.asString()
-                    ?: it
+                    } else mapped as? String ?: (mapped as? Series<*>)?.let { s ->
+                        (s as? Series<Char>)?.asString()
+                    } ?: (mapped as? CharSeries)?.asString() ?: mapped
                 }
             }
 
@@ -206,7 +207,7 @@ object JsonParser {
         /**contains the indexes and the src chars */
         context: JsContext,
         /** strings will enter by obj key, indexes will deliver nth slot for obj or array*/
-        path: JsPath,
+        path: JsonPath,
         /**whether success payload is reified or JsIndex */
         reifyResult: Boolean = true,
         /**path and depth have a relationship, path needs depth to succeed, so this can aid in skipping shallow
@@ -214,7 +215,8 @@ object JsonParser {
         depths: List<Int>? = null,
 //        payload: Array<Any?> = arrayOf(Unit),
     ): Any? {
-        val (pathHead: JsPathElement, pathTail: JsPath) = path.first() j path.drop(1)
+        val pathHead: JsonPathElement = path[0]
+        val pathTail: JsonPath = path.drop(1)
 
         return pathHead.fold(
             /** this, String branch, performs the search of a key by descending into each segment, and looking for a
@@ -230,7 +232,7 @@ object JsonParser {
 
     private fun selectByKey(
         context: JsContext,
-        pathTail: Series<Either<String, Int>>,
+        pathTail: JsonPath,
         reifyResult: Boolean,
     ): (String) -> Any? = { key: String ->
         val (element: JsElement, src) = context
@@ -276,7 +278,7 @@ object JsonParser {
 
 
     private fun resumePath(
-        pathTail: Series<Either<String, Int>>,
+        pathTail: JsonPath,
         reifyResult: Boolean,
         tmp: CharSeries,
 
@@ -303,7 +305,7 @@ object JsonParser {
 
     fun selectByIndex(
         context: JsContext,
-        pathTail: Series<Either<String, Int>>,
+        pathTail: JsonPath,
         reifyResult: Boolean,
     ): (Int) -> Any? = { idx: Int ->
         var r: Any? = Unit

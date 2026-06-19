@@ -23,7 +23,10 @@ class MockNetworkConnection(val responseData: String) : NetworkConnection {
 
 class MockNetworkTransport(val responseData: String) : NetworkTransportSpi {
     lateinit var lastConnection: MockNetworkConnection
-    override suspend fun connect(host: String, port: Int): NetworkConnection {
+    lateinit var lastTarget: HtxTarget
+
+    override suspend fun connect(target: HtxTarget): NetworkConnection {
+        lastTarget = target
         lastConnection = MockNetworkConnection(responseData)
         return lastConnection
     }
@@ -41,9 +44,45 @@ class HtxClientGetTest {
 
         assertEquals(200, response.status)
         assertEquals("Hello, World!", response.body)
+        assertEquals(HtxScheme.HTTP, transport.lastTarget.scheme)
+        assertEquals(HtxTransportProtocol.HTTP, transport.lastTarget.transportProtocol)
+        assertEquals(80, transport.lastTarget.port)
+        assertEquals("/test", transport.lastTarget.requestPath)
 
         // Verify request was written correctly
         val written = transport.lastConnection.writtenData.joinToString("") { it.decodeToString() }
         assertTrue(written.startsWith("GET /test HTTP/1.1\r\nHost: example.com\r\n"))
+    }
+
+    @Test
+    fun testHttpsUsesTlsPortAndProtocol() = runTest {
+        val mockResponse = "HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok"
+        val transport = MockNetworkTransport(mockResponse)
+        val client = HtxClient(transport)
+
+        val response = client.get("https://example.com/secure")
+
+        assertEquals(200, response.status)
+        assertEquals(HtxScheme.HTTPS, transport.lastTarget.scheme)
+        assertEquals(HtxTransportProtocol.HTTPS, transport.lastTarget.transportProtocol)
+        assertEquals(443, transport.lastTarget.port)
+        assertEquals("/secure", transport.lastTarget.requestPath)
+    }
+
+    @Test
+    fun testIpfsRoutesThroughGatewayWithoutLosingScheme() = runTest {
+        val mockResponse = "HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok"
+        val transport = MockNetworkTransport(mockResponse)
+        val client = HtxClient(transport)
+
+        val response = client.get("ipfs://bafybeigdyrztu5fzz/data.txt")
+
+        assertEquals(200, response.status)
+        assertEquals(HtxScheme.IPFS, transport.lastTarget.scheme)
+        assertEquals(HtxTransportProtocol.HTTP, transport.lastTarget.transportProtocol)
+        assertEquals("127.0.0.1", transport.lastTarget.host)
+        assertEquals(8080, transport.lastTarget.port)
+        assertEquals("/ipfs/bafybeigdyrztu5fzz/data.txt", transport.lastTarget.requestPath)
+        assertEquals("bafybeigdyrztu5fzz", transport.lastTarget.resourceId)
     }
 }

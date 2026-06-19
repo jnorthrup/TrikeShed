@@ -1,7 +1,8 @@
 package borg.trikeshed.isam
 
-import borg.trikeshed.lib.Usable
+import borg.trikeshed.common.Usable
 import borg.trikeshed.userspace.nio.file.spi.FileOperations
+import borg.trikeshed.userspace.nio.file.spi.JsFileOperations
 import borg.trikeshed.cursor.Cursor
 import borg.trikeshed.cursor.*
 import borg.trikeshed.lib.*
@@ -10,12 +11,12 @@ actual class IsamDataFile actual constructor(
     datafileFilename: String,
     metafileFilename: String,
     metafile: IsamMetaFileReader,
-    private val fileOps: FileOperations,
 ) : Usable, Cursor {
     actual val datafileFilename: String = datafileFilename
     actual val metafile: IsamMetaFileReader = metafile
+    private val fileOps: FileOperations = JsFileOperations()
 
-   val recordlen: Int get() = metafile.recordlen
+    val recordlen: Int get() = metafile.recordlen
 
     actual override val a: Int
         get() = if (fileOps.exists(datafileFilename) && recordlen > 0) {
@@ -37,7 +38,6 @@ actual class IsamDataFile actual constructor(
         }
     }
 
-
     actual override fun open() {
         metafile.open()
     }
@@ -47,10 +47,11 @@ actual class IsamDataFile actual constructor(
     }
 
     actual companion object {
-        actual fun write(cursor: Cursor, datafilename: String, varChars: Map<String, Int>, fileOps: FileOperations) {
+        actual fun write(cursor: Cursor, datafilename: String, varChars: Map<String, Int>) {
+            val fileOps: FileOperations = JsFileOperations()
             val metafilename = "$datafilename.meta"
 
-            val meta0 = IsamMetaFileReader.write(metafilename, cursor.meta, varChars, fileOps)
+            val meta0 = IsamMetaFileReader.write(metafilename, cursor.meta, varChars)
 
             val last = meta0.last()
             val meta = (meta0 α {
@@ -75,11 +76,11 @@ actual class IsamDataFile actual constructor(
             datafilename: String,
             varChars: Map<String, Int>,
             transform: ((RowVec) -> RowVec)?,
-            fileOps: FileOperations,
         ): Unit {
+            val fileOps: FileOperations = JsFileOperations()
             val metafilename = "$datafilename.meta"
             val meta0: Series<RecordMeta> = if (fileOps.exists(metafilename)) {
-                val reader = IsamMetaFileReader(metafilename, fileOps)
+                val reader = IsamMetaFileReader(metafilename)
                 reader.open()
                 reader.constraints
             } else {
@@ -87,7 +88,7 @@ actual class IsamDataFile actual constructor(
                 val rows = msf.map { transform?.invoke(it) ?: it }.toList()
                 // create a dummy cursor from rows
                 val cursor = rows.toSeries()
-                write(cursor, datafilename, varChars, fileOps)
+                write(cursor, datafilename, varChars)
                 return
             }
 
@@ -108,4 +109,3 @@ actual class IsamDataFile actual constructor(
         }
     }
 }
-

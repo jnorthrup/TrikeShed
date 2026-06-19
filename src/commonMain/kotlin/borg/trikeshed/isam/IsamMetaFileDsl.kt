@@ -22,7 +22,7 @@ import kotlin.math.min
 
 interface Usable { fun open(); fun close() }
 
-inline  class MetafileConfig(
+data class MetafileConfig(
     val metafileFilename: String,
     val fileOps: FileOperations,
 )
@@ -31,16 +31,16 @@ inline  class MetafileConfig(
 // Reified inline builder for reading metafile
 // ---------------------------------------------------------------------------
 
-inline fun readMetafile(
-    crossinline config: MetafileConfig,
+fun readMetafile(
+    config: MetafileConfig,
     block: MetafileReader.() -> Unit,
 ): MetafileReader = MetafileReader(config).apply(block)
 
-inline  class MetafileReader(override val config: MetafileConfig) : Usable {
-    override fun open() = readMetafileInternal()
+class MetafileReader(val config: MetafileConfig) : Usable {
+    override fun open() { readMetafileInternal() }
     override fun close() = logDebug { "closing metafile ${config.metafileFilename}" }
 
-    inline fun readMetafileInternal(): MetafileResult {
+    fun readMetafileInternal(): MetafileResult {
         val lines = config.fileOps.readAllLines(config.metafileFilename).filterNot { it.trim().startsWith('#') }
         val coords = CharSeries(lines[0]).trim.splitWs() α CharSeries::asString
         val names = CharSeries(lines[1]).trim.splitWs() α CharSeries::asString
@@ -49,7 +49,7 @@ inline  class MetafileReader(override val config: MetafileConfig) : Usable {
         val namesList = names.toList()
         val groupsLine = if (lines.size > 3) lines[3].trim() else ""
         val groupSeries = if (groupsLine.isNotEmpty()) parseGroupsLine(groupsLine, namesList.size)
-            else namesList.size j { idx -> idx j "0" }
+            else namesList.size j { idx: Int -> idx j "0" }
 
         val constraints = namesList.zip(types.toList()).mapIndexed { index, (name, type) ->
             val begin = coords[2 * index].toInt()
@@ -58,7 +58,7 @@ inline  class MetafileReader(override val config: MetafileConfig) : Usable {
             val ioMemento = IOMemento.valueOf(type)
             RecordMeta(
                 name = name,
-                ioMemento = ioMemento,
+                type = ioMemento,
                 begin = begin,
                 end = end,
                 decoder = ioMemento.createDecoder(end - begin),
@@ -68,28 +68,28 @@ inline  class MetafileReader(override val config: MetafileConfig) : Usable {
             )
         }.toSeries()
 
-        val recordlen = constraints.last().end
+        val recordlen = constraints.view.last().end
         return MetafileResult(config.metafileFilename, recordlen, constraints)
     }
 
     companion object {
-        inline fun parseGroupsLine(line: String, colCount: Int): Series<Join<Int, String>> = parseGroupsLineReified(line, colCount)
+        fun parseGroupsLine(line: String, colCount: Int): Series<Join<Int, String>> = parseGroupsLineInternal(line, colCount)
 
-        private inline fun parseGroupsLineReified(line: String, colCount: Int): Series<Join<Int, String>> {
+        private fun parseGroupsLineInternal(line: String, colCount: Int): Series<Join<Int, String>> {
             val colToGroupName = mutableMapOf<Int, String>()
             val mentionedGroups = mutableListOf<String>()
             val cs = CharSeries(line).trim
             val tokens: Series<CharSeries> = cs.splitWs()
             for (token in tokens) {
-                val colonIdx = token.lastIndexOf(':')
+                val colonIdx = token.asString().lastIndexOf(':')
                 if (colonIdx < 0) continue
                 val colListCs = token.clone().lim(token.pos + colonIdx)
                 val groupName = token.clone().pos(token.pos + colonIdx + 1).asString()
                 if (groupName !in mentionedGroups) mentionedGroups.add(groupName)
-                val colSpecs: Series<CharSeries> = colListCs / ','
+                val colSpecs: Series<CharSeries> = (colListCs / ',') α { CharSeries(it) }
                 for (spec in colSpecs) {
                     val specs = spec.trim
-                    val dashIdx = specs.indexOf('-')
+                    val dashIdx = specs.asString().indexOf('-')
                     if (dashIdx > 0) {
                         val lo = specs.clone().lim(specs.pos + dashIdx).asString().toInt()
                         val hi = specs.clone().pos(specs.pos + dashIdx + 1).asString().toInt()
@@ -100,12 +100,11 @@ inline  class MetafileReader(override val config: MetafileConfig) : Usable {
                 }
             }
             val implicitName = mentionedGroups.size.toString()
-            return colCount j { idx -> idx j (colToGroupName[idx] ?: implicitName) }
+            return colCount j { idx: Int -> idx j (colToGroupName[idx] ?: implicitName) }
         }
     }
 }
 
-@Serializable
 data class MetafileResult(
     val metafileFilename: String,
     val recordlen: Int,
@@ -116,19 +115,19 @@ data class MetafileResult(
 // Reified inline builder for writing metafile
 // ---------------------------------------------------------------------------
 
-inline fun writeMetafile(
-    crossinline config: MetafileWriteConfig,
+fun writeMetafile(
+    config: MetafileWriteConfig,
     block: MetafileWriter.() -> Unit,
 ): MetafileResult = MetafileWriter(config).apply(block).build()
 
-inline  class MetafileWriteConfig(
+data class MetafileWriteConfig(
     val metafilename: String,
     val recordMetas: Series<ColumnMeta>,
     val varchars: Map<String, Int>,
     val fileOps: FileOperations,
 )
 
-class MetafileWriter(override val config: MetafileWriteConfig) {
+class MetafileWriter(val config: MetafileWriteConfig) {
     fun build(): MetafileResult {
         val result = sanitize(config.recordMetas, config.varchars)
         val lines = mutableListOf<String>()
@@ -140,7 +139,7 @@ class MetafileWriter(override val config: MetafileWriteConfig) {
 
         val distinctGroups = result.view.map { it.groupId }.toSet()
         if (distinctGroups.size > 1) {
-            val maxGroupId = distinctGroups.max()!!
+            val maxGroupId = distinctGroups.max()
             val byGroup = linkedMapOf<String, MutableList<Int>>()
             result.view.forEachIndexed { idx, rm ->
                 if (rm.groupId != maxGroupId)
@@ -157,10 +156,10 @@ class MetafileWriter(override val config: MetafileWriteConfig) {
     }
 
     companion object {
-        inline fun sanitize(recordMetas: Series<ColumnMeta>, varchars: Map<String, Int>): Series<RecordMeta> {
+        fun sanitize(recordMetas: Series<ColumnMeta>, varchars: Map<String, Int>): Series<RecordMeta> {
             return if (recordMetas.view.any { it !is RecordMeta || (min(it.begin, it.end) < 0 && it.child == null) }) {
                 var offset = 0
-                recordMetas.map { col: ColumnMeta ->
+                recordMetas.view.map { col: ColumnMeta ->
                     val name = col.name.toString()
                     val type = col.type
                     val len = type.networkSize ?: varchars[name] ?: throw Exception("no network size for $name")
@@ -182,7 +181,7 @@ class MetafileWriter(override val config: MetafileWriteConfig) {
             } else recordMetas as Series<RecordMeta>
         }
 
-        inline fun buildColList(cols: List<Int>): String {
+        fun buildColList(cols: List<Int>): String {
             if (cols.isEmpty()) return ""
             val sorted = cols.sorted()
             val sb = StringBuilder()
@@ -203,39 +202,40 @@ class MetafileWriter(override val config: MetafileWriteConfig) {
 }
 
 // ---------------------------------------------------------------------------
-// Result types
+// RecordMeta extended constructor with groupId/groupName
 // ---------------------------------------------------------------------------
 
-@Serializable
-data class RecordMeta(
-    val name: String,
-    val type: IOMemento,
-    val begin: Int,
-    val end: Int,
-    val decoder: (ByteArray) -> Any?,
-    val encoder: (Any?) -> ByteArray,
-    val groupId: Int = 0,
-    val groupName: String = "0",
-    val child: Any? = null,
-)
+fun RecordMeta(
+    name: String,
+    type: IOMemento,
+    begin: Int = -1,
+    end: Int = -1,
+    decoder: (ByteArray) -> Any? = type.createDecoder(end - begin),
+    encoder: (Any?) -> ByteArray = type.createEncoder(end - begin),
+    groupId: Int = 0,
+    groupName: String = "0",
+    child: ColumnMeta? = null,
+): RecordMeta = RecordMeta(name, type, begin, end, decoder, encoder, child).also {
+    it.groupId = groupId
+    it.groupName = groupName
+}
 
 // ---------------------------------------------------------------------------
 // Reified inline column specs
 // ---------------------------------------------------------------------------
 
-inline fun <T> columnSpec(
-    crossinline name: String,
-    crossinline ioMemento: IOMemento,
-    crossinline length: Int,
-    crossinline group: Int = 0,
-    crossinline groupName: String = "0",
+fun <T> columnSpec(
+    name: String,
+    ioMemento: IOMemento,
+    length: Int,
+    group: Int = 0,
+    groupName: String = "0",
 ): ColumnMeta = ColumnMeta(
     name = name,
     type = ioMemento,
-    networkSize = length,
     child = meta {
-        groupId = group
-        groupName = groupName
+        this.groupId = group
+        this.groupName = groupName
     }
 )
 
@@ -243,6 +243,6 @@ inline fun <T> columnSpec(
 // RecordMeta metadata marker
 // ---------------------------------------------------------------------------
 
-data class Meta<T>(val groupId: Int = 0, val groupName: String = "0")
+class Meta<T>(var groupId: Int = 0, var groupName: String = "0") : ColumnMeta by ColumnMeta("meta", IOMemento.IoString, null)
 
-inline fun meta(block: Meta<*>.() -> Unit): Meta<Any> = Meta().apply(block)
+fun meta(block: Meta<*>.() -> Unit): Meta<Any> = Meta<Any>().apply(block)

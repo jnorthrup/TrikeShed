@@ -183,13 +183,18 @@ class ByteSeries(
     /** skipws and rtrim */
     val trim: ByteSeries
         get() = apply {
-            var p = pos
-            var l = limit
-            while (p < l && (0xff and get(p).toInt()).toChar().isWhitespace()) p++
-            while (l > p && (0xff and get(l.dec()).toInt()).toChar().isWhitespace()) l--
-            lim(l)
-            pos(p)
+            confixScope { (0xff and it.toInt()).toChar().isWhitespace() }
         }
+
+    /** mutating operation to shrink the buffer  */
+    fun confixScope(pred: (Byte) -> Boolean) {
+        var p = pos
+        var l = limit
+        while (p < l && pred(get(p))) p++
+        while (l > p && pred(get(l.dec()))) l--
+        lim(l)
+        pos(p)
+    }
 
 
     //isEmpty override
@@ -257,7 +262,22 @@ class ByteSeries(
     /**
      * this rewrites the Series default toArray() to use the position and limit
      */
-    fun toArray(): ByteArray = ByteArray(rem, ::get)
+    fun toArray(): ByteArray = ByteArray(rem) { i -> get(pos + i) }
+
+    companion object {
+        fun unbrace(it: ByteSeries): Boolean = confixFeature(it, "{} ")
+        fun unbracket(it: ByteSeries): Boolean = confixFeature(it, "[] ")
+        fun unquote(it: ByteSeries): Boolean = confixFeature(it, "\"\" ")
+
+        private fun confixFeature(client: ByteSeries, chlit: String): Boolean {
+            var x = 0
+            client.confixScope { test: Byte ->
+                val target = chlit[x].code.toByte()
+                (target == test && x < 2).apply { if (this) x++ }
+            }
+            return x == 2
+        }
+    }
 
 }
 
@@ -292,4 +312,18 @@ fun Series<Byte>.startsWith(s: String): Boolean {
 fun Series<Byte>.endsWith(s: String): Boolean {
     val join = s.encodeToByteArray() α { it }
     return join.size <= size && join.zip(this.reversed()).`▶`.all { it.a == it.b }
+}
+
+fun ByteSeries.splitWs(): Series<ByteSeries> {
+    val result = mutableListOf<ByteSeries>()
+    var start = pos
+    while (start < limit) {
+        while (start < limit && (0xff and get(start).toInt()).toChar().isWhitespace()) start++
+        if (start >= limit) break
+        var end = start
+        while (end < limit && !(0xff and get(end).toInt()).toChar().isWhitespace()) end++
+        result.add(ByteSeries(this[start until end]))
+        start = end
+    }
+    return result.toSeries()
 }

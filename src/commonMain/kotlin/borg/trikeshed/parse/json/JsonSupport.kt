@@ -10,10 +10,10 @@ import borg.trikeshed.parse.confix.*
  * Delegates to the confix JSON stack.
  */
 object JsonSupport {
-    fun parse(text: String): Any? = JsonParser.parse(text)
+    fun parse(text: String): Any? = JsonParser.reify(CharSeries(text))
 
     fun query(text: String, vararg pathSteps: Any?): Any? {
-        val map = JsonParser.parse(text)
+        val map = JsonParser.reify(CharSeries(text))
         return resolvePath(map, pathSteps.toList())
     }
 

@@ -49,7 +49,7 @@ fun CoroutineScope.installHtxKanbanConduit(
     )
     return installHtxKanbanConduit(
         fanout = fanout,
-        conduit = HtxKanbanConduit(projector = projector, hermes = hermes),
+        conduit = HtxKanbanConduit(projector = projector, sink = HermesKanbanSink(hermes)),
         eventType = HTX_PLANNING_EVENT_TYPE,
     )
 }

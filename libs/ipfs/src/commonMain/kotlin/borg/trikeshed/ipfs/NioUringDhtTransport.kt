@@ -39,4 +39,8 @@ class NioUringDhtTransport(entries: Int = 256) : DhtTransport {
 
         return mutex.withLock { registry[key]?.toList() ?: emptyList() }
     }
+
+    override fun close() {
+        // No-op or cleanup if needed in future
+    }
 }

@@ -70,4 +70,4 @@ internal expect object ChannelsImpl {
     fun socket(domain: Int, type: Int, protocol: Int): FileImpl
 }
 
-internal expect fun openUserspaceChannelBackend(entries: Int): UserspaceChannelBackend
+expect fun openUserspaceChannelBackend(entries: Int): UserspaceChannelBackend

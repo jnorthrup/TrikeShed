@@ -135,7 +135,7 @@ object CSVUtil {
         //first we call parseSegments with our fileEvidence then we trap the RecordMeta child types as a separate meta,
         // then we use the CharSeries cursor features to create a String marshaller per column
         val segments: Cursor = parseSegments(file, fileEvidence)
-        val meta = (newMeta ?: (segments.meta α { (it as RecordMeta).child!! })).debug {
+        val meta = (newMeta ?: (segments.meta α { (it as RecordMeta).child as RecordMeta })).debug {
             logDebug { "parseConformantmeta: ${it.toList()}" }
         }
         return segments.a j { y: Int ->

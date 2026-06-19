@@ -8,26 +8,26 @@ import kotlinx.serialization.Serializable
 /**
  * ISAM WireProto DSL — reified inline factory builders.
  *
- * FieldSynapse wire format (24 bytes LE):
- *   phase: Int     (4 bytes)  -- phase index
- *   opcode: UInt   (4 bytes)  -- operation code
- *   methodIdx: Int (4 bytes)  -- method index
- *   addr: Long     (8 bytes)  -- instruction address
- *   seq: Long      (8 bytes)  -- cursor index / sequence
- *   nano: Long     (8 bytes)  -- timestamp (nanoseconds)
- *   callsiteHash: UInt (4 bytes) -- FNV-1a hash
- *   templateIdx: Int (4 bytes) -- template index
+ * FieldSynapse wire format (bit-packed LE):
+ *   phase: Int     (phaseBits)    -- phase index
+ *   opcode: UInt   (opcodeBits)   -- operation code
+ *   methodIdx: Int (methodIdxBits)-- method index
+ *   addr: Long     (addrBits)     -- instruction address
+ *   seq: Long      (seqBits)      -- cursor index / sequence
+ *   nano: Long     (nanoBits)     -- timestamp (nanoseconds)
+ *   callsiteHash: UInt (hashBits) -- FNV-1a hash
+ *   templateIdx: Int (templateBits)-- template index
  *
- * Total: 44 bytes (traditional) or 24 bytes (compact)
+ * Total bits defined by WireProtoSpec.
  *
- * This DSL provides reified inline encode/decode with typeclass encoders.
+ * This DSL provides inline encode/decode with typeclass encoders.
  */
 
 // ---------------------------------------------------------------------------
 // Wire format spec
 // ---------------------------------------------------------------------------
 
-inline  class WireProtoSpec(
+data class WireProtoSpec(
     val phaseBits: Int = 4,
     val opcodeBits: Int = 8,
     val methodIdxBits: Int = 4,
@@ -45,7 +45,7 @@ inline  class WireProtoSpec(
 val STANDARD_WIRE_PROTO = WireProtoSpec(phaseBits = 4, opcodeBits = 8, methodIdxBits = 4, addrBits = 8, seqBits = 8, nanoBits = 8, hashBits = 4, templateBits = 4)
 
 // ---------------------------------------------------------------------------
-// FieldSynapse — reified inline encode/decode
+// FieldSynapse — encode/decode
 // ---------------------------------------------------------------------------
 
 @Serializable
@@ -59,9 +59,9 @@ data class FieldSynapse(
     val callsiteHash: UInt,
     val templateIdx: Int,
 ) {
-    fun encode(spec: WireProtoSpec = STANDARD_WIRE_PROTO): ByteArray = spec.encode(this)
+    fun encode(spec: WireProtoSpec = STANDARD_WIRE_PROTO): ByteArray = encodeWireProtoInternal(spec, this)
     companion object {
-        fun decode(bytes: ByteArray, spec: WireProtoSpec = STANDARD_WIRE_PROTO): FieldSynapse = spec.decode(bytes)
+        fun decode(bytes: ByteArray, spec: WireProtoSpec = STANDARD_WIRE_PROTO): FieldSynapse = decodeWireProtoInternal(spec, bytes)
     }
 }
 
@@ -80,7 +80,7 @@ class RingJournal<Synapse> private constructor(
     private var size: Int = 0,
 ) {
     /** Atomic append — returns index of written slot. */
-    fun append(synapse: Synapse): Int = synchronized(this) {
+    fun append(synapse: Synapse): Int = synchronizedLock(this) {
         val idx = head
         buffer[idx] = synapse
         head = (head + 1) % capacity
@@ -97,11 +97,11 @@ class RingJournal<Synapse> private constructor(
     fun clear() { buffer.fill(null); head = 0; size = 0 }
     fun isFull(): Boolean = size == capacity
     fun isEmpty(): Boolean = size == 0
-}
 
-object RingJournal {
-    inline fun <Synapse> create(crossinline capacity: Int = 4096): RingJournal<Synapse> =
-        RingJournal(capacity, Array(capacity) { null })
+    companion object {
+        fun <Synapse> create(capacity: Int = 4096): RingJournal<Synapse> =
+            RingJournal(capacity, arrayOfNulls<Any?>(capacity) as Array<Synapse?>)
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -122,55 +122,53 @@ enum class JournalBody {
 }
 
 // ---------------------------------------------------------------------------
-// Reified inline encode/decode for hot path
+// Encode/decode for hot path
 // ---------------------------------------------------------------------------
 
-inline fun encodeWireProto(
-    crossinline synapse: FieldSynapse,
-    crossinline spec: WireProtoSpec = STANDARD_WIRE_PROTO,
-): ByteArray = spec.encode(synapse)
+fun encodeWireProto(
+    synapse: FieldSynapse,
+    spec: WireProtoSpec = STANDARD_WIRE_PROTO,
+): ByteArray = encodeWireProtoInternal(spec, synapse)
 
-inline fun decodeWireProto(
-    crossinline bytes: ByteArray,
-    crossinline spec: WireProtoSpec = STANDARD_WIRE_PROTO,
-): FieldSynapse = spec.decode(bytes)
+fun decodeWireProto(
+    bytes: ByteArray,
+    spec: WireProtoSpec = STANDARD_WIRE_PROTO,
+): FieldSynapse = decodeWireProtoInternal(spec, bytes)
 
 // ---------------------------------------------------------------------------
-// WireProtoSpec encode/decode implementation
+// WireProtoSpec encode/decode implementation (internal for public inline access)
 // ---------------------------------------------------------------------------
 
-private fun WireProtoSpec.encode(synapse: FieldSynapse): ByteArray {
-    val buf = ByteArray(totalBytes)
+internal fun encodeWireProtoInternal(spec: WireProtoSpec, synapse: FieldSynapse): ByteArray {
+    val buf = ByteArray(spec.totalBytes)
     var bitPos = 0
     fun writeBits(value: Long, bits: Int) {
         var v = value
         for (i in 0 until bits) {
-            if ((v and 1L) != 0L) buf[bitPos / 8] = (buf[bitPos / 8] or (1 shl (bitPos % 8))).toByte()
+            if ((v and 1L) != 0L) buf[bitPos / 8] = (buf[bitPos / 8].toInt() or (1 shl (bitPos % 8))).toByte()
             v = v ushr 1
             bitPos++
         }
     }
-    writeBits(synapse.phase.toLong(), phaseBits)
-    val opcodeVal = synapse.opcode.toULong()
-    writeBits(opcodeVal, opcodeBits)
-    writeBits(synapse.methodIdx.toLong(), methodIdxBits)
-    writeBits(synapse.addr, addrBits)
-    writeBits(synapse.seq, seqBits)
-    writeBits(synapse.nano, nanoBits)
-    val hashVal = synapse.callsiteHash.toULong()
-    writeBits(hashVal, hashBits)
-    writeBits(synapse.templateIdx.toLong(), templateBits)
+    writeBits(synapse.phase.toLong(), spec.phaseBits)
+    writeBits(synapse.opcode.toLong(), spec.opcodeBits)
+    writeBits(synapse.methodIdx.toLong(), spec.methodIdxBits)
+    writeBits(synapse.addr, spec.addrBits)
+    writeBits(synapse.seq, spec.seqBits)
+    writeBits(synapse.nano, spec.nanoBits)
+    writeBits(synapse.callsiteHash.toLong(), spec.hashBits)
+    writeBits(synapse.templateIdx.toLong(), spec.templateBits)
     return buf
 }
 
-private fun WireProtoSpec.decode(bytes: ByteArray): FieldSynapse {
+internal fun decodeWireProtoInternal(spec: WireProtoSpec, bytes: ByteArray): FieldSynapse {
     var bitPos = 0
     fun readBits(bits: Int): Long {
         var result = 0L
         for (i in 0 until bits) {
             val byteIdx = bitPos / 8
             val bitIdx = bitPos % 8
-            if (byteIdx < bytes.size && (bytes[byteIdx] and (1 shl bitIdx)) != 0) {
+            if (byteIdx < bytes.size && (bytes[byteIdx].toInt() and (1 shl bitIdx)) != 0) {
                 result = result or (1L shl i)
             }
             bitPos++
@@ -178,14 +176,14 @@ private fun WireProtoSpec.decode(bytes: ByteArray): FieldSynapse {
         return result
     }
     return FieldSynapse(
-        phase = readBits(phaseBits).toInt(),
-        opcode = readBits(opcodeBits).toUInt(),
-        methodIdx = readBits(methodIdxBits).toInt(),
-        addr = readBits(addrBits),
-        seq = readBits(seqBits),
-        nano = readBits(nanoBits),
-        callsiteHash = readBits(hashBits).toUInt(),
-        templateIdx = readBits(templateBits).toInt(),
+        phase = readBits(spec.phaseBits).toInt(),
+        opcode = readBits(spec.opcodeBits).toUInt(),
+        methodIdx = readBits(spec.methodIdxBits).toInt(),
+        addr = readBits(spec.addrBits),
+        seq = readBits(spec.seqBits),
+        nano = readBits(spec.nanoBits),
+        callsiteHash = readBits(spec.hashBits).toUInt(),
+        templateIdx = readBits(spec.templateBits).toInt(),
     )
 }
 
@@ -193,28 +191,28 @@ private fun WireProtoSpec.decode(bytes: ByteArray): FieldSynapse {
 // FNV-1a hash for callsite
 // ---------------------------------------------------------------------------
 
-inline fun fnv1aHash(data: String): UInt {
+fun fnv1aHash(data: String): UInt {
     var hash: UInt = 0x811c9dc5.toUInt()
-    for (c in data.toByteArray()) {
-        hash ^= c.toUInt()
+    for (c in data.encodeToByteArray()) {
+        hash = hash xor c.toUByte().toUInt()
         hash *= 0x01000193.toUInt()
     }
     return hash
 }
 
 // ---------------------------------------------------------------------------
-// FieldSynapse builder (reified inline)
+// FieldSynapse builder
 // ---------------------------------------------------------------------------
 
-inline fun fieldSynapse(
-    crossinline phase: Int,
-    crossinline opcode: UInt,
-    crossinline methodIdx: Int,
-    crossinline addr: Long,
-    crossinline seq: Long,
-    crossinline nano: Long = platformUtils.currentTimeMillis() * 1_000_000,
-    crossinline callsite: String = "",
-    crossinline templateIdx: Int = 0,
+fun fieldSynapse(
+    phase: Int,
+    opcode: UInt,
+    methodIdx: Int,
+    addr: Long,
+    seq: Long,
+    nano: Long = kotlinx.datetime.Clock.System.now().toEpochMilliseconds() * 1_000_000,
+    callsite: String = "",
+    templateIdx: Int = 0,
 ): FieldSynapse = FieldSynapse(
     phase = phase,
     opcode = opcode,

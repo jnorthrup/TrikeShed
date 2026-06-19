@@ -1,8 +1,8 @@
 package borg.trikeshed.server.generated
 
 import borg.trikeshed.context.AsyncContextKey
-import borg.trikeshed.htx.client.HtxKey
-import borg.trikeshed.htx.client.HtxElement
+import borg.trikeshed.htx.HtxElement
+import borg.trikeshed.htx.HtxKey
 import borg.trikeshed.quic.QuicKey
 import borg.trikeshed.quic.QuicElement
 import borg.trikeshed.sctp.SctpKey

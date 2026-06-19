@@ -7,7 +7,18 @@ import kotlin.test.assertNotNull
 class TestStation17RoundTrip {
     @Test
     fun debugStation17() {
-        val yaml = java.nio.file.Files.readString(Path.of("/tmp/station17.yaml"))
+        val path = Path.of("/tmp/station17.yaml")
+        if (!java.nio.file.Files.exists(path)) {
+            val jsonText = java.nio.file.Files.readString(Path.of("src/commonTest/resources/big.json"))
+            val original = borg.trikeshed.parse.json.JsonSupport.parse(jsonText) as Map<*, *>
+            val stations = original["stations"] as List<*>
+            val s17 = stations[17]
+            val helper = YamlBigJsonParityTest()
+            val yamlText = helper.renderYaml(mapOf("stations" to listOf(s17)))
+            java.nio.file.Files.createDirectories(path.parent)
+            java.nio.file.Files.writeString(path, yamlText)
+        }
+        val yaml = java.nio.file.Files.readString(path)
         val reparsed = YamlParser.reify(yaml) as Map<*, *>
         val stations = reparsed["stations"] as List<*>
         println("stations count: ${stations.size}")

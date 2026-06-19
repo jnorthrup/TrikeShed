@@ -102,14 +102,192 @@ fun parse(text: String): Map<String, Any?> {
     return (doc.root.reify() as? Map<String, Any?>) ?: emptyMap()
 }
 
+class DirectYamlParser(val lines: List<String>) {
+    var lineIdx = 0
+
+    data class LineInfo(val lineNum: Int, val indent: Int, val content: String)
+
+    fun peekLine(): LineInfo? {
+        var idx = lineIdx
+        while (idx < lines.size) {
+            val line = lines[idx]
+            val trimmed = line.trim()
+            if (trimmed.isEmpty() || trimmed.startsWith("#")) {
+                idx++
+                continue
+            }
+            val indent = line.length - line.trimStart().length
+            return LineInfo(idx + 1, indent, trimmed)
+        }
+        return null
+    }
+
+    fun parseBlock(indent: Int): YamlNode {
+        val firstLine = peekLine() ?: return YamlScalarNode(null, lines.size j lines.size)
+        if (firstLine.content.startsWith("-")) {
+            return parseSequence(firstLine.indent)
+        }
+        val colonIdx = findColon(firstLine.content)
+        if (colonIdx >= 0) {
+            return parseMapping(firstLine.indent)
+        }
+        return parseScalar(firstLine.indent)
+    }
+
+    fun findColon(str: String): Int {
+        var insideQuote = false
+        var quoteChar = '\u0000'
+        var i = 0
+        while (i < str.length) {
+            val c = str[i]
+            if (insideQuote) {
+                if (c == quoteChar) insideQuote = false
+            } else {
+                if (c == '"' || c == '\'') {
+                    insideQuote = true
+                    quoteChar = c
+                } else if (c == ':') {
+                    if (i + 1 == str.length || str[i + 1].isWhitespace()) {
+                        return i
+                    }
+                }
+            }
+            i++
+        }
+        return -1
+    }
+
+    fun parseMapping(indent: Int): YamlNode {
+        val startLine = lineIdx + 1
+        val entries = mutableListOf<YamlMappingEntry>()
+        var endLine = startLine
+        
+        while (true) {
+            val line = peekLine() ?: break
+            if (line.indent < indent) break
+            if (line.indent > indent) {
+                lineIdx++
+                endLine = line.lineNum
+                continue
+            }
+            val colonIdx = findColon(line.content)
+            if (colonIdx < 0) break
+            
+            lineIdx++
+            endLine = line.lineNum
+            
+            val keyStr = line.content.substring(0, colonIdx).trim()
+            val valStr = line.content.substring(colonIdx + 1).trim()
+            
+            val keySeries = keyStr.toSeries()
+            val valNode: YamlNode
+            
+            if (valStr.isNotEmpty()) {
+                if (valStr.startsWith("[") || valStr.startsWith("{") || valStr.startsWith("\"") || valStr.startsWith("'")) {
+                    val slice = valStr.toSeries()
+                    valNode = if (valStr.startsWith("[")) {
+                        YamlSequenceNode(YamlParser.parseInlineSequence(slice), line.lineNum j line.lineNum)
+                    } else if (valStr.startsWith("{")) {
+                        YamlMappingNode(YamlParser.parseInlineMapping(slice), line.lineNum j line.lineNum)
+                    } else {
+                        YamlScalarNode(slice, line.lineNum j line.lineNum)
+                    }
+                } else {
+                    valNode = YamlScalarNode(valStr.toSeries(), line.lineNum j line.lineNum)
+                }
+            } else {
+                val nextLine = peekLine()
+                if (nextLine != null && nextLine.indent > indent) {
+                    valNode = parseBlock(nextLine.indent)
+                    endLine = valNode.span.b
+                } else {
+                    valNode = YamlScalarNode(null, line.lineNum j line.lineNum)
+                }
+            }
+            entries.add(YamlMappingEntry(keySeries, valNode, line.lineNum j endLine))
+        }
+        return YamlMappingNode(entries.toSeries(), startLine j endLine)
+    }
+
+    fun parseSequence(indent: Int): YamlNode {
+        val startLine = lineIdx + 1
+        val items = mutableListOf<YamlNode>()
+        var endLine = startLine
+        
+        while (true) {
+            val line = peekLine() ?: break
+            if (line.indent < indent) break
+            if (!line.content.startsWith("-")) break
+            
+            lineIdx++
+            endLine = line.lineNum
+            
+            val rest = line.content.substring(1).trim()
+            val valNode: YamlNode
+            
+            if (rest.isNotEmpty()) {
+                val colonIdx = findColon(rest)
+                if (colonIdx >= 0) {
+                    val savedLines = lines.toMutableList()
+                    val savedIdx = lineIdx
+                    savedLines[savedIdx - 1] = " ".repeat(indent + 2) + rest
+                    val parser = DirectYamlParser(savedLines)
+                    parser.lineIdx = savedIdx - 1
+                    valNode = parser.parseBlock(indent + 2)
+                    lineIdx = parser.lineIdx
+                    endLine = valNode.span.b
+                } else if (rest.startsWith("[") || rest.startsWith("{") || rest.startsWith("\"") || rest.startsWith("'")) {
+                    val slice = rest.toSeries()
+                    valNode = if (rest.startsWith("[")) {
+                        YamlSequenceNode(YamlParser.parseInlineSequence(slice), line.lineNum j line.lineNum)
+                    } else if (rest.startsWith("{")) {
+                        YamlMappingNode(YamlParser.parseInlineMapping(slice), line.lineNum j line.lineNum)
+                    } else {
+                        YamlScalarNode(slice, line.lineNum j line.lineNum)
+                    }
+                } else {
+                    valNode = YamlScalarNode(rest.toSeries(), line.lineNum j line.lineNum)
+                }
+            } else {
+                val nextLine = peekLine()
+                if (nextLine != null && nextLine.indent > indent) {
+                    valNode = parseBlock(nextLine.indent)
+                    endLine = valNode.span.b
+                } else {
+                    valNode = YamlScalarNode(null, line.lineNum j line.lineNum)
+                }
+            }
+            items.add(valNode)
+        }
+        return YamlSequenceNode(items.toSeries(), startLine j endLine)
+    }
+
+    fun parseScalar(indent: Int): YamlNode {
+        val startLine = lineIdx + 1
+        val line = peekLine() ?: return YamlScalarNode(null, startLine j startLine)
+        lineIdx++
+        var endLine = line.lineNum
+        val sb = StringBuilder(line.content)
+        while (true) {
+            val nextLine = peekLine() ?: break
+            if (nextLine.indent <= indent) break
+            val colonIdx = findColon(nextLine.content)
+            if (colonIdx >= 0) break
+            lineIdx++
+            endLine = nextLine.lineNum
+            sb.append(" ").append(nextLine.content)
+        }
+        val text = sb.toString().trim()
+        return YamlScalarNode(text.toSeries(), startLine j endLine)
+    }
+}
+
 object YamlParser {
     /** Parse a YAML string into a YamlNode AST, then wrap as YamlDocument */
     fun parse(text: String): YamlDocument {
-        val src = text.toSeries()
-        val bytes = src.encodeToByteArray()
-        val cursor: Cursor = Syntax.YAML.scan(bytes.size j { i -> bytes[i] })
-        val lineStarts = buildLineStarts(src)
-        val root = if (cursor.size > 0) cursorToYamlNode(cursor[0], src, lineStarts) else YamlScalarNode(null, 1 j 1)
+        val lines = text.replace("\r\n", "\n").replace('\r', '\n').lines()
+        val parser = DirectYamlParser(lines)
+        val root = parser.parseBlock(0)
         return YamlDocument(root)
     }
 
@@ -127,87 +305,8 @@ object YamlParser {
         rowVecCallback: (RowVec) -> Unit = {},
     ): Any? = parse(text).root.reify(nodeEvidence, rowVecCallback)
 
-    /** Build an IntArray of character positions at the start of each line (1-indexed: result[0]=0 for line 1). */
-    private fun buildLineStarts(src: Series<Char>): IntArray {
-        val buf = mutableListOf(0)
-        var i = 0
-        while (i < src.size) {
-            if (src[i] == '\n') buf.add(i + 1)
-            i++
-        }
-        return buf.toIntArray()
-    }
-
-    /** 1-based line number for a character offset using a pre-built lineStarts array. */
-    private fun lineOf(lineStarts: IntArray, offset: Int): Int {
-        var lo = 0; var hi = lineStarts.size - 1
-        while (lo < hi) {
-            val mid = (lo + hi + 1) / 2
-            if (lineStarts[mid] <= offset) lo = mid else hi = mid - 1
-        }
-        return lo + 1
-    }
-
-    /** Convert a Cursor RowVec subtree into a YamlNode. */
-    private fun cursorToYamlNode(row: RowVec, src: Series<Char>, lineStarts: IntArray): YamlNode {
-        val open = row[0].a as? Int ?: return YamlScalarNode(null, 1 j 1)
-        val close = row[0].b as? Int ?: return YamlScalarNode(null, 1 j 1)
-        val tag = row[2].a as? IOMemento ?: return YamlScalarNode(null, 1 j 1)
-        val span = lineOf(lineStarts, open) j lineOf(lineStarts, close)
-        val children = row[3].a as? Cursor
-        return when (tag) {
-            IOMemento.IoArray -> {
-                val items = if (children != null && children.size > 0) {
-                    children.size j { i -> cursorToYamlNode(children[i], src, lineStarts) }
-                } else {
-                    parseInlineSequence(src.slice(open, close + 1))
-                }
-                YamlSequenceNode(items, span)
-            }
-            IOMemento.IoObject -> {
-                val entries = if (children != null && children.size > 0) {
-                    buildMappingEntries(children, src, lineStarts)
-                } else {
-                    parseInlineMapping(src.slice(open, close + 1))
-                }
-                YamlMappingNode(entries, span)
-            }
-            IOMemento.IoNothing -> YamlScalarNode(null, span)
-            else -> {
-                val text = src.slice(open, close + 1)
-                YamlScalarNode(text, span)
-            }
-        }
-    }
-
-    /** Build YamlMappingEntry pairs from object children (alternating key/value). */
-    private fun buildMappingEntries(
-        children: Cursor,
-        src: Series<Char>,
-        lineStarts: IntArray,
-    ): Series<YamlMappingEntry> {
-        val n = children.size
-        if (n == 0) return emptyList<YamlMappingEntry>().toSeries()
-        val list = ArrayList<YamlMappingEntry>(n / 2)
-        var i = 0
-        while (i + 1 < n) {
-            val keyRow = children[i]
-            val valRow = children[i + 1]
-            val kOpen = keyRow[0].a as? Int ?: break
-            val kClose = keyRow[0].b as? Int ?: break
-            val keyText = src.slice(kOpen, kClose + 1)
-            val valNode = cursorToYamlNode(valRow, src, lineStarts)
-            val entryStart = lineOf(lineStarts, kOpen)
-            val vClose = valRow[0].b as? Int ?: kClose
-            val entryEnd = lineOf(lineStarts, vClose)
-            list.add(YamlMappingEntry(keyText, valNode, entryStart j entryEnd))
-            i += 2
-        }
-        return list.toSeries()
-    }
-
     /** Parse a YAML inline flow sequence `[a, b, c]` into child YamlNodes. */
-    private fun parseInlineSequence(src: Series<Char>): Series<YamlNode> {
+    internal fun parseInlineSequence(src: Series<Char>): Series<YamlNode> {
         val items = mutableListOf<YamlNode>()
         var start = 1
         val end = src.size - 1
@@ -228,7 +327,7 @@ object YamlParser {
         return items.toSeries()
     }
 
-    private fun parseInlineMapping(src: Series<Char>): Series<YamlMappingEntry> {
+    internal fun parseInlineMapping(src: Series<Char>): Series<YamlMappingEntry> {
         val entries = mutableListOf<YamlMappingEntry>()
         var start = 1
         val end = src.size - 1

@@ -16,10 +16,9 @@ import borg.trikeshed.lib.*
  * No operator overloading on get() to avoid return-type ambiguity.
  * Uses .b(i) for index access on Series/Cursor (no operator get on Join).
  */
-object CursorOps {
-
-    // Helper to create Join with explicit function type (noinline to fix lambda inference)
-    private inline fun <A, B> join(a: A, noinline f: (Int) -> B): Join<A, (Int) -> B> = a j f
+// Helper to create Join with explicit function type (noinline to fix lambda inference)
+@PublishedApi
+internal inline fun <A, B> join(a: A, noinline f: (Int) -> B): Join<A, (Int) -> B> = a j f
 
     // ── Selection ───────────────────────────────────────────────────
 
@@ -73,6 +72,10 @@ object CursorOps {
         return select(*indices)
     }
 
+    /** Column exclusion by name operator. */
+    operator fun Cursor.minus(name: CharSequence): Cursor = without(name)
+
+
     // ── Widening (along columns) ────────────────────────────────────
 
     /** Join two cursors side-by-side — widens along columns. */
@@ -118,4 +121,3 @@ object CursorOps {
 
     /** Column count. */
     val Cursor.width: Int get() = this.b(0).size
-}

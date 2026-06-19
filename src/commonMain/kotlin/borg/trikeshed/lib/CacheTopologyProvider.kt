@@ -33,9 +33,9 @@ interface CacheTopologyProvider : CoroutineContext.Element {
 fun CoroutineContext.reificationContext(): ReificationContext {
     val t = this[CacheTopologyProvider.Key]?.topology
     val cursorTopology = CacheTopology(
-        l1DataBytes = t?.l1DataBytes,
-        l2Bytes = t?.l2Bytes,
-        l3Bytes = t?.l3Bytes,
+        l1DataBytes = t?.l1DataBytes?.toInt(),
+        l2Bytes = t?.l2Bytes?.toInt(),
+        l3Bytes = t?.l3Bytes?.toInt(),
     )
     return ReificationContext.from(cursorTopology)
 }
