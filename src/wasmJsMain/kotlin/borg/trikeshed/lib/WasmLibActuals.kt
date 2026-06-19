@@ -4,7 +4,7 @@ actual fun assert(value: Boolean) {
     if (!value) throw AssertionError("Assertion failed")
 }
 
-internal actual fun assert(value: Boolean, lazyMessage: () -> Any) {
+actual fun assert(value: Boolean, lazyMessage: () -> Any) {
     if (!value) throw AssertionError(lazyMessage().toString())
 }
 

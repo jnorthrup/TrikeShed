@@ -5,6 +5,7 @@ plugins {
     kotlin("multiplatform") version "2.4.0"
     id("com.github.ben-manes.versions") version "0.54.0"
     `maven-publish`
+    kotlin("plugin.serialization") version "2.4.0" apply false
 }
 
 group = "org.bereft"
@@ -67,21 +68,30 @@ kotlin {
         browser()
     }
 
-    macosArm64("macos")
-    macosX64("macosX64")
-    linuxX64("linux") {
-        compilations.getByName("main") {
-            val zlinux_uring by cinterops.creating {
-                defFile(project.file("io_uring_interop/zlinux_uring.def"))
-                compilerOpts("-I${project.rootDir}/liburing/src/include", "-I${project.rootDir}/io_uring_interop")
+    val hostOs = System.getProperty("os.name").lowercase()
+    val isMac = hostOs.contains("mac")
+    val isLinux = hostOs.contains("linux")
+
+    if (isMac) {
+        macosArm64("macos")
+        macosX64("macosX64")
+    }
+
+    if (isLinux) {
+        linuxX64("linux") {
+            compilations.getByName("main") {
+                val zlinux_uring by cinterops.creating {
+                    defFile(project.file("io_uring_interop/zlinux_uring.def"))
+                    compilerOpts("-I${project.rootDir}/liburing/src/include", "-I${project.rootDir}/io_uring_interop")
+                }
             }
         }
-    }
-    linuxArm64("linuxArm64") {
-        compilations.getByName("main") {
-            val zlinux_uring by cinterops.creating {
-                defFile(project.file("io_uring_interop/zlinux_uring.def"))
-                compilerOpts("-I${project.rootDir}/liburing/src/include", "-I${project.rootDir}/io_uring_interop")
+        linuxArm64("linuxArm64") {
+            compilations.getByName("main") {
+                val zlinux_uring by cinterops.creating {
+                    defFile(project.file("io_uring_interop/zlinux_uring.def"))
+                    compilerOpts("-I${project.rootDir}/liburing/src/include", "-I${project.rootDir}/io_uring_interop")
+                }
             }
         }
     }
@@ -135,6 +145,7 @@ kotlin {
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
                 implementation("org.graalvm.polyglot:polyglot:25.0.2")
+                implementation("org.graalvm.polyglot:js-community:25.0.2")
             }
             kotlin.srcDir("src/jmhMain/kotlin")
             resources.srcDir("src/jmhMain/resources")

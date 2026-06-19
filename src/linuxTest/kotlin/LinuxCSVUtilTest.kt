@@ -1,15 +1,15 @@
 package borg.trikeshed.isam
 
 import borg.trikeshed.common.*
-import borg.trikeshed.lib.CharSeries
-import borg.trikeshed.cursor.*
-import borg.trikeshed.isam.meta.IOMemento
-import borg.trikeshed.lib.*
-import borg.trikeshed.common.TypeEvidence
 import borg.trikeshed.common.FileBuffer
 import borg.trikeshed.common.Files
-import borg.trikeshed.common.openFileBuffer
-import borg.trikeshed.common.DelimitRange
+import borg.trikeshed.common.TypeEvidence
+import borg.trikeshed.cursor.Cursor
+import borg.trikeshed.cursor.head
+import borg.trikeshed.cursor.meta
+import borg.trikeshed.cursor.row
+import borg.trikeshed.isam.meta.IOMemento
+import borg.trikeshed.lib.*
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -47,7 +47,7 @@ class LinuxCSVUtilTest {
             val fileDeduce: MutableList<TypeEvidence> = mutableListOf()
             val parseSegments: Cursor = CSVUtil.parseSegments(fileBuf, fileEvidence = fileDeduce)
 
-            parseSegments.head()
+            parseSegments.head
             debug { logDebug { "${Random.nextInt()}" } }
 
             //test row 16 against the contents

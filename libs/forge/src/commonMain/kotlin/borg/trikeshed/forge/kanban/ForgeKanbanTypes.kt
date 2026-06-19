@@ -1,6 +1,7 @@
 package borg.trikeshed.forge.kanban
 
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.Contextual
 import java.time.Instant
 
 /**
@@ -98,7 +99,7 @@ data class DashboardView(
     val viewId: String,
     val title: String,
     val viewType: DashboardViewType,
-    val data: Map<String, Any>,
+    val data: Map<String, @Contextual Any>,
     val thresholds: Map<String, Double> = emptyMap(),
     val metadata: Map<String, String> = emptyMap(),
 )

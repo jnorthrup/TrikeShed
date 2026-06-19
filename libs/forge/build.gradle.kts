@@ -2,7 +2,8 @@ import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.dsl.KotlinVersion
 
 plugins {
-    kotlin("multiplatform") version "2.4.0"
+    kotlin("multiplatform")
+    kotlin("plugin.serialization")
     `maven-publish`
 }
 

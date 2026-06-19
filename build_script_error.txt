@@ -1,0 +1,233 @@
+WARNING: A restricted method in java.lang.System has been called
+WARNING: java.lang.System::load has been called by net.rubygrapefruit.platform.internal.NativeLibraryLoader in an unnamed module (file:/Users/jim/.gradle/wrapper/dists/gradle-9.6.0-rc-1-bin/202yt5fuujq9lg3l5mh3049tk/gradle-9.6.0-rc-1/lib/native-platform-0.22-milestone-29.jar)
+WARNING: Use --enable-native-access=ALL-UNNAMED to avoid a warning for callers in this module
+WARNING: Restricted methods will be blocked in a future release unless native access is enabled
+
+
+> Configure project :
+e: file:///Users/jim/work/TrikeShed/build.gradle.kts:77:82: This API requires opt-in. Use '@OptIn(KotlinNativeCacheApi::class)' on the file or declaration that calls this API.
+e: file:///Users/jim/work/TrikeShed/build.gradle.kts:77:110: Unresolved reference 'values'.
+e: file:///Users/jim/work/TrikeShed/build.gradle.kts:78:21: Unresolved reference 'it'.
+e: file:///Users/jim/work/TrikeShed/build.gradle.kts:79:61: This API requires opt-in. Use '@OptIn(KotlinNativeCacheApi::class)' on the file or declaration that calls this API.
+e: file:///Users/jim/work/TrikeShed/build.gradle.kts:79:89: Unresolved reference 'values'.
+e: file:///Users/jim/work/TrikeShed/build.gradle.kts:80:17: This API requires opt-in. Use '@OptIn(KotlinNativeCacheApi::class)' on the file or declaration that calls this API.
+w: file:///Users/jim/work/TrikeShed/build.gradle.kts:86:9: 'fun macosX64(name: String = ..., configure: KotlinNativeTargetWithHostTests.() -> Unit = ...): KotlinNativeTargetWithHostTests' is deprecated. Target will be removed in a future release. See: https://kotl.in/native-targets-tiers.
+e: file:///Users/jim/work/TrikeShed/build.gradle.kts:88:82: This API requires opt-in. Use '@OptIn(KotlinNativeCacheApi::class)' on the file or declaration that calls this API.
+e: file:///Users/jim/work/TrikeShed/build.gradle.kts:88:110: Unresolved reference 'values'.
+e: file:///Users/jim/work/TrikeShed/build.gradle.kts:89:21: Unresolved reference 'it'.
+e: file:///Users/jim/work/TrikeShed/build.gradle.kts:90:61: This API requires opt-in. Use '@OptIn(KotlinNativeCacheApi::class)' on the file or declaration that calls this API.
+e: file:///Users/jim/work/TrikeShed/build.gradle.kts:90:89: Unresolved reference 'values'.
+e: file:///Users/jim/work/TrikeShed/build.gradle.kts:91:17: This API requires opt-in. Use '@OptIn(KotlinNativeCacheApi::class)' on the file or declaration that calls this API.
+w: file:///Users/jim/work/TrikeShed/build.gradle.kts:102:47: 'fun provideDelegate(thisRef: Any?, property: KProperty<*>): ExistingDomainObjectDelegate<DefaultCInteropSettings>' is deprecated. Use 'val element = create(name)' instead. See the Gradle 9.6 upgrading guide.
+w: file:///Users/jim/work/TrikeShed/build.gradle.kts:102:47: 'fun <T : Any> NamedDomainObjectContainer<T>.creating(configuration: T.() -> Unit): NamedDomainObjectContainerCreatingDelegateProvider<T>' is deprecated. Use 'val element = create(name) { }' instead. See the Gradle 9.6 upgrading guide.
+w: file:///Users/jim/work/TrikeShed/build.gradle.kts:102:47: 'fun <T> ExistingDomainObjectDelegate<out T>.getValue(receiver: Any?, property: KProperty<*>): T' is deprecated. Use the named() API instead. See the Gradle 9.6 upgrading guide.
+w: file:///Users/jim/work/TrikeShed/build.gradle.kts:110:47: 'fun provideDelegate(thisRef: Any?, property: KProperty<*>): ExistingDomainObjectDelegate<DefaultCInteropSettings>' is deprecated. Use 'val element = create(name)' instead. See the Gradle 9.6 upgrading guide.
+w: file:///Users/jim/work/TrikeShed/build.gradle.kts:110:47: 'fun <T : Any> NamedDomainObjectContainer<T>.creating(configuration: T.() -> Unit): NamedDomainObjectContainerCreatingDelegateProvider<T>' is deprecated. Use 'val element = create(name) { }' instead. See the Gradle 9.6 upgrading guide.
+w: file:///Users/jim/work/TrikeShed/build.gradle.kts:110:47: 'fun <T> ExistingDomainObjectDelegate<out T>.getValue(receiver: Any?, property: KProperty<*>): T' is deprecated. Use the named() API instead. See the Gradle 9.6 upgrading guide.
+w: file:///Users/jim/work/TrikeShed/build.gradle.kts:119:27: 'fun provideDelegate(thisRef: Any?, property: KProperty<*>): ExistingDomainObjectDelegate<KotlinSourceSet>' is deprecated. Use 'val element = getByName(name)' instead. See the Gradle 9.6 upgrading guide.
+w: file:///Users/jim/work/TrikeShed/build.gradle.kts:119:27: 'fun <T : Any, U : NamedDomainObjectCollection<T>> U.getting(configuration: T.() -> Unit): NamedDomainObjectCollectionDelegateProvider<T>' is deprecated. Use 'val element = getByName(name) { }' instead. See the Gradle 9.6 upgrading guide.
+w: file:///Users/jim/work/TrikeShed/build.gradle.kts:119:27: 'fun <T> ExistingDomainObjectDelegate<out T>.getValue(receiver: Any?, property: KProperty<*>): T' is deprecated. Use the named() API instead. See the Gradle 9.6 upgrading guide.
+w: file:///Users/jim/work/TrikeShed/build.gradle.kts:125:27: 'fun provideDelegate(thisRef: Any?, property: KProperty<*>): ExistingDomainObjectDelegate<KotlinSourceSet>' is deprecated. Use 'val element = getByName(name)' instead. See the Gradle 9.6 upgrading guide.
+w: file:///Users/jim/work/TrikeShed/build.gradle.kts:125:27: 'fun <T : Any, U : NamedDomainObjectCollection<T>> U.getting(configuration: T.() -> Unit): NamedDomainObjectCollectionDelegateProvider<T>' is deprecated. Use 'val element = getByName(name) { }' instead. See the Gradle 9.6 upgrading guide.
+w: file:///Users/jim/work/TrikeShed/build.gradle.kts:125:27: 'fun <T> ExistingDomainObjectDelegate<out T>.getValue(receiver: Any?, property: KProperty<*>): T' is deprecated. Use the named() API instead. See the Gradle 9.6 upgrading guide.
+w: file:///Users/jim/work/TrikeShed/build.gradle.kts:140:27: 'fun provideDelegate(thisRef: Any?, property: KProperty<*>): ExistingDomainObjectDelegate<KotlinSourceSet>' is deprecated. Use 'val element = create(name)' instead. See the Gradle 9.6 upgrading guide.
+w: file:///Users/jim/work/TrikeShed/build.gradle.kts:140:27: 'fun <T : Any> NamedDomainObjectContainer<T>.creating(configuration: T.() -> Unit): NamedDomainObjectContainerCreatingDelegateProvider<T>' is deprecated. Use 'val element = create(name) { }' instead. See the Gradle 9.6 upgrading guide.
+w: file:///Users/jim/work/TrikeShed/build.gradle.kts:140:27: 'fun <T> ExistingDomainObjectDelegate<out T>.getValue(receiver: Any?, property: KProperty<*>): T' is deprecated. Use the named() API instead. See the Gradle 9.6 upgrading guide.
+w: file:///Users/jim/work/TrikeShed/build.gradle.kts:141:27: 'fun provideDelegate(thisRef: Any?, property: KProperty<*>): ExistingDomainObjectDelegate<KotlinSourceSet>' is deprecated. Use 'val element = create(name)' instead. See the Gradle 9.6 upgrading guide.
+w: file:///Users/jim/work/TrikeShed/build.gradle.kts:141:27: 'fun <T : Any> NamedDomainObjectContainer<T>.creating(configuration: T.() -> Unit): NamedDomainObjectContainerCreatingDelegateProvider<T>' is deprecated. Use 'val element = create(name) { }' instead. See the Gradle 9.6 upgrading guide.
+w: file:///Users/jim/work/TrikeShed/build.gradle.kts:141:27: 'fun <T> ExistingDomainObjectDelegate<out T>.getValue(receiver: Any?, property: KProperty<*>): T' is deprecated. Use the named() API instead. See the Gradle 9.6 upgrading guide.
+w: file:///Users/jim/work/TrikeShed/build.gradle.kts:142:26: 'fun provideDelegate(thisRef: Any?, property: KProperty<*>): ExistingDomainObjectDelegate<KotlinSourceSet>' is deprecated. Use 'val element = create(name)' instead. See the Gradle 9.6 upgrading guide.
+w: file:///Users/jim/work/TrikeShed/build.gradle.kts:142:26: 'fun <T : Any> NamedDomainObjectContainer<T>.creating(configuration: T.() -> Unit): NamedDomainObjectContainerCreatingDelegateProvider<T>' is deprecated. Use 'val element = create(name) { }' instead. See the Gradle 9.6 upgrading guide.
+w: file:///Users/jim/work/TrikeShed/build.gradle.kts:142:26: 'fun <T> ExistingDomainObjectDelegate<out T>.getValue(receiver: Any?, property: KProperty<*>): T' is deprecated. Use the named() API instead. See the Gradle 9.6 upgrading guide.
+w: file:///Users/jim/work/TrikeShed/build.gradle.kts:143:26: 'fun provideDelegate(thisRef: Any?, property: KProperty<*>): ExistingDomainObjectDelegate<KotlinSourceSet>' is deprecated. Use 'val element = create(name)' instead. See the Gradle 9.6 upgrading guide.
+w: file:///Users/jim/work/TrikeShed/build.gradle.kts:143:26: 'fun <T : Any> NamedDomainObjectContainer<T>.creating(configuration: T.() -> Unit): NamedDomainObjectContainerCreatingDelegateProvider<T>' is deprecated. Use 'val element = create(name) { }' instead. See the Gradle 9.6 upgrading guide.
+w: file:///Users/jim/work/TrikeShed/build.gradle.kts:143:26: 'fun <T> ExistingDomainObjectDelegate<out T>.getValue(receiver: Any?, property: KProperty<*>): T' is deprecated. Use the named() API instead. See the Gradle 9.6 upgrading guide.
+w: file:///Users/jim/work/TrikeShed/build.gradle.kts:155:27: 'fun provideDelegate(thisRef: Any?, property: KProperty<*>): ExistingDomainObjectDelegate<KotlinSourceSet>' is deprecated. Use 'val element = getByName(name)' instead. See the Gradle 9.6 upgrading guide.
+w: file:///Users/jim/work/TrikeShed/build.gradle.kts:155:27: 'fun <T : Any, U : NamedDomainObjectCollection<T>> U.getting(configuration: T.() -> Unit): NamedDomainObjectCollectionDelegateProvider<T>' is deprecated. Use 'val element = getByName(name) { }' instead. See the Gradle 9.6 upgrading guide.
+w: file:///Users/jim/work/TrikeShed/build.gradle.kts:155:27: 'fun <T> ExistingDomainObjectDelegate<out T>.getValue(receiver: Any?, property: KProperty<*>): T' is deprecated. Use the named() API instead. See the Gradle 9.6 upgrading guide.
+w: file:///Users/jim/work/TrikeShed/build.gradle.kts:156:27: 'fun provideDelegate(thisRef: Any?, property: KProperty<*>): ExistingDomainObjectDelegate<KotlinSourceSet>' is deprecated. Use 'val element = getByName(name)' instead. See the Gradle 9.6 upgrading guide.
+w: file:///Users/jim/work/TrikeShed/build.gradle.kts:156:27: 'fun <T : Any, U : NamedDomainObjectCollection<T>> U.getting(configuration: T.() -> Unit): NamedDomainObjectCollectionDelegateProvider<T>' is deprecated. Use 'val element = getByName(name) { }' instead. See the Gradle 9.6 upgrading guide.
+w: file:///Users/jim/work/TrikeShed/build.gradle.kts:156:27: 'fun <T> ExistingDomainObjectDelegate<out T>.getValue(receiver: Any?, property: KProperty<*>): T' is deprecated. Use the named() API instead. See the Gradle 9.6 upgrading guide.
+w: file:///Users/jim/work/TrikeShed/build.gradle.kts:158:24: 'fun provideDelegate(thisRef: Any?, property: KProperty<*>): ExistingDomainObjectDelegate<KotlinSourceSet>' is deprecated. Use 'val element = getByName(name)' instead. See the Gradle 9.6 upgrading guide.
+w: file:///Users/jim/work/TrikeShed/build.gradle.kts:158:24: 'fun <T : Any, U : NamedDomainObjectCollection<T>> U.getting(configuration: T.() -> Unit): NamedDomainObjectCollectionDelegateProvider<T>' is deprecated. Use 'val element = getByName(name) { }' instead. See the Gradle 9.6 upgrading guide.
+w: file:///Users/jim/work/TrikeShed/build.gradle.kts:158:24: 'fun <T> ExistingDomainObjectDelegate<out T>.getValue(receiver: Any?, property: KProperty<*>): T' is deprecated. Use the named() API instead. See the Gradle 9.6 upgrading guide.
+w: file:///Users/jim/work/TrikeShed/build.gradle.kts:171:24: 'fun provideDelegate(thisRef: Any?, property: KProperty<*>): ExistingDomainObjectDelegate<KotlinSourceSet>' is deprecated. Use 'val element = getByName(name)' instead. See the Gradle 9.6 upgrading guide.
+w: file:///Users/jim/work/TrikeShed/build.gradle.kts:171:24: 'fun <T : Any, U : NamedDomainObjectCollection<T>> U.getting(configuration: T.() -> Unit): NamedDomainObjectCollectionDelegateProvider<T>' is deprecated. Use 'val element = getByName(name) { }' instead. See the Gradle 9.6 upgrading guide.
+w: file:///Users/jim/work/TrikeShed/build.gradle.kts:171:24: 'fun <T> ExistingDomainObjectDelegate<out T>.getValue(receiver: Any?, property: KProperty<*>): T' is deprecated. Use the named() API instead. See the Gradle 9.6 upgrading guide.
+w: file:///Users/jim/work/TrikeShed/build.gradle.kts:178:23: 'fun provideDelegate(thisRef: Any?, property: KProperty<*>): ExistingDomainObjectDelegate<KotlinSourceSet>' is deprecated. Use 'val element = getByName(name)' instead. See the Gradle 9.6 upgrading guide.
+w: file:///Users/jim/work/TrikeShed/build.gradle.kts:178:23: 'fun <T : Any, U : NamedDomainObjectCollection<T>> U.getting(configuration: T.() -> Unit): NamedDomainObjectCollectionDelegateProvider<T>' is deprecated. Use 'val element = getByName(name) { }' instead. See the Gradle 9.6 upgrading guide.
+w: file:///Users/jim/work/TrikeShed/build.gradle.kts:178:23: 'fun <T> ExistingDomainObjectDelegate<out T>.getValue(receiver: Any?, property: KProperty<*>): T' is deprecated. Use the named() API instead. See the Gradle 9.6 upgrading guide.
+
+FAILURE: Build failed with an exception.
+
+* Where:
+Build file '/Users/jim/work/TrikeShed/build.gradle.kts' line: 77
+
+* What went wrong:
+Script compilation errors:
+
+  Line 077:                 val disableCacheVersion = org.jetbrains.kotlin.gradle.plugin.mpp.DisableCacheInKotlinVersion.values().firstOrNull {
+                                                                                             ^ This API requires opt-in. Use '@OptIn(KotlinNativeCacheApi::class)' on the file or declaration that calls this API.
+
+  Line 077:                 val disableCacheVersion = org.jetbrains.kotlin.gradle.plugin.mpp.DisableCacheInKotlinVersion.values().firstOrNull {
+                                                                                                                         ^ Unresolved reference 'values'.
+
+  Line 078:                     it.name.contains("2_4")
+                                ^ Unresolved reference 'it'.
+
+  Line 079:                 } ?: org.jetbrains.kotlin.gradle.plugin.mpp.DisableCacheInKotlinVersion.values().last()
+                                                                        ^ This API requires opt-in. Use '@OptIn(KotlinNativeCacheApi::class)' on the file or declaration that calls this API.
+
+  Line 079:                 } ?: org.jetbrains.kotlin.gradle.plugin.mpp.DisableCacheInKotlinVersion.values().last()
+                                                                                                    ^ Unresolved reference 'values'.
+
+  Line 080:                 disableNativeCache(
+                            ^ This API requires opt-in. Use '@OptIn(KotlinNativeCacheApi::class)' on the file or declaration that calls this API.
+
+  Line 086:         macosX64("macosX64") {
+                    ^ 'fun macosX64(name: String = ..., configure: KotlinNativeTargetWithHostTests.() -> Unit = ...): KotlinNativeTargetWithHostTests' is deprecated. Target will be removed in a future release. See: https://kotl.in/native-targets-tiers.
+
+  Line 088:                 val disableCacheVersion = org.jetbrains.kotlin.gradle.plugin.mpp.DisableCacheInKotlinVersion.values().firstOrNull {
+                                                                                             ^ This API requires opt-in. Use '@OptIn(KotlinNativeCacheApi::class)' on the file or declaration that calls this API.
+
+  Line 088:                 val disableCacheVersion = org.jetbrains.kotlin.gradle.plugin.mpp.DisableCacheInKotlinVersion.values().firstOrNull {
+                                                                                                                         ^ Unresolved reference 'values'.
+
+  Line 089:                     it.name.contains("2_4")
+                                ^ Unresolved reference 'it'.
+
+  Line 090:                 } ?: org.jetbrains.kotlin.gradle.plugin.mpp.DisableCacheInKotlinVersion.values().last()
+                                                                        ^ This API requires opt-in. Use '@OptIn(KotlinNativeCacheApi::class)' on the file or declaration that calls this API.
+
+  Line 090:                 } ?: org.jetbrains.kotlin.gradle.plugin.mpp.DisableCacheInKotlinVersion.values().last()
+                                                                                                    ^ Unresolved reference 'values'.
+
+  Line 091:                 disableNativeCache(
+                            ^ This API requires opt-in. Use '@OptIn(KotlinNativeCacheApi::class)' on the file or declaration that calls this API.
+
+  Line 102:                 val zlinux_uring by cinterops.creating {
+                                                          ^ 'fun provideDelegate(thisRef: Any?, property: KProperty<*>): ExistingDomainObjectDelegate<DefaultCInteropSettings>' is deprecated. Use 'val element = create(name)' instead. See the Gradle 9.6 upgrading guide.
+
+  Line 102:                 val zlinux_uring by cinterops.creating {
+                                                          ^ 'fun <T : Any> NamedDomainObjectContainer<T>.creating(configuration: T.() -> Unit): NamedDomainObjectContainerCreatingDelegateProvider<T>' is deprecated. Use 'val element = create(name) { }' instead. See the Gradle 9.6 upgrading guide.
+
+  Line 102:                 val zlinux_uring by cinterops.creating {
+                                                          ^ 'fun <T> ExistingDomainObjectDelegate<out T>.getValue(receiver: Any?, property: KProperty<*>): T' is deprecated. Use the named() API instead. See the Gradle 9.6 upgrading guide.
+
+  Line 110:                 val zlinux_uring by cinterops.creating {
+                                                          ^ 'fun provideDelegate(thisRef: Any?, property: KProperty<*>): ExistingDomainObjectDelegate<DefaultCInteropSettings>' is deprecated. Use 'val element = create(name)' instead. See the Gradle 9.6 upgrading guide.
+
+  Line 110:                 val zlinux_uring by cinterops.creating {
+                                                          ^ 'fun <T : Any> NamedDomainObjectContainer<T>.creating(configuration: T.() -> Unit): NamedDomainObjectContainerCreatingDelegateProvider<T>' is deprecated. Use 'val element = create(name) { }' instead. See the Gradle 9.6 upgrading guide.
+
+  Line 110:                 val zlinux_uring by cinterops.creating {
+                                                          ^ 'fun <T> ExistingDomainObjectDelegate<out T>.getValue(receiver: Any?, property: KProperty<*>): T' is deprecated. Use the named() API instead. See the Gradle 9.6 upgrading guide.
+
+  Line 119:         val commonMain by getting {
+                                      ^ 'fun provideDelegate(thisRef: Any?, property: KProperty<*>): ExistingDomainObjectDelegate<KotlinSourceSet>' is deprecated. Use 'val element = getByName(name)' instead. See the Gradle 9.6 upgrading guide.
+
+  Line 119:         val commonMain by getting {
+                                      ^ 'fun <T : Any, U : NamedDomainObjectCollection<T>> U.getting(configuration: T.() -> Unit): NamedDomainObjectCollectionDelegateProvider<T>' is deprecated. Use 'val element = getByName(name) { }' instead. See the Gradle 9.6 upgrading guide.
+
+  Line 119:         val commonMain by getting {
+                                      ^ 'fun <T> ExistingDomainObjectDelegate<out T>.getValue(receiver: Any?, property: KProperty<*>): T' is deprecated. Use the named() API instead. See the Gradle 9.6 upgrading guide.
+
+  Line 125:         val commonTest by getting {
+                                      ^ 'fun provideDelegate(thisRef: Any?, property: KProperty<*>): ExistingDomainObjectDelegate<KotlinSourceSet>' is deprecated. Use 'val element = getByName(name)' instead. See the Gradle 9.6 upgrading guide.
+
+  Line 125:         val commonTest by getting {
+                                      ^ 'fun <T : Any, U : NamedDomainObjectCollection<T>> U.getting(configuration: T.() -> Unit): NamedDomainObjectCollectionDelegateProvider<T>' is deprecated. Use 'val element = getByName(name) { }' instead. See the Gradle 9.6 upgrading guide.
+
+  Line 125:         val commonTest by getting {
+                                      ^ 'fun <T> ExistingDomainObjectDelegate<out T>.getValue(receiver: Any?, property: KProperty<*>): T' is deprecated. Use the named() API instead. See the Gradle 9.6 upgrading guide.
+
+  Line 140:         val nativeMain by creating { dependsOn(commonMain) }
+                                      ^ 'fun provideDelegate(thisRef: Any?, property: KProperty<*>): ExistingDomainObjectDelegate<KotlinSourceSet>' is deprecated. Use 'val element = create(name)' instead. See the Gradle 9.6 upgrading guide.
+
+  Line 140:         val nativeMain by creating { dependsOn(commonMain) }
+                                      ^ 'fun <T : Any> NamedDomainObjectContainer<T>.creating(configuration: T.() -> Unit): NamedDomainObjectContainerCreatingDelegateProvider<T>' is deprecated. Use 'val element = create(name) { }' instead. See the Gradle 9.6 upgrading guide.
+
+  Line 140:         val nativeMain by creating { dependsOn(commonMain) }
+                                      ^ 'fun <T> ExistingDomainObjectDelegate<out T>.getValue(receiver: Any?, property: KProperty<*>): T' is deprecated. Use the named() API instead. See the Gradle 9.6 upgrading guide.
+
+  Line 141:         val nativeTest by creating { dependsOn(commonTest) }
+                                      ^ 'fun provideDelegate(thisRef: Any?, property: KProperty<*>): ExistingDomainObjectDelegate<KotlinSourceSet>' is deprecated. Use 'val element = create(name)' instead. See the Gradle 9.6 upgrading guide.
+
+  Line 141:         val nativeTest by creating { dependsOn(commonTest) }
+                                      ^ 'fun <T : Any> NamedDomainObjectContainer<T>.creating(configuration: T.() -> Unit): NamedDomainObjectContainerCreatingDelegateProvider<T>' is deprecated. Use 'val element = create(name) { }' instead. See the Gradle 9.6 upgrading guide.
+
+  Line 141:         val nativeTest by creating { dependsOn(commonTest) }
+                                      ^ 'fun <T> ExistingDomainObjectDelegate<out T>.getValue(receiver: Any?, property: KProperty<*>): T' is deprecated. Use the named() API instead. See the Gradle 9.6 upgrading guide.
+
+  Line 142:         val posixMain by creating { dependsOn(nativeMain) }
+                                     ^ 'fun provideDelegate(thisRef: Any?, property: KProperty<*>): ExistingDomainObjectDelegate<KotlinSourceSet>' is deprecated. Use 'val element = create(name)' instead. See the Gradle 9.6 upgrading guide.
+
+  Line 142:         val posixMain by creating { dependsOn(nativeMain) }
+                                     ^ 'fun <T : Any> NamedDomainObjectContainer<T>.creating(configuration: T.() -> Unit): NamedDomainObjectContainerCreatingDelegateProvider<T>' is deprecated. Use 'val element = create(name) { }' instead. See the Gradle 9.6 upgrading guide.
+
+  Line 142:         val posixMain by creating { dependsOn(nativeMain) }
+                                     ^ 'fun <T> ExistingDomainObjectDelegate<out T>.getValue(receiver: Any?, property: KProperty<*>): T' is deprecated. Use the named() API instead. See the Gradle 9.6 upgrading guide.
+
+  Line 143:         val posixTest by creating { dependsOn(nativeTest) }
+                                     ^ 'fun provideDelegate(thisRef: Any?, property: KProperty<*>): ExistingDomainObjectDelegate<KotlinSourceSet>' is deprecated. Use 'val element = create(name)' instead. See the Gradle 9.6 upgrading guide.
+
+  Line 143:         val posixTest by creating { dependsOn(nativeTest) }
+                                     ^ 'fun <T : Any> NamedDomainObjectContainer<T>.creating(configuration: T.() -> Unit): NamedDomainObjectContainerCreatingDelegateProvider<T>' is deprecated. Use 'val element = create(name) { }' instead. See the Gradle 9.6 upgrading guide.
+
+  Line 143:         val posixTest by creating { dependsOn(nativeTest) }
+                                     ^ 'fun <T> ExistingDomainObjectDelegate<out T>.getValue(receiver: Any?, property: KProperty<*>): T' is deprecated. Use the named() API instead. See the Gradle 9.6 upgrading guide.
+
+  Line 155:         val wasmJsMain by getting { dependsOn(commonMain) }
+                                      ^ 'fun provideDelegate(thisRef: Any?, property: KProperty<*>): ExistingDomainObjectDelegate<KotlinSourceSet>' is deprecated. Use 'val element = getByName(name)' instead. See the Gradle 9.6 upgrading guide.
+
+  Line 155:         val wasmJsMain by getting { dependsOn(commonMain) }
+                                      ^ 'fun <T : Any, U : NamedDomainObjectCollection<T>> U.getting(configuration: T.() -> Unit): NamedDomainObjectCollectionDelegateProvider<T>' is deprecated. Use 'val element = getByName(name) { }' instead. See the Gradle 9.6 upgrading guide.
+
+  Line 155:         val wasmJsMain by getting { dependsOn(commonMain) }
+                                      ^ 'fun <T> ExistingDomainObjectDelegate<out T>.getValue(receiver: Any?, property: KProperty<*>): T' is deprecated. Use the named() API instead. See the Gradle 9.6 upgrading guide.
+
+  Line 156:         val wasmJsTest by getting { dependsOn(commonTest) }
+                                      ^ 'fun provideDelegate(thisRef: Any?, property: KProperty<*>): ExistingDomainObjectDelegate<KotlinSourceSet>' is deprecated. Use 'val element = getByName(name)' instead. See the Gradle 9.6 upgrading guide.
+
+  Line 156:         val wasmJsTest by getting { dependsOn(commonTest) }
+                                      ^ 'fun <T : Any, U : NamedDomainObjectCollection<T>> U.getting(configuration: T.() -> Unit): NamedDomainObjectCollectionDelegateProvider<T>' is deprecated. Use 'val element = getByName(name) { }' instead. See the Gradle 9.6 upgrading guide.
+
+  Line 156:         val wasmJsTest by getting { dependsOn(commonTest) }
+                                      ^ 'fun <T> ExistingDomainObjectDelegate<out T>.getValue(receiver: Any?, property: KProperty<*>): T' is deprecated. Use the named() API instead. See the Gradle 9.6 upgrading guide.
+
+  Line 158:         val jvmMain by getting {
+                                   ^ 'fun provideDelegate(thisRef: Any?, property: KProperty<*>): ExistingDomainObjectDelegate<KotlinSourceSet>' is deprecated. Use 'val element = getByName(name)' instead. See the Gradle 9.6 upgrading guide.
+
+  Line 158:         val jvmMain by getting {
+                                   ^ 'fun <T : Any, U : NamedDomainObjectCollection<T>> U.getting(configuration: T.() -> Unit): NamedDomainObjectCollectionDelegateProvider<T>' is deprecated. Use 'val element = getByName(name) { }' instead. See the Gradle 9.6 upgrading guide.
+
+  Line 158:         val jvmMain by getting {
+                                   ^ 'fun <T> ExistingDomainObjectDelegate<out T>.getValue(receiver: Any?, property: KProperty<*>): T' is deprecated. Use the named() API instead. See the Gradle 9.6 upgrading guide.
+
+  Line 171:         val jvmTest by getting {
+                                   ^ 'fun provideDelegate(thisRef: Any?, property: KProperty<*>): ExistingDomainObjectDelegate<KotlinSourceSet>' is deprecated. Use 'val element = getByName(name)' instead. See the Gradle 9.6 upgrading guide.
+
+  Line 171:         val jvmTest by getting {
+                                   ^ 'fun <T : Any, U : NamedDomainObjectCollection<T>> U.getting(configuration: T.() -> Unit): NamedDomainObjectCollectionDelegateProvider<T>' is deprecated. Use 'val element = getByName(name) { }' instead. See the Gradle 9.6 upgrading guide.
+
+  Line 171:         val jvmTest by getting {
+                                   ^ 'fun <T> ExistingDomainObjectDelegate<out T>.getValue(receiver: Any?, property: KProperty<*>): T' is deprecated. Use the named() API instead. See the Gradle 9.6 upgrading guide.
+
+  Line 178:         val jsTest by getting {
+                                  ^ 'fun provideDelegate(thisRef: Any?, property: KProperty<*>): ExistingDomainObjectDelegate<KotlinSourceSet>' is deprecated. Use 'val element = getByName(name)' instead. See the Gradle 9.6 upgrading guide.
+
+  Line 178:         val jsTest by getting {
+                                  ^ 'fun <T : Any, U : NamedDomainObjectCollection<T>> U.getting(configuration: T.() -> Unit): NamedDomainObjectCollectionDelegateProvider<T>' is deprecated. Use 'val element = getByName(name) { }' instead. See the Gradle 9.6 upgrading guide.
+
+  Line 178:         val jsTest by getting {
+                                  ^ 'fun <T> ExistingDomainObjectDelegate<out T>.getValue(receiver: Any?, property: KProperty<*>): T' is deprecated. Use the named() API instead. See the Gradle 9.6 upgrading guide.
+
+52 errors
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights from a Build Scan (powered by Develocity).
+> Get more help at https://help.gradle.org.
+
+BUILD FAILED in 795ms

@@ -203,9 +203,11 @@ switch (project.path) {
     case ":libs:tiny-btrfs":
     case ":libs:ngsctp":
     case ":libs:quic":
-    case ":libs:ipfs":
     case ":libs:tls":
         kmpHost()
+        break
+    case ":libs:ipfs":
+        kmpJvm(rootMode: "api", coroutinesMain: true)
         break
     case ":libs:uring":
         kmpJvm()
