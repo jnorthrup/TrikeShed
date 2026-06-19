@@ -47,7 +47,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.singleWindowApplication
 import borg.trikeshed.forge.kanban.v2.CoordinatorConfig
-import borg.trikeshed.forge.kanban.v2.GepaConfig
 import borg.trikeshed.forge.kanban.v2.KanbanElements
 import borg.trikeshed.forge.kanban.v2.installKanban
 import kotlinx.coroutines.CoroutineScope
@@ -66,13 +65,11 @@ fun ForgeApp() {
         try {
             val elements = installKanban(
                 config = CoordinatorConfig(maxInProgress = 5, maxSpawn = 3),
-                gepaConfig = GepaConfig(maxMetricCalls = 20, intervalSeconds = 30),
                 maxHistoryPerKey = 500
             )
             kanbanElements = elements
-            // Start coordinator and GEPA loops
+            // Start coordinator loop
             kanbanScope.launch { elements.coordinator.startLoop(kanbanScope) }
-            kanbanScope.launch { elements.gepa.startLoop(kanbanScope, intervalSeconds = 60) }
         } catch (e: Exception) {
             initError = e.message
         }
@@ -80,8 +77,6 @@ fun ForgeApp() {
 
     // Collect reactive state
     val coordinatorState by (kanbanElements?.coordinator?.flowState
-        ?.collectAsState(initial = null) ?: remember { mutableStateOf(null) })
-    val gepaState by (kanbanElements?.gepa?.flowState
         ?.collectAsState(initial = null) ?: remember { mutableStateOf(null) })
     var keyPoolStats by remember { mutableStateOf<String>("") }
 
@@ -151,9 +146,6 @@ fun ForgeApp() {
                 // Coordinator State
                 CoordinatorStateCard(state = coordinatorState)
 
-                // GEPA Optimizer State
-                GepaStateCard(state = gepaState)
-
                 // Controls
                 ControlsCard(
                     maxInProgress = maxInProgress,
@@ -166,22 +158,7 @@ fun ForgeApp() {
                         )
                     },
                     onRunTick = { elements.coordinator.tick() },
-                    onRunGepaCycle = { elements.gepa.runCycle() },
                 )
-
-                if (showConfig) {
-                    ConfigDialog(
-                        maxInProgress = maxInProgress,
-                        maxSpawn = maxSpawn,
-                        onApply = {
-                            elements.coordinator.updateConfig(
-                                CoordinatorConfig(maxInProgress = maxInProgress, maxSpawn = maxSpawn)
-                            )
-                            showConfig = false
-                        },
-                        onCancel = { showConfig = false }
-                    )
-                }
             }
         }
     }
@@ -261,44 +238,6 @@ fun CoordinatorStateCard(state: borg.trikeshed.forge.kanban.v2.CoordinatorState?
 }
 
 @Composable
-fun GepaStateCard(state: borg.trikeshed.forge.kanban.v2.GepaState?) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = Color(0xFF16213E),
-            contentColor = Color.White
-        )
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text(text = "GEPA Optimizer", fontSize = 18.sp, fontWeight = FontWeight.Bold)
-            androidx.compose.foundation.layout.Spacer(modifier = Modifier.padding(0.dp, 8.dp, 0.dp, 0.dp))
-            if (state != null) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    MetricBox("Status", if (state.running) "RUNNING" else "IDLE", if (state.running) Colors.Green else Colors.Gray)
-                    MetricBox("Cycles", state.cycleCount.toString(), Colors.Blue)
-                    MetricBox("Last Result", state.lastResult?.let { "Score: ${it.bestCandidate.take(40)}..." } ?: "None", Colors.Purple)
-                }
-                if (state.lastResult != null) {
-                    androidx.compose.foundation.layout.Spacer(modifier = Modifier.padding(0.dp, 8.dp, 0.dp, 0.dp))
-                    Text(
-                        text = "Best: ${state.lastResult?.bestCandidate}",
-                        fontSize = 12.sp,
-                        color = Color(0xFF8888AA),
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-            } else {
-                Text(text = "Ready", color = Color(0xFF666688))
-            }
-        }
-    }
-}
-
-@Composable
 fun RowScope.MetricBox(label: String, value: String, color: Color) {
     Column(
         modifier = Modifier
@@ -329,7 +268,6 @@ fun ControlsCard(
     onMaxSpawnChange: (Int) -> Unit,
     onApply: () -> Unit,
     onRunTick: () -> Unit,
-    onRunGepaCycle: () -> Unit,
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -384,15 +322,6 @@ fun ControlsCard(
                     )
                 ) {
                     Text(text = "Run Dispatch Tick", fontWeight = FontWeight.Bold)
-                }
-                Button(
-                    onClick = onRunGepaCycle,
-                    modifier = Modifier.weight(1f),
-                    colors = androidx.compose.material3.ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFFBB86FC)
-                    )
-                ) {
-                    Text(text = "Run GEPA Cycle", fontWeight = FontWeight.Bold)
                 }
                 Button(
                     onClick = onApply,

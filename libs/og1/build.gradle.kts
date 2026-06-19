@@ -7,7 +7,7 @@ group = "borg.trikeshed"
 version = "0.1.0-SNAPSHOT"
 
 kotlin {
-    jvmToolchain(21)
+    jvmToolchain(25)
     jvm()
     js { nodejs() }
     wasmJs { nodejs() }

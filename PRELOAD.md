@@ -50,6 +50,11 @@ typealias HashBody<T> = Join<Version, Series<Bucket<T>>>
 2. Use Series for sequences and collections
 3. Implement immutable cores with mutable wrappers when needed
 4. Utilize lazy evaluation through lambda expressions in Join and Series
+5. Do not introduce List-backed storage in core algebra when a Series surface can carry the same shape
+6. Keep pointcutting and Rete fabric at the integration boundary where production behavior exists; do not inject them into foundation galleries or signal surfaces gratuitously
+7. Native target support may be host-only; disable unsupported x86 and linux-aarch fallbacks unless the user explicitly needs that target
+8. JVM-bearing modules target toolchain 25 for the SDKMAN GraalCE baseline
+9. TODO-only future contracts should still end in explicit CCEK choreography surfaces for command-line and generated API entry points: data -> LCNC cursor facets -> user-signalling events
 
 ## Refactoring Guidelines
 

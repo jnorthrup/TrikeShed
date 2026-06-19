@@ -74,19 +74,10 @@ kotlin {
 
     if (isMac) {
         macosArm64("macos")
-        macosX64("macosX64")
     }
 
     if (isLinux) {
         linuxX64("linux") {
-            compilations.getByName("main") {
-                val zlinux_uring by cinterops.creating {
-                    defFile(project.file("io_uring_interop/zlinux_uring.def"))
-                    compilerOpts("-I${project.rootDir}/liburing/src/include", "-I${project.rootDir}/io_uring_interop")
-                }
-            }
-        }
-        linuxArm64("linuxArm64") {
             compilations.getByName("main") {
                 val zlinux_uring by cinterops.creating {
                     defFile(project.file("io_uring_interop/zlinux_uring.def"))

@@ -138,8 +138,9 @@ class Metrics:
     worker_util: float = 0.0
 
 
-SEED_POLICY = """max_in_progress=4
-max_spawn=4
+SEED_POLICY = """max_in_progress=3
+max_spawn=3
+max_per_provider=1
 lease_ttl_ms=300000
 tick_interval_ms=5000
 backoff_on_error=true
@@ -227,8 +228,9 @@ class KanbanBoard:
     def tick(self, policy: dict[str, Any]) -> DispatchResult:
         """Run one dispatch tick under the given policy. Returns real metrics."""
         self.tick_count += 1
-        max_ip = int(policy.get("max_in_progress", 4))
-        max_spawn = int(policy.get("max_spawn", 4))
+        max_ip = int(policy.get("max_in_progress", 3))
+        max_spawn = int(policy.get("max_spawn", 3))
+        max_per_provider = int(policy.get("max_per_provider", 1))
         lease_ttl_ms = int(policy.get("lease_ttl_ms", 300000))
         backoff_on_error = bool(policy.get("backoff_on_error", True))
         promote_on_done = bool(policy.get("promote_on_done", True))
@@ -236,7 +238,19 @@ class KanbanBoard:
         priority_weight = float(policy.get("priority_weight", 1.5))
         util_target = float(policy.get("util_target", 0.70))
 
-        avail = self.available_keys()
+        # Count currently running (DOING) agents per provider
+        provider_counts: dict[str, int] = {}
+        with self._lock:
+            for c in self.cards:
+                if c.column == Column.DOING and c.assignee:
+                    key = self.keys.get(c.assignee)
+                    if key:
+                        provider_counts[key.provider] = provider_counts.get(key.provider, 0) + 1
+
+        # Filter available keys to respect per-provider limit
+        avail_all = self.available_keys()
+        avail = [k for k in avail_all if provider_counts.get(k.provider, 0) < max_per_provider]
+        
         doing = self.doing_count()
         can_spawn = min(max_spawn, max_ip - doing, len(avail))
 

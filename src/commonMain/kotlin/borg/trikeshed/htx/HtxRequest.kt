@@ -237,7 +237,7 @@ private fun HtxTransportProtocol.defaultPort(): Int =
         HtxTransportProtocol.HTTPS -> 443
     }
 
-private fun HtxHeaders.headerValue(name: String): String? =
+fun HtxHeaders.headerValue(name: String): String? =
     toList().firstOrNull { it.a.equals(name, ignoreCase = true) }?.b
 
 private fun HtxMethod.wireToken(): String =

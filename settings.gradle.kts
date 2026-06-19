@@ -24,7 +24,7 @@ rootProject.name = "TrikeShed"
 // We want: pointcutting algebra SEPARATED from xvm/lib_cursor
 val workingModules = setOf(
     "forge", "forge-api", "forge-ui", "kanban", "keymux", "modelmux",
-    "lcnc", "miniduck-memory", "common",
+    "user-signals", "lcnc", "miniduck-memory", "common",
     "couch", "couch:viewserver", "htx-client", "tls", "ipfs", "quic",
     "tiny-btrfs", "kursive", "patl", "concurrency", "dreamer-kmm", "dreamer-dashboard",
     "openapi", "htx-client", "jules-client", "cmc",
@@ -33,7 +33,7 @@ val workingModules = setOf(
 )
 
 val brokenModules = setOf(
-    "user-signals", "ngsctp", "miniduck", "uring", "ccek-dsl", "server", "window-toolkit", "lcnc"
+    "ngsctp", "miniduck", "uring", "ccek-dsl", "server", "window-toolkit", "lcnc"
 )
 
 val libsDir = rootDir.resolve("libs")

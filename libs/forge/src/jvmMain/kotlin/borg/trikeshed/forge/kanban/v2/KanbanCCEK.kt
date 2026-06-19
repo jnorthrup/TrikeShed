@@ -21,7 +21,6 @@ import kotlin.coroutines.CoroutineContext
 object KeyPoolKey : CoroutineContext.Key<KeyPoolElement>
 object OperationalDataPoolKey : CoroutineContext.Key<OperationalDataPoolElement>
 object CoordinatorKey : CoroutineContext.Key<CoordinatorElement>
-object GepaOptimizerKey : CoroutineContext.Key<GepaOptimizerElement>
 
 @Serializable data class KeyEntry(
     val keyId: String, val provider: String, val label: String,
@@ -53,6 +52,7 @@ enum class AggregateReducer { SUM, AVG, MIN, MAX, COUNT, LATEST }
 
 @Serializable data class CoordinatorConfig(
     val maxInProgress: Int = 3, val maxSpawn: Int = 3,
+    val maxPerProvider: Int = 1,
     val leaseTtlMs: Long = 300_000, val tickIntervalMs: Long = 5_000,
     val queueDepth: Int = 0,
 )
@@ -266,54 +266,11 @@ class CoordinatorElement(parentJob: Job? = null, private val keyPoolElement: Key
     fun updateConfig(newConfig: CoordinatorConfig) { _state.value = _state.value.copy(maxInProgress=newConfig.maxInProgress, maxSpawn=newConfig.maxSpawn) }
 }
 
-class GepaOptimizerElement(parentJob: Job? = null, private val coordinatorElement: CoordinatorElement? = null, private val opsPoolElement: OperationalDataPoolElement? = null, private val config: GepaConfig = GepaConfig()) : AsyncContextElement(ElementState.CREATED, parentJob) {
-    override val key: CoroutineContext.Key<*> get() = GepaOptimizerKey
-    private val _state = MutableStateFlow(GepaState()); val flowState: StateFlow<GepaState> = _state.asStateFlow()
-    private var backgroundJob: Job? = null
-    private val coordinator: CoordinatorElement by lazy { coordinatorElement ?: error("CoordinatorElement required") }
-    private val opsPool: OperationalDataPoolElement by lazy { opsPoolElement ?: error("OperationalDataPoolElement required") }
-
-    fun runCycle(): GepaResult { val rl = buildReflectionLm(); val res = runOptimization(config.seedPolicy, config.maxMetricCalls, rl); _state.value = _state.value.copy(running=false, cycleCount=_state.value.cycleCount+1, lastResult=res); return res }
-    fun startLoop(scope: CoroutineScope = CoroutineScope(SupervisorJob()), intervalSeconds: Int = config.intervalSeconds): Job {
-        if (backgroundJob != null && backgroundJob!!.isActive) return backgroundJob!!
-        _state.value = _state.value.copy(running=true)
-        backgroundJob = scope.launch { while (true) { delay(intervalSeconds*1000L); if (!_state.value.running) break; try { runCycle() } catch (e: Exception) {} }; _state.value = _state.value.copy(running=false) }
-        return backgroundJob!!
-    }
-    fun stopLoop(): GepaState { backgroundJob?.cancel(); backgroundJob = null; val fs = _state.value.copy(running=false); _state.value = fs; return fs }
-    private fun runOptimization(seed: String, maxCalls: Int, rl: (Any)->String): GepaResult {
-        var best = seed; var bestScore = Double.NEGATIVE_INFINITY; var calls = 0; var cands = 0
-        val base = parsePolicy(seed); var curScore = evaluatePolicy(base); bestScore = curScore
-        for (i in 1..maxCalls) { cands++; val cand = reflectAndMutate(best, rl); val score = evaluatePolicy(parsePolicy(cand)); if (score > bestScore) { bestScore = score; best = cand }; calls++ }
-        return GepaResult(best, calls, cands, "gepa_run_${Instant.now().toEpochMilli()}")
-    }
-    private fun parsePolicy(s: String): Map<String,Double> { val p = mutableMapOf<String,Double>(); for (pair in s.split(",")) { val parts = pair.trim().split("="); if (parts.size==2) try { p[parts[0].trim()] = parts[1].trim().toDouble() } catch (e: NumberFormatException) {} }; return p }
-    private fun evaluatePolicy(p: Map<String,Double>): Double {
-        val currentCoordConfig = coordinator.flowState.value
-        if (p.containsKey("max_in_progress")) coordinator.updateConfig(CoordinatorConfig(maxInProgress=p["max_in_progress"]!!.toInt(), maxSpawn=currentCoordConfig.maxSpawn))
-        if (p.containsKey("max_spawn")) coordinator.updateConfig(CoordinatorConfig(maxInProgress=currentCoordConfig.maxInProgress, maxSpawn=p["max_spawn"]!!.toInt()))
-        val res = coordinator.tick()
-        val tp = opsPool.query(OperationalPool.TASK_THROUGHPUT).sumOf{it.value}
-        val lat = opsPool.query(OperationalPool.LATENCY_DISTRIBUTION).sumOf{it.value}/1000.0
-        val err = opsPool.query(OperationalPool.ERROR_RATES).sumOf{it.value}*100
-        val wu = opsPool.query(OperationalPool.WORKER_UTILIZATION); val util = if (wu.isNotEmpty()) abs(wu.map { it.value }.average() - 0.7) * 50 else 0.0
-        return tp*10 - lat - err - util
-    }
-    private fun reflectAndMutate(policy: String, rl: (Any)->String): String = try { rl("Current policy: $policy\nObjective: Maximize kanban dispatch throughput while minimizing latency, error rates, and worker imbalance.\nPropose a mutated policy string (key=value, ...) with small adjustments.\nReturn only the policy string.").trim() } catch (e: Exception) { mutatePolicy(policy) }
-    private fun mutatePolicy(policy: String): String { val ps = parsePolicy(policy); val ks = ps.keys.toList(); if (ks.isEmpty()) return policy; val k = ks.random(); val cur = ps[k]!!; val mut = when(k){"max_in_progress"->(cur+(Math.random()*2-1).toInt()).coerceIn(1.0,20.0);"max_spawn"->(cur+(Math.random()*2-1).toInt()).coerceIn(1.0, 20.0);else->cur}; return ps.plus(k to mut).entries.joinToString(", "){ "${it.key}=${it.value}" } }
-    private fun buildReflectionLm(): (Any)->String = { _ -> "latency_warning=5000, latency_critical=15000, error_warning=0.05, error_critical=0.10, worker_overload=0.90, worker_idle=0.10, max_in_progress=${coordinator.flowState.value.maxInProgress}, max_spawn=${coordinator.flowState.value.maxSpawn}" }
-}
-
-@Serializable data class GepaConfig(val seedPolicy: String = "latency_warning=5000, latency_critical=15000, error_warning=0.05, error_critical=0.10, worker_overload=0.90, worker_idle=0.10, max_in_progress=3, max_spawn=3", val maxMetricCalls: Int = 10, val intervalSeconds: Int = 300)
-@Serializable data class GepaState(val running: Boolean = false, val cycleCount: Int = 0, val lastResult: GepaResult? = null)
-@Serializable data class GepaResult(val bestCandidate: String, val totalMetricCalls: Int, val numCandidates: Int, val runDir: String, val timestampMs: Long = Instant.now().toEpochMilli())
-
-suspend fun installKanban(config: CoordinatorConfig = CoordinatorConfig(), gepaConfig: GepaConfig = GepaConfig(), maxHistoryPerKey: Int = 1000): KanbanElements {
+suspend fun installKanban(config: CoordinatorConfig = CoordinatorConfig(), maxHistoryPerKey: Int = 1000): KanbanElements {
     val kp = KeyPoolElement(); val op = OperationalDataPoolElement(maxHistoryPerKey = maxHistoryPerKey)
     val coord = CoordinatorElement(keyPoolElement=kp, opsPoolElement=op, config=config)
-    val gp = GepaOptimizerElement(coordinatorElement=coord, opsPoolElement=op, config=gepaConfig)
-    kp.open(); op.open(); coord.open(); gp.open()
-    return withContext(kp + op + coord + gp) { KanbanElements(kp, op, coord, gp) }
+    kp.open(); op.open(); coord.open()
+    return withContext(kp + op + coord) { KanbanElements(kp, op, coord) }
 }
 
-data class KanbanElements(val keyPool: KeyPoolElement, val opsPool: OperationalDataPoolElement, val coordinator: CoordinatorElement, val gepa: GepaOptimizerElement) : CoroutineContext by keyPool + opsPool + coordinator + gepa
+data class KanbanElements(val keyPool: KeyPoolElement, val opsPool: OperationalDataPoolElement, val coordinator: CoordinatorElement) : CoroutineContext by keyPool + opsPool + coordinator
