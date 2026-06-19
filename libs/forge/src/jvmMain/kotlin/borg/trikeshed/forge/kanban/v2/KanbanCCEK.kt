@@ -57,8 +57,8 @@ enum class AggregateReducer { SUM, AVG, MIN, MAX, COUNT, LATEST }
     val queueDepth: Int = 0,
 )
 @Serializable data class CoordinatorState(
-    val maxInProgress: Int, val maxSpawn: Int, val currentlyRunning: Int,
-    val availableKeys: Int, val queueDepth: Int,
+    val maxInProgress: Int, val maxSpawn: Int, val maxPerProvider: Int,
+    val currentlyRunning: Int, val availableKeys: Int, val queueDepth: Int,
 )
 @Serializable data class DispatchResult(val spawned: Int, val reclaimed: Int, val promoted: Int, val crashed: Int, val timestampMs: Long)
 @Serializable data class CoordinatorStats(
@@ -110,6 +110,7 @@ class KeyPoolElement(parentJob: Job? = null) : AsyncContextElement(ElementState.
         return e.toImmutable()
     }
     fun getAvailable(): List<KeyEntry> = mutableEntries.values.filter { it.status == KeyStatus.ACTIVE }.map { it.toImmutable() }
+    fun getRunningPerProvider(): Map<String, Int> = mutableEntries.values.filter { it.status == KeyStatus.ACTIVE && it.leasedTo != null }.groupBy { it.provider }.mapValues { it.value.size }
     fun getAvailableForAgent(agentId: String): List<KeyEntry> {
         val now = Instant.now().toEpochMilli()
         return mutableEntries.values.filter { it.status == KeyStatus.ACTIVE }.filter { e ->
@@ -235,20 +236,20 @@ class CoordinatorElement(parentJob: Job? = null, private val keyPoolElement: Key
     private val spawnedCount = AtomicInteger(0); private val reclaimedCount = AtomicInteger(0)
     private val promotedCount = AtomicInteger(0); private val crashedCount = AtomicInteger(0)
     private val lastTickTime = AtomicLong(0)
-    private val _state = MutableStateFlow(CoordinatorState(maxInProgress=config.maxInProgress, maxSpawn=config.maxSpawn, currentlyRunning=0, availableKeys=0, queueDepth=0))
+    private val _state = MutableStateFlow(CoordinatorState(maxInProgress=config.maxInProgress, maxSpawn=config.maxSpawn, maxPerProvider=config.maxPerProvider, currentlyRunning=0, availableKeys=0, queueDepth=0))
     val flowState: StateFlow<CoordinatorState> = _state.asStateFlow()
     private val keyPool: KeyPoolElement by lazy { keyPoolElement ?: error("KeyPoolElement required") }
     private val opsPool: OperationalDataPoolElement by lazy { opsPoolElement ?: error("OperationalDataPoolElement required") }
-
     fun tick(): DispatchResult {
-        val availableKeys = keyPool.getAvailable().size
+        val runningPerProvider = keyPool.getRunningPerProvider()
+        val availableEntries = keyPool.getAvailable().filter { runningPerProvider.getOrDefault(it.provider, 0) < config.maxPerProvider }
+        val availableKeys = availableEntries.size
         val currentlyRunning = spawnedCount.get() - reclaimedCount.get()
         val canSpawn = minOf(config.maxSpawn, config.maxInProgress - currentlyRunning, availableKeys)
         var spawned = 0
         if (canSpawn > 0) {
-            val entries = keyPool.getAvailable()
-            for (i in 0 until minOf(canSpawn, entries.size)) {
-                val e = entries[i]
+            for (i in 0 until minOf(canSpawn, availableEntries.size)) {
+                val e = availableEntries[i]
                 val agentId = "agent-${spawnedCount.incrementAndGet()}"
                 if (runBlocking { keyPool.acquireLease(e.keyId, agentId, config.leaseTtlMs) }) {
                     spawned++
@@ -257,13 +258,13 @@ class CoordinatorElement(parentJob: Job? = null, private val keyPoolElement: Key
             }
         }
         val now = Instant.now().toEpochMilli(); lastTickTime.set(now)
-        _state.value = CoordinatorState(maxInProgress=config.maxInProgress, maxSpawn=config.maxSpawn, currentlyRunning=spawnedCount.get()-reclaimedCount.get(), availableKeys=availableKeys-spawned, queueDepth=config.queueDepth)
+        _state.value = CoordinatorState(maxInProgress=config.maxInProgress, maxSpawn=config.maxSpawn, maxPerProvider=config.maxPerProvider, currentlyRunning=spawnedCount.get()-reclaimedCount.get(), availableKeys=availableKeys-spawned, queueDepth=config.queueDepth)
         runBlocking { opsPool.record(OperationalPool.TASK_THROUGHPUT, "tick_$now", mapOf("phase" to "tick"), value=spawned.toDouble()) }
         return DispatchResult(spawned, 0, 0, 0, now)
     }
     fun startLoop(scope: CoroutineScope = CoroutineScope(SupervisorJob())): Job = scope.launch { while (true) { tick(); delay(config.tickIntervalMs) } }
     fun getStats(): CoordinatorStats = CoordinatorStats(totalSpawned=spawnedCount.get(), totalReclaimed=reclaimedCount.get(), totalPromoted=promotedCount.get(), totalCrashed=crashedCount.get(), lastTickMs=lastTickTime.get(), currentState=_state.value)
-    fun updateConfig(newConfig: CoordinatorConfig) { _state.value = _state.value.copy(maxInProgress=newConfig.maxInProgress, maxSpawn=newConfig.maxSpawn) }
+    fun updateConfig(newConfig: CoordinatorConfig) { _state.value = _state.value.copy(maxInProgress=newConfig.maxInProgress, maxSpawn=newConfig.maxSpawn, maxPerProvider=newConfig.maxPerProvider) }
 }
 
 suspend fun installKanban(config: CoordinatorConfig = CoordinatorConfig(), maxHistoryPerKey: Int = 1000): KanbanElements {

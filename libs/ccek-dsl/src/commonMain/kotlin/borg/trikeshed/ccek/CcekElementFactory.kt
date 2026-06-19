@@ -278,10 +278,9 @@ object CcekKeyRegistry {
     val KeyPool = KeyPoolKey
     val OperationalDataPool = OperationalDataPoolKey
     val Coordinator = CoordinatorKey
-    val GepaOptimizer = GepaOptimizerKey
     
     val all: Series<CoroutineContext.Key<out AsyncContextElement>> = 
-        (8).j { i -> when (i) {
+        (7).j { i -> when (i) {
             0 -> NioUserspace
             1 -> Liburing
             2 -> FanoutDispatcher
@@ -289,14 +288,12 @@ object CcekKeyRegistry {
             4 -> KeyPool
             5 -> OperationalDataPool
             6 -> Coordinator
-            7 -> GepaOptimizer
         }}
 }
 
 private object KeyPoolKey : CoroutineContext.Key<Any>
 private object OperationalDataPoolKey : CoroutineContext.Key<Any>
 private object CoordinatorKey : CoroutineContext.Key<Any>
-private object GepaOptimizerKey : CoroutineContext.Key<Any>
 
 // ═════════════════════════════════════════════════════════════════════════════
 // EXTENSIONS

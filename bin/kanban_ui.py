@@ -1,5 +1,5 @@
 #!/usr/bin/env python3.14
-"""Flask web UI for the GEPA-evolved kanban board.
+"""Flask web UI for the kanban board.
 
 Serves the board state as JSON API and renders an HTML dashboard.
 Board state is loaded from the persisted Confix JSON.
@@ -71,7 +71,7 @@ HTML_TEMPLATE = """
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>GEPA Kanban -- TrikeShed</title>
+<title>Kanban -- TrikeShed</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
@@ -128,8 +128,8 @@ HTML_TEMPLATE = """
 <div class="error-banner" id="error"></div>
 
 <header>
-  <h1>GEPA Kanban -- TrikeShed</h1>
-  <p>Evolved dispatch policy | Confix persistence | IntEnum handles</p>
+  <h1>Kanban -- TrikeShed</h1>
+  <p>Confix persistence | IntEnum handles</p>
 </header>
 
 <div class="metrics" id="metrics">
@@ -321,7 +321,7 @@ def main():
     
     BOARD = load_board()
     
-    print(f"Starting GEPA Kanban UI on http://localhost:{args.port}")
+    print(f"Starting Kanban UI on http://localhost:{args.port}")
     print(f"Board: {len(BOARD.keys)} keys, {len(BOARD.cards)} cards")
     print(f"State: {BOARD_JSON}")
     app.run(host="0.0.0.0", port=args.port, debug=False, threaded=True)

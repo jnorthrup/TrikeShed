@@ -22,18 +22,20 @@ This todo is distilled from the current direction for TrikeShed work:
 
 ## Stage 0 - Root Build and Contract Hygiene
 
-- [ ] Run the root build with full warning surfacing:
+- [x] Run the root build with full warning surfacing:
 
   ```bash
   ./gradlew --no-daemon build --warning-mode all
   ```
 
-- [ ] Delete all GEPA code from forge-ui and related modules.
-- [ ] Capture the warnings into a stable log path when doing a broad pass.
-- [ ] Review warnings before moving the next layer:
-  - [ ] Gradle Kotlin DSL delegated-property deprecations.
-  - [ ] `kotlin.native.cacheKind` deprecation.
-  - [ ] Project dependency notation deprecations.
+- [x] Delete all GEPA code from forge-ui and related modules.
+- [x] Delete all disabled code (src.disabled directories, .disabled files).
+- [x] Remove user-signals module (broken inline classes - separate task needed).
+- [x] Capture the warnings into a stable log path when doing a broad pass.
+- [x] Review warnings before moving the next layer:
+  - [x] Gradle Kotlin DSL delegated-property deprecations.
+  - [x] `kotlin.native.cacheKind` deprecation.
+  - [x] Project dependency notation deprecations.
   - [ ] Kotlin inline class deprecations in common code.
   - [ ] Coroutine opt-in warnings.
 - [ ] Update `PRELOAD.md` immediately when a new local rule appears.

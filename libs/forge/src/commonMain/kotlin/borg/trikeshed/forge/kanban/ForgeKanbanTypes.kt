@@ -5,17 +5,15 @@ import kotlinx.serialization.Contextual
 import java.time.Instant
 
 /**
- * Forge Kanban module — self-running tspy, GEPA, kanban with keymux and modelmux.
+ * Forge Kanban module — self-running tspy, kanban with keymux and modelmux.
  * 
  * Provides bidirectional integration with Hermes:
  * - Can share model/usage data with Hermes providers
- * - Can enhance Hermes models via GEPA optimization
  * - Borrows Hermes tool patterns for local execution
  */
 @Serializable
 data class ForgeKanbanConfig(
     val tspyEnabled: Boolean = true,
-    val gepaEnabled: Boolean = true,
     val kanbanEnabled: Boolean = true,
     val keymuxEnabled: Boolean = true,
     val modelmuxEnabled: Boolean = true,
@@ -29,7 +27,6 @@ enum class ShareWithHermes {
     MODELS_ONLY,    // Share model registry
     USAGE_ONLY,     // Share usage metrics
     FULL,           // Share both models and usage
-    ENHANCE_HERMES, // Actively enhance Hermes models via GEPA
 }
 
 /**
@@ -105,28 +102,6 @@ data class DashboardView(
 )
 
 /**
- * GEPA optimization state.
- */
-@Serializable
-data class GepaState(
-    val running: Boolean = false,
-    val cycleCount: Int = 0,
-    val lastResult: GepaResult? = null,
-    val seedPolicy: String = "",
-    val maxMetricCalls: Int = 10,
-    val intervalSeconds: Int = 300,
-)
-
-@Serializable
-data class GepaResult(
-    val bestCandidate: String,
-    val totalMetricCalls: Int,
-    val numCandidates: Int,
-    val runDir: String,
-    val timestampMs: Long = Instant.now().toEpochMilli(),
-)
-
-/**
  * Kanban board integration.
  */
 @Serializable
@@ -135,6 +110,7 @@ data class KanbanBoardRef(
     val workspaceId: String,
     val maxInProgress: Int = 3,
     val maxSpawn: Int = 3,
+    val maxPerProvider: Int = 1,
 )
 
 /**

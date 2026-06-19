@@ -1,9 +1,5 @@
 """
-tspy.kanban -- GEPA-evolved kanban coordination for TrikeShed forge solvers.
-
-The implementation is evolved by GEPA against operational metrics.
-The seed candidate below is the starting policy string; GEPA mutates it
-toward Pareto-efficient dispatch.
+tspy.kanban -- Kanban coordination for TrikeShed forge solvers.
 
 Uses tspy.keymux for credential keys (lazy env scan, quota tracking) and
 tspy.modelmux for lazy model listing cache. The board pulls real keys
