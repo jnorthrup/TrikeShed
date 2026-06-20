@@ -49,6 +49,6 @@ class DhtServiceIntegrationTest {
         val retrieved = ipfsElement.get(cid)
 
         assertNotNull(retrieved)
-        assertEquals(testData.contentToString(), retrieved?.contentToString())
+        assertEquals(testData.contentToString(), retrieved.contentToString())
     }
 }

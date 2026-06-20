@@ -1,5 +1,6 @@
 package borg.trikeshed.usersignals
 
+import borg.trikeshed.lib.Series
 import kotlin.coroutines.CoroutineContext
 import kotlinx.coroutines.channels.Channel
 
@@ -127,12 +128,22 @@ class SignalFactory(private val context: SignalContextElement) {
         context.registerSource(signalId, d as SignalSource<*>)
         return d
     }
+    fun <T> dial(signalId: String, positions: Series<T>, initial: T? = null): Dial<T> {
+        val d = dial(positions, initial)
+        context.registerSource(signalId, d as SignalSource<*>)
+        return d
+    }
     fun levelMeter(signalId: String, peakHoldMillis: Long = 1000): LevelMeter {
         val lm = levelMeter(peakHoldMillis)
         context.registerSource(signalId, lm as SignalSource<*>)
         return lm
     }
     fun <T> radioToggle(signalId: String, options: List<T>, initial: T? = null): RadioToggle<T> {
+        val rt = radioToggle(options, initial)
+        context.registerSource(signalId, rt as SignalSource<*>)
+        return rt
+    }
+    fun <T> radioToggle(signalId: String, options: Series<T>, initial: T? = null): RadioToggle<T> {
         val rt = radioToggle(options, initial)
         context.registerSource(signalId, rt as SignalSource<*>)
         return rt

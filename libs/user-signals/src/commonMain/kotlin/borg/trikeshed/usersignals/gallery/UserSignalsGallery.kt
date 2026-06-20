@@ -14,6 +14,7 @@ import borg.trikeshed.usersignals.levelMeter
 import borg.trikeshed.usersignals.momentaryButton
 import borg.trikeshed.usersignals.slider
 import borg.trikeshed.usersignals.textField
+import borg.trikeshed.usersignals.constSignal
 import borg.trikeshed.usersignals.toggle
 import kotlin.jvm.JvmInline
 import kotlin.math.abs
@@ -71,7 +72,11 @@ fun userSignalsGallery(): UserSignalsGallery =
             title = "Text signals",
             intent = "Text field preserves caret and commitment details for low-code/no-code entry",
             signals = s_[
-                gallerySignal("prompt.text", "text field retains typed user signal plus cursor state", textField("open kanban node details")),
+                gallerySignal("prompt.text", "text field retains typed user signal plus cursor state", textField("open kanban node details").apply {
+                    focus()
+                    setSelection(5, 11)
+                    commit()
+                }),
                 gallerySignal("section.note", "constant signal anchors gallery context", Signal.Const("user-signals gallery")),
             ],
         ),
@@ -146,7 +151,25 @@ private fun appendSignalRows(
 private fun renderSignalValue(value: Any?): String = when (value) {
     is Boolean -> if (value) "on" else "off"
     is Double -> value.toFixed(2)
-    is TextFieldState -> "\"" + value.text + "\" caret=" + value.caret
+    is TextFieldState -> buildString {
+        append("\"")
+        append(value.text)
+        append("\" caret=")
+        append(value.caret)
+        if (value.hasSelection) {
+            append(" selection=")
+            append(value.selectionStart)
+            append("..")
+            append(value.selectionEnd)
+            append(" selected=\"")
+            append(value.selectedText)
+            append("\"")
+        }
+        append(" focused=")
+        append(value.focused)
+        append(" committed=")
+        append(value.committed)
+    }
     null -> "null"
     else -> value.toString()
 }

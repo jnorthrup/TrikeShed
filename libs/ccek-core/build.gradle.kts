@@ -18,12 +18,12 @@ kotlin {
     jvmToolchain(25)
 
     sourceSets {
-        val main by getting {
+        val main = getByName("main") {
             dependencies {
                 api("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
             }
         }
-        val test by getting {
+        val test = getByName("test") {
             dependencies {
                 implementation(kotlin("test"))
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")

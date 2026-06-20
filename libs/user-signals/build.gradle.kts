@@ -50,6 +50,7 @@ kotlin {
                 api("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
                 api(rootProject)  // root project has mutable package
             }
+            kotlin.srcDir("src/commonMain/kotlin")
         }
 
         getByName("commonTest") {

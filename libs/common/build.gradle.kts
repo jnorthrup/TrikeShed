@@ -5,8 +5,8 @@ plugins {
 kotlin {
     jvm {}
     sourceSets {
-        val commonMain by getting {}
-        val jvmMain by getting {}
+        val commonMain = getByName("commonMain") {}
+        val jvmMain = getByName("jvmMain") {}
     }
 }
 

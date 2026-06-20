@@ -1,5 +1,11 @@
 package borg.trikeshed.usersignals
 
+import borg.trikeshed.lib.Series
+import borg.trikeshed.lib.get
+import borg.trikeshed.lib.j
+import borg.trikeshed.lib.size
+import borg.trikeshed.lib.toList
+import borg.trikeshed.usersignals.platform.currentTimeMillis
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
@@ -21,6 +27,10 @@ interface Signal<out T> {
     fun <U, R> combine(other: Signal<U>, combiner: (T, U) -> R): Signal<R> = CombinedSignal(this, other, combiner)
     fun filter(predicate: (T) -> Boolean): Signal<T> = FilteredSignal(this, predicate)
     fun sample(intervalMillis: Long): Signal<T> = SampledSignal(this, intervalMillis)
+
+    companion object {
+        fun <T> Const(value: T): Signal<T> = constSignal(value)
+    }
 }
 
 interface SignalSource<T> : Signal<T> {
@@ -43,12 +53,21 @@ internal class FilteredSignal<T>(private val source: Signal<T>, private val pred
     override val changes: Flow<T> = source.changes.filter(predicate)
 }
 
+@OptIn(kotlinx.coroutines.FlowPreview::class)
 internal class SampledSignal<T>(private val source: Signal<T>, private val intervalMillis: Long) : Signal<T> {
     override val value: T get() = source.value
     override val changes: Flow<T> = source.changes.distinctUntilChanged().debounce(intervalMillis)
 }
 
 internal fun <T> Channel<T>.asFlow(): Flow<T> = channelFlow { while (true) { send(receive()) } }
+
+// Constant signal - a signal that never changes
+fun <T> constSignal(value: T): Signal<T> = ConstSignal(value)
+
+internal class ConstSignal<T>(private val constValue: T) : Signal<T> {
+    override val value: T = constValue
+    override val changes: Flow<T> = kotlinx.coroutines.flow.flowOf(constValue)
+}
 
 // ====================================================================
 // 0-DIMENSIONAL SIGNALS
@@ -76,7 +95,8 @@ interface MomentaryButton : Signal<Boolean> {
 
 interface RadioToggle<T> : Signal<T> {
     val selected: T?
-    val options: List<T>
+    val optionSeries: Series<T>
+    val options: List<T> get() = optionSeries.toList()
     fun select(option: T): Boolean
     fun clear(): Boolean
 }
@@ -111,7 +131,8 @@ interface Knob : Signal<Double> {
 
 interface Dial<T> : Signal<T> {
     override val value: T
-    val positions: List<T>
+    val positionSeries: Series<T>
+    val positions: List<T> get() = positionSeries.toList()
     val index: Int
     fun next(): T
     fun previous(): T
@@ -162,10 +183,12 @@ interface TextField : Signal<TextFieldState> {
 fun toggle(initial: Boolean = false): Toggle = ToggleImpl(initial)
 fun idiotLight(initial: Boolean = false): IdiotLight = IdiotLightImpl(initial)
 fun momentaryButton(): MomentaryButton = MomentaryButtonImpl()
-fun <T> radioToggle(options: List<T>, initial: T? = null): RadioToggle<T> = RadioToggleImpl(options, initial)
+fun <T> radioToggle(options: Series<T>, initial: T? = null): RadioToggle<T> = RadioToggleImpl(options, initial)
+fun <T> radioToggle(options: List<T>, initial: T? = null): RadioToggle<T> = radioToggle(options.size j { index -> options[index] }, initial)
 fun slider(min: Double, max: Double, initial: Double? = null, step: Double? = null): Slider = SliderImpl(min, max, initial ?: min, step)
 fun knob(min: Double = 0.0, max: Double = 1.0, initial: Double = 0.0, detents: Int? = null): Knob = KnobImpl(min, max, initial, detents)
-fun <T> dial(positions: List<T>, initial: T? = null): Dial<T> = DialImpl(positions, initial ?: positions.first())
+fun <T> dial(positions: Series<T>, initial: T? = null): Dial<T> = DialImpl(positions, initial ?: positions[0])
+fun <T> dial(positions: List<T>, initial: T? = null): Dial<T> = dial(positions.size j { index -> positions[index] }, initial)
 fun levelMeter(peakHoldMillis: Long = 1000): LevelMeter = LevelMeterImpl(peakHoldMillis)
 fun textField(initial: String = "", placeholder: String? = null, masked: Boolean = false): TextField = TextFieldImpl(initial, placeholder, masked)
 
@@ -193,7 +216,23 @@ internal class IdiotLightImpl(initial: Boolean) : IdiotLight, SignalSource<Boole
     private val _channel = Channel<Boolean>(Channel.UNLIMITED)
     override val changes: Flow<Boolean> = _channel.asFlow()
     override suspend fun flash(durationMillis: Long): Boolean { value = true; _channel.trySend(true); delay(durationMillis); value = false; _channel.trySend(false); return false }
-    override suspend fun pulse(intervalMillis: Long, count: Int): Sequence<Boolean> = sequence { repeat(count) { value = true; _channel.trySend(true); yield(true); kotlinx.coroutines.runBlocking { delay(intervalMillis / 2) }; value = false; _channel.trySend(false); yield(false); kotlinx.coroutines.runBlocking { delay(intervalMillis / 2) } } }
+    override suspend fun pulse(intervalMillis: Long, count: Int): Sequence<Boolean> {
+        repeat(count) {
+            value = true
+            _channel.trySend(true)
+            delay(intervalMillis / 2)
+            value = false
+            _channel.trySend(false)
+            delay(intervalMillis / 2)
+        }
+        return Sequence {
+            object : Iterator<Boolean> {
+                private var index = 0
+                override fun hasNext(): Boolean = index < count * 2
+                override fun next(): Boolean = (index++ % 2) == 0
+            }
+        }
+    }
     override fun emit(value: Boolean): Boolean { this.value = value; _channel.trySend(value); return value }
     override suspend fun emitSuspend(value: Boolean): Boolean { this.value = value; _channel.send(value); return value }
 }
@@ -211,14 +250,15 @@ internal class MomentaryButtonImpl() : MomentaryButton, SignalSource<Boolean> {
     override suspend fun emitSuspend(value: Boolean): Boolean { this.value = value; _channel.send(value); return value }
 }
 
-internal class RadioToggleImpl<T>(override val options: List<T>, initial: T?) : RadioToggle<T>, SignalSource<T> {
-    override var value: T = initial ?: options.first()
+internal class RadioToggleImpl<T>(override val optionSeries: Series<T>, initial: T?) : RadioToggle<T>, SignalSource<T> {
+    init { require(optionSeries.size > 0) { "RadioToggle must have at least one option" } }
+    override var value: T = initial ?: optionSeries[0]
         private set
     override val selected: T? get() = value
     private val _channel = Channel<T>(Channel.UNLIMITED)
     override val changes: Flow<T> = _channel.asFlow()
-    override fun select(option: T): Boolean { if (option in options) { value = option; _channel.trySend(value); return true }; return false }
-    override fun clear(): Boolean { value = options.first(); _channel.trySend(value); return true }
+    override fun select(option: T): Boolean { if (optionSeries.indexOfValue(option) >= 0) { value = option; _channel.trySend(value); return true }; return false }
+    override fun clear(): Boolean { value = optionSeries[0]; _channel.trySend(value); return true }
     override fun emit(value: T): T { this.value = value; _channel.trySend(value); return value }
     override suspend fun emitSuspend(value: T): T { this.value = value; _channel.send(value); return value }
 }
@@ -228,7 +268,7 @@ internal class SliderImpl(override val min: Double, override val max: Double, in
         private set
     private val _channel = Channel<Double>(Channel.UNLIMITED)
     override val changes: Flow<Double> = _channel.asFlow()
-    override fun setValue(newValue: Double): Double { value = newValue.coerceIn(min, max); if (step != null) value = kotlin.math.round(value / step!!) * step!!; _channel.trySend(value); return value }
+    override fun setValue(newValue: Double): Double { value = newValue.coerceIn(min, max); step?.let { value = kotlin.math.round(value / it) * it }; _channel.trySend(value); return value }
     override fun increment(): Double = setValue(value + (step ?: (max - min) / 100))
     override fun decrement(): Double = setValue(value - (step ?: (max - min) / 100))
     override fun snap(): Double = setValue(value)
@@ -241,25 +281,32 @@ internal class KnobImpl(override val min: Double, override val max: Double, init
         private set
     private val _channel = Channel<Double>(Channel.UNLIMITED)
     override val changes: Flow<Double> = _channel.asFlow()
-    override fun setValue(newValue: Double): Double { value = newValue.coerceIn(min, max); if (detents != null) { val range = max - min; val step = range / detents!!; value = kotlin.math.round(value / step) * step }; _channel.trySend(value); return value }
+    override fun setValue(newValue: Double): Double { value = newValue.coerceIn(min, max); detents?.let { detentCount -> val range = max - min; val step = range / detentCount; value = kotlin.math.round(value / step) * step }; _channel.trySend(value); return value }
     override fun rotateBy(delta: Double): Double = setValue(value + delta)
     override fun snapToDetent(): Double = setValue(value)
     override fun emit(value: Double): Double { this.value = value.coerceIn(min, max); _channel.trySend(this.value); return this.value }
     override suspend fun emitSuspend(value: Double): Double { this.value = value.coerceIn(min, max); _channel.send(this.value); return this.value }
 }
 
-internal class DialImpl<T>(override val positions: List<T>, initial: T) : Dial<T>, SignalSource<T> {
-    init { require(positions.isNotEmpty()) { "Dial must have at least one position" }; require(initial in positions) { "Initial position must be in positions list" } }
+internal class DialImpl<T>(override val positionSeries: Series<T>, initial: T) : Dial<T>, SignalSource<T> {
+    init { require(positionSeries.size > 0) { "Dial must have at least one position" }; require(positionSeries.indexOfValue(initial) >= 0) { "Initial position must be in positions series" } }
     override var value: T = initial
         private set
-    override val index: Int get() = positions.indexOf(value)
+    override val index: Int get() = positionSeries.indexOfValue(value)
     private val _channel = Channel<T>(Channel.UNLIMITED)
     override val changes: Flow<T> = _channel.asFlow()
-    override fun next(): T { val nextIndex = (index + 1) % positions.size; value = positions[nextIndex]; _channel.trySend(value); return value }
-    override fun previous(): T { val prevIndex = (index - 1 + positions.size) % positions.size; value = positions[prevIndex]; _channel.trySend(value); return value }
-    override fun goto(position: T): Boolean { if (position in positions) { value = position; _channel.trySend(value); return true }; return false }
+    override fun next(): T { val nextIndex = (index + 1) % positionSeries.size; value = positionSeries[nextIndex]; _channel.trySend(value); return value }
+    override fun previous(): T { val prevIndex = (index - 1 + positionSeries.size) % positionSeries.size; value = positionSeries[prevIndex]; _channel.trySend(value); return value }
+    override fun goto(position: T): Boolean { if (positionSeries.indexOfValue(position) >= 0) { value = position; _channel.trySend(value); return true }; return false }
     override fun emit(value: T): T { this.value = value; _channel.trySend(value); return value }
     override suspend fun emitSuspend(value: T): T { this.value = value; _channel.send(value); return value }
+}
+
+private fun <T> Series<T>.indexOfValue(value: T): Int {
+    for (index in 0 until size) {
+        if (this[index] == value) return index
+    }
+    return -1
 }
 
 internal class LevelMeterImpl(override val peakHoldMillis: Long) : LevelMeter, SignalSource<Double> {
@@ -268,13 +315,13 @@ internal class LevelMeterImpl(override val peakHoldMillis: Long) : LevelMeter, S
     override val level: Double get() = value
     private var peakValue: Double = 0.0
     private var peakTimestamp: Long = 0
-    override val peak: Double get() = if (System.currentTimeMillis() - peakTimestamp < peakHoldMillis) peakValue else 0.0
+    override val peak: Double get() = if (currentTimeMillis() - peakTimestamp < peakHoldMillis) peakValue else 0.0
     private val _channel = Channel<Double>(Channel.UNLIMITED)
     override val changes: Flow<Double> = _channel.asFlow()
     override fun resetPeak(): Double { peakValue = 0.0; peakTimestamp = 0; return 0.0 }
-    override fun setLevel(level: Double): Double { value = level.coerceIn(0.0, 1.0); if (value > peakValue) { peakValue = value; peakTimestamp = System.currentTimeMillis() }; _channel.trySend(value); return value }
-    override fun emit(value: Double): Double { this.value = value.coerceIn(0.0, 1.0); if (this.value > peakValue) { peakValue = this.value; peakTimestamp = System.currentTimeMillis() }; _channel.trySend(this.value); return this.value }
-    override suspend fun emitSuspend(value: Double): Double { this.value = value.coerceIn(0.0, 1.0); if (this.value > peakValue) { peakValue = this.value; peakTimestamp = System.currentTimeMillis() }; _channel.send(this.value); return this.value }
+    override fun setLevel(level: Double): Double { value = level.coerceIn(0.0, 1.0); if (value > peakValue) { peakValue = value; peakTimestamp = currentTimeMillis() }; _channel.trySend(value); return value }
+    override fun emit(value: Double): Double { this.value = value.coerceIn(0.0, 1.0); if (this.value > peakValue) { peakValue = this.value; peakTimestamp = currentTimeMillis() }; _channel.trySend(this.value); return this.value }
+    override suspend fun emitSuspend(value: Double): Double { this.value = value.coerceIn(0.0, 1.0); if (this.value > peakValue) { peakValue = this.value; peakTimestamp = currentTimeMillis() }; _channel.send(this.value); return this.value }
 }
 
 // ====================================================================

@@ -1,5 +1,6 @@
 package borg.trikeshed.usersignals
 
+import borg.trikeshed.usersignals.platform.formatDouble
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -58,7 +59,7 @@ class TextBackend : RenderBackend {
     private fun formatValue(value: Any?): String = when (value) {
         is Map<*, *> -> value.map { formatValue(it.key) + "=" + formatValue(it.value) }.joinToString(", ", "{", "}")
         is List<*> -> value.joinToString(", ", "[", "]") { formatValue(it) }
-        is Double -> "%.3f".format(value)
+        is Double -> formatDouble(value, 3)
         is Boolean -> if (value) "on" else "off"
         null -> "null"
         else -> value.toString()
@@ -116,7 +117,7 @@ class AnsiBackend : RenderBackend {
     }
 
     private fun formatAnsiValue(value: Any?): String = when (value) {
-        is Double -> "%.2f".format(value)
+        is Double -> formatDouble(value, 2)
         is Boolean -> if (value) "ON" else "OFF"
         null -> "null"
         else -> value.toString()
@@ -249,11 +250,6 @@ class SignalTemplate(
         override val changes: Flow<TemplateOutput> = _channel.receiveAsFlow()
         init { _channel.trySend(value) }
     }
-}
-
-private class ConstSignal<T>(private val constValue: T) : Signal<T> {
-    override val value: T = constValue
-    override val changes: Flow<T> = kotlinx.coroutines.flow.flowOf(constValue)
 }
 
 fun signalTemplate(block: SignalTemplateBuilder.() -> Unit): SignalTemplate =

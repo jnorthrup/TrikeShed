@@ -1,21 +1,21 @@
 gradle
-.idea
-.gradle
-build
+.idea/
+.gradle/
+.kotlin/
+build/
+**/build/
 docs/
 tmp/
 .vscode/
-
-<<<<<<< HEAD
-.kotlin/
-=======
-.kotlin
-.idea
-.gradle
-gradle
-gradlew
-gradlew.bat
-
->>>>>>> posixish
 .aider*
 .env
+target/
+**/target/
+__pycache__/
+**/__pycache__/
+*.pyc
+*.pyo
+.hermes/
+modelmux/
+libs/keymux/
+liburing/

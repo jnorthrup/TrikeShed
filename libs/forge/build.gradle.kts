@@ -80,3 +80,35 @@ tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompilationTask<*>> {
 tasks.named("jvmTest") {
     (this as org.gradle.api.tasks.testing.Test).useJUnitPlatform()
 }
+
+tasks.register<JavaExec>("runForgeDemoJvm") {
+    group = "run"
+    description = "Runs the Forge demo on JVM."
+    dependsOn("jvmJar")
+    mainClass.set("borg.trikeshed.forge.demo.ForgeDemoKt")
+    classpath(tasks.named("jvmJar"), configurations.getByName("jvmRuntimeClasspath"))
+}
+
+tasks.register<JavaExec>("runKanbanBoardDemoJvm") {
+    group = "run"
+    description = "Runs the KanbanBoard demo on JVM."
+    dependsOn("jvmJar")
+    mainClass.set("borg.trikeshed.forge.demo.KanbanBoardDemo")
+    classpath(tasks.named("jvmJar"), configurations.getByName("jvmRuntimeClasspath"))
+}
+
+tasks.register<JavaExec>("runForgeBuilderDemoJvm") {
+    group = "run"
+    description = "Runs the Forge builder demo on JVM."
+    dependsOn("jvmJar")
+    mainClass.set("borg.trikeshed.forge.demo.ForgeBuilderDemoKt")
+    classpath(tasks.named("jvmJar"), configurations.getByName("jvmRuntimeClasspath"))
+}
+
+tasks.register<JavaExec>("runForgeOverlayDemoJvm") {
+    group = "run"
+    description = "Runs the Forge overlay demo on JVM."
+    dependsOn("jvmJar")
+    mainClass.set("borg.trikeshed.forge.demo.ForgeOverlayDemoKt")
+    classpath(tasks.named("jvmJar"), configurations.getByName("jvmRuntimeClasspath"))
+}

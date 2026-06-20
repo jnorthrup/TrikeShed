@@ -5,12 +5,12 @@ plugins {
 kotlin {
     jvm {}
     sourceSets {
-        val commonMain by getting {
+        val commonMain = getByName("commonMain") {
             dependencies {
                 api(project(":"))
             }
         }
-        val jvmMain by getting {
+        val jvmMain = getByName("jvmMain") {
             dependencies {
                 api(project(":"))
             }

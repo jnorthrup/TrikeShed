@@ -15,6 +15,6 @@ class DiskBlockStoreTest {
         store.put(cid, data)
         val got = store.get(cid)
         assertNotNull(got)
-        assertEquals(String(data), String(got!!))
+        assertEquals(String(data), String(got))
     }
 }

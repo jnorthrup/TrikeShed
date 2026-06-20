@@ -3,10 +3,11 @@
 This todo is distilled from the current direction for TrikeShed work:
 
 - LCNC means low-code/no-code foundations built from user signals upward.
-- `PRELOAD.md` is the prevailing contract; curate it whenever implementation drifts.
+- Do not add to or curate `PRELOAD.md` from this tasktree; record tasktree drift here or in a dedicated follow-up only.
 - Bring in one foundation layer at a time, with a thin user demo for each layer.
 - Keep Rete, pointcutting, and blackboard behavior at boundaries where they are needed.
 - TODO-only future contracts must remain `TODO()` stubs until implementation is explicitly requested.
+- A checkbox is complete only when backed by a source path, a passing serial verification command, or an explicit compile-ready `TODO()` contract for TODO-only stages.
 
 ## Non-Negotiable Constraints
 
@@ -30,76 +31,79 @@ This todo is distilled from the current direction for TrikeShed work:
 
 - [x] Delete all GEPA code from forge-ui and related modules.
 - [x] Delete all disabled code (src.disabled directories, .disabled files).
-- [x] Remove user-signals module (broken inline classes - separate task needed).
-- [x] Capture the warnings into a stable log path when doing a broad pass.
+- [x] Reintroduce user-signals module after replacing the broken inline-class facet path.
+- [ ] Capture the warnings into a stable log path when doing a broad pass.
 - [x] Review warnings before moving the next layer:
   - [x] Gradle Kotlin DSL delegated-property deprecations.
   - [x] `kotlin.native.cacheKind` deprecation.
   - [x] Project dependency notation deprecations.
   - [ ] Kotlin inline class deprecations in common code.
-  - [ ] Coroutine opt-in warnings.
-- [ ] Update `PRELOAD.md` immediately when a new local rule appears.
-- [ ] Keep `PRELOAD.md` focused on reusable project patterns, not one-off implementation notes.
-- [ ] Make root build verification serial; do not run overlapping Kotlin compile tasks against the same incremental caches.
-- [ ] If a daemon cache collision appears, verify again serially before treating it as a source failure.
+  - [x] Coroutine opt-in warnings.
+- [x] Keep this tasktree independent from `PRELOAD.md`; do not add to PRELOAD for these stages.
+- [x] Make root build verification serial; do not run overlapping Kotlin compile tasks against the same incremental caches.
+- [x] If a daemon cache collision appears, verify again serially before treating it as a source failure.
 
 ## Stage 1 - User Signals Foundation
 
 Goal: establish a user-signalling gallery that demonstrates LCNC from user signals upward.
 
-- [ ] Keep `libs/user-signals` included in the root tasktree.
-- [ ] Host the user-signals demo on JVM.
-- [ ] Host the user-signals demo on JS Node.
-- [ ] Host the user-signals demo on the supported native host target only.
-- [ ] Keep unsupported x86 and linux-aarch target fallbacks disabled.
-- [ ] Keep 0D user-signal primitives visible:
-  - [ ] Toggle.
-  - [ ] Idiot light.
-  - [ ] Momentary button.
-- [ ] Keep 1D user-signal primitives visible:
-  - [ ] Slider.
-  - [ ] Knob.
-  - [ ] Level meter.
-- [ ] Keep text user-signal primitives visible:
-  - [ ] Text field state.
-  - [ ] Caret and selection state.
-  - [ ] Commit/focus state.
-- [ ] Provide a thin gallery render path for each host:
-  - [ ] JVM task.
-  - [ ] JS Node executable.
-  - [ ] Native executable on supported host.
-- [ ] Ensure gallery magnification exposes detail gradually:
-  - [ ] Level 1: signal labels and current values.
-  - [ ] Level 2: drilldown details.
-  - [ ] Level 3: signal type and foundation metadata.
-- [ ] Keep galleries free of Rete and pointcut mechanics.
-- [ ] If user-signal facets are needed, express them as `Series<Join<FacetKey, Signal<*>>>`.
-- [ ] Avoid using `List` as core facet storage.
-- [ ] Audit remaining user-signals factory APIs that still expose `List` for user-facing option sets.
-- [ ] Decide whether those option sets should remain ergonomic APIs or gain `Series` overloads.
+Evidence: `libs/user-signals` is included by `settings.gradle.kts`; verified serially with `:libs:user-signals:runUserSignalsGalleryJvm`, `:libs:user-signals:jsNodeProductionRun`, and `:libs:user-signals:runDebugExecutableMacos` after fixing JS `currentTimeMillis()` and text-state rendering.
+
+- [x] Keep `libs/user-signals` included in the root tasktree.
+- [x] Host the user-signals demo on JVM.
+- [x] Host the user-signals demo on JS Node.
+- [x] Host the user-signals demo on the supported native host target only.
+- [x] Keep unsupported x86 and linux-aarch target fallbacks disabled.
+- [x] Keep 0D user-signal primitives visible:
+  - [x] Toggle.
+  - [x] Idiot light.
+  - [x] Momentary button.
+- [x] Keep 1D user-signal primitives visible:
+  - [x] Slider.
+  - [x] Knob.
+  - [x] Level meter.
+- [x] Keep text user-signal primitives visible:
+  - [x] Text field state.
+  - [x] Caret and selection state.
+  - [x] Commit/focus state.
+- [x] Provide a thin gallery render path for each host:
+  - [x] JVM task.
+  - [x] JS Node executable.
+  - [x] Native executable on supported host.
+- [x] Ensure gallery magnification exposes detail gradually:
+  - [x] Level 1: signal labels and current values.
+  - [x] Level 2: drilldown details.
+  - [x] Level 3: signal type and foundation metadata.
+- [x] Keep galleries free of Rete and pointcut mechanics.
+- [x] If user-signal facets are needed, express them as `Series<Join<FacetKey, Signal<*>>>`.
+- [x] Avoid using `List` as core facet storage.
+- [x] Audit remaining user-signals factory APIs that still expose `List` for user-facing option sets.
+- [x] Decide whether those option sets should remain ergonomic APIs or gain `Series` overloads.
 
 ## Stage 2 - LCNC Cursor Facets
 
 Goal: move from raw data to cursor facets, then from cursor facets to user-signalling events.
 
-- [ ] Define the minimal LCNC cursor facet vocabulary needed by Forge and user signals.
-- [ ] Reuse existing root cursor algebra:
-  - [ ] `Cursor`.
-  - [ ] `RowVec`.
-  - [ ] `ColumnMeta`.
-  - [ ] `FacetedCursor`.
-  - [ ] `SlabFacet`.
-- [ ] Identify which existing cursor facet code is compile-ready enough to intern into root contracts.
-- [ ] Keep raw blackboard overlays out of user-facing galleries.
-- [ ] Add only necessary LCNC facet handles:
-  - [ ] Logic.
-  - [ ] Computation.
-  - [ ] Notification.
-  - [ ] Coupling.
-  - [ ] Layout hint.
-  - [ ] DAG coordinate.
-  - [ ] WTK hint.
-- [ ] Define the data-flow chain:
+Evidence: `src/commonMain/kotlin/borg/trikeshed/cursor/CcekChoreography.kt`, `src/commonMain/kotlin/borg/trikeshed/cursor/Cursor.kt`, and `src/commonMain/kotlin/borg/trikeshed/classfile/slab/SlabKernel.kt` compile under `./gradlew --no-daemon compileKotlinJvm --warning-mode all`.
+
+- [x] Define the minimal LCNC cursor facet vocabulary needed by Forge and user signals.
+- [x] Reuse existing root cursor algebra:
+  - [x] `Cursor`.
+  - [x] `RowVec`.
+  - [x] `ColumnMeta`.
+  - [x] `FacetedCursor`.
+  - [x] `SlabFacet`.
+- [x] Identify which existing cursor facet code is compile-ready enough to intern into root contracts.
+- [x] Keep raw blackboard overlays out of user-facing galleries.
+- [x] Add only necessary LCNC facet handles:
+  - [x] Logic.
+  - [x] Computation.
+  - [x] Notification.
+  - [x] Coupling.
+  - [x] Layout hint.
+  - [x] DAG coordinate.
+  - [x] WTK hint.
+- [x] Define the data-flow chain:
 
   ```text
   data source
@@ -110,8 +114,8 @@ Goal: move from raw data to cursor facets, then from cursor facets to user-signa
   -> Forge/Kanban visible overlay
   ```
 
-- [ ] Provide a TODO-only root CCEK contract for lifting cursor facets into user-signal events.
-- [ ] Provide a TODO-only command-line choreography contract:
+- [x] Provide a TODO-only root CCEK contract for lifting cursor facets into user-signal events.
+- [x] Provide a TODO-only command-line choreography contract:
 
   ```text
   main(args)
@@ -121,7 +125,7 @@ Goal: move from raw data to cursor facets, then from cursor facets to user-signa
   -> user-signalling events
   ```
 
-- [ ] Provide a TODO-only generated API choreography contract:
+- [x] Provide a TODO-only generated API choreography contract:
 
   ```text
   OpenAPI operation
@@ -136,6 +140,8 @@ Goal: move from raw data to cursor facets, then from cursor facets to user-signa
 
 Goal: review `libs/htx-client`, detail reactor choreography, and intern compile-ready concepts to root.
 
+Evidence: root HTX request types and reactor elements exist in `src/commonMain/kotlin/borg/trikeshed/htx/`; `runHtxDemo` passed serially. Live replacement of `libs/htx-client` and fake transport/TLS verification remain open.
+
 - [ ] Treat `libs/htx-client` as a temporary byte-stream client until root HTX is complete.
 - [ ] Document current `libs/htx-client` behavior:
   - [ ] Parse URL into target.
@@ -143,16 +149,16 @@ Goal: review `libs/htx-client`, detail reactor choreography, and intern compile-
   - [ ] Write rendered HTTP request bytes.
   - [ ] Parse response headers from byte chunks.
   - [ ] Return body or stream range bytes.
-- [ ] Prefer root `borg.trikeshed.htx` request/response types over `libs/htx-client` duplicates.
-- [ ] Intern root-ready request shapes:
-  - [ ] `HtxScheme`.
-  - [ ] `HtxTransportProtocol`.
-  - [ ] `HtxMethod`.
-  - [ ] `HtxFetchStyle`.
-  - [ ] `HtxRange`.
-  - [ ] `HtxTarget`.
-  - [ ] `HtxRequest`.
-  - [ ] `HtxResponse`.
+- [x] Prefer root `borg.trikeshed.htx` request/response types over `libs/htx-client` duplicates.
+- [x] Intern root-ready request shapes:
+  - [x] `HtxScheme`.
+  - [x] `HtxTransportProtocol`.
+  - [x] `HtxMethod`.
+  - [x] `HtxFetchStyle`.
+  - [x] `HtxRange`.
+  - [x] `HtxTarget`.
+  - [x] `HtxRequest`.
+  - [x] `HtxResponse`.
 - [ ] Retire duplicate `libs/htx-client` request parsing after root consumers are migrated.
 - [ ] Replace opaque byte-stream transport with root reactor services:
   - [ ] `HtxElement`.
@@ -162,7 +168,7 @@ Goal: review `libs/htx-client`, detail reactor choreography, and intern compile-
   - [ ] `TlsCodecBackend`.
   - [ ] `ChannelOperations`.
   - [ ] `NioSupervisor`.
-- [ ] Document root reactor choreography:
+- [x] Document root reactor choreography:
 
   ```text
   openHtxElement()
@@ -183,7 +189,7 @@ Goal: review `libs/htx-client`, detail reactor choreography, and intern compile-
   - [ ] macOS.
   - [ ] Linux.
   - [ ] JS Node.
-- [ ] Keep unsupported native target policy aligned with `PRELOAD.md`.
+- [ ] Keep unsupported native target policy aligned with this tasktree; do not update `PRELOAD.md`.
 - [ ] Verify HTX with fake `ChannelOperations` and fake TLS backend before using live network tests.
 
 ## Stage 4 - Default SupervisorJob Main Scaffolding
@@ -234,36 +240,38 @@ Goal: all active TrikeShed mains enter through the same root SupervisorJob and C
 
 Goal: graph labelling must be visible to users, queryable, and tied to ACL-backed overlays.
 
-- [ ] Make graph labels accessible to users.
-- [ ] Make graph labels accessible to user queries.
-- [ ] Resolve user graph queries into ISAM column-oriented groupings per consuming method.
-- [ ] Add visible overlays for labels.
-- [ ] Ensure overlays can be rendered independently from base graph nodes.
-- [ ] Add placeholder Forge identity ACLs:
-  - [ ] User principal.
-  - [ ] Agent principal.
-  - [ ] Owner placeholder.
-  - [ ] Codex agent placeholder.
-  - [ ] Generic agent placeholder.
-- [ ] Add placeholder overlay profiles.
-- [ ] Define overlay permissions:
-  - [ ] Read label.
-  - [ ] Drilldown.
-  - [ ] Query grouping.
-  - [ ] Edit overlay.
-- [ ] Add overlay facet handles:
-  - [ ] LCNC facet handle.
-  - [ ] WTK hint.
-  - [ ] WTK layout.
-  - [ ] DAG coordinate.
+Evidence: `libs/forge/src/commonMain/kotlin/borg/trikeshed/forge/KanbanGraphOverlays.kt`; `:libs:forge:runKanbanBoardDemoJvm` passed serially. Magnification-specific overlay levels are still open.
+
+- [x] Make graph labels accessible to users.
+- [x] Make graph labels accessible to user queries.
+- [x] Resolve user graph queries into ISAM column-oriented groupings per consuming method.
+- [x] Add visible overlays for labels.
+- [x] Ensure overlays can be rendered independently from base graph nodes.
+- [x] Add placeholder Forge identity ACLs:
+  - [x] User principal.
+  - [x] Agent principal.
+  - [x] Owner placeholder.
+  - [x] Codex agent placeholder.
+  - [x] Generic agent placeholder.
+- [x] Add placeholder overlay profiles.
+- [x] Define overlay permissions:
+  - [x] Read label.
+  - [x] Drilldown.
+  - [x] Query grouping.
+  - [x] Edit overlay.
+- [x] Add overlay facet handles:
+  - [x] LCNC facet handle.
+  - [x] WTK hint.
+  - [x] WTK layout.
+  - [x] DAG coordinate.
 - [ ] Make magnification reveal details:
   - [ ] Label only.
   - [ ] Label plus node identity.
   - [ ] Label plus ACL and facets.
   - [ ] Label plus ISAM grouping and consuming method.
-- [ ] Keep label overlays separate from core board data until persistence contracts are chosen.
-- [ ] Keep current `KanbanBoard` list-backed serialization shape as a compatibility boundary.
-- [ ] Do not introduce new list-backed core algebra below that boundary.
+- [x] Keep label overlays separate from core board data until persistence contracts are chosen.
+- [x] Keep current `KanbanBoard` list-backed serialization shape as a compatibility boundary.
+- [x] Do not introduce new list-backed core algebra below that boundary.
 
 ## Stage 6 - Forge Kanban, CCEK, Counters, Drains, and Rete
 
@@ -357,6 +365,8 @@ Goal: hoist the Forge and Forge UI galleries into root runs without hiding behin
 
 Goal: move from Kotlin JS/Wasm target assumptions toward Graal ECMA where that is the runtime plan.
 
+Evidence: no `GraalECMAContracts.kt` or `GraalECMADemo.kt` exists on disk yet; this stage remains open rather than weakly completed.
+
 - [ ] Identify what currently depends on Kotlin JS browser or Wasm targets.
 - [ ] Keep JS Node support for hostable demo slices where needed.
 - [ ] Decide which ECMA behavior belongs in GraalVM instead of Kotlin JS/Wasm.
@@ -368,6 +378,8 @@ Goal: move from Kotlin JS/Wasm target assumptions toward Graal ECMA where that i
 ## Stage 10 - Polyglot Classfile Pointcut Specializations
 
 Goal: declare polyglot specialization points for harnessing VM objects and inserting TrikeShed/Forge objects.
+
+Evidence: no `PolyglotContracts.kt` or `PolyglotPointcutDemo.kt` exists on disk yet; this stage remains open rather than weakly completed.
 
 - [ ] Keep current Ruby specialization as `TODO()` only.
 - [ ] Keep current Python specialization as `TODO()` only.
@@ -388,6 +400,9 @@ Goal: declare polyglot specialization points for harnessing VM objects and inser
 
 Goal: generated APIs should participate in the same CCEK choreography as command-line mains.
 
+Evidence: `libs/openapi/src/commonMain/kotlin/borg/trikeshed/openapi/OpenApiChoreographyContracts.kt` and `:libs:openapi:runOpenApiChoreographyDemo` compile/run; generated-source integration remains open.
+
+- [x] Add TODO-only OpenAPI choreography contracts outside generated output.
 - [ ] Review generated `SupervisorJobs.kt` output.
 - [ ] Replace isolated generated job creation with root-compatible parent job composition.
 - [ ] Generate operation-specific request cursors.
@@ -404,23 +419,25 @@ Goal: generated APIs should participate in the same CCEK choreography as command
 
 - [ ] Ensure generated APIs do not bypass overlay ACL checks.
 - [ ] Ensure generated APIs do not bypass counter/drain/Rete delegate hooks once implemented.
-- [ ] Keep generated APIs compatible with JVM 25.
+- [x] Keep generated APIs compatible with JVM 25.
 - [ ] Decide whether generated APIs belong in root, `libs/openapi`, or generated source only.
 
 ## Stage 12 - Blackboard and Classfile DAG Fabric
 
 Goal: support an overarching pointcutting blackboard classfile DAG as the main event fabric, without gratuitous insertion.
 
-- [ ] Define the blackboard classfile DAG as an event fabric contract.
-- [ ] Keep DAG coordinates available through overlay facets.
-- [ ] Use pointcutting only where it is the natural boundary:
-  - [ ] Classfile pointcut coordinate.
-  - [ ] VM object harnessing.
-  - [ ] Graph-node planning.
-  - [ ] Cursor facet transition.
-  - [ ] Rete production activation.
-- [ ] Avoid adding pointcuts inside passive data holders.
-- [ ] Avoid adding pointcuts inside user-signal gallery renderers.
+Evidence: `src/commonMain/kotlin/borg/trikeshed/dag/BlackboardDagFabric.kt`; `runBlackboardDagDemo` passed serially. Runtime conversions into user signals, Forge overlay facets, Rete facts, and ACL gates remain open.
+
+- [x] Define the blackboard classfile DAG as an event fabric contract.
+- [x] Keep DAG coordinates available through overlay facets.
+- [x] Use pointcutting only where it is the natural boundary:
+  - [x] Classfile pointcut coordinate.
+  - [x] VM object harnessing.
+  - [x] Graph-node planning.
+  - [x] Cursor facet transition.
+  - [x] Rete production activation.
+- [x] Avoid adding pointcuts inside passive data holders.
+- [x] Avoid adding pointcuts inside user-signal gallery renderers.
 - [ ] Decide how blackboard events become user-signalling events.
 - [ ] Decide how classfile DAG coordinates become Forge overlay facets.
 - [ ] Decide how Rete facts are projected from DAG events.
@@ -430,15 +447,17 @@ Goal: support an overarching pointcutting blackboard classfile DAG as the main e
 
 Goal: user graph queries resolve into ISAM column-oriented groupings per consuming method.
 
-- [ ] Define consuming method identifiers.
-- [ ] Define query result grouping shape.
-- [ ] Define column grouping for Kanban board columns.
-- [ ] Define column grouping for Kanban cards.
-- [ ] Define column grouping for Cascade graph nodes.
-- [ ] Define column grouping for overlay ACL rows.
-- [ ] Define column grouping for LCNC facet rows.
-- [ ] Decide whether grouping is persisted in ISAM immediately or kept as an in-memory contract first.
-- [ ] Keep query output renderable as:
+Evidence: `src/commonMain/kotlin/borg/trikeshed/isam/IsamColumnGroupings.kt`; `runIsamDemo` now renders node id, label, consuming method, ISAM columns, facets, and ACL status.
+
+- [x] Define consuming method identifiers.
+- [x] Define query result grouping shape.
+- [x] Define column grouping for Kanban board columns.
+- [x] Define column grouping for Kanban cards.
+- [x] Define column grouping for Cascade graph nodes.
+- [x] Define column grouping for overlay ACL rows.
+- [x] Define column grouping for LCNC facet rows.
+- [x] Decide whether grouping is persisted in ISAM immediately or kept as an in-memory contract first.
+- [x] Keep query output renderable as:
 
   ```text
   node id

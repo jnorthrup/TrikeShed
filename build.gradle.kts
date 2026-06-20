@@ -88,13 +88,13 @@ kotlin {
     }
 
     sourceSets {
-        val commonMain by getting {
+        val commonMain = getByName("commonMain") {
             dependencies {
                 api("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0-rc02")
                 api("org.jetbrains.kotlinx:kotlinx-datetime:0.8.0-rc02-0.6.x-compat")
             }
         }
-        val commonTest by getting {
+        val commonTest = getByName("commonTest") {
             kotlin.exclude(
                 "**/demos/**",
                 "**/strategy/**",
@@ -109,10 +109,10 @@ kotlin {
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0-rc02")
             }
         }
-        val nativeMain by creating { dependsOn(commonMain) }
-        val nativeTest by creating { dependsOn(commonTest) }
-        val posixMain by creating { dependsOn(nativeMain) }
-        val posixTest by creating { dependsOn(nativeTest) }
+        val nativeMain = create("nativeMain") { dependsOn(commonMain) }
+        val nativeTest = create("nativeTest") { dependsOn(commonTest) }
+        val posixMain = create("posixMain") { dependsOn(nativeMain) }
+        val posixTest = create("posixTest") { dependsOn(nativeTest) }
 
         val macosMain = sourceSets.findByName("macosMain"); macosMain?.dependsOn(posixMain)
         val macosTest = sourceSets.findByName("macosTest"); macosTest?.dependsOn(posixTest)
@@ -124,10 +124,10 @@ kotlin {
         val linuxArm64Main = sourceSets.findByName("linuxArm64Main"); linuxArm64Main?.dependsOn(posixMain); linuxArm64Main?.kotlin?.srcDir("src/linuxMain/kotlin")
         val linuxArm64Test = sourceSets.findByName("linuxArm64Test"); linuxArm64Test?.dependsOn(posixTest); linuxArm64Test?.kotlin?.srcDir("src/linuxTest/kotlin")
 
-        val wasmJsMain by getting { dependsOn(commonMain) }
-        val wasmJsTest by getting { dependsOn(commonTest) }
+        val wasmJsMain = getByName("wasmJsMain") { dependsOn(commonMain) }
+        val wasmJsTest = getByName("wasmJsTest") { dependsOn(commonTest) }
 
-        val jvmMain by getting {
+        val jvmMain = getByName("jvmMain") {
             resources.srcDir("src/jvmMain/resources")
             dependencies {
                 implementation("org.openjdk.jmh:jmh-core:1.37")
@@ -141,14 +141,14 @@ kotlin {
             kotlin.srcDir("src/jmhMain/kotlin")
             resources.srcDir("src/jmhMain/resources")
         }
-        val jvmTest by getting {
+        val jvmTest = getByName("jvmTest") {
             dependencies {
                 implementation(kotlin("test-junit"))
                 implementation("org.junit.jupiter:junit-jupiter:6.1.0-RC1")
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0-rc02")
             }
         }
-        val jsTest by getting {
+        val jsTest = getByName("jsTest") {
             dependencies {
                 npm("karma-electron", "7.2.0")
                 npm("electron", "31.7.7")
@@ -169,4 +169,63 @@ tasks.named("cleanPublishMavenLocal") {
     doFirst {
         println("=== Clean build + publish to mavenLocal ===")
     }
+}
+
+// HTX Demo run task
+tasks.register<JavaExec>("runHtxDemo") {
+    group = "run"
+    description = "Runs the HTX demo on JVM."
+    dependsOn(":compileKotlinJvm")
+    mainClass.set("borg.trikeshed.htx.demo.HtxDemoKt")
+    classpath(tasks.named("jvmJar"), configurations.named("jvmRuntimeClasspath"))
+}
+
+// HTX Network Demo run task
+tasks.register<JavaExec>("runHtxNetworkDemo") {
+    group = "run"
+    description = "Runs the HTX network demo on JVM."
+    dependsOn(":compileKotlinJvm")
+    mainClass.set("borg.trikeshed.htx.demo.HtxNetworkDemo")
+    classpath(tasks.named("jvmJar"), configurations.named("jvmRuntimeClasspath"))
+}
+
+
+// Blackboard DAG Demo run task
+tasks.register<JavaExec>("runBlackboardDagDemo") {
+    group = "run"
+    description = "Runs the Blackboard DAG Fabric demo on JVM."
+    dependsOn(":compileKotlinJvm")
+    mainClass.set("borg.trikeshed.dag.demo.BlackboardDagDemo")
+    classpath(tasks.named("jvmJar"), configurations.named("jvmRuntimeClasspath"))
+}
+
+// ISAM Column Groupings Demo run task
+tasks.register<JavaExec>("runIsamDemo") {
+    group = "run"
+    description = "Runs the ISAM Column Groupings demo on JVM."
+    dependsOn(":compileKotlinJvm")
+    mainClass.set("borg.trikeshed.isam.demo.IsamColumnGroupingsDemo")
+    classpath(tasks.named("jvmJar"), configurations.named("jvmRuntimeClasspath"))
+}
+
+// CLI Demo run task
+tasks.register<JavaExec>("runCliDemo") {
+    group = "run"
+    description = "Runs the CLI demo on JVM."
+    dependsOn("jvmJar")
+    mainClass.set("borg.trikeshed.cli.demo.CliDemo")
+    classpath(tasks.named("jvmJar"), configurations.getByName("jvmRuntimeClasspath"))
+}
+
+// OpenAPI Demo run task
+tasks.register<JavaExec>("runOpenApiDemo") {
+    group = "run"
+    description = "Runs the OpenAPI demo on JVM."
+    dependsOn(":libs:openapi:compileKotlinJvm")
+    mainClass.set("borg.trikeshed.openapi.demo.OpenApiDemo")
+    classpath(
+        sourceSets.getByName("jvmMain").runtimeClasspath,
+        project(":libs:openapi").sourceSets.getByName("jvmMain").output.classesDirs
+    )
+    workingDir = projectDir
 }
