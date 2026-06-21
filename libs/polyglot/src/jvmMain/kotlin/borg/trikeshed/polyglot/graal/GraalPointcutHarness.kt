@@ -5,6 +5,7 @@ import borg.trikeshed.polyglot.ccek.FieldSynapse
 import borg.trikeshed.polyglot.ccek.PointcutEventProducer
 import org.graalvm.polyglot.Context
 import org.graalvm.polyglot.HostAccess
+import org.graalvm.polyglot.Instrumenter
 import java.util.Collections
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
@@ -18,6 +19,23 @@ const val OP_P_SET = 0xA8.toByte()
 // Phase constants
 const val PHASE_BEFORE = 0.toByte()
 const val PHASE_AFTER = 1.toByte()
+
+/**
+ * Service key for sharing PointcutEventProducer with Truffle instruments.
+ */
+internal object PointcutProducerService {
+    private var producer: PointcutEventProducer? = null
+    private var harness: GraalPointcutHarness? = null
+    
+    fun setProducer(p: PointcutEventProducer, h: GraalPointcutHarness) {
+        producer = p
+        harness = h
+    }
+    
+    fun getProducer(): PointcutEventProducer? = producer
+    fun getHarness(): GraalPointcutHarness? = harness
+    fun clear() { producer = null; harness = null }
+}
 
 /**
  * Compatibility trace for the existing misspelled test helper `capturedSynapes()`.
@@ -66,6 +84,8 @@ class GraalPointcutHarness(
         PolyglotPointcutTrace.reset()
         if (pointcutProducer != null) {
             graalContext.bindPointcutEmitter(this, pointcutProducer)
+            // Register producer for Truffle instruments to access
+            PointcutProducerService.setProducer(pointcutProducer, this)
         }
         if (enableInstrumentation) {
             installPythonInstrumentation()
@@ -111,6 +131,7 @@ class GraalPointcutHarness(
     /** Bind pointcut emitter to context manually (for custom setup). */
     fun bindPointcutEmitter(producer: PointcutEventProducer) {
         graalContext.bindPointcutEmitter(this, producer)
+        PointcutProducerService.setProducer(producer, this)
     }
 
     /**

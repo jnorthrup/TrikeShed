@@ -33,12 +33,24 @@ class ChannelRunner(
 
     private var running = false
 
-    /** Open a TCP socket and register for read/write events. */
-    fun tcpConnect(host: String, port: Int): Int {
+    /** Open a TCP listener socket and register for accept events.
+     *  Used by servers. The returned fd is a ServerSocketChannel-equivalent. */
+    fun tcpListen(host: String, port: Int): Int {
         val fd = channelOps.socket(2 /* AF_INET */, 1 /* SOCK_STREAM */, 0)
-        reactorOps.register(fd, setOf(Interest.READ, Interest.WRITE))
+        reactorOps.register(fd, setOf(Interest.ACCEPT))
         return fd
     }
+
+    /** Open a TCP client socket and register for connect events.
+     *  Used by clients dialing out. */
+    fun tcpDial(host: String, port: Int): Int {
+        val fd = channelOps.socket(2 /* AF_INET */, 1 /* SOCK_STREAM */, 0)
+        reactorOps.register(fd, setOf(Interest.CONNECT))
+        return fd
+    }
+
+    /** Deprecated: ambiguous between listen and dial. Use tcpListen() or tcpDial(). */
+    fun tcpConnect(host: String, port: Int): Int = tcpDial(host, port)
 
     /** Suspend until data is available on [fd]. */
     suspend fun readAsync(fd: Int): Int {

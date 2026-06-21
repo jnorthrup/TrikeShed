@@ -65,6 +65,7 @@ class JvmChannelOperations(
             ch.bind(java.net.InetSocketAddress(port))
             0
         } catch (e: Exception) {
+            println("[JvmChannelOperations.bind] fd=$fd port=$port failed: ${e.javaClass.simpleName}: ${e.message}")
             -1
         }
     }

@@ -48,10 +48,10 @@ class JvmReactorOperations(
         if (Interest.CONNECT in interests) ops = ops or SelectionKey.OP_CONNECT
 
         try {
-            entry.channel.register(selector, ops)
+            channel.register(selector, ops)
         } catch (e: Exception) {
-            selector.keys().firstOrNull { it.channel() == entry.channel }?.cancel()
-            entry.channel.register(selector, ops)
+            selector.keys().firstOrNull { it.channel() == channel }?.cancel()
+            channel.register(selector, ops)
         }
     }
 

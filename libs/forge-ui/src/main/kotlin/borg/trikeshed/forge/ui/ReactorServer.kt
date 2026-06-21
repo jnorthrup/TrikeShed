@@ -41,11 +41,18 @@ object ReactorServer {
 
             // Create userspace-nio components
             channelOps = JvmChannelOperations()
-            reactorOps = JvmReactorOperations()
+            // Bridge allows reactorOps.register(fd, READ) to lazily discover
+            // a client socket that JvmChannelOperations.accept() already created.
+            // This is the missing link that made readAsync hang on the previous
+            // attempts.
+            reactorOps = JvmReactorOperations(
+                channelOpsBridge = { fd -> channelOps!!.getSocketChannel(fd) as? java.nio.channels.SelectableChannel }
+            )
             val runner = ChannelRunner(channelOps!!, reactorOps!!)
 
-            // Open TCP server socket
-            val sockFd = runner.tcpConnect("0.0.0.0", port)
+            // Open TCP server socket — tcpListen registers Interest.ACCEPT
+            // so the Selector wakes on incoming connections.
+            val sockFd = runner.tcpListen("0.0.0.0", port)
             val bindResult = channelOps!!.bind(sockFd, port)
             val listenResult = channelOps!!.listen(sockFd, 128)
 
@@ -63,6 +70,11 @@ object ReactorServer {
             println("bind=$bindResult listen=$listenResult")
             println("SSE endpoint: http://localhost:$port/events")
 
+            // Critical: tcpConnect() initially registers READ+WRITE — but a ServerSocketChannel
+            // needs OP_ACCEPT to wake on incoming connections, not OP_READ. Overwrite interest
+            // with ACCEPT (and keep READ in case we ever probe state) so poll() actually fires.
+            reactorOps!!.register(serverFdRef, setOf(Interest.ACCEPT))
+
             // Run reactor event loop
             val timeout = Duration.parse("100ms")
             runnerJob = runner.run(scope, pollTimeout = timeout) { signal ->
@@ -74,7 +86,10 @@ object ReactorServer {
                             // otherwise the reactor's next poll() yields nothing for this fd
                             // and readAsync's deferred never completes.
                             reactorOps!!.register(clientFd, setOf(Interest.READ))
+                            println("[ReactorServer] accepted clientFd=$clientFd, READ interest registered")
                             scope.launch { handleClient(runner, clientFd) }
+                        } else {
+                            println("[ReactorServer] accept returned $clientFd")
                         }
                     }
                     Interest.READ in signal.ready -> {
