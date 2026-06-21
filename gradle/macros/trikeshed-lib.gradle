@@ -587,11 +587,13 @@ switch (project.path) {
         }
         break
     case ":libs:forge-ui":
-        // Apply Compose plugin first so it can configure the application plugin
+        // Forge UI: JVM-only for now (ReactorServer)
         pluginManager.apply("org.jetbrains.kotlin.plugin.compose")
         pluginManager.apply("org.jetbrains.compose")
-        plainJvm(true)
+        plainJvm(true)  // JVM only, no KMP
+        
         def forgeUiKotlin = extensions.getByName("kotlin")
+        // JVM-only dependencies (ReactorServer uses these)
         forgeUiKotlin.sourceSets.getByName("main").dependencies {
             implementation "org.jetbrains.kotlinx:kotlinx-coroutines-core:${prop('versions.kotlinx-coroutines-core')}"
             implementation "org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3"
@@ -601,16 +603,34 @@ switch (project.path) {
             implementation "org.jetbrains.compose.material:material-icons-extended:1.7.3"
             implementation project(":libs:forge")
         }
-        // Configure compose desktop application
+        // JVM test dependencies - add to project-level dependencies (not sourceSet)
+        project.dependencies {
+            testImplementation "org.jetbrains.kotlin:kotlin-test:${kotlinVersion}"
+            testImplementation "org.jetbrains.kotlin:kotlin-test-junit:${kotlinVersion}"
+            testImplementation "org.jetbrains.kotlinx:kotlinx-coroutines-core:${prop('versions.kotlinx-coroutines-core')}"
+            testImplementation "org.jetbrains.kotlinx:kotlinx-coroutines-test:${prop('versions.kotlinx-coroutines-test')}"
+            testImplementation "org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3"
+        }
+        // Configure test task to include main classes after evaluation
         project.afterEvaluate {
-            project.application { mainClass = "borg.trikeshed.forge.ui.MainKt" }
-            def ext = project.extensions.findByName("compose")
-            if (ext) {
-                ext.desktop {
-                    application {
-                        mainClass = "borg.trikeshed.forge.ui.MainKt"
-                    }
-                }
+            project.tasks.getByName("test") {
+                useJUnit()
+                classpath += files("build/classes/kotlin/main")
+            }
+        }
+        // Configure JVM run task
+        project.afterEvaluate {
+            project.tasks.register("runReactorServer", JavaExec) {
+                group = "run"
+                description = "Run the Forge UI Reactor Server"
+                dependsOn("jar", "compileKotlin")
+                mainClass.set("borg.trikeshed.forge.ui.ReactorServerKt")
+                // Include compiled classes + runtime dependencies
+                classpath(files(
+                    project.file("build/classes/kotlin/main"),
+                    project.file("build/resources/main")
+                ) + configurations.getByName("runtimeClasspath"))
+                workingDir = project.projectDir
             }
         }
         break
