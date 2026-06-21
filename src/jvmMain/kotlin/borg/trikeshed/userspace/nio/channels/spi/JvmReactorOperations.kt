@@ -23,6 +23,10 @@ import java.util.concurrent.atomic.AtomicInteger
  */
 class JvmReactorOperations(
     private val selector: Selector = JdkSelectorProvider.provider().openSelector(),
+    // Optional bridge to JvmChannelOperations so register(fd, interests) can
+    // lazily pick up a channel that was created on the channel-ops side
+    // (e.g. via accept()) without coupling the classes in their constructors.
+    private val channelOpsBridge: (Int) -> java.nio.channels.SelectableChannel? = { null },
 ) : ReactorOperations {
 
     // fd -> (Channel, interests, userData)
@@ -30,9 +34,12 @@ class JvmReactorOperations(
     private val fdCounter = AtomicInteger(1000)
 
     override fun register(fd: Int, interests: Set<Interest>, userData: Long) {
-        val entry = fdRegistry[fd] ?: return
+        // Look up in our own registry first; if missing, try the bridge so
+        // dynamically accepted fds become visible to the Selector.
+        val existing = fdRegistry[fd]
+        val channel = existing?.channel ?: channelOpsBridge(fd) ?: return
         val mask = Interest.toMask(interests)
-        fdRegistry[fd] = RegistryEntry(entry.channel, interests, userData)
+        fdRegistry[fd] = RegistryEntry(channel, interests, userData)
 
         var ops = 0
         if (Interest.READ in interests) ops = ops or SelectionKey.OP_READ

@@ -1,9 +1,10 @@
-//! keymux library - KeyStore and DselRouter with Chimera semaphore integration
+//! keymux library - Plugin system for keyboard-driven applications.
 
-pub mod keystore;
-pub mod dsel;
-pub mod chimera;
+pub mod cli;
+pub mod event_bus;
+pub mod keymap;
+pub mod plugin;
 
-pub use keystore::{KeyStore, ApiKey, ProviderQuota, ProviderSpec};
-pub use dsel::{DselRouter, RouteResult, ProviderStatus};
-pub use chimera::{ChimeraPool, ChimeraDraft};
+pub use event_bus::{EventBus, KeyEvent, KeyChord, Modifier};
+pub use keymap::{KeyMap, KeyBinding, Action};
+pub use plugin::{Plugin, PluginContext, PluginConfig, PluginMetadata, PluginRegistry, PluginManager, ActionResult, TrikeShedKanbanPlugin};

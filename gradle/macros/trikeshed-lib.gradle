@@ -8,6 +8,7 @@ buildscript {
     }
     dependencies {
         classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:2.4.0"
+        classpath "org.jetbrains.compose:compose-gradle-plugin:1.7.3"
     }
 }
  
@@ -215,9 +216,43 @@ switch (project.path) {
     case ":libs:polyglot":
         kmpJvm()
         def polyglotKotlin = extensions.getByName("kotlin")
+        // Override commonTest to avoid kotlin-test-junit/junit5 conflict
         polyglotKotlin.sourceSets.getByName("commonTest").dependencies {
             implementation rootPeer()
-            implementation "org.jetbrains.kotlinx:kotlinx-coroutines-core:${prop("versions.kotlinx-coroutines-core")}"
+            implementation "org.jetbrains.kotlinx:kotlinx-coroutines-core:${prop('versions.kotlinx-coroutines-core')}"
+            // Use kotlin-test without JUnit runner - we'll use JUnit Jupiter directly
+            implementation "org.jetbrains.kotlin:kotlin-test:${kotlinVersion}"
+            implementation "org.jetbrains.kotlinx:kotlinx-coroutines-test:${prop('versions.kotlinx-coroutines-test')}"
+        }
+        polyglotKotlin.sourceSets.getByName("jvmMain").dependencies {
+            implementation "org.graalvm.polyglot:polyglot:25.0.2"
+            implementation "org.graalvm.polyglot:js-community:25.0.2"
+            implementation "org.graalvm.polyglot:python-community:25.0.2"
+        }
+        polyglotKotlin.sourceSets.getByName("jvmTest").dependencies {
+            // JUnit 5 only - no kotlin-test-junit or kotlin-test-junit5
+            implementation "org.junit.jupiter:junit-jupiter:6.1.0-RC1"
+            implementation "org.junit.jupiter:junit-jupiter-params:6.1.0-RC1"
+            implementation "org.junit.platform:junit-platform-launcher:1.11.0"
+            implementation "org.jetbrains.kotlinx:kotlinx-coroutines-test:${prop('versions.kotlinx-coroutines-test')}"
+        }
+        // Exclude conflicting JUnit 4/5 implementations from kotlin-test
+        configurations {
+            jvmTestCompileClasspath {
+                resolutionStrategy {
+                    exclude module: "kotlin-test-junit"
+                    exclude module: "kotlin-test-junit5"
+                }
+            }
+            jvmTestRuntimeClasspath {
+                resolutionStrategy {
+                    exclude module: "kotlin-test-junit"
+                    exclude module: "kotlin-test-junit5"
+                }
+            }
+        }
+        tasks.named("jvmTest") {
+            useJUnitPlatform()
         }
         break
     case ":libs:concurrency":
@@ -587,10 +622,8 @@ switch (project.path) {
         }
         break
     case ":libs:forge-ui":
-        // Forge UI: JVM-only for now (ReactorServer)
-        pluginManager.apply("org.jetbrains.kotlin.plugin.compose")
-        pluginManager.apply("org.jetbrains.compose")
-        plainJvm(true)  // JVM only, with application plugin for desktop UI
+        // Forge UI: JVM-only (ReactorServer - no Compose needed)
+        plainJvm(true)  // JVM only
         
         def forgeUiKotlin = extensions.getByName("kotlin")
         // JVM-only dependencies (ReactorServer uses these)
@@ -622,7 +655,7 @@ switch (project.path) {
             }
             // Configure application plugin for desktop UI
             project.tasks.getByName("run") {
-                mainClass.set("borg.trikeshed.forge.ui.KanbanBoardKt")
+                mainClass.set("borg.trikeshed.forge.ui.MainKt")
             }
         }
         // Configure JVM run tasks (ReactorServer only - KanbanBoard uses application plugin)
@@ -631,7 +664,7 @@ switch (project.path) {
                 group = "run"
                 description = "Run the Forge UI Reactor Server"
                 dependsOn("jar", "compileKotlin")
-                mainClass.set("borg.trikeshed.forge.ui.ReactorServerKt")
+                mainClass.set("borg.trikeshed.forge.ui.MainKt")
                 classpath(files(
                     project.file("build/classes/kotlin/main"),
                     project.file("build/resources/main")

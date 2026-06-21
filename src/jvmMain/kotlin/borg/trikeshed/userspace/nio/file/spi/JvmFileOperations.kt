@@ -92,7 +92,14 @@ class JvmFileOperations : FileOperations {
 
     override fun deleteRecursively(path: String) { File(path).deleteRecursively() }
 
-    override fun resolvePath(vararg parts: String): String = parts.joinToString(File.separator)
+    override fun resolvePath(vararg parts: String): String {
+        val joined = parts.joinToString(File.separator)
+        return when {
+            joined.startsWith("~") -> joined.replaceFirst("~", System.getProperty("user.home")!!)
+            !java.nio.file.Path.of(joined).isAbsolute -> java.nio.file.Path.of(cwd(), joined).toAbsolutePath().toString()
+            else -> joined
+        }
+    }
 
     override fun readZip(path: String): List<Pair<String, ByteArray>> = ZipFile(path).use { zip ->
         zip.entries().asSequence().map { entry ->

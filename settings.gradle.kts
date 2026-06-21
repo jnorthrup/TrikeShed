@@ -3,6 +3,10 @@ pluginManagement {
         gradlePluginPortal()
         mavenCentral()
         google()
+        maven("https://oss.sonatype.org/content/repositories/snapshots/")
+    }
+    plugins {
+        kotlin("plugin.compose") version "2.4.0"
     }
 }
 
@@ -24,12 +28,13 @@ rootProject.name = "TrikeShed"
 // We want: pointcutting algebra SEPARATED from xvm/lib_cursor
 val workingModules = setOf(
     "forge", "forge-api", "forge-ui", "kanban", "keymux", "modelmux",
-    "lcnc", "miniduck-memory", "common", "user-signals",
+    "lcnc", "miniduck", "miniduck-memory", "common", "user-signals",
     "couch", "couch:viewserver", "htx-client", "tls", "ipfs", "quic",
     "tiny-btrfs", "kursive", "patl", "concurrency", "dreamer-kmm", "dreamer-dashboard",
     "openapi", "htx-client", "jules-client", "cmc",
     "cmc-generated", "krak", "krak-generated", "rhood-generated", "cpu-cache",
-    "ccek-core", "lib", "classfile"
+    "ccek-core", "lib", "classfile",
+    "polyglot"
 )
 
 val brokenModules = setOf(

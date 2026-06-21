@@ -45,18 +45,28 @@ class JvmChannelOperations(
         JvmChannelHandle(this, entries)
 
     override fun socket(domain: Int, type: Int, protocol: Int): Int {
-        val ch = if (type == 1) { // SOCK_STREAM
-            SocketChannel.open().apply { configureBlocking(false) }
-        } else {
+        // type=1 (SOCK_STREAM): default branch in userspace-nio == listener (ServerSocketChannel)
+        // type!=1 (e.g. SOCK_DGRAM): dialer (SocketChannel via DatagramChannel when needed)
+        // For the DEV stub we keep both as SelectableChannels in the same map.
+        val ch: SelectableChannel = if (type == 1) {
             ServerSocketChannel.open().apply { configureBlocking(false) }
+        } else {
+            SocketChannel.open().apply { configureBlocking(false) }
         }
         return registerChannelInternal(ch, Interest.toMask(setOf(Interest.READ, Interest.ACCEPT, Interest.CONNECT)))
     }
 
     override fun bind(fd: Int, port: Int): Int {
         val ch = socketChannels[fd] as? ServerSocketChannel ?: return -1
-        ch.bind(java.net.InetSocketAddress(port))?.let { return 0 }
-        return -1
+        // ServerSocketChannel.bind() returns the channel itself (never null on success);
+        // an exception on failure. Don't use `?.let { return 0 }` — that returns 0
+        // unconditionally inside the let branch, masking bind failures.
+        return try {
+            ch.bind(java.net.InetSocketAddress(port))
+            0
+        } catch (e: Exception) {
+            -1
+        }
     }
 
     override fun listen(fd: Int, backlog: Int): Int = 0 // NIO ServerSocketChannel listens implicitly on bind
@@ -107,6 +117,10 @@ class JvmChannelOperations(
     fun registerFile(fd: Int, fc: FileChannel) {
         fileChannels[fd] = fc
     }
+    
+    /** Get socket channel by fd for direct I/O (DEV stub only) */
+    fun getSocketChannel(fd: Int): java.nio.channels.SocketChannel? =
+        socketChannels[fd] as? java.nio.channels.SocketChannel
 }
 
 // Moved out of inner class to avoid 'Class is prohibited here' error
