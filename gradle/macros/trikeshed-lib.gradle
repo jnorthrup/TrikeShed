@@ -10,7 +10,7 @@ buildscript {
         classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:2.4.0"
     }
 }
-
+ 
 def trikeshedVersion = "1.0"
 def libVersion = "0.1.0-SNAPSHOT"
 def kotlinVersion = "2.4.0"
@@ -590,7 +590,7 @@ switch (project.path) {
         // Forge UI: JVM-only for now (ReactorServer)
         pluginManager.apply("org.jetbrains.kotlin.plugin.compose")
         pluginManager.apply("org.jetbrains.compose")
-        plainJvm(true)  // JVM only, no KMP
+        plainJvm(true)  // JVM only, with application plugin for desktop UI
         
         def forgeUiKotlin = extensions.getByName("kotlin")
         // JVM-only dependencies (ReactorServer uses these)
@@ -601,6 +601,9 @@ switch (project.path) {
             implementation "org.jetbrains.compose.desktop:desktop-jvm:1.7.3"
             implementation "org.jetbrains.compose.material3:material3:1.7.3"
             implementation "org.jetbrains.compose.material:material-icons-extended:1.7.3"
+            implementation("org.jetbrains.skiko:skiko-awt-runtime-macos-arm64:0.148.2") {
+                because "Required for Compose Desktop on macOS"
+            }
             implementation project(":libs:forge")
         }
         // JVM test dependencies - add to project-level dependencies (not sourceSet)
@@ -617,15 +620,18 @@ switch (project.path) {
                 useJUnit()
                 classpath += files("build/classes/kotlin/main")
             }
+            // Configure application plugin for desktop UI
+            project.tasks.getByName("run") {
+                mainClass.set("borg.trikeshed.forge.ui.KanbanBoardKt")
+            }
         }
-        // Configure JVM run task
+        // Configure JVM run tasks (ReactorServer only - KanbanBoard uses application plugin)
         project.afterEvaluate {
             project.tasks.register("runReactorServer", JavaExec) {
                 group = "run"
                 description = "Run the Forge UI Reactor Server"
                 dependsOn("jar", "compileKotlin")
                 mainClass.set("borg.trikeshed.forge.ui.ReactorServerKt")
-                // Include compiled classes + runtime dependencies
                 classpath(files(
                     project.file("build/classes/kotlin/main"),
                     project.file("build/resources/main")
