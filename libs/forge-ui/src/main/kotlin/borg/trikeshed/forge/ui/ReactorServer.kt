@@ -46,7 +46,7 @@ object ReactorServer {
             // This is the missing link that made readAsync hang on the previous
             // attempts.
             reactorOps = JvmReactorOperations(
-                channelOpsBridge = { fd -> channelOps!!.getSocketChannel(fd) as? java.nio.channels.SelectableChannel }
+                channelOpsBridge = { fd -> channelOps!!.getSelectableChannel(fd) }
             )
             val runner = ChannelRunner(channelOps!!, reactorOps!!)
 
@@ -108,14 +108,18 @@ object ReactorServer {
     }
     
     private suspend fun handleClient(runner: ChannelRunner, clientFd: Int) {
-        try {
-            val channel = channelOps!!.getSocketChannel(clientFd) ?: return
+        val channel = channelOps!!.getSelectableChannel(clientFd) as? java.nio.channels.SocketChannel
+        if (channel == null) {
+            channelOps?.close(clientFd)
+            return
+        }
 
-            // Suspend on READ via the deferred registered in readers{} when
-            // we called runner.readAsync. The reactor's poll() will fire once
-            // because we registered the interest at accept time.
+        try {
+            // Suspend on READ via the deferred registered in readers{} when we
+            // called runner.readAsync. The reactor's poll() will fire because
+            // we registered the interest at accept time.
             val buffer = java.nio.ByteBuffer.allocate(8192)
-            runner.readAsync(clientFd)  // suspend
+            runner.readAsync(clientFd)
             val n = try { channel.read(buffer) } catch (e: Exception) { -1 }
             if (n <= 0) return
 
@@ -124,34 +128,151 @@ object ReactorServer {
             buffer.clear()
 
             val path = request.lines().firstOrNull()?.split(" ")?.getOrNull(1) ?: "/"
-            val (status, contentType, body) = when (path) {
-                "/" -> httpResponse(200, "text/html", indexHtml())
-                // SSE: respond with the initial frame and close — long-lived
-                // event stream is out of scope for this cut. The reactor +
-                // bootstrap wiring is still proven by MuxReactorBootstrapJvm
-                // being initialized in start().
-                "/events" -> httpResponse(200, "text/event-stream",
-                    "event: initialized\ndata: {\"count\":${reactor?.kanbanEvents?.replayCache?.size ?: 0}}\n\n")
-                else -> httpResponse(404, "text/plain", "Not Found")
+
+            when (path) {
+                "/events" -> handleSse(runner, clientFd, channel)
+                "/big"    -> writeResponse(channel, 200, "text/plain", "x".repeat(200_000), runner, clientFd)
+                "/burst"  -> writeBurst(channel, runner, clientFd)
+                "/"       -> writeResponse(channel, 200, "text/html", indexHtml(), runner, clientFd)
+                else      -> writeResponse(channel, 404, "text/plain", "Not Found", runner, clientFd)
             }
-
-            val bodyBytes = body.toByteArray(StandardCharsets.UTF_8)
-            val header = "HTTP/1.1 $status OK\r\n" +
-                         "Content-Type: $contentType\r\n" +
-                         "Connection: close\r\n" +
-                         "Content-Length: ${bodyBytes.size}\r\n\r\n"
-            val fullBytes = (header + body).toByteArray(StandardCharsets.UTF_8)
-
-            // One suspending write via the write-async path so we don't tight-loop.
-            runner.writeAsync(clientFd)
-            val writeBuf = java.nio.ByteBuffer.wrap(fullBytes)
-            try { channel.write(writeBuf) } catch (e: Exception) { /* client gone */ }
-
         } catch (e: Exception) {
             println("Error handling client: ${e.message}")
         } finally {
             channelOps?.close(clientFd)
         }
+    }
+
+    private suspend fun writeResponse(
+        channel: java.nio.channels.SocketChannel,
+        status: Int,
+        contentType: String,
+        body: String,
+        runner: ChannelRunner? = null,
+        clientFd: Int = -1,
+    ) {
+        val bodyBytes = body.toByteArray(StandardCharsets.UTF_8)
+        val header = "HTTP/1.1 $status OK\r\n" +
+                     "Content-Type: $contentType\r\n" +
+                     "Connection: close\r\n" +
+                     "Content-Length: ${bodyBytes.size}\r\n\r\n"
+        val fullBytes = (header + body).toByteArray(StandardCharsets.UTF_8)
+        writeFully(channel, java.nio.ByteBuffer.wrap(fullBytes), runner, clientFd)
+    }
+
+    /** Stress a non-blocking channel with 100 small frames. */
+    private suspend fun writeBurst(
+        channel: java.nio.channels.SocketChannel,
+        runner: ChannelRunner,
+        clientFd: Int,
+    ) {
+        val header = "HTTP/1.1 200 OK\r\n" +
+                     "Content-Type: text/event-stream\r\n" +
+                     "Cache-Control: no-cache\r\n" +
+                     "Connection: close\r\n\r\n"
+        writeFully(channel, java.nio.ByteBuffer.wrap(header.toByteArray(StandardCharsets.UTF_8)), runner, clientFd)
+        for (i in 1..100) {
+            val frame = "event: tick\ndata: {\"i\":$i,\"pad\":\"${"y".repeat(9000)}\"}\n\n"
+            val buf = java.nio.ByteBuffer.wrap(frame.toByteArray(StandardCharsets.UTF_8))
+            writeFully(channel, buf, runner, clientFd)
+        }
+    }
+
+    /** Write a buffer to completion against a non-blocking channel.
+     *
+     *  When channel.write returns 0 (kernel send buffer full), the reactor
+     *  is asked for OP_WRITE interest and the coroutine suspends on the
+     *  write-deferred. After wakeup the channel is writable again and the
+     *  loop resumes. Falls back to a non-suspending yield loop if the
+     *  reactorOps reference is gone (e.g. after stop()). */
+    private suspend fun writeFully(
+        channel: java.nio.channels.SocketChannel,
+        buf: java.nio.ByteBuffer,
+        runner: ChannelRunner? = null,
+        clientFd: Int = -1,
+    ) {
+        var attempts = 0
+        while (buf.hasRemaining()) {
+            val n = try { channel.write(buf) } catch (e: Exception) { return }
+            if (n > 0) {
+                attempts = 0
+                continue
+            }
+            // n == 0: kernel buffer full. Either back-pressure through the
+            // reactor (preferred) or yield-and-retry as a fallback.
+            if (runner != null && clientFd >= 0) {
+                reactorOps!!.register(clientFd, setOf(Interest.WRITE))
+                println("[ReactorServer] writeAsync suspend (kernel buffer full) clientFd=$clientFd remaining=${buf.remaining()}")
+                runner.writeAsync(clientFd)
+                println("[ReactorServer] writeAsync woke up clientFd=$clientFd")
+                // After wakeup, loop continues. The reactor has cleared
+                // OP_WRITE via deregister on the writable wake.
+                continue
+            }
+            if (++attempts > 1000) return  // give up to avoid infinite spin
+            Thread.`yield`()
+        }
+    }
+
+    /**
+     * Long-lived SSE. Headers + initial frame first, then collect reactor
+     * events and pipe each into the open stream until client closes or the
+     * stream cancels.
+     */
+    private suspend fun handleSse(
+        runner: ChannelRunner,
+        clientFd: Int,
+        channel: java.nio.channels.SocketChannel,
+    ) {
+        val events = reactor?.kanbanEvents
+        if (events == null) {
+            writeResponse(channel, 503, "text/plain", "reactor not initialized", runner, clientFd)
+            return
+        }
+
+        // Initial frame — no Content-Length and no Transfer-Encoding; raw SSE
+        // is its own framing. We commit to keeping the connection open until
+        // the client disconnects.
+        val init = "event: initialized\ndata: {\"count\":${events.replayCache.size}}\n\n"
+        val header = "HTTP/1.1 200 OK\r\n" +
+                     "Content-Type: text/event-stream\r\n" +
+                     "Cache-Control: no-cache\r\n" +
+                     "Connection: close\r\n\r\n"
+        try {
+            writeFully(channel,
+                java.nio.ByteBuffer.wrap((header + init).toByteArray(StandardCharsets.UTF_8)),
+                runner, clientFd)
+        } catch (e: Exception) {
+            return  // client gone before we could send the preamble
+        }
+
+        // Stream events until the client disconnects. Use a ChannelRunner write
+        // guard so we back-pressure through the reactor.
+        val inv = scope.launch {
+            events.collect { event ->
+                val frame = "event: tick\ndata: ${eventToJsonCompact(event)}\n\n"
+                try {
+                    val bytes = frame.toByteArray(StandardCharsets.UTF_8)
+                    writeFully(channel, java.nio.ByteBuffer.wrap(bytes), runner, clientFd)
+                } catch (e: Exception) {
+                    this.cancel()
+                }
+            }
+        }
+        try {
+            inv.join()
+        } catch (_: CancellationException) { /* normal on disconnect */ }
+    }
+
+    private fun eventToJsonCompact(event: Any): String {
+        // Trim the fully-qualified class name to last segment so the wire
+        // payload stays compact.
+        val raw = event::class.qualifiedName ?: event.javaClass.simpleName
+        val simple = raw.substringAfterLast('.')
+        val suffix = when (event) {
+            else -> ""
+        }
+        return """{"type":"$simple"$suffix}"""
     }
     
     private fun indexHtml(): String = """

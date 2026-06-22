@@ -5,7 +5,6 @@ import borg.trikeshed.polyglot.ccek.FieldSynapse
 import borg.trikeshed.polyglot.ccek.PointcutEventProducer
 import org.graalvm.polyglot.Context
 import org.graalvm.polyglot.HostAccess
-import org.graalvm.polyglot.Instrumenter
 import java.util.Collections
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong

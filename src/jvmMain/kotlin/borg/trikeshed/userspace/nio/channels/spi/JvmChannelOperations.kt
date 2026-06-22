@@ -119,9 +119,12 @@ class JvmChannelOperations(
         fileChannels[fd] = fc
     }
     
-    /** Get socket channel by fd for direct I/O (DEV stub only) */
-    fun getSocketChannel(fd: Int): java.nio.channels.SocketChannel? =
-        socketChannels[fd] as? java.nio.channels.SocketChannel
+    /** Get socket channel by fd for direct I/O (DEV stub only).
+     *  Returns ANY select-able channel — SocketChannel, ServerSocketChannel,
+     *  or DatagramChannel — because the bridge needs all variants, not just
+     *  stream clients. */
+    fun getSelectableChannel(fd: Int): java.nio.channels.SelectableChannel? =
+        socketChannels[fd]
 }
 
 // Moved out of inner class to avoid 'Class is prohibited here' error
