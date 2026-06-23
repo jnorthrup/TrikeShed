@@ -49,6 +49,40 @@ sealed class DhtMessage {
         val requestId: String,
     ) : DhtMessage()
 
+    @Serializable
+    @SerialName("find_node")
+    data class FindNode(
+        val target: CID,
+        val requestId: String,
+    ) : DhtMessage()
+
+    @Serializable
+    @SerialName("neighbors")
+    data class Neighbors(
+        val nodes: List<NodeInfo>,
+        val requestId: String,
+    ) : DhtMessage()
+
+    @Serializable
+    @SerialName("find_value")
+    data class FindValue(
+        val key: CID,
+        val requestId: String,
+    ) : DhtMessage()
+
+    @Serializable
+    @SerialName("value")
+    data class Value(
+        val value: ByteArray,
+        val requestId: String,
+    ) : DhtMessage()
+
+    @Serializable
+    data class NodeInfo(
+        val id: CID,
+        val address: String,
+    )
+
     // ── Encoding / Decoding ──────────────────────────────────────────────
     
     companion object {

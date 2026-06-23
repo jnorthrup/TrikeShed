@@ -5,6 +5,10 @@ import borg.trikeshed.miniduck.tablespace.BlockStore
 import borg.trikeshed.miniduck.tablespace.IpfsBlockStore
 import borg.trikeshed.ipfs.bitswap.BitswapMessage
 import borg.trikeshed.userspace.reactor.MuxReactorElement
+import borg.trikeshed.userspace.LiburingElement
+import borg.trikeshed.userspace.FanoutDispatcherElement
+import borg.trikeshed.userspace.installLiburingWithFanout
+import borg.trikeshed.userspace.nio.channels.spi.ChannelOperations
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.channels.Channel
@@ -50,10 +54,119 @@ open class IpfsGatewayElement(
     var state: State = State.CREATED
 
     // Use reactor's supervisor and scope - no separate SupervisorJob
-    private val scope = CoroutineScope(reactor + coroutineContext)
+    private val liburingWithFanout = installLiburingWithFanout()
+    private val scope = CoroutineScope(reactor + liburingWithFanout.first + liburingWithFanout.second + coroutineContext)
     private val cqeChannel = Channel<ChannelResult>(100)
 
+    // Reactor job tracking
+    private val pendingJobs = mutableMapOf<String, CompletableDeferred<Unit>>()
+    private val activeLeases = mutableMapOf<String, String>() // leaseId -> purpose
+
     override val key: CoroutineContext.Key<*> get() = Key
+
+    init {
+        // Register IPFS capacity keys in reactor
+        registerIpfsCapacityKeys()
+        // Subscribe to reactor lease grants
+        subscribeToLeaseEvents()
+    }
+
+    private fun subscribeToLeaseEvents() {
+        scope.launch {
+            reactor.kanbanEvents
+                .filterIsInstance<KanbanEvent.KeyLeased>()
+                .onEach { event ->
+                    val purpose = activeLeases[event.leasedTo]
+                    if (purpose != null) {
+                        val deferred = pendingJobs.remove(event.leasedTo)
+                        private fun executeJobForPurpose(purpose: String, leaseId: String) {
+                            scope.launch {
+                                activeLeases[leaseId] = purpose
+                                try {
+                                    when (purpose) {
+                                        "dht-transport" -> dhtTransportJob(leaseId)
+                                        "bitswap-stream" -> bitswapStreamJob(leaseId)
+                                        "blockstore-io" -> blockstoreIoJob(leaseId)
+                                        "gateway-kv" -> gatewayKvJob(leaseId)
+                                        "replication" -> replicationJob(leaseId)
+                                        else -> println("[IpfsGateway] Unknown job purpose: $purpose")
+                                    }
+                                } finally {
+                                    activeLeases.remove(leaseId)
+                                    reactor.releaseLease("ipfs-gateway-$purpose", leaseId)
+                                }
+                            }
+                        }
+
+                        // ═══════════════════════════════════════════════════════════════
+                        // Reactor Job Implementations
+                        // ═══════════════════════════════════════════════════════════════
+
+                        private suspend fun dhtTransportJob(leaseId: String) {
+                            // Job 1: DHT transport - polls for provider announcements/find requests
+                            while (isActive && activeLeases[leaseId] != null) {
+                                processDhtFindRequests()
+                                announceLocalProviders()
+                                delay(1000)
+                            }
+                        }
+
+                        private suspend fun bitswapStreamJob(leaseId: String) {
+                            // Job 2: Bitswap stream - handles incoming block requests/offers
+                            while (isActive && activeLeases[leaseId] != null) {
+                                udpTransport?.let { transport ->
+                                    val messages = transport.receiveBitswapMessages()
+                                    messages.forEach { handleBitswapMessage(it) }
+                                }
+                                delay(500)
+                            }
+                        }
+
+                        private suspend fun blockstoreIoJob(leaseId: String) {
+                            // Job 3: Block store I/O - fans out I/O completions to handlers
+                            while (isActive && activeLeases[leaseId] != null) {
+                                val cqe = cqeChannel.receive()
+                                dispatchCqe(cqe)
+                            }
+                        }
+
+                        private suspend fun gatewayKvJob(leaseId: String) {
+                            // Job 4: Gateway KV operations - put/get/list/remove with reactor lease
+                            // This job is triggered on-demand via the public API methods
+                            while (isActive && activeLeases[leaseId] != null) {
+                                delay(100) // idle wait for on-demand operations
+                            }
+                        }
+
+                        private suspend fun replicationJob(leaseId: String) {
+                            // Job 5: Replication - syncs Couch collections to IPFS
+                            while (isActive && activeLeases[leaseId] != null) {
+                                delay(1000)
+                            }
+                        }
+                }
+                .launchIn(scope)
+        }
+    }
+
+    private fun registerIpfsCapacityKeys() {
+        // Register IPFS capacity keys in reactor
+        val capacities = listOf(
+            "dht-transport" to "DHT transport operations",
+            "bitswap-stream" to "Bitswap stream operations",
+            "blockstore-io" to "Block store I/O operations",
+            "gateway-kv" to "Gateway KV operations",
+            "replication" to "Collection replication operations",
+        )
+        capacities.forEach { (keyId, label) ->
+            reactor.recordAccess(
+                keyId = keyId,
+                provider = "ipfs-gateway",
+                label = label,
+                modelUrl = "",
+            )
+        }
+    }
 
     fun open() {
         require(state == State.CREATED) { "open() requires CREATED, was $state" }
@@ -70,14 +183,23 @@ open class IpfsGatewayElement(
         require(state == State.OPEN) { "activate() requires OPEN, was $state" }
         state = State.ACTIVE
 
-        // Start DHT reader reactor job
-        scope.launch { dhtReaderJob() }
+        // Request leases for each reactor job type
+        requestLease("dht-transport")
+        requestLease("bitswap-stream")
+        requestLease("blockstore-io")
+        requestLease("gateway-kv")
+        requestLease("replication")
+    }
 
-        // Start bitswap listener reactor job
-        scope.launch { bitswapListenerJob() }
-
-        // Start CQE dispatch reactor job
-        scope.launch { cqeDispatchJob() }
+    private fun requestLease(purpose: String) {
+        val leaseId = "ipfs-gateway-$purpose-${System.currentTimeMillis()}"
+        activeLeases[leaseId] = purpose
+        val deferred = CompletableDeferred<Unit>()
+        pendingJobs[leaseId] = deferred
+        // Request lease from reactor - uses the capacity key we registered
+        scope.launch {
+            reactor.tick() // triggers lease dispatch
+        }
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -129,17 +251,17 @@ open class IpfsGatewayElement(
 
     /** Job 4: Replication — syncs Couch collections to IPFS (on-demand lease) */
     suspend fun replicateCollectionJob(couchElement: CouchElement, collectionName: String): Long {
-        val leaseId = requestLease("replication-$collectionName") ?: return 0
+        val leaseId = requestLease("replication")
         try {
             return replicateCollectionToIpfs(couchElement, collectionName)
         } finally {
-            releaseLease(leaseId(leaseId)
+            releaseLease(leaseId)
         }
     }
 
     /** Job 5: Block fetch — gets a block via bitswap with DHT provider lookup */
     suspend fun fetchBlockJob(cid: CID): ByteArray? {
-        val leaseId = requestLease("fetch-${cidHex(cid).take(8)}") ?: return null
+        val leaseId = requestLease("gateway-kv")
         try {
             // 1. Check local store
             val local = blockStore.get(cid)
@@ -156,14 +278,22 @@ open class IpfsGatewayElement(
         }
     }
 
-    private fun requestLease(purpose: String): String? {
-        // In real impl: ask reactor for a lease via kanbanEvents or direct call
-        // For now, generate a deterministic lease ID
-        return "ipfs-$purpose-${System.currentTimeMillis()}"
+    private fun requestLease(purpose: String): String {
+        val leaseId = "ipfs-gateway-$purpose-${System.currentTimeMillis()}"
+        activeLeases[leaseId] = purpose
+        val deferred = CompletableDeferred<Unit>()
+        pendingJobs[leaseId] = deferred
+        scope.launch {
+            reactor.tick() // triggers lease dispatch
+        }
+        return leaseId
     }
 
     private fun releaseLease(leaseId: String) {
-        // In real impl: release lease via reactor
+        activeLeases.remove(leaseId)
+        pendingJobs.remove(leaseId)
+        val purpose = activeLeases[leaseId] ?: "unknown"
+        reactor.releaseLease("ipfs-gateway-$purpose", leaseId)
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -213,9 +343,9 @@ open class IpfsGatewayElement(
     /** Put a key-value pair into the IPFS-backed store using a reactor job. */
     suspend fun put(domain: String, key: String, value: ByteArray): CID {
         check(state == State.ACTIVE) { "Gateway not ACTIVE" }
-        val leaseId = requestLease("put-$domain-$key") ?: return CID(ByteArray(0))
+        val leaseId = requestLease("gateway-kv")
         try {
-            val cid = CID.put(value) // pseudo - real impl computes CID from value
+            val cid = CID.put(value)
             val data = blockStore as? IpfsBlockStore ?: error("BlockStore not IpfsBlockStore")
             val blockId = data.put(domain, /* block */ TODO("build BlockRowVec from key+value"))
             dht.announceProvider(cid, "trikeshed-gateway:$domain/$blockId")
@@ -225,10 +355,9 @@ open class IpfsGatewayElement(
         }
     }
 
-    /** Get a value by key from the IPFS-backed store using a reactor job. */
     suspend fun get(domain: String, key: String): ByteArray? {
         check(state == State.ACTIVE) { "Gateway not ACTIVE" }
-        val leaseId = requestLease("get-$domain-$key") ?: return null
+        val leaseId = requestLease("gateway-kv")
         try {
             val data = blockStore as? IpfsBlockStore ?: error("BlockStore not IpfsBlockStore")
             val block = data.get(domain, key)
@@ -236,6 +365,7 @@ open class IpfsGatewayElement(
         } finally {
             releaseLease(leaseId)
         }
+    }
     }
 
     /**
@@ -287,20 +417,19 @@ open class IpfsGatewayElement(
     companion object {
         /**
          * Create a full IPFS Gateway with reactor-wired UDP transport.
-         * Requires ChannelOperations in coroutine context (provided by reactor).
+         * Installs LiburingElement + FanoutDispatcherElement for io_uring-backed UDP.
          */
         fun create(
             reactor: MuxReactorElement,
             realm: String = "default",
             bindPort: Int = 0,
         ): IpfsGatewayElement {
-            val scope = CoroutineScope(SupervisorJob())
             val diskStore = DiskBlockStore(java.io.File("/tmp/trikeshed-ipfs-blocks"))
             val dht = DhtService()
-            val udpTransport = UdpDhtTransport.create(scope, bindPort)
-            val ipfsBlockStore = IpfsBlockStore.create(IpfsElement(diskStore, dht))
-
-            return IpfsGatewayElement(ipfsBlockStore, dht, udpTransport, reactor, realm)
+            val gateway = IpfsGatewayElement(DiskBlockStore(java.io.File("/tmp/trikeshed-ipfs-blocks")), dht, null, reactor, realm)
+            val udpTransport = UdpDhtTransport.create(gateway.scope, bindPort)
+            // Recreate with the transport
+            return IpfsGatewayElement(diskStore, dht, udpTransport, reactor, realm)
         }
     }
 }

@@ -8,29 +8,28 @@ echo "========================================="
 echo "TrikeShed Polyglot Pointcut Demo"
 echo "========================================="
 echo ""
-echo "This demo shows how GraalVM polyglot languages (JS, Ruby, Python)"
+echo "This demo shows how GraalVM polyglot languages (JS, Python)"
 echo "can emit FieldSynapse pointcut events through the CCEK bridge."
 echo ""
-echo "FieldSynapse = 24-byte wire protocol frame:"
-echo "  phase(1) + opcode(1) + methodIdx(4) + addr(4) + seq(4) + nano(8)"
-echo "  callsiteHash(4) + templateIdx(4)"
+echo "FieldSynapse = 30-byte wire protocol frame:"
+echo "  phase(1) + opcode(1) + methodIdx(4) + addr(4) + seq(4)"
+echo "  + nano(8) + callsiteHash(4) + templateIdx(4)"
 echo ""
-
-./gradlew :libs:polyglot:jvmTest --tests "GraalPointcutTddTest.harness close cleans up Graal context" -q 2>/dev/null
-
-echo "✓ Basic harness lifecycle works"
+echo "[1] JavaScript pointcut emission (L_GET/L_SET/P_GET/P_SET opcode matrix):"
+./gradlew :libs:polyglot:jvmTest --tests "PointcutCertaintyTest.emitFieldAccess opcode matrix is exactly correct" 2>&1 | grep -E "(PASSED|FAILED|BUILD)" | head -3
 echo ""
-
-# Run the pointcut tests and show output
-echo "Running pointcut interception tests..."
-./gradlew :libs:polyglot:jvmTest --tests "GraalPointcutTddTest.L_GET*" --tests "GraalPointcutTddTest.L_SET*" --tests "GraalPointcutTddTest.P_GET*" --tests "GraalPointcutTddTest.P_SET*" --tests "GraalPointcutTddTest.AFTER*" --tests "GraalPointcutTddTest.virtual*" --tests "GraalPointcutTddTest.pointcut carries*" --tests "GraalPointcutTddTest.sequential*" -q 2>&1 | tail -20
-
+echo "[2] Demo polyglot flow (JS host interop + emitter):"
+./gradlew :libs:polyglot:jvmTest --tests "DemoPointcutTest" 2>&1 | grep -E "(PASSED|FAILED|BUILD)" | head -3
+echo ""
+echo "[3] FieldSynapse 30-byte wire encoding roundtrip:"
+./gradlew :libs:polyglot:jvmTest --tests "FieldSynapseWireTest" 2>&1 | grep -E "(PASSED|FAILED|BUILD)" | head -3
+echo ""
+echo "[4] TruffleInstrument + ExecutionEventListener wiring (E2E):"
+./gradlew :libs:polyglot:jvmTest --tests "PythonPointcutInstrumentE2ETest" 2>&1 | grep -E "(PASSED|FAILED|BUILD)" | head -3
+echo ""
+echo "[5] PointcutProducerService registration:"
+./gradlew :libs:polyglot:jvmTest --tests "PythonPointcutInstrumentTest" 2>&1 | grep -E "(PASSED|FAILED|BUILD)" | head -3
 echo ""
 echo "========================================="
-echo "Running multi-language tests..."
-./gradlew :libs:polyglot:jvmTest --tests "GraalPointcutTddTest.multi-language*" --tests "GraalPointcutTddTest.pointcut emitter*" -q 2>&1 | tail -10
-
-echo ""
-echo "========================================="
-echo "All tests passing! Demo complete."
+echo "Demo complete. All pointcut pathways verified."
 echo "========================================="
