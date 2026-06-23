@@ -180,11 +180,12 @@ object ReactorServer {
 
     /** Write a buffer to completion against a non-blocking channel.
      *
-     *  When channel.write returns 0 (kernel send buffer full), the reactor
-     *  is asked for OP_WRITE interest and the coroutine suspends on the
-     *  write-deferred. After wakeup the channel is writable again and the
-     *  loop resumes. Falls back to a non-suspending yield loop if the
-     *  reactorOps reference is gone (e.g. after stop()). */
+     *  When channel.write returns 0 (kernel send buffer full), we back-pressure
+     *  through the reactor: runner.writeAsync puts a deferred in writers[fd]
+     *  FIRST and registers OP_WRITE SECOND. Poll fires OP_WRITE → completes
+     *  the deferred → coroutine resumes. Subsequent writes may need more
+     *  wake cycles (single-slot writers{} means we replace the prior
+     *  completed deferred as we re-suspend). */
     private suspend fun writeFully(
         channel: java.nio.channels.SocketChannel,
         buf: java.nio.ByteBuffer,
@@ -198,18 +199,11 @@ object ReactorServer {
                 attempts = 0
                 continue
             }
-            // n == 0: kernel buffer full. Either back-pressure through the
-            // reactor (preferred) or yield-and-retry as a fallback.
             if (runner != null && clientFd >= 0) {
-                reactorOps!!.register(clientFd, setOf(Interest.WRITE))
-                println("[ReactorServer] writeAsync suspend (kernel buffer full) clientFd=$clientFd remaining=${buf.remaining()}")
                 runner.writeAsync(clientFd)
-                println("[ReactorServer] writeAsync woke up clientFd=$clientFd")
-                // After wakeup, loop continues. The reactor has cleared
-                // OP_WRITE via deregister on the writable wake.
                 continue
             }
-            if (++attempts > 1000) return  // give up to avoid infinite spin
+            if (++attempts > 1000) return
             Thread.`yield`()
         }
     }

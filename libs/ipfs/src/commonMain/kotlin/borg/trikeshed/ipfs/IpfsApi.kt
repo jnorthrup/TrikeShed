@@ -1,5 +1,8 @@
 package borg.trikeshed.ipfs
 
+import kotlinx.serialization.Serializable
+
+@Serializable
 data class CID(val bytes: ByteArray)
 
 interface BlockStore {

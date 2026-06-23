@@ -209,6 +209,12 @@ switch (project.path) {
         break
     case ":libs:ipfs":
         kmpJvm(rootMode: "api", coroutinesMain: true)
+        def ipfsKotlin = extensions.getByName("kotlin")
+        pluginManager.apply("kotlinx-serialization")
+        ipfsKotlin.sourceSets.getByName("jvmMain").dependencies {
+            implementation "org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3"
+            implementation "org.jetbrains.kotlinx:kotlinx-serialization-core:1.7.3"
+        }
         break
     case ":libs:uring":
         kmpJvm()
@@ -228,6 +234,7 @@ switch (project.path) {
             implementation "org.graalvm.polyglot:polyglot:25.0.2"
             implementation "org.graalvm.polyglot:js-community:25.0.2"
             implementation "org.graalvm.polyglot:python-community:25.0.2"
+            implementation "org.graalvm.truffle:truffle-api:25.0.2"
         }
         polyglotKotlin.sourceSets.getByName("jvmTest").dependencies {
             // JUnit 5 only - no kotlin-test-junit or kotlin-test-junit5

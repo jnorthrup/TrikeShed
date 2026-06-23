@@ -52,16 +52,23 @@ class ChannelRunner(
     /** Deprecated: ambiguous between listen and dial. Use tcpListen() or tcpDial(). */
     fun tcpConnect(host: String, port: Int): Int = tcpDial(host, port)
 
-    /** Suspend until data is available on [fd]. */
+    /** Suspend until data is available on [fd].
+     *  Deferred is emplaced BEFORE the OP_READ register call so a
+     *  same-tick poll cannot fire on an empty slot. */
     suspend fun readAsync(fd: Int): Int {
+        reactorOps.register(fd, setOf(Interest.READ))
         val deferred = CompletableDeferred<Int>()
         readers[fd] = deferred
         return deferred.await()
     }
 
-    /** Suspend until [fd] is writable. */
+    /** Suspend until [fd] is writable.
+     *  Cursor-wakes any prior waiter before empacing a new deferred
+     *  (one waiter per fd per OP_WRITE; the level-triggered JDK
+     *  Selector re-fires OP_WRITE without an explicit re-register). */
     suspend fun writeAsync(fd: Int) {
         reactorOps.register(fd, setOf(Interest.READ, Interest.WRITE))
+        writers.remove(fd)?.complete(Unit)
         val deferred = CompletableDeferred<Unit>()
         writers[fd] = deferred
         deferred.await()
