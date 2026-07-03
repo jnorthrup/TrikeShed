@@ -4,7 +4,6 @@ gradle
 .kotlin/
 build/
 **/build/
-docs/
 tmp/
 .vscode/
 .aider*

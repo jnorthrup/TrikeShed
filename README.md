@@ -2,6 +2,88 @@
 
 many things
 
+---
+
+## Forge & Forge-UI
+
+`libs/forge` and `libs/forge-ui` form the agentic workflow layer of TrikeShed: composable pipelines, a live Kanban board, and a headless recording/replay system.
+
+### forge — workflow engine (`libs/forge`)
+
+Package root: `borg.trikeshed.forge`
+
+| Subsystem | Key types | Purpose |
+|---|---|---|
+| **Workspace** | `ForgeWorkspace`, `ForgeFile`, `ForgePrompt`, `ForgeArtifact` | CRUD over a project workspace; import/export bundles |
+| **Workflow execution** | `ForgeStepRunner`, `ForgeAgentRunner` | Drive `LlmCall`, `CodeExecution`, `AgentInvocation` (CODEX/CLAUDE), `FileTransform`, `Conditional`, `Parallel`, `CascadeExecution` |
+| **Cascade pipelines** | `MapStage`, `ReduceStage`, `FilterStage`, `JoinStage` | CouchDB-style map/reduce/rereduce over `FileSource`, `WorkflowOutput`, `CursorSource` |
+| **Patch-bay routing** | `PatchBayModule`, `PatchCable`, `PatchCableShapeDimension` | 18-dimensional typed port routing (`DATA`/`CV`/`GATE`/`AUDIO`/`VIDEO`); hot-swap cables |
+| **Model gateway** | `ModelKeyGateway`, `MemoryCAS`, `KeyEntry` | Key lease/backoff/bench lifecycle across providers |
+| **Kanban overlay** | `KanbanForgeExtensions` | `toCascadeGraph()`, `toMermaid()`, `toDot()`, `toPatchBayModules()` on root board types |
+| **Cursor Notion** | `CursorDrivenNotion`, `NotionKanbanBridge`, `TaxonomyCreator` | Sync taxonomy nodes to/from a Kanban board |
+| **Agent swarm** | `SwarmRoot`, `SwarmWorker`, `SwarmVerifier`, `SwarmSynthesizer` | Multi-agent coordination with `renderMermaid()`/`renderDot()` visualisation |
+| **Operational dashboard** | `OperationalEntry`, `DashboardView` | GAUGE/LINE/BAR/TABLE/HEATMAP/STATUS_GRID views; pre-named pools |
+
+The canonical board types (`KanbanBoard`, `KanbanCard`, `KanbanColumn`, `CardPriority`) live in **root commonMain** at `borg.trikeshed.kanban` — no forge dependency required for consumers that only need the board model.  `libs/forge/KanbanTypes.kt` is pure typealiases into that package.
+
+---
+
+### forge-ui — Compose Desktop Kanban + live server (`libs/forge-ui`)
+
+Package root: `borg.trikeshed.forge.ui`  
+Run: `./gradlew :libs:forge-ui:run`
+
+| Component | File | Purpose |
+|---|---|---|
+| **KanbanBoardScreen** | `KanbanBoardScreen.kt` | Fluid drag-and-drop Compose Desktop board; WIP limit badges; narration overlay; recording toolbar (▶ / ⬛ / frame counter / "Show video") |
+| **ForgeBoardFSM** | `src/commonMain/.../kanban/ForgeBoardFSM.kt` | Board lifecycle FSM; `StateFlow<ForgeBoardState>`; drag events (`DragStarted`, `DragOver`, `DragDropped`); singleton `object` |
+| **ReactorServer** | `ReactorServer.kt` | Embedded HTTP/SSE server; `/events` stream; `/taxonomy?topic=` endpoint injects `KanbanEvent.TaxonomyNodeCreated`; restartable; `boundPort: AtomicInteger` |
+| **WalkthroughTypes** | `WalkthroughTypes.kt` | Declarative script DSL — `WalkthroughScript`, `WalkthroughStep`, `WalkthroughAction` sealed class (14 subtypes) |
+| **WalkthroughPlayer** | `WalkthroughPlayer.kt` | Coroutine playback driving `ForgeBoardFSM`; wraps `ForgeRecorder`; exports `~/Movies/forge-<id>.mp4` |
+| **ScreenRecorder** | `ScreenRecorder.kt` | AWT `Robot.createScreenCapture()` → PNG frames → ffmpeg pipe → H.264 MP4; narration `drawtext` burnt into stream |
+| **OffscreenRenderer** | `OffscreenRenderer.kt` | Java2D `BufferedImage` board renderer — no screen, no Compose; RGB24 frame pipe to ffmpeg for headless use |
+| **HeadlessWalkthroughRunner** | `OffscreenRenderer.kt` | Runs any `WalkthroughScript` headlessly; prints full board-state trace to stdout per step |
+
+Run all headless usecase videos (no display needed):
+
+```
+./gradlew :libs:forge-ui:runHeadless
+# outputs:  ~/Movies/forge-walkthroughs/
+#   1_teach_pendant_robot.mp4   — robot arm weld pipeline teach-pendant
+#   2_ai_kanban_benefits.mp4    — AI agent auto-grooms and advances board
+#   3_recording_replay_demo.mp4 — record operator actions, replay headlessly
+```
+
+---
+
+### User signals / usecase principals
+
+Three principals drive the board:
+
+**1. Human operator (teach-pendant model)**  
+The operator drags cards through the board while the recording system captures every action as a `WalkthroughScript`.  The script is deterministic and replayable: any future CI run or demo can reproduce the exact sequence without a human present.
+
+**2. AI agent (autonomous grooming)**  
+An agent process emits `ForgeBoardEvent`s directly into `ForgeBoardFSM` — creating cards from a backlog analysis, respecting WIP limits, and closing tasks when done.  The same recording pipeline captures this; the resulting video is a verifiable audit trail of what the agent did and in what order.
+
+**3. External system (SSE / taxonomy injection)**  
+`ReactorServer` exposes `/taxonomy?topic=` so external tools (CI pipelines, LLM orchestrators, Notion webhooks) can inject `TaxonomyNodeCreated` events over HTTP.  These surface as board cards in real time and appear in the SSE stream at `/events`.
+
+All three principals produce the same observable: a sequence of `ForgeBoardEvent`s that the FSM reduces to a `KanbanBoard` snapshot, the renderer turns into frames, and ffmpeg encodes to a shareable MP4.
+
+---
+
+### Teach-pendant robot walkthrough (recorded demo)
+
+The video below was produced headlessly by `HeadlessWalkthroughRunner` — no display attached, pure Java2D → ffmpeg pipe.  It shows a robot-arm weld pipeline (`Calibrate → Load Fixtures → Run Weld Sequence → Inspect`) flowing through Backlog → In Progress → Review → Done.
+
+https://github.com/jnorthrup/TrikeShed/raw/master/docs/media/teach_pendant_robot.mp4
+
+> Recorded at 1280×800 · 30 fps · H.264 · ~28 s  
+> Re-render anytime: `./gradlew :libs:forge-ui:runHeadless`
+
+---
+
 ## tldr --
 
 this is the backbone of the json scanner and the fast-enough single-threaded Flat/ISAM <sup>[1]</sup>  database within
