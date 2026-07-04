@@ -130,6 +130,4 @@ class HashSet<T> : Set<T> {
     }
 }
 
-fun main() {
-    println(borg.trikeshed.forge.forgeAtlasHtml())
-}
+
