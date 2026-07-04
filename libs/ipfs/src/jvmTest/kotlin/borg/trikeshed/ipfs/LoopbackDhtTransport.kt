@@ -2,6 +2,7 @@ package borg.trikeshed.ipfs
 
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import java.net.InetSocketAddress
 
 class LoopbackDhtTransport : DhtTransport {
     companion object {
@@ -20,6 +21,15 @@ class LoopbackDhtTransport : DhtTransport {
     override suspend fun findProvidersRemote(cid: CID): List<String> {
         val key = hex(cid.bytes)
         return mutex.withLock { registry[key]?.toList() ?: emptyList() }
+    }
+
+    override suspend fun sendTo(address: InetSocketAddress, data: ByteArray) {
+        // No-op for loopback transport
+    }
+
+    override suspend fun sendAndReceive(address: InetSocketAddress, data: ByteArray): ByteArray {
+        // For loopback, just echo back
+        return data
     }
 
     override fun close() {}

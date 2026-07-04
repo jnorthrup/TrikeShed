@@ -48,4 +48,16 @@ open class RoutingTable<TNum : Comparable<TNum>, Sz : borg.trikeshed.dht.net.Net
 
     val buckets: Array<MutableMap<TNum, borg.trikeshed.dht.include.Route<TNum>>> = Array(bucketCount) { linkedMapOf() }
 
+    /** Get K closest nodes to target from routing table */
+    fun getClosest(target: TNum, k: Int): List<Join<borg.trikeshed.dht.id.NUID<TNum>, Address>> {
+        val allRoutes = mutableListOf<Join<borg.trikeshed.dht.id.NUID<TNum>, Address>>()
+        for (bucket in buckets) {
+            for ((_, value) in bucket.entries) {
+                allRoutes.add(value)
+            }
+        }
+        // Sort by XOR distance to target
+        allRoutes.sortBy { agentNUID.netmask.distance(agentNUID.id!!, it.a.id!!) }
+        return allRoutes.take(k)
+    }
 }

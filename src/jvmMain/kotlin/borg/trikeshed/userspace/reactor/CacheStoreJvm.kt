@@ -1,5 +1,6 @@
 package borg.trikeshed.userspace.reactor
 
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.nio.file.Files
@@ -18,6 +19,14 @@ import java.nio.file.Path
  *   ]
  * }
  */
+
+/**
+ * Serialization container for CacheEntry list.
+ * Must be top-level for kotlinx.serialization plugin to generate serializer.
+ */
+@Serializable
+data class CacheSnapshot(val entries: List<CacheEntry>)
+
 object CacheStoreJvm {
 
     private val json = Json {
@@ -51,7 +60,13 @@ object CacheStoreJvm {
             val modelId = entryObj["modelId"]?.toString()?.trim('"') ?: ""
             val storedAtMs = entryObj["storedAtMs"]?.toString()?.toLongOrNull() ?: 0L
             val hits = entryObj["hits"]?.toString()?.toLongOrNull() ?: 0L
-            val payload = entryObj["payload"]?.toString()?.trim('"') ?: ""
+            // Properly decode the payload string from JSON (handles escaped quotes)
+            val payloadJson = entryObj["payload"]
+            val payload = if (payloadJson is kotlinx.serialization.json.JsonPrimitive) {
+                payloadJson.content
+            } else {
+                payloadJson?.toString()?.trim('"') ?: ""
+            }
             CacheEntry(
                 key = key,
                 provider = provider,
@@ -62,7 +77,4 @@ object CacheStoreJvm {
             )
         }
     }
-
-    @kotlinx.serialization.Serializable
-    private data class CacheSnapshot(val entries: List<CacheEntry>)
 }

@@ -52,6 +52,35 @@ sealed class KanbanEvent {
         val cacheKey: String,
         override val timestampMs: Long,
     ) : KanbanEvent()
+
+    /**
+     * A taxonomy node was created by the AI taxonomical creator (or any
+     * Notion-adjacent emitter). This is the first KanbanEvent that is NOT
+     * about keymux/modelmux — it carries the creation of a taxonomy node
+     * (e.g. a Notion block, a kanban card, a graph label) into the board
+     * state, giving the kanban a consumption path for the Notion clone
+     * and a future AI agent's taxonomy output.
+     */
+    @Serializable
+    data class TaxonomyNodeCreated(
+        val nodeId: String,
+        val kind: String,            // "database", "row", "heading", "todo", etc.
+        val label: String,
+        val parentId: String? = null,
+        override val timestampMs: Long,
+    ) : KanbanEvent()
+
+    /** A signal facet was reduced by the lcnc reduction pipeline.
+     * Emitted when the signal spine (user-signals → lcnc → forge-ui) produces
+     * a reduced value from a FacetedSignal facet.
+     */
+    @Serializable
+    data class SignalFacetReduced(
+        val facetKey: String,
+        val reducedValue: String,
+        val sourceSignalId: String,
+        override val timestampMs: Long,
+    ) : KanbanEvent()
 }
 
 /**
@@ -73,6 +102,10 @@ data class KanbanState(
     val lastCacheKey: String = "",
     val lastEventKind: String = "INIT",
     val lastEventTimestampMs: Long = 0L,
+    /** Count of taxonomy nodes created (endgame: AI taxonomical creator → kanban). */
+    val taxonomyNodeCount: Int = 0,
+    /** Labels of the most recent taxonomy nodes (capped, for UI display). */
+    val recentTaxonomyNodes: List<String> = emptyList(),
 )
 
 /**
@@ -145,6 +178,16 @@ object KanbanFSM {
                     lastEventTimestampMs = event.timestampMs,
                 )
             }
+            is KanbanEvent.TaxonomyNodeCreated -> prior.copy(
+                taxonomyNodeCount = prior.taxonomyNodeCount + 1,
+                recentTaxonomyNodes = (prior.recentTaxonomyNodes + event.label).takeLast(16),
+                lastEventKind = "TaxonomyNodeCreated",
+                lastEventTimestampMs = event.timestampMs,
+            )
+            is KanbanEvent.SignalFacetReduced -> prior.copy(
+                lastEventKind = "SignalFacetReduced",
+                lastEventTimestampMs = event.timestampMs,
+            )
         }
         _state.value = next
         return next

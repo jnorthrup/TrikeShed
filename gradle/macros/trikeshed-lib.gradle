@@ -629,55 +629,56 @@ switch (project.path) {
         }
         break
     case ":libs:forge-ui":
-        // Forge UI: JVM-only (ReactorServer - no Compose needed)
-        plainJvm(true)  // JVM only
-        
+        // Forge UI: JVM desktop + browser JS showcase.
+        pluginManager.apply("org.jetbrains.kotlin.multiplatform")
+        pluginManager.apply("maven-publish")
+        pluginManager.apply("org.jetbrains.kotlin.plugin.compose")
+
+        group = "borg.trikeshed"
+        version = libVersion
+
         def forgeUiKotlin = extensions.getByName("kotlin")
-        // JVM-only dependencies (ReactorServer uses these)
-        forgeUiKotlin.sourceSets.getByName("main").dependencies {
+        forgeUiKotlin.jvmToolchain(25)
+        forgeUiKotlin.jvm()
+        forgeUiKotlin.js {
+            browser()
+            binaries.executable()
+        }
+
+        def forgeUiSourceSets = forgeUiKotlin.sourceSets
+        forgeUiSourceSets.getByName("commonMain").dependencies {
+            // showcase model lives here; no extra deps required
+        }
+        forgeUiSourceSets.getByName("jvmMain").dependencies {
             implementation "org.jetbrains.kotlinx:kotlinx-coroutines-core:${prop('versions.kotlinx-coroutines-core')}"
             implementation "org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3"
             implementation "org.jetbrains.kotlinx:kotlinx-serialization-core:1.7.3"
             implementation "org.jetbrains.compose.desktop:desktop-jvm:1.7.3"
+            implementation "org.jetbrains.compose.runtime:runtime:1.7.3"
+            implementation "org.jetbrains.compose.ui:ui:1.7.3"
+            implementation "org.jetbrains.compose.ui:ui-text:1.7.3"
+            implementation "org.jetbrains.compose.ui:ui-graphics:1.7.3"
+            implementation "org.jetbrains.compose.foundation:foundation:1.7.3"
+            implementation "org.jetbrains.compose.foundation:foundation-layout:1.7.3"
+            implementation "org.jetbrains.compose.material:material:1.7.3"
             implementation "org.jetbrains.compose.material3:material3:1.7.3"
             implementation "org.jetbrains.compose.material:material-icons-extended:1.7.3"
             implementation("org.jetbrains.skiko:skiko-awt-runtime-macos-arm64:0.148.2") {
                 because "Required for Compose Desktop on macOS"
             }
             implementation project(":libs:forge")
+            implementation project(":")  // For KanbanFSM/KanbanState from root project
         }
-        // JVM test dependencies - add to project-level dependencies (not sourceSet)
-        project.dependencies {
-            testImplementation "org.jetbrains.kotlin:kotlin-test:${kotlinVersion}"
-            testImplementation "org.jetbrains.kotlin:kotlin-test-junit:${kotlinVersion}"
-            testImplementation "org.jetbrains.kotlinx:kotlinx-coroutines-core:${prop('versions.kotlinx-coroutines-core')}"
-            testImplementation "org.jetbrains.kotlinx:kotlinx-coroutines-test:${prop('versions.kotlinx-coroutines-test')}"
-            testImplementation "org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3"
+        forgeUiSourceSets.getByName("jsMain").dependencies {
+            // Browser DOM showcase uses the generated common widget catalog.
+            implementation "org.jetbrains.compose.runtime:runtime:1.7.3"
         }
-        // Configure test task to include main classes after evaluation
-        project.afterEvaluate {
-            project.tasks.getByName("test") {
-                useJUnit()
-                classpath += files("build/classes/kotlin/main")
-            }
-            // Configure application plugin for desktop UI
-            project.tasks.getByName("run") {
-                mainClass.set("borg.trikeshed.forge.ui.MainKt")
-            }
-        }
-        // Configure JVM run tasks (ReactorServer only - KanbanBoard uses application plugin)
-        project.afterEvaluate {
-            project.tasks.register("runReactorServer", JavaExec) {
-                group = "run"
-                description = "Run the Forge UI Reactor Server"
-                dependsOn("jar", "compileKotlin")
-                mainClass.set("borg.trikeshed.forge.ui.MainKt")
-                classpath(files(
-                    project.file("build/classes/kotlin/main"),
-                    project.file("build/resources/main")
-                ) + configurations.getByName("runtimeClasspath"))
-                workingDir = project.projectDir
-            }
+        forgeUiSourceSets.getByName("jvmTest").dependencies {
+            implementation "org.jetbrains.kotlin:kotlin-test:${kotlinVersion}"
+            implementation "org.jetbrains.kotlin:kotlin-test-junit:${kotlinVersion}"
+            implementation "org.jetbrains.kotlinx:kotlinx-coroutines-core:${prop('versions.kotlinx-coroutines-core')}"
+            implementation "org.jetbrains.kotlinx:kotlinx-coroutines-test:${prop('versions.kotlinx-coroutines-test')}"
+            implementation "org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3"
         }
         break
     default:

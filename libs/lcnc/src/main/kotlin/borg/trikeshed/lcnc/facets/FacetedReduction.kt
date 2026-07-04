@@ -198,34 +198,3 @@ inline fun <reified I : Signal<*>> reductionPipelineCursor(
     adapter: FacetedCursorAdapter,
     block: ReductionPipelineBuilder<I>.() -> Unit,
 ): FacetedCursor = ReductionPipelineBuilder(input).apply(block).executeCursor(adapter)
-
-/**
- * LcncKeyAlg over FacetedSignal — key extraction and grouping.
- */
-class FacetKeyAlg<I : Signal<*>>(
-    private val keyExtractors: Map<String, (I) -> Signal<*>>,
-) {
-
-    /** Group by a facet key. */
-    inline fun <reified K> groupBy(key: String, crossinline extract: (I) -> K): Map<K, I> = TODO()
-
-    /** Join two faceted signals on a key. */
-    fun join(other: I, thisKey: String, otherKey: String): I = TODO()
-
-    /** Deduplicate by key. */
-    fun distinctByKey(key: String): I = TODO()
-}
-
-/**
- * LcncValueAlg over FacetedSignal — value aggregation algebra.
- */
-class FacetValueAlg<I : Signal<*>>(
-    private val valueExtractors: Map<String, (I) -> Signal<Number>>,
-) {
-
-    fun sum(key: String): Signal<Number> = TODO()
-    fun avg(key: String): Signal<Number> = TODO()
-    fun min(key: String): Signal<Number> = TODO()
-    fun max(key: String): Signal<Number> = TODO()
-    fun variance(key: String): Signal<Number> = TODO()
-}

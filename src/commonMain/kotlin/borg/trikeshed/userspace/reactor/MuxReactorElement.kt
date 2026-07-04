@@ -167,6 +167,16 @@ class MuxReactorElement(
     }
 
     /**
+     * Reactor-owned ingress for external taxonomy creation events.
+     * Callers submit taxonomy events here instead of emitting directly into the
+     * public kanban SharedFlow.
+     */
+    fun ingestTaxonomyEvents(events: List<KanbanEvent.TaxonomyNodeCreated>): Int {
+        events.forEach(::emitKanbanEvent)
+        return events.size
+    }
+
+    /**
      * Look up a model in the reactor-owned modelmux cache. Emits a
      * KanbanEvent.CacheTick so the FSM records the hit/miss.
      */
@@ -244,12 +254,15 @@ class MuxReactorElement(
 
     fun tick(): MuxDispatchResult {
         reclaimExpiredLeases()
-        val runningPerProvider = activeLeases()
-            .groupBy { keysById[it.keyId]?.provider.orEmpty() }
-            .mapValues { it.value.size }
+        val runningPerProvider: Map<String, Int> = activeLeases()
+            .mapNotNull { lease ->
+                keysById[lease.keyId]?.provider?.let { it to 1 }
+            }
+            .groupBy { it.first }
+            .mapValues { (_, entries) -> entries.size }
         val available = keysById.values
             .filter { it.status == MuxKeyStatus.ACTIVE && it.leasedTo == null }
-            .filter { runningPerProvider.getOrDefault(it.provider, 0) < config.maxPerProvider }
+            .filter { runningPerProvider.get(it.provider) ?: 0 < config.maxPerProvider }
         val running = activeLeases().size
         val canSpawn = minOf(config.maxSpawn, config.maxInProgress - running, available.size).coerceAtLeast(0)
         val now = nowMs()
@@ -413,10 +426,6 @@ suspend fun openMuxReactorElement(
     parentJob: Job? = null,
 ): MuxReactorElement = MuxReactorElement(parentJob = parentJob, initialConfig = config)
     .also { it.open() }
-    .also { reactor ->
-        // Wire reactor event stream to the singleton KanbanFSM so UI sees live transitions
-        CoroutineScope(reactor.supervisor).launch { KanbanFSM.collectAndReduce(reactor.kanbanEvents) }
-    }
 
 @Serializable
 data class MuxReactorConfig(

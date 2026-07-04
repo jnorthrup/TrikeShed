@@ -11,6 +11,7 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import java.nio.charset.StandardCharsets
 import kotlin.time.Duration
+import java.io.File
 
 /**
  * Pure userspace-nio ReactorServer — no JDK HttpServer.
@@ -26,12 +27,20 @@ import kotlin.time.Duration
 object ReactorServer {
     private var runnerJob: Job? = null
     private var serverFd: Int = -1
-    private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    private val _boundPort = java.util.concurrent.atomic.AtomicInteger(-1)
+    private var scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private var reactor: MuxReactorElement? = null
     private var channelOps: JvmChannelOperations? = null
     private var reactorOps: JvmReactorOperations? = null
-    
+
     val isRunning: Boolean get() = runnerJob?.isActive == true
+
+    /**
+     * The actual TCP port the server is listening on.
+     * Returns the assigned port when started with port=0 (ephemeral).
+     * Returns -1 when the server is not bound.
+     */
+    val boundPort: Int get() = _boundPort.get()
     
     /** Start the server on given port using pure userspace-nio. */
     fun start(port: Int = 8080) = scope.launch {
@@ -64,6 +73,10 @@ object ReactorServer {
             }
 
             this@ReactorServer.serverFd = sockFd
+            // Publish the actual bound port (handles port=0 ephemeral assignment)
+            val actualPort = (channelOps!!.getSelectableChannel(sockFd) as? java.nio.channels.ServerSocketChannel)
+                ?.let { (it.localAddress as? java.net.InetSocketAddress)?.port } ?: port
+            _boundPort.set(actualPort)
             val serverFdRef = sockFd
 
             println("ReactorServer (userspace-nio) listening on port $port")
@@ -133,8 +146,16 @@ object ReactorServer {
                 "/events" -> handleSse(runner, clientFd, channel)
                 "/big"    -> writeResponse(channel, 200, "text/plain", "x".repeat(200_000), runner, clientFd)
                 "/burst"  -> writeBurst(channel, runner, clientFd)
+                "/forge-ui.js" -> writeResponse(channel, 200, "application/javascript", forgeUiBundleJs(), runner, clientFd)
                 "/"       -> writeResponse(channel, 200, "text/html", indexHtml(), runner, clientFd)
-                else      -> writeResponse(channel, 404, "text/plain", "Not Found", runner, clientFd)
+                else      -> {
+                    // /taxonomy?topic=... injects a TaxonomyNodeCreated event
+                    if (path.startsWith("/taxonomy")) {
+                        handleTaxonomy(path, channel, runner, clientFd)
+                    } else {
+                        writeResponse(channel, 404, "text/plain", "Not Found", runner, clientFd)
+                    }
+                }
             }
         } catch (e: Exception) {
             println("Error handling client: ${e.message}")
@@ -209,6 +230,36 @@ object ReactorServer {
     }
 
     /**
+     * POST/GET /taxonomy?topic=<url-encoded-topic>
+     *
+     * Injects a [KanbanEvent.TaxonomyNodeCreated] for the given topic into the
+     * reactor's kanban event stream, then responds 200 with a JSON echo so the
+     * test (and any browser caller) can confirm the event was queued.
+     */
+    private suspend fun handleTaxonomy(
+        path: String,
+        channel: java.nio.channels.SocketChannel,
+        runner: ChannelRunner,
+        clientFd: Int,
+    ) {
+        val topic = path.substringAfter("topic=").substringBefore("&")
+            .let { java.net.URLDecoder.decode(it, "UTF-8") }
+            .ifBlank { "unknown" }
+        val now = System.currentTimeMillis()
+        val nodeId = "taxonomy-${now}"
+        val event = borg.trikeshed.userspace.reactor.KanbanEvent.TaxonomyNodeCreated(
+            nodeId = nodeId,
+            kind = "topic",
+            label = topic,
+            parentId = null,
+            timestampMs = now,
+        )
+        reactor?.ingestTaxonomyEvents(listOf(event))
+        val body = """{"nodeId":"$nodeId","kind":"topic","label":"${topic.replace("\"","\\\"")}}"""
+        writeResponse(channel, 200, "application/json", body, runner, clientFd)
+    }
+
+    /**
      * Long-lived SSE. Headers + initial frame first, then collect reactor
      * events and pipe each into the open stream until client closes or the
      * stream cancels.
@@ -264,6 +315,10 @@ object ReactorServer {
         val raw = event::class.qualifiedName ?: event.javaClass.simpleName
         val simple = raw.substringAfterLast('.')
         val suffix = when (event) {
+            is borg.trikeshed.userspace.reactor.KanbanEvent.TaxonomyNodeCreated ->
+                ""","nodeId":"${event.nodeId}","kind":"${event.kind}","label":"${event.label}""""
+            is borg.trikeshed.userspace.reactor.KanbanEvent.CacheTick ->
+                ""","cacheKey":"${event.cacheKey}","kind":"${event.kind}""""
             else -> ""
         }
         return """{"type":"$simple"$suffix}"""
@@ -271,15 +326,66 @@ object ReactorServer {
     
     private fun indexHtml(): String = """
         <!DOCTYPE html>
-        <html>
-        <head><title>Forge UI</title></head>
+        <html lang="en">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Forge UI Reactor — intelligent gallery</title>
+            <style>
+                body { margin: 0; font-family: Inter, system-ui, sans-serif; background: #0b0f14; color: #d3dbe6; }
+                .frame { min-height: 100vh; padding: 24px; box-sizing: border-box; background: radial-gradient(circle at top, rgba(122,162,247,.12), transparent 55%), #0b0f14; }
+                .shell { max-width: 1440px; margin: 0 auto; border: 1px solid #1d2a38; border-radius: 28px; background: rgba(17,24,33,.92); box-shadow: 0 24px 60px rgba(0,0,0,.35); overflow: hidden; }
+                .hero { padding: 28px; display: grid; gap: 14px; grid-template-columns: 1.3fr .9fr; border-bottom: 1px solid #1d2a38; }
+                .eyebrow { text-transform: uppercase; letter-spacing: .18em; font-size: 11px; color: #758395; margin: 0; }
+                h1, h2, p { margin: 0; }
+                .lede { color: #758395; line-height: 1.55; margin-top: 10px; }
+                .pill-row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
+                .pill { padding: 8px 12px; border-radius: 999px; border: 1px solid #1d2a38; background: rgba(15,20,27,.82); color: #d3dbe6; }
+                .launch { display: grid; gap: 12px; align-content: start; }
+                .launch a { color: #7aa2f7; text-decoration: none; }
+                #app { min-height: 70vh; }
+            </style>
+            <script defer src="/forge-ui.js"></script>
+        </head>
         <body>
-            <h1>Forge UI Reactor (userspace-nio)</h1>
-            <p><a href="/events">SSE Events Stream</a></p>
+            <div class="frame">
+                <div class="shell">
+                    <section class="hero">
+                        <div>
+                            <p class="eyebrow">Forge UI Reactor</p>
+                            <h1>Development atlas</h1>
+                            <p class="lede">A living document that launches the widget gallery, opens the blackboard terrain, and keeps the board readable as a linked development map.</p>
+                            <div class="pill-row">
+                                <span class="pill">document</span>
+                                <span class="pill">gallery</span>
+                                <span class="pill">radar</span>
+                                <span class="pill">kanban</span>
+                            </div>
+                        </div>
+                        <div class="launch">
+                            <h2>Live routes</h2>
+                            <p><a href="/events">/events</a> — SSE stream</p>
+                            <p><a href="/taxonomy?topic=blackboard">/taxonomy?topic=blackboard</a> — inject graph node</p>
+                            <p><a href="/forge-ui.js">/forge-ui.js</a> — browser bundle</p>
+                        </div>
+                    </section>
+                    <div id="app"></div>
+                </div>
+            </div>
         </body>
         </html>
     """.trimIndent()
     
+    private fun forgeUiBundleJs(): String {
+        val candidates = listOf(
+            File("libs/forge-ui/build/kotlin-webpack/js/developmentExecutable/forge-ui.js"),
+            File("build/kotlin-webpack/js/developmentExecutable/forge-ui.js"),
+            File("../libs/forge-ui/build/kotlin-webpack/js/developmentExecutable/forge-ui.js"),
+        )
+        val bundle = candidates.firstOrNull { it.exists() }
+        return bundle?.readText() ?: "console.error('forge-ui bundle not found');"
+    }
+
     private fun httpResponse(status: Int, contentType: String, body: String): Triple<Int, String, String> = 
         Triple(status, contentType, body)
     
@@ -289,7 +395,10 @@ object ReactorServer {
             channelOps?.close(serverFd)
             serverFd = -1
         }
+        _boundPort.set(-1)
         runnerJob = null
         scope.cancel()
+        // Recreate scope so start() can be called again after stop()
+        scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     }
 }

@@ -28,8 +28,10 @@ class ChannelRunner(
     /** Map of fd → pending read deferred. */
     private val readers = mutableMapOf<Int, CompletableDeferred<Int>>()
 
-    /** Map of fd → pending write deferred. */
-    private val writers = mutableMapOf<Int, CompletableDeferred<Unit>>()
+    /** Map of fd → queue of pending write deferreds.
+     *  Supports sustained single-coroutine writes (depth 1) and
+     *  multi-coroutine contention (FIFO queue). */
+    private val writers = mutableMapOf<Int, MutableList<CompletableDeferred<Unit>>>()
 
     private var running = false
 
@@ -63,15 +65,19 @@ class ChannelRunner(
     }
 
     /** Suspend until [fd] is writable.
-     *  Cursor-wakes any prior waiter before empacing a new deferred
-     *  (one waiter per fd per OP_WRITE; the level-triggered JDK
-     *  Selector re-fires OP_WRITE without an explicit re-register). */
+     *  Enqueues a deferred; reactor completes head on each OP_WRITE.
+     *  Level-triggered Selector re-fires OP_WRITE while socket writable. */
     suspend fun writeAsync(fd: Int) {
         reactorOps.register(fd, setOf(Interest.READ, Interest.WRITE))
-        writers.remove(fd)?.complete(Unit)
         val deferred = CompletableDeferred<Unit>()
-        writers[fd] = deferred
-        deferred.await()
+        val queue = writers.getOrPut(fd) { mutableListOf() }
+        queue.add(deferred)
+        try {
+            deferred.await()
+        } finally {
+            queue.remove(deferred)
+            if (queue.isEmpty()) writers.remove(fd)
+        }
     }
 
     /**
@@ -93,7 +99,10 @@ class ChannelRunner(
                     readers.remove(signal.fd)?.complete(1)
                 }
                 if (Interest.WRITE in signal.ready) {
-                    writers.remove(signal.fd)?.complete(Unit)
+                    val queue = writers[signal.fd]
+                    if (queue != null && queue.isNotEmpty()) {
+                        queue.removeAt(0).complete(Unit)
+                    }
                 }
             }
         }

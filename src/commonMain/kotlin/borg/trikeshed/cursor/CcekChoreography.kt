@@ -4,15 +4,6 @@ import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.Join
 import borg.trikeshed.userspace.nio.spi.NioSupervisor
 
-// ==================== CCEK CHOREOGRAPHY CONTRACTS ====================
-//
-// These contracts define the data-flow chain from data sources through cursor
-// facets to user-signalling events. They are TODO-only stubs until
-// implementation is explicitly requested.
-//
-// Data-flow chain:
-//   data source -> Cursor -> FacetedCursor -> LCNC facet grouping -> user-signal event -> Forge/Kanban overlay
-
 // ==================== LCNC FACET HANDLES ====================
 
 /**
@@ -87,65 +78,6 @@ data class LcncFacetGroup(
     val wtkHint: WtkHint? = null
 )
 
-// ==================== CCEK CONTRACT: CURSOR TO USER-SIGNAL ====================
-
-/**
- * CCEK choreography entry point for command-line invocation.
- *
- * Contract:
- *   main(args)
- *   -> default SupervisorJob
- *   -> NioSupervisor
- *   -> LCNC cursor facets
- *   -> user-signalling events
- */
-fun ccekCommandLineChoreography(
-    args: Array<String>,
-    supervisorJob: Any? = null,
-    nioSupervisor: NioSupervisor? = null
-): Series<Any?> = TODO(
-    "CCEK command-line choreography: args -> SupervisorJob -> NioSupervisor -> LCNC facets -> user-signals"
-)
-
-/**
- * CCEK choreography entry point for generated API invocation.
- *
- * Contract:
- *   OpenAPI operation
- *   -> generated request cursor
- *   -> default SupervisorJob
- *   -> NioSupervisor
- *   -> LCNC cursor facets
- *   -> user-signalling events
- */
-fun ccekGeneratedApiChoreography(
-    operationId: String,
-    requestCursor: Cursor,
-    supervisorJob: Any? = null,
-    nioSupervisor: NioSupervisor? = null
-): Series<Any?> = TODO(
-    "CCEK generated API choreography: operation -> requestCursor -> SupervisorJob -> NioSupervisor -> LCNC facets -> user-signals"
-)
-
-/**
- * Lift a cursor with facets into a user-signalling event.
- *
- * This is the core contract that connects LCNC cursor facets to the user-signals system.
- */
-fun liftCursorFacetsToUserSignal(
-    facetedCursor: Cursor, // TODO: FacetedCursor
-    facetGroup: LcncFacetGroup
-): Series<Any?> = TODO(
-    "FacetedCursor + LcncFacetGroup -> user-signal event series"
-)
-
-/**
- * Lift a cursor into user-signals with automatic facet inference.
- */
-fun cursorToUserSignals(cursor: Cursor): Series<Any?> = TODO(
-    "Cursor (auto-facetted) -> user-signal event series"
-)
-
 // ==================== CCEK CONTRACT: REQUEST CURSOR ====================
 
 /**
@@ -160,16 +92,18 @@ typealias ResponseCursor = Cursor
 
 /**
  * Convert a generated request to a request cursor.
+ * TODO: implement when request cursor choreography is needed.
  */
 fun convertRequestToCursor(request: Any?): RequestCursor = TODO(
-    "HTTP request / generated request -> RequestCursor"
+    "convertRequestToCursor: Stage 2 decision — implement when request cursor choreography is needed"
 )
 
 /**
  * Convert a response cursor to an HTTP response.
+ * TODO: implement when response cursor choreography is needed.
  */
 fun convertCursorToResponse(responseCursor: ResponseCursor): Any? = TODO(
-    "ResponseCursor -> HTTP response"
+    "convertCursorToResponse: Stage 2 decision — implement when response cursor choreography is needed"
 )
 
 // ==================== SUPERVISOR SCAFFOLD CONTRACT ====================

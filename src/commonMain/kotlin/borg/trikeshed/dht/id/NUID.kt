@@ -62,6 +62,16 @@ interface NUID<Primitive : Comparable<Primitive>> {
     }
 
     companion object {
+        /** 
+         * Create NUID from byte array (for CID bytes).
+         * Uses the minNUID factory for 8-bit (Byte) NUIDs.
+         */
+        fun fromBytes(bytes: ByteArray): NUID<Byte> {
+            val nuid = minNUID(8) as NUID<Byte>
+            nuid.id = bytes.firstOrNull()?.toByte() ?: 0
+            return nuid
+        }
+
         /**
          * minimum bitops types for the intended bitcount of NUID
          */

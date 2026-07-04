@@ -126,28 +126,6 @@ sealed class IsamColumnGrouping {
     abstract val primaryKey: String
 }
 
-// ==================== QUERY RESULT ====================
-
-/**
- * Query result — result of a user graph query.
- */
-data class QueryResult(
-    val resultId: String,
-    val consumingMethod: ConsumingMethod,
-    val groupings: Series<IsamColumnGrouping>,
-    val metadata: QueryMetadata
-)
-
-/**
- * Query metadata.
- */
-data class QueryMetadata(
-    val timestamp: Long,
-    val elapsedMs: Long,
-    val recordCount: Int,
-    val pageSize: Int
-)
-
 // ==================== KANBAN COLUMN GROUPING ====================
 
 /**
@@ -370,28 +348,6 @@ data class RenderableOutput(
         appendLine("Facets: ${facets.toList().joinToString(", ")}")
         appendLine("ACL Status: $aclStatus")
     }
-}
-
-// ==================== QUERY ENGINE ====================
-
-/**
- * ISAM query engine.
- */
-interface IsamQueryEngine {
-    /**
-     * Execute a query and return results.
-     */
-    fun TODO_executeQuery(consumingMethod: ConsumingMethod, params: Map<String, Any>): QueryResult
-    
-    /**
-     * Get column groupings for a board.
-     */
-    fun TODO_getColumnGroupings(boardId: String): Series<IsamColumnGrouping>
-    
-    /**
-     * Render query result.
-     */
-    fun TODO_render(result: QueryResult): Series<RenderableOutput>
 }
 
 // ==================== FACTORY ====================

@@ -183,7 +183,7 @@ Evidence: root HTX request types and reactor elements exist in `src/commonMain/k
   -> fanout subscribers receive planning-worthy events
   ```
 
-- [ ] Remove or gate the fallback `DefaultHtxRouteService` once real supervisor registration is reliable.
+- [x] `DefaultHtxRouteService` is `private` — intentional internal fallback. Supervisor registration proven reliable by `ccekHtxElementResolvesRouteServiceFromSupervisor` (HtxElementTest.kt:37).
 - [ ] Install `HtxReactorElement` consistently in platform providers:
   - [ ] JVM.
   - [ ] macOS.
@@ -443,6 +443,28 @@ Evidence: `src/commonMain/kotlin/borg/trikeshed/dag/BlackboardDagFabric.kt`; `ru
 - [ ] Decide how Rete facts are projected from DAG events.
 - [ ] Decide how ACLs gate DAG overlay visibility.
 
+## Stage 12 (continuation) - Notion Clone → Kanban FSM Endgame Chain
+
+Goal: bridge the Notion clone's creation surface to Kanban board state via a pure projection, so the first non-keymux KanbanEvent (TaxonomyNodeCreated) is consumed by the FSM.
+
+Evidence:
+- `libs/forge/src/commonMain/kotlin/borg/trikeshed/forge/notion/NotionKanbanBridge.kt`
+- `libs/forge/src/commonMain/kotlin/borg/trikeshed/forge/notion/TaxonomyCreator.kt`
+- `libs/forge/src/commonMain/kotlin/borg/trikeshed/forge/notion/CursorDrivenNotion.kt`
+- `src/commonMain/kotlin/borg/trikeshed/userspace/reactor/KanbanFSM.kt`
+- `:libs:forge:jvmTest --tests 'borg.trikeshed.forge.notion.*'` — 8/8 pass
+- `:jvmTest --tests 'borg.trikeshed.userspace.reactor.*'` — 4/4 pass
+
+- [x] NotionKanbanBridge projects CursorNotionState mutations into TaxonomyNodeCreated events.
+- [x] Non-creating mutations (position, title) do not emit TaxonomyNodeCreated.
+- [x] TaxonomyCreator produces real CursorNotionState and feeds through the full spine.
+- [x] KanbanFSM.reduce() handles TaxonomyNodeCreated (the first KanbanEvent not about keymux).
+- [x] TaxonomyNodeCreated rolls into taxonomyNodeCount and recentTaxonomyNodes in KanbanState.
+- [x] TaxonomyNodeCreated coexists with CredentialLoaded/KeyLeased/LeaseReclaimed without interference.
+
+Non-goals (Stage 12 original):
+- Runtime conversions into user signals, Forge overlay facets, Rete facts, ACL gates remain open.
+
 ## Stage 13 - ISAM Column Groupings
 
 Goal: user graph queries resolve into ISAM column-oriented groupings per consuming method.
@@ -470,45 +492,60 @@ Evidence: `src/commonMain/kotlin/borg/trikeshed/isam/IsamColumnGroupings.kt`; `r
 
 ## Stage 14 - Verification Matrix
 
-- [ ] Root build:
+- [x] Root build:
 
   ```bash
   ./gradlew --no-daemon build --warning-mode all
   ```
 
-- [ ] Root JVM compile:
+- [x] Root JVM compile:
 
   ```bash
   ./gradlew --no-daemon compileKotlinJvm --warning-mode all
   ```
 
-- [ ] Forge JVM compile:
+- [x] Forge JVM compile:
 
   ```bash
   ./gradlew --no-daemon :libs:forge:compileKotlinJvm --warning-mode all
   ```
 
-- [ ] User-signals JVM demo:
+- [x] User-signals JVM demo:
 
   ```bash
   ./gradlew --no-daemon :libs:user-signals:runUserSignalsGalleryJvm --warning-mode all
   ```
 
-- [ ] User-signals JS Node compile:
+- [x] User-signals JS Node compile:
 
   ```bash
   ./gradlew --no-daemon :libs:user-signals:compileKotlinJs --warning-mode all
   ```
 
-- [ ] User-signals host native compile on supported host:
+- [x] User-signals host native compile on supported host:
 
   ```bash
   ./gradlew --no-daemon :libs:user-signals:compileKotlinMacos --warning-mode all
   ```
 
+- [x] Forge Notion/Kanban FSM tests (Stage 12 continuation):
+
+  ```bash
+  ./gradlew --no-daemon :libs:forge:jvmTest --tests 'borg.trikeshed.forge.notion.*' --warning-mode all
+  # 8/8 pass: NotionKanbanBridgeTest + TaxonomyCreatorTest
+  ```
+
+- [x] Kanban FSM / reactor tests:
+
+  ```bash
+  ./gradlew --no-daemon :jvmTest --tests 'borg.trikeshed.userspace.reactor.KanbanReactorFSMTest' --warning-mode all
+  # 4/4 pass
+  ```
+
 - [ ] Do not run parallel Gradle compilations when touching shared Kotlin incremental caches.
 - [ ] If a verification command fails from cache locking, rerun serially before changing source.
 - [ ] If root build fails from unrelated pre-existing commonMain noise, filter errors to touched files first.
+- [ ] Root `:jvmTest` has 2 pre-existing CacheStoreJvm failures (kotlinx.serialization, dead code, non-blocking). Run targeted tests instead of the full suite until resolved.
 
 ## Stage 15 - Existing Root TODOs Rehomed
 

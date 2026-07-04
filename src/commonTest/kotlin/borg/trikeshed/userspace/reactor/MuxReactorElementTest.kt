@@ -1,11 +1,48 @@
 package borg.trikeshed.userspace.reactor
 
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 
 class MuxReactorElementTest {
+
+    @Test
+    fun reactorOwnsTaxonomyEventIngress() = runTest {
+        KanbanFSM.reset()
+        val reactor = openMuxReactorElement()
+
+        val accepted = reactor.ingestTaxonomyEvents(
+            listOf(
+                KanbanEvent.TaxonomyNodeCreated(
+                    nodeId = "blk-1",
+                    kind = "heading_1",
+                    label = "REST APIs",
+                    parentId = null,
+                    timestampMs = 100L,
+                ),
+                KanbanEvent.TaxonomyNodeCreated(
+                    nodeId = "blk-2",
+                    kind = "heading_2",
+                    label = "REST APIs — Definition",
+                    parentId = "blk-1",
+                    timestampMs = 200L,
+                ),
+            ),
+        )
+
+        advanceUntilIdle()
+
+        assertEquals(2, accepted)
+        val replayed = reactor.kanbanEvents.replayCache.filterIsInstance<KanbanEvent.TaxonomyNodeCreated>()
+        assertEquals(listOf("REST APIs", "REST APIs — Definition"), replayed.map { it.label })
+
+        // Manually reduce events like KanbanReactorFSMTest does
+        val reduced = replayed.fold(KanbanState()) { acc, e -> KanbanFSM.reduce(e, acc) }
+        assertEquals(2, reduced.taxonomyNodeCount)
+        assertEquals(listOf("REST APIs", "REST APIs — Definition"), reduced.recentTaxonomyNodes)
+    }
 
     @Test
     fun reactorOwnsMuxStateAndTicksLeases() = runTest {

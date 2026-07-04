@@ -5,7 +5,8 @@ plugins {
     kotlin("multiplatform") version "2.4.0"
     id("com.github.ben-manes.versions") version "0.54.0"
     `maven-publish`
-    kotlin("plugin.serialization") version "2.4.0" apply false
+    kotlin("plugin.serialization") version "2.4.0"
+    kotlin("plugin.compose") version "2.4.0" apply false
 }
 
 group = "org.bereft"
@@ -14,9 +15,15 @@ val enableNativeSharedLib = providers.gradleProperty("native.sharedLib").orNull 
 
 val focusedTransportSlice = providers.gradleProperty("focusedTransportSlice").orNull == "true"
 
-extra["versions.kotlinx-coroutines-core"] = "1.10.1"
-extra["versions.kotlinx-coroutines-test"] = "1.10.1"
+extra["versions.kotlinx-coroutines-core"] = "1.11.0"
+extra["versions.kotlinx-coroutines-test"] = "1.11.0"
 extra["versions.kotlinx-datetime"] = "0.8.0-0.6.x-compat"
+
+// Typed reads — single source of truth consumed by this file AND by the
+// trikeshed-lib.gradle macro (which reads these via gradleProperty/ext).
+val coroutinesVersion = extra["versions.kotlinx-coroutines-core"] as String
+val coroutinesTestVersion = extra["versions.kotlinx-coroutines-test"] as String
+val datetimeVersion = extra["versions.kotlinx-datetime"] as String
 
 repositories {
     maven("https://oss.sonatype.org/content/repositories/snapshots/")
@@ -90,8 +97,9 @@ kotlin {
     sourceSets {
         val commonMain = getByName("commonMain") {
             dependencies {
-                api("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0-rc02")
-                api("org.jetbrains.kotlinx:kotlinx-datetime:0.8.0-rc02-0.6.x-compat")
+                api("org.jetbrains.kotlinx:kotlinx-coroutines-core:$coroutinesVersion")
+                api("org.jetbrains.kotlinx:kotlinx-datetime:$datetimeVersion")
+                api("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
             }
         }
         val commonTest = getByName("commonTest") {
@@ -106,7 +114,7 @@ kotlin {
             )
             dependencies {
                 implementation(kotlin("test"))
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0-rc02")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:$coroutinesTestVersion")
             }
         }
         val nativeMain = create("nativeMain") { dependsOn(commonMain) }
@@ -133,10 +141,11 @@ kotlin {
                 implementation("org.openjdk.jmh:jmh-core:1.37")
                 implementation("org.openjdk.jmh:jmh-generator-annprocess:1.37")
                 implementation("org.bouncycastle:bcprov-jdk15on:1.70")
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:$coroutinesVersion")
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
                 implementation("org.graalvm.polyglot:polyglot:25.0.2")
                 implementation("org.graalvm.polyglot:js-community:25.0.2")
+                implementation("org.graalvm.polyglot:python-community:25.0.2")
             }
             kotlin.srcDir("src/jmhMain/kotlin")
             resources.srcDir("src/jmhMain/resources")
@@ -145,7 +154,7 @@ kotlin {
             dependencies {
                 implementation(kotlin("test-junit"))
                 implementation("org.junit.jupiter:junit-jupiter:6.1.0-RC1")
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0-rc02")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:$coroutinesTestVersion")
             }
         }
         val jsTest = getByName("jsTest") {

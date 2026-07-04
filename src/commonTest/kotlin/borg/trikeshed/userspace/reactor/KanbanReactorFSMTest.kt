@@ -107,4 +107,52 @@ class KanbanReactorFSMTest {
         // sanity: flow exposes the same value
         assertEquals(a, KanbanFSM.flow.value)
     }
+
+    /**
+     * Endgame cut #1: the kanban can consume a taxonomy-node creation event
+     * (from a Notion-adjacent AI taxonomical creator) and reflect it in board
+     * state. This is the narrowest bridge between the Notion clone's creation
+     * surface and the kanban's render surface — the first KanbanEvent that is
+     * not about keymux/modelmux.
+     */
+    @Test
+    fun taxonomyNodeCreatedEventRollsIntoBoardState() = runTest {
+        KanbanFSM.reset()
+        val e1 = KanbanEvent.TaxonomyNodeCreated(
+            nodeId = "blk-1",
+            kind = "database",
+            label = "Endpoints",
+            parentId = null,
+            timestampMs = 100L,
+        )
+        val e2 = KanbanEvent.TaxonomyNodeCreated(
+            nodeId = "blk-2",
+            kind = "row",
+            label = "GET /health",
+            parentId = "blk-1",
+            timestampMs = 200L,
+        )
+        val s1 = KanbanFSM.reduce(e1)
+        assertEquals(1, s1.taxonomyNodeCount)
+        assertEquals(listOf("Endpoints"), s1.recentTaxonomyNodes)
+        assertEquals("TaxonomyNodeCreated", s1.lastEventKind)
+        assertEquals(100L, s1.lastEventTimestampMs)
+
+        val s2 = KanbanFSM.reduce(e2, s1)
+        assertEquals(2, s2.taxonomyNodeCount)
+        assertEquals(listOf("Endpoints", "GET /health"), s2.recentTaxonomyNodes)
+        assertEquals(200L, s2.lastEventTimestampMs)
+
+        // Folding a mixed stream still works — taxonomy events coexist with
+        // the pre-existing credential/lease events without interference.
+        KanbanFSM.reset()
+        val mixed = listOf<KanbanEvent>(
+            KanbanEvent.CredentialLoaded("openai", "key-1", 1L),
+            KanbanEvent.TaxonomyNodeCreated("blk-3", "heading", "Phase 1", null, 2L),
+        )
+        val reduced = mixed.fold(KanbanState()) { acc, e -> KanbanFSM.reduce(e, acc) }
+        assertEquals(listOf("openai"), reduced.activeProviders)
+        assertEquals(1, reduced.taxonomyNodeCount)
+        assertEquals(listOf("Phase 1"), reduced.recentTaxonomyNodes)
+    }
 }
