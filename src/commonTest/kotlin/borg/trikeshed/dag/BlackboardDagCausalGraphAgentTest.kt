@@ -9,7 +9,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -39,9 +41,9 @@ class BlackboardDagCausalGraphAgentTest {
         overlays = emptySeriesOf(),
     )
 
-    @Test fun indexNodePlanningAutoBindsAgentAndPushesToSink() = runBlocking {
+    @Test fun indexNodePlanningAutoBindsAgentAndPushesToSink() = runTest {
         val index = CausalGraphNodeIndex()
-        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val scope = backgroundScope
         val firedChannel = Channel<ReteAgent.Fire>(capacity = Channel.UNLIMITED)
 
         // First bind the agent, then add nodes — they should flow through to the agent
@@ -53,12 +55,16 @@ class BlackboardDagCausalGraphAgentTest {
         index.indexNodePlanning(nodePlanning(boardId = "board-a", nodeId = "n1"))
         index.indexNodePlanning(nodePlanning(boardId = "board-a", nodeId = "n2"))
         index.indexNodePlanning(nodePlanning(boardId = "board-a", nodeId = "n3"))
+        advanceUntilIdle()
 
-        val collected = mutableListOf<ReteAgent.Fire>()
-        while (collected.size < 3) {
-            val fire = firedChannel.receiveCatching().getOrNull() ?: break
-            collected += fire
-        }
+        val collected = withTimeoutOrNull(2_000) {
+            buildList {
+                repeat(3) {
+                    val fire = firedChannel.receiveCatching().getOrNull() ?: return@buildList
+                    add(fire)
+                }
+            }
+        } ?: emptyList()
 
         assertEquals(3, collected.size, "expected 3 fires, saw ${collected.size}")
         assertEquals(setOf("n1", "n2", "n3"), collected.map { it.nodeId }.toSet())

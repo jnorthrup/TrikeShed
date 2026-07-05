@@ -4,11 +4,10 @@ import borg.trikeshed.cursor.blackboardContext
 import borg.trikeshed.graph.CausalGraphNode
 import borg.trikeshed.graph.CausalGraphNodeIndex
 import borg.trikeshed.graph.causalGraphNode
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -41,8 +40,8 @@ class CausalGraphNodeIndexBindAgentTest {
         outputHash = null,
     )
 
-    @Test fun bindAgentForwardsNodesToAgent() = runBlocking {
-        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    @Test fun bindAgentForwardsNodesToAgent() = runTest {
+        val scope = backgroundScope
         val firedChannel = Channel<ReteAgent.Fire>(capacity = Channel.UNLIMITED)
         val agent = ReteAgent.run(
             rules = listOf(
@@ -65,15 +64,16 @@ class CausalGraphNodeIndexBindAgentTest {
         index.addOrGet(node("n1", "board-a"))
         index.addOrGet(node("n2", "board-a"))
         index.addOrGet(node("n3", "board-a"))
+        advanceUntilIdle()
 
-        val collected: List<ReteAgent.Fire> = runBlocking {
-            val out = mutableListOf<ReteAgent.Fire>()
-            while (out.size < 3) {
-                val fire = firedChannel.receiveCatching().getOrNull() ?: break
-                out += fire
+        val collected = withTimeoutOrNull(2_000) {
+            buildList {
+                repeat(3) {
+                    val fire = firedChannel.receiveCatching().getOrNull() ?: return@buildList
+                    add(fire)
+                }
             }
-            out
-        }
+        } ?: emptyList()
 
         assertEquals(3, collected.size, "expected 3 fires, saw ${collected.size}")
         assertEquals(setOf("n1", "n2", "n3"), collected.map { it.nodeId }.toSet())

@@ -12,7 +12,7 @@ import borg.trikeshed.kanban.KanbanColumnId
 import borg.trikeshed.userspace.reactor.MuxReactorElement
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withTimeout
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -42,7 +42,7 @@ class CceTableTestingVisionTest {
 
     // ─── 1. UserContext: coroutine-scoped epistemic layer ─────────────────────
 
-    @Test fun `user context layers assertions over causal rete`() = runBlocking {
+    @Test fun `user context layers assertions over causal rete`() = runTest {
         val binding = CCEK.initialize(MuxReactorElement())
         val ctx = binding.createUserContext("tester-1")
         ctx.activate()
@@ -60,7 +60,7 @@ class CceTableTestingVisionTest {
 
     // ─── 2. CausalReteTable: table-test assertions ────────────────────────────
 
-    @Test fun `rete table tests model predictions against facts`() = runBlocking {
+    @Test fun `rete table tests model predictions against facts`() = runTest {
         val binding = CCEK.initialize(MuxReactorElement())
         val ctx = binding.createUserContext("model-tester")
         ctx.activate()
@@ -88,7 +88,7 @@ class CceTableTestingVisionTest {
 
     // ─── 3. PolyglotBlackboard: classfile pointcut facts ──────────────────────
 
-    @Test fun `polyglot blackboard exposes classfile pointcut facts to models`() = runBlocking {
+    @Test fun `polyglot blackboard exposes classfile pointcut facts to models`() = runTest {
         val binding = CCEK.initialize(MuxReactorElement())
         val ctx = binding.createUserContext("pointcut-tester")
         ctx.activate()
@@ -113,7 +113,7 @@ class CceTableTestingVisionTest {
 
     // ─── 4. GraphicalFlow: Blockly-style block graph ──────────────────────────
 
-    @Test fun `graphical flow projects causality as cursor-backed blocks`() = runBlocking {
+    @Test fun `graphical flow projects causality as cursor-backed blocks`() = runTest {
         val binding = CCEK.initialize(MuxReactorElement())
         val ctx = binding.createUserContext("flow-builder")
         ctx.activate()
@@ -140,7 +140,7 @@ class CceTableTestingVisionTest {
 
     // ─── 5. SpreadsheetVeneer: cursor-backed faceted grid ─────────────────────
 
-    @Test fun `spreadsheet veneer facets assertions into columns`() = runBlocking {
+    @Test fun `spreadsheet veneer facets assertions into columns`() = runTest {
         val binding = CCEK.initialize(MuxReactorElement())
         val ctx = binding.createUserContext("spreadsheet-tester")
         ctx.activate()
@@ -174,7 +174,7 @@ class CceTableTestingVisionTest {
 
     // ─── 6. MetaLcncAdapter: LCNC paradigm adaptation ─────────────────────────
 
-    @Test fun `meta lcnc adapter adapts paradigm to articulation surface`() = runBlocking {
+    @Test fun `meta lcnc adapter adapts paradigm to articulation surface`() = runTest {
         val binding = CCEK.initialize(MuxReactorElement())
         val ctx = binding.createUserContext("lcnc-adapter-tester")
         ctx.activate()
@@ -201,7 +201,7 @@ class CceTableTestingVisionTest {
 
     // ─── 7. Integrated: signal → causal assertion → model test → projection ───
 
-    @Test fun `end-to-end signal assertion model test and projection`() = runBlocking {
+    @Test fun `end-to-end signal assertion model test and projection`() = runTest {
         val binding = CCEK.initialize(MuxReactorElement())
         val ctx = binding.createUserContext("integration-tester")
         ctx.activate()
@@ -237,7 +237,7 @@ class CceTableTestingVisionTest {
 
     // ─── 8. Context isolation: separate user contexts don't leak ───────────────
 
-    @Test fun `separate user contexts are isolated`() = runBlocking {
+    @Test fun `separate user contexts are isolated`() = runTest {
         val bindingA = CCEK.initialize(MuxReactorElement())
         val bindingB = CCEK.initialize(MuxReactorElement())
         val ctxA = bindingA.createUserContext("user-a")

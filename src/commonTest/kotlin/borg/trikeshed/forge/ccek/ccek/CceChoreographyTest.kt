@@ -12,7 +12,7 @@ import borg.trikeshed.kanban.KanbanColumnId
 import borg.trikeshed.userspace.reactor.MuxReactorElement
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withTimeout
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -42,7 +42,7 @@ class CceChoreographyTest {
 
     // ─── 1. CCEK.choreograph() entry point ────────────────────────────────────
 
-    @Test fun `choreograph creates articulated node from document`() = runBlocking {
+    @Test fun `choreograph creates articulated node from document`() = runTest {
         val doc = ForgeDoc.empty("Project Alpha")
         val binding = CCEK.initialize(MuxReactorElement())
         val node = binding.choreograph(doc)
@@ -54,7 +54,7 @@ class CceChoreographyTest {
 
     // ─── 2. ArticulatedNode has document, board, and markdown projections ─────
 
-    @Test fun `articulated node fans out to document board and markdown`() = runBlocking {
+    @Test fun `articulated node fans out to document board and markdown`() = runTest {
         val binding = CCEK.initialize(MuxReactorElement())
         val doc = ForgeDoc.empty("Vision Doc")
         val node = binding.choreograph(doc)
@@ -73,7 +73,7 @@ class CceChoreographyTest {
 
     // ─── 3. Signal input → all projections update atomically ──────────────────
 
-    @Test fun `signal fans out to all projections simultaneously`() = runBlocking {
+    @Test fun `signal fans out to all projections simultaneously`() = runTest {
         val binding = CCEK.initialize(MuxReactorElement())
         val doc = ForgeDoc.empty("Fan-Out Test")
         val node = binding.choreograph(doc)
@@ -104,7 +104,7 @@ class CceChoreographyTest {
 
     // ─── 4. Hierarchical composition: parent scope → child scopes ─────────────
 
-    @Test fun `articulated node spawns child scopes for sub-blocks`() = runBlocking {
+    @Test fun `articulated node spawns child scopes for sub-blocks`() = runTest {
         val binding = CCEK.initialize(MuxReactorElement())
         val doc = ForgeDoc.empty("Hierarchy")
         val node = binding.choreograph(doc)
@@ -125,7 +125,7 @@ class CceChoreographyTest {
 
     // ─── 5. Structured cancellation: cancel parent → children stop ────────────
 
-    @Test fun `cancelling articulated node stops all child scopes`() = runBlocking {
+    @Test fun `cancelling articulated node stops all child scopes`() = runTest {
         val binding = CCEK.initialize(MuxReactorElement())
         val doc = ForgeDoc.empty("Cancellation Test")
         val node = binding.choreograph(doc)
@@ -147,7 +147,7 @@ class CceChoreographyTest {
 
     // ─── 6. Agent integration: signal → agent fires → projection updates ──────
 
-    @Test fun `agent subscription receives signals and can write back`() = runBlocking {
+    @Test fun `agent subscription receives signals and can write back`() = runTest {
         val binding = CCEK.initialize(MuxReactorElement())
         val doc = ForgeDoc.empty("Agent Test")
         val node = binding.choreograph(doc)
@@ -178,7 +178,7 @@ class CceChoreographyTest {
 
     // ─── 7. Self-reconfiguration: facet change triggers re-fan-out ────────────
 
-    @Test fun `property change triggers re-projection`() = runBlocking {
+    @Test fun `property change triggers re-projection`() = runTest {
         val binding = CCEK.initialize(MuxReactorElement())
         val doc = ForgeDoc.empty("Reconfigure")
         val node = binding.choreograph(doc)
@@ -217,7 +217,7 @@ class CceChoreographyTest {
 
     // ─── 8. Recording: channel events are deterministic frames ─────────────────
 
-    @Test fun `recording captures signal sequence for replay`() = runBlocking {
+    @Test fun `recording captures signal sequence for replay`() = runTest {
         val binding = CCEK.initialize(MuxReactorElement())
         val doc = ForgeDoc.empty("Recording")
         val node = binding.choreograph(doc, record = true)
@@ -237,7 +237,7 @@ class CceChoreographyTest {
 
     // ─── 9. Multi-view: Kanban board is one of many projections ───────────────
 
-    @Test fun `kanban board and markdown stay in sync`() = runBlocking {
+    @Test fun `kanban board and markdown stay in sync`() = runTest {
         val binding = CCEK.initialize(MuxReactorElement())
         val doc = ForgeDoc.empty("Sync Test")
         val node = binding.choreograph(doc)
@@ -267,7 +267,7 @@ class CceChoreographyTest {
 
     // ─── 10. Autotools configure: facet-driven projection activation ──────────
 
-    @Test fun `configure activates only matching projection contracts`() = runBlocking {
+    @Test fun `configure activates only matching projection contracts`() = runTest {
         val binding = CCEK.initialize(MuxReactorElement())
         val doc = ForgeDoc.empty("Configure Test")
         val node = binding.choreograph(
