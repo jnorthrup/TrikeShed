@@ -4,16 +4,33 @@ import borg.trikeshed.graal.ConfixBlackboard
 import borg.trikeshed.kanban.CardPriority
 import borg.trikeshed.kanban.ForgeBoardFSM
 import borg.trikeshed.kanban.KanbanBoard
+import borg.trikeshed.kanban.KanbanBoardId
 import borg.trikeshed.kanban.KanbanCard
+import borg.trikeshed.kanban.KanbanCardId
 import borg.trikeshed.kanban.KanbanColumn
 import borg.trikeshed.kanban.KanbanColumnId
-import borg.trikeshed.kanban.KanbanBoardId
-import borg.trikeshed.kanban.KanbanCardId
 import borg.trikeshed.kanban.cardsInColumn
-import borg.trikeshed.kanban.moveCard
-import kotlin.math.max
 
-fun forgeAtlasHtml(): String {
+data class ForgeAtlasRoute(
+    val path: String,
+    val description: String,
+)
+
+data class ForgeAtlasSection(
+    val id: String,
+    val title: String,
+    val body: String,
+    val accent: String = "#7aa2f7",
+)
+
+data class ForgeAtlasSnapshot(
+    val board: KanbanBoard,
+    val blackboard: ConfixBlackboard,
+    val routes: List<ForgeAtlasRoute>,
+    val sections: List<ForgeAtlasSection>,
+)
+
+fun forgeAtlasSnapshot(): ForgeAtlasSnapshot {
     if (ForgeBoardFSM.current().activeBoard == null) {
         ForgeBoardFSM.loadDefault()
     }
@@ -21,18 +38,38 @@ fun forgeAtlasHtml(): String {
     val blackboard = ConfixBlackboard.fromMap(
         mapOf(
             "root" to "src/",
-            "surface" to "notion-like atlas",
-            "transport" to "nodejs js target",
-            "metaphor" to "blackboard terrain",
+            "surface" to "forge workspace",
+            "transport" to "local-first node/browser target with optional api reach-out",
+            "autonomy" to "local models + mesh confix blackboard",
+            "board.name" to board.name,
+            "board.columns" to board.columns.size,
+            "board.cards" to board.cards.size,
         ),
         language = "forge-atlas",
     )
-    val sections = listOf(
-        AtlasSection("outline", "Outline", "Document-first launcher, linked sections, and live routes into the gallery."),
-        AtlasSection("board", "Kanban terrain", "A working board with depth, shadow, and the familiar Notion-like workflow."),
-        AtlasSection("radar", "Radar graph", "Zoom, pan, and flip across linked surface nodes instead of a flat list."),
-        AtlasSection("blackboard", "Blackboard", "A content-addressed note surface that acts like a live development document."),
+    val routes = listOf(
+        ForgeAtlasRoute("/events", "SSE stream from the reactor"),
+        ForgeAtlasRoute("/taxonomy?topic=blackboard", "injects a linked node"),
+        ForgeAtlasRoute("jsNodeProductionRun", "prints this atlas on Node.js"),
     )
+    val sections = listOf(
+        ForgeAtlasSection("outline", "Outline", "Local-first launcher: useful offline by default, then able to reach APIs after local autonomy tools decide it is warranted."),
+        ForgeAtlasSection("board", "Board workspace", "A working board with real column/card counts from ForgeBoardFSM, prioritizing local execution state over mock showcase copy.", accent = "#73daca"),
+        ForgeAtlasSection("blackboard", "Blackboard", "Content-addressed notes, scope keys, and model coordination derived from the live Confix blackboard snapshot and mesh-style handoff.", accent = "#bb9af7"),
+        ForgeAtlasSection("graph", "Linked graph", "Causal/semantic graph surface for local-first apps: anchorable relationships now, richer force/layout semantics next.", accent = "#e0af68"),
+    )
+    return ForgeAtlasSnapshot(
+        board = board,
+        blackboard = blackboard,
+        routes = routes,
+        sections = sections,
+    )
+}
+
+fun forgeAtlasHtml(): String {
+    val snapshot = forgeAtlasSnapshot()
+    val board = snapshot.board
+    val blackboard = snapshot.blackboard
     return buildString {
         appendLine("<!doctype html>")
         appendLine("<html lang=\"en\">")
@@ -85,22 +122,22 @@ fun forgeAtlasHtml(): String {
         appendLine("        <div>")
         appendLine("          <p class=\"eyebrow\">Forge UI / Notion-like atlas</p>")
         appendLine("          <h1>Development atlas</h1>")
-        appendLine("          <p class=\"lede\">Forge should look and move like Notion: document-first, linked, keyboard-friendly, and alive on the Node.js target.</p>")
+        appendLine("          <p class=\"lede\">Forge should host local-first apps: document-first, linked, keyboard-friendly, autonomous on-device first, and able to reach APIs only after local tools/models/blackboard logic choose to.</p>")
         appendLine("          <div class=\"pill-row\">")
-        appendLine("            <span class=\"pill\">document</span><span class=\"pill\">linked outline</span><span class=\"pill\">board</span><span class=\"pill\">radar</span><span class=\"pill\">nodejs</span>")
+        appendLine("            <span class=\"pill\">local-first</span><span class=\"pill\">linked outline</span><span class=\"pill\">board</span><span class=\"pill\">mesh blackboard</span><span class=\"pill\">nodejs</span><span class=\"pill\">optional api</span>")
         appendLine("          </div>")
         appendLine("        </div>")
         appendLine("        <div>")
         appendLine("          <h2>Live routes</h2>")
-        appendLine("          <p class=\"route\"><strong>/events</strong> SSE stream from the reactor</p>")
-        appendLine("          <p class=\"route\"><strong>/taxonomy?topic=blackboard</strong> injects a linked node</p>")
-        appendLine("          <p class=\"route\"><strong>jsNodeProductionRun</strong> prints this atlas on Node.js</p>")
+        for (route in snapshot.routes) {
+            appendLine("          <p class=\"route\"><strong>${route.path}</strong> ${route.description}</p>")
+        }
         appendLine("        </div>")
         appendLine("      </section>")
         appendLine("      <section class=\"layout\">")
         appendLine("        <aside class=\"panel\"><div class=\"inner\">")
         appendLine("          <p class=\"eyebrow\">Outline</p>")
-        for ((index, section) in sections.withIndex()) {
+        for ((index, section) in snapshot.sections.withIndex()) {
             val active = if (index == 0) " active" else ""
             appendLine("          <div class=\"outline-item$active\" style=\"--accent:${section.accent}\">")
             appendLine("            <div class=\"kicker\">${section.id}</div>")
@@ -137,7 +174,7 @@ fun forgeAtlasHtml(): String {
         appendLine("        </div></section>")
         appendLine("        <aside class=\"panel\"><div class=\"inner\">")
         appendLine("          <p class=\"eyebrow\">Transitions</p>")
-        appendLine(renderTransitionNotes())
+        appendLine(renderTransitionNotes(snapshot.sections))
         appendLine("        </div></aside>")
         appendLine("      </section>")
         appendLine("    </div>")
@@ -152,9 +189,9 @@ private fun renderBoardSummary(board: KanbanBoard): String = buildString {
     appendLine("  <div class=\"kicker\">kanban</div>")
     appendLine("  <div class=\"card-title\">${board.name}</div>")
     appendLine("  <div class=\"card-value\">${board.columns.size} columns · ${board.cards.size} cards</div>")
-    appendLine("  <div class=\"card-body\">This board is the active workspace. It should feel like a living Notion database — but with direct motion, drag states, and clear command surfaces.</div>")
+    appendLine("  <div class=\"card-body\">This board is the active workspace. The UI should surface real column/card state instead of synthetic widget copy.</div>")
     appendLine("  <div class=\"badge-row\">")
-    appendLine("    <span class=\"badge\">shadow</span><span class=\"badge\">reflection</span><span class=\"badge\">scale</span>")
+    appendLine("    <span class=\"badge\">data-backed</span><span class=\"badge\">forgeboardfsm</span><span class=\"badge\">live counts</span>")
     appendLine("  </div>")
     appendLine("</article>")
 }
@@ -164,7 +201,7 @@ private fun renderBlackboardSummary(blackboard: ConfixBlackboard): String = buil
     appendLine("  <div class=\"kicker\">blackboard</div>")
     appendLine("  <div class=\"card-title\">Content-addressed notes</div>")
     appendLine("  <div class=\"card-value\">${blackboard.keys().size} entries</div>")
-    appendLine("  <div class=\"card-body\">A blackboard surface that carries transition metadata: root, surface, transport, and metaphor. The document can navigate, not just describe.</div>")
+    appendLine("  <div class=\"card-body\">The blackboard is rendered from a real Confix snapshot and acts as the local coordination mesh before any remote API call is needed.</div>")
     appendLine("  <div class=\"badge-row\">")
     for (key in blackboard.keys()) {
         appendLine("    <span class=\"badge\">$key</span>")
@@ -173,13 +210,13 @@ private fun renderBlackboardSummary(blackboard: ConfixBlackboard): String = buil
     appendLine("</article>")
 }
 
-private fun renderTransitionNotes(): String = buildString {
-    val lines = listOf(
-        "Document-first layout should open like Notion, not a settings panel.",
-        "The blackboard should be a linked scope, not a dead note list.",
-        "The Node.js target must print an atlas that matches the live app's mental model.",
-        "Radar is the map; board is the work; outline is the door.",
-    )
+private fun renderTransitionNotes(sections: List<ForgeAtlasSection>): String = buildString {
+    val lines = buildList {
+        add("Document-first layout should open like Notion, not a settings panel.")
+        add("The blackboard should be a linked scope, not a dead note list.")
+        add("The Node.js target must publish a local-first atlas that still works before any remote API is introduced.")
+        addAll(sections.map { "${it.title}: ${it.body}" })
+    }
     for (line in lines) {
         appendLine("<div class=\"route\">$line</div>")
     }
@@ -209,10 +246,3 @@ private fun defaultBoard(): KanbanBoard {
         ),
     )
 }
-
-private data class AtlasSection(
-    val id: String,
-    val title: String,
-    val body: String,
-    val accent: String = "#7aa2f7",
-)
