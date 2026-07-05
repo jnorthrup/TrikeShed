@@ -30,6 +30,9 @@ data class ForgeAtlasSnapshot(
 )
 
 fun forgeAtlasSnapshot(): ForgeAtlasSnapshot {
+    if (ForgeBoardFSM.current().activeBoard == null) {
+        ForgeBoardFSM.loadDefault()
+    }
     val state = ForgeBoardFSM.current()
     val board = state.activeBoard ?: emptyBoard()
     val boardLoaded = state.activeBoard != null
