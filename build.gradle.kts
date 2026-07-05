@@ -257,12 +257,20 @@ tasks.register<JavaExec>("runOpenApiDemo") {
     workingDir = projectDir
 }
 
-tasks.register<JavaExec>("generateForgePages") {
+tasks.register<Sync>("generateForgePages") {
     group = "documentation"
-    description = "Generates docs/index.html and docs/.nojekyll from the Forge atlas."
-    dependsOn(":jvmJar")
-    mainClass.set("borg.trikeshed.forge.ForgePagesMainKt")
-    classpath(tasks.named("jvmJar"), configurations.getByName("jvmRuntimeClasspath"))
-    args(project.layout.projectDirectory.dir("docs").asFile.absolutePath)
-    workingDir = projectDir
+    description = "Publishes the real root KMPP JS browser target into docs/ with .nojekyll."
+    dependsOn("jsBrowserProductionWebpack")
+
+    from(project.layout.buildDirectory.dir("kotlin-webpack/js/productionExecutable"))
+    from(project.layout.projectDirectory.dir("src/jsMain/resources"))
+    into(project.layout.projectDirectory.dir("docs"))
+
+    doLast {
+        val noJekyll = project.layout.projectDirectory.file("docs/.nojekyll").asFile
+        if (!noJekyll.exists()) {
+            noJekyll.writeText("\n")
+        }
+        println("Published root KMPP JS browser target to ${project.layout.projectDirectory.dir("docs").asFile.absolutePath}")
+    }
 }
