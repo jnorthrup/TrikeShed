@@ -1,0 +1,82 @@
+# pyenv test environment
+# =====================
+# Local pyenv version file (don't commit specific versions)
+.python-version
+
+# Virtual environments
+.venv/
+venv/
+env/
+.pyenv/
+
+# Python bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Test artifacts
+.coverage
+coverage.xml
+*.cover
+.hypothesis/
+.pytest_cache/
+.mypy_cache/
+.tox/
+.ruff_cache/
+
+# Jupyter notebooks
+.ipynb_checkpoints/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# pyenv-specific
+$(pyenv root)/versions/*/envs/polyglot-test/
+
+# Manim cache
+manim_cache/
+media/
+*.mp4
+*.gif
+
+# Test output
+test_output/
+*.log
+
+# GraalPy specific
+.graalpy/
+
+# Local development
+local.ini
+*.local.py
+
+# Environment secrets
+.env
+.env.local
+
+# Keep these files
+!README.md
+!requirements*.txt
+!pytest.ini
+!pyproject.toml
