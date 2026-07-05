@@ -110,7 +110,11 @@ kotlin {
                 "**/PointcutMutableSeriesTest.kt",
                 "**/ReduxListBridgeTest.kt",
                 "**/ReduxMutableSeriesTest.kt",
-                "**/BtrfsCodecElementContractTest.kt"
+                "**/BtrfsCodecElementContractTest.kt",
+                // Vision / RED choreography specs: explicitly aspirational, not yet part of
+                // the build gate. Keep them runnable by name when working the CCEK roadmap.
+                "**/CceChoreographyTest.kt",
+                "**/CceTableTestingVisionTest.kt"
             )
             dependencies {
                 implementation(kotlin("test"))
@@ -162,6 +166,11 @@ kotlin {
                 implementation(kotlin("test-junit"))
                 implementation("org.junit.jupiter:junit-jupiter:6.1.0-RC1")
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:$coroutinesTestVersion")
+            }
+        }
+        val jsMain = getByName("jsMain") {
+            dependencies {
+                implementation(devNpm("workbox-webpack-plugin", "7.1.0"))
             }
         }
         val jsTest = getByName("jsTest") {
