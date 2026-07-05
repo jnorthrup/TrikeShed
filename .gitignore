@@ -18,3 +18,11 @@ __pycache__/
 modelmux/
 libs/keymux/
 liburing/
+
+.gradle 
+.hermes 
+.idea 
+.kotlin 
+.nojekyll 
+.tspy 
+.vscode
