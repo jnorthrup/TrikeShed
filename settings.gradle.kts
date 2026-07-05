@@ -24,26 +24,17 @@ dependencyResolutionManagement {
 
 rootProject.name = "TrikeShed"
 
-// Clean working modules - NO xvm, lib_cursor, polyglot, activejs, classfile
-// We want: pointcutting algebra SEPARATED from xvm/lib_cursor
-val workingModules = setOf(
-    "couch", "couch:viewserver", "htx-client", "tls", "ipfs", "quic",
-    "tiny-btrfs", "kursive", "patl", "concurrency", "dreamer-kmm", "dreamer-dashboard",
-    "openapi", "htx-client", "jules-client", "cmc",
-    "cmc-generated", "krak", "krak-generated", "rhood-generated", "cpu-cache",
-    "ccek-core", "lib", "classfile",
-    "polyglot"
-)
-
-val brokenModules = setOf(
-    "ngsctp", "miniduck", "uring", "ccek-dsl", "server", "window-toolkit"
-)
-
+// libs/ subprojects were split out to https://github.com/jnorthrup/trikeshed-libs on 2026-07-05.
+// TrikeShed's root src/ is self-contained and has zero libs/ imports. To re-attach the libs
+// subprojects, either:
+//   (a) git submodule add https://github.com/jnorthrup/trikeshed-libs libs
+//   (b) check out trikeshed-libs as a sibling and run with --include-build ../trikeshed-libs
+// The composite-build include below only activates when libs/ exists locally. When absent,
+// TrikeShed builds standalone with no reference to libs/ modules.
 val libsDir = rootDir.resolve("libs")
 if (libsDir.exists() && libsDir.isDirectory) {
-    libsDir.listFiles()!!
-        .filter { it.isDirectory }
-        .filter { it.name in workingModules }
-        .filter { it.name !in brokenModules }
-        .forEach { include(":libs:${it.name}") }
+    // Composite include: each direct child with a build.gradle.kts becomes ':libs:<name>'.
+    libsDir.listFiles()!!.filter { it.isDirectory }.forEach { sub ->
+        if (sub.resolve("build.gradle.kts").exists()) include(":libs:${sub.name}")
+    }
 }

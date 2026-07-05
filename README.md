@@ -4,9 +4,47 @@ many things
 
 ---
 
+## Repository split (2026-07-05)
+
+This repo (`jnorthrup/TrikeShed`) is **self-contained at root `src/`** and has no `libs/`
+directory. All former `libs/` subprojects were extracted verbatim into a sibling repo:
+
+| Repo | Holds |
+|---|---|
+| `jnorthrup/TrikeShed` (this one) | Root KMPP `src/` engine — Forge, CCEK, dag/rete, lcnc reductions, blackboard, kanban, cursors, JSON scanner, ISAM/FlatFile, IO |
+| `jnorthrup/trikeshed-libs` | Every former `libs/<name>` subproject as a standalone Gradle module (acpmcp, asclepius, ccek-core, cmc, couch, forge, htx-client, ipfs, krak, lcnc, lsm, og1, openapi, patl, polyglot, quic, tls, torrent, user-signals, …) |
+
+### Re-attaching the libs tree
+
+`settings.gradle.kts` auto-includes any `libs/<name>/` that has a `build.gradle.kts`, but only
+when `libs/` exists locally. The `runOpenApiDemo` task is similarly conditional on
+`libs/openapi/`. Two supported mounts:
+
+1. **Submodule**
+   ```
+   git submodule add https://github.com/jnorthrup/trikeshed-libs libs
+   ```
+2. **Sibling checkout + composite build**
+   ```
+   git clone https://github.com/jnorthrup/trikeshed-libs ../trikeshed-libs
+   ./gradlew --include-build ../trikeshed-libs :jvmTest
+   ```
+
+With neither in place, TrikeShed builds and tests standalone against only `src/`. The root
+source set has zero `libs/` imports.
+
+> Note: the prose below describes `libs/forge` / `libs/forge-ui`, which now live in
+> `trikeshed-libs`. The canonical board types (`KanbanBoard`, `KanbanCard`, `KanbanColumn`,
+> `CardPriority`) remain in **root commonMain** at `borg.trikeshed.kanban`.
+
+---
+
 ## Forge & Forge-UI
 
-`libs/forge` and `libs/forge-ui` form the agentic workflow layer of TrikeShed: composable pipelines, a live Kanban board, and a headless recording/replay system.
+`libs/forge` and `libs/forge-ui` form the agentic workflow layer of TrikeShed: composable pipelines, a live Kanban board, and a headless recording/replay system. They now live in
+`jnorthrup/trikeshed-libs`. The canonical board types (`KanbanBoard`, `KanbanCard`,
+`KanbanColumn`, `CardPriority`) remain in root commonMain `borg.trikeshed.kanban` — no
+forge dependency required for consumers that only need the board model.
 
 ### forge — workflow engine (`libs/forge`)
 
