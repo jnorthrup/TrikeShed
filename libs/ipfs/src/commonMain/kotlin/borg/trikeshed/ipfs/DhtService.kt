@@ -5,7 +5,7 @@ import borg.trikeshed.dht.id.NUID
 import borg.trikeshed.dht.net.NetMask
 import borg.trikeshed.dht.id.ElectionNUID
 import borg.trikeshed.dht.include.Route
-import borg.trikeshed.lib.Join
+import borg.trikeshed.lib.j
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
@@ -119,7 +119,8 @@ class DhtService(
         // Initialize with bootstrap nodes
         bootstrapNodes.forEach { addr ->
             val addrStr = addr.toString()
-            val dist = localNUID.netmask.distance(localNUID.id!!, target.bytes.toUByteArray())
+            val targetId = target.bytes.firstOrNull() ?: 0
+            val dist = localNUID.netmask.distance(localNUID.id!!, targetId)
             candidates.add(dist to addrStr)
         }
         candidates.sortBy { it.first }
@@ -146,13 +147,13 @@ class DhtService(
             var foundCloser = false
             for (response in responses) {
                 for (nodeInfo in response.nodes) {
-                    val nodeAddrStr = nodeInfo.address.toString()
+                    val nodeAddrStr = nodeInfo.address
                     // Use first byte of CID as node ID for 8-bit NUID
-                    val nodeIdByte = nodeInfo.id.getOrNull(0)?.toByte() ?: 0
+                    val nodeIdByte = nodeInfo.id.bytes.firstOrNull() ?: 0
                     
                     // Add to routing table (uses String address)
                     val nodeNUID = ElectionNUID(nodeIdByte)
-                    val route: Route<Byte> = Join(nodeNUID, nodeAddrStr)
+                    val route: Route<Byte> = nodeNUID j nodeAddrStr
                     routingTable.addRoute(route)
                     
                     // Add to candidates if not queried

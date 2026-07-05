@@ -629,7 +629,7 @@ switch (project.path) {
         }
         break
     case ":libs:forge-ui":
-        // Forge UI: JVM desktop + browser JS showcase.
+        // Forge UI: JVM desktop + browser/Node.js JS showcase.
         pluginManager.apply("org.jetbrains.kotlin.multiplatform")
         pluginManager.apply("maven-publish")
         pluginManager.apply("org.jetbrains.kotlin.plugin.compose")
@@ -641,13 +641,14 @@ switch (project.path) {
         forgeUiKotlin.jvmToolchain(25)
         forgeUiKotlin.jvm()
         forgeUiKotlin.js {
+            nodejs()
             browser()
             binaries.executable()
         }
 
         def forgeUiSourceSets = forgeUiKotlin.sourceSets
         forgeUiSourceSets.getByName("commonMain").dependencies {
-            // showcase model lives here; no extra deps required
+            implementation project(":")
         }
         forgeUiSourceSets.getByName("jvmMain").dependencies {
             implementation "org.jetbrains.kotlinx:kotlinx-coroutines-core:${prop('versions.kotlinx-coroutines-core')}"

@@ -21,11 +21,11 @@ kotlin {
         val commonMain by getting {
             dependencies {
                 implementation(project(":"))
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
             }
         }
         val jvmMain by getting {
             dependencies {
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
             }
         }
         val jvmTest by getting {

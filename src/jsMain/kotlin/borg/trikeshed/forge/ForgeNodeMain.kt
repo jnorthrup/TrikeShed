@@ -1,7 +1,7 @@
 package borg.trikeshed.forge
 
 fun main() {
-    val html = forgeAtlasHtml()
+    val html = forgeAppHtml()
     if (isBrowserRuntime()) {
         renderBrowser(html)
     } else {

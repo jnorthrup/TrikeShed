@@ -47,14 +47,14 @@ class MultiIndexContainer<E : Any> {
     // We use its hashCode/identity as a proxy key in a plain array list —
     // number of hash indexes is tiny in practice so linear scan is fine.
     private data class HashEntry(
-        val extractorId: Int,
+        val extractor: (Any?) -> Any?,
         val map: LinearHashMap<Any, Int>,
     )
     private val hashIndexes = ArrayList<HashEntry>()
 
     // ── live sort indexes ────────────────────────────────────────────────────
     private data class SortEntry(
-        val extractorId: Int,
+        val extractor: (Any?) -> Comparable<Any?>,
         val positions: IntArray,      // positions into store[], sorted by key
     )
     private val sortIndexes = ArrayList<SortEntry>()
@@ -66,7 +66,7 @@ class MultiIndexContainer<E : Any> {
         store += element
         // update hash indexes
         for (he in hashIndexes) {
-            val k = extractFromId(he.extractorId, element) ?: continue
+            val k = he.extractor(element) ?: continue
             he.map.put(k, pos)
         }
         // rebuild sort indexes (small cost, typically few sort indexes)
@@ -87,38 +87,35 @@ class MultiIndexContainer<E : Any> {
     fun <R> facet(key: MultiIndexK<R>): R = when (key) {
 
         is MultiIndexK.ByHash<*> -> {
-            val id = System.identityHashCode(key.extractor)
-            val he = hashIndexes.firstOrNull { it.extractorId == id }
-                ?: buildHashIndex(id, key.extractor).also { hashIndexes += it }
+            val he = hashIndexes.firstOrNull { it.extractor === key.extractor }
+                ?: buildHashIndex(key.extractor).also { hashIndexes += it }
             val map = he.map
             val fn: (Any?) -> Int? = { k -> if (k == null) null else map.get(k) }
             fn as R
         }
 
         is MultiIndexK.ByOrder<*> -> {
-            val id  = System.identityHashCode(key.extractor)
             val ext = key.extractor as (Any?) -> Comparable<Any?>
-            val se  = sortIndexes.firstOrNull { it.extractorId == id }
-                ?: buildSortIndex(id, ext).also { sortIndexes += it }
+            val se  = sortIndexes.firstOrNull { it.extractor === ext }
+                ?: buildSortIndex(ext).also { sortIndexes += it }
             val arr = se.positions
             (arr.size j { i: Int -> arr[i] }) as R
         }
 
         is MultiIndexK.ByRange<*> -> {
-            val id = System.identityHashCode(key.extractor)
             val ext = key.extractor as (Any?) -> Comparable<Any?>
             // ensure sort index exists
-            sortIndexes.firstOrNull { it.extractorId == id }
-                ?: buildSortIndex(id, ext).also { sortIndexes += it }
+            sortIndexes.firstOrNull { it.extractor === ext }
+                ?: buildSortIndex(ext).also { sortIndexes += it }
 
             val fn: (Any?, Any?) -> Series<Int> = { lo, hi ->
-                val se2 = sortIndexes.first { it.extractorId == id }
+                val se2 = sortIndexes.first { it.extractor === ext }
                 val arr = se2.positions
                 // binary search bounds
                 val from = lowerBound(arr, lo, ext)
                 val to   = upperBound(arr, hi, ext)
                 val len  = maxOf(0, to - from)
-                len j { i -> arr[from + i] }
+                len j { i: Int -> arr[from + i] }
             }
             fn as R
         }
@@ -134,43 +131,29 @@ class MultiIndexContainer<E : Any> {
 
     // ── private helpers ──────────────────────────────────────────────────────
 
-    private fun buildHashIndex(id: Int, extractor: (Any?) -> Any?): HashEntry {
+    private fun buildHashIndex(extractor: (Any?) -> Any?): HashEntry {
         val map = LinearHashMap<Any, Int>(store.size.coerceAtLeast(16))
         for (pos in store.indices) {
             val k = extractor(store[pos]) ?: continue
             map.put(k, pos)
         }
-        return HashEntry(id, map)
+        return HashEntry(extractor, map)
     }
 
-    private fun buildSortIndex(id: Int, extractor: (Any?) -> Comparable<Any?>): SortEntry {
+    private fun buildSortIndex(extractor: (Any?) -> Comparable<Any?>): SortEntry {
         val positions = store.indices.sortedWith(Comparator { a, b ->
             val ka = extractor(store[a])
             val kb = extractor(store[b])
             compareValues(ka, kb)
         }).toIntArray()
-        return SortEntry(id, positions)
+        return SortEntry(extractor, positions)
     }
 
     private fun rebuildSortIndexes() {
         for (i in sortIndexes.indices) {
             val se = sortIndexes[i]
-            val ext = sortExtractorById(se.extractorId) ?: continue
-            sortIndexes[i] = buildSortIndex(se.extractorId, ext)
+            sortIndexes[i] = buildSortIndex(se.extractor)
         }
-    }
-
-    // extractor registry: kept in parallel to sortIndexes
-    private val sortExtractors = ArrayList<Pair<Int, (Any?) -> Comparable<Any?>>>()
-
-    private fun sortExtractorById(id: Int): ((Any?) -> Comparable<Any?>)? =
-        sortExtractors.firstOrNull { it.first == id }?.second
-
-    @Suppress("UNCHECKED_CAST")
-    private fun extractFromId(id: Int, element: E): Any? {
-        // For hash indexes we stored the extractor in hashIndexes already — no lookup needed for put.
-        // This helper is only invoked from add(), which doesn't need type cast beyond Any?.
-        return null  // actual extraction done inline in add() via the stored lambda
     }
 
     // ── overloaded add with explicit hash-index registration ─────────────────
@@ -181,20 +164,24 @@ class MultiIndexContainer<E : Any> {
      * a full index build.
      */
     fun <K : Any> registerHash(key: MultiIndexK.ByHash<K>) {
-        val id = System.identityHashCode(key.extractor)
-        if (hashIndexes.none { it.extractorId == id })
-            hashIndexes += buildHashIndex(id, key.extractor)
+        if (hashIndexes.none { it.extractor === key.extractor })
+            hashIndexes += buildHashIndex(key.extractor)
     }
 
     /**
-     * Register a ByOrder/ByRange key so its sort index is maintained on add().
+     * Register a ByOrder key so its sort index is maintained on add().
      */
     fun <K : Comparable<K>> registerOrder(key: MultiIndexK.ByOrder<K>) {
-        val id = System.identityHashCode(key.extractor)
         val ext = key.extractor as (Any?) -> Comparable<Any?>
-        if (sortExtractors.none { it.first == id }) sortExtractors += id to ext
-        if (sortIndexes.none { it.extractorId == id })
-            sortIndexes += buildSortIndex(id, ext)
+        if (sortIndexes.none { it.extractor === ext })
+            sortIndexes += buildSortIndex(ext)
+    }
+
+    /** Register a ByRange key so its sorted projection is maintained on add(). */
+    fun <K : Comparable<K>> registerOrder(key: MultiIndexK.ByRange<K>) {
+        val ext = key.extractor as (Any?) -> Comparable<Any?>
+        if (sortIndexes.none { it.extractor === ext })
+            sortIndexes += buildSortIndex(ext)
     }
 
     // ── binary search helpers ────────────────────────────────────────────────

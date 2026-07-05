@@ -135,4 +135,33 @@ class MultiIndexContainerTest {
         val byName2 = c.facet(MultiIndexK.ByHash { (it as Person).name })
         assertEquals(1, byName2("Eve"))
     }
+
+    @Test fun registeredHashFacetSeesLaterAddsThroughSameKey() {
+        val c = MultiIndexContainer<Person>()
+        val nameKey = MultiIndexK.ByHash { (it as Person).name }
+        c.registerHash(nameKey)
+
+        c.add(alice)
+        val byName = c.facet(nameKey)
+        assertEquals(0, byName("Alice"))
+
+        c.add(bob)
+        assertEquals(1, byName("Bob"))
+    }
+
+    @Test fun orderFacetRegisteredByRangeKeySeesLaterAdds() {
+        val c = MultiIndexContainer<Person>()
+        val ageRange = MultiIndexK.ByRange { (it as Person).age }
+        c.registerOrder(ageRange)
+
+        c.add(alice)
+        c.add(carol)
+        val range = c.facet(ageRange)
+        assertEquals(listOf("Alice", "Carol"), (0 until range(0, 99).size).map { idx -> c[range(0, 99).b(idx)].name })
+
+        c.add(bob)
+        val hits = range(25, 30)
+        val names = (0 until hits.size).map { idx -> c[hits.b(idx)].name }
+        assertEquals(listOf("Bob", "Alice"), names)
+    }
 }

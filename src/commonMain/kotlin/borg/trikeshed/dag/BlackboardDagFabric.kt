@@ -240,6 +240,21 @@ sealed class ReteFact {
     ) : ReteFact() {
         override val factId: String = "dag:${coordinate.className}@${coordinate.bytecodeOffset}"
     }
+
+    /**
+     * Causal graph node fact — pairs a deterministic causal node with the
+     * blackboard DAG. Produced by [borg.trikeshed.dag.ReteCausalBridge.project]
+     * from a [BlackboardEvent.NodePlanning] event.
+     */
+    data class NodeFact(
+        val nodeId: String,
+        val boardId: String,
+        val opId: String,
+        val opVersion: String,
+        val causalKey: String,
+    ) : ReteFact() {
+        override val factId: String = "node:$boardId:$nodeId"
+    }
 }
 
 // ==================== RETE PROJECTION ====================

@@ -67,8 +67,8 @@ object OpenApiChoreographyDemo {
         // 6. Show ACL check
         println("6. ACL Check")
         println("   - Ensures generated APIs don't bypass overlay ACL")
-        println("   - Principal: ${OverlayPrincipal::class.simpleName}")
-        println("   - Result: ${AclResult::class.simpleName}")
+        println("   - Principal: TODO(OpenAPI choreography): bind to forge overlay principal model")
+        println("   - Result: TODO(OpenAPI choreography): bind to ACL result model")
         println()
 
         // 7. Show counter/drain hooks
@@ -83,8 +83,8 @@ object OpenApiChoreographyDemo {
         println("8. Graph Node Planning")
         println("   - Plan nodes from operation result")
         println("   - Get planned nodes for board")
-        println("   - Node: ${GraphNode::class.simpleName}")
-        println("   - Overlay: ${GraphOverlay::class.simpleName}")
+        println("   - Node: TODO(OpenAPI choreography): bind to root causal graph node model")
+        println("   - Overlay: TODO(OpenAPI choreography): bind to kanban/forge overlay projection")
         println()
 
         // 9. Show factory
