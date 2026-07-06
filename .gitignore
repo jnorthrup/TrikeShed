@@ -19,10 +19,16 @@ modelmux/
 libs/keymux/
 liburing/
 
-.gradle 
-.hermes 
-.idea 
-.kotlin 
-.nojekyll 
-.tspy 
+# Session-local Hermes / agent-runtime artifacts (not source-controlled)
+.agents/
+.claude/
+.codex/
+.mcp.json
+
+.gradle
+.hermes
+.idea
+.kotlin
+.nojekyll
+.tspy
 .vscode

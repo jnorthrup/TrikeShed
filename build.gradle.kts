@@ -182,16 +182,10 @@ kotlin {
     }
 }
 
-// TODO(js-browser-test): Kotlin/JS browser tests currently time out in the
-// karma-electron launcher (`reconnect failed before timeout of 2000ms`). Keep
-// the production JS compile/webpack artifacts in `build`, but do not let this
-// flaky harness break the global build gate until the launcher is repaired.
-// TODO(js-node-test): Kotlin/JS node tests currently leave mocha/node runners
-// alive past the build timeout. Keep JS production compile/dist in `build`, but
-// exclude the hung test harness from the global gate until the runner exits.
-tasks.matching { it.name == "jsBrowserTest" || it.name == "jsNodeTest" }.configureEach {
-    enabled = false
-}
+// Keep the JS gate on the headless node runner: the production executable is a
+// UMD bundle exposed as `globalThis.TrikeShed`, so jsNodeTest can verify the
+// shipped artifact parses and loads without depending on the flaky Karma/
+// electron launcher. If browser coverage comes back, re-add it separately.
 
 apply(from = "publish_macro.gradle.kts")
 

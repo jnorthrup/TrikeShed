@@ -147,6 +147,19 @@ class ArticulatedNode(
 
     fun recording(): List<ForgeSignal> = recordedSignals.toList()
 
+    /** For tests only: snapshot the post-start state under a transient scope. */
+    private val docMutex = kotlinx.coroutines.sync.Mutex()
+
+    /**
+     * Apply a signal synchronously to a clone of [doc] and return the
+     * resulting project. Test seams only — production callers should use
+     * `sendSignal`.
+     */
+    fun applySignalForTest(signal: ForgeSignal): ForgeDocument {
+        val local = doc
+        return applySignal(signal)
+    }
+
     private fun applySignal(signal: ForgeSignal): ForgeDocument = when (signal) {
         is ForgeSignal.AppendBlock -> ForgeDoc.appendBlock(doc, doc.rootPageId, signal.kind, signal.text, signal.properties)
         is ForgeSignal.UpdateText -> {
@@ -158,12 +171,24 @@ class ArticulatedNode(
             ForgeDoc.deleteBlock(doc, blockId)
         }
         is ForgeSignal.MoveCard -> {
-            val board = doc.toKanbanBoard()
-            val card = board.cards.find { it.id.value == signal.cardId } ?: return doc
-            val movedCard = card.copy(columnId = KanbanColumnId(signal.toColumnId))
-            board.copy(cards = board.cards.map { existing ->
-                if (existing.id == card.id) movedCard else existing
-            }).toForgeDocument()
+            // In-place property edit, NOT a board round-trip: the projection
+            // layer has a fixed 3-column schema (backlog/inprog/done), so any
+            // custom column id (e.g. col-b) would be lost on re-projection.
+            // We update the underlying heading block's `kanban.column.id`
+            // (preferred) and `kanban.status` (legacy heuristic) so the
+            // round-trip is identity-stable.
+            val targetBlock = doc.blocks[signal.cardId]?.takeIf { block ->
+                block.kind == ForgeBlockKind.HEADING_2 ||
+                    block.kind == ForgeBlockKind.HEADING_1 ||
+                    block.kind == ForgeBlockKind.HEADING_3
+            } ?: return doc
+            val status = when (signal.toColumnId) {
+                "col-inprogress" -> "in-progress"
+                "col-done" -> "done"
+                else -> "backlog"
+            }
+            val withId = ForgeDoc.setProperty(doc, targetBlock.id, "kanban.column.id", signal.toColumnId)
+            ForgeDoc.setProperty(withId, targetBlock.id, "kanban.status", status)
         }
     }
 

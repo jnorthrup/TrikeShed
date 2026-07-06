@@ -88,6 +88,25 @@ class ForgeDocTest {
         assertTrue(md.contains("- [x] Task"))
     }
 
+    @Test fun forgeAppHtmlIncludesPwaShellAndSeed() {
+        val html = forgeAppHtml()
+
+        assertTrue(html.startsWith("<!doctype html>"))
+        assertTrue(html.contains("<title>TrikeShed Forge workspace</title>"))
+        assertTrue(html.contains("<link rel=\"manifest\" href=\"./manifest.webmanifest\" />"))
+        assertTrue(html.contains("<link rel=\"icon\" href=\"./icons/forge-icon.svg\" type=\"image/svg+xml\" />"))
+        assertTrue(html.contains("<link rel=\"apple-touch-icon\" href=\"./icons/forge-icon-maskable.svg\" />"))
+        assertTrue(html.contains("class=\"app-shell\""))
+        assertTrue(html.contains("class=\"rail\""))
+        assertTrue(html.contains("class=\"editor\""))
+        assertTrue(html.contains("class=\"board-pane\""))
+        assertTrue(html.contains("id=\"spatial-shell\""))
+        assertTrue(html.contains("id=\"board-root\""))
+        assertTrue(html.contains("id=\"reactor-root\""))
+        assertTrue(html.contains("<script id=\"forge-seed\" type=\"application/json\">"))
+        assertTrue(html.contains("\"useCases\""))
+    }
+
     @Test fun forgeDocumentProjectsToKanbanBoard() {
         var doc = ForgeDoc.empty("Sprint Board")
         doc = ForgeDoc.appendBlock(doc, doc.rootPageId, ForgeBlockKind.HEADING_2, "Auth Story",

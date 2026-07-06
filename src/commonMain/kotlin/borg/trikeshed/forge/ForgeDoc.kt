@@ -67,25 +67,34 @@ data class ForgeDocument(
 
 object ForgeDoc {
 
-    fun empty(title: String = "Untitled"): ForgeDocument {
-        val pageId = ForgeBlockId.generate()
-        val firstChildId = ForgeBlockId.generate()
+    fun page(rootPageId: ForgeBlockId, title: String): ForgeDocument {
         val page = ForgeBlock(
-            id = pageId,
+            id = rootPageId,
             kind = ForgeBlockKind.PAGE,
             text = title,
             parentId = null,
-            children = listOf(firstChildId),
+            children = emptyList(),
         )
+        return ForgeDocument(
+            rootPageId = rootPageId,
+            blocks = mapOf(rootPageId.value to page),
+            cursor = ForgeCursor(rootPageId, rootPageId, 0),
+        )
+    }
+
+    fun empty(title: String = "Untitled"): ForgeDocument {
+        val pageId = ForgeBlockId.generate()
+        val doc = page(pageId, title)
+        val firstChildId = ForgeBlockId.generate()
         val firstChild = ForgeBlock(
             id = firstChildId,
             kind = ForgeBlockKind.TEXT,
             text = "",
             parentId = pageId,
         )
-        return ForgeDocument(
-            rootPageId = pageId,
-            blocks = mapOf(pageId.value to page, firstChildId.value to firstChild),
+        val page = doc.requireBlock(pageId).copy(children = listOf(firstChildId))
+        return doc.copy(
+            blocks = doc.blocks + (pageId.value to page) + (firstChildId.value to firstChild),
             cursor = ForgeCursor(pageId, firstChildId, 0),
         )
     }
@@ -96,10 +105,25 @@ object ForgeDoc {
         kind: ForgeBlockKind,
         text: String,
         properties: Map<String, String> = emptyMap(),
+    ): ForgeDocument = appendBlockWithId(doc, parentId, ForgeBlockId.generate(), kind, text, properties)
+
+    /**
+     * Append a block with an explicit [id]. The projection boundary (e.g.
+     * `KanbanBoard.toForgeDocument`) uses this to preserve source ids so the
+     * round-trip stays identity-stable.
+     */
+    fun appendBlockWithId(
+        doc: ForgeDocument,
+        parentId: ForgeBlockId,
+        blockId: ForgeBlockId,
+        kind: ForgeBlockKind,
+        text: String,
+        properties: Map<String, String> = emptyMap(),
     ): ForgeDocument {
+        check(!(blockId in doc.blocks.values.map { it.id })) { "blockId collision: $blockId" }
         val parent = doc.requireBlock(parentId)
         val block = ForgeBlock(
-            id = ForgeBlockId.generate(),
+            id = blockId,
             kind = kind,
             text = text,
             parentId = parent.id,
@@ -215,14 +239,39 @@ object ForgeDoc {
 /**
  * Project a Forge document into a KanbanBoard.
  *
- * Each heading becomes a card. Bullet/TODO under a heading become that card's
- * sub-tasks. The KanbanBoard is a first-class client of the Forge surface.
+ * Each heading becomes a card. Columns are derived from the page block's
+ * `kanban.columns` property (a JSON array of `{id,name,order,wipLimit?}`)
+ * when present; otherwise the schema falls back to the canonical
+ * `backlog / in-progress / done` triple. This makes the projection
+ * identity-stable for arbitrary column sets and lets `MoveCard` round-trip
+ * custom columns like `col-b` without losing them.
  */
 fun ForgeDocument.toKanbanBoard(): KanbanBoard {
     val page = requireBlock(rootPageId)
+
+    // Parse `kanban.columns` if present so the column-set survives round-trip.
+    val customColumns = parseKanbanColumnsProperty(page.properties["kanban.columns"])
+
     val backlog = KanbanColumnId("col-backlog")
     val inprog = KanbanColumnId("col-inprogress")
     val done = KanbanColumnId("col-done")
+    // When customColumns is empty we use the canonical mapping directly.
+    // When non-empty we honour explicit kanban.column.id, otherwise fall
+    // back to the canonical mapping IF the column exists in the custom
+    // set; otherwise map to the first custom column so the projection
+    // never silently drops a card.
+    val BlockColumnId: (String) -> KanbanColumnId = { status ->
+        val canonical = when (status) {
+            "in-progress" -> inprog
+            "done" -> done
+            else -> backlog
+        }
+        when {
+            customColumns.isEmpty() -> canonical
+            customColumns.any { it.id == canonical.value } -> canonical
+            else -> KanbanColumnId(customColumns.first().id)
+        }
+    }
 
     val cards = mutableListOf<KanbanCard>()
     var order = 0
@@ -232,11 +281,11 @@ fun ForgeDocument.toKanbanBoard(): KanbanBoard {
         when (block.kind) {
             ForgeBlockKind.HEADING_1, ForgeBlockKind.HEADING_2, ForgeBlockKind.HEADING_3 -> {
                 val status = block.properties["kanban.status"] ?: "backlog"
-                val columnId = when (status) {
-                    "in-progress" -> inprog
-                    "done" -> done
-                    else -> backlog
-                }
+                // Honour explicit `kanban.column.id` if present; fall back to
+                // the kanban-status→column heuristic for legacy documents.
+                val columnId = block.properties["kanban.column.id"]
+                    ?.let { id -> customColumns.firstOrNull { it.id == id }?.let { KanbanColumnId(it.id) } }
+                    ?: BlockColumnId(status)
                 val priority = when (block.properties["kanban.priority"]) {
                     "critical" -> CardPriority.CRITICAL
                     "high" -> CardPriority.HIGH
@@ -247,16 +296,18 @@ fun ForgeDocument.toKanbanBoard(): KanbanBoard {
                     block(cid)?.takeIf { it.kind == ForgeBlockKind.BULLET || it.kind == ForgeBlockKind.TODO }
                         ?.let { "- ${it.text}" }
                 }
-                cards.add(KanbanCard(
-                    id = KanbanCardId(block.id.value),
-                    title = block.text,
-                    description = childTexts.joinToString("\n"),
-                    columnId = columnId,
-                    order = order++,
-                    priority = priority,
-                    assignee = block.properties["kanban.assignee"],
-                    tags = block.properties["kanban.tags"]?.split(",")?.map { it.trim() }?.toSet().orEmpty(),
-                ))
+                cards.add(
+                    KanbanCard(
+                        id = KanbanCardId(block.id.value),
+                        title = block.text,
+                        description = childTexts.joinToString("\n"),
+                        columnId = columnId,
+                        order = order++,
+                        priority = priority,
+                        assignee = block.properties["kanban.assignee"],
+                        tags = block.properties["kanban.tags"]?.split(",")?.map { it.trim() }?.toSet().orEmpty(),
+                    )
+                )
             }
             else -> {}
         }
@@ -265,58 +316,177 @@ fun ForgeDocument.toKanbanBoard(): KanbanBoard {
 
     page.children.forEach { walk(it) }
 
-    return KanbanBoard(
-        id = KanbanBoardId(rootPageId.value),
-        name = page.text.ifBlank { "Untitled" },
-        columns = listOf(
+    val columns: List<KanbanColumn> = if (customColumns.isNotEmpty()) {
+        customColumns.map { c ->
+            KanbanColumn(
+                id = KanbanColumnId(c.id),
+                name = c.name,
+                order = c.order,
+                wipLimit = c.wipLimit,
+            )
+        }
+    } else {
+        listOf(
             KanbanColumn(backlog, "Backlog", 0),
             KanbanColumn(inprog, "In Progress", 1, wipLimit = 3),
             KanbanColumn(done, "Done", 2),
-        ),
+        )
+    }
+
+    return KanbanBoard(
+        id = KanbanBoardId(rootPageId.value),
+        name = page.text.ifBlank { "Untitled" },
+        columns = columns,
         cards = cards,
     )
 }
 
+/** A column as encoded in the `kanban.columns` page property. */
+private data class KanbanColumnRef(
+    val id: String,
+    val name: String,
+    val order: Int,
+    val wipLimit: Int? = null,
+)
+
 /**
- * Project a KanbanBoard back into a Forge document.
+ * Lightweight parser for `kanban.columns` JSON arrays.
  *
- * Each card becomes a heading with kanban.* properties. This is the two-way
- * bridge: Forge ↔ Kanban.
+ * Format: `[{"id":"col-…","name":"…","order":N,"wipLimit":N?}, ...]`.
+ * The parser is forgiving on whitespace and skips malformed entries rather
+ * than throwing — projection freshness matters more than strict parsing.
  */
-fun KanbanBoard.toForgeDocument(): ForgeDocument {
-    var doc = ForgeDoc.empty(title = name)
-    val pageId = doc.rootPageId
-
-    for (card in cards.sortedBy { it.order }) {
-        val status = when (card.columnId.value) {
-            "col-inprogress" -> "in-progress"
-            "col-done" -> "done"
-            else -> "backlog"
-        }
-        val priority = when (card.priority) {
-            CardPriority.CRITICAL -> "critical"
-            CardPriority.HIGH -> "high"
-            CardPriority.LOW -> "low"
-            else -> "medium"
-        }
-        val props = buildMap {
-            put("kanban.status", status)
-            put("kanban.priority", priority)
-            if (card.assignee != null) put("kanban.assignee", card.assignee)
-            if (card.tags.isNotEmpty()) put("kanban.tags", card.tags.joinToString(","))
-        }
-        doc = ForgeDoc.appendBlock(doc, pageId, ForgeBlockKind.HEADING_2, card.title, props)
-
-        if (card.description.isNotBlank()) {
-            val headingBlockId = doc.cursor.blockId
-            card.description.lines().filter { it.isNotBlank() }.forEach { line ->
-                val text = line.removePrefix("- ").removePrefix("* ")
-                doc = ForgeDoc.appendBlock(doc, headingBlockId, ForgeBlockKind.BULLET, text)
-                // Move cursor back to page level for next heading
-                doc = doc.copy(cursor = doc.cursor.copy(blockId = pageId))
+private fun parseKanbanColumnsProperty(raw: String?): List<KanbanColumnRef> {
+    if (raw.isNullOrBlank()) return emptyList()
+    val trimmed = raw.trim()
+    if (!trimmed.startsWith('[') || !trimmed.endsWith(']')) return emptyList()
+    val body = trimmed.substring(1, trimmed.length - 1)
+    if (body.isBlank()) return emptyList()
+    val out = mutableListOf<KanbanColumnRef>()
+    var depth = 0
+    var start = -1
+    body.forEachIndexed { i, ch ->
+        when (ch) {
+            '{' -> {
+                if (depth == 0) start = i
+                depth++
+            }
+            '}' -> {
+                depth--
+                if (depth == 0 && start >= 0) {
+                    val entry = body.substring(start, i + 1)
+                    parseKanbanColumnObject(entry)?.let { out += it }
+                    start = -1
+                }
             }
         }
     }
+    return out
+}
 
-    return doc
+private fun parseKanbanColumnObject(entry: String): KanbanColumnRef? {
+    fun field(key: String): String? {
+        val regex = Regex("\"$key\"\\s*:\\s*(\"([^\"\\\\]*(?:\\\\.[^\"\\\\]*)*)\"|([0-9]+))")
+        val m = regex.find(entry) ?: return null
+        return when {
+            m.groupValues[2].isNotEmpty() -> m.groupValues[2]
+            m.groupValues[3].isNotEmpty() -> m.groupValues[3]
+            else -> null
+        }
+    }
+    val id = field("id") ?: return null
+    val name = field("name") ?: id
+    val order = field("order")?.toIntOrNull() ?: 0
+    val wipLimit = field("wipLimit")?.toIntOrNull()
+    return KanbanColumnRef(id = id, name = name, order = order, wipLimit = wipLimit)
+}
+
+/** Stable JSON serialiser for `kanban.columns` page-block property. */
+private fun encodeKanbanColumns(columns: List<KanbanColumn>): String =
+    columns.joinToString(prefix = "[", postfix = "]") { c ->
+        buildString {
+            append("{\"id\":\"").append(escapeJson(c.id.value))
+            append("\",\"name\":\"").append(escapeJson(c.name))
+            append("\",\"order\":").append(c.order)
+            if (c.wipLimit != null) append(",\"wipLimit\":").append(c.wipLimit)
+            append("}")
+        }
+    }
+
+private fun escapeJson(s: String): String =
+    s.replace("\\", "\\\\").replace("\"", "\\\"")
+
+/**
+ * Project a KanbanBoard back into a Forge document.
+ *
+ * Each card becomes a heading with kanban.* properties. Source card ids are
+ * preserved as the heading-block ids so the round-trip stays
+ * identity-stable. This is the two-way bridge: Forge ↔ Kanban.
+ */
+fun KanbanBoard.toForgeDocument(rootPageId: ForgeBlockId = ForgeBlockId(id.value)): ForgeDocument {
+    val pageId = rootPageId
+    val initial = ForgeDoc.page(pageId, title = name)
+
+    // Encode column set as a `kanban.columns` page-block property so the
+    // list survives the round-trip (otherwise `toKanbanBoard()` falls back
+    // to the canonical backlog/inprogress/done triple).
+    val withColumns = columns.takeIf { it.isNotEmpty() }?.let { cols ->
+        ForgeDoc.setProperty(initial, pageId, "kanban.columns", encodeKanbanColumns(cols))
+    } ?: initial
+
+    // Fold cards in stable order; each step appends the heading with the
+    // card's source id, then optionally appends child bullets carrying
+    // stable ids per line.
+    val finalDoc = cards.sortedBy { it.order }.fold(withColumns) { acc, card ->
+        val headingId = ForgeBlockId(card.id.value)
+        val withHeading = ForgeDoc.appendBlockWithId(
+            doc = acc,
+            parentId = pageId,
+            blockId = headingId,
+            kind = ForgeBlockKind.HEADING_2,
+            text = card.title,
+            properties = card.toProperties(),
+        )
+        if (card.description.isBlank()) {
+            withHeading
+        } else {
+            // Stable child ids derived from the card id so round-trip is
+            // idempotent.
+            card.description
+                .lines()
+                .filter { it.isNotBlank() }
+                .mapIndexed { lineIdx, line ->
+                    ForgeBlockId(card.id.value + "-l" + lineIdx) to
+                        line.removePrefix("- ").removePrefix("* ")
+                }
+                .fold(withHeading) { innerAcc, (bulletId, text) ->
+                    ForgeDoc.appendBlockWithId(
+                        doc = innerAcc,
+                        parentId = headingId,
+                        blockId = bulletId,
+                        kind = ForgeBlockKind.BULLET,
+                        text = text,
+                    )
+                }
+        }
+    }
+    return finalDoc
+}
+
+private fun KanbanCard.toProperties(): Map<String, String> = buildMap {
+    val status = when (columnId.value) {
+        "col-inprogress" -> "in-progress"
+        "col-done" -> "done"
+        else -> "backlog"
+    }
+    val priority = when (priority) {
+        CardPriority.CRITICAL -> "critical"
+        CardPriority.HIGH -> "high"
+        CardPriority.LOW -> "low"
+        else -> "medium"
+    }
+    put("kanban.status", status)
+    put("kanban.priority", priority)
+    if (assignee != null) put("kanban.assignee", assignee!!)
+    if (tags.isNotEmpty()) put("kanban.tags", tags.joinToString(","))
 }

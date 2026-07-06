@@ -9,6 +9,9 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.datetime.Clock
 import kotlinx.serialization.Serializable
+import kotlin.concurrent.atomics.AtomicBoolean
+import kotlin.concurrent.atomics.AtomicLong
+import kotlin.concurrent.atomics.ExperimentalAtomicApi
 
 /**
  * Forge-native Kanban FSM — board/card lifecycle events.
@@ -18,7 +21,13 @@ import kotlinx.serialization.Serializable
  * by the UI. The reactor may bridge into this stream via
  * [ForgeBoardFSM.emit].
  */
+@OptIn(ExperimentalAtomicApi::class)
 object ForgeBoardFSM {
+
+    private data class ColumnSequenceKey(
+        val boardId: KanbanBoardId,
+        val columnId: KanbanColumnId,
+    )
 
     // ─── Event bus ─────────────────────────────────────────────────────────
 
@@ -32,6 +41,8 @@ object ForgeBoardFSM {
     // ─── Board state ────────────────────────────────────────────────────────
 
     private val _state = MutableStateFlow(ForgeBoardState())
+    private val emitGuard = AtomicBoolean(false)
+    private val columnSequences = mutableMapOf<ColumnSequenceKey, AtomicLong>()
     val state: StateFlow<ForgeBoardState> = _state.asStateFlow()
 
     fun current(): ForgeBoardState = _state.value
@@ -41,7 +52,20 @@ object ForgeBoardFSM {
     /** Emit an event and immediately fold it into state. Best-effort (no block). */
     fun emit(event: ForgeBoardEvent) {
         _events.tryEmit(event)
-        _state.value = reduce(event, _state.value)
+        withEmitLock {
+            _state.value = reduce(event, _state.value)
+        }
+    }
+
+    private inline fun <T> withEmitLock(block: () -> T): T {
+        while (!emitGuard.compareAndSet(false, true)) {
+            // Spin: these transitions are tiny and in-memory.
+        }
+        return try {
+            block()
+        } finally {
+            emitGuard.store(false)
+        }
     }
 
     /** Pure reducer; side-effect free. */
@@ -52,7 +76,7 @@ object ForgeBoardFSM {
                 activeBoardId = prior.activeBoardId ?: event.board.id,
                 lastEventKind = "BoardLoaded",
                 lastEventMs = event.timestampMs,
-            )
+            ).also { seedColumnSequences(event.board) }
 
             is ForgeBoardEvent.BoardSelected -> prior.copy(
                 activeBoardId = event.boardId,
@@ -79,7 +103,7 @@ object ForgeBoardFSM {
                     columnId = event.columnId,
                     priority = event.priority,
                     assignee = event.assignee,
-                    order = board.cardsInColumn(event.columnId).size,
+                    order = nextCardOrder(board, event.boardId, event.columnId),
                 )
                 val newBoard = board.copy(cards = board.cards + newCard)
                 prior.copy(
@@ -174,7 +198,26 @@ object ForgeBoardFSM {
 
     /** For test isolation only. */
     fun reset() {
-        _state.value = ForgeBoardState()
+        withEmitLock {
+            _state.value = ForgeBoardState()
+            columnSequences.clear()
+        }
+    }
+
+    private fun seedColumnSequences(board: KanbanBoard) {
+        board.columns.forEach { column ->
+            val nextOrder = (board.cardsInColumn(column.id).maxOfOrNull { it.order } ?: -1) + 1
+            columnSequences[ColumnSequenceKey(board.id, column.id)] = AtomicLong(nextOrder.toLong())
+        }
+    }
+
+    private fun nextCardOrder(board: KanbanBoard, boardId: KanbanBoardId, columnId: KanbanColumnId): Int {
+        val key = ColumnSequenceKey(boardId, columnId)
+        val sequence = columnSequences.getOrPut(key) {
+            val nextOrder = (board.cardsInColumn(columnId).maxOfOrNull { it.order } ?: -1) + 1
+            AtomicLong(nextOrder.toLong())
+        }
+        return sequence.fetchAndAdd(1).toInt()
     }
 
     private fun nowMs(): Long = Clock.System.now().toEpochMilliseconds()
