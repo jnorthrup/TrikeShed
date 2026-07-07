@@ -38,12 +38,13 @@ button, input, textarea, select { font:inherit; }
 .app-shell {
   min-height:100vh;
   display:grid;
-  grid-template-columns:260px minmax(360px, .82fr) minmax(620px, 1.18fr);
+  grid-template-columns:280px 1fr 320px;
+  grid-template-areas: "rail graph inspector";
   background:linear-gradient(180deg, rgba(255,255,255,.015), rgba(255,255,255,0));
 }
-.rail { border-right:1px solid var(--line); padding:16px; display:grid; gap:14px; background:rgba(9,13,19,.88); }
-.editor { padding:18px; overflow:auto; background:linear-gradient(180deg, rgba(9,13,19,.52), rgba(9,13,19,.16)); }
-.board-pane { border-left:1px solid var(--line); padding:18px; display:grid; gap:14px; background:rgba(9,13,19,.94); overflow:auto; }
+.rail { grid-area: rail; border-right:1px solid var(--line); padding:16px; display:grid; gap:14px; background:rgba(9,13,19,.88); }
+.graph-pane { grid-area: graph; padding:18px; overflow:auto; background:linear-gradient(180deg, rgba(9,13,19,.52), rgba(9,13,19,.16)); }
+.inspector-pane { grid-area: inspector; border-left:1px solid var(--line); padding:18px; display:grid; gap:14px; background:rgba(9,13,19,.94); overflow:auto; }
 .panel {
   background:linear-gradient(180deg, rgba(18,25,36,.97), rgba(12,18,28,.95));
   border:1px solid var(--line);
@@ -293,63 +294,62 @@ button, input, textarea, select { font:inherit; }
     <aside class="rail">
       <div class="brand panel">
         <div class="eyebrow">Forge local-first</div>
-        <h1>Page, board, field</h1>
-        <p>CRUD on the same local-first work graph, with an RTS-style zoom surface that opens fractal detail around the selected card.</p>
+        <h1>Blackboard, graph, field</h1>
+        <p>Real-time causal graph centered. Blackboard entities on left, project objects on right. Drag to build.</p>
         <div class="toolbar compact">
-          <button class="btn primary" id="add-item-top">New work item</button>
-          <button class="btn" id="reset-workspace">Reset local state</button>
+          <button class="btn primary" id="add-entity">Add Entity</button>
+          <button class="btn" id="reset-workspace">Reset</button>
         </div>
       </div>
       <div class="panel section-block">
         <div class="section-head">
-          <h2>Use cases</h2>
-          <p>Load document + board patterns into the same workspace.</p>
+          <h2>Blackboard Entities</h2>
+          <p>Lcnc-entity-first ordering. Drag onto graph.</p>
         </div>
-        <div id="usecase-root" class="usecase-list"></div>
+        <div id="entity-root" class="entity-list"></div>
       </div>
       <div class="panel section-block">
         <div class="section-head">
-          <h2>Work items</h2>
-          <p>Document blocks and board cards are the same local objects.</p>
+          <h2>Project Objects</h2>
+          <p>Forge docs, boards, signals. Add to graph.</p>
         </div>
-        <div id="nav-root" class="nav-list"></div>
+        <div id="project-root" class="project-list"></div>
       </div>
     </aside>
-    <main class="editor">
-      <div id="doc-root" class="page"></div>
-    </main>
-    <aside class="board-pane">
+    <main class="graph-pane">
       <div class="panel section-block">
         <div class="section-head">
-          <h2>RTS / fractal field</h2>
-          <p>Zoom from workspace lanes into card-level checklist detail without leaving the board.</p>
+          <h2>RTS Causal Graph</h2>
+          <p>Center piece — live force-directed. Click node to inspect, drag to reposition.</p>
         </div>
-        <div class="space-toolbar">
+        <div class="graph-toolbar">
           <label class="zoom-stack" for="zoom-slider">
             <span>Zoom</span>
             <input id="zoom-slider" type="range" min="0.55" max="2.8" step="0.05" />
           </label>
           <div class="toolbar compact">
-            <button class="btn" id="focus-board">Whole board</button>
-            <button class="btn" id="focus-selected">Selected card</button>
+            <button class="btn" id="focus-graph">Fit All</button>
+            <button class="btn" id="focus-selected">Selected</button>
           </div>
         </div>
-        <div class="space-caption"><span id="zoom-label"></span></div>
+        <div class="graph-caption"><span id="zoom-label"></span></div>
         <div id="spatial-shell" class="spatial-shell">
           <svg id="spatial-root" class="spatial-root" viewBox="0 0 1200 720" preserveAspectRatio="xMidYMid meet"></svg>
         </div>
       </div>
+    </main>
+    <aside class="inspector-pane">
       <div class="panel section-block">
         <div class="section-head">
-          <h2>Kanban board</h2>
-          <p>Move the same items you edit in the page. CRUD stays local-first.</p>
+          <h2>Node Inspector</h2>
+          <p>Click a node for properties, causal edges, actions.</p>
         </div>
-        <div id="board-root" class="column-stack"></div>
+        <div id="inspector-content"></div>
       </div>
     </aside>
   </div>
   <div id="reactor-root" class="status-strip"></div>
-  <script id="forge-seed" type="application/json">{"title":"Forge Board","pageNotes":"Forge local-first workspace: page narrative, board flow, and RTS-style zoom into card detail all live in one operator surface.","columns":[{"id":"col-backlog","name":"Backlog","order":0},{"id":"col-inprogress","name":"In Progress","order":1},{"id":"col-review","name":"Review","order":2},{"id":"col-done","name":"Done","order":3}],"items":[{"id":"c1","title":"Setup CI pipeline","notes":"Define the first repeatable gate. Keep every blocking note attached to the same work item so the board and page never drift.","status":"col-backlog","priority":"high","checklist":[{"id":"c1-check-1","text":"Pick the required build + test commands","checked":true},{"id":"c1-check-2","text":"Capture failing output in card notes"},{"id":"c1-check-3","text":"Promote the green path into the gate"}]},{"id":"c2","title":"Add user authentication","notes":"Turn access rules into page notes, then split the real implementation checks into the checklist below.","status":"col-backlog","priority":"medium"},{"id":"c3","title":"Implement API gateway","notes":"This is the active systems cut. Use the zoom field to inspect how detailed work fans out around the selected card.","status":"col-inprogress","priority":"critical","checklist":[{"id":"c3-check-1","text":"Confirm routing seam"},{"id":"c3-check-2","text":"Trace live event flow"},{"id":"c3-check-3","text":"Lock regression coverage"}]},{"id":"c4","title":"Code review: HTX client","notes":"Review notes live with the card so evidence, comments, and board motion stay local-first.","status":"col-review","priority":"high"},{"id":"c5","title":"Initial commit","notes":"Capture what proved the baseline and what must remain stable while the rest of the board changes.","status":"col-done","priority":"low"},{"id":"c6","title":"Fix login bug","notes":"Use this as the debugging pattern card: root cause notes, observed symptoms, and regression checks.","status":"col-backlog","priority":"high","checklist":[{"id":"c6-check-1","text":"Reproduce the failure"},{"id":"c6-check-2","text":"Trace the true source"},{"id":"c6-check-3","text":"Prove the fix against the real path"}]}],"selectedItemId":"c1","useCases":[{"id":"brief-board","name":"Project brief + board","summary":"Page-level brief, execution board, and checklist detail in one local-first surface.","pageNotes":"Capture the brief at page scope, spin execution items into the board, and keep every checklist line attached to the same card.","itemTitles":["Frame the brief","Break work into cards","Track execution evidence"]},{"id":"research-dossier","name":"Research dossier","summary":"Collect observations, hold decisions, and move findings toward action without leaving the page.","pageNotes":"Use the page for synthesis, use cards for live questions, and zoom into the evidence around the active work item.","itemTitles":["Capture source notes","Extract claims","Turn claims into actions"]},{"id":"release-room","name":"Release room","summary":"Coordinate launch readiness with board flow, detailed checklists, and a shared field map.","pageNotes":"Keep release notes, risks, and rollout sequencing local-first while the board shows execution pressure in real time.","itemTitles":["Lock scope","Run final checks","Ship + observe"]},{"id":"mesh-ops","name":"Mesh / reactor ops","summary":"Drive signal, reduction, and board motion from one operator surface.","pageNotes":"Use this mode to inspect causal movement, recent reductions, and the board-space relationship under RTS-style zoom.","itemTitles":["Observe event flow","Reduce signal facets","Confirm board response"]}],"reactor":{"taxonomyNodeCount":6,"lastEventKind":"BoardLoaded","lastEventTimestampMs":1783380078961,"recentTaxonomyNodes":["Setup CI pipeline","Add user authentication","Implement API gateway","Code review: HTX client","Initial commit","Fix login bug"],"recentSignals":["ForgeBoardFSM:BoardLoaded"]}}</script>
+  <script id="forge-seed" type="application/json">{"title":"Forge Board","pageNotes":"Forge local-first workspace: page narrative, board flow, and RTS-style zoom into card detail all live in one operator surface.","columns":[{"id":"col-backlog","name":"Backlog","order":0},{"id":"col-inprogress","name":"In Progress","order":1},{"id":"col-review","name":"Review","order":2},{"id":"col-done","name":"Done","order":3}],"items":[{"id":"c1","title":"Setup CI pipeline","notes":"Define the first repeatable gate. Keep every blocking note attached to the same work item so the board and page never drift.","status":"col-backlog","priority":"high","checklist":[{"id":"c1-check-1","text":"Pick the required build + test commands","checked":true},{"id":"c1-check-2","text":"Capture failing output in card notes"},{"id":"c1-check-3","text":"Promote the green path into the gate"}]},{"id":"c2","title":"Add user authentication","notes":"Turn access rules into page notes, then split the real implementation checks into the checklist below.","status":"col-backlog","priority":"medium"},{"id":"c3","title":"Implement API gateway","notes":"This is the active systems cut. Use the zoom field to inspect how detailed work fans out around the selected card.","status":"col-inprogress","priority":"critical","checklist":[{"id":"c3-check-1","text":"Confirm routing seam"},{"id":"c3-check-2","text":"Trace live event flow"},{"id":"c3-check-3","text":"Lock regression coverage"}]},{"id":"c4","title":"Code review: HTX client","notes":"Review notes live with the card so evidence, comments, and board motion stay local-first.","status":"col-review","priority":"high"},{"id":"c5","title":"Initial commit","notes":"Capture what proved the baseline and what must remain stable while the rest of the board changes.","status":"col-done","priority":"low"},{"id":"c6","title":"Fix login bug","notes":"Use this as the debugging pattern card: root cause notes, observed symptoms, and regression checks.","status":"col-backlog","priority":"high","checklist":[{"id":"c6-check-1","text":"Reproduce the failure"},{"id":"c6-check-2","text":"Trace the true source"},{"id":"c6-check-3","text":"Prove the fix against the real path"}]}],"selectedItemId":"c1","useCases":[{"id":"brief-board","name":"Project brief + board","summary":"Page-level brief, execution board, and checklist detail in one local-first surface.","pageNotes":"Capture the brief at page scope, spin execution items into the board, and keep every checklist line attached to the same card.","itemTitles":["Frame the brief","Break work into cards","Track execution evidence"]},{"id":"research-dossier","name":"Research dossier","summary":"Collect observations, hold decisions, and move findings toward action without leaving the page.","pageNotes":"Use the page for synthesis, use cards for live questions, and zoom into the evidence around the active work item.","itemTitles":["Capture source notes","Extract claims","Turn claims into actions"]},{"id":"release-room","name":"Release room","summary":"Coordinate launch readiness with board flow, detailed checklists, and a shared field map.","pageNotes":"Keep release notes, risks, and rollout sequencing local-first while the board shows execution pressure in real time.","itemTitles":["Lock scope","Run final checks","Ship + observe"]},{"id":"mesh-ops","name":"Mesh / reactor ops","summary":"Drive signal, reduction, and board motion from one operator surface.","pageNotes":"Use this mode to inspect causal movement, recent reductions, and the board-space relationship under RTS-style zoom.","itemTitles":["Observe event flow","Reduce signal facets","Confirm board response"]}],"reactor":{"taxonomyNodeCount":6,"lastEventKind":"BoardLoaded","lastEventTimestampMs":1783383859368,"recentTaxonomyNodes":["Setup CI pipeline","Add user authentication","Implement API gateway","Code review: HTX client","Initial commit","Fix login bug"],"recentSignals":["ForgeBoardFSM:BoardLoaded"]}}</script>
   <script>
 (() => {
   const STORAGE_KEY = 'forge.workspace.v4';
@@ -1945,3 +1945,5 @@ button, input, textarea, select { font:inherit; }
   render();
 })();
   </script>
+</body>
+</html>
