@@ -32,3 +32,6 @@ liburing/
 .nojekyll
 .tspy
 .vscode
+bin/
+.jules
+.zenith*

@@ -67,6 +67,7 @@ data class HtxRequest(
     val fetchStyle: HtxFetchStyle = HtxFetchStyle.CURL,
     val headers: HtxHeaders = emptyHtxHeaders(),
     val range: HtxRange? = null,
+    val body: HtxBody = emptyHtxBody(),
 )
 
 data class HtxResponse(
@@ -86,6 +87,7 @@ fun parseHtxRequest(
     config: HtxClientConfig = HtxClientConfig(),
     range: HtxRange? = null,
     method: HtxMethod = HtxMethod.GET,
+    body: HtxBody = emptyHtxBody(),
 ): HtxRequest {
     val scheme = when (url.substringBefore("://").lowercase()) {
         "http" -> HtxScheme.HTTP
@@ -107,6 +109,7 @@ fun parseHtxRequest(
             else -> HtxFetchStyle.CURL
         },
         range = range,
+        body = body,
     )
 }
 

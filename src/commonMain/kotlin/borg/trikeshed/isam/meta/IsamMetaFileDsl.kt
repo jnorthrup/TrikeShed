@@ -1,26 +1,14 @@
 @file:Suppress("unused")
 
-package borg.trikeshed.isam
+package borg.trikeshed.isam.meta
 
+import borg.trikeshed.common.Usable
 import borg.trikeshed.cursor.ColumnMeta
 import borg.trikeshed.cursor.TypeMemento
-import borg.trikeshed.isam.meta.IOMemento
+import borg.trikeshed.isam.RecordMeta
 import borg.trikeshed.lib.*
 import borg.trikeshed.userspace.nio.file.spi.FileOperations
 import kotlin.math.min
-
-/**
- * ISAM Metafile DSL — reified inline factory builders.
- *
- * Replaces class-based reader/writer with composable builder functions.
- * All operations are reified inline — no reflection, no runtime overhead.
- */
-
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
-interface Usable { fun open(); fun close() }
 
 data class MetafileConfig(
     val metafileFilename: String,
@@ -125,11 +113,12 @@ data class MetafileWriteConfig(
     val recordMetas: Series<ColumnMeta>,
     val varchars: Map<String, Int>,
     val fileOps: FileOperations,
+    val useMonocursorGroupings: Boolean = true,
 )
 
 class MetafileWriter(val config: MetafileWriteConfig) {
     fun build(): MetafileResult {
-        val result = sanitize(config.recordMetas, config.varchars)
+        val result = sanitize(config.recordMetas, config.varchars, config.useMonocursorGroupings)
         val lines = mutableListOf<String>()
         lines.add("# format:  coords WS .. EOL names WS .. EOL TypeMememento WS .. [EOL]")
         lines.add("# last coord is the recordlen")
@@ -156,22 +145,33 @@ class MetafileWriter(val config: MetafileWriteConfig) {
     }
 
     companion object {
-        fun sanitize(recordMetas: Series<ColumnMeta>, varchars: Map<String, Int>): Series<RecordMeta> {
-            return if (recordMetas.view.any { it !is RecordMeta || (min(it.begin, it.end) < 0 && it.child == null) }) {
+        fun sanitize(
+            recordMetas: Series<ColumnMeta>,
+            varchars: Map<String, Int>,
+            useMonocursorGroupings: Boolean = true
+        ): Series<RecordMeta> {
+            return if (recordMetas.view.any { it !is RecordMeta || (min(it.begin, it.end) < 0 && it.child == null) } || useMonocursorGroupings) {
                 var offset = 0
                 recordMetas.view.map { col: ColumnMeta ->
                     val name = col.name.toString()
-                    val type = col.type
+                    val type = col.type as IOMemento
                     val len = type.networkSize ?: varchars[name] ?: throw Exception("no network size for $name")
-                    val groupId = (col as? RecordMeta)?.groupId ?: 0
-                    val groupName = (col as? RecordMeta)?.groupName ?: groupId.toString()
+                    val existingGroupId = (col as? RecordMeta)?.groupId ?: 0
+                    val existingGroupName = (col as? RecordMeta)?.groupName ?: "0"
+
+                    val (groupId, groupName) = if (useMonocursorGroupings && (existingGroupName == "0" || existingGroupName == "default")) {
+                        type.ordinal to type.name
+                    } else {
+                        existingGroupId to existingGroupName
+                    }
+
                     val recordMeta = RecordMeta(
-                        name,
-                        type as IOMemento,
-                        offset,
-                        offset + len,
-                        type.createDecoder(len),
-                        type.createEncoder(len),
+                        name = name,
+                        type = type as IOMemento,
+                        begin = offset,
+                        end = offset + len,
+                        decoder = type.createDecoder(len),
+                        encoder = type.createEncoder(len),
                         groupId = groupId,
                         groupName = groupName,
                     )

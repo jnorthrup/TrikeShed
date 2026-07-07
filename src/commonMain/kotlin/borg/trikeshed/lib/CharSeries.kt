@@ -266,19 +266,12 @@ class CharSeries(
 operator fun Series<Char>.div(delim: Char): Series<Series<Char>> { //lazy split
     val intList = mutableListOf<Int>()
     for (x in 0 until size) if (this[x] == delim) intList.add(x)
+    val iarr = intList.toIntArray()
+    val partsCount = iarr.size + 1
 
-    /**
-     * iarr is an index of delimitted endings of the CharSeries.
-     */
-    val iarr: IntArray = intList.toIntArray()
-
-    return iarr α { x ->
-        val p = if (x == 0) 0 else iarr[x.dec()].inc() //start of next
-        val l = //is x last index?
-            if (x == iarr.lastIndex)
-                this.size
-            else
-                iarr[x].dec()
+    return partsCount j { partIdx ->
+        val p = if (partIdx == 0) 0 else iarr[partIdx - 1] + 1
+        val l = if (partIdx == iarr.size) this.size else iarr[partIdx]
         this[p until l]
     }
 }
@@ -286,23 +279,14 @@ operator fun Series<Char>.div(delim: Char): Series<Series<Char>> { //lazy split
 operator fun Series<Byte>.div(delim: Byte): Series<Series<Byte>> { //lazy split
     val intList = mutableListOf<Int>()
     for (x in 0 until size) if (this[x] == delim) intList.add(x)
+    val iarr = intList.toIntArray()
+    val partsCount = iarr.size + 1
 
-    /**
-     * iarr is an index of delimitted endings of the ByteSeries.
-     */
-    val iarr: IntArray = intList.toIntArray()
-
-    return iarr α { x ->
-        val p = if (x == 0) 0 else iarr[x.dec()].inc() //start of next
-        val l = //is x last index?
-            if (x == iarr.lastIndex)
-                this.size
-            else
-                iarr[x].dec()
+    return partsCount j { partIdx ->
+        val p = if (partIdx == 0) 0 else iarr[partIdx - 1] + 1
+        val l = if (partIdx == iarr.size) this.size else iarr[partIdx]
         this[p until l]
     }
-
-
 }
 
 val Series<Char>.cs: CharSequence

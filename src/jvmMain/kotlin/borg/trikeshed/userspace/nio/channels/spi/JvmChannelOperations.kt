@@ -45,24 +45,20 @@ class JvmChannelOperations(
         JvmChannelHandle(this, entries)
 
     override fun socket(domain: Int, type: Int, protocol: Int): Int {
-        // type=1 (SOCK_STREAM): default branch in userspace-nio == listener (ServerSocketChannel)
-        // type!=1 (e.g. SOCK_DGRAM): dialer (SocketChannel via DatagramChannel when needed)
-        // For the DEV stub we keep both as SelectableChannels in the same map.
-        val ch: SelectableChannel = if (type == 1) {
-            ServerSocketChannel.open().apply { configureBlocking(false) }
-        } else {
-            SocketChannel.open().apply { configureBlocking(false) }
-        }
+        val ch: SelectableChannel = SocketChannel.open().apply { configureBlocking(true) }
         return registerChannelInternal(ch, Interest.toMask(setOf(Interest.READ, Interest.ACCEPT, Interest.CONNECT)))
     }
 
     override fun bind(fd: Int, port: Int): Int {
-        val ch = socketChannels[fd] as? ServerSocketChannel ?: return -1
-        // ServerSocketChannel.bind() returns the channel itself (never null on success);
-        // an exception on failure. Don't use `?.let { return 0 }` — that returns 0
-        // unconditionally inside the let branch, masking bind failures.
+        val oldCh = socketChannels[fd]
+        if (oldCh != null) {
+            try { oldCh.close() } catch (_: Exception) {}
+        }
+        val serverCh = ServerSocketChannel.open().apply { configureBlocking(true) }
+        socketChannels[fd] = serverCh
+
         return try {
-            ch.bind(java.net.InetSocketAddress(port))
+            serverCh.bind(java.net.InetSocketAddress(port))
             0
         } catch (e: Exception) {
             println("[JvmChannelOperations.bind] fd=$fd port=$port failed: ${e.javaClass.simpleName}: ${e.message}")
@@ -75,7 +71,7 @@ class JvmChannelOperations(
     override fun accept(fd: Int): Int {
         val server = socketChannels[fd] as? ServerSocketChannel ?: return -1
         val client = server.accept() ?: return -1
-        client.configureBlocking(false)
+        client.configureBlocking(true)
         return registerChannelInternal(client, Interest.toMask(setOf(Interest.READ)))
     }
 
@@ -88,9 +84,9 @@ class JvmChannelOperations(
                 ch.finishConnect() // might throw
             }
         } catch (e: Exception) {
+            println("JvmChannelOperations connect exception: ${e.message}")
+            e.printStackTrace()
             return -1
-        } finally {
-            ch.configureBlocking(false)
         }
         socketInterests[fd] = setOf(Interest.READ, Interest.WRITE, Interest.CONNECT)
         return 0

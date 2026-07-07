@@ -3,6 +3,7 @@ package borg.trikeshed.isam//package borg.trikeshed.isam
 //import borg.trikeshed.common.Usable
 //import borg.trikeshed.cursor.*
 //import borg.trikeshed.isam.meta.IOMemento
+//import borg.trikeshed.isam.meta.IsamMetaFileReader
 //import borg.trikeshed.lib.*
 //import borg.trikeshed.native.HasPosixErr
 //import kotlinx.cinterop.*

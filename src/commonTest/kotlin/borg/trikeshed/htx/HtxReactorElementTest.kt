@@ -25,6 +25,62 @@ import kotlin.test.assertTrue
 
 class HtxReactorElementTest {
     @Test
+    fun ccekOpenHtxReactorElementWithChannelOperationsConstructsActiveElement() = runTest {
+        val channelOperations = FakeChannelOperations(
+            connectionReads = listOf(
+                listOf(httpResponse(200, "ok")),
+            ),
+        )
+
+        val routeService = openHtxReactorElement(channelOperations = channelOperations)
+        val response = routeService.exchange(
+            HtxExchangeState(exchangeOrdinal = 1),
+            parseHtxRequest("http://example.com/health"),
+        )
+
+        assertEquals(borg.trikeshed.context.ElementState.ACTIVE, routeService.state)
+        assertEquals(HtxExchangeLifecycle.RESPONDED, response.state.lifecycle)
+        assertEquals(200, response.state.response?.status)
+        assertTrue(channelOperations.recordedRequestText(0).startsWith("GET /health HTTP/1.1\r\n"))
+
+        routeService.close()
+    }
+
+    @Test
+    fun ccekOpenHtxReactorElementFromSupervisorConstructsActiveTlsElement() = runTest {
+        val channelOperations = FakeChannelOperations(
+            connectionReads = listOf(
+                listOf(
+                    "server-hello".encodeToByteArray(),
+                    "server-app-data".encodeToByteArray(),
+                ),
+            ),
+        )
+        val tlsBackend = FakeTlsCodecBackend()
+        val supervisor = NioSupervisor()
+        supervisor.register(channelOperations)
+        supervisor.register(tlsBackend)
+        supervisor.open()
+
+        val routeService = openHtxReactorElement(nioSupervisor = supervisor)
+        val response = routeService.exchange(
+            HtxExchangeState(exchangeOrdinal = 1),
+            parseHtxRequest("https://example.com/health"),
+        )
+
+        assertEquals(borg.trikeshed.context.ElementState.ACTIVE, routeService.state)
+        assertEquals(HtxExchangeLifecycle.RESPONDED, response.state.lifecycle)
+        assertEquals(200, response.state.response?.status)
+
+        val wire = channelOperations.recordedRequestText(0)
+        assertTrue(wire.contains("client-hello"))
+        assertTrue(wire.contains("enc:GET /health HTTP/1.1"))
+
+        routeService.close()
+        supervisor.close()
+    }
+
+    @Test
     fun ccekHtxElementResolvesRegisteredPlainReactorRouteService() = runTest {
         val parentJob = SupervisorJob()
         val channelOperations = FakeChannelOperations(

@@ -21,7 +21,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.runBlocking
+import borg.trikeshed.runBlocking
 
 /**
  * Tests for VAL-CCEK-002 / GAP-08 (MoveCard idempotent) and VAL-CCEK-003 /

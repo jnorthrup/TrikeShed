@@ -20,6 +20,7 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
 
 object CCEK {
     fun initialize(reactor: MuxReactorElement): CcekReactorBinding = CcekReactorBinding(reactor)
@@ -103,6 +104,7 @@ class ArticulatedNode(
     private val agents = linkedMapOf<String, (ForgeSignal) -> Unit>()
     private val recordedSignals = mutableListOf<ForgeSignal>()
     private var fanOutJob: Job? = null
+    private val startMutex = Mutex()
 
     val markdownProjectionCount: Int get() = _markdownProjections.replayCache.size
     val childScopeCount: Int get() = childScopes.size
@@ -114,14 +116,25 @@ class ArticulatedNode(
 
     fun start() {
         if (fanOutJob?.isActive == true) return
-        fanOutJob = scope.launch {
-            fanOutAll()
-            for (signal in signalIn) {
-                if (record) recordedSignals += signal
-                agents.values.forEach { it(signal) }
-                doc = applySignal(signal)
-                registerChildScopes(doc)
-                fanOutAll()
+        scope.launch {
+            startMutex.lock()
+            try {
+                if (fanOutJob?.isActive == true) {
+                    return@launch
+                }
+                fanOutJob = scope.launch {
+                    fanOutAll()
+                    for (signal in signalIn) {
+                        if (record) recordedSignals += signal
+                        val agentsSnapshot = agents.values.toList()
+                        agentsSnapshot.forEach { it(signal) }
+                        doc = applySignal(signal)
+                        registerChildScopes(doc)
+                        fanOutAll()
+                    }
+                }
+            } finally {
+                startMutex.unlock()
             }
         }
     }
@@ -151,13 +164,13 @@ class ArticulatedNode(
     private val docMutex = kotlinx.coroutines.sync.Mutex()
 
     /**
-     * Apply a signal synchronously to a clone of [doc] and return the
-     * resulting project. Test seams only — production callers should use
-     * `sendSignal`.
+     * Apply a signal synchronously and return the resulting document.
+     * Updates internal state so repeated applications are idempotent.
+     * Test seams only — production callers should use `sendSignal`.
      */
     fun applySignalForTest(signal: ForgeSignal): ForgeDocument {
-        val local = doc
-        return applySignal(signal)
+        doc = applySignal(signal)
+        return doc
     }
 
     private fun applySignal(signal: ForgeSignal): ForgeDocument = when (signal) {

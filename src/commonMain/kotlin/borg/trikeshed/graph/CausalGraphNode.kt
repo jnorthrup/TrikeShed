@@ -12,6 +12,22 @@ import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.size
+import kotlinx.serialization.Serializable
+
+/**
+ * Serializable snapshot of a causal graph node, for passing through the
+ * HTML seed JSON to the JS graph renderer.
+ */
+@Serializable
+data class CausalGraphNodeDTO(
+    val nodeId: String,
+    val opId: String,
+    val opVersion: String,
+    val parentNodeIds: List<String>,
+    val causalKey: String,
+    val topoOrdinal: Int,
+    val causalClock: Long,
+)
 
 /**
  * Causal graph node row: deterministic construction identity plus blackboard context.
