@@ -1,26 +1,14 @@
 @file:Suppress("unused")
 
-package borg.trikeshed.isam
+package borg.trikeshed.isam.meta
 
+import borg.trikeshed.common.Usable
 import borg.trikeshed.cursor.ColumnMeta
 import borg.trikeshed.cursor.TypeMemento
-import borg.trikeshed.isam.meta.IOMemento
+import borg.trikeshed.isam.RecordMeta
 import borg.trikeshed.lib.*
 import borg.trikeshed.userspace.nio.file.spi.FileOperations
 import kotlin.math.min
-
-/**
- * ISAM Metafile DSL — reified inline factory builders.
- *
- * Replaces class-based reader/writer with composable builder functions.
- * All operations are reified inline — no reflection, no runtime overhead.
- */
-
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
-interface Usable { fun open(); fun close() }
 
 data class MetafileConfig(
     val metafileFilename: String,
@@ -166,12 +154,12 @@ class MetafileWriter(val config: MetafileWriteConfig) {
                     val groupId = (col as? RecordMeta)?.groupId ?: 0
                     val groupName = (col as? RecordMeta)?.groupName ?: groupId.toString()
                     val recordMeta = RecordMeta(
-                        name,
-                        type as IOMemento,
-                        offset,
-                        offset + len,
-                        type.createDecoder(len),
-                        type.createEncoder(len),
+                        name = name,
+                        type = type as IOMemento,
+                        begin = offset,
+                        end = offset + len,
+                        decoder = type.createDecoder(len),
+                        encoder = type.createEncoder(len),
                         groupId = groupId,
                         groupName = groupName,
                     )

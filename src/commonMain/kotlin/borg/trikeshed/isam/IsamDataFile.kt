@@ -1,33 +1,53 @@
 package borg.trikeshed.isam
 
 import borg.trikeshed.common.Usable
-import borg.trikeshed.cursor.ColumnMeta
 import borg.trikeshed.cursor.Cursor
 import borg.trikeshed.cursor.RowVec
-import borg.trikeshed.lib.Join
+import borg.trikeshed.isam.meta.IsamMetaFileReader
 
-expect class IsamDataFile(
-    datafileFilename: String,
-    metafileFilename: String = "$datafileFilename.meta",
-    metafile: IsamMetaFileReader = IsamMetaFileReader(metafileFilename),
+class IsamDataFile(
+    val datafileFilename: String,
+    val metafileFilename: String = "$datafileFilename.meta",
+    val metafile: IsamMetaFileReader = IsamMetaFileReader(metafileFilename),
+    private val operations: IsamOperations = defaultIsamOperations()
 ) : Usable, Cursor {
-    override val a: Int
-    override val b: (Int) -> Join<Int, (Int) -> Join<Any?, () -> ColumnMeta>>
-    val datafileFilename: String
-    val metafile: IsamMetaFileReader
 
-    override fun open()
-    override fun close()
+    private val reader by lazy {
+        operations.createReader(datafileFilename, metafileFilename, metafile)
+    }
+
+    override val a: Int
+        get() = reader.recordCount
+
+    override val b: (Int) -> RowVec
+        get() = reader.readRow
+
+    override fun open() {
+        reader.open()
+    }
+
+    override fun close() {
+        reader.close()
+    }
 
     companion object {
-        fun write(cursor: Cursor, datafilename: String, varChars: Map<String, Int> = emptyMap())
+        fun write(
+            cursor: Cursor,
+            datafilename: String,
+            varChars: Map<String, Int> = emptyMap(),
+            operations: IsamOperations = defaultIsamOperations()
+        ) {
+            operations.write(cursor, datafilename, varChars)
+        }
 
-           fun append(
-               msf: Iterable<RowVec>,
-               datafilename: String,
-               varChars: Map<String, Int> = emptyMap(),
-               transform: ((RowVec) -> RowVec)? = null,
-           )
-
+        fun append(
+            msf: Iterable<RowVec>,
+            datafilename: String,
+            varChars: Map<String, Int> = emptyMap(),
+            transform: ((RowVec) -> RowVec)? = null,
+            operations: IsamOperations = defaultIsamOperations()
+        ) {
+            operations.append(msf, datafilename, varChars, transform)
+        }
     }
 }
