@@ -81,13 +81,15 @@ class ConfixOracleService : ConfixOracleFacade {
         var currentName = typeName
         val seen = mutableSetOf<String>()
 
+        val entriesMap = (0 until row.entries.a).associate { row.entries.b(it).name to row.entries.b(it) }
+
         while (true) {
             if (!seen.add(currentName)) {
                 // Cycle detected — terminate
                 break
             }
 
-            val entry = (0 until row.entries.a).map { row.entries.b(it) }.find { it.name == currentName } ?: break
+            val entry = entriesMap[currentName] ?: break
 
             // Extract the base name from referredToType (strip params, unions, etc.)
             val baseName = extractBaseName(entry.referredToType)
