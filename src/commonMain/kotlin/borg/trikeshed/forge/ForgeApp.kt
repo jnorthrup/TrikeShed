@@ -227,8 +227,29 @@ ${forgeAppStyles()}
         <div id="nav-root" class="nav-list"></div>
       </div>
     </aside>
-    <main class="editor">
-      <div id="doc-root" class="page"></div>
+    <main class="graph-pane">
+      <div class="panel section-block" style="height:100%; display:grid; grid-template-rows:auto 1fr auto;">
+        <div class="section-head">
+          <h2>RTS / Causal Graph</h2>
+          <p>Force-directed causal graph — drag nodes, scroll to zoom, click to inspect</p>
+        </div>
+        <div class="graph-toolbar" style="display:flex; gap:8px; align-items:center; padding:8px 0;">
+          <label class="zoom-stack" for="graph-zoom-slider" style="display:grid; gap:4px; color:var(--muted); font-size:11px; text-transform:uppercase; letter-spacing:.08em;">
+            <span>Zoom</span>
+            <input id="graph-zoom-slider" type="range" min="0.2" max="3" step="0.05" value="1" style="width:140px;" />
+          </label>
+          <button class="btn" id="btn-graph-fit">Fit</button>
+          <button class="btn" id="btn-graph-center">Center</button>
+          <button class="btn primary" id="btn-graph-seed">Seed Demo</button>
+        </div>
+        <div id="graph-spatial-shell" class="graph-spatial-shell" style="flex:1; position:relative; min-height:500px; border:1px solid var(--line2); border-radius:18px; background:radial-gradient(circle at top, rgba(122,162,247,.08), rgba(8,12,18,.96) 56%); overflow:hidden; cursor:grab;">
+          <svg id="graph-spatial-root" class="graph-spatial-root" viewBox="0 0 1200 720" preserveAspectRatio="xMidYMid meet" style="width:100%; height:100%; display:block;"></svg>
+        </div>
+        <div class="graph-status" style="display:flex; gap:8px; flex-wrap:wrap; padding-top:12px;">
+          <span class="status-chip"><span class="dot"></span>Force sim active</span>
+          <span class="status-chip"><span class="dot"></span>Graph: <span id="graph-stat-nodes">0</span> nodes, <span id="graph-stat-links">0</span> links</span>
+        </div>
+      </div>
     </main>
     <aside class="board-pane">
       <div class="panel section-block">
@@ -298,11 +319,11 @@ private fun forgeAppStyles(): String = """
     .app-shell {
       min-height:100vh;
       display:grid;
-      grid-template-columns:260px minmax(360px, .82fr) minmax(620px, 1.18fr);
+      grid-template-columns:260px 1fr minmax(400px, 1.2fr);
       background:linear-gradient(180deg, rgba(255,255,255,.015), rgba(255,255,255,0));
     }
     .rail { border-right:1px solid var(--line); padding:16px; display:grid; gap:14px; background:rgba(9,13,19,.88); }
-    .editor { padding:18px; overflow:auto; background:linear-gradient(180deg, rgba(9,13,19,.52), rgba(9,13,19,.16)); }
+    .graph-pane { padding:18px; overflow:auto; background:linear-gradient(180deg, rgba(9,13,19,.52), rgba(9,13,19,.16)); }
     .board-pane { border-left:1px solid var(--line); padding:18px; display:grid; gap:14px; background:rgba(9,13,19,.94); overflow:auto; }
     .panel {
       background:linear-gradient(180deg, rgba(18,25,36,.97), rgba(12,18,28,.95));
