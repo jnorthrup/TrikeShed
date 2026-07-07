@@ -114,7 +114,7 @@ class IsamMetaFileReader(
                 val colListCs  = token.clone().lim(token.pos + colonIdx)
                 val groupName  = token.clone().pos(token.pos + colonIdx + 1).asString()
                 if (groupName !in mentionedGroups) mentionedGroups.add(groupName)
-                val colSpecs: Series<CharSeries> = (colListCs / ',') α { CharSeries(it) }
+                val colSpecs: Series<CharSeries> = (CharSeries(colListCs.asString()) / ',') α { CharSeries(it) }
                 for (spec in colSpecs) {
                     val specs = spec.trim
                     val dashIdx = specs.asString().indexOf('-')
@@ -129,7 +129,18 @@ class IsamMetaFileReader(
             }
 
             val implicitName = mentionedGroups.size.toString()
-            return colCount j { idx: Int -> idx j (colToGroupName[idx] ?: implicitName) }
+            val implicitGroupId = mentionedGroups.size
+
+            return colCount j { idx: Int ->
+                val gname = colToGroupName[idx] ?: implicitName
+                val gid = if (gname == implicitName) {
+                    implicitGroupId
+                } else {
+                    val pos = mentionedGroups.indexOf(gname)
+                    if (pos >= 0) pos else implicitGroupId
+                }
+                gid j gname
+            }
         }
 
         fun write(
