@@ -33,3 +33,5 @@ liburing/
 .tspy
 .vscode
 bin/
+.jules
+.zenith*

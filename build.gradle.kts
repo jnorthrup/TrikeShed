@@ -275,24 +275,6 @@ tasks.register<JavaExec>("runKeyMuxApp") {
     classpath(tasks.named("jvmJar"), configurations.named("jvmRuntimeClasspath"))
 }
 
-// OpenAPI Demo run task — only registered when :libs:openapi is available, i.e. when the
-// libs/ tree is mounted locally (via trikeshed-libs submodule or sibling checkout).
-// TrikeShed standalone has no openapi lib and no reference to :libs:openapi.
-val openapiLib = rootDir.resolve("libs/openapi")
-if (openapiLib.resolve("build.gradle.kts").exists()) {
-    tasks.register<JavaExec>("runOpenApiDemo") {
-        group = "run"
-        description = "Runs the OpenAPI demo on JVM."
-        dependsOn(":libs:openapi:compileKotlinJvm")
-        mainClass.set("borg.trikeshed.openapi.demo.OpenApiDemo")
-        classpath(
-            sourceSets.getByName("jvmMain").runtimeClasspath,
-            project(":libs:openapi").sourceSets.getByName("jvmMain").output.classesDirs
-        )
-        workingDir = projectDir
-    }
-}
-
 tasks.register<Sync>("generateForgePages") {
     group = "documentation"
     description = "Publishes the real root KMPP JS browser target into docs/ with .nojekyll."

@@ -285,6 +285,50 @@ fun forgePersistenceScript(): String = """
   });
   zoomSlider.addEventListener('change', () => saveState());
   bindSpatialGestures();
+
+  const graphFitBtn = document.getElementById('btn-graph-fit');
+  const graphCenterBtn = document.getElementById('btn-graph-center');
+  const graphSeedBtn = document.getElementById('btn-graph-seed');
+  const graphZoomSlider = document.getElementById('graph-zoom-slider');
+  const graphSpatialShell = document.getElementById('graph-spatial-shell');
+  const graphSpatialRoot = document.getElementById('graph-spatial-root');
+  const graphStatNodes = document.getElementById('graph-stat-nodes');
+  const graphStatLinks = document.getElementById('graph-stat-links');
+
+  // Graph transform state
+  let graphTransform = { x: 0, y: 0, k: 1 };
+  let graphDragCamera = null;
+
+  // Seed demo graph from causalGraph in seed
+  if (graphSeedBtn) {
+    graphSeedBtn.addEventListener('click', () => {
+      seedGraphFromCausalData();
+      renderGraph();
+    });
+  }
+  if (graphFitBtn) {
+    graphFitBtn.addEventListener('click', () => { fitGraph(); renderGraph(); });
+  }
+  if (graphCenterBtn) {
+    graphCenterBtn.addEventListener('click', () => { centerGraph(); renderGraph(); });
+  }
+  if (graphZoomSlider) {
+    graphZoomSlider.addEventListener('input', (event) => {
+      graphTransform.k = clamp(Number(event.target.value) || 1, 0.2, 3);
+      renderGraph();
+    });
+  }
+  if (graphSpatialShell) bindGraphGestures();
+
+  // Auto-seed graph on init so it appears on load
+  if (graphSeedBtn && seed.causalNodes && seed.causalNodes.length) {
+    seedGraphFromCausalData();
+    setTimeout(() => { fitGraph(); renderGraph(); }, 50);
+  }
+
+  // Drag-and-drop attachment support — stores blobs in IndexedDB as Confix-shaped records
+  bindAttachmentDropZone();
+
   hydratePersistence();
 
   function loadState() {
@@ -1181,6 +1225,73 @@ fun forgePersistenceScript(): String = """
     checklistSection.appendChild(checklist);
     dialog.appendChild(checklistSection);
 
+    // Attachments section (CouchDB-style _attachments)
+    const attachSection = document.createElement('section');
+    attachSection.className = 'dialog-section';
+    const attachHead = document.createElement('div');
+    attachHead.className = 'dialog-section-head';
+    const attachTitle = document.createElement('h3');
+    attachTitle.textContent = 'Attachments';
+    const attachHint = document.createElement('div');
+    attachHint.className = 'dialog-hint';
+    attachHint.textContent = 'Drop files anywhere in the editor pane. Stored as CouchDB-style blob records (Confix CBOR shape).';
+    attachHead.append(attachTitle, attachHint);
+    attachSection.appendChild(attachHead);
+
+    const attachList = document.createElement('div');
+    attachList.className = 'checklist';
+    const attachments = selected.attachments || {};
+    const attachNames = Object.keys(attachments);
+    if (attachNames.length) {
+      attachNames.forEach((name) => {
+        const meta = attachments[name];
+        const row = document.createElement('div');
+        row.className = 'check-row';
+        const icon = document.createElement('span');
+        icon.textContent = '📎';
+        icon.style.marginRight = '6px';
+        const label = document.createElement('a');
+        label.textContent = name + ' (' + (meta.content_type || '?') + ' · ' + meta.length + ' B)';
+        label.style.cursor = 'pointer';
+        label.style.color = 'var(--cyan)';
+        label.style.textDecoration = 'none';
+        label.addEventListener('click', async () => {
+          const blob = await readAttachmentBlob(selected.id, name);
+          if (!blob) return;
+          const url = URL.createObjectURL(blob);
+          window.open(url, '_blank');
+          setTimeout(() => URL.revokeObjectURL(url), 30000);
+        });
+        const remove = document.createElement('button');
+        remove.className = 'status-btn';
+        remove.textContent = '×';
+        remove.addEventListener('click', async () => {
+          delete attachments[name];
+          const db = await openPersistenceDb();
+          if (db && db.objectStoreNames.contains(ATTACHMENT_STORE)) {
+            await new Promise((resolve) => {
+              const tx = db.transaction(ATTACHMENT_STORE, 'readwrite');
+              tx.objectStore(ATTACHMENT_STORE).delete(selected.id + '/' + name);
+              tx.oncomplete = () => resolve();
+              tx.onerror = () => resolve();
+            });
+          }
+          recordReactor('SignalFacetReduced', 'Attachment removed: ' + name, 'couch');
+          saveState();
+          render();
+        });
+        row.append(icon, label, remove);
+        attachList.appendChild(row);
+      });
+    } else {
+      const empty = document.createElement('div');
+      empty.className = 'empty';
+      empty.textContent = 'No attachments. Drop a file here to store it.';
+      attachList.appendChild(empty);
+    }
+    attachSection.appendChild(attachList);
+    dialog.appendChild(attachSection);
+
     shell.append(dialog);
     docRoot.appendChild(shell);
   }
@@ -1785,6 +1896,324 @@ fun forgePersistenceScript(): String = """
     if (!text) return '';
     return text.length > limit ? text.slice(0, limit - 1) + '…' : text;
   }
+
+  function clamp(value, min, max) {
+    return Math.min(max, Math.max(min, value));
+  }
+
+  // ===== GRAPH FUNCTIONS =====
+  let graphNodes = [];
+  let graphLinks = [];
+
+  function seedGraphFromCausalData() {
+    const causal = seed.causalNodes || [];
+    if (!causal.length) return;
+    graphNodes = [];
+    graphLinks = [];
+    // causal is an array of CausalGraphNodeDTO
+    causal.forEach((node) => {
+      graphNodes.push({
+        id: node.nodeId,
+        opId: node.opId,
+        opVersion: node.opVersion,
+        parentNodeIds: node.parentNodeIds,
+        causalKey: node.causalKey,
+        topoOrdinal: node.topoOrdinal,
+        causalClock: node.causalClock,
+        x: 200 + (node.topoOrdinal * 180) + Math.random() * 60,
+        y: 360 + Math.random() * 200 - 100,
+        vx: 0, vy: 0,
+        r: 24,
+        color: nodeTypeColor(node.opId)
+      });
+    });
+    // Build links from parentNodeIds
+    const nodeById = {};
+    graphNodes.forEach(n => { nodeById[n.id] = n; });
+    graphNodes.forEach(n => {
+      n.parentNodeIds.forEach(pid => {
+        if (nodeById[pid]) {
+          graphLinks.push({ source: pid, target: n.id });
+        }
+      });
+    });
+    updateGraphStats();
+  }
+
+  function nodeTypeColor(opId) {
+    if (opId.startsWith('signal') || opId.startsWith('PriceFeed')) return '#9ece6a';
+    if (opId.startsWith('transform') || opId.startsWith('KalmanFilter') || opId.startsWith('ArchetypeMatch')) return '#7aa2f7';
+    if (opId.startsWith('decision') || opId.startsWith('LongEntry') || opId.startsWith('ShortEntry')) return '#7dcfff';
+    if (opId.startsWith('sink') || opId.startsWith('OrderRouter') || opId.startsWith('RiskEngine')) return '#f7768e';
+    return '#bb9af7';
+  }
+
+  function updateGraphStats() {
+    if (graphStatNodes) graphStatNodes.textContent = graphNodes.length;
+    if (graphStatLinks) graphStatLinks.textContent = graphLinks.length;
+  }
+
+  function renderGraph() {
+    if (!graphSpatialRoot) return;
+    const rect = graphSpatialRoot.getBoundingClientRect();
+    graphSpatialRoot.setAttribute('viewBox', '0 0 ' + rect.width + ' ' + rect.height);
+    graphSpatialRoot.innerHTML = '';
+
+    // Draw links
+    graphLinks.forEach(link => {
+      const source = graphNodes.find(n => n.id === link.source);
+      const target = graphNodes.find(n => n.id === link.target);
+      if (!source || !target) return;
+      const line = document.createElementNS(SVG_NS, 'line');
+      line.setAttribute('x1', source.x);
+      line.setAttribute('y1', source.y);
+      line.setAttribute('x2', target.x);
+      line.setAttribute('y2', target.y);
+      line.setAttribute('stroke', 'rgba(122,162,247,0.25)');
+      line.setAttribute('stroke-width', '1.5');
+      graphSpatialRoot.appendChild(line);
+    });
+
+    // Draw nodes
+    graphNodes.forEach(node => {
+      const circle = document.createElementNS(SVG_NS, 'circle');
+      circle.setAttribute('cx', node.x);
+      circle.setAttribute('cy', node.y);
+      circle.setAttribute('r', node.r);
+      circle.setAttribute('fill', node.color);
+      circle.setAttribute('stroke', 'rgba(122,162,247,0.4)');
+      circle.setAttribute('stroke-width', '1.5');
+      graphSpatialRoot.appendChild(circle);
+
+      const text = document.createElementNS(SVG_NS, 'text');
+      text.setAttribute('x', node.x);
+      text.setAttribute('y', node.y + node.r + 14);
+      text.setAttribute('fill', '#dbe7f3');
+      text.setAttribute('font-size', '11');
+      text.setAttribute('text-anchor', 'middle');
+      text.textContent = node.id;
+      graphSpatialRoot.appendChild(text);
+    });
+
+    updateGraphStats();
+  }
+
+  function fitGraph() {
+    if (!graphNodes.length) return;
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    graphNodes.forEach(n => {
+      minX = Math.min(minX, n.x - n.r);
+      maxX = Math.max(maxX, n.x + n.r);
+      minY = Math.min(minY, n.y - n.r);
+      maxY = Math.max(maxY, n.y + n.r);
+    });
+    const pad = 40;
+    const w = graphSpatialRoot.clientWidth;
+    const h = graphSpatialRoot.clientHeight;
+    const scaleX = (w - pad * 2) / (maxX - minX);
+    const scaleY = (h - pad * 2) / (maxY - minY);
+    graphTransform.k = Math.min(scaleX, scaleY, 3);
+    graphTransform.x = pad - minX * graphTransform.k;
+    graphTransform.y = pad - minY * graphTransform.k;
+    if (graphZoomSlider) graphZoomSlider.value = graphTransform.k;
+  }
+
+  function centerGraph() {
+    if (!graphNodes.length) return;
+    const w = graphSpatialRoot.clientWidth;
+    const h = graphSpatialRoot.clientHeight;
+    const cx = graphNodes.reduce((a, n) => a + n.x, 0) / graphNodes.length;
+    const cy = graphNodes.reduce((a, n) => a + n.y, 0) / graphNodes.length;
+    graphTransform.x = w / 2 - cx * graphTransform.k;
+    graphTransform.y = h / 2 - cy * graphTransform.k;
+  }
+
+  function bindGraphGestures() {
+    if (!graphSpatialShell) return;
+    let isPanning = false, panStart = { x: 0, y: 0 };
+    graphSpatialShell.addEventListener('mousedown', e => {
+      if (e.button === 1 || e.button === 2) {
+        isPanning = true;
+        panStart = { x: e.clientX, y: e.clientY };
+        graphSpatialShell.style.cursor = 'grabbing';
+        e.preventDefault();
+      }
+    });
+    window.addEventListener('mousemove', e => {
+      if (isPanning) {
+        const dx = e.clientX - panStart.x;
+        const dy = e.clientY - panStart.y;
+        graphTransform.x += dx;
+        graphTransform.y += dy;
+        panStart = { x: e.clientX, y: e.clientY };
+        renderGraph();
+      }
+    });
+    window.addEventListener('mouseup', () => {
+      isPanning = false;
+      graphSpatialShell.style.cursor = 'grab';
+    });
+    graphSpatialShell.addEventListener('wheel', e => {
+      e.preventDefault();
+      const rect = graphSpatialShell.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+      const factor = e.deltaY > 0 ? 0.9 : 1/0.9;
+      const newK = clamp(graphTransform.k * factor, 0.2, 3);
+      const scale = newK / graphTransform.k;
+      graphTransform.x = mouseX - (mouseX - graphTransform.x) * scale;
+      graphTransform.y = mouseY - (mouseY - graphTransform.y) * scale;
+      graphTransform.k = newK;
+      if (graphZoomSlider) graphZoomSlider.value = graphTransform.k;
+      renderGraph();
+    }, { passive: false });
+    graphSpatialShell.addEventListener('dblclick', () => {
+      graphTransform = { x: 0, y: 0, k: 1 };
+      if (graphZoomSlider) graphZoomSlider.value = 1;
+      renderGraph();
+    });
+  }
+
+  // ===== END GRAPH FUNCTIONS =====
+
+  // ===== ATTACHMENT (CouchDB-style) FUNCTIONS =====
+  // PouchDB model: doc._attachments = { name: { content_type, data(base64), digest, length } }
+  // Confix mapping: each attachment is a ConfixDoc record { _id, _rev, name, content_type, digest, length, docId }
+  // Blob bytes live in ATTACHMENT_STORE; metadata lives in the workspace snapshot under item.attachments.
+
+  const ATTACHMENT_STORE = 'attachments';
+
+  function bindAttachmentDropZone() {
+    const editor = document.querySelector('.editor');
+    if (!editor) return;
+    editor.addEventListener('dragover', (event) => {
+      event.preventDefault();
+      editor.style.background = 'rgba(122,162,247,0.06)';
+    });
+    editor.addEventListener('dragleave', () => {
+      editor.style.background = '';
+    });
+    editor.addEventListener('drop', async (event) => {
+      event.preventDefault();
+      editor.style.background = '';
+      const files = Array.from(event.dataTransfer.files || []);
+      if (!files.length) return;
+      const selected = itemById(state.selectedItemId);
+      const docId = selected ? selected.id : 'workspace';
+      for (const file of files) {
+        await writeAttachmentToIndexedDb(docId, file.name, file);
+      }
+      recordReactor('CacheStored', files.length + ' attachment(s) → ' + docId, 'couch');
+      saveState();
+      render();
+    });
+  }
+
+  async function writeAttachmentToIndexedDb(docId, name, file) {
+    const db = await openPersistenceDb();
+    if (!db) return;
+    const buffer = await file.arrayBuffer();
+    const digest = 'md5-' + await computeDigest(buffer);
+    const attachmentRecord = {
+      id: docId + '/' + name,
+      docId: docId,
+      name: name,
+      content_type: file.type || 'application/octet-stream',
+      length: file.size,
+      digest: digest,
+      data: buffer,
+      storedAtMs: Date.now(),
+    };
+    // Ensure object store exists
+    await ensureAttachmentStore(db);
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction(ATTACHMENT_STORE, 'readwrite');
+      tx.objectStore(ATTACHMENT_STORE).put(attachmentRecord);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error || new Error('Attachment write failed'));
+    });
+    // Link attachment metadata into the item
+    const item = itemById(docId);
+    if (item) {
+      if (!item.attachments) item.attachments = {};
+      item.attachments[name] = {
+        content_type: attachmentRecord.content_type,
+        length: attachmentRecord.length,
+        digest: attachmentRecord.digest,
+        storedAtMs: attachmentRecord.storedAtMs,
+      };
+    }
+  }
+
+  async function ensureAttachmentStore(db) {
+    if (db.objectStoreNames.contains(ATTACHMENT_STORE)) return;
+    // Need version bump to add store
+    const currentVersion = db.version;
+    db.close();
+    persistenceDbPromise = null;
+    await new Promise((resolve, reject) => {
+      const request = indexedDB.open(DB_NAME, currentVersion + 1);
+      request.onupgradeneeded = () => {
+        const upgradedDb = request.result;
+        if (!upgradedDb.objectStoreNames.contains(SNAPSHOT_STORE)) {
+          upgradedDb.createObjectStore(SNAPSHOT_STORE, { keyPath: 'id' });
+        }
+        if (!upgradedDb.objectStoreNames.contains(EVENT_STORE)) {
+          const store = upgradedDb.createObjectStore(EVENT_STORE, { keyPath: 'id' });
+          store.createIndex('timestampMs', 'timestampMs', { unique: false });
+        }
+        if (!upgradedDb.objectStoreNames.contains(ATTACHMENT_STORE)) {
+          upgradedDb.createObjectStore(ATTACHMENT_STORE, { keyPath: 'id' });
+        }
+      };
+      request.onsuccess = () => {
+        persistenceDbPromise = Promise.resolve(request.result);
+        resolve();
+      };
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  async function computeDigest(buffer) {
+    // Simple hash — not cryptographic, but deterministic for dedup
+    let hash = 0;
+    const view = new Uint8Array(buffer);
+    for (let i = 0; i < view.length; i++) {
+      hash = ((hash << 5) - hash + view[i]) | 0;
+    }
+    return Math.abs(hash).toString(16);
+  }
+
+  async function readAttachmentBlob(docId, name) {
+    const db = await openPersistenceDb();
+    if (!db || !db.objectStoreNames.contains(ATTACHMENT_STORE)) return null;
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(ATTACHMENT_STORE, 'readonly');
+      const request = tx.objectStore(ATTACHMENT_STORE).get(docId + '/' + name);
+      request.onsuccess = () => {
+        const record = request.result;
+        if (!record || !record.data) return resolve(null);
+        resolve(new Blob([record.data], { type: record.content_type }));
+      };
+      request.onerror = () => reject(request.error);
+    }).catch(() => null);
+  }
+
+  async function listAttachments(docId) {
+    const db = await openPersistenceDb();
+    if (!db || !db.objectStoreNames.contains(ATTACHMENT_STORE)) return [];
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(ATTACHMENT_STORE, 'readonly');
+      const request = tx.objectStore(ATTACHMENT_STORE).getAll();
+      request.onsuccess = () => {
+        const all = request.result || [];
+        resolve(all.filter(r => r.docId === docId));
+      };
+      request.onerror = () => reject(request.error);
+    }).catch(() => []);
+  }
+
+  // ===== END ATTACHMENT FUNCTIONS =====
 
   function clamp(value, min, max) {
     return Math.min(max, Math.max(min, value));
