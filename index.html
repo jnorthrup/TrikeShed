@@ -38,10 +38,11 @@ button, input, textarea, select { font:inherit; }
 .app-shell {
   min-height:100vh;
   display:grid;
-  grid-template-columns:260px 1fr minmax(400px, 1.2fr);
+  grid-template-columns:260px minmax(320px, 0.8fr) 1.2fr minmax(400px, 1.3fr);
   background:linear-gradient(180deg, rgba(255,255,255,.015), rgba(255,255,255,0));
 }
 .rail { border-right:1px solid var(--line); padding:16px; display:grid; gap:14px; background:rgba(9,13,19,.88); }
+.editor { padding:18px; overflow:auto; background:linear-gradient(180deg, rgba(9,13,19,.52), rgba(9,13,19,.16)); border-right:1px solid var(--line); }
 .graph-pane { padding:18px; overflow:auto; background:linear-gradient(180deg, rgba(9,13,19,.52), rgba(9,13,19,.16)); }
 .board-pane { border-left:1px solid var(--line); padding:18px; display:grid; gap:14px; background:rgba(9,13,19,.94); overflow:auto; }
 .panel {
@@ -315,6 +316,9 @@ button, input, textarea, select { font:inherit; }
         <div id="nav-root" class="nav-list"></div>
       </div>
     </aside>
+    <main class="editor">
+      <div id="doc-root" class="page"></div>
+    </main>
     <main class="graph-pane">
       <div class="panel section-block" style="height:100%; display:grid; grid-template-rows:auto 1fr auto;">
         <div class="section-head">
@@ -370,7 +374,7 @@ button, input, textarea, select { font:inherit; }
     </aside>
   </div>
   <div id="reactor-root" class="status-strip"></div>
-  <script id="forge-seed" type="application/json">{"title":"Forge Board","pageNotes":"Forge local-first workspace: page narrative, board flow, and RTS-style zoom into card detail all live in one operator surface.","columns":[{"id":"col-backlog","name":"Backlog","order":0},{"id":"col-inprogress","name":"In Progress","order":1},{"id":"col-review","name":"Review","order":2},{"id":"col-done","name":"Done","order":3}],"items":[{"id":"c1","title":"Setup CI pipeline","notes":"Define the first repeatable gate. Keep every blocking note attached to the same work item so the board and page never drift.","status":"col-backlog","priority":"high","checklist":[{"id":"c1-check-1","text":"Pick the required build + test commands","checked":true},{"id":"c1-check-2","text":"Capture failing output in card notes"},{"id":"c1-check-3","text":"Promote the green path into the gate"}]},{"id":"c2","title":"Add user authentication","notes":"Turn access rules into page notes, then split the real implementation checks into the checklist below.","status":"col-backlog","priority":"medium"},{"id":"c3","title":"Implement API gateway","notes":"This is the active systems cut. Use the zoom field to inspect how detailed work fans out around the selected card.","status":"col-inprogress","priority":"critical","checklist":[{"id":"c3-check-1","text":"Confirm routing seam"},{"id":"c3-check-2","text":"Trace live event flow"},{"id":"c3-check-3","text":"Lock regression coverage"}]},{"id":"c4","title":"Code review: HTX client","notes":"Review notes live with the card so evidence, comments, and board motion stay local-first.","status":"col-review","priority":"high"},{"id":"c5","title":"Initial commit","notes":"Capture what proved the baseline and what must remain stable while the rest of the board changes.","status":"col-done","priority":"low"},{"id":"c6","title":"Fix login bug","notes":"Use this as the debugging pattern card: root cause notes, observed symptoms, and regression checks.","status":"col-backlog","priority":"high","checklist":[{"id":"c6-check-1","text":"Reproduce the failure"},{"id":"c6-check-2","text":"Trace the true source"},{"id":"c6-check-3","text":"Prove the fix against the real path"}]}],"selectedItemId":"c1","useCases":[{"id":"brief-board","name":"Project brief + board","summary":"Page-level brief, execution board, and checklist detail in one local-first surface.","pageNotes":"Capture the brief at page scope, spin execution items into the board, and keep every checklist line attached to the same card.","itemTitles":["Frame the brief","Break work into cards","Track execution evidence"]},{"id":"research-dossier","name":"Research dossier","summary":"Collect observations, hold decisions, and move findings toward action without leaving the page.","pageNotes":"Use the page for synthesis, use cards for live questions, and zoom into the evidence around the active work item.","itemTitles":["Capture source notes","Extract claims","Turn claims into actions"]},{"id":"release-room","name":"Release room","summary":"Coordinate launch readiness with board flow, detailed checklists, and a shared field map.","pageNotes":"Keep release notes, risks, and rollout sequencing local-first while the board shows execution pressure in real time.","itemTitles":["Lock scope","Run final checks","Ship + observe"]},{"id":"mesh-ops","name":"Mesh / reactor ops","summary":"Drive signal, reduction, and board motion from one operator surface.","pageNotes":"Use this mode to inspect causal movement, recent reductions, and the board-space relationship under RTS-style zoom.","itemTitles":["Observe event flow","Reduce signal facets","Confirm board response"]}],"reactor":{"taxonomyNodeCount":6,"lastEventKind":"BoardLoaded","lastEventTimestampMs":1783385938865,"recentTaxonomyNodes":["Setup CI pipeline","Add user authentication","Implement API gateway","Code review: HTX client","Initial commit","Fix login bug"],"recentSignals":["ForgeBoardFSM:BoardLoaded"]}}</script>
+  <script id="forge-seed" type="application/json">{"title":"Forge Board","pageNotes":"Forge local-first workspace: page narrative, board flow, and RTS-style zoom into card detail all live in one operator surface.","columns":[{"id":"col-backlog","name":"Backlog","order":0},{"id":"col-inprogress","name":"In Progress","order":1},{"id":"col-review","name":"Review","order":2},{"id":"col-done","name":"Done","order":3}],"items":[{"id":"c1","title":"Setup CI pipeline","notes":"Define the first repeatable gate. Keep every blocking note attached to the same work item so the board and page never drift.","status":"col-backlog","priority":"high","checklist":[{"id":"c1-check-1","text":"Pick the required build + test commands","checked":true},{"id":"c1-check-2","text":"Capture failing output in card notes"},{"id":"c1-check-3","text":"Promote the green path into the gate"}]},{"id":"c2","title":"Add user authentication","notes":"Turn access rules into page notes, then split the real implementation checks into the checklist below.","status":"col-backlog","priority":"medium"},{"id":"c3","title":"Implement API gateway","notes":"This is the active systems cut. Use the zoom field to inspect how detailed work fans out around the selected card.","status":"col-inprogress","priority":"critical","checklist":[{"id":"c3-check-1","text":"Confirm routing seam"},{"id":"c3-check-2","text":"Trace live event flow"},{"id":"c3-check-3","text":"Lock regression coverage"}]},{"id":"c4","title":"Code review: HTX client","notes":"Review notes live with the card so evidence, comments, and board motion stay local-first.","status":"col-review","priority":"high"},{"id":"c5","title":"Initial commit","notes":"Capture what proved the baseline and what must remain stable while the rest of the board changes.","status":"col-done","priority":"low"},{"id":"c6","title":"Fix login bug","notes":"Use this as the debugging pattern card: root cause notes, observed symptoms, and regression checks.","status":"col-backlog","priority":"high","checklist":[{"id":"c6-check-1","text":"Reproduce the failure"},{"id":"c6-check-2","text":"Trace the true source"},{"id":"c6-check-3","text":"Prove the fix against the real path"}]}],"selectedItemId":"c1","useCases":[{"id":"brief-board","name":"Project brief + board","summary":"Page-level brief, execution board, and checklist detail in one local-first surface.","pageNotes":"Capture the brief at page scope, spin execution items into the board, and keep every checklist line attached to the same card.","itemTitles":["Frame the brief","Break work into cards","Track execution evidence"]},{"id":"research-dossier","name":"Research dossier","summary":"Collect observations, hold decisions, and move findings toward action without leaving the page.","pageNotes":"Use the page for synthesis, use cards for live questions, and zoom into the evidence around the active work item.","itemTitles":["Capture source notes","Extract claims","Turn claims into actions"]},{"id":"release-room","name":"Release room","summary":"Coordinate launch readiness with board flow, detailed checklists, and a shared field map.","pageNotes":"Keep release notes, risks, and rollout sequencing local-first while the board shows execution pressure in real time.","itemTitles":["Lock scope","Run final checks","Ship + observe"]},{"id":"mesh-ops","name":"Mesh / reactor ops","summary":"Drive signal, reduction, and board motion from one operator surface.","pageNotes":"Use this mode to inspect causal movement, recent reductions, and the board-space relationship under RTS-style zoom.","itemTitles":["Observe event flow","Reduce signal facets","Confirm board response"]}],"reactor":{"taxonomyNodeCount":6,"lastEventKind":"BoardLoaded","lastEventTimestampMs":1783386652595,"recentTaxonomyNodes":["Setup CI pipeline","Add user authentication","Implement API gateway","Code review: HTX client","Initial commit","Fix login bug"],"recentSignals":["ForgeBoardFSM:BoardLoaded"]}}</script>
   <script>
 (() => {
   const STORAGE_KEY = 'forge.workspace.v4';
@@ -745,20 +749,6 @@ button, input, textarea, select { font:inherit; }
     return null;
   }
 
-    const snapshot = normalizeState(JSON.parse(JSON.stringify(state)));
-    const now = Date.now();
-    snapshot.cache.snapshotTimestampMs = now;
-    snapshot.cache.lastPersistTarget = 'indexeddb+cache';
-    snapshot.cache.status = 'persisted';
-    await Promise.all([
-      writeSnapshotToIndexedDb(snapshot),
-      writeSnapshotToCache(snapshot),
-    ]);
-    state.cache.snapshotTimestampMs = now;
-    state.cache.lastPersistTarget = 'indexeddb+cache';
-    state.cache.status = 'persisted';
-  }
-
   function openPersistenceDb() {
     if (!("indexedDB" in window)) return Promise.resolve(null);
     if (persistenceDbPromise) return persistenceDbPromise;
@@ -808,14 +798,6 @@ button, input, textarea, select { font:inherit; }
         },
       }),
     );
-  }
-
-  async function loadPersistedSnapshot() {
-    const indexedDbSnapshot = await readSnapshotFromIndexedDb();
-    if (indexedDbSnapshot) return { source: 'indexeddb', snapshot: indexedDbSnapshot };
-    const cachedSnapshot = await readSnapshotFromCache();
-    if (cachedSnapshot) return { source: 'cache-storage', snapshot: cachedSnapshot };
-    return null;
   }
 
   async function readSnapshotFromIndexedDb() {
