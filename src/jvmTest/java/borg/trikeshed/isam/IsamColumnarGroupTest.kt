@@ -152,7 +152,7 @@ class IsamColumnarGroupTest {
             listOf("alpha", "beta").toSeries(),
             listOf("gamma", "delta").toSeries()
         ).toSeries()
-        val monoCursor = MonoCursor(names, IOMemento.IoString, matrix)
+        val monoCursor = MonoCursor(names.toSeries<CharSequence>(), IOMemento.IoString, matrix)
 
         assertEquals(2, monoCursor.size)
         val row0 = monoCursor.b(0)
