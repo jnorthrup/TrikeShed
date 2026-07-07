@@ -20,60 +20,75 @@ class JvmIsamDataReader(
     val metafileFilename: String,
     val metafile: IsamMetaFileReader
 ) : IsamDataReader {
-    private val data: SeekableByteChannel by lazy {
-        Files.newByteChannel(
-            Paths.get(datafileFilename),
-            READ
-        )
-    }
-
-    private val recordlen: Int by lazy { metafile.recordlen }
-    private val fileSize: Long get() = data.size()
-    override val recordCount: Int by lazy { fileSize.toInt() / recordlen }
-
     private val constraints: Series<RecordMeta> get() = metafile.constraints
+    private val columnsByGroup: Map<String, List<RecordMeta>> by lazy {
+        constraints.view.groupBy { it.groupName }
+    }
+    private val maxGroupId: Int by lazy {
+        constraints.view.map { it.groupId }.maxOrNull() ?: 0
+    }
+    private val groupChannels = mutableMapOf<String, SeekableByteChannel>()
     private val lock: ReentrantLock = ReentrantLock()
 
-    override val readRow: (Int) -> RowVec = { row ->
-        lock.lock()
-        val buffer = ByteBuffer.allocate(recordlen)
-        data.position(row * recordlen.toLong())
-        data.read(buffer)
-        lock.unlock()
-        val array = buffer.position(0).array()
+    private val primaryGroupFilename: String by lazy {
+        val primaryGname = columnsByGroup.entries.firstOrNull { entry ->
+            entry.value.first().groupId == maxGroupId
+        }?.key ?: "0"
+        
+        primaryGname
+    }
 
-        constraints.size j { col ->
-            val constraint = constraints[col]
-            val s = array.sliceArray(constraint.begin until constraint.end)
+    override val recordCount: Int by lazy {
+        val channel = groupChannels[primaryGroupFilename] ?: groupChannels.values.first()
+        val groupCols = columnsByGroup[primaryGroupFilename] ?: columnsByGroup.values.first()
+        val groupRecordLen = groupCols.sumOf { it.end - it.begin }
+        (channel.size().toInt() / groupRecordLen)
+    }
+
+    override val readRow: (Int) -> RowVec = { row ->
+        val groupBuffers = mutableMapOf<String, ByteArray>()
+        lock.lock()
+        try {
+            for ((gname, cols) in columnsByGroup) {
+                val channel = groupChannels[gname]!!
+                val groupRecordLen = cols.sumOf { it.end - it.begin }
+                val buffer = ByteBuffer.allocate(groupRecordLen)
+                channel.position(row * groupRecordLen.toLong())
+                channel.read(buffer)
+                groupBuffers[gname] = buffer.position(0).array()
+            }
+        } finally {
+            lock.unlock()
+        }
+
+        constraints.size j { colIdx ->
+            val constraint = constraints[colIdx]
+            val gname = constraint.groupName
+            val colsInGroup = columnsByGroup[gname]!!
+            val localOffset = colsInGroup.takeWhile { it != constraint }.sumOf { it.end - it.begin }
+            val len = constraint.end - constraint.begin
+            val s = groupBuffers[gname]!!.sliceArray(localOffset until localOffset + len)
             constraint.decoder(s)!! j { constraint }
         }
     }
 
     override fun open() {
         metafile.open()
-        // report on record alignment of the file
-        val alignment = fileSize % recordlen
-        if (alignment != 0L) {
-            println("WARN: file $datafileFilename is not aligned to recordlen $recordlen")
-        } else
-            println("DEBUG: file $datafileFilename is aligned to recordlen $recordlen")
-
-        val fieldCounts: Map<IOMemento, Pair<Int, Int>> = constraints.`▶`.groupBy { it.type }
-            .mapValues { (_, v) -> v.size to v.sumOf { it.end - it.begin } }
-
-        val ySize = fileSize / recordlen
-        println("DEBUG: file $datafileFilename has $ySize records")
-        fieldCounts.forEach { (type, pair) ->
-            val (count, occupancy) = pair
-            val ocu2 = occupancy.toLong()
-            val unitSize = ocu2.humanReadableByteCountIEC
-            val collectiveSize = (ySize.toLong() * ocu2).humanReadableByteCountIEC
-            println("DEBUG: file $datafileFilename has $count fields of type $type occupying $unitSize or total of $collectiveSize   (${occupancy * 100 / recordlen}%)")
+        
+        for (gname in columnsByGroup.keys) {
+            val cols = columnsByGroup[gname]!!
+            val firstCol = cols.first()
+            val gfilename = if (firstCol.groupId == maxGroupId) {
+                datafileFilename
+            } else {
+                getGroupFilename(datafileFilename, gname)
+            }
+            groupChannels[gname] = Files.newByteChannel(Paths.get(gfilename), READ)
         }
     }
 
     override fun close() {
-        data.close()
+        groupChannels.values.forEach { it.close() }
         metafile.close()
     }
 }
@@ -85,63 +100,114 @@ class JvmIsamOperations : IsamOperations {
         metafile: IsamMetaFileReader
     ): IsamDataReader = JvmIsamDataReader(datafileFilename, metafileFilename, metafile)
 
-    override fun write(cursor: Cursor, datafilename: String, varChars: Map<String, Int>) {
+    override fun write(
+        cursor: Cursor,
+        datafilename: String,
+        varChars: Map<String, Int>,
+        useMonocursorGroupings: Boolean
+    ) {
         val metafilename = "$datafilename.meta"
 
         val row0 = cursor.b(0)
         val cursorMeta: Series<ColumnMeta> = row0.a j { c: Int -> row0.b(c).b() }
-        val meta0 = IsamMetaFileReader.write(metafilename, cursorMeta, varChars)
+        val meta0 = IsamMetaFileReader.write(metafilename, cursorMeta, varChars, useMonocursorGroupings = useMonocursorGroupings)
 
-        val randomAccessFile = RandomAccessFile(datafilename, "rw")
-        val data = randomAccessFile.channel
+        val columnsByGroup = meta0.view.groupBy { it.groupName }
+        val maxGroupId = meta0.view.map { it.groupId }.maxOrNull() ?: 0
 
-        val last = meta0.last()
-        val rowLen = last.end
-        val rowBuffer1 = ByteBuffer.allocate(rowLen)
-        val rowBuffer = rowBuffer1.array()
+        val groupChannels = mutableMapOf<String, SeekableByteChannel>()
+        val groupFiles = mutableMapOf<String, RandomAccessFile>()
+
+        for (gname in columnsByGroup.keys) {
+            val cols = columnsByGroup[gname]!!
+            val firstCol = cols.first()
+            val gfilename = if (firstCol.groupId == maxGroupId) {
+                datafilename
+            } else {
+                getGroupFilename(datafilename, gname)
+            }
+            val raf = RandomAccessFile(gfilename, "rw")
+            groupFiles[gname] = raf
+            groupChannels[gname] = raf.channel
+        }
 
         cursor.iterator().forEach { rowVec ->
-            WireProto.writeToBuffer(rowVec, rowBuffer, meta0)
-            rowBuffer1.position(0)
-            data.write(rowBuffer1)
+            for ((gname, cols) in columnsByGroup) {
+                val groupRecordLen = cols.sumOf { it.end - it.begin }
+                val rowBuffer1 = ByteBuffer.allocate(groupRecordLen)
+                val rowBuffer = rowBuffer1.array()
+                
+                writeGroupToBuffer(rowVec, rowBuffer, cols, meta0)
+                rowBuffer1.position(0)
+                groupChannels[gname]!!.write(rowBuffer1)
+            }
         }
-        randomAccessFile.close()
-        data.close()
+
+        groupChannels.values.forEach { it.close() }
+        groupFiles.values.forEach { it.close() }
     }
 
     override fun append(
         msf: Iterable<RowVec>,
         datafilename: String,
         varChars: Map<String, Int>,
-        transform: ((RowVec) -> RowVec)?
+        transform: ((RowVec) -> RowVec)?,
+        useMonocursorGroupings: Boolean
     ) {
         val metafilename = "$datafilename.meta"
         lateinit var meta0: Series<RecordMeta>
-        val data = Files.newOutputStream(Paths.get(datafilename), APPEND, WRITE, CREATE)
-
-        var last: RecordMeta
-        var rowLen = 0
-        lateinit var rowBuffer: ByteArray
-        var fibLog: FibonacciReporter? = null
-        debug { fibLog = FibonacciReporter(size = null, noun = "appends") }
         var first = true
+
+        var columnsByGroup: Map<String, List<RecordMeta>> = emptyMap()
+        var maxGroupId = 0
+        val groupStreams = mutableMapOf<String, java.io.OutputStream>()
 
         msf.forEach { rowVec1: RowVec ->
             val rowVec = transform?.let { it(rowVec1) } ?: rowVec1
             if (first) {
-                meta0 = IsamMetaFileReader.write(metafilename, rowVec.right.α { it() }, varChars)
-                last = meta0.last()
-                rowLen = last.end
-                rowBuffer = ByteArray(rowLen) { 0 }
-                debug { logDebug { "toIsam: " + meta0.toList() } }
+                meta0 = IsamMetaFileReader.write(metafilename, rowVec.right.α { it() }, varChars, useMonocursorGroupings = useMonocursorGroupings)
+                columnsByGroup = meta0.view.groupBy { it.groupName }
+                maxGroupId = meta0.view.map { it.groupId }.maxOrNull() ?: 0
+
+                for (gname in columnsByGroup.keys) {
+                    val cols = columnsByGroup[gname]!!
+                    val firstCol = cols.first()
+                    val gfilename = if (firstCol.groupId == maxGroupId) {
+                        datafilename
+                    } else {
+                        getGroupFilename(datafilename, gname)
+                    }
+                    groupStreams[gname] = Files.newOutputStream(Paths.get(gfilename), APPEND, WRITE, CREATE)
+                }
                 first = false
             }
 
-            WireProto.writeToBuffer(rowVec, rowBuffer, meta0)
-            data.write(rowBuffer)
-            debug { fibLog?.report()?.let { println(it) } }
+            for ((gname, cols) in columnsByGroup) {
+                val groupRecordLen = cols.sumOf { it.end - it.begin }
+                val rowBuffer = ByteArray(groupRecordLen)
+                writeGroupToBuffer(rowVec, rowBuffer, cols, meta0)
+                groupStreams[gname]!!.write(rowBuffer)
+            }
         }
-        data.close()
+
+        groupStreams.values.forEach { it.close() }
+    }
+
+    private fun writeGroupToBuffer(
+        rowVec: RowVec,
+        rowBuf: ByteArray,
+        groupMeta: List<RecordMeta>,
+        globalMeta: Series<RecordMeta>
+    ) {
+        val rowData = rowVec.left
+        var localOffset = 0
+        for (colMeta in groupMeta) {
+            val globalIdx = globalMeta.view.indexOf(colMeta)
+            val colData = rowData[globalIdx]
+            val colBytes = colMeta.encoder(colData)
+            colBytes.copyInto(rowBuf, localOffset, 0, colBytes.size)
+            localOffset += colMeta.end - colMeta.begin
+        }
     }
 }
 

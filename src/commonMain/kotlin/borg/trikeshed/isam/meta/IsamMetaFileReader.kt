@@ -147,11 +147,12 @@ class IsamMetaFileReader(
             metafilename: String,
             recordMetas: Series<ColumnMeta>,
             varchars: Map<String, Int>,
-            fileOps: FileOperations? = null
+            fileOps: FileOperations? = null,
+            useMonocursorGroupings: Boolean = true
         ): Series<RecordMeta> {
             val lines = mutableListOf<String>()
 
-            val result = sanitize(recordMetas, varchars)
+            val result = sanitize(recordMetas, varchars, useMonocursorGroupings)
             lines.add("# format:  coords WS .. EOL names WS .. EOL TypeMememento WS .. [EOL]")
             lines.add("# last coord is the recordlen")
             lines.add(result.view.joinToString(" ") { it.begin.toString() + " " + it.end })
@@ -200,15 +201,26 @@ class IsamMetaFileReader(
             return sb.toString()
         }
 
-        fun sanitize(recordMetas: Series<ColumnMeta>, varchars: Map<String, Int>): Series<RecordMeta> {
-            val result = if (recordMetas.view.any { it !is RecordMeta || (min(it.begin, it.end) < 0 && it.child == null) }) {
+        fun sanitize(
+            recordMetas: Series<ColumnMeta>,
+            varchars: Map<String, Int>,
+            useMonocursorGroupings: Boolean = true
+        ): Series<RecordMeta> {
+            val result = if (recordMetas.view.any { it !is RecordMeta || (min(it.begin, it.end) < 0 && it.child == null) } || useMonocursorGroupings) {
                 var offset = 0
                 recordMetas.view.map { columnMeta: ColumnMeta ->
                     val name = columnMeta.name.toString()
-                    val type = columnMeta.type
+                    val type = columnMeta.type as IOMemento
                     val len = type.networkSize ?: varchars[name] ?: throw Exception("no network size for $name")
-                    val groupId = (columnMeta as? RecordMeta)?.groupId ?: 0
-                    val groupName = (columnMeta as? RecordMeta)?.groupName ?: groupId.toString()
+                    val existingGroupId = (columnMeta as? RecordMeta)?.groupId ?: 0
+                    val existingGroupName = (columnMeta as? RecordMeta)?.groupName ?: "0"
+
+                    val (groupId, groupName) = if (useMonocursorGroupings && (existingGroupName == "0" || existingGroupName == "default")) {
+                        type.ordinal to type.name
+                    } else {
+                        existingGroupId to existingGroupName
+                    }
+
                     val recordMeta = RecordMeta(
                         name = name,
                         type = type as IOMemento,

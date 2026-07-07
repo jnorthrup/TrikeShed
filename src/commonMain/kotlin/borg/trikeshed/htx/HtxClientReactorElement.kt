@@ -239,6 +239,7 @@ open class HtxClientReactorElement(
                 url = nextUrl,
                 range = request.range,
                 method = request.method,
+                body = request.body,
             ).copy(headers = request.headers)
 
             channelize(

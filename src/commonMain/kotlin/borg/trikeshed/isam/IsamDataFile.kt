@@ -35,9 +35,10 @@ class IsamDataFile(
             cursor: Cursor,
             datafilename: String,
             varChars: Map<String, Int> = emptyMap(),
-            operations: IsamOperations = defaultIsamOperations()
+            operations: IsamOperations = defaultIsamOperations(),
+            useMonocursorGroupings: Boolean = true
         ) {
-            operations.write(cursor, datafilename, varChars)
+            operations.write(cursor, datafilename, varChars, useMonocursorGroupings)
         }
 
         fun append(
@@ -45,9 +46,10 @@ class IsamDataFile(
             datafilename: String,
             varChars: Map<String, Int> = emptyMap(),
             transform: ((RowVec) -> RowVec)? = null,
-            operations: IsamOperations = defaultIsamOperations()
+            operations: IsamOperations = defaultIsamOperations(),
+            useMonocursorGroupings: Boolean = true
         ) {
-            operations.append(msf, datafilename, varChars, transform)
+            operations.append(msf, datafilename, varChars, transform, useMonocursorGroupings)
         }
     }
 }

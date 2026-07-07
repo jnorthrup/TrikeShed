@@ -15,14 +15,16 @@ interface IsamOperations {
     fun write(
         cursor: Cursor,
         datafilename: String,
-        varChars: Map<String, Int>
+        varChars: Map<String, Int>,
+        useMonocursorGroupings: Boolean = true
     )
 
     fun append(
         msf: Iterable<RowVec>,
         datafilename: String,
         varChars: Map<String, Int>,
-        transform: ((RowVec) -> RowVec)?
+        transform: ((RowVec) -> RowVec)?,
+        useMonocursorGroupings: Boolean = true
     )
 }
 
@@ -32,3 +34,13 @@ interface IsamDataReader : Usable {
 }
 
 expect fun defaultIsamOperations(): IsamOperations
+
+fun getGroupFilename(datafilename: String, groupName: String): String {
+    val lastSlash = datafilename.lastIndexOf('/')
+    val lastBackslash = datafilename.lastIndexOf('\\')
+    val separatorIdx = maxOf(lastSlash, lastBackslash)
+    val dir = if (separatorIdx >= 0) datafilename.substring(0, separatorIdx + 1) else ""
+    val name = if (separatorIdx >= 0) datafilename.substring(separatorIdx + 1) else datafilename
+    val base = if (name.endsWith(".bin")) name.removeSuffix(".bin") else name
+    return "$dir$base.$groupName.bin"
+}

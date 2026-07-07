@@ -5,7 +5,7 @@ import kotlin.test.assertEquals
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.runBlocking
+import borg.trikeshed.runBlocking
 
 /**
  * Tests for VAL-FSM-001 / GAP-04: ForgeBoardFSM CardCreated lost-update race

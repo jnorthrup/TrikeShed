@@ -113,11 +113,12 @@ data class MetafileWriteConfig(
     val recordMetas: Series<ColumnMeta>,
     val varchars: Map<String, Int>,
     val fileOps: FileOperations,
+    val useMonocursorGroupings: Boolean = true,
 )
 
 class MetafileWriter(val config: MetafileWriteConfig) {
     fun build(): MetafileResult {
-        val result = sanitize(config.recordMetas, config.varchars)
+        val result = sanitize(config.recordMetas, config.varchars, config.useMonocursorGroupings)
         val lines = mutableListOf<String>()
         lines.add("# format:  coords WS .. EOL names WS .. EOL TypeMememento WS .. [EOL]")
         lines.add("# last coord is the recordlen")
@@ -144,15 +145,26 @@ class MetafileWriter(val config: MetafileWriteConfig) {
     }
 
     companion object {
-        fun sanitize(recordMetas: Series<ColumnMeta>, varchars: Map<String, Int>): Series<RecordMeta> {
-            return if (recordMetas.view.any { it !is RecordMeta || (min(it.begin, it.end) < 0 && it.child == null) }) {
+        fun sanitize(
+            recordMetas: Series<ColumnMeta>,
+            varchars: Map<String, Int>,
+            useMonocursorGroupings: Boolean = true
+        ): Series<RecordMeta> {
+            return if (recordMetas.view.any { it !is RecordMeta || (min(it.begin, it.end) < 0 && it.child == null) } || useMonocursorGroupings) {
                 var offset = 0
                 recordMetas.view.map { col: ColumnMeta ->
                     val name = col.name.toString()
-                    val type = col.type
+                    val type = col.type as IOMemento
                     val len = type.networkSize ?: varchars[name] ?: throw Exception("no network size for $name")
-                    val groupId = (col as? RecordMeta)?.groupId ?: 0
-                    val groupName = (col as? RecordMeta)?.groupName ?: groupId.toString()
+                    val existingGroupId = (col as? RecordMeta)?.groupId ?: 0
+                    val existingGroupName = (col as? RecordMeta)?.groupName ?: "0"
+
+                    val (groupId, groupName) = if (useMonocursorGroupings && (existingGroupName == "0" || existingGroupName == "default")) {
+                        type.ordinal to type.name
+                    } else {
+                        existingGroupId to existingGroupName
+                    }
+
                     val recordMeta = RecordMeta(
                         name = name,
                         type = type as IOMemento,

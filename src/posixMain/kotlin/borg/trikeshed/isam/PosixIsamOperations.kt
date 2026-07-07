@@ -1,11 +1,10 @@
 @file:OptIn(ExperimentalForeignApi::class)
+@file:Suppress("UNCHECKED_CAST")
 
 package borg.trikeshed.isam
 
 import borg.trikeshed.common.Usable
-import borg.trikeshed.cursor.Cursor
-import borg.trikeshed.cursor.RowVec
-import borg.trikeshed.cursor.meta
+import borg.trikeshed.cursor.*
 import borg.trikeshed.isam.meta.IOMemento
 import borg.trikeshed.isam.meta.IsamMetaFileReader
 import borg.trikeshed.lib.*
@@ -14,37 +13,51 @@ import platform.posix.*
 import simple.PosixFile
 import simple.PosixOpenOpts
 
+class PosixMmapInfo(
+    val data: COpaquePointer,
+    val fileSize: Long,
+    val groupRecordLen: Int
+)
+
 class PosixIsamDataReader(
     val datafileFilename: String,
     val metafileFilename: String,
     val metafile: IsamMetaFileReader
 ) : IsamDataReader {
-    private val recordlen: Int by lazy {
-        metafile.recordlen.also {
-            require(it > 0) { "recordlen must be > 0" }
-        }
+    private val constraints: Series<RecordMeta> get() = metafile.constraints
+    private val columnsByGroup: Map<String, List<RecordMeta>> by lazy {
+        constraints.view.groupBy { it.groupName }
     }
-    private val constraints: Series<RecordMeta> by lazy { metafile.constraints }
-    private lateinit var data: COpaquePointer
-    private var fileSize: Long = -1
+    private val maxGroupId: Int by lazy {
+        constraints.view.map { it.groupId }.maxOrNull() ?: 0
+    }
+    
+    private val groupMmaps = mutableMapOf<String, PosixMmapInfo>()
     private var first = true
 
     override val recordCount: Int
         get() {
             open()
-            return (fileSize / recordlen).toInt()
+            val primaryGname = columnsByGroup.entries.firstOrNull { it.value.first().groupId == maxGroupId }?.key ?: "0"
+            val info = groupMmaps[primaryGname] ?: groupMmaps.values.first()
+            return (info.fileSize / info.groupRecordLen).toInt()
         }
 
     override val readRow: (Int) -> RowVec = { row ->
         memScoped {
-            val d2 = data.toLong() + (row * recordlen)
-            constraints.size j { col ->
-                constraints[col].let { recordMeta ->
-                    val d4 = d2 + recordMeta.begin
-                    val d5: COpaquePointer = d4.toCPointer()!!
-                    val d6: ByteArray = d5.readBytes(recordMeta.end - recordMeta.begin)
-                    recordMeta.decoder(d6)!! j { recordMeta }
-                }
+            constraints.size j { colIdx ->
+                val constraint = constraints[colIdx]
+                val gname = constraint.groupName
+                val colsInGroup = columnsByGroup[gname]!!
+                val mmapInfo = groupMmaps[gname]!!
+                
+                val localOffset = colsInGroup.takeWhile { it != constraint }.sumOf { it.end - it.begin }
+                val len = constraint.end - constraint.begin
+                
+                val d2 = mmapInfo.data.toLong() + (row * mmapInfo.groupRecordLen) + localOffset
+                val d5: COpaquePointer = d2.toCPointer()!!
+                val d6: ByteArray = d5.readBytes(len)
+                constraint.decoder(d6)!! j { constraint }
             }
         }
     }
@@ -53,46 +66,38 @@ class PosixIsamDataReader(
         if (!first) return
         first = false
         metafile.open()
+        
         memScoped {
-            val fd = open(datafileFilename, O_RDONLY)
-            val stat = alloc<stat>()
-            fstat(fd, stat.ptr)
-            fileSize = stat.st_size
+            for (gname in columnsByGroup.keys) {
+                val cols = columnsByGroup[gname]!!
+                val firstCol = cols.first()
+                val gfilename = if (firstCol.groupId == maxGroupId) {
+                    datafileFilename
+                } else {
+                    getGroupFilename(datafileFilename, gname)
+                }
+                
+                val fd = open(gfilename, O_RDONLY)
+                val stat = alloc<stat>()
+                fstat(fd, stat.ptr)
+                val fileSize = stat.st_size
+                val groupRecordLen = cols.sumOf { it.end - it.begin }
 
-            require(fileSize % recordlen == 0L) { "fileSize must be a multiple of recordlen" }
+                require(fileSize % groupRecordLen == 0L) { "fileSize of $gfilename must be a multiple of $groupRecordLen" }
 
-            data = mmap(null, fileSize.toULong(), PROT_READ, MAP_PRIVATE, fd, 0)!!
-            close(fd)
-
-            // report on record alignment of the file
-            val alignment = fileSize % recordlen
-            if (alignment != 0L) {
-                println("WARN: file $datafileFilename is not aligned to recordlen $recordlen")
-            } else
-                println("DEBUG: file $datafileFilename is aligned to recordlen $recordlen")
-
-            println("DEBUG: each record is ${recordlen.toLong().humanReadableByteCountIEC} bytes long")
-
-            val fieldCounts = mutableMapOf<IOMemento, Int>()
-            val fieldOccupancy = mutableMapOf<IOMemento, Int>()
-            constraints.forEach { constraint ->
-                val count = fieldCounts.getOrPut(constraint.type) { 0 }
-                fieldCounts[constraint.type] = count + 1
-                val occupancy = fieldOccupancy.getOrPut(constraint.type) { 0 }
-                fieldOccupancy[constraint.type] = occupancy + constraint.end - constraint.begin
-            }
-            val recordCount = fileSize / recordlen
-            println("DEBUG: file  $datafileFilename has $recordCount records in ${fileSize.humanReadableByteCountIEC}")
-            fieldCounts.forEach { (type, count) ->
-                val occupancy = fieldOccupancy[type]!!
-                println("DEBUG: file $datafileFilename has $count fields of type $type occupying $occupancy bytes (${occupancy * 100 / recordlen}%) of each record (${(occupancy * recordCount).humanReadableByteCountSI} in the file)")
+                val data = mmap(null, fileSize.toULong(), PROT_READ, MAP_PRIVATE, fd, 0)!!
+                close(fd)
+                
+                groupMmaps[gname] = PosixMmapInfo(data, fileSize, groupRecordLen)
             }
         }
     }
 
     override fun close() {
         memScoped {
-            munmap(data, fileSize.toULong())
+            for (info in groupMmaps.values) {
+                munmap(info.data, info.fileSize.toULong())
+            }
         }
         metafile.close()
     }
@@ -105,43 +110,74 @@ class PosixIsamOperations : IsamOperations {
         metafile: IsamMetaFileReader
     ): IsamDataReader = PosixIsamDataReader(datafileFilename, metafileFilename, metafile)
 
-    override fun write(cursor: Cursor, datafilename: String, varChars: Map<String, Int>) {
+    override fun write(
+        cursor: Cursor,
+        datafilename: String,
+        varChars: Map<String, Int>,
+        useMonocursorGroupings: Boolean
+    ) {
         val metafilename = "$datafilename.meta"
 
-        val meta0 = IsamMetaFileReader.write(metafilename, cursor.meta, varChars)
+        val row0 = cursor.b(0)
+        val cursorMeta: Series<ColumnMeta> = row0.a j { c: Int -> row0.b(c).b() }
+        val meta0 = IsamMetaFileReader.write(metafilename, cursorMeta, varChars, useMonocursorGroupings = useMonocursorGroupings)
 
-        val data = PosixFile(
-            datafilename,
-            PosixOpenOpts.withFlags(PosixOpenOpts.O_Creat, PosixOpenOpts.O_Trunc, PosixOpenOpts.O_Rdwr)
-        )
+        val columnsByGroup = meta0.view.groupBy { it.groupName }
+        val maxGroupId = meta0.view.map { it.groupId }.maxOrNull() ?: 0
 
-        meta0.debug {
-            logDebug { "toIsam: " + it.toList() }
+        val groupFiles = mutableMapOf<String, PosixFile>()
+
+        for (gname in columnsByGroup.keys) {
+            val cols = columnsByGroup[gname]!!
+            val firstCol = cols.first()
+            val gfilename = if (firstCol.groupId == maxGroupId) {
+                datafilename
+            } else {
+                getGroupFilename(datafilename, gname)
+            }
+            groupFiles[gname] = PosixFile(
+                gfilename,
+                PosixOpenOpts.withFlags(PosixOpenOpts.O_Creat, PosixOpenOpts.O_Trunc, PosixOpenOpts.O_Rdwr)
+            )
         }
-
-        val last = meta0.last()
-        val meta = (meta0 α {
-            val encoder = it.type.createEncoder(it.end - it.begin)
-            RecordMeta(it.name, it.type, it.begin, it.end, encoder = encoder)
-        }).toArray()
-        val rowLen = last.end
-
-        val rowBuffer1 = ByteArray(rowLen)
 
         cursor.iterator().forEach { rowVec ->
-            WireProto.writeToBuffer(rowVec, rowBuffer1, meta0)
-            data.write(rowBuffer1)
+            for ((gname, cols) in columnsByGroup) {
+                val groupRecordLen = cols.sumOf { it.end - it.begin }
+                val rowBuffer = ByteArray(groupRecordLen)
+                writeGroupToBuffer(rowVec, rowBuffer, cols, meta0)
+                groupFiles[gname]!!.write(rowBuffer)
+            }
         }
-        data.close()
+
+        groupFiles.values.forEach { it.close() }
     }
 
     override fun append(
         msf: Iterable<RowVec>,
         datafilename: String,
         varChars: Map<String, Int>,
-        transform: ((RowVec) -> RowVec)?
+        transform: ((RowVec) -> RowVec)?,
+        useMonocursorGroupings: Boolean
     ) {
         TODO("append not implemented for PosixIsamOperations")
+    }
+
+    private fun writeGroupToBuffer(
+        rowVec: RowVec,
+        rowBuf: ByteArray,
+        groupMeta: List<RecordMeta>,
+        globalMeta: Series<RecordMeta>
+    ) {
+        val rowData = rowVec.left
+        var localOffset = 0
+        for (colMeta in groupMeta) {
+            val globalIdx = globalMeta.view.indexOf(colMeta)
+            val colData = rowData[globalIdx]
+            val colBytes = colMeta.encoder(colData)
+            colBytes.copyInto(rowBuf, localOffset, 0, colBytes.size)
+            localOffset += colMeta.end - colMeta.begin
+        }
     }
 }
 

@@ -186,6 +186,7 @@ kotlin {
 // UMD bundle exposed as `globalThis.TrikeShed`, so jsNodeTest can verify the
 // shipped artifact parses and loads without depending on the flaky Karma/
 // electron launcher. If browser coverage comes back, re-add it separately.
+// TODO: Resolve Node.js/JS platform mismatch where some commonTest files use runBlocking which is JVM/Native only.
 
 apply(from = "publish_macro.gradle.kts")
 
@@ -245,6 +246,33 @@ tasks.register<JavaExec>("runCliDemo") {
     dependsOn("jvmJar")
     mainClass.set("borg.trikeshed.cli.demo.CliDemo")
     classpath(tasks.named("jvmJar"), configurations.getByName("jvmRuntimeClasspath"))
+}
+
+// Jules Usecase Demo run task
+tasks.register<JavaExec>("runJulesUsecaseDemo") {
+    group = "run"
+    description = "Runs the Jules API and Agent Usecase Demo on JVM."
+    dependsOn("jvmJar")
+    mainClass.set("borg.trikeshed.jules.client.demo.JulesUsecaseDemo")
+    classpath(tasks.named("jvmJar"), configurations.getByName("jvmRuntimeClasspath"))
+}
+
+// Live Jules PR app run task
+tasks.register<JavaExec>("runLiveJulesPr") {
+    group = "run"
+    description = "Fires a live PR request to Google Jules API on JVM."
+    dependsOn("jvmJar")
+    mainClass.set("borg.trikeshed.jules.client.demo.LiveJulesPrApp")
+    classpath(tasks.named("jvmJar"), configurations.getByName("jvmRuntimeClasspath"))
+}
+
+// KeyMux App run task
+tasks.register<JavaExec>("runKeyMuxApp") {
+    group = "run"
+    description = "Runs the KeyMux application on JVM."
+    dependsOn(":compileKotlinJvm")
+    mainClass.set("keymux.app.KeyMuxAppKt")
+    classpath(tasks.named("jvmJar"), configurations.named("jvmRuntimeClasspath"))
 }
 
 // OpenAPI Demo run task — only registered when :libs:openapi is available, i.e. when the

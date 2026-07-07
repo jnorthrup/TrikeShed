@@ -594,20 +594,6 @@ fun forgePersistenceScript(): String = """
     return null;
   }
 
-    const snapshot = normalizeState(JSON.parse(JSON.stringify(state)));
-    const now = Date.now();
-    snapshot.cache.snapshotTimestampMs = now;
-    snapshot.cache.lastPersistTarget = 'indexeddb+cache';
-    snapshot.cache.status = 'persisted';
-    await Promise.all([
-      writeSnapshotToIndexedDb(snapshot),
-      writeSnapshotToCache(snapshot),
-    ]);
-    state.cache.snapshotTimestampMs = now;
-    state.cache.lastPersistTarget = 'indexeddb+cache';
-    state.cache.status = 'persisted';
-  }
-
   function openPersistenceDb() {
     if (!("indexedDB" in window)) return Promise.resolve(null);
     if (persistenceDbPromise) return persistenceDbPromise;
@@ -657,14 +643,6 @@ fun forgePersistenceScript(): String = """
         },
       }),
     );
-  }
-
-  async function loadPersistedSnapshot() {
-    const indexedDbSnapshot = await readSnapshotFromIndexedDb();
-    if (indexedDbSnapshot) return { source: 'indexeddb', snapshot: indexedDbSnapshot };
-    const cachedSnapshot = await readSnapshotFromCache();
-    if (cachedSnapshot) return { source: 'cache-storage', snapshot: cachedSnapshot };
-    return null;
   }
 
   async function readSnapshotFromIndexedDb() {

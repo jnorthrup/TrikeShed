@@ -4,16 +4,16 @@ import keymux.*
 import modelmux.*
 import modelmux.acp.*
 import java.nio.file.Paths
+import borg.trikeshed.userspace.nio.file.spi.JvmFileOperations
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.flow.*
 import borg.trikeshed.lib.*
-//temporary demo exception to the uring userspace nio without trekking far off the path 
 
-fun main() = runBlocking {
+fun main() = runBlocking(JvmFileOperations()) {
     // ── 1. Build keymux: env > persist > api precedence ──
     val mux = KeyMux {
         env("APP")                                    // APP_LLMS__OPENAI__KEY etc.
-        persist(Paths.get(System.getProperty("user.home"), ".config", "llm"))
+        persist(System.homedir + "/.config/llm")
         api("https://config.internal.example.com/v1")
     }
 

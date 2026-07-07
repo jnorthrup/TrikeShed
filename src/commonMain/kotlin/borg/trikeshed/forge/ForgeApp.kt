@@ -227,6 +227,9 @@ ${forgeAppStyles()}
         <div id="nav-root" class="nav-list"></div>
       </div>
     </aside>
+    <main class="editor">
+      <div id="doc-root" class="page"></div>
+    </main>
     <main class="graph-pane">
       <div class="panel section-block" style="height:100%; display:grid; grid-template-rows:auto 1fr auto;">
         <div class="section-head">
@@ -319,10 +322,11 @@ private fun forgeAppStyles(): String = """
     .app-shell {
       min-height:100vh;
       display:grid;
-      grid-template-columns:260px 1fr minmax(400px, 1.2fr);
+      grid-template-columns:260px minmax(320px, 0.8fr) 1.2fr minmax(400px, 1.3fr);
       background:linear-gradient(180deg, rgba(255,255,255,.015), rgba(255,255,255,0));
     }
     .rail { border-right:1px solid var(--line); padding:16px; display:grid; gap:14px; background:rgba(9,13,19,.88); }
+    .editor { padding:18px; overflow:auto; background:linear-gradient(180deg, rgba(9,13,19,.52), rgba(9,13,19,.16)); border-right:1px solid var(--line); }
     .graph-pane { padding:18px; overflow:auto; background:linear-gradient(180deg, rgba(9,13,19,.52), rgba(9,13,19,.16)); }
     .board-pane { border-left:1px solid var(--line); padding:18px; display:grid; gap:14px; background:rgba(9,13,19,.94); overflow:auto; }
     .panel {

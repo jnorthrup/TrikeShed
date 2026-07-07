@@ -6,7 +6,11 @@ import borg.trikeshed.htx.HtxResponse
 import borg.trikeshed.htx.HtxRequest
 import borg.trikeshed.htx.HtxMethod
 import borg.trikeshed.htx.parseHtxRequest
+import borg.trikeshed.htx.htxHeaders
+import borg.trikeshed.lib.ByteSeries
 import borg.trikeshed.lib.asString
+import borg.trikeshed.lib.j
+import borg.trikeshed.lib.toSeries
 import kotlin.coroutines.CoroutineContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -61,19 +65,26 @@ class JulesClient(val context: CoroutineContext, val apiKey: String) {
             else -> HtxMethod.GET
         }
 
-        // HtxRequest has no body field directly, but we can serialize body or pass via custom mechanism
-        // For standard HTX elements, they receive HtxRequest. In our mock/tests and client, we pass request
-        // through htx.request(request).
-        // Let's build the HtxRequest using parseHtxRequest.
+        val headerList = mutableListOf<borg.trikeshed.lib.Join<String, String>>()
+        headerList.add("X-Goog-Api-Key" j apiKey)
+        if (body.isNotEmpty()) {
+            headerList.add("Content-Type" j "application/json")
+            headerList.add("Content-Length" j body.encodeToByteArray().size.toString())
+        } else if (htxMethod == HtxMethod.POST || htxMethod == HtxMethod.PUT || htxMethod == HtxMethod.PATCH) {
+            headerList.add("Content-Length" j "0")
+        }
+        val requestHeaders = headerList.toSeries()
+
         val request = parseHtxRequest(
             url = requestPath,
-            method = htxMethod
-        )
+            method = htxMethod,
+            body = ByteSeries(body.encodeToByteArray())
+        ).copy(headers = requestHeaders)
 
-        // Note: HtxResponse has body: ByteSeries (which is wraps ByteArray).
-        // We call request(request) to get HtxResponse
         val response = htx.request(request)
-        check(response.status in 200..299) { "Jules API error: ${response.status} ${response.body.asString()}" }
+        check(response.status in 200..299) { 
+            "Jules API error: ${response.status} - ${response.body.asString()}" 
+        }
         return response.body.asString()
     }
 
@@ -90,6 +101,7 @@ class JulesClient(val context: CoroutineContext, val apiKey: String) {
 
     suspend fun listSessions(): List<JulesSession> {
         val responseBody = executeRequest("GET", "/v1alpha/sessions")
+        if (responseBody.isBlank()) return emptyList()
         val wrapper = json.decodeFromString<JulesSessionsWrapper>(responseBody)
         return wrapper.sessions
     }
@@ -104,19 +116,21 @@ class JulesClient(val context: CoroutineContext, val apiKey: String) {
     }
 
     suspend fun sendMessage(sessionName: String, message: String) {
-        val bodyObj = mapOf("message" to message)
+        val bodyObj = mapOf("prompt" to message)
         val requestBody = json.encodeToString(bodyObj)
         executeRequest("POST", "/v1alpha/$sessionName:sendMessage", requestBody)
     }
 
     suspend fun listActivities(parentSessionName: String): List<JulesActivity> {
         val responseBody = executeRequest("GET", "/v1alpha/$parentSessionName/activities")
+        if (responseBody.isBlank()) return emptyList()
         val wrapper = json.decodeFromString<JulesActivitiesWrapper>(responseBody)
         return wrapper.activities
     }
 
     suspend fun listSources(): List<JulesSource> {
         val responseBody = executeRequest("GET", "/v1alpha/sources")
+        if (responseBody.isBlank()) return emptyList()
         val wrapper = json.decodeFromString<JulesSourcesWrapper>(responseBody)
         return wrapper.sources
     }
