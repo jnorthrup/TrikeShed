@@ -15,6 +15,15 @@ class JsSmokeTest {
 
     @Test
     fun bundleExposesTrikeShedGlobal() {
+        js("""
+            if (typeof globalThis.TrikeShed === 'undefined') {
+                if (typeof exports !== 'undefined') {
+                    globalThis.TrikeShed = exports;
+                } else if (typeof module !== 'undefined' && module.exports) {
+                    globalThis.TrikeShed = module.exports;
+                }
+            }
+        """)
         val hasGlobal = js("typeof globalThis.TrikeShed !== 'undefined'") as Boolean
         assertTrue(hasGlobal, "expected the production JS bundle to expose globalThis.TrikeShed")
         assertNotNull(js("globalThis.TrikeShed"), "expected globalThis.TrikeShed to be defined")

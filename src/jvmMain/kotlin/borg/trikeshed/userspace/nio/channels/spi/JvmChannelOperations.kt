@@ -45,7 +45,7 @@ class JvmChannelOperations(
         JvmChannelHandle(this, entries)
 
     override fun socket(domain: Int, type: Int, protocol: Int): Int {
-        val ch: SelectableChannel = SocketChannel.open().apply { configureBlocking(true) }
+        val ch: SelectableChannel = SocketChannel.open().apply { configureBlocking(false) }
         return registerChannelInternal(ch, Interest.toMask(setOf(Interest.READ, Interest.ACCEPT, Interest.CONNECT)))
     }
 
@@ -54,7 +54,7 @@ class JvmChannelOperations(
         if (oldCh != null) {
             try { oldCh.close() } catch (_: Exception) {}
         }
-        val serverCh = ServerSocketChannel.open().apply { configureBlocking(true) }
+        val serverCh = ServerSocketChannel.open().apply { configureBlocking(false) }
         socketChannels[fd] = serverCh
 
         return try {
@@ -71,7 +71,7 @@ class JvmChannelOperations(
     override fun accept(fd: Int): Int {
         val server = socketChannels[fd] as? ServerSocketChannel ?: return -1
         val client = server.accept() ?: return -1
-        client.configureBlocking(true)
+        client.configureBlocking(false)
         return registerChannelInternal(client, Interest.toMask(setOf(Interest.READ)))
     }
 
@@ -79,6 +79,7 @@ class JvmChannelOperations(
         val ch = socketChannels[fd] as? SocketChannel ?: return -1
         val address = java.net.InetSocketAddress(host, port)
         try {
+            // Configure to blocking mode so HtxReactorElement's private wait loops work properly
             ch.configureBlocking(true)
             if (!ch.connect(address)) {
                 ch.finishConnect() // might throw
