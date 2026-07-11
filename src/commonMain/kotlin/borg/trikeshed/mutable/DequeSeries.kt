@@ -169,9 +169,12 @@ class DequeSeries<T> : MutableSeries<T> {
     override fun plusAssign(item: T) { addLast(item) }
     override fun minusAssign(item: T) { remove(item) }
 
-    override fun freeze(): Series<T> = (0 until a).map { b(it) }.let { list ->
-        val arr = arrayOfNulls<Any?>(list.size).also { a -> list.forEachIndexed { i, v -> a[i] = v } }
-        FrozenArray(arr)
+    override fun freeze(): Series<T> {
+        // Known size — one array freeze (no List map intermediate).
+        val n = a
+        val arr = arrayOfNulls<Any?>(n)
+        for (i in 0 until n) arr[i] = b(i)
+        return FrozenArray(arr)
     }
     override fun cowSnapshot(): MutableSeries<T> {
         val snap = DequeSeries<T>(); snap.front = front; snap.back = back; return snap

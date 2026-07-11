@@ -1,63 +1,100 @@
 package borg.trikeshed.userspace.nio.file.spi
 
-import borg.trikeshed.lib.*
-import java.io.File
-import java.io.ByteArrayOutputStream
+import borg.trikeshed.lib.Join
+import borg.trikeshed.lib.Series
+import borg.trikeshed.lib.j
+import borg.trikeshed.lib.toSeries
+import java.nio.channels.SeekableByteChannel
+import java.nio.charset.StandardCharsets
+import java.nio.file.FileVisitResult
+import java.nio.file.Files as NioFiles
+import java.nio.file.LinkOption
+import java.nio.file.OpenOption
+import java.nio.file.Path
+import java.nio.file.Paths
+import java.nio.file.SimpleFileVisitor
+import java.nio.file.StandardOpenOption
+import java.nio.file.attribute.BasicFileAttributes
+import java.util.EnumSet
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.zip.ZipFile
 
+/**
+ * JVM userspace.nio adapter — pure [java.nio.file] / NIO channels.
+ * No java.io.File. Platform filesystem is only this adapter layer.
+ */
 class JvmFileOperations : FileOperations {
 
+    private val nextFd = AtomicInteger(1)
+    private val channels = ConcurrentHashMap<Int, SeekableByteChannel>()
+
+    private fun pathOf(filename: String): Path = Paths.get(filename)
+
     override fun open(path: String, readOnly: Boolean): Int {
-        val path_ = java.nio.file.Path.of(path)
-        val flags = if (readOnly) {
-            java.util.EnumSet.of(java.nio.file.StandardOpenOption.READ)
+        val flags: Set<OpenOption> = if (readOnly) {
+            EnumSet.of(StandardOpenOption.READ)
         } else {
-            java.util.EnumSet.of(java.nio.file.StandardOpenOption.READ, java.nio.file.StandardOpenOption.WRITE, java.nio.file.StandardOpenOption.CREATE)
+            EnumSet.of(StandardOpenOption.READ, StandardOpenOption.WRITE, StandardOpenOption.CREATE)
         }
-        val channel = java.nio.file.Files.newByteChannel(path_, flags)
-        return channel.hashCode() // JVM channels don't expose raw fd, use hashCode as handle
+        val channel = NioFiles.newByteChannel(pathOf(path), flags)
+        val fd = nextFd.getAndIncrement()
+        channels[fd] = channel
+        return fd
     }
 
-    override fun close(fd: Int): Int = 0 // JVM channel closed via close()
+    override fun close(fd: Int): Int {
+        val ch = channels.remove(fd) ?: return -1
+        return try {
+            ch.close()
+            0
+        } catch (_: Exception) {
+            -1
+        }
+    }
 
     override fun size(fd: Int): Long {
-        // fd is channel hashCode here — lookup from registry if needed
-        return 0L
+        val ch = channels[fd] ?: return -1L
+        return try {
+            ch.size()
+        } catch (_: Exception) {
+            -1L
+        }
     }
 
     override fun readAllLines(filename: String): List<String> =
-        java.nio.file.Files.readAllLines(java.nio.file.Path.of(filename))
+        NioFiles.readAllLines(pathOf(filename), StandardCharsets.UTF_8)
 
     override fun readAllBytes(filename: String): ByteArray =
-        java.nio.file.Files.readAllBytes(java.nio.file.Path.of(filename))
+        NioFiles.readAllBytes(pathOf(filename))
 
     override fun readString(filename: String): String =
-        java.nio.file.Files.readString(java.nio.file.Path.of(filename))
+        NioFiles.readString(pathOf(filename), StandardCharsets.UTF_8)
 
     override fun write(filename: String, bytes: ByteArray) {
-        java.nio.file.Files.write(java.nio.file.Path.of(filename), bytes)
+        NioFiles.write(pathOf(filename), bytes)
     }
 
     override fun write(filename: String, lines: List<String>) {
-        java.nio.file.Files.write(java.nio.file.Path.of(filename), lines)
+        NioFiles.write(pathOf(filename), lines, StandardCharsets.UTF_8)
     }
 
     override fun write(filename: String, string: String) {
-        java.nio.file.Files.writeString(java.nio.file.Path.of(filename), string)
+        NioFiles.writeString(pathOf(filename), string, StandardCharsets.UTF_8)
     }
 
-    override fun cwd(): String = java.nio.file.Path.of("").toAbsolutePath().toString()
+    override fun cwd(): String =
+        Paths.get("").toAbsolutePath().normalize().toString()
 
     override fun exists(filename: String): Boolean =
-        java.nio.file.Files.exists(java.nio.file.Path.of(filename))
+        NioFiles.exists(pathOf(filename))
 
     override fun streamLines(fileName: String, bufsize: Int): Sequence<Join<Long, ByteArray>> = sequence {
-        val f = File(fileName)
-        val buffer = ByteArray(bufsize)
-        var offset: Long = 0
-        var lineStartOffset: Long = 0
-        val lineBuffer = ByteArrayOutputStream()
-        f.inputStream().use { input ->
+        NioFiles.newInputStream(pathOf(fileName)).use { input ->
+            val buffer = ByteArray(bufsize.coerceAtLeast(1))
+            var offset = 0L
+            var lineStartOffset = 0L
+            val lineBuffer = java.io.ByteArrayOutputStream()
             while (true) {
                 val bytesRead = input.read(buffer)
                 if (bytesRead == -1) break
@@ -81,32 +118,62 @@ class JvmFileOperations : FileOperations {
     override fun iterateLines(fileName: String, bufsize: Int): Iterable<Join<Long, Series<Byte>>> =
         streamLines(fileName, bufsize).map { (off, arr) -> off j arr.toSeries() }.asIterable()
 
-    override fun listDir(path: String): List<String> =
-        File(path).listFiles()?.map { it.name } ?: emptyList()
-
-    override fun isDir(path: String): Boolean = File(path).isDirectory
-
-    override fun isFile(path: String): Boolean = File(path).isFile
-
-    override fun mkdirs(path: String) { File(path).mkdirs() }
-
-    override fun deleteRecursively(path: String) { File(path).deleteRecursively() }
-
-    override fun resolvePath(vararg parts: String): String {
-        val joined = parts.joinToString(File.separator)
-        return when {
-            joined.startsWith("~") -> joined.replaceFirst("~", System.getProperty("user.home")!!)
-            !java.nio.file.Path.of(joined).isAbsolute -> java.nio.file.Path.of(cwd(), joined).toAbsolutePath().toString()
-            else -> joined
+    override fun listDir(path: String): List<String> {
+        val p = pathOf(path)
+        if (!NioFiles.isDirectory(p)) return emptyList()
+        NioFiles.newDirectoryStream(p).use { stream ->
+            return stream.map { it.fileName.toString() }
         }
     }
 
-    override fun readZip(path: String): List<Pair<String, ByteArray>> = ZipFile(path).use { zip ->
-        zip.entries().asSequence().map { entry ->
-            entry.name to zip.getInputStream(entry).use { it.readBytes() }
-        }.toList()
+    override fun isDir(path: String): Boolean =
+        NioFiles.isDirectory(pathOf(path))
+
+    override fun isFile(path: String): Boolean =
+        NioFiles.isRegularFile(pathOf(path))
+
+    override fun mkdirs(path: String) {
+        NioFiles.createDirectories(pathOf(path))
     }
 
+    override fun deleteRecursively(path: String) {
+        val p = pathOf(path)
+        if (!NioFiles.exists(p)) return
+        NioFiles.walkFileTree(p, object : SimpleFileVisitor<Path>() {
+            override fun visitFile(file: Path, attrs: BasicFileAttributes): FileVisitResult {
+                NioFiles.deleteIfExists(file)
+                return FileVisitResult.CONTINUE
+            }
+
+            override fun postVisitDirectory(dir: Path, exc: java.io.IOException?): FileVisitResult {
+                NioFiles.deleteIfExists(dir)
+                return FileVisitResult.CONTINUE
+            }
+        })
+    }
+
+    override fun resolvePath(vararg parts: String): String {
+        if (parts.isEmpty()) return cwd()
+        var joined = Paths.get(parts[0], *parts.drop(1).toTypedArray())
+        val asString = joined.toString()
+        if (asString.startsWith("~")) {
+            val home = System.getProperty("user.home")
+            joined = Paths.get(asString.replaceFirst("~", home))
+        }
+        return if (joined.isAbsolute) {
+            joined.normalize().toString()
+        } else {
+            Paths.get(cwd()).resolve(joined).normalize().toString()
+        }
+    }
+
+    override fun readZip(path: String): List<Pair<String, ByteArray>> =
+        ZipFile(path).use { zip ->
+            zip.entries().asSequence().map { entry ->
+                entry.name to zip.getInputStream(entry).use { it.readBytes() }
+            }.toList()
+        }
+
     override fun createTempDir(prefix: String): String =
-        java.nio.file.Files.createTempDirectory(prefix).toAbsolutePath().toString()
+        NioFiles.createTempDirectory(prefix).toAbsolutePath().toString()
 }

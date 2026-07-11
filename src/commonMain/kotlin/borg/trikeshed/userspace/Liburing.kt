@@ -1,6 +1,10 @@
 package borg.trikeshed.userspace
 
-/** Result of a single io_uring submission queue entry completion. */
+/**
+ * Result of a single io_uring submission-queue-entry (SQE) completion.
+ *
+ * Single canonical type for userspace. SPI providers return this shape directly.
+ */
 data class UringCompletion(
     val userData: Long,
     val res: Int,
@@ -10,8 +14,8 @@ data class UringCompletion(
 }
 
 /**
- * Canonical userspace liburing facade.
- * Platform bindings are hidden behind LiburingImpl actuals.
+ * Canonical userspace liburing facade. Platform bindings hide behind [LiburingImpl].
+ * `Spi` here is the ServiceLoader SPI marker — implementations are actuals.
  */
 interface LiburingFacade {
     fun open(entries: Int = 2, flags: Int = 0): Result<Unit>
@@ -27,7 +31,13 @@ interface LiburingFacade {
     fun prepSendmsg(fd: Int, msgHdrPtr: Long, flags: Int, userData: Long): Result<Unit>
     fun prepRecvmsg(fd: Int, msgHdrPtr: Long, flags: Int, userData: Long): Result<Unit>
     fun submit(): Result<Int>
-    fun waitCqe(): Result<UringCompletion>
+
+    /**
+     * Drain the CQ, dispatching each [UringCompletion] to handlers registered
+     * via [registerFanoutHandler] for the matching userData token.
+     * Returns the next peek-safe completion (or null) without dequeuing the ring.
+     */
+    fun waitCqe(): Result<UringCompletion?>
     fun peekCqe(): Result<UringCompletion?>
     fun cqAdvance(count: Int)
     fun registerFanoutHandler(token: Long, handler: (UringCompletion) -> Unit)
@@ -36,34 +46,15 @@ interface LiburingFacade {
     fun close(): Result<Unit>
 }
 
+/** Single entry point. Platform binding is in [LiburingImpl] (expect/actual). */
 object Liburing : LiburingFacade by LiburingImpl
 
 internal expect object LiburingImpl : LiburingFacade {
     override fun open(entries: Int, flags: Int): Result<Unit>
-    override fun prepRead(
-        fd: Int,
-        bufAddress: Long,
-        len: Int,
-        offset: Long,
-        userData: Long
-    ): Result<Unit>
-
-    override fun prepWrite(
-        fd: Int,
-        bufAddress: Long,
-        len: Int,
-        offset: Long,
-        userData: Long
-    ): Result<Unit>
-
+    override fun prepRead(fd: Int, bufAddress: Long, len: Int, offset: Long, userData: Long): Result<Unit>
+    override fun prepWrite(fd: Int, bufAddress: Long, len: Int, offset: Long, userData: Long): Result<Unit>
     override fun prepAccept(fd: Int, userData: Long): Result<Unit>
-    override fun prepConnect(
-        fd: Int,
-        addrPtr: Long,
-        addrLen: Int,
-        userData: Long
-    ): Result<Unit>
-
+    override fun prepConnect(fd: Int, addrPtr: Long, addrLen: Int, userData: Long): Result<Unit>
     override fun prepClose(fd: Int, userData: Long): Result<Unit>
     override fun prepFsync(fd: Int, userData: Long, datasync: Boolean): Result<Unit>
     override fun prepFtruncate(fd: Int, size: Long, userData: Long): Result<Unit>
@@ -72,19 +63,11 @@ internal expect object LiburingImpl : LiburingFacade {
     override fun prepSendmsg(fd: Int, msgHdrPtr: Long, flags: Int, userData: Long): Result<Unit>
     override fun prepRecvmsg(fd: Int, msgHdrPtr: Long, flags: Int, userData: Long): Result<Unit>
     override fun submit(): Result<Int>
-    override fun waitCqe(): Result<UringCompletion>
+    override fun waitCqe(): Result<UringCompletion?>
     override fun peekCqe(): Result<UringCompletion?>
     override fun cqAdvance(count: Int)
-    override fun registerFanoutHandler(
-        token: Long,
-        handler: (UringCompletion) -> Unit
-    )
-
-    override fun removeFanoutHandler(
-        token: Long,
-        handler: (UringCompletion) -> Unit
-    )
-
+    override fun registerFanoutHandler(token: Long, handler: (UringCompletion) -> Unit)
+    override fun removeFanoutHandler(token: Long, handler: (UringCompletion) -> Unit)
     override fun drain(): Result<Unit>
     override fun close(): Result<Unit>
 }

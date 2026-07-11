@@ -9,7 +9,8 @@ import borg.trikeshed.userspace.reactor.MuxKeyStatus
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 
-fun <T> Series<T>.iterable(): Iterable<T> = Iterable { (0 until size).map { this[it] }.iterator() }
+/** Lazy iterable — delegates to Series.view, no eager size-N List. */
+fun <T> Series<T>.iterable(): Iterable<T> = view
 
 // ═══════════════════════════════════════════
 // Type algebra
@@ -27,7 +28,7 @@ typealias KeyBinding = Join<KeyPath, KeySource>
 /** The mux itself: ordered bindings + resolver strategy */
 typealias KeyMuxCore = Join<Series<KeyBinding>, KeyResolver>
 
-fun KeyPath.asString(): String = (0 until size).joinToString(".") { this[it] }
+fun KeyPath.asString(): String = view.joinToString(".")
 fun String.toKeyPath(): KeyPath = split(".").toSeries()
 
 // ═══════════════════════════════════════════
@@ -240,8 +241,7 @@ class KeyMux constructor(
 
     suspend fun set(key: String, value: String) {
         val path = key.toKeyPath()
-        for (i in 0 until bindings.size) {
-            val (p, src) = bindings[i]
+        for ((p, src) in bindings.view) {
             if (pathMatch(p, path)) {
                 try { src.write(path, value); return } catch (_: UnsupportedOperationException) { /* skip read-only */ }
             }
@@ -256,18 +256,17 @@ class KeyMux constructor(
 
     private fun pathMatch(binding: KeyPath, query: KeyPath): Boolean {
         if (binding.size > query.size) return false
-        return (0 until binding.size).all { i -> binding[i] == "*" || binding[i] == query[i] }
+        return binding.view.withIndex().all { (i, seg) -> seg == "*" || seg == query[i] }
     }
 
     private suspend fun listRaw(prefix: String): Series<Join<String, String?>> {
         val results = mutableListOf<Join<String, String?>>()
-        for (i in 0 until bindings.size) {
-            val src = bindings[i].b
+        for ((_, src) in bindings.view) {
             if (src is PersistSource) {
-                val fileOps = (src as PersistSource).let { it.explicitFileOps } 
+                val fileOps = src.explicitFileOps
                     ?: currentCoroutineContext()[FileOperations.Key]
                     ?: continue
-                val file = fileOps.resolvePath((src as PersistSource).root, "keymux.conf")
+                val file = fileOps.resolvePath(src.root, "keymux.conf")
                 if (!fileOps.exists(file)) continue
                 val map = defaultCodecRead(fileOps.readAllBytes(file))
                 map.filter { it.key.startsWith(prefix) }.forEach { (k, v) ->

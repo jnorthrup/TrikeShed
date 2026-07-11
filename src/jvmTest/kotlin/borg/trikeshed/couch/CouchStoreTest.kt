@@ -1,5 +1,7 @@
 package borg.trikeshed.couch
 
+import borg.trikeshed.lib.get
+import borg.trikeshed.lib.size
 import org.junit.Assert.*
 import org.junit.Test
 
@@ -97,6 +99,16 @@ class CouchStoreTest {
         val result = store.query()
         assertNotNull(result.cursor)
         assertEquals(3, result.totalCount)
+        assertEquals(3, result.cursor.size)
+        assertEquals(3, result.cursor[0].size)
+        assertEquals("doc-1", result.cursor[0].b(0).a)
+        assertEquals("a", result.cursor[0].b(1).a)
+        assertEquals(1, result.cursor[0].b(2).a)
+
+        val byName = store.query("name", "b")
+        assertEquals(1, byName.totalCount)
+        assertEquals(1, byName.cursor.size)
+        assertEquals("doc-2", byName.cursor[0].b(0).a)
     }
 
     @Test
@@ -131,5 +143,28 @@ class CouchStoreTest {
         store.close()  // should not throw
 
         assertEquals(1, store.size)
+    }
+
+    @Test
+    fun `ViewServer execute store uses query Cursor path`() {
+        val store = CouchStoreFactory.inMemory()
+        store.put(Document("doc-1", listOf(Field("type", "A"), Field("value", 10))))
+        store.put(Document("doc-2", listOf(Field("type", "B"), Field("value", 20))))
+        store.put(Document("doc-3", listOf(Field("type", "A"), Field("value", 30))))
+
+        val viewDef = ViewDefinition(
+            ddoc = "_design/test",
+            viewName = "byType",
+            mapFn = MapFunction.Emit(
+                key = KeyExpr.DocField("type"),
+                value = ValueExpr.Const(1),
+            ),
+        )
+        val result = ViewServer().execute(viewDef, store)
+        assertEquals(3, result.size)
+        val keys = mutableSetOf<Any?>()
+        for (i in 0 until result.size) keys.add(result[i].key)
+        assertTrue("unexpected keys=$keys size=${result.size} sample=${(0 until result.size).map { result[it].key to result[it].docId }}", keys == setOf("A", "B"))
+        assertEquals(3, store.query().cursor.size)
     }
 }

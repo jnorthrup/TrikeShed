@@ -6,6 +6,3 @@ fun loadUserspaceNioSpi(): UserspaceNioSpi =
     ServiceLoader.load(UserspaceNioSpi::class.java).firstOrNull()
         ?: error("No UserspaceNioSpi provider registered in META-INF/services")
 
-fun loadLiburingFacadeSpi(): LiburingFacadeSpi =
-    ServiceLoader.load(LiburingFacadeSpi::class.java).firstOrNull()
-        ?: error("No LiburingFacadeSpi provider registered in META-INF/services")

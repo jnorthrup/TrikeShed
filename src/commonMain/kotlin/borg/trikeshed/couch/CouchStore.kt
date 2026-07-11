@@ -123,25 +123,40 @@ class CouchStore(
     fun ids(): Join<Int, (Int) -> String> = docs.α { it.id }
     
     /**
-     * Query with Confix Cursor — projects documents to a Cursor for CursorOps composition.
-     * 
-     * The returned Cursor has rows = documents, columns = Field(name, value).
-     * Metadata carries TypeMemento for each column.
+     * Query — projects all documents to a Cursor (rows = docs, cols = _id + fields).
      */
     fun query(): QueryResult {
-        // Simplified: return empty cursor for now - core K-V works
-        val emptyCursor: Cursor = 0 j { error("empty cursor") }
-        return QueryResult(emptyCursor, docs.a.toLong())
+        val cursor = buildCursorFromDocs(docs)
+        return QueryResult(cursor, docs.a.toLong())
     }
 
     /** Query by field value equality. */
     fun query(fieldName: String, value: Any): QueryResult {
-        val emptyCursor: Cursor = 0 j { error("empty cursor") }
-        return QueryResult(emptyCursor, 0L)
+        val matched = ArrayList<Document>()
+        for (i in 0 until docs.a) {
+            val doc = docs[i]
+            if (doc.fields.any { it.name == fieldName && it.value == value }) matched.add(doc)
+        }
+        val series: Series<Document> = matched.size j { matched[it] }
+        return QueryResult(buildCursorFromSeries(series), matched.size.toLong())
     }
 
-    private fun buildCursorFromDocs(documents: MutableSeries<Document>): Cursor {
-        return 0 j { error("empty cursor") }
+    private fun buildCursorFromDocs(documents: MutableSeries<Document>): Cursor =
+        buildCursorFromSeries(documents.a j { documents[it] })
+
+    private fun buildCursorFromSeries(documents: Series<Document>): Cursor {
+        if (documents.size == 0) return 0 j { error("empty cursor") }
+        return documents.size j { rowIdx -> documentToRowVec(documents[rowIdx]) }
+    }
+
+    private fun documentToRowVec(doc: Document): RowVec {
+        val n = 1 + doc.fields.size
+        val keys = Array(n) { i -> if (i == 0) "_id" else doc.fields[i - 1].name }
+        val cells = Array<Any?>(n) { i -> if (i == 0) doc.id else doc.fields[i - 1].value }
+        return borg.trikeshed.cursor.cellsToRowVec(
+            n j { cells[it] },
+            n j { keys[it] },
+        )
     }
     /**
      * Subscribe to mutation events.
@@ -217,73 +232,32 @@ object NoOpPersistence : CouchPersistence {
 }
 
 /**
- * JSON file persistence (minimal, single-file append-only log).
- */
-class JsonFilePersistence(private val file: java.io.File) : CouchPersistence {
-    private val json = Json { prettyPrint = true }
-    
-    init {
-        if (!file.exists()) {
-            file.parentFile?.mkdirs()
-            file.createNewFile()
-            file.writeText(json.encodeToString(emptyList<Document>()))
-        }
-    }
-    
-    override fun persist(document: Document) {
-        val list = loadAll().toMutableList()
-        val idx = list.indexOfFirst { it.id == document.id }
-        if (idx >= 0) list[idx] = document else list.add(document)
-        saveAll(list)
-    }
-    
-    override fun delete(docId: String) {
-        val list = loadAll().filter { it.id != docId }
-        saveAll(list)
-    }
-    
-    override fun flush() {} // Write-through on every persist
-    
-    override fun drain() {} // No pending buffer
-    
-    override fun close() {}
-    
-    private fun loadAll(): List<Document> {
-        return try {
-            json.decodeFromString<List<Document>>(file.readText())
-        } catch (e: Exception) {
-            emptyList()
-        }
-    }
-    
-    private fun saveAll(list: List<Document>) {
-        file.writeText(json.encodeToString(list))
-    }
-}
-
-/**
  * Factory functions for CouchStore creation.
+ * File-backed store uses [FileOperations] (userspace.nio) — JVM is only the nio adapter.
  */
 object CouchStoreFactory {
     fun inMemory(): CouchStore = CouchStore(NoOpPersistence)
-    
-    fun withJsonFile(file: java.io.File): CouchStore = CouchStore(JsonFilePersistence(file))
-    
+
     fun withPersistence(persistence: CouchPersistence): CouchStore = CouchStore(persistence)
+
+    fun withJsonFile(path: String, files: borg.trikeshed.userspace.nio.file.spi.FileOperations): CouchStore =
+        CouchStore(JsonFilePersistence(path, files))
 }
 
 /**
  * Extension for Cursor → Document reconstruction.
+ * Known row size — Field list freeze per row (Document takes List).
  */
 fun Cursor.toDocuments(): MutableSeries<Document> {
     val result = mutableSeriesOf<Document>()
-    this.α { row ->
-        val fields = (0 until row.size).map { colIdx ->
-            val value = row.b(colIdx).a ?: ""  // Handle nullable
-            val meta = row.b(colIdx).b()
-            Field(meta.name.toString(), value)
+    for (i in 0 until size) {
+        val row = this[i]
+        val fields = ArrayList<Field>(row.size)
+        for (colIdx in 0 until row.size) {
+            val cell = row.b(colIdx)
+            fields.add(Field(cell.b().name.toString(), cell.a ?: ""))
         }
-        result.append(Document("reconstructed-${row.hashCode()}", fields))
+        result.append(Document("reconstructed-$i", fields))
     }
     return result
 }

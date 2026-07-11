@@ -3,6 +3,8 @@ package borg.trikeshed.parse.confix
 import borg.trikeshed.cursor.IOMemento
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.Twin
+import borg.trikeshed.lib.get
+import borg.trikeshed.lib.size
 
 sealed interface SaxEvent {
     data class Enter(val tag: IOMemento, val offset: Int) : SaxEvent
@@ -10,58 +12,48 @@ sealed interface SaxEvent {
 }
 
 fun ConfixIndex.saxWalk(action: (SaxEvent) -> Unit) {
-    @Suppress("UNCHECKED_CAST")
-    val spans = b(ConfixIndexK.Spans) as Series<Twin<Int>>
-    @Suppress("UNCHECKED_CAST")
-    val tags = b(ConfixIndexK.Tags) as Series<IOMemento>
-    
-    val count = spans.a
+    val spans: Series<Twin<Int>> = facet(ConfixIndexK.Spans)
+    val tags: Series<IOMemento> = facet(ConfixIndexK.Tags)
+    val count = spans.size
     for (i in 0 until count) {
-        val tag = tags.b(i)
-        val twin = spans.b(i)
-        val start = twin.a
-        val end = twin.b
-        
-        action(SaxEvent.Enter(tag, start))
-        action(SaxEvent.Leave(tag, end))
+        val tag = tags[i]
+        val twin = spans[i]
+        action(SaxEvent.Enter(tag, twin.a))
+        action(SaxEvent.Leave(tag, twin.b))
     }
 }
 
 class JaxElement(val tag: IOMemento, val startIndex: Int, val endIndex: Int) {
     val children = mutableListOf<JaxElement>()
     private var backingBytes: ByteArray? = null
-    
+
     fun bytes(): ByteArray {
         return backingBytes ?: ByteArray(0)
     }
-    
+
     companion object {
         fun inflate(index: ConfixIndex, parentTokenIdx: Int, src: Series<Byte>): JaxElement {
-            @Suppress("UNCHECKED_CAST")
-            val spans = index.b(ConfixIndexK.Spans) as Series<Twin<Int>>
-            @Suppress("UNCHECKED_CAST")
-            val tags = index.b(ConfixIndexK.Tags) as Series<IOMemento>
-            @Suppress("UNCHECKED_CAST")
-            val directChildrenFn = index.b(ConfixIndexK.DirectChildren) as (Int) -> Series<Int>
-            
-            if (spans.a == 0) return JaxElement(IOMemento.IoObject, 0, 0)
-            
-            val rootTag = tags.b(parentTokenIdx)
-            val rootTwin = spans.b(parentTokenIdx)
+            val spans: Series<Twin<Int>> = index.facet(ConfixIndexK.Spans)
+            val tags: Series<IOMemento> = index.facet(ConfixIndexK.Tags)
+            val directChildrenFn: (Int) -> Series<Int> = index.facet(ConfixIndexK.DirectChildren)
+
+            if (spans.size == 0) return JaxElement(IOMemento.IoObject, 0, 0)
+
+            val rootTag = tags[parentTokenIdx]
+            val rootTwin = spans[parentTokenIdx]
             val rootStart = rootTwin.a
             val rootEnd = rootTwin.b
-            
             val root = JaxElement(rootTag, rootStart, rootEnd)
-            
+
             val directChildren = directChildrenFn(parentTokenIdx)
-            val childCount = directChildren.a
+            val childCount = directChildren.size
             for (i in 0 until childCount) {
-                val childIdx = directChildren.b(i)
+                val childIdx = directChildren[i]
                 root.children.add(inflate(index, childIdx, src))
             }
-            
+
             val len = rootEnd - rootStart + 1
-            root.backingBytes = if (len > 0) ByteArray(len) { i -> src.b(rootStart + i) } else ByteArray(0)
+            root.backingBytes = if (len > 0) ByteArray(len) { i -> src[rootStart + i] } else ByteArray(0)
             return root
         }
     }

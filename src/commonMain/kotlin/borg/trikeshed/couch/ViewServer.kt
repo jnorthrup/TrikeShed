@@ -220,44 +220,62 @@ sealed interface ReduceFunction {
  */
 class ViewServer {
 
+    /**
+     * Production path: view map over [CouchStore] via [CouchStore.query] Cursor.
+     * Cursor enumerates rows (and _id column); store.get supplies map body.
+     * Closes S5: query algebra with a real consumer outside tests.
+     */
+    fun execute(viewDef: ViewDefinition, store: CouchStore): ViewResult {
+        val qr = store.query()
+        val cursor = qr.cursor
+        require(qr.totalCount == store.size.toLong()) {
+            "query totalCount ${qr.totalCount} != store.size ${store.size}"
+        }
+        require(cursor.size == store.size) {
+            "query cursor.size ${cursor.size} != store.size ${store.size}"
+        }
+        val docs = ArrayList<Document>(cursor.size)
+        for (i in 0 until cursor.size) {
+            val row = cursor[i]
+            require(row.size > 0) { "empty cursor row $i" }
+            val id = row.b(0).a as? String
+                ?: error("query cursor row $i missing _id string, got ${row.b(0).a}")
+            docs.add(store.get(id) ?: error("store missing doc $id from query cursor"))
+        }
+        return execute(viewDef, docs)
+    }
+
     /** Execute a view definition against a list of documents. */
     fun execute(viewDef: ViewDefinition, documents: List<Document>): ViewResult {
         val rows = mutableSeriesOf<ViewRow>()
-        
         for (doc in documents) {
-            val confixDoc = documentToConfixDoc(doc)
-            executeMap(viewDef.mapFn, confixDoc, doc.id, rows)
+            executeMap(viewDef.mapFn, doc, rows)
         }
-        
         var result = ViewResult(rows)
-        
-        // Apply reduce if specified
         viewDef.reduceFn?.let { reduceFn ->
             result = when (reduceFn) {
                 is ReduceFunction.Builtin -> result.reduce(reduceFn.name)
                 is ReduceFunction.Custom -> executeCustomReduce(reduceFn.dsl, result)
             }
         }
-        
         return result
     }
 
-    /** Execute map function for a single document, appending emitted rows. */
-    private fun executeMap(mapFn: MapFunction, doc: ConfixDoc, docId: String, rows: MutableSeries<ViewRow>) {
+    /** Map one [Document] — DocField reads store fields; JsPath uses Confix when needed. */
+    private fun executeMap(mapFn: MapFunction, doc: Document, rows: MutableSeries<ViewRow>) {
         when (mapFn) {
             is MapFunction.Emit -> {
-                val key = evaluateKeyExpr(mapFn.key, doc, docId)
-                val value = evaluateValueExpr(mapFn.value, doc, docId)
-                rows.append(ViewRow(key = key, value = value, docId = docId, jsPath = describeEmit(mapFn)))
+                val key = evaluateKeyExpr(mapFn.key, doc)
+                val value = evaluateValueExpr(mapFn.value, doc)
+                rows.append(ViewRow(key = key, value = value, docId = doc.id, jsPath = describeEmit(mapFn)))
             }
             is MapFunction.EmitEach -> {
-                val arrayValue = doc.value(mapFn.arrayField) as? List<*> ?: return
+                val arrayValue = fieldValue(doc, mapFn.arrayField) as? List<*> ?: return
                 for (item in arrayValue) {
-                    // For EmitEach, the key/value expressions can reference the array item
                     val key = when (mapFn.keyExpr) {
                         is KeyExpr.DocField -> item
                         is KeyExpr.Const -> mapFn.keyExpr.value
-                        is KeyExpr.DocId -> docId
+                        is KeyExpr.DocId -> doc.id
                         is KeyExpr.JsPathExpr -> item
                     }
                     val value = when (mapFn.valueExpr) {
@@ -266,26 +284,27 @@ class ViewServer {
                         is ValueExpr.DocValue -> item
                         is ValueExpr.JsPathExpr -> item
                     }
-                    rows.append(ViewRow(key = key, value = value, docId = docId, jsPath = "${mapFn.arrayField}[]"))
+                    rows.append(ViewRow(key = key, value = value, docId = doc.id, jsPath = "${mapFn.arrayField}[]"))
                 }
             }
         }
     }
 
-    /** Evaluate a key expression against a document. */
-    private fun evaluateKeyExpr(expr: KeyExpr, doc: ConfixDoc, docId: String): Any? = when (expr) {
-        is KeyExpr.DocField     -> doc.value(expr.fieldName)
-        is KeyExpr.DocId        -> docId
-        is KeyExpr.Const        -> expr.value
-        is KeyExpr.JsPathExpr   -> doc.value(expr.path)
+    private fun fieldValue(doc: Document, name: String): Any? =
+        doc.fields.firstOrNull { it.name == name }?.value
+
+    private fun evaluateKeyExpr(expr: KeyExpr, doc: Document): Any? = when (expr) {
+        is KeyExpr.DocField -> fieldValue(doc, expr.fieldName)
+        is KeyExpr.DocId -> doc.id
+        is KeyExpr.Const -> expr.value
+        is KeyExpr.JsPathExpr -> documentToConfixDoc(doc).value(expr.path)
     }
 
-    /** Evaluate a value expression against a document. */
-    private fun evaluateValueExpr(expr: ValueExpr, doc: ConfixDoc, docId: String): Any? = when (expr) {
-        is ValueExpr.DocField   -> doc.value(expr.fieldName)
-        is ValueExpr.DocValue   -> doc
-        is ValueExpr.Const      -> expr.value
-        is ValueExpr.JsPathExpr -> doc.value(expr.path)
+    private fun evaluateValueExpr(expr: ValueExpr, doc: Document): Any? = when (expr) {
+        is ValueExpr.DocField -> fieldValue(doc, expr.fieldName)
+        is ValueExpr.DocValue -> doc
+        is ValueExpr.Const -> expr.value
+        is ValueExpr.JsPathExpr -> documentToConfixDoc(doc).value(expr.path)
     }
 
     /** Generate a JS-path description for an emit operation (for debugging). */

@@ -26,8 +26,9 @@ sealed interface Item {
             }
             return null
         }
-        fun keys(): List<String> = (0 until entries.a).map { entries.b(it).a }
-        fun values(): List<Item> = (0 until entries.a).map { entries.b(it).b }
+        /** Lazy Series — not List via (0 until).map */
+        fun keys(): Series<String> = entries.a j { entries.b(it).a }
+        fun values(): Series<Item> = entries.a j { entries.b(it).b }
         fun containsKey(key: String): Boolean = get(key) != null
     }
 
@@ -97,7 +98,10 @@ fun Item.toAny(): Any? = when (this) {
         }
         m
     }
-    is Item.Arr -> (0 until items.a).map { items.b(it).toAny() }
+    is Item.Arr -> {
+        val n = items.a
+        List(n) { items.b(it).toAny() }  // Any boundary freeze; size known
+    }
     is Item.Tag -> item.toAny()
 }
 

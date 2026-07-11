@@ -47,8 +47,9 @@ fun eigenvalueReduce(series: Series<Map<String, Any?>>, k: Int): Map<String, Any
     val dim = minOf(k, n)
     val matrix = buildSquareMatrix(series, dim)
     val v = powerIteration(matrix)
-    val eigenvalue = v.zip(v).sumOf { (a, b) -> a * b }
-    return mapOf("eigenvector" to v, "eigenvalue" to eigenvalue)
+    var eigenvalue = 0.0
+    for (x in v) eigenvalue += x * x
+    return mapOf("eigenvector" to v.asList(), "eigenvalue" to eigenvalue)
 }
 
 /** K-means reducer: cluster assignments on "v" field. */
@@ -62,65 +63,98 @@ fun kmeansReduce(series: Series<Map<String, Any?>>, k: Int): Map<String, Any> {
 
 // ── Matrix helpers ─────────────────────────────────────────────────────────
 
-private fun buildSquareMatrix(series: Series<Map<String, Any?>>, dim: Int): List<List<Double>> {
+/** Dense matrix for power iter — DoubleArray rows (autovec), not List of Lists. */
+private fun buildSquareMatrix(series: Series<Map<String, Any?>>, dim: Int): Array<DoubleArray> {
     val n = series.a
-    return (0 until minOf(dim, n)).map { i ->
-        (0 until minOf(dim, n)).map { j ->
+    val d = minOf(dim, n)
+    return Array(d) { i ->
+        DoubleArray(d) { j ->
             val idx = i * dim + j
-            if (idx < n) {
-                series[idx]["v"]?.let { (it as? Number)?.toDouble() } ?: 0.0
-            } else 0.0
+            if (idx < n) series[idx]["v"]?.let { (it as? Number)?.toDouble() } ?: 0.0 else 0.0
         }
     }
 }
 
-private fun powerIteration(matrix: List<List<Double>>, iterations: Int = 50): List<Double> {
+private fun powerIteration(matrix: Array<DoubleArray>, iterations: Int = 50): DoubleArray {
     val k = matrix.size
-    if (k == 0) return emptyList()
-    var v = List(k) { 1.0 / k }
+    if (k == 0) return DoubleArray(0)
+    var v = DoubleArray(k) { 1.0 / k }
+    val Av = DoubleArray(k)
     repeat(iterations) {
-        val Av = v.mapIndexed { i, _ ->
-            matrix[i].zip(v).sumOf { (a, b) -> a * b }
+        for (i in 0 until k) {
+            var s = 0.0
+            val row = matrix[i]
+            for (j in 0 until k) s += row[j] * v[j]
+            Av[i] = s
         }
-        val norm = kotlin.math.sqrt(Av.sumOf { it * it })
-        if (norm > 1e-10) v = Av.map { it / norm }
+        var norm = 0.0
+        for (i in 0 until k) norm += Av[i] * Av[i]
+        norm = kotlin.math.sqrt(norm)
+        if (norm > 1e-10) {
+            val inv = 1.0 / norm
+            for (i in 0 until k) v[i] = Av[i] * inv
+        }
     }
     return v
 }
 
-private fun extractValues(series: Series<Map<String, Any?>>): List<Double> =
-    (0 until series.a).map { i ->
+/** One DoubleArray freeze from Series field "v". */
+private fun extractValues(series: Series<Map<String, Any?>>): DoubleArray {
+    val n = series.a
+    return DoubleArray(n) { i ->
         series[i]["v"]?.let { (it as? Number)?.toDouble() } ?: 0.0
     }
+}
 
-private fun kmeansAssign(X: List<Double>, k: Int, maxIter: Int = 20): List<Int> {
-    if (X.isEmpty()) return emptyList()
-    val lo = X.minOrNull() ?: 0.0
-    val hi = X.maxOrNull() ?: 1.0
-    var centroids = (0 until k).map { lo + (hi - lo) * it / k }
-    var assignments = List(X.size) { 0 }
+private fun kmeansAssign(X: DoubleArray, k: Int, maxIter: Int = 20): IntArray {
+    if (X.isEmpty()) return IntArray(0)
+    var lo = X[0]; var hi = X[0]
+    for (x in X) { if (x < lo) lo = x; if (x > hi) hi = x }
+    val centroids = DoubleArray(k) { c -> lo + (hi - lo) * c / k }
+    val assignments = IntArray(X.size)
+    val sums = DoubleArray(k)
+    val counts = IntArray(k)
     repeat(maxIter) {
-        assignments = X.map { x ->
-            centroids.indices.minByOrNull { kotlin.math.abs(x - centroids[it]) } ?: 0
+        for (i in X.indices) {
+            val x = X[i]
+            var best = 0
+            var bestDist = kotlin.math.abs(x - centroids[0])
+            for (c in 1 until k) {
+                val d = kotlin.math.abs(x - centroids[c])
+                if (d < bestDist) { bestDist = d; best = c }
+            }
+            assignments[i] = best
         }
-        centroids = (0 until k).map { c ->
-            val members = assignments.zip(X).filter { it.first == c }.map { it.second }
-            if (members.isEmpty()) centroids[c] else members.sum() / members.size
+        for (c in 0 until k) { sums[c] = 0.0; counts[c] = 0 }
+        for (i in X.indices) {
+            val c = assignments[i]
+            sums[c] += X[i]
+            counts[c]++
+        }
+        for (c in 0 until k) {
+            if (counts[c] > 0) centroids[c] = sums[c] / counts[c]
         }
     }
     return assignments
 }
 
-private fun buildClusterSummary(assignments: List<Int>, values: List<Double>, k: Int): List<Map<String, Any>> =
-    (0 until k).map { cid ->
-        val members = assignments.zip(values).filter { it.first == cid }.map { it.second }
-        val centroid = if (members.isEmpty()) 0.0 else members.sum() / members.size
+private fun buildClusterSummary(assignments: IntArray, values: DoubleArray, k: Int): List<Map<String, Any>> {
+    val sums = DoubleArray(k)
+    val counts = IntArray(k)
+    for (i in assignments.indices) {
+        val c = assignments[i]
+        sums[c] += values[i]
+        counts[c]++
+    }
+    return List(k) { cid ->
+        val centroid = if (counts[cid] == 0) 0.0 else sums[cid] / counts[cid]
         mapOf(
             "clusterId" to cid,
-            "memberCount" to members.size,
+            "memberCount" to counts[cid],
             "centroid" to round(centroid, 6),
         )
     }
+}
 
 private fun round(v: Double, decimals: Int): Double {
     val factor = Math.pow(10.0, decimals.toDouble())
@@ -202,14 +236,16 @@ object Og1RingTool {
     }
 
     fun capture(ringName: String): Map<String, Any?> {
-        // Snapshot: read all events from ring and return them as a flat list
+        // Ring mutates — freeze once into array-backed Series (cap is power-of-2, small).
+        // Series.toList() is AbstractList over that array, not Iterable.view.toList copy.
         val ring = RingRegistry.getOrCreate(ringName)
-        val events = (0 until ring.size).map { ring[it] }
+        val n = ring.size
+        val frozen: Series<Map<String, Any?>> = Array(n) { ring[it] }.toSeries()
         return mapOf(
             "ringName" to ringName,
             "captured" to true,
-            "size" to ring.size,
-            "events" to events,
+            "size" to n,
+            "events" to frozen.toList(),
         )
     }
     fun listRings(): Map<String, Any?> = mapOf("rings" to RingRegistry.names())

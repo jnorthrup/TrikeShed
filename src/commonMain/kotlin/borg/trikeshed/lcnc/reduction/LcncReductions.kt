@@ -63,7 +63,8 @@ object LcncReductions {
                 // Merge all partials into a single accumulator per key
                 val grouped = reduced.groupBy({ it.a }) { it.b }
                 val merged = grouped.map { (key, carrier) ->
-                    val partials = (0 until carrier.size).map { carrier[it] }.toSeries()
+                    // Stay Series: size j oracle over the carrier — no List round-trip.
+                    val partials: Series<MultiMetricAccumulator> = carrier.size j { carrier[it] }
                     key j valueAlg.merger.merge(partials)
                 }
                 return SeriesCarrier(merged.toSeries())

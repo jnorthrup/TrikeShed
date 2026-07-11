@@ -39,8 +39,7 @@ fun ConfixCell.reify(): Any? = row.reify(src)
 typealias ConfixDoc = Join<ConfixIndex, Series<Byte>>
 val ConfixDoc.index: ConfixIndex get() = a
 val ConfixDoc.src: Series<Byte>  @kotlin.jvm.JvmName("getConfixDocSrc") get() = b
-@Suppress("UNCHECKED_CAST")
-val ConfixDoc.roots: Cursor get() = index.b(ConfixIndexK.TreeCursor) as Cursor
+val ConfixDoc.roots: Cursor get() = index.facet(ConfixIndexK.TreeCursor)
 val ConfixDoc.root: RowVec? get() = if (roots.size > 0) roots[0] else null
 
 // ── Parse entry points ─────────────────────────────────────────────────────────
@@ -121,15 +120,13 @@ fun RowVec.reify(src: Series<Byte>): Any? = when (tag) {
     else                            -> src.spanStr(open, close)
 }
 
-@Suppress("UNCHECKED_CAST")
 fun ConfixDoc.reify(tokenIdx: Int): Any? =
-    (index.b(ConfixIndexK.TreeCursor) as Cursor)[tokenIdx].reify(src)
+    index.facet(ConfixIndexK.TreeCursor)[tokenIdx].reify(src)
 
 // ── Flat index navigation (re-exported from Confix.kt) ───────────────────────
 
-@Suppress("UNCHECKED_CAST")
 fun ConfixIndex.valueIndexFor(keyTokenIdx: Int): Int? {
-    val depths = b(ConfixIndexK.Depths) as Series<Int>
+    val depths = facet(ConfixIndexK.Depths)
     val d = depths[keyTokenIdx]
     val total = depths.size
     for (i in keyTokenIdx + 1 until total)
@@ -137,13 +134,11 @@ fun ConfixIndex.valueIndexFor(keyTokenIdx: Int): Int? {
     return null
 }
 
-@Suppress("UNCHECKED_CAST")
 fun ConfixIndex.resolve(key: CharSequence): Int? =
-    (b(ConfixIndexK.KeyToChild) as (CharSequence) -> Int?)(key)?.let { valueIndexFor(it) }
+    facet(ConfixIndexK.KeyToChild)(key)?.let { valueIndexFor(it) }
 
-@Suppress("UNCHECKED_CAST")
 fun ConfixIndex.resolve(parentTokenIdx: Int, arrayIdx: Int): Int? {
-    val ch = (b(ConfixIndexK.DirectChildren) as (Int) -> Series<Int>)(parentTokenIdx)
+    val ch = facet(ConfixIndexK.DirectChildren)(parentTokenIdx)
     return if (arrayIdx < ch.size) ch[arrayIdx] else null
 }
 

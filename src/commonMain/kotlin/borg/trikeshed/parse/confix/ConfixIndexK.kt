@@ -29,3 +29,10 @@ sealed class ConfixIndexK<out R> : OpK<R>() {
     data object TreeCursor     : ConfixIndexK<Cursor>()
     data object KeyToChild     : ConfixIndexK<(CharSequence) -> Int?>()
 }
+
+/**
+ * Typed facet access on ConfixIndex (FacetedRow\<Any\>).
+ * Prefer this over `index.b(key) as T` casts.
+ */
+@Suppress("UNCHECKED_CAST")
+fun <R> ConfixIndex.facet(key: ConfixIndexK<R>): R = b(key as Any) as R

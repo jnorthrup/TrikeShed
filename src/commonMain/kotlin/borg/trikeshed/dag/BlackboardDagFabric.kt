@@ -2,6 +2,8 @@ package borg.trikeshed.dag
 
 import borg.trikeshed.cursor.*
 import borg.trikeshed.lib.Series
+import borg.trikeshed.lib.j
+import borg.trikeshed.lib.size
 
 /**
  * Blackboard and Classfile DAG Fabric — event fabric for the entire system.
@@ -384,14 +386,52 @@ interface CursorFacetTransition {
     fun TODO_getFacets(cursor: Cursor): Series<Any>
 }
 
+// ==================== IN-MEMORY FABRIC ====================
+
+/**
+ * Minimal live blackboard fabric — publish + subscribe + event series.
+ * Stage-12 TODO_* methods on other interfaces remain; this closes the create() hollow.
+ */
+class InMemoryBlackboardFabric : BlackboardFabric {
+    private val events = mutableListOf<BlackboardEvent>()
+    private val handlers = mutableListOf<Pair<String, (BlackboardEvent) -> Unit>>()
+
+    override fun publish(event: BlackboardEvent) {
+        events.add(event)
+        val kind = event::class.simpleName ?: "*"
+        handlers.filter { it.first == "*" || it.first == kind }.forEach { it.second(event) }
+    }
+
+    override fun TODO_subscribe(eventType: String, handler: (BlackboardEvent) -> Unit): Subscription {
+        val entry = eventType to handler
+        handlers.add(entry)
+        val subId = "sub-${handlers.size}-${eventType}"
+        return object : Subscription {
+            override val id: String = subId
+            override val eventType: String = eventType
+            override fun unsubscribe() {
+                handlers.remove(entry)
+            }
+        }
+    }
+
+    override fun TODO_getEvents(from: DagCoordinate, to: DagCoordinate): Series<BlackboardEvent> {
+        val lo = minOf(from.timestamp, to.timestamp)
+        val hi = maxOf(from.timestamp, to.timestamp)
+        val matched = events.filter { it.timestamp in lo..hi }
+        return matched.size j { matched[it] }
+    }
+
+    override fun TODO_projectToUserSignals(event: BlackboardEvent): Series<Any> =
+        1 j { event as Any }
+}
+
 // ==================== FACTORY ====================
 
 /**
  * Factory for blackboard fabric.
  */
 object BlackboardFabrics {
-    /**
-     * Create a new blackboard fabric.
-     */
-    fun create(): BlackboardFabric = TODO("BlackboardFabrics.create: implement in Stage 12")
+    /** Create a new in-memory blackboard fabric. */
+    fun create(): BlackboardFabric = InMemoryBlackboardFabric()
 }

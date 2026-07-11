@@ -256,7 +256,14 @@ actual class FileImpl actual constructor(actual val id: Int) {
         jvmChannel?.close()
         jvmChannel = null
     }
-    actual fun size(): Long = jvmChannel?.size() ?: java.io.File(path).let { if (it.exists()) it.length() else -1L }
+    actual fun size(): Long {
+        jvmChannel?.let { return it.size() }
+        return try {
+            java.nio.file.Files.size(java.nio.file.Paths.get(path))
+        } catch (_: Exception) {
+            -1L
+        }
+    }
 }
 
 internal actual object FilesImpl {
