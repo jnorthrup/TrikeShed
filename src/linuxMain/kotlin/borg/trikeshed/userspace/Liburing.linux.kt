@@ -108,7 +108,7 @@ internal actual object LiburingImpl : LiburingFacade {
         return if (rc < 0) failure("io_uring_submit failed", rc) else Result.success(rc)
     }
 
-    actual override fun waitCqe(): Result<UringCompletion> {
+    actual override fun waitCqe(): Result<UringCompletion?> {
         val currentRing = ring ?: return failure("liburing ring is not open")
         memScoped {
             val cqe = alloc<CPointerVar<io_uring_cqe>>()

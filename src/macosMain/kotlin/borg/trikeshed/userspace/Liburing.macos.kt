@@ -14,7 +14,7 @@ internal actual object LiburingImpl : LiburingFacade {
     actual override fun prepSendmsg(fd: Int, msgHdrPtr: Long, flags: Int, userData: Long): Result<Unit> = unsupported()
     actual override fun prepRecvmsg(fd: Int, msgHdrPtr: Long, flags: Int, userData: Long): Result<Unit> = unsupported()
     actual override fun submit(): Result<Int> = unsupported()
-    actual override fun waitCqe(): Result<UringCompletion> = unsupported()
+    actual override fun waitCqe(): Result<UringCompletion?> = unsupported()
     actual override fun peekCqe(): Result<UringCompletion?> = unsupported()
     actual override fun cqAdvance(count: Int) {}
     actual override fun registerFanoutHandler(token: Long, handler: (UringCompletion) -> Unit) {}
