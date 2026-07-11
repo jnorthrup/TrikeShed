@@ -1,6 +1,6 @@
 package borg.trikeshed.lcnc.reactor
 
-import borg.trikeshed.lcnc.isam.NotionEntity
+import borg.trikeshed.lcnc.isam.LcncEntity
 import borg.trikeshed.lib.Series
 
 /**
@@ -22,19 +22,19 @@ sealed class IngestSource {
  * The expected format of the ingested content.
  */
 enum class IngestFormat {
-    CSV, TSV, MARKDOWN, HTML, JSON, NOTION_NATIVE
+    CSV, TSV, MARKDOWN, HTML, JSON, LCNC_NATIVE
 }
 
 /**
- * A codec capable of decoding an IngestSource into Notion entities.
+ * A codec capable of decoding an IngestSource into Lcnc entities.
  * In the Reactor model, this can be an asynchronous operation yielding events.
  */
 interface IngestCodec {
     val supportedFormats: Set<IngestFormat>
 
     /**
-     * Parses the source and emits a Series of parsed Notion entities.
+     * Parses the source and emits a Series of parsed Lcnc entities.
      * In a full reactive implementation, this might return a Flow or emit via CCEK.
      */
-    suspend fun decode(source: IngestSource, format: IngestFormat): Series<NotionEntity>
+    suspend fun decode(source: IngestSource, format: IngestFormat): Series<LcncEntity>
 }

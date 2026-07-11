@@ -4,12 +4,12 @@ import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.j
 
 /**
- * Represents the associative mapping gems for the Notion taxonomy.
+ * Represents the associative mapping gems for the Lcnc taxonomy.
  * This handles dynamic schemas, properties, and metadata associations.
  */
 
 /**
- * Defines the type of a property (column) in a Notion Database.
+ * Defines the type of a property (column) in a Lcnc Database.
  */
 enum class PropertyType {
     TITLE, TEXT, NUMBER, SELECT, MULTI_SELECT, DATE, PEOPLE, FILES, CHECKBOX, URL, EMAIL, PHONE_NUMBER, FORMULA, RELATION, ROLLUP, CREATED_TIME, CREATED_BY, LAST_EDITED_TIME, LAST_EDITED_BY
@@ -27,7 +27,7 @@ data class PropertySchema(
 )
 
 /**
- * Represents the schema of an entire Notion Database.
+ * Represents the schema of an entire Lcnc Database.
  * Maps property names or IDs to their schemas.
  */
 data class DatabaseSchema(
@@ -35,7 +35,7 @@ data class DatabaseSchema(
 )
 
 /**
- * Represents a concrete value for a specific property on a Notion Page.
+ * Represents a concrete value for a specific property on a Lcnc Page.
  */
 data class PropertyValue(
     val propertyId: String,
@@ -45,7 +45,7 @@ data class PropertyValue(
 )
 
 /**
- * Represents the associative collection of all properties for a single Notion Page.
+ * Represents the associative collection of all properties for a single Lcnc Page.
  */
 data class PageProperties(
     // Maps property ID to the PropertyValue
