@@ -2,10 +2,12 @@ package borg.trikeshed.userspace.context
 
 /* Compatibility layer: reuse the shared (libs/common) AsyncContextElement and ElementState
    definitions to avoid duplicate interfaces across packages. This file provides thin
-   aliases and subclasses so userspace code can depend on borg.trikeshed.userspace.context
-   while the canonical implementations live under borg.trikeshed.context. */
+   type aliases so userspace code can depend on borg.trikeshed.userspace.context
+   while the canonical implementations live under borg.trikeshed.context and
+   borg.trikeshed.userspace. */
 
-import borg.trikeshed.context.*
+import borg.trikeshed.context.AsyncContextElement
+import borg.trikeshed.context.ElementState
 import kotlin.coroutines.CoroutineContext
 
 /** Alias to canonical ElementState from borg.trikeshed.context */
@@ -14,14 +16,11 @@ typealias ElementLifecycleState = ElementState
 /** Alias to canonical AsyncContextElement implementation */
 typealias AsyncContextElement = borg.trikeshed.context.AsyncContextElement
 
-/**
- * Subclass the canonical NioUserspaceElement so callers may extend it inside the
- * userspace package without reimplementing lifecycle semantics.
- */
-open class NioUserspaceElement : borg.trikeshed.context.NioUserspaceElement() {
-    override val key: CoroutineContext.Key<*> get() = AsyncContextKey.NioUserspaceKey
-}
+/** Type alias for NioUserspaceElement from the canonical context package */
+typealias NioUserspaceElement = borg.trikeshed.context.NioUserspaceElement
 
-open class FanoutDispatcherElement : borg.trikeshed.context.FanoutDispatcherElement() {
-    override val key: CoroutineContext.Key<*> get() = AsyncContextKey.FanoutDispatcherKey
-}
+/** Type alias for LiburingElement from the userspace package */
+typealias LiburingElement = borg.trikeshed.userspace.LiburingElement
+
+/** Type alias for FanoutDispatcherElement from the reactor package */
+typealias FanoutDispatcherElement = borg.trikeshed.userspace.reactor.FanoutDispatcherElement

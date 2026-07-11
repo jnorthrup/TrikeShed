@@ -12,7 +12,7 @@ import kotlin.coroutines.CoroutineContext
  * Fanout dispatcher CCEK element for liburing completion dispatch.
  * Moved here from userspace/LiburingElement.kt for proper package organization.
  */
-class FanoutDispatcherElement(
+open class FanoutDispatcherElement(
     parentJob: Job? = null,
 ) : AsyncContextElement(ElementState.CREATED, parentJob) {
 
@@ -23,6 +23,7 @@ class FanoutDispatcherElement(
     /** Register a handler for completions with the given userData token. */
     fun registerHandler(userData: Long, handler: (UringCompletion) -> Unit) {
         handlers.getOrPut(userData) { mutableListOf() }.add(handler)
+        // Also register with liburing facade
         Liburing.registerFanoutHandler(userData, handler)
     }
 

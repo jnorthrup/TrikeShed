@@ -19,6 +19,7 @@ abstract class AsyncContextElement(
     initialState: ElementState = CREATED,
     parentJob: Job? = null
 ) : CoroutineContext.Element {
+
     /** Parent job passed to the internal SupervisorJob, or null. */
     protected val parentJob: Job? = parentJob
 
@@ -37,6 +38,9 @@ abstract class AsyncContextElement(
      * channelized completions from this element.
      */
     open val fanoutSubscribers: List<AsyncContextElement> = emptyList()
+
+    /** Abstract key property that must be implemented by subclasses. */
+    abstract override val key: CoroutineContext.Key<*>
 
     /** Transition CREATED -> OPEN. Idempotent if already OPEN or later. */
     open suspend fun open() {

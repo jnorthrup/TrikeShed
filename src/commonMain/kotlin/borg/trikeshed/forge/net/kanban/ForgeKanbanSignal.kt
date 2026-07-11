@@ -1,15 +1,6 @@
-package borg.trikeshed.userspace.reactor
+package borg.trikeshed.forge.net.kanban
 
-import borg.trikeshed.userspace.FanoutEvent
-
-const val HTX_PLANNING_EVENT_TYPE: Int = 0x485458
-
-/**
- * Stable, planning-oriented vocabulary between HTX/CCEK fanout and Hermes Kanban.
- *
- * HTX publishes planning-worthy facts; Hermes owns task lifecycle and decomposition.
- */
-sealed interface HtxPlanningSignal {
+sealed interface ForgeKanbanSignal {
     val idempotencyKey: String
     val title: String
     val body: String
@@ -21,7 +12,7 @@ sealed interface HtxPlanningSignal {
         override val body: String,
         override val metadata: Map<String, String>,
         val workspace: String,
-    ) : HtxPlanningSignal
+    ) : ForgeKanbanSignal
 
     data class ProgressNote(
         override val idempotencyKey: String,
@@ -29,7 +20,7 @@ sealed interface HtxPlanningSignal {
         override val body: String,
         override val metadata: Map<String, String>,
         val taskId: String,
-    ) : HtxPlanningSignal
+    ) : ForgeKanbanSignal
 
     data class NeedsHuman(
         override val idempotencyKey: String,
@@ -38,7 +29,7 @@ sealed interface HtxPlanningSignal {
         override val metadata: Map<String, String>,
         val taskId: String,
         val reason: String,
-    ) : HtxPlanningSignal
+    ) : ForgeKanbanSignal
 
     data class Resolved(
         override val idempotencyKey: String,
@@ -47,16 +38,10 @@ sealed interface HtxPlanningSignal {
         override val metadata: Map<String, String>,
         val taskId: String,
         val summary: String,
-    ) : HtxPlanningSignal
+    ) : ForgeKanbanSignal
 }
 
-/**
- * Typed HTX-side planning facts published through the reactor fanout.
- *
- * These are deliberately coarse-grained. They are what the HTX side knows after
- * protocol normalization, before Hermes turns them into board mutations.
- */
-sealed interface HtxPlanningEvent : FanoutEvent {
+sealed interface ForgeKanbanEvent : borg.trikeshed.userspace.FanoutEvent {
     val connectionId: String
     val streamId: String
     val sequence: Long
@@ -66,7 +51,7 @@ sealed interface HtxPlanningEvent : FanoutEvent {
     val dedupeKey: String?
 
     override val eventType: Int
-        get() = HTX_PLANNING_EVENT_TYPE
+        get() = 0x464F5247 // "FORG" in hex
 
     data class IntentDetected(
         override val connectionId: String,
@@ -77,7 +62,7 @@ sealed interface HtxPlanningEvent : FanoutEvent {
         override val metadata: Map<String, String> = emptyMap(),
         override val dedupeKey: String? = null,
         val workspace: String,
-    ) : HtxPlanningEvent
+    ) : ForgeKanbanEvent
 
     data class ProgressObserved(
         override val connectionId: String,
@@ -88,7 +73,7 @@ sealed interface HtxPlanningEvent : FanoutEvent {
         override val metadata: Map<String, String> = emptyMap(),
         override val dedupeKey: String? = null,
         val taskId: String,
-    ) : HtxPlanningEvent
+    ) : ForgeKanbanEvent
 
     data class HumanInterventionRequired(
         override val connectionId: String,
@@ -100,7 +85,7 @@ sealed interface HtxPlanningEvent : FanoutEvent {
         override val dedupeKey: String? = null,
         val taskId: String,
         val reason: String,
-    ) : HtxPlanningEvent
+    ) : ForgeKanbanEvent
 
     data class ResolutionObserved(
         override val connectionId: String,
@@ -112,5 +97,5 @@ sealed interface HtxPlanningEvent : FanoutEvent {
         override val dedupeKey: String? = null,
         val taskId: String,
         val summary: String,
-    ) : HtxPlanningEvent
+    ) : ForgeKanbanEvent
 }

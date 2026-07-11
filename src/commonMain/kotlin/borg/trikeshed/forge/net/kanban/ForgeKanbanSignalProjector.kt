@@ -1,14 +1,14 @@
-package borg.trikeshed.userspace.reactor
+package borg.trikeshed.forge.net.kanban
 
 import borg.trikeshed.userspace.FanoutEvent
 
 /**
- * Projects HTX fanout facts into sink-facing planning signals.
+ * Projects Forge Kanban fanout facts into sink-facing signals.
  */
-class HtxPlanningSignalProjector {
+class ForgeKanbanSignalProjector {
 
-    fun project(event: FanoutEvent): HtxPlanningSignal? = when (event) {
-        is HtxPlanningEvent.IntentDetected -> HtxPlanningSignal.NewIntent(
+    fun project(event: FanoutEvent): ForgeKanbanSignal? = when (event) {
+        is ForgeKanbanEvent.IntentDetected -> ForgeKanbanSignal.NewIntent(
             idempotencyKey = event.dedupeKey ?: idempotencyKeyFor(event.connectionId, event.streamId, event.sequence),
             title = event.title,
             body = renderBody(event.detail, metadataFor(event)),
@@ -16,7 +16,7 @@ class HtxPlanningSignalProjector {
             workspace = event.workspace,
         )
 
-        is HtxPlanningEvent.ProgressObserved -> HtxPlanningSignal.ProgressNote(
+        is ForgeKanbanEvent.ProgressObserved -> ForgeKanbanSignal.ProgressNote(
             idempotencyKey = event.dedupeKey ?: idempotencyKeyFor(event.connectionId, event.streamId, event.sequence),
             title = event.title,
             body = renderBody(event.detail, metadataFor(event)),
@@ -24,7 +24,7 @@ class HtxPlanningSignalProjector {
             taskId = event.taskId,
         )
 
-        is HtxPlanningEvent.HumanInterventionRequired -> HtxPlanningSignal.NeedsHuman(
+        is ForgeKanbanEvent.HumanInterventionRequired -> ForgeKanbanSignal.NeedsHuman(
             idempotencyKey = event.dedupeKey ?: idempotencyKeyFor(event.connectionId, event.streamId, event.sequence),
             title = event.title,
             body = renderBody(event.detail, metadataFor(event)),
@@ -33,7 +33,7 @@ class HtxPlanningSignalProjector {
             reason = event.reason,
         )
 
-        is HtxPlanningEvent.ResolutionObserved -> HtxPlanningSignal.Resolved(
+        is ForgeKanbanEvent.ResolutionObserved -> ForgeKanbanSignal.Resolved(
             idempotencyKey = event.dedupeKey ?: idempotencyKeyFor(event.connectionId, event.streamId, event.sequence),
             title = event.title,
             body = renderBody(event.detail, metadataFor(event)),
@@ -45,7 +45,7 @@ class HtxPlanningSignalProjector {
         else -> null
     }
 
-    private fun metadataFor(event: HtxPlanningEvent): Map<String, String> = buildMap {
+    private fun metadataFor(event: ForgeKanbanEvent): Map<String, String> = buildMap {
         putAll(event.metadata)
         put("connectionId", event.connectionId)
         put("streamId", event.streamId)
@@ -74,6 +74,6 @@ class HtxPlanningSignalProjector {
 
     companion object {
         fun idempotencyKeyFor(connectionId: String, streamId: String, sequence: Long): String =
-            "htx:$connectionId:$streamId:$sequence"
+            "forge:$connectionId:$streamId:$sequence"
     }
 }

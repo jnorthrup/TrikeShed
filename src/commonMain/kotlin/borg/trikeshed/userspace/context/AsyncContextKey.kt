@@ -1,5 +1,6 @@
 package borg.trikeshed.userspace.context
 
+import borg.trikeshed.userspace.reactor.FanoutDispatcherElement
 import kotlin.coroutines.CoroutineContext
 
 /**
