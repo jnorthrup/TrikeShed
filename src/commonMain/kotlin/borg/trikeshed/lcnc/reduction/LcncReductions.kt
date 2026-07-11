@@ -97,8 +97,16 @@ object LcncReductions {
         }
 
         val valueAlg = object : ValueAlg<Byte, TreeBuilderState> {
-            override val folder: Folder<Byte, TreeBuilderState> = Folder { acc, _ -> acc }
-            override val merger: Merger<TreeBuilderState> = Merger { partials -> partials[0] }
+            override val folder: Folder<Byte, TreeBuilderState> = object : Folder<Byte, TreeBuilderState> {
+                val scanFolder = ConfixReducers.Scan0Folder()
+                val buildFolder = ConfixReducers.BuildTreeFolder()
+
+                override fun fold(acc: TreeBuilderState, input: Byte): TreeBuilderState {
+                    val tokens = scanFolder.fold(emptyList(), input)
+                    return tokens.fold(acc) { state, token -> buildFolder.fold(state, token) }
+                }
+            }
+            override val merger: Merger<TreeBuilderState> = ConfixReducers.TreeBuilderMerger()
             override val initial: TreeBuilderState = TreeBuilderState()
         }
 
