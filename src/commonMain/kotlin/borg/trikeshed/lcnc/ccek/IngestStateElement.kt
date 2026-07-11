@@ -1,6 +1,6 @@
 package borg.trikeshed.lcnc.ccek
 
-import borg.trikeshed.lcnc.isam.NotionEntity
+import borg.trikeshed.lcnc.isam.LcncEntity
 import borg.trikeshed.lib.Series
 import kotlin.coroutines.AbstractCoroutineContextElement
 import kotlin.coroutines.CoroutineContext
@@ -21,12 +21,12 @@ class IngestStateElement(
 
     // Internal state holding the parsed entities so far.
     // In a real system, this might use a mutable thread-safe structure or Channel.
-    private val parsedEntities = mutableListOf<NotionEntity>()
+    private val parsedEntities = mutableListOf<LcncEntity>()
 
     /**
      * Called by codecs to publish a newly parsed entity into the context scope.
      */
-    fun publishEntity(entity: NotionEntity) {
+    fun publishEntity(entity: LcncEntity) {
         parsedEntities.add(entity)
         // Here we could fan out to a PointcutEventProducer or other bus
     }
@@ -34,7 +34,7 @@ class IngestStateElement(
     /**
      * Retrieves all entities parsed within this context.
      */
-    fun getEntities(): List<NotionEntity> = parsedEntities.toList()
+    fun getEntities(): List<LcncEntity> = parsedEntities.toList()
 
     companion object Key : CoroutineContext.Key<IngestStateElement>
 }
@@ -44,7 +44,7 @@ class IngestStateElement(
  */
 suspend inline fun publishIngestedEntity(
     context: CoroutineContext,
-    entity: NotionEntity
+    entity: LcncEntity
 ) {
     context[IngestStateElement]?.publishEntity(entity)
 }
