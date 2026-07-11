@@ -1,5 +1,6 @@
 package borg.trikeshed.userspace.context
 
+import borg.trikeshed.context.AsyncContextElement as CanonicalAsyncContextElement
 import kotlin.coroutines.CoroutineContext
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -78,7 +79,7 @@ class AsyncContextKeyElementTest {
    fun makeNioElement(state: ElementLifecycleState = ElementLifecycleState.CREATED) =
         object : NioUserspaceElement() {
             override val lifecycleState = state
-            override val fanoutSubscribers = emptyList<AsyncContextElement>()
+            override val fanoutSubscribers = emptyList<CanonicalAsyncContextElement>()
             override suspend fun open() {}
             override suspend fun drain() {}
             override suspend fun close() {}
@@ -87,7 +88,7 @@ class AsyncContextKeyElementTest {
    fun makeFanoutElement() =
         object : FanoutDispatcherElement() {
             override val lifecycleState = ElementLifecycleState.CREATED
-            override val fanoutSubscribers = emptyList<AsyncContextElement>()
+            override val fanoutSubscribers = emptyList<CanonicalAsyncContextElement>()
             override suspend fun open() {}
             override suspend fun drain() {}
             override suspend fun close() {}
