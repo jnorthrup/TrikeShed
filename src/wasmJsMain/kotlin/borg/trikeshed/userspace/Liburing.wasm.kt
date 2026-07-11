@@ -12,7 +12,7 @@ internal actual object LiburingImpl : LiburingFacade {
     actual override fun prepMmap(fd: Int, addr: Long, len: Int, prot: Int, flags: Int, offset: Long, userData: Long): Result<Unit> = unsupported()
     actual override fun prepMunmap(addr: Long, len: Int, userData: Long): Result<Unit> = unsupported()
     actual override fun submit(): Result<Int> = unsupported()
-    actual override fun waitCqe(): Result<UringCompletion> = unsupported()
+    actual override fun waitCqe(): Result<UringCompletion?> = unsupported()
     actual override fun peekCqe(): Result<UringCompletion?> = unsupported()
     actual override fun cqAdvance(count: Int) {}
     actual override fun registerFanoutHandler(token: Long, handler: (UringCompletion) -> Unit) {}
