@@ -94,6 +94,7 @@ object WebSocketFrame {
             }
 
             result.headerBytes = buf.pos - mark
+            if (buf.rem < result.payloadLength) { buf.pos = mark; return false }
             return true
         } catch (_: IndexOutOfBoundsException) {
             buf.pos = mark
