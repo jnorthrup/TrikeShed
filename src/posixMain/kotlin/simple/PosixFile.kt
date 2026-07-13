@@ -113,16 +113,6 @@ class PosixFile(
     */
 
     override fun write64(buf: ByteArray): ULong {
-//        val b: Long = buf.pin().objcPtr().toLong()
-//        val write = write(fd, b.toCPointer<ByteVar>()!!, buf.size.toULong())
-//        HasPosixErr.posixRequires(write >= 0) { "write failed with result ${HasPosixErr.reportErr(write.toInt())}" }
-//        return write.toULong()
-//      ---  produces
-//        	at <global>.ThrowNullPointerException(Unknown Source)
-//	at simple.PosixFile#write64(Unknown Source)
-//	at borg.trikeshed.native.HasDescriptor#write(Unknown Source)
-
-        //rewrite with very verbose debug{} blocks and logdebug{ progress}
         val addressOf = buf.pin().addressOf(0)
         val b: CArrayPointer<ByteVar> = addressOf.reinterpret()
         val write = write(fd, b, buf.size.toULong())
