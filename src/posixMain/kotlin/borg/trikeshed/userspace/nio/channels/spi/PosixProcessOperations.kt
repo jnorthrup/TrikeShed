@@ -14,57 +14,82 @@ class PosixProcessOperations : ProcessOperations {
         env: Map<String, String>,
     ): ProcessResult {
         val stdinPath = stdin?.let { createTempFile(it) }
-        val stderrPath = createTempFile(byteArrayOf())
-            ?: return ProcessResult(-1, byteArrayOf(), "mkstemp(stderr) failed".encodeToByteArray())
-
-        val shellCommand = buildCommand(command, args, env, stdinPath, stderrPath)
-        val fp = popen(shellCommand, "r")
-            ?: return ProcessResult(-1, byteArrayOf(), "popen() failed".encodeToByteArray()).also {
+        val stdoutPath = createTempFile(byteArrayOf())
+            ?: return ProcessResult(-1, byteArrayOf(), "mkstemp(stdout) failed".encodeToByteArray()).also {
                 stdinPath?.let(::unlink)
-                unlink(stderrPath)
+            }
+        val stderrPath = createTempFile(byteArrayOf())
+            ?: return ProcessResult(-1, byteArrayOf(), "mkstemp(stderr) failed".encodeToByteArray()).also {
+                stdinPath?.let(::unlink)
+                unlink(stdoutPath)
             }
 
-        val stdout = readPipe(fp)
-        val raw = pclose(fp)
+        val exitCode = memScoped {
+            val pid = alloc<pid_tVar>()
+            val actions = alloc<posix_spawn_file_actions_t>()
+            posix_spawn_file_actions_init(actions.ptr)
+
+            if (stdinPath != null) {
+                posix_spawn_file_actions_addopen(
+                    actions.ptr, STDIN_FILENO, stdinPath, O_RDONLY, 0u
+                )
+            }
+
+            // 420u is 0644 octal (S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)
+            val mode = (S_IRUSR or S_IWUSR or S_IRGRP or S_IROTH).toUInt()
+            posix_spawn_file_actions_addopen(
+                actions.ptr, STDOUT_FILENO, stdoutPath, O_WRONLY or O_CREAT or O_TRUNC, mode
+            )
+
+            posix_spawn_file_actions_addopen(
+                actions.ptr, STDERR_FILENO, stderrPath, O_WRONLY or O_CREAT or O_TRUNC, mode
+            )
+
+            // We use 'env' to set environment variables and inherit the rest, similar to the original behavior
+            val argv = allocArray<CPointerVar<ByteVar>>(env.size + args.size + 3)
+            var argIndex = 0
+
+            argv[argIndex++] = "env".cstr.ptr
+            env.forEach { (key, value) ->
+                argv[argIndex++] = "$key=$value".cstr.ptr
+            }
+            argv[argIndex++] = command.cstr.ptr
+            args.forEach { arg ->
+                argv[argIndex++] = arg.cstr.ptr
+            }
+            argv[argIndex] = null
+
+            // Pass environ for envp to inherit the current environment (which 'env' will then augment)
+            val spawnResult = posix_spawnp(pid.ptr, "env", actions.ptr, null, argv, platform.posix.environ)
+            posix_spawn_file_actions_destroy(actions.ptr)
+
+            if (spawnResult != 0) {
+                return@memScoped -1
+            }
+
+            val status = alloc<IntVar>()
+            var waitRes: Int
+            do {
+                waitRes = waitpid(pid.value, status.ptr, 0)
+            } while (waitRes == -1 && errno == EINTR)
+
+            if ((status.value and 0x7F) == 0) {
+                // WIFEXITED
+                (status.value shr 8) and 0xFF
+            } else {
+                -1
+            }
+        }
+
+        val stdout = readFile(stdoutPath)
         val stderr = readFile(stderrPath)
 
         stdinPath?.let(::unlink)
+        unlink(stdoutPath)
         unlink(stderrPath)
 
-        val exitCode = if (raw < 0) raw else raw ushr 8
         return ProcessResult(exitCode, stdout, stderr)
     }
-
-    private fun buildCommand(
-        command: String,
-        args: List<String>,
-        env: Map<String, String>,
-        stdinPath: String?,
-        stderrPath: String,
-    ): String = buildString {
-        if (env.isNotEmpty()) {
-            env.forEach { (key, value) ->
-                append(key)
-                append('=')
-                append(shellQuote(value))
-                append(' ')
-            }
-        }
-        append(shellQuote(command))
-        args.forEach { arg ->
-            append(' ')
-            append(shellQuote(arg))
-        }
-        if (stdinPath != null) {
-            append(" < ")
-            append(shellQuote(stdinPath))
-        }
-        append(" 2> ")
-        append(shellQuote(stderrPath))
-    }
-
-    private fun shellQuote(value: String): String =
-        "'" + value.replace("'", "'\"'\"'") + "'"
 
     private fun createTempFile(bytes: ByteArray): String? = memScoped {
         val template = "/tmp/trikeshed-process-XXXXXX".cstr.placeTo(this)
@@ -88,19 +113,6 @@ class PosixProcessOperations : ProcessOperations {
         }
         close(fd)
         return template.toKString()
-    }
-
-    private fun readPipe(fp: CPointer<FILE>): ByteArray = memScoped {
-        val out = ByteAccumulator()
-        val buf = allocArray<ByteVar>(4096)
-        while (true) {
-            val read = fread(buf, 1.convert(), 4096.convert(), fp).toInt()
-            if (read <= 0) {
-                break
-            }
-            out.append(buf, read)
-        }
-        out.toByteArray()
     }
 
     private fun readFile(path: String): ByteArray {
