@@ -212,7 +212,7 @@ val jvmMain = getByName("jvmMain") {
 // ─────────────────────────────────────────────────────────────────
 
 // 1. Force explicit tasks instead of dynamic property creation
-tasks.register("kmpPartiallyResolvedDependenciesChecker") {
+tasks.register("kmpPartiallyResolvedDependenciesCheckerIgnore") {
     doLast { }
 }
 
