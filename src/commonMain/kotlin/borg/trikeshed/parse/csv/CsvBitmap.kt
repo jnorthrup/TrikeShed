@@ -121,16 +121,3 @@ object CsvBitmap {
     }
 }
 
-//
-//class TestCsvBitmap {
-//    @OptIn(ExperimentalUnsignedTypes::class)
-//    @Test
-//    fun testAbitOfEverythingCsv() {
-//        val lines =
-//            Files.readAllLines("src/commonTest/resources/hi.csv").map { it.encodeToByteArray().toUByteArray() }
-//
-//        for (line in lines) {
-//            val encode = CsvBitmap.encode(line)
-//        }
-//    }
-//}
