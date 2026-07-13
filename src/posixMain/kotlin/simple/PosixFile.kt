@@ -485,27 +485,28 @@ class PosixFile(
         fun exists(fname: String): Boolean = access(fname, F_OK).z
 
         /** lean on getline to read a file into a sequence of CharSeries */
-        fun readLinesSeq(path: String): Sequence<String> = sequence {
-            val fp = fopen(path, "r") ?: return@sequence
+        fun readLinesSeq(path: String): Sequence<String> = memScoped {
+            val file = PosixFile(path)
+            val fp = fdopen(file.fd, "r")
             try {
-                val line: CPointerVarOf<CPointer<ByteVarOf<Byte>>> = nativeHeap.alloc()
-                val len: ULongVarOf<size_t> = nativeHeap.alloc()
+                val line: CPointerVarOf<CPointer<ByteVarOf<Byte>>> = alloc()
+                val len: ULongVarOf<size_t> = alloc()
                 line.value = null
                 len.value = 0u
                 try {
-                    while (true) {
-                        val read = getline(line.ptr, len.ptr, fp)
-                        if (read == -1L) break
-                        yield(line.value!!.toKString().trim())
-                    }
-                    if (ferror(fp) != 0) {
-                        perror("ferror")
-                        exit(1)
+                    sequence {
+                        while (true) {
+                            val read = getline(line.ptr, len.ptr, fp)
+                            if (read == -1L) break
+                            yield(line.value!!.toKString().trim())
+                        }
+                        if (ferror(fp) != 0) {
+                            perror("ferror")
+                            exit(1)
+                        }
                     }
                 } finally {
                     free(line.value)
-                    nativeHeap.free(line)
-                    nativeHeap.free(len)
                 }
             } finally {
                 fclose(fp)
@@ -513,8 +514,9 @@ class PosixFile(
         }
 
         fun readLines(path: String): List<String> = memScoped {
-            val fp = fopen(path, "r")
-            HasPosixErr.posixRequires(fp != null) { "fopen $path" }
+            val file = PosixFile(path)
+            val fp = fdopen(file.fd, "r")
+            HasPosixErr.posixRequires(fp != null) { "fdopen $path" }
             try {
                 val line: CPointerVarOf<CPointer<ByteVarOf<Byte>>> = alloc()
                 val len: ULongVarOf<size_t> = alloc()
@@ -537,7 +539,6 @@ class PosixFile(
                 fclose(fp)
             }
         }
-
         fun readAllBytes(filename: String): ByteArray = memScoped {
             val file = PosixFile(filename)
             val stat = statk(filename)
