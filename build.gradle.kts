@@ -397,17 +397,3 @@ tasks.register<JavaExec>("benchmarkVector") {
     dependsOn("jvmJar")
     mainClass.set("borg.trikeshed.lib.VectorBenchmarkRunner")
     classpath(tasks.named("jvmJar"), configurations.getByName("jvmRuntimeClasspath"))
-}
-
-tasks.register<JavaExec>("benchmarkMath") {
-    dependsOn(":compileKotlinJvm")
-    mainClass.set("org.openjdk.jmh.Main")
-    classpath(tasks.named("jvmJar"), configurations.named("jvmRuntimeClasspath"))
-    args("MathJoinBenchmark", "-wi", "5", "-i", "10", "-f", "1")
-}
-
-tasks.register<JavaExec>("benchmarkConfix") {
-    dependsOn("jvmJar")
-    mainClass.set("borg.trikeshed.parse.confix.ConfixBenchmarkRunner")
-    classpath(tasks.named("jvmJar"), configurations.getByName("jvmRuntimeClasspath"))
-}
