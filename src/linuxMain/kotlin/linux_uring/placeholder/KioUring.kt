@@ -1,6 +1,5 @@
 package linux_uring.placeholder
 
-
 import borg.trikeshed.lib.CZero.nz
 import borg.trikeshed.lib.CZero.z
 import borg.trikeshed.native.HasPosixErr.Companion.posixRequires
@@ -28,7 +27,7 @@ import simple.LinuxPosixFile.Companion.namedDirAndFile
 import simple.PosixStatMode
 import kotlin.math.min
 import platform.posix.free as posix_free
-import platform.posix.fstat as posix_fstat
+
 import platform.posix.ioctl as posix_ioctl
 import platform.posix.mmap as posix_mmap
 import platform.posix.off_t as posix_off_t
@@ -231,7 +230,7 @@ fun io_uring_enter(ring_fd: Int, to_submit: UInt, min_complete: UInt, flags: UIn
  *  Properly handles regular file and block devices as well. Pretty. */
 fun get_file_size(fd: Int): posix_off_t = memScoped {
     val st: platform.posix.stat = alloc()
-    if (posix_fstat(fd, st.ptr as CValuesRef<platform.posix.stat>) >= 0) {
+    if (platform.posix.fstat(fd, st.ptr as CValuesRef<platform.posix.stat>) >= 0) {
         if (PosixStatMode.S_ISBLK(st.st_mode)) {
             return getBlockDeviceBlockSize(fd)
         } else posixRequires(PosixStatMode.S_ISREG(st.st_mode)) { "file handle invalid" }
@@ -334,11 +333,9 @@ fun io_uring_params.asString(): String =
         UringSetupFlags.fromInt(flags)
     } resv: $resv sq_entries: $sq_entries sq_off: $sq_off sq_thread_cpu: $sq_thread_cpu sq_thread_idle: $sq_thread_idle wq_fd: $wq_fd"
 
-
 fun io_uring_cqe.asString(): String {
     return "cqe:{ flags: $flags res: $res user_data: $user_data }"
 }
-
 
 fun io_uring.asString(): String = memScoped {
     val ss = sequence {
