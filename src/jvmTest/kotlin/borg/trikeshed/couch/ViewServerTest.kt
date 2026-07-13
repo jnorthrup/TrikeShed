@@ -1,9 +1,11 @@
 package borg.trikeshed.couch
 
 import borg.trikeshed.parse.confix.confixDoc
+import kotlin.test.assertFailsWith
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+
 
 class ViewServerTest {
 
@@ -263,5 +265,24 @@ class ViewServerTest {
         assertEquals("k1", result[0].key)
         assertEquals("k2", result[1].key)
         assertEquals("k3", result[2].key)
+    }
+
+    @Test
+    fun `custom reduce function throws UnsupportedOperationException`() {
+        val server = ViewServer()
+
+        val viewDef = ViewDefinition(
+            ddoc = "_design/test",
+            viewName = "customReduce",
+            mapFn = MapFunction.Emit(
+                key = KeyExpr.DocId,
+                value = ValueExpr.DocValue
+            ),
+            reduceFn = ReduceFunction.Custom("some dsl here")
+        )
+
+        assertFailsWith<UnsupportedOperationException> {
+            server.execute(viewDef, emptyList())
+        }
     }
 }
