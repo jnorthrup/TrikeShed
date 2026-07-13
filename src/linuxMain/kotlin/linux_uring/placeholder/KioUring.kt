@@ -32,7 +32,6 @@ import platform.posix.free as posix_free
 import platform.posix.fstat as posix_fstat
 import platform.posix.ioctl as posix_ioctl
 import platform.posix.mmap as posix_mmap
-import platform.posix.off_t as posix_off_t
 import platform.posix.stat as posix_stat
 
 import zlinux_uring.*
@@ -168,7 +167,7 @@ class KioUring {
         file_fd: Int,
         sqe: CPointer<io_uring_sqe>,
     ): Unit = run {
-        val file_sz: posix_off_t = get_file_size(file_fd)
+        val file_sz: platform.posix.off_t = get_file_size(file_fd)
         var blocks: Int = (file_sz / BLOCK_SZ).toInt()
         val fi_ptr = mallocWithFlex(file_info::iovecs, blocks)
         val fi: file_info = fi_ptr.pointed
@@ -230,7 +229,7 @@ fun io_uring_enter(ring_fd: Int, to_submit: UInt, min_complete: UInt, flags: UIn
 
 /** Returns the size of the file whose open file descriptor is passed in.
  *  Properly handles regular file and block devices as well. Pretty. */
-fun get_file_size(fd: Int): posix_off_t = memScoped {
+fun get_file_size(fd: Int): platform.posix.off_t = memScoped {
     val st: posix_stat = alloc()
     if (posix_fstat(fd, st.ptr as CValuesRef<posix_stat>) >= 0) {
         if (PosixStatMode.S_ISBLK(st.st_mode)) {
@@ -240,7 +239,7 @@ fun get_file_size(fd: Int): posix_off_t = memScoped {
     return st.st_size
 }
 
-private fun MemScope.getBlockDeviceBlockSize(fd: Int): posix_off_t {
+private fun MemScope.getBlockDeviceBlockSize(fd: Int): platform.posix.off_t {
     val bytes: LongVar = alloc()
     posixRequires(posix_ioctl(fd, PlatformLinuxBLKGETSIZE64, bytes.ptr).z) { ("ioctl") }
     return bytes.value /* = kotlin.Long */
