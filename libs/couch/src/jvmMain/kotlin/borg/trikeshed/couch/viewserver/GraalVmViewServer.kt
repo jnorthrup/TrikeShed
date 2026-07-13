@@ -19,6 +19,8 @@ class GraalVmViewServer(
 ) : AutoCloseable {
 
     private val context: Context = Context.newBuilder("js")
+        .allowHostAccess(org.graalvm.polyglot.HostAccess.NONE)
+        .resourceLimits(org.graalvm.polyglot.ResourceLimits.newBuilder().statementLimit(10000, null).build())
         .build()
 
     /**
