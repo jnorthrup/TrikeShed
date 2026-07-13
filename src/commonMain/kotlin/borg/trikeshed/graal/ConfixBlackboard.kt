@@ -130,12 +130,27 @@ private fun ConfixDoc.set(key: String, value: Any?): ConfixDoc {
 }
 
 private fun ConfixDoc.get(key: String): Any? {
-    // TODO: implement proper Confix navigation
-    return null
+    return this.value(key)
 }
 
 private fun ConfixDoc.remove(key: String): ConfixDoc = this
 
-private fun ConfixDoc.has(key: String): Boolean = true
+private fun ConfixDoc.has(key: String): Boolean {
+    return this.docAt(key) != null
+}
 
-private fun ConfixDoc.keys(): List<String> = listOf()
+private fun ConfixDoc.keys(): List<String> {
+    val root = this.rootCell ?: return emptyList()
+    val keys = mutableListOf<String>()
+    val ch = root.row.kids
+    var i = 0
+    while (i + 1 < ch.size) {
+        val k = ch[i]
+        if (k.tag == borg.trikeshed.cursor.IOMemento.IoString) {
+            val kStr = k.reify(root.src) as String
+            keys.add(kStr)
+        }
+        i += 2
+    }
+    return keys
+}
