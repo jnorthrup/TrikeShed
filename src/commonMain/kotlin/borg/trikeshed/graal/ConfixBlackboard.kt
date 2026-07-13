@@ -1,8 +1,8 @@
 package borg.trikeshed.graal
 
 import borg.trikeshed.parse.confix.*
-import borg.trikeshed.lib.Series
-import borg.trikeshed.lib.j
+import borg.trikeshed.cursor.*
+import borg.trikeshed.lib.*
 import kotlinx.datetime.Clock
 
 /**
@@ -129,28 +129,27 @@ private fun ConfixDoc.set(key: String, value: Any?): ConfixDoc {
     return confixDoc(json.encodeToByteArray(), Syntax.JSON)
 }
 
-private fun ConfixDoc.get(key: String): Any? {
-    return this.value(key)
-}
+private fun ConfixDoc.get(key: String): Any? = this.value(key)
 
 private fun ConfixDoc.remove(key: String): ConfixDoc = this
 
-private fun ConfixDoc.has(key: String): Boolean {
-    return this.docAt(key) != null
-}
+private fun ConfixDoc.has(key: String): Boolean = this.docAt(key) != null
 
 private fun ConfixDoc.keys(): List<String> {
-    val root = this.rootCell ?: return emptyList()
-    val keys = mutableListOf<String>()
-    val ch = root.row.kids
-    var i = 0
-    while (i + 1 < ch.size) {
-        val k = ch[i]
-        if (k.tag == borg.trikeshed.cursor.IOMemento.IoString) {
-            val kStr = k.reify(root.src) as String
-            keys.add(kStr)
+    val r = this.root
+    if (r != null && r.tag == IOMemento.IoObject) {
+        val keys = mutableListOf<String>()
+        val ch = r.kids
+        var i = 0
+        while (i + 1 < ch.size) {
+            val k = ch[i]
+            if (k.tag == IOMemento.IoString) {
+                val key = k.reify(this.src) as? String
+                if (key != null) keys.add(key)
+            }
+            i += 2
         }
-        i += 2
+        return keys
     }
-    return keys
+    return emptyList()
 }
