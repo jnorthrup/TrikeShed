@@ -349,8 +349,65 @@ class ViewServer {
 
     /** Execute a custom Confix DSL reducer (stub — future expansion). */
     private fun executeCustomReduce(dsl: String, input: ViewResult): ViewResult {
-        // TODO: Parse and execute Confix DSL reducer expression
-        throw UnsupportedOperationException("Confix DSL reducer expression parsing not yet implemented")
+        val doc = borg.trikeshed.parse.confix.confixDoc(dsl)
+
+        val groups = mutableMapOf<Any?, MutableList<ViewRow>>()
+        for (row in input.rows) {
+            groups.getOrPut(row.key) { mutableListOf() }.add(row)
+        }
+
+        val reduced = borg.trikeshed.mutable.mutableSeriesOf<ViewRow>()
+        for ((key, group) in groups) {
+            val reducedValue = evaluateReducerAst(doc, group)
+            reduced.append(ViewRow(key = key, value = reducedValue, docId = "_custom", jsPath = "_custom"))
+        }
+        return ViewResult(reduced)
+    }
+
+    private fun evaluateReducerAst(ast: ConfixDoc, group: List<ViewRow>): Any? {
+        val op = ast.value("op") as? String ?: return null
+        val mapExpr = ast.value("map")
+
+        val values = if (mapExpr != null) {
+            group.map { evaluateExpr(mapExpr, it.value) }
+        } else {
+            group.map { it.value }
+        }
+
+        return when (op) {
+            "sum" -> values.sumOf { (it as? Number)?.toDouble() ?: (it as? String)?.toDoubleOrNull() ?: 0.0 }
+            "count" -> values.size.toLong()
+            "min" -> values.minOfOrNull { (it as? Number)?.toDouble() ?: (it as? String)?.toDoubleOrNull() ?: Double.MAX_VALUE } ?: 0.0
+            "max" -> values.maxOfOrNull { (it as? Number)?.toDouble() ?: (it as? String)?.toDoubleOrNull() ?: Double.MIN_VALUE } ?: 0.0
+            "avg" -> {
+                if (values.isEmpty()) 0.0
+                else values.sumOf { (it as? Number)?.toDouble() ?: (it as? String)?.toDoubleOrNull() ?: 0.0 } / values.size
+            }
+            "concat" -> values.joinToString("") { it?.toString() ?: "" }
+            "collect" -> values
+            else -> null
+        }
+    }
+
+    private fun evaluateExpr(expr: Any?, rowValue: Any?): Any? {
+        if (expr is String && expr == "\$value") return rowValue
+        if (expr !is Map<*, *>) return expr
+
+        val op = expr["op"] as? String ?: return null
+        val args = expr["args"] as? List<*> ?: emptyList<Any?>()
+
+        return when (op) {
+            "+" -> {
+                val evaluated = args.map { evaluateExpr(it, rowValue) }
+                evaluated.sumOf { (it as? Number)?.toDouble() ?: (it as? String)?.toDoubleOrNull() ?: 0.0 }
+            }
+            "*" -> {
+                val evaluated = args.map { evaluateExpr(it, rowValue) }
+                evaluated.fold(1.0) { acc, e -> acc * ((e as? Number)?.toDouble() ?: (e as? String)?.toDoubleOrNull() ?: 1.0) }
+            }
+            "value" -> rowValue
+            else -> null
+        }
     }
 }
 

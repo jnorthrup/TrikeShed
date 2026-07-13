@@ -268,21 +268,47 @@ class ViewServerTest {
     }
 
     @Test
-    fun `custom reduce function throws UnsupportedOperationException`() {
+    fun `custom reduce evaluates confix dsl ast`() {
         val server = ViewServer()
 
         val viewDef = ViewDefinition(
             ddoc = "_design/test",
-            viewName = "customReduce",
+            viewName = "byTypeCustom",
             mapFn = MapFunction.Emit(
-                key = KeyExpr.DocId,
-                value = ValueExpr.DocValue
+                key = KeyExpr.DocField("type"),
+                value = ValueExpr.DocField("value")
             ),
-            reduceFn = ReduceFunction.Custom("some dsl here")
+            reduceFn = ReduceFunction.Custom("""
+                {
+                  "op": "sum",
+                  "map": {
+                    "op": "*",
+                    "args": [{"op": "value"}, 2]
+                  }
+                }
+            """.trimIndent())
         )
 
-        assertFailsWith<UnsupportedOperationException> {
-            server.execute(viewDef, emptyList())
-        }
+        val docs = listOf(
+            Document("doc-1", listOf(Field("type", "A"), Field("value", 10))),
+            Document("doc-2", listOf(Field("type", "B"), Field("value", 20))),
+            Document("doc-3", listOf(Field("type", "A"), Field("value", 30)))
+        )
+
+        val result = server.execute(viewDef, docs)
+
+        assertEquals(2, result.size)
+
+        val aRow = result.rows.firstOrNull { it.key == "A" }
+        val bRow = result.rows.firstOrNull { it.key == "B" }
+
+        assertTrue(aRow != null)
+        assertTrue(bRow != null)
+
+        // (10 * 2) + (30 * 2) = 80
+        assertEquals(80.0, aRow!!.value)
+        // (20 * 2) = 40
+        assertEquals(40.0, bRow!!.value)
     }
+
 }

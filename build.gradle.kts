@@ -254,6 +254,9 @@ val jvmMain = getByName("jvmMain") {
 // ─────────────────────────────────────────────────────────────────
 
 // 1. Force explicit tasks instead of dynamic property creation
+tasks.register("kmpPartiallyResolvedDependenciesCheckerIgnore") {
+    doLast { }
+}
 
 tasks.named("checkKotlinGradlePluginConfigurationErrors") {
     enabled = false
