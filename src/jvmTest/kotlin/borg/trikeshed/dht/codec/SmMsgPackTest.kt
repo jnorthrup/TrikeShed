@@ -32,15 +32,6 @@ fun recv(ser: ByteBuffer): ReifiedMessage {
 
 class SmMsgPackTest : TestCase() {
 
-//    val sm1: SimpleMessage = _v["Alice" t2 "Bob",
-//            "Charley" t2 "Delta"] t2 "Random message Body here"
-//    fun testMsgPack() {
-//        val byteBuffer = SmMsgPack.send(sm1)
-//        debug{}
-//        val done=SmMsgPack.recv(byteBuffer!!)
-//        debug{}
-//    }
-
     val sm1: ReifiedMessage = listOf("Alice" to "Bob", "Charley" to "Delta") to "Random message Body here"
 
     fun testMsgPack() {
