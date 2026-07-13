@@ -8,7 +8,6 @@ buildscript {
     }
     dependencies {
         classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:2.4.0"
-        classpath "org.jetbrains.compose:compose-gradle-plugin:1.7.3"
     }
 }
  

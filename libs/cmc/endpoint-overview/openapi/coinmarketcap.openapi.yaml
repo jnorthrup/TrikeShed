@@ -1,0 +1,182 @@
+openapi: 3.1.0
+info:
+  title: CoinMarketCap API Documentation
+  version: endpoint-overview
+  description: Contour of https://coinmarketcap.com/api/documentation/pro-api-reference/endpoint-overview
+servers:
+  - url: https://coinmarketcap.com
+x-page-contour:
+  source: https://coinmarketcap.com/api/documentation/pro-api-reference/endpoint-overview
+  sections:
+    - heading: Which CoinMarketCap API Endpoint Should I Use?
+      summary: Use this page when you know what you want to build, but you are not yet sure which part of the API to start with. The task chooser below points you to the right API family first. The full category tables remain below if you prefer to browse the API by section.
+    - heading: Start with your goal
+      rows:
+        - want: Get the latest prices for assets you already know
+          start: Cryptocurrency
+          patterns: [quotes/latest, price-performance-stats/latest]
+        - want: Get a ranked list of top assets by market cap
+          start: Cryptocurrency
+          patterns: [listings/latest, trending/*]
+        - want: Fetch historical prices or candlestick data
+          start: Cryptocurrency and OHLCV
+          patterns: [quotes/historical, ohlcv/historical]
+        - want: Look up metadata, IDs, logos, or mappings
+          start: Cryptocurrency, Exchange, and Tools
+          patterns: [info, map, price-conversion]
+        - want: Analyze centralized exchanges and market pairs
+          start: Exchange
+          patterns: [info, listings/latest, market-pairs/latest, assets]
+        - want: Work with DEX tokens, pairs, and on-chain trading activity
+          start: Token, Platform, and OHLCV
+          patterns: [token lookup, pair quotes, pool/liquidity data, OHLCV]
+        - want: Understand the broader market and sentiment
+          start: Global Metrics, CMC Index, Content, and Community
+          patterns: [market cap, dominance, indices, headlines, trending topics]
+        - want: Convert prices or export a Postman helper
+          start: Tools
+          patterns: [price-conversion, postman]
+    - heading: Quick rules that save time
+      bullets:
+        - Use listings endpoints when you want sorted, paginated lists.
+        - Use quotes, info, and market-pairs endpoints when you already know which assets or exchanges you care about.
+        - Use */latest for current market data and */historical for time-series data.
+        - Use */info for descriptive metadata and */map for stable identifiers.
+        - Use CoinMarketCap IDs when possible; they are more stable than symbols.
+        - Use the guides for authentication, response format and IDs, and rate limits and troubleshooting.
+    - heading: Browse all API families
+      families:
+        - heading: Market Data
+          categories:
+            - name: Cryptocurrency
+              useFor: Quotes, listings, OHLCV, market pairs, trending, categories, airdrops, and price performance stats.
+            - name: Exchange
+              useFor: Exchange metadata, rankings, volume quotes, market pairs, and proof-of-reserves assets.
+            - name: Global Metrics
+              useFor: Aggregate market cap, BTC/ETH dominance, total market volume, and historical market-wide views.
+            - name: Content
+              useFor: News headlines, Alexandria content, community posts, and post comments.
+            - name: Community
+              useFor: Trending topics and trending tokens driven by community activity.
+            - name: CMC Index
+              useFor: CoinMarketCap indices such as CMC 100 and CMC 20.
+        - heading: DEX Data
+          categories:
+            - name: Token
+              useFor: Token lookup, batch queries, price, liquidity, pools, transactions, trending lists, new tokens, meme tokens, gainers/losers, and security analysis.
+            - name: Platform
+              useFor: Supported blockchain networks and DEX platform details.
+            - name: Holder
+              useFor: Token holder analytics and distribution data.
+            - name: OHLCV
+              useFor: Candlestick data and OHLCV price history for DEX pairs.
+            - name: Others
+              useFor: Additional DEX endpoints including trade data and blockchain statistics.
+        - heading: Utilities
+          categories:
+            - name: Tools
+              useFor: Fiat ID maps, API key usage info, price conversion, and Postman collection export.
+        - heading: Legacy
+          categories:
+            - name: Deprecated
+              useFor: Legacy endpoints retained for backward compatibility. Many have newer V2/V3 replacements, while others remain archived legacy surfaces.
+paths:
+  /api/documentation/pro-api-reference/endpoint-overview:
+    get:
+      operationId: cmcEndpointOverview
+      summary: Which CoinMarketCap API Endpoint Should I Use?
+      description: Entry point for choosing an API family.
+      responses:
+        "200":
+          description: Endpoint overview page
+  /api/documentation/pro-api-reference/cryptocurrency:
+    get:
+      operationId: cmcCryptocurrency
+      summary: Cryptocurrency
+      responses:
+        "200":
+          description: Market Data family page
+  /api/documentation/pro-api-reference/exchange:
+    get:
+      operationId: cmcExchange
+      summary: Exchange
+      responses:
+        "200":
+          description: Market Data family page
+  /api/documentation/pro-api-reference/global-metrics:
+    get:
+      operationId: cmcGlobalMetrics
+      summary: Global Metrics
+      responses:
+        "200":
+          description: Market Data family page
+  /api/documentation/pro-api-reference/content:
+    get:
+      operationId: cmcContent
+      summary: Content
+      responses:
+        "200":
+          description: Market Data family page
+  /api/documentation/pro-api-reference/community:
+    get:
+      operationId: cmcCommunity
+      summary: Community
+      responses:
+        "200":
+          description: Market Data family page
+  /api/documentation/pro-api-reference/cmc-index:
+    get:
+      operationId: cmcIndex
+      summary: CMC Index
+      responses:
+        "200":
+          description: Market Data family page
+  /api/documentation/pro-api-reference/crypto-others:
+    get:
+      operationId: cmcCryptoOthers
+      summary: Others
+      responses:
+        "200":
+          description: Market Data family page
+  /api/documentation/pro-api-reference/token:
+    get:
+      operationId: cmcToken
+      summary: Token
+      responses:
+        "200":
+          description: DEX Data family page
+  /api/documentation/pro-api-reference/platform:
+    get:
+      operationId: cmcPlatform
+      summary: Platform
+      responses:
+        "200":
+          description: DEX Data family page
+  /api/documentation/pro-api-reference/holder:
+    get:
+      operationId: cmcHolder
+      summary: Holder
+      responses:
+        "200":
+          description: DEX Data family page
+  /api/documentation/pro-api-reference/ohlcv:
+    get:
+      operationId: cmcOhlcv
+      summary: OHLCV
+      responses:
+        "200":
+          description: DEX Data family page
+  /api/documentation/pro-api-reference/tools:
+    get:
+      operationId: cmcTools
+      summary: Tools
+      responses:
+        "200":
+          description: Utility family page
+  /api/documentation/pro-api-reference/deprecated:
+    get:
+      operationId: cmcDeprecated
+      summary: Deprecated
+      responses:
+        "200":
+          description: Legacy family page

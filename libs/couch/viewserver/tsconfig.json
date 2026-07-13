@@ -1,0 +1,15 @@
+{
+  "compilerOptions": {
+    "allowJs": true,
+    "checkJs": true,
+    "declaration": true,
+    "emitDeclarationOnly": true,
+    "noEmit": false,
+    "esModuleInterop": true,
+    "module": "ESNext",
+    "target": "ES2018",
+    "moduleResolution": "Node",
+    "declarationDir": "build/dts"
+  },
+  "include": ["usercode/**/*.js"]
+}

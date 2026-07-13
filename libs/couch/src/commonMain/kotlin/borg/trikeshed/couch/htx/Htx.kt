@@ -1,9 +1,5 @@
 package borg.trikeshed.couch.htx
 
-import borg.trikeshed.couch.crypto.X25519PrivateKey
-import borg.trikeshed.couch.crypto.X25519PublicKey
-import borg.trikeshed.couch.crypto.x25519Dh
-
 /**
  * HTX Protocol Implementation ported from literbike.
  * Provides ticket verification for access control.
@@ -23,6 +19,9 @@ class Htx {
          * Uses bitwise XOR accumulator — no short-circuit, no early exit.
          * Each byte is compared independently, the diff accumulator holds
          * the OR of all per-byte XOR results.  Final check `diff == 0`.
+         *
+         * TODO: X25519 DH between serverPrivKey and clientPubKey to derive
+         *       the shared secret, rather than using serverPrivKey directly.
          */
         fun verifyAccessTicket(
             serverPrivKey: ByteArray,
@@ -31,8 +30,7 @@ class Htx {
             receivedTicket: ByteArray,
             currentHour: Long
         ): Boolean {
-            val sharedSecret = x25519Dh(X25519PrivateKey(serverPrivKey), X25519PublicKey(clientPubKey))
-            val expectedTicket = computeTicketForHour(sharedSecret, ticketKeyId, currentHour)
+            val expectedTicket = computeTicketForHour(serverPrivKey, ticketKeyId, currentHour)
             if (receivedTicket.size != expectedTicket.size) return false
             var diff = 0
             for (i in receivedTicket.indices) {

@@ -1,0 +1,79 @@
+package org.xvm.asm.op;
+
+import java.io.DataInput;
+import java.io.IOException;
+
+import org.xvm.asm.Argument;
+import org.xvm.asm.Constant;
+import org.xvm.asm.OpTest;
+import org.xvm.asm.constants.TypeConstant;
+
+import org.xvm.runtime.Frame;
+import org.xvm.runtime.ObjectHandle;
+import org.xvm.runtime.ObjectHandle.ExceptionHandle;
+
+import org.xvm.runtime.template.xBoolean;
+
+import org.xvm.runtime.template._native.reflect.xRTType.TypeHandle;
+
+
+/**
+ * IS_NTYPE  rvalue, rvalue-type, lvalue-return ; !(T instanceof Type) -> Boolean
+ *
+ * NOTE: not currently used
+ */
+public class IsNType
+        extends OpTest {
+    /**
+     * Construct an IS_NTYPE op based on the specified arguments.
+     *
+     * @param arg1       the value Argument
+     * @param arg2       the type Argument
+     * @param argReturn  the location to store the Boolean result
+     */
+    public IsNType(Argument arg1, Argument arg2, Argument argReturn) {
+        super(arg1, arg2, argReturn);
+    }
+
+    /**
+     * Deserialization constructor.
+     *
+     * @param in      the DataInput to read from
+     * @param aconst  an array of constants used within the method
+     */
+    public IsNType(DataInput in, Constant[] aconst)
+            throws IOException {
+        super(in, aconst);
+    }
+
+    @Override
+    public int getOpCode() {
+        return OP_IS_NTYPE;
+    }
+
+    @Override
+    protected boolean hasSecondArgument() {
+        return true;
+    }
+
+    @Override
+    protected int completeUnaryOp(Frame frame, ObjectHandle hValue) {
+        TypeConstant typeTest;
+        if (m_nValue2 <= CONSTANT_OFFSET) {
+            typeTest = frame.resolveType(m_nValue2);
+        } else {
+            try {
+                TypeHandle hType = (TypeHandle) frame.getArgument(m_nValue2);
+                typeTest = hType.getUnsafeDataType();
+            } catch (ClassCastException e) {
+                // should not happen
+                return frame.assignValue(m_nRetValue, xBoolean.FALSE);
+            } catch (ExceptionHandle.WrapperException e) {
+                return frame.raiseException(e);
+            }
+        }
+
+        return frame.assignValue(m_nRetValue,
+                xBoolean.makeHandle(!hValue.getUnsafeType().isA(typeTest)));
+    }
+}

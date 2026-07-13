@@ -46,15 +46,57 @@ kotlin {
             "-Xsuppress-version-warnings",
             "-Xexpect-actual-classes",
             "-Xallow-kotlin-package",
+            // JEP 484 ClassFile API (jdk.internal.classfile)
+            "--add-exports=java.base/jdk.internal.classfile=ALL-UNNAMED",
+            "--add-exports=java.base/jdk.internal.classfile.attribute=ALL-UNNAMED",
+            "--add-exports=java.base/jdk.internal.classfile.constantpool=ALL-UNNAMED",
+            "--add-exports=java.base/jdk.internal.classfile.instruction=ALL-UNNAMED",
+            "--add-exports=java.base/jdk.internal.classfile.models=ALL-UNNAMED",
         )
     }
 
     jvmToolchain(21)
 
-    jvm {
-        @OptIn(ExperimentalKotlinGradlePluginApi::class) compilerOptions {
-            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21)
-            freeCompilerArgs.addAll(
+    jvm {}
+
+    sourceSets {
+        val commonMain by getting {
+            dependencies {
+                api("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
+                api("org.jetbrains.kotlinx:kotlinx-datetime:0.8.0-0.6.x-compat")
+            }
+        }
+        val commonTest by getting {
+            dependencies {
+                implementation(kotlin("test"))
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
+            }
+        }
+        val jvmMain by getting {
+            resources.srcDir("src/jvmMain/resources")
+            dependencies {
+                // JMH dependencies for benchmarking
+                implementation("org.openjdk.jmh:jmh-core:1.37")
+                implementation("org.openjdk.jmh:jmh-generator-annprocess:1.37")
+
+                implementation("org.bouncycastle:bcprov-jdk15on:1.70")
+
+                // GraalJS polyglot for JS eval (Bun alternate core)
+                implementation("org.graalvm.polyglot:js:24.1.1")
+
+                // Depend on userspace/context implementations via classpath (no libs/ subprojects)
+            }
+
+            // Include JMH benchmark sources in jvmMain for compilation
+            kotlin.srcDir("src/jvmMain/kotlin")
+            kotlin.srcDir("src/jmhMain/kotlin")
+            resources.srcDir("src/jmhMain/resources")
+
+            // Local DuckDB JVM sources unavailable (libs/ removed)
+        }
+
+        tasks.withType<JavaCompile>().configureEach {
+            options.compilerArgs.addAll(
                 listOf(
                     "-J--add-exports=java.base/jdk.internal.classfile=ALL-UNNAMED",
                     "-J--add-exports=java.base/jdk.internal.classfile.constantpool=ALL-UNNAMED",
