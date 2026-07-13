@@ -40,9 +40,13 @@ class ConfixLocalStore(
     private val compactJson = Json { prettyPrint = false; ignoreUnknownKeys = true }
 
     val dbDir: Path = baseDir.resolve(project).resolve(instance).resolve("db").resolve("id")
+    val walDir: Path = baseDir.resolve(project).resolve(instance).resolve("db").resolve("wal")
+    val attDir: Path = baseDir.resolve(project).resolve(instance).resolve("db").resolve("attachments")
 
     init {
         Files.createDirectories(dbDir)
+        Files.createDirectories(walDir)
+        Files.createDirectories(attDir)
     }
 
     /**
@@ -52,6 +56,10 @@ class ConfixLocalStore(
     fun put(docId: String, fields: Map<String, Any?>): ConfixLocalStore {
         val entries = buildMap {
             put("_id", JsonPrimitive(docId))
+            val existing = loadAsJson(docId)
+            val rev = (existing?.get("_rev") as? JsonPrimitive)?.contentOrNull?.toIntOrNull() ?: 0
+            val nextRev = rev + 1
+            put("_rev", JsonPrimitive(nextRev.toString()))
             fields.forEach { (k, v) ->
                 val element = when (v) {
                     null -> kotlinx.serialization.json.JsonNull
@@ -67,6 +75,8 @@ class ConfixLocalStore(
         val jsonText = compactJson.encodeToString(JsonObject.serializer(), jsonObject)
         val docPath = docPath(docId)
         Files.createDirectories(docPath.parent)
+        val walPath = walDir.resolve("_wal.log")
+        Files.writeString(walPath, "${docId}\t${System.currentTimeMillis()}\n", StandardOpenOption.CREATE, StandardOpenOption.APPEND)
         Files.write(
             docPath,
             jsonText.encodeToByteArray(),
