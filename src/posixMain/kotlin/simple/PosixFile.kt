@@ -497,49 +497,53 @@ class PosixFile(
         //todo: better FILE* handling
 
         /** lean on getline to read a file into a sequence of CharSeries */
-        fun readLinesSeq(path: String): Sequence<String> = memScoped {
-
-            val file = PosixFile(path)
-            val fp = fdopen(file.fd, "r")
-            val line: CPointerVarOf<CPointer<ByteVarOf<Byte>>> = alloc()
-            val len: ULongVarOf<size_t> = alloc()
-            len.value = 0u
-            var read: ssize_t
+        fun readLinesSeq(path: String): Sequence<String> {
+            val fp = fopen(path, "r") ?: return emptySequence()
             return sequence<String> {
-                while (true) {
-                    read = getline(line.ptr, len.ptr, fp)
-                    if (read == -1L) break
-                    yield(/*CharSeries*/line.value!!.toKString().trim())
-                }
-                free(line.value)
-                if (ferror(fp) != 0) {
-                    perror("ferror")
-                    exit(1)
-                }
-            }.also { file.close().also { fclose(fp) } }
+                memScoped {
+                    val line = alloc<CPointerVar<ByteVar>>()
+                    val len = alloc<ULongVar>()
+                    len.value = 0u
+                    line.value = null
 
+                    try {
+                        while (true) {
+                            val read = getline(line.ptr, len.ptr, fp)
+                            if (read == -1L) break
+                            val str = line.value!!.toKString().trim()
+                            yield(str)
+                        }
+                    } finally {
+                        if (line.value != null) free(line.value)
+                        fclose(fp)
+                    }
+                }
+            }
         }
 
         fun readLines(path: String): List<String> = memScoped {
-            val file = PosixFile(path)
-            val fp = fdopen(file.fd, "r")
-            val line: CPointerVarOf<CPointer<ByteVarOf<Byte>>> = alloc()
-            val len: ULongVarOf<size_t> = alloc()
+            val fp = fopen(path, "r") ?: return emptyList()
+            val line = alloc<CPointerVar<ByteVar>>()
+            val len = alloc<ULongVar>()
             len.value = 0u
+            line.value = null
             var read: ssize_t
-            val list: MutableList<String> = mutableListOf()
+            val list = mutableListOf<String>()
 
-            while (true) {
-                read = getline(line.ptr, len.ptr, fp)
-                if (read == -1L) break
-                list.add((line.value!!.toKString().trim()))
+            try {
+                while (true) {
+                    read = getline(line.ptr, len.ptr, fp)
+                    if (read == -1L) break
+                    list.add(line.value!!.toKString().trim())
+                }
+                if (ferror(fp) != 0) {
+                    perror("ferror")
+                }
+                return list
+            } finally {
+                if (line.value != null) free(line.value)
+                fclose(fp)
             }
-            free(line.value)
-            if (ferror(fp) != 0) {
-                perror("ferror")
-                exit(1)
-            }
-            return list.also { file.close().also { fclose(fp) } }
         }
 
         fun readAllBytes(filename: String): ByteArray = memScoped {
