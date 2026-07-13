@@ -486,54 +486,56 @@ class LinuxPosixFile(
 
         fun exists(fname: String): Boolean = access(fname, F_OK).z
 
-        //todo: better FILE* handling
-
         /** lean on getline to read a file into a sequence of CharSeries */
-        fun readLinesSeq(path: String): Sequence<String> {
-            val fp = fopen(path, "r") ?: return emptySequence()
-            return sequence<String> {
-                memScoped {
-                    val line = alloc<CPointerVar<ByteVar>>()
-                    val len = alloc<ULongVar>()
-                    len.value = 0u
-                    line.value = null
-
-                    try {
-                        while (true) {
-                            val read = getline(line.ptr, len.ptr, fp)
-                            if (read == -1L) break
-                            val str = line.value!!.toKString().trim()
-                            yield(str)
-                        }
-                    } finally {
-                        if (line.value != null) free(line.value)
-                        fclose(fp)
+        fun readLinesSeq(path: String): Sequence<String> = sequence {
+            val fp = fopen(path, "r") ?: return@sequence
+            try {
+                val line: CPointerVarOf<CPointer<ByteVarOf<Byte>>> = nativeHeap.alloc()
+                val len: ULongVarOf<size_t> = nativeHeap.alloc()
+                line.value = null
+                len.value = 0u
+                try {
+                    while (true) {
+                        val read = getline(line.ptr, len.ptr, fp)
+                        if (read == -1L) break
+                        yield(line.value!!.toKString().trim())
                     }
+                    if (ferror(fp) != 0) {
+                        perror("ferror")
+                        exit(1)
+                    }
+                } finally {
+                    free(line.value)
+                    nativeHeap.free(line)
+                    nativeHeap.free(len)
                 }
+            } finally {
+                fclose(fp)
             }
         }
 
         fun readLines(path: String): List<String> = memScoped {
-            val fp = fopen(path, "r") ?: return emptyList()
-            val line = alloc<CPointerVar<ByteVar>>()
-            val len = alloc<ULongVar>()
-            len.value = 0u
-            line.value = null
-            var read: ssize_t
-            val list = mutableListOf<String>()
-
+            val fp = fopen(path, "r")
+            HasPosixErr.posixRequires(fp != null) { "fopen $path" }
             try {
+                val line: CPointerVarOf<CPointer<ByteVarOf<Byte>>> = alloc()
+                val len: ULongVarOf<size_t> = alloc()
+                len.value = 0u
+                var read: ssize_t
+                val list: MutableList<String> = mutableListOf()
+
                 while (true) {
                     read = getline(line.ptr, len.ptr, fp)
                     if (read == -1L) break
-                    list.add(line.value!!.toKString().trim())
+                    list.add((line.value!!.toKString().trim()))
                 }
+                free(line.value)
                 if (ferror(fp) != 0) {
                     perror("ferror")
+                    exit(1)
                 }
                 return list
             } finally {
-                if (line.value != null) free(line.value)
                 fclose(fp)
             }
         }
