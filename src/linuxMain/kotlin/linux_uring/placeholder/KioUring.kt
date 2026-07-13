@@ -34,7 +34,7 @@ import platform.posix.ioctl as posix_ioctl
 import platform.posix.mmap as posix_mmap
 import platform.posix.off_t as posix_off_t
 import platform.posix.stat as posix_stat
-import platform.posix.syscall as posix_syscall
+
 import zlinux_uring.*
 
 /**
@@ -223,10 +223,10 @@ class KioUring {
  *  functions.
  */
 fun io_uring_setup(entries: UInt, p: CPointer<io_uring_params>): Int =
-    posix_syscall(__NR_io_uring_setup.toLong(), entries, p).toInt()
+    platform.posix.syscall(__NR_io_uring_setup.toLong(), entries, p).toInt()
 
 fun io_uring_enter(ring_fd: Int, to_submit: UInt, min_complete: UInt, flags: UInt, sig: CPointer<sigset_t>? = null): Int =
-    posix_syscall(__NR_io_uring_enter.toLong(), ring_fd, to_submit, min_complete, flags, 0L, sig).toInt()
+    platform.posix.syscall(__NR_io_uring_enter.toLong(), ring_fd, to_submit, min_complete, flags, 0L, sig).toInt()
 
 /** Returns the size of the file whose open file descriptor is passed in.
  *  Properly handles regular file and block devices as well. Pretty. */
