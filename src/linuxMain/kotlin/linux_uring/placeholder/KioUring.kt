@@ -27,7 +27,6 @@ import simple.LinuxPosixFile.Companion.getDirFd
 import simple.LinuxPosixFile.Companion.namedDirAndFile
 import simple.PosixStatMode
 import kotlin.math.min
-import platform.linux.BLKGETSIZE64 as PlatformLinuxBLKGETSIZE64
 import platform.posix.free as posix_free
 import platform.posix.fstat as posix_fstat
 import platform.posix.ioctl as posix_ioctl
@@ -242,7 +241,7 @@ fun get_file_size(fd: Int): posix_off_t = memScoped {
 
 private fun MemScope.getBlockDeviceBlockSize(fd: Int): posix_off_t {
     val bytes: LongVar = alloc()
-    posixRequires(posix_ioctl(fd, PlatformLinuxBLKGETSIZE64, bytes.ptr).z) { ("ioctl") }
+    posixRequires(posix_ioctl(fd, platform.linux.BLKGETSIZE64, bytes.ptr).z) { ("ioctl") }
     return bytes.value /* = kotlin.Long */
 }
 
