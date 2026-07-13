@@ -29,7 +29,6 @@ import simple.PosixStatMode
 import kotlin.math.min
 import platform.linux.BLKGETSIZE64 as PlatformLinuxBLKGETSIZE64
 import platform.posix.free as posix_free
-import platform.posix.fstat as posix_fstat
 import platform.posix.ioctl as posix_ioctl
 import platform.posix.mmap as posix_mmap
 import platform.posix.off_t as posix_off_t
@@ -232,7 +231,7 @@ fun io_uring_enter(ring_fd: Int, to_submit: UInt, min_complete: UInt, flags: UIn
  *  Properly handles regular file and block devices as well. Pretty. */
 fun get_file_size(fd: Int): posix_off_t = memScoped {
     val st: posix_stat = alloc()
-    if (posix_fstat(fd, st.ptr as CValuesRef<posix_stat>) >= 0) {
+    if (platform.posix.fstat(fd, st.ptr as CValuesRef<posix_stat>) >= 0) {
         if (PosixStatMode.S_ISBLK(st.st_mode)) {
             return getBlockDeviceBlockSize(fd)
         } else posixRequires(PosixStatMode.S_ISREG(st.st_mode)) { "file handle invalid" }
