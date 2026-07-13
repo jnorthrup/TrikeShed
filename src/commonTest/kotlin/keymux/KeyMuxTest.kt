@@ -52,6 +52,23 @@ class KeyMuxTest {
         assertEquals(listOf("a", "b", "c"), path.iterable().toList())
         assertEquals("a.b.c", path.asString())
         assertEquals(listOf("single"), "single".toKeyPath().iterable().toList())
+
+        // Edge cases
+        val emptyPath = "".toKeyPath()
+        assertEquals(listOf(""), emptyPath.iterable().toList())
+        assertEquals("", emptyPath.asString())
+
+        val trailingPath = "a.b.".toKeyPath()
+        assertEquals(listOf("a", "b", ""), trailingPath.iterable().toList())
+        assertEquals("a.b.", trailingPath.asString())
+
+        val leadingPath = ".a.b".toKeyPath()
+        assertEquals(listOf("", "a", "b"), leadingPath.iterable().toList())
+        assertEquals(".a.b", leadingPath.asString())
+
+        val consecutivePath = "a..b".toKeyPath()
+        assertEquals(listOf("a", "", "b"), consecutivePath.iterable().toList())
+        assertEquals("a..b", consecutivePath.asString())
     }
 
     @Test
