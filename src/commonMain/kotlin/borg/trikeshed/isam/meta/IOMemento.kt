@@ -82,12 +82,7 @@ enum class IOMemento(override val networkSize: Int? = null, val fromChars: (Seri
         override fun createEncoder(i: Int): (Any?) -> ByteArray = {
             //try a cast elvis first with Instant then with LocalDate
             val date = (it as? Instant)?.toLocalDateTime(TimeZone.UTC)?.date ?: it as LocalDate
-//
-//            val toEpochDays = (it as LocalDate).toEpochDays()
-//            writeLong (toEpochDays.toLong())
             writeLong(date.toEpochDays().toLong())
-
-
         }
 
         override fun createDecoder(size: Int): (ByteArray) -> Any? = {
