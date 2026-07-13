@@ -33,7 +33,6 @@ import platform.posix.ioctl as posix_ioctl
 import platform.posix.mmap as posix_mmap
 import platform.posix.off_t as posix_off_t
 
-import platform.posix.syscall as posix_syscall
 import zlinux_uring.*
 
 /**
