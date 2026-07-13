@@ -44,8 +44,10 @@ internal actual object LiburingImpl : LiburingFacade {
     actual override fun prepMunmap(addr: Long, len: Int, userData: Long): Result<Unit> =
         delegate?.prepMunmap(addr, len, userData) ?: Result.failure(UnsupportedOperationException("liburing unavailable"))
 
-    actual override fun prepSendmsg(fd: Int, msgHdrPtr: Long, flags: Int, userData: Long): Result<Unit> =
-        delegate?.prepSendmsg(fd, msgHdrPtr, flags, userData) ?: Result.failure(UnsupportedOperationException("liburing unavailable"))
+    actual override fun prepSendmsg(fd: Int, msgHdrPtr: Long, flags: Int, userData: Long): Result<Unit> = unsupported()
+    actual override fun prepRecvmsg(fd: Int, msgHdrPtr: Long, flags: Int, userData: Long): Result<Unit> = unsupported()
+
+    actual override fun submit(): Result<Int> = delegate?.submit() ?: unsupported()
 
     actual override fun prepRecvmsg(fd: Int, msgHdrPtr: Long, flags: Int, userData: Long): Result<Unit> =
         delegate?.prepRecvmsg(fd, msgHdrPtr, flags, userData) ?: Result.failure(UnsupportedOperationException("liburing unavailable"))
