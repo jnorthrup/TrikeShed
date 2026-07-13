@@ -28,7 +28,7 @@ import simple.LinuxPosixFile.Companion.namedDirAndFile
 import simple.PosixStatMode
 import kotlin.math.min
 import platform.linux.BLKGETSIZE64 as PlatformLinuxBLKGETSIZE64
-import platform.posix.free as posix_free
+import platform.posix.fstat as posix_fstat
 import platform.posix.ioctl as posix_ioctl
 import platform.posix.mmap as posix_mmap
 import platform.posix.stat as posix_stat
@@ -285,7 +285,7 @@ fun completionQueues(s: KioUring) {
                 iovBase!!.reinterpret(),
                 fi.pointed.iovecs[i].iov_len.toInt()
             )
-            platform.posix.free(iovBase)
+            free(iovBase)
         }
         write_barrier()
         head++
