@@ -47,6 +47,14 @@ class KeyMuxTest {
     }
 
     @Test
+    fun toKeyPath_parsesStringCorrectly() {
+        val path = "a.b.c".toKeyPath()
+        assertEquals(listOf("a", "b", "c"), path.iterable().toList())
+        assertEquals("a.b.c", path.asString())
+        assertEquals(listOf("single"), "single".toKeyPath().iterable().toList())
+    }
+
+    @Test
     fun envSource_readsVariables() = runTest {
         // We test reading env via SystemOperations mock where possible or just check env source instantiation
         val envSource = EnvSource("APP")
