@@ -30,7 +30,6 @@ class Trie(var root: Map<String, Node> = linkedMapOf()) {
     operator fun get(vararg key: String): Int? = search(*key)?.payload
 
     fun frez(n: Node) {
-//        if (n.leaf) return
         (n.children.entries).let { cnodes ->
             n.children = ArrayMap.sorting(n.children)
             for ((_, v) in cnodes) frez(v)
