@@ -314,8 +314,8 @@ data class NgChunk_Data(
     override fun serialize(): ByteArray {
         val length = 16 + userData.remaining()
         val buffer = ByteBuffer.allocate(length)
-        buffer.put(type.value)
-        buffer.put(flags.value)
+        buffer.put(type.value.toByte())
+        buffer.put(flags.value.toByte())
         buffer.putShort(length.toShort())
         buffer.putShort(streamId.toShort())
         buffer.putShort(streamSequenceNumber.toShort())
@@ -343,8 +343,8 @@ data class NgChunk_Init(
             length += 4 + param.data.size
         }
         val buffer = ByteBuffer.allocate(length)
-        buffer.put(type.value)
-        buffer.put(flags.value)
+        buffer.put(type.value.toByte())
+        buffer.put(flags.value.toByte())
         buffer.putShort(length.toShort())
         buffer.putInt(initiateTag.toInt())
         buffer.putInt(initialTSN.toInt())
@@ -373,8 +373,8 @@ data class NgChunk_InitAck(
     override fun serialize(): ByteArray {
         val length = 20 + cookie.size
         val buffer = ByteBuffer.allocate(length)
-        buffer.put(type.value)
-        buffer.put(flags.value)
+        buffer.put(type.value.toByte())
+        buffer.put(flags.value.toByte())
         buffer.putShort(length.toShort())
         buffer.putInt(initiateTag.toInt())
         buffer.putInt(initialTSN.toInt())
@@ -404,8 +404,8 @@ data class NgChunk_Sack(
         // 12 bytes header + 4 bytes per gap ack block + 4 bytes per duplicate TSN
         val length = 12 + (gapAckBlocks.size * 4) + (duplicateTSNs.size * 4)
         val buffer = ByteBuffer.allocate(length)
-        buffer.put(type.value)
-        buffer.put(flags.value)
+        buffer.put(type.value.toByte())
+        buffer.put(flags.value.toByte())
         buffer.putShort(length.toShort())
         buffer.putInt(cumulativeTSNAck.toInt())
         buffer.putInt(advertisedReceiverWindowCredit.toInt())
@@ -436,8 +436,8 @@ data class NgChunk_CookieEcho(
     override fun serialize(): ByteArray {
         val length = 4 + cookie.size
         val buffer = ByteBuffer.allocate(length)
-        buffer.put(type.value)
-        buffer.put(flags.value)
+        buffer.put(type.value.toByte())
+        buffer.put(flags.value.toByte())
         buffer.putShort(length.toShort())
         buffer.put(cookie)
         return buffer.array()
@@ -463,8 +463,8 @@ data class NgChunk_Heartbeat(
     override fun serialize(): ByteArray {
         val length = 4 + info.size
         val buffer = ByteBuffer.allocate(length)
-        buffer.put(type.value)
-        buffer.put(flags.value)
+        buffer.put(type.value.toByte())
+        buffer.put(flags.value.toByte())
         buffer.putShort(length.toShort())
         buffer.put(info)
         return buffer.array()
@@ -480,8 +480,8 @@ data class NgChunk_HeartbeatAck(
     override fun serialize(): ByteArray {
         val length = 4 + info.size
         val buffer = ByteBuffer.allocate(length)
-        buffer.put(type.value)
-        buffer.put(flags.value)
+        buffer.put(type.value.toByte())
+        buffer.put(flags.value.toByte())
         buffer.putShort(length.toShort())
         buffer.put(info)
         return buffer.array()
@@ -496,8 +496,8 @@ data class NgChunk_Shutdown(
 ) : NgChunk {
     override fun serialize(): ByteArray {
         val buffer = ByteBuffer.allocate(8)
-        buffer.put(type.value)
-        buffer.put(flags.value)
+        buffer.put(type.value.toByte())
+        buffer.put(flags.value.toByte())
         buffer.putShort(8)
         buffer.putInt(cumulativeTSNAck.toInt())
         return buffer.array()
@@ -568,8 +568,8 @@ data class NgChunk_ForwardTsn(
         // 4 bytes header + 4 bytes per stream mapping
         val length = 4 + (streamMappings.size * 4)
         val buffer = ByteBuffer.allocate(length)
-        buffer.put(type.value)
-        buffer.put(flags.value)
+        buffer.put(type.value.toByte())
+        buffer.put(flags.value.toByte())
         buffer.putShort(length.toShort())
         buffer.putInt(cumulativeTSN.toInt())
         
@@ -617,8 +617,8 @@ data class NgChunk_Abort(
         val infoBytes = errorInfo?.toByteArray() ?: ByteArray(0)
         val length = 4 + infoBytes.size
         val buffer = ByteBuffer.allocate(length)
-        buffer.put(type.value)
-        buffer.put(flags.value)
+        buffer.put(type.value.toByte())
+        buffer.put(flags.value.toByte())
         buffer.putShort(length.toShort())
         buffer.put(infoBytes)
         return buffer.array()
@@ -635,8 +635,8 @@ data class NgChunk_Error(
     override fun serialize(): ByteArray {
         val length = 6 + additionalInfo.size
         val buffer = ByteBuffer.allocate(length)
-        buffer.put(type.value)
-        buffer.put(flags.value)
+        buffer.put(type.value.toByte())
+        buffer.put(flags.value.toByte())
         buffer.putShort(length.toShort())
         buffer.putShort(errorCode.toShort())
         buffer.put(additionalInfo)
@@ -836,8 +836,8 @@ data class NgChunk_Ecne(
 ) : NgChunk {
     override fun serialize(): ByteArray {
         val buffer = ByteBuffer.allocate(8)
-        buffer.put(type.value)
-        buffer.put(flags.value)
+        buffer.put(type.value.toByte())
+        buffer.put(flags.value.toByte())
         buffer.putShort(8) // Length
         buffer.putInt(lowestTSN.toInt())
         return buffer.array()
@@ -865,8 +865,8 @@ data class NgChunk_Cwr(
 ) : NgChunk {
     override fun serialize(): ByteArray {
         val buffer = ByteBuffer.allocate(8)
-        buffer.put(type.value)
-        buffer.put(flags.value)
+        buffer.put(type.value.toByte())
+        buffer.put(flags.value.toByte())
         buffer.putShort(8) // Length
         buffer.putInt(lowestTSN.toInt())
         return buffer.array()
@@ -970,8 +970,8 @@ data data class NgChunk_ReConfig(
         val items = requests.ifEmpty { responses }
         val length = 4 + (items.size * 8)
         val buffer = ByteBuffer.allocate(length)
-        buffer.put(type.value)
-        buffer.put(flags.value)
+        buffer.put(type.value.toByte())
+        buffer.put(flags.value.toByte())
         buffer.putShort(length.toShort())
         
         // Serialize requests
@@ -1098,8 +1098,8 @@ data class NgChunk_Asconf(
         val length = 8 + paramLength
         
         val buffer = ByteBuffer.allocate(length)
-        buffer.put(type.value)
-        buffer.put(flags.value)
+        buffer.put(type.value.toByte())
+        buffer.put(flags.value.toByte())
         buffer.putShort(length.toShort())
         buffer.putInt(serial.toInt())
         
@@ -1180,8 +1180,8 @@ data class NgChunk_AsconfAck(
     override fun serialize(): ByteArray {
         val length = 8 + (parameters.size * 8)
         val buffer = ByteBuffer.allocate(length)
-        buffer.put(type.value)
-        buffer.put(flags.value)
+        buffer.put(type.value.toByte())
+        buffer.put(flags.value.toByte())
         buffer.putShort(length.toShort())
         buffer.putInt(serial.toInt())
         
@@ -1248,8 +1248,8 @@ data class NgChunk_IData(
         // 20 bytes header + user data
         val length = 20 + userData.size
         val buffer = ByteBuffer.allocate(length)
-        buffer.put(type.value)
-        buffer.put(flags.value)
+        buffer.put(type.value.toByte())
+        buffer.put(flags.value.toByte())
         buffer.putShort(length.toShort())
         buffer.putInt(tsn.toInt())
         buffer.putShort(streamId)

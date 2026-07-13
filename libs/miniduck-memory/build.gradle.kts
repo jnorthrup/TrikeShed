@@ -21,6 +21,6 @@ repositories {
 }
 
 kotlin.sourceSets["commonMain"].dependencies {
-    api(project(":libs:miniduck"))
+    api(project(":"))
     api(project(":libs:classfile:lib_cursor"))
 }

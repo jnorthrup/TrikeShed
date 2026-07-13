@@ -31,6 +31,13 @@ sealed class AsyncContextKey {
     object NioUserspaceKey : AsyncContextKey(), CoroutineContext.Key<NioUserspaceElement>
 
     /**
+     * Key for liburing facade context elements.
+     * Singleton object: always compare by identity (===).
+     * Type-parameterized as Key<LiburingElement> for safe context lookup.
+     */
+    object LiburingKey : AsyncContextKey(), CoroutineContext.Key<LiburingElement>
+
+    /**
      * Key for channelized fanout dispatcher context elements.
      * Singleton object: always compare by identity (===).
      * Type-parameterized as Key<FanoutDispatcherElement> for safe context lookup.

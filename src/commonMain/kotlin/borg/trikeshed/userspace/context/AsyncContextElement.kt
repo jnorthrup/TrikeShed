@@ -24,13 +24,10 @@ open class NioUserspaceElement : CanonicalNioUserspaceElement() {
     override val key: CoroutineContext.Key<*> get() = AsyncContextKey.NioUserspaceKey
 }
 
-/** Type alias for LiburingElement from the userspace package */
-typealias LiburingElement = borg.trikeshed.userspace.LiburingElement
+open class LiburingElement : borg.trikeshed.context.LiburingElement() {
+    override val key: CoroutineContext.Key<*> get() = AsyncContextKey.LiburingKey
+}
 
-/**
- * Subclass the canonical FanoutDispatcherElement so its key is the userspace key.
- * This ensures ctx[AsyncContextKey.FanoutDispatcherKey] works correctly.
- */
-open class FanoutDispatcherElement : FanoutDispatcherElement() {
+open class FanoutDispatcherElement : borg.trikeshed.context.FanoutDispatcherElement() {
     override val key: CoroutineContext.Key<*> get() = AsyncContextKey.FanoutDispatcherKey
 }

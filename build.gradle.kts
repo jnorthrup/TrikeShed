@@ -81,9 +81,6 @@ kotlin {
 
                 implementation("org.bouncycastle:bcprov-jdk15on:1.70")
 
-                // GraalJS polyglot for JS eval (Bun alternate core)
-                implementation("org.graalvm.polyglot:js:24.1.1")
-
                 // Depend on userspace/context implementations via classpath (no libs/ subprojects)
             }
 
