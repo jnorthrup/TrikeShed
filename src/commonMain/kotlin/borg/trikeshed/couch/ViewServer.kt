@@ -350,8 +350,7 @@ class ViewServer {
     /** Execute a custom Confix DSL reducer (stub — future expansion). */
     private fun executeCustomReduce(dsl: String, input: ViewResult): ViewResult {
         // TODO: Parse and execute Confix DSL reducer expression
-        // For now, return input unchanged
-        return input
+        throw UnsupportedOperationException("Confix DSL reducer expression parsing not yet implemented")
     }
 }
 
