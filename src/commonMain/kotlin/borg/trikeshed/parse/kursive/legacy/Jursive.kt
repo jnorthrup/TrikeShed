@@ -1,5 +1,7 @@
 package borg.trikeshed.parse.kursive.legacy
 
+import borg.trikeshed.lib.SeriesBuffer
+
 import borg.trikeshed.collections.s_
 import borg.trikeshed.cursor.*
 import borg.trikeshed.isam.meta.IOMemento
@@ -8,33 +10,6 @@ import borg.trikeshed.lib.*
 typealias NarsiveEvent = Join<Series<Char>, Twin<Int>>
 typealias NarsiveTrace = Series<NarsiveEvent>
 
-class SeriesBuffer<T>(
-    capacity: Int = 8,
-) : Series<T> {
-    var buf: Array<Any?> = arrayOfNulls(capacity)
-    var count: Int = 0
-
-    override val a: Int get() = count
-    override val b: (Int) -> T get() = { index -> buf[index] as T }
-
-    fun add(item: T) {
-        if (count == buf.size) {
-            val next = arrayOfNulls<Any?>(buf.size * 2)
-            buf.copyInto(next)
-            buf = next
-        }
-        buf[count++] = item
-    }
-
-    fun removeLast(): T {
-        require(count > 0) { "removeLast on empty SeriesBuffer" }
-        val idx = --count
-        @Suppress("UNCHECKED_CAST")
-        return (buf[idx] as T).also { buf[idx] = null }
-    }
-
-    fun snapshot(): Series<T> = count j { index -> buf[index] as T }
-}
 //TODO DRY THESE INTO ONE ABSTRACTION
 
 class JursiveCharSeries constructor(
