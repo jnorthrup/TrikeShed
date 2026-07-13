@@ -41,4 +41,3 @@ include(":libs:classfile:lib_cursor")
 if (java.io.File("../xvm").exists()) {
     includeBuild("../xvm")
 }
-include(":libs:lcnc")
