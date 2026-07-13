@@ -1,29 +1,9 @@
 package gk.kademlia.agent
 
+import borg.trikeshed.dht.agent.Agent as BorgAgent
+import borg.trikeshed.dht.agent.WorldRouter as BorgWorldRouter
+import borg.trikeshed.dht.agent.WorldNetwork as BorgWorldNetwork
 
-import gk.kademlia.id.NUID
-import gk.kademlia.net.NetMask
-import gk.kademlia.routing.RoutingTable
-import borg.trikeshed.num.BigInt as BigInteger
-
-interface Agent<TNum : Comparable<TNum>, Sz : NetMask<TNum>> {
-    /**
-     * Network Unique Id
-     */
-    val NUID: NUID<TNum>
-    val routingTable: RoutingTable<TNum, Sz>
-}
-
-class WorldAgent(
-    override val NUID: NUID<BigInteger>,
-    override val routingTable: RoutingTable<BigInteger, WorldNetwork>,
-
-    ) : Agent<BigInteger, WorldNetwork>
-
-class WorldRouter(agentNUID: NUID<BigInteger>) : RoutingTable<BigInteger, WorldNetwork>(agentNUID)
-
-
-object WorldNetwork : NetMask<BigInteger> {
-    override val bits: Int
-        get() = 128
-}
+typealias Agent<TNum, Sz> = BorgAgent<TNum, Sz>
+typealias WorldRouter = BorgWorldRouter
+typealias WorldNetwork = BorgWorldNetwork

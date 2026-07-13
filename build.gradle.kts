@@ -212,9 +212,6 @@ val jvmMain = getByName("jvmMain") {
 // ─────────────────────────────────────────────────────────────────
 
 // 1. Force explicit tasks instead of dynamic property creation
-tasks.register("kmpPartiallyResolvedDependenciesChecker") {
-    doLast { }
-}
 
 tasks.named("checkKotlinGradlePluginConfigurationErrors") {
     enabled = false
@@ -290,10 +287,10 @@ tasks.withType<JavaCompile>().configureEach {
 }
 
 // Explicit test configuration to force Karma Electron usage
-tasks.named("jsTest", org.jetbrains.kotlin.gradle.targets.js.testing.KotlinJsTest::class) {
+tasks.named("jsNodeTest", org.jetbrains.kotlin.gradle.targets.js.testing.KotlinJsTest::class) {
     dependsOn("jsBrowserTest")
 }
-tasks.named("wasmJsTest", org.jetbrains.kotlin.gradle.targets.js.testing.KotlinJsTest::class) {
+tasks.named("wasmJsNodeTest", org.jetbrains.kotlin.gradle.targets.js.testing.KotlinJsTest::class) {
     dependsOn("wasmJsBrowserTest")
 }
 
@@ -304,9 +301,6 @@ tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach 
     }
 }
 
-tasks.register<Jar>("jvmJar") {
-    archiveBaseName.set("trikeshed-jvm")
-    from(kotlin.sourceSets.getByName("jvmMain").kotlin.srcDirs)
     from(kotlin.sourceSets.getByName("jvmMain").resources.srcDirs)
 }
 
