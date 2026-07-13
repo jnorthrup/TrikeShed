@@ -54,6 +54,7 @@ class CouchStore(
     // DocId -> Document (using MutableSeries as index)
     private val docs = mutableSeriesOf<Document>()
     private val docIndex = mutableMapOf<String, Int>() // docId -> index in docs
+    private val fieldIndex = mutableMapOf<String, MutableMap<Any, MutableSet<String>>>()
     
     // Mutation event stream for subscribers
     private val mutations = mutableSeriesOf<MutationEvent>()
@@ -70,13 +71,16 @@ class CouchStore(
     fun put(document: Document): Boolean {
         val existingIndex = docIndex[document.id]
         if (existingIndex != null) {
+            removeFromFieldIndex(docs[existingIndex])
             docs.set(existingIndex, document)
+            addToFieldIndex(document)
             mutations.append(MutationEvent.Updated(document))
             persistence?.persist(document)
             return false // updated
         } else {
             docs.append(document)
             docIndex[document.id] = docs.a - 1
+            addToFieldIndex(document)
             mutations.append(MutationEvent.Inserted(document))
             persistence?.persist(document)
             return true // inserted
@@ -96,6 +100,7 @@ class CouchStore(
      */
     fun delete(docId: String): Boolean {
         val idx = docIndex.remove(docId) ?: return false
+        removeFromFieldIndex(docs[idx])
         docs.removeAt(idx)
         // Rebuild index (simplest correct approach for in-memory)
         docIndex.clear()
@@ -107,6 +112,24 @@ class CouchStore(
         return true
     }
     
+    private fun addToFieldIndex(doc: Document) {
+        for (field in doc.fields) {
+            fieldIndex.getOrPut(field.name) { mutableMapOf() }
+                      .getOrPut(field.value) { mutableSetOf() }
+                      .add(doc.id)
+        }
+    }
+
+    private fun removeFromFieldIndex(doc: Document) {
+        for (field in doc.fields) {
+            val innerMap = fieldIndex[field.name]
+            if (innerMap != null) {
+                val set = innerMap[field.value]
+                set?.remove(doc.id)
+            }
+        }
+    }
+
     /**
      * Check if document exists.
      */
@@ -132,10 +155,10 @@ class CouchStore(
 
     /** Query by field value equality. */
     fun query(fieldName: String, value: Any): QueryResult {
-        val matched = ArrayList<Document>()
-        for (i in 0 until docs.a) {
-            val doc = docs[i]
-            if (doc.fields.any { it.name == fieldName && it.value == value }) matched.add(doc)
+        val matchedIds = fieldIndex[fieldName]?.get(value) ?: emptySet()
+        val matched = ArrayList<Document>(matchedIds.size)
+        for (id in matchedIds) {
+            docIndex[id]?.let { idx -> matched.add(docs[idx]) }
         }
         val series: Series<Document> = matched.size j { matched[it] }
         return QueryResult(buildCursorFromSeries(series), matched.size.toLong())
