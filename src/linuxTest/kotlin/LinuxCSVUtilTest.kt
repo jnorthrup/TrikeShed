@@ -1,7 +1,7 @@
 package borg.trikeshed.isam
 
 import borg.trikeshed.common.*
-import borg.trikeshed.common.FileBuffer
+import borg.trikeshed.lib.FileBuffer
 import borg.trikeshed.common.Files
 import borg.trikeshed.common.TypeEvidence
 import borg.trikeshed.cursor.Cursor

@@ -6,6 +6,13 @@ import java.lang.constant.MethodTypeDesc
 
 object AotClassfileTransformer {
     fun transformDirectory(dir: File) {
+        require(dir.isDirectory) { "Expected a class directory: $dir" }
+        dir.walkTopDown()
+            .filter { it.isFile && it.extension == "class" }
+            .forEach(::transformFile)
+    }
+
+    private fun transformFile(file: File) {
         // Implementation provided via Java ClassFile API interop wrapper since Kotlin
         // compiler has issues parsing Java 24/25 new java.lang.classfile.*
         val bytes = file.readBytes()

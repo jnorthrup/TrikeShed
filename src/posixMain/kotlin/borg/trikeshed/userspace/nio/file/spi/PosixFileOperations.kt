@@ -2,6 +2,7 @@
 
 package borg.trikeshed.userspace.nio.file.spi
 
+import borg.trikeshed.common.createTempDirectory
 import borg.trikeshed.lib.*
 import kotlinx.cinterop.*
 import platform.posix.*
@@ -121,8 +122,8 @@ class PosixFileOperations : FileOperations {
 
     override fun size(fd: Int): Long = memScoped {
         val st = alloc<stat>()
-        if (fstat(fd, st.ptr) == 0) st.st_size else 0L
+        if (fstat(fd, st.ptr) == 0) st.st_size else -1L
     }
 
-    override fun createTempDir(prefix: String): String = "/tmp/$prefix-${generateSequence { ('a'..'z').random() }.take(8).joinToString("")}"
+    override fun createTempDir(prefix: String): String = createTempDirectory(prefix)
 }

@@ -49,11 +49,11 @@ kotlin {
         )
     }
 
-    jvmToolchain(21)
+    jvmToolchain(25)
 
     jvm {
         @OptIn(ExperimentalKotlinGradlePluginApi::class) compilerOptions {
-            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21)
+            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_25)
             freeCompilerArgs.addAll(
                 listOf(
                     "-J--add-exports=java.base/jdk.internal.classfile=ALL-UNNAMED",
@@ -107,6 +107,8 @@ kotlin {
             }
         }
     }
+
+    macosArm64()
 
     sourceSets {
         val commonMain = getByName("commonMain") {
@@ -176,28 +178,32 @@ val jvmMain = getByName("jvmMain") {
             resources.srcDir("src/jmhMain/resources")
         }
         val jvmTest = getByName("jvmTest") {
-            // TODO(confix-serialization): these tests currently assert a cursor-backed
-            // JSON/CBOR/YAML round trip, but decode returns MissingFieldException for
-            // object payloads and a list mismatch for primitive arrays. Keep them out
-            // of the global `gradle build` gate until the ConfixDoc -> JsonElement
-            // cursor walk is repaired; run explicitly with:
-            //   ./gradlew :jvmTest --tests 'borg.trikeshed.parse.confix.ConfixSerializationTest'
-            kotlin.exclude("**/ConfixSerializationTest.kt")
             // ViewServerTest has pre-existing compile errors unrelated to current work
             kotlin.exclude("**/ViewServerTest.kt")
             dependencies {
                 implementation("org.junit.jupiter:junit-jupiter-api:5.10.2")
                 implementation("org.junit.jupiter:junit-jupiter-engine:5.10.2")
                 implementation("org.jetbrains.kotlin:kotlin-test-junit5")
+                implementation("junit:junit:4.13.2")
             }
         }
 
-        val linuxX64Main = getByName("linuxX64Main") {
-            dependsOn(commonMain)
+        val nativeMain = maybeCreate("nativeMain").apply { dependsOn(commonMain) }
+        val nativeTest = maybeCreate("nativeTest").apply { dependsOn(commonTest) }
+        val posixMain = maybeCreate("posixMain").apply { dependsOn(nativeMain) }
+        val posixTest = maybeCreate("posixTest").apply { dependsOn(nativeTest) }
+        val linuxMain = maybeCreate("linuxMain").apply {
+            dependsOn(posixMain)
+            kotlin.exclude("linux_uring/**")
         }
-        val linuxX64Test = getByName("linuxX64Test") {
-            dependsOn(commonTest)
-        }
+        val linuxTest = maybeCreate("linuxTest").apply { dependsOn(posixTest) }
+        val macosMain = maybeCreate("macosMain").apply { dependsOn(posixMain) }
+        val macosTest = maybeCreate("macosTest").apply { dependsOn(posixTest) }
+
+        getByName("linuxX64Main").dependsOn(linuxMain)
+        getByName("linuxX64Test").dependsOn(linuxTest)
+        getByName("macosArm64Main").dependsOn(macosMain)
+        getByName("macosArm64Test").dependsOn(macosTest)
 
         // Use standard commonMain configuration, intercept cinterops compilation later
         all {
@@ -211,33 +217,31 @@ val jvmMain = getByName("jvmMain") {
 // Gradle Configuration Cache / Deprecation Suppression Hooks
 // ─────────────────────────────────────────────────────────────────
 
-// 1. Force explicit tasks instead of dynamic property creation
-tasks.register("kmpPartiallyResolvedDependenciesChecker") {
-    doLast { }
-}
-
 tasks.named("checkKotlinGradlePluginConfigurationErrors") {
     enabled = false
 }
 
 // ─────────────────────────────────────────────────────────────────
-// CInterop - Only compile io_uring bindings for focusedTransportSlice
+// CInterop - Linux production actuals import this binding directly.
 // ─────────────────────────────────────────────────────────────────
 
-if (focusedTransportSlice) {
-    kotlin {
-        linuxX64 {
-            compilations.getByName("main") {
-                cinterops {
-                    val liburing by creating {
-                        defFile = project.file("io_uring_interop/liburing.def")
-                        compilerOpts("-I${project.rootDir}/liburing/src/include", "-I${project.rootDir}/io_uring_interop")
-                    }
+kotlin {
+    linuxX64 {
+        compilations.getByName("main") {
+            cinterops {
+                val zlinux_uring by creating {
+                    defFile = project.file("io_uring_interop/zlinux_uring.def")
+                    compilerOpts(
+                        "-I${project.rootDir}/liburing/src/include",
+                        "-I${project.rootDir}/io_uring_interop",
+                    )
                 }
             }
         }
     }
-} else {
+}
+
+if (!focusedTransportSlice) {
     // Exclude transport tests from global runs to avoid CInterop linker errors
     kotlin {
         sourceSets.getByName("commonTest") {
@@ -290,10 +294,10 @@ tasks.withType<JavaCompile>().configureEach {
 }
 
 // Explicit test configuration to force Karma Electron usage
-tasks.named("jsTest", org.jetbrains.kotlin.gradle.targets.js.testing.KotlinJsTest::class) {
+tasks.named("jsTest") {
     dependsOn("jsBrowserTest")
 }
-tasks.named("wasmJsTest", org.jetbrains.kotlin.gradle.targets.js.testing.KotlinJsTest::class) {
+tasks.named("wasmJsTest") {
     dependsOn("wasmJsBrowserTest")
 }
 
@@ -302,12 +306,6 @@ tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach 
     if (name.contains("Jvm")) {
         dependsOn("jvmProcessResources")
     }
-}
-
-tasks.register<Jar>("jvmJar") {
-    archiveBaseName.set("trikeshed-jvm")
-    from(kotlin.sourceSets.getByName("jvmMain").kotlin.srcDirs)
-    from(kotlin.sourceSets.getByName("jvmMain").resources.srcDirs)
 }
 
 // JMH Setup

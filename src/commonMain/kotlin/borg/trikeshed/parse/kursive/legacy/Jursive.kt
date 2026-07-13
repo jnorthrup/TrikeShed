@@ -6,7 +6,6 @@ import borg.trikeshed.cursor.MapTypeMemento
 import borg.trikeshed.cursor.RowVec
 import borg.trikeshed.cursor.SeqTypeMemento
 import borg.trikeshed.cursor.TypeMemento
-import borg.trikeshed.cursor.joins
 import borg.trikeshed.cursor.label
 import borg.trikeshed.lib.SeriesBuffer
 import borg.trikeshed.lib.CharSeries

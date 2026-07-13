@@ -3,8 +3,6 @@
 package borg.trikeshed.userspace
 
 import kotlinx.cinterop.*
-import platform.posix.sockaddr
-import platform.posix.msghdr
 import zlinux_uring.IORING_FSYNC_DATASYNC
 import zlinux_uring.io_uring
 import zlinux_uring.io_uring_cq_advance
@@ -63,7 +61,12 @@ internal actual object LiburingImpl : LiburingFacade {
     actual override fun prepConnect(fd: Int, addrPtr: Long, addrLen: Int, userData: Long): Result<Unit> =
         prepare(userData) { sqe ->
             sqe.pointed.user_data = userData.toULong()
-            io_uring_prep_connect(sqe, fd, addrPtr.toCPointer<sockaddr>(), addrLen.toUInt())
+            io_uring_prep_connect(
+                sqe,
+                fd,
+                addrPtr.toCPointer<ByteVar>()?.reinterpret(),
+                addrLen.toUInt(),
+            )
         }
 
     actual override fun prepClose(fd: Int, userData: Long): Result<Unit> =

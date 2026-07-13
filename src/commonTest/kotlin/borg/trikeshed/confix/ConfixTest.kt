@@ -80,6 +80,28 @@ class ConfixTest {
         assertEquals(4, dc.size)
     }
 
+    @Test fun `direct children retain source order for object key value pairs`() {
+        val doc = confixDoc("""{"first":1,"second":2}""")
+        val directChildren = doc.index.facet(ConfixIndexK.DirectChildren)(0)
+        val spans = doc.index.facet(ConfixIndexK.Spans)
+
+        assertEquals(4, directChildren.size)
+        for (index in 1 until directChildren.size) {
+            assertTrue(
+                spans[directChildren[index - 1]].a < spans[directChildren[index]].a,
+                "DirectChildren must retain source order so object cursors expose key/value pairs",
+            )
+        }
+
+        val firstKey = doc.index.facet(ConfixIndexK.KeyToChild)("first")
+        assertNotNull(firstKey)
+        val firstValue = doc.index.valueIndexFor(firstKey)
+        assertNotNull(firstValue)
+        val span = spans[firstValue]
+        val source = CharArray(span.b - span.a + 1) { doc.src[span.a + it].toInt().toChar() }.concatToString()
+        assertEquals("1", source)
+    }
+
     @Test fun `tree cursor produces rows`() {
         val cursor = Syntax.JSON.scan(src("[1,2]"))
         assertTrue(cursor.size >= 0)
@@ -113,6 +135,34 @@ class ConfixTest {
         val b = byteArrayOf(0x83.toByte(), 0x01, 0x02, 0x03)
         val cursor = Syntax.CBOR.scan(b.size j { i: Int -> b[i] })
         assertTrue(cursor.size > 0)
+    }
+
+    @Test fun `CBOR index facets use the same scanner geometry as the tree cursor`() {
+        val bytes = byteArrayOf(
+            0xA1.toByte(),
+            0x65.toByte(), 0x68, 0x65, 0x6C, 0x6C, 0x6F,
+            0x01,
+        )
+        val doc = confixDoc(bytes, Syntax.CBOR)
+        val tags = doc.index.facet(ConfixIndexK.Tags)
+        val children = doc.index.facet(ConfixIndexK.DirectChildren)
+
+        assertEquals(IOMemento.IoObject, tags[0])
+        assertEquals(IOMemento.IoObject, doc.root?.tag)
+        assertEquals(2, children(0).size)
+    }
+
+    @Test fun `CBOR scalar rows reify text payloads and unsigned integers`() {
+        val bytes = byteArrayOf(
+            0xA1.toByte(),
+            0x65.toByte(), 0x68, 0x65, 0x6C, 0x6C, 0x6F,
+            0x01,
+        )
+        val doc = confixDoc(bytes, Syntax.CBOR)
+        val children = doc.root!!.kids
+
+        assertEquals("hello", children[0].reify(doc.src))
+        assertEquals(1L, children[1].reify(doc.src))
     }
 
     @Test fun `decodeText strips quotes`() {

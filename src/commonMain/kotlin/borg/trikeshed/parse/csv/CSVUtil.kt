@@ -240,14 +240,14 @@ object CSVUtil {
             debug { reporter = FibonacciReporter(lines.size) }
 
 
-            lines α { line ->
+            lines.toSeries() α { line ->
                 //y axis here
 
                 val lserr: Series<Byte> = file.drop(line.a)[0 until line.b.size]
-                line.b.withIndex() α { (x, b): IndexedValue<Int> ->
+                line.b.size j { x: Int ->
                     //x axis here
 
-                    val delimitRange = DelimitRange(b)
+                    val delimitRange = DelimitRange(line.b[x])
                     CharSeries(
                         lserr[delimitRange.start.toInt() until delimitRange.endInclusive.inc().toInt()].decodeUtf8()
                     ) j {

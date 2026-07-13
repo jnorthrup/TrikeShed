@@ -2,8 +2,6 @@
 
 package borg.trikeshed.lib
 
-import borg.trikeshed.cursor.j
-
 class SeriesBuffer<T>(
     capacity: Int = 8,
 ) : MutableSeries<T> {
