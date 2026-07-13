@@ -7,6 +7,7 @@ import borg.trikeshed.lib.j
 import borg.trikeshed.parse.confix.ConfixDoc
 import org.graalvm.polyglot.Context
 import org.graalvm.polyglot.Value
+import org.graalvm.polyglot.HostAccess
 
 /**
  * A CouchDB 1.6/1.7 compatible View Server running in-process via GraalVM Polyglot Javascript.
@@ -19,6 +20,10 @@ class GraalVmViewServer(
 ) : AutoCloseable {
 
     private val context: Context = Context.newBuilder("js")
+        .allowHostAccess(HostAccess.NONE)
+        .allowIO(false)
+        .allowNativeAccess(false)
+        .allowCreateThread(false)
         .build()
 
     /**
