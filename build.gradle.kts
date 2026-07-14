@@ -343,8 +343,6 @@ tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach 
     }
 }
 
-    from(kotlin.sourceSets.getByName("jvmMain").resources.srcDirs)
-}
 
 // JMH Setup
 tasks.register<JavaExec>("jmh") {
@@ -371,7 +369,7 @@ tasks.register<JavaExec>("jmhConfix") {
     dependsOn(":compileKotlinJvm")
     mainClass.set("org.openjdk.jmh.Main")
     classpath(tasks.named("jvmJar"), configurations.named("jvmRuntimeClasspath"))
-    args("ConfixDocCursorBenchmark", "-wi", "5", "-i", "10", "-f", "1")
+    args("borg.trikeshed.parse.confix.ConfixDocCursorBenchmark", "-wi", "5", "-i", "10", "-f", "1")
 }
 
 tasks.register<JavaExec>("jmhWal") {
