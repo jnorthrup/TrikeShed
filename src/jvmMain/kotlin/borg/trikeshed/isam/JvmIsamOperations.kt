@@ -9,11 +9,14 @@ import borg.trikeshed.isam.meta.IsamMetaFileReader
 import borg.trikeshed.lib.*
 import java.io.RandomAccessFile
 import java.nio.ByteBuffer
-import java.nio.channels.SeekableByteChannel
 import java.nio.file.Files
 import java.nio.file.Paths
 import java.nio.file.StandardOpenOption.*
-import java.util.concurrent.locks.ReentrantLock
+import borg.trikeshed.userspace.openUserspaceChannelBackend
+import borg.trikeshed.userspace.UringOp.Companion.Submissions
+import borg.trikeshed.userspace.nio.file.Files as UserspaceFiles
+import borg.trikeshed.userspace.nio.file.File as UserspaceFile
+import borg.trikeshed.userspace.nio.ByteBuffer as UserspaceByteBuffer
 
 class JvmIsamDataReader(
     val datafileFilename: String,
@@ -27,8 +30,7 @@ class JvmIsamDataReader(
     private val maxGroupId: Int by lazy {
         constraints.view.map { it.groupId }.maxOrNull() ?: 0
     }
-    private val groupChannels = mutableMapOf<String, SeekableByteChannel>()
-    private val lock: ReentrantLock = ReentrantLock()
+    private val groupFiles = mutableMapOf<String, UserspaceFile>()
 
     private val primaryGroupFilename: String by lazy {
         val primaryGname = columnsByGroup.entries.firstOrNull { entry ->
@@ -39,26 +41,49 @@ class JvmIsamDataReader(
     }
 
     override val recordCount: Int by lazy {
-        val channel = groupChannels[primaryGroupFilename] ?: groupChannels.values.first()
+        val file = groupFiles[primaryGroupFilename] ?: groupFiles.values.first()
         val groupCols = columnsByGroup[primaryGroupFilename] ?: columnsByGroup.values.first()
         val groupRecordLen = groupCols.sumOf { it.end - it.begin }
-        (channel.size().toInt() / groupRecordLen)
+        (file.size().toInt() / groupRecordLen)
     }
 
     override val readRow: (Int) -> RowVec = { row ->
         val groupBuffers = mutableMapOf<String, ByteArray>()
-        lock.lock()
-        try {
-            for ((gname, cols) in columnsByGroup) {
-                val channel = groupChannels[gname]!!
-                val groupRecordLen = cols.sumOf { it.end - it.begin }
-                val buffer = ByteBuffer.allocate(groupRecordLen)
-                channel.position(row * groupRecordLen.toLong())
-                channel.read(buffer)
-                groupBuffers[gname] = buffer.position(0).array()
-            }
-        } finally {
-            lock.unlock()
+        val backend = borg.trikeshed.userspace.openUserspaceChannelBackend(32)
+        val submissions = mutableListOf<borg.trikeshed.userspace.UringOp.Companion.UringSubmission>()
+
+        var userData = 1L
+        val gnames = mutableListOf<String>()
+        val nioBufs = mutableListOf<java.nio.ByteBuffer>()
+
+        for ((gname, cols) in columnsByGroup) {
+            val file = groupFiles[gname]!!
+            val groupRecordLen = cols.sumOf { it.end - it.begin }
+            val nioBuf = java.nio.ByteBuffer.allocateDirect(groupRecordLen)
+
+            val addr = nioBuf.let { java.lang.reflect.Field::class.java.getDeclaredField("address").apply { isAccessible = true } }.run { getLong(this) }
+
+            val wrapperBuf = borg.trikeshed.userspace.nio.ByteBuffer(nioBuf.array()) // Fake wrapper for compat
+            submissions.add(borg.trikeshed.userspace.UringOp.Companion.Submissions.read(
+                fd = file.id,
+                bufAddr = addr,
+                len = groupRecordLen,
+                offset = row * groupRecordLen.toLong(),
+                userData = userData++
+            ).copy(buffer = wrapperBuf))
+
+            gnames.add(gname)
+            nioBufs.add(nioBuf)
+        }
+
+        backend.submitBatch(submissions)
+
+        for (i in gnames.indices) {
+            val buf = nioBufs[i]
+            val arr = ByteArray(buf.capacity())
+            buf.position(0)
+            buf.get(arr)
+            groupBuffers[gnames[i]] = arr
         }
 
         constraints.size j { colIdx ->
@@ -83,12 +108,12 @@ class JvmIsamDataReader(
             } else {
                 getGroupFilename(datafileFilename, gname)
             }
-            groupChannels[gname] = Files.newByteChannel(Paths.get(gfilename), READ)
+            groupFiles[gname] = UserspaceFiles.open(gfilename, readOnly = true)
         }
     }
 
     override fun close() {
-        groupChannels.values.forEach { it.close() }
+        groupFiles.values.forEach { it.close() }
         metafile.close()
     }
 }
@@ -115,8 +140,8 @@ class JvmIsamOperations : IsamOperations {
         val columnsByGroup = meta0.view.groupBy { it.groupName }
         val maxGroupId = meta0.view.map { it.groupId }.maxOrNull() ?: 0
 
-        val groupChannels = mutableMapOf<String, SeekableByteChannel>()
-        val groupFiles = mutableMapOf<String, RandomAccessFile>()
+        val groupFiles = mutableMapOf<String, UserspaceFile>()
+        val offsets = mutableMapOf<String, Long>()
 
         for (gname in columnsByGroup.keys) {
             val cols = columnsByGroup[gname]!!
@@ -126,24 +151,43 @@ class JvmIsamOperations : IsamOperations {
             } else {
                 getGroupFilename(datafilename, gname)
             }
-            val raf = RandomAccessFile(gfilename, "rw")
-            groupFiles[gname] = raf
-            groupChannels[gname] = raf.channel
+
+            groupFiles[gname] = UserspaceFiles.open(gfilename, readOnly = false)
+            offsets[gname] = 0L
         }
+
+        val backend = borg.trikeshed.userspace.openUserspaceChannelBackend(32)
+        var userData = 1L
 
         cursor.iterator().forEach { rowVec ->
+            val submissions = mutableListOf<borg.trikeshed.userspace.UringOp.Companion.UringSubmission>()
+
             for ((gname, cols) in columnsByGroup) {
                 val groupRecordLen = cols.sumOf { it.end - it.begin }
-                val rowBuffer1 = ByteBuffer.allocate(groupRecordLen)
-                val rowBuffer = rowBuffer1.array()
+                val rowBuffer = ByteArray(groupRecordLen)
                 
                 writeGroupToBuffer(rowVec, rowBuffer, cols, meta0)
-                rowBuffer1.position(0)
-                groupChannels[gname]!!.write(rowBuffer1)
+
+                val nioBuf = java.nio.ByteBuffer.allocateDirect(groupRecordLen)
+                nioBuf.put(rowBuffer)
+                nioBuf.position(0)
+
+                val file = groupFiles[gname]!!
+                val addr = nioBuf.let { java.lang.reflect.Field::class.java.getDeclaredField("address").apply { isAccessible = true } }.run { getLong(this) }
+
+                val currentOffset = offsets[gname]!!
+                submissions.add(borg.trikeshed.userspace.UringOp.Companion.Submissions.write(
+                    fd = file.id,
+                    bufAddr = addr,
+                    len = groupRecordLen,
+                    offset = currentOffset,
+                    userData = userData++
+                ).copy(buffer = borg.trikeshed.userspace.nio.ByteBuffer(rowBuffer)))
+                offsets[gname] = currentOffset + groupRecordLen
             }
+            backend.submitBatch(submissions)
         }
 
-        groupChannels.values.forEach { it.close() }
         groupFiles.values.forEach { it.close() }
     }
 
@@ -160,7 +204,10 @@ class JvmIsamOperations : IsamOperations {
 
         var columnsByGroup: Map<String, List<RecordMeta>> = emptyMap()
         var maxGroupId = 0
-        val groupStreams = mutableMapOf<String, java.io.OutputStream>()
+
+                val groupFiles = mutableMapOf<String, UserspaceFile>()
+        val offsets = mutableMapOf<String, Long>()
+        var userData = 1L
 
         msf.forEach { rowVec1: RowVec ->
             val rowVec = transform?.let { it(rowVec1) } ?: rowVec1
@@ -177,20 +224,43 @@ class JvmIsamOperations : IsamOperations {
                     } else {
                         getGroupFilename(datafilename, gname)
                     }
-                    groupStreams[gname] = Files.newOutputStream(Paths.get(gfilename), APPEND, WRITE, CREATE)
+                    val file = UserspaceFiles.open(gfilename, readOnly = false)
+                    groupFiles[gname] = file
+                    offsets[gname] = file.size().takeIf { it >= 0 } ?: 0L
                 }
                 first = false
             }
 
+            val submissions = mutableListOf<borg.trikeshed.userspace.UringOp.Companion.UringSubmission>()
+
             for ((gname, cols) in columnsByGroup) {
                 val groupRecordLen = cols.sumOf { it.end - it.begin }
                 val rowBuffer = ByteArray(groupRecordLen)
+
                 writeGroupToBuffer(rowVec, rowBuffer, cols, meta0)
-                groupStreams[gname]!!.write(rowBuffer)
+
+                val nioBuf = java.nio.ByteBuffer.allocateDirect(groupRecordLen)
+                nioBuf.put(rowBuffer)
+                nioBuf.position(0)
+
+                val file = groupFiles[gname]!!
+                val addr = nioBuf.let { java.lang.reflect.Field::class.java.getDeclaredField("address").apply { isAccessible = true } }.run { getLong(this) }
+
+                val currentOffset = offsets[gname]!!
+                submissions.add(Submissions.write(
+                    fd = file.id,
+                    bufAddr = addr,
+                    len = groupRecordLen,
+                    offset = currentOffset,
+                    userData = userData++
+                ).copy(buffer = UserspaceByteBuffer(rowBuffer)))
+                offsets[gname] = currentOffset + groupRecordLen
             }
+            val backend = openUserspaceChannelBackend(32)
+            backend.submitBatch(submissions)
         }
 
-        groupStreams.values.forEach { it.close() }
+        groupFiles.values.forEach { it.close() }
     }
 
     private fun writeGroupToBuffer(
