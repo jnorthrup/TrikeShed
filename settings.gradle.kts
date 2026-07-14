@@ -24,7 +24,6 @@ dependencyResolutionManagement {
 
 rootProject.name = "TrikeShed"
 
-// TrikeShed is root-only — all libs/ subprojects removed
 // Support hybrid kotlin xvm build if ../xvm exists
 if (java.io.File("../xvm").exists()) {
     includeBuild("../xvm")
