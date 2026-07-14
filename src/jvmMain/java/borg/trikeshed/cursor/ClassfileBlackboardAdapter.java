@@ -1,16 +1,16 @@
 package borg.trikeshed.cursor;
 
-import jdk.internal.classfile.Classfile;
-import jdk.internal.classfile.ClassModel;
-import jdk.internal.classfile.FieldModel;
-import jdk.internal.classfile.MethodModel;
+import java.lang.classfile.ClassFile;
+import java.lang.classfile.ClassModel;
+import java.lang.classfile.FieldModel;
+import java.lang.classfile.MethodModel;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
 /**
- * Adapter that maps Classfile metadata to a ConfixBlackboard using JDK 21+ Classfile API.
+ * Adapter that maps Classfile metadata to a ConfixBlackboard using JDK 25 Classfile API.
  */
 public class ClassfileBlackboardAdapter {
     private final ConfixBlackboard blackboard;
@@ -21,7 +21,7 @@ public class ClassfileBlackboardAdapter {
 
     public void attachClass(byte[] classfileBytes) {
         try {
-            ClassModel cm = Classfile.parse(classfileBytes);
+            ClassModel cm = ClassFile.of().parse(classfileBytes);
             String id = cm.thisClass().asInternalName();
             String json = buildJson(cm);
             ClassfileBlackboardAdapterExtKt.attachClassToBlackboard(blackboard, id, json);
@@ -33,7 +33,7 @@ public class ClassfileBlackboardAdapter {
     public void parseAndRegister(Path path, String id) {
         try {
             byte[] bytes = Files.readAllBytes(path);
-            ClassModel cm = Classfile.parse(bytes);
+            ClassModel cm = ClassFile.of().parse(bytes);
             String json = buildJson(cm);
             ClassfileBlackboardAdapterExtKt.attachClassToBlackboard(blackboard, id, json);
         } catch (IOException e) {

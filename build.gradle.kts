@@ -44,32 +44,32 @@ kotlin {
             "-Xsuppress-version-warnings",
             "-Xexpect-actual-classes",
             "-Xallow-kotlin-package",
-            "--add-exports=java.base/jdk.internal.classfile=ALL-UNNAMED",
-            "--add-exports=java.base/jdk.internal.classfile.attribute=ALL-UNNAMED",
-            "--add-exports=java.base/jdk.internal.classfile.constantpool=ALL-UNNAMED",
-            "--add-exports=java.base/jdk.internal.classfile.instruction=ALL-UNNAMED",
-            "--add-exports=java.base/jdk.internal.classfile.models=ALL-UNNAMED",
         )
     }
 
-    jvmToolchain(21)
+    jvmToolchain(25)
 
-    jvm {}
+    jvm {
+        compilerOptions {
+            freeCompilerArgs = listOf(
+            )
+        }
+    }
 
     sourceSets {
-        val commonMain by getting {
+        val commonMain = getByName("commonMain") {
             dependencies {
                 api("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
                 api("org.jetbrains.kotlinx:kotlinx-datetime:0.8.0-0.6.x-compat")
             }
         }
-        val commonTest by getting {
+        val commonTest = getByName("commonTest") {
             dependencies {
                 implementation(kotlin("test"))
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
             }
         }
-        val jvmMain by getting {
+        val jvmMain = getByName("jvmMain") {
             resources.srcDir("src/jvmMain/resources")
             dependencies {
                 implementation("org.openjdk.jmh:jmh-core:1.37")
@@ -85,12 +85,13 @@ kotlin {
             kotlin.srcDir("src/jmhMain/kotlin")
             resources.srcDir("src/jmhMain/resources")
         }
-        val jvmTest by getting {
+        val jvmTest = getByName("jvmTest") {
             kotlin.exclude("**/ConfixSerializationTest.kt")
             kotlin.exclude("**/ViewServerTest.kt")
             dependencies {
                 implementation("org.junit.jupiter:junit-jupiter-api:5.10.2")
                 implementation("org.junit.jupiter:junit-jupiter-engine:5.10.2")
+                implementation("org.junit.vintage:junit-vintage-engine:5.10.2")
                 implementation("org.jetbrains.kotlin:kotlin-test-junit5")
             }
         }
@@ -109,7 +110,6 @@ kotlin {
         binaries.executable()
     }
 
-    @OptIn(ExperimentalWasmDsl::class)
     wasmJs {
         nodejs()
         browser {
@@ -123,6 +123,11 @@ kotlin {
         binaries.executable()
     }
 
+    // linuxX64 target - disabled by default, enable with -PenableLinuxX64=true
+// Build on Linux with: ./gradlew compileKotlinLinuxX64 -PenableLinuxX64=true
+val enableLinuxX64 = providers.gradleProperty("enableLinuxX64").orNull == "true"
+
+if (enableLinuxX64) {
     linuxX64 {
         if (enableNativeSharedLib) {
             binaries.sharedLib {
@@ -130,6 +135,10 @@ kotlin {
             }
         }
     }
+} else {
+    // Disable linuxX64 target when not building on Linux
+    // The linuxX64 target is only available on Linux hosts
+}
 
     sourceSets {
         val commonMain = getByName("commonMain") {
@@ -153,8 +162,10 @@ kotlin {
         val wasmJsMain = getByName("wasmJsMain") { dependsOn(commonMain) }
         val wasmJsTest = getByName("wasmJsTest") { dependsOn(commonTest) }
 
-        val linuxX64Main = getByName("linuxX64Main") { dependsOn(commonMain) }
-        val linuxX64Test = getByName("linuxX64Test") { dependsOn(commonTest) }
+        if (enableNativeSharedLib) {
+            val linuxX64Main = getByName("linuxX64Main") { dependsOn(commonMain) }
+            val linuxX64Test = getByName("linuxX64Test") { dependsOn(commonTest) }
+        }
 
         all {
             languageSettings.optIn("kotlinx.cinterop.ExperimentalForeignApi")
@@ -169,8 +180,8 @@ if (focusedTransportSlice) {
         linuxX64 {
             compilations.getByName("main") {
                 cinterops {
-                    val liburing by creating {
-                        defFile = project.file("io_uring_interop/liburing.def")
+                    val liburing = create("liburing") {
+                        defFile = project.file("src/linuxMain/resources/META-INF/cinterop/liburing.def")
                         compilerOpts("-I${project.rootDir}/liburing/src/include", "-I${project.rootDir}/io_uring_interop")
                     }
                 }
@@ -191,19 +202,14 @@ if (focusedTransportSlice) {
     }
 }
 
-// JVM args for internal APIs
-val internalExports = listOf(
-    "--add-exports", "java.base/jdk.internal.classfile=ALL-UNNAMED",
-    "--add-exports", "java.base/jdk.internal.classfile.constantpool=ALL-UNNAMED",
-    "--add-exports", "java.base/jdk.internal.classfile.instruction=ALL-UNNAMED",
-    "--add-exports", "java.base/jdk.internal.classfile.components=ALL-UNNAMED"
-)
+// JVM args for internal APIs - not needed for JDK 25+ where ClassFile API is public
+// val internalExports = listOf(
+//     "--add-exports", "java.base/java.lang.classfile=ALL-UNNAMED",
+//     "--add-exports", "java.base/java.lang.constant=ALL-UNNAMED"
+// )
 
 tasks.withType<JavaCompile>().configureEach {
-    options.compilerArgs.addAll(internalExports)
-    options.compilerArgs.addAll(
-        internalExports.map { "-J$it" }
-    )
+    // No internal exports needed for JDK 25+ public ClassFile API
 }
 
 tasks.withType<Test>().configureEach {
@@ -212,7 +218,7 @@ tasks.withType<Test>().configureEach {
         events("passed", "skipped", "failed")
         showStandardStreams = true
     }
-    jvmArgs(*internalExports.toTypedArray())
+    // No internal exports needed for JDK 25+
 }
 
 // Karma config

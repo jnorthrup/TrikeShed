@@ -1,12 +1,12 @@
 package borg.trikeshed.pointcut;
 
-import jdk.internal.classfile.ClassFile;
-import jdk.internal.classfile.ClassModel;
-import jdk.internal.classfile.ClassTransform;
-import jdk.internal.classfile.CodeBuilder;
-import jdk.internal.classfile.CodeElement;
-import jdk.internal.classfile.instruction.FieldInstruction;
-import jdk.internal.classfile.Opcode;
+import java.lang.classfile.ClassFile;
+import java.lang.classfile.ClassModel;
+import java.lang.classfile.ClassTransform;
+import java.lang.classfile.CodeBuilder;
+import java.lang.classfile.CodeElement;
+import java.lang.classfile.instruction.FieldInstruction;
+import java.lang.classfile.Opcode;
 import java.lang.constant.ClassDesc;
 import java.lang.constant.MethodTypeDesc;
 
@@ -36,6 +36,6 @@ public class JavaAotClassfileTransformer {
             }
         });
 
-        return ClassFile.of().transform(classModel, transform);
+        return ClassFile.of().transformClass(classModel, transform);
     }
 }
