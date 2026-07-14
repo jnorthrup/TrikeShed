@@ -1,33 +1,78 @@
-package borg.trikeshed.userspace.context
+package borg.trikeshed.context
 
-/* Compatibility layer: reuse the shared (libs/common) AsyncContextElement and ElementState
-   definitions to avoid duplicate interfaces across packages. This file provides thin
-   subclasses so userspace code can depend on borg.trikeshed.userspace.context
-   while the canonical implementations live under borg.trikeshed.context and
-   borg.trikeshed.userspace. */
-
-import borg.trikeshed.context.AsyncContextElement
-import borg.trikeshed.context.ElementState
-import borg.trikeshed.context.NioUserspaceElement as CanonicalNioUserspaceElement
-import borg.trikeshed.userspace.LiburingElement
-import borg.trikeshed.userspace.reactor.FanoutDispatcherElement
+import borg.trikeshed.context.ElementState.*
+import kotlinx.coroutines.CompletableJob
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlin.coroutines.CoroutineContext
 
-/** Alias to canonical ElementState from borg.trikeshed.context */
-typealias ElementLifecycleState = ElementState
-
 /**
- * Subclass the canonical NioUserspaceElement so its key is the userspace key.
- * This ensures ctx[AsyncContextKey.NioUserspaceKey] works correctly.
+ * Base for all Element lifecycle objects in the coroutine->context->key->element flow.
+ * Implementors hold their Key as a companion object singleton.
+ *
+ * Fanout semantics: an element may channel completions to N downstream
+ * subscribers via [fanoutSubscribers]. The element is responsible for
+ * dispatching completions to all subscribers atomically from its perspective.
  */
-open class NioUserspaceElement : CanonicalNioUserspaceElement() {
-    override val key: CoroutineContext.Key<*> get() = AsyncContextKey.NioUserspaceKey
-}
+abstract class AsyncContextElement(
+    initialState: ElementState = CREATED,
+    parentJob: Job? = null
+) : CoroutineContext.Element {
 
-open class LiburingElement : borg.trikeshed.context.LiburingElement() {
-    override val key: CoroutineContext.Key<*> get() = AsyncContextKey.LiburingKey
-}
+    /** Parent job passed to the internal SupervisorJob, or null. */
+    protected val parentJob: Job? = parentJob
 
-open class FanoutDispatcherElement : borg.trikeshed.context.FanoutDispatcherElement() {
-    override val key: CoroutineContext.Key<*> get() = AsyncContextKey.FanoutDispatcherKey
+    /** SupervisorJob for this element's coroutine scope. */
+    open val supervisor: CompletableJob = SupervisorJob(parentJob)
+
+    var state: ElementState = initialState
+        protected set
+
+    /** Alias for [state] — overrideable in anonymous test subclasses. */
+    open val lifecycleState: ElementState get() = state
+
+    /**
+     * Ordered list of downstream fanout subscribers.
+     * Each subscriber is an [AsyncContextElement] that will receive
+     * channelized completions from this element.
+     */
+    open val fanoutSubscribers: List<AsyncContextElement> = emptyList()
+
+    /** Abstract key property that must be implemented by subclasses. */
+    abstract override val key: CoroutineContext.Key<*>
+
+    /** Transition CREATED -> OPEN. Idempotent if already OPEN or later. */
+    open suspend fun open() {
+        if (state == CREATED) {
+            state = OPEN
+        }
+    }
+
+    /**
+     * Begin draining: stop accepting new work, process remaining completions,
+     * then transition to [ElementState.CLOSED].
+     */
+    open suspend fun drain() {
+        if (state.isAtLeast(OPEN) && state.isLessThan(DRAINING)) {
+            state = DRAINING
+            // Implementation specific drain logic here
+            close()
+        }
+    }
+
+    /** Transition OPEN -> DRAINING -> CLOSED. */
+    open suspend fun close() {
+        if (state.isAtLeast(OPEN) && state.isLessThan(CLOSED)) {
+            if (state < DRAINING) {
+                state = DRAINING
+            }
+            supervisor.cancel()
+            state = CLOSED
+        }
+    }
+
+    protected fun requireState(expected: ElementState) {
+        check(state == expected) { "Expected $expected but was $state" }
+    }
 }

@@ -2,13 +2,6 @@ package borg.trikeshed.userspace
 
 import borg.trikeshed.context.loadUserspaceNioSpi
 
-/**
- * JVM actual for [LiburingImpl].
- *
- * Resolves a [UserspaceNioSpi] via ServiceLoader; if its `liburing` surface is non-null
- * (i.e. implements [UserspaceNioSpi.LiburingSurface]), calls are forwarded.
- * Otherwise every call is non-fatal [unsupported].
- */
 internal actual object LiburingImpl : LiburingFacade {
     private val delegate: LiburingFacade? by lazy {
         runCatching { loadUserspaceNioSpi().liburing }.getOrNull()
@@ -44,13 +37,11 @@ internal actual object LiburingImpl : LiburingFacade {
     actual override fun prepMunmap(addr: Long, len: Int, userData: Long): Result<Unit> =
         delegate?.prepMunmap(addr, len, userData) ?: Result.failure(UnsupportedOperationException("liburing unavailable"))
 
-    actual override fun prepSendmsg(fd: Int, msgHdrPtr: Long, flags: Int, userData: Long): Result<Unit> = unsupported()
-    actual override fun prepRecvmsg(fd: Int, msgHdrPtr: Long, flags: Int, userData: Long): Result<Unit> = unsupported()
-
-    actual override fun submit(): Result<Int> = delegate?.submit() ?: unsupported()
+    actual override fun prepSendmsg(fd: Int, msgHdrPtr: Long, flags: Int, userData: Long): Result<Unit> =
+        Result.failure(UnsupportedOperationException("liburing unavailable"))
 
     actual override fun prepRecvmsg(fd: Int, msgHdrPtr: Long, flags: Int, userData: Long): Result<Unit> =
-        delegate?.prepRecvmsg(fd, msgHdrPtr, flags, userData) ?: Result.failure(UnsupportedOperationException("liburing unavailable"))
+        Result.failure(UnsupportedOperationException("liburing unavailable"))
 
     actual override fun submit(): Result<Int> =
         delegate?.submit() ?: Result.failure(UnsupportedOperationException("liburing unavailable"))
@@ -73,7 +64,9 @@ internal actual object LiburingImpl : LiburingFacade {
         delegate?.removeFanoutHandler(token, handler)
     }
 
-    actual override fun drain(): Result<Unit> = delegate?.drain() ?: Result.failure(UnsupportedOperationException("liburing unavailable"))
-    actual override fun close(): Result<Unit> = delegate?.close() ?: Result.failure(UnsupportedOperationException("liburing unavailable"))
+    actual override fun drain(): Result<Unit> =
+        delegate?.drain() ?: Result.failure(UnsupportedOperationException("liburing unavailable"))
 
+    actual override fun close(): Result<Unit> =
+        delegate?.close() ?: Result.failure(UnsupportedOperationException("liburing unavailable"))
 }
