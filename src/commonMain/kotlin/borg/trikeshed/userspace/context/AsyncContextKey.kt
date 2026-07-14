@@ -1,6 +1,5 @@
 package borg.trikeshed.userspace.context
 
-import borg.trikeshed.userspace.reactor.FanoutDispatcherElement
 import kotlin.coroutines.CoroutineContext
 
 /**
@@ -18,10 +17,6 @@ import kotlin.coroutines.CoroutineContext
  *              ctx[FanoutDispatcherKey] returns FanoutDispatcherElement? without unsafe cast.
  */
 sealed class AsyncContextKey {
-
-    object BtrfsCodecKey : AsyncContextKey(), CoroutineContext.Key<borg.trikeshed.userspace.btrfs.BtrfsCodecElement>
-
-    object LiburingKey : AsyncContextKey(), CoroutineContext.Key<borg.trikeshed.userspace.LiburingElement>
 
     /**
      * Key for TrikeShed Userspace NIO context elements.
@@ -43,4 +38,25 @@ sealed class AsyncContextKey {
      * Type-parameterized as Key<FanoutDispatcherElement> for safe context lookup.
      */
     object FanoutDispatcherKey : AsyncContextKey(), CoroutineContext.Key<FanoutDispatcherElement>
+
+    /**
+     * Key for Btrfs little-endian codec context elements.
+     * Btrfs on-disk format is little-endian; this codec is distinct from
+     * PlatformCodec.wireCodec (which is BIG_ENDIAN for network protocols).
+     * Singleton object: always compare by identity (===).
+     * Type-parameterized as Key<BtrfsCodecElement> for safe context lookup.
+     */
+    object BtrfsCodecKey : AsyncContextKey(), CoroutineContext.Key<BtrfsCodecElement>
+}
+
+interface LiburingElement : CoroutineContext.Element {
+    companion object Key : CoroutineContext.Key<LiburingElement>
+}
+
+interface FanoutDispatcherElement : CoroutineContext.Element {
+    companion object Key : CoroutineContext.Key<FanoutDispatcherElement>
+}
+
+interface BtrfsCodecElement : CoroutineContext.Element {
+    companion object Key : CoroutineContext.Key<BtrfsCodecElement>
 }

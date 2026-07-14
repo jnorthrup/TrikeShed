@@ -6,21 +6,22 @@ import borg.trikeshed.couch.ViewServer
 import borg.trikeshed.htx.HtxRequest
 import borg.trikeshed.htx.HtxResponse
 import borg.trikeshed.htx.HtxMethod
-import borg.trikeshed.htx.HtxStatus
 import borg.trikeshed.htx.HtxHeader
 import borg.trikeshed.htx.HtxHeaders
 import borg.trikeshed.htx.htxHeaders
 import borg.trikeshed.lib.ByteSeries
 import borg.trikeshed.lib.j
+import borg.trikeshed.lib.toSeries
 import borg.trikeshed.htx.HtxReactorElement
 import borg.trikeshed.htx.openHtxReactorElement
-import borg.trikeshed.userspace.nio.channels.spi.NioSupervisor
+import borg.trikeshed.userspace.nio.spi.NioSupervisor
 import borg.trikeshed.reactor.TlsApplicationProtocol
 import borg.trikeshed.reactor.TlsConfig
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 
 class RfxHttpServerJvm(
     override val store: ConfixDocStore = ConfixDocStoreFactory.create(),
@@ -65,7 +66,7 @@ class RfxHttpServerJvm(
 
     /**
      * Start underlying Reactor HtxElement to handle connections.
-     * We initialize a full polyglot reactor configuration allowing HTTP 1/2/3 ALPN configurations.
+     * We initialize a full polyglot reactor configuration allowing HTTP 1/2 ALPN configurations.
      *
      * (Note: SCTP/QUIC implementation resides in external QUIC reactor module, so we enable HTTP/3 ALPN intent here)
      */
@@ -75,13 +76,12 @@ class RfxHttpServerJvm(
         val scope = CoroutineScope(supervisorJob)
 
         scope.launch {
-            // Configure TLS / ALPN for HTTP/1.1, HTTP/2, and HTTP/3
+            // Configure TLS / ALPN for HTTP/1.1 and HTTP/2
             val tlsConfig = TlsConfig(
-                alpnProtocols = borg.trikeshed.lib.seriesOf(
+                alpnProtocols = arrayOf(
                     TlsApplicationProtocol.HTTP_1_1,
-                    TlsApplicationProtocol.HTTP_2,
-                    TlsApplicationProtocol.HTTP_3
-                )
+                    TlsApplicationProtocol.H2
+                ).toList().toSeries()
             )
 
             // Open the HTX Reactor via the NioSupervisor.
@@ -99,6 +99,6 @@ class RfxHttpServerJvm(
 
     override fun stop() {
         job?.cancel()
-        reactor?.close()
+        runBlocking { reactor?.close() }
     }
 }

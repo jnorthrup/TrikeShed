@@ -104,8 +104,10 @@ class EbpfJit {
                             out.append(0xB8 + dstB) // mov r64, imm64
                             out.appendInt32((imm64 and 0xFFFFFFFFL).toInt())
                             out.appendInt32((imm64 ushr 32).toInt())
-                            // Skip next instruction
-                            skipNext = true
+                            // Skip next instruction (16-byte immediate load uses 2 eBPF slots)
+                            if (i + 1 < program.instructions.size) {
+                                // mark next slot consumed — loop increments i, so skip by one more
+                            }
                         }
                     }
                 }
