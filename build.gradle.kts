@@ -15,13 +15,19 @@ val enableNativeSharedLib = providers.gradleProperty("native.sharedLib").orNull 
 
 val focusedTransportSlice = providers.gradleProperty("focusedTransportSlice").orNull == "true"
 
+// ── Locked versions ───────────────────────────────────────────────────────
+// GraalVM CE 25.0.2 is the locked runtime; JDK 25 toolchain.
+val graalVersion = "25.0.2"
+
 extra["versions.kotlinx-coroutines-core"] = "1.11.0"
 extra["versions.kotlinx-coroutines-test"] = "1.11.0"
 extra["versions.kotlinx-datetime"] = "0.8.0-0.6.x-compat"
+extra["versions.kotlinx-serialization"] = "1.11.0"
 
 val coroutinesVersion = extra["versions.kotlinx-coroutines-core"] as String
 val coroutinesTestVersion = extra["versions.kotlinx-coroutines-test"] as String
 val datetimeVersion = extra["versions.kotlinx-datetime"] as String
+val serializationVersion = extra["versions.kotlinx-serialization"] as String
 
 repositories {
     maven("https://oss.sonatype.org/content/repositories/snapshots/")
@@ -59,14 +65,15 @@ kotlin {
     sourceSets {
         val commonMain = getByName("commonMain") {
             dependencies {
-                api("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
-                api("org.jetbrains.kotlinx:kotlinx-datetime:0.8.0-0.6.x-compat")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:$coroutinesVersion")
+                implementation("org.jetbrains.kotlinx:kotlinx-datetime:$datetimeVersion")
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-core:$serializationVersion")
             }
         }
         val commonTest = getByName("commonTest") {
             dependencies {
                 implementation(kotlin("test"))
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:$coroutinesTestVersion")
             }
         }
         val jvmMain = getByName("jvmMain") {
@@ -76,11 +83,13 @@ kotlin {
                 implementation("org.openjdk.jmh:jmh-generator-annprocess:1.37")
                 implementation("org.bouncycastle:bcprov-jdk15on:1.70")
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:$coroutinesVersion")
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
-                implementation("org.graalvm.polyglot:polyglot:25.0.2")
-                implementation("org.graalvm.polyglot:js-community:25.0.2")
-                implementation("org.graalvm.polyglot:python-community:25.0.2")
-                implementation("org.graalvm.truffle:truffle-api:25.0.2")
+
+                // GraalVM Polyglot — locked to 25.0.2 (GraalVM CE)
+                implementation("org.graalvm.polyglot:polyglot:$graalVersion")
+                implementation("org.graalvm.polyglot:js-community:$graalVersion")
+                implementation("org.graalvm.polyglot:python-community:$graalVersion")
+                implementation("org.graalvm.truffle:truffle-api:$graalVersion")
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:$serializationVersion")
             }
             kotlin.srcDir("src/jmhMain/kotlin")
             resources.srcDir("src/jmhMain/resources")
@@ -149,8 +158,6 @@ if (enableLinuxX64) {
             dependencies {
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:$coroutinesVersion")
                 implementation("org.jetbrains.kotlinx:kotlinx-datetime:$datetimeVersion")
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-cbor:1.7.3")
             }
         }
 
@@ -277,7 +284,7 @@ tasks.register<JavaExec>("benchmarkJoin") {
 
 tasks.register<JavaExec>("benchmarkSequence") {
     dependsOn("jvmJar")
-    mainClass.set("borg.trikeshed.lib.SequenceBenchmarkRunner")
+    mainClass.set("borg.trikiched.lib.SequenceBenchmarkRunner")
     classpath(tasks.named("jvmJar"), configurations.getByName("jvmRuntimeClasspath"))
 }
 
