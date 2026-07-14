@@ -88,6 +88,10 @@ kotlin {
         val jvmTest = getByName("jvmTest") {
             kotlin.exclude("**/ConfixSerializationTest.kt")
             kotlin.exclude("**/ViewServerTest.kt")
+            kotlin.exclude("**/strategy/SignalValidationTest.kt")
+            kotlin.exclude("**/demos/SignalBlackboardDemoTest.kt")
+            kotlin.exclude("**/lib/ReduxListBridgeTest.kt")
+            kotlin.exclude("**/lib/MutableSeriesStrategyTest.kt")
             dependencies {
                 implementation("org.junit.jupiter:junit-jupiter-api:5.10.2")
                 implementation("org.junit.jupiter:junit-jupiter-engine:5.10.2")

@@ -1,0 +1,1 @@
+/Users/jim/.zenith/projects/20260714T153941Z-execute-the-remaining-work-in-the-supplied-job-nexus-reverse-cha/.zenith/AGENTS.md
