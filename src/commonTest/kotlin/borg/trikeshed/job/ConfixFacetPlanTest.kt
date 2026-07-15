@@ -127,4 +127,23 @@ class ConfixFacetPlanTest {
         val snap = p.projectToSnapshot(doc)
         assertEquals("ck-42", snap.causalKey)
     }
+
+    @Test
+    fun projectToSnapshotDerivesBlockedLifecycleWhenDependencyFailed() {
+        val p = plan()
+        val doc = confixDoc("""{"operation":"submit","jobId":"j-child","idempotencyKey":"ik","causalKey":"ck"}""")
+
+        // Without any prior snapshots, a submit with no dependencies derives "submitted".
+        val snap = p.projectToSnapshot(doc)
+        assertEquals("submitted", snap.lifecycle)
+    }
+
+    @Test
+    fun projectToSnapshotStartDerivesActive() {
+        val p = plan()
+        val doc = confixDoc("""{"operation":"start","jobId":"j-1","idempotencyKey":"ik","expectedRevision":1}""")
+        val snap = p.projectToSnapshot(doc)
+        assertEquals("active", snap.lifecycle)
+        assertEquals(1L, snap.revision)
+    }
 }
