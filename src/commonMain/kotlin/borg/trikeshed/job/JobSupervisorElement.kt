@@ -71,6 +71,8 @@ class JobSupervisorElement private constructor(
     val committedCapacity: Int get() = capacity
     val commandChannelClosed: Boolean get() = _commands.isClosedForSend
     val committedChannelClosed: Boolean get() = _committed.isClosedForReceive
+    val factsChannelClosed: Boolean get() = _facts.isClosedForReceive
+    val activationsChannelClosed: Boolean get() = _activations.isClosedForReceive
 
     init {
         _lifecycleState = ElementState.OPEN
@@ -176,14 +178,20 @@ class JobSupervisorElement private constructor(
     }
 
     suspend fun drain() {
-        _lifecycleState = ElementState.DRAINING
-        _commands.close()
+        beginDrain()
         reactorJob.join()
         _committed.close()
         _facts.close()
         _activations.close()
         _lifecycleState = ElementState.CLOSED
         _rootJob.complete()
+    }
+
+    /** Transition to DRAINING and close the command channel without joining the reactor. */
+    fun beginDrain() {
+        if (_lifecycleState != ElementState.ACTIVE) return
+        _lifecycleState = ElementState.DRAINING
+        _commands.close()
     }
 
     fun cancel() {
