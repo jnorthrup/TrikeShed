@@ -27,6 +27,8 @@ open class CasStore private constructor(
         return bytes.copyOf()
     }
 
+    fun contains(cid: ContentId): Boolean = get(cid) != null
+
     fun corrupt(cid: ContentId) {
         blobs[cid]?.let { original ->
             val corrupted = original.copyOf()
