@@ -107,6 +107,18 @@ class ForgeDocTest {
         assertTrue(html.contains("\"useCases\""))
     }
 
+    @Test fun forgeAppHtmlIncludesCascadeGrid() {
+        val html = forgeAppHtml()
+
+        assertTrue(html.contains("id=\"cascade-grid-root\""))
+        assertTrue(html.contains("Cascade grid"))
+        assertTrue(html.contains("renderCascadeGrid"))
+        // The seed JSON must contain cascade rollup rows produced by the view-server tool
+        assertTrue(html.contains("\"cascadeGrid\""))
+        assertTrue(html.contains("\"cpu_mhz\""))
+        assertTrue(html.contains("\"byOrganization\""))
+    }
+
     @Test fun forgeDocumentProjectsToKanbanBoard() {
         var doc = ForgeDoc.empty("Sprint Board")
         doc = ForgeDoc.appendBlock(doc, doc.rootPageId, ForgeBlockKind.HEADING_2, "Auth Story",

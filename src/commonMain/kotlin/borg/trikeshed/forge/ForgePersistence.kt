@@ -1829,6 +1829,35 @@ fun forgePersistenceScript(): String = """
     renderReactor();
     renderSpatial();
     renderBoard();
+    renderCascadeGrid();
+  }
+
+  function renderCascadeGrid() {
+    const root = document.getElementById('cascade-grid-root');
+    if (!root) return;
+    root.innerHTML = '';
+    const rows = state.cascadeGrid || [];
+    if (!rows.length) { root.textContent = 'No cascade data'; return; }
+    const table = document.createElement('table');
+    const thead = document.createElement('thead');
+    const headerRow = document.createElement('tr');
+    ['View', 'Metric', 'Sum', 'Avg', 'Min', 'Max', 'Count'].forEach(function (h) {
+      const th = document.createElement('th'); th.textContent = h; headerRow.appendChild(th);
+    });
+    thead.appendChild(headerRow); table.appendChild(thead);
+    const tbody = document.createElement('tbody');
+    rows.forEach(function (row) {
+      const tr = document.createElement('tr');
+      [['text', row.viewName], ['text', row.metric], ['num', row.sum], ['num', row.avg], ['num', row.min], ['num', row.max], ['num', row.count]].forEach(function (entry) {
+        var td = document.createElement('td');
+        td.textContent = String(entry[1]);
+        if (entry[0] === 'num') td.className = 'num';
+        tr.appendChild(td);
+      });
+      tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+    root.appendChild(table);
   }
 
   function selectField(labelText, options, selectedValue, onChange) {

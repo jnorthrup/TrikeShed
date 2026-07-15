@@ -14,7 +14,7 @@ version = "1.0"
 val enableNativeSharedLib = providers.gradleProperty("native.sharedLib").orNull == "true"
 
 val focusedTransportSlice = providers.gradleProperty("focusedTransportSlice").orNull == "true"
-val viewServerNodeSlice = providers.gradleProperty("viewServerNodeSlice").orNull == "true"
+val viewServerNodeSlice = false
 
 // ── Locked versions ───────────────────────────────────────────────────────
 // GraalVM CE 25.0.2 is the locked runtime; JDK 25 toolchain.
