@@ -14,6 +14,7 @@ version = "1.0"
 val enableNativeSharedLib = providers.gradleProperty("native.sharedLib").orNull == "true"
 
 val focusedTransportSlice = providers.gradleProperty("focusedTransportSlice").orNull == "true"
+val viewServerNodeSlice = providers.gradleProperty("viewServerNodeSlice").orNull == "true"
 
 // ── Locked versions ───────────────────────────────────────────────────────
 // GraalVM CE 25.0.2 is the locked runtime; JDK 25 toolchain.
@@ -64,6 +65,9 @@ kotlin {
 
     sourceSets {
         val commonMain = getByName("commonMain") {
+            if (viewServerNodeSlice) {
+                kotlin.setSrcDirs(listOf("src/viewServerCommonMain/kotlin"))
+            }
             dependencies {
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:$coroutinesVersion")
                 implementation("org.jetbrains.kotlinx:kotlinx-datetime:$datetimeVersion")
@@ -71,6 +75,9 @@ kotlin {
             }
         }
         val commonTest = getByName("commonTest") {
+            if (viewServerNodeSlice) {
+                kotlin.setSrcDirs(listOf("src/viewServerCommonTest/kotlin"))
+            }
             dependencies {
                 implementation(kotlin("test"))
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:$coroutinesTestVersion")
@@ -168,8 +175,18 @@ if (enableLinuxX64) {
             }
         }
 
-        val jsMain = getByName("jsMain") { dependsOn(commonMain) }
-        val jsTest = getByName("jsTest") { dependsOn(commonTest) }
+        val jsMain = getByName("jsMain") {
+            dependsOn(commonMain)
+            if (viewServerNodeSlice) {
+                kotlin.setSrcDirs(listOf("src/viewServerJsMain/kotlin"))
+            }
+        }
+        val jsTest = getByName("jsTest") {
+            dependsOn(commonTest)
+            if (viewServerNodeSlice) {
+                kotlin.setSrcDirs(emptyList<String>())
+            }
+        }
         val wasmJsMain = getByName("wasmJsMain") { dependsOn(commonMain) }
         val wasmJsTest = getByName("wasmJsTest") { dependsOn(commonTest) }
 
@@ -234,7 +251,7 @@ tasks.withType<Test>().configureEach {
 
 // Karma config
 tasks.named("jsNodeTest", org.jetbrains.kotlin.gradle.targets.js.testing.KotlinJsTest::class) {
-    dependsOn("jsBrowserTest")
+    if (!viewServerNodeSlice) dependsOn("jsBrowserTest")
 }
 tasks.named("wasmJsNodeTest", org.jetbrains.kotlin.gradle.targets.js.testing.KotlinJsTest::class) {
     dependsOn("wasmJsBrowserTest")

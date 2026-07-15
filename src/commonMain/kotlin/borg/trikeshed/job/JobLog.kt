@@ -21,6 +21,10 @@ open class JobLog private constructor(
     }
 
     open fun append(sequence: Long, payload: ByteArray) {
+        val previous = frames.lastOrNull()?.sequence
+        require(previous == null || sequence > previous) {
+            "WAL sequence must increase: previous=$previous, attempted=$sequence"
+        }
         frames.add(Frame(sequence, payload.copyOf()))
     }
 

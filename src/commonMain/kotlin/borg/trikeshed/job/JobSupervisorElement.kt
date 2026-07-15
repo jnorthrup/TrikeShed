@@ -26,12 +26,13 @@ class JobSupervisorElement private constructor(
     private val parentScope: kotlinx.coroutines.CoroutineScope,
     private val capacity: Int,
     private val walData: MutableMap<String, ByteArray>?,
-    private val injectCasFailureFlag: () -> Boolean,
-    private val injectWalFailureFlag: () -> Boolean,
     private val instrumentationRef: Instrumentation,
 ) : kotlinx.coroutines.CoroutineScope {
 
-    private val _rootJob = SupervisorJob(parentScope.coroutineContext[Job])
+    private val parentJob = requireNotNull(parentScope.coroutineContext[Job]) {
+        "JobSupervisorElement requires a parent scope containing a Job"
+    }
+    private val _rootJob = SupervisorJob(parentJob)
 
     override val coroutineContext: CoroutineContext
         get() = parentScope.coroutineContext + _rootJob
@@ -78,8 +79,8 @@ class JobSupervisorElement private constructor(
             val log = JobLog.fromMap(walData)
             log.replay().forEach { frame ->
                 val result = reducer.reduce(CanonicalCbor.decodeJobCommand(frame.payload))
+                committedSequence = frame.sequence
                 if (result.accepted) {
-                    committedSequence++
                     result.snapshot?.let { snapshots[it.jobId] = it }
                 }
             }
@@ -105,13 +106,13 @@ class JobSupervisorElement private constructor(
         // Step 3: CAS write
         val cid = ContentId.of(canonicalBytes)
         instrumentationRef.casWriteAttempts++
-        if (injectCasFailureFlag()) return
+        if (_injectCasFailure) return
         instrumentationRef.casWriteCount++
         instrumentationRef.casWriteSequence = ++instrumentationRef.globalSequence
 
         // Step 4: WAL append
         instrumentationRef.walAppendAttempts++
-        if (injectWalFailureFlag()) return
+        if (_injectWalFailure) return
         walData?.let { it["${committedSequence + 1}"] = canonicalBytes }
         instrumentationRef.walAppendCount++
         instrumentationRef.walAppendSequence = ++instrumentationRef.globalSequence
@@ -188,6 +189,9 @@ class JobSupervisorElement private constructor(
     fun cancel() {
         _lifecycleState = ElementState.CLOSED
         _commands.close()
+        _committed.close()
+        _facts.close()
+        _activations.close()
         _rootJob.cancel()
     }
 
@@ -213,12 +217,9 @@ class JobSupervisorElement private constructor(
             capacity: Int = 64,
             walData: MutableMap<String, ByteArray>? = null,
         ): JobSupervisorElement {
+            require(capacity > 0) { "command capacity must be positive: $capacity" }
             val inst = Instrumentation()
-            return JobSupervisorElement(scope, capacity, walData,
-                injectCasFailureFlag = { false },
-                injectWalFailureFlag = { false },
-                instrumentationRef = inst,
-            )
+            return JobSupervisorElement(scope, capacity, walData, inst)
         }
     }
 }

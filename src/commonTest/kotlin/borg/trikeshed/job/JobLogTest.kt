@@ -2,6 +2,7 @@ package borg.trikeshed.job
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
 
@@ -32,6 +33,21 @@ class JobLogTest {
         assertEquals(3L, frames[2].sequence)
         assertTrue(frames[0].payload.contentEquals("one".encodeToByteArray()))
         assertTrue(frames[2].payload.contentEquals("three".encodeToByteArray()))
+    }
+
+    @Test
+    fun appendRejectsDuplicateOrDescendingSequence() {
+        val log = JobLog.inMemory()
+        log.append(7L, "first".encodeToByteArray())
+
+        assertFailsWith<IllegalArgumentException> {
+            log.append(7L, "duplicate".encodeToByteArray())
+        }
+        assertFailsWith<IllegalArgumentException> {
+            log.append(6L, "descending".encodeToByteArray())
+        }
+
+        assertEquals(listOf(7L), log.replay().map { it.sequence }.toList())
     }
 
     @Test
