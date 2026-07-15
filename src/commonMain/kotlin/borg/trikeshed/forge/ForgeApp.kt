@@ -7,11 +7,10 @@ import borg.trikeshed.graph.CausalGraphNodeDTO
 import borg.trikeshed.graph.causalGraphKey
 import borg.trikeshed.graph.causalGraphNode
 import borg.trikeshed.kanban.ForgeBoardFSM
+import borg.trikeshed.parse.json.JsonSupport
 import borg.trikeshed.userspace.reactor.KanbanFSM
 import kotlinx.datetime.Clock
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
 
 @Serializable
 data class LcncEntityDTO(
@@ -149,8 +148,6 @@ private fun defaultCascadeGrid(): List<CascadeRollupRow> {
     }
     return rows
 }
-
-private val forgeAppJson = Json { prettyPrint = false }
 
 private fun defaultForgeUseCases(): List<ForgeAppUseCase> = listOf(
     ForgeAppUseCase(
@@ -434,8 +431,85 @@ private fun defaultForgeAppState(): ForgeAppState {
     )
 }
 
+private fun ForgeAppState.toJsonValue(): Map<String, Any?> = linkedMapOf(
+    "title" to title,
+    "pageNotes" to pageNotes,
+    "columns" to columns.map { linkedMapOf("id" to it.id, "name" to it.name, "order" to it.order) },
+    "items" to items.map { item ->
+        linkedMapOf(
+            "id" to item.id,
+            "title" to item.title,
+            "notes" to item.notes,
+            "status" to item.status,
+            "priority" to item.priority,
+            "checklist" to item.checklist.map {
+                linkedMapOf("id" to it.id, "text" to it.text, "checked" to it.checked)
+            },
+        )
+    },
+    "selectedItemId" to selectedItemId,
+    "useCases" to useCases.map {
+        linkedMapOf(
+            "id" to it.id,
+            "name" to it.name,
+            "summary" to it.summary,
+            "pageNotes" to it.pageNotes,
+            "itemTitles" to it.itemTitles,
+        )
+    },
+    "reactor" to linkedMapOf(
+        "taxonomyNodeCount" to reactor.taxonomyNodeCount,
+        "signalFacetCount" to reactor.signalFacetCount,
+        "cacheStoredCount" to reactor.cacheStoredCount,
+        "lastEventKind" to reactor.lastEventKind,
+        "lastEventTimestampMs" to reactor.lastEventTimestampMs,
+        "recentTaxonomyNodes" to reactor.recentTaxonomyNodes,
+        "recentSignals" to reactor.recentSignals,
+    ),
+    "spatial" to linkedMapOf(
+        "zoom" to spatial.zoom,
+        "offsetX" to spatial.offsetX,
+        "offsetY" to spatial.offsetY,
+        "focusMode" to spatial.focusMode,
+    ),
+    "causalNodes" to causalNodes.map {
+        linkedMapOf(
+            "nodeId" to it.nodeId,
+            "opId" to it.opId,
+            "opVersion" to it.opVersion,
+            "parentNodeIds" to it.parentNodeIds,
+            "causalKey" to it.causalKey,
+            "topoOrdinal" to it.topoOrdinal,
+            "causalClock" to it.causalClock,
+        )
+    },
+    "lcncEntities" to lcncEntities.map {
+        linkedMapOf(
+            "entityId" to it.entityId,
+            "lcncKind" to it.lcncKind,
+            "lane" to it.lane,
+            "facet" to it.facet,
+            "causalKey" to it.causalKey,
+            "title" to it.title,
+            "description" to it.description,
+        )
+    },
+    "blackboardId" to blackboardId,
+    "cascadeGrid" to cascadeGrid.map {
+        linkedMapOf(
+            "viewName" to it.viewName,
+            "metric" to it.metric,
+            "sum" to it.sum,
+            "avg" to it.avg,
+            "min" to it.min,
+            "max" to it.max,
+            "count" to it.count,
+        )
+    },
+)
+
 fun forgeAppHtml(): String {
-    val seed = htmlEscape(forgeAppJson.encodeToString(defaultForgeAppState()))
+    val seed = htmlEscape(JsonSupport.stringify(defaultForgeAppState().toJsonValue()))
     return """
 <!doctype html>
 <html lang="en">

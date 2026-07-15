@@ -65,26 +65,20 @@ open class Checkpoint {
 
 // ── Failing factory stubs for rollback tests ──────────────────────────────────
 
-class FailingCasStoreFactory : () -> CasStore {
-    override fun invoke(): CasStore = throw RuntimeException("injected CAS failure")
-}
+fun FailingCasStoreFactory(): () -> CasStore =
+    { throw RuntimeException("injected CAS failure") }
 
-class FailingJobLogFactory(val stage: String = "wal") : () -> JobLog {
-    override fun invoke(): JobLog = throw RuntimeException("injected $stage failure")
-}
+fun FailingJobLogFactory(stage: String = "wal"): () -> JobLog =
+    { throw RuntimeException("injected $stage failure") }
 
-class FailingJobIndexFactory(val stage: String = "index") : () -> JobIndex {
-    override fun invoke(): JobIndex = throw RuntimeException("injected $stage failure")
-}
+fun FailingJobIndexFactory(stage: String = "index"): () -> JobIndex =
+    { throw RuntimeException("injected $stage failure") }
 
-class FailingReteNetworkFactory(val stage: String = "rete") : () -> ReteNetwork {
-    override fun invoke(): ReteNetwork = throw RuntimeException("injected $stage failure")
-}
+fun FailingReteNetworkFactory(stage: String = "rete"): () -> ReteNetwork =
+    { throw RuntimeException("injected $stage failure") }
 
-class FailingProjectionFactory(val stage: String = "projection") : () -> JobProjectionEngine {
-    override fun invoke(): JobProjectionEngine = throw RuntimeException("injected $stage failure")
-}
+fun FailingProjectionFactory(stage: String = "projection"): () -> JobProjectionEngine =
+    { throw RuntimeException("injected $stage failure") }
 
-class FailingCheckpointFactory(val stage: String = "checkpoint") : () -> Checkpoint {
-    override fun invoke(): Checkpoint = throw RuntimeException("injected $stage failure")
-}
+fun FailingCheckpointFactory(stage: String = "checkpoint"): () -> Checkpoint =
+    { throw RuntimeException("injected $stage failure") }

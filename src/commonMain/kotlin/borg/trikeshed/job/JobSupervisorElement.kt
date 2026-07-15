@@ -151,23 +151,50 @@ class JobSupervisorElement private constructor(
 
     suspend fun submitRaw(jsonBytes: ByteArray) {
         val doc = confixDoc(jsonBytes, Syntax.JSON)
-        val operation = doc.value("operation")?.toString() ?: ""
+        if (!RAW_FACET_PLAN.validate(doc).valid) return
+
+        val operation = doc.value("operation")?.toString() ?: return
         val jobId = JobId.of(doc.value("jobId")?.toString() ?: "")
         val idemKey = doc.value("idempotencyKey")?.toString() ?: ""
+        val expectedRevision = doc.value("expectedRevision").coerceLong() ?: 0L
         val cmd = when (operation) {
-            "submit" -> JobCommand.Submit(jobId, idemKey)
-            "start" -> JobCommand.Start(jobId, idemKey, doc.value("expectedRevision")?.toString()?.toLong() ?: 0L)
-            "complete" -> JobCommand.Complete(jobId, idemKey, doc.value("expectedRevision")?.toString()?.toLong() ?: 0L)
-            "fail" -> JobCommand.Fail(jobId, idemKey, doc.value("expectedRevision")?.toString()?.toLong() ?: 0L, doc.value("reason")?.toString() ?: "")
-            "retry" -> JobCommand.Retry(jobId, idemKey, doc.value("expectedRevision")?.toString()?.toLong() ?: 0L)
-            else -> { _commands.send(JobCommand.Submit(jobId, idemKey)); return }
-        }
-        // Validate operation — invalid ops fail at schema validation
-        val knownOps = setOf("submit", "start", "progress", "block", "complete", "fail",
-            "cancel", "retry", "move", "acknowledge", "retract")
-        if (operation !in knownOps) {
-            // Schema validation fails — don't attempt CAS or WAL
-            return
+            "submit" -> JobCommand.Submit(
+                jobId = jobId,
+                idempotencyKey = idemKey,
+                dependencies = RAW_FACET_PLAN.projectToSnapshot(doc).dependencies,
+                expectedRevision = doc.value("expectedRevision").coerceLong(),
+            )
+            "start" -> JobCommand.Start(jobId, idemKey, expectedRevision)
+            "progress" -> JobCommand.Progress(
+                jobId,
+                idemKey,
+                expectedRevision,
+                doc.value("progress").coerceDouble() ?: 0.0,
+            )
+            "block" -> JobCommand.Block(
+                jobId,
+                idemKey,
+                expectedRevision,
+                doc.value("reason")?.toString() ?: "",
+            )
+            "complete" -> JobCommand.Complete(jobId, idemKey, expectedRevision)
+            "fail" -> JobCommand.Fail(
+                jobId,
+                idemKey,
+                expectedRevision,
+                doc.value("reason")?.toString() ?: "",
+            )
+            "cancel" -> JobCommand.Cancel(jobId, idemKey, expectedRevision)
+            "retry" -> JobCommand.Retry(jobId, idemKey, expectedRevision)
+            "move" -> JobCommand.Move(
+                jobId,
+                idemKey,
+                expectedRevision,
+                KanbanColumnId.of(doc.value("toColumn")?.toString() ?: ""),
+            )
+            "acknowledge" -> JobCommand.Acknowledge(jobId, idemKey, expectedRevision)
+            "retract" -> JobCommand.Retract(jobId, idemKey, expectedRevision)
+            else -> return
         }
         _commands.send(cmd)
     }
@@ -220,6 +247,8 @@ class JobSupervisorElement private constructor(
     private var _injectWalFailure = false
 
     companion object {
+        private val RAW_FACET_PLAN = ConfixFacetPlan.fromSchema("confix/job-nexus.schema.json")
+
         fun open(
             scope: kotlinx.coroutines.CoroutineScope,
             capacity: Int = 64,
@@ -230,6 +259,22 @@ class JobSupervisorElement private constructor(
             return JobSupervisorElement(scope, capacity, walData, inst)
         }
     }
+}
+
+private fun Any?.coerceLong(): Long? = when (this) {
+    null -> null
+    is Long -> this
+    is Int -> toLong()
+    is Number -> toLong()
+    is String -> toLongOrNull() ?: toDoubleOrNull()?.toLong()
+    else -> toString().toLongOrNull()
+}
+
+private fun Any?.coerceDouble(): Double? = when (this) {
+    null -> null
+    is Number -> toDouble()
+    is String -> toDoubleOrNull()
+    else -> toString().toDoubleOrNull()
 }
 
 data class ValidationResult(val valid: Boolean, val reason: String?)

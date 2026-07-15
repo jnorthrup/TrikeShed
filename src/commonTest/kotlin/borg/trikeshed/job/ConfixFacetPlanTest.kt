@@ -146,4 +146,112 @@ class ConfixFacetPlanTest {
         assertEquals("active", snap.lifecycle)
         assertEquals(1L, snap.revision)
     }
+
+    // ── Lifecycle derivation for remaining operations ──────────────────────────
+
+    @Test
+    fun projectToSnapshotProgressDerivesActive() {
+        val p = plan()
+        val doc = confixDoc("""{"operation":"progress","jobId":"j-1","idempotencyKey":"ik","expectedRevision":5}""")
+        val snap = p.projectToSnapshot(doc)
+        assertEquals("active", snap.lifecycle,
+            "progress operation must project to 'active' lifecycle, not '${snap.lifecycle}'")
+        assertEquals(5L, snap.revision,
+            "progress must preserve expectedRevision")
+    }
+
+    @Test
+    fun projectToSnapshotBlockDerivesBlocked() {
+        val p = plan()
+        val doc = confixDoc("""{"operation":"block","jobId":"j-1","idempotencyKey":"ik"}""")
+        val snap = p.projectToSnapshot(doc)
+        assertEquals("blocked", snap.lifecycle,
+            "block operation must project to 'blocked' lifecycle, not '${snap.lifecycle}'")
+    }
+
+    @Test
+    fun projectToSnapshotCancelDerivesCancelled() {
+        val p = plan()
+        val doc = confixDoc("""{"operation":"cancel","jobId":"j-1","idempotencyKey":"ik"}""")
+        val snap = p.projectToSnapshot(doc)
+        assertEquals("cancelled", snap.lifecycle,
+            "cancel operation must project to 'cancelled' lifecycle, not '${snap.lifecycle}'")
+    }
+
+    @Test
+    fun projectToSnapshotRetryDerivesSubmitted() {
+        val p = plan()
+        val doc = confixDoc("""{"operation":"retry","jobId":"j-1","idempotencyKey":"ik","expectedRevision":3}""")
+        val snap = p.projectToSnapshot(doc)
+        assertEquals("submitted", snap.lifecycle)
+        assertEquals(3L, snap.revision,
+            "retry must preserve expectedRevision")
+    }
+
+    @Test
+    fun projectToSnapshotMoveDerivesMoved() {
+        val p = plan()
+        val doc = confixDoc("""{"operation":"move","jobId":"j-1","idempotencyKey":"ik"}""")
+        val snap = p.projectToSnapshot(doc)
+        assertEquals("moved", snap.lifecycle,
+            "move operation must project to 'moved' lifecycle, not '${snap.lifecycle}'")
+    }
+
+    @Test
+    fun projectToSnapshotAcknowledgeDerivesAcknowledged() {
+        val p = plan()
+        val doc = confixDoc("""{"operation":"acknowledge","jobId":"j-1","idempotencyKey":"ik"}""")
+        val snap = p.projectToSnapshot(doc)
+        assertEquals("acknowledged", snap.lifecycle,
+            "acknowledge operation must project to 'acknowledged' lifecycle, not '${snap.lifecycle}'")
+    }
+
+    @Test
+    fun projectToSnapshotRetractDerivesRetracted() {
+        val p = plan()
+        val doc = confixDoc("""{"operation":"retract","jobId":"j-1","idempotencyKey":"ik"}""")
+        val snap = p.projectToSnapshot(doc)
+        assertEquals("retracted", snap.lifecycle,
+            "retract operation must project to 'retracted' lifecycle, not '${snap.lifecycle}'")
+    }
+
+    // ── expectedRevision propagation ───────────────────────────────────────────
+
+    @Test
+    fun projectToSnapshotPreservesExpectedRevision() {
+        val p = plan()
+        val doc = confixDoc("""{"operation":"complete","jobId":"j-1","idempotencyKey":"ik","expectedRevision":42}""")
+        val snap = p.projectToSnapshot(doc)
+        assertEquals(42L, snap.revision,
+            "expectedRevision must be preserved in snapshot")
+    }
+
+    @Test
+    fun projectToSnapshotDefaultsToOneWhenNoExpectedRevision() {
+        val p = plan()
+        val doc = confixDoc("""{"operation":"submit","jobId":"j-1","idempotencyKey":"ik"}""")
+        val snap = p.projectToSnapshot(doc)
+        assertEquals(1L, snap.revision,
+            "revision must default to 1 when expectedRevision is absent")
+    }
+
+    // ── dependencies propagation ─────────────────────────────────────────────
+
+    @Test
+    fun projectToSnapshotCarriesDependencies() {
+        val p = plan()
+        val doc = confixDoc("""{"operation":"submit","jobId":"j-1","idempotencyKey":"ik","dependencies":["dep-a","dep-b"]}""")
+        val snap = p.projectToSnapshot(doc)
+        assertEquals(listOf("dep-a", "dep-b"), snap.dependencies.map { it.value },
+            "dependencies array must be preserved as list of JobId strings")
+    }
+
+    @Test
+    fun projectToSnapshotEmptyDependenciesWhenAbsent() {
+        val p = plan()
+        val doc = confixDoc("""{"operation":"submit","jobId":"j-1","idempotencyKey":"ik"}""")
+        val snap = p.projectToSnapshot(doc)
+        assertEquals(emptyList<String>(), snap.dependencies.map { it.value },
+            "dependencies must default to empty list when absent")
+    }
 }

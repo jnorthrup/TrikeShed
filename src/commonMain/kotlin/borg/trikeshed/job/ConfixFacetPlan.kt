@@ -1,6 +1,16 @@
 package borg.trikeshed.job
 
+import borg.trikeshed.cursor.RowVec
+import borg.trikeshed.cursor.getValue
+import borg.trikeshed.lib.Series
+import borg.trikeshed.lib.j
+import borg.trikeshed.lib.Join
+import borg.trikeshed.parse.confix.ConfixCell
 import borg.trikeshed.parse.confix.ConfixDoc
+import borg.trikeshed.parse.confix.cellKids
+import borg.trikeshed.parse.confix.docAt
+import borg.trikeshed.parse.confix.reify
+import borg.trikeshed.parse.confix.root
 import borg.trikeshed.parse.confix.value
 
 /**
@@ -76,19 +86,50 @@ data class ConfixFacetPlan(
     fun projectToSnapshot(doc: ConfixDoc): JobSnapshot {
         val operation = doc.value("operation")?.toString() ?: "unknown"
         val lifecycle = when (operation) {
-            "submit" -> "submitted"
-            "start" -> "active"
-            "complete" -> "closed"
-            "fail" -> "failed"
-            "retry" -> "submitted"
-            else -> operation
+            "submit"      -> "submitted"
+            "start"       -> "active"
+            "progress"    -> "active"
+            "block"       -> "blocked"
+            "complete"    -> "closed"
+            "fail"        -> "failed"
+            "cancel"      -> "cancelled"
+            "retry"       -> "submitted"
+            "move"        -> "moved"
+            "acknowledge" -> "acknowledged"
+            "retract"     -> "retracted"
+            else          -> operation
         }
+        val revision = doc.value("expectedRevision")?.let {
+            when (it) {
+                is Long  -> it
+                is Int   -> it.toLong()
+                is Number -> it.toLong()
+                else     -> 1L
+            }
+        } ?: 1L
+
+        val depCells: Series<ConfixCell>? = doc.docAt("dependencies")?.cellKids
+        val dependencies: List<JobId> = if (depCells != null) {
+            val n: Int = depCells.a
+            val builder = mutableListOf<JobId>()
+            var i = 0
+            while (i < n) {
+                val cell: ConfixCell = depCells.b(i)
+                val s: String? = cell.reify()?.toString()
+                if (s != null) builder.add(JobId.of(s))
+                i++
+            }
+            builder.reversed()
+        } else {
+            emptyList()
+        }
+
         return JobSnapshot(
-            jobId = JobId.of(doc.value("jobId")?.toString() ?: ""),
-            revision = 1L,
-            causalKey = doc.value("causalKey")?.toString() ?: "",
-            lifecycle = lifecycle,
-            dependencies = emptyList(),
+            jobId       = JobId.of(doc.value("jobId")?.toString() ?: ""),
+            revision    = revision,
+            lifecycle   = lifecycle,
+            causalKey   = doc.value("causalKey")?.toString() ?: "",
+            dependencies = dependencies,
         )
     }
 }

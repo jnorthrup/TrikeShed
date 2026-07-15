@@ -60,7 +60,7 @@ open class JobLog private constructor(
 
         fun fromMap(data: MutableMap<String, ByteArray>): JobLog {
             val log = JobLog()
-            data.toSortedMap(compareBy { it.toLongOrNull() ?: 0L }).forEach { (k, v) ->
+            data.entries.sortedBy { it.key.toLongOrNull() ?: 0L }.forEach { (k, v) ->
                 val seq = k.toLongOrNull() ?: 0L
                 log.append(seq, v)
             }

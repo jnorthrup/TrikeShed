@@ -8,7 +8,6 @@ import borg.trikeshed.cursor.RowVec
 import borg.trikeshed.cursor.ColumnMeta
 import borg.trikeshed.isam.meta.IOMemento
 import kotlinx.serialization.*
-import kotlinx.serialization.json.Json
 
 /**
  * Couch K-V Document Store — minimal in-memory implementation backed by MutableSeries.
@@ -273,8 +272,6 @@ object CouchStoreFactory {
 
     fun withPersistence(persistence: CouchPersistence): CouchStore = CouchStore(persistence)
 
-    fun withJsonFile(path: String, files: borg.trikeshed.userspace.nio.file.spi.FileOperations): CouchStore =
-        CouchStore(JsonFilePersistence(path, files))
 }
 
 /**
