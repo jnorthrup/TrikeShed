@@ -15,4 +15,23 @@ data class JobSnapshot(
     val attemptCount: Int = 0,
     val parentJobId: JobId? = null,
     val attemptId: String = "",
-)
+) {
+    companion object {
+        /**
+         * Factory for test ergonomics - accepts String for jobId and dependencies.
+         */
+        operator fun invoke(
+            jobId: String,
+            revision: Long,
+            causalKey: String,
+            lifecycle: String,
+            dependencies: List<String> = emptyList(),
+        ): JobSnapshot = JobSnapshot(
+            jobId = JobId.of(jobId),
+            revision = revision,
+            causalKey = causalKey,
+            lifecycle = lifecycle,
+            dependencies = dependencies.map { JobId.of(it) },
+        )
+    }
+}

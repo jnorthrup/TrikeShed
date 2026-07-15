@@ -22,12 +22,10 @@ object JobProjection {
     fun projectToCard(snapshot: JobSnapshot): KanbanCard {
         val column = when (snapshot.lifecycle) {
             "submitted" -> KanbanColumnId.of("col-causal-blocked")
+            "ready" -> KanbanColumnId.of("col-causal-blocked")
             "active" -> KanbanColumnId.of("col-agentic")
             "blocked" -> KanbanColumnId.of("col-attention")
             "failed" -> KanbanColumnId.of("col-attention")
-            "closed" -> KanbanColumnId.of("col-closed")
-            "submitted" -> KanbanColumnId.of("col-causal-blocked")
-            "active" -> KanbanColumnId.of("col-agentic")
             "closed" -> KanbanColumnId.of("col-closed")
             else -> KanbanColumnId.of("col-attention")
         }
