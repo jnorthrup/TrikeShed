@@ -1,0 +1,155 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://trikeshed.org/schemas/job-nexus.schema.json",
+  "title": "Job Nexus Confix Schema",
+  "type": "object",
+  "definitions": {
+    "JobId": { "type": "string", "pattern": "^[a-z0-9-]+$" },
+    "Revision": { "type": "integer", "minimum": 1 },
+    "Sequence": { "type": "integer", "minimum": 0 },
+    "ContentId": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "CausalKey": { "type": "string" },
+    "ActivationId": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "RuleId": { "type": "string" },
+    "RuleVersion": { "type": "string" },
+    "TimestampMs": { "type": "integer", "minimum": 0 },
+    "IdempotencyKey": { "type": "string", "minLength": 1 }
+  },
+  "oneOf": [
+    { "$ref": "#/definitions/command" },
+    { "$ref": "#/definitions/event" },
+    { "$ref": "#/definitions/snapshot" },
+    { "$ref": "#/definitions/fact" },
+    { "$ref": "#/definitions/activation" },
+    { "$ref": "#/definitions/couchHead" },
+    { "$ref": "#/definitions/checkpoint" }
+  ],
+  "definitions": {
+    "commonFacets": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": { "type": "string", "const": "1.0.0" },
+        "frameKind": { "type": "string", "enum": ["command", "event", "snapshot", "fact", "activation", "couchHead", "checkpoint"] },
+        "operation": { "type": "string" },
+        "workspaceId": { "type": "string" },
+        "jobId": { "$ref": "#/definitions/JobId" },
+        "attemptId": { "type": "string" },
+        "parentJobId": { "type": ["string", "null"] },
+        "sequence": { "$ref": "#/definitions/Sequence" },
+        "revision": { "$ref": "#/definitions/Revision" },
+        "expectedRevision": { "type": ["integer", "null"] },
+        "priorCid": { "$ref": "#/definitions/ContentId" },
+        "cid": { "$ref": "#/definitions/ContentId" },
+        "idempotencyKey": { "$ref": "#/definitions/IdempotencyKey" },
+        "causalKey": { "$ref": "#/definitions/CausalKey" },
+        "lifecycle": { "type": "string", "enum": ["submitted", "active", "blocked", "failed", "closed", "cancelled", "moved", "acknowledged", "retracted", "unknown"] },
+        "dependencies": { "type": "array", "items": { "$ref": "#/definitions/JobId" } },
+        "timestampMs": { "$ref": "#/definitions/TimestampMs" },
+        "ruleId": { "$ref": "#/definitions/RuleId" },
+        "ruleVersion": { "$ref": "#/definitions/RuleVersion" },
+        "activationId": { "$ref": "#/definitions/ActivationId" },
+        "supportCids": { "type": "array", "items": { "$ref": "#/definitions/ContentId" } },
+        "payload": { "type": "object" },
+        "lcncMode": { "type": "string" },
+        "slabFacet": { "type": "string" },
+        "indexSpecId": { "type": "string" },
+        "hashAlgorithm": { "type": "string", "const": "sha256" },
+        "hashFormatVersion": { "type": "integer", "const": 1 },
+        "hashSeed": { "type": "string" },
+        "hashSegmentCid": { "$ref": "#/definitions/ContentId" }
+      },
+      "required": ["schemaVersion", "frameKind", "operation", "workspaceId", "jobId", "sequence", "cid", "idempotencyKey", "causalKey", "timestampMs"]
+    },
+    "command": {
+      "allOf": [
+        { "$ref": "#/definitions/commonFacets" },
+        {
+          "type": "object",
+          "properties": {
+            "frameKind": { "const": "command" },
+            "operation": { "enum": ["submit", "start", "progress", "block", "complete", "fail", "cancel", "retry", "move", "acknowledge", "retract"] }
+          },
+          "required": ["frameKind", "operation"]
+        }
+      ]
+    },
+    "event": {
+      "allOf": [
+        { "$ref": "#/definitions/commonFacets" },
+        {
+          "type": "object",
+          "properties": {
+            "frameKind": { "const": "event" },
+            "operation": { "enum": ["accepted", "rejected"] }
+          },
+          "required": ["frameKind", "operation"]
+        }
+      ]
+    },
+    "snapshot": {
+      "allOf": [
+        { "$ref": "#/definitions/commonFacets" },
+        {
+          "type": "object",
+          "properties": {
+            "frameKind": { "const": "snapshot" },
+            "operation": { "const": "snapshot" }
+          },
+          "required": ["frameKind", "operation", "lifecycle", "revision"]
+        }
+      ]
+    },
+    "fact": {
+      "allOf": [
+        { "$ref": "#/definitions/commonFacets" },
+        {
+          "type": "object",
+          "properties": {
+            "frameKind": { "const": "fact" },
+            "operation": { "const": "assert" }
+          },
+          "required": ["frameKind", "operation"]
+        }
+      ]
+    },
+    "activation": {
+      "allOf": [
+        { "$ref": "#/definitions/commonFacets" },
+        {
+          "type": "object",
+          "properties": {
+            "frameKind": { "const": "activation" },
+            "operation": { "enum": ["enqueued", "fired", "retracted"] }
+          },
+          "required": ["frameKind", "operation", "activationId", "ruleId", "ruleVersion", "supportCids"]
+        }
+      ]
+    },
+    "couchHead": {
+      "allOf": [
+        { "$ref": "#/definitions/commonFacets" },
+        {
+          "type": "object",
+          "properties": {
+            "frameKind": { "const": "couchHead" },
+            "operation": { "enum": ["head", "deleted"] }
+          },
+          "required": ["frameKind", "operation", "revision"]
+        }
+      ]
+    },
+    "checkpoint": {
+      "allOf": [
+        { "$ref": "#/definitions/commonFacets" },
+        {
+          "type": "object",
+          "properties": {
+            "frameKind": { "const": "checkpoint" },
+            "operation": { "const": "checkpoint" }
+          },
+          "required": ["frameKind", "operation", "indexSpecId", "hashAlgorithm", "hashFormatVersion", "hashSeed", "hashSegmentCid"]
+        }
+      ]
+    }
+  }
+}

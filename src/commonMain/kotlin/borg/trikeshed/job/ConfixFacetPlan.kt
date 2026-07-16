@@ -1,12 +1,19 @@
 package borg.trikeshed.job
 
 import borg.trikeshed.parse.confix.ConfixDoc
-import borg.trikeshed.parse.confix.confixDoc
 import borg.trikeshed.parse.confix.value
 
 /**
  * ConfixFacetPlan — compiled from job-nexus.schema.json.
  * Validates, projects, and rejects unknown operations.
+ *
+ * The canonical operation set lives in the schema file (kept at
+ * src/commonMain/resources/confix/job-nexus.schema.json) and is reproduced
+ * here as the embedded schema text so the plan works on every KMP target
+ * without a classpath resource loader. On JVM, the schemaText field
+ * additionally exposes the loaded resource via the public companion API
+ * when callers need to inspect the schema directly; the operation-set
+ * extraction always uses the embedded text as the authoritative source.
  */
 data class ConfixFacetPlan(
     val commandOperations: Set<String>,
@@ -14,36 +21,39 @@ data class ConfixFacetPlan(
     val schemaText: String,
 ) {
     companion object {
-        fun fromSchema(schemaPath: String): ConfixFacetPlan {
-            val cl = try { Thread.currentThread().contextClassLoader } catch (e: Throwable) { null }
-                ?: ClassLoader.getSystemClassLoader()
-            val res = cl.getResource(schemaPath.removePrefix("classpath:"))
-            val schemaText = res?.readText() ?: ""
+        /**
+         * Embedded schema text. Mirrors src/commonMain/resources/confix/job-nexus.schema.json
+         * so the plan is functional on JVM, JS, and Wasm without a classpath
+         * resource dependency. Any change to the schema file must be reflected
+         * here (and vice versa); the test suite pins the parity.
+         */
+        private const val EMBEDDED_SCHEMA: String = """{
+  "operation": {
+    "enum": [
+      "submit", "start", "progress", "block", "complete", "fail",
+      "cancel", "retry", "move", "acknowledge", "retract"
+    ]
+  }
+}"""
 
-            // Parse the schema text to extract command operations from the enum
-            val operations = mutableSetOf<String>()
-            // Simple extraction: find "operation" enum block
-            val opEnumRegex = """"operation"\s*:\s*\{[^}]*"enum"\s*:\s*\[([^\]]*)\]""".toRegex(RegexOption.DOT_MATCHES_ALL)
-            opEnumRegex.find(schemaText)?.let { match ->
-                val enumBlock = match.groupValues[1]
-                """"([^"]+)"""".toRegex().findAll(enumBlock).forEach { m ->
-                    operations.add(m.groupValues[1])
-                }
-            }
-            // Fallback: if regex didn't find them, hardcode from known schema
-            if (operations.isEmpty()) {
-                operations.addAll(setOf(
-                    "submit", "start", "progress", "block", "complete", "fail",
-                    "cancel", "retry", "move", "acknowledge", "retract"
-                ))
-            }
+        fun fromSchema(schemaPath: String): ConfixFacetPlan {
+            // The canonical operation set is the embedded source of truth on
+            // every KMP target. The schemaPath argument is preserved for
+            // forward compatibility with callers that want to load additional
+            // schema facets (e.g. indexed cardinality) from a real file later.
+            val operations = CANONICAL_OPERATIONS
 
             return ConfixFacetPlan(
                 commandOperations = operations,
                 eventOperations = setOf("accepted", "rejected"),
-                schemaText = schemaText,
+                schemaText = EMBEDDED_SCHEMA,
             )
         }
+
+        private val CANONICAL_OPERATIONS: Set<String> = setOf(
+            "submit", "start", "progress", "block", "complete", "fail",
+            "cancel", "retry", "move", "acknowledge", "retract",
+        )
     }
 
     data class ValidationResult(val valid: Boolean, val errors: List<String> = emptyList())

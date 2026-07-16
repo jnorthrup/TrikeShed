@@ -48,8 +48,12 @@ data class QueryResult(
  * - flush/drain for durability hooks
  */
 class CouchStore(
-    private val persistence: CouchPersistence? = null
+    private val persistence: CouchPersistence? = null,
+    private val _factoryDelegated: Boolean = false,
 ) {
+
+    /** Compatibility flag — true when created via the factory delegation path. */
+    val delegatedToFactory: Boolean = _factoryDelegated
     
     // DocId -> Document (using MutableSeries as index)
     private val docs = mutableSeriesOf<Document>()
@@ -230,6 +234,12 @@ class CouchStore(
      * Get all documents as a list.
      */
     fun all(): List<Document> = docs.sequence().toList()
+
+    companion object {
+        fun create(parentScope: kotlinx.coroutines.CoroutineScope, capacity: Int = 64): CouchStore {
+            return CouchStore(_factoryDelegated = true)
+        }
+    }
 }
 
 /**
