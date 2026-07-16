@@ -6,14 +6,14 @@ plugins {
     id("com.github.ben-manes.versions") version "0.54.0"
     `maven-publish`
     kotlin("plugin.serialization") version "2.4.0"
-    kotlin("plugin.compose") version "2.4.0" apply false
+    kotlin("plugin.compose") version "2.4.0"
+    id("org.jetbrains.compose") version "1.11.1"
 }
 
 group = "org.bereft"
 version = "1.0"
 val enableNativeSharedLib = providers.gradleProperty("native.sharedLib").orNull == "true"
 val enableBrowserTests = providers.gradleProperty("browserTests").orNull == "true"
-
 val focusedTransportSlice = providers.gradleProperty("focusedTransportSlice").orNull == "true"
 val viewServerNodeSlice = false
 
@@ -30,6 +30,7 @@ val coroutinesVersion = extra["versions.kotlinx-coroutines-core"] as String
 val coroutinesTestVersion = extra["versions.kotlinx-coroutines-test"] as String
 val datetimeVersion = extra["versions.kotlinx-datetime"] as String
 val serializationVersion = extra["versions.kotlinx-serialization"] as String
+
 
 repositories {
     maven("https://oss.sonatype.org/content/repositories/snapshots/")
@@ -61,60 +62,6 @@ kotlin {
         compilerOptions {
             freeCompilerArgs = listOf(
             )
-        }
-    }
-
-    sourceSets {
-        val commonMain = getByName("commonMain") {
-            if (viewServerNodeSlice) {
-                kotlin.setSrcDirs(listOf("src/viewServerCommonMain/kotlin"))
-            }
-            dependencies {
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:$coroutinesVersion")
-                implementation("org.jetbrains.kotlinx:kotlinx-datetime:$datetimeVersion")
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-core:$serializationVersion")
-            }
-        }
-        val commonTest = getByName("commonTest") {
-            if (viewServerNodeSlice) {
-                kotlin.setSrcDirs(listOf("src/viewServerCommonTest/kotlin"))
-            }
-            dependencies {
-                implementation(kotlin("test"))
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:$coroutinesTestVersion")
-            }
-        }
-        val jvmMain = getByName("jvmMain") {
-            resources.srcDir("src/jvmMain/resources")
-            dependencies {
-                implementation("org.openjdk.jmh:jmh-core:1.37")
-                implementation("org.openjdk.jmh:jmh-generator-annprocess:1.37")
-                implementation("org.bouncycastle:bcprov-jdk15on:1.70")
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:$coroutinesVersion")
-
-                // GraalVM Polyglot — locked to 25.0.2 (GraalVM CE)
-                implementation("org.graalvm.polyglot:polyglot:$graalVersion")
-                implementation("org.graalvm.polyglot:js-community:$graalVersion")
-                implementation("org.graalvm.polyglot:python-community:$graalVersion")
-                implementation("org.graalvm.truffle:truffle-api:$graalVersion")
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:$serializationVersion")
-            }
-            kotlin.srcDir("src/jmhMain/kotlin")
-            resources.srcDir("src/jmhMain/resources")
-        }
-        val jvmTest = getByName("jvmTest") {
-            kotlin.exclude("**/ConfixSerializationTest.kt")
-            kotlin.exclude("**/ViewServerTest.kt")
-            kotlin.exclude("**/strategy/SignalValidationTest.kt")
-            kotlin.exclude("**/demos/SignalBlackboardDemoTest.kt")
-            kotlin.exclude("**/lib/ReduxListBridgeTest.kt")
-            kotlin.exclude("**/lib/MutableSeriesStrategyTest.kt")
-            dependencies {
-                implementation("org.junit.jupiter:junit-jupiter-api:5.10.2")
-                implementation("org.junit.jupiter:junit-jupiter-engine:5.10.2")
-                implementation("org.junit.vintage:junit-vintage-engine:5.10.2")
-                implementation("org.jetbrains.kotlin:kotlin-test-junit5")
-            }
         }
     }
 
@@ -177,6 +124,10 @@ kotlin {
             dependencies {
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:$coroutinesVersion")
                 implementation("org.jetbrains.kotlinx:kotlinx-datetime:$datetimeVersion")
+                // Compose runtime annotations must be visible to every target so the
+                // compose compiler plugin (applied globally) doesn't bail on JS/WASM/Native.
+                // Full UI deps stay in jvmMain — Compose doesn't publish for macosX64.
+                implementation(compose.runtime)
             }
         }
 
@@ -187,21 +138,56 @@ kotlin {
             }
         }
 
+        val jvmMain = getByName("jvmMain") {
+            resources.srcDir("src/jvmMain/resources")
+            dependencies {
+                implementation("org.openjdk.jmh:jmh-core:1.37")
+                implementation("org.openjdk.jmh:jmh-generator-annprocess:1.37")
+                implementation("org.bouncycastle:bcprov-jdk15on:1.70")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:$coroutinesVersion")
+
+                // GraalVM Polyglot — locked to 25.0.2 (GraalVM CE)
+                implementation("org.graalvm.polyglot:polyglot:$graalVersion")
+                implementation("org.graalvm.polyglot:js-community:$graalVersion")
+                implementation("org.graalvm.polyglot:python-community:$graalVersion")
+                implementation("org.graalvm.truffle:truffle-api:$graalVersion")
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:$serializationVersion")
+
+                                // Compose Desktop UI — JVM + Skiko only
+                implementation(compose.desktop.currentOs)
+                implementation(compose.foundation)
+                implementation(compose.material3)
+                implementation(compose.materialIconsExtended)
+                implementation(compose.ui)
+            }
+            kotlin.srcDir("src/jmhMain/kotlin")
+            resources.srcDir("src/jmhMain/resources")
+        }
+        val jvmTest = getByName("jvmTest") {
+            kotlin.exclude("**/ConfixSerializationTest.kt")
+            kotlin.exclude("**/ViewServerTest.kt")
+            kotlin.exclude("**/strategy/SignalValidationTest.kt")
+            kotlin.exclude("**/demos/SignalBlackboardDemoTest.kt")
+            kotlin.exclude("**/lib/ReduxListBridgeTest.kt")
+            kotlin.exclude("**/lib/MutableSeriesStrategyTest.kt")
+            dependencies {
+                implementation("org.junit.jupiter:junit-jupiter-api:5.10.2")
+                implementation("org.junit.jupiter:junit-jupiter-engine:5.10.2")
+                implementation("org.junit.vintage:junit-vintage-engine:5.10.2")
+                implementation("org.jetbrains.kotlin:kotlin-test-junit5")
+            }
+        }
+
         val jsMain = getByName("jsMain") {
             dependsOn(commonMain)
             dependencies {
                 implementation(npm("workbox-webpack-plugin", "7.4.1"))
             }
-            if (viewServerNodeSlice) {
-                kotlin.setSrcDirs(listOf("src/viewServerJsMain/kotlin"))
-            }
         }
         val jsTest = getByName("jsTest") {
             dependsOn(commonTest)
-            if (viewServerNodeSlice) {
-                kotlin.setSrcDirs(emptyList<String>())
-            }
         }
+
         val wasmJsMain = getByName("wasmJsMain") {
             dependsOn(commonMain)
             dependencies {
@@ -233,12 +219,14 @@ kotlin {
         findByName("linuxMain")?.dependsOn(posixMain)
         findByName("linuxTest")?.dependsOn(posixTest)
 
+
         all {
             languageSettings.optIn("kotlinx.cinterop.ExperimentalForeignApi")
             languageSettings.optIn("kotlin.RequiresOptIn")
         }
     }
 }
+
 
 // CInterop - Only compile io_uring bindings for focusedTransportSlice
 if (focusedTransportSlice) {
@@ -287,9 +275,6 @@ tasks.withType<Test>().configureEach {
     // No internal exports needed for JDK 25+
 }
 
-// Browser executables are published to GitHub Pages; browser tests are opt-in
-// with -PbrowserTests=true. Node tests remain part of the default build.
-
 // Ensure resources are copied before JVM compilation
 tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
     if (name.contains("Jvm")) {
@@ -334,7 +319,7 @@ tasks.register<JavaExec>("benchmarkJoin") {
 
 tasks.register<JavaExec>("benchmarkSequence") {
     dependsOn("jvmJar")
-    mainClass.set("borg.trikiched.lib.SequenceBenchmarkRunner")
+    mainClass.set("borg.trikeshed.lib.SequenceBenchmarkRunner")
     classpath(tasks.named("jvmJar"), configurations.getByName("jvmRuntimeClasspath"))
 }
 
@@ -354,6 +339,25 @@ tasks.register<JavaExec>("benchmarkMath") {
 tasks.register<JavaExec>("benchmarkConfix") {
     dependsOn("jvmJar")
     mainClass.set("borg.trikeshed.parse.confix.ConfixBenchmarkRunner")
+    classpath(tasks.named("jvmJar"), configurations.getByName("jvmRuntimeClasspath"))
+}
+
+// Forge widget gallery — print the catalog + blackboard to stdout for JVM sanity checks
+tasks.register<JavaExec>("printForgeGallery") {
+    group = "forge"
+    description = "Print the Forge widget gallery catalog and blackboard view to stdout."
+    dependsOn("compileKotlinJvm")
+    mainClass.set("borg.trikeshed.forge.gallery.ForgeGalleryPrinterKt")
+    classpath(tasks.named("jvmJar"), configurations.getByName("jvmRuntimeClasspath"))
+}
+
+// Forge JVM shell — interactive Compose Desktop window that hosts the same
+// workspace model the browser bundle renders (board, page, gallery, blackboard).
+tasks.register<JavaExec>("runForgeJvm") {
+    group = "forge"
+    description = "Launch the interactive Forge JVM shell (Compose Desktop)."
+    dependsOn("compileKotlinJvm")
+    mainClass.set("borg.trikeshed.forge.shell.ForgeWorkspaceKt")
     classpath(tasks.named("jvmJar"), configurations.getByName("jvmRuntimeClasspath"))
 }
 

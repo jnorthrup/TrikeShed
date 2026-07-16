@@ -2,37 +2,28 @@ package borg.trikeshed.lib
 
 import kotlin.test.Test
 import kotlin.test.assertFalse
-import kotlin.js.JsAny
+import kotlin.js.ExperimentalWasmJsInterop
 
 class WasmStorageTest {
 
+    @OptIn(ExperimentalWasmJsInterop::class)
     @Test
     fun testStorageSetExceptionHandling() {
-        val original = backupAndMock()
+        backupAndMock()
         try {
             // This should trigger the catch block in storageSet and return false
             val result = storageSet("testFailKey", "testValue")
             assertFalse(result, "storageSet should return false when localStorage.setItem throws an exception")
         } finally {
-            restore(original)
+            restore()
         }
     }
 }
 
-@JsFun("""
-    () => {
-        var original = localStorage.setItem;
-        localStorage.setItem = function() {
-            throw new Error('Mock Storage Error');
-        };
-        return original;
-    }
-""")
-private external fun backupAndMock(): JsAny
+@OptIn(ExperimentalWasmJsInterop::class)
+@JsFun("() => { globalThis.mockStorageThrow = true; }")
+private external fun backupAndMock()
 
-@JsFun("""
-    (orig) => {
-        localStorage.setItem = orig;
-    }
-""")
-private external fun restore(original: JsAny)
+@OptIn(ExperimentalWasmJsInterop::class)
+@JsFun("() => { globalThis.mockStorageThrow = false; }")
+private external fun restore()

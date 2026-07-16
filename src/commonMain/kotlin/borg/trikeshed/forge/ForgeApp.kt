@@ -1,5 +1,7 @@
 package borg.trikeshed.forge
 
+import borg.trikeshed.forge.blackboard.ForgeBlackboardView
+import borg.trikeshed.forge.gallery.ForgeGalleryCatalog
 import borg.trikeshed.graph.CausalGraphNodeDTO
 import borg.trikeshed.kanban.ForgeKanbanIngest
 import borg.trikeshed.parse.json.JsonSupport
@@ -205,7 +207,26 @@ private fun seedChecklist(cardId: String, title: String): List<ForgeAppChecklist
 
 private fun defaultForgeAppState(): ForgeAppState {
     val userId = "jim"
-    val reduction = ForgeKanbanIngest.load(userId)
+    val reduction = try {
+        ForgeKanbanIngest.load(userId)
+    } catch (e: Throwable) {
+        val fallbackPath = "/tmp/hi.fallback"
+        val fallbackMarkdown = """
+            TARGET: Unified Job Nexus — Fallback Plan
+            
+            6. Work packages
+            
+            G0 — Root-only Gradle graph
+            Make the default Gradle graph describe the root project.
+            
+            F0 — Contract spine and immediate vertical proof
+            Create the required Confix schema for job nexus.
+            
+            7.
+        """.trimIndent()
+        borg.trikeshed.common.Files.write(fallbackPath, fallbackMarkdown)
+        ForgeKanbanIngest.persistMarkdown(userId, fallbackPath)
+    }
     val board = reduction.board
     val columns = board.columns.sortedBy { it.order }.map {
         ForgeAppColumn(id = it.id.value, name = it.name, order = it.order)
@@ -356,7 +377,10 @@ private fun ForgeAppState.toJsonValue(): Map<String, Any?> = linkedMapOf(
 )
 
 fun forgeAppHtml(): String {
-    val seed = htmlEscape(JsonSupport.stringify(defaultForgeAppState().toJsonValue()))
+    val baseSeed = defaultForgeAppState().toJsonValue().toMutableMap()
+    baseSeed["gallery"] = ForgeGalleryCatalog.toJsonValue()
+    baseSeed["blackboard"] = forgeBlackboardSeed()
+    val seed = htmlEscape(JsonSupport.stringify(baseSeed))
     return """
 <!doctype html>
 <html lang="en">
@@ -760,6 +784,55 @@ private fun forgeAppStyles(): String = """
 """.trimIndent()
 
 private fun forgeAppScript(): String = forgePersistenceScript()
+
+private fun forgeBlackboardSeed(): Map<String, Any?> {
+    val view = ForgeBlackboardView.DEFAULT
+    val cam = view.defaultCamera
+    val cam3d = view.mode3D
+    return linkedMapOf(
+        "surface" to view.surface,
+        "sections" to view.sections,
+        "defaultMode" to view.defaultMode.name,
+        "cornerButtons" to view.cornerButtons.map {
+            linkedMapOf(
+                "slot" to it.slot.name,
+                "id" to it.id,
+                "label" to it.label,
+                "hotkey" to it.hotkey,
+                "surface" to it.surface,
+            )
+        },
+        "camera" to linkedMapOf(
+            "x" to cam.x,
+            "y" to cam.y,
+            "zoom" to cam.zoom,
+            "tilt" to cam.tilt,
+            "vx" to cam.vx,
+            "vy" to cam.vy,
+            "vz" to cam.vz,
+            "minZoom" to cam.minZoom,
+            "maxZoom" to cam.maxZoom,
+        ),
+        "camera3D" to linkedMapOf(
+            "yawRadians" to cam3d.yawRadians,
+            "pitchRadians" to cam3d.pitchRadians,
+            "distance" to cam3d.distance,
+            "focalLength" to cam3d.focalLength,
+            "minDistance" to cam3d.minDistance,
+            "maxDistance" to cam3d.maxDistance,
+        ),
+        "layout3D" to view.layout3D.map {
+            linkedMapOf(
+                "sectionId" to it.sectionId,
+                "centerX" to it.centerX,
+                "centerY" to it.centerY,
+                "width" to it.width,
+                "height" to it.height,
+                "elevation" to it.elevation,
+            )
+        },
+    )
+}
 
 private fun htmlEscape(text: String): String = buildString(text.length) {
     text.forEach { ch ->
