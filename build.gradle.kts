@@ -64,48 +64,6 @@ kotlin {
         }
     }
 
-    js {
-        nodejs()
-        browser {
-            testTask {
-                enabled = enableBrowserTests
-                useKarma {
-                    useConfigDirectory(project.layout.projectDirectory.dir("karma.config.d").asFile)
-                    useChromeHeadless()
-                }
-            }
-        }
-        binaries.executable()
-    }
-
-    wasmJs {
-        nodejs()
-        browser {
-            testTask {
-                enabled = enableBrowserTests
-                useKarma {
-                    useConfigDirectory(project.layout.projectDirectory.dir("karma.config.d").asFile)
-                    useChromeHeadless()
-                }
-            }
-        }
-        binaries.executable()
-    }
-
-    // linuxX64 target - disabled by default, enable with -PenableLinuxX64=true
-    // Build on Linux with: ./gradlew compileKotlinLinuxX64 -PenableLinuxX64=true
-    val enableLinuxX64 = providers.gradleProperty("enableLinuxX64").orNull == "true"
-
-    if (enableLinuxX64) {
-        linuxX64 {
-            if (enableNativeSharedLib) {
-                binaries.sharedLib {
-                    baseName = "trikeshed"
-                }
-            }
-        }
-    }
-
     sourceSets {
         val commonMain = getByName("commonMain") {
             if (viewServerNodeSlice) {
@@ -188,25 +146,49 @@ kotlin {
         binaries.executable()
     }
 
-    // linuxX64 target - disabled by default, enable with -PenableLinuxX64=true
-// Build on Linux with: ./gradlew compileKotlinLinuxX64 -PenableLinuxX64=true
-val enableLinuxX64 = providers.gradleProperty("enableLinuxX64").orNull == "true"
+    // ── Host-detected native targets (restored from c0e3f0fc) ────────────────
+    val hostOs = System.getProperty("os.name").lowercase()
+    val isMac = hostOs.contains("mac")
+    val isLinux = hostOs.contains("linux")
 
-if (enableLinuxX64) {
-    linuxX64 {
-        if (enableNativeSharedLib) {
-            binaries.sharedLib {
-                baseName = "trikeshed"
+    if (isMac) {
+        macosArm64("macos") {
+            compilations.getByName("main") {
+                cinterops {
+                    val posixSpawn = create("posixSpawn") {
+                        defFile = project.file("src/macosMain/resources/META-INF/cinterop/posix_spawn.def")
+                    }
+                }
+            }
+        }
+        macosX64("macosX64")
+    }
+
+    if (isLinux || providers.gradleProperty("enableLinuxX64").orNull == "true") {
+        linuxX64("linux") {
+            if (enableNativeSharedLib) {
+                binaries.sharedLib { baseName = "trikeshed" }
             }
         }
     }
-} else {
-    // Disable linuxX64 target when not building on Linux
-    // The linuxX64 target is only available on Linux hosts
-}
 
     sourceSets {
         val commonMain = getByName("commonMain") {
+            dependencies {
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:$coroutinesVersion")
+                implementation("org.jetbrains.kotlinx:kotlinx-datetime:$datetimeVersion")
+            }
+        }
+
+        val commonTest = getByName("commonTest") {
+            dependencies {
+                implementation(kotlin("test"))
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:$coroutinesTestVersion")
+            }
+        }
+
+        val jsMain = getByName("jsMain") {
+            dependsOn(commonMain)
             dependencies {
                 implementation(npm("workbox-webpack-plugin", "7.4.1"))
             }
@@ -226,26 +208,30 @@ if (enableLinuxX64) {
                 implementation(npm("workbox-webpack-plugin", "7.4.1"))
             }
         }
-
-        val jsMain = getByName("jsMain") {
-            dependsOn(commonMain)
-            if (viewServerNodeSlice) {
-                kotlin.setSrcDirs(listOf("src/viewServerJsMain/kotlin"))
-            }
-        }
-        val jsTest = getByName("jsTest") {
-            dependsOn(commonTest)
-            if (viewServerNodeSlice) {
-                kotlin.setSrcDirs(emptyList<String>())
-            }
-        }
-        val wasmJsMain = getByName("wasmJsMain") { dependsOn(commonMain) }
         val wasmJsTest = getByName("wasmJsTest") { dependsOn(commonTest) }
 
-        if (enableNativeSharedLib) {
-            val linuxX64Main = getByName("linuxX64Main") { dependsOn(commonMain) }
-            val linuxX64Test = getByName("linuxX64Test") { dependsOn(commonTest) }
-        }
+        // ── posixMain: custom shared intermediate above the default template's ──
+        // nativeMain.  The default hierarchy template creates:
+        //   nativeMain ← macosMain ← macosArm64Main
+        //   nativeMain ← linuxMain  ← linuxX64Main
+        // We insert posixMain between nativeMain and each platform leaf so that
+        // src/posixMain actuals resolve for both macos and linux.
+        val posixMain = maybeCreate("posixMain")
+        val posixTest = maybeCreate("posixTest")
+        // Ensure nativeMain exists (template may create lazily), posixMain sits above it
+        val nativeMain = maybeCreate("nativeMain").apply { dependsOn(getByName("commonMain")) }
+        val nativeTest = maybeCreate("nativeTest").apply { dependsOn(getByName("commonTest")) }
+        posixMain.dependsOn(nativeMain)
+        posixTest.dependsOn(nativeTest)
+
+        // Re-parent each platform intermediate onto posixMain (which itself
+        // depends on nativeMain, so the chain posixMain→nativeMain→commonMain holds).
+        // We add posixMain as a parent; the template's nativeMain parent is harmless
+        // since posixMain sits above it in the same chain.
+        findByName("macosMain")?.dependsOn(posixMain)
+        findByName("macosTest")?.dependsOn(posixTest)
+        findByName("linuxMain")?.dependsOn(posixMain)
+        findByName("linuxTest")?.dependsOn(posixTest)
 
         all {
             languageSettings.optIn("kotlinx.cinterop.ExperimentalForeignApi")
@@ -301,13 +287,8 @@ tasks.withType<Test>().configureEach {
     // No internal exports needed for JDK 25+
 }
 
-// Karma config
-tasks.named("jsNodeTest", org.jetbrains.kotlin.gradle.targets.js.testing.KotlinJsTest::class) {
-    if (!viewServerNodeSlice) dependsOn("jsBrowserTest")
-}
-tasks.named("wasmJsNodeTest", org.jetbrains.kotlin.gradle.targets.js.testing.KotlinJsTest::class) {
-    dependsOn("wasmJsBrowserTest")
-}
+// Browser executables are published to GitHub Pages; browser tests are opt-in
+// with -PbrowserTests=true. Node tests remain part of the default build.
 
 // Ensure resources are copied before JVM compilation
 tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {

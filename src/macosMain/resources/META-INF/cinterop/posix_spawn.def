@@ -1,0 +1,4 @@
+// Supplement the built-in platform.posix cinterop with spawn.h symbols
+// (glibc's default posix surface includes these; Darwin's does not)
+package = platform.posix
+headers = spawn.h
