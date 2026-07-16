@@ -16,6 +16,7 @@ import borg.trikeshed.kanban.ForgeKanbanIngest
  * → seed and saves mutations back to localStorage + IndexedDB permanently.
  */
 fun main() {
+    // Node.js: ingest /tmp/hi into the local-first persistence layer.
     if (!isBrowserRuntime()) {
 
         // Node.js: ingest /tmp/hi into the local-first persistence layer.

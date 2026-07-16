@@ -1615,9 +1615,9 @@ fun forgePersistenceScript(): String = """
     renderSpatial();
     renderBoard();
     renderCascadeGrid();
+    renderGallery();
+    renderBlackboardChrome();
   }
-
-  function renderCascadeGrid() {
     const root = document.getElementById('cascade-grid-root');
     if (!root) return;
     root.innerHTML = '';

@@ -1,12 +1,16 @@
 package borg.trikeshed.forge.gallery
 
 import borg.trikeshed.parse.json.JsonSupport
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
+import borg.trikeshed.forge.blackboard.ForgeBlackboardView
 
 /**
  * Widget category — the gallery groups every previsualizable widget into one of these
  * families.  This intentionally mirrors the categories already in use across the
  * forge-ui surfaces so the gallery can be a section of the same blackboard.
  */
+@Serializable
 enum class ForgeGallerySection {
     LAYOUT, INPUT, DISPLAY, FEEDBACK, DATA, CANVAS,
     FORGE, KANBAN, CONFIX, COUCH, CAS,
@@ -21,7 +25,10 @@ enum class ForgeGallerySection {
  * TEXT    – rendered as a fixed-width text grid, available on JVM (and any terminal target).
  * STUB    – described but not previewable yet (calls out to the support matrix).
  */
-enum class ForgeGalleryPreview { FULL, DOM, TEXT, STUB }
+@Serializable
+enum class ForgeGalleryPreview {
+    FULL, DOM, TEXT, STUB,
+}
 
 /**
  * A single widget entry in the kitchen-sink gallery.  Pinned at commonMain so the
@@ -29,13 +36,14 @@ enum class ForgeGalleryPreview { FULL, DOM, TEXT, STUB }
  * command line.  No UI toolkit dependency: the renderer turns the description +
  * previewToken into a DOM element or a text grid.
  */
+@Serializable
 data class ForgeGalleryWidget(
-    val id: String,                   // e.g. "input.button"
+    val id: String,                   // e.g. "layout.box", "input.button"
     val section: ForgeGallerySection,
-    val name: String,                 // "Button"
+    val name: String,                 // "Box", "Button"
     val synopsis: String,             // one-line description for the side panel
     val supportTargets: Set<String>,  // ["JVM_DESKTOP","JS_BROWSER","WASM_JS_BROWSER",...]
-    val previewToken: String,         // renderer key — see ForgeGalleryPreviewer
+    val previewToken: String,         // renderer key — see ForgeGalleryRenderer
     val apiSignature: String? = null, // Composable signature if available
 )
 
@@ -47,6 +55,7 @@ data class ForgeGalleryWidget(
 object ForgeGalleryCatalog {
 
     private val widgets: List<ForgeGalleryWidget> = listOf(
+        // ── LAYOUT ──
         layout("layout.box", "Box",
             synopsis = "Stack children with alignment + propagation.",
             previewToken = "box-stack",
@@ -71,6 +80,7 @@ object ForgeGalleryCatalog {
             supportTargets = setOf("JVM_DESKTOP", "JS_BROWSER", "JS_NODE", "WASM_JS_BROWSER", "WASM_JS_NODE", "MACOS_ARM64", "LINUX_X64", "WINDOWS_X64", "IOS_ARM64", "ANDROID_ARM64"),
         ),
 
+        // ── INPUT ──
         input("input.button", "Button",
             synopsis = "Tappable surface with primary/secondary/tertiary variants.",
             previewToken = "button-tap",
@@ -93,6 +103,7 @@ object ForgeGalleryCatalog {
             supportTargets = setOf("JVM_DESKTOP", "JS_BROWSER", "WASM_JS_BROWSER", "MACOS_ARM64", "LINUX_X64", "WINDOWS_X64", "IOS_ARM64", "ANDROID_ARM64"),
         ),
 
+        // ── DISPLAY ──
         display("display.text", "Text",
             synopsis = "Rich text with overflow, alignment and style spans.",
             previewToken = "text-truncate",
@@ -104,6 +115,7 @@ object ForgeGalleryCatalog {
             supportTargets = setOf("JVM_DESKTOP", "JS_BROWSER", "JS_NODE", "WASM_JS_BROWSER", "WASM_JS_NODE", "MACOS_ARM64", "LINUX_X64", "WINDOWS_X64", "IOS_ARM64", "ANDROID_ARM64"),
         ),
 
+        // ── FEEDBACK ──
         feedback("feedback.dialog", "Dialog",
             synopsis = "Modal with confirm/dismiss actions.",
             previewToken = "dialog-modal",
@@ -115,12 +127,14 @@ object ForgeGalleryCatalog {
             supportTargets = setOf("JVM_DESKTOP", "JS_BROWSER", "WASM_JS_BROWSER", "MACOS_ARM64", "LINUX_X64", "WINDOWS_X64", "IOS_ARM64", "ANDROID_ARM64"),
         ),
 
+        // ── DATA ──
         data("data.list", "List",
             synopsis = "Virtualised scrollable list with selection.",
             previewToken = "list-rows",
             supportTargets = setOf("JVM_DESKTOP", "JS_BROWSER", "WASM_JS_BROWSER", "MACOS_ARM64", "LINUX_X64", "WINDOWS_X64", "IOS_ARM64", "ANDROID_ARM64"),
         ),
 
+        // ── CANVAS ──
         canvas("canvas.skiko", "Skiko Canvas",
             synopsis = "Imperative drawing — circles, paths, gradients.",
             previewToken = "skiko-rings",
@@ -239,11 +253,11 @@ object ForgeGalleryCatalog {
      * workspace seed JSON.  Keys are stable strings so the JS renderer never
      * depends on Kotlin reflection.
      */
-    fun toJsonValue(): Map<String, Any?> = linkedMapOf(
+    fun toJsonValue(): Map<String, Any?> = mapOf(
         "version" to CATALOG_VERSION,
         "sections" to ForgeGallerySection.values().map { it.name },
         "widgets" to widgets.map { widget ->
-            linkedMapOf<String, Any?>(
+            mapOf<String, Any?>(
                 "id" to widget.id,
                 "section" to widget.section.name,
                 "name" to widget.name,

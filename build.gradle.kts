@@ -61,6 +61,7 @@ kotlin {
     jvm {
         compilerOptions {
             freeCompilerArgs = listOf(
+                "-P", "plugin:androidx.compose.compiler.plugins.kotlin:runtimeSignature=1.11.1"
             )
         }
     }
@@ -127,7 +128,7 @@ kotlin {
                 // Compose runtime annotations must be visible to every target so the
                 // compose compiler plugin (applied globally) doesn't bail on JS/WASM/Native.
                 // Full UI deps stay in jvmMain — Compose doesn't publish for macosX64.
-                implementation(compose.runtime)
+                // implementation(compose.runtime) // REMOVED: breaks macosX64
             }
         }
 
@@ -182,6 +183,7 @@ kotlin {
             dependsOn(commonMain)
             dependencies {
                 implementation(npm("workbox-webpack-plugin", "7.4.1"))
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
             }
         }
         val jsTest = getByName("jsTest") {
@@ -192,6 +194,9 @@ kotlin {
             dependsOn(commonMain)
             dependencies {
                 implementation(npm("workbox-webpack-plugin", "7.4.1"))
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
+                // Compose runtime for WASM_JS_BROWSER (compiler is global)
+                implementation(compose.runtime)
             }
         }
         val wasmJsTest = getByName("wasmJsTest") { dependsOn(commonTest) }
@@ -357,17 +362,17 @@ tasks.register<JavaExec>("runForgeJvm") {
     group = "forge"
     description = "Launch the interactive Forge JVM shell (Compose Desktop)."
     dependsOn("compileKotlinJvm")
-    mainClass.set("borg.trikeshed.forge.shell.ForgeWorkspaceKt")
+    mainClass.set("borg.trikeshed.forge.gallery.ForgeComposeFactory")
     classpath(tasks.named("jvmJar"), configurations.getByName("jvmRuntimeClasspath"))
 }
 
-// Forge pages — publish the root KMPP JS browser target into docs/ for GitHub Pages
+// Forge pages — publish the root KMPP WASM_JS_BROWSER target into docs/ for GitHub Pages
 tasks.register<Sync>("generateForgePages") {
     group = "documentation"
-    description = "Publishes the real root KMPP JS browser target into docs/ with .nojekyll."
-    dependsOn("jsBrowserProductionWebpack")
+    description = "Publishes the WASM_JS_BROWSER target into docs/ with .nojekyll."
+    dependsOn("wasmJsBrowserProductionWebpack")
 
-    from(project.layout.buildDirectory.dir("kotlin-webpack/js/productionExecutable"))
+    from(project.layout.buildDirectory.dir("kotlin-webpack/wasmJs/productionExecutable"))
     from(project.layout.projectDirectory.dir("src/jsMain/resources"))
     into(project.layout.projectDirectory.dir("docs"))
 
@@ -376,7 +381,7 @@ tasks.register<Sync>("generateForgePages") {
         if (!noJekyll.exists()) {
             noJekyll.writeText("\n")
         }
-        println("Published root KMPP JS browser target to ${project.layout.projectDirectory.dir("docs").asFile.absolutePath}")
+        println("Published WASM_JS_BROWSER target to ${project.layout.projectDirectory.dir("docs").asFile.absolutePath}")
     }
 }
 
