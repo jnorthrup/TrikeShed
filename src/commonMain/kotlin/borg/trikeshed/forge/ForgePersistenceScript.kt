@@ -146,6 +146,9 @@ fun forgePersistenceScript(): String = """
     next.spatial.offsetX = Number(next.spatial.offsetX) || 0;
     next.spatial.offsetY = Number(next.spatial.offsetY) || 0;
     next.spatial.focusMode = typeof next.spatial.focusMode === 'string' ? next.spatial.focusMode : 'board';
+    next.causalNodes = Array.isArray(raw && raw.causalNodes) && raw.causalNodes.length ? raw.causalNodes : base.causalNodes;
+    next.lcncEntities = Array.isArray(raw && raw.lcncEntities) && raw.lcncEntities.length ? raw.lcncEntities : base.lcncEntities;
+    next.cascadeGrid = Array.isArray(raw && raw.cascadeGrid) && raw.cascadeGrid.length ? raw.cascadeGrid : base.cascadeGrid;
     ensureSelection(next);
     return next;
   }
