@@ -1,0 +1,89 @@
+[versions]
+# Kotlin & Coroutines
+kotlin = "2.4.0"
+kotlinx-coroutines = "1.11.0"
+kotlinx-datetime = "0.8.0-0.6.x-compat"
+kotlin-reflect = "1.8.0"
+
+# Kotlinx Serialization
+kotlinx-serialization = "1.7.3"
+
+# Compose Multiplatform
+compose = "1.7.3"
+compose-compiler = "1.7.3"
+compose-versions = "1.7.3"
+
+# Kotlin Testing
+kotlin-test-common = "2.4.0"
+kotlin-test-annotations-common = "2.4.0"
+kotlin-test-junit = "2.4.0"
+
+# IO Uring (Linux only)
+io-uring = "1.0"
+
+# JMH
+jmh = "1.37"
+
+# JUnit Jupiter
+junit-jupiter = "5.11.0"
+
+[libraries]
+# Kotlin stdlib & reflection
+kotlin-stdlib = { module = "org.jetbrains.kotlin:kotlin-stdlib", version.ref = "kotlin" }
+kotlin-reflect = { module = "org.jetbrains.kotlin:kotlin-reflect", version.ref = "kotlin-reflect" }
+
+# Kotlin Coroutines
+kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinx-coroutines" }
+kotlinx-coroutines-core-jvm = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm", version.ref = "kotlinx-coroutines" }
+kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "kotlinx-coroutines" }
+
+# Kotlinx Datetime
+kotlinx-datetime = { module = "org.jetbrains.kotlinx:kotlinx-datetime", version.ref = "kotlinx-datetime" }
+
+# Kotlinx Serialization
+kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinx-serialization" }
+
+# IO Uring (Linux)
+io-uring = { module = "org.bereft:io_uring", version.ref = "io-uring" }
+
+# Kotlin Test (common)
+kotlin-test-common = { module = "org.jetbrains.kotlin:kotlin-test-common", version.ref = "kotlin-test-common" }
+kotlin-test-annotations-common = { module = "org.jetbrains.kotlin:kotlin-test-annotations-common", version.ref = "kotlin-test-annotations-common" }
+kotlin-test-junit = { module = "org.jetbrains.kotlin:kotlin-test-junit", version.ref = "kotlin-test-junit" }
+
+# Kotlin Test (JVM specific)
+kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
+
+# JUnit Jupiter
+junit-jupiter = { module = "org.junit.jupiter:junit-jupiter", version.ref = "junit-jupiter" }
+
+# Compose Multiplatform
+compose-runtime = { module = "org.jetbrains.compose.runtime:runtime", version.ref = "compose" }
+compose-foundation = { module = "org.jetbrains.compose.foundation:foundation", version.ref = "compose" }
+compose-material3 = { module = "org.jetbrains.compose.material3:material3", version.ref = "compose" }
+compose-ui = { module = "org.jetbrains.compose.ui:ui", version.ref = "compose" }
+compose-ui-test = { module = "org.jetbrains.compose.ui:ui-test", version.ref = "compose" }
+compose-ui-test-junit4 = { module = "org.jetbrains.compose.ui:ui-test-junit4", version.ref = "compose" }
+compose-ui-test-manifest = { module = "org.jetbrains.compose.ui:ui-test-manifest", version.ref = "compose" }
+compose-components-resources = { module = "org.jetbrains.compose.components:components-resources", version.ref = "compose" }
+compose-desktop = { module = "org.jetbrains.compose.desktop:desktop", version.ref = "compose" }
+compose-desktop-swing = { module = "org.jetbrains.compose.desktop:desktop-swing", version.ref = "compose" }
+compose-web-core = { module = "org.jetbrains.compose.web:web-core", version.ref = "compose" }
+compose-web-svg = { module = "org.jetbrains.compose.web:web-svg", version.ref = "compose" }
+compose-web-dom = { module = "org.jetbrains.compose.web:web-dom", version.ref = "compose" }
+compose-web-canvas = { module = "org.jetbrains.compose.web:web-canvas", version.ref = "compose" }
+
+[plugins]
+# Kotlin Multiplatform
+kotlin-multiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
+kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
+
+# Compose Multiplatform
+compose-multiplatform = { id = "org.jetbrains.compose", version.ref = "compose" }
+
+# Maven Publishing
+maven-publish = { id = "maven-publish" }
+
+[metadata]
+# Version catalog metadata
+catalog-format-version = "1.1"
