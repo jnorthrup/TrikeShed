@@ -94,8 +94,12 @@ tmp/
 temp/
 *.tmp
 *.temp
+*.broken
 *.out
 *.err
+
+# Local task captures
+/docs/task1.md
 
 # Coverage/reports
 **/build/reports/

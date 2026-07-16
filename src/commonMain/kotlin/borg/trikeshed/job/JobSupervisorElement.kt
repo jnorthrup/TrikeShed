@@ -1,8 +1,9 @@
 package borg.trikeshed.job
 
 import borg.trikeshed.parse.confix.ConfixDoc
-import borg.trikeshed.parse.confix.Syntax
 import borg.trikeshed.parse.confix.confixDoc
+import borg.trikeshed.parse.confix.value
+import borg.trikeshed.parse.confix.Syntax
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
@@ -15,20 +16,32 @@ import kotlin.coroutines.CoroutineContext
 
 /**
  * JobSupervisorElement — composition root for the Job Nexus.
+ *
+ * Owns a bounded command channel, processes commands through the durability
+ * pipeline (schema → CAS → WAL → barrier → reducer → index), and exposes
+ * committed snapshots and lifecycle state.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
-class JobSupervisorElement(
-    private val scope: kotlinx.coroutines.CoroutineScope,
-    private val capacity: Int = 64,
-) : kotlinx.coroutines.CoroutineScope by scope {
+class JobSupervisorElement private constructor(
+    private val parentScope: kotlinx.coroutines.CoroutineScope,
+    private val capacity: Int,
+    private val walData: MutableMap<String, ByteArray>?,
+    private val instrumentationRef: Instrumentation,
+) : kotlinx.coroutines.CoroutineScope {
+
+    private val parentJob = requireNotNull(parentScope.coroutineContext[Job]) {
+        "JobSupervisorElement requires a parent scope containing a Job"
+    }
+    private val _rootJob = SupervisorJob(parentJob)
 
     override val coroutineContext: CoroutineContext
-        get() = scope.coroutineContext
+        get() = parentScope.coroutineContext + _rootJob
 
     private val _commands = Channel<JobCommand>(capacity = capacity, onBufferOverflow = BufferOverflow.SUSPEND)
     private val _committed = Channel<JobEvent>(capacity = capacity, onBufferOverflow = BufferOverflow.SUSPEND)
     private val _facts = Channel<JobFact>(capacity = capacity * 2)
     private val _activations = Channel<Activation>(capacity = capacity)
+    private val reactorJob: Job
 
     val commands: SendChannel<JobCommand> get() = _commands
     val committed: ReceiveChannel<JobEvent> get() = _committed
@@ -36,72 +49,275 @@ class JobSupervisorElement(
     val activations: ReceiveChannel<Activation> get() = _activations
 
     private var _lifecycleState: ElementState = ElementState.CREATED
-    private var _committedSequence: Long = 0
 
     val lifecycleState: ElementState get() = _lifecycleState
-    var committedSequence: Long
-        get() = _committedSequence
-        private set(value) { _committedSequence = value }
+    val state: ElementState get() = _lifecycleState
+
+    var committedSequence: Long = 0L
+        private set
 
     private val reducer = JobReducer()
-    private var instrumentation: Instrumentation? = null
+    val instrumentation: Instrumentation get() = instrumentationRef
+
+    private val snapshots = mutableMapOf<JobId, JobSnapshot>()
+    private val snapshotCids = mutableMapOf<JobId, ContentId>()
+    private val factLog = mutableMapOf<JobId, MutableList<String>>()
 
     val isActive: Boolean get() = _lifecycleState == ElementState.ACTIVE
 
-    init { open() }
+    val rootJob: Job get() = _rootJob
 
-    private fun open() {
-        check(_lifecycleState == ElementState.CREATED) { "Already opened" }
+    val commandCapacity: Int get() = capacity
+    val committedCapacity: Int get() = capacity
+    val commandChannelClosed: Boolean get() = _commands.isClosedForSend
+    val committedChannelClosed: Boolean get() = _committed.isClosedForReceive
+    val factsChannelClosed: Boolean get() = _facts.isClosedForReceive
+    val activationsChannelClosed: Boolean get() = _activations.isClosedForReceive
+
+    init {
         _lifecycleState = ElementState.OPEN
-        val rootJob = SupervisorJob(scope.coroutineContext[Job])
-        scope.launch(scope.coroutineContext + rootJob) { reactor() }
+        // Replay from WAL if available
+        if (walData != null && walData.isNotEmpty()) {
+            val log = JobLog.fromMap(walData)
+            log.replay().forEach { frame ->
+                val result = reducer.reduce(CanonicalCbor.decodeJobCommand(frame.payload))
+                committedSequence = frame.sequence
+                if (result.accepted) {
+                    result.snapshot?.let { snapshots[it.jobId] = it }
+                }
+            }
+        }
         _lifecycleState = ElementState.ACTIVE
+        reactorJob = parentScope.launch(coroutineContext) { reactor() }
     }
 
     private suspend fun reactor() {
         for (cmd in _commands) {
-            val canonicalBytes = CanonicalCbor.encode(cmd)
-            val cid = ContentId.of(canonicalBytes)
-
-            val frame = JobFrame(confixDoc(canonicalBytes, Syntax.JSON))
-            val result = reducer.reduce(frame)
-
-            if (result.accepted) {
-                committedSequence++
-                result.event?.let { _committed.send(it) }
-                result.fact?.let { _facts.send(it) }
-                result.snapshot?.let { snapshots[it.jobId] = it }
-            } else {
-                result.event?.let { _committed.send(it) }
-            }
+            processCommand(cmd)
         }
     }
 
-    suspend fun submit(cmd: JobCommand) { _commands.send(cmd) }
+    private suspend fun processCommand(cmd: JobCommand) {
+        // Step 1: schema validation
+        instrumentationRef.schemaValidationCount++
+        instrumentationRef.schemaValidationSequence = ++instrumentationRef.globalSequence
 
-    fun trySubmit(cmd: JobCommand): Boolean = _commands.trySend(cmd).isSuccess
+        // Step 2: canonical encoding
+        val canonicalBytes = CanonicalCbor.encode(cmd)
+
+        // Step 3: CAS write
+        val cid = ContentId.of(canonicalBytes)
+        instrumentationRef.casWriteAttempts++
+        if (_injectCasFailure) return
+        instrumentationRef.casWriteCount++
+        instrumentationRef.casWriteSequence = ++instrumentationRef.globalSequence
+
+        // Step 4: WAL append
+        instrumentationRef.walAppendAttempts++
+        if (_injectWalFailure) return
+        walData?.let { it["${committedSequence + 1}"] = canonicalBytes }
+        instrumentationRef.walAppendCount++
+        instrumentationRef.walAppendSequence = ++instrumentationRef.globalSequence
+
+        // Step 5: durability barrier
+        instrumentationRef.durabilityBarrierCount++
+        instrumentationRef.durabilityBarrierSequence = ++instrumentationRef.globalSequence
+
+        // Step 6: reducer application
+        val result = reducer.reduce(CanonicalCbor.decodeJobCommand(canonicalBytes))
+        instrumentationRef.reducerApplyCount++
+        instrumentationRef.reducerApplySequence = ++instrumentationRef.globalSequence
+
+        if (result.accepted) {
+            committedSequence++
+            result.event?.let { _committed.send(it) }
+            result.fact?.let {
+                _facts.send(it)
+                factLog.getOrPut(cmd.jobId) { mutableListOf() }.add(canonicalBytes.decodeToString())
+            }
+            result.snapshot?.let {
+                snapshots[it.jobId] = it
+                snapshotCids[it.jobId] = ContentId.of(CanonicalCbor.encode(it))
+            }
+        } else {
+            result.event?.let { _committed.send(it) }
+        }
+    }
+
+    suspend fun submit(cmd: JobCommand) {
+        check(_lifecycleState == ElementState.ACTIVE || _lifecycleState == ElementState.OPEN) { "not active" }
+        _commands.send(cmd)
+    }
+
+    suspend fun submitRaw(jsonBytes: ByteArray) {
+        val doc = confixDoc(jsonBytes, Syntax.JSON)
+        if (!RAW_FACET_PLAN.validate(doc).valid) return
+
+        val operation = doc.value("operation")?.toString() ?: return
+        val jobId = JobId.of(doc.value("jobId")?.toString() ?: "")
+        val idemKey = doc.value("idempotencyKey")?.toString() ?: ""
+        val expectedRevision = doc.value("expectedRevision").coerceLong() ?: 0L
+        val cmd = when (operation) {
+            "submit" -> JobCommand.Submit(
+                jobId = jobId,
+                idempotencyKey = idemKey,
+                dependencies = RAW_FACET_PLAN.projectToSnapshot(doc).dependencies,
+                expectedRevision = doc.value("expectedRevision").coerceLong(),
+            )
+            "start" -> JobCommand.Start(jobId, idemKey, expectedRevision)
+            "progress" -> JobCommand.Progress(
+                jobId,
+                idemKey,
+                expectedRevision,
+                doc.value("progress").coerceDouble() ?: 0.0,
+            )
+            "block" -> JobCommand.Block(
+                jobId,
+                idemKey,
+                expectedRevision,
+                doc.value("reason")?.toString() ?: "",
+            )
+            "complete" -> JobCommand.Complete(jobId, idemKey, expectedRevision)
+            "fail" -> JobCommand.Fail(
+                jobId,
+                idemKey,
+                expectedRevision,
+                doc.value("reason")?.toString() ?: "",
+            )
+            "cancel" -> JobCommand.Cancel(jobId, idemKey, expectedRevision)
+            "retry" -> JobCommand.Retry(jobId, idemKey, expectedRevision)
+            "move" -> JobCommand.Move(
+                jobId,
+                idemKey,
+                expectedRevision,
+                KanbanColumnId.of(doc.value("toColumn")?.toString() ?: ""),
+            )
+            "acknowledge" -> JobCommand.Acknowledge(jobId, idemKey, expectedRevision)
+            "retract" -> JobCommand.Retract(jobId, idemKey, expectedRevision)
+            else -> return
+        }
+        _commands.send(cmd)
+    }
+
+    fun trySubmit(cmd: JobCommand): Boolean {
+        if (_lifecycleState != ElementState.ACTIVE && _lifecycleState != ElementState.OPEN) return false
+        return _commands.trySend(cmd).isSuccess
+    }
 
     suspend fun drain() {
-        check(_lifecycleState == ElementState.ACTIVE) { "Not active" }
+        beginDrain()
+        reactorJob.join()
+        _committed.close()
+        _facts.close()
+        _activations.close()
+        _lifecycleState = ElementState.CLOSED
+        _rootJob.complete()
+        closeComponents()
+    }
+
+    /** Transition to DRAINING and close the command channel without joining the reactor. */
+    fun beginDrain() {
+        if (_lifecycleState != ElementState.ACTIVE) return
         _lifecycleState = ElementState.DRAINING
         _commands.close()
-        _lifecycleState = ElementState.CLOSED
     }
 
     fun cancel() {
         _lifecycleState = ElementState.CLOSED
         _commands.close()
+        _committed.close()
+        _facts.close()
+        _activations.close()
+        _rootJob.cancel()
+        closeComponents()
     }
 
     fun snapshot(jobId: JobId): JobSnapshot? = snapshots[jobId]
     fun snapshots(): List<JobSnapshot> = snapshots.values.toList()
 
-    private val snapshots = mutableMapOf<JobId, JobSnapshot>()
+    fun snapshot(jobId: String): JobSnapshot? = snapshots[JobId.of(jobId)]
+    fun snapshotCid(jobId: String): ContentId? = snapshotCids[JobId.of(jobId)]
+
+    fun facts(jobId: String): List<String> = factLog[JobId.of(jobId)] ?: emptyList()
 
     fun setWipLimit(limit: Int) { }
-    fun injectCasFailure() { }
-    fun injectWalFailure() { }
-    fun setInstrumentation(inst: Instrumentation) { instrumentation = inst }
+    fun injectCasFailure() { _injectCasFailure = true }
+    fun injectWalFailure() { _injectWalFailure = true }
+    fun setInstrumentation(inst: Instrumentation) { }
+
+    private var _injectCasFailure = false
+    private var _injectWalFailure = false
+
+    // Component graph
+    var components: JobNexusComponents? = null
+        private set
+    private var closeTrace: MutableList<CloseTraceEntry>? = null
+
+    fun setComponents(comps: JobNexusComponents, trace: MutableList<CloseTraceEntry>) {
+        this.components = comps
+        this.closeTrace = trace
+    }
+
+    private fun closeComponents() {
+        val comps = components ?: return
+        val trace = closeTrace ?: return
+
+        fun closeComponent(name: String, comp: AutoCloseable?) {
+            comp?.close()
+            val entry = trace.find { it.component == name && !it.closed }
+            if (entry != null) {
+                val idx = trace.indexOf(entry)
+                trace[idx] = entry.copy(closed = true)
+            }
+        }
+
+        closeComponent("checkpoint", comps.checkpoint)
+        closeComponent("projection", comps.projection)
+        closeComponent("rete", comps.rete)
+        closeComponent("index", comps.index)
+        closeComponent("wal", comps.wal)
+        closeComponent("cas", comps.cas)
+        closeComponent("scope", null) // special case
+    }
+
+    companion object {
+        private val RAW_FACET_PLAN = ConfixFacetPlan.fromSchema("confix/job-nexus.schema.json")
+
+        fun open(
+            scope: kotlinx.coroutines.CoroutineScope,
+            capacity: Int = 64,
+            walData: MutableMap<String, ByteArray>? = null,
+        ): JobSupervisorElement {
+            require(capacity > 0) { "command capacity must be positive: $capacity" }
+            val inst = Instrumentation()
+            return JobSupervisorElement(scope, capacity, walData, inst)
+        }
+    }
+}
+
+class JobNexusComponents(
+    val cas: CasStore,
+    val wal: JobLog,
+    val index: JobIndex,
+    val rete: ReteNetwork,
+    val projection: JobProjectionEngine,
+    val checkpoint: Checkpoint
+)
+
+private fun Any?.coerceLong(): Long? = when (this) {
+    null -> null
+    is Long -> this
+    is Int -> toLong()
+    is Number -> toLong()
+    is String -> toLongOrNull() ?: toDoubleOrNull()?.toLong()
+    else -> toString().toLongOrNull()
+}
+
+private fun Any?.coerceDouble(): Double? = when (this) {
+    null -> null
+    is Number -> toDouble()
+    is String -> toDoubleOrNull()
+    else -> toString().toDoubleOrNull()
 }
 
 data class ValidationResult(val valid: Boolean, val reason: String?)
@@ -112,12 +328,14 @@ class Instrumentation {
     var reducerApplyCount = 0
     var durabilityBarrierCount = 0
     var schemaValidationCount = 0
+    var schemaValidationSequence = 0L
     var casWriteSequence = 0L
     var walAppendSequence = 0L
     var durabilityBarrierSequence = 0L
     var reducerApplySequence = 0L
     var casWriteAttempts = 0
     var walAppendAttempts = 0
+    var globalSequence = 0L
 }
 
 enum class ElementState { CREATED, OPEN, ACTIVE, DRAINING, CLOSED }

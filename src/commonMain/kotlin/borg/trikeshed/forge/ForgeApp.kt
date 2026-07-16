@@ -7,11 +7,10 @@ import borg.trikeshed.graph.CausalGraphNodeDTO
 import borg.trikeshed.graph.causalGraphKey
 import borg.trikeshed.graph.causalGraphNode
 import borg.trikeshed.kanban.ForgeBoardFSM
+import borg.trikeshed.parse.json.JsonSupport
 import borg.trikeshed.userspace.reactor.KanbanFSM
 import kotlinx.datetime.Clock
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
 
 @Serializable
 data class LcncEntityDTO(
@@ -89,9 +88,66 @@ data class ForgeAppState(
     val causalNodes: List<CausalGraphNodeDTO> = emptyList(),
     val lcncEntities: List<LcncEntityDTO> = emptyList(),
     val blackboardId: String = "",
+    val cascadeGrid: List<CascadeRollupRow> = emptyList(),
 )
 
-private val forgeAppJson = Json { prettyPrint = false }
+@Serializable
+data class CascadeRollupRow(
+    val viewName: String,
+    val metric: String,
+    val sum: Double = 0.0,
+    val avg: Double = 0.0,
+    val min: Double = 0.0,
+    val max: Double = 0.0,
+    val count: Long = 0L,
+)
+
+/** Build the cascade grid by running sample reading docs through the view-server tool. */
+private fun defaultCascadeGrid(): List<CascadeRollupRow> {
+    val server = borg.trikeshed.viewserver.CommonViewServer()
+    val views = listOf("byOrganization", "byMachine", "byBillingGroup")
+    val docs = listOf(
+        mapOf(
+            "organization_id" to borg.trikeshed.viewserver.ViewValue.Text("org-1"),
+            "machine_id" to borg.trikeshed.viewserver.ViewValue.Text("machine-1"),
+            "billing_group_id" to borg.trikeshed.viewserver.ViewValue.Text("billing-1"),
+            "reading_date" to borg.trikeshed.viewserver.ViewValue.Text("2026-07-15T12:34:00Z"),
+            "cpu_mhz" to borg.trikeshed.viewserver.ViewValue.Number(100.0),
+            "memory_mib" to borg.trikeshed.viewserver.ViewValue.Number(200.0),
+        ),
+        mapOf(
+            "organization_id" to borg.trikeshed.viewserver.ViewValue.Text("org-1"),
+            "machine_id" to borg.trikeshed.viewserver.ViewValue.Text("machine-1"),
+            "billing_group_id" to borg.trikeshed.viewserver.ViewValue.Text("billing-1"),
+            "reading_date" to borg.trikeshed.viewserver.ViewValue.Text("2026-07-15T12:35:00Z"),
+            "cpu_mhz" to borg.trikeshed.viewserver.ViewValue.Number(300.0),
+            "memory_mib" to borg.trikeshed.viewserver.ViewValue.Number(400.0),
+        ),
+    )
+    val docValues = docs.map { borg.trikeshed.viewserver.ViewValue.ObjectValue(it) }
+    val rows = mutableListOf<CascadeRollupRow>()
+    for (view in views) {
+        server.reset()
+        server.addFunction("tool:couchdbcascade/$view")
+        val rollup = server.reduce("tool:couchdbcascade", docValues)
+        val metricsObj = (rollup as borg.trikeshed.viewserver.ViewValue.ArrayValue).values[0]
+            as borg.trikeshed.viewserver.ViewValue.ObjectValue
+        val count = (rollup.values[1] as borg.trikeshed.viewserver.ViewValue.Number).value.toLong()
+        for ((metric, stats) in metricsObj.fields) {
+            val s = stats as borg.trikeshed.viewserver.ViewValue.ObjectValue
+            rows += CascadeRollupRow(
+                viewName = view,
+                metric = metric,
+                sum = (s.fields["sum"] as borg.trikeshed.viewserver.ViewValue.Number).value,
+                avg = (s.fields["avg"] as borg.trikeshed.viewserver.ViewValue.Number).value,
+                min = (s.fields["min"] as borg.trikeshed.viewserver.ViewValue.Number).value,
+                max = (s.fields["max"] as borg.trikeshed.viewserver.ViewValue.Number).value,
+                count = count,
+            )
+        }
+    }
+    return rows
+}
 
 private fun defaultForgeUseCases(): List<ForgeAppUseCase> = listOf(
     ForgeAppUseCase(
@@ -371,11 +427,89 @@ private fun defaultForgeAppState(): ForgeAppState {
             ),
         ),
         blackboardId = blackboardId,
+        cascadeGrid = defaultCascadeGrid(),
     )
 }
 
+private fun ForgeAppState.toJsonValue(): Map<String, Any?> = linkedMapOf(
+    "title" to title,
+    "pageNotes" to pageNotes,
+    "columns" to columns.map { linkedMapOf("id" to it.id, "name" to it.name, "order" to it.order) },
+    "items" to items.map { item ->
+        linkedMapOf(
+            "id" to item.id,
+            "title" to item.title,
+            "notes" to item.notes,
+            "status" to item.status,
+            "priority" to item.priority,
+            "checklist" to item.checklist.map {
+                linkedMapOf("id" to it.id, "text" to it.text, "checked" to it.checked)
+            },
+        )
+    },
+    "selectedItemId" to selectedItemId,
+    "useCases" to useCases.map {
+        linkedMapOf(
+            "id" to it.id,
+            "name" to it.name,
+            "summary" to it.summary,
+            "pageNotes" to it.pageNotes,
+            "itemTitles" to it.itemTitles,
+        )
+    },
+    "reactor" to linkedMapOf(
+        "taxonomyNodeCount" to reactor.taxonomyNodeCount,
+        "signalFacetCount" to reactor.signalFacetCount,
+        "cacheStoredCount" to reactor.cacheStoredCount,
+        "lastEventKind" to reactor.lastEventKind,
+        "lastEventTimestampMs" to reactor.lastEventTimestampMs,
+        "recentTaxonomyNodes" to reactor.recentTaxonomyNodes,
+        "recentSignals" to reactor.recentSignals,
+    ),
+    "spatial" to linkedMapOf(
+        "zoom" to spatial.zoom,
+        "offsetX" to spatial.offsetX,
+        "offsetY" to spatial.offsetY,
+        "focusMode" to spatial.focusMode,
+    ),
+    "causalNodes" to causalNodes.map {
+        linkedMapOf(
+            "nodeId" to it.nodeId,
+            "opId" to it.opId,
+            "opVersion" to it.opVersion,
+            "parentNodeIds" to it.parentNodeIds,
+            "causalKey" to it.causalKey,
+            "topoOrdinal" to it.topoOrdinal,
+            "causalClock" to it.causalClock,
+        )
+    },
+    "lcncEntities" to lcncEntities.map {
+        linkedMapOf(
+            "entityId" to it.entityId,
+            "lcncKind" to it.lcncKind,
+            "lane" to it.lane,
+            "facet" to it.facet,
+            "causalKey" to it.causalKey,
+            "title" to it.title,
+            "description" to it.description,
+        )
+    },
+    "blackboardId" to blackboardId,
+    "cascadeGrid" to cascadeGrid.map {
+        linkedMapOf(
+            "viewName" to it.viewName,
+            "metric" to it.metric,
+            "sum" to it.sum,
+            "avg" to it.avg,
+            "min" to it.min,
+            "max" to it.max,
+            "count" to it.count,
+        )
+    },
+)
+
 fun forgeAppHtml(): String {
-    val seed = htmlEscape(forgeAppJson.encodeToString(defaultForgeAppState()))
+    val seed = htmlEscape(JsonSupport.stringify(defaultForgeAppState().toJsonValue()))
     return """
 <!doctype html>
 <html lang="en">
@@ -474,6 +608,13 @@ ${forgeAppStyles()}
           <p>Move the same items you edit in the page. CRUD stays local-first.</p>
         </div>
         <div id="board-root" class="column-stack"></div>
+      </div>
+      <div class="panel section-block">
+        <div class="section-head">
+          <h2>Cascade grid</h2>
+          <p>CouchDB Cascade metric rollup via view-server tool.</p>
+        </div>
+        <div id="cascade-grid-root" class="cascade-grid"></div>
       </div>
     </aside>
   </div>
@@ -764,6 +905,11 @@ private fun forgeAppStyles(): String = """
       .item-meta, .space-toolbar { grid-template-columns:1fr; }
       .board-pane { border-top:1px solid var(--line); }
     }
+    .cascade-grid { display:grid; gap:6px; }
+    .cascade-grid table { width:100%; border-collapse:collapse; font-size:12px; }
+    .cascade-grid th { text-align:left; color:var(--muted); text-transform:uppercase; letter-spacing:.08em; font-size:10px; padding:6px 8px; border-bottom:1px solid var(--line2); }
+    .cascade-grid td { padding:6px 8px; border-bottom:1px solid var(--line); color:var(--ink); }
+    .cascade-grid td.num { text-align:right; font-variant-numeric:tabular-nums; }
 """.trimIndent()
 
 private fun forgeAppScript(): String = forgePersistenceScript()

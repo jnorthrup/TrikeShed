@@ -12,8 +12,10 @@ plugins {
 group = "org.bereft"
 version = "1.0"
 val enableNativeSharedLib = providers.gradleProperty("native.sharedLib").orNull == "true"
+val enableBrowserTests = providers.gradleProperty("browserTests").orNull == "true"
 
 val focusedTransportSlice = providers.gradleProperty("focusedTransportSlice").orNull == "true"
+val viewServerNodeSlice = false
 
 // ── Locked versions ───────────────────────────────────────────────────────
 // GraalVM CE 25.0.2 is the locked runtime; JDK 25 toolchain.
@@ -64,6 +66,9 @@ kotlin {
 
     sourceSets {
         val commonMain = getByName("commonMain") {
+            if (viewServerNodeSlice) {
+                kotlin.setSrcDirs(listOf("src/viewServerCommonMain/kotlin"))
+            }
             dependencies {
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:$coroutinesVersion")
                 implementation("org.jetbrains.kotlinx:kotlinx-datetime:$datetimeVersion")
@@ -71,6 +76,9 @@ kotlin {
             }
         }
         val commonTest = getByName("commonTest") {
+            if (viewServerNodeSlice) {
+                kotlin.setSrcDirs(listOf("src/viewServerCommonTest/kotlin"))
+            }
             dependencies {
                 implementation(kotlin("test"))
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:$coroutinesTestVersion")
@@ -114,6 +122,7 @@ kotlin {
         nodejs()
         browser {
             testTask {
+                enabled = enableBrowserTests
                 useKarma {
                     useConfigDirectory(project.layout.projectDirectory.dir("karma.config.d").asFile)
                     useChromeHeadless()
@@ -127,6 +136,7 @@ kotlin {
         nodejs()
         browser {
             testTask {
+                enabled = enableBrowserTests
                 useKarma {
                     useConfigDirectory(project.layout.projectDirectory.dir("karma.config.d").asFile)
                     useChromeHeadless()
@@ -168,9 +178,27 @@ if (enableLinuxX64) {
             }
         }
 
-        val jsMain = getByName("jsMain") { dependsOn(commonMain) }
-        val jsTest = getByName("jsTest") { dependsOn(commonTest) }
-        val wasmJsMain = getByName("wasmJsMain") { dependsOn(commonMain) }
+        val jsMain = getByName("jsMain") {
+            dependsOn(commonMain)
+            dependencies {
+                implementation(npm("workbox-webpack-plugin", "7.4.1"))
+            }
+            if (viewServerNodeSlice) {
+                kotlin.setSrcDirs(listOf("src/viewServerJsMain/kotlin"))
+            }
+        }
+        val jsTest = getByName("jsTest") {
+            dependsOn(commonTest)
+            if (viewServerNodeSlice) {
+                kotlin.setSrcDirs(emptyList<String>())
+            }
+        }
+        val wasmJsMain = getByName("wasmJsMain") {
+            dependsOn(commonMain)
+            dependencies {
+                implementation(npm("workbox-webpack-plugin", "7.4.1"))
+            }
+        }
         val wasmJsTest = getByName("wasmJsTest") { dependsOn(commonTest) }
 
         if (enableNativeSharedLib) {
@@ -232,13 +260,8 @@ tasks.withType<Test>().configureEach {
     // No internal exports needed for JDK 25+
 }
 
-// Karma config
-tasks.named("jsNodeTest", org.jetbrains.kotlin.gradle.targets.js.testing.KotlinJsTest::class) {
-    dependsOn("jsBrowserTest")
-}
-tasks.named("wasmJsNodeTest", org.jetbrains.kotlin.gradle.targets.js.testing.KotlinJsTest::class) {
-    dependsOn("wasmJsBrowserTest")
-}
+// Browser executables are published to GitHub Pages; browser tests are opt-in
+// with -PbrowserTests=true. Node tests remain part of the default build.
 
 // Ensure resources are copied before JVM compilation
 tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {

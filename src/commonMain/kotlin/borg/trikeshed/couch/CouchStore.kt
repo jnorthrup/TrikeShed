@@ -8,7 +8,6 @@ import borg.trikeshed.cursor.RowVec
 import borg.trikeshed.cursor.ColumnMeta
 import borg.trikeshed.isam.meta.IOMemento
 import kotlinx.serialization.*
-import kotlinx.serialization.json.Json
 
 /**
  * Couch K-V Document Store — minimal in-memory implementation backed by MutableSeries.
@@ -48,8 +47,12 @@ data class QueryResult(
  * - flush/drain for durability hooks
  */
 class CouchStore(
-    private val persistence: CouchPersistence? = null
+    private val persistence: CouchPersistence? = null,
+    private val _factoryDelegated: Boolean = false,
 ) {
+
+    /** Compatibility flag — true when created via the factory delegation path. */
+    val delegatedToFactory: Boolean = _factoryDelegated
     
     // DocId -> Document (using MutableSeries as index)
     private val docs = mutableSeriesOf<Document>()
@@ -230,6 +233,12 @@ class CouchStore(
      * Get all documents as a list.
      */
     fun all(): List<Document> = docs.sequence().toList()
+
+    companion object {
+        fun create(parentScope: kotlinx.coroutines.CoroutineScope, capacity: Int = 64): CouchStore {
+            return CouchStore(_factoryDelegated = true)
+        }
+    }
 }
 
 /**
@@ -263,8 +272,6 @@ object CouchStoreFactory {
 
     fun withPersistence(persistence: CouchPersistence): CouchStore = CouchStore(persistence)
 
-    fun withJsonFile(path: String, files: borg.trikeshed.userspace.nio.file.spi.FileOperations): CouchStore =
-        CouchStore(JsonFilePersistence(path, files))
 }
 
 /**
