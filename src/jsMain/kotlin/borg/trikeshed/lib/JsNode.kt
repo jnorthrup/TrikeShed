@@ -3,11 +3,17 @@ package borg.trikeshed.lib
 import kotlin.js.Date
 import kotlin.random.Random
 
-val fs: dynamic = js("require('fs')")
-val os: dynamic = js("require('os')")
-val path: dynamic = js("require('path')")
-val processObj: dynamic = js("process")
-val Buffer: dynamic = js("globalThis.Buffer")
+// Lazy Node.js module access — these require() calls MUST NOT execute at module
+// load time or the browser bundle crashes (browsers have no require()).  Each
+// is wrapped in a lazy delegate that only fires when a Node path actually calls it.
+
+private fun requireModule(name: String): dynamic = js("require")(name)
+
+val fs: dynamic get() = requireModule("fs")
+val os: dynamic get() = requireModule("os")
+val path: dynamic get() = requireModule("path")
+val processObj: dynamic get() = js("process")
+val Buffer: dynamic get() = js("globalThis.Buffer")
 
 internal fun jsCwd(): String = processObj.cwd() as String
 
