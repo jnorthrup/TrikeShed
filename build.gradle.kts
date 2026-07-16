@@ -361,18 +361,33 @@ tasks.register<JavaExec>("benchmarkConfix") {
 tasks.register<Sync>("generateForgePages") {
     group = "documentation"
     description = "Publishes the real root KMPP JS browser target into docs/ with .nojekyll."
-    dependsOn("jsBrowserProductionWebpack")
+    dependsOn("jsBrowserProductionWebpack", "compileProductionExecutableKotlinJs")
 
     from(project.layout.buildDirectory.dir("kotlin-webpack/js/productionExecutable"))
     from(project.layout.projectDirectory.dir("src/jsMain/resources"))
     into(project.layout.projectDirectory.dir("docs"))
 
     doLast {
+        val nodeBinary = project.layout.buildDirectory.file("compileSync/js/main/productionExecutable/kotlin/TrikeShed.js").get().asFile
+        if (!nodeBinary.exists()) {
+            throw GradleException("Compiled JS Node binary does not exist at ${nodeBinary.absolutePath}")
+        }
+        val process = ProcessBuilder("node", nodeBinary.absolutePath)
+            .redirectError(ProcessBuilder.Redirect.INHERIT)
+            .start()
+        val html = process.inputStream.bufferedReader().readText()
+        val exitCode = process.waitFor()
+        if (exitCode != 0) {
+            throw GradleException("Failed to execute Node binary to generate index.html: exit code $exitCode")
+        }
+        val indexHtml = project.layout.projectDirectory.file("docs/index.html").asFile
+        indexHtml.writeText(html)
+
         val noJekyll = project.layout.projectDirectory.file("docs/.nojekyll").asFile
         if (!noJekyll.exists()) {
             noJekyll.writeText("\n")
         }
-        println("Published root KMPP JS browser target to ${project.layout.projectDirectory.dir("docs").asFile.absolutePath}")
+        println("Published root KMPP JS browser target (HTML generated via Node.js target) to ${project.layout.projectDirectory.dir("docs").asFile.absolutePath}")
     }
 }
 
