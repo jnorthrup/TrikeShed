@@ -27,8 +27,12 @@ class JobSupervisorDrainTest {
 
     @Test
     fun casFailureStopsBeforeWalReducerAndVisibility() = runTest {
-        val nexus = JobSupervisorElement.open(this, capacity = 1)
-        nexus.injectCasFailure()
+        val brokenCas = object : CasStore() {
+            override fun put(bytes: ByteArray): ContentId {
+                throw RuntimeException("injected CAS failure")
+            }
+        }
+        val nexus = JobSupervisorElement.open(this, capacity = 1, casStore = brokenCas)
 
         nexus.submit(JobCommand.Submit(JobId.of("j-cas-fail"), "k-cas-fail"))
         nexus.drain()
@@ -39,6 +43,23 @@ class JobSupervisorDrainTest {
         assertEquals(0, nexus.instrumentation.reducerApplyCount)
         assertEquals(0L, nexus.committedSequence)
         assertEquals(null, nexus.snapshot("j-cas-fail"))
+    }
+
+    @Test
+    fun casDigestReadbackFailureStopsPipeline() = runTest {
+        val lyingCas = object : CasStore() {
+            override fun put(bytes: ByteArray): ContentId = ContentId.of(bytes)
+            override fun get(cid: ContentId): ByteArray = "wrong bytes".encodeToByteArray()
+        }
+        val nexus = JobSupervisorElement.open(this, capacity = 1, casStore = lyingCas)
+
+        nexus.submit(JobCommand.Submit(JobId.of("j-cas-readback"), "k-readback"))
+        nexus.drain()
+
+        assertEquals(1, nexus.instrumentation.casWriteAttempts)
+        assertEquals(0, nexus.instrumentation.casWriteCount)
+        assertEquals(0, nexus.instrumentation.walAppendAttempts)
+        assertEquals(0L, nexus.committedSequence)
     }
 
     @Test
@@ -127,7 +148,7 @@ class JobSupervisorDrainTest {
             ),
         )
 
-        val nexus = JobSupervisorElement.open(this, capacity = 1, walData = wal)
+        val nexus = JobSupervisorElement.open(this, capacity = 1, jobLog = JobLog.fromMap(wal))
 
         assertEquals(9L, nexus.committedSequence)
         assertEquals(1L, nexus.snapshot("j-replay")?.revision)
@@ -136,8 +157,12 @@ class JobSupervisorDrainTest {
 
     @Test
     fun walFailureStopsAfterCasBeforeReducerAndVisibility() = runTest {
-        val nexus = JobSupervisorElement.open(this, capacity = 1)
-        nexus.injectWalFailure()
+        val brokenWal = object : JobLog() {
+            override fun append(sequence: Long, payload: ByteArray) {
+                throw RuntimeException("injected WAL append failure")
+            }
+        }
+        val nexus = JobSupervisorElement.open(this, capacity = 1, jobLog = brokenWal)
 
         nexus.submit(JobCommand.Submit(JobId.of("j-wal-fail"), "k-wal-fail"))
         nexus.drain()
@@ -148,6 +173,25 @@ class JobSupervisorDrainTest {
         assertEquals(0, nexus.instrumentation.reducerApplyCount, "reducer must not run after WAL failure")
         assertEquals(0L, nexus.committedSequence, "committedSequence must not advance after WAL failure")
         assertEquals(null, nexus.snapshot("j-wal-fail"), "snapshot must not be visible after WAL failure")
+    }
+
+    @Test
+    fun barrierFailureStopsPipeline() = runTest {
+        val brokenBarrier = object : JobLog() {
+            override fun flush() {
+                throw RuntimeException("injected barrier failure")
+            }
+        }
+        val nexus = JobSupervisorElement.open(this, capacity = 1, jobLog = brokenBarrier)
+
+        nexus.submit(JobCommand.Submit(JobId.of("j-barrier-fail"), "k-barrier-fail"))
+        nexus.drain()
+
+        assertEquals(1, nexus.instrumentation.walAppendCount)
+        assertEquals(0, nexus.instrumentation.durabilityBarrierCount)
+        assertEquals(0, nexus.instrumentation.reducerApplyCount)
+        assertEquals(0L, nexus.committedSequence)
+        assertEquals(null, nexus.snapshot("j-barrier-fail"))
     }
 
     @Test
