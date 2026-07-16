@@ -357,6 +357,25 @@ tasks.register<JavaExec>("benchmarkConfix") {
     classpath(tasks.named("jvmJar"), configurations.getByName("jvmRuntimeClasspath"))
 }
 
+// Forge pages — publish the root KMPP JS browser target into docs/ for GitHub Pages
+tasks.register<Sync>("generateForgePages") {
+    group = "documentation"
+    description = "Publishes the real root KMPP JS browser target into docs/ with .nojekyll."
+    dependsOn("jsBrowserProductionWebpack")
+
+    from(project.layout.buildDirectory.dir("kotlin-webpack/js/productionExecutable"))
+    from(project.layout.projectDirectory.dir("src/jsMain/resources"))
+    into(project.layout.projectDirectory.dir("docs"))
+
+    doLast {
+        val noJekyll = project.layout.projectDirectory.file("docs/.nojekyll").asFile
+        if (!noJekyll.exists()) {
+            noJekyll.writeText("\n")
+        }
+        println("Published root KMPP JS browser target to ${project.layout.projectDirectory.dir("docs").asFile.absolutePath}")
+    }
+}
+
 // Config cache
 tasks.register("kmpPartiallyResolvedDependenciesCheckerIgnore") {
     doLast { }

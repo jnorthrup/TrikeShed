@@ -30,12 +30,12 @@ data class CloseTraceEntry(
  */
 class JobNexusComponentFactories(
     val scopeFactory: () -> CoroutineScope = { error("default scopeFactory not set") },
-    val casStoreFactory: () -> CasStore = { CasStore.inMemory() },
-    val walFactory: () -> JobLog = { JobLog.inMemory() },
-    val indexFactory: () -> JobIndex = { JobIndex() },
-    val reteFactory: () -> ReteNetwork = { ReteNetwork() },
-    val projectionFactory: () -> JobProjectionEngine = { JobProjectionEngine() },
-    val checkpointFactory: () -> Checkpoint = { Checkpoint() },
+    val casStoreFactory: CasStoreFactory = CasStoreFactory { CasStore.inMemory() },
+    val walFactory: JobLogFactory = JobLogFactory { JobLog.inMemory() },
+    val indexFactory: JobIndexFactory = JobIndexFactory { JobIndex() },
+    val reteFactory: ReteNetworkFactory = ReteNetworkFactory { ReteNetwork() },
+    val projectionFactory: ProjectionFactory = ProjectionFactory { JobProjectionEngine() },
+    val checkpointFactory: CheckpointFactory = CheckpointFactory { Checkpoint() },
 )
 
 /** Minimal component types assembled by the factory. */
@@ -64,27 +64,37 @@ open class Checkpoint {
 }
 
 // ── Failing factory stubs for rollback tests ──────────────────────────────────
+// Use fun interface with SAM named invoke() so the classes remain callable
+// as factory() (compatible with the () -> X field types), while avoiding the
+// JS prohibition on classes implementing kotlin.FunctionN directly.
 
-class FailingCasStoreFactory : () -> CasStore {
+fun interface CasStoreFactory { operator fun invoke(): CasStore }
+fun interface JobLogFactory { operator fun invoke(): JobLog }
+fun interface JobIndexFactory { operator fun invoke(): JobIndex }
+fun interface ReteNetworkFactory { operator fun invoke(): ReteNetwork }
+fun interface ProjectionFactory { operator fun invoke(): JobProjectionEngine }
+fun interface CheckpointFactory { operator fun invoke(): Checkpoint }
+
+class FailingCasStoreFactory : CasStoreFactory {
     override fun invoke(): CasStore = throw RuntimeException("injected CAS failure")
 }
 
-class FailingJobLogFactory(val stage: String = "wal") : () -> JobLog {
+class FailingJobLogFactory(val stage: String = "wal") : JobLogFactory {
     override fun invoke(): JobLog = throw RuntimeException("injected $stage failure")
 }
 
-class FailingJobIndexFactory(val stage: String = "index") : () -> JobIndex {
+class FailingJobIndexFactory(val stage: String = "index") : JobIndexFactory {
     override fun invoke(): JobIndex = throw RuntimeException("injected $stage failure")
 }
 
-class FailingReteNetworkFactory(val stage: String = "rete") : () -> ReteNetwork {
+class FailingReteNetworkFactory(val stage: String = "rete") : ReteNetworkFactory {
     override fun invoke(): ReteNetwork = throw RuntimeException("injected $stage failure")
 }
 
-class FailingProjectionFactory(val stage: String = "projection") : () -> JobProjectionEngine {
+class FailingProjectionFactory(val stage: String = "projection") : ProjectionFactory {
     override fun invoke(): JobProjectionEngine = throw RuntimeException("injected $stage failure")
 }
 
-class FailingCheckpointFactory(val stage: String = "checkpoint") : () -> Checkpoint {
+class FailingCheckpointFactory(val stage: String = "checkpoint") : CheckpointFactory {
     override fun invoke(): Checkpoint = throw RuntimeException("injected $stage failure")
 }
