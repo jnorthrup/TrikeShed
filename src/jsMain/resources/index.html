@@ -13,10 +13,24 @@
   <style>
     html, body { margin: 0; height: 100%; background: #090d13; }
     #boot { display: flex; align-items: center; justify-content: center; height: 100vh; color: #7e8da0; font-family: Inter, system-ui, sans-serif; }
+    #err { display: none; position: fixed; bottom: 0; left: 0; right: 0; padding: 16px; background: rgba(247,118,142,.12); border-top: 1px solid #f7768e; color: #f7768e; font-family: monospace; font-size: 12px; white-space: pre-wrap; max-height: 40vh; overflow: auto; }
   </style>
 </head>
 <body>
   <div id="boot">Loading Forge…</div>
+  <div id="err"></div>
+  <script>
+    window.addEventListener('error', function(e) {
+      var el = document.getElementById('err');
+      el.textContent = e.message + '\n' + (e.error && e.error.stack || '');
+      el.style.display = 'block';
+    });
+    window.addEventListener('unhandledrejection', function(e) {
+      var el = document.getElementById('err');
+      el.textContent = 'Unhandled rejection: ' + (e.reason && e.reason.message || e.reason) + '\n' + (e.reason && e.reason.stack || '');
+      el.style.display = 'block';
+    });
+  </script>
   <script src="./TrikeShed.js"></script>
 </body>
 </html>
