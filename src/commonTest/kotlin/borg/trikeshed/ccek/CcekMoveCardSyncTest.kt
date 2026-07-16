@@ -16,7 +16,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
-import borg.trikeshed.runBlocking
+import kotlinx.coroutines.test.runTest
 
 /**
  * Test CCEK MoveCard via the synchronous test seam.
@@ -48,7 +48,7 @@ class CcekMoveCardSyncTest {
     }
 
     @Test
-    fun applySignalMoveCardSetsKanbanColumnId() = runBlocking {
+    fun applySignalMoveCardSetsKanbanColumnId() = runTest {
         val doc = seedDoc()
         // Wrap into a working CCEK node so applySignalForTest sees a doc
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -77,7 +77,7 @@ class CcekMoveCardSyncTest {
     }
 
     @Test
-    fun moveCardIdempotentSynchronous() = runBlocking {
+    fun moveCardIdempotentSynchronous() = runTest {
         val doc = seedDoc()
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
         val node = ArticulatedNode(

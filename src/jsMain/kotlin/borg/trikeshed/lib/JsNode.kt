@@ -16,12 +16,30 @@ internal fun jsHomeDir(): String =
         ?: (processObj.env.USERPROFILE as? String)
         ?: jsCwd()
 
-internal fun jsExists(filename: String): Boolean = fs.existsSync(filename) as Boolean
+internal fun resolveTestPath(filename: String): String {
+    if (fs.existsSync(filename) as Boolean) return filename
+    var dir = processObj.cwd() as String
+    while (dir != "/" && dir.isNotEmpty()) {
+        val check = path.join(dir, "build.gradle.kts") as String
+        if (fs.existsSync(check) as Boolean) {
+            val candidate = path.join(dir, filename) as String
+            if (fs.existsSync(candidate) as Boolean) {
+                return candidate
+            }
+        }
+        val parent = path.dirname(dir) as String
+        if (parent == dir) break
+        dir = parent
+    }
+    return filename
+}
 
-internal fun jsReadString(filename: String): String = fs.readFileSync(filename, "utf8") as String
+internal fun jsExists(filename: String): Boolean = fs.existsSync(resolveTestPath(filename)) as Boolean
+
+internal fun jsReadString(filename: String): String = fs.readFileSync(resolveTestPath(filename), "utf8") as String
 
 internal fun jsReadBytes(filename: String): ByteArray {
-    val buffer: dynamic = fs.readFileSync(filename)
+    val buffer: dynamic = fs.readFileSync(resolveTestPath(filename))
     val size = (buffer.length as Number).toInt()
     return ByteArray(size) { index -> (buffer[index] as Number).toByte() }
 }
@@ -62,7 +80,7 @@ internal fun jsMktemp(): String {
 
 /** Open a file and return a numeric file descriptor. */
 internal fun jsOpen(filename: String, readOnly: Boolean): Int {
-    val fd: dynamic = fs.openSync(filename, if (readOnly) "r" else "r+")
+    val fd: dynamic = fs.openSync(resolveTestPath(filename), if (readOnly) "r" else "r+")
     return fd as Int
 }
 
