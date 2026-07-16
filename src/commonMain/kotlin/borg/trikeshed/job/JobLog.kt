@@ -7,7 +7,7 @@ package borg.trikeshed.job
  * Each frame: [sequence(Long)][payloadLen(Int)][payload(bytes)].
  * A "torn frame" has a payload length that exceeds available bytes → replay stops.
  */
-open class JobLog private constructor(
+open class JobLog protected constructor(
     private val frames: MutableList<Frame> = mutableListOf(),
 ) {
 
@@ -44,6 +44,11 @@ open class JobLog private constructor(
     open fun injectTornFrame(sequence: Long, payload: ByteArray) {
         frames.add(Frame(sequence, ByteArray(0)))
     }
+
+    /**
+     * Explicit durability barrier.
+     */
+    open fun flush() {}
 
     fun toMap(): MutableMap<String, ByteArray> {
         val map = mutableMapOf<String, ByteArray>()
