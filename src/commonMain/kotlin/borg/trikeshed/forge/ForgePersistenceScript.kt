@@ -76,6 +76,8 @@ fun forgePersistenceScript(): String = """
   const graphStatLinks = document.getElementById('graph-stat-links');
 
   // Graph transform state
+  let graphNodes = [];
+  let graphLinks = [];
   let graphTransform = { x: 0, y: 0, k: 1 };
   let graphDragCamera = null;
 
@@ -1714,8 +1716,6 @@ fun forgePersistenceScript(): String = """
   }
 
   // ===== GRAPH FUNCTIONS =====
-  let graphNodes = [];
-  let graphLinks = [];
 
   function seedGraphFromCausalData() {
     const causal = seed.causalNodes || [];
