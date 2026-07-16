@@ -23,8 +23,3 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "TrikeShed"
-
-// Support hybrid kotlin xvm build if ../xvm exists
-if (java.io.File("../xvm").exists()) {
-    includeBuild("../xvm")
-}

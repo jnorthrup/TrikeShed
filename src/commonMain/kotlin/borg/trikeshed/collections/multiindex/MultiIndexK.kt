@@ -24,7 +24,7 @@ sealed class MultiIndexK<out R> : OpK<R>() {
     /**
      * Hash lookup — key to backing-store position.
      * Returns (K) -> Int? : null when absent.
-     * Intended backing: elastic triangular probing (arXiv:2501.02305).
+     * Backing: double-hashing open addressing.
      */
     class ByHash<K : Any>(val extractor: (Any?) -> K) : MultiIndexK<(K) -> Int?>()
 

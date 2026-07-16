@@ -1,15 +1,9 @@
 package borg.trikeshed.forge
 
-import borg.trikeshed.cursor.BlackboardContext
-import borg.trikeshed.cursor.provenance
-import borg.trikeshed.graph.CausalGraphNodeIndex
 import borg.trikeshed.graph.CausalGraphNodeDTO
-import borg.trikeshed.graph.causalGraphKey
-import borg.trikeshed.graph.causalGraphNode
-import borg.trikeshed.kanban.ForgeBoardFSM
+import borg.trikeshed.kanban.ForgeKanbanIngest
 import borg.trikeshed.parse.json.JsonSupport
 import borg.trikeshed.userspace.reactor.KanbanFSM
-import kotlinx.datetime.Clock
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -210,11 +204,9 @@ private fun seedChecklist(cardId: String, title: String): List<ForgeAppChecklist
 }
 
 private fun defaultForgeAppState(): ForgeAppState {
-    if (ForgeBoardFSM.current().activeBoard == null) {
-        ForgeBoardFSM.loadDefault()
-    }
-    val boardState = ForgeBoardFSM.current()
-    val board = boardState.activeBoard ?: error("Forge board failed to load")
+    val userId = "jim"
+    val reduction = ForgeKanbanIngest.load(userId)
+    val board = reduction.board
     val columns = board.columns.sortedBy { it.order }.map {
         ForgeAppColumn(id = it.id.value, name = it.name, order = it.order)
     }
@@ -222,10 +214,10 @@ private fun defaultForgeAppState(): ForgeAppState {
         ForgeAppItem(
             id = card.id.value,
             title = card.title,
-            notes = seedNotes(card.title),
+            notes = card.description,
             status = card.columnId.value,
             priority = card.priority.name.lowercase(),
-            checklist = seedChecklist(card.id.value, card.title),
+            checklist = emptyList(),
         )
     }
     val reactorCore = KanbanFSM.current()
@@ -235,107 +227,15 @@ private fun defaultForgeAppState(): ForgeAppState {
         items.takeLast(6).map { it.title }
     }
     val recentSignals = buildList {
-        add("ForgeBoardFSM:${boardState.lastEventKind}")
+        add("Rete:${reduction.reteFacts.count { it.fields["kind"] == "task" }} tasks")
+        add("Rete:${reduction.reteFacts.count { it.fields["kind"] == "link" }} links")
         if (reactorCore.lastEventKind != "INIT") add("KanbanFSM:${reactorCore.lastEventKind}")
     }
 
-    // Build real causal graph index for RTS demo
-    val causalIndex = CausalGraphNodeIndex()
-    val clock = Clock.System.now().toEpochMilliseconds()
-    val blackboardId = "forge-workspace-$clock"
-    val blackboardContext = BlackboardContext(
-        id = blackboardId,
-        provenance = provenance(
-            source = "forge-seed",
-            timestamp = clock,
-            transformations = listOf("CausalGraphNodeIndex.seed")
-        )
-    )
-
-    // Seed causal nodes via DSL
-    val op1 = causalGraphNode(
-        nodeId = "signal:price-feed",
-        opId = "PriceFeed",
-        opVersion = "v1",
-        parentNodeIds = emptyList(),
-        inputFingerprint = "binance-btc-usdt",
-        blackboard = blackboardContext,
-        causalClock = clock,
-        topoOrdinal = 0,
-        outputHash = null
-    )
-    val op2 = causalGraphNode(
-        nodeId = "transform:kalman",
-        opId = "KalmanFilter",
-        opVersion = "v1",
-        parentNodeIds = listOf("signal:price-feed"),
-        inputFingerprint = "state-estimate",
-        blackboard = blackboardContext,
-        causalClock = clock + 1,
-        topoOrdinal = 1,
-        outputHash = null
-    )
-    val op3 = causalGraphNode(
-        nodeId = "transform:archetype",
-        opId = "ArchetypeMatch",
-        opVersion = "v1",
-        parentNodeIds = listOf("signal:price-feed"),
-        inputFingerprint = "regime-detection",
-        blackboard = blackboardContext,
-        causalClock = clock + 2,
-        topoOrdinal = 1,
-        outputHash = null
-    )
-    val op4 = causalGraphNode(
-        nodeId = "decision:long-entry",
-        opId = "LongEntry",
-        opVersion = "v1",
-        parentNodeIds = listOf("transform:kalman", "transform:archetype"),
-        inputFingerprint = "buy-signal",
-        blackboard = blackboardContext,
-        causalClock = clock + 3,
-        topoOrdinal = 2,
-        outputHash = null
-    )
-    val op5 = causalGraphNode(
-        nodeId = "decision:short-entry",
-        opId = "ShortEntry",
-        opVersion = "v1",
-        parentNodeIds = listOf("transform:kalman", "transform:archetype"),
-        inputFingerprint = "sell-signal",
-        blackboard = blackboardContext,
-        causalClock = clock + 4,
-        topoOrdinal = 2,
-        outputHash = null
-    )
-    val op6 = causalGraphNode(
-        nodeId = "sink:order-router",
-        opId = "OrderRouter",
-        opVersion = "v1",
-        parentNodeIds = listOf("decision:long-entry", "decision:short-entry"),
-        inputFingerprint = "execution-order",
-        blackboard = blackboardContext,
-        causalClock = clock + 5,
-        topoOrdinal = 3,
-        outputHash = null
-    )
-    val op7 = causalGraphNode(
-        nodeId = "sink:risk-engine",
-        opId = "RiskEngine",
-        opVersion = "v1",
-        parentNodeIds = listOf("decision:long-entry", "decision:short-entry"),
-        inputFingerprint = "risk-check",
-        blackboard = blackboardContext,
-        causalClock = clock + 6,
-        topoOrdinal = 3,
-        outputHash = null
-    )
-
-    listOf(op1, op2, op3, op4, op5, op6, op7).forEach { causalIndex.addOrGet(it) }
-
+    val cascadeGrid = defaultCascadeGrid()
     return ForgeAppState(
         title = board.name,
-        pageNotes = "Forge local-first workspace: page narrative, board flow, and RTS-style zoom into card detail all live in one operator surface.",
+        pageNotes = reduction.source.description,
         columns = columns,
         items = items,
         selectedItemId = items.firstOrNull()?.id,
@@ -344,13 +244,13 @@ private fun defaultForgeAppState(): ForgeAppState {
             taxonomyNodeCount = maxOf(reactorCore.taxonomyNodeCount, items.size),
             signalFacetCount = reactorCore.cacheHits + reactorCore.cacheMisses + reactorCore.cacheStored + reactorCore.cacheEvicted,
             cacheStoredCount = reactorCore.cacheStored,
-            lastEventKind = if (reactorCore.lastEventKind != "INIT") reactorCore.lastEventKind else "BoardLoaded",
-            lastEventTimestampMs = if (reactorCore.lastEventTimestampMs != 0L) reactorCore.lastEventTimestampMs else boardState.lastEventMs,
+            lastEventKind = if (reactorCore.lastEventKind != "INIT") reactorCore.lastEventKind else "SourceReduced",
+            lastEventTimestampMs = reactorCore.lastEventTimestampMs,
             recentTaxonomyNodes = recentTaxonomy,
             recentSignals = recentSignals,
         ),
         spatial = ForgeSpatialState(),
-        causalNodes = listOf(op1, op2, op3, op4, op5, op6, op7).map {
+        causalNodes = reduction.causalNodes.map {
             CausalGraphNodeDTO(
                 nodeId = it.nodeId,
                 opId = it.opId,
@@ -361,73 +261,20 @@ private fun defaultForgeAppState(): ForgeAppState {
                 causalClock = it.causalClock,
             )
         },
-        lcncEntities = listOf(
+        lcncEntities = reduction.correlations.map { correlation ->
+            val card = board.cards.first { it.id.value == correlation.taskId }
             LcncEntityDTO(
-                entityId = "lcnc:price-feed",
-                lcncKind = "source",
-                lane = "col-causal-ready",
-                facet = "market-data",
-                causalKey = "signal:price-feed",
-                title = "Price Feed (Binance)",
-                description = "BTC-USDT real-time stream",
-            ),
-            LcncEntityDTO(
-                entityId = "lcnc:kalman",
-                lcncKind = "transform",
-                lane = "col-causal-blocked",
-                facet = "signal-processing",
-                causalKey = "transform:kalman",
-                title = "Kalman Filter",
-                description = "State estimation on price",
-            ),
-            LcncEntityDTO(
-                entityId = "lcnc:archetype",
-                lcncKind = "transform",
-                lane = "col-causal-blocked",
-                facet = "pattern-recognition",
-                causalKey = "transform:archetype",
-                title = "Archetype Match",
-                description = "Regime detection",
-            ),
-            LcncEntityDTO(
-                entityId = "lcnc:long-entry",
-                lcncKind = "decision",
-                lane = "col-agentic",
-                facet = "execution",
-                causalKey = "decision:long-entry",
-                title = "Long Entry",
-                description = "Buy signal from confluence",
-            ),
-            LcncEntityDTO(
-                entityId = "lcnc:short-entry",
-                lcncKind = "decision",
-                lane = "col-agentic",
-                facet = "execution",
-                causalKey = "decision:short-entry",
-                title = "Short Entry",
-                description = "Sell signal from confluence",
-            ),
-            LcncEntityDTO(
-                entityId = "lcnc:order-router",
-                lcncKind = "sink",
-                lane = "col-agentic",
-                facet = "execution",
-                causalKey = "sink:order-router",
-                title = "Order Router",
-                description = "Route to exchange",
-            ),
-            LcncEntityDTO(
-                entityId = "lcnc:risk-engine",
-                lcncKind = "sink",
-                lane = "col-agentic",
-                facet = "risk",
-                causalKey = "sink:risk-engine",
-                title = "Risk Engine",
-                description = "Position sizing + limits",
-            ),
-        ),
-        blackboardId = blackboardId,
-        cascadeGrid = defaultCascadeGrid(),
+                entityId = "task:${correlation.taskId}",
+                lcncKind = "work-package",
+                lane = card.columnId.value,
+                facet = if (correlation.ready) "ready" else "dependency-gated",
+                causalKey = correlation.causalKey,
+                title = card.title,
+                description = card.description,
+            )
+        },
+        blackboardId = board.id.value,
+        cascadeGrid = cascadeGrid,
     )
 }
 
