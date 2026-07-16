@@ -55,10 +55,10 @@ sealed class KanbanEvent {
 
     /**
      * A taxonomy node was created by the AI taxonomical creator (or any
-     * Notion-adjacent emitter). This is the first KanbanEvent that is NOT
+     * workspace-adjacent emitter). This is the first KanbanEvent that is NOT
      * about keymux/modelmux — it carries the creation of a taxonomy node
-     * (e.g. a Notion block, a kanban card, a graph label) into the board
-     * state, giving the kanban a consumption path for the Notion clone
+     * (e.g. a workspace block, a kanban card, a graph label) into the board
+     * state, giving the kanban a consumption path for the workspace
      * and a future AI agent's taxonomy output.
      */
     @Serializable
