@@ -210,22 +210,14 @@ private fun defaultForgeAppState(): ForgeAppState {
     val reduction = try {
         ForgeKanbanIngest.load(userId)
     } catch (e: Throwable) {
-        val fallbackPath = "/tmp/hi.fallback"
-        val fallbackMarkdown = """
-            TARGET: Unified Job Nexus — Fallback Plan
-            
-            6. Work packages
-            
-            G0 — Root-only Gradle graph
-            Make the default Gradle graph describe the root project.
-            
-            F0 — Contract spine and immediate vertical proof
-            Create the required Confix schema for job nexus.
-            
-            7.
-        """.trimIndent()
-        borg.trikeshed.common.Files.write(fallbackPath, fallbackMarkdown)
-        ForgeKanbanIngest.persistMarkdown(userId, fallbackPath)
+        // Browser or first-run fallback — build a minimal seed entirely in
+        // memory without touching disk (Files.write would call require('fs')
+        // in the browser and crash).
+        try {
+            ForgeKanbanIngest.persistMarkdown(userId, "/tmp/hi")
+        } catch (_: Throwable) {
+            ForgeKanbanIngest.fallbackReduction()
+        }
     }
     val board = reduction.board
     val columns = board.columns.sortedBy { it.order }.map {

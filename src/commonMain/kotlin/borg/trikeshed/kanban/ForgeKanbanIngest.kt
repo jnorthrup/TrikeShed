@@ -59,6 +59,34 @@ object ForgeKanbanIngest {
     fun load(userId: String): ForgeKanbanReduction =
         reduce(ForgeBoardPersistence.load(userId).getOrThrow())
 
+    /**
+     * Browser-safe fallback — builds a minimal reduction entirely in memory
+     * without touching disk.  Used when [load] and [persistMarkdown] both fail
+     * (e.g. browser bundle where require('fs') is unavailable).
+     */
+    fun fallbackReduction(): ForgeKanbanReduction {
+        val source = ForgeKanbanSource(
+            version = 1,
+            userId = "forge",
+            title = "Forge local-first workspace",
+            sourcePath = "",
+            description = """
+                TARGET: Forge local-first workspace
+
+                G0 — Root-only Gradle graph
+                Make the default Gradle graph describe the root project.
+
+                F0 — Widget gallery + blackboard
+                Gallery catalog and 3D blackboard view as sections of the workspace.
+
+                C1 — Browser + JVM targets
+                Kotlin/JS browser bundle and JVM Compose Desktop shell.
+            """.trimIndent(),
+            contentId = "fallback",
+        )
+        return reduce(source)
+    }
+
     fun reduce(source: ForgeKanbanSource): ForgeKanbanReduction {
         val tasks = parseWorkPackages(source.description)
         require(tasks.isNotEmpty()) { "no work packages found in source description" }
