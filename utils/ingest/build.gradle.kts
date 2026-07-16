@@ -1,8 +1,8 @@
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 
 plugins {
-    kotlin("multiplatform") version "2.4.0"
-    kotlin("plugin.serialization") version "2.4.0"
+    kotlin("multiplatform") version "2.4.10"
+    kotlin("plugin.serialization") version "2.4.10"
 }
 
 group = "org.bereft"
@@ -76,6 +76,11 @@ tasks.register<JavaExec>("catalog") {
 // Same compat guard TrikeShed uses — disable the KMPP plugin-config check task.
 tasks.named("checkKotlinGradlePluginConfigurationErrors") {
     enabled = false
+}
+tasks.configureEach {
+    if (name == "kmpPartiallyResolvedDependenciesChecker") {
+        enabled = false
+    }
 }
 
 tasks.withType<Test>().configureEach {

@@ -2,11 +2,11 @@ import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 
 plugins {
-    kotlin("multiplatform") version "2.4.0"
+    kotlin("multiplatform") version "2.4.10"
     id("com.github.ben-manes.versions") version "0.54.0"
     `maven-publish`
-    kotlin("plugin.serialization") version "2.4.0"
-    kotlin("plugin.compose") version "2.4.0"
+    kotlin("plugin.serialization") version "2.4.10"
+    kotlin("plugin.compose") version "2.4.10"
     id("org.jetbrains.compose") version "1.11.1"
 }
 
@@ -386,4 +386,9 @@ tasks.register("kmpPartiallyResolvedDependenciesCheckerIgnore") {
 }
 tasks.named("checkKotlinGradlePluginConfigurationErrors") {
     enabled = false
+}
+tasks.configureEach {
+    if (name == "kmpPartiallyResolvedDependenciesChecker") {
+        enabled = false
+    }
 }

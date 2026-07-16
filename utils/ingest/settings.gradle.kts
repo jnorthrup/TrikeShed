@@ -6,7 +6,7 @@ pluginManagement {
         maven("https://oss.sonatype.org/content/repositories/snapshots/")
     }
     plugins {
-        kotlin("plugin.compose") version "2.4.0"
+        kotlin("plugin.compose") version "2.4.10"
     }
 }
 

@@ -9,13 +9,13 @@ buildscript {
         maven { url = uri("https://oss.sonatype.org/content/repositories/snapshots/") }
     }
     dependencies {
-        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:2.4.0"
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:2.4.10"
     }
 }
 
 def trikeshedVersion = "1.0"
 def libVersion = "0.1.0-SNAPSHOT"
-def kotlinVersion = "2.4.0"
+def kotlinVersion = "2.4.10"
 
 def prop = { String name ->
     def value = rootProject.providers.gradleProperty(name).orNull

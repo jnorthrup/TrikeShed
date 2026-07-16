@@ -1,6 +1,6 @@
 [versions]
 # Kotlin & Coroutines
-kotlin = "2.4.0"
+kotlin = "2.4.10"
 kotlinx-coroutines = "1.11.0"
 kotlinx-datetime = "0.8.0-0.6.x-compat"
 kotlin-reflect = "1.8.0"
@@ -14,9 +14,9 @@ compose-compiler = "1.7.3"
 compose-versions = "1.7.3"
 
 # Kotlin Testing
-kotlin-test-common = "2.4.0"
-kotlin-test-annotations-common = "2.4.0"
-kotlin-test-junit = "2.4.0"
+kotlin-test-common = "2.4.10"
+kotlin-test-annotations-common = "2.4.10"
+kotlin-test-junit = "2.4.10"
 
 # IO Uring (Linux only)
 io-uring = "1.0"

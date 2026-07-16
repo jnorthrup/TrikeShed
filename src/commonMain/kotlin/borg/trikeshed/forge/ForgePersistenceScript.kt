@@ -1767,6 +1767,7 @@ fun forgePersistenceScript(): String = """
 
   function renderGraph() {
     if (!graphSpatialRoot) return;
+    if (!graphNodes || !graphLinks) return;
     const rect = graphSpatialRoot.getBoundingClientRect();
     graphSpatialRoot.setAttribute('viewBox', '0 0 ' + rect.width + ' ' + rect.height);
     graphSpatialRoot.innerHTML = '';
