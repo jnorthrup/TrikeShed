@@ -151,4 +151,39 @@ class JobNexusFactoryTest {
             element.cancel()
         }
     }
+
+    @Test
+    fun injectedFactoryObjectIdentityReachesReturnedRootAndIsClosedOnCancel() {
+        var capturedCas: CasStore? = null
+        var capturedWal: JobLog? = null
+
+        val spec = JobNexusSpec()
+        val bindings = JobNexusBindings(
+            parentScope = scope(),
+            componentFactories = JobNexusComponentFactories(
+                casStoreFactory = { CasStore.inMemory().also { capturedCas = it } },
+                walFactory = { JobLog.inMemory().also { capturedWal = it } }
+            )
+        )
+        val element = JobNexusFactory.open(spec, bindings)
+
+        val supervisorComponents = element.components
+        assertNotNull(supervisorComponents, "supervisor must retain a JobNexusComponents graph")
+
+        // Assert identity
+        assertTrue(capturedCas === supervisorComponents.cas, "injected CAS factory identity must match supervisor's CAS")
+        assertTrue(capturedWal === supervisorComponents.wal, "injected WAL factory identity must match supervisor's WAL")
+
+        // Cancel to trigger close
+        element.cancel()
+
+        val casTrace = bindings.closeTrace.first { it.component == "cas" }
+        assertTrue(casTrace.closed, "cas must be marked closed after cancel")
+        val walTrace = bindings.closeTrace.first { it.component == "wal" }
+        assertTrue(walTrace.closed, "wal must be marked closed after cancel")
+
+        // Assert reverse order in trace visually by finding their closed indexes
+        // The original open order is scope, cas, wal. Cancel should close them in reverse,
+        // but `bindings.closeTrace` tracks the final state (closed=true) for each component.
+    }
 }

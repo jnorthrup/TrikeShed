@@ -37,47 +37,66 @@ object JobNexusFactory {
         val opened = mutableListOf<String>()
         var orderCounter = 0
 
+        var cas: CasStore? = null
+        var wal: JobLog? = null
+        var index: JobIndex? = null
+        var rete: ReteNetwork? = null
+        var projection: JobProjectionEngine? = null
+        var checkpoint: Checkpoint? = null
+
         try {
             // scope
             opened.add("scope")
             bindings.closeTrace.add(CloseTraceEntry("scope", ++orderCounter, false))
 
             // cas — register only after factory succeeds
-            val cas = bindings.componentFactories.casStoreFactory()
+            cas = bindings.componentFactories.casStoreFactory()
             opened.add("cas")
             bindings.closeTrace.add(CloseTraceEntry("cas", ++orderCounter, false))
 
             // wal
-            val wal = bindings.componentFactories.walFactory()
+            wal = bindings.componentFactories.walFactory()
             opened.add("wal")
             bindings.closeTrace.add(CloseTraceEntry("wal", ++orderCounter, false))
 
             // index
-            val index = bindings.componentFactories.indexFactory()
+            index = bindings.componentFactories.indexFactory()
             opened.add("index")
             bindings.closeTrace.add(CloseTraceEntry("index", ++orderCounter, false))
 
             // rete
-            val rete = bindings.componentFactories.reteFactory()
+            rete = bindings.componentFactories.reteFactory()
             opened.add("rete")
             bindings.closeTrace.add(CloseTraceEntry("rete", ++orderCounter, false))
 
             // projection
-            val projection = bindings.componentFactories.projectionFactory()
+            projection = bindings.componentFactories.projectionFactory()
             opened.add("projection")
             bindings.closeTrace.add(CloseTraceEntry("projection", ++orderCounter, false))
 
             // checkpoint
-            val checkpoint = bindings.componentFactories.checkpointFactory()
+            checkpoint = bindings.componentFactories.checkpointFactory()
             opened.add("checkpoint")
             bindings.closeTrace.add(CloseTraceEntry("checkpoint", ++orderCounter, false))
 
             // Mark all as opened successfully
-            return JobSupervisorElement.open(scope, spec.channels.commands)
+            val supervisor = JobSupervisorElement.open(scope, spec.channels.commands)
+            val comps = JobNexusComponents(cas!!, wal!!, index!!, rete!!, projection!!, checkpoint!!)
+            supervisor.setComponents(comps, bindings.closeTrace)
+            return supervisor
 
         } catch (e: Throwable) {
             // Rollback: close all previously opened components in reverse order
             for (compName in opened.reversed()) {
+                when (compName) {
+                    "checkpoint" -> checkpoint?.close()
+                    "projection" -> projection?.close()
+                    "rete" -> rete?.close()
+                    "index" -> index?.close()
+                    "wal" -> wal?.close()
+                    "cas" -> cas?.close()
+                    "scope" -> {} // Nothing to close on the scope itself here
+                }
                 val entry = bindings.closeTrace.find { it.component == compName && !it.closed }
                 if (entry != null) {
                     val idx = bindings.closeTrace.indexOf(entry)

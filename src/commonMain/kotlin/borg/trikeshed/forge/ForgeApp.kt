@@ -1,7 +1,9 @@
 package borg.trikeshed.forge
 
 import borg.trikeshed.graph.CausalGraphNodeDTO
-import borg.trikeshed.kanban.ForgeKanbanIngest
+import borg.trikeshed.graph.causalGraphKey
+import borg.trikeshed.graph.causalGraphNode
+import borg.trikeshed.kanban.ForgeBoardFSM
 import borg.trikeshed.parse.json.JsonSupport
 import borg.trikeshed.userspace.reactor.KanbanFSM
 import kotlinx.serialization.Serializable
@@ -264,17 +266,71 @@ private fun defaultForgeAppState(): ForgeAppState {
         lcncEntities = reduction.correlations.map { correlation ->
             val card = board.cards.first { it.id.value == correlation.taskId }
             LcncEntityDTO(
-                entityId = "task:${correlation.taskId}",
-                lcncKind = "work-package",
-                lane = card.columnId.value,
-                facet = if (correlation.ready) "ready" else "dependency-gated",
-                causalKey = correlation.causalKey,
-                title = card.title,
-                description = card.description,
-            )
-        },
-        blackboardId = board.id.value,
-        cascadeGrid = cascadeGrid,
+                entityId = "lcnc:price-feed",
+                lcncKind = "source",
+                lane = "col-causal-ready",
+                facet = "market-data",
+                causalKey = "signal:price-feed",
+                title = "Price Feed (Binance)",
+                description = "BTC-USDT real-time stream",
+            ),
+            LcncEntityDTO(
+                entityId = "lcnc:kalman",
+                lcncKind = "transform",
+                lane = "col-causal-blocked",
+                facet = "signal-processing",
+                causalKey = "transform:kalman",
+                title = "Kalman Filter",
+                description = "State estimation on price",
+            ),
+            LcncEntityDTO(
+                entityId = "lcnc:archetype",
+                lcncKind = "transform",
+                lane = "col-causal-blocked",
+                facet = "pattern-recognition",
+                causalKey = "transform:archetype",
+                title = "Archetype Match",
+                description = "Regime detection",
+            ),
+            LcncEntityDTO(
+                entityId = "lcnc:long-entry",
+                lcncKind = "decision",
+                lane = "col-agentic",
+                facet = "execution",
+                causalKey = "decision:long-entry",
+                title = "Long Entry",
+                description = "Buy signal from confluence",
+            ),
+            LcncEntityDTO(
+                entityId = "lcnc:short-entry",
+                lcncKind = "decision",
+                lane = "col-agentic",
+                facet = "execution",
+                causalKey = "decision:short-entry",
+                title = "Short Entry",
+                description = "Sell signal from confluence",
+            ),
+            LcncEntityDTO(
+                entityId = "lcnc:order-router",
+                lcncKind = "sink",
+                lane = "col-agentic",
+                facet = "execution",
+                causalKey = "sink:order-router",
+                title = "Order Router",
+                description = "Route to exchange",
+            ),
+            LcncEntityDTO(
+                entityId = "lcnc:risk-engine",
+                lcncKind = "sink",
+                lane = "col-agentic",
+                facet = "risk",
+                causalKey = "sink:risk-engine",
+                title = "Risk Engine",
+                description = "Position sizing + limits",
+            ),
+        ),
+        blackboardId = blackboardId,
+        cascadeGrid = defaultCascadeGrid(),
     )
 }
 

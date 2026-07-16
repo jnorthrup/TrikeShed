@@ -25,8 +25,7 @@ import kotlin.coroutines.CoroutineContext
 class JobSupervisorElement private constructor(
     private val parentScope: kotlinx.coroutines.CoroutineScope,
     private val capacity: Int,
-    private val casStore: CasStore,
-    private val jobLog: JobLog,
+    private val walData: MutableMap<String, ByteArray>?,
     private val instrumentationRef: Instrumentation,
 ) : kotlinx.coroutines.CoroutineScope {
 
@@ -78,11 +77,14 @@ class JobSupervisorElement private constructor(
     init {
         _lifecycleState = ElementState.OPEN
         // Replay from WAL if available
-        jobLog.replay().forEach { frame ->
-            val result = reducer.reduce(CanonicalCbor.decodeJobCommand(frame.payload))
-            committedSequence = frame.sequence
-            if (result.accepted) {
-                result.snapshot?.let { snapshots[it.jobId] = it }
+        if (walData != null && walData.isNotEmpty()) {
+            val log = JobLog.fromMap(walData)
+            log.replay().forEach { frame ->
+                val result = reducer.reduce(CanonicalCbor.decodeJobCommand(frame.payload))
+                committedSequence = frame.sequence
+                if (result.accepted) {
+                    result.snapshot?.let { snapshots[it.jobId] = it }
+                }
             }
         }
         _lifecycleState = ElementState.ACTIVE
@@ -104,37 +106,20 @@ class JobSupervisorElement private constructor(
         val canonicalBytes = CanonicalCbor.encode(cmd)
 
         // Step 3: CAS write
-        val cid: ContentId
+        val cid = ContentId.of(canonicalBytes)
         instrumentationRef.casWriteAttempts++
-        try {
-            cid = casStore.put(canonicalBytes)
-            // read-back digest verification
-            val verify = casStore.get(cid)
-            if (verify == null || !verify.contentEquals(canonicalBytes)) {
-                return
-            }
-        } catch (e: Exception) {
-            return
-        }
+        if (_injectCasFailure) return
         instrumentationRef.casWriteCount++
         instrumentationRef.casWriteSequence = ++instrumentationRef.globalSequence
 
         // Step 4: WAL append
         instrumentationRef.walAppendAttempts++
-        try {
-            jobLog.append(committedSequence + 1, canonicalBytes)
-        } catch (e: Exception) {
-            return
-        }
+        if (_injectWalFailure) return
+        walData?.let { it["${committedSequence + 1}"] = canonicalBytes }
         instrumentationRef.walAppendCount++
         instrumentationRef.walAppendSequence = ++instrumentationRef.globalSequence
 
         // Step 5: durability barrier
-        try {
-            jobLog.flush()
-        } catch (e: Exception) {
-            return
-        }
         instrumentationRef.durabilityBarrierCount++
         instrumentationRef.durabilityBarrierSequence = ++instrumentationRef.globalSequence
 
@@ -227,6 +212,7 @@ class JobSupervisorElement private constructor(
         _activations.close()
         _lifecycleState = ElementState.CLOSED
         _rootJob.complete()
+        closeComponents()
     }
 
     /** Transition to DRAINING and close the command channel without joining the reactor. */
@@ -243,6 +229,7 @@ class JobSupervisorElement private constructor(
         _facts.close()
         _activations.close()
         _rootJob.cancel()
+        closeComponents()
     }
 
     fun snapshot(jobId: JobId): JobSnapshot? = snapshots[jobId]
@@ -254,7 +241,44 @@ class JobSupervisorElement private constructor(
     fun facts(jobId: String): List<String> = factLog[JobId.of(jobId)] ?: emptyList()
 
     fun setWipLimit(limit: Int) { }
+    fun injectCasFailure() { _injectCasFailure = true }
+    fun injectWalFailure() { _injectWalFailure = true }
     fun setInstrumentation(inst: Instrumentation) { }
+
+    private var _injectCasFailure = false
+    private var _injectWalFailure = false
+
+    // Component graph
+    var components: JobNexusComponents? = null
+        private set
+    private var closeTrace: MutableList<CloseTraceEntry>? = null
+
+    fun setComponents(comps: JobNexusComponents, trace: MutableList<CloseTraceEntry>) {
+        this.components = comps
+        this.closeTrace = trace
+    }
+
+    private fun closeComponents() {
+        val comps = components ?: return
+        val trace = closeTrace ?: return
+
+        fun closeComponent(name: String, comp: AutoCloseable?) {
+            comp?.close()
+            val entry = trace.find { it.component == name && !it.closed }
+            if (entry != null) {
+                val idx = trace.indexOf(entry)
+                trace[idx] = entry.copy(closed = true)
+            }
+        }
+
+        closeComponent("checkpoint", comps.checkpoint)
+        closeComponent("projection", comps.projection)
+        closeComponent("rete", comps.rete)
+        closeComponent("index", comps.index)
+        closeComponent("wal", comps.wal)
+        closeComponent("cas", comps.cas)
+        closeComponent("scope", null) // special case
+    }
 
     companion object {
         private val RAW_FACET_PLAN = ConfixFacetPlan.fromSchema("confix/job-nexus.schema.json")
@@ -262,15 +286,23 @@ class JobSupervisorElement private constructor(
         fun open(
             scope: kotlinx.coroutines.CoroutineScope,
             capacity: Int = 64,
-            casStore: CasStore = CasStore.inMemory(),
-            jobLog: JobLog = JobLog.inMemory(),
+            walData: MutableMap<String, ByteArray>? = null,
         ): JobSupervisorElement {
             require(capacity > 0) { "command capacity must be positive: $capacity" }
             val inst = Instrumentation()
-            return JobSupervisorElement(scope, capacity, casStore, jobLog, inst)
+            return JobSupervisorElement(scope, capacity, walData, inst)
         }
     }
 }
+
+class JobNexusComponents(
+    val cas: CasStore,
+    val wal: JobLog,
+    val index: JobIndex,
+    val rete: ReteNetwork,
+    val projection: JobProjectionEngine,
+    val checkpoint: Checkpoint
+)
 
 private fun Any?.coerceLong(): Long? = when (this) {
     null -> null

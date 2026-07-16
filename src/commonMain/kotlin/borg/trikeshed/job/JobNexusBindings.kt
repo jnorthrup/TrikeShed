@@ -39,28 +39,32 @@ class JobNexusComponentFactories(
 )
 
 /** Minimal component types assembled by the factory. */
-open class JobIndex {
+open class JobIndex : AutoCloseable {
     private val byJob = mutableMapOf<JobId, JobSnapshot>()
     open fun put(snap: JobSnapshot) { byJob[snap.jobId] = snap }
     operator fun get(jobId: JobId): JobSnapshot? = byJob[jobId]
     val size: Int get() = byJob.size
+    override fun close() {}
 }
 
-open class ReteNetwork {
+open class ReteNetwork : AutoCloseable {
     var cycleBudget: Int = 1_000
     val rules: MutableList<String> = mutableListOf()
     fun addRule(rule: String) { rules.add(rule) }
+    override fun close() {}
 }
 
-open class JobProjectionEngine {
+open class JobProjectionEngine : AutoCloseable {
     val cards: MutableMap<JobId, JobProjection.KanbanCard> = mutableMapOf()
     open fun project(snapshot: JobSnapshot) {
         cards[snapshot.jobId] = JobProjection.projectToCard(snapshot)
     }
+    override fun close() {}
 }
 
-open class Checkpoint {
+open class Checkpoint : AutoCloseable {
     var checkpointEvery: Int = 0
+    override fun close() {}
 }
 
 // ── Failing factory stubs for rollback tests ──────────────────────────────────

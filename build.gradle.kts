@@ -158,6 +158,75 @@ kotlin {
                 implementation("org.jetbrains.kotlin:kotlin-test-junit5")
             }
         }
+    }
+
+    js {
+        nodejs()
+        browser {
+            testTask {
+                enabled = enableBrowserTests
+                useKarma {
+                    useConfigDirectory(project.layout.projectDirectory.dir("karma.config.d").asFile)
+                    useChromeHeadless()
+                }
+            }
+        }
+        binaries.executable()
+    }
+
+    wasmJs {
+        nodejs()
+        browser {
+            testTask {
+                enabled = enableBrowserTests
+                useKarma {
+                    useConfigDirectory(project.layout.projectDirectory.dir("karma.config.d").asFile)
+                    useChromeHeadless()
+                }
+            }
+        }
+        binaries.executable()
+    }
+
+    // linuxX64 target - disabled by default, enable with -PenableLinuxX64=true
+// Build on Linux with: ./gradlew compileKotlinLinuxX64 -PenableLinuxX64=true
+val enableLinuxX64 = providers.gradleProperty("enableLinuxX64").orNull == "true"
+
+if (enableLinuxX64) {
+    linuxX64 {
+        if (enableNativeSharedLib) {
+            binaries.sharedLib {
+                baseName = "trikeshed"
+            }
+        }
+    }
+} else {
+    // Disable linuxX64 target when not building on Linux
+    // The linuxX64 target is only available on Linux hosts
+}
+
+    sourceSets {
+        val commonMain = getByName("commonMain") {
+            dependencies {
+                implementation(npm("workbox-webpack-plugin", "7.4.1"))
+            }
+            if (viewServerNodeSlice) {
+                kotlin.setSrcDirs(listOf("src/viewServerJsMain/kotlin"))
+            }
+        }
+        val jsTest = getByName("jsTest") {
+            dependsOn(commonTest)
+            if (viewServerNodeSlice) {
+                kotlin.setSrcDirs(emptyList<String>())
+            }
+        }
+        val wasmJsMain = getByName("wasmJsMain") {
+            dependsOn(commonMain)
+            dependencies {
+                implementation(npm("workbox-webpack-plugin", "7.4.1"))
+            }
+        }
+
         val jsMain = getByName("jsMain") {
             dependsOn(commonMain)
             dependencies {
