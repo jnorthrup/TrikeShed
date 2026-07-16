@@ -4,36 +4,19 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" content="#090d13" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <link rel="manifest" href="./manifest.webmanifest" />
   <link rel="icon" href="./icons/forge-icon.svg" type="image/svg+xml" />
-  <title>TrikeShed Forge — RTS Graph Workspace</title>
+  <link rel="apple-touch-icon" href="./icons/forge-icon-maskable.svg" />
+  <title>TrikeShed Forge workspace</title>
   <style>
-    * { box-sizing: border-box; }
-    html, body { margin: 0; height: 100%; background: radial-gradient(circle at top, #101a27 0%, #090d13 52%); color: #dbe7f3; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 24px; }
-    .card { background: linear-gradient(180deg, rgba(18,25,36,.97), rgba(12,18,28,.95)); border: 1px solid #1b2635; border-radius: 18px; box-shadow: 0 18px 44px rgba(0,0,0,.28); padding: 40px 48px; text-align: center; max-width: 600px; }
-    h1 { margin: 0 0 12px; font-size: 32px; font-weight: 800; }
-    p { margin: 0 0 24px; color: #7e8da0; font-size: 16px; line-height: 1.6; }
-    .btn { display: inline-flex; align-items: center; gap: 10px; border: 1px solid #263548; border-radius: 12px; background: rgba(17,24,36,.95); color: #dbe7f3; padding: 14px 28px; font-size: 16px; font-weight: 600; cursor: pointer; text-decoration: none; transition: border-color 120ms, background 120ms, transform 80ms; }
-    .btn:hover { border-color: rgba(122,162,247,.45); background: rgba(122,162,247,.12); transform: translateY(-1px); }
-    .btn.primary { background: rgba(122,162,247,.18); border-color: rgba(122,162,247,.45); }
-    .features { display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; margin-top: 24px; }
-    .feature { background: rgba(8,12,18,.82); border: 1px solid #263548; border-radius: 12px; padding: 16px 20px; min-width: 140px; }
-    .feature-icon { font-size: 24px; margin-bottom: 8px; }
-    .feature-title { font-weight: 700; font-size: 13px; }
-    .feature-desc { font-size: 11px; color: #7e8da0; margin-top: 4px; }
+    html, body { margin: 0; height: 100%; background: #090d13; }
+    #boot { display: flex; align-items: center; justify-content: center; height: 100vh; color: #7e8da0; font-family: Inter, system-ui, sans-serif; }
   </style>
 </head>
 <body>
-  <div class="card">
-    <h1>TrikeShed Forge</h1>
-    <p>RTS Graph Workspace — causal graph → Kanban → Page<br/>Resizable border layout with live force-directed simulation</p>
-    <a class="btn primary" href="./rts-graph-demo.html">Open RTS Graph Demo</a>
-    <div class="features">
-      <div class="feature"><div class="feature-icon">🎯</div><div class="feature-title">Force-Directed Graph</div><div class="feature-desc">D3-style physics with charge, link, collision & center forces</div></div>
-      <div class="feature"><div class="feature-icon">📐</div><div class="feature-title">Resizable Panels</div><div class="feature-desc">Drag borders to resize left/center/right panes with CSS Grid</div></div>
-      <div class="feature"><div class="feature-icon">🔍</div><div class="feature-title">Node Inspector</div><div class="feature-desc">Click nodes for properties, connections & actions</div></div>
-      <div class="feature"><div class="feature-icon">⚡</div><div class="feature-title">Live Controls</div><div class="feature-desc">Real-time physics parameter adjustment</div></div>
-    </div>
-  </div>
+  <div id="boot">Loading Forge…</div>
+  <script src="./TrikeShed.js"></script>
 </body>
 </html>
