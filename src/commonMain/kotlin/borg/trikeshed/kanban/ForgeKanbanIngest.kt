@@ -73,6 +73,8 @@ object ForgeKanbanIngest {
             description = """
                 TARGET: Forge local-first workspace
 
+                6. Work packages
+
                 G0 — Root-only Gradle graph
                 Make the default Gradle graph describe the root project.
 
@@ -81,6 +83,8 @@ object ForgeKanbanIngest {
 
                 C1 — Browser + JVM targets
                 Kotlin/JS browser bundle and JVM Compose Desktop shell.
+
+                7.
             """.trimIndent(),
             contentId = "fallback",
         )
