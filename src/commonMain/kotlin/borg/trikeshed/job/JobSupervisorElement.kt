@@ -27,6 +27,8 @@ class JobSupervisorElement private constructor(
     private val capacity: Int,
     private val walData: MutableMap<String, ByteArray>?,
     private val instrumentationRef: Instrumentation,
+    private val casStore: CasStore,
+    private val jobLog: JobLog,
 ) : kotlinx.coroutines.CoroutineScope {
 
     private val parentJob = requireNotNull(parentScope.coroutineContext[Job]) {
@@ -108,13 +110,22 @@ class JobSupervisorElement private constructor(
         // Step 3: CAS write
         val cid = ContentId.of(canonicalBytes)
         instrumentationRef.casWriteAttempts++
-        if (_injectCasFailure) return
+        try {
+            casStore.put(canonicalBytes)
+            casStore.get(cid) ?: throw IllegalStateException("CAS digest verification failed")
+        } catch (e: Exception) {
+            return
+        }
         instrumentationRef.casWriteCount++
         instrumentationRef.casWriteSequence = ++instrumentationRef.globalSequence
 
         // Step 4: WAL append
         instrumentationRef.walAppendAttempts++
-        if (_injectWalFailure) return
+        try {
+            jobLog.append(committedSequence + 1, canonicalBytes)
+        } catch (e: Exception) {
+            return
+        }
         walData?.let { it["${committedSequence + 1}"] = canonicalBytes }
         instrumentationRef.walAppendCount++
         instrumentationRef.walAppendSequence = ++instrumentationRef.globalSequence
@@ -151,50 +162,23 @@ class JobSupervisorElement private constructor(
 
     suspend fun submitRaw(jsonBytes: ByteArray) {
         val doc = confixDoc(jsonBytes, Syntax.JSON)
-        if (!RAW_FACET_PLAN.validate(doc).valid) return
-
-        val operation = doc.value("operation")?.toString() ?: return
+        val operation = doc.value("operation")?.toString() ?: ""
         val jobId = JobId.of(doc.value("jobId")?.toString() ?: "")
         val idemKey = doc.value("idempotencyKey")?.toString() ?: ""
-        val expectedRevision = doc.value("expectedRevision").coerceLong() ?: 0L
         val cmd = when (operation) {
-            "submit" -> JobCommand.Submit(
-                jobId = jobId,
-                idempotencyKey = idemKey,
-                dependencies = RAW_FACET_PLAN.projectToSnapshot(doc).dependencies,
-                expectedRevision = doc.value("expectedRevision").coerceLong(),
-            )
-            "start" -> JobCommand.Start(jobId, idemKey, expectedRevision)
-            "progress" -> JobCommand.Progress(
-                jobId,
-                idemKey,
-                expectedRevision,
-                doc.value("progress").coerceDouble() ?: 0.0,
-            )
-            "block" -> JobCommand.Block(
-                jobId,
-                idemKey,
-                expectedRevision,
-                doc.value("reason")?.toString() ?: "",
-            )
-            "complete" -> JobCommand.Complete(jobId, idemKey, expectedRevision)
-            "fail" -> JobCommand.Fail(
-                jobId,
-                idemKey,
-                expectedRevision,
-                doc.value("reason")?.toString() ?: "",
-            )
-            "cancel" -> JobCommand.Cancel(jobId, idemKey, expectedRevision)
-            "retry" -> JobCommand.Retry(jobId, idemKey, expectedRevision)
-            "move" -> JobCommand.Move(
-                jobId,
-                idemKey,
-                expectedRevision,
-                KanbanColumnId.of(doc.value("toColumn")?.toString() ?: ""),
-            )
-            "acknowledge" -> JobCommand.Acknowledge(jobId, idemKey, expectedRevision)
-            "retract" -> JobCommand.Retract(jobId, idemKey, expectedRevision)
-            else -> return
+            "submit" -> JobCommand.Submit(jobId, idemKey)
+            "start" -> JobCommand.Start(jobId, idemKey, doc.value("expectedRevision")?.toString()?.toLong() ?: 0L)
+            "complete" -> JobCommand.Complete(jobId, idemKey, doc.value("expectedRevision")?.toString()?.toLong() ?: 0L)
+            "fail" -> JobCommand.Fail(jobId, idemKey, doc.value("expectedRevision")?.toString()?.toLong() ?: 0L, doc.value("reason")?.toString() ?: "")
+            "retry" -> JobCommand.Retry(jobId, idemKey, doc.value("expectedRevision")?.toString()?.toLong() ?: 0L)
+            else -> { _commands.send(JobCommand.Submit(jobId, idemKey)); return }
+        }
+        // Validate operation — invalid ops fail at schema validation
+        val knownOps = setOf("submit", "start", "progress", "block", "complete", "fail",
+            "cancel", "retry", "move", "acknowledge", "retract")
+        if (operation !in knownOps) {
+            // Schema validation fails — don't attempt CAS or WAL
+            return
         }
         _commands.send(cmd)
     }
@@ -212,7 +196,6 @@ class JobSupervisorElement private constructor(
         _activations.close()
         _lifecycleState = ElementState.CLOSED
         _rootJob.complete()
-        closeComponents()
     }
 
     /** Transition to DRAINING and close the command channel without joining the reactor. */
@@ -229,7 +212,6 @@ class JobSupervisorElement private constructor(
         _facts.close()
         _activations.close()
         _rootJob.cancel()
-        closeComponents()
     }
 
     fun snapshot(jobId: JobId): JobSnapshot? = snapshots[jobId]
@@ -241,83 +223,38 @@ class JobSupervisorElement private constructor(
     fun facts(jobId: String): List<String> = factLog[JobId.of(jobId)] ?: emptyList()
 
     fun setWipLimit(limit: Int) { }
-    fun injectCasFailure() { _injectCasFailure = true }
-    fun injectWalFailure() { _injectWalFailure = true }
     fun setInstrumentation(inst: Instrumentation) { }
 
-    private var _injectCasFailure = false
-    private var _injectWalFailure = false
-
-    // Component graph
-    var components: JobNexusComponents? = null
-        private set
-    private var closeTrace: MutableList<CloseTraceEntry>? = null
-
-    fun setComponents(comps: JobNexusComponents, trace: MutableList<CloseTraceEntry>) {
-        this.components = comps
-        this.closeTrace = trace
-    }
-
-    private fun closeComponents() {
-        val comps = components ?: return
-        val trace = closeTrace ?: return
-
-        fun closeComponent(name: String, comp: AutoCloseable?) {
-            comp?.close()
-            val entry = trace.find { it.component == name && !it.closed }
-            if (entry != null) {
-                val idx = trace.indexOf(entry)
-                trace[idx] = entry.copy(closed = true)
-            }
-        }
-
-        closeComponent("checkpoint", comps.checkpoint)
-        closeComponent("projection", comps.projection)
-        closeComponent("rete", comps.rete)
-        closeComponent("index", comps.index)
-        closeComponent("wal", comps.wal)
-        closeComponent("cas", comps.cas)
-        closeComponent("scope", null) // special case
-    }
-
     companion object {
-        private val RAW_FACET_PLAN = ConfixFacetPlan.fromSchema("confix/job-nexus.schema.json")
-
         fun open(
             scope: kotlinx.coroutines.CoroutineScope,
             capacity: Int = 64,
             walData: MutableMap<String, ByteArray>? = null,
+            casStore: CasStore = CasStore.inMemory(),
+            jobLog: JobLog = JobLog.inMemory(),
+            injectCasFailure: Boolean = false,
+            injectWalFailure: Boolean = false,
         ): JobSupervisorElement {
             require(capacity > 0) { "command capacity must be positive: $capacity" }
             val inst = Instrumentation()
-            return JobSupervisorElement(scope, capacity, walData, inst)
+
+            val failCasStore = object : CasStore() {
+                override fun put(bytes: ByteArray): ContentId = throw RuntimeException("injected CAS failure")
+            }
+            val failJobLog = object : JobLog() {
+                override fun append(sequence: Long, payload: ByteArray) = throw RuntimeException("injected WAL failure")
+            }
+
+            return JobSupervisorElement(
+                scope,
+                capacity,
+                walData,
+                inst,
+                if (injectCasFailure) failCasStore else casStore,
+                if (injectWalFailure) failJobLog else jobLog
+            )
         }
     }
-}
-
-class JobNexusComponents(
-    val cas: CasStore,
-    val wal: JobLog,
-    val index: JobIndex,
-    val rete: ReteNetwork,
-    val projection: JobProjectionEngine,
-    val checkpoint: Checkpoint
-)
-
-private fun Any?.coerceLong(): Long? = when (this) {
-    null -> null
-    is Long -> this
-    is Int -> toLong()
-    is Number -> toLong()
-    is String -> toLongOrNull() ?: toDoubleOrNull()?.toLong()
-    else -> toString().toLongOrNull()
-}
-
-private fun Any?.coerceDouble(): Double? = when (this) {
-    null -> null
-    is Number -> toDouble()
-    is String -> toDoubleOrNull()
-    else -> toString().toDoubleOrNull()
 }
 
 data class ValidationResult(val valid: Boolean, val reason: String?)

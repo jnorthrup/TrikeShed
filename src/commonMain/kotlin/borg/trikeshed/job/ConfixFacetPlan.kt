@@ -7,10 +7,6 @@ import borg.trikeshed.lib.j
 import borg.trikeshed.lib.Join
 import borg.trikeshed.parse.confix.ConfixCell
 import borg.trikeshed.parse.confix.ConfixDoc
-import borg.trikeshed.parse.confix.cellKids
-import borg.trikeshed.parse.confix.docAt
-import borg.trikeshed.parse.confix.reify
-import borg.trikeshed.parse.confix.root
 import borg.trikeshed.parse.confix.value
 
 /**

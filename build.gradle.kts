@@ -229,9 +229,6 @@ if (enableLinuxX64) {
 
         val jsMain = getByName("jsMain") {
             dependsOn(commonMain)
-            dependencies {
-                implementation(npm("workbox-webpack-plugin", "7.4.1"))
-            }
             if (viewServerNodeSlice) {
                 kotlin.setSrcDirs(listOf("src/viewServerJsMain/kotlin"))
             }
@@ -242,12 +239,7 @@ if (enableLinuxX64) {
                 kotlin.setSrcDirs(emptyList<String>())
             }
         }
-        val wasmJsMain = getByName("wasmJsMain") {
-            dependsOn(commonMain)
-            dependencies {
-                implementation(npm("workbox-webpack-plugin", "7.4.1"))
-            }
-        }
+        val wasmJsMain = getByName("wasmJsMain") { dependsOn(commonMain) }
         val wasmJsTest = getByName("wasmJsTest") { dependsOn(commonTest) }
 
         if (enableNativeSharedLib) {
@@ -309,8 +301,13 @@ tasks.withType<Test>().configureEach {
     // No internal exports needed for JDK 25+
 }
 
-// Browser executables are published to GitHub Pages; browser tests are opt-in
-// with -PbrowserTests=true. Node tests remain part of the default build.
+// Karma config
+tasks.named("jsNodeTest", org.jetbrains.kotlin.gradle.targets.js.testing.KotlinJsTest::class) {
+    if (!viewServerNodeSlice) dependsOn("jsBrowserTest")
+}
+tasks.named("wasmJsNodeTest", org.jetbrains.kotlin.gradle.targets.js.testing.KotlinJsTest::class) {
+    dependsOn("wasmJsBrowserTest")
+}
 
 // Ensure resources are copied before JVM compilation
 tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {

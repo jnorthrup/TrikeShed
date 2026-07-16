@@ -145,6 +145,8 @@ private fun defaultCascadeGrid(): List<CascadeRollupRow> {
     return rows
 }
 
+private val forgeAppJson = Json { prettyPrint = false }
+
 private fun defaultForgeUseCases(): List<ForgeAppUseCase> = listOf(
     ForgeAppUseCase(
         id = "brief-board",

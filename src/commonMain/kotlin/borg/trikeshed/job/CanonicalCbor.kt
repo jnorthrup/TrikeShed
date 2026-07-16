@@ -149,7 +149,7 @@ object CanonicalCbor {
 
     /** Canonical encode a JobSnapshot for CID computation. */
     fun encode(snapshot: JobSnapshot): ByteArray {
-        val fields = mutableMapOf<String, Any?>()
+        val fields = sortedMapOf<String, Any?>()
         fields["jobId"] = snapshot.jobId.value
         fields["revision"] = snapshot.revision
         fields["causalKey"] = snapshot.causalKey
@@ -168,8 +168,9 @@ object CanonicalCbor {
     }
 
     private fun encodeSortedMap(fields: Map<String, Any?>): ByteArray {
+        val sorted = fields.toSortedMap()
         // Build Item.Map with sorted keys for canonical CBOR
-        val pairs = fields.entries.sortedBy { it.key }.map { it.key to it.value.toItem() }
+        val pairs = sorted.entries.map { it.key to it.value.toItem() }
         val map = itemMapOf(*pairs.toTypedArray())
         return Cbor.encode(map)
     }

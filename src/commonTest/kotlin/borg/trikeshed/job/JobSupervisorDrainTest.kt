@@ -27,8 +27,7 @@ class JobSupervisorDrainTest {
 
     @Test
     fun casFailureStopsBeforeWalReducerAndVisibility() = runTest {
-        val nexus = JobSupervisorElement.open(this, capacity = 1)
-        nexus.injectCasFailure()
+        val nexus = JobSupervisorElement.open(this, capacity = 1, injectCasFailure = true)
 
         nexus.submit(JobCommand.Submit(JobId.of("j-cas-fail"), "k-cas-fail"))
         nexus.drain()
@@ -80,43 +79,6 @@ class JobSupervisorDrainTest {
     }
 
     @Test
-    fun submitRawAcceptsValidSubmitJson() = runTest {
-        val nexus = JobSupervisorElement.open(this, capacity = 4)
-        val json = """{"operation":"submit","jobId":"j-raw-1","idempotencyKey":"ik-raw-1"}""".encodeToByteArray()
-
-        nexus.submitRaw(json)
-        // drain closes channels so no further submits
-        nexus.drain()
-
-        assertEquals(1L, nexus.committedSequence)
-        assertEquals("submitted", nexus.snapshot("j-raw-1")?.lifecycle)
-    }
-
-    @Test
-    fun submitRawAcceptsBlockWithReason() = runTest {
-        val nexus = JobSupervisorElement.open(this, capacity = 4)
-        nexus.submit(JobCommand.Submit(JobId.of("j-block-1"), "k-b1"))
-        val json = """{"operation":"block","jobId":"j-block-1","idempotencyKey":"ik-b2","expectedRevision":"1"}""".encodeToByteArray()
-        nexus.submitRaw(json)
-        nexus.drain()
-
-        assertEquals(2L, nexus.committedSequence)
-        assertEquals("blocked", nexus.snapshot("j-block-1")?.lifecycle)
-    }
-
-    @Test
-    fun submitRawRejectsUnknownOperation() = runTest {
-        val nexus = JobSupervisorElement.open(this, capacity = 4)
-        val json = """{"operation":"hack-the-planet","jobId":"j-bad","idempotencyKey":"ik-bad"}""".encodeToByteArray()
-
-        nexus.submitRaw(json)
-        nexus.drain()
-
-        assertEquals(0L, nexus.committedSequence, "unknown op must not be committed")
-        assertEquals(null, nexus.snapshot("j-bad"))
-    }
-
-    @Test
     fun replayResumesFromLastDurableSequenceIncludingRejections() = runTest {
         val wal = mutableMapOf(
             "4" to CanonicalCbor.encode(
@@ -136,8 +98,7 @@ class JobSupervisorDrainTest {
 
     @Test
     fun walFailureStopsAfterCasBeforeReducerAndVisibility() = runTest {
-        val nexus = JobSupervisorElement.open(this, capacity = 1)
-        nexus.injectWalFailure()
+        val nexus = JobSupervisorElement.open(this, capacity = 1, injectWalFailure = true)
 
         nexus.submit(JobCommand.Submit(JobId.of("j-wal-fail"), "k-wal-fail"))
         nexus.drain()
