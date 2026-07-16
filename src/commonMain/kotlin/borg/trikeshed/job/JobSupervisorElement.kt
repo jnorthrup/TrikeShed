@@ -25,7 +25,8 @@ import kotlin.coroutines.CoroutineContext
 class JobSupervisorElement private constructor(
     private val parentScope: kotlinx.coroutines.CoroutineScope,
     private val capacity: Int,
-    private val walData: MutableMap<String, ByteArray>?,
+    private val casStore: CasStore,
+    private val jobLog: JobLog,
     private val instrumentationRef: Instrumentation,
 ) : kotlinx.coroutines.CoroutineScope {
 
@@ -77,14 +78,11 @@ class JobSupervisorElement private constructor(
     init {
         _lifecycleState = ElementState.OPEN
         // Replay from WAL if available
-        if (walData != null && walData.isNotEmpty()) {
-            val log = JobLog.fromMap(walData)
-            log.replay().forEach { frame ->
-                val result = reducer.reduce(CanonicalCbor.decodeJobCommand(frame.payload))
-                committedSequence = frame.sequence
-                if (result.accepted) {
-                    result.snapshot?.let { snapshots[it.jobId] = it }
-                }
+        jobLog.replay().forEach { frame ->
+            val result = reducer.reduce(CanonicalCbor.decodeJobCommand(frame.payload))
+            committedSequence = frame.sequence
+            if (result.accepted) {
+                result.snapshot?.let { snapshots[it.jobId] = it }
             }
         }
         _lifecycleState = ElementState.ACTIVE
@@ -106,20 +104,37 @@ class JobSupervisorElement private constructor(
         val canonicalBytes = CanonicalCbor.encode(cmd)
 
         // Step 3: CAS write
-        val cid = ContentId.of(canonicalBytes)
+        val cid: ContentId
         instrumentationRef.casWriteAttempts++
-        if (_injectCasFailure) return
+        try {
+            cid = casStore.put(canonicalBytes)
+            // read-back digest verification
+            val verify = casStore.get(cid)
+            if (verify == null || !verify.contentEquals(canonicalBytes)) {
+                return
+            }
+        } catch (e: Exception) {
+            return
+        }
         instrumentationRef.casWriteCount++
         instrumentationRef.casWriteSequence = ++instrumentationRef.globalSequence
 
         // Step 4: WAL append
         instrumentationRef.walAppendAttempts++
-        if (_injectWalFailure) return
-        walData?.let { it["${committedSequence + 1}"] = canonicalBytes }
+        try {
+            jobLog.append(committedSequence + 1, canonicalBytes)
+        } catch (e: Exception) {
+            return
+        }
         instrumentationRef.walAppendCount++
         instrumentationRef.walAppendSequence = ++instrumentationRef.globalSequence
 
         // Step 5: durability barrier
+        try {
+            jobLog.flush()
+        } catch (e: Exception) {
+            return
+        }
         instrumentationRef.durabilityBarrierCount++
         instrumentationRef.durabilityBarrierSequence = ++instrumentationRef.globalSequence
 
@@ -239,12 +254,7 @@ class JobSupervisorElement private constructor(
     fun facts(jobId: String): List<String> = factLog[JobId.of(jobId)] ?: emptyList()
 
     fun setWipLimit(limit: Int) { }
-    fun injectCasFailure() { _injectCasFailure = true }
-    fun injectWalFailure() { _injectWalFailure = true }
     fun setInstrumentation(inst: Instrumentation) { }
-
-    private var _injectCasFailure = false
-    private var _injectWalFailure = false
 
     companion object {
         private val RAW_FACET_PLAN = ConfixFacetPlan.fromSchema("confix/job-nexus.schema.json")
@@ -252,11 +262,12 @@ class JobSupervisorElement private constructor(
         fun open(
             scope: kotlinx.coroutines.CoroutineScope,
             capacity: Int = 64,
-            walData: MutableMap<String, ByteArray>? = null,
+            casStore: CasStore = CasStore.inMemory(),
+            jobLog: JobLog = JobLog.inMemory(),
         ): JobSupervisorElement {
             require(capacity > 0) { "command capacity must be positive: $capacity" }
             val inst = Instrumentation()
-            return JobSupervisorElement(scope, capacity, walData, inst)
+            return JobSupervisorElement(scope, capacity, casStore, jobLog, inst)
         }
     }
 }
