@@ -20,47 +20,6 @@
   <div id="boot">Loading Forge…</div>
   <div id="err"></div>
   <script>
-    // Render function expected by Kotlin WASM
-    function renderHtml(html) {
-      document.open();
-      document.write(html);
-      document.close();
-      hydrateGallery();
-    }
-
-    // Hydrate gallery from seed
-    function hydrateGallery() {
-      var root = document.getElementById('gallery-root');
-      if (!root) return;
-      try {
-        var seedEl = document.getElementById('forge-seed');
-        if (!seedEl) return;
-        var seed = JSON.parse(seedEl.textContent);
-        if (seed && seed.gallery && seed.gallery.widgets) {
-          var widgets = seed.gallery.widgets;
-          var sections = {};
-          widgets.forEach(function(w) {
-            var s = w.section || 'Other';
-            if (!sections[s]) sections[s] = [];
-            sections[s].push(w);
-          });
-          var html = '';
-          Object.keys(sections).sort().forEach(function(section) {
-            html += '<section class="gallery-section"><h3>' + section + '</h3><div class="gallery-list">';
-            sections[section].forEach(function(w) {
-              html += '<article class="gallery-card"><div class="name">' + w.name + '</div>' +
-                '<div class="synopsis">' + (w.synopsis || '') + '</div>' +
-                '<div class="id">' + w.id + '</div>' +
-                '<div class="meta"><span class="targets">Targets: ' + (w.supportTargets || []).join(', ') + '</span></div>' +
-                '</article>';
-            });
-            html += '</div></section>';
-          });
-          root.innerHTML = html;
-        }
-      } catch(e) { console.error('Gallery hydration:', e); }
-    }
-
     window.addEventListener('error', function(e) {
       var el = document.getElementById('err');
       el.textContent = e.message + '\n' + (e.error && e.error.stack || '');
