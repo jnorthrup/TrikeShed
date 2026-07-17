@@ -254,14 +254,14 @@ object CouchStoreFactory {
     fun inMemory(): CouchStore {
         val head = CouchHeadProjection()
         val changes = CouchChangesProjection()
-        val ingress = SyncTestIngress(head, changes, NoOpPersistence)
+        val ingress = ProductionCouchIngress(head, { frame -> head.applyCommit(frame); changes.applyCommit(frame); }, { doc -> borg.trikeshed.job.ContentId.of(doc.fields.joinToString { it.value.toString() }.encodeToByteArray()) })
         return CouchStore(ingress, head, changes)
     }
 
     fun withPersistence(persistence: CouchPersistence): CouchStore {
         val head = CouchHeadProjection()
         val changes = CouchChangesProjection()
-        val ingress = SyncTestIngress(head, changes, persistence)
+        val ingress = ProductionCouchIngress(head, { frame -> head.applyCommit(frame); changes.applyCommit(frame); persistence.persist(frame.doc ?: Document(frame.docId, emptyList())) }, { doc -> borg.trikeshed.job.ContentId.of(doc.fields.joinToString { it.value.toString() }.encodeToByteArray()) })
         return CouchStore(ingress, head, changes)
     }
 }

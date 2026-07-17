@@ -38,7 +38,7 @@ class CouchProjectionTest {
     fun testStaleRevisionRejection() {
         val head = CouchHeadProjection()
         val changes = CouchChangesProjection()
-        val ingress = CouchStoreFactory.SyncTestIngress(head, changes, NoOpPersistence)
+        val ingress = ProductionCouchIngress(head, { frame -> head.applyCommit(frame); changes.applyCommit(frame); }, { doc -> borg.trikeshed.job.ContentId.of(doc.fields.joinToString { it.value.toString() }.encodeToByteArray()) })
         val store = CouchStore(ingress, head, changes)
 
         val doc = Document("doc2", listOf(Field("age", 30)))
