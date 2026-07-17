@@ -50,7 +50,7 @@ class ConfixPersistenceTest {
     @Test
     fun `couch store with confix persistence stores and queries`() {
         val persistence = ConfixPersistence()
-        val store = CouchStore(persistence)
+        val store = CouchStoreFactory.withPersistence(persistence)
 
         store.put(Document("user:1", listOf(Field("name", "Bob"), Field("role", "admin"))))
         store.put(Document("user:2", listOf(Field("name", "Carol"), Field("role", "user"))))

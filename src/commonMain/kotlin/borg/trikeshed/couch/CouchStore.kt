@@ -39,6 +39,11 @@ data class QueryResult(
     val totalCount: Long
 )
 
+interface CouchIngress {
+    fun putIntent(doc: Document, expectedRev: String?): Boolean
+    fun deleteIntent(docId: String, expectedRev: String?): Boolean
+}
+
 /**
  * CouchStore — minimal K-V document store with:
  * - put/get/delete by docId
@@ -47,21 +52,11 @@ data class QueryResult(
  * - flush/drain for durability hooks
  */
 class CouchStore(
-    private val persistence: CouchPersistence? = null,
-    private val _factoryDelegated: Boolean = false,
+    private val ingress: CouchIngress,
+    val head: CouchHeadProjection,
+    val changes: CouchChangesProjection
 ) {
 
-    /** Compatibility flag — true when created via the factory delegation path. */
-    val delegatedToFactory: Boolean = _factoryDelegated
-    
-    // DocId -> Document (using MutableSeries as index)
-    private val docs = mutableSeriesOf<Document>()
-    private val docIndex = mutableMapOf<String, Int>() // docId -> index in docs
-    private val fieldIndex = mutableMapOf<String, MutableMap<Any, MutableSet<String>>>()
-    
-    // Mutation event stream for subscribers
-    private val mutations = mutableSeriesOf<MutationEvent>()
-    
     sealed interface MutationEvent {
         data class Inserted(val doc: Document) : MutationEvent
         data class Updated(val doc: Document) : MutationEvent
@@ -72,137 +67,93 @@ class CouchStore(
      * Put a document — insert or replace.
      */
     fun put(document: Document): Boolean {
-        val existingIndex = docIndex[document.id]
-        if (existingIndex != null) {
-            removeFromFieldIndex(docs[existingIndex])
-            docs.set(existingIndex, document)
-            addToFieldIndex(document)
-            mutations.append(MutationEvent.Updated(document))
-            persistence?.persist(document)
-            return false // updated
-        } else {
-            docs.append(document)
-            docIndex[document.id] = docs.a - 1
-            addToFieldIndex(document)
-            mutations.append(MutationEvent.Inserted(document))
-            persistence?.persist(document)
-            return true // inserted
-        }
+        return ingress.putIntent(document, null)
     }
     
     /**
      * Get a document by id.
      */
     fun get(docId: String): Document? {
-        val idx = docIndex[docId] ?: return null
-        return docs[idx]
+        return head.get(docId)
     }
     
     /**
      * Delete a document by id.
      */
     fun delete(docId: String): Boolean {
-        val idx = docIndex.remove(docId) ?: return false
-        removeFromFieldIndex(docs[idx])
-        docs.removeAt(idx)
-        // Rebuild index (simplest correct approach for in-memory)
-        docIndex.clear()
-        for (i in 0 until docs.a) {
-            docIndex[docs[i].id] = i
-        }
-        mutations.append(MutationEvent.Deleted(docId))
-        persistence?.delete(docId)
-        return true
-    }
-    
-    private fun addToFieldIndex(doc: Document) {
-        for (field in doc.fields) {
-            fieldIndex.getOrPut(field.name) { mutableMapOf() }
-                      .getOrPut(field.value) { mutableSetOf() }
-                      .add(doc.id)
-        }
-    }
-
-    private fun removeFromFieldIndex(doc: Document) {
-        for (field in doc.fields) {
-            val innerMap = fieldIndex[field.name]
-            if (innerMap != null) {
-                val set = innerMap[field.value]
-                set?.remove(doc.id)
-            }
-        }
+        return ingress.deleteIntent(docId, null)
     }
 
     /**
      * Check if document exists.
      */
-    fun contains(docId: String): Boolean = docId in docIndex
+    fun contains(docId: String): Boolean = head.contains(docId)
     
     /**
      * Total document count.
      */
-    val size: Int get() = docs.a
+    val size: Int get() = head.size
     
     /**
      * All document ids.
      */
-    fun ids(): Join<Int, (Int) -> String> = docs.α { it.id }
+    fun ids(): Join<Int, (Int) -> String> = head.ids()
+
+    /**
+     * Get all documents as a list.
+     */
+    fun all(): List<Document> = head.all()
     
     /**
      * Query — projects all documents to a Cursor (rows = docs, cols = _id + fields).
      */
     fun query(): QueryResult {
-        val cursor = buildCursorFromDocs(docs)
-        return QueryResult(cursor, docs.a.toLong())
+        return head.query()
     }
 
     /** Query by field value equality. */
     fun query(fieldName: String, value: Any): QueryResult {
-        val matchedIds = fieldIndex[fieldName]?.get(value) ?: emptySet()
-        val matched = ArrayList<Document>(matchedIds.size)
-        for (id in matchedIds) {
-            docIndex[id]?.let { idx -> matched.add(docs[idx]) }
-        }
-        val series: Series<Document> = matched.size j { matched[it] }
-        return QueryResult(buildCursorFromSeries(series), matched.size.toLong())
+        return head.query(fieldName, value)
     }
 
-    private fun buildCursorFromDocs(documents: MutableSeries<Document>): Cursor =
-        buildCursorFromSeries(documents.a j { documents[it] })
-
-    private fun buildCursorFromSeries(documents: Series<Document>): Cursor {
-        if (documents.size == 0) return 0 j { error("empty cursor") }
-        return documents.size j { rowIdx -> documentToRowVec(documents[rowIdx]) }
-    }
-
-    private fun documentToRowVec(doc: Document): RowVec {
-        val n = 1 + doc.fields.size
-        val keys = Array(n) { i -> if (i == 0) "_id" else doc.fields[i - 1].name }
-        val cells = Array<Any?>(n) { i -> if (i == 0) doc.id else doc.fields[i - 1].value }
-        return borg.trikeshed.cursor.cellsToRowVec(
-            n j { cells[it] },
-            n j { keys[it] },
-        )
-    }
     /**
      * Subscribe to mutation events.
      * Returns cancel function to unsubscribe.
      */
     fun subscribeMutations(observer: (MutationEvent) -> Unit): () -> Unit {
-        return mutations.subscribe { twin: Twin<Series<MutationEvent>> ->
-            // Twin<Series<MutationEvent>> is Join<Series<MutationEvent>, Series<MutationEvent>>
-            // So twin.a is Series<MutationEvent> and twin.b is Series<MutationEvent>
-            // Get the last element from the series
-            val series: Series<MutationEvent> = twin.a
-            if (series.size > 0) {
-                observer(series[series.size - 1])
+        var lastSeen = 0
+        return changes.subscribe { twin: Twin<Series<CouchCommittedFrame>> ->
+            val series: Series<CouchCommittedFrame> = twin.a
+            while (lastSeen < series.size) {
+                val frame = series[lastSeen]
+                lastSeen++
+                if (frame.deleted) {
+                    observer(MutationEvent.Deleted(frame.docId))
+                } else if (frame.doc != null) {
+                    if (frame.rev.startsWith("uuid-0-")) {
+                         observer(MutationEvent.Inserted(frame.doc))
+                    } else {
+                         observer(MutationEvent.Updated(frame.doc))
+                    }
+                }
             }
         }
     }
 
     /** Subscribe to mutation events as Twin<Series<MutationEvent>> (for MutableSeries DSL). */
     fun subscribeMutationsSeries(observer: (Twin<Series<MutationEvent>>) -> Unit): () -> Unit {
-        return mutations.subscribe(observer)
+        return changes.subscribe { twin: Twin<Series<CouchCommittedFrame>> ->
+            val src: Series<CouchCommittedFrame> = twin.a
+            // create an ephemeral projection to matching types
+            val mapped: Series<MutationEvent> = src.size j { i: Int ->
+                val f = src[i]
+                if (f.deleted) MutationEvent.Deleted(f.docId)
+                else if (f.rev.startsWith("uuid-0-")) MutationEvent.Inserted(f.doc!!)
+                else MutationEvent.Updated(f.doc!!)
+            }
+            // For now, this is a leaky abstraction that wraps Series inside a Twin dummy view.
+            observer(mapped j mapped)
+        }
     }
 
     /**
@@ -210,7 +161,7 @@ class CouchStore(
      * Idempotent — safe to call repeatedly.
      */
     fun flush(): Unit {
-        persistence?.flush()
+        // persistence is now handled by the ingress / pipeline
     }
     
     /**
@@ -218,7 +169,6 @@ class CouchStore(
      * For in-memory store, this is a no-op; persistence implementations may override.
      */
     fun drain(): Unit {
-        persistence?.drain()
     }
     
     /**
@@ -226,17 +176,11 @@ class CouchStore(
      */
     fun close(): Unit {
         drain()
-        persistence?.close()
     }
-    
-    /**
-     * Get all documents as a list.
-     */
-    fun all(): List<Document> = docs.sequence().toList()
 
     companion object {
         fun create(parentScope: kotlinx.coroutines.CoroutineScope, capacity: Int = 64): CouchStore {
-            return CouchStore(_factoryDelegated = true)
+            return CouchStoreFactory.inMemory()
         }
     }
 }
@@ -268,10 +212,58 @@ object NoOpPersistence : CouchPersistence {
  * File-backed store uses [FileOperations] (userspace.nio) — JVM is only the nio adapter.
  */
 object CouchStoreFactory {
-    fun inMemory(): CouchStore = CouchStore(NoOpPersistence)
+    class SyncTestIngress(val head: CouchHeadProjection, val changes: CouchChangesProjection, val persistence: CouchPersistence) : CouchIngress {
+        var seq: Long = 0
+        override fun putIntent(doc: Document, expectedRev: String?): Boolean {
+            val existingRev = head.getRev(doc.id)
+            val isDeleted = head.isDeleted(doc.id)
+            if (expectedRev != null && existingRev != expectedRev) {
+                return false // reject stale
+            }
 
-    fun withPersistence(persistence: CouchPersistence): CouchStore = CouchStore(persistence)
+            val newRev = if (existingRev == null || isDeleted) "uuid-0-${doc.id.hashCode()}" else "uuid-${seq}-${doc.id.hashCode()}" // simple rev generator
+            val frame = CouchCommittedFrame(seq, doc.id, newRev, false, doc)
+            seq++
 
+            head.applyCommit(frame)
+            changes.applyCommit(frame)
+            persistence.persist(doc)
+            return existingRev == null || isDeleted
+        }
+
+        override fun deleteIntent(docId: String, expectedRev: String?): Boolean {
+            val existingRev = head.getRev(docId) ?: return false
+            val isDeleted = head.isDeleted(docId)
+            if (isDeleted) return false // already deleted
+
+            if (expectedRev != null && existingRev != expectedRev) {
+                return false // reject stale
+            }
+
+            val newRev = "uuid-${seq}-deleted"
+            val frame = CouchCommittedFrame(seq, docId, newRev, true, null)
+            seq++
+
+            head.applyCommit(frame)
+            changes.applyCommit(frame)
+            persistence.delete(docId)
+            return true
+        }
+    }
+
+    fun inMemory(): CouchStore {
+        val head = CouchHeadProjection()
+        val changes = CouchChangesProjection()
+        val ingress = SyncTestIngress(head, changes, NoOpPersistence)
+        return CouchStore(ingress, head, changes)
+    }
+
+    fun withPersistence(persistence: CouchPersistence): CouchStore {
+        val head = CouchHeadProjection()
+        val changes = CouchChangesProjection()
+        val ingress = SyncTestIngress(head, changes, persistence)
+        return CouchStore(ingress, head, changes)
+    }
 }
 
 /**
