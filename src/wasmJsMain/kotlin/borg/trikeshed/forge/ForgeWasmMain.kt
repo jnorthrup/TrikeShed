@@ -1,13 +1,15 @@
+@file:OptIn(ExperimentalJsExport::class)
+
 package borg.trikeshed.forge
+
+import kotlin.js.ExperimentalJsExport
+import kotlin.js.JsExport
+import kotlin.js.JsName
 
 /**
  * WASM/JS Browser entry point for Forge workspace.
- * wasmJs targets browser only - no Node.js support needed.
+ * Returns HTML string for JS to render after WASM loads.
  */
-@JsName("renderHtml")
-private external fun renderHtml(html: String)
-
-fun main() {
-    val html = forgeAppHtml()
-    renderHtml(html)
-}
+@JsExport
+@JsName("getForgeHtml")
+fun getForgeHtml(): String = forgeAppHtml()
