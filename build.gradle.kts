@@ -59,11 +59,6 @@ kotlin {
     jvmToolchain(25)
 
     jvm {
-        compilerOptions {
-            freeCompilerArgs = listOf(
-                "-P", "plugin:androidx.compose.compiler.plugins.kotlin:runtimeSignature=1.11.1"
-            )
-        }
     }
 
     js {
