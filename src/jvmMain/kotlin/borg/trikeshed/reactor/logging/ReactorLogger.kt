@@ -3,6 +3,7 @@ package borg.trikeshed.reactor.logging
 import org.slf4j.Logger
 import borg.trikeshed.job.JobLog
 import borg.trikeshed.couch.isam.Stringpool
+import borg.trikeshed.couch.isam.DurableAppendLog
 
 /**
  * CAS-based WAL Logger that implements the SLF4J facade.
@@ -14,10 +15,14 @@ import borg.trikeshed.couch.isam.Stringpool
 class ReactorLogger(
     private val name: String,
     private val stringpool: Stringpool,
-    private val wal: JobLog
+    private val wal: JobLog,
+    private val durableAppendLog: DurableAppendLog? = null
 ) : Logger {
 
     override fun getName(): String = name
+
+    // Monotonic sequence source
+    private var currentSequence = 0L
 
     private fun logCas(level: Byte, template: String, vararg args: Any) {
         // 1. Memoize template string using Stringpool (returns offset/CAS)
@@ -43,7 +48,16 @@ class ReactorLogger(
             out.addAll(argBytes.toList())
         }
 
-        wal.append(System.nanoTime(), out.toByteArray())
+        // Use a strictly monotonic sequence
+        val sequence = ++currentSequence
+        val payload = out.toByteArray()
+
+        // Append to job log
+        wal.append(sequence, payload)
+
+        // Write to durable append log and cross durability boundary
+        durableAppendLog?.append(sequence, payload)
+        durableAppendLog?.flush()
     }
 
     override fun info(s: String) { logCas(1, s) }
