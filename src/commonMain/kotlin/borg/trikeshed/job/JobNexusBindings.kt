@@ -33,7 +33,7 @@ class JobNexusComponentFactories(
     val casStoreFactory: CasStoreFactory = CasStoreFactory { CasStore.inMemory() },
     val walFactory: JobLogFactory = JobLogFactory { JobLog.inMemory() },
     val indexFactory: JobIndexFactory = JobIndexFactory { JobIndex() },
-    val reteFactory: ReteNetworkFactory = ReteNetworkFactory { ReteNetwork() },
+    val reteFactory: ReteNetworkFactory = ReteNetworkFactory { borg.trikeshed.dag.ReteNetwork() },
     val projectionFactory: ProjectionFactory = ProjectionFactory { JobProjectionEngine() },
     val checkpointFactory: CheckpointFactory = CheckpointFactory { Checkpoint() },
 )
@@ -44,12 +44,6 @@ open class JobIndex {
     open fun put(snap: JobSnapshot) { byJob[snap.jobId] = snap }
     operator fun get(jobId: JobId): JobSnapshot? = byJob[jobId]
     val size: Int get() = byJob.size
-}
-
-open class ReteNetwork {
-    var cycleBudget: Int = 1_000
-    val rules: MutableList<String> = mutableListOf()
-    fun addRule(rule: String) { rules.add(rule) }
 }
 
 open class JobProjectionEngine {
@@ -71,7 +65,7 @@ open class Checkpoint {
 fun interface CasStoreFactory { operator fun invoke(): CasStore }
 fun interface JobLogFactory { operator fun invoke(): JobLog }
 fun interface JobIndexFactory { operator fun invoke(): JobIndex }
-fun interface ReteNetworkFactory { operator fun invoke(): ReteNetwork }
+fun interface ReteNetworkFactory { operator fun invoke(): borg.trikeshed.dag.ReteNetwork }
 fun interface ProjectionFactory { operator fun invoke(): JobProjectionEngine }
 fun interface CheckpointFactory { operator fun invoke(): Checkpoint }
 
@@ -88,7 +82,7 @@ class FailingJobIndexFactory(val stage: String = "index") : JobIndexFactory {
 }
 
 class FailingReteNetworkFactory(val stage: String = "rete") : ReteNetworkFactory {
-    override fun invoke(): ReteNetwork = throw RuntimeException("injected $stage failure")
+    override fun invoke(): borg.trikeshed.dag.ReteNetwork = throw RuntimeException("injected $stage failure")
 }
 
 class FailingProjectionFactory(val stage: String = "projection") : ProjectionFactory {

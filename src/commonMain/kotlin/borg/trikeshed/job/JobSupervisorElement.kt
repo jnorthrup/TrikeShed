@@ -29,6 +29,7 @@ class JobSupervisorElement private constructor(
     private val instrumentationRef: Instrumentation,
     private val casStore: CasStore,
     private val jobLog: JobLog,
+    private val reteNetwork: borg.trikeshed.dag.ReteNetwork,
 ) : kotlinx.coroutines.CoroutineScope {
 
     private val parentJob = requireNotNull(parentScope.coroutineContext[Job]) {
@@ -44,6 +45,8 @@ class JobSupervisorElement private constructor(
     private val _facts = Channel<JobFact>(capacity = capacity * 2)
     private val _activations = Channel<Activation>(capacity = capacity)
     private val reactorJob: Job
+    private val reteConsumerJob: Job
+    private val reteProducerJob: Job
 
     val commands: SendChannel<JobCommand> get() = _commands
     val committed: ReceiveChannel<JobEvent> get() = _committed
@@ -91,6 +94,26 @@ class JobSupervisorElement private constructor(
         }
         _lifecycleState = ElementState.ACTIVE
         reactorJob = parentScope.launch(coroutineContext) { reactor() }
+        reteProducerJob = parentScope.launch(coroutineContext) { reteNetwork.run(_commands) }
+        reteConsumerJob = parentScope.launch(coroutineContext) {
+            for (fact in _facts) {
+                val snap = snapshots[fact.jobId] ?: continue
+                val factId = borg.trikeshed.dag.FactId("job-board", fact.jobId.value)
+                val fields = mapOf(
+                    "jobId" to snap.jobId.value,
+                    "revision" to snap.revision,
+                    "lifecycle" to snap.lifecycle,
+                    "dependencies" to snap.dependencies.map { it.value }
+                )
+
+                val existing = reteNetwork.workingMemory.facts(factId)
+                if (existing.isEmpty()) {
+                    reteNetwork.assert(factId, fields, fact.cid, borg.trikeshed.cursor.BlackboardContext("job-board"))
+                } else {
+                    reteNetwork.modify(factId, fields, fact.cid)
+                }
+            }
+        }
     }
 
     private suspend fun reactor() {
@@ -189,10 +212,20 @@ class JobSupervisorElement private constructor(
     }
 
     suspend fun drain() {
+        // Wait for Rete to finish producing events and adding to _commands BEFORE beginDrain
+        // Actually we need to process all facts first, so wait for _facts to empty.
+        // But _facts doesn't close until we close it.
+        // Rete processing loop pushes to _commands. We must ensure commands are drained.
+        // Let's yield first so that the test coroutine scheduler runs the child coroutines.
+        kotlinx.coroutines.yield()
+
         beginDrain()
         reactorJob.join()
         _committed.close()
         _facts.close()
+        reteConsumerJob.join()
+        reteNetwork.close()
+        reteProducerJob.join()
         _activations.close()
         _lifecycleState = ElementState.CLOSED
         _rootJob.complete()
@@ -251,7 +284,8 @@ class JobSupervisorElement private constructor(
                 walData,
                 inst,
                 if (injectCasFailure) failCasStore else casStore,
-                if (injectWalFailure) failJobLog else jobLog
+                if (injectWalFailure) failJobLog else jobLog,
+                borg.trikeshed.dag.ReteNetwork(),
             )
         }
     }
