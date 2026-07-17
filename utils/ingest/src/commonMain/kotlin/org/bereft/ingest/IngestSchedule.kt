@@ -21,13 +21,13 @@ interface IngestSchedule {
 
     /**
      * Schedule an ingest job for [source]. Returns a [Channel] that receives
-     * [IngestResult] as each projection completes. Non-blocking — the caller
+     * [IngestEnvelope] as each projection completes. Non-blocking — the caller
      * drains the channel at its own pace.
      */
     fun schedule(
         source: String,
         projections: Set<IngestProjection>,
-    ): Channel<IngestResult>
+    ): Channel<IngestEnvelope>
 
     /**
      * Schedule a batch of sources. Returns a single merged channel. Fan-in
@@ -41,5 +41,5 @@ interface IngestSchedule {
         scope: CoroutineScope,
         sources: Series<String>,
         projections: Set<IngestProjection>,
-    ): Channel<IngestResult> = IngestScheduleMerge.run(scope, this, sources, projections)
+    ): Channel<IngestEnvelope> = IngestScheduleMerge.run(scope, this, sources, projections)
 }
