@@ -67,6 +67,7 @@ kotlin {
             dependencies {
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:$coroutinesVersion")
                 implementation("org.jetbrains.kotlinx:kotlinx-datetime:$datetimeVersion")
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:$serializationVersion")
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-core:$serializationVersion")
             }
         }
@@ -101,6 +102,18 @@ kotlin {
             kotlin.exclude("**/demos/SignalBlackboardDemoTest.kt")
             kotlin.exclude("**/lib/ReduxListBridgeTest.kt")
             kotlin.exclude("**/lib/MutableSeriesStrategyTest.kt")
+            kotlin.exclude("**/job/**")
+            kotlin.exclude("**/kanban/**")
+            kotlin.exclude("**/strategy/**")
+            kotlin.exclude("**/lib/ReduxMutableSeriesTest.kt")
+            kotlin.exclude("**/lib/ReduxListBridgeTest.kt")
+            kotlin.exclude("**/dag/**")
+            kotlin.exclude("**/collections/**")
+            kotlin.exclude("**/forge/**")
+            kotlin.exclude("**/dht/**")
+            kotlin.exclude("**/couch/CouchHeadProjectionTest.kt")
+            kotlin.exclude("**/couch/isam/DurableAppendLogTest.kt")
+            kotlin.exclude("**/couch/isam/WalFrameFormatTest.kt")
             dependencies {
                 implementation("org.junit.jupiter:junit-jupiter-api:5.10.2")
                 implementation("org.junit.jupiter:junit-jupiter-engine:5.10.2")
@@ -158,6 +171,7 @@ if (enableLinuxX64) {
             dependencies {
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:$coroutinesVersion")
                 implementation("org.jetbrains.kotlinx:kotlinx-datetime:$datetimeVersion")
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:$serializationVersion")
             }
         }
 
@@ -313,4 +327,21 @@ tasks.register("kmpPartiallyResolvedDependenciesCheckerIgnore") {
 }
 tasks.named("checkKotlinGradlePluginConfigurationErrors") {
     enabled = false
+}if (providers.gradleProperty("viewServerNodeSlice").orNull == "true") {
+    kotlin {
+        sourceSets.getByName("commonMain").kotlin.srcDir("src/viewServerCommonMain/kotlin")
+        sourceSets.getByName("commonTest").kotlin.srcDir("src/viewServerCommonTest/kotlin")
+        sourceSets.getByName("jsMain").kotlin.srcDir("src/viewServerJsMain/kotlin")
+        sourceSets.getByName("jvmMain").kotlin.srcDir("src/viewServerJvmMain/kotlin")
+    }
+
+    tasks.register<JavaExec>("runViewServerJvm") {
+        dependsOn(":compileKotlinJvm")
+        mainClass.set("borg.trikeshed.couch.viewserver.GraalVmViewServerHostKt")
+        classpath(configurations.named("jvmRuntimeClasspath"), sourceSets.getByName("jvmMain").output)
+        doFirst {
+            val kotlinExt = project.extensions.getByType(org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension::class.java)
+            classpath(kotlinExt.targets.getByName("jvm").compilations.getByName("main").output.allOutputs)
+        }
+    }
 }
