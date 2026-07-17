@@ -61,7 +61,7 @@ kotlin {
     jvm {
         compilerOptions {
             freeCompilerArgs = listOf(
-                "-P", "plugin:androidx.compose.compiler.plugins.kotlin:runtimeSignature=1.11.1"
+                // "-P", "plugin:androidx.compose.compiler.plugins.kotlin:runtimeSignature=1.11.1"
             )
         }
     }
