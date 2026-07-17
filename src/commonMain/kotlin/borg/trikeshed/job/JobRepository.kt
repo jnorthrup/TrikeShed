@@ -1,10 +1,14 @@
 package borg.trikeshed.job
 
 import borg.trikeshed.couch.isam.DurableAppendLog
+import borg.trikeshed.collections.btree.CowBPlusTree
+import borg.trikeshed.collections.btree.BTreeNode
+import borg.trikeshed.collections.btree.CowBPlusTreeCodec
 
 /** Result of recovering committed repository heads from the durable log. */
 data class RecoveryResult(
     val committedSequence: Long,
+    val checkpoint: JobCheckpoint? = null,
     private val snapshots: Map<JobId, JobSnapshot>,
 ) {
     fun snapshot(jobId: JobId): JobSnapshot? = snapshots[jobId]
@@ -38,9 +42,24 @@ class JobRepository(
         commit(JobId.of(jobIdStr), snapshot, payload)
     }
 
+    fun checkpoint(checkpoint: JobCheckpoint) {
+        val sequence = currentSequence + 1L
+        log.append(sequence, JobCheckpointCodec.encode(checkpoint))
+        log.flush()
+        currentSequence = sequence
+    }
+
     suspend fun recover(): RecoveryResult {
         val snapshots = mutableMapOf<JobId, JobSnapshot>()
+        var latestCheckpoint: JobCheckpoint? = null
+
         val lastSequence = log.replay { _, payload ->
+            val checkpoint = JobCheckpointCodec.decode(payload)
+            if (checkpoint != null) {
+                latestCheckpoint = checkpoint
+                snapshots.clear() // Discard preceding tail records
+                return@replay
+            }
             val record = JobRepositoryRecordCodec.decode(payload) ?: return@replay
             val canonicalSnapshot = CanonicalCbor.encode(record.snapshot)
             val stored = runCatching { casStore.get(record.snapshotCid) }.getOrNull()
@@ -52,7 +71,29 @@ class JobRepository(
             }
         }
         currentSequence = lastSequence
-        return RecoveryResult(lastSequence, snapshots)
+
+        if (latestCheckpoint != null) {
+            val checkpoint = latestCheckpoint!!
+            // Verify schemaCid exists
+            casStore.get(checkpoint.schemaCid) ?: throw IllegalStateException("Checkpoint schemaCid ${checkpoint.schemaCid} not found in CAS")
+
+            // Verify full B+Tree
+            fun verifyTree(cid: ContentId) {
+                val bytes = casStore.get(cid) ?: throw IllegalStateException("Checkpoint B+Tree node $cid not found in CAS")
+                val node = CowBPlusTreeCodec.decode(bytes)
+                if (node is BTreeNode.Internal) {
+                    node.children.forEach { verifyTree(it) }
+                }
+            }
+            verifyTree(checkpoint.rootCid)
+
+            // Verify metadata
+            checkpoint.metadata.values.forEach { cid ->
+                casStore.get(cid) ?: throw IllegalStateException("Checkpoint metadata cid $cid not found in CAS")
+            }
+        }
+
+        return RecoveryResult(lastSequence, latestCheckpoint, snapshots)
     }
 
     fun injectCorruptionAfter(sequence: Long) {
