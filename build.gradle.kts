@@ -125,6 +125,7 @@ kotlin {
             dependencies {
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:$coroutinesVersion")
                 implementation("org.jetbrains.kotlinx:kotlinx-datetime:$datetimeVersion")
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:$serializationVersion")
                 // Compose runtime annotations must be visible to every target so the
                 // compose compiler plugin (applied globally) doesn't bail on JS/WASM/Native.
                 // Full UI deps stay in jvmMain — Compose doesn't publish for macosX64.
