@@ -92,6 +92,11 @@ kotlin {
             }
         }
         binaries.executable()
+
+        // Compose runtime for WASM target (compose compiler requires runtime on classpath)
+        sourceSets.getByName("wasmJsMain").dependencies {
+            implementation(compose.runtime)
+        }
     }
 
     // ── Host-detected native targets (restored from c0e3f0fc) ────────────────
@@ -169,126 +174,11 @@ kotlin {
             kotlin.exclude("**/ConfixSerializationTest.kt")
             kotlin.exclude("**/ViewServerTest.kt")
             kotlin.exclude("**/strategy/SignalValidationTest.kt")
-            kotlin.exclude("**/demos/SignalBlackboardDemoTest.kt")
-            kotlin.exclude("**/lib/ReduxListBridgeTest.kt")
-            kotlin.exclude("**/lib/MutableSeriesStrategyTest.kt")
-            dependencies {
-                implementation("org.junit.jupiter:junit-jupiter-api:5.10.2")
-                implementation("org.junit.jupiter:junit-jupiter-engine:5.10.2")
-                implementation("org.junit.vintage:junit-vintage-engine:5.10.2")
-                implementation("org.jetbrains.kotlin:kotlin-test-junit5")
-            }
-        }
-
-        val jsMain = getByName("jsMain") {
-            dependsOn(commonMain)
-            dependencies {
-                implementation(npm("workbox-webpack-plugin", "7.4.1"))
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
-            }
-        }
-        val jsTest = getByName("jsTest") {
-            dependsOn(commonTest)
-        }
-
-        val wasmJsMain = getByName("wasmJsMain") {
-            dependsOn(commonMain)
-            dependencies {
-                implementation(npm("workbox-webpack-plugin", "7.4.1"))
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
-                // Compose runtime for WASM_JS_BROWSER (compiler is global)
-                implementation(compose.runtime)
-            }
-        }
-        val wasmJsTest = getByName("wasmJsTest") { dependsOn(commonTest) }
-
-        // ── posixMain: custom shared intermediate above the default template's ──
-        // nativeMain.  The default hierarchy template creates:
-        //   nativeMain ← macosMain ← macosArm64Main
-        //   nativeMain ← linuxMain  ← linuxX64Main
-        // We insert posixMain between nativeMain and each platform leaf so that
-        // src/posixMain actuals resolve for both macos and linux.
-        val posixMain = maybeCreate("posixMain")
-        val posixTest = maybeCreate("posixTest")
-        // Ensure nativeMain exists (template may create lazily), posixMain sits above it
-        val nativeMain = maybeCreate("nativeMain").apply { dependsOn(getByName("commonMain")) }
-        val nativeTest = maybeCreate("nativeTest").apply { dependsOn(getByName("commonTest")) }
-        posixMain.dependsOn(nativeMain)
-        posixTest.dependsOn(nativeTest)
-
-        // Re-parent each platform intermediate onto posixMain (which itself
-        // depends on nativeMain, so the chain posixMain→nativeMain→commonMain holds).
-        // We add posixMain as a parent; the template's nativeMain parent is harmless
-        // since posixMain sits above it in the same chain.
-        findByName("macosMain")?.dependsOn(posixMain)
-        findByName("macosTest")?.dependsOn(posixTest)
-        findByName("linuxMain")?.dependsOn(posixMain)
-        findByName("linuxTest")?.dependsOn(posixTest)
-
-
-        all {
-            languageSettings.optIn("kotlinx.cinterop.ExperimentalForeignApi")
-            languageSettings.optIn("kotlin.RequiresOptIn")
         }
     }
 }
 
-
-// CInterop - Only compile io_uring bindings for focusedTransportSlice
-if (focusedTransportSlice) {
-    kotlin {
-        linuxX64 {
-            compilations.getByName("main") {
-                cinterops {
-                    val liburing = create("liburing") {
-                        defFile = project.file("src/linuxMain/resources/META-INF/cinterop/liburing.def")
-                        compilerOpts("-I${project.rootDir}/liburing/src/include", "-I${project.rootDir}/io_uring_interop")
-                    }
-                }
-            }
-        }
-    }
-} else {
-    kotlin {
-        sourceSets.getByName("commonTest") {
-            kotlin.exclude("**/transport/**")
-            kotlin.exclude("**/userspace/**")
-            kotlin.exclude("**/ipfs/**")
-            kotlin.exclude("**/quic/**")
-            kotlin.exclude("**/sctp/**")
-            kotlin.exclude("**/window/**")
-            kotlin.exclude("**/htx/**")
-        }
-    }
-}
-
-// JVM args for internal APIs - not needed for JDK 25+ where ClassFile API is public
-// val internalExports = listOf(
-//     "--add-exports", "java.base/java.lang.classfile=ALL-UNNAMED",
-//     "--add-exports", "java.base/java.lang.constant=ALL-UNNAMED"
-// )
-
-tasks.withType<JavaCompile>().configureEach {
-    // No internal exports needed for JDK 25+ public ClassFile API
-}
-
-tasks.withType<Test>().configureEach {
-    useJUnitPlatform()
-    testLogging {
-        events("passed", "skipped", "failed")
-        showStandardStreams = true
-    }
-    // No internal exports needed for JDK 25+
-}
-
-// Ensure resources are copied before JVM compilation
-tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
-    if (name.contains("Jvm")) {
-        dependsOn("jvmProcessResources")
-    }
-}
-
-// JMH Setup
+// ── JMH Setup ──────────────────────────────────────────────────────────────
 tasks.register<JavaExec>("jmh") {
     dependsOn(":compileKotlinJvm")
     mainClass.set("org.openjdk.jmh.Main")
@@ -386,6 +276,22 @@ tasks.register<Sync>("generateForgePages") {
     }
 }
 
+// Deploy to gh-pages branch using gh CLI
+tasks.register<Exec>("deployGhPages") {
+    group = "documentation"
+    description = "Deploys docs/ to gh-pages branch via gh CLI."
+    dependsOn("generateForgePages")
+    commandLine("gh", "pages", "deploy", "--branch", "gh-pages", "--source", "docs", "--dotfiles")
+    doLast {
+        println("Deployed docs/ to gh-pages branch")
+    }
+}
+
+// Make wasmJsBrowserProductionWebpack trigger deploy as final step
+tasks.named("wasmJsBrowserProductionWebpack").configure {
+    finalizedBy("deployGhPages")
+}
+
 // Config cache
 tasks.register("kmpPartiallyResolvedDependenciesCheckerIgnore") {
     doLast { }
@@ -396,5 +302,13 @@ tasks.named("checkKotlinGradlePluginConfigurationErrors") {
 tasks.configureEach {
     if (name == "kmpPartiallyResolvedDependenciesChecker") {
         enabled = false
+    }
+}
+
+tasks.withType<Test>().configureEach {
+    useJUnitPlatform()
+    testLogging {
+        events("passed", "skipped", "failed")
+        showStandardStreams = true
     }
 }
