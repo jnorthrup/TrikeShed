@@ -46,7 +46,7 @@ class ConfixFacetPlanTest {
     @Test
     fun validationAcceptsWellFormedSubmit() {
         val p = plan()
-        val doc = confixDoc("""{"operation":"submit","jobId":"j-1","idempotencyKey":"ik-1"}""")
+        val doc = confixDoc("""{"schemaVersion":"1.0.0","frameKind":"command","workspaceId":"w-1","sequence":0,"cid":"sha256:0000000000000000000000000000000000000000000000000000000000000000","causalKey":"ck","timestampMs":0,"operation":"submit","jobId":"j-1","idempotencyKey":"ik-1"}""")
         val r = p.validate(doc)
         assertTrue(r.valid, "submit with jobId+idempotencyKey must validate: ${r.errors}")
         assertEquals(emptyList(), r.errors)
@@ -55,7 +55,7 @@ class ConfixFacetPlanTest {
     @Test
     fun validationRejectsMissingJobId() {
         val p = plan()
-        val doc = confixDoc("""{"operation":"submit","idempotencyKey":"ik-1"}""")
+        val doc = confixDoc("""{"schemaVersion":"1.0.0","frameKind":"command","workspaceId":"w-1","sequence":0,"cid":"sha256:0000000000000000000000000000000000000000000000000000000000000000","causalKey":"ck","timestampMs":0,"operation":"submit","idempotencyKey":"ik-1"}""")
         val r = p.validate(doc)
         assertFalse(r.valid, "doc without jobId must be invalid")
         assertTrue(r.errors.any { it.contains("jobId") },
@@ -65,7 +65,7 @@ class ConfixFacetPlanTest {
     @Test
     fun validationRejectsMissingIdempotencyKey() {
         val p = plan()
-        val doc = confixDoc("""{"operation":"submit","jobId":"j-1"}""")
+        val doc = confixDoc("""{"schemaVersion":"1.0.0","frameKind":"command","workspaceId":"w-1","sequence":0,"cid":"sha256:0000000000000000000000000000000000000000000000000000000000000000","causalKey":"ck","timestampMs":0,"operation":"submit","jobId":"j-1"}""")
         val r = p.validate(doc)
         assertFalse(r.valid)
         assertTrue(r.errors.any { it.contains("idempotencyKey") },
@@ -75,7 +75,7 @@ class ConfixFacetPlanTest {
     @Test
     fun validationRejectsUnknownOperation() {
         val p = plan()
-        val doc = confixDoc("""{"operation":"hack-the-planet","jobId":"j-1","idempotencyKey":"ik"}""")
+        val doc = confixDoc("""{"schemaVersion":"1.0.0","frameKind":"command","workspaceId":"w-1","sequence":0,"cid":"sha256:0000000000000000000000000000000000000000000000000000000000000000","causalKey":"ck","timestampMs":0,"operation":"hack-the-planet","jobId":"j-1","idempotencyKey":"ik"}""")
         val r = p.validate(doc)
         assertFalse(r.valid)
         assertTrue(r.errors.any { it.contains("operation") },
@@ -85,7 +85,7 @@ class ConfixFacetPlanTest {
     @Test
     fun validationRejectsMissingOperation() {
         val p = plan()
-        val doc = confixDoc("""{"jobId":"j-1","idempotencyKey":"ik"}""")
+        val doc = confixDoc("""{"schemaVersion":"1.0.0","frameKind":"command","workspaceId":"w-1","sequence":0,"cid":"sha256:0000000000000000000000000000000000000000000000000000000000000000","causalKey":"ck","timestampMs":0,"jobId":"j-1","idempotencyKey":"ik"}""")
         val r = p.validate(doc)
         assertFalse(r.valid)
         assertTrue(r.errors.any { it.contains("operation") },
@@ -95,7 +95,7 @@ class ConfixFacetPlanTest {
     @Test
     fun validationAcceptsStartCommand() {
         val p = plan()
-        val doc = confixDoc("""{"operation":"start","jobId":"j-1","idempotencyKey":"ik","expectedRevision":1}""")
+        val doc = confixDoc("""{"schemaVersion":"1.0.0","frameKind":"command","workspaceId":"w-1","sequence":0,"cid":"sha256:0000000000000000000000000000000000000000000000000000000000000000","causalKey":"ck","timestampMs":0,"operation":"start","jobId":"j-1","idempotencyKey":"ik","expectedRevision":1}""")
         val r = p.validate(doc)
         assertTrue(r.valid, "start command must validate: ${r.errors}")
     }
@@ -123,7 +123,7 @@ class ConfixFacetPlanTest {
     @Test
     fun projectToSnapshotPreservesCausalKey() {
         val p = plan()
-        val doc = confixDoc("""{"operation":"submit","jobId":"j-1","idempotencyKey":"ik","causalKey":"ck-42"}""")
+        val doc = confixDoc("""{"schemaVersion":"1.0.0","frameKind":"command","workspaceId":"w-1","sequence":0,"cid":"sha256:0000000000000000000000000000000000000000000000000000000000000000","causalKey":"ck-42","timestampMs":0,"operation":"submit","jobId":"j-1","idempotencyKey":"ik"}""")
         val snap = p.projectToSnapshot(doc)
         assertEquals("ck-42", snap.causalKey)
     }
@@ -131,7 +131,7 @@ class ConfixFacetPlanTest {
     @Test
     fun projectToSnapshotDerivesBlockedLifecycleWhenDependencyFailed() {
         val p = plan()
-        val doc = confixDoc("""{"operation":"submit","jobId":"j-child","idempotencyKey":"ik","causalKey":"ck"}""")
+        val doc = confixDoc("""{"schemaVersion":"1.0.0","frameKind":"command","workspaceId":"w-1","sequence":0,"cid":"sha256:0000000000000000000000000000000000000000000000000000000000000000","causalKey":"ck","timestampMs":0,"operation":"submit","jobId":"j-child","idempotencyKey":"ik"}""")
 
         // Without any prior snapshots, a submit with no dependencies derives "submitted".
         val snap = p.projectToSnapshot(doc)
@@ -141,7 +141,7 @@ class ConfixFacetPlanTest {
     @Test
     fun projectToSnapshotStartDerivesActive() {
         val p = plan()
-        val doc = confixDoc("""{"operation":"start","jobId":"j-1","idempotencyKey":"ik","expectedRevision":1}""")
+        val doc = confixDoc("""{"schemaVersion":"1.0.0","frameKind":"command","workspaceId":"w-1","sequence":0,"cid":"sha256:0000000000000000000000000000000000000000000000000000000000000000","causalKey":"ck","timestampMs":0,"operation":"start","jobId":"j-1","idempotencyKey":"ik","expectedRevision":1}""")
         val snap = p.projectToSnapshot(doc)
         assertEquals("active", snap.lifecycle)
         assertEquals(1L, snap.revision)
