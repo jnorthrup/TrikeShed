@@ -20,14 +20,63 @@
   <div id="boot">Loading Forge…</div>
   <div id="err"></div>
   <script>
+    // Load WASM, then get HTML and render
+    async function init() {
+      try {
+        // Wait for WASM to load (poll for getForgeHtml)
+        for (var i = 0; i < 50 && typeof getForgeHtml !== 'function'; i++) {
+          await new Promise(r => setTimeout(r, 100));
+        }
+        var html = (typeof getForgeHtml === 'function') ? getForgeHtml() : '';
+        if (html) {
+          document.body.innerHTML = html;
+          hydrateGallery();
+          document.getElementById('boot').style.display = 'none';
+        } else {
+          document.getElementById('err').textContent = 'WASM failed to load getForgeHtml';
+          document.getElementById('err').style.display = 'block';
+        }
+      } catch(e) {
+        document.getElementById('err').textContent = e.message;
+        document.getElementById('err').style.display = 'block';
+      }
+    }
+    init();
+
+    // Hydrate gallery from seed
+    function hydrateGallery() {
+      var root = document.getElementById('gallery-root');
+      if (!root) return;
+      try {
+        var seedEl = document.getElementById('forge-seed');
+        if (!seedEl) return;
+        var seed = JSON.parse(seedEl.textContent);
+        if (seed && seed.gallery && seed.gallery.widgets) {
+          var widgets = seed.gallery.widgets;
+          var sections = {};
+          widgets.forEach(function(w) {
+            var s = w.section || 'Other';
+            if (!sections[s]) sections[s] = [];
+            sections[s].push(w);
+          });
+          Object.keys(sections).forEach(function(section) {
+            var sectionEl = document.createElement('section');
+            sectionEl.innerHTML = '<h3>' + section + '</h3><div class="widgets"></div>';
+            var container = sectionEl.querySelector('.widgets');
+            sections[section].forEach(function(w) {
+              var card = document.createElement('div');
+              card.className = 'widget-card';
+              card.innerHTML = '<div class="widget-icon">' + (w.icon || '🔧') + '</div><div class="widget-name">' + w.name + '</div>';
+              container.appendChild(card);
+            });
+            root.appendChild(sectionEl);
+          });
+        }
+      } catch(e) { console.error('hydrateGallery:', e); }
+    }
     window.addEventListener('error', function(e) {
       var el = document.getElementById('err');
       el.textContent = e.message + '\n' + (e.error && e.error.stack || '');
-      el.style.display = 'block';
-    });
-    window.addEventListener('unhandledrejection', function(e) {
-      var el = document.getElementById('err');
-      el.textContent = 'Unhandled rejection: ' + (e.reason && e.reason.message || e.reason) + '\n' + (e.reason && e.reason.stack || '');
       el.style.display = 'block';
     });
   </script>
