@@ -50,14 +50,14 @@ class JobRepository(
     }
 
     suspend fun recover(): RecoveryResult {
-        val snapshots = mutableMapOf<JobId, JobSnapshot>()
+        val tailSnapshots = mutableMapOf<JobId, JobSnapshot>()
         var latestCheckpoint: JobCheckpoint? = null
 
         val lastSequence = log.replay { _, payload ->
             val checkpoint = JobCheckpointCodec.decode(payload)
             if (checkpoint != null) {
                 latestCheckpoint = checkpoint
-                snapshots.clear() // Discard preceding tail records
+                tailSnapshots.clear() // Discard preceding tail records
                 return@replay
             }
             val record = JobRepositoryRecordCodec.decode(payload) ?: return@replay
@@ -67,25 +67,36 @@ class JobRepository(
                 ContentId.of(canonicalSnapshot) == record.snapshotCid &&
                 stored?.contentEquals(canonicalSnapshot) == true
             ) {
-                snapshots[record.snapshot.jobId] = record.snapshot
+                tailSnapshots[record.snapshot.jobId] = record.snapshot
             }
         }
         currentSequence = lastSequence
+
+        val recoveredSnapshots = mutableMapOf<JobId, JobSnapshot>()
 
         if (latestCheckpoint != null) {
             val checkpoint = latestCheckpoint!!
             // Verify schemaCid exists
             casStore.get(checkpoint.schemaCid) ?: throw IllegalStateException("Checkpoint schemaCid ${checkpoint.schemaCid} not found in CAS")
 
-            // Verify full B+Tree
-            fun verifyTree(cid: ContentId) {
+            // Verify full B+Tree and restore snapshots
+            fun verifyAndHydrateTree(cid: ContentId) {
                 val bytes = casStore.get(cid) ?: throw IllegalStateException("Checkpoint B+Tree node $cid not found in CAS")
                 val node = CowBPlusTreeCodec.decode(bytes)
-                if (node is BTreeNode.Internal) {
-                    node.children.forEach { verifyTree(it) }
+                when (node) {
+                    is BTreeNode.Internal -> {
+                        node.children.forEach { verifyAndHydrateTree(it) }
+                    }
+                    is BTreeNode.Leaf -> {
+                        node.values.forEach { value ->
+                            val snapshotBytes = casStore.get(value.cid) ?: throw IllegalStateException("Checkpoint JobSnapshot ${value.cid} not found in CAS")
+                            val snapshot = CanonicalCbor.decodeJobSnapshot(snapshotBytes)
+                            recoveredSnapshots[snapshot.jobId] = snapshot
+                        }
+                    }
                 }
             }
-            verifyTree(checkpoint.rootCid)
+            verifyAndHydrateTree(checkpoint.rootCid)
 
             // Verify metadata
             checkpoint.metadata.values.forEach { cid ->
@@ -93,7 +104,10 @@ class JobRepository(
             }
         }
 
-        return RecoveryResult(lastSequence, latestCheckpoint, snapshots)
+        // Apply tail logs, which take precedence
+        recoveredSnapshots.putAll(tailSnapshots)
+
+        return RecoveryResult(lastSequence, latestCheckpoint, recoveredSnapshots)
     }
 
     fun injectCorruptionAfter(sequence: Long) {
