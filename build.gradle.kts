@@ -80,6 +80,7 @@ kotlin {
         binaries.executable()
     }
 
+    @OptIn(org.jetbrains.kotlin.gradle.ExperimentalWasmDsl::class)
     wasmJs {
         nodejs()
         browser {
@@ -94,8 +95,8 @@ kotlin {
         binaries.executable()
 
         // Compose runtime for WASM target (compose compiler requires runtime on classpath)
-        sourceSets.getByName("wasmJsMain").dependencies {
-            implementation(compose.runtime)
+        kotlin.sourceSets.getByName("wasmJsMain").dependencies {
+            implementation(org.jetbrains.compose.ComposePlugin.Dependencies(project).runtime)
         }
     }
 
@@ -134,7 +135,7 @@ kotlin {
                 // Compose runtime annotations must be visible to every target so the
                 // compose compiler plugin (applied globally) doesn't bail on JS/WASM/Native.
                 // Full UI deps stay in jvmMain — Compose doesn't publish for macosX64.
-                // implementation(compose.runtime) // REMOVED: breaks macosX64
+                // implementation(org.jetbrains.compose.ComposePlugin.Dependencies(project).runtime) // REMOVED: breaks macosX64
             }
         }
 
