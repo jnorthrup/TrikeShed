@@ -147,6 +147,42 @@ object CanonicalCbor {
     /** Canonical encode a JobNexusSpec to its canonical bytes. */
     fun encode(spec: JobNexusSpec): ByteArray = spec.canonicalBytes
 
+    /** Decode the canonical bytes of a JobSnapshot. */
+    fun decodeJobSnapshot(bytes: ByteArray): JobSnapshot {
+        val fields = Cbor.decode(bytes) as? Item.Map
+            ?: error("canonical job snapshot must be a CBOR map")
+        fun string(name: String): String =
+            (fields[name] as? Item.Str)?.value ?: error("missing string field: $name")
+        fun long(name: String): Long =
+            (fields[name] as? Item.Num)?.value ?: error("missing integer field: $name")
+        fun int(name: String): Int = long(name).toInt()
+
+        val jobId = JobId.of(string("jobId"))
+        val revision = long("revision")
+        val causalKey = string("causalKey")
+        val lifecycle = string("lifecycle")
+        val dependencies = (fields["dependencies"] as? Item.Arr)?.let { values ->
+            List(values.size) { index ->
+                JobId.of((values[index] as? Item.Str)?.value
+                    ?: error("dependencies[$index] must be a string"))
+            }
+        } ?: emptyList()
+        val attemptCount = int("attemptCount")
+        val parentJobId = (fields["parentJobId"] as? Item.Str)?.value?.let { JobId.of(it) }
+        val attemptId = (fields["attemptId"] as? Item.Str)?.value ?: ""
+
+        return JobSnapshot(
+            jobId = jobId,
+            revision = revision,
+            causalKey = causalKey,
+            lifecycle = lifecycle,
+            dependencies = dependencies,
+            attemptCount = attemptCount,
+            parentJobId = parentJobId,
+            attemptId = attemptId
+        )
+    }
+
     /** Canonical encode a JobSnapshot for CID computation. */
     fun encode(snapshot: JobSnapshot): ByteArray {
         val fields = mutableMapOf<String, Any?>()
