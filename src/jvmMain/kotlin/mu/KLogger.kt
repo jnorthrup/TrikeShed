@@ -24,7 +24,7 @@ class KLogger : Logger {
     override fun warn(s: String) = logDebug { s }
     fun warn(function: () -> String) = debug(function)
 
-    fun error(s: String) = logDebug { s }
+    override fun error(s: String) = logDebug { s }
     fun error(function: () -> String) {
         debug(function)
     }

@@ -1,6 +1,7 @@
 package borg.trikeshed.couch.isam
 
 import borg.trikeshed.userspace.nio.file.spi.FileOperations
+import borg.trikeshed.collections.FunnelHashMap
 
 /**
  * A basic stringpool for storing and retrieving variable-length strings via integer offsets.
@@ -26,12 +27,19 @@ class FileBackedStringpool(
     // For now, we simulate the offset generation and storage.
     private var currentOffset = 0
     private val memoryCache = mutableMapOf<Int, String>()
+    private val memoizedStrings = FunnelHashMap<String, Int>()
 
     override fun put(value: String): Int {
+        val existingOffset = memoizedStrings.get(value)
+        if (existingOffset != null) {
+            return existingOffset
+        }
+
         val offset = currentOffset
         val bytes = value.encodeToByteArray()
         // Simulate writing bytes to `location`
         memoryCache[offset] = value
+        memoizedStrings.put(value, offset)
         currentOffset += bytes.size
         return offset
     }
