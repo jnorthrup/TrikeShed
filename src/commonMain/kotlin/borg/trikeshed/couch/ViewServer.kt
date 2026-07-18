@@ -78,11 +78,7 @@ data class ViewResult(
         for ((key, group) in groups) {
             var sum: Double = 0.0
             for (row in group) {
-                sum += when (row.value) {
-                    is Number   -> row.value.toDouble()
-                    is String   -> row.value.toDoubleOrNull() ?: 0.0
-                    else        -> 0.0
-                }
+                sum += row.value.toDoubleValue()
             }
             reduced.append(ViewRow(key = key, value = sum, docId = "_sum", jsPath = "_sum"))
         }
@@ -104,11 +100,7 @@ data class ViewResult(
             var maxVal: Double? = null
             var sumSqr = 0.0
             for (row in group) {
-                val v = when (row.value) {
-                    is Number   -> row.value.toDouble()
-                    is String   -> row.value.toDoubleOrNull() ?: 0.0
-                    else        -> 0.0
-                }
+                val v = row.value.toDoubleValue()
                 count++
                 sum += v
                 minVal = if (minVal == null) v else kotlin.math.min(minVal, v)
@@ -126,6 +118,7 @@ data class ViewResult(
         }
         return ViewResult(reduced)
     }
+
 }
 
 /**
@@ -347,7 +340,7 @@ class ViewServer {
         }
     }
 
-    /** Execute a custom Confix DSL reducer (stub — future expansion). */
+    /** Execute a custom Confix DSL reducer. */
     private fun executeCustomReduce(dsl: String, input: ViewResult): ViewResult {
         val doc = borg.trikeshed.parse.confix.confixDoc(dsl)
 
@@ -375,13 +368,13 @@ class ViewServer {
         }
 
         return when (op) {
-            "sum" -> values.sumOf { (it as? Number)?.toDouble() ?: (it as? String)?.toDoubleOrNull() ?: 0.0 }
+            "sum" -> values.sumOf { it.toDoubleValue() }
             "count" -> values.size.toLong()
-            "min" -> values.minOfOrNull { (it as? Number)?.toDouble() ?: (it as? String)?.toDoubleOrNull() ?: Double.MAX_VALUE } ?: 0.0
-            "max" -> values.maxOfOrNull { (it as? Number)?.toDouble() ?: (it as? String)?.toDoubleOrNull() ?: Double.MIN_VALUE } ?: 0.0
+            "min" -> values.minOfOrNull { it.toDoubleValue(Double.MAX_VALUE) } ?: 0.0
+            "max" -> values.maxOfOrNull { it.toDoubleValue(Double.MIN_VALUE) } ?: 0.0
             "avg" -> {
                 if (values.isEmpty()) 0.0
-                else values.sumOf { (it as? Number)?.toDouble() ?: (it as? String)?.toDoubleOrNull() ?: 0.0 } / values.size
+                else values.sumOf { it.toDoubleValue() } / values.size
             }
             "concat" -> values.joinToString("") { it?.toString() ?: "" }
             "collect" -> values
@@ -399,16 +392,22 @@ class ViewServer {
         return when (op) {
             "+" -> {
                 val evaluated = args.map { evaluateExpr(it, rowValue) }
-                evaluated.sumOf { (it as? Number)?.toDouble() ?: (it as? String)?.toDoubleOrNull() ?: 0.0 }
+                evaluated.sumOf { it.toDoubleValue() }
             }
             "*" -> {
                 val evaluated = args.map { evaluateExpr(it, rowValue) }
-                evaluated.fold(1.0) { acc, e -> acc * ((e as? Number)?.toDouble() ?: (e as? String)?.toDoubleOrNull() ?: 1.0) }
+                evaluated.fold(1.0) { acc, e -> acc * e.toDoubleValue(1.0) }
             }
             "value" -> rowValue
             else -> null
         }
     }
+}
+
+private fun Any?.toDoubleValue(default: Double = 0.0): Double = when (this) {
+    is Number -> this.toDouble()
+    is String -> this.toDoubleOrNull() ?: default
+    else -> default
 }
 
 /**
