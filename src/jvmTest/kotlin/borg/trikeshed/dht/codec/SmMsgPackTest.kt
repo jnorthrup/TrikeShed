@@ -1,11 +1,12 @@
 package borg.trikeshed.dht.codec
 
-import junit.framework.TestCase
 import java.nio.ByteBuffer
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.ObjectInputStream
 import java.io.ObjectOutputStream
+import kotlin.test.Test
+import kotlin.test.assertEquals
 
 
 typealias ReifiedMessage = Pair<List<Pair<String, String>>, String>
@@ -30,10 +31,11 @@ fun recv(ser: ByteBuffer): ReifiedMessage {
     return decodeFromByteArray
 }
 
-class SmMsgPackTest : TestCase() {
+class SmMsgPackTest {
 
     val sm1: ReifiedMessage = listOf("Alice" to "Bob", "Charley" to "Delta") to "Random message Body here"
 
+    @Test
     fun testMsgPack() {
         val byteBuffer = send(sm1)
         debug()

@@ -171,11 +171,6 @@ kotlin {
             kotlin.srcDir("src/jmhMain/kotlin")
             resources.srcDir("src/jmhMain/resources")
         }
-        val jvmTest = getByName("jvmTest") {
-            kotlin.exclude("**/ConfixSerializationTest.kt")
-            kotlin.exclude("**/ViewServerTest.kt")
-            kotlin.exclude("**/strategy/SignalValidationTest.kt")
-        }
     }
 }
 
@@ -254,7 +249,7 @@ tasks.register<JavaExec>("runForgeJvm") {
     group = "forge"
     description = "Launch the interactive Forge JVM shell (Compose Desktop)."
     dependsOn("compileKotlinJvm")
-    mainClass.set("borg.trikeshed.forge.gallery.ForgeComposeFactory")
+    mainClass.set("borg.trikeshed.forge.shell.ForgeWorkspaceKt")
     classpath(tasks.named("jvmJar"), configurations.getByName("jvmRuntimeClasspath"))
 }
 
@@ -275,22 +270,6 @@ tasks.register<Sync>("generateForgePages") {
         }
         println("Published WASM_JS_BROWSER target to ${project.layout.projectDirectory.dir("docs").asFile.absolutePath}")
     }
-}
-
-// Deploy to gh-pages branch using gh CLI
-tasks.register<Exec>("deployGhPages") {
-    group = "documentation"
-    description = "Deploys docs/ to gh-pages branch via gh CLI."
-    dependsOn("generateForgePages")
-    commandLine("gh", "pages", "deploy", "--branch", "gh-pages", "--source", "docs", "--dotfiles")
-    doLast {
-        println("Deployed docs/ to gh-pages branch")
-    }
-}
-
-// Make wasmJsBrowserProductionWebpack trigger deploy as final step
-tasks.named("wasmJsBrowserProductionWebpack").configure {
-    finalizedBy("deployGhPages")
 }
 
 // Config cache

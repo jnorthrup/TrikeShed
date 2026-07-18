@@ -1,7 +1,6 @@
 package borg.trikeshed.util.oroboros
 
 import borg.trikeshed.job.ContentId
-import borg.trikeshed.job.Sha256Pure
 import borg.trikeshed.dht.routing.RoutingTable
 import borg.trikeshed.dht.id.NUID
 import borg.trikeshed.dht.include.Address
@@ -59,14 +58,12 @@ class DummyRoutingTable : RoutingTable<Int, NetMask<Int>>(
 
 class OroborosNetworkTest {
 
-    private val HEX_CHARS = "0123456789abcdef".toCharArray()
-
     @Test
     fun testDhtProviderLookup() {
         val routingTable = DummyRoutingTable()
         val gateway = DhtContentGateway(routingTable) { 42 }
 
-        val contentId = ContentId("sha256-abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd")
+        val contentId = ContentId("sha256:" + "ab".repeat(32))
         val closest = gateway.lookup(contentId)
 
         assertEquals(1, closest.size)
@@ -77,16 +74,7 @@ class OroborosNetworkTest {
     @Test
     fun testIpfsDigestMismatchRejection() = runTest {
         val validContent = "hello world".encodeToByteArray()
-        val hash = Sha256Pure.hash(validContent)
-
-        val hexBuilder = StringBuilder(hash.size * 2)
-        for (b in hash) {
-            val v = b.toInt() and 0xFF
-            hexBuilder.append(HEX_CHARS[v ushr 4])
-            hexBuilder.append(HEX_CHARS[v and 0x0F])
-        }
-        val hexHash = hexBuilder.toString()
-        val contentId = ContentId("sha256-$hexHash")
+        val contentId = ContentId.of(validContent)
 
         val htxElement = DummyHtxElement(validContent)
         val gateway = object : IpfsContentGateway(htxElement) {
@@ -102,16 +90,7 @@ class OroborosNetworkTest {
     @Test
     fun testIpfsHtxPathSuccess() = runTest {
         val validContent = "valid ipfs payload".encodeToByteArray()
-        val hash = Sha256Pure.hash(validContent)
-
-        val hexBuilder = StringBuilder(hash.size * 2)
-        for (b in hash) {
-            val v = b.toInt() and 0xFF
-            hexBuilder.append(HEX_CHARS[v ushr 4])
-            hexBuilder.append(HEX_CHARS[v and 0x0F])
-        }
-        val hexHash = hexBuilder.toString()
-        val contentId = ContentId("sha256-$hexHash")
+        val contentId = ContentId.of(validContent)
 
         val htxElement = DummyHtxElement(validContent)
         val gateway = object : IpfsContentGateway(htxElement) {
@@ -127,7 +106,7 @@ class OroborosNetworkTest {
         val transport = DummyTransport()
         val gateway = StreamContentGateway(transport)
 
-        val contentId = ContentId("sha256-abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd")
+        val contentId = ContentId("sha256:" + "ab".repeat(32))
 
         val responseBytes = ByteArray(5)
         responseBytes[0] = 0x02 // CONTENT
@@ -157,7 +136,7 @@ class OroborosNetworkTest {
         val fanout = ContentGatewayFanout(mapOf("gw1" to gw1, "gw2" to gw2))
 
         val failure = assertFailsWith<FanoutFailure> {
-            fanout.fetch(ContentId("sha256-abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd"))
+            fanout.fetch(ContentId("sha256:" + "ab".repeat(32)))
         }
         assertTrue(failure.failures.containsKey("gw1"))
         assertTrue(failure.failures.containsKey("gw2"))

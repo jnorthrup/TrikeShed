@@ -30,7 +30,26 @@
       el.textContent = 'Unhandled rejection: ' + (e.reason && e.reason.message || e.reason) + '\n' + (e.reason && e.reason.stack || '');
       el.style.display = 'block';
     });
+    async function init() {
+      try {
+        var forge = await globalThis.TrikeShed;
+        var html = forge && typeof forge.getForgeHtml === 'function'
+          ? forge.getForgeHtml()
+          : '';
+        if (html) {
+          document.body.innerHTML = html;
+          hydrateGallery();
+        } else {
+          document.getElementById('err').textContent = 'WASM module did not export getForgeHtml';
+          document.getElementById('err').style.display = 'block';
+        }
+      } catch(e) {
+        document.getElementById('err').textContent = e.message;
+        document.getElementById('err').style.display = 'block';
+      }
+    }
+    window.addEventListener('DOMContentLoaded', init);
   </script>
-  <script src="./TrikeShed.js" defer></script>
+  <script type="module" src="./TrikeShed.js"></script>
 </body>
 </html>

@@ -3,7 +3,7 @@ package borg.trikeshed.userspace.ebpf
 import borg.trikeshed.userspace.nio.ByteBuffer
 import borg.trikeshed.userspace.nio.channels.spi.ChannelOperations
 import borg.trikeshed.userspace.nio.channels.spi.ChannelResult
-import org.junit.jupiter.api.Test
+import kotlin.test.Test
 import kotlin.test.assertEquals
 
 class EbpfChannelizerTest {

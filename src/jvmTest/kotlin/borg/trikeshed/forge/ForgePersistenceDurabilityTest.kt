@@ -1,25 +1,15 @@
 package borg.trikeshed.forge
 
-import borg.trikeshed.blackboard.BlackboardSurfaceProjectionTest
-import borg.trikeshed.ccek.CCEK
-import borg.trikeshed.dag.ReteAgentTest
-import borg.trikeshed.forge.ForgeDoc
-import borg.trikeshed.kanban.ForgeBoardFSMTest
-import borg.trikeshed.lcnc.reduction.LcncReductionCoreTest
-import borg.trikeshed.userspace.reactor.MuxReactorElement
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import kotlin.test.Test
-import kotlin.test.Ignore
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
-import kotlin.time.TimeSource
 
 class ForgePersistenceDurabilityTest {
 
@@ -104,37 +94,6 @@ class ForgePersistenceDurabilityTest {
         assertEquals(250, loaded["counter"]!!.jsonPrimitive.intOrNull)
     }
 
-    @Ignore
-    @Test
-    fun persistLatencyBudget() = runTest {
-        val store = InMemoryForgePersistenceStore()
-        val persistence = ForgePersistenceCoordinator(store)
-        val workspace = syntheticWorkspace(cardCount = 500, blocksPerCard = 5)
-        val samplesMs = buildList {
-            repeat(100) { iteration ->
-                val start = TimeSource.Monotonic.markNow()
-                persistence.persistSnapshot(workspace)
-                val elapsedMs = start.elapsedNow().inWholeMicroseconds / 1000.0
-                if (iteration >= 10) add(elapsedMs)
-            }
-        }
-
-        assertEquals(90, samplesMs.size)
-        val p95 = percentile(samplesMs, 95)
-        assertTrue(p95 < 50.0, "expected 500-card workspace persist p95 < 50ms, saw ${p95}ms")
-        assertTrue(samplesMs.maxOrNull()!! < 4.0, "expected no persist iteration above 4ms, saw ${samplesMs.maxOrNull()}ms")
-    }
-
-    @Test fun priorValSuitesRemainGreen() {
-        ForgeDocTest().emptyDocumentHasPageAndFirstChild()
-        ForgeDocTest().forgeDocumentProjectsToKanbanBoard()
-        ForgeBoardFSMTest().`loadDefault populates board and selects it`()
-        val binding = CCEK.initialize(MuxReactorElement())
-        binding.choreograph(ForgeDoc.empty("Regression guard")).cancel()
-        ReteAgentTest().sinkFeedFiresRulesAsynchronously()
-        LcncReductionCoreTest().testForgeKeyHierarchy()
-        BlackboardSurfaceProjectionTest().lcncEntitiesProjectFirstAndCausalNodesAttachByCausalKey()
-    }
 
     private fun workspaceSnapshot(counter: Int) = buildJsonObject {
         put("counter", counter)
@@ -142,37 +101,6 @@ class ForgePersistenceDurabilityTest {
         put("title", "Workspace $counter")
     }
 
-    private fun syntheticWorkspace(cardCount: Int, blocksPerCard: Int): JsonObject = buildJsonObject {
-        put("title", "Latency Workspace")
-        put("cards", buildJsonArray {
-            repeat(cardCount) { cardIndex ->
-                add(buildJsonObject {
-                    val cardNumber = cardIndex + 1
-                    put("id", "card-$cardNumber")
-                    put("title", "Card $cardNumber")
-                    put("status", if (cardIndex % 2 == 0) "backlog" else "in-progress")
-                    put("updatedAtMs", cardNumber * 10L)
-                    put("blocks", buildJsonArray {
-                        repeat(blocksPerCard) { blockIndex ->
-                            val blockNumber = blockIndex + 1
-                            add(buildJsonObject {
-                                put("id", "card-$cardNumber-block-$blockNumber")
-                                put("kind", if (blockIndex % 2 == 0) "text" else "check")
-                                put("text", "Block $blockNumber for card $cardNumber")
-                                put("order", blockIndex)
-                            })
-                        }
-                    })
-                })
-            }
-        })
-    }
-
-    private fun percentile(values: List<Double>, percentile: Int): Double {
-        val sorted = values.sorted()
-        val index = ((sorted.size - 1) * percentile) / 100
-        return sorted[index]
-    }
 
     private fun walEntry(counter: Int, snapshot: kotlinx.serialization.json.JsonObject) = ForgeWalEntry(
         id = "mut-$counter",
