@@ -40,7 +40,7 @@ data class IngestResult(
     val sourcePath: String,
     val mediaType: String,                          // MIME-ish: "application/pdf", "audio/wav"
     val detectedFormat: String,                     // Confix facet: "pdf", "archive-zip", "audio-whisper"
-    val extractedContent: Series<Char>,             // lazy char oracle — no copy until indexed
+    val extractedContent: borg.trikeshed.lib.Series<Char>,             // lazy char oracle — no copy until indexed
     val projections: Set<IngestProjection>,         // which projections produced this result
     val qualityMetrics: Map<String, Double> = emptyMap(),
     val processingTimeMs: Long = 0L,
@@ -48,8 +48,8 @@ data class IngestResult(
 ) {
     /** PRELOAD-compliant content access: index the Series, don't copy it. */
     operator fun get(i: Int): Char = extractedContent.b(i)
-    val contentSize: Int get() = extractedContent.size
+    val contentSize: Int get() = extractedContent.a
 }
 
 /** Build a char [Series] from a plain string without materializing a second copy. */
-fun charSeries(text: String): Series<Char> = text.length j { i -> text[i] }
+fun charSeries(text: String): borg.trikeshed.lib.Series<Char> = text.length j { i -> text[i] }
