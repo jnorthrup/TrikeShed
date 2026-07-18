@@ -10,17 +10,6 @@ import borg.trikeshed.userspace.reactor.KanbanFSM
 import kotlinx.serialization.Serializable
 
 @Serializable
-data class LcncEntityDTO(
-    val entityId: String,
-    val lcncKind: String,
-    val lane: String,
-    val facet: String,
-    val causalKey: String? = null,
-    val title: String,
-    val description: String = "",
-)
-
-@Serializable
 data class ForgeAppColumn(
     val id: String,
     val name: String,
@@ -83,7 +72,8 @@ data class ForgeAppState(
     val reactor: ForgeAppReactorState = ForgeAppReactorState(),
     val spatial: ForgeSpatialState = ForgeSpatialState(),
     val causalNodes: List<CausalGraphNodeDTO> = emptyList(),
-    val lcncEntities: List<LcncEntityDTO> = emptyList(),
+    @kotlinx.serialization.Transient
+    val lcncEntities: List<borg.trikeshed.lcnc.isam.LcncBlock> = emptyList(),
     val blackboardId: String = "",
     val cascadeGrid: List<CascadeRollupRow> = emptyList(),
 )
@@ -277,14 +267,17 @@ private fun defaultForgeAppState(): ForgeAppState {
         },
         lcncEntities = reduction.correlations.map { correlation ->
             val card = board.cards.first { it.id.value == correlation.taskId }
-            LcncEntityDTO(
-                entityId = "task:${correlation.taskId}",
-                lcncKind = "work-package",
-                lane = card.columnId.value,
-                facet = if (correlation.ready) "ready" else "dependency-gated",
-                causalKey = correlation.causalKey,
-                title = card.title,
-                description = card.description,
+            borg.trikeshed.lcnc.isam.LcncBlock(
+                id = "task:${correlation.taskId}",
+                type = "work-package",
+                parentId = null,
+                content = mapOf(
+                    "lane" to card.columnId.value,
+                    "facet" to if (correlation.ready) "ready" else "dependency-gated",
+                    "causalKey" to correlation.causalKey,
+                    "title" to card.title,
+                    "description" to card.description,
+                )
             )
         },
         blackboardId = board.id.value,
@@ -345,14 +338,15 @@ private fun ForgeAppState.toJsonValue(): Map<String, Any?> = linkedMapOf(
         )
     },
     "lcncEntities" to lcncEntities.map {
+        val content = it.content as? Map<*, *>
         linkedMapOf(
-            "entityId" to it.entityId,
-            "lcncKind" to it.lcncKind,
-            "lane" to it.lane,
-            "facet" to it.facet,
-            "causalKey" to it.causalKey,
-            "title" to it.title,
-            "description" to it.description,
+            "entityId" to it.id,
+            "lcncKind" to it.type,
+            "lane" to content?.get("lane"),
+            "facet" to content?.get("facet"),
+            "causalKey" to content?.get("causalKey"),
+            "title" to content?.get("title"),
+            "description" to content?.get("description"),
         )
     },
     "blackboardId" to blackboardId,
