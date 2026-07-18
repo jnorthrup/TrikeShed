@@ -123,12 +123,6 @@ object JvmKanbanServer {
             while (true) {
                 val msg = runCatching { httpSlot.consume() }.getOrNull() ?: continue
                 val resp = routeHttp(msg.payload)
-                // Echo the response back into the same listener on the
-                // Json slot — the bind adapter will eventually learn to
-                // echo through the original connection. For now this is
-                // a "log the response" surface, so the daemon isn't a
-                // black hole: we surface the response as a Json message
-                // downstream.
                 val out = buildString {
                     append("HTTP/1.1 ${resp.status} ${statusReason(resp.status)}\r\n")
                     append("Content-Length: ${resp.body.toByteArray(StandardCharsets.UTF_8).size}\r\n")
@@ -136,7 +130,17 @@ object JvmKanbanServer {
                     append("Access-Control-Allow-Origin: *\r\n\r\n")
                     append(resp.body)
                 }
-                listener.accept(Protocol.Json, out.toByteArray(StandardCharsets.UTF_8))
+                val outBytes = out.toByteArray(StandardCharsets.UTF_8)
+                if (msg.respond != null) {
+                    try {
+                        msg.respond.invoke(outBytes)
+                    } catch (e: Exception) {
+                        System.err.println("Failed to write response to originating channel: ${e.message}")
+                    }
+                } else {
+                    // Fallback: surface the response as a Json message downstream
+                    listener.accept(Protocol.Json, outBytes)
+                }
             }
         }
         scope.launch {
