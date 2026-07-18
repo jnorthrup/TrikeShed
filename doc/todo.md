@@ -56,7 +56,7 @@ these interfaces. No platform IO leaks into `commonMain`.
   - Targets: `commonMain`.
   - Evidence: compiles, tests for trait matching and subnet containment.
 
-- [ ] **T3. Volume / BlockArray / BootBlock interface in commonMain**
+- [x] **T3. Volume / BlockArray / BootBlock interface in commonMain**
   - `Volume` interface: `blockSize`, `capacity`, `read(lba, count)`, `write(lba, data)`, `sync()`.
   - `BlockArray` and `BootBlock` helpers on top of `Volume`.
   - Targets: `commonMain`.
