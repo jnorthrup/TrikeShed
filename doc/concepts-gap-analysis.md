@@ -1,137 +1,72 @@
-# `doc/concepts.md` Gap Analysis
+# `doc/concepts.md` Gap Analysis — refresh 2026-07-18
 
-## Scope
+Re-audit of the prior pass (which compared `cebea1da` → `638fb71b`) against
+current master (`603b0859`). Each prior finding is re-scored against live disk;
+new findings from the litebike/NUID/LCNC session are appended. No code changed
+in this pass — documentation state only.
 
-This audit compares the concept map at its creation commit (`cebea1da`, tagged `concept-map-v1`) with current `master` (`638fb71b`). The post-map delta is 49 files, 4,013 insertions, and 3,364 deletions. The substantive source work groups into six areas:
+## Re-scored prior findings
 
-| Work cluster | Post-map delta | Coverage in `concepts.md` | Finding |
-|---|---:|---|---|
-| Oroboros storage/network/workspace | 15 files, +1,449 | Absent | Largest documentation gap |
-| CAS B+tree and repository recovery | 5 files, +887/-1 | Named repeatedly | Coverage overstates recovery completeness |
-| Couch CQRS projections | 5 files, +404/-108 | Partially described | Architecture and revision semantics are stale |
-| Funnel map, stringpool, WAL logger | 8 files, +442/-1 | Funnel map only | Stringpool/logger path absent; durability overstated by names |
-| View-server runtimes | 5 files, +147/-12 | One phrase plus Forge sample usage | Runtime topology absent; two incompatible implementations exist |
-| Build/source-set changes | mixed | Build section exists | Current verification commands do not configure successfully |
+| ID | Prior claim | Live-tree status | Verdict |
+|----|---|---|---|
+| G1 | Oroboros is a substantial undocumented subsystem; components tested but uncomposed | `rg 'borg.trikeshed.util.oroboros' src -g '!src/commonMain/.../oroboros/**' -g '!*Test.kt'` → **1 hit**, and that hit is `src/commonTest/.../FakeFileOperations.kt`. Zero non-test external consumers. `OroborosNetwork.kt:53` still carries `// ... mocked for testing tests` with a `frame.toString() == "MOCK_PAYLOAD"` extractor. | **OPEN, unchanged.** Components exist, no production composition root, mock remains. |
+| G2 | Couch CQRS docs claim Job/CID semantics the impl does not provide | `CouchStore.inMemory()` and `withPersistence()` now both build a **`ProductionCouchIngress`** (`CouchStore.kt:257,264`); `SyncTestIngress` (`CouchStore.kt:215`) still exists as a nested class but is no longer the default factory path. `CouchHeadProjection` still stores the raw revision string (`CouchHeadProjection.kt:24-56`) — no CID-derived `_id`/`_rev`. | **PARTIALLY CLOSED.** Default ingress is production-shaped now; revision-string semantics still not CID-derived. `concepts.md` Couch prose is still ahead of the code on `_id = head CID, _rev = gen-CID-prefix`. |
+| G3 | Checkpoint recovery incomplete — clears preceding snapshots, never hydrates from tree | `JobRepository.recover()` now has `verifyAndHydrateTree(cid)` (`JobRepository.kt:79-98`) which walks `BTreeNode.Internal`/`Leaf`, fetches each snapshot CID from CAS, decodes via `CanonicalCbor.decodeJobSnapshot`, and inserts into `recoveredSnapshots`. | **CLOSED.** Recovery hydrates checkpoint tree values before tail application. `concepts.md` recovery prose is now accurate. |
+| G4 | Stringpool documented but file-backed backing is simulated; WAL logger durability overstated | `FileBackedStringpool` (`Stringpool.kt:18-49`) now has a real `init` block: `fileOps.exists(location)` → `readAllBytes` → frame-walk with `isCorrupted` flag. The header comment still says "In a full implementation, this uses functional uring or NIO byte channels to append to a memory-mapped file or WAL block." `ReactorLogger.kt:60` now calls `durableAppendLog?.flush()`. | **PARTIALLY CLOSED.** Recovery-on-open is real; append path and mmap/WAL block are still aspirational per the in-code comment. Logger now flushes. |
+| G5 | View-server runtime forks into two incompatible APIs (`addFunction` typed vs `addTool` raw-JSON) | `src/viewServerCommonMain`, `src/viewServerJsMain`, `src/viewServerJvmMain` **do not exist on disk**. `rg addTool src` → 0 hits. Only the common `CommonViewServer` + `CouchDbCascadeTool` path remains. `build.gradle.kts:27` still sets `viewServerNodeSlice = false` as a dead flag. | **CLOSED.** The duplicate raw-JSON fork was deleted from the tree. Only the stale `viewServerNodeSlice` flag remains in the build script. |
+| G6 | Build section commands not executable; serializer contract violated (commonMain has `kotlinx-serialization-json` directly) | `./gradlew compileKotlinJvm compileKotlinMacos compileKotlinJs compileKotlinWasmJs` → **BUILD SUCCESSFUL**. `kotlinx-serialization-json` still a direct `commonMain` dependency (`build.gradle.kts:146`). | **PARTIALLY CLOSED.** Build configures and all four targets compile. The serializer contract violation is still real but is now the actual enforced state — `concepts.md:24` ("commonMain allows only `kotlinx-serialization-core`") is a *desired* boundary, not the current one. |
 
-## Priority gap map
+## New findings from the litebike / NUID / LCNC session (post-`638fb71b`)
 
-### G1 — Oroboros is a substantial undocumented subsystem
+These are gaps between `concepts.md` (last edited before this session) and what
+actually landed in commits `c3370100` … `603b0859`.
 
-Current implementation spans three distinct layers that do not appear in the architecture spine, maintainer surfaces, build section, or recovery paths:
+| ID | Sev | Area | Description | Evidence (file:line) | Suggested fix path |
+|----|-----|------|-------------|----------------------|--------------------|
+| N1 | HIGH | forge | `concepts.md` never mentions that `ForgeAppState` / `ForgeAppReactorState` / `ForgeSpatialState` / `LcncEntityDTO` / `CascadeRollupRow` / `ForgeAppUseCase` / `ForgeAppItem` / `ForgeAppChecklistItem` / `ForgeAppColumn` were **deleted** and replaced by `BlackboardSurface.project()` + `confixDoc()` parsing of persisted JSON (PR #160, commit `1e8fd692`). The architecture spine at `concepts.md:65-70` still describes "Blackboard-as-Confix-cursor" as an aspiration; the DTO-removal is a landed structural change. | `ForgeApp.kt` HEAD: `defaultForgeAppState(): Map<String, Any?>`; commit `1e8fd692` message | Update §2 spine row + §3.4 projections table to state the DTO is gone and the seed JSON is built from `BlackboardSurface` rows |
+| N2 | MED | commonMain | `elastic/` directory was deleted this session — it redeclared `interface Join` / `typealias Series` (CRIT shadow, zero importers). `concepts.md` does not record that this ever existed or that the rule "canonical types live only in `borg.trikeshed.lib`" is now enforced by deletion, not just convention. | (deleted; was `elastic/ElasticHashingInTrikeShed.kt:36,44`) | One line in §1 kernel algebra: "canonical `Join`/`Series` live only in `borg.trikeshed.lib`; a prior `elastic/` shadow was removed Jul 2026" |
+| N3 | MED | build | `classfile/slab/**` is **excluded from `commonMain` compile** in `build.gradle.kts` (entire layer of ~20 `TODO()` stubs: GraalJS eval, DuckDB c-interop, `FacetedCursorContract`, `MiniDuckContract`, `CircularQueue`). Files remain on disk. `concepts.md` architecture spine has no mention of the slab layer at all — neither its existence nor its exclusion. | `build.gradle.kts` slab exclude block; `FacetedCursorContract.kt:177,178,301,306,311`; `MiniDuckContract.kt:98-167` | Add a "compiled-out layers" note to §0 or §2 listing the excluded tree + rationale |
+| N4 | LOW | collections | `CircularQueue.poll/peek/iterator.remove` converted from `TODO("Not yet implemented")` to `error("CirQlar.poll is write-only…")` — the hollow is now loud at the call site. Not worth a concepts.md entry on its own, but belongs in the same "compiled-out / loud-hollow" note as N3. | `CircularQueue.kt:50,51,69` | Same note as N3 |
+| N5 | HIGH | litebike/nuid | `concepts.md` **does** cover the NUID/CCEK fanout (§8.1a) and Litebike listener (§8.1b) — but the additions were written alongside the code in the same session, so the spine at §2 and the prose at §8.1a/§8.1b have not been cross-checked for drift. Specifics to verify: the doc claims "IDs 1-7 match litebike taxonomy.rs conceptually" — verified true (`Taxonomy.kt` vs `taxonomy.rs:362-370`, Http=1…WebSocket=7). It also says `JvmKanbanServer` registers `Http/Json/Socks5/Tls/Bonjour/Upnp` — live code matches (`JvmKanbanServer.kt`). | `doc/concepts.md:344-363`; `Taxonomy.kt`; `JvmKanbanServer.kt:run` | No action — spot-check passed. Keep as a verification record. |
+| N6 | MED | lcnc | `LcncIngestPipeline` (new file, `lcnc/reactor/LcncIngestPipeline.kt`) landed but has **zero production callers** — same S5 signature the LCNC package had before. It also contains a `RegexOption.DOT_MATCHES_ALL` JVM-only flag that was converted to inline `(?si)` this session (commit `af4b0894`). `concepts.md` LCNC section does not exist at all — the package (`lcnc/`) is absent from the architecture spine despite 17 files on disk. | `rg 'LcncIngestPipeline' src -g '!LcncIngestPipeline.kt'` → 0; `LcncIngestPipeline.kt:460` | Either add an LCNC row to the §2 spine marked "self-enclosed, no external consumers" or state the exclusion explicitly in §0 orientation |
+| N7 | LOW | todo | `doc/todo.md` now carries T22–T29 (LCNC no-code gap follow-up) plus T-KANBAN-HTTP-1 … T-KANBAN-CROSS-11 (running-Kanban-live task list). `concepts.md` does not reference `doc/todo.md` as the task ledger. A maintainer reading only `concepts.md` would not know these queues exist. | `doc/todo.md` (513+ lines) | One pointer line in §0: "Task ledger: `doc/todo.md` (LCNC + Kanban-live queues)" |
 
-1. Workspace and change capture
-   - `ForgeHome` confines agent paths under a per-agent root and rejects unsafe path components: `src/commonMain/kotlin/borg/trikeshed/util/oroboros/ForgeHome.kt:8`.
-   - `FileEWatcher` provisions and reconciles filesystem state into bounded `FileEvent` traffic using content IDs: `src/commonMain/kotlin/borg/trikeshed/util/oroboros/FileEWatcher.kt:17-27`, `:32-47`, `:53-108`.
-   - Git and Pijul implementations of `VersionGateway` initialize and record workspace revisions through `ProcessOperations`: `src/commonMain/kotlin/borg/trikeshed/util/oroboros/VersionGateway.kt:5-20`, `:23-73`, `:75-116`.
-
-2. Durable content and attachment surfaces
-   - `FileCasStore` shards SHA-256 content paths and verifies bytes on both write and read: `src/commonMain/kotlin/borg/trikeshed/util/oroboros/Sha2CasBus.kt:12-56`.
-   - `Sha2CasBus` enforces durable-before-visible publication through a finite suspending channel: `src/commonMain/kotlin/borg/trikeshed/util/oroboros/Sha2CasBus.kt:59-85`.
-   - `CouchAttachmentGateway` stores attachment metadata in Couch and bytes in CAS, with revision-checked deletion and a `Series2` manifest: `src/commonMain/kotlin/borg/trikeshed/util/oroboros/CouchAttachmentGateway.kt:12-101`.
-   - `OroborosStorageK` exposes typed CAS, attachment, event, manifest, and status facets: `src/commonMain/kotlin/borg/trikeshed/util/oroboros/OroborosStorage.kt:10-24`.
-
-3. Content retrieval
-   - `OroborosNetworkK` defines DHT, IPFS, stream, HTX, and fanout facets: `src/commonMain/kotlin/borg/trikeshed/util/oroboros/OroborosNetwork.kt:29-37`.
-   - DHT lookup, digest-checked IPFS retrieval, stream framing, HTX retrieval, and first-success fanout are implemented in `OroborosNetwork.kt:39-209`.
-   - `NgSctpGateway` publishes the existing `SctpElement` as a typed facet: `src/commonMain/kotlin/borg/trikeshed/util/oroboros/NgSctpGateway.kt:7-22`.
-
-Evidence classification: mixed, not a live end-to-end runtime. Tests instantiate the individual components, but production code outside `util/oroboros` does not compose them. The network payload extractor explicitly calls itself a test mock and contains placeholder extraction (`OroborosNetwork.kt:53-64`). The concept map should document this as a tested component library awaiting a composition root, not as an operational Forge path.
-
-Required `concepts.md` change: add an Oroboros layer or maintainer surface, show workspace event → CAS/attachment → version gateway and DHT/IPFS/HTX/SCTP retrieval, and explicitly mark the missing production composition root and real HTX payload extraction.
-
-### G2 — Couch CQRS documentation claims semantics the implementation does not provide
-
-The concept map currently says:
-
-- Couch is an in-memory store with pluggable persistence (`concepts.md:218-225`).
-- head `_id` is the head CID and `_rev` is a generation-CID prefix (`concepts.md:228`).
-- Couch projections are built from committed Job frames (`concepts.md:185-186`, `:225`).
-
-The landed CQRS shape is different:
-
-- `CouchStore` is a facade over an injected `CouchIngress`, `CouchHeadProjection`, and `CouchChangesProjection`: `src/commonMain/kotlin/borg/trikeshed/couch/CouchStore.kt:42-58`.
-- Reads come only from the head projection; writes only submit intents: `CouchStore.kt:66-116`.
-- The only factory-provided ingress is named `SyncTestIngress`; it generates `uuid-*` revisions, applies projections directly, and calls persistence directly: `CouchStore.kt:214-265`.
-- `flush`, `drain`, and `close` do not drive a durable reactor: `CouchStore.kt:159-179`.
-- `CouchHeadProjection` indexes by the original document ID and stores the supplied revision string; it does not derive `_id` or `_rev` from a content ID: `CouchHeadProjection.kt:13-18`, `:24-56`, `:83-116`.
-- `CouchChangesProjection.applyCommit` appends frames but does not itself enforce increasing sequence values or provide an `afterSequence` resume API: `CouchChangesProjection.kt:10-33`.
-
-Evidence classification: the projection split and no-precommit read boundary are real and tested (`CouchProjectionTest.kt:13-125`), but Job-reactor ingress, CID-based revisions, and resumable strict sequencing are contract-only. The current prose promotes intended semantics to implemented semantics.
-
-Required `concepts.md` change: describe the actual ingress/head/changes split, label `SyncTestIngress` as the current factory path, and move Job-frame/CID/replay claims into an explicit integration gap until a production ingress backs them.
-
-### G3 — B+tree implementation is real, but “checkpoint + tail recovery” is incomplete
-
-The concept map already names `CowBPlusTree`, `JobCheckpoint`, and checkpoint/tail recovery in the architecture spine and reading paths (`concepts.md:81`, `:92`, `:187-188`, `:241`, `:371`). It does not explain the substantial landed mechanics:
-
-- deterministic node codec and CAS-backed copy-on-write insertion: `src/commonMain/kotlin/borg/trikeshed/collections/btree/CowBPlusTree.kt:53-247`, `:249-429`;
-- exact and range reads over immutable roots: `CowBPlusTree.kt:267-325`;
-- CAS-before-WAL snapshot commits with read-back verification: `src/commonMain/kotlin/borg/trikeshed/job/JobRepository.kt:18-39`;
-- checkpoint/schema/tree/metadata verification during replay: `JobRepository.kt:45-96`.
-
-The stronger problem is semantic. On seeing a checkpoint, recovery clears all preceding snapshots, verifies the B+tree, then returns only snapshots reconstructed from later WAL records (`JobRepository.kt:52-96`). It never traverses B+tree values to hydrate checkpointed `JobSnapshot` state. The test pins that behavior by expecting pre-checkpoint jobs to be absent (`JobRepositoryRecoveryTest.kt:53-90`).
-
-Evidence classification: `CowBPlusTree` is live as an isolated CAS collection and has deterministic/snapshot/range tests (`CowBPlusTreeTest.kt:14-146`). Repository checkpoint validation and tail replay are live, but recovery of checkpointed job heads is not.
-
-Required `concepts.md` change: split “checkpoint validation + tail replay” from “checkpoint state restoration.” Do not call the current path complete recovery until checkpoint tree values restore the repository head before tail application.
-
-### G4 — Funnel hashing is documented; stringpool and WAL logging are not
-
-`concepts.md:237` names `FunnelHashMap` and `FunnelHashIndex`, but omits the landed consumers:
-
-- `FileBackedStringpool` memoizes string-to-offset entries through `FunnelHashMap`: `src/commonMain/kotlin/borg/trikeshed/couch/isam/Stringpool.kt:21-49`.
-- `ReactorLogger` implements the local SLF4J facade, stores log templates in the stringpool, and appends a compact binary payload to `JobLog`: `src/jvmMain/kotlin/borg/trikeshed/reactor/logging/ReactorLogger.kt:7-47`.
-
-Evidence classification: mixed. The logger payload format and template memoization have a focused test (`ReactorLoggerTest.kt:12-58`). The “file-backed” stringpool is currently an in-memory simulation: comments say the file/WAL path is future work and all values live in maps (`Stringpool.kt:18-49`). `ReactorLogger` appends with `System.nanoTime()` as the WAL sequence and does not flush in `logCas` (`ReactorLogger.kt:22-47`), so “CAS-based WAL logger” should not be documented as a durable production logger without qualification.
-
-Required `concepts.md` change: add the template → stringpool offset → binary `JobLog` record path under persistence/observability, and label the stringpool backing and durability boundary as incomplete.
-
-### G5 — The view-server runtime is almost absent from the concept map and currently forks into two APIs
-
-The map only mentions “ViewServer cascade rollups” in the persistence layer (`concepts.md:82`) and a Forge sample-grid call (`ForgeApp.kt:101-105`, indirectly represented by `concepts.md:298-303`). It omits:
-
-- the analyzable mapper model and CouchDB built-in reduce/rereduce support in `src/commonMain/kotlin/borg/trikeshed/viewserver/CommonViewServer.kt:15-125`;
-- the `CouchDbCascadeTool` view/metric rollup contract in `src/commonMain/kotlin/borg/trikeshed/viewserver/CouchDbCascadeTool.kt:7-104`;
-- the Node JSON-lines entry point in `src/viewServerJsMain/kotlin/borg/trikeshed/viewserver/NodeViewServer.kt:53-102`;
-- the GraalVM host boundary in `src/viewServerJvmMain/kotlin/borg/trikeshed/couch/viewserver/GraalVmViewServerHost.kt:9-47`;
-- the restricted standalone Graal evaluator in `src/jvmMain/kotlin/borg/trikeshed/couch/viewserver/GraalVmViewServer.kt:7-18`.
-
-There are also two incompatible definitions with the same package/type names:
-
-- common source uses `addFunction`, typed `ViewValue`, and working map/reduce/rereduce;
-- `viewServerCommonMain` uses `addTool`, raw JSON strings, returns `[]` from `mapDoc` and `rereduce`, and depends directly on `kotlinx-serialization-json`: `src/viewServerCommonMain/kotlin/borg/trikeshed/viewserver/CommonViewServer.kt:1-54`.
-
-The dedicated view-server tree is not attached to a source set or task. `build.gradle.kts:18` sets an unused `viewServerNodeSlice = false`, and the only configured source sets are the standard KMP sets (`build.gradle.kts:128-178`).
-
-Evidence classification: commonMain engine is used by Forge and has common tests; the dedicated Node/Graal host files are disconnected source trees. The host path is therefore contract-only in the current build.
-
-Required `concepts.md` change: document the common engine separately from host adapters, and state that Node/Graal launch is not available until the duplicate API is collapsed and its source sets/tasks are wired.
-
-### G6 — The concept map’s build and serializer contracts are not currently executable truths
-
-Two current contradictions affect every documented subsystem:
-
-1. `concepts.md:24` says commonMain permits only `kotlinx-serialization-core`, but `build.gradle.kts:128-138` directly adds `kotlinx-serialization-json` to `commonMain`.
-2. The documented full and focused Gradle commands (`concepts.md:335-341`) fail during build-script compilation. The current failure is at `build.gradle.kts:97-98`: `sourceSets` and `compose.runtime` are referenced through an invalid implicit receiver inside `wasmJs`. No selected test executed.
-
-This audit attempted the Couch projection, B+tree, repository recovery, and reactor logger suites together. Gradle exited before task execution with 10 build-script diagnostics. Consequently, source and test evidence above establishes definitions and intended assertions, not a fresh green runtime baseline.
-
-Required `concepts.md` change: do not refresh command examples or claim a green baseline until the build configures. Preserve the serializer rule as the desired boundary, but identify the current dependency violation rather than describing it as enforced.
-
-## Coverage disposition
+## Coverage disposition (updated)
 
 | Concept-map area | Disposition |
 |---|---|
-| Oroboros | Add a new section; mark components tested but uncomposed |
-| Couch | Rewrite current-state semantics; separate live CQRS projection from intended Job/CID ingress |
-| B+tree/recovery | Expand mechanics; downgrade complete checkpoint recovery claim |
-| Collections | Keep Funnel coverage; add stringpool consumer and its simulated backing status |
-| Observability | Add reactor logger path with explicit non-durable boundaries |
-| View server | Add engine/adapter topology; call out disconnected duplicate host implementation |
-| Build | Correct only after Gradle configuration is green; record serializer dependency mismatch |
+| Oroboros | Add a new section; mark components tested but uncomposed; note the `MOCK_PAYLOAD` extractor explicitly (unchanged from prior pass) |
+| Couch | Prose now closer to truth (ProductionCouchIngress default) — rewrite the `_id`/`_rev` sentences to say "revision string stored raw; CID-derived revisions not yet implemented" |
+| B+tree/recovery | Expand mechanics — recovery hydration is real now; prior "incomplete recovery" warning can be deleted |
+| Collections | Keep Funnel coverage; stringpool recovery-on-open is real, append/mmap still aspirational — downgrade the durability sentence, don't delete it |
+| Observability | ReactorLogger now flushes via `durableAppendLog?.flush()` — the "no flush" claim in the prior pass is stale |
+| View server | Fork is gone from disk; only the stale `viewServerNodeSlice = false` flag in `build.gradle.kts:27` remains — update to say the duplicate was deleted, flag is dead |
+| Build | All four targets compile; keep the serializer note as "desired boundary, currently violated by direct `commonMain` dep on `kotlinx-serialization-json`" |
+| Forge | **New entry needed** — `ForgeAppState` DTO family deleted, `BlackboardSurface` projection is the seed source (N1) |
+| Litebike/NUID | Doc sections exist and were spot-checked against code (N5) — no action |
+| LCNC | Package absent from spine; either add a row marked self-enclosed or state the omission (N6) |
 
-## Best debt-reduction cut
+## Best debt-reduction cut (documentation-only)
 
-Collapse the view-server fork into the tested commonMain `CommonViewServer`/`CouchDbCascadeTool`, wire one Node source set and one JVM `JavaExec` host task to that API, and delete or supersede the disconnected raw-JSON implementation. This removes duplicate truth, converts a merged feature from contract-only to runnable, and gives `concepts.md` one honest runtime path to document.
+One focused edit to `doc/concepts.md`, 1 file, ~15 lines:
 
-The next architectural cut is a production `CouchIngress` backed by the committed Job sequence. That would make the existing Couch prose true by replacing `SyncTestIngress` as the default and deriving head/changes state from one durable source.
+- **§2 spine**: change the Forge row from "Blackboard-as-Confix-cursor: single JSON file → Cursor slices" to "BlackboardSurface projection: `confixDoc(persistedJson)` → `BlackboardSurface.project(...)` → seed rows; the `ForgeAppState` DTO family was removed (commit `1e8fd692`)".
+- **§3.4 projections table**: replace the two Couch rows' revision semantics with "revision string stored raw".
+- **§3.3 / recovery paragraph**: delete the "incomplete checkpoint recovery" caveat (G3 closed).
+- **§0 orientation**: add one pointer line to `doc/todo.md` as the task ledger, and one "compiled-out layers" note for the slab exclusion + `CircularQueue` loud-hollow (N3/N4).
+- **§6 build**: keep serializer note, drop the "commands do not configure" sentence (G6 build is green).
+
+Verification: `rg -n 'ForgeAppState|SyncTestIngress|incomplete|addTool' doc/concepts.md` returns only the
+corrected/removed references after the edit.
+
+Non-goals: do not rewrite the Oroboros section (G1 is a code gap, not a doc
+gap — the doc should keep saying "uncomposed"); do not add an LCNC spine row
+until the package gains an external consumer or a decision to exclude is made
+(N6 is a decision, not prose).
+
+## Stale-evidence note
+
+The prior version of this file compared against `638fb71b` and claimed the
+build could not configure. That is no longer true; this refresh supersedes
+those sections. Keep this file's structure (re-scored table first, new
+findings second) so the next refresh can diff row-by-row.

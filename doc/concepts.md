@@ -21,8 +21,10 @@ TrikeShed/
 
 **Toolchain** — JDK 25 (GraalVM CE 25.0.2), Kotlin 2.4.10, Gradle 9.6.1.  
 **No libs/ subprojects** — everything lives in `src/`.  
-**Confix** — the only portable serializer (commonMain allows only `kotlinx-serialization-core`).  
-**License** — AGPLv3 (effective 2017). Do not change.
+**Confix** — the only portable serializer (desired boundary: commonMain allows only `kotlinx-serialization-core`; currently `kotlinx-serialization-json` is a direct `commonMain` dep in `build.gradle.kts` — the boundary is aspirational, not enforced).  
+**License** — AGPLv3 (effective 2017). Do not change.  
+**Task ledger** — `doc/todo.md` (LCNC T22–T29, Kanban-live T-KANBAN-* queues).  
+**Compiled-out layers** — `classfile/slab/**` is excluded from `commonMain` compile in `build.gradle.kts` (~20 `TODO()` stubs: GraalJS eval, DuckDB c-interop, `FacetedCursorContract`, `MiniDuckContract`; files preserved on disk). `CircularQueue.poll/peek/iterator.remove` converted from `TODO()` to `error(...)` — loud hollow, not silent stub.
 
 ---
 
@@ -67,7 +69,7 @@ Key operators (in `lib/Join.kt`, `lib/Series.kt`):
 │  - ForgeDoc block tree, ForgeBoardFSM, KanbanFSM                    │
 │  - CCEK choreography (channels, projections, agents)                │
 │  - Gallery / blackboard 2.5D/3D spatial layout                      │
-│  - Blackboard-as-Confix-cursor: single JSON file → Cursor slices      │
+│  - BlackboardSurface projection: `confixDoc(persistedJson)` → `BlackboardSurface.project(...)` → seed rows; the `ForgeAppState` DTO family was removed (commit `1e8fd692`) │
 │  - ManimWM RTS camera: momentum, tilt, translucent marble/jade      │
 ├──────────────────────────────────────────────────────────────────────┤
 │  NUID / CCEK FANOUT   (authorization + dispatch)                    │
@@ -195,7 +197,7 @@ Actions **never** mutate Kanban/Couch/snapshots directly — they enqueue `JobCo
 |------------|---------|
 | `JobKanbanProjection` | Kanban cards from committed snapshots (`applyCommit` + `rebuild`) |
 | `ForgeKanbanJobSink`  | Monotonic sequence gate → projection |
-| `CouchHeadProjection` | `_id` = head CID, `_rev` = gen-CID-prefix, MVCC |
+| `CouchHeadProjection` | revision string stored raw; CID-derived `_id`/`_rev` not yet implemented, MVCC |
 | `CouchChangesProjection` | Strict monotonic `_changes` stream |
 | `CowBPlusTree` | Persistent ordered/range index (pages in CasStore) |
 | `JobCheckpoint` | Committed sequence + root CID + schema CID |
@@ -238,7 +240,7 @@ CouchStore (in-memory, pluggable CouchPersistence)
   └─ CouchHeadProjection / CouchChangesProjection  (built from committed Job frames)
 ```
 
-**Head/Changes semantics** — `_id` = current head CID; `_rev` = generation-CID prefix; stale revision rejected; delete = tombstone; `_changes` resumes after sequence without gaps.
+**Head/Changes semantics** — revision string stored raw by the projection; stale revision rejected; delete = tombstone; `_changes` resumes after sequence without gaps. CID-derived `_id`/`_rev` is an integration gap, not the current state.
 
 ---
 
@@ -251,7 +253,7 @@ CouchStore (in-memory, pluggable CouchPersistence)
 | `ElasticHashIndex` | append-only, deterministic split |
 | `RadixTree` / `Trie` | prefix queries, deterministic order |
 | `MultiIndexK / MultiIndexContainer` | stable `IndexSpecId`, unique/non-unique, txn add/modify/retract, immutable snapshots |
-| `CowBPlusTree` | COW pages in CasStore, deterministic page CID, checkpoint + tail recovery |
+| `CowBPlusTree` | COW pages in CasStore, deterministic page CID, checkpoint validation + tree hydration + tail replay |
 
 **MultiIndex transition** — lambda-identity keys replaced by explicit `IndexSpecId`; incremental order/range (binary insert), no full-store resort.
 
