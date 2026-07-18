@@ -1,7 +1,7 @@
 @file:OptIn(ExperimentalForeignApi::class)
 
 package borg.trikeshed.userspace.nio.channels.spi
-
+import borg.trikeshed.userspace.nio.channels.spi.*
 import kotlinx.cinterop.*
 import platform.posix.*
 
@@ -26,7 +26,7 @@ class PosixProcessOperations : ProcessOperations {
 
         val exitCode = memScoped {
             val pid = alloc<pid_tVar>()
-            val actions = alloc<posix_spawn_file_actions_t>()
+            val actions = alloc<posix_spawn_file_actions_tVar>()
             posix_spawn_file_actions_init(actions.ptr)
 
             if (stdinPath != null) {
@@ -35,8 +35,8 @@ class PosixProcessOperations : ProcessOperations {
                 )
             }
 
-            // 420u is 0644 octal (S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)
-            val mode = (S_IRUSR or S_IWUSR or S_IRGRP or S_IROTH).toUInt()
+            // 0644 octal (S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)
+            val mode = (S_IRUSR or S_IWUSR or S_IRGRP or S_IROTH).toUShort()
             posix_spawn_file_actions_addopen(
                 actions.ptr, STDOUT_FILENO, stdoutPath, O_WRONLY or O_CREAT or O_TRUNC, mode
             )
@@ -59,8 +59,8 @@ class PosixProcessOperations : ProcessOperations {
             }
             argv[argIndex] = null
 
-            // Pass environ for envp to inherit the current environment (which 'env' will then augment)
-            val spawnResult = posix_spawnp(pid.ptr, "env", actions.ptr, null, argv, platform.posix.environ)
+            // envp = null inherits the parent's environment, which 'env' then augments
+            val spawnResult = posix_spawnp(pid.ptr, "env", actions.ptr, null, argv, null)
             posix_spawn_file_actions_destroy(actions.ptr)
 
             if (spawnResult != 0) {
