@@ -2,8 +2,7 @@ package borg.trikeshed.couch
 
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.size
-import org.junit.Assert.*
-import org.junit.Test
+import kotlin.test.*
 
 class CouchStoreTest {
 
@@ -164,7 +163,7 @@ class CouchStoreTest {
         assertEquals(3, result.size)
         val keys = mutableSetOf<Any?>()
         for (i in 0 until result.size) keys.add(result[i].key)
-        assertTrue("unexpected keys=$keys size=${result.size} sample=${(0 until result.size).map { result[it].key to result[it].docId }}", keys == setOf("A", "B"))
+        assertTrue(keys == setOf("A", "B"), "unexpected keys=$keys size=${result.size} sample=${(0 until result.size).map { result[it].key to result[it].docId }}")
         assertEquals(3, store.query().cursor.size)
     }
 }

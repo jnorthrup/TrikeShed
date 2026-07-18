@@ -1,0 +1,7 @@
+// Supplement the built-in platform.posix cinterop with spawn.h symbols
+// (Darwin's default posix surface lacks spawn.h; environ is in unistd.h)
+package = platform.posix
+headers = \
+    spawn.h \
+    unistd.h \
+    sys/types.h

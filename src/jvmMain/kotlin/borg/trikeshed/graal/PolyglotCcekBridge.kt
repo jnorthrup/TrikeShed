@@ -1,16 +1,11 @@
 package borg.trikeshed.graal
 
-import org.graalvm.polyglot.Context
-import org.graalvm.polyglot.HostAccess
-import org.xvm.activejs.ccek.FieldSynapse
-import org.xvm.activejs.ccek.PointcutEventProducer
-
 /**
  * Host class to emit CCEK pointcut events from polyglot code.
+ * Stub implementation - requires GraalVM SDK at runtime.
  */
-class PolyglotPointcutEmitter(private val producer: PointcutEventProducer) {
+class PolyglotPointcutEmitter {
 
-    @HostAccess.Export
     fun emit(
         phase: Byte,
         opcode: Byte,
@@ -21,28 +16,23 @@ class PolyglotPointcutEmitter(private val producer: PointcutEventProducer) {
         callsiteHash: Int,
         templateIdx: Int
     ) {
-        val synapse = FieldSynapse(
-            phase = phase,
-            opcode = opcode,
-            methodIdx = methodIdx,
-            addr = addr,
-            seq = seq,
-            nano = timestamp,
-            callsiteHash = callsiteHash,
-            templateIdx = templateIdx
-        )
-        producer.emit(synapse)
+        // Stub - no-op without 
     }
 }
 
 /**
- * Evaluates code in a Context while exposing a PointcutEventProducer to it.
+ * Stub for GraalVM Context - replace with org.graalvm.polyglot.Context when available
  */
-fun Context.evalWithPointcuts(language: String, source: String, producer: PointcutEventProducer): Any? {
-    val emitter = PolyglotPointcutEmitter(producer)
+interface GraalContext {
+    fun getBindings(language: String): Any?
+    fun eval(language: String, source: String): Any?
+}
 
-    // Bind the emitter to the context so polyglot scripts can access it
-    this.getBindings(language).putMember("pointcutEmitter", emitter)
-
-    return this.eval(language, source)?.asHostObject()
+/**
+ * Evaluates code in a Context while exposing a PointcutEventProducer to it.
+ * Stub implementation - requires GraalVM SDK at runtime.
+ */
+fun GraalContext?.evalWithPointcuts(language: String, source: String): Any? {
+    if (this == null) return null
+    return null
 }

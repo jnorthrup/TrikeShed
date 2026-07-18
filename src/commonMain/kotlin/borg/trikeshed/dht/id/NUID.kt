@@ -8,13 +8,26 @@ import borg.trikeshed.dht.id.impl.*
 import borg.trikeshed.dht.net.NetMask
 import kotlin.random.Random
 
+//import java.math.BigInteger
+//import java.math.BigInteger
+//import java.util.concurrent.ThreadLocalRandom
+//import kotlin.random as KotlinRandom
+
+/**
+ * Network Unique ID
+ *
+ * network IDs within larger networks within larger networks
+ *
+ */
+
 interface NUID<Primitive : Comparable<Primitive>> {
     var id: Primitive?
     val netmask: borg.trikeshed.dht.net.NetMask<Primitive>
     val ops: BitOps<Primitive>
 
     fun random(distance: Int? = null, centroid: Primitive = id!!) = ops.run {
-        Random.run {
+        Random/*
+        ThreadLocalRandom.current().asKotlinRandom()*/.run {
             var accum = centroid
             val uBits = netmask.bits
             (distance?.takeIf { it <= uBits } ?: nextInt(uBits)).let { distance ->
@@ -29,13 +42,18 @@ interface NUID<Primitive : Comparable<Primitive>> {
     }
 
     val capacity: Primitive get() = with(ops) { xor(netmask.mask, minus(shl(one, netmask.bits), one)) }
-
     fun assign(it: Primitive) {
         if (id != null)
             id.run { throw RuntimeException("GUID assigned twice for $id") }
         id = it
     }
 
+    /**
+     * whatever the definition of a Riac Bitclock means, this one means
+     *
+     * from _a[3,4,5]
+     * to   1<<3+1<<4+1<<5
+     */
     fun fromBitClock(vararg clock: Int): Primitive = ops.run {
         clock.fold(xor(one, one)) { acc, i ->
             assert(netmask.bits > i)
@@ -43,52 +61,10 @@ interface NUID<Primitive : Comparable<Primitive>> {
         }
     }
 
-    fun toBytes(): ByteArray {
-        val number = ops.toNumber(id ?: ops.xor(ops.one, ops.one))
-        if (number is BigInt) {
-            val bytes = number.toByteArray()
-            if (bytes.size < 9) {
-                val padded = ByteArray(9)
-                bytes.copyInto(padded, 9 - bytes.size)
-                return padded
-            }
-            return bytes
-        } else {
-            val longVal = number.toLong()
-            return ByteArray(8) { i -> (longVal shr (i * 8)).toByte() }
-        }
-    }
-
-    fun fromBytes(bytes: ByteArray) {
-        if (ops.one is BigInt) {
-            id = BigInt(bytes) as Primitive
-            return
-        }
-        var longVal = 0L
-        for (i in 0 until minOf(bytes.size, 8)) {
-            longVal = longVal or ((bytes[i].toLong() and 0xFF) shl (i * 8))
-        }
-        val primitive = when (ops.one) {
-            is Byte -> longVal.toByte() as Primitive
-            is UByte -> longVal.toUByte() as Primitive
-            is Short -> longVal.toShort() as Primitive
-            is UShort -> longVal.toUShort() as Primitive
-            is Int -> longVal.toInt() as Primitive
-            is UInt -> longVal.toUInt() as Primitive
-            is Long -> longVal as Primitive
-            is ULong -> longVal.toULong() as Primitive
-            else -> BigInt(longVal.toString()) as Primitive
-        }
-        id = primitive
-    }
-
     companion object {
-        fun fromBytes(bytes: ByteArray): NUID<Byte> {
-            val nuid = minNUID(8) as NUID<Byte>
-            nuid.fromBytes(bytes)
-            return nuid
-        }
-
+        /**
+         * minimum bitops types for the intended bitcount of NUID
+         */
         fun minNUID(size: Int): NUID<*> =
             when (size) {
                 in Int.MIN_VALUE..7 -> object : borg.trikeshed.dht.id.impl.ByteNUID(minOps(size).one as Byte) {

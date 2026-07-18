@@ -5,7 +5,7 @@ import kotlin.test.assertEquals
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
-import borg.trikeshed.runBlocking
+import kotlinx.coroutines.test.runTest
 
 /**
  * Tests for VAL-FSM-001 / GAP-04: ForgeBoardFSM CardCreated lost-update race
@@ -24,7 +24,7 @@ class ForgeBoardFsmConcurrencyTest {
     )
 
     @Test
-    fun cardCreatedConcurrentOrdersAreDistinctAndMonotonic() = runBlocking {
+    fun cardCreatedConcurrentOrdersAreDistinctAndMonotonic() = runTest {
         ForgeBoardFSM.reset()
         val board = seedBoard()
         ForgeBoardFSM.emit(ForgeBoardEvent.BoardLoaded(board, 0L))
@@ -60,14 +60,14 @@ class ForgeBoardFsmConcurrencyTest {
         assertEquals(perCoroutine * coroutines, cards.size, "all cards persisted")
         assertEquals(orders.size, orders.toSet().size, "no duplicate orders")
         assertEquals(
-            orders.sorted(),
             (0 until perCoroutine * coroutines).toList(),
+            orders.sorted(),
             "monotonic from 0",
         )
     }
 
     @Test
-    fun cardCreatedAcross2CoroutinesAreDistinct() = runBlocking {
+    fun cardCreatedAcross2CoroutinesAreDistinct() = runTest {
         ForgeBoardFSM.reset()
         val board = seedBoard()
         ForgeBoardFSM.emit(ForgeBoardEvent.BoardLoaded(board, 0L))

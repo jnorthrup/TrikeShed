@@ -110,8 +110,8 @@ class KanbanReactorFSMTest {
 
     /**
      * Endgame cut #1: the kanban can consume a taxonomy-node creation event
-     * (from a Notion-adjacent AI taxonomical creator) and reflect it in board
-     * state. This is the narrowest bridge between the Notion clone's creation
+     * (from a workspace-adjacent AI taxonomical creator) and reflect it in board
+     * state. This is the narrowest bridge between the workspace clone's creation
      * surface and the kanban's render surface — the first KanbanEvent that is
      * not about keymux/modelmux.
      */

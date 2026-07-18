@@ -21,7 +21,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
-import borg.trikeshed.runBlocking
+import kotlinx.coroutines.test.runTest
 
 /**
  * Tests for VAL-CCEK-002 / GAP-08 (MoveCard idempotent) and VAL-CCEK-003 /
@@ -61,14 +61,14 @@ class CcekStateCorrectnessTest {
         val node = ArticulatedNode(
             initialDoc = doc,
             scope = scope,
-            record = true,
+            record = false,
             enabledProjections = setOf(ProjectionKind.BOARD, ProjectionKind.DOCUMENT),
         )
         return node to scope
     }
 
     @Test
-    fun moveCardIdempotentAcrossManyApplications() = runBlocking {
+    fun moveCardIdempotentAcrossManyApplications() = runTest {
         val (node, scope) = newNode(seedBoard().toForgeDocument())
 
         val baselineRootId = node.applySignalForTest(
@@ -93,7 +93,7 @@ class CcekStateCorrectnessTest {
     }
 
     @Test
-    fun subscribeAgentMidFanoutIsSafe() = runBlocking {
+    fun subscribeAgentMidFanoutIsSafe() = runTest {
         val (node, scope) = newNode(seedBoard().toForgeDocument())
 
         val preExisting = (0 until 50).map { i ->

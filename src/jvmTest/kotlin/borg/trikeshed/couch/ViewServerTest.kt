@@ -1,7 +1,6 @@
 package borg.trikeshed.couch
 
-import borg.trikeshed.parse.confix.confixDoc
-import kotlin.test.assertFailsWith
+import borg.trikeshed.mutable.mutableSeriesOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -36,11 +35,11 @@ class ViewServerTest {
         assertEquals(3, result.size)
 
         // Two rows with key "A", one with key "B"
-        val keys = result.rows.map { it.key }.toSet()
+        val keys = result.rows.sequence().map { it.key }.toSet()
         assertEquals(setOf("A", "B"), keys)
 
-        val aRows = result.rows.filter { it.key == "A" }
-        val bRows = result.rows.filter { it.key == "B" }
+        val aRows = result.rows.sequence().filter { it.key == "A" }.toList()
+        val bRows = result.rows.sequence().filter { it.key == "B" }.toList()
         assertEquals(2, aRows.size)
         assertEquals(1, bRows.size)
 
@@ -77,8 +76,8 @@ class ViewServerTest {
         assertEquals(2, result.size)
 
         // Find rows for A and B
-        val aRow = result.rows.firstOrNull { it.key == "A" }
-        val bRow = result.rows.firstOrNull { it.key == "B" }
+        val aRow = result.rows.sequence().firstOrNull { it.key == "A" }
+        val bRow = result.rows.sequence().firstOrNull { it.key == "B" }
 
         assertTrue(aRow != null)
         assertTrue(bRow != null)
@@ -114,8 +113,8 @@ class ViewServerTest {
 
         assertEquals(2, result.size)
 
-        val aRow = result.rows.firstOrNull { it.key == "A" }
-        val bRow = result.rows.firstOrNull { it.key == "B" }
+        val aRow = result.rows.sequence().firstOrNull { it.key == "A" }
+        val bRow = result.rows.sequence().firstOrNull { it.key == "B" }
 
         assertTrue(aRow != null)
         assertTrue(bRow != null)
@@ -147,8 +146,8 @@ class ViewServerTest {
 
         assertEquals(2, result.size)
 
-        val aRow = result.rows.firstOrNull { it.key == "A" }
-        val bRow = result.rows.firstOrNull { it.key == "B" }
+        val aRow = result.rows.sequence().firstOrNull { it.key == "A" }
+        val bRow = result.rows.sequence().firstOrNull { it.key == "B" }
 
         assertTrue(aRow != null)
         assertTrue(bRow != null)
@@ -169,7 +168,7 @@ class ViewServerTest {
     }
 
     @Test
-    fun `emit with doc._id as key`() {
+    fun `emit with document id as key`() {
         val server = ViewServer()
 
         val viewDef = ViewDefinition(
@@ -190,7 +189,7 @@ class ViewServerTest {
 
         assertEquals(2, result.size)
 
-        val keys = result.rows.map { it.key }.toSet()
+        val keys = result.rows.sequence().map { it.key }.toSet()
         assertEquals(setOf("doc-1", "doc-2"), keys)
 
         // Values should be the whole document (ConfixDoc)
@@ -299,8 +298,8 @@ class ViewServerTest {
 
         assertEquals(2, result.size)
 
-        val aRow = result.rows.firstOrNull { it.key == "A" }
-        val bRow = result.rows.firstOrNull { it.key == "B" }
+        val aRow = result.rows.sequence().firstOrNull { it.key == "A" }
+        val bRow = result.rows.sequence().firstOrNull { it.key == "B" }
 
         assertTrue(aRow != null)
         assertTrue(bRow != null)

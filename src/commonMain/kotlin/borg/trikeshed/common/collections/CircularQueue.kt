@@ -47,8 +47,8 @@ open class CirQlar<T>(
         }
     }
 
-    /*override*/ fun poll(): T = TODO("Not yet implemented")
-    /*override*/ fun peek(): T = TODO("Not yet implemented")
+    /*override*/ fun poll(): T = error("CirQlar.poll is write-only; use iterator()/toVect0r()")
+    /*override*/ fun peek(): T = error("CirQlar.peek is write-only; use iterator()/toVect0r()")
     /*override*/ fun add(k: T): Boolean = offer(k)
     operator fun CirQlar<T>.plus(k: T): Boolean = offer(k)
     operator fun CirQlar<T>.plusAssign(k: T) {
@@ -66,7 +66,7 @@ open class CirQlar<T>(
         var i = 0
         override fun hasNext(): Boolean = i < v.size
         override fun next(): T = v.b(i++)
-        override fun remove(): Unit = TODO("Not yet implemented")
+        override fun remove(): Unit = error("CirQlar iterator is read-only")
     }
 }
 

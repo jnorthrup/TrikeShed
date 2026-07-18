@@ -8,6 +8,9 @@ config.plugins.push(
     skipWaiting: true,
     cleanupOutdatedCaches: true,
     navigateFallback: 'index.html',
+    additionalManifestEntries: [
+      { url: 'index.html', revision: Date.now().toString() }
+    ],
     maximumFileSizeToCacheInBytes: 6 * 1024 * 1024,
     exclude: [/\.map$/],
     runtimeCaching: [

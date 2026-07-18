@@ -126,6 +126,13 @@ enum class Syntax {
 
     abstract fun scan(src: Series<Byte>): Cursor
     abstract fun recognize(first: Byte): Boolean
+
+    companion object {
+        val Json: Syntax get() = JSON
+        val Yaml: Syntax get() = YAML
+        val Cbor: Syntax get() = CBOR
+    }
+
     fun dispatch(bytes: ByteArray): Cursor {
         val n = bytes.size
         val src: Series<Byte> = n j { i: Int -> bytes[i] }

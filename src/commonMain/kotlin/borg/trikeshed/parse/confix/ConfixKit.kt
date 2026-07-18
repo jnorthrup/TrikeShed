@@ -146,9 +146,11 @@ fun ConfixIndex.resolve(parentTokenIdx: Int, arrayIdx: Int): Int? {
 
 fun RowVec.step(key: CharSequence, src: Series<Byte>): RowVec? {
     val ch = kids
+    // Confix flat-kid order: (value, key) pairs — keys follow values, not precede them.
     var i = 0
     while (i + 1 < ch.size) {
-        val k = ch[i]
+        val v = ch[i]
+        val k = ch[i + 1]
         if (k.tag == borg.trikeshed.cursor.IOMemento.IoString) {
             val kOpen  = k.open  + 1
             val kClose = k.close - 1
@@ -157,7 +159,7 @@ fun RowVec.step(key: CharSequence, src: Series<Byte>): RowVec? {
                 var match = true
                 for (d in 0 until kLen)
                     if (src[kOpen + d].toInt().toChar() != key[d]) { match = false; break }
-                if (match) return ch[i + 1]
+                if (match) return v
             }
         }
         i += 2

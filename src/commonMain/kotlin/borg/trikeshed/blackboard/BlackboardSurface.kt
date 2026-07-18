@@ -20,6 +20,8 @@ import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.size
+import borg.trikeshed.parse.confix.ConfixDoc
+import borg.trikeshed.parse.confix.value
 
 /**
  * One row of the visual blackboard.
@@ -27,6 +29,7 @@ import borg.trikeshed.lib.size
  * Intentionally a value-shaped projection: the UI consumes `card_id`, `lane`,
  * `phase`, `facet`, `provenance`, `causalKey`, `lcncKind` as familiar metaphors.
  */
+@kotlinx.serialization.Serializable
 data class BlackboardSurfaceRow(
     val cardId: String,
     val lane: String,
@@ -164,6 +167,33 @@ class BlackboardSurface private constructor(
                 metadata = mapOf("blackboardId" to blackboardId, "source" to "BlackboardSurface"),
             )
             return BlackboardSurface(rows, board)
+        }
+
+        /** Project a persisted Confix source envelope into the cursor surface. */
+        fun project(
+            blackboardId: String,
+            index: CausalGraphNodeIndex,
+            document: ConfixDoc,
+            entities: List<LcncEntitySurface>,
+        ): BlackboardSurface {
+            val source = document.value("sourcePath")?.toString()
+                ?.takeIf { it.isNotEmpty() }
+                ?: "confix"
+            val contentId = document.value("contentId")?.toString().orEmpty()
+            return project(
+                blackboardId = blackboardId,
+                index = index,
+                entities = entities,
+                context = blackboardContext(
+                    id = blackboardId,
+                    provenance = provenance(
+                        source = source,
+                        timestamp = 0L,
+                        transformations = listOf("confixDoc", "BlackboardSurface.project"),
+                    ),
+                    tags = mapOf("sourceContentId" to contentId),
+                ),
+            )
         }
 
         private fun resolveLane(

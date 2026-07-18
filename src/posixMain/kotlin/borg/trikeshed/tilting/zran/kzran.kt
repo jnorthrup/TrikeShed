@@ -181,16 +181,23 @@ class GzIndex {
                 pointOutput.add(uLong)
             }
 
-            for (i in pointOutput.indices) {
-                fread(__ptr, __ulSz, 1u, indexFp)
-                pointInput.add(readULong(buf))
-            }
+        }
 
-            for (i in pointOutput.indices) {
-                fread(__ptr, __usSz, 1u, indexFp)
-                val uShort = readUShort(buf)
-                windowSizes.add(uShort)
-            }
+        val count = pointOutput.size
+        val bulkSize = count * (ULong.SIZE_BYTES + UShort.SIZE_BYTES)
+        val bulkBuf = ByteArray(bulkSize)
+        bulkBuf.usePinned { fread(it.addressOf(0), 1u, bulkSize.toULong(), indexFp) }
+
+        var offset = 0
+        for (i in 0 until count) {
+            bulkBuf.copyInto(buf, 0, offset, offset + ULong.SIZE_BYTES)
+            pointInput.add(readULong(buf))
+            offset += ULong.SIZE_BYTES
+        }
+        for (i in 0 until count) {
+            bulkBuf.copyInto(buf, 0, offset, offset + UShort.SIZE_BYTES)
+            windowSizes.add(readUShort(buf))
+            offset += UShort.SIZE_BYTES
         }
 
         list.clear()

@@ -1,0 +1,85 @@
+package borg.trikeshed.forge.blackboard
+
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertNotEquals
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
+
+class ForgeBlackboardInteractionTest {
+
+    @Test
+    fun cycleModeProgressesFlatToParallaxToWorldToFlat() {
+        val initial = ForgeBlackboardInteraction(mode = ForgeBlackboardMode.FLAT_2D)
+        val parallax = initial.cycleMode()
+        assertEquals(ForgeBlackboardMode.PARALLAX_25D, parallax.mode)
+        val world = parallax.cycleMode()
+        assertEquals(ForgeBlackboardMode.WORLD_3D, world.mode)
+        val flat = world.cycleMode()
+        assertEquals(ForgeBlackboardMode.FLAT_2D, flat.mode)
+    }
+
+    @Test
+    fun cycleModeSetsAnimatingFlag() {
+        val next = ForgeBlackboardInteraction().cycleMode()
+        assertTrue(next.animating, "cycling mode must flag animation")
+    }
+
+    @Test
+    fun resetToBoardClearsSelectionAndResetsCameras() {
+        val interaction = ForgeBlackboardInteraction(
+            selectedSectionId = "board",
+            camera3d = ForgeBlackboard3D(distance = 800.0),
+        )
+        val reset = interaction.resetToBoard()
+        assertNull(reset.selectedSectionId)
+        assertEquals(ForgeBlackboardView.DEFAULT.mode3D.distance, reset.camera3d.distance)
+        assertTrue(reset.animating)
+    }
+
+    @Test
+    fun focusSectionZoomsIntoSectionBounds() {
+        val interaction = ForgeBlackboardInteraction()
+        val focused = interaction.focusSection("gallery")
+        val placement = ForgeBlackboardView.DEFAULT.layout3D.first { it.sectionId == "gallery" }
+        val expectedDistance = (maxOf(placement.width, placement.height) * 2.2)
+            .coerceIn(interaction.camera3d.minDistance, interaction.camera3d.maxDistance)
+        assertEquals(expectedDistance, focused.camera3d.distance)
+        assertEquals("gallery", focused.selectedSectionId)
+    }
+
+    @Test
+    fun centerSelectedUsesCurrentSelection() {
+        val interaction = ForgeBlackboardInteraction(selectedSectionId = "graph")
+        val centered = interaction.centerSelected()
+        val placement = ForgeBlackboardView.DEFAULT.layout3D.first { it.sectionId == "graph" }
+        val expectedDistance = (maxOf(placement.width, placement.height) * 2.2)
+            .coerceIn(interaction.camera3d.minDistance, interaction.camera3d.maxDistance)
+        assertEquals(expectedDistance, centered.camera3d.distance)
+    }
+
+    @Test
+    fun centerSelectedNoopsWithoutSelection() {
+        val interaction = ForgeBlackboardInteraction(selectedSectionId = null)
+        val centered = interaction.centerSelected()
+        assertEquals(interaction, centered)
+    }
+
+    @Test
+    fun tickDampsVelocityAndEventuallyRests() {
+        val impulse = ForgeBlackboardInteraction(
+            animating = true,
+            camera2d = ForgeBlackboardCamera(vx = 100.0, vy = 50.0),
+        )
+        val ticked = impulse.tick(1.0 / 60.0)
+        assertNotEquals(impulse.camera2d.vx, ticked.camera2d.vx, "velocity must change")
+    }
+
+    @Test
+    fun modeLabelMatchesCurrentMode() {
+        assertEquals("Flat 2D", ForgeBlackboardInteraction(mode = ForgeBlackboardMode.FLAT_2D).modeLabel())
+        assertEquals("2.5D depth", ForgeBlackboardInteraction(mode = ForgeBlackboardMode.PARALLAX_25D).modeLabel())
+        assertEquals("3D world", ForgeBlackboardInteraction(mode = ForgeBlackboardMode.WORLD_3D).modeLabel())
+    }
+}

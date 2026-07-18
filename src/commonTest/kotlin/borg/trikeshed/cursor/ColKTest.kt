@@ -1,70 +1,57 @@
 package borg.trikeshed.cursor
 
-import borg.trikeshed.lib.*
-import kotlin.test.*
+import borg.trikeshed.lib.j
+import borg.trikeshed.lib.Join
+import borg.trikeshed.lib.Series
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 
 class ColKTest {
-
     @Test
     fun testRowVecAsFaceted() {
-        // Create a simple RowVec
-        val cells = seriesOfAny(listOf("foo", 42, true))
-        val keys = seriesOf(listOf("name", "age", "active"))
-        val rowVec = cellsToRowVec(cells, keys)
+        val meta0 = ColumnMeta("id", IOMemento.IoInt)
+        val meta1 = ColumnMeta("name", IOMemento.IoString)
 
-        // Lift to FacetedRow
-        val faceted = rowVec.asFaceted()
+        // RowVec is a Series of Join<Any?, ColumnMeta↻>
+        val row: RowVec = 2 j { i: Int ->
+            when (i) {
+                0 -> (42 as Any?) j { meta0 }
+                1 -> ("Alice" as Any?) j { meta1 }
+                else -> throw IndexOutOfBoundsException()
+            }
+        }
+
+        val faceted = row.asFaceted()
 
         // Test Width
-        assertEquals(3, faceted[ColK.Width])
+        assertEquals(2, faceted.b(ColK.Width))
 
         // Test ByIndex
-        assertEquals("foo", faceted[ColK.ByIndex(0)])
-        assertEquals(42, faceted[ColK.ByIndex(1)])
-        assertEquals(true, faceted[ColK.ByIndex(2)])
+        assertEquals(42, faceted.b(ColK.ByIndex(0)))
+        assertEquals("Alice", faceted.b(ColK.ByIndex(1)))
 
         // Test ByName
-        assertEquals("foo", faceted[ColK.ByName("name")])
-        assertEquals(42, faceted[ColK.ByName("age")])
-        assertEquals(true, faceted[ColK.ByName("active")])
+        assertEquals(42, faceted.b(ColK.ByName("id")))
+        assertEquals("Alice", faceted.b(ColK.ByName("name")))
 
         // Test Meta
-        val metaSeries = faceted[ColK.Meta]
-        assertEquals(3, metaSeries.size)
-        assertEquals("name", metaSeries[0].name)
-        assertEquals("age", metaSeries[1].name)
-        assertEquals("active", metaSeries[2].name)
-    }
+        val metas = faceted.b(ColK.Meta) as Series<ColumnMeta>
+        assertEquals(2, metas.a)
+        assertEquals(meta0, metas.b(0))
+        assertEquals(meta1, metas.b(1))
 
-    @Test
-    fun testByNameNotFoundThrows() {
-        val cells = seriesOfAny(listOf("foo"))
-        val keys = seriesOf(listOf("name"))
-        val rowVec = cellsToRowVec(cells, keys)
-        val faceted = rowVec.asFaceted()
-
+        // Test missing name
         assertFailsWith<NoSuchElementException> {
-            faceted[ColK.ByName("missing")]
+            faceted.b(ColK.ByName("missing"))
         }
-    }
 
-    @Test
-    fun testFacetedAsRowVec() {
-        val cells = seriesOfAny(listOf("bar", 99, false))
-        val keys = seriesOf(listOf("first", "second", "third"))
-        val originalRowVec = cellsToRowVec(cells, keys)
-
-        val faceted = originalRowVec.asFaceted()
-        val restoredRowVec = faceted.asRowVec()
-
-        assertEquals(originalRowVec.size, restoredRowVec.size)
-
-        for (i in 0 until originalRowVec.size) {
-            val origPair = originalRowVec[i]
-            val restPair = restoredRowVec[i]
-
-            assertEquals(origPair.a, restPair.a)
-            assertEquals(origPair.b().name, restPair.b().name)
-        }
+        // Test reverse: asRowVec()
+        val row2 = faceted.asRowVec()
+        assertEquals(2, row2.a)
+        assertEquals(42, row2.b(0).a)
+        assertEquals("Alice", row2.b(1).a)
+        assertEquals(meta0, row2.b(0).b())
+        assertEquals(meta1, row2.b(1).b())
     }
 }

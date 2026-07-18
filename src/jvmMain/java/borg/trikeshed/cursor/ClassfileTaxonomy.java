@@ -1,17 +1,32 @@
 package borg.trikeshed.cursor;
 
+import java.lang.classfile.ClassFile;
+import java.lang.classfile.ClassModel;
+import java.lang.classfile.FieldModel;
+import java.lang.classfile.MethodModel;
+import java.lang.classfile.CodeModel;
+import java.lang.classfile.CodeElement;
+import java.lang.classfile.Instruction;
+import java.lang.classfile.instruction.FieldInstruction;
+import java.lang.classfile.instruction.InvokeInstruction;
+import java.lang.classfile.Opcode;
+import java.lang.classfile.constantpool.ConstantPool;
+import java.lang.classfile.constantpool.PoolEntry;
+import java.lang.classfile.constantpool.ClassEntry;
+import java.lang.classfile.constantpool.Utf8Entry;
+
 import java.nio.file.Path;
 import java.util.Map;
 import java.util.HashMap;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.Set;
+import java.util.Optional;
 
 /**
- * ClassfileTaxonomy — JEP 484 ClassFile API via reflection, for TrikeShed cursor algebra.
+ * ClassfileTaxonomy — JEP 484 ClassFile API, for TrikeShed cursor algebra.
  *
- * Uses reflection to access jdk.internal.classfile.* classes, which are
- * accessible but not directly importable on Corretto JDK 21.
+ * Uses java.lang.classfile (JDK 25+ public API).
  *
  * Column layout per element type:
  *   CLASS       → [thisClass, superClass, majorVersion, minorVersion, accessFlags, interfaceCount]
@@ -101,7 +116,7 @@ public class ClassfileTaxonomy {
         return rows.stream().filter(r -> r.kind == Kind.INSTRUCTION).toList();
     }
 
-    // ── Factory via reflection ────────────────────────────────────────────
+    // ── Factory via public ClassFile API ──────────────────────────────────────
 
     public static ClassfileTaxonomy open(Path path) throws java.io.IOException {
         return openBytes(java.nio.file.Files.readAllBytes(path));
@@ -109,194 +124,109 @@ public class ClassfileTaxonomy {
 
     public static ClassfileTaxonomy openBytes(byte[] bytes) {
         try {
-            return parseClassfileReflection(bytes);
-        } catch (ReflectiveOperationException e) {
+            return parseClassfile(bytes);
+        } catch (Exception e) {
             throw new RuntimeException("Failed to parse classfile via JEP 484", e);
         }
     }
 
-    /** Reflective invocation of jdk.internal.classfile.Classfile.parse(byte[]) */
-    private static ClassfileTaxonomy parseClassfileReflection(byte[] bytes)
-            throws ReflectiveOperationException {
-
-        Class<?> classfileClass = Class.forName("jdk.internal.classfile.Classfile");
-        Object classModel = classfileClass.getMethod("parse", byte[].class).invoke(null, bytes);
-
-        Class<?> classModelClass = classModel.getClass();
-        Class<?> fieldModelClass = Class.forName("jdk.internal.classfile.FieldModel");
-        Class<?> methodModelClass = Class.forName("jdk.internal.classfile.MethodModel");
-        Class<?> codeModelClass = Class.forName("jdk.internal.classfile.CodeModel");
-        Class<?> codeElementClass = Class.forName("jdk.internal.classfile.CodeElement");
-        Class<?> instructionClass = Class.forName("jdk.internal.classfile.instruction.Instruction");
-        Class<?> fieldInstructionClass = Class.forName("jdk.internal.classfile.instruction.FieldInstruction");
-        Class<?> invokeInstructionClass = Class.forName("jdk.internal.classfile.instruction.InvokeInstruction");
-        Class<?> constantPoolClass = Class.forName("jdk.internal.classfile.ConstantPool");
+    /** Parse classfile using JDK 25+ java.lang.classfile API */
+    private static ClassfileTaxonomy parseClassfile(byte[] bytes) throws Exception {
+        ClassFile classfile = ClassFile.of();
+        ClassModel classModel = classfile.parse(bytes);
 
         ClassfileTaxonomy ct = new ClassfileTaxonomy();
 
         // class header
-        Object thisClass = invoke(classModelClass, "thisClass", classModel);
-        Object superClassOpt = invoke(classModelClass, "superclass", classModel);
-        String superClass = String.valueOf(invokeOpt("asInternalName", superClassOpt, ""));
+        String thisClass = classModel.thisClass().asInternalName();
+        String superClass = classModel.superclass()
+            .map(ClassEntry::asInternalName).orElse("");
         ct.addClass(
-            String.valueOf(invoke(classModelClass, "thisClass", classModel)),
+            thisClass,
             superClass,
-            ((Number) invoke(classModelClass, "majorVersion", classModel)).intValue(),
-            ((Number) invoke(classModelClass, "minorVersion", classModel)).intValue(),
-            ((Number) invoke(classModelClass, "accessFlags", classModel,
-                "get", classModelClass)).intValue(),
-            ((Number) invoke(classModelClass, "interfaces", classModel)).intValue()
+            classModel.majorVersion(),
+            classModel.minorVersion(),
+            classModel.flags().flagsMask(),
+            classModel.interfaces().size()
         );
 
         // fields
-        Object fields = invoke(classModelClass, "fields", classModel);
-        for (Object fm : (Iterable<?>) fields) {
+        for (FieldModel fm : classModel.fields()) {
             ct.addField(
-                String.valueOf(invoke(fieldModelClass, "fieldName", fm, "stringValue")),
-                String.valueOf(invoke(fieldModelClass, "descriptor", fm, "stringValue")),
-                ((Number) invoke(fieldModelClass, "flags", fm, "get", int.class)).intValue()
+                fm.fieldName().stringValue(),
+                fm.fieldType().stringValue(),
+                fm.flags().flagsMask()
             );
         }
 
         // methods + instructions
-        Object methods = invoke(classModelClass, "methods", classModel);
-        for (Object mm : (Iterable<?>) methods) {
-            final int[] insnCount = {0};
-            Object codeOpt = invokeOpt("ifPresent", mm, (java.util.function.Consumer<?>) c -> {
-                try {
-                    Object code = null;
-                    for (Object ce : (Iterable<?>) invoke(codeModelClass, "elementList", c)) {
-                        if (instructionClass.isInstance(ce)) {
-                            insnCount[0]++;
-                            String owner = "";
-                            String name = "";
-                            if (fieldInstructionClass.isInstance(ce)) {
-                                owner = String.valueOf(invoke(fieldInstructionClass, "owner", ce, "asInternalName"));
-                            } else if (invokeInstructionClass.isInstance(ce)) {
-                                owner = String.valueOf(invoke(invokeInstructionClass, "owner", ce, "asInternalName"));
-                                name = String.valueOf(invoke(invokeInstructionClass, "methodName", ce, "stringValue"));
-                            }
-                            int pos = ((Number) invoke(instructionClass, "position", ce)).intValue();
-                            Object opcode = invoke(instructionClass, "opcode", ce);
-                            int opCode = ((Number) opcode.getClass().getMethod("bytecode").invoke(opcode)).intValue();
-                            String mnem = String.valueOf(opcode.getClass().getMethod("name").invoke(opcode));
-                            ct.addInstruction(pos, opCode, mnem, owner, name);
-                        }
+        for (MethodModel mm : classModel.methods()) {
+            int accessFlags = mm.flags().flagsMask();
+            int maxStack = 0;
+            int maxLocals = 0;
+            int insnCount = 0;
+
+            Optional<CodeModel> codeOpt = mm.code();
+            if (codeOpt.isPresent()) {
+                CodeModel code = codeOpt.get();
+
+                // attributes() contains CodeAttribute with maxStack/maxLocals
+                for (var attr : code.attributes()) {
+                    if (attr instanceof java.lang.classfile.attribute.CodeAttribute ca) {
+                        maxStack = ca.maxStack();
+                        maxLocals = ca.maxLocals();
+                        break;
                     }
-                } catch (ReflectiveOperationException ex) {
-                    throw new RuntimeException(ex);
                 }
-            });
-            if (codeOpt != null) {
-                // already processed in the lambda
+
+                // CodeModel is Iterable<CodeElement> via CompoundElement
+                for (CodeElement ce : code) {
+                    if (ce instanceof Instruction inst) {
+                        insnCount++;
+                        String owner = "";
+                        String name = "";
+                        if (inst instanceof FieldInstruction fi) {
+                            owner = fi.owner().asInternalName();
+                        } else if (inst instanceof InvokeInstruction ii) {
+                            owner = ii.owner().asInternalName();
+                            name = ii.name().stringValue();
+                        }
+                        // Instruction doesn't have position() - skip offset for now
+                        int opCode = inst.opcode().bytecode();
+                        String mnem = inst.opcode().name();
+                        ct.addInstruction(-1, opCode, mnem, owner, name);
+                    }
+                }
             }
-            Object codeOpt2 = invokeOpt("ifPresent", mm, (java.util.function.Consumer<?>) c -> {
-                // just count
-            });
-            int maxStack = ((Number) invokeOpt("map", mm, (java.util.function.Function<?, ?>) o -> {
-                try { return invoke(codeModelClass, "maxStack", o); }
-                catch (Exception e) { return 0; }
-            }, 0)).intValue();
-            int maxLocals = ((Number) invokeOpt("map", mm, (java.util.function.Function<?, ?>) o -> {
-                try { return invoke(codeModelClass, "maxLocals", o); }
-                catch (Exception e) { return 0; }
-            }, 0)).intValue();
-            int accessFlags = ((Number) invoke(methodModelClass, "flags", mm, "get", int.class)).intValue();
 
             ct.addMethod(
-                String.valueOf(invoke(methodModelClass, "methodName", mm, "stringValue")),
-                String.valueOf(invoke(methodModelClass, "methodType", mm, "stringValue")),
+                mm.methodName().stringValue(),
+                mm.methodType().stringValue(),
                 accessFlags,
-                maxStack, maxLocals, insnCount[0]
+                maxStack, maxLocals, insnCount
             );
         }
 
         // constant pool
-        Object cp = invoke(classModelClass, "constantPool", classModel);
-        for (Object cpe : (Iterable<?>) cp) {
+        ConstantPool cp = classModel.constantPool();
+        int index = 1;
+        for (PoolEntry pe : cp) {
             try {
-                int idx = ((Number) cpe.getClass().getMethod("index").invoke(cpe)).intValue();
-                String tag = String.valueOf(cpe.getClass().getMethod("tag").invoke(cpe,
-                    cpe.getClass().getMethod("name").invoke(cpe)));
-                String val = String.valueOf(cpe.getClass().getMethod("stringValue").invoke(cpe));
-                ct.addConstant(idx, tag, val);
+                String tag = pe.getClass().getSimpleName();
+                String val = "";
+                if (pe instanceof Utf8Entry u8) {
+                    val = u8.stringValue();
+                } else if (pe instanceof ClassEntry ce) {
+                    val = ce.asInternalName();
+                } else {
+                    val = pe.toString();
+                }
+                ct.addConstant(index, tag, val);
             } catch (Exception ignored) {}
+            index++;
         }
 
         return ct;
-    }
-
-    // ── Reflection helpers ─────────────────────────────────────────────────
-
-    private static Object invoke(Class<?> cls, String method, Object target) throws ReflectiveOperationException {
-        return cls.getMethod(method).invoke(target);
-    }
-
-    private static Object invoke(Class<?> cls, String method, Object target, String helper) throws ReflectiveOperationException {
-        for (var m : cls.getMethods()) {
-            if (m.getName().equals(method)) {
-                for (var p : m.getParameters()) {
-                    if (p.getName().equals(helper)) {
-                        return m.invoke(target);
-                    }
-                }
-            }
-        }
-        return cls.getMethod(method).invoke(target);
-    }
-
-    private static Object invoke(Class<?> cls, String method, Object target, String helper, Class<?> retType) throws ReflectiveOperationException {
-        for (var m : cls.getMethods()) {
-            if (m.getName().equals(method)) {
-                for (var p : m.getParameters()) {
-                    if (p.getName().equals(helper)) {
-                        return m.invoke(target);
-                    }
-                }
-            }
-        }
-        return cls.getMethod(method).invoke(target);
-    }
-
-    private static Object invokeOpt(String method, Object target, Object arg, int defaultVal) {
-        try {
-            return invokeOpt(method, target, arg);
-        } catch (Exception e) {
-            return defaultVal;
-        }
-    }
-
-    private static Object invokeOpt(String method, Object target, Object arg) {
-        try {
-            java.lang.reflect.Method m = null;
-            for (var meth : target.getClass().getMethods()) {
-                if (meth.getName().equals(method)) {
-                    m = meth;
-                    break;
-                }
-            }
-            if (m == null) return null;
-            if (arg instanceof java.util.function.Consumer) {
-                m.invoke(target, arg);
-                return null;
-            }
-            if (arg instanceof java.util.function.Function) {
-                return m.invoke(target, arg);
-            }
-            return m.invoke(target, arg);
-        } catch (Exception e) {
-            return null;
-        }
-    }
-
-    private static String invokeOpt(String method, Object target, String defaultVal) {
-        try {
-            if (target == null) return defaultVal;
-            var m = target.getClass().getMethod(method);
-            return String.valueOf(m.invoke(target));
-        } catch (Exception e) {
-            return defaultVal;
-        }
     }
 
     public static List<ClassfileTaxonomy> openTree(Path root) {

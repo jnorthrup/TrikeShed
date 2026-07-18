@@ -1,19 +1,15 @@
 package borg.trikeshed.forge
 
-import org.junit.Assert.*
-import org.junit.Rule
-import org.junit.Test
-import org.junit.rules.TemporaryFolder
+import kotlin.test.*
+import java.nio.file.Files
 import java.nio.file.Path
 
 class ConfixLocalStoreTest {
 
-    @get:Rule
-    val tempFolder = TemporaryFolder()
+    private val tempFolder: Path = Files.createTempDirectory("confix-local-store-test-")
 
     private fun newStore(): ConfixLocalStore {
-        val baseDir: Path = tempFolder.root.toPath()
-        return ConfixLocalStore(project = "test-proj", instance = "test-1", baseDir = baseDir)
+        return ConfixLocalStore(project = "test-proj", instance = "test-1", baseDir = tempFolder)
     }
 
     @Test
@@ -23,9 +19,9 @@ class ConfixLocalStoreTest {
         store.put("user:1", mapOf("name" to "Alice", "age" to 30, "active" to true))
 
         val doc = store.loadConfixDoc("user:1")
-        assertNotNull("confix doc must exist after put", doc)
+        assertNotNull(doc, "confix doc must exist after put")
         val loaded = store.loadAsJson("user:1")
-        assertNotNull("json reification must work", loaded)
+        assertNotNull(loaded, "json reification must work")
     }
 
     @Test
@@ -37,7 +33,7 @@ class ConfixLocalStoreTest {
         val json = store.loadAsJson("user:1")
         assertNotNull(json)
         val idField = json!!["_id"]?.toString()
-        assertTrue("_id must be present in JSON reification", idField?.contains("user:1") == true)
+        assertTrue(idField?.contains("user:1") == true, "_id must be present in JSON reification")
     }
 
     @Test
@@ -48,7 +44,7 @@ class ConfixLocalStoreTest {
 
         val yaml = store.loadAsYaml("user:1")
         assertNotNull(yaml)
-        assertTrue("YAML must contain field name", yaml!!.contains("name:"))
+        assertTrue(yaml!!.contains("name:"), "YAML must contain field name")
     }
 
     @Test
@@ -94,13 +90,13 @@ class ConfixLocalStoreTest {
 
         store.put("doc:1", mapOf("x" to 1))
 
-        val expectedDir = tempFolder.root.toPath()
+        val expectedDir = tempFolder
             .resolve("test-proj")
             .resolve("test-1")
             .resolve("db")
             .resolve("id")
-        assertTrue("db/id directory must exist", java.nio.file.Files.exists(expectedDir))
+        assertTrue(java.nio.file.Files.exists(expectedDir), "db/id directory must exist")
         val files = java.nio.file.Files.list(expectedDir).use { it.toList() }
-        assertTrue("must have .json files", files.any { it.fileName.toString().endsWith(".json") })
+        assertTrue(files.any { it.fileName.toString().endsWith(".json") }, "must have .json files")
     }
 }

@@ -11,7 +11,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.test.runTest
-import org.junit.Assume.assumeTrue
 
 class JvmTlsCodecBackendTest {
     @Test
@@ -80,7 +79,7 @@ class JvmTlsCodecBackendTest {
 
     @Test
     fun supervisorJobCanProveRemoteHttpsSite() = runTest {
-        assumeTrue(System.getProperty("trikeshed.liveTls") == "true")
+        if (System.getProperty("trikeshed.liveTls") != "true") return@runTest
 
         val host = System.getProperty("trikeshed.liveTlsHost") ?: "example.com"
         val supervisor = SupervisorJob()

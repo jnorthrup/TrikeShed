@@ -49,9 +49,53 @@ class KeyMuxTest {
     @Test
     fun toKeyPath_parsesStringCorrectly() {
         val path = "a.b.c".toKeyPath()
+        assertEquals(3, path.size)
+        assertEquals("a", path[0])
+        assertEquals("b", path[1])
+        assertEquals("c", path[2])
         assertEquals(listOf("a", "b", "c"), path.iterable().toList())
-        assertEquals("a.b.c", path.asString())
-        assertEquals(listOf("single"), "single".toKeyPath().iterable().toList())
+
+        val singlePath = "single".toKeyPath()
+        assertEquals(1, singlePath.size)
+        assertEquals("single", singlePath[0])
+        assertEquals(listOf("single"), singlePath.iterable().toList())
+
+        // Edge cases
+        val emptyPath = "".toKeyPath()
+        assertEquals(1, emptyPath.size)
+        assertEquals("", emptyPath[0])
+        assertEquals(listOf(""), emptyPath.iterable().toList())
+
+        val trailingPath = "a.b.".toKeyPath()
+        assertEquals(3, trailingPath.size)
+        assertEquals("a", trailingPath[0])
+        assertEquals("b", trailingPath[1])
+        assertEquals("", trailingPath[2])
+        assertEquals(listOf("a", "b", ""), trailingPath.iterable().toList())
+
+        val leadingPath = ".a.b".toKeyPath()
+        assertEquals(3, leadingPath.size)
+        assertEquals("", leadingPath[0])
+        assertEquals("a", leadingPath[1])
+        assertEquals("b", leadingPath[2])
+        assertEquals(listOf("", "a", "b"), leadingPath.iterable().toList())
+
+        val consecutivePath = "a..b".toKeyPath()
+        assertEquals(3, consecutivePath.size)
+        assertEquals("a", consecutivePath[0])
+        assertEquals("", consecutivePath[1])
+        assertEquals("b", consecutivePath[2])
+        assertEquals(listOf("a", "", "b"), consecutivePath.iterable().toList())
+    }
+
+    @Test
+    fun asString_formatsKeyPathCorrectly() {
+        assertEquals("a.b.c", "a.b.c".toKeyPath().asString())
+        assertEquals("single", "single".toKeyPath().asString())
+        assertEquals("", "".toKeyPath().asString())
+        assertEquals("a.b.", "a.b.".toKeyPath().asString())
+        assertEquals(".a.b", ".a.b".toKeyPath().asString())
+        assertEquals("a..b", "a..b".toKeyPath().asString())
     }
 
     @Test

@@ -21,5 +21,11 @@ interface Logger {
     fun debug(s: String, vararg o: Any) = debug("it $o")
     fun trace(s: String, vararg o: Any) = trace("it $o")
     fun warn(s: String, vararg o: Any) = warn("it $o")
+    fun error(s: String)
+    fun isErrorEnabled(): Boolean = true
+    fun error(s: String, o: Any) = error("it $o")
+    fun error(s: String, o: Any, o2: Any) = error("it $o $o2")
+    fun error(s: String, vararg o: Any) = error("it $o")
+    fun getName(): String = ""
 }
 

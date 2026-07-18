@@ -1,17 +1,20 @@
 package borg.trikeshed.forge
 
-import borg.trikeshed.cursor.BlackboardContext
-import borg.trikeshed.cursor.provenance
-import borg.trikeshed.graph.CausalGraphNodeIndex
+import borg.trikeshed.blackboard.BlackboardSurface
+import borg.trikeshed.blackboard.BlackboardSurfaceRow
+import borg.trikeshed.blackboard.LcncEntitySurface
+import borg.trikeshed.forge.blackboard.ForgeBlackboardView
+import borg.trikeshed.forge.gallery.ForgeGalleryCatalog
+import borg.trikeshed.forge.gallery.ForgeGalleryRenderer
 import borg.trikeshed.graph.CausalGraphNodeDTO
-import borg.trikeshed.graph.causalGraphKey
-import borg.trikeshed.graph.causalGraphNode
-import borg.trikeshed.kanban.ForgeBoardFSM
+import borg.trikeshed.graph.CausalGraphNodeIndex
+import borg.trikeshed.kanban.ForgeBoardPersistence
+import borg.trikeshed.kanban.ForgeKanbanIngest
+import borg.trikeshed.lcnc.isam.LcncBlock
+import borg.trikeshed.parse.confix.confixDoc
+import borg.trikeshed.parse.json.JsonSupport
 import borg.trikeshed.userspace.reactor.KanbanFSM
-import kotlinx.datetime.Clock
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
 
 @Serializable
 data class LcncEntityDTO(
@@ -89,9 +92,68 @@ data class ForgeAppState(
     val causalNodes: List<CausalGraphNodeDTO> = emptyList(),
     val lcncEntities: List<LcncEntityDTO> = emptyList(),
     val blackboardId: String = "",
+    /** Canonical blackboard cursor rows; legacy DTO fields remain compatible views. */
+    val surfaceRows: List<BlackboardSurfaceRow> = emptyList(),
+    val cascadeGrid: List<CascadeRollupRow> = emptyList(),
 )
 
-private val forgeAppJson = Json { prettyPrint = false }
+@Serializable
+data class CascadeRollupRow(
+    val viewName: String,
+    val metric: String,
+    val sum: Double = 0.0,
+    val avg: Double = 0.0,
+    val min: Double = 0.0,
+    val max: Double = 0.0,
+    val count: Long = 0L,
+)
+
+/** Build the cascade grid by running sample reading docs through the view-server tool. */
+private fun defaultCascadeGrid(): List<CascadeRollupRow> {
+    val server = borg.trikeshed.viewserver.CommonViewServer()
+    val views = listOf("byOrganization", "byMachine", "byBillingGroup")
+    val docs = listOf(
+        mapOf(
+            "organization_id" to borg.trikeshed.viewserver.ViewValue.Text("org-1"),
+            "machine_id" to borg.trikeshed.viewserver.ViewValue.Text("machine-1"),
+            "billing_group_id" to borg.trikeshed.viewserver.ViewValue.Text("billing-1"),
+            "reading_date" to borg.trikeshed.viewserver.ViewValue.Text("2026-07-15T12:34:00Z"),
+            "cpu_mhz" to borg.trikeshed.viewserver.ViewValue.Number(100.0),
+            "memory_mib" to borg.trikeshed.viewserver.ViewValue.Number(200.0),
+        ),
+        mapOf(
+            "organization_id" to borg.trikeshed.viewserver.ViewValue.Text("org-1"),
+            "machine_id" to borg.trikeshed.viewserver.ViewValue.Text("machine-1"),
+            "billing_group_id" to borg.trikeshed.viewserver.ViewValue.Text("billing-1"),
+            "reading_date" to borg.trikeshed.viewserver.ViewValue.Text("2026-07-15T12:35:00Z"),
+            "cpu_mhz" to borg.trikeshed.viewserver.ViewValue.Number(300.0),
+            "memory_mib" to borg.trikeshed.viewserver.ViewValue.Number(400.0),
+        ),
+    )
+    val docValues = docs.map { borg.trikeshed.viewserver.ViewValue.ObjectValue(it) }
+    val rows = mutableListOf<CascadeRollupRow>()
+    for (view in views) {
+        server.reset()
+        server.addFunction("tool:couchdbcascade/$view")
+        val rollup = server.reduce("tool:couchdbcascade", docValues)
+        val metricsObj = (rollup as borg.trikeshed.viewserver.ViewValue.ArrayValue).values[0]
+            as borg.trikeshed.viewserver.ViewValue.ObjectValue
+        val count = (rollup.values[1] as borg.trikeshed.viewserver.ViewValue.Number).value.toLong()
+        for ((metric, stats) in metricsObj.fields) {
+            val s = stats as borg.trikeshed.viewserver.ViewValue.ObjectValue
+            rows += CascadeRollupRow(
+                viewName = view,
+                metric = metric,
+                sum = (s.fields["sum"] as borg.trikeshed.viewserver.ViewValue.Number).value,
+                avg = (s.fields["avg"] as borg.trikeshed.viewserver.ViewValue.Number).value,
+                min = (s.fields["min"] as borg.trikeshed.viewserver.ViewValue.Number).value,
+                max = (s.fields["max"] as borg.trikeshed.viewserver.ViewValue.Number).value,
+                count = count,
+            )
+        }
+    }
+    return rows
+}
 
 private fun defaultForgeUseCases(): List<ForgeAppUseCase> = listOf(
     ForgeAppUseCase(
@@ -154,11 +216,41 @@ private fun seedChecklist(cardId: String, title: String): List<ForgeAppChecklist
 }
 
 private fun defaultForgeAppState(): ForgeAppState {
-    if (ForgeBoardFSM.current().activeBoard == null) {
-        ForgeBoardFSM.loadDefault()
+    val userId = "jim"
+    val reduction = try {
+        ForgeKanbanIngest.reduce(ForgeBoardPersistence.load(userId).getOrThrow())
+    } catch (e: Throwable) {
+        // Browser or first-run fallback — build a minimal seed entirely in
+        // memory without touching disk (Files.write would call require('fs')
+        // in the browser and crash).
+        try {
+            ForgeKanbanIngest.persistMarkdown(userId, "/tmp/hi")
+        } catch (_: Throwable) {
+            ForgeKanbanIngest.fallbackReduction()
+        }
     }
-    val boardState = ForgeBoardFSM.current()
-    val board = boardState.activeBoard ?: error("Forge board failed to load")
+    val board = reduction.board
+    val persistedDoc = confixDoc(ForgeBoardPersistence.encode(reduction.source))
+    val causalIndex = CausalGraphNodeIndex().also { index ->
+        reduction.causalNodes.forEach(index::addOrGet)
+    }
+    val surface = BlackboardSurface.project(
+        blackboardId = board.id.value,
+        index = causalIndex,
+        document = persistedDoc,
+        entities = reduction.correlations.map { correlation ->
+            val card = board.cards.first { it.id.value == correlation.taskId }
+            LcncEntitySurface(
+                entityId = "task:${correlation.taskId}",
+                lcncKind = "work-package",
+                lane = card.columnId.value,
+                facet = if (correlation.ready) "ready" else "dependency-gated",
+                causalKey = correlation.causalKey,
+                title = card.title,
+                description = card.description,
+            )
+        },
+    )
     val columns = board.columns.sortedBy { it.order }.map {
         ForgeAppColumn(id = it.id.value, name = it.name, order = it.order)
     }
@@ -166,10 +258,10 @@ private fun defaultForgeAppState(): ForgeAppState {
         ForgeAppItem(
             id = card.id.value,
             title = card.title,
-            notes = seedNotes(card.title),
+            notes = card.description,
             status = card.columnId.value,
             priority = card.priority.name.lowercase(),
-            checklist = seedChecklist(card.id.value, card.title),
+            checklist = emptyList(),
         )
     }
     val reactorCore = KanbanFSM.current()
@@ -179,107 +271,15 @@ private fun defaultForgeAppState(): ForgeAppState {
         items.takeLast(6).map { it.title }
     }
     val recentSignals = buildList {
-        add("ForgeBoardFSM:${boardState.lastEventKind}")
+        add("Rete:${reduction.reteFacts.count { it.fields["kind"] == "task" }} tasks")
+        add("Rete:${reduction.reteFacts.count { it.fields["kind"] == "link" }} links")
         if (reactorCore.lastEventKind != "INIT") add("KanbanFSM:${reactorCore.lastEventKind}")
     }
 
-    // Build real causal graph index for RTS demo
-    val causalIndex = CausalGraphNodeIndex()
-    val clock = Clock.System.now().toEpochMilliseconds()
-    val blackboardId = "forge-workspace-$clock"
-    val blackboardContext = BlackboardContext(
-        id = blackboardId,
-        provenance = provenance(
-            source = "forge-seed",
-            timestamp = clock,
-            transformations = listOf("CausalGraphNodeIndex.seed")
-        )
-    )
-
-    // Seed causal nodes via DSL
-    val op1 = causalGraphNode(
-        nodeId = "signal:price-feed",
-        opId = "PriceFeed",
-        opVersion = "v1",
-        parentNodeIds = emptyList(),
-        inputFingerprint = "binance-btc-usdt",
-        blackboard = blackboardContext,
-        causalClock = clock,
-        topoOrdinal = 0,
-        outputHash = null
-    )
-    val op2 = causalGraphNode(
-        nodeId = "transform:kalman",
-        opId = "KalmanFilter",
-        opVersion = "v1",
-        parentNodeIds = listOf("signal:price-feed"),
-        inputFingerprint = "state-estimate",
-        blackboard = blackboardContext,
-        causalClock = clock + 1,
-        topoOrdinal = 1,
-        outputHash = null
-    )
-    val op3 = causalGraphNode(
-        nodeId = "transform:archetype",
-        opId = "ArchetypeMatch",
-        opVersion = "v1",
-        parentNodeIds = listOf("signal:price-feed"),
-        inputFingerprint = "regime-detection",
-        blackboard = blackboardContext,
-        causalClock = clock + 2,
-        topoOrdinal = 1,
-        outputHash = null
-    )
-    val op4 = causalGraphNode(
-        nodeId = "decision:long-entry",
-        opId = "LongEntry",
-        opVersion = "v1",
-        parentNodeIds = listOf("transform:kalman", "transform:archetype"),
-        inputFingerprint = "buy-signal",
-        blackboard = blackboardContext,
-        causalClock = clock + 3,
-        topoOrdinal = 2,
-        outputHash = null
-    )
-    val op5 = causalGraphNode(
-        nodeId = "decision:short-entry",
-        opId = "ShortEntry",
-        opVersion = "v1",
-        parentNodeIds = listOf("transform:kalman", "transform:archetype"),
-        inputFingerprint = "sell-signal",
-        blackboard = blackboardContext,
-        causalClock = clock + 4,
-        topoOrdinal = 2,
-        outputHash = null
-    )
-    val op6 = causalGraphNode(
-        nodeId = "sink:order-router",
-        opId = "OrderRouter",
-        opVersion = "v1",
-        parentNodeIds = listOf("decision:long-entry", "decision:short-entry"),
-        inputFingerprint = "execution-order",
-        blackboard = blackboardContext,
-        causalClock = clock + 5,
-        topoOrdinal = 3,
-        outputHash = null
-    )
-    val op7 = causalGraphNode(
-        nodeId = "sink:risk-engine",
-        opId = "RiskEngine",
-        opVersion = "v1",
-        parentNodeIds = listOf("decision:long-entry", "decision:short-entry"),
-        inputFingerprint = "risk-check",
-        blackboard = blackboardContext,
-        causalClock = clock + 6,
-        topoOrdinal = 3,
-        outputHash = null
-    )
-
-    listOf(op1, op2, op3, op4, op5, op6, op7).forEach { causalIndex.addOrGet(it) }
-
+    val cascadeGrid = defaultCascadeGrid()
     return ForgeAppState(
         title = board.name,
-        pageNotes = "Forge local-first workspace: page narrative, board flow, and RTS-style zoom into card detail all live in one operator surface.",
+        pageNotes = reduction.source.description,
         columns = columns,
         items = items,
         selectedItemId = items.firstOrNull()?.id,
@@ -288,13 +288,13 @@ private fun defaultForgeAppState(): ForgeAppState {
             taxonomyNodeCount = maxOf(reactorCore.taxonomyNodeCount, items.size),
             signalFacetCount = reactorCore.cacheHits + reactorCore.cacheMisses + reactorCore.cacheStored + reactorCore.cacheEvicted,
             cacheStoredCount = reactorCore.cacheStored,
-            lastEventKind = if (reactorCore.lastEventKind != "INIT") reactorCore.lastEventKind else "BoardLoaded",
-            lastEventTimestampMs = if (reactorCore.lastEventTimestampMs != 0L) reactorCore.lastEventTimestampMs else boardState.lastEventMs,
+            lastEventKind = if (reactorCore.lastEventKind != "INIT") reactorCore.lastEventKind else "SourceReduced",
+            lastEventTimestampMs = reactorCore.lastEventTimestampMs,
             recentTaxonomyNodes = recentTaxonomy,
             recentSignals = recentSignals,
         ),
         spatial = ForgeSpatialState(),
-        causalNodes = listOf(op1, op2, op3, op4, op5, op6, op7).map {
+        causalNodes = reduction.causalNodes.map {
             CausalGraphNodeDTO(
                 nodeId = it.nodeId,
                 opId = it.opId,
@@ -305,77 +305,131 @@ private fun defaultForgeAppState(): ForgeAppState {
                 causalClock = it.causalClock,
             )
         },
-        lcncEntities = listOf(
+        // Legacy DTO view retained unchanged for existing seed consumers.
+        lcncEntities = reduction.correlations.map { correlation ->
+            val card = board.cards.first { it.id.value == correlation.taskId }
+            val block: LcncBlock = LcncBlock(
+                id = "task:${correlation.taskId}",
+                type = "work-package",
+                parentId = correlation.causalKey?.let { key -> "causal:$key" },
+                children = null,
+                content = mapOf(
+                    "lane" to card.columnId.value,
+                    "facet" to if (correlation.ready) "ready" else "dependency-gated",
+                    "causalKey" to correlation.causalKey,
+                    "title" to card.title,
+                    "description" to card.description,
+                ),
+            )
             LcncEntityDTO(
-                entityId = "lcnc:price-feed",
-                lcncKind = "source",
-                lane = "col-causal-ready",
-                facet = "market-data",
-                causalKey = "signal:price-feed",
-                title = "Price Feed (Binance)",
-                description = "BTC-USDT real-time stream",
-            ),
-            LcncEntityDTO(
-                entityId = "lcnc:kalman",
-                lcncKind = "transform",
-                lane = "col-causal-blocked",
-                facet = "signal-processing",
-                causalKey = "transform:kalman",
-                title = "Kalman Filter",
-                description = "State estimation on price",
-            ),
-            LcncEntityDTO(
-                entityId = "lcnc:archetype",
-                lcncKind = "transform",
-                lane = "col-causal-blocked",
-                facet = "pattern-recognition",
-                causalKey = "transform:archetype",
-                title = "Archetype Match",
-                description = "Regime detection",
-            ),
-            LcncEntityDTO(
-                entityId = "lcnc:long-entry",
-                lcncKind = "decision",
-                lane = "col-agentic",
-                facet = "execution",
-                causalKey = "decision:long-entry",
-                title = "Long Entry",
-                description = "Buy signal from confluence",
-            ),
-            LcncEntityDTO(
-                entityId = "lcnc:short-entry",
-                lcncKind = "decision",
-                lane = "col-agentic",
-                facet = "execution",
-                causalKey = "decision:short-entry",
-                title = "Short Entry",
-                description = "Sell signal from confluence",
-            ),
-            LcncEntityDTO(
-                entityId = "lcnc:order-router",
-                lcncKind = "sink",
-                lane = "col-agentic",
-                facet = "execution",
-                causalKey = "sink:order-router",
-                title = "Order Router",
-                description = "Route to exchange",
-            ),
-            LcncEntityDTO(
-                entityId = "lcnc:risk-engine",
-                lcncKind = "sink",
-                lane = "col-agentic",
-                facet = "risk",
-                causalKey = "sink:risk-engine",
-                title = "Risk Engine",
-                description = "Position sizing + limits",
-            ),
-        ),
-        blackboardId = blackboardId,
+                entityId = block.id,
+                lcncKind = block.type,
+                lane = card.columnId.value,
+                facet = if (correlation.ready) "ready" else "dependency-gated",
+                causalKey = correlation.causalKey,
+                title = card.title,
+                description = "", // stripped: 48KB duplicate of items[].notes, never read by JS
+            )
+        },
+        blackboardId = board.id.value,
+        surfaceRows = surface.rows,
+        cascadeGrid = cascadeGrid,
     )
 }
 
+private fun ForgeAppState.toJsonValue(): Map<String, Any?> = linkedMapOf(
+    "title" to title,
+    "pageNotes" to pageNotes,
+    "columns" to columns.map { linkedMapOf("id" to it.id, "name" to it.name, "order" to it.order) },
+    "items" to items.map { item ->
+        linkedMapOf(
+            "id" to item.id,
+            "title" to item.title,
+            "notes" to item.notes,
+            "status" to item.status,
+            "priority" to item.priority,
+            "checklist" to item.checklist.map {
+                linkedMapOf("id" to it.id, "text" to it.text, "checked" to it.checked)
+            },
+        )
+    },
+    "selectedItemId" to selectedItemId,
+    "useCases" to useCases.map {
+        linkedMapOf(
+            "id" to it.id,
+            "name" to it.name,
+            "summary" to it.summary,
+            "pageNotes" to it.pageNotes,
+            "itemTitles" to it.itemTitles,
+        )
+    },
+    "reactor" to linkedMapOf(
+        "taxonomyNodeCount" to reactor.taxonomyNodeCount,
+        "signalFacetCount" to reactor.signalFacetCount,
+        "cacheStoredCount" to reactor.cacheStoredCount,
+        "lastEventKind" to reactor.lastEventKind,
+        "lastEventTimestampMs" to reactor.lastEventTimestampMs,
+        "recentTaxonomyNodes" to reactor.recentTaxonomyNodes,
+        "recentSignals" to reactor.recentSignals,
+    ),
+    "spatial" to linkedMapOf(
+        "zoom" to spatial.zoom,
+        "offsetX" to spatial.offsetX,
+        "offsetY" to spatial.offsetY,
+        "focusMode" to spatial.focusMode,
+    ),
+    "causalNodes" to causalNodes.map {
+        linkedMapOf(
+            "nodeId" to it.nodeId,
+            "opId" to it.opId,
+            "opVersion" to it.opVersion,
+            "parentNodeIds" to it.parentNodeIds,
+            "causalKey" to it.causalKey,
+            "topoOrdinal" to it.topoOrdinal,
+            "causalClock" to it.causalClock,
+        )
+    },
+    "lcncEntities" to lcncEntities.map {
+        linkedMapOf(
+            "entityId" to it.entityId,
+            "lcncKind" to it.lcncKind,
+            "lane" to it.lane,
+            "facet" to it.facet,
+            "causalKey" to it.causalKey,
+            "title" to it.title,
+            "description" to it.description,
+        )
+    },
+    "blackboardId" to blackboardId,
+    "surfaceRows" to surfaceRows.map {
+        linkedMapOf(
+            "cardId" to it.cardId,
+            "lane" to it.lane,
+            "phase" to it.phase,
+            "facet" to it.facet,
+            "provenance" to it.provenance,
+            "causalKey" to it.causalKey,
+            "lcncKind" to it.lcncKind,
+        )
+    },
+    "cascadeGrid" to cascadeGrid.map {
+        linkedMapOf(
+            "viewName" to it.viewName,
+            "metric" to it.metric,
+            "sum" to it.sum,
+            "avg" to it.avg,
+            "min" to it.min,
+            "max" to it.max,
+            "count" to it.count,
+        )
+    },
+)
+
 fun forgeAppHtml(): String {
-    val seed = htmlEscape(forgeAppJson.encodeToString(defaultForgeAppState()))
+    val baseSeed = defaultForgeAppState().toJsonValue().toMutableMap()
+    baseSeed["gallery"] = ForgeGalleryCatalog.toJsonValue()
+    baseSeed["blackboard"] = forgeBlackboardSeed()
+    val seed = htmlEscape(JsonSupport.stringify(baseSeed))
     return """
 <!doctype html>
 <html lang="en">
@@ -419,6 +473,13 @@ ${forgeAppStyles()}
         </div>
         <div id="nav-root" class="nav-list"></div>
       </div>
+      <div class="panel section-block">
+        <div class="section-head">
+          <h2>Widget Gallery</h2>
+          <p>Forge widget catalog with per-target support matrix.</p>
+        </div>
+        <div id="gallery-root" class="gallery-list">${galleryHtml()}</div>
+      </div>
     </aside>
     <main class="editor">
       <div id="doc-root" class="page"></div>
@@ -461,6 +522,7 @@ ${forgeAppStyles()}
           <div class="toolbar compact">
             <button class="btn" id="focus-board">Whole board</button>
             <button class="btn" id="focus-selected">Selected card</button>
+            <button class="btn" id="toggle-depth">2.5D depth</button>
           </div>
         </div>
         <div class="space-caption"><span id="zoom-label"></span></div>
@@ -474,6 +536,13 @@ ${forgeAppStyles()}
           <p>Move the same items you edit in the page. CRUD stays local-first.</p>
         </div>
         <div id="board-root" class="column-stack"></div>
+      </div>
+      <div class="panel section-block">
+        <div class="section-head">
+          <h2>Cascade grid</h2>
+          <p>CouchDB Cascade metric rollup via view-server tool.</p>
+        </div>
+        <div id="cascade-grid-root" class="cascade-grid"></div>
       </div>
     </aside>
   </div>
@@ -764,9 +833,66 @@ private fun forgeAppStyles(): String = """
       .item-meta, .space-toolbar { grid-template-columns:1fr; }
       .board-pane { border-top:1px solid var(--line); }
     }
+    .cascade-grid { display:grid; gap:6px; }
+    .cascade-grid table { width:100%; border-collapse:collapse; font-size:12px; }
+    .cascade-grid th { text-align:left; color:var(--muted); text-transform:uppercase; letter-spacing:.08em; font-size:10px; padding:6px 8px; border-bottom:1px solid var(--line2); }
+    .cascade-grid td { padding:6px 8px; border-bottom:1px solid var(--line); color:var(--ink); }
+    .cascade-grid td.num { text-align:right; font-variant-numeric:tabular-nums; }
 """.trimIndent()
 
 private fun forgeAppScript(): String = forgePersistenceScript()
+
+/** Server-rendered gallery HTML for the workspace rail. No client-side hydration needed. */
+private fun galleryHtml(): String = ForgeGalleryRenderer.renderHtml()
+
+private fun forgeBlackboardSeed(): Map<String, Any?> {
+    val view = ForgeBlackboardView.DEFAULT
+    val cam = view.defaultCamera
+    val cam3d = view.mode3D
+    return linkedMapOf(
+        "surface" to view.surface,
+        "sections" to view.sections,
+        "defaultMode" to view.defaultMode.name,
+        "cornerButtons" to view.cornerButtons.map {
+            linkedMapOf(
+                "slot" to it.slot.name,
+                "id" to it.id,
+                "label" to it.label,
+                "hotkey" to it.hotkey,
+                "surface" to it.surface,
+            )
+        },
+        "camera" to linkedMapOf(
+            "x" to cam.x,
+            "y" to cam.y,
+            "zoom" to cam.zoom,
+            "tilt" to cam.tilt,
+            "vx" to cam.vx,
+            "vy" to cam.vy,
+            "vz" to cam.vz,
+            "minZoom" to cam.minZoom,
+            "maxZoom" to cam.maxZoom,
+        ),
+        "camera3D" to linkedMapOf(
+            "yawRadians" to cam3d.yawRadians,
+            "pitchRadians" to cam3d.pitchRadians,
+            "distance" to cam3d.distance,
+            "focalLength" to cam3d.focalLength,
+            "minDistance" to cam3d.minDistance,
+            "maxDistance" to cam3d.maxDistance,
+        ),
+        "layout3D" to view.layout3D.map {
+            linkedMapOf(
+                "sectionId" to it.sectionId,
+                "centerX" to it.centerX,
+                "centerY" to it.centerY,
+                "width" to it.width,
+                "height" to it.height,
+                "elevation" to it.elevation,
+            )
+        },
+    )
+}
 
 private fun htmlEscape(text: String): String = buildString(text.length) {
     text.forEach { ch ->

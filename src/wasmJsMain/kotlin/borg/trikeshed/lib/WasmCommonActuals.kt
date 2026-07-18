@@ -4,25 +4,32 @@ import borg.trikeshed.userspace.ByteRegion
 import borg.trikeshed.lib.long.LongSeries
 import kotlin.random.Random
 
-@JsName("localStorage")external val browserLocalStorage: Storage?
-external class Storage {
-    val length: Int
-    fun getItem(key: String): String?
-    fun setItem(key: String, value: String)
-    fun removeItem(key: String)
-    fun key(index: Int): String?
-}
+@OptIn(kotlin.js.ExperimentalWasmJsInterop::class)
+@JsFun("(key, value) => { try { if (globalThis.mockStorageThrow) { throw new Error('Mock Storage Error'); } if (typeof localStorage !== 'undefined') { localStorage.setItem(key, value); return true; } } catch (e) {} return false; }")
+private external fun jsStorageSet(key: String, value: String): Boolean
+
+@OptIn(kotlin.js.ExperimentalWasmJsInterop::class)
+@JsFun("(key) => { try { if (typeof localStorage !== 'undefined') { return localStorage.getItem(key); } } catch (e) {} return null; }")
+private external fun jsStorageGet(key: String): String?
+
+@OptIn(kotlin.js.ExperimentalWasmJsInterop::class)
+@JsFun("(key) => { try { if (typeof localStorage !== 'undefined') { localStorage.removeItem(key); return true; } } catch (e) {} return false; }")
+private external fun jsStorageRemove(key: String): Boolean
+
+@OptIn(kotlin.js.ExperimentalWasmJsInterop::class)
+@JsFun("() => { try { if (typeof localStorage !== 'undefined') { return localStorage.length; } } catch (e) {} return 0; }")
+private external fun jsStorageLength(): Int
+
+@OptIn(kotlin.js.ExperimentalWasmJsInterop::class)
+@JsFun("(index) => { try { if (typeof localStorage !== 'undefined') { return localStorage.key(index); } } catch (e) {} return null; }")
+private external fun jsStorageKey(index: Int): String?
+
 const val FILE_PREFIX = "trikeshed:browser:file:"
 const val DIR_PREFIX = "trikeshed:browser:dir:"
 val blobFallback = linkedMapOf<String, String>()
 val dirFallback = linkedSetOf<String>()
 val envFallback = linkedMapOf<String, String>()
-fun storageOrNull(): Storage? =
-    try {
-        browserLocalStorage
-    } catch (_: Throwable) {
-        null
-    }
+
 fun normalizePath(path: String): String {
     val normalized = path.replaceChar('\\', '/')
     val parts: MutableList<String> = mutableListOf<String>()
@@ -43,41 +50,14 @@ fun parentPath(path: String): String? {
 }
 fun fileKey(path: String): String = FILE_PREFIX + normalizePath(path)
 fun dirKey(path: String): String = DIR_PREFIX + normalizePath(path)
-fun storageGet(key: String): String? =
-    storageOrNull()?.let {
-        try {
-            it.getItem(key)
-        } catch (_: Throwable) {
-            null
-        }
-    }
-fun storageSet(key: String, value: String): Boolean {
-    val storage = storageOrNull() ?: return false
-    return try {
-        storage.setItem(key, value)
-        true
-    } catch (_: Throwable) {
-        false
-    }
-}
-fun storageRemove(key: String): Boolean {
-    val storage = storageOrNull() ?: return false
-    return try {
-        storage.removeItem(key)
-        true
-    } catch (_: Throwable) {
-        false
-    }
-}
+fun storageGet(key: String): String? = jsStorageGet(key)
+fun storageSet(key: String, value: String): Boolean = jsStorageSet(key, value)
+fun storageRemove(key: String): Boolean = jsStorageRemove(key)
 fun storageKeys(prefix: String): List<String> {
-    val storage = storageOrNull() ?: return emptyList()
+    val len = jsStorageLength()
     val keys = mutableListOf<String>()
-    for (index in 0 until storage.length) {
-        val key = try {
-            storage.key(index)
-        } catch (_: Throwable) {
-            null
-        }
+    for (index in 0 until len) {
+        val key = jsStorageKey(index)
         if (key != null && key.startsWith(prefix)) keys += key
     }
     return keys

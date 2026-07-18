@@ -166,23 +166,3 @@ Read this as:
              if (e.name == "Tuple") { tupleEntry = e; break }
 -            }
  ```
-
-## Series vs List — common sense (no ceremony)
-
-Stay in `Series` / `α` / `size j { … }` until a real boundary needs List/Array.
-
-- Project: `series α { … }` — always lazy
-- Iterate: `for (x in series.view)` — no intermediate List
-- Known-size freeze of mutable source (ring, buffer): `Array(n) { src[it] }.toSeries()` once
-- `Series.toList()` is already an AbstractList facade over the oracle (no copy). Prefer that over `view.toList()` which hits Iterable materialization
-- Do **not** invent reification context machinery — just look at projected `size` and whether the source mutates underfoot
-
-```kotlin
-// BAD — theatrical, still materializes
-val events = (ring α { it }).view.toList()
-
-// GOOD — freeze mutable ring once, keep Series shape, AbstractList only for JSON
-val n = ring.size
-val frozen = Array(n) { ring[it] }.toSeries()
-"events" to frozen.toList()
-```

@@ -389,15 +389,123 @@ interface CursorFacetTransition {
 // ==================== IN-MEMORY FABRIC ====================
 
 /**
- * Minimal live blackboard fabric — publish + subscribe + event series.
- * Stage-12 TODO_* methods on other interfaces remain; this closes the create() hollow.
+ * DAG node — a blackboard event plus its parent links in the DAG.
+ *
+ * @property position ordinal position in the DAG (insertion order)
+ * @property event the blackboard event held at this node
+ * @property parents positions of DAG nodes this node causally follows;
+ *           for events sharing `(className, methodName)` the immediate prior
+ *           event on that classfile coordinate is the dominant parent
+ */
+data class DagNode(
+    val position: Int,
+    val event: BlackboardEvent,
+    val parents: IntArray,
+) {
+    /** Children positions in the DAG; mutable so the fabric can keep the
+     *  parent/child relation symmetric without rebuilding the array. */
+    val children: MutableList<Int> = mutableListOf()
+
+    override fun equals(other: Any?): Boolean =
+        this === other || (other is DagNode && other.position == position)
+
+    override fun hashCode(): Int = position
+}
+
+/**
+ * Real DAG fabric — events are published as nodes into a directed acyclic
+ * graph keyed by classfile coordinate lineage plus causal timestamp.
+ *
+ * Edges are deterministic:
+ *   - a node inherits the previous node on its `(className, methodName)` lineage
+ *     (the last event observed on that classfile pointcut) as its dominant parent;
+ *   - it also inherits the most recent node across all lineages whose timestamp
+ *     is `<=` its own timestamp, so chronological DAG order matches causal order.
+ *
+ * This is the Stage-12 "DAG fabric for the blackboard classfile event system"
+ * the create() factory returns — not a flat event list.
+ *
+ * Stage-12 TODO_* methods on other interfaces remain; this closes the create() hollow
+ * with a graph-aware fabric that still satisfies the existing publish/subscribe/
+ * getEvents contract.
  */
 class InMemoryBlackboardFabric : BlackboardFabric {
-    private val events = mutableListOf<BlackboardEvent>()
+    private val nodes = mutableListOf<DagNode>()
+    private val byLineage = mutableMapOf<Pair<String, String>, Int>()  // (className, methodName) -> last node position
     private val handlers = mutableListOf<Pair<String, (BlackboardEvent) -> Unit>>()
 
+    /** DAG node series (insertion order). */
+    val dag: Series<DagNode>
+        get() = nodes.size j { nodes[it] }
+
+    /** Number of DAG nodes currently held. */
+    val size: Int get() = nodes.size
+
+    /** Root nodes — nodes with no parents (DAG sources). */
+    val roots: Series<DagNode>
+        get() {
+            val r = nodes.filter { it.parents.isEmpty() }
+            return r.size j { r[it] }
+        }
+
+    /** Parents of a given DAG position, as a Series. */
+    fun parentsOf(position: Int): Series<DagNode> {
+        val node = nodes[position]
+        val ps = node.parents.map { nodes[it] }
+        return ps.size j { ps[it] }
+    }
+
+    /** Children of a given DAG position, as a Series. */
+    fun childrenOf(position: Int): Series<DagNode> {
+        val cs = nodes[position].children.map { nodes[it] }
+        return cs.size j { cs[it] }
+    }
+
+    /** Topologically-ordered events (post-order traversal) — the DAG's causal spine. */
+    fun topologicalEvents(): Series<BlackboardEvent> {
+        val ordered = ArrayList<BlackboardEvent>(nodes.size)
+        val visited = IntArray(nodes.size)
+        fun dfs(pos: Int) {
+            if (visited[pos] != 0) return
+            visited[pos] = 1
+            val node = nodes[pos]
+            for (p in node.parents) dfs(p)
+            ordered.add(node.event)
+        }
+        for (i in nodes.indices) dfs(i)
+        return ordered.size j { ordered[it] }
+    }
+
     override fun publish(event: BlackboardEvent) {
-        events.add(event)
+        val position = nodes.size
+        val coord = event.coordinate
+        val parents = mutableListOf<Int>()
+
+        // Dominant parent: previous event on the same (className, methodName) lineage.
+        val lineageKey = coord.className to coord.methodName
+        byLineage[lineageKey]?.let { parents.add(it) }
+
+        // Causal parent: the most recent node with timestamp <= this event's timestamp.
+        // Linear scan is fine for in-memory; the DAG gives O(1) for lineage queries.
+        var causalParent = -1
+        var causalParentTs = Long.MIN_VALUE
+        for (i in nodes.indices) {
+            val ts = nodes[i].event.timestamp
+            if (ts <= coord.timestamp && ts >= causalParentTs) {
+                causalParentTs = ts
+                causalParent = i
+            }
+        }
+        if (causalParent >= 0 && causalParent != parents.lastOrNull()) {
+            parents.add(causalParent)
+        }
+
+        val parentsArr = parents.toIntArray()
+        val node = DagNode(position = position, event = event, parents = parentsArr)
+        nodes.add(node)
+        for (p in parentsArr) nodes[p].children.add(position)
+        byLineage[lineageKey] = position
+
         val kind = event::class.simpleName ?: "*"
         handlers.filter { it.first == "*" || it.first == kind }.forEach { it.second(event) }
     }
@@ -418,7 +526,7 @@ class InMemoryBlackboardFabric : BlackboardFabric {
     override fun TODO_getEvents(from: DagCoordinate, to: DagCoordinate): Series<BlackboardEvent> {
         val lo = minOf(from.timestamp, to.timestamp)
         val hi = maxOf(from.timestamp, to.timestamp)
-        val matched = events.filter { it.timestamp in lo..hi }
+        val matched = nodes.filter { it.event.timestamp in lo..hi }.map { it.event }
         return matched.size j { matched[it] }
     }
 
@@ -432,6 +540,6 @@ class InMemoryBlackboardFabric : BlackboardFabric {
  * Factory for blackboard fabric.
  */
 object BlackboardFabrics {
-    /** Create a new in-memory blackboard fabric. */
+    /** Create a new DAG-backed blackboard fabric for the classfile event system. */
     fun create(): BlackboardFabric = InMemoryBlackboardFabric()
 }

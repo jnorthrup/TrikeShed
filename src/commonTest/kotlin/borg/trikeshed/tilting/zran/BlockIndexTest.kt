@@ -8,7 +8,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
-import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 // ================================================================================
@@ -261,72 +260,6 @@ class BlockIndexTest {
     @Test fun compressionProvider_gzipAndZstd() {
         assertEquals(CompressionProvider.GZIP, CompressionProvider.GZIP)
         assertEquals(CompressionProvider.ZSTD, CompressionProvider.ZSTD)
-    }
-
-    // ========================================================================
-    // RED: ZstdBlockIndex — stub in kzran.kt posixMain
-    // All ops throw NotImplementedError until zstd is wired via expect/actual.
-    // Links:
-    // - ZSTD skippable frame: https://github.com/facebook/zstd/blob/v1.5.5/contrib/pzstd/SkippableFrame.h
-    // ========================================================================
-
-    @Test fun `ZstdBlockIndex build throws NotImplementedError`() {
-        assertFailsWith<NotImplementedError> {
-            // ZstdBlockIndex lives in kzran.kt posixMain — stubbed to throw.
-            // Once zstd is wired via expect/actual, this test will pass.
-            throw NotImplementedError("ZstdBlockIndex requires zstd. Wire via expect/actual: JNI or cinterop. See: https://github.com/facebook/zstd/tree/v1.5.5/contrib/cmake")
-        }
-    }
-
-    @Test fun `ZstdBlockIndex seekLine throws NotImplementedError`() {
-        assertFailsWith<NotImplementedError> {
-            throw NotImplementedError("ZstdBlockIndex requires zstd. Wire via expect/actual.")
-        }
-    }
-
-    @Test fun `ZstdBlockIndex seekByte throws NotImplementedError`() {
-        assertFailsWith<NotImplementedError> {
-            throw NotImplementedError("ZstdBlockIndex requires zstd. Wire via expect/actual.")
-        }
-    }
-
-    @Test fun `ZstdBlockIndex writeIndex throws NotImplementedError`() {
-        assertFailsWith<NotImplementedError> {
-            throw NotImplementedError("ZstdBlockIndex requires zstd. Wire via expect/actual.")
-        }
-    }
-
-    @Test fun `ZstdBlockIndex readIndex throws NotImplementedError`() {
-        assertFailsWith<NotImplementedError> {
-            throw NotImplementedError("ZstdBlockIndex requires zstd. Wire via expect/actual.")
-        }
-    }
-
-    @Test fun `ZstdBlockIndex getWindow throws NotImplementedError`() {
-        assertFailsWith<NotImplementedError> {
-            throw NotImplementedError("ZstdBlockIndex requires zstd. Wire via expect/actual.")
-        }
-    }
-
-    // ========================================================================
-    // RED: Lz4BlockIndex — TDD, does not exist yet in production
-    // Links:
-    // - LZ4 frame: https://github.com/lz4/lz4/blob/dev/lib/lz4frame.c
-    // ========================================================================
-
-    @Test fun `Lz4BlockIndex does not exist yet — all ops throw NotImplementedError`() {
-        // When lz4 is wired, Lz4BlockIndex should:
-        // - implement BlockIndex
-        // - have provider = CompressionProvider.LZ4
-        // - build(fileName: String?, span: ULong): Int
-        // - readIndex(indexFname: String?): Boolean
-        // - writeIndex(indexFname: String): Int
-        // - getWindow(index: Int): UByteArray
-        // - seekLine(lineIndex: Int): PointRowVec?
-        // - seekByte(decompressedOffset: ULong): PointRowVec?
-        assertFailsWith<NotImplementedError> {
-            throw NotImplementedError("Lz4BlockIndex does not exist yet. Implement mirroring ZstdBlockIndex but for LZ4. See: https://github.com/lz4/lz4/tree/dev/lib")
-        }
     }
 
 }

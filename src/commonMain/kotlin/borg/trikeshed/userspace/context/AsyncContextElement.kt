@@ -1,33 +1,21 @@
 package borg.trikeshed.userspace.context
 
-/* Compatibility layer: reuse the shared (libs/common) AsyncContextElement and ElementState
-   definitions to avoid duplicate interfaces across packages. This file provides thin
-   subclasses so userspace code can depend on borg.trikeshed.userspace.context
-   while the canonical implementations live under borg.trikeshed.context and
-   borg.trikeshed.userspace. */
+/* Compatibility layer: reuse the shared AsyncContextElement and ElementState
+   definitions to avoid duplicate interfaces across packages. */
 
 import borg.trikeshed.context.AsyncContextElement
 import borg.trikeshed.context.ElementState
-import borg.trikeshed.context.NioUserspaceElement as CanonicalNioUserspaceElement
-import borg.trikeshed.userspace.LiburingElement
-import borg.trikeshed.userspace.reactor.FanoutDispatcherElement
 import kotlin.coroutines.CoroutineContext
 
 /** Alias to canonical ElementState from borg.trikeshed.context */
 typealias ElementLifecycleState = ElementState
 
+/** Alias to canonical AsyncContextElement implementation */
+typealias AsyncContextElement = borg.trikeshed.context.AsyncContextElement
+
 /**
- * Subclass the canonical NioUserspaceElement so its key is the userspace key.
- * This ensures ctx[AsyncContextKey.NioUserspaceKey] works correctly.
+ * Userspace NioUserspaceElement delegates to canonical implementation.
  */
-open class NioUserspaceElement : CanonicalNioUserspaceElement() {
+open class NioUserspaceElement : AsyncContextElement() {
     override val key: CoroutineContext.Key<*> get() = AsyncContextKey.NioUserspaceKey
-}
-
-open class LiburingElement : borg.trikeshed.context.LiburingElement() {
-    override val key: CoroutineContext.Key<*> get() = AsyncContextKey.LiburingKey
-}
-
-open class FanoutDispatcherElement : borg.trikeshed.context.FanoutDispatcherElement() {
-    override val key: CoroutineContext.Key<*> get() = AsyncContextKey.FanoutDispatcherKey
 }
