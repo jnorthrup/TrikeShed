@@ -1,0 +1,141 @@
+From fe1a17cdda4e6e3d0bc60eaf4ec1cfe91afda33c Mon Sep 17 00:00:00 2001
+From: "google-labs-jules[bot]"
+ <161369871+google-labs-jules[bot]@users.noreply.github.com>
+Date: Sat, 18 Jul 2026 23:32:16 +0000
+Subject: [PATCH] examples/echo-server: handle short sends
+
+---
+ examples/echo-server.c | 62 ++++++++++++++++++++++++++++--------------
+ 1 file changed, 42 insertions(+), 20 deletions(-)
+
+diff --git a/examples/echo-server.c b/examples/echo-server.c
+index 3ca5e01d..5e58f29a 100644
+--- a/examples/echo-server.c
++++ b/examples/echo-server.c
+@@ -52,27 +52,41 @@ static struct conn conns[MAX_CONNS];
+ static int listen_fd;
+
+ /*
+- * Encode event type, buffer ID, and file descriptor into a single 64-bit
+- * user_data value:
++ * Encode event type, length, offset, buffer ID, and file descriptor into a
++ * single 64-bit user_data value:
+  *
+- *   bits 63-56: event type (ACCEPT, RECV, SEND)
+- *   bits 31-16: buffer ID (used by SEND to identify which buffer to recycle)
++ *   bits 63-60: event type (ACCEPT, RECV, SEND)
++ *   bits 59-44: length (up to 65535 bytes)
++ *   bits 43-28: offset (up to 65535 bytes)
++ *   bits 27-16: buffer ID (used by SEND to identify which buffer to recycle)
+  *   bits 15-0:  file descriptor
+  */
+-static __u64 encode_userdata(enum event_type type, int bid, int fd)
++static __u64 encode_userdata(enum event_type type, int len, int offset, int bid, int fd)
+ {
+-	return ((__u64)type << 56) | ((__u64)(bid & 0xffff) << 16) |
++	return ((__u64)type << 60) | ((__u64)(len & 0xffff) << 44) |
++		((__u64)(offset & 0xffff) << 28) |
++		((__u64)(bid & 0xfff) << 16) |
+		(__u64)(fd & 0xffff);
+ }
+
+ static enum event_type decode_type(__u64 user_data)
+ {
+-	return (enum event_type)(user_data >> 56);
++	return (enum event_type)(user_data >> 60);
++}
++
++static int decode_len(__u64 user_data)
++{
++	return (int)((user_data >> 44) & 0xffff);
++}
++
++static int decode_offset(__u64 user_data)
++{
++	return (int)((user_data >> 28) & 0xffff);
+ }
+
+ static int decode_bid(__u64 user_data)
+ {
+-	return (int)((user_data >> 16) & 0xffff);
++	return (int)((user_data >> 16) & 0xfff);
+ }
+
+ static int decode_fd(__u64 user_data)
+@@ -168,8 +182,7 @@ static void add_multishot_accept(void)
+
+	sqe = get_sqe();
+	io_uring_prep_multishot_accept(sqe, listen_fd, NULL, NULL, 0);
+-	io_uring_sqe_set_data64(sqe, encode_userdata(EVENT_ACCEPT, 0,
+-						     listen_fd));
++	io_uring_sqe_set_data64(sqe, encode_userdata(EVENT_ACCEPT, 0, 0, 0, listen_fd));
+ }
+
+ /*
+@@ -186,20 +199,20 @@ static void add_recv(int fd)
+	io_uring_prep_recv_multishot(sqe, fd, NULL, 0, 0);
+	sqe->flags |= IOSQE_BUFFER_SELECT;
+	sqe->buf_group = BGID;
+-	io_uring_sqe_set_data64(sqe, encode_userdata(EVENT_RECV, 0, fd));
++	io_uring_sqe_set_data64(sqe, encode_userdata(EVENT_RECV, 0, 0, 0, fd));
+ }
+
+ /*
+  * Submit a send echoing data back to the client. The buffer ID is encoded
+  * in user_data so we can recycle the buffer when the send completes.
+  */
+-static void add_send(int fd, int bid, int len)
++static void add_send(int fd, int bid, int len, int offset)
+ {
+	struct io_uring_sqe *sqe;
+
+	sqe = get_sqe();
+-	io_uring_prep_send(sqe, fd, bufs + bid * BUF_SIZE, len, 0);
+-	io_uring_sqe_set_data64(sqe, encode_userdata(EVENT_SEND, bid, fd));
++	io_uring_prep_send(sqe, fd, bufs + bid * BUF_SIZE + offset, len - offset, 0);
++	io_uring_sqe_set_data64(sqe, encode_userdata(EVENT_SEND, len, offset, bid, fd));
+ }
+
+ static void close_conn(int fd)
+@@ -299,8 +312,7 @@ static void handle_recv(struct io_uring_cqe *cqe)
+	bid = cqe->flags >> IORING_CQE_BUFFER_SHIFT;
+
+	/* Echo the data back to the client */
+-	/* TODO: handle short sends for production use */
+-	add_send(fd, bid, cqe->res);
++	add_send(fd, bid, cqe->res, 0);
+
+	/*
+	 * If IORING_CQE_F_MORE is not set, the multishot recv has
+@@ -319,15 +331,25 @@ static void handle_send(struct io_uring_cqe *cqe)
+ {
+	int bid = decode_bid(cqe->user_data);
+	int fd = decode_fd(cqe->user_data);
++	int len = decode_len(cqe->user_data);
++	int offset = decode_offset(cqe->user_data);
+
+-	/* Always recycle the buffer, regardless of send success */
+-	recycle_buffer(bid);
+-
+-	if (cqe->res < 0) {
++	if (cqe->res <= 0) {
++		recycle_buffer(bid);
+		close_conn(fd);
+		return;
+	}
+
++	offset += cqe->res;
++	if (offset < len) {
++		/* Short send, re-submit remaining data */
++		add_send(fd, bid, len, offset);
++		return;
++	}
++
++	/* Full send completed */
++	recycle_buffer(bid);
++
+	/*
+	 * Re-arm multishot recv if it was terminated due to ENOBUFS
+	 * or another non-fatal reason. Check that the connection is
+--
+2.53.0
