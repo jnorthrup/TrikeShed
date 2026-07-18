@@ -3,7 +3,6 @@ package borg.trikeshed.memvid
 import borg.trikeshed.job.CasStore
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.lib.seriesOf
-import borg.trikeshed.lib.b
 import borg.trikeshed.lib.size
 import borg.trikeshed.cursor.Cursor
 import borg.trikeshed.isam.meta.IOMemento
@@ -21,10 +20,10 @@ class MemvidStoragePipelineTest {
         val cas = CasStore.inMemory()
         val pipeline = MemvidStoragePipeline(cas, 4)
 
-        val docs = seriesOf(
+        val docs = seriesOf(listOf(
             MemvidDocument("doc1.txt", "text/plain", "abcdefgh".encodeToByteArray()),
             MemvidDocument("doc2.txt", "text/plain", "xyz".encodeToByteArray())
-        )
+        ))
 
         val archive = pipeline.store(docs)
 
@@ -43,9 +42,9 @@ class MemvidStoragePipelineTest {
         val cas = CasStore.inMemory()
         val pipeline = MemvidStoragePipeline(cas, 3)
 
-        val docs = seriesOf(
+        val docs = seriesOf(listOf(
             MemvidDocument("doc1.txt", "text/plain", "abcdef".encodeToByteArray())
-        )
+        ))
 
         val archive = pipeline.store(docs)
         val frames = archive.b(MemvidK.Frames.ordinal) as Cursor
@@ -70,7 +69,7 @@ class MemvidStoragePipelineTest {
         val pipeline = MemvidStoragePipeline(cas, 2)
 
         val bytes = "Hello, 世界".encodeToByteArray()
-        val docs = seriesOf(MemvidDocument("doc", "text/plain", bytes))
+        val docs = seriesOf(listOf(MemvidDocument("doc", "text/plain", bytes)))
 
         val archive = pipeline.store(docs)
 
@@ -90,12 +89,12 @@ class MemvidStoragePipelineTest {
     fun testDeterministicArchiveAndManifestCid() {
         val cas1 = CasStore.inMemory()
         val pipeline1 = MemvidStoragePipeline(cas1, 4)
-        val docs1 = seriesOf(MemvidDocument("d", "text/plain", "abc".encodeToByteArray()))
+        val docs1 = seriesOf(listOf(MemvidDocument("d", "text/plain", "abc".encodeToByteArray())))
         val archive1 = pipeline1.store(docs1)
 
         val cas2 = CasStore.inMemory()
         val pipeline2 = MemvidStoragePipeline(cas2, 4)
-        val docs2 = seriesOf(MemvidDocument("d", "text/plain", "abc".encodeToByteArray()))
+        val docs2 = seriesOf(listOf(MemvidDocument("d", "text/plain", "abc".encodeToByteArray())))
         val archive2 = pipeline2.store(docs2)
 
         val cid1 = archive1.b(MemvidK.ArchiveId.ordinal) as ContentId

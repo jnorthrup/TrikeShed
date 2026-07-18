@@ -1,5 +1,6 @@
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
+import org.jetbrains.kotlin.gradle.plugin.KotlinPlatformType
 
 plugins {
     kotlin("multiplatform") version "2.4.10"
@@ -8,6 +9,14 @@ plugins {
     kotlin("plugin.serialization") version "2.4.10"
     kotlin("plugin.compose") version "2.4.10"
     id("org.jetbrains.compose") version "1.11.1"
+}
+
+// Compose UI is a JVM-only surface in this multiplatform project.  The Kotlin
+// Compose compiler plugin defaults to every target, which makes Native/JS/Wasm
+// compilations require a Compose runtime even though they contain no Compose UI.
+// Restrict the compiler plugin to the target that actually consumes Compose.
+composeCompiler {
+    targetKotlinPlatforms.set(setOf(KotlinPlatformType.jvm))
 }
 
 group = "org.bereft"
@@ -93,12 +102,6 @@ kotlin {
             }
         }
         binaries.executable()
-
-        // Compose runtime for WASM target (compose compiler requires runtime on classpath)
-        kotlin.sourceSets.getByName("wasmJsMain").dependencies {
-            implementation(org.jetbrains.compose.ComposePlugin.Dependencies(project).runtime)
-            implementation(devNpm("workbox-webpack-plugin", "7.0.0"))
-        }
     }
 
     // ── Host-detected native targets (restored from c0e3f0fc) ────────────────
@@ -116,7 +119,15 @@ kotlin {
                 }
             }
         }
-        macosX64("macosX64")
+        macosX64("macosX64") {
+            compilations.getByName("main") {
+                cinterops {
+                    create("posixSpawn") {
+                        defFile = project.file("src/macosMain/resources/META-INF/cinterop/posix_spawn.def")
+                    }
+                }
+            }
+        }
     }
 
     if (isLinux || providers.gradleProperty("enableLinuxX64").orNull == "true") {
@@ -216,8 +227,19 @@ kotlin {
         posixMain.dependsOn(nativeMain)
         posixTest.dependsOn(nativeTest)
 
+        // Default hierarchy template is disabled in gradle.properties, so the intermediate
+        // macosMain/linuxMain source sets must be created explicitly.
+        val macosMain = maybeCreate("macosMain").apply { dependsOn(posixMain) }
+        val macosTest = maybeCreate("macosTest").apply { dependsOn(posixTest) }
+        val macosX64Main = maybeCreate("macosX64Main").apply { dependsOn(macosMain) }
+        val macosX64Test = maybeCreate("macosX64Test").apply { dependsOn(macosTest) }
+        val linuxMain = maybeCreate("linuxMain").apply { dependsOn(posixMain) }
+        val linuxTest = maybeCreate("linuxTest").apply { dependsOn(posixTest) }
+
         findByName("macosMain")?.dependsOn(posixMain)
         findByName("macosTest")?.dependsOn(posixTest)
+        findByName("macosX64Main")?.dependsOn(posixMain)
+        findByName("macosX64Test")?.dependsOn(posixTest)
         findByName("linuxMain")?.dependsOn(posixMain)
         findByName("linuxTest")?.dependsOn(posixTest)
 
@@ -248,6 +270,8 @@ kotlin {
             kotlin.exclude("**/sctp/**")
             kotlin.exclude("**/window/**")
             kotlin.exclude("**/htx/**")
+            // Stale against current CouchStore/CouchAttachmentGateway/Htx APIs; re-enable after reconciliation.
+            kotlin.exclude("**/util/oroboros/**")
         }
     }
 }

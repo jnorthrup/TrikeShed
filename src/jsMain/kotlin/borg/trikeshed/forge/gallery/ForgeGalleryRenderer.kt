@@ -47,9 +47,7 @@ object ForgeGalleryRenderer {
             """)
             append("</style>")
 
-            sections.toList().sortedBy { it.key }.forEach { entry: Map.Entry<String, List<Any>> ->
-                val sectionName = entry.key
-                val widgets = entry.value
+            sections.toList().sortedBy { it.first }.forEach { (sectionName, widgets) ->
                 append("<section class=\"gallery-section\">")
                 append("<h3>$sectionName</h3>")
                 append("<div class=\"gallery-list\">")

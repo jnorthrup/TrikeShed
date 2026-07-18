@@ -1,9 +1,0 @@
-// Supplement the built-in platform.posix cinterop with spawn.h symbols
-// (Darwin's default posix surface lacks spawn.h; environ is unistd.h's global)
-package = platform.posix
-headers = spawn.h unistd.h sys/types.h
-
----
-
-// environ is a global pointer; declare explicitly so cinterop exports it
-extern char **environ;
