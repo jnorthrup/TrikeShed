@@ -41,8 +41,6 @@ kotlin {
     sourceSets {
         val commonMain = getByName("commonMain") {
             dependencies {
-                // TrikeShed kernel algebra (Join, Series, α, ForgeDoc types) — resolved
-                // via the composite includeBuild in settings.gradle.kts.
                 implementation("org.bereft:TrikeShed:1.0")
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:$coroutinesVersion")
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-core:$serializationVersion")
@@ -57,14 +55,21 @@ kotlin {
         val jvmMain = getByName("jvmMain") {
             dependencies {
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:$serializationVersion")
+                implementation("org.apache.tika:tika-core:3.0.0")
+                implementation("org.apache.tika:tika-parsers-standard-package:3.0.0")
             }
         }
-        val jvmTest = getByName("jvmTest")
+        val jvmTest = getByName("jvmTest") {
+            dependencies {
+                implementation(kotlin("test-junit5"))
+                implementation("org.junit.jupiter:junit-jupiter-api:5.10.2")
+                implementation("org.junit.jupiter:junit-jupiter-engine:5.10.2")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:$coroutinesVersion")
+            }
+        }
     }
 }
 
-// Catalog CLI — KMPP has no `run` task; wire a JavaExec so
-// `./gradlew catalog --args='...'` works.
 tasks.register<JavaExec>("catalog") {
     group = "application"
     description = "Run CatalogMain. Args: --args='<root-dir> [--out <file>] [--no-header]'"
@@ -73,7 +78,6 @@ tasks.register<JavaExec>("catalog") {
     classpath(tasks.named("jvmJar"), configurations.named("jvmRuntimeClasspath"))
 }
 
-// Same compat guard TrikeShed uses — disable the KMPP plugin-config check task.
 tasks.named("checkKotlinGradlePluginConfigurationErrors") {
     enabled = false
 }

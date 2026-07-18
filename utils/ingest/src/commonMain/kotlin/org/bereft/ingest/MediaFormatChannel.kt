@@ -1,32 +1,13 @@
 package org.bereft.ingest
 
+import borg.trikeshed.cursor.*
 import borg.trikeshed.lib.*
-import borg.trikeshed.lib.Series
 
-/**
- * SPI for media/format detection and projection routing.
- *
- * A platform implementation probes a source and returns which
- * [IngestProjection]s are available for that media type. This is the
- * Confix-aware access layer for media channels: it describes what is possible,
- * it does NOT execute extraction.
- *
- * Ported from the J01 ingest-cascade `MediaFormatChannel` contract.
- */
 interface MediaFormatChannel {
-
-    /** Detect the media type of a source path. */
     fun detect(path: String): MediaFormatInfo
-
-    /** Return the projections available for a detected media type. */
     fun availableProjections(mediaType: String): Set<IngestProjection>
 
     companion object {
-        /**
-         * Canonical media-type → projection mapping. Platform implementations
-         * may override, but this is the shared default so detection stays
-         * consistent across targets.
-         */
         val DEFAULT_PROJECTIONS: Map<String, Set<IngestProjection>> = mapOf(
             "application/pdf" to setOf(IngestProjection.TEXT_EXTRACTION, IngestProjection.TABLE_EXTRACTION, IngestProjection.METADATA),
             "text/plain" to setOf(IngestProjection.TEXT_EXTRACTION, IngestProjection.TAXONOMY, IngestProjection.COGNITIVE_LOAD, IngestProjection.METADATA),
@@ -47,27 +28,39 @@ interface MediaFormatChannel {
     }
 }
 
-/**
- * One row in a media catalog: a path, its detected type, its Confix facet, a
- * confidence score, and the projections available for it.
- */
 data class MediaFormatInfo(
     val path: String,
-    val mediaType: String,           // "application/pdf", "audio/wav"
-    val formatFacet: String,         // Confix facet key: "pdf", "zip", "audio", "text"
+    val mediaType: String,
+    val formatFacet: String,
     val confidence: Double,
     val availableProjections: Set<IngestProjection>,
     val sizeBytes: Long = 0L,
 ) {
     override fun toString(): String =
         "$path\t$mediaType\t$formatFacet\t${"%.2f".format(confidence)}\t${availableProjections.count()}\t$sizeBytes"
+
+    // Convert into a RowVec to comply with Cursor schema requirement.
+    fun toRowVec(): RowVec {
+        val metaPath: ColumnMeta = ColumnMeta("path", IOMemento.IoString)
+        val metaType: ColumnMeta = ColumnMeta("mediaType", IOMemento.IoString)
+        val metaFacet: ColumnMeta = ColumnMeta("formatFacet", IOMemento.IoString)
+        val metaConf: ColumnMeta = ColumnMeta("confidence", IOMemento.IoDouble)
+        val metaSize: ColumnMeta = ColumnMeta("sizeBytes", IOMemento.IoLong)
+
+        val values = arrayOf<Any?>(path, mediaType, formatFacet, confidence, sizeBytes)
+        val meta = arrayOf<ColumnMeta↻>({ metaPath }, { metaType }, { metaFacet }, { metaConf }, { metaSize })
+
+        val valueSeries: Series<Any?> = values.size j { i -> values[i] }
+        val metaSeries: Series<ColumnMeta↻> = meta.size j { i -> meta[i] }
+
+        return valueSeries joins metaSeries
+    }
 }
 
-/**
- * A scanned directory as a lazy [Series] of [MediaFormatInfo] — PRELOAD shape:
- * size paired with an index oracle. No materialized list; project with `α`.
- */
 fun interface Catalog {
     fun entries(): Series<MediaFormatInfo>
     val size: Int get() = entries().size
+
+    // Expose catalog rows as a stable Cursor schema
+    fun cursor(): Cursor = size j { i -> entries().b(i).toRowVec() }
 }
