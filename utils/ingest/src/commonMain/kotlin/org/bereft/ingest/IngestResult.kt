@@ -34,7 +34,7 @@ data class IngestResult(
     val blockIds: List<String> = emptyList(),
 ) {
     operator fun get(i: Int): Char = extractedContent.b(i)
-    val contentSize: Int get() = extractedContent.size
+    val contentSize: Int get() = extractedContent.a
 }
 
 fun charSeries(text: String): Series<Char> = text.length j { i -> text[i] }
