@@ -328,7 +328,7 @@ private fun defaultForgeAppState(): ForgeAppState {
                 facet = if (correlation.ready) "ready" else "dependency-gated",
                 causalKey = correlation.causalKey,
                 title = card.title,
-                description = card.description,
+                description = "", // stripped: 48KB duplicate of items[].notes, never read by JS
             )
         },
         blackboardId = board.id.value,
