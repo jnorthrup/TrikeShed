@@ -97,6 +97,7 @@ kotlin {
         // Compose runtime for WASM target (compose compiler requires runtime on classpath)
         kotlin.sourceSets.getByName("wasmJsMain").dependencies {
             implementation(org.jetbrains.compose.ComposePlugin.Dependencies(project).runtime)
+            implementation(devNpm("workbox-webpack-plugin", "7.0.0"))
         }
     }
 
@@ -277,21 +278,9 @@ tasks.register<Sync>("generateForgePages") {
     }
 }
 
-// Deploy to gh-pages branch using gh CLI
-tasks.register<Exec>("deployGhPages") {
-    group = "documentation"
-    description = "Deploys docs/ to gh-pages branch via gh CLI."
-    dependsOn("generateForgePages")
-    commandLine("gh", "pages", "deploy", "--branch", "gh-pages", "--source", "docs", "--dotfiles")
-    doLast {
-        println("Deployed docs/ to gh-pages branch")
-    }
-}
 
-// Make wasmJsBrowserProductionWebpack trigger deploy as final step
-tasks.named("wasmJsBrowserProductionWebpack").configure {
-    finalizedBy("deployGhPages")
-}
+
+
 
 // Config cache
 tasks.register("kmpPartiallyResolvedDependenciesCheckerIgnore") {

@@ -34,17 +34,7 @@ object Float32ToInt32Converter {
     }
 }
 
-fun main() {
-    val testValues = listOf(0f, -0f, 1f, -1f, 1.5f, -1.5f,
-        Float.MAX_VALUE, Float.MIN_VALUE,
-        Float.POSITIVE_INFINITY, Float.NEGATIVE_INFINITY,
-        Float.NaN)
-
-    for (value in testValues) {
-        val result = Float32ToInt32Converter.convertFloat32ToInt32(value)
-        println("Float: $value, Int: $result")
-    }
-}/** this is a set of helper extension functions to produce network-endian versions of getIntAt, setIntAt, getLongAt,
+/** this is a set of helper extension functions to produce network-endian versions of getIntAt, setIntAt, getLongAt,
  *  setLongAt, etc. for ByteArray
  *
  * the kotlin native package marshalling is treated as if it was in Least-Significant-Byte first (little-endian) byte

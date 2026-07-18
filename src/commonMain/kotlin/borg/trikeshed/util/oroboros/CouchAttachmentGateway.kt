@@ -89,8 +89,8 @@ class CouchAttachmentGateway(
             doc.fields.none { it.name == "deleted" && it.value == "true" }
         }
 
-        val paths = allDocs.size j { i -> allDocs[i].id }
-        val refs = allDocs.size j { i ->
+        val paths = allDocs.size j { i: Int -> allDocs[i].id }
+        val refs = allDocs.size j { i: Int ->
             val doc = allDocs[i]
             val contentType = doc.fields.find { it.name == "contentType" }?.value as? String ?: ""
             val lengthStr = doc.fields.find { it.name == "length" }?.value as? String ?: "0"

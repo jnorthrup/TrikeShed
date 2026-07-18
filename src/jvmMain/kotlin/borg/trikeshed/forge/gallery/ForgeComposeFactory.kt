@@ -1,9 +1,6 @@
 package borg.trikeshed.forge.gallery
 
-import androidx.compose.ui.window.Window
-import androidx.compose.ui.window.application
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.supervisorScope
+import borg.trikeshed.forge.shell.main
 import kotlin.jvm.JvmStatic
 
 /**
@@ -15,8 +12,9 @@ object ForgeComposeFactory {
 
     /**
      * Creates and shows the Forge JVM window.
-     * TODO: Implement the actual window creation and ForgeWorkspace mounting.
      */
     @JvmStatic
-    fun createAndShow(): Window = TODO("Implement Forge JVM Compose Desktop shell")
+    fun main(args: Array<String>) {
+        borg.trikeshed.forge.shell.main()
+    }
 }
