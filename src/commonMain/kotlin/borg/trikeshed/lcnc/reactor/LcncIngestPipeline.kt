@@ -456,8 +456,7 @@ class LcncIngestPipeline(
         var id = 0
 
         val tagRegex = Regex(
-            "<(h[1-6]|p|li|pre|code)\\b[^>]*>(.*?)</\\1>",
-            setOf(RegexOption.DOT_MATCHES_ALL, RegexOption.IGNORE_CASE),
+            "(?si)<(h[1-6]|p|li|pre|code)\\b[^>]*>(.*?)</\\1>",
         )
         for (m in tagRegex.findAll(text)) {
             val tag = m.groupValues[1].lowercase()
