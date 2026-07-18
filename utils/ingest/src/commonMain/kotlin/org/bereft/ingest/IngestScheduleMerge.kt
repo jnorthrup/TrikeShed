@@ -25,8 +25,8 @@ object IngestScheduleMerge {
         sources: Series<String>,
         projections: Set<IngestProjection>,
         capacity: Int = Channel.BUFFERED,
-    ): Channel<IngestResult> {
-        val merged = Channel<IngestResult>(capacity)
+    ): Channel<IngestEnvelope> {
+        val merged = Channel<IngestEnvelope>(capacity)
         // PRELOAD: iterate the String Series via index, not (0 until n).map.
         val n = sources.size
         val jobs = ArrayList<Job>(n)
