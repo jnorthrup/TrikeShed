@@ -360,22 +360,35 @@ tasks.register<JavaExec>("runForgeJvm") {
     classpath(tasks.named("jvmJar"), configurations.getByName("jvmRuntimeClasspath"))
 }
 
-// Forge pages — publish the root KMPP WASM_JS_BROWSER target into docs/ for GitHub Pages
+// Forge pages — publish web assets to docs/ for GitHub Pages.
+// After running this, regenerate the seed-baked index.html via:
+//   ./gradlew jsNodeProductionRun --no-daemon --console=plain 2>&1 \\
+//     | awk '/^<!doctype html>/,/^<\\/html>/' > docs/index.html
+// (kept as a shell step because re-invoking jsNodeProductionRun inside the same
+// Gradle build deadlocks task graph ordering).
 tasks.register<Sync>("generateForgePages") {
     group = "documentation"
-    description = "Publishes the WASM_JS_BROWSER target into docs/ with .nojekyll."
+    description = "Publishes web assets (wasm, icons, manifest, sw.js) to docs/. Index.html regenerated separately via jsNodeProductionRun."
     dependsOn("wasmJsBrowserProductionWebpack")
 
-    from(project.layout.buildDirectory.dir("kotlin-webpack/wasmJs/productionExecutable"))
-    from(project.layout.projectDirectory.dir("src/commonMain/resources/web"))
+    from(project.layout.buildDirectory.dir("kotlin-webpack/wasmJs/productionExecutable")) {
+        exclude("index.html")
+    }
+    from(project.layout.projectDirectory.dir("src/commonMain/resources/web")) {
+        exclude("index.html")
+    }
     into(project.layout.projectDirectory.dir("docs"))
+
+    // Preserve the seed-baked index.html (regenerated via jsNodeProductionRun)
+    preserve {
+        include("index.html")
+    }
 
     doLast {
         val noJekyll = project.layout.projectDirectory.file("docs/.nojekyll").asFile
-        if (!noJekyll.exists()) {
-            noJekyll.writeText("\n")
-        }
-        println("Published WASM_JS_BROWSER target to ${project.layout.projectDirectory.dir("docs").asFile.absolutePath}")
+        if (!noJekyll.exists()) noJekyll.writeText("\n")
+        println("Published web assets to docs/. Regenerate index.html with:")
+        println("  ./gradlew jsNodeProductionRun --no-daemon --console=plain 2>&1 | awk '/^<!doctype html>/,/^<\\/html>/' > docs/index.html")
     }
 }
 
