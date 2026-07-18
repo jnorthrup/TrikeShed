@@ -9,28 +9,27 @@ import borg.trikeshed.manimwm.WindowEvent
  */
 interface ManimWmSpi {
     /**
-     * Initializes and shows a native platform window.
+     * Initializes a render/composit surface.
      */
-    fun createWindow(title: String, width: Int, height: Int)
+    fun initSurface(width: Int, height: Int)
 
     /**
-     * Closes and cleans up native resources associated with the window.
+     * Closes and cleans up native resources associated with the render surface.
      */
-    fun destroyWindow()
+    fun destroySurface()
 
     /**
-     * Updates the text displayed in the title bar of the window.
+     * Resizes the render surface.
      */
-    fun setWindowTitle(title: String)
+    fun resizeSurface(width: Int, height: Int)
 
     /**
-     * Toggles platform-specific window decorations (title bar, borders, etc).
+     * Requests a new frame to be drawn to the render surface.
      */
-    fun setWindowDecorations(decorated: Boolean)
+    fun requestFrame()
 
     /**
-     * Polls native window events (like resize, close requests, mouse movements)
-     * and forwards them to the reactive Causality primitive layer.
+     * Pushes a causality event to the reactive causality primitive layer.
      */
-    fun pollEvents(onEvent: (WindowEvent) -> Unit)
+    fun pushEvent(event: WindowEvent)
 }
