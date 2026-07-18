@@ -1,10 +1,17 @@
 package borg.trikeshed.forge
 
+import borg.trikeshed.blackboard.BlackboardSurface
+import borg.trikeshed.blackboard.BlackboardSurfaceRow
+import borg.trikeshed.blackboard.LcncEntitySurface
 import borg.trikeshed.forge.blackboard.ForgeBlackboardView
 import borg.trikeshed.forge.gallery.ForgeGalleryCatalog
 import borg.trikeshed.forge.gallery.ForgeGalleryRenderer
 import borg.trikeshed.graph.CausalGraphNodeDTO
+import borg.trikeshed.graph.CausalGraphNodeIndex
+import borg.trikeshed.kanban.ForgeBoardPersistence
 import borg.trikeshed.kanban.ForgeKanbanIngest
+import borg.trikeshed.lcnc.isam.LcncBlock
+import borg.trikeshed.parse.confix.confixDoc
 import borg.trikeshed.parse.json.JsonSupport
 import borg.trikeshed.userspace.reactor.KanbanFSM
 import kotlinx.serialization.Serializable
@@ -85,6 +92,8 @@ data class ForgeAppState(
     val causalNodes: List<CausalGraphNodeDTO> = emptyList(),
     val lcncEntities: List<LcncEntityDTO> = emptyList(),
     val blackboardId: String = "",
+    /** Canonical blackboard cursor rows; legacy DTO fields remain compatible views. */
+    val surfaceRows: List<BlackboardSurfaceRow> = emptyList(),
     val cascadeGrid: List<CascadeRollupRow> = emptyList(),
 )
 
@@ -209,7 +218,7 @@ private fun seedChecklist(cardId: String, title: String): List<ForgeAppChecklist
 private fun defaultForgeAppState(): ForgeAppState {
     val userId = "jim"
     val reduction = try {
-        ForgeKanbanIngest.load(userId)
+        ForgeKanbanIngest.reduce(ForgeBoardPersistence.load(userId).getOrThrow())
     } catch (e: Throwable) {
         // Browser or first-run fallback — build a minimal seed entirely in
         // memory without touching disk (Files.write would call require('fs')
@@ -221,6 +230,27 @@ private fun defaultForgeAppState(): ForgeAppState {
         }
     }
     val board = reduction.board
+    val persistedDoc = confixDoc(ForgeBoardPersistence.encode(reduction.source))
+    val causalIndex = CausalGraphNodeIndex().also { index ->
+        reduction.causalNodes.forEach(index::addOrGet)
+    }
+    val surface = BlackboardSurface.project(
+        blackboardId = board.id.value,
+        index = causalIndex,
+        document = persistedDoc,
+        entities = reduction.correlations.map { correlation ->
+            val card = board.cards.first { it.id.value == correlation.taskId }
+            LcncEntitySurface(
+                entityId = "task:${correlation.taskId}",
+                lcncKind = "work-package",
+                lane = card.columnId.value,
+                facet = if (correlation.ready) "ready" else "dependency-gated",
+                causalKey = correlation.causalKey,
+                title = card.title,
+                description = card.description,
+            )
+        },
+    )
     val columns = board.columns.sortedBy { it.order }.map {
         ForgeAppColumn(id = it.id.value, name = it.name, order = it.order)
     }
@@ -275,11 +305,25 @@ private fun defaultForgeAppState(): ForgeAppState {
                 causalClock = it.causalClock,
             )
         },
+        // Legacy DTO view retained unchanged for existing seed consumers.
         lcncEntities = reduction.correlations.map { correlation ->
             val card = board.cards.first { it.id.value == correlation.taskId }
+            val block: LcncBlock = LcncBlock(
+                id = "task:${correlation.taskId}",
+                type = "work-package",
+                parentId = correlation.causalKey?.let { key -> "causal:$key" },
+                children = null,
+                content = mapOf(
+                    "lane" to card.columnId.value,
+                    "facet" to if (correlation.ready) "ready" else "dependency-gated",
+                    "causalKey" to correlation.causalKey,
+                    "title" to card.title,
+                    "description" to card.description,
+                ),
+            )
             LcncEntityDTO(
-                entityId = "task:${correlation.taskId}",
-                lcncKind = "work-package",
+                entityId = block.id,
+                lcncKind = block.type,
                 lane = card.columnId.value,
                 facet = if (correlation.ready) "ready" else "dependency-gated",
                 causalKey = correlation.causalKey,
@@ -288,6 +332,7 @@ private fun defaultForgeAppState(): ForgeAppState {
             )
         },
         blackboardId = board.id.value,
+        surfaceRows = surface.rows,
         cascadeGrid = cascadeGrid,
     )
 }
@@ -356,6 +401,17 @@ private fun ForgeAppState.toJsonValue(): Map<String, Any?> = linkedMapOf(
         )
     },
     "blackboardId" to blackboardId,
+    "surfaceRows" to surfaceRows.map {
+        linkedMapOf(
+            "cardId" to it.cardId,
+            "lane" to it.lane,
+            "phase" to it.phase,
+            "facet" to it.facet,
+            "provenance" to it.provenance,
+            "causalKey" to it.causalKey,
+            "lcncKind" to it.lcncKind,
+        )
+    },
     "cascadeGrid" to cascadeGrid.map {
         linkedMapOf(
             "viewName" to it.viewName,

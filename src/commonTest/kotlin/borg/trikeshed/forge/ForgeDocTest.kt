@@ -119,6 +119,16 @@ class ForgeDocTest {
         assertTrue(html.contains("\"byOrganization\""))
     }
 
+    @Test fun forgePersistenceScriptUsesSeededBlackboardCameraForTiltAndMomentum() {
+        val script = forgePersistenceScript()
+
+        assertTrue(script.contains("seed.blackboard && seed.blackboard.camera"), "browser camera must hydrate from the blackboard seed")
+        assertTrue(script.contains("Math.cos(camera.tilt)"), "spatial projection must apply camera tilt")
+        assertTrue(script.contains("requestAnimationFrame(tickCamera)"), "camera momentum must advance per animation frame")
+        assertTrue(script.contains("camera.vx *= friction"), "pan momentum must decay")
+        assertTrue(script.contains("camera.vz *= friction"), "zoom momentum must decay")
+    }
+
     @Test fun forgeDocumentProjectsToKanbanBoard() {
         var doc = ForgeDoc.empty("Sprint Board")
         doc = ForgeDoc.appendBlock(doc, doc.rootPageId, ForgeBlockKind.HEADING_2, "Auth Story",

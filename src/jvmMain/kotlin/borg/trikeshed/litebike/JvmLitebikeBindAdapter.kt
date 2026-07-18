@@ -3,12 +3,7 @@
 package borg.trikeshed.litebike
 
 import borg.trikeshed.litebike.taxonomy.Protocol
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.asCoroutineDispatcher
-import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withContext
 import java.net.InetSocketAddress
 import java.net.StandardSocketOptions
 import java.nio.ByteBuffer
@@ -16,7 +11,6 @@ import java.nio.channels.AsynchronousChannelGroup
 import java.nio.channels.AsynchronousServerSocketChannel
 import java.nio.channels.AsynchronousSocketChannel
 import java.nio.channels.CompletionHandler
-import java.nio.charset.StandardCharsets
 import java.util.concurrent.Executors
 
 /**
@@ -42,7 +36,14 @@ import java.util.concurrent.Executors
  *
  * The adapter is deliberately thin: bytes → CCEK accept. The HTTP
  * parsing, the JSON inspection, the wire-protocol fanout — all of it
- * lives in protocol-typed workers registered on the listener.
+ * lives in protocol-typed workers registered on the listener. The daemon
+ * starts [LitebikeListenerElement.fanoutChannels]; this adapter must not
+ * start a competing consumer set.
+ *
+ * R05 — accepted channels are registered into the [ConnectionRegistry]
+ * passed via [bindAndServe]. The bind adapter stamps the resulting
+ * sequence id onto the registry so the HTTP worker can write the
+ * response back to the originating socket.
  */
 object JvmLitebikeBindAdapter {
 
@@ -50,11 +51,19 @@ object JvmLitebikeBindAdapter {
      * Bind + accept-loop on [port] and pipe every accepted byte stream
      * into [element]'s fanout. The bind + accept loop suspends the
      * current coroutine; cancel to stop.
+     *
+     * @param connections JVM-side connection registry; every accepted
+     * channel is registered and stamped with its sequence id before
+     * bytes are offered to [element]. Pass the same instance the HTTP
+     * worker reads from so response writes hit the originating socket.
+     * The default is suitable only for callers that do not need to share
+     * the registry with a separate response worker.
      */
     suspend fun bindAndServe(
         element: LitebikeListenerElement,
         port: Int,
         host: String = "0.0.0.0",
+        connections: ConnectionRegistry = ConnectionRegistry(),
     ) {
         // JVM NIO executor — one thread per CPU, daemon.
         val group: AsynchronousChannelGroup =
@@ -72,15 +81,14 @@ object JvmLitebikeBindAdapter {
         // each accepted connection is its own AsynchronousSocketChannel
         // and each accepted runOnDispatch puts bytes on the listener.
         // No Htx/HTTP framework, no reactor-without-bind.
-        coroutineScope {
-            // Single-element-listener loops — one per protocol slot —
-            // ensure incoming bytes are routed by protocol.
-            element.fanoutChannels { _, _ -> true }
-
-            acceptLoop(server, element)
-        }
+        // The daemon owns the protocol-slot consumers. This adapter only
+        // owns the bind and accepted-channel read loop; starting a second
+        // fanout here would race the daemon's consumers and consume messages
+        // before the HTTP worker can dispatch them through NUID.
+        acceptLoop(server, element, connections)
 
         // Best-effort cleanup if scope exits unexpectedly.
+        runCatching { connections.closeAll() }
         runCatching { server.close() }
         runCatching { group.shutdown() }
     }
@@ -88,14 +96,20 @@ object JvmLitebikeBindAdapter {
     private suspend fun acceptLoop(
         server: AsynchronousServerSocketChannel,
         element: LitebikeListenerElement,
+        connections: ConnectionRegistry,
     ) = kotlinx.coroutines.suspendCancellableCoroutine<Unit> { cont ->
         val handler = object : CompletionHandler<AsynchronousSocketChannel, Any?> {
             override fun completed(ch: AsynchronousSocketChannel, attached: Any?) {
                 // Continue accepting the next connection immediately.
                 server.accept(null, this)
+                // R05 — register the channel up front. The drain loop
+                // attaches the sequence id once the listener assigns
+                // one, so the HTTP worker can route responses back
+                // through the originating socket.
+                val connId = connections.register(ch)
                 // Read all bytes from the channel asynchronously, then
                 // forward to the listener with the detected protocol.
-                drainOne(ch, element)
+                drainOne(ch, element, connections, connId)
             }
 
             override fun failed(t: Throwable, attached: Any?) {
@@ -111,6 +125,8 @@ object JvmLitebikeBindAdapter {
     private fun drainOne(
         ch: AsynchronousSocketChannel,
         element: LitebikeListenerElement,
+        connections: ConnectionRegistry,
+        connId: Long,
     ) {
         val buf = ByteBuffer.allocate(8 * 1024)
         ch.read(
@@ -118,7 +134,8 @@ object JvmLitebikeBindAdapter {
             object : CompletionHandler<Int, Any?> {
                 override fun completed(read: Int, attached: Any?) {
                     if (read <= 0) {
-                        runCatching { ch.close() }
+                        // Peer closed — drop the registry entry.
+                        connections.unregister(connId)
                         return
                     }
                     val bytes = ByteArray(read).also { buf.flip(); buf.get(it) }
@@ -126,15 +143,21 @@ object JvmLitebikeBindAdapter {
                     val proto: Protocol = ProtocolDetector.detect(head, bytes.size)
                     // runBlocking is OK from a JDK CompletionHandler because
                     // those callbacks are pure Java threads, not coroutines.
-                    val ok = runBlocking { element.accept(proto, bytes) }
-                    if (!ok) runCatching { ch.close() }
+                    //
+                    // R05 — capture the sequence id the listener stamps on
+                    // this message and attach it to the connection so the
+                    // HTTP worker can look up the originating socket.
+                    val seqId = runBlocking { element.nextSequenceIdForEmit() }
+                    connections.attachSequence(connId, seqId)
+                    val ok = runBlocking { element.acceptWithSequence(proto, bytes, seqId) }
+                    if (!ok) connections.unregister(connId)
                     // Continue draining while data remains.
                     buf.clear()
                     ch.read(buf, null, this)
                 }
 
                 override fun failed(t: Throwable, attached: Any?) {
-                    runCatching { ch.close() }
+                    connections.unregister(connId)
                 }
             }
         )
@@ -142,6 +165,9 @@ object JvmLitebikeBindAdapter {
 }
 
 /** Companion helper for users who want a fire-and-forget lifecycle. */
-suspend fun LitebikeListenerElement.serveOnPort(port: Int) {
-    JvmLitebikeBindAdapter.bindAndServe(this, port = port)
+suspend fun LitebikeListenerElement.serveOnPort(
+    port: Int,
+    connections: ConnectionRegistry = ConnectionRegistry(),
+) {
+    JvmLitebikeBindAdapter.bindAndServe(this, port = port, connections = connections)
 }

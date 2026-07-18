@@ -13,7 +13,11 @@ fun forgePersistenceScript(): String = """
   const SVG_NS = 'http://www.w3.org/2000/svg';
   const seed = JSON.parse(document.getElementById('forge-seed').textContent);
   let state = loadState();
+  let camera = normalizeCamera(state.spatial.camera);
   let dragCamera = null;
+  let cameraAnimationFrame = null;
+  let cameraFrameTimestamp = 0;
+  let cameraSavePending = false;
   let persistenceDbPromise = null;
   let persistenceWritePromise = Promise.resolve();
   let persistenceRotationSnapshot = null;
@@ -30,7 +34,7 @@ fun forgePersistenceScript(): String = """
   const zoomSlider = document.getElementById('zoom-slider');
   const zoomLabel = document.getElementById('zoom-label');
 
-  zoomSlider.value = String(state.spatial.zoom || 0.82);
+  zoomSlider.value = String(camera.zoom);
 
   document.getElementById('add-item-top').addEventListener('click', () => {
     addItem();
@@ -39,6 +43,8 @@ fun forgePersistenceScript(): String = """
   document.getElementById('reset-workspace').addEventListener('click', async () => {
     await clearPersistedWorkspace();
     state = normalizeState(structuredClone(seed));
+    camera = normalizeCamera(state.spatial.camera);
+    stopCameraAnimation();
     ensureSelection();
     recordReactor('CacheStored', 'workspace reset', 'pwa');
     saveState();
@@ -46,20 +52,24 @@ fun forgePersistenceScript(): String = """
   });
   document.getElementById('focus-board').addEventListener('click', () => {
     state.spatial.focusMode = 'board';
-    state.spatial.zoom = 0.82;
+    camera.zoom = clamp(0.82, camera.minZoom, camera.maxZoom);
+    clearCameraMomentum();
     centerBoard();
     saveState();
     renderSpatial();
   });
   document.getElementById('focus-selected').addEventListener('click', () => {
     state.spatial.focusMode = 'selected';
-    state.spatial.zoom = Math.max(state.spatial.zoom || 0.82, 1.9);
+    camera.zoom = clamp(Math.max(camera.zoom, 1.9), camera.minZoom, camera.maxZoom);
+    clearCameraMomentum();
     focusSelected();
     saveState();
     renderSpatial();
   });
   zoomSlider.addEventListener('input', (event) => {
-    state.spatial.zoom = clamp(Number(event.target.value) || 0.82, 0.55, 2.8);
+    camera.zoom = clamp(Number(event.target.value) || 0.82, camera.minZoom, camera.maxZoom);
+    camera.vz = 0;
+    syncSpatialFromCamera();
     state.spatial.focusMode = 'manual';
     renderSpatial();
   });
@@ -144,15 +154,54 @@ fun forgePersistenceScript(): String = """
     next.reactorLog = normalizeReactorLog(raw && raw.reactorLog);
     next.cache = normalizeCacheState(raw && raw.cache);
     next.spatial = Object.assign({}, base.spatial, raw && raw.spatial ? raw.spatial : {});
-    next.spatial.zoom = clamp(Number(next.spatial.zoom) || base.spatial.zoom, 0.55, 2.8);
+    next.spatial.zoom = clamp(Number(next.spatial.zoom) || Number(base.spatial.zoom) || 0.82, 0.45, 3.2);
     next.spatial.offsetX = Number(next.spatial.offsetX) || 0;
     next.spatial.offsetY = Number(next.spatial.offsetY) || 0;
     next.spatial.focusMode = typeof next.spatial.focusMode === 'string' ? next.spatial.focusMode : 'board';
+    const rawCamera = raw && raw.spatial && raw.spatial.camera ? raw.spatial.camera : null;
+    const sourceSpatial = raw && raw.spatial ? raw.spatial : null;
+    const legacyCamera = rawCamera ? null : sourceSpatial;
+    next.spatial.camera = normalizeCamera(rawCamera, legacyCamera);
+    next.spatial.zoom = next.spatial.camera.zoom;
+    next.spatial.offsetX = next.spatial.camera.x;
+    next.spatial.offsetY = next.spatial.camera.y;
     next.causalNodes = Array.isArray(raw && raw.causalNodes) && raw.causalNodes.length ? raw.causalNodes : base.causalNodes;
     next.lcncEntities = Array.isArray(raw && raw.lcncEntities) && raw.lcncEntities.length ? raw.lcncEntities : base.lcncEntities;
     next.cascadeGrid = Array.isArray(raw && raw.cascadeGrid) && raw.cascadeGrid.length ? raw.cascadeGrid : base.cascadeGrid;
     ensureSelection(next);
     return next;
+  }
+
+  function normalizeCamera(raw, legacySpatial) {
+    const seeded = seed.blackboard && seed.blackboard.camera ? seed.blackboard.camera : {};
+    const legacy = legacySpatial || {};
+    const source = Object.assign({}, seeded, raw || {});
+    const hasLegacyX = legacy.offsetX !== undefined && legacy.offsetX !== null && Number.isFinite(Number(legacy.offsetX));
+    const hasLegacyY = legacy.offsetY !== undefined && legacy.offsetY !== null && Number.isFinite(Number(legacy.offsetY));
+    const hasLegacyZoom = legacy.zoom !== undefined && legacy.zoom !== null && Number.isFinite(Number(legacy.zoom));
+    const hasRawX = raw && Number.isFinite(Number(raw.x));
+    const hasRawY = raw && Number.isFinite(Number(raw.y));
+    const hasRawZoom = raw && Number.isFinite(Number(raw.zoom));
+    const minZoom = Number(source.minZoom) || 0.45;
+    const maxZoom = Number(source.maxZoom) || 3.2;
+    return {
+      x: hasRawX ? Number(raw.x) : (hasLegacyX ? Number(legacy.offsetX) : (Number(source.x) || 0)),
+      y: hasRawY ? Number(raw.y) : (hasLegacyY ? Number(legacy.offsetY) : (Number(source.y) || 0)),
+      zoom: clamp(hasRawZoom ? Number(raw.zoom) : (hasLegacyZoom ? Number(legacy.zoom) : (Number(source.zoom) || 1)), minZoom, maxZoom),
+      tilt: Number(source.tilt) || 0,
+      vx: Number(source.vx) || 0,
+      vy: Number(source.vy) || 0,
+      vz: Number(source.vz) || 0,
+      minZoom,
+      maxZoom,
+    };
+  }
+
+  function syncSpatialFromCamera() {
+    state.spatial.camera = { ...camera };
+    state.spatial.zoom = camera.zoom;
+    state.spatial.offsetX = camera.x;
+    state.spatial.offsetY = camera.y;
   }
 
   function normalizeCacheState(raw) {
@@ -208,6 +257,7 @@ fun forgePersistenceScript(): String = """
     const persisted = await loadPersistedSnapshot();
     if (persisted) {
       state = normalizeState(persisted.snapshot);
+      camera = normalizeCamera(state.spatial.camera);
       state.cache.hydrationSource = persisted.source;
       state.cache.hydrationTimestampMs = Date.now();
       state.cache.status = 'hydrated';
@@ -218,6 +268,7 @@ fun forgePersistenceScript(): String = """
       }
     } else {
       state = normalizeState(state);
+      camera = normalizeCamera(state.spatial.camera);
       state.cache.hydrationSource = 'localStorage';
       state.cache.hydrationTimestampMs = Date.now();
       state.cache.status = 'local-only';
@@ -247,6 +298,7 @@ fun forgePersistenceScript(): String = """
   }
 
   function saveState(mutation) {
+    syncSpatialFromCamera();
     recordMutation(state, mutation || { kind: 'state-change', label: 'saveState', source: 'forge' });
   }
 
@@ -932,7 +984,8 @@ fun forgePersistenceScript(): String = """
     focusSelectedBtn.textContent = 'Zoom to detail';
     focusSelectedBtn.addEventListener('click', () => {
       state.spatial.focusMode = 'selected';
-      state.spatial.zoom = Math.max(state.spatial.zoom || 0.82, 1.9);
+      camera.zoom = clamp(Math.max(camera.zoom, 1.9), camera.minZoom, camera.maxZoom);
+      clearCameraMomentum();
       focusSelected();
       saveState();
       renderSpatial();
@@ -1375,18 +1428,18 @@ fun forgePersistenceScript(): String = """
 
   function renderSpatial() {
     const layout = layoutBoard();
-    if (state.spatial.focusMode === 'board' && (!state.spatial.offsetX && !state.spatial.offsetY)) {
+    if (state.spatial.focusMode === 'board' && (!camera.x && !camera.y)) {
       centerBoard();
     }
     clampCamera(layout);
-    const zoom = state.spatial.zoom || 0.82;
-    const viewWidth = layout.width / zoom;
-    const viewHeight = layout.height / zoom;
+    syncSpatialFromCamera();
+    const zoom = camera.zoom;
     const far = zoom < 0.9;
     const mid = zoom >= 0.9 && zoom < 1.45;
     const near = zoom >= 1.45 && zoom < 1.95;
     const intimate = zoom >= 1.95;
-    spatialRoot.setAttribute('viewBox', state.spatial.offsetX + ' ' + state.spatial.offsetY + ' ' + viewWidth + ' ' + viewHeight);
+    spatialRoot.setAttribute('viewBox', '0 0 ' + layout.width + ' ' + layout.height);
+    spatialRoot.setAttribute('preserveAspectRatio', 'xMidYMid meet');
     spatialRoot.innerHTML = '';
     zoomSlider.value = String(zoom);
     zoomLabel.textContent = spatialDepthLabel(zoom) + ' · farther zoom hides fine detail · closer zoom reveals notes + checklist orbit';
@@ -1512,32 +1565,59 @@ fun forgePersistenceScript(): String = """
   }
 
   function bindSpatialGestures() {
-
     spatialShell.addEventListener('wheel', (event) => {
       event.preventDefault();
-      const next = clamp((state.spatial.zoom || 0.82) * (event.deltaY < 0 ? 1.08 : 0.92), 0.55, 2.8);
-      state.spatial.zoom = next;
+      const layout = layoutBoard();
+      const rect = spatialShell.getBoundingClientRect();
+      const viewX = (event.clientX - rect.left) * layout.width / Math.max(1, rect.width);
+      const viewY = (event.clientY - rect.top) * layout.height / Math.max(1, rect.height);
+      const cosTilt = Math.max(0.01, Math.cos(camera.tilt));
+      const focusWorldX = camera.x + viewX / camera.zoom;
+      const focusWorldY = camera.y + viewY / (camera.zoom * cosTilt);
+      const targetZoom = clamp(camera.zoom * (event.deltaY < 0 ? 1.08 : 0.92), camera.minZoom, camera.maxZoom);
+      const ratio = camera.zoom / targetZoom;
+      camera.x = focusWorldX - (focusWorldX - camera.x) * ratio;
+      camera.y = focusWorldY - (focusWorldY - camera.y) * ratio;
+      camera.vz += (targetZoom / camera.zoom - 1) * 12;
+      camera.zoom = targetZoom;
       state.spatial.focusMode = 'manual';
       renderSpatial();
-      saveState();
+      cameraSavePending = true;
+      startCameraAnimation();
     }, { passive: false });
 
     spatialShell.addEventListener('pointerdown', (event) => {
+      stopCameraAnimation();
+      clearCameraMomentum();
       spatialShell.classList.add('dragging');
       dragCamera = {
         x: event.clientX,
         y: event.clientY,
-        offsetX: state.spatial.offsetX,
-        offsetY: state.spatial.offsetY,
+        cameraX: camera.x,
+        cameraY: camera.y,
+        lastCameraX: camera.x,
+        lastCameraY: camera.y,
+        lastTimestamp: event.timeStamp,
       };
       spatialShell.setPointerCapture(event.pointerId);
     });
 
     spatialShell.addEventListener('pointermove', (event) => {
       if (!dragCamera) return;
-      const zoom = state.spatial.zoom || 0.82;
-      state.spatial.offsetX = dragCamera.offsetX - (event.clientX - dragCamera.x) / zoom;
-      state.spatial.offsetY = dragCamera.offsetY - (event.clientY - dragCamera.y) / zoom;
+      const layout = layoutBoard();
+      const rect = spatialShell.getBoundingClientRect();
+      const screenToViewX = layout.width / Math.max(1, rect.width);
+      const screenToViewY = layout.height / Math.max(1, rect.height);
+      const cosTilt = Math.max(0.01, Math.cos(camera.tilt));
+      camera.x = dragCamera.cameraX - (event.clientX - dragCamera.x) * screenToViewX / camera.zoom;
+      camera.y = dragCamera.cameraY - (event.clientY - dragCamera.y) * screenToViewY / (camera.zoom * cosTilt);
+      const dtSeconds = Math.max(1 / 240, (event.timeStamp - dragCamera.lastTimestamp) / 1000);
+      camera.vx = (camera.x - dragCamera.lastCameraX) / dtSeconds;
+      camera.vy = (camera.y - dragCamera.lastCameraY) / dtSeconds;
+      dragCamera.lastCameraX = camera.x;
+      dragCamera.lastCameraY = camera.y;
+      dragCamera.lastTimestamp = event.timeStamp;
+      syncSpatialFromCamera();
       state.spatial.focusMode = 'manual';
       renderSpatial();
     });
@@ -1549,7 +1629,8 @@ fun forgePersistenceScript(): String = """
       if (event && spatialShell.hasPointerCapture(event.pointerId)) {
         spatialShell.releasePointerCapture(event.pointerId);
       }
-      saveState();
+      cameraSavePending = true;
+      startCameraAnimation();
     };
 
     spatialShell.addEventListener('pointerup', release);
@@ -1559,50 +1640,159 @@ fun forgePersistenceScript(): String = """
     });
   }
 
+  function startCameraAnimation() {
+    if (cameraAnimationFrame !== null) return;
+    if (!cameraIsMoving()) {
+      if (cameraSavePending) {
+        cameraSavePending = false;
+        saveState({ kind: 'camera-settled', label: 'camera settled', source: 'blackboard' });
+      }
+      return;
+    }
+    cameraFrameTimestamp = 0;
+    cameraAnimationFrame = requestAnimationFrame(tickCamera);
+  }
+
+  function stopCameraAnimation() {
+    if (cameraAnimationFrame !== null) cancelAnimationFrame(cameraAnimationFrame);
+    cameraAnimationFrame = null;
+    cameraFrameTimestamp = 0;
+    cameraSavePending = false;
+  }
+
+  function clearCameraMomentum() {
+    camera.vx = 0;
+    camera.vy = 0;
+    camera.vz = 0;
+  }
+
+  function cameraSpeed() {
+    return Math.sqrt(camera.vx * camera.vx + camera.vy * camera.vy);
+  }
+
+  function cameraIsMoving() {
+    return cameraSpeed() >= 0.5 || Math.abs(camera.vz) >= 0.001;
+  }
+
+  function tickCamera(timestamp) {
+    const dtSeconds = cameraFrameTimestamp
+      ? clamp((timestamp - cameraFrameTimestamp) / 1000, 1 / 240, 1 / 20)
+      : 1 / 60;
+    cameraFrameTimestamp = timestamp;
+    const friction = Math.pow(0.86, dtSeconds * 60);
+    camera.vx *= friction;
+    camera.vy *= friction;
+    camera.vz *= friction;
+    camera.x += camera.vx * dtSeconds;
+    camera.y += camera.vy * dtSeconds;
+    const unclampedZoom = camera.zoom * (1 + camera.vz * dtSeconds);
+    camera.zoom = clamp(unclampedZoom, camera.minZoom, camera.maxZoom);
+    if (camera.zoom !== unclampedZoom) camera.vz = 0;
+    clampCamera(layoutBoard());
+    syncSpatialFromCamera();
+    renderSpatial();
+    if (cameraIsMoving()) {
+      cameraAnimationFrame = requestAnimationFrame(tickCamera);
+    } else {
+      clearCameraMomentum();
+      cameraAnimationFrame = null;
+      cameraFrameTimestamp = 0;
+      if (cameraSavePending) {
+        cameraSavePending = false;
+        saveState({ kind: 'camera-settled', label: 'momentum settled', source: 'blackboard' });
+      }
+    }
+  }
+
   function focusSelected() {
     const selected = itemById(state.selectedItemId);
     if (!selected) return;
     const layout = layoutBoard();
     const pos = layout.positions[selected.id];
     if (!pos) return;
-    const viewWidth = layout.width / state.spatial.zoom;
-    const viewHeight = layout.height / state.spatial.zoom;
-    state.spatial.offsetX = pos.x - viewWidth / 2;
-    state.spatial.offsetY = pos.y - viewHeight / 2;
+    const viewWidth = layout.width / camera.zoom;
+    const viewHeight = layout.height / camera.zoom;
+    camera.x = pos.x - viewWidth / 2;
+    camera.y = pos.y * Math.cos(camera.tilt) - viewHeight / 2;
     clampCamera(layout);
   }
 
   function centerBoard() {
     const layout = layoutBoard();
-    const viewWidth = layout.width / (state.spatial.zoom || 0.82);
-    const viewHeight = layout.height / (state.spatial.zoom || 0.82);
-    state.spatial.offsetX = (layout.width - viewWidth) / 2;
-    state.spatial.offsetY = (layout.height - viewHeight) / 2;
+    const viewWidth = layout.width / camera.zoom;
+    const viewHeight = layout.height / camera.zoom;
+    const projectedHeight = layout.height * Math.cos(camera.tilt);
+    camera.x = (layout.width - viewWidth) / 2;
+    camera.y = (projectedHeight - viewHeight) / 2;
     clampCamera(layout);
   }
 
   function clampCamera(layout) {
-    const viewWidth = layout.width / (state.spatial.zoom || 0.82);
-    const viewHeight = layout.height / (state.spatial.zoom || 0.82);
+    const beforeX = camera.x;
+    const beforeY = camera.y;
+    const viewWidth = layout.width / camera.zoom;
+    const viewHeight = layout.height / camera.zoom;
+    const projectedHeight = layout.height * Math.cos(camera.tilt);
     if (viewWidth >= layout.width) {
-      state.spatial.offsetX = (layout.width - viewWidth) / 2;
+      camera.x = (layout.width - viewWidth) / 2;
     } else {
       const maxX = layout.width - viewWidth;
-      state.spatial.offsetX = clamp(state.spatial.offsetX || 0, 0, maxX);
+      camera.x = clamp(camera.x || 0, 0, maxX);
     }
-    if (viewHeight >= layout.height) {
-      state.spatial.offsetY = (layout.height - viewHeight) / 2;
+    const clampedX = camera.x !== beforeX;
+    if (viewHeight >= projectedHeight) {
+      camera.y = (projectedHeight - viewHeight) / 2;
     } else {
-      const maxY = layout.height - viewHeight;
-      state.spatial.offsetY = clamp(state.spatial.offsetY || 0, 0, maxY);
+      const maxY = projectedHeight - viewHeight;
+      camera.y = clamp(camera.y || 0, 0, maxY);
     }
+    if (clampedX) camera.vx = 0;
+    if (camera.y !== beforeY) camera.vy = 0;
+    syncSpatialFromCamera();
   }
 
   function svgElement(tag, attrs, text) {
     const node = document.createElementNS(SVG_NS, tag);
-    Object.entries(attrs || {}).forEach(([key, value]) => node.setAttribute(key, String(value)));
+    const projected = projectSpatialAttributes(tag, attrs || {});
+    Object.entries(projected).forEach(([key, value]) => node.setAttribute(key, String(value)));
     if (text) node.textContent = text;
     return node;
+  }
+
+  function projectSpatialAttributes(tag, attrs) {
+    const next = { ...attrs };
+    const depth = Number(attrs['data-depth']) || 0;
+    const pointKeys = tag === 'line'
+      ? [['x1', 'y1'], ['x2', 'y2']]
+      : tag === 'circle'
+        ? [['cx', 'cy']]
+        : [['x', 'y']];
+    pointKeys.forEach(([xKey, yKey]) => {
+      if (!(xKey in attrs) || !(yKey in attrs)) return;
+      const point = projectCameraPoint(Number(attrs[xKey]), Number(attrs[yKey]), depth);
+      next[xKey] = point.x;
+      next[yKey] = point.y;
+    });
+    if (tag === 'rect') {
+      const heightScale = camera.zoom * Math.cos(camera.tilt);
+      next.width = Number(attrs.width) * camera.zoom;
+      next.height = Number(attrs.height) * heightScale;
+      if ('rx' in attrs) next.rx = Number(attrs.rx) * camera.zoom;
+    } else if (tag === 'circle' && 'r' in attrs) {
+      next.r = Number(attrs.r) * camera.zoom;
+    }
+    delete next['data-depth'];
+    return next;
+  }
+
+  function projectCameraPoint(worldX, worldY, depth) {
+    const lift = depth * (1 - Math.cos(camera.tilt));
+    const scaledY = (worldY - lift) * Math.cos(camera.tilt);
+    const parallaxY = depth * Math.sin(camera.tilt);
+    return {
+      x: (worldX - camera.x) * camera.zoom,
+      y: ((scaledY - camera.y) * camera.zoom) + parallaxY * camera.zoom,
+    };
   }
 
   function render() {
