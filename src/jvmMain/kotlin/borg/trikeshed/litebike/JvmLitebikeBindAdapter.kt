@@ -113,6 +113,24 @@ object JvmLitebikeBindAdapter {
         element: LitebikeListenerElement,
     ) {
         val buf = ByteBuffer.allocate(8 * 1024)
+        val respondCallback: suspend (ByteArray) -> Unit = { responseBytes ->
+            withContext(Dispatchers.IO) {
+                val writeBuf = ByteBuffer.wrap(responseBytes)
+                while (writeBuf.hasRemaining()) {
+                    val written = kotlin.coroutines.suspendCoroutine { cont ->
+                        ch.write(writeBuf, null, object : CompletionHandler<Int, Any?> {
+                            override fun completed(result: Int, attachment: Any?) {
+                                cont.resumeWith(Result.success(result))
+                            }
+                            override fun failed(exc: Throwable, attachment: Any?) {
+                                cont.resumeWith(Result.failure(exc))
+                            }
+                        })
+                    }
+                    if (written < 0) break
+                }
+            }
+        }
         ch.read(
             buf, null,
             object : CompletionHandler<Int, Any?> {
@@ -126,7 +144,7 @@ object JvmLitebikeBindAdapter {
                     val proto: Protocol = ProtocolDetector.detect(head, bytes.size)
                     // runBlocking is OK from a JDK CompletionHandler because
                     // those callbacks are pure Java threads, not coroutines.
-                    val ok = runBlocking { element.accept(proto, bytes) }
+                    val ok = runBlocking { element.accept(proto, bytes, respondCallback) }
                     if (!ok) runCatching { ch.close() }
                     // Continue draining while data remains.
                     buf.clear()

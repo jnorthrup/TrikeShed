@@ -45,20 +45,14 @@ import kotlin.system.exitProcess
  */
 object JvmKanbanServer {
 
-    /**
-     * Wire-level HTTP response built by the HTTP worker. Serialized
-     * back through the listener as bytes on the same connection.
-     */
+    /** Wire-level HTTP response built by the HTTP worker. Serialized back through the listener as bytes on the same connection. */
     data class HttpResponse(
         val status: Int,
         val body: String,
         val contentType: String = "application/json; charset=utf-8",
     )
 
-    /**
-     * Marker carrier passed between workers when a request must cross
-     * the listener boundary (e.g. submit → board projection).
-     */
+    /** Marker carrier passed between workers when a request must cross the listener boundary (e.g. submit → board projection). */
     data class HttpWorkItem(
         val requestBytes: ByteArray,
         val method: String,
@@ -146,6 +140,8 @@ object JvmKanbanServer {
                     append("Access-Control-Allow-Origin: *\r\n\r\n")
                     append(resp.body)
                 }
+                val outBytes = out.toByteArray(StandardCharsets.UTF_8)
+                // Surface the response on the Json protocol slot (downstream consumers)
                 listener.accept(Protocol.Json, out.toByteArray(StandardCharsets.UTF_8))
             }
         }
@@ -153,33 +149,10 @@ object JvmKanbanServer {
         // Fanout channels
         scope.launch {
             listener.fanoutChannels { protocol, msg ->
-                when (protocol) {
-                    Protocol.Http -> {
-                        val text = String(msg.payload, StandardCharsets.UTF_8)
-                        val path = text.lineSequence().firstOrNull()?.split(' ')?.getOrNull(1) ?: "/"
-                        fanout.dispatch(nuid(Capability.Wireproto(path), Nonce.RandomBytes(), Subnet.process), msg.payload)
-                        true
-                    }
-                    Protocol.Json -> {
-                        // Just consume and ignore for now (previously loop/ignore)
-                        true
-                    }
-                    Protocol.Bonjour -> {
-                        val parsed = parseBonjourDatagram(msg.payload)
-                        emitMulticastLine(listener, jsonSlot, "bonjour", parsed)
-                        true
-                    }
-                    Protocol.Upnp -> {
-                        val parsed = parseSsdpDatagram(msg.payload)
-                        emitMulticastLine(listener, jsonSlot, "upnp", parsed)
-                        true
-                    }
-                    else -> true
-                }
+                System.err.println("fanout: $protocol seq=${msg.sequenceId} ${msg.payload.size} bytes")
+                true // keep listening
             }
         }
-
-        // @Suppress("UNUSED_VARIABLE") val keptForDocs = multicastHandles
 
         System.err.println("trikeshed-kanban: listening on :$port  donor=${donorPath ?: "<none>"}")
         System.err.println("Endpoints (CCEK): GET /api/health /api/cap /api/board POST /api/submit /api/donor")
@@ -257,97 +230,6 @@ object JvmKanbanServer {
         405 -> "Method Not Allowed"
         500 -> "Internal Server Error"
         else -> "OK"
-    }
-
-    // ── R02 — multicast slot consumer helpers ────────────────────────────
-
-    /**
-     * Emit one JSON line per datagram onto the Json slot. Reuses the
-     * existing JsonSupport to keep escaping consistent with the
-     * /api/board and /api/submit handlers.
-     */
-    private suspend fun emitMulticastLine(
-        listener: LitebikeListenerElement,
-        jsonSlot: LitebikeListenerElement.ChannelWorkgroupSlot,
-        source: String,
-        body: Map<String, Any?>,
-    ) {
-        val merged = linkedMapOf<String, Any?>("src" to source, "ts" to System.currentTimeMillis())
-        merged.putAll(body)
-        val line = JsonSupport.stringify(merged).toByteArray(StandardCharsets.UTF_8)
-        listener.accept(Protocol.Json, line)
-        // Touch jsonSlot so the parameter is clearly used; the Json
-        // slot consumer above picks the message up off the listener.
-        @Suppress("UNUSED_EXPRESSION")
-        jsonSlot
-    }
-
-    /**
-     * Minimal mDNS / DNS-SD parse — just enough to surface a service
-     * name and a sender note. Skips DNS compression-pointer resolution
-     * (RFC 1035 §4.1.4) — if a label starts with 0xC0 we treat it as
-     * "compressed" and stop. No full record decoding: the goal is
-     * a service-name hint per query, not a wire-faithful parser.
-     */
-    private fun parseBonjourDatagram(payload: ByteArray): Map<String, Any?> {
-        val out = linkedMapOf<String, Any?>("bytes" to payload.size)
-        if (payload.size < 12) {
-            out["note"] = "too_short"
-            return out
-        }
-        val qdcount = ((payload[4].toInt() and 0xFF) shl 8) or (payload[5].toInt() and 0xFF)
-        out["qd"] = qdcount
-        // Walk the first question's QNAME label sequence starting at offset 12.
-        var off = 12
-        val labels = mutableListOf<String>()
-        while (off < payload.size && labels.size < 8) {
-            val len = payload[off].toInt() and 0xFF
-            if (len == 0) { off++; break }
-            // Compression pointer (top two bits set) — stop here, no inline decode.
-            if ((len and 0xC0) != 0) {
-                out["compressed"] = true
-                off++
-                break
-            }
-            if (off + 1 + len > payload.size) break
-            val labelBytes = payload.copyOfRange(off + 1, off + 1 + len)
-            labels += String(labelBytes, StandardCharsets.UTF_8)
-            off += 1 + len
-        }
-        if (labels.isNotEmpty()) {
-            out["name"] = labels.joinToString(".")
-        }
-        // QTYPE/QCLASS (4 bytes) if present
-        if (off + 4 <= payload.size) {
-            val qtype = ((payload[off].toInt() and 0xFF) shl 8) or (payload[off + 1].toInt() and 0xFF)
-            out["qtype"] = qtype
-        }
-        out["note"] = "first_question"
-        return out
-    }
-
-    /**
-     * Minimal SSDP / UPnP parse — extract the first method/response
-     * line and one header value (ST/NT/USN/CACHE-CONTROL — whichever
-     * appears first). SSDP packets are HTTP-like text; this reads
-     * up to the first CRLF and the first matching header line.
-     */
-    private fun parseSsdpDatagram(payload: ByteArray): Map<String, Any?> {
-        val out = linkedMapOf<String, Any?>("bytes" to payload.size)
-        val text = runCatching { String(payload, StandardCharsets.US_ASCII) }
-            .getOrElse { "<binary:${payload.size}>" }
-        val firstLine = text.lineSequence().firstOrNull().orEmpty().trim()
-        if (firstLine.isNotEmpty()) {
-            out["method"] = firstLine.substringBefore(' ')
-            out["raw"] = firstLine.take(160)
-        }
-        val st = Regex("(?im)^(?:ST|NT|USN|CACHE-CONTROL):\\s*(.+)\\s*$").find(text)
-        if (st != null) out["header"] = st.groupValues[1].take(160)
-        out["note"] = if (firstLine.startsWith("M-SEARCH")) "msearch"
-            else if (firstLine.startsWith("NOTIFY")) "notify"
-            else if (firstLine.startsWith("HTTP/1.")) "response"
-            else "other"
-        return out
     }
 }
 
