@@ -183,7 +183,7 @@ Per-target mapping:
   - Targets: per-target source sets.
   - Evidence: each target can launch and render the HTML shell; at least one platform test per implementation.
 
-- [ ] **T19. Reposition `manimwm-tk` as a native render/composit layer**
+- [x] **T19. Reposition `manimwm-tk` as a native render/composit layer**
   - `manimwm` keeps its SPI (`ManimWmSpi`) but is no longer the window manager.
   - Native desktop: the HTML window manager requests frames/textures from `manimwm` and positions them in the DOM via a canvas or WebGL surface.
   - Browser: `manimwm` can render to a `<canvas>`/WebGL if ported, or the browser uses its own animation layer.
